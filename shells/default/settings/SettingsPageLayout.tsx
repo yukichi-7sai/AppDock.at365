@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { SettingsPageDefinition } from '../../../src/shared/settings-catalog';
+import type { SettingsPageAuxiliary } from '../../../src/shared/settings-page';
 
 const descriptions: Record<string, string> = {
   appearance: 'テーマと各領域のShellを選び、ワークスペースの見た目を整えます。',
@@ -29,6 +30,8 @@ export function SettingsPageLayout({
   error,
   onMode,
   onOpenFile,
+  storage,
+  onLocalSettings,
   onReload,
   children,
   announcement,
@@ -38,7 +41,9 @@ export function SettingsPageLayout({
   pending: boolean;
   error: string;
   onMode(mode: 'form' | 'json'): void;
-  onOpenFile(): void;
+  onOpenFile(scope?: 'shared' | 'device'): void;
+  storage?: SettingsPageAuxiliary['storage'];
+  onLocalSettings?(enabled: boolean): void;
   onReload(): void;
   children: ReactNode;
   announcement: ReactNode;
@@ -70,15 +75,63 @@ export function SettingsPageLayout({
             </button>
           ))}
         </div>
+        {storage && (storage.canSwitch || ['appearance', 'general'].includes(page.id)) ? (
+          <label className="settings-storage-toggle">
+            <input
+              type="checkbox"
+              checked={storage.local}
+              disabled={!storage.canSwitch || pending}
+              onChange={(event) => onLocalSettings?.(event.target.checked)}
+            />
+            このPCで設定を保持する
+          </label>
+        ) : null}
         <p className="settings-save-status" role="status">
+          {storage && page.json && (
+            <span className="settings-storage-status">
+              設定JSON:{' '}
+              {storage.files.length > 1 ? '共有＋このPC' : storage.local ? 'このPC専用' : '共有'}　
+            </span>
+          )}
           {pending ? '保存中…' : '変更は自動で保存されます。'}
         </p>
-        {page.json && (
-          <button type="button" className="settings-file-button" onClick={onOpenFile}>
-            ファイルを開く
-          </button>
+        {page.json && storage && storage.files.length > 1 ? (
+          <details className="settings-file-menu">
+            <summary>ファイルを開く</summary>
+            <div>
+              {storage.files.map((file) => (
+                <button
+                  type="button"
+                  key={file.scope}
+                  onClick={(event) => {
+                    event.currentTarget.closest('details')!.open = false;
+                    onOpenFile(file.scope);
+                  }}
+                >
+                  {file.scope === 'device' ? 'このPC' : '共有'}: {file.name}
+                </button>
+              ))}
+            </div>
+          </details>
+        ) : (
+          page.json && (
+            <button
+              type="button"
+              className="settings-file-button"
+              onClick={() => onOpenFile(storage?.files[0]?.scope)}
+            >
+              ファイルを開く
+            </button>
+          )
         )}
       </div>
+      {storage?.canSwitch && (
+        <p className="settings-storage-description">
+          {storage.local
+            ? 'このPC専用の設定を使います。OFFにすると共有設定へ戻り、このPCの設定は残します。'
+            : '共有設定を使います。初めてONにすると現在の設定をコピーし、保存済みの端末設定があれば再開します。'}
+        </p>
+      )}
       {error && (
         <div className="settings-page-error">
           <p className="error-text" role="alert">

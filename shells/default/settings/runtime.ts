@@ -59,6 +59,17 @@ export class SettingsViewClient {
   }
   act(operation: SettingsPageOperation): Promise<any> {
     if (
+      operation.kind === 'edit' &&
+      ['page-values', 'partial-text'].includes(operation.action.type)
+    )
+      operation = {
+        ...operation,
+        action: {
+          ...operation.action,
+          storageScope: this.model?.content.auxiliary.storage?.signature,
+        },
+      } as SettingsPageOperation;
+    if (
       operation.kind === 'select' ||
       operation.kind === 'move' ||
       (operation.kind === 'edit' && ['mode', 'reload'].includes(operation.action.type))
@@ -117,12 +128,20 @@ export class SettingsViewClient {
   }
   invoke = (name: string, args: unknown[] = []): Promise<any> => {
     const pageId = this.model?.content.page.id;
+    const storageSignature = this.model?.content.auxiliary.storage?.signature;
     // Long operations (palette, updates) must not hold the input queue or their cancel action.
     return this.chain.then(async () => {
       this.accept((await window.appdockPage.connect()).snapshot);
       const m = this.model!;
       const id = m.content.actions[name];
       if (!id || m.content.page.id !== pageId) throw Error('この設定では利用できない操作です。');
+      if (name === 'set-local-settings' || name === 'open-settings') {
+        if (m.content.auxiliary.storage?.signature !== storageSignature)
+          throw Error('設定の保存先が変わりました。再取得してください。');
+        if (name === 'set-local-settings' && this.input)
+          throw Error('入力のエラーを修正するか、設定を再読み込みしてから切り替えてください。');
+        args = [...args, m.content.auxiliary.storage?.revision];
+      }
       const response = (await window.appdockPage.act({
         id: m.id,
         type: 'settings',
@@ -132,6 +151,7 @@ export class SettingsViewClient {
         operation: { kind: 'invoke', actionId: id, args },
       })) as { model: SettingsPageModel; result: unknown };
       this.accept(response.model);
+      this.failed('');
       return response.result;
     });
   };

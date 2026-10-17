@@ -6,6 +6,8 @@ Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作API
 
 認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
+0.57.0以降、起動時の設定・settingsChanged・自己設定の読書きは、このPCで選択している共有／端末専用の同じ設定へ接続します。既存のNode/.NET APIの形式は維持します。保存モードの切り替えは本体のローカル設定UIだけで行い、Appletからの切り替えAPIは追加しません。
+
 ## リボンバッジ
 
 `minimumHostVersion: "0.51.0"`と`ribbon-badges` capabilityを宣言する。Nodeは`context.ribbon.setBadge(target, badge)`、RPCは`host.ribbon.setBadge`へ`{ target, badge }`、.NETは`context.Ribbon.SetBadgeAsync(RibbonBadgeTarget, RibbonBadge?, token)`を使う。

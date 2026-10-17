@@ -49,6 +49,8 @@ MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscri
 
 設定変更はcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
 
+0.57.0以降、読取りは共有とこのPCの設定の合成値、書込みは現在の保存先を使用します。本体のテーマ等とAppletの有効状態は常に端末別です。Appletの共有／端末専用はローカルUIで選択し、MCPへ保存先切り替えや他端末の設定を公開しません。公開項目・許可・dryRun・共通revisionの契約は維持します。
+
 | キー | 値 | 適用タイミング |
 | --- | --- | --- |
 | theme | dark/light/system | immediate |

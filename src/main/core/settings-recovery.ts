@@ -11,7 +11,7 @@ export interface SettingsRecoveryUi {
 /** The minimal recovery loop runs before Applets, Shells and settings-dependent services. */
 export async function recoverSettingsAtStartup(store: SettingsStore, ui: SettingsRecoveryUi) {
   let message =
-    'settings.jsonとこのPCのバックアップを読み込めません。正常なJSONから復元するか、ファイルを修正して再読み込みしてください。再起動だけでは修復されません。';
+    '設定ファイルとこのPCのバックアップを読み込めません。正常なJSONから復元するか、ファイルを修正して再読み込みしてください。再起動だけでは修復されません。';
   for (;;) {
     const choice = await ui.chooseStartupAction(message);
     if (choice === 'quit') return false;

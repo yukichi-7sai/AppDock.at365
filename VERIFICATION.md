@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-18: 端末別設定のコミット確認（0.57.0）
+
+- 利用者から0.57.0の動作成功の報告を受け、今回の30ファイルを再確認。設定の保存先、既存Applet契約、即時保存、移行・復旧、固定チェック表示と公開文書の整合に未解決指摘なし。利用者の報告を、未実施の実PC間同期・UAC・実タスク復旧の個別成功へ読み替えていない。
+- 実装時の512入力、成功ログ、GUI結果と発行物をSHA256で照合し、型検査・ビルド・本体標準**591/591（fail/skip 0）**・固定EXE GUI8群・隔離smokeを再利用。今回の製品修正・版更新・再発行はない。検証記録の追記だけを文書差分として扱い、各試験の対象と判定は`.artifacts/commit-validation-device-settings-20261018/reuse.json`へ記録する。
+- 開始時はローカルHEADとGitHub/AQUAの両mainが`1e92f5fa48de63c883ff8524f54355001f3d966e`で一致。明示された範囲は今回のコミットと両設定済み保存先への通常push。stage/commit treeと先端照合は同所の`stage.json`・`commit.json`・`push.json`へ記録する。GitHub Release・実利用先deployは行わない。
+
+## 2026-10-18: 端末別設定と保存先ツールバー（0.57.0）
+
+- EXE隣の`settings-<端末名>.json`を導入。Applet有効状態と保存モード、本体の表示・一般8項目を端末別に保持する。Applet設定一式・開始待ち・表示先は共有／端末専用を選択し、OFFでも端末設定を残す。共有元データへの書戻しと合成値を分離し、動的ページのenabledも端末別に扱う。
+- ツールバーのフォーム／JSON／保存先／ファイル対象を同じモデルへ接続。表示・一般は同じチェックボックスをチェック済み・操作不可とした。起動前のGPU値、初回移行と初期化記録、正常世代、複数ファイルの回復記録、Windowsタスクの中断記録と明示復旧を実装。Node/.NETの既存設定契約、公開項目と許可は維持した。
+- 発行前レビューと修正確認で、設定切替応答の全設定露出を解消、committed後の後片付け失敗で素材やOS登録を巻き戻さないよう修正、UTF-8 BOM付きJSONの復旧を追加、設定読込失敗時は起動前にGPUを安全な既定値へ固定した。複数ファイル失敗・途中終了・外部変更保持・BOM・初期化記録・生成コマンドdryRunと保存先を回帰で確認。修正後に未解決の発行阻害指摘はない。
+- 固定lockfile install、型検査、本体／Default Shell／Node/.NET fixtureビルド成功。最終の本体標準回帰は**591/591成功、fail/skip 0**。Git管理対象と新規入力512件のSHA256を最終検証の前後で照合し、変更0件。依存版・lockfile・toolchainは変更していない。記録は`.artifacts/device-settings-implementation-20261018/`の`inputs-verified-before.json`、`inputs-verified-after.json`、`typecheck-verified.log`、`regression-verified.log`。
+- 通常publishを終了0で完了。最終`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144219906 bytes / SHA256 `398fba0e2176310b6e96f69912c5ff3d122eb77d1ed4524705c513809f86e297`**。FileVersion/ProductVersionとupdate.jsonは0.57.0。BOM修正後に同じ未公開版を再発行し、旧発行の成功を最終物の検証へ流用していない。
+- 最終固定EXEのコピーhashを照合し、`device-settings-ui-1792274812762/result.json`で8群成功。表示／一般の固定チェック、Applet保存先・フォーム・JSON・ファイル対象の連動、OFF/ONでの再開、不正JSONの転送拒否、明暗、狭幅のエミュレーション、再起動保持、実Node Appletの自己設定、Applet詳細と全体設定の共用を確認。ファイル対象はモデルの照合であり、既定エディターの実起動は試験していない。
+- 最終EXEの隔離smokeは`smoke-1792274861510/smoke-result.json`で成功。画面、EXE隣の設定・共有素材、トレイ、正常終了を確認。Windows Task SchedulerのXmlTextはメモリ内の定義だけで往復を確認し、登録は変更していない。実PC間の同期サービス、物理モニター、実スピーカー、UAC承認・実タスクの登録／復旧・サインインは未確認。
+- 制限環境のTemp置換EPERM、GUIのCDP起動不可、版更新後のpnpm検証待ちは、必要な同一処理だけ通常ユーザー権限で実行して解消。GUI初期試験の非表示viewportは通常の設定を開くコマンドと表示待機へ、非同期ページ遷移は描画完了待機へ、不正JSONでチェックが変化しない期待動作はclick検証へ修正。元の失敗資料は各fixtureとログへ保持した。
+- 未変更Appletの再発行・全体ZIP作成、commit・push・Release・実利用先deployは行っていない。保存・移行・検証の契約は[端末別設定](docs/device-settings-design.md)を参照する。
+- 終了時の照合は`.artifacts/device-settings-implementation-20261018/validation.json`。新規GUI成功は直近3回を保持し、失敗資料も保持した。smokeは直近3回と既存の再利用資料を保持。古い候補のプロセス参照確認はCIMアクセス拒否のため完了せず、状態不明分も保持し、削除0件。
+
 ## 2026-10-17: pnpmストアのプロジェクト共通設定
 
 - `pnpm-workspace.yaml`に`storeDir: A:/30.PROJECT/.pnpm_store`を追加。同じ`A:\`へ同期する別PCとworktreeでも、ユーザー共通設定に依存せず30.PROJECT直下を使う。開発ガイドに設定場所と、旧ストアを使う既存依存の一度だけの再接続手順を追記した。

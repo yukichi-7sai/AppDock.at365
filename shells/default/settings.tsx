@@ -194,7 +194,13 @@ function App() {
         pending={editing.pending}
         error={error || editing.error || ''}
         onMode={(mode) => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
-        onOpenFile={() => void c.invoke('open-settings').catch(() => {})}
+        storage={model.content.auxiliary.storage}
+        onLocalSettings={(enabled) =>
+          void c.invoke('set-local-settings', [enabled]).catch((error) => setError(String(error)))
+        }
+        onOpenFile={(scope) =>
+          void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
+        }
         onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
         announcement={
           <span key={movement.id} className="settings-live" role="status" aria-live="polite">

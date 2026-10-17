@@ -1,0 +1,335 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const net = require('node:net');
+const { spawn } = require('node:child_process');
+const { createHash } = require('node:crypto');
+const assert = require('node:assert/strict');
+const { chromium } = require('playwright');
+const { settingsPage } = require('./settings-shell-helper.cjs');
+const { settleSettings } = require('./settings-immediate-helper.cjs');
+const root = path.resolve(__dirname, '..');
+const portable = process.argv[2] && path.resolve(process.argv[2]);
+const output = path.join(root, '.artifacts', `device-settings-ui-${Date.now()}`);
+const base = path.join(output, 'profile'),
+  local = path.join(output, 'local');
+fs.mkdirSync(base, { recursive: true });
+const value = require('../out/main/shared/settings-schema').createDefaultSettings();
+Object.assign(value.host, { theme: 'light', soundEnabled: false, closeToTray: false });
+value.gestures.enabled = false;
+value.keybindings = [];
+value.globalShortcutCommands = [];
+value.extensions['example.device-settings'] = { enabled: false, settings: { interval: 60 } };
+const sharedFile = path.join(base, 'settings.json');
+const deviceFile = path.join(base, `settings-${os.hostname()}.json`);
+fs.writeFileSync(sharedFile, JSON.stringify(value));
+const folder = path.join(base, 'extensions', 'example');
+fs.mkdirSync(folder, { recursive: true });
+fs.writeFileSync(
+  path.join(folder, 'extension.json'),
+  JSON.stringify({
+    apiVersion: 1,
+    id: 'example.device-settings',
+    name: 'Device settings fixture',
+    displayName: 'Device settings fixture',
+    version: '1.0.0',
+    runtime: 'node',
+    entry: 'index.js',
+    startupDelaySeconds: 0,
+    capabilities: ['settings'],
+    commands: [{ id: 'example.device-settings.self-set', title: 'Set own interval' }],
+    settings: [{ key: 'interval', title: '間隔（秒）', type: 'number', minimum: 1, default: 60 }],
+  }),
+);
+fs.writeFileSync(
+  path.join(folder, 'index.js'),
+  'exports.activate = async context => { context.commands.register("example.device-settings.self-set", "Set own interval", () => context.settings.set("interval", 180)); };',
+);
+const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+let executable = require('electron');
+if (portable) {
+  executable = path.join(base, 'AppDock.at365.exe');
+  fs.copyFileSync(portable, executable);
+  assert.equal(hash(executable), hash(portable));
+}
+const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+async function until(fn, label) {
+  const end = Date.now() + 30000;
+  while (Date.now() < end) {
+    try {
+      const result = await fn();
+      if (result) return result;
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  }
+  throw Error('Timed out: ' + label);
+}
+async function port() {
+  const server = net.createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const result = server.address().port;
+  await new Promise((resolve) => server.close(resolve));
+  return result;
+}
+let running;
+async function start() {
+  const debug = await port(),
+    env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  const log = fs.openSync(path.join(output, 'process.log'), 'a');
+  const child = spawn(
+    executable,
+    [
+      ...(portable ? [] : [root]),
+      `--test-profile=${base}`,
+      `--test-local-state=${local}`,
+      `--remote-debugging-port=${debug}`,
+    ],
+    { cwd: base, env, windowsHide: true, stdio: ['ignore', log, log] },
+  );
+  fs.closeSync(log);
+  running = { child };
+  const browser = (running.browser = await until(
+    () => chromium.connectOverCDP(`http://127.0.0.1:${debug}`, { timeout: 1000 }),
+    'CDP',
+  ));
+  const host = (running.host = await until(
+    () =>
+      browser
+        .contexts()
+        .flatMap((context) => context.pages())
+        .find((page) => page.url().startsWith('appdock://host/')),
+    'host',
+  ));
+  await until(
+    async () => (await host.evaluate(() => window.dock.snapshot())).startupReady,
+    'startup',
+  );
+  await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+  running.page = await settingsPage(host);
+  await until(
+    () => running.page.evaluate(() => innerWidth > 300 && innerHeight > 200),
+    'visible settings viewport',
+  );
+  running.page.setDefaultTimeout(15000);
+  return running;
+}
+async function stop() {
+  if (!running) return;
+  if (running.host)
+    await running.host.evaluate(() => window.dock.executeCommand('appdock.quit')).catch(() => {});
+  await until(() => running.child.exitCode !== null, 'shutdown');
+  await running.browser?.close().catch(() => {});
+  running = undefined;
+}
+const checks = [];
+(async () => {
+  try {
+    let state = await start(),
+      page = state.page;
+    const toggle = () =>
+      page.getByRole('checkbox', { name: 'このPCで設定を保持する', exact: true });
+    assert.equal(await toggle().isChecked(), true);
+    assert.equal(await toggle().isDisabled(), true);
+    await page.getByLabel('テーマ', { exact: true }).selectOption('dark');
+    await settleSettings(state.host);
+    await until(() => disk(deviceFile).host.theme === 'dark', 'local theme');
+    assert.equal(disk(sharedFile).host.theme, 'light');
+    checks.push('appearance checked disabled; theme local');
+    await page.getByRole('button', { name: '一般', exact: true }).click();
+    await page.getByRole('heading', { name: '一般', exact: true }).waitFor();
+    assert.equal(await toggle().isChecked(), true);
+    assert.equal(await toggle().isDisabled(), true);
+    const general = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+    assert.deepEqual(
+      general.content.auxiliary.storage.files.map((file) => file.scope),
+      ['device'],
+    );
+    checks.push('general checked disabled; JSON and file target device');
+    await page.getByRole('button', { name: 'Device settings fixture', exact: true }).click();
+    await page.getByRole('heading', { name: 'Device settings fixture', exact: true }).waitFor();
+    assert.equal(await toggle().isChecked(), false);
+    assert.equal(await toggle().isDisabled(), false);
+    await toggle().check();
+    await until(
+      () => disk(deviceFile).extensions['example.device-settings'].useLocalSettings,
+      'local mode',
+    );
+    const scopedResult = await page.evaluate(async () => {
+      const m = (await window.appdockPage.connect()).snapshot;
+      return (
+        await window.appdockPage.act({
+          id: m.id,
+          type: 'settings',
+          sessionId: m.content.editing.sessionId,
+          editRevision: m.content.editing.editRevision,
+          operationId: crypto.randomUUID(),
+          operation: {
+            kind: 'invoke',
+            actionId: m.content.actions['set-local-settings'],
+            args: [true, m.content.auxiliary.storage.revision],
+          },
+        })
+      ).result;
+    });
+    assert.deepEqual(Object.keys(scopedResult).sort(), ['revision', 'storage']);
+    await page.getByLabel('間隔（秒）', { exact: true }).fill('120');
+    await settleSettings(state.host);
+    await until(
+      () =>
+        disk(deviceFile).extensions['example.device-settings'].configuration.settings.interval ===
+        120,
+      'local config',
+    );
+    assert.equal(disk(sharedFile).extensions['example.device-settings'].settings.interval, 60);
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    let text = await page.getByRole('textbox', { name: '設定JSON', exact: true }).inputValue();
+    assert.equal(JSON.parse(text).extensions['example.device-settings'].settings.interval, 120);
+    let model = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+    assert.deepEqual(
+      model.content.auxiliary.storage.files.map((file) => file.scope),
+      ['device'],
+    );
+    await toggle().uncheck();
+    await until(
+      () => !disk(deviceFile).extensions['example.device-settings'].useLocalSettings,
+      'shared mode',
+    );
+    await until(
+      async () =>
+        JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()).extensions[
+          'example.device-settings'
+        ].settings.interval === 60,
+      'shared JSON',
+    );
+    model = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+    assert.deepEqual(
+      model.content.auxiliary.storage.files.map((file) => file.scope),
+      ['shared'],
+    );
+    await toggle().check();
+    await until(
+      () => disk(deviceFile).extensions['example.device-settings'].useLocalSettings,
+      'resume local',
+    );
+    checks.push(
+      'Applet mode, form, JSON and file target switch together; saved local configuration resumes',
+    );
+    await page.getByRole('textbox', { name: '設定JSON' }).fill('{broken');
+    await page.getByRole('alert').first().waitFor();
+    await toggle().click();
+    await until(
+      async () => (await page.locator('.settings-page-error').innerText()).includes('入力'),
+      'invalid input guard',
+    );
+    assert.equal(disk(deviceFile).extensions['example.device-settings'].useLocalSettings, true);
+    await page.getByRole('button', { name: '設定を再読み込み', exact: true }).click();
+    checks.push('invalid JSON cannot be transferred to another storage scope');
+    await page.screenshot({ path: path.join(output, 'applet-json.png') });
+    await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+    await page.screenshot({ path: path.join(output, 'applet-form.png') });
+    await state.host.evaluate(async () => {
+      const snapshot = await window.dock.snapshot();
+      const next = structuredClone(snapshot.settings.value);
+      next.host.theme = 'light';
+      await window.dock.saveSettings(next, snapshot.settings.revision);
+    });
+    await page.screenshot({ path: path.join(output, 'applet-light.png') });
+    const session = await state.host.context().newCDPSession(state.host);
+    await session.send('Emulation.setDeviceMetricsOverride', {
+      width: 700,
+      height: 780,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
+    await page.screenshot({ path: path.join(output, 'applet-narrow.png') });
+    await session.send('Emulation.clearDeviceMetricsOverride');
+    await session.detach();
+    checks.push('dark/light and emulated narrow settings screenshots');
+    await stop();
+    state = await start();
+    page = state.page;
+    await page.getByRole('button', { name: 'Device settings fixture', exact: true }).click();
+    await page.getByRole('heading', { name: 'Device settings fixture', exact: true }).waitFor();
+    assert.equal(await toggle().isChecked(), true);
+    assert.equal(await page.getByLabel('間隔（秒）', { exact: true }).inputValue(), '120');
+    const snapshot = await state.host.evaluate(() => window.dock.snapshot());
+    assert.equal(
+      snapshot.extensions.find((item) => item.id === 'example.device-settings').enabled,
+      false,
+    );
+    checks.push('restart retains local mode/configuration without activating disabled Applet');
+    await state.host.evaluate(() => window.dock.toggleExtension('example.device-settings', true));
+    await until(
+      async () =>
+        (await state.host.evaluate(() => window.dock.snapshot())).extensions.find(
+          (item) => item.id === 'example.device-settings',
+        ).state === 'running',
+      'Node fixture running',
+    );
+    await state.host.evaluate(() => window.dock.executeCommand('example.device-settings.self-set'));
+    await until(
+      () =>
+        disk(deviceFile).extensions['example.device-settings'].configuration.settings.interval ===
+        180,
+      'Node self setting uses device store',
+    );
+    assert.equal(disk(sharedFile).extensions['example.device-settings'].settings.interval, 60);
+    await state.host.evaluate(() => window.dock.toggleExtension('example.device-settings', false));
+    checks.push('real Node Applet self-setting writes selected device configuration');
+    await state.host.evaluate(() => window.dock.navigate('extensions'));
+    await state.host
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /Device settings fixture/ })
+      .click();
+    await state.host.getByRole('tab', { name: '設定', exact: true }).click();
+    page = await settingsPage(state.host);
+    await until(
+      () => page.evaluate(() => innerWidth > 300 && innerHeight > 200),
+      'detail settings viewport',
+    );
+    assert.equal(
+      await page.getByRole('checkbox', { name: 'このPCで設定を保持する', exact: true }).isChecked(),
+      true,
+    );
+    assert.equal(await page.getByLabel('間隔（秒）', { exact: true }).inputValue(), '180');
+    await page.screenshot({ path: path.join(output, 'detail-settings.png') });
+    checks.push('Applet detail and full settings share the same selected storage and values');
+    await stop();
+    const result = {
+      passed: true,
+      checks,
+      portable: portable ? { path: portable, sha256: hash(portable) } : null,
+      output,
+    };
+    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result));
+  } catch (error) {
+    fs.writeFileSync(path.join(output, 'failure.txt'), String(error.stack));
+    if (running?.page) {
+      await running.page
+        .evaluate(() => ({
+          width: innerWidth,
+          height: innerHeight,
+          buttons: [...document.querySelectorAll('button')].slice(0, 25).map((element) => ({
+            text: element.textContent,
+            rect: element.getBoundingClientRect().toJSON(),
+          })),
+        }))
+        .then((value) =>
+          fs.writeFileSync(path.join(output, 'layout.json'), JSON.stringify(value, null, 2)),
+        )
+        .catch(() => {});
+      await running.page
+        .screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 })
+        .catch((error) =>
+          fs.writeFileSync(path.join(output, 'screenshot-error.txt'), String(error)),
+        );
+    }
+    await stop().catch(() => {});
+    throw error;
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -18,6 +18,7 @@ class SettingsReadError extends Error {
   }
 }
 export interface SettingsRecoveryPlan {
+  readonly scope?: 'shared' | 'device';
   readonly candidate: string;
   readonly candidateHash: string;
   readonly modifiedAt: number;
@@ -70,10 +71,10 @@ function atomicWrite(
     if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
   }
 }
-class SettingsStore extends EventEmitter {
+class SettingsStore<T = Settings> extends EventEmitter {
   file: string;
   revision: number;
-  value: Settings;
+  value: T;
   watcher?: fs.FSWatcher;
   timer?: ReturnType<typeof setTimeout>;
   private observer?: ReturnType<typeof observeFile>;
@@ -93,11 +94,12 @@ class SettingsStore extends EventEmitter {
   constructor(
     file: string,
     private backupDirectory?: string,
+    private codec?: { defaults(): T; parse(value: unknown): T },
   ) {
     super();
     this.file = file;
     this.revision = 0;
-    this.value = defaults();
+    this.value = codec ? codec.defaults() : (defaults() as T);
   }
   private readBytes(file: string): Buffer {
     try {
@@ -114,7 +116,7 @@ class SettingsStore extends EventEmitter {
   private parse(bytes: Buffer | string) {
     try {
       const raw = JSON.parse(bytes.toString().replace(/^\uFEFF/, ''));
-      const value = validate(raw);
+      const value = this.codec ? this.codec.parse(raw) : (validate(raw) as T);
       return value;
     } catch {
       throw new SettingsReadError('read-invalid');
@@ -157,7 +159,7 @@ class SettingsStore extends EventEmitter {
       }
     }
   }
-  private tryBackup(value: Settings) {
+  private tryBackup(value: T) {
     try {
       this.backup(value);
       this.health.clear('backup');
@@ -198,7 +200,7 @@ class SettingsStore extends EventEmitter {
     this.revision++;
     return this.snapshot();
   }
-  snapshot(): SettingsSnapshot {
+  snapshot(): SettingsSnapshot<T> {
     return {
       value: structuredClone(this.value),
       revision: this.revision,
@@ -207,7 +209,7 @@ class SettingsStore extends EventEmitter {
       recovered: this.recovered,
     };
   }
-  private backup(value: Settings) {
+  private backup(value: T) {
     if (!this.backupDirectory) return;
     const text = JSON.stringify(value, null, 2) + '\n';
     const hash = createHash('sha256').update(text).digest('hex');
@@ -233,7 +235,7 @@ class SettingsStore extends EventEmitter {
     for (const old of generations.slice(20)) fs.unlinkSync(path.join(this.backupDirectory, old));
     this.lastBackup = hash;
   }
-  private accept(next: Settings) {
+  private accept(next: T) {
     this.observer?.resetError();
     const changed = JSON.stringify(next) !== JSON.stringify(this.value);
     const unhealthy = this.syncError || this.recovered;
@@ -248,7 +250,7 @@ class SettingsStore extends EventEmitter {
   }
   assertRevision(revision: number) {
     // Also detect a manual edit before the file watcher has delivered it.
-    let disk: Settings;
+    let disk: T;
     try {
       disk = this.readDisk();
     } catch (error) {
@@ -266,7 +268,10 @@ class SettingsStore extends EventEmitter {
   save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
     if (this.writesBlocked) throw Error('設定を復元中です。完了後に保存してください。');
     this.assertRevision(revision);
-    const next = validate(value);
+    const next = this.codec ? this.codec.parse(value) : (validate(value) as T);
+    const serialized = JSON.stringify(next, null, 2) + '\n';
+    if (Buffer.byteLength(serialized, 'utf8') > 4 * 1024 * 1024)
+      throw Error('設定ファイルは4MB以下にしてください。');
     this.tryBackup(this.value);
     const previous = this.readBytes(this.file);
     if (JSON.stringify(this.parse(previous)) !== JSON.stringify(this.value)) {
@@ -275,7 +280,7 @@ class SettingsStore extends EventEmitter {
     }
     try {
       asset?.commit();
-      atomicWrite(this.file, JSON.stringify(next, null, 2) + '\n', { previous });
+      atomicWrite(this.file, serialized, { previous });
     } catch (error) {
       if (!(error instanceof SettingsConflictError)) this.health.set('save', 'save-failed');
       try {
@@ -296,7 +301,7 @@ class SettingsStore extends EventEmitter {
     this.emit('changed', this.snapshot());
     return this.snapshot();
   }
-  updateExtension(id: string, patch: Partial<ExtensionSettings>) {
+  updateExtension(this: SettingsStore<Settings>, id: string, patch: Partial<ExtensionSettings>) {
     const v = structuredClone(this.value);
     const current = v.extensions[id] || { enabled: false, settings: {} };
     v.extensions[id] = { ...current, ...patch };
@@ -330,7 +335,7 @@ class SettingsStore extends EventEmitter {
   }
   private recoveryTarget() {
     // A valid incoming sync update always wins over recovery.
-    let incoming: Settings | undefined;
+    let incoming: T | undefined;
     try {
       incoming = this.readDisk();
     } catch {

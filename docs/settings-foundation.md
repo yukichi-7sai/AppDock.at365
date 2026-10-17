@@ -2,6 +2,8 @@
 
 設定画面を本体rendererへ統合する方針と移行計画は[設定画面の本体統合とsettings-uiの整理](settings-host-ui-design.md)を参照する。同計画は未実装であり、以下は現在の設定Shellの仕様である。
 
+0.57.0以降のApplet単位の共有／端末専用設定、ツールバーとJSON・ファイル操作の連動、本体の表示／一般設定・有効状態の保存分離は[端末別設定](device-settings-design.md)を参照する。表示・一般の同じチェックボックスはチェック済み・操作不可とし、Appletでは切り替え可能にする。共有・自端末の合成値と共通revisionをDeviceSettingsStoreから取得する。
+
 全設定は変更時に検証して即時保存する。正本は保存済みSettingsStoreの値とrevision。共有ドラフト・dirty・全体保存/破棄・未保存通知・mainの途中入力と画像バッファは撤去した。
 
 ## 保存と入力

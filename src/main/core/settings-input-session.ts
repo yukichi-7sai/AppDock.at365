@@ -16,6 +16,7 @@ export class SettingsInputSession {
   constructor(
     private options: {
       current(): SettingsSnapshot;
+      scope?(page: import('../../shared/settings-catalog').SettingsPageDefinition): string;
       applets(): ExtensionSnapshot[];
       save(
         value: Settings,
@@ -116,6 +117,11 @@ export class SettingsInputSession {
         break;
       case 'page-values':
       case 'partial-text': {
+        if (
+          action.storageScope !== undefined &&
+          action.storageScope !== this.options.scope?.(this.page())
+        )
+          throw Error('設定の保存先が変わりました。再読み込みして入力し直してください。');
         if (
           action.pageId !== this.state.pageId ||
           this.state.mode !== (action.type === 'partial-text' ? 'json' : 'form')

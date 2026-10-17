@@ -13,11 +13,18 @@ export type SettingsEdit =
   | { type: 'select-page'; pageId: string }
   | {
       type: 'page-values';
+      storageScope?: string;
       pageId: string;
       before: Record<string, unknown>;
       value: Record<string, unknown>;
     }
-  | { type: 'partial-text'; pageId: string; before: Record<string, unknown>; value: string }
+  | {
+      type: 'partial-text';
+      pageId: string;
+      before: Record<string, unknown>;
+      value: string;
+      storageScope?: string;
+    }
   | { type: 'values'; before: Settings; value: Settings }
   | { type: 'mode'; value: 'form' | 'json' }
   | { type: 'avatar'; bytes: Uint8Array | null; name?: string }

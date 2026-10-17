@@ -40,7 +40,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { SettingsStore, SettingsConflictError } from './core/settings';
+import { SettingsConflictError } from './core/settings';
+import { DeviceSettingsStore } from './core/device-settings-store';
+import { deviceHostKeys, readDeviceCollections } from './core/device-settings';
+import { settingsPaths } from '../shared/settings-catalog';
 import { recoverSettingsAtStartup, type SettingsRecoveryUi } from './core/settings-recovery';
 import {
   SettingsHealthNotifications,
@@ -196,9 +199,18 @@ if (locked)
       ...(smoke && smokeDirectory ? ['--smoke-test', `--smoke-dir=${baseDirectory}`] : []),
     ],
   );
-const settings = new SettingsStore(
+const deviceCollections = () =>
+  readDeviceCollections([
+    path.join(baseDirectory, 'extensions'),
+    app.isPackaged
+      ? path.join(process.resourcesPath, 'shells')
+      : path.join(app.getAppPath(), 'out', 'shells'),
+  ]);
+const settings = new DeviceSettingsStore(
   path.join(baseDirectory, 'settings.json'),
-  path.join(dataDirectory, 'settings-backups'),
+  dataDirectory,
+  os.hostname(),
+  deviceCollections,
 );
 const launch = new WindowsLaunch(
   app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
@@ -210,9 +222,16 @@ const launch = new WindowsLaunch(
     failed: () => settings.health.set('launch', 'launch-save-failed'),
     succeeded: () => settings.health.clear('launch'),
     changed: () => {
+      settings.writesBlocked = settingsRecoveryBusy || launch.recoveryPending;
       settingsHealthNotifications?.refresh();
       changed();
     },
+  },
+  {
+    file: path.join(dataDirectory, 'settings-transactions', 'launch.json'),
+    desiredSaved: (next) =>
+      settings.value.host.startAtLogon === next.startAtLogon &&
+      settings.value.host.runAsAdministrator === next.runAsAdministrator,
   },
 );
 let settingsLoadError: Error | undefined;
@@ -223,6 +242,7 @@ if (locked) {
     if (!settings.value.host.hardwareAcceleration) app.disableHardwareAcceleration();
   } catch (error) {
     settingsLoadError = error instanceof Error ? error : new Error(String(error));
+    app.disableHardwareAcceleration();
   }
 }
 const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
@@ -339,6 +359,7 @@ const ribbonBadges = new RibbonBadges(
 const settingsNavigation: import('../shared/settings-page').SettingsNavigationState = { query: '' };
 const settingsEditing = new SettingsInputSession({
   current: () => settings.snapshot(),
+  scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
   save: async (value, revision, avatar, name) => {
     assertSettingsWritable();
@@ -1012,6 +1033,7 @@ async function reconcileSettingsApplets() {
 function assertSettingsWritable() {
   if (quitting || settingsRecoveryBusy)
     throw Error('設定の復元・再起動中です。完了後に操作してください。');
+  if (launch.recoveryPending) throw Error('一般設定で中断したWindows起動設定を復旧してください。');
 }
 const settingsRestartRequired = () =>
   settings.value.host.hardwareAcceleration !== startupHardwareAcceleration;
@@ -1020,8 +1042,8 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
     (
       await dialog.showMessageBox({
         type: 'warning',
-        message: '正常な設定で共有ファイルを復元しますか？',
-        detail: `復元元の更新日時: ${new Date(plan.modifiedAt).toLocaleString()}\n復元したsettings.jsonは同期先のPCにも届きます。現在の破損ファイルはこのPCへ退避します。`,
+        message: `正常な設定で${plan.scope === 'device' ? 'このPCの設定ファイル' : '共有ファイル'}を復元しますか？`,
+        detail: `復元元の更新日時: ${new Date(plan.modifiedAt).toLocaleString()}\n${plan.scope === 'device' ? 'このPCの設定だけを復元します。' : '復元した共有設定は同期先のPCにも届きます。'}現在の破損ファイルはこのPCへ退避します。`,
         buttons: ['キャンセル', '復元'],
         defaultId: 0,
         cancelId: 0,
@@ -1044,7 +1066,7 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
       type: 'error',
       title: 'AppDock — 設定の復旧',
       message: '設定を確認して再起動してください',
-      detail: `${message}\n\n${settings.file}`,
+      detail: `${message}\n\n${settings.recoveryPath()}\n復旧記録: ${path.join(dataDirectory, 'settings-transactions')}`,
       buttons: ['正常なJSONから復元', '保存先を開く', '再読み込み', '終了'],
       defaultId: 2,
       cancelId: 3,
@@ -1052,7 +1074,7 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
     return (['restore', 'open', 'reload', 'quit'] as const)[result.response] ?? 'quit';
   },
 };
-async function restoreSettingsBackup() {
+async function restoreSettingsBackup(scope?: 'shared' | 'device') {
   if (settingsOperationBusy() || quitting)
     throw Error('設定を処理中です。完了後に操作してください。');
   settingsRecoveryBusy = true;
@@ -1060,7 +1082,7 @@ async function restoreSettingsBackup() {
   settingsHealthNotifications?.refresh();
   changed();
   try {
-    const plan = settings.prepareRecovery();
+    const plan = settings.prepareRecovery(undefined, scope);
     if (!(await settingsRecoveryUi.confirm(plan))) return null;
     return settings.restoreRecovery(plan);
   } catch (error) {
@@ -1089,6 +1111,44 @@ function commitSettings(
 ) {
   assertSettingsWritable();
   return saveUserSettings(settings, baseDirectory, value, revision, avatar, avatarName);
+}
+function settingsPageStorage(
+  page: SettingsPageDefinition,
+): NonNullable<SettingsPageAuxiliary['storage']> {
+  const owner = page.collection?.owner ?? page.owner;
+  const local =
+    page.kind === 'applet'
+      ? settings.localSettings(owner!)
+      : ['appearance', 'general'].includes(page.id);
+  const scopes = new Set<'shared' | 'device'>();
+  for (const p of settingsPaths(page, allApplets())) {
+    scopes.add(
+      p[0] === 'host' && (deviceHostKeys as readonly string[]).includes(p[1])
+        ? 'device'
+        : p[0] === 'extensions' && p[2] !== 'updateSource'
+          ? settings.localSettings(p[1])
+            ? 'device'
+            : 'shared'
+          : 'shared',
+    );
+  }
+  if (
+    page.kind === 'applet' &&
+    !local &&
+    deviceCollections().some((item) => item.owner === owner) &&
+    (!page.collection ||
+      allApplets()
+        .find((a) => a.id === page.owner)
+        ?.settings?.some((field) => field.key === 'enabled'))
+  )
+    scopes.add('device');
+  return {
+    canSwitch: page.kind === 'applet' && !page.collection,
+    local,
+    signature: `${page.id}:${local ? 'device' : 'shared'}`,
+    revision: settings.revision,
+    files: [...scopes].map((scope) => ({ scope, name: path.basename(settings.targetFile(scope)) })),
+  };
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
   const host = snapshot();
@@ -1153,6 +1213,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
         recovered: settings.recovered,
         canRestore: settings.recovered && !!settings.backupCandidate(),
         busy: settingsOperationBusy(),
+        launchRecovery: launch.recoveryPending,
       },
     };
   if (id === 'notifications')
@@ -1252,6 +1313,17 @@ function settingsPageActions(
   page: SettingsPageDefinition,
 ): Record<string, (args: unknown[]) => Promise<unknown>> {
   const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  if (page.kind === 'applet' && !page.collection)
+    actions['set-local-settings'] = async ([enabled, revision]) => {
+      assertSettingsWritable();
+      if (typeof enabled !== 'boolean' || typeof revision !== 'number')
+        throw Error('設定操作が不正です。');
+      settings.setLocalSettings(page.owner!, enabled, revision, (value) => {
+        pageCollections.validate(value);
+        validateAppletSettings(value, manager.snapshot());
+      });
+      return { storage: enabled ? 'device' : 'shared', revision: settings.revision };
+    };
   if (page.id === 'ribbon')
     actions.editRibbon = async ([operation, before]) => {
       const commands = new RibbonCommands({
@@ -1289,8 +1361,15 @@ function settingsPageActions(
     return v;
   };
   if (page.json)
-    actions['open-settings'] = async () => {
-      const error = await shell.openPath(settings.file);
+    actions['open-settings'] = async ([scope, revision]) => {
+      if (typeof revision !== 'number') throw Error('設定の保存先を再取得してください。');
+      settings.assertRevision(revision);
+      if (!settingsPageStorage(page).files.some((file) => file.scope === scope))
+        throw Error('このページの保存先ではありません。');
+      const file = settings.targetFile(scope as 'shared' | 'device');
+      if (!fs.existsSync(file))
+        throw Error('設定ファイルがありません。復旧状態を確認してください。');
+      const error = await shell.openPath(file);
       if (error) throw Error(error);
     };
   if (page.id === 'appearance')
@@ -1385,10 +1464,23 @@ function settingsPageActions(
     };
   }
   if (page.id === 'general') {
+    actions.restoreScopedSettings = async ([scope]) => {
+      if (scope !== 'shared' && scope !== 'device') throw Error('復元対象が不正です。');
+      await restoreSettingsBackup(scope);
+      return null;
+    };
     actions.restart = async () => {
       quitHost(true);
     };
-    actions.restoreSettingsBackup = restoreSettingsBackup;
+    actions.recoverLaunchSettings = async () => {
+      await launch.recoverSavedTask();
+      settings.writesBlocked = launch.recoveryPending;
+      changed();
+    };
+    actions.restoreSettingsBackup = async () => {
+      await restoreSettingsBackup();
+      return null;
+    };
     actions.openSettingsDirectory = settingsRecoveryUi.openDirectory;
     actions.refreshLegacyLocalData = async () => legacyLocalData?.refresh();
     actions.refreshLaunchState = async () => {
@@ -2507,7 +2599,11 @@ async function initialize() {
               editor: settingsEditing,
               host: snapshot,
               changed,
-              auxiliary: settingsPageAuxiliary,
+              auxiliary: (page) => ({
+                ...settingsPageAuxiliary(page),
+                storage: settingsPageStorage(page),
+                settingsFiles: page.id === 'general' ? settings.diagnostics() : undefined,
+              }),
               actions: settingsPageActions,
               release: releaseSettingsView,
               resize: (width) => window?.webContents.send('dock:settingsSidebarWidth', width),
@@ -2687,7 +2783,11 @@ async function initialize() {
     [...manager.items.values()].map((item) => item.manifest),
   );
   migrated.trayMenu = getTrayMenu(migrated, allApplets());
-  if (!settings.recovered && JSON.stringify(migrated) !== JSON.stringify(settings.value))
+  if (
+    !settings.recovered &&
+    !launch.recoveryPending &&
+    JSON.stringify(migrated) !== JSON.stringify(settings.value)
+  )
     settings.save(migrated, settings.revision);
   await manager.reconcile();
   await syncHotKeys();
@@ -3089,8 +3189,11 @@ else
     .whenReady()
     .then(async () => {
       await launch.refresh();
+      if (!settingsLoadError) await launch.checkRecovery();
+      settings.writesBlocked = launch.recoveryPending;
       if (
         !settingsLoadError &&
+        !launch.recoveryPending &&
         launch.state.supported &&
         !launch.state.elevated &&
         settings.value.host.runAsAdministrator &&

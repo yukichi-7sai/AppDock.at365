@@ -53,15 +53,24 @@ export class SettingsHealth {
   has(key: string) {
     return this.issues.has(key);
   }
-  set(key: string, kind: SettingsIssueKind, generation = 0, immediate = true) {
+  set(key: string, kind: SettingsIssueKind, generation = 0, immediate = true, message?: string) {
     if (generation < (this.generations.get(key) ?? 0)) return;
     this.generations.set(key, generation);
     const previous = this.issues.get(key);
-    if (previous?.kind === kind && (previous.immediate || !immediate)) return;
+    if (
+      previous?.kind === kind &&
+      previous.message ===
+        (message ||
+          (kind === 'apply-failed' && applyMessages[key]) ||
+          settingsIssueMessages[kind]) &&
+      (previous.immediate || !immediate)
+    )
+      return;
     this.issues.set(key, {
       key,
       kind,
-      message: (kind === 'apply-failed' && applyMessages[key]) || settingsIssueMessages[kind],
+      message:
+        message || (kind === 'apply-failed' && applyMessages[key]) || settingsIssueMessages[kind],
       since: previous?.since ?? this.now(),
       immediate,
     });

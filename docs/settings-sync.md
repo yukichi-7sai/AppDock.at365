@@ -2,6 +2,10 @@
 
 利用者向けの入口は[README](../README.md#設定とデータの保存先)。単一EXEの配布方式は維持し、同期できる登録データとPC専用の実行状態を分離する。
 
+0.57.0以降、EXE隣の`settings-<端末名>.json`を共有settings.jsonと合成する。Appletの有効状態、本体の表示・一般8項目は常に端末別。Applet設定一式・開始待ち・表示先は、ツールバーの「このPCで設定を保持する」で保存先を選ぶ。OFFでも端末設定を保持する。端末名・初期化・保存分離・復旧の契約は[端末別設定](device-settings-design.md)を参照する。
+
+本体で使用するDeviceSettingsStoreは、共有と自端末のStoreを統括する。合成値を共有へ丸ごと書き戻さず、編集した対象だけを保存先へ振り分ける。共通revisionはマスクされた共有変更でも進む。両ファイルを監視し、他端末のJSONは読まない。正常世代は共有と端末ごとに分離し、複数ファイル保存の回復記録・Windows起動設定の記録はPC専用settings-transactionsへ保持する。
+
 ## 保存先
 
 リボンのグループ定義・所属・表示名・アイコンのみ表示は共有`settings.json`、持続型の開閉はPC専用rootの`ribbon-state.json`へ分離する。一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-groups-badges-design.md#pc専用の開閉状態)を参照する。

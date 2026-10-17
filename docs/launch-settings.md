@@ -1,5 +1,9 @@
 # スタートアップ・管理者起動
 
+0.57.0以降、両設定は常にEXE隣の`settings-<端末名>.json`へ保存する。早期起動も共有との合成値を使う。詳細は[端末別設定](device-settings-design.md#本体の起動設定)を参照する。
+
+Windows操作の前にPC専用settings-transactions/launch.jsonへ元タスクXMLと希望値を記録し、OS確認後に操作後XMLを記録する。途中終了時は読取りだけで登録と保存値を照合し、未解決なら一般設定の明示的な復旧操作へ誘導する。起動時にタスク変更・UACを再実行しない。明示復旧でも登録が記録と異なる場合は外部変更を保持する。復旧元XMLのアクション・元EXE・引数・ユーザー・LogonTypeを検証する。
+
 一般設定の`host.startAtLogon`と`host.runAsAdministrator`で起動方法を設定する。どちらも既定false。旧JSONの欠落だけをfalseへ移行し、null/非booleanは拒否する。通常設定と同じ保存済み値/部分JSON/revisionを使う。トグル変更時に検証・OS登録・原子的保存を行い、失敗時は既存の設定と登録を保持して画面にエラーを表示する。
 
 ## Windowsの登録

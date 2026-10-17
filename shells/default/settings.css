@@ -113,6 +113,54 @@ body,
   flex: 1;
   font-size: 12px;
 }
+.settings-storage-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+}
+.settings-storage-toggle input {
+  margin: 0;
+}
+.settings-storage-description {
+  margin: -8px 0 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.settings-file-menu {
+  position: relative;
+  font-size: 12px;
+}
+.settings-file-menu summary {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  list-style: none;
+}
+.settings-file-menu > div {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--raised);
+}
+.settings-file-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.settings-file-diagnostic {
+  margin: 14px 0;
+}
+.settings-file-diagnostic code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
 .settings-file-button,
 .settings-page-error > button,
 .settings-panel :where(button:not([class]), button.secondary) {

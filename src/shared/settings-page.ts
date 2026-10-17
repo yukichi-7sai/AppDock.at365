@@ -41,6 +41,20 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  storage?: {
+    canSwitch: boolean;
+    local: boolean;
+    signature: string;
+    revision: number;
+    files: { scope: 'shared' | 'device'; name: string }[];
+  };
+  settingsFiles?: {
+    scope: 'shared' | 'device';
+    path: string;
+    recovered: boolean;
+    errors: string[];
+    canRestore: boolean;
+  }[];
   legacyLocalData?: import('./legacy-local-data').LegacyLocalDataState;
   settingsHealth?: {
     restartRequired: boolean;
@@ -49,6 +63,7 @@ export interface SettingsPageAuxiliary {
     recovered: boolean;
     canRestore: boolean;
     busy: boolean;
+    launchRecovery?: boolean;
   };
   ai?: {
     connections: { id: string; apiKeyConfigured: boolean; keyRevision: string; error?: string }[];

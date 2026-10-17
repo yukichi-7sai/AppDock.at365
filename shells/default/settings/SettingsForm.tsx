@@ -365,7 +365,7 @@ export function SettingsForm({
                   <p>設定は正常です。</p>
                 )}
                 {aux.settingsHealth?.recovered && (
-                  <p>最後の正常な設定で動作しています。共有ファイルは変更していません。</p>
+                  <p>最後の正常な設定で動作しています。問題のあるファイルは保持しています。</p>
                 )}
                 {aux.settingsHealth?.reasons.map((reason) => (
                   <p key={reason}>{reason}</p>
@@ -376,6 +376,35 @@ export function SettingsForm({
                   </p>
                 ))}
                 {!!aux.settingsHealth?.errors.length && <p>原因を確認して再起動してください。</p>}
+                {aux.settingsHealth?.launchRecovery && (
+                  <button
+                    disabled={busy}
+                    onClick={() => void run(() => invoke('recoverLaunchSettings'))}
+                  >
+                    中断したWindows起動設定を復旧
+                  </button>
+                )}
+                {aux.settingsFiles?.map((file) => (
+                  <div className="settings-file-diagnostic" key={file.scope}>
+                    <strong>{file.scope === 'device' ? 'このPCの設定' : '共有設定'}</strong>
+                    <code>{file.path}</code>
+                    <p>
+                      {file.recovered
+                        ? '正常な設定で継続中です。ファイルを確認してください。'
+                        : '正常'}
+                    </p>
+                    {file.canRestore && (
+                      <button
+                        disabled={busy || aux.settingsHealth?.busy}
+                        onClick={() =>
+                          void run(() => invoke('restoreScopedSettings', [file.scope]))
+                        }
+                      >
+                        このファイルをバックアップで復元
+                      </button>
+                    )}
+                  </div>
+                ))}
                 <div className="button-row">
                   <button
                     disabled={busy || aux.settingsHealth?.busy}

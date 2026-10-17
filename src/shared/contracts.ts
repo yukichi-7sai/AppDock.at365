@@ -41,8 +41,8 @@ export interface Settings {
   ribbon: import('./ribbon').RibbonLayout;
   profile: { name: string; avatar: string | null };
 }
-export interface SettingsSnapshot {
-  value: Settings;
+export interface SettingsSnapshot<T = Settings> {
+  value: T;
   revision: number;
   path: string;
   syncError?: string;

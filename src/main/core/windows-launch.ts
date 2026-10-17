@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import net from 'node:net';
+import fs from 'node:fs';
+import { atomicWrite } from './settings';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { HostSettings, LaunchState } from '../../shared/contracts';
@@ -57,9 +59,17 @@ export interface LaunchTask {
   registered: boolean;
   taskElevated: boolean;
 }
+interface LaunchRecovery {
+  version: 1;
+  before: LaunchTask;
+  next: Pick<HostSettings, 'startAtLogon' | 'runAsAdministrator'>;
+  afterXml?: string | null;
+  committed?: boolean;
+}
 export class WindowsLaunch {
   state: LaunchState;
   private busy = false;
+  recoveryPending = false;
   get isBusy() {
     return this.busy;
   }
@@ -71,6 +81,10 @@ export class WindowsLaunch {
     supported = process.platform === 'win32' && !!executable,
     private readonly run = runPowerShell,
     private readonly health?: { failed(): void; succeeded(): void; changed(): void },
+    private readonly recovery?: {
+      file: string;
+      desiredSaved(next: LaunchRecovery['next']): boolean;
+    },
   ) {
     const id = createHash('sha256')
       .update(`${executable.toLowerCase()}\n${directory.toLowerCase()}`)
@@ -84,6 +98,104 @@ export class WindowsLaunch {
       taskElevated: false,
       taskName: '',
     };
+  }
+  private recoveryRecord(): LaunchRecovery | undefined {
+    if (!this.recovery || !fs.existsSync(this.recovery.file)) return;
+    if (fs.statSync(this.recovery.file).size > 2 * 1024 * 1024)
+      throw Error('起動設定の復旧記録が不正です。');
+    const record = JSON.parse(fs.readFileSync(this.recovery.file, 'utf8')) as LaunchRecovery;
+    if (
+      record.version !== 1 ||
+      !record.before ||
+      !/^S-1-[0-9-]+$/.test(record.before.sid) ||
+      ['administratorAccount', 'elevated', 'registered', 'taskElevated'].some(
+        (key) => typeof (record.before as any)[key] !== 'boolean',
+      ) ||
+      (record.before.xml !== null && typeof record.before.xml !== 'string') ||
+      !record.next ||
+      typeof record.next.startAtLogon !== 'boolean' ||
+      typeof record.next.runAsAdministrator !== 'boolean' ||
+      (record.afterXml !== undefined &&
+        record.afterXml !== null &&
+        typeof record.afterXml !== 'string')
+    )
+      throw Error('起動設定の復旧記録が不正です。');
+    return record;
+  }
+  private completeRecovery() {
+    try {
+      if (this.recovery && fs.existsSync(this.recovery.file)) fs.unlinkSync(this.recovery.file);
+      this.recoveryPending = false;
+    } catch {
+      this.recoveryPending = true;
+      this.health?.failed();
+    }
+  }
+  async checkRecovery() {
+    try {
+      const record = this.recoveryRecord();
+      if (!record) return;
+      const actual = await this.read();
+      if (actual.sid !== record.before.sid)
+        throw Error('起動設定の復旧記録の利用者が一致しません。');
+      if (
+        record.committed ||
+        actual.xml === record.before.xml ||
+        (this.recovery!.desiredSaved(record.next) &&
+          actual.registered === record.next.startAtLogon &&
+          (!actual.registered || actual.taskElevated === record.next.runAsAdministrator))
+      )
+        this.completeRecovery();
+      else {
+        this.recoveryPending = true;
+        this.health?.failed();
+      }
+    } catch {
+      this.recoveryPending = true;
+      this.health?.failed();
+    }
+  }
+  async recoverSavedTask() {
+    if (this.busy) throw Error('起動設定を変更中です。');
+    this.busy = true;
+    try {
+      const record = this.recoveryRecord();
+      if (!record) {
+        this.recoveryPending = false;
+        return;
+      }
+      const actual = await this.read();
+      if (actual.sid !== record.before.sid) throw Error('同じWindowsユーザーで復旧してください。');
+      if (actual.xml !== record.before.xml) {
+        if (record.afterXml === undefined || actual.xml !== record.afterXml)
+          throw Error(
+            'Windowsの登録が復旧記録と異なります。外部の変更を保持したため、登録を確認してください。',
+          );
+        const elevated = !actual.elevated && (actual.taskElevated || record.before.taskElevated);
+        const restore = record.before.xml
+          ? `
+$restore=$service.NewTask(0)
+$restore.XmlText=${psString(record.before.xml)}
+$restoreUser=$restore.Principal.UserId
+if ($restoreUser -notmatch '^S-1-') { $restoreUser=([Security.Principal.NTAccount]$restoreUser).Translate([Security.Principal.SecurityIdentifier]).Value }
+if ($restore.Actions.Count -ne 1 -or $restore.Actions.Item(1).Path -ine ${psString(this.executable)} -or [string]$restore.Actions.Item(1).Arguments -cne ${psString(this.argumentLine())} -or $restoreUser -ine $sid -or $restore.Principal.LogonType -ne 3) { throw 'Recovery task ownership mismatch' }
+$null=$folder.RegisterTaskDefinition($name,$restore,6,$sid,$null,3,'D:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;'+$sid+')')`
+          : '\nif ($task) { $folder.DeleteTask($name,0) }';
+        await this.mutate(
+          `if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne ${psString(record.before.sid)}) { throw 'Use the same Windows user' }\n` +
+            this.context() +
+            restore,
+          elevated,
+        );
+        await this.read();
+      }
+      this.completeRecovery();
+      if (this.recoveryPending) throw Error('起動設定の復旧記録を保存先から削除できません。');
+      this.health?.succeeded();
+    } finally {
+      this.busy = false;
+      this.health?.changed();
+    }
   }
   private context() {
     return `$ErrorActionPreference='Stop'
@@ -153,6 +265,7 @@ if ($child.ExitCode -ne 0) { throw 'Windows could not update the startup task' }
     commit: () => T,
   ): Promise<T> {
     if (this.busy) throw Error('起動設定を変更中です。完了後に保存してください。');
+    if (this.recoveryPending) throw Error('一般設定で中断したWindows起動設定を復旧してください。');
     this.busy = true;
     this.health?.changed();
     const read = async () => {
@@ -217,9 +330,24 @@ if ($task) { $folder.DeleteTask($name,0) }`;
       const sameUser = `$expectedSid=${psString(before.sid)}
 if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedSid) { throw 'Use the same Windows user for this operation' }
 `;
+      const recovery: LaunchRecovery = {
+        version: 1,
+        before,
+        next: { startAtLogon: next.startAtLogon, runAsAdministrator: next.runAsAdministrator },
+      };
+      if (this.recovery)
+        atomicWrite(this.recovery.file, JSON.stringify(recovery), { previous: undefined });
       try {
         await this.mutate(sameUser + script, elevate);
       } catch (error) {
+        if (this.recovery) {
+          try {
+            if ((await this.read()).xml === before.xml) this.completeRecovery();
+            else this.recoveryPending = true;
+          } catch {
+            this.recoveryPending = true;
+          }
+        }
         if (error instanceof WindowsOperationCancelled) throw error;
         this.health?.failed();
         throw Error(
@@ -228,6 +356,10 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
       }
       try {
         const after = await read();
+        if (this.recovery) {
+          recovery.afterXml = after.xml;
+          atomicWrite(this.recovery.file, JSON.stringify(recovery));
+        }
         if (
           after.registered !== next.startAtLogon ||
           (next.startAtLogon && after.taskElevated !== next.runAsAdministrator)
@@ -237,7 +369,8 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
         }
         preflight();
         const result = commit();
-        this.health?.succeeded();
+        this.completeRecovery();
+        if (!this.recoveryPending) this.health?.succeeded();
         return result;
       } catch (error) {
         try {
@@ -250,7 +383,9 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
             elevate,
           );
           await this.read();
+          this.completeRecovery();
         } catch (rollback) {
+          this.recoveryPending = !!this.recovery;
           this.health?.failed();
           throw Error(
             `${String(error)} / Windowsの起動設定を元に戻せませんでした: ${String(rollback)}`,
