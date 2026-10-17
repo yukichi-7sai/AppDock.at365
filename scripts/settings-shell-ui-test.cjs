@@ -474,21 +474,53 @@ async function until(fn, label) {
     checks.push(
       'no global draft, partial buffer, staged avatar or unsaved banner survives navigation',
     );
+    await host.evaluate(() => window.dock.navigate('settings'));
+    await settingsPage();
+    await host.waitForFunction(
+      () => localStorage.getItem('appdock.restart-view.page') === '"settings"',
+    );
     await close();
-    host = await launch(['--safe-shell']);
+    host = await launch(['--safe-shell', '--restore-view']);
     await until(
       () => host.evaluate(() => window.dock.snapshot().then((s) => s.startupReady)),
       'restart',
     );
-    await host.evaluate(() => window.dock.navigate('settings'));
     shell = await providerPage('appdock.default-shell');
+    assert.equal((await modelOf(shell)).content.context, 'full');
+    assert.equal(await host.getByText(/設定を読み込んでいます…Error:/).count(), 0);
     const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     assert.equal(saved.extensions['fixture.settings'].settings.amount, 12);
     assert.equal(saved.profile.avatar, 'data/assets/profile/icon.png');
     assert.equal(saved.extensions['missing.applet'].settings.private, 'never-in-shell');
     checks.push(
-      'restart and safe Shell retain immediate settings/assets and unrelated private values',
+      'restored full settings renders without navigation, including safe Shell; immediate settings/assets and unrelated private values persist',
     );
+    await host.evaluate(() => window.dock.navigate('extensions'));
+    await host
+      .getByRole('complementary', { name: 'Applet一覧' })
+      .getByRole('button', { name: /^Settings fixture/ })
+      .click();
+    await host.getByRole('tab', { name: '設定', exact: true }).click();
+    await settingsPage();
+    await host.waitForFunction(
+      () =>
+        localStorage.getItem('appdock.restart-view.page') === '"extensions"' &&
+        localStorage.getItem('appdock.restart-view.selected') === '"fixture.settings"',
+    );
+    await close();
+    host = await launch(['--restore-view']);
+    shell = await settingsPage();
+    assert.equal((await modelOf(shell)).content.context, 'applet');
+    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
+    await shell.getByLabel('Fixture text', { exact: true }).fill('Restored detail');
+    await settleSettings(shell);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[
+        'fixture.settings'
+      ].settings['text.value'],
+      'Restored detail',
+    );
+    checks.push('restored Applet settings renders and saves without switching pages');
     const result = {
       success: true,
       profile,

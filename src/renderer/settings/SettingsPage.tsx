@@ -10,10 +10,12 @@ import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import '../settings-ui/controls.css';
 import './settings.css';
 export function SettingsPage({
+  ready,
   context = 'full',
   pageId,
   sidebarWidth = 280,
 }: {
+  ready: boolean;
   context?: 'full' | 'applet';
   pageId?: string;
   sidebarWidth?: number;
@@ -26,6 +28,9 @@ export function SettingsPage({
   const surface = useRef<HTMLDivElement>(null);
   const [controls, setControls] = useState<ReturnType<SettingsViewClient['controls']>>();
   useEffect(() => {
+    // Restored local navigation can render before startup and main-side routing are ready.
+    if (!ready) return;
+    setError('');
     let live = true;
     let connectionId: string | undefined;
     const transport = window.dock.settingsPage;
@@ -80,11 +85,11 @@ export function SettingsPage({
       if (connectionId) void transport.close(connectionId);
       client.current = null;
     };
-  }, [context, pageId]);
+  }, [ready, context, pageId]);
   const c = client.current;
   useEffect(() => {
     const move = model?.content.move;
-    if (!c || !move || move.completed || model.content.editing.mode !== 'form') return;
+    if (!ready || !c || !move || move.completed || model.content.editing.mode !== 'form') return;
     let done = false,
       highlight: ReturnType<typeof setTimeout> | undefined;
     let target: HTMLElement | null = null;
@@ -124,9 +129,10 @@ export function SettingsPage({
       observer.disconnect();
       target?.classList.remove('setting-highlight');
     };
-  }, [model?.content.move?.id, model?.content.page.id, model?.content.editing.mode]);
+  }, [ready, model?.content.move?.id, model?.content.page.id, model?.content.editing.mode]);
   const act = (operation: SettingsPageOperation) => void c?.act(operation).catch(() => {});
-  if (!model || !c || !controls) return <p role="status">設定を読み込んでいます…{error}</p>;
+  if (!ready || !model || !c || !controls)
+    return <p role="status">設定を読み込んでいます…{ready && error}</p>;
   const { page, navigation, editing } = model.content;
   const editor = c.editor(model);
   const resize = (width: number) => {

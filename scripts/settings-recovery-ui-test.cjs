@@ -274,6 +274,9 @@ async function main() {
   );
   await until(async () => (await state()).startupReady, 'relaunch ready');
   await until(async () => (await state()).navigation.route === 'settings', 'restore view');
+  await settingsPage(host);
+  await host.getByRole('switch', { name: 'ハードウェアアクセラレーション', exact: true }).waitFor();
+  assert.equal(await host.getByText(/設定を読み込んでいます…Error:/).count(), 0);
   assert.equal((await state()).settings.value.host.hardwareAcceleration, true);
   assert(!(await items()).some((i) => i.typeId === 'restart-required'));
   checks.push(

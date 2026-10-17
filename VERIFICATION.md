@@ -1,6 +1,17 @@
 # 検証記録
 
+## 2026-10-18: 更新・再起動時の設定画面復元（0.58.1）
+
+- 利用者報告を受け、main `d827906`と0.58.0の固定EXEで、`--restore-view`による復元時の`dock:settingsPage:open`「設定画面の対象が変わりました」を再現した。mainのrouteはsettingsへ到達していたが、先に失敗した本文の接続は再実行されていなかった。通常起動後に手動で設定を開く試験と、再起動後のrouteだけの照合では見落としていた。再現記録は`.artifacts/settings-restore-fix-20261018/reproduce-0580.log`。
+- 全体設定とApplet詳細で、startupReadyとmainのnavigation.routeが表示先にそろってから接続するよう修正。準備中は読み込み表示とし、条件が外れれば接続・入力登録・購読・検索移動の監視を解放する。mainの対象/接続検査や即時保存は維持し、時間を決めた再試行や検査の緩和は追加していない。発行前の差分レビューに未解決指摘なし。保存形式・設定項目・依存・lockfile・toolchainは変更せず、通常の不具合修正として本体を0.58.1へ更新した。
+- 固定lockfileの依存検査、型検査、本体/Default Shell/Node/.NET fixtureビルドと標準回帰が成功。**596/596、fail/skip 0**。ソースGUIは、手動の開き直しを挟まず、全体設定・safe Shell時の設定・Applet詳細を復元し、入力保存まで確認した。実再起動の試験にも、route確認に加えて本文の表示確認を追加した。
+- 通常publishは終了0。最終`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144237236 bytes / SHA256 `02ccdac305fd384a28c1e32914e123a58422a27cf9e0af7fd1513223b9fc774d`**。版・feedのsize/hash・固定コピーを照合し、発行先のdeploy関連3ファイルは元のhashを保持した。このEXEでsmoke、設定本文/両入口の復元、通知からの実再起動と復旧、portable更新の**4コマンドがすべて終了0**。
+- portable更新試験は同版再適用を許可した隔離fixtureで、実helperによる終了・EXE置換・再起動、更新後のバージョン情報本文、通常再起動後の「一般」カテゴリ、Appletページの再開を確認した。最初の試験はカテゴリ復元の途中で既定の「表示」を読み取って失敗したため、選択前後の完了を待つよう試験を補正し、全体を再実行して11群成功。追加の製品変更はなく、同じ最終EXEを使用した。確認ダイアログはfixtureで応答し、実Google認証・物理モニター・実スピーカー・UAC・実同期サービスは対象外。
+- 証跡は`.artifacts/settings-restore-fix-20261018/validation.json`、各コマンドの完全ログ/result/input SHA256一覧、環境情報、`review.md`。標準回帰後の差分は検証文書とportable更新GUIの待機だけ。当該GUIは再実行し、それを読み込まない標準回帰・ほかのGUIの成功は再利用した。制限環境の依存キャッシュ不足は、通常ユーザー環境で同じoffline固定lockfile検査を成功確認した。再現失敗・途中失敗・現在の固定物と成功資料を保持し、今回の旧成功profile削除は0件。commit前後の照合は同所`stage.json`・`commit.json`へ記録する。push・Release・実利用先deployは行わない。
+
 ## 2026-10-18: 設定画面の本体統合（0.58.0）
+
+この時点の復旧試験の再起動照合はmainの遷移先を確認したもの。設定本文の接続までの確認不足は、上記0.58.1で補完した。
 
 - main `e239d38`を基準に、[設計](docs/settings-host-ui-design.md)を実装。`src/shared/settings-ui`を`src/renderer/settings-ui`へ、Default Shellの設定ページを`src/renderer/settings`へ移動した。全体設定とApplet詳細は同じ本体SettingsPageを使い、設定用Shell HTML・View・ビルド入口を撤去。現行契約は[設定基盤](docs/settings-foundation.md)を参照する。
 - Shellの有効領域は8件。旧`page.settings`の保存指定・manifestは保持して読込むが起動しない。旧コマンド条件は常に不成立とし、条件の削除で無条件実行へ変わらないようにした。ほかのShell領域・Node/.NET接続・保存ファイル形式・操作許可は維持した。外部の設定描画契約を廃止するため本体を0.58.0へ更新し、依存版・lockfile・toolchainは変更していない。

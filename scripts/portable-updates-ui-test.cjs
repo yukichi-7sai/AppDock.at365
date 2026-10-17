@@ -197,8 +197,14 @@ async function surfaceRenderer(inspectPort, file, expression, selector) {
   }
   throw Error('Shell surface not ready: ' + file + ' / ' + selector);
 }
-const settingsRenderer = (port, expression, selector = '.settings-categories') =>
-  renderer(port, expression);
+async function settingsRenderer(port, expression, selector = '.settings-categories') {
+  for (let i = 0; i < 150; i++) {
+    if (await renderer(port, `!!document.querySelector(${JSON.stringify(selector)})`))
+      return renderer(port, expression);
+    await wait(100);
+  }
+  throw Error('Host settings surface not ready: ' + selector);
+}
 const ribbonRenderer = (port, expression) =>
   surfaceRenderer(port, 'index.html', expression, '.activity-rail');
 async function restarted(inspectPort, predicate, previousPid) {
@@ -332,7 +338,9 @@ async function restarted(inspectPort, predicate, previousPid) {
     checks.push(
       'collapsed settings, prominent actions, per-Applet sources, host/Applet default resets',
     );
-    await page.getByLabel('AppDockの更新元', { exact: true }).fill(path.join(getPublishDirectory(root)));
+    await page
+      .getByLabel('AppDockの更新元', { exact: true })
+      .fill(path.join(getPublishDirectory(root)));
     await page.getByLabel('AppDockの更新元', { exact: true }).press('Enter');
     await page.getByLabel('起動から確認までの秒数', { exact: true }).fill('1');
 
@@ -479,6 +487,11 @@ async function restarted(inspectPort, predicate, previousPid) {
       inspectPort,
       "[...document.querySelectorAll('.settings-categories button')].find(b => b.textContent.trim() === '一般').click()",
     );
+    await settingsRenderer(
+      inspectPort,
+      'true',
+      '.settings-categories button.selected span[title="一般"]',
+    );
     await wait(200);
     const oldPid = await inspect(inspectPort, 'process.pid');
     await renderer(
@@ -499,6 +512,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       await settingsRenderer(
         inspectPort,
         "document.querySelector('.settings-categories button.selected')?.textContent.trim()",
+        '.settings-categories button.selected span[title="一般"]',
       ),
       '一般',
     );

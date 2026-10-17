@@ -10,6 +10,7 @@ import { useLayoutEffect, useRef } from 'react';
 
 /** Separate detail tabs edit the same host settings session. */
 export function AppletSettingsPanel({
+  ready,
   applet,
   applets,
   commands,
@@ -18,6 +19,7 @@ export function AppletSettingsPanel({
   onWebAccounts,
   webAccounts,
 }: {
+  ready: boolean;
   applet: ExtensionSnapshot;
   applets: { id: string; title: string }[];
   commands: UiCommand[];
@@ -37,7 +39,12 @@ export function AppletSettingsPanel({
       ref={panel}
     >
       {tab === 'settings' ? (
-        <SettingsPage key={applet.id} context="applet" pageId={appletSettingsPageId(applet.id)} />
+        <SettingsPage
+          key={applet.id}
+          ready={ready}
+          context="applet"
+          pageId={appletSettingsPageId(applet.id)}
+        />
       ) : (
         <AppletShortcutOverview
           key={applet.id}

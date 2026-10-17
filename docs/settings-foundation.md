@@ -24,6 +24,8 @@ IME変換中は画面内に保持してcompositionendで送る。フォーカス
 
 SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使用する。DockApi.settingsPageのopen/get/act/close/onChangedを本体のmainFrameだけに提供し、SettingsPageHostが接続ID・route・対象を検査する。Shell Appletへ設定描画bridgeは公開しない。
 
+更新・再起動で画面を復元するときは、保存された表示先だけで接続を開始しない。本体のstartupReadyとnavigation.routeが実際の表示先にそろってから設定を接続する。準備中は読み込み表示とし、対象が変われば接続と検索移動の監視を解放する。全体設定とApplet詳細の両入口で同じ条件を使う。
+
 本体内部モデルは選択ページのvalues/定義/表示用補助情報/不透明な操作IDとsessionId/editRevision/pending/mode/errorだけ。選択ページ以外のSettings/HostSnapshot・他Appletの値を投影しない。dirty/conflict/text/avatarChanged/avatarLoadingを削除した。page-values/partial-textは同ページのbefore投影を必須とし、対象外キーを拒否する。save/discard/avatar-loadingを削除。JSONはUTF-8 1MiB、画像5MiB、検索語512文字。
 
 全体設定とApplet詳細は同じ本文を使い、全体だけ左インデックスを表示する。停止/無効Appletも編集でき、開くだけで起動しない。本体の入力flushはナビゲーション前にuseSettingsEditorとSettingsViewClientのキューを3秒以内で待つ。成功済み値はページ切替/画面再作成をまたいで共有し、不正入力をView間で保持しない。Webアカウント削除は保存済み参照を検査する。

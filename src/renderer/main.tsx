@@ -168,6 +168,7 @@ function App() {
     ['description', 'settings', 'shortcuts', 'logs'],
   );
   const detailSettings = detailView === 'settings' || detailView === 'shortcuts';
+  const settingsPageReady = snapshot?.startupReady === true && snapshot.navigation.route === page;
   const editor = useSettingsEditor(snapshot?.settings);
   const settingsViewRestored = useRef(false);
   useEffect(() => {
@@ -624,6 +625,7 @@ function App() {
                             currentRevision={snapshot.settings.revision}
                           />
                           <AppletSettingsPanel
+                            ready={settingsPageReady}
                             commands={shortcutCommands}
                             applets={orderedApplets.map((e) => ({
                               id: e.id,
@@ -658,7 +660,9 @@ function App() {
               </>
             )}
             <div className="settings-page" hidden={page !== 'settings'}>
-              {page === 'settings' && <SettingsPage sidebarWidth={appletSidebar.width} />}
+              {page === 'settings' && (
+                <SettingsPage ready={settingsPageReady} sidebarWidth={appletSidebar.width} />
+              )}
             </div>
             {page === 'notifications' && (
               <ShellPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />
