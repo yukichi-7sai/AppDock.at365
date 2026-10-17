@@ -318,69 +318,24 @@ async function close() {
     await assign({ 'page.home': ids.b });
     await bound('page.home', ids.b);
     await host.evaluate(() => window.dock.navigate('settings'));
-    let settingsPage = await page('page.settings', defaultShellId);
-    assert.equal((await settingsPage.getByRole('combobox').count()) >= 9, true);
+    const settingsPage = await require('./settings-host-helper.cjs').settingsPage(host);
+    assert.equal(await settingsPage.getByLabel('設定のShell', { exact: true }).count(), 0);
     await settingsPage.screenshot({ path: path.join(profile, 'appearance.png') });
-    await settingsPage.getByLabel('設定のShell', { exact: true }).selectOption(ids.a);
-    settingsPage = await page('page.settings', ids.a);
+    await assign({ 'page.settings': ids.a });
+    assert.equal((await snap()).settings.value.host.shellProviders['page.settings'], ids.a);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.shellProviders[
-        'page.settings'
-      ],
-      ids.a,
+      (await snap()).shellRegions.regions.some((r) => r.region === 'page.settings'),
+      false,
     );
-    await settingsPage.getByLabel('設定のShell', { exact: true }).selectOption(ids.b);
-    settingsPage = await page('page.settings', ids.b);
+    assert.equal(
+      pages().some((p) => p.url().endsWith('/settings.html')),
+      false,
+    );
     assert.equal(
       (await snap()).settings.value.host.shellProviders['future.panel'],
       'missing.future',
     );
-    assert.equal((await snap()).settings.value.host.shellProvider, undefined);
-    checks.push(
-      'partial provider retains assignment with region fallback; settings UI self-switch waits for immediate save and input queue, preserving unknown regions',
-    );
-    if (app) {
-      await app.evaluate(({ webContents }) => {
-        const wc = webContents
-          .getAllWebContents()
-          .find((c) => c.getURL().includes('/fixture.region-b/settings.html'));
-        globalThis.regionFlush = { wc, send: wc.send.bind(wc) };
-        wc.send = (channel, ...args) => {
-          if (channel !== 'shell-page:flush') globalThis.regionFlush.send(channel, ...args);
-        };
-      });
-      await assign({ 'page.settings': ids.a });
-      await until(
-        async () => String((await state('page.settings')).reason).includes('入力受付'),
-        'flush timeout',
-      );
-      assert.equal((await state('page.settings')).boundProvider, ids.b);
-      assert.equal((await state('page.settings')).configuredProvider, ids.a);
-      await app.evaluate(() => {
-        globalThis.regionFlush.wc.send = globalThis.regionFlush.send;
-      });
-      settingsPage = await page('page.settings', ids.b);
-      const conn = await settingsPage.evaluate(() => window.appdockPage.connect());
-      await settingsPage.evaluate(async (c) => {
-        const m = c.snapshot;
-        await window.appdockPage.act({
-          id: m.id,
-          type: 'settings',
-          sessionId: m.content.editing.sessionId,
-          editRevision: m.content.editing.editRevision,
-          operationId: crypto.randomUUID(),
-          operation: {
-            kind: 'invoke',
-            actionId: m.content.actions.retryShellRegion,
-            args: ['page.settings'],
-          },
-        });
-      }, conn);
-      await bound('page.settings', ids.a);
-      checks.push(
-        '3s flush timeout keeps valid old settings View and saved assignment; explicit region retry completes swap without rollback',
-      );
-    }
+    checks.push('settings remains host owned while retired and unknown assignments are preserved');
     await execute(ids.a + '.notice');
     await bound('notification.banner', ids.a);
     await bound('notification.desktop', ids.b);

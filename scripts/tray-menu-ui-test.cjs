@@ -199,7 +199,7 @@ const checks = [];
     // CDP mouse dragging in an embedded WebContentsView may emit no HTML5 drag events.
     // Exercise the browser's drag handlers with one shared DataTransfer; keyboard and
     // reorder buttons above still use normal UI input.
-    const dragPage = await require('./settings-shell-helper.cjs').settingsPage(page);
+    const dragPage = await require('./settings-host-helper.cjs').settingsPage(page);
     const dataTransfer = await dragPage.evaluateHandle(() => new DataTransfer());
     const sourceRow = dragPage.locator(`[data-tray-item="${openId}"] .tray-drag`);
     const targetRow = dragPage.locator('[data-tray-item]').first();
@@ -427,7 +427,7 @@ const checks = [];
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result));
   } catch (error) {
-    const settingsPage = await require('./settings-shell-helper.cjs')
+    const settingsPage = await require('./settings-host-helper.cjs')
       .settingsPage(page)
       .catch(() => page);
     await settingsPage.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});

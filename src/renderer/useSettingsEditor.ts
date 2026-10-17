@@ -1,3 +1,4 @@
+import { flushSettingsPageInputs } from './settings-input-flush';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Settings, SettingsSnapshot } from '../shared/contracts';
 import type { SettingsEdit, SettingsInputState } from '../shared/settings-editing';
@@ -81,7 +82,7 @@ export function useSettingsEditor(current: SettingsSnapshot | undefined) {
         void send({ type: 'values', before, value }).catch(() => {});
       },
       selectPage: (pageId: string) => {
-        void send({ type: 'select-page', pageId }).catch(() => {});
+        void flushSettingsPageInputs().then(() => send({ type: 'select-page', pageId })).catch((e) => setError(String(e)));
       },
       reset: () => {
         setError('');

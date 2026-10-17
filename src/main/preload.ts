@@ -1,6 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 const api: DockApi = {
+  settingsPage: {
+    open: (request) => ipcRenderer.invoke('dock:settingsPage:open', request),
+    get: (id) => ipcRenderer.invoke('dock:settingsPage:get', id),
+    act: (id, action) => ipcRenderer.invoke('dock:settingsPage:act', id, action),
+    close: (id) => ipcRenderer.invoke('dock:settingsPage:close', id),
+    onChanged: (callback) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        connection: import('../shared/settings-page').SettingsPageConnection,
+      ) => callback(connection);
+      ipcRenderer.on('dock:settingsPage:changed', listener);
+      return () => ipcRenderer.removeListener('dock:settingsPage:changed', listener);
+    },
+  },
   settingsEditing: () => ipcRenderer.invoke('dock:settingsEditing'),
   flushSettings: () => ipcRenderer.invoke('dock:flushSettings'),
   onSettingsSidebarWidth: (callback) => {
@@ -47,7 +61,7 @@ const api: DockApi = {
     ipcRenderer.on('dock:shellFocusHost', handler);
     return () => ipcRenderer.removeListener('dock:shellFocusHost', handler);
   },
-  navigate: (route) => ipcRenderer.invoke('dock:navigate', route),
+  navigate: (route, restore) => ipcRenderer.invoke('dock:navigate', route, restore),
   shellViewport: (bounds) => ipcRenderer.invoke('dock:shellViewport', bounds),
   retryShell: () => ipcRenderer.invoke('dock:retryShell'),
   setAppletApiPermissions: (permissions) =>

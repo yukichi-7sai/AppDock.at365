@@ -8,7 +8,7 @@ async function clickRibbon(page, name) {
   const rail = await require('./shell-overlay-helper.cjs').ribbonPage(page);
   await rail.getByRole('button', { name, exact: true }).click();
   if (name === 'ホーム') await require('./shell-overlay-helper.cjs').homePage(page);
-  else if (name === '設定') await require('./settings-shell-helper.cjs').settingsPage(page);
+  else if (name === '設定') await require('./settings-host-helper.cjs').settingsPage(page);
   else if (name === 'ログ') await require('./shell-overlay-helper.cjs').logsPage(page);
   else await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
 }
@@ -55,8 +55,8 @@ async function launch() {
 }
 (async () => {
   let { app, page } = await launch();
-  const body = require('./settings-shell-helper.cjs').deferred(() =>
-    require('./settings-shell-helper.cjs').settingsPage(page),
+  const body = require('./settings-host-helper.cjs').deferred(() =>
+    require('./settings-host-helper.cjs').settingsPage(page),
   );
   const width = async () =>
     ((await page.evaluate(() => window.dock.snapshot())).navigation.route === 'settings'
@@ -153,15 +153,15 @@ async function launch() {
     const settingsSeparator = body.getByRole('separator', { name: '設定一覧の幅を変更' });
     const settingsBounds = await settingsSeparator.boundingBox();
     await (
-      await require('./settings-shell-helper.cjs').settingsPage(page)
+      await require('./settings-host-helper.cjs').settingsPage(page)
     ).mouse.move(settingsBounds.x + settingsBounds.width / 2, settingsBounds.y + 60);
-    await (await require('./settings-shell-helper.cjs').settingsPage(page)).mouse.down();
+    await (await require('./settings-host-helper.cjs').settingsPage(page)).mouse.down();
     await (
-      await require('./settings-shell-helper.cjs').settingsPage(page)
+      await require('./settings-host-helper.cjs').settingsPage(page)
     ).mouse.move(settingsBounds.x + settingsBounds.width / 2 - 40, settingsBounds.y + 60, {
       steps: 8,
     });
-    await (await require('./settings-shell-helper.cjs').settingsPage(page)).mouse.up();
+    await (await require('./settings-host-helper.cjs').settingsPage(page)).mouse.up();
     assert.equal(await width(), 310, 'settings can resize the shared sidebar');
     await settingsSeparator.focus();
     await settingsSeparator.press('ArrowRight');

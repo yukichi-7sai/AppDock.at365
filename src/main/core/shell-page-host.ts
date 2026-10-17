@@ -26,16 +26,12 @@ type Surface = {
 };
 /** One nonmodal body slot. Content controllers never own native display or provider recovery. */
 export class ShellPageHost {
-  private switching = false;
-  private deferredProvider?: string;
-  private flushBlocked?: string;
   private current?: ShellPageController;
   private surface?: Surface;
   private bounds: ShellPageViewport | null = null;
   private unavailable = false;
   private disposed = false;
   private pendingFocus?: 'first' | 'last';
-  private flushes = new Map<string, () => void>();
   constructor(
     private options: {
       window: BrowserWindow;
@@ -70,11 +66,8 @@ export class ShellPageHost {
             options.window.isVisible() &&
             !options.window.isMinimized() &&
             this.current?.route === options.route(),
-          pending: current ? (this.deferredProvider ?? null) : null,
-          reason:
-            current && this.flushBlocked
-              ? '設定画面の入力受付待ちです。再試行してください。'
-              : null,
+          pending: null,
+          reason: null,
         };
       });
     const bound = (event: IpcMainInvokeEvent, active = false) => {
@@ -113,10 +106,6 @@ export class ShellPageHost {
       bound(event, true);
       return this.current!.act(action);
     });
-    ipcMain.handle('shell-page:flushed', (event, id) => {
-      bound(event, true);
-      this.flushes.get(id)?.();
-    });
     ipcMain.handle('shell-page:executeCommand', (event, command) =>
       options.execute(bound(event, true).provider, command),
     );
@@ -153,30 +142,8 @@ export class ShellPageHost {
     this.bounds = bounds;
     this.refresh();
   }
-  async flush() {
-    if (
-      !this.current?.requiresFlush ||
-      !this.surface?.ready ||
-      this.current.route !== this.options.route()
-    )
-      return;
-    const id = randomUUID();
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.flushes.delete(id);
-        reject(Error('設定画面の入力受付を確認できませんでした。もう一度お試しください。'));
-      }, 3000);
-      this.flushes.set(id, () => {
-        clearTimeout(timer);
-        this.flushes.delete(id);
-        resolve();
-      });
-      this.surface!.view.webContents.send('shell-page:flush', id);
-    });
-  }
   close(id?: string) {
     if (id !== undefined && id !== this.current?.id) return;
-    this.flushBlocked = this.deferredProvider = undefined;
     this.current?.dispose?.();
     this.current = undefined;
     this.bounds = null;
@@ -269,7 +236,6 @@ export class ShellPageHost {
     if (!s) return;
     this.current?.viewClosed?.();
     // The closed view cannot acknowledge further requests; accepted edits already live in main.
-    for (const complete of this.flushes.values()) complete();
     if (this.current && !s.view.webContents.isDestroyed() && s.view.webContents.isFocused())
       this.pendingFocus = 'first';
     clearTimeout(s.timer);
@@ -313,7 +279,6 @@ export class ShellPageHost {
     }
     if (!this.options.ready()) return;
     if (this.surface && !this.options.registry.usable(this.region(), this.surface)) {
-      this.flushBlocked = this.deferredProvider = undefined;
       this.closeSurface();
     }
     const provider = this.candidate();
@@ -321,34 +286,7 @@ export class ShellPageHost {
       this.surface &&
       (provider?.id !== this.surface.provider || provider.version !== this.surface.version)
     ) {
-      if (this.current.requiresFlush && this.surface.ready) {
-        const key = provider?.id + ':' + provider?.generation;
-        this.deferredProvider = provider?.id;
-        if (!this.switching && this.flushBlocked !== key) {
-          this.switching = true;
-          const surface = this.surface;
-          // Let the current IPC reply finish before the renderer drains its input queue.
-          setImmediate(
-            () =>
-              void this.flush()
-                .then(
-                  () => {
-                    if (this.surface === surface) this.closeSurface();
-                    this.flushBlocked = undefined;
-                  },
-                  () => {
-                    if (this.surface === surface) this.flushBlocked = key;
-                  },
-                )
-                .finally(() => {
-                  this.switching = false;
-                  this.deferredProvider = undefined;
-                  this.refresh();
-                  this.options.registry.touch();
-                }),
-          );
-        }
-      } else this.closeSurface();
+      this.closeSurface();
     }
     if (!this.surface) this.present();
     const s = this.surface;
@@ -370,7 +308,6 @@ export class ShellPageHost {
   retry(region?: ShellRegion) {
     if (region && !region.startsWith('page.')) return;
     this.options.registry.retry(region);
-    this.flushBlocked = undefined;
     this.unavailable = false;
     this.refresh();
   }
@@ -381,7 +318,6 @@ export class ShellPageHost {
       'connect',
       'ready',
       'act',
-      'flushed',
       'executeCommand',
       'getSettings',
       'shortcut',

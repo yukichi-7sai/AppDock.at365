@@ -1,4 +1,4 @@
-const { settingsPage } = require('./settings-shell-helper.cjs');
+const { settingsPage } = require('./settings-host-helper.cjs');
 const { ribbonPage } = require('./shell-overlay-helper.cjs');
 const methods = [
   'getByRole',
@@ -21,12 +21,12 @@ function settingsAwarePage(host) {
       const route = (await host.evaluate(() => window.dock.snapshot())).navigation.route;
       if (
         ['settings', 'extensions'].includes(route) &&
-        ((await host.locator('.shell-page-slot[aria-label="設定画面に移動"]').count()) ||
+        ((await host.locator('.settings-surface').count()) ||
           route === 'settings')
       )
         settings = await settingsPage(host);
     } catch {}
-    if (settings) result.push(settings);
+    if (settings && settings !== host) result.push(settings);
     const route = (await host.evaluate(() => window.dock.snapshot())).navigation.route;
     if (['home', 'logs'].includes(route)) {
       for (const p of host

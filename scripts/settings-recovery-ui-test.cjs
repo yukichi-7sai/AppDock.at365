@@ -9,7 +9,7 @@ const { spawn } = require('node:child_process');
 const { inspect, electronExpression } = require('./electron-main-helper.cjs');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const { settingsAwarePage } = require('./settings-aware-page.cjs');
-const { settingsPage } = require('./settings-shell-helper.cjs');
+const { settingsPage } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..');
 const portable = process.argv[2] && path.resolve(process.argv[2]);
@@ -221,13 +221,13 @@ async function main() {
   fs.writeFileSync(file, JSON.stringify(disabled));
   await until(
     async () =>
-      (await state()).settings.value.notificationPreferences.overrides[0].enabled === false,
-    'disabled',
+      (await state()).settings.value.notificationPreferences.overrides[0].enabled === undefined,
+    'retired notification OFF input discarded',
   );
   fs.writeFileSync(file, '{broken-disabled');
   await until(async () => (await state()).settings.recovered, 'disabled recovery state');
   await sleep(2200);
-  assert(!(await items()).some((i) => i.ownerId === 'errors'));
+  assert((await items()).some((i) => i.ownerId === 'errors'));
   assert.equal(
     await ui.getByRole('button', { name: 'バックアップで復元', exact: true }).isEnabled(),
     true,
@@ -241,9 +241,9 @@ async function main() {
   await ui.getByRole('button', { name: 'バックアップで復元', exact: true }).click();
   await until(
     async () => !(await state()).settings.recovered,
-    'settings page restores with notifications disabled',
+    'host settings page restores alongside the error notification',
   );
-  checks.push('General recovery remains available when notifications disabled');
+  checks.push('General recovery and error notifications remain available after legacy OFF input');
   await toggle.click();
   await settleSettings(host);
   await until(
@@ -284,8 +284,8 @@ async function main() {
   fs.writeFileSync(file, JSON.stringify(reenabled));
   await until(
     async () =>
-      (await state()).settings.value.notificationPreferences.overrides[0].enabled === true,
-    'reenable errors before fallback startup',
+      (await state()).settings.value.notificationPreferences.overrides[0].enabled === undefined,
+    'legacy enabled input discarded before fallback startup',
   );
   await host.evaluate(() => window.dock.executeCommand('appdock.quit')).catch(() => {});
   await until(() => !browser.isConnected(), 'relaunch shutdown');

@@ -53,7 +53,7 @@ async function until(fn, label) {
 }
 async function page(category) {
   await host.evaluate(() => window.dock.navigate('settings'));
-  const p = await require('./settings-shell-helper.cjs').settingsPage(host);
+  const p = await require('./settings-host-helper.cjs').settingsPage(host);
   p.setDefaultTimeout(15000);
   const title = {
     appearance: '表示',
@@ -68,7 +68,7 @@ async function page(category) {
     () =>
       p.evaluate(
         (category) =>
-          window.appdockPage.connect().then((c) => c.snapshot.content.page.id === category),
+          window.dock.settingsPage.get(document.querySelector('.settings-surface').dataset.settingsConnection).then((m) => m.content.page.id === category),
         category,
       ),
     category,

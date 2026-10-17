@@ -1,6 +1,6 @@
 # Shellのページ表示
 
-ホーム・ログ・設定は共通の本文契約を使います。設定のデータ範囲と編集状態は[設定基盤](settings-foundation.md)を参照してください。
+ホーム・ログ・通知センターは共通の本文契約を使います。設定画面はShell対象外であり、[設定基盤](settings-foundation.md)を参照してください。
 
 ページViewはリボン・ステータスバー・ホスト通知を除く本文領域全体に配置します。Applet詳細内では見出し・タブの下の本文領域を使います。ホストは最大幅や外側余白を付けず、Shellが内部の余白・スクロールを管理します。寸法報告とページ別の配置は[Shellページのレイアウト](shell-page-layout.md)を参照してください。
 
@@ -28,8 +28,6 @@ WindowとページViewのネイティブ背景は現在のテーマに合わせ�
 | `HostLog` | ログの記録、起動中の直近500件、既存ファイル保存 |
 | `HomePageSession` | ホーム用の統計・ピン・カード、表示順の投影、操作ID・可否 |
 | `HomeCommandExecution` | Window内で共有するホームの実行中・結果・通知。通常コマンド実行経路へ委譲 |
-| `SettingsPageSession` | 選択ページの投影・操作ID・共有編集セッションへの接続 |
-| `SettingsInputSession` | 保存済み値を読むページ・モード・操作受付と保存revision |
 | `LogPageSession` | 表示対象、検索条件、表示モデル、操作の検証。表示用のコピーだけを公開 |
 | `ShellPageHost` | primary本文の1枠、提供元選択、遅延生成、ready、寸法・zoom、IPC送信元、表示順序、復旧、破棄 |
 | 本体の`ShellPageSlot` | 空の表示枠、領域報告、Tabによるフォーカス移動。本文UIを持たない |
@@ -87,17 +85,9 @@ ready期限は10秒。読込失敗・renderer終了/応答不能では同じCont
 
 `tests/log-page.test.cjs`は絞り込み・範囲固定・500件・revision・古い操作の拒否を確認する。`scripts/shell-page-ui-test.cjs [固定EXE]`は全体/詳細/Web管理・部分差し替え・自己コマンド/設定・復旧・ready期限・safe起動・テーマ・寸法・フォーカスを隔離profileで確認する。既存navigation、Shell、overlay、settings-shellの回帰も影響範囲に含む。実行結果と未確認事項は[VERIFICATION](../VERIFICATION.md)へ記録する。
 
-## 設定の公開契約
+## 設定画面との境界
 
-一般設定の`SettingsPageAuxiliary.settingsHealth`は、再起動待ちの理由、設定障害の安全な要約、バックアップ継続状態、復元可否、処理中の状態だけを追加投影する。Default Shellは「設定ファイル」欄を表示し、再起動・バックアップ復元・保存先表示を既存のopaque actionで呼ぶ。JSON本文、バックアップ一覧、通知内部の履歴は追加投影しない。通知を閉じたあともこの状態と操作は利用できる。
-
-`page.settings` は `SettingsPageModel` と `SettingsPageAction` を使用する。全体ページ（full）とApplet詳細（applet）は同じSettingsPageSession・Default Shell本文を共用し、fullだけが左インデックスを表示する。選択ページの値、項目定義、表示に必要な補助モデル、発行済みの不透明な操作IDだけを渡す。全Settings・HostSnapshotを公開しない。
-
-page.settingsは0.33.0からschemaVersion:2、追加ShellはminimumHostVersion:0.33.0以上。未対応の設定領域だけDefault Shellへ戻す。before/valueの選択ページ投影を検証して即時保存し、dirty/text/保存/破棄/画像バッファを持たない。入力途中と失敗値は現在のUIだけに保持する。onFlush/flushedの3秒期限と発行操作IDの範囲検査を維持する。契約の正本は[設定基盤](settings-foundation.md)。
-
-設定の`search`は最大512文字の検索語だけを更新し、編集revision・選択ページ・JSON範囲を変えない。`move`は最新カタログの項目IDを検証し、不正JSONの画面内入力を破棄して移動できる。成功時はフォーム全体を選択し、一意の移動要求を返す。Viewは宣言されたdata-setting-itemアンカーを待ち、親detailsを開き、固定ヘッダー外のスクロール領域へ移動してコンテナへフォーカスする。`moved`は現在の要求ID・ページIDのみを完了にする。古い要求を採用しない。
-
-SettingsNavigationStateはprimaryに保持し、Controller再作成・Shell復旧でもqueryを戻す。検索結果は項目名・説明・所属名・移動IDだけで、別ページの値や完全な定義を含めない。対象消失時は左結果を更新し、右は利用不可を表示する。選択と編集の値は勝手に別ページへ移さない。
+設定画面は本体rendererの共通UIであり、ShellPageRequest/Model/Actionの対象外とする。全体設定とApplet詳細は本体のSettingsPageSession・SettingsPageを共用する。投影、検索、即時保存、入力flushは[設定基盤](settings-foundation.md)を参照する。旧page.settings指定とmanifestは互換入力として保持・読込するが、設定用HTMLは起動しない。
 
 ## 通知センター
 

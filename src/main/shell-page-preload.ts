@@ -14,8 +14,6 @@ const api: ShellPageApi = {
   executeCommand: (id) => ipcRenderer.invoke('shell-page:executeCommand', id),
   onChanged: (callback) => subscribe('shell-page:changed', callback),
   onFocus: (callback) => subscribe('shell-page:focus', callback),
-  onFlush: (callback) => subscribe('shell-page:flush', callback),
-  flushed: (id) => ipcRenderer.invoke('shell-page:flushed', id),
   focusHost: (edge) => ipcRenderer.invoke('shell-page:focusHost', edge),
   shortcut: (key) => ipcRenderer.invoke('shell-page:shortcut', key),
 };

@@ -231,7 +231,7 @@ TTSジョブは生成から再生までを1件ずつ順番に実行し、先行�
 
 ## 実装構成と保守
 
-サービスはsrc/main/core/tts-service.ts、音声再生はtts-player.ts、秘密保存はtts-secrets.ts、共有型・設定検証はsrc/shared/tts.ts、Default Shellの設定フォームはshells/default/settings/TtsSettings.tsx。共通APIカタログ・設定・許可・本体寿命を接続する。
+サービスはsrc/main/core/tts-service.ts、音声再生はtts-player.ts、秘密保存はtts-secrets.ts、共有型・設定検証はsrc/shared/tts.ts、Default Shellの設定フォームはsrc/renderer/settings/TtsSettings.tsx。共通APIカタログ・設定・許可・本体寿命を接続する。
 
 以下は変更時の確認順序を示す。
 

@@ -15,6 +15,7 @@ settings.host.notifications = false;
 settings.globalShortcutCommands = [];
 settings.extensions['missing.applet'] = { enabled: false, settings: { private: 'never-in-shell' } };
 settings.host.closeToTray = false;
+require('./settings-web-fixture.cjs').installWebSettings(profile, settings);
 settings.extensions['fixture.settings'] = { enabled: false, settings: {} };
 settings.appletOrder = ['fixture.settings', 'fixture.stalled-settings'];
 for (const id of ['fixture.settings-shell', 'fixture.stalled-settings'])
@@ -58,6 +59,10 @@ manifest.id = 'fixture.settings-shell';
 manifest.name = 'Settings shell fixture';
 manifest.minimumHostVersion = '0.33.0';
 manifest.shell = { apiVersion: 1, views: { 'page.settings': 'settings.html' } };
+fs.writeFileSync(
+  path.join(external, 'settings.html'),
+  '<body>Legacy settings must not be opened</body>',
+);
 fs.writeFileSync(path.join(external, 'extension.json'), JSON.stringify(manifest));
 const stalled = path.join(profile, 'extensions', 'fixture.stalled-settings');
 fs.mkdirSync(stalled, { recursive: true });
@@ -125,7 +130,7 @@ async function until(fn, label) {
       await connection.close();
     }
   }
-  const settingsPage = () => require('./settings-shell-helper.cjs').settingsPage(host);
+  const settingsPage = () => require('./settings-host-helper.cjs').settingsPage(host);
   const provider = async (id) => {
     await host.evaluate(async (id) => {
       const s = await window.dock.snapshot();
@@ -152,12 +157,17 @@ async function until(fn, label) {
       );
     }, id);
   };
-  const modelOf = (p) => p.evaluate(() => window.appdockPage.connect().then((c) => c.snapshot));
+  const modelOf = (p) =>
+    p.evaluate(() =>
+      window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      ),
+    );
   const providerPage = (id) =>
     until(async () => {
       const p = await settingsPage();
       try {
-        if ((await p.evaluate(() => window.appdockPage.connect())).providerAppletId === id)
+        if (!(await context.pages()).some((surface) => surface.url().endsWith('/settings.html')))
           return p;
       } catch {}
     }, `provider ${id}`);
@@ -165,15 +175,20 @@ async function until(fn, label) {
   const itemId = require('../out/main/shared/settings-catalog').settingsItemId;
   const op = (page, operation) =>
     page.evaluate(async (operation) => {
-      const m = (await window.appdockPage.connect()).snapshot;
-      return window.appdockPage.act({
-        id: m.id,
-        type: 'settings',
-        sessionId: m.content.editing.sessionId,
-        editRevision: m.content.editing.editRevision,
-        operationId: crypto.randomUUID(),
-        operation,
-      });
+      const m = await window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      );
+      return window.dock.settingsPage.act(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+        {
+          id: m.id,
+          type: 'settings',
+          sessionId: m.content.editing.sessionId,
+          editRevision: m.content.editing.editRevision,
+          operationId: crypto.randomUUID(),
+          operation,
+        },
+      );
     }, operation);
   try {
     await until(
@@ -375,7 +390,7 @@ async function until(fn, label) {
     await host.evaluate(async (id) => {
       const account = await window.dock.createWebAccount('Search account');
       const s = await window.dock.snapshot();
-      s.settings.value.webApplets.items.push({
+      s.settings.value.extensions['fixture.web-settings'].settings.items.push({
         id,
         name: 'New search site',
         url: 'https://example.com/',
@@ -388,8 +403,8 @@ async function until(fn, label) {
       });
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     }, webId);
-    await shell.getByRole('option', { name: /^名前/ }).waitFor();
-    await shell.getByRole('option', { name: /^名前/ }).click();
+    await shell.getByRole('option', { name: /^WebAppletの名前/ }).waitFor();
+    await shell.getByRole('option', { name: /^WebAppletの名前/ }).click();
     await shell.getByLabel('WebAppletの名前').waitFor();
     m = await modelOf(shell);
     const oldItem = m.content.page.items[0].id;
@@ -397,9 +412,10 @@ async function until(fn, label) {
       assert.equal(await shell.locator(`[data-setting-item="${item.id}"]`).count(), 1, item.id);
     await host.evaluate(async (id) => {
       const s = await window.dock.snapshot();
-      s.settings.value.webApplets.items = s.settings.value.webApplets.items.filter(
-        (a) => a.id !== id,
-      );
+      s.settings.value.extensions['fixture.web-settings'].settings.items =
+        s.settings.value.extensions['fixture.web-settings'].settings.items.filter(
+          (a) => a.id !== id,
+        );
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     }, webId);
     await shell.getByText('0件の設定', { exact: true }).waitFor();
@@ -410,7 +426,7 @@ async function until(fn, label) {
     await op(shell, { kind: 'select', pageId: 'appearance' });
     await shell.getByLabel('テーマ', { exact: true }).waitFor();
     await search().fill('テーマ');
-    // The fixture switches providers through the host API, outside the Shell input queue.
+    // The fixture switches legacy assignments through the host API after input settles.
     await until(
       async () => (await modelOf(shell)).content.query === 'テーマ',
       'search accepted before provider replacement',
@@ -421,26 +437,13 @@ async function until(fn, label) {
     await provider('fixture.settings-shell');
     shell = await providerPage('fixture.settings-shell');
     assert.equal(await search().inputValue(), 'テーマ');
-    if (app) {
-      await app.evaluate(({ webContents }) =>
-        webContents
-          .getAllWebContents()
-          .find(
-            (w) =>
-              w.getURL().includes('/fixture.settings-shell/') &&
-              w.getURL().endsWith('/settings.html'),
-          )
-          .forcefullyCrashRenderer(),
-      );
-      shell = await providerPage('appdock.default-shell');
-    } else {
-      await provider('fixture.stalled-settings');
-      await until(
-        () => context.pages().some((p) => p.url().includes('/fixture.stalled-settings/')),
-        'stalled created',
-      );
-      shell = await providerPage('appdock.default-shell');
-    }
+    assert.equal(
+      context.pages().some((p) => p.url().endsWith('/settings.html')),
+      false,
+    );
+    checks.push('settings remain in the host document; legacy Shell HTML is never loaded');
+    await provider('fixture.stalled-settings');
+    shell = await providerPage('appdock.default-shell');
     assert.equal(await search().inputValue(), 'テーマ');
     await shell.getByRole('option', { name: /テーマ/ }).click();
     await shell.getByLabel('テーマ', { exact: true }).waitFor();
@@ -460,8 +463,8 @@ async function until(fn, label) {
     } else await shell.screenshot({ path: path.join(profile, 'search-portable.png') });
     checks.push(
       app
-        ? 'query and selection survive provider change/crash; narrow 900/700 and reduced motion'
-        : 'fixed EXE query survives provider change/timeout recovery; reduced motion',
+        ? 'query and selection survive legacy provider assignments; narrow 900/700 and reduced motion'
+        : 'fixed EXE query survives inert legacy provider assignments; reduced motion',
     );
     const result = {
       success: true,

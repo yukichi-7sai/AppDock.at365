@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process'),
   { createHash } = require('node:crypto'),
   { chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
-const { settingsPage } = require('./settings-shell-helper.cjs'),
+const { settingsPage } = require('./settings-host-helper.cjs'),
   { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'applet-settings-' + Date.now());
@@ -19,14 +19,7 @@ initial.host.hardwareAcceleration = false;
 initial.host.notifications = false;
 initial.keybindings = [];
 initial.gestures.enabled = false;
-for (const name of [
-  'Gmail',
-  'Watch',
-  'WallpaperSlideshow',
-  'WebBrowserTools',
-  'WindowsTools',
-  'WindowMover',
-]) {
+for (const name of ['Gmail', 'Watch', 'WallpaperSlideshow', 'WebBrowserTools', 'WindowsTools']) {
   const repo = path.resolve(root, '../Applet.' + name + '.at365'),
     folder = path.join(profile, 'extensions', name);
   const source = path.join(getPublishDirectory(repo), 'Applet.' + name + '.at365');
@@ -79,6 +72,7 @@ fs.writeFileSync(
 );
 initial.extensions['fixture.sections'] = { enabled: true, settings: { privateValue: 'keep' } };
 const webId = 'web.12121212-1212-4212-8212-121212121212';
+initial.webApplets = {};
 initial.webApplets.items = [
   {
     id: webId,
@@ -96,6 +90,13 @@ require('../out/main/shared/settings-schema').parseSettings(initial);
 initial.webApplets.accounts = [
   { id: initial.webApplets.items[0].accountId, name: 'Fixture account' },
 ];
+require('./settings-web-fixture.cjs').installWebSettings(
+  profile,
+  initial,
+  initial.webApplets.items,
+  initial.webApplets.accounts,
+);
+delete initial.webApplets;
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const checks = [],
   errors = [];
@@ -178,7 +179,7 @@ async function until(fn, label) {
       assert.notEqual((await snapshot()).extensions.find((a) => a.id === m.id).state, 'running');
     }
     checks.push(
-      'all six real Applet manifests render common sections and every field/action; common startup saves without activating Applets',
+      'all five available real Applet manifests render common sections and every field/action; common startup saves without activating Applets',
     );
     await select('Watch.at365');
     assert.equal(
@@ -208,9 +209,10 @@ async function until(fn, label) {
     await select('WallpaperSlideshow.at365');
     await page.getByRole('button', { name: 'モニターを追加', exact: true }).click();
     await settleSettings(page);
-    await page.getByLabel('モニター1 表示モード', { exact: true }).selectOption('Tile');
-    await settleSettings(page);
-    await page.getByLabel('モニター1 タイル枚数', { exact: true }).fill('6');
+    const monitorDialog = page.getByRole('dialog');
+    await monitorDialog.getByLabel('表示モード', { exact: true }).selectOption('Tile');
+    await monitorDialog.getByLabel('タイル枚数', { exact: true }).fill('6');
+    await monitorDialog.getByRole('button', { name: 'OK', exact: true }).click();
     await settleSettings(page);
     assert.equal(
       (await snapshot()).settings.value.extensions['at365.wallpaper-slideshow'].settings.monitors[0]
@@ -268,8 +270,12 @@ async function until(fn, label) {
     await select('Web settings fixture');
     await page.getByLabel('WebAppletの表示方法', { exact: true }).selectOption('window');
     await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.webApplets.items[0].display, 'window');
-    assert.equal(await page.locator('.web-applet-form > .settings-section').count(), 4);
+    assert.equal(
+      (await snapshot()).settings.value.extensions['fixture.web-settings'].settings.items[0]
+        .display,
+      'window',
+    );
+    assert.equal(await page.locator('.settings-body [data-setting-item]').count(), 3);
     for (const theme of ['dark', 'light']) {
       await host.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -302,7 +308,7 @@ async function until(fn, label) {
     }
     assert.deepEqual(errors, []);
     checks.push(
-      'six Applets plus WebApplet fit light/dark at wide and narrow sizes; native Applets stay stopped',
+      'five available Applets plus a remote collection fixture fit light/dark at wide and narrow sizes; native Applets stay stopped',
     );
     const disk = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     assert.equal(disk.extensions['fixture.sections'].settings.text, 'saved in detail');

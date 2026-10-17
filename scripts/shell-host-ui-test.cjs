@@ -1,5 +1,5 @@
 const { settleSettings } = require('./settings-immediate-helper.cjs');
-const { settingsPage: getSettingsPage, deferred } = require('./settings-shell-helper.cjs');
+const { settingsPage: getSettingsPage, deferred } = require('./settings-host-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),

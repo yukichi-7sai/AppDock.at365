@@ -4,7 +4,7 @@ async function settleSettings(page) {
   const context = await page.context();
   const host = context.pages().find((p) => p.url().startsWith('appdock://host/'));
   assert(host, 'host page for settings flush');
-  for (const p of context.pages().filter((p) => p.url().endsWith('/settings.html')))
+  for (const p of context.pages().filter((p) => p.url().startsWith('appdock://host/')))
     await p.waitForFunction(
       () =>
         ![...document.querySelectorAll('.profile-actions button')].some((e) =>

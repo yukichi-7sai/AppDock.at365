@@ -1,6 +1,6 @@
 # Shell Hostの構成と拡張方針
 
-本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。リボン、コマンドパレット、ホーム、ログ、設定本文、通知センター、通知バナー・デスクトップ通知はShellが描画する。未移行の本文は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
+本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。リボン、コマンドパレット、ホーム、ログ、通知センター、通知バナー・デスクトップ通知はShellが描画する。未移行の本文は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
 
 ## 用語と境界
 
@@ -12,6 +12,8 @@
 
 Default Shellは本体と独立したrenderer成果物として同時ビルドし、単一EXEへ同梱する。追加Appletの独立repo規則はDefault Shellへ適用しない。出荷元以外の実行契約はShell Appletと共通にし、Default Shell専用APIや本体rendererの復旧用描画を作らない。
 
+設定画面は本体rendererの共通画面で、Shellの提供元・復旧には依存しない。詳しくは[設定基盤](settings-foundation.md)を参照する。
+
 本体はShellのReact実装をimportせず、Shellもsrc/main・src/rendererをimportしない。公開型・共通のアイコン素材・限定bridgeを使う。本体の汎用ローダーがmanifestと成果物を発見するための参照は、この描画依存禁止とは別である。
 
 ## 表示領域
@@ -20,7 +22,6 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | --- | --- | --- |
 | ribbon | UiPresentationの表示モデル・操作ID・ナビゲーション | [Shell API](shell-api.md) |
 | overlay.command-palette | CommandPaletteSessionとOverlayController | [部分Shellと共通オーバーレイ](shell-overlays.md) |
-| page.settings | SettingsPageSessionとSettingsInputSession | [設定基盤](settings-foundation.md) |
 | page.home | HomePageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.logs | LogPageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.notifications | NotificationCenterController | [通知基盤](notifications.md) |
@@ -61,7 +62,7 @@ Viewは領域単位で必要時に生成し、ready後に表示を切り替え�
 
 ## 後続計画
 
-設定の左右領域とApplet詳細の設定本文は`page.settings`で共用する。選択ページの値だけを配信し、入力の受付・保存はmainの共有編集セッションへ接続する。境界は[設定基盤](settings-foundation.md)を参照する。Appletインデックス・横断検索・項目移動も同じ公開契約で提供する。
+設定の左右領域とApplet詳細の設定本文は本体のSettingsPageを共用する。即時保存・検索・部分JSONは本体の設定基盤へ接続する。設定描画をShellへ移す後続計画は廃止した。
 
 一般Appletの複数Window・同一領域の同時多重表示は未実装。通知専用Windowは共通通知射影へ限定し、Applet Surfaceを多重化しない。導入する場合はcontext/binding/sessionとWindow寿命を分け、同じ機能サービスを複数の読者から使う。Windowが閉じても共有Appletや他の読者を停止しない。単一WebContentsの二重表示を前提にせず、既存AppletSurfaceの全面的な多重化は別に設計する。
 

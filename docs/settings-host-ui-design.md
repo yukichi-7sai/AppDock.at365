@@ -1,6 +1,6 @@
 # 設定画面の本体統合とsettings-uiの整理
 
-状態: 設計完了・未実装（2026-10-17）。設定画面はすべてのShellで共通とする方針に基づく。現行動作は[設定基盤](settings-foundation.md)を参照する。本書はその変更計画であり、現時点で設定Shellが撤去済みであることを示さない。
+状態: 実装済み（2026-10-18、0.58.0）。設計作成: 2026-10-17。設定画面はすべてのShellで共通とする方針に基づく。現行動作は[設定基盤](settings-foundation.md)を参照する。本書は採用した設計を記録する。実行結果と未確認事項はVERIFICATIONを参照する。
 
 ## 目的と決定
 
@@ -73,7 +73,7 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 
 ### 本体専用の設定ページbridge
 
-本体preloadのDockApiへ`settingsPage`を追加する。以下は新規の内部API案で、Applet/MCPには公開しない。
+本体preloadのDockApiへ`settingsPage`を追加する。以下は本体の内部APIで、Applet/MCPには公開しない。
 
 | 操作 | 役割 |
 | --- | --- |
@@ -166,7 +166,7 @@ ShellPageRequest/Model/Actionのunionから設定を外し、ShellPageSlot、She
 4. **検証基盤の移行**: 設定Surfaceを探す共通helperと、直接settings.htmlへ接続する試験を本体documentへ更新。旧Shell復旧の試験を、本体固定表示・旧宣言無視・他領域継続の試験へ置き換える。
 5. **レビュー・記録・発行**: 差分と影響先をレビューし、必要な検証を終えて文書・版を更新。本体だけを通常publishし、固定EXEを隔離確認する。
 
-今回は設計書の作成までとする。実装時には公開契約の撤去と設定項目の廃止を含むため、[共通手順](development-workflow.md#版更新の判断)に従って本体をマイナー更新する。具体的な版は実装着手時の版から決定する。未変更Appletの版更新・再発行、全体ZIP作成、commit/push/Release/deployはこの設計作業に含めない。
+実装は本書の方針に従う。実装時には公開契約の撤去と設定項目の廃止を含むため、[共通手順](development-workflow.md#版更新の判断)に従って本体をマイナー更新する。具体的な版は実装着手時の版から決定する。未変更Appletの版更新・再発行、全体ZIP作成、commit/push/Release/deployはこの設計作業に含めない。
 
 ## 検証計画と完了条件
 

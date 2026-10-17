@@ -155,7 +155,8 @@ test('uninstalled, waiting, partial and incompatible providers fall back only in
   const { registry: r, assignments, providers } = fixture();
   assignments['page.settings'] = 'shell.a';
   providers[1].minimumHostVersion = '0.32.0';
-  assert.equal(r.resolve('page.settings').provider.id, defaultShellId);
+  assert.equal(r.snapshot().regions.some((v) => v.region === 'page.settings'), false);
+  assert.match(r.requirement('shell.a', { region: 'page.settings', state: 'resolved' }), /本体/);
   assert.equal(r.resolve('ribbon').provider.id, 'shell.a');
   delete providers[1].shell.views.ribbon;
   assert.equal(r.resolve('ribbon').provider.id, defaultShellId);

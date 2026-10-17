@@ -5,7 +5,7 @@ const net = require('node:net');
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
-const { settingsPage } = require('./settings-shell-helper.cjs');
+const { settingsPage } = require('./settings-host-helper.cjs');
 const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'web-list-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });

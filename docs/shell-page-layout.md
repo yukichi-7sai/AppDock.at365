@@ -1,5 +1,7 @@
 # Shellページの表示領域とレイアウト設計
 
+現在の設定画面は本体rendererのSettingsPageで描画する。設定は本書のShellPageSlot/WebContentsViewの対象外であり、[本体統合](settings-host-ui-design.md)を参照する。以下の旧設定Shellへの言及は移行前のレイアウト検討記録とする。
+
 2026-10-12実装。本文領域の割り当てとShell内部のレイアウトを定義する。検証結果は[VERIFICATION](../VERIFICATION.md)を参照。
 
 ## 目的

@@ -11,7 +11,7 @@ const profile = path.join(root, '.artifacts', `ribbon-groups-ui-${Date.now()}`);
 const portable = process.argv[2] && path.resolve(process.argv[2]);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const { ribbonPage, closingAction } = require('./shell-overlay-helper.cjs');
-const { settingsPage } = require('./settings-shell-helper.cjs');
+const { settingsPage } = require('./settings-host-helper.cjs');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;

@@ -34,3 +34,16 @@ test('host and Default Shell communicate through public contracts, without cross
   }
   assert.deepEqual(violations, []);
 });
+test('settings UI ships only in the host renderer, with no settings Shell entry', () => {
+  assert.equal(fs.existsSync(path.join(sdk, 'settings-ui')), false);
+  assert.equal(fs.existsSync(path.join(shell, 'settings.html')), false);
+  assert(fs.existsSync(path.join(host, 'renderer/settings/SettingsPage.tsx')));
+  const manifest = JSON.parse(fs.readFileSync(path.join(shell, 'extension.json'), 'utf8'));
+  assert.equal(manifest.shell.views['page.settings'], undefined);
+  assert.equal(
+    fs
+      .readFileSync(path.join(root, 'src/main/shell-page-preload.ts'), 'utf8')
+      .includes('dock:settingsPage:'),
+    false,
+  );
+});

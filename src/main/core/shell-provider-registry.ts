@@ -3,7 +3,6 @@ import {
   defaultShellId,
   shellRegions,
   shellView,
-  settingsShellCompatible,
   type ShellRegion,
   type ShellRegionStatus,
   type ShellRegionsSnapshot,
@@ -77,8 +76,6 @@ export class ShellProviderRegistry {
     if (!shellView(p.shell, region)) return 'この領域を提供していません。';
     if (region === 'ribbon' && p.shell?.ribbonSchemaVersion !== 2)
       return 'グループとバッジに対応していないリボンShellです。';
-    if (region === 'page.settings' && !settingsShellCompatible(p))
-      return '即時保存に対応していない設定Shellです。';
     if (p.state === 'error') return '提供元のworkerが停止しました。再試行してください。';
     if (p.state !== 'running') return '提供元の起動を待っています。';
     if (this.failed(region, p.id, p.version))
@@ -178,16 +175,18 @@ export class ShellProviderRegistry {
   }
   lease(provider: string, requirement?: ShellRequirement): (() => boolean) | undefined {
     if (!requirement) return;
+    if (requirement.region === 'page.settings') return () => false;
+    const region = requirement.region;
     const generation = this.providers().find((p) => p.id === provider)?.generation;
-    const session = this.probes.get(requirement.region)?.().session;
+    const session = this.probes.get(region)?.().session;
     return () =>
       this.providers().find((p) => p.id === provider)?.generation === generation &&
       !this.requirement(provider, requirement) &&
-      (requirement.state !== 'visible' ||
-        this.probes.get(requirement.region)?.().session === session);
+      (requirement.state !== 'visible' || this.probes.get(region)?.().session === session);
   }
   requirement(provider: string, requirement?: ShellRequirement): string | undefined {
     if (!requirement) return;
+    if (requirement.region === 'page.settings') return '設定画面は本体で共通表示します。';
     const state = this.region(requirement.region);
     if (
       requirement.state === 'resolved'

@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process'),
   { createHash } = require('node:crypto'),
   { chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
-const { settingsPage } = require('./settings-shell-helper.cjs'),
+const { settingsPage } = require('./settings-host-helper.cjs'),
   { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'settings-usability-' + Date.now());
@@ -162,7 +162,11 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     assert(!requests.includes('speech'), 'editing never speaks');
     checks.push('voice selection and speed save without automatic speech');
     await select('通知');
-    const model = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+    const model = await page.evaluate(() =>
+      window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      ),
+    );
     const type = model.content.auxiliary.notificationTypes.find((t) => !t.requiredTargets.length);
     assert(type);
     await page
@@ -283,7 +287,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         ]) {
           await select(name);
           const result = await page.evaluate(() => {
-            const m = document.querySelector('main'),
+            const m = document.querySelector('.settings-page-layout'),
               b = document.querySelector('.settings-body'),
               h = document.querySelector('.settings-page-heading'),
               t = document.querySelector('.settings-page-toolbar');
@@ -316,7 +320,13 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
       0,
     );
-    assert.equal(await page.getByRole('button', { name: 'AppDockを更新', exact: true }).count(), 1);
+    assert.equal(
+      await page
+        .locator('.settings-surface')
+        .getByRole('button', { name: 'AppDockを更新', exact: true })
+        .count(),
+      1,
+    );
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
     assert.equal(await page.locator('.about-applets').isVisible(), false);
     assert.equal(await page.locator('.about-installed-version .settings-badge').count(), 1);

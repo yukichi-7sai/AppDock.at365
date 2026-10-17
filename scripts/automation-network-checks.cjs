@@ -97,7 +97,7 @@ module.exports = async ({ page, section, client, configFile, profile, checks, un
   const surface = page
     .context()
     .pages()
-    .find((item) => item.url().endsWith('/settings.html'));
+    .find((item) => item.url().startsWith('appdock://host/'));
   assert(surface, 'settings surface');
   await select.scrollIntoViewIfNeeded();
   await surface.screenshot({ path: path.join(profile, 'mcp-network.png') });

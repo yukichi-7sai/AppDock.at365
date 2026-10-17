@@ -1,0 +1,56 @@
+import type { Settings } from '../../shared/contracts';
+import type { UiCommand } from '../../shared/commands';
+import {
+  applyKeybindingOrder,
+  getKeybindings,
+  keybindingGroups,
+  keybindingConditionLabel,
+  moveKeybindingWithinKey,
+  withKeybindings,
+} from '../../shared/keybindings';
+import { BindingOrderDialog } from './BindingOrderDialog';
+
+export function ShortcutOrderDialog({
+  settings,
+  commands,
+  applets,
+  initialKey,
+  onChange,
+  onClose,
+}: {
+  settings: Settings;
+  commands: UiCommand[];
+  applets: { id: string; title: string }[];
+  initialKey?: string;
+  onChange(value: Settings): void;
+  onClose(): void;
+}) {
+  return (
+    <BindingOrderDialog
+      bindings={getKeybindings(settings)}
+      commands={commands}
+      initialInput={initialKey}
+      title="ショートカットの実行順"
+      inputName="キー"
+      inputLabel={(key) => key}
+      conditionLabel={(row, command) =>
+        keybindingConditionLabel(
+          row.when,
+          command?.extensionId ? command.extension : undefined,
+          applets,
+        )
+      }
+      groupRows={keybindingGroups}
+      moveRow={moveKeybindingWithinKey}
+      onApply={(ordered, original) =>
+        onChange(
+          withKeybindings(
+            settings,
+            applyKeybindingOrder(getKeybindings(settings), original, ordered),
+          ),
+        )
+      }
+      onClose={onClose}
+    />
+  );
+}

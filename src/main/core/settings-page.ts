@@ -1,20 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import type { HostSnapshot } from '../../shared/contracts';
-import type { ShellPageAction, ShellPageRequest } from '../../shared/shell-pages';
 import type {
   SettingsPageAuxiliary,
   SettingsPageModel,
   SettingsPageRequest,
   SettingsNavigationState,
+  SettingsPageAction,
 } from '../../shared/settings-page';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import { searchSettings } from '../../shared/settings-catalog';
 import type { SettingsInputSession } from './settings-input-session';
-import type { ShellPageController } from './shell-page-controller';
 
-export class SettingsPageSession implements ShellPageController {
+export class SettingsPageSession {
   readonly kind = 'settings';
-  readonly requiresFlush = true;
   readonly id: string;
   readonly route: string;
   private revision = 0;
@@ -66,8 +64,22 @@ export class SettingsPageSession implements ShellPageController {
         });
     }
   }
+  isCurrent() {
+    return (
+      !this.disposed &&
+      (this.request.context !== 'applet' ||
+        !this.request.pageId ||
+        this.options.editor.snapshot().pageId === this.request.pageId)
+    );
+  }
   snapshot(): SettingsPageModel {
     const state = this.options.editor.snapshot();
+    if (
+      this.request.context === 'applet' &&
+      this.request.pageId &&
+      state.pageId !== this.request.pageId
+    )
+      throw Error('設定画面の対象が変わりました。');
     const host = this.options.host();
     const catalog = this.options.editor.catalog();
     const page = catalog.find((p) => p.id === state.pageId) ?? {
@@ -142,7 +154,7 @@ export class SettingsPageSession implements ShellPageController {
       content,
     };
   }
-  async act(action: ShellPageAction) {
+  async act(action: SettingsPageAction) {
     if (
       this.disposed ||
       action?.type !== 'settings' ||
@@ -159,8 +171,14 @@ export class SettingsPageSession implements ShellPageController {
     while (this.requests.size > 512) this.requests.delete(this.requests.keys().next().value!);
     return work;
   }
-  private async perform(action: Extract<ShellPageAction, { type: 'settings' }>) {
+  private async perform(action: SettingsPageAction) {
     const state = this.options.editor.snapshot();
+    if (
+      this.request.context === 'applet' &&
+      this.request.pageId &&
+      state.pageId !== this.request.pageId
+    )
+      throw Error('設定画面の対象が変わりました。');
     if (action.sessionId !== state.sessionId || action.editRevision !== state.editRevision)
       throw Error('編集内容が別の画面で変わりました。再取得してください。');
     this.error = '';
@@ -203,6 +221,10 @@ export class SettingsPageSession implements ShellPageController {
         )
           throw Error('移動要求が古くなっています。');
         move.completed = true;
+      } else if (op.kind === 'viewport') {
+        if (!Number.isFinite(op.width) || op.width < 320 || op.width > 10000)
+          throw Error('設定画面の幅が不正です。');
+        this.request.hostWidth = op.width;
       } else if (op.kind === 'sidebar-width') {
         if (
           this.request.context !== 'full' ||
@@ -256,7 +278,7 @@ export class SettingsPageSession implements ShellPageController {
     this.actions.clear();
     this.options.release?.();
   }
-  update(request: ShellPageRequest) {
+  update(request: SettingsPageRequest) {
     if (request.kind !== 'settings') return;
     if (
       Number.isFinite(request.sidebarWidth) &&

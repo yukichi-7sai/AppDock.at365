@@ -22,7 +22,6 @@
 | `page.home` | ホーム本文 | ShellPageHost |
 | `page.logs` | 全体・Applet詳細・WebApplet管理のログ本文 | ShellPageHost |
 | `page.notifications` | 通知センター本文 | ShellPageHost |
-| `page.settings` | 全体設定とApplet詳細の設定本文 | ShellPageHost |
 | `notification.banner` | Window内の通知バナー | NotificationSurfaceHost |
 | `notification.desktop` | 独立Window内のデスクトップ通知 | NotificationDesktopHostとNotificationSurfaceHost |
 
@@ -30,14 +29,13 @@
 
 領域ID・表示名・対応契約は本体の共通カタログにまとめる。Appletは既存の`shell.views`で提供領域を宣言し、`shell.ui`は従来どおりリボンの別名として扱う。領域の同一性を画面の名前やHTMLファイル名で判定しない。
 
-現行カタログは上記9領域。旧`host.shellProvider`の一括指定は従来8領域だけへ移行し、新しい`overlay.ribbon-group`はDefault Shellを使う。リボン提供元は`shell.ribbonSchemaVersion: 2`が必要で、旧schemaの指定は保持したままリボン領域だけDefault Shellへ戻す。対応済みの他領域は継続する。
+現行カタログは上記8領域。設定画面は本体が描画する。旧page.settingsキーは保持するが領域状態・自己状態・再試行には含めない。旧`host.shellProvider`の一括指定は従来8領域だけへ移行し、新しい`overlay.ribbon-group`はDefault Shellを使う。リボン提供元は`shell.ribbonSchemaVersion: 2`が必要で、旧schemaの指定は保持したままリボン領域だけDefault Shellへ戻す。対応済みの他領域は継続する。
 
 | 領域 | 保存された指定 | AとBが稼働中 | Aを無効化した後 |
 | --- | --- | --- | --- |
 | リボン | A | A | Default Shell |
 | ホーム | B | B | B |
 | パレット | A | A | Default Shell |
-| 設定 | Default Shell | Default Shell | Default Shell |
 
 Aに割り当てた複数領域はそれぞれ復旧対象になる。Aのリボンrendererだけの故障では、Aの正常なパレットやBのホームを切り替えない。Aのworkerが停止した場合は、Aが担当する全領域が利用不可になる。
 
@@ -51,8 +49,7 @@ Aに割り当てた複数領域はそれぞれ復旧対象になる。Aのリボ
     "shellProviders": {
       "ribbon": "example.shell-a",
       "page.home": "example.shell-b",
-      "overlay.command-palette": "example.shell-a",
-      "page.settings": "appdock.default-shell"
+      "overlay.command-palette": "example.shell-a"
     }
   }
 }
@@ -86,7 +83,7 @@ Aに割り当てた複数領域はそれぞれ復旧対象になる。Aのリボ
 
 旧版へのダウングレードでは領域別指定を再現できない。旧単一指定との二重書込みは行わず、利用者向け説明には旧版がDefault Shellを使い得ることと設定バックアップの復元方法を記載する。
 
-既存のshell.views・connect・自己設定・自己コマンドの契約は維持する。page.settingsは現行schemaVersion:2の互換判定を通す。さらに旧shellProviderを固定実装した表示フォームは領域別項目へ対応する必要がある。旧キーを新しい部分JSONへ混在させた要求は範囲外入力として拒否し、変更していないのに保存成功と表示しない。描画APIの互換と、新しい設定UIへの追随を区別する。
+既存のshell.views・connect・自己設定・自己コマンドの契約は設定領域以外で維持する。旧設定領域のviews宣言は読込可能だが起動しない。shellRequirementの旧page.settings条件は常に不成立とし、他の領域や通常コマンドを継続する。
 
 ## 提供元の決定と稼働状態
 
@@ -94,7 +91,7 @@ Aに割り当てた複数領域はそれぞれ復旧対象になる。Aのリボ
 
 1. `--safe-shell`なら、保存値を変えずDefault Shellを指定先として扱う。
 2. 保存マップから指定先を取得する。省略はDefault Shell。
-3. 指定先の実在・出自・有効状態・稼働状態・領域提供・契約互換性・故障抑止を確認する。page.settingsはschemaVersion:2とminimumHostVersion:0.33.0以上の現行互換判定を維持し、旧提供元は設定領域だけDefault Shellへ戻す。
+3. 指定先の実在・出自・有効状態・稼働状態・領域提供・契約互換性・故障抑止を確認する。旧page.settingsは解決対象に含めず、本体の共通設定画面を使う。
 4. 利用可能なら指定先、利用不可なら同じ領域のDefault Shellを候補にする。
 5. Default Shellも利用できなければ、候補なしと既存の復旧エラーを返す。他の外部Shellは自動採用しない。
 
@@ -240,7 +237,7 @@ Window管理・保存済み設定と入力受付・ナビゲーション・通�
 | `src/shared/settings-page.ts`、mainの設定ページ・補助モデル | 候補・稼働状態・再試行、部分JSON・即時保存と入力キューとの接続 |
 | mainの新しい提供元Registryと各表示Host・通知専用Window | 共通解決、領域別状態、故障抑止、session失効、切替 |
 | `src/main/index.ts` | Hostの接続、状態通知、全体・領域別再試行、コマンド経路 |
-| `shells/default/settings/SettingsForm.tsx`と関連描画 | 単一選択から領域行へ変更、適用前後と理由の表示 |
+| `src/renderer/settings/SettingsForm.tsx`と関連描画 | 単一選択から領域行へ変更、適用前後と理由の表示 |
 | `src/shared/extension-commands.ts`、`src/main/core/extensions.ts` | manifest条件、利用可否、別名・動的登録との統合 |
 | `src/main/core/host-api.ts`、`src/main/node-worker.ts`、.NET SDK/Runtime | 自己状態の取得・購読と世代検査。既存APIは維持 |
 | 共通コマンド・入力・トレイ・外部操作の投影 | 条件と利用不可理由の共用、実行直前検査 |

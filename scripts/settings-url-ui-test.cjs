@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process'),
   { createHash } = require('node:crypto'),
   { chromium } = require('playwright');
 const { freePort } = require('./electron-main-helper.cjs'),
-  { settingsPage } = require('./settings-shell-helper.cjs'),
+  { settingsPage } = require('./settings-host-helper.cjs'),
   { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'settings-url-' + Date.now());
@@ -69,6 +69,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       }),
     );
     fs.writeFileSync(path.join(fixture, 'index.cjs'), 'module.exports={};');
+    require('./settings-web-fixture.cjs').installWebSettings(profile, settings);
     settings.extensions['fixture.url'] = { enabled: false, settings: {} };
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     const port = await freePort(),
@@ -208,7 +209,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     await host.evaluate(
       async ({ account, base }) => {
         const s = await window.dock.snapshot();
-        s.settings.value.webApplets.items.push({
+        s.settings.value.extensions['fixture.web-settings'].settings.items.push({
           id: 'web.12345678-1234-1234-1234-123456789abc',
           name: '新しいWebApplet',
           url: base + '/old',
@@ -229,42 +230,29 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     await web.fill(base + '/new/');
     await pause(150);
     assert.equal(requests.length, count);
-    assert.equal((await snapshot()).settings.value.webApplets.items[0].url, base + '/old');
+    assert.equal(
+      (await snapshot()).settings.value.extensions['fixture.web-settings'].settings.items[0].url,
+      base + '/old',
+    );
     await web.press('Enter');
     await settleSettings(page);
-    await until(() => requests.length > count, 'Web defaults after confirmation');
-    assert.equal((await snapshot()).settings.value.webApplets.items[0].url, base + '/new/');
+    assert.equal(requests.length, count, 'disabled collection settings do not navigate the site');
+    assert.equal(
+      (await snapshot()).settings.value.extensions['fixture.web-settings'].settings.items[0].url,
+      base + '/new/',
+    );
     await pause(250);
     const confirmedCount = requests.length;
     await web.blur();
     await pause(250);
     assert.equal(requests.length, confirmedCount, 'blur does not repeat defaults import');
-    checks.push(
-      'Web URL and automatic defaults lookup wait for confirmation and do not repeat on blur',
-    );
-    const origins = page.getByLabel('WebAppletの追加許可先', { exact: true });
-    await origins.fill(base + '/');
-    await origins.press('Shift+Enter');
-    await origins.pressSequentially('http://localhost:1234/');
-    await pause(100);
-    assert.deepEqual((await snapshot()).settings.value.webApplets.items[0].allowedOrigins, []);
-    await origins.press('Enter');
-    await settleSettings(page);
-    assert.deepEqual((await snapshot()).settings.value.webApplets.items[0].allowedOrigins, []);
-    assert.equal(await origins.inputValue(), base + '/\nhttp://localhost:1234/');
-    await origins.fill(base + '\nhttp://localhost:1234');
-    await origins.press('Enter');
-    await settleSettings(page);
-    assert.deepEqual((await snapshot()).settings.value.webApplets.items[0].allowedOrigins, [
-      base,
-      'http://localhost:1234',
-    ]);
-    checks.push(
-      'URL lists retain multiline incomplete input, Shift+Enter adds a line and Enter validates origins',
-    );
+    checks.push('remote collection URL waits for confirmation and disabled pages remain unopened');
     await page.getByLabel('WebAppletの名前', { exact: true }).fill('URL fixture renamed');
     await settleSettings(page);
-    assert.equal((await snapshot()).settings.value.webApplets.items[0].name, 'URL fixture renamed');
+    assert.equal(
+      (await snapshot()).settings.value.extensions['fixture.web-settings'].settings.items[0].name,
+      'URL fixture renamed',
+    );
     checks.push('ordinary text fields retain immediate save');
     await page.screenshot({ path: path.join(profile, 'confirmed.png') });
     success = true;

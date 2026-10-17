@@ -100,6 +100,7 @@ export type SettingsPageOperation =
   | { kind: 'invoke'; actionId: string; args?: unknown[] }
   | { kind: 'select'; pageId: string }
   | { kind: 'sidebar-width'; width: number }
+  | { kind: 'viewport'; width: number }
   | { kind: 'search'; text: string }
   | { kind: 'move'; itemId: string }
   | { kind: 'moved'; requestId: string; pageId: string };
@@ -115,4 +116,19 @@ export interface SettingsPageAction {
   editRevision: number;
   operationId: string;
   operation: SettingsPageOperation;
+}
+export interface SettingsPageConnection {
+  connectionId: string;
+  snapshot: SettingsPageModel;
+}
+/** Trusted host renderer only; never exposed in an Applet preload. */
+export interface SettingsPageApi {
+  open(request: SettingsPageRequest): Promise<SettingsPageConnection>;
+  get(connectionId: string): Promise<SettingsPageModel>;
+  act(
+    connectionId: string,
+    action: SettingsPageAction,
+  ): Promise<{ model: SettingsPageModel; result: unknown }>;
+  close(connectionId: string): Promise<void>;
+  onChanged(callback: (connection: SettingsPageConnection) => void): () => void;
 }

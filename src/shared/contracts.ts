@@ -234,6 +234,7 @@ export interface GlobalHotKeyStatus {
   error?: string;
 }
 export interface DockApi {
+  settingsPage: import('./settings-page').SettingsPageApi;
   settingsEditing(): Promise<import('./settings-editing').SettingsInputState>;
   flushSettings(): Promise<void>;
   onSettingsSidebarWidth(callback: (width: number) => void): () => void;
@@ -251,7 +252,7 @@ export interface DockApi {
   onLogSourceChanged(callback: (source: string) => void): () => void;
   focusShell(edge: 'first' | 'last'): Promise<void>;
   onShellFocusHost(callback: (edge: 'before' | 'after') => void): () => void;
-  navigate(route: string): Promise<void>;
+  navigate(route: string, restore?: true): Promise<void>;
   shellViewport(
     bounds: { x: number; y: number; width: number; height: number } | null,
   ): Promise<void>;

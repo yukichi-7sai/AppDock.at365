@@ -98,17 +98,17 @@ const checks = [];
   const page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
   page.setDefaultTimeout(12000);
-  const body = require('./settings-shell-helper.cjs').deferred(() =>
-    require('./settings-shell-helper.cjs').settingsPage(page),
+  const body = require('./settings-host-helper.cjs').deferred(() =>
+    require('./settings-host-helper.cjs').settingsPage(page),
   );
-  const saveSurface = require('./settings-shell-helper.cjs').deferred(async () =>
+  const saveSurface = require('./settings-host-helper.cjs').deferred(async () =>
     (await page.evaluate(() => window.dock.snapshot())).navigation.route === 'settings'
-      ? require('./settings-shell-helper.cjs').settingsPage(page)
+      ? require('./settings-host-helper.cjs').settingsPage(page)
       : page,
   );
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const button = (name) =>
+  const rawButton = (name) =>
     name === 'ショートカットキー'
       ? detailTab('ショートカット')
       : name === '設定項目'
@@ -122,6 +122,33 @@ const checks = [];
             name: name === 'Appletに戻る' ? 'Applet' : name,
             exact: true,
           });
+  const button = (name) => {
+    const locator = rawButton(name);
+    const route = {
+      ホーム: 'home',
+      Applet: 'extensions',
+      Appletに戻る: 'extensions',
+      設定: 'settings',
+      ログ: 'logs',
+    }[name];
+    if (!route) return locator;
+    return new Proxy(locator, {
+      get(target, key) {
+        if (key === 'click')
+          return async (...args) => {
+            await target.click(...args);
+            await require('./settings-host-helper.cjs').waitForHost(
+              page,
+              async (route) => (await window.dock.snapshot()).navigation.route === route,
+              route,
+            );
+            if (route === 'settings') await page.waitForSelector('.settings-surface.full');
+          };
+        const value = target[key];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  };
   const detailTab = (name) => {
     const locator = page
       .getByRole('tablist', { name: 'Applet詳細の切り替え' })
@@ -186,7 +213,7 @@ const checks = [];
     await button('Applet').click();
     const selected = page.locator('.sidebar-extensions [aria-current="true"]');
     const selectedName = await selected.locator('span').textContent();
-    assert.equal(await page.locator('.detail h2').textContent(), selectedName);
+    assert.equal(await page.locator('.detail > .detail-heading h2').textContent(), selectedName);
     assert.deepEqual(
       await page
         .getByRole('tablist', { name: 'Applet詳細の切り替え' })
@@ -225,7 +252,7 @@ const checks = [];
     const descriptionAppearance = await switchAppearance();
     await detailTab('設定').click();
     assert.deepEqual(await switchAppearance(), descriptionAppearance);
-    assert.equal(await page.locator('.detail h2').textContent(), selectedName);
+    assert.equal(await page.locator('.detail > .detail-heading h2').textContent(), selectedName);
     assert.equal(await page.getByRole('complementary', { name: 'Applet一覧' }).count(), 1);
     assert.equal(await button('ショートカットを設定').count(), 0);
     await detailTab('説明').click();
@@ -301,7 +328,7 @@ const checks = [];
     await chooseApplet('検証Applet 02');
     await body.getByLabel('検証項目 0', { exact: true }).fill('別Appletの値');
     await button('Appletに戻る').click();
-    assert.equal(await page.locator('.detail h2').textContent(), '検証Applet 02');
+    assert.equal(await page.locator('.detail > .detail-heading h2').textContent(), '検証Applet 02');
     await detailTab('設定').click();
     assert.equal(await body.getByLabel('検証項目 0', { exact: true }).inputValue(), '別Appletの値');
     await button('設定').click();
@@ -611,10 +638,36 @@ const checks = [];
     await searchButton.click();
     palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
     await palette.getByPlaceholder('コマンドを入力…').fill('ウェルカムを更新');
+    await app.evaluate(() => {
+      const { ExtensionManager } = process
+        .getBuiltinModule('module')
+        .createRequire(process.cwd() + '/package.json')('./out/main/main/core/extensions');
+      const original = ExtensionManager.prototype.execute;
+      globalThis.paletteExecutionFixture = {
+        original,
+        prototype: ExtensionManager.prototype,
+        completed: false,
+      };
+      ExtensionManager.prototype.execute = async function (id, ...args) {
+        const result = await original.call(this, id, ...args);
+        if (id === 'appdock.welcome.refresh') globalThis.paletteExecutionFixture.completed = true;
+        return result;
+      };
+    });
     await require('./shell-overlay-helper.cjs').closingAction(
       palette.getByPlaceholder('コマンドを入力…').press('Enter'),
     );
-    await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
+    assert(
+      await app.evaluate(async () => {
+        const end = Date.now() + 10000;
+        while (!globalThis.paletteExecutionFixture.completed && Date.now() < end)
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        const fixture = globalThis.paletteExecutionFixture;
+        fixture.prototype.execute = fixture.original;
+        return fixture.completed;
+      }),
+      'palette dispatch completes the selected Applet handler',
+    );
     checks.push('palette owner search / arrows / Enter / focus restoration');
 
     for (const theme of ['dark', 'light']) {
@@ -747,6 +800,32 @@ const checks = [];
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
+    console.error(
+      'SETTINGS-DIAGNOSTIC',
+      await page
+        .evaluate(async () => {
+          const state = await window.dock.settingsEditing();
+          const id = document.querySelector('.settings-surface')?.dataset.settingsConnection;
+          let model;
+          try {
+            model = await window.dock.settingsPage.get(id);
+          } catch {}
+          return {
+            pageId: state.pageId,
+            mode: state.mode,
+            editRevision: state.editRevision,
+            modelPage: model?.content.page.id,
+            modelMode: model?.content.editing.mode,
+            alerts: [...document.querySelectorAll('[role="alert"]')].map((el) => el.textContent),
+            controls: [...document.querySelectorAll('.settings-page-toolbar button')].map((el) => [
+              el.textContent,
+              el.className,
+              el.disabled,
+            ]),
+          };
+        })
+        .catch(() => null),
+    );
     await page.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
     throw error;
   } finally {

@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const { settingsPage } = require('./settings-shell-helper.cjs');
+const { settingsPage } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..');
 const portable = process.argv[2] && path.resolve(process.argv[2]);
@@ -140,7 +140,11 @@ const checks = [];
     await page.getByRole('heading', { name: '一般', exact: true }).waitFor();
     assert.equal(await toggle().isChecked(), true);
     assert.equal(await toggle().isDisabled(), true);
-    const general = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+    const general = await page.evaluate(() =>
+      window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      ),
+    );
     assert.deepEqual(
       general.content.auxiliary.storage.files.map((file) => file.scope),
       ['device'],
@@ -156,20 +160,25 @@ const checks = [];
       'local mode',
     );
     const scopedResult = await page.evaluate(async () => {
-      const m = (await window.appdockPage.connect()).snapshot;
+      const m = await window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      );
       return (
-        await window.appdockPage.act({
-          id: m.id,
-          type: 'settings',
-          sessionId: m.content.editing.sessionId,
-          editRevision: m.content.editing.editRevision,
-          operationId: crypto.randomUUID(),
-          operation: {
-            kind: 'invoke',
-            actionId: m.content.actions['set-local-settings'],
-            args: [true, m.content.auxiliary.storage.revision],
+        await window.dock.settingsPage.act(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+          {
+            id: m.id,
+            type: 'settings',
+            sessionId: m.content.editing.sessionId,
+            editRevision: m.content.editing.editRevision,
+            operationId: crypto.randomUUID(),
+            operation: {
+              kind: 'invoke',
+              actionId: m.content.actions['set-local-settings'],
+              args: [true, m.content.auxiliary.storage.revision],
+            },
           },
-        })
+        )
       ).result;
     });
     assert.deepEqual(Object.keys(scopedResult).sort(), ['revision', 'storage']);
@@ -185,7 +194,11 @@ const checks = [];
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
     let text = await page.getByRole('textbox', { name: '設定JSON', exact: true }).inputValue();
     assert.equal(JSON.parse(text).extensions['example.device-settings'].settings.interval, 120);
-    let model = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+    let model = await page.evaluate(() =>
+      window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      ),
+    );
     assert.deepEqual(
       model.content.auxiliary.storage.files.map((file) => file.scope),
       ['device'],
@@ -202,7 +215,11 @@ const checks = [];
         ].settings.interval === 60,
       'shared JSON',
     );
-    model = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+    model = await page.evaluate(() =>
+      window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      ),
+    );
     assert.deepEqual(
       model.content.auxiliary.storage.files.map((file) => file.scope),
       ['shared'],

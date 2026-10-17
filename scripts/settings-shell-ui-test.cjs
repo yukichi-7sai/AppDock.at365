@@ -43,6 +43,10 @@ manifest.id = 'fixture.settings-shell';
 manifest.name = 'Settings shell fixture';
 manifest.minimumHostVersion = '0.33.0';
 manifest.shell = { apiVersion: 1, views: { 'page.settings': 'settings.html' } };
+fs.writeFileSync(
+  path.join(external, 'settings.html'),
+  '<body>Legacy settings must not be opened</body>',
+);
 fs.writeFileSync(path.join(external, 'extension.json'), JSON.stringify(manifest));
 const stalled = path.join(profile, 'extensions', 'fixture.stalled-settings');
 fs.mkdirSync(stalled, { recursive: true });
@@ -118,6 +122,7 @@ async function until(fn, label) {
     );
   }
   let host = await launch();
+  host.on('pageerror', (error) => console.error('HOST-RENDERER-ERROR', error.message));
   async function close() {
     if (!app && !portable) return;
     if (app) {
@@ -131,7 +136,7 @@ async function until(fn, label) {
       await connection.close();
     }
   }
-  const settingsPage = () => require('./settings-shell-helper.cjs').settingsPage(host);
+  const settingsPage = () => require('./settings-host-helper.cjs').settingsPage(host);
   const provider = async (id) => {
     await host.evaluate(async (id) => {
       const s = await window.dock.snapshot();
@@ -158,12 +163,17 @@ async function until(fn, label) {
       );
     }, id);
   };
-  const modelOf = (p) => p.evaluate(() => window.appdockPage.connect().then((c) => c.snapshot));
+  const modelOf = (p) =>
+    p.evaluate(() =>
+      window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      ),
+    );
   const providerPage = (id) =>
     until(async () => {
       const p = await settingsPage();
       try {
-        if ((await p.evaluate(() => window.appdockPage.connect())).providerAppletId === id)
+        if (!(await context.pages()).some((surface) => surface.url().endsWith('/settings.html')))
           return p;
       } catch {}
     }, `provider ${id}`);
@@ -182,7 +192,7 @@ async function until(fn, label) {
       0,
     );
     assert.equal(JSON.stringify(await modelOf(shell)).includes('never-in-shell'), false);
-    assert.equal(await shell.evaluate(() => typeof window.dock), 'undefined');
+    assert.equal(await shell.evaluate(() => typeof window.appdockPage), 'undefined');
     await require('./shell-page-layout-helper.cjs').exerciseLayout(host, shell, app, 'settings');
     await shell.getByLabel('テーマ', { exact: true }).selectOption('light');
     await settleSettings(shell);
@@ -343,26 +353,31 @@ async function until(fn, label) {
       await window.dock.saveSettings(v, s.settings.revision);
     });
     const rejected = await shell.evaluate(async (old) => {
-      const m = (await window.appdockPage.connect()).snapshot;
+      const m = await window.dock.settingsPage.get(
+        document.querySelector('.settings-surface').dataset.settingsConnection,
+      );
       const next = structuredClone(old.content.values);
       next.extensions['fixture.settings'].settings.amount = 13;
       try {
-        await window.appdockPage.act({
-          id: m.id,
-          type: 'settings',
-          sessionId: m.content.editing.sessionId,
-          editRevision: m.content.editing.editRevision,
-          operationId: crypto.randomUUID(),
-          operation: {
-            kind: 'edit',
-            action: {
-              type: 'page-values',
-              pageId: m.content.page.id,
-              before: old.content.values,
-              value: next,
+        await window.dock.settingsPage.act(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+          {
+            id: m.id,
+            type: 'settings',
+            sessionId: m.content.editing.sessionId,
+            editRevision: m.content.editing.editRevision,
+            operationId: crypto.randomUUID(),
+            operation: {
+              kind: 'edit',
+              action: {
+                type: 'page-values',
+                pageId: m.content.page.id,
+                before: old.content.values,
+                value: next,
+              },
             },
           },
-        });
+        );
         return false;
       } catch {
         return true;
@@ -376,38 +391,84 @@ async function until(fn, label) {
       12,
     );
     checks.push(
-      'public compatible custom Shell shares persisted values; stale same-field edit cannot overwrite an external update',
+      'legacy assignments retain host settings values; stale same-field edit cannot overwrite an external update',
     );
-    if (app) {
-      await app.evaluate(({ webContents }) =>
-        webContents
-          .getAllWebContents()
-          .find(
-            (w) =>
-              w.getURL().includes('/fixture.settings-shell/') &&
-              w.getURL().endsWith('/settings.html'),
-          )
-          .forcefullyCrashRenderer(),
-      );
-      shell = await providerPage('appdock.default-shell');
-      assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
-      checks.push('crashed settings provider falls back with persisted settings intact');
-    }
+    assert.equal(
+      context.pages().some((p) => p.url().endsWith('/settings.html')),
+      false,
+    );
+    checks.push('settings remain in the host document; legacy Shell HTML is never loaded');
     await provider('fixture.old-settings');
     shell = await providerPage('appdock.default-shell');
-    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
-    checks.push(
-      'pre-0.33 settings provider falls back per region without loading incompatible controls',
+    await until(
+      async () => (await shell.getByLabel('Fixture amount', { exact: true }).inputValue()) === '12',
+      'external value reflected in host controls',
     );
+    assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
+    checks.push('pre-0.33 settings provider keeps host controls without loading legacy HTML');
     await provider('fixture.stalled-settings');
     shell = await providerPage('appdock.default-shell');
     assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
+    if (app) {
+      await category('プロフィール');
+      await app.evaluate(() => {
+        const { SettingsInputSession } = process
+          .getBuiltinModule('module')
+          .createRequire(process.cwd() + '/package.json')(
+          './out/main/main/core/settings-input-session',
+        );
+        const prototype = SettingsInputSession.prototype;
+        const original = prototype.act;
+        globalThis.settingsDrainFixture = { prototype, original };
+        prototype.act = function (request) {
+          if (
+            request.action?.type === 'page-values' &&
+            request.action.value?.profile?.name === 'Drain proof'
+          )
+            return new Promise((resolve) => {
+              globalThis.settingsDrainFixture.release = resolve;
+            }).then(() => original.call(this, request));
+          return original.call(this, request);
+        };
+      });
+      try {
+        await shell.getByLabel('ユーザー名', { exact: true }).fill('Drain proof');
+        await until(
+          () => app.evaluate(() => !!globalThis.settingsDrainFixture.release),
+          'queued host settings edit',
+        );
+        const navigating = host.evaluate(() => window.dock.navigate('home'));
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        assert.equal(
+          (await host.evaluate(() => window.dock.snapshot())).navigation.route,
+          'settings',
+        );
+        await app.evaluate(() => {
+          globalThis.settingsDrainFixture.release();
+        });
+        await navigating;
+        assert.equal(
+          (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+          'Drain proof',
+        );
+        checks.push(
+          'navigation waits for the settings form queue before disposing the host surface',
+        );
+      } finally {
+        await app.evaluate(() => {
+          const fixture = globalThis.settingsDrainFixture;
+          fixture.release?.();
+          fixture.prototype.act = fixture.original;
+          delete globalThis.settingsDrainFixture;
+        });
+      }
+    }
     await host.evaluate(() => window.dock.navigate('home'));
     const state = await host.evaluate(() => window.dock.settingsEditing());
     for (const key of ['draft', 'dirty', 'buffers', 'text', 'avatarChanged', 'saveError'])
       assert.equal(key in state, false);
     assert.equal(
-      context.pages().some((p) => p.url().endsWith('/notifications.html')),
+      context.pages().some((p) => p.url().endsWith('/settings.html')),
       false,
     );
     checks.push(
@@ -437,6 +498,20 @@ async function until(fn, label) {
     };
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result));
+  } catch (error) {
+    console.error(
+      'HOST-SETTINGS-DIAGNOSTIC',
+      await host
+        .evaluate(async () => ({
+          navigation: (await window.dock.snapshot()).navigation,
+          rememberedPage: localStorage.getItem('appdock.restart-view.page'),
+          surface: document.querySelector('.settings-surface')?.className,
+          headings: [...document.querySelectorAll('h1')].map((element) => element.textContent),
+          body: document.body.innerText.slice(0, 500),
+        }))
+        .catch(() => null),
+    );
+    throw error;
   } finally {
     if (app)
       await app

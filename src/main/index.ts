@@ -52,6 +52,7 @@ import {
 import { SettingsCommands } from './core/settings-commands';
 import { SettingsInputSession } from './core/settings-input-session';
 import { SettingsPageSession } from './core/settings-page';
+import { SettingsPageHost } from './core/settings-page-host';
 import { dataPaths } from './core/data-paths';
 import { WindowsLaunch } from './core/windows-launch';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
@@ -288,6 +289,7 @@ async function flushSettingsInputs() {
 let shellHost: ShellHost | undefined;
 let overlayHost: OverlayHost | undefined;
 let shellPageHost: ShellPageHost | undefined;
+let settingsPageHost: SettingsPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
 let ribbonState: RibbonState | undefined;
 const safeShell = process.argv.includes('--safe-shell');
@@ -295,7 +297,6 @@ const navigation = new NavigationCoordinator(
   () => changed(),
   async () => {
     await flushSettingsInputs();
-    await shellPageHost?.flush();
   },
   (error) => log.write('error', 'navigation', String(error)),
 );
@@ -663,6 +664,7 @@ const changed = () => {
     notificationWindows?.refresh();
     shellHost?.refresh();
     shellPageHost?.refresh();
+    settingsPageHost?.refresh();
     overlayHost?.refresh();
     shellRegistry?.touch();
     if (shellRegistry && manager)
@@ -1722,16 +1724,24 @@ function registerIpc() {
     });
   handle('dock:snapshot', snapshot);
   handle('dock:settingsEditing', () => settingsEditing.snapshot());
-  handle('dock:flushSettings', () => shellPageHost?.flush());
+  handle('dock:flushSettings', () => flushSettingsInputs());
   handle('dock:editSettings', async (request) => {
     if (['reload', 'select-page', 'mode'].includes(request?.action?.type)) {
-      await shellPageHost?.flush();
       request = { ...request, editRevision: settingsEditing.snapshot().editRevision };
     }
     return settingsEditing.act(request);
   });
+  handle('dock:settingsPage:open', (request) => settingsPageHost!.open(request));
+  handle('dock:settingsPage:get', (id) => settingsPageHost!.get(id));
+  handle('dock:settingsPage:act', (id, action) => settingsPageHost!.act(id, action));
+  handle('dock:settingsPage:close', (id) => {
+    if (typeof id !== 'string') throw Error('Invalid settings connection');
+    settingsPageHost?.close(id);
+  });
   handle('dock:focusShell', (edge) => shellHost?.focus(edge));
-  handle('dock:navigate', (route: string) => navigation.navigate(route));
+  handle('dock:navigate', (route: string, restore?: true) =>
+    restore === true ? navigation.restore(route) : navigation.navigate(route),
+  );
   handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
   handle('dock:shellPage', (request, bounds) => shellPageHost?.mount(request, bounds));
   handle('dock:closeShellPage', (id) => shellPageHost?.close(id));
@@ -2567,6 +2577,50 @@ async function initialize() {
     },
   });
   window.once('closed', () => homeExecution.dispose());
+  settingsPageHost = new SettingsPageHost({
+    allowed: (request) =>
+      startupReady &&
+      !quitting &&
+      request.kind === 'settings' &&
+      request.route === navigation.state.route &&
+      ((request.context === 'full' && request.route === 'settings' && !request.pageId) ||
+        (request.context === 'applet' &&
+          request.route === 'extensions' &&
+          typeof request.pageId === 'string' &&
+          settingsEditing.catalog().some((p) => p.kind === 'applet' && p.id === request.pageId))),
+    flush: flushSettingsInputs,
+    changed: (connection) => {
+      if (window && !window.isDestroyed())
+        window.webContents.send('dock:settingsPage:changed', connection);
+    },
+    create: async (request) => {
+      if (request.pageId && request.pageId !== settingsEditing.snapshot().pageId) {
+        const state = settingsEditing.snapshot();
+        await settingsEditing.act({
+          sessionId: state.sessionId,
+          editRevision: state.editRevision,
+          operationId: randomUUID(),
+          action: { type: 'select-page', pageId: request.pageId },
+        });
+      }
+      return new SettingsPageSession(request, {
+        navigation: settingsNavigation,
+        editor: settingsEditing,
+        host: snapshot,
+        changed,
+        auxiliary: (page) => ({
+          ...settingsPageAuxiliary(page),
+          storage: settingsPageStorage(page),
+          settingsFiles: page.id === 'general' ? settings.diagnostics() : undefined,
+        }),
+        actions: settingsPageActions,
+        release: releaseSettingsView,
+        resize: (width) => window?.webContents.send('dock:settingsSidebarWidth', width),
+      });
+    },
+  });
+  window.webContents.on('did-start-loading', () => settingsPageHost?.dispose());
+  window.webContents.on('render-process-gone', () => settingsPageHost?.dispose());
   shellPageHost = new ShellPageHost({
     window,
     preload: path.join(__dirname, 'shell-page-preload.js'),
@@ -2593,44 +2647,28 @@ async function initialize() {
                 })
               ).response === 1,
           })
-        : request.kind === 'settings'
-          ? new SettingsPageSession(request, {
-              navigation: settingsNavigation,
-              editor: settingsEditing,
-              host: snapshot,
-              changed,
-              auxiliary: (page) => ({
-                ...settingsPageAuxiliary(page),
-                storage: settingsPageStorage(page),
-                settingsFiles: page.id === 'general' ? settings.diagnostics() : undefined,
-              }),
-              actions: settingsPageActions,
-              release: releaseSettingsView,
-              resize: (width) => window?.webContents.send('dock:settingsSidebarWidth', width),
+        : request.kind === 'home'
+          ? new HomePageSession(request, {
+              applets: allApplets,
+              commands: uiCommands,
+              pins: () => settings.value.pinnedCommands,
+              appletOrder: () => settingsEditing.value.appletOrder,
+              dark: () => nativeTheme.shouldUseDarkColors,
+              execution: homeExecution,
+              navigate: executeCommand,
+              openApplet: (id) => navigation.navigate('extensions', undefined, id),
             })
-          : request.kind === 'home'
-            ? new HomePageSession(request, {
-                applets: allApplets,
-                commands: uiCommands,
-                pins: () => settings.value.pinnedCommands,
-                appletOrder: () => settingsEditing.value.appletOrder,
-                dark: () => nativeTheme.shouldUseDarkColors,
-                execution: homeExecution,
-                navigate: executeCommand,
-                openApplet: (id) => navigation.navigate('extensions', undefined, id),
-              })
-            : new LogPageSession(request, {
-                entries: () => log.entries,
-                sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
-                dark: () => nativeTheme.shouldUseDarkColors,
-                openDirectory: async () => {
-                  const error = await shell.openPath(log.directory);
-                  if (error) throw Error(error);
-                },
-                sourceChanged: (source) =>
-                  window?.webContents.send('dock:logSourceChanged', source),
-                changed,
-              }),
+          : new LogPageSession(request, {
+              entries: () => log.entries,
+              sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
+              dark: () => nativeTheme.shouldUseDarkColors,
+              openDirectory: async () => {
+                const error = await shell.openPath(log.directory);
+                if (error) throw Error(error);
+              },
+              sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
+              changed,
+            }),
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     shortcut: async (key) => {
@@ -2999,15 +3037,9 @@ async function runSmoke() {
     );
     tray!.emit('click');
     await new Promise((r) => setTimeout(r, 250));
-    const settingsSurface = window!.contentView.children.find(
-      (view) =>
-        view instanceof WebContentsView && view.webContents.getURL().endsWith('/settings.html'),
-    );
     if (
-      navigation.state.route !== 'settings' ||
-      !(settingsSurface instanceof WebContentsView) ||
-      !(await settingsSurface.webContents.executeJavaScript(
-        `!!document.querySelector('.settings-surface')`,
+      !(await window!.webContents.executeJavaScript(
+        "!!document.querySelector('.settings-surface')",
       ))
     )
       throw new Error('Selected tray click did not open settings');
@@ -3154,6 +3186,7 @@ app.on('before-quit', (event) => {
   shellHost?.dispose();
   overlayHost?.dispose();
   shellPageHost?.dispose();
+  settingsPageHost?.dispose();
   void (async () => {
     for (const stop of [
       () => tts.close(),

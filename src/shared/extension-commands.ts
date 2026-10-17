@@ -25,7 +25,8 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
         typeof requirement !== 'object' ||
         Array.isArray(requirement) ||
         Object.keys(requirement).some((k) => !['region', 'state'].includes(k)) ||
-        !isShellRegion((requirement as any).region) ||
+        (!isShellRegion((requirement as any).region) &&
+          (requirement as any).region !== 'page.settings') ||
         !['resolved', 'visible'].includes((requirement as any).state))
     )
       throw Error('shellRequirementは既知のregionとresolved / visibleです。');

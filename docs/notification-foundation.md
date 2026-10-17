@@ -61,7 +61,7 @@ Windows adapterは起動準備後に有効となる。通知IDからTag/Groupを
 
 SettingsStoreの保存済み値を正本とし、SettingsInputSessionはページ・モード・操作受付だけを調整する。共有ドラフト、dirty、全体保存/破棄、SettingsNotificationSource、未保存通知種類、途中入力・画像の本体バッファ、専用IPCとURLを削除した。現在のUIだけが不完全入力と保存失敗値を保持し、修正後に再送する。詳細は[設定基盤](settings-foundation.md)。
 
-page.settingsはschemaVersion:2、対応追加ShellはminimumHostVersion:0.33.0以上を宣言する。旧Shellの設定領域だけDefault Shellへ戻し、ほかの対応領域は利用を続ける。保存ファイルと通知SDKの互換性を維持する。
+設定画面は本体rendererの共通UIで描画する。旧Shellのpage.settings宣言は読込可能だが起動せず、ほかの対応領域は利用を続ける。保存ファイルと通知SDKの互換性を維持する。
 
 ## 検証と環境
 

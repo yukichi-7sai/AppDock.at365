@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process'),
   { createHash } = require('node:crypto'),
   { chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
-const { settingsPage } = require('./settings-shell-helper.cjs'),
+const { settingsPage } = require('./settings-host-helper.cjs'),
   { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'notification-speech-ui-' + Date.now());
@@ -308,7 +308,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByRole('button', { name: '通知の読み上げを試聴', exact: true }).click();
     await until(() => requests.length === 2, 'preview request');
     await until(async () => {
-      const m = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+      const m = await page.evaluate(() => window.dock.settingsPage.get(document.querySelector('.settings-surface').dataset.settingsConnection));
       return m.content.auxiliary.notificationSpeech.jobs.at(-1)?.state === 'completed';
     }, 'preview ended');
     checks.push('notification preview completed');

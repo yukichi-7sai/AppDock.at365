@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ExtensionSnapshot } from '../shared/contracts';
 import { moveApplet } from '../shared/applet-order';
-import { Toggle } from '../shared/settings-ui/Toggle';
+import { Toggle } from './settings-ui/Toggle';
 import type { SettingsEditor } from './useSettingsEditor';
 
 export function AppletIndex({

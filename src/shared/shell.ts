@@ -1,4 +1,3 @@
-import { compareVersions } from './versions';
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
 /** Only these regions are mounted today. Additional page regions need their own public contract. */
@@ -9,7 +8,6 @@ export type ShellRegion =
   | 'page.logs'
   | 'page.home'
   | 'page.notifications'
-  | 'page.settings'
   | 'notification.banner'
   | 'notification.desktop';
 
@@ -20,14 +18,17 @@ export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
   { id: 'page.home', title: 'ホーム' },
   { id: 'page.logs', title: 'ログ' },
   { id: 'page.notifications', title: '通知センター' },
-  { id: 'page.settings', title: '設定' },
   { id: 'notification.banner', title: '通知バナー' },
   { id: 'notification.desktop', title: 'デスクトップ通知' },
 ];
 export function isShellRegion(value: unknown): value is ShellRegion {
   return shellRegions.some((r) => r.id === value);
 }
-export type ShellRequirement = { region: ShellRegion; state: 'resolved' | 'visible' };
+export type LegacyShellRegion = 'page.settings';
+export type ShellRequirement = {
+  region: ShellRegion | LegacyShellRegion;
+  state: 'resolved' | 'visible';
+};
 export interface ShellRegionStatus {
   region: ShellRegion;
   configuredProvider: string;
@@ -86,15 +87,22 @@ export function parseShellProviders(host: Record<string, unknown>): Record<strin
   if (!Object.hasOwn(host, 'shellProvider') || host.shellProvider === undefined) return {};
   if (!id(host.shellProvider)) throw Error('host.shellProvider はShellのIDです。');
   return Object.fromEntries(
-    shellRegions
-      .filter((r) => r.id !== 'overlay.ribbon-group')
-      .map((r) => [r.id, host.shellProvider as string]),
+    [
+      'ribbon',
+      'overlay.command-palette',
+      'page.home',
+      'page.logs',
+      'page.settings',
+      'page.notifications',
+      'notification.banner',
+      'notification.desktop',
+    ].map((region) => [region, host.shellProvider as string]),
   );
 }
 
 export function shellView(
   shell: { ui?: string; views?: Record<string, string> } | undefined,
-  region: ShellRegion,
+  region: ShellRegion | LegacyShellRegion,
 ) {
   return shell?.views?.[region] ?? (region === 'ribbon' ? shell?.ui : undefined);
 }
@@ -169,11 +177,3 @@ export type NavigationState = {
   section?: 'profile' | 'ribbon' | 'general';
   appletId?: string;
 };
-
-/** Settings page schema 2 requires immediate-save semantics; older providers fall back per region. */
-export function settingsShellCompatible(provider: { id: string; minimumHostVersion?: string }) {
-  return (
-    provider.id === defaultShellId ||
-    (!!provider.minimumHostVersion && compareVersions(provider.minimumHostVersion, '0.33.0') >= 0)
-  );
-}

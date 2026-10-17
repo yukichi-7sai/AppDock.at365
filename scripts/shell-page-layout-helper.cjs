@@ -79,6 +79,20 @@ async function assertLayout(host, page, app, embedded = false) {
 }
 
 async function exerciseLayout(host, page, app, kind) {
+  if (kind === 'settings') {
+    await settles(async () => {
+      const layout = await host.evaluate(() => {
+        const surface = document.querySelector('.settings-surface');
+        const body = surface.querySelector('.settings-body');
+        const r = surface.getBoundingClientRect();
+        return { width: r.width, height: r.height, body: body.clientHeight, scroll: document.documentElement.scrollWidth, viewport: innerWidth };
+      });
+      assert(layout.width > 0 && layout.height > 0 && layout.body > 0);
+      assert(layout.scroll <= layout.viewport + 1);
+      assert.equal(page, host);
+    });
+    return;
+  }
   await assertLayout(host, page, app);
   if (kind === 'logs') {
     const scrolling = await page.evaluate(() => {

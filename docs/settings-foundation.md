@@ -1,6 +1,6 @@
-# 設定基盤とDefault Shell
+# 設定基盤と本体の共通設定画面
 
-設定画面を本体rendererへ統合する方針と移行計画は[設定画面の本体統合とsettings-uiの整理](settings-host-ui-design.md)を参照する。同計画は未実装であり、以下は現在の設定Shellの仕様である。
+設定画面は本体rendererで描画し、すべてのShellで共通とする。[本体統合の設計](settings-host-ui-design.md)に従い、設定UIはsrc/renderer/settingsとsettings-uiへ集約した。
 
 0.57.0以降のApplet単位の共有／端末専用設定、ツールバーとJSON・ファイル操作の連動、本体の表示／一般設定・有効状態の保存分離は[端末別設定](device-settings-design.md)を参照する。表示・一般の同じチェックボックスはチェック済み・操作不可とし、Appletでは切り替え可能にする。共有・自端末の合成値と共通revisionをDeviceSettingsStoreから取得する。
 
@@ -20,15 +20,15 @@ IME変換中は画面内に保持してcompositionendで送る。フォーカス
 
 ショートカット・ジェスチャーの編集/順序パネルは組合せ入力をパネル内に保持し、「適用」で1回保存する。取消/Escape/×はパネル内だけを破棄する。削除・ON/OFFは即時保存。ID・順序・外部変更検査・記録中の一時的実行抑止を維持し、保存自体で割当コマンドを実行しない。
 
-## 公開契約
+## 本体の設定ページ契約
 
-page.settingsはSettingsPageModel schemaVersion:2、追加ShellはminimumHostVersion:0.33.0以上。旧提供元は設定領域だけDefault Shellへ戻し、他領域やApplet実行は無効化しない。他のShellモデルはschemaVersion:1を維持する。
+SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使用する。DockApi.settingsPageのopen/get/act/close/onChangedを本体のmainFrameだけに提供し、SettingsPageHostが接続ID・route・対象を検査する。Shell Appletへ設定描画bridgeは公開しない。
 
-公開モデルは選択ページのvalues/定義/表示用補助情報/不透明な操作IDとsessionId/editRevision/pending/mode/errorだけ。全Settings/HostSnapshot・他Appletの値は公開しない。dirty/conflict/text/avatarChanged/avatarLoadingを削除した。page-values/partial-textは同ページのbefore投影を必須とし、対象外キーを拒否する。save/discard/avatar-loadingを削除。JSONはUTF-8 1MiB、画像5MiB、検索語512文字。
+本体内部モデルは選択ページのvalues/定義/表示用補助情報/不透明な操作IDとsessionId/editRevision/pending/mode/errorだけ。選択ページ以外のSettings/HostSnapshot・他Appletの値を投影しない。dirty/conflict/text/avatarChanged/avatarLoadingを削除した。page-values/partial-textは同ページのbefore投影を必須とし、対象外キーを拒否する。save/discard/avatar-loadingを削除。JSONはUTF-8 1MiB、画像5MiB、検索語512文字。
 
-全体設定とApplet詳細は同じ本文を使い、全体だけ左インデックスを表示する。停止/無効Appletも編集でき、開くだけで起動しない。onFlush/flushedは切替前の現在入力キューを3秒以内で待つ。成功済み値は切替/故障/Default復旧をまたいで共有し、不正入力をView間で保持しない。Webアカウント削除は保存済み参照を検査する。
+全体設定とApplet詳細は同じ本文を使い、全体だけ左インデックスを表示する。停止/無効Appletも編集でき、開くだけで起動しない。本体の入力flushはナビゲーション前にuseSettingsEditorとSettingsViewClientのキューを3秒以内で待つ。成功済み値はページ切替/画面再作成をまたいで共有し、不正入力をView間で保持しない。Webアカウント削除は保存済み参照を検査する。
 
-「表示」の部分JSONは`host.theme`と`host.shellProviders`です。8領域の選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。旧単一キーを部分JSONへ混在させた要求は範囲外として拒否します。領域別指定の移行・未知領域保持・自分自身の切替は[領域別割り当て](shell-region-assignment.md)。
+「表示」の部分JSONは`host.theme`と`host.shellProviders`です。8領域の選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。旧単一キーを部分JSONへ混在させた要求は範囲外として拒否します。領域別指定の移行・未知領域保持・旧設定領域の廃止は[領域別割り当て](shell-region-assignment.md)。
 
 ## カタログ・JSON・検索
 
@@ -38,9 +38,9 @@ settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタ
 
 ## 共通の画面構成
 
-Default Shellの設定ページは`SettingsPageLayout`（`shells/default/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。ページ側で同じ見出しを重ねない。フォーム/JSONの切替と共通の操作欄を上部に固定し、間隔を置いた本文だけをスクロールする。Applet詳細でも同じ本文部品を使い、ショートカット一覧の内部にタイトル・説明を追加しない。
+本体の設定ページは`SettingsPageLayout`（`src/renderer/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。ページ側で同じ見出しを重ねない。フォーム/JSONの切替と共通の操作欄を上部に固定し、間隔を置いた本文だけをスクロールする。Applet詳細でも同じ本文部品を使い、ショートカット一覧の内部にタイトル・説明を追加しない。
 
-本文は`src/shared/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ）、`SettingsField`（項目名・説明と入力）、`SettingsChoice`（選択カード）、`SettingsFeedback`（処理・結果・エラー）を再利用する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。
+本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ）、`SettingsField`（項目名・説明と入力）、`SettingsChoice`（選択カード）、`SettingsFeedback`（処理・結果・エラー）を再利用する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。
 
 通知のボイス候補は`SettingsCombobox`を使う。入力欄の位置と幅に合わせた同一Surfaceのポップオーバーで、スクロール枠に切られず、下に空きがない場合は上に開く。IDの直接入力・ID/名前による候補絞り込み・クリック・上下キーとEnterでの選択・Escape/Tabでの終了に対応し、IME入力の確定は共通入力部品へ委ねる。取得済み一覧は通知の声・速度や無関係な設定の保存で破棄せず、TTS設定またはAPIキーの変更時に無効化する。取得中に接続設定が変わった場合は古い応答を破棄する。
 
@@ -48,7 +48,7 @@ Default Shellの設定ページは`SettingsPageLayout`（`shells/default/setting
 
 `scripts/settings-usability-ui-test.cjs [固定EXE]`は共通構成、8ページの明暗テーマと狭い幅、モデル候補・直接入力、通知先と声/速度の継承、隔離したCodex登録/解除を確認する。保存と公開範囲の契約は上記を維持する。
 
-Applet本文は`src/shared/settings-ui/AppletSettingsForm.tsx`を共通テンプレートとする。manifestの`settingSections`を検証し、設定ページのauxiliaryへ投影する。セクションへ配置されなかった設定・操作も表示し、設定保存/JSONの投影に表示メタデータを混ぜない。設定アンカーは既存のキーのままで、セクションの再配置や折りたたみに依存しない。WebAppletもSettingsSection/SettingsFieldでサイト・表示とページ遷移・アカウント・管理を描画する。
+Applet本文は`src/renderer/settings-ui/AppletSettingsForm.tsx`を共通テンプレートとする。manifestの`settingSections`を検証し、設定ページのauxiliaryへ投影する。セクションへ配置されなかった設定・操作も表示し、設定保存/JSONの投影に表示メタデータを混ぜない。設定アンカーは既存のキーのままで、セクションの再配置や折りたたみに依存しない。WebAppletもSettingsSection/SettingsFieldでサイト・表示とページ遷移・アカウント・管理を描画する。
 
 `scripts/applet-settings-ui-test.cjs [固定EXE]`は兄弟Appletの宣言と配布物を隔離配置し、停止したまま全項目の描画・保存・検索・両入口の一致・明暗/狭幅を確認する。コマンドの実行中表示は専用Node fixtureを使い、実壁紙やロック・キー送信は実行しない。最低ホスト版と宣言形式は[Applet API](extensions.md#共通の設定ページ)を正本とする。
 
@@ -58,7 +58,7 @@ URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・ス�
 
 ## 検証と次の範囲
 
-tests/settings-editing.test.cjs・settings-page.test.cjsは即時保存、失敗/競合、再送、範囲を確認する。scripts/settings-shell-ui-test.cjs [固定EXE]は連続入力/IME、画像、不正入力、保存失敗fixture、外部競合、公開範囲、追加/旧Shell/故障復旧と再起動を確認する。settings-search/navigation/shortcuts/gestures/ribbon/tray/notification-settings/syncと実Windows起動タスクの関連回帰はVERIFICATIONを参照する。
+tests/settings-editing.test.cjs・settings-page.test.cjsは即時保存、失敗/競合、再送、範囲を確認する。scripts/settings-shell-ui-test.cjs [固定EXE]は連続入力/IME、画像、不正入力、保存失敗fixture、外部競合、公開範囲、旧旧設定Shell指定の無視・他領域の継続と再起動を確認する。settings-search/navigation/shortcuts/gestures/ribbon/tray/notification-settings/syncと実Windows起動タスクの関連回帰はVERIFICATIONを参照する。
 
 settings-notice-ui-test.cjsと発行元は廃止した。汎用notification-banner-ui-test.cjsは通知基盤の回帰として維持する。通知基盤の段階1〜5と即時保存移行は今回で完了。新通知種類、履歴の機能拡張、一般の複数Window/MCP通知発行は別途の依頼範囲とする。
 
@@ -68,7 +68,7 @@ settings-notice-ui-test.cjsと発行元は廃止した。汎用notification-bann
 
 AI接続のように複数の項目が密接に関係する設定は、画面内のダイアログに一時入力を持たせ、OKで一つの操作として保存する。これは全体のdirty・保存／破棄を復活させるものではない。共通プロンプト等の通常項目は即時保存を維持する。キャンセル・Escape・画面破棄で入力を破棄し、保存失敗では入力と安全なエラーをそのダイアログに保持する。
 
-共有部品SettingsModalは、設定ページ内のnative dialog、フォーカス囲い込み／復帰、IME対応のEscape、背面のショートカット入力停止／復帰を担う。SettingsDialogはその上で非同期OK・二重実行防止・保存中の閉鎖抑止を提供する。ショートカットとジェスチャーの編集／順序ダイアログもSettingsModalを使う。これは既存設定Surface内のモーダルであり、別WebContentsを横断するShell OverlayHostとは用途を分ける。本体はSettingsPageの操作契約で検証と保存を所有し、Shellは一時入力と描画を所有する。
+本体の共通部品SettingsModalは、設定ページ内のnative dialog、フォーカス囲い込み／復帰、IME対応のEscape、背面のショートカット入力停止／復帰を担う。SettingsDialogはその上で非同期OK・二重実行防止・保存中の閉鎖抑止を提供する。ショートカットとジェスチャーの編集／順序ダイアログもSettingsModalを使う。これは既存設定Surface内のモーダルであり、別WebContentsを横断するShell OverlayHostとは用途を分ける。本体はSettingsPageの操作契約で検証と保存を所有し、本体rendererは一時入力と描画を所有する。
 
 AIのモデル取得は設定ページ専用の操作として未保存の接続・一時キーを受け付ける。Applet/MCPの生成APIへURLやキーの上書きを公開しない。保存は元の接続・キー改訂を確認して最新の他項目へ合成し、SettingsStoreのrevisionと原子的書き込み、関連データのcommit/rollbackを使う。並べ替えは元ID列を検査し、保存後の順序だけを置換する。
 

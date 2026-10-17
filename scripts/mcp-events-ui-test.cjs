@@ -91,7 +91,7 @@ async function stop() {
 const action = (value) => host.evaluate((value) => window.dock.automation(value), value);
 async function page() {
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-  const p = await require('./settings-shell-helper.cjs').settingsPage(host);
+  const p = await require('./settings-host-helper.cjs').settingsPage(host);
   await p.getByRole('button', { name: '通知', exact: true }).click();
   const card = p
     .locator('.notification-setting-card')

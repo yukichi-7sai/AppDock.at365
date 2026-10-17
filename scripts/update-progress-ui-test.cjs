@@ -114,7 +114,7 @@ let app;
     const update = page
       .locator('.about-applets')
       .getByRole('button', { name: 'このAppletを更新', exact: true });
-    const settingsPage = await require('./settings-shell-helper.cjs').settingsPage(page);
+    const settingsPage = await require('./settings-host-helper.cjs').settingsPage(page);
     const appletSection = settingsPage.locator('details.settings-section').filter({
       has: settingsPage.getByRole('heading', { name: 'インストール済みのApplet', exact: true }),
     });

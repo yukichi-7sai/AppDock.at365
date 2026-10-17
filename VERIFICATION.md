@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-18: 設定画面の本体統合（0.58.0）
+
+- main `e239d38`を基準に、[設計](docs/settings-host-ui-design.md)を実装。`src/shared/settings-ui`を`src/renderer/settings-ui`へ、Default Shellの設定ページを`src/renderer/settings`へ移動した。全体設定とApplet詳細は同じ本体SettingsPageを使い、設定用Shell HTML・View・ビルド入口を撤去。現行契約は[設定基盤](docs/settings-foundation.md)を参照する。
+- Shellの有効領域は8件。旧`page.settings`の保存指定・manifestは保持して読込むが起動しない。旧コマンド条件は常に不成立とし、条件の削除で無条件実行へ変わらないようにした。ほかのShell領域・Node/.NET接続・保存ファイル形式・操作許可は維持した。外部の設定描画契約を廃止するため本体を0.58.0へ更新し、依存版・lockfile・toolchainは変更していない。
+- 発行前レビューで、ページごとの操作ID・投影・revision・古い接続の拒否、Web/外部Shellへ内部設定APIを公開しない境界を確認。移動時に不足したPC専用保存先の補助情報と、フォームの入力キューを待たない完了通知を修正した。Reactの依存注入を画面ごとのContextにし、入れ子のmain要素を解消。起動時の復元は受付済みの明示的な画面遷移を優先する。未解決の発行阻害指摘なし。詳細は`.artifacts/settings-host-ui-20261018/review.md`。
+- 最終型検査・本体/Default Shell/Node/.NET fixtureビルドと標準回帰は成功。**596/596、fail/skip 0**。ソースGUIでは意図的に保存受付を遅延させ、フォームの入力が確定するまで画面遷移しないことを確認した。24個の試験Appletを使うナビゲーションGUIも成功。変更したCJS 46ファイルの構文確認は成功し、文書の新規リンク不備は0件。既存のREADME・過去検証記録の参照欠落は変更していない。
+- 最終の通常publishは終了0。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144237074 bytes / SHA256 `b91e8dffd929266a91401bb84f5c32f464ebf5d8f0fcd8e84f0e41fe06289542`**。FileVersion/ProductVersion・update.jsonは0.58.0、feedのsize/hashと固定コピーを照合した。発行先のdeploy関連3ファイルは元のhashを保持。未変更Appletの再発行、全体ZIP、実利用先deployは行っていない。
+- この最終固定EXEで、smoke・本体設定・PC専用設定・設定ページ操作・検索・Applet設定・URL確定・Shell領域・WebApplet一覧編集・設定復旧の**10コマンドがすべて終了0**。即時保存、部分JSON、IMEの擬似入力、画像、外部競合、検索と両入口の共用、旧Shell指定の不活性、明暗・狭幅を確認。5つの既存Appletの宣言/停止中payload、無効なリモート一覧fixtureと、別途WebAppletの発行済み管理画面を使用した。復旧試験は同じ隔離profileの実際の再起動まで確認。スクリーンショットも確認した。物理モニター操作・実Google認証/受信・実スピーカー・実同期サービスは未確認であり、確認ダイアログや保存失敗の注入を実操作の成功とは扱わない。
+- 初期の固定EXE試験のnull-surfaceは、非同期の待機条件がPromiseの時点で成立扱いになる試験側の問題と判明。mainの遷移先はsettingsを保持していた。待機方法を修正してソース/最終EXEで再確認し、旧発行物の成功は最終EXEの証跡へ流用していない。検索試験の結果文言も旧Shell指定の不活性を表す説明へ修正し、当該試験だけ再実行した。制限環境で失敗した.NET/GUI処理は、必要な同一処理を通常ユーザー権限で成功確認した。
+- 証跡は`.artifacts/settings-host-ui-20261018/validation.json`と各コマンドのresult/log/input SHA256一覧。標準回帰時の595入力から後続差分は文書と検索GUIの結果文言/コメントだけで、製品・標準試験の入力に影響しないことを照合した。コミット前後のtree照合は同所`stage.json`・`commit.json`に記録する。ローカルコミットまでが今回の範囲で、push・Releaseは対象外。終了済みの成功profileを23件識別し、現在の証跡・種類ごとの直近3回・失敗/状態不明資料を保持、不要な旧成功profile1件だけ削除した。
+
 ## 2026-10-18: 端末別設定のコミット確認（0.57.0）
 
 - 利用者から0.57.0の動作成功の報告を受け、今回の30ファイルを再確認。設定の保存先、既存Applet契約、即時保存、移行・復旧、固定チェック表示と公開文書の整合に未解決指摘なし。利用者の報告を、未実施の実PC間同期・UAC・実タスク復旧の個別成功へ読み替えていない。

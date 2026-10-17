@@ -11,7 +11,7 @@ const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const {
   StreamableHTTPClientTransport,
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
-const { settingsPage } = require('./settings-shell-helper.cjs'),
+const { settingsPage } = require('./settings-host-helper.cjs'),
   { settleSettings } = require('./settings-immediate-helper.cjs');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
 const root = path.resolve(__dirname, '..'),

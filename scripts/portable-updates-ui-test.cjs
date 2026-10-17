@@ -198,7 +198,7 @@ async function surfaceRenderer(inspectPort, file, expression, selector) {
   throw Error('Shell surface not ready: ' + file + ' / ' + selector);
 }
 const settingsRenderer = (port, expression, selector = '.settings-categories') =>
-  surfaceRenderer(port, 'settings.html', expression, selector);
+  renderer(port, expression);
 const ribbonRenderer = (port, expression) =>
   surfaceRenderer(port, 'index.html', expression, '.activity-rail');
 async function restarted(inspectPort, predicate, previousPid) {

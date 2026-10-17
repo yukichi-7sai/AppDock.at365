@@ -254,7 +254,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         for (const p of page
           .context()
           .pages()
-          .filter((p) => p.url().endsWith('/settings.html'))) {
+          .filter((p) => p.url().startsWith('appdock://host/'))) {
           console.error(
             'PERMISSION-DIAGNOSTIC',
             await p

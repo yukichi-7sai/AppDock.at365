@@ -241,10 +241,7 @@ async function restarted(inspectPort, predicate) {
       () =>
         inspect(
           inspectPort,
-          shellExpression(
-            '/settings.html',
-            "window.appdockPage.connect().then(c=>c.snapshot.content.page.id==='about' && !!document.querySelector('.about-page'))",
-          ),
+          `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().startsWith('appdock://host/')).executeJavaScript("!!document.querySelector('.settings-surface .about-page')")`,
         ),
       'normal update settings page',
     );

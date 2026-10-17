@@ -1,9 +1,9 @@
 import type { ExtensionSnapshot } from '../shared/contracts';
 import type { UiCommand } from '../shared/commands';
-import { ShellPageSlot } from './ShellPageSlot';
+import { SettingsPage } from './settings/SettingsPage';
 import { appletSettingsPageId } from '../shared/settings-catalog';
 
-import { AppletShortcutOverview } from '../shared/settings-ui/AppletShortcutOverview';
+import { AppletShortcutOverview } from './settings-ui/AppletShortcutOverview';
 import type { SettingsEditor } from './useSettingsEditor';
 import type { WebProfile } from '../shared/web-content';
 import { useLayoutEffect, useRef } from 'react';
@@ -37,13 +37,7 @@ export function AppletSettingsPanel({
       ref={panel}
     >
       {tab === 'settings' ? (
-        <ShellPageSlot
-          key={applet.id}
-          kind="settings"
-          settingsContext="applet"
-          settingsPageId={appletSettingsPageId(applet.id)}
-          navigationRequest={0}
-        />
+        <SettingsPage key={applet.id} context="applet" pageId={appletSettingsPageId(applet.id)} />
       ) : (
         <AppletShortcutOverview
           key={applet.id}

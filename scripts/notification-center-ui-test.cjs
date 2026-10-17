@@ -215,7 +215,7 @@ const storage = (id, key) => {
 const saved = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
 async function settingsPage() {
   await host.evaluate(() => window.dock.navigate('settings'));
-  const p = await require('./settings-shell-helper.cjs').settingsPage(host);
+  const p = await require('./settings-host-helper.cjs').settingsPage(host);
   await p
     .locator('.settings-categories')
     .getByRole('button', { name: '通知', exact: true })
@@ -228,7 +228,7 @@ async function save(p) {
   await until(
     () =>
       p.evaluate(() =>
-        window.appdockPage.connect().then((c) => !c.snapshot.content.editing.pending),
+        window.dock.settingsPage.get(document.querySelector('.settings-surface').dataset.settingsConnection).then((m) => !m.content.editing.pending),
       ),
     'saved model',
   );

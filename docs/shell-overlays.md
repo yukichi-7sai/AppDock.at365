@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`overlay.ribbon-group`、`page.logs`・`page.home`・`page.settings`・`page.notifications`、`notification.banner`・`notification.desktop`です。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
+公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`overlay.ribbon-group`、`page.logs`・`page.home`・`page.notifications`、`notification.banner`・`notification.desktop`です。設定画面は本体の共通UIで描画します。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
 
 ```json
 {

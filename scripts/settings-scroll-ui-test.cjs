@@ -20,7 +20,7 @@ let application;
     const page = await application.firstWindow();
     await require('./shell-overlay-helper.cjs').homePage(page);
     await page.keyboard.press('Control+,');
-    const settingsPage = await require('./settings-shell-helper.cjs').settingsPage(page);
+    const settingsPage = await require('./settings-host-helper.cjs').settingsPage(page);
     for (const width of [1280, 900, 760]) {
       await application.evaluate(
         ({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setSize(width, 600),

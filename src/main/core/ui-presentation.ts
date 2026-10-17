@@ -13,6 +13,11 @@ export class NavigationCoordinator {
     private beforeNavigate?: () => Promise<void>,
     private failed?: (error: unknown) => void,
   ) {}
+  restore(route: string) {
+    // Startup restoration has lower priority than any explicit or pending navigation.
+    if (this.requestSequence !== 0) return;
+    return this.navigate(route);
+  }
   navigate(route: string, section?: NavigationState['section'], appletId?: string) {
     if (
       !['home', 'extensions', 'settings', 'logs', 'notifications'].includes(route) &&

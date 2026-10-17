@@ -81,9 +81,9 @@ const localUi = async (suffix) =>
         .find((page) => page.url().endsWith(suffix)),
     `Missing UI ${suffix}`,
   );
-const settingsUi = () => require('./settings-shell-helper.cjs').settingsPage(dock);
+const settingsUi = () => require('./settings-host-helper.cjs').settingsPage(dock);
 const button = (title) =>
-  require('./settings-shell-helper.cjs')
+  require('./settings-host-helper.cjs')
     .deferred(async () => {
       if (['ホーム', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title)) return rail;
       const snapshot = await dock.evaluate(() => window.dock.snapshot());

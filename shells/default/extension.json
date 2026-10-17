@@ -5,7 +5,9 @@
   "version": "0.0.0",
   "runtime": "node",
   "entry": "worker.cjs",
-  "capabilities": ["shell"],
+  "capabilities": [
+    "shell"
+  ],
   "shell": {
     "apiVersion": 1,
     "ribbonSchemaVersion": 2,
@@ -15,7 +17,6 @@
       "overlay.ribbon-group": "overlay.html",
       "page.logs": "logs.html",
       "page.home": "home.html",
-      "page.settings": "settings.html",
       "page.notifications": "notification-center.html",
       "notification.banner": "notifications.html",
       "notification.desktop": "notifications.html"

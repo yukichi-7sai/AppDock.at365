@@ -23,10 +23,7 @@ export interface HomePageRequest {
   appletOrder: string[];
 }
 export type ShellPageRequest =
-  | LogPageRequest
-  | HomePageRequest
-  | import('./settings-page').SettingsPageRequest
-  | import('./notification-center').NotificationCenterRequest;
+  LogPageRequest | HomePageRequest | import('./notification-center').NotificationCenterRequest;
 export interface ShellPageViewport {
   x: number;
   y: number;
@@ -82,17 +79,13 @@ export interface HomePageModel {
   };
 }
 export type ShellPageModel =
-  | LogPageModel
-  | HomePageModel
-  | import('./settings-page').SettingsPageModel
-  | import('./notification-center').NotificationCenterModel;
+  LogPageModel | HomePageModel | import('./notification-center').NotificationCenterModel;
 export interface HomeCommandResult {
   message: string;
   error: string;
 }
 export type ShellPageAction =
   | import('./notification-center').NotificationCenterAction
-  | import('./settings-page').SettingsPageAction
   | { id: string; type: 'filters'; filters: LogFilters }
   | { id: string; type: 'open-directory' }
   | { id: string; type: 'invoke'; actionId: string };
@@ -103,9 +96,6 @@ export interface ShellPageApi extends ShellAppletApi {
   onChanged(callback: (model: ShellPageModel) => void): () => void;
   focusHost(edge: 'before' | 'after'): Promise<void>;
   onFocus(callback: (edge: 'first' | 'last') => void): () => void;
-  /** Drain confirmed input before a host-owned save or discard. */
-  onFlush(callback: (requestId: string) => void): () => void;
-  flushed(requestId: string): Promise<void>;
   /** Keyboard shortcuts retain host routing while text input stays local. */
   shortcut(key: string): Promise<unknown>;
 }

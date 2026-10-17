@@ -65,7 +65,7 @@ window-rendering.tsはapp.readyより前にWindowsのNativeWinOcclusionを無効
 
 ユーザーがAppDock画面から操作する機能だけを対象にします。
 
-Applet管理一覧は本体renderer、設定カテゴリ・設定用Applet一覧・横断検索はDefault Shellが描画します。設定本文はSettingsPageSessionが選択ページだけを投影し、SettingsInputSessionへ編集を送ります。本体のサイドバーや非表示の設定本文を重複mountしません。ショートカット等の共用コントロールはsrc/shared/settings-uiに置き、依存を注入して本体とShell双方から利用します。
+Applet管理一覧は本体renderer、設定カテゴリ・設定用Applet一覧・横断検索も本体rendererが描画します。設定本文はSettingsPageSessionが選択ページだけを投影し、SettingsInputSessionへ編集を送ります。本体のサイドバーや非表示の設定本文を重複mountしません。ショートカット等の共用コントロールはsrc/renderer/settings-uiに置き、依存を注入して本体の各画面で利用します。
 
 1. [共有契約](../src/shared/contracts.ts)へ表示データや `DockApi`メソッドを追加します。秘密情報・プロセス内部オブジェクト・任意コードは渡しません。
 2. [preload](../src/main/preload.ts)に、固定したIPCメソッドの橋渡しを追加します。任意のチャンネルや任意のElectron操作を呼べる汎用口は作りません。
@@ -171,7 +171,7 @@ portableランチャーは更新間で実行パスを固定し、tray-identity.t
 
 ## Appletページとリボン
 
-契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、shells/default/settings/RibbonSettings.tsxが即時保存する入力を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
+契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、src/renderer/settings/RibbonSettings.tsxが即時保存する入力を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
 
 リボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。現行の導線は下記の設定パネルと表示順の仕様に従います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
 
@@ -180,9 +180,9 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 
 ## Applet設定パネルの共用
 
-全体設定とApplet詳細は同じSettingsPageSession/Default Shell本文を使う。0.33.0では保存済みSettingsStoreが正本となり、SettingsInputSessionはページ・モード・操作受付だけを担当する。フォーム/JSONの不完全入力や保存失敗値は現在のUIだけに保持する。全体保存/破棄・共有ドラフト・未保存警告・draft-avatarを撤去した。
+全体設定とApplet詳細は同じSettingsPageSession/本体SettingsPage本文を使う。0.33.0では保存済みSettingsStoreが正本となり、SettingsInputSessionはページ・モード・操作受付だけを担当する。フォーム/JSONの不完全入力や保存失敗値は現在のUIだけに保持する。全体保存/破棄・共有ドラフト・未保存警告・draft-avatarを撤去した。
 
-page.settingsはschemaVersion:2、追加ShellはminimumHostVersion:0.33.0以上。旧提供元は設定領域だけDefault Shellへ戻る。部分JSON・入力キュー・外部競合・検索の正本は[設定基盤](settings-foundation.md)。操作許可とWebアカウントは既存のPC専用/別名簿サービスを維持する。scripts/settings-shell-ui-test.cjs [固定EXE]で即時保存・IME/連続入力・画像・失敗/競合・復旧・再起動を確認する。通知基盤で編集状態を管理しない。
+SettingsPageModel schemaVersion:2は本体内部の投影契約とし、DockApi.settingsPageを使う。旧page.settingsのShell宣言と保存指定は読込可能だが描画には使用しない。部分JSON・入力キュー・外部競合・検索は[設定基盤](settings-foundation.md)を正本とする。scripts/settings-shell-ui-test.cjs [固定EXE]は本体設定の即時保存・IME・画像・失敗/競合・入力flush・復元を確認する。
 
 
 ## Appletの表示順

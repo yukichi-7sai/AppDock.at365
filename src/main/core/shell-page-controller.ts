@@ -2,7 +2,6 @@ import type { ShellPageAction, ShellPageModel, ShellPageRequest } from '../../sh
 
 /** Content is independent of its WebContents, provider and native bounds. */
 export interface ShellPageController {
-  readonly requiresFlush?: boolean;
   readonly id: string;
   readonly route: string;
   readonly kind: ShellPageModel['kind'];

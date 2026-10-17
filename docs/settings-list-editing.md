@@ -65,27 +65,27 @@
 
 | 役割                     | 参照先・責務                                                                                                                                                                                                                  |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ページと項目の配置       | [SettingsPageLayout](../shells/default/settings/SettingsPageLayout.tsx)、[SettingsSections](../src/shared/settings-ui/SettingsSections.tsx)。見出し、余白、カード、項目行、フィードバック                                     |
-| モーダルの表示寿命       | [SettingsModal](../src/shared/settings-ui/SettingsModal.tsx)。native dialog、フォーカス囲い込み／復帰、IME対応のEscape、背面の入力操作の一時停止                                                                              |
+| ページと項目の配置       | [SettingsPageLayout](../src/renderer/settings/SettingsPageLayout.tsx)、[SettingsSections](../src/renderer/settings-ui/SettingsSections.tsx)。見出し、余白、カード、項目行、フィードバック                                     |
+| モーダルの表示寿命       | [SettingsModal](../src/renderer/settings-ui/SettingsModal.tsx)。native dialog、フォーカス囲い込み／復帰、IME対応のEscape、背面の入力操作の一時停止                                                                              |
 | 非同期の確定操作         | 同ファイルの`SettingsDialog`。OK／キャンセル、処理中の無効化、重複防止、失敗時の入力保持                                                                                                                                      |
-| 入力とテーマ             | [SettingsInput](../src/shared/settings-ui/SettingsInput.tsx)、[controls.css](../src/shared/settings-ui/controls.css)、[settings-sections.css](../src/shared/settings-ui/settings-sections.css)。URL入力、共通の色・余白・状態 |
-| 一覧とダイアログの接続例 | [AiSettings](../shells/default/settings/AiSettings.tsx)。追加／編集／削除／並べ替えの入口、検索アンカー                                                                                                                       |
-| 関連項目と順序の編集例   | [AiConnectionDialog](../shells/default/settings/AiConnectionDialog.tsx)。一時入力、明示的な候補取得、詳細折りたたみ。順序編集は共通SettingsOrderDialogへ接続                                                                                 |
+| 入力とテーマ             | [SettingsInput](../src/renderer/settings-ui/SettingsInput.tsx)、[controls.css](../src/renderer/settings-ui/controls.css)、[settings-sections.css](../src/renderer/settings-ui/settings-sections.css)。URL入力、共通の色・余白・状態 |
+| 一覧とダイアログの接続例 | [AiSettings](../src/renderer/settings/AiSettings.tsx)。追加／編集／削除／並べ替えの入口、検索アンカー                                                                                                                       |
+| 関連項目と順序の編集例   | [AiConnectionDialog](../src/renderer/settings/AiConnectionDialog.tsx)。一時入力、明示的な候補取得、詳細折りたたみ。順序編集は共通SettingsOrderDialogへ接続                                                                                 |
 | 保存側の例               | [AiSettingsController](../src/main/core/ai-settings.ts)。登録単位の検証、競合、関連ファイル、順序の合成                                                                                                                       |
 
 共通部品は表示と操作中の状態を担い、設定の保存・認証・通信の規則は所有しない。AIの一覧・保存Controllerは具体例であり、任意の設定を扱う汎用CRUD部品ではない。AI固有のモデル・キー・登録上限を別機能へコピーしない。新たな共通部品を切り出す場合は、実際に共通する表示と操作に限定する。
 
-本体の設定ページでは公開されたSettingsPageの操作契約を通して本体が検証・保存し、Shellは描画と一時入力を持つ。Shellごとの内部importや専用の保存経路を増やさない。SettingsModalは同じ設定Surface内のダイアログであり、別WebContentsにまたがる表示には[Shellの共通オーバーレイ](shell-overlays.md)を使う。
+本体の設定ページでは公開されたSettingsPageの操作契約を通して本体が検証・保存し、本体rendererは描画と一時入力を持つ。Shellごとの内部importや専用の保存経路を増やさない。SettingsModalは同じ設定Surface内のダイアログであり、別WebContentsにまたがる表示には[Shellの共通オーバーレイ](shell-overlays.md)を使う。
 
 Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ)を確認する。`object-list`に`list`を宣言すると、本体が共通の一覧・追加/編集・削除確認・並べ替えダイアログを自動生成する。既存の`list`未指定の表示は維持する。WebAppletの管理ページも同じ`SettingsListTable`を利用する。
 
 ## Shellで並べ替えを再利用する
 
-`src/shared/settings-ui/SettingsOrderDialog.tsx`は、AIサーバーと宣言型オブジェクトリストで共有する並べ替え部品。`items`にダイアログ内で一意かつ不変の`id`、表示用`title`、任意の`description`を渡し、`title`と`listLabel`で対象を示す。選択肢は保存値ではなく一覧と同じ表示名へ変換して渡す。
+`src/renderer/settings-ui/SettingsOrderDialog.tsx`は、AIサーバーと宣言型オブジェクトリストで共有する並べ替え部品。`items`にダイアログ内で一意かつ不変の`id`、表示用`title`、任意の`description`を渡し、`title`と`listLabel`で対象を示す。選択肢は保存値ではなく一覧と同じ表示名へ変換して渡す。
 
 `onApply(orderedIds, originalIds)`が成功したときだけ閉じる。保存・入力検証・競合判定は呼び出し側が所有する。オブジェクトリストは開始時のスナップショット内のindexを一時IDに使い、既存の一覧全体の競合判定を保持する。移動途中にpropsを更新しても編集中の順序を置換しない。取消・Escapeで破棄し、保存中のボタン・ドラッグ移動を抑止する。
 
-別Shellでは既存の`configureSettingsControls`へ公開APIのadapterを設定し、共通`controls.css`とテーマ変数を読み込んで使う。Default Shellの内部実装や`settings.css`への依存はない。行、ハンドル、番号、補足、上下操作、移動案内、狭幅の配置を共通化する。`SettingsOrderDialog`と`BindingOrderDialog`は共通の`OrderDialogFrame`を使う。幅760px（画面幅から32pxを除いた幅が上限）、通常24px／720px以下で18pxの内側余白、同じテーマ色・見出し・操作欄を適用する。本文では一覧だけを縮めてスクロールさせ、見出し・補足・操作欄を保持する。同一Surface内の表示寿命は`SettingsModal`が担う。
+別Shellでは既存の`configureSettingsControls`へ公開APIのadapterを設定し、共通`controls.css`とテーマ変数を読み込んで使う。本体rendererの内部実装や`settings.css`への依存はない。行、ハンドル、番号、補足、上下操作、移動案内、狭幅の配置を共通化する。`SettingsOrderDialog`と`BindingOrderDialog`は共通の`OrderDialogFrame`を使う。幅760px（画面幅から32pxを除いた幅が上限）、通常24px／720px以下で18pxの内側余白、同じテーマ色・見出し・操作欄を適用する。本文では一覧だけを縮めてスクロールさせ、見出し・補足・操作欄を保持する。同一Surface内の表示寿命は`SettingsModal`が担う。
 
 `OrderDialogFrame`は見た目だけを共有するテンプレート。タイトル・任意の補助見出し・本文・フッター文言・エラー・処理中状態・適用可否を受け取り、保存や順序の意味を判断しない。ショートカット／ジェスチャー側は対象選択、条件説明、複数グループの一時編集、変更件数、既存の同期的な適用・競合検出を維持する。表示順側は非同期保存、二重送信防止、保存中の入力停止、失敗時の順序保持を維持する。
 

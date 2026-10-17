@@ -1,7 +1,9 @@
-import { configureSettingsControls } from '../shared/settings-ui/api';
+import { SettingsControlsProvider } from './settings-ui/api';
+import { flushSettingsPageInputs } from './settings-input-flush';
 import { ShellPageSlot } from './ShellPageSlot';
+import { SettingsPage } from './settings/SettingsPage';
 import { Icon, type IconName } from './Icon';
-import { Toggle } from '../shared/settings-ui/Toggle';
+import { Toggle } from './settings-ui/Toggle';
 import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
 import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -22,7 +24,7 @@ import { AppletIndex } from './AppletIndex';
 import { orderApplets } from '../shared/applet-order';
 import { SettingsToolbar, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
-import { VersionCheck } from '../shared/settings-ui/VersionCheck';
+import { VersionCheck } from './settings-ui/VersionCheck';
 import { UpdateProgress } from './UpdateProgress';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
@@ -110,7 +112,8 @@ function App() {
     if (!nav || nav.request === navigationSeen.current) return;
     navigationSeen.current = nav.request;
     if (nav.request === 0) {
-      void window.dock.navigate(page);
+      if (page !== nav.route)
+        void window.dock.navigate(page, true).catch((error) => setError(String(error)));
       return;
     }
     setLocalPage(nav.route as Page);
@@ -204,8 +207,7 @@ function App() {
   useEffect(
     () =>
       window.dock.onFlushSettingsInputs((id) => {
-        void editor
-          .flush()
+        void Promise.all([editor.flush(), flushSettingsPageInputs()])
           .then(() => window.dock.settingsInputsFlushed(id))
           .catch((e) => setError(String(e)));
       }),
@@ -656,13 +658,7 @@ function App() {
               </>
             )}
             <div className="settings-page" hidden={page !== 'settings'}>
-              {page === 'settings' && (
-                <ShellPageSlot
-                  kind="settings"
-                  sidebarWidth={appletSidebar.width}
-                  navigationRequest={snapshot.navigation.request}
-                />
-              )}
+              {page === 'settings' && <SettingsPage sidebarWidth={appletSidebar.width} />}
             </div>
             {page === 'notifications' && (
               <ShellPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />
@@ -981,5 +977,8 @@ function ExtensionDetail({
     </section>
   );
 }
-configureSettingsControls(window.dock);
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <SettingsControlsProvider api={window.dock}>
+    <App />
+  </SettingsControlsProvider>,
+);

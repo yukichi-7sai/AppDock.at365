@@ -173,11 +173,21 @@ test('field merge preserves unrelated external updates, detects same-field confl
   );
   assert.throws(() => mergeSettingsInput(a, { ...a, items: [NaN] }, a), /不正/);
 });
-test('old settings Shell falls back only for settings; schema 2 providers are accepted', () => {
-  const { settingsShellCompatible } = require('../out/main/shared/shell');
-  assert.equal(settingsShellCompatible({ id: 'fixture', minimumHostVersion: '0.32.0' }), false);
-  assert.equal(settingsShellCompatible({ id: 'fixture', minimumHostVersion: '0.33.0' }), true);
-  assert.equal(settingsShellCompatible({ id: 'appdock.default-shell' }), true);
+test('settings is host owned and retired assignments remain inert compatibility data', () => {
+  const { shellRegions, parseShellProviders, isShellRegion } = require('../out/main/shared/shell');
+  assert.equal(isShellRegion('page.settings'), false);
+  assert.equal(shellRegions.length, 8);
+  const { parseDeclaredCommands } = require('../out/main/shared/extension-commands');
+  const requirement = { region: 'page.settings', state: 'visible' };
+  assert.deepEqual(
+    parseDeclaredCommands('legacy.shell', [
+      { id: 'legacy.shell.action', title: 'Legacy', shellRequirement: requirement },
+    ])[0].shellRequirement,
+    requirement,
+  );
+  assert.deepEqual(parseShellProviders({ shellProviders: { 'page.settings': 'legacy.shell' } }), {
+    'page.settings': 'legacy.shell',
+  });
 });
 
 test('all JSON pages round-trip only selected ranges; unknown owners, leaves and order survive', () => {

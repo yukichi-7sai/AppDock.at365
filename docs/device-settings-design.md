@@ -334,7 +334,7 @@ ON/OFFの説明には、初回コピー、端末用設定の再開、OFFでは�
 
 本体の保存形式、設定項目、保存ファイルが増えるため、実装時は[共通手順](development-workflow.md#版更新の判断)に従ってAppDockをマイナー更新する。具体的な版は着手時の版から決める。既存Appletへ同じ設定オブジェクトを渡す契約を保ち、変更しないAppletの版更新・再発行を行わない。共通APIの変更が必要と判明した場合だけ、対応型・文書・Node/.NET試験・最低ホスト版の影響を確認する。
 
-実装版は0.57.0。`device-settings.ts`が形式・合成・保存先分類、`device-settings-store.ts`が既存Storeのfacadeと回復処理を担う。保存先切り替えの応答は範囲とrevisionだけを返し、設定全体を設定Shellへ返さない。設定画面自体の本体renderer統合は別設計のまま維持する。
+実装版は0.57.0。`device-settings.ts`が形式・合成・保存先分類、`device-settings-store.ts`が既存Storeのfacadeと回復処理を担う。保存先切り替えの応答は範囲とrevisionだけを返し、設定全体を設定ページモデルへ返さない。0.58.0では[本体統合](settings-host-ui-design.md)を実装し、本体の共通画面でも保存先・JSON・ファイル操作の連動を維持する。
 
 実装時の文書更新対象はsettings-sync、settings-foundation、launch-settings、automation、applet-development/extensions、READMEの保存先、必要な更新・配布手順。publish/deploy/updateが`settings-<端末名>.json`を生成物と誤認して同梱・上書き・削除しないことも確認する。commit・push・Release・実利用先deployは実装・通常publishと分離する。
 

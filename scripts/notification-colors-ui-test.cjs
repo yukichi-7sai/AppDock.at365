@@ -254,7 +254,7 @@ async function main() {
   );
   await dismiss(banner);
   await command('appdock.settings.open');
-  const p = await require('./settings-shell-helper.cjs').settingsPage(host);
+  const p = await require('./settings-host-helper.cjs').settingsPage(host);
   await p
     .locator('.settings-categories')
     .getByRole('button', { name: '通知', exact: true })

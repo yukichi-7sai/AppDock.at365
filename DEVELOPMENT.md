@@ -33,8 +33,8 @@
 | Shellの領域別割り当て | [領域ごとの指定・復旧・専用コマンドと実装計画](docs/shell-region-assignment.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |
-| 設定基盤・共通UIテンプレート | [設定基盤とDefault Shell](docs/settings-foundation.md)、[ページ・カード・項目行の共通部品](docs/settings-foundation.md#共通の画面構成) |
-| 設定画面の本体統合（設計・未実装） | [設定Shellの終了・settings-uiの移動・互換入力・検証計画](docs/settings-host-ui-design.md) |
+| 設定基盤・共通UIテンプレート | [設定基盤と本体の共通設定画面](docs/settings-foundation.md)、[ページ・カード・項目行の共通部品](docs/settings-foundation.md#共通の画面構成) |
+| 設定画面の本体統合 | [設定Shellの終了・settings-uiの移動・互換入力・検証計画](docs/settings-host-ui-design.md) |
 | 一覧形式の設定編集 | [AI接続を基準とする一覧・追加／編集・削除・並べ替え](docs/settings-list-editing.md) |
 | 通知基盤・移行設計 | [通知サービスとShell契約](docs/notifications.md)、[通知種類設定と段階的な拡張の設計](docs/notification-foundation.md) |
 | 共通のエラー報告 | [エラー通知とログの方針・共通入口・接続範囲](docs/error-reporting.md) |
@@ -246,7 +246,7 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
 
-[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、page.home/page.logs/page.settingsの公開モデル/操作/購読、Default Shellへのホーム・ログ描画移行を定義する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsInputSessionから読み取ります。過去ログや日付検索は後続。
+[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、ホーム・ログ・通知センターの公開モデル/操作/購読を定義する。設定画面は[本体の共通UI](docs/settings-foundation.md)で描画する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsInputSessionから読み取ります。過去ログや日付検索は後続。
 
 設定の正本は保存済みSettingsStoreです。mainのSettingsInputSessionは選択/モード/操作受付だけを持ちます。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
 

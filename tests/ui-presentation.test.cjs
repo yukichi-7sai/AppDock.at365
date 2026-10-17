@@ -149,3 +149,27 @@ test('navigation waits for pending input and only applies the latest request', a
   assert.equal(nav.state.route, 'logs');
   assert.equal(errors.length, 1);
 });
+
+test('startup restoration yields to explicit navigation before and during its input drain', async () => {
+  const releases = [];
+  const nav = new NavigationCoordinator(
+    () => {},
+    () => new Promise((resolve) => releases.push(resolve)),
+  );
+  const restored = nav.restore('extensions');
+  const explicit = nav.navigate('settings');
+  assert.equal(nav.restore('home'), undefined);
+  releases[0]();
+  await restored;
+  assert.equal(nav.state.route, 'home');
+  releases[1]();
+  await explicit;
+  assert.equal(nav.state.route, 'settings');
+  assert.equal(nav.restore('logs'), undefined);
+  assert.equal(nav.state.route, 'settings');
+
+  const first = new NavigationCoordinator(() => {});
+  first.navigate('settings');
+  first.restore('home');
+  assert.equal(first.state.route, 'settings');
+});

@@ -308,7 +308,7 @@ const checks = [];
       checks.push('modifier key gesture');
     }
     await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    const settingsPage = await require('./settings-shell-helper.cjs').settingsPage(dock);
+    const settingsPage = await require('./settings-host-helper.cjs').settingsPage(dock);
     await settingsPage.getByRole('button', { name: 'マウスジェスチャー', exact: true }).click();
     await require('./gesture-command-checks.cjs')({
       page: settingsPage,

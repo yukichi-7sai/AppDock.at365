@@ -28,7 +28,7 @@ Ollama APIではモデルのtool callを受けたAIアプリが実際のツー�
 | 接続日時 | 全クライアント共通の最終initialize日時 | 全体・このPC・ネットワークを区別して表示 |
 | 内部接続テスト | ループバックへのinitialize | 維持。LAN疎通やCodex接続成功の証明とは扱わない |
 
-主な参照元は [automation.ts](../src/main/core/automation.ts)、[automation-mcp.ts](../src/main/core/automation-mcp.ts)、[codex-registration.ts](../src/main/core/codex-registration.ts)、[CodexSettings.tsx](../shells/default/settings/CodexSettings.tsx)。
+主な参照元は [automation.ts](../src/main/core/automation.ts)、[automation-mcp.ts](../src/main/core/automation-mcp.ts)、[codex-registration.ts](../src/main/core/codex-registration.ts)、[CodexSettings.tsx](../src/renderer/settings/CodexSettings.tsx)。
 
 ## 3. 保存とIPC
 

@@ -61,7 +61,7 @@ async function waitPins(page, pins) {
   try {
     let page = await launch();
     let palette;
-    const settingsPage = () => require('./settings-shell-helper.cjs').settingsPage(page);
+    const settingsPage = () => require('./settings-host-helper.cjs').settingsPage(page);
     await page.keyboard.press('Control+p');
     palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
     await (

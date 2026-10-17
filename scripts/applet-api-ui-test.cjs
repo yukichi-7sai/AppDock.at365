@@ -101,8 +101,8 @@ if (portable) fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'))
 const states = [],
   checks = [];
 let client, page;
-const settingsSurface = require('./settings-shell-helper.cjs').deferred(() =>
-  require('./settings-shell-helper.cjs').settingsPage(page),
+const settingsSurface = require('./settings-host-helper.cjs').deferred(() =>
+  require('./settings-host-helper.cjs').settingsPage(page),
 );
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
@@ -403,12 +403,12 @@ async function grant(id, permissions) {
           'horizontal overflow',
         );
         await (
-          await require('./settings-shell-helper.cjs').settingsPage(page)
+          await require('./settings-host-helper.cjs').settingsPage(page)
         ).screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
         if (width === 700) {
           await panel.getByText('直接公開なし', { exact: true }).scrollIntoViewIfNeeded();
           await (
-            await require('./settings-shell-helper.cjs').settingsPage(page)
+            await require('./settings-host-helper.cjs').settingsPage(page)
           ).screenshot({
             path: path.join(profile, `permissions-${theme}-${width}-input.png`),
           });
@@ -451,7 +451,7 @@ async function grant(id, permissions) {
     try {
       if (page)
         await (
-          await require('./settings-shell-helper.cjs').settingsPage(page)
+          await require('./settings-host-helper.cjs').settingsPage(page)
         ).screenshot({
           path: path.join(profile, 'failure.png'),
         });
