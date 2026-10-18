@@ -516,9 +516,6 @@ const information = new InformationReporter({
   notifications: () => (quitting ? undefined : typedNotifications),
   log: (source, message) => log.write('info', source, message),
 });
-function commandCompleted() {
-  information.report('commands', 'コマンド実行', 'コマンドを実行しました。');
-}
 let legacyLocalData: LegacyLocalDataMonitor | undefined;
 const ai = new AiService({
   settings: () => settings.value.ai ?? defaultAiSettings(),
@@ -1200,7 +1197,6 @@ function openCommandPalette(request: CommandPaletteRequest) {
   return session.result
     .then((result) => {
       if (result.status === 'executed') {
-        commandCompleted();
         if (window && !window.isDestroyed()) window.webContents.send('dock:paletteExecuted');
       }
       return result;
@@ -2277,9 +2273,7 @@ function registerIpc() {
     if (!window?.isFocused()) return;
     const normalized = normalizeShortcut(key);
     if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === normalized)) return;
-    const result = await dispatchShortcut(normalized);
-    if (result?.executed && !result.failed) commandCompleted();
-    return result;
+    return dispatchShortcut(normalized);
   });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
   handle('dock:setShortcutRecording', async (recording: boolean) => {
@@ -2326,11 +2320,7 @@ function registerIpc() {
     await appletManagement.run(id, 'restart');
     information.report('applets', 'Applet', 'Appletを再起動しました。');
   });
-  handle('dock:executeCommand', async (id: string) => {
-    const result = await executeCommand(id);
-    commandCompleted();
-    return result;
-  });
+  handle('dock:executeCommand', (id: string) => executeCommand(id));
   handle('dock:executePanelAction', (id: string, actionId: string) =>
     manager.executePanelAction(id, actionId),
   );
@@ -3011,7 +3001,6 @@ async function initialize() {
     execute: executeCommand,
     changed,
     completed: (result) => {
-      if (result.message) commandCompleted();
       if (!quitting && window && !window.isDestroyed() && navigation.state.route !== 'home')
         window.webContents.send('dock:homeCommandResult', result);
     },

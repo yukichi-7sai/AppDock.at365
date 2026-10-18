@@ -139,7 +139,7 @@ test('controller survives presentation reconnect, guards in-flight execution and
   finish();
   await pending;
   assert.equal(session.snapshot().content.busy, false);
-  assert.equal(session.snapshot().content.message, 'コマンドを実行しました。');
+  assert.equal(session.snapshot().content.message, '');
   state.execute = async () => {
     throw Error('Fixture failure');
   };
@@ -195,8 +195,8 @@ test('page remount cannot bypass pending execution and completion outlives the o
   finish();
   await pending;
   assert.equal(state.executions.length, 1);
-  assert.equal(next.snapshot().content.message, 'コマンドを実行しました。');
-  assert.deepEqual(state.result, { message: 'コマンドを実行しました。', error: '' });
+  assert.equal(next.snapshot().content.message, '');
+  assert.deepEqual(state.result, { message: '', error: '' });
   next.dispose();
   execution.dispose();
 });

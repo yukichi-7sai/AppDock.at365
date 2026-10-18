@@ -174,6 +174,24 @@ const home = (provider = 'appdock.default-shell') =>
     }
   }, `logs provider ${provider}`);
 const countRows = (p) => p.locator('.log-row').count();
+async function assertNoCommandNotification() {
+  assert(
+    !(await dock.evaluate(() => window.dock.snapshot())).logs.some(
+      (l) => l.source === 'commands' && l.message.includes('[INFO]'),
+    ),
+  );
+  for (const page of dock
+    .context()
+    .pages()
+    .filter((p) => p.url().endsWith('/notifications.html'))) {
+    const { snapshot } = await page.evaluate(() => window.appdockNotifications.connect());
+    assert(
+      !snapshot.items.some(
+        (i) => i.ownerId === 'information' && i.body === 'コマンドを実行しました。',
+      ),
+    );
+  }
+}
 async function check(name, action) {
   await action();
   checks.push(name);
@@ -258,22 +276,9 @@ const invoke = (p, actionId) =>
         'disabled busy button',
       );
       await until(async () => !(await model(p)).content.busy, 'complete');
+      assert.equal((await model(p)).content.message, '');
       assert.equal(await p.locator('.home-result').count(), 0);
-      await until(async () => {
-        for (const page of dock
-          .context()
-          .pages()
-          .filter((p) => p.url().endsWith('/notifications.html'))) {
-          const { snapshot } = await page.evaluate(() => window.appdockNotifications.connect());
-          if (
-            snapshot.items.some(
-              (i) => i.ownerId === 'information' && i.body === 'コマンドを実行しました。',
-            )
-          )
-            return true;
-        }
-        return false;
-      }, 'home command information notification');
+      await assertNoCommandNotification();
       await p.getByRole('button', { name: /Fail/ }).click();
       await p.getByRole('alert').filter({ hasText: 'Home fixture error' }).waitFor();
       await navigate('settings');
@@ -287,7 +292,9 @@ const invoke = (p, actionId) =>
       'navigation retains in-flight guard and reports detached command completion',
       async () => {
         let p = await home();
-        const startedAt = Date.now();
+        const completedBefore = (await dock.evaluate(() => window.dock.snapshot())).logs.filter(
+          (l) => l.message === 'Home command completed',
+        ).length;
         await p.getByRole('button', { name: /Run slow/ }).click();
         await until(async () => (await model(p)).content.busy, 'command started');
         await p.locator('.extension-card').filter({ hasText: 'Fixture Home' }).click();
@@ -301,24 +308,14 @@ const invoke = (p, actionId) =>
         );
         await p.getByRole('button', { name: 'ログを開く', exact: true }).click();
         await require('./shell-overlay-helper.cjs').logsPage(dock);
-        await until(async () => {
-          for (const page of dock
-            .context()
-            .pages()
-            .filter((p) => p.url().endsWith('/notifications.html'))) {
-            const { snapshot } = await page.evaluate(() => window.appdockNotifications.connect());
-            if (
-              snapshot.items.some(
-                (i) =>
-                  i.createdAt >= startedAt &&
-                  i.ownerId === 'information' &&
-                  i.body === 'コマンドを実行しました。',
-              )
-            )
-              return true;
-          }
-          return false;
-        }, 'command information notification');
+        await until(
+          async () =>
+            (await dock.evaluate(() => window.dock.snapshot())).logs.filter(
+              (l) => l.message === 'Home command completed',
+            ).length > completedBefore,
+          'detached command completed',
+        );
+        await assertNoCommandNotification();
         await navigate('home');
         p = await home();
         assert.equal((await model(p)).content.busy, false);
@@ -395,7 +392,7 @@ const invoke = (p, actionId) =>
         assert.equal((await model(fallback)).id, id);
         assert.equal((await model(fallback)).content.applets[0].id, 'fixture.home');
         await until(async () => !(await model(fallback)).content.busy, 'recovered completion');
-        assert.equal((await model(fallback)).content.message, 'コマンドを実行しました。');
+        assert.equal((await model(fallback)).content.message, '');
         await dock.evaluate(() => window.dock.retryShell());
         await home('fixture.home');
         await dock.evaluate(() => window.dock.toggleExtension('fixture.home', false));

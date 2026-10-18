@@ -31,7 +31,6 @@ export class HomeCommandExecution {
   error = '';
   message = '';
   private closed = false;
-  private timer?: ReturnType<typeof setTimeout>;
   constructor(
     private options: {
       execute(id: string): Promise<unknown>;
@@ -44,17 +43,9 @@ export class HomeCommandExecution {
     this.busy = true;
     this.error = '';
     this.message = '';
-    clearTimeout(this.timer);
     this.options.changed();
     try {
       await this.options.execute(id);
-      if (!this.closed) {
-        this.message = 'コマンドを実行しました。';
-        this.timer = setTimeout(() => {
-          this.message = '';
-          this.options.changed();
-        }, 3500);
-      }
     } catch (error) {
       if (!this.closed) this.error = error instanceof Error ? error.message : String(error);
     } finally {
@@ -67,7 +58,6 @@ export class HomeCommandExecution {
   }
   dispose() {
     this.closed = true;
-    clearTimeout(this.timer);
   }
 }
 type Operation = { command: string; navigation?: true } | { applet: string };

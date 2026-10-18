@@ -10,7 +10,9 @@ const { settingsAwarePage } = require('./settings-aware-page.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..'),
-  portable = process.argv[2] && path.resolve(process.argv[2]);
+  portable =
+    process.argv[2] && process.argv[2] !== '--commands-only' && path.resolve(process.argv[2]);
+const commandsOnly = process.argv.includes('--commands-only');
 const profile = path.join(root, '.artifacts', `information-notifications-ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const accountFixture = path.join(profile, 'extensions', 'fixture.accounts');
@@ -26,9 +28,19 @@ fs.writeFileSync(
     runtime: 'node',
     entry: 'index.js',
     capabilities: ['web-profiles'],
+    commands: [
+      { id: 'fixture.accounts.run', title: 'Run fixture' },
+      { id: 'fixture.accounts.fail', title: 'Fail fixture' },
+    ],
   }),
 );
-fs.writeFileSync(path.join(accountFixture, 'index.js'), 'exports.activate = async () => {};');
+fs.writeFileSync(
+  path.join(accountFixture, 'index.js'),
+  `exports.activate = async c => {
+  c.commands.register('fixture.accounts.run', 'Run fixture', async () => c.log.info('Shortcut fixture completed'));
+  c.commands.register('fixture.accounts.fail', 'Fail fixture', async () => { throw Error('Shortcut fixture failed'); });
+};`,
+);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
@@ -38,7 +50,14 @@ if (portable) {
 const settings = createDefaultSettings();
 settings.host.checkForUpdatesOnStartup = false;
 settings.host.notifications = false;
-settings.keybindings = [];
+settings.extensions['fixture.accounts'] = { enabled: true, settings: {} };
+settings.keybindings = ['run', 'fail'].map((name, i) => ({
+  id: 'fixture.' + name,
+  command: 'fixture.accounts.' + name,
+  key: i ? 'Ctrl+F11' : 'Ctrl+F12',
+  enabled: true,
+  when: { scope: 'app', appletIds: [] },
+}));
 settings.globalShortcutCommands = [];
 settings.gestures.enabled = false;
 settings.tts.baseUrl = 'http://127.0.0.1:1/v1';
@@ -146,6 +165,101 @@ async function main() {
   host.setDefaultTimeout(15000);
   await until(async () => (await snapshot()).startupReady, 'ready');
   ui = settingsAwarePage(host);
+  await until(
+    async () =>
+      (await snapshot()).extensions.some(
+        (e) => e.id === 'fixture.accounts' && e.state === 'running',
+      ),
+    'shortcut fixture ready',
+  );
+  await host.bringToFront();
+  const completedCount = async () =>
+    (await snapshot()).logs.filter((l) => l.message === 'Shortcut fixture completed').length;
+  const before = await completedCount();
+  await host.keyboard.press('Control+F12');
+  await until(async () => (await completedCount()) === before + 1, 'keyboard command executed');
+  assert.deepEqual(await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+F12')), {
+    executed: 1,
+    failed: 0,
+  });
+  assert.deepEqual(await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+F11')), {
+    executed: 0,
+    failed: 1,
+  });
+  assert.deepEqual(await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+F9')), {
+    executed: 0,
+    failed: 0,
+  });
+  assert(
+    (await snapshot()).logs.some(
+      (l) => l.source === 'shortcuts' && l.message.includes('Shortcut fixture failed'),
+    ),
+  );
+  await host.evaluate(() => window.dock.executeCommand('fixture.accounts.run'));
+  assert.equal(await completedCount(), before + 3);
+  await host.evaluate(() => {
+    window.fixturePaletteResult = undefined;
+    window.fixturePaletteEvents = 0;
+    window.dock.onPaletteExecuted(() => window.fixturePaletteEvents++);
+    void window.dock
+      .openCommandPalette({ requestId: 'silent-command', mode: 'execute' })
+      .then((result) => {
+        window.fixturePaletteResult = result;
+      });
+  });
+  const palette = await require('./shell-overlay-helper.cjs').overlayPage(host);
+  await palette.getByRole('combobox').fill('fixture.accounts.run');
+  await require('./shell-overlay-helper.cjs').closingAction(
+    palette.locator('.palette-execute').click(),
+  );
+  await host.waitForFunction(() => window.fixturePaletteResult?.status === 'executed');
+  assert.equal(await completedCount(), before + 4);
+  assert.equal(await host.evaluate(() => window.fixturePaletteEvents), 1);
+  assert(
+    !(await snapshot()).logs.some((l) => l.source === 'commands' && l.message.includes('[INFO]')),
+  );
+  assert.equal((await info()).length, 0);
+  checks.push(
+    'keyboard, direct and palette commands execute silently; shortcut counts, error logs and palette completion remain',
+  );
+  if (commandsOnly) {
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await ui.getByRole('button', { name: '読み上げ', exact: true }).click();
+    await ui.getByRole('button', { name: 'すべての読み上げを停止', exact: true }).click();
+    await until(
+      async () =>
+        (await snapshot()).logs.some(
+          (l) => l.source === 'tts' && l.message.includes('読み上げを停止しました。'),
+        ),
+      'specific operation receipt',
+    );
+    const historyFile = path.join(profile, 'local-state', 'notifications', 'history.json');
+    await until(
+      () =>
+        fs.existsSync(historyFile) &&
+        JSON.parse(fs.readFileSync(historyFile)).entries.some(
+          (n) => n.body === '読み上げを停止しました。',
+        ),
+      'specific notification persisted',
+    );
+    const history = JSON.parse(fs.readFileSync(historyFile));
+    assert(!history.entries.some((n) => n.body === 'コマンドを実行しました。'));
+    checks.push(
+      'no generic success log/history; specific TTS stop notification persists even when Windows suppresses banners',
+    );
+    const result = {
+      ok: true,
+      profile,
+      mode: portable ? 'portable' : 'source',
+      scope: 'commands-only',
+      version: (await snapshot()).version,
+      exeHash: portable ? hash(exe) : undefined,
+      checks,
+    };
+    fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result));
+    return;
+  }
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   await ui.getByRole('button', { name: '通知', exact: true }).click();
   const cards = (await settingsPage(host)).locator('.notification-setting-card');
