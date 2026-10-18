@@ -1,4 +1,4 @@
-import { McpClientSettings } from './core/mcp-client-settings';
+import { McpClientSettings, McpSettingsError } from './core/mcp-client-settings';
 import { McpClientService, type McpActor } from './core/mcp-client';
 import { ShellProviderRegistry } from './core/shell-provider-registry';
 import { isDeepStrictEqual } from 'node:util';
@@ -648,11 +648,21 @@ const mcpClient = new McpClientService({
     if (actor.kind === 'host') return startupReady;
     if (actor.owner !== mcpActor(actor.appletId, { origin: actor.origin }).owner) return false;
     const allowed = (id?: string) => {
-      if (!id) return mcpAllowed('allowUseMcp') && (!execute || mcpAllowed('allowExecute'));
+      if (!id)
+        return (
+          mcpAllowed('allowUseMcp') &&
+          (!execute || mcpAllowed('allowExecute')) &&
+          (!actor.management || mcpAllowed('allowManageMcpServers'))
+        );
       const e = manager?.items.get(id);
       const p =
         e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
-      return p.read === true && p.useMcp === true && (!execute || p.execute === true);
+      return (
+        p.read === true &&
+        p.useMcp === true &&
+        (!execute || p.execute === true) &&
+        (!actor.management || p.manageMcpServers === true)
+      );
     };
     return (
       allowed(actor.appletId) &&
@@ -771,8 +781,39 @@ customCommands.registerHost(
     unavailableReason: (config) => mcpClient.commandUnavailable(config),
   },
 );
+function mcpSettingsOperation<T>(operation: () => T): T {
+  try {
+    return operation();
+  } catch (error) {
+    const code = error instanceof McpSettingsError ? error.code : 'INVALID_ARGUMENT';
+    const message =
+      error instanceof McpSettingsError
+        ? error.message
+        : 'MCP接続設定の入力形式と認証情報を確認してください。';
+    if (code === 'SAVE_FAILED')
+      errors.report({
+        eventId: randomUUID(),
+        source: 'mcp-client',
+        title: 'MCP接続設定を保存できませんでした',
+        code,
+        message,
+      });
+    throw new AutomationError(code, message);
+  }
+}
 const operationApi = new AppDockApi({
   handlers: {
+    'mcp.servers.getSettings': async (p) =>
+      mcpSettingsOperation(() => mcpSettings.getSettings(p.serverId)),
+    'mcp.servers.updateSettings': async (p) => {
+      try {
+        assertSettingsWritable();
+      } catch {
+        throw new AutomationError('BUSY', '設定の復元・再起動が完了してから操作してください。');
+      }
+      return mcpSettingsOperation(() => mcpSettings.update(p));
+    },
+    'mcp.servers.inspectTools': (p, id, c) => mcpClient.inspectTools(mcpActor(id, c), p),
     'mcp.servers.list': async (p, id, c) => mcpClient.servers(mcpActor(id, c), p),
     'mcp.tools.list': (p, id, c) => mcpClient.tools(mcpActor(id, c), p),
     'mcp.tools.get': (p, id, c) => mcpClient.tool(mcpActor(id, c), p),
@@ -837,6 +878,7 @@ const operationApi = new AppDockApi({
   appletManagement,
   customCommands,
   mcpClientAllowed: () => mcpAllowed('allowUseMcp'),
+  mcpServersManageable: () => mcpAllowed('allowManageMcpServers'),
   customCommandsManageable: () => mcpAllowed('allowManageCustomCommands'),
   appletPermissions: (id) => {
     const e = manager?.items.get(id);
@@ -1852,6 +1894,8 @@ function settingsPageActions(
               'setRibbonEditing',
               'setTts',
               'setAi',
+              'setMcpClient',
+              'setMcpServerManagement',
               'setTrayEditing',
               'setCustomCommandManagement',
             ]

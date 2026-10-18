@@ -8,7 +8,7 @@ import {
   parseMcpRoster,
   type McpConnection,
 } from '../../shared/mcp-client';
-import { atomicWrite, type SettingsStore } from './settings';
+import { atomicWrite, SettingsConflictError, type SettingsStore } from './settings';
 
 export const mcpDigest = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -24,6 +24,14 @@ export const mcpEndpointIdentity = (c: McpConnection) =>
 interface LocalEntry {
   connection: McpConnection;
   secret?: string;
+}
+export class McpSettingsError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 export class McpClientSettings {
   constructor(
@@ -51,7 +59,10 @@ export class McpClientSettings {
       }
       return data.entries;
     } catch {
-      throw Error('MCPのPC専用設定を読み取れません。設定ファイルを確認してください。');
+      throw new McpSettingsError(
+        'CONFIGURATION_REQUIRED',
+        'MCPのPC専用設定を読み取れません。設定ファイルを確認してください。',
+      );
     }
   }
   roster() {
@@ -102,7 +113,10 @@ export class McpClientSettings {
         throw Error();
       return { token: data.token, env: data.env };
     } catch {
-      throw Error('MCPの認証情報を復号できません。接続設定で再入力してください。');
+      throw new McpSettingsError(
+        'CONFIGURATION_REQUIRED',
+        'MCPの認証情報を復号できません。接続設定で再入力してください。',
+      );
     }
   }
   statuses() {
@@ -128,27 +142,82 @@ export class McpClientSettings {
       }
     });
   }
-  private asset(entries: Record<string, LocalEntry>) {
+  getSettings(serverId?: unknown) {
+    const revision = this.revision();
+    const items = this.roster();
+    if (serverId === undefined) {
+      const statuses = this.statuses();
+      return {
+        revision,
+        items: items.map((item) => ({
+          ...item,
+          state: statuses.find((s) => s.id === item.id)?.state,
+        })),
+      };
+    }
+    const item = items.find((item) => item.id === serverId);
+    if (!item) throw new McpSettingsError('NOT_FOUND', 'MCP接続先が見つかりません。');
+    return { revision, item, ...this.statuses().find((s) => s.id === serverId) };
+  }
+  private asset(entries: Record<string, LocalEntry>, expectedRevision: string) {
     const content = JSON.stringify({ version: 1, entries }) + '\n';
     if (Object.keys(entries).length > 64 || Buffer.byteLength(content, 'utf8') > 1024 * 1024)
       throw Error(
         'MCPのPC専用設定が保存上限を超えます。不要な接続設定や環境変数を整理してください。',
       );
     const previous = fs.existsSync(this.file) ? fs.readFileSync(this.file) : undefined;
+    let committed = false;
     return {
-      commit: () => atomicWrite(this.file, content),
+      commit: () => {
+        if (this.revision() !== expectedRevision)
+          throw new SettingsConflictError('MCP接続設定が変更されました。');
+        atomicWrite(this.file, content, { previous });
+        committed = true;
+      },
       rollback: () => {
-        if (previous) atomicWrite(this.file, previous);
-        else fs.rmSync(this.file, { force: true });
+        if (!committed) return;
+        const written = Buffer.from(content, 'utf8');
+        if (previous) atomicWrite(this.file, previous, { previous: written });
+        else {
+          if (!fs.readFileSync(this.file).equals(written))
+            throw new SettingsConflictError('MCP接続設定が変更されました。');
+          fs.rmSync(this.file);
+        }
       },
     };
   }
   update(request: unknown) {
     if (!jsonObject(request) || typeof request.expectedRevision !== 'string')
       throw Error('MCP接続設定の更新要求が不正です。');
-    this.settings.assertRevision(this.settings.revision);
+    const fields: Record<string, string[]> = {
+      save: ['item', 'connection', 'token', 'environment'],
+      remove: ['id'],
+      reorder: ['ids'],
+      enabled: ['id', 'enabled'],
+    };
+    const permitted = fields[String(request.op)];
+    if (
+      !permitted ||
+      Object.keys(request).some(
+        (k) => !['op', 'expectedRevision', 'dryRun', ...permitted].includes(k),
+      ) ||
+      (request.dryRun !== undefined && typeof request.dryRun !== 'boolean')
+    )
+      throw Error('MCP接続設定の更新要求が不正です。');
+    boundedJson(request, 262144, 8, 4096);
+    try {
+      this.settings.assertRevision(this.settings.revision);
+    } catch {
+      throw new McpSettingsError(
+        'REVISION_CONFLICT',
+        '設定が別の場所で変更されました。設定を再取得してください。',
+      );
+    }
     if (request.expectedRevision !== this.revision())
-      throw Error('設定が別の場所で変更されました。キャンセルして開き直してください。');
+      throw new McpSettingsError(
+        'REVISION_CONFLICT',
+        '設定が別の場所で変更されました。キャンセルして開き直してください。',
+      );
     const entries = this.read();
     let items = this.roster();
     if (request.op === 'save') {
@@ -235,11 +304,30 @@ export class McpClientSettings {
       entries[request.id].connection.enabled = request.enabled;
     } else throw Error('対応していない更新です。');
     const mcpServers = parseMcpRoster({ version: 1, items });
-    this.settings.save(
-      { ...this.settings.value, mcpServers },
-      this.settings.revision,
-      this.asset(entries),
-    );
+    const next = { ...this.settings.value, mcpServers };
+    if (Buffer.byteLength(JSON.stringify(next, null, 2) + '\n', 'utf8') > 4 * 1024 * 1024)
+      throw Error('設定ファイルは4MB以下にしてください。');
+    if (request.expectedRevision !== this.revision())
+      throw new McpSettingsError(
+        'REVISION_CONFLICT',
+        '設定が別の場所で変更されました。設定を再取得してください。',
+      );
+    const asset = this.asset(entries, request.expectedRevision);
+    if (request.dryRun === true)
+      return { saved: false, validated: true, revision: this.revision() };
+    try {
+      this.settings.save(next, this.settings.revision, asset);
+    } catch (error) {
+      if (error instanceof SettingsConflictError)
+        throw new McpSettingsError(
+          'REVISION_CONFLICT',
+          '設定が別の場所で変更されました。設定を再取得してください。',
+        );
+      throw new McpSettingsError(
+        'SAVE_FAILED',
+        'MCP接続設定を保存できません。保存先のアクセス権と空き容量を確認してください。',
+      );
+    }
     this.changed();
     return { saved: true, revision: this.revision() };
   }

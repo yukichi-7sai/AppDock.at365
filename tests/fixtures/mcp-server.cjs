@@ -20,6 +20,7 @@ function fixtureServer(state = { count: 0, changed: false }) {
     additionalProperties: false,
   };
   server.setRequestHandler(ListToolsRequestSchema, async ({ params }) => {
+    await state.beforeList?.();
     const tools = [
       'echo',
       'fail',

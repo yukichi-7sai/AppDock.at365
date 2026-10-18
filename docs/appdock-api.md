@@ -12,6 +12,8 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 0.60.0から`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`をAppletとMCPへ公開します。発見/状態取得はread + useMcp、実行/取消はさらにexecuteが必要で、useMcpは両入口で初期OFFです。本体のMCPサーバーOFFでもAppletから利用できます。[接続・保存・上限](mcp-client-design.md)と[中継公開](mcp-hub-relay-design.md)を参照してください。
 
+接続先管理には`mcp.servers.getSettings/updateSettings/inspectTools`を使用します。read + manageMcpServersを基本とし、更新にはexecute + write、未公開ツールの確認にはexecute + useMcpも必要です。独立した管理許可は両入口で初期OFF。元callerの必要許可も照合します。[管理API](mcp-client-design.md#接続先の管理api)に、保存・秘密・公開範囲の契約をまとめています。
+
 tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返します。tools.callには`{serverId,name,arguments,toolRevision,requestId,timeoutMs?}`を指定し、返されたjobIdでjobs.get/cancelを呼びます。Nodeは`context.appdock.call`、.NETは`context.AppDock.CallAsync`を使用します。結果取得は同じ実行主体に限り、MCP起点を経由したAppletには元のMCP許可と公開リストも適用します。設定UIだけが全ジョブを確認できます。
 
 接続先の追加・秘密・公開許可の変更は本体設定UIで行います。管理APIへ実行ファイルやURLを渡して任意の接続先を作る機能はありません。未対応Schema・変更済みtoolRevision・非公開ツール・上限超過・再起動後のジョブは明確なエラーとして返します。
@@ -27,7 +29,7 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/manageCustomCommandsがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/manageCustomCommands/manageMcpServersがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |

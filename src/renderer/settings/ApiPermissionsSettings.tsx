@@ -32,6 +32,13 @@ const rows: {
     label: 'カスタムコマンド管理',
   },
   {
+    key: 'manageMcpServers',
+    description: hostSettingItem('permissions', 'manageMcpServers').description,
+    mcp: 'allowManageMcpServers',
+    action: 'setMcpServerManagement',
+    label: 'MCP接続先の管理',
+  },
+  {
     key: 'useAi',
     description: hostSettingItem('permissions', 'useAi').description,
     mcp: 'allowUseAi',
@@ -105,7 +112,8 @@ function needs(key: AppletApiPermission, permissions: AppletApiPermissions, appl
     key !== 'useTts' &&
     key !== 'useAi' &&
     key !== 'useMcp' &&
-    key !== 'manageCustomCommands'
+    key !== 'manageCustomCommands' &&
+    key !== 'manageMcpServers'
   )
     required.push('execute');
   if (key.startsWith('edit')) required.push('write');

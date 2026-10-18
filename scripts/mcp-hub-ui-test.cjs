@@ -114,6 +114,7 @@ const fixtureMetadata = {
   }).trim(),
   node: process.version,
   nodeSha256: hash(process.execPath),
+  settingsSchemaSha256: hash(path.join(root, 'out/main/shared/settings-schema.js')),
   mcpServerSha256: hash(path.join(root, 'tests/fixtures/mcp-server.cjs')),
 };
 fs.writeFileSync(
@@ -243,6 +244,47 @@ async function checkDialogLayout(dialog) {
     JSON.stringify(layout),
   );
 }
+async function mcpPermissionControl(page, management = false) {
+  await page.getByRole('button', { name: '操作の許可', exact: true }).click();
+  const panel = page.getByRole('region', { name: '操作の許可', exact: true });
+  const control = panel.getByRole('switch', {
+    name: management
+      ? 'CodexからのMCP接続先の管理を許可する'
+      : 'CodexからのMCP接続先の利用を許可する',
+    exact: true,
+  });
+  await control.waitFor();
+  await until(() => control.isEnabled(), 'MCP permission control ready');
+  return { panel, control };
+}
+async function setMcpPermission(page, allowed, management = false) {
+  const { panel, control } = await mcpPermissionControl(page, management);
+  const permission = management ? 'allowManageMcpServers' : 'allowUseMcp';
+  const file = path.join(local, 'automation.json');
+  const before = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+  const stateBefore = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+  assert.notEqual(await control.isChecked(), allowed);
+  await control.click();
+  await until(async () => {
+    if (await panel.getByRole('alert').count()) return true;
+    return (await control.isEnabled()) && (await control.isChecked()) === allowed;
+  }, 'MCP permission UI save');
+  assert.equal(await panel.getByRole('alert').count(), 0, await panel.innerText());
+  assert.equal(await control.isChecked(), allowed);
+  const after = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(after[permission], allowed);
+  if (before) {
+    const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+    assert.equal(digest({ ...after, [permission]: before[permission] }), digest(before));
+  }
+  const stateAfter = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+  assert.equal(stateAfter[permission], allowed);
+  for (const key of Object.keys(stateBefore).filter(
+    (key) => key.startsWith('allow') && key !== permission,
+  ))
+    assert.equal(stateAfter[key], stateBefore[key], key);
+  assert.equal(stateAfter.enabled, stateBefore.enabled);
+}
 (async () => {
   try {
     let state = await start(),
@@ -252,6 +294,11 @@ async function checkDialogLayout(dialog) {
       false,
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await setMcpPermission(page, true);
+    await setMcpPermission(page, false);
+    checks.push(
+      'permissions UI: MCP use can be saved ON/OFF while integration is OFF without changing other settings',
+    );
     await page.getByRole('button', { name: 'MCP接続先', exact: true }).click();
     await page.getByRole('button', { name: '接続先を追加', exact: true }).click();
     const connectionDialog = page.getByRole('dialog');
@@ -299,7 +346,127 @@ async function checkDialogLayout(dialog) {
       (await client.callTool({ name: 'appdock_mcp_list_servers', arguments: {} })).isError,
       true,
     );
-    await page.evaluate(() => window.dock.automation({ kind: 'setMcpClient', allowed: true }));
+    await setMcpPermission(page, true);
+    await page.screenshot({ path: path.join(profile, 'mcp-permission-on.png') });
+    assert.equal(
+      (await client.callTool({ name: 'appdock_mcp_get_server_settings', arguments: {} }))
+        .structuredContent.code,
+      'API_DISABLED',
+    );
+    await setMcpPermission(page, true, true);
+    await page.screenshot({ path: path.join(profile, 'mcp-management-permission-on.png') });
+    const managedId = randomUUID();
+    const managedConnection = {
+      enabled: false,
+      transport: 'stdio',
+      command: process.execPath,
+      args: [path.join(root, 'tests/fixtures/mcp-server.cjs')],
+      cwd: '',
+      url: '',
+      authentication: 'none',
+      published: false,
+      publishedTools: [],
+    };
+    const managedItem = {
+      id: managedId,
+      name: 'MCP registered fixture',
+      description: 'Registered through MCP',
+    };
+    const managedUpdate = async (args) =>
+      call('appdock_mcp_update_server_settings', {
+        expectedRevision: (await call('appdock_mcp_get_server_settings')).revision,
+        ...args,
+      });
+    const request = {
+      op: 'save',
+      item: managedItem,
+      connection: managedConnection,
+      environment: { MCP_FIXTURE_SECRET: 'fixture-management-secret' },
+    };
+    const beforePreview = [
+      hash(path.join(profile, 'settings.json')),
+      hash(path.join(local, 'mcp-client.json')),
+    ];
+    assert.equal((await managedUpdate({ ...request, dryRun: true })).saved, false);
+    assert.deepEqual(
+      [hash(path.join(profile, 'settings.json')), hash(path.join(local, 'mcp-client.json'))],
+      beforePreview,
+    );
+    await managedUpdate(request);
+    let managedDetails = await call('appdock_mcp_get_server_settings', { serverId: managedId });
+    assert.deepEqual(managedDetails.connection, managedConnection);
+    assert.deepEqual(managedDetails.environmentNames, ['MCP_FIXTURE_SECRET']);
+    assert(!JSON.stringify(managedDetails).includes('fixture-management-secret'));
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_mcp_inspect_server_tools',
+          arguments: { serverId: managedId },
+        })
+      ).structuredContent.code,
+      'CONNECTION_DISABLED',
+    );
+    await managedUpdate({ op: 'enabled', id: managedId, enabled: true });
+    assert(
+      (await call('appdock_mcp_inspect_server_tools', { serverId: managedId })).items.some(
+        (t) => t.name === 'echo',
+      ),
+    );
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_mcp_get_tool',
+          arguments: { serverId: managedId, name: 'echo' },
+        })
+      ).structuredContent.code,
+      'NOT_FOUND',
+    );
+    managedDetails = await call('appdock_mcp_get_server_settings', { serverId: managedId });
+    await managedUpdate({
+      op: 'save',
+      item: managedItem,
+      connection: { ...managedDetails.connection, published: true, publishedTools: ['echo'] },
+    });
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_mcp_update_server_settings',
+          arguments: { op: 'remove', id: managedId, expectedRevision: managedDetails.revision },
+        })
+      ).structuredContent.code,
+      'REVISION_CONFLICT',
+    );
+    const managedTool = (await call('appdock_mcp_get_tool', { serverId: managedId, name: 'echo' }))
+      .tool;
+    const accepted = await call('appdock_mcp_call_tool', {
+      serverId: managedId,
+      name: 'echo',
+      toolRevision: managedTool.toolRevision,
+      requestId: randomUUID(),
+      arguments: { message: 'managed relay' },
+    });
+    const managedJob = await until(async () => {
+      const job = await call('appdock_mcp_get_job', { jobId: accepted.jobId });
+      return job.state !== 'running' && job;
+    }, 'managed relay job');
+    assert.equal(managedJob.result.structuredContent.message, 'managed relay');
+    assert.equal(managedJob.result.structuredContent.environment, true);
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_mcp_get_tool',
+          arguments: { serverId: managedId, name: 'delay' },
+        })
+      ).structuredContent.code,
+      'NOT_FOUND',
+    );
+    await managedUpdate({ op: 'remove', id: managedId });
+    assert.equal((await call('appdock_mcp_get_server_settings')).items.length, 1);
+    assert.equal(JSON.stringify((await client.listTools()).tools), outer);
+    checks.push(
+      'MCP registration: separate default-OFF UI grant, dry-run, credential redaction, enable, private catalog inspection, explicit publication, execution, revision conflict and deletion on one connection',
+    );
+    await page.getByRole('button', { name: 'MCP接続先', exact: true }).click();
     assert.equal((await call('appdock_mcp_list_servers')).items.length, 0);
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     let relayDialog = page.getByRole('dialog');
@@ -679,8 +846,13 @@ async function checkDialogLayout(dialog) {
     await stop(state);
     state = await start();
     page = state.page;
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    const restoredOn = await mcpPermissionControl(page);
+    assert.equal(await restoredOn.control.isChecked(), true);
     await connect(state);
     assert.equal((await call('appdock_list_custom_commands')).items.length, 4);
+    assert.equal(await (await mcpPermissionControl(page, true)).control.isChecked(), true);
+    assert.equal((await call('appdock_mcp_get_server_settings')).items.length, 1);
     assert.equal((await savedJob()).result.structuredContent.scheduledSeconds, 600);
     assert.equal(
       (await call('appdock_execute_command', { id: node.commandId })).result.message,
@@ -695,6 +867,35 @@ async function checkDialogLayout(dialog) {
     );
     assert(!(await call('appdock_list_commands')).commands.some((c) => c.id === node.commandId));
     checks.push('delete removes executable catalog entry while retaining shortcut references');
+    await setMcpPermission(page, false);
+    assert.equal(
+      (await client.callTool({ name: 'appdock_mcp_list_servers', arguments: {} })).isError,
+      true,
+    );
+    await client.close();
+    client = null;
+    await stop(state);
+    state = await start();
+    page = state.page;
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    const restoredPermission = await mcpPermissionControl(page);
+    assert.equal(await restoredPermission.control.isChecked(), false);
+    await connect(state);
+    assert.equal(
+      (await client.callTool({ name: 'appdock_mcp_list_servers', arguments: {} })).isError,
+      true,
+    );
+    checks.push('permissions UI: ON and OFF survive process restart; OFF revokes MCP hub access');
+    assert.equal((await call('appdock_mcp_get_server_settings')).items.length, 1);
+    await setMcpPermission(page, false, true);
+    assert.equal(
+      (await client.callTool({ name: 'appdock_mcp_get_server_settings', arguments: {} }))
+        .structuredContent.code,
+      'API_DISABLED',
+    );
+    checks.push(
+      'management grant survives restart, reads settings independently of useMcp and revokes immediately through UI',
+    );
     await client.close();
     client = null;
     await stop(state);

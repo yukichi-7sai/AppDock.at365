@@ -64,6 +64,7 @@ export class AppDockApi {
       customCommands?: CustomCommandService;
       customCommandsManageable?(): boolean;
       mcpClientAllowed?(): boolean;
+      mcpServersManageable?(): boolean;
       appletManagement?: AppletManagement;
       manageable?(): boolean;
       shortcutsEditable?(): boolean;
@@ -111,6 +112,7 @@ export class AppDockApi {
       useTts: this.options.ttsAllowed?.() ?? false,
       useAi: this.options.aiAllowed?.() ?? false,
       useMcp: this.options.mcpClientAllowed?.() ?? false,
+      manageMcpServers: this.options.mcpServersManageable?.() ?? false,
       read: true,
       execute: this.options.executable(),
       write: this.options.writable(),

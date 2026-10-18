@@ -2,6 +2,8 @@
 
 MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-relay-design.md)と[保存型コマンド](mcp-command-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 
+接続先管理には`appdock_mcp_get_server_settings`、`appdock_mcp_update_server_settings`、`appdock_mcp_inspect_server_tools`の固定3入口があります。独立した初期OFFの管理許可で、登録・編集・削除と公開前のツール確認を扱います。保存には設定変更・コマンド実行、未公開ツールの確認にはMCP利用・コマンド実行の許可も必要です。[管理APIの契約](mcp-client-design.md#接続先の管理api)を参照してください。
+
 保存型カスタムコマンドの管理は固定の4つの読取り入口と`appdock.customCommands.update`を使用します。[カスタムコマンド契約](custom-commands-design.md#共通apiとmcpの固定入口)を参照してください。初回のツール定義反映後、種類や定義の増減でMCPのtools/listは変化しません。管理許可は既存の実行・設定変更許可と独立し、定義のconfigを閲覧できる許可です。保存成功、handlerReturned、effectVerified:falseを区別します。
 
 Appletも同じ操作APIを使用します。[Applet向け接続・許可・SDK](appdock-api.md)を参照してください。操作実装とカタログを共有し、Codex連携の許可とは独立しています。

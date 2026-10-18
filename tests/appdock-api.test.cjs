@@ -73,9 +73,13 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   assert.equal(f.access.get().useAi, false);
   assert.equal(f.access.get().useMcp, false);
   assert.equal(f.access.get().manageCustomCommands, false);
+  assert.equal(f.access.get().manageMcpServers, false);
   assert.ok(
     Object.entries(f.access.get())
-      .filter(([k]) => !['useTts', 'useAi', 'useMcp', 'manageCustomCommands'].includes(k))
+      .filter(
+        ([k]) =>
+          !['useTts', 'useAi', 'useMcp', 'manageCustomCommands', 'manageMcpServers'].includes(k),
+      )
       .every(([, v]) => v === true),
   );
   assert.equal(
@@ -115,6 +119,61 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   );
   f.grant({});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
+});
+test('MCP server management requires independent caller and origin grants for each operation', async (t) => {
+  const f = setup(t);
+  const methods = [
+    'mcp.servers.getSettings',
+    'mcp.servers.updateSettings',
+    'mcp.servers.inspectTools',
+  ];
+  let executed = 0;
+  Object.assign(f.options, {
+    executable: () => true,
+    writable: () => true,
+    mcpClientAllowed: () => true,
+    mcpServersManageable: () => false,
+    handlers: Object.fromEntries(methods.map((m) => [m, async () => ({ called: ++executed })])),
+  });
+  const params = [
+    {},
+    { op: 'remove', id: 'server', expectedRevision: 'revision' },
+    { serverId: 'server' },
+  ];
+  for (const [i, m] of methods.entries())
+    await assert.rejects(async () => f.api.call(m, params[i]), { code: 'API_DISABLED' });
+  assert.equal(executed, 0);
+  f.options.mcpServersManageable = () => true;
+  f.options.mcpClientAllowed = () => false;
+  f.options.executable = () => false;
+  f.options.writable = () => false;
+  assert.equal((await f.api.call(methods[0])).called, 1);
+  for (const i of [1, 2])
+    await assert.rejects(async () => f.api.call(methods[i], params[i]), { code: 'API_DISABLED' });
+  f.options.executable = () => true;
+  await assert.rejects(async () => f.api.call(methods[1], params[1]), { code: 'API_DISABLED' });
+  f.options.writable = () => true;
+  await f.api.call(methods[1], params[1]);
+  await assert.rejects(async () => f.api.call(methods[2], params[2]), { code: 'API_DISABLED' });
+  f.options.mcpClientAllowed = () => true;
+  await f.api.call(methods[2], params[2]);
+  const grants = { read: true, execute: true, write: true, useMcp: true, manageMcpServers: true };
+  f.grant(grants);
+  for (const [i, m] of methods.entries()) assert.equal((await f.call(m, params[i])).ok, true);
+  f.options.mcpServersManageable = () => false;
+  for (const [i, m] of methods.entries())
+    await assert.rejects(
+      async () => f.api.call(m, params[i], f.manifest.id, { origin: { kind: 'mcp' } }),
+      { code: 'API_DISABLED' },
+    );
+  f.options.mcpServersManageable = () => true;
+  f.grant({ ...grants, manageMcpServers: false });
+  for (const [i, m] of methods.entries())
+    assert.equal((await f.call(m, params[i])).error.code, 'API_DISABLED');
+  await assert.rejects(
+    async () => f.api.call(methods[2], { serverId: 'server', management: true }),
+    { code: 'INVALID_ARGUMENT' },
+  );
 });
 test('Caller identity cannot be supplied, capability and lifetime are checked, audit excludes arguments', async (t) => {
   const f = setup(t);

@@ -447,6 +447,7 @@ export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
 export const appletApiPermissionLabels = {
   useMcp: 'MCP接続先の利用',
   manageCustomCommands: 'カスタムコマンド定義の閲覧・編集',
+  manageMcpServers: 'MCP接続先の管理',
   useAi: 'AIサーバーへの送信・文章生成',
   useTts: 'TTSサーバーへの送信・読み上げ',
   sendInput: 'Windowsへのキー・操作メッセージ送信',

@@ -19,7 +19,36 @@
 
 ## 共通サービスと発見
 
-本体のMcpClientServiceを単一実体とし、Appletは`context.appdock.call`/`.NET AppDock.CallAsync`を使う。MCPサーバー機能OFFでも本体とAppletの利用は可能。操作は`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`。Appletの`useMcp`は新設で初期OFF。読取りはread + useMcp、実行/取消はさらにexecute。接続先の作成・秘密・公開許可は信頼された本体設定UIだけで変更する。
+本体のMcpClientServiceを単一実体とし、Appletは`context.appdock.call`/`.NET AppDock.CallAsync`を使う。MCPサーバー機能OFFでも本体とAppletの利用は可能。操作は`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`。Appletの`useMcp`は初期OFF。読取りはread + useMcp、実行/取消はさらにexecute。接続先の管理は本体設定UIと、独立した管理許可を持つ共通APIから同じ保存処理を使う。
+
+## 接続先の管理API
+
+「操作の許可」の「MCP接続先の管理」は、Appletの`manageMcpServers`、MCPの`allowManageMcpServers`に対応する。両方とも新規・旧設定で省略時はOFF。URL・EXE・引数・公開範囲を閲覧・編集できる許可なので、通常の`useMcp`とは独立させる。MCP自身から操作許可を変更する入口は設けない。
+
+| 共通API / MCPツール | 必要許可 | 結果・操作 |
+| --- | --- | --- |
+| `mcp.servers.getSettings` / `appdock_mcp_get_server_settings` | read + manageMcpServers | 引数なしは最大32件の名簿・状態とrevision。serverId指定は1接続先のitem/connection/tokenConfigured/environmentNamesも返す |
+| `mcp.servers.updateSettings` / `appdock_mcp_update_server_settings` | read + execute + write + manageMcpServers | 最新expectedRevisionとopで登録・編集・削除・並替・PC上の有効化。dryRun:trueは検証のみ |
+| `mcp.servers.inspectTools` / `appdock_mcp_inspect_server_tools` | read + execute + useMcp + manageMcpServers | serverIdで未公開を含むツール概要をページ取得。name指定時は1ツールのSchema。refresh:trueで再取得 |
+
+管理用の取得・保存は接続・プロセス起動を行わない。inspectToolsは有効な接続先へ接続し、stdioなら指定EXEを起動する。呼出し元・元callerの管理/利用/実行許可を通信後にも再確認する。管理用の閲覧範囲をツール実行へ流用しない。通常のMCP実行には接続先のpublishedとpublishedToolsが必要。
+
+更新の共通項目は`{op, expectedRevision, dryRun?}`。op別に次を指定する。無関係な項目は拒否する。
+
+- `save`: `item:{id,name,description}`とconnection全項目。新規idは小文字UUID。新規接続先は`enabled:false,published:false,publishedTools:[]`から登録し、利用・公開は明示的に選ぶ。
+- `remove`: `id`。名簿とこのPCの接続・暗号化済み秘密を削除する。
+- `reorder`: 名簿と同じID集合の`ids`配列。
+- `enabled`: `id`とbooleanの`enabled`。既存のPC設定の有効状態だけを変更する。
+
+connectionは`{enabled,transport,command,args,cwd,url,authentication,published,publishedTools}`。HTTPはcommand/cwdを空文字・argsを空配列とし、stdioはurlを空文字・authenticationをnoneとする。入力Schemaの正本は[操作カタログ](../src/shared/mcp-client.ts)。
+
+`save`のtoken/environmentは書込み専用。省略時は同じ接続先の秘密を保持し、指定時は置換する。環境変数を消すには`environment:{}`、Bearerを解除するにはauthenticationをnoneとする。接続先が変わると旧秘密を転用しない。秘密値をcommand/argsへ埋め込まず、token/environmentを使う。APIの結果・監査・エラーには秘密値を戻さない。
+
+共有名簿とPC設定を既存の原子的保存で更新し、他設定を保持する。dryRunは保存上限・秘密の保護も検証し、ファイルとrevisionを変更しない。競合はREVISION_CONFLICT、保存失敗はSAVE_FAILEDと安全な案内を返し、保存失敗を共通エラー通知へつなぐ。暗号化・復号・形式の失敗で元データを上書きしない。
+
+推奨手順は「管理設定取得 → 新規IDと接続内容をdryRun → 保存 → enabledをON → 管理用ツール取得 → 公開するツール名を選んでsave → 通常のツール詳細取得・実行」。入口は固定なので、接続先の増減による外側tools/listの更新は不要。
+
+## 接続とカタログ
 
 接続は発見/実行時に遅延開始する。1接続先の準備は共有し、設定世代が変われば途中の応答を採用しない。交渉15秒、一覧最大16ページ/512ツール、ツール定義1件64KiB、全体1MiB、結果1MiB、引数64KiBで制限する。一覧キャッシュは30秒と変更通知で失効し、実行前に定義を再取得する。外向け一覧は1ページ最大50件の概要だけを返し、詳細でSchemaを返す。cursorは一覧/公開範囲の識別情報へ結び付ける。
 

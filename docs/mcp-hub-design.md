@@ -1,6 +1,6 @@
 # MCPハブとカスタムコマンドの全体概要設計
 
-状態: 第1〜4段階をAppDock 0.60.0へ実装。更新日: 2026-10-18。実機・配布物の確認範囲は[VERIFICATION](../VERIFICATION.md)を参照。
+状態: 第1〜4段階と接続先の管理APIを実装。製品版0.61.0、更新日: 2026-10-18。実機・配布物の確認範囲は[VERIFICATION](../VERIFICATION.md)を参照。
 
 本書は全体の役割と段階間の契約を定める。[実装計画](mcp-hub-implementation-plan.md)は順序と到達点、詳細設計は[カスタムコマンド](custom-commands-design.md)、[MCPクライアント](mcp-client-design.md)、[ハブ](mcp-hub-relay-design.md)、[保存型MCPコマンド](mcp-command-design.md)へ分ける。
 
@@ -77,6 +77,7 @@ AppDockのMCP `tools/list`に載せる入口と入力Schemaを固定する。接
 | `mcp.tools.get` | 必要な1ツールの入力/出力Schema、説明、注釈、定義の識別情報 |
 | `mcp.tools.call` | 接続先ID・ツール名・arguments・toolRevision・requestIdでジョブを受付 |
 | `mcp.jobs.get/cancel` | 呼出し元に結び付いた状態・結果の取得と待機取消 |
+| `mcp.servers.getSettings/updateSettings/inspectTools` | 独立した管理許可の下で接続先を登録・編集し、未公開ツールを確認。詳細は[管理API](mcp-client-design.md#接続先の管理api) |
 
 発見の階層は「接続先 → その接続先のツール」の2段階とする。ツール一覧が大きい場合は概要だけ返し、詳細取得で対象Schemaを読む。すべての接続先の全Schemaを一括で返さない。
 

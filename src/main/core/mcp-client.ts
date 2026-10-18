@@ -32,6 +32,8 @@ export interface McpActor {
   owner: string;
   kind: 'host' | 'applet' | 'mcp';
   external: boolean;
+  /** Host-created scope for catalog inspection only; never accepted from API parameters. */
+  management?: boolean;
   appletId?: string;
   origin?: { kind: 'mcp' } | { kind: 'applet'; appletId: string };
 }
@@ -149,7 +151,7 @@ export class McpClientService {
     this.reaper.unref();
   }
   private allow(actor: McpActor, execute = false) {
-    if (!this.options.authorized(actor, execute))
+    if (!this.options.authorized(actor, execute || actor.management === true))
       fail('API_DISABLED', 'MCPの利用が許可されていません。');
   }
   private configuration(actor: McpActor, id: unknown, tool?: string) {
@@ -162,7 +164,11 @@ export class McpClientService {
     } catch {
       return fail('CONFIGURATION_REQUIRED', 'MCPのPC専用設定を確認してください。');
     }
-    if (actor.external && (!c?.published || (tool && !c.publishedTools.includes(tool))))
+    if (
+      actor.external &&
+      !actor.management &&
+      (!c?.published || (tool && !c.publishedTools.includes(tool)))
+    )
       return fail('NOT_FOUND', '公開されたMCP接続先またはツールが見つかりません。');
     if (!c?.enabled)
       return fail('CONNECTION_DISABLED', 'このPCでMCP接続先を設定して有効にしてください。');
@@ -394,6 +400,7 @@ export class McpClientService {
             signal,
             timeout: 15000,
           });
+          this.configuration(actor, id);
           boundedJson(reply, 1024 * 1024, 48, 65536);
           for (const raw of reply.tools) {
             if (tools.length >= 512 || names.has(raw.name) || !/^[\w.-]{1,128}$/.test(raw.name))
@@ -462,22 +469,26 @@ export class McpClientService {
     const c = this.configuration(actor, id);
     return this.page(
       tools
-        .filter((t) => !actor.external || c.publishedTools.includes(t.name))
+        .filter((t) => !actor.external || actor.management || c.publishedTools.includes(t.name))
         .map(({ inputSchema, outputSchema, annotations, ...t }) => t),
       params,
-      actor.owner + ':' + id + ':' + this.options.settings.identity(id),
+      actor.owner + ':' + !!actor.management + ':' + id + ':' + this.options.settings.identity(id),
     );
   }
   async tool(actor: McpActor, params: Record<string, unknown>) {
     if (typeof params.name !== 'string')
       return fail('INVALID_ARGUMENT', 'ツール名を指定してください。');
     this.configuration(actor, params.serverId, params.name);
-    const tool = (await this.catalog(actor, params.serverId as string)).find(
-      (v) => v.name === params.name,
-    );
+    const tool = (
+      await this.catalog(actor, params.serverId as string, params.refresh === true)
+    ).find((v) => v.name === params.name);
     this.configuration(actor, params.serverId, params.name);
     if (!tool) return fail('NOT_FOUND', 'ツールが見つかりません。');
     return { tool: structuredClone(tool) };
+  }
+  inspectTools(actor: McpActor, params: Record<string, unknown>) {
+    const inspector = { ...actor, management: true };
+    return params.name === undefined ? this.tools(inspector, params) : this.tool(inspector, params);
   }
   commandValidation(config: JsonObject): string | null {
     if (
@@ -532,6 +543,10 @@ export class McpClientService {
     signal?: AbortSignal,
     detachAfterAcceptance = false,
   ): Promise<McpJob> {
+    if (actor.management)
+      return Promise.reject(
+        new AutomationError('API_DISABLED', '管理用のツール確認では実行できません。'),
+      );
     this.allow(actor, true);
     this.expire();
     if (

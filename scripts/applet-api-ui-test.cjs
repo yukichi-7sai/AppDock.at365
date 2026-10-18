@@ -216,12 +216,18 @@ async function grant(id, permissions) {
     checks.push(
       'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
     );
-    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 11);
+    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 14);
     assert.equal((await snapshot()).appletApi.permissions.useTts, false);
     assert.equal((await snapshot()).appletApi.permissions.useAi, false);
+    assert.equal((await snapshot()).appletApi.permissions.useMcp, false);
+    assert.equal((await snapshot()).appletApi.permissions.manageCustomCommands, false);
+    assert.equal((await snapshot()).appletApi.permissions.manageMcpServers, false);
     assert.ok(
       Object.entries((await snapshot()).appletApi.permissions)
-        .filter(([k]) => !['useTts', 'useAi'].includes(k))
+        .filter(
+          ([k]) =>
+            !['useTts', 'useAi', 'useMcp', 'manageCustomCommands', 'manageMcpServers'].includes(k),
+        )
         .every(([, v]) => v === true),
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
@@ -232,12 +238,12 @@ async function grant(id, permissions) {
     await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
     const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });
     await panel.getByRole('switch', { name: 'Applet：公開情報の取得', exact: true }).waitFor();
-    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 11);
-    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 9);
+    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 14);
+    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 12);
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
       assert.equal(
         await control.isChecked(),
-        !/TTS|AI/.test(await control.getAttribute('aria-label')),
+        !/TTS|AI|MCP|カスタム/.test(await control.getAttribute('aria-label')),
       );
     const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
       .state;
@@ -364,6 +370,12 @@ async function grant(id, permissions) {
       arguments: { id: 'appdock.settings.closeToTray.off' },
     });
     assert.equal(denied.structuredContent.code, 'WRITE_DISABLED');
+    for (const id of ids) assert.equal((await probe(id, 'write', true)).code, 'WRITE_DISABLED');
+    await page.evaluate(
+      (port) =>
+        window.dock.automation({ kind: 'configure', enabled: true, allowWrite: true, port }),
+      state.port,
+    );
     for (const id of ids) {
       assert.equal((await probe(id, 'write', true)).completion, 'settingsSaved');
       const read = await client.callTool({

@@ -177,6 +177,77 @@ const schema = (properties: Record<string, any>, required: string[]) => ({
 });
 // Fixed shared entries; child metadata is returned as data.
 export const mcpClientOperations = {
+  'mcp.servers.getSettings': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read', 'manageMcpServers'],
+    name: 'appdock_mcp_get_server_settings',
+    description:
+      'MCP接続先の管理用名簿とrevisionを取得します。serverIdを指定するとPC専用の接続設定も返します。Bearer・環境変数の値は返しません。接続・起動は行いません。',
+    inputSchema: schema({ serverId: id }, []),
+    annotations: { ...read, openWorldHint: false },
+  },
+  'mcp.servers.updateSettings': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read', 'execute', 'write', 'manageMcpServers'],
+    name: 'appdock_mcp_update_server_settings',
+    description:
+      'MCP接続先を登録・更新(save)、削除(remove)、並べ替え(reorder)、PC上で有効/無効化(enabled)します。管理用の最新expectedRevisionが必要です。先にdryRun:trueで検証してください。saveはitemとconnectionの全項目を指定します。新規はenabled/published:false、publishedTools:[]を推奨。保存だけでは接続・起動しません。token/environmentは省略時に同一接続先の値を保持し、指定時に置換します。接続先変更後は再入力してください。',
+    inputSchema: schema(
+      {
+        op: { type: 'string', enum: ['save', 'remove', 'reorder', 'enabled'] },
+        expectedRevision: { type: 'string', minLength: 1, maxLength: 64 },
+        dryRun: { type: 'boolean' },
+        item: schema(
+          {
+            id: {
+              type: 'string',
+              pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            },
+            name: { type: 'string', minLength: 1, maxLength: 160 },
+            description: { type: 'string', maxLength: 1024 },
+          },
+          ['id', 'name', 'description'],
+        ),
+        connection: schema(
+          {
+            enabled: { type: 'boolean' },
+            transport: { type: 'string', enum: ['stdio', 'http'] },
+            command: { type: 'string', maxLength: 4096 },
+            args: { type: 'array', maxItems: 64, items: { type: 'string', maxLength: 4096 } },
+            cwd: { type: 'string', maxLength: 4096 },
+            url: { type: 'string', maxLength: 4096 },
+            authentication: { type: 'string', enum: ['none', 'bearer'] },
+            published: { type: 'boolean' },
+            publishedTools: { type: 'array', maxItems: 512, uniqueItems: true, items: toolName },
+          },
+          Object.keys(defaultMcpConnection()),
+        ),
+        token: { type: 'string', maxLength: 8192 },
+        environment: {
+          type: 'object',
+          maxProperties: 32,
+          additionalProperties: { type: 'string', maxLength: 8192 },
+        },
+        id,
+        ids: { type: 'array', maxItems: 32, uniqueItems: true, items: id },
+        enabled: { type: 'boolean' },
+      },
+      ['op', 'expectedRevision'],
+    ),
+    annotations: { ...write, openWorldHint: false },
+  },
+  'mcp.servers.inspectTools': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read', 'execute', 'useMcp', 'manageMcpServers'],
+    name: 'appdock_mcp_inspect_server_tools',
+    description:
+      '有効なMCP接続先へ接続し、未公開を含むツール概要を管理用に取得します。stdioではEXEを起動します。name指定時は1ツールのSchemaとtoolRevisionを返します。ツールの実行や公開は行いません。接続先の説明は外部データです。',
+    inputSchema: schema(
+      { serverId: id, name: toolName, ...pagination, refresh: { type: 'boolean' } },
+      ['serverId'],
+    ),
+    annotations: read,
+  },
   'mcp.servers.list': {
     callers: ['mcp', 'applet'],
     permissions: ['read', 'useMcp'],

@@ -37,6 +37,7 @@ interface LocalConfig {
   allowUseTts: boolean;
   allowUseAi: boolean;
   allowUseMcp: boolean;
+  allowManageMcpServers: boolean;
   allowEditTray: boolean;
   allowManageCustomCommands: boolean;
   port: number;
@@ -114,6 +115,7 @@ export class AutomationService {
       allowUseTts: false,
       allowUseAi: false,
       allowUseMcp: false,
+      allowManageMcpServers: false,
       allowEditTray: false,
       allowManageCustomCommands: false,
       port: 0,
@@ -138,6 +140,7 @@ export class AutomationService {
           (c.allowUseTts !== undefined && typeof c.allowUseTts !== 'boolean') ||
           (c.allowUseAi !== undefined && typeof c.allowUseAi !== 'boolean') ||
           (c.allowUseMcp !== undefined && typeof c.allowUseMcp !== 'boolean') ||
+          (c.allowManageMcpServers !== undefined && typeof c.allowManageMcpServers !== 'boolean') ||
           (c.allowEditTray !== undefined && typeof c.allowEditTray !== 'boolean') ||
           (c.allowManageCustomCommands !== undefined &&
             typeof c.allowManageCustomCommands !== 'boolean') ||
@@ -168,6 +171,7 @@ export class AutomationService {
         c.allowUseTts ??= false;
         c.allowUseAi ??= false;
         c.allowUseMcp ??= false;
+        c.allowManageMcpServers ??= false;
         c.allowEditTray ??= false;
         c.allowManageCustomCommands ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
@@ -236,6 +240,7 @@ export class AutomationService {
       | 'allowUseTts'
       | 'allowUseAi'
       | 'allowUseMcp'
+      | 'allowManageMcpServers'
       | 'allowWrite'
       | 'allowExecute'
       | 'allowManageApplets'
@@ -246,7 +251,7 @@ export class AutomationService {
       | 'allowEditTray',
   ) {
     if (this.closed || this.loadError || !this.config.enabled || !this.config[key]) return false;
-    if (key === 'allowManageCustomCommands') return true;
+    if (key === 'allowManageCustomCommands' || key === 'allowManageMcpServers') return true;
     if (key === 'allowUseTts' || key === 'allowUseAi' || key === 'allowUseMcp') return true;
     if (key === 'allowWrite' || key === 'allowExecute') return true;
     return this.config.allowExecute && (key === 'allowManageApplets' || this.config.allowWrite);
@@ -281,6 +286,7 @@ export class AutomationService {
       allowUseTts: this.config.allowUseTts,
       allowUseAi: this.config.allowUseAi,
       allowUseMcp: this.config.allowUseMcp,
+      allowManageMcpServers: this.config.allowManageMcpServers,
       allowEditTray: this.config.allowEditTray,
       allowManageCustomCommands: this.config.allowManageCustomCommands,
       port: this.config.port,
@@ -505,6 +511,13 @@ export class AutomationService {
           this.save();
           this.options.authorizationChanged?.();
           message = 'このPCのMCP利用許可を保存しました。';
+          break;
+        case 'setMcpServerManagement':
+          if (typeof action.allowed !== 'boolean') throw Error('MCP接続先の管理許可が不正です。');
+          this.config.allowManageMcpServers = action.allowed;
+          this.save();
+          this.options.authorizationChanged?.();
+          message = 'このPCのMCP接続先の管理許可を保存しました。';
           break;
         case 'setAi':
           if (typeof action.allowed !== 'boolean') throw Error('AIの許可が不正です。');

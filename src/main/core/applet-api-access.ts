@@ -34,7 +34,9 @@ export class AppletApiAccess {
         this.grants = Object.fromEntries(
           Object.keys(appletApiPermissionLabels).map((key) => [
             key,
-            !['useTts', 'useAi', 'useMcp', 'manageCustomCommands'].includes(key),
+            !['useTts', 'useAi', 'useMcp', 'manageCustomCommands', 'manageMcpServers'].includes(
+              key,
+            ),
           ]),
         );
         return;

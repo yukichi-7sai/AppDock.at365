@@ -1,5 +1,29 @@
 # 検証記録
 
+## 2026-10-18: MCP接続先管理のコミット・プッシュ前確認（0.61.0）
+
+- 利用者が、AppDockのMCP経由で接続設定を変更し、SwitchBotのツールを公開してシーンを実行できたと報告した。実接続先での成功は利用者確認として記録し、今回の検証では機器操作を繰り返していない。
+- 未コミットの25ファイルをレビューし、実装完了時の617入力と現在値が一致することを確認。型検査・ビルド・関連79件、ソース/固定EXEのMCP GUI各14群、共通API・権限画面5群、固定EXE smoke、publishの成功を再利用した。既存の標準回帰から、依存入力が不変の19ファイル79件も成功ログと照合して再利用した。
+- 変更された共通API/設定の依存先、全ソースの境界検査、旧プロセス試験の生成物記録が不足していた範囲だけ追加実行。fixtureビルドと62ファイル**465/465**が成功し、再利用と合わせて本体標準回帰**623/623、fail/skip 0**。新しいfixture入力155ファイルは試験前後で不変。GUIの隔離コピー、最終EXE・feed・ASAR、main生成物160ファイル、WatchのHEADとclean状態も照合した。
+- 証跡は`.artifacts/commit-validation-mcp-management-20261018/`の`initial.json`、`validation.json`、各runの完全ログ・入力hash、fixture一覧。stage tree・commit tree・GitHub/AQUAのmain照合結果を同フォルダーへ記録する。製品変更・版更新・再発行は不要で、0.61.0の既発行EXEを維持する。新しいGUI profileは作成せず、再利用資料を保持。GitHub Releaseと実利用先deployは対象外。
+
+## 2026-10-18: MCP経由の接続先管理（0.61.0）
+
+- MCPとAppletの共通APIへ`mcp.servers.getSettings/updateSettings/inspectTools`を追加。独立した初期OFFの「MCP接続先の管理」許可を設け、管理設定の取得、dryRun、登録・編集・削除・並替・有効化、未公開ツールの確認を既存の保存/接続サービスへ接続した。更新はread/execute/write/manageMcpServers、未公開ツール確認はread/execute/useMcp/manageMcpServersを要求し、元callerの許可も照合する。許可設定追加のため0.60.1から0.61.0へ更新。先行する利用許可スイッチの修正を含む。
+- 発行前レビューで、詳細取得のrefresh、最終保存時のREVISION_CONFLICT、PC設定のrevision/byte比較と外部変更を保持するrollback、dryRunの共有/PC保存上限を確認・補強した。秘密値はAPI結果・監査へ返さず、保存だけでは下流を起動しない。型検査、build、書式、差分確認が成功。関連6ファイルの回帰は**79/79、fail/skip 0**（`1792303854633-00a07cc3`）。制限環境のTEMP置換/localhost拒否は同じコマンドを通常ユーザー権限で再実行して成功した。依存版・lockfile・供給元検査を変更していない。
+- ソース/最終固定EXEのMCP GUIは各**14群**成功（`mcp-hub-source-1792303856508`、`mcp-hub-portable-1792304038574`）。同じSDK接続で管理許可の初期拒否、画面からのON、dryRunのファイル不変、MCP登録、秘密の非露出、未公開カタログ、明示公開、stdio実行、revision競合、削除を確認。外側tools/listは登録・削除で不変。既存のカスタムコマンド、Node/.NET/native、Watch、ショートカットdispatch、実プロセス再起動、利用/管理許可の取消も確認。最終EXEのsmokeは`smoke-1792304104570`で成功。
+- Node/.NET共通APIと権限画面のGUI **5群**も成功（`applet-api-source-1792303762408`）。14 Applet行/12 MCP行の初期許可、独立保存、元MCPの設定変更許可、2テーマ×3幅、再起動保持を検証。旧fixtureの権限数・元callerのwrite条件を現行仕様へ更新し、テスト中の設定変更で動的ポートを保持した。途中失敗のログを保持。以後の製品変更はMCP接続保存だけで、このGUIは同保存APIを呼ばないため結果を再利用した。最終EXEの管理スイッチと狭幅の権限画面を目視確認した。
+- 通常publish終了0。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144254130 bytes / SHA256 `37cc8230b05601bd59526d38e4ca1eefeee40644c100b7a72c8d693a2368f2b3`**。package/feed/EXEは0.61.0、feedのsize/hash一致、main生成物160ファイルとASAR一致、fixture非同梱、deploy関連3ファイル保持を確認。GUIに複製したEXEのhash一致、各500個のApplet fixture入力が不変。Watch HEADは`b070c2d89f8c1b3d452a5569c99431510a78da2f`、既存Release buildを使用した。
+- 証跡は`.artifacts/mcp-server-management-20261018/validation.json`、各runの完全ログ・input SHA256・result、`review.json`、`artifact.json`、`cleanup.json`。最終追記は検証文書のみ。直近3回・固定EXE・再利用資料・失敗記録を保持し、終了/成功/パス/非junction/実行プロセスなしを確認した古いsource profile 1件を整理した。ChatGPT本体の初回ツール反映・利用者の実接続先操作は未確認。利用中の設定は変更せず、commit/push/Release/実利用deployは未実施。
+
+## 2026-10-18: MCP利用許可スイッチの保存経路修正（0.60.1）
+
+- 操作の許可で「MCP接続先の利用」のMCP列を切り替えると、設定ページの操作一覧に`setMcpClient`がなく保存前に拒否されていた。permissionsページにこの既存操作だけを追加し、スイッチから従来の保存・許可取消処理へ接続した。既存項目の不具合修正として0.60.0から0.60.1へ更新。保存形式・新規権限・MCP公開APIの追加はない。
+- 既存GUI試験の直接APIによる許可設定を、実際の画面のスイッチ操作へ変更。旧0.60.0 EXEで報告と同じエラーを再現後、修正版のソース/最終固定EXEで各**12群**成功。連携OFF中と稼働中のON/OFF保存、ほかの許可の保持、実プロセス再起動後のON/OFF復元、OFF後のMCPアクセス拒否を確認した。操作の許可画面の撮影結果も目視した。
+- 型検査・ビルド・関連6ファイル**75/75、fail/skip 0**・変更ファイルの書式/差分確認が成功。標準全回帰はこの1操作の接続修正では重ねず、設定ページ、Automation、共通API、MCPクライアント、カスタムコマンド、MCP Eventsと実画面を対象にした。発行前レビューに未解決指摘なし。版更新後のpnpm記録不一致は固定lockfileのoffline同期で解消し、依存版・lockfile・検査方針は維持した。
+- 通常publish終了0。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144247496 bytes / SHA256 `360fb1df39a1a7f432a972a7a5658a269174010b611f9baae42056291dacbca7`**。EXE/package/feedの版0.60.1、feedのsize/hash、生成済みmain 160ファイルとASAR、fixture非同梱、既存deploy関連3ファイル保持を確認。最終固定EXEのGUIとsmokeも終了0。未変更Appletの再発行・実利用先deployはしていない。
+- 証跡は`.artifacts/mcp-permission-fix-20261018/validation.json`と各runのresult/input SHA256/完全ログ、`review.json`、`artifact.json`。GUI profileはソース`mcp-hub-source-1792302452601`、固定EXE`mcp-hub-portable-1792302646061`、smoke`smoke-1792302721895`。旧版の再現失敗と再利用資料を保持し、旧成功source profile 1件を整理した（`cleanup.json`）。利用者の実設定・MCP登録は変更していない。MCP経由の接続先登録は、この修正完了後に追加する別の変更。
+
 ## 2026-10-18: MCPハブのコミット前照合（0.60.0）
 
 - 実装完了時の617入力、完全ログ、発行EXE/feed/ASAR、固定コピー、生成済みmain 160ファイル、ソース/固定EXE GUIのfixture各500ファイルを照合した。製品・試験・依存・ビルド入力の追加変更はなく、今回の追記はこの検証文書だけ。WatchのHEADとclean状態も一致している。
