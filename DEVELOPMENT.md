@@ -16,6 +16,7 @@
 | 端末別設定 | [Appletごとの保存先・ツールバー・表示／一般設定・移行と復旧](docs/device-settings-design.md) |
 | 設定の再起動通知・JSON復旧 | [現行仕様](docs/settings-sync.md#設定の状態と再起動通知)、[設計と確認項目](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
+| MCPハブ・カスタムコマンド（設計案・未実装） | [全体概要](docs/mcp-hub-design.md)、[段階的実装計画](docs/mcp-hub-implementation-plan.md)、[第1段階の詳細設計](docs/custom-commands-design.md) |
 | MCPのネットワーク接続 | [接続範囲・認証・Codex互換性の設計](docs/mcp-network-access-design.md) |
 | MCP Eventsとdot | [通知種類の選択・購読・Webhook・保存と再送](docs/mcp-events-design.md) |
 | 音声再生の共通API | [再生キュー・取消・Gmail通知移行](docs/audio-playback.md) |
