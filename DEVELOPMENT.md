@@ -14,6 +14,7 @@
 | ホストとAppletの開発 | [ホスト開発](docs/host-development.md)、[Applet開発](docs/applet-development.md)、[Applet API](docs/extensions.md) |
 | 保存・起動 | [設定同期と保存領域](docs/settings-sync.md)、[Windows起動設定](docs/launch-settings.md) |
 | 端末別設定 | [Appletごとの保存先・ツールバー・表示／一般設定・移行と復旧](docs/device-settings-design.md) |
+| 共有設定・dataの場所（設計・未実装） | [端末ごとの参照先指定・素材と名簿・NASの排他と復旧](docs/shared-settings-location-design.md) |
 | 設定の再起動通知・JSON復旧 | [現行仕様](docs/settings-sync.md#設定の状態と再起動通知)、[設計と確認項目](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
 | MCPハブ・カスタムコマンド（0.60.0） | [全体概要](docs/mcp-hub-design.md)、[実装計画と到達点](docs/mcp-hub-implementation-plan.md)、[コマンド基盤](docs/custom-commands-design.md)、[クライアント](docs/mcp-client-design.md)、[ハブ](docs/mcp-hub-relay-design.md)、[保存型MCPコマンド](docs/mcp-command-design.md) |
