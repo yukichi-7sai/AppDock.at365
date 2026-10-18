@@ -51,6 +51,7 @@ module.exports = async function ({
     { kind: 'configure', changes: { enabled: true, distance: 65, wheelDelayMs: 80 } },
   ]);
   await page.getByRole('button', { name: 'マウスジェスチャー', exact: true }).click();
+  await page.locator('.gesture-settings-section > summary').click();
   await until(
     async () =>
       await page.getByRole('switch', { name: 'マウスジェスチャーを有効にする' }).isChecked(),

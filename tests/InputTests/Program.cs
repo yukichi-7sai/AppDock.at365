@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using AppDock.Runtime;
 using System.Windows.Forms;
+using System.Windows.Automation;
 
 internal static class Program
 {
@@ -53,23 +54,37 @@ internal static class Program
     }
     private static async Task Run(Probe form,string helper)
     {
+        // Install before the worker: observe what it forwards before another gesture app can consume it.
+        using var passthrough = new RightButtonProbe();
         using var child=Process.Start(new ProcessStartInfo(helper){UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,RedirectStandardOutput=true,RedirectStandardError=true})!;
         var errors=child.StandardError.ReadToEndAsync();
         await using var peer=new JsonRpcConnection(child.StandardOutput,child.StandardInput);
-        var invocations=new List<string>();var cancellations=0;var delay=0;
+        var invocations=new List<string>();var selections=new List<string[]>();var cancellations=0;var delay=0;
         var reading=peer.ReadAsync(async(method,p)=>{
             if(method=="gestures.cancel"){Interlocked.Increment(ref cancellations);return null;}
             if(method!="gestures.invoke")throw new Exception(method);
-            lock(invocations)invocations.Add(p.GetProperty("gesture").GetString()!);
+            lock(invocations){
+                invocations.Add(p.GetProperty("gesture").GetString()!);
+                selections.Add(p.GetProperty("rowIds").EnumerateArray().Select(r=>r.GetString()!).ToArray());
+            }
             if(delay>0)await Task.Delay(delay);
             return null;
         });
         int Count(){lock(invocations)return invocations.Count;}
-        async Task Sync(string scope="global",string[]? excluded=null,bool enabled=true,int interval=0,string window=""){
+        string[] LastRows(){lock(invocations)return selections[^1];}
+        async Task Sync(string scope="global",string[]? excluded=null,bool enabled=true,int interval=0,string window="",string mode="all",string position="gesture-start",bool selection=false){
             var triggers=new[]{"move-up","move-down","move-left","move-right","click-left","click-middle","wheel-up","wheel-down","key:A","key:Ctrl+A"};
             var process=Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
-            await peer.RequestAsync("gestures.sync",new{enabled,browsers=new[]{process},excludedProcesses=excluded??[],requireChromiumWindowClass=false,distance=30,wheelDelayMs=interval,indicatorOpacity=.45,indicatorPosition="gesture-start",context="test",revision=1,
-                rows=triggers.Select((g,i)=>new{id="r"+i,command="test.run",gesture=g,title="Test "+g,window,when=new{scope,appletIds=Array.Empty<string>(),processes=new[]{process}}}).ToArray()},CancellationToken.None);
+            object Row(string id,string command,string gesture,string title,string rowScope="global",string rowWindow="",string? exe=null)=>
+                new{id,command,gesture,title,window=rowWindow,when=new{scope=rowScope,appletIds=Array.Empty<string>(),processes=new[]{exe??process}}};
+            var rows = triggers.Select((g,i)=>Row("r"+i,"test.run",g,"Test "+g,scope,window)).ToArray();
+            if(selection) rows=triggers.SelectMany(g=>new[]{
+                Row("wrong-window-"+g,"test.wrong-window",g,"Wrong window",rowWindow:"1"),
+                Row("wrong-exe-"+g,"test.wrong-exe",g,"Wrong exe","exe",exe:"nonexistent-process"),
+                Row("first-"+g,"test.first",g,"First","exe"),
+                Row("second-"+g,"test.second",g,"Second"),
+                Row("duplicate-"+g,"test.first",g,"Duplicate")}).ToArray();
+            await peer.RequestAsync("gestures.sync",new{enabled,browsers=new[]{process},excludedProcesses=excluded??[],requireChromiumWindowClass=false,distance=30,wheelDelayMs=interval,executionMode=mode,indicatorOpacity=.45,indicatorPosition=position,context="test",revision=1,rows},CancellationToken.None);
             await Task.Delay(70);
         }
         async Task Begin(){FocusTarget(form);await Task.Delay(80);if(GetForegroundWindow()!=form.Handle)throw new Exception("Gesture fixture did not become foreground.");Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
@@ -85,6 +100,38 @@ internal static class Program
             GetWindowThreadProcessId(GetForegroundWindow(),out var firstForegroundPid);
             Console.WriteLine($"First stroke: received={Count()-n}, foreground={GetForegroundWindow()==form.Handle}, foregroundProcess={Process.GetProcessById((int)firstForegroundPid).ProcessName}");
             Check(Count()==n+1 && invocations[^1]=="move-left","single stroke on release");
+            nint VisibleIndicator(){
+                nint found=0;
+                EnumWindows((window,_)=>{GetWindowThreadProcessId(window,out var pid);if(pid==child.Id&&IsWindowVisible(window)){found=window;return false;}return true;},0);
+                return found;
+            }
+            string IndicatorCaption(nint window)=>string.Join("|",AutomationElement.FromHandle(window)
+                .FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text))
+                .Cast<AutomationElement>().Select(e=>e.Current.Name));
+            foreach(var mode in new[]{"all","first"}){
+                await Sync(mode:mode,selection:true);n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);
+                var showDeadline=Environment.TickCount64+2000;
+                while(VisibleIndicator()==0&&Environment.TickCount64<showDeadline)await Task.Delay(20);
+                var overlay=VisibleIndicator();Check(overlay!=0,mode+" preview is visible");
+                if(overlay!=0){var caption=IndicatorCaption(overlay);Check(caption.Contains("First")&&!caption.Contains("Wrong")&&!caption.Contains("Duplicate")&&caption.Contains("Second")== (mode=="all"),mode+" preview contains exactly selected commands");}
+                await End();
+                var expected=mode=="first"?new[]{"first-move-left"}:new[]{"first-move-left","second-move-left"};
+                Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" stroke uses conditions, saved order and command deduplication");
+                foreach(var gesture in new[]{"click-left","click-middle","wheel-up","key:A"}){
+                    n=Count();await Begin();
+                    if(gesture=="click-left"){Mouse(2);await Task.Delay(60);Mouse(4);}
+                    else if(gesture=="click-middle"){Mouse(0x20);await Task.Delay(60);Mouse(0x40);}
+                    else if(gesture=="wheel-up")Mouse(0x800,120);
+                    else{Key(0x41);Key(0x41,true);}
+                    await Task.Delay(60);await End();
+                    expected=mode=="first"?new[]{"first-"+gesture}:new[]{"first-"+gesture,"second-"+gesture};
+                    Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" selection for "+gesture);
+                }
+            }
+            await Sync(mode:"first",position:"none",selection:true);n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(150);
+            Check(VisibleIndicator()==0,"hidden indicator does not create a visible waiting window");await End();
+            Check(Count()==n+1&&LastRows().SequenceEqual(new[]{"first-move-left"}),"hidden indicator retains gesture recognition and execution");
+            await Sync();
             var right=form.RightUps;await Begin();await End();Check(form.RightUps==right+1,"ordinary right click replay");
             async Task BlockedStart(string name,Action press,Action release,int stateKey,bool releaseEarly)
             {
@@ -110,14 +157,16 @@ internal static class Program
                     await BlockedStart(button.Name,()=>Mouse(button.Down,button.Data),()=>Mouse(button.Up,button.Data),button.Key,early);
             n=Count();await Begin();Key(0xA2);await Task.Delay(20);Key(0x41);await Task.Delay(80);Key(0x41,true);await End();
             Check(Count()==n+1 && invocations[^1]=="key:Ctrl+A","modifier pressed after right-down remains a key gesture");
-            n=Count();var down=form.RightDowns;await Begin();
-            Check(form.RightDowns==down+1,"captured Ctrl still held prevents a new waiting session");
+            n=Count();var down=passthrough.Downs;await Begin();
+            Console.WriteLine($"Captured Ctrl: worker-forwarded right-down delta={passthrough.Downs-down}, invocation delta={Count()-n}");
+            Check(passthrough.Downs==down+1,"captured Ctrl still held prevents a new waiting session");
             Key(0xA2,true);Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(60);await End();
             Check(Count()==n,"captured Ctrl release does not start a gesture mid-press");
             n=Count();await Begin();Mouse(2);await Task.Delay(80);await End();
             Check(Count()==n+1,"left click gesture starts normally before captured-button test");
-            n=Count();down=form.RightDowns;await Begin();
-            Check(form.RightDowns==down+1,"captured left button still held prevents a new waiting session");
+            n=Count();down=passthrough.Downs;await Begin();
+            Console.WriteLine($"Captured left: worker-forwarded right-down delta={passthrough.Downs-down}, invocation delta={Count()-n}");
+            Check(passthrough.Downs==down+1,"captured left button still held prevents a new waiting session");
             Mouse(4);Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(60);await End();
             Check(Count()==n,"captured button release does not start a gesture mid-press");
             n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(70);await End();
@@ -140,6 +189,26 @@ internal static class Program
         }finally{child.StandardInput.Close();await reading;await child.WaitForExitAsync();Console.Write(await errors);}
     }
     private sealed class Probe:Form {public int RightDowns,RightUps,LeftUps,Keys;protected override void WndProc(ref Message m){if(m.Msg is 0x204 or 0x206)RightDowns++;if(m.Msg==0x205)RightUps++;if(m.Msg==0x202)LeftUps++;if(m.Msg==0x100)Keys++;base.WndProc(ref m);}}
+    private sealed class RightButtonProbe : IDisposable
+    {
+        private readonly MouseCallback callback;
+        private readonly nint hook;
+        internal int Downs;
+        internal RightButtonProbe(){
+            callback=(code,message,data)=>{if(code>=0&&message==0x204)Interlocked.Increment(ref Downs);return CallNextHookEx(hook,code,message,data);};
+            hook=SetWindowsHookEx(14,callback,GetModuleHandle(null),0);
+            if(hook==0)throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+        public void Dispose()=>UnhookWindowsHookEx(hook);
+    }
+    private delegate nint MouseCallback(int code,uint message,nint data);
+    [DllImport("user32.dll",SetLastError=true)]private static extern nint SetWindowsHookEx(int kind,MouseCallback callback,nint module,uint thread);
+    [DllImport("user32.dll")]private static extern bool UnhookWindowsHookEx(nint hook);
+    [DllImport("user32.dll")]private static extern nint CallNextHookEx(nint hook,int code,uint message,nint data);
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode)]private static extern nint GetModuleHandle(string? name);
+    private delegate bool WindowCallback(nint window,nint param);
+    [DllImport("user32.dll")]private static extern bool EnumWindows(WindowCallback callback,nint param);
+    [DllImport("user32.dll")]private static extern bool IsWindowVisible(nint window);
     private static void FocusTarget(Form form) {
         form.Show(); form.Activate(); FocusWindow(form.Handle);
     }

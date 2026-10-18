@@ -136,6 +136,8 @@ test('gesture validation rejects right-click, malformed scopes, paths and invali
     { distance: 501 },
     { wheelDelayMs: -1 },
     { indicatorOpacity: 0 },
+    { executionMode: 'unknown' },
+    { executionMode: null },
     { browsers: ['C:\\bad.exe'] },
     { bindings: [row('same'), row('same')] },
     { bindings: [{ ...row('r'), gesture: 'click-right' }] },
@@ -147,6 +149,27 @@ test('gesture validation rejects right-click, malformed scopes, paths and invali
     parseGestures({ ...defaultGestures(), bindings: [{ ...row('r'), gesture: 'key:ctrl+a' }] })
       .bindings[0].gesture,
     'key:Ctrl+A',
+  );
+});
+
+test('gesture execution mode defaults old settings to all and preserves hidden indicator settings', () => {
+  const legacy = defaultGestures();
+  delete legacy.executionMode;
+  assert.equal(parseGestures(legacy).executionMode, 'all');
+  assert.equal(
+    parseSettings({ ...createDefaultSettings(), gestures: legacy }).gestures.executionMode,
+    'all',
+  );
+  const settings = {
+    ...legacy,
+    executionMode: 'first',
+    indicatorPosition: 'none',
+    indicatorOpacity: 0.7,
+  };
+  assert.deepEqual(parseGestures(settings), settings);
+  assert.equal(
+    parseGestures({ ...settings, indicatorPosition: 'gesture-start' }).indicatorOpacity,
+    0.7,
   );
 });
 test('local gesture scopes require the real active page and owner; external scopes retain native process gates', () => {

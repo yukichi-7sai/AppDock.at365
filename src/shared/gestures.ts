@@ -29,8 +29,9 @@ export interface GestureSettings {
   requireChromiumWindowClass: boolean;
   distance: number;
   wheelDelayMs: number;
+  executionMode: 'all' | 'first';
   indicatorOpacity: number;
-  indicatorPosition: 'gesture-start' | 'window-center';
+  indicatorPosition: 'gesture-start' | 'window-center' | 'none';
   bindings: GestureBinding[];
 }
 /** Different gestures never share an execution batch; ordering is local to each group. */
@@ -110,6 +111,7 @@ export function defaultGestures(): GestureSettings {
     requireChromiumWindowClass: false,
     distance: 50,
     wheelDelayMs: 0,
+    executionMode: 'all',
     indicatorOpacity: 0.45,
     indicatorPosition: 'gesture-start',
     bindings: [],
@@ -155,7 +157,8 @@ export function parseGestures(value: unknown): GestureSettings {
     !Number.isFinite(v.indicatorOpacity) ||
     v.indicatorOpacity < 0.1 ||
     v.indicatorOpacity > 1 ||
-    !['gesture-start', 'window-center'].includes(v.indicatorPosition) ||
+    (v.executionMode !== undefined && !['all', 'first'].includes(v.executionMode)) ||
+    !['gesture-start', 'window-center', 'none'].includes(v.indicatorPosition) ||
     !Array.isArray(v.bindings) ||
     v.bindings.length > 2000
   )
@@ -192,6 +195,7 @@ export function parseGestures(value: unknown): GestureSettings {
   });
   return {
     ...v,
+    executionMode: v.executionMode ?? 'all',
     browsers: processNames(v.browsers),
     excludedProcesses: processNames(v.excludedProcesses),
     bindings,

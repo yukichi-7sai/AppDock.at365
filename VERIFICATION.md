@@ -1,5 +1,25 @@
 # 検証記録
 
+## 2026-10-18: 動作設定を一覧の枠から分離・コミット確認（0.59.0）
+
+- 追加依頼により、折りたたみ「動作設定」とコマンド一覧を共通SettingsSectionの独立した枠へ分けた。ジェスチャーページだけ既存のセクション配置へ切り替え、設定検索・即時保存・一覧の検索/編集/実行順を維持。発行前レビューで変更範囲・保存経路・他カテゴリへの影響を確認し、未解決指摘なし。同じ未公開変更の追加修正として0.59.0を維持した。
+- 型検査・本体/Default Shell build・試験fixture build・ソースGUIが成功。コミットに必要な本体標準回帰は、実装時の関連7ファイル**71/71**を入力と完全ログのSHA256で照合して再利用し、未実行だった残り**526/526**を追加実行。合計**597/597、fail/skip 0**。WindowsTools標準**38/38**と専用入力試験**112項目**も対象ソース・依存・生成物432件を照合して再利用した。判定と差分は`.artifacts/commit-validation-gestures-20261018/reuse.json`。
+- 通常publishを終了0で完了。最終`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144240145 bytes / SHA256 `1f8fdf6b299ba6c15903bf3beeff6b318fe20d529e1f93d05c453c1dbebb4ee8`**。版0.59.0・feed・固定コピーを照合し、deploy関連6ファイルを保持。WindowsTools 0.1.6の既存ZIP/DLLは変更せず、hashと版を再照合した。
+- この最終EXEでジェスチャーGUI/実OS入力**17群**、設定レイアウト/検索**6群**、隔離smokeが成功。明暗テーマ・1280/900/700幅・独立した枠・折りたたみ・保存/再読込/再起動を確認し、最終画面も目視した。発行WindowsToolsのprotocol/通常前面/ジェスチャー対象smokeと、専用Windowの**右移動・左移動・全高3件**も再実行して成功。実利用アプリ、UAC、混在DPI、実利用先deployは未確認。
+- 証跡は[validation.json](.artifacts/commit-validation-gestures-20261018/validation.json)と同所のログ・入力hash前後・review/environment/generated-inputs/publish-verification。利用者依頼の今回の変更22ファイルとWindowsToolsの6ファイルだけを対象とし、stage/commit treeの一致と、設定済みGitHub/AQUA両mainへの通常push後の先端照合を同所`stage.json`・`commit.json`・`push.json`へ記録する。Release・実利用先deployは行わない。終了済み成功出力の整理は同所`cleanup.json`へ記録し、直近3回と検証/再利用資料を保持する。
+
+## 2026-10-18: ジェスチャーの実行方法・待機表示・動作設定（0.59.0）
+
+- `executionMode`へ「すべて／最初の1つ」を追加。旧設定と初期値は`all`。開始対象と条件で絞った行から登録順・コマンドID重複除去で選び、待機表示と実行は同じ選択処理を使う。移動・クリック・ホイール・キーに適用し、既存の取消・予約・再入防止を維持した。
+- 一番上の折りたたみ「動作設定」に、有効・実行方法・操作感・待機表示・Webブラウザ・除外をまとめた。表示位置へ`none`（表示なし）を追加し、入力・実行を継続する。不透明度の保存値は保持する。即時保存、検索での折りたたみ展開、PC別設定の対象パス、公開configureのschema・検証・文書も整合した。
+- 発行前に設定互換、表示と実行の一致、条件と順序、保存・共通API、WindowsToolsとの連携、必要な試験をレビューした。GUIで表示位置selectの正確なラベル参照が失敗したため明示的なaccessible nameを補い、型検査・build・ソースUIを再確認して同じ0.59.0を再発行。追加レビュー後に未解決の指摘なし。新設定追加のため本体はマイナー更新。WindowsToolsの修正は兄弟repoの検証記録を参照する。
+- 型検査、本体/Default Shell build、関連7ファイルの回帰**71/71**、WindowsTools回帰**38/38**、専用Windowと実OS入力による**112項目**が成功。112項目は先頭/全件の表示とrowIds、条件不一致の除外、重複除去、移動/クリック/ホイール/キー、表示なし、従来の開始抑止・取消・通常入力を含む。捕捉キー/ボタン継続時の2項目は、Window到達数ではなく試験worker直後の観測フックで入力通過を確認するよう試験を修正した。worker通過は1件、後段のWindow到達は0件となる状態を切り分けている。製品の開始条件は変更していない。
+- 最終固定EXEでジェスチャーGUI **17群**（実OS入力、条件・順序・同一ID抑止、先頭/全件、表示なし、編集停止、保存、renderer再読込、プロセス再起動、Light/Dark各1280/900/700幅）と設定レイアウト/検索 **6群**、portable smokeが成功。独立WebAppletを発行先から隔離コピーし、入力hashも記録。旧WebApplet設定を使うfixture、async waitForFunctionによる起動待ち、共有settings.jsonだけを読む設定保存検証は現行契約へ合わせた。UI-onlyのソース確認は実入力の成功と区別する。
+- 最終本体と発行WindowsToolsを隔離接続し、専用の使い捨てWindowへ本物の入力フック経由でジェスチャーを送信。**右移動・左移動・全高の3件**が成功した。名前形式のprocessを渡す実経路を確認し、実利用Windowは操作していない。WindowsToolsの発行DLLはprotocol、通常前面、ジェスチャー対象固定の各smokeも成功。
+- 通常publish終了0。最終`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144227811 bytes / SHA256 `d94da795404415898c77a22026e5de88b90876dfc9857808756dc93248ed976e`**。0.59.0・feed・固定コピー・再起動後を照合。本体/WindowsToolsのdeploy関連計6ファイルを保持し、Applet ZIP内3ファイルも発行payloadとSHA256一致。未変更Appletの再発行、全体ZIP、commit/push/Release/実利用deployは行っていない。
+- 証跡: [validation.json](.artifacts/gesture-behavior-20261018/validation.json)、同フォルダーの全ログ・入力hash前後・review.json・generated-inputs.json・publish-verification.json・zip-verification.json。538入力を各実行前後で照合し、後続のCJS試験修正等が無関係な成功結果は試験別の対象入力を再照合して再利用した。無関係な本体/Applet全回帰は未実行。ユーザーアプリ、手操作、UAC、混在DPI、実利用配置先での確認は別途。
+- 後片付け: 完了・成功・参照・使用中プロセス・絶対パス・内部リンクを確認し、古いsmoke出力5件を削除。種類/実行方式ごとの直近3件、失敗・状態不明・検証/再利用資料は保持した。削除名と保持理由は同フォルダーのcleanup.json。固定ビルド出力・別作業は整理していない。
+
 ## 2026-10-18: MCPハブの初期設計（文書のみ）
 
 - 0.58.1 / `87d2e02e3f2e500a100c567d9d304edac384824f`の共通API、動的登録、公開判定、実行/結果、設定・端末別保存、Node/.NET契約を調査し、[全体概要](docs/mcp-hub-design.md)、[段階的実装計画](docs/mcp-hub-implementation-plan.md)、[第1段階の詳細設計](docs/custom-commands-design.md)を作成。DEVELOPMENTに未実装の設計として入口を追加した。

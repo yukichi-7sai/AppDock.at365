@@ -1,4 +1,3 @@
-import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { useState } from 'react';
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
@@ -10,13 +9,12 @@ import {
   applyGestureBinding,
   type GestureBinding,
 } from '../../shared/gestures';
-import { Toggle } from '../settings-ui/Toggle';
-import { SettingsField } from '../settings-ui/SettingsSections';
 import { CommandBindingList } from '../settings-ui/CommandBindingList';
 import { CommandBindingToolbar } from '../settings-ui/CommandBindingToolbar';
 import { GestureBindingDialog } from './GestureBindingDialog';
 import { GestureOrderDialog } from './GestureOrderDialog';
 import { GestureOptions } from './GestureOptions';
+import { SettingsSection } from '../settings-ui/SettingsSections';
 
 export function GesturesEditor({
   settings,
@@ -73,94 +71,85 @@ export function GesturesEditor({
     );
   });
   return (
-    <section
-      className="gestures-editor command-shortcuts"
-      {...settingAnchor('gestures', 'gestures')}
-      aria-label="マウスジェスチャー設定"
-    >
-      <CommandBindingToolbar
-        inputName="ジェスチャー"
-        count={catalog.length}
-        visibleCount={visible.length}
-        filter={filter}
-        statusFilter={statusFilter}
-        setFilter={setFilter}
-        setStatusFilter={setStatusFilter}
-        onOrder={() => setOrderOpen(true)}
+    <>
+      <GestureOptions gestures={gestures} change={change} />
+      <SettingsSection
+        className="gestures-editor command-shortcuts"
+        {...settingAnchor('gestures', 'gestures')}
+        aria-label="マウスジェスチャー設定"
       >
-        <SettingsField
-          className="gesture-settings-toggle"
-          title={hostSettingItem('gestures', 'enabled').title}
-          description="右ボタンを押しながら、移動・クリック・ホイール・キーで操作。"
-          {...settingAnchor('gestures', 'enabled')}
-        >
-          <Toggle
-            label={hostSettingItem('gestures', 'enabled').title}
-            checked={gestures.enabled}
-            onChange={(enabled) => change({ enabled })}
-          />
-        </SettingsField>
-        <GestureOptions gestures={gestures} change={change} />
-      </CommandBindingToolbar>
-      {!gestures.enabled && (
-        <p className="settings-help">
-          現在、ジェスチャーは無効です。割り当てはそのまま編集できます。
-        </p>
-      )}
-      {bindings.length >= 2000 && (
-        <p role="status">
-          割り当ては2000件までです。追加するには既存の割り当てを削除してください。
-        </p>
-      )}
-      <CommandBindingList<GestureBinding>
-        commands={visible}
-        bindings={bindings}
-        showProvider
-        inputName="ジェスチャー"
-        inputLabel={(row) => gestureTitle(row.gesture)}
-        conditionLabel={conditionLabel}
-        newBinding={(command) => ({
-          id: crypto.randomUUID(),
-          command: command.id,
-          gesture: 'move-up',
-          enabled: true,
-          when: { scope: command.extensionId ? 'owner' : 'app', appletIds: [], processes: [] },
-        })}
-        applyBinding={(row, original) =>
-          change({ bindings: applyGestureBinding(bindings, row, original) })
-        }
-        deleteBinding={(row) => change({ bindings: bindings.filter((item) => item.id !== row.id) })}
-        renderEditor={(edit, apply, close) => (
-          <GestureBindingDialog
-            initial={edit.row}
-            title={edit.title}
-            ownerTitle={edit.ownerTitle}
-            applets={targets}
-            adding={edit.adding}
-            onApply={apply}
-            onClose={close}
-          />
+        <CommandBindingToolbar
+          inputName="ジェスチャー"
+          count={catalog.length}
+          visibleCount={visible.length}
+          filter={filter}
+          statusFilter={statusFilter}
+          setFilter={setFilter}
+          setStatusFilter={setStatusFilter}
+          onOrder={() => setOrderOpen(true)}
+        />
+        {!gestures.enabled && (
+          <p className="settings-help">
+            現在、ジェスチャーは無効です。割り当てはそのまま編集できます。
+          </p>
         )}
-        renderOrder={(row, close) => (
+        {bindings.length >= 2000 && (
+          <p role="status">
+            割り当ては2000件までです。追加するには既存の割り当てを削除してください。
+          </p>
+        )}
+        <CommandBindingList<GestureBinding>
+          commands={visible}
+          bindings={bindings}
+          showProvider
+          inputName="ジェスチャー"
+          inputLabel={(row) => gestureTitle(row.gesture)}
+          conditionLabel={conditionLabel}
+          newBinding={(command) => ({
+            id: crypto.randomUUID(),
+            command: command.id,
+            gesture: 'move-up',
+            enabled: true,
+            when: { scope: command.extensionId ? 'owner' : 'app', appletIds: [], processes: [] },
+          })}
+          applyBinding={(row, original) =>
+            change({ bindings: applyGestureBinding(bindings, row, original) })
+          }
+          deleteBinding={(row) =>
+            change({ bindings: bindings.filter((item) => item.id !== row.id) })
+          }
+          renderEditor={(edit, apply, close) => (
+            <GestureBindingDialog
+              initial={edit.row}
+              title={edit.title}
+              ownerTitle={edit.ownerTitle}
+              applets={targets}
+              adding={edit.adding}
+              onApply={apply}
+              onClose={close}
+            />
+          )}
+          renderOrder={(row, close) => (
+            <GestureOrderDialog
+              settings={settings}
+              commands={catalog}
+              applets={targets}
+              initialGesture={row.gesture}
+              onChange={onChange}
+              onClose={close}
+            />
+          )}
+        />
+        {orderOpen && (
           <GestureOrderDialog
             settings={settings}
             commands={catalog}
             applets={targets}
-            initialGesture={row.gesture}
             onChange={onChange}
-            onClose={close}
+            onClose={() => setOrderOpen(false)}
           />
         )}
-      />
-      {orderOpen && (
-        <GestureOrderDialog
-          settings={settings}
-          commands={catalog}
-          applets={targets}
-          onChange={onChange}
-          onClose={() => setOrderOpen(false)}
-        />
-      )}
-    </section>
+      </SettingsSection>
+    </>
   );
 }

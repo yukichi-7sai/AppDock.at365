@@ -3,6 +3,18 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 module.exports = async ({ page, host, profile, checks, calls, send, until }) => {
   const snapshot = () => host.evaluate(() => window.dock.snapshot());
+  const options = page.locator('.gesture-settings-section');
+  assert(
+    await options.evaluate(
+      (el) =>
+        el === el.parentElement.firstElementChild &&
+        el.nextElementSibling?.matches('.gestures-editor') &&
+        !el.closest('.gestures-editor') &&
+        getComputedStyle(el.closest('.settings-panel')).borderTopWidth === '0px',
+    ),
+    'behavior settings are first and outside the command list frame',
+  );
+  assert.equal(await options.getAttribute('open'), null, 'behavior settings start collapsed');
   const filter = page.getByLabel('ジェスチャーのコマンドを検索');
   const status = page.getByLabel('ジェスチャーの絞り込み');
   const row = (id) => page.locator(`[data-shortcut-command="${id}"]`);
@@ -145,7 +157,9 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   checks.push(
     'separate order panel / full gesture group / drag, arrows and Alt+arrows / key selection retains pending order / unrelated shortcut bindings unchanged',
   );
-  await page.locator('.command-shortcut-summary').screenshot({ path: path.join(profile, 'gesture-order-button.png') });
+  await page
+    .locator('.command-shortcut-summary')
+    .screenshot({ path: path.join(profile, 'gesture-order-button.png') });
   await page.getByRole('button', { name: '実行順…', exact: true }).click();
   await orderPanel.getByRole('heading', { name: 'ジェスチャーの実行順', exact: true }).waitFor();
   await orderPanel.getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -249,12 +263,60 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     'host defaults / assignment filters / both themes at 1280, 900, 700 / bounded editor and matching toolbar',
   );
   await page.locator('summary').filter({ hasText: '動作設定' }).click();
+  assert.deepEqual(await options.locator('.settings-field-label > strong').allTextContents(), [
+    'マウスジェスチャーを有効にする',
+    '条件に一致したコマンドの実行方法',
+    '操作感',
+    '待機表示',
+    'Webブラウザ',
+    '除外',
+  ]);
+  assert.equal(await page.getByLabel('条件に一致したコマンドの実行方法').inputValue(), 'all');
+  const bindingsBeforeOptions = await saved();
+  const enabled = page.getByRole('switch', { name: 'マウスジェスチャーを有効にする', exact: true });
+  await enabled.click();
+  await save();
+  assert.equal((await snapshot()).settings.value.gestures.enabled, false);
+  assert.deepEqual(await saved(), bindingsBeforeOptions);
+  await enabled.click();
+  await page.getByLabel('条件に一致したコマンドの実行方法').selectOption('first');
+  const opacity = page.getByLabel('不透明度', { exact: true });
+  await opacity.fill('0.65');
+  await page.getByLabel('表示位置', { exact: true }).selectOption('none');
+  assert(await opacity.isDisabled());
+  await save();
+  assert.equal((await snapshot()).settings.value.gestures.indicatorOpacity, 0.65);
+  await page.getByLabel('表示位置', { exact: true }).selectOption('window-center');
+  assert(await opacity.isEnabled());
+  assert.equal(await opacity.inputValue(), '0.65');
+  await page.getByLabel('表示位置', { exact: true }).selectOption('none');
   await page.getByLabel('Webブラウザのexe', { exact: true }).fill('firefox.exe, msedge.exe');
   await page.getByLabel('移動距離（px）').fill('70');
   await save();
   const state = (await snapshot()).settings.value;
   assert.equal(state.gestures.distance, 70);
   assert.deepEqual(state.gestures.browsers, ['firefox', 'msedge']);
+  assert.equal(state.gestures.executionMode, 'first');
+  assert.equal(state.gestures.indicatorPosition, 'none');
+  assert.equal(state.gestures.enabled, true);
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate((theme) => {
+      document.documentElement.dataset.theme = theme;
+    }, theme);
+    for (const width of [1280, 900, 700]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert(await options.evaluate((el) => el.scrollWidth <= el.clientWidth));
+      assert(await page.locator('main').evaluate((el) => el.scrollWidth <= el.clientWidth));
+      await options.locator('summary').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await page.screenshot({
+        path: path.join(profile, `${theme}-${width}-gesture-options.png`),
+        fullPage: true,
+      });
+    }
+  }
+  checks.push(
+    'top collapsed behavior settings / grouped layout / enabled move / first-all mode / hidden display and retained opacity / both themes at three widths',
+  );
   await page.locator('summary').filter({ hasText: '動作設定' }).click();
   const persisted = structuredClone(state.gestures);
   await host.reload();

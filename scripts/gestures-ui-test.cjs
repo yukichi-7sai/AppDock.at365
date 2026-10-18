@@ -16,6 +16,18 @@ const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', `gestures-ui-${Date.now()}`);
 const fixture = path.join(profile, 'extensions', 'test.gestures');
 fs.mkdirSync(fixture, { recursive: true });
+const webSource = path.join(
+  getPublishDirectory(path.resolve(root, '../Applet.WebApplet.at365')),
+  'extensions/at365.web-applet',
+);
+fs.cpSync(webSource, path.join(profile, 'extensions/at365.web-applet'), { recursive: true });
+const webInputs = fs
+  .readdirSync(webSource, { recursive: true, withFileTypes: true })
+  .filter((entry) => entry.isFile())
+  .map((entry) => {
+    const file = path.join(entry.parentPath, entry.name);
+    return { file, sha256: createHash('sha256').update(fs.readFileSync(file)).digest('hex') };
+  });
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({
@@ -89,22 +101,33 @@ const until = async (fn, label) => {
 const checks = [];
 (async () => {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  settings.webApplets = {
-    accounts: [{ id: accountId, name: 'Test' }],
-    items: [
-      {
-        id: webId,
-        name: 'Webジェスチャー',
-        url: `http://127.0.0.1:${server.address().port}/`,
-        accountId,
-        enabled: true,
-        display: 'page',
-        navigation: 'none',
-        allowedOrigins: [],
-        icon: '',
-      },
-    ],
+  settings.extensions['at365.web-applet'] = {
+    enabled: true,
+    settings: {
+      items: [
+        {
+          id: webId,
+          name: 'Webジェスチャー',
+          url: `http://127.0.0.1:${server.address().port}/`,
+          accountId,
+          enabled: true,
+          display: 'page',
+          navigation: 'none',
+          allowedOrigins: [],
+          icon: '',
+        },
+      ],
+    },
   };
+  settings.migrations = { webApplet: { version: 1, owner: 'at365.web-applet', ids: [webId] } };
+  fs.mkdirSync(path.join(profile, 'data/web-applets'), { recursive: true });
+  fs.writeFileSync(
+    path.join(profile, 'data/web-applets/accounts.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      accounts: [{ id: accountId, name: 'Test' }],
+    }),
+  );
   fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -174,7 +197,10 @@ const checks = [];
   let app = await launch();
   try {
     const dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
-    await dock.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
+    await until(
+      async () => (await dock.evaluate(() => window.dock.snapshot())).startupReady,
+      'host startup ready',
+    );
     await dock.evaluate(() => window.dock.executeCommand('appdock.open'));
     await dock.bringToFront();
     await wait(300);
@@ -224,6 +250,37 @@ const checks = [];
     } else {
       await expect(['a', 'b']);
       checks.push('global/app order and duplicate suppression');
+      for (const mode of ['first', 'all']) {
+        await dock.evaluate(async (mode) => {
+          const s = await window.dock.snapshot();
+          s.settings.value.gestures.executionMode = mode;
+          s.settings.value.gestures.indicatorPosition = 'none';
+          await window.dock.saveSettings(s.settings.value, s.settings.revision);
+        }, mode);
+        await wait(150);
+        for (const gesture of ['move-left', 'key:A', 'click-left', 'wheel-up']) {
+          await save([
+            row('wrong-owner', 'c', 'owner', gesture),
+            row('first', 'a', 'global', gesture),
+            row('second', 'b', 'app', gesture),
+            row('duplicate', 'a', 'global', gesture),
+          ]);
+          const n = calls().length;
+          const expected = mode === 'first' ? ['a'] : ['a', 'b'];
+          await send(gesture);
+          await until(() => calls().length >= n + expected.length, mode + ' ' + gesture);
+          await wait(100);
+          assert.deepEqual(calls().slice(n), expected);
+        }
+      }
+      await dock.evaluate(async () => {
+        const s = await window.dock.snapshot();
+        s.settings.value.gestures.indicatorPosition = 'gesture-start';
+        await window.dock.saveSettings(s.settings.value, s.settings.revision);
+      });
+      checks.push(
+        'first/all execution with condition skipping, deduplication and hidden indicator for stroke/key/click/wheel',
+      );
       await save([
         row('start-stroke', 'a', 'global'),
         row('start-wheel', 'b', 'global', 'wheel-up'),
@@ -289,7 +346,9 @@ const checks = [];
       checks.push('WebApplet scope without leaking provider condition');
       await dock.evaluate(async (id) => {
         const s = await window.dock.snapshot();
-        s.settings.value.webApplets.items.find((i) => i.id === id).display = 'window';
+        s.settings.value.extensions['at365.web-applet'].settings.items.find(
+          (i) => i.id === id,
+        ).display = 'window';
         await window.dock.saveSettings(s.settings.value, s.settings.revision);
         await window.dock.executeCommand(id + '.open');
       }, webId);
@@ -329,7 +388,10 @@ const checks = [];
     const restarted = require('./settings-aware-page.cjs').settingsAwarePage(
       await app.firstWindow(),
     );
-    await restarted.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
+    await until(
+      async () => (await restarted.evaluate(() => window.dock.snapshot())).startupReady,
+      'restarted host ready',
+    );
     assert.deepEqual(
       (await restarted.evaluate(() => window.dock.snapshot())).settings.value.gestures,
       persisted,
@@ -339,7 +401,11 @@ const checks = [];
     );
     fs.writeFileSync(
       path.join(profile, 'result.json'),
-      JSON.stringify({ ok: true, checks, profile, portable, sha256: portableHash }, null, 2),
+      JSON.stringify(
+        { ok: true, checks, profile, portable, sha256: portableHash, webInputs },
+        null,
+        2,
+      ),
     );
     console.log(
       JSON.stringify({ ok: true, checks, profile, portable, sha256: portableHash }, null, 2),

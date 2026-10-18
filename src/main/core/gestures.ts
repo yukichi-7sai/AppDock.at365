@@ -89,6 +89,7 @@ export class GestureManager {
                 .map((r) => r.command),
             ),
           ];
+          if (current.settings.gestures?.executionMode === 'first') commands.splice(1);
           const controller = new AbortController();
           this.active.set(p.session, controller);
           try {

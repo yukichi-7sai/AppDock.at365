@@ -127,7 +127,7 @@ export function SettingsForm({
   return (
     <div className="settings-layout">
       <div
-        className={`settings-form${['general', 'appearance', 'profile'].includes(category) ? ' settings-sections' : ''}`}
+        className={`settings-form${['general', 'appearance', 'profile', 'gestures'].includes(category) ? ' settings-sections' : ''}`}
       >
         {category === 'gestures' && (
           <GesturesEditor

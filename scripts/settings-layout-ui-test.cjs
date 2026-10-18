@@ -68,7 +68,9 @@ async function page(category) {
     () =>
       p.evaluate(
         (category) =>
-          window.dock.settingsPage.get(document.querySelector('.settings-surface').dataset.settingsConnection).then((m) => m.content.page.id === category),
+          window.dock.settingsPage
+            .get(document.querySelector('.settings-surface').dataset.settingsConnection)
+            .then((m) => m.content.page.id === category),
         category,
       ),
     category,
@@ -143,7 +145,7 @@ async function save(p) {
     await sound.click();
     await save(p);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.soundEnabled,
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.host.soundEnabled,
       false,
     );
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.soundEnabled.on'));
@@ -221,12 +223,13 @@ async function save(p) {
     p = await page('gestures');
     const gesture = section(p, '動作設定');
     assert.equal(await gesture.evaluate((e) => e.open), false);
-    const standalone = p.getByRole('switch', {
+    const contained = p.getByRole('switch', {
       name: 'マウスジェスチャーを有効にする',
       exact: true,
+      includeHidden: true,
     });
-    await standalone.waitFor();
-    assert.equal(await standalone.evaluate((e) => !!e.closest('details')), false);
+    assert.equal(await contained.evaluate((e) => !!e.closest('details')), true);
+    assert.equal(await contained.isVisible(), false);
     await capture(p, 'gestures-collapsed');
     await gesture.locator(':scope > summary').click();
     await p.getByRole('heading', { name: '動作設定', exact: true }).waitFor();
@@ -238,7 +241,7 @@ async function save(p) {
     await save(p);
     await capture(p, 'gestures-expanded');
     checks.push(
-      'TTS label; standalone gesture toggle and collapsed common options card; enabled setting saves',
+      'TTS label; gesture toggle inside top collapsed common options card; enabled setting saves',
     );
     await gesture.locator(':scope > summary').click();
     const search = p.getByRole('combobox', { name: '設定を検索', exact: true });
@@ -252,7 +255,7 @@ async function save(p) {
       'search opens notification card',
     );
     checks.push('search reveals collapsed gesture and notification settings');
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+    const saved = (await host.evaluate(() => window.dock.snapshot())).settings.value;
     assert.equal(saved.host.theme, 'light');
     assert.equal('notifications' in saved.host, false);
     assert.ok(saved.notificationPreferences.overrides.every((r) => !('enabled' in r)));

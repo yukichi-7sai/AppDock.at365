@@ -116,8 +116,9 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     requireChromiumWindowClass: true,
     distance: 75,
     wheelDelayMs: 120,
+    executionMode: 'first',
     indicatorOpacity: 0.6,
-    indicatorPosition: 'window-center',
+    indicatorPosition: 'none',
   };
   const operations = [{ kind: 'configure', changes }];
   const dry = await f.edit(operations, { dryRun: true });
@@ -126,6 +127,8 @@ test('configure validates ranges/processes atomically, preserves bindings and su
   const result = await f.edit(operations);
   assert.deepEqual(result.bindings, before.bindings);
   assert.equal(result.settings.distance, 75);
+  assert.equal(result.settings.executionMode, 'first');
+  assert.equal(result.settings.indicatorPosition, 'none');
   const revision = f.settings.revision;
   await f.edit(operations);
   assert.equal(f.settings.revision, revision);
@@ -136,6 +139,7 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     { wheelDelayMs: -1 },
     { indicatorOpacity: 2 },
     { indicatorPosition: 'other' },
+    { executionMode: 'other' },
     { enabled: 'true' },
     { browsers: ['C:/chrome.exe'] },
     { bindings: [] },

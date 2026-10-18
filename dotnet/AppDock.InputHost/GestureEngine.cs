@@ -9,7 +9,7 @@ internal sealed record Condition(string Scope, string[] AppletIds, string[] Proc
 internal sealed record Binding(string Id, string Command, string Gesture, string Title, string Window, Condition When);
 internal sealed record Configuration(bool Enabled, string[] Browsers, string[] ExcludedProcesses,
     bool RequireChromiumWindowClass, int Distance, int WheelDelayMs, double IndicatorOpacity,
-    string IndicatorPosition, Binding[] Rows, string Context, int Revision);
+    string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all");
 internal enum GestureDirection { Up, Down, Left, Right }
 [StructLayout(LayoutKind.Sequential)] internal readonly record struct GesturePoint(int X, int Y);
 internal static class GestureConfiguration { internal static readonly string[] Marks = ["⬆️","⬇️","⬅️","➡️"]; }
@@ -171,10 +171,10 @@ internal sealed class GestureEngine : IDisposable
         if (lastWheel != 0 && Environment.TickCount64-lastWheel >= 100) CancelPending();
         if (!ready) return;
         if (!otherMode && GetCursorPos(out var point)) Move(point);
-        if (cancelled || otherMode || direction == null) { indicator?.Hide(); return; }
+        if (cancelled || otherMode || direction == null || config!.IndicatorPosition == "none") { indicator?.Hide(); return; }
         indicator ??= new GestureIndicator();
         if (indicator.IsVisible) return;
-        var titles = candidates.Where(r=>r.Gesture=="move-"+direction.ToString()!.ToLowerInvariant()).Select(r=>r.Title).Distinct().ToArray();
+        var titles = SelectedRows("move-"+direction.ToString()!.ToLowerInvariant()).Select(r=>r.Title).ToArray();
         var caption = string.Join("\n",titles.Take(3)) + (titles.Length>3 ? $"\nほか {titles.Length-3} 件" : "");
         var center = origin;
         if (config!.IndicatorPosition == "window-center" && GetWindowRect(target,out var rect)) center=new((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
@@ -192,7 +192,7 @@ internal sealed class GestureEngine : IDisposable
     private bool Run(string gesture, int repeats=1, bool released=false)
     {
         if (busy || cancelled || !Current) return false;
-        var rows=candidates.Where(r=>r.Gesture==gesture).ToArray(); if (rows.Length==0) return false;
+        var rows=SelectedRows(gesture); if (rows.Length==0) return false;
         if (lifetime == null || lifetime.IsCancellationRequested) { lifetime?.Dispose(); lifetime=new(); session=Guid.NewGuid().ToString("N"); }
         var token=lifetime.Token;
         var capturedSession=session; var capturedTarget=target.ToInt64().ToString();
@@ -211,6 +211,13 @@ internal sealed class GestureEngine : IDisposable
             finally { busy=false; }
         }));
         return true;
+    }
+    private Binding[] SelectedRows(string gesture)
+    {
+        // Candidates already passed the start-window, browser/exe and host page conditions.
+        // Preview and execution must use the same ordered, command-deduplicated selection.
+        var rows = candidates.Where(r => r.Gesture == gesture).DistinctBy(r => r.Command);
+        return (config!.ExecutionMode == "first" ? rows.Take(1) : rows).ToArray();
     }
     private void Release(GesturePoint point)
     {

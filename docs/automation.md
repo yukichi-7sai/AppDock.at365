@@ -100,7 +100,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 - update: idとchanges（command/gesture/enabled/whenの部分更新）。whenを指定するときはscope/appletIds/processes全体が必要です。入力変更は移動先の末尾、条件だけの変更は現在位置を保ちます。
 - remove: 削除するidを指定します。存在しないIDはNOT_FOUNDです。
 - reorder: gestureとidsを指定。同じ入力の無効行も含む全IDが必要で、別入力の順序は維持します。
-- configure: changesでenabled、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center）を部分更新します。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
+- configure: changesでenabled、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、executionMode（all/first）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center/none）を部分更新します。executionModeは条件一致のすべて／最初の1つ、noneは待機表示なしです。省略された旧executionModeはallになります。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
 
 exe条件のprocessesはパスを含まない実行ファイル名を1件以上指定し、その他の条件では空配列です。browsers/excludedProcessesも同じ形式で各100件まで。末尾.exeと大文字小文字を正規化します。applets条件だけappletIdsへ登録済みIDを1件以上指定し、その他では空配列です。本体コマンドにownerは使えません。旧未公開/未導入の割当は保持・無効化・削除でき、既存の同じ入力内で並べ替えられます。新規追加・再有効化・その他の更新は公開済み引数なしコマンドに限ります。
 

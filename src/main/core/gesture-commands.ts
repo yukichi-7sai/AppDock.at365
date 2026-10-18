@@ -77,8 +77,9 @@ const configurationFields = {
   requireChromiumWindowClass: { type: 'boolean' },
   distance: { type: 'integer', minimum: 5, maximum: 500 },
   wheelDelayMs: { type: 'integer', minimum: 0, maximum: 5000 },
+  executionMode: { type: 'string', enum: ['all', 'first'] },
   indicatorOpacity: { type: 'number', minimum: 0.1, maximum: 1 },
-  indicatorPosition: { type: 'string', enum: ['gesture-start', 'window-center'] },
+  indicatorPosition: { type: 'string', enum: ['gesture-start', 'window-center', 'none'] },
 };
 const gestureSettings = (settings: Settings): GestureSettings => {
   const source = settings.gestures ?? defaultGestures();
@@ -329,7 +330,7 @@ export class GestureCommands {
       warning: store.syncError ?? null,
       applies: 'gesturesChanged',
       message:
-        '保存後に既存の入力処理へ非同期に反映します。実際の入力効果は未確認です。同じジェスチャーの複数行は条件を満たす順に実行します。',
+        '保存後に既存の入力処理へ非同期に反映します。実際の入力効果は未確認です。条件に一致したコマンドは実行方法の設定に従って登録順に選びます。',
     };
   }
 }
