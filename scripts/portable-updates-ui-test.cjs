@@ -87,7 +87,8 @@ fs.writeFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'login-f
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function connect(port) {
   let last;
-  for (let i = 0; i < 40; i++) {
+  const startupDeadline = Date.now() + 60000;
+  while (Date.now() < startupDeadline) {
     try {
       const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 2500 });
       const deadline = Date.now() + 30000;

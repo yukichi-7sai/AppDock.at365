@@ -1,6 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { WindowsLaunch, psString, encodedScript } = require('../out/main/main/core/windows-launch');
+const {
+  WindowsLaunch,
+  psString,
+  encodedScript,
+  administratorAccountExpression,
+} = require('../out/main/main/core/windows-launch');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const sid = 'S-1-5-21-123-456-789-1001';
 test(
@@ -15,6 +20,82 @@ test(
       runPowerShell('throw [ComponentModel.Win32Exception]::new(1223)'),
       WindowsOperationCancelled,
     );
+  },
+);
+test(
+  'administrator membership includes enabled and deny-only user group claims without granting elevation',
+  { skip: process.platform !== 'win32' },
+  async () => {
+    const { runPowerShell } = require('../out/main/main/core/windows-launch');
+    const actual = JSON.parse(
+      await runPowerShell(`
+$cases=@(
+  [pscustomobject]@{ UserClaims=@([Security.Claims.Claim]::new([Security.Claims.ClaimTypes]::GroupSid,'S-1-5-32-544')) },
+  [pscustomobject]@{ UserClaims=@([Security.Claims.Claim]::new([Security.Claims.ClaimTypes]::DenyOnlySid,'S-1-5-32-544')) },
+  [pscustomobject]@{ UserClaims=@([Security.Claims.Claim]::new([Security.Claims.ClaimTypes]::GroupSid,'S-1-5-32-545')) },
+  [pscustomobject]@{ UserClaims=@([Security.Claims.Claim]::new([Security.Claims.ClaimTypes]::Name,'S-1-5-32-544')) },
+  [pscustomobject]@{ UserClaims=@() }
+)
+@($cases | ForEach-Object { $identity=$_; ${administratorAccountExpression} }) | ConvertTo-Json -Compress`),
+    );
+    assert.deepEqual(actual, [true, true, false, false, false]);
+  },
+);
+test(
+  'real Windows startup read distinguishes account membership from the current filtered token',
+  { skip: process.platform !== 'win32' },
+  async (t) => {
+    const {
+      runPowerShell,
+      WindowsOperationCancelled,
+    } = require('../out/main/main/core/windows-launch');
+    const expected = JSON.parse(
+      await runPowerShell(`
+$identity=[Security.Principal.WindowsIdentity]::GetCurrent()
+@{
+  administratorAccount=[bool]((& whoami.exe /groups /fo csv /nh) -match '"S-1-5-32-544"')
+  legacyMembership=($identity.Groups.Value -contains 'S-1-5-32-544')
+  elevated=([Security.Principal.WindowsPrincipal]$identity).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+} | ConvertTo-Json -Compress`),
+    );
+    const directory = `C:\\AppDock-read-only-${require('node:crypto').randomUUID()}`;
+    const service = new WindowsLaunch(`${directory}\\AppDock.exe`, directory, [], true);
+    const actual = await service.read();
+    assert.equal(actual.administratorAccount, expected.administratorAccount);
+    assert.equal(actual.elevated, expected.elevated);
+    assert.equal(actual.registered, false);
+    if (expected.administratorAccount && !expected.elevated) {
+      assert.equal(expected.legacyMembership, false);
+      assert.equal(actual.administratorAccount, true);
+      let elevationRequests = 0;
+      const guarded = new WindowsLaunch(service.executable, directory, [], true, async (script) => {
+        // Stop at the actual UAC boundary; never show or approve a prompt in this test.
+        if (script.includes('-Verb RunAs')) {
+          elevationRequests++;
+          throw new WindowsOperationCancelled('test cancellation before UAC');
+        }
+        return runPowerShell(script);
+      });
+      const host = createDefaultSettings().host;
+      await assert.rejects(
+        guarded.save(
+          { ...host, startAtLogon: true, runAsAdministrator: true },
+          host,
+          () => {},
+          () => assert.fail('cancelled registration must not commit settings'),
+        ),
+        WindowsOperationCancelled,
+      );
+      await assert.rejects(
+        guarded.restartElevated(['--restore-view', '--appdock-elevation-attempt']),
+        WindowsOperationCancelled,
+      );
+      assert.equal(elevationRequests, 2);
+      assert.equal((await guarded.read()).registered, false);
+      t.diagnostic(
+        'Filtered administrator reaches both UAC boundaries; no prompt, task or settings changed.',
+      );
+    }
   },
 );
 test('launch health excludes explicit UAC cancellation and preflight conflicts, reports operational failure', async () => {

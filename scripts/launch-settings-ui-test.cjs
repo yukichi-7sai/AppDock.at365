@@ -14,7 +14,9 @@ const profile = path.join(root, '.artifacts', `launch-settings-${Date.now()}`);
 const folder = path.join(profile, '日本語 folder');
 fs.mkdirSync(folder, { recursive: true });
 const executable = path.join(folder, "AppDock's.at365.exe");
-const source = path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'));
+const source = path.resolve(
+  process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'),
+);
 fs.copyFileSync(source, executable);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 assert.equal(hash(source), hash(executable));
@@ -220,6 +222,19 @@ async function close() {
     checks.push(
       'restart preserves settings and detects Windows registration; disabling and saving removes only isolated task',
     );
+    if (registered.administratorAccount && !registered.elevated) {
+      await toggle('常に管理者として起動').click();
+      await save();
+      assert.equal((await snapshot()).settings.value.host.runAsAdministrator, true);
+      assert.equal((await snapshot()).launch.elevated, false);
+      assert.equal((await service.read()).registered, false);
+      await toggle('常に管理者として起動').click();
+      await save();
+      assert.equal((await snapshot()).settings.value.host.runAsAdministrator, false);
+      checks.push(
+        'filtered administrator can immediately enable and disable administrator preference without a startup task or changing the current token',
+      );
+    }
     if (!registered.administratorAccount && !registered.elevated) {
       await close();
       const stored = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));

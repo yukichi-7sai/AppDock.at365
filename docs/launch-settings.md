@@ -17,6 +17,8 @@ Windows操作の前にPC専用settings-transactions/launch.jsonへ元タスクXM
 - ONの保存で登録/更新、OFFの保存で当該タスクだけ解除する。元タスクのXMLを保持し、OS変更成功後にrevisionを再確認してJSON/画像を保存する。競合/画像不正/書き込み失敗ではXMLを復元する。復元失敗も明示する。同時保存はガードする。状態確認後に判明した登録と希望値の差は、次の画面からの設定変更時に同期する。
 - Highestタスクへの変更、または既存Highestタスクの変更/解除では、通常権限から同じWindowsユーザーのRunAsヘルパーを起動する。UACキャンセル・権限不足・別ユーザー資格情報ではJSONを保存しない。標準ユーザーのHighestは管理者権限を与えるものではないため、管理者設定を有効にする時点で管理者グループの所属も確認する。
 
+管理者アカウントの所属判定は、WindowsIdentity.UserClaimsのGroupSid/DenyOnlySidにAdministratorsのSIDがあるかを確認する。WindowsIdentity.GroupsはUACの通常権限トークンでdeny-onlyになった管理者グループを除外するため、所属判定には使わない。現在の管理者権限は従来どおりWindowsPrincipal.IsInRoleで別に判定し、UAC後の同一ユーザー・管理者トークン確認も維持する。
+
 タスクの作成は製品起動時や設定ファイル監視では行わない。外部JSON編集/別PCへのコピーだけでは登録を移行しない。移動前に旧配置から登録を解除し、新配置で保存する。Startupフォルダー/他名タスク/PowerToysの登録は変更しない。
 
 ## 管理者起動

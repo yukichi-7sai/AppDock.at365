@@ -11,6 +11,11 @@ const execute = promisify(execFile);
 export class WindowsOperationCancelled extends Error {}
 export const psString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 export const encodedScript = (value: string) => Buffer.from(value, 'utf16le').toString('base64');
+// Groups omits deny-only SIDs from filtered UAC tokens; user claims retain them.
+export const administratorAccountExpression = `[bool]($identity.UserClaims | Where-Object {
+  $_.Value -eq 'S-1-5-32-544' -and
+  ($_.Type -eq [Security.Claims.ClaimTypes]::GroupSid -or $_.Type -eq [Security.Claims.ClaimTypes]::DenyOnlySid)
+})`;
 export const powershell = () =>
   path.win32.join(
     process.env.SystemRoot || 'C:\\Windows',
@@ -224,7 +229,7 @@ if ($task) {
   async read(): Promise<LaunchTask> {
     const data = JSON.parse(
       await this.run(`${this.context()}
-@{ administratorAccount=($identity.Groups.Value -contains 'S-1-5-32-544'); elevated=$admin; sid=$sid; xml=$(if ($task) { $task.Xml } else { $null }); registered=($null -ne $task -and $task.Enabled); taskElevated=($null -ne $task -and $task.Definition.Principal.RunLevel -eq 1) } | ConvertTo-Json -Compress`),
+@{ administratorAccount=${administratorAccountExpression}; elevated=$admin; sid=$sid; xml=$(if ($task) { $task.Xml } else { $null }); registered=($null -ne $task -and $task.Enabled); taskElevated=($null -ne $task -and $task.Definition.Principal.RunLevel -eq 1) } | ConvertTo-Json -Compress`),
     ) as LaunchTask;
     this.state = {
       supported: this.state.supported,
