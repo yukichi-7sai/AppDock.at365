@@ -33,7 +33,10 @@ public interface ICommandService
     void Register(string id, string title, Func<CancellationToken, Task> handler);
     Task ReplaceAsync(IReadOnlyList<CommandRegistration> commands, CancellationToken cancellationToken = default);
 }
-public sealed record CommandRegistration(string Id, string Title, Func<CancellationToken, Task> Handler);
+public sealed record CommandRegistration(string Id, string Title, Func<CancellationToken, Task> Handler)
+{
+    public string? Description { get; init; }
+}
 public interface ICustomCommandService
 {
     Task RegisterAsync(string typeId, Func<System.Text.Json.JsonElement, CancellationToken, Task<System.Text.Json.JsonElement?>> handler, CancellationToken cancellationToken = default);

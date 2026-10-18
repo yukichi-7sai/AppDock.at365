@@ -49,12 +49,16 @@ internal sealed class InputSender : IDisposable
             var expected = new nint(long.Parse(p.GetProperty("window").GetString()!));
             if (expected != 0 && expected != target) throw new InvalidOperationException("開始時のウィンドウが最前面ではないため中止しました。");
             InputKeyChord? chord = method == "input.sendKeys" ? InputKeyChord.Parse(p.GetProperty("keys").GetString()!) : null;
+            var requestedChord = chord;
             var appCommand = method == "input.appCommand" ? p.GetProperty("action").GetString() switch {
                 "back" => 1, "forward" => 2, "reload" => 3, _ => throw new ArgumentException("未対応の操作です。")
             } : 0;
             if (chord is null && appCommand == 0) throw new ArgumentException("未対応の操作です。");
             var start = Environment.TickCount64;
-            while (HeldModifiers.Any(Pressed) || (chord is not null && Pressed(chord.Key))) {
+            while (true) {
+                if (requestedChord?.Symbol is char symbol)
+                    chord = requestedChord.ResolveSymbol(VkKeyScanEx(symbol, GetKeyboardLayout(GetWindowThreadProcessId(target, out _))));
+                if (!HeldModifiers.Any(Pressed) && (chord is null || !Pressed(chord.Key))) break;
                 await Task.Delay(25, token);
                 CheckTarget(target);
                 if (Environment.TickCount64 - start >= 2000) throw new InvalidOperationException("修飾キーを離してから再実行してください。");
@@ -96,6 +100,9 @@ internal sealed class InputSender : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct KeyboardInput { public ushort Key, Scan; public uint Flags, Time; public nuint Extra; }
     [StructLayout(LayoutKind.Sequential)] private struct MouseInput { public int X, Y; public uint Data, Flags, Time; public nuint Extra; }
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint process);
+    [DllImport("user32.dll")] private static extern nint GetKeyboardLayout(uint thread);
+    [DllImport("user32.dll", EntryPoint = "VkKeyScanExW", CharSet = CharSet.Unicode)] private static extern short VkKeyScanEx(char character, nint layout);
     [DllImport("user32.dll")] private static extern nint GetDesktopWindow();
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);

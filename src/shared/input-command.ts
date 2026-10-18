@@ -22,6 +22,21 @@ export function normalizeInputKeys(value: unknown): string {
   if (modifiers.some((part) => !part) || new Set(modifiers).size !== modifiers.length)
     throw Error('送信キーの修飾キーを確認してください。');
   const special: Record<string, string> = {
+    WIN: 'Win',
+    WINDOWS: 'Win',
+    META: 'Win',
+    PAUSE: 'Pause',
+    PRINTSCREEN: 'PrintScreen',
+    PRTSCN: 'PrintScreen',
+    PERIOD: 'Period',
+    '.': 'Period',
+    SEMICOLON: 'Semicolon',
+    ';': 'Semicolon',
+    SLASH: 'Slash',
+    '/': 'Slash',
+    PLUS: 'Plus',
+    MINUS: 'Minus',
+    '-': 'Minus',
     ENTER: 'Enter',
     TAB: 'Tab',
     ESC: 'Escape',
@@ -42,6 +57,8 @@ export function normalizeInputKeys(value: unknown): string {
   const normalized =
     /^[A-Z0-9]$/.test(key) || /^F([1-9]|1[0-9]|2[0-4])$/.test(key) ? key : special[key];
   if (!normalized) throw Error('未対応の送信キーです。例: Ctrl+Shift+T、Enter、Win+E');
+  if (normalized === 'Win' && modifiers.length)
+    throw Error('Win単独は修飾キーなしで指定してください。');
   return [
     ...['Ctrl', 'Alt', 'Shift', 'Win'].filter((part) => modifiers.includes(part)),
     normalized,
@@ -55,6 +72,7 @@ export function inputKeysFromEvent(event: KeyStroke): string | null {
   )
     return null;
   let key = event.key;
+  if (key === '+') key = 'Plus';
   if (event.code?.startsWith('Digit') && event.shiftKey) key = event.code.slice(5);
   if (key === ' ') key = 'Space';
   if (key.startsWith('Arrow')) key = key.slice(5);

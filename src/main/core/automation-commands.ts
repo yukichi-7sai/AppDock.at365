@@ -74,6 +74,7 @@ export function automationCommands(applets: ExtensionSnapshot[]): AutomationComm
           return {
             id: c.id,
             title: c.title,
+            ...(c.description !== undefined ? { description: c.description } : {}),
             appletId: a.id,
             available,
             unavailableReason: available

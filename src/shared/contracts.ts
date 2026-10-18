@@ -53,6 +53,7 @@ export interface SettingsSnapshot<T = Settings> {
 export interface Command {
   id: string;
   title: string;
+  description?: string;
 }
 export interface DeclaredCommand extends Command {
   shellRequirement?: import('./shell').ShellRequirement;

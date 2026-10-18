@@ -98,6 +98,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                     ＋
                   </button>
                 </div>
+                {command.description && <small>{command.description}</small>}
                 <small className="command-id">{command.id}</small>
                 {showProvider && (
                   <small className="shortcut-provider">

@@ -19,7 +19,11 @@ import {
 } from '../../shared/settings-commands';
 import { parseSettingActions } from '../../shared/setting-actions';
 import { parseSettingSections } from '../../shared/setting-sections';
-import { parseExtensionCommands, parseDeclaredCommands } from '../../shared/extension-commands';
+import {
+  parseExtensionCommands,
+  parseDeclaredCommands,
+  maxExtensionCommands,
+} from '../../shared/extension-commands';
 import { parseKeybindingDefaults } from '../../shared/keybindings';
 import { parseGestures, defaultGestures } from '../../shared/gestures';
 import { parseVersion, compareVersions, validRepository } from '../../shared/versions';
@@ -473,6 +477,9 @@ class ExtensionManager extends EventEmitter {
       });
     for (const command of e.commands)
       catalog.set(command.id, {
+        ...(catalog.get(command.id)?.description !== undefined
+          ? { description: catalog.get(command.id)!.description }
+          : {}),
         ...command,
         // Runtime registration (including replace) cannot grant external access.
         automation:
@@ -493,6 +500,7 @@ class ExtensionManager extends EventEmitter {
         catalog.set(alias, {
           id: alias,
           title: target.title,
+          ...(target.description !== undefined ? { description: target.description } : {}),
           available: target.available,
           disabledReason: target.disabledReason,
           shellRequirement: target.shellRequirement,
@@ -669,7 +677,7 @@ class ExtensionManager extends EventEmitter {
       if (
         !isObject(result) ||
         !Array.isArray(result.commands) ||
-        result.commands.length > 100 ||
+        result.commands.length > maxExtensionCommands ||
         result.commands.some(
           (c: any) =>
             !isObject(c) ||

@@ -1,5 +1,37 @@
 # 検証記録
 
+## 2026-10-19: Windows標準コマンド対応のコミット確認（0.62.3）
+
+- 利用者が普段使う追加コマンドの動作成功を確認し、コミットを依頼した。共通説明・件数上限・キー文法／対象配列・取消と、WindowsTools 0.2.1との接続を再確認し、未解決の製品指摘なし。製品追加変更・版更新・再発行は行わない。
+- 実装時と本体629入力を照合し、検証記録以外の差分なし。関連5ファイル39件を再利用し、標準回帰の未実施84ファイル **598/598** を追加確認した。合計89ファイル **637/637、fail/skip 0**。型検査/build、発行DLLと固定EXE GUI、native Watch互換、標準smoke、利用者の実入力6群を入力／ログ／最終配布物hashと照合して再利用した。実ロックなど全Windows機能の実効果を一括検証したとは扱わない。
+- 本体EXE SHA256 `ac641e1d243a9c54f3c0e910923d31359ba241a4a7c44f713f1de52b4d7a9939`、WindowsTools ZIP `709cd8f4bdff0c3dbbfb1eb437f1015224f37127b131b2576253cbdc14834e3b`を維持。[コミット前証跡](.artifacts/commit-validation-windows-shortcuts-20261019/)に試験選択・入力・完全ログとstage/tree・commit照合を保存する。既存の成功・失敗・再利用資料を保持し、削除0件。今回の実装だけをコミットし、push・Release・実利用先deployは行わない。最新取得手順の更新は、その後の別作業として分離する。
+
+## 2026-10-19: WindowsTools最新0.2系との統合確認
+
+- WindowsToolsのmainを最新0.2.0へfast-forwardし、旧キー送信撤去とジェスチャー判定修正を保ったまま、標準66件と専用ロックを0.2.1へ統合した。本体の製品ソース・0.62.3固定EXEは変更せず、今回の本体変更はこの記録だけ。先に成功した実入力6群と関連39件、型検査/build・native Watch互換・smokeの適用範囲を維持する。
+- WindowsToolsの最終回帰40/40、発行DLL実ランナーで79件登録／説明と66件の模擬API委譲、同じ固定EXE＋最終DLLの隔離GUIが成功。説明表示／検索、旧キーUIとsend登録の非復活、旧設定／割り当て保持、MCP設定、予約取消、再起動／停止・終了0を確認した。本体の再発行なし。詳細とhashは[WindowsToolsの最新記録](../Applet.WindowsTools.at365/VERIFICATION.md#2026-10-19-最新020への標準コマンド統合021)と[統合証跡](../Applet.WindowsTools.at365/.artifacts/windows-shortcuts-merge-20261019/validation.json)を参照。
+
+## 2026-10-19: 対話端末での実入力試験成功（0.62.3）
+
+- 利用者が通常の対話PowerShellから固定EXEに対して`dev.bat exec node scripts/native-input-ui-test.cjs A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`を実行し、全6群が成功。保存された[result.json](.artifacts/native-input-ui-1792341550956/result.json)の`ok: true`と報告内容の一致を確認した。以下の過去の記録にある実入力GUIの確認待ちは、この成功で解消した。過去の失敗ログと診断は保持する。
+- ホストのカスタムコマンドと実Node WebBrowserTools 11コマンドの共通入力、Applet入力許可と読み取り許可の独立性、Applet/MCPの入力許可取消による待機中の送信中止、MCPの入力公開範囲を確認。native workerの対象変更拒否、修飾キー押下中の取消、連続ジェスチャー入力（固定150ms待機なし、14ms）と、現在のキーボード配列での記号キー実到達も成功した。
+- 試験profile内のEXEと発行EXEのSHA256は`ac641e1d243a9c54f3c0e910923d31359ba241a4a7c44f713f1de52b4d7a9939`で一致。WindowsToolsのDLLも前回のhashを維持した。製品変更・版更新・再発行は不要。個別Windows機能の実効果や実ロックは一括実行していない。今回の更新は検証記録・証跡・共有メモリのみ。
+
+## 2026-10-19: コンソール復帰後の実入力再試験
+
+- 利用者のコンソール復帰後、実行プロセスとActiveConsoleSessionがともに1、スレッドと入力先のデスクトップがともにDefault、UserInteractive=true、最前面がExplorer/Progmanであることを確認。RDP接続だけが原因とは断定しない。
+- 同じ固定EXEで実入力GUIを再実行したが、専用ウィンドウへの前面化で停止。試験画面へ通常の復元要求と診断項目を追加して切り分けたところ、画面は可視だが、同じデスクトップのExplorerへのAttachThreadInputがWin32エラー5、SetForegroundWindowもfalse。自身の表示面への一時的なクリックでも前面化できず、この追加経路は試験コードから取り除いた。Windowsの設定・保護・製品コードは変更していない。
+- 最終fixtureのビルドは成功。実入力の成功は未確認のまま。通常のPowerShellで`dev.bat exec node scripts/native-input-ui-test.cjs A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`を実行して再確認する。既存の関連80件・固定EXE GUI・実ランナー・native互換・smokeの成功と、配布物のhashは維持。版更新・再発行は不要。
+- 証跡: [.artifacts/windows-shortcuts-20261019/native-input-console.log](.artifacts/windows-shortcuts-20261019/native-input-console.log)、[前面化の診断](.artifacts/windows-shortcuts-20261019/focus-desktop-check.log)、失敗profile `.artifacts/native-input-ui-1792341024024/`。入力fixtureと検証記録以外の製品ソース・配布物は変更していない。今回の追加失敗も保持し、成功した試験へ読み替えない。
+
+## 2026-10-19: WindowsTools標準ショートカットの共通入力・説明対応（0.62.3）
+
+- WindowsTools 0.1.6に必要なWin単独・Pause・PrintScreen・記号キーを共通送信文法へ追加。記号は対象スレッドのキーボード配列で送信直前に解決し、押下解放待機・対象変更拒否・権限・取消・再入防止を維持。カスタムコマンドの既存説明検証を静的/実行時コマンドにも共用し、共通の一覧とパレットへ表示。パレットは説明でも検索可能。登録上限は本体と.NETで256件に揃えた。保存形式・設定・既存APIを破壊しない追加として0.62.2からパッチ更新。
+- 発行前レビュー、必要な修正、型検査/build、関連5ファイル **39/39**、WindowsTools標準 **41/41**、発行DLLの79固定＋32自由登録の実ランナー接続が成功。新SDK/Runtimeで未変更native WatchをRelease buildし、隔離RPC・WPF画像描画・設定反映・停止/EOF終了も成功。既存コンストラクターと説明省略時のRPC形状を維持。詳細なレビューと検証範囲は[WindowsToolsの記録](../Applet.WindowsTools.at365/VERIFICATION.md#2026-10-19-windows標準ショートカットと専用ロック016)を参照。
+- 固定単一EXEとWindowsTools発行物の隔離GUI、説明表示/検索、111件同時登録、自由登録の編集とホットキー、MCP設定、再起動/停止/終了0が成功。固定EXE標準smokeも成功。本体とDefault Shellの版は0.62.3、EXE 168901925 bytes / SHA256 `ac641e1d243a9c54f3c0e910923d31359ba241a4a7c44f713f1de52b4d7a9939`、feed・GUI/smokeのコピーhash一致。publish.bat終了0、lockfile/toolchain不変。
+- 実入力GUIは未完了。portableを既存のElectron launchで起動する試験がタイムアウトしたため、CDP接続と実際の展開先からのInputHost取得へテスト側を修正。その後は最前面の所有者がLockAppで、専用入力画面を前面化できず中止。ロック解除や保護回避は行っていない。失敗ログ・profileを保持し、キーの実到達、実権限取消、各Windows操作の実効果とは区別する。解除後の再検証が必要。
+- [本体のログ・native互換性・実入力失敗](.artifacts/windows-shortcuts-20261019/)、[入力hash・レビュー・発行物照合](../Applet.WindowsTools.at365/.artifacts/windows-shortcuts-20261019/validation.json)、[固定EXE GUI](../Applet.WindowsTools.at365/.artifacts/host-1792340281997/result.json)、[smoke](.artifacts/smoke-1792340668570/smoke-result.json)を保存。製品659入力の照合後、発行後は試験スクリプトのみ変更。整理は今回GUI1成功と入力2失敗を保持、smokeの直近成功3件とセットアップの再利用資料・状態不明を保護し、削除対象なし。標準全回帰・全Applet再発行は未実施。commit/push/GitHub Release/実利用先deployなし。
+
 ## 2026-10-18: 汎用成功通知撤去のコミット・プッシュ確認（0.62.2）
 
 - 利用者が動作成功を確認し、コミットとプッシュを依頼した。今回の8ファイルをレビューし、汎用成功通知だけの撤去、具体的な通知・失敗・結果イベントの維持、保存形式/APIの不変を再確認。未解決の製品指摘なし。今回の追加変更はこの検証記録だけで、製品版・発行物は維持する。

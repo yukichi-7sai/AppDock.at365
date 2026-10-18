@@ -32,9 +32,9 @@ await context.Ribbon.SetBadgeAsync(
 
 ## 動的コマンドとキー送信の一覧設定
 
-`dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大100件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。
+`dynamic-commands` capabilityを宣言したAppletは、`.NET: context.Commands.ReplaceAsync(IReadOnlyList<CommandRegistration>, token)` またはRPC `host.commands.replace` の `{ commands: [{ id, title }] }` で起動中のコマンド一覧を置き換えられます。固定コマンドも含めた全件（最大256件）を渡します。IDの接頭辞・重複・表示名を検証してから変更します。変更はパレット、ショートカット設定、グローバルホットキーへ反映され、削除したコマンドのキー登録を解除します。保存済みの割り当てとピンは保持します。
 
-.NETの`CommandRegistration`はID・タイトル・実行ハンドラーの3項目です。ActivateまたはSettings.OnChangedの中から呼び、更新をawaitしてください。コマンドは設定変更後にハンドラーを再取得するため、削除済みの処理を実行しません。ホストが更新を拒否するとRuntimeは元の一覧へ戻します。
+.NETの`CommandRegistration`はID・タイトル・実行ハンドラーと、任意の`Description`プロパティを持ちます。manifestとRPCにも任意の`description`（1,000 UTF-16コード単位以内）を指定でき、カスタムコマンドと同じ説明の検証・表示を使います。ActivateまたはSettings.OnChangedの中から呼び、更新をawaitしてください。コマンドは設定変更後にハンドラーを再取得するため、削除済みの処理を実行しません。ホストが更新を拒否するとRuntimeは元の一覧へ戻します。
 
 設定定義の `type: "shortcut-list"` は `{ id, title, keys }` の配列を扱い、追加・削除UIを提供します。IDは小文字英数字とハイフン（先頭英数字、40文字以内）、名前は100文字以内、最大32件。既定値は `[]` です。キーは `Ctrl+Shift+T` や `Win+E` などの1組の組み合わせで、フォーム保存／Host API保存時に検証します。設定型はキーを送信せず、実行はApplet側の責任です。
 

@@ -3,7 +3,8 @@ const fs = require('node:fs'),
   assert = require('node:assert/strict');
 const { getPublishDirectory } = require('./publish-paths.cjs');
 const { spawn } = require('node:child_process');
-const { _electron: electron } = require('playwright');
+const { _electron: electron, chromium } = require('playwright');
+const { freePort, inspect } = require('./electron-main-helper.cjs');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const { NativeInput } = require('../out/main/main/core/native-input');
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
@@ -54,7 +55,8 @@ for (const name of ['WebBrowserTools']) {
   };
 }
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
-let application, target, targetPeer, client, page, sender;
+let application, target, targetPeer, client, page, sender, packagedChild, browser, resourcesPath;
+let processOutput = '';
 const checks = [],
   sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
@@ -86,16 +88,52 @@ async function execute(id) {
 }
 (async () => {
   try {
-    application = await electron.launch({
-      executablePath: packaged || require('electron'),
-      args: [
-        ...(packaged ? [] : [root]),
-        `--test-profile=${profile}`,
-        `--test-local-state=${path.join(profile, 'local')}`,
-      ],
-      timeout: 30000,
-    });
-    page = await application.firstWindow();
+    if (packaged) {
+      const port = await freePort(),
+        mainPort = await freePort();
+      const executable = path.join(profile, 'AppDock.at365.exe');
+      fs.copyFileSync(packaged, executable);
+      const env = { ...process.env };
+      delete env.ELECTRON_RUN_AS_NODE;
+      packagedChild = spawn(
+        executable,
+        [
+          `--test-profile=${profile}`,
+          `--test-local-state=${path.join(profile, 'local')}`,
+          `--remote-debugging-port=${port}`,
+          `--inspect=${mainPort}`,
+        ],
+        { cwd: root, env, windowsHide: true, stdio: 'pipe' },
+      );
+      packagedChild.stdout.on('data', (d) => (processOutput += d));
+      packagedChild.stderr.on('data', (d) => (processOutput += d));
+      await until(async () => {
+        browser = await chromium
+          .connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 })
+          .catch(() => null);
+        return browser;
+      }, 'portable CDP');
+      await until(() => {
+        page = browser
+          .contexts()
+          .flatMap((c) => c.pages())
+          .find((p) => p.url().startsWith('appdock://host/'));
+        return page;
+      }, 'portable host page');
+      resourcesPath = await inspect(mainPort, 'process.resourcesPath');
+    } else {
+      application = await electron.launch({
+        executablePath: packaged || require('electron'),
+        args: [
+          ...(packaged ? [] : [root]),
+          `--test-profile=${profile}`,
+          `--test-local-state=${path.join(profile, 'local')}`,
+        ],
+        timeout: 30000,
+      });
+      page = await application.firstWindow();
+      resourcesPath = await application.evaluate(() => process.resourcesPath);
+    }
     await until(async () => {
       const s = await page.evaluate(() => window.dock.snapshot());
       return (
@@ -260,7 +298,7 @@ async function execute(id) {
     );
     sender = new NativeInput(
       packaged
-        ? path.join(path.dirname(packaged), 'resources/dotnet-host/input/AppDock.InputHost.exe')
+        ? path.join(resourcesPath, 'dotnet-host/input/AppDock.InputHost.exe')
         : path.join(root, '.artifacts/dotnet-host/input/AppDock.InputHost.exe'),
     );
     const focused = await focus();
@@ -323,6 +361,26 @@ async function execute(id) {
         (Date.now() - before) +
         'ms',
     );
+    for (const [keys, symbol] of [
+      ['Period', '.'],
+      ['Semicolon', ';'],
+      ['Slash', '/'],
+      ['Plus', '+'],
+      ['Minus', '-'],
+    ]) {
+      const state = await focus();
+      await clear();
+      assert.ok(state.symbolKeys[symbol], 'Foreground layout supports ' + symbol);
+      await sender.send('input.sendKeys', { keys }, 'fixture', {
+        window: state.window,
+        source: 'gesture',
+      });
+      await until(
+        async () => (await events()).includes(state.symbolKeys[symbol]),
+        'layout-specific symbol ' + symbol,
+      );
+    }
+    checks.push('symbol keys delivered to the isolated target using its current keyboard layout');
     const logs = (await page.evaluate(() => window.dock.snapshot())).logs;
     assert.ok(
       logs.some(
@@ -357,6 +415,14 @@ async function execute(id) {
     if (targetPeer && !targetPeer.closed) await targetPeer.request('release').catch(() => {});
     target?.stdin.end();
     await application?.close();
+    if (packagedChild) {
+      await page?.evaluate(() => window.dock.executeCommand('appdock.quit')).catch(() => {});
+      await until(() => packagedChild.exitCode !== null, 'portable shutdown').catch(() =>
+        packagedChild.kill(),
+      );
+      await browser?.close().catch(() => {});
+      fs.writeFileSync(path.join(profile, 'process.log'), processOutput);
+    }
     if (target) {
       await sleep(100);
       if (target.exitCode === null) target.kill();

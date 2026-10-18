@@ -202,6 +202,7 @@ export class CustomCommandService {
     return this.summaries().map((item) => ({
       id: item.commandId,
       title: item.title,
+      description: item.description,
       extension: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
       extensionId: item.owner.kind === 'host' ? null : item.owner.id,
       available: item.available,

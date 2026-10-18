@@ -44,9 +44,26 @@ test('command replacement validates namespace, duplicates and limits before chan
       { id: 'test.a', title: 'A' },
       { id: 'test.a', title: 'B' },
     ],
-    Array.from({ length: 101 }, (_, i) => ({ id: `test.${i}`, title: 'A' })),
+    Array.from({ length: 257 }, (_, i) => ({ id: `test.${i}`, title: 'A' })),
   ])
     assert.throws(() => parseExtensionCommands('test', entries));
+  assert.equal(
+    parseExtensionCommands(
+      'test',
+      Array.from({ length: 256 }, (_, i) => ({ id: `test.${i}`, title: 'A' })),
+    ).length,
+    256,
+  );
+});
+
+test('static and runtime command descriptions use the existing common description validation', () => {
+  for (const parse of [parseExtensionCommands, parseDeclaredCommands]) {
+    assert.deepEqual(parse('test', [{ id: 'test.a', title: 'A', description: '条件\r\n説明' }]), [
+      { id: 'test.a', title: 'A', description: '条件\n説明' },
+    ]);
+    for (const description of [null, 4, 'x'.repeat(1001), 'bad\u0000text'])
+      assert.throws(() => parse('test', [{ id: 'test.a', title: 'A', description }]));
+  }
 });
 test('shortcut-list validates live editable entries and preserves stable IDs', () => {
   const [definition] = parseSettingDefinitions([

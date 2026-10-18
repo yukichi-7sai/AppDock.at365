@@ -1,5 +1,8 @@
 import { isShellRegion } from './shell';
 import type { Command, DeclaredCommand } from './contracts';
+import { customDescription } from './custom-commands';
+
+export const maxExtensionCommands = 256;
 
 export function parseDeclaredCommands(id: string, value: unknown): DeclaredCommand[] | undefined {
   if (value === undefined) return undefined;
@@ -62,8 +65,8 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
 }
 
 export function parseExtensionCommands(id: string, value: unknown): Command[] {
-  if (!Array.isArray(value) || value.length > 100)
-    throw new Error('コマンド登録は100件以下の配列です。');
+  if (!Array.isArray(value) || value.length > maxExtensionCommands)
+    throw new Error(`コマンド登録は${maxExtensionCommands}件以下の配列です。`);
   const seen = new Set<string>();
   return value.map((command) => {
     if (
@@ -79,6 +82,12 @@ export function parseExtensionCommands(id: string, value: unknown): Command[] {
     )
       throw new Error('コマンド登録の形式が正しくありません。');
     seen.add(command.id);
-    return { id: command.id, title: command.title };
+    return {
+      id: command.id,
+      title: command.title,
+      ...(command.description !== undefined
+        ? { description: customDescription(command.description) }
+        : {}),
+    };
   });
 }

@@ -59,9 +59,27 @@ test('sending grammar accepts SDK keys and Win separately from trigger bindings'
     ['META+E', 'Win+E'],
     ['Alt+Ctrl+Delete', 'Ctrl+Alt+Delete'],
     ['ESC', 'Escape'],
+    ['Win', 'Win'],
+    ['Win+Pause', 'Win+Pause'],
+    ['Win+PrtScn', 'Win+PrintScreen'],
+    ['Win+.', 'Win+Period'],
+    ['Win+;', 'Win+Semicolon'],
+    ['Win+/', 'Win+Slash'],
+    ['Win+Plus', 'Win+Plus'],
+    ['Win+-', 'Win+Minus'],
   ])
     assert.equal(normalizeInputKeys(input), expected);
-  for (const input of ['', 'Ctrl+Ctrl+A', 'F25', 'Win+', 'Ctrl+Unknown', 'A+B', 'A'.repeat(101)])
+  for (const input of [
+    '',
+    'Ctrl+Ctrl+A',
+    'F25',
+    'Win+',
+    'Ctrl+Unknown',
+    'A+B',
+    'Ctrl+Win',
+    'Win++',
+    'A'.repeat(101),
+  ])
     assert.throws(() => normalizeInputKeys(input));
 });
 
@@ -84,20 +102,12 @@ test('key recording follows sending grammar, including Windows, navigation and c
     [event('F24'), 'F24'],
     [event('Tab'), 'Tab'],
     [event('Escape'), 'Escape'],
+    [event('Pause'), 'Pause'],
+    [event('+'), 'Plus'],
+    [event(';', { metaKey: true }), 'Win+Semicolon'],
   ])
     assert.equal(inputKeysFromEvent(stroke), expected);
-  for (const key of [
-    'Control',
-    'Alt',
-    'Shift',
-    'Meta',
-    'Process',
-    'Dead',
-    'Unidentified',
-    'Pause',
-    '+',
-    ';',
-  ])
+  for (const key of ['Control', 'Alt', 'Shift', 'Meta', 'Process', 'Dead', 'Unidentified'])
     assert.equal(inputKeysFromEvent(event(key)), null, key);
   assert.equal(inputKeysFromEvent(event('a', { isComposing: true })), null);
 });

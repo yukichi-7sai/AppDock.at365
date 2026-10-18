@@ -38,7 +38,9 @@ export function CommandPalette({
     commands.filter(
       (c) =>
         !c.hidden &&
-        `${c.title} ${c.extension} ${c.id}`.toLowerCase().includes(query.toLowerCase()),
+        `${c.title} ${c.description ?? ''} ${c.extension} ${c.id}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
     ),
     pins,
   );
@@ -151,6 +153,7 @@ export function CommandPalette({
                   <Icon name={mode === 'select' ? 'check' : 'play'} size={16} />
                   <div>
                     {c.title}
+                    {c.description && <small>{c.description}</small>}
                     <small title={c.extension}>
                       <span className="command-id">{c.id}</span>
                       {!c.available && (

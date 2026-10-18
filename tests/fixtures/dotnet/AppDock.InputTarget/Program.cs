@@ -5,26 +5,35 @@ internal sealed class Target : Form
 {
     private readonly List<string> events = [];
     private readonly nint previous = GetForegroundWindow();
+    private object? focusAttempt;
     public Target() { Text = "AppDock isolated input target"; Width = 480; Height = 180; Controls.Add(new Label { Text = "Input verification window", Dock = DockStyle.Fill }); }
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData) { events.Add("key:" + keyData); return true; }
     protected override void WndProc(ref Message m) {
         if (m.Msg == 0x0319) { events.Add("app:" + (((long)m.LParam >> 16) & 0x7ff)); m.Result = 1; return; }
         base.WndProc(ref m);
     }
-    private static void Foreground(nint window) {
+    private static object Foreground(nint window) {
         var thread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
         var own = GetCurrentThreadId();
         var attached = thread != 0 && thread != own && AttachThreadInput(own, thread, true);
-        try { SetForegroundWindow(window); }
+        var attachError = Marshal.GetLastWin32Error();
+        try { return new { thread, own, attached, attachError, activated = SetForegroundWindow(window), visible = IsWindowVisible(window),
+            session = System.Diagnostics.Process.GetCurrentProcess().SessionId, desktop = DesktopName(GetThreadDesktop(own)), foregroundDesktop = DesktopName(GetThreadDesktop(thread)) }; }
         finally { if (attached) AttachThreadInput(own, thread, false); }
+    }
+    private static string DesktopName(nint desktop) {
+        var name = new System.Text.StringBuilder(256);
+        return GetUserObjectInformation(desktop, 2, name, 512, out _) ? name.ToString() : "error:" + Marshal.GetLastWin32Error();
     }
     private static string Class(nint window) {
         var text = new System.Text.StringBuilder(256); GetClassName(window, text, text.Capacity); return text.ToString();
     }
     private object Call(string method, JsonElement request) {
         if (method == "focus") {
-            Show(); Activate();
-            Foreground(Handle);
+            Show();
+            ShowWindow(Handle, 9);
+            Activate();
+            focusAttempt = Foreground(Handle);
         }
         if (method == "clear") events.Clear();
         if (method == "hold") keybd_event(0x11, 0, 0, 0);
@@ -57,7 +66,13 @@ internal sealed class Target : Form
             if (owner == hostPid && Class(w).StartsWith("Chrome_WidgetWin")) { hostWindow = w.ToString(); return false; }
             return true;
         }, 0);
-        return new { window = Handle.ToString(), focused = foreground == Handle, foreground = foreground.ToString(),
+        var layout = GetKeyboardLayout(GetWindowThreadProcessId(Handle, out _));
+        var symbolKeys = new[] { '.', ';', '/', '+', '-' }.ToDictionary(c => c.ToString(), c => {
+            var mapping = VkKeyScanEx(c, layout);
+            return mapping == -1 ? null : "key:" + (Keys)((mapping & 0xff) | ((mapping & 0x100) != 0 ? (int)Keys.Shift : 0)
+                | ((mapping & 0x200) != 0 ? (int)Keys.Control : 0) | ((mapping & 0x400) != 0 ? (int)Keys.Alt : 0));
+        });
+        return new { window = Handle.ToString(), focused = foreground == Handle, foreground = foreground.ToString(), symbolKeys, focusAttempt,
             foregroundClass = Class(foreground), shell = GetShellWindow().ToString(), hostWindow, explorers, events = events.ToArray() };
     }
     protected override void OnShown(EventArgs e) {
@@ -88,6 +103,9 @@ internal sealed class Target : Form
     protected override void OnFormClosed(FormClosedEventArgs e) { keybd_event(0x11, 0, 2, 0); if (previous != 0) SetForegroundWindow(previous); base.OnFormClosed(e); }
     [STAThread] public static void Main() { Application.SetHighDpiMode(HighDpiMode.PerMonitorV2); Application.Run(new Target()); }
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
+    [DllImport("user32.dll")] private static extern nint GetKeyboardLayout(uint thread);
+    [DllImport("user32.dll", EntryPoint = "VkKeyScanExW", CharSet = CharSet.Unicode)] private static extern short VkKeyScanEx(char character, nint layout);
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(nint window, System.Text.StringBuilder text, int count);
     private delegate bool EnumWindow(nint window, nint data);
@@ -97,6 +115,8 @@ internal sealed class Target : Form
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint pid);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
-    [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint a, uint b, bool attach);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool AttachThreadInput(uint a, uint b, bool attach);
+    [DllImport("user32.dll")] private static extern nint GetThreadDesktop(uint thread);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool GetUserObjectInformation(nint handle, int index, System.Text.StringBuilder name, uint size, out uint needed);
     [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, nuint extra);
 }

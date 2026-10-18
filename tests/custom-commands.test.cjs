@@ -124,6 +124,7 @@ test('descriptions are common metadata, normalized and published without config'
     item = f.add({ automation: true, description: '用途\r\n条件' });
   assert.equal(f.store.value.customCommands.version, 2);
   assert.equal(f.service.publicCommands()[0].description, '用途\n条件');
+  assert.equal(f.service.uiCommands()[0].description, '用途\n条件');
   assert.equal(
     f.service.read('customCommands.get', { id: item.id }).item.description,
     '用途\n条件',
