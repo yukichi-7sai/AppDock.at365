@@ -10,6 +10,7 @@ const {
   StreamableHTTPClientTransport,
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 const { parse } = require('smol-toml');
+const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const root = path.resolve(__dirname, '..'),
   portable = process.argv[2] && path.resolve(process.argv[2]);
 const profile = path.join(
@@ -28,6 +29,21 @@ settings.host.hardwareAcceleration = false;
 settings.gestures.enabled = false;
 settings.updates.checkHostOnStartup = false;
 settings.updates.checkAppletsOnStartup = false;
+settings.customCommands = {
+  version: 1,
+  items: [
+    {
+      id: randomUUID(),
+      typeId: 'test.custom-node.echo',
+      owner: { kind: 'applet', id: 'test.custom-node' },
+      title: 'Unsupported old fixture',
+      configVersion: 1,
+      config: { message: 'old' },
+      enabled: true,
+      automation: true,
+    },
+  ],
+};
 const providerIds = ['test.custom-node', 'test.custom-dotnet', 'test.custom-native'];
 for (const [index, id] of providerIds.entries()) {
   const folder = path.join(profile, 'extensions', id);
@@ -116,6 +132,16 @@ const fixtureMetadata = {
   nodeSha256: hash(process.execPath),
   settingsSchemaSha256: hash(path.join(root, 'out/main/shared/settings-schema.js')),
   mcpServerSha256: hash(path.join(root, 'tests/fixtures/mcp-server.cjs')),
+  inputTargetSha256: hash(
+    path.join(
+      root,
+      'tests/fixtures/dotnet/AppDock.InputTarget/bin/Release/net10.0-windows/AppDock.InputTarget.exe',
+    ),
+  ),
+  sourceProcessWorkerSha256: hash(
+    path.join(root, '.artifacts/dotnet-host/process/AppDock.ProcessHost.dll'),
+  ),
+  sourceProcessServiceSha256: hash(path.join(root, 'out/main/main/core/process-launch.js')),
 };
 fs.writeFileSync(
   path.join(profile, 'fixture-inputs.json'),
@@ -141,7 +167,11 @@ async function start() {
   await new Promise((r) => listener.listen(0, '127.0.0.1', r));
   const port = listener.address().port;
   await new Promise((r) => listener.close(r));
-  const env = { ...process.env, APPDOCK_WATCH_TEST_OUTPUT: path.join(profile, 'watch') };
+  const env = {
+    ...process.env,
+    APPDOCK_WATCH_TEST_OUTPUT: path.join(profile, 'watch'),
+    APPDOCK_CUSTOM_PROCESS_FIXTURE: path.join(profile, 'common-process.txt'),
+  };
   delete env.ELECTRON_RUN_AS_NODE;
   const state = {
     child: spawn(
@@ -198,7 +228,8 @@ async function stop(state) {
   await state.browser.close();
   state.browser = null;
 }
-let client;
+let client, inputTarget, inputPeer;
+const guiProcesses = [];
 async function connect(state) {
   const status = await state.page.evaluate(
     async () => (await window.dock.automation({ kind: 'status' })).state,
@@ -294,6 +325,33 @@ async function setMcpPermission(page, allowed, management = false) {
       false,
     );
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+    await page.getByText('この保存版には対応していません。', { exact: false }).waitFor();
+    assert.equal(
+      await page.getByRole('button', { name: 'コマンドを追加', exact: true }).isEnabled(),
+      false,
+    );
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).customCommands
+        .version,
+      1,
+    );
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    const resetJson = page.getByRole('textbox', { name: '設定JSON' });
+    const resetValue = JSON.parse(await resetJson.inputValue());
+    resetValue.customCommands = { version: 2, items: [] };
+    await resetJson.fill(JSON.stringify(resetValue, null, 2));
+    await resetJson.press('Tab');
+    await until(
+      () =>
+        JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).customCommands
+          .version === 2,
+      'explicit v2 JSON replacement',
+    );
+    await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+    checks.push(
+      'unsupported version 1 stays inert and unchanged until explicit JSON replacement with an empty version 2 list; no migration',
+    );
     await setMcpPermission(page, true);
     await setMcpPermission(page, false);
     checks.push(
@@ -544,6 +602,7 @@ async function setMcpPermission(page, allowed, management = false) {
     let dialog = page.getByRole('dialog');
     await dialog.getByLabel('種類', { exact: true }).selectOption('test.custom-node.echo');
     await dialog.getByLabel('名前', { exact: true }).fill('Saved Node');
+    await dialog.getByLabel('説明', { exact: true }).fill('Saved command description\n日本語');
     await dialog.getByLabel('メッセージ', { exact: true }).fill('fixed');
     await dialog.getByLabel('MCP・Appletの共通APIへ公開').check();
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
@@ -551,6 +610,12 @@ async function setMcpPermission(page, allowed, management = false) {
     let list = await call('appdock_list_custom_commands');
     const node = list.items.find((i) => i.title === 'Saved Node');
     assert(node);
+    assert.equal(node.description, 'Saved command description\n日本語');
+    assert.equal(
+      (await call('appdock_list_commands')).commands.find((c) => c.id === node.commandId)
+        .description,
+      node.description,
+    );
     for (const type of types.filter((t) => t.id !== 'test.custom-node.echo'))
       await update([
         {
@@ -578,6 +643,279 @@ async function setMcpPermission(page, allowed, management = false) {
     assert.equal(JSON.stringify((await client.listTools()).tools), outer);
     checks.push(
       'same MCP connection: dynamic CRUD and Node/.NET/native executions without tool metadata change',
+    );
+    await update([
+      { op: 'update', id: node.id, changes: { description: '説明を更新\n同じ接続へ反映' } },
+    ]);
+    assert.equal(
+      (await call('appdock_list_commands')).commands.find((c) => c.id === node.commandId)
+        .description,
+      '説明を更新\n同じ接続へ反映',
+    );
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    assert(
+      JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue())
+        .customCommands.items.find((i) => i.id === node.id)
+        .description.includes('説明を更新'),
+    );
+    await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+    const targetExe = path.join(
+      root,
+      'tests/fixtures/dotnet/AppDock.InputTarget/bin/Release/net10.0-windows/AppDock.InputTarget.exe',
+    );
+    inputTarget = spawn(targetExe, [], { windowsHide: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    inputTarget.stderr.resume();
+    inputPeer = new JsonLinePeer(inputTarget.stdout, inputTarget.stdin, async () => {});
+    await page.evaluate(() => window.dock.executeCommand('appdock.open'));
+    await page.getByRole('button', { name: 'コマンドを追加', exact: true }).click();
+    dialog = page.getByRole('dialog');
+    await dialog.getByLabel('種類', { exact: true }).selectOption('appdock.input.sendKeys');
+    await dialog.getByLabel('名前', { exact: true }).fill('Host key fixture');
+    await dialog.getByLabel('説明', { exact: true }).fill('キーを送信する試験');
+    await dialog
+      .getByRole('button', { name: '送信キーを入力', exact: true })
+      .press('Control+Shift+T');
+    await dialog.getByLabel('MCP・Appletの共通APIへ公開').check();
+    await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    const keyItem = (await call('appdock_list_custom_commands')).items.find(
+      (i) => i.title === 'Host key fixture',
+    );
+    await require('./custom-key-capture-checks.cjs')({ page, item: keyItem, call, profile, until });
+    checks.push(
+      'shared sending-key recorder: add/edit, Enter/Tab/Escape, Win, unsupported/repeat/IME input, cancel, stable identity, JSON correction and both themes at two widths',
+    );
+    assert.equal(
+      (await call('appdock_list_commands')).commands.find((c) => c.id === keyItem.commandId)
+        .available,
+      false,
+    );
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: keyItem.commandId },
+        })
+      ).isError,
+      true,
+    );
+    const setCapability = async (label, allowed) => {
+      await page.getByRole('button', { name: '操作の許可', exact: true }).click();
+      const checkbox = page.getByRole('switch', {
+        name: 'Codexからの' + label + 'を許可する',
+        exact: true,
+      });
+      await until(() => checkbox.isEnabled(), 'capability ready');
+      assert.equal(await checkbox.isChecked(), !allowed);
+      await checkbox.click();
+      await until(
+        async () => (await checkbox.isEnabled()) && (await checkbox.isChecked()) === allowed,
+        'capability saved',
+      );
+      const expected =
+        label === 'Windowsへのキー・操作メッセージ送信' ? 'allowSendInput' : 'allowRunProcesses';
+      assert.equal(
+        JSON.parse(fs.readFileSync(path.join(local, 'automation.json'), 'utf8'))[expected],
+        allowed,
+      );
+    };
+    await setCapability('Windowsへのキー・操作メッセージ送信', true);
+    await until(async () => {
+      await inputPeer.request('focus');
+      const snapshot = await inputPeer.request('snapshot');
+      fs.writeFileSync(path.join(profile, 'input-focus.json'), JSON.stringify(snapshot));
+      return snapshot.focused;
+    }, 'input target focus');
+    await inputPeer.request('clear');
+    assert.equal(
+      (await call('appdock_execute_command', { id: keyItem.commandId })).result.completion,
+      'inputSubmitted',
+    );
+    await until(
+      async () => (await inputPeer.request('snapshot')).events.includes('key:T, Shift, Control'),
+      'host key delivery',
+    );
+    await setCapability('Windowsへのキー・操作メッセージ送信', false);
+    assert.equal(
+      (await call('appdock_list_commands')).commands.find((c) => c.id === keyItem.commandId)
+        .available,
+      false,
+    );
+    await update([{ op: 'remove', id: keyItem.id }]);
+    inputTarget.stdin.end();
+    await until(() => inputTarget.exitCode !== null, 'input target exit');
+    inputPeer.close();
+    inputPeer = null;
+    checks.push(
+      'host key command: form description, default-OFF MCP input grant, catalog availability and actual Ctrl+Shift+T delivery to isolated native target',
+    );
+    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+    await page.getByRole('button', { name: 'コマンドを追加', exact: true }).click();
+    dialog = page.getByRole('dialog');
+    await dialog.getByLabel('種類', { exact: true }).selectOption('appdock.process.start');
+    await dialog.getByLabel('名前', { exact: true }).fill('Host process fixture');
+    await dialog.getByLabel('説明', { exact: true }).fill('GUIプロセス起動試験');
+    await dialog.getByLabel('実行ファイル', { exact: true }).fill(targetExe);
+    await dialog.getByLabel('引数', { exact: true }).fill('invalid JSON');
+    assert.equal(await dialog.getByRole('button', { name: 'OK', exact: true }).isEnabled(), false);
+    const processOut = path.join(profile, 'launched-gui.json');
+    guiProcesses.push(processOut);
+    await dialog
+      .getByLabel('引数', { exact: true })
+      .fill(
+        JSON.stringify([
+          '--process-target',
+          processOut,
+          '日本語',
+          'space value',
+          'quote"value',
+          'trailing\\',
+        ]),
+      );
+    await dialog.getByLabel('MCP・Appletの共通APIへ公開').check();
+    await page.setViewportSize({ width: 740, height: 760 });
+    await checkDialogLayout(dialog);
+    await page.screenshot({ path: path.join(profile, 'process-command-dark-narrow.png') });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    const processItem = (await call('appdock_list_custom_commands')).items.find(
+      (i) => i.title === 'Host process fixture',
+    );
+    assert.equal(
+      (await call('appdock_list_commands')).commands.find((c) => c.id === processItem.commandId)
+        .available,
+      false,
+    );
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: processItem.commandId },
+        })
+      ).isError,
+      true,
+    );
+    assert(!(await client.listTools()).tools.some((t) => t.name === 'appdock_start_process'));
+    await setCapability('コマンド・プロセスの起動', true);
+    assert.equal(
+      (await call('appdock_execute_command', { id: processItem.commandId })).result.completion,
+      'processStarted',
+    );
+    const launched = await until(() => {
+      try {
+        return JSON.parse(fs.readFileSync(processOut, 'utf8'));
+      } catch {
+        return false;
+      }
+    }, 'GUI process start');
+    assert.equal(launched.visible, true);
+    assert.deepEqual(launched.args, ['日本語', 'space value', 'quote"value', 'trailing\\']);
+    const recorder = path.join(profile, 'command recorder.cjs');
+    fs.writeFileSync(
+      recorder,
+      "require('node:fs').writeFileSync(process.argv[2],process.argv[3]);",
+    );
+    for (const mode of ['cmd', 'powershell']) {
+      await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+      await page.getByRole('button', { name: 'Host process fixtureを編集', exact: true }).click();
+      dialog = page.getByRole('dialog');
+      await dialog.getByLabel('実行方法', { exact: true }).selectOption(mode);
+      const out = path.join(profile, mode + '-from-form.txt');
+      const code =
+        mode === 'cmd'
+          ? '"' + process.execPath + '" "' + recorder + '" "' + out + '" "cmd 日本語"'
+          : "[IO.File]::WriteAllText('" +
+            out.replaceAll("'", "''") +
+            "', 'powershell 日本語', [Text.Encoding]::UTF8)";
+      await dialog
+        .getByLabel(mode === 'cmd' ? 'コマンド' : 'スクリプト', { exact: true })
+        .fill(code);
+      assert.equal(
+        await dialog.getByLabel('説明', { exact: true }).inputValue(),
+        'GUIプロセス起動試験',
+      );
+      await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+      await dialog.waitFor({ state: 'hidden' });
+      const saved = (await call('appdock_get_custom_command', { id: processItem.id })).item;
+      assert.equal(saved.config.mode, mode);
+      assert.equal(saved.config.executable, undefined);
+      assert.equal(saved.config.arguments, undefined);
+      assert.equal(fs.existsSync(out), false, 'saving is not execution');
+      assert.equal(
+        (await call('appdock_execute_command', { id: processItem.commandId })).result.completion,
+        'processStarted',
+      );
+      await until(() => fs.existsSync(out), 'shell mode from form');
+      assert.equal(fs.readFileSync(out, 'utf8').replace(/^\uFEFF/, ''), mode + ' 日本語');
+    }
+    await setCapability('コマンド・プロセスの起動', false);
+    await update([{ op: 'remove', id: processItem.id }]);
+    assert.equal(JSON.stringify((await client.listTools()).tools), outer);
+    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+    checks.push(
+      'process form: invalid argv retained, narrow dialog, independent default-OFF permission, GUI launch with exact argv, hidden-console option preserves GUI, fixed outer MCP tools',
+    );
+    const processProbe = path.join(profile, 'common-process.txt');
+    const probeCount = () =>
+      fs.existsSync(processProbe)
+        ? fs.readFileSync(processProbe, 'utf8').trim().split(/\r?\n/).length
+        : 0;
+    const nodeType = types.find((t) => t.id === 'test.custom-node.echo');
+    await update([
+      {
+        op: 'update',
+        id: node.id,
+        expectedTypeRevision: nodeType.typeRevision,
+        changes: { config: { message: 'process-fixture' } },
+      },
+    ]);
+    await assert.rejects(page.evaluate((id) => window.dock.executeCommand(id), node.commandId));
+    assert.equal(probeCount(), 0);
+    const originalGrants = (await page.evaluate(() => window.dock.snapshot())).appletApi
+      .permissions;
+    await page.evaluate(
+      (grants) => window.dock.setAppletApiPermissions({ ...grants, runProcesses: true }),
+      originalGrants,
+    );
+    await page.evaluate((id) => window.dock.executeCommand(id), node.commandId);
+    await until(() => probeCount() === 1, 'direct Applet process API');
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: node.commandId },
+        })
+      ).isError,
+      true,
+    );
+    assert.equal(probeCount(), 1);
+    await setCapability('コマンド・プロセスの起動', true);
+    await call('appdock_execute_command', { id: node.commandId });
+    await until(() => probeCount() === 2, 'MCP origin with Applet process API');
+    await page.evaluate((grants) => window.dock.setAppletApiPermissions(grants), originalGrants);
+    assert.equal(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: node.commandId },
+        })
+      ).isError,
+      true,
+    );
+    assert.equal(probeCount(), 2);
+    await setCapability('コマンド・プロセスの起動', false);
+    await update([
+      {
+        op: 'update',
+        id: node.id,
+        expectedTypeRevision: nodeType.typeRevision,
+        changes: { config: { message: 'fixed' } },
+      },
+    ]);
+    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+    checks.push(
+      'real Node Applet processes.start: direct default-OFF grant, local launch, MCP root grant intersection and immediate Applet revocation without duplicate launches',
     );
     await page.getByRole('button', { name: 'Saved Nodeを編集', exact: true }).click();
     dialog = page.getByRole('dialog');
@@ -670,6 +1008,9 @@ async function setMcpPermission(page, allowed, management = false) {
     }, node.commandId);
     await update([{ op: 'update', id: node.id, changes: { title: 'Renamed Node' } }]);
     assert.equal((await call('appdock_get_shortcuts')).bindings[0].command, node.commandId);
+    await page.evaluate(() => window.dock.executeCommand('appdock.open'));
+    await page.bringToFront();
+    await page.waitForFunction(() => document.hasFocus());
     const dispatched = await page.evaluate(() => window.dock.dispatchShortcut('Ctrl+Alt+F6'));
     assert.equal(dispatched.executed, 1);
     checks.push(
@@ -680,6 +1021,7 @@ async function setMcpPermission(page, allowed, management = false) {
     dialog = page.getByRole('dialog');
     await dialog.getByLabel('種類', { exact: true }).selectOption('appdock.mcp.call');
     await dialog.getByLabel('名前', { exact: true }).fill('Saved MCP');
+    await dialog.getByLabel('説明', { exact: true }).fill('MCPツールを実行する試験');
     await dialog.getByLabel('MCP接続先', { exact: true }).selectOption(mcpServerId);
     await dialog.getByRole('button', { name: 'ツールを取得', exact: true }).click();
     await dialog.getByLabel('MCPツール', { exact: true }).selectOption('schedule_off');
@@ -704,6 +1046,7 @@ async function setMcpPermission(page, allowed, management = false) {
       (i) => i.title === 'Saved MCP',
     );
     assert(savedMcp);
+    assert.equal(savedMcp.description, 'MCPツールを実行する試験');
     const savedJob = async () => {
       const accepted = await call('appdock_execute_command', { id: savedMcp.commandId });
       assert.equal(accepted.completion, 'handlerReturned');
@@ -844,6 +1187,18 @@ async function setMcpPermission(page, allowed, management = false) {
     await client.close();
     client = null;
     await stop(state);
+    if (guiProcesses.length) {
+      const file = guiProcesses[0],
+        before = JSON.parse(fs.readFileSync(file, 'utf8')).heartbeat;
+      await until(
+        () => JSON.parse(fs.readFileSync(file, 'utf8')).heartbeat > before,
+        'GUI survives actual AppDock exit',
+      );
+      fs.writeFileSync(file + '.stop', '');
+      checks.push(
+        'launched GUI survives grant revocation, definition removal and actual AppDock exit',
+      );
+    }
     state = await start();
     page = state.page;
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
@@ -926,6 +1281,9 @@ async function setMcpPermission(page, allowed, management = false) {
       }
     await client?.close().catch(() => {});
     for (const state of states) await stop(state).catch(() => {});
+    inputTarget?.stdin.end();
+    inputPeer?.close();
+    for (const file of guiProcesses) fs.writeFileSync(file + '.stop', '');
   }
 })().catch((e) => {
   fs.writeFileSync(path.join(profile, 'failure.txt'), String(e.stack));

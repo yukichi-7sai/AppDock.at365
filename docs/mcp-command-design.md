@@ -22,4 +22,4 @@ configVersion 1。configは`serverId`、`toolName`、`toolRevision`、固定`arg
 
 `customCommands.types.get({typeId:'appdock.mcp.call'})`と`mcp.tools.get`を取得し、`appdock.customCommands.update`へadd/updateを送る。expectedRevision、expectedTypeRevisionとdryRunは既存契約を使う。公開を希望する場合はdefinitionのautomation=trueも必要。その後shortcuts.getと`appdock.shortcuts.update`で安定commandIdを割り当てる。管理許可があっても接続先や公開許可を作成・拡大できない。
 
-「10分後の消灯」は接続先の予約ツールに600秒などの引数を渡す単一呼出しとして検証する。AppDock自身の永続タイマー、複数操作の連結、WindowsTools移行、OSコマンド実行は含めない。
+「10分後の消灯」は接続先の予約ツールに600秒などの引数を渡す単一呼出しとして検証する。AppDock自身の永続タイマーと複数操作の連結は含めない。全種類共通の個別説明文、本体のキー送信・プロセス起動、WindowsTools撤去は[種類拡張](custom-command-types-design.md)を参照し、このMCP種類のconfigとジョブ契約は維持する。

@@ -98,6 +98,7 @@ test('codec preserves unknown blocks and rejects unsafe or oversized known defin
   const item = {
     id: randomUUID(),
     title: 'x',
+    description: '',
     typeId: type.id,
     owner: { kind: 'applet', id: 'test.custom' },
     configVersion: 9,
@@ -105,15 +106,77 @@ test('codec preserves unknown blocks and rejects unsafe or oversized known defin
     enabled: false,
     automation: false,
   };
-  assert.deepEqual(parseCustomCommands({ version: 1, items: [item] }).items, [item]);
+  assert.deepEqual(parseCustomCommands({ version: 2, items: [item] }).items, [item]);
+  assert.deepEqual(parseCustomCommands({ version: 1, items: [item] }), {
+    version: 1,
+    items: [item],
+  });
   for (const items of [
     [item, item],
     [{ ...item, config: { x: 'x'.repeat(16384) } }],
     [{ ...item, owner: { kind: 'host', id: 'spoof' } }],
     [{ ...item, config: JSON.parse('{"__proto__":1}') }],
   ])
-    assert.throws(() => parseCustomCommands({ version: 1, items }));
+    assert.throws(() => parseCustomCommands({ version: 2, items }));
 });
+test('descriptions are common metadata, normalized and published without config', (t) => {
+  const f = fixture(t),
+    item = f.add({ automation: true, description: '用途\r\n条件' });
+  assert.equal(f.store.value.customCommands.version, 2);
+  assert.equal(f.service.publicCommands()[0].description, '用途\n条件');
+  assert.equal(
+    f.service.read('customCommands.get', { id: item.id }).item.description,
+    '用途\n条件',
+  );
+  const expectedTypeRevision = f.descriptor().typeRevision;
+  f.update([{ op: 'update', id: item.id, changes: { title: 'renamed' } }]);
+  assert.equal(f.service.publicCommands()[0].description, '用途\n条件');
+  for (const description of [null, false, 0, {}, 'x'.repeat(1001), 'bad\0value'])
+    assert.throws(
+      () => f.update([{ op: 'update', id: item.id, changes: { description } }]),
+      (e) => e.code === 'INVALID_ARGUMENT',
+    );
+  f.update([{ op: 'update', id: item.id, changes: { description: '' } }]);
+  assert.equal(f.service.publicCommands()[0].description, '');
+  assert.equal(f.descriptor().typeRevision, expectedTypeRevision);
+  assert(!JSON.stringify(f.service.publicCommands()).includes('secret config'));
+});
+
+test('old storage is inert and only explicit JSON replacement creates the new format', (t) => {
+  const f = fixture(t),
+    item = f.add();
+  const legacy = {
+    ...f.store.value,
+    customCommands: { ...f.store.value.customCommands, version: 1 },
+  };
+  f.store.save(legacy, f.store.revision);
+  assert.equal(f.service.has(customCommandId(item.id)), false);
+  assert.equal(f.service.read('customCommands.list', {}).supportedVersion, false);
+  assert.throws(
+    () => f.add(),
+    (e) => e.code === 'UNSUPPORTED_VERSION',
+  );
+  const replacement = { ...f.store.value, customCommands: { version: 2, items: [] } };
+  f.service.validateReplacement(replacement);
+  assert.equal(f.store.value.customCommands.version, 1);
+  f.options.save(replacement, f.store.revision);
+  assert.deepEqual(f.store.value.customCommands, { version: 2, items: [] });
+});
+
+test('description edits leave in-flight execution snapshots running', async (t) => {
+  const f = fixture(t),
+    item = f.add();
+  let finish;
+  f.provider.invoke = () =>
+    new Promise((resolve) => {
+      finish = resolve;
+    });
+  const running = f.service.execute(customCommandId(item.id));
+  f.update([{ op: 'update', id: item.id, changes: { description: 'new purpose' } }]);
+  finish({ ok: true });
+  assert.equal((await running).result.ok, true);
+});
+
 test('schema accepts only bounded local acyclic common keywords and checks defaults', () => {
   assert.equal(
     compileCustomType(parseCustomTypes('test.custom', [type])[0])({ message: 'ok' }).valid,
@@ -362,6 +425,7 @@ test('API grants separate config management and execution and preserve nested or
     executable: () => true,
     writable: () => true,
     customCommandsManageable: () => false,
+    inputAllowed: () => true,
     appletPermissions: () => grants,
     handlers: { 'input.sendKeys': async () => ({ completion: 'inputSubmitted' }) },
   });

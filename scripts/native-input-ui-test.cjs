@@ -17,9 +17,30 @@ const profile = path.join(root, '.artifacts', 'native-input-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.notifications = false;
-const ids = ['at365.web-browser-tools', 'at365.windows-tools'];
-for (const name of ['WebBrowserTools', 'WindowsTools']) {
-  const source = path.join(getPublishDirectory(path.resolve(root, `../Applet.${name}.at365`)), `Applet.${name}.at365`);
+const ids = ['at365.web-browser-tools'];
+const keyId = require('node:crypto').randomUUID(),
+  keyCommand = 'appdock.custom.' + keyId;
+settings.customCommands = {
+  version: 2,
+  items: [
+    {
+      id: keyId,
+      typeId: 'appdock.input.sendKeys',
+      owner: { kind: 'host' },
+      title: 'Host key input',
+      description: 'Native input fixture',
+      configVersion: 1,
+      config: { keys: 'Ctrl+A' },
+      enabled: true,
+      automation: true,
+    },
+  ],
+};
+for (const name of ['WebBrowserTools']) {
+  const source = path.join(
+    getPublishDirectory(path.resolve(root, `../Applet.${name}.at365`)),
+    `Applet.${name}.at365`,
+  );
   const dest = path.join(profile, 'extensions', name);
   fs.cpSync(source, dest, { recursive: true });
   const file = path.join(dest, 'extension.json'),
@@ -29,13 +50,7 @@ for (const name of ['WebBrowserTools', 'WindowsTools']) {
   fs.writeFileSync(file, JSON.stringify(m));
   settings.extensions[m.id] = {
     enabled: true,
-    settings:
-      name === 'WindowsTools'
-        ? {
-            autoLockEnabled: false,
-            shortcuts: [{ id: 'test', title: 'Test input', keys: 'Ctrl+A' }],
-          }
-        : {},
+    settings: {},
   };
 }
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
@@ -73,7 +88,11 @@ async function execute(id) {
   try {
     application = await electron.launch({
       executablePath: packaged || require('electron'),
-      args: packaged ? [`--test-profile=${profile}`] : [root, `--test-profile=${profile}`],
+      args: [
+        ...(packaged ? [] : [root]),
+        `--test-profile=${profile}`,
+        `--test-local-state=${path.join(profile, 'local')}`,
+      ],
       timeout: 30000,
     });
     page = await application.firstWindow();
@@ -81,33 +100,35 @@ async function execute(id) {
       const s = await page.evaluate(() => window.dock.snapshot());
       return (
         s.startupReady &&
-        ['at365.web-browser-tools', 'at365.windows-tools'].every((id) =>
+        ids.every((id) =>
           s.extensions.some(
             (e) =>
               e.id === id &&
               e.state === 'running' &&
-              e.commands.some(
-                (c) => c.id === id + (id.endsWith('windows-tools') ? '.send.test' : '.new-tab'),
-              ),
+              e.commands.some((c) => c.id === id + '.new-tab'),
           ),
         )
       );
-    }, 'both Applet commands ready');
+    }, 'Applet commands ready without WindowsTools');
     target = spawn(
       path.join(
         root,
         'tests/fixtures/dotnet/AppDock.InputTarget/bin/Release/net10.0-windows/AppDock.InputTarget.exe',
       ),
       [],
-      { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+      { windowsHide: false, stdio: ['pipe', 'pipe', 'pipe'] },
     );
     target.stderr.resume();
     targetPeer = new JsonLinePeer(target.stdout, target.stdin, async () => {});
     await page.evaluate(() => window.dock.setAppletApiPermissions({}));
     await focus();
     await assert.rejects(execute(ids[0] + '.new-tab'), /許可/);
-    await assert.rejects(execute(ids[1] + '.send.test'), /許可/);
     assert.deepEqual(await events(), []);
+    await execute(keyCommand);
+    await until(
+      async () => (await events()).includes('key:A, Control'),
+      'local host key ignores external grants',
+    );
     await page.evaluate(() => window.dock.setAppletApiPermissions({ sendInput: true }));
     const snapshot = await page.evaluate(() => window.dock.snapshot());
     const expected = {
@@ -136,19 +157,19 @@ async function execute(id) {
     }
     await sleep(170);
     await clear();
-    await execute(ids[1] + '.send.test');
+    await execute(keyCommand);
     await until(
       async () => (await events()).some((e) => e.includes('A') && e.includes('Control')),
-      'native .NET input delivered',
+      'host custom input delivered',
     );
     checks.push(
-      'real Node WebBrowserTools eleven commands and .NET WindowsTools use shared native input; explicit denial, one global input grant without read permission',
+      'host custom command without WindowsTools and real Node WebBrowserTools eleven commands use shared native input; direct Applet input grant remains independent of read permission',
     );
     await focus();
     await clear();
     await targetPeer.request('hold');
     await sleep(60);
-    const pending = execute(ids[1] + '.send.test').then(
+    const pending = execute(ids[0] + '.new-tab').then(
       () => ({ ok: true }),
       (error) => ({ error: String(error) }),
     );
@@ -158,11 +179,11 @@ async function execute(id) {
     await targetPeer.request('release');
     await sleep(200);
     assert.ok(
-      !(await events()).some((e) => e.includes('A,')),
+      !(await events()).some((e) => e.startsWith('key:T')),
       'revocation must cancel pending send',
     );
     await page.evaluate(() => window.dock.setAppletApiPermissions({ sendInput: true }));
-    checks.push('global permission revocation cancels pending .NET input');
+    checks.push('global Applet permission revocation cancels pending delegated input');
     const cfg = path.join(profile, 'codex', 'config.toml');
     await page.evaluate(async (file) => {
       await window.dock.automation({ kind: 'selectConfig', file });
@@ -184,10 +205,23 @@ async function execute(id) {
         },
       }),
     );
-    assert.equal((await client.listTools()).tools.length, 14);
+    assert(!(await client.listTools()).tools.some((t) => t.name === 'appdock_send_keys'));
     assert.ok(
       (await client.callTool({ name: 'appdock_send_keys', arguments: { keys: 'A' } })).isError,
     );
+    assert(
+      (await client.callTool({ name: 'appdock_execute_command', arguments: { id: keyCommand } }))
+        .isError,
+    );
+    assert(
+      (
+        await client.callTool({
+          name: 'appdock_execute_command',
+          arguments: { id: ids[0] + '.close-tab' },
+        })
+      ).isError,
+    );
+    await page.evaluate(() => window.dock.automation({ kind: 'setInputSending', allowed: true }));
     await focus();
     await clear();
     const result = await client.callTool({
@@ -196,8 +230,33 @@ async function execute(id) {
     });
     assert.ok(!result.isError, JSON.stringify(result));
     assert.ok((await events()).length > 0);
+    await focus();
+    await clear();
+    assert.equal(
+      (await client.callTool({ name: 'appdock_execute_command', arguments: { id: keyCommand } }))
+        .structuredContent.result.completion,
+      'inputSubmitted',
+    );
+    await until(async () => (await events()).includes('key:A, Control'), 'MCP host key delivered');
     checks.push(
-      'MCP cannot discover or directly call raw input; explicitly published Applet command delegates successfully with MCP write off',
+      'MCP cannot discover raw input; saved host key and published Applet command require independent MCP input grant with write OFF',
+    );
+    await focus();
+    await clear();
+    await targetPeer.request('hold');
+    await sleep(60);
+    const pendingHost = client.callTool({
+      name: 'appdock_execute_command',
+      arguments: { id: keyCommand },
+    });
+    await sleep(100);
+    await page.evaluate(() => window.dock.automation({ kind: 'setInputSending', allowed: false }));
+    assert((await pendingHost).isError);
+    await targetPeer.request('release');
+    await sleep(200);
+    assert(!(await events()).some((e) => e.startsWith('key:A')));
+    checks.push(
+      'MCP permission revocation cancels a saved host key while a modifier is physically held',
     );
     sender = new NativeInput(
       packaged
@@ -276,7 +335,7 @@ async function execute(id) {
     assert.ok(
       logs.some(
         (l) =>
-          l.source === ids[1] &&
+          l.source === ids[0] &&
           l.message.includes('API=input.sendKeys') &&
           l.message.includes('failed'),
       ),

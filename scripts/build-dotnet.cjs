@@ -40,3 +40,15 @@ run([
   '-o',
   path.join(output, 'input'),
 ]);
+run([
+  'publish',
+  'dotnet/AppDock.ProcessHost/AppDock.ProcessHost.csproj',
+  '-c',
+  'Release',
+  '-r',
+  'win-x64',
+  '--self-contained',
+  'true',
+  '-o',
+  path.join(output, 'process'),
+]);

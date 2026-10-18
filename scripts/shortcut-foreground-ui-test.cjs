@@ -3,7 +3,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net');
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const assert = require('node:assert/strict');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const root = path.resolve(__dirname, '..');
@@ -11,17 +11,28 @@ const profile = path.join(root, '.artifacts', 'shortcut-foreground-' + Date.now(
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.notifications = false;
-settings.extensions['at365.windows-tools'] = {
-  enabled: true,
-  settings: {
-    autoLockEnabled: false,
-    shortcuts: [{ id: 'explorer', title: 'Explorer test', keys: 'Win+E' }],
-  },
+const keyId = randomUUID(),
+  keyCommand = 'appdock.custom.' + keyId;
+settings.customCommands = {
+  version: 2,
+  items: [
+    {
+      id: keyId,
+      typeId: 'appdock.input.sendKeys',
+      owner: { kind: 'host' },
+      title: 'Explorer test',
+      description: 'Desktop Win+E fixture',
+      configVersion: 1,
+      config: { keys: 'Win+E' },
+      enabled: true,
+      automation: false,
+    },
+  ],
 };
 settings.extensions['test.foreground'] = { enabled: true, settings: {} };
 settings.keybindings = [
   ['show', 'appdock.open', 'Ctrl+Shift+F23'],
-  ['send', 'at365.windows-tools.send.explorer', 'Ctrl+Shift+F24'],
+  ['send', keyCommand, 'Ctrl+Shift+F24'],
 ].map(([id, command, key]) => ({
   id,
   command,
@@ -29,11 +40,6 @@ settings.keybindings = [
   enabled: true,
   when: { scope: 'global', appletIds: [] },
 }));
-fs.cpSync(
-  path.resolve(root, '../../40.ARTIFACT/Applet.WindowsTools.at365/Applet.WindowsTools.at365'),
-  path.join(profile, 'extensions/WindowsTools'),
-  { recursive: true },
-);
 const fixture = path.join(profile, 'extensions/test.foreground');
 fs.mkdirSync(fixture, { recursive: true });
 fs.writeFileSync(
@@ -91,6 +97,7 @@ const checks = [];
       [
         ...(portable ? [] : [root]),
         `--test-profile=${profile}`,
+        `--test-local-state=${path.join(profile, 'local')}`,
         '--remote-debugging-address=127.0.0.1',
         `--remote-debugging-port=${port}`,
       ],
@@ -124,14 +131,13 @@ const checks = [];
         s.startupReady && s.globalHotKeys.length === 2 && s.globalHotKeys.every((k) => k.registered)
       );
     }, 'two global shortcuts registered');
-    await page.evaluate(() => window.dock.setAppletApiPermissions({ sendInput: true }));
     target = spawn(
       path.join(
         root,
         'tests/fixtures/dotnet/AppDock.InputTarget/bin/Release/net10.0-windows/AppDock.InputTarget.exe',
       ),
       [],
-      { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
+      { windowsHide: false, stdio: ['pipe', 'pipe', 'pipe'] },
     );
     target.stderr.resume();
     peer = new JsonLinePeer(target.stdout, target.stdin, async () => {});
@@ -173,16 +179,9 @@ const checks = [];
         s.foreground
       );
     }, 'Win+E from desktop opens new Explorer');
-    await until(async () => {
-      const logs = (await page.evaluate(() => window.dock.snapshot())).logs;
-      return logs.some(
-        (l) =>
-          l.source === 'at365.windows-tools' &&
-          l.message.includes('API=input.sendKeys') &&
-          l.message.includes('result=success'),
-      );
-    }, 'input completion audit after native re-entry guard');
-    checks.push('real WindowsTools global command sends Win+E from desktop and opens Explorer');
+    checks.push(
+      'host custom command without WindowsTools sends Win+E from desktop through a real global shortcut and opens Explorer',
+    );
     const result = {
       ok: true,
       profile,

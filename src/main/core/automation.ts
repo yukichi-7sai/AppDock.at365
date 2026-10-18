@@ -37,6 +37,8 @@ interface LocalConfig {
   allowUseTts: boolean;
   allowUseAi: boolean;
   allowUseMcp: boolean;
+  allowSendInput: boolean;
+  allowRunProcesses: boolean;
   allowManageMcpServers: boolean;
   allowEditTray: boolean;
   allowManageCustomCommands: boolean;
@@ -115,6 +117,8 @@ export class AutomationService {
       allowUseTts: false,
       allowUseAi: false,
       allowUseMcp: false,
+      allowSendInput: false,
+      allowRunProcesses: false,
       allowManageMcpServers: false,
       allowEditTray: false,
       allowManageCustomCommands: false,
@@ -140,6 +144,8 @@ export class AutomationService {
           (c.allowUseTts !== undefined && typeof c.allowUseTts !== 'boolean') ||
           (c.allowUseAi !== undefined && typeof c.allowUseAi !== 'boolean') ||
           (c.allowUseMcp !== undefined && typeof c.allowUseMcp !== 'boolean') ||
+          (c.allowSendInput !== undefined && typeof c.allowSendInput !== 'boolean') ||
+          (c.allowRunProcesses !== undefined && typeof c.allowRunProcesses !== 'boolean') ||
           (c.allowManageMcpServers !== undefined && typeof c.allowManageMcpServers !== 'boolean') ||
           (c.allowEditTray !== undefined && typeof c.allowEditTray !== 'boolean') ||
           (c.allowManageCustomCommands !== undefined &&
@@ -171,6 +177,8 @@ export class AutomationService {
         c.allowUseTts ??= false;
         c.allowUseAi ??= false;
         c.allowUseMcp ??= false;
+        c.allowSendInput ??= false;
+        c.allowRunProcesses ??= false;
         c.allowManageMcpServers ??= false;
         c.allowEditTray ??= false;
         c.allowManageCustomCommands ??= false;
@@ -240,6 +248,8 @@ export class AutomationService {
       | 'allowUseTts'
       | 'allowUseAi'
       | 'allowUseMcp'
+      | 'allowSendInput'
+      | 'allowRunProcesses'
       | 'allowManageMcpServers'
       | 'allowWrite'
       | 'allowExecute'
@@ -253,6 +263,7 @@ export class AutomationService {
     if (this.closed || this.loadError || !this.config.enabled || !this.config[key]) return false;
     if (key === 'allowManageCustomCommands' || key === 'allowManageMcpServers') return true;
     if (key === 'allowUseTts' || key === 'allowUseAi' || key === 'allowUseMcp') return true;
+    if (key === 'allowSendInput' || key === 'allowRunProcesses') return this.config.allowExecute;
     if (key === 'allowWrite' || key === 'allowExecute') return true;
     return this.config.allowExecute && (key === 'allowManageApplets' || this.config.allowWrite);
   }
@@ -286,6 +297,8 @@ export class AutomationService {
       allowUseTts: this.config.allowUseTts,
       allowUseAi: this.config.allowUseAi,
       allowUseMcp: this.config.allowUseMcp,
+      allowSendInput: this.config.allowSendInput,
+      allowRunProcesses: this.config.allowRunProcesses,
       allowManageMcpServers: this.config.allowManageMcpServers,
       allowEditTray: this.config.allowEditTray,
       allowManageCustomCommands: this.config.allowManageCustomCommands,
@@ -504,6 +517,15 @@ export class AutomationService {
           this.config.allowUseTts = action.allowed;
           this.save();
           message = 'このPCの読み上げ許可を保存しました。';
+          break;
+        case 'setInputSending':
+        case 'setProcessLaunching':
+          if (typeof action.allowed !== 'boolean') throw Error('実行許可が不正です。');
+          this.config[action.kind === 'setInputSending' ? 'allowSendInput' : 'allowRunProcesses'] =
+            action.allowed;
+          this.save();
+          this.options.authorizationChanged?.();
+          message = 'このPCの実行許可を保存しました。';
           break;
         case 'setMcpClient':
           if (typeof action.allowed !== 'boolean') throw Error('MCP利用許可が不正です。');

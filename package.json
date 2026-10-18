@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.61.0",
+  "version": "0.62.1",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.json",
     "build": "node scripts/build-main.cjs && vite build && vite build --config vite.shell.config.mts && node scripts/build-shell.cjs",
     "start": "pnpm run build && electron .",
-    "test": "pnpm run build:updater && pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
+    "test": "pnpm run build:updater && pnpm run build:process-host && pnpm run build && pnpm run build:test-extensions && node --test tests/*.test.cjs",
+    "build:process-host": "dotnet publish dotnet/AppDock.ProcessHost/AppDock.ProcessHost.csproj -c Release -r win-x64 --self-contained true -o .artifacts/dotnet-host/process",
     "build:test-extensions": "node scripts/build-test-extensions.cjs",
     "build:dotnet": "node scripts/build-dotnet.cjs",
     "build:updater": "node scripts/build-updater.cjs",

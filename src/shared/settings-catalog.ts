@@ -221,6 +221,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
         manageCustomCommands:
           '定義の設定値を含む閲覧と編集を許可します。公開したコマンドの実行許可とは別です。',
         sendInput: 'アクティブなウィンドウへキーや操作メッセージを送ります。',
+        runProcesses:
+          'コマンドやアプリのプロセスを起動します。保存したコマンドからの外部実行には、この許可も必要です。',
       } as Record<string, string>
     )[key],
   ]),

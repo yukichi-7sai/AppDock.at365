@@ -4,6 +4,7 @@ import { hostCommands } from '../../shared/commands';
 export interface AutomationCommand {
   id: string;
   title: string;
+  description?: string;
   appletId: string | null;
   available: boolean;
   unavailableReason: string | null;

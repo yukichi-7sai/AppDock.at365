@@ -22,14 +22,14 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 - `src/main/core/appdock-api.ts`のAppDockApiはMCPの起動状態から独立した単一インスタンスです。MCPはHTTPアダプター、Appletは既存JSON-lines RPCの`host.appdock.call`から呼びます。AppletにHTTPポート・Bearer token・Codex登録は不要です。
 - 操作カタログは`src/shared/appdock-api.ts`のappDockOperationsへ集約します。各操作で`callers`（mcp/applet）、`permissions`、入力JSON SchemaとMCP情報を宣言します。新規処理はAppDockApiのhandlersへ登録し、共通dispatcherが公開先・必要許可・Schemaを検証します。MCP列挙も同じ公開先を使うため、Applet RPC/SDK/MCPの通信実装を追加する必要はありません。既存のcommands.executeから公開コマンドを増やす場合も新しいツールは不要です。
-- 公開操作の正本は操作カタログのcallersです。公開情報・設定・コマンド、カスタムコマンド管理、Applet管理、入力割当編集等を提供し、Applet専用の入力2操作があります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
+- 公開操作の正本は操作カタログのcallersです。公開情報・設定・コマンド、カスタムコマンド管理、Applet管理、入力割当編集等を提供し、Applet専用の入力2操作とprocesses.startがあります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
 - 自分のStorage/Secrets、通知、UI登録等の既存APIは引き続き用途別の入口を使います。これらをMCPへ自動公開しません。リモートWebページにはこのAPIやホストIPCを渡しません。
 
 ## 宣言と許可
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/manageCustomCommands/manageMcpServersがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/manageCustomCommands/manageMcpServers/runProcessesがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
@@ -39,10 +39,24 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 | Appletの有効・無効・再起動 | read + execute + manageApplets |
 | ショートカット等の編集 | read + execute + write + 対象のeditShortcuts/editGestures/editRibbon/editTray |
 | input.sendKeys / input.appCommand | sendInputのみ（MCPは直接呼出し不可） |
+| processes.start | read + execute + runProcesses（Applet専用） |
+| 保存したキー送信／プロセス起動コマンド | read + execute + sendInput／runProcessesと、定義の外部公開 |
 
 許可を変更できるのはホストの設定画面だけです。MCPやAppletから自分の許可を追加できません。呼び出し元のApplet IDはホストが接続から決定し、リクエストから受け取りません。監査ログは呼び出し元Appletのログへ`[Applet API]`として操作名・リクエストID・成否を記録し、引数や秘密値を含めません。
 
-CodexとAppletの許可設定は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、ホストが発行する元callerを維持し、必要な共通許可はAppletとMCPの両方を満たす必要があります。キー送信だけは従来どおりAppletのsendInputと元MCPのコマンド実行許可を使用し、MCPへ生のキー送信APIを公開しません。信頼できるローカルAppletを前提とし、Appletプロセス自体をOSサンドボックスにする機能ではありません。
+CodexとAppletの許可設定は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、ホストが発行する元callerを維持し、必要な共通許可はAppletとMCPの両方を満たす必要があります。キー送信にもMCP列のsendInput許可を使い、元MCPのコマンド実行許可だけでは実行しません。プロセス起動も両方のrunProcessesを必要とします。どちらもMCPの生の引数指定APIとして直接公開しません。信頼できるローカルAppletを前提とし、Appletプロセス自体をOSサンドボックスにする機能ではありません。
+
+## プロセス起動
+
+0.62.0向けに追加したApplet専用操作`processes.start`は、appdock-api capabilityとread／execute／runProcesses許可を必要とします。Node/.NET/nativeは既存の汎用Callを使います。直接モードは絶対パスの.exeと文字列配列のarguments、cmdは1行のcommand、Windows PowerShellはscriptを指定します。任意項目は絶対パスのworkingDirectoryとshowConsole（既定false）です。
+
+```ts
+await context.appdock.call('processes.start', {
+  mode: 'executable', executable: 'C:\\Tools\\Example.exe', arguments: ['file name.txt']
+});
+```
+
+返り値は`{completion:'processStarted',effectVerified:false}`。起動受付を表し、終了・出力の取得は待ちません。起動済みプロセスはAppDock終了や許可撤回で強制終了しません。未確認の起動を自動再送しません。保存形式、モード別の引用符・サイズ・寿命は[カスタムコマンド拡張](custom-command-types-design.md#共通apiと寿命)を正本とします。
 
 ## Windows入力
 

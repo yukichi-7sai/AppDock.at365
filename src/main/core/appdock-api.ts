@@ -64,6 +64,8 @@ export class AppDockApi {
       customCommands?: CustomCommandService;
       customCommandsManageable?(): boolean;
       mcpClientAllowed?(): boolean;
+      inputAllowed?(): boolean;
+      processesAllowed?(): boolean;
       mcpServersManageable?(): boolean;
       appletManagement?: AppletManagement;
       manageable?(): boolean;
@@ -112,6 +114,8 @@ export class AppDockApi {
       useTts: this.options.ttsAllowed?.() ?? false,
       useAi: this.options.aiAllowed?.() ?? false,
       useMcp: this.options.mcpClientAllowed?.() ?? false,
+      sendInput: (this.options.inputAllowed?.() ?? false) && this.options.executable(),
+      runProcesses: this.options.processesAllowed?.() ?? false,
       manageMcpServers: this.options.mcpServersManageable?.() ?? false,
       read: true,
       execute: this.options.executable(),
@@ -132,21 +136,18 @@ export class AppDockApi {
     return Object.fromEntries(
       Object.entries(own).map(([key, value]) => [
         key,
-        value === true &&
-          (key === 'sendInput' && origin.kind === 'mcp'
-            ? root.execute === true
-            : root[key as keyof AppletApiPermissions] === true),
+        value === true && root[key as keyof AppletApiPermissions] === true,
       ]),
     ) as AppletApiPermissions;
   }
-  private commands() {
+  private commands(context: InputInvocation = {}) {
     return [
       ...new Map(
         [
           ...this.options.commands(),
           ...(this.options.customCommands
             ? [
-                ...this.options.customCommands.publicCommands(),
+                ...this.options.customCommands.publicCommands(context),
                 this.options.customCommands.managementCommand(),
               ]
             : []),
@@ -252,7 +253,11 @@ export class AppDockApi {
         if (!applet) throw new AutomationError('NOT_FOUND', 'Appletが見つかりません。');
         return {
           applet,
-          commands: this.commands().filter((c) => c.appletId === id),
+          commands: this.commands({
+            ...context,
+            apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
+            origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
+          }).filter((c) => c.appletId === id),
           executable: permissions.execute === true,
         };
       }
@@ -263,7 +268,11 @@ export class AppDockApi {
           gestureEditingAllowed: permissions.editGestures === true,
           shortcutEditingAllowed: permissions.editShortcuts === true,
           appletManagementAllowed: permissions.manageApplets === true,
-          commands: this.commands(),
+          commands: this.commands({
+            ...context,
+            apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
+            origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
+          }),
           executable: permissions.execute === true,
           writable: permissions.write === true,
         };

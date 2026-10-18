@@ -20,6 +20,7 @@ export interface CustomCommandType {
 export interface CustomCommandDefinition {
   id: string;
   title: string;
+  description: string;
   typeId: string;
   owner: CustomCommandOwner;
   configVersion: number;
@@ -42,6 +43,16 @@ export interface CustomCommandSummary extends Omit<CustomCommandDefinition, 'con
 }
 export const customCommandId = (id: string) => `appdock.custom.${id}`;
 export const customUpdateCommand = 'appdock.customCommands.update';
+export const customCommandVersion = 2;
+export function customDescription(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    value.length > 1000 ||
+    /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value)
+  )
+    throw Error('説明は1,000文字以内で入力してください。');
+  return value.replace(/\r\n?/g, '\n');
+}
 export const jsonObject = (v: unknown): v is JsonObject =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export const customUuid = (v: unknown): v is string =>
@@ -75,13 +86,13 @@ export function boundedJson(value: unknown, bytes: number, depth = 16, count = 2
     throw Error('JSONのサイズ上限を超えています。');
 }
 export function customItems(block: CustomCommandBlock | undefined): CustomCommandDefinition[] {
-  return block?.version === 1 ? (block.items as CustomCommandDefinition[]) : [];
+  return block?.version === customCommandVersion ? (block.items as CustomCommandDefinition[]) : [];
 }
 export function parseCustomCommands(value: unknown): CustomCommandBlock {
   if (!jsonObject(value) || !version(value.version))
     throw Error('カスタムコマンドの保存形式が不正です。');
   boundedJson(value, 1024 * 1024, 40, 100000);
-  if (value.version !== 1) return structuredClone(value) as CustomCommandBlock;
+  if (value.version !== customCommandVersion) return structuredClone(value) as CustomCommandBlock;
   if (
     Object.keys(value).some((k) => !['version', 'items'].includes(k)) ||
     !Array.isArray(value.items) ||
@@ -98,6 +109,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
           ![
             'id',
             'title',
+            'description',
             'typeId',
             'owner',
             'configVersion',
@@ -126,9 +138,13 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
     const owner = item.owner.kind === 'host' ? 'host' : `applet:${item.owner.id}`;
     counts.set(owner, (counts.get(owner) ?? 0) + 1);
     if (counts.get(owner)! > 100) throw Error('同じ提供元のコマンドは100件以内です。');
-    return { ...item, title: item.title.trim() };
+    return {
+      ...item,
+      title: item.title.trim(),
+      description: customDescription(item.description === undefined ? '' : item.description),
+    };
   });
-  return structuredClone({ version: 1, items });
+  return structuredClone({ version: customCommandVersion, items });
 }
 
 // Deliberate common subset of JSON Schema 2020-12 and draft-07. No remote/recursive

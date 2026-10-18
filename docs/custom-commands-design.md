@@ -1,16 +1,18 @@
-# カスタムコマンド基盤の詳細設計（第1段階）
+# カスタムコマンド基盤の詳細設計
 
-状態: 第1段階を実装（0.60.0）。更新日: 2026-10-18。実測は[VERIFICATION](../VERIFICATION.md)を参照。
+状態: 基盤を実装。保存版2と種類拡張を検証中。更新日: 2026-10-18。実測・未確認は[VERIFICATION](../VERIFICATION.md)を参照。
 
-[全体概要](mcp-hub-design.md)と[実装計画](mcp-hub-implementation-plan.md)に基づく第1段階の契約。最低ホスト版は0.60.0。Node/.NET/nativeの種類ハンドラーは同じ保存・実行サービスを使用する。
+[全体概要](mcp-hub-design.md)と[実装計画](mcp-hub-implementation-plan.md)に基づく契約。種類提供APIは0.60.0以降、現行の保存版2は0.62.0向けの変更。Node/.NET/nativeの種類ハンドラーは同じ保存・実行サービスを使用する。
+
+全種類共通の個別説明文、キー送信・プロセス起動、WindowsToolsのキー送信撤去は[拡張設計](custom-command-types-design.md)と[段階的実装計画](custom-command-types-implementation-plan.md)を参照する。保存形式はversion 2に一本化し、旧設定の移行は実装しない。
 
 ## 目的と完了範囲
 
 本体および任意のAppletがコマンドの「種類」を提供し、その種類の設定を持つコマンドを共通UI・共通APIで動的に作成、保存、変更、削除できるようにする。保存したコマンドを既存のカタログ・入力経路・MCP公開へ接続する。
 
-第1段階は種類の登録、永続定義、CRUD、実行、UI、Node/.NET契約、検証までとする。MCP実行種類は第4段階、WindowsToolsの移行とOSコマンド実行種類は別工程。既存の`commands.register`、`host.commands.replace`、`.NET Commands.ReplaceAsync`、manifest.commandsは互換性を維持する。
+基盤は種類の登録、永続定義、CRUD、実行、UI、Node/.NET契約を提供する。本体種類の実行はそれぞれ入力・プロセス・MCPの共通サービスへ接続する。既存の`commands.register`、`host.commands.replace`、`.NET Commands.ReplaceAsync`、manifest.commandsは互換性を維持する。
 
-通常製品に検証用の種類を同梱しない。種類を提供するAppletがない場合は空の管理画面を表示する。この段階だけでMCPツール呼出しが可能になったとは案内しない。
+通常製品に検証用の種類を同梱しない。本体はキー送信・プロセス起動・MCP実行の3種類を提供し、Appletを導入すると宣言された種類を追加できる。
 
 ## 用語と責務
 
@@ -31,11 +33,12 @@
 ```json
 {
   "customCommands": {
-    "version": 1,
+    "version": 2,
     "items": [
       {
         "id": "a6323167-2370-4da8-a038-c63df70013e1",
         "title": "確認用の操作",
+        "description": "設定した内容を返す確認用の操作です。",
         "typeId": "test.custom-command.echo",
         "owner": { "kind": "applet", "id": "test.custom-command" },
         "configVersion": 1,
@@ -55,10 +58,11 @@
 | id | 小文字のUUID。作成時に発行し、名称・設定変更で変えない。公開APIの新規作成では呼出し元がUUIDを用意する |
 | commandId | `appdock.custom.<id>`として本体が生成する。保存データには重複して持たない |
 | title | 前後空白を除いて1～100文字。表示名の重複は許可し、識別に使わない |
+| description | 全種類共通の任意の説明。省略時は空文字、1,000 UTF-16コード単位以内。改行はLFへ揃え、公開コマンド一覧にも返す |
 | typeId | 種類宣言のID。作成後は変更不可。別種類への変更は別定義の作成として扱う |
 | owner | 作成時に本体が宣言から設定する。CRUD入力では指定・変更不可。実行時は現在の宣言との一致を必須とする |
 | configVersion | 種類が宣言する設定形式の版。第1段階の各種類は1つの版だけを扱う。版の更新は全configと同時に明示保存し、IDを保持する |
-| config | 種類のSchemaに一致するJSONオブジェクト。スクリプト/関数/実行文脈を保持しない |
+| config | 種類のSchemaに一致するJSONオブジェクト。実行可能な関数や実行文脈を保持しない。種類が宣言したスクリプト文字列はデータとして保存し、基盤自体で評価しない |
 | enabled | 定義を実行可能にする指定。省略時true。提供元の起動・許可とは別 |
 | automation | 外部のcommands.list/executeへの公開指定。省略時false。種類の宣言を超える公開は不可 |
 
@@ -66,7 +70,9 @@
 
 itemsの配列順は管理一覧の順序だけを表す。ショートカットやジェスチャーの実行順は既存の割当順を使う。名前変更や並べ替えでcommandIdと割当を変えない。
 
-このブロックは第1段階では常に共有する。Appletごとの端末専用設定モードからは独立し、DeviceSettingsStoreで共有へ振り分ける。別PCで未導入の種類は保持して利用不可にする。提供元の有効状態は既存の端末別設定を使う。
+このブロックは常に共有する。Appletごとの端末専用設定モードからは独立し、DeviceSettingsStoreで共有へ振り分ける。別PCで未導入の種類は保持して利用不可にする。提供元の有効状態は既存の端末別設定を使う。
+
+未対応の保存版は読込だけで変換・削除せず、実行と通常の定義編集を停止する。設定ページのJSON編集からversion 2の新しい一覧を明示保存できる。旧形式reader・インポート・旧IDの対応表・割当の自動付替えは提供しない。
 
 ### 上限と入力検証
 
@@ -328,7 +334,7 @@ sequenceDiagram
 | settings-catalog.ts、設定ページController、本体renderer/settings-ui | ページ投影、共通一覧/フォーム/JSON、競合表示 |
 | tests、tests/fixtures、scripts | 保存/権限/実行の契約、Node/.NET fixture、隔離GUI |
 
-既存の命名ではextensionsとAppletが混在するため、型や内部名の一括改名はしない。WindowsToolsのコードや設定をこの段階で変更しない。
+既存の命名ではextensionsとAppletが混在するため、型や内部名の一括改名はしない。WindowsToolsのキー送信撤去は[種類拡張の契約](custom-command-types-design.md)に従い、本体の入力APIとSDKは維持する。
 
 ## 検証計画
 
@@ -351,11 +357,11 @@ sequenceDiagram
 
 Node/.NET fixtureは隔離profileだけで動かし、実キー送信、実プロセス操作、実MCP接続を代用したと扱わない。実装時の必要なGUI/入力確認を別に選ぶ。ChatGPTでの実接続試験は可能な環境で行い、未確認ならその範囲を残す。今回の文書作成では製品テストを実行しない。
 
-## 第1段階から後続へ渡すもの
+## 関連する種類と実行サービス
 
-- 第2段階へ: 実行元と取消の文脈、共通API/許可の接続方法。MCP通信をカスタムコマンドサービスへ混ぜない。
-- 第3段階へ: 固定入口と動的一覧、設定revisionとcatalog世代の区別、管理と実行の権限分離。
-- 第4段階へ: 種類の宣言/登録、config保存、安定commandId、入力割当、結果取得。長時間ジョブ/メディアの扱いはその段階で追加設計する。
-- WindowsTools移行へ: 提供元の所有者と実行文脈、旧ID/割当を保つ移行の接続点。既存send.<id>をこの段階では変更しない。
+- MCPクライアントは実行元・取消・共通許可を受け取り、通信とジョブを所有する。通信をカスタムコマンドサービスへ混ぜない。
+- MCPハブは固定入口と動的一覧を公開し、設定revisionとcatalog世代、管理と実行の許可を分ける。
+- MCP実行種類は安定commandIdと固定configを保存し、長時間処理・メディアはMCPクライアントのジョブ結果で返す。
+- キー送信／プロセス起動種類は[拡張設計](custom-command-types-design.md)に従い、同じ実行文脈と共通サービスへ接続する。WindowsToolsの旧キー送信は撤去し、設定移行・旧ID互換・自動付替えは行わない。
 
-具体的なMCP接続設定やWindows実行引数を第1段階の汎用保存型へ固定しない。種類固有の詳細は、それぞれのconfigSchemaと実行サービスで定義する。
+具体的なMCP接続設定やWindows実行引数を汎用保存型へ固定しない。種類固有の詳細は、それぞれのconfigSchemaと実行サービスで定義する。

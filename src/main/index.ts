@@ -1,4 +1,8 @@
 import { McpClientSettings, McpSettingsError } from './core/mcp-client-settings';
+import { inputCommandType, normalizeInputKeys } from '../shared/input-command';
+import { executionAuthorized, type ExecutionPermission } from './core/execution-permissions';
+import { processCommandType } from '../shared/process-launch';
+import { ProcessLaunchService, ProcessLaunchError, processLaunchSpec } from './core/process-launch';
 import { McpClientService, type McpActor } from './core/mcp-client';
 import { ShellProviderRegistry } from './core/shell-provider-registry';
 import { isDeepStrictEqual } from 'node:util';
@@ -693,6 +697,40 @@ const mcpClient = new McpClientService({
     ),
 });
 let customCommandWarning: ReturnType<WarningReporter['episode']> | undefined;
+function customExecutionAllowed(
+  permission: ExecutionPermission,
+  context: import('./core/command-contexts').InputInvocation,
+) {
+  return (
+    !quitting &&
+    startupReady &&
+    executionAuthorized(permission, context, (actor) => {
+      if (actor.kind === 'mcp')
+        return {
+          read: true,
+          execute: mcpAllowed('allowExecute'),
+          sendInput: mcpAllowed('allowSendInput'),
+          runProcesses: mcpAllowed('allowRunProcesses'),
+        };
+      const item = manager?.items.get(actor.appletId);
+      return item && ['starting', 'running'].includes(item.state)
+        ? appletApiAccess.get(item.manifest)
+        : {};
+    })
+  );
+}
+const processAppDirectory = path.dirname(
+  process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe'),
+);
+const processLauncher = new ProcessLaunchService(
+  processAppDirectory,
+  path.join(
+    app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), '.artifacts'),
+    'dotnet-host',
+    'process',
+    'AppDock.ProcessHost.exe',
+  ),
+);
 const customCommands = new CustomCommandService({
   settings,
   settingsCommands,
@@ -746,6 +784,65 @@ const customCommands = new CustomCommandService({
     });
   },
 });
+const validateProcessConfig = (config: Record<string, unknown>) => {
+  try {
+    processLaunchSpec(config, processAppDirectory);
+    return null;
+  } catch {
+    return '実行ファイル・引数・コマンドの長さ・実行方法を確認してください。';
+  }
+};
+const validateInputConfig = (config: Record<string, unknown>) => {
+  try {
+    normalizeInputKeys(config.keys);
+    return null;
+  } catch {
+    return '送信キーを確認してください。例: Ctrl+Shift+T、Enter、Win+E';
+  }
+};
+customCommands.registerHost(
+  processCommandType,
+  async (config, context) => {
+    try {
+      return await processLauncher.start(config, context, () =>
+        customExecutionAllowed('runProcesses', context),
+      );
+    } catch (error) {
+      if (error instanceof ProcessLaunchError)
+        throw new CustomCommandError(error.code, error.message);
+      throw error;
+    }
+  },
+  {
+    authorized: (context) => customExecutionAllowed('runProcesses', context),
+    validateConfig: validateProcessConfig,
+    unavailableReason: validateProcessConfig,
+  },
+);
+customCommands.registerHost(
+  inputCommandType,
+  async (config, context) => {
+    if (!customExecutionAllowed('sendInput', context))
+      throw new CustomCommandError('API_DISABLED', 'キー送信を許可してください。');
+    if (!nativeInput) throw new CustomCommandError('NOT_READY', '入力機能は準備中です。');
+    try {
+      return await nativeInput.send(
+        'input.sendKeys',
+        { keys: normalizeInputKeys(config.keys) },
+        'host:custom-input',
+        context,
+      );
+    } catch (error) {
+      if (error instanceof AutomationError) throw new CustomCommandError(error.code, error.message);
+      throw error;
+    }
+  },
+  {
+    authorized: (context) => customExecutionAllowed('sendInput', context),
+    validateConfig: validateInputConfig,
+    unavailableReason: validateInputConfig,
+  },
+);
 customCommands.registerHost(
   mcpCommandType,
   async (config, context) => {
@@ -871,6 +968,21 @@ const operationApi = new AppDockApi({
       ),
     }),
     'input.sendKeys': sendInput('input.sendKeys'),
+    'processes.start': async (params, id, context) => {
+      const invocation = {
+        ...context,
+        apiCaller: id ? { kind: 'applet' as const, appletId: id } : { kind: 'mcp' as const },
+      };
+      try {
+        return await processLauncher.start(params, invocation, () =>
+          customExecutionAllowed('runProcesses', invocation),
+        );
+      } catch (error) {
+        if (error instanceof ProcessLaunchError)
+          throw new AutomationError(error.code, error.message);
+        throw error;
+      }
+    },
     'input.appCommand': sendInput('input.appCommand'),
   },
   settings,
@@ -878,6 +990,8 @@ const operationApi = new AppDockApi({
   appletManagement,
   customCommands,
   mcpClientAllowed: () => mcpAllowed('allowUseMcp'),
+  inputAllowed: () => mcpAllowed('allowSendInput'),
+  processesAllowed: () => mcpAllowed('allowRunProcesses'),
   mcpServersManageable: () => mcpAllowed('allowManageMcpServers'),
   customCommandsManageable: () => mcpAllowed('allowManageCustomCommands'),
   appletPermissions: (id) => {
@@ -1895,6 +2009,8 @@ function settingsPageActions(
               'setTts',
               'setAi',
               'setMcpClient',
+              'setInputSending',
+              'setProcessLaunching',
               'setMcpServerManagement',
               'setTrayEditing',
               'setCustomCommandManagement',
@@ -2067,6 +2183,7 @@ function registerIpc() {
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
     appletApiAccess.set(permissions);
+    customCommands.reconcile();
     ai.reconcile();
     tts.reconcile();
     for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
@@ -3528,6 +3645,7 @@ app.on('before-quit', (event) => {
       () => automation?.close(),
       () => gestures?.close(),
       () => nativeInput?.close(),
+      () => processLauncher.close(),
       () => hotKeys?.close(),
       () => pageCollections.close(),
       () => manager.shutdown(),

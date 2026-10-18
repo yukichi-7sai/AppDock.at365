@@ -103,7 +103,7 @@ export function SettingsDialog({
 }: {
   title: string;
   description?: string;
-  children: ReactNode;
+  children: ReactNode | ((ready: boolean, setError: (error: string) => void) => ReactNode);
   onClose(): void;
   onApply(): Promise<unknown>;
   applyLabel?: string;
@@ -157,7 +157,7 @@ export function SettingsDialog({
       </header>
       <div className="settings-dialog-body">
         <fieldset className="settings-dialog-fields" disabled={pending}>
-          {children}
+          {typeof children === 'function' ? children(ready, setError) : children}
         </fieldset>
       </div>
       {error && (

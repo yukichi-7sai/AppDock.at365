@@ -3,6 +3,8 @@ import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv
 import {
   boundedJson,
   customCommandId,
+  customCommandVersion,
+  customDescription,
   customItems,
   customUpdateCommand,
   customUpdateSchema,
@@ -33,6 +35,7 @@ export interface CustomCommandProvider {
   invoke(definition: CustomCommandDefinition, context: InputInvocation): Promise<unknown>;
   validateConfig?(config: JsonObject): string | null;
   unavailableReason?(config: JsonObject): string | null;
+  authorized?(context: InputInvocation): boolean;
 }
 const failure = (code: string, message: string): never => {
   throw new CustomCommandError(code, message);
@@ -102,7 +105,7 @@ export class CustomCommandService {
   registerHost(
     type: CustomCommandType,
     handler: (config: JsonObject, context: InputInvocation) => Promise<unknown>,
-    checks: Pick<CustomCommandProvider, 'validateConfig' | 'unavailableReason'> = {},
+    checks: Pick<CustomCommandProvider, 'validateConfig' | 'unavailableReason' | 'authorized'> = {},
   ) {
     const [parsed] = parseCustomTypes(null, [type]);
     if (this.hosts.has(parsed.id)) throw Error('種類は登録済みです。');
@@ -205,17 +208,23 @@ export class CustomCommandService {
       disabledReason: item.unavailableReason ?? undefined,
     }));
   }
-  publicCommands(): AutomationCommand[] {
+  publicCommands(context: InputInvocation = {}): AutomationCommand[] {
     return customItems(this.options.settings.value.customCommands).flatMap((item) => {
       const state = this.state(item);
+      const reason =
+        state.reason ??
+        (state.record?.provider.authorized?.(context) === false
+          ? '呼び出し元にこの種類の実行が許可されていません。'
+          : null);
       return state.published
         ? [
             {
               id: customCommandId(item.id),
               title: item.title,
+              description: item.description,
               appletId: item.owner.kind === 'applet' ? item.owner.id : null,
-              available: state.reason === null,
-              unavailableReason: state.reason,
+              available: reason === null,
+              unavailableReason: reason,
               completion: 'handlerReturned' as const,
             },
           ]
@@ -229,7 +238,7 @@ export class CustomCommandService {
       appletId: null,
       available:
         !this.options.settings.value.customCommands ||
-        this.options.settings.value.customCommands.version === 1,
+        this.options.settings.value.customCommands.version === customCommandVersion,
       unavailableReason: null,
       completion: 'settingsSaved',
       permission: 'customCommands.write',
@@ -297,7 +306,7 @@ export class CustomCommandService {
       nextCursor: offset + limit < filtered.length ? `${offset + limit}:${signature}` : null,
       supportedVersion:
         !this.options.settings.value.customCommands ||
-        this.options.settings.value.customCommands.version === 1,
+        this.options.settings.value.customCommands.version === customCommandVersion,
     };
   }
   update(raw: unknown, caller?: string, replacement = false): JsonObject {
@@ -316,7 +325,11 @@ export class CustomCommandService {
       );
     this.options.settingsCommands.checkRevision(raw.expectedRevision);
     const store = this.options.settings;
-    if (store.value.customCommands && store.value.customCommands.version !== 1)
+    if (
+      !replacement &&
+      store.value.customCommands &&
+      store.value.customCommands.version !== customCommandVersion
+    )
       return failure('UNSUPPORTED_VERSION', '未対応の保存版は編集できません。');
     let items = structuredClone(customItems(store.value.customCommands));
     const descriptors = this.descriptors();
@@ -364,6 +377,7 @@ export class CustomCommandService {
                   'id',
                   'typeId',
                   'title',
+                  'description',
                   'configVersion',
                   'config',
                   'enabled',
@@ -380,6 +394,9 @@ export class CustomCommandService {
             return failure('PERMISSION_DENIED', 'Appletは外部公開を設定できません。');
           const item = {
             ...input,
+            description: customDescription(
+              input.description === undefined ? '' : input.description,
+            ),
             owner: type.owner,
             enabled: input.enabled ?? true,
             automation: input.automation ?? false,
@@ -414,7 +431,15 @@ export class CustomCommandService {
               !jsonObject(changes) ||
               !Object.keys(changes).length ||
               Object.keys(changes).some(
-                (k) => !['title', 'enabled', 'automation', 'config', 'configVersion'].includes(k),
+                (k) =>
+                  ![
+                    'title',
+                    'description',
+                    'enabled',
+                    'automation',
+                    'config',
+                    'configVersion',
+                  ].includes(k),
               )
             )
               return failure('INVALID_ARGUMENT', '変更する項目を確認してください。');
@@ -435,7 +460,7 @@ export class CustomCommandService {
           }
         }
       }
-      const block = parseCustomCommands({ version: 1, items });
+      const block = parseCustomCommands({ version: customCommandVersion, items });
       if (!raw.dryRun) {
         this.options.settingsCommands.checkRevision(raw.expectedRevision);
         try {
@@ -464,11 +489,7 @@ export class CustomCommandService {
   validateReplacement(next: Settings) {
     const current = this.options.settings.value.customCommands;
     if (JSON.stringify(current) === JSON.stringify(next.customCommands)) return;
-    if (
-      !next.customCommands ||
-      next.customCommands.version !== 1 ||
-      (current && current.version !== 1)
-    )
+    if (!next.customCommands || next.customCommands.version !== customCommandVersion)
       return failure('UNSUPPORTED_VERSION', '保存ブロックの版は変更できません。');
     const before = customItems(current),
       after = customItems(parseCustomCommands(next.customCommands));
@@ -487,7 +508,7 @@ export class CustomCommandService {
         if (old.typeId !== item.typeId || !sameCustomOwner(old.owner, item.owner))
           return failure('INVALID_ARGUMENT', '種類と提供元は変更できません。');
         const changes = Object.fromEntries(
-          ['title', 'configVersion', 'config', 'enabled', 'automation']
+          ['title', 'description', 'configVersion', 'config', 'enabled', 'automation']
             .filter(
               (k) =>
                 JSON.stringify(old[k as keyof typeof old]) !==
@@ -528,7 +549,8 @@ export class CustomCommandService {
         state.record.provider.generation !== active.generation ||
         !state.record.provider.available ||
         (active.context.origin && active.context.origin.kind !== 'local' && !state.published) ||
-        this.options.authorized?.(active.context) === false
+        this.options.authorized?.(active.context) === false ||
+        state.record.provider.authorized?.(active.context) === false
       )
         active.controller.abort();
     }
@@ -564,7 +586,11 @@ export class CustomCommandService {
       external = context.origin && context.origin.kind !== 'local';
     if (state.reason || !state.record)
       return failure('TYPE_UNAVAILABLE', state.reason ?? '種類を利用できません。');
-    if ((external && !state.published) || this.options.authorized?.(context) === false)
+    if (
+      (external && !state.published) ||
+      this.options.authorized?.(context) === false ||
+      state.record.provider.authorized?.(context) === false
+    )
       return failure('PERMISSION_DENIED', 'このコマンドの実行は許可されていません。');
     if (context.signal?.aborted) return failure('CANCELLED', '実行は取り消されました。');
     if (this.active.has(id)) return failure('BUSY', 'このコマンドを実行中です。');

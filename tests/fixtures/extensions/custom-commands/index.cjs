@@ -1,5 +1,12 @@
 exports.activate = async (context) => {
   await context.customCommands.register('test.custom-node.echo', async (config, invocation) => {
+    if (config.message === 'process-fixture' && process.env.APPDOCK_CUSTOM_PROCESS_FIXTURE) {
+      const file = process.env.APPDOCK_CUSTOM_PROCESS_FIXTURE.replaceAll("'", "''");
+      return context.appdock.call('processes.start', {
+        mode: 'powershell',
+        script: "[IO.File]::AppendAllText('" + file + '\', "started`n")',
+      });
+    }
     if (config.delay)
       await new Promise((resolve, reject) => {
         const cancel = () => {

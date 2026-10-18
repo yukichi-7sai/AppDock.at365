@@ -18,6 +18,8 @@ export interface AutomationState {
   allowUseTts: boolean;
   allowUseAi: boolean;
   allowUseMcp: boolean;
+  allowSendInput: boolean;
+  allowRunProcesses: boolean;
   allowManageMcpServers: boolean;
   allowEditTray: boolean;
   allowManageCustomCommands: boolean;
@@ -45,6 +47,8 @@ export type AutomationAction =
   | { kind: 'setTts'; allowed: boolean }
   | { kind: 'setAi'; allowed: boolean }
   | { kind: 'setMcpClient'; allowed: boolean }
+  | { kind: 'setInputSending'; allowed: boolean }
+  | { kind: 'setProcessLaunching'; allowed: boolean }
   | { kind: 'setMcpServerManagement'; allowed: boolean }
   | { kind: 'setExecution'; allowed: boolean }
   | { kind: 'setAppletManagement'; allowed: boolean }

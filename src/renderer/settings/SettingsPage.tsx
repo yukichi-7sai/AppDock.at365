@@ -223,11 +223,6 @@ export function SettingsPage({
           ) : editing.mode === 'json' ? (
             <SettingsTextarea
               aria-label="設定JSON"
-              readOnly={
-                page.id === 'custom-commands' &&
-                !!model.content.values.customCommands &&
-                (model.content.values.customCommands as { version: number }).version !== 1
-              }
               value={c.text(model)}
               spellCheck={false}
               onChange={(e) => {

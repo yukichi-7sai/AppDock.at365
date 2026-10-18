@@ -17,6 +17,7 @@
 | 設定の再起動通知・JSON復旧 | [現行仕様](docs/settings-sync.md#設定の状態と再起動通知)、[設計と確認項目](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
 | MCPハブ・カスタムコマンド（0.60.0） | [全体概要](docs/mcp-hub-design.md)、[実装計画と到達点](docs/mcp-hub-implementation-plan.md)、[コマンド基盤](docs/custom-commands-design.md)、[クライアント](docs/mcp-client-design.md)、[ハブ](docs/mcp-hub-relay-design.md)、[保存型MCPコマンド](docs/mcp-command-design.md) |
+| カスタムコマンドの種類と説明 | [共通説明文・キー送信・プロセス起動・WindowsToolsの撤去](docs/custom-command-types-design.md)、[実装計画と到達点](docs/custom-command-types-implementation-plan.md)。保存版2へ一本化し、旧設定の移行は行わない |
 | MCPのネットワーク接続 | [接続範囲・認証・Codex互換性の設計](docs/mcp-network-access-design.md) |
 | MCP Eventsとdot | [通知種類の選択・購読・Webhook・保存と再送](docs/mcp-events-design.md) |
 | 音声再生の共通API | [再生キュー・取消・Gmail通知移行](docs/audio-playback.md) |
@@ -212,7 +213,7 @@ MCPハブの契約試験は`tests/custom-commands.test.cjs`と`tests/mcp-client.
 
 AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、Applet管理、ショートカット、ジェスチャー、リボン、トレイの編集にはそれぞれの既存サービスを使い、通信層へ処理を複製しません。tests/appdock-api.test.cjs、tests/automation.test.cjsと対象サービスの単体試験、scripts/automation-ui-test.cjs、scripts/applet-api-ui-test.cjsを変更範囲から選びます。入力APIはNode実行文脈とInputTests、scripts/native-input-ui-test.cjsも確認します。詳細な手順と許可は[共通操作API](docs/appdock-api.md)と[外部操作](docs/automation.md)を参照してください。
 
-`scripts/shortcut-foreground-ui-test.cjs [portable EXE]`は隔離profileと実WindowsToolsの発行物を使い、Ctrl+Shift+F23で背後・最小化・非表示から本体の実HWNDが最前面になること、Ctrl+Shift+F24でデスクトップからWin+Eを送り新しいExplorerが開くことを確認します。先にInputTarget fixtureをReleaseビルドします。CDPは本体のフォーカスを操作せず、独立したネイティブfixtureがOS入力を生成します。試験で新規作成したExplorerだけを閉じ、portableの隔離コピーは元EXEとのSHA256を照合します。
+`scripts/shortcut-foreground-ui-test.cjs [portable EXE]`はWindowsToolsを入れない隔離profileの本体キー送信種類を使い、Ctrl+Shift+F23で背後・最小化・非表示から本体の実HWNDが最前面になること、Ctrl+Shift+F24でデスクトップからWin+Eを送り新しいExplorerが開くことを確認します。先にInputTarget fixtureをReleaseビルドします。CDPは本体のフォーカスを操作せず、独立したネイティブfixtureがOS入力を生成します。試験で新規作成したExplorerだけを閉じ、portableの隔離コピーは元EXEとのSHA256を照合します。
 
 自己更新のmetadata・helper・journal・中断復旧は[更新ガイド](docs/updates.md)、実GitHub/HTTP(S)/UNCは[チェックリスト](docs/update-checklist.md)で確認します。通常publishと、公開後の実取得・インストール確認は別工程です。
 

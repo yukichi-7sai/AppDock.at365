@@ -3,6 +3,7 @@ import type { SettingDefinition, Settings } from '../../shared/contracts';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import {
   customItems,
+  customCommandVersion,
   type CustomCommandDefinition,
   type CustomCommandDescriptor,
 } from '../../shared/custom-commands';
@@ -13,6 +14,9 @@ import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { McpCommandFields } from './McpCommandFields';
+import { ProcessCommandFields } from './ProcessCommandFields';
+import { defaultProcessLaunch } from '../../shared/process-launch';
+import { ShortcutCaptureField } from '../settings-ui/ShortcutCaptureField';
 
 const list: SettingDefinition = {
   key: 'definitions',
@@ -46,7 +50,8 @@ export function CustomCommandsSettings({
 }) {
   const items = customItems(settings.customCommands),
     types = auxiliary?.types ?? [];
-  const supported = !settings.customCommands || settings.customCommands.version === 1;
+  const supported =
+    !settings.customCommands || settings.customCommands.version === customCommandVersion;
   const [error, setError] = useState('');
   const [dialog, setDialog] = useState<
     | null
@@ -76,7 +81,8 @@ export function CustomCommandsSettings({
       >
         {!supported && (
           <p role="status">
-            この保存版には対応していません。定義を保持したまま読み取り専用で表示しています。
+            この保存版には対応していません。自動移行は行いません。JSON編集でversion
+            2の一覧を保存して作り直してください。
           </p>
         )}
         {!types.length && (
@@ -170,14 +176,17 @@ function CustomCommandDialog({
   invoke: Invoke;
 }) {
   const defaults = (id: string) =>
-    Object.fromEntries(
-      (types.find((t) => t.id === id)?.fields ?? [])
-        .filter((f) => f.default !== undefined)
-        .map((f) => [f.key, f.default]),
-    );
+    id === 'appdock.process.start'
+      ? { ...defaultProcessLaunch() }
+      : Object.fromEntries(
+          (types.find((t) => t.id === id)?.fields ?? [])
+            .filter((f) => f.default !== undefined)
+            .map((f) => [f.key, f.default]),
+        );
   const [id] = useState(() => original?.id ?? crypto.randomUUID());
   const [typeId, setTypeId] = useState(original?.typeId ?? types[0]?.id ?? '');
   const [title, setTitle] = useState(original?.title ?? '');
+  const [description, setDescription] = useState(original?.description ?? '');
   const [config, setConfig] = useState<Record<string, unknown>>(
     () => original?.config ?? defaults(typeId),
   );
@@ -190,7 +199,7 @@ function CustomCommandDialog({
   const type = types.find((t) => t.id === typeId);
   const oldVersion = !!original && original.configVersion !== type?.configVersion;
   const editableConfig = !!type && (!oldVersion || migrate);
-  const jsonOnly = !type?.fields?.length;
+  const jsonOnly = !type?.fields?.length && typeId !== 'appdock.process.start';
   return (
     <SettingsDialog
       title={original ? 'カスタムコマンドの編集' : 'カスタムコマンドの追加'}
@@ -208,6 +217,7 @@ function CustomCommandDialog({
           : original!.config;
         const value = {
           title: title.trim(),
+          description,
           configVersion: migrate || !original ? type!.configVersion : original.configVersion,
           config: nextConfig,
           enabled,
@@ -238,160 +248,193 @@ function CustomCommandDialog({
         return onApply({ op: 'update', id, changes, expectedTypeRevision: type?.typeRevision });
       }}
     >
-      <SettingsField title="種類">
-        <select
-          aria-label="種類"
-          value={typeId}
-          disabled={!!original}
-          onChange={(e) => {
-            const value = e.target.value;
-            setTypeId(value);
-            const next = defaults(value);
-            setConfig(next);
-            setJson(JSON.stringify(next, null, 2));
-            setAutomation(false);
-            setInvalidFields({});
-          }}
-        >
-          {!type && <option value={typeId}>{typeId || '種類がありません'}</option>}
-          {types.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
-            </option>
-          ))}
-        </select>
-      </SettingsField>
-      {type?.description && <p>{type.description}</p>}
-      <SettingsField title="名前">
-        <SettingsInput
-          aria-label="名前"
-          data-initial-focus
-          value={title}
-          maxLength={100}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </SettingsField>
-      <SettingsChoice
-        label="有効"
-        checked={enabled}
-        disabled={!type && !enabled}
-        onChange={setEnabled}
-      />
-      <SettingsChoice
-        label="MCP・Appletの共通APIへ公開"
-        checked={automation}
-        disabled={!type?.automation && !automation}
-        onChange={setAutomation}
-      />
-      {!type?.automation && <p className="muted">この種類は外部公開を許可していません。</p>}
-      {oldVersion && type && (
-        <SettingsChoice
-          label={`現在の設定形式（${type.configVersion}）へ明示的に更新する`}
-          checked={migrate}
-          onChange={(checked) => {
-            setMigrate(checked);
-            const next = checked ? defaults(typeId) : original!.config;
-            setConfig(next);
-            setJson(JSON.stringify(next, null, 2));
-            setInvalidFields({});
-          }}
-        />
-      )}
-      {!jsonOnly && editableConfig && (
-        <SettingsChoice
-          label="設定をJSONで編集"
-          checked={jsonMode}
-          onChange={(checked) => {
-            if (checked) setJson(JSON.stringify(config, null, 2));
-            else {
-              try {
-                const parsed = JSON.parse(json);
-                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
-                setConfig(parsed);
-              } catch {
-                return;
-              }
-            }
-            setInvalidFields({});
-            setJsonMode(checked);
-          }}
-        />
-      )}
-      {!editableConfig || jsonMode || jsonOnly ? (
-        <SettingsField title="固定設定（JSON）">
-          <SettingsTextarea
-            aria-label="固定設定（JSON）"
-            value={json}
-            readOnly={!editableConfig}
-            rows={10}
-            onChange={(e) => setJson(e.target.value)}
-          />
-        </SettingsField>
-      ) : typeId === 'appdock.mcp.call' ? (
-        <McpCommandFields
-          config={config}
-          onChange={setConfig}
-          invoke={invoke}
-          onValidity={(valid) =>
-            setInvalidFields((previous) => ({ ...previous, mcpArguments: !valid }))
-          }
-        />
-      ) : (
-        type!.fields!.map((field) => (
-          <SettingsField key={field.key} title={field.title}>
-            {field.type === 'boolean' ? (
-              <input
-                aria-label={field.title}
-                type="checkbox"
-                checked={config[field.key] === true}
-                onChange={(e) => setConfig({ ...config, [field.key]: e.target.checked })}
-              />
-            ) : field.type === 'select' ? (
-              <select
-                aria-label={field.title}
-                value={String(config[field.key] ?? '')}
-                onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}
-              >
-                <option value="">選択してください</option>
-                {field.options?.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            ) : field.type === 'json' ? (
-              <JsonField
-                label={field.title}
-                value={config[field.key]}
-                onValidity={(valid) =>
-                  setInvalidFields((previous) => ({ ...previous, [field.key]: !valid }))
-                }
-                onChange={(value) => setConfig({ ...config, [field.key]: value })}
-              />
-            ) : (
-              <SettingsInput
-                aria-label={field.title}
-                type={field.type === 'number' ? 'number' : 'text'}
-                value={String(config[field.key] ?? '')}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    [field.key]:
-                      field.type === 'number' && e.target.value.trim()
-                        ? Number(e.target.value)
-                        : e.target.value,
-                  })
-                }
-              />
-            )}
+      {(ready, setError) => (
+        <>
+          <SettingsField title="種類">
+            <select
+              aria-label="種類"
+              value={typeId}
+              disabled={!!original}
+              onChange={(e) => {
+                const value = e.target.value;
+                setTypeId(value);
+                const next = defaults(value);
+                setConfig(next);
+                setJson(JSON.stringify(next, null, 2));
+                setAutomation(false);
+                setInvalidFields({});
+              }}
+            >
+              {!type && <option value={typeId}>{typeId || '種類がありません'}</option>}
+              {types.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
           </SettingsField>
-        ))
-      )}
-      {type && (
-        <details>
-          <summary>設定Schema</summary>
-          <pre>{JSON.stringify(type.configSchema, null, 2)}</pre>
-        </details>
+          {type?.description && <p>{type.description}</p>}
+          <SettingsField title="名前">
+            <SettingsInput
+              aria-label="名前"
+              data-initial-focus
+              value={title}
+              maxLength={100}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </SettingsField>
+          <SettingsField
+            title="説明"
+            description="公開すると、MCP・Appletのコマンド一覧にも表示されます。"
+          >
+            <SettingsTextarea
+              aria-label="説明"
+              value={description}
+              maxLength={1000}
+              rows={3}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </SettingsField>
+          <SettingsChoice
+            label="有効"
+            checked={enabled}
+            disabled={!type && !enabled}
+            onChange={setEnabled}
+          />
+          <SettingsChoice
+            label="MCP・Appletの共通APIへ公開"
+            checked={automation}
+            disabled={!type?.automation && !automation}
+            onChange={setAutomation}
+          />
+          {!type?.automation && <p className="muted">この種類は外部公開を許可していません。</p>}
+          {oldVersion && type && (
+            <SettingsChoice
+              label={`現在の設定形式（${type.configVersion}）へ明示的に更新する`}
+              checked={migrate}
+              onChange={(checked) => {
+                setMigrate(checked);
+                const next = checked ? defaults(typeId) : original!.config;
+                setConfig(next);
+                setJson(JSON.stringify(next, null, 2));
+                setInvalidFields({});
+              }}
+            />
+          )}
+          {!jsonOnly && editableConfig && (
+            <SettingsChoice
+              label="設定をJSONで編集"
+              checked={jsonMode}
+              onChange={(checked) => {
+                if (checked) setJson(JSON.stringify(config, null, 2));
+                else {
+                  try {
+                    const parsed = JSON.parse(json);
+                    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+                    setConfig(parsed);
+                  } catch {
+                    return;
+                  }
+                }
+                setInvalidFields({});
+                setJsonMode(checked);
+              }}
+            />
+          )}
+          {!editableConfig || jsonMode || jsonOnly ? (
+            <SettingsField title="固定設定（JSON）">
+              <SettingsTextarea
+                aria-label="固定設定（JSON）"
+                value={json}
+                readOnly={!editableConfig}
+                rows={10}
+                onChange={(e) => setJson(e.target.value)}
+              />
+            </SettingsField>
+          ) : typeId === 'appdock.input.sendKeys' ? (
+            <ShortcutCaptureField
+              mode="send"
+              label="送信キー"
+              value={typeof config.keys === 'string' ? config.keys : ''}
+              onChange={(keys) => setConfig({ ...config, keys })}
+              recordingReady={ready}
+              setError={setError}
+            />
+          ) : typeId === 'appdock.process.start' ? (
+            <ProcessCommandFields
+              config={config}
+              onChange={setConfig}
+              onValidity={(valid) =>
+                setInvalidFields((previous) => ({ ...previous, process: !valid }))
+              }
+            />
+          ) : typeId === 'appdock.mcp.call' ? (
+            <McpCommandFields
+              config={config}
+              onChange={setConfig}
+              invoke={invoke}
+              onValidity={(valid) =>
+                setInvalidFields((previous) => ({ ...previous, mcpArguments: !valid }))
+              }
+            />
+          ) : (
+            type!.fields!.map((field) => (
+              <SettingsField key={field.key} title={field.title}>
+                {field.type === 'boolean' ? (
+                  <input
+                    aria-label={field.title}
+                    type="checkbox"
+                    checked={config[field.key] === true}
+                    onChange={(e) => setConfig({ ...config, [field.key]: e.target.checked })}
+                  />
+                ) : field.type === 'select' ? (
+                  <select
+                    aria-label={field.title}
+                    value={String(config[field.key] ?? '')}
+                    onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}
+                  >
+                    <option value="">選択してください</option>
+                    {field.options?.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : field.type === 'json' ? (
+                  <JsonField
+                    label={field.title}
+                    value={config[field.key]}
+                    onValidity={(valid) =>
+                      setInvalidFields((previous) => ({ ...previous, [field.key]: !valid }))
+                    }
+                    onChange={(value) => setConfig({ ...config, [field.key]: value })}
+                  />
+                ) : (
+                  <SettingsInput
+                    aria-label={field.title}
+                    type={field.type === 'number' ? 'number' : 'text'}
+                    value={String(config[field.key] ?? '')}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        [field.key]:
+                          field.type === 'number' && e.target.value.trim()
+                            ? Number(e.target.value)
+                            : e.target.value,
+                      })
+                    }
+                  />
+                )}
+              </SettingsField>
+            ))
+          )}
+          {type && (
+            <details>
+              <summary>設定Schema</summary>
+              <pre>{JSON.stringify(type.configSchema, null, 2)}</pre>
+            </details>
+          )}
+        </>
       )}
     </SettingsDialog>
   );

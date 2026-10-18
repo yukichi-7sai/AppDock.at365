@@ -1,5 +1,39 @@
 # 検証記録
 
+## 2026-10-18: 拡張基盤・キー入力枠のコミット／プッシュ確認（0.62.1）
+
+- 利用者がキー入力枠の動作を良好と確認し、コミットとプッシュを依頼した。カスタムコマンド拡張A〜Dと入力枠、設計／計画／利用文書を対象とする。実装完了時の本体629入力とWindowsTools 24入力を照合し、製品・試験・依存・発行設定の追加変更がないことを確認。今回の追記は検証記録だけで、製品版・発行物は維持する。
+- 標準89ファイルを試験単位で分類。対象・transitive import・試験自体・依存／ツール入力を照合できた28ファイル**140件**を再利用し、後続修正の影響や生成物記録が不足した61ファイル**496/496**を追加確認した。合計**636/636、fail/skip 0**。生成物・Node・兄弟Appletのmanifest等**957入力**は前後一致。HTTP JSON／SSEの2ケースも成功ログと照合した。証跡の上書きを避けるため生成物一覧を実行別へ固定し、最終run `1792322691374-1aec1a50`を採用する。
+- 型検査・build・ソース／固定EXEのMCP GUI各20群とshortcut GUI各8群を、入力／完全ログ／固定コピーのhashで照合して再利用。既存入力5群は送信経路とnative部品の不変を確認した範囲で再利用し、旧EXEの結果を新EXEの実行結果へ読み替えない。WindowsToolsの回帰35/35・最終DLLのprotocol／nativeも再利用し、最終本体0.62.1とのGUIだけ追加成功（`host-1792322404244`）。
+- 本体EXE SHA256 `d6e3edc28307f37cd64c2c3760c81a21fc4c65be7986747da5d70f4672939bdc`、WindowsTools ZIP SHA256 `e0bc845a8cedef6ca6b17b13e7a2f74da148b1aa09f24a12feaeaac1651d72e9`を維持。feed・ASAR・生成物192ファイル／extraResources629ファイルを照合し、再発行なし。実装時レビューと今回の差分確認に未解決の製品指摘なし。
+- 証跡は`.artifacts/commit-validation-custom-commands-20261018/validation.json`、`test-plan.json`、各runと実行別generated一覧。stage／作業内容／commit treeの照合と、設定済みGitHub／AQUA両mainの通常push後の先端を`stage.json`、`commit.json`、`push.json`へ記録する。利用中設定・認証・実サービスを変更せず、Release・実利用deployは行わない。終了済みの成功／再利用資料・固定出力を保持し、整理結果は`cleanup.json`を参照する。
+
+## 2026-10-18: キー送信コマンドに共通キー入力枠を追加（0.62.1）
+
+- 「キーを送信する」の追加・編集に、ショートカット編集と同じ`ShortcutCaptureField`を接続。押した組合せの表示、Win、特殊キー選択、Tab移動／Esc取消、Enterの記録、JSON切替を対応した。送信モードだけで既存の送信用文法を使い、Pause／Plus等を選択肢から除外する。保存だけで送信せず、設定版・API・許可・送信worker・WindowsToolsは維持した。
+- 発行前レビュー1回と修正確認を実施。既存の入力停止／復帰・フォーカス・取消・保存処理を共用し、JSONの不正値から戻った際の修飾キー初期化と、IME 229の除外を補強した。未解決の製品指摘なし。設定項目／形式変更を伴わないUI拡張として本体だけ0.62.0→**0.62.1**へパッチ更新した。前回の未コミット変更を保持する。
+- 型検査・build、関連4ファイル**42/42、fail/skip 0**（`1792321051832-082b1cac`）が成功。ソースMCP GUI **20群**（`mcp-hub-source-1792321130030`）で追加／編集、Win、Tab／Esc、未対応キー・repeat・composition／229、取消、ID／説明保持、JSONでの不正入力の修正、明暗2幅と専用native先への実送信を確認。既存shortcut GUI **8群**（`shortcuts-ui-1792321201898`）で通常の入力枠・特殊キー・登録停止と復帰・取消・競合・保存／再起動を確認した。全標準回帰は重ねず、今回のUIと関連する文法・保存・割当に絞った。
+- 通常publish終了0（`1792321311199-eb03a82a`）。最終`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**168897902 bytes / SHA256 `d6e3edc28307f37cd64c2c3760c81a21fc4c65be7986747da5d70f4672939bdc`**。EXE／package／feedは0.62.1、feedのsize/hash一致、生成物192ファイルとASAR／Shell、extraResources 629ファイル、fixture非同梱、deploy関連ファイルとlockfile保持を確認。native DLLの生成hashも発行前と同一。WindowsTools 0.2.0のZIP／DLLは前回のhashを維持し、再発行していない。
+- 固定EXEでもMCP GUI **20群**（`mcp-hub-portable-1792321481937`）、既存shortcut GUI **8群**（`shortcuts-ui-1792321579273`）が終了0。各固定コピーと最終EXEのhash、fixture入力前後が一致し、明暗の入力枠を目視した。キー記録の操作はChromium入力、送信先への到達は別途native Windowで確認している。OS予約のWin組合せの物理記録と各IMEの手動操作は未確認。
+- 証跡は`.artifacts/custom-key-capture-20261018/validation.json`、各runの完全ログ・入力SHA256・終了結果、`review.md`、artifact／package照合と`cleanup.json`。公開一覧に設定値を期待した試験の参照先を隔離設定へ修正し、失敗資料を保持した。試験プロセス残存0、今回の成功profileは方式別1件で、過去の再利用資料・失敗・不明なものを保持し削除0。実利用設定・認証の変更、commit/push/Release/実利用deployは行っていない。
+
+## 2026-10-18: カスタムコマンド拡張 A〜D（0.62.0）
+
+- 全種類共通の説明文、単一のversion 2、キー送信種類、プロセス起動種類（exe／cmd／PowerShell）を実装。説明は一般公開コマンド一覧へ返し、同じMCP接続で更新される。Applet専用の`processes.start`と、初期OFFのプロセス起動許可・MCP入力許可を追加した。MCPからは保存して公開したコマンドを実行し、直接callerと元callerの許可を照合する。
+- 旧設定の移行・旧IDの付替え・自動清掃は行わない。未対応版を保持して実行停止し、JSONから空のversion 2一覧へ明示的に置き換えられる。A・Bの実入力検証後にWindowsToolsの旧キー送信を撤去し、固定12コマンドを維持した。WindowsToolsの詳細は兄弟repoの検証記録を参照する。
+- 発行前レビュー1回と修正確認を実施。説明のnull等の拒否、旧版JSON欄の編集可否、許可取消時の未送信入力取消、private ProcessHostのNUL標準入出力とRPC handle非継承を修正・確認した。起動受付は`processStarted / effectVerified:false`であり、子アプリの処理成功を示さない。結果不明時の再送・終了待ちは行わない。未解決の製品指摘なし。
+- 型検査・build・書式・差分確認が成功。標準回帰**634/634**（`1792313165961-e2b976e1`）後、追加試験と後続修正の影響7ファイルを**23/23＋43/43、fail/skip 0**で確認（`1792314054553-23a6bf8e`、`1792315582903-62f0e238`）。依存版・lockfile・供給元検査を維持した。版変更によるpnpm記録不一致は既存のfrozen/offline installで同期し、制限環境で詳細なく停止した.NETビルドは同じコマンドを通常権限で成功確認した。
+- ロック解除後の実入力GUI **5群**、実グローバルshortcut **4群**、ソースMCP GUI **19群**、権限GUI **5群**が成功。WindowsToolsなしで専用Windowへの実キー送信、開始対象・修飾キー待機・取消・連続操作、デスクトップからのWin+Eを確認した。最終固定EXEでもMCP **19群**（`mcp-hub-portable-1792315021027`）、権限 **5群**（`applet-api-portable-1792315174333`）、shortcut **4群**（`shortcut-foreground-1792315507951`）が成功。exeの厳密argv・GUI表示、cmd／PowerShell本文、Appletと元MCPの許可交差、設定保存だけでは未実行、許可取消・定義削除・実AppDock終了後のGUI継続を確認した。固定コピーのEXE hashとfixture入力前後も一致した。
+- 通常publish終了0。本体**0.62.0**の`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**168900019 bytes / SHA256 `822d633ecbbe2ac2d41a99df8c71b639833b1d1289c10b90e7740839c6d402eb`**。feedの版・size/hash、生成物192ファイルとASAR／Shell、extraResources 629ファイル、ProcessHost/runtimeconfig、fixture非同梱、deploy関連ファイル保持を確認。SDK／Runtimeのソース・版は変更せず、再ビルドで変化した生成DLLは発行物との一致と新しい実入力・固定EXEのNode/.NET/native接続で確認した。変更したWindowsToolsのみ0.2.0として発行し、未変更Applet・全体ZIPは発行していない。
+- 証跡は`.artifacts/custom-command-types-20261018/validation.json`、各runの入力SHA256・完全ログ・終了結果、`review.md`、`artifacts-after.json`、`package-content.json`、`zip-content.json`、`cleanup.json`。試験プロセス残存0、不要な調査ファイル4件を削除。今回の成功profileは方式別3件以内で、過去の再利用資料・失敗・利用状況不明を保持し、フォルダー削除0。利用中の設定・認証・実接続先を変更せず、実消灯・PCロック・実SwitchBot操作は行っていない。実利用アプリ固有の入力、UAC、混在DPI、各IMEの手動入力は未確認。commit/push/Release/実利用先deployは未実施。
+
+## 2026-10-18: カスタムコマンドの種類・説明文拡張の設計
+
+- AppDock `0d457b9`（0.61.0）とWindowsTools `3e74ec0`（0.1.6）の保存型・CRUD・入力サービス・公開一覧・共通UI・キー送信実装を照合し、[拡張設計](docs/custom-command-types-design.md)と[段階的実装計画](docs/custom-command-types-implementation-plan.md)を作成した。既存MCP実行種類を維持し、全種類共通の説明文、キー送信、プロセス起動、WindowsTools旧機能撤去を整理した。
+- 利用者指定により、WindowsToolsの設定移行を行わない。既存カスタムコマンド設定の作り直しも許容し、単一の新保存形式を採用する。旧形式専用reader・自動変換・旧ID対応・割当自動付替えを作らない。共通の未対応版保持と、JSON編集による新形式の明示保存は区別した。
+- 既存のキー送信は本体共通APIを再利用でき、個別説明文の保存・一般公開カタログへの投影は未実装であることを確認。MCPの固定ツールと動的な一覧応答の違い、入力許可、プロセス起動受付、各モードの引数・寿命を設計へ反映した。MCP・Microsoft・Nodeの一次資料も参照した。
+- 文書の差分・追加リンク・コードフェンス・参照先・変更範囲を確認し、証跡を`.artifacts/custom-command-types-design-20261018/validation.json`へ保存する。本体8ファイルとWindowsToolsの開発入口1ファイルの文書変更のみ。製品コード・利用中の設定・版・配布物は変更せず、製品テスト・commit/pushは実行しない。
+
 ## 2026-10-18: MCP接続先管理のコミット・プッシュ前確認（0.61.0）
 
 - 利用者が、AppDockのMCP経由で接続設定を変更し、SwitchBotのツールを公開してシーンを実行できたと報告した。実接続先での成功は利用者確認として記録し、今回の検証では機器操作を繰り返していない。

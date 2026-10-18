@@ -216,17 +216,25 @@ async function grant(id, permissions) {
     checks.push(
       'MCP off, default-allowed Node/.NET SDK; legacy self-setting during activation and commands needs no new permission',
     );
-    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 14);
+    assert.equal(Object.keys((await snapshot()).appletApi.permissions).length, 15);
     assert.equal((await snapshot()).appletApi.permissions.useTts, false);
     assert.equal((await snapshot()).appletApi.permissions.useAi, false);
     assert.equal((await snapshot()).appletApi.permissions.useMcp, false);
     assert.equal((await snapshot()).appletApi.permissions.manageCustomCommands, false);
     assert.equal((await snapshot()).appletApi.permissions.manageMcpServers, false);
+    assert.equal((await snapshot()).appletApi.permissions.runProcesses, false);
     assert.ok(
       Object.entries((await snapshot()).appletApi.permissions)
         .filter(
           ([k]) =>
-            !['useTts', 'useAi', 'useMcp', 'manageCustomCommands', 'manageMcpServers'].includes(k),
+            ![
+              'useTts',
+              'useAi',
+              'useMcp',
+              'manageCustomCommands',
+              'manageMcpServers',
+              'runProcesses',
+            ].includes(k),
         )
         .every(([, v]) => v === true),
     );
@@ -238,12 +246,12 @@ async function grant(id, permissions) {
     await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
     const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });
     await panel.getByRole('switch', { name: 'Applet：公開情報の取得', exact: true }).waitFor();
-    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 14);
-    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 12);
+    assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 15);
+    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 14);
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
       assert.equal(
         await control.isChecked(),
-        !/TTS|AI|MCP|カスタム/.test(await control.getAttribute('aria-label')),
+        !/TTS|AI|MCP|カスタム|プロセス/.test(await control.getAttribute('aria-label')),
       );
     const mcpDefaults = (await page.evaluate(() => window.dock.automation({ kind: 'status' })))
       .state;
@@ -260,7 +268,7 @@ async function grant(id, permissions) {
           .evaluateAll((nodes) => nodes.every((n) => n.getAttribute('aria-checked') === 'false')),
       'all grants revoked',
     );
-    await panel.getByText('直接公開なし', { exact: true }).waitFor();
+    assert.equal(await panel.getByText('直接公開なし', { exact: true }).count(), 0);
     await panel.getByText('連携中は許可', { exact: true }).waitFor();
     const mcpWrite = panel.getByRole('switch', {
       name: 'Codexからの設定変更を許可する',
@@ -418,7 +426,12 @@ async function grant(id, permissions) {
           await require('./settings-host-helper.cjs').settingsPage(page)
         ).screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
         if (width === 700) {
-          await panel.getByText('直接公開なし', { exact: true }).scrollIntoViewIfNeeded();
+          await panel
+            .getByRole('switch', {
+              name: 'CodexからのWindowsへのキー・操作メッセージ送信を許可する',
+              exact: true,
+            })
+            .scrollIntoViewIfNeeded();
           await (
             await require('./settings-host-helper.cjs').settingsPage(page)
           ).screenshot({

@@ -101,11 +101,24 @@ const rows: {
     action: 'setTrayEditing',
     label: 'タスクトレイ編集',
   },
-  { key: 'sendInput', description: hostSettingItem('permissions', 'sendInput').description },
+  {
+    key: 'sendInput',
+    description: hostSettingItem('permissions', 'sendInput').description,
+    mcp: 'allowSendInput',
+    action: 'setInputSending',
+    label: 'Windowsへのキー・操作メッセージ送信',
+  },
+  {
+    key: 'runProcesses',
+    description: hostSettingItem('permissions', 'runProcesses').description,
+    mcp: 'allowRunProcesses',
+    action: 'setProcessLaunching',
+    label: 'コマンド・プロセスの起動',
+  },
 ];
 
 function needs(key: AppletApiPermission, permissions: AppletApiPermissions, applet: boolean) {
-  if (key === 'read' || key === 'sendInput') return [];
+  if (key === 'read' || (key === 'sendInput' && applet)) return [];
   const required: AppletApiPermission[] = applet ? ['read'] : [];
   if (
     key !== 'execute' &&
@@ -238,8 +251,6 @@ export function ApiPermissionsSettings({
                 <td data-caller="MCP（Codex）">
                   {row.key === 'read' ? (
                     <span className="permission-fixed">連携中は許可</span>
-                  ) : row.key === 'sendInput' ? (
-                    <span className="permission-fixed">直接公開なし</span>
                   ) : (
                     <>
                       <Toggle

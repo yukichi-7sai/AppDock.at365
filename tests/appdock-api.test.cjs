@@ -74,11 +74,19 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   assert.equal(f.access.get().useMcp, false);
   assert.equal(f.access.get().manageCustomCommands, false);
   assert.equal(f.access.get().manageMcpServers, false);
+  assert.equal(f.access.get().runProcesses, false);
   assert.ok(
     Object.entries(f.access.get())
       .filter(
         ([k]) =>
-          !['useTts', 'useAi', 'useMcp', 'manageCustomCommands', 'manageMcpServers'].includes(k),
+          ![
+            'useTts',
+            'useAi',
+            'useMcp',
+            'manageCustomCommands',
+            'manageMcpServers',
+            'runProcesses',
+          ].includes(k),
       )
       .every(([, v]) => v === true),
   );
@@ -97,6 +105,7 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
       !m.startsWith('mcp.') &&
       !m.startsWith('ai.') &&
       !m.startsWith('input.') &&
+      !m.startsWith('processes.') &&
       !m.startsWith('ui.') &&
       m !== 'commands.execute' &&
       m !== 'applets.get',

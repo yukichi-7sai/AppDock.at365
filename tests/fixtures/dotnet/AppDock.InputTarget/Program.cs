@@ -62,6 +62,17 @@ internal sealed class Target : Form
     }
     protected override void OnShown(EventArgs e) {
         base.OnShown(e);
+        var arguments = Environment.GetCommandLineArgs();
+        if (arguments.Length >= 3 && arguments[1] == "--process-target") {
+            var output = arguments[2];
+            var timer = new System.Windows.Forms.Timer { Interval = 100 };
+            timer.Tick += (_, _) => {
+                if (File.Exists(output + ".stop")) { timer.Stop(); timer.Dispose(); Close(); return; }
+                File.WriteAllText(output, JsonSerializer.Serialize(new { pid = Environment.ProcessId, visible = Visible, window = Handle.ToString(), heartbeat = DateTime.UtcNow.Ticks, args = arguments.Skip(3).ToArray() }));
+            };
+            timer.Start();
+            return;
+        }
         _ = Task.Run(async () => {
             try {
                 while (await Console.In.ReadLineAsync() is string line) {

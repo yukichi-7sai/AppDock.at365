@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { normalizeShortcut, shortcutFromEvent } from '../../shared/commands';
+import { inputKeysFromEvent, normalizeInputKeys } from '../../shared/input-command';
 const specialGroups = [
   ['操作', ['Tab', 'Enter', 'Escape', 'Space', 'Backspace', 'Delete', 'Insert', 'Pause', 'Plus']],
   ['移動', ['Up', 'Down', 'Left', 'Right', 'Home', 'End', 'PageUp', 'PageDown']],
@@ -12,17 +13,34 @@ export function ShortcutCaptureField({
   recordingReady,
   setError,
   label = 'ショートカットキー',
+  mode = 'shortcut',
 }: {
   value: string;
   onChange(value: string): void;
   recordingReady: boolean;
   setError(error: string): void;
   label?: string;
+  mode?: 'shortcut' | 'send';
 }) {
   const id = useId();
   const recorder = useRef<HTMLButtonElement>(null);
   const [special, setSpecial] = useState(false);
-  const [modifiers, setModifiers] = useState<string[]>(value.split('+').slice(0, -1));
+  const normalize = mode === 'send' ? normalizeInputKeys : normalizeShortcut;
+  const [modifiers, setModifiers] = useState<string[]>(() => {
+    try {
+      return normalize(value).split('+').slice(0, -1);
+    } catch {
+      return [];
+    }
+  });
+  const supported = (key: string) => {
+    try {
+      normalize(key);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   useLayoutEffect(() => {
     recorder.current?.focus({ preventScroll: true });
   }, []);
@@ -44,14 +62,28 @@ export function ShortcutCaptureField({
         aria-label={`${label}を入力`}
         aria-describedby={`${id}-hint`}
         onKeyDown={(event) => {
-          if (event.key === 'Escape' || (event.key === 'Tab' && !event.ctrlKey && !event.altKey))
+          if (
+            event.key === 'Escape' ||
+            (event.key === 'Tab' &&
+              !event.ctrlKey &&
+              !event.altKey &&
+              (mode !== 'send' || !event.metaKey))
+          )
             return;
           event.preventDefault();
           event.stopPropagation();
-          if (!recordingReady || event.repeat || event.nativeEvent.isComposing) return;
-          const key = shortcutFromEvent(event.nativeEvent);
+          if (
+            !recordingReady ||
+            event.repeat ||
+            event.nativeEvent.isComposing ||
+            event.nativeEvent.keyCode === 229
+          )
+            return;
+          const key = (mode === 'send' ? inputKeysFromEvent : shortcutFromEvent)(event.nativeEvent);
           if (key) choose(key);
-          else if (!['Control', 'Alt', 'Shift'].includes(event.key))
+          else if (
+            !['Control', 'Alt', 'Shift', ...(mode === 'send' ? ['Meta'] : [])].includes(event.key)
+          )
             setError('このキーは使用できません。特殊キーから選択することもできます。');
         }}
       >
@@ -75,7 +107,7 @@ export function ShortcutCaptureField({
       {special && (
         <div className="shortcut-special-picker" id={`${id}-special`}>
           <div className="shortcut-modifiers" role="group" aria-label="特殊キーの修飾キー">
-            {['Ctrl', 'Alt', 'Shift'].map((modifier) => (
+            {['Ctrl', 'Alt', 'Shift', ...(mode === 'send' ? ['Win'] : [])].map((modifier) => (
               <button
                 key={modifier}
                 aria-pressed={modifiers.includes(modifier)}
@@ -96,12 +128,12 @@ export function ShortcutCaptureField({
             <div className="shortcut-special-group" key={name}>
               <small>{name}</small>
               <div>
-                {keys.map((key) => (
+                {keys.filter(supported).map((key) => (
                   <button
                     key={key}
-                    aria-pressed={value === normalizeShortcut([...modifiers, key].join('+'))}
+                    aria-pressed={value === normalize([...modifiers, key].join('+'))}
                     onClick={() => {
-                      choose(normalizeShortcut([...modifiers, key].join('+')));
+                      choose(normalize([...modifiers, key].join('+')));
                       setSpecial(false);
                       recorder.current?.focus({ preventScroll: true });
                     }}
