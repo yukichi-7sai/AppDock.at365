@@ -39,7 +39,7 @@ export const createDefaultSettings = (): Settings => ({
   },
   extensions: {},
   updates: {
-    hostSource: 'github:5ynonym/AppDock.at365',
+    hostSource: 'github:yukichi-7sai/AppDock.at365',
     checkHostOnStartup: false,
     checkAppletsOnStartup: false,
     startupDelaySeconds: 10,

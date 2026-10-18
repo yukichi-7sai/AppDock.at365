@@ -333,7 +333,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
     assert.equal(
       await page.getByLabel('AppDockの更新元', { exact: true }).inputValue(),
-      'github:5ynonym/AppDock.at365',
+      'github:yukichi-7sai/AppDock.at365',
     );
     checks.push(
       'collapsed settings, prominent actions, per-Applet sources, host/Applet default resets',

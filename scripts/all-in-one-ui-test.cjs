@@ -112,7 +112,7 @@ async function about(page) {
     await about(page);
     await page.screenshot({ path: path.join(profile, 'all-in-one-applets.png') });
     const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
-    assert.equal(saved.updates.hostSource, 'github:5ynonym/AppDock.at365');
+    assert.equal(saved.updates.hostSource, 'github:yukichi-7sai/AppDock.at365');
     const report = {
       ok: true,
       profile,

@@ -190,7 +190,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
     [
       'hostSource',
       'AppDockの更新元',
-      'ローカルの絶対パス・UNC・更新情報JSONのHTTP(S) URL・GitHubリポジトリURLに対応します。空欄で更新確認を無効にします。',
+      '既定: github:yukichi-7sai/AppDock.at365。ローカルの絶対パス・UNC・更新情報JSONのHTTP(S) URL・GitHubリポジトリURLに対応します。空欄で更新確認を無効にします。',
     ],
     ['checkHostOnStartup', '起動時にAppDockの更新を確認'],
     ['checkAppletsOnStartup', '起動時にAppletの更新を確認'],

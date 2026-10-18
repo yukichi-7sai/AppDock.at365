@@ -185,10 +185,31 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       .filter({ has: page.getByRole('heading', { name: '更新の設定', exact: true }) })
       .locator(':scope > summary')
       .click();
+    assert.equal(
+      await page.getByLabel('AppDockの更新元', { exact: true }).inputValue(),
+      'github:yukichi-7sai/AppDock.at365',
+    );
+    assert.ok(
+      (await page.locator('.about-page').innerText()).includes(
+        '既定: github:yukichi-7sai/AppDock.at365',
+      ),
+    );
     await confirmed('AppDockの更新元', (s) => s.updates.hostSource, {
       raw: base + '/update.json',
       saved: base + '/update.json',
     });
+    await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
+    await settleSettings(page);
+    assert.equal(
+      (await snapshot()).settings.value.updates.hostSource,
+      'github:yukichi-7sai/AppDock.at365',
+    );
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).updates.hostSource,
+      'github:yukichi-7sai/AppDock.at365',
+    );
+    checks.push('new GitHub default and description, reset saved immediately');
+    await page.screenshot({ path: path.join(profile, 'github-update-default.png') });
     await page
       .locator('details')
       .filter({ has: page.getByRole('heading', { name: 'インストール済みのApplet', exact: true }) })

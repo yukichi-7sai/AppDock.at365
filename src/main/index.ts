@@ -2124,7 +2124,7 @@ async function retryShell(region?: ShellRegion) {
 }
 function registerIpc() {
   const updateTarget = (id?: string) => {
-    if (id === undefined) return { version: app.getVersion(), repository: '5ynonym/AppDock.at365' };
+    if (id === undefined) return { version: app.getVersion(), repository: 'yukichi-7sai/AppDock.at365' };
     if (typeof id !== 'string' || !manager.items.has(id))
       throw new Error('Appletが見つかりません。');
     const manifest = manager.items.get(id)!.manifest;

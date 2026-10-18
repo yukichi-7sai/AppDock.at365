@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-19: GitHub参照先変更のコミット確認（0.62.4）
+
+- 利用者が本体への反映を確認し、先に本体をコミットするよう依頼。実装時の追跡入力・全生成物・成功ログ・固定EXEのSHA256を再照合し一致。型検査/build、関連51件、固定EXEのGUI6群・smokeを再利用した。実装時未実施の85ファイル586件だけを追加し、標準89ファイル **637/637、fail/skip 0**。制限環境のfixture build／試験中断を成功扱いせず、通常ユーザー環境でfixture buildと残り回帰が成功した。
+- 製品追加修正・再発行なし。実装時からの文書追記を確認し、対象10ファイルだけをstageしてtree／作業ファイルと照合する。[コミット証跡](.artifacts/commit-validation-github-account-20261019/)に再利用元・入力・追加試験・ログ・発行物・stage/commit照合を記録。過去・今回の成功／失敗証跡を保持し削除0件。push・Release・実利用先deployなし。全Appletの対応は、このコミット後に進める。
+
+## 2026-10-19: GitHubアカウント名の更新（0.62.4）
+
+- 開始時はmain `cb9c2c6`／作業ツリー・インデックス・未追跡ともclean。追跡先から`pull --ff-only`成功（Already up to date）。本体リポジトリ情報、更新元の既定値、設定例、更新元の画面説明を`yukichi-7sai/AppDock.at365`へ変更し、既定復帰を検査する既存GUIスクリプトの期待値も更新した。履歴文書の旧アカウント名は当時の記録として保持する。
+- 発行前に差分と影響先をレビューし、指摘なし。新規作成／欠落時の既定値と明示的な既定復帰だけを変更し、保存済みの旧GitHub指定・独自URL・空文字は保持する。設定項目・保存ファイル・公開APIの追加削除はなく、パッチ版0.62.4へ更新。本体だけを既存publish.batで`A:\40.ARTIFACT\AppDock.at365`へ発行した。
+- `dev.bat run typecheck`、`dev.bat run build`成功。`dev.bat exec node --test tests/core.test.cjs tests/settings-page.test.cjs tests/startup-updates.test.cjs tests/portable-updates.test.cjs`は **51/51、fail/skip 0**。既定値と保存済み3種類の保持を直接確認した。制限環境ではGitのDNS、依存ポリシー照会待ち、更新helperのアクセス拒否、GUIのspawn UNKNOWNが発生。既存の検査条件を維持して通常ユーザー権限で実行し成功した。
+- 最終EXEの隔離コピーで`settings-url-ui-test.cjs`の **6群** が成功。新しい既定値・説明文・既定復帰後のメモリ／settings.jsonの一致、既存URL確定動作を検証。画面画像も確認した。同じ最終EXEで`smoke.cjs`が成功し、画面・設定／画像保存先・正常終了を確認した。
+- 発行EXE／feed／Default Shellは0.62.4で一致。EXEは **168877131 bytes**、SHA256 **043d72acd4f4176d0417bbc4166a111cecc5aaa7e8740baf21b8d6647b0e85ab**。固定EXEコピーとhash一致。証跡は[今回の検証資料](.artifacts/github-account-20261019/)、GUIは`.artifacts/settings-url-1792344576028/`、smokeは`.artifacts/smoke-1792344604511/`。追跡入力の前後hashと生成物／ログhashを記録。型検査・ソース回帰後の変更はGUIスクリプトへの画像保存1行だけであり、製品・依存・ビルド入力に影響しない。
+- 全体ZIP／実更新交換のGUI、無関係な全回帰、実GitHub Releaseからの取得・実利用先deployは今回未実施。テストフォルダーは今回の成功証跡、制限環境の失敗証跡、過去の参照／再利用資料・利用状態未確認分を保持し、削除0件。コミット・push・Releaseなし。
+- 追加相談の「バージョン情報・更新」ページのPC別保存は別対応。既存チェック欄は再利用できるが、切替操作はApplet専用で、updatesと各AppletのupdateSourceは共有保存のため、保存・合成・切替処理の拡張が必要。利用者の指定により今回は未実装。
+
 ## 2026-10-19: 設計・実装前の最新取得手順
 
 - Windows標準コマンドの実装コミット後、設計・実装・修正の開始時にクリーンな対象repoを現在の追跡先から`pull --ff-only`する手順を30.PROJECT/AGENTS.mdへ追加し、このrepoの共通ワークフローから参照した。未コミット変更・未追跡ファイルの保護、追跡先なし／取得失敗／分岐時の扱いと、取得後の指示・版の再確認を明記した。
