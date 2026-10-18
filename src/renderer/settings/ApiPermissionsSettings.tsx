@@ -18,6 +18,20 @@ const rows: {
   label?: string;
 }[] = [
   {
+    key: 'useMcp',
+    description: hostSettingItem('permissions', 'useMcp').description,
+    mcp: 'allowUseMcp',
+    action: 'setMcpClient',
+    label: 'MCP接続先の利用',
+  },
+  {
+    key: 'manageCustomCommands',
+    description: hostSettingItem('permissions', 'manageCustomCommands').description,
+    mcp: 'allowManageCustomCommands',
+    action: 'setCustomCommandManagement',
+    label: 'カスタムコマンド管理',
+  },
+  {
     key: 'useAi',
     description: hostSettingItem('permissions', 'useAi').description,
     mcp: 'allowUseAi',
@@ -86,7 +100,14 @@ const rows: {
 function needs(key: AppletApiPermission, permissions: AppletApiPermissions, applet: boolean) {
   if (key === 'read' || key === 'sendInput') return [];
   const required: AppletApiPermission[] = applet ? ['read'] : [];
-  if (key !== 'execute' && key !== 'useTts' && key !== 'useAi') required.push('execute');
+  if (
+    key !== 'execute' &&
+    key !== 'useTts' &&
+    key !== 'useAi' &&
+    key !== 'useMcp' &&
+    key !== 'manageCustomCommands'
+  )
+    required.push('execute');
   if (key.startsWith('edit')) required.push('write');
   return required.filter((k) => !permissions[k]).map((k) => appletApiPermissionLabels[k]);
 }

@@ -1,3 +1,4 @@
+import { McpClientSettingsForm } from './McpClientSettings';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
@@ -14,6 +15,7 @@ import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
 import { TtsSettingsForm } from './TtsSettings';
 import { AiSettingsForm } from './AiSettings';
+import { CustomCommandsSettings } from './CustomCommandsSettings';
 import { ProfileEditor } from './ProfileEditor';
 import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
@@ -95,6 +97,24 @@ export function SettingsForm({
     return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
   if (category === 'ai')
     return <AiSettingsForm editor={editor} auxiliary={aux.ai} invoke={invoke} busy={busy} />;
+  if (category === 'mcp-client')
+    return (
+      <McpClientSettingsForm
+        settings={editor.value}
+        auxiliary={aux.mcpClient}
+        invoke={invoke}
+        busy={busy}
+      />
+    );
+  if (category === 'custom-commands')
+    return (
+      <CustomCommandsSettings
+        settings={settings}
+        auxiliary={aux.customCommands}
+        invoke={invoke}
+        busy={busy}
+      />
+    );
   if (category === 'notifications')
     return (
       <NotificationSettings

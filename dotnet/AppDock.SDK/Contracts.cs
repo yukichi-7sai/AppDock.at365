@@ -15,6 +15,7 @@ public interface IExtensionContext
     IShellService Shell => throw new NotSupportedException("Shell state requires AppDock 0.34.0 or later.");
     IAppDockService AppDock => throw new NotSupportedException("AppDock operations require AppDock 0.26.36 or later.");
     ICommandService Commands { get; }
+    ICustomCommandService CustomCommands => throw new NotSupportedException("Custom commands require AppDock 0.60.0 or later.");
     ITrayService Tray { get; }
     IRibbonService Ribbon => throw new NotSupportedException("Ribbon badges require AppDock 0.51.0 or later.");
     ISettingsService Settings { get; }
@@ -33,6 +34,10 @@ public interface ICommandService
     Task ReplaceAsync(IReadOnlyList<CommandRegistration> commands, CancellationToken cancellationToken = default);
 }
 public sealed record CommandRegistration(string Id, string Title, Func<CancellationToken, Task> Handler);
+public interface ICustomCommandService
+{
+    Task RegisterAsync(string typeId, Func<System.Text.Json.JsonElement, CancellationToken, Task<System.Text.Json.JsonElement?>> handler, CancellationToken cancellationToken = default);
+}
 public interface ITrayService { void Add(string title, string command); }
 public interface ISettingsService
 {

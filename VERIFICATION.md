@@ -1,5 +1,42 @@
 # 検証記録
 
+## 2026-10-18: MCPハブのコミット前照合（0.60.0）
+
+- 実装完了時の617入力、完全ログ、発行EXE/feed/ASAR、固定コピー、生成済みmain 160ファイル、ソース/固定EXE GUIのfixture各500ファイルを照合した。製品・試験・依存・ビルド入力の追加変更はなく、今回の追記はこの検証文書だけ。WatchのHEADとclean状態も一致している。
+- 標準618件のうち後続修正の影響範囲は関連69件の成功で補完し、型検査・ソースGUI10群・最終固定EXE GUI10群・smoke・publishの成功記録を再利用した。必要な成功結果に不足はなく、製品試験・publishは重ねていない。外部サービスの現在の状態やChatGPT実接続を今回再確認したとは扱わない。
+- 証跡は`.artifacts/commit-validation-mcp-hub-20261018/initial.json`と`validation.json`。対象61ファイルのstage/作業内容とtreeを`stage.json`、コミット後のSHA/tree照合を`commit.json`へ記録する。ローカルコミットが対象で、push・Release・実利用先deployは行わない。
+
+## 2026-10-18: MCPハブ 第4段階・全段階の実装完了（0.60.0）
+
+- main `7135a68df661b424eef2e37a296ce79d5f986d2a`を基準に、第1〜4段階を実装。`appdock.mcp.call`は共通カスタムコマンド基盤へ登録し、接続先/ツール選択・Schema確認・固定引数・timeoutを保存する。実行は元callerと実API呼出し元の両方を保ち、下流公開条件を検査してjobIdを返す。保存/dryRunでの実行、ハンドラー終了による受付済みジョブの取消、自動再送は行わない。
+- 発行前レビューで保存・権限・実行寿命・結果・既存入力経路・配布範囲を確認。初期種類登録の通知順序、接続の名前変更で暗号文を保持する処理、PC設定の保存前容量検証/破損時の読取り専用表示、128文字ツール名の共通API Schemaを修正した。設定/既知エラーを共通警告へ、接続/ジョブの最終失敗を共通エラーへ接続し、取消を通知しない。最終目視で発見したチェックボックスの幅は共通ダイアログの入力selectorを絞って修正。影響先のソースGUI/固定EXEを再検証し、発行を妨げる指摘は残っていない。
+- 型検査成功（`1792294037892-88f863b5`）。標準回帰**618/618、fail/skip 0**（`1792293894676-07704090`）。その後のツール名Schema修正と追加試験を含む関連5ファイル**69/69、fail/skip 0**（`1792293963752-cf6f4e6f`）が成功。これ以降の製品変更はダイアログCSSの1 selectorだけで、業務処理の再変更はなく全標準試験は重ねていない。Node 24.21.0/pnpm 12.10.1、既存MCP SDK 1.32.0を維持し、依存更新なし。
+- ソースGUI**10群**成功（`1792294187187-39acac24`、profile `.artifacts/mcp-hub-source-1792294187585`）。共通ダイアログの作成・不正JSON修正、API dryRun/create、専用shortcut編集、名称変更後の安定ID、受付後ジョブの成功、公開OFFによる実行拒否、再起動復元を確認。予約fixtureへ600秒を渡した。共通UIは740幅でも横はみ出しがなく項目名を読めることを計測・撮影・目視した。
+- 通常publish終了0（`1792294228511-8afe92af`）。最終`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**144266502 bytes / SHA256 `7dfa90c720222d25b8267d66a565a695cac6e488154d548e910c39c3392bb43c`**。package/EXE/feedの版0.60.0・サイズ/hash・ASAR内の実装一致・fixture非同梱・既存deploy関連3ファイル保持を`.artifacts/mcp-hub-validation/final-artifact.json`で照合した。共有設定ブロックとPC専用保存の追加により0.59.0からマイナー更新し、段階ごとの同じ未公開変更では版を重ねなかった。
+- 最終EXEの固定コピーでGUI**10群**成功（`1792294349535-020914cf`、profile `.artifacts/mcp-hub-portable-1792294349954`）。標準portable smokeも成功（`1792294391539-0c7e81dd`）。既存Watchの接続・実Window表示・保存・停止/再開と、Node/.NET/native種類の実行を含む。fixtureの入力hash前後、Watch HEAD `b070c2d89f8c1b3d452a5569c99431510a78da2f`、Node/MCP fixture hashを各profileの`fixture-inputs.json`へ記録。Watchのソース変更・再発行はしていない。
+- 証跡のIDはすべて`.artifacts/mcp-hub-validation/<ID>/`のresult.json・入力hash前後・完全ログを指す。初期化順序の起動失敗（`1792293427388-8b44d897`）と古いUI snapshotを開いた試験の競合（`1792293515238-f4da0783`）は修正/試験同期の見直し後に再確認し、失敗資料を保持した。終了済み成功profileの古い4件と不要な編集helperだけを整理し、直近3回/文書参照/失敗/実接続/検証ログは保持（`cleanup.json`）。後の再利用判定は`final-review.json`を入口とする。
+- 全体概要・実装計画・4段階の詳細・README/API/開発/保存/入力文書を現行仕様へ更新。ChatGPT本体の初回反映とRefreshなしの利用、物理キー/マウスの全経路、実照明、OAuth等の初期対象外機能は未確認。SDK同一接続の確認と実DeepWikiの公開データ読取りを、それらの成功へ置き換えない。WindowsTools移行、OSコマンド、永続予約、複数操作は別工程。commit/push/Release/実利用先deployは行っていない。
+
+## 2026-10-18: MCPハブ 第3段階（0.60.0）
+
+- 固定6入口をMCPへ公開し、接続先・ツール別のPC公開リスト、独立した利用許可、ジョブ結果のネイティブcontent投影を接続。レビューでCookieを送らない設定と、画像base64をJSONへ重複展開しない結果表現を確認。型検査/build、関連回帰54/54成功（`1792292724816-5b5bb82b`）。
+- ソースGUI9群成功（`1792292684248-6e041c66`）。公開OFFの接続先は一覧に出ず、未公開ツールのID指定を拒否。同じSDK接続で下流ツール追加後の発見/実行、外側tools/list不変、画像contentとisError保持を確認。暗色/740幅の共通ダイアログを撮影・目視した。
+- 通常publish終了0（`1792292730345-6c588e17`）。この段階のEXE SHA256 `1171ae49e9346e980e2582ff0412dea0aaf98d27369f8bc7348ba838002ead7b`。固定コピーのGUI9群成功（`1792292845752-46c60453`）。実際のChatGPT登録の初回反映/Refresh操作は未確認で、SDK試験とは区別する。
+
+## 2026-10-18: MCPハブ 第2段階（0.60.0）
+
+- 共通MCPクライアント、共有名簿/PC接続設定/暗号化秘密の分離、共通設定UI、Applet向け6操作と初期OFFのuseMcpを実装。stdioとStreamable HTTP（JSON/SSE）、認証なし/Bearer、Schema/公開範囲/世代の再検査、最大600秒のジョブと取消、二重受付防止を確認。レビューで公開許可の再検査位置と、FastMCPの明示的な結果注釈対応を補った。
+- 型検査成功（`1792292392704-b9452114`）、標準回帰615/615成功（`1792292363893-9689ef03`）。独立サーバーとの実通信7群はBearer、環境変数暗号化、許可、ページ分割、画像/isError、Schema変更、不正出力/容量超過、タイムアウト、自動再送なし、redirect防止、AppDockへの循環拒否を含む。
+- [公式の公開DeepWiki MCP](https://docs.devin.ai/work-with-devin/deepwiki-mcp)へ実接続し、公開`modelcontextprotocol/typescript-sdk`の目次をread_wiki_structureで取得した。認証情報・ローカルソースは送信していない。結果3621 bytes、succeeded（`1792292203181-25693bee`、`.artifacts/mcp-live-1792292203473`）。実照明等は操作していない。
+- 通常publish終了0（`1792292396206-33250b69`）。この段階のEXEは144253761 bytes、SHA256 `a034ffa708f4e7f3ab8b4a67f4ab264a72398b22326697b6557e0f1c2e922948`。固定コピーでGUI8群成功（`1792292524629-87a5b0fa`）。MCPサーバーOFFでstdio登録→一覧→実行→ジョブ結果表示も確認。ソースGUIは`.artifacts/mcp-hub-source-1792292157319`。OAuth、新方式専用サーバー、旧HTTP+SSE、実利用先deployは対象外。
+
+## 2026-10-18: MCPハブ 第1段階（0.60.0、後続段階は作業中）
+
+- 保存型カスタムコマンド、共有CRUD、独立管理許可、Node/.NET/nativeの種類登録、既存入力カタログ、共通設定UIを実装。WindowsTools移行・OS実行種類は対象外。発行前レビューで元callerの伝搬、旧キー送信契約、所有者/宣言/JSON検証、停止世代、取消と結果上限を照合し修正した。
+- 型検査・build成功。標準回帰608/608成功（`.artifacts/mcp-hub-validation/1792291247364-aea5b248`）。レビュー後に影響するAPI/カスタムコマンド22/22を再検証（`1792291319967-5b1ada6e`）。証跡は各ディレクトリのresult.json、入力hash前後、完全ログ。既存WatchのRelease build成功、ソースGUIで接続・実Window表示・保存・停止/再開を確認し描画PNGも目視した。
+- 通常publish終了0（`1792291334744-1afbd1fa`）。この段階の固定EXEは144246037 bytes、SHA256 `4b04dfc4259f0ee1a36ae828bd4bd1005ac994a8ec4ede7fc34110a08e58564b`。固定コピーの隔離確認7群が成功（`1792291478914-4ac66206`、profile `.artifacts/mcp-hub-portable-1792291479312`）。同じMCP接続で3方式の種類/定義追加と実行、入力競合保持、JSON所有者偽装拒否、安定ID、許可取消、提供元再開、AppDock再起動、削除後の割当保持を確認。
+- ショートカットは既存dispatcherの呼出しを検証し、物理キー/マウス操作の実機効果やChatGPT側のRefresh操作は未実施。MCP fixtureの成功をその確認へ置き換えない。後続の段階で同じ未公開版を更新する。commit/push/Release/実利用先deployは未実施。
+
 ## 2026-10-18: ジェスチャー一覧のボタンスタイル修正（0.59.0）
 
 - 独立したSettingsSectionへ移した一覧で、汎用`button:not(.toggle)`が追加・割り当て編集・メニューの専用スタイルを上書きしていた。共通ボタンの既定スタイルをクラスなし/primary/secondaryの操作ボタンへ限定し、専用コントロールの背景・余白・サイズ・文字サイズを維持するよう修正。設定・保存・実行処理は変更していない。

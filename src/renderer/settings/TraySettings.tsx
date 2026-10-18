@@ -34,7 +34,7 @@ export function TraySettings({
     'add' | 'trayClickCommand' | 'trayDoubleClickCommand' | null
   >(null);
   const items = getTrayMenu(settings, extensions);
-  const catalog = trayCommandCatalog(extensions);
+  const catalog = trayCommandCatalog(extensions, commands);
   const title = (item: TrayMenuItem) =>
     item.type === 'group'
       ? item.title

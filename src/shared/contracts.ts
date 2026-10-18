@@ -20,6 +20,8 @@ export interface ExtensionSettings {
   settings: Record<string, unknown>;
 }
 export interface Settings {
+  mcpServers?: import('./mcp-client').McpServerRoster;
+  customCommands?: import('./custom-commands').CustomCommandBlock;
   migrations?: { webApplet?: { version: 1; owner: string; ids: string[] } };
   tts?: import('./tts').TtsSettings;
   ai?: import('./ai').AiSettings;
@@ -149,6 +151,7 @@ export interface PanelAction {
   selected?: boolean;
 }
 export interface ExtensionManifest {
+  customCommandTypes?: import('./custom-commands').CustomCommandType[];
   pageActions?: { id: string; parameters?: Record<string, 'string' | 'number' | 'boolean'> }[];
   pageCollections?: import('./page-collections').PageCollectionDefinition[];
   notificationTypes?: import('./notification-types').NotificationTypeDefinition[];

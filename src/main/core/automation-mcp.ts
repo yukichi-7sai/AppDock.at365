@@ -3,7 +3,11 @@ import http, { type IncomingMessage } from 'node:http';
 import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  CallToolResultSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { AutomationApi, AutomationError } from './automation-api';
 import type { ConnectionScope } from '../../shared/automation';
 import { isLocalClient, validMcpHeaders } from './automation-network';
@@ -193,7 +197,20 @@ export class AutomationMcp {
             'info',
             `${context} result=success${method === 'commands.execute' ? ` completion=${value.completion}` : ''} durationMs=${Date.now() - started}`,
           );
+          if (method === 'mcp.jobs.get' && value.result) {
+            const result = CallToolResultSchema.parse(value.result);
+            const { content, ...metadata } = result;
+            return {
+              content,
+              structuredContent: { ...value, result: metadata },
+              ...(result.isError === undefined ? {} : { isError: result.isError }),
+            };
+          }
           return {
+            ...(method === 'mcp.jobs.get' &&
+            ['failed', 'outcome-unknown'].includes(String(value.state))
+              ? { isError: true }
+              : {}),
             content: [{ type: 'text', text: JSON.stringify(value) }],
             structuredContent: value,
           };

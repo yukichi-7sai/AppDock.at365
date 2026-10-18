@@ -128,8 +128,11 @@ export function resolveTrayMenu(
   return result;
 }
 
-export function trayCommandCatalog(extensions: ExtensionSnapshot[]) {
-  return [
+export function trayCommandCatalog(
+  extensions: ExtensionSnapshot[],
+  additional: import('./commands').UiCommand[] = [],
+) {
+  const base = [
     ...hostCommands,
     ...appletManagementCommands(extensions),
     ...extensions.flatMap((e) =>
@@ -139,4 +142,5 @@ export function trayCommandCatalog(extensions: ExtensionSnapshot[]) {
       })),
     ),
   ];
+  return [...base, ...additional.filter((c) => !base.some((b) => b.id === c.id))];
 }

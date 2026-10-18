@@ -1,5 +1,9 @@
 # 設定同期と保存領域
 
+保存型カスタムコマンドの`customCommands`ブロックは共有settings.jsonに保存します。Applet自身の設定保存先切替とは独立します。未知のブロック版・未導入種類・停止中提供元の定義と入力割当を保持し、実行だけを利用不可にします。[詳細契約](custom-commands-design.md)を参照してください。
+
+MCPの`mcpServers`名簿（ID・名前・説明）も共有settings.jsonです。URL/EXEパス/引数/cwd/許可は本体dataDirectoryのPC専用`mcp-client.json`へ分離し、Bearer/環境変数値はsafeStorageで暗号化します。共有名簿だけが届いたPCでは未設定です。固定コマンド引数は共有されるため秘密値を入れません。PCファイルの破損・未対応版は上書きせず、設定画面を読み取り専用にします。詳細は[クライアント保存契約](mcp-client-design.md#保存と設定ui)を参照してください。
+
 利用者向けの入口は[README](../README.md#設定とデータの保存先)。単一EXEの配布方式は維持し、同期できる登録データとPC専用の実行状態を分離する。
 
 0.57.0以降、EXE隣の`settings-<端末名>.json`を共有settings.jsonと合成する。Appletの有効状態、本体の表示・一般8項目は常に端末別。Applet設定一式・開始待ち・表示先は、ツールバーの「このPCで設定を保持する」で保存先を選ぶ。OFFでも端末設定を保持する。端末名・初期化・保存分離・復旧の契約は[端末別設定](device-settings-design.md)を参照する。

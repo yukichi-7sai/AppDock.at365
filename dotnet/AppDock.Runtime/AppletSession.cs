@@ -35,27 +35,34 @@ public static class AppletSession
                     case "settings.changed":
                         if (context is not null) await context.ChangeSettingsAsync(parameters);
                         return null;
+                    case "customCommand.execute":
                     case "command.execute":
                         if (context is null) throw new InvalidOperationException("Not activated.");
                         var invocation = parameters.TryGetProperty("invocation", out var metadata)
                             ? System.Text.Json.JsonSerializer.Deserialize<CommandInvocation>(metadata, JsonRpcConnection.Json) : null;
                         using (var commandLifetime = CancellationTokenSource.CreateLinkedTokenSource(active.Token)) {
-                            if (invocation is not null && !invocations.TryAdd(invocation.Session, commandLifetime))
+                            var callId = parameters.TryGetProperty("executionId", out var callIdentity) ? callIdentity.GetString()! : invocation?.Session;
+                            if (callId is not null && !invocations.TryAdd(callId, commandLifetime))
                                 throw new InvalidOperationException("Invocation already running.");
+                            if (invocation is not null && invocation.Session != callId) invocations.TryAdd(invocation.Session, commandLifetime);
                             try {
-                                if (invocation is not null && cancelledInvocations.ContainsKey(invocation.Session)) commandLifetime.Cancel();
+                                if ((invocation is not null && cancelledInvocations.ContainsKey(invocation.Session)) || (callId is not null && cancelledInvocations.ContainsKey(callId))) commandLifetime.Cancel();
                                 CommandExecution.Current = invocation;
                                 ExtensionContext.ExecutionId.Value = parameters.TryGetProperty("executionId", out var executionId) ? executionId.GetString() : null;
+                                if (method == "customCommand.execute")
+                                    return await context.ExecuteCustomAsync(parameters.GetProperty("typeId").GetString()!, parameters.GetProperty("config"), commandLifetime.Token);
                                 await context.ExecuteAsync(parameters.GetProperty("id").GetString()!, commandLifetime.Token);
                             } finally {
                                 CommandExecution.Current = null;
                                 ExtensionContext.ExecutionId.Value = null;
                                 if (invocation is not null) invocations.TryRemove(invocation.Session, out _);
+                                if (callId is not null) invocations.TryRemove(callId, out _);
                             }
                         }
                         return null;
+                    case "customCommand.cancel":
                     case "command.cancel":
-                        var cancelledSession = parameters.GetProperty("session").GetString()!;
+                        var cancelledSession = parameters.GetProperty(method == "customCommand.cancel" ? "executionId" : "session").GetString()!;
                         if (cancelledInvocations.TryAdd(cancelledSession, 0)) cancellationOrder.Enqueue(cancelledSession);
                         while (cancelledInvocations.Count > 256 && cancellationOrder.TryDequeue(out var expired))
                             cancelledInvocations.TryRemove(expired, out _);

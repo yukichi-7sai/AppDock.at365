@@ -1,8 +1,8 @@
 # カスタムコマンド基盤の詳細設計（第1段階）
 
-状態: 設計案・未実装。作成日: 2026-10-18。
+状態: 第1段階を実装（0.60.0）。更新日: 2026-10-18。実測は[VERIFICATION](../VERIFICATION.md)を参照。
 
-[全体概要](mcp-hub-design.md)と[実装計画](mcp-hub-implementation-plan.md)に基づく第1段階の契約。本書中の新規API、設定キー、型、コンポーネント名は実装予定である。現行の0.58.1には存在しない。
+[全体概要](mcp-hub-design.md)と[実装計画](mcp-hub-implementation-plan.md)に基づく第1段階の契約。最低ホスト版は0.60.0。Node/.NET/nativeの種類ハンドラーは同じ保存・実行サービスを使用する。
 
 ## 目的と完了範囲
 
@@ -81,7 +81,7 @@ itemsの配列順は管理一覧の順序だけを表す。ショートカット
 | 一覧 | 1ページ最大50件。config/Schema全文を含めない |
 | 実行結果 | JSONオブジェクト64KiB以内。画像・音声bytes・任意ファイル参照は第1段階の結果に含めない |
 
-settings.json全体の4MiB制限、設定ページJSONの1MiB制限も維持する。個別上限内でも保存全体の上限を超える場合は保存前に拒否する。prototype系キー、重複ID、他提供元へのなりすまし、予約済みcommandIdとの衝突を拒否する。
+settings.json全体と設定ページJSONは既存codecの1MiB制限も受ける。個別上限内でも保存全体の上限を超える場合は保存前に拒否する。prototype系キー、重複ID、他提供元へのなりすまし、予約済みcommandIdとの衝突を拒否する。
 
 ## 種類の宣言とハンドラー登録
 
@@ -113,7 +113,7 @@ Appletは新しいcapability `custom-commands`と、manifestの`customCommandTyp
 
 例はmanifestの関連部分だけを示す。minimumHostVersionは第1段階の実装版を指定する。automationは省略時false。この宣言は「この種類の定義を利用者が外部公開できる」という上限であり、定義を自動公開しない。
 
-configSchemaはJSON Schema 2020-12を基本とし、現在使っているSDKのAjv検証器を再利用できるか実装時に確認する。利用するkeywordとローカル`$defs`/`$ref`だけを受け付け、ネットワークからSchemaを取得しない。未知のkeywordや未対応Schemaを黙って無視して保存しない。Schemaはmanifest読込時に上限検査・コンパイルし、実行ごとに再コンパイルしない。
+configSchemaはJSON Schema 2020-12とdraft-7の共通部分に限定し、SDKのAjv検証器を再利用する。型、properties/required/additionalProperties、items、数値/長さ/件数の境界、enum/const、allOf/anyOf/oneOf/not、ローカル`$defs`/`$ref`を扱う。循環参照・外部参照・pattern/format・未知keywordは宣言時に拒否し、ネットワークからSchemaを取得しない。許可したdialect宣言はSchema位置だけで除去して検証する。Schemaは宣言時に上限検査・コンパイルし、実行ごとに再コンパイルしない。
 
 fieldsは既存の設定入力部品を使うための表示宣言。第1段階ではconfig直下のstring/number/boolean/select/jsonを対象とする。required、上限、許容値の正本はconfigSchemaで、fieldsの型・既定値との矛盾は宣言エラーにする。動的なリモートSchemaからフォームを生成する処理は第4段階で設計する。fieldsがない部分は検証付きJSON入力で編集する。
 

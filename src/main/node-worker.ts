@@ -14,6 +14,15 @@ const execution = new AsyncLocalStorage<{ id?: string; invocation: NodeCommandIn
 const activeCommands = new Map<string, { session?: string; controller: AbortController }>();
 const cancelledSessions = new Set<string>();
 export interface NodeExtensionContext {
+  customCommands: {
+    register(
+      typeId: string,
+      handler: (
+        config: Record<string, unknown>,
+        invocation: NodeCommandInvocation,
+      ) => Promise<Record<string, unknown> | void>,
+    ): Promise<void>;
+  };
   ribbon: {
     setBadge(
       target: import('../shared/ribbon').RibbonBadgeTarget,
@@ -104,6 +113,13 @@ export interface NodeExtension {
   onPageAction?(actionId: string, input: Record<string, unknown>, pageId: string): Promise<unknown>;
 }
 const commands: (Command & { handler: Handler })[] = [];
+const customHandlers = new Map<
+  string,
+  (
+    config: Record<string, unknown>,
+    invocation: NodeCommandInvocation,
+  ) => Promise<Record<string, unknown> | void>
+>();
 const tray: TrayItem[] = [];
 const disposables: (() => void)[] = [];
 let configuration: Record<string, unknown> = {};
@@ -119,6 +135,19 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       configuration = p.settings;
       extension = require(process.argv[2]) as NodeExtension;
       const context: NodeExtensionContext = {
+        customCommands: {
+          register: async (typeId, handler) => {
+            if (customHandlers.has(typeId) || typeof handler !== 'function')
+              throw Error('Invalid custom handler');
+            customHandlers.set(typeId, handler);
+            try {
+              await peer.request('host.customCommands.register', { typeId });
+            } catch (error) {
+              customHandlers.delete(typeId);
+              throw error;
+            }
+          },
+        },
         shell: {
           getState: async () => {
             const state = (await peer.request('host.shell.getState', {})) as OwnShellState;
@@ -269,9 +298,11 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       await extension.activate(context);
       return { commands: commands.map(({ id, title }) => ({ id, title })), tray };
     }
+    case 'customCommand.execute':
     case 'command.execute': {
+      const custom = method === 'customCommand.execute' ? customHandlers.get(p.typeId) : undefined;
       const cmd = commands.find((c) => c.id === p.id);
-      if (!cmd) throw new Error('Unknown command');
+      if (!cmd && !custom) throw new Error('Unknown command');
       const controller = new AbortController();
       const session = p.invocation?.session;
       const key = p.executionId ?? session ?? String(Math.random());
@@ -280,12 +311,15 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       const invocation = { ...p.invocation, signal: controller.signal };
       try {
         return await execution.run({ id: p.executionId, invocation }, () =>
-          cmd.handler(invocation),
+          custom ? custom(p.config, invocation) : cmd!.handler(invocation),
         );
       } finally {
         activeCommands.delete(key);
       }
     }
+    case 'customCommand.cancel':
+      activeCommands.get(p.executionId)?.controller.abort();
+      return null;
     case 'command.cancel': {
       cancelledSessions.add(p.session);
       if (cancelledSessions.size > 256)

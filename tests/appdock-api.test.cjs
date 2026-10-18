@@ -71,12 +71,17 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   assert.equal((await f.call('system.getInfo')).ok, true);
   assert.equal(f.access.get().useTts, false);
   assert.equal(f.access.get().useAi, false);
+  assert.equal(f.access.get().useMcp, false);
+  assert.equal(f.access.get().manageCustomCommands, false);
   assert.ok(
     Object.entries(f.access.get())
-      .filter(([k]) => k !== 'useTts' && k !== 'useAi')
+      .filter(([k]) => !['useTts', 'useAi', 'useMcp', 'manageCustomCommands'].includes(k))
       .every(([, v]) => v === true),
   );
-  assert.equal(Object.keys(f.access.get()).length, 11);
+  assert.equal(
+    Object.keys(f.access.get()).length,
+    Object.keys(require('../out/main/shared/appdock-api').appletApiPermissionLabels).length,
+  );
   f.grant({});
   assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(), {});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
@@ -84,6 +89,8 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   for (const method of automationMethods.filter(
     (m) =>
       !m.startsWith('tts.') &&
+      !m.startsWith('customCommands.') &&
+      !m.startsWith('mcp.') &&
       !m.startsWith('ai.') &&
       !m.startsWith('input.') &&
       !m.startsWith('ui.') &&

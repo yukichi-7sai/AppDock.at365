@@ -39,6 +39,8 @@ export const hostSettingsPages = [
   ['notifications', '通知'],
   ['tts', '読み上げ'],
   ['ai', 'AI'],
+  ['custom-commands', 'カスタムコマンド'],
+  ['mcp-client', 'MCP接続先'],
   ['ribbon', 'リボン'],
   ['tray', 'タスクトレイ'],
   ['shortcuts', 'ショートカット'],
@@ -50,6 +52,16 @@ export const hostSettingsPages = [
   ['about', 'バージョン情報・更新'],
 ] as const;
 const hostItems: Record<string, [string, string, string?][]> = {
+  'mcp-client': [
+    ['connections', 'MCP接続先', 'サーバー stdio HTTP 接続 設定 認証 ツール ジョブ 取消'],
+  ],
+  'custom-commands': [
+    [
+      'definitions',
+      'カスタムコマンド',
+      '種類を選んで固定設定を保存し、ショートカット・ジェスチャー・MCPから実行します。',
+    ],
+  ],
   ai: [
     ['commonPrompt', '共通プロンプト', '各AppletとMCPからの追加プロンプトに組み合わせる基本方針'],
     ['defaultConnectionId', '既定のAI接続', '呼出し側が接続を省略したときに使用'],
@@ -202,6 +214,10 @@ const hostItems: Record<string, [string, string, string?][]> = {
         editGestures: '割り当て・条件・実行順・動作設定を編集します。',
         editRibbon: '表示・配置・並び順・区切り線を編集します。',
         editTray: 'メニューとクリック・ダブルクリックの割り当てを編集します。',
+        useMcp:
+          '登録されたMCP接続先のツールを取得・実行します。実行にはコマンド実行の許可も必要です。',
+        manageCustomCommands:
+          '定義の設定値を含む閲覧と編集を許可します。公開したコマンドの実行許可とは別です。',
         sendInput: 'アクティブなウィンドウへキーや操作メッセージを送ります。',
       } as Record<string, string>
     )[key],
@@ -351,6 +367,10 @@ export function settingsPaths(
     ];
   }
   switch (page.id) {
+    case 'mcp-client':
+      return [['mcpServers']];
+    case 'custom-commands':
+      return [['customCommands']];
     case 'appearance':
       return ['theme', 'shellProviders'].map((k) => ['host', k]);
     case 'tts':

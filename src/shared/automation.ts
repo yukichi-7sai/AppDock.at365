@@ -17,7 +17,9 @@ export interface AutomationState {
   allowEditRibbon: boolean;
   allowUseTts: boolean;
   allowUseAi: boolean;
+  allowUseMcp: boolean;
   allowEditTray: boolean;
+  allowManageCustomCommands: boolean;
   port: number;
   running: boolean;
   endpoint: string;
@@ -41,12 +43,15 @@ export type AutomationAction =
   | { kind: 'selectName'; name: string }
   | { kind: 'setTts'; allowed: boolean }
   | { kind: 'setAi'; allowed: boolean }
+  | { kind: 'setMcpClient'; allowed: boolean }
   | { kind: 'setExecution'; allowed: boolean }
   | { kind: 'setAppletManagement'; allowed: boolean }
   | { kind: 'setShortcutEditing'; allowed: boolean }
   | { kind: 'setGestureEditing'; allowed: boolean }
   | { kind: 'setRibbonEditing'; allowed: boolean }
+  | { kind: 'setCustomCommandManagement'; allowed: boolean }
   | { kind: 'setTrayEditing'; allowed: boolean };
+// Separate management grants never enable command execution implicitly.
 
 export interface AutomationReply {
   state: AutomationState;

@@ -56,6 +56,8 @@ export function SettingsListTable({
   onToggle,
   onOrder,
   extra,
+  maxItems = 64,
+  canAdd = true,
 }: {
   definition: SettingDefinition;
   entries: Record<string, unknown>[];
@@ -67,6 +69,8 @@ export function SettingsListTable({
   onToggle?(index: number): void;
   onOrder(): void;
   extra?(entry: Record<string, unknown>, index: number): ReactNode;
+  maxItems?: number;
+  canAdd?: boolean;
 }) {
   const view = definition.list!;
   const fields = definition.fields ?? [];
@@ -75,7 +79,9 @@ export function SettingsListTable({
   return (
     <div className="settings-list">
       <div className="settings-list-toolbar">
-        <span>{entries.length} / 64 件</span>
+        <span>
+          {entries.length} / {maxItems} 件
+        </span>
         <div>
           <button
             type="button"
@@ -91,7 +97,7 @@ export function SettingsListTable({
             type="button"
             className="primary"
             data-dialog-focus-fallback
-            disabled={busy || entries.length >= 64}
+            disabled={busy || !canAdd || entries.length >= maxItems}
             onClick={onAdd}
           >
             {definition.itemTitle ?? '項目'}を追加

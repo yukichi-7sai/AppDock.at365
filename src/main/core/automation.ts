@@ -36,7 +36,9 @@ interface LocalConfig {
   allowEditRibbon: boolean;
   allowUseTts: boolean;
   allowUseAi: boolean;
+  allowUseMcp: boolean;
   allowEditTray: boolean;
+  allowManageCustomCommands: boolean;
   port: number;
   token: string;
   configFile: string;
@@ -111,7 +113,9 @@ export class AutomationService {
       allowEditRibbon: false,
       allowUseTts: false,
       allowUseAi: false,
+      allowUseMcp: false,
       allowEditTray: false,
+      allowManageCustomCommands: false,
       port: 0,
       token: '',
       serverName: 'AppDock',
@@ -133,7 +137,10 @@ export class AutomationService {
           (c.allowManageApplets !== undefined && typeof c.allowManageApplets !== 'boolean') ||
           (c.allowUseTts !== undefined && typeof c.allowUseTts !== 'boolean') ||
           (c.allowUseAi !== undefined && typeof c.allowUseAi !== 'boolean') ||
+          (c.allowUseMcp !== undefined && typeof c.allowUseMcp !== 'boolean') ||
           (c.allowEditTray !== undefined && typeof c.allowEditTray !== 'boolean') ||
+          (c.allowManageCustomCommands !== undefined &&
+            typeof c.allowManageCustomCommands !== 'boolean') ||
           (c.allowEditRibbon !== undefined && typeof c.allowEditRibbon !== 'boolean') ||
           (c.allowEditGestures !== undefined && typeof c.allowEditGestures !== 'boolean') ||
           (c.allowEditShortcuts !== undefined && typeof c.allowEditShortcuts !== 'boolean') ||
@@ -160,7 +167,9 @@ export class AutomationService {
         c.allowEditRibbon ??= false;
         c.allowUseTts ??= false;
         c.allowUseAi ??= false;
+        c.allowUseMcp ??= false;
         c.allowEditTray ??= false;
+        c.allowManageCustomCommands ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
         const token = options.decrypt(c.token);
         if (!/^[a-f0-9]{64}$/.test(token)) throw Error();
@@ -226,16 +235,19 @@ export class AutomationService {
     key:
       | 'allowUseTts'
       | 'allowUseAi'
+      | 'allowUseMcp'
       | 'allowWrite'
       | 'allowExecute'
       | 'allowManageApplets'
       | 'allowEditShortcuts'
       | 'allowEditGestures'
       | 'allowEditRibbon'
+      | 'allowManageCustomCommands'
       | 'allowEditTray',
   ) {
     if (this.closed || this.loadError || !this.config.enabled || !this.config[key]) return false;
-    if (key === 'allowUseTts' || key === 'allowUseAi') return true;
+    if (key === 'allowManageCustomCommands') return true;
+    if (key === 'allowUseTts' || key === 'allowUseAi' || key === 'allowUseMcp') return true;
     if (key === 'allowWrite' || key === 'allowExecute') return true;
     return this.config.allowExecute && (key === 'allowManageApplets' || this.config.allowWrite);
   }
@@ -268,7 +280,9 @@ export class AutomationService {
       allowEditRibbon: this.config.allowEditRibbon,
       allowUseTts: this.config.allowUseTts,
       allowUseAi: this.config.allowUseAi,
+      allowUseMcp: this.config.allowUseMcp,
       allowEditTray: this.config.allowEditTray,
+      allowManageCustomCommands: this.config.allowManageCustomCommands,
       port: this.config.port,
       running: !!this.server,
       endpoint: this.config.port ? `http://127.0.0.1:${this.config.port}/mcp` : '',
@@ -485,6 +499,13 @@ export class AutomationService {
           this.save();
           message = 'このPCの読み上げ許可を保存しました。';
           break;
+        case 'setMcpClient':
+          if (typeof action.allowed !== 'boolean') throw Error('MCP利用許可が不正です。');
+          this.config.allowUseMcp = action.allowed;
+          this.save();
+          this.options.authorizationChanged?.();
+          message = 'このPCのMCP利用許可を保存しました。';
+          break;
         case 'setAi':
           if (typeof action.allowed !== 'boolean') throw Error('AIの許可が不正です。');
           this.config.allowUseAi = action.allowed;
@@ -509,6 +530,13 @@ export class AutomationService {
           this.config.allowEditTray = action.allowed;
           this.save();
           message = 'このPCのタスクトレイ編集許可を保存しました。';
+          break;
+        case 'setCustomCommandManagement':
+          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          this.config.allowManageCustomCommands = action.allowed;
+          this.save();
+          this.options.authorizationChanged?.();
+          message = 'このPCのカスタムコマンド管理許可を保存しました。';
           break;
         case 'setRibbonEditing':
           if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');

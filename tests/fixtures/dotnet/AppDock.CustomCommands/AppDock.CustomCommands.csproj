@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../../../dotnet/Directory.Build.props" />
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../../../dotnet/AppDock.Runtime/AppDock.Runtime.csproj" /></ItemGroup>
+</Project>

@@ -1,5 +1,7 @@
 # 条件付きショートカット
 
+保存型[カスタムコマンド](custom-commands-design.md)も同じカタログとdispatcherに載ります。IDは`appdock.custom.<UUID>`で名前変更後も一定です。Applet種類のownerは提供元ID、本体種類は本体として条件を判定します。提供元停止・定義削除時も割当は保持し、利用不可の操作を自動起動しません。ジェスチャーも同じ実行経路を使用します。
+
 ## 設定
 
 `Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。

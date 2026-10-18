@@ -2,18 +2,32 @@
 
 MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保存処理を使います。機能別の契約は[共通操作APIの各操作](automation.md)を正本とし、この文書はAppletの接続・許可・互換性を説明します。
 
+## 保存型カスタムコマンド
+
+0.60.0から`customCommands.types.list/get`と`customCommands.list/get`、`commands.execute`経由の`appdock.customCommands.update`を使用できます。[カスタムコマンド契約](custom-commands-design.md)に保存形式・Schema・上限・CRUD例をまとめています。管理読取りはread + manageCustomCommands、変更はさらにexecute + write、保存済みコマンドの実行はread + executeです。新しい管理許可はMCP・Appletとも初期OFF。Appletは自身の定義だけを管理でき、外部公開を追加できません。実行の元callerはハンドラー内の共通APIにも引き継ぎ、MCPとAppletの必要許可の積を検査します。
+
+本体提供種類`appdock.mcp.call`は接続先ID・ツール名・toolRevision・固定argumentsを保存します。実行は`handlerReturned`内の`result.completion:'accepted'`とjobIdを返し、完了を待ちません。[保存型MCPコマンド](mcp-command-design.md)を参照してください。
+
+## MCPクライアントとハブ
+
+0.60.0から`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`をAppletとMCPへ公開します。発見/状態取得はread + useMcp、実行/取消はさらにexecuteが必要で、useMcpは両入口で初期OFFです。本体のMCPサーバーOFFでもAppletから利用できます。[接続・保存・上限](mcp-client-design.md)と[中継公開](mcp-hub-relay-design.md)を参照してください。
+
+tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返します。tools.callには`{serverId,name,arguments,toolRevision,requestId,timeoutMs?}`を指定し、返されたjobIdでjobs.get/cancelを呼びます。Nodeは`context.appdock.call`、.NETは`context.AppDock.CallAsync`を使用します。結果取得は同じ実行主体に限り、MCP起点を経由したAppletには元のMCP許可と公開リストも適用します。設定UIだけが全ジョブを確認できます。
+
+接続先の追加・秘密・公開許可の変更は本体設定UIで行います。管理APIへ実行ファイルやURLを渡して任意の接続先を作る機能はありません。未対応Schema・変更済みtoolRevision・非公開ツール・上限超過・再起動後のジョブは明確なエラーとして返します。
+
 ## 構造と公開範囲
 
 - `src/main/core/appdock-api.ts`のAppDockApiはMCPの起動状態から独立した単一インスタンスです。MCPはHTTPアダプター、Appletは既存JSON-lines RPCの`host.appdock.call`から呼びます。AppletにHTTPポート・Bearer token・Codex登録は不要です。
 - 操作カタログは`src/shared/appdock-api.ts`のappDockOperationsへ集約します。各操作で`callers`（mcp/applet）、`permissions`、入力JSON SchemaとMCP情報を宣言します。新規処理はAppDockApiのhandlersへ登録し、共通dispatcherが公開先・必要許可・Schemaを検証します。MCP列挙も同じ公開先を使うため、Applet RPC/SDK/MCPの通信実装を追加する必要はありません。既存のcommands.executeから公開コマンドを増やす場合も新しいツールは不要です。
-- Appletは20操作、MCPは18操作を公開します。公開情報・設定・コマンド、Applet管理、ショートカット・ジェスチャー・リボン・トレイ編集に加え、Applet専用の入力2操作があります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
+- 公開操作の正本は操作カタログのcallersです。公開情報・設定・コマンド、カスタムコマンド管理、Applet管理、入力割当編集等を提供し、Applet専用の入力2操作があります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。
 - 自分のStorage/Secrets、通知、UI登録等の既存APIは引き続き用途別の入口を使います。これらをMCPへ自動公開しません。リモートWebページにはこのAPIやホストIPCを渡しません。
 
 ## 宣言と許可
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.26.36"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境の初期値は既存9項目ON、useTtsはOFFです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/manageCustomCommandsがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
@@ -26,7 +40,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 許可を変更できるのはホストの設定画面だけです。MCPやAppletから自分の許可を追加できません。呼び出し元のApplet IDはホストが接続から決定し、リクエストから受け取りません。監査ログは呼び出し元Appletのログへ`[Applet API]`として操作名・リクエストID・成否を記録し、引数や秘密値を含めません。
 
-CodexとAppletの権限は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、内側には全Applet共通の許可を適用します。MCP起点を理由にApplet専用APIを拒否しません。これにより、MCPには生のキー送信APIを出さず、Appletが定義・公開する具体的な操作を実行できます。これは信頼できる、自分で作成するローカルAppletを前提にした仕様です。Appletプロセス自体はOSサンドボックスではありません。
+CodexとAppletの許可設定は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、ホストが発行する元callerを維持し、必要な共通許可はAppletとMCPの両方を満たす必要があります。キー送信だけは従来どおりAppletのsendInputと元MCPのコマンド実行許可を使用し、MCPへ生のキー送信APIを公開しません。信頼できるローカルAppletを前提とし、Appletプロセス自体をOSサンドボックスにする機能ではありません。
 
 ## Windows入力
 

@@ -2,6 +2,9 @@ import { shellView, type ShellRequirement } from '../../shared/shell';
 import type { ShellProvider } from './shell-provider-registry';
 import { parseNotificationTypes } from '../../shared/notification-types';
 import { CommandContexts } from './command-contexts';
+import type { InputInvocation } from './command-contexts';
+import { parseCustomTypes } from '../../shared/custom-commands';
+import { compileCustomType, type CustomCommandProvider } from './custom-commands';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -82,6 +85,15 @@ function readManifest(
     (!Array.isArray(m.capabilities) || m.capabilities.some((c: any) => typeof c !== 'string'))
   )
     throw new Error('capabilities の形式が正しくありません。');
+  const customCommandTypes = parseCustomTypes(m.id, m.customCommandTypes);
+  if (
+    customCommandTypes.length &&
+    (!m.capabilities?.includes('custom-commands') ||
+      !m.minimumHostVersion ||
+      compareVersions(m.minimumHostVersion, '0.60.0') < 0)
+  )
+    throw Error('カスタムコマンドにはcustom-commandsとminimumHostVersion:0.60.0以上が必要です。');
+  for (const type of customCommandTypes) compileCustomType(type);
   if (m.webAccounts) {
     if (!m.capabilities?.includes('web-accounts'))
       throw Error('Webアカウントにはweb-accounts capabilityが必要です。');
@@ -253,6 +265,7 @@ function readManifest(
     throw Error('設定セクションにはminimumHostVersion:0.36.8以上が必要です。');
   return {
     ...m,
+    customCommandTypes,
     settings: settingDefinitions,
     commands,
     defaultKeybindings,
@@ -289,6 +302,7 @@ export interface ExtensionInstance {
   peer?: JsonLinePeer | null;
 }
 interface ManagerOptions {
+  reservedCustomTypeIds?(): string[];
   builtinRoots?: string[];
   hostVersion?: string;
   roots: string[];
@@ -331,6 +345,7 @@ class ExtensionManager extends EventEmitter {
   queue: Promise<void>;
   shuttingDown: boolean;
   hostVersion: string;
+  reservedCustomTypeIds: () => string[];
   constructor({
     roots,
     builtinRoots = [],
@@ -341,6 +356,7 @@ class ExtensionManager extends EventEmitter {
     api,
     log,
     hostVersion = '0.0.0',
+    reservedCustomTypeIds = () => [],
   }: ManagerOptions) {
     super();
     this.builtinRoots = builtinRoots;
@@ -355,6 +371,7 @@ class ExtensionManager extends EventEmitter {
     this.queue = Promise.resolve();
     this.shuttingDown = false;
     this.hostVersion = hostVersion;
+    this.reservedCustomTypeIds = reservedCustomTypeIds;
   }
   discover() {
     const rejected = new Set<string>();
@@ -382,6 +399,17 @@ class ExtensionManager extends EventEmitter {
             );
             continue;
           }
+          const existingTypes = [
+            ...this.reservedCustomTypeIds(),
+            ...[...this.items.values()].flatMap((e) =>
+              (e.manifest.customCommandTypes ?? []).map((t) => t.id),
+            ),
+          ];
+          if (
+            existingTypes.length + (manifest.customCommandTypes?.length ?? 0) > 256 ||
+            manifest.customCommandTypes?.some((t) => existingTypes.includes(t.id))
+          )
+            throw Error('カスタムコマンドの種類が重複、または全体256件の上限を超えています。');
           this.items.set(manifest.id, {
             manifest,
             state: 'stopped',
@@ -719,10 +747,7 @@ class ExtensionManager extends EventEmitter {
     e.error = null;
     this.emit('changed');
   }
-  execute(
-    id: string,
-    invocation?: { session: string; window: string; process: string; source: string },
-  ) {
+  execute(id: string, invocation?: InputInvocation) {
     for (const item of this.items.values()) {
       const page = item.dynamicPages?.find((candidate) => candidate.openCommand === id);
       if (page) {
@@ -758,7 +783,16 @@ class ExtensionManager extends EventEmitter {
           running.peer!.request('command.execute', {
             id,
             executionId,
-            ...(invocation ? { invocation } : {}),
+            ...(invocation?.session
+              ? {
+                  invocation: {
+                    session: invocation.session,
+                    window: invocation.window,
+                    process: invocation.process,
+                    source: invocation.source,
+                  },
+                }
+              : {}),
           }),
         valid,
       );
@@ -787,7 +821,16 @@ class ExtensionManager extends EventEmitter {
           e.peer!.request('command.execute', {
             id,
             executionId,
-            ...(invocation ? { invocation } : {}),
+            ...(invocation?.session
+              ? {
+                  invocation: {
+                    session: invocation.session,
+                    window: invocation.window,
+                    process: invocation.process,
+                    source: invocation.source,
+                  },
+                }
+              : {}),
           }),
         );
       });
@@ -796,6 +839,63 @@ class ExtensionManager extends EventEmitter {
       () => {},
     );
     return execution;
+  }
+  customCommandProviders(): CustomCommandProvider[] {
+    return [...this.items.values()]
+      .filter((e) => e.manifest.customCommandTypes?.length)
+      .map((e) => ({
+        owner: { kind: 'applet' as const, id: e.manifest.id },
+        title: appletDisplayName(e.manifest),
+        types: e.manifest.customCommandTypes!,
+        generation: e.runtimeSession ?? '',
+        available:
+          e.state === 'running' && !!this.settings.value.extensions[e.manifest.id]?.enabled,
+        invoke: async (definition, invocation) => {
+          const peer = e.peer,
+            generation = e.runtimeSession;
+          if (!peer || peer.closed || e.state !== 'running')
+            throw Error('提供元が停止しています。');
+          return this.executions.run(e.manifest.id, invocation, async (executionId) => {
+            const cancel = () => {
+              try {
+                peer.send({
+                  jsonrpc: '2.0',
+                  method: 'customCommand.cancel',
+                  params: { executionId },
+                });
+              } catch {
+                /* Closing provider. */
+              }
+            };
+            invocation.signal?.addEventListener('abort', cancel, { once: true });
+            try {
+              if (invocation.signal?.aborted) throw Error('実行が取り消されました。');
+              const result = await peer.request(
+                'customCommand.execute',
+                {
+                  definitionId: definition.id,
+                  typeId: definition.typeId,
+                  configVersion: definition.configVersion,
+                  config: definition.config,
+                  executionId,
+                  invocation: {
+                    session: invocation.session ?? executionId,
+                    window: invocation.window ?? '',
+                    process: invocation.process ?? '',
+                    source: invocation.source ?? invocation.origin?.kind ?? 'local',
+                  },
+                },
+                30000,
+              );
+              if (generation !== e.runtimeSession || e.state !== 'running')
+                throw Error('提供元の実行世代が変わりました。');
+              return result;
+            } finally {
+              invocation.signal?.removeEventListener('abort', cancel);
+            }
+          });
+        },
+      }));
   }
   executePanelAction(extensionId: string, actionId: string) {
     const extension = this.items.get(extensionId);

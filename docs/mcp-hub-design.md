@@ -1,8 +1,8 @@
 # MCPハブとカスタムコマンドの全体概要設計
 
-状態: 設計案・未実装。作成日: 2026-10-18。
+状態: 第1〜4段階をAppDock 0.60.0へ実装。更新日: 2026-10-18。実機・配布物の確認範囲は[VERIFICATION](../VERIFICATION.md)を参照。
 
-本書は全体の役割と段階間の契約を定める。[実装計画](mcp-hub-implementation-plan.md)は順序と完了条件、[第1段階の詳細設計](custom-commands-design.md)はカスタムコマンド基盤の具体的な契約を扱う。第2～4段階の通信・認証・画面・保存形式の詳細は、それぞれの着手前に設計する。本書のAPI名や例は、現行製品で利用できるAPIを意味しない。
+本書は全体の役割と段階間の契約を定める。[実装計画](mcp-hub-implementation-plan.md)は順序と到達点、詳細設計は[カスタムコマンド](custom-commands-design.md)、[MCPクライアント](mcp-client-design.md)、[ハブ](mcp-hub-relay-design.md)、[保存型MCPコマンド](mcp-command-design.md)へ分ける。
 
 ## 目的と利用例
 
@@ -17,7 +17,7 @@ AppDockが外部MCPサーバーのクライアントになり、次の両方を�
 
 ## 現状と再利用する基盤
 
-設計の調査基準はAppDock 0.58.1、commit `87d2e02e3f2e500a100c567d9d304edac384824f`。実装開始時に差分を再確認する。
+当初の調査基準は0.58.1、commit `87d2e02e3f2e500a100c567d9d304edac384824f`。実装はmainの0.59.0、commit `7135a68df661b424eef2e37a296ce79d5f986d2a`から開始し、0.60.0へ版更新した。
 
 | 現行の仕組み | 再利用・拡張の方針 |
 | --- | --- |
@@ -28,7 +28,7 @@ AppDockが外部MCPサーバーのクライアントになり、次の両方を�
 | SettingsCommands、DeviceSettingsStore、設定ページ | revision、原子的保存、外部更新、共通の一覧編集を再利用する |
 | コマンドカタログ、入力dispatcher、CommandContexts | 所有者、割当、実行元、開始対象、取消を同じ経路で扱う |
 
-現行の動的登録は基本的にID・表示名・ハンドラーの登録であり、任意の保存型コマンドのCRUDではない。また、動的登録の外部公開はmanifestの個別ID宣言で決まる。通常のAppletコマンドは実行引数なしで、外部APIはハンドラーの戻り値をそのまま公開しない。この差分を第1段階で明示的に拡張する。
+従来の動的登録はID・表示名・ハンドラーの登録であり、外部公開はmanifestの個別ID宣言で決まる。この契約を保持し、保存定義のCRUDと種類別ハンドラーを追加した。通常のAppletコマンドと保存型コマンドの戻り値契約を混同しない。
 
 参照: [共通API](appdock-api.md)、[動的コマンド](extensions.md#動的コマンドとキー送信の一覧設定)、[操作カタログ](../src/shared/appdock-api.ts)、[現在の公開判定](../src/main/core/extensions.ts)、[現在の実行経路](../src/main/core/appdock-api.ts)。
 
@@ -70,12 +70,13 @@ flowchart LR
 
 AppDockのMCP `tools/list`に載せる入口と入力Schemaを固定する。接続先・ツール・カスタムコマンドの増減は、入口の返り値に反映する。
 
-| 概念上の共通API | 内容 |
+| 共通API | 内容 |
 | --- | --- |
 | `mcp.servers.list` | 外部公開が許可された接続先のID・名前・状態・概要 |
 | `mcp.tools.list` | 指定した接続先のツールの概要。ページ分割を持つ |
 | `mcp.tools.get` | 必要な1ツールの入力/出力Schema、説明、注釈、定義の識別情報 |
-| `mcp.tools.call` | 接続先ID・ツール名・argumentsで実行 |
+| `mcp.tools.call` | 接続先ID・ツール名・arguments・toolRevision・requestIdでジョブを受付 |
+| `mcp.jobs.get/cancel` | 呼出し元に結び付いた状態・結果の取得と待機取消 |
 
 発見の階層は「接続先 → その接続先のツール」の2段階とする。ツール一覧が大きい場合は概要だけ返し、詳細取得で対象Schemaを読む。すべての接続先の全Schemaを一括で返さない。
 
@@ -83,7 +84,7 @@ AppDockのMCP `tools/list`に載せる入口と入力Schemaを固定する。接
 
 接続先のツール一覧は対応する変更通知・再取得・キャッシュ期限で更新する。外部AIは必要に応じて一覧を再取得する。古いID、削除済みツール、変更されたSchemaは安全なエラーにし、同名の別ツールや別接続先へ自動で置き換えない。
 
-固定入口の初回導入、名前・Schema等の公開契約の変更にはクライアント側への反映が必要。導入後のデータの追加・変更・削除には入口の更新を必要としない。実際のChatGPT接続でこの差を検証する。公開プラグインの審査・反映方式は、直接接続のRefreshと区別する。
+固定入口の初回導入、名前・Schema等の公開契約の変更にはクライアント側への反映が必要。導入後のデータの追加・変更・削除には入口の更新を必要としない。同じSDK接続でメタデータ不変とツール増減を確認した。ChatGPT本体の実接続・初回反映・Refreshなしの増減は未確認であり、SDK試験と区別する。
 
 ### 保存と同期
 
@@ -108,11 +109,11 @@ AppDockへの認証と接続先への認証は別物。受信したAppDock用Bea
 
 タイムアウト・切断・応答消失では効果が発生した可能性がある。変更操作を自動再送せず、状態照会や利用者の判断につなげる。取消は伝搬するが、既に発生した効果を取り消したとは扱わない。AppDock自身や他のハブへの接続による循環は拒否するか、有界の経路検査で停止する。
 
-長時間ツールはHTTP要求を無制限に保持しない。第2段階でジョブID・状態取得・取消・保持期限・再起動時の状態を設計する。接続先が対応していない継続実行や重複防止を、AppDock側だけで保証しない。
+長時間ツールは受付後にjobIdを返す。1接続先1件・全体4件、待ち時間1〜600秒、完了結果は10分保持する。再起動後は再開・再送しない。保存型コマンドのhandlerReturnedはジョブ受付であり、接続先の応答や実効果とは別である。接続先が対応していない継続実行や重複防止を、AppDock側だけで保証しない。
 
 ## 今回の範囲と後続の範囲
 
-最初のMCPハブの対象はツールの発見と実行とする。Resources、Prompts、MCP AppsのUI中継、Eventsの再配信、Sampling、Elicitation等の双方向機能は対応範囲を別に決める。未対応機能を対応済みとしてcapabilityに宣言しない。
+MCPクライアントの対象はstdioとStreamable HTTP（JSON/SSE応答）、認証なし/Bearer、2025-11-25方式のツール発見・実行。OAuth、旧HTTP+SSE、Resources、Prompts、MCP AppsのUI中継、Eventsの再配信、Sampling、Elicitation、MCP Tasks、2026-07-28だけに対応する下流は初期対象外。AppDock自身の既存MCPサーバー入口の新旧方式対応は維持する。
 
 | 別工程 | 接続する場所・理由 |
 | --- | --- |
@@ -134,8 +135,8 @@ AppDockへの認証と接続先への認証は別物。受信したAppDock用Bea
 
 ## 参照した外部仕様
 
-2026-10-18確認。仕様やクライアントの動作は実装段階で再確認する。
+2026-10-18確認。下流クライアントは既存SDK 1.32.0と実接続の対応に基づいて採用版を限定した。
 
-- [MCP Tools仕様](https://modelcontextprotocol.io/specification/2026-07-28/server/tools): 一覧、ページ分割、Schema、呼出し、結果、注釈、変更通知。上記の`mcp.*`はAppDock固有の共通API案であり、標準メソッド名とは区別する。
+- [採用したMCP Tools仕様](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)、[Transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports): 一覧、ページ分割、Schema、呼出し、結果、注釈、変更通知。上記の`mcp.*`はAppDock固有の共通APIであり、標準メソッド名とは区別する。
 - [MCP Specification](https://modelcontextprotocol.io/specification/2026-07-28): capabilityと拡張の対応範囲。
 - [OpenAI: Connect and test your plugin](https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata): 直接接続における公開メタデータ変更時のRefreshと、公開プラグインとの差。

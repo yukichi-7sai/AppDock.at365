@@ -3689,7 +3689,7 @@ summary {
   gap: 20px;
   padding: 14px 0;
 }
-.settings-dialog-body input,
+.settings-dialog-body input:not([type='checkbox']):not([type='radio']),
 .settings-dialog-body select {
   min-width: 0;
   width: 100%;

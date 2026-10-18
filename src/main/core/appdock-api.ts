@@ -1,5 +1,7 @@
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import type { InputInvocation } from './command-contexts';
+import type { CustomCommandService } from './custom-commands';
+import { customUpdateCommand } from '../../shared/custom-commands';
 import type { AppletApiPermissions } from '../../shared/appdock-api';
 import {
   appDockMethods,
@@ -59,6 +61,9 @@ export class AppDockApi {
       appletPermissions?(id: string): AppletApiPermissions;
       save(value: Settings, revision: number): SettingsSnapshot;
       settingsCommands?: SettingsCommands;
+      customCommands?: CustomCommandService;
+      customCommandsManageable?(): boolean;
+      mcpClientAllowed?(): boolean;
       appletManagement?: AppletManagement;
       manageable?(): boolean;
       shortcutsEditable?(): boolean;
@@ -70,7 +75,7 @@ export class AppDockApi {
       shortcutStatus?(): GlobalHotKeyStatus[];
       applets(): AutomationApplet[];
       commands(): AutomationCommand[];
-      execute(id: string): Promise<unknown>;
+      execute(id: string, context?: InputInvocation): Promise<unknown>;
       ttsAllowed?(): boolean;
       aiAllowed?(): boolean;
       executable(): boolean;
@@ -105,6 +110,7 @@ export class AppDockApi {
     return {
       useTts: this.options.ttsAllowed?.() ?? false,
       useAi: this.options.aiAllowed?.() ?? false,
+      useMcp: this.options.mcpClientAllowed?.() ?? false,
       read: true,
       execute: this.options.executable(),
       write: this.options.writable(),
@@ -113,13 +119,35 @@ export class AppDockApi {
       editGestures: this.options.gesturesEditable?.() ?? false,
       editRibbon: this.options.ribbonEditable?.() ?? false,
       editTray: this.options.trayEditable?.() ?? false,
+      manageCustomCommands: this.options.customCommandsManageable?.() ?? false,
     };
+  }
+  private effectivePermissions(appletId: string | undefined, context: InputInvocation) {
+    const own = this.permissions(appletId);
+    const origin = context.origin;
+    if (!origin || origin.kind === 'local') return own;
+    const root = this.permissions(origin.kind === 'applet' ? origin.appletId : undefined);
+    return Object.fromEntries(
+      Object.entries(own).map(([key, value]) => [
+        key,
+        value === true &&
+          (key === 'sendInput' && origin.kind === 'mcp'
+            ? root.execute === true
+            : root[key as keyof AppletApiPermissions] === true),
+      ]),
+    ) as AppletApiPermissions;
   }
   private commands() {
     return [
       ...new Map(
         [
           ...this.options.commands(),
+          ...(this.options.customCommands
+            ? [
+                ...this.options.customCommands.publicCommands(),
+                this.options.customCommands.managementCommand(),
+              ]
+            : []),
           ...this.settingsCommands.commands(),
           ...(this.options.appletManagement?.commands() ?? []),
           ...this.shortcuts.commands(),
@@ -154,7 +182,7 @@ export class AppDockApi {
     appletId?: string,
     context: InputInvocation = {},
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
-    const permissions = this.permissions(appletId);
+    const permissions = this.effectivePermissions(appletId, context);
     const definition = Object.hasOwn(appDockOperations, method)
       ? appDockOperations[method as AppDockMethod]
       : undefined;
@@ -167,6 +195,19 @@ export class AppDockApi {
     if (!this.options.ready())
       throw new AutomationError('NOT_READY', 'AppDockは起動中または終了中です。');
     if (!object(params)) throw new AutomationError('INVALID_ARGUMENT', '引数はオブジェクトです。');
+    if (method.startsWith('customCommands.')) {
+      if (!inputValidators.get(method)!(params).valid)
+        throw new AutomationError('INVALID_ARGUMENT', '引数が操作の形式に一致しません。');
+      if (!this.options.customCommands)
+        throw new AutomationError('NOT_READY', 'カスタムコマンドを利用できません。');
+      try {
+        return this.options.customCommands.read(method, params, appletId);
+      } catch (error) {
+        if (error instanceof SettingsCommandError)
+          throw new AutomationError(error.code, error.message);
+        throw error;
+      }
+    }
     const handler = this.options.handlers?.[method as AppDockMethod];
     if (handler) {
       if (!inputValidators.get(method)!(params).valid)
@@ -229,6 +270,7 @@ export class AppDockApi {
           this.id(params, true),
           params.args === undefined ? {} : params.args,
           appletId,
+          context,
         );
       case 'tray.get':
         return {
@@ -305,8 +347,9 @@ export class AppDockApi {
     id: string,
     args: unknown,
     appletId?: string,
+    context: InputInvocation = {},
   ): Promise<Record<string, unknown>> {
-    const permissions = this.permissions(appletId);
+    const permissions = this.effectivePermissions(appletId, context);
     if (!permissions.execute)
       throw new AutomationError(
         'EXECUTION_DISABLED',
@@ -321,6 +364,7 @@ export class AppDockApi {
       !object(args) ||
       (![
         'settings.write',
+        'customCommands.write',
         'shortcuts.write',
         'gestures.write',
         'ribbon.write',
@@ -335,6 +379,7 @@ export class AppDockApi {
     if (
       [
         'settings.write',
+        'customCommands.write',
         'shortcuts.write',
         'gestures.write',
         'ribbon.write',
@@ -383,6 +428,23 @@ export class AppDockApi {
       );
     this.executing++;
     try {
+      if (command.permission === 'customCommands.write') {
+        if (!permissions.manageCustomCommands || !this.options.customCommands)
+          throw new AutomationError('API_DISABLED', 'カスタムコマンドの管理を許可してください。');
+        const result = this.options.customCommands.update(args, appletId);
+        return {
+          id: customUpdateCommand,
+          completion: result.dryRun ? 'validated' : 'settingsSaved',
+          effectVerified: false,
+          ...result,
+        };
+      }
+      if (this.options.customCommands?.has(id))
+        return await this.options.customCommands.execute(id, {
+          ...context,
+          apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
+          origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
+        });
       if (command.permission === 'tray.write') {
         const result = this.tray.execute(args);
         return {
@@ -427,7 +489,10 @@ export class AppDockApi {
           ...result,
         };
       }
-      await this.options.execute(id);
+      await this.options.execute(id, {
+        ...context,
+        origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
+      });
       return {
         id,
         completion: command.completion,
@@ -438,6 +503,7 @@ export class AppDockApi {
             : 'コマンド処理から応答が返りました。操作先での効果は未確認です。',
       };
     } catch (error) {
+      if (error instanceof AutomationError) throw error;
       if (error instanceof SettingsCommandError || error instanceof AppletManagementError)
         throw new AutomationError(error.code, error.message);
       throw new AutomationError(

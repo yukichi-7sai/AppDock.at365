@@ -1,7 +1,11 @@
+import { mcpClientOperations } from './mcp-client';
 import { aiOperations } from './ai-api';
+import { customCommandOperations } from './custom-commands';
 // One operation catalog drives MCP tools and both Applet SDK entry points.
 export const appDockOperations = {
   ...aiOperations,
+  ...mcpClientOperations,
+  ...customCommandOperations,
   'tts.speak': {
     callers: ['mcp', 'applet'],
     permissions: ['read', 'execute', 'useTts'],
@@ -441,6 +445,8 @@ export function operationsFor(caller: ApiCaller) {
 export type AppDockMethod = keyof typeof appDockOperations;
 export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
 export const appletApiPermissionLabels = {
+  useMcp: 'MCP接続先の利用',
+  manageCustomCommands: 'カスタムコマンド定義の閲覧・編集',
   useAi: 'AIサーバーへの送信・文章生成',
   useTts: 'TTSサーバーへの送信・読み上げ',
   sendInput: 'Windowsへのキー・操作メッセージ送信',

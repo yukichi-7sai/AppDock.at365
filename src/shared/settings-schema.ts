@@ -1,3 +1,4 @@
+import { parseMcpRoster } from './mcp-client';
 import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
 import { parseShellProviders } from './shell';
@@ -218,6 +219,10 @@ export function parseSettings(value: unknown): Settings {
   )
     throw Error('更新確認の開始までの秒数は0～3600の整数です。');
   const next = {
+    ...(value.mcpServers === undefined ? {} : { mcpServers: parseMcpRoster(value.mcpServers) }),
+    ...(value.customCommands === undefined
+      ? {}
+      : { customCommands: parseCustomCommands(value.customCommands) }),
     tts: parseTtsSettings(value.tts),
     ai: parseAiSettings(value.ai),
     gestures: value.gestures === undefined ? defaultGestures() : parseGestures(value.gestures),
@@ -277,3 +282,4 @@ function parseGestureInitialized(value: unknown): string[] {
     throw Error('ジェスチャー初期設定の適用済み一覧が不正です。');
   return [...new Set(value)] as string[];
 }
+import { parseCustomCommands } from './custom-commands';

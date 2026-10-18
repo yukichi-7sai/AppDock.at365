@@ -1,0 +1,571 @@
+const { test } = require('node:test'),
+  assert = require('node:assert/strict'),
+  fs = require('node:fs'),
+  os = require('node:os'),
+  path = require('node:path'),
+  http = require('node:http');
+const { randomUUID } = require('node:crypto');
+const {
+  StreamableHTTPServerTransport,
+} = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
+const { fixtureServer } = require('./fixtures/mcp-server.cjs');
+const { SettingsStore } = require('../out/main/main/core/settings');
+const { McpClientSettings } = require('../out/main/main/core/mcp-client-settings');
+const { McpClientService } = require('../out/main/main/core/mcp-client');
+const { parseMcpRoster, defaultMcpConnection } = require('../out/main/shared/mcp-client');
+const { operationsFor } = require('../out/main/shared/appdock-api');
+const { CustomCommandService } = require('../out/main/main/core/custom-commands');
+const { SettingsCommands } = require('../out/main/main/core/settings-commands');
+const { mcpCommandType } = require('../out/main/shared/mcp-command');
+const host = { owner: 'host', kind: 'host', external: false },
+  external = { owner: 'mcp:1', kind: 'mcp', external: true },
+  applet = { owner: 'applet:a:1', kind: 'applet', external: false };
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+async function until(fn) {
+  for (let i = 0; i < 250; i++) {
+    const v = await fn();
+    if (v) return v;
+    await delay(20);
+  }
+  throw Error('Timed out');
+}
+function fixture(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-mcp-'));
+  const store = new SettingsStore(path.join(dir, 'settings.json'));
+  store.load();
+  let service,
+    allowed = true;
+  const settings = new McpClientSettings(
+    store,
+    path.join(dir, 'mcp-client.json'),
+    {
+      encrypt: (v) => randomUUID() + ':' + Buffer.from(v).toString('base64'),
+      decrypt: (v) => Buffer.from(v.slice(37), 'base64').toString(),
+    },
+    () => service?.reconcile(),
+  );
+  const failures = [];
+  service = new McpClientService({
+    settings,
+    authorized: (actor) => actor.kind === 'host' || allowed,
+    failed: (id, e) => failures.push(e),
+  });
+  t.after(async () => {
+    await service.shutdown();
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  const add = (connection, extra = {}) => {
+    const id = randomUUID();
+    settings.update({
+      op: 'save',
+      expectedRevision: settings.revision(),
+      item: { id, name: 'Fixture', description: 'Test' },
+      connection: { ...defaultMcpConnection(), ...connection },
+      ...extra,
+    });
+    return id;
+  };
+  return {
+    dir,
+    store,
+    settings,
+    service,
+    failures,
+    add,
+    revoke: () => {
+      allowed = false;
+      service.reconcile();
+    },
+  };
+}
+async function httpFixture(t, { json = true, bearer } = {}) {
+  const state = { count: 0, changed: false },
+    sessions = new Map(),
+    received = [];
+  const server = http.createServer(async (req, res) => {
+    received.push({ method: req.method, authorization: req.headers.authorization });
+    if (bearer && req.headers.authorization !== 'Bearer ' + bearer) {
+      res.writeHead(401);
+      res.end();
+      return;
+    }
+    try {
+      let entry = sessions.get(req.headers['mcp-session-id']);
+      if (!entry) {
+        const sdk = fixtureServer(state),
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: randomUUID,
+            enableJsonResponse: json,
+            onsessioninitialized: (id) => sessions.set(id, { sdk, transport }),
+          });
+        entry = { sdk, transport };
+        await sdk.connect(transport);
+      }
+      await entry.transport.handleRequest(req, res);
+    } catch {
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    }
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(async () => {
+    await Promise.allSettled([...sessions.values()].map((v) => v.sdk.close()));
+    server.closeAllConnections();
+    await new Promise((r) => server.close(r));
+  });
+  return { url: `http://127.0.0.1:${server.address().port}/mcp`, state, received };
+}
+async function call(f, actor, id, name, args = {}, extra = {}) {
+  const { tool } = await f.service.tool(actor, { serverId: id, name });
+  const job = await f.service.start(actor, {
+    serverId: id,
+    name,
+    arguments: args,
+    toolRevision: tool.toolRevision,
+    requestId: randomUUID(),
+    ...extra,
+  });
+  return until(() => {
+    const j = f.service.get(actor, job.jobId);
+    return j.state !== 'running' && j;
+  });
+}
+test('MCP roster, local binding, encryption and atomic revisions do not share endpoints or secrets', async (t) => {
+  const f = fixture(t),
+    id = f.add(
+      { enabled: true, url: 'http://127.0.0.1:9876/mcp', authentication: 'bearer' },
+      { token: 'secret-value' },
+    );
+  const shared = fs.readFileSync(f.store.file, 'utf8');
+  assert(!shared.includes('secret-value'));
+  assert(!shared.includes('9876'));
+  assert(!fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8').includes('secret-value'));
+  const revision = f.settings.revision();
+  assert.throws(
+    () =>
+      f.settings.update({
+        op: 'save',
+        expectedRevision: revision,
+        item: f.settings.roster()[0],
+        connection: { ...f.settings.connection(id), url: 'http://127.0.0.1:9877/mcp' },
+      }),
+    /再入力/,
+  );
+  assert.equal(f.settings.revision(), revision);
+  assert.throws(
+    () => f.settings.update({ op: 'enabled', id, enabled: false, expectedRevision: 'stale' }),
+    /変更/,
+  );
+  assert.throws(() =>
+    parseMcpRoster({ version: 1, items: [{ id, name: 'x', description: '', url: 'secret' }] }),
+  );
+  assert.throws(() => f.add({ transport: 'stdio', command: 'cmd.exe' }));
+  const before = f.settings.revision(),
+    save = f.store.save.bind(f.store);
+  f.store.save = () => {
+    throw Error('disk');
+  };
+  assert.throws(
+    () => f.settings.update({ op: 'enabled', id, enabled: false, expectedRevision: before }),
+    /disk/,
+  );
+  f.store.save = save;
+  assert.equal(f.settings.revision(), before);
+  const identity = f.settings.identity(id),
+    encrypted = JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8')).entries[id]
+      .secret;
+  f.settings.update({
+    op: 'save',
+    expectedRevision: f.settings.revision(),
+    item: { ...f.settings.roster()[0], name: 'Renamed' },
+    connection: f.settings.connection(id),
+  });
+  assert.equal(f.settings.identity(id), identity);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json'), 'utf8')).entries[id].secret,
+    encrypted,
+  );
+  f.settings.update({
+    op: 'save',
+    expectedRevision: f.settings.revision(),
+    item: f.settings.roster()[0],
+    connection: f.settings.connection(id),
+    token: 'changed-secret',
+  });
+  assert.notEqual(f.settings.identity(id), identity);
+});
+test('stdio uses a real process, paginated tools and encrypted environment; errors and cancellation are distinct', async (t) => {
+  const f = fixture(t),
+    cancelFile = path.join(f.dir, 'cancelled'),
+    startedFile = path.join(f.dir, 'started'),
+    id = f.add(
+      {
+        enabled: true,
+        transport: 'stdio',
+        command: process.execPath,
+        args: [path.resolve(__dirname, 'fixtures/mcp-server.cjs')],
+      },
+      {
+        environment: {
+          MCP_FIXTURE_SECRET: 'test',
+          MCP_FIXTURE_CANCEL_FILE: cancelFile,
+          MCP_FIXTURE_STARTED_FILE: startedFile,
+        },
+      },
+    );
+  const listed = await f.service.tools(applet, { serverId: id, limit: 2 });
+  assert.equal(listed.items.length, 2);
+  assert(listed.nextCursor);
+  assert(!('inputSchema' in listed.items[0]));
+  const result = await call(f, applet, id, 'echo', { message: 'hello' });
+  assert.equal(result.result.structuredContent.message, 'hello');
+  assert.equal(result.result.structuredContent.environment, true);
+  assert.equal(result.effectVerified, false);
+  assert.equal((await call(f, applet, id, 'fail')).state, 'tool-error');
+  assert.equal((await call(f, applet, id, 'image')).result.content[0].type, 'image');
+  assert.equal((await call(f, applet, id, 'annotated')).result.structuredContent.result, 'wrapped');
+  const { tool } = await f.service.tool(applet, { serverId: id, name: 'delay' });
+  const p = {
+    serverId: id,
+    name: 'delay',
+    arguments: { delay: 3000 },
+    toolRevision: tool.toolRevision,
+    requestId: randomUUID(),
+  };
+  const [a, b] = await Promise.all([f.service.start(applet, p), f.service.start(applet, p)]);
+  assert.equal(a.jobId, b.jobId);
+  await until(() => fs.existsSync(startedFile));
+  assert.equal(f.service.cancel(applet, a.jobId).state, 'cancelled');
+  await until(() => fs.existsSync(cancelFile));
+  assert.throws(
+    () => f.service.get(external, a.jobId),
+    (e) => e.code === 'NOT_FOUND',
+  );
+  assert.equal(f.failures.length, 1);
+});
+for (const json of [true, false])
+  test(`HTTP ${json ? 'JSON' : 'SSE'} validates Bearer, dynamic schemas, results and caller scope`, async (t) => {
+    const server = await httpFixture(t, { json, bearer: 'downstream-only' }),
+      f = fixture(t),
+      id = f.add(
+        {
+          enabled: true,
+          url: server.url,
+          authentication: 'bearer',
+          published: true,
+          publishedTools: ['echo', 'image', 'delay', 'schedule_off'],
+        },
+        { token: 'downstream-only' },
+      );
+    assert.equal(f.service.servers(external).items.length, 1);
+    assert.deepEqual(
+      (await f.service.tools(external, { serverId: id, limit: 50 })).items.map((v) => v.name),
+      ['echo', 'delay', 'image', 'schedule_off'],
+    );
+    await assert.rejects(
+      f.service.tool(external, { serverId: id, name: 'fail' }),
+      (e) => e.code === 'NOT_FOUND',
+    );
+    const old = (await f.service.tool(host, { serverId: id, name: 'echo' })).tool;
+    const p = {
+      serverId: id,
+      name: 'echo',
+      arguments: { message: 'payload' },
+      toolRevision: old.toolRevision,
+      requestId: randomUUID(),
+    };
+    const result = await f.service.start(external, p);
+    await until(() => f.service.get(external, result.jobId).state === 'succeeded');
+    assert.equal((await f.service.start(external, p)).jobId, result.jobId);
+    assert.equal(server.state.count, 1);
+    await assert.rejects(
+      f.service.start(external, { ...p, arguments: { message: 'other' } }),
+      (e) => e.code === 'REQUEST_CONFLICT',
+    );
+    assert.throws(
+      () => f.service.get(applet, result.jobId),
+      (e) => e.code === 'NOT_FOUND',
+    );
+    await call(f, host, id, 'change_catalog');
+    await assert.rejects(
+      f.service.start(host, { ...p, requestId: randomUUID() }),
+      (e) => e.code === 'SCHEMA_CHANGED',
+    );
+    assert(
+      (await f.service.tools(host, { serverId: id, refresh: true, limit: 50 })).items.some(
+        (v) => v.name === 'added',
+      ),
+    );
+    const unsupported = (await f.service.tool(host, { serverId: id, name: 'unsupported' })).tool;
+    assert(unsupported.unsupportedReason);
+    await assert.rejects(
+      f.service.start(host, {
+        serverId: id,
+        name: 'unsupported',
+        arguments: {},
+        toolRevision: unsupported.toolRevision,
+        requestId: randomUUID(),
+      }),
+      (e) => e.code === 'UNSUPPORTED_SCHEMA',
+    );
+    assert.equal(
+      (await call(f, external, id, 'schedule_off', { seconds: 600 })).result.structuredContent
+        .scheduledSeconds,
+      600,
+    );
+    assert(server.received.every((r) => r.authorization === 'Bearer downstream-only'));
+    f.revoke();
+    assert.throws(
+      () => f.service.get(external, result.jobId),
+      (e) => e.code === 'API_DISABLED',
+    );
+  });
+test('timeout is outcome unknown without retry, revocation removes results, and connection edits invalidate revisions', async (t) => {
+  const server = await httpFixture(t),
+    f = fixture(t),
+    id = f.add({ enabled: true, url: server.url });
+  const result = await call(f, applet, id, 'delay', { delay: 4000 }, { timeoutMs: 1000 });
+  assert.equal(result.state, 'outcome-unknown');
+  assert.equal(server.state.count, 1);
+  const tool = (await f.service.tool(applet, { serverId: id, name: 'echo' })).tool;
+  f.settings.update({
+    op: 'save',
+    expectedRevision: f.settings.revision(),
+    item: f.settings.roster()[0],
+    connection: { ...f.settings.connection(id), published: true },
+  });
+  await assert.rejects(
+    f.service.start(applet, {
+      serverId: id,
+      name: 'echo',
+      arguments: {},
+      toolRevision: tool.toolRevision,
+      requestId: randomUUID(),
+    }),
+    (e) => e.code === 'SCHEMA_CHANGED',
+  );
+});
+test('invalid output and oversized results are never success; auth failures and AppDock loops are rejected', async (t) => {
+  const f = fixture(t),
+    server = await httpFixture(t),
+    id = f.add({ enabled: true, url: server.url });
+  assert.equal((await call(f, host, id, 'invalid_output')).error.code, 'INVALID_RESULT');
+  assert.equal((await call(f, host, id, 'oversized')).state, 'outcome-unknown');
+  const secured = await httpFixture(t, { bearer: 'test-secret' }),
+    secureId = f.add({ enabled: true, url: secured.url });
+  await assert.rejects(
+    f.service.tools(host, { serverId: secureId }),
+    (e) => e.code === 'AUTH_REQUIRED',
+  );
+  assert.equal(f.service.statuses().find((s) => s.id === secureId).state, 'error');
+  const loop = await httpFixture(t);
+  loop.state.serverName = 'AppDock';
+  const loopId = f.add({ enabled: true, url: loop.url });
+  await assert.rejects(f.service.tools(host, { serverId: loopId }), (e) => e.code === 'HUB_CYCLE');
+});
+test('HTTP redirects never forward the downstream credential', async (t) => {
+  let calls = 0;
+  const target = http.createServer((req, res) => {
+    calls++;
+    res.end('{}');
+  });
+  await new Promise((r) => target.listen(0, '127.0.0.1', r));
+  const redirect = http.createServer((req, res) => {
+    res.writeHead(307, { Location: `http://127.0.0.1:${target.address().port}/other` });
+    res.end();
+  });
+  await new Promise((r) => redirect.listen(0, '127.0.0.1', r));
+  t.after(async () => {
+    for (const s of [redirect, target]) {
+      s.closeAllConnections();
+      await new Promise((r) => s.close(r));
+    }
+  });
+  const f = fixture(t),
+    id = f.add(
+      {
+        enabled: true,
+        url: `http://127.0.0.1:${redirect.address().port}/mcp`,
+        authentication: 'bearer',
+      },
+      { token: 'secret' },
+    );
+  await assert.rejects(f.service.tools(host, { serverId: id }));
+  assert.equal(calls, 0);
+});
+
+test('saved MCP commands validate without execution, retain identity, and detach accepted job lifetime', async (t) => {
+  const remote = await httpFixture(t),
+    f = fixture(t),
+    serverId = f.add({
+      enabled: true,
+      url: remote.url,
+      published: true,
+      publishedTools: ['delay'],
+    });
+  const settingsCommands = new SettingsCommands({
+    settings: f.store,
+    applets: () => [],
+    save: (v, r) => f.store.save(v, r),
+  });
+  const service = new CustomCommandService({
+    settings: f.store,
+    settingsCommands,
+    providers: () => [],
+    save: (v, r) => f.store.save(v, r),
+  });
+  service.registerHost(
+    mcpCommandType,
+    async (config, context) => {
+      const job = await f.service.start(
+        external,
+        {
+          serverId: config.serverId,
+          name: config.toolName,
+          arguments: config.arguments,
+          toolRevision: config.toolRevision,
+          requestId: randomUUID(),
+        },
+        context.signal,
+        true,
+      );
+      return { completion: 'accepted', jobId: job.jobId };
+    },
+    {
+      validateConfig: (c) => f.service.commandValidation(c),
+      unavailableReason: (c) => f.service.commandUnavailable(c),
+    },
+  );
+  const tool = (await f.service.tool(host, { serverId, name: 'delay' })).tool;
+  const config = {
+    serverId,
+    toolName: 'delay',
+    toolRevision: tool.toolRevision,
+    arguments: { delay: 150 },
+  };
+  const id = randomUUID(),
+    type = service.descriptors()[0];
+  const operations = [
+    {
+      op: 'add',
+      expectedTypeRevision: type.typeRevision,
+      item: {
+        id,
+        typeId: type.id,
+        title: 'Saved MCP',
+        enabled: true,
+        automation: true,
+        configVersion: 1,
+        config,
+      },
+    },
+  ];
+  const before = fs.readFileSync(path.join(f.dir, 'settings.json'), 'utf8');
+  service.update({ expectedRevision: settingsCommands.revision(), operations, dryRun: true });
+  assert.equal(fs.readFileSync(path.join(f.dir, 'settings.json'), 'utf8'), before);
+  assert.equal(remote.state.count, 0);
+  service.update({ expectedRevision: settingsCommands.revision(), operations });
+  assert.equal(remote.state.count, 0);
+  const accepted = await service.execute('appdock.custom.' + id, { origin: { kind: 'mcp' } });
+  assert.equal(accepted.result.completion, 'accepted');
+  const completed = await until(() => {
+    const j = f.service.get(external, accepted.result.jobId);
+    return j.state !== 'running' && j;
+  });
+  assert.equal(completed.state, 'succeeded');
+  assert.equal(remote.state.count, 1);
+  service.update({
+    expectedRevision: settingsCommands.revision(),
+    operations: [{ op: 'update', id, changes: { title: 'Renamed' } }],
+  });
+  assert.equal(service.summaries()[0].commandId, 'appdock.custom.' + id);
+  assert.match(f.service.commandValidation({ ...config, arguments: { delay: 'bad' } }), /Schema/);
+  assert.match(f.service.commandValidation({ ...config, toolRevision: '0'.repeat(64) }), /再取得/);
+  f.settings.update({
+    op: 'enabled',
+    id: serverId,
+    enabled: false,
+    expectedRevision: f.settings.revision(),
+  });
+  assert.match(f.service.commandUnavailable(config), /OFF/);
+  await assert.rejects(
+    service.execute('appdock.custom.' + id),
+    (e) => e.code === 'TYPE_UNAVAILABLE',
+  );
+  assert.equal(remote.state.count, 1);
+});
+
+test('saved MCP acceptance checks cancellation and external publication before sending', async (t) => {
+  const remote = await httpFixture(t),
+    f = fixture(t),
+    id = f.add({ enabled: true, url: remote.url });
+  const tool = (await f.service.tool(host, { serverId: id, name: 'echo' })).tool;
+  const params = {
+    serverId: id,
+    name: 'echo',
+    toolRevision: tool.toolRevision,
+    arguments: {},
+    requestId: randomUUID(),
+  };
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    f.service.start(host, params, controller.signal, true),
+    (e) => e.code === 'CANCELLED',
+  );
+  assert.throws(
+    () => f.service.start(external, params, undefined, true),
+    (e) => e.code === 'NOT_FOUND',
+  );
+  assert.equal(remote.state.count, 0);
+});
+
+test('the shared API can discover and execute a 128-character downstream tool name', async (t) => {
+  const remote = await httpFixture(t),
+    f = fixture(t);
+  const name = (remote.state.longTool = 't'.repeat(128));
+  const id = f.add({ enabled: true, url: remote.url, published: true, publishedTools: [name] });
+  const { AppDockApi } = require('../out/main/main/core/appdock-api');
+  const api = new AppDockApi({
+    settings: f.store,
+    applets: () => [],
+    commands: () => [],
+    execute: async () => {},
+    save: (v, r) => f.store.save(v, r),
+    ready: () => true,
+    version: 'test',
+    instanceId: 'test',
+    executable: () => true,
+    writable: () => true,
+    mcpClientAllowed: () => true,
+    handlers: {
+      'mcp.tools.get': (p) => f.service.tool(external, p),
+      'mcp.tools.call': (p) => f.service.start(external, p),
+    },
+  });
+  const { tool } = await api.call('mcp.tools.get', { serverId: id, name });
+  const accepted = await api.call('mcp.tools.call', {
+    serverId: id,
+    name,
+    toolRevision: tool.toolRevision,
+    arguments: { message: 'long-name' },
+    requestId: randomUUID(),
+  });
+  const result = await until(() => {
+    const j = f.service.get(external, accepted.jobId);
+    return j.state !== 'running' && j;
+  });
+  assert.equal(result.state, 'succeeded');
+  assert.equal(result.result.structuredContent.message, 'long-name');
+});
+
+test('damaged local MCP settings remain intact and expose a read-only health error', (t) => {
+  const f = fixture(t),
+    file = path.join(f.dir, 'mcp-client.json');
+  fs.writeFileSync(file, '{invalid');
+  assert.equal(f.settings.health().revision, '');
+  assert.match(f.settings.health().error, /読み取り専用/);
+  assert.throws(() => f.settings.update({ op: 'remove', id: randomUUID(), expectedRevision: '' }));
+  assert.equal(fs.readFileSync(file, 'utf8'), '{invalid');
+});

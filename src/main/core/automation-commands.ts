@@ -9,6 +9,7 @@ export interface AutomationCommand {
   unavailableReason: string | null;
   completion: 'accepted' | 'handlerReturned' | 'settingsSaved' | 'lifecycleApplied';
   permission?:
+    | 'customCommands.write'
     | 'settings.write'
     | 'applets.manage'
     | 'shortcuts.write'

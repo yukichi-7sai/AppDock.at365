@@ -625,7 +625,13 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   t.diagnostic('SDK connected');
   assert.ok(service.state().lastClientAt);
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 22);
+  assert.deepEqual(
+    tools.map((t) => t.name).sort(),
+    require('../out/main/shared/appdock-api')
+      .operationsFor('mcp')
+      .map(([, d]) => d.name)
+      .sort(),
+  );
   for (const name of [
     'appdock_ai_generate_text',
     'appdock_ai_get_job',

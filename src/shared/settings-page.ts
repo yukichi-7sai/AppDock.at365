@@ -41,6 +41,17 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  mcpClient?: {
+    revision: string;
+    error?: string;
+    connections: import('./mcp-client').McpLocalStatus[];
+    jobs: import('./mcp-client').McpJob[];
+  };
+  customCommands?: {
+    types: import('./custom-commands').CustomCommandDescriptor[];
+    summaries: import('./custom-commands').CustomCommandSummary[];
+    revision: string;
+  };
   storage?: {
     canSwitch: boolean;
     local: boolean;

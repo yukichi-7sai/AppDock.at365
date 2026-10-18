@@ -44,6 +44,7 @@ export function createHostApi(
   collectionHost?: () => import('./page-collections').PageCollectionManager,
   ribbonBadges?: import('./ribbon-badges').RibbonBadges,
   sharedDataRoot = path.join(dataRoot, 'shared'),
+  customCommands?: import('./custom-commands').CustomCommandService,
 ) {
   const api = async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -78,6 +79,12 @@ export function createHostApi(
       return p.key as string;
     };
     switch (method) {
+      case 'host.customCommands.register':
+        requireCapability('custom-commands');
+        if (!customCommands || !e.runtimeSession || Object.keys(p).some((k) => k !== 'typeId'))
+          throw Error('種類登録を利用できません。');
+        customCommands.registerApplet(id, e.runtimeSession, p.typeId);
+        return null;
       case 'host.ribbon.setBadge': {
         requireCapability('ribbon-badges');
         if (

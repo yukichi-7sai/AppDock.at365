@@ -16,7 +16,7 @@
 | 端末別設定 | [Appletごとの保存先・ツールバー・表示／一般設定・移行と復旧](docs/device-settings-design.md) |
 | 設定の再起動通知・JSON復旧 | [現行仕様](docs/settings-sync.md#設定の状態と再起動通知)、[設計と確認項目](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
-| MCPハブ・カスタムコマンド（設計案・未実装） | [全体概要](docs/mcp-hub-design.md)、[段階的実装計画](docs/mcp-hub-implementation-plan.md)、[第1段階の詳細設計](docs/custom-commands-design.md) |
+| MCPハブ・カスタムコマンド（0.60.0） | [全体概要](docs/mcp-hub-design.md)、[実装計画と到達点](docs/mcp-hub-implementation-plan.md)、[コマンド基盤](docs/custom-commands-design.md)、[クライアント](docs/mcp-client-design.md)、[ハブ](docs/mcp-hub-relay-design.md)、[保存型MCPコマンド](docs/mcp-command-design.md) |
 | MCPのネットワーク接続 | [接続範囲・認証・Codex互換性の設計](docs/mcp-network-access-design.md) |
 | MCP Eventsとdot | [通知種類の選択・購読・Webhook・保存と再送](docs/mcp-events-design.md) |
 | 音声再生の共通API | [再生キュー・取消・Gmail通知移行](docs/audio-playback.md) |
@@ -207,6 +207,8 @@ manifestのsettingActionsで設定ページに操作ボタンを表示します�
 
 
 ## 共通操作と更新の検証
+
+MCPハブの契約試験は`tests/custom-commands.test.cjs`と`tests/mcp-client.test.cjs`、実GUIは`dev.bat exec node scripts/mcp-hub-ui-test.cjs [固定EXEの絶対パス]`。GUIは隔離profileにNode/.NET/nativeの種類fixtureとMCPサーバーを配置し、既存WatchのRelease出力を使う。先に本体をbuildし、`tests/fixtures/dotnet/AppDock.CustomCommands`と兄弟WatchのRelease buildを用意する。GUI実行中のbuildを禁止し、結果のprofile・EXE hash・確認項目を保存する。fixtureは製品へ同梱しない。実ChatGPT、物理入力、実照明は別の確認範囲である。
 
 AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、Applet管理、ショートカット、ジェスチャー、リボン、トレイの編集にはそれぞれの既存サービスを使い、通信層へ処理を複製しません。tests/appdock-api.test.cjs、tests/automation.test.cjsと対象サービスの単体試験、scripts/automation-ui-test.cjs、scripts/applet-api-ui-test.cjsを変更範囲から選びます。入力APIはNode実行文脈とInputTests、scripts/native-input-ui-test.cjsも確認します。詳細な手順と許可は[共通操作API](docs/appdock-api.md)と[外部操作](docs/automation.md)を参照してください。
 

@@ -1,3 +1,5 @@
+import { McpClientSettings } from './core/mcp-client-settings';
+import { McpClientService, type McpActor } from './core/mcp-client';
 import { ShellProviderRegistry } from './core/shell-provider-registry';
 import { isDeepStrictEqual } from 'node:util';
 import { shellRegions, isShellRegion, type ShellRegion } from '../shared/shell';
@@ -51,6 +53,9 @@ import {
 } from './core/settings-health-notifications';
 import { SettingsCommands } from './core/settings-commands';
 import { SettingsInputSession } from './core/settings-input-session';
+import { CustomCommandService, CustomCommandError } from './core/custom-commands';
+import { mcpCommandType } from '../shared/mcp-command';
+import type { InputInvocation } from './core/command-contexts';
 import { SettingsPageSession } from './core/settings-page';
 import { SettingsPageHost } from './core/settings-page-host';
 import { dataPaths } from './core/data-paths';
@@ -569,8 +574,213 @@ const ai = new AiService({
 const aiPreviewJobs = new Set<string>();
 const previewJobs = new Set<string>();
 const notificationPreviewJobs = new Set<string>();
+const mcpHostActor: McpActor = { owner: 'host', kind: 'host', external: false };
+let mcpConfigurationWarning: ReturnType<WarningReporter['episode']> | undefined;
+function mcpChanged() {
+  if (!startupReady || quitting) return;
+  customCommands.reconcile();
+  const invalid =
+    mcpSettings.health().error ||
+    mcpClient.statuses().some((s) => s.state === 'error' || s.state === 'unconfigured');
+  if (invalid)
+    (mcpConfigurationWarning ??= warnings.episode()).update({
+      eventId: 'mcp-configuration',
+      source: 'mcp-client',
+      title: 'MCP接続先を確認してください',
+      code: 'MCP_CONFIGURATION_REQUIRED',
+      message:
+        'このPCで利用できないMCP接続先があります。設定の「MCP接続先」で状態と認証情報を確認してください。',
+    });
+  else {
+    mcpConfigurationWarning?.resolve();
+    mcpConfigurationWarning = undefined;
+  }
+  changed();
+}
+function mcpActor(id?: string, context: InputInvocation = {}): McpActor {
+  const root: McpActor['origin'] =
+    context.origin?.kind === 'mcp'
+      ? { kind: 'mcp' }
+      : context.origin?.kind === 'applet'
+        ? context.origin
+        : undefined;
+  const origin =
+    (root?.kind === 'mcp' && !id) || (root?.kind === 'applet' && root.appletId === id)
+      ? undefined
+      : root;
+  const identity = id
+    ? 'applet:' + id + ':' + manager?.items.get(id)?.runtimeSession
+    : 'mcp:' + aiMcpGeneration;
+  const suffix =
+    origin?.kind === 'mcp'
+      ? '|mcp:' + aiMcpGeneration
+      : origin?.kind === 'applet'
+        ? '|applet:' + origin.appletId + ':' + manager?.items.get(origin.appletId)?.runtimeSession
+        : '';
+  return {
+    owner: identity + suffix,
+    kind: id ? 'applet' : 'mcp',
+    appletId: id,
+    external: !id || origin?.kind === 'mcp',
+    origin,
+  };
+}
+const mcpSettings = new McpClientSettings(
+  settings,
+  path.join(dataDirectory, 'mcp-client.json'),
+  {
+    encrypt: (v) => {
+      if (!safeStorage.isEncryptionAvailable())
+        throw Error('Windowsの認証情報保護を利用できません。');
+      return safeStorage.encryptString(v).toString('base64');
+    },
+    decrypt: (v) => safeStorage.decryptString(Buffer.from(v, 'base64')),
+  },
+  () => {
+    mcpClient.reconcile();
+    mcpChanged();
+  },
+);
+const mcpClient = new McpClientService({
+  settings: mcpSettings,
+  authorized: (actor, execute) => {
+    if (quitting) return false;
+    if (actor.kind === 'host') return startupReady;
+    if (actor.owner !== mcpActor(actor.appletId, { origin: actor.origin }).owner) return false;
+    const allowed = (id?: string) => {
+      if (!id) return mcpAllowed('allowUseMcp') && (!execute || mcpAllowed('allowExecute'));
+      const e = manager?.items.get(id);
+      const p =
+        e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
+      return p.read === true && p.useMcp === true && (!execute || p.execute === true);
+    };
+    return (
+      allowed(actor.appletId) &&
+      (!actor.origin || allowed(actor.origin.kind === 'applet' ? actor.origin.appletId : undefined))
+    );
+  },
+  fetcher: (url, init) =>
+    net.fetch(url instanceof URL ? url.href : typeof url === 'string' ? url : url.url, init),
+  changed: mcpChanged,
+  failed: (id, error) =>
+    errors.report({
+      eventId: id,
+      source: 'mcp-client',
+      title: 'MCPツールの処理を完了できませんでした',
+      ...error,
+    }),
+  audit: (job) =>
+    log.write(
+      'info',
+      'mcp-client',
+      'jobId=' +
+        job.jobId +
+        ' serverId=' +
+        job.serverId +
+        ' state=' +
+        job.state +
+        (job.error ? ' code=' + job.error.code : ''),
+    ),
+});
+let customCommandWarning: ReturnType<WarningReporter['episode']> | undefined;
+const customCommands = new CustomCommandService({
+  settings,
+  settingsCommands,
+  save: (value, revision) => commitSettings(prepareSettings(value), revision),
+  providers: () => manager?.customCommandProviders() ?? [],
+  reservedIds: () => [
+    ...hostCommands.map((c) => c.id),
+    ...(manager?.snapshot() ?? []).flatMap((a) => a.commands.map((c) => c.id)),
+  ],
+  authorized: (context) => {
+    if (quitting) return false;
+    if (context.origin?.kind === 'mcp') return mcpAllowed('allowExecute');
+    if (context.origin?.kind === 'applet') {
+      const owner = manager?.items.get(context.origin.appletId);
+      const permissions =
+        owner && ['starting', 'running'].includes(owner.state)
+          ? appletApiAccess.get(owner.manifest)
+          : {};
+      return permissions.read === true && permissions.execute === true;
+    }
+    return true;
+  },
+  changed: () => {
+    if (startupReady) changed();
+  },
+  unavailable: (ids) => {
+    if (!startupReady || quitting) return;
+    if (!ids.length) {
+      customCommandWarning?.resolve();
+      customCommandWarning = undefined;
+      return;
+    }
+    (customCommandWarning ??= warnings.episode()).update({
+      eventId: 'custom-commands-unavailable',
+      source: 'custom-commands',
+      title: 'カスタムコマンドを確認してください',
+      code: 'CUSTOM_COMMAND_UNAVAILABLE',
+      message:
+        '利用できない種類または設定があります。カスタムコマンド設定で提供元と設定形式を確認してください。',
+      logDetails: ids,
+    });
+  },
+  failed: (code, id) => {
+    log.write('warn', 'custom-commands', `${code} command=${id}`);
+    errors.report({
+      eventId: randomUUID(),
+      source: 'commands',
+      title: 'コマンドを完了できませんでした',
+      code,
+      message: '操作先の状態を確認してから再実行してください。',
+    });
+  },
+});
+customCommands.registerHost(
+  mcpCommandType,
+  async (config, context) => {
+    const caller = context.apiCaller ?? context.origin;
+    const actor =
+      caller?.kind === 'applet'
+        ? mcpActor(caller.appletId, context)
+        : caller?.kind === 'mcp'
+          ? mcpActor(undefined, context)
+          : mcpHostActor;
+    try {
+      const job = await mcpClient.start(
+        actor,
+        {
+          serverId: config.serverId,
+          name: config.toolName,
+          toolRevision: config.toolRevision,
+          arguments: config.arguments,
+          timeoutMs: config.timeoutMs ?? 60000,
+          requestId: randomUUID(),
+        },
+        context.signal,
+        true,
+      );
+      return { completion: 'accepted', jobId: job.jobId, state: job.state };
+    } catch (error) {
+      if (error instanceof AutomationError) throw new CustomCommandError(error.code, error.message);
+      throw error;
+    }
+  },
+  {
+    validateConfig: (config) => mcpClient.commandValidation(config),
+    unavailableReason: (config) => mcpClient.commandUnavailable(config),
+  },
+);
 const operationApi = new AppDockApi({
   handlers: {
+    'mcp.servers.list': async (p, id, c) => mcpClient.servers(mcpActor(id, c), p),
+    'mcp.tools.list': (p, id, c) => mcpClient.tools(mcpActor(id, c), p),
+    'mcp.tools.get': (p, id, c) => mcpClient.tool(mcpActor(id, c), p),
+    'mcp.tools.call': async (p, id, c) => ({
+      ...(await mcpClient.start(mcpActor(id, c), p, c.signal)),
+    }),
+    'mcp.jobs.get': async (p, id, c) => ({ ...mcpClient.get(mcpActor(id, c), p.jobId) }),
+    'mcp.jobs.cancel': async (p, id, c) => ({ ...mcpClient.cancel(mcpActor(id, c), p.jobId) }),
     'ai.text.generate': async (params, id) => ({ ...ai.generate(aiOwner(id), params) }),
     'ai.jobs.get': async (params, id) => ({ ...ai.get(aiOwner(id), params.jobId) }),
     'ai.jobs.cancel': async (params, id) => ({ ...ai.cancel(aiOwner(id), params.jobId) }),
@@ -596,7 +806,7 @@ const operationApi = new AppDockApi({
       };
     },
     'ui.assets.get': async (params) => presentation.getAsset(params.id),
-    'ui.actions.invoke': async (params, id) => ({
+    'ui.actions.invoke': async (params, id, context) => ({
       result: await presentation.invoke(
         params as unknown as import('../shared/shell').UiActionRequest,
         id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp',
@@ -608,7 +818,7 @@ const operationApi = new AppDockApi({
             return { accepted: true };
           }
           if (action.command)
-            return operationApi.call('commands.execute', { id: action.command }, id);
+            return operationApi.call('commands.execute', { id: action.command }, id, context);
           if (action.theme) {
             if (!externalUiPermissions(id).write) throw Error('設定変更が許可されていません。');
             return toggleTheme();
@@ -625,6 +835,9 @@ const operationApi = new AppDockApi({
   settings,
   settingsCommands,
   appletManagement,
+  customCommands,
+  mcpClientAllowed: () => mcpAllowed('allowUseMcp'),
+  customCommandsManageable: () => mcpAllowed('allowManageCustomCommands'),
   appletPermissions: (id) => {
     const e = manager?.items.get(id);
     return e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
@@ -726,7 +939,7 @@ function trayMenu() {
   const applets = allApplets();
   const entries = resolveTrayMenu(
     getTrayMenu(settings.value, applets),
-    trayCommandCatalog(applets),
+    trayCommandCatalog(applets, customCommands.uiCommands()),
   );
   const template = (items: ResolvedTrayItem[]): Electron.MenuItemConstructorOptions[] =>
     items.map((item) =>
@@ -794,6 +1007,7 @@ const knownSettingsCommands = new Map<string, ReturnType<typeof uiCommands>[numb
 function uiCommands(): import('../shared/commands').UiCommand[] {
   const commands = [
     ...hostCommands.map((c) => ({ ...c, extensionId: null })),
+    ...customCommands.uiCommands(),
     ...appletManagementCommands(allApplets()),
     ...allApplets().flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
@@ -839,8 +1053,9 @@ function openCommandPalette(request: CommandPaletteRequest) {
       if (paletteSession === session) paletteSession = undefined;
     });
 }
-async function executeCommand(id: string, invocation?: GestureInvocation) {
+async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
+  if (customCommands.has(id)) return customCommands.execute(id, invocation);
   if (id === 'appdock.commands.search') {
     showWindow();
     if (overlayHost?.active) overlayHost.cancel('toggle');
@@ -884,6 +1099,7 @@ function shortcutContext() {
 function availableShortcutCommands() {
   return [
     ...hostCommands.map((c) => ({ id: c.id, title: c.title, extensionId: null })),
+    ...customCommands.uiCommands().filter((c) => c.available),
     ...appletManagementCommands(allApplets()).filter((c) => c.available),
     ...allApplets().flatMap((e) =>
       e.commands
@@ -993,6 +1209,10 @@ function syncHotKeys(retry = false) {
   if (quitting || !hotKeys) return Promise.resolve();
   const available = [
     ...hostCommands.map((command) => command.id),
+    ...customCommands
+      .uiCommands()
+      .filter((c) => c.available)
+      .map((c) => c.id),
     ...appletManagementCommands(allApplets())
       .filter((c) => c.available)
       .map((c) => c.id),
@@ -1112,6 +1332,7 @@ function commitSettings(
   avatarName?: string,
 ) {
   assertSettingsWritable();
+  customCommands.validateReplacement(value);
   return saveUserSettings(settings, baseDirectory, value, revision, avatar, avatarName);
 }
 function settingsPageStorage(
@@ -1147,7 +1368,14 @@ function settingsPageStorage(
   return {
     canSwitch: page.kind === 'applet' && !page.collection,
     local,
-    signature: `${page.id}:${local ? 'device' : 'shared'}`,
+    signature: `${page.id}:${local ? 'device' : 'shared'}${
+      page.id === 'custom-commands'
+        ? ':' +
+          createHash('sha256')
+            .update(JSON.stringify(customCommands.descriptors().map((t) => t.typeRevision)))
+            .digest('hex')
+        : ''
+    }`,
     revision: settings.revision,
     files: [...scopes].map((scope) => ({ scope, name: path.basename(settings.targetFile(scope)) })),
   };
@@ -1156,6 +1384,22 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   const host = snapshot();
   const state = settingsEditing.snapshot();
   const id = page.id;
+  if (id === 'mcp-client')
+    return {
+      mcpClient: {
+        ...mcpSettings.health(),
+        connections: mcpClient.statuses(),
+        jobs: mcpClient.summaries(),
+      },
+    };
+  if (id === 'custom-commands')
+    return {
+      customCommands: {
+        types: customCommands.descriptors(),
+        summaries: customCommands.summaries(),
+        revision: settingsCommands.revision(),
+      },
+    };
   const summary = (a: ExtensionSnapshot): ExtensionSnapshot => ({
     apiVersion: 1,
     id: a.id,
@@ -1315,6 +1559,27 @@ function settingsPageActions(
   page: SettingsPageDefinition,
 ): Record<string, (args: unknown[]) => Promise<unknown>> {
   const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  if (page.id === 'mcp-client' || page.id === 'custom-commands') {
+    actions.mcpServers = async () => mcpClient.servers(mcpHostActor, { limit: 50 });
+    actions.mcpTools = async ([serverId, cursor]) =>
+      mcpClient.tools(mcpHostActor, { serverId, cursor, refresh: !cursor, limit: 50 });
+    actions.mcpTool = async ([serverId, name]) => mcpClient.tool(mcpHostActor, { serverId, name });
+  }
+  if (page.id === 'mcp-client') {
+    actions.updateMcpConnection = async ([args]) => {
+      assertSettingsWritable();
+      return mcpSettings.update(args);
+    };
+    actions.mcpCall = async ([params]) =>
+      mcpClient.start(mcpHostActor, params as Record<string, unknown>);
+    actions.mcpGetJob = async ([jobId]) => mcpClient.get(mcpHostActor, jobId);
+    actions.mcpCancelJob = async ([jobId]) => mcpClient.cancel(mcpHostActor, jobId);
+  }
+  if (page.id === 'custom-commands')
+    actions.updateCustomCommands = async ([args]) => {
+      assertSettingsWritable();
+      return customCommands.update(args);
+    };
   if (page.kind === 'applet' && !page.collection)
     actions['set-local-settings'] = async ([enabled, revision]) => {
       assertSettingsWritable();
@@ -1506,7 +1771,10 @@ function settingsPageActions(
       quitHost();
     };
   }
-  if (['shortcuts', 'gestures', 'ai', 'ribbon'].includes(page.id) || page.kind === 'applet') {
+  if (
+    ['shortcuts', 'gestures', 'ai', 'ribbon', 'custom-commands', 'mcp-client'].includes(page.id) ||
+    page.kind === 'applet'
+  ) {
     actions.setShortcutRecording = async ([value]) => {
       if (typeof value !== 'boolean') throw Error('入力状態が不正です。');
       settingsRecording = value;
@@ -1585,6 +1853,7 @@ function settingsPageActions(
               'setTts',
               'setAi',
               'setTrayEditing',
+              'setCustomCommandManagement',
             ]
           : [
               'status',
@@ -1604,6 +1873,8 @@ function settingsPageActions(
       if (!value || !permitted.includes(value.kind))
         throw Error('このページでは利用できない操作です。');
       const reply = await automation!.action(value);
+      customCommands.reconcile();
+      mcpClient.reconcile();
       ai.reconcile();
       tts.reconcile();
       return reply;
@@ -1611,6 +1882,8 @@ function settingsPageActions(
     if (page.id === 'permissions')
       actions.setAppletApiPermissions = async ([value]) => {
         appletApiAccess.set(value);
+        customCommands.reconcile();
+        mcpClient.reconcile();
         ai.reconcile();
         tts.reconcile();
         for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
@@ -1970,6 +2243,7 @@ async function initialize() {
   const external = path.join(baseDirectory, 'extensions');
   fs.mkdirSync(external, { recursive: true });
   manager = new ExtensionManager({
+    reservedCustomTypeIds: () => customCommands.hostTypeIds(),
     hostVersion: app.getVersion(),
     roots: [external],
     builtinRoots: [
@@ -2001,6 +2275,7 @@ async function initialize() {
       () => pageCollections,
       ribbonBadges,
       paths.shared,
+      customCommands,
     ),
     log: log.write,
   });
@@ -2214,6 +2489,8 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
   );
   manager.on('changed', () => {
+    customCommands.reconcile();
+    mcpClient.reconcile();
     pageCollections.reconcile();
     ribbonBadges.reconcile();
     ai.reconcile();
@@ -2229,6 +2506,8 @@ async function initialize() {
   });
   settings.on('changed', () => {
     try {
+      customCommands.reconcile();
+      mcpClient.reconcile();
       applyAudioPlaybackSettings();
       ribbonBadges.reconcile();
       ai.reconcile();
@@ -2831,6 +3110,9 @@ async function initialize() {
   await syncHotKeys();
   await gestures.start();
   startupReady = true;
+  customCommands.reconcile();
+  mcpClient.reconcile();
+  mcpChanged();
   settingsHealthNotifications = new SettingsHealthNotifications({
     notifications: typedNotifications!,
     errors,
@@ -2908,11 +3190,16 @@ async function initialize() {
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
     changed: () => {
       ai.reconcile();
+      customCommands.reconcile();
+      mcpClient.reconcile();
       changed();
     },
     authorizationChanged: () => {
+      customCommands.reconcile();
+      mcpClient.reconcile();
       const owner = aiOwner();
       aiMcpGeneration++;
+      mcpClient.reconcile();
       ai.forgetOwner(owner);
     },
     audit: (level, message) => log.write(level, 'automation', message),
@@ -3172,6 +3459,7 @@ app.on('before-quit', (event) => {
   event.preventDefault();
   if (shutdownStarted) return;
   shutdownStarted = true;
+  customCommands.cancelAll();
   settingsHealthNotifications?.dispose();
   legacyLocalData?.dispose();
   notificationBanner?.dispose();
@@ -3192,6 +3480,7 @@ app.on('before-quit', (event) => {
       () => tts.close(),
       () => audioPlayback.close(),
       () => ai.close(),
+      () => mcpClient.shutdown(),
       () => automation?.close(),
       () => gestures?.close(),
       () => nativeInput?.close(),

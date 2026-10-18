@@ -5,11 +5,26 @@ using AppDock.SDK;
 namespace AppDock.Runtime;
 
 internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcConnection connection, CancellationToken lifetime) :
-    IExtensionContext, ICommandService, ITrayService, IRibbonService, ISettingsService, INotificationService,
+    IExtensionContext, ICommandService, ICustomCommandService, ITrayService, IRibbonService, ISettingsService, INotificationService,
     IAppDockService, IShellService, IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
     private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler)> commands = new();
     private readonly SemaphoreSlim commandUpdates = new(1, 1);
+    private readonly ConcurrentDictionary<string, Func<JsonElement, CancellationToken, Task<JsonElement?>>> customHandlers = new();
+    public ICustomCommandService CustomCommands => this;
+    public async Task RegisterAsync(string typeId, Func<JsonElement, CancellationToken, Task<JsonElement?>> handler, CancellationToken cancellationToken = default)
+    {
+        if (!customHandlers.TryAdd(typeId, handler)) throw new ArgumentException("Duplicate custom command type.");
+        try { await CallAsync("host.customCommands.register", new { typeId }, cancellationToken); }
+        catch { customHandlers.TryRemove(typeId, out _); throw; }
+    }
+    internal async Task<JsonElement?> ExecuteCustomAsync(string typeId, JsonElement config, CancellationToken token)
+    {
+        if (!customHandlers.TryGetValue(typeId, out var handler)) throw new ArgumentException("Unknown custom command type.");
+        await commandLock.WaitAsync(token);
+        try { return await handler(config.Clone(), token); }
+        finally { commandLock.Release(); }
+    }
     private readonly List<object> tray = [];
     private readonly List<ScheduledTask> schedules = [];
     private readonly SemaphoreSlim commandLock = new(1, 1);
