@@ -17,6 +17,40 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert.equal(await options.getAttribute('open'), null, 'behavior settings start collapsed');
   const filter = page.getByLabel('ジェスチャーのコマンドを検索');
   const status = page.getByLabel('ジェスチャーの絞り込み');
+  const bindingStyles = async () => {
+    await page.mouse.move(0, 0);
+    await filter.focus();
+    const styles = await page.locator('.shortcut-command-list').evaluate((root) => {
+      const add = root.querySelector('.applet-shortcut-add');
+      const edit = root.querySelector('.applet-shortcut-edit');
+      const menu = root.querySelector('.gesture-menu-trigger');
+      return {
+        addWidth: add.getBoundingClientRect().width,
+        addHeight: add.getBoundingClientRect().height,
+        addPadding: getComputedStyle(add).padding,
+        editBackground: getComputedStyle(edit).backgroundColor,
+        editBorder: getComputedStyle(edit).borderLeftWidth,
+        editPaddingLeft: getComputedStyle(edit).paddingLeft,
+        menuBackground: getComputedStyle(menu).backgroundColor,
+        menuFontSize: getComputedStyle(menu).fontSize,
+      };
+    });
+    assert.deepEqual(
+      styles,
+      {
+        addWidth: 30,
+        addHeight: 30,
+        addPadding: '0px',
+        editBackground: 'rgba(0, 0, 0, 0)',
+        editBorder: '0px',
+        editPaddingLeft: '0px',
+        menuBackground: 'rgba(0, 0, 0, 0)',
+        menuFontSize: '22px',
+      },
+      'assignment controls retain their dedicated styles inside the section',
+    );
+  };
+  await bindingStyles();
   const row = (id) => page.locator(`[data-shortcut-command="${id}"]`);
   const panel = page.locator('.gesture-binding-dialog');
   const orderPanel = page.locator('.shortcut-order-dialog');
@@ -256,11 +290,15 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
       const search = await filter.boundingBox(),
         select = await status.boundingBox();
       assert(Math.abs(search.y - select.y) < 1);
+      await bindingStyles();
       await page.screenshot({ path: path.join(profile, `${theme}-${width}-gestures.png`) });
+      await row('test.gestures.b').screenshot({
+        path: path.join(profile, `${theme}-${width}-gesture-assigned-row.png`),
+      });
     }
   }
   checks.push(
-    'host defaults / assignment filters / both themes at 1280, 900, 700 / bounded editor and matching toolbar',
+    'host defaults / assignment filters / both themes at 1280, 900, 700 / bounded editor and matching toolbar / dedicated assignment button styles',
   );
   await page.locator('summary').filter({ hasText: '動作設定' }).click();
   assert.deepEqual(await options.locator('.settings-field-label > strong').allTextContents(), [

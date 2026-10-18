@@ -231,7 +231,8 @@
   display: block;
   color: var(--muted);
 }
-.settings-section button:not(.toggle) {
+/* Dedicated controls own their appearance; only plain action buttons use the defaults. */
+.settings-section :where(button:not([class]), button.primary, button.secondary) {
   min-height: 34px;
   padding: 7px 12px;
   border: 1px solid var(--border);
@@ -244,7 +245,8 @@
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }
-.settings-section button:not(.toggle):hover:not(:disabled) {
+.settings-section
+  :where(button:not([class]), button.primary, button.secondary):hover:not(:disabled) {
   border-color: var(--accent);
 }
 .settings-choice-grid {
