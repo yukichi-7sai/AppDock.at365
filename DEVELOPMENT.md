@@ -39,7 +39,7 @@
 | 文書 | [文書方針](docs/documentation.md) |
 | 設定基盤・共通UIテンプレート | [設定基盤と本体の共通設定画面](docs/settings-foundation.md)、[ページ・カード・項目行の共通部品](docs/settings-foundation.md#共通の画面構成) |
 | 設定画面の本体統合 | [設定Shellの終了・settings-uiの移動・互換入力・検証計画](docs/settings-host-ui-design.md) |
-| 一覧形式の設定編集 | [AI接続を基準とする一覧・追加／編集・削除・並べ替え](docs/settings-list-editing.md) |
+| 一覧編集・ダイアログ | [一覧の基本形、共通部品の使用例、表示順・Shellを入口にする際の接続とフォーカス](docs/settings-list-editing.md) |
 | 通知基盤・移行設計 | [通知サービスとShell契約](docs/notifications.md)、[通知種類設定と段階的な拡張の設計](docs/notification-foundation.md) |
 | 共通のエラー報告 | [エラー通知とログの方針・共通入口・接続範囲](docs/error-reporting.md) |
 | Shellページの表示領域 | [本文領域全体への配置とページ内レイアウト](docs/shell-page-layout.md) |

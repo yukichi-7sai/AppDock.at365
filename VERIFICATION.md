@@ -1,5 +1,12 @@
 # 検証記録
 
+## 2026-10-19: 共通ダイアログの追加手順とShell起点の文書化
+
+- [一覧編集・ダイアログのガイド](docs/settings-list-editing.md)へ部品の選択表、`SettingsDialog`の使用例、Provider・一時入力・保存失敗・初期フォーカスと復帰、`SettingsModal`を直接使う際の責務を追記した。入力停止の`ready`と背景準備を区別し、native dialogの自動検知・共通CSS・背景Viewの登録条件を明記した。
+- Shellのボタンから本体へ表示を依頼する手順、別WebContentsへのフォーカス移動、元のボタン／有効な戻り先、停止・提供元交代・route変更、実際の入口からの確認項目を追加した。現行の背景登録はリボン・両バーであり、Shell本文・Web／Applet本文・通知を残す場合には別途統合と確認が必要なこと、汎用の編集ダイアログ開始APIは未実装であることを明記した。リボン・バーの契約とDEVELOPMENTから参照する。
+- 現ソースの部品・Provider・preload・HostModalLayer・各Shell Host／公開操作・ShellPageHostと記述を照合してレビューし、未解決の指摘なし。リンク、追加アンカー、使用例を既存rendererの型と固定TypeScript CLIで検査した。検証用コピーでは相対importだけを配置先に合わせ、製品ファイルを生成・変更していない。型APIを使う初回の補助検査は現行コンパイラーで非対応だったため、ログを保持してCLIへ修正した。[結果・入力・完全ログ](.artifacts/commit-validation-dialog-guide-20261019/validation.json)。
+- 文書5ファイルだけの変更として、版は0.64.0を維持し、製品回帰・再発行は追加していない。前工程の製品・試験・依存入力が同一であることを照合し、標準659件と固定EXEの成功記録を今回実行した結果へ読み替えない。文書差分、stage／commit tree、GitHub・AQUAのmain先端とローカルcommitの照合は[今回の検証資料](.artifacts/commit-validation-dialog-guide-20261019/)へ記録する。新しいGUI試験フォルダーの生成・整理対象なし。
+
 ## 2026-10-19: ダイアログの表示タイミング修正とShell化のコミット確認（0.64.0）
 
 - ダイアログのグレーが出た後にShellの描画面が背面へ切り替わる瞬間を見せないよう修正した。準備中はnative dialogと`::backdrop`を透明に保ち、背景画像のdecode・配置と元の3 Viewの一時非表示が完了した応答を受けてから両方を表示する。待機中のフォーカス囲い込み、早いEscape、閉じた後や旧寸法への遅延応答の破棄を維持し、画像の取得・decode失敗でも操作を再開する。公開API・設定・保存形式の追加変更はなく、同じ未公開Shell化の補正として **0.64.0** を維持した。

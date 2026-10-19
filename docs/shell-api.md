@@ -68,6 +68,8 @@ schema 2の項目は任意の`iconOnly: boolean`を持ち、trueなら表示ラ�
 
 `onFocus(first/last)`は本体からのフォーカス移動、`focusHost(before/after)`はShellからの移動。Default ShellはTab/Shift+Tabで境界を越え、共通ショートカットはShell Hostが既存ディスパッチャへ渡す。パレット表示中は独立オーバーレイを最前面に置き、下のリボン・Appletページは同じViewを保持する。表示領域は本体の予約領域をzoom込みのDIPへ変換する。
 
+リボンを入口に本体内ダイアログを追加する場合は、[共通部品の使用とShellからの表示依頼](settings-list-editing.md#shellからダイアログを開く)に従う。操作カタログから本体へ依頼して表示し、開閉時のフォーカスと有効な復帰先を機能側で管理する。リボン内へ全画面ダイアログを直接描画したり、`executeCommand`の所有範囲を広げたりしない。
+
 ## 切替・復旧と後続範囲
 
 切替先がreadyになるまで旧Shellを保持し、成功時に旧session/Viewを破棄する。準備中に別選択へ変更した場合は準備中Viewも破棄する。ready期限は10秒。意図的な無効化・再起動は故障記録に含めず、再び有効で稼働中になれば保存された選択を使用する。worker停止・renderer終了/応答不能・HTML欠落・起動失敗ではDefault Shellへ戻す。PC専用`dataDirectory/shell-failures.json`で失敗した提供元と版を記録し、同じ版を次回起動で自動再試行しない。「Shellを再試行」または提供元の版更新で再試行できる。

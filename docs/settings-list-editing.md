@@ -75,13 +75,99 @@
 
 共通部品は表示と操作中の状態を担い、設定の保存・認証・通信の規則は所有しない。AIの一覧・保存Controllerは具体例であり、任意の設定を扱う汎用CRUD部品ではない。AI固有のモデル・キー・登録上限を別機能へコピーしない。新たな共通部品を切り出す場合は、実際に共通する表示と操作に限定する。
 
-本体の設定ページでは公開されたSettingsPageの操作契約を通して本体が検証・保存し、本体rendererは描画と一時入力を持つ。Shellごとの内部importや専用の保存経路を増やさない。SettingsModalは同じ設定Surface内のダイアログであり、別WebContentsにまたがる表示には[Shellの共通オーバーレイ](shell-overlays.md)を使う。
+本体の設定ページでは公開されたSettingsPageの操作契約を通して本体が検証・保存し、本体rendererは描画と一時入力を持つ。Shellごとの内部importや専用の保存経路を増やさない。
+
+## ダイアログを追加する
+
+開くボタンの所在と、ダイアログを描画する場所を分けて決める。リボンやタイトルバーが入口でも、本体の設定を編集するダイアログは本体rendererに表示する。ダイアログ自体の描画をShellへ提供させる場合は、[共通オーバーレイ](shell-overlays.md)の表示モデル・操作・寿命の契約を使う。
+
+### 共通部品の選び方
+
+| 用途 | 使用する部品・経路 | 呼出側が用意するもの |
+| --- | --- | --- |
+| 通常の追加・編集・削除確認 | `SettingsDialog` | タイトル、一時入力、検証、保存処理、閉じる処理 |
+| キー記録など独自の本文・フッターが必要 | `SettingsModal` | 見出しと`labelledBy`、本文・ボタン、初期フォーカス、処理中の制御 |
+| 設定以外の本体内プレビュー等 | 本体documentの`<dialog>`を`showModal()`で開く | ラベル、初期フォーカス、Escape・取消・復帰、必要な入力停止 |
+| パレットのように描画をShellへ差し替える | `OverlayController`と`OverlayHost` | 内容別モデル・操作・取消。新しい種類は公開契約と描画側も追加 |
+
+`SettingsDialog`と`SettingsModal`は[SettingsControlsProvider](../src/renderer/settings-ui/api.tsx)の配下で使用する。本体のルートと設定ページは既に接続している。別のSurfaceや試験へ持ち出す場合は、そのSurfaceで許可された`SettingsControlsApi`を注入する。ShellのHTMLへ本体用部品や`window.dock`を持ち込まない。
+
+### SettingsDialogの使用例
+
+以下は`src/renderer/settings/`に置く部品の例。親は開く間だけmountし、`onClose`でunmountする。別の登録へ切り替えるときは対象IDで`key`を分け、一時入力を取り違えないようにする。
+
+```tsx
+import { useState } from 'react';
+import { SettingsDialog } from '../settings-ui/SettingsModal';
+import { SettingsInput } from '../settings-ui/SettingsInput';
+
+export function ItemNameDialog({
+  original,
+  onSave,
+  onClose,
+}: {
+  original: string;
+  onSave(name: string): Promise<unknown>;
+  onClose(): void;
+}) {
+  const [name, setName] = useState(original);
+  return (
+    <SettingsDialog
+      title="名前を編集"
+      valid={name.trim().length > 0}
+      onApply={() => onSave(name.trim())}
+      onClose={onClose}
+    >
+      <label>
+        名前
+        <SettingsInput
+          data-initial-focus
+          value={name}
+          onChange={(event) => setName(event.currentTarget.value)}
+        />
+      </label>
+    </SettingsDialog>
+  );
+}
+```
+
+`onSave`は機能側の既存の検証・競合検査・保存操作に接続する。上の`name`はローカルの一時入力であり、入力ごとの永続保存は行わない。保存失敗はrejectまたはthrowで返す。`SettingsDialog`がエラーを表示して入力を保持し、成功時だけ`onClose`を呼ぶため、呼出側で先に閉じない。`valid`は画面の確定可否であり、保存側の再検証も必要になる。
+
+`SettingsDialog`はnative dialogの開始、見出し、本文とフッター、保存中の二重送信・閉鎖防止を扱う。`applyLabel`で「追加」「削除」等を指定できる。`children`に`(ready, setError) => ...`を渡すと入力受付の準備状態とエラー表示口を利用できる。この`ready`はショートカット等の入力停止の準備であり、背景画像の描画準備とは別の状態である。
+
+`SettingsModal`を直接使う場合は、見出しIDを`labelledBy`へ渡す。初期フォーカスは`data-initial-focus`または`initialFocus`で指定し、`onReady`で入力受付を制御し、失敗は`onError`へ接続する。非同期処理中は`closeDisabled`と自前のボタン無効化・重複防止を揃える。同じ本体documentの開く前の要素へフォーカスを戻し、その要素が削除された場合は`data-dialog-focus-fallback`を付けた安定した操作へ戻す。
+
+### 描画順と背景の管理
+
+背景処理は[本体preload](../src/main/preload.ts)が同じdocumentの`dialog:modal`を監視して開始する。共通部品は内部で`showModal()`を呼ぶため、ダイアログごとの登録・描画順変更・待機時間の追加は不要。独自の本体内ダイアログも`showModal()`で開く。`show()`、`open`属性だけの表示、`div`による独自の覆いはこの判定の対象にならない。
+
+準備中の透明化は[本体の共通CSS](../src/renderer/style.css)の`data-host-modal-pending`に従う。機能側でこの属性を操作したり、独自のopacity・animationで準備完了前に表示したりしない。通常のスタイル追加も既存の外部CSSへ置き、CSPを緩めない。
 
 本体documentのnative dialogを開く間は、[HostModalLayer](../src/main/core/host-modal-layer.ts)が登録されたShellの描画面をまとめて背景として扱う。表示中の各Viewの画像を元の表示順で同じdocumentへ置き、その上からdialogの`::backdrop`で暗くする。準備中はdialogと`::backdrop`を透明に保ち、すべての画像の読み込みと配置、native Viewの一時非表示が完了した応答を受けてから両方を一緒に表示する。これにより、グレーの表示後に描画順が切り替わる瞬間を見せない。待機中もnative dialogのフォーカス囲い込みを保ち、閉じた後や古い寸法への遅延応答では表示を再開しない。画像の取得・decodeに失敗した場合は元のViewを保持してdialogの操作を再開する。renderer・接続・状態は保持し、画像は寸法・zoom・提供元・対象集合の変更時に更新する。
 
 描画面の所有者はViewを`register(view)`で登録し、親への追加・bounds更新後に返された登録口の`setVisible(visible)`へ表示希望を渡す。操作とフォーカスの入口では`blocked`を検査し、Viewの終了時に`dispose()`する。通常は希望どおり表示し、モーダル中だけ共通側が非表示を管理する。リボンと[タイトルバー・ステータスバー](shell-bars.md)を同じ登録口へ接続している。将来追加する背景のShell領域もこの契約を使う。
 
+現在この背景登録に接続しているのはリボン・タイトルバー・ステータスバーであり、既存の編集ダイアログは本体の設定Surface上で確認している。[Shell本文](../src/main/core/shell-page-host.ts)やWeb／Appletの本文View、通知等も含めた全Viewを自動的に取り込む仕組みではない。新しいダイアログを別の画面上で開く場合は、その時点で見えているnative Viewを確認する。対象の本体設定Surfaceへ移動してから開くか、残る描画面の登録・表示希望・操作停止・寿命を共通管理へ接続するか、用途に合う共通オーバーレイを使うかを決めて検証する。
+
 開いている最後のnative dialogを閉じると画像を破棄して各Viewを最新の表示希望に戻す。本体rendererの再読込・終了でも非表示を解除し、遅れて届いた画像や表示完了の応答は世代で拒否する。これは既存ダイアログの背景処理であり、コマンドパレットの独立したオーバーレイは従来の表示経路を使う。
+
+### Shellからダイアログを開く
+
+リボン・タイトルバー・ステータスバーは本体と別のWebContentsViewである。開くボタンがこれらのShellにあっても、本体内ダイアログは次の経路へ揃える。
+
+1. Shellが公開モデルの操作IDを`invoke`で本体へ渡す。本体で接続元・提供元・session・ready・現在の利用可否を検査する。二重要求は既存のrequestId契約で扱う。
+2. 本体の内容Controllerまたは機能側の所有者が、表示対象・一時入力・完了・取消を管理する。現在のrouteと表示中のnative Viewを確認し、本体の設定Surfaceへ移るか、他の背景Viewも含む表示経路を用意して、本体rendererへ表示を依頼する。Shell Hostへ設定保存などの内容判断を追加しない。
+3. 本体のWebContentsへフォーカスを渡し、共通ダイアログをmountする。DOM要素への`focus()`と、別WebContents間のフォーカス移動を分けて扱う。
+4. 共通背景管理が登録されたリボン・両バーを背面として扱う。呼出元のShellだけを自前で暗くしたり、非表示・再生成したりしない。
+5. 閉じたら、元のroute・Windowのフォーカス・呼出元の提供元／sessionと表示可否を確認して戻す。同じShellの元のボタンが残っていればそこへ戻す。提供元の交代・停止やroute変更があれば、現在有効な本体側の操作へ戻し、古いViewへフォーカスしない。
+
+`SettingsModal`が覚える復帰先は本体document内の要素であり、Shell内のボタンは自動では記憶しない。Shellを入口にする新しい操作では、機能側の要求に戻り先の識別を持ち、閉じた後に有効なShellへフォーカスを渡して描画側で元のボタンへ戻す接続を追加する。既存の`focusHost(before/after)`と`onFocus(first/last)`はTab境界用なので、それだけで任意のボタンへの復帰が完成したとは扱わない。
+
+現在、リボンは[Shell API](shell-api.md)の操作カタログ、両バーは[バーの公開契約](shell-bars.md)に定義された操作だけを受け付ける。任意の編集ダイアログを開く汎用APIはまだない。新しい入口では表示モデル・操作契約・本体側の表示要求と終了通知を追加する。`executeCommand`も自Appletの利用可能な自己コマンドに限定され、本体の任意ダイアログを開く迂回路にはしない。パレットは既存の専用オーバーレイ経路を使用する。
+
+ShellのHTML内で`showModal()`しても、そのViewの小さな描画範囲に限定され、本体preloadの監視対象にはならない。本体全体を覆うためにShellのViewを独自に拡張したり、Shell自身のDOMから本体のDOMを操作したりせず、表示の所有者を上記の本体内ダイアログか共通オーバーレイに定める。
+
+### Appletの宣言型一覧
 
 Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ)を確認する。`object-list`に`list`を宣言すると、本体が共通の一覧・追加/編集・削除確認・並べ替えダイアログを自動生成する。既存の`list`未指定の表示は維持する。WebAppletの管理ページも同じ`SettingsListTable`を利用する。
 
@@ -127,7 +213,12 @@ AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出し�
 - 失敗時に入力が残り、外部の追加・編集・削除・並べ替えを上書きしない。
 - URLの連続入力、IME、Enter／blur、Tab移動、Escape、フォーカス復帰を確認する。連続追加で一覧が勝手にスクロールしない。
 - 明暗テーマ、狭い幅、長い名前、空の一覧、上限、詳細の展開、処理中・エラー表示でも操作できる。
+- ダイアログがリボン・両バーに重なる寸法、背景準備中の取消、リサイズ、提供元の交代・故障でも、グレーの先出しやShellによるダイアログの遮蔽が起きず、操作・表示が復帰する。画像取得・decode失敗でも操作を再開できる。
+- Shellを入口に追加した場合は、実際のShellボタンから開き、初期フォーカス・Tab／Escape・同じボタンへの復帰を確認する。入口の停止・交代・route変更後は現在有効な戻り先を確認する。本体内ボタンから開く試験だけで代用しない。
+- 開けるrouteごとに背景のnative Viewを確認する。Shell本文・Web／Applet本文・通知を残す設計なら、そのViewを含む表示順・暗化・入力停止を確認し、リボンと両バーだけの成功を全画面へ広げない。
 - 設定検索のアンカーを、閉じたダイアログ内だけでなく常設の一覧・項目に置く。検索対象や画面モデルへ秘密値を載せない。
 - 実装の影響に応じて保存境界・競合の回帰と隔離したUI確認を行う。実サービスの成功とfixtureの成功は分けて記録する。
 
 既存の確認例は[AI設定UI試験](../scripts/ai-ui-test.cjs)、[URL入力試験](../scripts/settings-url-ui-test.cjs)、[設定操作の回帰](../tests/ai-settings.test.cjs)を参照する。製品の変更・発行がある場合の検証範囲は[開発手順](development-workflow.md)に従う。
+
+背景と入力の確認例は[モーダルGUI試験](../scripts/host-modal-ui-test.cjs)、Shell間の実フォーカス・ドラッグ領域の確認例は[バーGUI試験](../scripts/shell-bars-ui-test.cjs)を参照する。両試験は現在のダイアログ・パレット・既存操作の検証例であり、将来追加するShell起点の編集ダイアログの接続を実装・検証済みとするものではない。WebContentsViewを含む見た目はWindows合成画像と実入力で確認する。
