@@ -97,7 +97,10 @@ if (legacyDll) {
   settings.extensions['appdock.dotnet-demo'] = { enabled: true, settings: {} };
 }
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
-if (portable) fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'));
+if (portable) {
+  fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'));
+  assert.equal(hash(path.join(profile, 'AppDock.at365.exe')), hash(portable));
+}
 const states = [],
   checks = [];
 let client, page;
@@ -245,9 +248,54 @@ async function grant(id, permissions) {
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
     await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
     const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });
-    await panel.getByRole('switch', { name: 'Applet：公開情報の取得', exact: true }).waitFor();
+    await panel.getByRole('switch', { name: 'Applet：情報の取得', exact: true }).waitFor();
+    assert.deepEqual(await panel.locator('tbody > tr > th strong').allTextContents(), [
+      '情報の取得',
+      '設定の変更',
+      'Appletの有効・無効・再起動',
+      'コマンドの実行',
+      'ショートカットの編集',
+      'マウスジェスチャーの編集',
+      'リボンの編集',
+      'タスクトレイの編集',
+      'カスタムコマンド定義の閲覧・編集',
+      'Windowsへのキー・操作メッセージ送信',
+      'コマンド・プロセスの起動',
+      'MCP接続先の管理',
+      'MCP接続先の利用',
+      'AIサーバーへの送信・文章生成',
+      'TTSサーバーへの送信・読み上げ',
+    ]);
     assert.equal(await panel.getByRole('switch', { name: /^Applet：/ }).count(), 15);
-    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 14);
+    assert.equal(await panel.getByRole('switch', { name: /^Codexからの/ }).count(), 15);
+    const fixedRead = panel.getByRole('switch', {
+      name: 'Codexからの情報取得を許可する（MCP連携中は常に許可）',
+      exact: true,
+    });
+    assert.equal(await fixedRead.isChecked(), true);
+    assert.equal(await fixedRead.isDisabled(), true);
+    const warnings = [
+      ['execute', 'コマンドの実行'],
+      ['sendInput', 'Windowsへのキー・操作メッセージ送信'],
+      ['runProcesses', 'コマンド・プロセスの起動'],
+      ['useMcp', 'MCP接続先の利用'],
+      ['useAi', 'AIサーバーへの送信・文章生成'],
+      ['useTts', 'TTSサーバーへの送信・読み上げ'],
+    ];
+    assert.equal(await panel.locator('.permission-warning-icon').count(), warnings.length);
+    assert.equal(await panel.locator('[data-caller="Applet"] .permission-warning-icon').count(), 0);
+    for (const [key, title] of warnings) {
+      const icon = panel.getByRole('img', { name: `MCP：${title}の注意点`, exact: true });
+      const tooltip = panel.locator(`#permission-warning-${key}`);
+      await icon.scrollIntoViewIfNeeded();
+      await icon.focus();
+      assert.equal(await tooltip.isVisible(), true);
+      assert.ok((await tooltip.textContent()).length > 10);
+      await page.keyboard.press('Tab');
+    }
+    checks.push(
+      'requested row labels/order, fixed-ON disabled MCP read, six MCP-only warnings while OFF and keyboard tooltips',
+    );
     for (const control of await panel.getByRole('switch', { name: /^Applet：/ }).all())
       assert.equal(
         await control.isChecked(),
@@ -269,7 +317,8 @@ async function grant(id, permissions) {
       'all grants revoked',
     );
     assert.equal(await panel.getByText('直接公開なし', { exact: true }).count(), 0);
-    await panel.getByText('連携中は許可', { exact: true }).waitFor();
+    assert.equal(await fixedRead.isChecked(), true);
+    assert.equal(await fixedRead.isDisabled(), true);
     const mcpWrite = panel.getByRole('switch', {
       name: 'Codexからの設定変更を許可する',
       exact: true,
@@ -307,7 +356,7 @@ async function grant(id, permissions) {
     await settleSettings(page);
     const childGrant = panel.getByRole('switch', { name: 'Applet：リボンの編集', exact: true });
     await childGrant.click();
-    await panel.getByText(/未有効：公開情報の取得・公開コマンドの実行・公開設定の変更/).waitFor();
+    await panel.getByText(/未有効：情報の取得・コマンドの実行・設定の変更/).waitFor();
     assert.equal((await snapshot()).appletApi.permissions.read, undefined);
     await until(() => childGrant.isEnabled(), 'save child grant');
     await childGrant.click();
@@ -327,7 +376,7 @@ async function grant(id, permissions) {
     checks.push(
       'one permissions page; independent Applet/MCP settings, MCP-off preparation, unmet prerequisites and revocation, fixed read/input exposure, immediate shared settings preserved',
     );
-    for (const label of ['公開情報の取得', '公開コマンドの実行', '公開設定の変更']) {
+    for (const label of ['情報の取得', 'コマンドの実行', '設定の変更']) {
       await panel.getByRole('switch', { name: 'Applet：' + label, exact: true }).click();
       await until(
         async () =>
@@ -364,6 +413,9 @@ async function grant(id, permissions) {
       await window.dock.automation({ kind: 'register' });
     }, configFile);
     const state = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
+    assert.equal(await fixedRead.isChecked(), true);
+    assert.equal(await fixedRead.isDisabled(), true);
+    assert.equal(await panel.locator('.permission-warning-icon').count(), warnings.length);
     client = new Client({ name: 'Applet API regression', version: '1' });
     await client.connect(
       new StreamableHTTPClientTransport(new URL(state.endpoint), {
@@ -422,6 +474,7 @@ async function grant(id, permissions) {
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
           'horizontal overflow',
         );
+        await panel.locator('tbody > tr').first().scrollIntoViewIfNeeded();
         await (
           await require('./settings-host-helper.cjs').settingsPage(page)
         ).screenshot({ path: path.join(profile, `permissions-${theme}-${width}.png`) });
@@ -441,6 +494,39 @@ async function grant(id, permissions) {
             .getByRole('heading', { name: '操作の許可', level: 1, exact: true })
             .scrollIntoViewIfNeeded();
         }
+        const warningIcon = panel.getByRole('img', {
+          name: 'MCP：コマンドの実行の注意点',
+          exact: true,
+        });
+        await warningIcon.hover();
+        await page.evaluate(
+          () =>
+            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+        );
+        const tooltip = panel.locator('#permission-warning-execute');
+        assert.equal(await tooltip.isVisible(), true);
+        assert.ok(
+          await tooltip.evaluate((node) => {
+            const bounds = node.getBoundingClientRect();
+            const table = node.closest('.permission-table').getBoundingClientRect();
+            const body = node.closest('.settings-body').getBoundingClientRect();
+            return (
+              bounds.left >= Math.max(0, table.left, body.left) &&
+              bounds.right <= Math.min(window.innerWidth, table.right, body.right) &&
+              bounds.top >= body.top &&
+              bounds.bottom <= body.bottom
+            );
+          }),
+          'warning tooltip fits the table and settings scroll area',
+        );
+        // Keep the tooltip visible if native resizing resets hover during capture.
+        await warningIcon.focus();
+        assert.equal(await tooltip.isVisible(), true);
+        await page.screenshot({
+          path: path.join(profile, `permissions-${theme}-${width}-warning.png`),
+        });
+        await page.keyboard.press('Tab');
+        await page.mouse.move(0, 0);
       }
     }
     await client.close();
@@ -456,7 +542,15 @@ async function grant(id, permissions) {
       (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.running,
       false,
     );
-    checks.push('both themes at three widths; permissions survive restart with MCP disabled');
+    await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await settingsSurface.getByRole('button', { name: '操作の許可', exact: true }).click();
+    await fixedRead.waitFor();
+    assert.equal(await fixedRead.isChecked(), true);
+    assert.equal(await fixedRead.isDisabled(), true);
+    assert.equal(await panel.locator('.permission-warning-icon').count(), warnings.length);
+    checks.push(
+      'both themes at three widths with hover tooltips in viewport; permissions and fixed read survive restart with MCP disabled',
+    );
     await stop(s);
     const result = {
       ok: true,

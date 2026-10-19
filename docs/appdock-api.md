@@ -31,9 +31,11 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/manageCustomCommands/manageMcpServers/runProcessesがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
+画面ではread／write／executeを「情報の取得」「設定の変更」「コマンドの実行」と表示します。MCP列の情報取得はON固定・操作不可のトグルで、「MCP連携中は常に許可」と補足します。Applet列の情報取得は従来どおり切り替えられます。コマンド実行・Windows入力・プロセス起動・MCP利用・AI送信・TTS送信の6項目は、MCP列のトグル横に注意アイコンを表示します。許可がOFFでも表示し、マウスを重ねるかキーボードでフォーカスすると注意理由を読めます。アイコンは表示上の案内で、許可の判定や保存値を変更しません。
+
 | 操作 | 必要なApplet側の許可 |
 | --- | --- |
-| 読取り | 公開情報の取得（read） |
+| 読取り | 情報の取得（read） |
 | 通常の公開コマンド | read + execute |
 | 公開設定変更・生成ON/OFF/toggle | read + execute + write |
 | Appletの有効・無効・再起動 | read + execute + manageApplets |

@@ -16,50 +16,9 @@ const rows: {
   mcp?: keyof AutomationState;
   action?: string;
   label?: string;
+  mcpWarning?: string;
 }[] = [
-  {
-    key: 'useMcp',
-    description: hostSettingItem('permissions', 'useMcp').description,
-    mcp: 'allowUseMcp',
-    action: 'setMcpClient',
-    label: 'MCP接続先の利用',
-  },
-  {
-    key: 'manageCustomCommands',
-    description: hostSettingItem('permissions', 'manageCustomCommands').description,
-    mcp: 'allowManageCustomCommands',
-    action: 'setCustomCommandManagement',
-    label: 'カスタムコマンド管理',
-  },
-  {
-    key: 'manageMcpServers',
-    description: hostSettingItem('permissions', 'manageMcpServers').description,
-    mcp: 'allowManageMcpServers',
-    action: 'setMcpServerManagement',
-    label: 'MCP接続先の管理',
-  },
-  {
-    key: 'useAi',
-    description: hostSettingItem('permissions', 'useAi').description,
-    mcp: 'allowUseAi',
-    action: 'setAi',
-    label: 'AI文章生成',
-  },
-  {
-    key: 'useTts',
-    description: hostSettingItem('permissions', 'useTts').description,
-    mcp: 'allowUseTts',
-    action: 'setTts',
-    label: '読み上げ',
-  },
   { key: 'read', description: hostSettingItem('permissions', 'read').description },
-  {
-    key: 'execute',
-    description: hostSettingItem('permissions', 'execute').description,
-    mcp: 'allowExecute',
-    action: 'setExecution',
-    label: 'コマンド実行',
-  },
   {
     key: 'write',
     description: hostSettingItem('permissions', 'write').description,
@@ -72,6 +31,14 @@ const rows: {
     mcp: 'allowManageApplets',
     action: 'setAppletManagement',
     label: 'Applet管理',
+  },
+  {
+    key: 'execute',
+    description: hostSettingItem('permissions', 'execute').description,
+    mcp: 'allowExecute',
+    action: 'setExecution',
+    label: 'コマンド実行',
+    mcpWarning: '公開されたコマンドを実行します。操作内容によってPCや外部サービスへ影響します。',
   },
   {
     key: 'editShortcuts',
@@ -102,11 +69,20 @@ const rows: {
     label: 'タスクトレイ編集',
   },
   {
+    key: 'manageCustomCommands',
+    description: hostSettingItem('permissions', 'manageCustomCommands').description,
+    mcp: 'allowManageCustomCommands',
+    action: 'setCustomCommandManagement',
+    label: 'カスタムコマンド管理',
+  },
+  {
     key: 'sendInput',
     description: hostSettingItem('permissions', 'sendInput').description,
     mcp: 'allowSendInput',
     action: 'setInputSending',
     label: 'Windowsへのキー・操作メッセージ送信',
+    mcpWarning:
+      '他のアプリへキーや操作メッセージを送信します。意図しない操作につながる場合があります。',
   },
   {
     key: 'runProcesses',
@@ -114,6 +90,40 @@ const rows: {
     mcp: 'allowRunProcesses',
     action: 'setProcessLaunching',
     label: 'コマンド・プロセスの起動',
+    mcpWarning:
+      'このPCでコマンドやプログラムを起動します。ファイルやシステムへ影響する場合があります。',
+  },
+  {
+    key: 'manageMcpServers',
+    description: hostSettingItem('permissions', 'manageMcpServers').description,
+    mcp: 'allowManageMcpServers',
+    action: 'setMcpServerManagement',
+    label: 'MCP接続先の管理',
+  },
+  {
+    key: 'useMcp',
+    description: hostSettingItem('permissions', 'useMcp').description,
+    mcp: 'allowUseMcp',
+    action: 'setMcpClient',
+    label: 'MCP接続先の利用',
+    mcpWarning:
+      '接続先のMCPツールを利用します。ツールによって外部サービスやPC上の操作を実行します。',
+  },
+  {
+    key: 'useAi',
+    description: hostSettingItem('permissions', 'useAi').description,
+    mcp: 'allowUseAi',
+    action: 'setAi',
+    label: 'AI文章生成',
+    mcpWarning: '設定したAIサーバーへ入力した文章を送信します。',
+  },
+  {
+    key: 'useTts',
+    description: hostSettingItem('permissions', 'useTts').description,
+    mcp: 'allowUseTts',
+    action: 'setTts',
+    label: '読み上げ',
+    mcpWarning: '設定したTTSサーバーへ読み上げる文章を送信します。',
   },
 ];
 
@@ -250,28 +260,71 @@ export function ApiPermissionsSettings({
                 </td>
                 <td data-caller="MCP（Codex）">
                   {row.key === 'read' ? (
-                    <span className="permission-fixed">連携中は許可</span>
+                    <span className="permission-fixed" title="MCP連携中は常に許可">
+                      <Toggle
+                        label="Codexからの情報取得を許可する（MCP連携中は常に許可）"
+                        checked
+                        disabled
+                        onChange={() => {}}
+                      />
+                    </span>
                   ) : (
                     <>
-                      <Toggle
-                        label={`Codexからの${row.label}を許可する`}
-                        checked={!!mcpOn}
-                        disabled={hostBusy || busy || !state}
-                        onChange={(allowed) =>
-                          void save(async () => {
-                            const action =
-                              row.key === 'write'
-                                ? ({
-                                    kind: 'configure',
-                                    enabled: state!.enabled,
-                                    allowWrite: allowed,
-                                    port: state!.port,
-                                  } as const)
-                                : ({ kind: row.action, allowed } as AutomationAction);
-                            setState((await settingsControls.automation(action)).state);
-                          })
-                        }
-                      />
+                      <div className="permission-control">
+                        <Toggle
+                          label={`Codexからの${row.label}を許可する`}
+                          checked={!!mcpOn}
+                          disabled={hostBusy || busy || !state}
+                          onChange={(allowed) =>
+                            void save(async () => {
+                              const action =
+                                row.key === 'write'
+                                  ? ({
+                                      kind: 'configure',
+                                      enabled: state!.enabled,
+                                      allowWrite: allowed,
+                                      port: state!.port,
+                                    } as const)
+                                  : ({ kind: row.action, allowed } as AutomationAction);
+                              setState((await settingsControls.automation(action)).state);
+                            })
+                          }
+                        />
+                        {row.mcpWarning && (
+                          <span className="permission-warning">
+                            <span
+                              className="permission-warning-icon"
+                              role="img"
+                              tabIndex={0}
+                              aria-label={`MCP：${appletApiPermissionLabels[row.key]}の注意点`}
+                              aria-describedby={`permission-warning-${row.key}`}
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path
+                                  d="M10.3 3.9 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="M12 9v4"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                />
+                                <circle cx="12" cy="17" r="1" fill="currentColor" />
+                              </svg>
+                            </span>
+                            <span
+                              id={`permission-warning-${row.key}`}
+                              className="permission-tooltip"
+                              role="tooltip"
+                            >
+                              {row.mcpWarning}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                       {mcpOn && reason(row.key, false) && (
                         <small className="permission-pending">{reason(row.key, false)}</small>
                       )}
@@ -286,7 +339,7 @@ export function ApiPermissionsSettings({
       <details className="permission-help">
         <summary>許可の適用とログについて</summary>
         <p>
-          MCPで公開されたAppletコマンドが共通APIを呼ぶ場合、その内側の処理にはApplet側の許可を使います。MCPで直接公開されていない入力操作も、この経路では利用できます。
+          MCPで公開されたAppletコマンドが共通APIを呼ぶ場合、Appletと元のMCPの両方の許可を確認します。キー送信やプロセス起動には、それぞれの操作許可も必要です。
         </p>
         <p>
           APIの呼出しと結果は、MCPはautomation、Appletは各Appletのログに記録します。引数の値や認証情報は記録しません。
