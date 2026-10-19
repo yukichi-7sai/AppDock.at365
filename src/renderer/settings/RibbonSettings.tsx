@@ -588,11 +588,6 @@ export function RibbonSettings({
                 <option value="temporary">一時的</option>
               </select>
             </label>
-            <p className="muted">
-              {dialog.group.expansion === 'persistent'
-                ? 'リボン内に展開します。開閉状態はこのPCで再起動後も保持します。'
-                : '右側のパネルに1行で表示します。ボタンの実行・外側クリック・Escapeで閉じます。'}
-            </p>
             <div>
               <strong>色</strong>
               <SettingsColorPicker
@@ -605,18 +600,6 @@ export function RibbonSettings({
                   )
                 }
               />
-              <div
-                className="ribbon-color-preview"
-                aria-label="グループの色のプレビュー"
-                style={
-                  {
-                    '--ribbon-group-color': dialog.group.color || 'transparent',
-                  } as React.CSSProperties
-                }
-              >
-                <span>グループ</span>
-                <div>ボタン</div>
-              </div>
             </div>
           </div>
         </SettingsDialog>

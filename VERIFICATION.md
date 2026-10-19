@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-20: 色選択UIと展開方法の説明整理・コミット対象の検証（0.67.1）
+
+- 利用者の色選択UIの動作確認後、グループ追加/編集の展開方法に付いていた補足説明を削除した。「持続的」「一時的」の選択肢と保存/展開動作を保持し、前工程の色UIと同じ9ファイルの変更へまとめる。同じ変更の追加調整なので版は**0.67.1**を維持し、通常publishで最終EXEを更新した。[差分レビュー](.artifacts/commit-validation-color-picker-20261020/review.md)は未解決指摘なし。
+- 開始時の未コミット変更を保持し、通常ユーザーでfetchを実行した。HEAD/origin/mainとGitHub/AQUA双方のmainは`78321d358fb887f3d791ee833643b2014ceaf7e3`で一致した。現在の実効作者/コミッターをGit設定と照合し、コミット・通常pushの対象を今回の9ファイルへ限定する。
+- 前回の標準95ファイル674件の入力・完全ログ/結果と、前工程の関連53件を照合した。テスト・main/shared・ビルド/依存定義・JS backend・fixtureは一致し、差はrendererの色UIと説明削除、GUI試験、文書、製品パッチ版に限定される。発行した.NET/updaterの15入力に差があるため、lifecycle・.NETページ・更新/梱包とShell境界の6ファイル**38/38**を再実行した。残る89ファイル636件は根拠付きで再利用し、標準全体は**95ファイル674/674、fail/skip 0**。制限内の一時ファイル/Git/junction権限の失敗は同じコマンドを通常ユーザーで成功させ、部分成功を再利用していない。[照合記録](.artifacts/commit-validation-color-picker-20261020/reuse.json)。
+- 型検査・本体/Default Shell/native build・最終固定EXEのGUI**4群**と隔離smokeが成功。GUIは両展開方法の説明非表示、3パレット/キーボード/自由色入力/取消/適用前の非保存/色なし、明暗各2幅の形状と赤いエラー枠、実リボンと再起動後の保持を確認した。[最終GUI結果](.artifacts/ribbon-customization-ui-1792436087858/result.json)、[説明削除後の編集画面](.artifacts/ribbon-customization-ui-1792436087858/group-editor-light.png)。
+- 最終EXEは**0.67.1 / 168,930,092 bytes / SHA256 2b47634b4c2623e3a018a9c2ef4a6b017ad2ad195a0ab3e00b4522a9e1cbe11f**。feed、隔離コピー、本体と同梱Default Shellの0.67.1を照合し、既存deploy関連3ファイルを保持した。入力673件と生成物993件はGUI/smoke前後で一致し、検証記録の追記だけを以後の文書差分として記録する。
+- 全コマンド・ログ/hash・入力・再利用根拠・発行物は[検証資料](.artifacts/commit-validation-color-picker-20261020/validation.json)、stage/commit tree・名義と両送信先の結果は同フォルダーの`commit.json`・`push.json`へ記録する。専用プロセスの終了を確認し、直近の成功資料と過去の再利用・失敗/状態不明を保持し削除0件。Release・実利用先deploy・他Applet再発行・別PC/混在DPI・OS色選択ダイアログの物理操作は今回の範囲外。
+
+## 2026-10-20: 共通の色選択UIの調整（0.67.1）
+
+- `SettingsColorPicker`を丸い色見本と選択チェック、コンパクトな「色なし」・自由選択・HEX入力へ変更した。パステルを既定に、くすみ・従来のベーシック各8色を巡回する。パレット変更は候補だけを替え、選択色・入力途中の値・有効性を保持する。「自由な色」「HEX」の可視ラベル、通常時とエラー時の説明文、グループの独立したプレビューを削除した。不正値は入力欄とフォーカスの赤い枠および`aria-invalid`で示す。
+- 開始時はmain `78321d3`、origin/main追跡、作業ツリー・インデックス・未追跡がclean。制限内のpullはDNS解決失敗、同一コマンドを通常ユーザーで再実行してAlready up to dateを確認した。[発行前レビュー](.artifacts/color-picker-20261020/review.md)で要件・入力確定/取消・保存・アクセシビリティ・影響先を確認し、発行を妨げる指摘なし。保存済みの色、設定項目・保存ファイル・公開APIを維持する通常UI改良として、パッチを0.67.0から**0.67.1**へ更新した。
+- 最終版の型検査、通常publishによる本体・Default Shell・native buildが成功。リボン装飾/グループ/操作、設定編集/ページ、Shell境界の関連6ファイルは**53/53、fail/skip 0**。固定EXEのリボンGUIは**4群**成功し、3パレットのキーボード切り替え、自由色入力、途中入力保持、取消、適用前の非保存、色なし、実リボンの枠/線、実再起動後の保持を確認した。明暗テーマの幅900/1120で、見本の正円・入力の整列・はみ出しなし、赤いエラー枠とフォーカス・説明なし・高さ保持を測定し、[ライト](.artifacts/ribbon-customization-ui-1792435151787/color-picker-light-900.png)・[ダーク](.artifacts/ribbon-customization-ui-1792435151787/color-picker-dark-900.png)・[入力エラー](.artifacts/ribbon-customization-ui-1792435151787/color-picker-light-invalid.png)を目視確認した。[GUI結果](.artifacts/ribbon-customization-ui-1792435151787/result.json)。最終EXEの隔離smokeも起動・設定/素材保存・正常終了が成功した。
+- `A:\40.ARTIFACT\AppDock.at365`へ通常発行済み。EXEは**0.67.1 / 168,915,692 bytes / SHA256 793dbca625cee73f361228020668f3f3a36c5cc2d93174c9084de5047a3cd8e9**。feed、隔離コピー、実行中の本体/同梱Default Shellの0.67.1とmanifest hashを照合し、deploy関連3ファイルも保持した。依存・固定lockfile・検査設定は変更しない。
+- Node 24.21.0、pnpm 12.10.1、.NET SDK 10.0.402、Windows x64で確認した。入力673件と生成物805件のGUI前後hashは差分0。GUI試験だけ、共通入力への反映を待たずに照合した2回の失敗を修正し、最終コマンド全体を成功させた。制限内のEXE起動失敗は同じ試験を通常ユーザーで再実行した。最初のpublishは依存チェック待ち中に追加UI指定の反映のため中断し、通常実行のpublishが終了0で完了した。全ログ・hash・比較・レビュー・未確認事項は[検証資料](.artifacts/color-picker-20261020/validation.json)へ記録する。
+- 試験専用プロセスは終了を確認。今回の成功資料は方式ごとに直近3回以内で、過去の再利用資料・失敗/状態不明は保持し、削除0件。全標準回帰・コマンド実行用GUI・他Appletの再発行、OSの色選択ダイアログの物理操作、別PC・混在DPIは今回未実施。commit・push・Release・実利用先deployは行わない。
+
 ## 2026-10-20: 設定入力確定のコミット前確認（0.67.0）
 
 - 利用者の動作確認とcommit・pushの依頼を受け、入力確定の実装・文書・GUI試験の23ファイルを対象とした。未コミット変更を保持してfetchし、GitHubとAQUAのmainが開始時HEAD `10c8850`と一致することを確認した。

@@ -1,17 +1,50 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SettingsInput } from './SettingsInput';
+import { Icon } from '../Icon';
 import { parseRibbonColor } from '../../shared/ribbon';
 import './settings-color-picker.css';
 
-const colors = [
-  ['赤', '#E5484D'],
-  ['橙', '#F08C2E'],
-  ['黄', '#D5AA16'],
-  ['緑', '#30A46C'],
-  ['青', '#3B82F6'],
-  ['紫', '#8B5CF6'],
-  ['桃', '#DB5CA1'],
-  ['灰', '#87909E'],
+const colorNames = ['赤', '橙', '黄', '緑', '青', '紫', '桃', '灰'] as const;
+const palettes = [
+  {
+    name: 'パステル',
+    colors: [
+      '#F2AAAA',
+      '#F6C397',
+      '#EDDEA4',
+      '#A8D5BA',
+      '#A9C9ED',
+      '#C6B4E3',
+      '#E7B3D1',
+      '#C7CBD4',
+    ],
+  },
+  {
+    name: 'くすみ',
+    colors: [
+      '#CC8F95',
+      '#D8AF88',
+      '#C9BB86',
+      '#91B5A1',
+      '#91ABC9',
+      '#B1A0C7',
+      '#C89EB6',
+      '#A7AFBE',
+    ],
+  },
+  {
+    name: 'ベーシック',
+    colors: [
+      '#E5484D',
+      '#F08C2E',
+      '#D5AA16',
+      '#30A46C',
+      '#3B82F6',
+      '#8B5CF6',
+      '#DB5CA1',
+      '#87909E',
+    ],
+  },
 ] as const;
 
 /** Controlled color value; unfinished text remains local and blocks the caller's confirmation. */
@@ -27,7 +60,8 @@ export function SettingsColorPicker({
   onValidityChange?(valid: boolean): void;
 }) {
   const [raw, setRaw] = useState(value ?? '');
-  const description = useId();
+  const [paletteIndex, setPaletteIndex] = useState(0);
+  const palette = palettes[paletteIndex];
   useEffect(() => {
     setRaw(value ?? '');
     onValidityChange?.(true);
@@ -44,52 +78,74 @@ export function SettingsColorPicker({
     onValidityChange?.(ready);
     if (ready) choose(text ? parseRibbonColor(text) : null);
   };
+  const invalid = !valid(raw);
   return (
     <div className="settings-color-picker">
+      <div className="settings-color-toolbar">
+        <span className="settings-color-palette-name" role="status" aria-atomic="true">
+          {palette.name}
+        </span>
+        <button
+          type="button"
+          className="settings-color-cycle"
+          aria-label="パレットを切り替え"
+          title={`次のパレット: ${palettes[(paletteIndex + 1) % palettes.length].name}`}
+          onClick={() => setPaletteIndex((current) => (current + 1) % palettes.length)}
+        >
+          <Icon name="refresh" size={16} />
+        </button>
+      </div>
       <div className="settings-color-swatches" role="group" aria-label="色見本">
-        {allowNone && (
-          <button type="button" aria-pressed={!value} onClick={() => choose(null)}>
-            色なし
-          </button>
-        )}
-        {colors.map(([name, color]) => (
+        {palette.colors.map((color, index) => (
           <button
             type="button"
+            className="settings-color-swatch"
             key={color}
-            aria-label={name}
-            title={name}
+            aria-label={colorNames[index]}
+            title={`${colorNames[index]} ${color}`}
             aria-pressed={value === color}
             onClick={() => choose(color)}
             style={{ backgroundColor: color }}
-          />
+          >
+            {value === color && <Icon name="check" size={16} />}
+          </button>
         ))}
       </div>
       <div className="settings-color-inputs">
-        <label>
-          自由な色
+        {allowNone && (
+          <button
+            type="button"
+            className="settings-color-none"
+            aria-pressed={!value}
+            onClick={() => choose(null)}
+          >
+            <span className="settings-color-none-mark" aria-hidden="true" />
+            色なし
+          </button>
+        )}
+        <div className={`settings-color-custom${invalid ? ' is-invalid' : ''}`}>
           <input
             aria-label="自由な色"
+            title="色を選択"
+            className="settings-color-native"
             type="color"
-            value={value ?? '#30A46C'}
+            value={value ?? palettes[0].colors[3]}
             onChange={(e) => choose(e.target.value.toUpperCase())}
           />
-        </label>
-        <label>
-          HEX
           <SettingsInput
             aria-label="色のHEX値"
+            className="settings-color-hex"
+            type="text"
             value={raw}
             placeholder="#RRGGBB"
             maxLength={7}
-            aria-invalid={!valid(raw)}
-            aria-describedby={description}
+            spellCheck={false}
+            autoComplete="off"
+            aria-invalid={invalid}
             onChange={(e) => changeText(e.target.value)}
           />
-        </label>
+        </div>
       </div>
-      <small id={description}>
-        {valid(raw) ? '6桁のHEX値を指定できます。' : '色を #RRGGBB の形式で指定してください。'}
-      </small>
     </div>
   );
 }

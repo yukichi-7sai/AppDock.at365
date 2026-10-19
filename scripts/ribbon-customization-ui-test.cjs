@@ -214,6 +214,43 @@ async function colorGeometry() {
     await page
       .getByRole('dialog', { name: 'リボングループを編集', exact: true })
       .screenshot({ path: path.join(profile, 'group-editor.png') });
+    const picker = page.locator('.settings-color-picker');
+    const paletteName = picker.locator('.settings-color-palette-name');
+    const cycle = picker.getByRole('button', { name: 'パレットを切り替え', exact: true });
+    const hex = page.getByLabel('色のHEX値', { exact: true });
+    const expectHex = (value) =>
+      until(async () => (await hex.inputValue()) === value, 'color input updated to ' + value);
+    for (const expansion of ['temporary', 'persistent']) {
+      await page.getByLabel('展開方法', { exact: true }).selectOption(expansion);
+      assert.equal(await page.getByLabel('展開方法', { exact: true }).inputValue(), expansion);
+      assert.equal(
+        await page
+          .getByText('リボン内に展開します。開閉状態はこのPCで再起動後も保持します。', {
+            exact: true,
+          })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page
+          .getByText(
+            '右側のパネルに1行で表示します。ボタンの実行・外側クリック・Escapeで閉じます。',
+            { exact: true },
+          )
+          .count(),
+        0,
+      );
+    }
+    assert.equal(await paletteName.textContent(), 'パステル');
+    assert.equal(
+      await picker.getByRole('group', { name: '色見本' }).getByRole('button').count(),
+      8,
+    );
+    assert.equal(await picker.getByText('自由な色', { exact: true }).count(), 0);
+    assert.equal(await picker.getByText('HEX', { exact: true }).count(), 0);
+    assert.equal(await picker.getByText('6桁のHEX値を指定できます。', { exact: true }).count(), 0);
+    assert.equal(await page.getByLabel('グループの色のプレビュー', { exact: true }).count(), 0);
+    assert.equal(await picker.locator('.settings-color-error').count(), 0);
     await page.getByLabel('色のHEX値', { exact: true }).fill('#12');
     assert.equal(await page.getByRole('button', { name: '適用', exact: true }).isEnabled(), false);
     assert.equal((await saved((r) => r.groups[0])).color, '#D249A1');
@@ -226,10 +263,68 @@ async function colorGeometry() {
     assert.equal((await saved((r) => r.groups[0])).color, '#D249A1');
     await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
-    await page.getByRole('button', { name: '青', exact: true }).click();
+    await cycle.click();
+    assert.equal(await paletteName.textContent(), 'くすみ');
+    await cycle.press('Enter');
+    assert.equal(await paletteName.textContent(), 'ベーシック');
+    assert.equal(
+      await picker.getByRole('button', { name: '青', exact: true }).getAttribute('title'),
+      '青 #3B82F6',
+    );
+    await cycle.press('Space');
+    assert.equal(await paletteName.textContent(), 'パステル');
+    await expectHex('#D249A1');
+    assert.equal((await saved((r) => r.groups[0])).color, '#D249A1');
+    await page.getByLabel('自由な色', { exact: true }).fill('#789abc');
+    await expectHex('#789ABC');
+    assert.equal((await saved((r) => r.groups[0])).color, '#D249A1');
+    await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
+    assert.equal(await paletteName.textContent(), 'パステル');
+    await expectHex('#D249A1');
+    await hex.fill('#12');
+    await cycle.click();
+    assert.equal(await paletteName.textContent(), 'くすみ');
+    await expectHex('#12');
+    assert.equal(await hex.getAttribute('aria-invalid'), 'true');
+    assert.equal(await picker.locator('.settings-color-custom.is-invalid').count(), 1);
+    assert.equal(await picker.locator('small').count(), 0);
+    assert.equal(await page.getByRole('button', { name: '適用', exact: true }).isEnabled(), false);
+    await picker.getByRole('button', { name: '青', exact: true }).press('Space');
+    await expectHex('#91ABC9');
+    assert.equal(await picker.locator('.settings-color-error').count(), 0);
+    assert.equal(await page.getByRole('button', { name: '適用', exact: true }).isEnabled(), true);
+    await picker.getByRole('button', { name: '色なし', exact: true }).click();
+    await expectHex('');
+    await cycle.click();
+    await cycle.click();
+    assert.equal(await paletteName.textContent(), 'パステル');
+    assert.equal(
+      await picker
+        .getByRole('button', { name: '色なし', exact: true })
+        .getAttribute('aria-pressed'),
+      'true',
+    );
+    await picker.getByRole('button', { name: '青', exact: true }).press('Enter');
+    await expectHex('#A9C9ED');
+    assert.equal(
+      await picker.getByRole('button', { name: '青', exact: true }).getAttribute('aria-pressed'),
+      'true',
+    );
+    assert.equal(
+      await picker.getByRole('button', { name: '青', exact: true }).locator('svg').count(),
+      1,
+    );
+    assert.equal((await saved((r) => r.groups[0])).color, '#D249A1');
     await page.getByRole('button', { name: '適用', exact: true }).click();
-    await saved((r) => r.groups[0].color === '#3B82F6');
-    await until(async () => (await colorGeometry()).line === 'rgb(59, 130, 246)', 'blue line');
+    await saved((r) => r.groups[0].color === '#A9C9ED');
+    await until(
+      async () => (await colorGeometry()).line === 'rgb(169, 201, 237)',
+      'pastel blue line',
+    );
+    checks.push(
+      'Pastel default, three palette cycle with keyboard, native custom color, invalid input preservation, no labels/preview and selection without early save',
+    );
     for (const theme of ['dark', 'light']) {
       await host.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -244,7 +339,79 @@ async function colorGeometry() {
         'theme applied',
       );
       await rail.screenshot({ path: path.join(profile, `group-${theme}.png`) });
+      await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
+      await until(
+        async () => (await page.locator('html').getAttribute('data-theme')) === theme,
+        'editor theme applied',
+      );
+      for (const width of [900, 1120]) {
+        await app.evaluate(
+          ({ BrowserWindow }, width) => BrowserWindow.getAllWindows()[0].setSize(width, 820),
+          width,
+        );
+        const geometry = await picker.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const swatch = element.querySelector('.settings-color-swatch').getBoundingClientRect();
+          const custom = element.querySelector('.settings-color-custom').getBoundingClientRect();
+          const native = element.querySelector('input[type="color"]').getBoundingClientRect();
+          const input = element.querySelector('input[type="text"]').getBoundingClientRect();
+          return {
+            overflow: element.scrollWidth > element.clientWidth,
+            fits: [...element.querySelectorAll('button, input')].every((control) => {
+              const child = control.getBoundingClientRect();
+              return child.left >= rect.left && child.right <= rect.right;
+            }),
+            round: Math.abs(swatch.width - swatch.height) < 1,
+            aligned: Math.abs(native.top + native.height / 2 - (input.top + input.height / 2)) < 1,
+            nativeWidth: native.width,
+            hexWidth: input.width,
+            customHeight: custom.height,
+          };
+        });
+        assert.equal(geometry.overflow, false);
+        assert.equal(geometry.fits, true);
+        assert.equal(geometry.round, true);
+        assert.equal(geometry.aligned, true);
+        assert.equal(geometry.nativeWidth, 24);
+        assert(geometry.hexWidth >= 100);
+        assert.equal(geometry.customHeight, 36);
+        await picker.screenshot({ path: path.join(profile, `color-picker-${theme}-${width}.png`) });
+      }
+      await page
+        .getByRole('dialog', { name: 'リボングループを編集', exact: true })
+        .screenshot({ path: path.join(profile, `group-editor-${theme}.png`) });
+      const pickerHeight = (await picker.boundingBox()).height;
+      await hex.fill('#12');
+      await until(
+        async () => (await hex.getAttribute('aria-invalid')) === 'true',
+        'invalid color rendered',
+      );
+      const errorColors = await picker.locator('.settings-color-custom').evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { border: style.borderColor, focus: style.outlineColor };
+      });
+      const red = theme === 'dark' ? 'rgb(229, 138, 155)' : 'rgb(194, 59, 83)';
+      assert.equal(errorColors.border, red);
+      assert.equal(errorColors.focus, red);
+      assert.equal((await picker.boundingBox()).height, pickerHeight);
+      assert.equal(await picker.locator('small').count(), 0);
+      assert.equal(
+        await page.getByRole('button', { name: '適用', exact: true }).isEnabled(),
+        false,
+      );
+      await picker.screenshot({ path: path.join(profile, `color-picker-${theme}-invalid.png`) });
+      await hex.press('Tab');
+      assert.equal(await picker.locator('.settings-color-custom.is-invalid').count(), 1);
+      await picker.getByRole('button', { name: '青', exact: true }).press('Enter');
+      await expectHex('#A9C9ED');
+      assert.equal(await picker.locator('.settings-color-custom.is-invalid').count(), 0);
+      assert.equal(await page.getByRole('button', { name: '適用', exact: true }).isEnabled(), true);
+      await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
     }
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 820));
+    checks.push(
+      'Round swatches, selected check, no overflow at 900/1120 widths and red invalid border/focus without text or layout movement in light/dark',
+    );
     await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
     await page.getByRole('button', { name: '色なし', exact: true }).click();
     await page.getByRole('button', { name: '適用', exact: true }).click();
@@ -305,6 +472,7 @@ async function colorGeometry() {
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
+    await host?.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify({ ok: false, checks, error: String(error), errors }, null, 2),
