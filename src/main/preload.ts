@@ -7,9 +7,23 @@ window.addEventListener('DOMContentLoaded', () => {
   let active = false;
   let generation = 0;
   let backdrop: HTMLDivElement | undefined;
+  const root = document.documentElement;
+  const finish = async (revision: number, current: number, rendered: boolean) => {
+    if (!active || current !== generation) return;
+    try {
+      if (!(await ipcRenderer.invoke('dock:hostModalReady', revision, rendered))) return;
+    } catch {
+      // Keep the dialog usable when preparation fails.
+    }
+    if (active && current === generation) root.removeAttribute('data-host-modal-pending');
+  };
   ipcRenderer.on('dock:hostModalBackdrop', async (_event, model: HostModalBackdrop) => {
     if (!active) return;
     const current = ++generation;
+    if (model.failed) {
+      void finish(model.revision, current, false);
+      return;
+    }
     const next = document.createElement('div');
     next.dataset.hostModalBackdrop = 'true';
     next.setAttribute('aria-hidden', 'true');
@@ -37,6 +51,7 @@ window.addEventListener('DOMContentLoaded', () => {
     try {
       await Promise.all(images.map((image) => image.decode()));
     } catch {
+      void finish(model.revision, current, false);
       return;
     }
     if (!active || current !== generation) return;
@@ -45,8 +60,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.body.append(next);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (active && current === generation)
-          void ipcRenderer.invoke('dock:hostModalReady', model.revision).catch(() => {});
+        void finish(model.revision, current, true);
       });
     });
   });
@@ -54,12 +68,16 @@ window.addEventListener('DOMContentLoaded', () => {
     const next = !!document.querySelector('dialog:modal');
     if (next === active) return;
     active = next;
-    if (!active) {
-      generation++;
+    const current = ++generation;
+    if (active) root.setAttribute('data-host-modal-pending', '');
+    else {
+      root.removeAttribute('data-host-modal-pending');
       backdrop?.remove();
       backdrop = undefined;
     }
-    void ipcRenderer.invoke('dock:hostModal', active).catch(() => {});
+    void ipcRenderer.invoke('dock:hostModal', active).catch(() => {
+      if (current === generation) root.removeAttribute('data-host-modal-pending');
+    });
   };
   new MutationObserver(update).observe(document.documentElement, {
     childList: true,
@@ -208,6 +226,17 @@ const api: DockApi = {
   executePanelAction: (id, actionId) => ipcRenderer.invoke('dock:executePanelAction', id, actionId),
   openPath: (kind) => ipcRenderer.invoke('dock:openPath', kind),
   windowAction: (action) => ipcRenderer.invoke('dock:windowAction', action),
+  barViewport: (region, bounds) => ipcRenderer.invoke('dock:barViewport', region, bounds),
+  focusBar: (region, edge) => ipcRenderer.invoke('dock:focusBar', region, edge),
+  onBarFocusHost: (callback) => {
+    const handler = (
+      _: Electron.IpcRendererEvent,
+      region: import('../shared/shell-bars').ShellBarRegion,
+      edge: 'before' | 'after',
+    ) => callback(region, edge);
+    ipcRenderer.on('dock:barFocusHost', handler);
+    return () => ipcRenderer.removeListener('dock:barFocusHost', handler);
+  },
   onChanged: (callback) => {
     const handler = () => callback();
     ipcRenderer.on('dock:changed', handler);

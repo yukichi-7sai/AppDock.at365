@@ -35,12 +35,28 @@
   scrollbar-gutter: auto;
 }
 
-.titlebar-notifications {
-  -webkit-app-region: no-drag;
-  flex-shrink: 0;
-  margin-right: 12px;
-  font-size: 12px;
-  color: var(--muted);
+.shell-bar-slot {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+}
+.shell-bar-slot[data-region='titlebar'] {
+  grid-row: 1;
+}
+.shell-bar-slot[data-region='statusbar'] {
+  grid-row: 3;
 }
 
-.settings-page:not([hidden]) { display:flex; flex:1; min-height:0; overflow:hidden; }
+.settings-page:not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Preserve native focus containment while Shell surfaces are prepared before painting. */
+html[data-host-modal-pending] dialog:modal,
+html[data-host-modal-pending] dialog:modal::backdrop {
+  opacity: 0 !important;
+  transition: none !important;
+  animation: none !important;
+}

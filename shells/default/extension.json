@@ -5,14 +5,14 @@
   "version": "0.0.0",
   "runtime": "node",
   "entry": "worker.cjs",
-  "capabilities": [
-    "shell"
-  ],
+  "capabilities": ["shell"],
   "shell": {
     "apiVersion": 1,
     "ribbonSchemaVersion": 2,
     "ui": "index.html",
     "views": {
+      "titlebar": "bars.html",
+      "statusbar": "bars.html",
       "overlay.command-palette": "overlay.html",
       "overlay.ribbon-group": "overlay.html",
       "page.logs": "logs.html",

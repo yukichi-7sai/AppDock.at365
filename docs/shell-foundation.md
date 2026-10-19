@@ -1,6 +1,6 @@
 # Shell Hostの構成と拡張方針
 
-本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。リボン、コマンドパレット、ホーム、ログ、通知センター、通知バナー・デスクトップ通知はShellが描画する。未移行の本文は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
+本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。タイトルバー、ステータスバー、リボン、コマンドパレット、ホーム、ログ、通知センター、通知バナー・デスクトップ通知はShellが描画する。未移行の本文と設定は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[shell-bars.ts](../src/shared/shell-bars.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
 
 ## 用語と境界
 
@@ -20,6 +20,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 
 | 領域 | 本体の内容管理 | 公開契約 |
 | --- | --- | --- |
+| titlebar / statusbar | WindowBarsと既存ウィンドウ・更新サービス | [タイトルバーとステータスバー](shell-bars.md) |
 | ribbon | UiPresentationの表示モデル・操作ID・ナビゲーション | [Shell API](shell-api.md) |
 | overlay.command-palette | CommandPaletteSessionとOverlayController | [部分Shellと共通オーバーレイ](shell-overlays.md) |
 | page.home | HomePageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
@@ -28,7 +29,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | notification.desktop | NotificationServiceとNotificationDesktopHost/SurfaceController | [通知基盤](notifications.md) |
 | notification.banner | NotificationServiceとNotificationSurfaceController | [通知基盤](notifications.md) |
 
-割り当ては`host.shellProviders`の領域IDからApplet IDへのマップ。共通カタログの8領域ごとに1件指定でき、省略はDefault Shellです。`ShellProviderRegistry`が軽量なmanifest・有効状態・起動世代から提供元と理由を解決し、各HostがViewの接続状態を報告します。設定を保存しても指定Appletを有効化しません。表示コンテキストはprimary、通常本文の本体Windowは1つ、通知専用Windowはdesktop射影を表示します。未割り当ての有効Appletも通常のcommands/settings/pagesを利用できます。設定移行・切替・再試行・状態とコマンド条件は[領域別割り当て](shell-region-assignment.md)を参照してください。
+割り当ては`host.shellProviders`の領域IDからApplet IDへのマップ。共通カタログの10領域ごとに1件指定でき、省略はDefault Shellです。`ShellProviderRegistry`が軽量なmanifest・有効状態・起動世代から提供元と理由を解決し、各HostがViewの接続状態を報告します。設定を保存しても指定Appletを有効化しません。表示コンテキストはprimary、通常本文の本体Windowは1つ、通知専用Windowはdesktop射影を表示します。未割り当ての有効Appletも通常のcommands/settings/pagesを利用できます。設定移行・切替・再試行・状態とコマンド条件は[領域別割り当て](shell-region-assignment.md)を参照してください。
 
 Shell Hostは位置・zoom・ready・接続元・表示順序・フォーカス・破棄を扱い、検索や設定保存等の機能判断は内容Controllerへ置く。ページ、オーバーレイ、リボンの寿命を分離し、1つのViewの破棄で他領域やAppletの処理を止めない。
 
@@ -66,7 +67,7 @@ Viewは領域単位で必要時に生成し、ready後に表示を切り替え�
 
 一般Appletの複数Window・同一領域の同時多重表示は未実装。通知専用Windowは共通通知射影へ限定し、Applet Surfaceを多重化しない。導入する場合はcontext/binding/sessionとWindow寿命を分け、同じ機能サービスを複数の読者から使う。Windowが閉じても共有Appletや他の読者を停止しない。単一WebContentsの二重表示を前提にせず、既存AppletSurfaceの全面的な多重化は別に設計する。
 
-タイトルバー等の残りの画面、過去ログ/日付検索、内蔵会話UIはこの基盤だけでは提供しない。追加時に個別の目的と公開契約を決める。
+Applet一覧・詳細等の残りの画面、過去ログ/日付検索、内蔵会話UIはこの基盤だけでは提供しない。追加時に個別の目的と公開契約を決める。
 
 ## 検証
 

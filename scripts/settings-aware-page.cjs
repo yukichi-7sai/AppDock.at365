@@ -21,8 +21,7 @@ function settingsAwarePage(host) {
       const route = (await host.evaluate(() => window.dock.snapshot())).navigation.route;
       if (
         ['settings', 'extensions'].includes(route) &&
-        ((await host.locator('.settings-surface').count()) ||
-          route === 'settings')
+        ((await host.locator('.settings-surface').count()) || route === 'settings')
       )
         settings = await settingsPage(host);
     } catch {}
@@ -42,6 +41,12 @@ function settingsAwarePage(host) {
     try {
       result.push(await ribbonPage(host));
     } catch {}
+    for (const page of host.context().pages()) {
+      if (page === host) continue;
+      try {
+        if (await page.evaluate(() => !!window.appdockBar)) result.push(page);
+      } catch {}
+    }
     return { result, settings };
   };
   const query = (chain) => {

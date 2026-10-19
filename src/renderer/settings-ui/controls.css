@@ -283,48 +283,6 @@ code {
   height: 100vh;
   overflow: hidden;
 }
-.titlebar {
-  grid-column: 1/-1;
-  background: var(--rail);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  -webkit-app-region: drag;
-  user-select: none;
-}
-.title-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: 18px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-}
-.titlebar-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  color: var(--faint);
-  font-size: 11px;
-}
-.window-controls {
-  margin-left: auto;
-  display: flex;
-  height: 100%;
-  -webkit-app-region: no-drag;
-}
-.window-controls button {
-  width: 44px;
-  border-radius: 0;
-}
-.window-controls button:hover {
-  background: var(--raised);
-}
-.window-controls .window-close:hover {
-  background: #c74652;
-  color: white;
-}
 .brand-mark {
   display: inline-flex;
   align-items: center;
@@ -819,44 +777,6 @@ main {
 .next-strip > .muted {
   margin-left: auto;
   font-size: 9px;
-}
-.statusbar {
-  position: relative;
-  grid-column: 1/-1;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 0 16px;
-  background: var(--side);
-  border-top: 1px solid var(--border);
-  font-size: 9px;
-  color: var(--muted);
-  user-select: none;
-}
-.statusbar > span:first-child {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  max-width: 36%;
-}
-.statusbar i {
-  background: var(--accent);
-  height: 4px;
-  width: 4px;
-  border-radius: 50%;
-}
-.statusbar > button {
-  margin-left: auto;
-  font-size: 9px;
-  color: var(--faint);
-  gap: 6px;
-}
-.statusbar kbd {
-  border: 0;
-  padding: 0;
-  margin-left: 5px;
-  font-size: 8px;
 }
 .extensions-layout {
   display: grid;
@@ -1525,16 +1445,6 @@ main {
 .settings-categories > *:not(.sidebar-resizer) {
   flex-shrink: 0;
 }
-.titlebar-search {
-  -webkit-app-region: no-drag;
-  margin-left: auto;
-  margin-right: 24px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.window-controls {
-  margin-left: 0;
-}
 .sidebar {
   gap: 16px;
   position: relative;
@@ -1760,9 +1670,7 @@ summary {
 .shortcut-row-actions button {
   font-size: 11px;
 }
-.state,
-.statusbar,
-.statusbar > button {
+.state {
   font-size: 11px;
 }
 .text-button,
@@ -1824,12 +1732,6 @@ summary {
   }
   .settings-layout {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .titlebar-search {
-    margin-right: 8px;
-  }
-  .titlebar-search kbd {
-    display: none;
   }
 }
 /* Editable SendKey command definitions supplied by an applet. */
@@ -2328,57 +2230,6 @@ summary {
   flex-basis: 100%;
 }
 
-/* Progress occupies the existing footer, including over native WebContentsView pages. */
-.statusbar:has(> .update-operation) > :not(.update-operation) {
-  visibility: hidden;
-}
-.update-operation {
-  position: absolute;
-  inset: 3px 12px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
-  min-width: 0;
-}
-.update-operation.has-error {
-  color: var(--text);
-  border-color: var(--border);
-  background: var(--panel);
-}
-.update-operation > svg,
-.update-operation > button {
-  flex-shrink: 0;
-}
-.update-operation-message {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.update-operation progress {
-  width: clamp(40px, 10vw, 140px);
-  height: 4px;
-  accent-color: var(--accent);
-}
-.update-operation small {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.update-operation button {
-  font-size: 10px;
-  color: inherit;
-  padding: 2px 5px;
-}
-.update-operation button:hover {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
 .update-result-inline {
   display: flex;
   flex-wrap: wrap;
@@ -2406,11 +2257,6 @@ summary {
 }
 .update-check-control time {
   min-width: 175px;
-}
-@media (max-width: 760px) {
-  .update-operation small {
-    display: none;
-  }
 }
 /* Conditional shortcut assignments: one row per binding. */
 .command-id {

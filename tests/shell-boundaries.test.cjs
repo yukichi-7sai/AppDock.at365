@@ -47,3 +47,13 @@ test('settings UI ships only in the host renderer, with no settings Shell entry'
     false,
   );
 });
+
+test('window bars are rendered only by the selected Shell and ship in the default manifest', () => {
+  const source = fs.readFileSync(path.join(host, 'renderer/main.tsx'), 'utf8');
+  assert(!source.includes('<header className="titlebar">'));
+  assert(!source.includes('<footer className="statusbar">'));
+  assert(!fs.existsSync(path.join(host, 'renderer/UpdateProgress.tsx')));
+  const manifest = JSON.parse(fs.readFileSync(path.join(shell, 'extension.json'), 'utf8'));
+  for (const region of ['titlebar', 'statusbar'])
+    assert(fs.existsSync(path.join(shell, manifest.shell.views[region])));
+});

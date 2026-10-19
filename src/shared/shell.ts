@@ -2,7 +2,9 @@
 export const defaultShellId = 'appdock.default-shell';
 /** Only these regions are mounted today. Additional page regions need their own public contract. */
 export type ShellRegion =
+  | 'titlebar'
   | 'ribbon'
+  | 'statusbar'
   | 'overlay.command-palette'
   | 'overlay.ribbon-group'
   | 'page.logs'
@@ -12,7 +14,9 @@ export type ShellRegion =
   | 'notification.desktop';
 
 export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
+  { id: 'titlebar', title: 'タイトルバー' },
   { id: 'ribbon', title: 'リボン' },
+  { id: 'statusbar', title: 'ステータスバー' },
   { id: 'overlay.command-palette', title: 'コマンドパレット' },
   { id: 'overlay.ribbon-group', title: 'リボングループ' },
   { id: 'page.home', title: 'ホーム' },

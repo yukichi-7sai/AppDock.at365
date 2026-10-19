@@ -324,6 +324,14 @@ export interface DockApi {
   executePanelAction(id: string, actionId: string): Promise<unknown>;
   openPath(kind: 'settings' | 'extensions' | 'logs'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
+  barViewport(
+    region: import('./shell-bars').ShellBarRegion,
+    bounds: import('./shell-pages').ShellPageViewport | null,
+  ): Promise<void>;
+  focusBar(region: import('./shell-bars').ShellBarRegion, edge: 'first' | 'last'): Promise<void>;
+  onBarFocusHost(
+    callback: (region: import('./shell-bars').ShellBarRegion, edge: 'before' | 'after') => void,
+  ): () => void;
   onChanged(callback: () => void): () => void;
 }
 export interface LaunchState {

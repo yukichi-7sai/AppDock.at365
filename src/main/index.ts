@@ -11,6 +11,8 @@ import type { ExtensionSnapshot } from '../shared/contracts';
 import type { SettingsPageDefinition } from '../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../shared/settings-page';
 import { ShellHost } from './core/shell-host';
+import { ShellBarHost } from './core/shell-bar-host';
+import { WindowBars } from './core/window-bars';
 import { OverlayHost } from './core/overlay-host';
 import { HostModalLayer } from './core/host-modal-layer';
 import { ShellPageHost } from './core/shell-page-host';
@@ -298,6 +300,7 @@ async function flushSettingsInputs() {
   });
 }
 let shellHost: ShellHost | undefined;
+let shellBarHost: ShellBarHost | undefined;
 let overlayHost: OverlayHost | undefined;
 let hostModalLayer: HostModalLayer | undefined;
 let shellPageHost: ShellPageHost | undefined;
@@ -1093,6 +1096,7 @@ const changed = () => {
     notificationDesktop?.refresh();
     notificationWindows?.refresh();
     shellHost?.refresh();
+    shellBarHost?.refresh();
     shellPageHost?.refresh();
     settingsPageHost?.refresh();
     overlayHost?.refresh();
@@ -2208,6 +2212,7 @@ async function retryShell(region?: ShellRegion) {
       await manager.restart(id);
   }
   if (!region || region === 'ribbon') shellHost?.retry();
+  if (!region || region === 'titlebar' || region === 'statusbar') shellBarHost?.retry(region);
   if (!region || region === 'overlay.command-palette' || region === 'overlay.ribbon-group')
     overlayHost?.retry(region);
   if (!region || region.startsWith('page.')) shellPageHost?.retry(region);
@@ -2262,6 +2267,8 @@ function registerIpc() {
     settingsPageHost?.close(id);
   });
   handle('dock:focusShell', (edge) => shellHost?.focus(edge));
+  handle('dock:barViewport', (region, bounds) => shellBarHost?.viewport(region, bounds));
+  handle('dock:focusBar', (region, edge) => shellBarHost?.focus(region, edge));
   handle('dock:navigate', (route: string, restore?: true) =>
     restore === true ? navigation.restore(route) : navigation.navigate(route),
   );
@@ -2374,9 +2381,10 @@ function registerIpc() {
     if (typeof active !== 'boolean') throw Error('Invalid modal state');
     hostModalLayer?.setActive(active);
   });
-  handle('dock:hostModalReady', (revision: number) => {
+  handle('dock:hostModalReady', (revision: number, rendered = true) => {
     if (!Number.isSafeInteger(revision)) throw Error('Invalid modal revision');
-    hostModalLayer?.ready(revision);
+    if (typeof rendered !== 'boolean') throw Error('Invalid modal background state');
+    return hostModalLayer?.ready(revision, rendered) ?? false;
   });
   handle('dock:setShortcutRecording', async (recording: boolean) => {
     if (typeof recording !== 'boolean') throw new Error('キー入力状態が正しくありません。');
@@ -2445,23 +2453,26 @@ function registerIpc() {
     if (error) throw new Error(error);
   });
   handle('dock:windowAction', (action: string) => {
-    switch (action) {
-      case 'minimize':
-        window?.minimize();
-        break;
-      case 'maximize':
-        window?.isMaximized() ? window.unmaximize() : window?.maximize();
-        break;
-      case 'close':
-        window?.close();
-        break;
-      case 'quit':
-        quitHost();
-        break;
-      default:
-        throw new Error('未対応のウィンドウ操作です。');
-    }
+    applyWindowAction(action);
   });
+}
+function applyWindowAction(action: string) {
+  switch (action) {
+    case 'minimize':
+      window?.minimize();
+      break;
+    case 'maximize':
+      window?.isMaximized() ? window.unmaximize() : window?.maximize();
+      break;
+    case 'close':
+      window?.close();
+      break;
+    case 'quit':
+      quitHost();
+      break;
+    default:
+      throw new Error('未対応のウィンドウ操作です。');
+  }
 }
 async function initialize() {
   if (settingsLoadError) {
@@ -3018,6 +3029,87 @@ async function initialize() {
     openCenter: () => executeCommand('appdock.notifications.open'),
     failed: (message) => log.write('error', 'notifications', message),
   });
+  shellBarHost = new ShellBarHost({
+    window,
+    preload: path.join(__dirname, 'shell-bar-preload.js'),
+    registry: shellRegistry!,
+    modalLayer: hostModalLayer,
+    ready: () => startupReady && !quitting,
+    blocked: () => !!overlayHost?.active,
+    content: new WindowBars({
+      state: () => {
+        const update = updater.state;
+        return {
+          dark: nativeTheme.shouldUseDarkColors,
+          version: app.getVersion(),
+          paletteKey: settings.value.shortcuts['appdock.commands.search']?.[0] ?? '',
+          maximized: window?.isMaximized() ?? false,
+          runningApplets: allApplets().filter(
+            (e) => e.sourceKind !== 'builtin' && e.state === 'running',
+          ).length,
+          update: {
+            busy: update.busy,
+            blocked: settingsEditing.snapshot().pending || settingsOperationBusy(),
+            phase: update.phase,
+            cancellable: update.cancellable === true,
+            ...(update.progress
+              ? {
+                  progress: {
+                    name: update.progress.name,
+                    index: update.progress.index,
+                    count: update.progress.count,
+                    receivedBytes: update.progress.receivedBytes,
+                    totalBytes: update.progress.totalBytes,
+                  },
+                }
+              : {}),
+          },
+        };
+      },
+      run: async (operation) => {
+        if (operation === 'palette')
+          return openCommandPalette({ requestId: randomUUID(), mode: 'execute' });
+        if (operation === 'notifications') return notificationBanner?.focus();
+        if (operation === 'update') {
+          await flushSettingsInputs();
+          await updater.install('host');
+          return { accepted: true };
+        }
+        if (operation === 'cancel') return updater.cancel();
+        applyWindowAction(operation);
+      },
+    }),
+    settings: (id) => settings.value.extensions[id]?.settings ?? {},
+    execute: executeShellCommand,
+    shortcut: async (key) => {
+      if (!window?.isFocused() || shortcutRecording) return;
+      const normalized = normalizeShortcut(key);
+      if (!globalShortcutOwnership.has(normalized)) return dispatchShortcut(normalized);
+    },
+    layer: () => {
+      notificationBanner?.layout();
+      overlayHost?.layout();
+    },
+    failed: (region, message, unavailable) => {
+      log.write('error', 'shell-bar', `${region}: ${message}`);
+      if (unavailable)
+        void dialog
+          .showMessageBox(window!, {
+            type: 'error',
+            title: 'Default Shell',
+            message,
+            buttons: ['再試行', 'ログを開く', '終了'],
+            defaultId: 0,
+          })
+          .then((result) => {
+            if (result.response === 0) void retryShell(region);
+            else if (result.response === 1) navigation.navigate('logs');
+            else quitHost();
+          });
+    },
+  });
+  window.on('maximize', changed);
+  window.on('unmaximize', changed);
   shellHost = new ShellHost({
     window,
     layer: () => {
@@ -3730,6 +3822,7 @@ app.on('before-quit', (event) => {
   typedNotifications?.dispose();
   notificationService?.dispose();
   shellHost?.dispose();
+  shellBarHost?.dispose();
   overlayHost?.dispose();
   shellPageHost?.dispose();
   settingsPageHost?.dispose();

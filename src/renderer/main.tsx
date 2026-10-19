@@ -1,6 +1,7 @@
 import { SettingsControlsProvider } from './settings-ui/api';
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { ShellPageSlot } from './ShellPageSlot';
+import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
 import { Icon, type IconName } from './Icon';
 import { Toggle } from './settings-ui/Toggle';
@@ -25,7 +26,6 @@ import { orderApplets } from '../shared/applet-order';
 import { SettingsToolbar, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './settings-ui/VersionCheck';
-import { UpdateProgress } from './UpdateProgress';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
 import { defaultShellId } from '../shared/shell';
@@ -38,15 +38,6 @@ declare global {
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | 'notifications' | `page:${string}`;
 type AppletDetailView = 'description' | 'settings' | 'shortcuts' | 'logs';
 
-function Brand({ small = false }: { small?: boolean }) {
-  return (
-    <span className={`brand-mark ${small ? 'small' : ''}`}>
-      <span />
-      <span />
-      <span />
-    </span>
-  );
-}
 const labels: Record<string, string> = {
   home: 'ホーム',
   extensions: 'Applet',
@@ -89,7 +80,7 @@ function App() {
       window.dock.onShellFocusHost((edge) => {
         const selector =
           edge === 'before'
-            ? '.titlebar button'
+            ? '.shell-bar-slot[data-region="titlebar"]'
             : '.sidebar button, main button, main input, main select, main .shell-page-slot';
         const elements = [...document.querySelectorAll<HTMLElement>(selector)].filter(
           (e) => e.getClientRects().length && !e.matches(':disabled'),
@@ -404,7 +395,6 @@ function App() {
         available: false,
       })),
   ];
-  const paletteKey = snapshot?.settings.value.shortcuts['appdock.commands.search']?.[0];
   async function execute(id: string) {
     if (id === 'appdock.notifications.open') {
       setPage('notifications');
@@ -431,48 +421,13 @@ function App() {
     await action(() => window.dock.executeCommand(id));
   }
   const selectedApplet = orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0];
-  const active = orderedApplets.filter((e) => e.state === 'running').length;
   return (
     <div
       className={`shell ${page === 'extensions' ? 'with-sidebar' : ''}`}
       data-route={page}
       style={{ '--applet-sidebar-width': `${appletSidebar.width}px` } as React.CSSProperties}
     >
-      <header className="titlebar">
-        <div className="title-brand">
-          <Brand small />
-          <span>
-            AppDock<span className="muted">.at365</span>
-          </span>
-        </div>
-        <button
-          className="titlebar-search"
-          onClick={() => {
-            void openPalette();
-          }}
-        >
-          <Icon name="search" size={15} /> コマンドを検索 {paletteKey && <kbd>{paletteKey}</kbd>}
-        </button>
-        <button
-          className="titlebar-notifications"
-          aria-label="通知へ移動"
-          onClick={() => void window.dock.focusNotifications()}
-        >
-          通知
-        </button>
-        <div className="window-controls">
-          {(['minimize', 'maximize', 'close'] as const).map((a, i) => (
-            <button
-              key={a}
-              aria-label={['最小化', '最大化', '閉じる'][i]}
-              className={a === 'close' ? 'window-close' : ''}
-              onClick={() => void window.dock.windowAction(a)}
-            >
-              <Icon name={(['minus', 'square', 'close'] as const)[i]} size={14} />
-            </button>
-          ))}
-        </div>
-      </header>
+      <ShellBarSlot region="titlebar" />
       <div
         className="shell-ribbon-slot"
         ref={ribbonSlot}
@@ -674,21 +629,7 @@ function App() {
           </div>
         )}
       </main>
-      <footer className="statusbar">
-        <span className="statusbar-activity">
-          <i />
-          実行中 {active} Applet
-        </span>
-        <span>
-          AppDock.at365 <span className="muted">v{snapshot?.version ?? '0.1.0'}</span>
-          <VersionCheck compact disabled={editor.pending} />
-        </span>
-        <button onClick={() => void openPalette()}>
-          <Icon name="command" size={12} />
-          コマンドパレット {paletteKey && <kbd>{paletteKey}</kbd>}
-        </button>
-        {snapshot && <UpdateProgress state={snapshot.updates} />}
-      </footer>
+      <ShellBarSlot region="statusbar" />
     </div>
   );
 }

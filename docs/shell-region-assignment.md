@@ -1,6 +1,6 @@
 # 領域ごとのShell割り当てと実装計画
 
-実装状態: 実装・必要回帰・固定配布物確認済み。AppDock 0.34.0。領域ごとにShell Appletを1件指定し、利用できない領域だけDefault Shellへ戻します。設定の即時保存と通知センター・デスクトップ通知を含むmain `51e0372`を起点に実装しました。優先順位リストは導入しません。現行契約の型は[src/shared/shell.ts](../src/shared/shell.ts)、解決と状態集約は[ShellProviderRegistry](../src/main/core/shell-provider-registry.ts)を正本とします。
+実装状態: AppDock 0.64.0。領域ごとにShell Appletを1件指定し、利用できない領域だけDefault Shellへ戻します。優先順位リストは導入しません。現行契約の型は[src/shared/shell.ts](../src/shared/shell.ts)、解決と状態集約は[ShellProviderRegistry](../src/main/core/shell-provider-registry.ts)を正本とします。
 
 現行の責務分離と描画APIは[Shell基盤](shell-foundation.md)、[リボン](shell-api.md)、[オーバーレイ](shell-overlays.md)、[本文](shell-pages.md)、[通知](notifications.md)を引き継ぐ。設定保存と編集は[設定同期](settings-sync.md)と[設定基盤](settings-foundation.md)、コマンドは[Applet API](extensions.md)と[共通操作API](appdock-api.md)に従う。
 
@@ -10,12 +10,14 @@
 
 本体は機能状態・操作・配置・表示寿命、Shellは公開モデルの描画を所有する。Appletの有効状態、領域への割り当て、実際のViewの状態は分離する。未割り当ての有効Appletも、通常のコマンド・設定・ページを利用できる。
 
-初回の対象は既存の8領域とprimaryコンテキスト、通常本文の本体Window1件および既存の通知専用Window。新たな画面領域への移植、一般Appletの複数Window、同一領域の同時多重表示、Applet本文WebContentsの複製、MCP向けの新しいShell操作APIは含めない。残る本体描画の移行条件は後述する。
+現在の対象は共通カタログの10領域とprimaryコンテキスト、通常本文の本体Window1件および既存の通知専用Window。タイトルバーとステータスバーは[専用契約](shell-bars.md)を使う。一般Appletの複数Window、同一領域の同時多重表示、Applet本文WebContentsの複製、MCP向けの新しいShell操作APIは含めない。残る本体描画の移行条件は後述する。
 
 ## 領域と割り当ての単位
 
 | 領域ID | 描画内容 | 現行の表示Host |
 | --- | --- | --- |
+| `titlebar` | 検索・通知・ウィンドウ操作 | ShellBarHost |
+| `statusbar` | 稼働数・本体版・更新・進捗 | ShellBarHost |
 | `ribbon` | ナビゲーションとコマンドのリボン | ShellHost |
 | `overlay.command-palette` | コマンド実行・選択パレット | OverlayHost |
 | `overlay.ribbon-group` | 一時展開するリボングループ | OverlayHost |
@@ -161,7 +163,7 @@ HostSnapshotと設定ページの補助モデルへ領域別状態を追加す�
 
 ## 設定画面
 
-「設定 → 表示 → Shell」に共通カタログ順の8行を配置する。各行に領域名、指定先の選択、現在の使用先、利用不可・適用待ちの理由、必要時の再試行を表示する。順番変更UIは設けない。
+「設定 → 表示 → Shell」に共通カタログ順の10行を配置する。各行に領域名、指定先の選択、現在の使用先、利用不可・適用待ちの理由、必要時の再試行を表示する。順番変更UIは設けない。
 
 選択肢はDefault Shellと、その領域を宣言する導入済みAppletとする。無効Appletも無効状態を明示して指定できるが、選択では有効化しない。保存済みの未導入・領域未提供の指定は補助選択肢として残し、勝手に別の値へ変更しない。Default Shellは「常時有効」と表示し、無効化操作は提供しない。
 
@@ -222,7 +224,7 @@ shell capabilityを持つworker向けに、自Appletの提供領域だけの状�
 
 ## 本体描画のDefault Shellへの移行
 
-領域別指定と描画移行は独立して進められる。タイトルバー、ステータスバー、Applet一覧・詳細の残る描画を移すときは、先に領域ID、表示モデル、操作、寸法、フォーカス、復旧単位を定義する。新しい領域の既定先はDefault Shellとし、既存の領域マップへ外部Appletを自動指定しない。
+領域別指定と描画移行は独立して進められる。タイトルバーとステータスバーは[公開契約](shell-bars.md)を使う。Applet一覧・詳細の残る描画を移すときも、先に領域ID、表示モデル、操作、寸法、フォーカス、復旧単位を定義する。新しい領域の既定先はDefault Shellとし、既存の領域マップへ外部Appletを自動指定しない。
 
 Window管理・保存済み設定と入力受付・ナビゲーション・通知・処理進捗・Applet本文の寿命は本体に残す。Default Shellだけが使う内部APIや、本体rendererの復旧用重複描画を作らない。AのリボンがBの本文DOMや内部状態を直接操作する依存を作らず、共通モデルと本体操作で連携する。
 
@@ -261,7 +263,7 @@ Window管理・保存済み設定と入力受付・ナビゲーション・通�
 
 ## 検証計画
 
-検証fixtureとして全8領域を持つA/B、一部領域のみのC、readyしない提供元、特定領域だけ故障する提供元を用意する。製品へ同梱しない。GUIは隔離profileで直列に実行し、既存のtoolchainと試験経路を使用する。
+検証fixtureとして共通カタログ全領域を持つA/B、一部領域のみのC、readyしない提供元、特定領域だけ故障する提供元を用意する。製品へ同梱しない。GUIは隔離profileで直列に実行し、既存のtoolchainと試験経路を使用する。
 
 | 検証群 | 必須の受入条件 | 利用する既存試験と追加範囲 |
 | --- | --- | --- |

@@ -66,7 +66,7 @@ fs.writeFileSync(
     runtime: 'node',
     entry: 'worker.cjs',
     capabilities: ['shell'],
-    shell: { apiVersion: 1, ui: 'index.html' },
+    shell: { apiVersion: 1, ribbonSchemaVersion: 2, ui: 'index.html' },
   }),
 );
 fs.writeFileSync(path.join(stalled, 'worker.cjs'), 'exports.activate=async()=>{};');
@@ -213,7 +213,10 @@ async function close() {
     );
     await rail.getByRole('button', { name: 'ホーム', exact: true }).focus();
     await rail.keyboard.press('Shift+Tab');
-    await dock.waitForFunction(() => document.activeElement?.closest('.titlebar'));
+    const titlebar = await require('./shell-bars-helper.cjs').barPage(dock, 'titlebar');
+    await titlebar.waitForFunction(
+      () => document.hasFocus() && document.activeElement?.closest('.window-controls'),
+    );
     checks.push('Tab and Shift+Tab cross renderer boundary');
     await rail.getByRole('button', { name: '設定', exact: true }).click();
     const setting = deferred(() => getSettingsPage(dock));

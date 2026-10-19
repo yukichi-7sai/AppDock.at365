@@ -10,6 +10,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
+        bars: path.resolve('shells/default/bars.html'),
         ribbon: path.resolve('shells/default/index.html'),
         overlay: path.resolve('shells/default/overlay.html'),
         logs: path.resolve('shells/default/logs.html'),

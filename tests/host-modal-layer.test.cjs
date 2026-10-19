@@ -68,7 +68,7 @@ test('all registered surfaces are decoded together before native views are cover
     [2, 1],
   );
   assert.deepEqual(f.messages[0].surfaces[1].bounds, { x: 0, y: 43, width: 76, height: 500 });
-  f.ready();
+  assert.equal(f.ready(), true);
   assert(!ribbon.view.visible && !title.view.visible);
   f.layer.setActive(false);
   assert(ribbon.view.visible && title.view.visible && !hidden.view.visible);
@@ -81,7 +81,7 @@ test('closing during capture rejects late images and acknowledgements', async ()
   f.layer.setActive(true);
   f.layer.setActive(false);
   await f.complete();
-  f.layer.ready(2);
+  assert.equal(f.layer.ready(2), false);
   assert.equal(f.messages.length, 0);
   assert(surface.view.visible);
 });
@@ -100,7 +100,7 @@ test('resize and surface replacement invalidate earlier captures and keep new su
   f.window.contentView.children = [];
   const replacement = f.add(2);
   assert(!replacement.view.visible);
-  f.layer.ready(oldRevision);
+  assert.equal(f.layer.ready(oldRevision), false);
   await f.complete(pending);
   await f.complete();
   assert.deepEqual(
@@ -143,7 +143,7 @@ test('renderer reload and exit restore every registered surface', async () => {
   }
 });
 
-test('one failed capture leaves all native surfaces visible until a successful retry', async () => {
+test('failed capture or decode releases presentation without hiding native surfaces; retry still works', async () => {
   const f = fixture(),
     first = f.add(1),
     second = f.add(2);
@@ -151,10 +151,15 @@ test('one failed capture leaves all native surfaces visible until a successful r
   f.captures[0].done = true;
   f.captures[0].reject(Error('closed'));
   await f.complete();
-  assert.equal(f.messages.length, 0);
+  assert.equal(f.messages.length, 1);
+  assert.equal(f.messages[0].failed, true);
+  assert.equal(f.layer.ready(f.messages[0].revision, false), true);
   assert(first.view.visible && second.view.visible);
   f.layer.layout();
   await f.complete();
+  assert.equal(f.messages.at(-1).failed, undefined);
+  assert.equal(f.layer.ready(f.messages.at(-1).revision, false), true);
+  assert(first.view.visible && second.view.visible);
   f.ready();
   assert(!first.view.visible && !second.view.visible);
 });

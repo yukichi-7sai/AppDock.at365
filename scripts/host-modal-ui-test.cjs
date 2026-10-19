@@ -88,6 +88,41 @@ const ribbonState = () =>
     const v = w.contentView.children.find((v) => v.webContents?.getURL().endsWith('/index.html'));
     return { id: v.webContents.id, visible: v.getVisible(), bounds: v.getBounds() };
   });
+const holdCaptures = () =>
+  main(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().startsWith('appdock://host/'),
+    );
+    const views = w.contentView.children.filter((v) =>
+      /\/(index|bars)\.html$/.test(v.webContents?.getURL()),
+    );
+    let resolve, reject;
+    const gate = new Promise((ok, fail) => {
+      resolve = ok;
+      reject = fail;
+    });
+    const entries = views.map((view) => {
+      const wc = view.webContents;
+      const original = wc.capturePage;
+      wc.capturePage = async (...args) => {
+        globalThis.__modalCaptureGate.calls++;
+        await gate;
+        return original.apply(wc, args);
+      };
+      return { wc, original };
+    });
+    globalThis.__modalCaptureGate = {
+      calls: 0,
+      release(fail) {
+        for (const { wc, original } of entries) wc.capturePage = original;
+        if (fail) reject(Error('fixture capture failure'));
+        else resolve();
+      },
+    };
+    return views.length;
+  });
+const releaseCaptures = (fail = false) =>
+  main((_electron, fail) => globalThis.__modalCaptureGate.release(fail), fail);
 const capture = async (name, all = false) => {
   const captured = await main(async ({ BrowserWindow, desktopCapturer }) => {
     const w = BrowserWindow.getAllWindows().find((w) =>
@@ -101,12 +136,16 @@ const capture = async (name, all = false) => {
       })
     ).find((s) => s.id === w.getMediaSourceId());
     const image = source.thumbnail;
-    const x = Math.round((3 * image.getSize().width) / size[0]);
-    const pixels = [180, 10, size[1] - 10].map((y, index) =>
+    const pixels = [
+      [3, 180],
+      [size[0] - 20, 10],
+      [size[0] - 20, size[1] - 10],
+      [size[0] - 20, 180],
+    ].map(([x, y]) =>
       [
         ...image
           .crop({
-            x: index === 0 ? x : Math.round(((size[0] - 20) * image.getSize().width) / size[0]),
+            x: Math.round((x * image.getSize().width) / size[0]),
             y: Math.round((y * image.getSize().height) / size[1]),
             width: 1,
             height: 1,
@@ -183,11 +222,73 @@ const capture = async (name, all = false) => {
         const opener = id
           ? host.locator(`[data-binding-id="${id}"] .applet-shortcut-edit`)
           : host.getByRole('button', { name: 'Modal customを編集', exact: true });
+        const checkPreparation = theme === 'light' && id === 'modal.key';
+        let preparedNormal;
+        if (checkPreparation) {
+          preparedNormal = await capture('preparation-normal', true);
+          assert.equal(await holdCaptures(), 3);
+          await host.evaluate(() => {
+            globalThis.__modalFrames = [];
+            globalThis.__modalAuditing = true;
+            const frame = () => {
+              if (!globalThis.__modalAuditing) return;
+              const dialog = document.querySelector('dialog:modal');
+              if (dialog)
+                globalThis.__modalFrames.push({
+                  pending: document.documentElement.hasAttribute('data-host-modal-pending'),
+                  dialog: getComputedStyle(dialog).opacity,
+                  backdrop: getComputedStyle(dialog, '::backdrop').opacity,
+                });
+              requestAnimationFrame(frame);
+            };
+            requestAnimationFrame(frame);
+          });
+        }
         await opener.click();
         await dialog().waitFor();
+        if (checkPreparation) {
+          await until(
+            () => main(() => globalThis.__modalCaptureGate.calls === 3),
+            'all captures held before painting',
+          );
+          await host.waitForFunction(() =>
+            document.documentElement.hasAttribute('data-host-modal-pending'),
+          );
+          assert((await ribbonState()).visible);
+          assert(await dialog().evaluate((el) => el.contains(document.activeElement)));
+          assert.equal(await dialog().evaluate((el) => getComputedStyle(el).opacity), '0');
+          assert.equal(
+            await dialog().evaluate((el) => getComputedStyle(el, '::backdrop').opacity),
+            '0',
+          );
+          const preparing = await capture('preparation-held', true);
+          assert(
+            preparing.every((pixel, i) =>
+              pixel.every((v, c) => Math.abs(v - preparedNormal[i][c]) <= 5),
+            ),
+            JSON.stringify({ preparedNormal, preparing }),
+          );
+          await releaseCaptures();
+        }
         await host.locator('[data-host-modal-backdrop]').waitFor();
         await until(async () => !(await ribbonState()).visible, 'native ribbon covered');
+        await host.waitForFunction(
+          () => !document.documentElement.hasAttribute('data-host-modal-pending'),
+        );
         await host.waitForTimeout(150);
+        if (checkPreparation) {
+          const frames = await host.evaluate(() => {
+            globalThis.__modalAuditing = false;
+            return globalThis.__modalFrames;
+          });
+          assert(frames.some((f) => f.pending && f.dialog === '0' && f.backdrop === '0'));
+          assert(frames.some((f) => !f.pending && f.dialog === '1' && f.backdrop === '1'));
+          assert(frames.every((f) => f.dialog === f.backdrop && (!f.pending || f.dialog === '0')));
+          result.preparation = { preparedNormal, preparing: 'preparation-held.png', frames };
+          result.checks.push(
+            'held native captures leave the whole window undimmed; dialog and backdrop appear together only after native views are covered',
+          );
+        }
         const dimmed = await capture(`${theme}-${id || 'custom'}-modal`);
         // Native dialog backdrop is #080b1266 (BGRA channels are reversed here).
         const expected = normal.map((value, i) => Math.round(value * 0.6 + [18, 11, 8][i] * 0.4));
@@ -207,8 +308,7 @@ const capture = async (name, all = false) => {
           await until(async () => {
             const bounds = (await ribbonState()).bounds;
             return host
-              .locator('[data-host-modal-surface]')
-              .first()
+              .locator(`[data-host-modal-surface="${before.id}"]`)
               .evaluate(
                 (el, height) => Math.abs(el.getBoundingClientRect().height - height) < 2,
                 bounds.height,
@@ -236,6 +336,40 @@ const capture = async (name, all = false) => {
     result.checks.push(
       'all three dialogs dim the composited native ribbon in both themes; Tab, cancel, focus return and renderer identity preserved',
     );
+    await select('ショートカット');
+    const shortcutOpener = host.locator('[data-binding-id="modal.key"] .applet-shortcut-edit');
+    await holdCaptures();
+    await shortcutOpener.click();
+    await until(
+      () => main(() => globalThis.__modalCaptureGate.calls === 3),
+      'held capture before cancel',
+    );
+    await host.keyboard.press('Escape');
+    await until(async () => (await dialog().count()) === 0, 'cancel preparation');
+    await releaseCaptures();
+    await until(
+      async () => (await ribbonState()).visible,
+      'native surfaces retained after early cancel',
+    );
+    assert.equal(await host.locator('[data-host-modal-backdrop]').count(), 0);
+    assert.equal(await host.locator('[data-host-modal-pending]').count(), 0);
+    await holdCaptures();
+    await shortcutOpener.click();
+    await until(
+      () => main(() => globalThis.__modalCaptureGate.calls === 3),
+      'held capture before failure',
+    );
+    await releaseCaptures(true);
+    await host.waitForFunction(
+      () => !document.documentElement.hasAttribute('data-host-modal-pending'),
+    );
+    assert.equal(await dialog().evaluate((el) => getComputedStyle(el).opacity), '1');
+    assert((await ribbonState()).visible);
+    await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await until(async () => (await dialog().count()) === 0, 'capture failure leaves dialog usable');
+    result.checks.push(
+      'Escape during preparation rejects late captures; failed capture releases the transparent dialog and remains cancellable',
+    );
     await host.evaluate(() => {
       void window.dock.openCommandPalette({ requestId: crypto.randomUUID(), mode: 'execute' });
     });
@@ -251,18 +385,6 @@ const capture = async (name, all = false) => {
       () => !context.pages().some((p) => p.url().endsWith('/overlay.html')),
       'palette dismissed',
     );
-    await main(({ app }) => {
-      const require = process
-        .getBuiltinModule('module')
-        .createRequire(app.getAppPath() + '/package.json');
-      const { HostModalLayer } = require('./out/main/main/core/host-modal-layer.js');
-      const original = HostModalLayer.prototype.register;
-      globalThis.__modalFixture = { HostModalLayer, original, surfaces: [] };
-      HostModalLayer.prototype.register = function (view) {
-        globalThis.__modalFixture.layer = this;
-        return original.call(this, view);
-      };
-    });
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
       s.settings.value.host.shellProviders.ribbon = 'fixture.modal-shell';
@@ -273,39 +395,32 @@ const capture = async (name, all = false) => {
       async () => (await window.dock.snapshot()).shell.active === 'fixture.modal-shell',
     );
     await select('ショートカット');
-    await main(async ({ BrowserWindow, WebContentsView }) => {
-      const fixture = globalThis.__modalFixture;
-      fixture.HostModalLayer.prototype.register = fixture.original;
-      if (!fixture.layer) throw Error('New Shell did not register with the shared modal layer');
-      const w = BrowserWindow.getAllWindows().find((w) =>
-        w.webContents.getURL().startsWith('appdock://host/'),
-      );
-      const [width, height] = w.getContentSize();
-      for (const [name, color, bounds] of [
-        ['titlebar', '#5080c0', { x: 0, y: 0, width, height: 43 }],
-        ['statusbar', '#906080', { x: 0, y: height - 28, width, height: 28 }],
-      ]) {
-        const view = new WebContentsView({
-          webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true },
-        });
-        const registration = fixture.layer.register(view);
-        w.contentView.addChildView(view);
-        view.setBounds(bounds);
-        await view.webContents.loadURL(
-          'data:text/html,' +
-            encodeURIComponent(`<body style="margin:0;background:${color}">${name}</body>`),
+    const barsVisible = () =>
+      main(({ BrowserWindow }) => {
+        const w = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().startsWith('appdock://host/'),
         );
-        registration.setVisible(true);
-        fixture.surfaces.push({ name, view, registration });
-      }
-    });
+        const bars = w.contentView.children.filter((v) =>
+          v.webContents?.getURL().endsWith('/bars.html'),
+        );
+        return bars.length === 2 && bars.every((v) => v.getVisible());
+      });
+    await until(barsVisible, 'real titlebar and statusbar ready');
     const multiNormal = await capture('multi-shell-normal', true);
     const externalRibbon = await ribbonState();
     await host.locator('[data-binding-id="modal.key"] .applet-shortcut-edit').click();
     await until(async () => !(await ribbonState()).visible, 'custom Shell covered');
     assert.equal((await ribbonState()).id, externalRibbon.id);
     await until(
-      () => main(() => globalThis.__modalFixture.surfaces.every((s) => !s.view.getVisible())),
+      () =>
+        main(({ BrowserWindow }) => {
+          const w = BrowserWindow.getAllWindows().find((w) =>
+            w.webContents.getURL().startsWith('appdock://host/'),
+          );
+          return w.contentView.children
+            .filter((v) => v.webContents?.getURL().endsWith('/bars.html'))
+            .every((v) => !v.getVisible());
+        }),
       'all registered surfaces covered',
     );
     assert.equal(await host.locator('[data-host-modal-surface]').count(), 3);
@@ -325,18 +440,9 @@ const capture = async (name, all = false) => {
       const w = BrowserWindow.getAllWindows().find((w) =>
         w.webContents.getURL().startsWith('appdock://host/'),
       );
-      globalThis.__modalFixture.minimum = w.getMinimumSize();
+      globalThis.__modalMinimum = w.getMinimumSize();
       w.setMinimumSize(480, 360);
       w.setSize(640, 500);
-      for (const s of globalThis.__modalFixture.surfaces) {
-        s.view.setBounds({
-          x: 0,
-          y: s.name === 'titlebar' ? 0 : 472,
-          width: 640,
-          height: s.name === 'titlebar' ? 43 : 28,
-        });
-        s.registration.setVisible(true);
-      }
     });
     await host.waitForFunction(() => {
       const images = [...document.querySelectorAll('[data-host-modal-surface]')];
@@ -367,9 +473,9 @@ const capture = async (name, all = false) => {
     }, 'fallback Shell remains covered');
     await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(async () => (await ribbonState()).visible, 'fallback restored');
-    assert(await main(() => globalThis.__modalFixture.surfaces.every((s) => s.view.getVisible())));
+    await until(barsVisible, 'real titlebar and statusbar restored');
     result.checks.push(
-      'ribbon, fixture titlebar and fixture statusbar share the same registry; all three dim, resize, remain behind the dialog and restore together',
+      'real ribbon, titlebar and statusbar share the same registry; all three dim, resize, remain behind the dialog and restore together',
     );
     result.checks.push(
       'custom Shell is covered without renderer replacement; failure falls back beneath the same dialog and restores on close',
@@ -378,13 +484,7 @@ const capture = async (name, all = false) => {
       const w = BrowserWindow.getAllWindows().find((w) =>
         w.webContents.getURL().startsWith('appdock://host/'),
       );
-      for (const s of globalThis.__modalFixture.surfaces) {
-        s.registration.dispose();
-        w.contentView.removeChildView(s.view);
-        s.view.webContents.close();
-      }
-      globalThis.__modalFixture.surfaces = [];
-      w.setMinimumSize(...globalThis.__modalFixture.minimum);
+      w.setMinimumSize(...globalThis.__modalMinimum);
       w.setSize(1280, 840);
     });
     await host.locator('[data-binding-id="modal.key"] .applet-shortcut-edit').click();

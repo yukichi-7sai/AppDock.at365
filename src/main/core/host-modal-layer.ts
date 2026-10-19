@@ -76,13 +76,16 @@ export class HostModalLayer {
     this.changed?.();
   }
 
-  ready(revision: number) {
-    if (!this.active || revision !== this.revision) return;
-    this.backgroundReady = true;
-    for (const surface of this.surfaces.values()) {
-      surface.covered = true;
-      this.show(surface);
+  ready(revision: number, rendered = true): boolean {
+    if (!this.active || revision !== this.revision) return false;
+    if (rendered) {
+      this.backgroundReady = true;
+      for (const surface of this.surfaces.values()) {
+        surface.covered = true;
+        this.show(surface);
+      }
     }
+    return true;
   }
 
   layout() {
@@ -125,7 +128,10 @@ export class HostModalLayer {
         window.webContents.send('dock:hostModalBackdrop', model);
       },
       () => {
-        if (revision === this.revision) this.signature = '';
+        if (!this.active || revision !== this.revision || window.isDestroyed()) return;
+        this.signature = '';
+        const model: HostModalBackdrop = { revision, surfaces: [], failed: true };
+        window.webContents.send('dock:hostModalBackdrop', model);
       },
     );
   }
