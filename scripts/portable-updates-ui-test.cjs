@@ -344,6 +344,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       .fill(path.join(getPublishDirectory(root)));
     await page.getByLabel('AppDockの更新元', { exact: true }).press('Enter');
     await page.getByLabel('起動から確認までの秒数', { exact: true }).fill('1');
+    await page.getByLabel('起動から確認までの秒数', { exact: true }).press('Enter');
 
     await settleSettings(page);
     await waitSnapshot(page, (s) => s.settings.value.updates.startupDelaySeconds === 1);

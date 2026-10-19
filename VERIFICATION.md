@@ -5,6 +5,8 @@
 - 利用者が見た目を確認し、commit・push・Releaseを依頼。変更した5ファイルとリリースノートを対象とする。main/origin/main、GitHub/AQUA両mainの開始先端`d5a545d`、実効作者/コミッターを確認。別作業の変更なし。
 - 実装時の入力582件・完全ログ・固定EXEとGUI/smokeのhashを照合し、型検査・変更部分のGUI4群を再利用する。標準`dev.bat test`を追加実行して **678/678、fail/skip 0** 成功。制限内のnative fixtureビルド失敗は保持し、同じコマンドを通常ユーザー環境で成功させた。製品追加修正なし。
 - [コミット検証資料](.artifacts/commit-validation-ribbon-bar-20261020/)へ入力/ログhash・再利用根拠・stage/commit tree・両送信先の確認を記録する。6AppletはcleanかつGitHub mainと一致し、現行版はすべて未公開。既存手順で本体の3配布物と同梱版の個別Releaseを準備し、公開後検証と最新3件の整理まで行う。正式な公開結果はrelease planと同フォルダーの最終結果を参照する。
+- 最初のPrepareは公開前のportable-updates試験で停止。既存試験が数値欄へ入力した後に確定せず保存を待っていたため、現行の入力契約に合わせてEnterを補った。保存ファイルで値が未確定の0のままであることを確認し、製品の修正・版の追加更新はしない。試験変更を追加検証・コミットし、新しいplanで準備する。失敗planと資料は保持する。
+- Enter補完後の標準 **678/678** と固定EXEの更新・実再起動 **11群** が成功（`regression-final.log`、`portable-updates-fixed.log`）。差分レビューは試験の1行と記録のみで指摘なし。共有.NET SDK/Runtimeの変更を受けるnative3Appletは現行SDKで標準回帰を追加確認し、WallpaperSlideshow 8群・Watch 8/8・WindowsTools 40/40が成功。Node3Appletの標準25/2/2件は自repo入力と完全ログhash一致により再利用する。正式planは[最終準備](.artifacts/release-0.68.1-20261020-final/plan.json)とし、新しい配布物の必要検証を省略しない。
 
 ## 2026-10-20: Default Shellのグループ色を左バーへ変更（0.68.1）
 
