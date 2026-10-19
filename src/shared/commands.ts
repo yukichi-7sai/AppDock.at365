@@ -78,7 +78,15 @@ export function normalizeShortcut(value: unknown): string {
   const modifiers = new Set<string>();
   for (const part of parts) {
     const modifier = (
-      { ctrl: 'Ctrl', control: 'Ctrl', alt: 'Alt', shift: 'Shift' } as Record<string, string>
+      {
+        ctrl: 'Ctrl',
+        control: 'Ctrl',
+        alt: 'Alt',
+        shift: 'Shift',
+        win: 'Win',
+        windows: 'Win',
+        meta: 'Win',
+      } as Record<string, string>
     )[part.toLowerCase()];
     if (!modifier || modifiers.has(modifier))
       throw new Error(`ショートカット ${value} の修飾キーを確認してください。`);
@@ -90,7 +98,7 @@ export function normalizeShortcut(value: unknown): string {
   else if (specialKeys[rawKey.toLowerCase()]) key = specialKeys[rawKey.toLowerCase()];
   else if (/^[,./\\;\[\]'=-]$/.test(rawKey)) key = rawKey;
   else throw new Error(`ショートカット ${value} のキーを確認してください。`);
-  return [...['Ctrl', 'Alt', 'Shift'].filter((m) => modifiers.has(m)), key].join('+');
+  return [...['Ctrl', 'Alt', 'Shift', 'Win'].filter((m) => modifiers.has(m)), key].join('+');
 }
 export interface KeyStroke {
   key: string;
@@ -104,7 +112,6 @@ export interface KeyStroke {
 export function shortcutFromEvent(event: KeyStroke): string | null {
   if (
     event.isComposing ||
-    event.metaKey ||
     ['Control', 'Alt', 'Shift', 'Meta', 'Process', 'Dead', 'Unidentified'].includes(event.key)
   )
     return null;
@@ -118,6 +125,7 @@ export function shortcutFromEvent(event: KeyStroke): string | null {
         ...(event.ctrlKey ? ['Ctrl'] : []),
         ...(event.altKey ? ['Alt'] : []),
         ...(event.shiftKey ? ['Shift'] : []),
+        ...(event.metaKey ? ['Win'] : []),
         key,
       ].join('+'),
     );

@@ -16,10 +16,12 @@ internal sealed class Target : Form
         var thread = GetWindowThreadProcessId(GetForegroundWindow(), out _);
         var own = GetCurrentThreadId();
         var attached = thread != 0 && thread != own && AttachThreadInput(own, thread, true);
+        var targetThread = GetWindowThreadProcessId(window, out _);
+        var targetAttached = targetThread != 0 && targetThread != own && targetThread != thread && AttachThreadInput(own, targetThread, true);
         var attachError = Marshal.GetLastWin32Error();
         try { return new { thread, own, attached, attachError, activated = SetForegroundWindow(window), visible = IsWindowVisible(window),
             session = System.Diagnostics.Process.GetCurrentProcess().SessionId, desktop = DesktopName(GetThreadDesktop(own)), foregroundDesktop = DesktopName(GetThreadDesktop(thread)) }; }
-        finally { if (attached) AttachThreadInput(own, thread, false); }
+        finally { if (targetAttached) AttachThreadInput(own, targetThread, false); if (attached) AttachThreadInput(own, thread, false); }
     }
     private static string DesktopName(nint desktop) {
         var name = new System.Text.StringBuilder(256);
@@ -28,6 +30,7 @@ internal sealed class Target : Form
     private static string Class(nint window) {
         var text = new System.Text.StringBuilder(256); GetClassName(window, text, text.Capacity); return text.ToString();
     }
+    private static string Title(nint window) { var text = new System.Text.StringBuilder(512); GetWindowText(window, text, text.Capacity); return text.ToString(); }
     private object Call(string method, JsonElement request) {
         if (method == "focus") {
             Show();
@@ -36,6 +39,7 @@ internal sealed class Target : Form
             focusAttempt = Foreground(Handle);
         }
         if (method == "clear") events.Clear();
+        if (method == "focusWindow") Foreground(new nint(long.Parse(request.GetProperty("params").GetProperty("window").GetString()!)));
         if (method == "hold") keybd_event(0x11, 0, 0, 0);
         if (method == "release") keybd_event(0x11, 0, 2, 0);
         if (method == "desktop") Foreground(GetShellWindow());
@@ -52,15 +56,41 @@ internal sealed class Target : Form
             var p = request.GetProperty("params");
             ShowWindow(new nint(long.Parse(p.GetProperty("window").GetString()!)), p.GetProperty("state").GetInt32());
         }
+        if (method == "chord") {
+            var p = request.GetProperty("params");
+            var modifiers = p.GetProperty("modifiers").EnumerateArray().Select(value => value.GetByte()).ToArray();
+            var key = p.GetProperty("key").GetByte();
+            var repeats = p.TryGetProperty("repeats", out var repeat) ? repeat.GetInt32() : 0;
+            try {
+                foreach (var modifier in modifiers) { keybd_event(modifier, 0, modifier is 0x5B or 0x5C ? 1u : 0, 0); Thread.Sleep(20); }
+                keybd_event(key, 0, 0, 0); Thread.Sleep(30);
+                for (var index = 0; index < repeats; index++) { keybd_event(key, 0, 0, 0); Thread.Sleep(25); }
+            } finally {
+                keybd_event(key, 0, 2, 0);
+                foreach (var modifier in modifiers.Reverse()) { Thread.Sleep(20); keybd_event(modifier, 0, 2 | (modifier is 0x5B or 0x5C ? 1u : 0), 0); }
+            }
+        }
         if (method == "closeExplorer") {
             var handle = new nint(long.Parse(request.GetProperty("params").GetProperty("window").GetString()!));
             if (Class(handle) == "CabinetWClass") PostMessage(handle, 0x10, 0, 0);
         }
+        if (method == "closeTerminal") {
+            var p = request.GetProperty("params");
+            var handle = new nint(long.Parse(p.GetProperty("window").GetString()!));
+            if (Class(handle) == "CASCADIA_HOSTING_WINDOW_CLASS" && Title(handle).Contains(p.GetProperty("title").GetString()!, StringComparison.Ordinal)) PostMessage(handle, 0x10, 0, 0);
+        }
         var foreground = GetForegroundWindow();
         var explorers = new List<string>();
+        var terminals = new List<object>();
         string? hostWindow = null;
         var hostPid = request.TryGetProperty("params", out var parameters) && parameters.TryGetProperty("pid", out var pid) ? pid.GetUInt32() : 0;
-        EnumWindows((w, _) => { if (Class(w) == "CabinetWClass") explorers.Add(w.ToString()); return true; }, 0);
+        EnumWindows((w, _) => {
+            if (Class(w) == "CabinetWClass") explorers.Add(w.ToString());
+            if (Title(w).StartsWith("AppDock shortcut test ", StringComparison.Ordinal)) {
+                GetWindowThreadProcessId(w,out var process); terminals.Add(new { window=w.ToString(),title=Title(w),kind=Class(w),process });
+            }
+            return true;
+        }, 0);
         if (hostPid != 0) EnumWindows((w, _) => {
             GetWindowThreadProcessId(w, out var owner);
             if (owner == hostPid && Class(w).StartsWith("Chrome_WidgetWin")) { hostWindow = w.ToString(); return false; }
@@ -73,7 +103,7 @@ internal sealed class Target : Form
                 | ((mapping & 0x200) != 0 ? (int)Keys.Control : 0) | ((mapping & 0x400) != 0 ? (int)Keys.Alt : 0));
         });
         return new { window = Handle.ToString(), focused = foreground == Handle, foreground = foreground.ToString(), symbolKeys, focusAttempt,
-            foregroundClass = Class(foreground), shell = GetShellWindow().ToString(), hostWindow, explorers, events = events.ToArray() };
+            foregroundClass = Class(foreground), foregroundTitle = Title(foreground), shell = GetShellWindow().ToString(), hostWindow, explorers, terminals, events = events.ToArray() };
     }
     protected override void OnShown(EventArgs e) {
         base.OnShown(e);
@@ -100,7 +130,11 @@ internal sealed class Target : Form
             } finally { BeginInvoke(Close); }
         });
     }
-    protected override void OnFormClosed(FormClosedEventArgs e) { keybd_event(0x11, 0, 2, 0); if (previous != 0) SetForegroundWindow(previous); base.OnFormClosed(e); }
+    protected override void OnFormClosed(FormClosedEventArgs e) {
+        keybd_event(0x11, 0, 2, 0); if (previous != 0) SetForegroundWindow(previous); base.OnFormClosed(e);
+        var arguments = Environment.GetCommandLineArgs();
+        if (arguments.Length >= 3 && arguments[1] == "--process-target") File.WriteAllText(arguments[2] + ".closed", "closed");
+    }
     [STAThread] public static void Main() { Application.SetHighDpiMode(HighDpiMode.PerMonitorV2); Application.Run(new Target()); }
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
@@ -108,6 +142,7 @@ internal sealed class Target : Form
     [DllImport("user32.dll", EntryPoint = "VkKeyScanExW", CharSet = CharSet.Unicode)] private static extern short VkKeyScanEx(char character, nint layout);
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(nint window, System.Text.StringBuilder text, int count);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(nint window, System.Text.StringBuilder text, int count);
     private delegate bool EnumWindow(nint window, nint data);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindow callback, nint data);
     [DllImport("user32.dll")] private static extern bool ShowWindow(nint window, int state);

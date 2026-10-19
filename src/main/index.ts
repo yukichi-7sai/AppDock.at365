@@ -43,6 +43,7 @@ import {
 } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
@@ -85,13 +86,13 @@ import {
   safePageShortcut,
 } from '../shared/keybindings';
 import { ShortcutDispatcher } from './core/shortcut-dispatcher';
-import { GestureManager, type GestureInvocation } from './core/gestures';
+import { GestureManager, type GestureInvocation, type ShortcutPress } from './core/gestures';
 import { initializeGestureDefaults } from '../shared/gestures';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { AppletManagement } from './core/applet-management';
 import { appletManagementCommands } from '../shared/applet-management';
-import { GlobalHotKeyManager, WindowsHotKeyBackend } from './core/global-hotkeys';
+import { GlobalHotKeyManager, InputCaptureHotKeyBackend } from './core/global-hotkeys';
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
 import {
   getTrayMenu,
@@ -407,6 +408,60 @@ let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
 let gestures: GestureManager | undefined;
 let shortcutRecording = false;
+let shortcutCaptured: { token: string; key: string; sequence: number } | undefined;
+let globalShortcutOwnership = new Set<string>();
+let ownershipGeneration = 0;
+const ownershipAcks = new Map<number, { sender: number; resolve(): void }>();
+ipcMain.on('dock:shortcutOwnership:get', (event) => {
+  event.returnValue = event.sender === window?.webContents ? [...globalShortcutOwnership] : [];
+});
+ipcMain.on('dock:shortcutOwnership:ack', (event, generation: number) => {
+  const pending = ownershipAcks.get(generation);
+  if (pending?.sender === event.sender.id) pending.resolve();
+});
+async function setShortcutOwnership(keys: string[]) {
+  const next = new Set(keys);
+  if (
+    next.size === globalShortcutOwnership.size &&
+    [...next].every((key) => globalShortcutOwnership.has(key))
+  )
+    return;
+  globalShortcutOwnership = next;
+  const contents = window?.webContents;
+  if (!contents || contents.isDestroyed() || contents.isLoadingMainFrame()) return;
+  const generation = ++ownershipGeneration;
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      ownershipAcks.delete(generation);
+      reject(Error('入力所有情報を画面へ適用できませんでした。'));
+    }, 2000);
+    ownershipAcks.set(generation, {
+      sender: contents.id,
+      resolve: () => {
+        clearTimeout(timer);
+        ownershipAcks.delete(generation);
+        resolve();
+      },
+    });
+    contents.send('dock:shortcutOwnership', { generation, keys: [...next] });
+  });
+}
+async function setShortcutCapture(request: { token: string; active: boolean; allowWin: boolean }) {
+  if (
+    !request ||
+    typeof request.token !== 'string' ||
+    !/^[a-zA-Z0-9-]{1,80}$/.test(request.token) ||
+    typeof request.active !== 'boolean' ||
+    typeof request.allowWin !== 'boolean'
+  )
+    throw Error('キー記録の状態が不正です。');
+  if (request.active && (!shortcutRecording || !window?.isFocused()))
+    throw Error('記録欄を最前面にしてください。');
+  await gestures?.record(
+    request,
+    window?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
+  );
+}
 let windowState: WindowStateStore | undefined;
 let restoreMaximized = false;
 let quitting = false;
@@ -727,6 +782,13 @@ const processLauncher = new ProcessLaunchService(
     'process',
     'AppDock.ProcessHost.exe',
   ),
+  async (processId) => {
+    const press = shortcutInvocation.getStore();
+    if (press)
+      await gestures
+        ?.activateProcess(press.pressId, processId)
+        .catch((error) => log.write('error', 'hotkeys', String(error)));
+  },
 );
 const customCommands = new CustomCommandService({
   settings,
@@ -1059,6 +1121,7 @@ const changed = () => {
     if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
   }, 60);
 };
+const shortcutInvocation = new AsyncLocalStorage<ShortcutPress>();
 function showWindow() {
   if (window) {
     if (restoreMaximized) {
@@ -1068,6 +1131,11 @@ function showWindow() {
     if (window.isMinimized()) window.restore();
     window.show();
     window.focus();
+    const press = shortcutInvocation.getStore();
+    if (press)
+      void gestures
+        ?.activate(press.pressId, window.getNativeWindowHandle().readBigUInt64LE().toString())
+        .catch((error) => log.write('error', 'hotkeys', String(error)));
   }
 }
 function trayMenu() {
@@ -1260,16 +1328,28 @@ function availableShortcutCommands() {
     ),
   ];
 }
-function dispatchShortcut(key: string, globalEvent = false) {
+function dispatchShortcut(key: string, globalEvent = false, press?: ShortcutPress) {
   if (shortcutRecording || quitting || overlayHost?.active) return Promise.resolve();
+  const currentContext = shortcutContext();
+  const context =
+    press &&
+    (press.window !==
+      BrowserWindow.getFocusedWindow()?.getNativeWindowHandle().readBigUInt64LE().toString() ||
+      press.context !== JSON.stringify({ ...currentContext, window: press.window }))
+      ? { appFocused: false }
+      : currentContext;
+  const rows = getKeybindings(settings.value);
+  const keys = press?.shortcuts ?? [key];
   const commands = resolveKeybindings(
-    getKeybindings(settings.value),
-    key,
-    shortcutContext(),
+    rows,
+    keys,
+    context,
     availableShortcutCommands(),
     globalEvent,
   );
-  return shortcutDispatcher.dispatch(key, commands);
+  return press
+    ? shortcutInvocation.run(press, () => shortcutDispatcher.dispatch(key, commands))
+    : shortcutDispatcher.dispatch(key, commands);
 }
 function runTrayCommand(id: string) {
   void executeCommand(id).catch((error) => {
@@ -1701,7 +1781,11 @@ function releaseSettingsView() {
   if (settingsRecording) {
     settingsRecording = false;
     shortcutRecording = false;
-    void syncHotKeys();
+    shortcutCaptured = undefined;
+    void gestures
+      ?.endRecording()
+      .then(() => syncHotKeys())
+      .catch(() => {});
   }
   if (settingsPalette && paletteSession?.request.requestId === settingsPalette)
     paletteSession.cancel('owner-disposed');
@@ -1931,8 +2015,15 @@ function settingsPageActions(
       if (typeof value !== 'boolean') throw Error('入力状態が不正です。');
       settingsRecording = value;
       shortcutRecording = value && !!window?.isFocused();
+      if (!value) {
+        shortcutCaptured = undefined;
+        await gestures?.endRecording();
+      }
       await syncHotKeys();
+      await gestures?.refresh();
     };
+    actions.setShortcutCapture = async ([value]) =>
+      setShortcutCapture(value as Parameters<typeof setShortcutCapture>[0]);
     if (['shortcuts', 'gestures'].includes(page.id))
       actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
@@ -2124,7 +2215,8 @@ async function retryShell(region?: ShellRegion) {
 }
 function registerIpc() {
   const updateTarget = (id?: string) => {
-    if (id === undefined) return { version: app.getVersion(), repository: 'yukichi-7sai/AppDock.at365' };
+    if (id === undefined)
+      return { version: app.getVersion(), repository: 'yukichi-7sai/AppDock.at365' };
     if (typeof id !== 'string' || !manager.items.has(id))
       throw new Error('Appletが見つかりません。');
     const manifest = manager.items.get(id)!.manifest;
@@ -2272,15 +2364,21 @@ function registerIpc() {
   handle('dock:dispatchShortcut', async (key: unknown) => {
     if (!window?.isFocused()) return;
     const normalized = normalizeShortcut(key);
-    if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === normalized)) return;
+    if (globalShortcutOwnership.has(normalized)) return;
     return dispatchShortcut(normalized);
   });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
   handle('dock:setShortcutRecording', async (recording: boolean) => {
     if (typeof recording !== 'boolean') throw new Error('キー入力状態が正しくありません。');
     shortcutRecording = recording && !!window?.isFocused();
+    if (!recording) {
+      shortcutCaptured = undefined;
+      await gestures?.endRecording();
+    }
     await syncHotKeys();
+    await gestures?.refresh();
   });
+  handle('dock:setShortcutCapture', setShortcutCapture);
   handle('dock:refreshLaunchState', async () => {
     const state = await launch.refresh();
     changed();
@@ -2533,24 +2631,14 @@ async function initialize() {
     ? path.join(process.resourcesPath, 'dotnet-host', 'AppDock.ExtensionHost.exe')
     : path.join(app.getAppPath(), '.artifacts', 'dotnet-host', 'AppDock.ExtensionHost.exe');
   hotKeys = new GlobalHotKeyManager(
-    new WindowsHotKeyBackend(
-      hotKeyHost,
-      (shortcut) => {
-        void hotKeys?.pressed(shortcut);
-      },
-      (error) => {
-        hotKeys?.failed(error);
-        if (!quitting && hotKeys?.statuses.length)
-          settings.health.set('apply-hotkeys', 'apply-failed', ++hotKeyApplyGeneration);
-      },
-    ),
+    new InputCaptureHotKeyBackend(() => gestures),
     async (id) => {
       if (shortcutRecording || quitting || overlayHost?.active) return;
       await executeCommand(id);
     },
     changed,
     (message) => log.write('error', 'hotkeys', message),
-    (key) => dispatchShortcut(key, true),
+    (key, press) => dispatchShortcut(key, true, press),
   );
   pageCollections = new PageCollectionManager({
     settings: () => settings.value,
@@ -2638,6 +2726,24 @@ async function initialize() {
           item.peer.send({ jsonrpc: '2.0', method: 'command.cancel', params: { session } });
     },
     (message) => log.write('error', 'gestures', message),
+    {
+      pressed: (press) => {
+        void hotKeys?.pressed(press).catch((error) => log.write('error', 'hotkeys', String(error)));
+      },
+      applied: (statuses) => hotKeys?.applied(statuses),
+      failed: (error) => {
+        hotKeys?.failed(error);
+        if (!quitting && hotKeys?.statuses.length)
+          settings.health.set('apply-hotkeys', 'apply-failed', ++hotKeyApplyGeneration);
+      },
+      ownership: setShortcutOwnership,
+      recorded: (event) => {
+        if (!shortcutRecording || !window?.isFocused()) return;
+        shortcutCaptured = event;
+        window.webContents.send('dock:shortcutCaptured', event);
+        changed();
+      },
+    },
   );
   manager.on('changed', () => {
     customCommands.reconcile();
@@ -2966,7 +3072,7 @@ async function initialize() {
         metaKey: input.meta,
       });
       if (!key) return false;
-      if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === key)) return true;
+      if (globalShortcutOwnership.has(key)) return false;
       const commands = resolveKeybindings(
         getKeybindings(settings.value),
         key,
@@ -3039,6 +3145,7 @@ async function initialize() {
         changed,
         auxiliary: (page) => ({
           ...settingsPageAuxiliary(page),
+          shortcutCapture: settingsRecording ? shortcutCaptured : undefined,
           storage: settingsPageStorage(page),
           settingsFiles: page.id === 'general' ? settings.diagnostics() : undefined,
         }),
@@ -3103,7 +3210,7 @@ async function initialize() {
     shortcut: async (key) => {
       if (!window?.isFocused()) return;
       const normalized = normalizeShortcut(key);
-      if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === normalized)) return;
+      if (globalShortcutOwnership.has(normalized)) return;
       return dispatchShortcut(normalized);
     },
     layer: () => {
@@ -3163,7 +3270,7 @@ async function initialize() {
         isComposing: input.isComposing,
       });
       if (!key) return false;
-      if (hotKeys?.statuses.some((s) => s.registered && s.shortcut === key)) return true;
+      if (globalShortcutOwnership.has(key)) return false;
       const commands = resolveKeybindings(
         getKeybindings(settings.value),
         key,
@@ -3201,20 +3308,6 @@ async function initialize() {
   window.webContents.on('render-process-gone', resumeHotKeys);
   window.webContents.on('did-start-loading', resumeHotKeys);
   window.webContents.on('did-start-loading', () => updatePageViewport(null, null));
-  window.webContents.on('before-input-event', (event, input) => {
-    if (shortcutRecording) return;
-    const shortcut = shortcutFromEvent({
-      key: input.key,
-      code: input.code,
-      ctrlKey: input.control,
-      altKey: input.alt,
-      shiftKey: input.shift,
-      metaKey: input.meta,
-      isComposing: input.isComposing,
-    });
-    if (hotKeys?.statuses.some((status) => status.registered && status.shortcut === shortcut))
-      event.preventDefault();
-  });
   registerIpc();
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'));
   tray = new Tray(

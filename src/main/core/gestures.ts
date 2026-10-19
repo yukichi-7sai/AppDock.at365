@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { JsonLinePeer } from './rpc';
 import { defaultGestures, nativeGestureRows, type GestureContext } from '../../shared/gestures';
-import type { Settings } from '../../shared/contracts';
+import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import type { ShortcutDispatcher } from './shortcut-dispatcher';
 
 export interface GestureInvocation {
@@ -10,16 +10,36 @@ export interface GestureInvocation {
   process: string;
   source: string;
 }
-export class GestureManager {
+export interface ShortcutInput {
+  shortcut: string;
+  blockOriginalInput: boolean;
+}
+export type NativeShortcutStatus = Omit<GlobalHotKeyStatus, 'commandId'>;
+export interface ShortcutPress {
+  shortcuts: string[];
+  window: string;
+  context: string;
+  revision: number;
+  pressId: number;
+}
+export class InputCaptureManager {
   private peer?: JsonLinePeer;
   private child?: ChildProcessWithoutNullStreams;
   private fingerprint = '';
-  private syncing = false;
+  private queue: Promise<unknown> = Promise.resolve();
   private stopped = false;
   private revision = 0;
+  private shortcutRevision = 0;
+  private inputs: ShortcutInput[] = [];
+  private statuses: NativeShortcutStatus[] = [];
+  private recording?: { token: string; window: string; allowWin: boolean };
+  private faultSettings?: string;
   private timer?: ReturnType<typeof setInterval>;
   private active = new Map<string, AbortController>();
+  private recordSequence = 0;
+  private endedRecordings = new Set<string>();
   paused = false;
+  private refreshing = false;
   constructor(
     private executable: string,
     private state: () => {
@@ -32,129 +52,277 @@ export class GestureManager {
     private execute: (id: string, invocation: GestureInvocation) => Promise<unknown>,
     private cancelCommand: (session: string) => void,
     private report: (message: string) => void,
+    private shortcuts: {
+      pressed(event: ShortcutPress): void;
+      applied(statuses: NativeShortcutStatus[]): void;
+      failed(error: Error): void;
+      ownership(keys: string[]): Promise<void>;
+      recorded(event: { token: string; key: string; sequence: number }): void;
+    },
   ) {}
   async start() {
-    await this.sync();
+    await this.refresh();
     this.timer = setInterval(() => {
-      void this.sync();
+      if (this.refreshing) return;
+      this.refreshing = true;
+      void this.refresh()
+        .catch(() => {})
+        .finally(() => {
+          this.refreshing = false;
+        });
     }, 40);
   }
   togglePause() {
     this.paused = !this.paused;
-    void this.sync();
+    void this.refresh().catch(() => {});
   }
-  private async sync() {
-    if (this.stopped || this.syncing) return;
-    const state = this.state(),
-      settings = state.settings.gestures ?? defaultGestures();
-    const rows = nativeGestureRows(settings, state.context, state.commands);
-    const context = JSON.stringify(state.context);
-    const config = {
-      ...settings,
-      rows,
-      context,
-      enabled: settings.enabled && !this.paused && !state.recording,
-    };
-    const fingerprint = JSON.stringify(config);
-    if (fingerprint === this.fingerprint) return;
-    if (!this.peer && (!config.enabled || !rows.length)) return;
-    this.syncing = true;
-    try {
-      if (!this.peer) {
-        const child = spawn(this.executable, [], {
-          windowsHide: true,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
-        this.child = child;
-        const peer = new JsonLinePeer(child.stdout, child.stdin, async (method, p) => {
-          if (method === 'gestures.cancel') {
-            this.active.get(p.session)?.abort();
-            this.cancelCommand(p.session);
-            return;
-          }
-          if (method !== 'gestures.invoke') throw Error('Unknown gesture event.');
-          if (p.revision !== this.revision || this.stopped || this.paused) return;
-          const current = this.state();
-          if (current.recording || JSON.stringify(current.context) !== p.context) return;
-          if (typeof p.session !== 'string' || !Array.isArray(p.rowIds)) return;
-          const allowed = nativeGestureRows(
-            current.settings.gestures ?? defaultGestures(),
-            current.context,
-            current.commands,
-          );
-          const commands = [
-            ...new Set(
-              allowed
-                .filter((r) => p.rowIds.includes(r.id) && r.gesture === p.gesture)
-                .map((r) => r.command),
-            ),
-          ];
-          if (current.settings.gestures?.executionMode === 'first') commands.splice(1);
-          const controller = new AbortController();
-          this.active.set(p.session, controller);
-          try {
-            await this.dispatcher.dispatch('gesture:' + p.gesture, commands, {
-              valid: async () =>
-                !controller.signal.aborted &&
-                !this.stopped &&
-                !this.paused &&
-                p.revision === this.revision &&
-                JSON.stringify(this.state().context) === p.context &&
-                !!(await peer.request('gestures.valid', { session: p.session, window: p.window })),
-              execute: async (id) => {
-                try {
-                  return await this.execute(id, {
-                    session: p.session,
-                    window: p.window,
-                    process: p.process,
-                    source: 'gesture',
-                  });
-                } catch (error) {
-                  if (!controller.signal.aborted) throw error;
-                }
-              },
-            });
-          } finally {
-            this.active.delete(p.session);
-          }
-        });
-        this.peer = peer;
-        child.stderr.setEncoding('utf8');
-        child.stderr.on('data', (data) => this.report(String(data).slice(0, 2000).trim()));
-        child.on('error', (error) => {
-          this.report(error.message);
-          peer.close();
-        });
-        child.on('exit', () => peer.close());
-        peer.on('closed', () => {
-          child.kill();
-          for (const [session, controller] of this.active) {
-            controller.abort();
-            this.cancelCommand(session);
-          }
-          if (!this.stopped)
-            this.report(
-              'ジェスチャー入力プロセスが停止しました。設定を保存するかAppDockを再起動してください。',
-            );
-          // No automatic restart loop; a configuration change can retry.
-        });
+  refresh(force = false): Promise<NativeShortcutStatus[]> {
+    const work = this.queue.then(() => this.sync(force));
+    this.queue = work.catch(() => {});
+    return work;
+  }
+  async syncShortcuts(inputs: ShortcutInput[], force = false) {
+    if (JSON.stringify(inputs) !== JSON.stringify(this.inputs) || force) {
+      this.inputs = structuredClone(inputs);
+      this.shortcutRevision++;
+    }
+    return this.refresh(force);
+  }
+  async record(request: { token: string; active: boolean; allowWin: boolean }, window: string) {
+    if (request.active && !this.endedRecordings.has(request.token))
+      this.recording = { token: request.token, window, allowWin: request.allowWin };
+    else if (!request.active) {
+      this.endedRecordings.add(request.token);
+      if (this.endedRecordings.size > 256)
+        this.endedRecordings.delete(this.endedRecordings.values().next().value!);
+      if (this.recording?.token === request.token) this.recording = undefined;
+    }
+    await this.refresh();
+  }
+  async endRecording() {
+    this.recording = undefined;
+    await this.refresh();
+  }
+  async activate(pressId: number, window: string) {
+    if (!this.peer || this.peer.closed || this.stopped) return false;
+    return !!(await this.peer.request('capture.activate', { pressId, window }));
+  }
+  async activateProcess(pressId: number, processId: number) {
+    if (!this.peer || this.peer.closed || this.stopped) return false;
+    return !!(await this.peer.request('capture.activateProcess', { pressId, processId }));
+  }
+  private async event(method: string, p: any) {
+    if (method === 'shortcuts.pressed') {
+      if (
+        this.stopped ||
+        this.state().recording ||
+        p.revision !== this.shortcutRevision ||
+        !Array.isArray(p.shortcuts) ||
+        !p.shortcuts.length ||
+        p.shortcuts.length > 2000 ||
+        p.shortcuts.some((key: unknown) => typeof key !== 'string') ||
+        typeof p.window !== 'string' ||
+        typeof p.context !== 'string'
+      )
+        return;
+      const keys = p.shortcuts.filter((key: string) =>
+        this.statuses.some((s) => s.registered && s.shortcut === key),
+      );
+      if (keys.length) this.shortcuts.pressed({ ...p, shortcuts: keys });
+      return;
+    }
+    if (method === 'shortcuts.applied') {
+      if (p.revision === this.shortcutRevision && Array.isArray(p.statuses)) {
+        if (p.statuses.some((status: NativeShortcutStatus) => status.error)) {
+          this.statuses = p.statuses;
+          this.faultSettings = JSON.stringify(this.state().settings);
+          await this.shortcuts.ownership([]);
+          this.shortcuts.applied(this.statuses);
+          return;
+        }
+        this.fingerprint = '';
+        await this.refresh(true);
       }
-      this.revision++;
+      return;
+    }
+    if (method === 'shortcuts.recorded') {
+      if (this.recording?.token === p.token && typeof p.key === 'string')
+        this.shortcuts.recorded({ token: p.token, key: p.key, sequence: ++this.recordSequence });
+      return;
+    }
+    if (method === 'shortcuts.recordEnded') {
+      if (this.recording?.token === p.token) this.recording = undefined;
+      return;
+    }
+    if (method === 'input.error') {
+      this.report(typeof p.message === 'string' ? p.message : '入力処理に失敗しました。');
+      return;
+    }
+    if (method === 'gestures.cancel') {
+      this.active.get(p.session)?.abort();
+      this.cancelCommand(p.session);
+      return;
+    }
+    if (method !== 'gestures.invoke') throw Error('Unknown input event.');
+    if (p.revision !== this.revision || this.stopped || this.paused) return;
+    const current = this.state();
+    if (
+      current.recording ||
+      JSON.stringify(current.context) !== p.context ||
+      typeof p.session !== 'string' ||
+      !Array.isArray(p.rowIds)
+    )
+      return;
+    const allowed = nativeGestureRows(
+      current.settings.gestures ?? defaultGestures(),
+      current.context,
+      current.commands,
+    );
+    const commands = [
+      ...new Set(
+        allowed
+          .filter((r) => p.rowIds.includes(r.id) && r.gesture === p.gesture)
+          .map((r) => r.command),
+      ),
+    ];
+    if (current.settings.gestures?.executionMode === 'first') commands.splice(1);
+    const controller = new AbortController();
+    this.active.set(p.session, controller);
+    const peer = this.peer!;
+    try {
+      await this.dispatcher.dispatch('gesture:' + p.gesture, commands, {
+        valid: async () =>
+          !controller.signal.aborted &&
+          !this.stopped &&
+          !this.paused &&
+          p.revision === this.revision &&
+          JSON.stringify(this.state().context) === p.context &&
+          !!(await peer.request('gestures.valid', { session: p.session, window: p.window })),
+        execute: async (id) => {
+          try {
+            return await this.execute(id, {
+              session: p.session,
+              window: p.window,
+              process: p.process,
+              source: 'gesture',
+            });
+          } catch (error) {
+            if (!controller.signal.aborted) throw error;
+          }
+        },
+      });
+    } finally {
+      this.active.delete(p.session);
+    }
+  }
+  private connect() {
+    const child = spawn(this.executable, [], {
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const peer = new JsonLinePeer(child.stdout, child.stdin, (method, p) => this.event(method, p));
+    this.child = child;
+    this.peer = peer;
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (data) => this.report(String(data).slice(0, 2000).trim()));
+    child.on('error', (error) => {
+      this.report(error.message);
+      peer.close();
+    });
+    child.on('exit', () => peer.close());
+    peer.on('closed', () => {
+      child.kill();
       for (const [session, controller] of this.active) {
         controller.abort();
         this.cancelCommand(session);
       }
-      if (this.peer.closed) {
-        this.peer = undefined;
-        return;
+      if (this.peer !== peer || this.stopped) return;
+      this.faultSettings = JSON.stringify(this.state().settings);
+      this.statuses = this.statuses.map((s) => ({
+        ...s,
+        registered: false,
+        error: '入力プロセスとの接続が終了しました。',
+      }));
+      this.shortcuts.failed(
+        new Error('入力プロセスが停止しました。設定を保存するか再試行してください。'),
+      );
+      void this.shortcuts.ownership([]).catch(() => {});
+    });
+    return peer;
+  }
+  private async sync(force: boolean): Promise<NativeShortcutStatus[]> {
+    if (this.stopped) return [];
+    const state = this.state();
+    if (this.faultSettings && !force && this.faultSettings === JSON.stringify(state.settings))
+      return this.statuses;
+    const settings = state.settings.gestures ?? defaultGestures();
+    const context = JSON.stringify(state.context);
+    const gesture = {
+      ...settings,
+      rows: nativeGestureRows(settings, state.context, state.commands),
+      context,
+      enabled: settings.enabled && !this.paused && !state.recording,
+    };
+    const inputs = state.recording ? [] : this.inputs;
+    const config = {
+      gestures: gesture,
+      shortcuts: inputs,
+      shortcutRevision: this.shortcutRevision,
+      hostProcessId: process.pid,
+      context,
+      recording: this.recording ?? null,
+    };
+    const fingerprint = JSON.stringify(config);
+    if (!force && fingerprint === this.fingerprint && !this.faultSettings) return this.statuses;
+    if (
+      !this.peer &&
+      !inputs.length &&
+      !this.recording &&
+      (!gesture.enabled || !gesture.rows.length)
+    ) {
+      this.fingerprint = fingerprint;
+      return [];
+    }
+    try {
+      if (!this.peer || this.peer.closed) {
+        this.connect();
       }
-      await this.peer.request('gestures.sync', { ...config, revision: this.revision });
+      const peer = this.peer!;
+      this.faultSettings = undefined;
+      if (this.fingerprint !== fingerprint) {
+        this.revision++;
+        for (const [session, controller] of this.active) {
+          controller.abort();
+          this.cancelCommand(session);
+        }
+      }
+      const payload = { ...config, gestures: { ...gesture, revision: this.revision } };
+      let statuses: NativeShortcutStatus[];
+      {
+        statuses = await peer.request('capture.sync', { ...payload, shortcutsActive: false });
+        await this.shortcuts.ownership(
+          statuses.filter((s) => s.registered).flatMap((s) => s.inputKeys ?? [s.shortcut]),
+        );
+        this.statuses = statuses;
+        this.shortcuts.applied(statuses);
+        if (inputs.length)
+          statuses = await peer.request('capture.sync', { ...payload, shortcutsActive: true });
+      }
+      this.statuses = statuses;
       this.fingerprint = fingerprint;
+      this.shortcuts.applied(statuses);
+      return statuses;
     } catch (error) {
-      this.fingerprint = fingerprint;
-      this.report(String(error));
-    } finally {
-      this.syncing = false;
+      this.faultSettings = JSON.stringify(state.settings);
+      this.statuses = inputs.map((row) => ({
+        shortcut: row.shortcut,
+        registered: false,
+        error: '入力の適用に失敗しました。',
+      }));
+      this.peer?.close();
+      this.shortcuts.failed(error instanceof Error ? error : new Error(String(error)));
+      await this.shortcuts.ownership([]);
+      throw error;
     }
   }
   async close() {
@@ -166,5 +334,7 @@ export class GestureManager {
     }
     this.peer?.close();
     this.child?.kill();
+    await this.shortcuts.ownership([]);
   }
 }
+export { InputCaptureManager as GestureManager };

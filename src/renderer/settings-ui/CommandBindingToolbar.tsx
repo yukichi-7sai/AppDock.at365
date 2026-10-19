@@ -47,7 +47,7 @@ export function CommandBindingToolbar({
           <option value="all">すべて</option>
           <option value="assigned">割り当て済み</option>
           <option value="unassigned">未割り当て</option>
-          {showRegistrationErrors && <option value="conflict">登録エラー</option>}
+          {showRegistrationErrors && <option value="conflict">入力の適用エラー</option>}
         </select>
       </div>
       <div className="command-shortcut-summary">

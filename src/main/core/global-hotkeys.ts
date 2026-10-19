@@ -1,87 +1,47 @@
-import { getKeybindings } from '../../shared/keybindings';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { getKeybindings, globalShortcutInputs } from '../../shared/keybindings';
 import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
-import { JsonLinePeer } from './rpc';
+import type {
+  InputCaptureManager,
+  NativeShortcutStatus,
+  ShortcutInput,
+  ShortcutPress,
+} from './gestures';
 
-type NativeStatus = Omit<GlobalHotKeyStatus, 'commandId'>;
 export interface HotKeyBackend {
-  sync(shortcuts: string[]): Promise<NativeStatus[]>;
+  sync(
+    shortcuts: string[],
+    inputs?: ShortcutInput[],
+    retry?: boolean,
+  ): Promise<NativeShortcutStatus[]>;
   close(): Promise<void>;
 }
-export class WindowsHotKeyBackend implements HotKeyBackend {
-  private child?: ChildProcessWithoutNullStreams;
-  private peer?: JsonLinePeer;
-  constructor(
-    private executable: string,
-    private pressed: (shortcut: string) => void,
-    private failed: (error: Error) => void,
-  ) {}
-  async sync(shortcuts: string[]): Promise<NativeStatus[]> {
-    if (!this.peer || this.peer.closed) {
-      if (!shortcuts.length) return [];
-      const child = spawn(this.executable, ['--hotkeys'], {
-        windowsHide: true,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      this.child = child;
-      const peer = new JsonLinePeer(child.stdout, child.stdin, async (method, parameters) => {
-        if (method === 'hotkeys.pressed' && typeof parameters.shortcut === 'string')
-          this.pressed(parameters.shortcut);
-      });
-      this.peer = peer;
-      child.stderr.resume();
-      child.on('error', (error) => {
-        peer.close();
-        this.failed(error);
-      });
-      peer.on('closed', () => {
-        child.kill();
-        if (this.peer === peer)
-          this.failed(new Error('グローバルホットキーホストとの接続が終了しました。'));
-      });
-      peer.on('protocolError', (error) => {
-        this.failed(error);
-        peer.close();
-      });
-      child.on('exit', () => peer.close());
-    }
-    return this.peer.request('hotkeys.sync', { shortcuts, foregroundProcessId: process.pid });
+export class InputCaptureHotKeyBackend implements HotKeyBackend {
+  constructor(private capture: () => InputCaptureManager | undefined) {}
+  sync(shortcuts: string[], inputs?: ShortcutInput[], retry = false) {
+    const capture = this.capture();
+    if (!capture) return Promise.reject(new Error('入力ホストを初期化中です。'));
+    return capture.syncShortcuts(
+      inputs ?? shortcuts.map((shortcut) => ({ shortcut, blockOriginalInput: true })),
+      retry,
+    );
   }
   async close() {
-    const child = this.child;
-    const peer = this.peer;
-    this.child = undefined;
-    this.peer = undefined;
-    if (!child) return;
-    const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
-    child.stdin.end(); // EOF releases the thread's Windows registrations.
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      exited,
-      new Promise<void>((resolve) => {
-        timer = setTimeout(() => {
-          child.kill();
-          resolve();
-        }, 2000);
-      }),
-    ]);
-    clearTimeout(timer);
-    peer?.close();
+    await this.capture()?.syncShortcuts([]);
   }
 }
-
 export class GlobalHotKeyManager {
   statuses: GlobalHotKeyStatus[] = [];
   private signature = '';
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
   private executing = new Set<string>();
+  private desired: { commandId: string; shortcut: string }[] = [];
   constructor(
     private backend: HotKeyBackend,
     private execute: (id: string) => Promise<unknown>,
     private changed: () => void,
     private report: (message: string) => void,
-    private dispatch?: (shortcut: string) => Promise<unknown>,
+    private dispatch?: (shortcut: string, press?: ShortcutPress) => Promise<unknown>,
   ) {}
   sync(settings: Settings, available: string[], suspended = false, retry = false): Promise<void> {
     const desired = suspended
@@ -91,33 +51,40 @@ export class GlobalHotKeyManager {
             (row) => row.enabled && row.when.scope === 'global' && available.includes(row.command),
           )
           .map((row) => ({ commandId: row.command, shortcut: row.key }));
+    const inputs = suspended ? [] : globalShortcutInputs(getKeybindings(settings), available);
     this.queue = this.queue.then(async () => {
       if (this.stopped) return;
-      const signature = JSON.stringify(desired);
+      const signature = JSON.stringify([desired, inputs]);
       if (!retry && signature === this.signature) return;
       this.signature = signature;
-      // Stop dispatching old registrations immediately, including queued Windows messages.
+      this.desired = desired;
       this.statuses = [];
       try {
-        const result = await this.backend.sync([...new Set(desired.map((item) => item.shortcut))]);
-        this.statuses = desired.map((item) => {
-          const status = result.find((entry) => entry.shortcut === item.shortcut);
-          return {
-            ...item,
-            registered: status?.registered ?? false,
-            ...(status?.error ? { error: status.error } : {}),
-          };
-        });
-        for (const status of this.statuses)
-          if (status.error) this.report(`${status.shortcut}: ${status.error}`);
+        this.applied(
+          await this.backend.sync(
+            inputs.map((row) => row.shortcut),
+            inputs,
+            retry,
+          ),
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        this.signature = '';
         this.statuses = desired.map((item) => ({ ...item, registered: false, error: message }));
         this.report(message);
+        this.changed();
       }
-      this.changed();
     });
     return this.queue;
+  }
+  applied(result: NativeShortcutStatus[]) {
+    if (this.stopped) return;
+    this.statuses = this.desired.map((item) => {
+      const status = result.find((entry) => entry.shortcut === item.shortcut);
+      return { ...item, ...status, registered: status?.registered ?? false };
+    });
+    for (const status of this.statuses) if (status.error) this.report(status.error);
+    this.changed();
   }
   failed(error: Error) {
     this.statuses = this.statuses.map((status) => ({
@@ -127,18 +94,19 @@ export class GlobalHotKeyManager {
     }));
     this.changed();
   }
-  async pressed(shortcut: string) {
+  async pressed(input: string | ShortcutPress) {
     if (this.stopped) return;
+    const keys = typeof input === 'string' ? [input] : input.shortcuts;
     const commands = [
       ...new Set(
         this.statuses
-          .filter((status) => status.shortcut === shortcut && status.registered)
+          .filter((status) => status.registered && keys.includes(status.shortcut))
           .map((status) => status.commandId),
       ),
     ];
     if (!commands.length) return;
     if (this.dispatch) {
-      await this.dispatch(shortcut);
+      await this.dispatch(keys[0], typeof input === 'string' ? undefined : input);
       return;
     }
     for (const commandId of commands) {
@@ -153,7 +121,6 @@ export class GlobalHotKeyManager {
       }
     }
   }
-
   async close() {
     this.stopped = true;
     await this.queue;

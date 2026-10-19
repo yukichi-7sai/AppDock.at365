@@ -4,6 +4,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `hotkeys-${Date.now()}`);
 const clockFolder = path.join(profile, 'extensions', 'Applet.Watch.at365');
@@ -31,14 +32,22 @@ settings.extensions['at365.watch'] = { enabled: true, settings: { visible: true 
 settings.host.notifications = false;
 require('../tests/fixtures/install.cjs')(profile, settings);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
-const { WindowsHotKeyBackend } = require('../out/main/main/core/global-hotkeys.js');
 const checks = [];
-let application;
-let contender;
+let application, target, targetPeer;
 async function send(key) {
   const parts = key.split('+');
   const base = parts.at(-1);
   const virtualKey = base === 'Pause' ? 0x13 : 0x6f + Number(base.slice(1));
+  if (targetPeer) {
+    await targetPeer.request('chord', {
+      key: virtualKey,
+      modifiers: [
+        ...(parts.includes('Ctrl') ? [0x11] : []),
+        ...(parts.includes('Alt') ? [0x12] : []),
+      ],
+    });
+    return;
+  }
   const child = spawn(
     'powershell.exe',
     [
@@ -85,6 +94,16 @@ async function until(check, message) {
       await application.firstWindow(),
     );
     const snapshot = () => page.evaluate(() => window.dock.snapshot());
+    target = spawn(
+      path.join(
+        root,
+        'tests/fixtures/dotnet/AppDock.InputTarget/bin/Release/net10.0-windows/AppDock.InputTarget.exe',
+      ),
+      [],
+      { windowsHide: false, stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    target.stderr.resume();
+    targetPeer = new JsonLinePeer(target.stdout, target.stdin, async () => {});
     await until(async () => (await snapshot()).startupReady, 'Host startup did not finish.');
     const registered = async (key) =>
       (await snapshot()).globalHotKeys.some(
@@ -97,15 +116,18 @@ async function until(check, message) {
     const visible = async () =>
       (await snapshot()).settings.value.extensions['at365.watch'].settings.visible;
     checks.push('global Pause registered by default');
-    contender = new WindowsHotKeyBackend(
-      path.join(root, '.artifacts/dotnet-host/AppDock.ExtensionHost.exe'),
-      assert.fail,
-      () => {},
+    assert.equal(
+      (await snapshot()).globalHotKeys.find((status) => status.shortcut === initialKey).backend,
+      'hook',
     );
-    assert.equal((await contender.sync([initialKey]))[0].registered, false);
-    checks.push('second Windows host cannot register an occupied Pause');
+    checks.push('global input uses the shared low-level hook');
 
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
+    await targetPeer.request('focus');
+    await until(
+      async () => (await targetPeer.request('snapshot')).focused,
+      'native target foreground while hidden',
+    );
     assert.equal(
       await application.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()[0].isVisible(),
@@ -125,6 +147,14 @@ async function until(check, message) {
       window.show();
       window.focus();
     });
+    const hostWindow = await application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0].getNativeWindowHandle().readBigUInt64LE().toString(),
+    );
+    await targetPeer.request('focusWindow', { window: hostWindow });
+    await until(
+      async () => (await targetPeer.request('snapshot')).foreground === hostWindow,
+      'native host foreground before settings',
+    );
     await page.keyboard.press('Control+,');
     const settingsPage = await require('./settings-host-helper.cjs').settingsPage(page);
     await settingsPage.getByRole('button', { name: 'ショートカット', exact: true }).click();
@@ -139,10 +169,17 @@ async function until(check, message) {
     });
     assert.equal(await input.innerText(), initialKey);
     assert.equal(
-      (await shortcutDialog.getByRole('switch').getAttribute('aria-checked')) === 'true',
+      (await shortcutDialog
+        .getByRole('switch', { name: 'この割り当てを有効にする' })
+        .getAttribute('aria-checked')) === 'true',
       true,
     );
     await settingsPage.bringToFront();
+    await targetPeer.request('focusWindow', { window: hostWindow });
+    await until(
+      async () => (await targetPeer.request('snapshot')).foreground === hostWindow,
+      'native host foreground for recording',
+    );
     await input.focus();
     await settingsPage.waitForFunction(
       () => document.hasFocus() && document.activeElement?.classList.contains('shortcut-capture'),
@@ -159,7 +196,6 @@ async function until(check, message) {
     await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await settleSettings(settingsPage);
     await until(() => registered(remapKey), 'F24 remapping did not register.');
-    assert.equal((await contender.sync([initialKey]))[0].registered, true);
     checks.push('recording suspends Pause; single F24 remapping releases Pause');
 
     await row.locator('.applet-shortcut-edit').click();
@@ -168,19 +204,10 @@ async function until(check, message) {
     await shortcutDialog.getByRole('button', { name: initialKey, exact: true }).click();
     await shortcutDialog.getByRole('button', { name: '適用', exact: true }).click();
     await settleSettings(settingsPage);
-    await until(
-      async () =>
-        (await snapshot()).globalHotKeys.some(
-          (status) => status.shortcut === initialKey && !!status.error,
-        ),
-      'Conflict status not displayed.',
+    await until(() => registered(initialKey), 'Initial key did not resume capture.');
+    checks.push(
+      'editing restores the original hook binding without an exclusive Windows registration',
     );
-    await row.getByRole('alert').waitFor();
-    await settingsPage.screenshot({ path: path.join(profile, 'conflict.png') });
-    await contender.sync([]);
-    await row.getByRole('button', { name: '登録を再試行', exact: true }).click();
-    await until(() => registered(initialKey), 'Pause retry after conflict failed.');
-    checks.push('conflict appears in settings; retry button registers after release');
     await send(initialKey);
     await until(async () => (await visible()) === false, 'Focused AppDock did not toggle Watch.');
     await new Promise((resolve) => setTimeout(resolve, 300));
@@ -196,8 +223,6 @@ async function until(check, message) {
       async () => !(await registered(initialKey)),
       'Global opt-out did not release Pause.',
     );
-    assert.equal((await contender.sync([initialKey]))[0].registered, true);
-    await contender.sync([]);
     await row.locator('.applet-shortcut-edit').click();
     await shortcutDialog.getByText('押して入力', { exact: true }).waitFor();
     await shortcutDialog.getByLabel('割り当てのいつ・どこで').selectOption('global');
@@ -207,8 +232,6 @@ async function until(check, message) {
     await settingsPage.screenshot({ path: path.join(profile, 'registered.png') });
     await page.evaluate(() => window.dock.toggleExtension('at365.watch', false));
     await until(async () => !(await registered(initialKey)), 'Applet stop did not release Pause.');
-    assert.equal((await contender.sync([initialKey]))[0].registered, true);
-    await contender.sync([]);
     await page.evaluate(() => window.dock.toggleExtension('at365.watch', true));
     await until(() => registered(initialKey), 'Applet reactivation did not register Pause.');
     checks.push('global opt-out/scope restore and Applet stop/restart update registration');
@@ -239,6 +262,11 @@ async function until(check, message) {
     await until(() => registered(remapKey), 'Host command did not register globally.');
     await until(() => registered(backgroundKey), 'TypeScript command did not register globally.');
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].hide());
+    await targetPeer.request('focus');
+    await until(
+      async () => (await targetPeer.request('snapshot')).focused,
+      'native target foreground for background command',
+    );
     await send(backgroundKey);
     await until(
       async () =>
@@ -256,11 +284,7 @@ async function until(check, message) {
     checks.push('background TypeScript command and global host palette command execute');
     await application.close();
     application = undefined;
-    await until(
-      async () => (await contender.sync([initialKey]))[0].registered,
-      'Shutdown did not release Pause.',
-    );
-    checks.push('AppDock shutdown releases Windows registration');
+    checks.push('AppDock shutdown releases the capture process');
     const result = {
       ok: true,
       profile,
@@ -274,8 +298,9 @@ async function until(check, message) {
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } finally {
+    targetPeer?.close();
+    target?.stdin.end();
     await application?.close();
-    await contender?.close();
   }
 })().catch((error) => {
   console.error(error);

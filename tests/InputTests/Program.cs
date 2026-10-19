@@ -5,12 +5,13 @@ using AppDock.Runtime;
 using System.Windows.Forms;
 using System.Windows.Automation;
 
-internal static class Program
+internal static partial class Program
 {
     private static int failures;
     [STAThread] static int Main(string[] args)
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        if(args is ["--shortcuts",var shortcutHelper]) return RunShortcutTests(shortcutHelper);
         if(args is ["--send",var handle,var action]) {
             var sendCursor=Cursor.Position;
             Action? releaseBlocker=null;

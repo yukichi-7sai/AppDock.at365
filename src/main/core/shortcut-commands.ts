@@ -8,6 +8,7 @@ import {
   changeKeybindingKey,
   applyKeybindingOrder,
   shortcutScopes,
+  protectedShortcut,
   type Keybinding,
 } from '../../shared/keybindings';
 import type { SettingsStore } from './settings';
@@ -43,6 +44,7 @@ const fields = {
   command: idSchema,
   key: { type: 'string', minLength: 1, maxLength: 80 },
   enabled: { type: 'boolean' },
+  blockOriginalInput: { type: 'boolean', description: 'グローバル入力を止める。省略時はtrue。' },
   when: whenSchema,
 };
 const operation = (kind: string, properties: Record<string, unknown>) => ({
@@ -88,7 +90,7 @@ export class ShortcutCommands {
                     binding: {
                       type: 'object',
                       properties: { id: idSchema, ...fields },
-                      required: ['id', ...Object.keys(fields)],
+                      required: ['id', 'command', 'key', 'enabled', 'when'],
                       additionalProperties: false,
                     },
                   }),
@@ -148,13 +150,16 @@ export class ShortcutCommands {
         commandId: s.commandId,
         shortcut: s.shortcut,
         registered: s.registered,
+        backend: s.backend,
+        effectiveBlockOriginalInput: s.effectiveBlockOriginalInput,
         warning: s.error
-          ? 'OSへの登録に失敗しました。AppDockのショートカット画面で確認してください。'
+          ? '入力の適用に失敗しました。AppDockのショートカット画面で確認してください。'
           : null,
       })),
     };
   }
   private validateAssignment(row: Keybinding) {
+    if (row.when.scope === 'global' && protectedShortcut(row.key)) throw invalid();
     const command = this.assignable().find((c) => c.id === row.command);
     if (!command)
       throw new SettingsCommandError(
@@ -268,7 +273,7 @@ export class ShortcutCommands {
       warning: store.syncError ?? null,
       applies: 'shortcutsChanged',
       message:
-        '保存後のOS登録結果はshortcuts.getで確認してください。同じキーの複数行は、条件を満たす順に実行されます。',
+        '保存後の入力適用結果はshortcuts.getで確認してください。同じキーの複数行は、条件を満たす順に実行されます。',
     };
   }
 }

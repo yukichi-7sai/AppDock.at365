@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
+let globalShortcutOwnership = new Set<string>(ipcRenderer.sendSync('dock:shortcutOwnership:get'));
+ipcRenderer.on(
+  'dock:shortcutOwnership',
+  (_event, value: { generation: number; keys: string[] }) => {
+    globalShortcutOwnership = new Set(value.keys);
+    ipcRenderer.send('dock:shortcutOwnership:ack', value.generation);
+  },
+);
 const api: DockApi = {
   settingsPage: {
     open: (request) => ipcRenderer.invoke('dock:settingsPage:open', request),
@@ -100,6 +108,18 @@ const api: DockApi = {
   dispatchShortcut: (key) => ipcRenderer.invoke('dock:dispatchShortcut', key),
   retryGlobalHotKeys: () => ipcRenderer.invoke('dock:retryGlobalHotKeys'),
   setShortcutRecording: (recording) => ipcRenderer.invoke('dock:setShortcutRecording', recording),
+  setShortcutCapture: (request) => ipcRenderer.invoke('dock:setShortcutCapture', request),
+  ownsGlobalShortcut: (key) => globalShortcutOwnership.has(key),
+  onShortcutCaptured: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      value: { token: string; key: string; sequence: number },
+    ) => callback(value);
+    ipcRenderer.on('dock:shortcutCaptured', listener);
+    return () => {
+      ipcRenderer.removeListener('dock:shortcutCaptured', listener);
+    };
+  },
   onHostCommand: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, id: string) => callback(id);
     ipcRenderer.on('dock:hostCommand', handler);

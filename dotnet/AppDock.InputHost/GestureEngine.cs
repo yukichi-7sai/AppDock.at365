@@ -19,11 +19,10 @@ internal sealed class GestureEngine : IDisposable
     internal const nuint InputMarker = 0x365B012;
     private readonly Dispatcher dispatcher;
     private readonly DispatcherTimer timer;
-    private readonly HookCallback mouseCallback, keyCallback;
-    private nint mouseHook, keyHook, target;
+    private nint target;
     private Configuration? config;
     private Binding[] candidates = [];
-    private GestureIndicator? indicator;
+    private readonly GestureDisplay indicator;
     private GesturePoint origin, checkpoint;
     private GestureDirection? direction;
     private string process = "", session = "";
@@ -36,9 +35,12 @@ internal sealed class GestureEngine : IDisposable
     internal Func<object, Task<System.Text.Json.JsonElement>>? Invoke;
     internal Action<string>? Cancel;
 
-    internal GestureEngine(Dispatcher dispatcher)
+    internal bool NeedsKeyboard => ready || keys.Count > 0 || config is {Enabled:true, Rows.Length:>0};
+    internal bool NeedsMouse => ready || clicks.Count > 0 || config is {Enabled:true, Rows.Length:>0};
+    internal Action? HooksChanged;
+    internal GestureEngine(Dispatcher dispatcher, GestureDisplay display)
     {
-        this.dispatcher = dispatcher; mouseCallback = Mouse; keyCallback = Keyboard;
+        this.dispatcher = dispatcher; indicator = display;
         timer = new DispatcherTimer(TimeSpan.FromMilliseconds(10), DispatcherPriority.Normal, (_,_) => Tick(), dispatcher);
         timer.Stop();
     }
@@ -46,21 +48,11 @@ internal sealed class GestureEngine : IDisposable
     {
         CancelPending(); if (ready) cancelled = true;
         indicator?.Hide(); config = next;
-        if (next.Enabled && next.Rows.Length > 0 && mouseHook == 0) {
-            indicator ??= new GestureIndicator(); // Initialize WPF before accepting timed native hooks.
-            mouseHook = SetWindowsHookEx(14, mouseCallback, GetModuleHandle(null), 0);
-            if (mouseHook == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
-            keyHook = SetWindowsHookEx(13, keyCallback, GetModuleHandle(null), 0);
-            if (keyHook == 0) { UnhookWindowsHookEx(mouseHook); mouseHook=0; throw new Win32Exception(Marshal.GetLastWin32Error()); }
-        }
         ReleaseHooksIfIdle();
     }
     private void ReleaseHooksIfIdle()
     {
-        if (ready || clicks.Count > 0 || keys.Count > 0 || config is {Enabled:true, Rows.Length:>0}) return;
-        if (mouseHook != 0) UnhookWindowsHookEx(mouseHook);
-        if (keyHook != 0) UnhookWindowsHookEx(keyHook);
-        mouseHook = keyHook = 0;
+        HooksChanged?.Invoke();
     }
     private bool Current => target != 0 && GetForegroundWindow() == target && IsWindowVisible(target);
     internal bool Valid(string id,string window) => id==session && target.ToInt64().ToString()==window && Current && !cancelled && lifetime is {IsCancellationRequested:false};
@@ -85,11 +77,11 @@ internal sealed class GestureEngine : IDisposable
         origin = checkpoint = p; direction=null; cancelled=false; otherMode=false;
         wheelDelta=0; wheelStarted=false; lastWheel=0; ready=true; timer.Start();
     }
-    private nint Mouse(int code, uint message, nint data)
+    internal nint Mouse(int code, uint message, nint data)
     {
-        if (code < 0 || disposed) return CallNextHookEx(mouseHook,code,message,data);
+        if (code < 0 || disposed) return 0;
         var input = Marshal.PtrToStructure<MouseData>(data);
-        if (input.Extra == InputMarker) return CallNextHookEx(mouseHook,code,message,data);
+        if (input.Extra == InputMarker) return 0;
         try {
             if ((message is 0x202 or 0x208) && clicks.Remove(message)) { ReleaseHooksIfIdle(); return 1; }
             if (message == 0x204 && !ready) { Begin(input.Point); if (ready) return 1; }
@@ -106,18 +98,18 @@ internal sealed class GestureEngine : IDisposable
                 if (message == 0x204) return 1;
             }
         } catch (Exception e) { Console.Error.WriteLine(e); cancelled=true; CancelPending(); }
-        return CallNextHookEx(mouseHook,code,message,data);
+        return 0;
     }
-    private nint Keyboard(int code, uint message, nint data)
+    internal nint Keyboard(int code, uint message, nint data)
     {
-        if (code < 0 || disposed) return CallNextHookEx(keyHook,code,message,data);
+        if (code < 0 || disposed) return 0;
         var input = Marshal.PtrToStructure<KeyData>(data);
-        if (input.Extra == InputMarker) return CallNextHookEx(keyHook,code,message,data);
+        if (input.Extra == InputMarker) return 0;
         try {
             var up = message is 0x101 or 0x105;
             if (up && keys.Remove(input.Key)) { ReleaseHooksIfIdle(); return 1; }
             if (keys.Contains(input.Key)) return 1; // OS repeat, including after right release.
-            if (!ready || up || cancelled || !Current) return CallNextHookEx(keyHook,code,message,data);
+            if (!ready || up || cancelled || !Current) return 0;
             var modifier = input.Key is 0x11 or 0xA2 or 0xA3 ? "Ctrl+" : input.Key is 0x12 or 0xA4 or 0xA5 ? "Alt+" : input.Key is 0x10 or 0xA0 or 0xA1 ? "Shift+" : null;
             if (modifier != null && candidates.Any(r=>r.Gesture.StartsWith("key:") && r.Gesture.Contains(modifier))) {
                 keys.Add(input.Key); return 1;
@@ -128,7 +120,7 @@ internal sealed class GestureEngine : IDisposable
             }
             if (input.Key == 0x1B) { keys.Add(input.Key); cancelled=true; CancelPending(); indicator?.Hide(); return 1; }
         } catch (Exception e) { Console.Error.WriteLine(e); cancelled=true; CancelPending(); }
-        return CallNextHookEx(keyHook,code,message,data);
+        return 0;
     }
     private string? KeyGesture(uint key)
     {
@@ -172,7 +164,6 @@ internal sealed class GestureEngine : IDisposable
         if (!ready) return;
         if (!otherMode && GetCursorPos(out var point)) Move(point);
         if (cancelled || otherMode || direction == null || config!.IndicatorPosition == "none") { indicator?.Hide(); return; }
-        indicator ??= new GestureIndicator();
         if (indicator.IsVisible) return;
         var titles = SelectedRows("move-"+direction.ToString()!.ToLowerInvariant()).Select(r=>r.Title).ToArray();
         var caption = string.Join("\n",titles.Take(3)) + (titles.Length>3 ? $"\nほか {titles.Length-3} 件" : "");
@@ -243,11 +234,9 @@ internal sealed class GestureEngine : IDisposable
     public void Dispose()
     {
         disposed=true; CancelPending(); lifetime?.Dispose(); timer.Stop();
-        if (mouseHook!=0) UnhookWindowsHookEx(mouseHook); if (keyHook!=0) UnhookWindowsHookEx(keyHook);
         indicator?.Close();
     }
     private static Input MouseInput(uint flags)=>new(){Union=new(){Mouse=new(){Flags=flags,Extra=InputMarker}}};
-    private delegate nint HookCallback(int code,uint message,nint data);
     [StructLayout(LayoutKind.Sequential)] private struct MouseData {public GesturePoint Point; public uint Data,Flags,Time; public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)] private struct KeyData {public uint Key,Scan,Flags,Time; public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)] private struct Input {public uint Type; public InputUnion Union;}
@@ -255,10 +244,6 @@ internal sealed class GestureEngine : IDisposable
     [StructLayout(LayoutKind.Sequential)] private struct MouseEvent {public int X,Y; public uint Data,Flags,Time; public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)] private struct KeyEvent {public ushort Key,Scan; public uint Flags,Time; public nuint Extra;}
     [StructLayout(LayoutKind.Sequential)] private struct WindowRect {public int Left,Top,Right,Bottom;}
-    [DllImport("user32.dll",SetLastError=true)] private static extern nint SetWindowsHookEx(int kind,HookCallback callback,nint module,uint thread);
-    [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(nint hook);
-    [DllImport("user32.dll")] private static extern nint CallNextHookEx(nint hook,int code,uint message,nint data);
-    [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] private static extern nint GetModuleHandle(string? name);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] private static extern nint WindowFromPoint(GesturePoint p);

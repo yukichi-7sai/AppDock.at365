@@ -21,6 +21,7 @@ export interface Keybinding {
   command: string;
   key: string;
   enabled: boolean;
+  blockOriginalInput?: boolean;
   when: { scope: ShortcutScope; appletIds: string[] };
 }
 export type KeybindingDefault = Omit<Keybinding, 'id'>;
@@ -41,7 +42,8 @@ export function parseKeybindings(value: unknown): Keybinding[] {
       ids.has(row.id) ||
       !validCommandId(row.command) ||
       typeof row.enabled !== 'boolean' ||
-      !object(row.when)
+      !object(row.when) ||
+      (row.blockOriginalInput !== undefined && typeof row.blockOriginalInput !== 'boolean')
     )
       throw Error('キーバインドのID・コマンド・有効状態・条件を確認してください。');
     ids.add(row.id);
@@ -58,12 +60,16 @@ export function parseKeybindings(value: unknown): Keybinding[] {
       throw Error(
         '「いつ・どこで」の条件を確認してください。指定したAppletは1件以上選んでください。',
       );
+    const key = normalizeShortcut(row.key);
     return {
       id: row.id,
       command: row.command,
-      key: normalizeShortcut(row.key),
+      key,
       enabled: row.enabled,
       when: { scope: when.scope as ShortcutScope, appletIds: [...when.appletIds] as string[] },
+      ...(row.blockOriginalInput === undefined
+        ? {}
+        : { blockOriginalInput: row.blockOriginalInput as boolean }),
     };
   });
 }
@@ -82,7 +88,9 @@ export function parseKeybindingDefaults(
       if (
         !object(row) ||
         !allowed.has(String(row.command)) ||
-        Object.keys(row).some((key) => !['command', 'key', 'enabled', 'when'].includes(key))
+        Object.keys(row).some(
+          (key) => !['command', 'key', 'enabled', 'when', 'blockOriginalInput'].includes(key),
+        )
       )
         throw Error('既定のキーバインドには自身の登録コマンドだけを指定してください。');
       return { ...row, id: `default.${index}` };
@@ -209,6 +217,23 @@ export function getKeybindings(
 }
 export function defaultKeybindings() {
   return migrateKeybindings(defaultShortcuts, defaultGlobalShortcutCommands);
+}
+
+export function protectedShortcut(key: string) {
+  const parts = normalizeShortcut(key).split('+');
+  return (
+    (parts.includes('Win') && parts.at(-1) === 'L') ||
+    (parts.includes('Ctrl') && parts.includes('Alt') && parts.at(-1) === 'Delete')
+  );
+}
+export function globalShortcutInputs(rows: Keybinding[], available: string[]) {
+  const groups = new Map<string, boolean>();
+  const commands = new Set(available);
+  for (const row of rows) {
+    if (!row.enabled || row.when.scope !== 'global' || !commands.has(row.command)) continue;
+    groups.set(row.key, (groups.get(row.key) ?? false) || row.blockOriginalInput !== false);
+  }
+  return [...groups].map(([shortcut, blockOriginalInput]) => ({ shortcut, blockOriginalInput }));
 }
 
 /** Group display is derived; never sort the stored dispatch array to render it. */
@@ -341,19 +366,20 @@ export function matchesWhen(
 }
 export function resolveKeybindings(
   rows: Keybinding[],
-  key: string,
+  key: string | readonly string[],
   context: ShortcutContext,
   available: { id: string; extensionId?: string | null }[],
   globalEvent = false,
 ): string[] {
   const commands = new Map(available.map((command) => [command.id, command]));
+  const keys = new Set(typeof key === 'string' ? [key] : key);
   return [
     ...new Set(
       rows
         .filter(
           (row) =>
             row.enabled &&
-            row.key === key &&
+            keys.has(row.key) &&
             (globalEvent || row.when.scope !== 'global') &&
             commands.has(row.command) &&
             matchesWhen(row.when, context, commands.get(row.command)?.extensionId),

@@ -41,6 +41,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  shortcutCapture?: { token: string; key: string; sequence: number };
   mcpClient?: {
     revision: string;
     error?: string;

@@ -1,5 +1,30 @@
 # 検証記録
 
+## 2026-10-19: 入力フック対応のコミット前確認（0.63.0）
+
+- 利用者が実装内容を確認し、コミットとプッシュを依頼した。製品・試験・依存・発行内容は追加変更せず、今回の追記は本記録のみ。
+- 実装時の最終記録と入力638件・生成物794件、成功ログ、固定EXE／展開native DLL、WatchとGmailの試験コピーをSHA256で照合し、一致を確認した。標準646件、レビュー後の関連49件とAPI23件、nativeショートカット27項目／ジェスチャー112項目、開発GUIと固定EXEのGUI／smokeを、実装時に記録した各影響範囲で再利用する。コミット依頼だけを理由とする再試験・版更新・再発行は行わない。
+- 対象51ファイルを限定してstageし、作業ファイル・`git write-tree`・commit treeとGitの作者／コミッターを照合する。設定済みのGitHub／AQUAへ通常pushし、両mainの先端を確認する。入力照合、記録追記の差分、stage/tree・commit・pushの実結果は[コミット確認資料](.artifacts/commit-validation-keyboard-hook-20261019/)へ保存する。既存の成功・失敗・再利用資料と0.63.0の固定配布物を保持し、整理による削除0件。
+
+## 2026-10-19: グローバルショートカットのフック統一（0.63.0）
+
+- 承認済み設計を実装。global受信を共有InputCaptureManager／InputHostの単一WH_KEYBOARD_LLへ統一し、旧RegisterHotKey受信と`--hotkeys`を撤去した。専用入力Dispatcherと表示Dispatcherを分離し、送信専用workerはフックを登録しない。Win／Windows／Metaの正規化、左右Winの記録、Winと英数字の選択、行ごとの任意`blockOriginalInput`を追加した。省略時ONを解釈し、省略値の書込みや設定移行を行わない。保護キーの旧行は保持し、新規の画面／API割り当てを拒否する。
+- 入力の所有を本体と信頼済みpreloadへ同期・確認してから捕捉を有効にする。配列変更も同じ手順を使い、物理記号キーの別表記をまとめる。ブロックは有効で利用可能なglobal行だけを重複コマンド除去前にOR集計し、押下時の通過／抑止を解放まで保持する。ローカル条件・入力欄／IME保護・保存順と共通dispatcherを維持した。外部編集は既存revision／dryRun／許可と原子的保存へ任意項目を追加し、旧必須項目を保つ。
+- 発行前に差分と影響先をレビューし、前面化、旧保護キーの読込み互換、配列切替の所有同期、物理別表記の実効状態、周期同期のキュー、保持キーの解放を修正・再確認した。フックからのAllowSetForegroundWindowでは旧WM_HOTKEYの前面化権限を引き継げなかったため、押下から1.5秒・1回限りの内部要求で、通知workerが押下元と対象の入力スレッドを一時接続して前面化する。finallyで解除し、別Windowへ操作が移った場合は中止する。プロセス起動は実際に返されたPIDと確認できた子孫に限定する。ASFW_ANY／合成Alt／常時最前面化は追加していない。[レビュー](.artifacts/keyboard-hook-implementation-20261019-01a15083/review.md)に判断を記録した。
+- 固定lockfileのinstall、型検査、本体／Default Shell／native build、標準90ファイル **646/646、fail/skip 0** が成功。レビュー後の影響範囲は関連49件とAPI23件を追加確認し、無関係な標準成功結果は再実行していない。最終nativeではショートカット **27項目**（down／repeat／up、自己入力、Pause、左右Win記録、記号キーの物理別表記、保持中の設定変更等）、既存ジェスチャー **112項目** が成功した。
+- 開発GUIは既存の一覧／編集／順序／保存再起動8群、Pause／Watch／停止再開／背景コマンド9群、本体・埋め込み／別Window・HTTPページ・オフラインGmail10群が成功。古い試験のWebApplet保存形式と空アカウント名簿を現在のfixtureへ合わせた。Electronのフォーカス表示と実HWNDが食い違う環境では、独立native fixtureで前面を確認してから送信するよう試験側を修正した。製品は不一致時にローカル条件を加えず、globalを維持する。
+- 本体だけを既存publish.batで`A:\40.ARTIFACT\AppDock.at365`へ発行した。最終単一EXEは **168900889 bytes**、SHA256 **093daac165edd4bdab8acd9b8e9b4ed3f34ad3b243cfc6368f39c4a3454226d8**。EXE／update.json／Default Shellは0.63.0で一致。固定EXEの隔離GUI **9群** が成功し、変更前のWin+Wで実際に`WindowsDashboard`が開く環境で、ON時と記録時の抑止、元入力通過、混在OR、重複実行防止、保存再起動、helper停止／再試行を確認した。既存cmdモードの`start "" wt.exe`から起動した実Windows Terminalが前面になることも検証し、固有タイトルを付けた試験Windowだけを閉じた。
+- 同じ固定EXEで背後／最小化／非表示からの本体前面化と、デスクトップからWin+Eを送る **4群**、標準smokeが成功。試験コピー／発行EXEのSHA256と、実際に展開されたInputHost／Runtime／ProcessHost DLLの生成物hashが一致した。画面は両テーマの700／900／1280pxで検査し、最終画像も確認した。証跡は[今回の検証資料](.artifacts/keyboard-hook-implementation-20261019-01a15083/)、固定GUIは`.artifacts/keyboard-hook-ui-1792358171287/`、前面化は`.artifacts/shortcut-foreground-1792358203654/`、smokeは`.artifacts/smoke-1792358219288/`。
+- 制限環境の.NET restore/build失敗は成功扱いせず、同一条件の通常ユーザー実行で成功した。WindowsApps起動エイリアスを実行ファイルモードへ直接渡す試験は既存パス検査で失敗し、Terminalは既存cmdモードで検証した。実キーボードによる手動受入、全JIS／US配列、他社フック、管理者対象、UAC／ロック画面、高負荷時のWindows側タイムアウト解除、遅い起動や既存別プロセスへの引継ぎは一括検証していない。既存の成功／失敗／再利用証跡と固定出力を保持し、整理による削除0件。実利用設定・未変更Applet・全体ZIP・実利用先deploy・commit・push・Releaseは変更していない。
+
+## 2026-10-19: グローバルショートカットのフック統一設計（未実装）
+
+- main `5e9331b4254fcd87ba48398119bbb93fa9465137`、追跡先origin/main、作業ツリー／インデックス／未追跡がcleanであることを確認した。開始前の `pull --ff-only`は制限環境でDNS失敗となり、同一コマンドを通常ユーザー環境で再実行して終了0／Already up to dateを確認。既存のローカルcommitとブランチを保持した。
+- [設計書](docs/keyboard-hook-shortcuts-design.md)を追加し、DEVELOPMENTと現行ショートカット文書から未実装の設計としてリンクした。グローバル受信は共有InputHostのローレベルフックへ統一し、方式選択は設けない。Win修飾キーの保存・記録・選択、割り当てごとの元入力ブロック、省略時ON、同じキーでの集約、既存ローカル入力の維持、API・障害・受入条件を定義した。
+- 現在の正規化、Windows登録、ジェスチャーとフックなし送信worker、共通ダイアログ、resolver／dispatcher、外部編集schemaと照合して文書レビューした。本人用合成入力を押下状態の更新前に除外する順序、Pauseの単発入力、記録時のWin／Alt解放、ブロックOFFの二重実行防止も明文化した。前面化と未文書化VKによる単独修飾キー動作の抑止は、実装時に実機で確認する成立条件として残す。
+- 新設計内のローカルリンク4件と参照先anchor、JSON例1件、コードフェンス6行、実在する検証入口10件、DEVELOPMENT／現行仕様からの入口、人物名・行末空白、`git diff --check`を確認した。結果は[文書検査](.artifacts/keyboard-hook-design-20261019-01a15083/validation.json)へ保存した。
+- 変更対象は設計書・入口・現行仕様への案内・本記録の4文書。製品ソース・0.62.5の版・実利用設定・配布物は変更せず、製品回帰・GUI・実Win+W・publish・commit・pushは未実施。検証計画を製品機能の成功として扱わない。
+
 ## 2026-10-19: 共有settings.jsonとdataの保存先指定の設計（未実装）
 
 - main `3af02e52135f78487d0dee9c12a11911974c9fa4`の作業ツリー・インデックス・未追跡がcleanであることを確認し、追跡先から`pull --ff-only`を実行。制限環境のDNS失敗後、同一コマンドを通常ユーザー環境で実行し、終了0／Already up to dateを確認した。

@@ -109,6 +109,35 @@ test('atomic add/update/remove, normalized keys, dry run, legacy compatibility a
   await f.edit([{ kind: 'remove', id: 'new' }]);
   assert.deepEqual(f.get().bindings, original.keybindings);
 });
+test('Win passthrough is optional, preserved by unrelated edits, and validated before save', async (t) => {
+  const f = fixture(t);
+  const source = {
+    ...binding('win', 'appdock.open', 'windows+w'),
+    when: { scope: 'global', appletIds: [] },
+    blockOriginalInput: false,
+  };
+  const operations = [{ kind: 'add', binding: source }];
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  const dry = await f.edit(operations, { dryRun: true });
+  assert.equal(dry.bindings.at(-1).key, 'Win+W');
+  assert.equal(dry.bindings.at(-1).blockOriginalInput, false);
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  await f.edit(operations);
+  await f.edit([{ kind: 'update', id: 'win', changes: { enabled: false } }]);
+  assert.equal(f.get().bindings.find((r) => r.id === 'win').blockOriginalInput, false);
+  assert.equal(Object.hasOwn(f.get().bindings[0], 'blockOriginalInput'), false);
+  await f.edit([{ kind: 'update', id: 'win', changes: { blockOriginalInput: true } }]);
+  assert.equal(f.get().bindings.find((r) => r.id === 'win').blockOriginalInput, true);
+  await assert.rejects(
+    f.edit([{ kind: 'add', binding: { ...source, id: 'protected', key: 'Win+L' } }]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  await assert.rejects(
+    f.edit([{ kind: 'update', id: 'win', changes: { blockOriginalInput: 'false' } }]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+});
+
 test('same-key order is explicit; no-op does not save and reorder cannot omit or duplicate members', async (t) => {
   const f = fixture(t);
   await f.edit(['a', 'b', 'c'].map((id) => ({ kind: 'add', binding: binding(id) })));

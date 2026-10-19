@@ -78,7 +78,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   await dialog.getByLabel('割り当てのいつ・どこで', { exact: true }).selectOption('applets');
   assert(await dialog.getByRole('button', { name: '追加', exact: true }).isDisabled());
   await dialog.getByRole('checkbox', { name: 'UI A', exact: true }).check();
-  await dialog.getByRole('switch').click();
+  await dialog.getByRole('switch', { name: 'この割り当てを有効にする', exact: true }).click();
   await page.screenshot({ path: path.join(profile, 'applet-shortcut-targets.png') });
   const position = await page.locator('.applet-settings-panel').evaluate((el) => el.scrollTop);
   await dialog.getByRole('button', { name: '追加', exact: true }).click();

@@ -10,6 +10,8 @@ export type SettingsControlsApi = Pick<
   | 'cancelUpdates'
   | 'openReleases'
   | 'setShortcutRecording'
+  | 'setShortcutCapture'
+  | 'onShortcutCaptured'
   | 'retryGlobalHotKeys'
   | 'openCommandPalette'
   | 'cancelCommandPalette'

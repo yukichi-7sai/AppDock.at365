@@ -137,8 +137,12 @@ export function processNames(value: unknown): string[] {
 }
 export function normalizeGesture(value: unknown): string {
   if (gestureTypes.some(([id]) => id === value)) return value as string;
-  if (typeof value === 'string' && value.startsWith('key:'))
-    return 'key:' + normalizeShortcut(value.slice(4));
+  if (typeof value === 'string' && value.startsWith('key:')) {
+    const key = normalizeShortcut(value.slice(4));
+    if (key.split('+').includes('Win'))
+      throw Error('ジェスチャーではWin修飾キーを使用できません。');
+    return 'key:' + key;
+  }
   throw Error('ジェスチャーは移動・左/中クリック・ホイール・キーから選んでください。');
 }
 export function parseGestures(value: unknown): GestureSettings {

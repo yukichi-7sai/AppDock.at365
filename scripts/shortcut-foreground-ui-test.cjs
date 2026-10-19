@@ -193,6 +193,15 @@ const checks = [];
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result, null, 2));
   } catch (e) {
+    if (page)
+      fs.writeFileSync(
+        path.join(profile, 'failure-host.json'),
+        JSON.stringify(
+          await page.evaluate(() => window.dock.snapshot()).catch(() => null),
+          null,
+          2,
+        ),
+      );
     if (peer)
       fs.writeFileSync(
         path.join(profile, 'failure-state.json'),

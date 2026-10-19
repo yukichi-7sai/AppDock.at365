@@ -15,11 +15,6 @@ if (args is ["--double-click-time"])
     wireOutput.WriteLine(NativeMouse.GetDoubleClickTime());
     return 0;
 }
-if (args is ["--hotkeys"])
-{
-    await WindowsHotKeySession.RunAsync(Console.In, wireOutput);
-    return 0;
-}
 if (args.Length != 2) { Console.Error.WriteLine("Usage: AppDock.ExtensionHost <assembly.dll> <type>"); return 2; }
 try
 {

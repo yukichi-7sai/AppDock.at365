@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { normalizeShortcut } from '../../shared/commands';
+import { protectedShortcut } from '../../shared/keybindings';
 import type { Keybinding } from '../../shared/keybindings';
 import { ShortcutConditionField } from './ShortcutFields';
 import { Toggle } from './Toggle';
@@ -24,7 +25,11 @@ export function AppletShortcutDialog({
   onClose(): void;
 }) {
   const [value, setValue] = useState(() => structuredClone(initial));
-  const valid = !!value.key && (value.when.scope !== 'applets' || !!value.when.appletIds.length);
+  const protectedKey = !!value.key && value.when.scope === 'global' && protectedShortcut(value.key);
+  const valid =
+    !!value.key &&
+    !protectedKey &&
+    (value.when.scope !== 'applets' || !!value.when.appletIds.length);
   return (
     <BindingEditDialog
       title={title}
@@ -54,6 +59,21 @@ export function AppletShortcutDialog({
               }}
             />
           </div>
+          <div className="shortcut-dialog-enabled">
+            <span>元のキー入力をブロックする</span>
+            <Toggle
+              checked={value.blockOriginalInput !== false}
+              disabled={value.when.scope !== 'global'}
+              label="元のキー入力をブロックする"
+              onChange={(blockOriginalInput) => setValue({ ...value, blockOriginalInput })}
+            />
+          </div>
+          <small>
+            {value.when.scope === 'global'
+              ? 'OFFにすると、入力をWindowsやほかのアプリにも渡します。'
+              : 'グローバルの割り当てで使用します。Windows標準キーの置き換えはグローバルを選んでください。'}
+          </small>
+          {protectedKey && <p role="alert">Windowsが保護するキーのため割り当てられません。</p>}
           <div className="shortcut-dialog-enabled">
             <span>この割り当てを有効にする</span>
             <Toggle

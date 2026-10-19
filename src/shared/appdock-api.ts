@@ -370,7 +370,7 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_shortcuts',
     description:
-      'ショートカットの割当・条件・実行順・revision・割当可能な公開コマンド・OS登録状態を取得します。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。設定変更・コマンド実行・ショートカット編集の許可が必要です。同じキーの複数行は条件を満たす順に実行します。OS登録は非同期なので保存後に再取得してください。',
+      'ショートカットの割当・条件・実行順・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。Win修飾キーと任意のblockOriginalInput（globalの元入力を止める、省略時true）に対応します。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。設定変更・コマンド実行・ショートカット編集の許可が必要です。同じキーの複数行は条件を満たす順に実行します。入力適用は非同期なので保存後に再取得してください。',
     inputSchema: {
       type: 'object',
       properties: {},

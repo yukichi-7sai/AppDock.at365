@@ -145,7 +145,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['trayMenu', 'コンテキストメニュー', '追加 削除 グループ 区切り線 表示イメージ'],
   ],
   shortcuts: [
-    ['keybindings', 'ショートカットキー', 'キー 割り当て コマンド 条件 実行順 登録エラー'],
+    [
+      'keybindings',
+      'ショートカットキー',
+      'キー 割り当て コマンド 条件 実行順 入力の適用エラー Win ブロック',
+    ],
   ],
   gestures: [
     ['gestures', 'マウスジェスチャー', '割り当て 条件 実行順'],

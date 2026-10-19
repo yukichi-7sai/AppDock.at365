@@ -207,7 +207,7 @@ const checks = [];
     const beforeEdit = (await snapshot()).settings.value.keybindings.map((r) => r.id);
     await row('a2').locator('.applet-shortcut-edit').click();
     await ready();
-    await dialog().getByRole('switch').click();
+    await dialog().getByRole('switch', { name: 'この割り当てを有効にする' }).click();
     await dialog().getByRole('button', { name: '適用', exact: true }).click();
     await save();
     assert.deepEqual(
@@ -276,7 +276,7 @@ const checks = [];
       'host default app scope / cancel leaves clean state / empty search and reset / unknown and bound aliases retained / key search retains all command assignments',
     );
 
-    // A second isolated host verifies actual Windows registration errors and their stable display.
+    // Low-level hooks do not reserve keys exclusively through RegisterHotKey.
     const conflictProfile = path.join(profile, 'conflict');
     fs.mkdirSync(conflictProfile);
     const conflictSettings = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -297,17 +297,18 @@ const checks = [];
       await cp.evaluate(() => window.dock.executeCommand('appdock.open'));
       await until(
         async () =>
-          (await cp.evaluate(() => window.dock.snapshot())).globalHotKeys.some((s) => s.error),
-        'Windows registration conflict',
+          (await cp.evaluate(() => window.dock.snapshot())).globalHotKeys.some(
+            (s) => s.registered && s.backend === 'hook' && !s.error,
+          ),
+        'second host applies shared shortcut',
       );
       await cp.getByRole('button', { name: '設定', exact: true }).click();
       await cp
         .locator('.settings-categories')
         .getByRole('button', { name: 'ショートカット', exact: true })
         .click();
-      await cp.getByLabel('ショートカットの絞り込み').selectOption('conflict');
       const cr = cp.locator('[data-binding-id="conflict"]');
-      await cr.getByRole('alert').waitFor();
+      assert.equal(await cr.getByRole('alert').count(), 0);
       await cr.locator('.applet-shortcut-edit').click();
       await cp
         .locator('.applet-shortcut-dialog')
@@ -315,26 +316,17 @@ const checks = [];
         .waitFor();
       await until(
         async () => !(await cp.evaluate(() => window.dock.snapshot())).globalHotKeys.length,
-        'recorder releases registrations',
+        'recorder suspends capture',
       );
-      assert.equal(await cr.locator('[role=alert]').count(), 1);
       await cp
         .locator('.applet-shortcut-dialog')
         .getByRole('button', { name: '編集をキャンセル', exact: true })
         .click();
-      await page.evaluate(async () => {
-        const state = await window.dock.snapshot();
-        state.settings.value.keybindings.find((r) => r.id === 'a1').enabled = false;
-        await window.dock.saveSettings(state.settings.value, state.settings.revision);
-      });
-      await until(async () => !(await snapshot()).globalHotKeys.length, 'release occupied key');
-      await cr.getByRole('button', { name: '登録を再試行', exact: true }).click();
       await until(
         async () =>
           (await cp.evaluate(() => window.dock.snapshot())).globalHotKeys.some((s) => s.registered),
-        'retry registration',
+        'capture resumes after recorder',
       );
-      await cr.waitFor({ state: 'hidden' });
     } finally {
       await conflictApp.close();
     }
@@ -346,7 +338,7 @@ const checks = [];
       await window.dock.saveSettings(state.settings.value, state.settings.revision);
     });
     checks.push(
-      'real Windows registration conflict / error filter / recorder status cache / retry clears error',
+      'two hook hosts apply the same key without registration errors / recorder suspends and resumes capture',
     );
     await button('Applet').click();
     await page.locator('[data-applet-id="test.a"] .applet-select').click();

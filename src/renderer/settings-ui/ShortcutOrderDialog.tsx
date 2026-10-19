@@ -38,7 +38,12 @@ export function ShortcutOrderDialog({
           row.when,
           command?.extensionId ? command.extension : undefined,
           applets,
-        )
+        ) +
+        (row.when.scope === 'global'
+          ? row.blockOriginalInput === false
+            ? '・入力を通す'
+            : '・入力をブロック'
+          : '')
       }
       groupRows={keybindingGroups}
       moveRow={moveKeybindingWithinKey}

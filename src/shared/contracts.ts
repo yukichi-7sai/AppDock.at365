@@ -236,6 +236,9 @@ export interface GlobalHotKeyStatus {
   shortcut: string;
   registered: boolean;
   error?: string;
+  backend?: 'hook';
+  inputKeys?: string[];
+  effectiveBlockOriginalInput?: boolean;
 }
 export interface DockApi {
   settingsPage: import('./settings-page').SettingsPageApi;
@@ -293,6 +296,11 @@ export interface DockApi {
   startExtensionNow(id: string): Promise<void>;
   retryGlobalHotKeys(): Promise<void>;
   setShortcutRecording(recording: boolean): Promise<void>;
+  setShortcutCapture(request: { token: string; active: boolean; allowWin: boolean }): Promise<void>;
+  onShortcutCaptured(
+    callback: (event: { token: string; key: string; sequence: number }) => void,
+  ): () => void;
+  ownsGlobalShortcut(key: string): boolean;
   onHostCommand(callback: (id: string) => void): () => void;
   onPaletteExecuted(callback: () => void): () => void;
   onHomeCommandResult(

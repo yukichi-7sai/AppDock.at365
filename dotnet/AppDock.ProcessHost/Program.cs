@@ -24,6 +24,7 @@ while (await input.ReadLineAsync() is { } line)
     var id = request.GetProperty("id").GetString();
     var method = request.GetProperty("method").GetString();
     var ok = method == "processes.ready";
+    int? processId = null;
     if (method == "processes.start")
     {
         try
@@ -41,10 +42,11 @@ while (await input.ReadLineAsync() is { } line)
             else foreach (var argument in arguments) info.ArgumentList.Add(argument);
             using var child = Process.Start(info);
             ok = child is not null;
+            if (child != null) processId = child.Id;
         }
         catch { ok = false; }
     }
-    await output.WriteLineAsync(JsonSerializer.Serialize(new { jsonrpc = "2.0", id, result = new { ok } }));
+    await output.WriteLineAsync(JsonSerializer.Serialize(new { jsonrpc = "2.0", id, result = new { ok, processId } }));
     await output.FlushAsync();
 }
 static class Native

@@ -109,6 +109,7 @@ export function GestureBindingDialog({
           </div>
           {family === 'key' ? (
             <ShortcutCaptureField
+              allowWin={false}
               label="ジェスチャーのキー"
               value={value.gesture.slice(4)}
               recordingReady={ready}

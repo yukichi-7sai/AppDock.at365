@@ -1,4 +1,5 @@
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useSettingsControls } from './api';
 import { normalizeShortcut, shortcutFromEvent } from '../../shared/commands';
 import { inputKeysFromEvent, normalizeInputKeys } from '../../shared/input-command';
 const specialGroups = [
@@ -14,6 +15,7 @@ export function ShortcutCaptureField({
   setError,
   label = 'ショートカットキー',
   mode = 'shortcut',
+  allowWin = true,
 }: {
   value: string;
   onChange(value: string): void;
@@ -21,9 +23,15 @@ export function ShortcutCaptureField({
   setError(error: string): void;
   label?: string;
   mode?: 'shortcut' | 'send';
+  allowWin?: boolean;
 }) {
+  const controls = useSettingsControls();
   const id = useId();
   const recorder = useRef<HTMLButtonElement>(null);
+  const [focused, setFocused] = useState(false);
+  const [captureReady, setCaptureReady] = useState(false);
+  const callbacks = useRef({ onChange, setError });
+  callbacks.current = { onChange, setError };
   const [special, setSpecial] = useState(false);
   const normalize = mode === 'send' ? normalizeInputKeys : normalizeShortcut;
   const [modifiers, setModifiers] = useState<string[]>(() => {
@@ -35,6 +43,7 @@ export function ShortcutCaptureField({
   });
   const supported = (key: string) => {
     try {
+      if (!allowWin && key.split('+').includes('Win')) return false;
       normalize(key);
       return true;
     } catch {
@@ -44,6 +53,40 @@ export function ShortcutCaptureField({
   useLayoutEffect(() => {
     recorder.current?.focus({ preventScroll: true });
   }, []);
+  useEffect(() => {
+    if (mode !== 'shortcut' || !focused || !recordingReady) {
+      setCaptureReady(false);
+      return;
+    }
+    const token = crypto.randomUUID();
+    let active = true;
+    const unsubscribe = controls.onShortcutCaptured((event) => {
+      if (!active || event.token !== token || document.activeElement !== recorder.current) return;
+      try {
+        const key = normalizeShortcut(event.key);
+        if (!allowWin && key.split('+').includes('Win')) return;
+        callbacks.current.onChange(key);
+        setModifiers(key.split('+').slice(0, -1));
+        callbacks.current.setError('');
+      } catch (error) {
+        callbacks.current.setError(String(error));
+      }
+    });
+    void controls
+      .setShortcutCapture({ token, active: true, allowWin })
+      .then(() => {
+        if (active) setCaptureReady(true);
+      })
+      .catch((error) => {
+        if (active) callbacks.current.setError(String(error));
+      });
+    return () => {
+      active = false;
+      unsubscribe();
+      setCaptureReady(false);
+      void controls.setShortcutCapture({ token, active: false, allowWin }).catch(() => {});
+    };
+  }, [focused, recordingReady, mode, allowWin]);
   const choose = (key: string) => {
     onChange(key);
     setModifiers(key.split('+').slice(0, -1));
@@ -54,20 +97,27 @@ export function ShortcutCaptureField({
       {' '}
       <div className="shortcut-capture-label">
         <span>{label}</span>
-        <small>{recordingReady ? '押して入力' : '入力を準備中…'}</small>
+        <small>
+          {!recordingReady
+            ? '入力を準備中…'
+            : !focused
+              ? 'クリックして入力'
+              : mode === 'send' || captureReady
+                ? '押して入力'
+                : '入力を準備中…'}
+        </small>
       </div>
       <button
         ref={recorder}
         className="shortcut-capture"
         aria-label={`${label}を入力`}
         aria-describedby={`${id}-hint`}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onKeyDown={(event) => {
           if (
             event.key === 'Escape' ||
-            (event.key === 'Tab' &&
-              !event.ctrlKey &&
-              !event.altKey &&
-              (mode !== 'send' || !event.metaKey))
+            (event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey)
           )
             return;
           event.preventDefault();
@@ -80,10 +130,8 @@ export function ShortcutCaptureField({
           )
             return;
           const key = (mode === 'send' ? inputKeysFromEvent : shortcutFromEvent)(event.nativeEvent);
-          if (key) choose(key);
-          else if (
-            !['Control', 'Alt', 'Shift', ...(mode === 'send' ? ['Meta'] : [])].includes(event.key)
-          )
+          if (key && supported(key)) choose(key);
+          else if (!['Control', 'Alt', 'Shift', 'Meta'].includes(event.key))
             setError('このキーは使用できません。特殊キーから選択することもできます。');
         }}
       >
@@ -107,7 +155,7 @@ export function ShortcutCaptureField({
       {special && (
         <div className="shortcut-special-picker" id={`${id}-special`}>
           <div className="shortcut-modifiers" role="group" aria-label="特殊キーの修飾キー">
-            {['Ctrl', 'Alt', 'Shift', ...(mode === 'send' ? ['Win'] : [])].map((modifier) => (
+            {['Ctrl', 'Alt', 'Shift', ...(allowWin ? ['Win'] : [])].map((modifier) => (
               <button
                 key={modifier}
                 aria-pressed={modifiers.includes(modifier)}
@@ -124,6 +172,24 @@ export function ShortcutCaptureField({
             ))}
             <small>組み合わせて選択</small>
           </div>
+          <label>
+            英数字
+            <select
+              aria-label="英数字のキーを選択"
+              value=""
+              onChange={(event) => {
+                if (!event.target.value) return;
+                choose(normalize([...modifiers, event.target.value].join('+')));
+                setSpecial(false);
+                recorder.current?.focus({ preventScroll: true });
+              }}
+            >
+              <option value="">キーを選択…</option>
+              {Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789').map((key) => (
+                <option key={key}>{key}</option>
+              ))}
+            </select>
+          </label>
           {specialGroups.map(([name, keys]) => (
             <div className="shortcut-special-group" key={name}>
               <small>{name}</small>

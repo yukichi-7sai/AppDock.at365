@@ -128,7 +128,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                       </button>
                       {statusError?.(row) && (
                         <button className="text-button" onClick={onRetry}>
-                          登録を再試行
+                          入力を再試行
                         </button>
                       )}
                       <BindingActions

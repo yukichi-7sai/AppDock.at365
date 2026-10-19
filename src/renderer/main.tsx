@@ -317,10 +317,7 @@ function App() {
       )
         return;
       const shortcut = shortcutFromEvent(e);
-      if (
-        snapshot?.globalHotKeys.some((status) => status.registered && status.shortcut === shortcut)
-      )
-        return;
+      if (shortcut && window.dock.ownsGlobalShortcut(shortcut)) return;
       if (
         !e.ctrlKey &&
         !e.altKey &&

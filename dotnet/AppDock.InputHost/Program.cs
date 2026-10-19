@@ -26,24 +26,31 @@ internal static class Program
         var output = Console.Out; Console.SetOut(Console.Error);
         if (args.SequenceEqual(new[] { "--notification-state" })) return NotificationState(output).GetAwaiter().GetResult();
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        using var engine = new GestureEngine(app.Dispatcher);
+        using var capture = new InputCaptureThread(app.Dispatcher);
         _ = Task.Run(async () => {
             await using var peer = new JsonRpcConnection(Console.In, output);
             using var inputSender = new InputSender();
-            engine.Invoke = p => peer.RequestAsync("gestures.invoke", p, peer.Lifetime);
-            engine.Cancel = id => { _ = peer.NotifyAsync("gestures.cancel", new { session = id }); };
+            await capture.BindAsync(p => peer.RequestAsync("gestures.invoke", p, peer.Lifetime),
+                id => { _ = peer.NotifyAsync("gestures.cancel", new { session = id }); });
+            var pumping = capture.PumpAsync((method, p) => peer.NotifyAsync(method, p), peer.Lifetime);
             try {
                 await peer.ReadAsync(async (method, p) => {
                     if (method == "input.cancel") { inputSender.Cancel(p.GetProperty("id").GetString()!); return null; }
                     if (method is "input.sendKeys" or "input.appCommand") return await inputSender.ExecuteAsync(method, p, peer.Lifetime);
-                    if (method == "gestures.valid") return await app.Dispatcher.InvokeAsync(() => engine.Valid(p.GetProperty("session").GetString()!,p.GetProperty("window").GetString()!));
+                    if (method == "gestures.valid") return await capture.ValidAsync(p.GetProperty("session").GetString()!,p.GetProperty("window").GetString()!);
+                    if (method == "capture.sync") {
+                        var configuration = p.Deserialize<CaptureConfiguration>(JsonRpcConnection.Json) ?? throw new ArgumentException("Missing capture configuration.");
+                        return await capture.ConfigureAsync(configuration);
+                    }
+                    if (method == "capture.activate") return await capture.ActivateAsync(p.GetProperty("pressId").GetInt64(), p.GetProperty("window").GetString()!);
+                    if (method == "capture.activateProcess") return await capture.ActivateProcessAsync(p.GetProperty("pressId").GetInt64(), p.GetProperty("processId").GetUInt32());
                     if (method != "gestures.sync") throw new ArgumentException("Unknown input method.");
                     var config = p.Deserialize<Configuration>(JsonRpcConnection.Json) ?? throw new ArgumentException("Missing configuration.");
-                    await app.Dispatcher.InvokeAsync(() => engine.Configure(config));
+                    await capture.ConfigureGesturesAsync(config);
                     return null;
                 });
             } catch (Exception e) { Console.Error.WriteLine(e); }
-            finally { await app.Dispatcher.InvokeAsync(() => app.Shutdown()); }
+            finally { capture.Dispose(); await app.Dispatcher.InvokeAsync(() => app.Shutdown()); }
         });
         return app.Run();
     }

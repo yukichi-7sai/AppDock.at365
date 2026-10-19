@@ -6,6 +6,7 @@ const fs = require('node:fs'),
 const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const assert = require('node:assert/strict');
+const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `keybindings-${Date.now()}`);
 const fixture = path.join(profile, 'extensions', 'test.keys');
@@ -55,8 +56,9 @@ fs.writeFileSync(
   `exports.activate=async c=>{let calls=[];c.commands.register('test.keys.open','Open',()=>c.pages.open('main'));for(const x of ['a','b','c','d'])c.commands.register('test.keys.'+x,'Record '+x,async()=>{calls.push(x);await c.storage.set('calls'+String(calls.length).padStart(5,'0'),x);});};`,
 );
 fs.writeFileSync(path.join(fixture, 'index.html'), '<h1>Keys</h1><input aria-label="Text">');
-const webId = 'web.' + randomUUID(),
+const webId = 'fixture.web-settings.items.site',
   accountId = 'account.' + randomUUID();
+let webItem;
 const make = (id, command, scope, appletIds = [], key = 'Ctrl+F12') => ({
   id,
   command,
@@ -95,7 +97,23 @@ const until = async (fn, label) => {
   }
   throw Error(label);
 };
-let app, dock;
+let app, dock, target, targetPeer;
+async function nativeFocus(suffix) {
+  const handle = await app.evaluate(({ webContents, BrowserWindow }, suffix) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().endsWith(suffix));
+    const contains = (view) => view.webContents === wc || (view.children ?? []).some(contains);
+    const window = BrowserWindow.getAllWindows().find(
+      (w) => w.webContents === wc || contains(w.contentView),
+    );
+    window.show();
+    return window.getNativeWindowHandle().readBigUInt64LE().toString();
+  }, suffix);
+  await targetPeer.request('focusWindow', { window: handle });
+  await until(
+    async () => (await targetPeer.request('snapshot')).foreground === handle,
+    'native Window foreground',
+  );
+}
 const checks = [];
 const save = async (rows) =>
   dock.evaluate(async (keybindings) => {
@@ -103,8 +121,9 @@ const save = async (rows) =>
     s.settings.value.keybindings = keybindings;
     await window.dock.saveSettings(s.settings.value, s.settings.revision);
   }, rows);
-const send = async (suffix, key = 'F12', modifiers = ['control']) =>
-  app.evaluate(
+const send = async (suffix, key = 'F12', modifiers = ['control']) => {
+  await nativeFocus(suffix);
+  return app.evaluate(
     async ({ webContents, BrowserWindow }, { suffix, key, modifiers }) => {
       const wc = webContents.getAllWebContents().find((w) => w.getURL().endsWith(suffix));
       if (!wc) throw Error('Missing ' + suffix);
@@ -122,6 +141,7 @@ const send = async (suffix, key = 'F12', modifiers = ['control']) =>
     },
     { suffix, key, modifiers },
   );
+};
 const sendGlobal = () =>
   new Promise((resolve, reject) => {
     const child = spawn(
@@ -160,22 +180,28 @@ const expectCalls = async (before, expected) => {
 (async () => {
   try {
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
-    settings.webApplets = {
-      accounts: [{ id: accountId, name: 'Test' }],
-      items: [
-        {
-          id: webId,
-          name: 'Webキー検証',
-          url: `http://127.0.0.1:${server.address().port}/`,
-          accountId,
-          enabled: true,
-          display: 'page',
-          navigation: 'none',
-          allowedOrigins: [],
-          icon: '',
-        },
-      ],
+    webItem = {
+      id: 'site',
+      name: 'Webキー検証',
+      url: `http://127.0.0.1:${server.address().port}/`,
+      accountId,
+      enabled: true,
+      display: 'page',
+      navigation: 'none',
+      allowedOrigins: [],
+      icon: '',
     };
+    const webOwner = require('./settings-web-fixture.cjs').installWebSettings(
+      profile,
+      settings,
+      [webItem],
+      [{ id: accountId, name: 'Test' }],
+    );
+    settings.extensions[webOwner].enabled = true;
+    fs.writeFileSync(
+      path.join(profile, 'extensions', webOwner, 'index.cjs'),
+      'exports.activate=async()=>{};',
+    );
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     app = await electron.launch({
       executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
@@ -183,6 +209,16 @@ const expectCalls = async (before, expected) => {
       timeout: 30000,
     });
     dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
+    target = spawn(
+      path.join(
+        root,
+        'tests/fixtures/dotnet/AppDock.InputTarget/bin/Release/net10.0-windows/AppDock.InputTarget.exe',
+      ),
+      [],
+      { windowsHide: false, stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    target.stderr.resume();
+    targetPeer = new JsonLinePeer(target.stdout, target.stdin, async () => {});
     await dock.waitForFunction(() => !!window.dock);
     await until(
       async () =>
@@ -211,6 +247,8 @@ const expectCalls = async (before, expected) => {
       w?.focus();
     });
     await new Promise((r) => setTimeout(r, 300));
+    await nativeFocus('appdock://host/index.html');
+    await new Promise((r) => setTimeout(r, 100));
     const globalBefore = calls().length;
     await sendGlobal();
     await expectCalls(globalBefore, ['d', 'a']);
@@ -253,13 +291,13 @@ const expectCalls = async (before, expected) => {
         app
           .context()
           .pages()
-          .find((p) => p.url() === settings.webApplets.items[0].url),
+          .find((p) => p.url() === webItem.url),
       'Web page',
     );
     await new Promise((r) => setTimeout(r, 500));
     await save([...settings.keybindings, make('owner', 'test.keys.d', 'owner')]);
     before = calls().length;
-    await send(settings.webApplets.items[0].url);
+    await send(webItem.url);
     await expectCalls(before, ['a', 'b', 'c']);
     await save(settings.keybindings);
     checks.push('owner scope runs only on the command provider page, not another Applet');
@@ -267,18 +305,20 @@ const expectCalls = async (before, expected) => {
       'WebApplet supports cross-Applet commands, multi-target conditions, captured context',
     );
     await remote.locator('#text').fill('入力保持');
-    await send(settings.webApplets.items[0].url, 'A', []);
+    await send(webItem.url, 'A', []);
     assert.equal(await remote.locator('#text').inputValue(), '入力保持'); // sendInputEvent keyDown is not a char event
     await remote.locator('#text').press('b');
     assert.equal(await remote.locator('#text').inputValue(), '入力保持b');
     await dock.evaluate(async (id) => {
       const s = await window.dock.snapshot();
-      s.settings.value.webApplets.items.find((i) => i.id === id).display = 'window';
+      s.settings.value.extensions['fixture.web-settings'].settings.items.find(
+        (i) => i.id === 'site',
+      ).display = 'window';
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
       await window.dock.executeCommand(id + '.open');
     }, webId);
     before = calls().length;
-    await send(settings.webApplets.items[0].url);
+    await send(webItem.url);
     await expectCalls(before, ['a', 'b', 'c']);
     checks.push('standalone page retains context and input');
     await app.evaluate(({ app }) =>
@@ -303,6 +343,10 @@ const expectCalls = async (before, expected) => {
           .find((p) => p.url().endsWith('/web/index.html')),
       'Gmail UI',
     );
+    await gmailUi.evaluate(async () => {
+      const state = await window.webAccounts.snapshot();
+      if (!state.accounts.length) await window.webAccounts.add();
+    });
     const gmail = await until(
       () =>
         app
@@ -396,7 +440,7 @@ const expectCalls = async (before, expected) => {
     ]);
     await dock.keyboard.press('Escape');
     await openEdit();
-    await editDialog.getByRole('switch').click();
+    await editDialog.getByRole('switch', { name: 'この割り当てを有効にする' }).click();
     await applyEdit();
     await settleSettings(dock);
     await until(
@@ -509,6 +553,8 @@ const expectCalls = async (before, expected) => {
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify({ checks }, null, 2));
     console.log(JSON.stringify({ profile, checks }, null, 2));
   } finally {
+    targetPeer?.close();
+    target?.stdin.end();
     if (app) await app.close();
     server.close();
   }

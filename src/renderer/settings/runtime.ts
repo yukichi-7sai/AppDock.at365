@@ -206,6 +206,21 @@ export class SettingsViewClient {
       cancelUpdates: () => invoke('cancelUpdates'),
       openReleases: (id) => invoke('openReleases', [id]),
       setShortcutRecording: (value) => invoke('setShortcutRecording', [value]),
+      setShortcutCapture: (value) => invoke('setShortcutCapture', [value]),
+      onShortcutCaptured: (callback) => {
+        let sequence = 0;
+        const listener = () => {
+          const event = this.model?.content.auxiliary.shortcutCapture;
+          if (event && event.sequence > sequence) {
+            sequence = event.sequence;
+            callback(event);
+          }
+        };
+        this.listeners.add(listener);
+        return () => {
+          this.listeners.delete(listener);
+        };
+      },
       retryGlobalHotKeys: () => invoke('retryGlobalHotKeys'),
       openCommandPalette: (request) => invoke('openCommandPalette', [request]),
       cancelCommandPalette: (id) => invoke('cancelCommandPalette', [id]),
