@@ -188,13 +188,28 @@ async function colorGeometry() {
     const button = group.querySelector('button'),
       children = group.querySelector('.ribbon-children');
     const rect = button.getBoundingClientRect();
+    const bar = getComputedStyle(button, ':after');
+    const childRect = children?.getBoundingClientRect();
+    const bridge = children && getComputedStyle(children, ':before');
     return {
       shadow: getComputedStyle(button).boxShadow,
+      bar: {
+        color: bar.backgroundColor,
+        width: parseFloat(bar.width),
+        height: parseFloat(bar.height),
+        left: rect.left + parseFloat(bar.left),
+        top: rect.top + parseFloat(bar.top),
+      },
       left: rect.left,
       width: rect.width,
+      height: rect.height,
+      bottom: rect.bottom,
       line: children && getComputedStyle(children).borderLeftColor,
-      lineLeft: children && children.getBoundingClientRect().left,
-      bridge: children && getComputedStyle(children, ':before').backgroundColor,
+      lineLeft: childRect?.left,
+      bridge: bridge?.backgroundColor,
+      bridgeTop: childRect && childRect.top + parseFloat(bridge.top),
+      bridgeBottom: childRect && childRect.top + parseFloat(bridge.top) + parseFloat(bridge.height),
+      lineTop: childRect?.top,
     };
   });
 }
@@ -204,11 +219,44 @@ async function colorGeometry() {
     await button('group:colored').click();
     await button('home').waitFor();
     const initial = await colorGeometry();
-    assert(initial.shadow.includes('210, 73, 161'));
+    assert.equal(initial.shadow, 'none');
+    assert.equal(initial.bar.color, 'rgb(210, 73, 161)');
+    assert.equal(initial.bar.width, 2);
+    assert.equal(initial.bar.height, initial.height);
+    assert.equal(initial.bar.left, initial.left);
     assert.equal(initial.line, 'rgb(210, 73, 161)');
     assert.equal(initial.bridge, initial.line);
+    assert.equal(initial.bar.color, initial.line);
+    assert(Math.abs(initial.bridgeTop - initial.bottom) < 1);
+    assert(Math.abs(initial.bridgeBottom - initial.lineTop) < 1);
     assert(Math.abs(initial.lineLeft - initial.left) < 1);
     await rail.screenshot({ path: path.join(profile, 'colored-expanded.png') });
+    await button('group:colored').click();
+    await button('home').waitFor({ state: 'hidden' });
+    const collapsed = await colorGeometry();
+    assert.deepEqual(collapsed.bar, initial.bar);
+    assert.equal(collapsed.shadow, 'none');
+    await rail.screenshot({ path: path.join(profile, 'colored-collapsed.png') });
+    for (const expansion of ['temporary', 'persistent']) {
+      await host.evaluate(async (expansion) => {
+        const s = await window.dock.snapshot();
+        s.settings.value.ribbon.groups[0].expansion = expansion;
+        await window.dock.saveSettings(s.settings.value, s.settings.revision);
+      }, expansion);
+      await until(
+        async () =>
+          (await button('group:colored').getAttribute('aria-haspopup')) ===
+          (expansion === 'temporary' ? 'dialog' : null),
+        expansion + ' group rendered',
+      );
+      const appearance = await colorGeometry();
+      assert.deepEqual(appearance.bar, initial.bar);
+      assert.equal(appearance.shadow, 'none');
+      if (expansion === 'temporary')
+        await rail.screenshot({ path: path.join(profile, 'colored-temporary.png') });
+    }
+    await button('group:colored').click();
+    await button('home').waitFor();
     const page = await openRibbonSettings();
     await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
     await page
@@ -335,8 +383,10 @@ async function colorGeometry() {
       }, theme);
       await until(
         async () =>
-          (await rail.evaluate(() => window.appdockShell.get())).dark === (theme === 'dark'),
-        'theme applied',
+          (await rail.locator('html').getAttribute('data-theme')) === theme &&
+          (await rail.locator('.activity-rail').evaluate((el) => getComputedStyle(el).backgroundColor)) ===
+            (theme === 'dark' ? 'rgb(12, 13, 17)' : 'rgb(237, 240, 244)'),
+        'ribbon theme rendered',
       );
       await rail.screenshot({ path: path.join(profile, `group-${theme}.png`) });
       await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
@@ -418,10 +468,12 @@ async function colorGeometry() {
     await saved((r) => r.groups[0].color === null);
     await until(async () => (await colorGeometry()).line === 'rgba(0, 0, 0, 0)', 'no color');
     const none = await colorGeometry();
+    assert.equal(none.bar.color, 'rgba(0, 0, 0, 0)');
+    assert.equal(none.shadow, 'none');
     assert.equal(none.width, initial.width);
     assert.equal(none.left, initial.left);
     checks.push(
-      'Same-color frame/bridge/line, theme rendering, invalid HEX and cancellation, no-color without layout movement',
+      'Left-only full-height color bar in expanded/collapsed persistent and temporary groups; continuous same-color bridge/child line; theme rendering, invalid HEX and cancellation, no-color without layout movement',
     );
     await page.getByRole('button', { name: 'セパレーター 1を編集', exact: true }).click();
     await page.getByLabel('名前', { exact: true }).fill('Work separator');

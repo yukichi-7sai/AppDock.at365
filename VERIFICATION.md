@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-20: リボン左バーのコミット・リリース前確認（0.68.1）
+
+- 利用者が見た目を確認し、commit・push・Releaseを依頼。変更した5ファイルとリリースノートを対象とする。main/origin/main、GitHub/AQUA両mainの開始先端`d5a545d`、実効作者/コミッターを確認。別作業の変更なし。
+- 実装時の入力582件・完全ログ・固定EXEとGUI/smokeのhashを照合し、型検査・変更部分のGUI4群を再利用する。標準`dev.bat test`を追加実行して **678/678、fail/skip 0** 成功。制限内のnative fixtureビルド失敗は保持し、同じコマンドを通常ユーザー環境で成功させた。製品追加修正なし。
+- [コミット検証資料](.artifacts/commit-validation-ribbon-bar-20261020/)へ入力/ログhash・再利用根拠・stage/commit tree・両送信先の確認を記録する。6AppletはcleanかつGitHub mainと一致し、現行版はすべて未公開。既存手順で本体の3配布物と同梱版の個別Releaseを準備し、公開後検証と最新3件の整理まで行う。正式な公開結果はrelease planと同フォルダーの最終結果を参照する。
+
+## 2026-10-20: Default Shellのグループ色を左バーへ変更（0.68.1）
+
+- main `d5a545d`・origin/main追跡・cleanで開始し、通常ユーザー環境の`pull --ff-only`で最新を確認した。Default Shellの色付きグループボタンの枠を、左端の全高2pxバーへ変更。持続的に開いた子の既存の縦線・接続部分へ同じ位置と色でつなぐ。閉じた状態と一時的グループにも適用し、選択背景・フォーカス表示・寸法・保存済み設定を保持する。設定項目・保存ファイル・公開APIの変更を伴わない表示修正なので **0.68.0→0.68.1** のパッチ更新。
+- [発行前レビューと再確認](.artifacts/ribbon-group-bar-20261020/review.md)で発行を妨げる指摘なし。型検査、本体/Default Shell build、通常publish（native含む）が成功。関連3ファイル（ribbon-customization、ribbon-groups、shell-boundaries）の回帰は **26/26、fail/skip 0**。
+- 最終固定EXEの隔離GUI **4群**が成功。展開/折りたたみ・一時型の左バー、枠の不在、親の全高と子の接続位置、色なしでの透明化と位置不変、明暗テーマ、色変更と再起動後の保持を確認した。[GUI結果](.artifacts/ribbon-customization-ui-1792441094706/result.json)、[展開時](.artifacts/ribbon-customization-ui-1792441094706/colored-expanded.png)、[一時型](.artifacts/ribbon-customization-ui-1792441094706/colored-temporary.png)、[ダーク](.artifacts/ribbon-customization-ui-1792441094706/group-dark.png)を目視確認。想定外のページエラーなし。最終EXEの隔離smokeも起動・設定/素材保存・正常終了に成功した。
+- 初回GUIのdark画像に既存試験の描画待ち不足を見つけ、モデル更新待ちからDOMテーマと背景の実計算色の待ちへ修正した。同じEXEでGUI全体を再実行し、最終画像で確認した。製品・発行物は変更せず、関連26件・型/buildは再実行不要。制限内の依存検査のネットワーク待機は今回のpnpmだけ停止して同じコマンドを通常実行し、GUI/smokeのspawn UNKNOWNも同じ試験の通常実行で成功。失敗・途中の証跡も保持し、固定依存・検査方針は変更していない。
+- `A:\40.ARTIFACT\AppDock.at365`へ発行。EXEは **0.68.1 / 168,919,314 bytes / SHA256 5c5ba8c65e1f24422b1bb6a7229bd4787f3a0f8ab4dcce6913a83da679c24478**。feed・GUIの隔離コピー・実行中の本体/Default Shellの版を照合。[検証資料](.artifacts/ribbon-group-bar-20261020/validation.json)にコマンド別の完全ログ/hash、入力582件・生成物202件の前後一致、GUI待ち変更1ファイルの影響判定を記録した。以後の差分は検証文書だけ。
+- 試験アプリの終了を確認。今回の成功分は実行方式ごとの直近3回内で、失敗/描画待ち調査・過去の再利用資料も保持し削除0件。[整理記録](.artifacts/ribbon-group-bar-20261020/cleanup.json)。全標準回帰・他Applet再発行・物理キー/別PC/混在DPIは未実施。commit・push・Release・実利用先deployなし。
+
 ## 2026-10-20: ヒント表示のコミット前確認（0.68.0）
 
 - 利用者の動作確認とcommit・pushの依頼を受け、ヒント基盤・表示切替・追加整理と文書/試験の43ファイルを対象とした。未コミット変更を保持してfetchし、GitHubとAQUAのmainが開始時HEAD `47ae4aa`と一致することを確認した。

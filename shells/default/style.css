@@ -139,14 +139,18 @@ button:disabled {
   padding: 2px 0;
   position: relative;
 }
-.ribbon-group > button {
-  box-shadow: inset 0 0 0 2px var(--ribbon-group-color, transparent);
+.ribbon-group > button:after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ribbon-group-color, transparent);
+  pointer-events: none;
 }
 .ribbon-group > button.active:before {
   display: none;
-}
-.ribbon-group[data-colored='true'][data-expanded='true'][data-expansion='persistent'] > button {
-  border-bottom-left-radius: 0;
 }
 .ribbon-children:before {
   content: '';
