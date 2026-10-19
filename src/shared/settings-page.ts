@@ -1,4 +1,4 @@
-import type { ExtensionSnapshot, GlobalHotKeyStatus, HostSnapshot, Settings } from './contracts';
+import type { ExtensionSnapshot, GlobalHotKeyStatus, HostSnapshot } from './contracts';
 import type { UiCommand } from './commands';
 import type { SettingsPageDefinition, SettingsItem } from './settings-catalog';
 import type { SettingsEdit } from './settings-editing';

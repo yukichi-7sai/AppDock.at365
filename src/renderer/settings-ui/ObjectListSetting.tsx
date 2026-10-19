@@ -1,4 +1,4 @@
-import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
+import { SettingsInput, numberInput } from './SettingsInput';
 import { useSettingsControls } from './api';
 import { useState } from 'react';
 import { SettingsField } from './SettingsSections';

@@ -5,7 +5,6 @@ import { appletSettingsPageId } from '../shared/settings-catalog';
 
 import { AppletShortcutOverview } from './settings-ui/AppletShortcutOverview';
 import type { SettingsEditor } from './useSettingsEditor';
-import type { WebProfile } from '../shared/web-content';
 import { useLayoutEffect, useRef } from 'react';
 
 /** Separate detail tabs edit the same host settings session. */
@@ -16,8 +15,6 @@ export function AppletSettingsPanel({
   commands,
   editor,
   tab,
-  onWebAccounts,
-  webAccounts,
 }: {
   ready: boolean;
   applet: ExtensionSnapshot;
@@ -25,8 +22,6 @@ export function AppletSettingsPanel({
   commands: UiCommand[];
   editor: SettingsEditor;
   tab: 'settings' | 'shortcuts';
-  onWebAccounts(): void;
-  webAccounts: WebProfile[];
 }) {
   const { value: settings, edit } = editor;
   const panel = useRef<HTMLDivElement>(null);

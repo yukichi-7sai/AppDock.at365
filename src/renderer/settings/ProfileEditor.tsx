@@ -1,6 +1,6 @@
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { SettingsInput, SettingsTextarea, numberInput } from '../settings-ui/SettingsInput';
+import { SettingsInput } from '../settings-ui/SettingsInput';
 import { useEffect, useRef, useState } from 'react';
 export function ProfileEditor({
   name,

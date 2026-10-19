@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import type { TtsVoice } from '../../shared/tts';
 import { resolveNotificationSpeech } from '../../shared/notification-types';

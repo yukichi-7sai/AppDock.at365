@@ -2,7 +2,7 @@ import { McpClientSettingsForm } from './McpClientSettings';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
-import type { Settings, ExtensionSnapshot, HostSnapshot } from '../../shared/contracts';
+import type { Settings } from '../../shared/contracts';
 import type { SettingsPageModel } from '../../shared/settings-page';
 import { defaultShellId, shellRegions, shellView } from '../../shared/shell';
 import { useSettingsControls } from '../settings-ui/api';

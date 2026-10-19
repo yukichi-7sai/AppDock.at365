@@ -1,4 +1,4 @@
-import { SettingsInput, SettingsTextarea, numberInput } from '../settings-ui/SettingsInput';
+import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { useState } from 'react';
 import {
   gestureTypes,

@@ -1,6 +1,7 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const { launch, until } = require('./page-test-host.cjs');
 const root = path.resolve(__dirname, '..');
+const expectedHostVersion = require('../package.json').version;
 const profile = path.join(root, '.artifacts', 'dotnet-pages-ui-' + Date.now());
 const portable = process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -99,7 +100,7 @@ let instance;
       return { version: app.getVersion(), defaultShellVersion: JSON.parse(bytes).version,
         shellManifestSha256: read('crypto').createHash('sha256').update(bytes).digest('hex') };
     });
-    assert.equal(runtime.version, '0.66.1'); assert.equal(runtime.defaultShellVersion, runtime.version);
+    assert.equal(runtime.version, expectedHostVersion); assert.equal(runtime.defaultShellVersion, runtime.version);
     await instance.close(); instance = undefined;
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify({ ok: true, portable, hostSha256, runtime, checks }, null, 2));
     console.log(JSON.stringify({ ok: true, profile, checks }));

@@ -61,7 +61,7 @@ export function PanelImageCard({
         <dialog
           ref={dialog}
           className="image-preview-dialog"
-          aria-label="壁紙のプレビュー"
+          aria-label="画像のプレビュー"
           onClose={() => setPreview(false)}
           onClick={(event) => {
             if (event.target === event.currentTarget) dialog.current?.close();

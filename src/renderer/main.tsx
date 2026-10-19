@@ -3,20 +3,13 @@ import { flushSettingsPageInputs } from './settings-input-flush';
 import { ShellPageSlot } from './ShellPageSlot';
 import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
-import { Icon, type IconName } from './Icon';
+import { Icon } from './Icon';
 import { Toggle } from './settings-ui/Toggle';
 import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
 import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type {
-  DockApi,
-  HostSnapshot,
-  ExtensionSnapshot,
-  Settings,
-  SettingsSnapshot,
-  GlobalHotKeyStatus,
-} from '../shared/contracts';
+import type { DockApi, HostSnapshot, ExtensionSnapshot } from '../shared/contracts';
 import './style.css';
 import { hostCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
 import { appletManagementCommands } from '../shared/applet-management';
@@ -24,11 +17,10 @@ import { AppletSettingsPanel } from './AppletSettingsPanel';
 import { AppletIndex } from './AppletIndex';
 import { orderApplets } from '../shared/applet-order';
 import { SettingsToolbar, SettingsMessages } from './SettingsActions';
-import { useSettingsEditor, type SettingsEditor } from './useSettingsEditor';
+import { useSettingsEditor } from './useSettingsEditor';
 import { VersionCheck } from './settings-ui/VersionCheck';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
-import { defaultShellId } from '../shared/shell';
 
 declare global {
   interface Window {
@@ -38,12 +30,6 @@ declare global {
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | 'notifications' | `page:${string}`;
 type AppletDetailView = 'description' | 'settings' | 'shortcuts' | 'logs';
 
-const labels: Record<string, string> = {
-  home: 'ホーム',
-  extensions: 'Applet',
-  settings: '設定',
-  logs: 'ログ',
-};
 const states = {
   waiting: '開始待ち',
   running: '実行中',
@@ -119,16 +105,11 @@ function App() {
   const openingRestoredPage = useRef(false);
   const [selected, setSelected] = useRestartView<string>('selected', '');
   const [error, setError] = useState('');
-  const openPalette = () =>
-    window.dock
-      .openCommandPalette({ requestId: crypto.randomUUID(), mode: 'execute' })
-      .catch((e) => setError(String(e)));
   const [busy, setBusy] = useState(false);
   const [profileRequest, setProfileRequest] = useState(0);
   const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const [generalRequest, setGeneralRequest] = useState(0);
-  const [webAccountsRequest, setWebAccountsRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const update = () => {
@@ -195,9 +176,6 @@ function App() {
   useEffect(() => {
     if (generalRequest) editor.selectPage('general');
   }, [generalRequest]);
-  useEffect(() => {
-    if (webAccountsRequest) editor.selectPage('web-accounts');
-  }, [webAccountsRequest]);
   useEffect(
     () =>
       window.dock.onFlushSettingsInputs((id) => {
@@ -239,7 +217,7 @@ function App() {
   );
   useEffect(
     () =>
-      window.dock.onAppletPage((key) => {
+      window.dock.onAppletPage(() => {
         // Main already owns navigation. Re-selecting the route can cancel its pending
         // input drain; the same route still needs fresh bounds after a Window move.
         setPagePlacementRevision((revision) => revision + 1);
@@ -414,10 +392,6 @@ function App() {
       setPage('settings');
       return;
     }
-    if (id === 'appdock.commands.search') {
-      await openPalette();
-      return;
-    }
     if (id === 'appdock.settings.open') {
       setPage('settings');
       return;
@@ -590,11 +564,6 @@ function App() {
                             applet={selectedApplet}
                             editor={editor}
                             tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
-                            webAccounts={snapshot.webAccounts}
-                            onWebAccounts={() => {
-                              setPage('settings');
-                              setWebAccountsRequest((n) => n + 1);
-                            }}
                           />
                         </>
                       ) : undefined
@@ -657,14 +626,12 @@ function ExtensionDetail({
   onView,
   settingsPanel,
   logsPanel,
-  builtin = false,
 }: {
   extension?: ExtensionSnapshot;
   view: AppletDetailView;
   onView(view: AppletDetailView): boolean;
   settingsPanel?: React.ReactNode;
   logsPanel?: React.ReactNode;
-  builtin?: boolean;
   busy: boolean;
   updateDisabled: boolean;
   run: Run;
@@ -684,28 +651,20 @@ function ExtensionDetail({
         <div>
           <h2>{e.displayName}</h2>
           <p>
-            {builtin ? (
-              '組み込み'
-            ) : (
-              <>
-                v{e.version} <span className="divider">/</span>{' '}
-                {!!e.collection
-                  ? 'Appletページ'
-                  : e.runtime === 'node'
-                    ? 'TypeScript · Node.js'
-                    : 'C# · .NET 10'}
-              </>
-            )}
+            v{e.version} <span className="divider">/</span>{' '}
+            {!!e.collection
+              ? 'Appletページ'
+              : e.runtime === 'node'
+                ? 'TypeScript · Node.js'
+                : 'C# · .NET 10'}
           </p>
         </div>
-        {!builtin && (
-          <Toggle
-            checked={e.enabled}
-            label={`${e.displayName}を有効にする`}
-            disabled={busy}
-            onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
-          />
-        )}
+        <Toggle
+          checked={e.enabled}
+          label={`${e.displayName}を有効にする`}
+          disabled={busy}
+          onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
+        />
       </div>
       <div className="detail-tabs" role="tablist" aria-label="Applet詳細の切り替え">
         {(

@@ -1,5 +1,5 @@
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { SettingsInput, SettingsTextarea, numberInput } from '../settings-ui/SettingsInput';
+import { SettingsInput } from '../settings-ui/SettingsInput';
 import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import type { RemotePageDefinition as WebApplet, WebProfile } from '../../shared/web-content';

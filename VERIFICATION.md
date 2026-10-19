@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-20: 未使用importのみの追加整理とコミット前確認（0.66.2）
+
+- 前項の未使用指摘23件から、8ファイルのimport 13個だけを削除した。SettingsInput系の未使用部品、NotificationSettingsのReact既定import、SettingsFormと共通settings-pageの未使用型が対象。未使用の変数・引数10件と、その初期化処理・Hookは変更していない。main.tsxの整理分も同じ未公開変更としてコミット対象に含める。
+- 型検査・本体/Default Shell build・未使用チェックが成功し、追加対象のimport指摘は0件。前回検証の672入力が編集前に一致し、import編集後も生成された **202ファイルすべてのSHA256が前後一致**した。前回のnative生成物602件、fixture 25件、固定EXE/feedのhashも照合した。[差分と生成物の照合](.artifacts/commit-validation-main-cleanup-20261020/import-comparison.json)。
+- コミット対象と影響先をレビューして指摘なし。標準95ファイル **674/674、fail/skip 0** は、入力・依存・生成物と完全ログを確認した9ファイル62件の再利用と、未実行86ファイル612件の今回実行を合わせた結果。再利用は試験単位に判定し、未確認の試験を成功扱いしていない。
+- 生成物の完全一致と固定EXEの同一hashにより、前回のソースGUI17群・固定EXEページ4群・smokeを再利用した。製品内容と配布物は不変のため、同じ整理変更の0.66.2を維持し、再発行は不要。既存EXEは **168902643 bytes / SHA256 3c738ff1958b286646e7debdf37575dd956ceaea01986183a4d44bbf760cf13c**、更新情報・同梱Default Shellとの一致も維持している。
+- 証跡は[validation.json](.artifacts/commit-validation-main-cleanup-20261020/validation.json)、[レビュー](.artifacts/commit-validation-main-cleanup-20261020/review.md)、入力/生成物hash・追加回帰の完全ログ。stage/commit tree・名義・GitHub/AQUA両mainの照合は同フォルダーのstaged.json・commit.json・push.jsonへ記録する。新しいGUI profileは作成せず、既存の再利用資料を保持。削除0件。Release・実利用先deployは行わない。
+
+## 2026-10-20: renderer mainの未使用処理整理（0.66.2）
+
+- mainの`c06a0d91d48bfa6834bd0183a937fc4346b383f5`（0.66.1、開始時clean）を基準に、追跡先のfast-forward取得で更新不要を確認。`main.tsx`の未使用import 6件・labels定数・Appletページイベントの未使用引数を削除し、呼ばれないWebアカウント導線のstate/effect/callbackと子の未使用props 2件、常にfalseだったbuiltin分岐、main側で処理済みのコマンド検索分岐を整理した。共通画像ダイアログの名称を「画像のプレビュー」へ変更した。
+- TypeScript 7.0.2のCLIに`noUnusedLocals`と`noUnusedParameters`を指定。mainと関連2部品・Default Shell mainを対象に、指摘は **10件→0件**。他ファイルの既存23件は前後で一致し、変更対象へ広げていない。通常の型検査と本体/Default Shell buildも成功した。検査用初回スクリプトの旧Compiler API想定はCLI使用へ修正し、初回ログを保持した。
+- 関連9ファイルの回帰は **62/62、fail/skip 0**。60件の成功と、試験用PageProbe/ExtensionHostの再生成後に再確認した.NETページ2件を合わせた結果。Applet詳細・設定・ショートカット・ログ・検索・即時保存・外部更新・両テーマ/狭幅のソースGUIは **17群成功**。初回GUIの`Unknown input method`は古いInputHost生成物との不一致で、現行の.NETホスト再生成後に同じ試験が成功した。設定置換/ビルド/起動の制限環境エラー、fixture欠落・古いSDKの失敗ログと、同じ処理の通常ユーザー実行結果を分けて保存した。
+- 発行前レビューでは、0.66.1で追加されたページ配置更新・説明への復帰、再起動復元、startupReadyとrouteの一致、入力flush、設定の共通セッション、実際に使うWebツールバーと共通パネルの継続を確認し、指摘なし。設定項目・保存ファイル・公開API・SDK・依存版の変更はなく、パッチ版0.66.1→0.66.2とした。既存.NETページGUIのホスト版照合は固定値ではなくpackage.jsonを参照するよう更新した。[レビュー](.artifacts/main-cleanup-20261020/review.md)。
+- 既存publish.batが終了0。固定依存/供給網検査を維持し、本体だけを`A:\40.ARTIFACT\AppDock.at365`へ発行した。EXEは **168902643 bytes / SHA256 3c738ff1958b286646e7debdf37575dd956ceaea01986183a4d44bbf760cf13c**。EXE/file version・update.json・同梱Default Shellは0.66.2で一致。更新payloadのsize/hash、隔離コピー2個のhash、配置用4ファイルの保持を照合した。
+- 最終固定EXEのページGUI **4群**（DLL/native/Node、JSON/null、画像変更と回収、動的context、表示先往復と入力保持、自身の説明への復帰、Session分離）が成功。[固定EXE結果](.artifacts/dotnet-pages-ui-1792424254513/result.json)。隔離smokeも保存先・画像・トレイ・正常終了を含め成功した。[smoke結果](.artifacts/smoke-1792424269115/smoke-result.json)。全標準回帰・実アカウント・物理入力/混在DPI・他Appletの再発行は今回未実行。
+- 証跡は[validation.json](.artifacts/main-cleanup-20261020/validation.json)、672件の入力一覧、生成物/fixture・完全ログのhash、検査前後の診断一覧と各実行結果。今回のGUIは正常終了済み。今回の成功profileは各方式で1件ずつ保持し、既存の再利用指定・使用状況を確定できない旧資料と失敗ログは保持した。削除0件。製品変更は未コミットで、push・Release・実利用先deployは行っていない。
+
 ## 2026-10-19: ページ連携と壁紙履歴のコミット前確認（0.66.1 / 0.6.2）
 
 - 本体の.NET/Nodeページ連携・画像配信・表示先切替と、WallpaperSlideshowの独立履歴・長パスPNG保存・60%プレビューを対象にレビューした。本体29ファイル、Applet21ファイルに範囲を限定し、先行する設計・実装をまとめて扱う。

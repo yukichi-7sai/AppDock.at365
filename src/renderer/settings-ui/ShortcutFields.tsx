@@ -1,4 +1,4 @@
-import { SettingsInput, SettingsTextarea, numberInput } from './SettingsInput';
+import { SettingsInput } from './SettingsInput';
 import { useSettingsControls } from './api';
 import { useState } from 'react';
 import { shortcutFromEvent } from '../../shared/commands';
