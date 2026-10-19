@@ -4,6 +4,7 @@ import {
   validGroupId,
   validRibbonId,
   validSeparatorId,
+  validRibbonButtonId,
   defaultRibbon,
   type RibbonItem,
 } from './applet-pages';
@@ -34,10 +35,14 @@ export const ribbonVisible = (layout: RibbonLayout, id: string) =>
 export function ribbonPresentation(layout: RibbonLayout, item: RibbonItem) {
   const override = layout.itemOverrides?.[item.id];
   return {
-    title: item.group ? item.group.title || 'グループ' : override?.title || item.title,
+    title: item.group
+      ? item.group.title || 'グループ'
+      : item.kind === 'separator'
+        ? layout.separatorTitles?.[item.id] || item.title
+        : item.command?.title || override?.title || item.title,
     iconOnly: item.group
       ? !!item.group.iconOnly || !item.group.title
-      : (override?.iconOnly ?? item.id === 'profile'),
+      : (item.command?.iconOnly ?? override?.iconOnly ?? item.id === 'profile'),
   };
 }
 export const ribbonRoots = (layout: RibbonLayout, items: RibbonItem[]) =>
@@ -52,7 +57,7 @@ export function ribbonRootIds(layout: RibbonLayout, items: RibbonItem[]) {
   ];
 }
 export function ribbonRetainedIds(layout: RibbonLayout, items: RibbonItem[]) {
-  const known = new Set(items.map((i) => i.id));
+  const known = new Set([...items.map((i) => i.id), ...(layout.buttons ?? []).map((b) => b.id)]);
   return [
     ...new Set([
       ...layout.order,
@@ -82,6 +87,8 @@ export function editRibbon(
       'parentId',
       'beforeId',
       'iconOnly',
+      'color',
+      'commandId',
     ])
   )
     invalid();
@@ -99,6 +106,7 @@ export function editRibbon(
     if (
       !items.some((i) => i.id === id) &&
       !next.groups!.some((g) => g.id === id) &&
+      !(next.buttons ?? []).some((b) => b.id === id) &&
       !(retained && ribbonRetainedIds(next, items).includes(id as string))
     )
       throw new RibbonLayoutError('NOT_FOUND', '現在登録されているリボン項目ではありません。');
@@ -143,6 +151,7 @@ export function editRibbon(
       !exact(op.changes, ['title', 'iconOnly']) ||
       !Object.keys(op.changes).length ||
       validGroupId(op.id) ||
+      validRibbonButtonId(op.id) ||
       validSeparatorId(op.id)
     )
       invalid();
@@ -156,6 +165,7 @@ export function editRibbon(
       !exact(op, ['kind', 'id']) ||
       items.some((item) => item.id === op.id) ||
       validGroupId(op.id) ||
+      validRibbonButtonId(op.id) ||
       validSeparatorId(op.id)
     )
       invalid();
@@ -208,9 +218,19 @@ export function editRibbon(
     remove(op.id);
     next.separators = next.separators.filter((id) => id !== op.id);
     next.hidden = next.hidden.filter((id) => id !== op.id);
+    if (next.separatorTitles) delete next.separatorTitles[op.id];
+  } else if (op.kind === 'updateSeparator') {
+    if (
+      !exact(op, ['kind', 'id', 'changes']) ||
+      !exact(op.changes, ['title']) ||
+      typeof op.changes.title !== 'string' ||
+      !next.separators.includes(op.id)
+    )
+      invalid();
+    next.separatorTitles = { ...next.separatorTitles, [op.id]: op.changes.title };
   } else if (op.kind === 'addGroup') {
     if (
-      !exact(op, ['kind', 'id', 'title', 'icon', 'expansion', 'placement', 'iconOnly']) ||
+      !exact(op, ['kind', 'id', 'title', 'icon', 'expansion', 'placement', 'iconOnly', 'color']) ||
       !validGroupId(op.id) ||
       next.groups.some((g) => g.id === op.id)
     )
@@ -224,16 +244,55 @@ export function editRibbon(
       expansion: op.expansion,
       children: [],
       ...(op.iconOnly !== undefined ? { iconOnly: op.iconOnly } : {}),
+      ...(op.color !== undefined ? { color: op.color } : {}),
     });
     setPlacement(op.id, p);
   } else if (op.kind === 'updateGroup') {
     if (
       !exact(op, ['kind', 'id', 'changes']) ||
-      !exact(op.changes, ['title', 'icon', 'expansion', 'iconOnly']) ||
+      !exact(op.changes, ['title', 'icon', 'expansion', 'iconOnly', 'color']) ||
       !Object.keys(op.changes).length
     )
       invalid();
     Object.assign(group(op.id), op.changes);
+  } else if (op.kind === 'addButton') {
+    if (
+      !exact(op, ['kind', 'id', 'title', 'icon', 'commandId', 'iconOnly', 'placement']) ||
+      !validRibbonButtonId(op.id) ||
+      (next.buttons ?? []).some((b) => b.id === op.id)
+    )
+      invalid();
+    const p = placement(op.placement);
+    next.buttons = [
+      ...(next.buttons ?? []),
+      {
+        id: op.id,
+        title: op.title,
+        icon: op.icon,
+        commandId: op.commandId,
+        ...(op.iconOnly !== undefined ? { iconOnly: op.iconOnly } : {}),
+      },
+    ];
+    next.order = [...roots(), op.id];
+    setPlacement(op.id, p);
+  } else if (op.kind === 'updateButton') {
+    if (
+      !exact(op, ['kind', 'id', 'changes']) ||
+      !exact(op.changes, ['title', 'icon', 'commandId', 'iconOnly']) ||
+      !Object.keys(op.changes).length
+    )
+      invalid();
+    const button = next.buttons?.find((b) => b.id === op.id);
+    if (!button) throw new RibbonLayoutError('NOT_FOUND', '指定されたコマンドボタンがありません。');
+    Object.assign(button, op.changes);
+  } else if (op.kind === 'removeButton') {
+    if (!exact(op, ['kind', 'id']) || !next.buttons?.some((b) => b.id === op.id)) invalid();
+    remove(op.id);
+    next.buttons = (next.buttons ?? []).filter((b) => b.id !== op.id);
+    next.hidden = next.hidden.filter((id) => id !== op.id);
+  } else if (op.kind === 'setRightClickCommand') {
+    if (!exact(op, ['kind', 'commandId'])) invalid();
+    next.rightClickCommand = op.commandId;
   } else if (op.kind === 'moveItem') {
     if (
       !exact(op, ['kind', 'id', 'parentId', 'beforeId', 'placement']) ||
@@ -281,7 +340,12 @@ export function editRibbon(
     }
   } else if (op.kind === 'reset') {
     if (!exact(op, ['kind'])) invalid();
-    return defaultRibbon();
+    return {
+      ...defaultRibbon(),
+      ...(layout.rightClickCommand !== undefined
+        ? { rightClickCommand: layout.rightClickCommand }
+        : {}),
+    };
   } else invalid();
   // Keep names for configured Applet pages without pinning a live source's display name.
   // Reads and no-op edits do not write metadata; explicit removal only removes its target.

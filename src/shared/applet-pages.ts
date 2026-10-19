@@ -1,5 +1,12 @@
 import type { ExtensionManifest, ExtensionSnapshot, Settings } from './contracts';
-import { ribbonGroupIcons, type RibbonGroup, type RibbonItemOverride } from './ribbon';
+import { validCommandId } from './commands';
+import {
+  ribbonGroupIcons,
+  parseRibbonColor,
+  type RibbonGroup,
+  type RibbonItemOverride,
+  type RibbonCommandButton,
+} from './ribbon';
 
 export type PageDisplay = 'page' | 'window';
 export interface AppletPageDefinition {
@@ -14,8 +21,9 @@ export interface AppletPageDefinition {
 }
 export interface RibbonItem {
   iconImage?: string;
-  kind?: 'separator' | 'group';
+  kind?: 'separator' | 'group' | 'command';
   group?: RibbonGroup;
+  command?: RibbonCommandButton;
   id: string;
   title: string;
   icon: string;
@@ -41,7 +49,10 @@ export const validRibbonId = (id: unknown): id is string =>
   (builtinRibbon.some((item) => item.id === id) ||
     /^page:[a-z0-9][a-z0-9.-]{0,100}:[a-z0-9][a-z0-9.-]{0,79}$/.test(id) ||
     validSeparatorId(id) ||
+    validRibbonButtonId(id) ||
     validGroupId(id));
+export const validRibbonButtonId = (id: unknown): id is string =>
+  typeof id === 'string' && /^button:[a-z0-9][a-z0-9-]{0,79}$/.test(id);
 export const validGroupId = (id: unknown): id is string =>
   typeof id === 'string' && /^group:[a-z0-9][a-z0-9-]{0,79}$/.test(id);
 export const validSeparatorId = (id: unknown): id is string =>
@@ -53,6 +64,8 @@ export const defaultRibbon = () => ({
   separators: [] as string[],
   groups: [] as RibbonGroup[],
   itemOverrides: {} as Record<string, RibbonItemOverride>,
+  separatorTitles: {} as Record<string, string>,
+  buttons: [] as RibbonCommandButton[],
 });
 
 export function parseAppletPages(manifest: ExtensionManifest): AppletPageDefinition[] {
@@ -103,6 +116,7 @@ export function ribbonItems(
   extensions: ExtensionManifest[],
   separators: string[] = [],
   groups: RibbonGroup[] = [],
+  buttons: RibbonCommandButton[] = [],
 ): RibbonItem[] {
   const applets = extensions.flatMap((extension) =>
     (extension.pages ?? []).map((page) => ({
@@ -131,17 +145,26 @@ export function ribbonItems(
       kind: 'group',
       group,
     })),
+    ...buttons.map((command): RibbonItem => ({
+      id: command.id,
+      title: command.title,
+      icon: command.icon,
+      kind: 'command',
+      command,
+    })),
   ];
 }
 export function visibleRibbonItems(
   extensions: ExtensionSnapshot[],
   separators: string[] = [],
   groups: RibbonGroup[] = [],
+  buttons: RibbonCommandButton[] = [],
 ): RibbonItem[] {
   return ribbonItems(
     extensions.filter((extension) => extension.enabled),
     separators,
     groups,
+    buttons,
   );
 }
 export function orderRibbon(items: RibbonItem[], order: string[]): RibbonItem[] {
@@ -173,6 +196,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
         separators: rawRibbon.separators === undefined ? [] : rawRibbon.separators,
         groups: rawRibbon.groups === undefined ? [] : rawRibbon.groups,
         itemOverrides: rawRibbon.itemOverrides === undefined ? {} : rawRibbon.itemOverrides,
+        buttons: rawRibbon.buttons === undefined ? [] : rawRibbon.buttons,
       }
     : rawRibbon;
   if (
@@ -199,13 +223,44 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
   if (!Array.isArray(ribbon.groups) || ribbon.groups.length > 50)
     throw Error('リボングループは50件以下で指定してください。');
   const groups = ribbon.groups as RibbonGroup[];
+  if (!Array.isArray(ribbon.buttons) || ribbon.buttons.length > 100)
+    throw Error('コマンドボタンは100件以下で指定してください。');
+  const buttonIds = new Set<string>();
+  ribbon.buttons = (ribbon.buttons as RibbonCommandButton[]).map((button) => {
+    if (
+      !object(button) ||
+      Object.keys(button).some(
+        (k) => !['id', 'title', 'icon', 'commandId', 'iconOnly'].includes(k),
+      ) ||
+      !validRibbonButtonId(button.id) ||
+      buttonIds.has(button.id) ||
+      typeof button.title !== 'string' ||
+      !button.title.trim() ||
+      button.title.trim().length > 80 ||
+      /[\x00-\x1f\x7f]/.test(button.title) ||
+      !ribbonGroupIcons.includes(button.icon) ||
+      !validCommandId(button.commandId) ||
+      (button.iconOnly !== undefined && typeof button.iconOnly !== 'boolean')
+    )
+      throw Error('コマンドボタンのID・名前・アイコン・コマンドを確認してください。');
+    buttonIds.add(button.id);
+    return { ...button, title: button.title.trim() };
+  });
+  if (ribbon.rightClickCommand !== undefined && !validCommandId(ribbon.rightClickCommand))
+    throw Error('右クリックのコマンドIDを確認してください。');
+  const missingButton = (id: string) => validRibbonButtonId(id) && !buttonIds.has(id);
+  if (
+    ['order', 'hidden', 'bottom'].some((k) => (ribbon[k] as string[]).some(missingButton)) ||
+    groups.some((g) => object(g) && Array.isArray(g.children) && g.children.some(missingButton))
+  )
+    throw Error('コマンドボタンを使うにはribbon.buttonsへ登録してください。');
   const groupIds = new Set<string>();
   const children = new Set<string>();
   for (const g of groups) {
     if (
       !object(g) ||
       Object.keys(g).some(
-        (k) => !['id', 'title', 'icon', 'expansion', 'children', 'iconOnly'].includes(k),
+        (k) => !['id', 'title', 'icon', 'expansion', 'children', 'iconOnly', 'color'].includes(k),
       ) ||
       !validGroupId(g.id) ||
       groupIds.has(g.id) ||
@@ -242,7 +297,28 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
     order.filter((id) => !validGroupId(id)).length + children.size > 500
   )
     throw Error('グループの子は1つの所属先だけに置き、グループをトップレベルへ配置してください。');
-  ribbon.groups = groups.map((g) => ({ ...g, title: g.title.trim(), children: [...g.children] }));
+  ribbon.groups = groups.map((g) => ({
+    ...g,
+    title: g.title.trim(),
+    children: [...g.children],
+    ...(g.color !== undefined ? { color: parseRibbonColor(g.color) } : {}),
+  }));
+  if (ribbon.separatorTitles !== undefined) {
+    if (!object(ribbon.separatorTitles) || Object.keys(ribbon.separatorTitles).length > 50)
+      throw Error('セパレーター名は50件以下で指定してください。');
+    const titles: Record<string, string> = {};
+    for (const [id, title] of Object.entries(ribbon.separatorTitles)) {
+      if (
+        !(ribbon.separators as string[]).includes(id) ||
+        typeof title !== 'string' ||
+        title.trim().length > 80 ||
+        /[\x00-\x1f\x7f]/.test(title)
+      )
+        throw Error('セパレーターのIDと80文字以内の名前を確認してください。');
+      if (title.trim()) titles[id] = title.trim();
+    }
+    ribbon.separatorTitles = titles;
+  }
   if (!object(ribbon.itemOverrides) || Object.keys(ribbon.itemOverrides).length > 500)
     throw Error('リボンの表示設定は500件以下のオブジェクトです。');
   const overrides: Record<string, RibbonItemOverride> = {};
@@ -251,6 +327,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       !validRibbonId(id) ||
       validGroupId(id) ||
       validSeparatorId(id) ||
+      validRibbonButtonId(id) ||
       !object(value) ||
       Object.keys(value).some((key) => !['title', 'iconOnly', 'lastKnownTitle'].includes(key)) ||
       ['title', 'lastKnownTitle'].some(

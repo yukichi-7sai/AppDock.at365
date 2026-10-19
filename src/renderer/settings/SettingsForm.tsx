@@ -115,6 +115,15 @@ export function SettingsForm({
         busy={busy}
       />
     );
+  if (category === 'ribbon')
+    return (
+      <RibbonSettings
+        settings={settings}
+        extensions={extensions}
+        commands={commands}
+        onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
+      />
+    );
   if (category === 'notifications')
     return (
       <NotificationSettings
@@ -155,13 +164,6 @@ export function SettingsForm({
             onChange={edit}
             commands={commands}
             applets={extensions}
-          />
-        )}
-        {category === 'ribbon' && (
-          <RibbonSettings
-            settings={settings}
-            extensions={extensions}
-            onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
           />
         )}
         {category === 'shortcuts' && (

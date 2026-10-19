@@ -318,6 +318,7 @@ const navigation = new NavigationCoordinator(
 const presentation = new UiPresentation({
   settings: () => (safeShell ? { ...settings.value, ribbon: defaultRibbon() } : settings.value),
   applets: () => (manager ? allApplets() : []),
+  commands: () => (manager ? ribbonUiCommands() : hostCommands),
   dark: () => nativeTheme.shouldUseDarkColors,
   avatar: () => {
     const file = avatarFile();
@@ -993,15 +994,16 @@ const operationApi = new AppDockApi({
     'tts.voices.list': async (_params, id) => ({ ...(await tts.voices(ttsOwner(id))) }),
     'tts.jobs.get': async (params, id) => ({ ...tts.get(ttsOwner(id), params.jobId) }),
     'tts.stop': async (params, id) => ({ ...(await tts.stop(ttsOwner(id), params.jobId)) }),
-    'ui.ribbon.get': async (params, id) => {
+    'ui.ribbon.get': async (params, id, context) => {
       const permissions = externalUiPermissions(id);
+      const published = (await operationApi.call('commands.list', {}, id, context))
+        .commands as import('./core/automation-commands').AutomationCommand[];
       return {
         ...presentation.get(
           (action) =>
             !!permissions.execute &&
             (!action.theme || !!permissions.write) &&
-            (!action.command ||
-              automationCommands(allApplets()).some((c) => c.id === action.command && c.available)),
+            (!action.command || published.some((c) => c.id === action.command && c.available)),
           params.schemaVersion === 2 ? 2 : 1,
           false,
         ),
@@ -1253,6 +1255,16 @@ function settingsUiCommands() {
       .map((c) => ({ ...c, available: false })),
   ];
 }
+function ribbonUiCommands() {
+  const applets = allApplets();
+  return settingsUiCommands().map((command) => ({
+    ...command,
+    available:
+      command.available &&
+      (!command.extensionId ||
+        applets.some((a) => a.id === command.extensionId && a.enabled && a.state === 'running')),
+  }));
+}
 function openCommandPalette(request: CommandPaletteRequest) {
   if (!startupReady || quitting || !overlayHost) throw Error('AppDockは準備中です。');
   const session = new CommandPaletteSession(request, {
@@ -1281,6 +1293,11 @@ function openCommandPalette(request: CommandPaletteRequest) {
 }
 async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
+  if (id === 'appdock.ribbon.settings.open') {
+    showWindow();
+    await navigation.navigate('settings', 'ribbon');
+    return { accepted: true };
+  }
   if (customCommands.has(id)) return customCommands.execute(id, invocation);
   if (id === 'appdock.commands.search') {
     showWindow();
@@ -1720,7 +1737,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
         }),
       },
     };
-  if (id === 'ribbon') return { applets: applets.map(summary) };
+  if (id === 'ribbon') return { applets: applets.map(summary), commands: ribbonUiCommands() };
   if (['shortcuts', 'gestures', 'tray'].includes(id))
     return {
       applets: applets.map(summary),
@@ -2033,7 +2050,7 @@ function settingsPageActions(
     if (['shortcuts', 'gestures'].includes(page.id))
       actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
-  if (['shortcuts', 'gestures', 'tray'].includes(page.id)) {
+  if (['shortcuts', 'gestures', 'tray', 'ribbon'].includes(page.id)) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;
       if (!value || value.mode !== 'select') throw Error('選択操作だけを利用できます。');

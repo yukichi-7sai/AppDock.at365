@@ -37,8 +37,28 @@ const operation = (kind: string, properties: Record<string, unknown>, optional: 
 });
 // Limit external reads to the documented fields, retaining extra local fields on save.
 const layoutOf = (settings: Settings): Layout => {
-  const { order, hidden, bottom, separators, groups = [], itemOverrides = {} } = settings.ribbon;
-  return structuredClone({ order, hidden, bottom, separators, groups, itemOverrides });
+  const {
+    order,
+    hidden,
+    bottom,
+    separators,
+    groups = [],
+    itemOverrides = {},
+    separatorTitles,
+    buttons = [],
+    rightClickCommand,
+  } = settings.ribbon;
+  return structuredClone({
+    order,
+    hidden,
+    bottom,
+    separators,
+    groups,
+    itemOverrides,
+    ...(separatorTitles !== undefined ? { separatorTitles } : {}),
+    buttons,
+    ...(rightClickCommand !== undefined ? { rightClickCommand } : {}),
+  });
 };
 export class RibbonCommands {
   constructor(
@@ -99,7 +119,46 @@ export class RibbonCommands {
                     placement: placementSchema,
                   }),
                   operation('removeSeparator', { id: idSchema }),
+                  operation('updateSeparator', {
+                    id: idSchema,
+                    changes: {
+                      type: 'object',
+                      properties: { title: { type: 'string', maxLength: 80 } },
+                      required: ['title'],
+                      additionalProperties: false,
+                    },
+                  }),
                   operation('removeMissing', { id: idSchema }),
+                  operation(
+                    'addButton',
+                    {
+                      id: idSchema,
+                      title: { type: 'string', minLength: 1, maxLength: 80 },
+                      icon: { enum: ribbonGroupIcons },
+                      commandId: { type: 'string', minLength: 1, maxLength: 180 },
+                      iconOnly: { type: 'boolean' },
+                      placement: placementSchema,
+                    },
+                    ['iconOnly'],
+                  ),
+                  operation('updateButton', {
+                    id: idSchema,
+                    changes: {
+                      type: 'object',
+                      minProperties: 1,
+                      additionalProperties: false,
+                      properties: {
+                        title: { type: 'string', minLength: 1, maxLength: 80 },
+                        icon: { enum: ribbonGroupIcons },
+                        commandId: { type: 'string', minLength: 1, maxLength: 180 },
+                        iconOnly: { type: 'boolean' },
+                      },
+                    },
+                  }),
+                  operation('removeButton', { id: idSchema }),
+                  operation('setRightClickCommand', {
+                    commandId: { type: 'string', minLength: 1, maxLength: 180 },
+                  }),
                   operation('updateItem', {
                     id: idSchema,
                     changes: {
@@ -121,8 +180,11 @@ export class RibbonCommands {
                       expansion: { enum: ['persistent', 'temporary'] },
                       placement: placementSchema,
                       iconOnly: { type: 'boolean' },
+                      color: {
+                        anyOf: [{ type: 'string', pattern: '^#[a-fA-F0-9]{6}$' }, { type: 'null' }],
+                      },
                     },
-                    ['iconOnly'],
+                    ['iconOnly', 'color'],
                   ),
                   operation('updateGroup', {
                     id: idSchema,
@@ -135,6 +197,12 @@ export class RibbonCommands {
                         icon: { enum: ribbonGroupIcons },
                         expansion: { enum: ['persistent', 'temporary'] },
                         iconOnly: { type: 'boolean' },
+                        color: {
+                          anyOf: [
+                            { type: 'string', pattern: '^#[a-fA-F0-9]{6}$' },
+                            { type: 'null' },
+                          ],
+                        },
                       },
                     },
                   }),
@@ -168,16 +236,24 @@ export class RibbonCommands {
   }
   private catalog(layout: Layout) {
     return orderRibbon(
-      ribbonItems(this.options.ribbonApplets?.() ?? [], layout.separators, layout.groups),
+      ribbonItems(
+        this.options.ribbonApplets?.() ?? [],
+        layout.separators,
+        layout.groups,
+        layout.buttons,
+      ),
       layout.order,
     );
   }
-  private describe(layout: Layout) {
+  private describe(layout: Layout, commands?: { id: string; available: boolean }[]) {
     const applets = this.options.ribbonApplets?.() ?? [];
     const items = this.catalog(layout).map((item) => {
-      const enabled = item.extensionId
-        ? applets.find((a) => a.id === item.extensionId)?.enabled === true
-        : true;
+      const enabled =
+        item.command && commands
+          ? commands.some((c) => c.id === item.command!.commandId && c.available)
+          : item.extensionId
+            ? applets.find((a) => a.id === item.extensionId)?.enabled === true
+            : true;
       const visible = !layout.hidden.includes(item.id);
       return {
         id: item.id,
@@ -193,19 +269,34 @@ export class RibbonCommands {
       };
     });
     return {
-      layout,
+      layout: commands
+        ? {
+            ...layout,
+            buttons: (layout.buttons ?? []).map((b) => {
+              const { commandId, ...metadata } = b;
+              return commands.some((c) => c.id === commandId) ? b : metadata;
+            }),
+            ...(layout.rightClickCommand !== undefined
+              ? {
+                  rightClickCommand: commands.some((c) => c.id === layout.rightClickCommand)
+                    ? layout.rightClickCommand
+                    : undefined,
+                }
+              : {}),
+          }
+        : layout,
       items,
       retainedIds: ribbonRetainedIds(layout, this.catalog(layout)),
     };
   }
-  get() {
+  get(commands?: { id: string; available: boolean }[]) {
     return {
-      ...this.describe(layoutOf(this.options.settings.value)),
+      ...this.describe(layoutOf(this.options.settings.value), commands),
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
     };
   }
-  execute(args: unknown) {
+  execute(args: unknown, commands?: { id: string; available: boolean }[]) {
     if (
       !exact(args, ['operations', 'expectedRevision', 'dryRun']) ||
       typeof args.expectedRevision !== 'string' ||
@@ -248,7 +339,7 @@ export class RibbonCommands {
       }
     }
     return {
-      ...this.describe(next),
+      ...this.describe(next, commands),
       dryRun: args.dryRun === true,
       changed,
       revision: this.options.settingsCommands.revision(),

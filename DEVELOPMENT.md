@@ -34,6 +34,7 @@
 | グローバル入力のフック統一（0.63.0） | [Winキーの記録・元入力のブロック・共有InputHost・検証計画](docs/keyboard-hook-shortcuts-design.md) |
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[タイトルバー・ステータスバー](docs/shell-bars.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
 | リボンのグループ化とバッジ | [両展開方式・保存・共通API・Gmail連携](docs/ribbon-groups-badges-design.md) |
+| リボンの装飾・コマンドボタン | [色付きの枠と連結線・色なし・名前・右クリック動作](docs/ribbon-customization-design.md)、[2段階の実装計画と受け入れ条件](docs/ribbon-customization-implementation-plan.md) |
 | Shellの領域別割り当て | [領域ごとの指定・復旧・専用コマンドと実装計画](docs/shell-region-assignment.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
 | 文書 | [文書方針](docs/documentation.md) |

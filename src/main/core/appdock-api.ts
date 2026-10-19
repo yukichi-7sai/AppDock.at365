@@ -292,7 +292,7 @@ export class AppDockApi {
         };
       case 'ribbon.get':
         return {
-          ...this.ribbon.get(),
+          ...this.ribbon.get(this.commands(context)),
           writable: permissions.write === true,
           executable: permissions.execute === true,
           ribbonEditingAllowed: permissions.editRibbon === true,
@@ -466,7 +466,7 @@ export class AppDockApi {
         };
       }
       if (command.permission === 'ribbon.write') {
-        const result = this.ribbon.execute(args);
+        const result = this.ribbon.execute(args, this.commands(context));
         return {
           id,
           completion: result.dryRun ? 'validated' : 'settingsSaved',

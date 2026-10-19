@@ -9,23 +9,49 @@ import {
   editRibbon,
   ribbonPresentation,
 } from '../../shared/ribbon-layout';
-import { ribbonGroupIcons, type RibbonGroup, type RibbonPlacement } from '../../shared/ribbon';
+import {
+  defaultRibbonRightClickCommand,
+  type RibbonCommandButton,
+  type RibbonGroup,
+  type RibbonPlacement,
+} from '../../shared/ribbon';
+import type { UiCommand } from '../../shared/commands';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { ListIcon } from '../settings-ui/SettingsListTable';
+import { SettingsColorPicker } from '../settings-ui/SettingsColorPicker';
+import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
+import { CommandPicker } from '../settings-ui/CommandPicker';
 
 export function RibbonSettings({
   settings,
   extensions,
+  commands,
   onEdit,
 }: {
   settings: Settings;
   extensions: ExtensionSnapshot[];
+  commands: UiCommand[];
   onEdit(operation: unknown, before: Settings['ribbon']): Promise<unknown>;
 }) {
   const layout = settings.ribbon;
   const groups = layout.groups ?? [];
   const [dragged, setDragged] = useState<string | null>(null);
+  const [colorValid, setColorValid] = useState(true);
+  const [picker, setPicker] = useState<'rightClick' | 'button'>();
+  const [buttonDialog, setButtonDialog] = useState<{
+    button: RibbonCommandButton;
+    adding: boolean;
+    placement: RibbonPlacement;
+    before: string;
+    nameEdited: boolean;
+  }>();
+  const [separatorDialog, setSeparatorDialog] = useState<{
+    id: string;
+    title: string;
+    before: string;
+  }>();
   const [error, setError] = useState(''),
     [pending, setPending] = useState(false);
   const [dialog, setDialog] = useState<{
@@ -43,10 +69,13 @@ export function RibbonSettings({
   }>();
   const [confirmation, setConfirmation] = useState<{
     group?: RibbonGroup;
+    button?: RibbonCommandButton;
     missing?: { id: string; title: string };
     before: string;
   }>();
-  const catalog = ribbonItems(extensions, layout.separators, groups);
+  const catalog = ribbonItems(extensions, layout.separators, groups, layout.buttons);
+  const commandTitle = (id: string) => commands.find((c) => c.id === id)?.title ?? id;
+  const rightClickCommand = layout.rightClickCommand ?? defaultRibbonRightClickCommand;
   const items = [
     ...catalog,
     ...ribbonRetainedIds(layout, catalog).map((id) => ({
@@ -112,7 +141,8 @@ export function RibbonSettings({
     if (id && items.some((item) => item.id === id)) work(id);
     setDragged(null);
   };
-  const open = (group: RibbonGroup | undefined, placement: RibbonPlacement) =>
+  const open = (group: RibbonGroup | undefined, placement: RibbonPlacement) => {
+    setColorValid(true);
     setDialog({
       group: group
         ? structuredClone(group)
@@ -127,6 +157,7 @@ export function RibbonSettings({
       placement,
       before: JSON.stringify(layout),
     });
+  };
   const row = (entry: RibbonItem, index: number, siblings: RibbonItem[]) => {
     const item = { ...entry, ...ribbonPresentation(layout, entry) };
     const parent = ribbonParent(layout, item.id);
@@ -174,9 +205,11 @@ export function RibbonSettings({
                   ? '登録元がありません。配置を保持しています。'
                   : item.group
                     ? `${item.group.expansion === 'persistent' ? '持続的' : '一時的'}・${item.group.children.length}項目`
-                    : item.kind === 'separator'
-                      ? '区切り線'
-                      : (item.extensionId ?? 'AppDock')}
+                    : item.command
+                      ? `${commandTitle(item.command.commandId)}${commands.some((c) => c.id === item.command!.commandId && c.available) ? '' : '・現在利用できません'}`
+                      : item.kind === 'separator'
+                        ? '区切り線'
+                        : (item.extensionId ?? 'AppDock')}
               </small>
             </span>
           </label>
@@ -214,29 +247,41 @@ export function RibbonSettings({
             >
               ↓
             </button>
-            {item.kind !== 'separator' ? (
+            {
               <button
                 className="settings-list-icon"
                 title="編集"
                 disabled={pending}
                 aria-label={`${item.title}を編集`}
                 onClick={() =>
-                  item.group
-                    ? open(item.group, ribbonPlacement(layout, item.id))
-                    : setItemDialog({
+                  item.kind === 'separator'
+                    ? setSeparatorDialog({
                         id: item.id,
-                        title: layout.itemOverrides?.[item.id]?.title ?? '',
-                        originalTitle: entry.title,
-                        iconOnly: item.iconOnly,
+                        title: layout.separatorTitles?.[item.id] ?? '',
                         before: JSON.stringify(layout),
                       })
+                    : item.command
+                      ? setButtonDialog({
+                          button: structuredClone(item.command),
+                          adding: false,
+                          placement: ribbonPlacement(layout, item.id),
+                          before: JSON.stringify(layout),
+                          nameEdited: true,
+                        })
+                      : item.group
+                        ? open(item.group, ribbonPlacement(layout, item.id))
+                        : setItemDialog({
+                            id: item.id,
+                            title: layout.itemOverrides?.[item.id]?.title ?? '',
+                            originalTitle: entry.title,
+                            iconOnly: item.iconOnly,
+                            before: JSON.stringify(layout),
+                          })
                 }
               >
                 <ListIcon kind="edit" />
               </button>
-            ) : (
-              <span className="ribbon-action-placeholder" aria-hidden="true" />
-            )}
+            }
             {item.kind === 'separator' ? (
               <button
                 className="settings-list-icon settings-list-delete"
@@ -244,6 +289,18 @@ export function RibbonSettings({
                 disabled={pending}
                 aria-label={`${item.title}を削除`}
                 onClick={() => run({ kind: 'removeSeparator', id: item.id })}
+              >
+                <ListIcon kind="delete" />
+              </button>
+            ) : item.command ? (
+              <button
+                className="settings-list-icon settings-list-delete"
+                title="削除"
+                disabled={pending}
+                aria-label={`${item.title}を削除`}
+                onClick={() =>
+                  setConfirmation({ button: item.command, before: JSON.stringify(layout) })
+                }
               >
                 <ListIcon kind="delete" />
               </button>
@@ -307,102 +364,152 @@ export function RibbonSettings({
     );
   };
   return (
-    <section
-      className="ribbon-settings"
-      {...settingAnchor('ribbon', 'ribbon')}
-      aria-label="リボン設定"
-    >
-      <p className="muted">
-        設定ボタンを非表示にしても、リボンの右クリックや「設定を開く」コマンドから戻れます。
-      </p>
-      {error && <p role="alert">{error}</p>}
-      {(['top', 'bottom'] as const).map((position) => {
-        const title = position === 'top' ? '上寄せ' : '下寄せ';
-        const siblings = roots.filter((item) => ribbonPlacement(layout, item.id) === position);
-        return (
-          <section
-            key={position}
-            className="ribbon-placement"
-            aria-label={`${title}のリボン設定`}
-            onDragOver={(e) => {
-              if (dragged) e.preventDefault();
-            }}
-            onDrop={(e) => drop(e, (id) => moveTo(id, null, position))}
+    <div className="settings-sections ribbon-settings" aria-label="リボン設定">
+      <SettingsSection title="動作設定" collapsible>
+        <SettingsField
+          title="右クリックのコマンド"
+          description="リボンを右クリックしたときに実行するコマンドです。"
+          {...settingAnchor('ribbon', 'rightClickCommand')}
+        >
+          <button
+            type="button"
+            className="secondary"
+            disabled={pending}
+            onClick={() => setPicker('rightClick')}
+            aria-label="右クリックのコマンドを選択"
           >
-            <div className="ribbon-group-heading">
-              <h4>{title}</h4>
-              <div className="ribbon-setting-actions">
-                <button
-                  className="secondary"
-                  disabled={pending || groups.length >= 50}
-                  onClick={() => open(undefined, position)}
-                >
-                  {title}にグループを追加
-                </button>
-                <button
-                  className="secondary"
-                  disabled={pending || layout.separators.length >= 50}
-                  onClick={() =>
-                    run({
-                      kind: 'addSeparator',
-                      id: `separator:${crypto.randomUUID()}`,
-                      placement: position,
-                    })
-                  }
-                >
-                  {title}にセパレーターを追加
-                </button>
+            {commandTitle(rightClickCommand)}
+          </button>
+          {!commands.some((c) => c.id === rightClickCommand && c.available) && (
+            <small>現在利用できません。</small>
+          )}
+        </SettingsField>
+      </SettingsSection>
+      <SettingsSection title="リボン編集" {...settingAnchor('ribbon', 'ribbon')}>
+        <p className="muted">
+          設定ボタンを非表示にしても、トレイの「設定…」や「設定を開く」コマンドから戻れます。
+        </p>
+        {error && <p role="alert">{error}</p>}
+        {(['top', 'bottom'] as const).map((position) => {
+          const title = position === 'top' ? '上寄せ' : '下寄せ';
+          const siblings = roots.filter((item) => ribbonPlacement(layout, item.id) === position);
+          return (
+            <section
+              key={position}
+              className="ribbon-placement"
+              aria-label={`${title}のリボン設定`}
+              onDragOver={(e) => {
+                if (dragged) e.preventDefault();
+              }}
+              onDrop={(e) => drop(e, (id) => moveTo(id, null, position))}
+            >
+              <div className="ribbon-group-heading">
+                <h4>{title}</h4>
+                <div className="ribbon-setting-actions">
+                  <button
+                    className="secondary"
+                    disabled={pending || (layout.buttons?.length ?? 0) >= 100}
+                    onClick={() =>
+                      setButtonDialog({
+                        adding: true,
+                        placement: position,
+                        before: JSON.stringify(layout),
+                        nameEdited: false,
+                        button: {
+                          id: `button:${crypto.randomUUID()}`,
+                          title: '',
+                          icon: 'extensions',
+                          commandId: '',
+                        },
+                      })
+                    }
+                  >
+                    {title}にコマンドボタンを追加
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={pending || groups.length >= 50}
+                    onClick={() => open(undefined, position)}
+                  >
+                    {title}にグループを追加
+                  </button>
+                  <button
+                    className="secondary"
+                    disabled={pending || layout.separators.length >= 50}
+                    onClick={() =>
+                      run({
+                        kind: 'addSeparator',
+                        id: `separator:${crypto.randomUUID()}`,
+                        placement: position,
+                      })
+                    }
+                  >
+                    {title}にセパレーターを追加
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="ribbon-setting-list">
-              {siblings.map((item, i) => row(item, i, siblings))}
-              {!siblings.length && (
-                <p className="empty">
-                  ここに表示するボタンはありません。配置の選択やドラッグで移動できます。
-                </p>
-              )}
-            </div>
-          </section>
-        );
-      })}
-      <button
-        className="text-button"
-        disabled={pending}
-        onClick={() => setConfirmation({ before: JSON.stringify(layout) })}
-      >
-        リボンを初期状態に戻す
-      </button>
+              <div className="ribbon-setting-list">
+                {siblings.map((item, i) => row(item, i, siblings))}
+                {!siblings.length && (
+                  <p className="empty">
+                    ここに表示するボタンはありません。配置の選択やドラッグで移動できます。
+                  </p>
+                )}
+              </div>
+            </section>
+          );
+        })}
+        <button
+          className="text-button"
+          disabled={pending}
+          onClick={() => setConfirmation({ before: JSON.stringify(layout) })}
+        >
+          リボンを初期状態に戻す
+        </button>
+      </SettingsSection>
       {confirmation && (
         <SettingsDialog
           title={
-            confirmation.group
-              ? 'グループを解除'
-              : confirmation.missing
-                ? 'リボン項目を設定から削除'
-                : 'リボンを初期状態に戻す'
+            confirmation.button
+              ? 'コマンドボタンを削除'
+              : confirmation.group
+                ? 'グループを解除'
+                : confirmation.missing
+                  ? 'リボン項目を設定から削除'
+                  : 'リボンを初期状態に戻す'
           }
           onClose={() => setConfirmation(undefined)}
           applyLabel={
-            confirmation.group ? '解除' : confirmation.missing ? '削除' : '初期状態に戻す'
+            confirmation.button
+              ? '削除'
+              : confirmation.group
+                ? '解除'
+                : confirmation.missing
+                  ? '削除'
+                  : '初期状態に戻す'
           }
           onApply={async () => {
             if (confirmation.before !== JSON.stringify(layout))
               throw Error('リボン設定が変更されています。閉じてからやり直してください。');
             await apply(
-              confirmation.group
-                ? { kind: 'ungroup', id: confirmation.group.id }
-                : confirmation.missing
-                  ? { kind: 'removeMissing', id: confirmation.missing.id }
-                  : { kind: 'reset' },
+              confirmation.button
+                ? { kind: 'removeButton', id: confirmation.button.id }
+                : confirmation.group
+                  ? { kind: 'ungroup', id: confirmation.group.id }
+                  : confirmation.missing
+                    ? { kind: 'removeMissing', id: confirmation.missing.id }
+                    : { kind: 'reset' },
             );
           }}
         >
           <p>
-            {confirmation.group
-              ? `「${confirmation.group.title || 'グループ'}」の名前・アイコン・展開方法を削除します。中のボタンはグループの位置に戻り、順序・上下配置・非表示状態を引き継ぎます。`
-              : confirmation.missing
-                ? `「${confirmation.missing.title}」の配置・グループ所属・表示名を設定から削除します。登録元を追加し直した場合は既定の表示に戻ります。`
-                : 'グループ・セパレーターと、未導入の項目も含む保存済み配置・表示名を初期化します。Appletの設定や有効状態は変わりません。'}
+            {confirmation.button
+              ? `「${confirmation.button.title}」の登録と配置を削除します。実行先のコマンドとその設定は残ります。`
+              : confirmation.group
+                ? `「${confirmation.group.title || 'グループ'}」の名前・アイコン・展開方法を削除します。中のボタンはグループの位置に戻り、順序・上下配置・非表示状態を引き継ぎます。`
+                : confirmation.missing
+                  ? `「${confirmation.missing.title}」の配置・グループ所属・表示名を設定から削除します。登録元を追加し直した場合は既定の表示に戻ります。`
+                  : 'グループと色・セパレーターと名前・コマンドボタン・未導入項目を含む配置と表示名を初期化します。動作設定の右クリック割当と、Appletの設定や有効状態は変わりません。'}
           </p>
         </SettingsDialog>
       )}
@@ -410,13 +517,13 @@ export function RibbonSettings({
         <SettingsDialog
           title={dialog.adding ? 'リボングループを追加' : 'リボングループを編集'}
           onClose={() => setDialog(undefined)}
-          valid={dialog.group.title.trim().length <= 80}
+          valid={dialog.group.title.trim().length <= 80 && colorValid}
           applyLabel={dialog.adding ? '追加' : '適用'}
           footer="確定するとすぐに反映・保存されます。"
           onApply={async () => {
             if (dialog.before !== JSON.stringify(layout))
               throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
-            const { id, title, icon, expansion, iconOnly = false } = dialog.group;
+            const { id, title, icon, expansion, iconOnly = false, color = null } = dialog.group;
             await apply(
               dialog.adding
                 ? {
@@ -426,9 +533,10 @@ export function RibbonSettings({
                     icon,
                     expansion,
                     iconOnly,
+                    color,
                     placement: dialog.placement,
                   }
-                : { kind: 'updateGroup', id, changes: { title, icon, expansion, iconOnly } },
+                : { kind: 'updateGroup', id, changes: { title, icon, expansion, iconOnly, color } },
             );
           }}
         >
@@ -445,35 +553,11 @@ export function RibbonSettings({
                 }
               />
             </label>
-            <label>
-              アイコン
-              <select
-                aria-label="グループのアイコン"
-                value={dialog.group.icon}
-                onChange={(e) =>
-                  setDialog({
-                    ...dialog,
-                    group: { ...dialog.group, icon: e.target.value as RibbonGroup['icon'] },
-                  })
-                }
-              >
-                {ribbonGroupIcons.map((icon) => (
-                  <option key={icon} value={icon}>
-                    {
-                      {
-                        folder: 'フォルダー',
-                        mail: 'メール',
-                        clock: '時計',
-                        image: '画像',
-                        extensions: 'アプレット',
-                        settings: '設定',
-                        bell: '通知',
-                      }[icon]
-                    }
-                  </option>
-                ))}
-              </select>
-            </label>
+            <RibbonIconPicker
+              label="グループのアイコン"
+              value={dialog.group.icon}
+              onChange={(icon) => setDialog({ ...dialog, group: { ...dialog.group, icon } })}
+            />
             <label className="ribbon-icon-only">
               <input
                 type="checkbox"
@@ -508,6 +592,31 @@ export function RibbonSettings({
                 ? 'リボン内に展開します。開閉状態はこのPCで再起動後も保持します。'
                 : '右側のパネルに1行で表示します。ボタンの実行・外側クリック・Escapeで閉じます。'}
             </p>
+            <div>
+              <strong>色</strong>
+              <SettingsColorPicker
+                value={dialog.group.color ?? null}
+                allowNone
+                onValidityChange={setColorValid}
+                onChange={(color) =>
+                  setDialog(
+                    (current) => current && { ...current, group: { ...current.group, color } },
+                  )
+                }
+              />
+              <div
+                className="ribbon-color-preview"
+                aria-label="グループの色のプレビュー"
+                style={
+                  {
+                    '--ribbon-group-color': dialog.group.color || 'transparent',
+                  } as React.CSSProperties
+                }
+              >
+                <span>グループ</span>
+                <div>ボタン</div>
+              </div>
+            </div>
           </div>
         </SettingsDialog>
       )}
@@ -553,6 +662,136 @@ export function RibbonSettings({
           </div>
         </SettingsDialog>
       )}
-    </section>
+      {separatorDialog && (
+        <SettingsDialog
+          title="セパレーターを編集"
+          applyLabel="適用"
+          valid={separatorDialog.title.trim().length <= 80}
+          onClose={() => setSeparatorDialog(undefined)}
+          onApply={async () => {
+            if (separatorDialog.before !== JSON.stringify(layout))
+              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+            await apply({
+              kind: 'updateSeparator',
+              id: separatorDialog.id,
+              changes: { title: separatorDialog.title },
+            });
+          }}
+        >
+          <label>
+            名前
+            <input
+              data-initial-focus
+              maxLength={80}
+              value={separatorDialog.title}
+              placeholder="空欄なら自動生成した名前を使います"
+              onChange={(e) => setSeparatorDialog({ ...separatorDialog, title: e.target.value })}
+            />
+          </label>
+        </SettingsDialog>
+      )}
+      {buttonDialog && !picker && (
+        <SettingsDialog
+          title={buttonDialog.adding ? 'コマンドボタンを追加' : 'コマンドボタンを編集'}
+          applyLabel={buttonDialog.adding ? '追加' : '適用'}
+          valid={
+            !!buttonDialog.button.title.trim() &&
+            buttonDialog.button.title.trim().length <= 80 &&
+            !!buttonDialog.button.commandId
+          }
+          onClose={() => setButtonDialog(undefined)}
+          onApply={async () => {
+            if (buttonDialog.before !== JSON.stringify(layout))
+              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+            const { id, ...changes } = buttonDialog.button;
+            await apply(
+              buttonDialog.adding
+                ? { kind: 'addButton', id, ...changes, placement: buttonDialog.placement }
+                : { kind: 'updateButton', id, changes },
+            );
+          }}
+        >
+          <div className="ribbon-edit-fields">
+            <div>
+              <strong>コマンド</strong>
+              <button
+                type="button"
+                className="secondary"
+                aria-label="実行コマンドを選択"
+                onClick={() => setPicker('button')}
+              >
+                {buttonDialog.button.commandId
+                  ? commandTitle(buttonDialog.button.commandId)
+                  : 'コマンドを選択'}
+              </button>
+              {buttonDialog.button.commandId &&
+                !commands.some((c) => c.id === buttonDialog.button.commandId && c.available) && (
+                  <small>現在利用できません。</small>
+                )}
+            </div>
+            <label>
+              ボタン名
+              <input
+                data-initial-focus
+                maxLength={80}
+                value={buttonDialog.button.title}
+                onChange={(e) =>
+                  setButtonDialog({
+                    ...buttonDialog,
+                    nameEdited: true,
+                    button: { ...buttonDialog.button, title: e.target.value },
+                  })
+                }
+              />
+            </label>
+            <RibbonIconPicker
+              label="ボタンのアイコン"
+              value={buttonDialog.button.icon}
+              onChange={(icon) =>
+                setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, icon } })
+              }
+            />
+            <label className="ribbon-icon-only">
+              <input
+                type="checkbox"
+                checked={!!buttonDialog.button.iconOnly}
+                onChange={(e) =>
+                  setButtonDialog({
+                    ...buttonDialog,
+                    button: { ...buttonDialog.button, iconOnly: e.target.checked },
+                  })
+                }
+              />
+              リボンにアイコンのみを表示する
+            </label>
+          </div>
+        </SettingsDialog>
+      )}
+      {picker && (
+        <CommandPicker
+          commands={commands.filter((c) => !c.hidden)}
+          pins={settings.pinnedCommands}
+          shortcuts={settings.shortcuts}
+          onClose={() => setPicker(undefined)}
+          onChoose={(command) => {
+            if (picker === 'rightClick')
+              run({ kind: 'setRightClickCommand', commandId: command.id });
+            else
+              setButtonDialog(
+                (current) =>
+                  current && {
+                    ...current,
+                    button: {
+                      ...current.button,
+                      commandId: command.id,
+                      title: current.nameEdited ? current.button.title : command.title,
+                    },
+                  },
+              );
+            setPicker(undefined);
+          }}
+        />
+      )}
+    </div>
   );
 }

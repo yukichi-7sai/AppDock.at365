@@ -93,7 +93,14 @@ function App() {
   const item = (item: RibbonView['items'][number]): React.ReactNode => {
     if (item.kind === 'group')
       return (
-        <div className="ribbon-group" key={item.id} data-expanded={item.expanded}>
+        <div
+          className="ribbon-group"
+          key={item.id}
+          data-expanded={item.expanded}
+          data-colored={!!item.color}
+          data-expansion={item.expansion}
+          style={{ '--ribbon-group-color': item.color || 'transparent' } as React.CSSProperties}
+        >
           <button
             data-ribbon-id={item.id}
             className={item.selected ? 'active' : ''}
@@ -172,7 +179,7 @@ function App() {
       }}
       onContextMenu={(e) => {
         e.preventDefault();
-        if (model) invoke(model.contextActionId);
+        if (model && model.contextActionEnabled !== false) invoke(model.contextActionId);
       }}
     >
       <div className="brand-mark" aria-hidden="true">

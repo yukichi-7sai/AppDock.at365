@@ -283,11 +283,15 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 ## リボン編集
 
+0.66.0以降、layoutには`buttons`（最大100件のコマンドボタン定義）と任意の`rightClickCommand`も含みます。操作は`addButton { id, title, icon, commandId, iconOnly?, placement }`、`updateButton { id, changes }`、`removeButton { id }`、`setRightClickCommand { commandId }`を追加しました。button IDは`button:<stable-id>`で、表示用items.kindはcommandです。保存済みの未登録コマンドも保持し、通常のretainedIdsへは分類しません。外部の取得・変更結果では公開されていないcommandId／rightClickCommandを省略するため、読取結果を保存型として丸ごと送り返さず、操作と変更対象だけを指定してください。編集はコマンドの実行許可を追加せず、実行時にも元callerと公開宣言・個別許可を検査します。
+
+0.65.0以降、layoutに任意の`separatorTitles`（登録済みセパレーターIDから名前へのマップ）を含みます。`updateSeparator { id, changes: { title } }`で80文字以内の名前を変更し、空欄で自動生成名へ戻します。`addGroup`の任意`color`、`updateGroup.changes.color`は`#RRGGBB`またはnullです。色なしのnull、欠落、色の正規化、名前、削除・初期化はGUIと同じ共有検証を使います。グループ削除で色、セパレーター削除で名前も削除されます。保存・dryRunだけではコマンドを実行しません。
+
 取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。
 
 編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。操作の許可画面のMCP列で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
 
-取得結果のlayoutはorder/hidden/bottom/separators/groups/itemOverrides、itemsはid/title/kind（builtin/page/separator/group）/appletId/pageId/parentId/placement/visible/enabled/displayedです。titleはリボンの実効表示名、placementは親からの継承を含みます。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは配置・所属・表示設定に保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
+取得結果のlayoutはorder/hidden/bottom/separators/groups/itemOverrides/separatorTitles/buttons/rightClickCommand、itemsはid/title/kind（builtin/page/separator/group/command）/appletId/pageId/parentId/placement/visible/enabled/displayedです。titleはリボンの実効表示名、placementは親からの継承を含みます。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは配置・所属・表示設定に保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
 
 ```json
 {
@@ -316,7 +320,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 | moveItem | id, parentId, beforeId, 任意placement | parentIdはgroup IDかnull。beforeIdは同じ所属内の挿入先かnull（末尾）。トップレベル時だけplacementが必須 |
 | reorderChildren | id, ids | 未導入・非表示も含む指定グループの全childrenを並べ替える |
 | ungroup | id | 子を元の親位置へ戻し、配置と実効非表示を継承。Appletは削除しない |
-| reset | なし | グループと未導入項目の保存配置・表示設定も含め初期化。order/hidden/separators/groupsは空、itemOverridesは空オブジェクト、bottomはtheme/profile |
+| reset | なし | グループと色・セパレーターと名前・コマンドボタン・未導入項目の保存配置と表示設定を初期化。bottomはtheme/profile。別の動作設定rightClickCommandは保持 |
 
 operationsは1〜100件。全操作を順にメモリ上で検証し、一つでも失敗すれば保存しません。GUIと同じparseRibbonを使い、ID配列550件、グループ50件・区切り線50件、明示配置全体の葉500件まで。reorderの不足・重複・別グループ混入、未登録区切り線参照、不明フィールドは拒否します。空グループのreorderは空idsだけを許可します。現在登録されていないページはupdate不可で、再導入後に編集できます。新たなApplet追加などで項目一覧が変わった場合は再取得してください。
 
@@ -324,7 +328,7 @@ operationsは1〜100件。全操作を順にメモリ上で検証し、一つで
 
 revisionは全設定で共通です。古いrevision、プロセス再起動前のrevision、同期競合を拒否し、GUIの未確定入力は上書きしません。dryRunは保存せず変更後のlayout/itemsを返します。同値更新は保存せずrevisionも変えません。リボン以外の設定と、ローカルribbonの未知フィールドは保持します。
 
-結果はdryRun/changed/layout/items/retainedIds/revision/warning/applies=ribbonChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後の画面反映は非同期です。Appletを有効化したりページを開いたりはしません。非表示にした設定ボタンへは既存の設定を開くコマンドやリボン右クリックから戻れます。
+結果はdryRun/changed/layout/items/retainedIds/revision/warning/applies=ribbonChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後の画面反映は非同期です。Appletを有効化したりページを開いたりはしません。非表示にした設定ボタンへは既存の設定を開くコマンドやトレイの固定「設定…」から戻れます。
 
 エラーはRIBBON_EDITING_DISABLED、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否を使用します。automation監査ログへAPI名・コマンドID・結果を記録し、操作引数や配置IDは記録しません。
 

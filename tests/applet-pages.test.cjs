@@ -44,6 +44,8 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
     separators: [],
     groups: [],
     itemOverrides: {},
+    separatorTitles: {},
+    buttons: [],
   });
   settings.ribbon = { order: ['page:test.pages:main', 'home'], hidden: ['settings'] };
   settings.extensions['test.pages'] = {
@@ -84,6 +86,7 @@ test('Ribbon separators and lower placement validate and survive save', () => {
     ...settings.ribbon,
     groups: [],
     itemOverrides: {},
+    buttons: [],
   });
   const ordered = orderRibbon(ribbonItems([manifest], [id]), settings.ribbon.order);
   assert.equal(ordered[1].kind, 'separator');

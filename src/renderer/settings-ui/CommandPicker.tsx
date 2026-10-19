@@ -16,6 +16,7 @@ export function CommandPicker(props: {
   useEffect(() => {
     const requestId = crypto.randomUUID();
     let live = true;
+    let pending = true;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     void settingsControls
       .openCommandPalette({
@@ -26,6 +27,7 @@ export function CommandPicker(props: {
         shortcuts: props.shortcuts,
       })
       .then((result) => {
+        pending = false;
         if (!live) return;
         if (result.status === 'selected') {
           const command = current.current.commands.find((c) => c.id === result.commandId);
@@ -34,11 +36,12 @@ export function CommandPicker(props: {
         } else current.current.onClose();
       })
       .catch(() => {
+        pending = false;
         if (live) current.current.onClose();
       });
     return () => {
       live = false;
-      void settingsControls.cancelCommandPalette(requestId).catch(() => {});
+      if (pending) void settingsControls.cancelCommandPalette(requestId).catch(() => {});
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, []);

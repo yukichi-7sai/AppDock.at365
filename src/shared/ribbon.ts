@@ -8,12 +8,22 @@ export const ribbonGroupIcons = [
   'settings',
   'bell',
 ] as const;
+export type RibbonBuiltinIcon = (typeof ribbonGroupIcons)[number];
+export const defaultRibbonRightClickCommand = 'appdock.ribbon.settings.open';
+export interface RibbonCommandButton {
+  id: string;
+  title: string;
+  icon: RibbonBuiltinIcon;
+  commandId: string;
+  iconOnly?: boolean;
+}
 export interface RibbonGroup {
   id: string;
   title: string;
   icon: (typeof ribbonGroupIcons)[number];
   expansion: 'persistent' | 'temporary';
   iconOnly?: boolean;
+  color?: string | null;
   children: string[];
 }
 export interface RibbonItemOverride {
@@ -29,6 +39,15 @@ export interface RibbonLayout {
   separators: string[];
   groups?: RibbonGroup[];
   itemOverrides?: Record<string, RibbonItemOverride>;
+  separatorTitles?: Record<string, string>;
+  buttons?: RibbonCommandButton[];
+  rightClickCommand?: string;
+}
+export function parseRibbonColor(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string' || !/^#[a-fA-F0-9]{6}$/.test(value))
+    throw Error('色は #RRGGBB または色なしで指定してください。');
+  return value.toUpperCase();
 }
 export type RibbonBadgeTarget = { pageId: string } | { collectionKey: string; itemId: string };
 export type RibbonBadge =

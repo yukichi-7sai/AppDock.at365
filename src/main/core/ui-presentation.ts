@@ -4,6 +4,7 @@ import { ribbonRoots, ribbonPlacement, ribbonPresentation } from '../../shared/r
 import { ribbonBadgeView, type RibbonBadge, type RibbonAnchor } from '../../shared/ribbon';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import type { NavigationState, RibbonView, UiActionRequest } from '../../shared/shell';
+import type { UiCommand } from '../../shared/commands';
 
 export class NavigationCoordinator {
   private requestSequence = 0;
@@ -61,6 +62,7 @@ export class UiPresentation {
     private options: {
       settings(): Settings;
       applets(): ExtensionSnapshot[];
+      commands?(): UiCommand[];
       dark(): boolean;
       avatar(): string | undefined;
       navigation: NavigationCoordinator;
@@ -94,8 +96,23 @@ export class UiPresentation {
     const route = this.options.navigation.state.route;
     this.assets.clear();
     this.actions.clear();
-    this.actions.set('ribbon.configure', { route: 'settings', section: 'ribbon' });
-    const catalog = visibleRibbonItems(applets, settings.ribbon.separators, settings.ribbon.groups);
+    const contextAction: Action = settings.ribbon.rightClickCommand
+      ? { command: settings.ribbon.rightClickCommand }
+      : { route: 'settings', section: 'ribbon' };
+    this.actions.set('ribbon.configure', contextAction);
+    const commands = this.options.commands?.();
+    const commandAvailable = (action: Action, provider?: ExtensionSnapshot) =>
+      !action.command ||
+      (commands
+        ? commands.some((c) => c.id === action.command && c.available)
+        : provider?.commands?.some((c) => c.id === action.command && c.available) === true);
+    const contextEnabled = commandAvailable(contextAction) && allowed(contextAction);
+    const catalog = visibleRibbonItems(
+      applets,
+      settings.ribbon.separators,
+      settings.ribbon.groups,
+      settings.ribbon.buttons,
+    );
     const project = (item: RibbonItem): RibbonView['items'][number] => {
       const appearance = ribbonPresentation(settings.ribbon, item);
       const actionId = `ribbon.${item.id}`;
@@ -104,17 +121,17 @@ export class UiPresentation {
       const action: Action =
         item.kind === 'group'
           ? { group: item.id }
-          : item.extensionId
-            ? { command: page?.openCommand }
-            : item.id === 'theme'
-              ? { theme: true }
-              : item.id === 'profile'
-                ? { route: 'settings', section: 'profile' }
-                : { route: item.id };
+          : item.command
+            ? { command: item.command.commandId }
+            : item.extensionId
+              ? { command: page?.openCommand }
+              : item.id === 'theme'
+                ? { theme: true }
+                : item.id === 'profile'
+                  ? { route: 'settings', section: 'profile' }
+                  : { route: item.id };
       if (item.kind !== 'separator') this.actions.set(actionId, action);
-      const available =
-        !action.command ||
-        provider?.commands?.some((c) => c.id === action.command && c.available) === true;
+      const available = commandAvailable(action, provider);
       const enabled =
         item.kind === 'separator' ||
         (!!(action.route || action.theme || action.command || action.group) &&
@@ -123,7 +140,7 @@ export class UiPresentation {
           (item.group?.expansion !== 'temporary' || local));
       return {
         id: item.id,
-        kind: item.kind ?? 'button',
+        kind: item.kind === 'command' ? 'button' : (item.kind ?? 'button'),
         title: appearance.title,
         tooltip:
           item.id === 'profile' && !settings.ribbon.itemOverrides?.profile?.title
@@ -136,7 +153,9 @@ export class UiPresentation {
           ? {
               disabledReason:
                 provider?.commands?.find((c) => c.id === action.command)?.disabledReason ??
-                'この接続からは実行できません。',
+                (available
+                  ? 'この接続からは実行できません。'
+                  : 'コマンドが未登録・停止中、または現在利用できません。'),
             }
           : {}),
         ...(item.kind === 'separator' ? {} : { actionId }),
@@ -193,6 +212,7 @@ export class UiPresentation {
         {
           ...group,
           expansion: item.group.expansion,
+          color: item.group.color ?? null,
           expanded,
           selected: children.some((c) => c.selected),
           badge: children.some((c) => c.badge)
@@ -214,11 +234,20 @@ export class UiPresentation {
       dark,
       route,
       contextActionId: 'ribbon.configure',
+      ...(schemaVersion === 2
+        ? {
+            contextActionEnabled: contextEnabled,
+            ...(!contextEnabled
+              ? { contextDisabledReason: '右クリックのコマンドは現在利用できません。' }
+              : {}),
+          }
+        : {}),
       items,
     };
     // Projection permissions may differ between callers; revision describes host state only.
     const signature = JSON.stringify({
       settings,
+      commands,
       route,
       dark,
       applets: applets.map((e) => [e.id, e.state, e.enabled, e.pages, e.commands]),
@@ -234,6 +263,7 @@ export class UiPresentation {
     return { ...body, revision: this.revision };
   }
   private children = new Map<string, RibbonView['items']>();
+  private runningCommands = new Set<string>();
   group(id: string) {
     const view = this.get();
     const group = view.items.find((item) => item.id === id && item.kind === 'group');
@@ -246,6 +276,7 @@ export class UiPresentation {
           items: this.children.get(id)!,
           configuration: JSON.stringify([
             config,
+            (layout.buttons ?? []).filter((button) => config?.children.includes(button.id)),
             layout.hidden.filter((key) => key === id || config?.children.includes(key)),
             ribbonPlacement(layout, id),
           ]),
@@ -290,6 +321,10 @@ export class UiPresentation {
     }
     const promise = Promise.resolve().then(async () => {
       const current = this.get();
+      if (JSON.stringify(this.actions.get(request.actionId)) !== JSON.stringify(action))
+        throw Error('Action target changed');
+      if (request.actionId === current.contextActionId && current.contextActionEnabled === false)
+        throw Error('右クリックのコマンドは現在利用できません。');
       const candidates = local?.groupId
         ? (this.children.get(local.groupId) ?? [])
         : current.items.flatMap((item) => [item, ...(item.children ?? [])]);
@@ -307,8 +342,16 @@ export class UiPresentation {
         } else this.toggleGroup(action.group);
         return { accepted: true };
       }
+      if (action.command) {
+        if (this.runningCommands.has(action.command)) throw Error('コマンドは実行中です。');
+        this.runningCommands.add(action.command);
+        try {
+          return await (execute ? execute(action) : this.options.execute(action.command));
+        } finally {
+          this.runningCommands.delete(action.command);
+        }
+      }
       if (execute) return execute(action);
-      if (action.command) return this.options.execute(action.command);
       if (action.theme) return this.options.theme();
       await this.options.navigation.navigate(action.route!, action.section);
       return { accepted: true };

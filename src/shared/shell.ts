@@ -118,9 +118,12 @@ export interface RibbonView {
   dark: boolean;
   route: string;
   contextActionId: string;
+  contextActionEnabled?: boolean;
+  contextDisabledReason?: string;
   items: {
     id: string;
     kind: 'button' | 'separator' | 'group';
+    color?: string | null;
     title: string;
     tooltip: string;
     placement: 'top' | 'bottom';

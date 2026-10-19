@@ -47,6 +47,10 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 ## 選択されたShellの公開bridge
 
+0.66.0以降、登録した任意コマンドのボタンも表示用の`kind: "button"`とactionIdで表します。コマンドID・設定・引数は描画モデルへ渡しません。schema 2に任意の`contextActionEnabled`／`contextDisabledReason`を追加し、右クリックも同じ利用可否・実行時再検査を受けます。省略時の動作はリボン設定を開く操作です。schema 1の形は維持し、これらの任意フィールドは省略します。追加情報を使わない旧Shellから操作されても、本体が利用不可の実行を拒否します。
+
+0.65.0以降のschema 2のグループは任意の`color: "#RRGGBB" | null`を持ちます。省略／nullは色なしです。Default Shellはこの色をグループボタンの2pxの枠と、持続的に開いた子の縦線・接続部分へ使います。色なしでは両方を表示しません。schema 1へ色は返しません。色を表示する追加Shellはこの任意項目を使い、コマンド実行や選択状態と区別してください。
+
 リボンを提供するShellは`minimumHostVersion: "0.51.0"`と`shell.ribbonSchemaVersion: 2`を宣言する。省略／1の提供元はリボン領域だけDefault Shellへ戻し、他領域の割り当てを維持する。ローカルbridgeは常にschema 2。外部`ui.ribbon.get`は省略時にschema 1へ射影し、グループを通常ボタン、開いた持続型の子を後続の通常項目として返す。
 
 schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-groups-badges-design.md)。

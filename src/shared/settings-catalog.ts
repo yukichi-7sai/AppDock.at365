@@ -133,10 +133,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['speech.preview', '通知の読み上げを試聴', '試聴と停止'],
   ],
   ribbon: [
+    ['rightClickCommand', '右クリックのコマンド', '動作設定 リボン 右クリック コマンド'],
     [
       'ribbon',
       'リボン',
-      '表示 配置 並べ替え 上部 下部 セパレーター グループ 展開 折りたたみ バッジ',
+      '表示 配置 並べ替え 上部 下部 セパレーター 名前 色 パレット グループ 展開 折りたたみ バッジ コマンドボタン',
     ],
   ],
   tray: [
@@ -407,10 +408,17 @@ export function settingsPaths(
         'bindings',
       ].map((key) => ['gestures', key]);
     case 'ribbon':
-      return ['order', 'hidden', 'bottom', 'separators', 'groups', 'itemOverrides'].map((k) => [
-        'ribbon',
-        k,
-      ]);
+      return [
+        'order',
+        'hidden',
+        'bottom',
+        'separators',
+        'groups',
+        'itemOverrides',
+        'separatorTitles',
+        'buttons',
+        'rightClickCommand',
+      ].map((k) => ['ribbon', k]);
     case 'profile':
       return [
         ['profile', 'name'],

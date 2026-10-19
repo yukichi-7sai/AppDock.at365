@@ -33,6 +33,7 @@ export interface AutomationApplet {
 const hostIds = new Set([
   'appdock.open',
   'appdock.settings.open',
+  'appdock.ribbon.settings.open',
   'appdock.commands.search',
   'appdock.applets.open',
   'appdock.logs.open',
