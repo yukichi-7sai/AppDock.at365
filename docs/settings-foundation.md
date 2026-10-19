@@ -4,7 +4,7 @@
 
 0.57.0以降のApplet単位の共有／端末専用設定、ツールバーとJSON・ファイル操作の連動、本体の表示／一般設定・有効状態の保存分離は[端末別設定](device-settings-design.md)を参照する。表示・一般の同じチェックボックスはチェック済み・操作不可とし、Appletでは切り替え可能にする。共有・自端末の合成値と共通revisionをDeviceSettingsStoreから取得する。
 
-全設定は変更時に検証して即時保存する。正本は保存済みSettingsStoreの値とrevision。共有ドラフト・dirty・全体保存/破棄・未保存通知・mainの途中入力と画像バッファは撤去した。
+全設定は変更の確定時に検証して即時保存する。文字・数値・URL・JSONは入力中に設定へ送らず、blurまたはEnterで確定する。正本は保存済みSettingsStoreの値とrevision。共有ドラフト・dirty・全体保存/破棄・未保存通知・mainの途中入力と画像バッファは撤去した。
 
 ## 保存と入力
 
@@ -14,7 +14,9 @@ SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/
 
 要求はbefore/valueを持ち、mergeSettingsInputが変更したフィールドだけを現在値へ統合する。未編集フィールドの外部変更を保持し、同じフィールドの外部変更は拒否する。配列は順序/IDが重要なので全体で比較する。UIキューの直前成功結果だけを後続の基準へ使い、外部変更/失敗を黙って再試行しない。操作送信前に最新モデルを取得して購読の到着遅れを補い、入力のbeforeは保持して競合を検査する。古いView入力はsession/editRevisionで拒否する。
 
-IME変換中は画面内に保持してcompositionendで送る。フォーカス中の文字・数値表現を維持し、trim等で連続入力の空白を消さない。別の正規値への外部変更は表示へ反映する。不完全な数値、不正JSON、検証違反、保存失敗は現在のUIだけで入力とエラーを保持し、Storeや通知に保存しない。修正した入力で再検証/保存する。「設定を再読み込み」は現在ページの入力を保存値へ戻し、保存済み変更は巻き戻さない。ページ/モード移動・View破棄で未確定入力を破棄し、移動を禁止しない。再起動で途中入力を復元しない。
+文字・数値は共通のSettingsInput/SettingsTextarea内に保持し、blurまたはEnterで一度だけonChangeへ渡す。Enter後のblurや繰り返すEnterでは同じ入力を再送しない。Escapeはその欄の未確定入力を確定前の値へ戻し、後のblurでも保存しない。数値の上下キーも画面内の現在値へ作用し、確定まで保存しない。複数行はEnterで確定、Shift+Enterで改行する。IME変換中のEnter/Escapeを確定・取消へ使わず、フォーカス中のcompositionendだけでは設定へ送らない。変換中にblurした場合はcompositionend後に一度確定する。trim等で連続入力の空白を消さず、別の正規値への外部変更は表示へ反映する。不完全な数値、不正JSON、検証違反、保存失敗は現在のUIだけで入力とエラーを保持し、Storeや通知に保存しない。修正した入力で再検証/保存する。「設定を再読み込み」は現在ページの入力を保存値へ戻し、保存済み変更は巻き戻さない。通常のクリック移動はblurで確定し、blurを経ないView破棄では未確定入力を破棄する。再起動で途中入力を復元しない。
+
+検索欄は入力中の絞り込みを維持する。追加・編集ダイアログはSettingsInputModeのinputモードで一時入力だけを更新し、Enter/blurで欄の確定点を更新、Escapeでその欄を戻す。変更のある欄のEscapeはダイアログへ伝播させず、欄の変更がないEscapeは従来どおりダイアログを取り消す。明示ボタンで設定するAPIキーや接続ポート、試験生成の入力も、inputモードのローカル入力と実操作を分離する。設定の保存は従来のOK/適用操作で行う。URLはこのモードでも確定まで補正・検証しない。
 
 画像は選択/削除時に即時保存する。画面内で非同期読込の後、saveUserSettingsがPNG/JPEG、5MiB、寸法・元ファイル名・同名別画像を検査し、原画像と参照を保存する。draft-avatar URL、mainのbytes/プレビュー/変更フラグ、画像読込状態IPCを削除。登録済み原素材と保存失敗時の既存保持方針は[設定同期](settings-sync.md)。
 
@@ -57,6 +59,8 @@ Applet本文は`src/renderer/settings-ui/AppletSettingsForm.tsx`を共通テン�
 URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・スラッシュ・不完全なURLを入力欄内に保持する。補正・検証・保存はEnterまたはフォーカスが外れた時だけ行い、Enter後のblurで同じ入力を二重送信しない。IME変換確定のEnterは設定確定として扱わない。AI/TTSのベースURL、WebAppletのURL、本体/各Appletの更新元に同じ動作を適用する。WebAppletの追加許可先は`SettingsUrlTextarea`を使い、Enterで確定、Shift+Enterで改行する。Web側の初期設定取得もURL確定後に行う。AI接続ダイアログではURLの確定はローカル入力だけを更新し、Enterでは未保存値でモデル一覧を取得する。blurでは通信・保存をしない。その他のモデル一覧・更新等の通信は既存の明示操作を維持する。
 
 `scripts/settings-url-ui-test.cjs [固定EXE]`はURLの連続入力、確定前の保存/通信抑止、Enter/blurの補正と即時保存、IME、不正URLの保持/修正、各URL欄の共通動作を隔離fixtureで確認する。
+
+`scripts/settings-input-ui-test.cjs [固定EXE]`は本体/Appletの文字・数値・URL、上下キー、IME、複数行、ダイアログ/パスワード、ボイス候補欄、検索の確定・取消と、実行時設定/設定ファイル/revisionが入力中に変わらないことを確認する。
 
 ## 検証と次の範囲
 

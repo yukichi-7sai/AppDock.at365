@@ -33,7 +33,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 - Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
 - [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。一般Appletの複数Window/同一領域の同時多重表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。
 - Applet詳細は説明・設定・ショートカット・ログの固定タブとし、同一ページ内に排他表示する。別Appletへ移ってもタブを保持し、非表示の入力部品を二重にmountしない。個別ログの対象固定と全体ログのsource選択を分ける。
-- 設定は[設定基盤](docs/settings-foundation.md)の即時保存を正本とする。SettingsInputSessionは受付調整のみ。本体の入力キュー、ページ投影/外部競合/原子的保存を維持し、不正入力と失敗値は現在のUIだけに保持する。dirty・共有ドラフト・全体保存/破棄・未保存通知を再導入しない。
+- 設定は[設定基盤](docs/settings-foundation.md)の確定後の即時保存を正本とする。文字・数値・URL・JSONは共通入力部品でblur/Enter確定・Escape取消、複数行はShift+Enter改行とし、IME操作を優先する。SettingsInputSessionは受付調整のみ。本体の入力キュー、ページ投影/外部競合/原子的保存を維持し、不正入力と失敗値は現在のUIだけに保持する。dirty・共有ドラフト・全体保存/破棄・未保存通知を再導入しない。
 - 関連する複数項目からなる登録の一覧編集は、[一覧形式の設定編集UI](docs/settings-list-editing.md)に従い、AI接続の一覧＋共通ダイアログを基本とする。追加／編集の一時入力はダイアログ内だけに保持し、OKで登録単位に保存する。削除確認・並べ替え・入力確定・フォーカス復帰を揃え、既存機能固有の操作契約は保持する。
 - Applet設定は詳細タブと設定ページの左インデックスを入口とし、同じ本体の設定本文と編集状態を共用する。横断検索は左だけに結果を表示し、右本文はページ全体を保つ。Applet本文内のローカル検索を追加しない。
 - 更新・通常再起動は--restore-viewと画面選択を復元し、終了中のselected(null)でホームへ上書きしない。Appletの復元はstartupReadyと対象runningを待つ。

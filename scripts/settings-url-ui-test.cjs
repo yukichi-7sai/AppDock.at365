@@ -155,7 +155,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       );
     }
     await select('AI');
-    await page.getByRole('button', { name: '新しい接続の設定', exact: true }).click();
+    await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
     const ai = page.getByLabel('AIのAPIのURL', { exact: true });
     await ai.fill(base + '/v1///');
     assert.equal(await ai.inputValue(), base + '/v1///');
@@ -269,12 +269,13 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     assert.equal(requests.length, confirmedCount, 'blur does not repeat defaults import');
     checks.push('remote collection URL waits for confirmation and disabled pages remain unopened');
     await page.getByLabel('WebAppletの名前', { exact: true }).fill('URL fixture renamed');
+    await page.getByLabel('WebAppletの名前', { exact: true }).press('Enter');
     await settleSettings(page);
     assert.equal(
       (await snapshot()).settings.value.extensions['fixture.web-settings'].settings.items[0].name,
       'URL fixture renamed',
     );
-    checks.push('ordinary text fields retain immediate save');
+    checks.push('ordinary text fields save on confirmation too');
     await page.screenshot({ path: path.join(profile, 'confirmed.png') });
     success = true;
   } catch (e) {

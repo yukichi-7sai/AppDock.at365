@@ -35,6 +35,8 @@ export function AiConnectionDialog({
     structuredClone(original ?? newAiConnection(crypto.randomUUID())),
   );
   const [apiKey, setApiKey] = useState<string | undefined>();
+  const [urlReady, setUrlReady] = useState(!!draft.baseUrl.trim());
+  useEffect(() => setUrlReady(!!draft.baseUrl.trim()), [draft.baseUrl]);
   const [models, setModels] = useState<AiModel[]>([]),
     [pending, setPending] = useState(false);
   const [error, setError] = useState(''),
@@ -133,7 +135,7 @@ export function AiConnectionDialog({
       description="OpenAI互換APIに接続します。モデルIDは直接入力することもできます。"
       className="ai-connection-dialog"
       onClose={onClose}
-      valid={!pending && !!draft.name.trim() && !!draft.baseUrl.trim()}
+      valid={!pending && !!draft.name.trim() && urlReady}
       footer="OKで接続情報をまとめて保存します。"
       onApply={async () => {
         const next = {
@@ -192,8 +194,7 @@ export function AiConnectionDialog({
             }
             onInput={(e) => {
               invalidate();
-              const baseUrl = e.currentTarget.value;
-              setDraft((c) => ({ ...c, baseUrl }));
+              setUrlReady(!!e.currentTarget.value.trim());
             }}
             onChange={(e) => {
               const raw = e.target.value;
@@ -201,7 +202,10 @@ export function AiConnectionDialog({
               if (normalized === undefined) setDraft((c) => ({ ...c, baseUrl: raw }));
               else if (normalized !== draft.baseUrl) invalidate();
             }}
-            onKeyDown={(e) => enter(e, 'url')}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setUrlReady(!!e.currentTarget.value.trim());
+              enter(e, 'url');
+            }}
           />
         </SettingsField>
         <SettingsField title="名前">

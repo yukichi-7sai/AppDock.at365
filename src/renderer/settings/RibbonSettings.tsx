@@ -20,6 +20,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsColorPicker } from '../settings-ui/SettingsColorPicker';
+import { SettingsInput } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
 import { CommandPicker } from '../settings-ui/CommandPicker';
@@ -543,7 +544,7 @@ export function RibbonSettings({
           <div className="ribbon-edit-fields">
             <label>
               グループ名
-              <input
+              <SettingsInput
                 data-initial-focus
                 value={dialog.group.title}
                 maxLength={80}
@@ -640,7 +641,7 @@ export function RibbonSettings({
           <div className="ribbon-edit-fields">
             <label>
               ボタン名
-              <input
+              <SettingsInput
                 data-initial-focus
                 maxLength={80}
                 value={itemDialog.title}
@@ -680,7 +681,7 @@ export function RibbonSettings({
         >
           <label>
             名前
-            <input
+            <SettingsInput
               data-initial-focus
               maxLength={80}
               value={separatorDialog.title}
@@ -731,7 +732,7 @@ export function RibbonSettings({
             </div>
             <label>
               ボタン名
-              <input
+              <SettingsInput
                 data-initial-focus
                 maxLength={80}
                 value={buttonDialog.button.title}

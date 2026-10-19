@@ -296,6 +296,7 @@ export function AiSettingsForm({
         >
           <SettingsInput
             aria-label="試験のAIモデル"
+            commitOn="input"
             value={model}
             onChange={(e) => setModel(e.target.value)}
           />
@@ -303,6 +304,7 @@ export function AiSettingsForm({
         <SettingsField title="追加プロンプト">
           <SettingsTextarea
             aria-label="試験の追加プロンプト"
+            commitOn="input"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
@@ -310,6 +312,7 @@ export function AiSettingsForm({
         <SettingsField title="入力データ">
           <SettingsTextarea
             aria-label="試験の入力データ"
+            commitOn="input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />

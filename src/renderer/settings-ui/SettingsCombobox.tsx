@@ -19,6 +19,7 @@ export function SettingsCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(-1);
+  const [confirmation, setConfirmation] = useState<{ value: string }>();
   const matches = options.filter((option) =>
     `${option.id} ${option.name}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
   );
@@ -30,6 +31,7 @@ export function SettingsCombobox({
   };
   const choose = (index: number) => {
     if (!matches[index]) return;
+    setConfirmation({ value: matches[index].id });
     onChange(matches[index].id);
     setOpen(false);
     input.current?.focus();
@@ -86,15 +88,16 @@ export function SettingsCombobox({
         autoComplete="off"
         placeholder={label}
         value={value}
+        confirmation={confirmation}
         onClick={() => {
           if (!visible) show();
         }}
-        onChange={(event) => {
-          onChange(event.target.value);
-          setQuery(event.target.value);
+        onInput={(event) => {
+          setQuery(event.currentTarget.value);
           setActive(-1);
           setOpen(true);
         }}
+        onChange={(event) => onChange(event.target.value)}
         onBlur={() => setOpen(false)}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
@@ -117,6 +120,7 @@ export function SettingsCombobox({
             event.preventDefault();
             event.stopPropagation();
             setOpen(false);
+            setQuery(value);
           } else if (event.key === 'Tab') setOpen(false);
         }}
       />

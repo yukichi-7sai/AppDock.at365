@@ -123,6 +123,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       'selected model saved',
     );
     await page.getByLabel('TTSモデル', { exact: true }).fill('custom-model');
+    await page.getByLabel('TTSモデル', { exact: true }).press('Enter');
     await settleSettings(page);
     assert.equal((await snapshot()).settings.value.tts.model, 'custom-model');
     modelStatus = 404;
@@ -157,6 +158,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByLabel('取得したボイス', { exact: true }).selectOption('voice-a');
     await settleSettings(page);
     await page.getByLabel('読み上げ速度', { exact: true }).fill('1.45');
+    await page.getByLabel('読み上げ速度', { exact: true }).press('Enter');
     await settleSettings(page);
     assert.equal((await snapshot()).settings.value.tts.defaultSpeed, 1.45);
     assert(!requests.includes('speech'), 'editing never speaks');
@@ -201,12 +203,27 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByLabel('通知の速度に共通設定を使う').uncheck();
     await settleSettings(page);
     await page.getByLabel('通知用の読み上げ速度').fill('1.2');
+    await page.getByLabel('通知用の読み上げ速度').press('Enter');
     await settleSettings(page);
     assert.equal((await snapshot()).settings.value.notificationPreferences.speech.speed, 1.2);
     await page.getByLabel('通知の速度に共通設定を使う').check();
     await settleSettings(page);
     assert.equal((await snapshot()).settings.value.notificationPreferences.speech.speed, undefined);
     checks.push('notification speech settings inherit independently');
+    await page.getByLabel('通知の声に共通設定を使う').uncheck();
+    await settleSettings(page);
+    await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
+    const voiceInput = page.getByLabel('通知用のボイスID', { exact: true });
+    await voiceInput.fill('voice');
+    await voiceInput.press('ArrowDown');
+    await voiceInput.press('Enter');
+    await voiceInput.blur();
+    await settleSettings(page);
+    assert.equal((await snapshot()).settings.value.notificationPreferences.speech.voice, 'voice-a');
+    assert.equal(await voiceInput.inputValue(), 'voice-a');
+    checks.push(
+      'selecting the current voice candidate replaces unfinished text without saving it on blur',
+    );
     await page
       .locator('.settings-section')
       .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })

@@ -1,7 +1,6 @@
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
-import { useEffect, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
 import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections';
 import type { GestureSettings } from '../../shared/gestures';
@@ -15,19 +14,16 @@ function Names({
   change: (values: string[]) => void;
 }) {
   const label = hostSettingItem('gestures', itemKey).title;
-  const [text, setText] = useState(values.join(', '));
-  useEffect(() => setText(values.join(', ')), [JSON.stringify(values)]);
   return (
     <label className="gesture-option" {...settingAnchor('gestures', itemKey)}>
       <span>{label}</span>
       <SettingsInput
         aria-label={label}
-        value={text}
+        value={values.join(', ')}
         placeholder="chrome.exe, firefox.exe"
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() =>
+        onChange={(e) =>
           change(
-            text
+            e.target.value
               .split(/[\n,]/)
               .map((v) => v.trim())
               .filter(Boolean),

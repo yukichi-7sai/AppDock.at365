@@ -93,7 +93,7 @@ export function SettingsPageLayout({
               {storage.files.length > 1 ? '共有＋このPC' : storage.local ? 'このPC専用' : '共有'}　
             </span>
           )}
-          {pending ? '保存中…' : '変更は自動で保存されます。'}
+          {pending ? '保存中…' : '文字・数値はEnterかフォーカスを外して確定、Escapeで入力を取消。'}
         </p>
         {page.json && storage && storage.files.length > 1 ? (
           <details className="settings-file-menu">

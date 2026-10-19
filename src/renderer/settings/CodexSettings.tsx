@@ -1,5 +1,5 @@
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { SettingsInput } from '../settings-ui/SettingsInput';
+import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
@@ -48,8 +48,8 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   useEffect(() => {
     setHostnames(savedHostnames ?? '');
   }, [savedHostnames]);
-  function saveHostnames() {
-    const names = hostnames
+  function saveHostnames(value: string) {
+    const names = value
       .split(/\r?\n/)
       .map((name) => name.trim())
       .filter(Boolean);
@@ -286,16 +286,18 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
       >
         <SettingsField
           title="追加の接続先ホスト名"
-          description="IPアドレスで接続する場合は不要です。MagicDNSの完全名やDNS別名を1行ずつ指定します。入力欄を離れると保存します（16件まで）。"
+          description="IPアドレスで接続する場合は不要です。MagicDNSの完全名やDNS別名をShift+Enterで1行ずつ指定します。Enterか入力欄を離れる操作で保存します（16件まで）。"
         >
-          <textarea
+          <SettingsTextarea
             aria-label="追加の接続先ホスト名"
             value={hostnames}
             rows={3}
             disabled={busy}
             spellCheck={false}
-            onChange={(e) => setHostnames(e.target.value)}
-            onBlur={saveHostnames}
+            onChange={(e) => {
+              setHostnames(e.target.value);
+              saveHostnames(e.target.value);
+            }}
           />
         </SettingsField>
         <SettingsField
@@ -304,6 +306,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         >
           <SettingsInput
             aria-label="Codexの設定ファイル"
+            commitOn="input"
             value={file}
             disabled={busy}
             spellCheck={false}
@@ -324,6 +327,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         >
           <SettingsInput
             aria-label="Codexへの登録名"
+            commitOn="input"
             value={name}
             maxLength={64}
             disabled={busy}
@@ -349,6 +353,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             max={65535}
             step={1}
             aria-label="接続ポート"
+            commitOn="input"
             value={port}
             disabled={busy}
             onChange={(e) => setPort(e.target.value)}

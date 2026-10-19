@@ -211,6 +211,7 @@ async function until(fn, label) {
     };
     await category('プロフィール');
     await shell.getByLabel('ユーザー名', { exact: true }).fill('Immediate profile');
+    await shell.getByLabel('ユーザー名', { exact: true }).press('Enter');
     await settleSettings(shell);
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).profile.name,
@@ -231,6 +232,7 @@ async function until(fn, label) {
     await name.evaluate((el) =>
       el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '変換確定' })),
     );
+    await name.press('Enter');
     await settleSettings(shell);
     assert.equal(
       (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
@@ -239,6 +241,7 @@ async function until(fn, label) {
     // Rapid confirmed events must serialize without losing a newer character.
     await name.fill('');
     await name.pressSequentially('Rapid typing');
+    await name.press('Enter');
     await settleSettings(shell);
     assert.equal(
       (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
@@ -257,7 +260,7 @@ async function until(fn, label) {
       'data/assets/profile/icon.png',
     );
     checks.push(
-      'text and rapid typing persist immediately; IME remains local until confirmed; avatar saves original bytes/name without staging',
+      'text and rapid typing persist on Enter; IME remains local until confirmed; avatar saves original bytes/name without staging',
     );
     if (app) {
       await app.evaluate(() => {
@@ -273,6 +276,7 @@ async function until(fn, label) {
         };
       });
       await name.fill('Rejected input');
+      await name.press('Enter');
       await shell.getByRole('alert').first().waitFor();
       assert.equal(await name.inputValue(), 'Rejected input');
       assert.equal(
@@ -284,6 +288,7 @@ async function until(fn, label) {
         delete globalThis.immediateSaveFixture;
       });
       await name.fill('Retry confirmed');
+      await name.press('Enter');
       await settleSettings(shell);
       assert.equal(
         (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
@@ -295,6 +300,7 @@ async function until(fn, label) {
     }
     await category('Settings fixture');
     await shell.getByLabel('Fixture amount', { exact: true }).fill('-');
+    await shell.getByLabel('Fixture amount', { exact: true }).press('Enter');
     await shell.getByRole('alert').first().waitFor();
     assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '-');
     assert.notEqual(
@@ -304,6 +310,7 @@ async function until(fn, label) {
       '-',
     );
     await shell.getByLabel('Fixture amount', { exact: true }).fill('9');
+    await shell.getByLabel('Fixture amount', { exact: true }).press('Enter');
     await settleSettings(shell);
     assert.equal(
       (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
@@ -312,9 +319,11 @@ async function until(fn, label) {
       9,
     );
     await shell.getByLabel('Fixture text', { exact: true }).fill('Shared durable text');
+    await shell.getByLabel('Fixture text', { exact: true }).press('Enter');
     await settleSettings(shell);
     await shell.getByRole('button', { name: 'JSON', exact: true }).click();
     await shell.getByLabel('設定JSON').fill('{invalid');
+    await shell.getByLabel('設定JSON').press('Enter');
     await shell.getByRole('alert').first().waitFor();
     assert.equal('text' in (await host.evaluate(() => window.dock.settingsEditing())), false);
     await category('表示');
@@ -327,6 +336,7 @@ async function until(fn, label) {
     const before = JSON.parse(await shell.getByLabel('設定JSON').inputValue());
     before.extensions['fixture.settings'].settings.amount = 11;
     await shell.getByLabel('設定JSON').fill(JSON.stringify(before));
+    await shell.getByLabel('設定JSON').press('Enter');
     await settleSettings(shell);
     assert.equal(
       (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
@@ -433,6 +443,7 @@ async function until(fn, label) {
       });
       try {
         await shell.getByLabel('ユーザー名', { exact: true }).fill('Drain proof');
+        await shell.getByLabel('ユーザー名', { exact: true }).press('Enter');
         await until(
           () => app.evaluate(() => !!globalThis.settingsDrainFixture.release),
           'queued host settings edit',
@@ -513,6 +524,7 @@ async function until(fn, label) {
     assert.equal((await modelOf(shell)).content.context, 'applet');
     assert.equal(await shell.getByLabel('Fixture amount', { exact: true }).inputValue(), '12');
     await shell.getByLabel('Fixture text', { exact: true }).fill('Restored detail');
+    await shell.getByLabel('Fixture text', { exact: true }).press('Enter');
     await settleSettings(shell);
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[

@@ -217,6 +217,13 @@ async function colorGeometry() {
     await page.getByLabel('色のHEX値', { exact: true }).fill('#12');
     assert.equal(await page.getByRole('button', { name: '適用', exact: true }).isEnabled(), false);
     assert.equal((await saved((r) => r.groups[0])).color, '#D249A1');
+    await page.getByLabel('色のHEX値', { exact: true }).press('Escape');
+    assert.equal(await page.getByLabel('色のHEX値', { exact: true }).inputValue(), '#D249A1');
+    assert.equal(await page.getByRole('dialog').count(), 1);
+    await page.getByLabel('色のHEX値', { exact: true }).fill('#aabbcc');
+    await page.getByLabel('色のHEX値', { exact: true }).press('Escape');
+    assert.equal(await page.getByLabel('色のHEX値', { exact: true }).inputValue(), '#D249A1');
+    assert.equal((await saved((r) => r.groups[0])).color, '#D249A1');
     await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
     await page.getByRole('button', { name: '青', exact: true }).click();

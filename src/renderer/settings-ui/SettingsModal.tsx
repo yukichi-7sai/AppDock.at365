@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSettingsControls } from './api';
+import { SettingsInputMode } from './SettingsInput';
 
 /** Shared settings modal: focus containment/return, IME-safe dismissal and input suspension. */
 export function SettingsModal({
@@ -62,29 +63,31 @@ export function SettingsModal({
     };
   }, []);
   return createPortal(
-    <dialog
-      ref={dialog}
-      className={`applet-shortcut-dialog settings-modal ${className}`}
-      aria-labelledby={labelledBy}
-      data-shortcut-recorder="true"
-      onCancel={(event) => {
-        event.preventDefault();
-        if (!closeDisabled) onClose();
-      }}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
-          if (event.key === 'Escape') event.preventDefault();
-          return;
-        }
-        if (event.key === 'Escape') {
+    <SettingsInputMode.Provider value="input">
+      <dialog
+        ref={dialog}
+        className={`applet-shortcut-dialog settings-modal ${className}`}
+        aria-labelledby={labelledBy}
+        data-shortcut-recorder="true"
+        onCancel={(event) => {
           event.preventDefault();
           if (!closeDisabled) onClose();
-        }
-      }}
-    >
-      {children}
-    </dialog>,
+        }}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+            if (event.key === 'Escape') event.preventDefault();
+            return;
+          }
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            if (!closeDisabled) onClose();
+          }
+        }}
+      >
+        {children}
+      </dialog>
+    </SettingsInputMode.Provider>,
     document.body,
   );
 }

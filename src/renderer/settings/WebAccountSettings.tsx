@@ -52,6 +52,7 @@ function AccountRow({
     <div className="web-account-card">
       <div className="web-account-row">
         <SettingsInput
+          commitOn="input"
           aria-label={`アカウント名 ${account.name}`}
           maxLength={80}
           value={name}

@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { SettingsInput } from './SettingsInput';
 import { parseRibbonColor } from '../../shared/ribbon';
 import './settings-color-picker.css';
 
@@ -26,7 +27,6 @@ export function SettingsColorPicker({
   onValidityChange?(valid: boolean): void;
 }) {
   const [raw, setRaw] = useState(value ?? '');
-  const composing = useRef(false);
   const description = useId();
   useEffect(() => {
     setRaw(value ?? '');
@@ -38,9 +38,9 @@ export function SettingsColorPicker({
     onChange(color);
   };
   const valid = (text: string) => /^#[a-fA-F0-9]{6}$/.test(text) || (allowNone && !text);
-  const changeText = (text: string, complete: boolean) => {
+  const changeText = (text: string) => {
     setRaw(text);
-    const ready = !composing.current && valid(text);
+    const ready = valid(text);
     onValidityChange?.(ready);
     if (ready) choose(text ? parseRibbonColor(text) : null);
   };
@@ -76,29 +76,14 @@ export function SettingsColorPicker({
         </label>
         <label>
           HEX
-          <input
+          <SettingsInput
             aria-label="色のHEX値"
             value={raw}
             placeholder="#RRGGBB"
             maxLength={7}
             aria-invalid={!valid(raw)}
             aria-describedby={description}
-            onCompositionStart={() => {
-              composing.current = true;
-              onValidityChange?.(false);
-            }}
-            onCompositionEnd={(e) => {
-              composing.current = false;
-              changeText(e.currentTarget.value, true);
-            }}
-            onChange={(e) => changeText(e.target.value, false)}
-            onBlur={(e) => changeText(e.target.value, true)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                if (!e.nativeEvent.isComposing) changeText(e.currentTarget.value, true);
-              }
-            }}
+            onChange={(e) => changeText(e.target.value)}
           />
         </label>
       </div>

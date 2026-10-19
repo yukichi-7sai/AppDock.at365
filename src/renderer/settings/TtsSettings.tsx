@@ -106,6 +106,7 @@ export function TtsSettingsForm({
         >
           <SettingsInput
             aria-label="APIキー"
+            commitOn="input"
             type="password"
             autoComplete="off"
             value={key}
@@ -260,6 +261,7 @@ export function TtsSettingsForm({
         <SettingsField title="試聴するテキスト">
           <SettingsTextarea
             aria-label="試聴するテキスト"
+            commitOn="input"
             value={text}
             placeholder="読み上げたい文章を入力…"
             onChange={(e) => setText(e.target.value)}

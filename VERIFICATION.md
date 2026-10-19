@@ -1,5 +1,21 @@
 # 検証記録
 
+## 2026-10-20: 設定入力確定のコミット前確認（0.67.0）
+
+- 利用者の動作確認とcommit・pushの依頼を受け、入力確定の実装・文書・GUI試験の23ファイルを対象とした。未コミット変更を保持してfetchし、GitHubとAQUAのmainが開始時HEAD `10c8850`と一致することを確認した。
+- 実装時の673入力・完全ログ・GUI結果・最終EXE/feedのSHA256を照合し、型検査・build/publish・関連6ファイル33件・GUI46群を再利用した。残る89ファイルを追加実行して **641/641、fail/skip 0** が成功し、合計95ファイル **674/674** を満たした。制限内のfixture buildと回帰の権限エラーはログを保持し、同一コマンドの通常ユーザー再実行で成功した。失敗コマンド内の部分成功を再利用していない。
+- [コミット検証資料](.artifacts/commit-validation-settings-input-20261020/validation.json)に入力/生成物の前後照合、再利用元、追加試験のコマンド・終了コード・ログhash、再レビューを記録した。stage/commit tree・実効作者/コミッター・GitHub/AQUA両mainの最終照合は同フォルダーの`staged.json`・`commit.json`・`push.json`へ記録する。
+- 製品内容は動作確認済みの **0.67.0** から変更せず、発行EXE **168911183 bytes / SHA256 6bcce60645bd3ea89acc7c1da93b7c198f6b1b12e1cf698fd52ad6a1a191bf71** を維持した。物理IMEの個別操作は追加確認しておらず、イベント注入のGUI試験と利用者の動作確認を区別する。新しいGUI profileと整理対象は追加せず、固定出力・失敗/再利用資料を保持する。Release・全体ZIP作成・実利用先deployは対象外。
+
+## 2026-10-20: 設定の文字・数値を確定時に保存（0.67.0）
+
+- 開始時はmain/c06a0d9・cleanを確認し、依頼どおり`pull --ff-only`でorigin/mainの`10c8850`（0.66.2）へ更新した。通常の文字・数値・URL・複数行/部分JSONは共通入力部品内で保持し、blur/Enterで検証・反映・保存、Escapeでその欄の未確定入力を取り消す。Enter後のblurは再送せず、上下キーも数値の確定まで保存しない。複数行はShift+Enterで改行する。
+- IMEのEnter/Escapeとcompositionendだけでは通常設定を保存せず、変換中にblurした場合はcompositionend後に一度だけ確定する。追加・編集ダイアログと明示ボタンで適用する入力は一時値だけを更新し、従来のOK/適用操作で保存する。変更のある欄のEscapeは欄だけを戻す。ボイス候補・HEX・リボンの名前・ジェスチャーのプロセス一覧・MCPホスト名・Webアカウント名も接続し、検索の即時絞り込みとキー記録の固有操作を保持した。
+- 型検査、本体/Default Shell/nativeホストのbuild、既存publish.batの発行が成功。関連6ファイルの単体回帰は **33/33、fail/skip 0**。後続修正はrendererの入力/候補に限られ、backend・共有型・試験・依存/ビルド定義の315入力のSHA256一致を確認した。[再利用の照合](.artifacts/settings-input-confirmation-20261020/unit-reuse.json)。最終固定EXEの5試験 **35群** とソースSettings Shell **11群**、合計 **46群** が成功した。入力中の実行時設定/ファイル/revision保持、取消後のblur、IME blur、外部変更、部分JSON、保存失敗、競合、復元、ダイアログ/秘密欄、同じボイスの再選択、両テーマ/1280・760幅、HEX取消と実再起動を検査した。
+- [発行前レビュー](.artifacts/settings-input-confirmation-20261020/review.md)と追加修正の再レビューを実施。検索Escapeの表示更新、同じボイスを再選択した時の未確定文字の誤保存、ローカルダイアログのIME blurを修正し、最後のEXEで再確認した。初回の制限環境のDNS/GUI失敗や試験の古いselector・不足していた入力は成功と扱わず、失敗資料と修正後の成功を保持した。保存の操作契約を変更するため **0.66.2→0.67.0** のマイナー更新。設定項目・保存ファイル・公開API・依存版の追加/削除はなく、既存保存値の移行は行っていない。
+- 発行先は`A:\40.ARTIFACT\AppDock.at365`。最終EXEは **168911183 bytes / SHA256 6bcce60645bd3ea89acc7c1da93b7c198f6b1b12e1cf698fd52ad6a1a191bf71**。update.jsonの版・サイズ・hashと一致し、各試験のコピーとも一致する。実行中の本体/同梱Default Shellも **0.67.0**。途中の別hashのEXEの成功を最終成果物へ流用していない。
+- [検証の照合結果](.artifacts/settings-input-confirmation-20261020/validation.json)に673入力の前後SHA256、試験コマンド/終了コード/ログhash、各profileの結果、最終EXE/feedと実行中のShell版を記録した。検証後の変更はこの記録だけ。今回作成した古い成功済みソース試験1件を、絶対パス・再解析ポイントなし・関連プロセスなしを確認して整理し、直近3件と失敗/固定EXE/既存の再利用資料は保持した。[整理記録](.artifacts/settings-input-confirmation-20261020/cleanup.json)。実OSでのIME変換は未確認で、IME試験はcomposition/keyイベント注入。無関係な全標準回帰は実行せず、commit・push・Release・実利用先deployは行っていない。
+
 ## 2026-10-20: 未使用importのみの追加整理とコミット前確認（0.66.2）
 
 - 前項の未使用指摘23件から、8ファイルのimport 13個だけを削除した。SettingsInput系の未使用部品、NotificationSettingsのReact既定import、SettingsFormと共通settings-pageの未使用型が対象。未使用の変数・引数10件と、その初期化処理・Hookは変更していない。main.tsxの整理分も同じ未公開変更としてコミット対象に含める。
