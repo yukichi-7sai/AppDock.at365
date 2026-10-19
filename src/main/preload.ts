@@ -1,5 +1,75 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
+import type { HostModalBackdrop } from '../shared/host-modal';
+
+// Native dialog backdrops cover all registered Shell surfaces in this document.
+window.addEventListener('DOMContentLoaded', () => {
+  let active = false;
+  let generation = 0;
+  let backdrop: HTMLDivElement | undefined;
+  ipcRenderer.on('dock:hostModalBackdrop', async (_event, model: HostModalBackdrop) => {
+    if (!active) return;
+    const current = ++generation;
+    const next = document.createElement('div');
+    next.dataset.hostModalBackdrop = 'true';
+    next.setAttribute('aria-hidden', 'true');
+    Object.assign(next.style, {
+      position: 'fixed',
+      inset: '0',
+      pointerEvents: 'none',
+      zIndex: '2147483647',
+    });
+    const images = model.surfaces.map((surface) => {
+      const image = new Image();
+      image.alt = '';
+      image.dataset.hostModalSurface = String(surface.id);
+      image.src = surface.image;
+      Object.assign(image.style, {
+        position: 'absolute',
+        left: `${surface.bounds.x}px`,
+        top: `${surface.bounds.y}px`,
+        width: `${surface.bounds.width}px`,
+        height: `${surface.bounds.height}px`,
+      });
+      next.append(image);
+      return image;
+    });
+    try {
+      await Promise.all(images.map((image) => image.decode()));
+    } catch {
+      return;
+    }
+    if (!active || current !== generation) return;
+    backdrop?.remove();
+    backdrop = next;
+    document.body.append(next);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (active && current === generation)
+          void ipcRenderer.invoke('dock:hostModalReady', model.revision).catch(() => {});
+      });
+    });
+  });
+  const update = () => {
+    const next = !!document.querySelector('dialog:modal');
+    if (next === active) return;
+    active = next;
+    if (!active) {
+      generation++;
+      backdrop?.remove();
+      backdrop = undefined;
+    }
+    void ipcRenderer.invoke('dock:hostModal', active).catch(() => {});
+  };
+  new MutationObserver(update).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['open'],
+  });
+  update();
+});
+
 let globalShortcutOwnership = new Set<string>(ipcRenderer.sendSync('dock:shortcutOwnership:get'));
 ipcRenderer.on(
   'dock:shortcutOwnership',

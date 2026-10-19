@@ -77,6 +77,12 @@
 
 本体の設定ページでは公開されたSettingsPageの操作契約を通して本体が検証・保存し、本体rendererは描画と一時入力を持つ。Shellごとの内部importや専用の保存経路を増やさない。SettingsModalは同じ設定Surface内のダイアログであり、別WebContentsにまたがる表示には[Shellの共通オーバーレイ](shell-overlays.md)を使う。
 
+本体documentのnative dialogを開く間は、[HostModalLayer](../src/main/core/host-modal-layer.ts)が登録されたShellの描画面をまとめて背景として扱う。表示中の各Viewの画像を元の表示順で同じdocumentへ置き、その上からdialogの`::backdrop`で暗くする。すべての画像の読み込みと配置が終わってからnative Viewを一時非表示にするため、リボンなどの別WebContentsがダイアログや背景より手前に残らない。renderer・接続・状態は保持し、画像は寸法・zoom・提供元・対象集合の変更時に更新する。
+
+描画面の所有者はViewを`register(view)`で登録し、親への追加・bounds更新後に返された登録口の`setVisible(visible)`へ表示希望を渡す。操作とフォーカスの入口では`blocked`を検査し、Viewの終了時に`dispose()`する。通常は希望どおり表示し、モーダル中だけ共通側が非表示を管理する。現在はリボンを接続済みで、将来タイトルバーやステータスバーをShell化する場合も同じ登録口を使う。新しいShell領域そのものはこの背景処理では追加しない。
+
+開いている最後のnative dialogを閉じると画像を破棄して各Viewを最新の表示希望に戻す。本体rendererの再読込・終了でも非表示を解除し、遅れて届いた画像や表示完了の応答は世代で拒否する。これは既存ダイアログの背景処理であり、コマンドパレットの独立したオーバーレイは従来の表示経路を使う。
+
 Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ)を確認する。`object-list`に`list`を宣言すると、本体が共通の一覧・追加/編集・削除確認・並べ替えダイアログを自動生成する。既存の`list`未指定の表示は維持する。WebAppletの管理ページも同じ`SettingsListTable`を利用する。
 
 ## Shellで並べ替えを再利用する

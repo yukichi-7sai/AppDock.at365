@@ -12,6 +12,7 @@ import type { SettingsPageDefinition } from '../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../shared/settings-page';
 import { ShellHost } from './core/shell-host';
 import { OverlayHost } from './core/overlay-host';
+import { HostModalLayer } from './core/host-modal-layer';
 import { ShellPageHost } from './core/shell-page-host';
 import { HomePageSession, HomeCommandExecution } from './core/home-page';
 import { NotificationCenterController } from './core/notification-center';
@@ -298,6 +299,7 @@ async function flushSettingsInputs() {
 }
 let shellHost: ShellHost | undefined;
 let overlayHost: OverlayHost | undefined;
+let hostModalLayer: HostModalLayer | undefined;
 let shellPageHost: ShellPageHost | undefined;
 let settingsPageHost: SettingsPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
@@ -2368,6 +2370,14 @@ function registerIpc() {
     return dispatchShortcut(normalized);
   });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
+  handle('dock:hostModal', (active: boolean) => {
+    if (typeof active !== 'boolean') throw Error('Invalid modal state');
+    hostModalLayer?.setActive(active);
+  });
+  handle('dock:hostModalReady', (revision: number) => {
+    if (!Number.isSafeInteger(revision)) throw Error('Invalid modal revision');
+    hostModalLayer?.ready(revision);
+  });
   handle('dock:setShortcutRecording', async (recording: boolean) => {
     if (typeof recording !== 'boolean') throw new Error('キー入力状態が正しくありません。');
     shortcutRecording = recording && !!window?.isFocused();
@@ -2893,6 +2903,7 @@ async function initialize() {
       relaunchDisplayName: 'AppDock.at365',
     });
   }
+  hostModalLayer = new HostModalLayer(window, () => shellRegistry?.touch());
   windowState.track(window);
   notificationService = new NotificationService(
     new NotificationHistoryStore(
@@ -3009,6 +3020,10 @@ async function initialize() {
   });
   shellHost = new ShellHost({
     window,
+    layer: () => {
+      overlayHost?.layout();
+    },
+    modalLayer: hostModalLayer,
     preload: path.join(__dirname, 'shell-preload.js'),
     ui: presentation,
     openGroup: (id, anchor) =>
