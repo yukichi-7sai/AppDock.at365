@@ -170,6 +170,22 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     }
     public Task ShowAsync(string title, string body, CancellationToken cancellationToken = default) => CallAsync("host.notifications.show", new { title, body }, cancellationToken);
     Task IPageService.OpenAsync(string id, CancellationToken cancellationToken) => CallAsync("host.pages.open", new { id }, cancellationToken);
+    public Task<PageListResult> ListAsync(CancellationToken cancellationToken = default)
+        => RequestAsync<PageListResult>("host.pages.list", new { }, cancellationToken);
+    public Task<PageRevisionResult> ReplaceAsync(IReadOnlyList<RuntimePageDefinition> pages, long expectedRevision, CancellationToken cancellationToken = default)
+        => RequestAsync<PageRevisionResult>("host.pages.replace", new { pages, expectedRevision }, cancellationToken);
+    public Task HideAsync(string id, CancellationToken cancellationToken = default) => CallAsync("host.pages.hide", new { id }, cancellationToken);
+    Task IPageService.DisposeAsync(string id, CancellationToken cancellationToken) => CallAsync("host.pages.dispose", new { id }, cancellationToken);
+    public Task OpenItemAsync(string id, CancellationToken cancellationToken = default) => CallAsync("host.pages.openItem", new { id }, cancellationToken);
+    public Task<PageChangeResult> NotifyChangedAsync(string id, CancellationToken cancellationToken = default)
+        => RequestAsync<PageChangeResult>("host.pages.changed", new { id }, cancellationToken);
+    public Task<PageImagesResult> RegisterImagesAsync(string id, IReadOnlyList<PageImageFile> files, CancellationToken cancellationToken = default)
+        => RequestAsync<PageImagesResult>("host.pages.images.register", new { id, files }, cancellationToken);
+    public Task ReleaseImagesAsync(string id, IReadOnlyList<string> imageIds, CancellationToken cancellationToken = default)
+        => CallAsync("host.pages.images.release", new { id, imageIds }, cancellationToken);
+    public Task OpenDetailsAsync(CancellationToken cancellationToken = default) => CallAsync("host.ui.openDetails", new { }, cancellationToken);
+    private async Task<T> RequestAsync<T>(string method, object parameters, CancellationToken token)
+        => (await connection.RequestAsync(method, parameters, token)).Deserialize<T>(JsonRpcConnection.Json)!;
     public Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default) => CallAsync("host.ui.panel", panel, cancellationToken);
     public async Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default) =>
         (await connection.RequestAsync("host.ui.imageDirectory", new { }, cancellationToken)).GetString()!;
@@ -198,6 +214,19 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
             if (!commands.TryGetValue(commandId, out var command)) throw new ArgumentException("Unknown command.");
             token.ThrowIfCancellationRequested();
             await command.Handler(token);
+        }
+        finally { commandLock.Release(); }
+    }
+    internal async Task<JsonElement?> ExecutePageActionAsync(IPageActionHandler handler, string actionId, JsonElement input, string pageId, CancellationToken token)
+    {
+        await commandLock.WaitAsync(token);
+        try {
+            token.ThrowIfCancellationRequested();
+            var result = await handler.HandlePageActionAsync(actionId, input.Clone(), pageId, token);
+            token.ThrowIfCancellationRequested();
+            if (JsonSerializer.SerializeToUtf8Bytes(result, JsonRpcConnection.Json).Length > 512 * 1024)
+                throw new InvalidDataException("ページの応答が大きすぎます。データを分割してください。");
+            return result;
         }
         finally { commandLock.Release(); }
     }

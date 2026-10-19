@@ -83,13 +83,16 @@ const localUi = async (suffix) =>
   );
 const settingsUi = () => require('./settings-host-helper.cjs').settingsPage(dock);
 const button = (title) =>
-  require('./settings-host-helper.cjs')
-    .deferred(async () => {
-      if (['ホーム', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title)) return rail;
-      const snapshot = await dock.evaluate(() => window.dock.snapshot());
-      return snapshot.navigation.route === 'settings' ? settingsUi() : dock;
-    })
-    .getByRole('button', { name: title, exact: true });
+  title === 'Gmail'
+    ? rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]')
+    : require('./settings-host-helper.cjs')
+        .deferred(async () => {
+          if (['ホーム', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title))
+            return rail;
+          const snapshot = await dock.evaluate(() => window.dock.snapshot());
+          return snapshot.navigation.route === 'settings' ? settingsUi() : dock;
+        })
+        .getByRole('button', { name: title, exact: true });
 const setDisplay = (extensionId, pageId, display) =>
   dock.evaluate(
     async ({ extensionId, pageId, display }) => {
@@ -213,6 +216,9 @@ async function launch() {
     await button('Gmail').click();
     const gmailUi = await localUi('/web/index.html');
     const snapshot = () => gmailUi.evaluate(() => window.webAccounts.snapshot());
+    await gmailUi.evaluate(async () => {
+      if (!(await window.webAccounts.snapshot()).accounts.length) await window.webAccounts.add();
+    });
     await until(async () => (await snapshot()).accounts[0].data?.pending === 1, 'Gmail baseline');
     const account = (await snapshot()).selected;
     fs.writeFileSync(
@@ -466,6 +472,10 @@ async function launch() {
     const restartSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     restartSettings.extensions['at365.gmail'].enabled = false;
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(restartSettings));
+    const deviceFile = path.join(profile, `settings-${require('node:os').hostname()}.json`);
+    const deviceSettings = JSON.parse(fs.readFileSync(deviceFile));
+    deviceSettings.extensions['at365.gmail'].enabled = false;
+    fs.writeFileSync(deviceFile, JSON.stringify(deviceSettings));
     await launch();
     await until(
       async () => (await rail.locator('[data-ribbon-id="settings"]').count()) === 0,
@@ -481,6 +491,25 @@ async function launch() {
       async () => (await remote(account, 'document.cookie')).includes('fixture=persisted'),
       'Cookie restart persistence',
     );
+    await until(
+      async () =>
+        (await dock.evaluate(() => window.dock.snapshot())).navigation.route ===
+          'page:at365.gmail:gmail' &&
+        (await app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().some(
+            (window) =>
+              window.webContents.getURL() === 'appdock://host/index.html' &&
+              window.contentView.children.some(
+                (view) =>
+                  view.getBounds().width > 700 &&
+                  view.children.some((child) =>
+                    child.webContents?.getURL().endsWith('/web/index.html'),
+                  ),
+              ),
+          ),
+        )),
+      'Restored Gmail page is attached before stopping',
+    );
     await dock.evaluate(() => window.dock.toggleExtension('at365.gmail', false));
     await until(() => restoredUi.isClosed(), 'UI disposed on stop');
     assert.equal(
@@ -491,7 +520,12 @@ async function launch() {
       ),
       false,
     );
-    assert.equal(await dock.locator('.applet-page-viewport').count(), 0);
+    await until(
+      async () =>
+        (await dock.evaluate(() => window.dock.snapshot())).navigation.route === 'home' &&
+        (await dock.locator('.applet-page-viewport').count()) === 0,
+      'Stopped page returns Home and removes the viewport',
+    );
     const errors = await dock.evaluate(async () =>
       (await window.dock.snapshot()).logs.filter((l) => l.level === 'error'),
     );

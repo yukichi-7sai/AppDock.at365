@@ -39,6 +39,9 @@ export interface NodeExtensionContext {
     openItem(id: string): Promise<unknown>;
     hide(id: string): Promise<unknown>;
     dispose(id: string): Promise<unknown>;
+    notifyChanged(id: string): Promise<{ accepted: true; delivered: boolean }>;
+    registerImages(id: string, files: import('./core/page-images').PageImageFile[]): Promise<{ images: import('./core/page-images').PageImageReference[] }>;
+    releaseImages(id: string, imageIds: string[]): Promise<unknown>;
     list(): Promise<{
       revision: number;
       pages: import('../shared/dynamic-pages').DynamicPageDefinition[];
@@ -89,6 +92,7 @@ export interface NodeExtensionContext {
     ): Promise<unknown>;
   };
   ui: {
+    openDetails(): Promise<unknown>;
     showPanel(panel: Panel): Promise<unknown>;
     getImageDirectory(): Promise<string>;
     pickFile(kind: 'json' | 'wav'): Promise<string | null>;
@@ -174,6 +178,9 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           openItem: (id) => peer.request('host.pages.openItem', { id }),
           hide: (id) => peer.request('host.pages.hide', { id }),
           dispose: (id) => peer.request('host.pages.dispose', { id }),
+          notifyChanged: (id) => peer.request('host.pages.changed', { id }) as Promise<{ accepted: true; delivered: boolean }>,
+          registerImages: (id, files) => peer.request('host.pages.images.register', { id, files }) as Promise<{ images: import('./core/page-images').PageImageReference[] }>,
+          releaseImages: (id, imageIds) => peer.request('host.pages.images.release', { id, imageIds }),
           list: () =>
             peer.request('host.pages.list', {}) as ReturnType<
               NodeExtensionContext['pages']['list']
@@ -239,6 +246,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           setOptions: (key, options) => peer.request('host.settings.options', { key, options }),
         },
         ui: {
+          openDetails: () => peer.request('host.ui.openDetails', {}),
           pickFile: (kind) => peer.request('host.ui.pickFile', { kind }, 300000),
           showPanel: (panel) => peer.request('host.ui.panel', panel),
           getImageDirectory: () => peer.request('host.ui.imageDirectory', {}) as Promise<string>,

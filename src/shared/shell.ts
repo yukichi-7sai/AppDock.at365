@@ -183,4 +183,5 @@ export type NavigationState = {
   request: number;
   section?: 'profile' | 'ribbon' | 'general';
   appletId?: string;
+  appletDetail?: 'description';
 };

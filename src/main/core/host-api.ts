@@ -24,6 +24,7 @@ import { contained } from './extensions';
 import { pageKey } from '../../shared/applet-pages';
 import { openLocalPage, pageHostShortcut } from './applet-pages';
 import { disposeAppletPage, hideAppletPage, updateAppletPage } from './applet-pages';
+import { localPageImages, notifyAppletPage } from './applet-pages';
 import { parseDynamicPages } from '../../shared/dynamic-pages';
 export function createHostApi(
   settings: SettingsStore,
@@ -45,6 +46,7 @@ export function createHostApi(
   ribbonBadges?: import('./ribbon-badges').RibbonBadges,
   sharedDataRoot = path.join(dataRoot, 'shared'),
   customCommands?: import('./custom-commands').CustomCommandService,
+  pageUi?: { openDetails(id: string): Promise<unknown>; failed?(id: string): void },
 ) {
   const api = async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
@@ -179,6 +181,26 @@ export function createHostApi(
           revision: e.pageRevision ?? 0,
           pages: structuredClone([...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])]),
         };
+      case 'host.pages.changed':
+      case 'host.pages.images.register':
+      case 'host.pages.images.release': {
+        requireCapability('pages');
+        const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find((page) => page.id === p.id);
+        if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
+        const allowedKeys = method === 'host.pages.changed' ? ['id'] : method.endsWith('.register') ? ['id','files'] : ['id','imageIds'];
+        if (Object.keys(p).some((key) => !allowedKeys.includes(key))) throw Error('ページ操作の引数を確認してください。');
+        const target = pageKey(id, page.id);
+        if (method === 'host.pages.changed') return { accepted: true, delivered: notifyAppletPage(target) };
+        requireCapability('local-images');
+        const images = localPageImages(target);
+        if (!images) throw Error('画像を登録するページを先に開いてください。');
+        if (method.endsWith('.register')) {
+          if (Buffer.byteLength(JSON.stringify(p)) > 256 * 1024 - 512) throw Error('画像の登録を分割してください。');
+          return images.register(p.files);
+        }
+        images.release(p.imageIds);
+        return null;
+      }
       case 'host.pages.replace': {
         const next = parseDynamicPages(e.manifest, p.pages);
         if (
@@ -227,6 +249,7 @@ export function createHostApi(
           (page) => page.id === p.id,
         );
         if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
+        const pageGeneration = e.runtimeSession;
         return openLocalPage(
           {
             appletId: id,
@@ -236,7 +259,11 @@ export function createHostApi(
             preload: path.resolve(__dirname, '../applet-page-preload.js'),
             stateFile: path.join(dataRoot, 'pages', id, page.id, 'window-state.json'),
             defaultDisplay: page.defaultDisplay,
-            partition: `applet-page-${id}-${page.id}`,
+            partition: `applet-page:${pageKey(id, page.id)}`,
+            ...(e.manifest.capabilities?.includes('local-images') ? { pageImages: {
+              dataRoot,
+              active: () => e.state === 'running' && e.runtimeSession === pageGeneration,
+            } } : {}),
             onLayout: () => {},
             onCreated: (contents) =>
               contents.on('before-input-event', (event, input) => {
@@ -303,11 +330,16 @@ export function createHostApi(
                 )
                   throw Error('宣言されたページ操作と引数だけを使用できます。');
                 const generation = e.runtimeSession;
-                const result = await e.peer?.request('page.action', {
-                  id: declaration.id,
-                  input: input.input,
-                  pageId: page.id,
-                });
+                let result: unknown;
+                try {
+                  if (!e.peer || e.peer.closed) throw Error('ページの提供元が終了しました。');
+                  result = await e.peer.request('page.action', {
+                    id: declaration.id, input: input.input, pageId: page.id,
+                  });
+                } catch (error) {
+                  if (e.state === 'running' && e.runtimeSession === generation) pageUi?.failed?.(id);
+                  throw error;
+                }
                 if (e.state !== 'running' || e.runtimeSession !== generation)
                   throw Error('ページの提供元が終了しました。');
                 return result;
@@ -671,6 +703,10 @@ export function createHostApi(
       case 'host.ui.imageDirectory':
         requireCapability('local-images');
         return imageDirectory(dataRoot, id);
+      case 'host.ui.openDetails':
+        requireCapability('ui');
+        if (Object.keys(p).length || !pageUi) throw Error('自身のApplet詳細だけを開けます。');
+        return pageUi.openDetails(id);
       case 'host.ui.panel': {
         requireCapability('ui');
         if (

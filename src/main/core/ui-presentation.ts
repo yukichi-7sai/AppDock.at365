@@ -19,7 +19,7 @@ export class NavigationCoordinator {
     if (this.requestSequence !== 0) return;
     return this.navigate(route);
   }
-  navigate(route: string, section?: NavigationState['section'], appletId?: string) {
+  navigate(route: string, section?: NavigationState['section'], appletId?: string, appletDetail?: NavigationState['appletDetail']) {
     if (
       !['home', 'extensions', 'settings', 'logs', 'notifications'].includes(route) &&
       !/^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(route)
@@ -29,7 +29,7 @@ export class NavigationCoordinator {
     if (route === this.state.route && !section && !appletId) return;
     const apply = () => {
       if (sequence !== this.requestSequence) return;
-      this.state = { route, section, appletId, request: this.state.request + 1 };
+      this.state = { route, section, appletId, request: this.state.request + 1, ...(appletDetail ? { appletDetail } : {}) };
       this.changed();
     };
     if (this.beforeNavigate)

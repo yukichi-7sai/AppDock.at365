@@ -11,6 +11,7 @@ public static class AppletSession
         using var active = CancellationTokenSource.CreateLinkedTokenSource(connection.Lifetime, cancellationToken);
         ExtensionContext? context = null;
         var deactivated = false;
+        var activated = false;
         var invocations = new System.Collections.Concurrent.ConcurrentDictionary<string, CancellationTokenSource>();
         // RPC handlers run concurrently: cancellation may arrive before command registration.
         var cancelledInvocations = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>();
@@ -25,6 +26,7 @@ public static class AppletSession
                         if (context is not null) throw new InvalidOperationException("Already activated.");
                         context = new ExtensionContext(parameters.GetProperty("id").GetString()!, parameters.GetProperty("settings"), connection, active.Token);
                         await applet.ActivateAsync(context, active.Token);
+                        Volatile.Write(ref activated, true);
                         return context.Contributions;
                     case "shell.changed":
                         if (context is not null) await context.ChangeShellAsync(parameters);
@@ -75,7 +77,14 @@ public static class AppletSession
                             throw new InvalidOperationException("Panel actions are not supported.");
                         await panelActions.HandlePanelActionAsync(parameters.GetProperty("id").GetString()!, active.Token);
                         return null;
+                    case "page.action":
+                        if (context is null || !Volatile.Read(ref activated) || applet is not IPageActionHandler pageActions)
+                            throw new InvalidOperationException("ページ操作は提供されていません。");
+                        return await context.ExecutePageActionAsync(pageActions,
+                            parameters.GetProperty("id").GetString()!, parameters.GetProperty("input"),
+                            parameters.GetProperty("pageId").GetString()!, active.Token);
                     case "deactivate":
+                        Volatile.Write(ref activated, false);
                         await active.CancelAsync();
                         if (context is not null) await context.DisposeAsync();
                         await applet.DeactivateAsync(CancellationToken.None);

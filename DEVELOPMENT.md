@@ -30,6 +30,7 @@
 | ページとWeb | [Appletページ](docs/applet-pages.md)、[Webアカウント](docs/web-accounts.md)、[WebApplet](docs/web-applets.md) |
 | アカウントグループ | [共用・保存・Gmail移行の設計](docs/web-account-groups-design.md) |
 | 動的ページとWebApplet分離 | [汎用ページ登録・共通Web基盤・独立Appletと移行の設計](docs/dynamic-pages-webapplet-design.md) |
+| .NET AppletのHTMLページ連携（0.66.1） | [ページサービス・JavaScriptからの操作・画像配信](docs/dotnet-applet-pages-design.md) |
 | 入力・トレイ | [ショートカット](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
 | グローバル入力のフック統一（0.63.0） | [Winキーの記録・元入力のブロック・共有InputHost・検証計画](docs/keyboard-hook-shortcuts-design.md) |
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[タイトルバー・ステータスバー](docs/shell-bars.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |

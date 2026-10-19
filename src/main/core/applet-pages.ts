@@ -2,6 +2,7 @@ import { BrowserWindow, WebContentsView, View, screen, type Input, type Rectangl
 import path from 'node:path';
 import { WindowStateStore, restoreWindowBounds } from './window-state';
 import type { PageDisplay } from '../../shared/applet-pages';
+import { PageImageRegistry } from './page-images';
 
 interface PageHost {
   window(): BrowserWindow | null;
@@ -16,6 +17,15 @@ let selected: string | null = null;
 let bounds: Rectangle | null = null;
 const surfaces = new Map<string, AppletSurface>();
 const allSurfaces = new Set<AppletSurface>();
+const imageSurfaces = new Map<string, AppletSurface>();
+const imageSessions = new WeakSet<Electron.Session>();
+export function localPageImages(key: string) { return imageSurfaces.get(key)?.images; }
+export function notifyAppletPage(key: string) {
+  const surface = surfaces.get(key);
+  if (!surface || surface.ui.webContents.isDestroyed()) return false;
+  surface.notifyChanged();
+  return true;
+}
 export function activeShortcutApplet(): string | undefined {
   return [...allSurfaces].find((surface) => surface.visible && surface.window?.isFocused())?.options
     .appletId;
@@ -91,9 +101,12 @@ export interface SurfaceOptions {
   partition: string;
   onLayout(): void;
   onCreated?(contents: Electron.WebContents): void;
+  pageImages?: { dataRoot: string; active(): boolean };
 }
 /** Owns the UI, independently of the window in which it is currently presented. */
 export class AppletSurface {
+  readonly images?: PageImageRegistry;
+  private changePending = false;
   readonly ui: WebContentsView;
   readonly contentView = new View();
   private standalone?: BrowserWindow;
@@ -122,11 +135,28 @@ export class AppletSurface {
       },
     });
     this.contentView.addChildView(this.ui);
+    if (options.pageImages && options.key && options.appletId) {
+      this.images = new PageImageRegistry(options.pageImages.dataRoot, options.appletId,
+        () => !this.closed && imageSurfaces.get(options.key!) === this && options.pageImages!.active(),
+        () => [...imageSurfaces.values()].filter((surface) => surface.options.appletId === options.appletId).reduce((sum, surface) => sum + (surface.images?.size ?? 0), 0));
+      imageSurfaces.set(options.key, this);
+      const session = this.ui.webContents.session;
+      if (!imageSessions.has(session)) {
+        session.protocol.handle('appdock', (request) => {
+          const surface = imageSurfaces.get(options.key!);
+          return surface?.ui.webContents.session === session && surface.images
+            ? surface.images.response(request.url) : new Response(null, { status: 404 });
+        });
+        imageSessions.add(session);
+      }
+      this.ui.webContents.once('destroyed', () => this.releaseImages());
+    }
     if (!options.remote) this.ui.webContents.on('will-navigate', (event) => event.preventDefault());
     this.ui.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-    this.ui.webContents.on('render-process-gone', (_, details) =>
-      host?.failed(`Applet画面が終了しました: ${details.reason}`),
-    );
+    this.ui.webContents.on('render-process-gone', (_, details) => {
+      if (this.images) this.close();
+      host?.failed(`Applet画面が終了しました: ${details.reason}`);
+    });
     options.onCreated?.(this.ui.webContents);
     this.ready = this.ui.webContents.loadURL(options.url);
     // The caller of open receives load errors; background creation must not reject unhandled.
@@ -138,6 +168,18 @@ export class AppletSurface {
     return this.options.key
       ? (host?.display(this.options.key, this.options.defaultDisplay ?? 'page') ?? 'window')
       : 'window';
+  }
+  notifyChanged() {
+    if (this.changePending || this.closed) return;
+    this.changePending = true;
+    queueMicrotask(() => {
+      this.changePending = false;
+      if (!this.closed && !this.ui.webContents.isDestroyed()) this.ui.webContents.send('applet-page:changed');
+    });
+  }
+  private releaseImages() {
+    this.images?.clear();
+    if (this.options.key && imageSurfaces.get(this.options.key) === this) imageSurfaces.delete(this.options.key);
   }
   get display() {
     return this.mode;
@@ -306,6 +348,7 @@ export class AppletSurface {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.releaseImages();
     allSurfaces.delete(this);
     this.detach();
     this.state.flush();

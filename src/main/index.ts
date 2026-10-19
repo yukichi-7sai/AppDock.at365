@@ -2563,6 +2563,18 @@ async function initialize() {
       ribbonBadges,
       paths.shared,
       customCommands,
+      {
+        openDetails: async (id) => {
+          showWindow();
+          await navigation.navigate('extensions', undefined, id, 'description');
+          return { accepted: true };
+        },
+        failed: (id) => errors.report({
+          eventId: randomUUID(), source: id, code: 'APPLET_PAGE_ACTION',
+          title: 'ページの操作に失敗しました',
+          message: 'ページの表示とAppletのログを確認してから、必要な操作をやり直してください。',
+        }),
+      },
     ),
     log: log.write,
   });

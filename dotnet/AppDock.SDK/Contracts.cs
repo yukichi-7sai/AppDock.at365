@@ -74,8 +74,9 @@ public sealed record NotificationPolicy(bool Enabled, IReadOnlyList<string> Sele
 public interface IUiService {
     Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default);
     Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default);
+    Task OpenDetailsAsync(CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Opening Applet details requires AppDock 0.66.1 or later.");
 }
-public interface IPageService { Task OpenAsync(string id, CancellationToken cancellationToken = default); }
 public interface IBrowserService { Task OpenAsync(string url, CancellationToken cancellationToken = default); }
 public interface ILogService
 {

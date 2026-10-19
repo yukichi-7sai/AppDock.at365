@@ -64,6 +64,7 @@ function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
+  const [pagePlacementRevision, setPagePlacementRevision] = useState(0);
   const [page, setLocalPage] = useRestartView<Page>(
     'page',
     'home',
@@ -109,6 +110,7 @@ function App() {
     }
     setLocalPage(nav.route as Page);
     if (nav.appletId) setSelected(nav.appletId);
+    if (nav.appletDetail === 'description') setDetailView('description');
     if (nav.section === 'profile') setProfileRequest((v) => v + 1);
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
     if (nav.section === 'general') setGeneralRequest((v) => v + 1);
@@ -238,7 +240,9 @@ function App() {
   useEffect(
     () =>
       window.dock.onAppletPage((key) => {
-        setPage(key ? (key as Page) : 'home');
+        // Main already owns navigation. Re-selecting the route can cancel its pending
+        // input drain; the same route still needs fresh bounds after a Window move.
+        setPagePlacementRevision((revision) => revision + 1);
       }),
     [],
   );
@@ -297,7 +301,7 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [page, error, !!snapshot, restoringPage]);
+  }, [page, error, !!snapshot, restoringPage, pagePlacementRevision, snapshot?.navigation.request]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (

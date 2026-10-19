@@ -1,5 +1,32 @@
 # 検証記録
 
+## 2026-10-19: ページ連携と壁紙履歴のコミット前確認（0.66.1 / 0.6.2）
+
+- 本体の.NET/Nodeページ連携・画像配信・表示先切替と、WallpaperSlideshowの独立履歴・長パスPNG保存・60%プレビューを対象にレビューした。本体29ファイル、Applet21ファイルに範囲を限定し、先行する設計・実装をまとめて扱う。
+- レビューで`test.pages-a/main`と`test.pages/a-main`のSession名が衝突することを旧固定EXEで再現した。localページのpartitionを既存の一意な`page:<owner>:<page>`キーへ変更。両Appletを同時に動かし、Session実体が別で、自身の画像は200・相手の画像は404になることを確認した。永続設定とWebアカウントの保存領域は変更しない。[レビュー](.artifacts/commit-validation-history-pages-20261019/review.md)。
+- 型検査、本体/Default Shell build、既存と追加のDLL/native fixture build、関連16ファイルの **98/98、fail/skip 0** が成功。ソースと最終固定EXEの共通ページGUI各4群でDLL/native/Node・null/JSON・画像変更/解放・動的context・同一Viewと入力保持・説明への復帰・停止時回収・Session分離を確認した。既存ページGUI **7群** も成功し、Gmailの背景監視、page/window往復、設定入力、停止再開、Cookieと選択状態の再起動保持を含む。古いfixtureを現行のアカウント追加、バッジ付きリボン、PC専用の有効状態、実View配置の待機へ合わせた。途中の失敗記録は保持した。
+- Appletの入力67件が0.6.2の検証時と一致し、C#34ファイルに基づく標準8群、native RPC/起動smoke、1000件の分割取得、モニター一覧GUI、配置fixtureをログ・資産hashと照合して再利用した。最終本体EXEの履歴GUI **7群** は改めて成功。260文字超のPNGの実decode、60%寸法、内部クリック/ドラッグと背景/Esc、フォーカス復帰、削除fake、MCP8設定、狭幅と表示先往復を確認した。
+- 同じ未公開変更の補正として本体0.66.1を再発行した。EXEは **168925267 bytes / SHA256 f4f39cace6652da0d921bea0eb30cc9ddd434a4482f8dc870cc764d62371a4dc**。EXE/feedと実行中のDefault Shellは0.66.1で一致。Applet0.6.2は再発行せず、EXE/manifest/web・更新ZIPの全5件と既存運用スクリプト6件のhash一致を確認した。
+- 最終入力671+67件、ログ、再利用理由、固定EXE、GUI結果は[検証資料](.artifacts/commit-validation-history-pages-20261019/validation.json)に保存。stage/commit tree・名義・GitHub/AQUA両mainの照合は同フォルダーの`staged.json`・`commits.json`・`push.json`へ記録する。実装時の画像/プレビュー表示は利用者確認済み。fixtureは一時画像とfakeを使い、実NAS・壁紙/Explorer・関連付け・ごみ箱の成功へ読み替えない。Release・全体ZIP作成・実利用先deployは対象外。
+
+## 2026-10-19: .NET HTML/JavaScriptページ連携（0.66.1）
+
+- .NET DLL/nativeの`IPageActionHandler`、型付きページサービス、ページ変更通知、説明パネルから独立した画像登録・配信・回収、自身の説明へ戻るAPIを実装した。Nodeにも同じ新APIを接続し、[共通契約](docs/dotnet-applet-pages-design.md)と開発資料を更新した。既存SDK実装向けに追加サービスメソッドは既定実装を持つ。永続設定・画像登録ファイルや保存済み割り当ての移行は追加しない。
+- 発行前レビューで実行ロック・取消・512KiB結果上限、runtime世代、画像の実パス・形式・寸法・件数上限、所属SessionとViewの寿命を確認した。GUIで判明したpage→window→page復帰時の二重navigateとviewport更新不足を修正し、同じView・入力を保った往復を再確認した。Applet側はViewへの画像登録失敗でworkerの残りを停止し、遅延終了後の空フォルダーも回収する。レビュー正本は[review.md](.artifacts/dotnet-pages-20261019/review.md)。
+- 型検査、.NET Release build、本体/Default Shell buildが成功。ページ・動的登録・既存パネル画像・navigation・DLL/native RPCの関連6ファイル **25/25、fail/skip 0** が成功。停止中取消、null/JSON、大きすぎる結果と処理失敗後の生存を含む。WallpaperSlideshowの標準8群、RPC、1000件・長いパスの32分割、WM_ENDSESSIONの隔離fixtureも成功した。
+- DLL/native/Nodeの実ローカルページをソース起動と最終固定EXEで確認した。画像のdecode・変更イベント、別ページURL拒否とrelease/停止後404、動的context・破棄・入力保持、自身の説明表示が成功。最終profileは`.artifacts/dotnet-pages-ui-1792415346517/`。固定EXEのSHA256は`b46c3d1bcd4f907d33afa3eaf813d5bd6e692c251c22ca24249fec31c692adba`、実行中の本体と同梱Default Shellはともに0.66.1。
+- 既定`publish.bat`で本体0.66.1と変更したWallpaperSlideshow 0.6.0だけを40.ARTIFACTへ発行した。EXE/feedの版・size・SHA256、Applet更新ZIPのEXE/manifest/web資産とソース、旧deploy互換入口・新テンプレートの隔離配置、設定/dataと既存運用スクリプトの保持を確認した。結果は[distribution.json](.artifacts/dotnet-pages-20261019/distribution.json)、各ログ・入力hash・GUI結果は[validation.json](.artifacts/dotnet-pages-20261019/validation.json)。
+- 制限内の.NET build／Electron起動失敗は同じ処理を通常ユーザーで再実行した。固定lockfileのinstallは通常ユーザーで成功し、依存変更なし。初回のnative probeのUTF-8、GUI補助コードのCSP、既存設定試験の廃止ヘルパーと全体renderer再読込手順を修正した。失敗ログを保持し、後続の成功結果で確認する。GUIは直列で、最終GUI中の再ビルドなし。
+- 壁紙とWindows画像関連付け／ごみ箱はfakeと一時画像で検証した。実Explorer・実ごみ箱・実関連付けの操作成功とは区別する。成功済み各種類の資料は3回以内、失敗・再利用証跡も保持した。commit・push・Release・実利用先deployは実施しない。
+
+## 2026-10-19: .NET AppletのHTMLページ連携設計（設計のみ）
+
+- [共通設計](docs/dotnet-applet-pages-design.md)を追加し、DEVELOPMENTへ入口を設けた。.NETのページサービス、`page.action`、ページ変更通知、説明パネルに依存しない画像配信、自身の説明画面へ戻るAPIを定義した。現行APIと提案APIを区別し、最初の利用先として[WallpaperSlideshowの履歴設計](../Applet.WallpaperSlideshow.at365/docs/history-page-design.md)を参照する。
+- 開始時は両repoのmain・追跡先origin/main・作業ツリー／インデックス／未追跡がクリーン。両方の`pull --ff-only`は制限環境でDNS解決に失敗し、同一コマンドの通常ユーザー再実行でAlready up to dateを確認した。基点は本体`45f1228441af087bcf7997684ab53d613964c9b3`、Applet`47aae6924a7923f0793ea4b0ae7d103da4d22807`。
+- ソースとの照合・自己レビューで、ローカルページ専用Sessionへの画像protocol登録、1MiBのRPC上限と分割、同一Appletの実行ロックと初回ロードの循環防止、予期しないView破棄時の参照失効と生成物回収の分担を明文化した。共通仕様は本体、画面・廃止コマンドはApplet側に分離した。
+- 文書の相対リンク19件・指定アンカー1件・JSON部分例2件、未実装表示、相互参照、変更対象が文書6ファイルだけであることを検査し、成功した。結果・文書hash・ソース根拠は[文書検査資料](.artifacts/dotnet-pages-design-20261019/document-check.json)へ記録した。初回の検査スクリプトだけでGit出力の1文字をHEADと比較する問題があり、取り出しを修正して成功した。実際のHEADは変わっていない。C#例や提案APIのbuild・動作成功を意味しない。
+- 製品ソース、現行0.66.0、発行物は変更しない。製品テスト・GUI・build・publish・commit・push・Release・実利用deployは未実施。実装時の検証条件は設計書へ記載した。
+
 ## 2026-10-19: リボン拡張とUI調整のコミット・push確認（0.66.0）
 
 - 利用者の依頼により、リボン拡張・共通の色／アイコン選択・コマンド実行・右クリック・UI調整と文書・試験の32ファイルをコミットと通常pushの対象とした。mainの未コミット変更を保持してfetchし、GitHubとAQUAのmainが開始時HEAD `459b649`と一致することを確認した。設定済みの両push先を使い、stage・commit tree・実効作者・各remote先端との照合を[コミット検証資料](.artifacts/commit-validation-ribbon-20261019/validation.json)へ記録する。

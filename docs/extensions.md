@@ -1,5 +1,7 @@
 # Applet API v1
 
+0.66.1から.NET/nativeも`IPageActionHandler`でHTML/JavaScriptからのページ操作に対応します。`IPageService`の動的登録・変更通知・画像登録と解放、`Ui.OpenDetailsAsync`の契約は[Appletページ](applet-pages.md)と[.NETページ連携](dotnet-applet-pages-design.md)を参照してください。Nodeも同じ通知・画像・説明表示APIを使えます。
+
 保存型のコマンド種類は0.60.0から`custom-commands` capabilityとmanifestの`customCommandTypes`で宣言し、Nodeの`context.customCommands.register(typeId, handler)`、.NET/nativeの`context.CustomCommands.RegisterAsync`へ登録します。configは保存値の複製、実行には取消と元callerを保持します。[カスタムコマンド契約](custom-commands-design.md)を参照してください。既存のcommands.register/replaceやWindowsToolsのキー送信定義は移行しません。
 
 Shell Appletは、通常のコマンド・設定・ページとShell描画を同じAppletで提供できます。`shell` capabilityと`shell.views`による領域単位の宣言、自己設定の購読、描画からの自己コマンド実行は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください。全領域の実装は不要です。

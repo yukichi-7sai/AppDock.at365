@@ -29,8 +29,15 @@ WebアカウントUIでは`source:"web-accounts"`を使い、uiを重複指定�
 - `snapshot(): Promise<{dark:boolean,settings:Record<string,unknown>}>`: 本体テーマと自身のmanifest設定値。settings capabilityがなければ空です。
 - `executeCommand(id): Promise<unknown>`: 自身の実行中の登録コマンドのみ。任意RPCや他Applet/本体コマンドは渡しません。
 - `onChanged(callback): () => void`: テーマ/設定の変更通知。UI側は返された解除関数を使います。
+- `call('actions.invoke', { id, input }): Promise<unknown>`: manifestの`pageActions`に宣言した操作。.NET/nativeは`IPageActionHandler`、Nodeは`onPageAction`がJSON値またはnullを返します。入力は宣言したstring/number/booleanだけです。
 
-画面の操作は自身のコマンドからNode/.NETの処理を呼びます。IPCはホストがUIのWebContents、main frame、厳密なローカルURLを照合し、リモートWeb画面には公開しません。Webアカウントsourceは既存の限定`window.webAccounts`を継続します。
+画面の操作は自身のコマンドまたは宣言済みページ操作からNode/.NETの処理を呼びます。IPCはホストがUIのWebContents、main frame、厳密なローカルURLを照合し、リモートWeb画面には公開しません。Webアカウントsourceは既存の限定`window.webAccounts`を継続します。
+
+## .NET/nativeとページ画像（0.66.1）
+
+`IPageService`は固定ページのopenに加え、list/replace/hide/dispose/openItem、変更通知、ページ別画像の登録と解放を提供します。Nodeも同じホストAPIを使用します。動的登録には`dynamic-pages`、画像には`local-images`を併せて宣言します。自身の説明へ戻る場合は`Ui.OpenDetailsAsync` / `context.ui.openDetails()`を使います。
+
+画像は`Ui.GetImageDirectoryAsync`内のPNG/JPEG/WebPを`Pages.RegisterImagesAsync`へ登録します。返されたURLは所属する生存中のlocal Viewだけで読み込めます。画像バイトをJSONへ埋め込んだり、説明パネルを通信経路にしたりする必要はありません。View破棄・停止で参照は失効し、Appletが生成ファイルを削除します。API、各種上限、実装例は[.NETページ連携の契約](dotnet-applet-pages-design.md)を参照してください。
 
 ## 表示先と保存互換性
 
