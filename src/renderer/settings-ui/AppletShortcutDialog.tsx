@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SettingsHint } from './SettingsHint';
 import { normalizeShortcut } from '../../shared/commands';
 import { protectedShortcut } from '../../shared/keybindings';
 import type { Keybinding } from '../../shared/keybindings';
@@ -68,11 +69,11 @@ export function AppletShortcutDialog({
               onChange={(blockOriginalInput) => setValue({ ...value, blockOriginalInput })}
             />
           </div>
-          <small>
+          <SettingsHint as="small">
             {value.when.scope === 'global'
               ? 'OFFにすると、入力をWindowsやほかのアプリにも渡します。'
               : 'グローバルの割り当てで使用します。Windows標準キーの置き換えはグローバルを選んでください。'}
-          </small>
+          </SettingsHint>
           {protectedKey && <p role="alert">Windowsが保護するキーのため割り当てられません。</p>}
           <div className="shortcut-dialog-enabled">
             <span>この割り当てを有効にする</span>

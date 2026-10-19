@@ -1,3 +1,4 @@
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import { useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { ribbonItems, type RibbonItem } from '../../shared/applet-pages';
@@ -387,9 +388,9 @@ export function RibbonSettings({
         </SettingsField>
       </SettingsSection>
       <SettingsSection title="リボン編集" {...settingAnchor('ribbon', 'ribbon')}>
-        <p className="muted">
+        <SettingsHint>
           設定ボタンを非表示にしても、トレイの「設定…」や「設定を開く」コマンドから戻れます。
-        </p>
+        </SettingsHint>
         {error && <p role="alert">{error}</p>}
         {(['top', 'bottom'] as const).map((position) => {
           const title = position === 'top' ? '上寄せ' : '下寄せ';
@@ -632,9 +633,9 @@ export function RibbonSettings({
                 onChange={(e) => setItemDialog({ ...itemDialog, title: e.target.value })}
               />
             </label>
-            <p className="muted">
+            <SettingsHint>
               空欄にすると登録元の名前を使います。変更はリボン内の表示だけに反映されます。
-            </p>
+            </SettingsHint>
             <label className="ribbon-icon-only">
               <input
                 type="checkbox"

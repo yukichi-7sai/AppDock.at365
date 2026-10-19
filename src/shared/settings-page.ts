@@ -23,6 +23,7 @@ export interface SettingsPageModel {
     context: SettingsPageRequest['context'];
     sidebarWidth: number;
     hostWidth: number;
+    showHints: boolean;
     page: SettingsPageDefinition;
     values: Record<string, unknown>;
     navigation: { id: string; title: string; owner?: string }[];

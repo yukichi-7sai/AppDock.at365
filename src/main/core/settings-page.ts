@@ -105,6 +105,7 @@ export class SettingsPageSession {
       context: this.request.context,
       sidebarWidth: this.request.sidebarWidth ?? 280,
       hostWidth: this.request.hostWidth ?? 1024,
+      showHints: host.settings.value.host.showHints,
       page,
       values: page.json ? this.options.editor.projection() : {},
       navigation:

@@ -1,3 +1,4 @@
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { useSettingsControls } from '../settings-ui/api';
@@ -149,7 +150,7 @@ export function WebAccountSettings({
       {...settingAnchor('web-accounts', 'accounts')}
       aria-label="Webアカウント設定"
     >
-      <p>ここでの操作はすぐに反映されます。設定の保存は不要です。</p>
+      <SettingsHint>ここでの操作はすぐに反映されます。設定の保存は不要です。</SettingsHint>
       <div className="actions">
         <button
           className="secondary"
@@ -187,9 +188,9 @@ export function WebAccountSettings({
         );
       })}
       {message && <p role="status">{message}</p>}
-      <p className="muted">
+      <SettingsHint>
         使用中の枠は削除できません。WebAppletの設定で別のアカウントを選択してください。削除は枠と保存データをまとめて消し、クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。
-      </p>
+      </SettingsHint>
     </section>
   );
 }

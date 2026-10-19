@@ -23,6 +23,7 @@ import { CodexSettings } from './CodexSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { AppletSettingsForm } from '../settings-ui/AppletSettingsForm';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsHint } from '../settings-ui/SettingsHint';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
@@ -194,7 +195,7 @@ export function SettingsForm({
         )}
         {category === 'appearance' && (
           <>
-            <SettingsSection>
+            <SettingsSection title="共通">
               <SettingRow pageId={category} itemKey="theme">
                 <select
                   aria-label="テーマ"
@@ -214,11 +215,17 @@ export function SettingsForm({
                   <option value="system">System</option>
                 </select>
               </SettingRow>
+              <SettingRow pageId={category} itemKey="showHints">
+                <Toggle
+                  label="ヒントの表示"
+                  checked={settings.host.showHints}
+                  onChange={(showHints) =>
+                    edit({ ...settings, host: { ...settings.host, showHints } })
+                  }
+                />
+              </SettingRow>
             </SettingsSection>
-            <SettingsSection
-              title="ワークスペースの表示"
-              description="各領域を描画するShellを選びます。"
-            >
+            <SettingsSection title="Shellの変更">
               {shellRegions.map(({ id, title }) => {
                 const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
                 const candidates = extensions.filter(
@@ -278,9 +285,9 @@ export function SettingsForm({
                           >
                             この領域を再試行
                           </button>
-                          <p className="muted">
+                          <SettingsHint>
                             workerの再起動が必要な場合は、このAppletの他の領域も再接続します。
-                          </p>
+                          </SettingsHint>
                         </>
                       )}
                     </div>

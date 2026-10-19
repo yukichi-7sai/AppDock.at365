@@ -1,3 +1,4 @@
+import { SettingsHint } from './SettingsHint';
 import { useId, useState, type ReactNode } from 'react';
 import { SettingsModal } from './SettingsModal';
 export function BindingEditDialog({
@@ -53,7 +54,7 @@ export function BindingEditDialog({
         </p>
       )}
       <footer>
-        <small>適用すると設定に反映されます。</small>
+        <SettingsHint as="small">適用すると設定に反映されます。</SettingsHint>
         <div>
           <button onClick={onClose}>キャンセル</button>
           <button className="primary" disabled={!valid || !recordingReady} onClick={apply}>

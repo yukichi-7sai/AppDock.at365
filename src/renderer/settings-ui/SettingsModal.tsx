@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import { useSettingsControls } from './api';
 import { SettingsInputMode } from './SettingsInput';
+import { SettingsHint } from './SettingsHint';
 
 /** Shared settings modal: focus containment/return, IME-safe dismissal and input suspension. */
 export function SettingsModal({
@@ -169,7 +170,7 @@ export function SettingsDialog({
         </p>
       )}
       <footer>
-        <small>{pending ? '保存しています…' : footer}</small>
+        <SettingsHint as="small">{footer}</SettingsHint>
         <div>
           <button disabled={pending} onClick={onClose}>
             キャンセル

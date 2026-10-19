@@ -10,7 +10,9 @@ export function SettingsToolbar({
   return (
     <div className="settings-toolbar">
       {children}
-      {editor.pending && <span role="status">保存中…</span>}
+      <span className="sr-only" role="status">
+        {editor.pending ? '保存中…' : ''}
+      </span>
     </div>
   );
 }

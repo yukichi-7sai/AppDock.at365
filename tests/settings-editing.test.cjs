@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { createDefaultSettings } = require('../out/main/shared/settings-schema');
+const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { SettingsInputSession } = require('../out/main/main/core/settings-input-session');
 const {
   settingsCatalog,
@@ -78,6 +78,33 @@ test('general sound toggle is searchable and editable through partial JSON witho
   assert.equal(saved.host.soundEnabled, false);
   assert.deepEqual(saved.tts, settings.tts);
   assert.ok(searchSettings(pages, '音の再生').some((r) => r.key === 'soundEnabled'));
+});
+
+test('hint visibility defaults on, preserves false, validates input and stays in the appearance projection', () => {
+  const settings = createDefaultSettings();
+  assert.equal(settings.host.showHints, true);
+  delete settings.host.showHints;
+  assert.equal(parseSettings(settings).host.showHints, true);
+  settings.host.showHints = false;
+  assert.equal(parseSettings(settings).host.showHints, false);
+  settings.host.showHints = 'false';
+  assert.throws(() => parseSettings(settings), /host.showHints/);
+  settings.host.showHints = true;
+  const pages = settingsCatalog(applets, settings);
+  const page = pages.find((p) => p.id === 'appearance');
+  assert.deepEqual(
+    page.items.slice(0, 2).map((i) => i.key),
+    ['theme', 'showHints'],
+  );
+  const projection = settingsProjection(settings, page, applets);
+  projection.host.showHints = false;
+  const saved = applySettingsJson(settings, page, applets, JSON.stringify(projection));
+  assert.equal(saved.host.showHints, false);
+  assert.deepEqual(saved.tts, settings.tts);
+  assert.ok(searchSettings(pages, 'ヒントの表示').some((r) => r.key === 'showHints'));
+  assert.ok(
+    page.items.filter((i) => i.key.startsWith('shellProviders.')).every((i) => !i.description),
+  );
 });
 
 test('valid edits save immediately; invalid JSON/numbers and save failures never enter host state', async () => {

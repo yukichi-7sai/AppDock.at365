@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "host": {
     "theme": "dark",
+    "showHints": true,
     "closeToTray": true,
     "notifications": true,
     "startMinimized": false,

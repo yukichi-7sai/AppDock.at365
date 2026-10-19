@@ -102,28 +102,29 @@ function fixture(t) {
     setExecute: (v) => (execute = v),
   };
 }
-test('sound playback generates public ON/OFF/toggle commands with immediate persisted effects', async (t) => {
-  const f = fixture(t);
-  const schema = f.api.call('settings.getSchema').fields.soundEnabled;
-  assert.equal(schema.type, 'boolean');
-  assert.equal(schema.applies, 'immediate');
-  assert.deepEqual(schema.generateCommands, ['on', 'off', 'toggle']);
-  const catalog = f.api.call('commands.list').commands;
-  for (const action of ['off', 'off', 'on', 'toggle']) {
-    const id = 'appdock.settings.soundEnabled.' + action;
-    assert.ok(catalog.some((c) => c.id === id));
-    assert.ok(hostCommands.some((c) => c.id === id));
-    const result = await f.api.call('commands.execute', { id });
-    assert.equal(result.completion, 'settingsSaved');
-    assert.equal(f.settings.value.host.soundEnabled, action === 'on');
-    assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.soundEnabled, action === 'on');
-  }
-  f.setWrite(false);
-  await assert.rejects(() =>
-    f.api.call('commands.execute', { id: 'appdock.settings.soundEnabled.on' }),
-  );
-  assert.equal(f.settings.value.host.soundEnabled, false);
-});
+for (const field of ['soundEnabled', 'showHints'])
+  test(`${field} generates public ON/OFF/toggle commands with immediate persisted effects`, async (t) => {
+    const f = fixture(t);
+    const schema = f.api.call('settings.getSchema').fields[field];
+    assert.equal(schema.type, 'boolean');
+    assert.equal(schema.applies, 'immediate');
+    assert.deepEqual(schema.generateCommands, ['on', 'off', 'toggle']);
+    const catalog = f.api.call('commands.list').commands;
+    for (const action of ['off', 'off', 'on', 'toggle']) {
+      const id = 'appdock.settings.' + field + '.' + action;
+      assert.ok(catalog.some((c) => c.id === id));
+      assert.ok(hostCommands.some((c) => c.id === id));
+      const result = await f.api.call('commands.execute', { id });
+      assert.equal(result.completion, 'settingsSaved');
+      assert.equal(f.settings.value.host[field], action === 'on');
+      assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host[field], action === 'on');
+    }
+    f.setWrite(false);
+    await assert.rejects(() =>
+      f.api.call('commands.execute', { id: 'appdock.settings.' + field + '.on' }),
+    );
+    assert.equal(f.settings.value.host[field], false);
+  });
 
 test('manifest accepts generated shortcut references and reserves host namespace', (t) => {
   const f = fixture(t),

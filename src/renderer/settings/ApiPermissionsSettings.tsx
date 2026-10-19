@@ -3,6 +3,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import {
   appletApiPermissionLabels,
   type AppletApiPermission,
@@ -202,9 +203,6 @@ export function ApiPermissionsSettings({
   }
   return (
     <section className="api-permissions" aria-label="操作の許可">
-      <div className="permission-heading">
-        <span className="muted">このPCに自動保存</span>
-      </div>
       <div className="permission-connection">
         <span>
           MCP連携：
@@ -214,17 +212,17 @@ export function ApiPermissionsSettings({
           Codex連携を設定
         </button>
       </div>
-      <p className="muted">
-        必要な許可が不足している操作は、ONでも有効になりません。連携がOFFの間も、MCPの許可を設定できます。
-      </p>
       {(error || appletError || state?.error) && (
         <p className="error-text" role="alert">
           {error || appletError || state?.error}
         </p>
       )}
-      <p className="permission-save-status" role="status">
-        {busy ? '保存しています…' : '変更は保存ボタンを押さずに保存されます。'}
-      </p>
+      <SettingsHint className="permission-save-status">
+        変更は保存ボタンを押さずに保存されます。
+      </SettingsHint>
+      <span className="sr-only" role="status">
+        {busy ? '保存しています…' : ''}
+      </span>
       <table className="permission-table">
         <thead>
           <tr>
@@ -338,6 +336,9 @@ export function ApiPermissionsSettings({
       </table>
       <details className="permission-help">
         <summary>許可の適用とログについて</summary>
+        <SettingsHint>
+          必要な許可が不足している操作は、ONでも有効になりません。連携がOFFの間も、MCPの許可を設定できます。
+        </SettingsHint>
         <p>
           MCPで公開されたAppletコマンドが共通APIを呼ぶ場合、Appletと元のMCPの両方の許可を確認します。キー送信やプロセス起動には、それぞれの操作許可も必要です。
         </p>

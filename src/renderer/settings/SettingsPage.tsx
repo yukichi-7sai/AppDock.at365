@@ -2,6 +2,7 @@ import { registerSettingsInputs } from '../settings-input-flush';
 import { useEffect, useRef, useState } from 'react';
 import type { SettingsPageModel, SettingsPageOperation } from '../../shared/settings-page';
 import { SettingsControlsProvider } from '../settings-ui/api';
+import { SettingsHintsContext } from '../settings-ui/SettingsHint';
 import { SettingsViewClient } from './runtime';
 import { SettingsForm } from './SettingsForm';
 import { SettingsIndex } from './SettingsIndex';
@@ -142,103 +143,107 @@ export function SettingsPage({
   };
   return (
     <SettingsControlsProvider api={controls}>
-      <div
-        ref={surface}
-        data-settings-connection={model.id}
-        className={`settings-surface ${context}`}
-        data-compact={model.content.hostWidth <= 760}
-      >
-        {context === 'full' && (
-          <aside
-            className="sidebar settings-categories"
-            style={{ width: Math.min(model.content.sidebarWidth, model.content.hostWidth * 0.4) }}
-            aria-label="設定一覧"
-          >
-            <h2>設定</h2>
-            <SettingsIndex content={model.content} act={act} />
-            <div
-              className="sidebar-resizer"
-              role="separator"
-              tabIndex={0}
-              aria-label="設定一覧の幅を変更"
-              aria-orientation="vertical"
-              aria-valuemin={220}
-              aria-valuemax={480}
-              aria-valuenow={model.content.sidebarWidth}
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                drag.current = {
-                  x: e.clientX,
-                  width: e.currentTarget.parentElement!.getBoundingClientRect().width,
-                };
-                e.currentTarget.setPointerCapture(e.pointerId);
-              }}
-              onPointerMove={(e) => {
-                if (drag.current) resize(drag.current.width + e.clientX - drag.current.x);
-              }}
-              onPointerUp={(e) => {
-                drag.current = null;
-                if (e.currentTarget.hasPointerCapture(e.pointerId))
-                  e.currentTarget.releasePointerCapture(e.pointerId);
-              }}
-              onLostPointerCapture={() => (drag.current = null)}
-              onKeyDown={(e) => {
-                const width = {
-                  ArrowLeft: model.content.sidebarWidth - 10,
-                  ArrowRight: model.content.sidebarWidth + 10,
-                  Home: 220,
-                  End: 480,
-                }[e.key];
-                if (width !== undefined) {
-                  e.preventDefault();
-                  resize(width);
-                }
-              }}
-            />
-          </aside>
-        )}
-        <SettingsPageLayout
-          page={page}
-          mode={editing.mode}
-          pending={editing.pending}
-          error={error || editing.error || ''}
-          onMode={(mode) => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
-          storage={model.content.auxiliary.storage}
-          onLocalSettings={(enabled) =>
-            void c.invoke('set-local-settings', [enabled]).catch((error) => setError(String(error)))
-          }
-          onOpenFile={(scope) =>
-            void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
-          }
-          onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
-          announcement={
-            <span key={movement.id} className="settings-live" role="status" aria-live="polite">
-              {movement.text}
-            </span>
-          }
+      <SettingsHintsContext.Provider value={model.content.showHints}>
+        <div
+          ref={surface}
+          data-settings-connection={model.id}
+          className={`settings-surface ${context}`}
+          data-compact={model.content.hostWidth <= 760}
         >
-          {page.unavailableReason ? (
-            <p role="status">{page.unavailableReason}</p>
-          ) : editing.mode === 'json' ? (
-            <SettingsTextarea
-              aria-label="設定JSON"
-              value={c.text(model)}
-              spellCheck={false}
-              onChange={(e) => {
-                c.setText(e.target.value);
-              }}
-            />
-          ) : (
-            <SettingsForm
-              model={model}
-              editor={editor}
-              select={(pageId) => act({ kind: 'select', pageId })}
-              invoke={c.invoke}
-            />
+          {context === 'full' && (
+            <aside
+              className="sidebar settings-categories"
+              style={{ width: Math.min(model.content.sidebarWidth, model.content.hostWidth * 0.4) }}
+              aria-label="設定一覧"
+            >
+              <h2>設定</h2>
+              <SettingsIndex content={model.content} act={act} />
+              <div
+                className="sidebar-resizer"
+                role="separator"
+                tabIndex={0}
+                aria-label="設定一覧の幅を変更"
+                aria-orientation="vertical"
+                aria-valuemin={220}
+                aria-valuemax={480}
+                aria-valuenow={model.content.sidebarWidth}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.preventDefault();
+                  drag.current = {
+                    x: e.clientX,
+                    width: e.currentTarget.parentElement!.getBoundingClientRect().width,
+                  };
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  if (drag.current) resize(drag.current.width + e.clientX - drag.current.x);
+                }}
+                onPointerUp={(e) => {
+                  drag.current = null;
+                  if (e.currentTarget.hasPointerCapture(e.pointerId))
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                }}
+                onLostPointerCapture={() => (drag.current = null)}
+                onKeyDown={(e) => {
+                  const width = {
+                    ArrowLeft: model.content.sidebarWidth - 10,
+                    ArrowRight: model.content.sidebarWidth + 10,
+                    Home: 220,
+                    End: 480,
+                  }[e.key];
+                  if (width !== undefined) {
+                    e.preventDefault();
+                    resize(width);
+                  }
+                }}
+              />
+            </aside>
           )}
-        </SettingsPageLayout>
-      </div>
+          <SettingsPageLayout
+            page={page}
+            mode={editing.mode}
+            pending={editing.pending}
+            error={error || editing.error || ''}
+            onMode={(mode) => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
+            storage={model.content.auxiliary.storage}
+            onLocalSettings={(enabled) =>
+              void c
+                .invoke('set-local-settings', [enabled])
+                .catch((error) => setError(String(error)))
+            }
+            onOpenFile={(scope) =>
+              void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
+            }
+            onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
+            announcement={
+              <span key={movement.id} className="settings-live" role="status" aria-live="polite">
+                {movement.text}
+              </span>
+            }
+          >
+            {page.unavailableReason ? (
+              <p role="status">{page.unavailableReason}</p>
+            ) : editing.mode === 'json' ? (
+              <SettingsTextarea
+                aria-label="設定JSON"
+                value={c.text(model)}
+                spellCheck={false}
+                onChange={(e) => {
+                  c.setText(e.target.value);
+                }}
+              />
+            ) : (
+              <SettingsForm
+                model={model}
+                editor={editor}
+                select={(pageId) => act({ kind: 'select', pageId })}
+                invoke={c.invoke}
+              />
+            )}
+          </SettingsPageLayout>
+        </div>
+      </SettingsHintsContext.Provider>
     </SettingsControlsProvider>
   );
 }

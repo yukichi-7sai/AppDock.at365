@@ -11,6 +11,7 @@ export const hostSettingDefinitions: SettingDefinition[] = [
     options: ['dark', 'light', 'system'].map((value) => ({ value, label: value })),
   },
   ...[
+    ['showHints', 'ヒントの表示', true],
     ['soundEnabled', '音の再生', true],
     ['closeToTray', '閉じるとトレイに格納', true],
     ['startMinimized', '起動時に最小化', false],

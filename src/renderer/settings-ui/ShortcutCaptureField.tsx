@@ -1,3 +1,4 @@
+import { SettingsHint, useSettingsHints } from './SettingsHint';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useSettingsControls } from './api';
 import { normalizeShortcut, shortcutFromEvent } from '../../shared/commands';
@@ -27,6 +28,7 @@ export function ShortcutCaptureField({
 }) {
   const controls = useSettingsControls();
   const id = useId();
+  const showHints = useSettingsHints();
   const recorder = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState(false);
   const [captureReady, setCaptureReady] = useState(false);
@@ -111,7 +113,7 @@ export function ShortcutCaptureField({
         ref={recorder}
         className="shortcut-capture"
         aria-label={`${label}を入力`}
-        aria-describedby={`${id}-hint`}
+        aria-describedby={showHints ? `${id}-hint` : undefined}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onKeyDown={(event) => {
@@ -141,9 +143,9 @@ export function ShortcutCaptureField({
           <span>キーの組み合わせを押してください</span>
         )}
       </button>
-      <p className="shortcut-capture-hint" id={`${id}-hint`}>
+      <SettingsHint className="shortcut-capture-hint" id={`${id}-hint`}>
         Tabで次の項目へ・Escでキャンセル。これらのキーは特殊キーから選べます。
-      </p>
+      </SettingsHint>
       <button
         className="shortcut-special-trigger"
         aria-expanded={special}

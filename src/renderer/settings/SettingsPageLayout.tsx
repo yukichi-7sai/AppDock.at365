@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 
 const descriptions: Record<string, string> = {
-  appearance: 'テーマと各領域のShellを選び、ワークスペースの見た目を整えます。',
+  appearance: 'テーマ・ヒントの表示と、各領域のShellを設定します。',
   general: '音の再生や、起動時・ウィンドウを閉じたときの動作を設定します。',
   notifications: '通知の種類ごとに、表示先・表示時間・読み上げを設定します。',
   tts: 'OpenAI互換のTTSサーバーで生成した音声を、このPCで再生します。',
@@ -93,7 +94,7 @@ export function SettingsPageLayout({
               {storage.files.length > 1 ? '共有＋このPC' : storage.local ? 'このPC専用' : '共有'}　
             </span>
           )}
-          {pending ? '保存中…' : '文字・数値はEnterかフォーカスを外して確定、Escapeで入力を取消。'}
+          <span className="sr-only">{pending ? '保存中…' : ''}</span>
         </p>
         {page.json && storage && storage.files.length > 1 ? (
           <details className="settings-file-menu">
@@ -126,11 +127,11 @@ export function SettingsPageLayout({
         )}
       </div>
       {storage?.canSwitch && (
-        <p className="settings-storage-description">
+        <SettingsHint className="settings-storage-description">
           {storage.local
             ? 'このPC専用の設定を使います。OFFにすると共有設定へ戻り、このPCの設定は残します。'
             : '共有設定を使います。初めてONにすると現在の設定をコピーし、保存済みの端末設定があれば再開します。'}
-        </p>
+        </SettingsHint>
       )}
       {error && (
         <div className="settings-page-error">

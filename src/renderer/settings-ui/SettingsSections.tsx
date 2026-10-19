@@ -115,7 +115,11 @@ export function SettingsFeedback({
           {error}
         </p>
       )}
-      {(busy || message) && <p role="status">{busy ? '処理しています…' : message}</p>}
+      {(busy || message) && (
+        <p className="sr-only" role="status">
+          {busy ? '処理しています…' : message}
+        </p>
+      )}
     </div>
   );
 }

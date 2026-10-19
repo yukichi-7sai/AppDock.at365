@@ -3,6 +3,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import { Toggle } from '../settings-ui/Toggle';
 import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections';
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import type { GestureSettings } from '../../shared/gestures';
 function Names({
   itemKey,
@@ -167,7 +168,9 @@ export function GestureOptions({
           change={(excludedProcesses) => change({ excludedProcesses })}
         />
       </SettingsField>
-      <p className="settings-help">何も操作せず右ボタンを離すと、通常の右クリックになります。</p>
+      <SettingsHint className="settings-help">
+        何も操作せず右ボタンを離すと、通常の右クリックになります。
+      </SettingsHint>
     </SettingsSection>
   );
 }

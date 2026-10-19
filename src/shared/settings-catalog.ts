@@ -74,10 +74,10 @@ const hostItems: Record<string, [string, string, string?][]> = {
   ],
   appearance: [
     ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
-    ...shellRegions.map(({ id, title }): [string, string, string] => [
+    ['showHints', 'ヒントの表示', '設定画面にヒントを表示します。'],
+    ...shellRegions.map(({ id, title }): [string, string] => [
       'shellProviders.' + id,
       title + 'のShell',
-      '領域ごとにShellを指定します。利用できない場合はDefault Shellを使います。無効なAppletの割り当ても保持します。',
     ]),
   ],
   general: [
@@ -381,7 +381,7 @@ export function settingsPaths(
     case 'custom-commands':
       return [['customCommands']];
     case 'appearance':
-      return ['theme', 'shellProviders'].map((k) => ['host', k]);
+      return ['theme', 'showHints', 'shellProviders'].map((k) => ['host', k]);
     case 'tts':
       return [['tts']];
     case 'ai':

@@ -17,6 +17,7 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
   assert.deepEqual(result.extensions, original.extensions);
   assert.deepEqual(result.host, {
     theme: 'light',
+    showHints: true,
     soundEnabled: true,
     closeToTray: false,
     startMinimized: true,

@@ -101,6 +101,20 @@ function fixture() {
     },
   };
 }
+test('all settings pages receive live hint visibility without exposing other page values', async () => {
+  const f = fixture();
+  await f.act({ kind: 'select', pageId: 'profile' });
+  const before = f.page.snapshot();
+  assert.equal(before.content.showHints, true);
+  f.saved.value.host.showHints = false;
+  f.saved.revision++;
+  const after = f.page.snapshot();
+  assert.equal(after.content.showHints, false);
+  assert.ok(after.revision > before.revision);
+  assert.equal(after.content.values.host?.showHints, undefined);
+  assert.equal(JSON.stringify(after).includes('private-value'), false);
+});
+
 test('public settings models never expose unrelated values; issued operations are scoped and replayed once', async () => {
   const f = fixture(),
     m = f.page.snapshot();

@@ -1,3 +1,4 @@
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { useState } from 'react';
 import {
@@ -89,7 +90,9 @@ export function GestureBindingDialog({
     >
       {(ready, setError) => (
         <>
-          <p className="gesture-input-hint">右ボタンを押しながら行う操作を選びます。</p>
+          <SettingsHint className="gesture-input-hint">
+            右ボタンを押しながら行う操作を選びます。
+          </SettingsHint>
           <div className="gesture-family-picker" role="group" aria-label="ジェスチャーの種類">
             {families.map((item) => (
               <button
@@ -142,11 +145,11 @@ export function GestureBindingDialog({
                 ))}
             </div>
           )}
-          <p className="shortcut-capture-hint">
+          <SettingsHint className="shortcut-capture-hint">
             {family === 'move'
               ? '右ボタンを離したときに実行。途中で方向を変えるとキャンセルします。'
               : '右ボタンを押したまま、この操作をしたときに実行します。'}
-          </p>
+          </SettingsHint>
           <div className="shortcut-dialog-condition">
             <span>いつ・どこで</span>
             <div>
@@ -175,9 +178,9 @@ export function GestureBindingDialog({
                 }}
               />
               {value.when.scope === 'browser' && (
-                <small className="gesture-condition-hint">
+                <SettingsHint as="small" className="gesture-condition-hint">
                   画面上部の「動作設定」で指定したブラウザに適用します。
-                </small>
+                </SettingsHint>
               )}
               {value.when.scope === 'exe' && (
                 <label className="gesture-processes">
@@ -189,7 +192,9 @@ export function GestureBindingDialog({
                     placeholder="notepad.exe, explorer.exe"
                     onChange={(event) => setProcessText(event.target.value)}
                   />
-                  <small>複数指定した場合は、いずれかに一致すると実行します。</small>
+                  <SettingsHint as="small">
+                    複数指定した場合は、いずれかに一致すると実行します。
+                  </SettingsHint>
                   {(processError || !processes.length) && (
                     <small role="alert">{processError || 'exe名を1件以上入力してください。'}</small>
                   )}

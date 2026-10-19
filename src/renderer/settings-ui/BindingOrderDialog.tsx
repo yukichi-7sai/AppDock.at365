@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { SettingsHint } from './SettingsHint';
 import { OrderDialogFrame } from './OrderDialogFrame';
 import type { UiCommand } from '../../shared/commands';
 export function BindingOrderDialog<R extends { id: string; command: string; enabled: boolean }>({
@@ -66,7 +67,13 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
       onError={setError}
       initialFocus="select"
       error={error}
-      footer={changed ? changed + '種類の順序を変更' : '適用すると設定に反映されます'}
+      footer={
+        changed ? (
+          changed + '種類の順序を変更'
+        ) : (
+          <SettingsHint as="span">適用すると設定に反映されます</SettingsHint>
+        )
+      }
       applyLabel="適用"
       applyDisabled={!changed || !ready}
       onApply={() => {
@@ -100,9 +107,9 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
           ))}
         </select>
       </label>
-      <p className="shortcut-order-help">
+      <SettingsHint className="shortcut-order-help">
         条件に一致する割り当てを、上から順に実行します。無効・利用できないものは実行されません。
-      </p>
+      </SettingsHint>
       <ol className="shortcut-order-list" aria-label={`${inputLabel(key)}の実行順`}>
         {rows.map((row, index) => {
           const command = catalog.get(row.command);
@@ -190,12 +197,15 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
             : `${inputName}の割り当てを追加すると、ここで実行順を変更できます。`}
         </p>
       )}
-      <p className="shortcut-order-help">
+      <SettingsHint className="shortcut-order-help">
         同じコマンドが複数の条件に一致した場合は、最初の一致位置で1回だけ実行します。
-      </p>
-      <div className="shortcut-order-notice" role="status">
-        {notice || 'ドラッグ・上下ボタンで並べ替えられます。'}
-      </div>
+      </SettingsHint>
+      <SettingsHint as="div" className="shortcut-order-notice">
+        ドラッグ・上下ボタンで並べ替えられます。
+      </SettingsHint>
+      <span className="sr-only" role="status">
+        {notice}
+      </span>
     </OrderDialogFrame>
   );
 }

@@ -22,7 +22,7 @@ export function OrderDialogFrame({
   title: string;
   eyebrow?: string;
   children: ReactNode;
-  footer?: string;
+  footer?: ReactNode;
   error?: string;
   pending?: boolean;
   applyDisabled?: boolean;
@@ -70,7 +70,7 @@ export function OrderDialogFrame({
         </p>
       )}
       <footer>
-        <small>{pending ? '保存しています…' : footer}</small>
+        <small>{footer}</small>
         <div>
           <button type="button" disabled={pending} onClick={onClose}>
             キャンセル

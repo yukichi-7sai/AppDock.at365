@@ -36,6 +36,32 @@ function fixture(t, name = 'PC-A', collections = []) {
   return { store, base, file, shared };
 }
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+test('hint visibility accepts old device files and remains independent per PC without changing shared bytes', (t) => {
+  const old = initialDeviceSettings('PC-A');
+  delete old.host.showHints;
+  const before = JSON.stringify(old);
+  assert.equal(parseDeviceSettings(old, 'PC-A').host.showHints, true);
+  assert.equal(JSON.stringify(old), before);
+  old.host.showHints = false;
+  assert.equal(parseDeviceSettings(old, 'PC-A').host.showHints, false);
+  old.host.showHints = null;
+  assert.throws(() => parseDeviceSettings(old, 'PC-A'), /showHints/);
+  const { store: a, file, base } = fixture(t);
+  const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
+  t.after(() => b.close());
+  b.load();
+  const sharedBefore = fs.readFileSync(file, 'utf8');
+  const next = structuredClone(a.value);
+  next.host.showHints = false;
+  a.save(next, a.revision);
+  assert.equal(a.value.host.showHints, false);
+  assert.equal(b.value.host.showHints, true);
+  assert.equal(fs.readFileSync(file, 'utf8'), sharedBefore);
+  assert.equal(disk(path.join(path.dirname(file), 'settings-PC-A.json')).host.showHints, false);
+  a.reload();
+  assert.equal(a.value.host.showHints, false);
+});
+
 test('migration preserves shared bytes and initializes local flags once', (t) => {
   const { store, file, shared } = fixture(t);
   assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));

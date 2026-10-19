@@ -3352,16 +3352,12 @@ summary {
   font-size: 18px;
   margin: 0;
 }
-.permission-heading,
 .permission-connection {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-}
-.permission-heading > span {
-  font-size: 12px;
 }
 .api-permissions > p,
 .permission-help {

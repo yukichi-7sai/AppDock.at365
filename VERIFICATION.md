@@ -1,5 +1,33 @@
 # 検証記録
 
+## 2026-10-20: ヒント表示のコミット前確認（0.68.0）
+
+- 利用者の動作確認とcommit・pushの依頼を受け、ヒント基盤・表示切替・追加整理と文書/試験の43ファイルを対象とした。未コミット変更を保持してfetchし、GitHubとAQUAのmainが開始時HEAD `47ae4aa`と一致することを確認した。
+- 最終実装の568入力・out生成物202件・ログ・固定EXE/feedを照合し、型検査・build/publish・関連9ファイル66件・固定EXEのGUI9群/再起動・smokeを再利用した。さらに前回の標準回帰から、試験と再帰的なrequire参照・実行worker/ツールの入力が一致し、変更した設定/renderer/nativeを使わない23ファイル97件を再利用した。設定の読み込み・生成コマンド・PC保存・発行nativeに関係する残る63ファイルを追加確認した。[再利用の照合と依存一覧](.artifacts/commit-validation-settings-hints-20261020/reuse.json)。
+- 追加回帰で、旧設定の期待値に新しい既定`showHints: true`が不足していた1か所を修正した。製品コードは変更せず、同じ追加回帰コマンド全体を再実行して**515/515、fail/skip 0**が成功した。再利用分163件と合わせて標準全体は**95ファイル678/678、fail/skip 0**。制限内の一時ファイル・接続・Windows API権限の失敗ログは保持し、同一コマンドの通常ユーザー実行で切り分けた。失敗コマンド内の部分成功を再利用していない。
+- 動作確認済みの**0.68.0 / 168917607 bytes / SHA256 e9b380696eb1e4e4fc934c99acfa3c669a1e3865008b75dd246be3354b0c74db**を維持し、製品修正・再発行なし。追加差分は上記試験の期待値と本検証記録だけで、型検査/GUI/発行物への影響がないことを確認する。全入力/生成物の前後照合、コマンド・完全ログ/hash・レビュー結果は[コミット検証資料](.artifacts/commit-validation-settings-hints-20261020/validation.json)、stage/commit tree・実効名義と両mainへの送信結果は同フォルダーの`staged.json`・`commit.json`・`push.json`へ記録する。
+- 新たなGUI profileは作成せず、固定fixture・直近の成功・再利用資料・失敗/状態不明の資料を保持し、削除0件。Release・全体ZIP・実利用先deploy・他Applet再発行・物理入力/実アカウント削除は今回の範囲外。
+
+## 2026-10-20: ヒント対象の追加と常設案内の整理（0.68.0継続）
+
+- 前工程の未コミット変更を保持し、同じヒント機能の追加調整として**0.68.0を維持**して再発行した。ジェスチャーの通常右クリックの補足、Webアカウントの削除/クリアの補足、操作許可の即時保存・許可不足の補足を`SettingsHint`へ統一した。許可不足の説明は末尾の「許可の適用とログについて」の折りたたみ内へ移した。
+- 入力確定の常設案内「文字・数値はEnterかフォーカスを外して確定、Escapeで入力を取消。」と「このPCに自動保存」はヒントON時も表示せず、不要になったbadge用CSSを削除した。操作許可の保存中は補足文を置換せず、スクリーンリーダー用通知とボタン無効化を維持する。許可の処理・エラー・6つの注意アイコン・MCP情報取得の固定許可と、アカウント削除/クリアの確認・使用中ガードは変更しない。
+- [発行前セルフレビュー](.artifacts/settings-hints-refinement-20261020/review.txt)は未解決指摘なし。型検査、本体/Default Shell/native buildが成功。前工程の入力hashと比較し、変更はrenderer/CSS・専用GUIスクリプトの6入力だけで、main/shared・設定/保存・依存・unit試験は一致した。rendererのimportを走査する境界試験**3/3件**を再実行し、他の**63件**を根拠付きで再利用して関連**66/66件**の成功を維持した。[照合記録](.artifacts/settings-hints-refinement-20261020/reuse.json)。全回帰は実行していない。
+- 最終固定EXEのGUI **9群**が成功。追加4ヒントのON/OFF、許可不足の説明が折りたたみ内にあることと開閉状態の保持、2案内の常時不在、許可の実保存/元の値への復帰、6注意アイコンと固定許可、既存の本文/ダイアログ/Applet詳細、進行・正常結果のレイアウト、明暗×2幅×ON/OFF、実プロセス再起動後の設定保持を確認した。[最終GUI結果](.artifacts/settings-hints-ui-1792439723672/result.json)、[許可ON](.artifacts/settings-hints-ui-1792439723672/permission-hints-on.png)、[許可OFF](.artifacts/settings-hints-ui-1792439723672/permission-hints-off.png)。画像を目視し、想定外のページエラーなしを確認した。
+- 常設案内の削除によりヒントのない通常ページもあるため、GUIのON待機を実際の表示箇所で行うよう試験を調整した。製品は発行後に変更していない。再発行EXEの隔離smokeも成功。最終EXEは**0.68.0 / 168,917,607 bytes / SHA256 e9b380696eb1e4e4fc934c99acfa3c669a1e3865008b75dd246be3354b0c74db**。feed、EXE、同梱Default Shellの版とサイズ/hash、隔離コピーを照合した。入力568件・out生成物202件は最終GUI/smoke中に変化なし。[コマンド・結果・ログ/hash](.artifacts/settings-hints-refinement-20261020/validation.json)。
+- GUIは隔離設定の描画・保存確認で、実アカウント削除や物理ジェスチャーの検証ではない。専用プロセスは正常終了し、直近の成功・再利用用/調査資料は保持した。コミット・push・Release・実利用先deploy・他Applet再発行は行っていない。
+
+## 2026-10-20: 設定ヒントの共通基盤と表示切替（0.68.0）
+
+- 表示ページを「共通」（テーマ、ヒントの表示）と「Shellの変更」へ整理した。文言は指定どおりとし、Shell選択欄の重複descriptionを削除。`SettingsHint`とContext、共通CSSを追加し、明確な操作ヒントを設定本文・ショートカット/ジェスチャー/順序/カスタムコマンド等のダイアログへ適用した。カードのdescription、現在値、警告・エラー、manifestのdescriptionは維持する。今後の追加規則は[設定基盤](docs/settings-foundation.md#ヒントと一時表示)に記載した。
+- `host.showHints`はPC専用・既定ONで即時保存/反映し、ON/OFF/toggleの3コマンドを設定定義から生成する。旧端末JSONの新項目欠落は読み取り時だけ既定ONを補い、保存済みfalseと共有ファイルを保持する。設定項目追加のため、本体のみ**0.67.1 → 0.68.0**へマイナー更新した。開始時main `47ae4aa`はclean・origin/main追跡で、ff-only pullは最新確認済み。
+- 保存中と共通`SettingsFeedback`の進行/正常結果は画面の行を増減させず、スクリーンリーダー用通知へ整理した。ボタンの無効化・二重操作防止・エラー表示を維持し、ヒントOFF時の`aria-describedby`の参照も外す。
+- 発行前セルフレビューで端末保存分類・旧端末JSONの読み込み・ページ投影/検索・生成コマンドと権限・portalへの即時反映・エラーの維持を確認した。端末専用キー追加と旧ファイル互換を揃え、未解決の発行阻害事項なし。[レビュー記録](.artifacts/settings-hints-20261020/review.txt)。型検査、本体/Default Shell/native build、関連**9ファイル66/66件、fail/skip 0**が成功。全回帰は実行していない。
+- 最終固定EXEのGUI **8群**が成功。既存設定の既定ON、指定カード構成、UI/コマンドでの切り替え、4設定ページと開いたままのダイアログへの反映、プロセス設定のヒントとdescriptionの分離、Appletの全体/詳細の共用、接続処理中/正常結果の位置不変と失敗表示、明暗×1280/760×ON/OFF、実プロセス再起動後のOFF保持を確認した。[最終GUI結果](.artifacts/settings-hints-ui-1792438121451/result.json)、[レイアウト実測](.artifacts/settings-hints-ui-1792438121451/feedback-layout.json)、[狭幅OFF](.artifacts/settings-hints-ui-1792438121451/light-760-off.png)、[Dark/ON](.artifacts/settings-hints-ui-1792438121451/dark-1280-on.png)。スクリーンショットも目視し、想定外のページエラーなしを確認した。
+- 試験側は開始ページの明示、モデル更新後の描画待ち、候補リストの増減を除いたコンテンツ座標の測定、入力flush/リサイズ完了の同期を調整した。途中の画像にあった検証操作の競合表示を見落とさず、ページエラーも検査する最終実行で再確認した。製品は発行後に変更していない。制限内のDNS/供給網照会、一時ファイルrename、EXE spawnの失敗は記録を保持し、同じ処理を通常ユーザー環境で成功させた。検査・固定依存は変更していない。
+- 通常publishと固定EXEの隔離smokeが成功。最終EXEは**0.68.0 / 168,906,787 bytes / SHA256 c10341d6a1efaa56fc83a83054e08306843db86617c7bc801a45fa9c5404c1b3**。update.json、EXEの版/サイズ/hash、同梱Default Shellの0.68.0、隔離コピーを照合した。資料とログ/hashは[検証資料](.artifacts/settings-hints-20261020/validation.json)、入力568件・out生成物202件の照合は同フォルダーを参照する。READMEと設定例の追記は検証後の文書/例の差分として扱う。
+- 接続確認はローカルHTTP fixtureであり、実TTSサーバーや別PCの同期は未確認。曖昧な補足・manifestのdescriptionは個別対応として残した。専用プロセスの正常終了を確認。今回のGUI成功は同スクリプトで直近3回以内のため整理対象なし。未解決/調査資料は保持し、コミット・push・Release・実利用先deploy・未変更Applet再発行は行っていない。
+
 ## 2026-10-20: 色選択UIと展開方法の説明整理・コミット対象の検証（0.67.1）
 
 - 利用者の色選択UIの動作確認後、グループ追加/編集の展開方法に付いていた補足説明を削除した。「持続的」「一時的」の選択肢と保存/展開動作を保持し、前工程の色UIと同じ9ファイルの変更へまとめる。同じ変更の追加調整なので版は**0.67.1**を維持し、通常publishで最終EXEを更新した。[差分レビュー](.artifacts/commit-validation-color-picker-20261020/review.md)は未解決指摘なし。

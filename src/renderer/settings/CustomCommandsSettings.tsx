@@ -1,3 +1,4 @@
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import { useState } from 'react';
 import type { SettingDefinition, Settings } from '../../shared/contracts';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
@@ -273,7 +274,7 @@ function CustomCommandDialog({
               ))}
             </select>
           </SettingsField>
-          {type?.description && <p>{type.description}</p>}
+          {type?.description && <SettingsHint>{type.description}</SettingsHint>}
           <SettingsField title="名前">
             <SettingsInput
               aria-label="名前"

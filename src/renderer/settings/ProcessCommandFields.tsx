@@ -1,3 +1,4 @@
+import { SettingsHint } from '../settings-ui/SettingsHint';
 import { useState } from 'react';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
@@ -107,7 +108,7 @@ export function ProcessCommandFields({
         checked={config.showConsole === true}
         onChange={(showConsole) => onChange({ ...config, showConsole })}
       />
-      <p className="muted">起動受付を返します。終了待ち・標準出力の取得は行いません。</p>
+      <SettingsHint>起動受付を返します。終了待ち・標準出力の取得は行いません。</SettingsHint>
     </>
   );
 }

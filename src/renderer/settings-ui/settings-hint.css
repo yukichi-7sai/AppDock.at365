@@ -1,0 +1,7 @@
+.settings-hint,
+.settings-surface .settings-hint,
+.settings-modal .settings-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}

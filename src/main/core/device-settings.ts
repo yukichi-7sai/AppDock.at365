@@ -10,6 +10,7 @@ import {
 
 export const deviceHostKeys = [
   'theme',
+  'showHints',
   'shellProviders',
   'soundEnabled',
   'closeToTray',
@@ -122,7 +123,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
   safeJson(raw);
   if (
     Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)) ||
-    deviceHostKeys.some((key) => raw.host[key] === undefined)
+    deviceHostKeys.some((key) => key !== 'showHints' && raw.host[key] === undefined)
   )
     throw Error('このPCの表示・一般設定を確認してください。');
   const probe = createDefaultSettings();
@@ -153,7 +154,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
       } as ExtensionSettings;
     }
   }
-  parseSettings(probe);
+  const parsedHost = parseSettings(probe).host;
   for (const [owner, groups] of Object.entries(raw.collectionEnabled)) {
     if (!id(owner) || !object(groups)) throw Error('ページの端末設定が不正です。');
     for (const [key, rows] of Object.entries(groups)) {
@@ -162,7 +163,10 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
         if (!id(item) || typeof enabled !== 'boolean') throw Error('ページの有効状態が不正です。');
     }
   }
-  return structuredClone(raw) as DeviceSettings;
+  return {
+    ...structuredClone(raw),
+    host: { ...structuredClone(raw.host), showHints: parsedHost.showHints },
+  } as DeviceSettings;
 }
 export function readDeviceCollections(roots: string[]): DeviceCollection[] {
   const result: DeviceCollection[] = [];
