@@ -117,7 +117,12 @@ for (const field of ['soundEnabled', 'showHints'])
       const result = await f.api.call('commands.execute', { id });
       assert.equal(result.completion, 'settingsSaved');
       assert.equal(f.settings.value.host[field], action === 'on');
-      assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host[field], action === 'on');
+      const raw = JSON.parse(fs.readFileSync(f.settings.file));
+      assert.equal(raw.host?.[field], action === 'on' ? undefined : false);
+      assert.equal(
+        require('../out/main/shared/settings-schema').parseSettings(raw).host[field],
+        action === 'on',
+      );
     }
     f.setWrite(false);
     await assert.rejects(() =>

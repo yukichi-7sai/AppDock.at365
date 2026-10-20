@@ -72,12 +72,13 @@ export function RibbonSettings({
     iconOnly: boolean;
     before: string;
   }>();
-  const [confirmation, setConfirmation] = useState<{
-    group?: RibbonGroup;
-    button?: RibbonCommandButton;
-    missing?: { id: string; title: string };
-    before: string;
-  }>();
+  const [confirmation, setConfirmation] = useState<
+    { before: string } & (
+      | { kind: 'button'; button: RibbonCommandButton }
+      | { kind: 'group'; group: RibbonGroup }
+      | { kind: 'missing'; missing: { id: string; title: string } }
+    )
+  >();
   const catalog = ribbonItems(extensions, layout.separators, groups, layout.buttons);
   const commandTitle = (id: string) => commands.find((c) => c.id === id)?.title ?? id;
   const rightClickCommand = layout.rightClickCommand ?? defaultRibbonRightClickCommand;
@@ -167,6 +168,7 @@ export function RibbonSettings({
   };
   const row = (entry: RibbonItem, index: number, siblings: RibbonItem[]) => {
     const item = { ...entry, ...ribbonPresentation(layout, entry) };
+    const { command, group } = item;
     const parent = ribbonParent(layout, item.id);
     const missing = !catalog.some((value) => value.id === item.id);
     return (
@@ -300,26 +302,34 @@ export function RibbonSettings({
               >
                 <ListIcon kind="delete" />
               </button>
-            ) : item.command ? (
+            ) : command ? (
               <button
                 className="settings-list-icon settings-list-delete"
                 title="削除"
                 disabled={pending}
                 aria-label={`${item.title}を削除`}
                 onClick={() =>
-                  setConfirmation({ button: item.command, before: JSON.stringify(layout) })
+                  setConfirmation({
+                    kind: 'button',
+                    button: command,
+                    before: JSON.stringify(layout),
+                  })
                 }
               >
                 <ListIcon kind="delete" />
               </button>
-            ) : item.group ? (
+            ) : group ? (
               <button
                 className="settings-list-icon settings-list-delete"
                 title="グループを解除"
                 disabled={pending}
                 aria-label={`${item.title}のグループを解除`}
                 onClick={() =>
-                  setConfirmation({ group: item.group, before: JSON.stringify(layout) })
+                  setConfirmation({
+                    kind: 'group',
+                    group,
+                    before: JSON.stringify(layout),
+                  })
                 }
               >
                 <ListIcon kind="delete" />
@@ -332,6 +342,7 @@ export function RibbonSettings({
                 aria-label={`${item.title}を設定から削除`}
                 onClick={() =>
                   setConfirmation({
+                    kind: 'missing',
                     missing: { id: item.id, title: item.title },
                     before: JSON.stringify(layout),
                   })
@@ -469,57 +480,36 @@ export function RibbonSettings({
             </section>
           );
         })}
-        <button
-          className="text-button"
-          disabled={pending}
-          onClick={() => setConfirmation({ before: JSON.stringify(layout) })}
-        >
-          リボンを初期状態に戻す
-        </button>
       </SettingsSection>
       {confirmation && (
         <SettingsDialog
           title={
-            confirmation.button
+            confirmation.kind === 'button'
               ? 'コマンドボタンを削除'
-              : confirmation.group
+              : confirmation.kind === 'group'
                 ? 'グループを解除'
-                : confirmation.missing
-                  ? 'リボン項目を設定から削除'
-                  : 'リボンを初期状態に戻す'
+                : 'リボン項目を設定から削除'
           }
           onClose={() => setConfirmation(undefined)}
-          applyLabel={
-            confirmation.button
-              ? '削除'
-              : confirmation.group
-                ? '解除'
-                : confirmation.missing
-                  ? '削除'
-                  : '初期状態に戻す'
-          }
+          applyLabel={confirmation.kind === 'group' ? '解除' : '削除'}
           onApply={async () => {
             if (confirmation.before !== JSON.stringify(layout))
               throw Error('リボン設定が変更されています。閉じてからやり直してください。');
             await apply(
-              confirmation.button
+              confirmation.kind === 'button'
                 ? { kind: 'removeButton', id: confirmation.button.id }
-                : confirmation.group
+                : confirmation.kind === 'group'
                   ? { kind: 'ungroup', id: confirmation.group.id }
-                  : confirmation.missing
-                    ? { kind: 'removeMissing', id: confirmation.missing.id }
-                    : { kind: 'reset' },
+                  : { kind: 'removeMissing', id: confirmation.missing.id },
             );
           }}
         >
           <p>
-            {confirmation.button
+            {confirmation.kind === 'button'
               ? `「${confirmation.button.title}」の登録と配置を削除します。実行先のコマンドとその設定は残ります。`
-              : confirmation.group
+              : confirmation.kind === 'group'
                 ? `「${confirmation.group.title || 'グループ'}」の名前・アイコン・展開方法を削除します。中のボタンはグループの位置に戻り、順序・上下配置・非表示状態を引き継ぎます。`
-                : confirmation.missing
-                  ? `「${confirmation.missing.title}」の配置・グループ所属・表示名を設定から削除します。登録元を追加し直した場合は既定の表示に戻ります。`
-                  : 'グループと色・セパレーターと名前・コマンドボタン・未導入項目を含む配置と表示名を初期化します。動作設定の右クリック割当と、Appletの設定や有効状態は変わりません。'}
+                : `「${confirmation.missing.title}」の配置・グループ所属・表示名を設定から削除します。登録元を追加し直した場合は既定の表示に戻ります。`}
           </p>
         </SettingsDialog>
       )}

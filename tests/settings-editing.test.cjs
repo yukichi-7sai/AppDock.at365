@@ -261,7 +261,7 @@ test('all JSON pages round-trip only selected ranges; unknown owners, leaves and
       ),
     /変更できない/,
   );
-  assert.throws(() => applySettingsJson(value, catalog[0], applets, '{"host":{}}'), /theme/);
+  assert.equal(applySettingsJson(value, catalog[0], applets, '{"host":{}}').host.theme, 'light');
 });
 test('web partial arrays preserve other rows and immutable fields', () => {
   const v = createDefaultSettings(),

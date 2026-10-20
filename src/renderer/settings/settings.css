@@ -121,6 +121,15 @@
   font-size: 12px;
   color: var(--muted);
 }
+.settings-reset-dialog .settings-dialog-fields {
+  display: grid;
+  gap: 12px;
+}
+.settings-reset-dialog label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .settings-file-menu {
   position: relative;
   font-size: 12px;

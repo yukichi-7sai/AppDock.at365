@@ -163,7 +163,14 @@ export class PageCollectionManager {
           ? 'Webアカウント一覧の同期を待っています。'
           : state?.error || page.parent.error,
         description: page.parent.displayName + 'のページ',
-        settings: page.definition.fields,
+        settings: page.definition.fields.map((field) => {
+          const inherited = page.parent.settings
+            ?.find((setting) => setting.key === page.binding.key)
+            ?.fields?.find((item) => item.key === field.key)?.default;
+          return field.default === undefined && inherited !== undefined
+            ? { ...field, default: inherited }
+            : field;
+        }),
         defaultKeybindings: page.definition.shortcutDefaultsKey
           ? parseKeybindingDefaults(
               this.options.settings().extensions[page.binding.owner]?.settings[

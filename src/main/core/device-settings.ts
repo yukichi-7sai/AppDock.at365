@@ -3,6 +3,10 @@ import path from 'node:path';
 import type { ExtensionManifest, ExtensionSettings, Settings } from '../../shared/contracts';
 import { createDefaultSettings, parseSettings } from '../../shared/settings-schema';
 import { defaultAppletEnabled } from '../../shared/applet-state';
+import { fillSettingDefaults, omitSettingDefaults } from '../../shared/settings-defaults';
+import { compactAppletConfiguration } from '../../shared/settings-storage';
+import { parseSettingDefinitions } from '../../shared/setting-definitions';
+import { parseAppletPages } from '../../shared/applet-pages';
 import {
   parsePageCollections,
   validateCollectionRecords,
@@ -107,6 +111,8 @@ export function initialDeviceSettings(
   return value;
 }
 export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings {
+  if (object(raw) && raw.schemaVersion === 1 && typeof raw.machineName === 'string')
+    raw = fillSettingDefaults(raw, initialDeviceSettings(name));
   if (
     !object(raw) ||
     raw.schemaVersion !== 1 ||
@@ -122,10 +128,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
   )
     throw Error('このPCの設定JSONの形式を確認してください。');
   safeJson(raw);
-  if (
-    Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)) ||
-    deviceHostKeys.some((key) => key !== 'showHints' && raw.host[key] === undefined)
-  )
+  if (Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)))
     throw Error('このPCの表示・一般設定を確認してください。');
   const probe = createDefaultSettings();
   probe.host = { ...probe.host, ...raw.host };
@@ -166,11 +169,26 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
   }
   return {
     ...structuredClone(raw),
-    host: { ...structuredClone(raw.host), showHints: parsedHost.showHints },
+    host: Object.fromEntries(deviceHostKeys.map((key) => [key, parsedHost[key]])),
   } as DeviceSettings;
 }
-export function readDeviceCollections(roots: string[]): DeviceCollection[] {
-  const result: DeviceCollection[] = [];
+export function deviceSettingsStorageValue(
+  value: DeviceSettings,
+  applets: ExtensionManifest[] = [],
+) {
+  const result = structuredClone(value);
+  result.host =
+    omitSettingDefaults(value.host, initialDeviceSettings(value.machineName).host) ?? {};
+  for (const [owner, entry] of Object.entries(result.extensions))
+    if (entry.configuration)
+      entry.configuration = compactAppletConfiguration(
+        entry.configuration,
+        applets.find((a) => a.id === owner),
+      );
+  return result;
+}
+export function readDeviceManifests(roots: string[]): ExtensionManifest[] {
+  const result: ExtensionManifest[] = [];
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
     for (const directory of fs.readdirSync(root, { withFileTypes: true })) {
@@ -179,20 +197,29 @@ export function readDeviceCollections(roots: string[]): DeviceCollection[] {
         const file = path.join(root, directory.name, 'extension.json');
         if (fs.statSync(file).size > 1024 * 1024) continue;
         const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as ExtensionManifest;
-        if (!id(manifest.id)) continue;
-        for (const definition of parsePageCollections(manifest))
-          if (
-            !result.some(
-              (item) => item.owner === manifest.id && item.definition.key === definition.key,
-            )
-          )
-            result.push({ owner: manifest.id, definition });
+        if (!id(manifest.id) || result.some((item) => item.id === manifest.id)) continue;
+        if (
+          manifest.startupDelaySeconds !== undefined &&
+          (!Number.isInteger(manifest.startupDelaySeconds) ||
+            manifest.startupDelaySeconds < 0 ||
+            manifest.startupDelaySeconds > 86400)
+        )
+          continue;
+        manifest.settings = parseSettingDefinitions(manifest.settings);
+        manifest.pages = parseAppletPages(manifest);
+        manifest.pageCollections = parsePageCollections(manifest);
+        result.push(manifest);
       } catch {
         /* Invalid or unavailable manifests are diagnosed by discovery, never executed here. */
       }
     }
   }
   return result;
+}
+export function readDeviceCollections(roots: string[]): DeviceCollection[] {
+  return readDeviceManifests(roots).flatMap((manifest) =>
+    (manifest.pageCollections ?? []).map((definition) => ({ owner: manifest.id, definition })),
+  );
 }
 export function combineSettings(
   shared: Settings,

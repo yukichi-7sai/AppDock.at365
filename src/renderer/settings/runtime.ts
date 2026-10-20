@@ -35,11 +35,11 @@ export class SettingsViewClient {
   text(m: SettingsPageModel) {
     return this.input?.pageId === m.content.page.id && this.input.text !== undefined
       ? this.input.text
-      : JSON.stringify(m.content.values, null, 2);
+      : JSON.stringify(m.content.jsonValues ?? m.content.values, null, 2);
   }
   setText(value: string) {
     const m = this.model!;
-    const before = m.content.values;
+    const before = m.content.jsonValues ?? m.content.values;
     this.input = { pageId: m.content.page.id, text: value };
     this.inputVersion++;
     this.render(this.display(m));
@@ -55,6 +55,14 @@ export class SettingsViewClient {
     private connectionId: string,
   ) {}
   flush = () => this.chain;
+  async preparePageChange() {
+    const pageId = this.model?.content.page.id;
+    await this.flush();
+    this.accept(await this.transport.get(this.connectionId));
+    if (this.input) throw Error('入力のエラーを修正するか、設定を再読み込みしてください。');
+    if (this.model?.content.page.id !== pageId) throw Error('設定ページが変わりました。');
+    return this.model!;
+  }
   accept(next: unknown) {
     const m = next as SettingsPageModel;
     if (m?.kind !== 'settings' || (this.model?.id === m.id && this.model.revision >= m.revision))
@@ -98,7 +106,13 @@ export class SettingsViewClient {
       )
         operation = {
           ...operation,
-          action: { ...operation.action, before: m.content.values },
+          action: {
+            ...operation.action,
+            before:
+              operation.action.type === 'partial-text'
+                ? (m.content.jsonValues ?? m.content.values)
+                : m.content.values,
+          },
         } as SettingsPageOperation;
       const response = (await this.transport.act(this.connectionId, {
         id: m.id,
@@ -146,7 +160,8 @@ export class SettingsViewClient {
           throw Error('設定の保存先が変わりました。再取得してください。');
         if (name === 'set-local-settings' && this.input)
           throw Error('入力のエラーを修正するか、設定を再読み込みしてから切り替えてください。');
-        args = [...args, m.content.auxiliary.storage?.revision];
+        if (name === 'open-settings' || args.length < 2)
+          args = [...args, m.content.auxiliary.storage?.revision];
       }
       const response = (await this.transport.act(this.connectionId, {
         id: m.id,

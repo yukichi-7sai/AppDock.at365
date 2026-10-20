@@ -108,6 +108,7 @@ export class SettingsPageSession {
       showHints: host.settings.value.host.showHints,
       page,
       values: page.json ? this.options.editor.projection() : {},
+      jsonValues: page.json ? this.options.editor.jsonProjection() : {},
       navigation:
         this.request.context === 'full'
           ? catalog.map((p) => ({
@@ -246,7 +247,9 @@ export class SettingsPageSession {
         if (op.pageId !== state.pageId) this.options.release?.();
         this.navigation.move = undefined;
       } else if (op.kind === 'edit') {
-        if (!['mode', 'page-values', 'partial-text', 'reload'].includes(op.action.type))
+        if (
+          !['mode', 'page-values', 'partial-text', 'reset-page', 'reload'].includes(op.action.type)
+        )
           throw Error('設定操作が不正です。');
         await this.options.editor.act({ ...action, action: op.action });
       } else if (op.kind === 'invoke') {

@@ -115,7 +115,7 @@ data/                         既存の共有名簿・登録素材
 }
 ```
 
-- hostは上表の9キーを扱い、旧ファイルにないshowHintsだけ既定trueを補う。他の8キーは必須とし、themeは既存の列挙値、shellProvidersは既存のShell指定規則、残りはbooleanとして検証する。extensionsとcollectionEnabledは必須object。Applet ID・ページID・秒数・表示方法等も既存の検証規則を再利用する。
+- hostは上表の9キーを扱い、省略キーは本体の現在の既定値を補う。themeは既存の列挙値、shellProvidersは既存のShell指定規則、残りはbooleanとして検証する。省略されたhost・extensions・collectionEnabledは空objectとして補い、明示された不正な型は拒否する。Applet ID・ページID・秒数・表示方法等も既存の検証規則を再利用する。
 - extensionsの各項目はenabledとuseLocalSettingsを必須とする。useLocalSettingsがtrueならconfigurationも必須。falseでも過去のconfigurationを保持できる。
 - configuration.settingsは必須object。未宣言・未導入時の既存設定キーも保持する。startupDelaySecondsとpagesは任意で、欠落時はmanifest等の既定値を使う。共有側の値へは戻らない。
 - configurationに含めるのはApplet設定ページで編集する上記3種類だけ。updateSource、リボン配置、通知種類設定、ショートカット、トレイ、共通名簿、認証、操作許可等を取り込まない。
@@ -166,7 +166,7 @@ Applet IDは共有設定・端末設定・導入済みmanifestの和集合とし
 | 初めて「このPCで設定を保持する」をON | 現在の保存済み設定一式をconfigurationへコピーし、モードと同じ1ファイルの保存で確定 |
 | 端末用configurationが残っている状態でON | 残っている端末用設定を再開。共有値で上書きしない |
 | ON中の編集 | 端末用configurationへ即時保存 |
-| OFFへ変更 | 最新の共有設定を適用。端末用configurationは残す |
+| OFFへ変更 | 確認ダイアログで共有へ反映／PC用を削除／PC用を保持を選択。保持を既定とする。成功後に共有設定を適用 |
 | OFF中の編集 | 共有設定へ即時保存。残してある端末用configurationは変更しない |
 | Appletを無効化 | 設定・保存モード・configurationを保持。保存先を変えない |
 | Appletが未導入・削除済み | 設定を保持。再導入時は同じIDの状態を使用 |
@@ -174,6 +174,8 @@ Applet IDは共有設定・端末設定・導入済みmanifestの和集合とし
 切り替え前に送信済みの入力キューを待ち、現在の保存済み値とrevisionを確かめる。無効な入力や失敗値を暗黙にコピーしない。画面にそのような値が残っていれば切り替えを受け付けず、既存の入力エラーから修正または再読み込みできるようにする。全体の未保存状態や保存／破棄ボタンは追加しない。
 
 OFFにする際は共有側も直前に再検証する。共有設定が読めない・対象設定が不正な場合はOFFを保存せず、現在の端末設定を維持する。ON再開時のconfigurationが現在の宣言で利用できない場合も切り替えを成立扱いしない。
+
+共有への反映は対象Appletのconfiguration一式だけを置き換え、PC用configurationの削除・モード変更と同じトランザクションで保存する。有効状態・更新元・子ページのPC専用有効状態を共有へコピーしない。詳細は[既定値省略とリセット](settings-defaults-reset-design.md)を参照する。同文書の省略形式も読み取れるため、hostの省略キーは現在の既定値を補う。schemaVersionとmachineNameの識別検証は維持する。
 
 保存モードの変更は有効化ではない。停止・無効のAppletを起動しない。有効なAppletの設定変更通知、開始待ちの再調整、ページ表示先の変更は、合成値に対する既存の適用経路を1回だけ実行する。起動・適用に失敗した場合は、保存結果と適用結果を分けて既存のエラー報告へ接続する。
 

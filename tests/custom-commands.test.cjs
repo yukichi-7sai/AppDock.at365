@@ -161,7 +161,9 @@ test('old storage is inert and only explicit JSON replacement creates the new fo
   f.service.validateReplacement(replacement);
   assert.equal(f.store.value.customCommands.version, 1);
   f.options.save(replacement, f.store.revision);
-  assert.deepEqual(f.store.value.customCommands, { version: 2, items: [] });
+  assert.equal(f.store.value.customCommands, undefined);
+  assert.equal(f.service.read('customCommands.list', {}).supportedVersion, true);
+  assert.equal(JSON.parse(fs.readFileSync(f.store.file)).customCommands, undefined);
 });
 
 test('description edits leave in-flight execution snapshots running', async (t) => {

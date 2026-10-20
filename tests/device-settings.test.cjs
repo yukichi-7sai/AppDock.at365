@@ -94,9 +94,13 @@ test('all display/general settings remain local while other settings synchronize
   const shared = disk(file),
     device = disk(store.device.file);
   assert.equal(shared.profile?.name, 'Shared');
-  assert.equal(shared.host.soundEnabled, true);
+  assert.equal(
+    require('../out/main/shared/settings-schema').parseSettings(shared).host.soundEnabled,
+    true,
+  );
   assert.equal(device.host.soundEnabled, false);
   assert.equal(device.host.runAsAdministrator, true);
+  shared.host ??= {};
   shared.host.theme = 'system';
   shared.host.startAtLogon = false;
   shared.profile = { ...shared.profile, name: 'Incoming' };

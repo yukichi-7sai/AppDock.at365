@@ -34,6 +34,7 @@ export function SettingsPageLayout({
   storage,
   onLocalSettings,
   onReload,
+  onReset,
   children,
   announcement,
 }: {
@@ -46,6 +47,7 @@ export function SettingsPageLayout({
   storage?: SettingsPageAuxiliary['storage'];
   onLocalSettings?(enabled: boolean): void;
   onReload(): void;
+  onReset?(): void;
   children: ReactNode;
   announcement: ReactNode;
 }) {
@@ -96,6 +98,11 @@ export function SettingsPageLayout({
           )}
           <span className="sr-only">{pending ? '保存中…' : ''}</span>
         </p>
+        {page.json && !page.unavailableReason && (
+          <button type="button" disabled={pending} onClick={onReset}>
+            このページを既定値に戻す
+          </button>
+        )}
         {page.json && storage && storage.files.length > 1 ? (
           <details className="settings-file-menu">
             <summary>ファイルを開く</summary>
@@ -129,7 +136,7 @@ export function SettingsPageLayout({
       {storage?.canSwitch && (
         <SettingsHint className="settings-storage-description">
           {storage.local
-            ? 'このPC専用の設定を使います。OFFにすると共有設定へ戻り、このPCの設定は残します。'
+            ? 'このPC専用の設定を使います。OFFにするときに、共有への反映・このPCの設定の削除・保持を選べます。'
             : '共有設定を使います。初めてONにすると現在の設定をコピーし、保存済みの端末設定があれば再開します。'}
         </SettingsHint>
       )}

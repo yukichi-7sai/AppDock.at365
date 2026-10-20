@@ -27,6 +27,13 @@ export type SettingsEdit =
     }
   | { type: 'values'; before: Settings; value: Settings }
   | { type: 'mode'; value: 'form' | 'json' }
+  | {
+      type: 'reset-page';
+      pageId: string;
+      revision: number;
+      storageScope?: string;
+      before: Record<string, unknown>;
+    }
   | { type: 'reload' };
 export interface SettingsEditRequest {
   sessionId: string;

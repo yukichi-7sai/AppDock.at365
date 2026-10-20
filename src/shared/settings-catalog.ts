@@ -8,6 +8,12 @@ import { validateSettingValue, validateAppletSettings } from './setting-definiti
 import { orderApplets } from './applet-order';
 import { getKeybindings } from './keybindings';
 import { appletApiPermissionLabels } from './appdock-api';
+import { fillSettingDefaults, omitSettingDefaults } from './settings-defaults';
+import {
+  appletConfigurationDefaults,
+  compactAppletConfiguration,
+  settingsStorageDefaults,
+} from './settings-storage';
 
 export const settingsTextLimit = 1024 * 1024;
 export type SettingsPath = string[];
@@ -497,6 +503,43 @@ export function settingsProjection(
   }
   return result;
 }
+export function settingsPageDefaults(page: SettingsPageDefinition, applets: ExtensionSnapshot[]) {
+  const defaults = settingsStorageDefaults();
+  for (const applet of applets) {
+    defaults.extensions[applet.id] = {
+      enabled: defaultAppletEnabled,
+      ...appletConfigurationDefaults(applet),
+      ...(applet.updateRepository ? { updateSource: `github:${applet.updateRepository}` } : {}),
+    };
+  }
+  if (page.collection) {
+    const applet = applets.find((a) => a.id === page.owner);
+    return {
+      extensions: {
+        [page.owner!]: {
+          settings: Object.fromEntries(
+            (applet?.settings ?? [])
+              .filter((field) => field.default !== undefined)
+              .map((field) => [field.key, field.default]),
+          ),
+        },
+      },
+    };
+  }
+  return settingsProjection(defaults, page, applets);
+}
+export function settingsJsonProjection(
+  value: Settings,
+  page: SettingsPageDefinition,
+  applets: ExtensionSnapshot[],
+) {
+  return (
+    omitSettingDefaults(
+      settingsProjection(value, page, applets),
+      settingsPageDefaults(page, applets),
+    ) ?? {}
+  );
+}
 const object = (v: unknown): v is Record<string, any> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 function assertScope(value: unknown, paths: SettingsPath[], prefix: string[] = []) {
@@ -529,29 +572,29 @@ export function applySettingsJson(
       fields.map((field) => ['extensions', page.owner!, 'settings', field.key]),
     );
     const input = value.extensions?.[page.owner!]?.settings;
-    if (!object(input)) throw Error('ページ設定を指定してください。');
+    if (input !== undefined && !object(input)) throw Error('ページ設定を指定してください。');
     const row = collectionRecord(next, page.collection);
     for (const field of fields) {
-      validateSettingValue(field, input[field.key]);
-      row[field.key] = input[field.key];
+      const part = input?.[field.key] === undefined ? field.default : input[field.key];
+      if (part !== undefined) validateSettingValue(field, part);
+      if (part === undefined) delete row[field.key];
+      else row[field.key] = structuredClone(part);
     }
     return next;
   }
   const paths = settingsPaths(page, applets);
   assertScope(value, paths);
   const check = createDefaultSettings();
+  const defaults = settingsPageDefaults(page, applets);
   for (const p of paths)
     if (p[0] === 'extensions')
       check.extensions[p[1]] ??= { enabled: defaultAppletEnabled, settings: {} };
-  for (const p of paths) writePath(check, p, readSettingsPath(value, p));
-  // Missing required values fail; optional values use the existing parser's defaults.
-  if (page.id === 'shortcuts' && !Array.isArray(value.keybindings))
-    throw Error('keybindings は配列で指定してください。');
-  if (
-    page.kind === 'applet' &&
-    !object(readSettingsPath(check, ['extensions', page.owner!, 'settings']))
-  )
-    throw Error('settings はオブジェクトで指定してください。');
+  for (const p of paths)
+    writePath(
+      check,
+      p,
+      fillSettingDefaults(readSettingsPath(value, p), readSettingsPath(defaults, p)),
+    );
   const normalized = parseSettings(check);
   validateAppletSettings(
     normalized,
@@ -561,6 +604,17 @@ export function applySettingsJson(
     if (p[0] === 'extensions')
       next.extensions[p[1]] ??= { enabled: defaultAppletEnabled, settings: {} };
     writePath(next, p, readSettingsPath(normalized, p));
+  }
+  if (page.id === 'tray') next.trayCommands = normalized.trayCommands;
+  if (page.kind === 'applet') {
+    const compact = compactAppletConfiguration(
+      next.extensions[page.owner!],
+      applets.find((a) => a.id === page.owner),
+    );
+    for (const key of ['settings', 'startupDelaySeconds', 'pages'] as const) {
+      delete next.extensions[page.owner!][key];
+      if (compact[key] !== undefined) (next.extensions[page.owner!] as any)[key] = compact[key];
+    }
   }
   return next;
 }

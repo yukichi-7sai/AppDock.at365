@@ -6,6 +6,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { observeFile } from './file-observer';
 import { SettingsHealth, settingsIssueMessages } from './settings-health';
 import type { Settings, SettingsSnapshot, ExtensionSettings } from '../../shared/contracts';
+import { settingsStorageValue } from '../../shared/settings-storage';
 import {
   createDefaultSettings as defaults,
   parseSettings as validate,
@@ -95,12 +96,18 @@ class SettingsStore<T = Settings> extends EventEmitter {
   constructor(
     file: string,
     private backupDirectory?: string,
-    private codec?: { defaults(): T; parse(value: unknown): T },
+    private codec?: { defaults(): T; parse(value: unknown): T; serialize?(value: T): unknown },
   ) {
     super();
     this.file = file;
     this.revision = 0;
     this.value = codec ? codec.defaults() : (defaults() as T);
+  }
+  serialize(value: T): string {
+    const stored = this.codec
+      ? (this.codec.serialize?.(value) ?? value)
+      : settingsStorageValue(value as Settings);
+    return JSON.stringify(stored, null, 2) + '\n';
   }
   private readBytes(file: string): Buffer {
     try {
@@ -183,7 +190,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
         )
           throw Error('設定ファイルがありません。');
         try {
-          atomicWrite(this.file, JSON.stringify(this.value, null, 2) + '\n', {
+          atomicWrite(this.file, this.serialize(this.value), {
             previous: undefined,
           });
         } catch (error) {
@@ -212,7 +219,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
   }
   private backup(value: T) {
     if (!this.backupDirectory) return;
-    const text = JSON.stringify(value, null, 2) + '\n';
+    const text = this.serialize(value);
     const hash = createHash('sha256').update(text).digest('hex');
     if (hash === this.lastBackup) {
       try {
@@ -269,8 +276,9 @@ class SettingsStore<T = Settings> extends EventEmitter {
   save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
     if (this.writesBlocked) throw Error('設定を復元中です。完了後に保存してください。');
     this.assertRevision(revision);
-    const next = this.codec ? this.codec.parse(value) : (validate(value) as T);
-    const serialized = JSON.stringify(next, null, 2) + '\n';
+    const parsed = this.codec ? this.codec.parse(value) : (validate(value) as T);
+    const serialized = this.serialize(parsed);
+    const next = this.parse(serialized);
     if (Buffer.byteLength(serialized, 'utf8') > 4 * 1024 * 1024)
       throw Error('設定ファイルは4MB以下にしてください。');
     this.tryBackup(this.value);
@@ -371,7 +379,8 @@ class SettingsStore<T = Settings> extends EventEmitter {
     if (this.revision !== plan.revision || !sameBytes(previous, plan.previous))
       throw new SettingsConflictError('復元中に設定が変わりました。もう一度確認してください。');
     const bytes = this.readBytes(plan.candidate);
-    const next = this.parse(bytes);
+    const serialized = this.serialize(this.parse(bytes));
+    const next = this.parse(serialized);
     if (hashBytes(bytes) !== plan.candidateHash)
       throw new SettingsConflictError('復元元が変わりました。もう一度確認してください。');
     try {
@@ -387,7 +396,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
       throw Error('破損ファイルを退避できないため復元を中止しました。保存先を確認してください。');
     }
     try {
-      atomicWrite(this.file, JSON.stringify(next, null, 2) + '\n', { previous });
+      atomicWrite(this.file, serialized, { previous });
     } catch (error) {
       if (!(error instanceof SettingsConflictError)) this.health.set('save', 'save-failed');
       throw error;

@@ -384,7 +384,9 @@ async function colorGeometry() {
       await until(
         async () =>
           (await rail.locator('html').getAttribute('data-theme')) === theme &&
-          (await rail.locator('.activity-rail').evaluate((el) => getComputedStyle(el).backgroundColor)) ===
+          (await rail
+            .locator('.activity-rail')
+            .evaluate((el) => getComputedStyle(el).backgroundColor)) ===
             (theme === 'dark' ? 'rgb(12, 13, 17)' : 'rgb(237, 240, 244)'),
         'ribbon theme rendered',
       );
@@ -681,23 +683,36 @@ async function commandChecks() {
   assert.equal(denied, true);
   assert.equal(executions(), 6);
   page = await openRibbonSettings();
-  await page.getByRole('button', { name: 'リボンを初期状態に戻す', exact: true }).click();
+  assert.equal(
+    await page.getByRole('button', { name: 'リボンを初期状態に戻す', exact: true }).count(),
+    0,
+  );
+  await page.getByRole('button', { name: 'このページを既定値に戻す', exact: true }).click();
   await page
-    .getByRole('dialog', { name: 'リボンを初期状態に戻す', exact: true })
-    .getByRole('button', { name: '初期状態に戻す', exact: true })
+    .getByRole('dialog', { name: 'このページを既定値に戻す', exact: true })
+    .getByRole('button', { name: '既定値に戻す', exact: true })
     .click();
   await saved(
     (r) =>
       !r.buttons.length &&
       !r.groups.length &&
       !r.separators.length &&
-      r.rightClickCommand === 'fixture.ribbon-action.run',
+      r.rightClickCommand === undefined,
   );
   assert.equal(executions(), 6);
+  const afterReset = (await host.evaluate(() => window.dock.snapshot())).settings.value;
+  assert.equal(afterReset.customCommands.items.length, 1);
+  assert.equal(afterReset.extensions['fixture.ribbon-action'].enabled, false);
+  await page.getByRole('button', { name: 'JSON', exact: true }).click();
+  assert.deepEqual(
+    JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()),
+    {},
+  );
+  await page.getByRole('button', { name: 'フォーム', exact: true }).click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 680));
   await page.getByRole('heading', { name: '動作設定', exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(profile, 'ribbon-settings-narrow.png') });
   checks.push(
-    'Right-click assignment and command definitions survive restart; stopped provider cannot run; reset preserves behavior assignment',
+    'Right-click assignment survives restart; stopped provider cannot run; page reset restores layout and behavior with empty JSON while preserving command definitions',
   );
 }

@@ -1,5 +1,33 @@
 # 検証記録
 
+## 2026-10-20: 設定画面の変更をまとめたコミット・push前照合（0.72.1）
+
+- 既定値のJSON省略・ページリセット・PC専用OFF時の選択と、リボン下部の旧リセット削除をまとめてcommit/pushする依頼を受領。0.72.0と追加修正0.72.1は利用者が動作確認済み。main/origin/main、開始HEAD `cea9498341bbefbec818cc9ed71c11f3b993fb93`、空のindexと今回の39パスを確認した。GitHubとAQUAのmainも同じ開始HEADで、dirtyのため自動pull・stash・履歴統合を行っていない。
+- [コミット時の照合記録](.artifacts/commit-validation-settings-defaults-0721/validation.json)で必要回帰と対象を確定。0.72.1の560入力・816生成物・native入力32件、完全ログと発行EXE/feedを照合し、型検査・build、関連47件、固定EXEのリボン6群・グループ7群・smokeの成功を再利用した。0.72.0の標準715件について、以後の変更がリボンrenderer、GUIスクリプト2本、packageのパッチ版だけであることと、単体試験が参照するmain/shared・native/fixtureの生成物、試験・依存・ビルド入力の不変を確認して再利用した。関連47件は標準715件に含まれ、合計へ二重加算しない。
+- 0.72.0の設定GUIを現在の発行物の成功に読み替えず、0.72.1の固定EXEで[設定GUI 12群](.artifacts/device-settings-ui-1792488007263/result.json)を追加実行して成功した。JSON省略、フォーム/JSONのresetと競合拒否、OFFの共有反映/削除/保持、保存と再起動、全体/詳細の両入口を確認。版・EXE・feedのsize/hashは0.72.1の発行記録から変わっておらず、製品修正・版更新・再発行は行っていない。
+- 実効author/committerは`yukichi-7sai <yukichi@at365.jp>`。repo-local設定がglobalより優先され、今回は双方が同じ値だった。stageと作業ファイルの一致、最終stage tree、commit/tree、両push先の先端は同証跡フォルダーのstage.json・commit.json・push.jsonへ記録する。今回と再利用元の証跡を保護し、追加GUIは直近3回以内のため削除0件。GitHub Release・全体ZIP・実利用先deployは今回の対象に含めない。
+
+## 2026-10-20: リボン設定の初期化ボタンを共通ツールバーへ統一（0.72.1）
+
+- リボン編集の下部にあった「リボンを初期状態に戻す」と、その専用確認分岐を削除した。上部の「このページを既定値に戻す」を使い、配置・装飾・コマンドボタン・右クリック割当を既定値へ戻す。個別削除・グループ解除・未導入項目削除の確認と競合検査は維持した。公開APIの`reset`が右クリック割当を保持する契約は変更せず、関連する設計書とGUI試験の操作先を整合させた。
+- 開始時はmain/origin/main、HEAD `cea9498341bbefbec818cc9ed71c11f3b993fb93`。先の0.72.0の未コミット変更を保持し、dirtyのため自動pull・stash・履歴統合を行っていない。設定項目・保存形式・公開APIの削除を伴わないUI整理のため、本体を**0.72.1**へパッチ更新した。変更しないAppletは版更新・再発行していない。
+- [発行前の自己レビュー](.artifacts/ribbon-reset-ui-20261020/review.json)で要件、確認分岐、保存/API互換性、必要回帰を確認。確認対象を必須の型で表し、初回の型検査で見つかったcallback内の絞り込みを修正して再検証した。初回ログも保持し、未解決の発行阻害指摘はない。[実行用スクリプトと完全ログ](.artifacts/ribbon-reset-ui-20261020/validate.ps1)、[入力と発行物の最終照合](.artifacts/ribbon-reset-ui-20261020/validation.json)を保存した。
+- 型検査・本体/Default Shell build、リボンと設定リセットの既存テスト**47/47、fail/skip 0**成功。source GUI 6群、[固定EXEのリボンGUI 6群](.artifacts/ribbon-customization-ui-1792487587767/result.json)、[固定EXEのグループGUI 7群](.artifacts/ribbon-groups-ui-1792487634911/result.json)、[固定EXE smoke](.artifacts/smoke-1792487666622/smoke-result.json)も成功した。旧ボタンの非表示、共通リセット後のJSON `{}`と右クリック既定値、コマンド定義とApplet有効状態の保持、未導入項目の削除・グループ解除、実プロセス再起動を確認。狭幅の画面も保存・目視確認した。560入力は検証前後・発行後でSHA256が一致し、先の0.72.0の715件の全回帰記録は別記録として保持する。
+- publish.bat成功。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**168,943,623 bytes / SHA256 `9681b79d47b862bcccef3bc3eb6882f4c852c3e7bd43604334171d804b18fb21`**。package、EXE、Default Shell、update.jsonは0.72.1で一致し、feedのsize/hashとGUIが使ったEXEコピーも照合した。版更新後のfrozen-lockfile installは成功し、依存版・lockfile・toolchain・供給網検査を変更していない。
+- [整理の確認](.artifacts/ribbon-reset-ui-20261020/cleanup.json)を保存。今回の実行方式ごとの成功出力は直近3回以内で、再利用資料・失敗記録・終了や方式が不明な旧出力を保護し、削除0件。実際の別PC同期・物理入力は今回の確認範囲に含まない。コミット・push・GitHub Release・実利用先deployは行っていない。
+
+## 2026-10-20: 設定JSONの既定値省略・ページリセット・共有への切り替え（0.72.0）
+
+- [設計](docs/settings-defaults-reset-design.md)を先に作成してから実装した。フォームには適用値、JSONには現在の既定値との差分だけを表示し、削除したキーは現在・将来の版の既定値に従う。フォームで既定値へ戻したキーも保存から省く。`{}`は表示ページのリセットとして扱い、空文字・不正JSONは入力エラーを維持する。共有・端末のcodec、バックアップ、journalのafterを同じ省略形へ統一した。
+- ツールバーの「このページを既定値に戻す」はフォーム／JSONで共通。ページ名・保存先・共有先への影響を確認し、確認時のrevision・保存先signature・ページ値を照合する。OFF時は共有へ反映／PC用を削除／PC用を保持を選べる。保持を既定にし、反映時は対象Appletのconfigurationだけを2ファイルトランザクションで保存する。有効状態・更新元・子ページのPC専用フラグをコピーしない。動的ページは登録IDと順序を残し、宣言済みフィールドの既定値を省略・再補完する。
+- 開始時は本体main/origin/main、HEAD `cea9498341bbefbec818cc9ed71c11f3b993fb93`、作業ツリー・index・未追跡が空であることを確認。制限内のDNS失敗後、同じpull --ff-onlyを通常ユーザー権限で実行しAlready up to dateを確認した。旧版で必須だった項目を省略する保存形式のため、本体のみ0.71.1から**0.72.0**へマイナー更新。変更しないAppletの版更新・再発行・全体ZIP作成は行っていない。
+- [記録と再実行用スクリプト](.artifacts/settings-defaults-20261020/validate.ps1)、[レビュー](.artifacts/settings-defaults-20261020/review.json)、[最終照合](.artifacts/settings-defaults-20261020/validation.json)を保存。ローカル自己レビューで、非空のcustom/MCPブロックのversion保持、補完処理が入力を変更しないこと、旧形式の復元後に正規化された保存値を採用することを修正・再確認した。未解決指摘なし。
+- 型検査・本体／Default Shell build成功。標準`node --test tests/*.test.cjs`は**715/715、fail/skip 0**（今回の専用13件を含む）。全JSONページの`{}`、false/0/空配列、未知キー、旧全項目形式の無書換読込、PC用の共有値非復活、将来のApplet既定値、OFFの3経路、保存失敗rollback、旧形式復元後の次回保存、外部競合を含む。560入力のSHA256が各検証の前後と発行後で一致した。初回の制限環境のEPERM・ネイティブ起動／Windows読取の拒否、修正前の失敗ログも同記録先へ保持した。
+- source GUIは12群成功。最終の固定配布EXEでも[GUI 12群](.artifacts/device-settings-ui-1792486194475/result.json)が成功し、フォームとJSONのリセット・キャンセル・確認後の外部変更拒否、保存キー非生成、OFFの3経路、無効Appletの非起動、実プロセス再起動、Node Appletの自己設定、全体／詳細の両入口を確認した。ライト／ダーク・狭幅のスクリーンショットを保存し、共有への反映ダイアログと狭幅表示を目視確認した。[固定EXE smoke](.artifacts/smoke-1792486266986/smoke-result.json)もok=trueで、EXE隣の隔離settings.jsonと登録画像の保存先を確認した。
+- publish.bat成功。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**168,939,096 bytes / SHA256 `1fad9fe65d864a7268d60f1981cf2602e4918657efd527ca17b6204e62b12679`**。package、Default Shell、update.jsonは0.72.0で一致し、feedのsize/hash、GUIで使ったEXEコピーと最終EXEのhashも一致した。版更新後はfrozen-lockfile installでpnpmの状態を照合し、依存版・lockfile・toolchain・供給網検査を変更していない。
+- 新設・更新文書のリンクは151件中150件が存在。READMEの既存WindowMoverリンク1件は開始HEADにも存在し、未取得の兄弟repoを参照しているため今回変更しない。今回追加したリンクの欠落なし。作成したGUI成功出力はsource／固定EXEの各1回、smokeも今回分を証跡として保持。初回失敗・既存の再利用対象が不明な出力・固定ビルド出力は保持し、削除0件。
+- 実際の複数PC間同期サービス、UAC承認後のタスク変更、実アカウント・物理入力は未確認。隔離fixtureの成功から推定しない。コミット・push・GitHub Release・実利用先へのdeployは未実施。
+
 ## 2026-10-20: 実装・発行ごとのパッチ版更新の手順整理
 
 - 通常の実装・修正を完成して発行するたびに、直前の発行版からパッチ番号を1つ増やす方針へ変更。同じ機能・同じ依頼への追加修正も対象とし、未コミット・GitHub未公開を版の据え置き理由にしない。`0.71.1 → 0.71.2 → 0.71.3`と、マイナー版発行後の通常修正`0.72.0 → 0.72.1`を共通手順へ明記した。

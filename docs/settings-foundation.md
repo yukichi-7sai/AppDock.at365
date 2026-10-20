@@ -6,6 +6,8 @@
 
 全設定は変更の確定時に検証して即時保存する。文字・数値・URL・JSONは入力中に設定へ送らず、blurまたはEnterで確定する。正本は保存済みSettingsStoreの値とrevision。共有ドラフト・dirty・全体保存/破棄・未保存通知・mainの途中入力と画像バッファは撤去した。
 
+JSONには既定値と異なる設定だけを表示・保存する。省略した項目は現在の本体スキーマ・Applet宣言の既定値を使い、将来の版で既定値が変われば新しい値に従う。フォームは適用値、JSONは差分を表示し、ページのJSONを`{}`にするとそのページを既定値に戻す。フォームから既定値へ戻した項目も保存JSONから省く。空配列・false・0等は既定値と異なれば保持する。ページリセット、保存形式と互換性、PC専用から共有へ切り替える選択肢は[既定値省略とリセット](settings-defaults-reset-design.md)を正本とする。
+
 ## 保存と入力
 
 SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/editRevision・pending・512操作の再送結果だけを持つ。snapshot.valueはStoreから取得し、別の値を保持しない。SettingsPageSessionは選択ページだけを投影する。useSettingsEditorとSettingsViewClientは入力キューと購読を担う。

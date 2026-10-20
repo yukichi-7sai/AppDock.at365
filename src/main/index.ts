@@ -52,7 +52,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { SettingsConflictError } from './core/settings';
 import { DeviceSettingsStore } from './core/device-settings-store';
-import { deviceHostKeys, readDeviceCollections } from './core/device-settings';
+import { deviceHostKeys, readDeviceCollections, readDeviceManifests } from './core/device-settings';
+import { restoreSettingsCollections } from '../shared/settings-storage';
 import { settingsPaths } from '../shared/settings-catalog';
 import { recoverSettingsAtStartup, type SettingsRecoveryUi } from './core/settings-recovery';
 import {
@@ -218,18 +219,19 @@ if (locked)
       ...(smoke && smokeDirectory ? ['--smoke-test', `--smoke-dir=${baseDirectory}`] : []),
     ],
   );
-const deviceCollections = () =>
-  readDeviceCollections([
-    path.join(baseDirectory, 'extensions'),
-    app.isPackaged
-      ? path.join(process.resourcesPath, 'shells')
-      : path.join(app.getAppPath(), 'out', 'shells'),
-  ]);
+const deviceManifestRoots = () => [
+  path.join(baseDirectory, 'extensions'),
+  app.isPackaged
+    ? path.join(process.resourcesPath, 'shells')
+    : path.join(app.getAppPath(), 'out', 'shells'),
+];
+const deviceCollections = () => readDeviceCollections(deviceManifestRoots());
 const settings = new DeviceSettingsStore(
   path.join(baseDirectory, 'settings.json'),
   dataDirectory,
   os.hostname(),
   deviceCollections,
+  () => readDeviceManifests(deviceManifestRoots()),
 );
 const launch = new WindowsLaunch(
   app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
@@ -379,14 +381,14 @@ const settingsEditing = new SettingsInputSession({
   current: () => settings.snapshot(),
   scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
-  save: async (value, revision) => {
+  save: async (value, revision, resetPage) => {
     assertSettingsWritable();
     const next = prepareSettings(value);
     return launch.save(
       next.host,
       settings.value.host,
       () => settings.assertRevision(revision),
-      () => commitSettings(next, revision),
+      () => commitSettings(next, revision, resetPage),
     );
   },
   changed: () => {
@@ -1566,16 +1568,22 @@ async function restoreSettingsBackup(scope?: 'shared' | 'device') {
   }
 }
 function prepareSettings(value: Settings) {
+  value = restoreSettingsCollections(value, manager.snapshot());
   let next = parseSettings(value);
   validateNotificationPreferenceChanges(next, settings.value, notificationCatalog(allApplets()));
   pageCollections.validate(next, settings.value);
   validateAppletSettings(next, manager.snapshot());
   return initializeCollectionDefaults(next, settings.value, manager.snapshot());
 }
-function commitSettings(value: Settings, revision: number) {
+function commitSettings(value: Settings, revision: number, resetPage?: SettingsPageDefinition) {
   assertSettingsWritable();
   customCommands.validateReplacement(value);
-  return settings.save(value, revision);
+  return settings.save(
+    value,
+    revision,
+    undefined,
+    resetPage ? settingsPageStorage(resetPage).files.map((file) => file.scope) : [],
+  );
 }
 function settingsPageStorage(
   page: SettingsPageDefinition,
@@ -1824,14 +1832,31 @@ function settingsPageActions(
       return customCommands.update(args);
     };
   if (page.kind === 'applet' && !page.collection)
-    actions['set-local-settings'] = async ([enabled, revision]) => {
+    actions['set-local-settings'] = async ([
+      enabled,
+      revision,
+      disposition = 'keep',
+      expectedScope,
+    ]) => {
       assertSettingsWritable();
-      if (typeof enabled !== 'boolean' || typeof revision !== 'number')
+      if (
+        typeof enabled !== 'boolean' ||
+        typeof revision !== 'number' ||
+        !['keep', 'share', 'clear'].includes(String(disposition))
+      )
         throw Error('設定操作が不正です。');
-      settings.setLocalSettings(page.owner!, enabled, revision, (value) => {
-        pageCollections.validate(value, settings.value);
-        validateAppletSettings(value, manager.snapshot());
-      });
+      if (expectedScope !== undefined && expectedScope !== settingsPageStorage(page).signature)
+        throw Error('設定の保存先が変わりました。もう一度確認してください。');
+      settings.setLocalSettings(
+        page.owner!,
+        enabled,
+        revision,
+        (value) => {
+          pageCollections.validate(value, settings.value);
+          validateAppletSettings(value, manager.snapshot());
+        },
+        disposition as 'keep' | 'share' | 'clear',
+      );
       return { storage: enabled ? 'device' : 'shared', revision: settings.revision };
     };
   if (page.id === 'ribbon')
@@ -2024,6 +2049,7 @@ function settingsPageActions(
       'mcp-client',
       'image-library',
     ].includes(page.id) ||
+    page.json ||
     page.kind === 'applet'
   ) {
     actions.setShortcutRecording = async ([value]) => {

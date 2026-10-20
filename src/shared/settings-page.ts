@@ -26,6 +26,7 @@ export interface SettingsPageModel {
     showHints: boolean;
     page: SettingsPageDefinition;
     values: Record<string, unknown>;
+    jsonValues?: Record<string, unknown>;
     navigation: { id: string; title: string; owner?: string }[];
     query: string;
     results: (SettingsItem & { pageTitle: string })[];

@@ -6,9 +6,12 @@ import { validateAppletSettings } from '../../shared/setting-definitions';
 import {
   settingsCatalog,
   settingsProjection,
+  settingsJsonProjection,
   applySettingsJson,
 } from '../../shared/settings-catalog';
 import { mergeSettingsInput } from '../../shared/settings-input';
+import { sameSetting } from '../../shared/settings-defaults';
+import { restoreSettingsCollections } from '../../shared/settings-storage';
 /** Coordinates scoped immediate writes; incomplete inputs belong to the rendering UI. */
 export class SettingsInputSession {
   private state: Omit<SettingsInputState, 'value'>;
@@ -18,7 +21,11 @@ export class SettingsInputSession {
       current(): SettingsSnapshot;
       scope?(page: import('../../shared/settings-catalog').SettingsPageDefinition): string;
       applets(): ExtensionSnapshot[];
-      save(value: Settings, revision: number): Promise<SettingsSnapshot>;
+      save(
+        value: Settings,
+        revision: number,
+        resetPage?: import('../../shared/settings-catalog').SettingsPageDefinition,
+      ): Promise<SettingsSnapshot>;
       changed(): void;
     },
   ) {
@@ -60,6 +67,9 @@ export class SettingsInputSession {
   projection(id = this.state.pageId) {
     return settingsProjection(this.value, this.page(id), this.options.applets());
   }
+  jsonProjection(id = this.state.pageId) {
+    return settingsJsonProjection(this.value, this.page(id), this.options.applets());
+  }
   async act(request: SettingsEditRequest): Promise<SettingsInputState> {
     if (
       !request ||
@@ -80,15 +90,15 @@ export class SettingsInputSession {
     while (this.operations.size > 512) this.operations.delete(this.operations.keys().next().value!);
     return result;
   }
-  private async save(value: Settings) {
-    const parsed = parseSettings(value);
+  private async save(value: Settings, force = false) {
+    const parsed = restoreSettingsCollections(parseSettings(value), this.options.applets());
     validateAppletSettings(parsed, this.options.applets());
-    if (JSON.stringify(parsed) === JSON.stringify(this.value)) return;
+    if (!force && JSON.stringify(parsed) === JSON.stringify(this.value)) return;
     const revision = this.options.current().revision;
     this.state.pending = true;
     this.notify();
     try {
-      await this.options.save(parsed, revision);
+      await this.options.save(parsed, revision, force ? this.page() : undefined);
     } finally {
       this.state.pending = false;
       this.state.revision = this.options.current().revision;
@@ -110,6 +120,20 @@ export class SettingsInputSession {
         break;
       case 'reload':
         break;
+      case 'reset-page': {
+        if (
+          action.pageId !== this.state.pageId ||
+          action.revision !== this.options.current().revision ||
+          action.storageScope !== this.options.scope?.(this.page()) ||
+          !sameSetting(action.before, this.jsonProjection())
+        )
+          throw Error('設定または保存先が変更されています。もう一度確認してください。');
+        await this.save(
+          applySettingsJson(this.value, this.page(), this.options.applets(), '{}'),
+          true,
+        );
+        break;
+      }
       case 'page-values':
       case 'partial-text': {
         if (
@@ -135,7 +159,11 @@ export class SettingsInputSession {
             throw Error('JSONの内容を修正してください。');
           }
         } else value = action.value;
-        const projection = mergeSettingsInput(action.before, value, this.projection());
+        const projection = mergeSettingsInput(
+          action.before,
+          value,
+          action.type === 'partial-text' ? this.jsonProjection() : this.projection(),
+        );
         await this.save(
           applySettingsJson(
             this.value,

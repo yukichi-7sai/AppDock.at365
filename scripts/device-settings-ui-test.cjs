@@ -134,8 +134,48 @@ const checks = [];
     await page.getByLabel('テーマ', { exact: true }).selectOption('dark');
     await settleSettings(state.host);
     await until(() => disk(deviceFile).host.theme === 'dark', 'local theme');
-    assert.equal(disk(sharedFile).host.theme, 'light');
+    assert.equal(
+      require('../out/main/shared/settings-schema').parseSettings(disk(sharedFile)).host.theme,
+      'light',
+    );
     checks.push('appearance checked disabled; theme local');
+    const reset = () => page.getByRole('button', { name: 'このページを既定値に戻す', exact: true });
+    const dialog = () => page.getByRole('dialog');
+    await reset().click();
+    await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
+    assert.equal(disk(deviceFile).host.theme, 'dark');
+    await reset().click();
+    await dialog().getByRole('button', { name: '既定値に戻す', exact: true }).click();
+    await until(() => disk(deviceFile).host.theme === undefined, 'default theme omitted');
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    assert.deepEqual(
+      JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()),
+      {},
+    );
+    assert.equal(
+      (await state.host.evaluate(() => window.dock.snapshot())).settings.value.host.theme,
+      'light',
+    );
+    checks.push(
+      'form reset/cancel preserves scope; default JSON is empty and device keys are omitted',
+    );
+    await reset().click();
+    await state.host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      const v = structuredClone(s.settings.value);
+      v.host.theme = 'system';
+      await window.dock.saveSettings(v, s.settings.revision);
+    });
+    await dialog().getByRole('button', { name: '既定値に戻す', exact: true }).click();
+    await dialog().getByRole('alert').waitFor();
+    assert.equal(disk(deviceFile).host.theme, 'system');
+    await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await reset().click();
+    await dialog().getByRole('button', { name: '既定値に戻す', exact: true }).click();
+    await until(() => disk(deviceFile).host.theme === undefined, 'JSON reset');
+    checks.push(
+      'JSON reset rejects changes after confirmation and succeeds after fresh confirmation',
+    );
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page.getByRole('heading', { name: '一般', exact: true }).waitFor();
     assert.equal(await toggle().isChecked(), true);
@@ -183,6 +223,7 @@ const checks = [];
     });
     assert.deepEqual(Object.keys(scopedResult).sort(), ['revision', 'storage']);
     await page.getByLabel('間隔（秒）', { exact: true }).fill('120');
+    await page.getByLabel('間隔（秒）', { exact: true }).press('Enter');
     await settleSettings(state.host);
     await until(
       () =>
@@ -190,7 +231,10 @@ const checks = [];
         120,
       'local config',
     );
-    assert.equal(disk(sharedFile).extensions['example.device-settings'].settings.interval, 60);
+    assert.equal(
+      disk(sharedFile).extensions['example.device-settings'].settings.interval ?? 60,
+      60,
+    );
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
     let text = await page.getByRole('textbox', { name: '設定JSON', exact: true }).inputValue();
     assert.equal(JSON.parse(text).extensions['example.device-settings'].settings.interval, 120);
@@ -203,16 +247,16 @@ const checks = [];
       model.content.auxiliary.storage.files.map((file) => file.scope),
       ['device'],
     );
-    await toggle().uncheck();
+    await toggle().click();
+    await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
     await until(
       () => !disk(deviceFile).extensions['example.device-settings'].useLocalSettings,
       'shared mode',
     );
     await until(
       async () =>
-        JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()).extensions[
-          'example.device-settings'
-        ].settings.interval === 60,
+        Object.keys(JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()))
+          .length === 0,
       'shared JSON',
     );
     model = await page.evaluate(() =>
@@ -232,7 +276,76 @@ const checks = [];
     checks.push(
       'Applet mode, form, JSON and file target switch together; saved local configuration resumes',
     );
+    await reset().click();
+    await dialog().getByRole('button', { name: '既定値に戻す', exact: true }).click();
+    await until(
+      () =>
+        !Object.hasOwn(
+          disk(deviceFile).extensions['example.device-settings'].configuration.settings,
+          'interval',
+        ),
+      'local default key removed',
+    );
+    assert.deepEqual(
+      JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()),
+      {},
+    );
+    assert.equal(
+      disk(sharedFile).extensions['example.device-settings'].settings.interval ?? 60,
+      60,
+    );
+    assert.equal(await toggle().isChecked(), true);
+    checks.push('Applet reset clears only selected local configuration and retains local mode');
+    const setInterval = async (value) => {
+      await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+      await page.getByLabel('間隔（秒）', { exact: true }).fill(String(value));
+      await page.getByLabel('間隔（秒）', { exact: true }).press('Enter');
+      await settleSettings(state.host);
+    };
+    await setInterval(150);
+    await toggle().click();
+    await dialog()
+      .getByRole('radio', { name: 'このPCの設定を共有設定に反映する', exact: true })
+      .check();
+    await page.screenshot({ path: path.join(output, 'storage-share-dialog.png') });
+    await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
+    await until(
+      () => disk(sharedFile).extensions['example.device-settings'].settings.interval === 150,
+      'local settings shared',
+    );
+    assert.equal(disk(deviceFile).extensions['example.device-settings'].configuration, undefined);
+    await toggle().check();
+    await setInterval(180);
+    await toggle().click();
+    await dialog()
+      .getByRole('radio', { name: 'このPCの設定を削除して共有設定に戻す', exact: true })
+      .check();
+    await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
+    await until(
+      () => !disk(deviceFile).extensions['example.device-settings'].useLocalSettings,
+      'clear and shared',
+    );
+    assert.equal(disk(deviceFile).extensions['example.device-settings'].configuration, undefined);
+    assert.equal(await page.getByLabel('間隔（秒）', { exact: true }).inputValue(), '150');
+    await toggle().check();
+    await setInterval(60);
+    assert.equal(
+      disk(deviceFile).extensions['example.device-settings'].configuration.settings.interval,
+      undefined,
+    );
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    assert.deepEqual(
+      JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()),
+      {},
+    );
+    checks.push(
+      'share and clear choices persist correctly; form changes back to default omit JSON keys',
+    );
+    // Restore the following regression's input while retaining a different shared value.
+    await setInterval(120);
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
     await page.getByRole('textbox', { name: '設定JSON' }).fill('{broken');
+    await page.getByRole('textbox', { name: '設定JSON' }).press('Enter');
     await page.getByRole('alert').first().waitFor();
     await toggle().click();
     await until(
@@ -291,7 +404,7 @@ const checks = [];
         180,
       'Node self setting uses device store',
     );
-    assert.equal(disk(sharedFile).extensions['example.device-settings'].settings.interval, 60);
+    assert.equal(disk(sharedFile).extensions['example.device-settings'].settings.interval, 150);
     await state.host.evaluate(() => window.dock.toggleExtension('example.device-settings', false));
     checks.push('real Node Applet self-setting writes selected device configuration');
     await state.host.evaluate(() => window.dock.navigate('extensions'));

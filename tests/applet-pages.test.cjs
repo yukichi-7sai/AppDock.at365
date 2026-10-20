@@ -54,7 +54,7 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
     pages: { main: { display: 'window' } },
   };
   const next = parseSettings(settings);
-  assert.deepEqual(next.ribbon.bottom, []);
+  assert.deepEqual(next.ribbon.bottom, ['theme']);
   assert.deepEqual(next.ribbon.separators, []);
   assert.equal(pageDisplay(next, 'test.pages', manifest.pages[0]), 'window');
   assert.equal(next.extensions['test.pages'].settings.unrelated, 3);
@@ -86,6 +86,7 @@ test('Ribbon separators and lower placement validate and survive save', () => {
     ...settings.ribbon,
     groups: [],
     itemOverrides: {},
+    separatorTitles: {},
     buttons: [],
   });
   const ordered = orderRibbon(ribbonItems([manifest], [id]), settings.ribbon.order);

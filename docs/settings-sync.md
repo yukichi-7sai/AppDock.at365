@@ -1,12 +1,14 @@
 # 設定同期と保存領域
 
+設定JSONの既定値省略とページリセットは[専用設計](settings-defaults-reset-design.md)を参照する。省略キーは現在の版の既定値を使い、明示保存するファイルと正常世代を省略形で保存する。起動時の一括変換は追加しない。共有／端末の保存境界、外部更新の競合、復旧対象の区分は本書の契約を維持する。
+
 保存型カスタムコマンドの`customCommands`ブロックは共有settings.jsonに保存します。Applet自身の設定保存先切替とは独立します。未知のブロック版・未導入種類・停止中提供元の定義と入力割当を保持し、実行だけを利用不可にします。[詳細契約](custom-commands-design.md)を参照してください。
 
 MCPの`mcpServers`名簿（ID・名前・説明）も共有settings.jsonです。URL/EXEパス/引数/cwd/許可は本体dataDirectoryのPC専用`mcp-client.json`へ分離し、Bearer/環境変数値はsafeStorageで暗号化します。共有名簿だけが届いたPCでは未設定です。固定コマンド引数は共有されるため秘密値を入れません。PCファイルの破損・未対応版は上書きせず、設定画面を読み取り専用にします。詳細は[クライアント保存契約](mcp-client-design.md#保存と設定ui)を参照してください。
 
 利用者向けの入口は[README](../README.md#設定とデータの保存先)。単一EXEの配布方式は維持し、同期できる登録データとPC専用の実行状態を分離する。
 
-0.57.0以降、EXE隣の`settings-<端末名>.json`を共有settings.jsonと合成する。Appletの有効状態、本体の表示・一般8項目は常に端末別。Applet設定一式・開始待ち・表示先は、ツールバーの「このPCで設定を保持する」で保存先を選ぶ。OFFでも端末設定を保持する。端末名・初期化・保存分離・復旧の契約は[端末別設定](device-settings-design.md)を参照する。
+EXE隣の`settings-<端末名>.json`を共有settings.jsonと合成する。Appletの有効状態、本体の表示・一般9項目は常に端末別。Applet設定一式・開始待ち・表示先は、ツールバーの「このPCで設定を保持する」で保存先を選ぶ。OFF時は共有へ反映・PC用を削除・PC用を保持から選ぶ。端末名・初期化・保存分離・復旧の契約は[端末別設定](device-settings-design.md)を参照する。
 
 本体で使用するDeviceSettingsStoreは、共有と自端末のStoreを統括する。合成値を共有へ丸ごと書き戻さず、編集した対象だけを保存先へ振り分ける。共通revisionはマスクされた共有変更でも進む。両ファイルを監視し、他端末のJSONは読まない。正常世代は共有と端末ごとに分離し、複数ファイル保存の回復記録・Windows起動設定の記録はPC専用settings-transactionsへ保持する。
 

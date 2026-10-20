@@ -10,6 +10,7 @@ import type { Settings } from './contracts';
 import { parseImageLibrary } from './registered-images';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
+import { fillSettingDefaults } from './settings-defaults';
 import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
@@ -54,6 +55,24 @@ export const createDefaultSettings = (): Settings => ({
   ribbon: defaultRibbon(),
 });
 export function parseSettings(value: unknown): Settings {
+  // Files may omit default-valued fields. Explicit invalid values still reach validation.
+  if (object(value) && value.schemaVersion === 1) {
+    const raw = value;
+    if (
+      object(raw.host) &&
+      !Object.hasOwn(raw.host, 'shellProviders') &&
+      Object.hasOwn(raw.host, 'shellProvider')
+    )
+      value = { ...raw, host: { ...raw.host, shellProviders: parseShellProviders(raw.host) } };
+    value = fillSettingDefaults(value, {
+      ...createDefaultSettings(),
+      ...(raw.notificationPreferences === undefined
+        ? {}
+        : { notificationPreferences: { overrides: [] } }),
+      ...(raw.mcpServers === undefined ? {} : { mcpServers: { version: 1, items: [] } }),
+      ...(raw.imageLibrary === undefined ? {} : { imageLibrary: { groups: [] } }),
+    });
+  }
   if (
     !object(value) ||
     value.schemaVersion !== 1 ||

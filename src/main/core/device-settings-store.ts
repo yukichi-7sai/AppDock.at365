@@ -7,8 +7,13 @@ import {
   atomicWrite,
   type SettingsRecoveryPlan,
 } from './settings';
-import type { Settings } from '../../shared/contracts';
+import type { Settings, ExtensionManifest } from '../../shared/contracts';
 import { parseSettings } from '../../shared/settings-schema';
+import {
+  settingsStorageValue,
+  restoreSettingsCollections,
+  restoreAppletConfiguration,
+} from '../../shared/settings-storage';
 import {
   combineSettings,
   configuration,
@@ -16,6 +21,7 @@ import {
   initialDeviceSettings,
   parseDeviceSettings,
   splitSettings,
+  deviceSettingsStorageValue,
   type DeviceCollection,
   type DeviceSettings,
 } from './device-settings';
@@ -47,6 +53,7 @@ export class DeviceSettingsStore extends SettingsStore {
     private localRoot: string,
     readonly machineName: string,
     private collections: () => DeviceCollection[] = () => [],
+    private applets: () => ExtensionManifest[] = () => [],
   ) {
     super(file);
     deviceName(machineName);
@@ -54,13 +61,28 @@ export class DeviceSettingsStore extends SettingsStore {
     const deviceBackups = path.join(backups, 'device', machineName.toLowerCase());
     this.marker = path.join(deviceBackups, 'initialized.json');
     this.journal = path.join(localRoot, 'settings-transactions', 'settings.json');
-    this.shared = new SettingsStore(file, backups);
+    this.shared = new SettingsStore(file, backups, {
+      defaults: () => this.value,
+      parse: (raw) => restoreSettingsCollections(parseSettings(raw), this.applets()),
+      serialize: (value) => settingsStorageValue(value, this.applets()),
+    });
     this.device = new SettingsStore(
       path.join(path.dirname(file), `settings-${machineName}.json`),
       deviceBackups,
       {
         defaults: () => initialDeviceSettings(machineName),
-        parse: (raw) => parseDeviceSettings(raw, machineName),
+        parse: (raw) => {
+          const value = parseDeviceSettings(raw, machineName);
+          const applets = this.applets();
+          for (const [owner, entry] of Object.entries(value.extensions))
+            if (entry.configuration)
+              entry.configuration = restoreAppletConfiguration(
+                entry.configuration,
+                applets.find((a) => a.id === owner),
+              );
+          return value;
+        },
+        serialize: (value) => deviceSettingsStorageValue(value, this.applets()),
       },
     );
     for (const store of [this.shared, this.device]) {
@@ -118,11 +140,9 @@ export class DeviceSettingsStore extends SettingsStore {
       }
       atomicWrite(
         this.device.file,
-        JSON.stringify(
+        this.device.serialize(
           initialDeviceSettings(this.machineName, this.shared.value, this.collections()),
-          null,
-          2,
-        ) + '\n',
+        ),
         { previous: undefined },
       );
     }
@@ -214,21 +234,22 @@ export class DeviceSettingsStore extends SettingsStore {
     device: DeviceSettings,
     revision: number,
     asset?: { commit(): void; rollback(): void },
+    rewrite: Scope[] = [],
   ) {
     if (this.writesBlocked) throw Error('設定を復元中です。完了後に保存してください。');
     this.assertRevision(revision);
     const files: Journal['files'] = [];
-    if (!same(shared, this.shared.value))
+    if (!same(shared, this.shared.value) || rewrite.includes('shared'))
       files.push({
         scope: 'shared',
         before: read(this.shared.file).toString('base64'),
-        after: Buffer.from(JSON.stringify(shared, null, 2) + '\n').toString('base64'),
+        after: Buffer.from(this.shared.serialize(shared)).toString('base64'),
       });
-    if (!same(device, this.device.value))
+    if (!same(device, this.device.value) || rewrite.includes('device'))
       files.push({
         scope: 'device',
         before: read(this.device.file).toString('base64'),
-        after: Buffer.from(JSON.stringify(device, null, 2) + '\n').toString('base64'),
+        after: Buffer.from(this.device.serialize(device)).toString('base64'),
       });
     for (const item of files)
       if (Buffer.from(item.after, 'base64').length > 4 * 1024 * 1024)
@@ -277,9 +298,14 @@ export class DeviceSettingsStore extends SettingsStore {
     this.refreshCombined(true);
     return this.snapshot();
   }
-  override save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
+  override save(
+    value: unknown,
+    revision: number,
+    asset?: { commit(): void; rollback(): void },
+    rewrite: Scope[] = [],
+  ) {
     this.assertRevision(revision);
-    const next = parseSettings(value);
+    const next = restoreSettingsCollections(parseSettings(value), this.applets());
     const split = splitSettings(
       next,
       this.value,
@@ -287,16 +313,20 @@ export class DeviceSettingsStore extends SettingsStore {
       this.device.value,
       this.collections(),
     );
-    return this.commitPair(split.shared, split.device, revision, asset);
+    return this.commitPair(split.shared, split.device, revision, asset, rewrite);
   }
   setLocalSettings(
     owner: string,
     enabled: boolean,
     revision: number,
     validate?: (value: Settings) => void,
+    disposition: 'keep' | 'share' | 'clear' = 'keep',
   ) {
     this.assertRevision(revision);
     if (typeof enabled !== 'boolean') throw Error('Appletの設定対象がありません。');
+    if (!['keep', 'share', 'clear'].includes(disposition) || (enabled && disposition !== 'keep'))
+      throw Error('設定の切り替え方法が不正です。');
+    const shared = structuredClone(this.shared.value);
     const next = structuredClone(this.device.value);
     const entry = (next.extensions[owner] ??= {
       enabled: appletEnabled(this.value, owner),
@@ -309,10 +339,32 @@ export class DeviceSettingsStore extends SettingsStore {
     }
     if (!enabled && this.shared.recovered)
       throw Error('共有設定を復旧してから切り替えてください。');
+    if (!enabled && disposition === 'share') {
+      const stored = (shared.extensions[owner] ??= { enabled: false, settings: {} });
+      const candidate = configuration(this.value, owner);
+      // Collection flags remain local. Copy only the original persisted configuration values.
+      for (const { owner: collectionOwner, definition } of this.collections()) {
+        if (collectionOwner !== owner) continue;
+        const rows = candidate.settings[definition.key];
+        const raw = entry.configuration?.settings[definition.key];
+        if (Array.isArray(rows))
+          for (const row of rows) {
+            const original = Array.isArray(raw)
+              ? raw.find((item) => item?.id === row.id)
+              : undefined;
+            row.enabled = original?.enabled ?? false;
+          }
+      }
+      stored.settings = candidate.settings;
+      delete stored.pages;
+      delete stored.startupDelaySeconds;
+      Object.assign(stored, candidate);
+    }
+    if (!enabled && disposition !== 'keep') delete entry.configuration;
     entry.useLocalSettings = enabled;
     parseDeviceSettings(next, this.machineName);
-    validate?.(combineSettings(this.shared.value, next, this.collections()));
-    return this.commitPair(this.shared.value, next, revision);
+    validate?.(combineSettings(shared, next, this.collections()));
+    return this.commitPair(parseSettings(shared), next, revision);
   }
   localSettings(owner: string) {
     return this.device.value.extensions[owner]?.useLocalSettings ?? false;

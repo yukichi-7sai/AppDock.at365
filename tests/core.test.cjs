@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { PassThrough } = require('node:stream');
-const { SettingsStore, defaults } = require('../out/main/main/core/settings.js');
+const { SettingsStore, defaults, validate } = require('../out/main/main/core/settings.js');
 const { JsonLinePeer } = require('../out/main/main/core/rpc.js');
 const { readManifest } = require('../out/main/main/core/extensions.js');
 function temporary(t) {
@@ -65,9 +65,10 @@ test('settings create beside selected executable directory, persist and reject s
   const next = defaults();
   next.host.theme = 'light';
   store.save(next, original.revision);
-  assert.equal(JSON.parse(fs.readFileSync(file)).host.theme, 'light');
+  assert.equal(JSON.parse(fs.readFileSync(file)).host?.theme, undefined);
+  assert.equal(validate(JSON.parse(fs.readFileSync(file))).host.theme, 'light');
   assert.throws(() => store.save(defaults(), original.revision), /別の場所/);
-  assert.equal(JSON.parse(fs.readFileSync(file)).host.theme, 'light');
+  assert.equal(validate(JSON.parse(fs.readFileSync(file))).host.theme, 'light');
 });
 test('invalid existing JSON is preserved', (t) => {
   const file = path.join(temporary(t), 'settings.json');
@@ -96,7 +97,7 @@ test('settings retain supported preferences and Applet data while dropping obsol
   const loaded = store.load();
   assert.deepEqual(loaded.value, value);
   store.save(loaded.value, loaded.revision);
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), value);
+  assert.deepEqual(validate(JSON.parse(fs.readFileSync(file, 'utf8'))), value);
 });
 test('invalid settings do not overwrite valid settings', (t) => {
   const file = path.join(temporary(t), 'settings.json');

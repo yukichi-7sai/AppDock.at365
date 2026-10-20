@@ -237,7 +237,11 @@ async function launch() {
     for (const ids of [deleted.order, deleted.hidden, deleted.bottom])
       assert.ok(!ids.includes(persisted.separators[0]));
     assert.equal(await rail.locator('.activity-rail [role="separator"]').count(), 0);
-    await button('リボンを初期状態に戻す').click();
+    await button('このページを既定値に戻す').click();
+    await dock
+      .getByRole('dialog', { name: 'このページを既定値に戻す', exact: true })
+      .getByRole('button', { name: '既定値に戻す', exact: true })
+      .click();
     await save();
     assert.deepEqual(await ribbonIds('bottom'), ['theme', 'profile']);
     checks.push(
