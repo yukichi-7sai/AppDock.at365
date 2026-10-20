@@ -41,9 +41,10 @@ export class InputCaptureManager {
   private endedRecordings = new Set<string>();
   paused = false;
   private refreshing = false;
+  private foregroundWindow?: string;
   constructor(
     private executable: string,
-    private state: () => {
+    private readState: (foregroundWindow?: string) => {
       settings: Settings;
       context: GestureContext;
       commands: { id: string; title: string; extensionId?: string | null }[];
@@ -61,6 +62,9 @@ export class InputCaptureManager {
       recorded(event: { token: string; key: string; sequence: number }): void;
     },
   ) {}
+  private state() {
+    return this.readState(this.foregroundWindow);
+  }
   async start() {
     await this.refresh();
     this.timer = setInterval(() => {
@@ -113,6 +117,12 @@ export class InputCaptureManager {
     return !!(await this.peer.request('capture.activateProcess', { pressId, processId }));
   }
   private async event(method: string, p: any) {
+    if (method === 'capture.foreground') {
+      if (typeof p.window !== 'string' || !/^\d{1,20}$/.test(p.window) || this.stopped) return;
+      this.foregroundWindow = p.window;
+      await this.refresh();
+      return;
+    }
     if (method === 'gestures.prepare') {
       if (typeof p.window !== 'string' || typeof p.hostWindow !== 'boolean') return false;
       // Wait only for the focus event caused by this press, then synchronize its actual conditions.
@@ -232,6 +242,7 @@ export class InputCaptureManager {
     }
   }
   private connect() {
+    this.foregroundWindow = undefined;
     const child = spawn(this.executable, [], {
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],

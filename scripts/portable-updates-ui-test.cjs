@@ -16,6 +16,17 @@ const settings = require('../out/main/shared/settings-schema.js').createDefaultS
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
 settings.host.startMinimized = true;
+settings.host.soundEnabled = false;
+settings.gestures.activateOnStart = true;
+settings.gestures.bindings = [
+  {
+    id: 'update-gesture',
+    command: 'appdock.settings.showHints.toggle',
+    gesture: 'move-left',
+    enabled: true,
+    when: { scope: 'global', appletIds: [], processes: [] },
+  },
+];
 settings.globalShortcutCommands = [];
 settings.updates = {
   ...settings.updates,
@@ -185,6 +196,48 @@ const renderer = (inspectPort, expression) =>
     inspectPort,
     `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().startsWith('appdock://host/')).executeJavaScript(${JSON.stringify(expression)})`,
   );
+async function verifyRestartGesture(inspectPort, label) {
+  const exchange = path.join(profile, 'gesture-probe-' + Date.now());
+  fs.mkdirSync(exchange);
+  const child = spawn(
+    path.join(root, 'tests/InputTests/bin/Release/net10.0-windows/AppDock.InputTests.exe'),
+    ['--external-gesture', exchange],
+    { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  let errorOutput = '';
+  child.stderr.on('data', (chunk) => {
+    errorOutput += chunk;
+  });
+  const waitFor = async (predicate) => {
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      if (await predicate()) return;
+      await wait(100);
+    }
+    throw Error(label + ': external gesture timed out. ' + errorOutput);
+  };
+  try {
+    await waitFor(() => fs.existsSync(path.join(exchange, 'ready')));
+    const before = await renderer(
+      inspectPort,
+      'window.dock.snapshot().then(s => s.settings.value.host.showHints)',
+    );
+    fs.writeFileSync(path.join(exchange, 'send-0'), '');
+    await waitFor(() => fs.existsSync(path.join(exchange, 'done-0')));
+    await waitFor(
+      async () =>
+        (await renderer(
+          inspectPort,
+          'window.dock.snapshot().then(s => s.settings.value.host.showHints)',
+        )) !== before,
+    );
+    checks.push(label + ': external gesture executes without manual AppDock activation');
+  } finally {
+    fs.writeFileSync(path.join(exchange, 'stop'), '');
+    if (child.exitCode === null) await new Promise((resolve) => child.once('exit', resolve));
+    assert.equal(child.exitCode, 0, errorOutput);
+  }
+}
 async function surfaceRenderer(inspectPort, file, expression, selector) {
   const target = `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().endsWith('/shells/default/' + ${JSON.stringify(file)}))`;
   for (let i = 0; i < 150; i++) {
@@ -468,6 +521,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       'login-fixture',
     );
     checks.push('real single-EXE host replacement and restart through the same helper');
+    await verifyRestartGesture(inspectPort, 'real host update restart');
     await ribbonRenderer(
       inspectPort,
       "[...document.querySelectorAll('.activity-rail button')].find(b => b.textContent.trim() === '設定').click()",
@@ -530,6 +584,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     checks.push(
       'ordinary restart restores selected category and shows window with tray-start enabled',
     );
+    await verifyRestartGesture(inspectPort, 'ordinary restart');
     await renderer(inspectPort, "window.dock.toggleExtension('test.disabled', true)");
     await restarted(inspectPort, (s) =>
       s.extensions.some((e) => e.id === 'test.disabled' && e.state === 'running'),

@@ -22,6 +22,8 @@
 
 本体は実Windowフォーカスと表示中Appletに対応する行を入力プロセスへ同期する（40ms間隔、内容が変化した時のみ送信）。ネイティブ側は押下時に最前面HWND・exe・カーソル下のWindow・除外・ブラウザクラス条件を確認。ローカル条件は通知済みHWNDにも限定する。状態の同期前に入力した場合に誤ったコマンドを実行しないよう、本体側も受信時と各コマンドの開始前に最新のページ/Window文脈を照合する。
 
+入力プロセスは`GetForegroundWindow()`の変化を`capture.foreground`で通知する（40ms間隔、初回も通知）。受信後のジェスチャー文脈は、この実HWNDと本体・AppletのWindowを照合して決める。再起動・更新後にElectronの`isFocused()`が古い状態を保持しても、その状態で外部Windowの開始準備を止めない。初回通知前だけElectronのフォーカスを使い、入力プロセスへ再接続すると実HWNDを取り直す。ローカル割り当てのページ条件、実行前のrevision/文脈照合、一時停止・記録中の抑止は維持する。
+
 非アクティブ開始をONにすると、開始地点のWindowを先に判定する。除外exeとデスクトップ条件を適用して候補がない場合は、アクティブ化や捕捉を行わない。アクティブ化は低レベルフックとは別のworkerで実行し、取得した開始対象と元の最前面が維持されていることを照合する。`gestures.prepare`で本体のフォーカス条件を同期してから待機・実行へ進み、この押下による条件更新だけは開始処理を取り消さない。実設定・コマンドの変更、一時停止・記録中への変更、他の対象への切替では取り消す。開始準備中の操作は1つだけ保留し、操作先と同期後の条件を再検査する。通常の連続操作へ固定の待機時間は加えない。準備できなかった場合は開始地点が保たれている範囲で通常の右押下・解放を復元する。
 
 非アクティブ開始をONにしたときは、未一致のローカル行もWindow=-1として入力プロセスへ渡し、AppDockをアクティブにする押下を検出できるようにする。この値は実行を許可するWindowではない。同期後に実際のページ/Windowに一致した行だけを候補へ入れ、本体の受信・実行直前の照合も継続する。
@@ -51,6 +53,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外、左右の修飾キーと左/中/X1/X2の先行押下・途中解放・捕捉された押下の継続・解除後の再開の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
 - ショートカット/ページの既存GUI回帰も併用し、試験は直列で行う。実測と未確認範囲はVERIFICATION.mdに記録する。
+- `dev.bat exec node scripts/gesture-startup-ui-test.cjs [--portable]`: トレイ起動・`--restore-view`付き起動で、外部の専用Windowを実際にアクティブにして、AppDockを手動でアクティブにする前のジェスチャーを検証する。Electronのフォーカス情報が残る状態も含め、実入力とコマンド記録を照合する。
 
 ## コマンド一覧と編集パネル
 

@@ -11,6 +11,7 @@ internal static partial class Program
     [STAThread] static int Main(string[] args)
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        if(args is ["--external-gesture",var exchange]) return RunExternalGesture(exchange);
         if(args is ["--shortcuts",var shortcutHelper]) return RunShortcutTests(shortcutHelper);
         if(args is ["--send" or "--send-inactive",var handle,var action]) {
             var sendCursor=Cursor.Position;

@@ -117,6 +117,48 @@ test('activation preparation synchronizes the new focus and refuses recording or
   assert.equal(synced, 1);
 });
 
+test('native foreground replaces stale Electron focus before activation preparation', async () => {
+  let foreground;
+  const manager = new InputCaptureManager(
+    'unused',
+    (window) => {
+      foreground = window;
+      return {
+        context:
+          window === undefined || window === '123'
+            ? { appFocused: true, window: '123' }
+            : { appFocused: false, window: '' },
+        recording: false,
+      };
+    },
+    {},
+    async () => {},
+    () => {},
+    () => {},
+    {},
+  );
+  let synced = 0;
+  manager.refresh = async () => {
+    manager.state();
+    synced++;
+  };
+  await manager.event('capture.foreground', { window: '456' });
+  assert.equal(foreground, '456');
+  assert.equal(await manager.event('gestures.prepare', { window: '456', hostWindow: false }), true);
+  await manager.event('capture.foreground', { window: '123' });
+  assert.equal(await manager.event('gestures.prepare', { window: '123', hostWindow: true }), true);
+  await manager.event('capture.foreground', { window: '0' });
+  assert.equal(foreground, '0');
+  const before = synced;
+  for (const window of [null, 456, '', '-1', 'unexpected', '1'.repeat(21)])
+    await manager.event('capture.foreground', { window });
+  assert.equal(synced, before);
+  assert.equal(foreground, '0');
+  manager.stopped = true;
+  await manager.event('capture.foreground', { window: '123' });
+  assert.equal(synced, before);
+});
+
 test('activation synchronization uses a bounded key unchanged by focus but changed by settings', async () => {
   const state = {
     settings: {

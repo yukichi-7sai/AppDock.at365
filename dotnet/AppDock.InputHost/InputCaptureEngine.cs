@@ -31,6 +31,7 @@ internal sealed class InputCaptureEngine : IDisposable
     private nint keyboardHook, mouseHook, layout, preparedLayout;
     private bool disposed, accepting;
     private long pressId;
+    private nint? foregroundWindow;
     internal GestureEngine Gestures { get; }
     internal InputCaptureEngine(Dispatcher dispatcher, GestureDisplay display, Func<string, object, bool> notify)
     {
@@ -100,6 +101,11 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         if (disposed) return;
         try {
+            var foreground = GetForegroundWindow();
+            if (foregroundWindow != foreground) {
+                if (notify("capture.foreground", new { window = foreground.ToInt64().ToString() }))
+                    foregroundWindow = foreground;
+            }
             if (recording != null && GetForegroundWindow().ToInt64().ToString() != recording.Window) EndRecording();
             if (inputs.Length > 0 && layout != ForegroundLayout()) {
                 accepting = false;

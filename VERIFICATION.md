@@ -1,5 +1,25 @@
 # 検証記録
 
+## 2026-10-20: ジェスチャー再起動修正のコミット・push前照合（0.73.6）
+
+- 利用者が「再起動してもジェスチャーが使えるようになった」と確認し、commit/pushを依頼した。main/origin/main、開始HEAD `f4b8633ab24fe3d7c9729e50e438acc1697a710b`、今回の12パスと空のindexを確認。GitHubとAQUAのmainも同じ先端で、dirtyのためpullや履歴統合は行っていない。
+- [コミット照合記録](.artifacts/commit-validation-gesture-0736/validation.json)で、実装時の608入力・13本の完全ログ・6試験profileと隔離EXEのhashを照合した。型検査/build、関連47件、InputHostのジェスチャー149/ショートカット27項目、ソース起動2群、固定EXE起動2/ジェスチャー20/更新13/キーフック8群・smokeの成功を再利用した。
+- 同じ100ファイルの標準回帰のうち、未実行の96ファイル685件だけを追加し、合計 **732/732（47再利用＋685追加）、fail/skip 0**。608ソース入力と831生成物/fixtureが前後一致した。制限環境の子プロセス/ファイル操作を伴う失敗は中断ログを保持し、同じコマンドを通常ユーザーで実行して成功した。製品・試験・依存検査を変更して切り抜けていない。
+- 差分と影響先をレビューし、保存設定/割り当て、ローカルscope、入力の所有・取消、フック再接続、試験の隔離にブロッキング指摘なし。利用者が確認した製品への追加変更はなく、0.73.6と発行EXE **168943767 bytes / SHA256 `fa45aa766474d7ac3e1e5e7c268e3020c1211713d665ef956e2c7f55f4a6d608`**を維持した。今回の製品試験後の追記はこの検証文書だけで、版更新・再発行は不要。
+- 実効author/committerは`yukichi-7sai <yukichi@at365.jp>`。意図した12パス、stageと作業ファイルの一致、stage treeとcommit/tree、GitHub/AQUAそれぞれのmain先端を、同証跡フォルダーのstage.json・commit.json・push.jsonへ記録する。再利用元・今回の標準回帰ログ・固定EXEを保持し、GitHub Release・全体ZIP・追加deployは今回の範囲に含めない。
+
+## 2026-10-20: 再起動・更新後にジェスチャーが前面化まで使えない問題（0.73.6）
+
+- main/origin/main、開始HEAD `f4b8633ab24fe3d7c9729e50e438acc1697a710b`、index/作業ツリー/未追跡が空であることを確認し、通常ユーザーの`git pull --ff-only`で最新一致を確認した。制限内のGitHub DNS失敗は成功扱いしていない。ショートカットは未反応時も使えるという利用者報告を受け、マウスの開始条件とフォーカス同期を調査した。
+- 旧実装の隔離試験で、トレイ起動では外部Windowのジェスチャーが動作する一方、`--restore-view`付き起動後はWindowsの外部HWNDに対してElectron側が`appFocused: true`と本体HWNDを保持する状態を再現。`gestures.prepare(hostWindow: false)`が古い文脈を待ち続け、取消になることを記録した。最初の診断は再起動で保存キーのカウンターが重複していたため不確実として区別し、一意の保存キーとネイティブ側の開始HWNDを使って再確認した。正本は[再現記録](.artifacts/gesture-startup-fix-20261020/reproduction.json)と同記録から参照するtrace。
+- InputHostが40ms間隔で実際の`GetForegroundWindow()`の初回・変化を通知し、本体がそのHWNDと管理中Window/表示Appletを照合してジェスチャー文脈を決定する。Electronに残ったフォーカス情報への依存を初回通知前だけに限定し、再接続時は取り直す。通知キューが満杯のときは次回に通知を再試行する。設定、割り当て、開始準備中の条件同期、ローカルscope、revision/文脈再検査、一時停止・記録・取消の契約は保持した。[ジェスチャー仕様](docs/gestures.md)へ追加ルールを記載した。
+- 発行前に入力通知・Appletの実Window照合・開始準備・実行取消・既存キーへの影響と設定/保存/API互換をレビューし、ブロッキング指摘なし。設定項目・保存ファイル・外部APIの追加/削除がない通常修正のため、**0.73.5→0.73.6**のパッチ更新とした。追加した更新試験の非同期snapshot参照も修正し、最終差分を確認した。
+- 型検査・本体/Default Shell build・frozen-lockfile同期成功。関連ソース回帰 **47/47**、専用WindowのSendInputによるネイティブジェスチャー **149項目**、ネイティブショートカット **27項目**成功。ソース起動試験はトレイ/復元起動の2群成功。制限内の.NET復元/ビルド失敗と依存検査の待機は保持・区別し、同じコマンドを通常ユーザーで実行して成功した。依存版・lockfile・検査は変更していない。
+- 発行した固定EXEの隔離コピーで、起動ジェスチャー **2群**、ジェスチャーGUI **20群**、更新GUI **13群**、キーフックGUI **8群**、標準smokeが成功。更新GUIへ外部専用Windowでの実入力確認を加え、実際の本体EXE交換後と通常再起動後の両方で、AppDockの手動アクティブ化なしにジェスチャーが実行されることを確認した。Appletの埋め込み/独立Window、WebApplet、ローカル条件、キーの通過/抑止、入力プロセス異常終了後の明示再試行、保存再起動も確認した。
+- `publish.bat`終了0。成果物は`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`、**0.73.6 / 168943767 bytes / SHA256 `fa45aa766474d7ac3e1e5e7c268e3020c1211713d665ef956e2c7f55f4a6d608`**。製品版・update.jsonの版/size/hash・同梱Default Shellの版と隔離コピーが一致し、同梱InputHost DLLも発行元と一致した。未変更Appletの発行、全体ZIP、commit/push、GitHub Release、実利用先deployは行っていない。
+- コマンド/終了コード・完全ログ・入力/成果物hash・環境・レビュー・再利用判断は[検証証跡](.artifacts/gesture-startup-fix-20261020/validation.json)に集約。全標準回帰は一律再実行せず、今回の入力/フォーカスに関係する回帰を選択した。Windowsの実HWNDとSendInputを使う隔離試験であり、物理マウス/キーボード、実Windows再起動・サインイン・ロック解除、UAC/管理者アプリ、他の入力ソフトとの併用は未確認。
+- 一時的な生成JSへの診断追記は通常buildで除去し、不要なバックアップ1件を削除。今回の再現/成功と再利用用の証跡、種類ごとの直近成功、以前の検証から参照されるprofileを保持し、profile削除0件。今回の試験ランナー終了とprofileに対応するプロセスが残っていないことを確認した。
+
 ## 2026-10-20: Applet管理のコミット・push前照合（0.73.5）
 
 - 設定内Applet管理、関連設定・ログへの絞り込み移動、旧管理ページの廃止、安全な導入・削除、一覧UIと導入ダイアログの追加調整をまとめてcommit/pushする依頼を受領。main/origin/main、開始HEAD `c06ecdf9b750d23fcc40672c244756ee9d62a614`、空のindexと今回の60パスを確認した。GitHubとAQUAのmainも同じ開始HEADで、dirtyのためpull・stash・履歴統合を行っていない。

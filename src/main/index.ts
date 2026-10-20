@@ -2927,12 +2927,22 @@ async function initialize() {
   );
   gestures = new GestureManager(
     path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
-    () => {
-      const focused = BrowserWindow.getFocusedWindow();
+    (foregroundWindow) => {
+      const focused =
+        foregroundWindow === undefined
+          ? BrowserWindow.getFocusedWindow()
+          : BrowserWindow.getAllWindows().find(
+              (candidate) =>
+                candidate.getNativeWindowHandle().readBigUInt64LE().toString() === foregroundWindow,
+            );
+      const appletId = activeShortcutApplet(foregroundWindow);
       return {
         settings: settings.value,
         context: {
-          ...shortcutContext(),
+          appFocused:
+            !!appletId ||
+            (foregroundWindow === undefined ? !!window?.isFocused() : focused === window),
+          appletId,
           window: focused?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
         },
         commands: availableShortcutCommands(),
