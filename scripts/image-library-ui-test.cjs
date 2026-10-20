@@ -180,7 +180,7 @@ if (portable) {
   fs.copyFileSync(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
-let app, host, rail;
+let app, host, rail, libraryPage, libraryNavigation;
 let nativePayload;
 const until = async (fn, label) => {
   const end = Date.now() + 60000;
@@ -272,16 +272,31 @@ async function openLibrary() {
     .locator('.settings-categories')
     .getByRole('button', { name: '画像ライブラリー', exact: true })
     .click();
-  await host.getByRole('button', { name: 'グループを追加', exact: true }).waitFor();
+  libraryNavigation = await host.evaluate(async () => {
+    const surface = document.querySelector('.settings-surface[data-settings-connection]');
+    return (await window.dock.settingsPage.get(surface.dataset.settingsConnection)).content
+      .navigation;
+  });
+  await host.getByRole('button', { name: '画像ライブラリーを開く', exact: true }).click();
+  libraryPage = await until(
+    () =>
+      app
+        .context()
+        .pages()
+        .find((p) => p.url().endsWith('/image-library.html')),
+    'image library page',
+  );
+  await libraryPage.getByRole('button', { name: 'グループを追加', exact: true }).waitFor();
 }
 const card = (scope, file) => scope.locator('.image-library-card').filter({ hasText: file });
+const libraryCard = (file) => libraryPage.locator('.ad-gallery-card').filter({ hasText: file });
 const ok = (dialog) => dialog.getByRole('button', { name: 'OK', exact: true }).click();
 async function addGroup(name) {
-  await host.getByRole('button', { name: 'グループを追加', exact: true }).click();
+  await libraryPage.getByRole('button', { name: 'グループを追加', exact: true }).click();
   const d = host.getByRole('dialog', { name: '画像グループを追加', exact: true });
   await d.getByLabel('画像グループ名').fill(name);
   await d.getByLabel('画像グループ名').press('Tab');
-  await ok(d);
+  await d.getByRole('button', { name: '追加', exact: true }).click();
   await until(
     async () => (await imageSnapshot()).groups.some((g) => g.name === name),
     'group saved',
@@ -395,49 +410,50 @@ async function chooseInPicker(file) {
     }, files);
     await openLibrary();
     console.log('Library opened');
-    const navigation = await host.evaluate(async () => {
-      const surface = document.querySelector('.settings-surface[data-settings-connection]');
-      return (await window.dock.settingsPage.get(surface.dataset.settingsConnection)).content
-        .navigation;
-    });
+    const navigation = libraryNavigation;
     assert.equal(
       navigation.some((page) => page.id === 'profile'),
       false,
     );
     assert(navigation.some((page) => page.id === 'applet:at365.profile'));
-    await host.getByRole('button', { name: 'ライブラリーに登録', exact: true }).click();
-    await card(host, 'sample.png').waitFor();
-    await host.getByRole('button', { name: 'ライブラリーに登録', exact: true }).click();
-    await card(host, 'second.png').waitFor();
+    await libraryPage.getByRole('button', { name: '画像を追加', exact: true }).click();
+    await libraryCard('sample.png').waitFor();
+    await libraryPage.getByRole('button', { name: '画像を追加', exact: true }).click();
+    await libraryCard('second.png').waitFor();
     for (const file of [jpeg, webp]) {
-      await host.getByRole('button', { name: 'ライブラリーに登録', exact: true }).click();
-      await card(host, path.basename(file)).waitFor();
+      await libraryPage.getByRole('button', { name: '画像を追加', exact: true }).click();
+      await libraryCard(path.basename(file)).waitFor();
       assert.equal(hash(path.join(profile, 'data/assets/images', path.basename(file))), hash(file));
     }
     checks.push('real PNG/JPEG/WebP decoders accept the original files without replacing bytes');
     assert.equal(hash(path.join(profile, 'data/assets/images/sample.png')), hash(sample));
     await addGroup('アイコン');
     await addGroup('背景');
-    await card(host, 'sample.png').click();
-    await host.getByRole('button', { name: '所属グループを編集', exact: true }).click();
+    await libraryPage
+      .locator('.library-sidebar nav')
+      .first()
+      .getByRole('button', { name: /すべて/ })
+      .click();
+    await libraryCard('sample.png').getByRole('button', { name: 'グループ', exact: true }).click();
     let d = host.getByRole('dialog', { name: '所属グループを編集', exact: true });
     await d.getByLabel('アイコン', { exact: true }).check();
     await d.getByLabel('背景', { exact: true }).check();
-    await ok(d);
+    await d.getByRole('button', { name: '適用', exact: true }).click();
     await until(
       async () =>
         (await imageSnapshot()).groups.every((g) => g.images.some((i) => i.file === 'sample.png')),
       'multiple memberships',
     );
     let groups = (await imageSnapshot()).groups;
-    await host.getByLabel('画像のグループ', { exact: true }).selectOption(`group:${groups[0].id}`);
-    await host.getByRole('button', { name: '選択中のグループを編集', exact: true }).click();
-    d = host.getByRole('dialog', { name: '画像グループを編集', exact: true });
+    await libraryPage.getByRole('button', { name: `${groups[0].name}の操作`, exact: true }).click();
+    await libraryPage.getByRole('button', { name: '名前を変更', exact: true }).click();
+    d = host.getByRole('dialog', { name: '画像グループの名前を変更', exact: true });
     await d.getByLabel('画像グループ名').fill('ボタン');
     await d.getByLabel('画像グループ名').press('Tab');
-    await ok(d);
+    await d.getByRole('button', { name: '適用', exact: true }).click();
     await until(async () => (await imageSnapshot()).groups[0].name === 'ボタン', 'rename');
-    await host.getByRole('button', { name: 'グループを削除', exact: true }).click();
+    await libraryPage.getByRole('button', { name: 'ボタンの操作', exact: true }).click();
+    await libraryPage.getByRole('button', { name: 'グループを削除', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像グループを削除', exact: true });
     await d.getByRole('button', { name: '削除', exact: true }).click();
     await until(async () => (await imageSnapshot()).groups.length === 1, 'delete group');
@@ -445,7 +461,7 @@ async function chooseInPicker(file) {
     checks.push(
       'library registration, multiple groups, rename/delete preserve originals and references',
     );
-    await host.screenshot({ path: path.join(profile, 'library.png') });
+    await libraryPage.screenshot({ path: path.join(profile, 'library.png') });
     await rail.locator('[data-ribbon-id="applet:at365.profile:main"]').click();
     await settingsPage(host);
     await host.getByLabel('ユーザー名', { exact: true }).fill('Hidden profile name');
@@ -583,14 +599,14 @@ async function chooseInPicker(file) {
         );
       }, theme);
       await openLibrary();
-      await host.screenshot({ path: path.join(profile, `${theme}-library.png`) });
+      await libraryPage.screenshot({ path: path.join(profile, `${theme}-library.png`) });
     }
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
         .find((w) => w.webContents.getURL().startsWith('appdock:'))
         .setSize(820, 760),
     );
-    await host.screenshot({ path: path.join(profile, 'narrow-library.png') });
+    await libraryPage.screenshot({ path: path.join(profile, 'narrow-library.png') });
     const before = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     await app.close();
     app = null;

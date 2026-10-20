@@ -2,6 +2,7 @@ import { SettingsControlsProvider } from './settings-ui/api';
 import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/RegisteredImagePicker';
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { ShellPageSlot } from './ShellPageSlot';
+import { ImageLibraryDialogHost } from './ImageLibraryDialogHost';
 import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
 import { Icon } from './Icon';
@@ -21,7 +22,14 @@ declare global {
     dock: DockApi;
   }
 }
-type Page = 'home' | 'extensions' | 'settings' | 'logs' | 'notifications' | `page:${string}`;
+type Page =
+  | 'home'
+  | 'image-library'
+  | 'extensions'
+  | 'settings'
+  | 'logs'
+  | 'notifications'
+  | `page:${string}`;
 function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
@@ -31,8 +39,9 @@ function App() {
     'page',
     'home',
     (value) =>
-      ['home', 'extensions', 'settings', 'logs', 'notifications'].includes(value) ||
-      /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value),
+      ['home', 'image-library', 'extensions', 'settings', 'logs', 'notifications'].includes(
+        value,
+      ) || /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value),
   );
   const setPage = (next: Page) => {
     void window.dock.navigate(next).catch((e) => setError(String(e)));
@@ -308,6 +317,10 @@ function App() {
     ) ?? []),
   ];
   async function execute(id: string) {
+    if (id === 'appdock.image-library.open') {
+      setPage('image-library');
+      return;
+    }
     if (id === 'appdock.notifications.open') {
       setPage('notifications');
       return;
@@ -352,7 +365,11 @@ function App() {
       />
       <main
         className={
-          page === 'settings' || page === 'home' || page === 'logs' || page === 'notifications'
+          page === 'settings' ||
+          page === 'home' ||
+          page === 'logs' ||
+          page === 'notifications' ||
+          page === 'image-library'
             ? 'shell-page-main'
             : page.startsWith('page:')
               ? 'applet-page-main'
@@ -438,6 +455,13 @@ function App() {
             {page === 'notifications' && (
               <ShellPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />
             )}
+            {page === 'image-library' && (
+              <ShellPageSlot
+                key="image-library"
+                kind="image-library"
+                navigationRequest={snapshot.navigation.request}
+              />
+            )}
             {page === 'logs' && (
               <ShellPageSlot
                 scope={{ type: 'all' }}
@@ -457,6 +481,7 @@ createRoot(document.getElementById('root')!).render(
     <RegisteredImagesProvider api={window.dock.imageLibrary}>
       <App />
       <ImagePickerHost />
+      <ImageLibraryDialogHost />
     </RegisteredImagesProvider>
   </SettingsControlsProvider>,
 );

@@ -51,7 +51,7 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 ## リボン
 
-標準項目（home/extensions/settings/logs/theme/notifications）と、導入Appletのpagesおよび宣言型ribbonItemsを一覧にします。ページIDは`page:<extensionId>:<pageId>`、宣言型IDは`applet:<extensionId>:<localId>`です。プロフィールは独立Appletの自己設定への宣言型ボタンです。[共通画像とリボン](registered-images.md)を参照してください。
+標準項目（home/image-library/extensions/settings/logs/theme/notifications）と、導入Appletのpagesおよび宣言型ribbonItemsを一覧にします。画像ライブラリーの新規既定位置はホームの次で、既存の保存順・非表示・上下配置は維持します。ページIDは`page:<extensionId>:<pageId>`、宣言型IDは`applet:<extensionId>:<localId>`です。プロフィールは独立Appletの自己設定への宣言型ボタンです。[共通画像とリボン](registered-images.md)を参照してください。
 
 すべてのApplet（Gmail/WebAppletを含む）は無効化中だけ実リボンから隠し、有効化時に元の配置へ戻します。リボン設定の一覧と保存済みの表示・配置は保持します。開始待ちやエラー状態でも、有効なAppletのリボンは表示します。
 

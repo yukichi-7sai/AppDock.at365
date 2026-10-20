@@ -1,6 +1,6 @@
 # Shell Hostの構成と拡張方針
 
-本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。タイトルバー、ステータスバー、リボン、コマンドパレット、ホーム、ログ、通知センター、通知バナー・デスクトップ通知はShellが描画する。未移行の本文と設定は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[shell-bars.ts](../src/shared/shell-bars.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
+本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。タイトルバー、ステータスバー、リボン、コマンドパレット、ホーム、画像ライブラリー、ログ、通知センター、通知バナー・デスクトップ通知はShellが描画する。未移行の本文と設定は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[shell-bars.ts](../src/shared/shell-bars.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
 
 ## 用語と境界
 
@@ -24,6 +24,7 @@ Default Shellは本体と独立したrenderer成果物として同時ビルド�
 | ribbon | UiPresentationの表示モデル・操作ID・ナビゲーション | [Shell API](shell-api.md) |
 | overlay.command-palette | CommandPaletteSessionとOverlayController | [部分Shellと共通オーバーレイ](shell-overlays.md) |
 | page.home | HomePageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
+| page.image-library | ImageLibraryPageSessionとWindow内の状態 | [共通ギャラリー](image-gallery.md) |
 | page.logs | LogPageSessionとShellPageController | [Shellのページ表示](shell-pages.md) |
 | page.notifications | NotificationCenterController | [通知基盤](notifications.md) |
 | notification.desktop | NotificationServiceとNotificationDesktopHost/SurfaceController | [通知基盤](notifications.md) |

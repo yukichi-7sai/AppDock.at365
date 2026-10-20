@@ -1,5 +1,30 @@
 # 検証記録
 
+## 2026-10-21: 画像ライブラリー0.74.0のコミット前照合
+
+- 明示的なコミットと次工程への継続依頼に従い、main/origin/main、開始HEAD `ed6c780`、空のindexと今回の変更対象を確認。GitHubとAQUAのmainは同じ先端だった。未コミット変更を保持し、pull・stash・履歴統合は行っていない。
+- [照合記録](.artifacts/commit-validation-gallery-0740/validation.json)で実装時の628入力、完全ログ・終了コード・hash、固定EXE/feed/実行中ShellとGUIの結果を照合。型検査・build/publish・関連107件・固定EXE GUI17群を再利用した。追加した標準回帰88ファイルは **633/633** 成功し、合計 **740/740（107再利用＋633追加）、fail/skip 0**。
+- 初回の追加回帰は制限環境のファイル置換・Windows API権限で失敗し、同一コマンドを通常ユーザーで再実行。Shell領域数が10のままの試験1件を、画像ライブラリーを含む11へ更新して全88ファイルを再確認した。後続変更はこの試験の期待値だけで、再利用した107件・型検査・発行物には影響しない。製品コード・依存・発行版/EXEは変更していない。
+- 対象差分、保存と公開API、共通表示部品、既存利用先の互換性、必要回帰と記録をレビューし、ブロッキング指摘なし。元のfixture入力は以前の成功記録と一致し、本体native/updaterとrendererは成功済み0.74.0発行の出力を使用した。stage tree・commit tree・実効identityを記録し、push・GitHub Release・実利用deployは行わない。
+
+## 2026-10-21: 共通ギャラリーと画像ライブラリーページ（0.74.0）
+
+- main/origin/main、開始HEAD `ed6c780959d962cea8a7b5482128af1c46b240da`、追跡差0/0、単一worktreeを確認。前工程の設計文書4ファイルが未コミットのためpull・stash・統合は行わず保持した。共通部品と管理ページを一緒に実装する依頼に従い、[設計](docs/image-library-gallery-design.md)のA〜CとDのrootプレビュー・本文モーダル対応を実装した。既存選択ダイアログへの共通カード適用とWallpaperSlideshowの変更は次工程。
+- フレームワーク非依存の`ui/image-gallery`、ES module/CSS/hash manifest、512/1024/2048pxの縮小取得、原子的な一括所属、複数登録の追加/再利用/失敗結果を追加。管理ページは左グループ・検索・180〜360pxスライダー・複数選択・拡大・グループ編集を備える。設定は入口へ集約し、新しいShell領域・標準リボン・コマンド・復元へ接続した。PC専用`image-gallery-state.json`の追加により0.73.9→0.74.0のマイナー更新。原画像・参照・共有グループ・既存選択APIを維持し、移行・原画像削除は加えていない。
+- 発行前に要件、保存競合と部分失敗、Window/session寿命、公開操作の検証、モーダル中の本文、キー付きDOM/フォーカス、既存画像利用と必要試験をレビュー。登録中の先行scanで新画像が欠ける競合、モーダル中の遅延画像取得、仮想グループID衝突、再利用結果、保存状態の外部上書き、操作途中のサイズの巻戻り、アンカーと明示再取得を修正・再確認した。発行阻害指摘なし。共通部品の追加ルールを[利用手順](docs/image-gallery.md)、現行UI/APIを[共通画像仕様](docs/registered-images.md)へ記載した。
+- 最終の型検査、frozen install、buildを含む`publish.bat`、関連回帰 **107/107（fail/skip 0）** が成功。512画像・64グループ・4096所属はController/保存のfixtureで件数・検索・全件選択・競合を確認した。初期の単体試験と.NET発行は制限環境のファイル権限等で失敗し、同一コマンドを通常ユーザー環境で実行して成功。初期ログを保持し、依存版・lockfile・供給網検査を変更していない。
+- ソースGUIで修正を確認後、最終固定EXEの新ページ **9群** と既存画像互換 **8群** が成功。77画像からの追加表示と全件選択、キー付き更新/フォーカス/アンカー、スライダーと共有設定・原画像hash不変、複数追加の部分成功・再利用、グループ一括追加/解除/取消、本文とバーのcapture/hide・背景操作拒否・原画像プレビュー、遷移後の状態保持と旧asset失効、設定入口、独立bundleの3モード、実プロセス再起動と`--restore-view`を確認した。ライト/ダーク、狭い画面、16:10枠・操作列整列を検査して画像を目視した。150/200%はElectronのCSS zoomであり、物理モニターDPIの確認ではない。
+- 互換試験では既存のNode/.NET画像登録・選択、PNG/JPEG/WebPの実decode、Profile/リボン/WebAppletの画像表示と保存、親編集の取消、Web Viewの背景と復元を確認。Watch・WindowsTools・WallpaperSlideshowの現行ソースから作ったfixtureで接続・設定表示/保存・停止を確認した。兄弟repoのソース変更・版更新・配布物の再発行は行っていない。
+- 発行EXEは **0.74.0 / 168958734 bytes / SHA256 `b3bc4da1cd204c5402d1aae05503fec48d611fb9a37ca7709439cbe4dba8229c`**。EXE製品版、package、update.jsonの版/size/hash、実行中Default Shell、GUIコピーのhash、共通bundleの版/hashが一致。[証跡](.artifacts/gallery-implementation-20261021/validation.json)に完全ログ/終了コード/hash、628製品・ビルド・試験入力の前後一致、兄弟入力と504 fixtureファイル、レビューを保存した。GUIは[新ページ](.artifacts/image-gallery-ui-1792514134021/result.json)・[既存互換](.artifacts/image-library-ui-1792514178183/result.json)。
+- 物理IME、複数モニターDPI、実NAS、実壁紙・ごみ箱は未確認。全512画像の実GUIメモリー測定や無関係な全回帰は行っていない。今回の隔離profileに対応する残留プロセスは0。完了した新ギャラリー3回、今回の互換2回、既存の参照証跡・失敗診断を保持し、フォルダー削除0件。commit・push・GitHub Release・実利用先deployは行っていない。
+
+## 2026-10-21: 画像ライブラリーのページ化と共通ギャラリーの設計
+
+- AppDock 0.73.9、main `ed6c780959d962cea8a7b5482128af1c46b240da`、origin/mainとの差0/0、作業ツリー／index／未追跡が空、単一worktreeを確認。`git pull --ff-only`は`Already up to date.`。参照先のWallpaperSlideshowは0.6.4 / `00bc835ac527aa1bbf408cbc583ca724ca498154`、cleanを読み取り確認し、変更していない。
+- [設計書](docs/image-library-gallery-design.md)を追加。左グループ構成、ページ内サイズスライダー、PC別・画面別保存、画像追加と複数所属操作、共通部品の配布、Shell本文とモーダルの接続、画像選択／壁紙履歴への適用、実装順序と受け入れ条件を記載した。DEVELOPMENTと現行の共通画像仕様から設計へのリンクを追加し、予定仕様と現行契約を区別した。
+- 現行の画像保存／参照、64pxサムネイル、単一登録／所属編集、Shellの公開型と本文枠、HostModalLayerの対象、リボン／設定入口、.NET Storageと履歴のgeneration／slot／確認トークンをソースと照合。文書レビューで、原画像登録と所属保存の部分失敗、未分類から既存画像を再利用した際の表示、一覧の状態判別、モーダル背景の二重制御、共通bundleの同梱境界を具体化した。
+- 文書3ファイルの相対リンク126件の存在、設計書のコードフェンスの対応と会話上の人物名が含まれないこと、`git diff --check`を確認した。製品・依存・設定・保存データ・版番号の変更なし。文書のみのため製品回帰・GUI・ビルド・版更新・発行は実行していない。本書の新UIとAPI、実機上の使い心地は未検証。commit・push・Release・deployは行っていない。
+
 ## 2026-10-21: 画像選択UI 0.73.9のコミット・push前照合
 
 - 明示的なcommit/push依頼に従い、main/origin/main、開始HEAD `85fbe73`、対象10パスと空のindexを確認。GitHubとAQUAのmainも同じ先端だった。dirtyのためpullや履歴統合は行っていない。

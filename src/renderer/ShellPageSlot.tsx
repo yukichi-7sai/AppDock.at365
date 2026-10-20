@@ -10,7 +10,7 @@ export function ShellPageSlot({
   navigationRequest,
 }: {
   scope?: LogScope;
-  kind?: 'logs' | 'home' | 'notifications';
+  kind?: 'logs' | 'home' | 'notifications' | 'image-library';
   appletOrder?: string[];
   source?: string;
   navigationRequest: number;
@@ -19,17 +19,19 @@ export function ShellPageSlot({
   const navigation = useRef(navigationRequest);
   navigation.current = navigationRequest;
   const request = useRef<ShellPageRequest>(
-    kind === 'notifications'
-      ? { id: crypto.randomUUID(), route: 'notifications', kind: 'notifications' }
-      : kind === 'home'
-        ? { id: crypto.randomUUID(), route: 'home', kind: 'home', appletOrder }
-        : {
-            id: crypto.randomUUID(),
-            route: scope!.type === 'all' ? 'logs' : 'extensions',
-            kind: 'logs',
-            scope: scope!,
-            source,
-          },
+    kind === 'image-library'
+      ? { id: crypto.randomUUID(), route: 'image-library', kind: 'image-library' }
+      : kind === 'notifications'
+        ? { id: crypto.randomUUID(), route: 'notifications', kind: 'notifications' }
+        : kind === 'home'
+          ? { id: crypto.randomUUID(), route: 'home', kind: 'home', appletOrder }
+          : {
+              id: crypto.randomUUID(),
+              route: scope!.type === 'all' ? 'logs' : 'extensions',
+              kind: 'logs',
+              scope: scope!,
+              source,
+            },
   );
   if (request.current.kind === 'home') request.current.appletOrder = appletOrder;
   const [error, setError] = useState('');
@@ -112,7 +114,15 @@ export function ShellPageSlot({
       ref={slot}
       className="shell-page-slot"
       tabIndex={0}
-      aria-label={kind === 'home' ? 'ホーム画面に移動' : 'ログ画面に移動'}
+      aria-label={
+        kind === 'image-library'
+          ? '画像ライブラリーに移動'
+          : kind === 'home'
+            ? 'ホーム画面に移動'
+            : kind === 'notifications'
+              ? '通知センターに移動'
+              : 'ログ画面に移動'
+      }
       onFocus={(event) => {
         const from = event.relatedTarget;
         const before =

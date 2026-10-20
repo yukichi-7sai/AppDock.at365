@@ -38,6 +38,7 @@
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[タイトルバー・ステータスバー](docs/shell-bars.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
 | リボンのグループ化とバッジ | [両展開方式・保存・共通API・Gmail連携](docs/ribbon-groups-badges-design.md) |
 | プロフィール分離・共通画像ライブラリー | [現行API・保存・グループ・汎用リボン](docs/registered-images.md)、[採用設計](docs/profile-applet-image-library-design.md) |
+| 画像ライブラリーのページと共通ギャラリー | [共通部品の利用・配布・Shell境界](docs/image-gallery.md)、[全体設計と後続の画像選択・壁紙履歴への適用](docs/image-library-gallery-design.md) |
 | リボンの装飾・コマンドボタン | [色付きの枠と連結線・色なし・名前・右クリック動作](docs/ribbon-customization-design.md)、[2段階の実装計画と受け入れ条件](docs/ribbon-customization-implementation-plan.md) |
 | Shellの領域別割り当て | [領域ごとの指定・復旧・専用コマンドと実装計画](docs/shell-region-assignment.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
@@ -257,7 +258,7 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
 
-[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、ホーム・ログ・通知センターの公開モデル/操作/購読を定義する。設定画面は[本体の共通UI](docs/settings-foundation.md)で描画する。全体・Appletで絞ったログ・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsInputSessionから読み取ります。過去ログや日付検索は後続。
+[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、ホーム・画像ライブラリー・ログ・通知センターの公開モデル/操作/購読を定義する。設定画面は[本体の共通UI](docs/settings-foundation.md)で描画する。全体・Appletで絞ったログ・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsInputSessionから読み取ります。過去ログや日付検索は後続。
 
 設定の正本は保存済みSettingsStoreです。mainのSettingsInputSessionは選択/モード/操作受付だけを持ちます。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
 

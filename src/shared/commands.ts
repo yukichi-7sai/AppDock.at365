@@ -5,6 +5,12 @@ export const hostCommands = [
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
   { id: 'appdock.settings.open', title: '設定を開く', extension: 'AppDock', available: true },
   {
+    id: 'appdock.image-library.open',
+    title: '画像ライブラリーを開く',
+    extension: 'AppDock',
+    available: true,
+  },
+  {
     id: 'appdock.ribbon.settings.open',
     title: 'リボン設定を開く',
     extension: 'AppDock',

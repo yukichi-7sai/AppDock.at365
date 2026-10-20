@@ -9,6 +9,7 @@ export type ShellRegion =
   | 'overlay.ribbon-group'
   | 'page.logs'
   | 'page.home'
+  | 'page.image-library'
   | 'page.notifications'
   | 'notification.banner'
   | 'notification.desktop';
@@ -20,6 +21,7 @@ export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
   { id: 'overlay.command-palette', title: 'コマンドパレット' },
   { id: 'overlay.ribbon-group', title: 'リボングループ' },
   { id: 'page.home', title: 'ホーム' },
+  { id: 'page.image-library', title: '画像ライブラリー' },
   { id: 'page.logs', title: 'ログ' },
   { id: 'page.notifications', title: '通知センター' },
   { id: 'notification.banner', title: '通知バナー' },

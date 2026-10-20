@@ -97,6 +97,27 @@ ipcRenderer.on(
   },
 );
 const api: DockApi = {
+  imageLibraryDialog: {
+    onRequest: (callback) => {
+      let live = true;
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        request: import('../shared/image-library-page').ImageLibraryDialogRequest | null,
+      ) => {
+        if (live) callback(request);
+      };
+      ipcRenderer.on('dock:imageLibraryDialog', listener);
+      void ipcRenderer.invoke('dock:imageLibraryDialog:pending').then((request) => {
+        if (live && request) callback(request);
+      });
+      return () => {
+        live = false;
+        ipcRenderer.removeListener('dock:imageLibraryDialog', listener);
+      };
+    },
+    complete: (id, operation) =>
+      ipcRenderer.invoke('dock:imageLibraryDialog:complete', id, operation),
+  },
   imageLibrary: {
     snapshot: () => ipcRenderer.invoke('dock:imageLibrary:snapshot'),
     register: () => ipcRenderer.invoke('dock:imageLibrary:register'),

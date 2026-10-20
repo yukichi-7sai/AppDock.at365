@@ -18,6 +18,8 @@ EXE隣の`settings-<端末名>.json`を共有settings.jsonと合成する。Appl
 
 リボンのグループ定義・所属・表示名・アイコンのみ表示は共有`settings.json`、持続型の開閉はPC専用rootの`ribbon-state.json`へ分離する。一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-groups-badges-design.md#pc専用の開閉状態)を参照する。
 
+画像ライブラリーのカードサイズはPC専用rootの`image-gallery-state.json`へ保存する。グループ定義・所属は引き続き共有`settings.json`、原画像は共有assets。検索・選択・閲覧位置はWindow内だけに保持する。破損・未知版・外部変更を上書きせず、設定カテゴリのリセットで原画像やカードサイズを削除しない。[共通ギャラリー](image-gallery.md)を参照する。
+
 MCP Eventsの購読・署名鍵・callback・送信待ちはPC専用rootの`automation-events.json`へsafeStorageで暗号化して保存する。種類別の送信選択は共有settings.jsonの通知設定に含める。[購読と再送の仕様](mcp-events-design.md)を参照。
 
 共有フォルダー名は小文字の`data`。旧`.appdock`の自動改名・移行・削除は行わない。旧プロフィール設定と画像は未使用のまま保持し、新規原画像は共通の`data/assets/images/`へ登録する。

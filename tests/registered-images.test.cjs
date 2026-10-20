@@ -41,6 +41,45 @@ const groups = {
     { id: 'backgrounds', name: '背景', images: [ref] },
   ],
 };
+test('addition waits for a pre-existing scan then refreshes the new file before returning', async () => {
+  let release, scanned;
+  const entered = new Promise((resolve) => {
+    scanned = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  let pause = false;
+  const library = await fixture(async (input) => {
+    if (pause && input.at(-1) === 1) {
+      scanned();
+      await gate;
+    }
+    return decoded();
+  });
+  await library.add(bytes, 'old.png');
+  await fs.writeFile(
+    path.join(library.directory, 'old.png'),
+    Buffer.concat([bytes, Buffer.from([1])]),
+  );
+  pause = true;
+  const scanning = library.refresh();
+  await entered;
+  const addition = library.addWithResult(Buffer.concat([bytes, Buffer.from([2])]), 'new.png');
+  for (let i = 0; i < 100; i++) {
+    if (await fs.stat(path.join(library.directory, 'new.png')).catch(() => null)) break;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  pause = false;
+  release();
+  await scanning;
+  assert.deepEqual(await addition, { ref: { file: 'new.png' }, reused: false });
+  assert(library.list().some((entry) => entry.ref.file === 'new.png'));
+  assert.equal(
+    (await library.addWithResult(Buffer.concat([bytes, Buffer.from([2])]), 'new.png')).reused,
+    true,
+  );
+});
 
 test('image references reject paths, URLs, reserved names and extra fields', () => {
   assert(imageReference(ref));

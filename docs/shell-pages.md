@@ -1,6 +1,6 @@
 # Shellのページ表示
 
-ホーム・ログ・通知センターは共通の本文契約を使います。設定画面はShell対象外であり、[設定基盤](settings-foundation.md)を参照してください。
+ホーム・ログ・通知センター・画像ライブラリーは共通の本文契約を使います。設定画面はShell対象外であり、[設定基盤](settings-foundation.md)を参照してください。
 
 ページViewはリボン・ステータスバー・ホスト通知を除く本文領域全体に配置します。ホストは最大幅や外側余白を付けず、Shellが内部の余白・スクロールを管理します。Appletのログは共通ログViewへ移動してsourceで絞り込みます。設定・Applet管理は本体rendererで描画します。寸法報告とページ別の配置は[Shellページのレイアウト](shell-page-layout.md)を参照してください。
 
@@ -19,7 +19,7 @@ WindowとページViewのネイティブ背景は現在のテーマに合わせ�
 }
 ```
 
-`host.shellProviders["page.logs"]`は全体・Appletで絞ったログ・WebApplet管理のログ本文へ共通適用します。未提供・無効・未導入・故障ではこの領域だけDefault Shellを使い、設定値とControllerの条件を保持します。ホーム・設定・通知センターには別の提供元を指定できます。リボンとパレットの実装は不要です。一般Appletの複数Window・同一領域の同時多重表示は未対応です。
+`host.shellProviders["page.logs"]`は全体・Appletで絞ったログ・WebApplet管理のログ本文へ共通適用します。未提供・無効・未導入・故障ではこの領域だけDefault Shellを使い、設定値とControllerの条件を保持します。ホーム・通知センター・画像ライブラリーには別の提供元を指定できます。リボンとパレットの実装は不要です。一般Appletの複数Window・同一領域の同時多重表示は未対応です。
 
 ## 責務と寿命
 
@@ -29,6 +29,8 @@ WindowとページViewのネイティブ背景は現在のテーマに合わせ�
 | `HomePageSession` | ホーム用の統計・ピン・カード、表示順の投影、操作ID・可否 |
 | `HomeCommandExecution` | Window内で共有するホームの実行中・結果・通知。通常コマンド実行経路へ委譲 |
 | `LogPageSession` | 表示対象、検索条件、表示モデル、操作の検証。表示用のコピーだけを公開 |
+| `ImageLibraryPageSession` | 登録画像とグループの投影、session内ID、選択・検索・追加・所属操作の検証 |
+| `ImageLibraryPageState` | Window内の検索・グループ・選択・閲覧位置・登録ジョブ。ページを離れても保持 |
 | `ShellPageHost` | primary本文の1枠、提供元選択、遅延生成、ready、寸法・zoom、IPC送信元、表示順序、復旧、破棄 |
 | 本体の`ShellPageSlot` | 空の表示枠、領域報告、Tabによるフォーカス移動。本文UIを持たない |
 | Default Shell / Shell Applet | 見出し、検索・絞り込み、一覧、エラー表示 |
@@ -36,6 +38,10 @@ WindowとページViewのネイティブ背景は現在のテーマに合わせ�
 ページは非モーダルで、設定通知と共通オーバーレイより下に置く。ページ上からも共通ショートカットが使え、検索欄の通常入力やIMEは描画が扱う。Tab/Shift+Tabは本体の前後の操作へつなぐ。Windowの非表示・最小化ではViewを隠し、復帰後は同じセッションを表示する。ページ・詳細タブ・対象Appletの変更、所有rendererの再読込・終了ではViewとタイマーを回収する。別ページへの遷移で他Appletの既存Viewや保存済み設定を変更しない。
 
 本文の表示モデルと操作は`ShellPageController`に分離する。次のページを追加するときは、機能サービスと公開モデル/操作を定義し、内容ControllerとShell描画を追加する。ページ固有の検索や業務判断を`ShellPageHost`へ追加しない。Default Shell専用の分岐や内部importを設けず、双方を同じmanifest・loader・bridgeで起動する。
+
+## 画像ライブラリーの契約
+
+画像ライブラリーは`views: { "page.image-library": "image-library.html" }`、minimumHostVersion `0.74.0`以上で提供する。公開型、共有カード、rootダイアログと本文のモーダル処理は[共通ギャラリー](image-gallery.md)を参照する。
 
 ## ホームの契約
 

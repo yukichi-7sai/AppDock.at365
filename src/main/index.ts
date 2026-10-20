@@ -18,6 +18,10 @@ import { OverlayHost } from './core/overlay-host';
 import { HostModalLayer } from './core/host-modal-layer';
 import { ShellPageHost } from './core/shell-page-host';
 import { HomePageSession, HomeCommandExecution } from './core/home-page';
+import { ImageLibraryPageSession, ImageLibraryPageState } from './core/image-library-page';
+import { ImageLibraryDialogs } from './core/image-library-dialogs';
+import { GalleryViewStateStore } from './core/gallery-view-state';
+import { GalleryImages } from './core/gallery-images';
 import { NotificationCenterController } from './core/notification-center';
 import { publishUpdateResult } from './core/update-result-notification';
 import { LogPageSession } from './core/log-page';
@@ -317,6 +321,7 @@ let shellBarHost: ShellBarHost | undefined;
 let overlayHost: OverlayHost | undefined;
 let hostModalLayer: HostModalLayer | undefined;
 let shellPageHost: ShellPageHost | undefined;
+let imageLibraryDialogs: ImageLibraryDialogs | undefined;
 let settingsPageHost: SettingsPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
 let ribbonState: RibbonState | undefined;
@@ -2423,6 +2428,10 @@ function registerIpc() {
     });
   handle('dock:snapshot', snapshot);
   handle('dock:imageLibrary:snapshot', () => imageLibraryHost.snapshot());
+  handle('dock:imageLibraryDialog:pending', () => imageLibraryDialogs?.current() ?? null);
+  handle('dock:imageLibraryDialog:complete', (id, operation) =>
+    imageLibraryDialogs?.complete(id, operation),
+  );
   handle('dock:imageLibrary:register', () => imageLibraryHost.register());
   handle('dock:imageLibrary:edit', (operation) => imageLibraryHost.edit(operation));
   handle('dock:imageLibrary:preview', async (ref, original = false) => {
@@ -2567,6 +2576,7 @@ function registerIpc() {
   handle('dock:hostModal', (active: boolean) => {
     if (typeof active !== 'boolean') throw Error('Invalid modal state');
     hostModalLayer?.setActive(active);
+    shellPageHost?.hostModalChanged(active);
   });
   handle('dock:hostModalReady', (revision: number, rendered = true) => {
     if (!Number.isSafeInteger(revision)) throw Error('Invalid modal revision');
@@ -3468,54 +3478,95 @@ async function initialize() {
   });
   window.webContents.on('did-start-loading', () => settingsPageHost?.dispose());
   window.webContents.on('render-process-gone', () => settingsPageHost?.dispose());
+  const galleryState = new ImageLibraryPageState(
+    new GalleryViewStateStore(path.join(dataDirectory, 'image-gallery-state.json')),
+  );
+  const galleryImages = new GalleryImages(registeredImages);
+  const galleryFailed = (message: string) =>
+    errors.report({
+      eventId: randomUUID(),
+      source: 'image-library',
+      title: '画像ライブラリーの操作を完了できませんでした',
+      code: 'IMAGE_LIBRARY_SAVE',
+      message,
+    });
+  const galleryDialogs = new ImageLibraryDialogs({
+    send: (request) => {
+      if (window && !window.isDestroyed())
+        window.webContents.send('dock:imageLibraryDialog', request);
+    },
+    edit: (operation) => imageLibraryHost.edit(operation),
+    failed: () =>
+      galleryFailed('画像グループを保存できませんでした。画面の入力と保存先を確認してください。'),
+  });
+  imageLibraryDialogs = galleryDialogs;
+  window.webContents.on('did-start-loading', () => galleryDialogs.cancel());
+  window.webContents.on('render-process-gone', () => galleryDialogs.cancel());
+  window.once('closed', () => {
+    galleryState.closed = true;
+    galleryDialogs.cancel();
+  });
   shellPageHost = new ShellPageHost({
     window,
+    modalLayer: hostModalLayer,
     preload: path.join(__dirname, 'shell-page-preload.js'),
     providers: () => manager.shellProviders(),
     registry: shellRegistry!,
     route: () => navigation.state.route,
     ready: () => startupReady && !quitting,
     create: (request) =>
-      request.kind === 'notifications'
-        ? new NotificationCenterController(request, {
-            service: notificationService!,
-            applets: allApplets,
+      request.kind === 'image-library'
+        ? new ImageLibraryPageSession(request, {
+            host: imageLibraryHost,
+            images: galleryImages,
+            state: galleryState,
+            groups: () => settings.value.imageLibrary?.groups ?? [],
+            dialogs: galleryDialogs,
             dark: () => nativeTheme.shouldUseDarkColors,
             changed,
-            confirmDeletion: async (count) =>
-              (
-                await dialog.showMessageBox(window!, {
-                  type: 'warning',
-                  message: '通知履歴を' + count + '件削除しますか？',
-                  detail: '終了した通知の履歴だけを削除します。',
-                  buttons: ['キャンセル', '削除'],
-                  defaultId: 0,
-                  cancelId: 0,
-                })
-              ).response === 1,
+            failed: galleryFailed,
           })
-        : request.kind === 'home'
-          ? new HomePageSession(request, {
+        : request.kind === 'notifications'
+          ? new NotificationCenterController(request, {
+              service: notificationService!,
               applets: allApplets,
-              commands: uiCommands,
-              pins: () => settings.value.pinnedCommands,
-              appletOrder: () => settingsEditing.value.appletOrder,
               dark: () => nativeTheme.shouldUseDarkColors,
-              execution: homeExecution,
-              navigate: executeCommand,
-              openApplet: (id) => navigation.navigate('extensions', undefined, id),
-            })
-          : new LogPageSession(request, {
-              entries: () => log.entries,
-              sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
-              dark: () => nativeTheme.shouldUseDarkColors,
-              openDirectory: async () => {
-                const error = await shell.openPath(log.directory);
-                if (error) throw Error(error);
-              },
-              sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
               changed,
-            }),
+              confirmDeletion: async (count) =>
+                (
+                  await dialog.showMessageBox(window!, {
+                    type: 'warning',
+                    message: '通知履歴を' + count + '件削除しますか？',
+                    detail: '終了した通知の履歴だけを削除します。',
+                    buttons: ['キャンセル', '削除'],
+                    defaultId: 0,
+                    cancelId: 0,
+                  })
+                ).response === 1,
+            })
+          : request.kind === 'home'
+            ? new HomePageSession(request, {
+                applets: allApplets,
+                commands: uiCommands,
+                pins: () => settings.value.pinnedCommands,
+                appletOrder: () => settingsEditing.value.appletOrder,
+                dark: () => nativeTheme.shouldUseDarkColors,
+                execution: homeExecution,
+                navigate: executeCommand,
+                openApplet: (id) => navigation.navigate('extensions', undefined, id),
+              })
+            : new LogPageSession(request, {
+                entries: () => log.entries,
+                sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
+                dark: () => nativeTheme.shouldUseDarkColors,
+                openDirectory: async () => {
+                  const error = await shell.openPath(log.directory);
+                  if (error) throw Error(error);
+                },
+                sourceChanged: (source) =>
+                  window?.webContents.send('dock:logSourceChanged', source),
+                changed,
+              }),
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     shortcut: async (key) => {

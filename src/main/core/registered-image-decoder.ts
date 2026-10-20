@@ -22,13 +22,13 @@ export function disposeRegisteredImageDecoder() {
 
 // NativeImage on Windows decodes PNG/JPEG. Chromium also decodes static WebP.
 // The private, sandboxed renderer receives bytes only and returns small derivatives.
-const browserDecode = `(async source => {
+const browserDecode = `(async ({source,edge}) => {
   const image = new Image(); image.src = source; await image.decode();
   const width = image.naturalWidth, height = image.naturalHeight;
   if (!width || !height || width > 8192 || height > 8192 || width * height > 16777216)
     throw new Error('Invalid dimensions');
   const preview = document.createElement('canvas');
-  const scale = 64 / Math.max(width, height);
+  const scale = edge === 64 ? 64 / Math.max(width, height) : Math.min(1, edge / Math.max(width, height));
   preview.width = Math.max(1, Math.round(width * scale));
   preview.height = Math.max(1, Math.round(height * scale));
   preview.getContext('2d').drawImage(image, 0, 0, preview.width, preview.height);
@@ -39,7 +39,7 @@ const browserDecode = `(async source => {
   return {width,height,thumbnail:preview.toDataURL('image/png'),circle:circle.toDataURL('image/png')};
 })`;
 
-function decodeWebP(bytes: Buffer): Promise<DecodedImage> {
+function decodeWebP(bytes: Buffer, edge = 64): Promise<DecodedImage> {
   const task = queue.then(async () => {
     if (stopped) throw Error('画像の読み込みを終了しました。');
     clearTimeout(idle);
@@ -71,7 +71,7 @@ function decodeWebP(bytes: Buffer): Promise<DecodedImage> {
         (async () => {
           await ready;
           return worker!.webContents.executeJavaScript(
-            `${browserDecode}(${JSON.stringify('data:image/webp;base64,' + bytes.toString('base64'))})`,
+            `${browserDecode}(${JSON.stringify({ source: 'data:image/webp;base64,' + bytes.toString('base64'), edge })})`,
           );
         })(),
         new Promise<never>((_, reject) => {
@@ -96,9 +96,10 @@ function decodeWebP(bytes: Buffer): Promise<DecodedImage> {
   return task;
 }
 
-export async function decodeRegisteredImage(bytes: Buffer): Promise<DecodedImage> {
+export async function decodeRegisteredImage(bytes: Buffer, edge = 64): Promise<DecodedImage> {
+  if (![64, 512, 1024, 2048].includes(edge)) throw Error('画像サイズを確認してください。');
   if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP')
-    return decodeWebP(bytes);
+    return decodeWebP(bytes, edge);
   const source = nativeImage.createFromBuffer(bytes),
     size = source.getSize();
   if (
@@ -108,8 +109,9 @@ export async function decodeRegisteredImage(bytes: Buffer): Promise<DecodedImage
     size.width * size.height > 16 * 1024 * 1024
   )
     throw Error('画像の寸法を確認してください。');
+  const target = edge === 64 ? 64 : Math.min(edge, Math.max(size.width, size.height));
   const thumbnail = source
-    .resize(size.width >= size.height ? { width: 64 } : { height: 64 })
+    .resize(size.width >= size.height ? { width: target } : { height: target })
     .toDataURL();
   const side = Math.min(size.width, size.height);
   const cropped = source

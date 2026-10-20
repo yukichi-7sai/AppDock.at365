@@ -156,6 +156,12 @@ function readManifest(
   }
   m.notificationTypes = parseNotificationTypes(m.notificationTypes);
   if (
+    sourceKind !== 'builtin' &&
+    m.shell?.views?.['page.image-library'] &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.74.0') < 0)
+  )
+    throw Error('画像ライブラリーにはminimumHostVersion:0.74.0以上が必要です。');
+  if (
     m.notificationTypes.length &&
     (!m.capabilities?.includes('notifications') ||
       !m.minimumHostVersion ||

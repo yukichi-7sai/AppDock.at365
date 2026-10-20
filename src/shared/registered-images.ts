@@ -18,6 +18,9 @@ export interface RegisteredImageEntry {
   bytes: number;
   thumbnail: string;
   available: boolean;
+  /** Optional richer status for gallery adapters; available retains its existing meaning. */
+  state?: 'ready' | 'missing' | 'error';
+  generation?: string;
 }
 export interface ImageLibrarySnapshot {
   images: RegisteredImageEntry[];
@@ -32,6 +35,12 @@ export type ImageLibraryEdit =
   | { kind: 'update'; group: ImageGroup; before: ImageGroup }
   | { kind: 'delete'; id: string; before: ImageGroup }
   | { kind: 'order'; ids: string[]; before: string[] }
+  | {
+      kind: 'membership-batch';
+      groupId: string;
+      mode: 'add' | 'remove';
+      images: { image: RegisteredImageRef; before: string[] }[];
+    }
   | { kind: 'membership'; image: RegisteredImageRef; ids: string[]; before: string[] };
 export interface ImageLibraryApi {
   snapshot(): Promise<ImageLibrarySnapshot>;
@@ -150,6 +159,36 @@ export function editImageLibrary(
     for (const g of next.groups) {
       g.images = g.images.filter((i) => imageKey(i) !== imageKey(op.image));
       if (op.ids.includes(g.id)) g.images.push(op.image);
+    }
+  } else if (op.kind === 'membership-batch') {
+    if (
+      !['add', 'remove'].includes(op.mode) ||
+      !next.groups.some((g) => g.id === op.groupId) ||
+      !Array.isArray(op.images) ||
+      !op.images.length ||
+      op.images.length > 4096 ||
+      op.images.some(
+        (v) =>
+          !object(v) ||
+          !imageReference(v.image) ||
+          !Array.isArray(v.before) ||
+          v.before.some((id) => typeof id !== 'string'),
+      ) ||
+      new Set(op.images.map((v) => imageKey(v.image))).size !== op.images.length
+    )
+      throw Error('画像の所属先と選択を確認してください。');
+    // Validate every prior membership before applying anything. Save the whole result once.
+    for (const item of op.images) {
+      const before = next.groups
+        .filter((g) => g.images.some((i) => imageKey(i) === imageKey(item.image)))
+        .map((g) => g.id)
+        .sort();
+      if (!equal(before, [...item.before].sort())) conflict();
+    }
+    const group = next.groups.find((g) => g.id === op.groupId)!;
+    for (const { image } of op.images) {
+      group.images = group.images.filter((i) => imageKey(i) !== imageKey(image));
+      if (op.mode === 'add') group.images.push(image);
     }
   } else throw Error('未対応の画像グループ操作です。');
   return parseImageLibrary(next);

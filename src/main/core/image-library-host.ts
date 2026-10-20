@@ -94,6 +94,46 @@ export class ImageLibraryHost {
       store.revision,
     );
   }
+  async registerMany() {
+    this.options.writable();
+    const parent = this.options.window();
+    if (!parent || parent.isDestroyed()) throw Error('画像の選択画面は準備中です。');
+    const selected = await dialog.showOpenDialog(parent, {
+      title: 'ライブラリーに画像を追加',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: '画像', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+    });
+    const results: {
+      name: string;
+      image?: RegisteredImageRef;
+      reused?: boolean;
+      error?: string;
+    }[] = [];
+    if (selected.canceled) return results;
+    for (const source of selected.filePaths) {
+      const name = path.basename(source);
+      try {
+        this.options.writable();
+        const stat = await fs.stat(source);
+        if (!stat.isFile() || stat.size > 5 * 1024 * 1024)
+          throw Error('画像は5MiB以下で指定してください。');
+        const { ref: image, reused } = await this.images.addWithResult(
+          await fs.readFile(source),
+          name,
+        );
+        results.push({ name, image, reused });
+      } catch (e) {
+        results.push({
+          name,
+          error:
+            e instanceof Error && !(e as NodeJS.ErrnoException).code
+              ? e.message
+              : '画像を登録できませんでした。ファイルと保存先を確認してください。',
+        });
+      }
+    }
+    return results;
+  }
   pendingRequest() {
     return this.pending ? { id: this.pending.id, current: this.pending.current } : null;
   }

@@ -1,0 +1,188 @@
+.ad-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--ad-gallery-width, 260px)), 1fr));
+  gap: 20px;
+  align-content: start;
+}
+.ad-gallery,
+.ad-gallery *,
+.ad-gallery-size,
+.ad-gallery-size * {
+  box-sizing: border-box;
+}
+.ad-gallery-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border, #e5e8ef);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  box-shadow: var(--shadow, 0 4px 16px #192b4d06);
+  color: var(--text, #202534);
+}
+.ad-gallery-card:hover {
+  border-color: color-mix(in srgb, var(--accent, #5664d9) 28%, var(--border, #e5e8ef));
+}
+.ad-gallery-selected {
+  outline: 2px solid var(--accent, #5664d9);
+  outline-offset: -2px;
+}
+.ad-gallery button {
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+.ad-gallery button:disabled {
+  cursor: default;
+  color: var(--muted, #747c8d);
+}
+.ad-gallery button:focus-visible,
+.ad-gallery-check:focus-visible,
+.ad-gallery-size input:focus-visible {
+  outline: 3px solid var(--accent, #5664d9);
+  outline-offset: -4px;
+}
+.ad-gallery-image {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/10;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background-color: var(--soft, #f1f3f7);
+  background-image: conic-gradient(
+    #80808010 25%,
+    transparent 0 50%,
+    #80808010 0 75%,
+    transparent 0
+  );
+  background-size: 16px 16px;
+}
+.ad-gallery-image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+.ad-gallery-image img:not([src]) {
+  visibility: hidden;
+}
+.ad-gallery[data-fit='cover'] .ad-gallery-image img {
+  object-fit: cover;
+}
+.ad-gallery-status {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--muted, #747c8d);
+  background: var(--surface, #fff);
+  border-radius: 6px;
+}
+.ad-gallery-status:empty {
+  display: none;
+}
+.ad-gallery-check {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent, #5664d9);
+  cursor: pointer;
+}
+.ad-gallery-check[hidden] {
+  display: none;
+}
+.ad-gallery-body {
+  padding: 15px 16px 12px;
+}
+.ad-gallery-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
+  height: 3em;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ad-gallery-detail {
+  color: var(--muted, #747c8d);
+  font-size: 11px;
+  margin: 6px 0 8px;
+  min-height: 18px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ad-gallery-labels {
+  display: flex;
+  gap: 4px;
+  min-height: 22px;
+  min-width: 0;
+}
+.ad-gallery-tag {
+  max-width: 45%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: var(--soft, #f1f3f7);
+  color: var(--muted, #747c8d);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 10px;
+}
+.ad-gallery-actions {
+  margin-top: auto;
+  display: flex;
+  gap: 6px;
+  border-top: 1px solid var(--border, #e5e8ef);
+  padding: 7px 9px;
+}
+.ad-gallery-action {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  font-size: 12px !important;
+  color: var(--muted, #747c8d) !important;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+}
+.ad-gallery-action:hover:enabled {
+  color: var(--text, #202534) !important;
+  background: var(--soft, #f1f3f7);
+}
+.ad-gallery-empty {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 70px 20px;
+  color: var(--muted, #747c8d);
+  border: 1px dashed var(--border, #e5e8ef);
+  border-radius: 14px;
+}
+.ad-gallery-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted, #747c8d);
+  white-space: nowrap;
+}
+.ad-gallery-size input {
+  width: 120px;
+  min-width: 50px;
+  accent-color: var(--accent, #5664d9);
+}

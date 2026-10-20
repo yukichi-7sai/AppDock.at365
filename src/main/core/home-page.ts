@@ -66,6 +66,7 @@ const navigationCommands = new Set([
   'appdock.logs.open',
   'appdock.applets.open',
   'appdock.settings.open',
+  'appdock.image-library.open',
   'appdock.updates.open',
 ]);
 /** Owns only home presentation/operations. Settings editing remains in the shared editor. */

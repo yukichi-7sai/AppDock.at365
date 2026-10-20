@@ -249,6 +249,7 @@ export interface GlobalHotKeyStatus {
 }
 export interface DockApi {
   imageLibrary: import('./registered-images').ImageLibraryApi;
+  imageLibraryDialog: import('./image-library-page').ImageLibraryDialogApi;
   settingsPage: import('./settings-page').SettingsPageApi;
   settingsEditing(): Promise<import('./settings-editing').SettingsInputState>;
   flushSettings(): Promise<void>;

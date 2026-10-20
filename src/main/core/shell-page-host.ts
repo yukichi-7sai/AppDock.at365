@@ -11,6 +11,7 @@ import { shellView } from '../../shared/shell';
 import type { ShellPageRequest, ShellPageViewport } from '../../shared/shell-pages';
 import type { ShellPageController } from './shell-page-controller';
 import { createShellView } from './shell-view';
+import type { HostModalLayer, HostModalRegistration } from './host-modal-layer';
 
 type Surface = {
   view: WebContentsView;
@@ -22,6 +23,7 @@ type Surface = {
   ready: boolean;
   revision: number;
   settingsSignature?: string;
+  modal?: HostModalRegistration;
   timer: ReturnType<typeof setTimeout>;
 };
 /** One nonmodal body slot. Content controllers never own native display or provider recovery. */
@@ -32,6 +34,7 @@ export class ShellPageHost {
   private unavailable = false;
   private disposed = false;
   private pendingFocus?: 'first' | 'last';
+  private modalFocus?: string;
   constructor(
     private options: {
       window: BrowserWindow;
@@ -45,6 +48,7 @@ export class ShellPageHost {
       settings(provider: string): Record<string, unknown>;
       shortcut(key: string): Promise<unknown>;
       layer(): void;
+      modalLayer?: HostModalLayer;
       failed(message: string, unavailable: boolean): void;
     },
   ) {
@@ -61,6 +65,7 @@ export class ShellPageHost {
           visible:
             !!current &&
             !!s?.ready &&
+            !s?.modal?.blocked &&
             !!this.bounds &&
             !options.window.isDestroyed() &&
             options.window.isVisible() &&
@@ -70,7 +75,7 @@ export class ShellPageHost {
           reason: null,
         };
       });
-    const bound = (event: IpcMainInvokeEvent, active = false) => {
+    const bound = (event: IpcMainInvokeEvent, active = false, passive = false) => {
       const s = this.surface;
       if (
         !s ||
@@ -80,7 +85,7 @@ export class ShellPageHost {
         event.sender !== s.view.webContents ||
         event.senderFrame !== event.sender.mainFrame ||
         event.sender.getURL() !== s.url ||
-        (active && !s.ready)
+        (active && (!s.ready || (!passive && s.modal?.blocked)))
       )
         throw Error('Page session is not bound');
       return s;
@@ -103,7 +108,8 @@ export class ShellPageHost {
         this.focus(this.current.id, this.pendingFocus);
     });
     ipcMain.handle('shell-page:act', (event, action) => {
-      bound(event, true);
+      bound(event);
+      bound(event, true, this.current!.passive?.(action));
       return this.current!.act(action);
     });
     ipcMain.handle('shell-page:executeCommand', (event, command) =>
@@ -153,6 +159,7 @@ export class ShellPageHost {
     this.options.registry.touch();
   }
   focus(id: string, edge: 'first' | 'last') {
+    if (this.surface?.modal?.blocked) return;
     if (id !== this.current?.id || !this.bounds || !['first', 'last'].includes(edge)) return;
     if (!this.surface?.ready) {
       this.pendingFocus = edge;
@@ -161,6 +168,25 @@ export class ShellPageHost {
     this.pendingFocus = undefined;
     this.surface.view.webContents.focus();
     this.surface.view.webContents.send('shell-page:focus', edge);
+  }
+  hostModalChanged(active: boolean) {
+    if (active) {
+      if (this.surface?.view.webContents.isFocused()) this.modalFocus = this.surface.session;
+    } else {
+      const session = this.modalFocus;
+      this.modalFocus = undefined;
+      setImmediate(() => {
+        const s = this.surface;
+        if (
+          session &&
+          s?.session === session &&
+          !s.modal?.blocked &&
+          this.current?.route === this.options.route() &&
+          this.options.window.isFocused()
+        )
+          s.view.webContents.focus();
+      });
+    }
   }
   private validateBounds(area: ShellPageViewport | null) {
     if (
@@ -213,6 +239,7 @@ export class ShellPageHost {
         timer: setTimeout(() => this.fail(s, 'ready timeout'), 10000),
       };
       this.surface = s;
+      s.modal = this.options.modalLayer?.register(view);
       this.options.window.contentView.addChildView(view);
       view.webContents.on('render-process-gone', () => this.fail(s, 'renderer exited'));
       view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
@@ -239,6 +266,7 @@ export class ShellPageHost {
     if (this.current && !s.view.webContents.isDestroyed() && s.view.webContents.isFocused())
       this.pendingFocus = 'first';
     clearTimeout(s.timer);
+    s.modal?.dispose();
     if (!this.options.window.isDestroyed()) this.options.window.contentView.removeChildView(s.view);
     if (!s.view.webContents.isDestroyed()) s.view.webContents.close();
   }
@@ -253,7 +281,8 @@ export class ShellPageHost {
       w.isVisible() &&
       !w.isMinimized() &&
       this.current?.route === this.options.route();
-    s.view.setVisible(visible);
+    if (s.modal) s.modal.setVisible(visible);
+    else s.view.setVisible(visible);
     if (!visible || !this.bounds) return;
     const zoom = w.webContents.getZoomFactor();
     const [width, height] = w.getContentSize();
@@ -266,6 +295,7 @@ export class ShellPageHost {
       height: Math.max(1, Math.min(height - y, Math.round(this.bounds.height * zoom))),
     });
     s.view.webContents.setZoomFactor(zoom);
+    s.modal?.setVisible(visible);
     this.options.registry.touch();
     // Nonmodal pages remain below the settings notice and modal overlay.
     w.contentView.addChildView(s.view);

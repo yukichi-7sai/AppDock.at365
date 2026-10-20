@@ -115,6 +115,12 @@ export class RegisteredImages {
     return bytes;
   }
   async add(bytes: Buffer, filename: string): Promise<RegisteredImageRef> {
+    return (await this.addWithResult(bytes, filename)).ref;
+  }
+  async addWithResult(
+    bytes: Buffer,
+    filename: string,
+  ): Promise<{ ref: RegisteredImageRef; reused: boolean }> {
     const run = async () => {
       await this.validate(bytes, filename);
       await this.root(true);
@@ -128,7 +134,7 @@ export class RegisteredImages {
           throw Error(
             `「${name}」と同名の別画像が登録されています。元のファイル名を変えてください。`,
           );
-        return saved.ref;
+        return { ref: saved.ref, reused: true };
       };
       if (existing) return duplicate();
       if (files.length >= 512) throw Error('登録できる画像は512件までです。');
@@ -148,8 +154,10 @@ export class RegisteredImages {
         await handle.close().catch(() => {});
         await fs.unlink(temp).catch(() => {});
       }
+      // A scan already in progress may have enumerated the directory before this addition.
+      if (this.refreshing) await this.refreshing;
       await this.refresh();
-      return ref;
+      return { ref, reused: false };
     };
     const task = this.queue.then(run, run);
     this.queue = task.catch(() => {});
@@ -226,14 +234,37 @@ export class RegisteredImages {
               height: decoded.height,
               thumbnail: decoded.thumbnail,
               available: true,
+              state: 'ready',
+              generation: createHash('sha256').update(bytes).digest('hex'),
             },
           });
         } catch {
           const old = this.entries.get(key);
-          if (old) old.entry.available = false;
+          if (old) {
+            old.entry.available = false;
+            old.entry.state = 'error';
+          } else
+            this.entries.set(key, {
+              signature: '',
+              hash: '',
+              circle: '',
+              entry: {
+                ref: { file: f.name },
+                width: 0,
+                height: 0,
+                bytes: 0,
+                thumbnail: '',
+                available: false,
+                state: 'error',
+              },
+            });
         }
       }
-      for (const [key, value] of this.entries) if (!seen.has(key)) value.entry.available = false;
+      for (const [key, value] of this.entries)
+        if (!seen.has(key)) {
+          value.entry.available = false;
+          value.entry.state = 'missing';
+        }
       this.error = undefined;
       if (this.timer && !this.watcher) {
         try {
@@ -249,7 +280,11 @@ export class RegisteredImages {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         this.error = '画像ライブラリーを読み取れません。保存先を確認してください。';
-      for (const value of this.entries.values()) value.entry.available = false;
+      for (const value of this.entries.values()) {
+        value.entry.available = false;
+        value.entry.state =
+          (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'error';
+      }
     }
     if (previous !== signature()) {
       this.changed();
