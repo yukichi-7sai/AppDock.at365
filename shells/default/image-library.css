@@ -6,8 +6,6 @@
   --text: #202534;
   --muted: #747c8d;
   --border: #e5e8ef;
-  --accent: #5664d9;
-  --accent-soft: #edf0ff;
   --danger: #bd4758;
   --shadow: 0 4px 16px #192b4d06;
 }
@@ -19,8 +17,6 @@
   --text: #e9edf5;
   --muted: #98a3b6;
   --border: #303847;
-  --accent: #a2adff;
-  --accent-soft: #303952;
   --danger: #f49ba7;
   --shadow: none;
 }
@@ -102,14 +98,13 @@ summary:focus-visible {
   align-items: center;
   gap: 8px;
   background: var(--accent);
-  color: var(--surface);
+  color: var(--accent-text);
   white-space: nowrap;
   font-weight: 600;
   padding: 9px 14px;
 }
 .library-page .library-primary:hover:enabled {
-  filter: brightness(0.95);
-  background: var(--accent);
+  background: var(--accent-hover);
 }
 .library-layout {
   display: grid;

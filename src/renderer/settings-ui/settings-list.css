@@ -138,3 +138,7 @@
     gap: 5px;
   }
 }
+
+.settings-list .settings-list-toggle[aria-checked='true'] span {
+  background: var(--accent-text);
+}

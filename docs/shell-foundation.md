@@ -1,5 +1,7 @@
 # Shell Hostの構成と拡張方針
 
+Shell全領域のアクセント色は[共通配色](appearance.md)を参照する。共通preloadがテーマと選択パレットを適用するため、Shell側に別のパレットや固定のアクセント色を追加しない。
+
 本体が状態・操作・表示領域を管理し、Default ShellとShell Appletが公開モデルを描画する。タイトルバー、ステータスバー、リボン、コマンドパレット、ホーム、画像ライブラリー、ログ、通知センター、通知バナー・デスクトップ通知はShellが描画する。未移行の本文と設定は本体rendererが描画する。実際の型は[src/shared/shell.ts](../src/shared/shell.ts)、[shell-bars.ts](../src/shared/shell-bars.ts)、[overlays.ts](../src/shared/overlays.ts)、[shell-pages.ts](../src/shared/shell-pages.ts)を正本とする。
 
 ## 用語と境界

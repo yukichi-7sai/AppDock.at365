@@ -12,8 +12,6 @@
   --text: #eff0f5;
   --muted: #8e93a6;
   --faint: #62697e;
-  --accent: #7ce1c5;
-  --accent-soft: #243b37;
   --blue: #a4b9fc;
   --purple: #beaff4;
   --shadow: 0 20px 70px #0005;
@@ -32,8 +30,6 @@
   --text: #242939;
   --muted: #71798a;
   --faint: #8c96a9;
-  --accent: #217a65;
-  --accent-soft: #e1f3ec;
   --blue: #566bb5;
   --purple: #7d61b8;
   --hero: #edf3f7;
@@ -307,7 +303,8 @@ code {
 .brand-mark span:last-child {
   height: 23px;
   transform: translateY(-2px);
-  background: var(--blue);
+  background: var(--accent);
+  opacity: 0.65;
 }
 .brand-mark.small {
   width: 17px;
@@ -551,7 +548,7 @@ main {
 }
 .primary {
   background: var(--accent);
-  color: #102820;
+  color: var(--accent-text);
   border: 1px solid transparent;
   border-radius: 7px;
   padding: 10px 15px;
@@ -652,7 +649,6 @@ main {
 }
 .dock-core .brand-mark {
   transform: rotate(0) scale(1.8);
-  --accent: #8aecce;
   --blue: #aac2fa;
 }
 .art-tile {
@@ -2148,29 +2144,21 @@ summary {
 
 /* Update actions stay visible; infrequent configuration opens on demand. */
 .update-primary {
-  background: #cbb9fa;
-  color: #302347;
-  border: 1px solid #cbb9fa;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
   border-radius: 10px;
   padding: 11px 18px;
   font-weight: 650;
   flex-shrink: 0;
 }
 .update-primary:hover:not(:disabled) {
-  background: #dccfff;
-  border-color: #dccfff;
-}
-:root[data-theme='light'] .update-primary {
-  background: #7250a8;
-  border-color: #7250a8;
-  color: #fff;
-}
-:root[data-theme='light'] .update-primary:hover:not(:disabled) {
-  background: #61418f;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 .update-primary:focus-visible,
 .update-disclosure > summary:focus-visible {
-  outline: 2px solid var(--purple);
+  outline: 2px solid var(--accent-focus);
   outline-offset: 4px;
 }
 .update-primary:disabled {
@@ -3665,4 +3653,11 @@ summary {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.toggle[aria-checked='true'] span {
+  background: var(--accent-text);
 }

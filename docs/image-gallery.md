@@ -15,7 +15,7 @@
 
 `mountGallerySizeControl`はドラッグ中の`change`と操作確定時の`commit`を分ける。サイズは180〜360 CSS px、20px刻み、初期260px。呼出元はchangeでレイアウトだけ更新し、commit時に保存する。モデル更新で操作途中の値を戻さない。検索・グループ変更などでの選択解除は用途側の判断とする。
 
-CSSは`gallery.css`を読み込む。`.ad-gallery`配下と専用クラスへ限定し、利用側の`button`等の広い規則で上書きしない。テーマは`--surface/--border/--text/--muted/--soft/--accent/--shadow`のCSS変数を利用側で指定する。固定の高さを外側へ押し付けず、呼出元のスクロール領域をobserverへ渡す。
+CSSは`gallery.css`を読み込む。`.ad-gallery`配下と専用クラスへ限定し、利用側の`button`等の広い規則で上書きしない。テーマは`--surface/--border/--text/--muted/--soft/--shadow`を利用側で指定し、アクセントは[ホストの共通配色](appearance.md)を参照する。固定の高さを外側へ押し付けず、呼出元のスクロール領域をobserverへ渡す。
 
 選択枠はカードの上に重ねた疑似要素で2 CSS pxを描く。画像や市松背景に枠を隠させず、選択時も寸法を変えない。枠はポインター操作を透過する。
 

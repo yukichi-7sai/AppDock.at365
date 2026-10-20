@@ -1,4 +1,11 @@
 import { McpClientSettings, McpSettingsError } from './core/mcp-client-settings';
+import {
+  appearanceArguments,
+  configureAppearance,
+  registerAppearance,
+  refreshAppearance,
+} from './core/appearance-host';
+import { resolveAppearance } from '../shared/appearance';
 import { inputCommandType, normalizeInputKeys } from '../shared/input-command';
 import { executionAuthorized, type ExecutionPermission } from './core/execution-permissions';
 import { processCommandType } from '../shared/process-launch';
@@ -276,6 +283,10 @@ if (locked) {
   }
 }
 const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
+configureAppearance(
+  () => resolveAppearance(settings.value.host.accentColor, nativeTheme.shouldUseDarkColors),
+  ipcMain,
+);
 function applyAudioPlaybackSettings() {
   const enabled = settings.value.host.soundEnabled;
   audioPlayback.setEnabled(enabled);
@@ -1120,6 +1131,7 @@ const operationApi = new AppDockApi({
   ready: () => startupReady && !quitting,
 });
 const changed = () => {
+  refreshAppearance();
   if (quitting || notifyTimer) return;
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
@@ -3141,6 +3153,7 @@ async function initialize() {
     icon: windowIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: appearanceArguments(),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
@@ -3149,6 +3162,7 @@ async function initialize() {
     },
   });
   primaryWindowCreated = true;
+  registerAppearance(window.webContents, hostDocumentUrl);
   if (process.platform === 'win32') {
     // Windows Shell needs a real file path, outside app.asar, for the taskbar icon.
     const executable = process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe');

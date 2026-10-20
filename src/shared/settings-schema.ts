@@ -1,4 +1,5 @@
 import { parseMcpRoster } from './mcp-client';
+import { defaultAccentColor, isAccentColor } from './appearance';
 import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
 import { parseShellProviders } from './shell';
@@ -29,6 +30,7 @@ export const createDefaultSettings = (): Settings => ({
   host: {
     shellProviders: {},
     theme: 'light',
+    accentColor: defaultAccentColor,
     showHints: true,
     soundEnabled: true,
     closeToTray: true,
@@ -85,6 +87,8 @@ export function parseSettings(value: unknown): Settings {
     !['dark', 'light', 'system'].includes(value.host.theme)
   )
     throw new Error('theme は dark / light / system です。');
+  if (!isAccentColor(value.host.accentColor))
+    throw new Error('host.accentColor は定義済みのアクセントパレットを指定してください。');
   for (const key of ['closeToTray', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
   const shellProviders = parseShellProviders(value.host);

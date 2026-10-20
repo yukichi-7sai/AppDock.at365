@@ -3,8 +3,6 @@
   --rail: #0c0d11;
   --border: #282b35;
   --faint: #62697e;
-  --accent: #7ce1c5;
-  --accent-soft: #243b37;
   font-family: 'Segoe UI', sans-serif;
 }
 :root[data-theme='light'] {
@@ -12,8 +10,6 @@
   --rail: #edf0f4;
   --border: #e0e4ed;
   --faint: #8c96a9;
-  --accent: #217a65;
-  --accent-soft: #e1f3ec;
 }
 * {
   box-sizing: border-box;
@@ -84,7 +80,8 @@ button:disabled {
 .brand-mark span:last-child {
   height: 23px;
   transform: translateY(-2px);
-  background: #a6b8ff;
+  background: var(--accent);
+  opacity: 0.65;
 }
 .activity-rail button {
   width: 62px;

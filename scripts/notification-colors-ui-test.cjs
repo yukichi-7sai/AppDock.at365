@@ -6,6 +6,7 @@ const { spawn } = require('node:child_process');
 const net = require('node:net');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
+const { resolveAppearance } = require('../out/main/shared/appearance');
 const portable = process.argv[2] && path.resolve(process.argv[2]);
 const profile = path.join(root, '.artifacts', 'notification-colors-' + Date.now());
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
@@ -71,6 +72,7 @@ for (const [index, id] of ids.entries()) {
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.checkForUpdatesOnStartup = false;
 settings.host.theme = 'dark';
+settings.host.accentColor = 'alice-blue';
 settings.keybindings = [];
 settings.globalShortcutCommands = [];
 settings.gestures.enabled = false;
@@ -167,8 +169,10 @@ async function inspectColors(page, selector, theme, kind) {
     if (row.button)
       assert(contrast(row.button.text, row.button.bg) >= 4.5, `${kind} ${theme} button contrast`);
     if (row.level === 'info') {
-      assert.equal(row.bg, theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(25, 31, 35)');
-      assert.equal(row.border, theme === 'light' ? 'rgb(33, 122, 101)' : 'rgb(124, 225, 197)');
+      assert.equal(row.bg, theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(25, 27, 35)');
+      const accent = resolveAppearance('alice-blue', theme === 'dark').colors.accent;
+      const rgb = accent.match(/[a-f\d]{2}/gi).map((value) => parseInt(value, 16));
+      assert.equal(row.border, `rgb(${rgb.join(', ')})`);
     }
   }
   styles.push({ theme, kind, rows });
@@ -261,7 +265,13 @@ async function main() {
     .click();
   await p.locator('.notification-settings').waitFor();
   assert.equal(await p.getByRole('button', { name: '既定に戻す', exact: true }).count(), 0);
+  await p
+    .locator('.notification-setting-card')
+    .filter({ has: p.getByRole('heading', { name: 'インフォメーション通知', exact: true }) })
+    .locator('summary')
+    .click();
   await p.getByLabel('インフォメーション通知の表示時間', { exact: true }).fill('8');
+  await p.getByLabel('インフォメーション通知の表示時間', { exact: true }).press('Tab');
   await require('./settings-immediate-helper.cjs').settleSettings(p);
   await until(
     () =>

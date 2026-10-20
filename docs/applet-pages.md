@@ -1,5 +1,7 @@
 # Appletページとリボン
 
+ローカルページには0.75.0以降、[共通配色](appearance.md)のCSS変数と読み取り専用`window.appdockAppearance`を提供する。配色変更はpreloadが自動反映する。リモート本文には公開しない。
+
 Appletは画面のHTML/React・操作・データ処理を実装し、ホストは左のリボン、表示先、UIプロセス、画面領域、ウィンドウ状態、終了処理を管理します。同じローカルUIのWebContentsViewを本体ページと別ウィンドウへ移動し、表示先の変更で再ロードしません。既存のWPF/WinForms/nativeウィンドウを自動変換する契約ではありません。
 
 ## manifestと起動

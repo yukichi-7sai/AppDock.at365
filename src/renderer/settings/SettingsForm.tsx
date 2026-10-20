@@ -1,4 +1,5 @@
 import { McpClientSettingsForm } from './McpClientSettings';
+import { AccentColorPicker } from './AccentColorPicker';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
@@ -218,6 +219,14 @@ export function SettingsForm({
                   <option value="light">Light</option>
                   <option value="system">System</option>
                 </select>
+              </SettingRow>
+              <SettingRow pageId={category} itemKey="accentColor">
+                <AccentColorPicker
+                  value={settings.host.accentColor}
+                  onChange={(accentColor) =>
+                    edit({ ...settings, host: { ...settings.host, accentColor } })
+                  }
+                />
               </SettingRow>
               <SettingRow pageId={category} itemKey="showHints">
                 <Toggle

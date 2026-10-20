@@ -1,5 +1,7 @@
 # 新しいAppletを作る
 
+ローカル画面のアクセント色はホストの[共通配色](appearance.md)を参照する。0.75.0以降はCSS変数を自動提供するため、Applet内にパレットや`--accent`の固定値を追加しない。警告やエラー等の意味を持つ色は分離する。
+
 リボンやコマンドパレットを自作したい場合は、通常Appletに`shell` capabilityと担当領域の`shell.views`を追加します。Shell Appletは通常のコマンド・設定・ページも併用でき、未実装の領域はDefault Shellが担当します。宣言例と自己設定/コマンドの利用は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください（minimumHostVersion 0.26.41）。
 
 AppDock本体の公開機能をAppletから操作する場合は[AppDock共通操作API](appdock-api.md)を使用します。minimumHostVersion 0.26.36、appdock-api capability、PC専用の利用許可が必要です。

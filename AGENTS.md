@@ -29,6 +29,8 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 
 ## Shellと画面
 
+- アクセント色は[共通配色](docs/appearance.md)を正本とする。新しい本体/Shell/Appletのローカル画面は共通preloadの配色変数を参照し、画面ごとにパレットや同名変数を定義しない。専用preload追加時は共通配色の同梱・URL登録・明暗テーマの検証も接続する。
+
 - [Shell基盤](docs/shell-foundation.md)に従い、本体は状態・操作・表示寿命、Default Shell/Shell AppletはShell対象領域の描画を所有する。設定画面は本体rendererが描画する。両Shellは同じ公開API/実行経路を使い、相互の内部import・Default Shell専用API・本体側の復旧用重複描画を作らない。
 - Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
 - [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)の公開契約を使う。新しい領域はモデルと操作を定義してから追加し、Shell Hostへ内容固有の判断を混ぜない。一般Appletの複数Window/同一領域の同時多重表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。

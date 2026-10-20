@@ -62,6 +62,24 @@ test('hint visibility accepts old device files and remains independent per PC wi
   assert.equal(a.value.host.showHints, false);
 });
 
+test('accent colors remain independent per PC, persist across reload, and omit the default without rewriting shared settings', (t) => {
+  const { store: a, file, base } = fixture(t);
+  const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
+  t.after(() => b.close());
+  b.load();
+  const before = fs.readFileSync(file, 'utf8');
+  const next = structuredClone(a.value);
+  next.host.accentColor = 'alice-blue';
+  a.save(next, a.revision);
+  a.reload();
+  assert.equal(a.value.host.accentColor, 'alice-blue');
+  assert.equal(b.value.host.accentColor, 'mint');
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  next.host.accentColor = 'mint';
+  a.save(next, a.revision);
+  assert.equal(disk(a.device.file).host?.accentColor, undefined);
+});
+
 test('migration preserves shared bytes and initializes local flags once', (t) => {
   const { store, file, shared } = fixture(t);
   assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));

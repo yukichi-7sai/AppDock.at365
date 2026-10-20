@@ -120,7 +120,7 @@
   height: 17px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--accent-text, #fff);
+  color: var(--accent-text);
 }
 .registered-image-preview {
   width: 48px;

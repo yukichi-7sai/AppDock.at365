@@ -1,7 +1,16 @@
 import type { AppletCommand, SettingDefinition } from './contracts';
+import { accentPalettes, defaultAccentColor } from './appearance';
 
 const switches = ['on', 'off', 'toggle'] as const;
 export const hostSettingDefinitions: SettingDefinition[] = [
+  {
+    key: 'accentColor',
+    title: 'アクセントカラー',
+    type: 'select',
+    default: defaultAccentColor,
+    automation: true,
+    options: accentPalettes.map(({ id, title }) => ({ value: id, label: title })),
+  },
   {
     key: 'theme',
     title: '表示テーマ',

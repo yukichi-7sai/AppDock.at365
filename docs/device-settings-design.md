@@ -22,6 +22,7 @@
 | ページ | 設定キー | 内容 |
 | --- | --- | --- |
 | 表示 | host.theme | テーマ |
+| 表示 | host.accentColor | アクセントパレット（既定ミント） |
 | 表示 | host.showHints | ヒントの表示（既定ON） |
 | 表示 | host.shellProviders | 領域ごとのShell選択 |
 | 一般 | host.soundEnabled | 音の再生 |
@@ -84,6 +85,7 @@ data/                         既存の共有名簿・登録素材
   "machineName": "PC-A",
   "host": {
     "theme": "light",
+    "accentColor": "mint",
     "showHints": true,
     "shellProviders": {},
     "soundEnabled": true,
@@ -115,7 +117,7 @@ data/                         既存の共有名簿・登録素材
 }
 ```
 
-- hostは上表の9キーを扱い、省略キーは本体の現在の既定値を補う。themeは既存の列挙値、shellProvidersは既存のShell指定規則、残りはbooleanとして検証する。省略されたhost・extensions・collectionEnabledは空objectとして補い、明示された不正な型は拒否する。Applet ID・ページID・秒数・表示方法等も既存の検証規則を再利用する。
+- hostは上表の10キーを扱い、省略キーは本体の現在の既定値を補う。themeとaccentColorは各定義の列挙値、shellProvidersは既存のShell指定規則、残りはbooleanとして検証する。省略されたhost・extensions・collectionEnabledは空objectとして補い、明示された不正な型は拒否する。Applet ID・ページID・秒数・表示方法等も既存の検証規則を再利用する。
 - extensionsの各項目はenabledとuseLocalSettingsを必須とする。useLocalSettingsがtrueならconfigurationも必須。falseでも過去のconfigurationを保持できる。
 - configuration.settingsは必須object。未宣言・未導入時の既存設定キーも保持する。startupDelaySecondsとpagesは任意で、欠落時はmanifest等の既定値を使う。共有側の値へは戻らない。
 - configurationに含めるのはApplet設定ページで編集する上記3種類だけ。updateSource、リボン配置、通知種類設定、ショートカット、トレイ、共通名簿、認証、操作許可等を取り込まない。
@@ -193,7 +195,7 @@ OFFにする際は共有側も直前に再検証する。共有設定が読め�
 
 表示と一般の設定JSON対象はすべて常時端末専用とし、共有へ戻すトグルは設けない。テーマ・音・GPU描画を含めて各PCで独立させる。Shell選択も、端末ごとにAppletの有効状態や使用可能なShellが異なることに合わせる。リボンの配置、通知の種類別設定、タスクトレイの割り当て等は引き続き共有とする。
 
-theme、showHints、soundEnabledは端末値の保存・受信から現在の共通適用経路へ即時反映する。soundEnabledをOFFにしたときの再生・待機中音声の取消と、TTS生成の扱いは[共通音声再生](audio-playback.md)に従う。hardwareAccelerationは早期起動から端末値を読み、変更後の再起動通知と完全終了後の反映を維持する。保存先の変更を、起動専用項目の即時反映へ置き換えない。
+theme、accentColor、showHints、soundEnabledは端末値の保存・受信から現在の共通適用経路へ即時反映する。soundEnabledをOFFにしたときの再生・待機中音声の取消と、TTS生成の扱いは[共通音声再生](audio-playback.md)に従う。hardwareAccelerationは早期起動から端末値を読み、変更後の再起動通知と完全終了後の反映を維持する。保存先の変更を、起動専用項目の即時反映へ置き換えない。
 
 ### 本体の起動設定
 

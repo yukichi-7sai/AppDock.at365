@@ -2,9 +2,15 @@ import { WebContentsView } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { appearanceArguments, registerAppearance } from './appearance-host';
 
 /** Same local-file boundary for built-in and external presentation surfaces. */
-export function createShellView(folder: string, entry: string, preload: string, additionalArguments: string[] = []) {
+export function createShellView(
+  folder: string,
+  entry: string,
+  preload: string,
+  additionalArguments: string[] = [],
+) {
   const file = fs.realpathSync(path.resolve(folder, entry));
   const relative = path.relative(fs.realpathSync(folder), file);
   if (relative.startsWith('..') || path.isAbsolute(relative))
@@ -12,7 +18,7 @@ export function createShellView(folder: string, entry: string, preload: string, 
   const view = new WebContentsView({
     webPreferences: {
       preload,
-      additionalArguments,
+      additionalArguments: [...additionalArguments, ...appearanceArguments()],
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -23,5 +29,7 @@ export function createShellView(folder: string, entry: string, preload: string, 
   view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   view.webContents.on('will-navigate', (event) => event.preventDefault());
   view.webContents.on('will-redirect', (event) => event.preventDefault());
-  return { view, url: pathToFileURL(file).href };
+  const url = pathToFileURL(file).href;
+  registerAppearance(view.webContents, url);
+  return { view, url };
 }

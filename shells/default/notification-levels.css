@@ -1,16 +1,13 @@
 /* Shared by banner, desktop and notification-center cards for every owner. */
 .level-info {
   color-scheme: dark;
-  --card: #191f23;
-  --panel: #191f23;
+  --card: #191b23;
+  --panel: #191b23;
   --text: #eff0f5;
-  --muted: #b1c2bc;
-  --border: #46665c;
-  --button: #243b37;
-  --primary: #217a65;
-  --accent: #7ce1c5;
-  --accent-soft: #243b37;
-  --notification-accent: #7ce1c5;
+  --muted: #a4aabd;
+  --border: color-mix(in srgb, var(--accent) 40%, var(--panel));
+  --button: var(--accent-soft);
+  --notification-accent: var(--accent);
   color: var(--text);
 }
 :root[data-theme='light'] .level-info {
@@ -18,12 +15,10 @@
   --card: #fff;
   --panel: #fff;
   --text: #242939;
-  --muted: #53665f;
-  --border: #9cc5b7;
-  --button: #eef6f2;
-  --accent: #217a65;
-  --accent-soft: #e1f3ec;
-  --notification-accent: #217a65;
+  --muted: #606a7c;
+  --border: color-mix(in srgb, var(--accent) 40%, var(--panel));
+  --button: var(--accent-soft);
+  --notification-accent: var(--accent);
 }
 .level-warning {
   --notification-accent: #d6a252;

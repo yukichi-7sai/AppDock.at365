@@ -1,5 +1,7 @@
 # AppDock.at365 開発ガイド
 
+全ローカルUIのアクセント色と新しい画面の追加規則は[共通配色](docs/appearance.md)を参照してください。画面ごとにパレットを定義せず、共通CSS変数を利用します。
+
 ## 発行・配置ファイルの保存先
 
 標準発行先は `A:\40.ARTIFACT\AppDock.at365` です。`publish.bat`はソースrepo、`deploy.bat`は発行先から実行します。配置用ファイル・設定の保持とテンプレートの更新は[共通発行手順](docs/publishing.md)を参照してください。

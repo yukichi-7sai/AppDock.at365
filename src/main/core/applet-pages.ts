@@ -3,6 +3,7 @@ import path from 'node:path';
 import { WindowStateStore, restoreWindowBounds } from './window-state';
 import type { PageDisplay } from '../../shared/applet-pages';
 import { PageImageRegistry } from './page-images';
+import { appearanceArguments, registerAppearance } from './appearance-host';
 
 interface PageHost {
   window(): BrowserWindow | null;
@@ -182,6 +183,9 @@ export class AppletSurface {
     this.ui = new WebContentsView({
       webPreferences: {
         preload: options.preload,
+        ...(!options.remote && options.preload
+          ? { additionalArguments: appearanceArguments() }
+          : {}),
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
@@ -193,6 +197,7 @@ export class AppletSurface {
       },
     });
     this.contentView.addChildView(this.ui);
+    if (!options.remote && options.preload) registerAppearance(this.ui.webContents, options.url);
     if (options.pageImages && options.key && options.appletId) {
       this.images = new PageImageRegistry(
         options.pageImages.dataRoot,

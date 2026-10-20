@@ -5,8 +5,6 @@
   --border: #282b35;
   --muted: #9ca5b9;
   --faint: #838da3;
-  --accent: #7ce1c5;
-  --accent-soft: #243b37;
   --text: #e8edf8;
   --shadow: 0 20px 65px #0008;
   font-family: 'Segoe UI', sans-serif;
@@ -19,8 +17,6 @@
   --border: #e0e4ed;
   --muted: #657087;
   --faint: #647087;
-  --accent: #217a65;
-  --accent-soft: #e1f3ec;
   --text: #263149;
   --shadow: 0 20px 65px #18263c30;
 }

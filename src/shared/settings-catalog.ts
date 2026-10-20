@@ -1,4 +1,5 @@
 import { collectionRecord } from './page-collections';
+import { accentPalettes } from './appearance';
 import { defaultAppletEnabled } from './applet-state';
 import { shellRegions } from './shell';
 import { notificationCatalog, notificationSettingKey } from './notification-types';
@@ -83,7 +84,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['preview', '文章生成の試験', 'モデル 追加プロンプト 入力 生成結果 停止'],
   ],
   appearance: [
-    ['theme', 'テーマ', 'ワークスペースの配色を選びます。'],
+    ['theme', 'テーマ', 'ワークスペースの明るさを選びます。'],
+    ['accentColor', 'アクセントカラー', 'テーマとは別に、ボタンや選択状態の配色を選びます。'],
     ['showHints', 'ヒントの表示', '設定画面にヒントを表示します。'],
     ...shellRegions.map(({ id, title }): [string, string] => [
       'shellProviders.' + id,
@@ -310,7 +312,11 @@ export function settingsCatalog(
         ...hostItems[id].map(([key, title, description]) => ({
           ...item(id, key, title, description),
           keywords:
-            id === 'appearance' && key === 'theme' ? ['Dark', 'Light', 'System'] : undefined,
+            id === 'appearance' && key === 'theme'
+              ? ['Dark', 'Light', 'System']
+              : id === 'appearance' && key === 'accentColor'
+                ? accentPalettes.flatMap((p) => [p.id, p.title])
+                : undefined,
         })),
         ...(id === 'notifications'
           ? notificationCatalog(orderApplets(applets, current.appletOrder)).map((t) =>
@@ -396,7 +402,7 @@ export function settingsPaths(
     case 'custom-commands':
       return [['customCommands']];
     case 'appearance':
-      return ['theme', 'showHints', 'shellProviders'].map((k) => ['host', k]);
+      return ['theme', 'accentColor', 'showHints', 'shellProviders'].map((k) => ['host', k]);
     case 'tts':
       return [['tts']];
     case 'ai':

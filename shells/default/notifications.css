@@ -8,7 +8,7 @@
   --border: #6b536d;
   --muted: #c5c2ce;
   --button: #393441;
-  --primary: #7651c4;
+  --primary: var(--accent);
 }
 :root[data-theme='light'] {
   color: #242334;
@@ -17,7 +17,7 @@
   --border: #c59744;
   --muted: #575261;
   --button: #f1e9dc;
-  --primary: #7651c4;
+  --primary: var(--accent);
 }
 * {
   box-sizing: border-box;
@@ -101,7 +101,7 @@ button {
 button.primary {
   background: var(--primary);
   border-color: var(--primary);
-  color: white;
+  color: var(--accent-text);
 }
 button:disabled {
   opacity: 0.6;
@@ -144,4 +144,9 @@ button:focus-visible {
 
 .desktop-lane .notification-actions {
   max-width: 100%;
+}
+
+button.primary:hover:enabled {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
