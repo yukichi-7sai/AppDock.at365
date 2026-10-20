@@ -82,15 +82,44 @@ AIのモデル取得は設定ページ専用の操作として未保存の接続
 
 `host.showHints`は既定trueで、表示ページの「共通」カードから即時保存・反映する。既存設定の欠落時だけtrueを補い、保存済みfalseは保持する。設定定義から`appdock.settings.showHints.on`、`.off`、`.toggle`を生成する。保存分類は他の表示設定と同じ端末専用とする。
 
-消してよい操作説明は`src/renderer/settings-ui/SettingsHint.tsx`を使用する。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・Applet詳細・portal内のダイアログへ適用する。見た目は`settings-hint.css`を正本とし、画面別クラスは必要な配置・余白に使う。
+消してよい操作説明は、タイトルに結びつくものを`SettingsSection`/`SettingsField`の`hint`、本文内の補足を`src/renderer/settings-ui/SettingsHint.tsx`で表示する。どちらも`useSettingsHints()`を通して同じContextを参照する。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・Applet詳細・portal内のダイアログへ適用する。本文ヒントの見た目は`settings-hint.css`、タイトルのヒントは`settings-hint-icon.css`を正本とする。
+
+`SettingsSection`/`SettingsField`の`hint?: string`は、空白を除いた内容があるときだけタイトルのすぐ右に丸付きの「？」を表示する。`description?: ReactNode`と併用できる。タイトルなしのセクションにはアイコンを表示しない。ヒントOFF時にはアイコン・ツールチップ・その参照をまとめて取り除き、入力欄やdescriptionは保持する。表示の切り替え用の設定や保存形式を追加しない。
+
+```tsx
+<SettingsField
+  title="読み上げ速度"
+  hint="1倍が標準速度です。"
+  description={`現在の速度: ${speed}倍`}
+>
+  {/* 入力部品 */}
+</SettingsField>
+```
+
+共通`SettingsHintIcon`がhover・Tabでのフォーカス・クリックでツールチップを表示し、Escape、フォーカス離脱、外側のクリック、画面のスクロール/サイズ変更で閉じる。Escapeは最初にツールチップだけを閉じ、編集ダイアログの取消へ伝播させない。アイコンのクリック・Enter・Spaceで折りたたみセクションを開閉しない。見出し名にはアイコンの操作ラベルを混ぜず、アイコン自身に「項目名のヒント」のアクセシブルな名前と`aria-describedby`を付ける。
+
+ツールチップは既存の候補選択部品と同じnative popoverのtop layerへ表示する。ダイアログ/スクロール領域に切り取られず、画面端では左右位置と上下の表示方向を調整し、長文は折り返す。アイコンからツールチップへポインターを移しても読める状態を保つ。各画面で独自のアイコン・ブラウザー標準title・非表示制御を追加しない。
+
+追加・移動する文言は、静的か動的かだけで判断せず、次の役割で分ける。
+
+| 内容                                                                                    | 表示先                                     |
+| --------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 入力方法、単位、空欄/既定値の意味、任意の使い方の補足                                   | タイトルに対応する`hint`                   |
+| 現在の設定・起動状態、通知の要約、コマンドID、保存先などの実データ                      | 常時表示する`description`や専用の値表示    |
+| 外部送信・料金・認証、接続切断、再登録/再起動など操作結果の重要な注意、前提不足、エラー | 常時表示する`description`や警告/エラー表示 |
+| 説明と重要な注意が混在する文章                                                          | 文を分けて`hint`と`description`を併用      |
+
+本体の`SettingRow`も同じ共通部品を使う。明確な補助説明をhintへ渡し、起動状態の明示descriptionやUAC・描画設定の再起動に関する注意は保持する。検索カタログのdescriptionは検索用メタデータとして引き続き利用する。Applet manifestや宣言型一覧のdescriptionは提供元の機能説明・ラベルとの関連付けを含むため、自動でhintへ読み替えない。共通のページ表示・起動待ち時間など、本体が所有する補助説明だけを個別にhintへ渡す。
+
+通知種類カタログのdescriptionは各通知カードの`hint`へ渡し、エラー通知・警告通知を含めてタイトル横の「？」から表示する。通知先・表示時間・読み上げ等の現在の設定要約はカードの`description`に残す。実際の警告状態、必要な通知先の固定表示、接続不足やエラーの表示はヒントOFFでも保持する。
 
 ```tsx
 import { SettingsHint } from '../settings-ui/SettingsHint';
 
-<SettingsHint>入力後にEnterで確定します。</SettingsHint>
+<SettingsHint>入力後にEnterで確定します。</SettingsHint>;
 ```
 
-インラインには`as="span"`、小さな補足には`as="small"`を使用できる。ヒントIDを`aria-describedby`で参照する部品は、`useSettingsHints()`がfalseのとき参照も外す。カード・項目のdescription、現在値、警告・エラー、操作に必要なラベルをヒントへ自動変換しない。manifestのdescriptionも現状維持とし、役割が曖昧な文言は個別対応する。
+本文の`SettingsHint`は、インラインに`as="span"`、小さな補足に`as="small"`を使用できる。ヒントIDを`aria-describedby`で参照する部品は、`useSettingsHints()`がfalseのとき参照も外す。既存のdescriptionを移すときも上表で内容を確認し、役割が曖昧な文言や操作に必要なラベルを一括して非表示にしない。
 
 共通`SettingsFeedback`の進行・正常結果と、保存中メッセージは視覚的な行を増減させず、スクリーンリーダー向けの通知として扱う。ボタンの無効化、二重実行防止、処理状態、エラー表示は維持する。この一時表示の整理はヒント表示のON/OFFと独立する。
 

@@ -80,7 +80,7 @@ async function page(category) {
 const section = (p, title) =>
   p.locator('.settings-section').filter({
     has: p
-      .locator(':scope > summary > h2, :scope > header > h2')
+      .locator(':scope > summary h2, :scope > header h2')
       .filter({ hasText: new RegExp('^' + title + '$') }),
   });
 async function capture(p, name) {
@@ -126,7 +126,10 @@ async function save(p) {
     let p = await page('appearance');
     const cards = p.locator('.settings-form > .settings-section');
     assert.equal(await cards.count(), 2);
-    assert.equal(await cards.first().locator('header').count(), 0);
+    assert.deepEqual(await cards.locator(':scope > header h2').allTextContents(), [
+      '共通',
+      'Shellの変更',
+    ]);
     assert.equal(await cards.first().getByLabel('テーマ', { exact: true }).inputValue(), 'light');
     assert.equal(await p.getByRole('heading', { name: 'Shell', exact: true }).count(), 0);
     await capture(p, 'appearance');
@@ -134,7 +137,7 @@ async function save(p) {
     await save(p);
     await p.getByLabel('テーマ', { exact: true }).selectOption('light');
     await save(p);
-    checks.push('untitled theme card precedes workspace list; theme saves immediately');
+    checks.push('common theme/hint card precedes Shell selection; theme saves immediately');
     p = await page('general');
     const sound = p.getByRole('switch', { name: '音の再生', exact: true });
     assert.equal(
@@ -157,7 +160,7 @@ async function save(p) {
       'sound switch is first in general; saves immediately and generated ON command reflects in UI',
     );
     assert.deepEqual(
-      await p.locator('.settings-form > .settings-section > header > h2').allTextContents(),
+      await p.locator('.settings-form > .settings-section > header h2').allTextContents(),
       ['ウィンドウ', 'スタートアップ', 'Applet・MCPからの操作', '設定ファイル'],
     );
     assert.equal(await p.getByText('旧PC専用データ', { exact: true }).count(), 0);
@@ -171,7 +174,7 @@ async function save(p) {
       (
         await p
           .locator(
-            '.notification-settings > .settings-section > summary > h2, .notification-settings > .settings-section > header > h2',
+            '.notification-settings > .settings-section > summary h2, .notification-settings > .settings-section > header h2',
           )
           .allTextContents()
       ).slice(0, 4),
@@ -195,6 +198,7 @@ async function save(p) {
     );
     await section(p, 'エラー通知').locator(':scope > summary').click();
     await p.getByLabel('エラー通知の表示時間', { exact: true }).fill('12');
+    await p.getByLabel('エラー通知の表示時間', { exact: true }).press('Enter');
     await save(p);
     assert.equal(await p.getByLabel('エラー通知のバナー', { exact: true }).isDisabled(), true);
     assert.equal(

@@ -261,6 +261,8 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 設定Shellの回帰は `tests/settings-editing.test.cjs`、`tests/settings-page.test.cjs`、`scripts/settings-shell-ui-test.cjs [固定EXE]`。既存navigation・preferences・設定通知・スクロール・sidebar・Shell復旧も影響範囲として確認します。全体JSONの入力を前提にした試験は、選択ページの部分JSONまたはhost専用編集アダプターへ接続します。
 
+ヒントの表示とタイトル横の「？」は`dev.bat exec node scripts/settings-hints-ui-test.cjs [固定EXE]`で確認します。hover/Tab/Escape、折りたたみを開閉しない操作、ダイアログ内のtop layer、ON/OFFの即時反映・再起動後の保持、状態・コマンドID・重要な注意・エラーの維持を検査します。文言の分類と部品の追加規則は[設定基盤](docs/settings-foundation.md#ヒントと一時表示)を参照してください。
+
 本体のnative dialogとShell描画面の共通背景は`tests/host-modal-layer.test.cjs`と`dev.bat exec node scripts/host-modal-ui-test.cjs [固定EXE]`で確認します。隔離profileでショートカット・ジェスチャー・カスタムコマンド編集の明暗テーマ、幅変更、フォーカス復帰、追加Shellの故障復旧、本体再読込を検査します。仮のタイトルバー・ステータスバーも同じ登録口へ接続し、複数Viewの暗化・復帰をWindowsのウィンドウ合成画像とピクセルで照合します。将来のShell領域そのものの実装確認とは区別します。
 
 設定の通知と破損復旧は`tests/settings-recovery.test.cjs`、`tests/settings-health-notifications.test.cjs`、`scripts/settings-recovery-ui-test.cjs [固定EXE]`で確認します。GUIは専用profileとPC専用rootを使い、復元確認だけをdialog fixtureで応答します。固定EXEでは既存のCDP/main inspector helperへ接続し、元EXEからの実際の再起動も確認します。OSのファイル選択dialogの実操作とは区別して記録してください。

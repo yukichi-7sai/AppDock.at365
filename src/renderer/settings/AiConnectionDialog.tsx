@@ -180,7 +180,7 @@ export function AiConnectionDialog({
             ))}
           </select>
         </SettingsField>
-        <SettingsField title="APIのURL" description="/v1まで入力し、Enterでモデルを取得します。">
+        <SettingsField title="APIのURL" hint="/v1まで入力し、Enterでモデルを取得します。">
           <SettingsUrlInput
             aria-label="AIのAPIのURL"
             value={draft.baseUrl}
@@ -246,7 +246,7 @@ export function AiConnectionDialog({
             </>
           )}
         </SettingsField>
-        <SettingsField title="モデル" description="呼出し側で省略したときに使う既定モデルです。">
+        <SettingsField title="モデル" hint="呼出し側で省略したときに使う既定モデルです。">
           <div className="ai-model-picker">
             <SettingsInput
               aria-label="AIの既定モデル"
@@ -279,7 +279,8 @@ export function AiConnectionDialog({
       <SettingsSection title="サーバーに合わせた詳細設定" collapsible>
         <SettingsField
           title="既定の出力トークン上限"
-          description="APIで未指定のときと文章生成の試験に使います。思考もこの枠を使うモデルがあります。大きな値では待ち時間や料金が増える場合があります。"
+          hint="APIで未指定のときと文章生成の試験に使います。思考もこの枠を使うモデルがあります。"
+          description="大きな値では待ち時間や料金が増える場合があります。"
         >
           <SettingsInput
             type="number"
@@ -293,7 +294,7 @@ export function AiConnectionDialog({
         </SettingsField>
         <SettingsField
           title="既定の待ち時間（秒）"
-          description="受付から待機・生成までの期限です。1〜600秒で指定し、APIで指定された待ち時間を優先します。"
+          hint="受付から待機・生成までの期限です。1〜600秒で指定し、APIで指定された待ち時間を優先します。"
         >
           <SettingsInput
             type="number"
@@ -323,7 +324,7 @@ export function AiConnectionDialog({
             <option value="max_completion_tokens">max_completion_tokens（OpenAI）</option>
           </select>
         </SettingsField>
-        <SettingsField title="Temperature" description="空欄はサーバーの既定値です。">
+        <SettingsField title="Temperature" hint="空欄はサーバーの既定値です。">
           <SettingsInput
             aria-label="AIのTemperature"
             inputMode="decimal"
@@ -331,10 +332,7 @@ export function AiConnectionDialog({
             onChange={(e) => setTemperature(e.target.value)}
           />
         </SettingsField>
-        <SettingsField
-          title="推論の強さ"
-          description="reasoning_effortに対応するモデルだけ指定します。"
-        >
+        <SettingsField title="推論の強さ" hint="reasoning_effortに対応するモデルだけ指定します。">
           <SettingsInput
             aria-label="AIの推論の強さ"
             value={draft.compatibility.reasoningEffort ?? ''}

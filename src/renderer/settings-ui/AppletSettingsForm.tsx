@@ -231,15 +231,12 @@ export function AppletSettingsForm({
         </SettingsSection>
       )}
       {!applet.collection && !!applet.pages?.length && (
-        <SettingsSection
-          title="ページの表示"
-          description="Appletのページをどこに表示するか選びます。"
-        >
+        <SettingsSection title="ページの表示" hint="Appletのページをどこに表示するか選びます。">
           {applet.pages.map((page) => (
             <SettingsField
               key={page.id}
               title={`${page.title}の表示方法`}
-              description={appletCommonDescriptions.display}
+              hint={appletCommonDescriptions.display}
               {...settingAnchor(pageId, `page:${page.id}`)}
             >
               <select
@@ -263,10 +260,10 @@ export function AppletSettingsForm({
         </SettingsSection>
       )}
       {!applet.collection && (
-        <SettingsSection title="起動" description="AppDockを起動したときの動作です。">
+        <SettingsSection title="起動" hint="AppDockを起動したときの動作です。">
           <SettingsField
             title="開始までの秒数"
-            description={appletCommonDescriptions.startupDelaySeconds}
+            hint={appletCommonDescriptions.startupDelaySeconds}
             {...settingAnchor(pageId, 'startupDelaySeconds')}
           >
             <SettingsInput

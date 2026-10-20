@@ -54,7 +54,7 @@ export function ProcessCommandFields({
           </SettingsField>
           <SettingsField
             title="引数"
-            description={'文字列のJSON配列で指定します。例: ["ファイル名.txt", "--option"]'}
+            hint={'文字列のJSON配列で指定します。例: ["ファイル名.txt", "--option"]'}
           >
             <SettingsTextarea
               aria-label="引数"

@@ -108,7 +108,8 @@ export function McpClientSettingsForm({
     <div className="settings-sections">
       <SettingsSection
         title="登録した接続先"
-        description="名前は共有し、接続設定・認証情報・許可はこのPCだけに保存します。登録したツールをAppDockから利用できます。"
+        hint="登録したツールをAppDockから利用できます。"
+        description="名前は共有し、接続設定・認証情報・許可はこのPCだけに保存します。"
         {...settingAnchor('mcp-client', 'connections')}
       >
         {auxiliary?.error && <p role="alert">{auxiliary.error}</p>}
@@ -145,7 +146,8 @@ export function McpClientSettingsForm({
       </SettingsSection>
       <SettingsSection
         title="ツールの確認と実行"
-        description="接続先を選ぶと、そのサーバーのツールを取得できます。実行ボタンを押すと操作先へ引数を送信します。"
+        hint="接続先を選ぶと、そのサーバーのツールを取得できます。"
+        description="実行ボタンを押すと操作先へ引数を送信します。"
       >
         <SettingsField title="接続先">
           <select

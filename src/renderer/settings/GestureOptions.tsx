@@ -47,12 +47,12 @@ export function GestureOptions({
       collapsible
       className="gesture-settings-section"
       title={hostSettingItem('gestures', 'options').title}
-      description={hostSettingItem('gestures', 'options').description}
+      hint={hostSettingItem('gestures', 'options').description}
       {...settingAnchor('gestures', 'options')}
     >
       <SettingsField
         title={hostSettingItem('gestures', 'enabled').title}
-        description="右ボタンを押しながら、移動・クリック・ホイール・キーで操作。一時停止はトレイから切り替えられます。"
+        hint="右ボタンを押しながら、移動・クリック・ホイール・キーで操作。一時停止はトレイから切り替えられます。"
         {...settingAnchor('gestures', 'enabled')}
       >
         <Toggle
@@ -63,7 +63,7 @@ export function GestureOptions({
       </SettingsField>
       <SettingsField
         title={hostSettingItem('gestures', 'activateOnStart').title}
-        description="右ボタンを押した場所をアクティブにして、その対象でジェスチャーを開始します。"
+        hint="右ボタンを押した場所をアクティブにして、その対象でジェスチャーを開始します。"
         {...settingAnchor('gestures', 'activateOnStart')}
       >
         <Toggle
@@ -74,7 +74,7 @@ export function GestureOptions({
       </SettingsField>
       <SettingsField
         title={hostSettingItem('gestures', 'executionMode').title}
-        description="操作と「いつ・どこで」の条件に一致したコマンドを、登録順に選びます。"
+        hint="操作と「いつ・どこで」の条件に一致したコマンドを、登録順に選びます。"
         {...settingAnchor('gestures', 'executionMode')}
       >
         <select
@@ -114,7 +114,7 @@ export function GestureOptions({
       </SettingsField>
       <SettingsField
         title="待機表示"
-        description="選択した実行方法に合わせて、実行対象のコマンドを表示します。「アクションなしを表示する」がOFFの場合、割り当てに一致しない移動では表示しません。"
+        hint="選択した実行方法に合わせて、実行対象のコマンドを表示します。「アクションなしを表示する」がOFFの場合、割り当てに一致しない移動では表示しません。"
       >
         <div className="gesture-options-grid">
           <label className="gesture-option" {...settingAnchor('gestures', 'indicatorPosition')}>
@@ -158,7 +158,7 @@ export function GestureOptions({
       </SettingsField>
       <SettingsField
         title="Webブラウザ"
-        description="exe名のみを指定し、パスは含めません。WebBrowserToolsの操作対象もこの一覧を使います。"
+        hint="exe名のみを指定し、パスは含めません。WebBrowserToolsの操作対象もこの一覧を使います。"
       >
         <Names
           itemKey="browsers"
@@ -178,10 +178,7 @@ export function GestureOptions({
         </div>
         <p className="settings-help">FirefoxなどではChromiumウィンドウの条件をオフにします。</p>
       </SettingsField>
-      <SettingsField
-        title="除外"
-        description="この一覧のアプリでは、すべてのジェスチャーを無効にします。"
-      >
+      <SettingsField title="除外" hint="この一覧のアプリでは、すべてのジェスチャーを無効にします。">
         <Names
           itemKey="excludedProcesses"
           values={gestures.excludedProcesses}

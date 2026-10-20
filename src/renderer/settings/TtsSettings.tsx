@@ -84,11 +84,11 @@ export function TtsSettingsForm({
     <div className="settings-sections tts-settings" aria-label="読み上げ">
       <SettingsSection
         title="TTS接続先"
-        description="使用するTTSサーバーを設定します。APIキーが不要なサーバーでは空欄のまま使えます。"
+        hint="使用するTTSサーバーを設定します。APIキーが不要なサーバーでは空欄のまま使えます。"
       >
         <SettingsField
           title="APIのURL"
-          description="サーバーのベースURLを入力します。"
+          hint="サーバーのベースURLを入力します。"
           {...settingAnchor('tts', 'baseUrl')}
         >
           <SettingsUrlInput
@@ -147,11 +147,11 @@ export function TtsSettingsForm({
       </SettingsSection>
       <SettingsSection
         title="モデルと声"
-        description="候補を取得して選択するか、サーバーで使えるIDを直接入力します。"
+        hint="候補を取得して選択するか、サーバーで使えるIDを直接入力します。"
       >
         <SettingsField
           title="TTSモデル"
-          description="一覧には音声生成以外のモデルも含まれる場合があります。TTS対応のモデルを選んでください。"
+          hint="一覧には音声生成以外のモデルも含まれる場合があります。TTS対応のモデルを選んでください。"
           {...settingAnchor('tts', 'model')}
         >
           <SettingsInput
@@ -192,7 +192,7 @@ export function TtsSettingsForm({
         </SettingsField>
         <SettingsField
           title="既定のボイス"
-          description="通常の読み上げで使う声です。"
+          hint="通常の読み上げで使う声です。"
           {...settingAnchor('tts', 'defaultVoice')}
         >
           <SettingsInput
@@ -236,7 +236,7 @@ export function TtsSettingsForm({
         </SettingsField>
         <SettingsField
           title="読み上げ速度"
-          description="1が標準速度です。0.25〜4の範囲で調整できます。"
+          hint="1が標準速度です。0.25〜4の範囲で調整できます。"
           {...settingAnchor('tts', 'defaultSpeed')}
         >
           <SettingsInput
@@ -320,7 +320,7 @@ export function TtsSettingsForm({
       </SettingsSection>
       <SettingsSection
         title="サーバーに合わせた詳細設定"
-        description="速度の適用先や、ボイス一覧の取得方法を調整できます。"
+        hint="速度の適用先や、ボイス一覧の取得方法を調整できます。"
         collapsible
       >
         <SettingsField title="速度の適用先" {...settingAnchor('tts', 'speedMode')}>
@@ -347,7 +347,7 @@ export function TtsSettingsForm({
         </SettingsField>
         <SettingsField
           title="ボイス一覧のパス"
-          description="サーバーから取得する場合に使う、ベースURL配下の相対パスです。"
+          hint="サーバーから取得する場合に使う、ベースURL配下の相対パスです。"
           {...settingAnchor('tts', 'voicesPath')}
         >
           <SettingsInput
@@ -358,7 +358,7 @@ export function TtsSettingsForm({
         </SettingsField>
         <SettingsField
           title="手動ボイス一覧"
-          description="idとnameを持つJSON配列です。取得方式を「手動一覧」にすると使用します。"
+          hint="idとnameを持つJSON配列です。取得方式を「手動一覧」にすると使用します。"
           {...settingAnchor('tts', 'manualVoices')}
         >
           <SettingsTextarea

@@ -41,7 +41,7 @@ export function AboutSettings({
       </SettingsSection>
       <SettingsSection
         title="インストール済みのApplet"
-        description="個別に更新できます。更新元を変更する場合は、各Appletの設定を開いてください。"
+        hint="個別に更新できます。更新元を変更する場合は、各Appletの設定を開いてください。"
         collapsible
         {...settingAnchor('about', 'updateSource')}
       >
@@ -67,7 +67,7 @@ export function AboutSettings({
       <UpdateSettings settings={settings} edit={edit} />
       <SettingsSection
         title="実行環境の詳細"
-        description="動作環境の確認や、不具合の調査に使う情報です。"
+        hint="動作環境の確認や、不具合の調査に使う情報です。"
         collapsible
         {...settingAnchor('about', 'runtime')}
       >

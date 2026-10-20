@@ -76,6 +76,7 @@ async function launch() {
 }
 async function stop() {
   if (host) await host.evaluate(() => window.dock.executeCommand('appdock.quit'));
+  else if (child && child.exitCode === null) child.kill();
   if (child) await until(() => child.exitCode !== null, 'shutdown');
   if (browser) await browser.close();
   host = browser = child = null;
@@ -109,7 +110,7 @@ async function hints(enabled) {
         ? (await host
             .getByRole('switch', { name: 'ヒントの表示', exact: true })
             .getAttribute('aria-checked')) === String(enabled)
-        : enabled || (await host.locator('.settings-hint').count()) === 0)
+        : enabled || (await host.locator('.settings-hint, .settings-hint-icon').count()) === 0)
     );
   }, 'hint rendering');
   assert.equal(await host.locator('.settings-page-error').count(), 0, 'no unexpected page errors');
@@ -127,20 +128,30 @@ async function appearance() {
     'Shellの変更',
   ]);
   const common = host.getByRole('region', { name: '共通', exact: true });
+  const visible = (await snapshot()).settings.value.host.showHints;
   assert.equal(
     await common.getByText('ワークスペースの配色を選びます。', { exact: true }).count(),
-    1,
+    visible ? 1 : 0,
   );
   assert.equal(
     await common.getByText('設定画面にヒントを表示します。', { exact: true }).count(),
-    1,
+    visible ? 1 : 0,
   );
+  assert.equal(await common.locator('.settings-hint-trigger').count(), visible ? 2 : 0);
   assert.equal(
     await host
       .getByRole('region', { name: 'Shellの変更', exact: true })
       .locator('.settings-field-label p')
       .count(),
     0,
+  );
+  assert.equal(
+    await host
+      .getByRole('region', { name: 'Shellの変更', exact: true })
+      .locator('.settings-hint-trigger')
+      .count(),
+    0,
+    'empty catalog hints do not produce icons',
   );
   return common;
 }
@@ -165,6 +176,8 @@ async function appearance() {
     initial.globalShortcutCommands = [];
     initial.keybindings = [];
     initial.gestures.enabled = false;
+    initial.host.trayClickCommand = 'fixture.hints.run';
+    initial.host.trayDoubleClickCommand = null;
     initial.tts.baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
     initial.extensions['fixture.hints'] = { enabled: true, settings: {} };
     const fixture = path.join(profile, 'extensions', 'hints');
@@ -194,6 +207,7 @@ async function appearance() {
       path.join(fixture, 'worker.cjs'),
       "exports.activate=async c=>{c.commands.register('fixture.hints.run','Hint action',()=>{});};",
     );
+    require('../out/main/shared/settings-schema').parseSettings(initial);
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
     if (source) {
       fs.copyFileSync(source, path.join(profile, 'AppDock.at365.exe'));
@@ -202,6 +216,24 @@ async function appearance() {
     await launch();
     assert.equal((await snapshot()).settings.value.host.showHints, true);
     let common = await appearance();
+    const titleTooltip = host.locator('.settings-hint-tooltip:popover-open');
+    const themeHint = common.getByRole('button', { name: 'テーマのヒント', exact: true });
+    await themeHint.hover();
+    await titleTooltip.waitFor();
+    assert.equal(await titleTooltip.innerText(), 'ワークスペースの配色を選びます。');
+    await titleTooltip.hover();
+    await host.screenshot({ path: path.join(profile, 'title-tooltip-hover.png') });
+    assert.equal(await titleTooltip.isVisible(), true, 'tooltip remains hoverable');
+    await host.keyboard.press('Escape');
+    await until(async () => (await titleTooltip.count()) === 0, 'hover tooltip dismissal');
+    await themeHint.focus();
+    await titleTooltip.waitFor();
+    const describedBy = await themeHint.getAttribute('aria-describedby');
+    assert.equal(await titleTooltip.getAttribute('id'), describedBy);
+    await hints(false);
+    assert.equal(await common.locator('.settings-hint-trigger').count(), 0);
+    assert.equal(await host.locator('.settings-hint-tooltip').count(), 0);
+    await hints(true);
     await common.getByRole('switch', { name: 'ヒントの表示', exact: true }).click();
     await until(
       async () =>
@@ -213,7 +245,7 @@ async function appearance() {
     );
     assert.equal(
       await common.getByText('設定画面にヒントを表示します。', { exact: true }).count(),
-      1,
+      0,
     );
     await common.getByRole('switch', { name: 'ヒントの表示', exact: true }).click();
     await until(
@@ -225,7 +257,97 @@ async function appearance() {
       'toggle on',
     );
     checks.push(
-      'existing settings default ON; exact common/Shell cards; UI saves immediately; descriptions survive OFF',
+      'existing settings default ON; title hints support hover/focus/Escape and disappear immediately with preference OFF',
+    );
+
+    await select('一般');
+    await hints(false);
+    await host
+      .getByText(
+        /通常権限で動作中|管理者権限で動作中|起動設定はWindowsの発行版AppDockで使用できます。/,
+      )
+      .waitFor();
+    await host.locator('.settings-field-label p').filter({ hasText: 'UAC確認' }).waitFor();
+    await select('通知');
+    await hints(true);
+    const notificationGuides = [
+      [
+        'エラー通知',
+        'AI文章生成、設定の読み込み・保存・反映・復旧、更新処理、接続テストの失敗を通知します。バナーで必ず通知し、本体ログにも記録します。',
+      ],
+      [
+        '警告通知',
+        '旧PC専用データなど、確認や対処が必要な状態を通知します。バナーで必ず通知し、本体ログでも確認できます。',
+      ],
+    ];
+    for (const [title, description] of notificationGuides) {
+      const card = host.locator('.notification-setting-card').filter({
+        has: host.getByRole('heading', { name: title, exact: true }),
+      });
+      const originalOpen = await card.getAttribute('open');
+      await card.getByRole('button', { name: `${title}のヒント`, exact: true }).hover();
+      await titleTooltip.waitFor();
+      assert.equal(await titleTooltip.innerText(), description);
+      assert.equal(await card.getAttribute('open'), originalOpen);
+      assert.equal(
+        await card
+          .locator('.settings-section-content > p')
+          .filter({ hasText: description })
+          .count(),
+        0,
+      );
+      await host.keyboard.press('Escape');
+    }
+    await hints(false);
+    assert.equal(
+      await host.locator('.notification-setting-card .settings-hint-trigger').count(),
+      0,
+    );
+    for (const [title, description] of notificationGuides) {
+      const card = host.locator('.notification-setting-card').filter({
+        has: host.getByRole('heading', { name: title, exact: true }),
+      });
+      assert.equal(await card.getByText(description, { exact: true }).count(), 0);
+      await card.locator('summary > p').waitFor();
+      assert.match(await card.locator('summary > p').innerText(), /バナー.*読み上げ:.*MCP Events:/);
+    }
+    const errorCard = host.locator('.notification-setting-card').filter({
+      has: host.getByRole('heading', { name: 'エラー通知', exact: true }),
+    });
+    await errorCard.locator('summary').click();
+    assert.equal(
+      await errorCard.getByLabel('エラー通知のバナー', { exact: true }).isDisabled(),
+      true,
+    );
+    assert.ok((await errorCard.getByText('この通知では必須', { exact: true }).count()) > 0);
+    await errorCard.locator('summary').click();
+    checks.push(
+      'notification type explanations use title hints; OFF removes explanations while current summaries and required targets remain',
+    );
+    const speechState = host
+      .locator('.notification-settings > .settings-section')
+      .filter({ has: host.getByRole('heading', { name: '読み上げ', exact: true }) })
+      .locator('summary > p');
+    await speechState.waitFor();
+    assert.match(await speechState.innerText(), /現在の声:.*速度:/);
+    await select('タスクトレイ');
+    await host
+      .locator('.tray-click-id.command-id')
+      .getByText('fixture.hints.run', { exact: true })
+      .waitFor();
+    await select('MCP接続先');
+    await host
+      .getByText('名前は共有し、接続設定・認証情報・許可はこのPCだけに保存します。', {
+        exact: true,
+      })
+      .waitFor();
+    await hints(true);
+    await host.getByRole('button', { name: '登録した接続先のヒント', exact: true }).hover();
+    await titleTooltip.waitFor();
+    assert.equal(await titleTooltip.innerText(), '登録したツールをAppDockから利用できます。');
+    await host.keyboard.press('Escape');
+    checks.push(
+      'current launch/speech state, command IDs and security descriptions survive OFF; hint and description coexist',
     );
 
     for (const title of ['リボン', 'Webアカウント', 'ショートカット', 'マウスジェスチャー']) {
@@ -250,6 +372,41 @@ async function appearance() {
     const gestureOptions = host
       .locator('details.settings-section')
       .filter({ has: host.getByRole('heading', { name: '動作設定', exact: true }) });
+    assert.equal(await gestureOptions.getAttribute('open'), null);
+    const optionsHint = gestureOptions.getByRole('button', {
+      name: '動作設定のヒント',
+      exact: true,
+    });
+    await optionsHint.waitFor();
+    await gestureOptions.locator('summary').focus();
+    const focusBeforeTab = await host.evaluate(() => document.activeElement?.outerHTML);
+    await host.keyboard.press('Tab');
+    const focusAfterTab = await host.evaluate(() => document.activeElement?.outerHTML);
+    fs.writeFileSync(
+      path.join(profile, 'summary-focus.json'),
+      JSON.stringify({ focusBeforeTab, focusAfterTab }, null, 2),
+    );
+    assert.equal(
+      await optionsHint.evaluate((node) => document.activeElement === node),
+      true,
+      focusAfterTab,
+    );
+    await titleTooltip.waitFor();
+    for (const key of ['Enter', 'Space']) {
+      await host.keyboard.press(key);
+      assert.equal(await gestureOptions.getAttribute('open'), null, `${key} must not toggle card`);
+    }
+    await optionsHint.click();
+    assert.equal(
+      await gestureOptions.getAttribute('open'),
+      null,
+      'hint click must not toggle card',
+    );
+    await host.keyboard.press('Escape');
+    await until(async () => (await titleTooltip.count()) === 0, 'summary tooltip dismissal');
+    checks.push(
+      'Tab/Enter/Space/click on a collapsed section hint preserve its open state and heading name',
+    );
     await gestureOptions.locator('summary').click();
     const rightClickHint = '何も操作せず右ボタンを離すと、通常の右クリックになります。';
     await gestureOptions.getByText(rightClickHint, { exact: true }).waitFor();
@@ -365,18 +522,55 @@ async function appearance() {
     await processDialog
       .getByText('起動受付を返します。終了待ち・標準出力の取得は行いません。', { exact: true })
       .waitFor();
+    const argumentsHint = processDialog.getByRole('button', { name: '引数のヒント', exact: true });
+    await argumentsHint.scrollIntoViewIfNeeded();
+    await argumentsHint.focus();
+    await titleTooltip.waitFor();
+    assert.match(await titleTooltip.innerText(), /文字列のJSON配列/);
+    const tooltipBounds = await titleTooltip.boundingBox();
+    const viewport = await host.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    assert.ok(tooltipBounds.x >= 0 && tooltipBounds.y >= 0);
+    assert.ok(tooltipBounds.x + tooltipBounds.width <= viewport.width);
+    assert.ok(tooltipBounds.y + tooltipBounds.height <= viewport.height);
+    assert.equal(
+      await titleTooltip.evaluate((node) => {
+        const rect = node.getBoundingClientRect();
+        return node.contains(
+          document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+        );
+      }),
+      true,
+      'tooltip is above the modal scrolling surface',
+    );
+    await host.screenshot({ path: path.join(profile, 'dialog-title-tooltip.png') });
+    await host.keyboard.press('Escape');
+    await until(async () => (await titleTooltip.count()) === 0, 'dialog tooltip dismissal');
+    assert.equal(await processDialog.isVisible(), true, 'first Escape only dismisses tooltip');
+    await argumentsHint.blur();
+    await argumentsHint.focus();
+    await titleTooltip.waitFor();
     await hints(false);
     assert.equal(await processDialog.locator('.settings-hint').count(), 0);
+    assert.equal(await processDialog.locator('.settings-hint-trigger').count(), 0);
+    assert.equal(await host.locator('.settings-hint-tooltip').count(), 0);
     assert.equal(
       await processDialog
         .getByText('文字列のJSON配列で指定します。例: ["ファイル名.txt", "--option"]', {
           exact: true,
         })
         .count(),
-      1,
+      0,
     );
+    await processDialog.getByLabel('引数', { exact: true }).fill('{');
+    await processDialog.getByLabel('引数', { exact: true }).press('Enter');
+    await processDialog
+      .getByRole('alert')
+      .filter({ hasText: '文字列のJSON配列を指定してください。' })
+      .waitFor();
     await processDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
-    checks.push('process-command guidance toggles while field descriptions remain');
+    checks.push(
+      'modal title hints stay in the top layer and viewport, Escape preserves dialog; OFF removes hints but retains validation errors',
+    );
 
     await hints(false);
     await select('Hint fixture');
@@ -470,12 +664,16 @@ async function appearance() {
         await settleSettings(host);
         for (const visible of [true, false]) {
           await hints(visible);
+          if (visible) {
+            await common.getByRole('button', { name: 'テーマのヒント', exact: true }).hover();
+            await titleTooltip.waitFor();
+          }
           await host.screenshot({
             path: path.join(profile, `${theme}-${width}-${visible ? 'on' : 'off'}.png`),
           });
           assert.equal(
             await common.getByText('設定画面にヒントを表示します。', { exact: true }).count(),
-            1,
+            visible ? 1 : 0,
           );
           assert.ok(
             await common.getByRole('switch', { name: 'ヒントの表示', exact: true }).isVisible(),
@@ -499,6 +697,7 @@ async function appearance() {
     await appearance();
     assert.equal((await snapshot()).settings.value.host.showHints, false);
     assert.equal(await host.locator('.settings-hint').count(), 0);
+    assert.equal(await host.locator('.settings-hint-trigger').count(), 0);
     assert.deepEqual(errors, []);
     checks.push('OFF survives an actual process restart; no renderer errors');
     success = true;

@@ -196,13 +196,13 @@ export function TraySettings({
     <section className="settings-sections tray-settings" aria-label="タスクトレイ設定">
       <SettingsSection
         title="クリック時の動作"
-        description="トレイアイコンを左クリックしたときの操作を設定します。"
+        hint="トレイアイコンを左クリックしたときの操作を設定します。"
       >
         {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
           <SettingsField
             key={key}
             title={hostSettingItem('tray', key).title}
-            description={
+            hint={
               key === 'trayDoubleClickCommand'
                 ? '未設定ならクリックをすぐ実行。設定するとWindowsのダブルクリック判定時間だけ待機します。'
                 : '1回クリックしたときに実行するコマンドです。'
@@ -247,7 +247,7 @@ export function TraySettings({
       </SettingsSection>
       <SettingsSection
         title="コンテキストメニュー"
-        description="右クリックで開くメニューです。コマンド・グループ・区切り線を追加し、順番を調整できます。"
+        hint="右クリックで開くメニューです。コマンド・グループ・区切り線を追加し、順番を調整できます。"
         {...settingAnchor('tray', 'trayMenu')}
       >
         <div className="tray-toolbar">

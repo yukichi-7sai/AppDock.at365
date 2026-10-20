@@ -77,7 +77,7 @@ export function CustomCommandsSettings({
     <div className="settings-sections">
       <SettingsSection
         title="登録済みコマンド"
-        description="種類と固定設定を保存します。保存したコマンドをショートカット、ジェスチャー、トレイに割り当てられます。"
+        hint="種類と固定設定を保存します。保存したコマンドをショートカット、ジェスチャー、トレイに割り当てられます。"
         {...settingAnchor('custom-commands', 'definitions')}
       >
         {!supported && (
@@ -286,7 +286,7 @@ function CustomCommandDialog({
           </SettingsField>
           <SettingsField
             title="説明"
-            description="公開すると、MCP・Appletのコマンド一覧にも表示されます。"
+            hint="公開すると、MCP・Appletのコマンド一覧にも表示されます。"
           >
             <SettingsTextarea
               aria-label="説明"

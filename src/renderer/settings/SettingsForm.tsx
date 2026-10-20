@@ -305,7 +305,7 @@ export function SettingsForm({
             </SettingsSection>
             <SettingsSection
               title="スタートアップ"
-              description="Windowsへのサインイン時や、AppDockを起動したときの動作を設定します。"
+              hint="Windowsへのサインイン時や、AppDockを起動したときの動作を設定します。"
             >
               <SettingRow pageId={category} itemKey="startAtLogon">
                 <Toggle
@@ -360,7 +360,7 @@ export function SettingsForm({
             </SettingsSection>
             <SettingsSection
               title="Applet・MCPからの操作"
-              description={hostSettingItem(category, 'permissions').description}
+              hint={hostSettingItem(category, 'permissions').description}
               {...settingAnchor(category, 'permissions')}
             >
               <div className="settings-actions">
@@ -369,7 +369,7 @@ export function SettingsForm({
             </SettingsSection>
             <SettingsSection
               title="設定ファイル"
-              description="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
+              hint="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
             >
               <div {...settingAnchor(category, 'settingsFile')}>
                 {!aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired && (
@@ -453,10 +453,13 @@ function SettingRow({
   children: React.ReactNode;
 }) {
   const item = hostSettingItem(pageId, itemKey);
+  const requiredDescription =
+    pageId === 'general' && ['runAsAdministrator', 'hardwareAcceleration'].includes(itemKey);
   return (
     <SettingsField
       title={item.title}
-      description={description ?? item.description}
+      hint={description === undefined && !requiredDescription ? item.description : undefined}
+      description={description ?? (requiredDescription ? item.description : undefined)}
       {...settingAnchor(pageId, itemKey)}
     >
       {children}

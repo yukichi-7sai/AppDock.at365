@@ -331,7 +331,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     'desktop immediately follows global / global and exe desktop exclusions save and reopen',
   );
   await page.locator('summary').filter({ hasText: '動作設定' }).click();
-  assert.deepEqual(await options.locator('.settings-field-label > strong').allTextContents(), [
+  assert.deepEqual(await options.locator('.settings-field-label strong').allTextContents(), [
     'マウスジェスチャーを有効にする',
     '非アクティブなウィンドウ・デスクトップでも開始する',
     '条件に一致したコマンドの実行方法',
@@ -340,7 +340,10 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     'Webブラウザ',
     '除外',
   ]);
-  assert.equal(await page.getByLabel('条件に一致したコマンドの実行方法').inputValue(), 'all');
+  assert.equal(
+    await page.getByLabel('条件に一致したコマンドの実行方法', { exact: true }).inputValue(),
+    'all',
+  );
   const activation = page.getByRole('switch', {
     name: '非アクティブなウィンドウ・デスクトップでも開始する',
     exact: true,
@@ -354,14 +357,14 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert.equal((await snapshot()).settings.value.gestures.enabled, false);
   assert.deepEqual(await saved(), bindingsBeforeOptions);
   await enabled.click();
-  await page.getByLabel('条件に一致したコマンドの実行方法').selectOption('first');
+  await page.getByLabel('条件に一致したコマンドの実行方法', { exact: true }).selectOption('first');
   const opacity = page.getByLabel('不透明度', { exact: true });
   const noAction = options.getByRole('switch', { name: 'アクションなしを表示する', exact: true });
   assert.equal(await noAction.getAttribute('aria-checked'), 'true');
   assert.equal(
     await noAction.evaluate(
       (el) =>
-        el.closest('.settings-field').querySelector('.settings-field-label > strong').textContent,
+        el.closest('.settings-field').querySelector('.settings-field-label strong').textContent,
     ),
     '待機表示',
   );

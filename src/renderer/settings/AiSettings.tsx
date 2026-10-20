@@ -103,7 +103,7 @@ export function AiSettingsForm({
     <div className="settings-sections ai-settings">
       <SettingsSection
         title="AI接続設定"
-        description="ローカルサーバーやクラウドのAIを登録します。接続先は8件まで追加できます。"
+        hint="ローカルサーバーやクラウドのAIを登録します。接続先は8件まで追加できます。"
         {...settingAnchor('ai', 'connections')}
       >
         <div className="ai-connections-toolbar">
@@ -199,10 +199,7 @@ export function AiSettingsForm({
           </table>
         </div>
       </SettingsSection>
-      <SettingsSection
-        title="共通設定"
-        description="AppletやMCPからの文章生成に使う共通の設定です。"
-      >
+      <SettingsSection title="共通設定" hint="AppletやMCPからの文章生成に使う共通の設定です。">
         <SettingsField title="既定のAI接続" {...settingAnchor('ai', 'defaultConnectionId')}>
           <select
             aria-label="既定のAI接続"
@@ -225,7 +222,7 @@ export function AiSettingsForm({
         </SettingsField>
         <SettingsField
           title="共通プロンプト"
-          description="すべての用途に共通する方針を入力します。"
+          hint="すべての用途に共通する方針を入力します。"
           {...settingAnchor('ai', 'commonPrompt')}
         >
           <SettingsTextarea
@@ -290,10 +287,7 @@ export function AiSettingsForm({
             ))}
           </select>
         </SettingsField>
-        <SettingsField
-          title="今回のモデル"
-          description="空欄なら選択した接続の既定モデルを使います。"
-        >
+        <SettingsField title="今回のモデル" hint="空欄なら選択した接続の既定モデルを使います。">
           <SettingsInput
             aria-label="試験のAIモデル"
             commitOn="input"

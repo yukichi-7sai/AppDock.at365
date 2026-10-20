@@ -1,6 +1,6 @@
 # 一覧形式の設定編集UI
 
-追加する操作ヒントや確定操作の補足は共通`SettingsHint`を使用し、カードのdescriptionやエラーと区別する。ヒントの表示設定とダイアログ内への適用は[設定基盤](settings-foundation.md#ヒントと一時表示)を参照する。
+タイトルに対応する操作説明は`SettingsSection`/`SettingsField`の`hint`に渡し、本文内の補足は共通`SettingsHint`を使用する。現在の状態・コマンドID・重要な注意・エラーは常時表示する。共通の「？」ツールチップ、descriptionとの役割分担、ヒントの表示設定とダイアログ内への適用は[設定基盤](settings-foundation.md#ヒントと一時表示)を参照する。
 
 複数の登録項目を管理する設定画面は、AI接続一覧の「一覧＋追加／編集ダイアログ」を基本形とする。利用者が一覧で内容を見渡し、一つの登録に必要な項目をまとめて確定できる構成へ揃える。本体設定と、独自の設定画面を持つAppletで新規作成・改修する際の共通指針とする。
 
@@ -65,15 +65,15 @@
 
 ## 利用する共通部品と実装例
 
-| 役割                     | 参照先・責務                                                                                                                                                                                                                  |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ページと項目の配置       | [SettingsPageLayout](../src/renderer/settings/SettingsPageLayout.tsx)、[SettingsSections](../src/renderer/settings-ui/SettingsSections.tsx)。見出し、余白、カード、項目行、フィードバック                                     |
-| モーダルの表示寿命       | [SettingsModal](../src/renderer/settings-ui/SettingsModal.tsx)。native dialog、フォーカス囲い込み／復帰、IME対応のEscape、背面の入力操作の一時停止                                                                              |
-| 非同期の確定操作         | 同ファイルの`SettingsDialog`。OK／キャンセル、処理中の無効化、重複防止、失敗時の入力保持                                                                                                                                      |
+| 役割                     | 参照先・責務                                                                                                                                                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ページと項目の配置       | [SettingsPageLayout](../src/renderer/settings/SettingsPageLayout.tsx)、[SettingsSections](../src/renderer/settings-ui/SettingsSections.tsx)。見出し、余白、カード、項目行、フィードバック                                           |
+| モーダルの表示寿命       | [SettingsModal](../src/renderer/settings-ui/SettingsModal.tsx)。native dialog、フォーカス囲い込み／復帰、IME対応のEscape、背面の入力操作の一時停止                                                                                  |
+| 非同期の確定操作         | 同ファイルの`SettingsDialog`。OK／キャンセル、処理中の無効化、重複防止、失敗時の入力保持                                                                                                                                            |
 | 入力とテーマ             | [SettingsInput](../src/renderer/settings-ui/SettingsInput.tsx)、[controls.css](../src/renderer/settings-ui/controls.css)、[settings-sections.css](../src/renderer/settings-ui/settings-sections.css)。URL入力、共通の色・余白・状態 |
-| 一覧とダイアログの接続例 | [AiSettings](../src/renderer/settings/AiSettings.tsx)。追加／編集／削除／並べ替えの入口、検索アンカー                                                                                                                       |
-| 関連項目と順序の編集例   | [AiConnectionDialog](../src/renderer/settings/AiConnectionDialog.tsx)。一時入力、明示的な候補取得、詳細折りたたみ。順序編集は共通SettingsOrderDialogへ接続                                                                                 |
-| 保存側の例               | [AiSettingsController](../src/main/core/ai-settings.ts)。登録単位の検証、競合、関連ファイル、順序の合成                                                                                                                       |
+| 一覧とダイアログの接続例 | [AiSettings](../src/renderer/settings/AiSettings.tsx)。追加／編集／削除／並べ替えの入口、検索アンカー                                                                                                                               |
+| 関連項目と順序の編集例   | [AiConnectionDialog](../src/renderer/settings/AiConnectionDialog.tsx)。一時入力、明示的な候補取得、詳細折りたたみ。順序編集は共通SettingsOrderDialogへ接続                                                                          |
+| 保存側の例               | [AiSettingsController](../src/main/core/ai-settings.ts)。登録単位の検証、競合、関連ファイル、順序の合成                                                                                                                             |
 
 共通部品は表示と操作中の状態を担い、設定の保存・認証・通信の規則は所有しない。AIの一覧・保存Controllerは具体例であり、任意の設定を扱う汎用CRUD部品ではない。AI固有のモデル・キー・登録上限を別機能へコピーしない。新たな共通部品を切り出す場合は、実際に共通する表示と操作に限定する。
 
@@ -85,12 +85,12 @@
 
 ### 共通部品の選び方
 
-| 用途 | 使用する部品・経路 | 呼出側が用意するもの |
-| --- | --- | --- |
-| 通常の追加・編集・削除確認 | `SettingsDialog` | タイトル、一時入力、検証、保存処理、閉じる処理 |
-| キー記録など独自の本文・フッターが必要 | `SettingsModal` | 見出しと`labelledBy`、本文・ボタン、初期フォーカス、処理中の制御 |
-| 設定以外の本体内プレビュー等 | 本体documentの`<dialog>`を`showModal()`で開く | ラベル、初期フォーカス、Escape・取消・復帰、必要な入力停止 |
-| パレットのように描画をShellへ差し替える | `OverlayController`と`OverlayHost` | 内容別モデル・操作・取消。新しい種類は公開契約と描画側も追加 |
+| 用途                                    | 使用する部品・経路                            | 呼出側が用意するもの                                             |
+| --------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------- |
+| 通常の追加・編集・削除確認              | `SettingsDialog`                              | タイトル、一時入力、検証、保存処理、閉じる処理                   |
+| キー記録など独自の本文・フッターが必要  | `SettingsModal`                               | 見出しと`labelledBy`、本文・ボタン、初期フォーカス、処理中の制御 |
+| 設定以外の本体内プレビュー等            | 本体documentの`<dialog>`を`showModal()`で開く | ラベル、初期フォーカス、Escape・取消・復帰、必要な入力停止       |
+| パレットのように描画をShellへ差し替える | `OverlayController`と`OverlayHost`            | 内容別モデル・操作・取消。新しい種類は公開契約と描画側も追加     |
 
 `SettingsDialog`と`SettingsModal`は[SettingsControlsProvider](../src/renderer/settings-ui/api.tsx)の配下で使用する。本体のルートと設定ページは既に接続している。別のSurfaceや試験へ持ち出す場合は、そのSurfaceで許可された`SettingsControlsApi`を注入する。ShellのHTMLへ本体用部品や`window.dock`を持ち込まない。
 
@@ -189,12 +189,29 @@ Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ
 
 ```json
 {
-  "key": "items", "title": "登録一覧", "type": "object-list", "default": [], "itemTitle": "項目",
-  "list": { "columns": ["name"], "titleKey": "name", "descriptionKey": "url", "enabledKey": "enabled", "idKey": "id", "confirmDelete": true },
+  "key": "items",
+  "title": "登録一覧",
+  "type": "object-list",
+  "default": [],
+  "itemTitle": "項目",
+  "list": {
+    "columns": ["name"],
+    "titleKey": "name",
+    "descriptionKey": "url",
+    "enabledKey": "enabled",
+    "idKey": "id",
+    "confirmDelete": true
+  },
   "fields": [
     { "key": "id", "title": "ID", "type": "string" },
     { "key": "name", "title": "名前", "type": "string", "default": "新しい項目" },
-    { "key": "url", "title": "URL", "type": "string", "format": "url", "default": "https://example.com/" },
+    {
+      "key": "url",
+      "title": "URL",
+      "type": "string",
+      "format": "url",
+      "default": "https://example.com/"
+    },
     { "key": "enabled", "title": "有効", "type": "boolean", "default": true }
   ]
 }

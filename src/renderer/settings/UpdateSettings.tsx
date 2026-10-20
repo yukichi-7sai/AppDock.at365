@@ -41,7 +41,7 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
     <SettingsSection
       {...settingAnchor('about', 'updateActions')}
       title="まとめて更新"
-      description="更新候補を確認して準備します。最後の確認でキャンセルでき、適用する場合は1回の再起動にまとめます。"
+      hint="更新候補を確認して準備します。最後の確認でキャンセルでき、適用する場合は1回の再起動にまとめます。"
     >
       <div className="settings-actions update-actions">
         <button
@@ -83,13 +83,13 @@ export function UpdateSettings({
   return (
     <SettingsSection
       title="更新の設定"
-      description="起動時の確認方法と、本体の更新元を変更できます。"
+      hint="起動時の確認方法と、本体の更新元を変更できます。"
       collapsible
       {...settingAnchor('about', 'updates')}
     >
       <SettingsField
         title="AppDockの更新元"
-        description={hostSettingItem('about', 'hostSource').description}
+        hint={hostSettingItem('about', 'hostSource').description}
         {...settingAnchor('about', 'hostSource')}
       >
         <SettingsUrlInput
@@ -140,7 +140,7 @@ export function UpdateSettings({
       ))}
       <SettingsField
         title={hostSettingItem('about', 'startupDelaySeconds').title}
-        description="0〜3,600秒で指定します。"
+        hint="0〜3,600秒で指定します。"
         {...settingAnchor('about', 'startupDelaySeconds')}
       >
         <SettingsInput

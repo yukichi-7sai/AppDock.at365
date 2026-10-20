@@ -95,7 +95,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
     <section className="settings-sections codex-settings" aria-label="MCP・Codex連携">
       <SettingsSection
         title="接続の状態"
-        description="同じPCのCodexや、ネットワーク上のMCPクライアントからAppDockを操作できます。"
+        hint="同じPCのCodexや、ネットワーク上のMCPクライアントからAppDockを操作できます。"
       >
         <dl className="settings-status-grid">
           <div>
@@ -125,7 +125,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </dl>
         <SettingsField
           title="連携を有効にする"
-          description="AppDockの起動中に接続できます。"
+          hint="AppDockの起動中に接続できます。"
           {...settingAnchor('codex', 'automation')}
         >
           <Toggle
@@ -166,7 +166,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         )}
         <SettingsField
           title="操作できる範囲"
-          description="AppletとMCPの許可を別々に設定できます。"
+          hint="AppletとMCPの許可を別々に設定できます。"
           {...settingAnchor('codex', 'permissions')}
         >
           <div className="settings-actions">
@@ -177,7 +177,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
       </SettingsSection>
       <SettingsSection
         title="Codexへ登録"
-        description="このPCのCodexにMCPでのAppDockの接続情報を追加します。"
+        hint="このPCのCodexにMCPでのAppDockの接続情報を追加します。"
         {...settingAnchor('codex', 'registration')}
       >
         <div className="settings-actions">
@@ -205,7 +205,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
       </SettingsSection>
       <SettingsSection
         title="ネットワークからの接続"
-        description="別端末のMCPクライアントへ、Streamable HTTPの接続先とBearerトークンを設定します。"
+        hint="別端末のMCPクライアントへ、Streamable HTTPの接続先とBearerトークンを設定します。"
         {...settingAnchor('codex', 'network')}
       >
         {state.connectionScope !== 'network' ? (
@@ -217,7 +217,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         ) : (
           <SettingsField
             title="ネットワークの接続先候補"
-            description="接続できるかどうかは、利用する端末から確認してください。"
+            hint="接続できるかどうかは、利用する端末から確認してください。"
           >
             {state.networkEndpoints.map((endpoint) => (
               <div key={endpoint} className="settings-actions codex-network-endpoint">
@@ -248,7 +248,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </p>
         <SettingsField
           title="認証の設定例"
-          description="「接続トークンをコピー」で取得したトークンを、接続元アプリの方式に合わせて設定してください。"
+          hint="「接続トークンをコピー」で取得したトークンを、接続元アプリの方式に合わせて設定してください。"
         >
           <div>
             <p>
@@ -280,13 +280,13 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
       </SettingsSection>
       <SettingsSection
         title="登録先や接続の詳細"
-        description="設定ファイル・登録名・ポートの変更や、登録の解除ができます。"
+        hint="設定ファイル・登録名・ポートの変更や、登録の解除ができます。"
         collapsible
         {...settingAnchor('codex', 'connection')}
       >
         <SettingsField
           title="追加の接続先ホスト名"
-          description="IPアドレスで接続する場合は不要です。MagicDNSの完全名やDNS別名をShift+Enterで1行ずつ指定します。Enterか入力欄を離れる操作で保存します（16件まで）。"
+          hint="IPアドレスで接続する場合は不要です。MagicDNSの完全名やDNS別名をShift+Enterで1行ずつ指定します。Enterか入力欄を離れる操作で保存します（16件まで）。"
         >
           <SettingsTextarea
             aria-label="追加の接続先ホスト名"
@@ -302,7 +302,8 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </SettingsField>
         <SettingsField
           title="Codexの設定ファイル"
-          description="通常は初期表示の場所を使います。別PCやWSLはこの画面の登録対象ではありません。"
+          hint="通常は初期表示の場所を使います。"
+          description="別PCやWSLはこの画面の登録対象ではありません。"
         >
           <SettingsInput
             aria-label="Codexの設定ファイル"
@@ -323,7 +324,8 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </SettingsField>
         <SettingsField
           title="Codexへの登録名"
-          description="複数のAppDockを使う場合は別の名前にします。登録済みの名前を変更する前に、登録を解除してください。"
+          hint="複数のAppDockを使う場合は別の名前にします。"
+          description="登録済みの名前を変更する前に、登録を解除してください。"
         >
           <SettingsInput
             aria-label="Codexへの登録名"
@@ -345,7 +347,8 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </SettingsField>
         <SettingsField
           title="接続ポート"
-          description="0を指定すると空きポートを選んで保存します。変更後は登録を修復してください。"
+          hint="0を指定すると空きポートを選んで保存します。"
+          description="変更後は登録を修復してください。"
         >
           <SettingsInput
             type="number"

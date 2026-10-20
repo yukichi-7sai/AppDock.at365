@@ -1,24 +1,30 @@
 import { useId, type ReactNode, type HTMLAttributes } from 'react';
 import { SettingsInput } from './SettingsInput';
+import { SettingsHintIcon } from './SettingsHintIcon';
 import './settings-sections.css';
 
 /** Reusable content blocks inside SettingsPageLayout. */
 export function SettingsSection({
   title,
   description,
+  hint,
   children,
   collapsible = false,
   ...props
 }: {
   title?: string;
   description?: ReactNode;
+  hint?: string;
   children: ReactNode;
   collapsible?: boolean;
 } & Omit<HTMLAttributes<HTMLElement>, 'title'>) {
   const id = useId();
   const heading = (
     <>
-      <h2 id={id}>{title}</h2>
+      <div className="settings-title-with-hint">
+        <h2 id={id}>{title}</h2>
+        {title && <SettingsHintIcon title={title} hint={hint} />}
+      </div>
       {description && <p>{description}</p>}
     </>
   );
@@ -45,17 +51,22 @@ export function SettingsSection({
 export function SettingsField({
   title,
   description,
+  hint,
   children,
   ...props
 }: {
   title: string;
   description?: ReactNode;
+  hint?: string;
   children: ReactNode;
 } & Omit<HTMLAttributes<HTMLDivElement>, 'title'>) {
   return (
     <div {...props} className={`settings-field ${props.className ?? ''}`}>
       <div className="settings-field-label">
-        <strong>{title}</strong>
+        <div className="settings-title-with-hint">
+          <strong>{title}</strong>
+          <SettingsHintIcon title={title} hint={hint} />
+        </div>
         {description && <p>{description}</p>}
       </div>
       <div className="settings-field-control">{children}</div>

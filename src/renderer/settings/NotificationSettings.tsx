@@ -115,7 +115,7 @@ export function NotificationSettings({
     <div className="settings-sections notification-settings">
       <SettingsSection
         title="通知の受け取り方"
-        description="種類ごとに通知先を組み合わせて設定できます。"
+        hint="種類ごとに通知先を組み合わせて設定できます。"
         collapsible
       >
         <p>全ての通知は、通知センターで確認できます。</p>
@@ -146,7 +146,7 @@ export function NotificationSettings({
         </SettingsField>
         <SettingsField
           title="声"
-          description="共通の声を使うか、通知だけ別の声に変更できます。"
+          hint="共通の声を使うか、通知だけ別の声に変更できます。"
           {...settingAnchor('notifications', 'speech.voice')}
         >
           <div className="settings-actions">
@@ -189,7 +189,7 @@ export function NotificationSettings({
         </SettingsField>
         <SettingsField
           title="速度"
-          description="1倍が標準速度です。"
+          hint="1倍が標準速度です。"
           {...settingAnchor('notifications', 'speech.speed')}
         >
           <div className="settings-actions">
@@ -256,7 +256,7 @@ export function NotificationSettings({
       </SettingsSection>
       <SettingsSection
         title="MCP Event"
-        description="ChatGPT Work/Dotsのイベントトリガーとして使用するための機能です。"
+        hint="ChatGPT Work/Dotsのイベントトリガーとして使用するための機能です。"
         collapsible
       >
         <SettingsField title="MCP連携設定" description="MCP連携を有効化する必要があります。">
@@ -305,13 +305,13 @@ export function NotificationSettings({
               return (
                 <SettingsSection
                   title={type.title}
+                  hint={type.description}
                   description={summary}
                   collapsible
                   className="notification-setting-card"
                   key={notificationTypeKey(type)}
                   {...settingAnchor('notifications', notificationSettingKey(type))}
                 >
-                  <p>{type.description}</p>
                   {type.ownerKind === 'applet' &&
                     !['starting', 'running'].includes(type.ownerState) && (
                       <p className="muted">Appletは停止中です。通知設定を編集できます。</p>
@@ -378,7 +378,7 @@ export function NotificationSettings({
                   {type.lifetimePolicy === 'userDuration' ? (
                     <SettingsField
                       title="自動消去までの秒数"
-                      description="1〜86,400秒。空欄なら閉じるまで表示します。"
+                      hint="1〜86,400秒。空欄なら閉じるまで表示します。"
                     >
                       <SettingsInput
                         type="text"

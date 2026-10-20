@@ -376,7 +376,7 @@ export function RibbonSettings({
       <SettingsSection title="動作設定" collapsible>
         <SettingsField
           title="右クリックのコマンド"
-          description="リボンを右クリックしたときに実行するコマンドです。"
+          hint="リボンを右クリックしたときに実行するコマンドです。"
           {...settingAnchor('ribbon', 'rightClickCommand')}
         >
           <button

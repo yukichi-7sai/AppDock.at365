@@ -103,6 +103,16 @@ async function port() {
 let application, browser, child, host, ui;
 const checks = [];
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
+async function statusbar() {
+  return until(async () => {
+    for (const page of host
+      .context()
+      .pages()
+      .filter((p) => p.url().endsWith('/bars.html')))
+      if (await page.locator('footer.statusbar').count()) return page;
+    return null;
+  }, 'Default Shell statusbar');
+}
 async function banner() {
   for (const page of host
     .context()
@@ -265,7 +275,7 @@ async function main() {
   const cards = (await settingsPage(host)).locator('.notification-setting-card');
   assert.deepEqual(
     await Promise.all(
-      [0, 1, 2].map((i) => cards.nth(i).locator(':scope > summary > h2').innerText()),
+      [0, 1, 2].map((i) => cards.nth(i).locator(':scope > summary h2').innerText()),
     ),
     ['エラー通知', '警告通知', 'インフォメーション通知'],
   );
@@ -343,7 +353,7 @@ async function main() {
     'no updates',
   );
   await until(
-    async () => (await host.locator('.update-operation').count()) === 0,
+    async () => (await (await statusbar()).locator('.update-operation').count()) === 0,
     'footer progress ends',
   );
   await dismissAll();
@@ -387,15 +397,16 @@ async function main() {
     await host.evaluate(() => {
       window.fixtureCheck = window.dock.checkUpdates();
     });
-    await host.getByRole('region', { name: '更新の進捗', exact: true }).waitFor();
-    await host.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    const footer = await statusbar();
+    await footer.getByRole('region', { name: '更新の進捗', exact: true }).waitFor();
+    await footer.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await host.evaluate(() => window.fixtureCheck);
     await until(
       async () => (await info()).some((i) => i.body === '更新確認を取り消しました。'),
       'cancel receipt',
     );
     await until(
-      async () => (await host.locator('.update-operation').count()) === 0,
+      async () => (await (await statusbar()).locator('.update-operation').count()) === 0,
       'cancel ends progress',
     );
     checks.push(

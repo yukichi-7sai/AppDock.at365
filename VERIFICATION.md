@@ -1,5 +1,33 @@
 # 検証記録
 
+## 2026-10-20: タイトルヒント対応のコミット・push前照合（0.71.1）
+
+- 実装と通知種類説明の追加調整をまとめてcommit/pushする依頼を受領。main/origin/main、開始HEAD `cb6c8dea396a44f42391019969e23ff771eec437`、今回の29パス、空のindex、実効author/committer `yukichi-7sai <yukichi@at365.jp>`を確認。GitHubとAQUAの設定済みpush先はどちらも同じ開始HEADで、dirtyのため自動pull・stash・履歴統合は行っていない。
+- [コミット時の照合記録](.artifacts/commit-validation-settings-hints-0711/validation.json)で必要回帰を確定。実装時の型検査・build、source/固定EXEのヒントGUI各12群、固定EXEのsmokeは、入力701ファイル・完全ログのSHA256・実行環境・EXEのSHA256を照合して再利用した。後続変更は独立した通知GUI試験2ファイル、ジェスチャーGUIの確認関数とVERIFICATIONへの追記だけで、これらを参照しない製品コード・依存・型検査/単体試験・ヒントGUI/smokeの入力は変わっていない。
+- 未実行だった標準`dev.bat test`を実行し、必要な.NET fixtureのRelease buildと本体/Default Shell buildを含めて**702/702、fail/skip 0**成功。固定EXEで配置GUI6群、警告通知GUI4群、情報通知GUI10群とジェスチャー設定GUIを追加確認。ジェスチャーは既存の`APPDOCK_GESTURE_UI_ONLY=1`を使い、設定・ダイアログ・保存・実プロセス再起動を確認し、native入力の再検証とは区別した。
+- 通知GUI2本の見出しselectorを共通タイトルの包み要素に合わせ、警告表示時間をEnterで確定するよう修正。情報通知試験の進捗/キャンセルは、現在の描画先であるDefault Shellのステータスバーへ接続した。ジェスチャーの実行方法はヒントボタンと入力部品を完全一致の操作ラベルで区別する。初回失敗ログを保持し、修正後の同じ固定EXEで各試験の成功を確認。製品ソースは追加変更しておらず、発行物は追加調整後の0.71.1（SHA256 `557870cbfd78cf0473e80ea1a41efaa2ed6cc4ad7532be6b4435821a2e2f453f`）を維持する。
+- stage対象と作業ファイルの一致、最終stage tree・commit tree、両push先の先端は同証跡フォルダーのstage.json/commit.json/push.jsonへ記録する。今回と参照保護された過去の証跡・未解決ではない初回失敗資料を保持。物理入力・実スクリーンリーダー・UAC/外部アカウントは未確認。Release公開・全体ZIP・実利用先deployは依頼範囲に含まない。
+
+## 2026-10-20: 通知種類の説明をヒントへ移動（0.71.1追加調整）
+
+- 先のタイトルヒント対応と同じ未コミット変更を保持し、dirtyのため自動pull・stashは行っていない。通知種類カタログの`description`を各カードの`hint`へ渡し、本文の重複説明を除去。エラー通知・警告通知を含む種類説明はタイトル横の「？」から表示し、現在の通知先・表示時間・読み上げ・MCP Eventsの要約、必須通知先、停止中の状態や実際の警告・エラーは常時表示する。設定基盤の文書へ分類規則を追加した。
+- [発行前レビュー](.artifacts/settings-notification-type-hints-20261020/review.json)で要件と既存操作、設定・保存/API互換、必要試験を確認。発行阻害指摘なし。同じ未公開ヒント対応への追加調整のため、更新済みの**0.71.1**を維持して既存publish.batで再発行した。
+- 型検査・本体/Default Shell build、通知ポリシー**18/18、fail/skip 0**、sourceと最終固定EXEのヒントGUI各**12群**、固定EXEのsmokeが成功。指定された2種類の全文がツールチップで表示され、カードの開閉へ影響しないこと、OFFでアイコンと本文の重複説明が消え、現在値の要約と「この通知では必須」が残ることを追加確認した。CDPによる操作であり、物理入力や実スクリーンリーダーの確認とは区別する。
+- 最新EXEは**0.71.1 / 168931520 bytes / SHA256 557870cbfd78cf0473e80ea1a41efaa2ed6cc4ad7532be6b4435821a2e2f453f**。feedの版・サイズ・SHA256、Default Shellの版と全**28ファイル**、固定GUI/smokeが実行したEXEコピーと一致。下の初回発行記録のEXE hashは追加調整前の履歴である。
+- [追加調整の証跡](.artifacts/settings-notification-type-hints-20261020/validation.json)へ各コマンド・完全ログのhash・入力一覧と発行物照合を記録。**701入力が前後一致**し、初回検証後の差分はNotificationSettings、ヒントGUI、設定基盤文書の3ファイルだけ。初回の関連50件と配置GUI6群のソース上の確認範囲を引き継ぎ、新しいEXEのヒントGUI/smokeは再実行した。現在と参照保護された過去の証跡を保持し、無関係な資料は削除していない。コミット依頼後の追加確認は別項に記録する。
+
+## 2026-10-20: 設定タイトルのヒントと説明文の整理（0.71.1）
+
+- main/origin/main・開始HEAD `cb6c8dea396a44f42391019969e23ff771eec437`とcleanを確認し、pull --ff-onlyで最新確認後に着手。制限内のDNS失敗は同じコマンドを通常ユーザー環境で実行して解消した。今回の変更は未コミット。
+- `SettingsSection`/`SettingsField`へ任意の文字列`hint`を追加。空・空白だけのヒントはアイコンを作らず、タイトル横の共通「？」からhover/フォーカス/クリックで表示する。既存の`useSettingsHints()`を共用し、OFFでアイコン・ツールチップ・アクセシビリティ参照をまとめて除去。native popoverでダイアログ/スクロールの切り取りを避け、折り返しと画面端の位置を調整する。Escapeはヒントだけを閉じ、Enter/Space/クリックで折りたたみを開閉しない。
+- 静的な説明 **53件を移動、6件をhintとdescriptionへ分割**し、元の文章が欠けていないことを[移動レビュー](.artifacts/settings-title-hints-20261020/migration-review.json)で照合。カタログ由来とApplet共通の補助説明もhintへ渡した。現在の起動/通知状態、コマンドID、料金・外部送信・認証・再登録等の注意、前提不足とエラーは常時表示する。manifest/宣言型一覧のdescriptionと検索メタデータを自動変換せず、設定・保存形式・公開APIは変更していない。README、設定基盤、一覧編集ガイド、開発ガイドへ追加規則と確認手順を反映。
+- [発行前レビュー](.artifacts/settings-title-hints-20261020/review.json)で要件、既存操作、保存/API互換、影響先と必要試験を確認。見出しの名前にアイコンの操作ラベルを混ぜず、共通タイトルの包み要素に合わせてGUI selectorを更新した。移動補助処理の改行位置ずれは修正し、型検査・差分と文章照合後のソースを発行した。未解決の発行阻害指摘なし。保存項目/保存ファイルの追加・削除や破壊的変更がないため、0.71.0→**0.71.1**のパッチ更新。
+- 型検査・本体/Default Shell build、設定ページ・編集・コマンド・端末保存・Applet設定の関連6ファイル **50/50、fail/skip 0** 成功。sourceのヒントGUI **11群**、最終固定EXEのヒントGUI **11群**と設定配置GUI **6群**、smokeが成功。hoverでの読み続け、Tab/Enter/Space/Escape、開いたヒントのOFF、ダイアログのtop layerと画面内配置、エラー/状態/IDの保持、空のヒント、両テーマ1280/760幅、実プロセス再起動後のOFF保持、既存設定の即時保存と検索による折りたたみ展開を確認した。
+- GUI fixtureの未設定コマンド値と非同期描画待ち、source/発行版の起動状態差、配置試験に残っていた旧カード構造/Enter未確定の前提は現行契約に合わせて修正し、最終成功を確認。制限内のCDP EACCESと依存ポリシー検査の停止は、検査を弱めず同じコマンドを通常ユーザー環境で実行して解消。初回失敗の記録は最終成功と区別して保持した。
+- 既存publish.batで本体だけを`A:\40.ARTIFACT\AppDock.at365`へ発行。EXEは **168943048 bytes / SHA256 c13b8bb0467a7d0260e1ba67e77a97d42ea80410d10d90756d68e44ea093893f**。EXEの製品版・feed・Default Shellは0.71.1で一致し、Shellの全 **28ファイル**と固定GUI/smokeのEXEコピーも一致した。
+- [検証結果](.artifacts/settings-title-hints-20261020/validation.json)に各コマンド・終了コード・完全ログのhash、レビュー、発行物、入力一覧を記録。最終 **701入力が前後一致**。型検査/関連試験から後の変更はGUI試験2ファイルだけで、製品ソースと関連単体試験は一致し、最終固定EXEでは更新後のGUI試験を実行した。
+- 不要になった今回の移動補助スクリプト2件を削除。旧成功GUIは既存の検証文書/検証記録からの参照があり、失敗資料と再利用保護・使用状態を確定できない旧smoke資料も保持した。[整理記録](.artifacts/settings-title-hints-20261020/cleanup.json)を参照。標準全回帰、物理キー/マウス、実スクリーンリーダー、UAC/外部アカウントは未実施。UIのキー操作はCDPによる確認である。commit・push・Release・全体ZIP・実利用先deployは行っていない。
+
 ## 2026-10-20: ジェスチャー追加のコミット・push前照合（0.71.0）
 
 - 利用者から発行済み0.71.0の動作成功とcommit/pushの依頼を受領。main/origin/main、開始HEAD `206f024c37b40bf11d0dd0ac9a7849307e0c8700`、未コミットの今回24パス、空のindex、実効author/committerを確認。設定済みGitHubとAQUAのmainはどちらも同じ開始HEADだった。dirtyのため自動pull・stash・履歴統合は行っていない。

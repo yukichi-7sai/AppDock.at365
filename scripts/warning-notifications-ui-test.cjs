@@ -176,7 +176,7 @@ async function main() {
   assert.deepEqual(
     await Promise.all(
       [0, 1].map((index) =>
-        notificationCards.nth(index).locator(':scope > summary > h2').innerText(),
+        notificationCards.nth(index).locator(':scope > summary h2').innerText(),
       ),
     ),
     ['エラー通知', '警告通知'],
@@ -196,6 +196,7 @@ async function main() {
     true,
   );
   await ui.getByRole('textbox', { name: '警告通知の表示時間', exact: true }).fill('12');
+  await ui.getByRole('textbox', { name: '警告通知の表示時間', exact: true }).press('Enter');
   await settleSettings(host);
   const preference = JSON.parse(
     fs.readFileSync(settingsFile),
