@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-20: 実装・発行ごとのパッチ版更新の手順整理
+
+- 通常の実装・修正を完成して発行するたびに、直前の発行版からパッチ番号を1つ増やす方針へ変更。同じ機能・同じ依頼への追加修正も対象とし、未コミット・GitHub未公開を版の据え置き理由にしない。`0.71.1 → 0.71.2 → 0.71.3`と、マイナー版発行後の通常修正`0.72.0 → 0.72.1`を共通手順へ明記した。
+- マイナー更新の条件とパッチ0へのリセット、複数条件がある場合のマイナー更新1回、明示された対象版の優先、文書のみ・影響のないモジュール・新たな製品修正を伴わない再発行/公開の扱いは維持した。初回ヒント対応の0.71.1再発行記録は、変更前の運用に基づく履歴として保持している。
+- 共通ルールrepoのmain/aqua/main（開始HEAD `a4f270b544d132440c85e451a34a1a8d5fd20f1a`）と本体repoのmain/origin/main（開始HEAD `4d9530525db9ffa6828303abb99af765af5769a9`）を確認。両方cleanで、pull --ff-onlyにより最新確認後に編集した。共通AGENTS、AppDockのAGENTS/開発ガイド/共通手順/発行/Release手順と、旧ルールが残っていた実装計画2文書を整合させた。A:\AGENTS.mdは変更していない。
+- [文書の照合記録](.artifacts/patch-version-workflow-20261020/validation.json)へ対象パスとhash、追加・変更行の相対リンク/アンカー、旧ルールの除去、マイナー更新条件の保持、diff --checkの結果を記録する。文書だけの変更で、本体の製品版は0.71.1を維持し、ビルド・製品回帰・publishは実行しない。コミット対象は共通repoのAGENTS.mdと本体repoの文書8パスだけ。
+- 文書のcommit/push依頼に基づき、各repoの実効author/committer・stageと作業ファイルの一致を確認する。最終stage tree・commit/tree・プッシュ後のAQUA（両repo）/GitHub（本体）のmain先端は、同証跡フォルダーのstage.json/commit.json/push.jsonへ記録する。製品実装・Release公開・実利用先deployは今回の対象に含めない。
+
 ## 2026-10-20: タイトルヒント対応のコミット・push前照合（0.71.1）
 
 - 実装と通知種類説明の追加調整をまとめてcommit/pushする依頼を受領。main/origin/main、開始HEAD `cb6c8dea396a44f42391019969e23ff771eec437`、今回の29パス、空のindex、実効author/committer `yukichi-7sai <yukichi@at365.jp>`を確認。GitHubとAQUAの設定済みpush先はどちらも同じ開始HEADで、dirtyのため自動pull・stash・履歴統合は行っていない。
