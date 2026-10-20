@@ -123,6 +123,10 @@ const api: DockApi = {
     register: () => ipcRenderer.invoke('dock:imageLibrary:register'),
     edit: (operation) => ipcRenderer.invoke('dock:imageLibrary:edit', operation),
     preview: (image, original) => ipcRenderer.invoke('dock:imageLibrary:preview', image, original),
+    galleryImage: (image, generation, edge) =>
+      ipcRenderer.invoke('dock:imageLibrary:galleryImage', image, generation, edge),
+    galleryView: () => ipcRenderer.invoke('dock:imageLibrary:galleryView'),
+    saveGalleryWidth: (value) => ipcRenderer.invoke('dock:imageLibrary:saveGalleryWidth', value),
     pick: (current) => ipcRenderer.invoke('dock:imageLibrary:pick', current),
     onChanged: (callback) => {
       const listener = () => callback();

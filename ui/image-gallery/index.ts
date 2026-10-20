@@ -37,6 +37,8 @@ type Card = {
   generation: number;
   loading: boolean;
 };
+const safeImage = (source: string) =>
+  /^(data:image\/(?:png|jpeg|webp);base64,|blob:|appdock:\/\/page-images\/)/.test(source);
 /** Keyed DOM updates preserve focused controls, decoded images and the visible anchor. */
 export function mountImageGallery(container: HTMLElement, options: GalleryOptions) {
   container.classList.add('ad-gallery');
@@ -80,10 +82,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         .image(assetId, edge)
         .then(async (source) => {
           // Only image URLs supplied by the adapter; never interpret markup.
-          if (
-            !/^(data:image\/(?:png|jpeg|webp);base64,|blob:|appdock:\/\/page-images\/)/.test(source)
-          )
-            throw Error('画像を読み込めません');
+          if (!safeImage(source)) throw Error('画像を読み込めません');
           const decoded = new Image();
           decoded.src = source;
           await decoded.decode();
@@ -235,7 +234,8 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
           card.button.setAttribute('aria-pressed', String(!!item.selected));
         else card.button.removeAttribute('aria-pressed');
         card.button.disabled =
-          next.selection === 'single' ? item.selectable === false : item.state !== 'ready';
+          item.selectable === false || (next.selection !== 'single' && item.state !== 'ready');
+        card.node.title = item.description ?? item.title;
         card.title.textContent = item.title;
         card.title.title = item.title;
         card.detail.textContent = item.detail;
@@ -390,6 +390,72 @@ export function mountGallerySizeControl(
       window.removeEventListener('pointerup', pointerEnd);
       window.removeEventListener('pointercancel', pointerEnd);
       label.remove();
+    },
+  };
+}
+
+export interface GalleryPreviewModel {
+  assetId: string;
+  title: string;
+  detail: string;
+  labels: string[];
+  state: GalleryItem['state'];
+}
+/** Preview content only: the adapter owns the dialog, source authorization and focus. */
+export function mountGalleryPreview(
+  container: HTMLElement,
+  options: { image(assetId: string): Promise<string> },
+) {
+  container.classList.add('ad-gallery-preview');
+  const stage = element('div', 'ad-gallery-preview-stage');
+  const picture = element('img', '');
+  const status = element('p', 'ad-gallery-preview-status');
+  status.setAttribute('role', 'status');
+  const detail = element('p', 'ad-gallery-preview-detail');
+  const labels = element('p', 'ad-gallery-preview-labels');
+  stage.append(picture, status);
+  container.append(stage, detail, labels);
+  let sequence = 0,
+    previous = '',
+    disposed = false;
+  return {
+    setModel(model: GalleryPreviewModel) {
+      picture.alt = model.title;
+      detail.textContent = model.detail;
+      labels.textContent = model.labels.join(' / ');
+      const key = `${model.assetId}:${model.state}`;
+      if (key === previous || disposed) return;
+      previous = key;
+      const current = ++sequence;
+      picture.removeAttribute('src');
+      status.textContent =
+        model.state === 'missing'
+          ? '画像がありません'
+          : model.state === 'error'
+            ? '画像を読み込めません'
+            : '読み込み中';
+      if (model.state !== 'ready') return;
+      void options
+        .image(model.assetId)
+        .then(async (source) => {
+          if (!safeImage(source)) throw Error('Unsupported image URL');
+          const decoded = new Image();
+          decoded.src = source;
+          await decoded.decode();
+          if (disposed || current !== sequence) return;
+          picture.src = source;
+          status.textContent = '';
+        })
+        .catch(() => {
+          if (!disposed && current === sequence) status.textContent = '画像を読み込めません';
+        });
+    },
+    dispose() {
+      disposed = true;
+      sequence++;
+      picture.removeAttribute('src');
+      container.replaceChildren();
+      container.classList.remove('ad-gallery-preview');
     },
   };
 }

@@ -4,7 +4,7 @@ import { imageKey, type ImageLibraryEdit } from '../shared/registered-images';
 import { SettingsDialog, SettingsModal } from './settings-ui/SettingsModal';
 import { SettingsInput } from './settings-ui/SettingsInput';
 import { SettingsOrderDialog } from './settings-ui/SettingsOrderDialog';
-import { RegisteredImagePreview } from './settings-ui/RegisteredImagePicker';
+import { RegisteredGalleryPreview } from './settings-ui/RegisteredImagePicker';
 
 export function ImageLibraryDialogHost() {
   const [request, setRequest] = useState<ImageLibraryDialogRequest | null>(null);
@@ -54,22 +54,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
           </button>
         </header>
         {error && <p role="alert">{error}</p>}
-        <RegisteredImagePreview
-          value={r.images[0]}
-          original
-          className="image-library-page-preview"
-        />
-        <p>
-          {r.entry?.width} × {r.entry?.height} ·{' '}
-          {r.images[0]?.file.split('.').at(-1)?.toUpperCase()} ·{' '}
-          {((r.entry?.bytes ?? 0) / 1024).toFixed(1)} KiB
-        </p>
-        <p>
-          {r.groups
-            .filter((g) => ids.includes(g.id))
-            .map((g) => g.name)
-            .join(' / ') || '未分類'}
-        </p>
+        {r.entry && <RegisteredGalleryPreview entry={r.entry} groups={r.groups} />}
       </SettingsModal>
     );
   const titles = {

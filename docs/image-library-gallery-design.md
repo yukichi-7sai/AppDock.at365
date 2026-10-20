@@ -1,6 +1,6 @@
 # 画像ライブラリーのページ化と共通画像ギャラリー
 
-状態: 共通部品・本体サービス・管理ページを実装（AppDock 0.74.0、2026-10-21）。工程A〜Cと、Dのうち本体プレビュー・HostModalLayerの本文登録を実装した。既存の画像選択ダイアログへの共通カード適用とWallpaperSlideshowの変更は次工程。本書は全工程の設計を含み、未適用の用途を現行仕様と扱わない。開始時の基準はAppDock 0.73.9 / main `ed6c780`、外観の参照元はWallpaperSlideshow 0.6.4 / main `00bc835`。
+状態: 工程A〜Eを実装（AppDock 0.74.1 / WallpaperSlideshow 0.7.0、2026-10-21）。管理ページ・画像選択・壁紙履歴に共通カード、拡大表示、独立したサイズ保存を適用した。実測したFの範囲と未確認事項は各VERIFICATIONを正本とする。開始時の基準はAppDock 0.73.9 / main `ed6c780`、外観の参照元はWallpaperSlideshow 0.6.4 / main `00bc835`。
 
 左にグループ、右に画像カードを置く画面を採用し、ページ内でカードサイズを変更できるようにする。WallpaperSlideshowの壁紙履歴を共通ギャラリーの外観の基準とする。画像の保存・参照・グループの現行契約は[共通画像ライブラリー](registered-images.md)、ページの責務は[Shellのページ表示](shell-pages.md)を正本とする。
 
@@ -8,7 +8,7 @@
 
 最初に画面・操作・保存・共通部品・実装順序・受け入れ条件を設計し、続く工程で共通部品と本体の独立ページを一緒に実装した。現在の利用方法と追加ルールは[共通画像ライブラリー](registered-images.md)と[共通ギャラリーの利用](image-gallery.md)を参照する。
 
-全工程では次を完成範囲とする。画像選択・壁紙履歴への適用は未着手であり、今回は本体管理ページまでを対象とする。
+実装範囲は次のとおり。表示と保存の責務を分け、既存の選択・履歴操作を各adapterで維持する。
 
 - 本体の独立した「画像ライブラリー」ページと、設定からの入口。
 - 左のグループ一覧、ファイル名検索、登録画像の一覧、拡大プレビュー。
@@ -317,13 +317,13 @@ WallpaperSlideshowのページ内プレビューは、そのHTMLのnative dialog
 | E. 壁紙履歴 | Appletのvendor梱包、history表示、Storage、限定pageActions | 現行の履歴・開く・削除・画像解放と、新しいサイズ保存が両立 |
 | F. 確認と発行 | 対象回帰、固定EXEの隔離GUI、レビュー、文書 | 受け入れ条件を満たし、変更モジュールだけ版更新・発行 |
 
-今回はA〜Cおよび管理ページのモーダルに必要なDを実装し、この範囲のFを行う。既存の選択ダイアログは現行部品を維持する。Eに着手するときはWallpaperSlideshowの開始状態・追跡先を改めて確認する。共通部品の参照だけを理由に、他のAppletを一括変更・再発行しない。
+A〜Cに続き、画像選択の単一選択と重なったプレビュー、壁紙履歴のvendor梱包・Storage保存を実装した。Fの証拠は実行対象の版・hash・fixture条件と一緒に記録する。共通部品の参照だけを理由に、他のAppletを一括変更・再発行しない。
 
 更新が必要な正本文書は、registered-images、shell-pages／shell領域、applet-pagesの標準リボン、settings-sync、共通UIの利用手順、WallpaperSlideshowのREADME／DEVELOPMENT／VERIFICATION。実装完了後に本書の状態と実装到達点を更新する。
 
 新しいShell領域を使う提供元のminimumHostVersionは、実際にその公開契約を提供したホスト版に合わせる。WallpaperSlideshowは利用するStorage／pageActions等の最低版を照合し、UI bundleを共用するという理由だけで根拠のない最低版やSDK更新を設定しない。
 
-本体はPC専用保存ファイルの追加により0.73.9から0.74.0へマイナー更新する。WallpaperSlideshowは今回は変更しない。後続の実装時にはStorageの保存仕様追加を含めて、その時点の版更新を判定する。
+本体の新規PC専用保存ファイルは0.74.0で導入済み。予約済みpicker欄を使用する今回の適用は0.74.1とする。WallpaperSlideshowはStorageキーの保存仕様追加により0.6.4から0.7.0へ更新する。
 
 ## 12. 受け入れ条件と検証計画
 
@@ -354,4 +354,4 @@ WallpaperSlideshowのページ内プレビューは、そのHTMLのnative dialog
 
 既存の`tests/registered-images.test.cjs`、`tests/shell-boundaries.test.cjs`、画像ライブラリー・リボン・ページ・モーダルのGUI、およびWallpaperSlideshowの`test-history-page-ui.cjs`を影響範囲に応じて更新する。共通部品とページController・表示状態保存の試験を追加し、成功した同じ対象の試験は[共通手順](development-workflow.md)に従って再利用する。
 
-本体管理ページと共通部品の検証記録は[VERIFICATION](../VERIFICATION.md)を参照する。上記は全工程の受け入れ計画であり、未適用の画像選択・壁紙履歴や、物理Windows倍率・実NAS・壁紙描画を確認済みと扱わない。
+本体管理ページと共通部品の検証記録は[VERIFICATION](../VERIFICATION.md)を参照する。上記は全工程の受け入れ計画であり、fixtureとCSS幅での成功を物理Windows倍率・実NAS・壁紙描画の確認済みとは扱わない。

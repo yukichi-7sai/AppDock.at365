@@ -14,6 +14,7 @@ export interface GalleryItem {
   id: string;
   assetId: string;
   title: string;
+  description?: string;
   detail: string;
   labels: string[];
   state: GalleryImageState;

@@ -455,7 +455,9 @@ async function theme(value) {
       path.join(appPath, 'out/ui/image-gallery/image-gallery.js'),
     ).href;
     const common = await page.evaluate(async (bundleUrl) => {
-      const { mountImageGallery, mountGallerySizeControl } = await import(bundleUrl);
+      const { mountImageGallery, mountGallerySizeControl, mountGalleryPreview } = await import(
+        bundleUrl
+      );
       const box = document.createElement('div');
       box.style.cssText =
         'position:fixed;inset:0;background:var(--bg);z-index:999;padding:20px;overflow:auto';
@@ -513,6 +515,46 @@ async function theme(value) {
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
       input.dispatchEvent(new KeyboardEvent('keyup', { key: 'End', bubbles: true }));
+      const previewRoot = document.createElement('div');
+      box.append(previewRoot);
+      let resolveOld;
+      const preview = mountGalleryPreview(previewRoot, {
+        image: (id) =>
+          id === 'old'
+            ? new Promise((resolve) => {
+                resolveOld = resolve;
+              })
+            : Promise.resolve(id === 'unsafe' ? 'https://example.invalid/private.png' : source),
+      });
+      const previewModel = {
+        assetId: 'old',
+        title: item.title,
+        detail: '<b>detail</b>',
+        labels: ['<i>group</i>'],
+        state: 'ready',
+      };
+      preview.setModel(previewModel);
+      preview.setModel({ ...previewModel, assetId: 'new', title: 'new' });
+      const previewImage = previewRoot.querySelector('img');
+      for (let i = 0; i < 100 && !previewImage.getAttribute('src'); i++)
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      if (previewImage.getAttribute('src') !== source) throw Error('preview did not decode');
+      resolveOld('data:image/png;base64,broken');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      if (previewImage.src !== source || previewRoot.querySelector('b,i'))
+        throw Error('stale preview or unsafe markup');
+      preview.setModel({ ...previewModel, assetId: 'unsafe' });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      if (
+        previewImage.hasAttribute('src') ||
+        !previewRoot.querySelector('[role=status]').textContent
+      )
+        throw Error('unsafe preview URL accepted');
+      preview.setModel(previewModel);
+      preview.dispose();
+      resolveOld(source);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      if (previewRoot.childElementCount) throw Error('disposed preview changed');
       view.dispose();
       control.dispose();
       box.remove();
@@ -525,7 +567,7 @@ async function theme(value) {
       values: [360],
     });
     checks.push(
-      'standalone public bundle supports history/picker modes, stable keys, text escaping and size commit',
+      'standalone public bundle supports history/picker modes, stable keys, text escaping, size commit and safe/stale/disposed previews',
     );
     assert.deepEqual(errors, []);
     fs.writeFileSync(

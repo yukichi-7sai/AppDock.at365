@@ -322,6 +322,8 @@ let overlayHost: OverlayHost | undefined;
 let hostModalLayer: HostModalLayer | undefined;
 let shellPageHost: ShellPageHost | undefined;
 let imageLibraryDialogs: ImageLibraryDialogs | undefined;
+let galleryViewState: GalleryViewStateStore;
+let galleryImages: GalleryImages;
 let settingsPageHost: SettingsPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
 let ribbonState: RibbonState | undefined;
@@ -2434,6 +2436,33 @@ function registerIpc() {
   );
   handle('dock:imageLibrary:register', () => imageLibraryHost.register());
   handle('dock:imageLibrary:edit', (operation) => imageLibraryHost.edit(operation));
+  handle('dock:imageLibrary:galleryView', () => ({
+    cardWidth: galleryViewState.get('picker'),
+    error: galleryViewState.error,
+  }));
+  handle('dock:imageLibrary:saveGalleryWidth', (value) => {
+    try {
+      galleryViewState.save('picker', value);
+    } catch (error) {
+      errors.report({
+        eventId: randomUUID(),
+        source: 'image-library',
+        title: '画像サイズを保存できませんでした',
+        code: 'IMAGE_LIBRARY_SAVE',
+        message: '画像選択の表示サイズを保存できませんでした。保存先を確認してください。',
+      });
+      throw error;
+    }
+  });
+  handle('dock:imageLibrary:galleryImage', async (ref, generation, edge) => {
+    const entry = registeredImages.entry(ref);
+    if (!entry?.available || !entry.generation || generation !== entry.generation)
+      throw Error('画像が更新されました。再取得してください。');
+    const source = await galleryImages.get(entry.ref, generation, edge);
+    if (registeredImages.entry(ref)?.generation !== generation)
+      throw Error('画像が更新されました。再取得してください。');
+    return source;
+  });
   handle('dock:imageLibrary:preview', async (ref, original = false) => {
     if (!imageReference(ref)) throw Error('画像の参照を確認してください。');
     if (original === true) {
@@ -3478,10 +3507,11 @@ async function initialize() {
   });
   window.webContents.on('did-start-loading', () => settingsPageHost?.dispose());
   window.webContents.on('render-process-gone', () => settingsPageHost?.dispose());
-  const galleryState = new ImageLibraryPageState(
-    new GalleryViewStateStore(path.join(dataDirectory, 'image-gallery-state.json')),
+  galleryViewState = new GalleryViewStateStore(
+    path.join(dataDirectory, 'image-gallery-state.json'),
   );
-  const galleryImages = new GalleryImages(registeredImages);
+  const galleryState = new ImageLibraryPageState(galleryViewState);
+  galleryImages = new GalleryImages(registeredImages);
   const galleryFailed = (message: string) =>
     errors.report({
       eventId: randomUUID(),

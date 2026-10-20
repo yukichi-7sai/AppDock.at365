@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-21: 共通ギャラリー適用のコミット前確認（0.74.1）
+
+- 実装時の最終入力687件、fixture524件、成功ログ、発行EXE/feedと壁紙更新ZIPのhashを照合。型検査・発行・native回帰9群・発行物GUI28群・RPCの成功を再利用した。
+- 本体の標準回帰は740件。最新の関連57件と変更のない630件を再利用し、再発行された補助EXEを使う7ファイル53件を追加実行して全件成功。制限環境のEPERMはログを保持し、同じコマンドを通常ユーザーで実行して解消した。製品への追加修正・版更新・再発行はない。
+- 作者/コミッターと対象差分を確認し、GitHub/AQUA両mainは本体`ed6c780`、壁紙`00bc835`で一致。共通カード・プレビュー・picker保存・限定IPCと配置手順を再確認し、未解決の指摘なし。
+- 再利用判断と入力/ログ照合は[コミット検証](.artifacts/commit-validation-gallery-0741/validation.json)、stage/commit treeは同フォルダーへ記録する。実壁紙・Explorer・ごみ箱・物理DPI/IME/実NASは未確認。push・Release・実利用先deployは行わない。
+
+## 2026-10-21: 画像選択・壁紙履歴へ共通ギャラリーを適用（0.74.1）
+
+- 前工程の0.74.0を`6b0ece0`へコミット（標準回帰740/740の照合記録は下記）。クリーンなmainで`pull --ff-only`を行い、追跡先に対してahead 1/behind 0で継続。WallpaperSlideshowもクリーンなmain/origin/mainから同手順で取得し、`00bc835`を基準に変更した。push・Release・実利用先deployは行っていない。今回の続きの実装は未コミット。
+- `RegisteredImagePicker`を共通カード・サイズ調整へ接続し、単一選択・拡大・親編集の確定/取消・フォーカス復帰を維持。既存PC専用ファイルの予約済みpicker欄を使い、管理ページと独立してサイズを保存する。共通の拡大表示内容を本体管理ページ・選択画面・壁紙履歴へ適用。画像参照の世代確認と縮小取得は信頼された本体rendererの内部APIで処理し、公開Applet画像APIは維持する。
+- 壁紙履歴は本体の公開bundleを版・元ソース・出力hashで検証してvendorへ梱包し、既存のgeneration/slot、画像登録/解放、開く・削除確認を保持。PC専用Storageの新規キー追加によりWallpaperSlideshowは0.7.0。本体は既存保存形式内の適用として0.74.1。共通SDKや最低ホスト版0.66.1を変更していない。
+- 発行前レビューで、選択ダイアログの幅指定、Storage capabilityの不足、暗色GUI試験の実テーマ反映、既存の未分類ラベルを修正。古い配置スクリプトのweb資産不足には、既存ファイルを保護した新しい`deploy-with-gallery.bat`を追加した。必要な再検証を終え、未解決の発行阻害指摘なし。履歴GUIの旧「説明」タブ期待は、現行のApplet管理への戻り先に更新した。
+- 最終型検査とbuild/publishが成功。関連本体回帰 **57/57（fail/skip 0）**、native標準回帰 **9群**、長パスRPCと発行native起動smokeが成功。本体回帰の制限付き実行は原子的ファイル置換のEPERMで失敗し、同一検査を通常ユーザーで再実行して成功。依存版・lockfile・検査機構は変更していない。
+- 最終固定EXEの隔離GUIは、[共通部品・管理ページ9群](.artifacts/image-gallery-ui-1792516548446/result.json)、[画像選択・既存連携9群](.artifacts/image-library-ui-1792516631893/result.json)、[壁紙履歴10群](../Applet.WallpaperSlideshow.at365/.artifacts/history-page-ui-long-cache-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-1792516720462/result.json)、合計 **28群** 成功。実際の明暗テーマ、広い選択画面の複数列、狭幅、カード/選択保持、重なったプレビューと取消、各サイズの独立保存、プロセス再起動、原画像/共有設定の不変を確認した。履歴では発行web資産とnative fixtureを使用し、画像操作中のopacity 1・DOM/URL保持、既存MCP設定8項目、View/画像の回収も確認した。
+- 発行EXEは **0.74.1 / 168974542 bytes / SHA256 `33eba2746fc6f3c7150b181870d2fc33f71fabcefc07ed4831216ccf3ef50f6f`**。製品版・feed・実行中Default Shell・GUIコピーのhashが一致。WallpaperSlideshow 0.7.0のZIP8ファイルと、source/vendor/発行bundleの版・hashを照合。隔離した配置先で旧deployと新入口の組合せも検証し、設定と運用者所有ファイル5件のhashを保持した。
+- [最終証跡](.artifacts/gallery-integration-20261021/validation.json)に687入力の発行前後一致、524 fixture入力、完全ログ/終了コード/hash、レビュー、発行物、環境、後片付けを保存した。以前の504 fixtureファイルはhashが一致し、未変更のProfile/WebApplet/Watch/WindowsTools等を再発行していない。今回の成功分は方式別の直近3回以内を保持し、過去の再利用資料・失敗診断も保護。削除対象なし、今回のテストプロセス残存0。
+- 150/200%はCSS zoomで、物理モニターDPI・実IME・NAS・壁紙描画・Explorer・実ごみ箱は未確認。fixtureの開く/削除を実OS操作の成功へ読み替えない。追加の製品操作や他モジュールの一律回帰・再発行は行っていない。
+
 ## 2026-10-21: 画像ライブラリー0.74.0のコミット前照合
 
 - 明示的なコミットと次工程への継続依頼に従い、main/origin/main、開始HEAD `ed6c780`、空のindexと今回の変更対象を確認。GitHubとAQUAのmainは同じ先端だった。未コミット変更を保持し、pull・stash・履歴統合は行っていない。

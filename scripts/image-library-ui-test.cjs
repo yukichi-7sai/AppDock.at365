@@ -288,7 +288,7 @@ async function openLibrary() {
   );
   await libraryPage.getByRole('button', { name: 'グループを追加', exact: true }).waitFor();
 }
-const card = (scope, file) => scope.locator('.image-library-card').filter({ hasText: file });
+const card = (scope, file) => scope.locator('.ad-gallery-card').filter({ hasText: file });
 const libraryCard = (file) => libraryPage.locator('.ad-gallery-card').filter({ hasText: file });
 const ok = (dialog) => dialog.getByRole('button', { name: 'OK', exact: true }).click();
 async function addGroup(name) {
@@ -304,7 +304,7 @@ async function addGroup(name) {
 }
 async function chooseInPicker(file) {
   const d = host.getByRole('dialog', { name: '画像を選択', exact: true });
-  await card(d, file).click();
+  await card(d, file).locator('.ad-gallery-image').click();
   await d.getByRole('button', { name: '画像を使う', exact: true }).click();
 }
 (async () => {
@@ -473,6 +473,127 @@ async function chooseInPicker(file) {
       'profile name',
     );
     await host.getByRole('button', { name: 'アバター画像を選択', exact: true }).click();
+    let picker = host.getByRole('dialog', { name: '画像を選択', exact: true });
+    await card(picker, 'sample.png').locator('.ad-gallery-image').waitFor();
+    assert(await picker.getByRole('button', { name: '画像を使う', exact: true }).isDisabled());
+    const settingsBeforeSize = hash(path.join(profile, 'settings.json'));
+    const originalBeforeSize = hash(sample);
+    await card(picker, 'sample.png').locator('.ad-gallery-image').click();
+    await card(picker, 'sample.png').evaluate((node) => {
+      window.pickerFirstCard = node;
+    });
+    const slider = picker.getByRole('slider', { name: '画像サイズ' });
+    await slider.press('End');
+    await slider.press('ArrowLeft');
+    await until(
+      async () =>
+        (await host.evaluate(() => window.dock.imageLibrary.galleryView())).cardWidth === 340,
+      'picker size saved',
+    );
+    assert(await card(picker, 'sample.png').evaluate((node) => window.pickerFirstCard === node));
+    assert.equal(
+      await card(picker, 'sample.png').locator('.ad-gallery-image').getAttribute('aria-pressed'),
+      'true',
+    );
+    assert.equal(hash(path.join(profile, 'settings.json')), settingsBeforeSize);
+    assert.equal(hash(sample), originalBeforeSize);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(profile, 'data/image-gallery-state.json'))).library
+        ?.cardWidth ?? 260,
+      260,
+      'library size stays independent',
+    );
+    await card(picker, 'sample.png').getByRole('button', { name: '拡大', exact: true }).click();
+    const preview = host.getByRole('dialog', { name: 'sample.png', exact: true });
+    await until(
+      () => preview.locator('img').evaluate((image) => image.complete && image.naturalWidth > 0),
+      'nested preview decoded',
+    );
+    await host.keyboard.press('Escape');
+    await until(() => preview.count().then((count) => count === 0), 'only preview closed');
+    assert(await picker.isVisible());
+    assert.equal(
+      await card(picker, 'sample.png').locator('.ad-gallery-image').getAttribute('aria-pressed'),
+      'true',
+    );
+    assert(
+      await card(picker, 'sample.png')
+        .getByRole('button', { name: '拡大', exact: true })
+        .evaluate((node) => node === document.activeElement),
+    );
+    assert.equal(
+      (await snapshot()).settings.value.extensions['at365.profile'].settings.avatar,
+      undefined,
+      'preview does not commit parent',
+    );
+    assert(
+      await picker
+        .locator('.ad-gallery')
+        .evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length >= 2),
+      'wide picker keeps multiple columns at 340px',
+    );
+    await picker.locator('.image-picker-scroll').evaluate((node) => {
+      node.scrollTop = 0;
+    });
+    await host.screenshot({ path: path.join(profile, 'picker-light.png') });
+    await host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      await window.dock.saveSettings(
+        { ...s.settings.value, host: { ...s.settings.value.host, theme: 'dark' } },
+        s.settings.revision,
+      );
+    });
+    await until(
+      () =>
+        host
+          .locator('html')
+          .getAttribute('data-theme')
+          .then((value) => value === 'dark'),
+      'picker dark theme applied',
+    );
+    await app.evaluate(({ nativeTheme, BrowserWindow }) => {
+      nativeTheme.themeSource = 'dark';
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
+        ?.setSize(760, 850);
+    });
+    await until(
+      () => picker.evaluate((node) => node.scrollWidth <= node.clientWidth),
+      'narrow picker fits',
+    );
+    await host.screenshot({ path: path.join(profile, 'picker-dark-narrow.png') });
+    await host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      await window.dock.saveSettings(
+        { ...s.settings.value, host: { ...s.settings.value.host, theme: 'light' } },
+        s.settings.revision,
+      );
+    });
+    await app.evaluate(({ nativeTheme, BrowserWindow }) => {
+      nativeTheme.themeSource = 'light';
+      BrowserWindow.getAllWindows()
+        .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
+        ?.setSize(1360, 950);
+    });
+    await picker.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    assert.equal(
+      (await snapshot()).settings.value.extensions['at365.profile'].settings.avatar,
+      undefined,
+      'picker cancel keeps parent',
+    );
+    await host.getByRole('button', { name: 'アバター画像を選択', exact: true }).click();
+    picker = host.getByRole('dialog', { name: '画像を選択', exact: true });
+    await until(
+      () =>
+        picker
+          .getByRole('slider', { name: '画像サイズ' })
+          .inputValue()
+          .then((value) => value === '340'),
+      'reopened picker size',
+    );
+    checks.push(
+      'shared picker cards, independent saved size, stable selection/DOM, nested preview cancellation/focus and light/dark narrow layout',
+    );
     await chooseInPicker('sample.png');
     await until(
       async () =>
@@ -612,6 +733,10 @@ async function chooseInPicker(file) {
     app = null;
     await launch();
     const after = (await snapshot()).settings.value;
+    assert.equal(
+      await host.evaluate(async () => (await window.dock.imageLibrary.galleryView()).cardWidth),
+      340,
+    );
     assert.deepEqual(
       after.extensions['at365.profile'].settings,
       before.extensions['at365.profile'].settings,

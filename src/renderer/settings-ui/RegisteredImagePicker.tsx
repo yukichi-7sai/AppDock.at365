@@ -7,7 +7,9 @@ import {
   type RegisteredImageRef,
   type RegisteredImageEntry,
 } from '../../shared/registered-images';
-import { SettingsDialog } from './SettingsModal';
+import { SettingsDialog, SettingsModal } from './SettingsModal';
+import { ImageGallery, GallerySizeControl, ImageGalleryPreview } from './ImageGallery';
+import { gallerySize } from '../../shared/image-gallery';
 import { SettingsInput } from './SettingsInput';
 import { SettingsHint } from './SettingsHint';
 import { Icon } from '../Icon';
@@ -107,6 +109,9 @@ export function ImageLibraryBrowser({
   onGroup,
   query,
   onQuery,
+  cardWidth,
+  disabled = false,
+  onPreview,
 }: {
   snapshot: ImageLibrarySnapshot;
   selected: RegisteredImageRef | null;
@@ -115,7 +120,11 @@ export function ImageLibraryBrowser({
   onGroup(value: string): void;
   query: string;
   onQuery(value: string): void;
+  cardWidth: number;
+  disabled?: boolean;
+  onPreview(entry: RegisteredImageEntry): void;
 }) {
+  const api = useRegisteredImages();
   const [limit, setLimit] = useState(64);
   useEffect(() => setLimit(64), [group, query]);
   const images = new Map(snapshot.images.map((image) => [imageKey(image.ref), image]));
@@ -179,29 +188,44 @@ export function ImageLibraryBrowser({
           />
         </label>
       </div>
-      <div className="image-library-grid" role="group" aria-label="登録画像">
-        {filtered.slice(0, limit).map((image) => (
-          <button
-            type="button"
-            className={`image-library-card${selected && imageKey(selected) === imageKey(image.ref) ? ' selected' : ''}`}
-            key={imageKey(image.ref)}
-            aria-pressed={!!selected && imageKey(selected) === imageKey(image.ref)}
-            onClick={() => onSelect(image.ref)}
-            title={image.ref.file}
-          >
-            {image.thumbnail ? (
-              <img src={image.thumbnail} alt="" />
-            ) : (
-              <span className="registered-image-missing">画像がありません</span>
-            )}
-            <span>{image.ref.file}</span>
-            <small>
-              {image.available ? `${image.width} × ${image.height}` : '未到着・読取待ち'}
-            </small>
-          </button>
-        ))}
-      </div>
-      {!filtered.length && <p>該当する画像はありません。</p>}
+      <ImageGallery
+        resetKey={`${group}:${query}`}
+        model={{
+          cardWidth,
+          fit: 'contain',
+          selection: 'single',
+          empty: '該当する画像はありません。',
+          items: filtered.slice(0, limit).map((image) => ({
+            id: imageKey(image.ref),
+            assetId: `${imageKey(image.ref)}:${image.generation ?? ''}`,
+            title: image.ref.file,
+            detail: image.available ? `${image.width} × ${image.height}` : '未到着・読取待ち',
+            labels: snapshot.groups
+              .filter((g) => g.images.some((ref) => imageKey(ref) === imageKey(image.ref)))
+              .map((g) => g.name),
+            state: image.available ? 'ready' : (image.state ?? 'missing'),
+            selected: !!selected && imageKey(selected) === imageKey(image.ref),
+            selectable: !disabled,
+            actions: [{ id: 'preview', title: '拡大', disabled: disabled || !image.available }],
+          })),
+        }}
+        options={{
+          image: async (assetId, edge) => {
+            const item = [...images.values()].find(
+              (image) => `${imageKey(image.ref)}:${image.generation ?? ''}` === assetId,
+            );
+            if (!item || !api) throw Error('画像が更新されました。');
+            return api.galleryImage(item.ref, item.generation ?? '', edge);
+          },
+          select: (id) => {
+            if (!disabled && images.has(id)) onSelect(images.get(id)!.ref);
+          },
+          activate: () => {},
+          action: (id) => {
+            if (!disabled && images.has(id)) onPreview(images.get(id)!);
+          },
+        }}
+      />
       {filtered.length > limit && (
         <button type="button" className="secondary" onClick={() => setLimit(limit + 64)}>
           さらに表示（残り{filtered.length - limit}件）
@@ -225,6 +249,40 @@ export function RegisteredImagePicker({
     [query, setQuery] = useState(''),
     [registering, setRegistering] = useState(false);
   const applied = useRef(false);
+  const [cardWidth, setCardWidth] = useState<number>(gallerySize.initial);
+  const [sizeError, setSizeError] = useState('');
+  const [preview, setPreview] = useState<RegisteredImageEntry | null>(null);
+  const sizeTouched = useRef(false);
+  const widthSave = useRef<Promise<unknown>>(Promise.resolve());
+  useEffect(() => {
+    let live = true;
+    void library.api
+      ?.galleryView()
+      .then((view) => {
+        if (!live) return;
+        if (!sizeTouched.current) setCardWidth(view.cardWidth);
+        setSizeError(view.error);
+      })
+      .catch(() => {
+        if (live) setSizeError('表示サイズを読み取れませんでした。');
+      });
+    return () => {
+      live = false;
+    };
+  }, [library.api]);
+  const saveWidth = (value: number) => {
+    sizeTouched.current = true;
+    widthSave.current = widthSave.current
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await library.api?.saveGalleryWidth(value);
+          setSizeError('');
+        } catch (error) {
+          setSizeError(error instanceof Error ? error.message : String(error));
+        }
+      });
+  };
   return (
     <SettingsDialog
       title="画像を選択"
@@ -271,6 +329,22 @@ export function RegisteredImagePicker({
         登録した原画像は、この編集をキャンセルしてもライブラリーに残ります。
       </SettingsHint>
       {library.error && <p role="alert">{library.error}</p>}
+      <GallerySizeControl
+        value={cardWidth}
+        onChange={(value) => {
+          sizeTouched.current = true;
+          setCardWidth(value);
+        }}
+        onCommit={saveWidth}
+      />
+      {sizeError && (
+        <p role="alert">
+          {sizeError}{' '}
+          <button type="button" onClick={() => saveWidth(cardWidth)}>
+            保存を再試行
+          </button>
+        </p>
+      )}
       <ImageLibraryBrowser
         snapshot={library.snapshot}
         selected={selected}
@@ -279,8 +353,54 @@ export function RegisteredImagePicker({
         onGroup={setGroup}
         query={query}
         onQuery={setQuery}
+        cardWidth={cardWidth}
+        disabled={registering}
+        onPreview={setPreview}
       />
+      {preview && (
+        <SettingsModal
+          labelledBy="picker-preview-title"
+          className="image-library-preview-modal"
+          onClose={() => setPreview(null)}
+        >
+          <header className="image-library-preview-heading">
+            <h2 id="picker-preview-title">{preview.ref.file}</h2>
+            <button type="button" data-initial-focus onClick={() => setPreview(null)}>
+              閉じる
+            </button>
+          </header>
+          <RegisteredGalleryPreview entry={preview} groups={library.snapshot.groups} />
+        </SettingsModal>
+      )}
     </SettingsDialog>
+  );
+}
+export function RegisteredGalleryPreview({
+  entry,
+  groups,
+}: {
+  entry: RegisteredImageEntry;
+  groups: ImageLibrarySnapshot['groups'];
+}) {
+  const api = useRegisteredImages();
+  const labels = groups
+    .filter((g) => g.images.some((ref) => imageKey(ref) === imageKey(entry.ref)))
+    .map((g) => g.name);
+  return (
+    <ImageGalleryPreview
+      model={{
+        assetId: `${imageKey(entry.ref)}:${entry.generation ?? ''}`,
+        title: entry.ref.file,
+        state: entry.available ? 'ready' : (entry.state ?? 'missing'),
+        detail: `${entry.width} × ${entry.height} · ${entry.ref.file.split('.').at(-1)?.toUpperCase()} · ${(entry.bytes / 1024).toFixed(1)} KiB`,
+        labels: labels.length ? labels : ['未分類'],
+      }}
+      image={async () => {
+        const source = await api?.preview(entry.ref, true);
+        if (!source) throw Error('画像を読み込めません。');
+        return source;
+      }}
+    />
   );
 }
 export function RegisteredImageInput({

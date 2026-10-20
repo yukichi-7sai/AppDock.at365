@@ -186,6 +186,11 @@ export class RegisteredImages {
       .map((v) => structuredClone(v.entry))
       .sort((a, b) => a.ref.file.localeCompare(b.ref.file, 'ja'));
   }
+  entry(ref: unknown) {
+    if (!imageReference(ref)) return undefined;
+    const value = this.entries.get(imageKey(ref));
+    return value ? structuredClone(value.entry) : undefined;
+  }
   icon(ref: unknown, shape = 'square') {
     if (!imageReference(ref)) return undefined;
     const entry = this.entries.get(imageKey(ref));
