@@ -51,6 +51,16 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 
 本体内の選択は共通SettingsDialogを使い、親ダイアログの一時入力だけを変更する。重なったモーダルがある間はショートカット記録の抑止を維持する。ローカルAppletページからの選択は本体へ委譲し、表示中Viewをcapture・hide、独立Windowを操作不可にして本体の選択画面を表示する。完了・取消・提供元停止で同じViewとフォーカスを復元し、WebContents/sessionを再生成しない。共有preloadのHostModalLayerがShellの背景を覆う。
 
+### 画像入力部品とアイコンの選択
+
+画像フィールドは共通`RegisteredImageInput`を使う。固定サイズのプレビュー自体を画像選択ボタンとし、画像を外すアイコンだけを隣に置く。別の選択ボタンやファイル名は表示しない。プレビューはクリック・Enter・Spaceで共通選択画面を開き、設定済みなら変更、未選択ならプレースホルダーから選択する。操作名のツールチップとアクセシブル名、キーボードのフォーカス表示を保つ。未選択時は解除を無効にする。解除は利用先の参照だけを外し、ライブラリーの原画像を削除しない。
+
+共通`RegisteredImagePicker`は画像の登録・検索・選択・確定を担当する。「画像を外す」は入力欄に集約し、選択ダイアログには置かない。未選択の「画像を使う」は無効。取消では呼出元の値を変えず、選択開始ボタンへフォーカスを戻す。一覧のファイル名・検索・寸法は画像の識別用に保持する。公開APIのnullableな戻り値型は互換性のため保持する。
+
+リボングループとコマンドボタンは`RibbonIconPicker`で「画像」「既定のアイコン」をこの順に切り替える。画像モードだけが共通画像入力を表示し、既定モードだけが固定アイコンの一覧を表示する。選択中の既定アイコンは枠とチェックで示す。新規追加は画像モード、既存編集は画像参照の有無から開始モードを決める。編集中の切り替えでは両側の選択を保持し、親ダイアログの適用で確定する。既定モードの適用は`image: null`、画像モードは選択した参照を保存する。画像未選択・解除後の適用は従来どおり固定アイコンへ戻る。親編集の取消は設定を変更しない。モードや非選択側の画像を保存する追加設定は作らない。
+
+新しい画像選択欄でもこの共通入力・選択画面を利用する。既定アイコンの切り替えはリボンの責務とし、一般の画像フィールドにリボン固有の選択肢を持ち込まない。
+
 ## Applet API
 
 `minimumHostVersion: "0.69.0"`と`registered-images` capabilityを宣言する。原画像の列挙と選択は信頼されたローカルUIだけが利用でき、リモートサイトへbridgeを渡さない。
@@ -63,7 +73,7 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 | .NET | `context.RegisteredImages.CopyToCacheAsync(image, thumbnail?, token)` | `RegisteredImageRef`を使い、既定は原画像 |
 | local UI | `appletPage.call('registeredImages.snapshot')` | メタデータ・参照・グループ。サムネイル本体は別取得 |
 | local UI | `appletPage.call('registeredImages.preview', { image })` | 縮小プレビューを返す |
-| local UI | `appletPage.call('registeredImages.pick', { current })` | `{cancelled:true}`または`{cancelled:false,image:ref|null}`。外す操作と取消を区別 |
+| local UI | `appletPage.call('registeredImages.pick', { current })` | `{cancelled:true}`または`{cancelled:false,image:ref|null}`。現在の選択UIは参照を返し、nullable型は互換用に保持。解除は呼出元の画像入力で行う |
 | local UI | `appletPage.call('registeredImages.import', { filename?, base64 })` | プログラム登録と同じ上限 |
 
 `copyToCache`は自己manifestのregistered-image設定、またはobject-list内の同型フィールドが現在参照している画像だけを受け付ける。登録しただけでは読取対象にならず、まず自己設定へ保存する。生成コピーはruntime世代別とし、停止・異常終了・世代変更で回収する。共有原画像は回収しない。古い処理の完了で新世代のコピーを消さない。ページで表示するときは既存の`pages.registerImages`へコピーを渡し、その画像IDの寿命も守る。
@@ -97,5 +107,7 @@ IDはApplet内で安定させる。リボンIDは`applet:<Applet ID>:<id>`。act
 ## 検証と追加時の規則
 
 `tests/registered-images.test.cjs`は参照・保存・同名衝突・グループ競合・欠落回復・設定・汎用リボンを検査する。`scripts/image-library-ui-test.cjs [固定EXE]`は独立Profile/WebApplet、Node/.NET API、選択画面、原画像hash、表示、再起動を隔離profileで確認する。先に`tests/fixtures/dotnet/AppDock.RegisteredImages`をRelease publishする。必要な出力場所と実測は[VERIFICATION](../VERIFICATION.md)を参照する。
+
+`scripts/ribbon-customization-ui-test.cjs [固定EXE] --icons-only`は共通画像入力とリボンのモード切替、親・子ダイアログの取消、フォーカス復帰、キーボード、解除と適用、明暗テーマ・画面幅、原画像保持・実再起動後の選択状態を確認する。
 
 新しい利用先は参照型・共通選択・既存の画像asset投影を使う。用途ごとの原画像保存、独自のID対応表、専用監視、ホストのApplet ID判定を追加しない。原画像、メモリーの縮小画像、PC専用コピー、ページ画像IDの寿命を混同しない。

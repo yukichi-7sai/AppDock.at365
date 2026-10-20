@@ -6,9 +6,121 @@
   gap: 10px;
   flex-wrap: wrap;
 }
-.registered-image-input > span {
-  overflow-wrap: anywhere;
-  max-width: 220px;
+.registered-image-input-preview {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.registered-image-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.registered-image-input-preview .registered-image-missing {
+  font-size: 10px;
+  text-align: center;
+}
+.registered-image-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--panel);
+}
+.registered-image-action:disabled,
+.registered-image-input-preview:disabled {
+  opacity: 0.4;
+}
+.ribbon-icon-picker {
+  display: grid;
+  gap: 12px;
+}
+.ribbon-icon-modes {
+  display: inline-flex;
+  justify-self: start;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 3px;
+  background: var(--raised);
+}
+.ribbon-icon-modes > label {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+.ribbon-icon-modes label > input[type='radio'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  clip-path: inset(50%);
+  opacity: 0;
+}
+.ribbon-icon-modes span {
+  display: block;
+  padding: 7px 16px;
+  border-radius: 6px;
+  color: var(--muted);
+}
+.ribbon-icon-modes input:checked + span {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 3px #0002;
+}
+.ribbon-icon-modes input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.ribbon-icon-modes input:disabled + span {
+  opacity: 0.4;
+  cursor: default;
+}
+.ribbon-builtin-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ribbon-builtin-icons > button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--text);
+}
+.ribbon-builtin-icons > button[aria-pressed='true'] {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+.ribbon-builtin-check {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text, #fff);
 }
 .registered-image-preview {
   width: 48px;

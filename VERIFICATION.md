@@ -1,5 +1,34 @@
 # 検証記録
 
+## 2026-10-21: 画像選択UI 0.73.9のコミット・push前照合
+
+- 明示的なcommit/push依頼に従い、main/origin/main、開始HEAD `85fbe73`、対象10パスと空のindexを確認。GitHubとAQUAのmainも同じ先端だった。dirtyのためpullや履歴統合は行っていない。
+- [コミット照合記録](.artifacts/commit-validation-image-picker-0739/validation.json)で570のソース/試験/依存入力、実装時の完全ログ・終了コード・hash、0.73.9の発行EXE/feed・固定GUI/smokeを照合。型検査/build・関連48件・ソースと固定EXEのGUI各6群・smoke成功を再利用した。テストfixtureは前回標準回帰の入力と一致し、native host/updaterは成功済み0.73.9 publishの出力を用いた。
+- 未実行の標準回帰96ファイル684件だけを通常ユーザー権限で追加し、合計 **732/732（48再利用＋684追加）、fail/skip 0**。570入力と831生成物は試験前後で一致した。共通入力、リボンのモード/一時選択、保存と取消、操作名・キーボード・共通呼出元をレビューし、ブロッキング指摘なし。
+- 製品は発行済み0.73.9から変更しておらず、版更新・再発行は不要。今回の追記は検証文書だけ。実効author/committerは`yukichi-7sai <yukichi@at365.jp>`。対象stageと作業ファイル、stage treeとcommit tree、各push先mainの照合を同フォルダーのstage.json・commit.json・push.jsonに記録する。GitHub Release・実利用先deployは対象外。証跡は再利用用に保持し、テストフォルダー削除0件。
+
+## 2026-10-21: 画像プレビューを選択ボタンへ統合（0.73.9）
+
+- main/origin/main、開始HEAD `85fbe73`。前回0.73.8の未コミット差分を保持し、dirtyのためpullは行っていない。共通`RegisteredImageInput`の64pxプレビューをnative buttonへ変更し、独立した選択ボタンを撤去。隣には解除だけを残す。未選択の画像マークもクリック可能で、title/aria-label、無効状態、Enter/Space操作を保持する。共通呼出元すべてに適用し、保存/APIの変更はない。
+- 発行前レビューで要件・共通呼出元・キーボード・フォーカス・無効状態を確認し、発行阻害指摘なし。[共通画像仕様](docs/registered-images.md)を更新。通常のUI修正として0.73.8→0.73.9へ更新した。
+- frozen install、型検査、build成功。ソースと最終固定EXEの専用GUI各6群で、プレビューだけが選択操作を持つこと、入力内ボタンがプレビューと解除の2つであること、クリック/Enter/Space、取消後のフォーカス復帰を確認。前回のモード切り替え・保存/取消・一般画像入力・明暗/幅・実再起動・原画像hash不変も成功。画像を目視確認し、固定EXEの標準smokeも成功した。関連回帰48件は前回の成功ログhashと製品/試験入力の不変を照合して再利用した。
+- `publish.bat`終了0。発行EXEは **0.73.9 / 168946433 bytes / SHA256 `01c3e0e01374b6fbb60dfa912e27da26a426da872e1f91d9eb265b00ac26f59b`**。製品版、update.jsonの版/size/hash、実行中Default Shell 0.73.9、GUI/smoke用EXEコピーのhashが一致した。
+- [検証証跡](.artifacts/image-preview-button-20261021/validation.json)に570入力の最終照合、完全ログ/終了コード/hash、レビュー、回帰再利用判断を保存。native/assets/deploymentは開始HEADから未変更。依存の供給網確認は制限環境内で成功した。.NET発行は制限環境で終了1となり、同一コマンドの通常ユーザー実行で成功。初期失敗記録を保持し、依存版・lockfile・検査は変更していない。
+- 隔離profileでの検証であり、実利用設定や物理IME/NAS/UACは未検証。今回の3試験profileに対応する残留プロセス0件。新規方式の成功は各2回以下で、既存の再利用・失敗証跡とともに保持し、削除0件。commit・push・GitHub Release・実利用先deployは行っていない。
+
+## 2026-10-21: 共通画像入力とリボンのアイコン選択を整理（0.73.8）
+
+- main/origin/main、開始HEAD `85fbe73`、cleanと単一worktreeを確認し、`git pull --ff-only`で最新一致を確認。画像を中心とする選択UI、既定アイコンとの明示的切り替え、ファイル名非表示、選択ダイアログの解除撤去、選択/解除のアイコン化という依頼を実装した。
+- 共通`RegisteredImageInput`を64pxプレビュー枠と36px操作アイコンに整理。選択/変更と解除には操作名のtitle/aria-labelを付け、未選択の解除を無効化。`RegisteredImagePicker`は選択なしの確定を禁止し、解除は呼出元へ集約した。ライブラリーの原画像・検索/一覧の識別情報・公開APIのnullable型は保持する。
+- `RibbonIconPicker`は「画像」「既定のアイコン」の順に切り替え、選択した側の操作だけを表示する。既定8種類は絵を直接選ぶ一覧と枠/チェックで示す。新規追加は画像から開始し、既存編集は保存値に合わせる。切り替え中の画像と既定アイコンは編集内で保持し、親の適用で確定、取消で破棄。グループ・コマンドボタンが共用し、一般の画像入力にはリボン固有の切り替えを加えない。画像未選択・解除後の適用は既存の固定アイコンへ戻る。保存するモード設定・移行処理は追加しない。
+- 発行前に要件・共通呼出元・保存/API互換・元画像保持・キーボードとフォーカス・明暗/幅・必要試験をレビュー。ラジオの隠し入力に既存の全幅input規則が勝たないよう詳細度を調整し、既存GUIのselect指定を切り替えとアイコン選択へ更新。最終スクリーンショットは画像decodeを待って取得する。発行阻害指摘なし。外部選択画面の利用先WebAppletも自身の`icon-clear`を持つことを読み取り確認し、兄弟repoの変更は行っていない。
+- 設定項目・保存ファイル・公開API型の追加削除を伴わないUI整理のため0.73.7→0.73.8のパッチ更新。固定依存のfrozen install、型検査、本体/Default Shell build、画像・リボンの関連回帰48/48（fail/skip 0）が成功した。
+- ソースと最終固定EXEの専用GUI各6群が成功。既存値の開始モード、新規追加の画像優先、選択/変更/解除のアイコンと操作名、ファイル名非表示、未選択の確定禁止、子ダイアログ取消とフォーカス復帰、切り替え中の両側の選択保持、矢印キー、親取消による非保存、実適用後のShell画像表示/既定へ復帰、共通画像入力での解除保存、原画像のSHA256不変、実プロセス再起動後の状態を確認。light/dark・1120/760幅の配置を検査しスクリーンショットを目視確認した。最終固定EXEの標準smokeも成功。
+- `publish.bat`終了0。発行EXEは **0.73.8 / 168945675 bytes / SHA256 `b9e1325f3ff5eedabfa91e867b15dbdb06e867f829a4aea9c89cae572b67935d`**。EXE製品版、update.jsonの版/size/hash、実行中Default Shell 0.73.8、GUI/smoke用EXEコピーのhashを照合した。未変更Appletの再発行・全体ZIP作成は行っていない。
+- 証跡の正本は[validation.json](.artifacts/ribbon-image-picker-20261020/validation.json)。570のソース/試験/依存/ビルド入力を発行開始後から最終試験まで照合し、追加のnative/assets/deployment入力は開始HEADから未変更と確認した。ソースGUI後の差分は試験の画像decode待ちだけで、最終固定EXEで確認済み。型検査・回帰に影響する製品入力の後続変更なし。完全ログ・終了コード・hash、レビューと関連仕様は同フォルダーおよび[共通画像仕様](docs/registered-images.md)に保存した。
+- 制限環境では依存の供給網確認が応答待ちとなり、今回のpnpmだけを親プロセスまで照合して停止した。同じコマンドは通常ユーザー環境で成功。画像単体試験のlink/symlink拒否、Electron起動拒否も同一コマンドで解消した。初期失敗ログを保持し、lockfile・依存版・検査・権限設定は変更していない。一般のUI整理なのでSDK/外部サービスや無関係な全回帰は再実行していない。実利用設定、物理IME/NAS/UACは未検証。
+- 今回のGUI/smokeは終了を確認。新規の専用GUI方式は成功各1回のため保持し、失敗・過去の参照証跡・再利用/所有が不明な既存profileも保持した。テストフォルダー削除0件。commit・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-20: Applet導入画面の余白とエラーツールチップ（0.73.7）
 
 - main/origin/main、開始HEAD `62e4c8b`、clean・追跡差0/0を確認し、`git pull --ff-only`で最新一致を確認。制限環境のDNS失敗は同一コマンドの通常ユーザー実行で解消した。

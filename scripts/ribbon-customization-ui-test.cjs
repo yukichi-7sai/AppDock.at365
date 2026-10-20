@@ -13,6 +13,7 @@ const profile = path.join(root, '.artifacts', `ribbon-customization-ui-${Date.no
 const portable =
   process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
 const appearanceOnly = process.argv.includes('--appearance-only');
+const iconsOnly = process.argv.includes('--icons-only');
 const marker = path.join(profile, 'command-executions.txt');
 const customMarker = path.join(profile, 'custom-executions.txt');
 const customId = randomUUID();
@@ -36,7 +37,13 @@ settings.ribbon.groups = [
   },
 ];
 fs.mkdirSync(profile, { recursive: true });
-if (!appearanceOnly) {
+if (iconsOnly) {
+  settings.ribbon.buttons = [
+    { id: 'button:icon', title: 'Icon command', icon: 'clock', commandId: 'appdock.logs.open' },
+  ];
+  settings.ribbon.order.push('button:icon');
+}
+if (!appearanceOnly && !iconsOnly) {
   const fixture = path.join(profile, 'extensions', 'ribbon-action');
   fs.mkdirSync(fixture, { recursive: true });
   fs.writeFileSync(
@@ -216,6 +223,55 @@ async function colorGeometry() {
 (async () => {
   try {
     await launch();
+    if (iconsOnly) {
+      await require('./ribbon-icon-ui-checks.cjs')({
+        app,
+        host,
+        rail,
+        profile,
+        checks,
+        until,
+        saved,
+        openRibbonSettings,
+        restart: async () => {
+          await app.close();
+          app = undefined;
+          await launch();
+          return { app, host, rail };
+        },
+      });
+      assert.deepEqual(errors, []);
+      const runtime = await app.evaluate(({ app }) => {
+        const read = process
+          .getBuiltinModule('module')
+          .createRequire(app.getAppPath() + '/package.json');
+        return {
+          version: app.getVersion(),
+          defaultShellVersion: JSON.parse(
+            read('fs').readFileSync(
+              read('path').join(app.getAppPath(), 'out/shells/default/extension.json'),
+            ),
+          ).version,
+        };
+      });
+      assert.equal(runtime.version, runtime.defaultShellVersion);
+      await app.close();
+      app = undefined;
+      const result = {
+        ok: true,
+        iconsOnly,
+        profile,
+        portable,
+        checks,
+        errors,
+        runtime,
+        executableSha256: portable ? hash(exe) : null,
+        stopped: true,
+      };
+      fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
     await button('group:colored').click();
     await button('home').waitFor();
     const initial = await colorGeometry();
@@ -567,7 +623,14 @@ async function commandChecks() {
     await choose(target);
     await page.getByRole('dialog', { name: 'コマンドボタンを追加', exact: true }).waitFor();
     assert.equal(await page.getByLabel('ボタン名', { exact: true }).inputValue(), title);
-    await page.getByLabel('ボタンのアイコン', { exact: true }).selectOption('clock');
+    await page
+      .locator('.ribbon-icon-modes label')
+      .filter({ hasText: /^既定のアイコン$/ })
+      .click();
+    await page
+      .locator('.ribbon-builtin-icons')
+      .getByRole('button', { name: '時計', exact: true })
+      .click();
     await page.getByRole('button', { name: '追加', exact: true }).click();
     const value = await saved((r) => r.buttons.find((b) => b.title === title));
     await button(value.id).waitFor();

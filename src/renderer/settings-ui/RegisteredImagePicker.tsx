@@ -10,6 +10,7 @@ import {
 import { SettingsDialog } from './SettingsModal';
 import { SettingsInput } from './SettingsInput';
 import { SettingsHint } from './SettingsHint';
+import { Icon } from '../Icon';
 import './registered-images.css';
 
 const ImagesContext = createContext<ImageLibraryApi | undefined>(undefined);
@@ -229,11 +230,12 @@ export function RegisteredImagePicker({
       title="画像を選択"
       className="image-library-dialog"
       applyLabel="画像を使う"
-      valid={!!library.api && !registering}
+      valid={!!library.api && !!selected && !registering}
       onClose={() => {
         if (!applied.current) onClose();
       }}
       onApply={async () => {
+        if (!selected) return;
         await onSelect(selected);
         applied.current = true;
       }}
@@ -262,9 +264,6 @@ export function RegisteredImagePicker({
           }}
         >
           ライブラリーに登録
-        </button>
-        <button type="button" className="text-button" onClick={() => setSelected(null)}>
-          画像を外す
         </button>
         <span>{selected?.file ?? '画像なし'}</span>
       </div>
@@ -298,27 +297,34 @@ export function RegisteredImageInput({
   const [open, setOpen] = useState(false);
   const ref = imageReference(value) ? value : null;
   const api = useRegisteredImages();
+  const action = ref ? '変更' : '選択';
   return (
-    <div className="registered-image-input">
-      <RegisteredImagePreview value={ref} />
-      <span>{ref?.file ?? '画像なし'}</span>
+    <div className="registered-image-input" role="group" aria-label={label}>
       <button
         type="button"
-        className="secondary"
-        aria-label={`${label}を選択`}
+        className="registered-image-input-preview"
+        aria-label={`${label}を${action}`}
+        title={`画像を${action}`}
         disabled={disabled || !api}
         onClick={() => setOpen(true)}
       >
-        画像を選択
+        {ref ? (
+          <RegisteredImagePreview value={ref} label={`${label}のプレビュー`} />
+        ) : (
+          <span className="registered-image-empty" role="img" aria-label="画像なし">
+            <Icon name="image" size={28} />
+          </span>
+        )}
       </button>
       <button
         type="button"
-        className="text-button"
+        className="registered-image-action"
         aria-label={`${label}を外す`}
+        title="画像を外す"
         disabled={disabled || !ref}
         onClick={() => onChange(null)}
       >
-        画像を外す
+        <Icon name="close" size={20} />
       </button>
       {open && (
         <RegisteredImagePicker

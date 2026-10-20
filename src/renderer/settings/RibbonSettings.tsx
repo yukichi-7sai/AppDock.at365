@@ -574,7 +574,9 @@ export function RibbonSettings({
               />
             </label>
             <RibbonIconPicker
+              key={dialog.group.id}
               label="グループのアイコン"
+              preferImage={dialog.adding}
               value={dialog.group.icon}
               image={dialog.group.image}
               onImage={(image) => setDialog({ ...dialog, group: { ...dialog.group, image } })}
@@ -759,7 +761,9 @@ export function RibbonSettings({
               />
             </label>
             <RibbonIconPicker
+              key={buttonDialog.button.id}
               label="ボタンのアイコン"
+              preferImage={buttonDialog.adding}
               value={buttonDialog.button.icon}
               image={buttonDialog.button.image}
               onImage={(image) =>

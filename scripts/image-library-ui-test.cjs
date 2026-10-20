@@ -499,6 +499,10 @@ async function chooseInPicker(file) {
     ]) {
       await host.getByRole('button', { name: `${title}を編集`, exact: true }).click();
       d = host.getByRole('dialog', { name: kind, exact: true });
+      await d
+        .locator('.ribbon-icon-modes label')
+        .filter({ hasText: /^画像$/ })
+        .click();
       await d.getByRole('button', { name: label, exact: true }).click();
       await chooseInPicker(file);
       await d.getByRole('button', { name: '適用', exact: true }).click();
