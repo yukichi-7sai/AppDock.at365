@@ -5,11 +5,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-internal static class Program
+internal static partial class Program
 {
     private const long Limit = 512L * 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true, DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull };
-    private sealed record Item(string Kind, string Id, string Version, string Source, string Destination, string? Sha256);
+    private sealed record Item(string Kind, string Id, string Version, string Source, string Destination, string? Sha256, string? Operation = null, string? PreviousSha256 = null);
     private sealed record Swap(Item Item, string Next, string Backup);
     private static string Full(string value) => Path.GetFullPath(value);
     private static bool Same(string a, string b) => string.Equals(Full(a), Full(b), StringComparison.OrdinalIgnoreCase);
@@ -165,6 +165,7 @@ internal static class Program
             throw new IOException("更新ジョブは専用の一時フォルダーに必要です。");
         using var job = JsonDocument.Parse(File.ReadAllText(jobPath));
         var root = job.RootElement;
+        if (root.GetProperty("schemaVersion").GetInt32() == 2) { ApplyPackageJob(root, stage, jobPath); return; }
         if (root.GetProperty("schemaVersion").GetInt32() != 1) throw new IOException("更新ジョブの形式が違います。");
         var baseDirectory = Full(root.GetProperty("baseDirectory").GetString()!); NoLinks(baseDirectory);
         var executable = Full(root.GetProperty("executable").GetString()!); NoLinks(executable);
@@ -285,6 +286,8 @@ internal static class Program
         var result = Path.Combine(stateDirectory, "update-result.json"); NoLinks(result);
         if (!File.Exists(journal)) return;
         using var document = JsonDocument.Parse(File.ReadAllText(journal));
+        if (document.RootElement.TryGetProperty("schemaVersion", out var schema) && schema.GetInt32() == 2)
+        { RecoverPackageJournal(baseDirectory, stateDirectory, document.RootElement); return; }
         var committed = document.RootElement.TryGetProperty("committed", out var flag) && flag.GetBoolean();
         var swaps = JsonSerializer.Deserialize<List<Swap>>(document.RootElement.GetProperty("swaps"), JsonOptions)
             ?? throw new IOException("更新復元の記録がありません。");

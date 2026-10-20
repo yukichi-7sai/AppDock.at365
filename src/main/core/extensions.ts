@@ -365,6 +365,7 @@ class ExtensionManager extends EventEmitter {
   shuttingDown: boolean;
   hostVersion: string;
   reservedCustomTypeIds: () => string[];
+  discoveryIssueCount = 0;
   constructor({
     roots,
     builtinRoots = [],
@@ -392,11 +393,28 @@ class ExtensionManager extends EventEmitter {
     this.hostVersion = hostVersion;
     this.reservedCustomTypeIds = reservedCustomTypeIds;
   }
+  validateInstall(folder: string) {
+    const manifest = readManifest(folder);
+    if (this.items.has(manifest.id)) throw Error('同じIDのAppletが存在します。');
+    const existingTypes = [
+      ...this.reservedCustomTypeIds(),
+      ...[...this.items.values()].flatMap((e) =>
+        (e.manifest.customCommandTypes ?? []).map((t) => t.id),
+      ),
+    ];
+    if (
+      existingTypes.length + (manifest.customCommandTypes?.length ?? 0) > 256 ||
+      manifest.customCommandTypes?.some((t) => existingTypes.includes(t.id))
+    )
+      throw Error('カスタムコマンドの種類が重複、または上限を超えています。');
+  }
   discover() {
+    this.discoveryIssueCount = 0;
     const rejected = new Set<string>();
     for (const root of this.roots) {
       if (!fs.existsSync(root)) continue;
       for (const dir of fs.readdirSync(root, { withFileTypes: true })) {
+        if (dir.name === '.transactions') continue;
         if (!dir.isDirectory()) continue;
         const folder = path.join(root, dir.name);
         if (!fs.existsSync(path.join(folder, 'extension.json'))) continue;
@@ -405,8 +423,12 @@ class ExtensionManager extends EventEmitter {
             folder,
             this.builtinRoots.includes(root) ? 'builtin' : 'external',
           );
-          if (rejected.has(manifest.id)) continue;
+          if (rejected.has(manifest.id)) {
+            this.discoveryIssueCount++;
+            continue;
+          }
           if (this.items.has(manifest.id)) {
+            this.discoveryIssueCount++;
             if (this.items.get(manifest.id)!.manifest.sourceKind !== 'builtin') {
               this.items.delete(manifest.id);
               rejected.add(manifest.id);
@@ -439,6 +461,7 @@ class ExtensionManager extends EventEmitter {
             error: null,
           });
         } catch (e: any) {
+          this.discoveryIssueCount++;
           this.log('error', dir.name, e.message);
         }
       }

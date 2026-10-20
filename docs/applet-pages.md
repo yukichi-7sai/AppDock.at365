@@ -80,3 +80,7 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 固定pagesに加え、pages/dynamic-pages capabilityでNodeのcontext.pages.list/replace/open/hide/disposeを使えます。実行中のlocalページを最大64件まで追加・置換・削除でき、同じHTMLへページ固有contextを渡せます。登録revisionで競合を拒否します。停止時は動的定義とSurfaceを回収します。
 
 manifest.pageCollectionsは自身のobject-list設定からlocal/remoteページと管理項目を投影します。親の停止中も設定を保持し、子は独立したプロセス・配布物・更新対象を作りません。最低ホスト版は0.44.0。API、manifest、所有範囲、限定bridge、実装例は[動的ページの設計と契約](dynamic-pages-webapplet-design.md)を正本とします。
+
+## 管理用ページの入口
+
+標準リボンの管理用`extensions`項目は表示カタログから除外する。保存済みの配置は欠落項目として保持し、`appdock.applets.open`と旧extensionsルートは設定のApplet管理へ解決する。各Applet自身のページ・リボン項目とWebサイトの表示は維持する。

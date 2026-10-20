@@ -8,6 +8,7 @@ import type {
   LogPageModel,
 } from '../../src/shared/shell-pages';
 import { shortcutFromEvent } from '../../src/shared/commands';
+import { Icon } from '../../src/shared/ui-icons';
 import './logs.css';
 document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches
   ? 'dark'
@@ -144,18 +145,31 @@ function App() {
           onChange={(e) => change({ ...filters, text: e.target.value })}
         />
         {content.scope.type === 'all' && (
-          <select
-            aria-label="ログのApplet"
-            value={filters.source}
-            onChange={(e) => change({ ...filters, source: e.target.value })}
-          >
-            <option value="">すべてのログ</option>
-            {content.sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title}
-              </option>
-            ))}
-          </select>
+          <div className="log-source-filter">
+            <select
+              aria-label="ログのApplet"
+              value={filters.source}
+              onChange={(e) => change({ ...filters, source: e.target.value })}
+            >
+              <option value="">すべてのログ</option>
+              {content.sources.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
+            {filters.source && (
+              <button
+                type="button"
+                className="log-filter-clear"
+                title="Appletの絞り込みを解除"
+                aria-label="Appletの絞り込みを解除"
+                onClick={() => change({ ...filters, source: '' })}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            )}
+          </div>
         )}
         <select
           aria-label="ログレベル"

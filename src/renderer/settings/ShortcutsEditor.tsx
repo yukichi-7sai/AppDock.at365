@@ -1,6 +1,7 @@
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { useSettingsControls } from '../settings-ui/api';
 import { CommandBindingToolbar } from '../settings-ui/CommandBindingToolbar';
+import { CommandProviderFilter } from '../settings-ui/CommandProviderFilter';
 import { useEffect, useRef, useState } from 'react';
 import type { UiCommand } from '../../shared/commands';
 import type { Settings, GlobalHotKeyStatus } from '../../shared/contracts';
@@ -19,18 +20,26 @@ export function ShortcutsEditor({
   onChange,
   statuses,
   applets,
+  provider,
+  clearProvider,
 }: {
   commands: UiCommand[];
   settings: Settings;
   onChange(value: Settings): void;
   statuses: GlobalHotKeyStatus[];
   applets: { id: string; title: string }[];
+  provider?: { id: string; title: string; request: number };
+  clearProvider?(): void;
 }) {
   const settingsControls = useSettingsControls();
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [error, setError] = useState('');
   const [orderOpen, setOrderOpen] = useState(false);
+  useEffect(() => {
+    setFilter('');
+    setStatusFilter('all');
+  }, [provider?.request]);
   const lastStatuses = useRef(statuses);
   useEffect(() => {
     if (statuses.length) lastStatuses.current = statuses;
@@ -57,6 +66,7 @@ export function ShortcutsEditor({
       : undefined;
   const terms = filter.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const visible = catalog.filter((command) => {
+    if (provider && command.extensionId !== provider.id) return false;
     const assigned = rows.filter((row) => row.command === command.id);
     const text = [
       command.title,
@@ -92,7 +102,9 @@ export function ShortcutsEditor({
         setStatusFilter={setStatusFilter}
         onOrder={() => setOrderOpen(true)}
         showRegistrationErrors
-      />
+      >
+        {provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />}
+      </CommandBindingToolbar>
       {error && <p role="alert">{error}</p>}
       {rows.length >= 2000 && (
         <p role="status">

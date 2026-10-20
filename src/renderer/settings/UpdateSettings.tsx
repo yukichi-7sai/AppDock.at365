@@ -184,7 +184,7 @@ export function AppletUpdateSource({
     edit(next);
   };
   return (
-    <details className="update-disclosure applet-update-source">
+    <details className="update-disclosure applet-update-source" {...settingAnchor(`applet:${extension.id}`, 'updateSource')}>
       <summary>
         更新元の設定{' '}
         <span className="muted">

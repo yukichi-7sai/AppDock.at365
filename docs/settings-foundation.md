@@ -32,7 +32,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使�
 
 本体内部モデルは選択ページのvalues/定義/表示用補助情報/不透明な操作IDとsessionId/editRevision/pending/mode/errorだけ。選択ページ以外のSettings/HostSnapshot・他Appletの値を投影しない。dirty/conflict/text/avatarChanged/avatarLoadingを削除した。page-values/partial-textは同ページのbefore投影を必須とし、対象外キーを拒否する。save/discard/avatar-loadingを削除。JSONはUTF-8 1MiB、画像5MiB、検索語512文字。
 
-全体設定とApplet詳細は同じ本文を使い、全体だけ左インデックスを表示する。停止/無効Appletも編集でき、開くだけで起動しない。本体の入力flushはナビゲーション前にuseSettingsEditorとSettingsViewClientのキューを3秒以内で待つ。成功済み値はページ切替/画面再作成をまたいで共有し、不正入力をView間で保持しない。Webアカウント削除は保存済み参照を検査する。
+Applet管理と左インデックスは本体の共通設定ページを開く。個別設定・入力設定・ログの移動先と表示用フィルターは[Applet管理](applet-management-settings-design.md)を参照する。停止・無効でも編集でき、移動だけで起動しない。入力キューと3秒のflush、競合と不正入力の契約を維持する。
 
 「表示」の部分JSONは`host.theme`と`host.shellProviders`です。8領域の選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。旧単一キーを部分JSONへ混在させた要求は範囲外として拒否します。領域別指定の移行・未知領域保持・旧設定領域の廃止は[領域別割り当て](shell-region-assignment.md)。
 
@@ -84,7 +84,7 @@ AIのモデル取得は設定ページ専用の操作として未保存の接続
 
 `host.showHints`は既定trueで、表示ページの「共通」カードから即時保存・反映する。既存設定の欠落時だけtrueを補い、保存済みfalseは保持する。設定定義から`appdock.settings.showHints.on`、`.off`、`.toggle`を生成する。保存分類は他の表示設定と同じ端末専用とする。
 
-消してよい操作説明は、タイトルに結びつくものを`SettingsSection`/`SettingsField`の`hint`、本文内の補足を`src/renderer/settings-ui/SettingsHint.tsx`で表示する。どちらも`useSettingsHints()`を通して同じContextを参照する。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・Applet詳細・portal内のダイアログへ適用する。本文ヒントの見た目は`settings-hint.css`、タイトルのヒントは`settings-hint-icon.css`を正本とする。
+消してよい操作説明は、タイトルに結びつくものを`SettingsSection`/`SettingsField`の`hint`、本文内の補足を`src/renderer/settings-ui/SettingsHint.tsx`で表示する。どちらも`useSettingsHints()`を通して同じContextを参照する。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・個別Applet設定・portal内のダイアログへ適用する。本文ヒントの見た目は`settings-hint.css`、タイトルのヒントは`settings-hint-icon.css`を正本とする。
 
 `SettingsSection`/`SettingsField`の`hint?: string`は、空白を除いた内容があるときだけタイトルのすぐ右に丸付きの「？」を表示する。`description?: ReactNode`と併用できる。タイトルなしのセクションにはアイコンを表示しない。ヒントOFF時にはアイコン・ツールチップ・その参照をまとめて取り除き、入力欄やdescriptionは保持する。表示の切り替え用の設定や保存形式を追加しない。
 
@@ -136,3 +136,7 @@ import { SettingsHint } from '../settings-ui/SettingsHint';
 ## 登録画像
 
 画像登録は設定保存から独立した共通ライブラリー操作。Appletは`registered-image`、object-listは同型フィールドと`list.imageKey`を宣言する。プロフィール専用保存・設定ページは持たない。入力と選択の契約は[共通画像](registered-images.md)を参照する。
+
+## Applet管理と個別の更新元
+
+管理ページはJSON・保存先切り替え・ページリセットを提供しない。個別Appletの更新元は従来の共有保存分類を保って個別設定へ配置し、フォーム／JSONとページリセットの同じ投影へ含める。更新元が未指定ならmanifestを継承し、空文字の無効化と保存済み値を保つ。

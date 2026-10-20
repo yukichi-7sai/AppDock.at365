@@ -64,11 +64,11 @@ WebApplet管理の設定とショートカット等、本体が描画するパ�
 
 ## 実装の配置
 
-1. `src/renderer/main.tsx` / `style.css`: 全体ページ用レイアウトと詳細内のShellパネルを区別し、枠へ利用可能領域を割り当てる。
-2. `src/renderer/ShellPageSlot.tsx` / `AppletSettingsPanel.tsx`: CSS主体の寸法報告と埋め込み枠を整える。
+1. `src/renderer/main.tsx` / `style.css`: 全体ページ用レイアウトを整え、枠へ利用可能領域を割り当てる。
+2. `src/renderer/ShellPageSlot.tsx`: CSS主体の寸法報告とShellページの埋め込み枠を整える。Applet管理・個別設定は本体の共通SettingsPage本文を使う。
 3. `shells/default/home.css` / `home.tsx`: 内側余白、全高背景、カードの可変列を調整する。
 4. `shells/default/logs.css` / `logs.tsx`: 残り高さを使う表、スクロール、全体/詳細の余白を調整する。
-5. `shells/default/settings.css` / 必要なら`settings.tsx`: 全高の左右領域、実幅に応じた配置、固定操作部と本文の分担を確認する。
+5. `src/renderer/settings/SettingsPageLayout.tsx` / `settings.css`: 全高の左右領域、実幅に応じた配置、固定操作部と本文の分担を確認する。
 6. 関連GUI試験へ境界とスクロールの検証を追加し、現行仕様文書と検証記録を更新する。
 
 表示モデル・操作・設定保存形式は変更しない。既存Shell Appletにも新しい枠寸法が適用されるため、部分差し替えfixtureを使って互換性を確認する。

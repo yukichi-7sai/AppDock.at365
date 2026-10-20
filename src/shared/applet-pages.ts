@@ -36,7 +36,6 @@ export interface RibbonItem {
 }
 export const builtinRibbon: RibbonItem[] = [
   { id: 'home', title: 'ホーム', icon: 'home' },
-  { id: 'extensions', title: 'Applet', icon: 'extensions' },
   { id: 'settings', title: '設定', icon: 'settings' },
   { id: 'logs', title: 'ログ', icon: 'logs' },
   { id: 'notifications', title: '通知センター', icon: 'bell' },
@@ -49,7 +48,7 @@ export const validPageId = (id: unknown): id is string =>
   !['constructor', 'prototype', '__proto__'].includes(id);
 export const validRibbonId = (id: unknown): id is string =>
   typeof id === 'string' &&
-  (builtinRibbon.some((item) => item.id === id) ||
+  (id === 'extensions' || builtinRibbon.some((item) => item.id === id) ||
     id === 'profile' ||
     /^(?:page|applet):[a-z0-9][a-z0-9.-]{0,100}:[a-z0-9][a-z0-9.-]{0,79}$/.test(id) ||
     validSeparatorId(id) ||

@@ -43,6 +43,7 @@ export const appletSettingsPageId = (id: string) => `applet:${id}`;
 export const hostSettingsPages = [
   ['appearance', '表示'],
   ['general', '一般'],
+  ['applets', 'Applet管理'],
   ['notifications', '通知'],
   ['tts', '読み上げ'],
   ['ai', 'AI'],
@@ -59,6 +60,9 @@ export const hostSettingsPages = [
   ['about', 'バージョン情報・更新'],
 ] as const;
 const hostItems: Record<string, [string, string, string?][]> = {
+  applets: [
+    ['management', 'Applet管理', 'インストール 有効 無効 更新 再起動 アンインストール 並べ替え'],
+  ],
   'mcp-client': [
     ['connections', 'MCP接続先', 'サーバー stdio HTTP 接続 設定 認証 ツール ジョブ 取消'],
   ],
@@ -204,7 +208,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['versions', 'バージョン情報', 'AppDock 現在のバージョン 本体を更新'],
     ['runtime', '実行環境の詳細', 'Electron Chromium Node.js OS プラットフォーム'],
     ['updates', '更新の設定', '起動時の更新確認と更新元を設定します。'],
-    ['updateSource', 'Appletの更新元', 'インストール済みのApplet 更新元の設定'],
     [
       'hostSource',
       'AppDockの更新元',
@@ -307,7 +310,7 @@ export function settingsCatalog(
       id,
       title,
       kind: 'host' as const,
-      json: !['web-accounts', 'permissions', 'codex'].includes(id),
+      json: !['applets', 'web-accounts', 'permissions', 'codex'].includes(id),
       items: [
         ...hostItems[id].map(([key, title, description]) => ({
           ...item(id, key, title, description),
@@ -331,6 +334,9 @@ export function settingsCatalog(
         collection: a.collection,
         json: true,
         items: [
+          ...(!a.collection
+            ? [item(id, 'updateSource', 'Appletの更新元', '更新元 URL GitHub')]
+            : []),
           ...(!a.collection ? (a.pages ?? []) : []).map((p) =>
             item(id, `page:${p.id}`, `${p.title}の表示方法`, appletCommonDescriptions.display),
           ),
@@ -379,6 +385,7 @@ export function settingsPaths(
     return [
       ['extensions', a.id, 'settings'],
       ['extensions', a.id, 'startupDelaySeconds'],
+      ...(!a.collection ? [['extensions', a.id, 'updateSource']] : []),
       ...(!a.collection ? (a.pages ?? []) : []).map((p) => [
         'extensions',
         a.id,
@@ -437,12 +444,7 @@ export function settingsPaths(
     case 'image-library':
       return [['imageLibrary']];
     case 'about':
-      return [
-        ...updateKeys.map((k) => ['updates', k]),
-        ...applets
-          .filter((a) => !a.collection && a.sourceKind !== 'builtin')
-          .map((a) => ['extensions', a.id, 'updateSource']),
-      ];
+      return [...updateKeys.map((k) => ['updates', k])];
     default:
       return [];
   }

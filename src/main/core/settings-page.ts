@@ -196,12 +196,13 @@ export class SettingsPageSession {
         const item = this.options.editor
           .catalog()
           .flatMap((p) => p.items)
-          .find((i) => i.id === op.itemId);
+          .find((i) => i.id === (op.itemId === 'about/updateSource' ? 'applets/management' : op.itemId));
         if (!item) throw Error('設定対象が見つかりません。検索結果を更新してください。');
         await this.options.editor.act({
           ...action,
           action: { type: 'select-page', pageId: item.pageId },
         });
+        this.navigation.provider = undefined;
         const selected = this.options.editor.snapshot();
         if (selected.mode !== 'form')
           await this.options.editor.act({
@@ -244,6 +245,7 @@ export class SettingsPageSession {
           ...action,
           action: { type: 'select-page', pageId: op.pageId },
         });
+        this.navigation.provider = undefined;
         if (op.pageId !== state.pageId) this.options.release?.();
         this.navigation.move = undefined;
       } else if (op.kind === 'edit') {

@@ -188,7 +188,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影契約とし、DockApi.
 ## Appletの表示順
 
 - `shared/applet-order.ts`は保存ID順に既存Appletを並べ、未登録の新規Appletは発見順で末尾へ置きます。不在IDを表示せず、新しい並べ替えでもそのIDは保存配列に保持します。WebAppletも同じ一覧に含みます。既存JSONのappletOrder未指定は空配列で補い、重複・不正ID・500件超を拒否します。
-- `AppletIndex.tsx`の並べ替えトグルはページ内の一時状態です。ONの間は全件表示し検索を無効化、ドラッグハンドル・上下ボタン・上下キーで移動します。並び順は操作時に保存します。revision競合・保存失敗時は保存済み値を維持してエラーを表示します。別Appletへの選択は変更せず、ページを離れるとモードを解除します。
+- 設定の`AppletManagementSettings.tsx`から共通`SettingsOrderDialog`を開き、ドラッグ・上下ボタン・上下キーで並べ替え、OKで保存します。管理対象はWebApplet本体を含む外部パッケージで、collectionの子と不在IDの保存位置を保ちます。revision競合・保存失敗時は保存済み値を維持してエラーを表示します。
 - rendererのApplet一覧・ホームカード・対象Applet候補に同じ順を使います。ショートカットのコマンド一覧はカタログ順で独立し、一覧内に実行順操作を置きません。専用ShortcutOrderDialogは全カタログを受け取り、提供元をまたいで同じキー内の順番を変更します。Applet表示順で実行順・起動順・ribbon.orderを変更しません。
 - 検証は`tests/applet-order.test.cjs`、`scripts/applet-order-ui-test.cjs`と既存navigation/default-shortcuts/WebApplet UI試験で行います。
 

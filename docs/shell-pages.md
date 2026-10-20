@@ -2,11 +2,11 @@
 
 ホーム・ログ・通知センターは共通の本文契約を使います。設定画面はShell対象外であり、[設定基盤](settings-foundation.md)を参照してください。
 
-ページViewはリボン・ステータスバー・ホスト通知を除く本文領域全体に配置します。Applet詳細内では見出し・タブの下の本文領域を使います。ホストは最大幅や外側余白を付けず、Shellが内部の余白・スクロールを管理します。寸法報告とページ別の配置は[Shellページのレイアウト](shell-page-layout.md)を参照してください。
+ページViewはリボン・ステータスバー・ホスト通知を除く本文領域全体に配置します。ホストは最大幅や外側余白を付けず、Shellが内部の余白・スクロールを管理します。Appletのログは共通ログViewへ移動してsourceで絞り込みます。設定・Applet管理は本体rendererで描画します。寸法報告とページ別の配置は[Shellページのレイアウト](shell-page-layout.md)を参照してください。
 
 WindowとページViewのネイティブ背景は現在のテーマに合わせ、View生成時から設定します。表示待ちのViewもテーマ更新の対象です。Default Shellは読込時に`prefers-color-scheme`を初期値とし、公開モデルを受け取ったら`dark`を同期的に適用してから`ready`を通知します。別Shellも初回表示前にモデルのテーマを適用してください。透明なオーバーレイやリボンの描画契約は変更しません。
 
-全体のログページ・Applet詳細のログタブ・WebApplet管理のログタブはDefault Shellで描画する。本体rendererにログの描画は残さない。既存の起動後500件、Applet/source・レベル・文字検索、保存先を開く操作、ファイルの1MBローテーションは維持する。過去ファイルの閲覧、日付フィルター、保存期間変更は未実装。
+全体のログページ・Applet管理から対象を指定して開く共通ログ・WebApplet管理のログタブはDefault Shellで描画する。本体rendererにログの描画は残さない。既存の起動後500件、Applet/source・レベル・文字検索、保存先を開く操作、ファイルの1MBローテーションは維持する。過去ファイルの閲覧、日付フィルター、保存期間変更は未実装。
 
 ## 部分差し替え
 
@@ -19,7 +19,7 @@ WindowとページViewのネイティブ背景は現在のテーマに合わせ�
 }
 ```
 
-`host.shellProviders["page.logs"]`は全体・Applet詳細・WebApplet管理のログ本文へ共通適用します。未提供・無効・未導入・故障ではこの領域だけDefault Shellを使い、設定値とControllerの条件を保持します。ホーム・設定・通知センターには別の提供元を指定できます。リボンとパレットの実装は不要です。一般Appletの複数Window・同一領域の同時多重表示は未対応です。
+`host.shellProviders["page.logs"]`は全体・Appletで絞ったログ・WebApplet管理のログ本文へ共通適用します。未提供・無効・未導入・故障ではこの領域だけDefault Shellを使い、設定値とControllerの条件を保持します。ホーム・設定・通知センターには別の提供元を指定できます。リボンとパレットの実装は不要です。一般Appletの複数Window・同一領域の同時多重表示は未対応です。
 
 ## 責務と寿命
 
@@ -87,7 +87,7 @@ ready期限は10秒。読込失敗・renderer終了/応答不能では同じCont
 
 ## 設定画面との境界
 
-設定画面は本体rendererの共通UIであり、ShellPageRequest/Model/Actionの対象外とする。全体設定とApplet詳細は本体のSettingsPageSession・SettingsPageを共用する。投影、検索、即時保存、入力flushは[設定基盤](settings-foundation.md)を参照する。旧page.settings指定とmanifestは互換入力として保持・読込するが、設定用HTMLは起動しない。
+設定画面は本体rendererの共通UIであり、ShellPageRequest/Model/Actionの対象外とする。全体設定と個別Applet設定は本体のSettingsPageSession・SettingsPageを共用する。投影、検索、即時保存、入力flushは[設定基盤](settings-foundation.md)を参照する。旧page.settings指定とmanifestは互換入力として保持・読込するが、設定用HTMLは起動しない。
 
 ## 通知センター
 
@@ -98,3 +98,5 @@ minimumHostVersion:0.31.0以上のShellはshell.viewsのpage.notificationsへ本
 本体側のnavigation requestもslotの報告キーへ含める。画面側が先に切り替わって初回報告を本体が拒否した場合、navigation確定後に同じ矩形でも再報告してViewを生成する。
 
 設定本文の通常交換では、現在のIPC応答と入力キューを待ち、候補を再解決します。3秒のflushが失敗した場合は、旧Viewが有効なら交換を保留して再試行を提示します。保存済みの割り当ては巻き戻しません。停止・故障時は保存済み値から復旧し、未確定入力を複製しません。設定Controllerと保存済み値は提供元変更で再生成しません。
+
+Applet管理からのログ移動は`scope: all`と`source: appletId`を使う。sourceを解除して全体表示へ戻れるようにし、旧詳細用の固定Applet scopeをこの入口へ流用しない。

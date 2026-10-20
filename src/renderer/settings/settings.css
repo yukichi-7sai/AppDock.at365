@@ -657,3 +657,100 @@ pre.ai-preview-result {
 .ai-connection-dialog .settings-dialog-body {
   flex: 1;
 }
+.applet-management-table th,
+.applet-management-table td {
+  padding: 14px 12px;
+  vertical-align: middle;
+}
+.applet-management-table td:first-child {
+  width: 30%;
+  min-width: 150px;
+  white-space: normal;
+}
+.applet-management-table td:nth-child(2) {
+  min-width: 156px;
+}
+.applet-management-table small,
+.applet-management-table time {
+  display: block;
+  margin-top: 5px;
+  white-space: normal;
+  font-size: 11px;
+}
+.applet-management .applet-management-name {
+  display: inline-block;
+  padding: 0;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.applet-management-name strong {
+  font-weight: 600;
+}
+.applet-management-column-title,
+.applet-management-version,
+.applet-management-links,
+.applet-management-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.applet-management-column-title {
+  gap: 10px;
+}
+.applet-management-links,
+.applet-management-actions {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.applet-management-links .settings-list-icon,
+.applet-management-actions .settings-list-icon {
+  width: 32px;
+  height: 32px;
+}
+.applet-management .applet-update-check {
+  width: 28px;
+  height: 28px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.applet-management .applet-update-check:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.applet-management .applet-update-install {
+  padding: 4px 0;
+  color: var(--accent);
+}
+.applet-package-status {
+  min-height: 1.5em;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.applet-install-dialog[open] {
+  /* Keep the source and footer stable throughout validation and error display. */
+  margin-block-start: max(20px, 10dvh);
+  margin-block-end: auto;
+  max-height: calc(100dvh - max(20px, 10dvh) - 20px);
+}
+.applet-install-dialog label {
+  display: grid;
+  gap: 6px;
+}
+.applet-install-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.applet-install-source input {
+  flex: 1;
+  min-width: 0;
+}
+.applet-install-source input[aria-invalid='true'] {
+  border-color: var(--settings-error-color);
+}
+.applet-install-source > button {
+  flex: none;
+}

@@ -10,6 +10,7 @@ import { shellRegions, isShellRegion, type ShellRegion } from '../shared/shell';
 import type { ExtensionSnapshot } from '../shared/contracts';
 import type { SettingsPageDefinition } from '../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../shared/settings-page';
+import type { AppletPackagePreviewResult } from '../shared/applet-packages';
 import { ShellHost } from './core/shell-host';
 import { ShellBarHost } from './core/shell-bar-host';
 import { WindowBars } from './core/window-bars';
@@ -54,7 +55,7 @@ import { SettingsConflictError } from './core/settings';
 import { DeviceSettingsStore } from './core/device-settings-store';
 import { deviceHostKeys, readDeviceCollections, readDeviceManifests } from './core/device-settings';
 import { restoreSettingsCollections } from '../shared/settings-storage';
-import { settingsPaths } from '../shared/settings-catalog';
+import { settingsPaths, appletSettingsPageId } from '../shared/settings-catalog';
 import { recoverSettingsAtStartup, type SettingsRecoveryUi } from './core/settings-recovery';
 import {
   SettingsHealthNotifications,
@@ -100,7 +101,11 @@ import { initializeGestureDefaults } from '../shared/gestures';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, shortcutFromEvent } from '../shared/commands';
 import { AppletManagement } from './core/applet-management';
-import { appletManagementCommands } from '../shared/applet-management';
+import {
+  appletManagementCommands,
+  managedApplets,
+  reorderManagedApplets,
+} from '../shared/applet-management';
 import { GlobalHotKeyManager, InputCaptureHotKeyBackend } from './core/global-hotkeys';
 import { trayCommandGroups, withoutMissingSamples } from './core/tray-commands';
 import {
@@ -1655,13 +1660,15 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     id: a.id,
     name: a.name,
     displayName: a.displayName,
-    version: id === 'about' ? a.version : '',
+    version: id === 'about' || id === 'applets' || page.kind === 'applet' ? a.version : '',
     runtime: a.runtime,
     collection: a.collection,
+    sourceKind: a.sourceKind,
     entry: '',
     folder: '',
     state: a.state,
-    error: null,
+    error: id === 'applets' && a.error ? '起動または停止に失敗しました。' : null,
+    scheduledStartAt: a.scheduledStartAt,
     enabled: a.enabled,
     commands: page.kind === 'applet' || id === 'tray' ? a.commands : [],
     tray: id === 'tray' ? a.tray : [],
@@ -1670,9 +1677,22 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     pages: page.kind === 'applet' || ['ribbon', 'gestures'].includes(id) ? a.pages : undefined,
     ribbonItems: id === 'ribbon' ? a.ribbonItems : undefined,
     shell: id === 'appearance' ? a.shell : undefined,
-    updateRepository: id === 'about' ? a.updateRepository : undefined,
+    updateRepository: id === 'about' || page.kind === 'applet' ? a.updateRepository : undefined,
   });
   const applets = allApplets();
+  if (id === 'applets')
+    return {
+      applets: managedApplets(applets, settings.value.appletOrder).map(summary),
+      updates: host.updates,
+      appletManagement: {
+        packagesAvailable: updater.packagesAvailable,
+        busy: updater.state.busy,
+        discoveryIssueCount: manager.discoveryIssueCount,
+        mutableIds: managedApplets(applets)
+          .filter((a) => updater.canManageApplet(a.id))
+          .map((a) => a.id),
+      },
+    };
   if (page.kind === 'applet') {
     const a = applets.find((a) => a.id === page.owner)!;
     return {
@@ -1736,6 +1756,15 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (id === 'ribbon') return { applets: applets.map(summary), commands: ribbonUiCommands() };
   if (['shortcuts', 'gestures', 'tray'].includes(id))
     return {
+      provider:
+        settingsNavigation.provider?.page === id
+          ? {
+              ...settingsNavigation.provider,
+              title:
+                applets.find((a) => a.id === settingsNavigation.provider?.id)?.displayName ??
+                settingsNavigation.provider.id,
+            }
+          : undefined,
       applets: applets.map(summary),
       commands: settingsUiCommands(),
       statuses: id === 'shortcuts' ? host.globalHotKeys : undefined,
@@ -1792,6 +1821,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
 let settingsRecording = false;
 let settingsPalette: string | undefined;
 function releaseSettingsView() {
+  void updater?.discardPackagePlans();
   aiSettings.cancelModels();
   if (settingsRecording) {
     settingsRecording = false;
@@ -1810,6 +1840,111 @@ function settingsPageActions(
   page: SettingsPageDefinition,
 ): Record<string, (args: unknown[]) => Promise<unknown>> {
   const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  if (page.id === 'applets') {
+    actions.openAppletDiscoveryLogs = async () => {
+      await flushSettingsInputs();
+      await navigation.navigate('logs', undefined, '');
+    };
+    const target = (value: unknown) => {
+      const found = managedApplets(allApplets()).find((a) => a.id === value);
+      if (!found) throw Error('管理対象のAppletが見つかりません。');
+      return found;
+    };
+    actions.manageApplet = async ([id, operation]) => {
+      target(id);
+      assertSettingsWritable();
+      if (updater.state.busy) throw Error('パッケージ操作の完了を待ってください。');
+      if (!['enable', 'disable', 'restart'].includes(operation as string))
+        throw Error('操作が不正です。');
+      return appletManagement.run(id as string, operation as 'enable' | 'disable' | 'restart');
+    };
+    actions.startAppletNow = async ([id]) => {
+      if (target(id).state !== 'waiting' || updater.state.busy)
+        throw Error('開始待ちのAppletが見つかりません。');
+      return manager.restart(id as string, true);
+    };
+    actions.reorderApplets = async ([ordered, original]) => {
+      assertSettingsWritable();
+      const value = settings.value;
+      const appletOrder = reorderManagedApplets(allApplets(), value.appletOrder, ordered, original);
+      return settings.save({ ...value, appletOrder }, settings.revision);
+    };
+    actions.openAppletDestination = async ([id, destination]) => {
+      const a = target(id);
+      if (!['settings', 'shortcuts', 'gestures', 'logs'].includes(destination as string))
+        throw Error('移動先が不正です。');
+      await flushSettingsInputs();
+      target(id);
+      if (destination === 'logs') {
+        await navigation.navigate('logs', undefined, a.id);
+      } else {
+        const s = settingsEditing.snapshot();
+        await settingsEditing.act({
+          sessionId: s.sessionId,
+          editRevision: s.editRevision,
+          operationId: randomUUID(),
+          action: {
+            type: 'select-page',
+            pageId:
+              destination === 'settings' ? appletSettingsPageId(a.id) : (destination as string),
+          },
+        });
+        settingsNavigation.provider =
+          destination === 'settings'
+            ? undefined
+            : { id: a.id, page: destination as 'shortcuts' | 'gestures', request: Date.now() };
+        changed();
+      }
+    };
+    actions.prepareAppletInstall = async ([url]): Promise<AppletPackagePreviewResult> => {
+      try {
+        const plan = await updater.prepareAppletInstall(url);
+        if (!plan) return { cancelled: true };
+        return {
+          ...plan,
+          updateSource: settings.value.extensions[plan.id]?.updateSource ?? plan.updateSource,
+        };
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+      }
+    };
+    actions.cancelAppletPackagePreview = async () => updater.cancelPackagePreview();
+    actions.discardAppletPackage = async ([id]) => updater.discardPackagePlan(id);
+    actions.chooseAppletInstallDirectory = async () => {
+      try {
+        const result = await dialog.showOpenDialog(window!, {
+          title: 'Appletの配布フォルダーを選ぶ',
+          properties: ['openDirectory'],
+        });
+        return { path: result.canceled ? null : (result.filePaths[0] ?? null) };
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+      }
+    };
+    actions.prepareAppletUninstall = async ([id]) => {
+      const a = target(id);
+      const plan = await updater.prepareAppletUninstall(a.id);
+      return {
+        ...plan,
+        siteCount: allApplets().filter((p) => p.collection?.owner === a.id).length,
+        shell: Object.values(settings.value.host.shellProviders ?? {}).includes(a.id),
+      };
+    };
+    actions.applyAppletPackage = async ([id]) => {
+      try {
+        await flushSettingsInputs();
+        return await updater.applyAppletPackage(id);
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+      }
+    };
+    actions.appletPackageStatus = async ([id]) => updater.packageStatus(id);
+  }
+  if (page.id === 'shortcuts' || page.id === 'gestures')
+    actions.clearProvider = async () => {
+      settingsNavigation.provider = undefined;
+      changed();
+    };
   if (page.id === 'mcp-client' || page.id === 'custom-commands') {
     actions.mcpServers = async () => mcpClient.servers(mcpHostActor, { limit: 50 });
     actions.mcpTools = async ([serverId, cursor]) =>
@@ -2048,6 +2183,7 @@ function settingsPageActions(
       'custom-commands',
       'mcp-client',
       'image-library',
+      'applets',
     ].includes(page.id) ||
     page.json ||
     page.kind === 'applet'
@@ -2080,7 +2216,7 @@ function settingsPageActions(
         paletteSession.cancel('owner-disposed');
     };
   }
-  if (page.id === 'about') {
+  if (page.id === 'about' || page.id === 'applets') {
     const target = (value: unknown, groups = false) => {
       if (value === undefined) return undefined;
       const id = string(value);
@@ -2653,6 +2789,7 @@ async function initialize() {
     settings: () => settings.value.updates,
     hostVersion: app.getVersion(),
     helper: helperPath,
+    validateApplet: (folder) => manager.validateInstall(folder),
     executable: app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : '',
     restartArgs: [
       '--restore-view',
@@ -3630,6 +3767,7 @@ async function initialize() {
     try {
       const resultBytes = fs.readFileSync(updateResultFile, 'utf8');
       const result = JSON.parse(resultBytes);
+      updater.recordPackageResult(result);
       updater.state.phase = result.message;
       if (result.ok === true) {
         publishUpdateResult(resultBytes, {

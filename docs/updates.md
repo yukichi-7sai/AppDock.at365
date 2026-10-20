@@ -43,7 +43,7 @@ Appletフォルダーは配布単位で交換。共有設定/素材はEXE隣のs
 
 `installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。本体が未設定/取得失敗/同版の再適用不可/旧版なら現行host版を使う。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。全候補の取得・検証に成功した後だけ1回の確認とhelperへの引渡しを行い、1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
 
-AboutSettingsは共通SettingsSectionで「まとめて更新」「AppDock.at365」「インストール済みのApplet」「更新の設定」「実行環境の詳細」を構成し、Applet一覧・更新設定・実行環境は初期状態で折りたたむ。先頭のUpdateActionsは「本体と全Appletを更新」と「Appletを一括更新」を提供し、本体のみ・個別の操作も維持する。WebAppletを一括対象件数に含めず、対象0件でも全体操作は本体更新に使える。確認専用ボタンは設置せず、更新候補の確認から最終確認/取消までは既存installUpdatesを使う。VersionCheckは更新ボタンと最終確認日時を同じ操作行に置き、全体操作の下には直近のcheckedAtを表示する。結果本文とリリースリンクは操作行の下へ直接表示する。フッター/個別Appletの共通VersionCheckも更新操作だけを表示する。確認用APIと起動時の自動確認は維持する。
+AboutSettingsは本体・一括更新・更新動作・実行環境を扱い、Applet別の一覧は設定のApplet管理へ集約する。管理一覧には確認専用の「更新を確認」と「更新」を用意し、個別の更新元はApplet設定で編集する。フッター等のVersionCheckと起動時確認の契約は維持する。WebApplet本体は通常のパッケージで、collectionの子サイトを更新候補・対象件数に加えない。
 
 ## 検証
 
@@ -86,3 +86,7 @@ IPCのcancelUpdatesは取得/検証中のAbortControllerだけを停止する。
 更新後の起動で読み込むupdate-result.jsonの成功結果は、host/updates/appliedという通知種類のバナーで案内します。初期表示はinfo/6秒で、通知設定からオン/オフ、通知センターのみ、表示時間を変更できます。履歴はPC専用通知履歴に安全な固定文言だけを記録します。既読や履歴削除で更新処理をやり直しません。
 
 PC専用notifications/update-receipt.jsonはschemaVersion:1と最後に受付けた成功結果のSHA256を持ち、同じ結果を再起動ごとに再送しません。通知オフで抑制した結果も受付済みにします。保存できない場合は次回再表示の可能性をログへ記録し、未知schemaは上書きしません。進捗、確認結果、失敗結果、helperの交換/復元契約は従来の更新処理を使います。
+
+## Appletの新規導入と削除
+
+HTTP(S)・GitHubのfeed解決、サイズ・hash・ZIP・manifest検証を共通化した。新規導入と削除は本体設定の専用計画IDで確認し、通常の更新と排他にしてhelperへ渡す。job/journalのschema 2はinstall/update/uninstallを区別し、schema 1の復旧も維持する。新形式の準備・退避はextensions/.transactions/<operationId>/<index>/配下に分離し、拡張検出から除外する。設定・data・認証を操作対象に含めない。確定と中断復旧の契約は[Applet管理](applet-management-settings-design.md)を正本とする。

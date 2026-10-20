@@ -52,6 +52,31 @@
 .log-toolbar select {
   font-size: 11px;
 }
+.log-source-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.log-source-filter select {
+  min-width: 0;
+}
+.log-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+.log-filter-clear:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
 .log-toolbar > span {
   font-size: 10px;
 }

@@ -43,6 +43,13 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  provider?: { id: string; title: string; request: number };
+  appletManagement?: {
+    packagesAvailable: boolean;
+    mutableIds: string[];
+    busy: boolean;
+    discoveryIssueCount: number;
+  };
   shortcutCapture?: { token: string; key: string; sequence: number };
   mcpClient?: {
     revision: string;
@@ -120,6 +127,7 @@ export type SettingsPageOperation =
 /** UI selection state lives for the primary context, independently of a Shell View. */
 export interface SettingsNavigationState {
   query: string;
+  provider?: { id: string; page: 'shortcuts' | 'gestures'; request: number };
   move?: SettingsPageModel['content']['move'];
 }
 export interface SettingsPageAction {

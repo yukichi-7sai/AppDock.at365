@@ -15,6 +15,7 @@
 | 保存・起動 | [設定同期と保存領域](docs/settings-sync.md)、[Windows起動設定](docs/launch-settings.md) |
 | 端末別設定 | [Appletごとの保存先・ツールバー・表示／一般設定・移行と復旧](docs/device-settings-design.md) |
 | 既定値とリセット | [設定JSONの既定値省略・ページリセット・PC専用から共有への選択](docs/settings-defaults-reset-design.md) |
+| Applet管理 | [設定の管理一覧・対象で絞った移動・URL/フォルダー導入・アンインストール](docs/applet-management-settings-design.md) |
 | 共有設定・dataの場所（設計・未実装） | [端末ごとの参照先指定・素材と名簿・NASの排他と復旧](docs/shared-settings-location-design.md) |
 | 設定の再起動通知・JSON復旧 | [現行仕様](docs/settings-sync.md#設定の状態と再起動通知)、[設計と確認項目](docs/settings-recovery-notifications-design.md) |
 | 共通操作と許可 | [共通操作API](docs/appdock-api.md)、[MCPとCodex登録](docs/automation.md) |
@@ -256,7 +257,7 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 
 `dev.bat run build`は本体とDefault Shellを独立ビルドし、`publish.bat`で同じEXEへ同梱する。関連回帰は`tests/ui-presentation.test.cjs`、`tests/shell-boundaries.test.cjs`（内部importの逆流防止）、`scripts/shell-host-ui-test.cjs`、既存リボン/ページ/設定通知試験。Shell試験は発行EXEを引数にして同じ隔離試験を行える。`scripts/shell-metrics.cjs <旧EXE> <新EXE>`は2つの固定配布物を順次測定する。
 
-[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、ホーム・ログ・通知センターの公開モデル/操作/購読を定義する。設定画面は[本体の共通UI](docs/settings-foundation.md)で描画する。全体・Applet詳細・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsInputSessionから読み取ります。過去ログや日付検索は後続。
+[Shellのページ表示](docs/shell-pages.md)は、本文領域のShellPageHostと内容別ShellPageController、ホーム・ログ・通知センターの公開モデル/操作/購読を定義する。設定画面は[本体の共通UI](docs/settings-foundation.md)で描画する。全体・Appletで絞ったログ・WebApplet管理のログを共用し、本体の重複描画を撤去した。回帰はtests/home-page.test.cjs、tests/log-page.test.cjsとscripts/shell-home-ui-test.cjs [固定EXE]、scripts/shell-page-ui-test.cjs [固定EXE]。テーマ切替時のネイティブ背景とページ描画はscripts/shell-page-theme-ui-test.cjsで確認し、--softwareでハードウェアアクセラレーション無効も確認できる。ホームの表示順はmainのSettingsInputSessionから読み取ります。過去ログや日付検索は後続。
 
 設定の正本は保存済みSettingsStoreです。mainのSettingsInputSessionは選択/モード/操作受付だけを持ちます。本体rendererのuseSettingsEditorは直列入力と購読を担当します。設定範囲・カタログ・公開契約は[設定基盤](docs/settings-foundation.md)を参照してください。
 
@@ -289,3 +290,5 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 未保存のApplet有効状態は`src/shared/applet-state.ts`を正本とする。設定を補完する経路でも同じ既定値を使い、保存済みOFFは保持する。`tests/applet-defaults.test.cjs`と関連するlifecycle・端末設定・設定操作を確認する。`tests/page-collections.test.cjs`は既存の不足参照が無関係な保存を妨げないことと、追加/変更行の検証を確認する。
 
 GUIは`dev.bat exec node scripts/applet-defaults-ui-test.cjs [固定EXE]`。新規Profileと開始待ちの自動起動、保存済みOFF、部分保存と実再起動、アカウント未検出時のリボンのフォーム/JSON保存を隔離profileで確認する。元の名簿と参照情報のbytes保持を検査し、実サイトへの接続や実利用設定の復旧は行わない。
+
+Applet管理の回帰は`dev.bat exec node scripts/applet-management-ui-test.cjs [固定EXE]`。WebApplet本体と子サイトの区別、状態変更、対象で絞った画面移動、順序、固定EXEと実helperのURL/配布フォルダー/展開済みフォルダーからの導入・削除・再起動と保存データ保持を確認する。`dev.bat exec node scripts/applet-install-dialog-ui-test.cjs`は実際の導入ダイアログを隔離Electronと模擬操作APIで描画し、固定エラー枠、長文詳細、明暗テーマ/幅/短い高さ、入力確定、検証中の取消と遅い応答、二重送信/再試行を検査する。後者を実導入の証明には使わない。詳細な復旧・検証範囲は[管理仕様](docs/applet-management-settings-design.md)を参照する。

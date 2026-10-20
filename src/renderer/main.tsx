@@ -5,21 +5,14 @@ import { ShellPageSlot } from './ShellPageSlot';
 import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
 import { Icon } from './Icon';
-import { Toggle } from './settings-ui/Toggle';
 import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
-import { PanelImageCard } from './PanelImageCard';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { DockApi, HostSnapshot, ExtensionSnapshot } from '../shared/contracts';
 import './style.css';
 import { hostCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
 import { appletManagementCommands } from '../shared/applet-management';
-import { AppletSettingsPanel } from './AppletSettingsPanel';
-import { AppletIndex } from './AppletIndex';
-import { orderApplets } from '../shared/applet-order';
-import { SettingsToolbar, SettingsMessages } from './SettingsActions';
 import { useSettingsEditor } from './useSettingsEditor';
-import { VersionCheck } from './settings-ui/VersionCheck';
 import { useRestartView } from './useRestartView';
 import { useAppletSidebar } from './useAppletSidebar';
 
@@ -29,24 +22,6 @@ declare global {
   }
 }
 type Page = 'home' | 'extensions' | 'settings' | 'logs' | 'notifications' | `page:${string}`;
-type AppletDetailView = 'description' | 'settings' | 'shortcuts' | 'logs';
-
-const states = {
-  waiting: '開始待ち',
-  running: '実行中',
-  stopped: '停止中',
-  starting: '起動中',
-  stopping: '停止処理中',
-  error: 'エラー',
-};
-function StateBadge({ extension }: { extension: ExtensionSnapshot }) {
-  return (
-    <span className={`state ${extension.state}`}>
-      <i />
-      {states[extension.state]}
-    </span>
-  );
-}
 function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
@@ -96,14 +71,15 @@ function App() {
       return;
     }
     setLocalPage(nav.route as Page);
-    if (nav.appletId) setSelected(nav.appletId);
-    if (nav.appletDetail) setDetailView(nav.appletDetail);
+    if (nav.route === 'logs' && typeof nav.appletId === 'string') setLogSource(nav.appletId);
+    if (nav.section === 'applets') editor.selectPage('applets');
+    else if (nav.route === 'settings' && nav.appletId && nav.appletDetail === 'settings')
+      editor.selectPage(`applet:${nav.appletId}`);
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
     if (nav.section === 'general') setGeneralRequest((v) => v + 1);
   }, [snapshot?.navigation]);
   const [restoringPage, setRestoringPage] = useState(page.startsWith('page:'));
   const openingRestoredPage = useRef(false);
-  const [selected, setSelected] = useRestartView<string>('selected', '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [updatesRequest, setUpdatesRequest] = useState(0);
@@ -135,12 +111,6 @@ function App() {
       window.removeEventListener('resize', update);
     };
   }, [!!snapshot]);
-  const [detailView, setDetailView] = useRestartView<AppletDetailView>(
-    'detailView',
-    'description',
-    ['description', 'settings', 'shortcuts', 'logs'],
-  );
-  const detailSettings = detailView === 'settings' || detailView === 'shortcuts';
   const settingsPageReady = snapshot?.startupReady === true && snapshot.navigation.route === page;
   const editor = useSettingsEditor(snapshot?.settings);
   const settingsViewRestored = useRef(false);
@@ -181,13 +151,8 @@ function App() {
       }),
     [editor.flush],
   );
-  const orderedApplets = orderApplets(
-    snapshot?.extensions.filter((e) => e.sourceKind !== 'builtin') ?? [],
-    editor.value.appletOrder,
-  );
   const [logSource, setLogSource] = useRestartView<string>('logSource', '');
   useEffect(() => window.dock.onLogSourceChanged(setLogSource), []);
-  const knownCommands = useRef(new Map<string, UiCommand>());
   const load = async () => {
     try {
       setSnapshot(await window.dock.snapshot());
@@ -335,43 +300,12 @@ function App() {
       setBusy(false);
     }
   }
-  const goExtension = async (id: string) => {
-    try {
-      await window.dock.flushSettings();
-    } catch (e) {
-      setError(String(e));
-      return;
-    }
-    setSelected(id);
-    setPage('extensions');
-  };
   const commands: UiCommand[] = [
     ...hostCommands.map((command) => ({ ...command, extensionId: null })),
     ...appletManagementCommands(snapshot?.extensions ?? []),
     ...(snapshot?.extensions.flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
     ) ?? []),
-  ];
-  for (const command of commands) knownCommands.current.set(command.id, command);
-  const commandIds = new Set(commands.map((c) => c.id));
-  const shortcutCommands: UiCommand[] = [
-    ...commands,
-    ...[
-      ...new Set([
-        ...knownCommands.current.keys(),
-        ...Object.keys(snapshot?.settings.value.shortcuts ?? {}),
-        ...(snapshot?.settings.value.trayCommands ?? []),
-        ...(snapshot ? [snapshot.settings.value.host.trayClickCommand] : []),
-        ...(snapshot?.settings.value.host.trayDoubleClickCommand
-          ? [snapshot.settings.value.host.trayDoubleClickCommand]
-          : []),
-      ]),
-    ]
-      .filter((id) => !commandIds.has(id))
-      .map((id) => ({
-        ...(knownCommands.current.get(id) ?? { id, title: id, extension: '未確認のコマンド' }),
-        available: false,
-      })),
   ];
   async function execute(id: string) {
     if (id === 'appdock.notifications.open') {
@@ -394,10 +328,9 @@ function App() {
     }
     await action(() => window.dock.executeCommand(id));
   }
-  const selectedApplet = orderedApplets.find((e) => e.id === selected) ?? orderedApplets[0];
   return (
     <div
-      className={`shell ${page === 'extensions' ? 'with-sidebar' : ''}`}
+      className="shell"
       data-route={page}
       style={{ '--applet-sidebar-width': `${appletSidebar.width}px` } as React.CSSProperties}
     >
@@ -417,28 +350,13 @@ function App() {
           void window.dock.focusShell(before ? 'first' : 'last');
         }}
       />
-      {page === 'extensions' && (
-        <aside className="sidebar" aria-label="Applet一覧">
-          <AppletIndex
-            applets={orderedApplets}
-            selected={selectedApplet?.id}
-
-            onSelect={goExtension}
-            editor={editor}
-            busy={busy}
-          />
-          <div className="sidebar-resizer" {...appletSidebar.separatorProps} />
-        </aside>
-      )}
       <main
         className={
           page === 'settings' || page === 'home' || page === 'logs' || page === 'notifications'
             ? 'shell-page-main'
-            : page === 'extensions'
-              ? 'applet-detail-main settings-main applet-detail-settings-main'
-              : page.startsWith('page:')
-                ? 'applet-page-main'
-                : undefined
+            : page.startsWith('page:')
+              ? 'applet-page-main'
+              : undefined
         }
       >
         {snapshot?.shell.error && (
@@ -512,74 +430,6 @@ function App() {
                 navigationRequest={snapshot.navigation.request}
               />
             )}
-            {page === 'extensions' && (
-              <>
-                <PageHeading
-                  title="Applet"
-                  action={
-                    <div className="actions">
-                      <button
-                        className="secondary"
-                        onClick={() => void action(() => window.dock.openPath('extensions'))}
-                      >
-                        <Icon name="folder" size={16} />
-                        Appletフォルダを開く
-                      </button>
-                    </div>
-                  }
-                />
-                <SettingsToolbar editor={editor} busy={busy} />
-                {!detailSettings && (
-                  <SettingsMessages editor={editor} currentRevision={snapshot.settings.revision} />
-                )}
-                <div className="extensions-layout">
-                  <ExtensionDetail
-                    extension={selectedApplet}
-                    view={detailView}
-                    onView={(view) => {
-                      void window.dock
-                        .flushSettings()
-                        .then(() => setDetailView(view))
-                        .catch((e) => setError(String(e)));
-                      return true;
-                    }}
-                    settingsPanel={
-                      detailSettings && selectedApplet ? (
-                        <>
-                          <SettingsMessages
-                            editor={editor}
-                            currentRevision={snapshot.settings.revision}
-                          />
-                          <AppletSettingsPanel
-                            ready={settingsPageReady}
-                            commands={shortcutCommands}
-                            applets={orderedApplets.map((e) => ({
-                              id: e.id,
-                              title: e.displayName,
-                            }))}
-                            applet={selectedApplet}
-                            editor={editor}
-                            tab={detailView === 'shortcuts' ? 'shortcuts' : 'settings'}
-                          />
-                        </>
-                      ) : undefined
-                    }
-                    logsPanel={
-                      detailView === 'logs' && selectedApplet ? (
-                        <ShellPageSlot
-                          key={selectedApplet.id}
-                          scope={{ type: 'applet', id: selectedApplet.id }}
-                          navigationRequest={snapshot.navigation.request}
-                        />
-                      ) : undefined
-                    }
-                    busy={busy}
-                    updateDisabled={editor.pending}
-                    run={action}
-                  />
-                </div>
-              </>
-            )}
             <div className="settings-page" hidden={page !== 'settings'}>
               {page === 'settings' && (
                 <SettingsPage ready={settingsPageReady} sidebarWidth={appletSidebar.width} />
@@ -600,282 +450,6 @@ function App() {
       </main>
       <ShellBarSlot region="statusbar" />
     </div>
-  );
-}
-function PageHeading({ title, action }: { title: string; action?: React.ReactNode }) {
-  return (
-    <div className="page-heading compact">
-      <div>
-        <h1>{title}</h1>
-      </div>
-      {action}
-    </div>
-  );
-}
-type Run = (work: () => Promise<unknown>) => Promise<void>;
-function ExtensionDetail({
-  extension: e,
-  busy,
-  updateDisabled,
-  run,
-  view,
-  onView,
-  settingsPanel,
-  logsPanel,
-}: {
-  extension?: ExtensionSnapshot;
-  view: AppletDetailView;
-  onView(view: AppletDetailView): boolean;
-  settingsPanel?: React.ReactNode;
-  logsPanel?: React.ReactNode;
-  busy: boolean;
-  updateDisabled: boolean;
-  run: Run;
-}) {
-  if (!e)
-    return (
-      <section className="detail empty">
-        Appletフォルダにextension.jsonを配置してAppDockを起動し直してください。
-      </section>
-    );
-  return (
-    <section className="detail">
-      <div className="detail-heading">
-        <span className={`extension-icon large ${e.runtime}`}>
-          <Icon name="extensions" size={30} />
-        </span>
-        <div>
-          <h2>{e.displayName}</h2>
-          <p>
-            v{e.version} <span className="divider">/</span>{' '}
-            {!!e.collection
-              ? 'Appletページ'
-              : e.runtime === 'node'
-                ? 'TypeScript · Node.js'
-                : 'C# · .NET 10'}
-          </p>
-        </div>
-        <Toggle
-          checked={e.enabled}
-          label={`${e.displayName}を有効にする`}
-          disabled={busy}
-          onChange={(v) => void run(() => window.dock.toggleExtension(e.id, v))}
-        />
-      </div>
-      <div className="detail-tabs" role="tablist" aria-label="Applet詳細の切り替え">
-        {(
-          [
-            { id: 'description', title: '説明', icon: 'extensions' },
-            { id: 'settings', title: '設定', icon: 'settings' },
-            { id: 'shortcuts', title: 'ショートカット', icon: 'command' },
-            { id: 'logs', title: 'ログ', icon: 'logs' },
-          ] as const
-        ).map((tab, index, tabs) => (
-          <button
-            key={tab.id}
-            id={`applet-detail-tab-${tab.id}`}
-            role="tab"
-            aria-selected={view === tab.id}
-            aria-controls="applet-detail-panel"
-            tabIndex={view === tab.id ? 0 : -1}
-            onClick={() => onView(tab.id)}
-            onKeyDown={(event) => {
-              const next =
-                event.key === 'ArrowRight'
-                  ? (index + 1) % tabs.length
-                  : event.key === 'ArrowLeft'
-                    ? (index + tabs.length - 1) % tabs.length
-                    : event.key === 'Home'
-                      ? 0
-                      : event.key === 'End'
-                        ? tabs.length - 1
-                        : undefined;
-              if (next === undefined) return;
-              event.preventDefault();
-              if (onView(tabs[next].id))
-                document.getElementById(`applet-detail-tab-${tabs[next].id}`)?.focus();
-            }}
-          >
-            <Icon name={tab.icon} size={16} />
-            {tab.title}
-          </button>
-        ))}
-      </div>
-      {settingsPanel ? (
-        <div
-          className="detail-settings"
-          id="applet-detail-panel"
-          role="tabpanel"
-          aria-labelledby={`applet-detail-tab-${view}`}
-        >
-          {settingsPanel}
-        </div>
-      ) : logsPanel ? (
-        <div
-          className="detail-logs"
-          id="applet-detail-panel"
-          role="tabpanel"
-          aria-labelledby="applet-detail-tab-logs"
-        >
-          {logsPanel}
-        </div>
-      ) : (
-        <div
-          className="detail-description-panel"
-          id="applet-detail-panel"
-          role="tabpanel"
-          aria-labelledby="applet-detail-tab-description"
-        >
-          <p className="detail-description">{e.description}</p>
-          {
-            <>
-              {e.minimumHostVersion && (
-                <p className="muted">AppDock v{e.minimumHostVersion}以降が必要です。</p>
-              )}
-              {!e.collection && (
-                <VersionCheck key={e.id} id={e.id} disabled={busy || updateDisabled} />
-              )}
-              <div className="detail-state">
-                <StateBadge extension={e} />
-                <button
-                  className="text-button"
-                  disabled={busy || !e.enabled}
-                  onClick={() => void run(() => window.dock.restartExtension(e.id))}
-                >
-                  <Icon name="refresh" size={14} />
-                  再起動
-                </button>
-              </div>
-              {e.error && <div className="error-text">{e.error}</div>}
-              {e.state === 'waiting' && (
-                <div className="extension-panel">
-                  <p>
-                    {e.displayName} は {new Date(e.scheduledStartAt!).toLocaleTimeString()}{' '}
-                    に開始します。
-                  </p>
-                  <button
-                    className="secondary"
-                    disabled={busy}
-                    onClick={() => void run(() => window.dock.startExtensionNow(e.id))}
-                  >
-                    今すぐ開始
-                  </button>
-                </div>
-              )}
-              {e.panel ? (
-                <div className="extension-panel">
-                  <h3>{e.panel.title}</h3>
-                  <p>{e.panel.description}</p>
-                  {!!e.panel.tabs?.length && (
-                    <nav className="panel-tabs" aria-label="パネルの切り替え">
-                      {e.panel.tabs.map((tab) => (
-                        <button
-                          className="secondary"
-                          key={tab.actionId ?? tab.command}
-                          aria-pressed={tab.selected ?? false}
-                          disabled={
-                            busy ||
-                            (!tab.actionId &&
-                              !e.commands.some(
-                                (command) => command.id === tab.command && command.available,
-                              ))
-                          }
-                          onClick={() =>
-                            void run(() =>
-                              tab.actionId
-                                ? window.dock.executePanelAction(e.id, tab.actionId)
-                                : window.dock.executeCommand(tab.command),
-                            )
-                          }
-                        >
-                          {tab.title}
-                        </button>
-                      ))}
-                    </nav>
-                  )}
-                  {!!e.panel.images?.length && (
-                    <div className="panel-images">
-                      {e.panel.images.map((item, i) => (
-                        <PanelImageCard key={i} item={item} extension={e} busy={busy} run={run} />
-                      ))}
-                    </div>
-                  )}
-                  <dl>
-                    {e.panel.facts?.map((f, i) => (
-                      <div key={i}>
-                        <dt>{f.label}</dt>
-                        <dd>{f.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <div className="actions">
-                    {e.panel.actions?.map((a) => (
-                      <button
-                        className="secondary"
-                        key={a.actionId ?? a.command}
-                        disabled={
-                          busy ||
-                          (!a.actionId &&
-                            !e.commands.some((c) => c.id === a.command && c.available))
-                        }
-                        onClick={() =>
-                          void run(() =>
-                            a.actionId
-                              ? window.dock.executePanelAction(e.id, a.actionId)
-                              : window.dock.executeCommand(a.command),
-                          )
-                        }
-                      >
-                        {a.title}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="inactive-panel">
-                  <Icon name="extensions" size={28} />
-                  <h3>
-                    {!e.enabled
-                      ? 'このAppletをDockにつなぐ'
-                      : e.state === 'waiting'
-                        ? 'Appletの開始を待っています'
-                        : e.state === 'starting'
-                          ? 'Appletを起動しています'
-                          : e.state === 'stopping'
-                            ? 'Appletを停止しています'
-                            : e.state === 'error'
-                              ? 'Appletでエラーが発生しました'
-                              : e.state === 'running'
-                                ? '専用の操作画面はありません'
-                                : 'Appletは停止しています'}
-                  </h3>
-                  <p>
-                    {!e.enabled
-                      ? '有効にすると、Appletの画面とコマンドを使えます。'
-                      : e.state === 'error'
-                        ? 'ログを確認して、必要に応じて再起動してください。'
-                        : e.state === 'running'
-                          ? '設定やコマンド検索から操作できます。'
-                          : '状態が変わるまでお待ちください。必要に応じて再起動できます。'}
-                  </p>
-                </div>
-              )}
-              <details className="detail-meta">
-                <summary>技術情報</summary>
-                <div>
-                  <span>Extension ID</span>
-                  <code>{e.id}</code>
-                </div>
-                <div>
-                  <span>Host API</span>
-                  <p>{e.capabilities?.join(' · ') || 'なし'}</p>
-                </div>
-              </details>
-            </>
-          }
-        </div>
-      )}
-    </section>
   );
 }
 createRoot(document.getElementById('root')!).render(

@@ -2740,6 +2740,43 @@ summary {
   align-items: stretch;
   gap: 12px;
 }
+.command-provider-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0 0 12px;
+  padding: 5px 6px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.command-provider-filter > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.command-provider-filter strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.command-provider-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.command-provider-clear:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .command-shortcut-search {
   display: flex;
   align-items: center;

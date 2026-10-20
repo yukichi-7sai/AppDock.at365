@@ -366,7 +366,7 @@ export interface UpdateSettings {
 }
 export interface UpdateState {
   notice?: { id: string; kind: 'info' | 'available' | 'error'; message: string };
-  completion?: { ok: boolean; message: string };
+  completion?: { ok: boolean; message: string; operationId?: string };
   cancellable?: boolean;
   progress?: {
     id: string;

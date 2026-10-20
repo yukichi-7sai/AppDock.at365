@@ -12,6 +12,7 @@ export function AboutSettings({
   runtime,
   version,
   busy,
+  openApplets,
 }: {
   settings: Settings;
   edit(value: Settings): void;
@@ -19,6 +20,7 @@ export function AboutSettings({
   runtime: NonNullable<SettingsPageAuxiliary['runtime']>;
   version: string;
   busy: boolean;
+  openApplets(): void;
 }) {
   const updates = useUpdateState();
   const applets = extensions.filter((extension) => !extension.collection);
@@ -39,31 +41,9 @@ export function AboutSettings({
         </div>
         <VersionCheck details disabled={busy} />
       </SettingsSection>
-      <SettingsSection
-        title="インストール済みのApplet"
-        hint="個別に更新できます。更新元を変更する場合は、各Appletの設定を開いてください。"
-        collapsible
-        {...settingAnchor('about', 'updateSource')}
-      >
-        {!applets.length && (
-          <p>個別に更新するAppletはありません。ページは提供元のAppletと一緒に管理されます。</p>
-        )}
-        <div className="about-applets">
-          {applets.map((extension) => (
-            <article key={extension.id} aria-label={extension.displayName}>
-              <div className="about-applet-heading">
-                <strong>{extension.displayName}</strong>
-                <VersionDisplay
-                  version={extension.version}
-                  result={updates.results.find((result) => result.id === extension.id)}
-                />
-              </div>
-              <VersionCheck id={extension.id} details disabled={busy} />
-              <AppletUpdateSource extension={extension} settings={settings} edit={edit} />
-            </article>
-          ))}
-        </div>
-      </SettingsSection>
+      <button className="text-button" onClick={openApplets}>
+        Appletの管理と更新
+      </button>
       <UpdateSettings settings={settings} edit={edit} />
       <SettingsSection
         title="実行環境の詳細"

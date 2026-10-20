@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useSettingsControls } from './api';
 import { SettingsInputMode } from './SettingsInput';
 import { SettingsHint } from './SettingsHint';
+import { SettingsError } from './SettingsError';
 let activeSettingsModals = 0;
 
 /** Shared settings modal: focus containment/return, IME-safe dismissal and input suspension. */
@@ -108,16 +109,26 @@ export function SettingsDialog({
   valid = true,
   className = '',
   footer,
+  errorLayout = 'inline',
+  cancelWhilePending = false,
 }: {
   title: string;
   description?: string;
-  children: ReactNode | ((ready: boolean, setError: (error: string) => void) => ReactNode);
+  children:
+    | ReactNode
+    | ((
+        ready: boolean,
+        setError: (error: string) => void,
+        state: { error: string; pending: boolean },
+      ) => ReactNode);
   onClose(): void;
   onApply(): Promise<unknown>;
   applyLabel?: string;
   valid?: boolean;
   className?: string;
   footer?: string;
+  errorLayout?: 'inline' | 'reserved';
+  cancelWhilePending?: boolean;
 }) {
   const settingsControls = useSettingsControls();
   const [id] = useState(() => `dialog-${crypto.randomUUID()}`);
@@ -147,7 +158,7 @@ export function SettingsDialog({
       onClose={onClose}
       onReady={setReady}
       onError={setError}
-      closeDisabled={pending}
+      closeDisabled={pending && !cancelWhilePending}
     >
       <header>
         <div>
@@ -157,7 +168,7 @@ export function SettingsDialog({
         <button
           className="shortcut-dialog-close"
           aria-label="ダイアログを閉じる"
-          disabled={pending}
+          disabled={pending && !cancelWhilePending}
           onClick={onClose}
         >
           ×
@@ -165,23 +176,30 @@ export function SettingsDialog({
       </header>
       <div className="settings-dialog-body">
         <fieldset className="settings-dialog-fields" disabled={pending}>
-          {typeof children === 'function' ? children(ready, setError) : children}
+          {typeof children === 'function'
+            ? children(ready, setError, { error, pending })
+            : children}
         </fieldset>
       </div>
-      {error && (
-        <p className="shortcut-dialog-error" role="alert">
-          {error}
-        </p>
+      {errorLayout === 'reserved' ? (
+        <SettingsError error={error} />
+      ) : (
+        error && (
+          <p className="shortcut-dialog-error" role="alert">
+            {error}
+          </p>
+        )
       )}
       <footer>
         <SettingsHint as="small">{footer}</SettingsHint>
         <div>
-          <button disabled={pending} onClick={onClose}>
+          <button disabled={pending && !cancelWhilePending} onClick={onClose}>
             キャンセル
           </button>
           <button
             className="primary"
             disabled={!ready || !valid || pending}
+            aria-busy={pending || undefined}
             onClick={() => void apply()}
           >
             {applyLabel}

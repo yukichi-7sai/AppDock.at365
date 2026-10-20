@@ -92,7 +92,7 @@ test('every host JSON page accepts an empty object and displays an empty default
   }
 });
 
-test('page reset removes Applet defaults while retaining enabled state, update source and unknown pages', () => {
+test('page reset includes the relocated update source while retaining enabled state and unknown pages', () => {
   const current = createDefaultSettings();
   current.extensions[applet.id] = {
     enabled: false,
@@ -107,7 +107,8 @@ test('page reset removes Applet defaults while retaining enabled state, update s
   assert.equal(reset.extensions[applet.id].startupDelaySeconds, undefined);
   assert.deepEqual(reset.extensions[applet.id].pages, { missing: { display: 'page' } });
   assert.equal(reset.extensions[applet.id].enabled, false);
-  assert.equal(reset.extensions[applet.id].updateSource, 'github:custom/source');
+  assert.equal(reset.extensions[applet.id].updateSource, undefined);
+  assert.equal(current.extensions[applet.id].updateSource, 'github:custom/source');
   assert.deepEqual(settingsJsonProjection(reset, p, applets), {});
   assert.throws(
     () => applySettingsJson(current, p, applets, '{"host":{"theme":"dark"}}'),

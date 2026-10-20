@@ -293,15 +293,17 @@ async function restarted(inspectPort, predicate, previousPid) {
     );
     await about(page);
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
-    assert.equal(await page.locator('.about-page > .settings-section').count(), 5);
+    assert.equal(await page.locator('.about-page > .settings-section').count(), 4);
     assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 0);
     assert.equal(
       await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
       0,
     );
-    assert.equal(await page.locator('.about-applets .applet-update-source').count(), 2);
-    assert.equal(await page.locator('.about-applets').isVisible(), false);
-    await page.getByText('インストール済みのApplet', { exact: true }).click();
+    assert.equal(await page.locator('.about-applets').count(), 0);
+    assert.equal(
+      await page.getByRole('button', { name: 'Appletの管理と更新', exact: true }).count(),
+      1,
+    );
     for (const control of await page.locator('.about-page .update-check-control').all()) {
       const button = await control.getByRole('button').boundingBox();
       const time = await control.locator('time').boundingBox();
@@ -313,8 +315,13 @@ async function restarted(inspectPort, predicate, previousPid) {
     );
     await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
     // Both source resets save immediately and preserve unrelated settings.
-    const appletCard = page.locator('.about-applets article').filter({ hasText: 'test.disabled' });
-    await appletCard.locator('.applet-update-source > summary').click();
+    await page.getByRole('button', { name: 'Appletの管理と更新', exact: true }).click();
+    await page
+      .locator('[data-applet-id="test.disabled"]')
+      .getByRole('button', { name: 'test.disabled', exact: true })
+      .click();
+    const appletCard = page.locator('.applet-update-source');
+    await appletCard.locator('summary').click();
     await appletCard.getByRole('button', { name: '既定に戻す', exact: true }).click();
     assert.equal(
       await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
@@ -329,7 +336,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       .getByLabel('test.disabledの更新元', { exact: true })
       .fill(path.join(profile, 'sources/test.disabled'));
     await settleSettings(page);
-    await appletCard.locator('.applet-update-source > summary').click();
+    await about(page);
     await page.getByText('更新の設定', { exact: true }).click();
     await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
     assert.equal(
@@ -468,14 +475,16 @@ async function restarted(inspectPort, predicate, previousPid) {
     await wait(300);
     await settingsRenderer(
       inspectPort,
-      "[...document.querySelectorAll('.settings-categories button')].find(b => b.textContent.trim() === 'バージョン情報・更新').click()",
+      "[...document.querySelectorAll('.settings-categories button')].find(b => b.textContent.trim() === 'Applet管理').click()",
     );
+    await wait(300);
+    await renderer(inspectPort, "window.dock.checkUpdates('appdock.dotnet-demo')");
     await wait(300);
     await approve(inspectPort);
     const individualPid = await inspect(inspectPort, 'process.pid');
     await settingsRenderer(
       inspectPort,
-      "(()=>{const button=[...document.querySelectorAll('.about-applets button')].find(b => b.textContent.trim() === 'このAppletを更新');button.closest('details.settings-section').querySelector('summary').click();button.click();})()",
+      "[...document.querySelectorAll('[data-applet-id=\"appdock.dotnet-demo\"] button')].find(b => b.textContent.trim() === '更新').click()",
     );
     await wait(1500);
     await restarted(inspectPort, (s) => !s.updates.busy, individualPid);

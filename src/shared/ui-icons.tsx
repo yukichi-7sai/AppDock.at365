@@ -17,6 +17,8 @@ export type IconName =
   | 'minus'
   | 'square'
   | 'command'
+  | 'keyboard'
+  | 'mouse'
   | 'mail'
   | 'clock'
   | 'image'
@@ -88,6 +90,18 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M8 8h8v8H8Z" />
       <path d="M8 8H5a3 3 0 1 1 3-3v14a3 3 0 1 1-3-3h14a3 3 0 1 1-3 3V5a3 3 0 1 1 3 3Z" />
+    </>
+  ),
+  keyboard: (
+    <>
+      <rect x="2" y="5" width="20" height="14" rx="3" />
+      <path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10" />
+    </>
+  ),
+  mouse: (
+    <>
+      <rect x="6" y="2" width="12" height="20" rx="6" />
+      <path d="M12 6v4" />
     </>
   ),
   mail: (

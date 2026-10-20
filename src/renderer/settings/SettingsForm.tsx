@@ -8,6 +8,8 @@ import { defaultShellId, shellRegions, shellView } from '../../shared/shell';
 import { useSettingsControls } from '../settings-ui/api';
 import { Toggle } from '../settings-ui/Toggle';
 import { AboutSettings } from './AboutSettings';
+import { AppletManagementSettings } from './AppletManagementSettings';
+import { AppletUpdateSource } from './UpdateSettings';
 
 import { ShortcutsEditor } from './ShortcutsEditor';
 import { GesturesEditor } from './GesturesEditor';
@@ -61,13 +63,31 @@ export function SettingsForm({
   };
   if (page.kind === 'applet')
     return (
-      <AppletSettingsForm
-        applet={extensions.find((a) => a.id === page.owner)!}
-        settings={settings}
-        onChange={edit}
-        accounts={aux.accounts}
-        onListCommit={(key, value, before) => invoke('replaceAppletList', [key, value, before])}
-        onListOpen={(key, id) => invoke('openAppletListItem', [key, id])}
+      <>
+        <AppletSettingsForm
+          applet={extensions.find((a) => a.id === page.owner)!}
+          settings={settings}
+          onChange={edit}
+          accounts={aux.accounts}
+          onListCommit={(key, value, before) => invoke('replaceAppletList', [key, value, before])}
+          onListOpen={(key, id) => invoke('openAppletListItem', [key, id])}
+        />
+        {!page.collection && (
+          <AppletUpdateSource
+            extension={extensions.find((a) => a.id === page.owner)!}
+            settings={settings}
+            edit={edit}
+          />
+        )}
+      </>
+    );
+  if (category === 'applets')
+    return (
+      <AppletManagementSettings
+        applets={extensions}
+        management={aux.appletManagement}
+        updates={aux.updates}
+        invoke={invoke}
       />
     );
   if (category === 'about')
@@ -79,6 +99,7 @@ export function SettingsForm({
         runtime={runtime}
         version={version}
         busy={busy}
+        openApplets={() => select('applets')}
       />
     );
   if (category === 'tray')
@@ -158,6 +179,8 @@ export function SettingsForm({
       >
         {category === 'gestures' && (
           <GesturesEditor
+            provider={aux.provider}
+            clearProvider={() => void invoke('clearProvider')}
             settings={settings}
             onChange={edit}
             commands={commands}
@@ -166,6 +189,8 @@ export function SettingsForm({
         )}
         {category === 'shortcuts' && (
           <ShortcutsEditor
+            provider={aux.provider}
+            clearProvider={() => void invoke('clearProvider')}
             key={category}
             commands={commands}
             settings={settings}
