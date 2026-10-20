@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { collectionPages, type CollectionPage } from '../../shared/page-collections';
 import type { RemotePageDefinition } from '../../shared/web-content';
@@ -217,12 +218,21 @@ export class PageCollectionManager {
       };
     });
   }
-  validate(settings: Settings) {
-    for (const page of collectionPages(settings, this.options.parents()))
-      if (page.definition.source === 'remote')
+  validate(settings: Settings, previous?: Settings) {
+    const parents = this.options.parents();
+    for (const page of collectionPages(settings, parents)) {
+      const rows = previous?.extensions[page.binding.owner]?.settings[page.binding.key];
+      if (
+        page.definition.source === 'remote' &&
+        !(
+          Array.isArray(rows) &&
+          rows.some((old) => old?.id === page.binding.itemId && isDeepStrictEqual(old, page.item))
+        )
+      )
         this.profiles(page.binding.owner).validateAccounts([
           { ...page.item, id: page.id } as RemotePageDefinition,
         ]);
+    }
   }
   states() {
     return Object.assign({}, ...[...this.services.values()].map((service) => service.states()));

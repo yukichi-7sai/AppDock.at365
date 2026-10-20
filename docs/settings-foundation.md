@@ -36,7 +36,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使�
 
 ## カタログ・JSON・検索
 
-settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタデータを定義する。IDはページIDとキーを個別にencodeURIComponentし、ドット入りID/設定キーはキー配列で扱う。未知の未編集フィールド・未導入Appletを保持する。未設定Appletの部分保存ではenabled:false/settings:{}の行を補完する。無検証マージと変更マーク比較を削除した。JSONは選択ページのみ、Webは対象IDを保つ1行投影の許可フィールドだけを変更する。
+settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタデータを定義する。IDはページIDとキーを個別にencodeURIComponentし、ドット入りID/設定キーはキー配列で扱う。未知の未編集フィールド・未導入Appletを保持する。未設定Appletの部分保存ではenabled:true/settings:{}の行を補完する。保存済みのenabled:falseは保持する。無検証マージと変更マーク比較を削除した。JSONは選択ページのみ、Webは対象IDを保つ1行投影の許可フィールドだけを変更する。
 
 検索はNFKC/空白区切りAND、項目名/説明/所属/静的キー・別名・固定選択肢・オブジェクトフィールドを対象にする。入力値/秘密/動的選択肢は対象外。入力だけで右ページを変えず、結果選択でフォーム全体へ移動する。data-setting-itemアンカー、details展開、スクロール/フォーカス/2秒強調、最新移動IDの完了照合を維持する。queryはprimaryのSettingsNavigationStateに保持し、不正JSONは移動を妨げない。対象消失時は結果更新/右を利用不可にする。
 

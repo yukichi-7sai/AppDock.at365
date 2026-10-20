@@ -243,7 +243,7 @@ LAN直結は暗号化されないHTTP通信です。tailnet経由ではTailscale
 
 ## オールインワン版
 
-AppDockのGitHub Releaseに添付する`AppDock.at365-all-in-one-<本体の版>.zip`には、単一EXEのAppDock本体と、リリース時に同梱した全Appletが入っています。ZIP全体を新しい書き込み可能なフォルダーへ展開し、`AppDock.at365.exe`を起動してください。AppletはEXEの隣の`extensions`に配置済みなので、使いたいものを一覧から有効にできます。初期状態はすべて無効です。.NET 10 Runtimeなど、本体・各Appletの動作要件は通常版と同じです。
+AppDockのGitHub Releaseに添付する`AppDock.at365-all-in-one-<本体の版>.zip`には、単一EXEのAppDock本体と、リリース時に同梱した全Appletが入っています。ZIP全体を新しい書き込み可能なフォルダーへ展開し、`AppDock.at365.exe`を起動してください。AppletはEXEの隣の`extensions`に配置済みです。新規Appletは既定で有効になり、使わないものは一覧で無効にできます。保存済みの有効・無効は引き継ぎます。.NET 10 Runtimeなど、本体・各Appletの動作要件は通常版と同じです。
 
 同梱したAppletの版は`bundle.json`で確認できます。このファイルは配布時の一覧で、導入後の個別更新には追従しません。既存環境の更新には、本体・Appletの更新ボタンを利用してください。オールインワンZIPを既存フォルダーへ重ねて展開すると、個別に更新したAppletを古い版へ戻す場合があります。
 
@@ -312,7 +312,7 @@ WebApplet専用のアカウント枠を選び、サイトのログイン状態�
 
 1. AppDockを完全終了します。
 2. 信頼できるAppletの配布フォルダーを、EXEの隣の `extensions` に置きます。`extensions/<Appletフォルダ>/extension.json` と、そのAppletの実行に必要なファイル一式をそろえてください。
-3. AppDockを起動し直し、「Applet」一覧で有効にします。新規Appletは既定で無効です。
+3. AppDockを起動し直します。新規Appletは既定で有効です。「Applet」一覧で有効・無効を切り替えられ、保存済みのOFFはそのまま引き継ぎます。
 
 追加・削除・更新後はAppDockを起動し直してください。同じIDのAppletが複数ある場合は先に見つかったものが使われ、重複をログに記録します。必要なAppDockバージョンは各Appletの案内を確認してください。非対応のバージョンでは起動できないことがあります。
 

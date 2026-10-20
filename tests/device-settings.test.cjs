@@ -145,8 +145,8 @@ test('two PC names see only their own state in the same synchronized placement',
   fs.writeFileSync(file, JSON.stringify(shared));
   a.reload();
   b.reload();
-  assert.equal(a.value.extensions['example.new'].enabled, false);
-  assert.equal(b.value.extensions['example.new'].enabled, false);
+  assert.equal(a.value.extensions['example.new'].enabled, true);
+  assert.equal(b.value.extensions['example.new'].enabled, true);
 });
 test('dynamic page flags never leak into shared or local configuration arrays', (t) => {
   const { store, file } = fixture(t, 'PC-A', [collection]);

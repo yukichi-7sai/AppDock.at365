@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-20: コミット前回帰とpush（0.69.1）
+
+- 6repoの732入力、成功コマンドの完全ログ/終了コード/hash、最終EXE/feedとProfile/WebAppletのZIP/feed、source/固定EXE GUI各3群・smokeを照合して一致。型検査・build・関連25ファイル209件を再利用した。元validationのpassedはコマンド一覧のため、各exitCode=0と結果JSONで成功を判断した。
+- fixtureを現行HEADのまま再ビルドし、未実施の標準73ファイル487/487が成功。本体標準98ファイル **696/696、fail/skip 0**。生成910ファイルのうち909件は前後一致、Demo fixture DLLだけ未変更C#ソースから現在のcommit情報5bc2183を含めて再生成された。SDK/Runtime・兄弟Appletのソース変更はなく、前回の兄弟回帰を無効化する変更はない。
+- 制限内の.NET fixture失敗と標準回帰のファイル置換/ローカル通信失敗はログを保持し、同一コマンドを通常ユーザー実行して成功。製品の追加修正・版更新・再publishなし。確認済み0.69.1のEXE/hashを維持した。
+- 今回の依頼に基づいて本体修正をcommitし、前回の本体/WebApplet/Profile commitも通常pushの対象にする。Profileは利用者の指定でGitHubの公開repoとAQUA bareを作成。Release・全体ZIP・実利用deploy・設定/アカウントの移行は行わない。
+- [コミット検証](.artifacts/commit-validation-applet-defaults-20261020/validation.json)へ再利用根拠、入力/生成物一覧、コマンド/ログhashを記録。[同フォルダー](.artifacts/commit-validation-applet-defaults-20261020/)のstage/commit/push記録で名義と最終tree・両送信先のmainを照合する。
+
+## 2026-10-20: Appletの既定ONとリボン保存（0.69.1）
+
+- main/origin/main追跡・cleanと直前の本体commit 5bc2183を確認し、pull --ff-onlyで最新確認後に修正。Profileはmain/clean・remoteなし。既存OFFを保持し、新規Applet/子ページの未保存状態をONへ統一。即時/開始待ち/再起動、Shell・生成コマンドと設定補完・端末保存も同じ既定値を使う。
+- 保存前検証が未変更Web行の不足アカウントまで検査し、リボン保存をSAVE_FAILEDにしていた。旧ビルドの隔離再現で報告と同じエラーを確認。新規/変更行だけアカウントの存在を検査し、行の構造・処理中ガードは保持。migrations.webAppletや名簿・sessionの自動修復/移行/削除は加えていない。移行後も参照が必要な理由を文書化した。
+- 型検査・本体/Default Shell build、関連25ファイル **209/209、fail/skip 0**。sourceと固定EXEの隔離GUIが各 **3群**成功。新規Profileの自動有効化・部分保存、開始待ち、保存済みOFFと実プロセス再起動、フォーム/JSONのリボン保存、元の参照行/名簿bytesと移行情報の不在を維持することを確認。固定EXE smokeも成功。
+- [発行前レビュー](.artifacts/applet-default-enabled-20261020/review.md)の未解決指摘なし。既存項目の既定値と保存検証の修正のため0.69.0→0.69.1。SDK/Runtime・Applet版は更新せず、本体だけpublish.batで発行。最終EXEは **168942100 bytes / SHA256 6519a677d5f8101b3e69c733b1f295df6e440f1fdce8bfbcbd57f83e4756cea8**、feedとDefault Shell 0.69.1が一致。Profile/WebAppletの発行ZIP/feedは前回と同一。
+- [検証結果](.artifacts/applet-default-enabled-20261020/validation.json)へ全コマンド/完全ログとhash、6repoの732入力の検証前後一致、固定EXE/コピー/GUI/smokeのhashを記録。制限内のファイル置換/GUI失敗と依存検証の待機は保持し、同じコマンドを通常ユーザー環境で成功させた。新しいfixtureの後処理と宣言を修正した失敗も最終成功と区別する。
+- 実利用設定・アカウント・外部サイトを操作せず、WebApplet側の再設計/復旧は行わない。実装時の必要範囲を検証し、全標準回帰・commit/push/Release/全体ZIP/実利用deployは未実施。
+
 ## 2026-10-20: コミット前回帰（0.69.0）
 
 - 実装時の728入力（製品・試験・fixture・依存・ビルド定義）と完全ログのSHA256、固定EXE/両Applet ZIP/feedを照合し一致。型検査・build、20ファイルの関連154件、WebApplet標準2件、固定EXE GUI8群・設定GUI9/11/8/6群・smoke、native3のRelease buildと接続/表示/保存/停止を再利用した。前項の関連ファイル数を21から20へ訂正した。

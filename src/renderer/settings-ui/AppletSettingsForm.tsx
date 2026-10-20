@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { defaultAppletEnabled } from '../../shared/applet-state';
 import type {
   ExtensionSnapshot,
   Settings,
@@ -43,7 +44,7 @@ export function AppletSettingsForm({
   const [result, setResult] = useState<{ command: string; message: string; error: boolean } | null>(
     null,
   );
-  const current = settings.extensions[applet.id] ?? { enabled: false, settings: {} };
+  const current = settings.extensions[applet.id] ?? { enabled: defaultAppletEnabled, settings: {} };
   const update = (next: typeof current) =>
     onChange({ ...settings, extensions: { ...settings.extensions, [applet.id]: next } });
   const sections = resolveSettingSections(

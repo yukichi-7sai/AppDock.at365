@@ -1,4 +1,5 @@
 import { collectionRecord } from './page-collections';
+import { defaultAppletEnabled } from './applet-state';
 import { shellRegions } from './shell';
 import { notificationCatalog, notificationSettingKey } from './notification-types';
 import type { ExtensionSnapshot, Settings, SettingDefinition } from './contracts';
@@ -532,7 +533,8 @@ export function applySettingsJson(
   assertScope(value, paths);
   const check = createDefaultSettings();
   for (const p of paths)
-    if (p[0] === 'extensions') check.extensions[p[1]] ??= { enabled: false, settings: {} };
+    if (p[0] === 'extensions')
+      check.extensions[p[1]] ??= { enabled: defaultAppletEnabled, settings: {} };
   for (const p of paths) writePath(check, p, readSettingsPath(value, p));
   // Missing required values fail; optional values use the existing parser's defaults.
   if (page.id === 'shortcuts' && !Array.isArray(value.keybindings))
@@ -548,7 +550,8 @@ export function applySettingsJson(
     page.kind === 'applet' ? applets.filter((a) => a.id === page.owner) : [],
   );
   for (const p of paths) {
-    if (p[0] === 'extensions') next.extensions[p[1]] ??= { enabled: false, settings: {} };
+    if (p[0] === 'extensions')
+      next.extensions[p[1]] ??= { enabled: defaultAppletEnabled, settings: {} };
     writePath(next, p, readSettingsPath(normalized, p));
   }
   return next;

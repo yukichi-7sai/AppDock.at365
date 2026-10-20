@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { defaultAppletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { randomUUID, createHash } from 'node:crypto';
@@ -303,7 +304,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
   }
   updateExtension(this: SettingsStore<Settings>, id: string, patch: Partial<ExtensionSettings>) {
     const v = structuredClone(this.value);
-    const current = v.extensions[id] || { enabled: false, settings: {} };
+    const current = v.extensions[id] || { enabled: defaultAppletEnabled, settings: {} };
     v.extensions[id] = { ...current, ...patch };
     return this.save(v, this.revision);
   }

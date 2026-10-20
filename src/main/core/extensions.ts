@@ -32,6 +32,7 @@ import { closeWebAccounts, validateWebAccounts } from './web-accounts';
 import { closeAppletPages } from './applet-pages';
 import { parseAppletPages } from '../../shared/applet-pages';
 import { parseRibbonItems } from '../../shared/ribbon-items';
+import { appletEnabled } from '../../shared/applet-state';
 import { parsePageCollections } from '../../shared/page-collections';
 import type {
   ExtensionManifest,
@@ -345,8 +346,7 @@ class ExtensionManager extends EventEmitter {
       folder: e.manifest.folder,
       sourceKind: e.manifest.sourceKind,
       enabled:
-        e.manifest.sourceKind === 'builtin' ||
-        !!this.settings.value.extensions[e.manifest.id]?.enabled,
+        e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, e.manifest.id),
       state: e.state,
       generation: e.runtimeSession,
     }));
@@ -454,8 +454,7 @@ class ExtensionManager extends EventEmitter {
       scheduledStartAt: e.scheduledStartAt,
       error: e.error,
       enabled:
-        e.manifest.sourceKind === 'builtin' ||
-        (this.settings.value.extensions[e.manifest.id]?.enabled ?? false),
+        e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, e.manifest.id),
       commands: this.commandCatalog(e),
       tray: e.tray,
       panel: e.panel,
@@ -527,7 +526,7 @@ class ExtensionManager extends EventEmitter {
       ...generatedSettingCommands(
         e.manifest.id,
         e.manifest.settings ?? [],
-        e.state === 'running' && !!this.settings.value.extensions[e.manifest.id]?.enabled,
+        e.state === 'running' && appletEnabled(this.settings.value, e.manifest.id),
       ),
     ];
   }
@@ -539,7 +538,7 @@ class ExtensionManager extends EventEmitter {
         for (const e of this.items.values()) {
           const enabled =
             e.manifest.sourceKind === 'builtin' ||
-            (this.settings.value.extensions[e.manifest.id]?.enabled ?? false);
+            appletEnabled(this.settings.value, e.manifest.id);
           if (enabled && e.state === 'stopped') await this.schedule(e);
           if (enabled && e.state === 'waiting' && e.scheduledDelay !== this.delay(e))
             await this.schedule(e);
@@ -601,7 +600,7 @@ class ExtensionManager extends EventEmitter {
         .catch((err) => this.log('error', 'host', err.message))
         .then(async () => {
           if (this.shuttingDown || e.state !== 'waiting' || e.scheduledStartAt !== due) return;
-          if (!this.settings.value.extensions[e.manifest.id]?.enabled) {
+          if (!appletEnabled(this.settings.value, e.manifest.id)) {
             await this.stop(e);
             return;
           }
@@ -871,8 +870,7 @@ class ExtensionManager extends EventEmitter {
         title: appletDisplayName(e.manifest),
         types: e.manifest.customCommandTypes!,
         generation: e.runtimeSession ?? '',
-        available:
-          e.state === 'running' && !!this.settings.value.extensions[e.manifest.id]?.enabled,
+        available: e.state === 'running' && appletEnabled(this.settings.value, e.manifest.id),
         invoke: async (definition, invocation) => {
           const peer = e.peer,
             generation = e.runtimeSession;
@@ -946,7 +944,7 @@ class ExtensionManager extends EventEmitter {
         if (!e) throw new Error('拡張が見つかりません。');
         await this.stop(e);
         if (
-          (e.manifest.sourceKind === 'builtin' || this.settings.value.extensions[id]?.enabled) &&
+          (e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, id)) &&
           !this.shuttingDown
         ) {
           if (immediate) await this.start(e);

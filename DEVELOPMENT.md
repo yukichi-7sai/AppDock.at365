@@ -280,3 +280,9 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 ## 共通画像の検証
 
 `tests/registered-images.test.cjs`と関連するリボン・設定・ページの回帰を実行する。`dev.bat exec node scripts/build-image-library-fixtures.cjs`でRegisteredImagesの.NET fixtureとnative3Appletを`.artifacts/image-library-fixtures/`へRelease buildする。GUIは`dev.bat exec node scripts/image-library-ui-test.cjs [固定EXE]`。独立Profileのソースと発行WebAppletを隔離profileへ配置する。GUI実行中に本体や.NET出力を再ビルドしない。実測の準備コマンド・入力hash・成功記録はVERIFICATIONを参照する。ファイル選択はnative dialog fixtureで応答し、原画像decodeと保存は実装を使う。
+
+## Appletの既定状態と参照欠落時の保存
+
+未保存のApplet有効状態は`src/shared/applet-state.ts`を正本とする。設定を補完する経路でも同じ既定値を使い、保存済みOFFは保持する。`tests/applet-defaults.test.cjs`と関連するlifecycle・端末設定・設定操作を確認する。`tests/page-collections.test.cjs`は既存の不足参照が無関係な保存を妨げないことと、追加/変更行の検証を確認する。
+
+GUIは`dev.bat exec node scripts/applet-defaults-ui-test.cjs [固定EXE]`。新規Profileと開始待ちの自動起動、保存済みOFF、部分保存と実再起動、アカウント未検出時のリボンのフォーム/JSON保存を隔離profileで確認する。元の名簿と参照情報のbytes保持を検査し、実サイトへの接続や実利用設定の復旧は行わない。

@@ -14,6 +14,10 @@ A:/40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-appletをAppDockのex
 
 サイトと初期キーはsettings.jsonのextensions.at365.web-applet.settingsへ保存します。旧webAppletsからの自動取り込みは行いません。移行済みの設定に記録されたIDと保存先の参照情報だけを読み取り、サイトID・リボン・キー・ログイン領域を維持します。参照情報を新たに生成・更新する処理はありません。
 
+`migrations.webApplet`は移行完了後も参照する保存情報です。`ids`は以前のページIDを、`owner`は以前のアカウント名簿とPC専用sessionの保存先を維持するために使います。削除すると新方式のID・保存先を参照し、既存アカウントや保存したリボン配置が見つからなくなる場合があります。元のデータは自動削除しません。
+
+アカウント参照の存在確認は、追加・変更したWebページの行に対して行います。名簿未到着や参照情報の変更で既存ページが同期待ちでも、変更していない行を再検査してリボン等の無関係な設定保存を拒否しません。新規/変更行の検証と、アカウント処理中のガードは維持します。
+
 既存の共有名簿data/web-applets/accounts.jsonとPC専用web-applets/sessions、web-applets/windowsを引き続き使い、Cookieを移動しません。新規構成は共有data/web-profiles/at365.web-applet/accounts.jsonとPC専用web-profiles/at365.web-appletを使います。詳しい保存区分は[設定同期](settings-sync.md)、保存先の互換参照は[分離設計](dynamic-pages-webapplet-design.md)を参照してください。
 
 本体単独更新では新Appletを自動導入しません。移行済みのデータを保持しますが、表示には対応Appletの配置が必要です。古いホストと新しい設定を双方向同期しないでください。旧版へ戻す場合は旧設定のバックアップと旧構成を使用します。

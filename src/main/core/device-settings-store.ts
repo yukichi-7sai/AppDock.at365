@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { appletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
 import {
   SettingsStore,
@@ -298,7 +299,7 @@ export class DeviceSettingsStore extends SettingsStore {
     if (typeof enabled !== 'boolean') throw Error('Appletの設定対象がありません。');
     const next = structuredClone(this.device.value);
     const entry = (next.extensions[owner] ??= {
-      enabled: this.value.extensions[owner]?.enabled ?? false,
+      enabled: appletEnabled(this.value, owner),
       useLocalSettings: false,
     });
     if (entry.useLocalSettings === enabled) return this.snapshot();

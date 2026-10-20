@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ExtensionManifest, ExtensionSettings, Settings } from '../../shared/contracts';
 import { createDefaultSettings, parseSettings } from '../../shared/settings-schema';
+import { defaultAppletEnabled } from '../../shared/applet-state';
 import {
   parsePageCollections,
   validateCollectionRecords,
@@ -206,8 +207,8 @@ export function combineSettings(
   ])) {
     const local = device.extensions[owner];
     if (!result.extensions[owner] && !local?.useLocalSettings) continue;
-    const entry = (result.extensions[owner] ??= { enabled: false, settings: {} });
-    entry.enabled = local?.enabled ?? false;
+    const entry = (result.extensions[owner] ??= { enabled: defaultAppletEnabled, settings: {} });
+    entry.enabled = local?.enabled ?? defaultAppletEnabled;
     if (owner === 'appdock.default-shell') entry.enabled = true;
     if (local?.useLocalSettings) {
       delete entry.startupDelaySeconds;
@@ -220,7 +221,8 @@ export function combineSettings(
     if (!Array.isArray(rows)) continue;
     for (const row of rows)
       if (object(row) && typeof row.id === 'string')
-        row.enabled = device.collectionEnabled[owner]?.[definition.key]?.[row.id] ?? false;
+        row.enabled =
+          device.collectionEnabled[owner]?.[definition.key]?.[row.id] ?? defaultAppletEnabled;
   }
   return parseSettings(result);
 }
@@ -262,7 +264,10 @@ export function splitSettings(
       delete shared.extensions[owner];
       continue;
     }
-    const local = (device.extensions[owner] ??= { enabled: false, useLocalSettings: false });
+    const local = (device.extensions[owner] ??= {
+      enabled: defaultAppletEnabled,
+      useLocalSettings: false,
+    });
     if (after.enabled !== previous?.enabled) local.enabled = after.enabled;
     const stored = (shared.extensions[owner] ??= { enabled: false, settings: {} });
     copyChanges(stored, previous ?? {}, after, [

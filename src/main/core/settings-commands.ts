@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { appletEnabled, defaultAppletEnabled } from '../../shared/applet-state';
 import { readObjectList } from '../../shared/object-list';
 import type {
   ExtensionSnapshot,
@@ -101,7 +102,7 @@ export class SettingsCommands {
     }
   }
   private applyAppletChanges(next: Settings, id: string, changes: Record<string, unknown>) {
-    const current = next.extensions[id] ?? { enabled: false, settings: {} };
+    const current = next.extensions[id] ?? { enabled: defaultAppletEnabled, settings: {} };
     next.extensions[id] = { ...current, settings: { ...current.settings, ...changes } };
   }
   revision() {
@@ -315,8 +316,7 @@ export class SettingsCommands {
         );
       }
     } else {
-      const extension = next.extensions[owner.id];
-      if (!extension?.enabled)
+      if (!appletEnabled(next, owner.id))
         throw new SettingsCommandError('UNAVAILABLE', 'Appletが有効である必要があります。');
       this.applyAppletChanges(next, owner.id, changes);
     }

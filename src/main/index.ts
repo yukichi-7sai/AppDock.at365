@@ -83,6 +83,7 @@ import { RibbonState } from './core/ribbon-state';
 import { RibbonBadges } from './core/ribbon-badges';
 import { RibbonGroupSession } from './core/ribbon-group-session';
 import { RibbonCommands } from './core/ribbon-commands';
+import { appletEnabled } from '../shared/applet-state';
 import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
 import {
@@ -1567,7 +1568,7 @@ async function restoreSettingsBackup(scope?: 'shared' | 'device') {
 function prepareSettings(value: Settings) {
   let next = parseSettings(value);
   validateNotificationPreferenceChanges(next, settings.value, notificationCatalog(allApplets()));
-  pageCollections.validate(next);
+  pageCollections.validate(next, settings.value);
   validateAppletSettings(next, manager.snapshot());
   return initializeCollectionDefaults(next, settings.value, manager.snapshot());
 }
@@ -1828,7 +1829,7 @@ function settingsPageActions(
       if (typeof enabled !== 'boolean' || typeof revision !== 'number')
         throw Error('設定操作が不正です。');
       settings.setLocalSettings(page.owner!, enabled, revision, (value) => {
-        pageCollections.validate(value);
+        pageCollections.validate(value, settings.value);
         validateAppletSettings(value, manager.snapshot());
       });
       return { storage: enabled ? 'device' : 'shared', revision: settings.revision };
@@ -2215,7 +2216,7 @@ async function retryShell(region?: ShellRegion) {
     const e = manager.items.get(id);
     if (
       e?.state === 'error' &&
-      (e.manifest.sourceKind === 'builtin' || settings.value.extensions[id]?.enabled)
+      (e.manifest.sourceKind === 'builtin' || appletEnabled(settings.value, id))
     )
       await manager.restart(id);
   }
