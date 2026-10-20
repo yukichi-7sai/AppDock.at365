@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { AppletManagementSettings } from '../../../src/renderer/settings/AppletManagementSettings';
 import { SettingsControlsProvider } from '../../../src/renderer/settings-ui/api';
+import { SettingsHintsContext } from '../../../src/renderer/settings-ui/SettingsHint';
 import '../../../src/renderer/settings-ui/controls.css';
 import '../../../src/renderer/settings/settings.css';
 
@@ -33,10 +34,12 @@ const invoke = async (name: string, args: unknown[] = []) => {
 const controls = { setShortcutRecording: async () => {} } as any;
 createRoot(document.getElementById('root')!).render(
   <SettingsControlsProvider api={controls}>
-    <AppletManagementSettings
-      applets={[]}
-      management={{ packagesAvailable: true } as any}
-      invoke={invoke}
-    />
+    <SettingsHintsContext.Provider value={false}>
+      <AppletManagementSettings
+        applets={[]}
+        management={{ packagesAvailable: true } as any}
+        invoke={invoke}
+      />
+    </SettingsHintsContext.Provider>
   </SettingsControlsProvider>,
 );

@@ -4,101 +4,57 @@
 :root[data-theme='light'] {
   --settings-error-color: #b83e52;
 }
-.settings-error-slot {
-  display: flex;
-  align-items: center;
+.settings-error-icon {
+  display: inline-flex;
   flex: none;
-  gap: 8px;
-  height: 40px;
-  min-width: 0;
-  box-sizing: border-box;
-  padding: 6px 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 20px;
+  width: 28px;
+  height: 28px;
 }
-.settings-error-slot[data-error='true'] {
-  color: var(--settings-error-color);
-  border-color: color-mix(in srgb, currentColor 28%, transparent);
-  background: color-mix(in srgb, currentColor 6%, transparent);
-}
-.settings-error-summary {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  gap: 8px;
-  min-width: 0;
-}
-.settings-error-summary > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-error-mark {
+.settings-error-icon .settings-error-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  border: 1px solid currentColor;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--settings-error-color);
+  background: transparent;
+}
+.settings-error-trigger > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid currentColor;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
 }
-.settings-error-slot > button {
-  flex: none;
-  height: 26px;
-  padding: 0 6px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
+.settings-error-trigger:hover,
+.settings-error-trigger:focus-visible {
+  background: color-mix(in srgb, var(--settings-error-color) 10%, transparent);
 }
-.settings-error-slot[data-error='false'] > button {
-  visibility: hidden;
-}
-.settings-error-details {
+.settings-error-tooltip {
   position: fixed;
-  inset: 0;
-  margin: auto;
-  width: min(520px, calc(100dvw - 32px));
-  max-height: min(360px, calc(100dvh - 32px));
+  inset: auto;
+  margin: 0;
+  width: max-content;
+  max-width: min(440px, calc(100dvw - 16px));
   box-sizing: border-box;
   overflow: auto;
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--settings-error-color);
+  border-radius: 10px;
   color: var(--text);
   background: var(--panel);
   box-shadow: var(--shadow);
   font-size: 13px;
   line-height: 1.7;
-}
-.settings-error-details > header {
-  position: sticky;
-  top: 0;
-  background: var(--panel);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 12px;
-}
-.settings-error-details > header button {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-}
-.settings-error-details > p {
-  margin: 0;
-  color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

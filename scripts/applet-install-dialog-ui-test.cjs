@@ -56,7 +56,7 @@ const same = (a, b) => {
     const geometry = () =>
       dialog.evaluate((element) =>
         Object.fromEntries(
-          ['input', 'footer', '.primary', '.settings-error-slot']
+          ['input', 'footer', '.primary', '.settings-error-icon']
             .map((selector) => [
               selector,
               element.querySelector(selector).getBoundingClientRect().toJSON(),
@@ -69,7 +69,10 @@ const same = (a, b) => {
       '\nフォルダーの内容を確認して、もう一度インストールしてください。';
     for (const theme of ['light', 'dark']) {
       await page.evaluate((theme) => (document.documentElement.dataset.theme = theme), theme);
-      for (const width of [1280, 760]) {
+      for (const width of [1280, 760, 390]) {
+        await page.evaluate(() => {
+          window.installFailure = '配布元のURLまたはフォルダーを入力してください。';
+        });
         await page.setViewportSize({ width, height: 900 });
         await open();
         assert.equal(
@@ -77,9 +80,24 @@ const same = (a, b) => {
           0,
         );
         const before = await geometry();
+        assert(await dialog.getByRole('button', { name: 'インストールのエラー' }).isHidden());
         await apply.click();
         await dialog.getByRole('alert').filter({ hasText: '配布元' }).waitFor();
         same(before, await geometry());
+        const icon = dialog.getByRole('button', { name: 'インストールのエラー' });
+        const details = dialog.getByRole('tooltip');
+        await icon.hover();
+        await details.waitFor();
+        const anchor = await icon.boundingBox();
+        const shortTip = await details.boundingBox();
+        assert(Math.abs(shortTip.y - (anchor.y + anchor.height + 6)) < 1);
+        assert(shortTip.x <= anchor.x + anchor.width && shortTip.x + shortTip.width >= anchor.x);
+        await page.screenshot({ path: path.join(output, `tooltip-short-${theme}-${width}.png`) });
+        // Move the pointer without Playwright scrolling the tooltip's ancestor into view.
+        await page.mouse.move(shortTip.x + shortTip.width / 2, shortTip.y + shortTip.height / 2);
+        assert(await details.isVisible());
+        await dialog.getByRole('heading').hover();
+        await details.waitFor({ state: 'hidden' });
         await source.fill('C:\\Applet 配布\\Sample');
         await source.press('Enter');
         same(before, await geometry());
@@ -90,10 +108,9 @@ const same = (a, b) => {
           (await dialog.getByRole('alert').textContent()).includes(longError),
         );
         same(before, await geometry());
-        await dialog.getByRole('button', { name: 'エラーの詳細を表示', exact: true }).click();
-        const details = dialog.getByRole('region', { name: 'エラーの詳細', exact: true });
+        await icon.focus();
         await details.waitFor();
-        await until(() => details.evaluate((e) => document.activeElement === e));
+        assert(await icon.evaluate((e) => document.activeElement === e));
         await page.keyboard.press('PageDown');
         await until(() => details.evaluate((e) => e.scrollTop > 0));
         assert((await details.innerText()).includes(longError));
@@ -111,15 +128,24 @@ const same = (a, b) => {
         assert(await dialog.isVisible());
         assert(
           await dialog
-            .getByRole('button', { name: 'エラーの詳細を表示' })
+            .getByRole('button', { name: 'インストールのエラー' })
             .evaluate((e) => e === document.activeElement),
         );
         await page.screenshot({ path: path.join(output, `error-${theme}-${width}.png`) });
+        await icon.click();
+        await details.waitFor();
+        await dialog.getByRole('heading').click();
+        assert(await details.isHidden());
+        await icon.focus();
+        await details.waitFor();
+        await page.setViewportSize({ width, height: 880 });
+        await details.waitFor({ state: 'hidden' });
+        await page.setViewportSize({ width, height: 900 });
         await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
       }
     }
     checks.push(
-      'empty-short-long-errors-and-details-do-not-move-source-dialog-footer-or-buttons-in-both-themes-and-widths',
+      'anchored-hover-focus-click-tooltip-with-scroll-escape-outside-resize-and-stable-layout-in-both-themes-at-three-widths',
     );
     await page.setViewportSize({ width: 760, height: 420 });
     await open();
@@ -128,6 +154,12 @@ const same = (a, b) => {
     const small = await geometry();
     assert(small.dialog.y >= 0 && small.dialog.y + small.dialog.height <= 421);
     assert(small.footer.y + small.footer.height <= small.dialog.y + small.dialog.height);
+    await dialog.getByRole('button', { name: 'インストールのエラー' }).focus();
+    const smallTip = dialog.getByRole('tooltip');
+    await smallTip.waitFor();
+    const smallBounds = await smallTip.boundingBox();
+    assert(smallBounds.y >= 8 && smallBounds.y + smallBounds.height <= 413);
+    await page.keyboard.press('Escape');
     await page.screenshot({ path: path.join(output, 'error-short-window.png') });
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     checks.push('short-window-keeps-footer-visible-without-growing-the-error-line');

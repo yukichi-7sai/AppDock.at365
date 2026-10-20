@@ -735,9 +735,28 @@ pre.ai-preview-result {
   margin-block-end: auto;
   max-height: calc(100dvh - max(20px, 10dvh) - 20px);
 }
-.applet-install-dialog label {
+.applet-install-dialog .settings-dialog-fields {
   display: grid;
-  gap: 6px;
+  gap: 24px;
+}
+.applet-install-field {
+  display: grid;
+  gap: 10px;
+}
+.applet-install-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.applet-install-dialog .settings-dialog-fields p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.applet-install-dialog .applet-install-notice {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--raised);
 }
 .applet-install-source {
   display: flex;

@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useSettingsControls } from './api';
 import { SettingsInputMode } from './SettingsInput';
 import { SettingsHint } from './SettingsHint';
-import { SettingsError } from './SettingsError';
 let activeSettingsModals = 0;
 
 /** Shared settings modal: focus containment/return, IME-safe dismissal and input suspension. */
@@ -127,7 +126,7 @@ export function SettingsDialog({
   valid?: boolean;
   className?: string;
   footer?: string;
-  errorLayout?: 'inline' | 'reserved';
+  errorLayout?: 'inline' | 'custom';
   cancelWhilePending?: boolean;
 }) {
   const settingsControls = useSettingsControls();
@@ -181,14 +180,10 @@ export function SettingsDialog({
             : children}
         </fieldset>
       </div>
-      {errorLayout === 'reserved' ? (
-        <SettingsError error={error} />
-      ) : (
-        error && (
-          <p className="shortcut-dialog-error" role="alert">
-            {error}
-          </p>
-        )
+      {errorLayout === 'inline' && error && (
+        <p className="shortcut-dialog-error" role="alert">
+          {error}
+        </p>
       )}
       <footer>
         <SettingsHint as="small">{footer}</SettingsHint>

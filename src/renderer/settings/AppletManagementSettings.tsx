@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ExtensionSnapshot, UpdateState } from '../../shared/contracts';
 import type { AppletPackagePlan, AppletPackagePreviewResult } from '../../shared/applet-packages';
 import { Icon, type IconName } from '../../shared/ui-icons';
@@ -6,6 +6,7 @@ import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput } from '../settings-ui/SettingsInput';
+import { SettingsError } from '../settings-ui/SettingsError';
 import { ListIcon } from '../settings-ui/SettingsListTable';
 import { Toggle } from '../settings-ui/Toggle';
 import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
@@ -34,6 +35,7 @@ async function applyPackage(invoke: Invoke, id: string) {
 }
 
 function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
+  const errorId = useId();
   const [source, setSource] = useState('');
   const [choosing, setChoosing] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -62,7 +64,7 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
       }}
       valid={!choosing}
       applyLabel="インストールして再起動"
-      errorLayout="reserved"
+      errorLayout="custom"
       cancelWhilePending={checking}
       onApply={async () => {
         // Read the current field at the explicit action, including a pending blur commit.
@@ -97,13 +99,18 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
     >
       {(_ready, setError, { error }) => (
         <>
-          <label>
-            配布元（URLまたはフォルダー）
+          <div className="applet-install-field">
+            <div className="applet-install-label">
+              <label htmlFor={`${errorId}-source`}>配布元（URLまたはフォルダー）</label>
+              <SettingsError error={error} id={errorId} />
+            </div>
             <div className="applet-install-source">
               <SettingsInput
                 ref={input}
+                id={`${errorId}-source`}
                 aria-label="Appletの配布元"
                 aria-invalid={!!error}
+                aria-describedby={error ? errorId : undefined}
                 value={source}
                 disabled={choosing}
                 commitOn="blur-or-enter"
@@ -137,9 +144,9 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
                 <Icon name="folder" />
               </button>
             </div>
-          </label>
-          <p>URL、配布フォルダー、または展開済みAppletのフォルダーを指定できます。</p>
-          <p>
+            <p>URL、配布フォルダー、または展開済みAppletのフォルダーを指定できます。</p>
+          </div>
+          <p className="applet-install-notice">
             AppletはこのPCでコードを実行します。信頼できる配布元を指定してください。
             インストール時に内容を検証し、問題がなければ導入してAppDockを再起動します。
           </p>

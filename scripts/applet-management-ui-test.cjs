@@ -564,7 +564,7 @@ async function until(fn, name) {
       const geometry = () =>
         dialog.evaluate((element) =>
           Object.fromEntries(
-            ['input', 'footer', '.primary', '.settings-error-slot']
+            ['input', 'footer', '.primary', '.settings-error-icon']
               .map((selector) => [
                 selector,
                 element.querySelector(selector).getBoundingClientRect().toJSON(),
@@ -613,13 +613,13 @@ async function until(fn, name) {
       await dialog.getByRole('alert').filter({ hasText: '404' }).waitFor();
       await unchanged();
       await noBackgroundError();
-      await dialog.getByRole('button', { name: 'エラーの詳細を表示', exact: true }).click();
-      await dialog.getByRole('region', { name: 'エラーの詳細', exact: true }).waitFor();
+      await dialog.getByRole('button', { name: 'インストールのエラー', exact: true }).click();
+      await dialog.getByRole('tooltip').waitFor();
       await unchanged();
       await page.screenshot({ path: path.join(output, 'install-error-details.png') });
       await page.keyboard.press('Escape');
       assert(await dialog.isVisible());
-      assert(await dialog.getByRole('region', { name: 'エラーの詳細', exact: true }).isHidden());
+      assert(await dialog.getByRole('tooltip').isHidden());
       await unchanged();
       await page.screenshot({ path: path.join(output, 'install-validation-error.png') });
       checks.push('one-install-action-keeps-validation-errors-local-and-geometry-stable');
