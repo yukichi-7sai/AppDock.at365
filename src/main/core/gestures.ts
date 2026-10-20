@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
 import { defaultGestures, nativeGestureRows, type GestureContext } from '../../shared/gestures';
 import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
@@ -112,6 +113,21 @@ export class InputCaptureManager {
     return !!(await this.peer.request('capture.activateProcess', { pressId, processId }));
   }
   private async event(method: string, p: any) {
+    if (method === 'gestures.prepare') {
+      if (typeof p.window !== 'string' || typeof p.hostWindow !== 'boolean') return false;
+      // Wait only for the focus event caused by this press, then synchronize its actual conditions.
+      const deadline = Date.now() + 500;
+      do {
+        if (this.stopped || this.paused || this.state().recording) return false;
+        const context = this.state().context;
+        if (p.hostWindow ? context.window === p.window : !context.window) {
+          await this.refresh();
+          return !this.stopped && !this.paused && !this.state().recording;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      } while (Date.now() < deadline);
+      return false;
+    }
     if (method === 'shortcuts.pressed') {
       if (
         this.stopped ||
@@ -259,8 +275,12 @@ export class InputCaptureManager {
     const context = JSON.stringify(state.context);
     const gesture = {
       ...settings,
-      rows: nativeGestureRows(settings, state.context, state.commands),
+      rows: nativeGestureRows(settings, state.context, state.commands, settings.activateOnStart),
       context,
+      settingsKey: createHash('sha256')
+        .update(JSON.stringify([settings, state.commands]))
+        .digest('hex'),
+      hostProcessId: process.pid,
       enabled: settings.enabled && !this.paused && !state.recording,
     };
     const inputs = state.recording ? [] : this.inputs;

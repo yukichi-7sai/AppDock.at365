@@ -14,16 +14,17 @@ export const gestureTypes = [
   ['wheel-up', 'ホイール上'],
   ['wheel-down', 'ホイール下'],
 ] as const;
-export type GestureScope = ShortcutScope | 'browser' | 'exe';
+export type GestureScope = ShortcutScope | 'browser' | 'exe' | 'desktop';
 export interface GestureBinding {
   id: string;
   command: string;
   gesture: string;
   enabled: boolean;
-  when: { scope: GestureScope; appletIds: string[]; processes: string[] };
+  when: { scope: GestureScope; appletIds: string[]; processes: string[]; excludeDesktop?: boolean };
 }
 export interface GestureSettings {
   enabled: boolean;
+  activateOnStart: boolean;
   browsers: string[];
   excludedProcesses: string[];
   requireChromiumWindowClass: boolean;
@@ -31,7 +32,8 @@ export interface GestureSettings {
   wheelDelayMs: number;
   executionMode: 'all' | 'first';
   indicatorOpacity: number;
-  indicatorPosition: 'gesture-start' | 'window-center' | 'none';
+  indicatorPosition: 'gesture-start' | 'window-center' | 'monitor-center' | 'none';
+  indicatorShowNoAction: boolean;
   bindings: GestureBinding[];
 }
 /** Different gestures never share an execution batch; ordering is local to each group. */
@@ -58,7 +60,10 @@ export function gestureConditionLabel(
   applets: { id: string; title: string }[] = [],
 ) {
   if (when.scope === 'browser') return 'Webブラウザ';
-  if (when.scope === 'exe') return when.processes.join(' / ');
+  if (when.scope === 'desktop') return 'デスクトップ';
+  if (when.scope === 'exe')
+    return when.processes.join(' / ') + (when.excludeDesktop ? '（デスクトップを除外）' : '');
+  if (when.scope === 'global' && when.excludeDesktop) return 'グローバル（デスクトップを除外）';
   return keybindingConditionLabel(
     { scope: when.scope, appletIds: when.appletIds },
     ownerTitle,
@@ -106,6 +111,7 @@ export function moveGestureBinding(rows: GestureBinding[], id: string, target: s
 export function defaultGestures(): GestureSettings {
   return {
     enabled: true,
+    activateOnStart: false,
     browsers: ['chrome', 'msedge', 'brave', 'vivaldi', 'opera', 'chromium', 'thorium'],
     excludedProcesses: [],
     requireChromiumWindowClass: false,
@@ -114,6 +120,7 @@ export function defaultGestures(): GestureSettings {
     executionMode: 'all',
     indicatorOpacity: 0.45,
     indicatorPosition: 'gesture-start',
+    indicatorShowNoAction: true,
     bindings: [],
   };
 }
@@ -151,6 +158,7 @@ export function parseGestures(value: unknown): GestureSettings {
   const v = value as GestureSettings;
   if (
     typeof v.enabled !== 'boolean' ||
+    (v.activateOnStart !== undefined && typeof v.activateOnStart !== 'boolean') ||
     typeof v.requireChromiumWindowClass !== 'boolean' ||
     !Number.isInteger(v.distance) ||
     v.distance < 5 ||
@@ -162,7 +170,8 @@ export function parseGestures(value: unknown): GestureSettings {
     v.indicatorOpacity < 0.1 ||
     v.indicatorOpacity > 1 ||
     (v.executionMode !== undefined && !['all', 'first'].includes(v.executionMode)) ||
-    !['gesture-start', 'window-center', 'none'].includes(v.indicatorPosition) ||
+    !['gesture-start', 'window-center', 'monitor-center', 'none'].includes(v.indicatorPosition) ||
+    (v.indicatorShowNoAction !== undefined && typeof v.indicatorShowNoAction !== 'boolean') ||
     !Array.isArray(v.bindings) ||
     v.bindings.length > 2000
   )
@@ -176,7 +185,11 @@ export function parseGestures(value: unknown): GestureSettings {
       !validCommandId(r.command) ||
       typeof r.enabled !== 'boolean' ||
       !r.when ||
-      !['global', 'browser', 'exe', 'app', 'pages', 'owner', 'applets'].includes(r.when.scope) ||
+      !['global', 'browser', 'exe', 'desktop', 'app', 'pages', 'owner', 'applets'].includes(
+        r.when.scope,
+      ) ||
+      (r.when.excludeDesktop !== undefined && typeof r.when.excludeDesktop !== 'boolean') ||
+      (r.when.excludeDesktop === true && !['global', 'exe'].includes(r.when.scope)) ||
       !Array.isArray(r.when.appletIds) ||
       r.when.appletIds.length > 500 ||
       r.when.appletIds.some((id) => !validCommandId(id)) ||
@@ -187,18 +200,29 @@ export function parseGestures(value: unknown): GestureSettings {
     const processes = processNames(r.when.processes);
     if (r.when.scope === 'exe' ? !processes.length : !!processes.length)
       throw Error('指定したexe条件にはexe名が必要です。');
-    if (Object.keys(r.when).some((k) => !['scope', 'appletIds', 'processes'].includes(k)))
+    if (
+      Object.keys(r.when).some(
+        (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
+      )
+    )
       throw Error('未知のジェスチャー条件です。');
     return {
       id: r.id,
       command: r.command,
       enabled: r.enabled,
       gesture: normalizeGesture(r.gesture),
-      when: { scope: r.when.scope, appletIds: [...new Set(r.when.appletIds)], processes },
+      when: {
+        scope: r.when.scope,
+        appletIds: [...new Set(r.when.appletIds)],
+        processes,
+        ...(r.when.excludeDesktop === undefined ? {} : { excludeDesktop: r.when.excludeDesktop }),
+      },
     };
   });
   return {
     ...v,
+    activateOnStart: v.activateOnStart ?? false,
+    indicatorShowNoAction: v.indicatorShowNoAction ?? true,
     executionMode: v.executionMode ?? 'all',
     browsers: processNames(v.browsers),
     excludedProcesses: processNames(v.excludedProcesses),
@@ -236,21 +260,24 @@ export function nativeGestureRows(
   settings: GestureSettings,
   context: GestureContext,
   commands: { id: string; title: string; extensionId?: string | null }[],
+  includeInactive = false,
 ) {
   const available = new Map(commands.map((c) => [c.id, c]));
   return settings.bindings.flatMap((row) => {
     const command = available.get(row.command);
     if (!row.enabled || !command) return [];
-    const external = ['global', 'browser', 'exe'].includes(row.when.scope);
-    if (
-      !external &&
-      !matchesWhen(
+    const external = ['global', 'browser', 'exe', 'desktop'].includes(row.when.scope);
+    const matches =
+      external ||
+      matchesWhen(
         { ...row.when, scope: row.when.scope as ShortcutScope },
         context,
         command.extensionId,
-      )
-    )
-      return [];
-    return [{ ...row, title: command.title, window: external ? '' : context.window }];
+      );
+    if (!matches && !includeInactive) return [];
+    // Keep hooks available for a click that activates AppDock, without authorizing inactive rows.
+    return [
+      { ...row, title: command.title, window: !matches ? '-1' : external ? '' : context.window },
+    ];
   });
 }

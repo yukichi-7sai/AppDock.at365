@@ -72,10 +72,11 @@ internal sealed class InputCaptureThread : IDisposable
         var state = await ready.Task;
         return await state.Dispatcher.InvokeAsync(() => state.Engine.Gestures.Valid(session, window));
     }
-    internal async Task BindAsync(Func<object, Task<System.Text.Json.JsonElement>> invoke, Action<string> cancel)
+    internal async Task BindAsync(Func<object, Task<System.Text.Json.JsonElement>> invoke, Action<string> cancel,
+        Func<object, Task<System.Text.Json.JsonElement>> prepare)
     {
         var state = await ready.Task;
-        await state.Dispatcher.InvokeAsync(() => { state.Engine.Gestures.Invoke = invoke; state.Engine.Gestures.Cancel = cancel; });
+        await state.Dispatcher.InvokeAsync(() => { state.Engine.Gestures.Invoke = invoke; state.Engine.Gestures.Cancel = cancel; state.Engine.Gestures.Prepare = prepare; });
     }
     public void Dispose()
     {

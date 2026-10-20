@@ -111,6 +111,7 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     bytes = fs.readFileSync(f.settings.file, 'utf8');
   const changes = {
     enabled: false,
+    activateOnStart: true,
     browsers: ['CHROME.EXE', 'chrome'],
     excludedProcesses: ['Editor.exe'],
     requireChromiumWindowClass: true,
@@ -118,7 +119,8 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     wheelDelayMs: 120,
     executionMode: 'first',
     indicatorOpacity: 0.6,
-    indicatorPosition: 'none',
+    indicatorPosition: 'monitor-center',
+    indicatorShowNoAction: false,
   };
   const operations = [{ kind: 'configure', changes }];
   const dry = await f.edit(operations, { dryRun: true });
@@ -128,7 +130,9 @@ test('configure validates ranges/processes atomically, preserves bindings and su
   assert.deepEqual(result.bindings, before.bindings);
   assert.equal(result.settings.distance, 75);
   assert.equal(result.settings.executionMode, 'first');
-  assert.equal(result.settings.indicatorPosition, 'none');
+  assert.equal(result.settings.indicatorPosition, 'monitor-center');
+  assert.equal(result.settings.indicatorShowNoAction, false);
+  assert.equal(result.settings.activateOnStart, true);
   const revision = f.settings.revision;
   await f.edit(operations);
   assert.equal(f.settings.revision, revision);
@@ -139,8 +143,10 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     { wheelDelayMs: -1 },
     { indicatorOpacity: 2 },
     { indicatorPosition: 'other' },
+    { indicatorShowNoAction: 'false' },
     { executionMode: 'other' },
     { enabled: 'true' },
+    { activateOnStart: 1 },
     { browsers: ['C:/chrome.exe'] },
     { bindings: [] },
     { unknown: 1 },
@@ -155,6 +161,42 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     );
     assert.equal(fs.readFileSync(f.settings.file, 'utf8'), saved);
   }
+});
+
+test('desktop scopes and exclusions round-trip through the public atomic editing API', async (t) => {
+  const f = fixture(t);
+  const scopes = f.get().scopes.map((scope) => scope.id);
+  assert.equal(scopes[scopes.indexOf('global') + 1], 'desktop');
+  const bindings = ['global', 'exe', 'desktop'].map((scope) => ({
+    ...binding('desktop-' + scope),
+    when: {
+      scope,
+      appletIds: [],
+      processes: scope === 'exe' ? ['EXPLORER.EXE'] : [],
+      ...(scope === 'desktop' ? {} : { excludeDesktop: true }),
+    },
+  }));
+  await f.edit(bindings.map((binding) => ({ kind: 'add', binding })));
+  for (const row of bindings) {
+    const saved = f.get().bindings.find((item) => item.id === row.id);
+    assert.equal(saved.when.scope, row.when.scope);
+    assert.equal(saved.when.excludeDesktop, row.when.excludeDesktop);
+    assert.deepEqual(saved.when.processes, row.when.scope === 'exe' ? ['explorer'] : []);
+  }
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  await assert.rejects(
+    f.edit([
+      {
+        kind: 'update',
+        id: 'desktop-desktop',
+        changes: {
+          when: { scope: 'desktop', appletIds: [], processes: [], excludeDesktop: true },
+        },
+      },
+    ]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
 });
 
 test('extra persisted gesture fields stay local and survive edits', async (t) => {

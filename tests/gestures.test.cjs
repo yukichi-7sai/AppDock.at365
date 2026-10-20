@@ -9,15 +9,156 @@ const {
   moveGestureBinding,
   applyGestureBinding,
   applyGestureOrder,
+  gestureConditionLabel,
 } = require('../out/main/shared/gestures');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { ShortcutDispatcher } = require('../out/main/main/core/shortcut-dispatcher');
+const { InputCaptureManager } = require('../out/main/main/core/gestures');
 const row = (id, scope = 'global', command = 'test.run') => ({
   id,
   command,
   gesture: 'move-left',
   enabled: true,
   when: { scope, appletIds: [], processes: [] },
+});
+
+test('no-action preview defaults on for old settings and preserves an explicit off value', () => {
+  const old = defaultGestures();
+  assert.equal(old.indicatorShowNoAction, true);
+  delete old.indicatorShowNoAction;
+  assert.equal(parseGestures(old).indicatorShowNoAction, true);
+  for (const indicatorPosition of ['gesture-start', 'window-center', 'monitor-center', 'none']) {
+    const parsed = parseGestures({ ...old, indicatorPosition, indicatorShowNoAction: false });
+    assert.equal(parsed.indicatorShowNoAction, false);
+    assert.equal(parsed.indicatorPosition, indicatorPosition);
+    assert.equal(parsed.indicatorOpacity, old.indicatorOpacity);
+  }
+  for (const indicatorShowNoAction of [null, 0, 'false'])
+    assert.throws(() => parseGestures({ ...old, indicatorShowNoAction }));
+});
+
+test('desktop options preserve old settings and validate scope-specific exclusions', () => {
+  const old = defaultGestures();
+  delete old.activateOnStart;
+  assert.equal(parseGestures(old).activateOnStart, false);
+  assert.equal(defaultGestures().activateOnStart, false);
+  const desktop = row('desktop', 'desktop');
+  const global = row('global');
+  global.when.excludeDesktop = true;
+  const exe = row('exe', 'exe');
+  exe.when.processes = ['Explorer.exe'];
+  exe.when.excludeDesktop = true;
+  const parsed = parseGestures({
+    ...old,
+    activateOnStart: true,
+    indicatorPosition: 'monitor-center',
+    bindings: [desktop, global, exe],
+  });
+  assert.equal(parsed.activateOnStart, true);
+  assert.equal(parsed.indicatorPosition, 'monitor-center');
+  assert.deepEqual(parsed.bindings[2].when.processes, ['explorer']);
+  assert.equal(gestureConditionLabel(desktop.when), 'デスクトップ');
+  assert.equal(gestureConditionLabel(global.when), 'グローバル（デスクトップを除外）');
+  assert.equal(gestureConditionLabel(exe.when), 'Explorer.exe（デスクトップを除外）');
+  for (const when of [
+    { ...desktop.when, excludeDesktop: true },
+    { ...global.when, excludeDesktop: 'true' },
+    { ...row('browser', 'browser').when, excludeDesktop: true },
+  ])
+    assert.throws(() => parseGestures({ ...old, bindings: [{ ...desktop, when }] }));
+  assert.throws(() => parseGestures({ ...old, activateOnStart: 1 }));
+});
+
+test('activation can keep local hooks available without authorizing inactive assignments', () => {
+  const settings = {
+    ...defaultGestures(),
+    bindings: [row('desktop', 'desktop'), row('local', 'app')],
+  };
+  const commands = [{ id: 'test.run', title: 'Run' }];
+  const context = { appFocused: false, window: '' };
+  assert.deepEqual(
+    nativeGestureRows(settings, context, commands).map((r) => r.id),
+    ['desktop'],
+  );
+  const pending = nativeGestureRows(settings, context, commands, true);
+  assert.equal(pending.find((r) => r.id === 'local').window, '-1');
+  assert.deepEqual(
+    nativeGestureRows(settings, context, commands).map((r) => r.id),
+    ['desktop'],
+  );
+});
+
+test('activation preparation synchronizes the new focus and refuses recording or pause', async () => {
+  const state = { context: { appFocused: false, window: '' }, recording: false };
+  const manager = new InputCaptureManager(
+    'unused',
+    () => state,
+    {},
+    async () => {},
+    () => {},
+    () => {},
+    {},
+  );
+  let synced = 0;
+  manager.refresh = async () => {
+    synced++;
+  };
+  const preparing = manager.event('gestures.prepare', { window: '123', hostWindow: true });
+  setTimeout(() => {
+    state.context = { appFocused: true, window: '123' };
+  }, 15);
+  assert.equal(await preparing, true);
+  assert.equal(synced, 1);
+  manager.paused = true;
+  assert.equal(await manager.event('gestures.prepare', { window: '123', hostWindow: true }), false);
+  manager.paused = false;
+  state.recording = true;
+  assert.equal(await manager.event('gestures.prepare', { window: '123', hostWindow: true }), false);
+  assert.equal(synced, 1);
+});
+
+test('activation synchronization uses a bounded key unchanged by focus but changed by settings', async () => {
+  const state = {
+    settings: {
+      gestures: {
+        ...defaultGestures(),
+        activateOnStart: true,
+        bindings: Array.from({ length: 2000 }, (_, i) => row('many-' + i, 'app')),
+      },
+    },
+    context: { appFocused: false, window: '' },
+    commands: [{ id: 'test.run', title: 'Run' }],
+    recording: false,
+  };
+  const payloads = [];
+  const manager = new InputCaptureManager(
+    'unused',
+    () => state,
+    {},
+    async () => {},
+    () => {},
+    () => {},
+    {
+      ownership: async () => {},
+      applied: () => {},
+    },
+  );
+  manager.peer = {
+    closed: false,
+    request: async (method, payload) => {
+      payloads.push(payload);
+      return [];
+    },
+  };
+  await manager.sync();
+  assert.match(payloads[0].gestures.settingsKey, /^[a-f0-9]{64}$/);
+  assert(Buffer.byteLength(JSON.stringify(payloads[0])) < 1024 * 1024);
+  state.context = { appFocused: true, window: '123' };
+  await manager.sync();
+  assert.equal(payloads[1].gestures.settingsKey, payloads[0].gestures.settingsKey);
+  state.settings.gestures.distance++;
+  await manager.sync();
+  assert.notEqual(payloads[2].gestures.settingsKey, payloads[0].gestures.settingsKey);
 });
 
 test('gesture editor preserves condition-only order, appends new inputs and rejects stale edits', () => {

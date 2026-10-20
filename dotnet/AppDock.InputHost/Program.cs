@@ -31,7 +31,8 @@ internal static class Program
             await using var peer = new JsonRpcConnection(Console.In, output);
             using var inputSender = new InputSender();
             await capture.BindAsync(p => peer.RequestAsync("gestures.invoke", p, peer.Lifetime),
-                id => { _ = peer.NotifyAsync("gestures.cancel", new { session = id }); });
+                id => { _ = peer.NotifyAsync("gestures.cancel", new { session = id }); },
+                p => peer.RequestAsync("gestures.prepare", p, peer.Lifetime));
             var pumping = capture.PumpAsync((method, p) => peer.NotifyAsync(method, p), peer.Lifetime);
             try {
                 await peer.ReadAsync(async (method, p) => {

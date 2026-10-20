@@ -1,0 +1,78 @@
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+using AppDock.InputHost;
+
+namespace AppDock.InputHost
+{
+    [StructLayout(LayoutKind.Sequential)] internal readonly record struct GesturePoint(int X, int Y);
+}
+
+internal static partial class Program
+{
+    private static nint FolderFixtureWindow(string folder)
+    {
+        object? application = null, collection = null;
+        try {
+            application = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application")!);
+            collection = ((dynamic)application!).Windows();
+            dynamic windows = collection;
+            for (var index = 0; index < (int)windows.Count; index++) {
+                object? item = null;
+                try {
+                    item = windows.Item(index);
+                    var location = (string)((dynamic)item!).LocationURL;
+                    if (Uri.TryCreate(location, UriKind.Absolute, out var uri) && uri.IsFile &&
+                        string.Equals(Path.GetFullPath(uri.LocalPath).TrimEnd('\\'), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                        return new nint((long)((dynamic)item).HWND);
+                } catch (COMException) { }
+                finally { if (item != null && Marshal.IsComObject(item)) Marshal.ReleaseComObject(item); }
+            }
+        } finally {
+            if (collection != null && Marshal.IsComObject(collection)) Marshal.ReleaseComObject(collection);
+            if (application != null && Marshal.IsComObject(application)) Marshal.ReleaseComObject(application);
+        }
+        return 0;
+    }
+    private static async Task<(nint Window, string Folder)> OpenFolderFixture()
+    {
+        var folder = Path.GetFullPath(Path.Combine(".artifacts", "gesture-folder-input-" + Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(folder);
+        using var launched = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "/n,\"" + folder + "\"") { UseShellExecute = true });
+        var deadline = Environment.TickCount64 + 8000;
+        do {
+            var window = FolderFixtureWindow(folder);
+            if (window != 0) return (window, folder);
+            await Task.Delay(50);
+        } while (Environment.TickCount64 < deadline);
+        throw new Exception("The isolated Explorer folder did not open: " + folder);
+    }
+    private static async Task CloseFolderFixture(nint window, string folder)
+    {
+        if (FolderFixtureWindow(folder) == window) PostFixtureMessage(window, 0x10, 0, 0);
+        var deadline = Environment.TickCount64 + 3000;
+        while (FolderFixtureWindow(folder) == window && Environment.TickCount64 < deadline) await Task.Delay(50);
+        if (FolderFixtureWindow(folder) == window) throw new Exception("The isolated Explorer folder did not close.");
+        Directory.Delete(folder);
+    }
+    private static System.Drawing.Point? DesktopPoint()
+    {
+        foreach (var screen in Screen.AllScreens)
+            for (var y = screen.WorkingArea.Top + 80; y < screen.WorkingArea.Bottom - 80; y += 100)
+                for (var x = screen.WorkingArea.Right - 100; x > screen.WorkingArea.Left + 180; x -= 100) {
+                    var point = new GesturePoint(x, y);
+                    if (GestureTarget.IsDesktop(GestureTarget.At(point)) &&
+                        GestureTarget.IsDesktop(GestureTarget.At(new(x - 80, y)))) return new(x, y);
+                }
+        return null;
+    }
+    private static bool CenteredOnMonitor(nint window, System.Drawing.Point origin)
+    {
+        GetWindowRect(window, out var rect);
+        var bounds = Screen.FromPoint(origin).Bounds;
+        return Math.Abs((rect.Left + rect.Right) / 2 - (bounds.Left + bounds.Right) / 2) <= 2 &&
+            Math.Abs((rect.Top + rect.Bottom) / 2 - (bounds.Top + bounds.Bottom) / 2) <= 2;
+    }
+    [DllImport("user32.dll")] private static extern nint GetShellWindow();
+    [DllImport("user32.dll", EntryPoint = "PostMessageW")] private static extern bool PostFixtureMessage(nint window, uint message, nuint wParam, nint lParam);
+}

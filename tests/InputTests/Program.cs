@@ -12,9 +12,14 @@ internal static partial class Program
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         if(args is ["--shortcuts",var shortcutHelper]) return RunShortcutTests(shortcutHelper);
-        if(args is ["--send",var handle,var action]) {
+        if(args is ["--send" or "--send-inactive",var handle,var action]) {
             var sendCursor=Cursor.Position;
             Action? releaseBlocker=null;
+            Probe? inactiveProbe=null;
+            void Pause(int milliseconds) {
+                var deadline=Environment.TickCount64+milliseconds;
+                do {if(inactiveProbe!=null)Application.DoEvents();Thread.Sleep(5);}while(Environment.TickCount64<deadline);
+            }
             try {
                 nint window;
                 if (handle.StartsWith("pid:")) {
@@ -25,6 +30,11 @@ internal static partial class Program
                 var focusDeadline=Environment.TickCount64+2000;
                 do {FocusWindow(window);Thread.Sleep(50);} while(GetForegroundWindow()!=window && Environment.TickCount64<focusDeadline);
                 if(GetForegroundWindow()!=window) throw new Exception($"Input target {handle}/{window} did not become foreground (actual {GetForegroundWindow()}).");
+                if(args[0]=="--send-inactive") {
+                    inactiveProbe=new Probe{Text="AppDock isolated inactive-start source",StartPosition=FormStartPosition.Manual,Location=Screen.PrimaryScreen!.WorkingArea.Location,Size=new(180,120)};
+                    inactiveProbe.Show();FocusTarget(inactiveProbe);Application.DoEvents();Thread.Sleep(120);
+                    if(GetForegroundWindow()!=inactiveProbe.Handle)throw new Exception("Inactive-start source did not become foreground.");
+                }
                 GetWindowRect(window,out var rect);Cursor.Position=new(rect.Left+350,rect.Top+330);Thread.Sleep(40);
                 var hovered=GetAncestor(WindowFromPoint(Cursor.Position),2);
                 var held=string.Join(",",new[]{0x10,0x11,0x12,0x5B,0x5C,0x01,0x02,0x04,0x05,0x06}.Where(k=>(GetAsyncKeyState(k)&0x8000)!=0).Select(k=>k.ToString("X")));
@@ -35,7 +45,7 @@ internal static partial class Program
                 else if(action=="blocked:left"){releaseBlocker=()=>Mouse(4);Mouse(2);}
                 else if(action=="blocked:middle"){releaseBlocker=()=>Mouse(0x40);Mouse(0x20);}
                 else if(action is "blocked:x1" or "blocked:x2"){var button=action=="blocked:x1"?1:2;releaseBlocker=()=>Mouse(0x100,button);Mouse(0x80,button);}
-                Thread.Sleep(60);Mouse(8);Thread.Sleep(50);
+                Pause(60);Mouse(8);Pause(50);
                 if(releaseBlocker!=null){
                     releaseBlocker();Thread.Sleep(40);
                     Cursor.Position=new(Cursor.Position.X-85,Cursor.Position.Y);Thread.Sleep(60);Mouse(0x800,120);
@@ -45,12 +55,15 @@ internal static partial class Program
                 else if(action=="key:Ctrl+A"){Key(0x11);Thread.Sleep(20);Key(0x41);Thread.Sleep(80);Key(0x41,true);Key(0x11,true);}
                 else if(action=="click-left"){Mouse(2);Thread.Sleep(80);Mouse(4);}
                 else if(action=="wheel-up")Mouse(0x800,120);
-                Thread.Sleep(100);Mouse(16);Thread.Sleep(150);return 0;
-            }finally{Mouse(16);releaseBlocker?.Invoke();Cursor.Position=sendCursor;}
+                Pause(100);Mouse(16);Pause(150);return 0;
+            }finally{Mouse(16);releaseBlocker?.Invoke();inactiveProbe?.Dispose();Cursor.Position=sendCursor;}
         }
         using var form=new Probe(); form.Text="AppDock isolated gesture test";form.StartPosition=FormStartPosition.CenterScreen;form.Size=new(720,500);
         var original=Cursor.Position;
-        form.Shown+=async(_,_)=>{try{await Run(form,args[0]);}catch(Exception e){Console.Error.WriteLine(e);failures++;}finally{Mouse(0x10);Mouse(0x04);Mouse(0x40);Key(0x41,true);Cursor.Position=original;form.Close();}};
+        form.Shown+=async(_,_)=>{try{await Run(form,args[0]);}catch(Exception e){Console.Error.WriteLine(e);failures++;}finally{
+            try {Mouse(0x10);Mouse(0x04);Mouse(0x40);Key(0x41,true);Cursor.Position=original;}
+            catch(Exception e){Console.Error.WriteLine("Input cleanup: "+e.Message);}
+            form.Close();}};
         Application.Run(form);return failures==0?0:1;
     }
     private static async Task Run(Probe form,string helper)
@@ -62,6 +75,7 @@ internal static partial class Program
         await using var peer=new JsonRpcConnection(child.StandardOutput,child.StandardInput);
         var invocations=new List<string>();var selections=new List<string[]>();var cancellations=0;var delay=0;
         var reading=peer.ReadAsync(async(method,p)=>{
+            if(method=="gestures.prepare") return true;
             if(method=="gestures.cancel"){Interlocked.Increment(ref cancellations);return null;}
             if(method!="gestures.invoke")throw new Exception(method);
             lock(invocations){
@@ -73,19 +87,23 @@ internal static partial class Program
         });
         int Count(){lock(invocations)return invocations.Count;}
         string[] LastRows(){lock(invocations)return selections[^1];}
-        async Task Sync(string scope="global",string[]? excluded=null,bool enabled=true,int interval=0,string window="",string mode="all",string position="gesture-start",bool selection=false){
+        async Task Sync(string scope="global",string[]? excluded=null,bool enabled=true,int interval=0,string window="",string mode="all",string position="gesture-start",bool selection=false,
+            bool activate=false,bool excludeDesktop=false,string? processOverride=null,bool? showNoAction=null,bool unmatched=false){
             var triggers=new[]{"move-up","move-down","move-left","move-right","click-left","click-middle","wheel-up","wheel-down","key:A","key:Ctrl+A"};
-            var process=Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
+            if(unmatched) triggers=["move-left"];
+            var process=processOverride??Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
             object Row(string id,string command,string gesture,string title,string rowScope="global",string rowWindow="",string? exe=null)=>
-                new{id,command,gesture,title,window=rowWindow,when=new{scope=rowScope,appletIds=Array.Empty<string>(),processes=new[]{exe??process}}};
+                new{id,command,gesture,title,window=rowWindow,when=new{scope=rowScope,appletIds=Array.Empty<string>(),processes=new[]{exe??process},excludeDesktop}};
             var rows = triggers.Select((g,i)=>Row("r"+i,"test.run",g,"Test "+g,scope,window)).ToArray();
             if(selection) rows=triggers.SelectMany(g=>new[]{
-                Row("wrong-window-"+g,"test.wrong-window",g,"Wrong window",rowWindow:"1"),
+                Row("wrong-window-"+g,"test.wrong-window",g,"Wrong window",rowWindow:activate?"-1":"1"),
                 Row("wrong-exe-"+g,"test.wrong-exe",g,"Wrong exe","exe",exe:"nonexistent-process"),
                 Row("first-"+g,"test.first",g,"First","exe"),
                 Row("second-"+g,"test.second",g,"Second"),
                 Row("duplicate-"+g,"test.first",g,"Duplicate")}).ToArray();
-            await peer.RequestAsync("gestures.sync",new{enabled,browsers=new[]{process},excludedProcesses=excluded??[],requireChromiumWindowClass=false,distance=30,wheelDelayMs=interval,executionMode=mode,indicatorOpacity=.45,indicatorPosition=position,context="test",revision=1,rows},CancellationToken.None);
+            var configuration=JsonSerializer.SerializeToNode(new{enabled,browsers=new[]{process},excludedProcesses=excluded??[],requireChromiumWindowClass=false,distance=30,wheelDelayMs=interval,executionMode=mode,indicatorOpacity=.45,indicatorPosition=position,activateOnStart=activate,hostProcessId=activate?Environment.ProcessId:0,context="test",revision=1,rows})!;
+            if(showNoAction.HasValue) configuration["indicatorShowNoAction"]=showNoAction.Value;
+            await peer.RequestAsync("gestures.sync",configuration,CancellationToken.None);
             await Task.Delay(70);
         }
         async Task Begin(){FocusTarget(form);await Task.Delay(80);if(GetForegroundWindow()!=form.Handle)throw new Exception("Gesture fixture did not become foreground.");Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
@@ -93,7 +111,7 @@ internal static partial class Program
         void Check(bool condition,string name){Console.WriteLine((condition?"PASS ":"FAIL ")+name);if(!condition)failures++;}
         try{
             await Sync();
-            var n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(70);await End();
+            var n=Count();var right=0;await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(70);await End();
             // The first WPF indicator/pipe round trip can outlast the fixed key-release wait.
             // Await its result without sending the gesture again.
             var firstDeadline=Environment.TickCount64+2000;
@@ -109,6 +127,23 @@ internal static partial class Program
             string IndicatorCaption(nint window)=>string.Join("|",AutomationElement.FromHandle(window)
                 .FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text))
                 .Cast<AutomationElement>().Select(e=>e.Current.Name));
+            foreach(bool? showNoAction in new bool?[]{null,true,false}){
+                await Sync(showNoAction:showNoAction,unmatched:true);n=Count();right=form.RightUps;
+                await Begin();Cursor.Position=new(Cursor.Position.X+80,Cursor.Position.Y);
+                var previewDeadline=Environment.TickCount64+500;
+                while(VisibleIndicator()==0&&Environment.TickCount64<previewDeadline)await Task.Delay(20);
+                var preview=VisibleIndicator();var name=showNoAction?.ToString()??"legacy";
+                Check((preview!=0)==(showNoAction!=false),name+" no-action preview visibility");
+                if(preview!=0)Check(IndicatorCaption(preview).Contains("アクション無し"),name+" no-action preview caption");
+                await End();Check(Count()==n&&form.RightUps==right,name+" unmatched stroke neither executes nor replays a right click");
+            }
+            await Sync(showNoAction:false);n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);
+            var matchedDeadline=Environment.TickCount64+1000;
+            while(VisibleIndicator()==0&&Environment.TickCount64<matchedDeadline)await Task.Delay(20);
+            var matchedPreview=VisibleIndicator();
+            Check(matchedPreview!=0&&IndicatorCaption(matchedPreview).Contains("Test move-left"),"no-action preview off still displays a matched action");
+            await End();Check(Count()==n+1,"no-action preview off still executes a matched action");
+            right=form.RightUps;await Begin();await End();Check(form.RightUps==right+1,"no-action preview off retains ordinary right click replay");
             foreach(var mode in new[]{"all","first"}){
                 await Sync(mode:mode,selection:true);n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);
                 var showDeadline=Environment.TickCount64+2000;
@@ -132,8 +167,70 @@ internal static partial class Program
             await Sync(mode:"first",position:"none",selection:true);n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(150);
             Check(VisibleIndicator()==0,"hidden indicator does not create a visible waiting window");await End();
             Check(Count()==n+1&&LastRows().SequenceEqual(new[]{"first-move-left"}),"hidden indicator retains gesture recognition and execution");
+            await Sync(activate:true,selection:true,mode:"first",position:"none");n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await End();
+            Check(Count()==n+1&&LastRows().SequenceEqual(new[]{"first-move-left"}),"active host never selects rows reserved for activation preparation");
+            await Sync(position:"monitor-center"); n=Count(); await Begin();
+            var startPoint=Cursor.Position; Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);
+            var indicatorDeadline=Environment.TickCount64+2000;
+            while(VisibleIndicator()==0&&Environment.TickCount64<indicatorDeadline)await Task.Delay(20);
+            Check(VisibleIndicator()!=0&&CenteredOnMonitor(VisibleIndicator(),startPoint),"monitor-center uses the monitor containing the initial cursor");
+            await End(); Check(Count()==n+1,"monitor-center retains execution");
+            Check(AppDock.InputHost.GestureTarget.IsDesktop(GetShellWindow()),"Shell desktop is classified as desktop");
+            Check(!AppDock.InputHost.GestureTarget.IsDesktop(form.Handle),"ordinary window is not classified as desktop");
+            await Sync(scope:"desktop");n=Count();right=form.RightUps;await Begin();await End();
+            Check(Count()==n&&form.RightUps==right+1,"desktop-only row does not capture an ordinary window");
+            foreach(var scope in new[]{"global","exe"}){
+                await Sync(scope:scope,excludeDesktop:true);n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await End();
+                Check(Count()==n+1,scope+" desktop exclusion retains ordinary windows");
+            }
+            using(var other=new Probe()){
+                other.StartPosition=FormStartPosition.Manual;other.Location=Screen.PrimaryScreen!.WorkingArea.Location;other.Size=new(180,120);other.Show();
+                foreach(var activate in new[]{false,true}){
+                    await Sync(activate:activate,position:"none");n=Count();FocusTarget(other);await Task.Delay(80);
+                    Cursor.Position=form.PointToScreen(new(330,220));right=form.RightUps;Mouse(8);
+                    var activationDeadline=Environment.TickCount64+700;
+                    while(GetForegroundWindow()!=form.Handle&&Environment.TickCount64<activationDeadline)await Task.Delay(10);
+                    Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(100);await End();
+                    Check(Count()==n+(activate?1:0),activate?"inactive window activates and starts on the same press":"disabled activation preserves ordinary inactive-window click");
+                    if(!activate)Check(form.RightUps==right+1,"inactive ordinary click retains its paired up");
+                }
+                await Sync(activate:true,position:"none");FocusTarget(other);await Task.Delay(80);Cursor.Position=form.PointToScreen(new(330,220));
+                right=form.RightUps;Mouse(8);await Task.Delay(150);await End();
+                Check(form.RightUps==right+1,"activation followed by no gesture restores one ordinary right click");
+            }
+            form.Hide();await Task.Delay(100);
+            var desktopPoint=DesktopPoint();Check(desktopPoint!=null,"a real desktop surface is available for input verification");
+            if(desktopPoint is { } desktop){
+                foreach(var scope in new[]{"desktop","exe"}){
+                    await Sync(scope:scope,activate:true,position:"window-center",processOverride:"explorer");n=Count();
+                    Cursor.Position=desktop;Mouse(8);await Task.Delay(150);Cursor.Position=new(desktop.X-80,desktop.Y);
+                    indicatorDeadline=Environment.TickCount64+2000;
+                    while(VisibleIndicator()==0&&Environment.TickCount64<indicatorDeadline)await Task.Delay(20);
+                    Check(VisibleIndicator()!=0&&CenteredOnMonitor(VisibleIndicator(),desktop),scope+" desktop window-center falls back to the starting monitor center");
+                    await End();Check(Count()==n+1,scope+" matches the real desktop");
+                }
+                foreach(var scope in new[]{"global","exe"}){
+                    await Sync(scope:scope,activate:true,excludeDesktop:true,processOverride:"explorer");n=Count();var downs=passthrough.Downs;
+                    Cursor.Position=desktop;Mouse(8);await Task.Delay(100);await End();Key(0x1B);Key(0x1B,true);await Task.Delay(80);
+                    Check(Count()==n&&passthrough.Downs==downs+1,scope+" desktop exclusion bypasses gesture capture from right-down");
+                }
+            }
+            var folderFixture=await OpenFolderFixture();
+            try {
+                Check(!AppDock.InputHost.GestureTarget.IsDesktop(folderFixture.Window),"actual Explorer folder is distinct from the desktop");
+                foreach(var scope in new[]{"desktop","global","exe"}) {
+                    await Sync(scope:scope,excludeDesktop:scope!="desktop",position:"none",processOverride:"explorer");n=Count();
+                    FocusWindow(folderFixture.Window);await Task.Delay(100);GetWindowRect(folderFixture.Window,out var folderRect);
+                    Cursor.Position=new((folderRect.Left+folderRect.Right)/2,(folderRect.Top+folderRect.Bottom)/2);
+                    Check(GetAncestor(WindowFromPoint(Cursor.Position),2)==folderFixture.Window,"Explorer input reaches its own folder surface");
+                    Mouse(8);await Task.Delay(50);Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(80);await End();
+                    Key(0x1B);Key(0x1B,true);await Task.Delay(40);
+                    Check(Count()==n+(scope=="desktop"?0:1),scope+" desktop handling preserves the actual Explorer folder");
+                }
+            } finally { await CloseFolderFixture(folderFixture.Window,folderFixture.Folder); }
+            FocusTarget(form);await Task.Delay(80);
             await Sync();
-            var right=form.RightUps;await Begin();await End();Check(form.RightUps==right+1,"ordinary right click replay");
+            right=form.RightUps;await Begin();await End();Check(form.RightUps==right+1,"ordinary right click replay");
             async Task BlockedStart(string name,Action press,Action release,int stateKey,bool releaseEarly)
             {
                 FocusTarget(form);await Task.Delay(80);Cursor.Position=form.PointToScreen(new(330,220));

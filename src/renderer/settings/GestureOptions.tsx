@@ -62,6 +62,17 @@ export function GestureOptions({
         />
       </SettingsField>
       <SettingsField
+        title={hostSettingItem('gestures', 'activateOnStart').title}
+        description="右ボタンを押した場所をアクティブにして、その対象でジェスチャーを開始します。"
+        {...settingAnchor('gestures', 'activateOnStart')}
+      >
+        <Toggle
+          label={hostSettingItem('gestures', 'activateOnStart').title}
+          checked={gestures.activateOnStart ?? false}
+          onChange={(activateOnStart) => change({ activateOnStart })}
+        />
+      </SettingsField>
+      <SettingsField
         title={hostSettingItem('gestures', 'executionMode').title}
         description="操作と「いつ・どこで」の条件に一致したコマンドを、登録順に選びます。"
         {...settingAnchor('gestures', 'executionMode')}
@@ -103,7 +114,7 @@ export function GestureOptions({
       </SettingsField>
       <SettingsField
         title="待機表示"
-        description="選択した実行方法に合わせて、実行対象のコマンドを表示します。"
+        description="選択した実行方法に合わせて、実行対象のコマンドを表示します。「アクションなしを表示する」がOFFの場合、割り当てに一致しない移動では表示しません。"
       >
         <div className="gesture-options-grid">
           <label className="gesture-option" {...settingAnchor('gestures', 'indicatorPosition')}>
@@ -119,6 +130,7 @@ export function GestureOptions({
             >
               <option value="gesture-start">ジェスチャー開始地点</option>
               <option value="window-center">対象ウィンドウの中央</option>
+              <option value="monitor-center">カーソルのあるモニターの中央</option>
               <option value="none">表示なし</option>
             </select>
           </label>
@@ -135,6 +147,14 @@ export function GestureOptions({
             />
           </label>
         </div>
+        <label className="gesture-option" {...settingAnchor('gestures', 'indicatorShowNoAction')}>
+          <span>{hostSettingItem('gestures', 'indicatorShowNoAction').title}</span>
+          <Toggle
+            label={hostSettingItem('gestures', 'indicatorShowNoAction').title}
+            checked={gestures.indicatorShowNoAction}
+            onChange={(indicatorShowNoAction) => change({ indicatorShowNoAction })}
+          />
+        </label>
       </SettingsField>
       <SettingsField
         title="Webブラウザ"

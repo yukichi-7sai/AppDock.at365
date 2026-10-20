@@ -84,7 +84,7 @@ export function ShortcutConditionField({
   ownerTitle?: string;
   applets: { id: string; title: string }[];
   allowDefault?: boolean;
-  extraScopes?: { id: string; title: string }[];
+  extraScopes?: { id: string; title: string; after?: ShortcutScope }[];
   selectedScope?: string;
   onExtraScope?(scope: string): void;
   onChange(value: ShortcutCondition): void;
@@ -116,13 +116,16 @@ export function ShortcutConditionField({
         }}
       >
         {allowDefault && <option value="default">コマンドの既定</option>}
-        {extraScopes.map((scope) => (
-          <option key={scope.id} value={scope.id}>
-            {scope.title}
-          </option>
-        ))}
+        {extraScopes
+          .filter((scope) => !scope.after)
+          .map((scope) => (
+            <option key={scope.id} value={scope.id}>
+              {scope.title}
+            </option>
+          ))}
         {shortcutScopes
           .filter((scope) => scope.id !== 'owner' || ownerTitle || value.scope === 'owner')
+          .flatMap((scope) => [scope, ...extraScopes.filter((extra) => extra.after === scope.id)])
           .map((scope) => (
             <option key={scope.id} value={scope.id} disabled={scope.id === 'owner' && !ownerTitle}>
               {scope.id === 'owner' ? (ownerTitle ?? '提供元不明') : scope.title}

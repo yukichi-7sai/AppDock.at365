@@ -34,7 +34,11 @@ const idSchema = {
 const whenSchema = {
   type: 'object',
   properties: {
-    scope: { type: 'string', enum: [...shortcutScopes.map((s) => s.id), 'browser', 'exe'] },
+    scope: {
+      type: 'string',
+      enum: [...shortcutScopes.map((s) => s.id), 'desktop', 'browser', 'exe'],
+    },
+    excludeDesktop: { type: 'boolean', description: 'global/exe条件でデスクトップだけを除外する' },
     appletIds: { type: 'array', items: idSchema, maxItems: 500, uniqueItems: true },
     processes: {
       type: 'array',
@@ -72,6 +76,7 @@ const processesSchema = {
 };
 const configurationFields = {
   enabled: { type: 'boolean' },
+  activateOnStart: { type: 'boolean' },
   browsers: processesSchema,
   excludedProcesses: processesSchema,
   requireChromiumWindowClass: { type: 'boolean' },
@@ -79,10 +84,14 @@ const configurationFields = {
   wheelDelayMs: { type: 'integer', minimum: 0, maximum: 5000 },
   executionMode: { type: 'string', enum: ['all', 'first'] },
   indicatorOpacity: { type: 'number', minimum: 0.1, maximum: 1 },
-  indicatorPosition: { type: 'string', enum: ['gesture-start', 'window-center', 'none'] },
+  indicatorShowNoAction: { type: 'boolean' },
+  indicatorPosition: {
+    type: 'string',
+    enum: ['gesture-start', 'window-center', 'monitor-center', 'none'],
+  },
 };
 const gestureSettings = (settings: Settings): GestureSettings => {
-  const source = settings.gestures ?? defaultGestures();
+  const source = parseGestures(settings.gestures ?? defaultGestures());
   // Retain extra persisted fields on save, but expose only the documented settings.
   return structuredClone({
     ...Object.fromEntries(
@@ -186,7 +195,9 @@ export class GestureCommands {
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
       scopes: [
-        ...shortcutScopes,
+        ...shortcutScopes.flatMap((scope) =>
+          scope.id === 'global' ? [scope, { id: 'desktop', title: 'デスクトップ' }] : [scope],
+        ),
         { id: 'browser', title: 'Webブラウザ' },
         { id: 'exe', title: '指定したexe' },
       ],

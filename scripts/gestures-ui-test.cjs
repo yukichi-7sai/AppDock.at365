@@ -212,7 +212,7 @@ const checks = [];
       }, bindings);
       await wait(250);
     };
-    const send = async (gesture = 'move-left') => {
+    const send = async (gesture = 'move-left', inactive = false) => {
       const handle = await app.evaluate(({ BrowserWindow }) => {
         const w = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
         w.show();
@@ -223,7 +223,7 @@ const checks = [];
       await new Promise((resolve, reject) => {
         const child = spawn(
           path.join(root, 'tests/InputTests/bin/Release/net10.0-windows/AppDock.InputTests.exe'),
-          ['--send', handle, gesture],
+          [inactive ? '--send-inactive' : '--send', handle, gesture],
           { windowsHide: true, stdio: 'pipe' },
         );
         child.on('error', reject);
@@ -248,6 +248,44 @@ const checks = [];
       await save([row('key', 'a', 'global', 'key:Ctrl+A')]);
       checks.push('native input checks skipped explicitly: UI-only mode');
     } else {
+      await dock.evaluate(async () => {
+        const s = await window.dock.snapshot();
+        s.settings.value.gestures.activateOnStart = true;
+        await window.dock.saveSettings(s.settings.value, s.settings.revision);
+      });
+      await save([row('inactive-local', 'a', 'app')]);
+      const beforeInactive = calls().length;
+      await send('move-left', true);
+      await until(
+        () => calls().length === beforeInactive + 1,
+        'inactive AppDock starts with synchronized local conditions',
+      );
+      assert.deepEqual(calls().slice(beforeInactive), ['a']);
+      await dock.evaluate(async () => {
+        const s = await window.dock.snapshot();
+        s.settings.value.gestures.executionMode = 'first';
+        await window.dock.saveSettings(s.settings.value, s.settings.revision);
+      });
+      await save([row('inactive-owner', 'c', 'owner'), row('active-app', 'a', 'app')]);
+      await expect(['a']);
+      await dock.evaluate(async () => {
+        const s = await window.dock.snapshot();
+        s.settings.value.gestures.activateOnStart = false;
+        s.settings.value.gestures.executionMode = 'all';
+        await window.dock.saveSettings(s.settings.value, s.settings.revision);
+      });
+      const beforeDisabled = calls().length;
+      await send('move-left', true);
+      await wait(200);
+      assert.equal(calls().length, beforeDisabled);
+      await save([
+        row('global-a', 'a', 'global'),
+        row('app-b', 'b', 'app'),
+        row('duplicate-a', 'a', 'global'),
+      ]);
+      checks.push(
+        'inactive AppDock activation synchronizes local-only rows without cancelling; OFF preserves ordinary input',
+      );
       await expect(['a', 'b']);
       checks.push('global/app order and duplicate suppression');
       for (const mode of ['first', 'all']) {

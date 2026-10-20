@@ -72,7 +72,9 @@ export function GestureBindingDialog({
     (value.when.scope !== 'applets' || !!value.when.appletIds.length) &&
     (value.when.scope !== 'exe' || (!processError && !!processes.length));
   const commonScope =
-    value.when.scope === 'exe' || value.when.scope === 'browser' ? 'global' : value.when.scope;
+    value.when.scope === 'exe' || value.when.scope === 'browser' || value.when.scope === 'desktop'
+      ? 'global'
+      : value.when.scope;
   return (
     <BindingEditDialog
       className="gesture-binding-dialog"
@@ -159,11 +161,19 @@ export function GestureBindingDialog({
                 extraScopes={[
                   { id: 'browser', title: 'Webブラウザ' },
                   { id: 'exe', title: '指定したexe' },
+                  { id: 'desktop', title: 'デスクトップ', after: 'global' },
                 ]}
                 onExtraScope={(scope) =>
                   setValue({
                     ...value,
-                    when: { scope: scope as GestureScope, appletIds: [], processes: [] },
+                    when: {
+                      scope: scope as GestureScope,
+                      appletIds: [],
+                      processes: [],
+                      ...(scope === 'exe' && value.when.excludeDesktop !== undefined
+                        ? { excludeDesktop: value.when.excludeDesktop }
+                        : {}),
+                    },
                   })
                 }
                 label="割り当てのいつ・どこで"
@@ -173,10 +183,32 @@ export function GestureBindingDialog({
                   if (when.scope !== 'default')
                     setValue({
                       ...value,
-                      when: { scope: when.scope, appletIds: when.appletIds, processes: [] },
+                      when: {
+                        scope: when.scope,
+                        appletIds: when.appletIds,
+                        processes: [],
+                        ...(when.scope === 'global' && value.when.excludeDesktop !== undefined
+                          ? { excludeDesktop: value.when.excludeDesktop }
+                          : {}),
+                      },
                     });
                 }}
               />
+              {['global', 'exe'].includes(value.when.scope) && (
+                <label className="gesture-desktop-exclusion">
+                  <input
+                    type="checkbox"
+                    checked={value.when.excludeDesktop ?? false}
+                    onChange={(event) =>
+                      setValue({
+                        ...value,
+                        when: { ...value.when, excludeDesktop: event.target.checked },
+                      })
+                    }
+                  />
+                  デスクトップを除外
+                </label>
+              )}
               {value.when.scope === 'browser' && (
                 <SettingsHint as="small" className="gesture-condition-hint">
                   画面上部の「動作設定」で指定したブラウザに適用します。

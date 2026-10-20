@@ -156,6 +156,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
   gestures: [
     ['gestures', 'マウスジェスチャー', '割り当て 条件 実行順'],
     ['enabled', 'マウスジェスチャーを有効にする'],
+    [
+      'activateOnStart',
+      '非アクティブなウィンドウ・デスクトップでも開始する',
+      '右ボタン アクティブ化',
+    ],
     ['options', '動作設定', '有効・実行方法・操作感・待機表示・Webブラウザ・除外'],
     ['executionMode', '条件に一致したコマンドの実行方法', '最初の1つ すべて 登録順'],
     ['browsers', 'Webブラウザのexe'],
@@ -166,9 +171,10 @@ const hostItems: Record<string, [string, string, string?][]> = {
     [
       'indicatorPosition',
       '表示位置',
-      '待機表示 ジェスチャー開始地点 対象ウィンドウの中央 表示なし',
+      '待機表示 ジェスチャー開始地点 対象ウィンドウの中央 カーソルのあるモニターの中央 表示なし',
     ],
     ['indicatorOpacity', '不透明度', '待機表示'],
+    ['indicatorShowNoAction', 'アクションなしを表示する', '待機表示 割り当てなし'],
   ],
   'web-accounts': [['accounts', 'Webアカウント', 'アカウント名 追加 削除 ログイン情報をクリア']],
   codex: [
@@ -398,6 +404,7 @@ export function settingsPaths(
     case 'gestures':
       return [
         'enabled',
+        'activateOnStart',
         'browsers',
         'excludedProcesses',
         'requireChromiumWindowClass',
@@ -406,6 +413,7 @@ export function settingsPaths(
         'executionMode',
         'indicatorOpacity',
         'indicatorPosition',
+        'indicatorShowNoAction',
         'bindings',
       ].map((key) => ['gestures', key]);
     case 'ribbon':

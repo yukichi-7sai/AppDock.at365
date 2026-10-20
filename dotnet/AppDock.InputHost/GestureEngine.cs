@@ -5,11 +5,12 @@ using System.Text;
 using System.Windows.Threading;
 
 namespace AppDock.InputHost;
-internal sealed record Condition(string Scope, string[] AppletIds, string[] Processes);
+internal sealed record Condition(string Scope, string[] AppletIds, string[] Processes, bool ExcludeDesktop = false);
 internal sealed record Binding(string Id, string Command, string Gesture, string Title, string Window, Condition When);
 internal sealed record Configuration(bool Enabled, string[] Browsers, string[] ExcludedProcesses,
     bool RequireChromiumWindowClass, int Distance, int WheelDelayMs, double IndicatorOpacity,
-    string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all");
+    string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all",
+    bool ActivateOnStart = false, string SettingsKey = "", uint HostProcessId = 0, bool IndicatorShowNoAction = true);
 internal enum GestureDirection { Up, Down, Left, Right }
 [StructLayout(LayoutKind.Sequential)] internal readonly record struct GesturePoint(int X, int Y);
 internal static class GestureConfiguration { internal static readonly string[] Marks = ["⬆️","⬇️","⬅️","➡️"]; }
@@ -24,6 +25,8 @@ internal sealed class GestureEngine : IDisposable
     private Binding[] candidates = [];
     private readonly GestureDisplay indicator;
     private GesturePoint origin, checkpoint;
+    private GesturePoint monitorCenter;
+    private PendingStart? starting;
     private GestureDirection? direction;
     private string process = "", session = "";
     private bool ready, cancelled, otherMode, busy, disposed;
@@ -33,6 +36,7 @@ internal sealed class GestureEngine : IDisposable
     private int wheelDelta;
     private CancellationTokenSource? lifetime;
     internal Func<object, Task<System.Text.Json.JsonElement>>? Invoke;
+    internal Func<object, Task<System.Text.Json.JsonElement>>? Prepare;
     internal Action<string>? Cancel;
 
     internal bool NeedsKeyboard => ready || keys.Count > 0 || config is {Enabled:true, Rows.Length:>0};
@@ -46,6 +50,11 @@ internal sealed class GestureEngine : IDisposable
     }
     internal void Configure(Configuration next)
     {
+        // A focus synchronization requested by this press may update its conditions while starting.
+        // Actual settings/command changes still cancel, as do all later context changes.
+        if (starting != null && next.Enabled && next.ActivateOnStart && next.SettingsKey.Length > 0 &&
+            next.SettingsKey == config?.SettingsKey) { config = next; ReleaseHooksIfIdle(); return; }
+        StopStart(false);
         CancelPending(); if (ready) cancelled = true;
         indicator?.Hide(); config = next;
         ReleaseHooksIfIdle();
@@ -56,26 +65,108 @@ internal sealed class GestureEngine : IDisposable
     }
     private bool Current => target != 0 && GetForegroundWindow() == target && IsWindowVisible(target);
     internal bool Valid(string id,string window) => id==session && target.ToInt64().ToString()==window && Current && !cancelled && lifetime is {IsCancellationRequested:false};
-    private bool OnTarget(GesturePoint p) => GetAncestor(WindowFromPoint(p),2) == target;
+    private bool OnTarget(GesturePoint p) => GestureTarget.Matches(target, GestureTarget.At(p));
+    private Binding[] MatchingRows(nint window, bool includeInactive = false)
+    {
+        var desktop = GestureTarget.IsDesktop(window);
+        var className = new StringBuilder(256); GetClassName(window, className, className.Capacity);
+        return config!.Rows.Where(r =>
+            (r.Window.Length == 0 || r.Window == window.ToInt64().ToString() || includeInactive && r.Window.Length > 0) &&
+            (r.When.Scope != "desktop" || desktop) && (!r.When.ExcludeDesktop || !desktop) &&
+            (r.When.Scope != "browser" || config.Browsers.Contains(process, StringComparer.OrdinalIgnoreCase) &&
+                (!config.RequireChromiumWindowClass || className.ToString().StartsWith("Chrome_WidgetWin_", StringComparison.Ordinal))) &&
+            (r.When.Scope != "exe" || r.When.Processes.Contains(process, StringComparer.OrdinalIgnoreCase))).ToArray();
+    }
     private void Begin(GesturePoint p)
     {
         if (config is not {Enabled:true} || busy || HasStartBlocker()) return;
-        target = GetForegroundWindow();
-        if (target == 0 || !OnTarget(p)) return;
-        GetWindowThreadProcessId(target, out var pid);
+        var hit = GestureTarget.At(p);
+        var foreground = GetForegroundWindow();
+        if (hit == 0 || !IsWindowVisible(hit)) return;
+        var same = GestureTarget.Matches(hit, foreground);
+        if (!same && !config.ActivateOnStart) return;
+        GetWindowThreadProcessId(hit, out var pid);
         using var instance = Process.GetProcessById((int)pid);
         process = instance.ProcessName.ToLowerInvariant();
         if (config.ExcludedProcesses.Contains(process,StringComparer.OrdinalIgnoreCase)) return;
-        var className = new StringBuilder(256); GetClassName(target,className,className.Capacity);
-        candidates = config.Rows.Where(r =>
-            (r.Window.Length == 0 || r.Window == target.ToInt64().ToString()) &&
-            (r.When.Scope != "browser" || config.Browsers.Contains(process,StringComparer.OrdinalIgnoreCase) &&
-                (!config.RequireChromiumWindowClass || className.ToString().StartsWith("Chrome_WidgetWin_",StringComparison.Ordinal))) &&
-            (r.When.Scope != "exe" || r.When.Processes.Contains(process,StringComparer.OrdinalIgnoreCase))).ToArray();
+        var hostWindow = pid == config.HostProcessId;
+        var needsContext = false;
+        if (config.ActivateOnStart && config.SettingsKey.Length > 0) {
+            using var context = System.Text.Json.JsonDocument.Parse(config.Context);
+            var knownWindow = context.RootElement.GetProperty("window").GetString();
+            needsContext = hostWindow ? knownWindow != hit.ToInt64().ToString() : !string.IsNullOrEmpty(knownWindow);
+        }
+        target = same ? foreground : hit;
+        var preparing = !same || needsContext;
+        candidates = MatchingRows(target, preparing && config.ActivateOnStart && hostWindow);
         if (candidates.Length == 0) return;
         CancelPending(); lifetime = new(); session = Guid.NewGuid().ToString("N");
         origin = checkpoint = p; direction=null; cancelled=false; otherMode=false;
+        monitorCenter = GestureTarget.MonitorCenter(p);
         wheelDelta=0; wheelStarted=false; lastWheel=0; ready=true; timer.Start();
+        if (preparing) {
+            starting = new PendingStart(hit, foreground, hostWindow);
+            _ = PrepareStartAsync(starting);
+        }
+    }
+    private sealed class PendingStart(nint hit, nint source, bool hostWindow)
+    {
+        internal readonly nint Hit = hit, Source = source;
+        internal readonly bool HostWindow = hostWindow;
+        internal readonly long At = Environment.TickCount64;
+        internal readonly CancellationTokenSource Cancellation = new();
+        internal bool Released, Replay;
+        internal GesturePoint ReleasePoint;
+        internal string? Gesture;
+        internal int Repeats;
+    }
+    private bool StartCurrent(PendingStart pending)
+    {
+        var foreground = GetForegroundWindow();
+        return foreground == 0 || foreground == pending.Source || GestureTarget.Matches(pending.Hit, foreground);
+    }
+    private async Task PrepareStartAsync(PendingStart pending)
+    {
+        try {
+            var activated = await Task.Run(() => GestureTarget.TryActivate(pending.Hit, pending.Source, pending.Cancellation.Token));
+            if (pending.Cancellation.IsCancellationRequested) return;
+            if (!activated) { await dispatcher.InvokeAsync(() => { if (starting == pending) StopStart(true); }); return; }
+            var window = GetForegroundWindow();
+            var prepared = Prepare == null || (await Prepare(new { window = window.ToInt64().ToString(), hostWindow = pending.HostWindow })).ValueKind == System.Text.Json.JsonValueKind.True;
+            await dispatcher.InvokeAsync(() => {
+                if (starting != pending || pending.Cancellation.IsCancellationRequested) return;
+                if (!prepared || !GestureTarget.Matches(pending.Hit, GetForegroundWindow())) { StopStart(true); return; }
+                target = GetForegroundWindow();
+                candidates = MatchingRows(target);
+                if (candidates.Length == 0) { StopStart(true); return; }
+                starting = null;
+                if (!cancelled && pending.Gesture != null) Run(pending.Gesture, pending.Repeats, pending.Released);
+                else if (pending.Released && pending.Replay) ReplayRightClick(pending.ReleasePoint);
+                if (!ready && !busy) timer.Stop();
+            });
+        } catch (Exception e) {
+            Console.Error.WriteLine(e.Message);
+            if (!dispatcher.HasShutdownStarted) await dispatcher.InvokeAsync(() => { if (starting == pending) StopStart(true); });
+        } finally { pending.Cancellation.Dispose(); }
+    }
+    private void StopStart(bool fallback)
+    {
+        var pending = starting;
+        if (pending == null) return;
+        starting = null; pending.Cancellation.Cancel(); indicator.Hide();
+        var restore = fallback && !cancelled && StartCurrent(pending) &&
+            GetCursorPos(out var point) && GestureTarget.Matches(pending.Hit, GestureTarget.At(point));
+        if (restore) {
+            // Return the captured press to Windows; a still-held press gets its ordinary up later.
+            var events = pending.Released ? new[] { MouseInput(8), MouseInput(16) } : new[] { MouseInput(8) };
+            var sent = SendInput((uint)events.Length, events, Marshal.SizeOf<Input>());
+            if (pending.Released && sent == 1) SendInput(1, [MouseInput(16)], Marshal.SizeOf<Input>());
+            if (sent != events.Length) Console.Error.WriteLine("通常の右クリックを復元できませんでした。");
+            ready = false;
+        } else cancelled = true;
+        CancelPending();
+        if (!ready && !busy) timer.Stop();
+        ReleaseHooksIfIdle();
     }
     internal nint Mouse(int code, uint message, nint data)
     {
@@ -84,9 +175,9 @@ internal sealed class GestureEngine : IDisposable
         if (input.Extra == InputMarker) return 0;
         try {
             if ((message is 0x202 or 0x208) && clicks.Remove(message)) { ReleaseHooksIfIdle(); return 1; }
-            if (message == 0x204 && !ready) { Begin(input.Point); if (ready) return 1; }
-            else if (ready) {
-                if (!Current) { cancelled=true; CancelPending(); }
+            if (message == 0x204 && !ready) { if (starting != null) StopStart(true); Begin(input.Point); if (ready) return 1; }
+            else if (ready || starting != null) {
+                if (starting is { } pending ? !StartCurrent(pending) : !Current) { cancelled=true; StopStart(false); CancelPending(); }
                 if (!otherMode && message is 0x200 or 0x205) Move(input.Point);
                 if (message is 0x201 or 0x207) {
                     var gesture = message == 0x201 ? "click-left" : "click-middle";
@@ -109,7 +200,7 @@ internal sealed class GestureEngine : IDisposable
             var up = message is 0x101 or 0x105;
             if (up && keys.Remove(input.Key)) { ReleaseHooksIfIdle(); return 1; }
             if (keys.Contains(input.Key)) return 1; // OS repeat, including after right release.
-            if (!ready || up || cancelled || !Current) return 0;
+            if (!ready || up || cancelled || (starting is { } pending ? !StartCurrent(pending) : !Current)) return 0;
             var modifier = input.Key is 0x11 or 0xA2 or 0xA3 ? "Ctrl+" : input.Key is 0x12 or 0xA4 or 0xA5 ? "Alt+" : input.Key is 0x10 or 0xA0 or 0xA1 ? "Shift+" : null;
             if (modifier != null && candidates.Any(r=>r.Gesture.StartsWith("key:") && r.Gesture.Contains(modifier))) {
                 keys.Add(input.Key); return 1;
@@ -158,6 +249,12 @@ internal sealed class GestureEngine : IDisposable
     }
     private void Tick()
     {
+        if (starting is { } pending) {
+            if (!StartCurrent(pending)) { StopStart(false); return; }
+            if (Environment.TickCount64 - pending.At > 1000) { StopStart(true); return; }
+            if (ready && !otherMode && GetCursorPos(out var cursor)) Move(cursor);
+            return;
+        }
         if (!ready && !busy) {timer.Stop();return;}
         if (!Current) { cancelled=true; CancelPending(); }
         if (lastWheel != 0 && Environment.TickCount64-lastWheel >= 100) CancelPending();
@@ -166,9 +263,11 @@ internal sealed class GestureEngine : IDisposable
         if (cancelled || otherMode || direction == null || config!.IndicatorPosition == "none") { indicator?.Hide(); return; }
         if (indicator.IsVisible) return;
         var titles = SelectedRows("move-"+direction.ToString()!.ToLowerInvariant()).Select(r=>r.Title).ToArray();
+        if (titles.Length == 0 && !config.IndicatorShowNoAction) { indicator.Hide(); return; }
         var caption = string.Join("\n",titles.Take(3)) + (titles.Length>3 ? $"\nほか {titles.Length-3} 件" : "");
         var center = origin;
-        if (config!.IndicatorPosition == "window-center" && GetWindowRect(target,out var rect)) center=new((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
+        if (config!.IndicatorPosition == "monitor-center" || config.IndicatorPosition == "window-center" && GestureTarget.IsDesktop(target)) center = monitorCenter;
+        else if (config.IndicatorPosition == "window-center" && GetWindowRect(target,out var rect)) center=new((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
         indicator.Display(center,process+".exe",direction.Value,caption.Length==0?"アクション無し":caption,config.IndicatorOpacity);
     }
     private void Wheel(int delta)
@@ -182,8 +281,13 @@ internal sealed class GestureEngine : IDisposable
     }
     private bool Run(string gesture, int repeats=1, bool released=false)
     {
-        if (busy || cancelled || !Current) return false;
+        if (busy || cancelled) return false;
         var rows=SelectedRows(gesture); if (rows.Length==0) return false;
+        if (starting is { } pending) {
+            if (pending.Gesture != null) return false;
+            pending.Gesture = gesture; pending.Repeats = repeats; return true;
+        }
+        if (!Current) return false;
         if (lifetime == null || lifetime.IsCancellationRequested) { lifetime?.Dispose(); lifetime=new(); session=Guid.NewGuid().ToString("N"); }
         var token=lifetime.Token;
         var capturedSession=session; var capturedTarget=target.ToInt64().ToString();
@@ -217,7 +321,14 @@ internal sealed class GestureEngine : IDisposable
         if (stroke) Run("move-"+direction.ToString()!.ToLowerInvariant(),released:true);
         else CancelPending();
         ready=false; if (!busy) timer.Stop(); indicator?.Hide();
-        if (replay && Current && OnTarget(point)) dispatcher.BeginInvoke(new Action(() => {
+        if (starting is { } pending) {
+            pending.Released = true; pending.Replay = replay; pending.ReleasePoint = point; timer.Start();
+        } else if (replay) ReplayRightClick(point);
+        ReleaseHooksIfIdle();
+    }
+    private void ReplayRightClick(GesturePoint point)
+    {
+        if (Current && OnTarget(point)) dispatcher.BeginInvoke(new Action(() => {
             if (Current && GetCursorPos(out var p) && OnTarget(p)) {
                 var events=new[]{MouseInput(8),MouseInput(16)};
                 var sent=SendInput(2,events,Marshal.SizeOf<Input>());
@@ -225,7 +336,6 @@ internal sealed class GestureEngine : IDisposable
                 if (sent!=2) Console.Error.WriteLine("通常の右クリックを再送信できませんでした。");
             }
         }));
-        ReleaseHooksIfIdle();
     }
     private void CancelPending()
     {
@@ -233,7 +343,7 @@ internal sealed class GestureEngine : IDisposable
     }
     public void Dispose()
     {
-        disposed=true; CancelPending(); lifetime?.Dispose(); timer.Stop();
+        disposed=true; StopStart(false); CancelPending(); lifetime?.Dispose(); timer.Stop();
         indicator?.Close();
     }
     private static Input MouseInput(uint flags)=>new(){Union=new(){Mouse=new(){Flags=flags,Extra=InputMarker}}};

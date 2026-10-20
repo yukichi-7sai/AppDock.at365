@@ -75,7 +75,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
 
-取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/app/pages/owner/applets/browser/exe、assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未確定入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
+取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/desktop/app/pages/owner/applets/browser/exeで、desktopはglobalの直下です。assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未確定入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
 編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。allowEditGesturesはPC専用automation.jsonに保存し、旧設定での省略時も初期OFF。操作の許可画面のMCP列で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
 
@@ -106,7 +106,9 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 - update: idとchanges（command/gesture/enabled/whenの部分更新）。whenを指定するときはscope/appletIds/processes全体が必要です。入力変更は移動先の末尾、条件だけの変更は現在位置を保ちます。
 - remove: 削除するidを指定します。存在しないIDはNOT_FOUNDです。
 - reorder: gestureとidsを指定。同じ入力の無効行も含む全IDが必要で、別入力の順序は維持します。
-- configure: changesでenabled、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、executionMode（all/first）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center/none）を部分更新します。executionModeは条件一致のすべて／最初の1つ、noneは待機表示なしです。省略された旧executionModeはallになります。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
+- configure: changesでenabled、activateOnStart、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、executionMode（all/first）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center/monitor-center/none）、indicatorShowNoAction（boolean）を部分更新します。indicatorShowNoActionは「アクションなしを表示する」に対応し、省略時は旧設定を含めtrueです。falseの場合は実行対象のない移動の待機表示を隠し、ジェスチャーの認識・実行・取消は維持します。activateOnStartは非アクティブな対象をアクティブにして開始する設定で、新規・旧設定での省略はfalseです。executionModeは条件一致のすべて／最初の1つ、noneは待機表示なしです。省略された旧executionModeはallになります。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
+
+desktop条件はデスクトップの背景・アイコン領域だけに一致し、フォルダー画面やタスクバーを含みません。whenの任意のboolean `excludeDesktop`はglobal/exeでtrueを指定でき、省略はfalseです。その行だけをデスクトップの開始候補から除外します。別のdesktop条件の行は維持し、候補がなければ通常の右クリックを通します。例: `{"scope":"exe","appletIds":[],"processes":["explorer"],"excludeDesktop":true}`。他のscopeでtrueを指定するとINVALID_ARGUMENTです。monitor-centerは開始時のカーソルがあるモニター全体の中央へ表示し、window-centerも対象がデスクトップなら同じ表示位置になります。
 
 exe条件のprocessesはパスを含まない実行ファイル名を1件以上指定し、その他の条件では空配列です。browsers/excludedProcessesも同じ形式で各100件まで。末尾.exeと大文字小文字を正規化します。applets条件だけappletIdsへ登録済みIDを1件以上指定し、その他では空配列です。本体コマンドにownerは使えません。旧未公開/未導入の割当は保持・無効化・削除でき、既存の同じ入力内で並べ替えられます。新規追加・再有効化・その他の更新は公開済み引数なしコマンドに限ります。
 

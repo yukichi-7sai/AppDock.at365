@@ -2941,6 +2941,12 @@ summary {
   gap: 8px;
   margin-top: 12px;
 }
+.gesture-desktop-exclusion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
 .gesture-processes textarea {
   width: 100%;
   min-width: 0;

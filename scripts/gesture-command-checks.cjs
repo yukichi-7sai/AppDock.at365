@@ -300,9 +300,40 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   checks.push(
     'host defaults / assignment filters / both themes at 1280, 900, 700 / bounded editor and matching toolbar / dedicated assignment button styles',
   );
+  for (const scope of ['global', 'exe', 'desktop']) {
+    await add('test.gestures.c');
+    await choose('移動', '左');
+    const condition = panel.getByLabel('割り当てのいつ・どこで');
+    const choices = await condition
+      .locator('option')
+      .evaluateAll((items) => items.map((item) => item.value));
+    assert.equal(choices[choices.indexOf('global') + 1], 'desktop');
+    await condition.selectOption(scope);
+    const exclude = panel.getByRole('checkbox', { name: 'デスクトップを除外', exact: true });
+    if (scope === 'desktop') assert.equal(await exclude.count(), 0);
+    else {
+      assert.equal(await exclude.isChecked(), false);
+      await exclude.check();
+      if (scope === 'exe') await panel.getByLabel('対象のexe名').fill('explorer.exe');
+    }
+    await apply(true);
+    const added = (await saved()).filter((item) => item.command === 'test.gestures.c').at(-1);
+    assert.equal(added.when.scope, scope);
+    assert.equal(added.when.excludeDesktop, scope === 'desktop' ? undefined : true);
+    await row('test.gestures.c')
+      .locator(`[data-binding-id="${added.id}"] .applet-shortcut-edit`)
+      .click();
+    assert.equal(await condition.inputValue(), scope);
+    if (scope !== 'desktop') assert(await exclude.isChecked());
+    await panel.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  }
+  checks.push(
+    'desktop immediately follows global / global and exe desktop exclusions save and reopen',
+  );
   await page.locator('summary').filter({ hasText: '動作設定' }).click();
   assert.deepEqual(await options.locator('.settings-field-label > strong').allTextContents(), [
     'マウスジェスチャーを有効にする',
+    '非アクティブなウィンドウ・デスクトップでも開始する',
     '条件に一致したコマンドの実行方法',
     '操作感',
     '待機表示',
@@ -310,6 +341,12 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     '除外',
   ]);
   assert.equal(await page.getByLabel('条件に一致したコマンドの実行方法').inputValue(), 'all');
+  const activation = page.getByRole('switch', {
+    name: '非アクティブなウィンドウ・デスクトップでも開始する',
+    exact: true,
+  });
+  assert.equal(await activation.getAttribute('aria-checked'), 'false');
+  await activation.click();
   const bindingsBeforeOptions = await saved();
   const enabled = page.getByRole('switch', { name: 'マウスジェスチャーを有効にする', exact: true });
   await enabled.click();
@@ -319,6 +356,18 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await enabled.click();
   await page.getByLabel('条件に一致したコマンドの実行方法').selectOption('first');
   const opacity = page.getByLabel('不透明度', { exact: true });
+  const noAction = options.getByRole('switch', { name: 'アクションなしを表示する', exact: true });
+  assert.equal(await noAction.getAttribute('aria-checked'), 'true');
+  assert.equal(
+    await noAction.evaluate(
+      (el) =>
+        el.closest('.settings-field').querySelector('.settings-field-label > strong').textContent,
+    ),
+    '待機表示',
+  );
+  await noAction.click();
+  await save();
+  assert.equal((await snapshot()).settings.value.gestures.indicatorShowNoAction, false);
   await opacity.fill('0.65');
   await page.getByLabel('表示位置', { exact: true }).selectOption('none');
   assert(await opacity.isDisabled());
@@ -327,16 +376,22 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await page.getByLabel('表示位置', { exact: true }).selectOption('window-center');
   assert(await opacity.isEnabled());
   assert.equal(await opacity.inputValue(), '0.65');
+  await page.getByLabel('表示位置', { exact: true }).selectOption('monitor-center');
+  await save();
+  assert.equal((await snapshot()).settings.value.gestures.indicatorPosition, 'monitor-center');
   await page.getByLabel('表示位置', { exact: true }).selectOption('none');
   await page.getByLabel('Webブラウザのexe', { exact: true }).fill('firefox.exe, msedge.exe');
   await page.getByLabel('移動距離（px）').fill('70');
+  await page.getByLabel('移動距離（px）').press('Enter');
   await save();
   const state = (await snapshot()).settings.value;
   assert.equal(state.gestures.distance, 70);
   assert.deepEqual(state.gestures.browsers, ['firefox', 'msedge']);
   assert.equal(state.gestures.executionMode, 'first');
   assert.equal(state.gestures.indicatorPosition, 'none');
+  assert.equal(state.gestures.indicatorShowNoAction, false);
   assert.equal(state.gestures.enabled, true);
+  assert.equal(state.gestures.activateOnStart, true);
   for (const theme of ['dark', 'light']) {
     await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
@@ -354,6 +409,9 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   }
   checks.push(
     'top collapsed behavior settings / grouped layout / enabled move / first-all mode / hidden display and retained opacity / both themes at three widths',
+  );
+  checks.push(
+    'no-action preview toggle defaults on in waiting display and saves off across display modes',
   );
   await page.locator('summary').filter({ hasText: '動作設定' }).click();
   const persisted = structuredClone(state.gestures);
