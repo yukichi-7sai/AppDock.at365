@@ -68,9 +68,18 @@
 .ad-gallery-card:hover {
   border-color: color-mix(in srgb, var(--accent, #5664d9) 28%, var(--border, #e5e8ef));
 }
-.ad-gallery-selected {
-  outline: 2px solid var(--accent, #5664d9);
-  outline-offset: -2px;
+.ad-gallery-card.ad-gallery-selected {
+  border-color: var(--accent, #5664d9);
+}
+.ad-gallery-selected::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: 1;
+  box-sizing: border-box;
+  border: 2px solid var(--accent, #5664d9);
+  border-radius: inherit;
+  pointer-events: none;
 }
 .ad-gallery button {
   font: inherit;

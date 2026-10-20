@@ -147,15 +147,19 @@ export function ItemNameDialog({
 
 ### 描画順と背景の管理
 
+`SettingsModal`の`closeOnBackdrop`は既定で無効。画像プレビューなど取消で入力を失わない表示に限り有効にする。dialogの外で押して外で離したクリックだけを取消とし、内側の余白や画像のクリック、内側から背景へのドラッグでは閉じない。`closeDisabled`中も閉じない。編集・削除確認には既定の明示的な確定・取消を使う。
+
 背景処理は[本体preload](../src/main/preload.ts)が同じdocumentの`dialog:modal`を監視して開始する。共通部品は内部で`showModal()`を呼ぶため、ダイアログごとの登録・描画順変更・待機時間の追加は不要。独自の本体内ダイアログも`showModal()`で開く。`show()`、`open`属性だけの表示、`div`による独自の覆いはこの判定の対象にならない。
 
 準備中の透明化は[本体の共通CSS](../src/renderer/style.css)の`data-host-modal-pending`に従う。機能側でこの属性を操作したり、独自のopacity・animationで準備完了前に表示したりしない。通常のスタイル追加も既存の外部CSSへ置き、CSPを緩めない。
 
-本体documentのnative dialogを開く間は、[HostModalLayer](../src/main/core/host-modal-layer.ts)が登録されたShellの描画面をまとめて背景として扱う。表示中の各Viewの画像を元の表示順で同じdocumentへ置き、その上からdialogの`::backdrop`で暗くする。準備中はdialogと`::backdrop`を透明に保ち、すべての画像の読み込みと配置、native Viewの一時非表示が完了した応答を受けてから両方を一緒に表示する。これにより、グレーの表示後に描画順が切り替わる瞬間を見せない。待機中もnative dialogのフォーカス囲い込みを保ち、閉じた後や古い寸法への遅延応答では表示を再開しない。画像の取得・decodeに失敗した場合は元のViewを保持してdialogの操作を再開する。renderer・接続・状態は保持し、画像は寸法・zoom・提供元・対象集合の変更時に更新する。
+本体documentのnative dialogを開く間は、[HostModalLayer](../src/main/core/host-modal-layer.ts)が登録されたShellの描画面をまとめて背景として扱う。表示中の各Viewの画像を元の表示順で同じdocumentへ置き、その上からdialogの`::backdrop`で暗くする。準備中はdialogと`::backdrop`を透明に保ち、すべての画像の読み込みと配置、native Viewの一時非表示が完了した応答を受けてから両方を一緒に表示する。これにより、グレーの表示後に描画順が切り替わる瞬間を見せない。待機中もnative dialogのフォーカス囲い込みを保ち、閉じた後や古い寸法への遅延応答では表示を再開しない。画像の取得・decodeに失敗した場合もnative Viewは一時非表示にしてdialogを操作できるようにする。背景画像の失敗を理由にViewを表示したままにすると、本文Viewがdialogを覆ってしまう。renderer・接続・状態は保持して閉じたときに復元し、画像は寸法・zoom・提供元・対象集合の変更時に更新する。
 
 描画面の所有者はViewを`register(view)`で登録し、親への追加・bounds更新後に返された登録口の`setVisible(visible)`へ表示希望を渡す。操作とフォーカスの入口では`blocked`を検査し、Viewの終了時に`dispose()`する。通常は希望どおり表示し、モーダル中だけ共通側が非表示を管理する。リボンと[タイトルバー・ステータスバー](shell-bars.md)を同じ登録口へ接続している。将来追加する背景のShell領域もこの契約を使う。
 
-現在この背景登録に接続しているのはリボン・タイトルバー・ステータスバーであり、既存の編集ダイアログは本体の設定Surface上で確認している。[Shell本文](../src/main/core/shell-page-host.ts)やWeb／Appletの本文View、通知等も含めた全Viewを自動的に取り込む仕組みではない。新しいダイアログを別の画面上で開く場合は、その時点で見えているnative Viewを確認する。対象の本体設定Surfaceへ移動してから開くか、残る描画面の登録・表示希望・操作停止・寿命を共通管理へ接続するか、用途に合う共通オーバーレイを使うかを決めて検証する。
+背景画像のdecodeとDOM配置が済んだら、描画フレームを待たずにnative Viewの非表示を要求する。本体documentが本文Viewに覆われている間は`requestAnimationFrame`が進まない場合があるため、非表示の前に描画完了を待つと相互待ちになる。非表示の応答後にdialogと背景の透明化を同時に解除し、古い世代の応答は無視する。
+
+現在この背景登録に接続しているのはリボン・タイトルバー・ステータスバーと[Shell本文](../src/main/core/shell-page-host.ts)。画像ライブラリーも本文Viewとして登録し、プレビュー・グループ編集を本体documentに表示する。Web／Appletの本文Viewや通知等、すべてのViewを自動的に取り込む仕組みではない。新しいダイアログを別の画面上で開く場合は、その時点で見えているnative Viewを確認する。対象の本体設定Surfaceへ移動してから開くか、残る描画面の登録・表示希望・操作停止・寿命を共通管理へ接続するか、用途に合う共通オーバーレイを使うかを決めて検証する。
 
 開いている最後のnative dialogを閉じると画像を破棄して各Viewを最新の表示希望に戻す。本体rendererの再読込・終了でも非表示を解除し、遅れて届いた画像や表示完了の応答は世代で拒否する。これは既存ダイアログの背景処理であり、コマンドパレットの独立したオーバーレイは従来の表示経路を使う。
 

@@ -20,7 +20,6 @@ const descriptions: Record<string, string> = {
     'AppletとMCPの許可を、それぞれ設定します。Applet側はすべてのAppletに共通です。変更はすぐに反映されます。',
   codex:
     '同じPCのCodexやネットワーク上のMCPクライアントから、AppDockの状態確認・設定変更・公開コマンドの実行ができます。連携の設定はこのPCへ即時反映されます。',
-  'image-library': '画像を登録してグループで整理し、Appletやリボンなどから共通で利用します。',
   about: 'AppDockとインストール済みAppletのバージョンを確認し、更新を管理します。',
 };
 

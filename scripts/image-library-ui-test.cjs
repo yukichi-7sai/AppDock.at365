@@ -268,16 +268,19 @@ async function launch() {
 async function openLibrary() {
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   await settingsPage(host);
-  await host
-    .locator('.settings-categories')
-    .getByRole('button', { name: '画像ライブラリー', exact: true })
-    .click();
+  assert.equal(
+    await host
+      .locator('.settings-categories')
+      .getByRole('button', { name: '画像ライブラリー', exact: true })
+      .count(),
+    0,
+  );
   libraryNavigation = await host.evaluate(async () => {
     const surface = document.querySelector('.settings-surface[data-settings-connection]');
     return (await window.dock.settingsPage.get(surface.dataset.settingsConnection)).content
       .navigation;
   });
-  await host.getByRole('button', { name: '画像ライブラリーを開く', exact: true }).click();
+  await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
   libraryPage = await until(
     () =>
       app
@@ -509,8 +512,10 @@ async function chooseInPicker(file) {
       () => preview.locator('img').evaluate((image) => image.complete && image.naturalWidth > 0),
       'nested preview decoded',
     );
-    await host.keyboard.press('Escape');
-    await until(() => preview.count().then((count) => count === 0), 'only preview closed');
+    await preview.locator('.ad-gallery-preview-stage').click();
+    assert(await preview.isVisible(), 'preview content does not dismiss it');
+    await host.mouse.click(4, 4);
+    await until(() => preview.count().then((count) => count === 0), 'backdrop closes only preview');
     assert(await picker.isVisible());
     assert.equal(
       await card(picker, 'sample.png').locator('.ad-gallery-image').getAttribute('aria-pressed'),

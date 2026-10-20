@@ -11,7 +11,16 @@ export interface ImageLibraryPageRequest {
   route: 'image-library';
 }
 export type ImageLibraryDialogKind =
-  'add' | 'rename' | 'delete' | 'order' | 'membership' | 'batch-add' | 'batch-remove' | 'preview';
+  | 'add'
+  | 'rename'
+  | 'delete'
+  | 'order'
+  | 'membership'
+  | 'batch-add'
+  | 'batch-remove'
+  | 'preview'
+  | 'delete-image';
+export type ImageLibraryDialogOperation = ImageLibraryEdit | { kind: 'delete-image' };
 export interface ImageLibraryDialogRequest {
   id: string;
   kind: ImageLibraryDialogKind;
@@ -19,10 +28,11 @@ export interface ImageLibraryDialogRequest {
   images: RegisteredImageRef[];
   groupId?: string;
   entry?: RegisteredImageEntry;
+  deleteBlocked?: boolean;
 }
 export interface ImageLibraryDialogApi {
   onRequest(callback: (request: ImageLibraryDialogRequest | null) => void): () => void;
-  complete(id: string, operation?: ImageLibraryEdit): Promise<void>;
+  complete(id: string, operation?: ImageLibraryDialogOperation): Promise<void>;
 }
 export interface ImageLibraryPageModel {
   schemaVersion: 1;

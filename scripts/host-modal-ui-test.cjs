@@ -364,11 +364,11 @@ const capture = async (name, all = false) => {
       () => !document.documentElement.hasAttribute('data-host-modal-pending'),
     );
     assert.equal(await dialog().evaluate((el) => getComputedStyle(el).opacity), '1');
-    assert((await ribbonState()).visible);
+    assert(!(await ribbonState()).visible);
     await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(async () => (await dialog().count()) === 0, 'capture failure leaves dialog usable');
     result.checks.push(
-      'Escape during preparation rejects late captures; failed capture releases the transparent dialog and remains cancellable',
+      'Escape during preparation rejects late captures; failed capture hides native surfaces and leaves the dialog cancellable',
     );
     await host.evaluate(() => {
       void window.dock.openCommandPalette({ requestId: crypto.randomUUID(), mode: 'execute' });

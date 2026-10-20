@@ -117,6 +117,57 @@ export class RegisteredImages {
   async add(bytes: Buffer, filename: string): Promise<RegisteredImageRef> {
     return (await this.addWithResult(bytes, filename)).ref;
   }
+  /** Only the confirmed, unchanged original may be recycled; failed settings saves restore it. */
+  remove(
+    ref: RegisteredImageRef,
+    generation: string,
+    options: { trash(file: string): Promise<void>; prepare(): () => void },
+  ): Promise<void> {
+    const run = async () => {
+      const original = await this.read(ref);
+      if (!generation || createHash('sha256').update(original.bytes).digest('hex') !== generation)
+        throw Error('画像が変更されました。再取得してから削除してください。');
+      const commit = options.prepare();
+      const file = path.join(this.directory, original.ref.file);
+      let recycled = false;
+      try {
+        await options.trash(file);
+        recycled = true;
+        commit();
+      } catch (error) {
+        try {
+          await this.root();
+          try {
+            await fs.writeFile(file, original.bytes, { flag: 'wx' });
+          } catch (restoreError) {
+            if (
+              (restoreError as NodeJS.ErrnoException).code !== 'EEXIST' ||
+              !(await this.fileBytes(original.ref.file)).equals(original.bytes)
+            )
+              throw restoreError;
+          }
+        } catch {
+          throw Error(
+            '画像の削除を完了できず、元の画像も復元できませんでした。保存先とごみ箱を確認してください。',
+          );
+        }
+        throw recycled
+          ? error
+          : Error('画像をごみ箱へ移せませんでした。ファイルと保存先を確認してください。');
+      } finally {
+        if (this.refreshing) await this.refreshing;
+        await this.refresh();
+      }
+      this.entries.delete(imageKey(original.ref));
+      // A concurrent file-system writer may have restored this filename.
+      await this.refresh();
+      this.changed();
+      for (const callback of this.listeners) callback();
+    };
+    const task = this.queue.then(run, run);
+    this.queue = task.catch(() => {});
+    return task;
+  }
   async addWithResult(
     bytes: Buffer,
     filename: string,

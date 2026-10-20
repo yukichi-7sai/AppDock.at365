@@ -58,11 +58,9 @@ window.addEventListener('DOMContentLoaded', () => {
     backdrop?.remove();
     backdrop = next;
     document.body.append(next);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        void finish(model.revision, current, true);
-      });
-    });
+    // A native body can occlude this renderer and suspend its animation frames.
+    // The decoded DOM is ready; cover native views before waiting for any paint.
+    void finish(model.revision, current, true);
   });
   const update = () => {
     const next = !!document.querySelector('dialog:modal');

@@ -208,6 +208,57 @@ async function theme(value) {
   }, value);
   await until(async () => (await model()).dark === (value === 'dark'), 'theme');
 }
+const borderSamples = [];
+async function selectedBorder(label) {
+  const selected = page.locator('.ad-gallery-selected').first();
+  const bounds = await selected.boundingBox();
+  const png = await selected.screenshot({ path: path.join(profile, `selected-${label}.png`) });
+  const accent = await selected.evaluate((el) =>
+    getComputedStyle(el, '::after').borderTopColor.match(/\d+/g).slice(0, 3).map(Number),
+  );
+  const result = await app.evaluate(
+    ({ nativeImage }, { base64, accent }) => {
+      const image = nativeImage.createFromBuffer(Buffer.from(base64, 'base64'));
+      const { width, height } = image.getSize();
+      const pixels = image.toBitmap();
+      const matches = (x, y) => {
+        const offset = (y * width + x) * 4;
+        return [pixels[offset + 2], pixels[offset + 1], pixels[offset]].every(
+          (v, i) => Math.abs(v - accent[i]) < 12,
+        );
+      };
+      const count = (point) =>
+        Array.from({ length: 8 }, (_, n) => point(n)).filter(([x, y]) => matches(x, y)).length;
+      return {
+        width,
+        height,
+        edges: [
+          count((n) => [Math.floor(width / 2), n]),
+          count((n) => [Math.floor(width / 2), height - 1 - n]),
+          ...[0.2, 0.7].flatMap((y) => [
+            count((n) => [n, Math.floor(height * y)]),
+            count((n) => [width - 1 - n, Math.floor(height * y)]),
+          ]),
+        ],
+      };
+    },
+    { base64: png.toString('base64'), accent },
+  );
+  const scale = result.width / bounds.width;
+  borderSamples.push({ label, scale, ...result });
+  for (const count of result.edges)
+    assert(Math.abs(count - 2 * scale) <= 1.05, `${label}: ${JSON.stringify(result)}`);
+  assert.equal(
+    result.edges[2],
+    result.edges[4],
+    'left border remains equally thick over image and body',
+  );
+  assert.equal(
+    result.edges[3],
+    result.edges[5],
+    'right border remains equally thick over image and body',
+  );
+}
 (async () => {
   try {
     await launch();
@@ -280,6 +331,9 @@ async function theme(value) {
     await assert.rejects(action('select-all'), /bound/);
     await host.screenshot({ path: path.join(profile, 'modal.png') });
     await d.getByLabel('画像グループ名').fill('新しいグループ');
+    await host.mouse.click(4, 4);
+    assert(await d.isVisible(), 'editing dialogs keep their draft after a backdrop click');
+    assert.equal(await d.getByLabel('画像グループ名').inputValue(), '新しいグループ');
     await d.getByRole('button', { name: '追加', exact: true }).click();
     await until(
       async () => (await imageSnapshot()).groups.some((g) => g.name === '新しいグループ'),
@@ -300,10 +354,21 @@ async function theme(value) {
         (await imageSnapshot()).groups.find((g) => g.name === '新しいグループ').images.length === 1,
       'membership',
     );
-    await card('image-000.png').getByRole('button', { name: '拡大', exact: true }).click();
+    await card('image-000.png')
+      .getByRole('button', { name: 'image-000.pngを拡大', exact: true })
+      .click();
     d = host.getByRole('dialog', { name: 'image-000.png', exact: true });
     await d.locator('img').waitFor();
-    await d.getByRole('button', { name: '閉じる', exact: true }).click();
+    await until(() => d.evaluate((el) => getComputedStyle(el).opacity === '1'), 'preview prepared');
+    await d.click({ position: { x: 12, y: 12 } });
+    assert(await d.isVisible(), 'preview padding stays open');
+    const previewBounds = await d.boundingBox();
+    await host.mouse.move(previewBounds.x + 12, previewBounds.y + 12);
+    await host.mouse.down();
+    await host.mouse.move(4, 4);
+    await host.mouse.up();
+    assert(await d.isVisible(), 'dragging from the preview to its backdrop does not dismiss it');
+    await host.mouse.click(4, 4);
     await until(
       async () =>
         (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
@@ -358,6 +423,73 @@ async function theme(value) {
     );
     await action('group', { groupId: 'all' });
     await action('reload');
+    assert.deepEqual(
+      await card('image-000.png').locator('.ad-gallery-actions button').allTextContents(),
+      ['グループ', '削除'],
+    );
+    await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
+    d = host.getByRole('dialog', { name: '画像を削除', exact: true });
+    await d.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
+    await host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      s.settings.value.extensions['fixture.reference'] = {
+        enabled: false,
+        settings: { image: { file: 'image-000.png' } },
+      };
+      await window.dock.saveSettings(s.settings.value, s.settings.revision);
+    });
+    await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
+    d = host.getByRole('dialog', { name: '画像を削除', exact: true });
+    assert(await d.getByRole('button', { name: '削除', exact: true }).isDisabled());
+    assert.match(await d.innerText(), /使用中/);
+    await d.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      delete s.settings.value.extensions['fixture.reference'];
+      await window.dock.saveSettings(s.settings.value, s.settings.revision);
+    });
+    await app.evaluate(({ shell }) => {
+      global.__galleryTrash = shell.trashItem;
+      shell.trashItem = async () => {
+        throw Error('recycle fixture failure');
+      };
+    });
+    await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
+    d = host.getByRole('dialog', { name: '画像を削除', exact: true });
+    await d.getByRole('button', { name: '削除', exact: true }).click();
+    await d.getByText(/画像をごみ箱へ移せませんでした/).waitFor();
+    assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
+    const recycled = path.join(profile, 'recycled-image-000.png');
+    await app.evaluate(
+      ({ shell }, { source, recycled }) => {
+        shell.trashItem = async (file) => {
+          if (file !== source) throw Error('unexpected recycle target');
+          await process.getBuiltinModule('fs/promises').rename(file, recycled);
+        };
+      },
+      { source: path.join(images, 'image-000.png'), recycled },
+    );
+    await d.getByRole('button', { name: '削除', exact: true }).click();
+    await until(
+      async () => !(await imageSnapshot()).images.some((i) => i.ref.file === 'image-000.png'),
+      'deleted image removed',
+    );
+    await until(
+      async () => !(await model()).content.items.some((i) => i.title === 'image-000.png'),
+      'deleted card removed',
+    );
+    assert.equal(hash(recycled), originalHash);
+    assert(
+      !(await imageSnapshot()).groups.some((g) => g.images.some((i) => i.file === 'image-000.png')),
+    );
+    await app.evaluate(({ shell }) => {
+      shell.trashItem = global.__galleryTrash;
+      delete global.__galleryTrash;
+    });
+    checks.push(
+      'image deletion: footer order, cancel, in-use guard, recycle failure/retry, memberships and catalogue removal (isolated recycle adapter)',
+    );
     await action('select', { imageId: (await model()).content.items[0].id, selected: true });
     const beforeRoute = (await model()).content;
     await host.evaluate(() => window.dock.navigate('home'));
@@ -371,11 +503,16 @@ async function theme(value) {
     for (const t of ['light', 'dark']) {
       await theme(t);
       await action('width', { value: 260, commit: true });
+      await action('select', {
+        imageId: (await model()).content.items.find((i) => i.title === 'image-001.png').id,
+        selected: true,
+      });
       await until(
         async () => (await page.locator('.ad-gallery-image img[src]').count()) > 3,
         'images for screenshot',
       );
       await page.screenshot({ path: path.join(profile, `${t}.png`) });
+      await selectedBorder(t);
       const geometry = await page.locator('.ad-gallery-card').evaluateAll((cards) =>
         cards.slice(0, 6).map((c) => ({
           top: c.getBoundingClientRect().top,
@@ -437,19 +574,28 @@ async function theme(value) {
     await open();
     assert.equal((await model()).content.cardWidth, 340);
     assert.deepEqual((await imageSnapshot()).groups, stateBefore);
-    assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
+    assert.equal(hash(recycled), originalHash);
+    assert(!fs.existsSync(path.join(images, 'image-000.png')));
     checks.push(
       '150/200 percent CSS scaling, process restart restores PC-local width and shared groups',
     );
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await until(() => host.locator('.settings-categories').isVisible(), 'settings');
-    await host
-      .locator('.settings-categories')
-      .getByRole('button', { name: '画像ライブラリー', exact: true })
-      .click();
-    await host.getByRole('button', { name: '画像ライブラリーを開く', exact: true }).click();
+    assert.equal(
+      await host
+        .locator('.settings-categories')
+        .getByRole('button', { name: '画像ライブラリー', exact: true })
+        .count(),
+      0,
+    );
+    assert.equal(
+      await host.getByRole('button', { name: '画像ライブラリーを開く', exact: true }).count(),
+      0,
+    );
     await open();
-    checks.push('settings category links to the page without duplicate gallery management');
+    checks.push(
+      'settings no longer contains a library category or link; the independent page remains available',
+    );
     const appPath = await app.evaluate(({ app }) => app.getAppPath());
     const bundleUrl = require('node:url').pathToFileURL(
       path.join(appPath, 'out/ui/image-gallery/image-gallery.js'),
@@ -579,6 +725,7 @@ async function theme(value) {
           executable: portable,
           sha256: portable ? hash(portable) : null,
           checks,
+          borderSamples,
           errors,
         },
         null,

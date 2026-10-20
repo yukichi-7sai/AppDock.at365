@@ -77,17 +77,17 @@ export class ShellPageHost {
       });
     const bound = (event: IpcMainInvokeEvent, active = false, passive = false) => {
       const s = this.surface;
-      if (
-        !s ||
-        !options.registry.usable(this.region(), s) ||
-        !this.current ||
-        this.current.route !== options.route() ||
-        event.sender !== s.view.webContents ||
-        event.senderFrame !== event.sender.mainFrame ||
-        event.sender.getURL() !== s.url ||
-        (active && (!s.ready || (!passive && s.modal?.blocked)))
-      )
-        throw Error('Page session is not bound');
+      const reject = (reason: string): never => {
+        throw Error(`Page session is not bound (${reason})`);
+      };
+      if (!s || !this.current) return reject('session-closed');
+      if (!options.registry.usable(this.region(), s)) return reject('provider-unavailable');
+      if (this.current.route !== options.route()) return reject('route-changed');
+      if (event.sender !== s.view.webContents) return reject('sender-mismatch');
+      if (event.senderFrame !== event.sender.mainFrame) return reject('frame-mismatch');
+      if (event.sender.getURL() !== s.url) return reject('document-changed');
+      if (active && !s.ready) return reject('page-not-ready');
+      if (active && !passive && s.modal?.blocked) return reject('modal-active');
       return s;
     };
     ipcMain.handle('shell-page:connect', (event) => {

@@ -1,4 +1,4 @@
-import { dialog, type BrowserWindow } from 'electron';
+import { dialog, shell, type BrowserWindow } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -58,6 +58,7 @@ export class ImageLibraryHost {
       writable(): void;
       show(): void;
       cover?(): Promise<() => void>;
+      referenced?(ref: RegisteredImageRef): boolean;
     },
   ) {}
   async snapshot(): Promise<ImageLibrarySnapshot> {
@@ -93,6 +94,55 @@ export class ImageLibraryHost {
       { ...store.value, imageLibrary: editImageLibrary(store.value.imageLibrary, operation) },
       store.revision,
     );
+  }
+  inUse(ref: RegisteredImageRef) {
+    const contains = (value: unknown): boolean => {
+      if (imageReference(value)) return imageKey(value) === imageKey(ref);
+      return !!value && typeof value === 'object' && Object.values(value).some(contains);
+    };
+    return (
+      Object.entries(this.options.settings.value).some(
+        ([key, value]) => key !== 'imageLibrary' && contains(value),
+      ) || !!this.options.referenced?.(ref)
+    );
+  }
+  async remove(entry: import('../../shared/registered-images').RegisteredImageEntry) {
+    await this.images.remove(entry.ref, entry.generation ?? '', {
+      trash: (file) => shell.trashItem(file),
+      prepare: () => {
+        const store = this.options.settings;
+        this.options.writable();
+        if (this.inUse(entry.ref))
+          throw Error(
+            'この画像は使用中です。リボンやAppletの画像設定を外してから削除してください。',
+          );
+        const revision = store.revision;
+        return () => {
+          this.options.writable();
+          if (store.revision !== revision || this.inUse(entry.ref))
+            throw Error(
+              '設定が変更されました。元の画像を復元したので、再取得してから削除してください。',
+            );
+          if (
+            store.value.imageLibrary?.groups.some((g) =>
+              g.images.some((r) => imageKey(r) === imageKey(entry.ref)),
+            )
+          )
+            store.save(
+              {
+                ...store.value,
+                imageLibrary: {
+                  groups: store.value.imageLibrary.groups.map((g) => ({
+                    ...g,
+                    images: g.images.filter((r) => imageKey(r) !== imageKey(entry.ref)),
+                  })),
+                },
+              },
+              revision,
+            );
+        };
+      },
+    });
   }
   async registerMany() {
     this.options.writable();

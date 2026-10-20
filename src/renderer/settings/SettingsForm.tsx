@@ -25,7 +25,6 @@ import { NotificationSettings } from './NotificationSettings';
 import { AppletSettingsForm } from '../settings-ui/AppletSettingsForm';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsHint } from '../settings-ui/SettingsHint';
-import { ImageLibrarySettings } from './ImageLibrarySettings';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
@@ -142,7 +141,6 @@ export function SettingsForm({
         onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
       />
     );
-  if (category === 'image-library') return <ImageLibrarySettings />;
   if (category === 'notifications')
     return (
       <NotificationSettings

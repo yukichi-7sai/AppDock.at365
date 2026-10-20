@@ -81,12 +81,13 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       void options
         .image(assetId, edge)
         .then(async (source) => {
+          if (disposed || generation !== card.generation || !card.visible) return;
           // Only image URLs supplied by the adapter; never interpret markup.
           if (!safeImage(source)) throw Error('画像を読み込めません');
           const decoded = new Image();
           decoded.src = source;
           await decoded.decode();
-          if (disposed || generation !== card.generation || !cards.has(card.item.id)) return;
+          if (disposed || generation !== card.generation || !card.visible) return;
           card.image.src = source;
           card.edge = edge;
           card.status.textContent = '';
@@ -109,8 +110,8 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         const card = cards.get((entry.target as HTMLElement).dataset.imageId!);
         if (card) {
           card.visible = entry.isIntersecting;
-          // Release offscreen decoded surfaces as the list grows.
-          if (!card.visible && card.image.hasAttribute('src')) {
+          // Invalidate pending replies too: an image may leave before its first decode.
+          if (!card.visible) {
             card.image.removeAttribute('src');
             card.edge = 0;
             card.requested = 0;

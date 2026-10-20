@@ -109,13 +109,13 @@ test('hint visibility defaults on, preserves false, validates input and stays in
 
 test('valid edits save immediately; invalid JSON/numbers and save failures never enter host state', async () => {
   const f = fixture();
-  await f.act({ type: 'select-page', pageId: 'image-library' });
+  await f.act({ type: 'select-page', pageId: 'appearance' });
   await f.act({ type: 'mode', value: 'json' });
   await assert.rejects(
     f.act({
       type: 'partial-text',
-      pageId: 'image-library',
-      before: f.session.projection(),
+      pageId: 'appearance',
+      before: f.session.jsonProjection(),
       value: '{broken',
     }),
     /JSON/,
@@ -125,20 +125,20 @@ test('valid edits save immediately; invalid JSON/numbers and save failures never
   assert.equal('dirty' in f.session.snapshot(), false);
   await f.act({
     type: 'partial-text',
-    pageId: 'image-library',
-    before: f.session.projection(),
-    value: JSON.stringify({ imageLibrary: { groups: [{ id: 'one', name: 'Saved', images: [] }] } }),
+    pageId: 'appearance',
+    before: f.session.jsonProjection(),
+    value: JSON.stringify({ host: { theme: 'dark' } }),
   });
-  assert.equal(f.saved.value.imageLibrary.groups[0].name, 'Saved');
+  assert.equal(f.saved.value.host.theme, 'dark');
   f.fail = true;
   const before = f.session.value,
-    next = { ...before, imageLibrary: { groups: [{ id: 'one', name: 'Rejected', images: [] }] } };
+    next = { ...before, host: { ...before.host, theme: 'light' } };
   await assert.rejects(f.act({ type: 'values', before, value: next }), /disk failure/);
-  assert.equal(f.saved.value.imageLibrary.groups[0].name, 'Saved');
+  assert.equal(f.saved.value.host.theme, 'dark');
   assert.equal(f.session.snapshot().pending, false);
   f.fail = false;
   await f.act({ type: 'values', before, value: next });
-  assert.equal(f.saved.value.imageLibrary.groups[0].name, 'Rejected');
+  assert.equal(f.saved.value.host.theme, 'light');
   await assert.rejects(
     f.act({ type: 'avatar', bytes: new Uint8Array([137, 80]), name: 'fixture.png' }),
     /不正/,

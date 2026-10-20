@@ -361,6 +361,7 @@ export function RegisteredImagePicker({
         <SettingsModal
           labelledBy="picker-preview-title"
           className="image-library-preview-modal"
+          closeOnBackdrop
           onClose={() => setPreview(null)}
         >
           <header className="image-library-preview-heading">

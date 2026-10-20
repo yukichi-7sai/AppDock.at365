@@ -28,6 +28,8 @@ function App() {
   const [query, setQuery] = useState('');
   const [width, setWidth] = useState(260);
   const [menu, setMenu] = useState('');
+  const [dialogPending, setDialogPending] = useState(false);
+  const openingDialog = useRef(false);
   const grid = useRef<HTMLDivElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     size = useRef<HTMLDivElement>(null);
@@ -39,12 +41,23 @@ function App() {
   const sizeDirty = useRef(false);
   const act = async (action: Action) => {
     if (!latest.current) return;
+    if (openingDialog.current && action.command !== 'anchor') return;
+    const opensDialog = action.command === 'dialog';
+    if (opensDialog) {
+      openingDialog.current = true;
+      setDialogPending(true);
+    }
     try {
       setError('');
       return await api.act({ ...action, id: latest.current.id, type: 'gallery' });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       throw e;
+    } finally {
+      if (opensDialog) {
+        openingDialog.current = false;
+        setDialogPending(false);
+      }
     }
   };
   const run = (action: Action) => {
@@ -99,6 +112,7 @@ function App() {
       (edge === 'first' ? controls()[0] : controls().at(-1))?.focus({ preventScroll: true }),
     );
     const keys = (e: KeyboardEvent) => {
+      if (openingDialog.current) return;
       if (e.defaultPrevented || e.isComposing || e.repeat) return;
       if (e.key === 'Tab') {
         const list = controls();
@@ -144,7 +158,7 @@ function App() {
       action: (imageId, actionId) =>
         run({
           command: 'dialog',
-          kind: actionId === 'preview' ? 'preview' : 'membership',
+          kind: actionId === 'delete-image' ? 'delete-image' : 'membership',
           imageId,
         }),
     });
@@ -215,7 +229,7 @@ function App() {
     run({ command: 'dialog', kind, groupId });
   };
   return (
-    <main className="library-page">
+    <main className="library-page" inert={dialogPending}>
       <header className="library-header">
         <div>
           <h1>画像ライブラリー</h1>

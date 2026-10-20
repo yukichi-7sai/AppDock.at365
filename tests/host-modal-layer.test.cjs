@@ -143,7 +143,7 @@ test('renderer reload and exit restore every registered surface', async () => {
   }
 });
 
-test('failed capture or decode releases presentation without hiding native surfaces; retry still works', async () => {
+test('failed capture or decode hides native surfaces so dialogs stay operable; close restores them', async () => {
   const f = fixture(),
     first = f.add(1),
     second = f.add(2);
@@ -154,12 +154,16 @@ test('failed capture or decode releases presentation without hiding native surfa
   assert.equal(f.messages.length, 1);
   assert.equal(f.messages[0].failed, true);
   assert.equal(f.layer.ready(f.messages[0].revision, false), true);
-  assert(first.view.visible && second.view.visible);
+  assert(!first.view.visible && !second.view.visible);
+  const replacement = f.add(3);
+  assert(!replacement.view.visible);
   f.layer.layout();
   await f.complete();
   assert.equal(f.messages.at(-1).failed, undefined);
   assert.equal(f.layer.ready(f.messages.at(-1).revision, false), true);
-  assert(first.view.visible && second.view.visible);
+  assert(!first.view.visible && !second.view.visible);
   f.ready();
   assert(!first.view.visible && !second.view.visible);
+  f.layer.setActive(false);
+  assert(first.view.visible && second.view.visible && replacement.view.visible);
 });

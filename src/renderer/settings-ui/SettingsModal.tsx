@@ -14,6 +14,7 @@ export function SettingsModal({
   onReady,
   onError,
   closeDisabled = false,
+  closeOnBackdrop = false,
   initialFocus = '[data-initial-focus], .shortcut-capture',
 }: {
   children: ReactNode;
@@ -23,10 +24,27 @@ export function SettingsModal({
   onReady?(ready: boolean): void;
   onError?(error: string): void;
   closeDisabled?: boolean;
+  closeOnBackdrop?: boolean;
   initialFocus?: string;
 }) {
   const settingsControls = useSettingsControls();
   const dialog = useRef<HTMLDialogElement>(null);
+  const backdropPressed = useRef(false);
+  const isBackdrop = (event: {
+    target: EventTarget;
+    currentTarget: HTMLDialogElement;
+    clientX: number;
+    clientY: number;
+  }) => {
+    if (event.target !== event.currentTarget) return false;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return (
+      event.clientX < bounds.left ||
+      event.clientX >= bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY >= bounds.bottom
+    );
+  };
   const callbacks = useRef({ onReady, onError });
   callbacks.current = { onReady, onError };
   const [returnFocus] = useState(() =>
@@ -74,6 +92,22 @@ export function SettingsModal({
         className={`applet-shortcut-dialog settings-modal ${className}`}
         aria-labelledby={labelledBy}
         data-shortcut-recorder="true"
+        onPointerDown={(event) => {
+          backdropPressed.current =
+            closeOnBackdrop &&
+            !closeDisabled &&
+            event.isPrimary &&
+            event.button === 0 &&
+            isBackdrop(event);
+        }}
+        onPointerCancel={() => {
+          backdropPressed.current = false;
+        }}
+        onClick={(event) => {
+          const dismiss = backdropPressed.current && isBackdrop(event);
+          backdropPressed.current = false;
+          if (closeOnBackdrop && !closeDisabled && dismiss) onClose();
+        }}
         onCancel={(event) => {
           event.preventDefault();
           if (!closeDisabled) onClose();

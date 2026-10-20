@@ -1,6 +1,6 @@
 # 画像ライブラリーのページ化と共通画像ギャラリー
 
-状態: 工程A〜Eを実装（AppDock 0.74.1 / WallpaperSlideshow 0.7.0、2026-10-21）。管理ページ・画像選択・壁紙履歴に共通カード、拡大表示、独立したサイズ保存を適用した。実測したFの範囲と未確認事項は各VERIFICATIONを正本とする。開始時の基準はAppDock 0.73.9 / main `ed6c780`、外観の参照元はWallpaperSlideshow 0.6.4 / main `00bc835`。
+状態: 工程A〜Eを実装し、Fの大量画像・遅延取得の確認まで実施（AppDock 0.74.6 / WallpaperSlideshow 0.7.2、2026-10-21）。管理ページ・画像選択・壁紙履歴に共通カード、拡大表示、独立したサイズ保存を適用した。512枚・64グループ・4096所属の隔離GUIと画面外の遅延応答を検証した。実測したFの範囲と未確認事項は各VERIFICATIONを正本とする。開始時の基準はAppDock 0.73.9 / main `ed6c780`、外観の参照元はWallpaperSlideshow 0.6.4 / main `00bc835`。
 
 左にグループ、右に画像カードを置く画面を採用し、ページ内でカードサイズを変更できるようにする。WallpaperSlideshowの壁紙履歴を共通ギャラリーの外観の基準とする。画像の保存・参照・グループの現行契約は[共通画像ライブラリー](registered-images.md)、ページの責務は[Shellのページ表示](shell-pages.md)を正本とする。
 
@@ -10,15 +10,16 @@
 
 実装範囲は次のとおり。表示と保存の責務を分け、既存の選択・履歴操作を各adapterで維持する。
 
-- 本体の独立した「画像ライブラリー」ページと、設定からの入口。
+- 本体の独立した「画像ライブラリー」ページと、リボン・コマンドからの入口。
 - 左のグループ一覧、ファイル名検索、登録画像の一覧、拡大プレビュー。
 - ページ上の「画像サイズ」スライダー、画面幅に応じた列数変更、PC別・画面別のサイズ保存。
 - 画像追加、単一画像の所属編集、複数選択によるグループへの追加・解除。
 - グループの追加・名前変更・削除・並べ替え。
+- 原画像を確認後にごみ箱へ移し、全グループの所属から外す。使用中の画像は先に使用先の設定を解除する。
 - 共通ギャラリーを管理ページ、既存の画像選択ダイアログ、WallpaperSlideshowの壁紙履歴へ適用。
 - 既存の原画像、画像参照、親ダイアログの確定・取消、履歴の操作契約の維持。
 
-原画像の削除・名前変更・未使用画像の自動整理、画像加工、階層グループ、タグとは別の分類方式、お気に入り、使用先の逆引き、ドラッグ＆ドロップ登録、URLからの取得は後続候補とする。NASへの保存先変更は[共有場所の設計](shared-settings-location-design.md)の別工程。本書を理由に既存ファイルをコピー・移動・削除・移行しない。
+原画像の名前変更・未使用画像の自動整理、画像加工、階層グループ、タグとは別の分類方式、お気に入り、使用先の逆引き、ドラッグ＆ドロップ登録、URLからの取得は後続候補とする。NASへの保存先変更は[共有場所の設計](shared-settings-location-design.md)の別工程。本書を理由に既存ファイルをコピー・移動・削除・移行しない。
 
 ## 2. 現状と変更点
 
@@ -35,7 +36,7 @@
 
 確認した主な入口:
 
-- [ImageLibrarySettings](../src/renderer/settings/ImageLibrarySettings.tsx)、[RegisteredImagePicker](../src/renderer/settings-ui/RegisteredImagePicker.tsx)、[一覧CSS](../src/renderer/settings-ui/registered-images.css)。
+- [画像管理ページ](../shells/default/image-library.tsx)、[RegisteredImagePicker](../src/renderer/settings-ui/RegisteredImagePicker.tsx)、[一覧CSS](../src/renderer/settings-ui/registered-images.css)。
 - [ImageLibraryHost](../src/main/core/image-library-host.ts)、[RegisteredImages](../src/main/core/registered-images.ts)、[画像の型と所属編集](../src/shared/registered-images.ts)、[画像decode](../src/main/core/registered-image-decoder.ts)。
 - [Shellページ型](../src/shared/shell-pages.ts)、[ShellPageSlot](../src/renderer/ShellPageSlot.tsx)、[標準リボン](../src/shared/applet-pages.ts)。
 - WallpaperSlideshowの[履歴CSS](../../Applet.WallpaperSlideshow.at365/web/history.css)、[履歴JavaScript](../../Applet.WallpaperSlideshow.at365/web/history.js)、[manifest](../../Applet.WallpaperSlideshow.at365/extension.json)。
@@ -47,13 +48,13 @@
 | 標準リボン | `image-library`、表示名「画像ライブラリー」、画像アイコン。新規の既定順はホームの次、上寄せ |
 | 保存済みリボン | 既存のorder・hidden・bottom・グループ・表示名を尊重。新項目は既存の未配置項目の規則で追加し、保存済み配列を自動書換えしない |
 | コマンド | `appdock.image-library.open`、「画像ライブラリーを開く」。パレット等の共通コマンド経路を使用 |
-| 設定 | 「画像ライブラリー」カテゴリと既存検索アンカーを残し、短い説明と「画像ライブラリーを開く」へ変更。画像一覧・グループ編集を二重に置かない |
+| 設定 | 同名カテゴリ・案内ページ・検索アンカーを除去。既存の画像設定入力は維持 |
 | 画像入力 | 今の画像選択ダイアログを開く。管理ページへ遷移させない |
 | 再起動 | 既存の`--restore-view`によるページ復元へ新ルートを追加。通常起動の既定ページの規則は変更しない |
 
-ページルートは`image-library`、Shell領域は`page.image-library`とする。本体管理機能として、通常Appletの有効化・起動に依存させない。リボンで非表示にしても設定とコマンドから開ける。
+ページルートは`image-library`、Shell領域は`page.image-library`とする。本体管理機能として、通常Appletの有効化・起動に依存させない。リボンで非表示にしてもコマンドから開ける。
 
-設定カテゴリの入口化はデータ項目`imageLibrary.groups`の廃止ではない。JSON編集、設定の取得・同期・PC専用指定・カテゴリのリセットは既存の設定契約を維持する。リセットの対象は従来のグループ設定であり、原画像や後述のカードサイズは対象に含めない。
+設定カテゴリの除去はデータ項目`imageLibrary.groups`の廃止ではない。設定の取得・同期・全体JSON編集は保存済みグループを維持する。原画像や後述のカードサイズを設定リセットで削除しない。
 
 ## 4. 画面構成
 
@@ -103,7 +104,7 @@ AppDockで使う画像を、ひとつの場所に。
 | ファイル名 | 最大2行、2行分の高さを確保。全文は拡大画面とアクセシブル名で取得可能 |
 | 補助情報 | 解像度・形式。詳細なファイルサイズは拡大画面へ表示 |
 | 所属 | 最大2つのグループ名と「ほかN件」。長い名前は1行で省略し、カード高さをグループ数で増やさない。全所属は編集画面で確認 |
-| 管理ページの下端 | 「拡大」「グループ」。画像自体のクリックも拡大 |
+| 管理ページの下端 | 「グループ」「削除」。画像自体のクリックで拡大 |
 | 選択 | 左上のチェックボックスと外枠。画像全体を着色して見えにくくしない |
 | 状態 | 読み込み中・未到着／読取待ち・読取失敗を区別。最後の正常画像があれば保持し、状態を併記 |
 
@@ -312,7 +313,7 @@ WallpaperSlideshowのページ内プレビューは、そのHTMLのnative dialog
 | --- | --- | --- |
 | A. 共通部品 | 本体`ui/image-gallery/`、専用ビルド、型と部品試験 | 3用途のモデルで同じカードを描け、サイズ変更とキー付き更新が独立動作 |
 | B. 本体のサービス | 画像縮小取得、一括所属、複数登録結果、GalleryViewStateStore | 保存の競合・部分失敗・原画像保持とサイズ復元を検証 |
-| C. 管理ページ | Shell公開型／Controller／Default Shell／navigation／標準リボン／コマンド／設定入口 | 左グループとページ内スライダーを持つページから全管理操作が可能 |
+| C. 管理ページ | Shell公開型／Controller／Default Shell／navigation／標準リボン／コマンド | 左グループとページ内スライダーを持つページから全管理操作が可能。設定の同名カテゴリは除去 |
 | D. 選択とモーダル | RegisteredImagePicker、プレビュー、HostModalLayerの本文登録 | 親編集の確定／取消、重なったモーダル、画像入力の現行形状を維持 |
 | E. 壁紙履歴 | Appletのvendor梱包、history表示、Storage、限定pageActions | 現行の履歴・開く・削除・画像解放と、新しいサイズ保存が両立 |
 | F. 確認と発行 | 対象回帰、固定EXEの隔離GUI、レビュー、文書 | 受け入れ条件を満たし、変更モジュールだけ版更新・発行 |
@@ -323,7 +324,7 @@ A〜Cに続き、画像選択の単一選択と重なったプレビュー、壁
 
 新しいShell領域を使う提供元のminimumHostVersionは、実際にその公開契約を提供したホスト版に合わせる。WallpaperSlideshowは利用するStorage／pageActions等の最低版を照合し、UI bundleを共用するという理由だけで根拠のない最低版やSDK更新を設定しない。
 
-本体の新規PC専用保存ファイルは0.74.0で導入済み。予約済みpicker欄を使用する今回の適用は0.74.1とする。WallpaperSlideshowはStorageキーの保存仕様追加により0.6.4から0.7.0へ更新する。
+本体の新規PC専用保存ファイルは0.74.0、予約済みpicker欄への適用は0.74.1、WallpaperSlideshowのStorageキー追加は0.7.0で導入済み。画面外の画像取得を失効させる補正は保存/API契約を変えず、本体0.74.2 / WallpaperSlideshow 0.7.1へパッチ更新する。
 
 ## 12. 受け入れ条件と検証計画
 

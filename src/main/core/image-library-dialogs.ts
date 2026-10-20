@@ -1,16 +1,22 @@
 import { randomUUID } from 'node:crypto';
-import type { ImageLibraryDialogRequest } from '../../shared/image-library-page';
-import type { ImageLibraryEdit } from '../../shared/registered-images';
+import type {
+  ImageLibraryDialogRequest,
+  ImageLibraryDialogOperation,
+} from '../../shared/image-library-page';
 /** Main owns the request lifetime; the trusted host renderer owns native dialogs. */
 export class ImageLibraryDialogs {
   private pending?: {
     request: ImageLibraryDialogRequest;
-    resolve(operation?: ImageLibraryEdit): void;
+    resolve(operation?: ImageLibraryDialogOperation): void;
+    busy?: boolean;
   };
   constructor(
     private options: {
       send(request: ImageLibraryDialogRequest | null): void;
-      edit(operation: ImageLibraryEdit): Promise<void>;
+      edit(
+        operation: ImageLibraryDialogOperation,
+        request: ImageLibraryDialogRequest,
+      ): Promise<void>;
       failed(): void;
     },
   ) {}
@@ -19,18 +25,23 @@ export class ImageLibraryDialogs {
   }
   open(request: Omit<ImageLibraryDialogRequest, 'id'>) {
     if (this.pending) throw Error('開いている画像の編集を終えてください。');
-    return new Promise<ImageLibraryEdit | undefined>((resolve) => {
+    return new Promise<ImageLibraryDialogOperation | undefined>((resolve) => {
       this.pending = { request: { ...structuredClone(request), id: randomUUID() }, resolve };
       this.options.send(this.pending.request);
     });
   }
-  async complete(id: string, operation?: ImageLibraryEdit) {
+  async complete(id: string, operation?: ImageLibraryDialogOperation) {
     const pending = this.pending;
     if (!pending || pending.request.id !== id) throw Error('画像の編集が終了しています。');
+    if (pending.busy) throw Error('画像の操作が完了するまでお待ちください。');
     if (operation) {
+      if ((operation.kind === 'delete-image') !== (pending.request.kind === 'delete-image'))
+        throw Error('画像の操作を確認してください。');
+      pending.busy = true;
       try {
-        await this.options.edit(operation);
+        await this.options.edit(operation, pending.request);
       } catch (e) {
+        pending.busy = false;
         this.options.failed();
         throw e;
       }

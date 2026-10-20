@@ -13,7 +13,8 @@ const root = path.join(__dirname, '../.artifacts/gallery-unit-' + Date.now());
 fs.mkdirSync(root, { recursive: true });
 let serial = 0;
 function fixture() {
-  const store = new GalleryViewStateStore(path.join(root, `${++serial}.json`));
+  const file = path.join(root, `${++serial}.json`);
+  const store = new GalleryViewStateStore(file);
   const state = new ImageLibraryPageState(store);
   let entries = Array.from({ length: 130 }, (_, i) => ({
     ref: { file: `image-${String(i).padStart(3, '0')}.png` },
@@ -32,6 +33,7 @@ function fixture() {
     ],
   };
   const host = {
+    inUse: () => false,
     images: { list: () => structuredClone(entries), refresh: async () => {} },
     edit: async (operation) => {
       value = editImageLibrary(value, operation);
@@ -66,6 +68,7 @@ function fixture() {
   const act = (command, fields = {}) =>
     session.act({ id: session.id, type: 'gallery', command, ...fields });
   return {
+    file,
     store,
     state,
     host,
@@ -269,4 +272,47 @@ test('maximum catalogue retains 512 images, 64 groups and 4096 memberships witho
   assert(!JSON.stringify(c).includes('base64'));
   await f.act('select-all');
   assert.equal(f.session.snapshot().content.selected, 512);
+});
+
+test('modal bookkeeping accepts validated anchors while edits remain active operations', async () => {
+  const f = fixture(),
+    item = f.session.snapshot().content.items[0];
+  const request = (command, fields = {}) => ({
+    id: f.session.id,
+    type: 'gallery',
+    command,
+    ...fields,
+  });
+  assert(f.session.passive(request('image')));
+  assert(f.session.passive(request('anchor')));
+  for (const command of [
+    'select',
+    'select-all',
+    'clear',
+    'query',
+    'group',
+    'width',
+    'more',
+    'reload',
+    'dialog',
+    'add',
+    'retry-membership',
+  ])
+    assert.equal(f.session.passive(request(command)), false, command);
+  assert.equal(f.session.passive({ type: 'invoke', command: 'anchor' }), false);
+  const persistedWidth = f.state.width;
+  const before = structuredClone(f.value);
+  await f.act('anchor', { anchor: { id: item.id, offset: -24 } });
+  assert.deepEqual(f.session.snapshot().content.anchor, { id: item.id, offset: -24 });
+  await assert.rejects(f.act('anchor', { anchor: { id: 'foreign', offset: 0 } }));
+  await assert.rejects(f.act('anchor', { anchor: { id: item.id, offset: Infinity } }));
+  await assert.rejects(f.act('anchor', { anchor: { id: item.id, offset: 10001 } }));
+  assert.deepEqual(f.session.snapshot().content.anchor, { id: item.id, offset: -24 });
+  assert.equal(f.session.snapshot().content.selected, 0);
+  assert.deepEqual(f.value, before);
+  assert.equal(f.state.width, persistedWidth);
+  assert.equal(f.store.get('library'), 260);
+  assert(!fs.existsSync(f.file));
+  f.session.dispose();
+  await assert.rejects(f.act('anchor', { anchor: { id: item.id, offset: 0 } }));
 });

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { ImageLibraryDialogRequest } from '../shared/image-library-page';
-import { imageKey, type ImageLibraryEdit } from '../shared/registered-images';
+import type {
+  ImageLibraryDialogRequest,
+  ImageLibraryDialogOperation,
+} from '../shared/image-library-page';
+import { imageKey } from '../shared/registered-images';
 import { SettingsDialog, SettingsModal } from './settings-ui/SettingsModal';
 import { SettingsInput } from './settings-ui/SettingsInput';
 import { SettingsOrderDialog } from './settings-ui/SettingsOrderDialog';
@@ -28,7 +31,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   const close = () => {
     void window.dock.imageLibraryDialog.complete(r.id).catch((e) => setError(String(e)));
   };
-  const save = (operation: ImageLibraryEdit) =>
+  const save = (operation: ImageLibraryDialogOperation) =>
     window.dock.imageLibraryDialog.complete(r.id, operation);
   if (r.kind === 'order')
     return (
@@ -40,11 +43,29 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
         onApply={(ids) => save({ kind: 'order', ids, before: r.groups.map((g) => g.id) })}
       />
     );
+  if (r.kind === 'delete-image')
+    return (
+      <SettingsDialog
+        title="画像を削除"
+        onClose={close}
+        onApply={() => save({ kind: 'delete-image' })}
+        applyLabel="削除"
+        valid={!r.deleteBlocked}
+      >
+        <p>「{r.images[0]?.file}」をごみ箱へ移します。すべてのグループからも外れます。</p>
+        {r.deleteBlocked && (
+          <p role="alert">
+            この画像は使用中です。リボンやAppletの画像設定を外してから削除してください。
+          </p>
+        )}
+      </SettingsDialog>
+    );
   if (r.kind === 'preview')
     return (
       <SettingsModal
         labelledBy="image-library-preview-title"
         className="image-library-preview-modal"
+        closeOnBackdrop
         onClose={close}
       >
         <header className="image-library-preview-heading">

@@ -74,7 +74,7 @@ import { SettingsPageSession } from './core/settings-page';
 import { SettingsPageHost } from './core/settings-page-host';
 import { dataPaths } from './core/data-paths';
 import { RegisteredImages } from './core/registered-images';
-import { ImageLibraryHost, decodeRegisteredImage } from './core/image-library-host';
+import { ImageLibraryHost, decodeRegisteredImage, ownsImage } from './core/image-library-host';
 import { stopRegisteredImageDecoder } from './core/registered-image-decoder';
 import { coverAppletPagesForImagePicker } from './core/applet-pages';
 import { imageReference } from '../shared/registered-images';
@@ -500,6 +500,10 @@ const imageLibraryHost = new ImageLibraryHost(registeredImages, {
   writable: assertSettingsWritable,
   show: showWindow,
   cover: coverAppletPagesForImagePicker,
+  referenced: (ref) =>
+    [...(manager?.items.values() ?? [])].some((item) =>
+      ownsImage(item.manifest, settings.value.extensions[item.manifest.id]?.settings ?? {}, ref),
+    ),
 });
 let updater: PortableUpdates;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
@@ -3525,9 +3529,18 @@ async function initialize() {
       if (window && !window.isDestroyed())
         window.webContents.send('dock:imageLibraryDialog', request);
     },
-    edit: (operation) => imageLibraryHost.edit(operation),
+    edit: (operation, request) => {
+      if (operation.kind === 'delete-image') {
+        if (!request.entry || request.deleteBlocked)
+          throw Error('削除する画像を確認してください。');
+        return imageLibraryHost.remove(request.entry);
+      }
+      return imageLibraryHost.edit(operation);
+    },
     failed: () =>
-      galleryFailed('画像グループを保存できませんでした。画面の入力と保存先を確認してください。'),
+      galleryFailed(
+        '画像ライブラリーの操作を完了できませんでした。画面の表示と保存先を確認してください。',
+      ),
   });
   imageLibraryDialogs = galleryDialogs;
   window.webContents.on('did-start-loading', () => galleryDialogs.cancel());

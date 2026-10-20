@@ -142,7 +142,12 @@ export class ImageLibraryPageSession implements ShellPageController {
     );
   }
   passive(action: ShellPageAction) {
-    return !!action && action.type === 'gallery' && action.command === 'image';
+    // Scrolling can report its last frame after a host dialog has blocked page input.
+    return (
+      !!action &&
+      action.type === 'gallery' &&
+      (action.command === 'image' || action.command === 'anchor')
+    );
   }
   snapshot(): ImageLibraryPageModel {
     const matched = this.catalogue(),
@@ -182,8 +187,8 @@ export class ImageLibraryPageSession implements ShellPageController {
         selected: s.selected.has(key),
         selectable: !s.busy,
         actions: [
-          { id: 'preview', title: '拡大', disabled: !e.available || s.busy },
           { id: 'membership', title: 'グループ', disabled: s.busy },
+          { id: 'delete-image', title: '削除', disabled: !e.available || s.busy },
         ],
       })),
       total: matched.length,
@@ -319,6 +324,7 @@ export class ImageLibraryPageSession implements ShellPageController {
             'batch-add',
             'batch-remove',
             'preview',
+            'delete-image',
           ].includes(action.kind)
         )
           throw Error('Unknown gallery dialog');
@@ -326,9 +332,9 @@ export class ImageLibraryPageSession implements ShellPageController {
         const item = action.imageId ? resolveImage(action.imageId)[1] : undefined;
         if (['rename', 'delete', 'batch-remove'].includes(action.kind) && !groupId)
           throw Error('グループを選択してください。');
-        if (['membership', 'preview'].includes(action.kind) && !item)
+        if (['membership', 'preview', 'delete-image'].includes(action.kind) && !item)
           throw Error('画像を選択してください。');
-        if (action.kind === 'preview' && !item?.entry.available)
+        if (['preview', 'delete-image'].includes(action.kind) && !item?.entry.available)
           throw Error('画像を読み取れません。同期の完了を待つか再取得してください。');
         if (action.kind === 'batch-remove' && s.group !== `group:${groupId}`)
           throw Error('現在表示しているグループを指定してください。');
@@ -343,6 +349,8 @@ export class ImageLibraryPageSession implements ShellPageController {
           images,
           groupId,
           entry: item?.entry,
+          deleteBlocked:
+            action.kind === 'delete-image' && !!item && this.options.host.inUse(item.entry.ref),
         });
         if (operation?.kind === 'add') {
           s.group = `group:${operation.group.id}`;

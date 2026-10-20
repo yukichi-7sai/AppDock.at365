@@ -76,14 +76,13 @@ export class HostModalLayer {
     this.changed?.();
   }
 
-  ready(revision: number, rendered = true): boolean {
+  ready(revision: number, _rendered = true): boolean {
     if (!this.active || revision !== this.revision) return false;
-    if (rendered) {
-      this.backgroundReady = true;
-      for (const surface of this.surfaces.values()) {
-        surface.covered = true;
-        this.show(surface);
-      }
+    // Native body views cover HTML dialogs even when their background capture failed.
+    this.backgroundReady = true;
+    for (const surface of this.surfaces.values()) {
+      surface.covered = true;
+      this.show(surface);
     }
     return true;
   }
