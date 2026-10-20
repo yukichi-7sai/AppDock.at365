@@ -40,7 +40,7 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
   assert.deepEqual(parseSettings(settings).ribbon, {
     order: [],
     hidden: [],
-    bottom: ['theme', 'profile'],
+    bottom: ['theme'],
     separators: [],
     groups: [],
     itemOverrides: {},

@@ -24,6 +24,8 @@ import { SettingsColorPicker } from '../settings-ui/SettingsColorPicker';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
+import { RegisteredImageInput } from '../settings-ui/RegisteredImagePicker';
+import type { RegisteredImageRef } from '../../shared/registered-images';
 import { CommandPicker } from '../settings-ui/CommandPicker';
 
 export function RibbonSettings({
@@ -66,6 +68,7 @@ export function RibbonSettings({
     id: string;
     title: string;
     originalTitle: string;
+    image?: RegisteredImageRef | null;
     iconOnly: boolean;
     before: string;
   }>();
@@ -112,9 +115,11 @@ export function RibbonSettings({
       parentId === null &&
       beforeId === undefined &&
       previous &&
-      ribbonPlacement(layout, previous.id) === placement
+      ribbonPlacement(layout, previous.id, items) === placement
     ) {
-      const siblings = roots.filter((item) => ribbonPlacement(layout, item.id) === placement);
+      const siblings = roots.filter(
+        (item) => ribbonPlacement(layout, item.id, items) === placement,
+      );
       beforeId = siblings[siblings.findIndex((item) => item.id === previous.id) + 1]?.id ?? null;
     }
     run({
@@ -128,10 +133,10 @@ export function RibbonSettings({
   const move = (id: string, target: string) => {
     if (id === target) return;
     const parentId = ribbonParent(layout, target)?.id ?? null;
-    const placement = ribbonPlacement(layout, target);
+    const placement = ribbonPlacement(layout, target, items);
     const siblings = parentId
       ? groups.find((g) => g.id === parentId)!.children
-      : roots.filter((i) => ribbonPlacement(layout, i.id) === placement).map((i) => i.id);
+      : roots.filter((i) => ribbonPlacement(layout, i.id, items) === placement).map((i) => i.id);
     const from = siblings.indexOf(id),
       to = siblings.indexOf(target);
     moveTo(id, parentId, placement, from >= 0 && from < to ? (siblings[to + 1] ?? null) : target);
@@ -219,7 +224,7 @@ export function RibbonSettings({
             <select
               aria-label={`${item.title}の配置`}
               disabled={pending}
-              value={parent?.id ?? ribbonPlacement(layout, item.id)}
+              value={parent?.id ?? ribbonPlacement(layout, item.id, items)}
               onChange={(e) =>
                 e.target.value.startsWith('group:')
                   ? moveTo(item.id, e.target.value)
@@ -266,16 +271,17 @@ export function RibbonSettings({
                       ? setButtonDialog({
                           button: structuredClone(item.command),
                           adding: false,
-                          placement: ribbonPlacement(layout, item.id),
+                          placement: ribbonPlacement(layout, item.id, items),
                           before: JSON.stringify(layout),
                           nameEdited: true,
                         })
                       : item.group
-                        ? open(item.group, ribbonPlacement(layout, item.id))
+                        ? open(item.group, ribbonPlacement(layout, item.id, items))
                         : setItemDialog({
                             id: item.id,
                             title: layout.itemOverrides?.[item.id]?.title ?? '',
                             originalTitle: entry.title,
+                            image: layout.itemOverrides?.[item.id]?.image,
                             iconOnly: item.iconOnly,
                             before: JSON.stringify(layout),
                           })
@@ -394,7 +400,9 @@ export function RibbonSettings({
         {error && <p role="alert">{error}</p>}
         {(['top', 'bottom'] as const).map((position) => {
           const title = position === 'top' ? '上寄せ' : '下寄せ';
-          const siblings = roots.filter((item) => ribbonPlacement(layout, item.id) === position);
+          const siblings = roots.filter(
+            (item) => ribbonPlacement(layout, item.id, items) === position,
+          );
           return (
             <section
               key={position}
@@ -525,7 +533,15 @@ export function RibbonSettings({
           onApply={async () => {
             if (dialog.before !== JSON.stringify(layout))
               throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
-            const { id, title, icon, expansion, iconOnly = false, color = null } = dialog.group;
+            const {
+              id,
+              title,
+              icon,
+              expansion,
+              iconOnly = false,
+              color = null,
+              image,
+            } = dialog.group;
             await apply(
               dialog.adding
                 ? {
@@ -536,9 +552,21 @@ export function RibbonSettings({
                     expansion,
                     iconOnly,
                     color,
+                    ...(image !== undefined ? { image } : {}),
                     placement: dialog.placement,
                   }
-                : { kind: 'updateGroup', id, changes: { title, icon, expansion, iconOnly, color } },
+                : {
+                    kind: 'updateGroup',
+                    id,
+                    changes: {
+                      title,
+                      icon,
+                      expansion,
+                      iconOnly,
+                      color,
+                      ...(image !== undefined ? { image } : {}),
+                    },
+                  },
             );
           }}
         >
@@ -558,6 +586,8 @@ export function RibbonSettings({
             <RibbonIconPicker
               label="グループのアイコン"
               value={dialog.group.icon}
+              image={dialog.group.image}
+              onImage={(image) => setDialog({ ...dialog, group: { ...dialog.group, image } })}
               onChange={(icon) => setDialog({ ...dialog, group: { ...dialog.group, icon } })}
             />
             <label className="ribbon-icon-only">
@@ -618,7 +648,11 @@ export function RibbonSettings({
             await apply({
               kind: 'updateItem',
               id: itemDialog.id,
-              changes: { title: itemDialog.title, iconOnly: itemDialog.iconOnly },
+              changes: {
+                title: itemDialog.title,
+                iconOnly: itemDialog.iconOnly,
+                ...(itemDialog.image !== undefined ? { image: itemDialog.image } : {}),
+              },
             });
           }}
         >
@@ -636,6 +670,11 @@ export function RibbonSettings({
             <SettingsHint>
               空欄にすると登録元の名前を使います。変更はリボン内の表示だけに反映されます。
             </SettingsHint>
+            <RegisteredImageInput
+              label="リボンの画像"
+              value={itemDialog.image}
+              onChange={(image) => setItemDialog({ ...itemDialog, image })}
+            />
             <label className="ribbon-icon-only">
               <input
                 type="checkbox"
@@ -732,6 +771,10 @@ export function RibbonSettings({
             <RibbonIconPicker
               label="ボタンのアイコン"
               value={buttonDialog.button.icon}
+              image={buttonDialog.button.image}
+              onImage={(image) =>
+                setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, image } })
+              }
               onChange={(icon) =>
                 setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, icon } })
               }

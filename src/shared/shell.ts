@@ -181,7 +181,7 @@ export interface ShellStatus {
 export type NavigationState = {
   route: string;
   request: number;
-  section?: 'profile' | 'ribbon' | 'general';
+  section?: 'ribbon' | 'general';
   appletId?: string;
-  appletDetail?: 'description';
+  appletDetail?: 'description' | 'settings';
 };

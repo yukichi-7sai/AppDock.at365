@@ -16,7 +16,7 @@ MCPの`mcpServers`名簿（ID・名前・説明）も共有settings.jsonです�
 
 MCP Eventsの購読・署名鍵・callback・送信待ちはPC専用rootの`automation-events.json`へsafeStorageで暗号化して保存する。種類別の送信選択は共有settings.jsonの通知設定に含める。[購読と再送の仕様](mcp-events-design.md)を参照。
 
-共有フォルダー名は小文字の`data`。旧`.appdock`の自動改名・移行・削除は行わない。古いアバター参照は読み取り互換として許可するが、新規登録は`data/assets/profile`へ保存する。
+共有フォルダー名は小文字の`data`。旧`.appdock`の自動改名・移行・削除は行わない。旧プロフィール設定と画像は未使用のまま保持し、新規原画像は共通の`data/assets/images/`へ登録する。
 
 今後追加するAppletにもこの保存境界を適用する。同期する設定はホストSettings、登録原素材はEXE隣のApplet別assetsを使う。端末固有のStorage/Secrets/認証/生成キャッシュはホストのPC専用root内でApplet IDごとに分離する。
 
@@ -32,12 +32,12 @@ Gmail 0.12.0以降の共通グループ名簿は`data/web-account-groups/at365.g
 
 ## ファイル名を使う登録素材
 
-- アバター原画像: `data/assets/profile/<元ファイル名>`。PNG/JPEG、5MB以下、従来の画像寸法上限を検証する。settingsにはこの相対パスを保存。表示名との対応表は不要。画像を外しても登録原画像を削除しない。
+- 共通原画像: `data/assets/images/<元ファイル名>`。PNG/JPEG/WebP、5MiB以下。参照は`{file}`、画像の分類は共有`imageLibrary.groups`へ保存し、名前変更や所属変更で原画像を動かさない。詳しくは[共通画像](registered-images.md)。旧アバター原画像と設定は保持し、自動移行しない。
 - Appletの通知音: `data/assets/applets/<Applet ID>/sounds/<元ファイル名>`。Gmailは`at365.gmail`。既存の16MB以下WAV検証を使い、512件まで登録する。ローカル枠の`{enabled,file}`のfileはファイル名だけ。保存された絶対パスをそのまま共有しない。
 - 同一フォルダー内の大文字小文字を無視した同名照合を行う。同名同内容は既存素材を再利用、同名別内容は登録拒否。上書き・連番生成をしない。新規ファイルはexclusive create。登録元・用途の別フォルダーでは同名を使用できる。
 - ファイル名はWindowsの禁止文字/予約名/末尾の空白・点/パス区切りを拒否し、登録rootから外れる参照や転送root/ファイルを受け入れない。任意パスをローカルUIの一覧選択から渡さない。
 - 一覧は実ファイルから生成し、インデックスJSONやID対応表を作らない。Gmailのsnapshot.registeredSoundsはローカルUIだけに渡す。Node readへ素材一覧を含めない。枠の削除・停止時に共有素材を自動pruneしない。
-- 素材だけ届く変更も監視する。Gmailの登録済み一覧は2秒ごとに照合。アバターは内容hashで表示URLを更新し、settingsが先に届いて素材が後から来ても表示を回復する。
+- 素材だけ届く変更も監視する。Gmailの登録済み一覧は2秒ごとに照合。共通画像はwatchと2秒pollでファイル変更を確認し、縮小表示を更新する。settingsが先に届いて原画像が後から来ても回復し、一時欠落時は参照と直近正常表示を保持する。
 
 ## 設定と名簿の受信
 

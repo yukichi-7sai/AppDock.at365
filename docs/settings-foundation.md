@@ -10,7 +10,7 @@
 
 SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/editRevision・pending・512操作の再送結果だけを持つ。snapshot.valueはStoreから取得し、別の値を保持しない。SettingsPageSessionは選択ページだけを投影する。useSettingsEditorとSettingsViewClientは入力キューと購読を担う。
 
-フォーム、部分JSON、通知方針、並び順、リボン、トレイは妥当な変更ごとにprepareSettings/LaunchSettings/saveUserSettings/SettingsStoreへ保存する。宣言済みApplet設定の検証、expectedRevision、Windows登録とJSONのトランザクション、原子的置換を維持する。正常保存時に配送・実行状態を更新し、通常の保存成功通知を出さない。PC専用権限とWebアカウントは各既存サービスを維持する。
+フォーム、部分JSON、通知方針、並び順、リボン、トレイは妥当な変更ごとにprepareSettings/LaunchSettings/SettingsStoreへ保存する。宣言済みApplet設定の検証、expectedRevision、Windows登録とJSONのトランザクション、原子的置換を維持する。正常保存時に配送・実行状態を更新し、通常の保存成功通知を出さない。PC専用権限とWebアカウントは各既存サービスを維持する。
 
 要求はbefore/valueを持ち、mergeSettingsInputが変更したフィールドだけを現在値へ統合する。未編集フィールドの外部変更を保持し、同じフィールドの外部変更は拒否する。配列は順序/IDが重要なので全体で比較する。UIキューの直前成功結果だけを後続の基準へ使い、外部変更/失敗を黙って再試行しない。操作送信前に最新モデルを取得して購読の到着遅れを補い、入力のbeforeは保持して競合を検査する。古いView入力はsession/editRevisionで拒否する。
 
@@ -18,7 +18,7 @@ SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/
 
 検索欄は入力中の絞り込みを維持する。追加・編集ダイアログはSettingsInputModeのinputモードで一時入力だけを更新し、Enter/blurで欄の確定点を更新、Escapeでその欄を戻す。変更のある欄のEscapeはダイアログへ伝播させず、欄の変更がないEscapeは従来どおりダイアログを取り消す。明示ボタンで設定するAPIキーや接続ポート、試験生成の入力も、inputモードのローカル入力と実操作を分離する。設定の保存は従来のOK/適用操作で行う。URLはこのモードでも確定まで補正・検証しない。
 
-画像は選択/削除時に即時保存する。画面内で非同期読込の後、saveUserSettingsがPNG/JPEG、5MiB、寸法・元ファイル名・同名別画像を検査し、原画像と参照を保存する。draft-avatar URL、mainのbytes/プレビュー/変更フラグ、画像読込状態IPCを削除。登録済み原素材と保存失敗時の既存保持方針は[設定同期](settings-sync.md)。
+画像は共通ライブラリーへ登録し、利用箇所には参照だけを保存する。通常設定では選択確定時、追加・編集ダイアログでは親のOKで参照を保存する。原画像の検証・同名衝突・独立した登録保存・既存保持は[共通画像](registered-images.md)と[設定同期](settings-sync.md)を参照する。
 
 ショートカット・ジェスチャーの編集/順序パネルは組合せ入力をパネル内に保持し、「適用」で1回保存する。取消/Escape/×はパネル内だけを破棄する。削除・ON/OFFは即時保存。ID・順序・外部変更検査・記録中の一時的実行抑止を維持し、保存自体で割当コマンドを実行しない。
 
@@ -101,3 +101,7 @@ import { SettingsHint } from '../settings-ui/SettingsHint';
 表示ページは「共通」カードにテーマとヒントの表示を配置し、その下の「Shellの変更」カードで領域ごとのShellを選ぶ。Shellの各選択欄に同一のdescriptionを繰り返さない。一般ページは見出しなしの「音の再生」トグル、ウィンドウ、スタートアップ、Applet・MCPからの操作、設定ファイルの順に表示する。音の再生は既定ONで即時保存・反映し、設定定義からON/OFF/切り替えのコマンドを生成する。旧PC専用データの確認は警告通知から本体ログを開く。通知ページは受け取り方、読み上げ、提供元グループの順とし、受け取り方と各通知種類は既定で折りたたむ。読み上げページの接続カードは「TTS接続先」とする。ジェスチャーの有効化は単独のトグルにし、動作設定を既定で閉じた共通カードに配置する。通知種類の見出しには現在の通知先・表示時間・読み上げON/OFFを表示する。折りたたみ状態は画面内だけで保持し、設定ファイルへ項目を増やさない。検索で項目を選ぶと必要な親カードを開く。
 
 新規設定のhost.themeはlight、gestures.enabledはtrue。保存済みの明示値は上書きしない。通知自体のOFF設定は廃止し、旧host.notificationsと通知種類のenabledは読込時に破棄する。
+
+## 登録画像
+
+画像登録は設定保存から独立した共通ライブラリー操作。Appletは`registered-image`、object-listは同型フィールドと`list.imageKey`を宣言する。プロフィール専用保存・設定ページは持たない。入力と選択の契約は[共通画像](registered-images.md)を参照する。

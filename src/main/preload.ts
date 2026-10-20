@@ -97,6 +97,41 @@ ipcRenderer.on(
   },
 );
 const api: DockApi = {
+  imageLibrary: {
+    snapshot: () => ipcRenderer.invoke('dock:imageLibrary:snapshot'),
+    register: () => ipcRenderer.invoke('dock:imageLibrary:register'),
+    edit: (operation) => ipcRenderer.invoke('dock:imageLibrary:edit', operation),
+    preview: (image, original) => ipcRenderer.invoke('dock:imageLibrary:preview', image, original),
+    pick: (current) => ipcRenderer.invoke('dock:imageLibrary:pick', current),
+    onChanged: (callback) => {
+      const listener = () => callback();
+      ipcRenderer.on('dock:changed', listener);
+      return () => ipcRenderer.removeListener('dock:changed', listener);
+    },
+    onPickRequest: (callback) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        request: {
+          id: string;
+          current: import('../shared/registered-images').RegisteredImageRef | null;
+        } | null,
+      ) => callback(request);
+      ipcRenderer.on('dock:imagePick', listener);
+      void ipcRenderer.invoke('dock:imagePick:pending').then((request) => {
+        if (request) callback(request);
+      });
+      return () => ipcRenderer.removeListener('dock:imagePick', listener);
+    },
+    completePick: (id, result) => ipcRenderer.invoke('dock:imagePick:complete', id, result),
+    onPickBackdrop: (callback) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        surfaces: Parameters<typeof callback>[0],
+      ) => callback(surfaces);
+      ipcRenderer.on('dock:imagePickerBackdrop', listener);
+      return () => ipcRenderer.removeListener('dock:imagePickerBackdrop', listener);
+    },
+  },
   settingsPage: {
     open: (request) => ipcRenderer.invoke('dock:settingsPage:open', request),
     get: (id) => ipcRenderer.invoke('dock:settingsPage:get', id),
@@ -214,8 +249,7 @@ const api: DockApi = {
     return () => ipcRenderer.removeListener('dock:hostCommand', handler);
   },
   snapshot: () => ipcRenderer.invoke('dock:snapshot'),
-  saveSettings: (value, revision, avatar, avatarName) =>
-    ipcRenderer.invoke('dock:saveSettings', value, revision, avatar, avatarName),
+  saveSettings: (value, revision) => ipcRenderer.invoke('dock:saveSettings', value, revision),
   restoreSettingsBackup: (revision) => ipcRenderer.invoke('dock:restoreSettingsBackup', revision),
   setPinnedCommands: (ids) => ipcRenderer.invoke('dock:setPinnedCommands', ids),
   openCommandPalette: (request) => ipcRenderer.invoke('dock:openCommandPalette', request),

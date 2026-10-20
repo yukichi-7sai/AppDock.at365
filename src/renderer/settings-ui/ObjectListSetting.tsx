@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SettingsField } from './SettingsSections';
 import type { SettingDefinition } from '../../shared/contracts';
 import { readObjectList, objectFieldValue, normalizeObject } from '../../shared/object-list';
+import { RegisteredImageInput } from './RegisteredImagePicker';
 
 export function ObjectListSetting({
   definition,
@@ -87,7 +88,13 @@ export function ObjectListSetting({
             const name = `${label}${index + 1} ${field.title}`;
             return (
               <SettingsField title={field.title} description={field.description} key={field.key}>
-                {field.type === 'string-list' ? (
+                {field.type === 'registered-image' ? (
+                  <RegisteredImageInput
+                    value={current}
+                    label={name}
+                    onChange={(next) => update(index, field.key, next)}
+                  />
+                ) : field.type === 'string-list' ? (
                   <div className="source-folders">
                     {((current as string[]) ?? []).map((folder, slot) => (
                       <div className="source-folder" key={slot}>

@@ -1,0 +1,100 @@
+.registered-image-input,
+.image-library-actions,
+.image-library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.registered-image-input > span {
+  overflow-wrap: anywhere;
+  max-width: 220px;
+}
+.registered-image-preview {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  flex: none;
+}
+.registered-image-missing {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.image-library-toolbar {
+  margin: 12px 0;
+  align-items: end;
+}
+.image-library-toolbar > label {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 150px;
+}
+.image-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+  gap: 10px;
+  max-height: 430px;
+  overflow: auto;
+  padding: 4px;
+}
+.image-library-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  min-width: 0;
+  min-height: 118px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+.image-library-card.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.image-library-card > img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.image-library-card > span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.image-library-card > small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.image-library-dialog {
+  width: min(800px, calc(100vw - 40px));
+}
+.image-library-dialog .settings-dialog-fields {
+  display: block;
+}
+.image-group-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.image-group-choice > input {
+  width: auto;
+}
+.image-library-original {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-height: 65vh;
+  margin: auto;
+}
+.image-picker-backdrop {
+  position: fixed;
+  z-index: 2147482000;
+  pointer-events: none;
+}

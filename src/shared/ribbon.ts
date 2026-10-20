@@ -1,4 +1,14 @@
 export type RibbonPlacement = 'top' | 'bottom';
+export interface AppletRibbonItem {
+  id: string;
+  title: string;
+  action: 'settings';
+  icon?: RibbonBuiltinIcon;
+  imageSetting?: string;
+  imageShape?: 'square' | 'circle';
+  iconOnly?: boolean;
+  defaultPlacement?: RibbonPlacement;
+}
 export const ribbonGroupIcons = [
   'folder',
   'mail',
@@ -7,10 +17,12 @@ export const ribbonGroupIcons = [
   'extensions',
   'settings',
   'bell',
+  'user',
 ] as const;
 export type RibbonBuiltinIcon = (typeof ribbonGroupIcons)[number];
 export const defaultRibbonRightClickCommand = 'appdock.ribbon.settings.open';
 export interface RibbonCommandButton {
+  image?: import('./registered-images').RegisteredImageRef | null;
   id: string;
   title: string;
   icon: RibbonBuiltinIcon;
@@ -18,6 +30,7 @@ export interface RibbonCommandButton {
   iconOnly?: boolean;
 }
 export interface RibbonGroup {
+  image?: import('./registered-images').RegisteredImageRef | null;
   id: string;
   title: string;
   icon: (typeof ribbonGroupIcons)[number];
@@ -27,6 +40,8 @@ export interface RibbonGroup {
   children: string[];
 }
 export interface RibbonItemOverride {
+  image?: import('./registered-images').RegisteredImageRef | null;
+  placement?: RibbonPlacement;
   title?: string;
   iconOnly?: boolean;
   /** Registration name remembered when saving a ribbon edit; used only if the source disappears. */

@@ -35,6 +35,7 @@
 | グローバル入力のフック統一（0.63.0） | [Winキーの記録・元入力のブロック・共有InputHost・検証計画](docs/keyboard-hook-shortcuts-design.md) |
 | Shell | [構成と拡張方針](docs/shell-foundation.md)、[タイトルバー・ステータスバー](docs/shell-bars.md)、[リボンAPI](docs/shell-api.md)、[オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md) |
 | リボンのグループ化とバッジ | [両展開方式・保存・共通API・Gmail連携](docs/ribbon-groups-badges-design.md) |
+| プロフィール分離・共通画像ライブラリー | [現行API・保存・グループ・汎用リボン](docs/registered-images.md)、[採用設計](docs/profile-applet-image-library-design.md) |
 | リボンの装飾・コマンドボタン | [色付きの枠と連結線・色なし・名前・右クリック動作](docs/ribbon-customization-design.md)、[2段階の実装計画と受け入れ条件](docs/ribbon-customization-implementation-plan.md) |
 | Shellの領域別割り当て | [領域ごとの指定・復旧・専用コマンドと実装計画](docs/shell-region-assignment.md) |
 | 更新 | [自己更新](docs/updates.md)、[配布先の確認](docs/update-checklist.md) |
@@ -275,3 +276,7 @@ AppDockApiと操作カタログをMCP/Node/.NETで共有します。設定、App
 通知センターの回帰はtests/notification-center.test.cjs、実Node/.NET・更新結果・ページング・再起動・追加Shell復旧はscripts/notification-center-ui-test.cjs [固定EXE]。共有bridgeと既存通知操作ロックを使います。独自デスクトップの回帰はtests/notification-delivery.test.cjsとscripts/notification-desktop-ui-test.cjs [固定EXE]。実Node/.NET・独立Window・focus・抑制・Shell復旧・最後の表示先を外した解放を確認します。InputHostの専用queryモードに通知内容や入力hookを渡しません。次回はWindows表示先と旧show APIを基盤へ接続します。
 
 領域別Shellの回帰は`dev.bat exec node scripts/shell-region-ui-test.cjs [固定EXE]`で、A/B混在・無効化復帰・パレット要求維持・設定Shell自身の即時保存/切替・通知ID/検索状態保持・Node/.NET/native自己状態・専用コマンド・safe起動を検証します。sourceでは入力flushの期限切れとrenderer単独故障も注入し、単体の`tests/shell-region.test.cjs`では正規化・版別故障・世代/session失効を検証します。
+
+## 共通画像の検証
+
+`tests/registered-images.test.cjs`と関連するリボン・設定・ページの回帰を実行する。`dev.bat exec node scripts/build-image-library-fixtures.cjs`でRegisteredImagesの.NET fixtureとnative3Appletを`.artifacts/image-library-fixtures/`へRelease buildする。GUIは`dev.bat exec node scripts/image-library-ui-test.cjs [固定EXE]`。独立Profileのソースと発行WebAppletを隔離profileへ配置する。GUI実行中に本体や.NET出力を再ビルドしない。実測の準備コマンド・入力hash・成功記録はVERIFICATIONを参照する。ファイル選択はnative dialog fixtureで応答し、原画像decodeと保存は実装を使う。

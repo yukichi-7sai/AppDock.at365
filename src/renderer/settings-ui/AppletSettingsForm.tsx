@@ -14,6 +14,7 @@ import { ShortcutListSetting } from './ShortcutListSetting';
 import { ObjectListSetting } from './ObjectListSetting';
 import { ObjectListDialogSetting } from './ObjectListDialogSetting';
 import { useSettingsControls } from './api';
+import { RegisteredImageInput } from './RegisteredImagePicker';
 
 /** Shared manifest-driven body for the settings index and Applet detail tab. */
 export function AppletSettingsForm({
@@ -139,6 +140,8 @@ export function AppletSettingsForm({
           <ObjectListSetting definition={item} value={value} onChange={set} />
         ) : item.type === 'shortcut-list' ? (
           <ShortcutListSetting title={item.title} value={value} onChange={set} />
+        ) : item.type === 'registered-image' ? (
+          <RegisteredImageInput value={value} onChange={set} label={item.title} />
         ) : item.type === 'json' ? (
           <SettingsTextarea
             aria-label={item.title}
@@ -190,6 +193,7 @@ export function AppletSettingsForm({
             aria-describedby={item.description ? help : undefined}
             type={item.type === 'number' ? 'number' : 'text'}
             min={item.minimum}
+            maxLength={item.maxLength}
             max={item.maximum}
             step={item.step ?? 'any'}
             value={String(value ?? '')}

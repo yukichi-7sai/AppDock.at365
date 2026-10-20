@@ -1,6 +1,7 @@
 import type React from 'react';
 export type IconName =
   | 'home'
+  | 'user'
   | 'extensions'
   | 'settings'
   | 'bell'
@@ -22,6 +23,12 @@ export type IconName =
   | 'sun'
   | 'moon';
 const paths: Record<IconName, React.ReactNode> = {
+  user: (
+    <>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 22v-3a8 8 0 0 1 16 0v3" />
+    </>
+  ),
   home: (
     <>
       <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" />

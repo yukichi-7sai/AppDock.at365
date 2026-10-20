@@ -22,7 +22,7 @@ const write = (file, value) => fs.writeFileSync(file, JSON.stringify(value));
 test('first-run creation adopts a concurrently delivered file, and an unreadable backup location never creates defaults', (t) => {
   const f = fixture(t),
     remote = defaults();
-  remote.profile.name = 'first incoming';
+  remote.profile = { ...remote.profile, name: 'first incoming' };
   const originalWrite = fs.writeFileSync;
   try {
     fs.writeFileSync = (file, ...args) => {
@@ -34,7 +34,7 @@ test('first-run creation adopts a concurrently delivered file, and an unreadable
   } finally {
     fs.writeFileSync = originalWrite;
   }
-  assert.equal(f.store.value.profile.name, 'first incoming');
+  assert.equal(f.store.value.profile?.name, 'first incoming');
   assert.equal(fs.readFileSync(f.file, 'utf8'), JSON.stringify(remote));
   const blocked = fixture(t);
   fs.writeFileSync(blocked.backup, 'not a directory');
@@ -67,11 +67,11 @@ test('backup failure accepts external settings, preserves read-only arrival and 
   fs.writeFileSync(f.backup, 'blocked');
   f.store.load();
   const remote = defaults();
-  remote.profile.name = 'remote';
+  remote.profile = { ...remote.profile, name: 'remote' };
   write(f.file, remote);
   const raw = fs.readFileSync(f.file);
   f.store.reload();
-  assert.equal(f.store.value.profile.name, 'remote');
+  assert.equal(f.store.value.profile?.name, 'remote');
   assert.deepEqual(fs.readFileSync(f.file), raw);
   assert(f.store.health.has('backup'));
   fs.unlinkSync(f.backup);
@@ -82,15 +82,15 @@ test('restore validates the latest backup, preserves exact damaged bytes and upd
   const f = fixture(t);
   f.store.load();
   const newer = defaults();
-  newer.profile.name = 'new backup';
+  newer.profile = { ...newer.profile, name: 'new backup' };
   write(path.join(f.backup, 'last-good.json'), newer);
   const broken = Buffer.from([0xef, 0xbb, 0xbf, 0x7b, 0xff, 0x00]);
   fs.writeFileSync(f.file, broken);
   assert.throws(() => f.store.reload());
   const plan = f.store.prepareRecovery();
   f.store.restoreRecovery(plan);
-  assert.equal(f.store.value.profile.name, 'new backup');
-  assert.equal(JSON.parse(fs.readFileSync(f.file)).profile.name, 'new backup');
+  assert.equal(f.store.value.profile?.name, 'new backup');
+  assert.equal(JSON.parse(fs.readFileSync(f.file)).profile?.name, 'new backup');
   const evidence = fs.readdirSync(f.backup).find((n) => n.startsWith('invalid-'));
   assert.deepEqual(fs.readFileSync(path.join(f.backup, evidence)), broken);
   assert.equal(f.store.recovered, false);
@@ -102,10 +102,10 @@ test('valid incoming settings and changed corrupt bytes during confirmation both
   fs.writeFileSync(f.file, '{bad');
   const plan = f.store.prepareRecovery();
   const remote = defaults();
-  remote.profile.name = 'incoming';
+  remote.profile = { ...remote.profile, name: 'incoming' };
   write(f.file, remote);
   assert.throws(() => f.store.restoreRecovery(plan), /正常な設定/);
-  assert.equal(f.store.value.profile.name, 'incoming');
+  assert.equal(f.store.value.profile?.name, 'incoming');
   fs.writeFileSync(f.file, '{bad');
   const other = f.store.prepareRecovery();
   fs.writeFileSync(f.file, '{changed');
@@ -118,7 +118,7 @@ test('changed recovery candidate and unpreservable targets are never overwritten
   fs.writeFileSync(f.file, '{bad');
   const plan = f.store.prepareRecovery();
   const next = defaults();
-  next.profile.name = 'changed';
+  next.profile = { ...next.profile, name: 'changed' };
   write(plan.candidate, next);
   assert.throws(() => f.store.restoreRecovery(plan), SettingsConflictError);
   assert.equal(fs.readFileSync(f.file, 'utf8'), '{bad');
@@ -135,7 +135,7 @@ test('failed preservation leaves target intact and failed replacement leaves the
   fs.writeFileSync(f.file, '{bad');
   const external = path.join(f.root, 'external.json');
   const next = defaults();
-  next.profile.name = 'restore';
+  next.profile = { ...next.profile, name: 'restore' };
   write(external, next);
   const plan = f.store.prepareRecovery(external);
   const originalWrite = fs.writeFileSync;
@@ -160,7 +160,7 @@ test('failed preservation leaves target intact and failed replacement leaves the
   } finally {
     fs.renameSync = rename;
   }
-  assert.notEqual(f.store.value.profile.name, 'restore');
+  assert.notEqual(f.store.value.profile?.name, 'restore');
   assert.equal(fs.readFileSync(f.file, 'utf8'), '{bad');
   assert(f.store.health.has('save'));
   f.store.restoreRecovery(plan);
@@ -222,7 +222,7 @@ test('startup recovery accepts valid sync during confirmation without overwritin
   const external = path.join(f.root, 'external.json');
   write(external, defaults());
   const remote = defaults();
-  remote.profile.name = 'remote wins';
+  remote.profile = { ...remote.profile, name: 'remote wins' };
   assert.equal(
     await recoverSettingsAtStartup(f.store, {
       chooseStartupAction: async () => 'restore',
@@ -235,7 +235,7 @@ test('startup recovery accepts valid sync during confirmation without overwritin
     }),
     true,
   );
-  assert.equal(f.store.value.profile.name, 'remote wins');
+  assert.equal(f.store.value.profile?.name, 'remote wins');
 });
 test('save errors persist across successful reads and validation/conflict do not become operational errors', (t) => {
   const f = fixture(t);

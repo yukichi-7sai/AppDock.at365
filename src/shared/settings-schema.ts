@@ -7,7 +7,7 @@ import { parseKeybindings, withKeybindings } from './keybindings';
 import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
 import { parseGestures, defaultGestures } from './gestures';
 import type { Settings } from './contracts';
-import { avatarReference } from './asset-names';
+import { parseImageLibrary } from './registered-images';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
 import {
@@ -52,7 +52,6 @@ export const createDefaultSettings = (): Settings => ({
   trayCommands: [],
   pinnedCommands: [],
   ribbon: defaultRibbon(),
-  profile: { name: 'ユキ', avatar: null },
 });
 export function parseSettings(value: unknown): Settings {
   if (
@@ -190,17 +189,6 @@ export function parseSettings(value: unknown): Settings {
     new Set(pinnedCommands).size !== pinnedCommands.length
   )
     throw new Error('pinnedCommands は重複のないコマンドIDの配列です。');
-  const profile = value.profile === undefined ? { name: 'ユキ', avatar: null } : value.profile;
-  if (
-    !object(profile) ||
-    typeof profile.name !== 'string' ||
-    !profile.name.trim() ||
-    profile.name.length > 80 ||
-    (profile.avatar !== null && !avatarReference(profile.avatar))
-  )
-    throw new Error(
-      'プロフィールは80文字以内の名前と、登録アバターの相対パス / null を指定してください。',
-    );
   const updates = {
     ...createDefaultSettings().updates,
     ...(object(value.updates) ? value.updates : {}),
@@ -256,7 +244,10 @@ export function parseSettings(value: unknown): Settings {
       ? {}
       : { notificationPreferences: parseNotificationPreferences(value.notificationPreferences) }),
     ribbon,
-    profile: { ...profile, name: profile.name.trim() },
+    ...(Object.hasOwn(value, 'profile') ? { profile: structuredClone(value.profile) } : {}),
+    ...(value.imageLibrary !== undefined
+      ? { imageLibrary: parseImageLibrary(value.imageLibrary) }
+      : {}),
   };
   const parsed = structuredClone(next) as unknown as Settings;
   // Saved identity/storage aliases remain readable; no legacy settings are imported.

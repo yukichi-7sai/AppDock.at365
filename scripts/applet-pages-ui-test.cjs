@@ -6,6 +6,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `applet-pages-${Date.now()}`);
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+settings.profile = { name: 'Legacy fixture', avatar: null };
 settings.host.hardwareAcceleration = false;
 settings.globalShortcutCommands = [];
 const fixture = path.join(profile, 'extensions', 'test.pages');

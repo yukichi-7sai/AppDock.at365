@@ -110,11 +110,11 @@
 - 押下時にも現在の登録先と利用可否を再照合し、既存の共通実行サービスへ一度だけ渡す。一時的グループでは既存の受付確定・パネル閉鎖・実行の順序を維持する。
 - 既存のrequestIdの重複抑止、実行中の再入防止、取消、共通エラー報告を維持する。失敗や結果不明の操作を自動再送しない。
 
-### 固定アイコンと将来の登録
+### 固定アイコンと登録画像
 
-現在の7種類（folder / mail / clock / image / extensions / settings / bell）をグループとボタンで共用する。`RibbonIconPicker`と固定アイコン一覧を共通化し、保存値は現行と同じ名前文字列とする。ボタンの初期アイコンはextensionsとする。
+固定アイコンはfolder / mail / clock / image / extensions / settings / bell / userをグループとボタンで共用する。`RibbonIconPicker`と固定一覧を共通化し、固定アイコンは従来の名前文字列で保存する。ボタンの初期値はextensions。
 
-将来の登録画像は、この選択部品と表示時のアイコン解決を拡張する。今回、素材登録・削除画面、未実装の画像参照型、移行用データは追加しない。後続で登録素材APIと既存のopaqueな`assetId`の表示経路へ接続し、Shellへファイルパスを渡さない。
+登録画像は同じ部品から選び、`image: { file } | null`として保存する。グループ、コマンド、通常ページ、WebAppletは[共通画像ライブラリー](registered-images.md)とopaque assetIdの表示経路へ接続する。Shellへパスを渡さない。
 
 ## 右クリック動作
 

@@ -89,22 +89,22 @@ test('all display/general settings remain local while other settings synchronize
     runAsAdministrator: true,
     hardwareAcceleration: true,
   });
-  next.profile.name = 'Shared';
+  next.profile = { ...next.profile, name: 'Shared' };
   store.save(next, store.revision);
   const shared = disk(file),
     device = disk(store.device.file);
-  assert.equal(shared.profile.name, 'Shared');
+  assert.equal(shared.profile?.name, 'Shared');
   assert.equal(shared.host.soundEnabled, true);
   assert.equal(device.host.soundEnabled, false);
   assert.equal(device.host.runAsAdministrator, true);
   shared.host.theme = 'system';
   shared.host.startAtLogon = false;
-  shared.profile.name = 'Incoming';
+  shared.profile = { ...shared.profile, name: 'Incoming' };
   fs.writeFileSync(file, JSON.stringify(shared));
   store.reload();
   assert.equal(store.value.host.theme, 'dark');
   assert.equal(store.value.host.startAtLogon, true);
-  assert.equal(store.value.profile.name, 'Incoming');
+  assert.equal(store.value.profile?.name, 'Incoming');
 });
 test('whole Applet configurations stay independent and survive OFF/ON', (t) => {
   const { store, file } = fixture(t);
@@ -179,7 +179,7 @@ test('mixed save failure rolls back both files and leaves no successful partial 
     throw Error('injected disk failure');
   };
   const next = structuredClone(store.value);
-  next.profile.name = 'Should rollback';
+  next.profile = { ...next.profile, name: 'Should rollback' };
   next.host.theme = 'dark';
   assert.throws(() => store.save(next, store.revision), /injected/);
   store.device.save = save;
@@ -196,7 +196,7 @@ test('rollback accepts and preserves a legacy UTF-8 BOM byte for byte', (t) => {
     throw Error('injected write failure');
   };
   const next = structuredClone(store.value);
-  next.profile.name = 'Rollback';
+  next.profile = { ...next.profile, name: 'Rollback' };
   next.host.theme = 'dark';
   assert.throws(() => store.save(next, store.revision), /injected/);
   assert.deepEqual(fs.readFileSync(file), before);
@@ -327,7 +327,7 @@ test('committed journal cleanup failure cannot roll back assets or saved setting
   };
   try {
     const next = structuredClone(store.value);
-    next.profile.name = 'Committed';
+    next.profile = { ...next.profile, name: 'Committed' };
     next.host.theme = 'dark';
     store.save(next, store.revision, {
       commit() {},
@@ -335,7 +335,7 @@ test('committed journal cleanup failure cannot roll back assets or saved setting
         rollback++;
       },
     });
-    assert.equal(disk(file).profile.name, 'Committed');
+    assert.equal(disk(file).profile?.name, 'Committed');
     assert.equal(rollback, 0);
   } finally {
     fs.unlinkSync = unlink;
@@ -348,15 +348,15 @@ test('rollback preserves external changes and retains unresolved recovery eviden
   const { store, file, base } = fixture(t);
   store.device.save = () => {
     const external = disk(file);
-    external.profile.name = 'External';
+    external.profile = { ...external.profile, name: 'External' };
     fs.writeFileSync(file, JSON.stringify(external));
     throw Error('disk failure');
   };
   const next = structuredClone(store.value);
-  next.profile.name = 'Mine';
+  next.profile = { ...next.profile, name: 'Mine' };
   next.host.theme = 'dark';
   assert.throws(() => store.save(next, store.revision));
-  assert.equal(disk(file).profile.name, 'External');
+  assert.equal(disk(file).profile?.name, 'External');
   assert.equal(fs.existsSync(path.join(base, 'local/settings-transactions/settings.json')), true);
 });
 test('initialization marker prevents reimport even when all backup writes were unavailable', (t) => {

@@ -19,7 +19,12 @@ export class NavigationCoordinator {
     if (this.requestSequence !== 0) return;
     return this.navigate(route);
   }
-  navigate(route: string, section?: NavigationState['section'], appletId?: string, appletDetail?: NavigationState['appletDetail']) {
+  navigate(
+    route: string,
+    section?: NavigationState['section'],
+    appletId?: string,
+    appletDetail?: NavigationState['appletDetail'],
+  ) {
     if (
       !['home', 'extensions', 'settings', 'logs', 'notifications'].includes(route) &&
       !/^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(route)
@@ -29,7 +34,13 @@ export class NavigationCoordinator {
     if (route === this.state.route && !section && !appletId) return;
     const apply = () => {
       if (sequence !== this.requestSequence) return;
-      this.state = { route, section, appletId, request: this.state.request + 1, ...(appletDetail ? { appletDetail } : {}) };
+      this.state = {
+        route,
+        section,
+        appletId,
+        request: this.state.request + 1,
+        ...(appletDetail ? { appletDetail } : {}),
+      };
       this.changed();
     };
     if (this.beforeNavigate)
@@ -42,6 +53,8 @@ export class NavigationCoordinator {
   }
 }
 type Action = {
+  appletId?: string;
+  appletDetail?: 'settings';
   route?: string;
   section?: NavigationState['section'];
   command?: string;
@@ -64,7 +77,7 @@ export class UiPresentation {
       applets(): ExtensionSnapshot[];
       commands?(): UiCommand[];
       dark(): boolean;
-      avatar(): string | undefined;
+      image?(ref: unknown, shape?: string): string | undefined;
       navigation: NavigationCoordinator;
       execute(command: string): Promise<unknown>;
       theme(): Promise<unknown>;
@@ -121,14 +134,14 @@ export class UiPresentation {
       const action: Action =
         item.kind === 'group'
           ? { group: item.id }
-          : item.command
-            ? { command: item.command.commandId }
-            : item.extensionId
-              ? { command: page?.openCommand }
-              : item.id === 'theme'
-                ? { theme: true }
-                : item.id === 'profile'
-                  ? { route: 'settings', section: 'profile' }
+          : item.contribution
+            ? { route: 'extensions', appletId: item.extensionId, appletDetail: 'settings' }
+            : item.command
+              ? { command: item.command.commandId }
+              : item.extensionId
+                ? { command: page?.openCommand }
+                : item.id === 'theme'
+                  ? { theme: true }
                   : { route: item.id };
       if (item.kind !== 'separator') this.actions.set(actionId, action);
       const available = commandAvailable(action, provider);
@@ -142,12 +155,13 @@ export class UiPresentation {
         id: item.id,
         kind: item.kind === 'command' ? 'button' : (item.kind ?? 'button'),
         title: appearance.title,
-        tooltip:
-          item.id === 'profile' && !settings.ribbon.itemOverrides?.profile?.title
-            ? settings.profile.name
-            : appearance.title,
-        placement: ribbonPlacement(settings.ribbon, item.id),
-        selected: route === item.id,
+        tooltip: appearance.title,
+        placement: ribbonPlacement(settings.ribbon, item.id, catalog),
+        selected: item.contribution
+          ? route === 'extensions' &&
+            this.options.navigation.state.appletId === item.extensionId &&
+            this.options.navigation.state.appletDetail === 'settings'
+          : route === item.id,
         enabled,
         ...(!enabled
           ? {
@@ -165,16 +179,26 @@ export class UiPresentation {
               iconOnly: appearance.iconOnly,
             }
           : {}),
-        icon:
-          item.id === 'profile'
-            ? {
-                assetId: this.asset(this.options.avatar()),
-                text: Array.from(settings.profile.name || 'A')[0],
-              }
-            : {
-                assetId: this.asset(item.iconImage),
-                name: item.id === 'theme' ? (dark ? 'sun' : 'moon') : item.icon,
-              },
+        icon: {
+          assetId: this.asset(
+            [
+              settings.ribbon.itemOverrides?.[item.id]?.image,
+              item.group?.image,
+              item.command?.image,
+              item.image,
+              item.contribution?.imageSetting
+                ? (settings.extensions[item.extensionId!]?.settings[
+                    item.contribution.imageSetting
+                  ] ??
+                  provider?.settings?.find((s) => s.key === item.contribution!.imageSetting)
+                    ?.default)
+                : undefined,
+            ]
+              .map((ref) => this.options.image?.(ref, item.contribution?.imageShape))
+              .find(Boolean) ?? item.iconImage,
+          ),
+          name: item.id === 'theme' ? (dark ? 'sun' : 'moon') : item.icon,
+        },
       };
     };
     const prune = (items: RibbonView['items']) =>
@@ -353,7 +377,12 @@ export class UiPresentation {
       }
       if (execute) return execute(action);
       if (action.theme) return this.options.theme();
-      await this.options.navigation.navigate(action.route!, action.section);
+      await this.options.navigation.navigate(
+        action.route!,
+        action.section,
+        action.appletId,
+        action.appletDetail,
+      );
       return { accepted: true };
     });
     const entry = { action: request.actionId, promise, completed: false, expires: Infinity };

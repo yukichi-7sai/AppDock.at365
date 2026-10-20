@@ -52,14 +52,14 @@ test('PC-local generations survive corruption and restart; incoming valid settin
   first.load();
   for (let i = 0; i < 24; i++) {
     const next = structuredClone(first.value);
-    next.profile.name = 'generation ' + i;
+    next.profile = { ...next.profile, name: 'generation ' + i };
     first.save(next, first.revision);
   }
   assert.equal(fs.readdirSync(backup).filter((n) => n.startsWith('settings-')).length, 20);
   fs.writeFileSync(file, '{broken');
   const second = new SettingsStore(file, backup);
   second.load();
-  assert.equal(second.value.profile.name, 'generation 23');
+  assert.equal(second.value.profile?.name, 'generation 23');
   assert.equal(second.recovered, true);
   assert.equal(fs.readFileSync(file, 'utf8'), '{broken');
   const roster = new WebProfileStore(
@@ -70,15 +70,15 @@ test('PC-local generations survive corruption and restart; incoming valid settin
   assert.deepEqual(roster.snapshot(), []);
   assert.throws(() => second.save(defaults(), second.revision));
   const good = defaults();
-  good.profile.name = 'remote won';
+  good.profile = { ...good.profile, name: 'remote won' };
   fs.writeFileSync(file, JSON.stringify(good));
   assert.throws(() => second.restoreBackup(second.revision), /正常な設定/);
-  assert.equal(second.value.profile.name, 'remote won');
+  assert.equal(second.value.profile?.name, 'remote won');
   fs.writeFileSync(file, '{broken');
   const third = new SettingsStore(file, backup);
   third.load();
   third.restoreBackup(third.revision);
-  assert.equal(JSON.parse(fs.readFileSync(file)).profile.name, 'remote won');
+  assert.equal(JSON.parse(fs.readFileSync(file)).profile?.name, 'remote won');
   fs.unlinkSync(file);
   const missing = new SettingsStore(file, backup);
   missing.load();

@@ -12,6 +12,7 @@ import { SettingsDialog } from './SettingsModal';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
 import { SettingsListTable, ListIcon, settingsListText } from './SettingsListTable';
 import { DirectoryListInput } from './DirectoryListInput';
+import { RegisteredImageInput } from './RegisteredImagePicker';
 
 export function ObjectListDialogSetting({
   definition,
@@ -212,6 +213,12 @@ export function ObjectListDialogSetting({
                         aria-label={field.title}
                         value={((current as string[]) ?? []).join('\n')}
                         onChange={(e) => update(field, e.target.value.split('\n').filter(Boolean))}
+                      />
+                    ) : field.type === 'registered-image' ? (
+                      <RegisteredImageInput
+                        value={current}
+                        label={field.title}
+                        onChange={(next) => update(field, next)}
                       />
                     ) : field.format === 'url' ? (
                       <SettingsUrlInput

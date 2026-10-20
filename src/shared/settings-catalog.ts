@@ -41,6 +41,7 @@ export const hostSettingsPages = [
   ['ai', 'AI'],
   ['custom-commands', 'カスタムコマンド'],
   ['mcp-client', 'MCP接続先'],
+  ['image-library', '画像ライブラリー'],
   ['ribbon', 'リボン'],
   ['tray', 'タスクトレイ'],
   ['shortcuts', 'ショートカット'],
@@ -48,7 +49,6 @@ export const hostSettingsPages = [
   ['web-accounts', 'Webアカウント'],
   ['permissions', '操作の許可'],
   ['codex', 'MCP・Codex連携'],
-  ['profile', 'プロフィール'],
   ['about', 'バージョン情報・更新'],
 ] as const;
 const hostItems: Record<string, [string, string, string?][]> = {
@@ -182,9 +182,9 @@ const hostItems: Record<string, [string, string, string?][]> = {
       '設定ファイル 登録名 接続ポート ポートを適用 認証情報を再発行 登録を解除',
     ],
   ],
-  profile: [
-    ['name', 'ユーザー名', '80文字以内で入力してください。'],
-    ['avatar', 'アバター画像', 'PNG / JPEG · 5MBまで。同名の別画像は登録できません。'],
+  'image-library': [
+    ['images', '登録画像', '画像を登録し、用途別のグループで整理します。'],
+    ['groups', 'グループ', '同じ画像を複数のグループで使えます。'],
   ],
   about: [
     ['updateActions', '更新を適用', 'すべて更新 Appletを更新 更新を中止 更新を確認'],
@@ -419,11 +419,8 @@ export function settingsPaths(
         'buttons',
         'rightClickCommand',
       ].map((k) => ['ribbon', k]);
-    case 'profile':
-      return [
-        ['profile', 'name'],
-        ['profile', 'avatar'],
-      ];
+    case 'image-library':
+      return [['imageLibrary']];
     case 'about':
       return [
         ...updateKeys.map((k) => ['updates', k]),

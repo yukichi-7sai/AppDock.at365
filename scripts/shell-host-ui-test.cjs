@@ -16,6 +16,7 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `shell-host-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+settings.profile = { name: 'Legacy fixture', avatar: null };
 settings.profile.name = 'Test profile';
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;

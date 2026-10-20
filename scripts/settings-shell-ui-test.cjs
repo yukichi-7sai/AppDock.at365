@@ -15,6 +15,7 @@ settings.host.notifications = false;
 settings.globalShortcutCommands = [];
 settings.extensions['missing.applet'] = { enabled: false, settings: { private: 'never-in-shell' } };
 settings.host.closeToTray = false;
+require('./profile-settings-fixture.cjs').installProfileSettings(profile, settings);
 for (const id of ['fixture.settings-shell', 'fixture.stalled-settings', 'fixture.old-settings'])
   settings.extensions[id] = { enabled: true, settings: {} };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
@@ -214,7 +215,8 @@ async function until(fn, label) {
     await shell.getByLabel('ユーザー名', { exact: true }).press('Enter');
     await settleSettings(shell);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).profile.name,
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['fixture.profile']
+        .settings.name,
       'Immediate profile',
     );
     const name = shell.getByLabel('ユーザー名', { exact: true });
@@ -226,7 +228,9 @@ async function until(fn, label) {
       );
     });
     assert.equal(
-      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.profile'
+      ].settings.name,
       'Immediate profile',
     );
     await name.evaluate((el) =>
@@ -235,7 +239,9 @@ async function until(fn, label) {
     await name.press('Enter');
     await settleSettings(shell);
     assert.equal(
-      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.profile'
+      ].settings.name,
       '変換確定',
     );
     // Rapid confirmed events must serialize without losing a newer character.
@@ -244,24 +250,12 @@ async function until(fn, label) {
     await name.press('Enter');
     await settleSettings(shell);
     assert.equal(
-      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.profile'
+      ].settings.name,
       'Rapid typing',
     );
-    await shell
-      .getByLabel('アバター画像を選択', { exact: true })
-      .setInputFiles(path.join(root, 'assets/icon.png'));
-    await until(
-      async () =>
-        !!(await host.evaluate(() => window.dock.snapshot())).settings.value.profile.avatar,
-      'avatar immediate',
-    );
-    assert.equal(
-      (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.avatar,
-      'data/assets/profile/icon.png',
-    );
-    checks.push(
-      'text and rapid typing persist on Enter; IME remains local until confirmed; avatar saves original bytes/name without staging',
-    );
+    checks.push('Applet text and rapid typing persist on Enter; IME remains local until confirmed');
     if (app) {
       await app.evaluate(() => {
         const r = process.getBuiltinModule('module').createRequire(process.cwd() + '/package.json')(
@@ -280,7 +274,9 @@ async function until(fn, label) {
       await shell.getByRole('alert').first().waitFor();
       assert.equal(await name.inputValue(), 'Rejected input');
       assert.equal(
-        (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+          'fixture.profile'
+        ].settings.name,
         'Rapid typing',
       );
       await app.evaluate(() => {
@@ -291,7 +287,9 @@ async function until(fn, label) {
       await name.press('Enter');
       await settleSettings(shell);
       assert.equal(
-        (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+          'fixture.profile'
+        ].settings.name,
         'Retry confirmed',
       );
       checks.push(
@@ -433,7 +431,7 @@ async function until(fn, label) {
         prototype.act = function (request) {
           if (
             request.action?.type === 'page-values' &&
-            request.action.value?.profile?.name === 'Drain proof'
+            request.action.value?.extensions?.['fixture.profile']?.settings?.name === 'Drain proof'
           )
             return new Promise((resolve) => {
               globalThis.settingsDrainFixture.release = resolve;
@@ -459,7 +457,9 @@ async function until(fn, label) {
         });
         await navigating;
         assert.equal(
-          (await host.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+          (await host.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+            'fixture.profile'
+          ].settings.name,
           'Drain proof',
         );
         checks.push(
@@ -501,7 +501,10 @@ async function until(fn, label) {
     assert.equal(await host.getByText(/設定を読み込んでいます…Error:/).count(), 0);
     const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     assert.equal(saved.extensions['fixture.settings'].settings.amount, 12);
-    assert.equal(saved.profile.avatar, 'data/assets/profile/icon.png');
+    assert.equal(
+      saved.extensions['fixture.profile'].settings.name,
+      portable ? 'Rapid typing' : 'Drain proof',
+    );
     assert.equal(saved.extensions['missing.applet'].settings.private, 'never-in-shell');
     checks.push(
       'restored full settings renders without navigation, including safe Shell; immediate settings/assets and unrelated private values persist',

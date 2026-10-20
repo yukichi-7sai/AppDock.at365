@@ -103,7 +103,7 @@ function fixture() {
 }
 test('all settings pages receive live hint visibility without exposing other page values', async () => {
   const f = fixture();
-  await f.act({ kind: 'select', pageId: 'profile' });
+  await f.act({ kind: 'select', pageId: 'image-library' });
   const before = f.page.snapshot();
   assert.equal(before.content.showHints, true);
   f.saved.value.host.showHints = false;
@@ -140,7 +140,7 @@ test('public settings models never expose unrelated values; issued operations ar
   await f.act({ kind: 'select', pageId: 'general' });
   await assert.rejects(f.act({ kind: 'invoke', actionId: id }), /許可/);
   f.page.dispose();
-  await assert.rejects(f.act({ kind: 'select', pageId: 'profile' }), /Stale/);
+  await assert.rejects(f.act({ kind: 'select', pageId: 'image-library' }), /Stale/);
 });
 test('invalid input never enters projection; valid page writes persist with privacy and no global save', async () => {
   const f = fixture();
@@ -214,7 +214,7 @@ test('removed setting targets remain unavailable and cannot be selected', async 
   f.applets.splice(0);
   assert(f.page.snapshot().content.page.unavailableReason);
   await assert.rejects(f.act({ kind: 'move', itemId: result.id }), /見つかりません/);
-  await f.act({ kind: 'select', pageId: 'profile' });
+  await f.act({ kind: 'select', pageId: 'image-library' });
 });
 
 test('settings View teardown releases recording while preserving the Controller, saved values and navigation', async () => {

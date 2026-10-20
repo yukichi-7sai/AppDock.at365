@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `navigation-${Date.now()}`);
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
+settings.profile = { name: 'Legacy fixture', avatar: null };
 settings.host.notifications = false;
 settings.globalShortcutCommands = [];
 settings.shortcuts['missing.command'] = ['Ctrl+Alt+9'];

@@ -14,6 +14,16 @@ const execution = new AsyncLocalStorage<{ id?: string; invocation: NodeCommandIn
 const activeCommands = new Map<string, { session?: string; controller: AbortController }>();
 const cancelledSessions = new Set<string>();
 export interface NodeExtensionContext {
+  registeredImages: {
+    import(input: {
+      filename?: string;
+      base64: string;
+    }): Promise<import('../shared/registered-images').RegisteredImageRef>;
+    copyToCache(
+      image: import('../shared/registered-images').RegisteredImageRef,
+      variant?: 'original' | 'thumbnail',
+    ): Promise<string>;
+  };
   customCommands: {
     register(
       typeId: string,
@@ -40,7 +50,10 @@ export interface NodeExtensionContext {
     hide(id: string): Promise<unknown>;
     dispose(id: string): Promise<unknown>;
     notifyChanged(id: string): Promise<{ accepted: true; delivered: boolean }>;
-    registerImages(id: string, files: import('./core/page-images').PageImageFile[]): Promise<{ images: import('./core/page-images').PageImageReference[] }>;
+    registerImages(
+      id: string,
+      files: import('./core/page-images').PageImageFile[],
+    ): Promise<{ images: import('./core/page-images').PageImageReference[] }>;
     releaseImages(id: string, imageIds: string[]): Promise<unknown>;
     list(): Promise<{
       revision: number;
@@ -173,14 +186,41 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
             ...(execution.getStore()?.id ? { executionId: execution.getStore()!.id } : {}),
           }),
         ),
+        registeredImages: {
+          import: (input) => {
+            if (
+              typeof input.base64 !== 'string' ||
+              input.base64.length > 700000 ||
+              Buffer.from(input.base64, 'base64').length > 512 * 1024
+            )
+              return Promise.reject(Error('画像は512KiB以下で指定してください。'));
+            return peer.request('host.registeredImages.import', input) as Promise<
+              import('../shared/registered-images').RegisteredImageRef
+            >;
+          },
+          copyToCache: (image, variant = 'original') =>
+            peer.request('host.registeredImages.copyToCache', {
+              image,
+              variant,
+            }) as Promise<string>,
+        },
         pages: {
+          // Image bytes remain outside page state and ordinary settings messages.
           open: (id) => peer.request('host.pages.open', { id }),
           openItem: (id) => peer.request('host.pages.openItem', { id }),
           hide: (id) => peer.request('host.pages.hide', { id }),
           dispose: (id) => peer.request('host.pages.dispose', { id }),
-          notifyChanged: (id) => peer.request('host.pages.changed', { id }) as Promise<{ accepted: true; delivered: boolean }>,
-          registerImages: (id, files) => peer.request('host.pages.images.register', { id, files }) as Promise<{ images: import('./core/page-images').PageImageReference[] }>,
-          releaseImages: (id, imageIds) => peer.request('host.pages.images.release', { id, imageIds }),
+          notifyChanged: (id) =>
+            peer.request('host.pages.changed', { id }) as Promise<{
+              accepted: true;
+              delivered: boolean;
+            }>,
+          registerImages: (id, files) =>
+            peer.request('host.pages.images.register', { id, files }) as Promise<{
+              images: import('./core/page-images').PageImageReference[];
+            }>,
+          releaseImages: (id, imageIds) =>
+            peer.request('host.pages.images.release', { id, imageIds }),
           list: () =>
             peer.request('host.pages.list', {}) as ReturnType<
               NodeExtensionContext['pages']['list']

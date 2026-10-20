@@ -47,8 +47,14 @@ export function createHostApi(
   sharedDataRoot = path.join(dataRoot, 'shared'),
   customCommands?: import('./custom-commands').CustomCommandService,
   pageUi?: { openDetails(id: string): Promise<unknown>; failed?(id: string): void },
+  imageLibrary?: import('./image-library-host').ImageLibraryHost,
 ) {
-  const api = async (e: ExtensionInstance, method: string, params: unknown): Promise<unknown> => {
+  const api = async (
+    e: ExtensionInstance,
+    method: string,
+    params: unknown,
+    localPage = false,
+  ): Promise<unknown> => {
     if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
     const p = params;
     const id = e.manifest.id;
@@ -137,6 +143,63 @@ export function createHostApi(
         if (method === 'host.webProfiles.clear') return profiles.clearAccount(p.id);
         return profiles.deleteAccount(p.id);
       }
+      case 'host.registeredImages.snapshot':
+      case 'host.registeredImages.pick':
+      case 'host.registeredImages.preview':
+      case 'host.registeredImages.import':
+      case 'host.registeredImages.copyToCache': {
+        requireCapability('registered-images');
+        if (!imageLibrary) throw Error('画像ライブラリーは準備中です。');
+        if (
+          [
+            'host.registeredImages.snapshot',
+            'host.registeredImages.preview',
+            'host.registeredImages.pick',
+          ].includes(method) &&
+          !localPage
+        )
+          throw Error('画像の一覧と選択はローカル画面から利用してください。');
+        if (method === 'host.registeredImages.snapshot') {
+          const snapshot = await imageLibrary.snapshot();
+          return {
+            ...snapshot,
+            images: snapshot.images.map((image) => ({ ...image, thumbnail: '' })),
+          };
+        }
+        if (method === 'host.registeredImages.preview') {
+          await imageLibrary.images.refresh();
+          return imageLibrary.images.icon(p.image) ?? null;
+        }
+        if (method === 'host.registeredImages.pick') {
+          const generation = e.runtimeSession;
+          const result = await imageLibrary.pick(
+            p.current ?? null,
+            () => e.state === 'running' && generation === e.runtimeSession,
+          );
+          if (e.state !== 'running' || generation !== e.runtimeSession)
+            throw Error('画像選択の提供元が終了しました。');
+          return result;
+        }
+        if (method === 'host.registeredImages.import') {
+          if (settings.writesBlocked)
+            throw Error('設定ファイルを復旧してから画像を登録してください。');
+          return imageLibrary.images.import(p as { base64: string; filename?: string });
+        }
+        const generation = e.runtimeSession;
+        const file = await imageLibrary.copyToCache(
+          e.manifest,
+          settings.value.extensions[id]?.settings ?? {},
+          p.image,
+          dataRoot,
+          p.variant,
+          generation,
+        );
+        if (!['starting', 'running'].includes(e.state) || generation !== e.runtimeSession) {
+          await imageLibrary.release(`${id}:${generation ?? ''}`);
+          throw Error('画像の提供元が終了しました。');
+        }
+        return file;
+      }
       case 'host.images.normalize': {
         requireCapability('images');
         if (
@@ -185,17 +248,27 @@ export function createHostApi(
       case 'host.pages.images.register':
       case 'host.pages.images.release': {
         requireCapability('pages');
-        const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find((page) => page.id === p.id);
+        const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find(
+          (page) => page.id === p.id,
+        );
         if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
-        const allowedKeys = method === 'host.pages.changed' ? ['id'] : method.endsWith('.register') ? ['id','files'] : ['id','imageIds'];
-        if (Object.keys(p).some((key) => !allowedKeys.includes(key))) throw Error('ページ操作の引数を確認してください。');
+        const allowedKeys =
+          method === 'host.pages.changed'
+            ? ['id']
+            : method.endsWith('.register')
+              ? ['id', 'files']
+              : ['id', 'imageIds'];
+        if (Object.keys(p).some((key) => !allowedKeys.includes(key)))
+          throw Error('ページ操作の引数を確認してください。');
         const target = pageKey(id, page.id);
-        if (method === 'host.pages.changed') return { accepted: true, delivered: notifyAppletPage(target) };
+        if (method === 'host.pages.changed')
+          return { accepted: true, delivered: notifyAppletPage(target) };
         requireCapability('local-images');
         const images = localPageImages(target);
         if (!images) throw Error('画像を登録するページを先に開いてください。');
         if (method.endsWith('.register')) {
-          if (Buffer.byteLength(JSON.stringify(p)) > 256 * 1024 - 512) throw Error('画像の登録を分割してください。');
+          if (Buffer.byteLength(JSON.stringify(p)) > 256 * 1024 - 512)
+            throw Error('画像の登録を分割してください。');
           return images.register(p.files);
         }
         images.release(p.imageIds);
@@ -260,10 +333,14 @@ export function createHostApi(
             stateFile: path.join(dataRoot, 'pages', id, page.id, 'window-state.json'),
             defaultDisplay: page.defaultDisplay,
             partition: `applet-page:${pageKey(id, page.id)}`,
-            ...(e.manifest.capabilities?.includes('local-images') ? { pageImages: {
-              dataRoot,
-              active: () => e.state === 'running' && e.runtimeSession === pageGeneration,
-            } } : {}),
+            ...(e.manifest.capabilities?.includes('local-images')
+              ? {
+                  pageImages: {
+                    dataRoot,
+                    active: () => e.state === 'running' && e.runtimeSession === pageGeneration,
+                  },
+                }
+              : {}),
             onLayout: () => {},
             onCreated: (contents) =>
               contents.on('before-input-event', (event, input) => {
@@ -334,10 +411,13 @@ export function createHostApi(
                 try {
                   if (!e.peer || e.peer.closed) throw Error('ページの提供元が終了しました。');
                   result = await e.peer.request('page.action', {
-                    id: declaration.id, input: input.input, pageId: page.id,
+                    id: declaration.id,
+                    input: input.input,
+                    pageId: page.id,
                   });
                 } catch (error) {
-                  if (e.state === 'running' && e.runtimeSession === generation) pageUi?.failed?.(id);
+                  if (e.state === 'running' && e.runtimeSession === generation)
+                    pageUi?.failed?.(id);
                   throw error;
                 }
                 if (e.state !== 'running' || e.runtimeSession !== generation)
@@ -352,6 +432,10 @@ export function createHostApi(
                 'webProfiles.clear',
                 'webProfiles.delete',
                 'images.normalize',
+                'registeredImages.snapshot',
+                'registeredImages.pick',
+                'registeredImages.preview',
+                'registeredImages.import',
                 'pages.openItem',
               ];
               if (
@@ -360,12 +444,14 @@ export function createHostApi(
                 !allowed.includes(operation)
               )
                 throw Error('このページから利用できない操作です。');
-              return api(e, `host.${operation}`, input);
+              return api(e, `host.${operation}`, input, true);
             },
             changed: (callback) => {
+              const unsubscribeImages = imageLibrary?.images.onChanged(callback);
               settings.on('changed', callback);
               nativeTheme.on('updated', callback);
               return () => {
+                unsubscribeImages?.();
                 settings.removeListener('changed', callback);
                 nativeTheme.removeListener('updated', callback);
               };

@@ -28,8 +28,19 @@ const exact = (v: unknown, keys: string[]): v is Record<string, any> =>
   Object.keys(v).every((k) => keys.includes(k));
 export const ribbonParent = (layout: RibbonLayout, id: string) =>
   (layout.groups ?? []).find((g) => g.children.includes(id));
-export const ribbonPlacement = (layout: RibbonLayout, id: string): RibbonPlacement =>
-  layout.bottom.includes(ribbonParent(layout, id)?.id ?? id) ? 'bottom' : 'top';
+export const ribbonPlacement = (
+  layout: RibbonLayout,
+  id: string,
+  items: RibbonItem[] = [],
+): RibbonPlacement => {
+  const root = ribbonParent(layout, id)?.id ?? id;
+  return (
+    layout.itemOverrides?.[root]?.placement ??
+    (layout.bottom.includes(root)
+      ? 'bottom'
+      : (items.find((i) => i.id === root)?.contribution?.defaultPlacement ?? 'top'))
+  );
+};
 export const ribbonVisible = (layout: RibbonLayout, id: string) =>
   !layout.hidden.includes(id) && !layout.hidden.includes(ribbonParent(layout, id)?.id ?? id);
 export function ribbonPresentation(layout: RibbonLayout, item: RibbonItem) {
@@ -42,7 +53,7 @@ export function ribbonPresentation(layout: RibbonLayout, item: RibbonItem) {
         : item.command?.title || override?.title || item.title,
     iconOnly: item.group
       ? !!item.group.iconOnly || !item.group.title
-      : (item.command?.iconOnly ?? override?.iconOnly ?? item.id === 'profile'),
+      : (item.command?.iconOnly ?? override?.iconOnly ?? item.contribution?.iconOnly ?? false),
   };
 }
 export const ribbonRoots = (layout: RibbonLayout, items: RibbonItem[]) =>
@@ -88,6 +99,7 @@ export function editRibbon(
       'beforeId',
       'iconOnly',
       'color',
+      'image',
       'commandId',
     ])
   )
@@ -116,6 +128,14 @@ export function editRibbon(
     return v as RibbonPlacement;
   };
   const setPlacement = (id: string, p: RibbonPlacement) => {
+    if (items.find((item) => item.id === id)?.contribution) {
+      next.itemOverrides = {
+        ...next.itemOverrides,
+        [id]: { ...next.itemOverrides?.[id], placement: p },
+      };
+      next.bottom = next.bottom.filter((x) => x !== id);
+      return;
+    }
     next.bottom = [...next.bottom.filter((x) => x !== id), ...(p === 'bottom' ? [id] : [])];
   };
   const remove = (id: string) => {
@@ -140,7 +160,7 @@ export function editRibbon(
     if (c.placement !== undefined) {
       const p = placement(c.placement);
       if (ribbonParent(next, op.id)) invalid();
-      if (ribbonPlacement(next, op.id) !== p) {
+      if (ribbonPlacement(next, op.id, items) !== p) {
         next.order = [...roots().filter((x) => x !== op.id), op.id];
         setPlacement(op.id, p);
       }
@@ -148,7 +168,7 @@ export function editRibbon(
   } else if (op.kind === 'updateItem') {
     if (
       !exact(op, ['kind', 'id', 'changes']) ||
-      !exact(op.changes, ['title', 'iconOnly']) ||
+      !exact(op.changes, ['title', 'iconOnly', 'image']) ||
       !Object.keys(op.changes).length ||
       validGroupId(op.id) ||
       validRibbonButtonId(op.id) ||
@@ -190,7 +210,7 @@ export function editRibbon(
     const ids = g
       ? g.children
       : ribbonRoots(next, items)
-          .filter((i) => ribbonPlacement(next, i.id) === p)
+          .filter((i) => ribbonPlacement(next, i.id, items) === p)
           .map((i) => i.id);
     if (ids.length !== op.ids.length || op.ids.some((id: string) => !ids.includes(id))) invalid();
     if (ids.some((id, index) => op.ids[index] !== id)) {
@@ -230,7 +250,17 @@ export function editRibbon(
     next.separatorTitles = { ...next.separatorTitles, [op.id]: op.changes.title };
   } else if (op.kind === 'addGroup') {
     if (
-      !exact(op, ['kind', 'id', 'title', 'icon', 'expansion', 'placement', 'iconOnly', 'color']) ||
+      !exact(op, [
+        'kind',
+        'id',
+        'title',
+        'icon',
+        'expansion',
+        'placement',
+        'iconOnly',
+        'color',
+        'image',
+      ]) ||
       !validGroupId(op.id) ||
       next.groups.some((g) => g.id === op.id)
     )
@@ -245,19 +275,20 @@ export function editRibbon(
       children: [],
       ...(op.iconOnly !== undefined ? { iconOnly: op.iconOnly } : {}),
       ...(op.color !== undefined ? { color: op.color } : {}),
+      ...(op.image !== undefined ? { image: op.image } : {}),
     });
     setPlacement(op.id, p);
   } else if (op.kind === 'updateGroup') {
     if (
       !exact(op, ['kind', 'id', 'changes']) ||
-      !exact(op.changes, ['title', 'icon', 'expansion', 'iconOnly', 'color']) ||
+      !exact(op.changes, ['title', 'icon', 'expansion', 'iconOnly', 'color', 'image']) ||
       !Object.keys(op.changes).length
     )
       invalid();
     Object.assign(group(op.id), op.changes);
   } else if (op.kind === 'addButton') {
     if (
-      !exact(op, ['kind', 'id', 'title', 'icon', 'commandId', 'iconOnly', 'placement']) ||
+      !exact(op, ['kind', 'id', 'title', 'icon', 'commandId', 'iconOnly', 'placement', 'image']) ||
       !validRibbonButtonId(op.id) ||
       (next.buttons ?? []).some((b) => b.id === op.id)
     )
@@ -270,6 +301,7 @@ export function editRibbon(
         title: op.title,
         icon: op.icon,
         commandId: op.commandId,
+        ...(op.image !== undefined ? { image: op.image } : {}),
         ...(op.iconOnly !== undefined ? { iconOnly: op.iconOnly } : {}),
       },
     ];
@@ -278,7 +310,7 @@ export function editRibbon(
   } else if (op.kind === 'updateButton') {
     if (
       !exact(op, ['kind', 'id', 'changes']) ||
-      !exact(op.changes, ['title', 'icon', 'commandId', 'iconOnly']) ||
+      !exact(op.changes, ['title', 'icon', 'commandId', 'iconOnly', 'image']) ||
       !Object.keys(op.changes).length
     )
       invalid();
@@ -304,20 +336,23 @@ export function editRibbon(
     known(op.id, true);
     const destination = op.parentId === null ? undefined : group(op.parentId);
     if (destination && (validGroupId(op.id) || op.placement !== undefined)) invalid();
-    const p = destination ? ribbonPlacement(next, destination.id) : placement(op.placement);
+    const p = destination ? ribbonPlacement(next, destination.id, items) : placement(op.placement);
     const before = destination ? destination.children : roots();
     if (
       op.beforeId !== null &&
-      (!before.includes(op.beforeId) || (!destination && ribbonPlacement(next, op.beforeId) !== p))
+      (!before.includes(op.beforeId) ||
+        (!destination && ribbonPlacement(next, op.beforeId, items) !== p))
     )
       invalid();
     const sameParent = (ribbonParent(next, op.id)?.id ?? null) === op.parentId;
-    const siblings = destination ? before : before.filter((id) => ribbonPlacement(next, id) === p);
+    const siblings = destination
+      ? before
+      : before.filter((id) => ribbonPlacement(next, id, items) === p);
     const desired = siblings.filter((id) => id !== op.id);
     desired.splice(op.beforeId === null ? desired.length : desired.indexOf(op.beforeId), 0, op.id);
     if (
       sameParent &&
-      ribbonPlacement(next, op.id) === p &&
+      ribbonPlacement(next, op.id, items) === p &&
       JSON.stringify(desired) === JSON.stringify(siblings)
     )
       return next;
@@ -328,7 +363,7 @@ export function editRibbon(
   } else if (op.kind === 'ungroup') {
     if (!exact(op, ['kind', 'id'])) invalid();
     const g = group(op.id),
-      p = ribbonPlacement(next, g.id),
+      p = ribbonPlacement(next, g.id, items),
       hidden = next.hidden.includes(g.id);
     next.order = roots().flatMap((id) => (id === g.id ? g.children : [id]));
     next.groups = next.groups.filter((v) => v.id !== g.id);

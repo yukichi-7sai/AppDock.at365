@@ -103,7 +103,6 @@ export interface SettingsPageAuxiliary {
     saved: { id: string; name: string; accountId: string }[];
   };
   permissions?: HostSnapshot['appletApi'];
-  avatarUrl?: string | null;
 }
 export type SettingsPageOperation =
   | {

@@ -16,7 +16,6 @@ import { TraySettings } from './TraySettings';
 import { TtsSettingsForm } from './TtsSettings';
 import { AiSettingsForm } from './AiSettings';
 import { CustomCommandsSettings } from './CustomCommandsSettings';
-import { ProfileEditor } from './ProfileEditor';
 import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { CodexSettings } from './CodexSettings';
@@ -24,10 +23,10 @@ import { NotificationSettings } from './NotificationSettings';
 import { AppletSettingsForm } from '../settings-ui/AppletSettingsForm';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsHint } from '../settings-ui/SettingsHint';
+import { ImageLibrarySettings } from './ImageLibrarySettings';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
-  setAvatar(bytes: Uint8Array | null, name?: string): void;
 }
 export function SettingsForm({
   model,
@@ -52,10 +51,7 @@ export function SettingsForm({
   const launch = aux.launch!,
     runtime = aux.runtime!,
     version = aux.version ?? '';
-  const avatarUrl = aux.avatarUrl ?? null,
-    avatarPreview = undefined;
-  const setAvatar = editor.setAvatar,
-    setCategory = select;
+  const setCategory = select;
   const run = async (work: () => Promise<unknown>) => {
     try {
       await work();
@@ -125,6 +121,7 @@ export function SettingsForm({
         onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
       />
     );
+  if (category === 'image-library') return <ImageLibrarySettings />;
   if (category === 'notifications')
     return (
       <NotificationSettings
@@ -157,7 +154,7 @@ export function SettingsForm({
   return (
     <div className="settings-layout">
       <div
-        className={`settings-form${['general', 'appearance', 'profile', 'gestures'].includes(category) ? ' settings-sections' : ''}`}
+        className={`settings-form${['general', 'appearance', 'gestures'].includes(category) ? ' settings-sections' : ''}`}
       >
         {category === 'gestures' && (
           <GesturesEditor
@@ -176,22 +173,6 @@ export function SettingsForm({
             applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
             statuses={globalHotKeys}
           />
-        )}
-        {category === 'profile' && (
-          <SettingsSection
-            title="名前と画像"
-            description="ワークスペースに表示するプロフィールを設定します。"
-          >
-            <ProfileEditor
-              name={settings.profile.name}
-              avatarUrl={avatarPreview === undefined ? avatarUrl : avatarPreview}
-              busy={busy}
-              onName={(name) => edit({ ...settings, profile: { ...settings.profile, name } })}
-              onAvatar={(bytes, preview, name) => {
-                setAvatar(bytes, name);
-              }}
-            />
-          </SettingsSection>
         )}
         {category === 'appearance' && (
           <>

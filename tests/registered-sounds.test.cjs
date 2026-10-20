@@ -4,7 +4,6 @@ const fs = require('node:fs/promises'),
   path = require('node:path'),
   os = require('node:os');
 const { RegisteredSounds } = require('../out/main/main/core/registered-sounds');
-const { avatarReference } = require('../out/main/shared/asset-names');
 function wav(value = 0) {
   const bytes = Buffer.alloc(44);
   bytes.write('RIFF');
@@ -44,10 +43,4 @@ test('case-insensitive duplicate names and Windows reserved names cannot create 
   await assert.rejects(assets.add(source, 'BELL.wav'), /同名の別ファイル/);
   await assert.rejects(assets.add(source, 'CON.wav'));
   await assert.rejects(assets.add(source, 'nested/bell.wav'));
-  assert.equal(avatarReference('data/assets/appdock/avatars/ユキ.png'), true);
-  assert.equal(avatarReference('data/assets/profile/ユキ.png'), true);
-  assert.equal(avatarReference('.appdock/assets/profile/ユキ.png'), true);
-  assert.equal(avatarReference('.appdock/assets/profile/../ユキ.png'), false);
-  assert.equal(avatarReference('data/assets/profile/../ユキ.png'), false);
-  assert.equal(avatarReference('data/assets/profile/CON.png'), false);
 });

@@ -7,7 +7,7 @@ const {
   rankCommands,
   movePinnedCommand,
 } = require('../out/main/shared/commands.js');
-test('legacy settings gain Ctrl+P, profile and pins without losing existing data', () => {
+test('legacy settings gain Ctrl+P and pins without creating a host profile', () => {
   const original = {
     schemaVersion: 1,
     host: { theme: 'light', closeToTray: false, notifications: false, startMinimized: true },
@@ -30,7 +30,7 @@ test('legacy settings gain Ctrl+P, profile and pins without losing existing data
   });
   assert.equal(result.shortcuts['appdock.commands.search'][0], 'Ctrl+P');
   assert.deepEqual(result.pinnedCommands, []);
-  assert.equal(result.profile.avatar, null);
+  assert.equal('profile' in result, false);
   assert.equal(original.shortcuts, undefined);
 });
 test('sound playback defaults on for missing settings and preserves explicit off', () => {
@@ -122,13 +122,8 @@ test('pins rank commands without mutating source and reorder around inactive or 
   settings.pinnedCommands = ['a', 'a'];
   assert.throws(() => parseSettings(settings), /重複/);
 });
-test('profile limits prevent arbitrary filenames and preserve normalized names', () => {
+test('legacy profile data is preserved opaquely and never normalized as active host settings', () => {
   const settings = createDefaultSettings();
-  settings.profile = { name: '  ユキちゃん  ', avatar: 'avatar.png' };
-  assert.equal(parseSettings(settings).profile.name, 'ユキちゃん');
-  settings.profile.avatar = '../other.png';
-  assert.throws(() => parseSettings(settings), /プロフィール/);
-  settings.profile.avatar = null;
-  settings.profile.name = '';
-  assert.throws(() => parseSettings(settings), /プロフィール/);
+  settings.profile = { name: '  Legacy  ', avatar: '../old-opaque-value.png', extra: true };
+  assert.deepEqual(parseSettings(settings).profile, settings.profile);
 });

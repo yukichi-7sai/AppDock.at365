@@ -29,6 +29,17 @@ const idSchema = {
   description: 'ribbon.getで取得したリボンID。コマンドIDではありません。',
 };
 const placementSchema = { type: 'string', enum: ['top', 'bottom'] };
+const registeredImageSchema = {
+  anyOf: [
+    { type: 'null' },
+    {
+      type: 'object',
+      properties: { file: { type: 'string', minLength: 1, maxLength: 180 } },
+      required: ['file'],
+      additionalProperties: false,
+    },
+  ],
+};
 const operation = (kind: string, properties: Record<string, unknown>, optional: string[] = []) => ({
   type: 'object',
   properties: { kind: { const: kind }, ...properties },
@@ -137,9 +148,10 @@ export class RibbonCommands {
                       icon: { enum: ribbonGroupIcons },
                       commandId: { type: 'string', minLength: 1, maxLength: 180 },
                       iconOnly: { type: 'boolean' },
+                      image: registeredImageSchema,
                       placement: placementSchema,
                     },
-                    ['iconOnly'],
+                    ['iconOnly', 'image'],
                   ),
                   operation('updateButton', {
                     id: idSchema,
@@ -152,6 +164,7 @@ export class RibbonCommands {
                         icon: { enum: ribbonGroupIcons },
                         commandId: { type: 'string', minLength: 1, maxLength: 180 },
                         iconOnly: { type: 'boolean' },
+                        image: registeredImageSchema,
                       },
                     },
                   }),
@@ -168,6 +181,7 @@ export class RibbonCommands {
                       properties: {
                         title: { type: 'string', maxLength: 80 },
                         iconOnly: { type: 'boolean' },
+                        image: registeredImageSchema,
                       },
                     },
                   }),
@@ -180,11 +194,12 @@ export class RibbonCommands {
                       expansion: { enum: ['persistent', 'temporary'] },
                       placement: placementSchema,
                       iconOnly: { type: 'boolean' },
+                      image: registeredImageSchema,
                       color: {
                         anyOf: [{ type: 'string', pattern: '^#[a-fA-F0-9]{6}$' }, { type: 'null' }],
                       },
                     },
-                    ['iconOnly', 'color'],
+                    ['iconOnly', 'color', 'image'],
                   ),
                   operation('updateGroup', {
                     id: idSchema,
@@ -197,6 +212,7 @@ export class RibbonCommands {
                         icon: { enum: ribbonGroupIcons },
                         expansion: { enum: ['persistent', 'temporary'] },
                         iconOnly: { type: 'boolean' },
+                        image: registeredImageSchema,
                         color: {
                           anyOf: [
                             { type: 'string', pattern: '^#[a-fA-F0-9]{6}$' },
@@ -262,7 +278,7 @@ export class RibbonCommands {
         appletId: item.extensionId ?? null,
         pageId: item.pageId ?? null,
         parentId: ribbonParent(layout, item.id)?.id ?? null,
-        placement: ribbonPlacement(layout, item.id),
+        placement: ribbonPlacement(layout, item.id, this.catalog(layout)),
         visible,
         enabled,
         displayed: ribbonVisible(layout, item.id) && enabled,

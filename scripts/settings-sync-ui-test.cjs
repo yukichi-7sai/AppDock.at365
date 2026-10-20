@@ -48,6 +48,7 @@ function profile(name) {
       : path.join(base, 'local-state');
   fs.mkdirSync(base, { recursive: true });
   const value = require('../out/main/shared/settings-schema').createDefaultSettings();
+  require('./profile-settings-fixture.cjs').installProfileSettings(base, value);
   value.host.hardwareAcceleration = false;
   value.host.notifications = false;
   value.keybindings = [];
@@ -191,14 +192,20 @@ async function gmail(s) {
   await until(async () => !(await b.snapshot()).dark, 'theme received');
   checks.push('rename-delivered settings apply while running');
   await b.dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-  await b.dock.getByRole('button', { name: 'プロフィール設定を開く', exact: true }).click();
+  await b.dock.getByRole('button', { name: 'プロフィール', exact: true }).click();
   await b.dock.getByLabel('ユーザー名').fill('即時保存');
+  await b.dock.getByLabel('ユーザー名').press('Enter');
   await settleSettings(b.dock);
-  assert.equal((await b.snapshot()).settings.value.profile.name, '即時保存');
-  await update(a, (v) => (v.profile.name = '相手の名前'));
+  assert.equal(
+    (await b.snapshot()).settings.value.extensions['fixture.profile'].settings.name,
+    '即時保存',
+  );
+  await update(a, (v) => (v.extensions['fixture.profile'].settings.name = '相手の名前'));
   deliverShared(a, b);
   await until(
-    async () => (await b.snapshot()).settings.value.profile.name === '相手の名前',
+    async () =>
+      (await b.snapshot()).settings.value.extensions['fixture.profile'].settings.name ===
+      '相手の名前',
     'remote name',
   );
   await until(
@@ -211,7 +218,10 @@ async function gmail(s) {
   const broken = '{broken';
   fs.writeFileSync(path.join(pb.base, 'settings.json'), broken);
   await until(async () => (await b.snapshot()).settings.recovered, 'invalid receipt');
-  assert.equal((await b.snapshot()).settings.value.profile.name, '相手の名前');
+  assert.equal(
+    (await b.snapshot()).settings.value.extensions['fixture.profile'].settings.name,
+    '相手の名前',
+  );
   await stop(b);
   b = await start(pb);
   assert.equal((await b.snapshot()).settings.recovered, true);
@@ -267,30 +277,44 @@ async function gmail(s) {
     'select other PC',
   );
   checks.push('registered filenames are listed live and selected independently per Gmail account');
-  const avatar = Array.from(fs.readFileSync(path.join(root, 'assets', 'icon.png')));
-  const current = (await a.snapshot()).settings;
-  await a.dock.evaluate(
-    ({ current, avatar }) =>
-      window.dock.saveSettings(
-        current.value,
-        current.revision,
-        new Uint8Array(avatar),
-        'fixture.png',
-      ),
-    { current, avatar },
-  );
+  const imageFile = path.join(pa.base, 'data/assets/images/fixture.png');
+  fs.mkdirSync(path.dirname(imageFile), { recursive: true });
+  fs.copyFileSync(path.join(root, 'assets/icon.png'), imageFile);
+  await update(a, (v) => {
+    v.extensions['fixture.profile'].settings.avatar = { file: 'fixture.png' };
+    v.imageLibrary = {
+      groups: [{ id: 'photos', name: '写真', images: [{ file: 'fixture.png' }] }],
+    };
+  });
   deliverShared(a, b);
   await until(
-    async () => (await b.snapshot()).settings.value.profile.avatar.endsWith('/fixture.png'),
-    'avatar ref',
+    async () =>
+      (await b.snapshot()).settings.value.extensions['fixture.profile'].settings.avatar?.file ===
+      'fixture.png',
+    'image ref',
   );
-  const before = (await b.snapshot()).avatarUrl;
-  assert.ok(before);
-  const file = path.join(pa.base, 'data', 'assets', 'profile', 'fixture.png');
-  fs.appendFileSync(file, Buffer.from('fixture image receipt'));
-  deliverFile(file, path.join(pb.base, 'data', 'assets', 'profile', 'fixture.png'));
-  await until(async () => (await b.snapshot()).avatarUrl !== before, 'image-only update');
-  checks.push('original avatar filename is retained and image-only delivery invalidates display');
+  const imageSnapshot = () => b.dock.evaluate(() => window.dock.imageLibrary.snapshot());
+  await until(
+    async () =>
+      (await imageSnapshot()).images.some((i) => i.ref.file === 'fixture.png' && i.available),
+    'image receipt',
+  );
+  const before = (await imageSnapshot()).images.find((i) => i.ref.file === 'fixture.png').thumbnail;
+  // A second valid PNG changes pixels without changing the logical reference.
+  const pixel = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=',
+    'base64',
+  );
+  fs.writeFileSync(imageFile, pixel);
+  deliverFile(imageFile, path.join(pb.base, 'data/assets/images/fixture.png'));
+  await until(
+    async () =>
+      (await imageSnapshot()).images.find((i) => i.ref.file === 'fixture.png')?.thumbnail !==
+      before,
+    'image-only update',
+  );
+  assert.equal((await imageSnapshot()).groups[0].images[0].file, 'fixture.png');
+  checks.push('common image refs/groups synchronize and image-only receipt refreshes the preview');
   await uiA.locator('.sound-file').scrollIntoViewIfNeeded();
   await uiA.screenshot({ path: path.join(output, 'gmail-light.png') });
   await update(a, (v) => (v.host.theme = 'dark'));

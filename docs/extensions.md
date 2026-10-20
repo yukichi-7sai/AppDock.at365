@@ -1,5 +1,7 @@
 # Applet API v1
 
+AppDock 0.69.0から`registered-image`設定、`list.imageKey`、`registered-images` API、`ribbon-items`宣言を提供します。.NET SDKは0.27.0。設定・原画像・生成コピーの寿命とNode/.NETの例は[共通画像とリボン](registered-images.md)を参照してください。
+
 0.66.1から.NET/nativeも`IPageActionHandler`でHTML/JavaScriptからのページ操作に対応します。`IPageService`の動的登録・変更通知・画像登録と解放、`Ui.OpenDetailsAsync`の契約は[Appletページ](applet-pages.md)と[.NETページ連携](dotnet-applet-pages-design.md)を参照してください。Nodeも同じ通知・画像・説明表示APIを使えます。
 
 保存型のコマンド種類は0.60.0から`custom-commands` capabilityとmanifestの`customCommandTypes`で宣言し、Nodeの`context.customCommands.register(typeId, handler)`、.NET/nativeの`context.CustomCommands.RegisterAsync`へ登録します。configは保存値の複製、実行には取消と元callerを保持します。[カスタムコマンド契約](custom-commands-design.md)を参照してください。既存のcommands.register/replaceやWindowsToolsのキー送信定義は移行しません。

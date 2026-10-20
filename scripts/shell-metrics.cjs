@@ -34,6 +34,7 @@ function metrics(pid) {
     const exe = path.join(profile, 'AppDock.at365.exe');
     fs.copyFileSync(path.resolve(input), exe);
     const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+    settings.profile = { name: 'Legacy fixture', avatar: null };
     settings.profile.name = 'Test profile';
     settings.host.hardwareAcceleration = false;
     settings.host.closeToTray = false;

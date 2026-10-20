@@ -243,13 +243,20 @@ test('external read and dry-run redact nonpublic targets and never execute their
   assert(!JSON.stringify(read).includes('private.secret'));
   const dry = api.execute(
     {
-      operations: [{ kind: 'updateButton', id: addButton.id, changes: { title: 'Updated' } }],
+      operations: [
+        {
+          kind: 'updateButton',
+          id: addButton.id,
+          changes: { title: 'Updated', image: { file: 'original.png' } },
+        },
+      ],
       expectedRevision: read.revision,
       dryRun: true,
     },
     [],
   );
   assert(!JSON.stringify(dry).includes('fixture.run'));
+  assert.deepEqual(dry.layout.buttons[0].image, { file: 'original.png' });
   assert.equal(fs.readFileSync(store.file, 'utf8'), before);
   assert.equal(
     api.get().layout.buttons[0].commandId,

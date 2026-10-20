@@ -19,6 +19,7 @@ public interface IExtensionContext
     ITrayService Tray { get; }
     IRibbonService Ribbon => throw new NotSupportedException("Ribbon badges require AppDock 0.51.0 or later.");
     ISettingsService Settings { get; }
+    IRegisteredImageService RegisteredImages => throw new NotSupportedException("Registered images require AppDock 0.69.0 or later.");
     INotificationService Notifications { get; }
     IUiService Ui { get; }
     IPageService Pages => throw new NotSupportedException("Applet pages require AppDock 0.18.0 or later.");

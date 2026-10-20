@@ -182,12 +182,8 @@ export class SettingsViewClient {
           }),
         );
       },
-      setAvatar: this.setAvatar,
     };
   }
-  setAvatar = (bytes: Uint8Array | null, name?: string) => {
-    void this.act({ kind: 'edit', action: { type: 'avatar', bytes, name } }).catch(() => {});
-  };
   controls(): SettingsControlsApi {
     const invoke = this.invoke;
     return {

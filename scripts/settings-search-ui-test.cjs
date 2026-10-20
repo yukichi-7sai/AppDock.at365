@@ -15,6 +15,7 @@ settings.host.notifications = false;
 settings.globalShortcutCommands = [];
 settings.extensions['missing.applet'] = { enabled: false, settings: { private: 'never-in-shell' } };
 settings.host.closeToTray = false;
+require('./profile-settings-fixture.cjs').installProfileSettings(profile, settings);
 require('./settings-web-fixture.cjs').installWebSettings(profile, settings);
 settings.extensions['fixture.settings'] = { enabled: false, settings: {} };
 settings.appletOrder = ['fixture.settings', 'fixture.stalled-settings'];
@@ -226,8 +227,9 @@ async function until(fn, label) {
     checks.push(
       'all host catalog items resolve to stable rendered anchors without executing actions',
     );
-    await op(shell, { kind: 'select', pageId: 'profile' });
+    await op(shell, { kind: 'select', pageId: 'applet:fixture.profile' });
     await shell.getByLabel('ユーザー名', { exact: true }).fill('Unpublished profile');
+    await shell.getByLabel('ユーザー名', { exact: true }).press('Enter');
     await op(shell, { kind: 'select', pageId: 'applet:fixture.settings' });
     await shell.getByLabel('Fixture text', { exact: true }).fill('private-current-text');
     const before = (await modelOf(shell)).content.page.id;
@@ -267,6 +269,7 @@ async function until(fn, label) {
       }),
     );
     await shell.getByLabel('Fixture field 47', { exact: true }).fill('Last field saved');
+    await shell.getByLabel('Fixture field 47', { exact: true }).press('Enter');
     await until(
       async () => (await shell.locator('.setting-highlight').count()) === 0,
       'highlight expires',
@@ -297,6 +300,7 @@ async function until(fn, label) {
     );
     assert.equal(await shell.getByRole('combobox', { name: '設定を検索' }).count(), 0);
     await shell.getByLabel('Fixture text', { exact: true }).fill('Edited in detail');
+    await shell.getByLabel('Fixture text', { exact: true }).press('Enter');
     await host.evaluate(() => window.dock.navigate('settings'));
     shell = await settingsPage();
     assert.equal(await search().inputValue(), 'Fixture field 47');
@@ -312,7 +316,8 @@ async function until(fn, label) {
             .snapshot()
             .then(
               (s) =>
-                s.settings.value.profile.name === 'Unpublished profile' &&
+                s.settings.value.extensions['fixture.profile'].settings.name ===
+                  'Unpublished profile' &&
                 s.settings.value.extensions['fixture.settings'].settings['text.value'] ===
                   'Edited in detail',
             ),
@@ -376,7 +381,7 @@ async function until(fn, label) {
       () =>
         shell.evaluate(
           (id) => document.activeElement?.getAttribute('data-setting-item') === id,
-          itemId('profile', 'name'),
+          itemId('applet:fixture.profile', 'setting:name'),
         ),
       'last move',
     );

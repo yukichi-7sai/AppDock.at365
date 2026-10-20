@@ -224,3 +224,7 @@ AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出し�
 既存の確認例は[AI設定UI試験](../scripts/ai-ui-test.cjs)、[URL入力試験](../scripts/settings-url-ui-test.cjs)、[設定操作の回帰](../tests/ai-settings.test.cjs)を参照する。製品の変更・発行がある場合の検証範囲は[開発手順](development-workflow.md)に従う。
 
 背景と入力の確認例は[モーダルGUI試験](../scripts/host-modal-ui-test.cjs)、Shell間の実フォーカス・ドラッグ領域の確認例は[バーGUI試験](../scripts/shell-bars-ui-test.cjs)を参照する。両試験は現在のダイアログ・パレット・既存操作の検証例であり、将来追加するShell起点の編集ダイアログの接続を実装・検証済みとするものではない。WebContentsViewを含む見た目はWindows合成画像と実入力で確認する。
+
+## 共通画像を含む編集
+
+object-listのregistered-imageフィールドは共通RegisteredImageInputを使い、list.imageKeyで一覧プレビューを宣言する。画像選択は親ダイアログの一時入力へ返し、親のOKで参照を保存する。画像登録だけは独立保存し、親の取消で消さない。入れ子のSettingsModalは最後のモーダルを閉じるまで入力抑止を解除しない。ローカルAppletの独自HTMLはホストのregisteredImages.pickを使い、Viewの背景・フォーカスを自己実装しない。[共通画像](registered-images.md)を参照。

@@ -90,7 +90,7 @@ test('settings retain supported preferences and Applet data while dropping obsol
   value.pinnedCommands = ['test.applet.run'];
   value.trayCommands = ['test.applet.run'];
   value.globalShortcutCommands = ['test.applet.run'];
-  value.profile.name = 'Test profile';
+  value.profile = { ...value.profile, name: 'Test profile' };
   fs.writeFileSync(file, JSON.stringify({ ...value, widgets: { obsolete: 'unused' } }));
   const store = new SettingsStore(file);
   const loaded = store.load();
@@ -147,7 +147,7 @@ test('failed JSON replacement rolls back the avatar and preserves saved settings
   assert.equal(fs.readFileSync(file, 'utf8'), before);
   assert.equal(fs.readFileSync(avatar, 'utf8'), 'previous image');
   assert.equal(store.revision, revision);
-  assert.equal(store.value.profile.name, 'ユキ');
+  assert.equal(store.value.profile, undefined);
   assert.deepEqual(fs.readdirSync(dir).sort(), ['avatar.png', 'settings.json']);
 });
 
@@ -159,8 +159,8 @@ test('stale or invalid settings cannot commit a staged avatar', (t) => {
   const asset = { commit: () => commits++, rollback: () => commits-- };
   assert.throws(() => store.save(defaults(), original.revision, asset), /別の場所/);
   const invalid = defaults();
-  invalid.profile.name = '';
-  assert.throws(() => store.save(invalid, store.revision, asset), /プロフィール/);
+  invalid.host.theme = 'invalid-theme';
+  assert.throws(() => store.save(invalid, store.revision, asset), /theme/);
   assert.equal(commits, 0);
 });
 test('watcher reloads external changes and retains last valid state on invalid edits', async (t) => {

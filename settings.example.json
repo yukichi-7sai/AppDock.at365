@@ -26,9 +26,8 @@
   "globalShortcutCommands": [],
   "trayCommands": [],
   "pinnedCommands": [],
-  "profile": {
-    "name": "User",
-    "avatar": null
+  "imageLibrary": {
+    "groups": []
   },
   "extensions": {},
   "webApplets": {

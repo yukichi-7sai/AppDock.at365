@@ -109,12 +109,12 @@ test('hint visibility defaults on, preserves false, validates input and stays in
 
 test('valid edits save immediately; invalid JSON/numbers and save failures never enter host state', async () => {
   const f = fixture();
-  await f.act({ type: 'select-page', pageId: 'profile' });
+  await f.act({ type: 'select-page', pageId: 'image-library' });
   await f.act({ type: 'mode', value: 'json' });
   await assert.rejects(
     f.act({
       type: 'partial-text',
-      pageId: 'profile',
+      pageId: 'image-library',
       before: f.session.projection(),
       value: '{broken',
     }),
@@ -125,21 +125,24 @@ test('valid edits save immediately; invalid JSON/numbers and save failures never
   assert.equal('dirty' in f.session.snapshot(), false);
   await f.act({
     type: 'partial-text',
-    pageId: 'profile',
+    pageId: 'image-library',
     before: f.session.projection(),
-    value: JSON.stringify({ profile: { name: 'Saved', avatar: null } }),
+    value: JSON.stringify({ imageLibrary: { groups: [{ id: 'one', name: 'Saved', images: [] }] } }),
   });
-  assert.equal(f.saved.value.profile.name, 'Saved');
+  assert.equal(f.saved.value.imageLibrary.groups[0].name, 'Saved');
   f.fail = true;
   const before = f.session.value,
-    next = { ...before, profile: { ...before.profile, name: 'Rejected' } };
+    next = { ...before, imageLibrary: { groups: [{ id: 'one', name: 'Rejected', images: [] }] } };
   await assert.rejects(f.act({ type: 'values', before, value: next }), /disk failure/);
-  assert.equal(f.saved.value.profile.name, 'Saved');
+  assert.equal(f.saved.value.imageLibrary.groups[0].name, 'Saved');
   assert.equal(f.session.snapshot().pending, false);
   f.fail = false;
   await f.act({ type: 'values', before, value: next });
-  assert.equal(f.saved.value.profile.name, 'Rejected');
-  await f.act({ type: 'avatar', bytes: new Uint8Array([137, 80]), name: 'fixture.png' });
+  assert.equal(f.saved.value.imageLibrary.groups[0].name, 'Rejected');
+  await assert.rejects(
+    f.act({ type: 'avatar', bytes: new Uint8Array([137, 80]), name: 'fixture.png' }),
+    /不正/,
+  );
   assert.equal('avatarChanged' in f.session.snapshot(), false);
   await f.act({ type: 'select-page', pageId: 'applet:test.a.b' });
   const raw = f.session.projection();
@@ -227,7 +230,7 @@ test('all JSON pages round-trip only selected ranges; unknown owners, leaves and
   };
   value.extensions['missing.owner'] = { enabled: false, settings: { secret: 'keep' } };
   value.host.unknown = 'keep';
-  value.profile.extra = 'keep';
+  value.profile = { extra: 'keep' };
   const catalog = settingsCatalog(applets, value);
   for (const page of catalog.filter((p) => p.json)) {
     const projected = settingsProjection(value, page, applets);

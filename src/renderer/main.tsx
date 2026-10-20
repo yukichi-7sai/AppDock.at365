@@ -1,4 +1,5 @@
 import { SettingsControlsProvider } from './settings-ui/api';
+import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/RegisteredImagePicker';
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { ShellPageSlot } from './ShellPageSlot';
 import { ShellBarSlot } from './ShellBarSlot';
@@ -96,8 +97,7 @@ function App() {
     }
     setLocalPage(nav.route as Page);
     if (nav.appletId) setSelected(nav.appletId);
-    if (nav.appletDetail === 'description') setDetailView('description');
-    if (nav.section === 'profile') setProfileRequest((v) => v + 1);
+    if (nav.appletDetail) setDetailView(nav.appletDetail);
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
     if (nav.section === 'general') setGeneralRequest((v) => v + 1);
   }, [snapshot?.navigation]);
@@ -106,7 +106,6 @@ function App() {
   const [selected, setSelected] = useRestartView<string>('selected', '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [profileRequest, setProfileRequest] = useState(0);
   const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const [generalRequest, setGeneralRequest] = useState(0);
@@ -164,9 +163,6 @@ function App() {
       localStorage.setItem(key, JSON.stringify(editor.pageId));
     } catch {}
   }, [snapshot?.startupReady, editor.sessionId, editor.pageId]);
-  useEffect(() => {
-    if (profileRequest) editor.selectPage('profile');
-  }, [profileRequest]);
   useEffect(() => {
     if (updatesRequest) editor.selectPage('about');
   }, [updatesRequest]);
@@ -884,6 +880,9 @@ function ExtensionDetail({
 }
 createRoot(document.getElementById('root')!).render(
   <SettingsControlsProvider api={window.dock}>
-    <App />
+    <RegisteredImagesProvider api={window.dock.imageLibrary}>
+      <App />
+      <ImagePickerHost />
+    </RegisteredImagesProvider>
   </SettingsControlsProvider>,
 );

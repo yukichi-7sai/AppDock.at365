@@ -17,9 +17,60 @@ let selected: string | null = null;
 let bounds: Rectangle | null = null;
 const surfaces = new Map<string, AppletSurface>();
 const allSurfaces = new Set<AppletSurface>();
+export async function coverAppletPagesForImagePicker() {
+  const visible = [...allSurfaces].filter((surface) => surface.visible);
+  const frozen: { image: string; bounds: Rectangle }[] = [];
+  const focused = visible.find((surface) => surface.ui.webContents.isFocused());
+  const window = host?.window();
+  const restore = () => {
+    if (window && !window.isDestroyed()) window.webContents.send('dock:imagePickerBackdrop', []);
+    for (const surface of visible) {
+      surface.covered = false;
+      if (surface.ui.webContents.isDestroyed()) continue;
+      if (surface.display === 'window') surface.window?.setEnabled(true);
+      surface.layout();
+    }
+    if (focused?.visible && !focused.ui.webContents.isDestroyed()) {
+      focused.window?.focus();
+      focused.ui.webContents.focus();
+    }
+  };
+  try {
+    for (const surface of visible) {
+      if (surface.display === 'page') {
+        const image = await surface.ui.webContents.capturePage(undefined, {
+          stayHidden: true,
+          stayAwake: true,
+        });
+        const zoom = surface.window?.webContents.getZoomFactor() ?? 1;
+        const area = surface.contentView.getBounds();
+        frozen.push({
+          image: image.toDataURL(),
+          bounds: {
+            x: area.x / zoom,
+            y: area.y / zoom,
+            width: area.width / zoom,
+            height: area.height / zoom,
+          },
+        });
+      }
+      surface.covered = true;
+      surface.contentView.setVisible(false);
+      if (surface.display === 'window') surface.window?.setEnabled(false);
+    }
+    if (window && !window.isDestroyed())
+      window.webContents.send('dock:imagePickerBackdrop', frozen);
+    return restore;
+  } catch (error) {
+    restore();
+    throw error;
+  }
+}
 const imageSurfaces = new Map<string, AppletSurface>();
 const imageSessions = new WeakSet<Electron.Session>();
-export function localPageImages(key: string) { return imageSurfaces.get(key)?.images; }
+export function localPageImages(key: string) {
+  return imageSurfaces.get(key)?.images;
+}
 export function notifyAppletPage(key: string) {
   const surface = surfaces.get(key);
   if (!surface || surface.ui.webContents.isDestroyed()) return false;
@@ -105,6 +156,7 @@ export interface SurfaceOptions {
 }
 /** Owns the UI, independently of the window in which it is currently presented. */
 export class AppletSurface {
+  covered = false;
   readonly images?: PageImageRegistry;
   private changePending = false;
   readonly ui: WebContentsView;
@@ -136,16 +188,24 @@ export class AppletSurface {
     });
     this.contentView.addChildView(this.ui);
     if (options.pageImages && options.key && options.appletId) {
-      this.images = new PageImageRegistry(options.pageImages.dataRoot, options.appletId,
-        () => !this.closed && imageSurfaces.get(options.key!) === this && options.pageImages!.active(),
-        () => [...imageSurfaces.values()].filter((surface) => surface.options.appletId === options.appletId).reduce((sum, surface) => sum + (surface.images?.size ?? 0), 0));
+      this.images = new PageImageRegistry(
+        options.pageImages.dataRoot,
+        options.appletId,
+        () =>
+          !this.closed && imageSurfaces.get(options.key!) === this && options.pageImages!.active(),
+        () =>
+          [...imageSurfaces.values()]
+            .filter((surface) => surface.options.appletId === options.appletId)
+            .reduce((sum, surface) => sum + (surface.images?.size ?? 0), 0),
+      );
       imageSurfaces.set(options.key, this);
       const session = this.ui.webContents.session;
       if (!imageSessions.has(session)) {
         session.protocol.handle('appdock', (request) => {
           const surface = imageSurfaces.get(options.key!);
           return surface?.ui.webContents.session === session && surface.images
-            ? surface.images.response(request.url) : new Response(null, { status: 404 });
+            ? surface.images.response(request.url)
+            : new Response(null, { status: 404 });
         });
         imageSessions.add(session);
       }
@@ -174,12 +234,14 @@ export class AppletSurface {
     this.changePending = true;
     queueMicrotask(() => {
       this.changePending = false;
-      if (!this.closed && !this.ui.webContents.isDestroyed()) this.ui.webContents.send('applet-page:changed');
+      if (!this.closed && !this.ui.webContents.isDestroyed())
+        this.ui.webContents.send('applet-page:changed');
     });
   }
   private releaseImages() {
     this.images?.clear();
-    if (this.options.key && imageSurfaces.get(this.options.key) === this) imageSurfaces.delete(this.options.key);
+    if (this.options.key && imageSurfaces.get(this.options.key) === this)
+      imageSurfaces.delete(this.options.key);
   }
   get display() {
     return this.mode;
@@ -341,6 +403,7 @@ export class AppletSurface {
       height: Math.max(1, Math.min(rect.height, height - rect.y)),
     };
     this.contentView.setBounds(area);
+    this.contentView.setVisible(!this.covered);
     this.ui.setBounds({ x: 0, y: 0, width: area.width, height: area.height });
     this.options.onLayout();
     host?.overlay?.();

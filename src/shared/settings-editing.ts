@@ -27,7 +27,6 @@ export type SettingsEdit =
     }
   | { type: 'values'; before: Settings; value: Settings }
   | { type: 'mode'; value: 'form' | 'json' }
-  | { type: 'avatar'; bytes: Uint8Array | null; name?: string }
   | { type: 'reload' };
 export interface SettingsEditRequest {
   sessionId: string;

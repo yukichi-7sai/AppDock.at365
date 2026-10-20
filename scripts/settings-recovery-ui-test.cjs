@@ -25,6 +25,7 @@ if (portable) {
   assert.equal(hash(exe), hash(portable));
 }
 const settings = createDefaultSettings();
+settings.profile = { name: 'Legacy fixture', avatar: null };
 settings.host.hardwareAcceleration = false;
 settings.host.checkForUpdatesOnStartup = false;
 settings.keybindings = [];

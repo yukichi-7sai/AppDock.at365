@@ -1,5 +1,6 @@
 import type { ExtensionManifest, Settings, SettingDefinition, SettingOption } from './contracts';
 import { readObjectList, objectFieldValue } from './object-list';
+import { imageReference } from './registered-images';
 const object = (value: unknown): value is Record<string, any> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 export function parseSettingOptions(value: unknown): SettingOption[] {
@@ -34,7 +35,14 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
       (definition.maximum !== undefined && value > definition.maximum))
   )
     fail();
-  if (definition.type === 'string' && (typeof value !== 'string' || value.length > 10000)) fail();
+  if (
+    definition.type === 'string' &&
+    (typeof value !== 'string' ||
+      value.length > (definition.maxLength ?? 10000) ||
+      value.trim().length < (definition.minLength ?? 0))
+  )
+    fail();
+  if (definition.type === 'registered-image' && value !== null && !imageReference(value)) fail();
   if (
     definition.type === 'string-list' &&
     (!Array.isArray(value) ||
@@ -138,6 +146,7 @@ export function parseSettingDefinitions(
         'boolean',
         'number',
         'string',
+        'registered-image',
         'json',
         'select',
         'shortcut-list',
@@ -149,6 +158,14 @@ export function parseSettingDefinitions(
     )
       throw new Error('settings の項目定義を確認してください。');
     keys.add(s.key);
+    for (const key of ['minLength', 'maxLength'])
+      if (
+        s[key] !== undefined &&
+        (s.type !== 'string' || !Number.isInteger(s[key]) || s[key] < 0 || s[key] > 10000)
+      )
+        throw Error('文字数の範囲を確認してください。');
+    if (s.minLength !== undefined && s.maxLength !== undefined && s.minLength > s.maxLength)
+      throw Error('文字数の範囲を確認してください。');
     if (
       (s.automation !== undefined && typeof s.automation !== 'boolean') ||
       ((s.automation === true || s.generateCommands !== undefined) &&
@@ -237,6 +254,7 @@ export function parseSettingDefinitions(
         (list.enabledKey !== undefined && !has(list.enabledKey, 'boolean')) ||
         (list.idKey !== undefined && !has(list.idKey, 'string')) ||
         (list.iconKey !== undefined && !safeKey(list.iconKey)) ||
+        (list.imageKey !== undefined && !has(list.imageKey, 'registered-image')) ||
         (list.confirmDelete !== undefined && typeof list.confirmDelete !== 'boolean') ||
         (list.showIndex !== undefined && typeof list.showIndex !== 'boolean')
       )

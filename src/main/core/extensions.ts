@@ -31,6 +31,7 @@ import { appletDisplayName } from '../../shared/applet-display-name';
 import { closeWebAccounts, validateWebAccounts } from './web-accounts';
 import { closeAppletPages } from './applet-pages';
 import { parseAppletPages } from '../../shared/applet-pages';
+import { parseRibbonItems } from '../../shared/ribbon-items';
 import { parsePageCollections } from '../../shared/page-collections';
 import type {
   ExtensionManifest,
@@ -221,6 +222,20 @@ function readManifest(
       );
   }
   const settingDefinitions = parseSettingDefinitions(m.settings);
+  m.ribbonItems = parseRibbonItems({
+    ...m,
+    settings: settingDefinitions,
+  } as unknown as ExtensionManifest);
+  if (
+    (m.ribbonItems?.length ||
+      m.capabilities?.includes('registered-images') ||
+      settingDefinitions?.some(
+        (s) =>
+          s.type === 'registered-image' || s.fields?.some((f) => f.type === 'registered-image'),
+      )) &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.69.0') < 0)
+  )
+    throw Error('共通画像と宣言型リボン項目にはminimumHostVersion:0.69.0以上が必要です。');
   if (
     settingDefinitions?.some((s) => s.list) &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.45.0') < 0)

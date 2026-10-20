@@ -18,12 +18,7 @@ export class SettingsInputSession {
       current(): SettingsSnapshot;
       scope?(page: import('../../shared/settings-catalog').SettingsPageDefinition): string;
       applets(): ExtensionSnapshot[];
-      save(
-        value: Settings,
-        revision: number,
-        avatar?: Uint8Array | null,
-        name?: string,
-      ): Promise<SettingsSnapshot>;
+      save(value: Settings, revision: number): Promise<SettingsSnapshot>;
       changed(): void;
     },
   ) {
@@ -85,15 +80,15 @@ export class SettingsInputSession {
     while (this.operations.size > 512) this.operations.delete(this.operations.keys().next().value!);
     return result;
   }
-  private async save(value: Settings, avatar?: Uint8Array | null, name?: string) {
+  private async save(value: Settings) {
     const parsed = parseSettings(value);
     validateAppletSettings(parsed, this.options.applets());
-    if (avatar === undefined && JSON.stringify(parsed) === JSON.stringify(this.value)) return;
+    if (JSON.stringify(parsed) === JSON.stringify(this.value)) return;
     const revision = this.options.current().revision;
     this.state.pending = true;
     this.notify();
     try {
-      await this.options.save(parsed, revision, avatar, name);
+      await this.options.save(parsed, revision);
     } finally {
       this.state.pending = false;
       this.state.revision = this.options.current().revision;
@@ -153,15 +148,6 @@ export class SettingsInputSession {
       }
       case 'values':
         await this.save(mergeSettingsInput(action.before, action.value, this.value));
-        break;
-      case 'avatar':
-        if (this.state.pageId !== 'profile') throw Error('画像はプロフィールで選択してください。');
-        if (
-          action.bytes !== null &&
-          (!(action.bytes instanceof Uint8Array) || action.bytes.length > 5 * 1024 * 1024)
-        )
-          throw Error('画像は5MB以下にしてください。');
-        await this.save(this.value, action.bytes, action.name);
         break;
       default:
         throw Error('設定操作が不正です。');

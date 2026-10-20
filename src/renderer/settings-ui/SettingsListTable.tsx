@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { SettingDefinition, SettingOption } from '../../shared/contracts';
 import { objectFieldValue } from '../../shared/object-list';
 import './settings-list.css';
+import { RegisteredImagePreview } from './RegisteredImagePicker';
 
 export function settingsListText(
   definition: SettingDefinition,
@@ -121,6 +122,12 @@ export function SettingsListTable({
               const name = view.showIndex
                 ? `${definition.itemTitle ?? '項目'}${index + 1}`
                 : display(entry, view.titleKey);
+              const legacyIcon =
+                view.iconKey &&
+                typeof entry[view.iconKey] === 'string' &&
+                /^data:image\/(?:png|jpeg|webp);base64,/.test(String(entry[view.iconKey]))
+                  ? String(entry[view.iconKey])
+                  : undefined;
               return (
                 <tr key={view.idKey ? String(entry[view.idKey]) : index} data-list-index={index}>
                   {view.showIndex && <td className="settings-list-index">{index + 1}</td>}
@@ -131,18 +138,10 @@ export function SettingsListTable({
                     >
                       {key === view.titleKey ? (
                         <div className="settings-list-title">
-                          {view.iconKey &&
-                            typeof entry[view.iconKey] === 'string' &&
-                            /^data:image\/(?:png|jpeg|webp);base64,/.test(
-                              String(entry[view.iconKey]),
-                            ) && (
-                              <img
-                                src={String(entry[view.iconKey])}
-                                alt=""
-                                width="28"
-                                height="28"
-                              />
-                            )}
+                          <RegisteredImagePreview
+                            value={view.imageKey ? entry[view.imageKey] : null}
+                            fallback={legacyIcon}
+                          />
                           <div>
                             <strong>{display(entry, key) || '未設定'}</strong>
                             {view.descriptionKey && (

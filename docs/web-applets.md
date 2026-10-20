@@ -41,3 +41,7 @@ remoteページはsandbox/contextIsolation/webSecurityを有効にし、preload/
 ## 検証
 
 単体試験はtests/dynamic-pages.test.cjs、web-applets.test.cjs、web-profiles.test.cjs、web-api.test.cjs。動的local/remote GUIはscripts/dynamic-pages-ui-test.cjs。共通一覧とダイアログはscripts/web-list-ui-test.cjs、配布EXEはscripts/web-applets-portable-test.cjsで確認します。実サイト認証とfixtureは区別し、結果は[VERIFICATION](../VERIFICATION.md)へ記録します。
+
+## 共通画像
+
+WebApplet 0.3.0とAppDock 0.69.0以降は、管理ダイアログの画像を共通ライブラリーから選ぶ。提供JSONやメタデータで取得した元画像も、OK時に共通importへ渡す。サイトレコードのimageはRegisteredImageRef、既存iconのdata URLは保持する。imageを優先し、未取得時は既存iconへ戻る。ローカル管理ページは登録画像APIを使い、リモートサイトには渡さない。原画像・制約・グループは[共通画像](registered-images.md)を参照する。

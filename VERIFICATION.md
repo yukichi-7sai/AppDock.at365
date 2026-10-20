@@ -1,5 +1,30 @@
 # 検証記録
 
+## 2026-10-20: コミット前回帰（0.69.0）
+
+- 実装時の728入力（製品・試験・fixture・依存・ビルド定義）と完全ログのSHA256、固定EXE/両Applet ZIP/feedを照合し一致。型検査・build、20ファイルの関連154件、WebApplet標準2件、固定EXE GUI8群・設定GUI9/11/8/6群・smoke、native3のRelease buildと接続/表示/保存/停止を再利用した。前項の関連ファイル数を21から20へ訂正した。
+- 未実施の標準76ファイルを追加実行して538/538成功。再利用分と合わせて本体標準96ファイル **692/692、fail/skip 0**。SDK影響先の標準回帰もWatch **8/8**、WindowsTools **40/40**、WallpaperSlideshow **8群**成功。実Windowsの壁紙・ロック操作は行わず、既存の模擬API/隔離fixtureを使った。
+- 制限内のfixture/.NETとファイル置換等の失敗を保存し、同じコマンドを通常ユーザー環境で成功させた。製品追加修正なし。発行済み0.69.0/0.3.0/0.1.0のbytesと版を保持。今回の追加変更は検証文書のみで、push・remote設定・Release・実利用deployは対象外。
+- [コミット検証](.artifacts/commit-validation-profile-image-library-20261020/validation.json)へ再利用根拠、各コマンド/終了コード/完全ログとhash、検証前後の入力一致を記録。[同フォルダー](.artifacts/commit-validation-profile-image-library-20261020/)でstage/commit treeと実効作者/コミッター、作業ツリーを照合する。
+
+## 2026-10-20: プロフィールAppletと共通画像ライブラリー（0.69.0）
+
+- 本体main/origin/main 8ac2063、同じcheckoutの承認済み設計3ファイルの変更を保持して開始し、dirtyな本体はpullしなかった。WebAppletはmain・cleanを確認してpull --ff-onlyで最新確認。独立したApplet.Profile.at365をmainで初期化した。commit/push/Release/実利用deployは実施していない。native3Appletのソースはcleanのまま保持。
+- プロフィールの名前・アバター設定をat365.profileへ分離し、本体専用Editor・保存・avatar URL・監視・表示特例を撤去。共有画像の原bytes、複数グループ、共通選択と原画像プレビュー、汎用ribbonItems、グループ/コマンド/ページ/Webボタンの参照を接続。旧profile・原画像・Web inline iconは保持し、自動移行・削除は行わない。現行契約は[共通画像](docs/registered-images.md)。
+- 設定・保存ファイル・公開APIの追加により本体0.68.1→0.69.0、WebApplet0.2.1→0.3.0、SDK/Runtime0.26.37→0.27.0。Profileは初版0.1.0。AssemblyVersion/FileVersion 0.10.0.0を保持し、ProductVersion/依存版0.27.0を照合した。
+- [発行前レビュー](.artifacts/profile-image-library-20261020/review.md)で、グループ編集の画像保存漏れ、旧世代コピー回収との競合、RPC一覧の容量、入れ子モーダルの入力抑止、原画像hashの変更通知、旧プロフィール用試験の依存を修正。追加の実形式試験でWindows NativeImageのWebP非対応を確認し、原bytesを保つ専用sandbox/offscreen decoderを追加した。直列処理・15秒上限・idle/終了時回収・起動中の補助Window終了ガードを再確認。発行を妨げる指摘は解決済み。
+- 型検査、本体/Default Shell/.NET build成功。関連20ファイル153/153成功後、WebPの非同期decode対応の影響箇所だけ14/14を再実行し成功。残り140件は新decoderとapp entrypointをimportしないため再利用し、関連の合計は**154/154、fail/skip 0**。WebApplet標準**2/2**。設定入力9群・共通設定11群・検索8群・preferences6群も成功。検索の未確定入力と旧アンカー、preferencesの廃止済み成功通知待ち、smokeの旧画像保存先判定は試験だけを現行契約へ修正した。
+- 最終固定EXEの隔離GUI **8群**成功。[結果](.artifacts/image-library-ui-1792449984611/result.json)。原PNG/JPEG/WebPのbyte保持、Node/.NETの原画像コピー・実在する未選択画像の拒否・停止後キャッシュ回収、グループの多重所属/改名/削除、名前を出さないプロフィール、実際のグループ/コマンド編集、WebAppletの同一View復帰と旧icon保持、明暗/狭幅、実再起動とWebP decoder回収を確認。native3AppletもRelease buildし、接続・panel表示・設定保存・停止が成功。スクリーンショットの画像ライブラリー、プロフィールのリボン、Webの画像選択を目視確認。最終固定EXEのsmokeも成功。
+- 各repoのpublish.batが成功。本体EXEは**168930163 bytes / SHA256 b7f4c8336d5ad8b5d3dc794cf25feff0ea7d3a311419e421742c178bb619f877**。feedの版/size/hash、Default Shell 0.69.0、EXE内SDK/Runtimeと発行resourcesのhashを照合。Profile/WebAppletのZIP全ファイルと発行物、ID/版/最低ホスト版/size/hashを照合し一致。ProfileのGUIに使ったソース2ファイルも発行物とbyte一致。未変更Appletの再発行と全体ZIPは行わない。
+- 証跡は[validation.json](.artifacts/profile-image-library-20261020/validation.json)、[成果物照合](.artifacts/profile-image-library-20261020/artifact-validation-final.json)、同フォルダーの入力/ログhash。最終728入力を記録。固定GUIの前後で製品と参照入力は同一、後の変更はsmoke検査スクリプトだけでEXEは変更していない。新しいsmoke検査で同じEXEを再確認した。Node24.21.0/pnpm12.10.1/.NET10.0.402/Electron44.6.0、Windows x64で実行。
+- 制限内のファイル置換/link/GUI/.NET発行失敗と依存検査のネットワーク待機はログを保持し、該当する同じ処理だけ通常ユーザー環境で成功させた。Windows管理者昇格・依存検査の無効化・lockfile変更なし。初回Runtime版表記と初回WebP GUIの不一致、旧smoke判定の失敗を保持し、最終成功と区別する。原画像の選択応答は専用native dialog fixtureを使用し、物理ファイル選択・実NAS/複数PC・実サイトログインは未確認。標準全回帰は今回一律に実行していない。
+
+## 2026-10-20: プロフィール分離と共通画像ライブラリーの設計
+
+- 本体0.68.1、main `8ac2063`、origin/main追跡・作業ツリーcleanを確認し、`git pull --ff-only`で最新確認後に設計した。制限内のGit読取はPermission deniedとなったため、同じコマンドを通常ユーザー権限で再実行して確認した。
+- [設計書](docs/profile-applet-image-library-design.md)へ、プロフィールの全設定を独立Appletへ移す境界、リボンにユーザー名を出さない方針、汎用リボン登録、原画像ライブラリーと複数グループ、リボン以外での画像利用、グループ/コマンド/Webボタンの共通参照を記録した。設定/画像/グループの同期、旧値保持と自動移行なし、Node/.NET RPCの1MiB制約、モーダルのApplet本文への適用も検証計画へ含めた。
+- 今回は設計と文書の入口だけ。製品コード・版・実利用設定・原画像・他repoは変更せず、実装・製品試験・GUI・発行・commit・pushは行っていない。文書のローカル参照13件（設計内11件と入口2件）、JSON例2件、コードフェンス5組、UTF-8、差分の空白エラーを確認し成功。セルフレビューでグループの並べ替え操作と生成キャッシュの回収範囲を補足した。変更は設計書・DEVELOPMENT・本記録の3ファイルに限定。
+
 ## 2026-10-20: リボン左バーのコミット・リリース前確認（0.68.1）
 
 - 利用者が見た目を確認し、commit・push・Releaseを依頼。変更した5ファイルとリリースノートを対象とする。main/origin/main、GitHub/AQUA両mainの開始先端`d5a545d`、実効作者/コミッターを確認。別作業の変更なし。

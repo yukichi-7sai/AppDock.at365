@@ -197,6 +197,7 @@ export class PageCollectionManager {
             ui: '',
             icon: 'extensions',
             iconImage: page.item.icon,
+            image: page.item.image,
             openCommand: `${page.id}.open`,
             defaultDisplay: page.item.display,
           },

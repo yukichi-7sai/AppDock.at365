@@ -31,7 +31,7 @@
 - `settings.ts`の原子的置換は保存直前のbytes照合を持つが、照合とrenameの間に別プロセスが書く場合を排他していない。同じNASファイルを直接使う保存には、PC間の排他が必要になる。
 - 現在の複数ファイルの回復記録は共有／端末というscopeを現在のパスへ解決する。参照先が変わった後に別ファイルへ復旧しないため、記録を共有参照先の識別子に結び付ける。
 - GPU設定はapp.ready前に使用する。ネットワークからの設定読み込みを、この早期処理の必須条件にしない。
-- `data-paths.ts`と`index.ts`からHost API・ページコレクションへ共有ルートを渡す構造は利用できる。一方、アバターの登録・読取はEXE配置先を直接使うため、共有ルートに接続する必要がある。
+- `data-paths.ts`と`index.ts`からHost API・ページコレクションへ共有ルートを渡す。共通画像も注入されたassets rootを使う。共有場所切替ではRegisteredImagesを参照先別に作り直し、正常表示と生成キャッシュを別の共有先へ使い回さない。
 - `web-profiles.ts`、`web-account-groups.ts`には共有名簿の同期I/Oと独自の回復処理がある。素材一覧・登録・音声読取も含め、共有設定だけを非同期化してNAS対応済みとは扱わない。
 
 ## 保存領域の分離
@@ -58,7 +58,7 @@ D:/Apps/AppDock/
 //NAS/Apps/AppDock/
   settings.json               指定した共有設定
   data/                       同じ共有先の登録素材・共有名簿
-    assets/profile/
+    assets/images/
     assets/applets/<Applet ID>/
     web-profiles/<Applet ID>/accounts.json
     web-account-groups/<group-id>/accounts.json
@@ -81,7 +81,7 @@ D:/Apps/AppDock/
 
 | data内の対象 | 切り替え・保存の契約 |
 | --- | --- |
-| data/assets/profile | アバター原画像。既存の画像形式・寸法・5MB上限と同名同内容の再利用を維持 |
+| data/assets/images | 共通原画像。共有設定のimageLibrary.groupsと同じ参照先へ切替。元bytesと同名衝突の契約は[共通画像](registered-images.md) |
 | data/assets/applets/<Applet ID> | 宣言済みの登録原素材。通知音は16MB以下のWAV・512件上限・同名別内容拒否を維持 |
 | data/web-profiles、data/web-appletsの共有名簿 | 共有のUUID・表示名を参照。Cookie・session・削除待ち記録はPC専用のまま |
 | data/web-account-groups/<group-id>/accounts.json | 共通名簿だけを共有。選択・監視・音の好み・旧session参照はPC専用のまま |
@@ -317,7 +317,7 @@ publish・deploy・自己更新・オールインワンの処理対象は従来�
 | `src/main/core/device-settings-store.ts` | 共有／端末パスの独立、起動時解決、専用メタデータ操作、対象別の保存可否、版2journal、参照先変更待ち |
 | `src/main/core/settings.ts`、`file-observer.ts` | 非同期I/O接続、参照先別backup、世代・結果不明の管理。既存のschema検証と競合判定を維持 |
 | 新しい`SharedStorageIo`と`dotnet/AppDock.SharedStorageHost` | 設定・素材・名簿の非同期要求、Windows/SMBのハンドル排他、置換、再照合、親子の終了処理、単一EXEへの同梱 |
-| `src/main/core/data-paths.ts`、`profile.ts`、`registered-sounds.ts` | 共有ルートからのdata/assets解決、アバターの登録・読取・protocol配信、素材の保護・非同期一覧・登録 |
+| `src/main/core/data-paths.ts`、`registered-images.ts`、`image-library-host.ts`、`registered-sounds.ts` | 共有assetsの解決、原画像・グループと音声の保護、非同期一覧・登録、参照先別の取得状態 |
 | `web-profiles.ts`、`web-account-groups.ts`、`web-accounts.ts`、`page-collections.ts`、`host-api.ts` | 共有名簿I/O、共通排他、参照先別の取得状態・pending、旧移行の再実行防止、PC専用session維持 |
 | `src/main/index.ts`、`settings-recovery.ts` | 早期端末読込と非同期共有読込の分離、起動前の場所変更、起動・再起動・更新との調停 |
 | `settings-health.ts`、`settings-health-notifications.ts` | 場所変更による再起動理由、参照先別の障害、結果不明状態 |

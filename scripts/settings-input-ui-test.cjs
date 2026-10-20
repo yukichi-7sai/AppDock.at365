@@ -37,7 +37,11 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
     initial.host.hardwareAcceleration = false;
     initial.keybindings = [];
     initial.gestures.enabled = false;
-    initial.profile.name = 'Original profile';
+    require('./profile-settings-fixture.cjs').installProfileSettings(
+      profile,
+      initial,
+      'Original profile',
+    );
     const fixture = path.join(profile, 'extensions', 'fixture.input');
     fs.mkdirSync(fixture, { recursive: true });
     fs.writeFileSync(
@@ -132,16 +136,20 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
     }
     await select('プロフィール');
     const name = page.getByLabel('ユーザー名', { exact: true });
-    await pending(name, 'Unconfirmed profile', (s) => s.profile.name);
+    await pending(
+      name,
+      'Unconfirmed profile',
+      (s) => s.extensions['fixture.profile'].settings.name,
+    );
     await name.press('Escape');
     assert.equal(await name.inputValue(), 'Original profile');
     await name.blur();
     await settleSettings(page);
-    assert.equal((await saved()).profile.name, 'Original profile');
-    await pending(name, 'Confirmed profile', (s) => s.profile.name);
+    assert.equal((await saved()).extensions['fixture.profile'].settings.name, 'Original profile');
+    await pending(name, 'Confirmed profile', (s) => s.extensions['fixture.profile'].settings.name);
     await name.press('Enter');
     await settleSettings(page);
-    assert.equal((await saved()).profile.name, 'Confirmed profile');
+    assert.equal((await saved()).extensions['fixture.profile'].settings.name, 'Confirmed profile');
     const revision = (await snapshot()).settings.revision;
     await name.press('Enter');
     await name.blur();
@@ -151,10 +159,10 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
       revision,
       'Enter/repeated Enter/blur writes once',
     );
-    await pending(name, 'Saved by blur', (s) => s.profile.name);
+    await pending(name, 'Saved by blur', (s) => s.extensions['fixture.profile'].settings.name);
     await name.blur();
     await settleSettings(page);
-    assert.equal(disk().profile.name, 'Saved by blur');
+    assert.equal(disk().extensions['fixture.profile'].settings.name, 'Saved by blur');
     checks.push(
       'host text defers runtime/disk/revision, Escape restores, Enter and blur save exactly once',
     );
@@ -184,11 +192,11 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
       );
     });
     await settleSettings(page);
-    assert.equal((await saved()).profile.name, 'Saved by blur');
+    assert.equal((await saved()).extensions['fixture.profile'].settings.name, 'Saved by blur');
     assert.equal(await name.inputValue(), '日本語の入力');
     await name.press('Enter');
     await settleSettings(page);
-    assert.equal(disk().profile.name, '日本語の入力');
+    assert.equal(disk().extensions['fixture.profile'].settings.name, '日本語の入力');
     checks.push(
       'IME Enter/Escape and compositionend keep text local until a separate confirmation',
     );
@@ -203,11 +211,11 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
       el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
     });
     await settleSettings(page);
-    assert.equal(disk().profile.name, 'Blur during IME');
+    assert.equal(disk().extensions['fixture.profile'].settings.name, 'Blur during IME');
     await name.fill('Pending external replacement');
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
-      s.settings.value.profile.name = 'External profile';
+      s.settings.value.extensions['fixture.profile'].settings.name = 'External profile';
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
     await until(

@@ -67,6 +67,11 @@ import type { InputInvocation } from './core/command-contexts';
 import { SettingsPageSession } from './core/settings-page';
 import { SettingsPageHost } from './core/settings-page-host';
 import { dataPaths } from './core/data-paths';
+import { RegisteredImages } from './core/registered-images';
+import { ImageLibraryHost, decodeRegisteredImage } from './core/image-library-host';
+import { stopRegisteredImageDecoder } from './core/registered-image-decoder';
+import { coverAppletPagesForImagePicker } from './core/applet-pages';
+import { imageReference } from '../shared/registered-images';
 import { WindowsLaunch } from './core/windows-launch';
 import { WindowStateStore, windowMinimum, restoreWindowBounds } from './core/window-state';
 import { ExtensionManager } from './core/extensions';
@@ -78,7 +83,6 @@ import { RibbonState } from './core/ribbon-state';
 import { RibbonBadges } from './core/ribbon-badges';
 import { RibbonGroupSession } from './core/ribbon-group-session';
 import { RibbonCommands } from './core/ribbon-commands';
-import { saveUserSettings } from './core/profile';
 import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
 import {
@@ -267,6 +271,7 @@ function applyAudioPlaybackSettings() {
 }
 applyAudioPlaybackSettings();
 let window: BrowserWindow | null = null;
+let primaryWindowCreated = false;
 let shellRegistry: ShellProviderRegistry | undefined;
 const shellStateSent = new Map<string, string>();
 let lastShellRevision = -1;
@@ -320,12 +325,7 @@ const presentation = new UiPresentation({
   applets: () => (manager ? allApplets() : []),
   commands: () => (manager ? ribbonUiCommands() : hostCommands),
   dark: () => nativeTheme.shouldUseDarkColors,
-  avatar: () => {
-    const file = avatarFile();
-    return file
-      ? nativeImage.createFromPath(file).resize({ width: 96, height: 96 }).toDataURL()
-      : undefined;
-  },
+  image: (ref, shape) => registeredImages.icon(ref, shape),
   navigation,
   execute: executeCommand,
   theme: toggleTheme,
@@ -378,14 +378,14 @@ const settingsEditing = new SettingsInputSession({
   current: () => settings.snapshot(),
   scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
-  save: async (value, revision, avatar, name) => {
+  save: async (value, revision) => {
     assertSettingsWritable();
     const next = prepareSettings(value);
     return launch.save(
       next.host,
       settings.value.host,
       () => settings.assertRevision(revision),
-      () => commitSettings(next, revision, avatar, name),
+      () => commitSettings(next, revision),
     );
   },
   changed: () => {
@@ -474,7 +474,18 @@ let quitting = false;
 let shutdownFinished = false;
 let shutdownStarted = false;
 let notifyTimer: ReturnType<typeof setTimeout> | undefined;
-let avatarPoll: ReturnType<typeof setInterval> | undefined;
+const registeredImages = new RegisteredImages(
+  path.join(paths.assets, 'images'),
+  decodeRegisteredImage,
+  () => changed(),
+);
+const imageLibraryHost = new ImageLibraryHost(registeredImages, {
+  settings,
+  window: () => window,
+  writable: assertSettingsWritable,
+  show: showWindow,
+  cover: coverAppletPagesForImagePicker,
+});
 let updater: PortableUpdates;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 let automation: AutomationService | undefined;
@@ -1381,25 +1392,6 @@ function runTrayCommand(id: string) {
     showWindow();
   });
 }
-function avatarFile(): string | undefined {
-  const relative = settings.value.profile.avatar;
-  if (!relative) return;
-  const file = path.resolve(baseDirectory, relative);
-  try {
-    if (
-      fs.lstatSync(file).isSymbolicLink() ||
-      fs.realpathSync(file).toLowerCase() !== file.toLowerCase()
-    )
-      return;
-    return file;
-  } catch {
-    return;
-  }
-}
-function avatarSignature() {
-  const file = avatarFile();
-  return file ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : '';
-}
 function snapshot(): HostSnapshot {
   return {
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
@@ -1437,7 +1429,6 @@ function snapshot(): HostSnapshot {
     sharedDirectory,
     legacyLocalData: !!legacyLocalData?.snapshot().targets.length,
     dark: nativeTheme.shouldUseDarkColors,
-    avatarUrl: avatarFile() ? `appdock://host/avatar.png?v=${avatarSignature()}` : null,
   };
 }
 function refreshWindowTheme() {
@@ -1580,15 +1571,10 @@ function prepareSettings(value: Settings) {
   validateAppletSettings(next, manager.snapshot());
   return initializeCollectionDefaults(next, settings.value, manager.snapshot());
 }
-function commitSettings(
-  value: Settings,
-  revision: number,
-  avatar?: Uint8Array | null,
-  avatarName?: string,
-) {
+function commitSettings(value: Settings, revision: number) {
   assertSettingsWritable();
   customCommands.validateReplacement(value);
-  return saveUserSettings(settings, baseDirectory, value, revision, avatar, avatarName);
+  return settings.save(value, revision);
 }
 function settingsPageStorage(
   page: SettingsPageDefinition,
@@ -1673,6 +1659,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     panel: null,
     settingOptions: {},
     pages: page.kind === 'applet' || ['ribbon', 'gestures'].includes(id) ? a.pages : undefined,
+    ribbonItems: id === 'ribbon' ? a.ribbonItems : undefined,
     shell: id === 'appearance' ? a.shell : undefined,
     updateRepository: id === 'about' ? a.updateRepository : undefined,
   });
@@ -1750,10 +1737,6 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       runtime: host.runtime,
       updates: host.updates,
       applets: applets.filter((a) => a.sourceKind !== 'builtin').map(summary),
-    };
-  if (id === 'profile')
-    return {
-      avatarUrl: host.avatarUrl,
     };
   if (id === 'web-accounts')
     return {
@@ -2031,7 +2014,15 @@ function settingsPageActions(
     };
   }
   if (
-    ['shortcuts', 'gestures', 'ai', 'ribbon', 'custom-commands', 'mcp-client'].includes(page.id) ||
+    [
+      'shortcuts',
+      'gestures',
+      'ai',
+      'ribbon',
+      'custom-commands',
+      'mcp-client',
+      'image-library',
+    ].includes(page.id) ||
     page.kind === 'applet'
   ) {
     actions.setShortcutRecording = async ([value]) => {
@@ -2268,6 +2259,22 @@ function registerIpc() {
       }
     });
   handle('dock:snapshot', snapshot);
+  handle('dock:imageLibrary:snapshot', () => imageLibraryHost.snapshot());
+  handle('dock:imageLibrary:register', () => imageLibraryHost.register());
+  handle('dock:imageLibrary:edit', (operation) => imageLibraryHost.edit(operation));
+  handle('dock:imageLibrary:preview', async (ref, original = false) => {
+    if (!imageReference(ref)) throw Error('画像の参照を確認してください。');
+    if (original === true) {
+      const saved = await registeredImages.read(ref);
+      const extension = path.extname(saved.ref.file).slice(1).toLowerCase();
+      return `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${saved.bytes.toString('base64')}`;
+    }
+    await registeredImages.refresh();
+    return registeredImages.icon(ref) ?? null;
+  });
+  handle('dock:imageLibrary:pick', (current) => imageLibraryHost.pick(current));
+  handle('dock:imagePick:pending', () => imageLibraryHost.pendingRequest());
+  handle('dock:imagePick:complete', (id, result) => imageLibraryHost.complete(id, result));
   handle('dock:settingsEditing', () => settingsEditing.snapshot());
   handle('dock:flushSettings', () => flushSettingsInputs());
   handle('dock:editSettings', async (request) => {
@@ -2429,19 +2436,16 @@ function registerIpc() {
       throw new SettingsConflictError('設定が変わりました。もう一度確認してください。');
     return restoreSettingsBackup();
   });
-  handle(
-    'dock:saveSettings',
-    async (value: Settings, revision: number, avatar?: Uint8Array | null, avatarName?: string) => {
-      assertSettingsWritable();
-      const next = prepareSettings(value);
-      return launch.save(
-        next.host,
-        settings.value.host,
-        () => settings.assertRevision(revision),
-        () => commitSettings(next, revision, avatar, avatarName),
-      );
-    },
-  );
+  handle('dock:saveSettings', async (value: Settings, revision: number) => {
+    assertSettingsWritable();
+    const next = prepareSettings(value);
+    return launch.save(
+      next.host,
+      settings.value.host,
+      () => settings.assertRevision(revision),
+      () => commitSettings(next, revision),
+    );
+  });
   handle('dock:setPinnedCommands', (ids: string[]) =>
     settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision),
   );
@@ -2569,12 +2573,16 @@ async function initialize() {
           await navigation.navigate('extensions', undefined, id, 'description');
           return { accepted: true };
         },
-        failed: (id) => errors.report({
-          eventId: randomUUID(), source: id, code: 'APPLET_PAGE_ACTION',
-          title: 'ページの操作に失敗しました',
-          message: 'ページの表示とAppletのログを確認してから、必要な操作をやり直してください。',
-        }),
+        failed: (id) =>
+          errors.report({
+            eventId: randomUUID(),
+            source: id,
+            code: 'APPLET_PAGE_ACTION',
+            title: 'ページの操作に失敗しました',
+            message: 'ページの表示とAppletのログを確認してから、必要な操作をやり直してください。',
+          }),
       },
+      imageLibraryHost,
     ),
     log: log.write,
   });
@@ -2796,6 +2804,13 @@ async function initialize() {
     },
   );
   manager.on('changed', () => {
+    imageLibraryHost.reconcile(
+      new Set(
+        [...manager.items.values()]
+          .filter((e) => ['starting', 'running'].includes(e.state))
+          .map((e) => `${e.manifest.id}:${e.runtimeSession ?? ''}`),
+      ),
+    );
     customCommands.reconcile();
     mcpClient.reconcile();
     pageCollections.reconcile();
@@ -2839,18 +2854,8 @@ async function initialize() {
     /* The health source reports stable failures through ErrorReporter. */
   });
   applySettings();
-  let lastAvatar = avatarSignature();
-  avatarPoll = setInterval(() => {
-    try {
-      const next = avatarSignature();
-      if (next !== lastAvatar) {
-        lastAvatar = next;
-        changed();
-      }
-    } catch {
-      /* A sync write can temporarily lock an image. Retry on the next poll. */
-    }
-  }, 2000);
+  await registeredImages.refresh();
+  registeredImages.watch();
   nativeTheme.on('updated', () => {
     refreshWindowTheme();
     changed();
@@ -2878,11 +2883,6 @@ async function initialize() {
             },
           }),
       );
-    }
-    if (url.host === 'host' && url.pathname === '/avatar.png') {
-      const file = avatarFile();
-      if (!file) return new Response('Not found', { status: 404 });
-      return net.fetch(pathToFileURL(file).href);
     }
     const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '');
     const file = path.resolve(renderer, relative || 'index.html');
@@ -2931,6 +2931,7 @@ async function initialize() {
       spellcheck: false,
     },
   });
+  primaryWindowCreated = true;
   if (process.platform === 'win32') {
     // Windows Shell needs a real file path, outside app.asar, for the taskbar icon.
     const executable = process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe');
@@ -3737,27 +3738,20 @@ async function runSmoke() {
       { ...settings.value, host: { ...settings.value.host, trayClickCommand: 'appdock.open' } },
       settings.revision,
     );
-    const avatarBytes = nativeImage
-      .createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'))
-      .resize({ width: 64, height: 64 })
-      .toPNG();
+    const libraryImage = await registeredImages.add(
+      nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png')).toPNG(),
+      'smoke-image.png',
+    );
+    const libraryUrl = registeredImages.icon(libraryImage);
     const result = await window!.webContents.executeJavaScript(`(async () => {
       const s = await window.dock.snapshot();
       await window.dock.saveSettings({...s.settings.value, host: {...s.settings.value.host, theme: 'light'}}, s.settings.revision);
-      const avatar = new Uint8Array(${JSON.stringify([...avatarBytes])});
-      const current = await window.dock.snapshot();
-      await window.dock.saveSettings({...current.settings.value, profile: {name: 'Portable test', avatar: 'avatar.png'}}, current.settings.revision, avatar);
       await window.dock.setPinnedCommands(['appdock.commands.search', 'appdock.settings.open']);
       const saved = await window.dock.snapshot();
       const image = new Image();
-      const avatarLoaded = await new Promise(resolve => {
-        image.onload = () => resolve(image.naturalWidth > 0);
-        image.onerror = () => resolve(false);
-        image.src = saved.avatarUrl;
-      });
+      const imageLoaded = await new Promise(resolve => { image.onload = () => resolve(image.naturalWidth > 0); image.onerror = () => resolve(false); image.src = ${JSON.stringify(libraryUrl)}; });
       return {bridge: !!window.dock, nodeExposed: typeof window.require !== 'undefined', rows: document.querySelectorAll('button').length,
-        profile: saved.settings.value.profile, pins: saved.settings.value.pinnedCommands,
-        paletteKeys: saved.settings.value.shortcuts['appdock.commands.search'], avatarLoaded};
+        pins: saved.settings.value.pinnedCommands, paletteKeys: saved.settings.value.shortcuts['appdock.commands.search'], imageLoaded};
     })()`);
     const shellRows = await Promise.all(
       window!.contentView.children
@@ -3769,13 +3763,8 @@ async function runSmoke() {
     result.rows += shellRows.reduce((total, count) => total + count, 0);
     if (result.nodeExposed || !result.bridge || result.rows < 5)
       throw new Error('Preload / React check failed');
-    if (
-      !result.avatarLoaded ||
-      result.profile.avatar !== 'data/assets/profile/avatar.png' ||
-      result.paletteKeys[0] !== 'Ctrl+P' ||
-      result.pins.length !== 2
-    )
-      throw new Error('Portable preferences / avatar check failed');
+    if (!result.imageLoaded || result.paletteKeys[0] !== 'Ctrl+P' || result.pins.length !== 2)
+      throw new Error('Portable preferences / registered image check failed');
     await new Promise((r) => setTimeout(r, 250));
     fs.mkdirSync(path.join(baseDirectory, 'screenshots'), { recursive: true });
     fs.writeFileSync(
@@ -3801,7 +3790,7 @@ async function runSmoke() {
             .snapshot()
             .map((e) => ({ id: e.id, state: e.state, panel: !!e.panel })),
           settingsPath: settings.file,
-          avatarPath: path.join(baseDirectory, 'data', 'assets', 'profile', 'avatar.png'),
+          registeredImage: path.join(registeredImages.directory, libraryImage.file),
           trayCommands: {
             defaultOpen: true,
             selectedHostCommands: true,
@@ -3877,13 +3866,16 @@ app.on('before-quit', (event) => {
     }
   })().finally(() => {
     settings.close();
-    clearInterval(avatarPoll);
+    registeredImages.stop();
+    stopRegisteredImageDecoder();
+    imageLibraryHost.cancel();
     tray?.destroy();
     shutdownFinished = true;
     app.quit();
   });
 });
 app.on('window-all-closed', () => {
+  if (!primaryWindowCreated && !quitting) return;
   if (!tray || quitting) app.quit();
 });
 if (!locked) app.quit();

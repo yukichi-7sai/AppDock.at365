@@ -51,7 +51,7 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 ## リボン
 
-標準6項目（home/extensions/settings/logs/theme/profile）と、導入Appletのpagesを一覧にします。AppletページのリボンIDは`page:<extensionId>:<pageId>`です。配置位置はホストが決め、名前・選択状態・キーボード操作は本体ボタンとして描画します。
+標準項目（home/extensions/settings/logs/theme/notifications）と、導入Appletのpagesおよび宣言型ribbonItemsを一覧にします。ページIDは`page:<extensionId>:<pageId>`、宣言型IDは`applet:<extensionId>:<localId>`です。プロフィールは独立Appletの自己設定への宣言型ボタンです。[共通画像とリボン](registered-images.md)を参照してください。
 
 すべてのApplet（Gmail/WebAppletを含む）は無効化中だけ実リボンから隠し、有効化時に元の配置へ戻します。リボン設定の一覧と保存済みの表示・配置は保持します。開始待ちやエラー状態でも、有効なAppletのリボンは表示します。
 
@@ -61,7 +61,7 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 通常ボタンのリボン内の別名とアイコンのみ表示は`ribbon.itemOverrides`、グループのアイコンのみ表示は`groups[].iconOnly`へ保存します。登録元の名前・ID・実行先は変えません。未導入IDの配置と表示設定は保持し、設定一覧から明示削除できます。無効Appletは登録済みなので、この削除の対象外です。
 
-`ribbon`未指定ならテーマ/プロフィールを下寄せにします。旧設定の不足する`bottom/separators/groups`は空配列、`itemOverrides`は空オブジェクトとして移行し、既存の配置を保ちます。初期化すると新しい既定配置へ戻ります。配置未指定の新しいボタンはトップレベルへ追加し、未導入Appletの設定は保持します。設定ボタンを隠してもリボンの右クリックか本体の設定コマンドから復帰できます。
+`ribbon`未指定ならテーマを下寄せにします。Appletの宣言型項目はdefaultPlacementを使い、保存された親グループ・明示配置を優先します。旧profileの配置IDや未導入Appletの設定は保持し、自動削除しません。設定ボタンを隠しても本体の設定コマンドとトレイから復帰できます。
 
 同じ配置を外部から取得・編集できます。許可と操作形式は[共通操作APIのリボン編集](automation.md#リボン編集)を参照してください。GUIとAPIは同じ検証と設定revisionを使います。
 

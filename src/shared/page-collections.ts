@@ -5,6 +5,7 @@ import type {
   SettingDefinition,
 } from './contracts';
 import { validPageId } from './applet-pages';
+import { imageReference, type RegisteredImageRef } from './registered-images';
 import { parseSettingDefinitions } from './setting-definitions';
 import { webUrl, profileId } from './web-content';
 
@@ -32,6 +33,7 @@ export interface CollectionRecord {
   navigation?: 'none' | 'same-origin' | 'any';
   allowedOrigins?: string[];
   icon?: string;
+  image?: RegisteredImageRef | null;
   [key: string]: unknown;
 }
 export interface CollectionPage {
@@ -139,6 +141,8 @@ export function validateCollectionRecords(
         item.icon.length > 24576)
     )
       throw Error('ページのアイコンは検証したPNGを指定してください。');
+    if (item.image != null && !imageReference(item.image))
+      throw Error('登録画像の参照を確認してください。');
     ids.add(item.id);
     return structuredClone(item);
   });

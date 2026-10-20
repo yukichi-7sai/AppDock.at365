@@ -4,7 +4,6 @@ const { UiPresentation, NavigationCoordinator } = require('../out/main/main/core
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 function fixture() {
   const settings = createDefaultSettings();
-  settings.profile.name = 'Fixture';
   let changes = 0,
     executions = [],
     toggles = 0;
@@ -15,14 +14,21 @@ function fixture() {
       enabled: true,
       state: 'running',
       commands: [{ id: 'test.page.open', available: true }],
-      pages: [{ id: 'main', title: 'Page', openCommand: 'test.page.open', source: 'local' }],
+      pages: [
+        {
+          iconImage: 'data:image/png;base64,AA==',
+          id: 'main',
+          title: 'Page',
+          openCommand: 'test.page.open',
+          source: 'local',
+        },
+      ],
     },
   ];
   const ui = new UiPresentation({
     settings: () => settings,
     applets: () => applets,
     dark: () => true,
-    avatar: () => 'data:image/png;base64,AA==',
     navigation: nav,
     execute: async (c) => executions.push(c),
     theme: async () => toggles++,
@@ -52,7 +58,7 @@ test('full presentation preserves order, placement, selected route and opaque as
   assert.equal(a.items[0].selected, true);
   assert.equal(a.items.find((i) => i.id === 'home').placement, 'bottom');
   assert.ok(!JSON.stringify(a).includes('openCommand'));
-  const asset = a.items.find((i) => i.id === 'profile').icon.assetId;
+  const asset = a.items.find((i) => i.id === 'page:test.page:main').icon.assetId;
   assert.match(asset, /^[a-f0-9]{64}$/);
   assert.equal(f.ui.getAsset(asset).dataUrl, 'data:image/png;base64,AA==');
   assert.throws(() => f.ui.getAsset('../settings.json'));

@@ -54,12 +54,12 @@ child.on('exit', (code) => {
   }
   if (
     result.ok &&
-    (!fs.existsSync(path.join(profile, 'data/assets/profile/avatar.png')) ||
-      path.resolve(result.avatarPath).toLowerCase() !==
-        path.join(profile, 'data/assets/profile/avatar.png').toLowerCase())
+    (!fs.existsSync(path.join(profile, 'data/assets/images/smoke-image.png')) ||
+      path.resolve(result.registeredImage).toLowerCase() !==
+        path.join(profile, 'data/assets/images/smoke-image.png').toLowerCase())
   ) {
     result.ok = false;
-    result.error = 'Avatar was not saved under data/assets/profile.';
+    result.error = 'Registered image was not saved under data/assets/images.';
   }
   console.log(JSON.stringify({ profile, portable, ...result }, null, 2));
   if (!result.ok) {

@@ -1,5 +1,6 @@
 import type { ExtensionManifest, ExtensionSnapshot, Settings } from './contracts';
 import { validCommandId } from './commands';
+import { imageReference, type RegisteredImageRef } from './registered-images';
 import {
   ribbonGroupIcons,
   parseRibbonColor,
@@ -10,6 +11,7 @@ import {
 
 export type PageDisplay = 'page' | 'window';
 export interface AppletPageDefinition {
+  image?: RegisteredImageRef | null;
   iconImage?: string;
   id: string;
   title: string;
@@ -20,6 +22,8 @@ export interface AppletPageDefinition {
   defaultDisplay?: PageDisplay;
 }
 export interface RibbonItem {
+  image?: RegisteredImageRef | null;
+  contribution?: import('./ribbon').AppletRibbonItem;
   iconImage?: string;
   kind?: 'separator' | 'group' | 'command';
   group?: RibbonGroup;
@@ -37,7 +41,6 @@ export const builtinRibbon: RibbonItem[] = [
   { id: 'logs', title: 'ログ', icon: 'logs' },
   { id: 'notifications', title: '通知センター', icon: 'bell' },
   { id: 'theme', title: 'テーマを切り替え', icon: 'sun' },
-  { id: 'profile', title: 'プロフィール設定を開く', icon: 'settings' },
 ];
 export const pageKey = (extensionId: string, pageId: string) => `page:${extensionId}:${pageId}`;
 export const validPageId = (id: unknown): id is string =>
@@ -47,7 +50,8 @@ export const validPageId = (id: unknown): id is string =>
 export const validRibbonId = (id: unknown): id is string =>
   typeof id === 'string' &&
   (builtinRibbon.some((item) => item.id === id) ||
-    /^page:[a-z0-9][a-z0-9.-]{0,100}:[a-z0-9][a-z0-9.-]{0,79}$/.test(id) ||
+    id === 'profile' ||
+    /^(?:page|applet):[a-z0-9][a-z0-9.-]{0,100}:[a-z0-9][a-z0-9.-]{0,79}$/.test(id) ||
     validSeparatorId(id) ||
     validRibbonButtonId(id) ||
     validGroupId(id));
@@ -60,7 +64,7 @@ export const validSeparatorId = (id: unknown): id is string =>
 export const defaultRibbon = () => ({
   order: [] as string[],
   hidden: [] as string[],
-  bottom: ['theme', 'profile'],
+  bottom: ['theme'],
   separators: [] as string[],
   groups: [] as RibbonGroup[],
   itemOverrides: {} as Record<string, RibbonItemOverride>,
@@ -124,6 +128,7 @@ export function ribbonItems(
       title: page.title,
       icon: page.icon ?? 'extensions',
       iconImage: page.iconImage,
+      image: page.image,
       extensionId: extension.id,
       pageId: page.id,
     })),
@@ -131,6 +136,15 @@ export function ribbonItems(
   return [
     ...builtinRibbon.slice(0, 4),
     ...applets,
+    ...extensions.flatMap((extension) =>
+      (extension.ribbonItems ?? []).map((contribution) => ({
+        id: `applet:${extension.id}:${contribution.id}`,
+        title: contribution.title,
+        icon: contribution.icon ?? 'extensions',
+        extensionId: extension.id,
+        contribution,
+      })),
+    ),
     ...builtinRibbon.slice(4),
     ...separators.map((id, index): RibbonItem => ({
       id,
@@ -230,9 +244,10 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
     if (
       !object(button) ||
       Object.keys(button).some(
-        (k) => !['id', 'title', 'icon', 'commandId', 'iconOnly'].includes(k),
+        (k) => !['id', 'title', 'icon', 'commandId', 'iconOnly', 'image'].includes(k),
       ) ||
       !validRibbonButtonId(button.id) ||
+      (button.image != null && !imageReference(button.image)) ||
       buttonIds.has(button.id) ||
       typeof button.title !== 'string' ||
       !button.title.trim() ||
@@ -260,9 +275,13 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
     if (
       !object(g) ||
       Object.keys(g).some(
-        (k) => !['id', 'title', 'icon', 'expansion', 'children', 'iconOnly', 'color'].includes(k),
+        (k) =>
+          !['id', 'title', 'icon', 'expansion', 'children', 'iconOnly', 'color', 'image'].includes(
+            k,
+          ),
       ) ||
       !validGroupId(g.id) ||
+      (g.image != null && !imageReference(g.image)) ||
       groupIds.has(g.id) ||
       typeof g.title !== 'string' ||
       g.title.trim().length > 80 ||
@@ -329,7 +348,11 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       validSeparatorId(id) ||
       validRibbonButtonId(id) ||
       !object(value) ||
-      Object.keys(value).some((key) => !['title', 'iconOnly', 'lastKnownTitle'].includes(key)) ||
+      (value.image != null && !imageReference(value.image)) ||
+      (value.placement !== undefined && !['top', 'bottom'].includes(value.placement as string)) ||
+      Object.keys(value).some(
+        (key) => !['title', 'iconOnly', 'lastKnownTitle', 'image', 'placement'].includes(key),
+      ) ||
       ['title', 'lastKnownTitle'].some(
         (key) =>
           value[key] !== undefined &&
@@ -342,9 +365,19 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       throw Error('リボンのボタン名・アイコンのみ表示を確認してください。');
     const title = (value.title as string | undefined)?.trim();
     const lastKnownTitle = (value.lastKnownTitle as string | undefined)?.trim();
-    if (title || lastKnownTitle || value.iconOnly !== undefined)
+    if (
+      title ||
+      lastKnownTitle ||
+      value.iconOnly !== undefined ||
+      value.image !== undefined ||
+      value.placement !== undefined
+    )
       overrides[id] = {
         ...(title ? { title } : {}),
+        ...(value.image !== undefined ? { image: value.image as RegisteredImageRef | null } : {}),
+        ...(value.placement !== undefined
+          ? { placement: value.placement as 'top' | 'bottom' }
+          : {}),
         ...(lastKnownTitle ? { lastKnownTitle } : {}),
         ...(value.iconOnly !== undefined ? { iconOnly: value.iconOnly as boolean } : {}),
       };

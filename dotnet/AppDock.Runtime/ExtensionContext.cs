@@ -6,7 +6,7 @@ namespace AppDock.Runtime;
 
 internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcConnection connection, CancellationToken lifetime) :
     IExtensionContext, ICommandService, ICustomCommandService, ITrayService, IRibbonService, ISettingsService, INotificationService,
-    IAppDockService, IShellService, IUiService, IPageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
+    IAppDockService, IShellService, IUiService, IPageService, IRegisteredImageService, IBrowserService, ILogService, IStorageService, ISecretService, ISchedulerService, IAsyncDisposable
 {
     private ConcurrentDictionary<string, (string Title, Func<CancellationToken, Task> Handler, string? Description)> commands = new();
     private readonly SemaphoreSlim commandUpdates = new(1, 1);
@@ -78,6 +78,15 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public INotificationService Notifications => this;
     public IUiService Ui => this;
     public IPageService Pages => this;
+    public IRegisteredImageService RegisteredImages => this;
+    public Task<RegisteredImageRef> ImportAsync(byte[] bytes, string? filename = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        if (bytes.Length > 512 * 1024) throw new ArgumentException("Registered image import is limited to 512 KiB.");
+        return RequestAsync<RegisteredImageRef>("host.registeredImages.import", new { filename, base64 = Convert.ToBase64String(bytes) }, cancellationToken);
+    }
+    public Task<string> CopyToCacheAsync(RegisteredImageRef image, bool thumbnail = false, CancellationToken cancellationToken = default)
+        => RequestAsync<string>("host.registeredImages.copyToCache", new { image, variant = thumbnail ? "thumbnail" : "original" }, cancellationToken);
     public IBrowserService Browser => this;
     public ILogService Log => this;
     public IStorageService Storage => this;

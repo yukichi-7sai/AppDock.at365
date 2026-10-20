@@ -3,7 +3,6 @@ const { _electron: electron } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `preferences-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
@@ -13,19 +12,9 @@ delete legacy.shortcuts;
 delete legacy.profile;
 delete legacy.pinnedCommands;
 legacy.host.notifications = false;
+require('./profile-settings-fixture.cjs').installProfileSettings(profile, legacy);
 require('../tests/fixtures/install.cjs')(profile, legacy);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(legacy, null, 2));
-const hash = () =>
-  createHash('sha256')
-    .update(
-      fs.readFileSync(
-        path.join(
-          profile,
-          JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).profile.avatar,
-        ),
-      ),
-    )
-    .digest('hex');
 let application;
 async function launch() {
   application = await electron.launch({
@@ -115,7 +104,7 @@ async function waitPins(page, pins) {
       await panel.getByRole('button', { name: adding ? '追加' : '適用', exact: true }).click();
     };
     await setShortcut('appdock.commands.search', 'Control+Alt+p');
-    await setShortcut('appdock.welcome.refresh', 'Control+Alt+p');
+    await setShortcut('appdock.welcome.verify-storage', 'Control+Alt+p');
     await settleSettings(await settingsPage());
     await settleSettings(await settingsPage());
     assert.equal(
@@ -124,7 +113,7 @@ async function waitPins(page, pins) {
       ].includes('Ctrl+Alt+P'),
       true,
     );
-    await setShortcut('appdock.welcome.refresh', 'Control+Alt+r');
+    await setShortcut('appdock.welcome.verify-storage', 'Control+Alt+r');
     await settleSettings(await settingsPage());
     await settleSettings(await settingsPage());
     await page.screenshot({ path: path.join(profile, 'shortcuts.png') });
@@ -144,7 +133,15 @@ async function waitPins(page, pins) {
     );
     await page.waitForFunction(async () => !(await window.dock.snapshot()).overlay.active);
     await page.keyboard.press('Control+Alt+r');
-    await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
+    await page.waitForFunction(() =>
+      window.dock
+        .snapshot()
+        .then((s) =>
+          s.logs.some((entry) =>
+            entry.message.includes('Storage / Secrets API の往復を確認しました。'),
+          ),
+        ),
+    );
     // Assign and execute a real .NET command through the same shortcut settings.
     await (
       await require('./shell-overlay-helper.cjs').ribbonPage(page)
@@ -186,88 +183,26 @@ async function waitPins(page, pins) {
       before,
     );
     const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
-    await shell.locator('[data-ribbon-id="profile"]').click();
-    await (await settingsPage()).getByLabel('ユーザー名').fill('検証ユーザー');
-    await (
-      await settingsPage()
-    )
-      .getByLabel('アバター画像を選択')
-      .setInputFiles(path.join(root, 'assets/icon.png'));
-    await (await settingsPage()).getByAltText('プロフィール画像').waitFor();
+    await shell.locator('[data-ribbon-id="applet:fixture.profile:main"]').click();
+    const name = (await settingsPage()).getByLabel('ユーザー名', { exact: true });
+    await name.fill('検証ユーザー');
+    await name.press('Enter');
     await settleSettings(await settingsPage());
-    await shell.locator('.avatar img').waitFor();
-    await shell.waitForFunction(() => {
-      const img = document.querySelector('.avatar img');
-      return img?.complete && img.naturalWidth > 0;
-    });
     assert.equal(
-      (await page.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      (await page.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.profile'
+      ].settings.name,
       '検証ユーザー',
     );
-    const firstHash = hash();
-    await (
-      await settingsPage()
-    )
-      .getByLabel('アバター画像を選択')
-      .setInputFiles(path.join(profile, 'pins.png'));
-    await settleSettings(await settingsPage());
-    await settleSettings(await settingsPage());
-    assert.notEqual(hash(), firstHash);
-    const finalHash = hash();
-    const conflict = path.join(profile, 'conflict', 'icon.png');
-    fs.mkdirSync(path.dirname(conflict), { recursive: true });
-    fs.copyFileSync(path.join(profile, 'pins.png'), conflict);
-    await (await settingsPage()).getByLabel('アバター画像を選択').setInputFiles(conflict);
-    await settleSettings(await settingsPage());
-    await (
-      await settingsPage()
-    )
-      .getByText(/同名の別画像が登録されています/)
-      .first()
-      .waitFor();
-    assert.equal(hash(), finalHash);
-    await (
-      await settingsPage()
-    )
-      .getByRole('button', { name: '設定を再読み込み', exact: true })
-      .click();
-    assert.deepEqual(fs.readdirSync(path.join(profile, 'data/assets/profile')).sort(), [
-      'icon.png',
-      'pins.png',
-    ]);
-    const rejected = await page.evaluate(async () => {
-      const s = await window.dock.snapshot();
-      try {
-        await window.dock.saveSettings(
-          { ...s.settings.value, profile: { ...s.settings.value.profile, name: 'invalid upload' } },
-          s.settings.revision,
-          new Uint8Array([1, 2, 3]),
-        );
-        return false;
-      } catch {
-        return true;
-      }
-    });
-    assert.equal(rejected, true);
-    assert.equal(hash(), finalHash);
-    assert.equal(
-      (await page.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
-      '検証ユーザー',
-    );
-    await page.screenshot({ path: path.join(profile, 'profile.png') });
     await application.close();
     application = undefined;
     page = await launch();
-    await (
-      await require('./shell-overlay-helper.cjs').ribbonPage(page)
-    )
-      .locator('.avatar img')
-      .waitFor();
     assert.equal(
-      (await page.evaluate(() => window.dock.snapshot())).settings.value.profile.name,
+      (await page.evaluate(() => window.dock.snapshot())).settings.value.extensions[
+        'fixture.profile'
+      ].settings.name,
       '検証ユーザー',
     );
-    assert.equal(hash(), finalHash);
     await page.keyboard.press('Control+Alt+p');
     await waitPins(page, ['appdock.welcome.refresh', 'appdock.welcome.verify-storage']);
     await (
@@ -290,8 +225,7 @@ async function waitPins(page, pins) {
             'pin / order / filter / unpin',
             'shortcut recording / shared bindings / remapping',
             'TypeScript and .NET keyboard commands',
-            'profile name / image upload / original filenames / retained assets',
-            'same-name different image and invalid image preserve profile and registered originals',
+            'declarative Profile Applet settings and restart persistence',
             'restart persistence',
           ],
         },

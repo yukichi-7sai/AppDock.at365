@@ -246,10 +246,8 @@ export class SettingsPageSession {
         if (op.pageId !== state.pageId) this.options.release?.();
         this.navigation.move = undefined;
       } else if (op.kind === 'edit') {
-        if (!['mode', 'page-values', 'partial-text', 'avatar', 'reload'].includes(op.action.type))
+        if (!['mode', 'page-values', 'partial-text', 'reload'].includes(op.action.type))
           throw Error('設定操作が不正です。');
-        if (op.action.type === 'avatar' && state.pageId !== 'profile')
-          throw Error('画像はプロフィールで選択してください。');
         await this.options.editor.act({ ...action, action: op.action });
       } else if (op.kind === 'invoke') {
         // Rebuild against current page and availability before resolving the issued ID.

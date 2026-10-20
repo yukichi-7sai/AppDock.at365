@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useSettingsControls } from './api';
 import { SettingsInputMode } from './SettingsInput';
 import { SettingsHint } from './SettingsHint';
+let activeSettingsModals = 0;
 
 /** Shared settings modal: focus containment/return, IME-safe dismissal and input suspension. */
 export function SettingsModal({
@@ -36,6 +37,7 @@ export function SettingsModal({
     dialog.current?.querySelector<HTMLElement>(initialFocus)?.focus({ preventScroll: true });
   }, []);
   useEffect(() => {
+    activeSettingsModals++;
     let active = true;
     const suspend = () => {
       callbacks.current.onReady?.(false);
@@ -53,7 +55,9 @@ export function SettingsModal({
     return () => {
       active = false;
       window.removeEventListener('focus', suspend);
-      void settingsControls.setShortcutRecording(false).catch(() => {});
+      activeSettingsModals = Math.max(0, activeSettingsModals - 1);
+      if (activeSettingsModals === 0)
+        void settingsControls.setShortcutRecording(false).catch(() => {});
       queueMicrotask(() => {
         if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
         else

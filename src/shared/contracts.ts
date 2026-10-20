@@ -42,7 +42,9 @@ export interface Settings {
   trayMenu?: import('./tray-menu').TrayMenuItem[];
   pinnedCommands: string[];
   ribbon: import('./ribbon').RibbonLayout;
-  profile: { name: string; avatar: string | null };
+  /** Opaque legacy data retained on save; never used for host presentation. */
+  profile?: unknown;
+  imageLibrary?: import('./registered-images').ImageLibrary;
 }
 export interface SettingsSnapshot<T = Settings> {
   value: T;
@@ -80,6 +82,7 @@ export interface SettingDefinition {
     | 'boolean'
     | 'number'
     | 'string'
+    | 'registered-image'
     | 'json'
     | 'select'
     | 'shortcut-list'
@@ -89,6 +92,8 @@ export interface SettingDefinition {
   default?: unknown;
   minimum?: number;
   maximum?: number;
+  minLength?: number;
+  maxLength?: number;
   step?: number;
   options?: SettingOption[];
   dynamic?: boolean;
@@ -105,6 +110,7 @@ export interface SettingDefinition {
     enabledKey?: string;
     idKey?: string;
     iconKey?: string;
+    imageKey?: string;
     confirmDelete?: boolean;
     showIndex?: boolean;
   };
@@ -153,6 +159,7 @@ export interface PanelAction {
   selected?: boolean;
 }
 export interface ExtensionManifest {
+  ribbonItems?: import('./ribbon').AppletRibbonItem[];
   customCommandTypes?: import('./custom-commands').CustomCommandType[];
   pageActions?: { id: string; parameters?: Record<string, 'string' | 'number' | 'boolean'> }[];
   pageCollections?: import('./page-collections').PageCollectionDefinition[];
@@ -230,7 +237,6 @@ export interface HostSnapshot {
   legacyLocalData: boolean;
   runtime: { electron: string; chrome: string; node: string; platform: string; arch: string };
   dark: boolean;
-  avatarUrl: string | null;
 }
 export interface GlobalHotKeyStatus {
   commandId: string;
@@ -242,6 +248,7 @@ export interface GlobalHotKeyStatus {
   effectiveBlockOriginalInput?: boolean;
 }
 export interface DockApi {
+  imageLibrary: import('./registered-images').ImageLibraryApi;
   settingsPage: import('./settings-page').SettingsPageApi;
   settingsEditing(): Promise<import('./settings-editing').SettingsInputState>;
   flushSettings(): Promise<void>;
@@ -308,12 +315,7 @@ export interface DockApi {
     callback: (result: import('./shell-pages').HomeCommandResult) => void,
   ): () => void;
   snapshot(): Promise<HostSnapshot>;
-  saveSettings(
-    value: Settings,
-    revision: number,
-    avatar?: Uint8Array | null,
-    avatarName?: string,
-  ): Promise<SettingsSnapshot>;
+  saveSettings(value: Settings, revision: number): Promise<SettingsSnapshot>;
   setPinnedCommands(ids: string[]): Promise<SettingsSnapshot>;
   openCommandPalette(
     request: import('./overlays').CommandPaletteRequest,
