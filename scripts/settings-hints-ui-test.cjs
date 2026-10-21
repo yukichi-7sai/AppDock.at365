@@ -18,6 +18,7 @@ const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const accentLayoutOnly = process.argv.includes('--accent-layout-only');
 const commandNavigationOnly = process.argv.includes('--command-navigation-only');
+const listScrollbarOnly = process.argv.includes('--list-scrollbar-only');
 const updateRequests = [];
 const titleSamples = [];
 const layoutSamples = [];
@@ -526,6 +527,18 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (listScrollbarOnly) {
+      await require('./settings-list-scrollbar-checks.cjs')({
+        host,
+        select,
+        until,
+        profile,
+        checks,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (commandNavigationOnly) {
       await require('./settings-command-navigation-checks.cjs')({
         host,
@@ -1121,6 +1134,7 @@ async function checkSectionTitles() {
       assignmentSpeechOnly,
       accentLayoutOnly,
       commandNavigationOnly,
+      listScrollbarOnly,
       titleSampleCount: titleSamples.length,
       checks,
       errors,

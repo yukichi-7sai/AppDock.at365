@@ -218,6 +218,67 @@
 .settings-panel > .settings-layout {
   min-height: 0;
 }
+/* Keep long command lists and their native horizontal scrollbar inside the page. */
+.settings-panel > .settings-layout:has(:is(.shortcuts-editor, .gestures-editor)) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.settings-panel .settings-form:has(> :is(.shortcuts-editor, .gestures-editor)) {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  flex: 1;
+  min-height: 0;
+}
+.settings-panel
+  .settings-form:has(> :is(.shortcuts-editor, .gestures-editor))
+  > :not(:is(.shortcuts-editor, .gestures-editor)),
+.settings-panel :is(.shortcuts-editor, .gestures-editor) > header,
+.settings-panel
+  :is(.shortcuts-editor, .gestures-editor)
+  > .settings-section-content
+  > :not(.shortcut-command-list) {
+  flex: none;
+}
+.settings-panel :is(.shortcuts-editor, .gestures-editor) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: min-content;
+}
+.settings-panel :is(.shortcuts-editor, .gestures-editor) > .settings-section-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: min-content;
+}
+.settings-panel :is(.shortcuts-editor, .gestures-editor) .shortcut-command-list {
+  flex: 1;
+  min-height: 80px;
+  contain: size;
+  overflow: auto;
+  scrollbar-width: auto;
+}
+.settings-panel :is(.shortcuts-editor, .gestures-editor) .shortcut-command-list::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.settings-panel
+  :is(.shortcuts-editor, .gestures-editor)
+  .shortcut-command-list::-webkit-scrollbar-track,
+.settings-panel
+  :is(.shortcuts-editor, .gestures-editor)
+  .shortcut-command-list::-webkit-scrollbar-corner {
+  background: var(--settings-group-background);
+}
+.settings-panel
+  :is(.shortcuts-editor, .gestures-editor)
+  .shortcut-command-list::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 3px solid var(--settings-group-background);
+  border-radius: 8px;
+}
 .settings-panel h3,
 .settings-panel h4 {
   color: var(--text);
