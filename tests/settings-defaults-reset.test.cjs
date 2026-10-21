@@ -82,6 +82,9 @@ test('sparse JSON round trips host settings; false, zero, empty arrays and unkno
 test('every host JSON page accepts an empty object and displays an empty default projection', () => {
   const current = createDefaultSettings();
   current.host.theme = 'dark';
+  current.host.accentColor = 'custom';
+  current.host.customAccentDark = '#123456';
+  current.host.customAccentLight = '#FEDCBA';
   current.host.soundEnabled = false;
   current.extensions['missing.owner'] = { enabled: false, settings: { keep: 9 } };
   for (const p of settingsCatalog([], current).filter((p) => p.json)) {

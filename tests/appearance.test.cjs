@@ -4,7 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { EventEmitter } = require('node:events');
-const { accentPalettes, resolveAppearance } = require('../out/main/shared/appearance');
+const {
+  accentPalettes,
+  accentChoices,
+  legacyAccentPalette,
+  defaultCustomAccent,
+  resolveAppearance,
+} = require('../out/main/shared/appearance');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
 const {
@@ -25,9 +31,11 @@ const contrast = (a, b) => {
   return (values[0] + 0.05) / (values[1] + 0.05);
 };
 test('all palettes provide readable accent text, soft selections and filled/hovered controls in both themes', () => {
-  assert.equal(accentPalettes.length, 6);
-  assert.deepEqual(accentPalettes.map((palette) => palette.title), ['ミント', 'アリス', 'スカイブルー', 'ラベンダー', 'マジカル', 'クッキー']);
-  for (const palette of accentPalettes)
+  assert.deepEqual(
+    accentChoices.map((palette) => palette.title),
+    ['ミント', 'アリス', 'ラベンダー', 'マジカル', 'クッキー', 'カスタム'],
+  );
+  for (const palette of [...accentPalettes, legacyAccentPalette])
     for (const dark of [false, true]) {
       const { colors } = resolveAppearance(palette.id, dark);
       for (const [a, b] of [
@@ -39,12 +47,50 @@ test('all palettes provide readable accent text, soft selections and filled/hove
     }
   assert.equal(resolveAppearance('alice-blue', false).colors.soft, '#f0f8ff');
 });
+test('custom tones keep arbitrary saved pairs intact and resolve readable colors for both themes', () => {
+  const colors = [
+    '#000000',
+    '#FFFFFF',
+    '#777777',
+    '#FF0000',
+    '#00FF00',
+    '#0000FF',
+    '#FFFF00',
+    '#6C3A86',
+    '#F8ECFF',
+  ];
+  for (const a of colors)
+    for (const b of colors)
+      for (const dark of [false, true]) {
+        const pair = Object.freeze({ dark: a, light: b });
+        const result = resolveAppearance('custom', dark, 23, pair);
+        assert.equal(result.palette, 'custom');
+        assert.equal(result.revision, 23);
+        assert.deepEqual(pair, { dark: a, light: b });
+        const { accent, soft, text, hover } = result.colors;
+        for (const [x, y] of [
+          [accent, soft],
+          [accent, text],
+          [hover, text],
+          [accent, dark ? '#20242f' : '#f0f2f6'],
+        ])
+          assert(contrast(x, y) >= 4.5, `${a}/${b}/${dark}/${x}/${y}`);
+      }
+  assert.equal(
+    resolveAppearance('custom', false, 0, { dark: '#245f9e', light: '#f0f8ff' }).colors.accent,
+    '#245f9e',
+  );
+  assert.equal(
+    resolveAppearance('custom', false, 0, { dark: '#245f9e', light: '#f0f8ff' }).colors.soft,
+    '#f0f8ff',
+  );
+});
 test('accent selection defaults to mint, validates exact presets, and participates in device settings and partial JSON', () => {
   const settings = createDefaultSettings();
   delete settings.host.accentColor;
   assert.equal(parseSettings(settings).host.accentColor, 'mint');
   assert(deviceHostKeys.includes('accentColor'));
-  for (const invalid of ['custom', '#f0f8ff', null, 5, {}])
+  for (const invalid of ['unknown', '#f0f8ff', null, 5, {}])
     assert.throws(() =>
       parseSettings({ ...settings, host: { ...settings.host, accentColor: invalid } }),
     );
@@ -60,6 +106,45 @@ test('accent selection defaults to mint, validates exact presets, and participat
   assert.equal(next.host.accentColor, 'alice-blue');
   assert.equal(next.host.theme, 'light');
   assert.equal(settingsProjection(next, page, []).host.accentColor, 'alice-blue');
+});
+test('custom and legacy colors round-trip without conversion, validate HEX and expose both fields to the appearance page and settings API', () => {
+  const settings = createDefaultSettings();
+  delete settings.host.customAccentDark;
+  delete settings.host.customAccentLight;
+  const parsed = parseSettings(settings);
+  assert.equal(parsed.host.customAccentDark, defaultCustomAccent.dark);
+  assert.equal(parsed.host.customAccentLight, defaultCustomAccent.light);
+  for (const key of ['customAccentDark', 'customAccentLight']) {
+    assert(deviceHostKeys.includes(key));
+    for (const invalid of ['#fff', '#00000000', 'red', '', null, 3, {}])
+      assert.throws(
+        () => parseSettings({ ...parsed, host: { ...parsed.host, [key]: invalid } }),
+        new RegExp(key),
+      );
+  }
+  const page = settingsCatalog([], parsed).find((p) => p.id === 'appearance');
+  const next = applySettingsJson(
+    parsed,
+    page,
+    [],
+    JSON.stringify({
+      host: { accentColor: 'custom', customAccentDark: '#AABBCC', customAccentLight: '#012345' },
+    }),
+  );
+  assert.equal(next.host.customAccentDark, '#AABBCC');
+  assert.equal(next.host.customAccentLight, '#012345');
+  assert.equal(settingsProjection(next, page, []).host.customAccentLight, '#012345');
+  next.host.accentColor = 'mint';
+  assert.equal(parseSettings(next).host.customAccentDark, '#AABBCC');
+  next.host.accentColor = 'sky-blue';
+  assert.equal(parseSettings(next).host.accentColor, 'sky-blue');
+  assert.equal(resolveAppearance('sky-blue', false).colors.accent, '#036a91');
+  const definitions = require('../out/main/shared/settings-commands').hostSettingDefinitions;
+  assert(
+    definitions.find((f) => f.key === 'accentColor').options.some((o) => o.value === 'custom'),
+  );
+  for (const key of ['customAccentDark', 'customAccentLight'])
+    assert.equal(definitions.find((f) => f.key === key).automation, true);
 });
 test('appearance delivery authorizes registered main frames, updates once per change, reloads, and unregisters destroyed surfaces', () => {
   const host = require('../out/main/main/core/appearance-host');

@@ -16,6 +16,7 @@ import { validateSettingValue } from '../../shared/setting-definitions';
 import type { SettingsStore } from './settings';
 import type { AutomationCommand } from './automation-commands';
 import { collectionRecord } from '../../shared/page-collections';
+import { isAccentHex } from '../../shared/appearance';
 
 export class SettingsCommandError extends Error {
   constructor(
@@ -299,8 +300,15 @@ export class SettingsCommands {
     const store = this.options.settings,
       next = structuredClone(store.value);
     const before = this.values(owner, store.value, fields);
-    if (owner.id === 'appdock') Object.assign(next.host, changes);
-    else if (owner.collection) {
+    if (owner.id === 'appdock') {
+      for (const key of ['customAccentDark', 'customAccentLight'])
+        if (Object.hasOwn(changes, key) && !isAccentHex(changes[key]))
+          throw new SettingsCommandError(
+            'INVALID_ARGUMENT',
+            'カスタムの色は #RRGGBB 形式で指定してください。',
+          );
+      Object.assign(next.host, changes);
+    } else if (owner.collection) {
       const item = collectionRecord(next, owner.collection);
       if (!item?.enabled)
         throw new SettingsCommandError('UNAVAILABLE', 'ページが有効である必要があります。');

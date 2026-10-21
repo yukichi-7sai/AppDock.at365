@@ -1,5 +1,5 @@
 import { parseMcpRoster } from './mcp-client';
-import { defaultAccentColor, isAccentColor } from './appearance';
+import { defaultAccentColor, defaultCustomAccent, isAccentColor, isAccentHex } from './appearance';
 import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
 import { parseShellProviders } from './shell';
@@ -31,6 +31,8 @@ export const createDefaultSettings = (): Settings => ({
     shellProviders: {},
     theme: 'light',
     accentColor: defaultAccentColor,
+    customAccentDark: defaultCustomAccent.dark,
+    customAccentLight: defaultCustomAccent.light,
     showHints: true,
     soundEnabled: true,
     closeToTray: true,
@@ -89,6 +91,8 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('theme は dark / light / system です。');
   if (!isAccentColor(value.host.accentColor))
     throw new Error('host.accentColor は定義済みのアクセントパレットを指定してください。');
+  for (const key of ['customAccentDark', 'customAccentLight'])
+    if (!isAccentHex(value.host[key])) throw new Error(`host.${key} は #RRGGBB 形式の色です。`);
   for (const key of ['closeToTray', 'startMinimized'])
     if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
   const shellProviders = parseShellProviders(value.host);

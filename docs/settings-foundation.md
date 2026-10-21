@@ -1,6 +1,6 @@
 # 設定基盤と本体の共通設定画面
 
-アクセントカラーは[共通配色](appearance.md)に従い、テーマから独立した`host.accentColor`で選ぶ。端末専用保存・即時反映・既定値省略・部分JSON/検索/設定APIの対象とする。
+アクセントカラーは[共通配色](appearance.md)に従い、テーマから独立した`host.accentColor`で選ぶ。カスタムの2色は`host.customAccentDark`・`host.customAccentLight`。端末専用保存・即時反映・既定値省略・部分JSON/検索/設定APIの対象とする。
 
 設定画面は本体rendererで描画し、すべてのShellで共通とする。[本体統合の設計](settings-host-ui-design.md)に従い、設定UIはsrc/renderer/settingsとsettings-uiへ集約した。
 
@@ -36,7 +36,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使�
 
 Applet管理と左インデックスは本体の共通設定ページを開く。個別設定・入力設定・ログの移動先と表示用フィルターは[Applet管理](applet-management-settings-design.md)を参照する。停止・無効でも編集でき、移動だけで起動しない。入力キューと3秒のflush、競合と不正入力の契約を維持する。
 
-「表示」の部分JSONは`host.theme`・`host.accentColor`・`host.showHints`・`host.shellProviders`です。領域ごとの選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。旧単一キーを部分JSONへ混在させた要求は範囲外として拒否します。領域別指定の移行・未知領域保持・旧設定領域の廃止は[領域別割り当て](shell-region-assignment.md)。
+「表示」の部分JSONは`host.theme`・`host.accentColor`・`host.customAccentDark`・`host.customAccentLight`・`host.showHints`・`host.shellProviders`です。領域ごとの選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。旧単一キーを部分JSONへ混在させた要求は範囲外として拒否します。領域別指定の移行・未知領域保持・旧設定領域の廃止は[領域別割り当て](shell-region-assignment.md)。
 
 ## カタログ・JSON・検索
 

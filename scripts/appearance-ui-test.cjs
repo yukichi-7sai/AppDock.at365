@@ -77,8 +77,8 @@ async function stop() {
   if (browser) await browser.close();
   browser = undefined;
 }
-async function assertColors(page, id, dark) {
-  const expected = resolveAppearance(id, dark);
+async function assertColors(page, id, dark, custom) {
+  const expected = resolveAppearance(id, dark, 0, custom);
   await page.waitForFunction(
     ({ id, dark, colors }) => {
       const r = document.documentElement,
@@ -87,6 +87,7 @@ async function assertColors(page, id, dark) {
         r.dataset.accent === id &&
         r.dataset.theme === (dark ? 'dark' : 'light') &&
         s.getPropertyValue('--accent').trim() === colors.accent &&
+        s.getPropertyValue('--accent-soft').trim() === colors.soft &&
         s.getPropertyValue('--accent-text').trim() === colors.text
       );
     },
@@ -143,6 +144,7 @@ async function assertColors(page, id, dark) {
     initial.host.hardwareAcceleration = false;
     initial.host.closeToTray = false;
     initial.host.soundEnabled = false;
+    initial.host.accentColor = 'sky-blue';
     initial.gestures.enabled = false;
     initial.keybindings = [];
     initial.globalShortcutCommands = [];
@@ -156,6 +158,18 @@ async function assertColors(page, id, dark) {
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await host.getByRole('button', { name: '表示', exact: true }).click();
     await host.getByRole('group', { name: 'アクセントカラー', exact: true }).waitFor();
+    await assertColors(host, 'sky-blue', false);
+    assert.equal(await host.getByRole('button', { name: 'スカイブルー', exact: true }).count(), 0);
+    assert(await host.getByText('現在の配色: スカイブルー', { exact: true }).isVisible());
+    assert.deepEqual(await host.locator('.accent-palettes button').allTextContents(), [
+      'ミント',
+      'アリス',
+      'ラベンダー',
+      'マジカル',
+      'クッキー',
+      'カスタム',
+    ]);
+    checks.push('legacy sky-blue preserved; custom last in six choices');
     assert(
       await host
         .locator('.settings-form')
@@ -183,6 +197,74 @@ async function assertColors(page, id, dark) {
         checks.push(palette.id + '/' + (dark ? 'dark' : 'light'));
       }
     }
+    await host.getByRole('button', { name: 'カスタム', exact: true }).click();
+    await host.getByLabel('テーマ', { exact: true }).selectOption('light');
+    await settleSettings(host);
+    const custom = { dark: '#6C3A86', light: '#F8ECFF' };
+    const darkGroup = host.getByRole('group', { name: '濃い色', exact: true });
+    const lightGroup = host.getByRole('group', { name: '淡い色', exact: true });
+    let darkHex = darkGroup.getByRole('textbox', { name: '色のHEX値' });
+    let lightHex = lightGroup.getByRole('textbox', { name: '色のHEX値' });
+    const before = (await host.evaluate(() => window.dock.snapshot())).settings;
+    await darkHex.fill('#12');
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.revision,
+      before.revision,
+    );
+    await darkHex.press('Escape');
+    assert.equal(await darkHex.inputValue(), before.value.host.customAccentDark);
+    await darkHex.fill('#XYZ123');
+    await darkHex.press('Enter');
+    assert.equal(await darkHex.getAttribute('aria-invalid'), 'true');
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.host.customAccentDark,
+      before.value.host.customAccentDark,
+    );
+    await darkHex.fill(custom.dark);
+    await darkHex.press('Enter');
+    await settleSettings(host);
+    await lightHex.fill(custom.light);
+    await lightHex.press('Tab');
+    await settleSettings(host);
+    await assertColors(host, 'custom', false, custom);
+    checks.push(
+      'custom HEX stays local, Escape cancels, invalid input is not saved, Enter/blur commit',
+    );
+    await lightGroup.getByRole('button', { name: '桃', exact: true }).click();
+    await settleSettings(host);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.host.customAccentLight,
+      '#E7B3D1',
+    );
+    await lightGroup.getByLabel('自由な色', { exact: true }).evaluate((el) => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '#f8ecff');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await settleSettings(host);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.host.customAccentLight,
+      custom.light,
+    );
+    checks.push('custom swatches and native color input save');
+    for (const dark of [false, true]) {
+      await host.getByLabel('テーマ', { exact: true }).selectOption(dark ? 'dark' : 'light');
+      await settleSettings(host);
+      for (const page of context
+        .pages()
+        .filter((p) => /appdock:\/\/host\/|\/(main|bars)\.html$/.test(p.url())))
+        await assertColors(page, 'custom', dark, custom);
+      await host.screenshot({ path: path.join(profile, `custom-${dark ? 'dark' : 'light'}.png`) });
+    }
+    checks.push('custom shared colors in both themes');
+    await host.getByRole('button', { name: 'アリス', exact: true }).click();
+    await settleSettings(host);
+    assert.equal(await host.locator('.accent-custom-colors').count(), 0);
+    await host.getByRole('button', { name: 'カスタム', exact: true }).click();
+    await settleSettings(host);
+    assert.equal(await darkHex.inputValue(), custom.dark);
+    assert.equal(await lightHex.inputValue(), custom.light);
+    checks.push('custom colors retained across preset switching');
     await host.getByRole('button', { name: 'アリス', exact: true }).click();
     await settleSettings(host);
     await host.screenshot({ path: path.join(profile, 'appearance-dark.png') });
@@ -256,28 +338,71 @@ async function assertColors(page, id, dark) {
     await settleSettings(host);
     await assertColors(local, 'alice-blue', false);
     checks.push('hidden Applet live updates');
+    await host.getByRole('button', { name: 'カスタム', exact: true }).click();
+    await settleSettings(host);
+    for (const page of context
+      .pages()
+      .filter((p) => p.url().startsWith('appdock://host/') || p.url().startsWith('file:')))
+      await assertColors(page, 'custom', false, custom);
+    await local.reload();
+    await assertColors(local, 'custom', false, custom);
+    checks.push(
+      'custom colors propagate to local Applet and all opened Shell surfaces, including reload',
+    );
+    await host.getByRole('button', { name: 'アリス', exact: true }).click();
+    await settleSettings(host);
     await host.screenshot({ path: path.join(profile, 'appearance-light.png') });
     await stop();
     await start();
     await assertColors(host, 'alice-blue', false);
     checks.push('restart persistence');
+    darkHex = host
+      .getByRole('group', { name: '濃い色', exact: true })
+      .getByRole('textbox', { name: '色のHEX値' });
+    lightHex = host
+      .getByRole('group', { name: '淡い色', exact: true })
+      .getByRole('textbox', { name: '色のHEX値' });
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await host.getByRole('button', { name: '表示', exact: true }).click();
+    await host.getByRole('button', { name: 'カスタム', exact: true }).click();
+    await settleSettings(host);
+    assert.equal(await darkHex.inputValue(), custom.dark);
+    assert.equal(await lightHex.inputValue(), custom.light);
+    await assertColors(host, 'custom', false, custom);
+    checks.push('custom pair restored after restart');
     await host.getByRole('button', { name: 'ミント', exact: true }).click();
     await settleSettings(host);
     await assertColors(host, 'mint', false);
-    await inspect(mainPort, electronExpression + ".BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/')).setSize(760,850)");
-    assert(await host.locator('.accent-palettes').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
-    await host.getByRole('button', {name:'アリス',exact:true}).focus();
+    await inspect(
+      mainPort,
+      electronExpression +
+        ".BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/')).setSize(760,850)",
+    );
+    assert(
+      await host.locator('.accent-palettes').evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    );
+    await host.getByRole('button', { name: 'アリス', exact: true }).focus();
     await host.keyboard.press('Space');
     await settleSettings(host);
     await assertColors(host, 'alice-blue', false);
-    await host.screenshot({path:path.join(profile,'appearance-narrow.png')});
-    await host.getByRole('button', {name:'ミント',exact:true}).focus();
+    await host.screenshot({ path: path.join(profile, 'appearance-narrow.png') });
+    await host.getByRole('button', { name: 'ミント', exact: true }).focus();
     await host.keyboard.press('Enter');
     await settleSettings(host);
     await assertColors(host, 'mint', false);
     checks.push('narrow native window and keyboard palette selection');
+    await host.getByRole('button', { name: 'カスタム', exact: true }).click();
+    await settleSettings(host);
+    assert(
+      await host
+        .locator('.accent-custom-colors')
+        .evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    );
+    assert(await darkHex.isVisible());
+    await host.screenshot({ path: path.join(profile, 'custom-narrow.png') });
+    await host.getByRole('button', { name: 'ミント', exact: true }).click();
+    await settleSettings(host);
+    checks.push('custom editors fit narrow window');
     const json = JSON.parse(
       fs.readFileSync(
         path.join(profile, 'settings-' + require('node:os').hostname() + '.json'),
@@ -285,6 +410,8 @@ async function assertColors(page, id, dark) {
       ),
     );
     assert.equal(json.host?.accentColor, undefined);
+    assert.equal(json.host.customAccentDark, custom.dark);
+    assert.equal(json.host.customAccentLight, custom.light);
     checks.push('default omitted from device JSON');
     success = true;
   } catch (error) {

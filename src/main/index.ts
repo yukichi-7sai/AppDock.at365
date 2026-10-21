@@ -284,7 +284,11 @@ if (locked) {
 }
 const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
 configureAppearance(
-  () => resolveAppearance(settings.value.host.accentColor, nativeTheme.shouldUseDarkColors),
+  () =>
+    resolveAppearance(settings.value.host.accentColor, nativeTheme.shouldUseDarkColors, 0, {
+      dark: settings.value.host.customAccentDark,
+      light: settings.value.host.customAccentLight,
+    }),
   ipcMain,
 );
 function applyAudioPlaybackSettings() {

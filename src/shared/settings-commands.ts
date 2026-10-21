@@ -1,5 +1,10 @@
 import type { AppletCommand, SettingDefinition } from './contracts';
-import { accentPalettes, defaultAccentColor } from './appearance';
+import {
+  accentChoices,
+  legacyAccentPalette,
+  defaultAccentColor,
+  defaultCustomAccent,
+} from './appearance';
 
 const switches = ['on', 'off', 'toggle'] as const;
 export const hostSettingDefinitions: SettingDefinition[] = [
@@ -9,8 +14,19 @@ export const hostSettingDefinitions: SettingDefinition[] = [
     type: 'select',
     default: defaultAccentColor,
     automation: true,
-    options: accentPalettes.map(({ id, title }) => ({ value: id, label: title })),
+    options: [...accentChoices, legacyAccentPalette].map(({ id, title }) => ({
+      value: id,
+      label: title,
+    })),
   },
+  ...(['dark', 'light'] as const).map((tone) => ({
+    key: tone === 'dark' ? 'customAccentDark' : 'customAccentLight',
+    title: `カスタムアクセントの${tone === 'dark' ? '濃い色' : '淡い色'}`,
+    description: '#RRGGBB形式の色。表示時はテーマに合わせて明るさを自動調整します。',
+    type: 'string' as const,
+    default: defaultCustomAccent[tone],
+    automation: true,
+  })),
   {
     key: 'theme',
     title: '表示テーマ',

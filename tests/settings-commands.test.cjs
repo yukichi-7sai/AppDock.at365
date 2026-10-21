@@ -102,6 +102,56 @@ function fixture(t) {
     setExecute: (v) => (execute = v),
   };
 }
+test('custom accent API validates HEX in dryRun, saves the pair atomically, and retains revision/permission checks', async (t) => {
+  const f = fixture(t);
+  const changes = {
+    accentColor: 'custom',
+    customAccentDark: '#123456',
+    customAccentLight: '#FEDCBA',
+  };
+  const revision = f.commands.revision();
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  for (const key of ['customAccentDark', 'customAccentLight'])
+    assert.throws(
+      () =>
+        f.commands.execute('appdock.settings.update', {
+          changes: { ...changes, [key]: '#xyz123' },
+          expectedRevision: revision,
+          dryRun: true,
+        }),
+      (e) => e.code === 'INVALID_ARGUMENT',
+    );
+  const dry = f.commands.execute('appdock.settings.update', {
+    changes,
+    expectedRevision: revision,
+    dryRun: true,
+  });
+  assert.equal(dry.values.customAccentDark, changes.customAccentDark);
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  f.setWrite(false);
+  await assert.rejects(() =>
+    f.api.call('commands.execute', {
+      id: 'appdock.settings.update',
+      args: { changes, expectedRevision: revision },
+    }),
+  );
+  assert.equal(f.commands.revision(), revision);
+  f.setWrite(true);
+  await f.api.call('commands.execute', {
+    id: 'appdock.settings.update',
+    args: { changes, expectedRevision: revision },
+  });
+  for (const [key, value] of Object.entries(changes))
+    assert.equal(f.settings.value.host[key], value);
+  assert.throws(
+    () =>
+      f.commands.execute('appdock.settings.update', {
+        changes: { accentColor: 'mint' },
+        expectedRevision: revision,
+      }),
+    (e) => e.code === 'REVISION_CONFLICT',
+  );
+});
 for (const field of ['soundEnabled', 'showHints'])
   test(`${field} generates public ON/OFF/toggle commands with immediate persisted effects`, async (t) => {
     const f = fixture(t);

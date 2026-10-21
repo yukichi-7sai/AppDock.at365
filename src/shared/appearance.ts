@@ -8,12 +8,6 @@ export const accentPalettes = [
     dark: ['#acd5ff', '#20364d'],
   },
   {
-    id: 'sky-blue',
-    title: 'スカイブルー',
-    light: ['#036a91', '#e5f6ff'],
-    dark: ['#75d6f5', '#173b48'],
-  },
-  {
     id: 'lavender',
     title: 'ラベンダー',
     light: ['#6d48a6', '#f3edff'],
@@ -22,10 +16,36 @@ export const accentPalettes = [
   { id: 'rose', title: 'マジカル', light: ['#a53666', '#ffedf4'], dark: ['#f2a6c6', '#452b38'] },
   { id: 'amber', title: 'クッキー', light: ['#865600', '#fff5dc'], dark: ['#f2c66a', '#40351f'] },
 ] as const;
-export type AccentColor = (typeof accentPalettes)[number]['id'];
+/** Retained for saved settings; no longer offered as a new palette. */
+export const legacyAccentPalette = {
+  id: 'sky-blue',
+  title: 'スカイブルー',
+  light: ['#036a91', '#e5f6ff'],
+  dark: ['#75d6f5', '#173b48'],
+} as const;
+export const accentChoices = [
+  ...accentPalettes.map(({ id, title }) => ({ id, title })),
+  { id: 'custom', title: 'カスタム' },
+] as const;
+export type AccentColor = (typeof accentPalettes)[number]['id'] | 'sky-blue' | 'custom';
 export const defaultAccentColor: AccentColor = 'mint';
+export interface CustomAccentColors {
+  dark: string;
+  light: string;
+}
+export const defaultCustomAccent: Readonly<CustomAccentColors> = {
+  dark: accentPalettes[0].light[0],
+  light: accentPalettes[0].light[1],
+};
+export function isAccentHex(value: unknown): value is string {
+  return typeof value === 'string' && /^#[a-f\d]{6}$/i.test(value);
+}
 export function isAccentColor(value: unknown): value is AccentColor {
-  return accentPalettes.some((palette) => palette.id === value);
+  return (
+    value === 'custom' ||
+    value === legacyAccentPalette.id ||
+    accentPalettes.some((palette) => palette.id === value)
+  );
 }
 export interface AppearanceSnapshot {
   revision: number;
@@ -46,8 +66,31 @@ export function resolveAppearance(
   palette: AccentColor,
   dark: boolean,
   revision = 0,
+  custom: CustomAccentColors = defaultCustomAccent,
 ): AppearanceSnapshot {
-  const definition = accentPalettes.find((item) => item.id === palette) ?? accentPalettes[0];
+  if (palette === 'custom') {
+    // Keep the saved pair intact. Resolve readable tones only for presentation.
+    const base = dark ? '#20242f' : '#f0f2f6';
+    const soft = toward(custom[dark ? 'dark' : 'light'], dark ? '#101116' : '#ffffff', (color) =>
+      dark ? luminance(color) <= 0.025 : luminance(color) >= 0.8,
+    );
+    const accent = toward(
+      custom[dark ? 'light' : 'dark'],
+      dark ? '#ffffff' : '#000000',
+      (color) => contrast(color, soft) >= 4.5 && contrast(color, base) >= 4.5,
+    );
+    const text = contrast(accent, '#000000') >= contrast(accent, '#ffffff') ? '#000000' : '#ffffff';
+    const hover = toward(
+      mix(accent, text === '#000000' ? '#ffffff' : '#000000', 0.12),
+      text === '#000000' ? '#ffffff' : '#000000',
+      (color) => contrast(color, text) >= 4.5,
+    );
+    return { revision, palette, dark, colors: { accent, soft, text, hover } };
+  }
+  const definition =
+    palette === legacyAccentPalette.id
+      ? legacyAccentPalette
+      : (accentPalettes.find((item) => item.id === palette) ?? accentPalettes[0]);
   const [accent, soft] = definition[dark ? 'dark' : 'light'];
   const text = dark ? '#101116' : '#ffffff';
   const hover =
@@ -62,4 +105,37 @@ export function resolveAppearance(
       })
       .join('');
   return { revision, palette: definition.id, dark, colors: { accent, soft, text, hover } };
+}
+
+function mix(color: string, target: string, amount: number): string {
+  return (
+    '#' +
+    [1, 3, 5]
+      .map((offset) =>
+        Math.round(
+          parseInt(color.slice(offset, offset + 2), 16) * (1 - amount) +
+            parseInt(target.slice(offset, offset + 2), 16) * amount,
+        )
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')
+  );
+}
+function luminance(hex: string): number {
+  const rgb = [1, 3, 5]
+    .map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255)
+    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+}
+function contrast(a: string, b: string): number {
+  const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+function toward(color: string, target: string, readable: (color: string) => boolean): string {
+  for (let step = 0; step <= 100; step++) {
+    const next = mix(color, target, step / 100);
+    if (readable(next)) return next;
+  }
+  return target;
 }

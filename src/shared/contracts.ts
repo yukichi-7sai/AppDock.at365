@@ -4,6 +4,8 @@ export interface HostSettings {
   shellProviders?: Record<string, string>;
   theme: 'dark' | 'light' | 'system';
   accentColor: import('./appearance').AccentColor;
+  customAccentDark: string;
+  customAccentLight: string;
   showHints: boolean;
   soundEnabled: boolean;
   closeToTray: boolean;

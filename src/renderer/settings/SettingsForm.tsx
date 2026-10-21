@@ -223,8 +223,21 @@ export function SettingsForm({
               <SettingRow pageId={category} itemKey="accentColor">
                 <AccentColorPicker
                   value={settings.host.accentColor}
+                  custom={{
+                    dark: settings.host.customAccentDark,
+                    light: settings.host.customAccentLight,
+                  }}
                   onChange={(accentColor) =>
                     edit({ ...settings, host: { ...settings.host, accentColor } })
+                  }
+                  onCustomChange={(tone, color) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        [tone === 'dark' ? 'customAccentDark' : 'customAccentLight']: color,
+                      },
+                    })
                   }
                 />
               </SettingRow>

@@ -779,6 +779,16 @@ pre.ai-preview-result {
   gap: 8px;
   width: 100%;
 }
+.accent-custom-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+.accent-custom-colors .settings-field {
+  display: block;
+  min-width: 0;
+}
 .accent-palettes .accent-palette {
   display: flex;
   align-items: center;

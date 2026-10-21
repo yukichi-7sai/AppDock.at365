@@ -70,14 +70,25 @@ test('accent colors remain independent per PC, persist across reload, and omit t
   const before = fs.readFileSync(file, 'utf8');
   const next = structuredClone(a.value);
   next.host.accentColor = 'alice-blue';
+  next.host.customAccentDark = '#123456';
+  next.host.customAccentLight = '#FEDCBA';
   a.save(next, a.revision);
   a.reload();
   assert.equal(a.value.host.accentColor, 'alice-blue');
   assert.equal(b.value.host.accentColor, 'mint');
+  assert.equal(a.value.host.customAccentDark, '#123456');
+  assert.equal(a.value.host.customAccentLight, '#FEDCBA');
+  assert.equal(b.value.host.customAccentDark, createDefaultSettings().host.customAccentDark);
   assert.equal(fs.readFileSync(file, 'utf8'), before);
   next.host.accentColor = 'mint';
   a.save(next, a.revision);
   assert.equal(disk(a.device.file).host?.accentColor, undefined);
+  assert.equal(disk(a.device.file).host.customAccentDark, '#123456');
+  next.host.customAccentDark = createDefaultSettings().host.customAccentDark;
+  next.host.customAccentLight = createDefaultSettings().host.customAccentLight;
+  a.save(next, a.revision);
+  assert.equal(disk(a.device.file).host?.customAccentDark, undefined);
+  assert.equal(disk(a.device.file).host?.customAccentLight, undefined);
 });
 
 test('migration preserves shared bytes and initializes local flags once', (t) => {

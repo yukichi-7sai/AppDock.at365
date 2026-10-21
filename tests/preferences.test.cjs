@@ -18,6 +18,8 @@ test('legacy settings gain Ctrl+P and pins without creating a host profile', () 
   assert.deepEqual(result.host, {
     theme: 'light',
     accentColor: 'mint',
+    customAccentDark: '#217a65',
+    customAccentLight: '#e1f3ec',
     showHints: true,
     soundEnabled: true,
     closeToTray: false,

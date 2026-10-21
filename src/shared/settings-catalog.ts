@@ -1,5 +1,5 @@
 import { collectionRecord } from './page-collections';
-import { accentPalettes } from './appearance';
+import { accentChoices } from './appearance';
 import { defaultAppletEnabled } from './applet-state';
 import { shellRegions } from './shell';
 import { notificationCatalog, notificationSettingKey } from './notification-types';
@@ -315,7 +315,14 @@ export function settingsCatalog(
             id === 'appearance' && key === 'theme'
               ? ['Dark', 'Light', 'System']
               : id === 'appearance' && key === 'accentColor'
-                ? accentPalettes.flatMap((p) => [p.id, p.title])
+                ? [
+                    ...accentChoices.flatMap((p) => [p.id, p.title]),
+                    '濃い色',
+                    '淡い色',
+                    'HEX',
+                    'customAccentDark',
+                    'customAccentLight',
+                  ]
                 : undefined,
         })),
         ...(id === 'notifications'
@@ -402,7 +409,14 @@ export function settingsPaths(
     case 'custom-commands':
       return [['customCommands']];
     case 'appearance':
-      return ['theme', 'accentColor', 'showHints', 'shellProviders'].map((k) => ['host', k]);
+      return [
+        'theme',
+        'accentColor',
+        'customAccentDark',
+        'customAccentLight',
+        'showHints',
+        'shellProviders',
+      ].map((k) => ['host', k]);
     case 'tts':
       return [['tts']];
     case 'ai':
