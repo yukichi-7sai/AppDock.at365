@@ -148,12 +148,10 @@ export function ApiPermissionsSettings({
   grants,
   error: appletError,
   busy: hostBusy,
-  onOpenCodex,
 }: {
   grants: AppletApiPermissions;
   error?: string;
   busy: boolean;
-  onOpenCodex(): void;
 }) {
   const settingsControls = useSettingsControls();
   const [state, setState] = useState<AutomationState>();
@@ -203,23 +201,11 @@ export function ApiPermissionsSettings({
   }
   return (
     <section className="api-permissions" aria-label="操作の許可">
-      <div className="permission-connection">
-        <span>
-          MCP連携：
-          {!state ? '確認中…' : state.running ? '稼働中' : state.enabled ? '起動できません' : 'OFF'}
-        </span>
-        <button className="secondary" onClick={onOpenCodex}>
-          Codex連携を設定
-        </button>
-      </div>
       {(error || appletError || state?.error) && (
         <p className="error-text" role="alert">
           {error || appletError || state?.error}
         </p>
       )}
-      <SettingsHint className="permission-save-status">
-        変更は保存ボタンを押さずに保存されます。
-      </SettingsHint>
       <span className="sr-only" role="status">
         {busy ? '保存しています…' : ''}
       </span>
@@ -228,7 +214,7 @@ export function ApiPermissionsSettings({
           <tr>
             <th scope="col">操作</th>
             <th scope="col">Applet</th>
-            <th scope="col">MCP（Codex）</th>
+            <th scope="col">MCP</th>
           </tr>
         </thead>
         <tbody>
@@ -256,7 +242,7 @@ export function ApiPermissionsSettings({
                     <small className="permission-pending">{reason(row.key, true)}</small>
                   )}
                 </td>
-                <td data-caller="MCP（Codex）">
+                <td data-caller="MCP">
                   {row.key === 'read' ? (
                     <span className="permission-fixed" title="MCP連携中は常に許可">
                       <Toggle

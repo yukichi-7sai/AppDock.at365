@@ -321,14 +321,14 @@ async function until(fn, name) {
       const cells = element.querySelectorAll('td');
       const name = element.querySelector('.applet-management-name');
       const version = element.querySelector('.version-display').getBoundingClientRect();
-      const check = element.querySelector('.applet-update-check').getBoundingClientRect();
+      const check = document.querySelector('.applet-management thead .applet-update-check');
       const time = element.querySelector('time').getBoundingClientRect();
       const links = [...element.querySelectorAll('.applet-management-links button')];
       return {
         nameSize: parseFloat(getComputedStyle(name).fontSize),
         idSize: parseFloat(getComputedStyle(cells[0].querySelector('small')).fontSize),
         nameWeight: Number(getComputedStyle(name.querySelector('strong')).fontWeight),
-        checkBesideVersion: check.x >= version.right && check.x - version.right < 16,
+        checkInVersionHeader: check.closest('th').textContent.includes('バージョン'),
         timeBelowVersion: time.y >= version.bottom,
         links: links.map((button) => ({
           title: button.title,
@@ -346,7 +346,7 @@ async function until(fn, name) {
       };
     });
     assert(presentation.nameSize > presentation.idSize && presentation.nameWeight >= 600);
-    assert(presentation.checkBesideVersion && presentation.timeBelowVersion);
+    assert(presentation.checkInVersionHeader && presentation.timeBelowVersion);
     assert.deepEqual(
       presentation.links.map((button) => button.title),
       ['設定', 'ショートカット', 'マウスジェスチャー', 'ログ'],
@@ -376,7 +376,7 @@ async function until(fn, name) {
         return [s.width, s.height, s.borderRadius, s.backgroundColor];
       });
     checks.push('compact-icon-columns-name-and-version-layout');
-    await row('test.a').getByTitle('更新を確認', { exact: true }).click();
+    await page.getByRole('button', { name: 'すべてのAppletの更新を確認', exact: true }).click();
     await waitForHost(
       page,
       async () =>
@@ -384,7 +384,8 @@ async function until(fn, name) {
           ?.checkedAt,
     );
     assert(await row('test.a').locator('time').getAttribute('datetime'));
-    checks.push('update-check-icon-and-last-check-time');
+    assert.equal(await page.locator('.applet-management tbody .applet-update-check').count(), 0);
+    checks.push('global-update-check-header-and-last-check-time');
     const previewFailure = await page.evaluate(async () => {
       const id = document.querySelector('.settings-surface').dataset.settingsConnection;
       const model = await window.dock.settingsPage.get(id);

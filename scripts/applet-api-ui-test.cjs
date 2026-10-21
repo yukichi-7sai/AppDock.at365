@@ -244,7 +244,7 @@ async function grant(id, permissions) {
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await settingsSurface.getByRole('button', { name: /^一般/ }).click();
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Applet：/ }).count(), 0);
-    await settingsSurface.getByRole('button', { name: 'MCP・Codex連携', exact: true }).click();
+    await settingsSurface.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
     assert.equal(await settingsSurface.getByRole('switch', { name: /^Codexからの/ }).count(), 0);
     await settingsSurface.getByRole('button', { name: '操作の許可を開く', exact: true }).click();
     const panel = settingsSurface.getByRole('region', { name: '操作の許可', exact: true });

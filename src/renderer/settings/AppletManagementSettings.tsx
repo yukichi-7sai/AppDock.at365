@@ -196,6 +196,7 @@ export function AppletManagementSettings({
   );
   const move = (id: string, destination: string) =>
     run(id, () => invoke('openAppletDestination', [id, destination]));
+  const status = !updates?.busy ? (updates?.completion?.message ?? updates?.phase) : '';
   return (
     <section
       className="settings-list applet-management"
@@ -230,9 +231,11 @@ export function AppletManagementSettings({
         </p>
       )}
       {error && <p role="alert">{error}</p>}
-      <p className="applet-package-status" role="status">
-        {!updates?.busy ? (updates?.completion?.message ?? updates?.phase) : ''}
-      </p>
+      {status && status !== '適用できる更新はありません。' && (
+        <p className="applet-package-status" role="status">
+          {status}
+        </p>
+      )}
       <div className="command-shortcut-summary">
         <span role="status">
           {visible.length} / {applets.length} Appletを表示
@@ -268,7 +271,21 @@ export function AppletManagementSettings({
                   </button>
                 </span>
               </th>
-              <th>バージョン</th>
+              <th>
+                <span className="applet-management-column-title">
+                  バージョン
+                  <button
+                    type="button"
+                    className="settings-list-icon applet-update-check"
+                    title="すべてのAppletの更新を確認"
+                    aria-label="すべてのAppletの更新を確認"
+                    disabled={busy || !applets.length}
+                    onClick={() => void run('updates', () => invoke('checkAppletUpdates'))}
+                  >
+                    <Icon name="refresh" size={16} />
+                  </button>
+                </span>
+              </th>
               <th>有効</th>
               <th>状態</th>
               <th>設定</th>
@@ -294,16 +311,6 @@ export function AppletManagementSettings({
                   <td>
                     <div className="applet-management-version">
                       <VersionDisplay version={a.version} result={result} />
-                      <button
-                        type="button"
-                        className="settings-list-icon applet-update-check"
-                        title="更新を確認"
-                        aria-label={`${a.displayName}の更新を確認`}
-                        disabled={busy}
-                        onClick={() => void run(a.id, () => invoke('checkUpdates', [a.id]))}
-                      >
-                        <Icon name="refresh" size={16} />
-                      </button>
                     </div>
                     <UpdateCheckTime checkedAt={result?.checkedAt} />
                     {result?.installable && (
@@ -385,7 +392,7 @@ export function AppletManagementSettings({
                           void run(a.id, () => invoke('manageApplet', [a.id, 'restart']))
                         }
                       >
-                        <Icon name="refresh" />
+                        <Icon name="power" />
                       </button>
                       <button
                         type="button"

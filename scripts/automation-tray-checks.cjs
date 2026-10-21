@@ -125,7 +125,7 @@ module.exports = async function ({
   assert.ok(value.menu.some((i) => i.id === 'mcp-tray-next'));
   assert.ok(!value.menu.some((i) => i.id === 'mcp-tray-group'));
   assert.equal(value.clicks.doubleClickCommand, null);
-  await page.getByRole('button', { name: 'MCP・Codex連携', exact: true }).click();
+  await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
   await grant();
   await until(async () => !(await read()).trayEditingAllowed, 'tray revoke');
   assert.equal(

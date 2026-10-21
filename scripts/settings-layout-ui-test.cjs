@@ -59,7 +59,7 @@ async function page(category) {
     appearance: '表示',
     general: '一般',
     notifications: '通知',
-    tts: '読み上げ',
+    tts: 'TTS',
     gestures: 'マウスジェスチャー',
   }[category];
   await p.locator('.settings-categories').getByRole('button', { name: title, exact: true }).click();

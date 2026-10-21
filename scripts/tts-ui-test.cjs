@@ -191,14 +191,14 @@ async function configure(patch) {
           width: innerWidth,
           height: innerHeight,
           buttons: [...document.querySelectorAll('button')]
-            .filter((b) => b.textContent.trim() === '読み上げ')
+            .filter((b) => b.textContent.trim() === 'TTS')
             .map((b) => ({ rect: b.getBoundingClientRect().toJSON(), html: b.outerHTML })),
         })),
         null,
         2,
       ),
     );
-    await page.getByRole('button', { name: '読み上げ', exact: true }).click();
+    await page.getByRole('button', { name: 'TTS', exact: true }).click();
     await page.getByLabel('TTSモデル', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
     await page

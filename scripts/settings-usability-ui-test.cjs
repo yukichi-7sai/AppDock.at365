@@ -113,7 +113,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       await page.getByRole('button', { name, exact: true }).click();
       await page.getByRole('heading', { name, level: 1, exact: true }).waitFor();
     };
-    await select('読み上げ');
+    await select('TTS');
     assert.equal(requests.length, 0, 'opening settings does not contact server');
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
     await page.getByLabel('取得したTTSモデル', { exact: true }).selectOption('model-b');
@@ -229,14 +229,14 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
       .getByRole('button', { name: '設定を開く', exact: true })
       .click();
-    await page.getByRole('heading', { name: '読み上げ', exact: true, level: 1 }).waitFor();
+    await page.getByRole('heading', { name: 'TTS', exact: true, level: 1 }).waitFor();
     await select('通知');
     const events = page
       .locator('.settings-section')
       .filter({ has: page.getByRole('heading', { name: 'MCP Event', exact: true }) });
     await events.locator(':scope > summary').click();
     await events.getByRole('button', { name: '設定を開く', exact: true }).click();
-    await page.getByRole('heading', { name: 'MCP・Codex連携', exact: true, level: 1 }).waitFor();
+    await page.getByRole('heading', { name: 'MCPサーバー', exact: true, level: 1 }).waitFor();
     assert.equal(
       await page
         .getByRole('region', { name: '接続の状態', exact: true })
@@ -293,9 +293,9 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         );
         await page.waitForTimeout(200);
         for (const name of [
-          '読み上げ',
+          'TTS',
           '通知',
-          'MCP・Codex連携',
+          'MCPサーバー',
           '一般',
           '表示',
           'プロフィール',

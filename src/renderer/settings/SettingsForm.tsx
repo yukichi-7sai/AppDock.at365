@@ -161,7 +161,6 @@ export function SettingsForm({
         grants={aux.permissions?.permissions ?? {}}
         error={aux.permissions?.error}
         busy={busy}
-        onOpenCodex={() => select('codex')}
       />
     );
   if (category === 'web-accounts')

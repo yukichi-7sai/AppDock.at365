@@ -92,6 +92,7 @@ export function CustomCommandsSettings({
           </p>
         )}
         <SettingsListTable
+          addInTitle
           definition={list}
           maxItems={256}
           canAdd={types.length > 0}

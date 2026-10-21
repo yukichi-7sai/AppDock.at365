@@ -2855,12 +2855,6 @@ summary {
     padding: 12px;
   }
 }
-.applet-shortcut-notice {
-  min-height: 28px;
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 8px;
-}
 .applet-shortcut-dialog {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100dvh - 40px);
@@ -3383,32 +3377,10 @@ summary {
   font-size: 18px;
   margin: 0;
 }
-.permission-connection {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
 .api-permissions > p,
 .permission-help {
   font-size: 13px;
   line-height: 1.7;
-}
-.permission-connection {
-  margin: 20px 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-}
-.permission-connection p {
-  flex: 1;
-  margin: 0;
-}
-.permission-save-status {
-  min-height: 22px;
-  color: var(--muted);
 }
 .permission-table {
   width: 100%;

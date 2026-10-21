@@ -114,6 +114,7 @@ export function McpClientSettingsForm({
       >
         {auxiliary?.error && <p role="alert">{auxiliary.error}</p>}
         <SettingsListTable
+          addInTitle
           definition={definition}
           maxItems={32}
           busy={busy || pending || !auxiliary || !!auxiliary.error}

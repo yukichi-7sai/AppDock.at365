@@ -2260,6 +2260,9 @@ function settingsPageActions(
       return updater.state.results.find((r) => r.id === (selected ?? 'host'));
     };
     actions.checkAllUpdates = async () => updater.check();
+    if (page.id === 'applets')
+      actions.checkAppletUpdates = async () =>
+        updater.check(managedApplets(allApplets()).map((a) => a.id));
     actions.cancelUpdates = async () => updater.cancel();
     actions.installUpdates = async ([id]) => {
       return updater.install(target(id, true)!);

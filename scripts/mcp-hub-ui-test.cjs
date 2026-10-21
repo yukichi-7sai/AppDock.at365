@@ -357,7 +357,7 @@ async function setMcpPermission(page, allowed, management = false) {
     checks.push(
       'permissions UI: MCP use can be saved ON/OFF while integration is OFF without changing other settings',
     );
-    await page.getByRole('button', { name: 'MCP接続先', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
     await page.getByRole('button', { name: '接続先を追加', exact: true }).click();
     const connectionDialog = page.getByRole('dialog');
     await connectionDialog.getByLabel('名前', { exact: true }).fill('Local MCP fixture');
@@ -524,7 +524,7 @@ async function setMcpPermission(page, allowed, management = false) {
     checks.push(
       'MCP registration: separate default-OFF UI grant, dry-run, credential redaction, enable, private catalog inspection, explicit publication, execution, revision conflict and deletion on one connection',
     );
-    await page.getByRole('button', { name: 'MCP接続先', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
     assert.equal((await call('appdock_mcp_list_servers')).items.length, 0);
     await page.getByRole('button', { name: 'Local MCP fixtureを編集', exact: true }).click();
     let relayDialog = page.getByRole('dialog');
@@ -1099,7 +1099,7 @@ async function setMcpPermission(page, allowed, management = false) {
       (await page.evaluate(() => window.dock.dispatchShortcut('Ctrl+Alt+F7'))).executed,
       1,
     );
-    await page.getByRole('button', { name: 'MCP接続先', exact: true }).click();
+    await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
     await until(async () => {
       const buttons = page.getByRole('button', { name: '結果を表示', exact: true });
       if (!(await buttons.count())) return false;

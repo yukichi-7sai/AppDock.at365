@@ -46,6 +46,29 @@ export function ListIcon({ kind }: { kind: 'edit' | 'delete' | 'order' | 'open' 
     </svg>
   );
 }
+export function SettingsListAddButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick(): void;
+}) {
+  return (
+    <button
+      type="button"
+      className="applet-shortcut-add"
+      data-dialog-focus-fallback
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      ＋
+    </button>
+  );
+}
 export function SettingsListTable({
   definition,
   entries,
@@ -59,6 +82,7 @@ export function SettingsListTable({
   extra,
   maxItems = 64,
   canAdd = true,
+  addInTitle = false,
 }: {
   definition: SettingDefinition;
   entries: Record<string, unknown>[];
@@ -72,6 +96,7 @@ export function SettingsListTable({
   extra?(entry: Record<string, unknown>, index: number): ReactNode;
   maxItems?: number;
   canAdd?: boolean;
+  addInTitle?: boolean;
 }) {
   const view = definition.list!;
   const fields = definition.fields ?? [];
@@ -94,15 +119,17 @@ export function SettingsListTable({
           >
             <ListIcon kind="order" />
           </button>
-          <button
-            type="button"
-            className="primary"
-            data-dialog-focus-fallback
-            disabled={busy || !canAdd || entries.length >= maxItems}
-            onClick={onAdd}
-          >
-            {definition.itemTitle ?? '項目'}を追加
-          </button>
+          {!addInTitle && (
+            <button
+              type="button"
+              className="primary"
+              data-dialog-focus-fallback
+              disabled={busy || !canAdd || entries.length >= maxItems}
+              onClick={onAdd}
+            >
+              {definition.itemTitle ?? '項目'}を追加
+            </button>
+          )}
         </div>
       </div>
       <div className="settings-list-scroll">
@@ -111,7 +138,20 @@ export function SettingsListTable({
             <tr>
               {view.showIndex && <th>{definition.itemTitle ?? '項目'}</th>}
               {view.columns.map((key) => (
-                <th key={key}>{fields.find((field) => field.key === key)!.title}</th>
+                <th key={key}>
+                  {addInTitle && key === view.titleKey ? (
+                    <span className="settings-list-heading">
+                      {fields.find((field) => field.key === key)!.title}
+                      <SettingsListAddButton
+                        label={`${definition.itemTitle ?? '項目'}を追加`}
+                        disabled={busy || !canAdd || entries.length >= maxItems}
+                        onClick={onAdd}
+                      />
+                    </span>
+                  ) : (
+                    fields.find((field) => field.key === key)!.title
+                  )}
+                </th>
               ))}
               {view.enabledKey && <th className="settings-list-state">有効</th>}
               <th className="settings-list-actions-heading">操作</th>
@@ -205,7 +245,9 @@ export function SettingsListTable({
                   }
                   className="settings-list-empty"
                 >
-                  登録がありません。「{definition.itemTitle ?? '項目'}を追加」から登録できます。
+                  {addInTitle
+                    ? `登録がありません。「${fields.find((field) => field.key === view.titleKey)!.title}」の横の＋から登録できます。`
+                    : `登録がありません。「${definition.itemTitle ?? '項目'}を追加」から登録できます。`}
                 </td>
               </tr>
             )}

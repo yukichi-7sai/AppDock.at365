@@ -234,7 +234,7 @@ async function main() {
   );
   if (commandsOnly) {
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await ui.getByRole('button', { name: '読み上げ', exact: true }).click();
+    await ui.getByRole('button', { name: 'TTS', exact: true }).click();
     await ui.getByRole('button', { name: 'すべての読み上げを停止', exact: true }).click();
     await until(
       async () =>
@@ -426,7 +426,7 @@ async function main() {
   assert.equal(await ui.getByText('アカウント枠を追加しました。', { exact: true }).count(), 0);
   checks.push('settings Shell operation reports account creation once without inline duplicate');
   await dismissAll();
-  await ui.getByRole('button', { name: '読み上げ', exact: true }).click();
+  await ui.getByRole('button', { name: 'TTS', exact: true }).click();
   await ui.getByLabel('APIキー', { exact: true }).fill('PRIVATE_TEST_KEY');
   await ui.getByRole('button', { name: 'APIキーを設定', exact: true }).click();
   await until(

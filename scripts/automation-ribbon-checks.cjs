@@ -113,7 +113,7 @@ module.exports = async function ({
     bottom: ['theme', 'profile'],
     separators: [],
   });
-  await page.getByRole('button', { name: 'MCP・Codex連携', exact: true }).click();
+  await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
   await grant();
   await until(async () => !(await read()).ribbonEditingAllowed, 'ribbon revoke');
   assert.equal((await denied([{ kind: 'reset' }])).code, 'RIBBON_EDITING_DISABLED');

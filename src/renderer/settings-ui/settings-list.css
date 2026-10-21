@@ -2,6 +2,11 @@
   width: 100%;
   min-width: 0;
 }
+.settings-list-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
 .settings-list-toolbar,
 .settings-list-toolbar > div,
 .settings-list-actions,

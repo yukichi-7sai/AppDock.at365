@@ -14,6 +14,8 @@ const source =
   process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
 const titlesOnly =
   process.argv.includes('--sections-only') || process.argv.includes('--titles-only');
+const refinementsOnly = process.argv.includes('--refinements-only');
+const updateRequests = [];
 const titleSamples = [];
 const layoutSamples = [];
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -211,10 +213,10 @@ async function checkSectionTitles() {
         '一般',
         '通知',
         'AI',
-        '読み上げ',
+        'TTS',
         'リボン',
         'マウスジェスチャー',
-        'MCP・Codex連携',
+        'MCPサーバー',
         'バージョン情報・更新',
       ]) {
         await select(title);
@@ -285,6 +287,21 @@ async function checkSectionTitles() {
   try {
     fs.mkdirSync(profile, { recursive: true });
     server = http.createServer((request, response) => {
+      if (refinementsOnly && request.url.startsWith('/updates/')) {
+        const id = request.url.split('/')[2];
+        updateRequests.push(id);
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            schemaVersion: 1,
+            kind: 'applet',
+            id,
+            version: '1.0.0',
+            payload: { file: 'update.zip', sha256: 'a'.repeat(64), size: 20, format: 'zip' },
+          }),
+        );
+        return;
+      }
       modelResponse = () => {
         response.writeHead(modelStatus, { 'Content-Type': 'application/json' });
         response.end(JSON.stringify({ data: [] }));
@@ -333,6 +350,31 @@ async function checkSectionTitles() {
       path.join(fixture, 'worker.cjs'),
       "exports.activate=async c=>{c.commands.register('fixture.hints.run','Hint action',()=>{});};",
     );
+    if (refinementsOnly) {
+      for (const id of ['fixture.hints', 'fixture.other']) {
+        const folder = path.join(profile, 'extensions', id === 'fixture.hints' ? 'hints' : 'other');
+        if (id === 'fixture.other') {
+          fs.mkdirSync(folder, { recursive: true });
+          fs.writeFileSync(
+            path.join(folder, 'extension.json'),
+            JSON.stringify({
+              apiVersion: 1,
+              id,
+              name: 'Other fixture',
+              version: '1.0.0',
+              runtime: 'node',
+              entry: 'worker.cjs',
+            }),
+          );
+          fs.writeFileSync(path.join(folder, 'worker.cjs'), 'exports.activate=()=>{};');
+        }
+        initial.extensions[id] = {
+          enabled: id === 'fixture.hints',
+          settings: {},
+          updateSource: `http://127.0.0.1:${server.address().port}/updates/${id}/update.json`,
+        };
+      }
+    }
     require('../out/main/shared/settings-schema').parseSettings(initial);
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
     if (source) {
@@ -340,6 +382,26 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (refinementsOnly) {
+      assert.equal((await snapshot()).version, require('../package.json').version);
+      await require('./settings-refinement-checks.cjs')({
+        host,
+        select,
+        hints,
+        snapshot,
+        until,
+        inspect,
+        inspector,
+        electronExpression,
+        profile,
+        checks,
+        updateRequests,
+        portable: !!source,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (titlesOnly) {
       assert.equal((await snapshot()).version, require('../package.json').version);
       await checkSectionTitles();
@@ -467,7 +529,7 @@ async function checkSectionTitles() {
       .locator('.tray-click-id.command-id')
       .getByText('fixture.hints.run', { exact: true })
       .waitFor();
-    await select('MCP接続先');
+    await select('MCPクライアント');
     await host
       .getByText('名前は共有し、接続設定・認証情報・許可はこのPCだけに保存します。', {
         exact: true,
@@ -574,7 +636,7 @@ async function checkSectionTitles() {
       await permissionHelp.getByText(permissionHint, { exact: true }).isVisible(),
       false,
     );
-    await host.getByText(saveHint, { exact: true }).waitFor();
+    assert.equal(await host.getByText(saveHint, { exact: true }).count(), 0);
     await permissionHelp.locator('summary').click();
     await permissionHelp.getByText(permissionHint, { exact: true }).waitFor();
     await hints(false);
@@ -599,7 +661,7 @@ async function checkSectionTitles() {
           !(await appletRead.isDisabled()),
         'permission save',
       );
-      assert.equal(await host.locator('.permission-save-status').innerText(), saveHint);
+      assert.equal(await host.locator('.permission-save-status').count(), 0);
       assert.equal(await host.locator('.settings-page-error').count(), 0);
     }
     await host.screenshot({ path: path.join(profile, 'permission-hints-on.png') });
@@ -726,7 +788,7 @@ async function checkSectionTitles() {
 
     await host.evaluate(() => window.dock.navigate('settings'));
     await settingsPage(host);
-    await select('読み上げ');
+    await select('TTS');
     await hints(false);
     const models = host.getByRole('button', { name: 'モデル一覧を更新', exact: true });
     const preview = host.getByRole('heading', { name: '試聴', exact: true });
@@ -862,6 +924,7 @@ async function checkSectionTitles() {
       layoutSampleCount: layoutSamples.length,
       success,
       titlesOnly,
+      refinementsOnly,
       titleSampleCount: titleSamples.length,
       checks,
       errors,

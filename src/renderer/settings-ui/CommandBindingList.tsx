@@ -1,4 +1,3 @@
-import { SettingsHint } from './SettingsHint';
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { BindingActions } from './BindingActions';
 import type { UiCommand } from '../../shared/commands';
@@ -170,9 +169,6 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   );
   return (
     <div className="shortcut-command-list" ref={root} tabIndex={-1}>
-      <SettingsHint as="div" className="applet-shortcut-notice">
-        {`${inputName}と条件をクリックして編集・＋で割り当てを追加`}
-      </SettingsHint>
       <span className="sr-only" role="status">
         {notice}
       </span>

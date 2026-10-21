@@ -171,7 +171,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     checks.push(
       'AI dialog URL confirms locally, fetches models on Enter, and cancels without saving',
     );
-    await select('読み上げ');
+    await select('TTS');
     await confirmed(
       'APIのURL',
       (s) => s.tts.baseUrl,

@@ -10,6 +10,7 @@ export type IconName =
   | 'arrow'
   | 'play'
   | 'refresh'
+  | 'power'
   | 'check'
   | 'folder'
   | 'chevron'
@@ -80,6 +81,7 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M20 8a8 8 0 1 0 .3 7M20 3v5h-5" />
     </>
   ),
+  power: <path d="M12 2v10M6.3 5.7a9 9 0 1 0 11.4 0" />,
   check: <path d="m5 12 4 4L19 6" />,
   folder: <path d="M3 7V5a1 1 0 0 1 1-1h6l2 3h8a1 1 0 0 1 1 1v11H3Z" />,
   chevron: <path d="m9 5 7 7-7 7" />,

@@ -94,7 +94,7 @@ module.exports = async function ({
     'INVALID_ARGUMENT',
   );
   assert.equal(fs.readFileSync(file, 'utf8'), saved);
-  await page.getByRole('button', { name: 'MCP・Codex連携', exact: true }).click();
+  await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
   await grant();
   await until(async () => !(await read()).gestureEditingAllowed, 'gesture revoke');
   assert.equal(

@@ -6,6 +6,7 @@ import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField, SettingsFeedback } from '../settings-ui/SettingsSections';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { SettingsListAddButton } from '../settings-ui/SettingsListTable';
 import {
   AiConnectionDialog,
   AiConnectionOrderDialog,
@@ -120,22 +121,22 @@ export function AiSettingsForm({
             >
               <ActionIcon kind="order" />
             </button>
-            <button
-              className="primary ai-add-button"
-              data-dialog-focus-fallback
-              aria-label="AIサーバーを追加"
-              disabled={busy || value.connections.length >= 8}
-              onClick={() => open('edit', null)}
-            >
-              <span aria-hidden="true">＋</span>追加
-            </button>
           </div>
         </div>
         <div className="command-shortcuts ai-connection-table">
           <table className="applet-shortcut-overview" aria-label="登録済みAIサーバー">
             <thead>
               <tr>
-                <th>サーバー</th>
+                <th>
+                  <span className="settings-list-heading">
+                    サーバー
+                    <SettingsListAddButton
+                      label="AIサーバーを追加"
+                      disabled={busy || value.connections.length >= 8}
+                      onClick={() => open('edit', null)}
+                    />
+                  </span>
+                </th>
                 <th>モデル</th>
                 <th>
                   <span className="ai-action-heading">操作</span>
@@ -190,7 +191,7 @@ export function AiSettingsForm({
                   <td colSpan={3}>
                     <div className="ai-empty">
                       <strong>AIサーバーを追加しましょう</strong>
-                      <p>右上の＋から接続先とモデルを設定できます。</p>
+                      <p>「サーバー」の横の＋から接続先とモデルを設定できます。</p>
                     </div>
                   </td>
                 </tr>

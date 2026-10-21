@@ -551,17 +551,6 @@ pre.ai-preview-result {
   color: #e15b64;
   border-color: #e15b64;
 }
-.ai-add-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 14px;
-  border-radius: 9px;
-}
-.ai-add-button span {
-  font-size: 18px;
-  line-height: 1;
-}
 .ai-connection-table {
   margin-bottom: 4px;
 }
