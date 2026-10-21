@@ -49,6 +49,8 @@ snapshotは`{revision,palette,dark,colors:{accent,soft,text,hover}}`。revision�
 
 ## 新しい画面・パレットの追加規則
 
+リボンの通常ボタンは文字と標準SVGアイコンで同じ`--ribbon-text`を参照し、テーマごとの中立色を使う。装飾用の薄い色を通常の文字へ流用しない。選択状態は共通の`--accent`/`--accent-soft`を参照し、通常・hover・focus・選択の各状態でコントラスト4.5以上を確認する。無効ボタンの減光、ユーザーが選んだ画像、グループの色線はこの文字色変更の対象に含めない。
+
 1. ローカル画面は既存の`createShellView`、`AppletSurface`または本体Windowの作成経路を使う。独立経路には配色初期引数・正確なURL登録・共通preloadを接続する。リモート画面へ適用しない。
 2. sandbox付きpreloadはローカルモジュールをruntime requireできないため、`scripts/build-main.cjs`が共通`appearance-preload.ts`のコンパイル結果を8種類のpreloadへIIFEとして同梱する。専用preloadを追加したらこの一覧と検証を更新する。sandbox/contextIsolationは維持する。
 3. 色コードはパレット正本にだけ追加する。選択UI・検索候補は`accentChoices`を参照する。設定検証と外部設定schemaは保存済みIDの互換性も保つ。カスタム色の解決を画面ごとに複製しない。

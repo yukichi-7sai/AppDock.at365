@@ -2,14 +2,14 @@
   color-scheme: dark;
   --rail: #0c0d11;
   --border: #282b35;
-  --faint: #62697e;
+  --ribbon-text: #b7bfd1;
   font-family: 'Segoe UI', sans-serif;
 }
 :root[data-theme='light'] {
   color-scheme: light;
   --rail: #edf0f4;
   --border: #e0e4ed;
-  --faint: #8c96a9;
+  --ribbon-text: #535e73;
 }
 * {
   box-sizing: border-box;
@@ -86,7 +86,7 @@ button:disabled {
 .activity-rail button {
   width: 62px;
   min-height: 52px;
-  color: var(--faint);
+  color: var(--ribbon-text);
   border-radius: 8px;
   position: relative;
   flex-direction: column;

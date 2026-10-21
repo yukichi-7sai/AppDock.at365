@@ -13,6 +13,20 @@ const profile = path.join(root, '.artifacts', 'appearance-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const checks = [],
   errors = [];
+const ribbonSamples = [];
+const luminance = (rgb) => {
+  const [r, g, b] = rgb
+    .match(/[\d.]+/g)
+    .slice(0, 3)
+    .map(Number)
+    .map((v) => v / 255)
+    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
+};
+const contrast = (a, b) => {
+  const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (high + 0.05) / (low + 0.05);
+};
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const until = async (read, label, timeout = 60000) => {
   const end = Date.now() + timeout;
@@ -96,6 +110,45 @@ async function assertColors(page, id, dark, custom) {
   const snapshot = await page.evaluate(() => window.appdockAppearance.snapshot());
   assert.equal(snapshot.palette, id);
   assert.equal(snapshot.dark, dark);
+}
+async function assertRibbonReadability(rail, id, dark) {
+  const normal = rail
+    .locator('.activity-rail button:not(:disabled):not(.active):not(.avatar):not(.error)')
+    .first();
+  const read = async (button, state) => {
+    const sample = await button.evaluate((el) => {
+      const style = getComputedStyle(el);
+      const background =
+        style.backgroundColor === 'rgba(0, 0, 0, 0)'
+          ? getComputedStyle(el.closest('.activity-rail')).backgroundColor
+          : style.backgroundColor;
+      return {
+        background,
+        opacity: style.opacity,
+        colors: [el, el.querySelector('.rail-label'), el.querySelector('svg')]
+          .filter(Boolean)
+          .map((node) => ({ element: node.tagName, color: getComputedStyle(node).color })),
+      };
+    });
+    ribbonSamples.push({ id, dark, state, ...sample });
+    for (const item of sample.colors)
+      assert(
+        contrast(item.color, sample.background) >= 4.5,
+        `${id}/${dark}/${state}/${item.element}: ${item.color} on ${sample.background} = ${contrast(item.color, sample.background).toFixed(2)}`,
+      );
+  };
+  await rail.locator('.brand-mark').hover();
+  await read(normal, 'normal');
+  await normal.hover();
+  await read(normal, 'hover');
+  await rail.locator('.brand-mark').hover();
+  await normal.focus();
+  await read(normal, 'focus');
+  const selected = rail.locator('.activity-rail button.active:not(:disabled)').first();
+  await read(selected, 'selected');
+  await rail.screenshot({
+    path: path.join(profile, `ribbon-${id}-${dark ? 'dark' : 'light'}.png`),
+  });
 }
 (async () => {
   let success = false;
@@ -184,6 +237,13 @@ async function assertColors(page, id, dark, custom) {
         ),
     );
     checks.push('appearance setting visible');
+    await host.getByLabel('テーマ', { exact: true }).selectOption('dark');
+    await settleSettings(host);
+    await assertRibbonReadability(
+      context.pages().find((p) => /\/shells\/default\/index\.html$/.test(p.url())),
+      'sky-blue',
+      true,
+    );
     for (const dark of [false, true]) {
       await host.getByLabel('テーマ', { exact: true }).selectOption(dark ? 'dark' : 'light');
       await settleSettings(host);
@@ -192,11 +252,18 @@ async function assertColors(page, id, dark, custom) {
         await settleSettings(host);
         await assertColors(host, palette.id, dark);
         assert.equal(await host.locator('.accent-palettes [aria-pressed="true"]').count(), 1);
-        const shells = context.pages().filter((p) => /\/(main|bars)\.html$/.test(p.url()));
+        const shells = context
+          .pages()
+          .filter((p) => /\/shells\/default\/(index|bars)\.html$/.test(p.url()));
         for (const shell of shells) await assertColors(shell, palette.id, dark);
+        const rail = shells.find((p) => p.url().endsWith('/index.html'));
+        await assertRibbonReadability(rail, palette.id, dark);
         checks.push(palette.id + '/' + (dark ? 'dark' : 'light'));
       }
     }
+    checks.push(
+      'ribbon labels/icons retain readable contrast in normal, hover, focus and selected states for all presets',
+    );
     await host.getByRole('button', { name: 'カスタム', exact: true }).click();
     await host.getByLabel('テーマ', { exact: true }).selectOption('light');
     await settleSettings(host);
@@ -254,6 +321,9 @@ async function assertColors(page, id, dark, custom) {
         .pages()
         .filter((p) => /appdock:\/\/host\/|\/(main|bars)\.html$/.test(p.url())))
         await assertColors(page, 'custom', dark, custom);
+      const rail = context.pages().find((p) => /\/shells\/default\/index\.html$/.test(p.url()));
+      await assertColors(rail, 'custom', dark, custom);
+      await assertRibbonReadability(rail, 'custom', dark);
       await host.screenshot({ path: path.join(profile, `custom-${dark ? 'dark' : 'light'}.png`) });
     }
     checks.push('custom shared colors in both themes');
@@ -426,7 +496,14 @@ async function assertColors(page, id, dark, custom) {
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify(
-        { success, portable: !!source, sourceHash: source && hash(source), checks, errors },
+        {
+          success,
+          portable: !!source,
+          sourceHash: source && hash(source),
+          checks,
+          errors,
+          ribbonSamples,
+        },
         null,
         2,
       ),
