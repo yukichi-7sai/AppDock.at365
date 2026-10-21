@@ -2,6 +2,8 @@ import type { Settings, SettingsSnapshot, GlobalHotKeyStatus } from '../../share
 import { normalizeShortcut, validCommandId } from '../../shared/commands';
 import {
   getKeybindings,
+  getKeybindingOptions,
+  parseKeybindingOptions,
   parseKeybindings,
   withKeybindings,
   appendKeybinding,
@@ -110,6 +112,14 @@ export class ShortcutCommands {
                     },
                   }),
                   operation('remove', { id: idSchema }),
+                  operation('configure', {
+                    changes: {
+                      type: 'object',
+                      properties: { executionMode: { type: 'string', enum: ['first', 'all'] } },
+                      required: ['executionMode'],
+                      additionalProperties: false,
+                    },
+                  }),
                   operation('reorder', {
                     key: fields.key,
                     ids: {
@@ -143,6 +153,7 @@ export class ShortcutCommands {
   get() {
     return {
       bindings: structuredClone(getKeybindings(this.options.settings.value)),
+      options: { executionMode: getKeybindingOptions(this.options.settings.value).executionMode },
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
       scopes: shortcutScopes,
@@ -200,7 +211,9 @@ export class ShortcutCommands {
     this.options.settingsCommands.checkRevision(args.expectedRevision);
     const store = this.options.settings;
     const before = structuredClone(getKeybindings(store.value));
+    const beforeOptions = structuredClone(getKeybindingOptions(store.value));
     let rows = structuredClone(before);
+    let options = structuredClone(beforeOptions);
     try {
       for (const op of args.operations) {
         if (!object(op)) throw invalid();
@@ -235,6 +248,14 @@ export class ShortcutCommands {
             this.validateAssignment(row);
           if (row.key !== old.key) rows = changeKeybindingKey(rows, old.id, row.key);
           rows = rows.map((r) => (r.id === row.id ? row : r));
+        } else if (op.kind === 'configure') {
+          if (
+            !exact(op, ['kind', 'changes']) ||
+            !exact(op.changes, ['executionMode']) ||
+            op.changes.executionMode === undefined
+          )
+            throw invalid();
+          options = parseKeybindingOptions({ ...options, ...op.changes });
         } else if (op.kind === 'reorder') {
           if (
             !exact(op, ['kind', 'key', 'ids']) ||
@@ -267,10 +288,15 @@ export class ShortcutCommands {
       if (error instanceof SettingsCommandError) throw error;
       throw invalid();
     }
-    const changed = JSON.stringify(before) !== JSON.stringify(rows);
+    const changed =
+      JSON.stringify(before) !== JSON.stringify(rows) ||
+      JSON.stringify(beforeOptions) !== JSON.stringify(options);
     if (changed && args.dryRun !== true) {
       try {
-        this.options.save(withKeybindings(structuredClone(store.value), rows), store.revision);
+        this.options.save(
+          withKeybindings({ ...structuredClone(store.value), keybindingOptions: options }, rows),
+          store.revision,
+        );
       } catch {
         throw new SettingsCommandError(
           'SAVE_FAILED',
@@ -282,11 +308,12 @@ export class ShortcutCommands {
       dryRun: args.dryRun === true,
       changed,
       bindings: rows,
+      options: { executionMode: options.executionMode },
       revision: this.options.settingsCommands.revision(),
       warning: store.syncError ?? null,
       applies: 'shortcutsChanged',
       message:
-        '保存後の入力適用結果はshortcuts.getで確認してください。同じキーの複数行は、条件を満たす順に実行されます。',
+        '保存後の入力適用結果はshortcuts.getで確認してください。条件を満たすコマンドから、動作設定の実行方法に従って登録順に選びます。',
     };
   }
 }

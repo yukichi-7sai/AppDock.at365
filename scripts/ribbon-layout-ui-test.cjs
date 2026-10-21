@@ -92,7 +92,7 @@ async function launch() {
     assert.equal(await dock.locator('.settings-applet-list').count(), 0);
     await dock
       .locator('.settings-categories')
-      .getByRole('button', { name: 'ショートカット', exact: true })
+      .getByRole('button', { name: 'ショートカットキー', exact: true })
       .click();
     assert.equal(await dock.locator('.shortcut-group').count(), 0);
     assert.ok(

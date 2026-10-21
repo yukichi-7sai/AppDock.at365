@@ -60,6 +60,32 @@ function fixture(t) {
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const page = (value, id) => settingsCatalog(applets, value).find((p) => p.id === id);
 
+test('shortcut options participate in sparse page JSON and reset independently of gestures', () => {
+  const saved = createDefaultSettings();
+  saved.keybindingOptions = { executionMode: 'first' };
+  saved.gestures.executionMode = 'first';
+  const shortcutPage = page(saved, 'shortcuts');
+  assert.equal(shortcutPage.title, 'ショートカットキー');
+  assert.equal(
+    shortcutPage.items.find((item) => item.key === 'keybindings').title,
+    'ショートカットキー割り当て',
+  );
+  const projected = settingsJsonProjection(saved, shortcutPage, applets);
+  assert.deepEqual(projected.keybindingOptions, { executionMode: 'first' });
+  const reset = applySettingsJson(saved, shortcutPage, applets, '{}');
+  assert.equal(reset.keybindingOptions.executionMode, 'all');
+  assert.equal(reset.gestures.executionMode, 'first');
+  assert.equal(settingsJsonProjection(reset, shortcutPage, applets).keybindingOptions, undefined);
+  assert.throws(() =>
+    applySettingsJson(
+      saved,
+      shortcutPage,
+      applets,
+      JSON.stringify({ keybindingOptions: { executionMode: 'invalid' } }),
+    ),
+  );
+});
+
 test('sparse JSON round trips host settings; false, zero, empty arrays and unknown leaves remain meaningful', () => {
   const value = createDefaultSettings();
   value.host.soundEnabled = false;

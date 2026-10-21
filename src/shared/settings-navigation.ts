@@ -8,7 +8,7 @@ export const hostSettingsPages = [
   ['notifications', '通知'],
   ['ribbon', 'リボン'],
   ['tray', 'タスクトレイ'],
-  ['shortcuts', 'ショートカット'],
+  ['shortcuts', 'ショートカットキー'],
   ['gestures', 'マウスジェスチャー'],
   ['custom-commands', 'カスタムコマンド'],
   ['web-accounts', 'Webアカウント'],

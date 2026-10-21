@@ -86,7 +86,7 @@ async function waitPins(page, pins) {
     await (
       await settingsPage()
     )
-      .getByRole('button', { name: 'ショートカット', exact: true })
+      .getByRole('button', { name: 'ショートカットキー', exact: true })
       .click();
     const setShortcut = async (commandId, key) => {
       const row = (await settingsPage()).locator(

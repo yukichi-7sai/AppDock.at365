@@ -141,9 +141,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['trayMenu', 'コンテキストメニュー', '追加 削除 グループ 区切り線 表示イメージ'],
   ],
   shortcuts: [
+    ['options', '動作設定', '条件に一致したコマンドの実行方法'],
+    ['executionMode', '条件に一致したコマンドの実行方法', '最初の1つ すべて 登録順'],
     [
       'keybindings',
-      'ショートカット割り当て',
+      'ショートカットキー割り当て',
       'ショートカットキー 割り当て コマンド 条件 実行順 入力の適用エラー Win ブロック',
     ],
   ],
@@ -411,7 +413,7 @@ export function settingsPaths(
     case 'tray':
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
-      return [['keybindings']];
+      return [['keybindings'], ['keybindingOptions']];
     case 'gestures':
       return [
         'enabled',

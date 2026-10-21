@@ -7,12 +7,15 @@ import type { UiCommand } from '../../shared/commands';
 import type { Settings, GlobalHotKeyStatus } from '../../shared/contracts';
 import {
   getKeybindings,
+  getKeybindingOptions,
   keybindingConditionLabel,
   type Keybinding,
 } from '../../shared/keybindings';
 import { ShortcutCommandList } from '../settings-ui/ShortcutCommandList';
 import { ShortcutOrderDialog } from '../settings-ui/ShortcutOrderDialog';
 import { SettingsSection } from '../settings-ui/SettingsSections';
+import { hostSettingItem } from '../../shared/settings-catalog';
+import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
 import {
   CommandTargetFilter,
   useCommandSettingsTarget,
@@ -95,56 +98,75 @@ export function ShortcutsEditor({
     );
   });
   return (
-    <SettingsSection
-      title="ショートカット割り当て"
-      hint="＋で割り当てを追加します。"
-      className="shortcuts-editor command-shortcuts"
-      {...settingAnchor('shortcuts', 'keybindings')}
-    >
-      <CommandBindingToolbar
-        inputName="ショートカット"
-        count={catalog.length}
-        visibleCount={visible.length}
-        filter={filter}
-        statusFilter={statusFilter}
-        setFilter={setFilter}
-        setStatusFilter={setStatusFilter}
-        onOrder={() => setOrderOpen(true)}
-        showRegistrationErrors
+    <>
+      <SettingsSection
+        collapsible
+        title={hostSettingItem('shortcuts', 'options').title}
+        hint={hostSettingItem('shortcuts', 'options').description}
+        {...settingAnchor('shortcuts', 'options')}
       >
-        {target ? (
-          <CommandTargetFilter />
-        ) : (
-          provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />
+        <CommandExecutionModeField
+          pageId="shortcuts"
+          value={getKeybindingOptions(settings).executionMode}
+          onChange={(executionMode) =>
+            onChange({
+              ...settings,
+              keybindingOptions: { ...getKeybindingOptions(settings), executionMode },
+            })
+          }
+        />
+      </SettingsSection>
+      <SettingsSection
+        title={hostSettingItem('shortcuts', 'keybindings').title}
+        hint="＋で割り当てを追加します。"
+        className="shortcuts-editor command-shortcuts"
+        {...settingAnchor('shortcuts', 'keybindings')}
+      >
+        <CommandBindingToolbar
+          inputName="ショートカットキー"
+          count={catalog.length}
+          visibleCount={visible.length}
+          filter={filter}
+          statusFilter={statusFilter}
+          setFilter={setFilter}
+          setStatusFilter={setStatusFilter}
+          onOrder={() => setOrderOpen(true)}
+          showRegistrationErrors
+        >
+          {target ? (
+            <CommandTargetFilter />
+          ) : (
+            provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />
+          )}
+        </CommandBindingToolbar>
+        {error && <p role="alert">{error}</p>}
+        {rows.length >= 2000 && (
+          <p role="status">
+            割り当ては2000件までです。追加するには既存の割り当てを削除してください。
+          </p>
         )}
-      </CommandBindingToolbar>
-      {error && <p role="alert">{error}</p>}
-      {rows.length >= 2000 && (
-        <p role="status">
-          割り当ては2000件までです。追加するには既存の割り当てを削除してください。
-        </p>
-      )}
-      <ShortcutCommandList
-        commands={visible}
-        allCommands={catalog}
-        settings={settings}
-        applets={applets}
-        onChange={onChange}
-        showProvider
-        statusError={statusError}
-        onRetry={() =>
-          void settingsControls.retryGlobalHotKeys().catch((reason) => setError(String(reason)))
-        }
-      />
-      {orderOpen && (
-        <ShortcutOrderDialog
+        <ShortcutCommandList
+          commands={visible}
+          allCommands={catalog}
           settings={settings}
-          commands={catalog}
           applets={applets}
           onChange={onChange}
-          onClose={() => setOrderOpen(false)}
+          showProvider
+          statusError={statusError}
+          onRetry={() =>
+            void settingsControls.retryGlobalHotKeys().catch((reason) => setError(String(reason)))
+          }
         />
-      )}
-    </SettingsSection>
+        {orderOpen && (
+          <ShortcutOrderDialog
+            settings={settings}
+            commands={catalog}
+            applets={applets}
+            onChange={onChange}
+            onClose={() => setOrderOpen(false)}
+          />
+        )}
+      </SettingsSection>
+    </>
   );
 }

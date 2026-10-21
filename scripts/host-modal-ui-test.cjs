@@ -209,7 +209,7 @@ const capture = async (name, all = false) => {
         );
       }, theme);
       for (const [category, id] of [
-        ['ショートカット', 'modal.key'],
+        ['ショートカットキー', 'modal.key'],
         ['マウスジェスチャー', 'modal.gesture'],
         ['カスタムコマンド', null],
       ]) {
@@ -336,7 +336,7 @@ const capture = async (name, all = false) => {
     result.checks.push(
       'all three dialogs dim the composited native ribbon in both themes; Tab, cancel, focus return and renderer identity preserved',
     );
-    await select('ショートカット');
+    await select('ショートカットキー');
     const shortcutOpener = host.locator('[data-binding-id="modal.key"] .applet-shortcut-edit');
     await holdCaptures();
     await shortcutOpener.click();
@@ -394,7 +394,7 @@ const capture = async (name, all = false) => {
       host,
       async () => (await window.dock.snapshot()).shell.active === 'fixture.modal-shell',
     );
-    await select('ショートカット');
+    await select('ショートカットキー');
     const barsVisible = () =>
       main(({ BrowserWindow }) => {
         const w = BrowserWindow.getAllWindows().find((w) =>

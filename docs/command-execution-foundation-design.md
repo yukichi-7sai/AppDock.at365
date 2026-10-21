@@ -1,6 +1,6 @@
 # トリガー共通の条件判定・コマンド実行基盤
 
-状態: 未実装の設計。2026-10-22の本体0.79.2、`ce70314`を基準にする。今回の成果物は設計書であり、基盤の接続、設定画面の変更、保存項目の追加はまだ行っていない。現在の動作は[ショートカット](keybindings.md)と[マウスジェスチャー](gestures.md)を正本とする。
+状態: 段階Aの基盤接続と段階Bのショートカットキー設定画面・保存項目・公開編集APIは実装済み。本書は共通基盤の内部契約と追加規則を定義し、入力ごとの操作は[ショートカットキー](keybindings.md)と[マウスジェスチャー](gestures.md)を正本とする。
 
 ## 目的と実装する段階
 
@@ -8,26 +8,26 @@
 
 | 段階 | 対象と決定 |
 | --- | --- |
-| A: 基盤の接続 | 共通条件モデル、条件判定、保存順の選択、first/all、重複除去、再入防止、取消、既存コマンド実行への接続を実装する。最初の実装範囲とする |
-| Aのショートカットキー | 共通基盤へ`all`を渡し、現在の「すべて実行」を保つ。設定画面・表示名・保存形式・公開編集APIは変更しない |
+| A: 基盤の接続 | 実装済み。共通条件モデル、条件判定、保存順の選択、first/all、重複除去、再入防止、取消、既存コマンド実行への接続 |
+| ショートカットキー | `keybindingOptions.executionMode`を共通基盤へ渡す。欠落時はallとして従来の動作を保つ |
 | Aのマウスジェスチャー | 現在の`gestures.executionMode`を共通基盤へ渡す。既存のfirst/all、条件、待機表示、入力捕捉、前面化を保持する |
-| B: ショートカットキー設定 | 後続工程。表示名の変更、折りたたみの「動作設定」、実行方法の保存と公開編集APIをまとめて追加する。本書で接続先まで決めておく |
+| B: ショートカットキー設定 | 実装済み。表示名の変更、折りたたみの「動作設定」、実行方法の保存・JSON・リセット・公開編集APIを共通基盤へ接続 |
 | 将来のトリガー | トリガー用のアダプターから同じ基盤を呼ぶ。今回、新しいトリガーや汎用トリガー設定画面は追加しない |
 
 段階Aでは新しい設定項目を先行追加しない。既存の割り当て・安定行ID・保存順・初期割り当ての適用済み記録を保持し、自動移行や設定ファイルの書き換えを追加しない。
 
-## 現在の構成と共通化する範囲
+## 共通基盤への接続
 
-すでに一部の基盤は共用している。[ShortcutDispatcher](../src/main/core/shortcut-dispatcher.ts)はキーとジェスチャーの順次実行・再入防止を担い、最終的な実行は[index.ts](../src/main/index.ts)の`executeCommand`へ集まる。一方、次の判断は入口ごとに残っている。
+[CommandDispatcher](../src/main/core/command-dispatcher.ts)の単一インスタンスがキーとジェスチャーの順次実行・再入防止を担い、最終的な実行は[index.ts](../src/main/index.ts)の`executeCommand`へ集まる。[ShortcutDispatcher](../src/main/core/shortcut-dispatcher.ts)は内部の互換アダプターであり、独立した実行ループを持たない。
 
-| 現在の処理 | 共通化後 |
+| 入口・処理 | 共通基盤との関係 |
 | --- | --- |
-| [keybindings.ts](../src/shared/keybindings.ts)の`matchesWhen`、`resolveKeybindings` | 共通条件判定と実行計画への互換アダプターにする。キーの正規化・物理キー別名・global/localの振り分けはキー側に残す |
-| [gestures.ts](../src/shared/gestures.ts)の`nativeGestureRows` | 保存済み条件を共通モデルへ正規化し、nativeへ渡す条件投影を作る |
-| [InputCaptureManager](../src/main/core/gestures.ts)の行照合・重複除去・first選択 | sessionやrevisionの検証は残し、条件判定と選択を共通の実行計画へ移す |
+| [keybindings.ts](../src/shared/keybindings.ts)の`planKeybindings` | 共通条件判定と実行計画へ渡す。`matchesWhen`、`resolveKeybindings`も同じ実装への互換アダプター。キーの正規化・物理キー別名・global/localの振り分けはキー側が所有 |
+| [gestures.ts](../src/shared/gestures.ts)の`nativeGestureRows`、`planGestureCommands` | 保存済み条件のnative投影を作り、開始対象の事実から共通の実行計画を求める |
+| [InputCaptureManager](../src/main/core/gestures.ts) | session・revision・settingsKey・文脈を検証し、nativeの選択行ID列と共通計画の一致を確認する |
 | [GestureEngine.cs](../dotnet/AppDock.InputHost/GestureEngine.cs)の対象判定・待機表示の選択 | フック内で必要な事前判定を維持し、共通規則に対応するnative評価器を使う |
-| index.tsの複数のローカルキー入口 | 同じキー用アダプターを経由させる。入口ごとのresolver/dispatcher直呼びを解消する |
-| [GlobalHotKeyManager](../src/main/core/global-hotkeys.ts)の独自実行ループ | 入力の登録・状態管理に専念し、実行は共通入口へ必ず渡す |
+| index.tsのローカルキー入口 | 同じ`prepareShortcut`と`dispatchShortcutPlan`を経由する。PageHostの入力時contextを保持 |
+| [GlobalHotKeyManager](../src/main/core/global-hotkeys.ts) | 入力の登録・状態管理に専念し、通知を必須のdispatch callbackから共通入口へ渡す |
 
 「いつ・どこで」は割り当てと入力に対する条件であり、コマンド自体の実行権限にはしない。パレットや公開APIでの直接実行へ入力割り当ての条件を適用しない。既存の公開可否・操作許可・Appletの生存確認は、各APIと既存の実行経路で引き続き検証する。
 
@@ -52,11 +52,11 @@ flowchart TD
 | 共通Dispatcher | 全トリガーで共有する実行中コマンドの予約、同じ入力の再入防止、実行前の取消確認、順次実行と解放、失敗の報告 |
 | 既存executeCommand | 本体・カスタム・Appletなどのコマンドを実行する。入力由来の実行情報を既存の前面化・キー送信へ渡す |
 
-新設する`src/shared/command-conditions.ts`へ条件モデルと評価、`src/shared/command-execution.ts`へ保存順の計画を置く。`ShortcutDispatcher`は`src/main/core/command-dispatcher.ts`の`CommandDispatcher`へ整理する。主処理は移して共用し、互換ラッパーを残す場合も別の選択・実行ループを持たせない。
+`src/shared/command-conditions.ts`に条件モデルと評価、`src/shared/command-execution.ts`に保存順の計画を置く。`src/main/core/command-dispatcher.ts`が予約・順次実行を所有する。互換ラッパーにも別の選択・実行ループを持たせない。
 
 ## 共通モデルと入口
 
-以下は内部契約の設計用の型であり、外部APIや保存JSONの追加ではない。
+以下は内部契約を簡略化した型であり、外部APIや保存JSONの追加ではない。
 
 ```ts
 type CommandExecutionMode = 'first' | 'all';
@@ -156,6 +156,13 @@ interface TriggerBinding {
 
 元のキー入力を止めるかどうかは、コマンド選択と別の入力契約である。globalの`blockOriginalInput`は、現在どおり有効かつ利用可能なglobal割り当て全体で合成する。firstで選ばれた1件やbusyの有無だけを見て変えない。保護キー、物理キー別名、押下・解放の対、右クリックの復元、ホイールの積算・期限も入力側の責務として保持する。
 
+共通の条件・選択fixtureは`tests/fixtures/command-conditions.json`に置く。本体をbuildした後、両評価器を次の入口で確認する。native側の試験は配布物と同じ`CommandConditions.cs`を直接コンパイルする。
+
+```powershell
+.\dev.bat exec node --test tests/command-execution.test.cjs
+dotnet run --project tests/CommandConditionsTests/CommandConditionsTests.csproj -c Release -- tests/fixtures/command-conditions.json
+```
+
 ## 入口の接続と追加規則
 
 段階Aでは、InputHostのglobal通知、通常のローカルキー、rendererのキー通知、Shellのキー処理、PageHost/Webページのキー処理を、同じキー用アダプターへ集約する。`dispatchShortcut`と現存するresolver直呼びの全箇所を確認し、キー入口だけ実行方法を適用し忘れる構造を残さない。GlobalHotKeyManagerのdispatch callbackなしの独自ループも解消し、試験用backendでも共通Dispatcherを使う。
@@ -171,9 +178,9 @@ interface TriggerBinding {
 
 独自の条件switch、先頭1件の切り出し、重複除去、コマンド実行ループを追加しない。条件の追加は共通モデル・評価器・対応トリガーの情報取得・必要なnative投影・fixtureを同時に更新する。トレイなどの既存の単一コマンド実行は、現在の`executeCommand`への接続を保ち、今回まとめて割り当て形式を変更しない。
 
-## 後続のショートカットキー設定
+## ショートカットキー設定
 
-段階Bで以下をまとめて実装する。段階Aの完了に必須ではなく、設定画面整備として独立して着手できる。
+段階Bでは以下を実装した。実行方法はキー用アダプターの共通入口で読み、global・renderer・Shell・PageHostの各経路へ適用する。
 
 | 場所 | 表示・動作 |
 | --- | --- |
@@ -185,7 +192,7 @@ interface TriggerBinding {
 | 項目のhint | `操作と「いつ・どこで」の条件に一致したコマンドを、登録順に選びます。` |
 | 初期値 | すべて。ジェスチャーとは独立して保存・変更する |
 
-実行方法の`SettingsField`、select、ラベル、選択肢、hintを共有部品へ抽出し、ジェスチャーと同じ見た目・アクセシビリティにする。検索項目・アンカー・設定カタログにも登録する。ページID`shortcuts`と設定を開くコマンドIDは変えない。共通のページ名を参照する設定を開くコマンドの表示名も更新し、無関係な「ショートカット」表記を一括置換しない。
+実行方法の`SettingsField`、select、ラベル、選択肢、hintは`CommandExecutionModeField`で共有し、ジェスチャーと同じ見た目・アクセシビリティにする。検索項目・アンカー・設定カタログにも登録する。ページID`shortcuts`と設定を開くコマンドIDは変えない。共通のページ名を参照する設定を開くコマンドの表示名も更新し、無関係な「ショートカット」表記を一括置換しない。
 
 保存は新しい任意項目`Settings.keybindingOptions?: { executionMode: 'first' | 'all' }`とする。既存の`keybindings`配列と旧`shortcuts`マップを別用途のオブジェクトへ変更しない。欠落時はall、不正な値は検証エラーとし、空の割り当てやカスタム条件を保持する。既定値allは既存の差分保存方式に従って省略できるようにする。
 
@@ -208,4 +215,4 @@ interface TriggerBinding {
 
 段階Bでは上記に加え、表の正確な文言・順序・hint・初期折りたたみ、両テーマと狭い画面、共有設定への保存・再起動・JSON・リセット・外部更新、APIの権限/revision/dryRun/原子的保存を確認する。
 
-実装時は影響に応じた型検査・build・回帰、発行前レビュー、版更新、固定EXEの確認を[共通手順](development-workflow.md)に従って実施する。段階Aは設定追加のない内部整理として版区分を判定し、段階Bは設定項目追加のためマイナー更新とする。設計書だけの今回は製品の版更新・発行・動作検証を行わない。実入力、UAC、ロック画面などの確認範囲は、実装後の[検証記録](../VERIFICATION.md)で試験条件と分けて記載する。
+実装時は影響に応じた型検査・build・回帰、発行前レビュー、版更新、固定EXEの確認を[共通手順](development-workflow.md)に従って実施する。段階Aは設定追加のない内部整理としてパッチ更新、段階Bは設定項目追加のためマイナー更新とする。実入力、UAC、ロック画面などの確認範囲は[検証記録](../VERIFICATION.md)で試験条件と分けて記載する。

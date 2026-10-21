@@ -665,8 +665,10 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.equal((await editShortcuts(additions, { dryRun: true })).completion, 'validated');
     assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settingsBytes);
     await editShortcuts(additions);
-    await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
-    const shortcutSearch = page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' });
+    await page.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
+    const shortcutSearch = page.getByRole('searchbox', {
+      name: 'ショートカットキーのコマンドを検索',
+    });
     await shortcutSearch.fill(`${fixtureId}.next`);
     await page
       .locator('.shortcuts-editor')
@@ -834,20 +836,17 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       () => JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'observed.json'))).feature === false,
       'local generated command observed',
     );
-    await page.getByRole('button', { name: 'ショートカット', exact: true }).click();
+    await page.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
     await page
-      .getByRole('searchbox', { name: 'ショートカットのコマンドを検索' })
+      .getByRole('searchbox', { name: 'ショートカットキーのコマンドを検索' })
       .fill('appdock.settings.closeToTray.toggle');
+    await page.getByText('appdock.settings.closeToTray.toggle', { exact: true }).first().waitFor();
+    await page.getByRole('searchbox', { name: 'ショートカットキーのコマンドを検索' }).fill('');
     await page
-      .getByText('appdock.settings.closeToTray.toggle', { exact: true })
-      .first()
-      .waitFor();
-    await page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' }).fill('');
-    await page
-      .getByRole('searchbox', { name: 'ショートカットのコマンドを検索' })
+      .getByRole('searchbox', { name: 'ショートカットキーのコマンドを検索' })
       .fill(lifecycleId(fixtureId, 'enable'));
     await page.getByText(lifecycleId(fixtureId, 'enable'), { exact: true }).first().waitFor();
-    await page.getByRole('searchbox', { name: 'ショートカットのコマンドを検索' }).fill('');
+    await page.getByRole('searchbox', { name: 'ショートカットキーのコマンドを検索' }).fill('');
     await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
     await page.keyboard.press('Control+Alt+F11');
     await until(

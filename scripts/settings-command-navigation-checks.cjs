@@ -30,7 +30,13 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
   };
   const move = async (from, title, page) => {
     await from.getByRole('button', { name: `${title}の${page}を開く`, exact: true }).click();
-    await host.getByRole('heading', { level: 1, name: page, exact: true }).waitFor();
+    await host
+      .getByRole('heading', {
+        level: 1,
+        name: page === 'ショートカット' ? 'ショートカットキー' : page,
+        exact: true,
+      })
+      .waitFor();
     await until(
       async () =>
         (await host.locator('.command-provider-filter').filter({ hasText: title }).count()) === 1,
@@ -159,8 +165,8 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
           .getByRole('button', { name: `Hint fixtureの${title}を開く`, exact: true })
           .locator('svg')
           .innerHTML();
-      await select('ショートカット');
-      for (const title of ['ショートカット', 'マウスジェスチャー', 'カスタムコマンド']) {
+      await select('ショートカットキー');
+      for (const title of ['ショートカットキー', 'マウスジェスチャー', 'カスタムコマンド']) {
         const index = host
           .locator('.settings-categories')
           .getByRole('button', { name: title, exact: true });
@@ -170,7 +176,8 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
           return { gap: r.right - s.right, padding: parseFloat(getComputedStyle(e).paddingRight) };
         });
         assert(Math.abs(geometry.gap - geometry.padding) < 1);
-        if (icons[title]) assert.equal(await index.locator('svg').innerHTML(), icons[title]);
+        const icon = icons[title === 'ショートカットキー' ? 'ショートカット' : title];
+        if (icon) assert.equal(await index.locator('svg').innerHTML(), icon);
       }
       assert.deepEqual(await host.locator('.applet-shortcut-overview th').allTextContents(), [
         'コマンド',
@@ -296,7 +303,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         `tray-index-publication-command-navigation-center-filtered-toggle-${theme}-${width}`,
       );
     }
-  await select('ショートカット');
+  await select('ショートカットキー');
   await move(row(id), 'Custom 2', 'マウスジェスチャー');
   await select('マウスジェスチャー');
   assert(
@@ -390,7 +397,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
   await otherApplet
     .getByRole('button', { name: 'fixture.otherのショートカットを開く', exact: true })
     .click();
-  await host.getByRole('heading', { level: 1, name: 'ショートカット', exact: true }).waitFor();
+  await host.getByRole('heading', { level: 1, name: 'ショートカットキー', exact: true }).waitFor();
   await until(
     async () => (await host.locator('.command-provider-filter').count()) === 1,
     'shortcut owner filter',

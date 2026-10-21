@@ -120,7 +120,12 @@ const checks = [];
               ? body
               : page
           ).getByRole('button', {
-            name: name === 'Appletに戻る' ? 'Applet' : name,
+            name:
+              name === 'Appletに戻る'
+                ? 'Applet'
+                : name === 'ショートカット'
+                  ? 'ショートカットキー'
+                  : name,
             exact: true,
           });
   const button = (name) => {
@@ -412,9 +417,9 @@ const checks = [];
     await save();
     assert.equal(await page.locator('.settings-applet-list').count(), 0);
     assert(await body.locator('.shortcuts-editor kbd').filter({ hasText: 'Ctrl+Alt+R' }).count());
-    await body.getByLabel('ショートカットの絞り込み').selectOption('conflict');
+    await body.getByLabel('ショートカットキーの絞り込み').selectOption('conflict');
     assert.equal(await body.locator('.shortcuts-editor tbody tr').count(), 0);
-    await body.getByLabel('ショートカットの絞り込み').selectOption('all');
+    await body.getByLabel('ショートカットキーの絞り込み').selectOption('all');
     assert(await body.locator('[data-shortcut-command^="appdock."]').count());
     checks.push(
       'Applet overview / command-first addition / flat catalog / error filter / host keys',
@@ -769,7 +774,7 @@ const checks = [];
       for (const width of [1280, 900, 700]) {
         await page.setViewportSize({ width, height: 620 });
         const search = await body.locator('.command-shortcut-search').boundingBox();
-        const statusGroup = body.getByLabel('ショートカットの絞り込み');
+        const statusGroup = body.getByLabel('ショートカットキーの絞り込み');
         const status = await statusGroup.boundingBox();
         assert.equal(await statusGroup.inputValue(), 'all');
         assert.equal(search.y, status.y, 'search and status filter share one row');

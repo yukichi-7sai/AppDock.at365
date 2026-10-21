@@ -23,7 +23,7 @@ module.exports = async function ({
     '通知',
     'リボン',
     'タスクトレイ',
-    'ショートカット',
+    'ショートカットキー',
     'マウスジェスチャー',
     'カスタムコマンド',
     'Webアカウント',
@@ -133,7 +133,7 @@ module.exports = async function ({
       await host.screenshot({
         path: path.join(profile, `refinement-permissions-${theme}-${width}.png`),
       });
-      for (const title of ['ショートカット', 'マウスジェスチャー']) {
+      for (const title of ['ショートカットキー', 'マウスジェスチャー']) {
         await select(title);
         assert.equal(await host.locator('.applet-shortcut-notice').count(), 0);
         assert.equal(

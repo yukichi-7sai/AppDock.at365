@@ -17,7 +17,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
         );
       }, theme);
       await host.setViewportSize({ width, height });
-      for (const page of ['ショートカット', 'マウスジェスチャー']) {
+      for (const page of ['ショートカットキー', 'マウスジェスチャー']) {
         await select(page);
         const list = host.locator('.shortcut-command-list');
         await list.waitFor();
@@ -67,7 +67,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
         await host.screenshot({
           path: path.join(
             profile,
-            `scrollbar-${theme}-${width}-${height}-${page === 'ショートカット' ? 'keys' : 'gestures'}.png`,
+            `scrollbar-${theme}-${width}-${height}-${page === 'ショートカットキー' ? 'keys' : 'gestures'}.png`,
           ),
         });
         assert(sample.bottom <= sample.bodyBottom + 1, JSON.stringify(sample));
@@ -106,7 +106,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
         for (const title of [
           'Applet管理',
           '通知',
-          'ショートカット',
+          'ショートカットキー',
           'マウスジェスチャー',
           'カスタムコマンド',
         ]) {
@@ -130,7 +130,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
       }
     }
   await host.setViewportSize({ width: 1280, height: 900 });
-  await select('ショートカット');
+  await select('ショートカットキー');
   await host.locator('.command-shortcut-search input').fill('Hint action');
   await until(
     async () => (await host.locator('[data-shortcut-command]').count()) === 1,

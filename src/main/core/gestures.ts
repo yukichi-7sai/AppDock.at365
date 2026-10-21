@@ -1,9 +1,20 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
-import { defaultGestures, nativeGestureRows, type GestureContext } from '../../shared/gestures';
+import {
+  defaultGestures,
+  nativeGestureRows,
+  planGestureCommands,
+  type GestureContext,
+} from '../../shared/gestures';
+import { readCommandTarget } from '../../shared/command-conditions';
 import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
-import type { ShortcutDispatcher } from './shortcut-dispatcher';
+import type { CommandDispatcher } from './command-dispatcher';
+
+const configurationKey = (settings: Settings['gestures'], commands: unknown) =>
+  createHash('sha256')
+    .update(JSON.stringify([settings, commands]))
+    .digest('hex');
 
 export interface GestureInvocation {
   session: string;
@@ -50,7 +61,7 @@ export class InputCaptureManager {
       commands: { id: string; title: string; extensionId?: string | null }[];
       recording: boolean;
     },
-    private dispatcher: ShortcutDispatcher,
+    private dispatcher: CommandDispatcher,
     private execute: (id: string, invocation: GestureInvocation) => Promise<unknown>,
     private cancelCommand: (session: string) => void,
     private report: (message: string) => void,
@@ -224,38 +235,56 @@ export class InputCaptureManager {
     if (method !== 'gestures.invoke') throw Error('Unknown input event.');
     if (p.revision !== this.revision || this.stopped || this.paused) return;
     const current = this.state();
+    const gestureSettings = current.settings.gestures ?? defaultGestures();
     if (
       current.recording ||
+      !gestureSettings.enabled ||
+      p.settingsKey !== configurationKey(gestureSettings, current.commands) ||
       JSON.stringify(current.context) !== p.context ||
+      typeof p.gesture !== 'string' ||
+      typeof p.process !== 'string' ||
+      !p.process.length ||
+      p.process.length > 120 ||
       typeof p.session !== 'string' ||
-      !Array.isArray(p.rowIds)
+      !p.session.length ||
+      p.session.length > 180 ||
+      this.active.has(p.session) ||
+      !Array.isArray(p.rowIds) ||
+      !p.rowIds.length ||
+      p.rowIds.length > 2000 ||
+      p.rowIds.some((id: unknown) => typeof id !== 'string' || id.length > 180) ||
+      new Set(p.rowIds).size !== p.rowIds.length
     )
       return;
-    const allowed = nativeGestureRows(
-      current.settings.gestures ?? defaultGestures(),
+    const target = readCommandTarget(p.target);
+    if (!target || target.window !== p.window || target.processName !== p.process) return;
+    const plan = planGestureCommands(
+      gestureSettings,
+      p.gesture,
       current.context,
+      target,
       current.commands,
     );
-    const commands = [
-      ...new Set(
-        allowed
-          .filter((r) => p.rowIds.includes(r.id) && r.gesture === p.gesture)
-          .map((r) => r.command),
-      ),
-    ];
-    if (current.settings.gestures?.executionMode === 'first') commands.splice(1);
+    if (JSON.stringify(plan.rowIds) !== JSON.stringify(p.rowIds)) return;
     const controller = new AbortController();
     this.active.set(p.session, controller);
     const peer = this.peer!;
     try {
-      await this.dispatcher.dispatch('gesture:' + p.gesture, commands, {
-        valid: async () =>
-          !controller.signal.aborted &&
-          !this.stopped &&
-          !this.paused &&
-          p.revision === this.revision &&
-          JSON.stringify(this.state().context) === p.context &&
-          !!(await peer.request('gestures.valid', { session: p.session, window: p.window })),
+      await this.dispatcher.dispatch('gesture:' + p.gesture, plan, {
+        valid: async () => {
+          const latest = this.state();
+          return (
+            !controller.signal.aborted &&
+            !this.stopped &&
+            !this.paused &&
+            !latest.recording &&
+            p.revision === this.revision &&
+            configurationKey(latest.settings.gestures ?? defaultGestures(), latest.commands) ===
+              p.settingsKey &&
+            JSON.stringify(latest.context) === p.context &&
+            !!(await peer.request('gestures.valid', { session: p.session, window: p.window }))
+          );
+        },
         execute: async (id) => {
           try {
             return await this.execute(id, {
@@ -320,9 +349,7 @@ export class InputCaptureManager {
       ...settings,
       rows: nativeGestureRows(settings, state.context, state.commands, settings.activateOnStart),
       context,
-      settingsKey: createHash('sha256')
-        .update(JSON.stringify([settings, state.commands]))
-        .digest('hex'),
+      settingsKey: configurationKey(settings, state.commands),
       hostProcessId: process.pid,
       enabled: settings.enabled && !this.paused && !state.recording,
     };

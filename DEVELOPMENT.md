@@ -34,7 +34,7 @@
 
 共有設定・dataの参照先変更は[未実装の設計](docs/shared-settings-location-design.md)として分離する。現在の保存仕様は設定同期の文書を正本とする。
 
-入力の「いつ・どこで」と実行方法をまとめる[共通コマンド実行基盤の設計](docs/command-execution-foundation-design.md)は未実装。基盤の接続を先に行い、ショートカットキー設定画面の整備を後続工程に分ける。
+入力の「いつ・どこで」と実行方法は[共通コマンド実行基盤](docs/command-execution-foundation-design.md)へ接続する。段階Aの基盤と段階Bのショートカットキー設定・保存・公開編集APIは実装済み。キーとジェスチャーは同じ基盤へ独立したfirst/all設定を渡す。
 
 ## 開発環境・ビルド・テスト
 

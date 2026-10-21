@@ -4,7 +4,12 @@ import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
 import { parseShellProviders } from './shell';
 import { parseNotificationPreferences } from './notification-types';
-import { parseKeybindings, withKeybindings } from './keybindings';
+import {
+  parseKeybindings,
+  withKeybindings,
+  defaultKeybindingOptions,
+  parseKeybindingOptions,
+} from './keybindings';
 import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
 import { parseGestures, defaultGestures } from './gestures';
 import type { Settings } from './contracts';
@@ -25,6 +30,7 @@ export const createDefaultSettings = (): Settings => ({
   ai: defaultAiSettings(),
   appletOrder: [],
   gestures: defaultGestures(),
+  keybindingOptions: defaultKeybindingOptions(),
   gestureDefaultsInitialized: [],
   schemaVersion: 1,
   host: {
@@ -244,6 +250,7 @@ export function parseSettings(value: unknown): Settings {
     tts: parseTtsSettings(value.tts),
     ai: parseAiSettings(value.ai),
     gestures: value.gestures === undefined ? defaultGestures() : parseGestures(value.gestures),
+    keybindingOptions: parseKeybindingOptions(value.keybindingOptions),
     gestureDefaultsInitialized: parseGestureInitialized(value.gestureDefaultsInitialized),
     ...(keybindings ? { keybindings } : {}),
     ...(value.keybindingDefaultsInitialized === undefined ? {} : { keybindingDefaultsInitialized }),

@@ -1,10 +1,14 @@
-# 条件付きショートカット
+# 条件付きショートカットキー
 
 入力の条件判定と実行は本体へ集約する。グローバル入力はInputHostの単一ローレベルフックを使い、ローカル入力と同じresolver/dispatcherへ渡す。
 
-「いつ・どこで」とfirst/allをジェスチャーと共通化する変更は[未実装の設計](command-execution-foundation-design.md)を参照。先に基盤を接続し、設定画面の整備は後続工程とする。以下は現在の動作を記載する。
+「いつ・どこで」、保存順の選択、再入防止と順次実行は[共通コマンド実行基盤](command-execution-foundation-design.md)を使う。キーとジェスチャーは同じ基盤へそれぞれの実行方法を渡す。
 
 ## 設定
+
+設定インデックスとページの名称は「ショートカットキー」。割り当て一覧「ショートカットキー割り当て」の上に、初期状態で閉じた「動作設定」を置く。「条件に一致したコマンドの実行方法」は「最初の1つ」「すべて」の順で表示し、ジェスチャーと同じ部品・hintを使う。
+
+`Settings.keybindingOptions.executionMode`は`first`または`all`で、欠落時と初期値は`all`（すべて）。既定値は差分JSONから省略する。不正値は保存せず、ジェスチャーの`gestures.executionMode`とは独立した共有設定として保存する。フォーム・ページJSON・外部ファイル更新・ページリセットは同じ項目へ接続する。リセットはキー側の割り当てと実行方法だけを戻す。設定の自動移行・既存行の書き換えは行わない。
 
 `Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。
 Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に宣言したコマンドの初期割り当てを指定できる。ID以外の`command`/`key`/`enabled`/`when`を各行へ書き、未宣言のコマンドはmanifest読込時に拒否する。初回発見時だけsettings.jsonにコピーし、適用済みIDは`keybindingDefaultsInitialized`へ記録する。行を消した後の再起動やApplet更新でも再追加しない。
@@ -35,8 +39,8 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 
 ## 入力と実行
 
-- shared/keybindingsのresolverで全候補を保存順に判定し、利用可能なコマンドに絞り、同一IDを重複除去する。
-- main/core/shortcut-dispatcherは開始前に全対象を予約する。コマンドによるキー送信の再入・同じキーの実行中再押下を抑止し、逐次awaitする。コマンド失敗は記録して続行し、終了・再起動では打ち切る。
+- shared/keybindingsの共通計画で全候補を保存順に判定し、利用可能なコマンドに絞り、同一IDを重複除去する。設定がfirstなら先頭1件、allなら全件を選ぶ。先頭が実行中・失敗でもfirstで次のコマンドへ繰り下げない。
+- main/core/command-dispatcherは開始前に選択バッチ全体を予約する。キーとジェスチャーをまたぐ同一コマンド、コマンドによるキー送信の再入・同じキーの実行中再押下を抑止し、逐次awaitする。allの個別コマンド失敗は記録して続行し、取消・終了・再起動では打ち切る。
 - mainの本体IPCとpageHostShortcutが共通resolver/dispatcherを呼ぶ。PageHostはSurfaceの可視状態と実Windowフォーカスを参照し、別Windowと埋め込み表示で同じApplet IDを使う。Surface破棄時に登録を除去する。native Appletの独自Windowは含めない。
 - InputCaptureHotKeyBackendはジェスチャーと同じInputCaptureManagerへ有効なglobalキーを同期する。専用入力スレッドのWH_KEYBOARD_LLで物理押下を一度捕捉し、globalとその時点で一致するローカル行を保存順に評価する。入力の所有キーは実行前に本体と信頼済みpreloadへ同期し、通過入力のDOM／before-input-event経路で再実行や追加抑止を行わない。表示用statusを所有判定へ流用しない。
 - 修飾キーはCtrl／Alt／Shift／Winの順。Windows／MetaもWinへ正規化する。左右Winは同じ割り当て。Win+LとCtrl+Alt+Delete等の保護されたglobalキーは新規の画面／外部API割り当てを拒否する。既存の保存行は保持して入力適用エラーを示し、設定全体の読み込みを妨げない。ジェスチャーのキーにWinは追加しない。
@@ -44,7 +48,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 - OS repeatはコマンドを再実行しない。キー解放まで押下時の通過／抑止を維持する。Win／Altを含む抑止時は自身の入力識別子付きダミー入力で単独修飾キー動作を防ぐ。自身のSendInputは捕捉しない。
 - 表示コマンドはrestore/show/focusの後、直近1.5秒の捕捉に対応する内部要求で前面化する。通知workerで必要な入力スレッドを一時接続し、finallyで解除する。前面Windowが押下元から変わった場合は中止する。プロセス起動は実際に起動したPIDと確認できた子孫PIDの可視Windowだけを同じ範囲で対象にし、起動受付の成功と前面化の成否を分ける。常時最前面化、合成Alt、ASFW_ANYは使わない。
 - ショートカット編集dialogを開くと誤実行防止のため全グローバル登録を一時解除し、statusesを空にする。dialogを閉じると保存済み設定で再登録する。正常時の「登録済み／未登録」を表示せず、有効なglobal行で利用可能なコマンドの登録エラーだけを示す。空のstatusesは記録/再同期の一時状態でもあるため、直近の非空statusを表示専用に保持し、同じコマンド/キーのエラーを再検査結果が届くまで表示する。エラーの絞り込みも同じ表示statusを使う。無効行/別scope/利用不能コマンドへ古いエラーを表示しない。backendの登録状態/入力判定や設定値へこの表示用キャッシュを戻さない。
-- 同じキーの複数割り当ては正常な使い方なので、行ごとの「同じキーの割り当てあり」を表示しない。共通の説明で全一致/順次実行を案内する。一覧には実行順操作・番号を置かず、専用パネルで変更した保存順序で実行する。
+- 同じキーの複数割り当ては正常な使い方なので、行ごとの「同じキーの割り当てあり」を表示しない。動作設定で実行方法を案内する。一覧には実行順操作・番号を置かず、専用パネルで変更した保存順序から選択する。
 - ローカル入力はkeyDownのみ、repeat/IME中/記録中を除く。本体はDOMの入力先判定を保つ。Applet Web画面はCtrl/Alt付きまたはF1〜F24/Pauseに限定して文字入力を守る。リモートへのpreload/IPC追加は行わない。globalはIME状態を参照せず、指定キーが常時対象になる。
 - アクティブページの条件は押下時に確定する。コマンドがページやフォーカスを変えても捕捉済みの対象を再評価しない。各コマンド自体の実行先（前面アプリ等）はそのコマンドの実装に従う。
 
@@ -108,7 +112,7 @@ flowchart LR
   Capture --> Mouse[ジェスチャーと記録用マウスフック]
   Keyboard --> Queue[捕捉した押下の通知]
   Queue --> Resolver[共通resolver]
-  Resolver --> Dispatcher[ShortcutDispatcher]
+  Resolver --> Dispatcher[CommandDispatcher]
   Dispatcher --> Commands[既存コマンド]
   Local[AppDock内のローカル入力] --> Resolver
 ```

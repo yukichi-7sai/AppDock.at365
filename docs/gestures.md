@@ -2,7 +2,7 @@
 
 入力基盤は本体が所有する。操作コマンドとその設定は提供元のAppletが所有する。本体はApplet IDによる専用処理を持たない。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorの即時保存/revision/atomic writeを共用する。
 
-キー入力と条件判定・実行方法を共通化する変更は[未実装の設計](command-execution-foundation-design.md)を参照。以下は現在の動作を記載する。
+キー入力と[共通コマンド実行基盤](command-execution-foundation-design.md)を使う。「いつ・どこで」の評価、保存順とfirst/allの選択、重複除去、実行予約と順次実行を共用し、入力認識とsessionの生存確認はジェスチャー側が担う。
 
 ## 保存と初期値
 
@@ -23,6 +23,8 @@
 `AppDock.InputHost`は本体の子プロセス。自己完結.NET/WPFで配布EXE内に収録し、利用者へDesktop Runtime追加を要求しない。globalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。非アクティブ・クリック透過の待機表示はUI Dispatcherへ分離し、表示の初期化はフック登録前に行う。コールバック内でコマンドやRPCを待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
 
 本体は実Windowフォーカスと表示中Appletに対応する行を入力プロセスへ同期する（40ms間隔、内容が変化した時のみ送信）。ネイティブ側は押下時に最前面HWND・exe・カーソル下のWindow・除外・ブラウザクラス条件を確認。ローカル条件は通知済みHWNDにも限定する。状態の同期前に入力した場合に誤ったコマンドを実行しないよう、本体側も受信時と各コマンドの開始前に最新のページ/Window文脈を照合する。
+
+InputHostは開始対象のHWND・プロセス・Window class・デスクトップ判定を固定して渡す。本体は同じ事実から共通の実行計画を求め、選択行IDの列がnativeの待機表示・送信候補と完全に一致する場合だけ実行する。設定・コマンド一覧のsettingsKeyも受信時と各コマンド直前に照合し、40msの同期を待っている間の変更でも後続を止める。不明な対象情報を条件一致として扱わない。
 
 入力プロセスは`GetForegroundWindow()`の変化を`capture.foreground`で通知する（40ms間隔、初回も通知）。受信後のジェスチャー文脈は、この実HWNDと本体・AppletのWindowを照合して決める。再起動・更新後にElectronの`isFocused()`が古い状態を保持しても、その状態で外部Windowの開始準備を止めない。初回通知前だけElectronのフォーカスを使い、入力プロセスへ再接続すると実HWNDを取り直す。ローカル割り当てのページ条件、実行前のrevision/文脈照合、一時停止・記録中の抑止は維持する。
 

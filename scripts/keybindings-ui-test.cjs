@@ -99,15 +99,25 @@ const until = async (fn, label) => {
 };
 let app, dock, target, targetPeer;
 async function nativeFocus(suffix) {
-  const handle = await app.evaluate(({ webContents, BrowserWindow }, suffix) => {
-    const wc = webContents.getAllWebContents().find((w) => w.getURL().endsWith(suffix));
-    const contains = (view) => view.webContents === wc || (view.children ?? []).some(contains);
-    const window = BrowserWindow.getAllWindows().find(
-      (w) => w.webContents === wc || contains(w.contentView),
-    );
-    window.show();
-    return window.getNativeWindowHandle().readBigUInt64LE().toString();
-  }, suffix);
+  const handle = await until(
+    () =>
+      app.evaluate(({ webContents, BrowserWindow }, suffix) => {
+        for (const wc of webContents
+          .getAllWebContents()
+          .filter((w) => w.getURL().endsWith(suffix))) {
+          const contains = (view) =>
+            view.webContents === wc || (view.children ?? []).some(contains);
+          const window = BrowserWindow.getAllWindows().find(
+            (w) => w.webContents === wc || contains(w.contentView),
+          );
+          if (window) {
+            window.show();
+            return window.getNativeWindowHandle().readBigUInt64LE().toString();
+          }
+        }
+      }, suffix),
+    'attached native Window for ' + suffix,
+  );
   await targetPeer.request('focusWindow', { window: handle });
   await until(
     async () => (await targetPeer.request('snapshot')).foreground === handle,
@@ -396,8 +406,8 @@ const expectCalls = async (before, expected) => {
     await dock.evaluate((id) => window.dock.executeCommand(id + '.open'), webId);
     checks.push('Gmail local UI and offline remote body use shared scope resolver');
     await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await dock.getByRole('button', { name: 'ショートカット', exact: true }).click();
-    await dock.getByLabel('ショートカットのコマンドを検索').fill('test.keys.c');
+    await dock.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
+    await dock.getByLabel('ショートカットキーのコマンドを検索').fill('test.keys.c');
     const row = dock.locator('[data-binding-id="selected"]');
     const editDialog = dock.locator('.applet-shortcut-dialog');
     const keyRecorder = editDialog.getByRole('button', {
@@ -505,11 +515,11 @@ const expectCalls = async (before, expected) => {
       appletIds: [],
     });
     await save([...ownerSaved.keybindings, make('gmail-owner', 'at365.gmail.open', 'owner')]);
-    await dock.getByLabel('ショートカットのコマンドを検索').fill('at365.gmail.open');
+    await dock.getByLabel('ショートカットキーのコマンドを検索').fill('at365.gmail.open');
     await openEdit(dock.locator('[data-binding-id="gmail-owner"]'));
     assert.equal(await editDialog.locator('option[value="owner"]').textContent(), 'Gmail');
     await keyRecorder.press('Escape');
-    await dock.getByLabel('ショートカットのコマンドを検索').fill('appdock.commands.search');
+    await dock.getByLabel('ショートカットキーのコマンドを検索').fill('appdock.commands.search');
     await openEdit(dock.locator('[data-binding-id="search"]'));
     assert.equal(await editDialog.locator('option[value="owner"]').count(), 0);
     await keyRecorder.press('Escape');
@@ -520,7 +530,7 @@ const expectCalls = async (before, expected) => {
       ['test.keys.open', 'Control+Shift+F9', 'owner'],
       ['appdock.restart', 'Control+Shift+F8', 'app'],
     ]) {
-      await dock.getByLabel('ショートカットのコマンドを検索').fill(command);
+      await dock.getByLabel('ショートカットキーのコマンドを検索').fill(command);
       const entry = dock.locator(`[data-shortcut-command="${command}"]`);
       assert.equal(await entry.locator('.command-id').textContent(), command);
       await entry.getByRole('button', { name: /に割り当てを追加/ }).click();
@@ -537,7 +547,7 @@ const expectCalls = async (before, expected) => {
         'Default scope saved',
       );
     }
-    await dock.getByLabel('ショートカットのコマンドを検索').fill('test.keys.c');
+    await dock.getByLabel('ショートカットキーのコマンドを検索').fill('test.keys.c');
     await dock.screenshot({ path: path.join(profile, 'shortcuts-dark.png') });
     await dock.evaluate(async () => {
       const s = await window.dock.snapshot();
@@ -580,6 +590,41 @@ const expectCalls = async (before, expected) => {
     checks.push(
       'new Applet/host binding defaults, unchanged existing scopes and full searchable IDs in settings, palette and home',
     );
+    await require('./shortcut-options-checks.cjs')({
+      app,
+      dock,
+      profile,
+      checks,
+      until,
+      calls,
+      send,
+      sendGlobal,
+      expectCalls,
+      nativeFocus,
+      restart: async () => {
+        await app.close();
+        app = await launchTestHost({
+          executablePath,
+          portable,
+          args: portable ? [`--test-profile=${profile}`] : [root, `--test-profile=${profile}`],
+          env,
+        });
+        const host = await until(
+          () =>
+            app
+              .context()
+              .pages()
+              .find((p) => p.url().startsWith('appdock://host/')),
+          'restarted Host page',
+        );
+        dock = require('./settings-aware-page.cjs').settingsAwarePage(host);
+        await until(
+          async () => (await dock.evaluate(() => window.dock.snapshot())).startupReady,
+          'restarted host ready',
+        );
+        return { app, dock };
+      },
+    });
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify({ checks, sha256: portableHash }, null, 2),

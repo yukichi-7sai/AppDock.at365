@@ -417,7 +417,7 @@ async function until(fn, name) {
     await move('test.b', 'ショートカット');
     await page.locator('.command-provider-filter').waitFor();
     await page
-      .getByRole('searchbox', { name: 'ショートカットのコマンドを検索', exact: true })
+      .getByRole('searchbox', { name: 'ショートカットキーのコマンドを検索', exact: true })
       .focus();
     assert.deepEqual(
       await page.locator('.command-shortcut-search').evaluate((element) => {

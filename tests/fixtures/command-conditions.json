@@ -1,0 +1,261 @@
+{
+  "conditions": [
+    {
+      "name": "global without target",
+      "when": { "scope": "global" },
+      "context": { "host": {} },
+      "expected": true
+    },
+    {
+      "name": "unknown scope",
+      "when": { "scope": "unknown" },
+      "context": { "host": { "focused": true } },
+      "expected": false
+    },
+    {
+      "name": "app focused",
+      "when": { "scope": "app" },
+      "context": { "host": { "focused": true } },
+      "expected": true
+    },
+    {
+      "name": "app unknown",
+      "when": { "scope": "app" },
+      "context": { "host": {} },
+      "expected": false
+    },
+    {
+      "name": "pages needs a page",
+      "when": { "scope": "pages" },
+      "context": { "host": { "focused": true } },
+      "expected": false
+    },
+    {
+      "name": "host page",
+      "when": { "scope": "pages" },
+      "context": { "host": { "focused": true, "pageId": "host.settings" } },
+      "expected": true
+    },
+    {
+      "name": "legacy applet page",
+      "when": { "scope": "pages" },
+      "context": { "host": { "focused": true, "appletId": "test.owner" } },
+      "expected": true
+    },
+    {
+      "name": "stale page cannot match",
+      "when": { "scope": "pages" },
+      "context": { "host": { "focused": false, "pageId": "host.settings" } },
+      "expected": false
+    },
+    {
+      "name": "registered owner",
+      "when": { "scope": "owner" },
+      "ownerId": "test.owner",
+      "context": { "host": { "focused": true, "appletId": "test.owner" } },
+      "expected": true
+    },
+    {
+      "name": "missing owner",
+      "when": { "scope": "owner" },
+      "context": { "host": { "focused": true, "appletId": "test.owner" } },
+      "expected": false
+    },
+    {
+      "name": "different owner",
+      "when": { "scope": "owner" },
+      "ownerId": "other",
+      "context": { "host": { "focused": true, "appletId": "test.owner" } },
+      "expected": false
+    },
+    {
+      "name": "specific host page",
+      "when": { "scope": "applets", "appletIds": ["host.settings"] },
+      "context": { "host": { "focused": true, "pageId": "host.settings" } },
+      "expected": true
+    },
+    {
+      "name": "specific applet page",
+      "when": { "scope": "applets", "appletIds": ["page:test.owner:history"] },
+      "context": {
+        "host": { "focused": true, "pageId": "page:test.owner:history", "appletId": "test.owner" }
+      },
+      "expected": true
+    },
+    {
+      "name": "legacy whole applet",
+      "when": { "scope": "applets", "appletIds": ["test.owner"] },
+      "context": {
+        "host": { "focused": true, "pageId": "page:test.owner:history", "appletId": "test.owner" }
+      },
+      "expected": true
+    },
+    {
+      "name": "other page",
+      "when": { "scope": "applets", "appletIds": ["host.logs"] },
+      "context": { "host": { "focused": true, "pageId": "host.settings" } },
+      "expected": false
+    },
+    {
+      "name": "desktop confirmed",
+      "when": { "scope": "desktop" },
+      "context": { "host": {}, "target": { "window": "100", "desktop": true } },
+      "expected": true
+    },
+    {
+      "name": "desktop unknown",
+      "when": { "scope": "desktop" },
+      "context": { "host": {}, "target": { "window": "100" } },
+      "expected": false
+    },
+    {
+      "name": "folder not desktop",
+      "when": { "scope": "desktop" },
+      "context": {
+        "host": {},
+        "target": { "window": "100", "processName": "explorer", "desktop": false }
+      },
+      "expected": false
+    },
+    {
+      "name": "browser case and suffix",
+      "when": { "scope": "browser" },
+      "environment": { "browsers": ["CHROME.EXE"] },
+      "context": { "host": {}, "target": { "window": "100", "processName": "chrome" } },
+      "expected": true
+    },
+    {
+      "name": "browser needs environment",
+      "when": { "scope": "browser" },
+      "context": { "host": {}, "target": { "window": "100", "processName": "chrome" } },
+      "expected": false
+    },
+    {
+      "name": "browser requires real process",
+      "when": { "scope": "browser" },
+      "environment": { "browsers": ["chrome"] },
+      "context": { "host": {} },
+      "expected": false
+    },
+    {
+      "name": "chromium class",
+      "when": { "scope": "browser" },
+      "environment": { "browsers": ["chrome"], "requireChromiumWindowClass": true },
+      "context": {
+        "host": {},
+        "target": { "window": "100", "processName": "chrome", "windowClass": "Chrome_WidgetWin_1" }
+      },
+      "expected": true
+    },
+    {
+      "name": "missing chromium class",
+      "when": { "scope": "browser" },
+      "environment": { "browsers": ["chrome"], "requireChromiumWindowClass": true },
+      "context": { "host": {}, "target": { "window": "100", "processName": "chrome" } },
+      "expected": false
+    },
+    {
+      "name": "class is case sensitive",
+      "when": { "scope": "browser" },
+      "environment": { "browsers": ["chrome"], "requireChromiumWindowClass": true },
+      "context": {
+        "host": {},
+        "target": { "window": "100", "processName": "chrome", "windowClass": "chrome_widgetwin_1" }
+      },
+      "expected": false
+    },
+    {
+      "name": "exe",
+      "when": { "scope": "exe", "processes": ["NOTEPAD.EXE"] },
+      "context": { "host": {}, "target": { "window": "100", "processName": "notepad" } },
+      "expected": true
+    },
+    {
+      "name": "exe unknown",
+      "when": { "scope": "exe", "processes": ["notepad"] },
+      "context": { "host": {}, "target": { "window": "100" } },
+      "expected": false
+    },
+    {
+      "name": "exclude desktop",
+      "when": { "scope": "global", "excludeDesktop": true },
+      "context": { "host": {}, "target": { "window": "100", "desktop": true } },
+      "expected": false
+    },
+    {
+      "name": "exclude needs desktop fact",
+      "when": { "scope": "global", "excludeDesktop": true },
+      "context": { "host": {} },
+      "expected": false
+    },
+    {
+      "name": "exclude confirmed ordinary target",
+      "when": { "scope": "global", "excludeDesktop": true },
+      "context": { "host": {}, "target": { "window": "100", "desktop": false } },
+      "expected": true
+    },
+    {
+      "name": "exe excludes desktop",
+      "when": { "scope": "exe", "processes": ["explorer"], "excludeDesktop": true },
+      "context": {
+        "host": {},
+        "target": { "window": "100", "processName": "explorer", "desktop": true }
+      },
+      "expected": false
+    }
+  ],
+  "selections": [
+    {
+      "name": "filter then deduplicate in saved order",
+      "context": { "host": { "focused": true } },
+      "mode": "all",
+      "catalog": [
+        { "id": "a" },
+        { "id": "b" },
+        { "id": "c" },
+        { "id": "disabled" },
+        { "id": "unavailable", "available": false }
+      ],
+      "rows": [
+        { "id": "not-owner", "command": "a", "when": { "scope": "owner" } },
+        { "id": "missing", "command": "missing", "when": { "scope": "global" } },
+        { "id": "off", "command": "disabled", "enabled": false, "when": { "scope": "global" } },
+        { "id": "unavailable", "command": "unavailable", "when": { "scope": "global" } },
+        { "id": "b-first", "command": "b", "when": { "scope": "app" } },
+        { "id": "b-duplicate", "command": "b", "when": { "scope": "global" } },
+        { "id": "c", "command": "c", "when": { "scope": "app" } }
+      ],
+      "expectedRows": ["b-first", "c"],
+      "expectedCommands": ["b", "c"]
+    },
+    {
+      "name": "first matching command after conditions",
+      "context": { "host": { "focused": true, "appletId": "actual.owner" } },
+      "mode": "first",
+      "catalog": [
+        { "id": "owner.prefix.command", "extensionId": "other" },
+        { "id": "second", "extensionId": "actual.owner" },
+        { "id": "third" }
+      ],
+      "rows": [
+        { "id": "prefix", "command": "owner.prefix.command", "when": { "scope": "owner" } },
+        { "id": "second", "command": "second", "when": { "scope": "owner" } },
+        { "id": "third", "command": "third", "when": { "scope": "global" } }
+      ],
+      "expectedRows": ["second"],
+      "expectedCommands": ["second"]
+    },
+    {
+      "name": "unknown target never widens conditions",
+      "context": { "host": {} },
+      "mode": "all",
+      "catalog": [{ "id": "a" }, { "id": "b" }],
+      "rows": [
+        { "id": "a", "command": "a", "when": { "scope": "desktop" } },
+        { "id": "b", "command": "b", "when": { "scope": "global", "excludeDesktop": true } }
+      ],
+      "expectedRows": [],
+      "expectedCommands": []
+    }
+  ]
+}

@@ -20,6 +20,42 @@ const {
 } = require('../out/main/shared/keybindings');
 const { ShortcutDispatcher } = require('../out/main/main/core/shortcut-dispatcher');
 const { GlobalHotKeyManager } = require('../out/main/main/core/global-hotkeys');
+const {
+  defaultKeybindingOptions,
+  parseKeybindingOptions,
+  getKeybindingOptions,
+} = require('../out/main/shared/keybindings');
+const { settingsStorageValue } = require('../out/main/shared/settings-storage');
+
+test('shortcut options default to all, validate explicit values and retain local future fields', () => {
+  assert.deepEqual(defaultKeybindingOptions(), { executionMode: 'all' });
+  assert.deepEqual(getKeybindingOptions({}), { executionMode: 'all' });
+  assert.deepEqual(parseKeybindingOptions({}), { executionMode: 'all' });
+  assert.deepEqual(parseKeybindingOptions({ executionMode: 'first', future: false }), {
+    executionMode: 'first',
+    future: false,
+  });
+  for (const value of [
+    null,
+    [],
+    false,
+    { executionMode: null },
+    { executionMode: 'unknown' },
+    { executionMode: 0 },
+  ])
+    assert.throws(() => parseKeybindingOptions(value));
+  const old = createDefaultSettings();
+  delete old.keybindingOptions;
+  assert.equal(parseSettings(old).keybindingOptions.executionMode, 'all');
+  assert.equal(settingsStorageValue(parseSettings(old)).keybindingOptions, undefined);
+  old.keybindingOptions = { executionMode: 'first' };
+  old.gestures.executionMode = 'all';
+  assert.equal(parseSettings(old).keybindingOptions.executionMode, 'first');
+  assert.deepEqual(settingsStorageValue(parseSettings(old)).keybindingOptions, {
+    executionMode: 'first',
+  });
+  assert.equal(parseSettings(old).gestures.executionMode, 'all');
+});
 const row = (id, command, scope = 'app', appletIds = []) => ({
   id,
   command,
@@ -423,10 +459,9 @@ test('one OS registration per key; common dispatch receives each press only once
       },
       close: async () => {},
     },
-    assert.fail,
+    async (key) => presses.push(key),
     () => {},
     assert.fail,
-    async (key) => presses.push(key),
   );
   await manager.sync(
     {

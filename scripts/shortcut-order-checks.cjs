@@ -4,7 +4,7 @@ const path = require('node:path');
 module.exports = async ({ page, snapshot, save, profile, checks }) => {
   const original = structuredClone((await snapshot()).settings.value.keybindings);
   const panel = page.locator('.shortcut-order-dialog');
-  const filter = page.getByLabel('ショートカットのコマンドを検索');
+  const filter = page.getByLabel('ショートカットキーのコマンドを検索');
   const openTop = () => page.getByRole('button', { name: '実行順…', exact: true }).click();
   await page
     .locator('.command-shortcut-summary')
@@ -108,7 +108,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await page.getByRole('button', { name: '設定', exact: true }).click();
   await page
     .locator('.settings-categories')
-    .getByRole('button', { name: 'ショートカット', exact: true })
+    .getByRole('button', { name: 'ショートカットキー', exact: true })
     .click();
   await filter.fill('');
   const extra = [

@@ -256,7 +256,7 @@ async function expectCalls(suffix, expected) {
     const page = require('./settings-aware-page.cjs').settingsAwarePage(host);
     let candidates;
     for (const [category, rowId, panelClass] of [
-      ['ショートカット', 'picked', '.applet-shortcut-dialog'],
+      ['ショートカットキー', 'picked', '.applet-shortcut-dialog'],
       ['マウスジェスチャー', 'gesture.picked', '.gesture-binding-dialog'],
     ]) {
       await page.getByRole('button', { name: category, exact: true }).click();

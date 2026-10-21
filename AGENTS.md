@@ -58,7 +58,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 
 - ジェスチャーから本体を開くコマンドは共通`showWindow(invocation)`へ入力元を渡し、InputHostの表示前準備・表示後の前面化を使う。開始元・生存session・本体所有HWND・1回限りの制約と、前面移動後の後続コマンド停止を保つ。新しい入口も[ジェスチャーの前面化](docs/gestures.md#本体を開くコマンドの前面化)に従う。
 
-- [条件付きショートカット](docs/keybindings.md)と[ジェスチャー](docs/gestures.md)を正本とする。本体・ローカルUI・Web・Windows入力は共通resolver/dispatcherへ接続し、押下時の条件、保存順、同一コマンド1回、再入防止・取消を維持する。
+- [条件付きショートカット](docs/keybindings.md)と[ジェスチャー](docs/gestures.md)を正本とする。本体・ローカルUI・Web・Windows入力は[共通条件・実行基盤](docs/command-execution-foundation-design.md)へ接続し、押下時の条件、保存順、同一コマンド1回、再入防止・取消を維持する。新しいトリガーも同じ計画とCommandDispatcherを使い、独自の条件判定・first/all選択・実行ループを追加しない。nativeの事前判定は共通fixtureとの一致を検査する。
 - Applet条件は実Windowフォーカスと表示Surfaceで判定する。ownerはコマンド登録元IDを使い、ID接頭辞で推測しない。新規Applet割当はowner、本体/不明はapp。manifestの初期値は初回だけ適用し、解除した行を再生成しない。
 - 一覧は全コマンドの平坦な表示とし、全体設定ではコマンド・割り当て・移動の3列を使う。共通アイコンでコマンド別の設定へ移動し、安定IDで絞り込む。表示順を実行順に流用せず、追加後の検索・スクロールを保持する。編集・順序パネルの一時入力は適用時に即時保存し、外部更新との競合を検査する。削除は確認なしで即時保存する。
 - 正常なWindows登録状態を行に表示せず、記録中の一時解除と実登録エラーを区別する。エラーの表示キャッシュをbackendやdraftへ戻さない。

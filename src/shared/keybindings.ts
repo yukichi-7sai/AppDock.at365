@@ -8,6 +8,8 @@ import {
 import type { Settings } from './contracts';
 import { collectionPages, collectionIdentity } from './page-collections';
 import { shortcutTargetTitle, validShortcutTarget } from './shortcut-pages';
+import { commandCondition, matchesCommandCondition } from './command-conditions';
+import { planCommandBatch, type CommandExecutionMode } from './command-execution';
 
 export const shortcutScopes = [
   { id: 'global', title: 'グローバル' },
@@ -30,6 +32,28 @@ export interface ShortcutContext {
   appFocused: boolean;
   appletId?: string;
   pageId?: string;
+}
+export interface KeybindingOptions {
+  executionMode: CommandExecutionMode;
+}
+export const defaultKeybindingOptions = (): KeybindingOptions => ({ executionMode: 'all' });
+export function parseKeybindingOptions(value: unknown): KeybindingOptions {
+  if (value === undefined) return defaultKeybindingOptions();
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw Error('ショートカットキーの動作設定を確認してください。');
+  const source = value as Record<string, unknown>;
+  if (
+    source.executionMode !== undefined &&
+    source.executionMode !== 'first' &&
+    source.executionMode !== 'all'
+  )
+    throw Error('ショートカットキーの実行方法は「最初の1つ」または「すべて」です。');
+  return { ...source, executionMode: source.executionMode ?? 'all' } as KeybindingOptions;
+}
+export function getKeybindingOptions(
+  settings: Pick<Settings, 'keybindingOptions'>,
+): KeybindingOptions {
+  return settings.keybindingOptions ?? defaultKeybindingOptions();
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -349,48 +373,36 @@ export function matchesWhen(
   context: ShortcutContext,
   extensionId?: string | null,
 ): boolean {
-  switch (when.scope) {
-    case 'global':
-      return true;
-    case 'app':
-      return context.appFocused;
-    case 'pages':
-      return context.appFocused && (!!context.pageId || !!context.appletId);
-    case 'owner':
-      return context.appFocused && !!extensionId && context.appletId === extensionId;
-    case 'applets':
-      return (
-        context.appFocused &&
-        ((!!context.pageId && when.appletIds.includes(context.pageId)) ||
-          (!!context.appletId && when.appletIds.includes(context.appletId)))
-      );
-    default:
-      return false;
-  }
+  return matchesCommandCondition(
+    commandCondition(when),
+    {
+      host: { focused: context.appFocused, appletId: context.appletId, pageId: context.pageId },
+    },
+    extensionId,
+  );
 }
-export function resolveKeybindings(
+export function planKeybindings(
   rows: Keybinding[],
   key: string | readonly string[],
   context: ShortcutContext,
   available: { id: string; extensionId?: string | null }[],
   globalEvent = false,
-): string[] {
-  const commands = new Map(available.map((command) => [command.id, command]));
+  mode: CommandExecutionMode = 'all',
+) {
   const keys = new Set(typeof key === 'string' ? [key] : key);
-  return [
-    ...new Set(
-      rows
-        .filter(
-          (row) =>
-            row.enabled &&
-            keys.has(row.key) &&
-            (globalEvent || row.when.scope !== 'global') &&
-            commands.has(row.command) &&
-            matchesWhen(row.when, context, commands.get(row.command)?.extensionId),
-        )
-        .map((row) => row.command),
-    ),
-  ];
+  return planCommandBatch(
+    rows
+      .filter((row) => keys.has(row.key) && (globalEvent || row.when.scope !== 'global'))
+      .map((row) => ({ ...row, when: commandCondition(row.when) })),
+    {
+      host: { focused: context.appFocused, appletId: context.appletId, pageId: context.pageId },
+    },
+    available,
+    mode,
+  );
+}
+export function resolveKeybindings(...args: Parameters<typeof planKeybindings>): string[] {
+  return [...planKeybindings(...args).commands];
 }
 /** No host IPC or text inspection is injected into remote documents. */
 export function safePageShortcut(input: { control: boolean; alt: boolean; key: string }) {

@@ -750,7 +750,7 @@ async function checkSectionTitles() {
       'current launch/speech state, command IDs and security descriptions survive OFF; hint and description coexist',
     );
 
-    for (const title of ['リボン', 'Webアカウント', 'ショートカット', 'マウスジェスチャー']) {
+    for (const title of ['リボン', 'Webアカウント', 'ショートカットキー', 'マウスジェスチャー']) {
       await select(title);
       await hints(true);
       await until(
@@ -877,7 +877,7 @@ async function checkSectionTitles() {
       'added gesture/account/permission hints toggle; prerequisite stays in help; removed guides stay absent; permission saves and six warnings remain',
     );
 
-    for (const title of ['ショートカット', 'マウスジェスチャー']) {
+    for (const title of ['ショートカットキー', 'マウスジェスチャー']) {
       await select(title);
       await hints(true);
       await host.getByRole('button', { name: 'Hint actionに割り当てを追加', exact: true }).click();
@@ -893,7 +893,7 @@ async function checkSectionTitles() {
         await dialog.getByRole('button', { name: 'キャンセル', exact: true }).count(),
         1,
       );
-      if (title === 'ショートカット')
+      if (title === 'ショートカットキー')
         assert.equal(
           await dialog.locator('.shortcut-capture').getAttribute('aria-describedby'),
           null,

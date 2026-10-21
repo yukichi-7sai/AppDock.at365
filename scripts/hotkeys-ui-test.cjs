@@ -157,8 +157,8 @@ async function until(check, message) {
     );
     await page.keyboard.press('Control+,');
     const settingsPage = await require('./settings-host-helper.cjs').settingsPage(page);
-    await settingsPage.getByRole('button', { name: 'ショートカット', exact: true }).click();
-    await settingsPage.getByLabel('ショートカットのコマンドを検索').fill(toggleCommand);
+    await settingsPage.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
+    await settingsPage.getByLabel('ショートカットキーのコマンドを検索').fill(toggleCommand);
     const row = settingsPage.locator(`[data-shortcut-command="${toggleCommand}"]`);
     await row.locator('.applet-shortcut-edit').click();
     const shortcutDialog = settingsPage.locator('.applet-shortcut-dialog');

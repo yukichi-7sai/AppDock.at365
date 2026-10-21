@@ -4,6 +4,8 @@ import { keybindingConditionLabel } from './keybindings';
 import { matchesWhen, type ShortcutContext, type ShortcutScope } from './keybindings';
 import { validShortcutTarget } from './shortcut-pages';
 import type { Settings } from './contracts';
+import { commandCondition, type CommandTarget } from './command-conditions';
+import { planCommandBatch } from './command-execution';
 
 export const moveDirections = [
   ['up', '↑ 上'],
@@ -289,7 +291,39 @@ export function nativeGestureRows(
     if (!matches && !includeInactive) return [];
     // Keep hooks available for a click that activates AppDock, without authorizing inactive rows.
     return [
-      { ...row, title: command.title, window: !matches ? '-1' : external ? '' : context.window },
+      {
+        ...row,
+        title: command.title,
+        ownerId: command.extensionId ?? null,
+        window: !matches ? '-1' : external ? '' : context.window,
+      },
     ];
   });
+}
+export function planGestureCommands(
+  settings: GestureSettings,
+  gesture: string,
+  context: GestureContext,
+  target: CommandTarget,
+  commands: { id: string; extensionId?: string | null }[],
+) {
+  return planCommandBatch(
+    settings.bindings
+      .filter((row) => row.gesture === gesture)
+      .map((row) => ({ ...row, when: commandCondition(row.when) })),
+    {
+      host: {
+        focused: context.appFocused && context.window === target.window,
+        pageId: context.pageId,
+        appletId: context.appletId,
+      },
+      target,
+    },
+    commands,
+    settings.executionMode,
+    {
+      browsers: settings.browsers,
+      requireChromiumWindowClass: settings.requireChromiumWindowClass,
+    },
+  );
 }

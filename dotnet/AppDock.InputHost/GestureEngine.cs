@@ -5,8 +5,7 @@ using System.Text;
 using System.Windows.Threading;
 
 namespace AppDock.InputHost;
-internal sealed record Condition(string Scope, string[] AppletIds, string[] Processes, bool ExcludeDesktop = false);
-internal sealed record Binding(string Id, string Command, string Gesture, string Title, string Window, Condition When);
+internal sealed record Binding(string Id, string Command, string Gesture, string Title, string Window, Condition When, string? OwnerId = null);
 internal sealed record Configuration(bool Enabled, string[] Browsers, string[] ExcludedProcesses,
     bool RequireChromiumWindowClass, int Distance, int WheelDelayMs, double IndicatorOpacity,
     string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all",
@@ -23,6 +22,8 @@ internal sealed class GestureEngine : IDisposable
     private nint target;
     private Configuration? config;
     private Binding[] candidates = [];
+    private CommandHostContext hostContext = new();
+    private CommandTargetContext? targetContext;
     private readonly GestureDisplay indicator;
     private GesturePoint origin, checkpoint;
     private GesturePoint monitorCenter;
@@ -54,6 +55,7 @@ internal sealed class GestureEngine : IDisposable
     }
     internal void Configure(Configuration next)
     {
+        hostContext = CommandConditions.HostContext(next.Context);
         // A show command may move focus to the host while its invocation is still completing.
         // Keep only that command alive across focus-only synchronization.
         if (busy && activationTarget != 0 && next.Enabled && next.SettingsKey.Length > 0 &&
@@ -97,13 +99,14 @@ internal sealed class GestureEngine : IDisposable
     private Binding[] MatchingRows(nint window, bool includeInactive = false)
     {
         var desktop = GestureTarget.IsDesktop(window);
-        var className = new StringBuilder(256); GetClassName(window, className, className.Capacity);
+        var className = new StringBuilder(256);
+        var classLength = GetClassName(window, className, className.Capacity);
+        targetContext = new(window.ToInt64().ToString(), process, classLength > 0 ? className.ToString() : null, desktop);
+        var context = new CommandContext(hostContext, targetContext);
+        var environment = new ConditionEnvironment(config!.Browsers, config.RequireChromiumWindowClass);
         return config!.Rows.Where(r =>
             (r.Window.Length == 0 || r.Window == window.ToInt64().ToString() || includeInactive && r.Window.Length > 0) &&
-            (r.When.Scope != "desktop" || desktop) && (!r.When.ExcludeDesktop || !desktop) &&
-            (r.When.Scope != "browser" || config.Browsers.Contains(process, StringComparer.OrdinalIgnoreCase) &&
-                (!config.RequireChromiumWindowClass || className.ToString().StartsWith("Chrome_WidgetWin_", StringComparison.Ordinal))) &&
-            (r.When.Scope != "exe" || r.When.Processes.Contains(process, StringComparer.OrdinalIgnoreCase))).ToArray();
+            (includeInactive && r.Window == "-1" || CommandConditions.Matches(r.When, context, r.OwnerId, environment))).ToArray();
     }
     private void Begin(GesturePoint p)
     {
@@ -323,7 +326,7 @@ internal sealed class GestureEngine : IDisposable
         if (lifetime == null || lifetime.IsCancellationRequested) { lifetime?.Dispose(); lifetime=new(); session=Guid.NewGuid().ToString("N"); }
         var token=lifetime.Token;
         var capturedSession=session; var capturedTarget=target.ToInt64().ToString();
-        var capturedConfig=config!; var wheel=gesture.StartsWith("wheel-");
+        var capturedConfig=config!; var capturedContext=targetContext; var wheel=gesture.StartsWith("wheel-");
         busy=true;
         dispatcher.BeginInvoke(new Action(async () => {
             try {
@@ -331,8 +334,9 @@ internal sealed class GestureEngine : IDisposable
                     if (token.IsCancellationRequested || disposed || !Current || (!released && !ready) ||
                         (wheel && Environment.TickCount64-lastWheel>=100)) break;
                     invokedAt = Environment.TickCount64;
-                    await Invoke!(new {session=capturedSession, window=capturedTarget, process,
-                        gesture, rowIds=rows.Select(r=>r.Id).ToArray(), context=capturedConfig.Context, revision=capturedConfig.Revision});
+                    await Invoke!(new {session=capturedSession, window=capturedTarget, process, target=capturedContext,
+                        gesture, rowIds=rows.Select(r=>r.Id).ToArray(), context=capturedConfig.Context,
+                        revision=capturedConfig.Revision, settingsKey=capturedConfig.SettingsKey});
                     if (config!.WheelDelayMs>0) break;
                 }
             } catch (Exception e) { Console.Error.WriteLine(e.Message); }
@@ -344,8 +348,7 @@ internal sealed class GestureEngine : IDisposable
     {
         // Candidates already passed the start-window, browser/exe and host page conditions.
         // Preview and execution must use the same ordered, command-deduplicated selection.
-        var rows = candidates.Where(r => r.Gesture == gesture).DistinctBy(r => r.Command);
-        return (config!.ExecutionMode == "first" ? rows.Take(1) : rows).ToArray();
+        return CommandConditions.Select(candidates.Where(r => r.Gesture == gesture), r => r.Command, config!.ExecutionMode);
     }
     private void Release(GesturePoint point)
     {

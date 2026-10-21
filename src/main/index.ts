@@ -101,12 +101,15 @@ import { validateAppletSettings } from '../shared/setting-definitions';
 import { parseSettings } from '../shared/settings-schema';
 import {
   getKeybindings,
+  getKeybindingOptions,
   initializeExtensionDefaults,
   initializeCollectionDefaults,
-  resolveKeybindings,
+  planKeybindings,
   safePageShortcut,
+  type ShortcutContext,
 } from '../shared/keybindings';
-import { ShortcutDispatcher } from './core/shortcut-dispatcher';
+import { CommandDispatcher } from './core/command-dispatcher';
+import type { CommandBatchPlan } from '../shared/command-execution';
 import { GestureManager, type GestureInvocation, type ShortcutPress } from './core/gestures';
 import { initializeGestureDefaults } from '../shared/gestures';
 import { normalizeShortcut } from '../shared/commands';
@@ -1446,7 +1449,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
       : pageCollections.navigate(web, id.slice(split + 1));
   return manager.execute(id, invocation);
 }
-const shortcutDispatcher = new ShortcutDispatcher(
+const commandDispatcher = new CommandDispatcher(
   executeCommand,
   (message) => log.write('error', 'shortcuts', message),
   () => quitting || shortcutRecording || !!overlayHost?.active,
@@ -1479,9 +1482,12 @@ function availableShortcutCommands() {
     ),
   ];
 }
-function dispatchShortcut(key: string, globalEvent = false, press?: ShortcutPress) {
-  if (shortcutRecording || quitting || overlayHost?.active) return Promise.resolve();
-  const currentContext = shortcutContext();
+function prepareShortcut(
+  key: string,
+  globalEvent = false,
+  press?: ShortcutPress,
+  currentContext: ShortcutContext = shortcutContext(),
+) {
   const context =
     press &&
     (press.window !==
@@ -1491,16 +1497,24 @@ function dispatchShortcut(key: string, globalEvent = false, press?: ShortcutPres
       : currentContext;
   const rows = getKeybindings(settings.value);
   const keys = press?.shortcuts ?? [key];
-  const commands = resolveKeybindings(
+  return planKeybindings(
     rows,
     keys,
     context,
     availableShortcutCommands(),
     globalEvent,
+    getKeybindingOptions(settings.value).executionMode,
   );
+}
+function dispatchShortcutPlan(key: string, plan: CommandBatchPlan, press?: ShortcutPress) {
+  const input = 'keyboard:' + [...new Set(press?.shortcuts ?? [key])].sort().join('|');
   return press
-    ? shortcutInvocation.run(press, () => shortcutDispatcher.dispatch(key, commands))
-    : shortcutDispatcher.dispatch(key, commands);
+    ? shortcutInvocation.run(press, () => commandDispatcher.dispatch(input, plan))
+    : commandDispatcher.dispatch(input, plan);
+}
+function dispatchShortcut(key: string, globalEvent = false, press?: ShortcutPress) {
+  if (shortcutRecording || quitting || overlayHost?.active) return Promise.resolve();
+  return dispatchShortcutPlan(key, prepareShortcut(key, globalEvent, press), press);
 }
 function runTrayCommand(id: string) {
   void executeCommand(id).catch((error) => {
@@ -3051,13 +3065,9 @@ async function initialize() {
     : path.join(app.getAppPath(), '.artifacts', 'dotnet-host', 'AppDock.ExtensionHost.exe');
   hotKeys = new GlobalHotKeyManager(
     new InputCaptureHotKeyBackend(() => gestures),
-    async (id) => {
-      if (shortcutRecording || quitting || overlayHost?.active) return;
-      await executeCommand(id);
-    },
+    (key, press) => dispatchShortcut(key, true, press),
     changed,
     (message) => log.write('error', 'hotkeys', message),
-    (key, press) => dispatchShortcut(key, true, press),
   );
   pageCollections = new PageCollectionManager({
     settings: () => settings.value,
@@ -3142,7 +3152,7 @@ async function initialize() {
         recording: shortcutRecording || quitting || !!overlayHost?.active,
       };
     },
-    shortcutDispatcher,
+    commandDispatcher,
     executeCommand,
     (session) => {
       manager.executions.cancel(session);
@@ -3579,14 +3589,9 @@ async function initialize() {
       });
       if (!key) return false;
       if (globalShortcutOwnership.has(key)) return false;
-      const commands = resolveKeybindings(
-        getKeybindings(settings.value),
-        key,
-        shortcutContext(),
-        availableShortcutCommands(),
-      );
-      if (!commands.length) return false;
-      void shortcutDispatcher.dispatch(key, commands);
+      const plan = prepareShortcut(key);
+      if (!plan.commands.length) return false;
+      void dispatchShortcutPlan(key, plan);
       return true;
     },
   });
@@ -3812,14 +3817,9 @@ async function initialize() {
       });
       if (!key) return false;
       if (globalShortcutOwnership.has(key)) return false;
-      const commands = resolveKeybindings(
-        getKeybindings(settings.value),
-        key,
-        context,
-        availableShortcutCommands(),
-      );
-      if (!commands.length) return false;
-      void shortcutDispatcher.dispatch(key, commands);
+      const plan = prepareShortcut(key, false, undefined, context);
+      if (!plan.commands.length) return false;
+      void dispatchShortcutPlan(key, plan);
       return true;
     },
   });

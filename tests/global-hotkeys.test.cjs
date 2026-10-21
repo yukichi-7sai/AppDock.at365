@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const { GlobalHotKeyManager } = require('../out/main/main/core/global-hotkeys.js');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema.js');
 const { shortcutFromEvent } = require('../out/main/shared/commands.js');
+const { getKeybindings, planKeybindings } = require('../out/main/shared/keybindings');
+const { CommandDispatcher } = require('../out/main/main/core/command-dispatcher');
 
 test('legacy Watch global Pause and explicit opt-out survive migration', () => {
   const settings = createDefaultSettings();
@@ -32,6 +34,7 @@ test('legacy Watch global Pause and explicit opt-out survive migration', () => {
 test('registration follows availability, rebinding, recording suspension and shutdown', async () => {
   const registrations = [];
   const executed = [];
+  const dispatcher = new CommandDispatcher(async (id) => executed.push(id), assert.fail);
   const backend = {
     async sync(keys) {
       registrations.push(keys);
@@ -43,7 +46,17 @@ test('registration follows availability, rebinding, recording suspension and shu
   };
   const manager = new GlobalHotKeyManager(
     backend,
-    async (id) => executed.push(id),
+    (key) =>
+      dispatcher.dispatch(
+        'keyboard:' + key,
+        planKeybindings(
+          getKeybindings(settings),
+          key,
+          { appFocused: false },
+          available.map((id) => ({ id })),
+          true,
+        ),
+      ),
     () => {},
     assert.fail,
   );
@@ -82,6 +95,15 @@ test('registration conflicts and host failure are visible; duplicate callbacks c
   const reports = [];
   let calls = 0;
   let finish;
+  const dispatcher = new CommandDispatcher(
+    async () => {
+      calls++;
+      await new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+    (error) => reports.push(error),
+  );
   const manager = new GlobalHotKeyManager(
     {
       async sync(keys) {
@@ -93,12 +115,17 @@ test('registration conflicts and host failure are visible; duplicate callbacks c
       },
       async close() {},
     },
-    async () => {
-      calls++;
-      await new Promise((resolve) => {
-        finish = resolve;
-      });
-    },
+    (key) =>
+      dispatcher.dispatch(
+        'keyboard:' + key,
+        planKeybindings(
+          getKeybindings(settings),
+          key,
+          { appFocused: false },
+          [{ id: 'at365.watch.toggle' }],
+          true,
+        ),
+      ),
     () => {},
     (error) => reports.push(error),
   );

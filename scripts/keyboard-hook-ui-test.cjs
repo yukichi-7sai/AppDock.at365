@@ -222,7 +222,7 @@ async function openShortcuts() {
   await focusHost();
   await page
     .locator('.settings-categories')
-    .getByRole('button', { name: 'ショートカット', exact: true })
+    .getByRole('button', { name: 'ショートカットキー', exact: true })
     .click();
 }
 (async () => {

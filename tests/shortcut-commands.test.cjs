@@ -76,6 +76,68 @@ function fixture(t) {
     });
   return { settings, api, options, permissions, get, edit };
 }
+
+test('execution mode configuration is atomic, revisioned, private-field preserving and dry-run aware', async (t) => {
+  const f = fixture(t);
+  assert.deepEqual(f.get().options, { executionMode: 'all' });
+  assert.equal(Object.hasOwn(f.api.call('settings.get').values, 'keybindingOptions'), false);
+  assert.equal(Object.hasOwn(f.api.call('settings.getSchema').fields, 'keybindingOptions'), false);
+  await assert.rejects(
+    f.api.call('commands.execute', {
+      id: 'appdock.settings.update',
+      args: {
+        expectedRevision: f.get().revision,
+        changes: { keybindingOptions: { executionMode: 'first' } },
+      },
+    }),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  f.settings.save(
+    { ...f.settings.value, keybindingOptions: { executionMode: 'all', future: 'PRIVATE' } },
+    f.settings.revision,
+  );
+  assert.equal(JSON.stringify(f.get()).includes('PRIVATE'), false);
+  const configure = { kind: 'configure', changes: { executionMode: 'first' } };
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  assert.equal((await f.edit([configure], { dryRun: true })).changed, true);
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  const rows = f.get().bindings;
+  await f.edit([configure, { kind: 'add', binding: binding('added') }]);
+  assert.equal(f.get().options.executionMode, 'first');
+  assert.equal(f.settings.value.keybindingOptions.future, 'PRIVATE');
+  assert.deepEqual(f.get().bindings[0], rows[0]);
+  const revision = f.get().revision;
+  assert.equal((await f.edit([configure])).changed, false);
+  assert.equal(f.get().revision, revision);
+  const persisted = fs.readFileSync(f.settings.file, 'utf8');
+  for (const changes of [
+    {},
+    { executionMode: null },
+    { executionMode: 'invalid' },
+    { executionMode: undefined },
+    { executionMode: 'all', extra: true },
+  ])
+    await assert.rejects(f.edit([{ kind: 'configure', changes }]), /確認/);
+  await assert.rejects(
+    f.edit([
+      { kind: 'configure', changes: { executionMode: 'all' } },
+      { kind: 'remove', id: 'missing' },
+    ]),
+  );
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), persisted);
+  f.settings.reload();
+  assert.equal(f.get().options.executionMode, 'first');
+});
+
+test('configuring execution mode requires all shortcut editing grants', async (t) => {
+  const f = fixture(t);
+  for (const grant of ['write', 'execute', 'shortcuts']) {
+    f.permissions[grant] = false;
+    await assert.rejects(f.edit([{ kind: 'configure', changes: { executionMode: 'first' } }]));
+    f.permissions[grant] = true;
+  }
+  assert.equal(f.get().options.executionMode, 'all');
+});
 test('shortcut read is scoped, lists assignable commands while stopped, and masks OS errors', (t) => {
   const f = fixture(t),
     value = f.get();

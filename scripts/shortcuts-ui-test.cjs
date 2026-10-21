@@ -150,8 +150,8 @@ const checks = [];
     const button = (name) => page.getByRole('button', { name, exact: true });
     const command = (id) => page.locator(`.shortcuts-editor [data-shortcut-command="${id}"]`);
     const row = (id) => page.locator(`[data-binding-id="${id}"]`);
-    const filter = () => page.getByLabel('ショートカットのコマンドを検索');
-    const status = () => page.getByLabel('ショートカットの絞り込み', { exact: true });
+    const filter = () => page.getByLabel('ショートカットキーのコマンドを検索');
+    const status = () => page.getByLabel('ショートカットキーの絞り込み', { exact: true });
     const dialog = () => page.locator('.applet-shortcut-dialog');
     const recorder = () =>
       dialog().getByRole('button', { name: 'ショートカットキーを入力', exact: true });
@@ -165,7 +165,7 @@ const checks = [];
     await button('設定').click();
     await page
       .locator('.settings-categories')
-      .getByRole('button', { name: 'ショートカット', exact: true })
+      .getByRole('button', { name: 'ショートカットキー', exact: true })
       .click();
     assert.equal(await page.locator('[data-shortcut-key], .gesture-drag-handle').count(), 0);
     assert(await command('appdock.restart').count());
@@ -305,7 +305,7 @@ const checks = [];
       await cp.getByRole('button', { name: '設定', exact: true }).click();
       await cp
         .locator('.settings-categories')
-        .getByRole('button', { name: 'ショートカット', exact: true })
+        .getByRole('button', { name: 'ショートカットキー', exact: true })
         .click();
       const cr = cp.locator('[data-binding-id="conflict"]');
       assert.equal(await cr.getByRole('alert').count(), 0);
@@ -366,7 +366,7 @@ const checks = [];
     await button('設定').click();
     await page
       .locator('.settings-categories')
-      .getByRole('button', { name: 'ショートカット', exact: true })
+      .getByRole('button', { name: 'ショートカットキー', exact: true })
       .click();
     for (const theme of ['dark', 'light']) {
       await page.evaluate((t) => {

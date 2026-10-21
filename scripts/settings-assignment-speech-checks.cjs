@@ -37,7 +37,7 @@ module.exports = async function ({
       );
       const spacing = [];
       for (const [page, title] of [
-        ['ショートカット', 'ショートカット割り当て'],
+        ['ショートカットキー', 'ショートカットキー割り当て'],
         ['マウスジェスチャー', 'マウスジェスチャー割り当て'],
       ]) {
         await select(page);
@@ -166,7 +166,7 @@ module.exports = async function ({
   await host.getByRole('heading', { name: 'MCPサーバー', exact: true, level: 1 }).waitFor();
   checks.push('notification-TTS-and-MCP-settings-links-retain-destinations');
   for (const [page, title] of [
-    ['ショートカット', 'ショートカット割り当て'],
+    ['ショートカットキー', 'ショートカットキー割り当て'],
     ['マウスジェスチャー', 'マウスジェスチャー割り当て'],
   ]) {
     const search = host.getByRole('combobox', { name: '設定を検索', exact: true });

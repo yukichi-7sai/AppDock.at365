@@ -34,6 +34,7 @@ export interface Settings {
   gestures?: import('./gestures').GestureSettings;
   gestureDefaultsInitialized?: string[];
   keybindings?: import('./keybindings').Keybinding[];
+  keybindingOptions?: import('./keybindings').KeybindingOptions;
   keybindingDefaultsInitialized?: string[];
   schemaVersion: 1;
   host: HostSettings;

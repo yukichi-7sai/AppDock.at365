@@ -34,14 +34,12 @@ export class GlobalHotKeyManager {
   private signature = '';
   private queue: Promise<void> = Promise.resolve();
   private stopped = false;
-  private executing = new Set<string>();
   private desired: { commandId: string; shortcut: string }[] = [];
   constructor(
     private backend: HotKeyBackend,
-    private execute: (id: string) => Promise<unknown>,
+    private dispatch: (shortcut: string, press?: ShortcutPress) => Promise<unknown>,
     private changed: () => void,
     private report: (message: string) => void,
-    private dispatch?: (shortcut: string, press?: ShortcutPress) => Promise<unknown>,
   ) {}
   sync(settings: Settings, available: string[], suspended = false, retry = false): Promise<void> {
     const desired = suspended
@@ -105,21 +103,7 @@ export class GlobalHotKeyManager {
       ),
     ];
     if (!commands.length) return;
-    if (this.dispatch) {
-      await this.dispatch(keys[0], typeof input === 'string' ? undefined : input);
-      return;
-    }
-    for (const commandId of commands) {
-      if (this.executing.has(commandId)) continue;
-      this.executing.add(commandId);
-      try {
-        await this.execute(commandId);
-      } catch (error) {
-        this.report(String(error));
-      } finally {
-        this.executing.delete(commandId);
-      }
-    }
+    await this.dispatch(keys[0], typeof input === 'string' ? undefined : input);
   }
   async close() {
     this.stopped = true;

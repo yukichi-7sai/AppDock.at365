@@ -1,6 +1,30 @@
 # 検証記録
 
-対象の現行版は`0.79.2`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.80.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+
+## 2026-10-22: 共通実行基盤・キー設定のコミット前確認（0.80.0）
+
+- 利用者から0.80.0の動作確認完了と、現状をコミットしてから条件拡張へ進む指示を受けた。mainは設計commit1件先行・実装未commitだったため、変更を保持して照合した。既存の型検査・関連163件・Windows入力228項目・条件fixture33項目・配布版GUI66群/smokeは入力と最終EXEのhashが一致し、その成功を再利用した。
+- 未実行だった標準回帰を追加し、**827/827、fail/skip 0**。製品ソース・依存・版・発行物の後続変更なしを確認し、0.80.0を維持した。コミット前の対象一覧・入力manifest・stage/tree・実効author/committer・成功ログの照合は`.artifacts/commit-validation-command-foundation-0800/`に記録する。push・Release・deployは行わない。
+
+## 2026-10-22: ショートカットキーの動作設定（0.80.0）
+
+- 既存の段階Aが未コミットのmain／origin/main（設計コミット1件先行）で継続したため、pull・stash・統合は行わず変更を保持した。別の設計用worktreeは操作していない。段階Bとして、設定インデックスとページを「ショートカットキー」、一覧を「ショートカットキー割り当て」へ変更し、一覧の上に初期状態で閉じた「動作設定」を追加した。実行方法のラベル・first/allの表示順・hint・部品をジェスチャーと共有する。レビューで共通セクション間の20px余白も揃えた。
+- `keybindingOptions.executionMode`は欠落時all、既定値は差分保存から省略し、ジェスチャーとは独立した共有設定とした。キー全入口の共通アダプターでこの値を読み、フォーム・ページJSON・リセット・外部ファイル更新へ接続した。公開編集はshortcuts.getのoptionsとupdateのconfigureを追加し、割り当てとの原子的保存・expectedRevision・dryRun・3種類の許可を維持した。一般設定APIからの迂回は拒否する。既存行の自動移行は追加していない。設定追加のためマイナー更新した。
+- 型検査・本体/Default Shell build・関連13ファイル **163/163、fail/skip 0**、開発GUIのキー **15群**・ジェスチャー **21群**が成功した。キーのfirst/allについて実Windows global入力とChromium合成入力の本体/PageHost、条件によるスキップ・重複除去、保存・JSON・外部更新・再起動・リセット・ジェスチャーとの独立性を確認した。試験側のPromise待機・設定名・Window接続/再起動完了待機と旧表示名の期待値を修正し、失敗ログを保持した。起動直後の失敗1回は、その隔離profileと確認できたElectronだけを終了して再実行した。
+- 発行前の自己レビューは未解決指摘なし。`publish.bat`終了0。**EXE/feed/Default Shellは0.80.0、EXEは168989239 bytes、SHA256 `3155ac4b436c58b389aa20add1bacff1208e694b9847831f5bab5831169cb65f`**。成果物は`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。InputHost EXE/DLLとnative試験/fixture入力は段階Aと一致し、Windows入力228項目と共通条件33項目の成功を再利用する。
+- 固定EXEのキー15群・ジェスチャー21群・前面化13群・キーフック8群・起動2群・設定移動7群（計 **66群**）とsmokeが成功し、隔離コピーのhashも最終EXEと一致した。明暗テーマの1280/900/実700px幅でフィールド・20px余白・画面内への収まりを確認し、画像も目視した。狭幅試験では試験Windowの最小幅だけを解除して、指定幅が900pxへ丸められないことも検査した。
+- [検証証跡](.artifacts/shortcut-options-20261022/validation.json)に各ログ・前後の入力manifest・ソース/試験依存/配布物のhash照合・レビュー・失敗履歴・再利用理由を保存した。開発ジェスチャー試験後の差分はキー画面だけへの共通余白class追加であることを照合し、最終配布版で両画面を確認した。今回の14試験profileとnative fixtureに対応するプロセス0を通常ユーザー権限で確認。方式ごとの直近3回を超える今回の不要な成功分はなく、失敗記録・比較/再利用資料・他作業を保持し、削除0件。実装は未コミット・未pushで、Release・実利用先deploy・全体ZIP・未変更Appletの再発行は行っていない。隔離環境の合成入力と、物理機器/UAC/ロック画面/実利用での確認は区別する。
+
+## 2026-10-22: 共通条件判定・コマンド実行基盤の接続（0.79.3）
+
+- 設計文書5ファイルを`eeb2f43`（tree `53ab4d9be6f4fc7e6384d8f63c74826e1356b98d`）へコミットした。対象パス・内容・実効author/committer・リンクを確認し、文書だけのため製品試験と版更新は行わない。cleanになったmain／origin/mainで`pull --ff-only`がAlready up to dateとなってから実装へ進んだ。今回の実装分は未コミットで、pushは行っていない。
+- [段階A](docs/command-execution-foundation-design.md)を実装。`command-conditions`と`command-execution`へwhen判定・利用可能性・保存順・重複除去・first/allを集約し、単一の`CommandDispatcher`で予約・再入防止・取消・順次実行を共有する。global、renderer、Shell、PageHostのキー入口とジェスチャーを接続し、GlobalHotKeyManagerの独自実行ループを解消した。nativeの条件と選択は同じfixtureで照合する。
+- キーは現行allを維持し、ジェスチャーは保存済みの実行方法を使う。待機表示と本体の選択行ID列を完全一致で検証し、開始対象の事実・session・revision・settingsKeyを照合する。レビューで、40msの同期前に設定/コマンドが変わる場合も受信時・各コマンド直前に止める検査を追加した。押下時のページ条件、元入力の通過/遮断、前面化と同一HWNDでの後続維持を保持する。設定画面・表示名・保存形式・公開Schema・SDKの変更や自動移行はなく、内部整理として本体を0.79.3へパッチ更新した。新しいトリガーの接続規則も文書化した。
+- 型検査・本体/Default Shell build、関連9ファイル **122/122、fail/skip 0**、共通TypeScript/native fixture **33/33**、Windows InputHost **228/228** が成功。開発版GUIはジェスチャー21群・ページ条件9群・前面化13群の **43群**、発行した固定EXEは同じ43群にキー設定/実入力10群・Win入力フック8群・トレイ/復元起動2群を加えた **63群** とsmokeが成功した。全標準回帰を一律には実行していない。入力は隔離ウィンドウへの合成入力であり、物理機器の操作感、管理者対象/UAC、ロック画面の確認とは区別する。
+- 発行前の差分・影響先の自己レビューは未解決指摘なし。`publish.bat`は終了0。**EXE/feed/Default Shellは0.79.3、EXEは168996670 bytes、SHA256 `a051d2eb59351d6a6a0f2b265988b0fe977a0069762e7d3da5b6f34285bf510e`**。各配布版GUIの隔離コピーも同じhash。配布物のInputHost EXE/DLLは228項目の試験対象とhashが一致するため、その成功結果を再利用した。成果物は`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。未変更Appletの再発行、全体ZIP、Release、実利用先deployは行っていない。
+- 初回の制限環境でのnative buildは停止し、同一コマンドの通常ユーザー権限での成功を採用した。版更新後のpnpm事前検査は、ローカルworkspace記録が0.79.2のため停止した。junction共有がないことを確認し、固定の`install --frozen-lockfile`でローカル記録を再構築して成功した。依存版・lockfile・toolchain・供給網検査は不変。配布版ページ試験の初回は試験コマンドの引数誤りでEXEの起動前に失敗し、正しいパスで成功した。会話中断時の未完了nativeログは再利用せず、同条件で再実行した228項目を採用した。
+- [検証証跡](.artifacts/command-foundation-20261022/validation.json)に完全ログとhash、前後の入力manifest、最終機能ソースとの一致、版metadata/文書だけの後続変更を区別した再利用理由、配布物とコピーの照合を保存。`review.json`と`design-commit.json`にレビュー・設計コミットを記録した。今回の10試験profileとInputTestsに対応するプロセス0を通常ユーザー権限で確認。直近の試験・失敗/中断ログ・固定出力・旧版比較/再利用資料と他作業資料を保持し、削除は0件。実利用での確認は未実施。
 
 ## 2026-10-22: 共通条件判定・コマンド実行基盤の設計
 

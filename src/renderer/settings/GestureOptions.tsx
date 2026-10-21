@@ -5,6 +5,7 @@ import { Toggle } from '../settings-ui/Toggle';
 import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections';
 import { SettingsHint } from '../settings-ui/SettingsHint';
 import type { GestureSettings } from '../../shared/gestures';
+import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
 function Names({
   itemKey,
   values,
@@ -72,22 +73,11 @@ export function GestureOptions({
           onChange={(activateOnStart) => change({ activateOnStart })}
         />
       </SettingsField>
-      <SettingsField
-        title={hostSettingItem('gestures', 'executionMode').title}
-        hint="操作と「いつ・どこで」の条件に一致したコマンドを、登録順に選びます。"
-        {...settingAnchor('gestures', 'executionMode')}
-      >
-        <select
-          aria-label={hostSettingItem('gestures', 'executionMode').title}
-          value={gestures.executionMode}
-          onChange={(e) =>
-            change({ executionMode: e.target.value as GestureSettings['executionMode'] })
-          }
-        >
-          <option value="first">最初の1つ</option>
-          <option value="all">すべて</option>
-        </select>
-      </SettingsField>
+      <CommandExecutionModeField
+        pageId="gestures"
+        value={gestures.executionMode}
+        onChange={(executionMode) => change({ executionMode })}
+      />
       <SettingsField title="操作感">
         <div className="gesture-options-grid">
           <label className="gesture-option" {...settingAnchor('gestures', 'distance')}>

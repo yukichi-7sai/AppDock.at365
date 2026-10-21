@@ -43,7 +43,7 @@ MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscri
 | applets.get | appdock_get_applet | id。applet（基本情報/description/runtime/errorSummary）と公開commands/executable/writable |
 | commands.list | appdock_list_commands | 引数なし。commands/executable |
 | commands.execute | appdock_execute_command | id/任意args。id/completion/effectVerified=falseと操作結果 |
-| shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。 |
+| shortcuts.get | appdock_get_shortcuts | 引数なし。bindings/options/revision/scopes/assignableCommands/globalHotKeys/warning/各許可。 |
 | tray.get | appdock_get_tray | 引数なし。menu/clicks/fixedCommands/assignableCommands/revision/warning/各許可。 |
 | ribbon.get | appdock_get_ribbon | 引数なし。layout/items/retainedIds/revision/warning/各許可。 |
 | gestures.get | appdock_get_gestures | 引数なし。settings/bindings/revision/gestureTypes/scopes/assignableCommands/warning/各許可。 |
@@ -122,6 +122,8 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。
 
+`options.executionMode`に有効な実行方法を返します。`first`は条件に一致した先頭1件、`all`は全件を登録順に選び、同一コマンドの重複を除きます。省略時はallです。firstで選んだコマンドが実行中・失敗になっても次へ繰り下げません。ジェスチャーとは独立した設定です。
+
 読取りは保存済みのbindings（id/command/key/enabled/whenと任意のblockOriginalInput）を実行順に返します。blockOriginalInputはglobalの元入力を止めるbooleanで、省略時true。旧行への既定値の書込みは行わず、updateで省略した場合は保存済み値を保持します。keyはWin／Windows／Meta修飾キーにも対応します。globalHotKeysのregisteredは共有フックへの適用成功を表し、backend="hook"とキー単位のeffectiveBlockOriginalInputも返します。OSの排他予約や実効果の保証ではありません。GUIの未確定入力は含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
 
 既存の未公開/未導入コマンドへの割当もbindingsへ返して保持します。それらは無効化・削除できますが、外部からキー/条件を変更したり有効化したりはできません。reorderは既存の同じキーの行だけを並べ替えます。ローカルの編集画面にはこの外部公開制限を加えません。
@@ -154,12 +156,13 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 - `update`: idとchanges。command/key/enabled/whenの一部を指定します。whenはscopeとappletIdsを一緒に指定。キーを変えると変更先キーの末尾へ移動します。
 - `remove`: idを指定。存在しないIDは拒否します。
 - `reorder`: keyとidsを指定。同じキーの全行IDを、無効な行も含めて実行順に指定します。他のキーは保持します。
+- `configure`: `changes: { "executionMode": "first" }`または`"all"`を指定します。割り当て操作と同じoperations内で原子的に保存し、同じ許可・expectedRevision・dryRunを使います。保存時にコマンドを実行しません。一般設定APIからの変更は公開しません。
 
 scopeはglobal/app/pages/owner/appletsです。appletsだけは登録済みApplet IDを1件以上指定し、他は空配列。既存の未導入対象は変更しない限り保持します。同じキーの複数割当を一律に競合扱いせず、既存の条件・実行順を使用します。同じコマンドが複数の条件で一致しても1回の押下では1回だけ実行します。
 
 operationsは1〜100件、全割当は2000件まで。既存parseKeybindings/キー正規化/条件検査/同じキー内の順序検査を共有します。全操作をメモリ上で検証し、1件でも不正なら保存しません。指定外の割当/設定を保持し、withKeybindingsでshortcuts/globalShortcutCommandsの互換フィールドも揃えます。dryRunは保存せず結果を返し、同じ許可とrevisionが必要です。同じ結果なら保存しません。
 
-revisionは本体/各Applet設定と共通です。他の設定編集・再起動・未通知のディスク変更でも古いrevisionを拒否します。保存は既存prepareSettings/commitSettingsを使用し、GUIの未確定入力を消さず、古いGUI版の保存は競合として拒否します。応答はdryRun/changed/bindings/revision/warning/appliesを含み、completionはvalidatedまたはsettingsSaved、effectVerified=false。共有フックへの適用は非同期なので、保存成功だけで入力適用の成功と扱わず、shortcuts.getのglobalHotKeysを再取得してください。適用エラーは限定した説明へ置き換えます。
+revisionは本体/各Applet設定と共通です。他の設定編集・再起動・未通知のディスク変更でも古いrevisionを拒否します。保存は既存prepareSettings/commitSettingsを使用し、GUIの未確定入力を消さず、古いGUI版の保存は競合として拒否します。応答はdryRun/changed/bindings/options/revision/warning/appliesを含み、completionはvalidatedまたはsettingsSaved、effectVerified=false。共有フックへの適用は非同期なので、保存成功だけで入力適用の成功と扱わず、shortcuts.getのglobalHotKeysを再取得してください。適用エラーは限定した説明へ置き換えます。
 
 追加エラーはSHORTCUT_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLEです。INVALID_ARGUMENT/NOT_FOUND/REVISION_CONFLICT/SAVE_FAILEDと既存の実行・書込拒否も使用します。変更はautomation監査ログへ結果を記録し、キーやbinding IDなどの引数は記録しません。キー入力の送信、既定テンプレート、Applet初期化状態、ジェスチャー/リボンの編集はこのAPIに含めません。
 
