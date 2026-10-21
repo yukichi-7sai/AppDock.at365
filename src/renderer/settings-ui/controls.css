@@ -2862,10 +2862,11 @@ summary {
   overflow-x: auto;
 }
 .applet-shortcut-overview:has(.command-settings-heading) {
+  --command-settings-cell-padding: 18px;
   min-width: 680px;
 }
 .applet-shortcut-overview .command-settings-heading {
-  width: 132px;
+  width: calc(2 * 34px + 6px + 2 * var(--command-settings-cell-padding));
 }
 .applet-shortcut-overview .command-settings-cell {
   vertical-align: middle;
@@ -2907,6 +2908,9 @@ summary {
   .command-shortcuts .applet-shortcut-overview th,
   .command-shortcuts .applet-shortcut-overview td {
     padding: 12px;
+  }
+  .applet-shortcut-overview:has(.command-settings-heading) {
+    --command-settings-cell-padding: 12px;
   }
 }
 .applet-shortcut-dialog {

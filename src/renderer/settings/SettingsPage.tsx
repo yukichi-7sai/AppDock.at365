@@ -270,6 +270,7 @@ export function SettingsPage({
                 value={
                   context === 'full'
                     ? {
+                        page: page.id,
                         target: commandTarget?.page === page.id ? commandTarget : undefined,
                         clear: () => setCommandTarget(undefined),
                         open: (pageId, command) => {

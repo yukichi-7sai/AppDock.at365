@@ -19,6 +19,30 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     );
   };
   const samples = [];
+  const spacing = [];
+  const checkLinks = async (page, theme, width) => {
+    const cells = host.locator('.command-settings-cell');
+    const measurements = await cells.evaluateAll((elements) =>
+      elements.map((cell) => {
+        const buttons = [...cell.querySelectorAll('button')];
+        return {
+          buttons: buttons.length,
+          gap: cell.getBoundingClientRect().right - buttons.at(-1).getBoundingClientRect().right,
+          padding: parseFloat(getComputedStyle(cell).paddingRight),
+          labels: buttons.map((button) => button.getAttribute('aria-label')),
+        };
+      }),
+    );
+    assert(measurements.length > 0);
+    for (const item of measurements) {
+      assert.equal(item.buttons, 2);
+      assert(item.labels.every((label) => !label.endsWith(`の${page}を開く`)));
+      assert(item.gap >= item.padding - 0.5 && item.gap > 0, JSON.stringify(item));
+      if (page !== 'カスタムコマンド')
+        assert(Math.abs(item.gap - item.padding) < 1, JSON.stringify(item));
+    }
+    spacing.push({ page, theme, width, measurements });
+  };
   for (const theme of ['light', 'dark'])
     for (const width of [1280, 760]) {
       await host.evaluate(async (theme) => {
@@ -83,6 +107,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         '割り当て',
         '移動',
       ]);
+      await checkLinks('ショートカット', theme, width);
       assert.equal(
         await row('fixture.hints.run').getByRole('img', { name: '外部公開コマンド' }).count(),
         1,
@@ -113,6 +138,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       await host.getByRole('menu').waitFor();
       await host.keyboard.press('Escape');
       await move(row('fixture.hints.run'), 'Hint action', 'マウスジェスチャー');
+      await checkLinks('マウスジェスチャー', theme, width);
       assert.equal(await host.locator('[data-shortcut-command]').count(), 1);
       assert.equal(
         await row('fixture.hints.run').getByText('未割り当て', { exact: true }).count(),
@@ -121,6 +147,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       await host.getByRole('button', { name: 'Hint actionの絞り込みを解除', exact: true }).click();
       assert((await host.locator('[data-shortcut-command]').count()) > 1);
       await select('カスタムコマンド');
+      await checkLinks('カスタムコマンド', theme, width);
       assert.deepEqual(await host.locator('.custom-commands-settings thead th').allTextContents(), [
         '名前＋',
         '種類',
@@ -185,4 +212,5 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
   );
   checks.push('index-navigation-clears-command-target-without-saving-or-executing');
   fs.writeFileSync(path.join(profile, 'command-navigation.json'), JSON.stringify(samples, null, 2));
+  fs.writeFileSync(path.join(profile, 'navigation-spacing.json'), JSON.stringify(spacing, null, 2));
 };

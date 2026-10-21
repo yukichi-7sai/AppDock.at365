@@ -16,6 +16,7 @@ export type CommandSettingsTarget = {
   request: number;
 };
 export const CommandSettingsNavigation = createContext<{
+  page: string;
   target?: CommandSettingsTarget;
   open(page: CommandSettingsPage, command: Pick<UiCommand, 'id' | 'title'>): void;
   clear(): void;
@@ -44,22 +45,24 @@ export function CommandSettingsLinks({
   if (!navigation) return null;
   return (
     <div className="command-settings-links" role="group" aria-label={`${command.title}の移動先`}>
-      {commandSettingsPages.map((page) => {
-        const unavailable = page.id === 'custom-commands' && !command.customDefinitionId;
-        return (
-          <button
-            key={page.id}
-            type="button"
-            className="settings-list-icon"
-            title={unavailable ? '登録済みのカスタムコマンドではありません' : page.title}
-            aria-label={`${command.title}の${page.title}を開く`}
-            disabled={unavailable}
-            onClick={() => navigation.open(page.id, command)}
-          >
-            <Icon name={page.icon} />
-          </button>
-        );
-      })}
+      {commandSettingsPages
+        .filter((page) => page.id !== navigation.page)
+        .map((page) => {
+          const unavailable = page.id === 'custom-commands' && !command.customDefinitionId;
+          return (
+            <button
+              key={page.id}
+              type="button"
+              className="settings-list-icon"
+              title={unavailable ? '登録済みのカスタムコマンドではありません' : page.title}
+              aria-label={`${command.title}の${page.title}を開く`}
+              disabled={unavailable}
+              onClick={() => navigation.open(page.id, command)}
+            >
+              <Icon name={page.icon} />
+            </button>
+          );
+        })}
     </div>
   );
 }
