@@ -8,7 +8,14 @@ import {
 import type { Settings } from './contracts';
 import { collectionPages, collectionIdentity } from './page-collections';
 import { shortcutTargetTitle, validShortcutTarget } from './shortcut-pages';
-import { commandCondition, matchesCommandCondition } from './command-conditions';
+import {
+  commandCondition,
+  matchesCommandCondition,
+  defaultConditionEnvironment,
+  processNames,
+  type CommandTarget,
+  type ConditionEnvironment,
+} from './command-conditions';
 import { planCommandBatch, type CommandExecutionMode } from './command-execution';
 
 export const shortcutScopes = [
@@ -19,24 +26,49 @@ export const shortcutScopes = [
   { id: 'applets', title: 'AppDockの指定したページ' },
 ] as const;
 export type ShortcutScope = (typeof shortcutScopes)[number]['id'];
+export const externalShortcutScopes = [
+  { id: 'browser', title: 'Webブラウザ' },
+  { id: 'exe', title: '指定したexe' },
+  { id: 'desktop', title: 'デスクトップ', after: 'global' },
+] as const;
+export type KeybindingScope = ShortcutScope | (typeof externalShortcutScopes)[number]['id'];
+export const keybindingScopes: readonly { id: KeybindingScope; title: string }[] = [
+  shortcutScopes[0],
+  externalShortcutScopes[2],
+  ...shortcutScopes.slice(1),
+  ...externalShortcutScopes.slice(0, 2),
+];
+export const externalShortcutScope = (scope: string) =>
+  ['global', 'desktop', 'browser', 'exe'].includes(scope);
 export interface Keybinding {
   id: string;
   command: string;
   key: string;
   enabled: boolean;
   blockOriginalInput?: boolean;
-  when: { scope: ShortcutScope; appletIds: string[] };
+  when: {
+    scope: KeybindingScope;
+    appletIds: string[];
+    processes?: string[];
+    excludeDesktop?: boolean;
+  };
 }
 export type KeybindingDefault = Omit<Keybinding, 'id'>;
 export interface ShortcutContext {
   appFocused: boolean;
   appletId?: string;
   pageId?: string;
+  target?: CommandTarget;
 }
 export interface KeybindingOptions {
   executionMode: CommandExecutionMode;
+  browsers: string[];
+  requireChromiumWindowClass: boolean;
 }
-export const defaultKeybindingOptions = (): KeybindingOptions => ({ executionMode: 'all' });
+export const defaultKeybindingOptions = (): KeybindingOptions => ({
+  executionMode: 'all',
+  ...defaultConditionEnvironment(),
+});
 export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   if (value === undefined) return defaultKeybindingOptions();
   if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -48,12 +80,25 @@ export function parseKeybindingOptions(value: unknown): KeybindingOptions {
     source.executionMode !== 'all'
   )
     throw Error('ショートカットキーの実行方法は「最初の1つ」または「すべて」です。');
-  return { ...source, executionMode: source.executionMode ?? 'all' } as KeybindingOptions;
+  if (
+    source.requireChromiumWindowClass !== undefined &&
+    typeof source.requireChromiumWindowClass !== 'boolean'
+  )
+    throw Error('Chromiumウィンドウの条件はONまたはOFFで指定してください。');
+  return {
+    ...defaultKeybindingOptions(),
+    ...source,
+    executionMode: source.executionMode ?? 'all',
+    browsers:
+      source.browsers === undefined
+        ? defaultConditionEnvironment().browsers
+        : processNames(source.browsers),
+  } as KeybindingOptions;
 }
 export function getKeybindingOptions(
   settings: Pick<Settings, 'keybindingOptions'>,
 ): KeybindingOptions {
-  return settings.keybindingOptions ?? defaultKeybindingOptions();
+  return { ...defaultKeybindingOptions(), ...settings.keybindingOptions };
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -75,24 +120,38 @@ export function parseKeybindings(value: unknown): Keybinding[] {
     ids.add(row.id);
     const when = row.when;
     if (
-      !shortcutScopes.some((s) => s.id === when.scope) ||
+      !keybindingScopes.some((s) => s.id === when.scope) ||
       !Array.isArray(when.appletIds) ||
       when.appletIds.length > 500 ||
       when.appletIds.some((id) => !validShortcutTarget(id)) ||
       new Set(when.appletIds).size !== when.appletIds.length ||
       (when.scope === 'applets' ? !when.appletIds.length : !!when.appletIds.length) ||
-      Object.keys(when).some((k) => !['scope', 'appletIds'].includes(k))
+      (when.excludeDesktop !== undefined && typeof when.excludeDesktop !== 'boolean') ||
+      (when.excludeDesktop === true && !['global', 'exe'].includes(String(when.scope))) ||
+      Object.keys(when).some(
+        (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
+      )
     )
       throw Error(
         '「いつ・どこで」の条件を確認してください。指定したページは1件以上選んでください。',
       );
     const key = normalizeShortcut(row.key);
+    const processes = when.processes === undefined ? [] : processNames(when.processes);
+    if (when.scope === 'exe' ? !processes.length : !!processes.length)
+      throw Error('指定したexeには対象のexe名を1件以上指定してください。');
     return {
       id: row.id,
       command: row.command,
       key,
       enabled: row.enabled,
-      when: { scope: when.scope as ShortcutScope, appletIds: [...when.appletIds] as string[] },
+      when: {
+        scope: when.scope as KeybindingScope,
+        appletIds: [...when.appletIds] as string[],
+        ...(when.processes === undefined ? {} : { processes }),
+        ...(when.excludeDesktop === undefined
+          ? {}
+          : { excludeDesktop: when.excludeDesktop as boolean }),
+      },
       ...(row.blockOriginalInput === undefined
         ? {}
         : { blockOriginalInput: row.blockOriginalInput as boolean }),
@@ -139,7 +198,7 @@ export function addDefaultBindings(
             {
               ...row,
               id: `applet-default.${owner}.${index}`,
-              when: { ...row.when, appletIds: [...row.when.appletIds] },
+              when: structuredClone(row.when),
             },
           ],
     ),
@@ -256,10 +315,45 @@ export function globalShortcutInputs(rows: Keybinding[], available: string[]) {
   const groups = new Map<string, boolean>();
   const commands = new Set(available);
   for (const row of rows) {
-    if (!row.enabled || row.when.scope !== 'global' || !commands.has(row.command)) continue;
+    if (!row.enabled || !externalShortcutScope(row.when.scope) || !commands.has(row.command))
+      continue;
     groups.set(row.key, (groups.get(row.key) ?? false) || row.blockOriginalInput !== false);
   }
   return [...groups].map(([shortcut, blockOriginalInput]) => ({ shortcut, blockOriginalInput }));
+}
+/** Native preselection only decides input ownership; the common planner owns first/all execution. */
+export function nativeShortcutInputs(
+  rows: Keybinding[],
+  available: string[],
+  environment: ConditionEnvironment,
+) {
+  return globalShortcutInputs(rows, available).map((input) => {
+    const members = rows.filter(
+      (row) =>
+        row.key === input.shortcut &&
+        row.enabled &&
+        available.includes(row.command) &&
+        externalShortcutScope(row.when.scope),
+    );
+    if (!members.some((row) => row.when.scope !== 'global' || row.when.excludeDesktop))
+      return input;
+    return {
+      ...input,
+      conditions: members.map((row) => ({
+        when: {
+          scope: row.when.scope,
+          appletIds: [],
+          processes: row.when.processes ?? [],
+          excludeDesktop: row.when.excludeDesktop ?? false,
+        },
+        blockOriginalInput: row.blockOriginalInput !== false,
+      })),
+      environment: {
+        browsers: environment.browsers,
+        requireChromiumWindowClass: environment.requireChromiumWindowClass,
+      },
+    };
+  });
 }
 
 /** Group display is derived; never sort the stored dispatch array to render it. */
@@ -349,7 +443,12 @@ export function keybindingConditionLabel(
     return (
       when.appletIds.map((id) => shortcutTargetTitle(id, applets)).join(' / ') || 'ページ未選択'
     );
-  return shortcutScopes.find((scope) => scope.id === when.scope)?.title ?? when.scope;
+  if (when.scope === 'exe')
+    return (
+      (when.processes ?? []).join(' / ') + (when.excludeDesktop ? '（デスクトップを除外）' : '')
+    );
+  if (when.scope === 'global' && when.excludeDesktop) return 'グローバル（デスクトップを除外）';
+  return keybindingScopes.find((scope) => scope.id === when.scope)?.title ?? when.scope;
 }
 /** Legacy fields are derived display/compatibility data once keybindings exists. */
 export function withKeybindings(settings: Settings, rows: Keybinding[]): Settings {
@@ -364,7 +463,9 @@ export function withKeybindings(settings: Settings, rows: Keybinding[]): Setting
     keybindings: rows,
     shortcuts,
     globalShortcutCommands: [
-      ...new Set(rows.filter((r) => r.enabled && r.when.scope === 'global').map((r) => r.command)),
+      ...new Set(
+        rows.filter((r) => r.enabled && externalShortcutScope(r.when.scope)).map((r) => r.command),
+      ),
     ],
   };
 }
@@ -372,13 +473,16 @@ export function matchesWhen(
   when: Keybinding['when'],
   context: ShortcutContext,
   extensionId?: string | null,
+  environment: ConditionEnvironment = {},
 ): boolean {
   return matchesCommandCondition(
     commandCondition(when),
     {
       host: { focused: context.appFocused, appletId: context.appletId, pageId: context.pageId },
+      target: context.target,
     },
     extensionId,
+    environment,
   );
 }
 export function planKeybindings(
@@ -388,17 +492,20 @@ export function planKeybindings(
   available: { id: string; extensionId?: string | null }[],
   globalEvent = false,
   mode: CommandExecutionMode = 'all',
+  environment: ConditionEnvironment = {},
 ) {
   const keys = new Set(typeof key === 'string' ? [key] : key);
   return planCommandBatch(
     rows
-      .filter((row) => keys.has(row.key) && (globalEvent || row.when.scope !== 'global'))
+      .filter((row) => keys.has(row.key) && (globalEvent || !externalShortcutScope(row.when.scope)))
       .map((row) => ({ ...row, when: commandCondition(row.when) })),
     {
       host: { focused: context.appFocused, appletId: context.appletId, pageId: context.pageId },
+      target: context.target,
     },
     available,
     mode,
+    environment,
   );
 }
 export function resolveKeybindings(...args: Parameters<typeof planKeybindings>): string[] {

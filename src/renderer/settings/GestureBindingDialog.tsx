@@ -1,11 +1,14 @@
 import { SettingsHint } from '../settings-ui/SettingsHint';
-import { SettingsTextarea } from '../settings-ui/SettingsInput';
+import {
+  CommandConditionDetails,
+  useConditionProcesses,
+} from '../settings-ui/CommandConditionDetails';
+import { externalShortcutScopes } from '../../shared/keybindings';
 import { useState } from 'react';
 import {
   gestureTypes,
   moveDirections,
   normalizeGesture,
-  processNames,
   type GestureBinding,
   type GestureScope,
 } from '../../shared/gestures';
@@ -82,27 +85,15 @@ export function GestureBindingDialog({
     [initialMove.split('-').length - 1]: initialMove,
   });
   const movement = choices.move.split('-').slice(1);
-  const [processText, setProcessText] = useState(initial.when.processes.join(', '));
+  const { processText, setProcessText, processes, processError } = useConditionProcesses(
+    value.when,
+  );
   const choose = (gesture: string) => {
     setValue({ ...value, gesture });
     setChoices({ ...choices, [family]: gesture });
     if (gesture.startsWith('move-'))
       setMoveChoices({ ...moveChoices, [gesture.split('-').length - 1]: gesture });
   };
-  let processes: string[] = [];
-  let processError = '';
-  if (value.when.scope === 'exe') {
-    try {
-      processes = processNames(
-        processText
-          .split(/[,\n]/)
-          .map((s) => s.trim())
-          .filter(Boolean),
-      );
-    } catch {
-      processError = 'パスを含めず、exe名をカンマまたは改行で区切ってください。';
-    }
-  }
   const valid =
     !!value.gesture &&
     value.gesture !== 'key:' &&
@@ -238,11 +229,7 @@ export function GestureBindingDialog({
               <ShortcutConditionField
                 value={{ scope: commonScope, appletIds: value.when.appletIds }}
                 selectedScope={value.when.scope}
-                extraScopes={[
-                  { id: 'browser', title: 'Webブラウザ' },
-                  { id: 'exe', title: '指定したexe' },
-                  { id: 'desktop', title: 'デスクトップ', after: 'global' },
-                ]}
+                extraScopes={externalShortcutScopes.slice()}
                 onExtraScope={(scope) =>
                   setValue({
                     ...value,
@@ -274,44 +261,16 @@ export function GestureBindingDialog({
                     });
                 }}
               />
-              {['global', 'exe'].includes(value.when.scope) && (
-                <label className="gesture-desktop-exclusion">
-                  <input
-                    type="checkbox"
-                    checked={value.when.excludeDesktop ?? false}
-                    onChange={(event) =>
-                      setValue({
-                        ...value,
-                        when: { ...value.when, excludeDesktop: event.target.checked },
-                      })
-                    }
-                  />
-                  デスクトップを除外
-                </label>
-              )}
-              {value.when.scope === 'browser' && (
-                <SettingsHint as="small" className="gesture-condition-hint">
-                  画面上部の「動作設定」で指定したブラウザに適用します。
-                </SettingsHint>
-              )}
-              {value.when.scope === 'exe' && (
-                <label className="gesture-processes">
-                  <span>対象のexe名</span>
-                  <SettingsTextarea
-                    aria-label="対象のexe名"
-                    rows={2}
-                    value={processText}
-                    placeholder="notepad.exe, explorer.exe"
-                    onChange={(event) => setProcessText(event.target.value)}
-                  />
-                  <SettingsHint as="small">
-                    複数指定した場合は、いずれかに一致すると実行します。
-                  </SettingsHint>
-                  {(processError || !processes.length) && (
-                    <small role="alert">{processError || 'exe名を1件以上入力してください。'}</small>
-                  )}
-                </label>
-              )}
+              <CommandConditionDetails
+                when={value.when}
+                onChange={(when) =>
+                  setValue({ ...value, when: { ...when, processes: when.processes ?? [] } })
+                }
+                processText={processText}
+                setProcessText={setProcessText}
+                processes={processes}
+                processError={processError}
+              />
             </div>
           </div>
           <div className="shortcut-dialog-enabled">

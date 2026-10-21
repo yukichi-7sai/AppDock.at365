@@ -9,7 +9,8 @@ import {
   appendKeybinding,
   changeKeybindingKey,
   applyKeybindingOrder,
-  shortcutScopes,
+  keybindingScopes,
+  externalShortcutScope,
   protectedShortcut,
   type Keybinding,
 } from '../../shared/keybindings';
@@ -41,8 +42,14 @@ const idSchema = {
 const whenSchema = {
   type: 'object',
   properties: {
-    scope: { type: 'string', enum: shortcutScopes.map((s) => s.id) },
+    scope: { type: 'string', enum: keybindingScopes.map((s) => s.id) },
     appletIds: { type: 'array', items: shortcutTargetSchema, maxItems: 500, uniqueItems: true },
+    processes: {
+      type: 'array',
+      items: { type: 'string', minLength: 1, maxLength: 120 },
+      maxItems: 100,
+    },
+    excludeDesktop: { type: 'boolean' },
   },
   required: ['scope', 'appletIds'],
   additionalProperties: false,
@@ -51,7 +58,10 @@ const fields = {
   command: idSchema,
   key: { type: 'string', minLength: 1, maxLength: 80 },
   enabled: { type: 'boolean' },
-  blockOriginalInput: { type: 'boolean', description: 'グローバル入力を止める。省略時はtrue。' },
+  blockOriginalInput: {
+    type: 'boolean',
+    description: '条件に一致した外部入力を止める。省略時はtrue。',
+  },
   when: whenSchema,
 };
 const operation = (kind: string, properties: Record<string, unknown>) => ({
@@ -115,8 +125,16 @@ export class ShortcutCommands {
                   operation('configure', {
                     changes: {
                       type: 'object',
-                      properties: { executionMode: { type: 'string', enum: ['first', 'all'] } },
-                      required: ['executionMode'],
+                      properties: {
+                        executionMode: { type: 'string', enum: ['first', 'all'] },
+                        browsers: {
+                          type: 'array',
+                          items: { type: 'string', minLength: 1, maxLength: 120 },
+                          maxItems: 100,
+                        },
+                        requireChromiumWindowClass: { type: 'boolean' },
+                      },
+                      minProperties: 1,
                       additionalProperties: false,
                     },
                   }),
@@ -153,10 +171,10 @@ export class ShortcutCommands {
   get() {
     return {
       bindings: structuredClone(getKeybindings(this.options.settings.value)),
-      options: { executionMode: getKeybindingOptions(this.options.settings.value).executionMode },
+      options: this.publicOptions(getKeybindingOptions(this.options.settings.value)),
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
-      scopes: shortcutScopes,
+      scopes: keybindingScopes,
       pages: this.options.inputPages?.() ?? shortcutPageChoices([]),
       assignableCommands: this.assignable().map((c) => ({
         id: c.id,
@@ -177,7 +195,7 @@ export class ShortcutCommands {
     };
   }
   private validateAssignment(row: Keybinding) {
-    if (row.when.scope === 'global' && protectedShortcut(row.key)) throw invalid();
+    if (externalShortcutScope(row.when.scope) && protectedShortcut(row.key)) throw invalid();
     const command = this.assignable().find((c) => c.id === row.command);
     if (!command)
       throw new SettingsCommandError(
@@ -251,8 +269,9 @@ export class ShortcutCommands {
         } else if (op.kind === 'configure') {
           if (
             !exact(op, ['kind', 'changes']) ||
-            !exact(op.changes, ['executionMode']) ||
-            op.changes.executionMode === undefined
+            !exact(op.changes, ['executionMode', 'browsers', 'requireChromiumWindowClass']) ||
+            !Object.keys(op.changes).length ||
+            Object.values(op.changes).some((v) => v === undefined)
           )
             throw invalid();
           options = parseKeybindingOptions({ ...options, ...op.changes });
@@ -308,12 +327,19 @@ export class ShortcutCommands {
       dryRun: args.dryRun === true,
       changed,
       bindings: rows,
-      options: { executionMode: options.executionMode },
+      options: this.publicOptions(options),
       revision: this.options.settingsCommands.revision(),
       warning: store.syncError ?? null,
       applies: 'shortcutsChanged',
       message:
         '保存後の入力適用結果はshortcuts.getで確認してください。条件を満たすコマンドから、動作設定の実行方法に従って登録順に選びます。',
+    };
+  }
+  private publicOptions(options: ReturnType<typeof getKeybindingOptions>) {
+    return {
+      executionMode: options.executionMode,
+      browsers: [...options.browsers],
+      requireChromiumWindowClass: options.requireChromiumWindowClass,
     };
   }
 }

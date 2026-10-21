@@ -6,6 +6,7 @@ import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections'
 import { SettingsHint } from '../settings-ui/SettingsHint';
 import type { GestureSettings } from '../../shared/gestures';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
+import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
 function Names({
   itemKey,
   values,
@@ -146,28 +147,7 @@ export function GestureOptions({
           />
         </label>
       </SettingsField>
-      <SettingsField
-        title="Webブラウザ"
-        hint="exe名のみを指定し、パスは含めません。WebBrowserToolsの操作対象もこの一覧を使います。"
-      >
-        <Names
-          itemKey="browsers"
-          values={gestures.browsers}
-          change={(browsers) => change({ browsers })}
-        />
-        <div
-          className="gesture-enabled"
-          {...settingAnchor('gestures', 'requireChromiumWindowClass')}
-        >
-          <Toggle
-            label={hostSettingItem('gestures', 'requireChromiumWindowClass').title}
-            checked={gestures.requireChromiumWindowClass}
-            onChange={(requireChromiumWindowClass) => change({ requireChromiumWindowClass })}
-          />
-          <span>{hostSettingItem('gestures', 'requireChromiumWindowClass').title}</span>
-        </div>
-        <p className="settings-help">FirefoxなどではChromiumウィンドウの条件をオフにします。</p>
-      </SettingsField>
+      <InputBrowserOptions pageId="gestures" value={gestures} onChange={change} />
       <SettingsField title="除外" hint="この一覧のアプリでは、すべてのジェスチャーを無効にします。">
         <Names
           itemKey="excludedProcesses"

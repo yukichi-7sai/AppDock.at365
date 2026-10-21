@@ -1,6 +1,22 @@
 # 検証記録
 
-対象の現行版は`0.80.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.81.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+
+## 2026-10-22: 0.81.0のコミット前確認
+
+- 利用者から0.81.0の動作確認完了と、コミット・pushの指示を受けた。未コミットの条件拡張を保持し、確認済みのソース・試験・依存入力・成功ログと現在の内容を照合した。
+- 型検査・build・標準829件・nativeキー50項目・Windows入力228項目・条件fixture33項目・固定EXEのGUI71群/smokeの成功を再利用した。製品・試験・依存・配布物の後続変更はなく、今回の追記は検証文書だけとした。0.81.0と配布EXEのSHA256を維持し、製品回帰の再実行・再発行は行わない。
+- 対象一覧、再利用元と入力照合、stage/実ファイル・tree・実効author/committer、commitとpush先端の結果は`.artifacts/commit-validation-shortcut-conditions-0810/`へ記録する。originに設定されたGitHub/AQUAのmainへ、未送信の設計・共通基盤と今回の条件拡張を通常pushする。
+
+## 2026-10-22: キーの「いつ・どこで」を全条件へ拡張（0.81.0）
+
+- 動作確認済みの共通基盤・キー画面を`74b1a1bd63c74a8105acf1d9ffab558a4946f936`（tree `f4ca4775323532d6b2bcf61eeb57313b2617a3d4`、59パス）へコミットした。コミット前の標準827件と既存成功の照合、stage/実ファイル・tree・実効author/committerを確認した。cleanなmainでpull --ff-onlyはAlready up to dateとなり、既存の別worktreeを操作せず条件拡張へ進んだ。pushは行っていない。
+- キーにdesktop/browser/exeとglobal/exeのデスクトップ除外を追加した。InputHostが押下時の前面Windowの事実を取得し、既存の条件評価器で一致した行だけの入力ブロックを合成する。first/all・重複除去とは独立させ、AppDock内では同じキーのローカル行を元入力を止めずに共通計画へ渡す。mainは同じ押下対象・revisionを検証する。取得不能な対象条件は一致扱いにしない。
+- ブラウザ一覧とChromium条件はkeybindingOptionsへ独立して追加し、既存ジェスチャーの値・保存行の自動移行は行わない。初期値・exe名検証・条件詳細・ブラウザ設定のUIを共有し、専用編集APIのconfigureとwhen Schemaへ接続した。保存・dryRun・revision・3許可・protected keys・既存設定の保持を検証した。設定追加のため0.81.0へマイナー更新した。
+- 型検査・本体/Default Shell build・関連165件、標準 **829/829、fail/skip 0**、nativeキー **50項目** と既存Windows入力 **228項目**、開発GUIのキー **13群**・ジェスチャー **21群** が成功した。標準回帰の初回は制限環境によるWindows API/暗号化/一時ファイル操作の失敗で、同じコマンドを通常ユーザーとして実行すると成功した。失敗ログを保持し、依存やチェックの緩和は行っていない。
+- 発行前レビューは未解決指摘なし。新しいprocesses配列を含むmanifest条件のdeep clone、nativeへの既知の環境フィールドだけの投影、旧UI試験の8候補への更新を確認した。`publish.bat`終了0。**EXE/feed/Default Shellは0.81.0、EXEは168984723 bytes、SHA256 `eaaecec4c0fa1dcbc6e13c10e308ef09c517ed4ef3ea3e5668dac5ca319cc251`**。成果物は`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。
+- 固定EXEでキー設定15群・条件付きキーフック13群・ジェスチャー21群・前面化13群・起動2群・設定移動7群（計 **71群**）とsmokeが成功し、各隔離コピーのhashも一致した。実際のShellデスクトップ、WinForms対象、Chromiumの本体を使い、条件不一致時の通過・一致した行だけのORブロック・first/all・重複除去・ローカル重複・無効なexe入力・再起動保持を確認した。両テーマ/3幅の条件編集と、700px幅のブラウザ設定も画像で確認した。
+- [検証証跡](.artifacts/shortcut-conditions-20261022/validation.json)に成功/失敗ログ・前後manifest・試験依存・native EXE/DLLと配布物の一致・レビュー・再利用理由を保存した。純粋なnative条件fixture33項目は同じ評価器/fixtureを照合して再利用し、TypeScript側は今回の標準回帰で再確認した。今回の9試験profileとnative fixtureのプロセス0を通常ユーザーで確認し、削除0件。方式ごとの新規成功分は各1回で、固定出力・比較/再利用資料・sandbox失敗・他作業を保持した。0.81.0の追加分は未コミット・未push。Release・deploy・全体ZIP・未変更Appletの再発行は行わず、物理機器/UAC/ロック画面/実利用は隔離環境の合成入力と区別する。
 
 ## 2026-10-22: 共通実行基盤・キー設定のコミット前確認（0.80.0）
 

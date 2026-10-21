@@ -21,6 +21,28 @@ export interface ConditionEnvironment {
   browsers?: readonly string[];
   requireChromiumWindowClass?: boolean;
 }
+export const defaultConditionEnvironment = () => ({
+  browsers: ['chrome', 'msedge', 'brave', 'vivaldi', 'opera', 'chromium', 'thorium'],
+  requireChromiumWindowClass: false,
+});
+export function processNames(value: unknown): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > 100 ||
+    value.some((v) => typeof v !== 'string' || !/^[\p{L}\p{N}_. -]{1,120}$/u.test(v.trim()))
+  )
+    throw Error('exe名は100件以内で、パスを含めずに指定してください。');
+  return [
+    ...new Set(
+      value.map((v) =>
+        v
+          .trim()
+          .replace(/\.exe$/i, '')
+          .toLowerCase(),
+      ),
+    ),
+  ];
+}
 
 /** Normalize binding formats without changing their persisted representation. */
 export function commandCondition(when: {

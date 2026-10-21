@@ -4,7 +4,13 @@ import { keybindingConditionLabel } from './keybindings';
 import { matchesWhen, type ShortcutContext, type ShortcutScope } from './keybindings';
 import { validShortcutTarget } from './shortcut-pages';
 import type { Settings } from './contracts';
-import { commandCondition, type CommandTarget } from './command-conditions';
+import {
+  commandCondition,
+  defaultConditionEnvironment,
+  processNames,
+  type CommandTarget,
+} from './command-conditions';
+export { processNames } from './command-conditions';
 import { planCommandBatch } from './command-execution';
 
 export const moveDirections = [
@@ -126,9 +132,8 @@ export function defaultGestures(): GestureSettings {
   return {
     enabled: true,
     activateOnStart: false,
-    browsers: ['chrome', 'msedge', 'brave', 'vivaldi', 'opera', 'chromium', 'thorium'],
+    ...defaultConditionEnvironment(),
     excludedProcesses: [],
-    requireChromiumWindowClass: false,
     distance: 50,
     wheelDelayMs: 0,
     executionMode: 'all',
@@ -137,24 +142,6 @@ export function defaultGestures(): GestureSettings {
     indicatorShowNoAction: true,
     bindings: [],
   };
-}
-export function processNames(value: unknown): string[] {
-  if (
-    !Array.isArray(value) ||
-    value.length > 100 ||
-    value.some((v) => typeof v !== 'string' || !/^[\p{L}\p{N}_. -]{1,120}$/u.test(v.trim()))
-  )
-    throw Error('exe名は100件以内で、パスを含めずに指定してください。');
-  return [
-    ...new Set(
-      value.map((v) =>
-        v
-          .trim()
-          .replace(/\.exe$/i, '')
-          .toLowerCase(),
-      ),
-    ),
-  ];
 }
 export function normalizeGesture(value: unknown): string {
   if (gestureTypes.some(([id]) => id === value)) return value as string;

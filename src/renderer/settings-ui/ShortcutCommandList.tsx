@@ -3,6 +3,7 @@ import {
   appendKeybinding,
   changeKeybindingKey,
   getKeybindings,
+  externalShortcutScope,
   keybindingConditionLabel,
   withKeybindings,
   type Keybinding,
@@ -47,7 +48,7 @@ export function ShortcutCommandList({
           command.extensionId ? command.extension : undefined,
           applets,
         ) +
-        (row.when.scope === 'global'
+        (externalShortcutScope(row.when.scope)
           ? row.blockOriginalInput === false
             ? '・入力を通す'
             : '・入力をブロック'

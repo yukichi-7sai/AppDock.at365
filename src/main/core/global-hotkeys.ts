@@ -1,4 +1,9 @@
-import { getKeybindings, globalShortcutInputs } from '../../shared/keybindings';
+import {
+  getKeybindings,
+  getKeybindingOptions,
+  nativeShortcutInputs,
+  externalShortcutScope,
+} from '../../shared/keybindings';
 import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import type {
   InputCaptureManager,
@@ -46,10 +51,15 @@ export class GlobalHotKeyManager {
       ? []
       : getKeybindings(settings)
           .filter(
-            (row) => row.enabled && row.when.scope === 'global' && available.includes(row.command),
+            (row) =>
+              row.enabled &&
+              externalShortcutScope(row.when.scope) &&
+              available.includes(row.command),
           )
           .map((row) => ({ commandId: row.command, shortcut: row.key }));
-    const inputs = suspended ? [] : globalShortcutInputs(getKeybindings(settings), available);
+    const inputs = suspended
+      ? []
+      : nativeShortcutInputs(getKeybindings(settings), available, getKeybindingOptions(settings));
     this.queue = this.queue.then(async () => {
       if (this.stopped) return;
       const signature = JSON.stringify([desired, inputs]);

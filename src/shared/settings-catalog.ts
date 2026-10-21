@@ -141,12 +141,14 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['trayMenu', 'コンテキストメニュー', '追加 削除 グループ 区切り線 表示イメージ'],
   ],
   shortcuts: [
-    ['options', '動作設定', '条件に一致したコマンドの実行方法'],
+    ['options', '動作設定', '条件に一致したコマンドの実行方法 Webブラウザ'],
     ['executionMode', '条件に一致したコマンドの実行方法', '最初の1つ すべて 登録順'],
+    ['browsers', 'Webブラウザのexe'],
+    ['requireChromiumWindowClass', 'ブラウザ条件でChromiumウィンドウだけを対象にする'],
     [
       'keybindings',
       'ショートカットキー割り当て',
-      'ショートカットキー 割り当て コマンド 条件 実行順 入力の適用エラー Win ブロック',
+      'ショートカットキー 割り当て コマンド 条件 デスクトップ Webブラウザ 指定したexe 実行順 入力の適用エラー Win ブロック',
     ],
   ],
   gestures: [

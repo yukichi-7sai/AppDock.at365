@@ -1500,10 +1500,11 @@ function prepareShortcut(
   return planKeybindings(
     rows,
     keys,
-    context,
+    { ...context, target: press?.target ?? context.target },
     availableShortcutCommands(),
     globalEvent,
     getKeybindingOptions(settings.value).executionMode,
+    getKeybindingOptions(settings.value),
   );
 }
 function dispatchShortcutPlan(key: string, plan: CommandBatchPlan, press?: ShortcutPress) {

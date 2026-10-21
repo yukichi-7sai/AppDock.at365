@@ -124,7 +124,9 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 `options.executionMode`に有効な実行方法を返します。`first`は条件に一致した先頭1件、`all`は全件を登録順に選び、同一コマンドの重複を除きます。省略時はallです。firstで選んだコマンドが実行中・失敗になっても次へ繰り下げません。ジェスチャーとは独立した設定です。
 
-読取りは保存済みのbindings（id/command/key/enabled/whenと任意のblockOriginalInput）を実行順に返します。blockOriginalInputはglobalの元入力を止めるbooleanで、省略時true。旧行への既定値の書込みは行わず、updateで省略した場合は保存済み値を保持します。keyはWin／Windows／Meta修飾キーにも対応します。globalHotKeysのregisteredは共有フックへの適用成功を表し、backend="hook"とキー単位のeffectiveBlockOriginalInputも返します。OSの排他予約や実効果の保証ではありません。GUIの未確定入力は含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
+`options.browsers`と`options.requireChromiumWindowClass`はキー用のブラウザ判定設定です。configureのchangesへこれらを部分指定できます。exe名はパスを含めずに指定し、大小文字と`.exe`を正規化します。ジェスチャー側の設定は変更しません。whenのscopeはglobal/desktop/app/pages/owner/applets/browser/exe、exeだけはprocessesを1件以上指定します。global/exeではexcludeDesktopも使用できます。条件に一致しない場所では元のキー入力を通します。globalHotKeysのeffectiveBlockOriginalInputは設定上の合成値であり、現在の前面アプリで入力を止めた証拠ではありません。
+
+読取りは保存済みのbindings（id/command/key/enabled/whenと任意のblockOriginalInput）を実行順に返します。blockOriginalInputは条件に一致した外部入力を止めるbooleanで、省略時true。旧行への既定値の書込みは行わず、updateで省略した場合は保存済み値を保持します。keyはWin／Windows／Meta修飾キーにも対応します。globalHotKeysのregisteredは共有フックへの適用成功を表し、backend="hook"とキー単位のeffectiveBlockOriginalInputも返します。OSの排他予約や実効果の保証ではありません。GUIの未確定入力は含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。
 
 既存の未公開/未導入コマンドへの割当もbindingsへ返して保持します。それらは無効化・削除できますが、外部からキー/条件を変更したり有効化したりはできません。reorderは既存の同じキーの行だけを並べ替えます。ローカルの編集画面にはこの外部公開制限を加えません。
 
@@ -158,7 +160,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 - `reorder`: keyとidsを指定。同じキーの全行IDを、無効な行も含めて実行順に指定します。他のキーは保持します。
 - `configure`: `changes: { "executionMode": "first" }`または`"all"`を指定します。割り当て操作と同じoperations内で原子的に保存し、同じ許可・expectedRevision・dryRunを使います。保存時にコマンドを実行しません。一般設定APIからの変更は公開しません。
 
-scopeはglobal/app/pages/owner/appletsです。appletsだけは登録済みApplet IDを1件以上指定し、他は空配列。既存の未導入対象は変更しない限り保持します。同じキーの複数割当を一律に競合扱いせず、既存の条件・実行順を使用します。同じコマンドが複数の条件で一致しても1回の押下では1回だけ実行します。
+scopeはglobal/desktop/app/pages/owner/applets/browser/exeです。appletsだけはページIDまたは既存のApplet IDを1件以上指定し、他はappletIdsを空配列にします。既存の未導入対象は変更しない限り保持します。同じキーの複数割当を一律に競合扱いせず、既存の条件・実行順を使用します。同じコマンドが複数の条件で一致しても1回の押下では1回だけ実行します。
 
 operationsは1〜100件、全割当は2000件まで。既存parseKeybindings/キー正規化/条件検査/同じキー内の順序検査を共有します。全操作をメモリ上で検証し、1件でも不正なら保存しません。指定外の割当/設定を保持し、withKeybindingsでshortcuts/globalShortcutCommandsの互換フィールドも揃えます。dryRunは保存せず結果を返し、同じ許可とrevisionが必要です。同じ結果なら保存しません。
 

@@ -7,6 +7,7 @@ import type { UiCommand } from '../../shared/commands';
 import type { Settings, GlobalHotKeyStatus } from '../../shared/contracts';
 import {
   getKeybindings,
+  externalShortcutScope,
   getKeybindingOptions,
   keybindingConditionLabel,
   type Keybinding,
@@ -16,6 +17,7 @@ import { ShortcutOrderDialog } from '../settings-ui/ShortcutOrderDialog';
 import { SettingsSection } from '../settings-ui/SettingsSections';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
+import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
 import {
   CommandTargetFilter,
   useCommandSettingsTarget,
@@ -68,7 +70,7 @@ export function ShortcutsEditor({
     (command) => !command.hidden || rows.some((row) => row.command === command.id),
   );
   const statusError = (row: Keybinding) =>
-    row.enabled && row.when.scope === 'global' && known.get(row.command)?.available
+    row.enabled && externalShortcutScope(row.when.scope) && known.get(row.command)?.available
       ? displayedStatuses.find(
           (status) => status.commandId === row.command && status.shortcut === row.key,
         )?.error
@@ -112,6 +114,16 @@ export function ShortcutsEditor({
             onChange({
               ...settings,
               keybindingOptions: { ...getKeybindingOptions(settings), executionMode },
+            })
+          }
+        />
+        <InputBrowserOptions
+          pageId="shortcuts"
+          value={getKeybindingOptions(settings)}
+          onChange={(patch) =>
+            onChange({
+              ...settings,
+              keybindingOptions: { ...getKeybindingOptions(settings), ...patch },
             })
           }
         />

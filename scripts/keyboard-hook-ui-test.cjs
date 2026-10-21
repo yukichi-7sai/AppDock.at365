@@ -466,6 +466,24 @@ async function openShortcuts() {
     assert.equal(saved.find((r) => r.id === 'win').blockOriginalInput, false);
     assert.equal(saved.find((r) => r.id === 'pass-a').blockOriginalInput, false);
     checks.push('saved Win shortcut and explicit passthrough survive full restart');
+    await require('./shortcut-conditions-checks.cjs')({
+      host,
+      page,
+      peer,
+      chord,
+      calls,
+      until,
+      profile,
+      checks,
+      focusHost,
+      openShortcuts,
+      hostProcessName: path.basename(executable, path.extname(executable)),
+      restart: async () => {
+        await closeHost();
+        await launch();
+        return { host, page };
+      },
+    });
     const result = {
       ok: true,
       profile,

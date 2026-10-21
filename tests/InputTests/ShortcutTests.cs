@@ -56,12 +56,12 @@ internal static partial class Program
             new {shortcut="Ctrl+Shift+F17",blockOriginalInput=false},
             new {shortcut="Pause",blockOriginalInput=true}
         ];
-        async Task Sync(object[]? rows=null,object? recording=null,int revision=1) {
+        async Task Sync(object[]? rows=null,object? recording=null,int revision=1,uint? hostProcess=null) {
             object Configuration(bool active) => new{
                 gestures=new{enabled=false,browsers=Array.Empty<string>(),excludedProcesses=Array.Empty<string>(),
                     requireChromiumWindowClass=false,distance=30,wheelDelayMs=0,indicatorOpacity=.4,
                     indicatorPosition="none",rows=Array.Empty<object>(),context="fixture",revision=1},
-                shortcuts=rows??inputs,shortcutRevision=revision,hostProcessId=(uint)Environment.ProcessId,context="fixture",recording,shortcutsActive=active
+                shortcuts=rows??inputs,shortcutRevision=revision,hostProcessId=hostProcess??(uint)Environment.ProcessId,context="fixture",recording,shortcutsActive=active
             };
             await peer.RequestAsync("capture.sync",Configuration(false),CancellationToken.None);
             var result=await peer.RequestAsync("capture.sync",Configuration(true),CancellationToken.None);
@@ -127,6 +127,40 @@ internal static partial class Program
             await Sync([],revision:4);
             count=Count();await Chord([0xA2,0xA4],0x7F);
             Check(Count()==count,"empty configuration releases shortcut capture");
+            object Conditional(string scope,string[] processes,bool block=true,string[]? browsers=null,bool chromium=false,bool exclude=false) =>
+                new {shortcut="Ctrl+Alt+F16",blockOriginalInput=block,
+                    conditions=new[]{new{when=new{scope,appletIds=Array.Empty<string>(),processes,excludeDesktop=exclude},blockOriginalInput=block}},
+                    environment=new{browsers=browsers??Array.Empty<string>(),requireChromiumWindowClass=chromium}};
+            var ownProcess=Process.GetCurrentProcess().ProcessName;
+            await Sync([Conditional("exe",["no-such-input-test"])],revision:5,hostProcess:0);
+            await Focus(); count=Count();downs=form.Downs.GetValueOrDefault(0x7Fu);ups=form.Ups.GetValueOrDefault(0x7Fu);
+            await Chord([0xA2,0xA4],0x7F);
+            Check(Count()==count,"nonmatching exe does not dispatch");
+            Check(form.Downs.GetValueOrDefault(0x7Fu)==downs+1&&form.Ups.GetValueOrDefault(0x7Fu)==ups+1,"nonmatching exe preserves original down and up");
+            await Sync([Conditional("exe",[ownProcess.ToUpperInvariant()+".EXE"])],revision:6,hostProcess:0);
+            count=Count();downs=form.Downs.GetValueOrDefault(0x7Fu);await Chord([0xA2,0xA4],0x7F,2);
+            Check(Count()==count+1&&form.Downs.GetValueOrDefault(0x7Fu)==downs,"matching exe blocks and dispatches once");
+            lock(events)Check(events.Last().GetProperty("target").GetProperty("window").GetString()==form.Handle.ToString()&&
+                events.Last().GetProperty("target").GetProperty("processName").GetString()==ownProcess,"key event carries captured target facts");
+            await Sync([Conditional("exe",[ownProcess],false)],revision:7,hostProcess:0);
+            count=Count();downs=form.Downs.GetValueOrDefault(0x7Fu);await Chord([0xA2,0xA4],0x7F);
+            Check(Count()==count+1&&form.Downs.GetValueOrDefault(0x7Fu)==downs+1,"matching exe passthrough dispatches while preserving input");
+            await Sync([Conditional("browser",[],browsers:[ownProcess])],revision:8,hostProcess:0);
+            count=Count();await Chord([0xA2,0xA4],0x7F);Check(Count()==count+1,"browser list uses captured process");
+            await Sync([Conditional("browser",[],browsers:[ownProcess],chromium:true)],revision:9,hostProcess:0);
+            count=Count();downs=form.Downs.GetValueOrDefault(0x7Fu);await Chord([0xA2,0xA4],0x7F);
+            Check(Count()==count&&form.Downs.GetValueOrDefault(0x7Fu)==downs+1,"Chromium class mismatch preserves ordinary input");
+            await Sync([Conditional("desktop",[])],revision:10,hostProcess:0);
+            count=Count();await Chord([0xA2,0xA4],0x7F);Check(Count()==count,"ordinary window does not match desktop");
+            FocusWindow(GetShellWindow());await Task.Delay(120);
+            Check(AppDock.InputHost.GestureTarget.IsDesktop(GetForegroundWindow()),"actual desktop receives shortcut probe");
+            count=Count();await Chord([0xA2,0xA4],0x7F);Check(Count()==count+1,"desktop shortcut dispatches on actual Shell desktop");
+            await Sync([Conditional("global",[],exclude:true)],revision:11,hostProcess:0);
+            count=Count();await Chord([0xA2,0xA4],0x7F);Check(Count()==count,"global desktop exclusion skips desktop");
+            await Focus(); count=Count();await Chord([0xA2,0xA4],0x7F);Check(Count()==count+1,"global desktop exclusion accepts ordinary window");
+            await Sync([Conditional("exe",["no-such-input-test"])],revision:12);
+            count=Count();downs=form.Downs.GetValueOrDefault(0x7Fu);await Chord([0xA2,0xA4],0x7F);
+            Check(Count()==count+1&&form.Downs.GetValueOrDefault(0x7Fu)==downs+1,"host-local fallback notifies without blocking on external condition mismatch");
             Console.WriteLine("PASS shortcut hook native acceptance");
         } finally {
             child.StandardInput.Close();

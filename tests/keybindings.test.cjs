@@ -28,10 +28,16 @@ const {
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
 
 test('shortcut options default to all, validate explicit values and retain local future fields', () => {
-  assert.deepEqual(defaultKeybindingOptions(), { executionMode: 'all' });
-  assert.deepEqual(getKeybindingOptions({}), { executionMode: 'all' });
-  assert.deepEqual(parseKeybindingOptions({}), { executionMode: 'all' });
+  const defaults = {
+    executionMode: 'all',
+    browsers: ['chrome', 'msedge', 'brave', 'vivaldi', 'opera', 'chromium', 'thorium'],
+    requireChromiumWindowClass: false,
+  };
+  assert.deepEqual(defaultKeybindingOptions(), defaults);
+  assert.deepEqual(getKeybindingOptions({}), defaults);
+  assert.deepEqual(parseKeybindingOptions({}), defaults);
   assert.deepEqual(parseKeybindingOptions({ executionMode: 'first', future: false }), {
+    ...defaults,
     executionMode: 'first',
     future: false,
   });
@@ -42,6 +48,9 @@ test('shortcut options default to all, validate explicit values and retain local
     { executionMode: null },
     { executionMode: 'unknown' },
     { executionMode: 0 },
+    { browsers: null },
+    { browsers: ['C:\\chrome.exe'] },
+    { requireChromiumWindowClass: 'true' },
   ])
     assert.throws(() => parseKeybindingOptions(value));
   const old = createDefaultSettings();
@@ -55,6 +64,103 @@ test('shortcut options default to all, validate explicit values and retain local
     executionMode: 'first',
   });
   assert.equal(parseSettings(old).gestures.executionMode, 'all');
+});
+test('external shortcut conditions normalize and match captured targets through the common planner', () => {
+  const {
+    planKeybindings,
+    nativeShortcutInputs,
+    keybindingConditionLabel,
+  } = require('../out/main/shared/keybindings');
+  const make = (id, scope, extras = {}) => ({
+    ...row(id, 'test.' + id, scope),
+    when: { scope, appletIds: [], ...extras },
+  });
+  const bindings = parseKeybindings([
+    make('miss', 'exe', { processes: ['other'] }),
+    make('exe', 'exe', { processes: ['CHROME.EXE', 'chrome'], excludeDesktop: true }),
+    make('browser', 'browser'),
+    make('desktop', 'desktop'),
+    make('global', 'global', { excludeDesktop: true }),
+  ]);
+  assert.deepEqual(bindings[1].when.processes, ['chrome']);
+  const available = bindings.map((r) => ({ id: r.command }));
+  const context = {
+    appFocused: false,
+    target: {
+      window: '42',
+      processName: 'Chrome.EXE',
+      windowClass: 'Chrome_WidgetWin_1',
+      desktop: false,
+    },
+  };
+  const environment = { browsers: ['chrome'], requireChromiumWindowClass: true };
+  assert.deepEqual(
+    planKeybindings(bindings, 'Ctrl+F12', context, available, true, 'all', environment).commands,
+    ['test.exe', 'test.browser', 'test.global'],
+  );
+  assert.deepEqual(
+    planKeybindings(bindings, 'Ctrl+F12', context, available, true, 'first', environment).commands,
+    ['test.exe'],
+  );
+  assert.deepEqual(
+    planKeybindings(bindings, 'Ctrl+F12', context, available, false, 'all', environment).commands,
+    [],
+  );
+  assert.deepEqual(
+    planKeybindings(
+      bindings,
+      'Ctrl+F12',
+      { appFocused: false },
+      available,
+      true,
+      'all',
+      environment,
+    ).commands,
+    [],
+  );
+  assert.deepEqual(
+    planKeybindings(
+      bindings,
+      'Ctrl+F12',
+      { appFocused: false, target: { ...context.target, desktop: true } },
+      available,
+      true,
+      'all',
+      environment,
+    ).commands,
+    ['test.browser', 'test.desktop'],
+  );
+  const input = nativeShortcutInputs(
+    bindings,
+    available.map((c) => c.id),
+    environment,
+  )[0];
+  assert.equal(input.conditions.length, 5);
+  assert.equal(input.blockOriginalInput, true);
+  assert.equal(
+    keybindingConditionLabel(bindings[1].when, undefined, []),
+    'chrome（デスクトップを除外）',
+  );
+  for (const when of [
+    { scope: 'exe', appletIds: [] },
+    { scope: 'browser', appletIds: [], processes: ['chrome'] },
+    { scope: 'desktop', appletIds: [], excludeDesktop: true },
+    { scope: 'exe', appletIds: [], processes: ['../bad'] },
+  ])
+    assert.throws(() => parseKeybindings([{ ...row('invalid', 'test.run'), when }]));
+  const old = [row('old', 'test.run')];
+  assert.deepEqual(parseKeybindings(old), old);
+  const settings = createDefaultSettings();
+  settings.keybindingOptions = {
+    ...defaultsForTest(),
+    browsers: ['FIREFOX.EXE'],
+    requireChromiumWindowClass: true,
+  };
+  assert.deepEqual(parseSettings(settings).keybindingOptions.browsers, ['firefox']);
+  assert.equal(parseSettings(settings).gestures.requireChromiumWindowClass, false);
+  function defaultsForTest() {
+    return defaultKeybindingOptions();
+  }
 });
 const row = (id, command, scope = 'app', appletIds = []) => ({
   id,

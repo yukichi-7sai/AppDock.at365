@@ -10,7 +10,7 @@ internal sealed record CaptureConfiguration(Configuration Gestures, ShortcutInpu
     bool ShortcutsActive = true);
 internal sealed record ShortcutPressNotice(int Revision, long PressId, string[] Shortcuts,
     bool Blocked, string Window, string Context,
-    [property: System.Text.Json.Serialization.JsonIgnore] uint HostProcessId)
+    [property: System.Text.Json.Serialization.JsonIgnore] uint HostProcessId, CommandTargetContext? Target = null)
 {
     [System.Text.Json.Serialization.JsonIgnore] public long CapturedAt { get; } = Environment.TickCount64;
 }
@@ -184,15 +184,27 @@ internal sealed class InputCaptureEngine : IDisposable
             if (!accepting || up || repeat || GetForegroundWindow() == 0 || configuration == null ||
                 !chords.TryGetValue(chord, out var rows))
                 return CallNextHookEx(keyboardHook, code, message, pointer);
-            var block = rows.Any(row => row.BlockOriginalInput);
+            var capturedWindow = GetForegroundWindow();
+            if (capturedWindow == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
+            var target = rows.Any(row => row.Conditions is {Length:>0}) ? CommandTargetCapture.Capture(capturedWindow) : null;
+            // A local binding sharing this key still dispatches through the native owner, without blocking ordinary input.
+            GetWindowThreadProcessId(capturedWindow, out var foregroundProcess);
+            var local = foregroundProcess == configuration.HostProcessId;
+            var context = new CommandContext(new(), target);
+            var matched = rows.Select(row => new {
+                Row = row,
+                Conditions = row.Conditions?.Where(c => CommandConditions.Matches(c.When, context, environment: row.Environment)).ToArray()
+            }).Where(item => item.Conditions == null || item.Conditions.Length > 0 || local).ToArray();
+            if (matched.Length == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
+            var block = matched.Any(item => item.Conditions == null ? item.Row.BlockOriginalInput : item.Conditions.Any(c => c.BlockOriginalInput));
             if (block && !MaskModifier(modifiers)) {
                 notify("input.error", new { message = "修飾キーの単独動作を抑止できなかったため入力を通しました。" });
                 return CallNextHookEx(keyboardHook, code, message, pointer);
             }
-            var window = GetForegroundWindow().ToInt64().ToString();
+            var window = capturedWindow.ToInt64().ToString();
             if (!notify("shortcuts.pressed", new ShortcutPressNotice(configuration.ShortcutRevision, ++pressId,
-                rows.Select(row => row.Shortcut).Distinct().ToArray(), block, window, configuration.Context,
-                configuration.HostProcessId))) return CallNextHookEx(keyboardHook, code, message, pointer);
+                matched.Select(item => item.Row.Shortcut).Distinct().ToArray(), block, window, configuration.Context,
+                configuration.HostProcessId, target))) return CallNextHookEx(keyboardHook, code, message, pointer);
             if (data.Key != 0x13) owned[data.Key] = block;
             return block ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
         } catch {

@@ -3,6 +3,7 @@ import type { UiCommand } from '../../shared/commands';
 import {
   applyKeybindingOrder,
   getKeybindings,
+  externalShortcutScope,
   keybindingGroups,
   keybindingConditionLabel,
   moveKeybindingWithinKey,
@@ -39,7 +40,7 @@ export function ShortcutOrderDialog({
           command?.extensionId ? command.extension : undefined,
           applets,
         ) +
-        (row.when.scope === 'global'
+        (externalShortcutScope(row.when.scope)
           ? row.blockOriginalInput === false
             ? '・入力を通す'
             : '・入力をブロック'

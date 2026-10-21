@@ -492,7 +492,10 @@ const expectCalls = async (before, expected) => {
     assert.deepEqual(
       await editDialog.locator('select[aria-label*="いつ・どこで"] option').allTextContents(),
       [
+        'Webブラウザ',
+        '指定したexe',
         'グローバル',
+        'デスクトップ',
         'AppDock全体',
         'AppDockのすべてのページ',
         'キー検証',

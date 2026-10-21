@@ -4,7 +4,11 @@ const fs = require('node:fs'),
   path = require('node:path');
 const { SettingsStore } = require('../out/main/main/core/settings');
 const { AutomationApi } = require('../out/main/main/core/automation-api');
-const { getKeybindings, withKeybindings } = require('../out/main/shared/keybindings');
+const {
+  getKeybindings,
+  withKeybindings,
+  defaultKeybindingOptions,
+} = require('../out/main/shared/keybindings');
 const id = 'appdock.shortcuts.update';
 const binding = (id, command = 'sample.run', key = 'Ctrl+F9') => ({
   id,
@@ -79,7 +83,7 @@ function fixture(t) {
 
 test('execution mode configuration is atomic, revisioned, private-field preserving and dry-run aware', async (t) => {
   const f = fixture(t);
-  assert.deepEqual(f.get().options, { executionMode: 'all' });
+  assert.deepEqual(f.get().options, defaultKeybindingOptions());
   assert.equal(Object.hasOwn(f.api.call('settings.get').values, 'keybindingOptions'), false);
   assert.equal(Object.hasOwn(f.api.call('settings.getSchema').fields, 'keybindingOptions'), false);
   await assert.rejects(
@@ -137,6 +141,49 @@ test('configuring execution mode requires all shortcut editing grants', async (t
     f.permissions[grant] = true;
   }
   assert.equal(f.get().options.executionMode, 'all');
+});
+test('external shortcut scopes and browser options are atomic, normalized and use the same restricted editor', async (t) => {
+  const f = fixture(t),
+    revision = f.get().revision;
+  assert.deepEqual(
+    f.get().scopes.map((s) => s.id),
+    ['global', 'desktop', 'app', 'pages', 'owner', 'applets', 'browser', 'exe'],
+  );
+  const source = {
+    ...binding('external'),
+    when: { scope: 'exe', appletIds: [], processes: ['NOTEPAD.EXE'], excludeDesktop: true },
+  };
+  const configure = {
+    kind: 'configure',
+    changes: { browsers: ['FIREFOX.EXE'], requireChromiumWindowClass: true },
+  };
+  const dry = await f.edit([configure, { kind: 'add', binding: source }], { dryRun: true });
+  assert.deepEqual(dry.options.browsers, ['firefox']);
+  assert.equal(f.get().revision, revision);
+  await f.edit([configure, { kind: 'add', binding: source }]);
+  assert.deepEqual(f.get().bindings.find((r) => r.id === 'external').when, {
+    ...source.when,
+    processes: ['notepad'],
+  });
+  assert.equal(f.settings.value.gestures.requireChromiumWindowClass, false);
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  await assert.rejects(
+    f.edit([
+      { kind: 'configure', changes: { browsers: ['chrome'] } },
+      { kind: 'add', binding: { ...source, id: 'invalid', key: 'Win+L' } },
+    ]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  for (const changes of [
+    { browsers: null },
+    { browsers: ['../chrome'] },
+    { requireChromiumWindowClass: null },
+    { requireChromiumWindowClass: undefined },
+  ])
+    await assert.rejects(f.edit([{ kind: 'configure', changes }]), { code: 'INVALID_ARGUMENT' });
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  f.settings.reload();
+  assert.deepEqual(f.get().options.browsers, ['firefox']);
 });
 test('shortcut read is scoped, lists assignable commands while stopped, and masks OS errors', (t) => {
   const f = fixture(t),

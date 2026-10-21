@@ -7,7 +7,11 @@ import {
   planGestureCommands,
   type GestureContext,
 } from '../../shared/gestures';
-import { readCommandTarget } from '../../shared/command-conditions';
+import {
+  readCommandTarget,
+  type CommandTarget,
+  type ConditionEnvironment,
+} from '../../shared/command-conditions';
 import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import type { CommandDispatcher } from './command-dispatcher';
 
@@ -25,6 +29,11 @@ export interface GestureInvocation {
 export interface ShortcutInput {
   shortcut: string;
   blockOriginalInput: boolean;
+  conditions?: {
+    when: { scope: string; appletIds: string[]; processes: string[]; excludeDesktop: boolean };
+    blockOriginalInput: boolean;
+  }[];
+  environment?: ConditionEnvironment;
 }
 export type NativeShortcutStatus = Omit<GlobalHotKeyStatus, 'commandId'>;
 export interface ShortcutPress {
@@ -33,6 +42,7 @@ export interface ShortcutPress {
   context: string;
   revision: number;
   pressId: number;
+  target?: CommandTarget;
 }
 export class InputCaptureManager {
   private peer?: JsonLinePeer;
@@ -197,7 +207,13 @@ export class InputCaptureManager {
       const keys = p.shortcuts.filter((key: string) =>
         this.statuses.some((s) => s.registered && s.shortcut === key),
       );
-      if (keys.length) this.shortcuts.pressed({ ...p, shortcuts: keys });
+      const conditional = this.inputs.some(
+        (input) => keys.includes(input.shortcut) && input.conditions?.length,
+      );
+      const target = p.target == null ? undefined : readCommandTarget(p.target);
+      if ((conditional && !target) || (p.target != null && (!target || target.window !== p.window)))
+        return;
+      if (keys.length) this.shortcuts.pressed({ ...p, shortcuts: keys, target });
       return;
     }
     if (method === 'shortcuts.applied') {

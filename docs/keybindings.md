@@ -10,6 +10,10 @@
 
 `Settings.keybindingOptions.executionMode`は`first`または`all`で、欠落時と初期値は`all`（すべて）。既定値は差分JSONから省略する。不正値は保存せず、ジェスチャーの`gestures.executionMode`とは独立した共有設定として保存する。フォーム・ページJSON・外部ファイル更新・ページリセットは同じ項目へ接続する。リセットはキー側の割り当てと実行方法だけを戻す。設定の自動移行・既存行の書き換えは行わない。
 
+同じ動作設定の`browsers`と`requireChromiumWindowClass`が、キー用のWebブラウザ条件を定義する。既定はChrome/Edge/Brave/Vivaldi/Opera/Chromium/Thoriumのexe名とChromium条件OFF。空の一覧はブラウザ条件に一致しない。ジェスチャーの同名設定とは独立して保存し、初期値とexe名検証だけを共用する。ブラウザ設定と割り当ての条件詳細は、ジェスチャーと同じUI部品を使う。
+
+「いつ・どこで」はジェスチャーと同じ8種類に対応する。`desktop`はWindows Shellのデスクトップ面、`browser`はキー側のブラウザ一覧、`exe`は`when.processes`のexe名のいずれかへの一致。`global`と`exe`の任意boolean `when.excludeDesktop`でデスクトップを除外する。対象はキーを押した瞬間の前面Windowであり、カーソル下のWindowへは切り替えない。exe名はパスを受け付けず、大文字小文字と`.exe`の有無を正規化する。processesはexe条件で1件以上、他の条件では空または省略とする。古い行に空配列やfalseを書き足す自動移行は行わない。
+
 `Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。
 Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に宣言したコマンドの初期割り当てを指定できる。ID以外の`command`/`key`/`enabled`/`when`を各行へ書き、未宣言のコマンドはmanifest読込時に拒否する。初回発見時だけsettings.jsonにコピーし、適用済みIDは`keybindingDefaultsInitialized`へ記録する。行を消した後の再起動やApplet更新でも再追加しない。
 新しいWebAppletは`webApplets.shortcutDefaults`から追加時の保存トランザクションでコピーする。このテンプレートのコマンドは`open`/`reload`/`back`/`forward`/`home`に限定し、コマンドIDの`web.<UUID>.`を追加時に補う。既存WebAppletの行は変更しない。Applet詳細は割り当てごとの追加・編集・削除に対応し、一括初期化の操作は置かない。WebApplet管理項目の新規サイト用テンプレート編集は維持する。
@@ -25,7 +29,7 @@ Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に�
 }
 ```
 
-scopeはglobal/app/pages/owner/applets。globalは常時、appはホスト管理Windowのフォーカス、pagesは本体またはAppletの表示中ページ、ownerはコマンド登録元のAppletページ、appletsは指定ページのいずれかを満たす。UIでは「グローバル」「AppDock全体」「AppDockのすべてのページ」「Gmailなどの提供元名だけ」「AppDockの指定したページ」の順。AppDock本体のコマンドには提供元の選択肢を出さない。ownerは保存したIDやコマンド名の接頭辞から推測せず、現在のコマンドカタログのextensionIdで判定する。提供元がない/不明/ページを持たない場合は一致しない。提供元の名前変更も現在の表示名を使う。applets以外のscopeはappletIdsを空にする。指定ページは1件以上必要。未知の条件を黙って無視せず拒否する。条件追加時はshared/keybindingsの型・検証・評価・UI候補・試験を一緒に追加する。連続キー（chord）とユーザー記述の式は対象外。
+scopeはglobal/desktop/app/pages/owner/applets/browser/exe。globalは常時、appはホスト管理Windowのフォーカス、pagesは本体またはAppletの表示中ページ、ownerはコマンド登録元のAppletページ、appletsは指定ページのいずれかを満たす。UIでは「Webブラウザ」「指定したexe」「グローバル」「デスクトップ」「AppDock全体」「AppDockのすべてのページ」「Gmailなどの提供元名だけ」「AppDockの指定したページ」の順。AppDock本体のコマンドには提供元の選択肢を出さない。ownerは保存したIDやコマンド名の接頭辞から推測せず、現在のコマンドカタログのextensionIdで判定する。提供元がない/不明/ページを持たない場合は一致しない。提供元の名前変更も現在の表示名を使う。applets以外のscopeはappletIdsを空にする。指定ページは1件以上必要。未知の条件を黙って無視せず拒否する。条件追加時はshared/keybindingsの型・検証・評価・UI候補・試験を一緒に追加する。連続キー（chord）とユーザー記述の式は対象外。
 
 ### ページ候補と識別
 
@@ -39,12 +43,14 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 
 ## 入力と実行
 
+- global/desktop/browser/exeはWindows側で捕捉する外部条件。InputHostが押下時の前面Window・exe名・Window class・デスクトップ判定を取得し、同じ条件評価器で入力を通すか止めるかを決める。利用可能かつ有効で条件に一致した行のblockOriginalInputをOR合成し、first/allやコマンド重複除去より前に適用する。不一致なら元の入力を通す。取得不能な事実が必要な条件には一致しない。
+- 同じ物理キーに対応する複数の表記をまとめて扱う。AppDock内では、外部条件が不一致でも同じキーのローカル行が共通計画へ届くよう、native所有者から入力を止めずに通知する。押下から解放までの通過/抑止は固定し、途中の設定変更でも対を崩さない。mainは生存revisionと取得対象を検証し、条件・保存順・first/all・重複除去を共通計画で確定する。
 - shared/keybindingsの共通計画で全候補を保存順に判定し、利用可能なコマンドに絞り、同一IDを重複除去する。設定がfirstなら先頭1件、allなら全件を選ぶ。先頭が実行中・失敗でもfirstで次のコマンドへ繰り下げない。
 - main/core/command-dispatcherは開始前に選択バッチ全体を予約する。キーとジェスチャーをまたぐ同一コマンド、コマンドによるキー送信の再入・同じキーの実行中再押下を抑止し、逐次awaitする。allの個別コマンド失敗は記録して続行し、取消・終了・再起動では打ち切る。
 - mainの本体IPCとpageHostShortcutが共通resolver/dispatcherを呼ぶ。PageHostはSurfaceの可視状態と実Windowフォーカスを参照し、別Windowと埋め込み表示で同じApplet IDを使う。Surface破棄時に登録を除去する。native Appletの独自Windowは含めない。
 - InputCaptureHotKeyBackendはジェスチャーと同じInputCaptureManagerへ有効なglobalキーを同期する。専用入力スレッドのWH_KEYBOARD_LLで物理押下を一度捕捉し、globalとその時点で一致するローカル行を保存順に評価する。入力の所有キーは実行前に本体と信頼済みpreloadへ同期し、通過入力のDOM／before-input-event経路で再実行や追加抑止を行わない。表示用statusを所有判定へ流用しない。
 - 修飾キーはCtrl／Alt／Shift／Winの順。Windows／MetaもWinへ正規化する。左右Winは同じ割り当て。Win+LとCtrl+Alt+Delete等の保護されたglobalキーは新規の画面／外部API割り当てを拒否する。既存の保存行は保持して入力適用エラーを示し、設定全体の読み込みを妨げない。ジェスチャーのキーにWinは追加しない。
-- 各行の任意boolean `blockOriginalInput`は省略時true。globalだけに適用し、同じ物理キーに有効で利用可能なglobal行が1つでもONなら、メインキーの押下・反復・解放を止める。全行OFFならWindows／前面アプリへ通す。無効・利用不可・ローカル行はブロック集計から除く。同一コマンドの重複を除く前に集計する。
+- 各行の任意boolean `blockOriginalInput`は省略時true。外部条件だけに適用し、同じ物理キーに有効で利用可能で条件に一致した外部行が1つでもONなら、メインキーの押下・反復・解放を止める。全行OFFならWindows／前面アプリへ通す。無効・利用不可・ローカル行はブロック集計から除く。同一コマンドの重複を除く前に集計する。
 - OS repeatはコマンドを再実行しない。キー解放まで押下時の通過／抑止を維持する。Win／Altを含む抑止時は自身の入力識別子付きダミー入力で単独修飾キー動作を防ぐ。自身のSendInputは捕捉しない。
 - 表示コマンドはrestore/show/focusの後、直近1.5秒の捕捉に対応する内部要求で前面化する。通知workerで必要な入力スレッドを一時接続し、finallyで解除する。前面Windowが押下元から変わった場合は中止する。プロセス起動は実際に起動したPIDと確認できた子孫PIDの可視Windowだけを同じ範囲で対象にし、起動受付の成功と前面化の成否を分ける。常時最前面化、合成Alt、ASFW_ANYは使わない。
 - ショートカット編集dialogを開くと誤実行防止のため全グローバル登録を一時解除し、statusesを空にする。dialogを閉じると保存済み設定で再登録する。正常時の「登録済み／未登録」を表示せず、有効なglobal行で利用可能なコマンドの登録エラーだけを示す。空のstatusesは記録/再同期の一時状態でもあるため、直近の非空statusを表示専用に保持し、同じコマンド/キーのエラーを再検査結果が届くまで表示する。エラーの絞り込みも同じ表示statusを使う。無効行/別scope/利用不能コマンドへ古いエラーを表示しない。backendの登録状態/入力判定や設定値へこの表示用キャッシュを戻さない。
