@@ -84,6 +84,8 @@ export function GesturesEditor({
     <>
       <GestureOptions gestures={gestures} change={change} />
       <SettingsSection
+        title="マウスジェスチャー割り当て"
+        hint="＋で割り当てを追加します。"
         className="gestures-editor command-shortcuts"
         {...settingAnchor('gestures', 'gestures')}
         aria-label="マウスジェスチャー設定"

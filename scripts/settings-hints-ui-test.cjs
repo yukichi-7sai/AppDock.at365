@@ -15,6 +15,7 @@ const source =
 const titlesOnly =
   process.argv.includes('--sections-only') || process.argv.includes('--titles-only');
 const refinementsOnly = process.argv.includes('--refinements-only');
+const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const updateRequests = [];
 const titleSamples = [];
 const layoutSamples = [];
@@ -322,6 +323,10 @@ async function checkSectionTitles() {
     initial.host.trayClickCommand = 'fixture.hints.run';
     initial.host.trayDoubleClickCommand = null;
     initial.tts.baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+    if (assignmentSpeechOnly) {
+      initial.tts.defaultVoice = 'fixture-voice';
+      initial.tts.defaultSpeed = 1.25;
+    }
     initial.extensions['fixture.hints'] = { enabled: true, settings: {} };
     const fixture = path.join(profile, 'extensions', 'hints');
     fs.mkdirSync(fixture, { recursive: true });
@@ -382,6 +387,24 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (assignmentSpeechOnly) {
+      assert.equal((await snapshot()).version, require('../package.json').version);
+      await require('./settings-assignment-speech-checks.cjs')({
+        host,
+        select,
+        hints,
+        snapshot,
+        until,
+        inspect,
+        inspector,
+        electronExpression,
+        profile,
+        checks,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (refinementsOnly) {
       assert.equal((await snapshot()).version, require('../package.json').version);
       await require('./settings-refinement-checks.cjs')({
@@ -925,6 +948,7 @@ async function checkSectionTitles() {
       success,
       titlesOnly,
       refinementsOnly,
+      assignmentSpeechOnly,
       titleSampleCount: titleSamples.length,
       checks,
       errors,

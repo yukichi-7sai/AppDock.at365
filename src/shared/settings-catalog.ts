@@ -160,12 +160,12 @@ const hostItems: Record<string, [string, string, string?][]> = {
   shortcuts: [
     [
       'keybindings',
-      'ショートカットキー',
-      'キー 割り当て コマンド 条件 実行順 入力の適用エラー Win ブロック',
+      'ショートカット割り当て',
+      'ショートカットキー 割り当て コマンド 条件 実行順 入力の適用エラー Win ブロック',
     ],
   ],
   gestures: [
-    ['gestures', 'マウスジェスチャー', '割り当て 条件 実行順'],
+    ['gestures', 'マウスジェスチャー割り当て', 'マウスジェスチャー 条件 実行順'],
     ['enabled', 'マウスジェスチャーを有効にする'],
     [
       'activateOnStart',

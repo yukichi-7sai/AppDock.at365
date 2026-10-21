@@ -50,6 +50,10 @@ settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタ
 
 入力欄がトグルだけの項目は、広い画面でも入力欄の左端にそろえる。「表示 → Shellの変更」の各領域の使用先と適用待ちは、その項目の`description`へ表示する。ヒントのON/OFFに関わらず現在の使用先を表示し、未適用の理由と再試行操作は従来どおり入力側へ残す。
 
+全体設定の割り当て一覧は「ショートカット割り当て」「マウスジェスチャー割り当て」を共通の`SettingsSection`で表示し、hintは「＋で割り当てを追加します。」とする。本文とヘッダーの余白は共通規則を使い、ジェスチャーだけの上余白を追加しない。Applet詳細の共用一覧内へ見出しを重ねない。
+
+通知の「読み上げ」カードの設定項目名は「TTS設定」とする。声・速度の現在値は各項目の`description`へ表示し、共通設定/個別設定とヒントON/OFFによらず有効値を示す。「MCP連携設定」のdescriptionは「MCP Eventを使用するには、MCPサーバーの設定と連携が必要です。」とする。
+
 本体の設定ページは`SettingsPageLayout`（`src/renderer/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。ページ側で同じ見出しを重ねない。フォーム/JSONの切替と共通の操作欄を上部に固定し、間隔を置いた本文だけをスクロールする。Applet詳細でも同じ本文部品を使い、ショートカット一覧の内部にタイトル・説明を追加しない。
 
 本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ）、`SettingsField`（項目名・説明と入力）、`SettingsChoice`（選択カード）、`SettingsFeedback`（処理・結果・エラー）を再利用する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。

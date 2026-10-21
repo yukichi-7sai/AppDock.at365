@@ -12,6 +12,7 @@ import {
 } from '../../shared/keybindings';
 import { ShortcutCommandList } from '../settings-ui/ShortcutCommandList';
 import { ShortcutOrderDialog } from '../settings-ui/ShortcutOrderDialog';
+import { SettingsSection } from '../settings-ui/SettingsSections';
 
 /** Settings adds catalog-wide discovery around the same command list used by Applet details. */
 export function ShortcutsEditor({
@@ -88,7 +89,9 @@ export function ShortcutsEditor({
     );
   });
   return (
-    <div
+    <SettingsSection
+      title="ショートカット割り当て"
+      hint="＋で割り当てを追加します。"
       className="shortcuts-editor command-shortcuts"
       {...settingAnchor('shortcuts', 'keybindings')}
     >
@@ -132,6 +135,6 @@ export function ShortcutsEditor({
           onClose={() => setOrderOpen(false)}
         />
       )}
-    </div>
+    </SettingsSection>
   );
 }

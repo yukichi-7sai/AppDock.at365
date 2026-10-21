@@ -137,7 +137,7 @@ export function NotificationSettings({
         collapsible
       >
         <SettingsField
-          title="読み上げ設定"
+          title="TTS設定"
           description="通知のタイトルと本文は共通設定のTTSサーバーへ送信されます。接続先・モデル・声を設定してください。"
         >
           <div className="settings-actions">
@@ -146,6 +146,7 @@ export function NotificationSettings({
         </SettingsField>
         <SettingsField
           title="声"
+          description={`現在の声: ${effective.voice || '未設定'}`}
           hint="共通の声を使うか、通知だけ別の声に変更できます。"
           {...settingAnchor('notifications', 'speech.voice')}
         >
@@ -161,7 +162,7 @@ export function NotificationSettings({
             />
             <span>共通設定を使う</span>
           </div>
-          {speech.voice !== undefined || voiceOverride ? (
+          {(speech.voice !== undefined || voiceOverride) && (
             <>
               <SettingsCombobox
                 label="通知用のボイスID"
@@ -183,12 +184,11 @@ export function NotificationSettings({
                 </button>
               </div>
             </>
-          ) : (
-            <p>現在の声: {effective.voice || '未設定'}</p>
           )}
         </SettingsField>
         <SettingsField
           title="速度"
+          description={`現在の速度: ${effective.speed}`}
           hint="1倍が標準速度です。"
           {...settingAnchor('notifications', 'speech.speed')}
         >
@@ -200,7 +200,7 @@ export function NotificationSettings({
             />
             <span>共通設定を使う</span>
           </div>
-          {speech.speed !== undefined ? (
+          {speech.speed !== undefined && (
             <SettingsInput
               type="number"
               min={0.25}
@@ -212,8 +212,6 @@ export function NotificationSettings({
                 changeSpeech('speed', e.target.value.trim() ? Number(e.target.value) : NaN)
               }
             />
-          ) : (
-            <p>現在の速度: {effective.speed}</p>
           )}
         </SettingsField>
         {(!auxiliary?.configured || !effective.voice) && (
@@ -259,7 +257,10 @@ export function NotificationSettings({
         hint="ChatGPT Work/Dotsのイベントトリガーとして使用するための機能です。"
         collapsible
       >
-        <SettingsField title="MCP連携設定" description="MCP連携を有効化する必要があります。">
+        <SettingsField
+          title="MCP連携設定"
+          description="MCP Eventを使用するには、MCPサーバーの設定と連携が必要です。"
+        >
           <div className="settings-actions">
             <button onClick={() => select('codex')}>設定を開く</button>
           </div>

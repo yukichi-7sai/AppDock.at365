@@ -15,9 +15,6 @@
   min-width: 0;
   background: var(--panel);
 }
-.gestures-editor > .settings-section-content {
-  padding-top: 20px;
-}
 .gesture-settings-section .gesture-options-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
 }
