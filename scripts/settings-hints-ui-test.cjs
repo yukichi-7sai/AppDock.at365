@@ -360,6 +360,13 @@ async function checkSectionTitles() {
       );
       initial.gestures.bindings = [
         {
+          id: 'nav.other.gesture',
+          command: 'fixture.other.run',
+          gesture: 'move-left',
+          enabled: false,
+          when: { scope: 'app', appletIds: [], processes: [] },
+        },
+        {
           id: 'nav.custom2.gesture',
           command: 'appdock.custom.00000000-0000-0000-0000-000000000002',
           gesture: 'move-up',
@@ -464,6 +471,29 @@ async function checkSectionTitles() {
       path.join(fixture, 'worker.cjs'),
       "exports.activate=async c=>{c.commands.register('fixture.hints.run','Hint action',()=>{});};",
     );
+    if (commandNavigationOnly) {
+      for (const [id, commands] of [
+        ['fixture.other', [{ id: 'fixture.other.run', title: 'Other action' }]],
+        ['fixture.hints.extra', []],
+      ]) {
+        const folder = path.join(profile, 'extensions', id);
+        fs.mkdirSync(folder, { recursive: true });
+        fs.writeFileSync(
+          path.join(folder, 'extension.json'),
+          JSON.stringify({
+            apiVersion: 1,
+            id,
+            name: id,
+            version: '1.0.0',
+            runtime: 'node',
+            entry: 'worker.cjs',
+            commands,
+          }),
+        );
+        fs.writeFileSync(path.join(folder, 'worker.cjs'), 'exports.activate=()=>{};');
+        initial.extensions[id] = { enabled: false, settings: {} };
+      }
+    }
     if (refinementsOnly) {
       for (const id of ['fixture.hints', 'fixture.other']) {
         const folder = path.join(profile, 'extensions', id === 'fixture.hints' ? 'hints' : 'other');

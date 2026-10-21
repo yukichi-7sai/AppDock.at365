@@ -27,14 +27,12 @@ export function useCommandSettingsTarget() {
 }
 export function CommandTargetFilter() {
   const navigation = useContext(CommandSettingsNavigation);
-  const root = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLParagraphElement>(null);
   useLayoutEffect(() => {
     if (navigation?.target) root.current?.scrollIntoView({ block: 'nearest' });
   }, [navigation?.target?.request]);
   return navigation?.target ? (
-    <div ref={root}>
-      <CommandProviderFilter title={navigation.target.title} onClear={navigation.clear} />
-    </div>
+    <CommandProviderFilter ref={root} title={navigation.target.title} onClear={navigation.clear} />
   ) : null;
 }
 export function CommandSettingsLinks({

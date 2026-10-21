@@ -10,6 +10,24 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     host
       .locator('.custom-commands-settings tbody tr')
       .filter({ has: host.getByText(title, { exact: true }) });
+  const filterPositions = [];
+  const checkFilterPlacement = async (kind) => {
+    const position = await host.locator('.command-shortcuts').evaluate((section) => {
+      const filter = section.querySelector('.command-provider-filter');
+      const tools = section.querySelector('.command-shortcut-tools');
+      return {
+        count: section.querySelectorAll('.command-provider-filter').length,
+        beforeSearch: !!(filter.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING),
+        gap: tools.getBoundingClientRect().top - filter.getBoundingClientRect().bottom,
+        left: filter.getBoundingClientRect().left - tools.getBoundingClientRect().left,
+      };
+    });
+    assert.equal(position.count, 1);
+    assert(position.beforeSearch && position.gap >= 0);
+    assert(Math.abs(position.left) < 1);
+    filterPositions.push({ kind, ...position });
+    return position;
+  };
   const move = async (from, title, page) => {
     await from.getByRole('button', { name: `${title}の${page}を開く`, exact: true }).click();
     await host.getByRole('heading', { level: 1, name: page, exact: true }).waitFor();
@@ -18,6 +36,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         (await host.locator('.command-provider-filter').filter({ hasText: title }).count()) === 1,
       'command target filter',
     );
+    if (page !== 'カスタムコマンド') await checkFilterPlacement('command-' + page);
   };
   const samples = [];
   const spacing = [];
@@ -32,6 +51,8 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
             custom: customIds.includes(cell.closest('tr').dataset.shortcutCommand),
             gap: cell.getBoundingClientRect().right - buttons.at(-1).getBoundingClientRect().right,
             padding: parseFloat(getComputedStyle(cell).paddingRight),
+            leftGap: buttons[0].getBoundingClientRect().left - cell.getBoundingClientRect().left,
+            leftPadding: parseFloat(getComputedStyle(cell).paddingLeft),
             labels: buttons.map((button) => button.getAttribute('aria-label')),
           };
         }),
@@ -42,8 +63,9 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       assert.equal(item.buttons, page === 'カスタムコマンド' || item.custom ? 2 : 1);
       assert(item.labels.every((label) => !label.endsWith(`の${page}を開く`)));
       assert(item.gap >= item.padding - 0.5 && item.gap > 0, JSON.stringify(item));
-      if (page !== 'カスタムコマンド')
+      if (page === 'マウスジェスチャー')
         assert(Math.abs(item.gap - item.padding) < 1, JSON.stringify(item));
+      else assert(Math.abs(item.leftGap - item.leftPadding) < 1, JSON.stringify(item));
     }
     spacing.push({ page, theme, width, measurements });
   };
@@ -116,6 +138,17 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         '移動',
       ]);
       const applet = host.locator('[data-applet-id="fixture.hints"]');
+      await checkAssigned(applet, 'Hint fixture', 'ショートカット', true);
+      await checkAssigned(applet, 'Hint fixture', 'マウスジェスチャー', false);
+      const otherApplet = host.locator('[data-applet-id="fixture.other"]');
+      await checkAssigned(otherApplet, 'fixture.other', 'ショートカット', false);
+      await checkAssigned(otherApplet, 'fixture.other', 'マウスジェスチャー', true);
+      const emptyApplet = host.locator('[data-applet-id="fixture.hints.extra"]');
+      await checkAssigned(emptyApplet, 'fixture.hints.extra', 'ショートカット', false);
+      await checkAssigned(emptyApplet, 'fixture.hints.extra', 'マウスジェスチャー', false);
+      await host.screenshot({
+        path: path.join(profile, `applet-assignments-${theme}-${width}.png`),
+      });
       assert.equal(
         await applet.locator('td').last().locator('.applet-management-links').count(),
         1,
@@ -189,6 +222,21 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       await checkAssigned(row('missing.command'), 'missing.command', 'ショートカット', true);
       await select('カスタムコマンド');
       await checkLinks('カスタムコマンド', theme, width);
+      const actionAlignment = await host
+        .locator('.custom-commands-settings .settings-list-actions')
+        .evaluateAll((elements) =>
+          elements.map((e) => {
+            const cell = e.closest('td');
+            return {
+              gap:
+                e.querySelector('button').getBoundingClientRect().left -
+                cell.getBoundingClientRect().left,
+              padding: parseFloat(getComputedStyle(cell).paddingLeft),
+            };
+          }),
+        );
+      assert(actionAlignment.length > 0);
+      assert(actionAlignment.every(({ gap, padding }) => Math.abs(gap - padding) < 1));
       await checkAssigned(customRow('Custom 1'), 'Custom 1', 'ショートカット', true);
       await checkAssigned(customRow('Custom 1'), 'Custom 1', 'マウスジェスチャー', false);
       await checkAssigned(customRow('Custom 2'), 'Custom 2', 'ショートカット', false);
@@ -291,7 +339,77 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
   checks.push(
     'assignment-colors-live-add-remove-duplicates-disabled-missing-exact-id-and-alice-palette',
   );
+  await select('Applet管理');
+  const applet = host.locator('[data-applet-id="fixture.hints"]');
+  await checkAssigned(applet, 'Hint fixture', 'ショートカット', true);
+  await host.evaluate(async () => {
+    const s = await window.dock.snapshot();
+    const next = structuredClone(s.settings.value);
+    next.extensions['fixture.hints'].enabled = false;
+    next.gestures.bindings.push({
+      id: 'nav.owner.gesture',
+      command: 'fixture.hints.run',
+      gesture: 'move-left',
+      enabled: false,
+      when: { scope: 'app', appletIds: [], processes: [] },
+    });
+    await window.dock.saveSettings(next, s.settings.revision);
+  });
+  await checkAssigned(applet, 'Hint fixture', 'マウスジェスチャー', true);
+  await checkAssigned(applet, 'Hint fixture', 'ショートカット', true);
+  await updateAssignments({ remove: ['nav.owner'] });
+  await checkAssigned(applet, 'Hint fixture', 'ショートカット', true);
+  await updateAssignments({ remove: ['nav.global'], removeGestures: 'fixture.hints.run' });
+  await checkAssigned(applet, 'Hint fixture', 'ショートカット', false);
+  await checkAssigned(applet, 'Hint fixture', 'マウスジェスチャー', false);
+  const otherApplet = host.locator('[data-applet-id="fixture.other"]');
+  await checkAssigned(otherApplet, 'fixture.other', 'マウスジェスチャー', true);
+  await otherApplet
+    .getByRole('button', { name: 'fixture.otherのマウスジェスチャーを開く', exact: true })
+    .click();
+  await host.getByRole('heading', { level: 1, name: 'マウスジェスチャー', exact: true }).waitFor();
+  await until(
+    async () => (await host.locator('[data-shortcut-command="fixture.other.run"]').count()) === 1,
+    'owner-filtered gesture',
+  );
+  assert.equal(await host.locator('[data-shortcut-command]').count(), 1);
+  const providerPosition = await checkFilterPlacement('applet-マウスジェスチャー');
+  assert(
+    filterPositions
+      .filter((p) => p.kind === 'command-マウスジェスチャー')
+      .every((p) => Math.abs(p.gap - providerPosition.gap) < 1),
+  );
+  await host.getByRole('button', { name: 'fixture.otherの絞り込みを解除', exact: true }).click();
+  await until(
+    async () =>
+      (await host.locator('.command-provider-filter').count()) === 0 &&
+      (await host.locator('[data-shortcut-command]').count()) > 1,
+    'cleared owner filter',
+  );
+  await select('Applet管理');
+  await otherApplet
+    .getByRole('button', { name: 'fixture.otherのショートカットを開く', exact: true })
+    .click();
+  await host.getByRole('heading', { level: 1, name: 'ショートカット', exact: true }).waitFor();
+  await until(
+    async () => (await host.locator('.command-provider-filter').count()) === 1,
+    'shortcut owner filter',
+  );
+  const shortcutPosition = await checkFilterPlacement('applet-ショートカット');
+  assert(
+    filterPositions
+      .filter((p) => p.kind === 'command-ショートカット')
+      .every((p) => Math.abs(p.gap - shortcutPosition.gap) < 1),
+  );
+  assert.equal((await snapshot()).settings.value.extensions['fixture.other'].enabled, false);
+  checks.push(
+    'applet-owner-exact-aggregation-stopped-disabled-live-duplicates-filter-without-activation',
+  );
   fs.writeFileSync(path.join(profile, 'command-navigation.json'), JSON.stringify(samples, null, 2));
+  fs.writeFileSync(
+    path.join(profile, 'filter-positions.json'),
+    JSON.stringify(filterPositions, null, 2),
+  );
   fs.writeFileSync(path.join(profile, 'navigation-spacing.json'), JSON.stringify(spacing, null, 2));
   fs.writeFileSync(
     path.join(profile, 'assignment-colors.json'),

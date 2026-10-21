@@ -2859,6 +2859,11 @@ summary {
   justify-content: flex-end;
   gap: 6px;
 }
+.shortcuts-editor .command-settings-links,
+.custom-commands-settings .command-settings-links,
+.custom-commands-settings .settings-list-actions {
+  justify-content: flex-start;
+}
 .shortcut-command-list:has(.command-settings-heading) {
   overflow-x: auto;
 }

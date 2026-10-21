@@ -1312,6 +1312,21 @@ function settingsCommandAssignments() {
     ],
   };
 }
+function settingsAppletAssignments() {
+  const commands = settingsUiCommands();
+  const assignments = settingsCommandAssignments();
+  const owners = (ids: string[]) => {
+    const assigned = new Set(ids);
+    return [
+      ...new Set(
+        commands.flatMap((command) =>
+          command.extensionId && assigned.has(command.id) ? [command.extensionId] : [],
+        ),
+      ),
+    ];
+  };
+  return { shortcuts: owners(assignments.shortcuts), gestures: owners(assignments.gestures) };
+}
 function ribbonUiCommands() {
   const applets = allApplets();
   return settingsUiCommands().map((command) => ({
@@ -1746,6 +1761,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       applets: managedApplets(applets, settings.value.appletOrder).map(summary),
       updates: host.updates,
       appletManagement: {
+        assignments: settingsAppletAssignments(),
         packagesAvailable: updater.packagesAvailable,
         busy: updater.state.busy,
         discoveryIssueCount: manager.discoveryIssueCount,

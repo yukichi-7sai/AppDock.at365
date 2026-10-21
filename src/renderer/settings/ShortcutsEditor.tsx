@@ -112,10 +112,13 @@ export function ShortcutsEditor({
         onOrder={() => setOrderOpen(true)}
         showRegistrationErrors
       >
-        {provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />}
+        {target ? (
+          <CommandTargetFilter />
+        ) : (
+          provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />
+        )}
       </CommandBindingToolbar>
       {error && <p role="alert">{error}</p>}
-      <CommandTargetFilter />
       {rows.length >= 2000 && (
         <p role="status">
           割り当ては2000件までです。追加するには既存の割り当てを削除してください。

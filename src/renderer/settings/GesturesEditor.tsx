@@ -106,9 +106,12 @@ export function GesturesEditor({
           setStatusFilter={setStatusFilter}
           onOrder={() => setOrderOpen(true)}
         >
-          {provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />}
+          {target ? (
+            <CommandTargetFilter />
+          ) : (
+            provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />
+          )}
         </CommandBindingToolbar>
-        <CommandTargetFilter />
         {!gestures.enabled && (
           <p className="settings-help">
             現在、ジェスチャーは無効です。割り当てはそのまま編集できます。

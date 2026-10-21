@@ -399,18 +399,27 @@ export function AppletManagementSettings({
                           ['gestures', 'マウスジェスチャー', 'mouse'],
                           ['logs', 'ログ', 'logs'],
                         ] satisfies [string, string, IconName][]
-                      ).map(([id, title, icon]) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className="settings-list-icon"
-                          title={title}
-                          aria-label={`${a.displayName}の${title}を開く`}
-                          onClick={() => void move(a.id, id)}
-                        >
-                          <Icon name={icon} />
-                        </button>
-                      ))}
+                      ).map(([id, title, icon]) => {
+                        const assigned =
+                          (id === 'shortcuts' || id === 'gestures') &&
+                          !!management?.assignments[id].includes(a.id);
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            className={`settings-list-icon${assigned ? ' accent-action' : ''}`}
+                            title={`${title}${assigned ? '（割り当てあり）' : ''}`}
+                            aria-label={`${a.displayName}の${title}を開く`}
+                            aria-description={
+                              assigned ? 'このAppletのコマンドに割り当てがあります。' : undefined
+                            }
+                            data-assigned={assigned}
+                            onClick={() => void move(a.id, id)}
+                          >
+                            <Icon name={icon} />
+                          </button>
+                        );
+                      })}
                     </div>
                   </td>
                 </tr>

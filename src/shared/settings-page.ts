@@ -46,6 +46,7 @@ export interface SettingsPageAuxiliary {
   commandAssignments?: { shortcuts: string[]; gestures: string[] };
   provider?: { id: string; title: string; request: number };
   appletManagement?: {
+    assignments: { shortcuts: string[]; gestures: string[] };
     packagesAvailable: boolean;
     mutableIds: string[];
     busy: boolean;

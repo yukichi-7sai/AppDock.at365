@@ -1,8 +1,17 @@
 import { Icon } from '../../shared/ui-icons';
+import type { Ref } from 'react';
 
-export function CommandProviderFilter({ title, onClear }: { title: string; onClear?(): void }) {
+export function CommandProviderFilter({
+  title,
+  onClear,
+  ref,
+}: {
+  title: string;
+  onClear?(): void;
+  ref?: Ref<HTMLParagraphElement>;
+}) {
   return (
-    <p className="command-provider-filter">
+    <p className="command-provider-filter" ref={ref}>
       <span>
         対象: <strong>{title}</strong>
       </span>
