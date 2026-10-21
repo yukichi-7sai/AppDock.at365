@@ -335,7 +335,7 @@ test('separator titles survive movement and serialization, and are cleared indep
   layout = edit(layout, { kind: 'moveItem', id: item.id, parentId: addGroup.id, beforeId: null });
   assert.equal(layout.separatorTitles[item.id], 'Work');
   layout = edit(layout, { kind: 'updateSeparator', id: item.id, changes: { title: '' } });
-  assert.equal(ribbonPresentation(layout, item).title, 'セパレーター 1');
+  assert.equal(ribbonPresentation(layout, item).title, '区切り線');
   layout = edit(layout, { kind: 'updateSeparator', id: item.id, changes: { title: 'Named' } });
   layout = edit(layout, { kind: 'removeSeparator', id: item.id });
   assert.deepEqual(layout.separatorTitles, {});

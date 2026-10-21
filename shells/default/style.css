@@ -157,6 +157,19 @@ button:disabled {
   width: 2px;
   height: 6px;
   background: var(--ribbon-group-color, transparent);
+  z-index: 1;
+  pointer-events: none;
+}
+.ribbon-children:after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ribbon-group-color, transparent);
+  z-index: 1;
+  pointer-events: none;
 }
 .ribbon-disclosure {
   position: absolute;

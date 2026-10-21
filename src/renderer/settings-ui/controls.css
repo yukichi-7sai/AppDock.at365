@@ -58,6 +58,11 @@
 .tray-click-controls button {
   overflow-wrap: anywhere;
   min-width: 0;
+  width: 100%;
+}
+.tray-click-controls {
+  display: grid;
+  width: 100%;
 }
 .tray-workspace {
   display: grid;
@@ -78,6 +83,14 @@
   gap: 4px;
   border-radius: 8px;
   margin: 2px 0;
+  flex-wrap: wrap;
+  padding: 8px;
+  border: 1px solid var(--border);
+}
+.tray-row-controls {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
 }
 .tray-editor-row.selected {
   background: var(--accent-soft);
@@ -2045,6 +2058,10 @@ summary {
   display: grid;
   gap: 8px;
 }
+.ribbon-command-field {
+  display: grid;
+  gap: 8px;
+}
 .ribbon-edit-fields input:not([type='checkbox']),
 .ribbon-edit-fields select {
   width: 100%;
@@ -2100,7 +2117,7 @@ summary {
 }
 .ribbon-group-heading {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
@@ -3629,6 +3646,21 @@ summary {
 
 .primary:hover:not(:disabled) {
   background: var(--accent-hover);
+  color: var(--accent-text);
+  filter: none;
+}
+/* Accent actions always switch the surface and foreground together. */
+button:is(.accent-action, .update-primary, .applet-shortcut-add) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  filter: none;
+}
+button:is(.accent-action, .update-primary, .applet-shortcut-add):hover:enabled {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-text);
+  filter: none;
 }
 .toggle[aria-checked='true'] span {
   background: var(--accent-text);

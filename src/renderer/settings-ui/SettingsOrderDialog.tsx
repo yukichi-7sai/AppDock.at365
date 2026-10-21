@@ -134,6 +134,7 @@ export function SettingsOrderDialog({
               <button
                 type="button"
                 aria-label={`${item.title}を上へ`}
+                className="accent-action"
                 disabled={pending || !index}
                 onClick={() => move(item.id, rows[index - 1].id)}
               >
@@ -142,6 +143,7 @@ export function SettingsOrderDialog({
               <button
                 type="button"
                 aria-label={`${item.title}を下へ`}
+                className="accent-action"
                 disabled={pending || index === rows.length - 1}
                 onClick={() => move(item.id, rows[index + 1].id)}
               >

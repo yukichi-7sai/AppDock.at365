@@ -244,6 +244,7 @@ export function RibbonSettings({
             </select>
             <button
               aria-label={`${item.title}を上へ`}
+              className="settings-list-icon accent-action"
               disabled={pending || index === 0}
               onClick={() => move(item.id, siblings[index - 1].id)}
             >
@@ -251,6 +252,7 @@ export function RibbonSettings({
             </button>
             <button
               aria-label={`${item.title}を下へ`}
+              className="settings-list-icon accent-action"
               disabled={pending || index === siblings.length - 1}
               onClick={() => move(item.id, siblings[index + 1].id)}
             >
@@ -428,7 +430,7 @@ export function RibbonSettings({
                 <h4>{title}</h4>
                 <div className="ribbon-setting-actions">
                   <button
-                    className="secondary"
+                    className="secondary accent-action"
                     disabled={pending || (layout.buttons?.length ?? 0) >= 100}
                     onClick={() =>
                       setButtonDialog({
@@ -445,17 +447,17 @@ export function RibbonSettings({
                       })
                     }
                   >
-                    {title}にコマンドボタンを追加
+                    ＋ コマンド
                   </button>
                   <button
-                    className="secondary"
+                    className="secondary accent-action"
                     disabled={pending || groups.length >= 50}
                     onClick={() => open(undefined, position)}
                   >
-                    {title}にグループを追加
+                    ＋ グループ
                   </button>
                   <button
-                    className="secondary"
+                    className="secondary accent-action"
                     disabled={pending || layout.separators.length >= 50}
                     onClick={() =>
                       run({
@@ -465,7 +467,7 @@ export function RibbonSettings({
                       })
                     }
                   >
-                    {title}にセパレーターを追加
+                    ＋ 区切り線
                   </button>
                 </div>
               </div>
@@ -728,8 +730,8 @@ export function RibbonSettings({
           }}
         >
           <div className="ribbon-edit-fields">
-            <div>
-              <strong>コマンド</strong>
+            <div className="ribbon-command-field">
+              <span>コマンド</span>
               <button
                 type="button"
                 className="secondary"

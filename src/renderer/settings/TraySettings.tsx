@@ -16,6 +16,7 @@ import {
   type ResolvedTrayItem,
 } from '../../shared/tray-menu';
 import { CommandPicker } from '../settings-ui/CommandPicker';
+import { ListIcon } from '../settings-ui/SettingsListTable';
 
 export function TraySettings({
   settings,
@@ -94,6 +95,18 @@ export function TraySettings({
       current.list.splice(index, 1);
       current.list.splice(target, 0, current.item);
     });
+  const remove = (id: string) => {
+    modify((next) => {
+      const current = find(next, id);
+      if (!current) return;
+      current.list.splice(
+        current.list.indexOf(current.item),
+        1,
+        ...(current.item.type === 'group' ? current.item.children : []),
+      );
+    });
+    if (selected === id) select(null);
+  };
   const place = (parent: string) =>
     modify((next) => {
       const current = find(next, selected);
@@ -120,7 +133,7 @@ export function TraySettings({
     drag(null);
   };
   const rows = (list: TrayMenuItem[], nested = false) =>
-    list.map((item) => (
+    list.map((item, index) => (
       <div key={item.id}>
         <div
           className={`tray-editor-row ${nested ? 'tray-child' : ''} ${selected === item.id ? 'selected' : ''}`}
@@ -171,6 +184,37 @@ export function TraySettings({
             )}
             {item.type === 'group' && <small>グループ · {item.children.length}項目</small>}
           </button>
+          <div className="tray-row-controls">
+            <button
+              type="button"
+              className="settings-list-icon accent-action"
+              aria-label={`${title(item)}を上へ`}
+              title="上へ移動"
+              disabled={index === 0}
+              onClick={() => move(-1, item.id)}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              className="settings-list-icon accent-action"
+              aria-label={`${title(item)}を下へ`}
+              title="下へ移動"
+              disabled={index === list.length - 1}
+              onClick={() => move(1, item.id)}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              className="settings-list-icon settings-list-delete"
+              aria-label={`${title(item)}${item.type === 'group' ? 'のグループを解除' : 'をメニューから外す'}`}
+              title={item.type === 'group' ? 'グループを解除' : 'メニューから外す'}
+              onClick={() => remove(item.id)}
+            >
+              <ListIcon kind="delete" />
+            </button>
+          </div>
         </div>
         {item.type === 'group' && rows(item.children, true)}
       </div>
@@ -194,10 +238,7 @@ export function TraySettings({
     id ? (commands.find((c) => c.id === id)?.title ?? id) : '未設定';
   return (
     <section className="settings-sections tray-settings" aria-label="タスクトレイ設定">
-      <SettingsSection
-        title="クリック時の動作"
-        hint="トレイアイコンを左クリックしたときの操作を設定します。"
-      >
+      <SettingsSection title="動作設定">
         {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
           <SettingsField
             key={key}
@@ -251,13 +292,13 @@ export function TraySettings({
         {...settingAnchor('tray', 'trayMenu')}
       >
         <div className="tray-toolbar">
-          <button className="secondary" onClick={() => setPicker('add')}>
+          <button className="secondary accent-action" onClick={() => setPicker('add')}>
             ＋ コマンド
           </button>
-          <button className="secondary" onClick={() => add('group')}>
+          <button className="secondary accent-action" onClick={() => add('group')}>
             ＋ グループ
           </button>
-          <button className="secondary" onClick={() => add('separator')}>
+          <button className="secondary accent-action" onClick={() => add('separator')}>
             ＋ 区切り線
           </button>
         </div>
@@ -276,40 +317,6 @@ export function TraySettings({
             </div>
             {active && (
               <div className="tray-item-editor" aria-label="選択したメニュー項目">
-                <div className="tray-toolbar">
-                  <button
-                    className="secondary"
-                    aria-label="メニュー項目を上へ移動"
-                    disabled={active.list.indexOf(active.item) === 0}
-                    onClick={() => move(-1)}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    className="secondary"
-                    aria-label="メニュー項目を下へ移動"
-                    disabled={active.list.indexOf(active.item) === active.list.length - 1}
-                    onClick={() => move(1)}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    className="secondary"
-                    onClick={() => {
-                      modify((next) => {
-                        const row = find(next, selected)!;
-                        row.list.splice(
-                          row.list.indexOf(row.item),
-                          1,
-                          ...(row.item.type === 'group' ? row.item.children : []),
-                        );
-                      });
-                      select(null);
-                    }}
-                  >
-                    {active.item.type === 'group' ? 'グループを解除' : 'メニューから外す'}
-                  </button>
-                </div>
                 {active.item.type === 'group' ? (
                   <label>
                     グループ名

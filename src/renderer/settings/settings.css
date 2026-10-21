@@ -65,6 +65,12 @@
   font-size: 13px;
   line-height: 1.7;
 }
+.settings-surface .settings-body.settings-panel-flat {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
 .settings-page-heading {
   display: grid;
   gap: 8px;
@@ -487,11 +493,6 @@
 }
 .update-last-checked {
   margin-top: 12px;
-}
-.about-page button.update-primary {
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }
 .about-page .applet-update-source {
   margin-top: 0;

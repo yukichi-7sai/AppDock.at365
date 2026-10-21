@@ -150,7 +150,10 @@ export function SettingsPageLayout({
           </button>
         </div>
       )}
-      <div className={`settings-body settings-panel settings-panel-${mode}`} key={page.id + mode}>
+      <div
+        className={`settings-body settings-panel settings-panel-${mode}${page.id === 'shortcuts' && mode === 'form' ? ' settings-panel-flat' : ''}`}
+        key={page.id + mode}
+      >
         {children}
       </div>
       {announcement}

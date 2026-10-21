@@ -102,13 +102,30 @@ async function launch() {
       .locator('.settings-categories')
       .getByRole('button', { name: 'リボン', exact: true })
       .click();
-    await button('上寄せにセパレーターを追加').click();
-    await button('下寄せにセパレーターを追加').click();
+    await dock
+      .getByRole('region', { name: '上寄せのリボン設定', exact: true })
+      .getByRole('button', { name: '＋ 区切り線', exact: true })
+      .click();
+    await dock
+      .getByRole('region', { name: '下寄せのリボン設定', exact: true })
+      .getByRole('button', { name: '＋ 区切り線', exact: true })
+      .click();
+    const separatorIds = (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon
+      .separators;
+    const separatorRow = (id) => dock.locator(`[data-ribbon-setting="${id}"]`);
     await dock.getByLabel('Gmailの配置', { exact: true }).selectOption('bottom');
-    await dock.getByLabel('セパレーター 1の配置', { exact: true }).selectOption('bottom');
-    await dock.getByLabel('セパレーター 1の配置', { exact: true }).selectOption('top');
-    await button('セパレーター 1を上へ').click();
-    await button('セパレーター 2を削除').click();
+    await separatorRow(separatorIds[0])
+      .getByLabel('区切り線の配置', { exact: true })
+      .selectOption('bottom');
+    await separatorRow(separatorIds[0])
+      .getByLabel('区切り線の配置', { exact: true })
+      .selectOption('top');
+    await separatorRow(separatorIds[0])
+      .getByRole('button', { name: '区切り線を上へ', exact: true })
+      .click();
+    await separatorRow(separatorIds[1])
+      .getByRole('button', { name: '区切り線を削除', exact: true })
+      .click();
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()
         .find((window) => window.webContents.getURL() === 'appdock://host/index.html')
@@ -230,7 +247,9 @@ async function launch() {
       .locator('.settings-categories')
       .getByRole('button', { name: 'リボン', exact: true })
       .click();
-    await button('セパレーター 1を削除').click();
+    await separatorRow(separatorIds[0])
+      .getByRole('button', { name: '区切り線を削除', exact: true })
+      .click();
     await save();
     const deleted = (await dock.evaluate(() => window.dock.snapshot())).settings.value.ribbon;
     assert.equal(deleted.separators.length, 0);

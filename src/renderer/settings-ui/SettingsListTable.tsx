@@ -111,7 +111,7 @@ export function SettingsListTable({
         <div>
           <button
             type="button"
-            className="settings-list-icon"
+            className="settings-list-icon accent-action"
             title="並べ替え"
             aria-label={`${definition.title}を並べ替え`}
             disabled={busy || entries.length < 2}

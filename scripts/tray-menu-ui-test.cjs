@@ -188,7 +188,7 @@ const checks = [];
     await page.getByLabel('メニュー項目の配置先').selectOption(groupId);
     await commandRow('b.run').locator('.tray-select').click();
     await page.getByLabel('メニュー項目の配置先').selectOption(groupId);
-    await button('メニュー項目を上へ移動').click();
+    await commandRow('b.run').getByTitle('上へ移動', { exact: true }).click();
     await select(groupId);
     await button('＋ 区切り線').click();
     await page.getByLabel('メニュー項目の配置先').selectOption('');
@@ -231,6 +231,7 @@ const checks = [];
     );
     await select(groupId);
     await page.getByLabel('グループ名', { exact: true }).fill('');
+    await page.getByLabel('グループ名', { exact: true }).press('Tab');
     await settleSettings(page);
     await page.getByRole('alert').first().waitFor();
     await page.getByLabel('グループ名', { exact: true }).fill('日常 & 操作');
@@ -325,7 +326,10 @@ const checks = [];
     await button('未設定に戻す').click();
     await save();
     await select(groupId);
-    await button('グループを解除').click();
+    await page
+      .locator(`[data-tray-item="${groupId}"]`)
+      .getByTitle('グループを解除', { exact: true })
+      .click();
     assert.equal(await commandRow('a.run').count(), 1);
     assert.equal(await commandRow('b.run').count(), 1);
     // Ungrouping is saved immediately; no shared discard state exists.
@@ -399,9 +403,10 @@ const checks = [];
     // Clear using the editor, including the former fixed pause item; it stays cleared across restart.
     while (await page.locator('[data-tray-item]').count()) {
       await page.locator('[data-tray-item] .tray-select').first().click();
-      const dissolve = button('グループを解除');
+      const selectedRow = page.locator('.tray-editor-row.selected');
+      const dissolve = selectedRow.getByTitle('グループを解除', { exact: true });
       if (await dissolve.count()) await dissolve.click();
-      else await button('メニューから外す').click();
+      else await selectedRow.getByTitle('メニューから外す', { exact: true }).click();
     }
     await save();
     assert.deepEqual((await snapshot()).settings.value.trayMenu, []);

@@ -16,6 +16,7 @@ const titlesOnly =
   process.argv.includes('--sections-only') || process.argv.includes('--titles-only');
 const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
+const accentLayoutOnly = process.argv.includes('--accent-layout-only');
 const updateRequests = [];
 const titleSamples = [];
 const layoutSamples = [];
@@ -323,6 +324,29 @@ async function checkSectionTitles() {
     initial.host.trayClickCommand = 'fixture.hints.run';
     initial.host.trayDoubleClickCommand = null;
     initial.tts.baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+    if (accentLayoutOnly) {
+      initial.ribbon.groups = [
+        {
+          id: 'group:color',
+          title: 'Color group',
+          icon: 'folder',
+          expansion: 'persistent',
+          color: '#D249A1',
+          children: ['home', 'logs'],
+        },
+      ];
+      initial.ribbon.order = ['group:color', 'settings'];
+      initial.trayMenu = [
+        { id: 'tray.first', type: 'command', command: 'appdock.open' },
+        {
+          id: 'tray.group',
+          type: 'group',
+          title: 'Tray group',
+          children: [{ id: 'tray.child', type: 'command', command: 'appdock.logs.open' }],
+        },
+        { id: 'tray.last', type: 'separator' },
+      ];
+    }
     if (assignmentSpeechOnly) {
       initial.tts.defaultVoice = 'fixture-voice';
       initial.tts.defaultSpeed = 1.25;
@@ -387,6 +411,24 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (accentLayoutOnly) {
+      assert.equal((await snapshot()).version, require('../package.json').version);
+      await require('./settings-accent-layout-checks.cjs')({
+        host,
+        select,
+        snapshot,
+        until,
+        inspect,
+        inspector,
+        electronExpression,
+        profile,
+        checks,
+        portable: !!source,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (assignmentSpeechOnly) {
       assert.equal((await snapshot()).version, require('../package.json').version);
       await require('./settings-assignment-speech-checks.cjs')({
@@ -949,6 +991,7 @@ async function checkSectionTitles() {
       titlesOnly,
       refinementsOnly,
       assignmentSpeechOnly,
+      accentLayoutOnly,
       titleSampleCount: titleSamples.length,
       checks,
       errors,

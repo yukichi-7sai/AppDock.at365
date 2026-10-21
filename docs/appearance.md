@@ -35,6 +35,8 @@ Lightでは濃い色を強調色、淡い色を選択背景の基にし、Dark�
 .selected { background: var(--accent-soft); color: var(--accent); }
 ```
 
+設定の追加・並べ替え・上下移動には共通の`accent-action`を使う。通常は`--accent-soft`と`--accent`、ホバーは`--accent-hover`と`--accent-text`を組にして切り替える。更新ボタンと一覧ヘッダーの追加ボタンも同じ規則を使う。背景だけを切り替えたり、`filter: brightness()`で解決済みの色を変えたりしない。寸法は既存のテキスト/アイコンボタンの部品に任せ、削除は既存の意味色を保つ。
+
 CSS以外の描画は読み取り専用の`window.appdockAppearance`を使う。
 
 ```js

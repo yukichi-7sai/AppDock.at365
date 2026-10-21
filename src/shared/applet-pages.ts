@@ -147,9 +147,9 @@ export function ribbonItems(
       })),
     ),
     ...builtinRibbon.filter((item) => item.id === 'theme'),
-    ...separators.map((id, index): RibbonItem => ({
+    ...separators.map((id): RibbonItem => ({
       id,
-      title: `セパレーター ${index + 1}`,
+      title: '区切り線',
       icon: '',
       kind: 'separator',
     })),

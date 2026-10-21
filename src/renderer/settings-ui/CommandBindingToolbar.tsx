@@ -56,7 +56,7 @@ export function CommandBindingToolbar({
         </span>
         <button
           type="button"
-          className="settings-list-icon shortcut-order-open"
+          className="settings-list-icon shortcut-order-open accent-action"
           aria-label="実行順…"
           title={`${inputName}の実行順`}
           onClick={onOrder}

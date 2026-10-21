@@ -173,6 +173,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
               <div className="shortcut-order-moves">
                 <button
                   aria-label={`${title}を上へ`}
+                  className="accent-action"
                   disabled={index === 0}
                   onClick={() => move(row.id, rows[index - 1].id)}
                 >
@@ -180,6 +181,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
                 </button>
                 <button
                   aria-label={`${title}を下へ`}
+                  className="accent-action"
                   disabled={index === rows.length - 1}
                   onClick={() => move(row.id, rows[index + 1].id)}
                 >

@@ -111,7 +111,7 @@ export function AiSettingsForm({
           <span className="muted">{value.connections.length} / 8 サーバー</span>
           <div>
             <button
-              className="ai-icon-button"
+              className="ai-icon-button accent-action"
               aria-label="AIサーバーを並べ替え"
               title="並べ替え"
               disabled={busy || value.connections.length < 2}

@@ -533,7 +533,7 @@ async function colorGeometry() {
     checks.push(
       'Left-only full-height color bar in expanded/collapsed persistent and temporary groups; continuous same-color bridge/child line; theme rendering, invalid HEX and cancellation, no-color without layout movement',
     );
-    await page.getByRole('button', { name: 'セパレーター 1を編集', exact: true }).click();
+    await page.getByRole('button', { name: '区切り線を編集', exact: true }).click();
     await page.getByLabel('名前', { exact: true }).fill('Work separator');
     await page.getByRole('button', { name: '適用', exact: true }).click();
     await saved((r) => r.separatorTitles['separator:test'] === 'Work separator');
@@ -617,7 +617,10 @@ async function commandChecks() {
   assert.equal(await cards.first().locator('h2').textContent(), '動作設定');
   assert.equal(await cards.nth(1).locator('h2').textContent(), 'リボン編集');
   const create = async (title, target) => {
-    await page.getByRole('button', { name: '上寄せにコマンドボタンを追加', exact: true }).click();
+    await page
+      .getByRole('region', { name: '上寄せのリボン設定', exact: true })
+      .getByRole('button', { name: '＋ コマンド', exact: true })
+      .click();
     await page.getByLabel('ボタン名', { exact: true }).fill(title);
     await page.getByRole('button', { name: '実行コマンドを選択', exact: true }).click();
     await choose(target);

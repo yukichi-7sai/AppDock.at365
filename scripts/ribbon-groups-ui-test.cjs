@@ -472,7 +472,10 @@ async function launch() {
       await saved((r) => !JSON.stringify(r).includes(id));
       assert.equal(await settingRow(id).count(), 0);
     }
-    await page.getByRole('button', { name: '上寄せにグループを追加', exact: true }).click();
+    await page
+      .getByRole('region', { name: '上寄せのリボン設定', exact: true })
+      .getByRole('button', { name: '＋ グループ', exact: true })
+      .click();
     await page.getByLabel('グループ名', { exact: true }).fill('Created group');
     await page.getByLabel('展開方法', { exact: true }).selectOption('temporary');
     const gaps = await page

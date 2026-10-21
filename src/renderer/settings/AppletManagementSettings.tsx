@@ -242,7 +242,7 @@ export function AppletManagementSettings({
         </span>
         <button
           type="button"
-          className="settings-list-icon shortcut-order-open"
+          className="settings-list-icon shortcut-order-open accent-action"
           aria-label="Appletを並べ替え"
           title="Appletの表示順"
           disabled={busy || applets.length < 2}

@@ -324,7 +324,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     }
     await select('タスクトレイ');
     assert.equal(
-      await page.getByRole('region', { name: 'クリック時の動作', exact: true }).count(),
+      await page.getByRole('region', { name: '動作設定', exact: true }).count(),
       1,
     );
     assert.equal(
