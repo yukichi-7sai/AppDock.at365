@@ -2,6 +2,8 @@
 
 入力の条件判定と実行は本体へ集約する。グローバル入力はInputHostの単一ローレベルフックを使い、ローカル入力と同じresolver/dispatcherへ渡す。
 
+「いつ・どこで」とfirst/allをジェスチャーと共通化する変更は[未実装の設計](command-execution-foundation-design.md)を参照。先に基盤を接続し、設定画面の整備は後続工程とする。以下は現在の動作を記載する。
+
 ## 設定
 
 `Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。

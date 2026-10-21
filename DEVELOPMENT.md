@@ -34,6 +34,8 @@
 
 共有設定・dataの参照先変更は[未実装の設計](docs/shared-settings-location-design.md)として分離する。現在の保存仕様は設定同期の文書を正本とする。
 
+入力の「いつ・どこで」と実行方法をまとめる[共通コマンド実行基盤の設計](docs/command-execution-foundation-design.md)は未実装。基盤の接続を先に行い、ショートカットキー設定画面の整備を後続工程に分ける。
+
 ## 開発環境・ビルド・テスト
 
 スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行した単一EXEの専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。

@@ -2,6 +2,8 @@
 
 入力基盤は本体が所有する。操作コマンドとその設定は提供元のAppletが所有する。本体はApplet IDによる専用処理を持たない。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorの即時保存/revision/atomic writeを共用する。
 
+キー入力と条件判定・実行方法を共通化する変更は[未実装の設計](command-execution-foundation-design.md)を参照。以下は現在の動作を記載する。
+
 ## 保存と初期値
 
 - `bindings`は最大2000行。各行は安定した`id`、`command`、`gesture`、`enabled`、`when`。配列順が実行順。`executionMode`は`all`（条件に一致したすべて、既定値）または`first`（最初の1つ）。同一コマンドIDは1回だけ。移動・クリック・ホイール・キーに共通して適用する。
