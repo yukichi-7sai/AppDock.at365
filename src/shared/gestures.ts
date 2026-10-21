@@ -2,6 +2,7 @@ import { normalizeShortcut, validCommandId } from './commands';
 import { applyBindingOrder } from './binding-order';
 import { keybindingConditionLabel } from './keybindings';
 import { matchesWhen, type ShortcutContext, type ShortcutScope } from './keybindings';
+import { validShortcutTarget } from './shortcut-pages';
 import type { Settings } from './contracts';
 
 export const gestureTypes = [
@@ -192,7 +193,7 @@ export function parseGestures(value: unknown): GestureSettings {
       (r.when.excludeDesktop === true && !['global', 'exe'].includes(r.when.scope)) ||
       !Array.isArray(r.when.appletIds) ||
       r.when.appletIds.length > 500 ||
-      r.when.appletIds.some((id) => !validCommandId(id)) ||
+      r.when.appletIds.some((id) => !validShortcutTarget(id)) ||
       (r.when.scope === 'applets' ? !r.when.appletIds.length : !!r.when.appletIds.length)
     )
       throw Error('ジェスチャー割り当てのID・コマンド・条件を確認してください。');

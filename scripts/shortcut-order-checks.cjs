@@ -6,7 +6,9 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   const panel = page.locator('.shortcut-order-dialog');
   const filter = page.getByLabel('ショートカットのコマンドを検索');
   const openTop = () => page.getByRole('button', { name: '実行順…', exact: true }).click();
-  await page.locator('.command-shortcut-summary').screenshot({ path: path.join(profile, 'shortcut-order-button.png') });
+  await page
+    .locator('.command-shortcut-summary')
+    .screenshot({ path: path.join(profile, 'shortcut-order-button.png') });
   const order = () =>
     panel
       .locator('[data-order-binding]')
@@ -91,15 +93,18 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     ['a1', 'a2', 'b1'],
   );
   // The Applet entry must include other providers, not just this Applet's catalog.
-  await page.getByRole('button', { name: 'Applet', exact: true }).click();
-  await page.locator('[data-applet-id="test.a"] .applet-select').click();
-  await page.getByRole('tab', { name: 'ショートカット', exact: true }).click();
+  await page.getByRole('button', { name: 'Applet管理', exact: true }).click();
+  await page
+    .locator('[data-applet-id="test.a"]')
+    .getByRole('button', { name: 'UI Aのショートカットを開く', exact: true })
+    .click();
   await fromMenu('a2');
   assert.match(await item('b1').innerText(), /B first[\s\S]*UI B/);
   await item('a2').locator('.shortcut-order-handle').press('Alt+ArrowDown');
   await apply();
   await save();
   assert.deepEqual((await snapshot()).settings.value.keybindings, original);
+  await page.getByRole('button', { name: 'UI Aの絞り込みを解除', exact: true }).click();
   await page.getByRole('button', { name: '設定', exact: true }).click();
   await page
     .locator('.settings-categories')
@@ -151,16 +156,22 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await write(original);
   await openTop();
   await choose('Ctrl+F8');
-  const setTheme = async theme => {
-    await page.evaluate(async theme => {
+  const setTheme = async (theme) => {
+    await page.evaluate(async (theme) => {
       const snapshot = await window.dock.snapshot();
       snapshot.settings.value.host.theme = theme;
       await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
     }, theme);
     const deadline = Date.now() + 10000;
     while (Date.now() < deadline) {
-      if (await panel.evaluate((el, theme) => el.ownerDocument.documentElement.dataset.theme === theme, theme)) return;
-      await new Promise(resolve => setTimeout(resolve, 50));
+      if (
+        await panel.evaluate(
+          (el, theme) => el.ownerDocument.documentElement.dataset.theme === theme,
+          theme,
+        )
+      )
+        return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw Error('Order dialog theme did not update');
   };

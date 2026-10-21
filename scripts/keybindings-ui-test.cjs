@@ -1,10 +1,10 @@
 const { settleSettings } = require('./settings-immediate-helper.cjs');
-const { _electron: electron } = require('playwright');
+const { launchTestHost } = require('./electron-test-launcher.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   http = require('node:http');
 const { spawn } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
+const { randomUUID, createHash } = require('node:crypto');
 const assert = require('node:assert/strict');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const root = path.resolve(__dirname, '..');
@@ -203,12 +203,36 @@ const expectCalls = async (before, expected) => {
       'exports.activate=async()=>{};',
     );
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
-    app = await electron.launch({
-      executablePath: process.argv[2] ? path.resolve(process.argv[2]) : require('electron'),
-      args: process.argv[2] ? [`--test-profile=${profile}`] : [root, `--test-profile=${profile}`],
-      timeout: 30000,
+    const portable = !!process.argv[2];
+    const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+    if (portable) fs.copyFileSync(path.resolve(process.argv[2]), executablePath);
+    const portableHash = portable
+      ? createHash('sha256').update(fs.readFileSync(executablePath)).digest('hex')
+      : undefined;
+    if (portable)
+      assert.equal(
+        portableHash,
+        createHash('sha256')
+          .update(fs.readFileSync(path.resolve(process.argv[2])))
+          .digest('hex'),
+      );
+    const env = { ...process.env };
+    delete env.ELECTRON_RUN_AS_NODE;
+    app = await launchTestHost({
+      executablePath,
+      portable,
+      args: portable ? [`--test-profile=${profile}`] : [root, `--test-profile=${profile}`],
+      env,
     });
-    dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
+    const host = await until(
+      () =>
+        app
+          .context()
+          .pages()
+          .find((p) => p.url().startsWith('appdock://host/')),
+      'Host page',
+    );
+    dock = require('./settings-aware-page.cjs').settingsAwarePage(host);
     target = spawn(
       path.join(
         root,
@@ -261,8 +285,8 @@ const expectCalls = async (before, expected) => {
     checks.push('real Windows global key: local overlap once, hidden global only');
     let before = calls().length;
     await send('appdock://host/index.html');
-    await expectCalls(before, ['a']);
-    checks.push('host scope excludes pages');
+    await expectCalls(before, ['a', 'b']);
+    checks.push('all pages includes the host home page');
     await dock.evaluate(() => window.dock.executeCommand('test.keys.open'));
     await until(
       () =>
@@ -389,7 +413,7 @@ const expectCalls = async (before, expected) => {
     await editDialog.getByRole('button', { name: /キー検証/ }).click();
     assert.equal(
       await editDialog
-        .getByRole('group', { name: /対象Applet$/ })
+        .getByRole('group', { name: /対象ページ$/ })
         .getByRole('checkbox', { checked: true })
         .count(),
       2,
@@ -457,7 +481,13 @@ const expectCalls = async (before, expected) => {
     await openEdit();
     assert.deepEqual(
       await editDialog.locator('select[aria-label*="いつ・どこで"] option').allTextContents(),
-      ['グローバル', 'AppDock全体', 'すべてのApplet', 'キー検証', '指定したApplet'],
+      [
+        'グローバル',
+        'AppDock全体',
+        'AppDockのすべてのページ',
+        'キー検証',
+        'AppDockの指定したページ',
+      ],
     );
     await editDialog.getByLabel('割り当てのいつ・どこで').selectOption('owner');
     await applyEdit();
@@ -550,7 +580,10 @@ const expectCalls = async (before, expected) => {
     checks.push(
       'new Applet/host binding defaults, unchanged existing scopes and full searchable IDs in settings, palette and home',
     );
-    fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify({ checks }, null, 2));
+    fs.writeFileSync(
+      path.join(profile, 'result.json'),
+      JSON.stringify({ checks, sha256: portableHash }, null, 2),
+    );
     console.log(JSON.stringify({ profile, checks }, null, 2));
   } finally {
     targetPeer?.close();

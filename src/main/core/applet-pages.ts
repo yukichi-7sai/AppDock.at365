@@ -78,15 +78,16 @@ export function notifyAppletPage(key: string) {
   surface.notifyChanged();
   return true;
 }
-export function activeShortcutApplet(foregroundWindow?: string): string | undefined {
-  return [...allSurfaces].find(
+export function activeShortcutPage(foregroundWindow?: string) {
+  const surface = [...allSurfaces].find(
     (surface) =>
       surface.visible &&
       surface.window &&
       (foregroundWindow === undefined
         ? surface.window.isFocused()
         : surface.window.getNativeWindowHandle().readBigUInt64LE().toString() === foregroundWindow),
-  )?.options.appletId;
+  );
+  return { appletId: surface?.options.appletId, pageId: surface?.options.key };
 }
 export function configurePageHost(value: PageHost) {
   host = value;

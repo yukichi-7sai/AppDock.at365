@@ -3,6 +3,7 @@ import { useSettingsControls } from './api';
 import { useState } from 'react';
 import { shortcutFromEvent } from '../../shared/commands';
 import { shortcutScopes, type Keybinding, type ShortcutScope } from '../../shared/keybindings';
+import { shortcutTargetTitle } from '../../shared/shortcut-pages';
 
 export type ShortcutCondition = Keybinding['when'] | { scope: 'default'; appletIds: string[] };
 
@@ -96,7 +97,7 @@ export function ShortcutConditionField({
     ...applets,
     ...value.appletIds
       .filter((id) => !applets.some((applet) => applet.id === id))
-      .map((id) => ({ id, title: `未導入: ${id}` })),
+      .map((id) => ({ id, title: shortcutTargetTitle(id, applets) })),
   ];
   return (
     <div className="shortcut-condition-field">
@@ -143,13 +144,13 @@ export function ShortcutConditionField({
               ? value.appletIds
                   .map((id) => choices.find((a) => a.id === id)?.title ?? id)
                   .join(' / ')
-              : 'Appletを選択…'}
+              : 'ページを選択…'}
           </button>
           {open && (
-            <div className="keybinding-picker" role="group" aria-label={`${label}の対象Applet`}>
+            <div className="keybinding-picker" role="group" aria-label={`${label}の対象ページ`}>
               <SettingsInput
-                aria-label="対象Appletを検索"
-                placeholder="Appletを検索…"
+                aria-label="対象ページを検索"
+                placeholder="ページを検索…"
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
               />
@@ -172,7 +173,7 @@ export function ShortcutConditionField({
                     {a.title}
                   </label>
                 ))}
-              {!choices.length && <small>Appletが登録されていません。</small>}
+              {!choices.length && <small>ページが登録されていません。</small>}
               <button onClick={() => setOpen(false)}>閉じる</button>
             </div>
           )}

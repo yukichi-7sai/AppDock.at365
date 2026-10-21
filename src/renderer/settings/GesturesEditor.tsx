@@ -2,6 +2,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { useEffect, useState } from 'react';
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
+import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import {
   defaultGestures,
   gestureTitle,
@@ -48,9 +49,7 @@ export function GesturesEditor({
   }, [provider?.request, target?.request]);
   const change = (patch: Partial<typeof gestures>) =>
     onChange({ ...settings, gestures: { ...gestures, ...patch } });
-  const targets = applets
-    .filter((applet) => applet.pages?.length)
-    .map((applet) => ({ id: applet.id, title: applet.displayName }));
+  const targets = shortcutPageChoices(applets);
   const known = new Map(commands.map((command) => [command.id, command]));
   for (const row of bindings)
     if (!known.has(row.command))

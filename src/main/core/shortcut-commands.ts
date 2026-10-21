@@ -14,6 +14,11 @@ import {
 import type { SettingsStore } from './settings';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
 import type { AutomationCommand } from './automation-commands';
+import {
+  shortcutPageChoices,
+  shortcutTargetSchema,
+  type ShortcutPageChoice,
+} from '../../shared/shortcut-pages';
 
 const commandId = 'appdock.shortcuts.update';
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -35,7 +40,7 @@ const whenSchema = {
   type: 'object',
   properties: {
     scope: { type: 'string', enum: shortcutScopes.map((s) => s.id) },
-    appletIds: { type: 'array', items: idSchema, maxItems: 500, uniqueItems: true },
+    appletIds: { type: 'array', items: shortcutTargetSchema, maxItems: 500, uniqueItems: true },
   },
   required: ['scope', 'appletIds'],
   additionalProperties: false,
@@ -62,6 +67,7 @@ export class ShortcutCommands {
       save(value: Settings, revision: number): SettingsSnapshot;
       commands(): AutomationCommand[];
       applets(): { id: string }[];
+      inputPages?(): ShortcutPageChoice[];
       status?(): GlobalHotKeyStatus[];
     },
   ) {}
@@ -140,6 +146,7 @@ export class ShortcutCommands {
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
       scopes: shortcutScopes,
+      pages: this.options.inputPages?.() ?? shortcutPageChoices([]),
       assignableCommands: this.assignable().map((c) => ({
         id: c.id,
         title: c.title,
@@ -171,7 +178,13 @@ export class ShortcutCommands {
       (command.appletId === null || command.permission === 'applets.manage')
     )
       throw invalid();
-    if (row.when.appletIds.some((id) => !this.options.applets().some((a) => a.id === id)))
+    const pages = this.options.inputPages?.() ?? shortcutPageChoices([]);
+    if (
+      row.when.appletIds.some(
+        (id) =>
+          !pages.some((page) => page.id === id) && !this.options.applets().some((a) => a.id === id),
+      )
+    )
       throw invalid();
   }
   execute(args: unknown) {

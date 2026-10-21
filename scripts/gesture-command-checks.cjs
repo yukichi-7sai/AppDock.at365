@@ -105,6 +105,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
       'test.gestures.a',
       'test.gestures.b',
       'test.gestures.c',
+      'appdock.settings.applet.test.gestures.open',
       ...['enable', 'disable', 'restart'].map(
         (action) => `appdock.applets.test.gestures.${action}`,
       ),
@@ -233,11 +234,13 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await panel.getByRole('button', { name: 'Tab', exact: true }).click();
   await panel.getByLabel('割り当てのいつ・どこで').selectOption('applets');
   assert(await panel.getByRole('button', { name: '適用', exact: true }).isDisabled());
-  await panel.getByRole('checkbox', { name: 'ジェスチャー検証', exact: true }).check();
+  await panel.getByRole('checkbox', { name: '検証ページ', exact: true }).check();
   await apply();
   await save();
   assert.equal((await saved()).find((r) => r.id === b).gesture, 'key:Ctrl+Tab');
-  assert.deepEqual((await saved()).find((r) => r.id === b).when.appletIds, ['test.gestures']);
+  assert.deepEqual((await saved()).find((r) => r.id === b).when.appletIds, [
+    'page:test.gestures:main',
+  ]);
   checks.push(
     'condition-only edit retains order / immediate deletion / all input families / modified special key / required target Applet',
   );

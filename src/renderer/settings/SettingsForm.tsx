@@ -1,6 +1,7 @@
 import { McpClientSettingsForm } from './McpClientSettings';
 import { AccentColorPicker } from './AccentColorPicker';
 import { hostSettingItem } from '../../shared/settings-catalog';
+import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings } from '../../shared/contracts';
@@ -194,7 +195,7 @@ export function SettingsForm({
             commands={commands}
             settings={settings}
             onChange={edit}
-            applets={extensions.map((e) => ({ id: e.id, title: e.displayName }))}
+            applets={shortcutPageChoices(extensions)}
             statuses={globalHotKeys}
           />
         )}

@@ -138,13 +138,14 @@ import { configureWindowRendering } from './core/window-rendering';
 import { trayIdentity } from './core/tray-identity';
 import { configureNotifications, activateNotification } from './core/notifications';
 import {
-  activeShortcutApplet,
+  activeShortcutPage,
   configurePageHost,
   updatePageViewport,
   refreshPageDisplays,
   localPageSource,
 } from './core/applet-pages';
 import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
+import { hostShortcutPage, shortcutPageChoices } from '../shared/shortcut-pages';
 import { PageCollectionManager } from './core/page-collections';
 import { WebProfileStore } from './core/web-profiles';
 import { contained } from './core/extensions';
@@ -1123,6 +1124,7 @@ const operationApi = new AppDockApi({
   ribbonApplets: allApplets,
   trayApplets: allApplets,
   shortcutStatus: () => hotKeys?.statuses ?? [],
+  inputPages: () => shortcutPageChoices(allApplets()),
   save: (value, revision) => commitSettings(prepareSettings(value), revision),
   applets: () => automationApplets(allApplets()),
   commands: () => automationCommands(allApplets()),
@@ -1424,9 +1426,17 @@ const shortcutDispatcher = new ShortcutDispatcher(
   (message) => log.write('error', 'shortcuts', message),
   () => quitting || shortcutRecording || !!overlayHost?.active,
 );
-function shortcutContext() {
-  const appletId = activeShortcutApplet();
-  return { appFocused: !!appletId || !!window?.isFocused(), appletId };
+function shortcutContext(foregroundWindow?: string) {
+  const { appletId, pageId } = activeShortcutPage(foregroundWindow);
+  const hostFocused =
+    foregroundWindow === undefined
+      ? !!window?.isFocused()
+      : window?.getNativeWindowHandle().readBigUInt64LE().toString() === foregroundWindow;
+  return {
+    appFocused: !!appletId || hostFocused,
+    appletId,
+    pageId: pageId ?? (hostFocused ? hostShortcutPage(navigation.state.route) : undefined),
+  };
 }
 function availableShortcutCommands() {
   return [
@@ -1750,7 +1760,10 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     tray: id === 'tray' ? a.tray : [],
     panel: null,
     settingOptions: {},
-    pages: page.kind === 'applet' || ['ribbon', 'gestures'].includes(id) ? a.pages : undefined,
+    pages:
+      page.kind === 'applet' || ['ribbon', 'gestures', 'shortcuts'].includes(id)
+        ? a.pages
+        : undefined,
     ribbonItems: id === 'ribbon' ? a.ribbonItems : undefined,
     shell: id === 'appearance' ? a.shell : undefined,
     updateRepository: id === 'about' || page.kind === 'applet' ? a.updateRepository : undefined,
@@ -3077,14 +3090,10 @@ async function initialize() {
               (candidate) =>
                 candidate.getNativeWindowHandle().readBigUInt64LE().toString() === foregroundWindow,
             );
-      const appletId = activeShortcutApplet(foregroundWindow);
       return {
         settings: settings.value,
         context: {
-          appFocused:
-            !!appletId ||
-            (foregroundWindow === undefined ? !!window?.isFocused() : focused === window),
-          appletId,
+          ...shortcutContext(foregroundWindow),
           window: focused?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
         },
         commands: availableShortcutCommands(),
@@ -3531,7 +3540,7 @@ async function initialize() {
       const commands = resolveKeybindings(
         getKeybindings(settings.value),
         key,
-        { appFocused: true },
+        shortcutContext(),
         availableShortcutCommands(),
       );
       if (!commands.length) return false;

@@ -349,12 +349,10 @@ const checks = [];
       await save([
         row('pages', 'a', 'pages'),
         row('owner', 'b', 'owner'),
-        row('selected', 'c', 'applets', 'move-left', ['test.gestures']),
+        row('selected', 'c', 'applets', 'move-left', ['page:test.gestures:main']),
       ]);
-      let n = calls().length;
-      await send();
-      await wait(200);
-      assert.equal(calls().length, n);
+      let n;
+      await expect(['a']);
       await dock.evaluate(() => window.dock.executeCommand('test.gestures.open'));
       await wait(400);
       await expect(['a', 'b', 'c']);
@@ -376,7 +374,7 @@ const checks = [];
       await save([
         row('web-pages', 'a', 'pages'),
         row('other-owner', 'b', 'owner'),
-        row('web-selected', 'c', 'applets', 'move-left', [webId]),
+        row('web-selected', 'c', 'applets', 'move-left', [`page:${webId}:main`]),
       ]);
       await dock.evaluate((id) => window.dock.executeCommand(id + '.open'), webId);
       await wait(500);

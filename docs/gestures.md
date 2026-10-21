@@ -8,7 +8,7 @@
 - 待機表示と実行は、開始対象と条件に一致した行から同じ登録順・コマンドID重複除去・実行方法で選ぶ。`indicatorPosition`は`gesture-start`・`window-center`・`monitor-center`・`none`（表示なし）。`monitor-center`は右ボタン押下時のカーソルがあるモニター全体の中央。`window-center`も対象がデスクトップなら同じ位置を使う。モニターは開始時に固定し、移動先の画面へ追従しない。`none`でも入力認識・実行・取消を続け、不透明度の保存値を保持する。
 - `indicatorShowNoAction`（「アクションなしを表示する」）は既定true。falseでは、移動方向と開始条件に一致する実行対象がない場合の待機表示を隠す。一致するアクションの表示・入力認識・実行・取消・通常の右クリック復元は従来どおり。`none`ではこの値にかかわらず表示せず、保存値は保持する。未一致の移動を通常の右クリックへ変換する設定ではない。
 - gestureは`move-up/down/left/right`、`click-left/middle`、`wheel-up/down`、`key:<キー>`。キーは既存ショートカットの正規化（Ctrl/Alt/Shift、英数字、F1〜F24、矢印、対応する記号・特殊キー）を使う。WinやOS専用の保護された入力は対象外。Tabは設定画面の特殊キー選択から登録できる。
-- whenは`global/desktop/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`と任意の`excludeDesktop`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。Applet条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。
+- whenは`global/desktop/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`と任意の`excludeDesktop`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。ページ条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。本体5ページ（設定を含む）・Applet各ページの候補、表示名、対象ID、保存済みApplet指定の保持は[ページ候補と識別](keybindings.md#ページ候補と識別)に従う。
 - `desktop`はWindows Shellが所有するデスクトップの背景・アイコン領域だけに一致する。プロセス名がexplorerであることだけでは一致させず、通常のフォルダー画面とタスクバーを含めない。`excludeDesktop: true`は`global`と`exe`で使用でき、その行だけをデスクトップの候補から除外する。省略はfalse。他にデスクトップで有効な行がなければ右押下を捕捉せず、通常入力を通す。`desktop`条件の別の行は引き続き利用できる。
 - `activateOnStart`は非アクティブなウィンドウ・デスクトップをアクティブにして同じ右押下で開始する設定。
 - `excludedProcesses`は全条件より優先。`enabled`は永続設定。トレイの一時停止は稼働中だけで、再起動で解除する。
@@ -60,7 +60,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - 設定ページは全コマンドをカタログ順に表示し、未割り当ても残す。非表示の互換コマンドは割り当てがある場合だけ、未確認のコマンドは保存済みIDを使って表示する。検索はコマンド/完全ID/提供元/入力/条件、状態はすべて・割り当て済み・未割り当て。Windowsホットキーの登録エラーはジェスチャーには表示しない。
 - CommandBindingToolbar/CommandBindingListはショートカットと共用する。全体設定はコマンド・割り当て・移動の3列、＋で直接追加、入力と条件のペアをクリックして編集する。移動と公開アイコンは[共通一覧UI](settings-list-editing.md)に従う。行のメニューは編集・このジェスチャーの実行順・削除。削除確認はなく、追加後に自動スクロールせず、検索/表示位置/focusを保持する。
 - GestureBindingDialogはBindingEditDialogの枠と入力停止/取消/適用を共用する。移動4方向、左/中クリック、ホイール上下を選択ボタンで指定し、キーボードはShortcutCaptureFieldで記録/修飾キー付き特殊キー選択を行う。種類を切り替えてもパネル内の各種類の選択を保持する。Tabは項目移動、Escapeは取消、対応キー自体は特殊キーから指定できる。
-- 条件の共通部分とApplet検索/複数選択はShortcutConditionFieldを使用し、Webブラウザ/指定したexeを追加する。exe名はパスなし、カンマ/改行区切り、1件以上必須。未導入Appletの選択を保持する。新規Appletコマンドはowner、本体/不明コマンドはapp。条件/有効状態だけの変更は元の保存位置、追加/入力変更は移動先入力の末尾へ反映する。
+- 条件の共通部分とページ検索/複数選択はShortcutConditionFieldを使用し、Webブラウザ/指定したexeを追加する。「AppDockのすべてのページ」「AppDockの指定したページ」はショートカットと同じ対象を扱う。exe名はパスなし、カンマ/改行区切り、1件以上必須。未導入ページの選択を保持する。新規Appletコマンドはowner、本体/不明コマンドはapp。条件/有効状態だけの変更は元の保存位置、追加/入力変更は移動先入力の末尾へ反映する。
 - パネル内の一時入力は追加/適用時だけ保存済み設定へ反映し、キャンセル/×/Escapeで破棄する。外部更新で対象行が変わった場合は適用を拒否する。保存形式、2000行上限、JSON/revision/save、入力フック/dispatcherを維持する。編集/実行順パネルの表示中は既存setShortcutRecording契約でホットキーとジェスチャーの実行を停止する。
 - GestureOrderDialogはBindingOrderDialogをショートカットと共用する。元一覧の検索にかかわらず同じgestureの全提供元/条件/無効/不明行を表示。入力選択、番号、ドラッグ・上下ボタン・Alt＋上下、複数入力の一時変更を扱う。同じgestureの既存スロットだけを入れ替え、変更した入力の外部更新は適用全体を拒否し、他入力/他設定の最新変更は保持する。key:Aとkey:Ctrl+Aは別入力で、ショートカットの順序とも独立する。
 - コマンド一覧の枠の外側、一番上に独立した折りたたみ「動作設定」を置き、有効、非アクティブなウィンドウ・デスクトップでも開始する、実行方法、操作感（距離・ホイール間隔）、待機表示（表示位置・不透明度・「アクションなしを表示する」トグル）、Webブラウザ、除外の順に共通SettingsFieldでまとめる。表示なしの間だけ不透明度の入力を無効にし、値は保持する。既存の即時保存と設定検索を維持し、OFF中も一覧と編集は利用できる。

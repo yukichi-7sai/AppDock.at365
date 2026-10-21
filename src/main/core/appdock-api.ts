@@ -19,6 +19,7 @@ import { RibbonCommands } from './ribbon-commands';
 import { GestureCommands } from './gesture-commands';
 import { ShortcutCommands } from './shortcut-commands';
 import type { GlobalHotKeyStatus, ExtensionSnapshot } from '../../shared/contracts';
+import type { ShortcutPageChoice } from '../../shared/shortcut-pages';
 
 export class AutomationError extends Error {
   constructor(
@@ -70,6 +71,7 @@ export class AppDockApi {
       appletManagement?: AppletManagement;
       manageable?(): boolean;
       shortcutsEditable?(): boolean;
+      inputPages?(): ShortcutPageChoice[];
       gesturesEditable?(): boolean;
       ribbonEditable?(): boolean;
       trayEditable?(): boolean;

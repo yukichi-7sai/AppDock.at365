@@ -340,16 +340,18 @@ const checks = [];
     checks.push(
       'two hook hosts apply the same key without registration errors / recorder suspends and resumes capture',
     );
-    await button('Applet').click();
-    await page.locator('[data-applet-id="test.a"] .applet-select').click();
-    await page.getByRole('tab', { name: 'ショートカット', exact: true }).click();
+    await button('Applet管理').click();
+    await page
+      .locator('[data-applet-id="test.a"]')
+      .getByRole('button', { name: 'UI Aのショートカットを開く', exact: true })
+      .click();
     assert.deepEqual(
       await page
-        .locator('.applet-shortcuts .shortcut-command-list')
+        .locator('.shortcuts-editor .shortcut-command-list')
         .first()
         .locator('[data-shortcut-command]')
         .evaluateAll((rows) => rows.map((r) => r.dataset.shortcutCommand)),
-      ['test.a.first', 'test.a.second', 'test.a.new'],
+      ['test.a.first', 'test.a.second', 'test.a.new', 'test.a.legacy'],
     );
     await page.screenshot({ path: path.join(profile, 'applet-overview.png') });
     await require('./applet-shortcut-edit-checks.cjs')({
@@ -360,6 +362,7 @@ const checks = [];
       profile,
       checks,
     });
+    await page.getByRole('button', { name: 'UI Aの絞り込みを解除', exact: true }).click();
     await button('設定').click();
     await page
       .locator('.settings-categories')

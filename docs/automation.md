@@ -118,6 +118,8 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 ## ショートカット編集
 
+`shortcuts.get`と`gestures.get`は`pages`に現在のページ候補（id/titleとAppletページの提供元）を返します。本体5ページは設定も含み、Appletは各宣言ページが対象です。編集時の`when.appletIds`にはこのページIDを指定できます。対象IDと共通判定は[ページ候補と識別](keybindings.md#ページ候補と識別)を参照してください。
+
 取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。
 
 読取りは保存済みのbindings（id/command/key/enabled/whenと任意のblockOriginalInput）を実行順に返します。blockOriginalInputはglobalの元入力を止めるbooleanで、省略時true。旧行への既定値の書込みは行わず、updateで省略した場合は保存済み値を保持します。keyはWin／Windows／Meta修飾キーにも対応します。globalHotKeysのregisteredは共有フックへの適用成功を表し、backend="hook"とキー単位のeffectiveBlockOriginalInputも返します。OSの排他予約や実効果の保証ではありません。GUIの未確定入力は含めません。全設定・Applet設定値・認証情報は返しません。assignableCommandsは新しく割り当てられる公開済み引数なしコマンド（id/title/available/ownerId）。停止中Appletも設定先として選べますが、実行可否はavailableで区別します。設定更新などの引数必須コマンドは割り当てられません。ownerId=nullの本体コマンドには「提供元のApplet」条件を使用できません。

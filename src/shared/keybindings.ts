@@ -7,13 +7,14 @@ import {
 } from './commands';
 import type { Settings } from './contracts';
 import { collectionPages, collectionIdentity } from './page-collections';
+import { shortcutTargetTitle, validShortcutTarget } from './shortcut-pages';
 
 export const shortcutScopes = [
   { id: 'global', title: 'グローバル' },
   { id: 'app', title: 'AppDock全体' },
-  { id: 'pages', title: 'すべてのApplet' },
+  { id: 'pages', title: 'AppDockのすべてのページ' },
   { id: 'owner', title: '提供元のApplet' },
-  { id: 'applets', title: '指定したApplet' },
+  { id: 'applets', title: 'AppDockの指定したページ' },
 ] as const;
 export type ShortcutScope = (typeof shortcutScopes)[number]['id'];
 export interface Keybinding {
@@ -28,6 +29,7 @@ export type KeybindingDefault = Omit<Keybinding, 'id'>;
 export interface ShortcutContext {
   appFocused: boolean;
   appletId?: string;
+  pageId?: string;
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -52,13 +54,13 @@ export function parseKeybindings(value: unknown): Keybinding[] {
       !shortcutScopes.some((s) => s.id === when.scope) ||
       !Array.isArray(when.appletIds) ||
       when.appletIds.length > 500 ||
-      when.appletIds.some((id) => !validCommandId(id)) ||
+      when.appletIds.some((id) => !validShortcutTarget(id)) ||
       new Set(when.appletIds).size !== when.appletIds.length ||
       (when.scope === 'applets' ? !when.appletIds.length : !!when.appletIds.length) ||
       Object.keys(when).some((k) => !['scope', 'appletIds'].includes(k))
     )
       throw Error(
-        '「いつ・どこで」の条件を確認してください。指定したAppletは1件以上選んでください。',
+        '「いつ・どこで」の条件を確認してください。指定したページは1件以上選んでください。',
       );
     const key = normalizeShortcut(row.key);
     return {
@@ -321,9 +323,7 @@ export function keybindingConditionLabel(
   if (when.scope === 'owner') return ownerTitle ?? '提供元不明';
   if (when.scope === 'applets')
     return (
-      when.appletIds
-        .map((id) => applets.find((applet) => applet.id === id)?.title ?? `未導入: ${id}`)
-        .join(' / ') || 'Applet未選択'
+      when.appletIds.map((id) => shortcutTargetTitle(id, applets)).join(' / ') || 'ページ未選択'
     );
   return shortcutScopes.find((scope) => scope.id === when.scope)?.title ?? when.scope;
 }
@@ -355,11 +355,15 @@ export function matchesWhen(
     case 'app':
       return context.appFocused;
     case 'pages':
-      return context.appFocused && !!context.appletId;
+      return context.appFocused && (!!context.pageId || !!context.appletId);
     case 'owner':
       return context.appFocused && !!extensionId && context.appletId === extensionId;
     case 'applets':
-      return context.appFocused && !!context.appletId && when.appletIds.includes(context.appletId);
+      return (
+        context.appFocused &&
+        ((!!context.pageId && when.appletIds.includes(context.pageId)) ||
+          (!!context.appletId && when.appletIds.includes(context.appletId)))
+      );
     default:
       return false;
   }

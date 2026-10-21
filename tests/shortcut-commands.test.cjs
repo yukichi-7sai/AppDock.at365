@@ -35,6 +35,10 @@ function fixture(t) {
     version: 'test',
     instanceId: 'test',
     applets: () => [{ id: 'sample' }],
+    inputPages: () => [
+      { id: 'host:settings', title: '設定' },
+      { id: 'page:sample:history', title: '履歴' },
+    ],
     commands: () => [
       {
         id: 'sample.run',
@@ -83,6 +87,37 @@ test('shortcut read is scoped, lists assignable commands while stopped, and mask
   assert.equal(value.settings, undefined);
   assert.throws(() => f.api.call('shortcuts.get', { unknown: true }), { code: 'INVALID_ARGUMENT' });
 });
+test('page targets are discoverable and validated against current declarations', async (t) => {
+  const f = fixture(t);
+  assert.equal(f.get().pages[1].id, 'page:sample:history');
+  const value = {
+    ...binding('pages'),
+    when: { scope: 'applets', appletIds: ['host:settings', 'page:sample:history'] },
+  };
+  await f.edit([{ kind: 'add', binding: value }]);
+  assert.deepEqual(
+    f.get().bindings.find((r) => r.id === 'pages'),
+    value,
+  );
+  await assert.rejects(
+    async () =>
+      f.edit([
+        {
+          kind: 'update',
+          id: 'pages',
+          changes: {
+            when: { scope: 'applets', appletIds: ['page:sample:missing'] },
+          },
+        },
+      ]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.deepEqual(
+    f.get().bindings.find((r) => r.id === 'pages'),
+    value,
+  );
+});
+
 test('atomic add/update/remove, normalized keys, dry run, legacy compatibility and unrelated preservation', async (t) => {
   const f = fixture(t),
     original = structuredClone(f.settings.value),

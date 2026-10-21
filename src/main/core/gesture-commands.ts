@@ -2,6 +2,11 @@ import type { Settings, SettingsSnapshot } from '../../shared/contracts';
 import { validCommandId } from '../../shared/commands';
 import { shortcutScopes } from '../../shared/keybindings';
 import {
+  shortcutPageChoices,
+  shortcutTargetSchema,
+  type ShortcutPageChoice,
+} from '../../shared/shortcut-pages';
+import {
   defaultGestures,
   parseGestures,
   normalizeGesture,
@@ -39,7 +44,7 @@ const whenSchema = {
       enum: [...shortcutScopes.map((s) => s.id), 'desktop', 'browser', 'exe'],
     },
     excludeDesktop: { type: 'boolean', description: 'global/exe条件でデスクトップだけを除外する' },
-    appletIds: { type: 'array', items: idSchema, maxItems: 500, uniqueItems: true },
+    appletIds: { type: 'array', items: shortcutTargetSchema, maxItems: 500, uniqueItems: true },
     processes: {
       type: 'array',
       items: { type: 'string', maxLength: 120 },
@@ -110,6 +115,7 @@ export class GestureCommands {
       save(value: Settings, revision: number): SettingsSnapshot;
       commands(): AutomationCommand[];
       applets(): { id: string }[];
+      inputPages?(): ShortcutPageChoice[];
     },
   ) {}
   commands(): AutomationCommand[] {
@@ -192,6 +198,7 @@ export class GestureCommands {
   get() {
     return {
       bindings: structuredClone(gestureSettings(this.options.settings.value).bindings),
+      pages: this.options.inputPages?.() ?? shortcutPageChoices([]),
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
       scopes: [
@@ -223,7 +230,13 @@ export class GestureCommands {
       (command.appletId === null || command.permission === 'applets.manage')
     )
       throw invalid();
-    if (row.when.appletIds.some((id) => !this.options.applets().some((a) => a.id === id)))
+    const pages = this.options.inputPages?.() ?? shortcutPageChoices([]);
+    if (
+      row.when.appletIds.some(
+        (id) =>
+          !pages.some((page) => page.id === id) && !this.options.applets().some((a) => a.id === id),
+      )
+    )
       throw invalid();
   }
   execute(args: unknown) {

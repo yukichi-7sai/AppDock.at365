@@ -7,6 +7,7 @@ import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
 import { Icon } from './Icon';
 import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
+import { hostShortcutPage } from '../shared/shortcut-pages';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { DockApi, HostSnapshot, ExtensionSnapshot } from '../shared/contracts';
@@ -273,6 +274,7 @@ function App() {
           {
             appFocused: true,
             appletId: page.startsWith('page:') ? page.split(':')[1] : undefined,
+            pageId: page.startsWith('page:') ? page : hostShortcutPage(page),
           },
           commands.filter((c) => c.available),
         );

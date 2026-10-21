@@ -12,14 +12,22 @@ Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に�
 ```json
 {
   "id": "binding.example",
-  "command": "at365.gmail.nextAccount",
+  "command": "appdock.commands.search",
   "key": "Ctrl+Tab",
   "enabled": true,
-  "when": { "scope": "applets", "appletIds": ["at365.gmail"] }
+  "when": { "scope": "applets", "appletIds": ["host:settings", "page:example.applet:history"] }
 }
 ```
 
-scopeはglobal/app/pages/owner/applets。globalは常時、appはホスト管理Windowのフォーカス、pagesはさらに表示中Appletページ、ownerはコマンド登録元のAppletページ、appletsは対象ID内のいずれかを満たす。UIでは「グローバル」「AppDock全体」「すべてのApplet」「Gmailなどの提供元名だけ」「指定したApplet」の順。AppDock本体のコマンドには提供元の選択肢を出さない。ownerは保存したIDやコマンド名の接頭辞から推測せず、現在のコマンドカタログのextensionIdで判定する。提供元がない/不明/ページを持たない場合は一致しない。提供元の名前変更も現在の表示名を使う。applets以外のscopeはappletIdsを空にする。指定Appletは1件以上必要。未知の条件を黙って無視せず拒否する。条件追加時はshared/keybindingsの型・検証・評価・UI候補・試験を一緒に追加する。連続キー（chord）とユーザー記述の式は対象外。
+scopeはglobal/app/pages/owner/applets。globalは常時、appはホスト管理Windowのフォーカス、pagesは本体またはAppletの表示中ページ、ownerはコマンド登録元のAppletページ、appletsは指定ページのいずれかを満たす。UIでは「グローバル」「AppDock全体」「AppDockのすべてのページ」「Gmailなどの提供元名だけ」「AppDockの指定したページ」の順。AppDock本体のコマンドには提供元の選択肢を出さない。ownerは保存したIDやコマンド名の接頭辞から推測せず、現在のコマンドカタログのextensionIdで判定する。提供元がない/不明/ページを持たない場合は一致しない。提供元の名前変更も現在の表示名を使う。applets以外のscopeはappletIdsを空にする。指定ページは1件以上必要。未知の条件を黙って無視せず拒否する。条件追加時はshared/keybindingsの型・検証・評価・UI候補・試験を一緒に追加する。連続キー（chord）とユーザー記述の式は対象外。
+
+### ページ候補と識別
+
+`shared/shortcut-pages`をショートカット・ジェスチャー・公開編集APIの共通候補とする。本体はホーム・画像ライブラリー・設定・ログ・通知センターの5ページ。設定内のカテゴリやApplet設定も「設定」に含む。Appletは`pages`の各`id/title`を使い、ページを持たないAppletを候補へ含めない。停止中・無効でも宣言済みページは選択できるが、入力判定は実際にフォーカスされた表示Surfaceだけに一致する。WebApplet等のcollection子ページも同じ規則で扱う。同名ページには提供元名を添え、同じ提供元内でも重複するときはページIDを添える。
+
+保存する対象IDは本体が`host:<route>`、Appletが既存の`page:<appletId>:<pageId>`。`when.appletIds`のフィールド名とscope IDは保持する。保存済みのApplet IDは、そのApplet内の全ページに一致する指定として保持し、編集時はその意味を表示する。設定の自動変換・削除は行わない。未導入ページの保存済み選択も保持する。新規候補は常にページ単位である。
+
+入力文脈は`appletId`（ownerと保存済みApplet指定用）と`pageId`（ページ指定用）を分ける。本体ページは本体Windowの実フォーカスとnavigationのroute、Appletは実フォーカスされたSurfaceのkeyから決める。独立Windowへの表示切替でも同じページIDを使い、外部Windowではページ条件を満たさない。`shortcuts.get`と`gestures.get`の`pages`で現在の候補を取得し、公開編集APIでは宣言にない新規ページ指定を拒否する。
 
 keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当てへ変換する。旧非グローバルはappとなる。キー編集後はkeybindingsを保存し、旧フィールドはコマンドパレット等の表示用に派生させる。空配列を未指定扱いにして既定割り当てを復活させない。新形式を旧バージョンで編集する往復互換は保証しない。設定全体の1MiB上限・atomic write・revision保護を維持する。
 
