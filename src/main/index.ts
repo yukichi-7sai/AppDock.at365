@@ -689,9 +689,7 @@ let mcpConfigurationWarning: ReturnType<WarningReporter['episode']> | undefined;
 function mcpChanged() {
   if (!startupReady || quitting) return;
   customCommands.reconcile();
-  const invalid =
-    mcpSettings.health().error ||
-    mcpClient.statuses().some((s) => s.state === 'error' || s.state === 'unconfigured');
+  const invalid = mcpClient.needsConfigurationAttention();
   if (invalid)
     (mcpConfigurationWarning ??= warnings.episode()).update({
       eventId: 'mcp-configuration',
@@ -706,6 +704,15 @@ function mcpChanged() {
     mcpConfigurationWarning = undefined;
   }
   changed();
+}
+function mcpConnectionWarning(warning: { code: string; message: string }) {
+  (mcpConfigurationWarning ??= warnings.episode()).update({
+    eventId: 'mcp-configuration',
+    source: 'mcp-client',
+    title: 'MCP接続を確認できませんでした',
+    code: warning.code,
+    message: warning.message,
+  });
 }
 function mcpActor(id?: string, context: InputInvocation = {}): McpActor {
   const root: McpActor['origin'] =
@@ -2045,9 +2052,26 @@ function settingsPageActions(
     actions.mcpTool = async ([serverId, name]) => mcpClient.tool(mcpHostActor, { serverId, name });
   }
   if (page.id === 'mcp-client') {
+    actions.mcpTools = async ([serverId, cursor]) => {
+      const attempt = await mcpClient.inspectForSettings(mcpHostActor, {
+        serverId,
+        cursor,
+        refresh: !cursor,
+        limit: 50,
+      });
+      if (attempt.warning) mcpConnectionWarning(attempt.warning);
+      return attempt.result ?? { items: [] };
+    };
+    actions.mcpTool = async ([serverId, name]) => {
+      const attempt = await mcpClient.inspectForSettings(mcpHostActor, { serverId, name });
+      if (attempt.warning) mcpConnectionWarning(attempt.warning);
+      return attempt.result ?? {};
+    };
     actions.updateMcpConnection = async ([args]) => {
       assertSettingsWritable();
-      return mcpSettings.update(args);
+      const result = await mcpClient.updateForSettings(mcpHostActor, args);
+      if ('warning' in result && result.warning) mcpConnectionWarning(result.warning);
+      return result;
     };
     actions.mcpCall = async ([params]) =>
       mcpClient.start(mcpHostActor, params as Record<string, unknown>);

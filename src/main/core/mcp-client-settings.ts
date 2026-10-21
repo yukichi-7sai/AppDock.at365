@@ -40,23 +40,13 @@ export class McpClientSettings {
     private encryption: { encrypt(v: string): string; decrypt(v: string): string },
     private changed: () => void,
   ) {}
-  private read(): Record<string, LocalEntry> {
+  private read(): Record<string, unknown> {
     if (!fs.existsSync(this.file)) return {};
     try {
       if (fs.statSync(this.file).size > 1024 * 1024) throw Error();
       const data = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       if (data.version !== 1 || !jsonObject(data.entries) || Object.keys(data.entries).length > 64)
         throw Error();
-      for (const [id, v] of Object.entries(data.entries)) {
-        if (
-          !mcpUuid(id) ||
-          !jsonObject(v) ||
-          Object.keys(v).some((k) => !['connection', 'secret'].includes(k)) ||
-          (v.secret !== undefined && (typeof v.secret !== 'string' || v.secret.length > 131072))
-        )
-          throw Error();
-        parseMcpConnection(v.connection);
-      }
       return data.entries;
     } catch {
       throw new McpSettingsError(
@@ -64,6 +54,20 @@ export class McpClientSettings {
         'MCPのPC専用設定を読み取れません。設定ファイルを確認してください。',
       );
     }
+  }
+  private entry(id: string, entries = this.read()): LocalEntry | undefined {
+    if (!Object.hasOwn(entries, id)) return undefined;
+    const value = entries[id];
+    if (
+      !mcpUuid(id) ||
+      !jsonObject(value) ||
+      Object.keys(value).some((key) => !['connection', 'secret'].includes(key)) ||
+      (value.secret !== undefined &&
+        (typeof value.secret !== 'string' || value.secret.length > 131072))
+    )
+      throw new McpSettingsError('CONFIGURATION_REQUIRED', 'MCPのPC専用設定を確認してください。');
+    parseMcpConnection(value.connection);
+    return value as unknown as LocalEntry;
   }
   roster() {
     return parseMcpRoster(this.settings.value.mcpServers).items;
@@ -83,13 +87,13 @@ export class McpClientSettings {
     }
   }
   connection(id: string) {
-    return this.read()[id]?.connection;
+    return this.entry(id)?.connection;
   }
   identity(id: string) {
-    return mcpDigest(this.read()[id] ?? null);
+    return mcpDigest(this.entry(id) ?? null);
   }
   secrets(id: string): { token?: string; env: Record<string, string> } {
-    const entry = this.read()[id];
+    const entry = this.entry(id);
     if (!entry?.secret) return { env: {} };
     try {
       const data = JSON.parse(this.encryption.decrypt(entry.secret));
@@ -121,9 +125,10 @@ export class McpClientSettings {
   }
   statuses() {
     return this.roster().map(({ id }) => {
+      let connection: McpConnection | undefined;
       try {
-        const connection = this.connection(id),
-          secrets = this.secrets(id);
+        connection = this.connection(id);
+        const secrets = this.secrets(id);
         return {
           id,
           connection,
@@ -132,11 +137,20 @@ export class McpClientSettings {
           state: connection ? (connection.enabled ? 'disconnected' : 'disabled') : 'unconfigured',
         };
       } catch {
+        let disabled = false;
+        try {
+          const raw = this.read()[id];
+          disabled =
+            jsonObject(raw) && jsonObject(raw.connection) && raw.connection.enabled === false;
+        } catch {
+          // An unreadable document is reported by health(), without breaking the page snapshot.
+        }
         return {
           id,
+          connection,
           tokenConfigured: false,
           environmentNames: [],
-          state: 'error',
+          state: disabled ? 'disabled' : 'error',
           error: 'PC専用設定または認証情報を確認してください。',
         };
       }
@@ -159,7 +173,7 @@ export class McpClientSettings {
     if (!item) throw new McpSettingsError('NOT_FOUND', 'MCP接続先が見つかりません。');
     return { revision, item, ...this.statuses().find((s) => s.id === serverId) };
   }
-  private asset(entries: Record<string, LocalEntry>, expectedRevision: string) {
+  private asset(entries: Record<string, unknown>, expectedRevision: string) {
     const content = JSON.stringify({ version: 1, entries }) + '\n';
     if (Object.keys(entries).length > 64 || Buffer.byteLength(content, 'utf8') > 1024 * 1024)
       throw Error(
@@ -224,7 +238,12 @@ export class McpClientSettings {
       const item = parseMcpRoster({ version: 1, items: [request.item] }).items[0];
       const connection = parseMcpConnection(request.connection);
       let previous: { token?: string; env: Record<string, string> } = { env: {} };
-      const old = entries[item.id];
+      let old: LocalEntry | undefined;
+      try {
+        old = this.entry(item.id, entries);
+      } catch {
+        // Explicitly saving this row repairs it; untouched entries remain verbatim JSON values.
+      }
       if (old && mcpEndpointIdentity(old.connection) === mcpEndpointIdentity(connection)) {
         try {
           previous = this.secrets(item.id);
@@ -301,7 +320,9 @@ export class McpClientSettings {
         typeof request.enabled !== 'boolean'
       )
         throw Error('接続先のPC設定を先に保存してください。');
-      entries[request.id].connection.enabled = request.enabled;
+      const entry = this.entry(request.id, entries);
+      if (!entry) throw Error('接続先のPC設定を先に保存してください。');
+      entry.connection.enabled = request.enabled;
     } else throw Error('対応していない更新です。');
     const mcpServers = parseMcpRoster({ version: 1, items });
     const next = { ...this.settings.value, mcpServers };

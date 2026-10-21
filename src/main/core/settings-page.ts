@@ -184,6 +184,7 @@ export class SettingsPageSession {
     if (action.sessionId !== state.sessionId || action.editRevision !== state.editRevision)
       throw Error('編集内容が別の画面で変わりました。再取得してください。');
     this.error = '';
+    let actionOwnsError = false;
     try {
       let result: unknown;
       const op = action.operation;
@@ -196,7 +197,9 @@ export class SettingsPageSession {
         const item = this.options.editor
           .catalog()
           .flatMap((p) => p.items)
-          .find((i) => i.id === (op.itemId === 'about/updateSource' ? 'applets/management' : op.itemId));
+          .find(
+            (i) => i.id === (op.itemId === 'about/updateSource' ? 'applets/management' : op.itemId),
+          );
         if (!item) throw Error('設定対象が見つかりません。検索結果を更新してください。');
         await this.options.editor.act({
           ...action,
@@ -264,11 +267,14 @@ export class SettingsPageSession {
           JSON.stringify(op.args ?? []).length > 1024 * 1024
         )
           throw Error('このページで許可されていない操作です。');
+        // The invoking control (for example SettingsDialog) owns action error feedback.
+        actionOwnsError = true;
         result = await issued.run(op.args ?? []);
+        actionOwnsError = false;
       } else throw Error('設定操作が不正です。');
       return { model: this.snapshot(), result };
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error);
+      if (!actionOwnsError) this.error = error instanceof Error ? error.message : String(error);
       throw error;
     } finally {
       this.options.changed();

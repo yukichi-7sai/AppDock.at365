@@ -133,6 +133,7 @@ function safeError(error: unknown, sent = false): { code: string; message: strin
 export class McpClientService {
   private sessions = new Map<string, Session>();
   private connectionErrors = new Map<string, string>();
+  private connectionChecks = new Set<string>();
   private jobs = new Map<string, JobRecord>();
   private starts = new Map<string, { signature: string; promise: Promise<McpJob> }>();
   private reaper: ReturnType<typeof setInterval>;
@@ -228,8 +229,77 @@ export class McpClientService {
               ...(record.error ? { error: record.error } : {}),
             }
           : {}),
+        ...(this.connectionChecks.has(s.id) ? { state: 'connecting', error: undefined } : {}),
       };
     });
+  }
+  needsConfigurationAttention() {
+    return Boolean(
+      this.options.settings.health().error || this.statuses().some((s) => s.state === 'error'),
+    );
+  }
+  private async connectionAttempt<T>(id: string, work: () => Promise<T>) {
+    if (this.connectionChecks.has(id))
+      return { warning: { code: 'BUSY', message: 'この接続先の接続確認が進行中です。' } };
+    this.connectionChecks.add(id);
+    try {
+      return { result: await work() };
+    } catch (error) {
+      return { warning: safeError(error) };
+    } finally {
+      this.connectionChecks.delete(id);
+    }
+  }
+  async inspectForSettings(actor: McpActor, params: Record<string, unknown>) {
+    return this.connectionAttempt(String(params.serverId), async () =>
+      params.name === undefined ? this.tools(actor, params) : this.tool(actor, params),
+    );
+  }
+  async updateForSettings(actor: McpActor, request: unknown) {
+    this.allow(actor, true);
+    const id =
+      jsonObject(request) && request.dryRun !== true
+        ? request.op === 'enabled' && request.enabled === true
+          ? request.id
+          : request.op === 'save' &&
+              jsonObject(request.item) &&
+              jsonObject(request.connection) &&
+              request.connection.enabled === true
+            ? request.item.id
+            : undefined
+        : undefined;
+    if (typeof id !== 'string') return this.options.settings.update(request);
+    if (this.connectionChecks.has(id))
+      return {
+        saved: false,
+        revision: this.options.settings.revision(),
+        warning: { code: 'BUSY', message: 'この接続先の接続確認が進行中です。' },
+      };
+    // Suppress persistent diagnostics before the temporary ON value is published.
+    this.connectionChecks.add(id);
+    try {
+      const result = this.options.settings.update(request);
+      if (this.sessions.get(id)?.tools) return result;
+      const identity = this.options.settings.identity(id);
+      let warning: { code: string; message: string };
+      try {
+        await this.tools(actor, { serverId: id });
+        return { ...result, revision: this.options.settings.revision() };
+      } catch (error) {
+        warning = safeError(error);
+      }
+      // A late failure must not disable a connection changed by another editor.
+      if (this.options.settings.identity(id) !== identity) return result;
+      this.options.settings.update({
+        op: 'enabled',
+        id,
+        enabled: false,
+        expectedRevision: this.options.settings.revision(),
+      });
+      return { ...result, revision: this.options.settings.revision(), warning };
+    } finally {
+      this.connectionChecks.delete(id);
+    }
   }
   private async close(record: Session) {
     if (record.closed) return;
@@ -369,7 +439,8 @@ export class McpClientService {
           const safe = safeError(error);
           this.connectionErrors.set(id, safe.message);
           current.error = safe.message;
-          if (safe.code !== 'CANCELLED') this.options.failed?.(randomUUID(), safe);
+          if (safe.code !== 'CANCELLED' && !this.connectionChecks.has(id))
+            this.options.failed?.(randomUUID(), safe);
           await this.close(current);
           throw new AutomationError(safe.code, safe.message);
         } finally {
@@ -452,7 +523,7 @@ export class McpClientService {
         const safe = safeError(error);
         record.error = safe.message;
         this.connectionErrors.set(id, safe.message);
-        if (!record.closed && safe.code !== 'STALE_CATALOG')
+        if (!record.closed && safe.code !== 'STALE_CATALOG' && !this.connectionChecks.has(id))
           this.options.failed?.(randomUUID(), safe);
         this.options.changed?.();
         throw new AutomationError(safe.code, safe.message);

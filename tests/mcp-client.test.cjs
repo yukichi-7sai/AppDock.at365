@@ -690,9 +690,194 @@ test('the shared API can discover and execute a 128-character downstream tool na
 test('damaged local MCP settings remain intact and expose a read-only health error', (t) => {
   const f = fixture(t),
     file = path.join(f.dir, 'mcp-client.json');
+  f.add({ url: 'http://127.0.0.1:9876/mcp' });
   fs.writeFileSync(file, '{invalid');
   assert.equal(f.settings.health().revision, '');
   assert.match(f.settings.health().error, /読み取り専用/);
   assert.throws(() => f.settings.update({ op: 'remove', id: randomUUID(), expectedRevision: '' }));
   assert.equal(fs.readFileSync(file, 'utf8'), '{invalid');
+  assert.equal(f.settings.statuses()[0].state, 'error');
+  assert.equal(f.service.needsConfigurationAttention(), true);
+});
+
+test('shared-only and OFF connections need no warning, including unreadable OFF credentials', (t) => {
+  const f = fixture(t),
+    id = f.add({ url: 'http://127.0.0.1:9876/mcp', authentication: 'bearer' }, { token: 'secret' }),
+    sharedId = randomUUID();
+  f.store.save(
+    {
+      ...f.store.value,
+      mcpServers: {
+        version: 1,
+        items: [...f.settings.roster(), { id: sharedId, name: 'Other PC', description: '' }],
+      },
+    },
+    f.store.revision,
+  );
+  const file = path.join(f.dir, 'mcp-client.json'),
+    local = JSON.parse(fs.readFileSync(file));
+  local.entries[id].secret = 'damaged-credential';
+  fs.writeFileSync(file, JSON.stringify(local));
+  assert.equal(f.settings.statuses().find((s) => s.id === sharedId).state, 'unconfigured');
+  assert.equal(f.settings.statuses().find((s) => s.id === id).state, 'disabled');
+  assert.equal(f.service.needsConfigurationAttention(), false);
+  f.settings.update({ op: 'enabled', id, enabled: true, expectedRevision: f.settings.revision() });
+  assert.equal(f.settings.statuses().find((s) => s.id === id).connection.enabled, true);
+  assert.equal(f.service.needsConfigurationAttention(), true);
+});
+
+test('one malformed local entry does not block healthy edits, reorder or explicit repair', async (t) => {
+  const f = fixture(t),
+    remote = await httpFixture(t),
+    badId = f.add({ url: 'http://127.0.0.1:9876/mcp' }),
+    goodId = f.add({ url: remote.url }),
+    file = path.join(f.dir, 'mcp-client.json'),
+    local = JSON.parse(fs.readFileSync(file));
+  const broken = { connection: { enabled: false, url: 'damaged' }, secret: 'keep-exactly' };
+  local.entries[badId] = broken;
+  fs.writeFileSync(file, JSON.stringify(local));
+  assert.equal(f.settings.health().error, undefined);
+  assert.equal(f.settings.statuses().find((s) => s.id === badId).connection, undefined);
+  assert.equal(f.service.needsConfigurationAttention(), false);
+  const enabled = await f.service.updateForSettings(host, {
+    op: 'enabled',
+    id: goodId,
+    enabled: true,
+    expectedRevision: f.settings.revision(),
+  });
+  assert.equal(enabled.warning, undefined);
+  assert.equal(f.service.statuses().find((s) => s.id === goodId).state, 'connected');
+  f.settings.update({
+    op: 'reorder',
+    ids: [goodId, badId],
+    expectedRevision: f.settings.revision(),
+  });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)).entries[badId], broken);
+  broken.connection.enabled = true;
+  const edited = JSON.parse(fs.readFileSync(file));
+  edited.entries[badId] = broken;
+  fs.writeFileSync(file, JSON.stringify(edited));
+  assert.equal(f.service.needsConfigurationAttention(), true);
+  f.settings.update({
+    op: 'save',
+    item: { ...f.settings.roster().find((s) => s.id === goodId), name: 'Healthy rename' },
+    connection: f.settings.connection(goodId),
+    expectedRevision: f.settings.revision(),
+  });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file)).entries[badId], broken);
+  f.settings.update({
+    op: 'save',
+    item: f.settings.roster().find((s) => s.id === badId),
+    connection: { ...defaultMcpConnection(), url: remote.url },
+    expectedRevision: f.settings.revision(),
+  });
+  assert.equal(f.settings.statuses().find((s) => s.id === badId).state, 'disabled');
+});
+
+test('UI activation checks the server and returns a warning with OFF persisted on failure', async (t) => {
+  const f = fixture(t),
+    remote = await httpFixture(t),
+    id = f.add({ url: remote.url });
+  const activate = () =>
+    f.service.updateForSettings(host, {
+      op: 'enabled',
+      id,
+      enabled: true,
+      expectedRevision: f.settings.revision(),
+    });
+  assert.equal((await activate()).warning, undefined);
+  assert.equal(f.settings.connection(id).enabled, true);
+  assert.equal(f.service.statuses().find((s) => s.id === id).state, 'connected');
+  f.settings.update({ op: 'enabled', id, enabled: false, expectedRevision: f.settings.revision() });
+  const beforeShared = fs.readFileSync(f.store.file, 'utf8');
+  f.service.options.fetcher = async () => {
+    throw Error('private-network-detail');
+  };
+  const result = await activate();
+  assert.equal(result.saved, true);
+  assert.equal(result.warning.code, 'CONNECTION_FAILED');
+  assert(!result.warning.message.includes('private-network-detail'));
+  assert.equal(f.settings.connection(id).enabled, false);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json'))).entries[id].connection.enabled,
+    false,
+  );
+  assert.equal(fs.readFileSync(f.store.file, 'utf8'), beforeShared);
+  assert.equal(f.service.needsConfigurationAttention(), false);
+  assert.deepEqual(f.failures, []);
+});
+
+test('UI save with ON checks authentication and keeps the saved connection OFF after failure', async (t) => {
+  const f = fixture(t),
+    remote = await httpFixture(t, { bearer: 'required' }),
+    id = randomUUID();
+  const result = await f.service.updateForSettings(host, {
+    op: 'save',
+    expectedRevision: f.settings.revision(),
+    item: { id, name: 'New server', description: '' },
+    connection: { ...defaultMcpConnection(), enabled: true, url: remote.url },
+  });
+  assert.equal(result.warning.code, 'AUTH_REQUIRED');
+  assert.equal(f.settings.connection(id).enabled, false);
+  assert.equal(f.settings.roster()[0].id, id);
+  assert.deepEqual(f.failures, []);
+});
+
+test('UI connection inspection returns warning data without reporting a processing error', async (t) => {
+  const f = fixture(t),
+    id = f.add({ enabled: true, url: 'http://127.0.0.1:9876/mcp' });
+  f.service.options.fetcher = async () => {
+    throw Error('private-connection');
+  };
+  const result = await f.service.inspectForSettings(host, { serverId: id });
+  assert.equal(result.warning.code, 'CONNECTION_FAILED');
+  assert.equal(result.result, undefined);
+  assert.deepEqual(f.failures, []);
+});
+
+test('temporary ON during UI activation does not publish persistent configuration warnings', async (t) => {
+  const f = fixture(t),
+    id = f.add({ url: 'http://127.0.0.1:9876/mcp', authentication: 'bearer' }, { token: 'secret' }),
+    file = path.join(f.dir, 'mcp-client.json'),
+    local = JSON.parse(fs.readFileSync(file));
+  local.entries[id].secret = 'unreadable';
+  fs.writeFileSync(file, JSON.stringify(local));
+  const attention = [];
+  f.settings.changed = () => {
+    f.service.reconcile();
+    attention.push(f.service.needsConfigurationAttention());
+  };
+  const result = await f.service.updateForSettings(host, {
+    op: 'enabled',
+    id,
+    enabled: true,
+    expectedRevision: f.settings.revision(),
+  });
+  assert(result.warning);
+  assert.deepEqual(attention, [false, false]);
+  assert.equal(f.settings.connection(id).enabled, false);
+  assert.equal(f.service.needsConfigurationAttention(), false);
+});
+
+test('activation failure does not overwrite a concurrent replacement connection', async (t) => {
+  const f = fixture(t),
+    id = f.add({ url: 'http://127.0.0.1:9876/mcp' });
+  f.service.options.fetcher = async () => {
+    f.settings.update({
+      op: 'save',
+      expectedRevision: f.settings.revision(),
+      item: f.settings.roster()[0],
+      connection: { ...f.settings.connection(id), url: 'http://127.0.0.1:9877/mcp' },
+    });
+    throw Error('old connection failed');
+  };
+  const result = await f.service.updateForSettings(host, {
+    op: 'enabled',
+    id,
+    enabled: true,
+    expectedRevision: f.settings.revision(),
+  });
+  assert.equal(result.warning, undefined);
+  assert.equal(f.settings.connection(id).enabled, true);
+  assert.equal(f.settings.connection(id).url, 'http://127.0.0.1:9877/mcp');
 });

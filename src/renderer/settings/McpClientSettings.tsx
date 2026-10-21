@@ -124,9 +124,12 @@ export function McpClientSettingsForm({
               ...item,
               enabled: s?.connection?.enabled ?? false,
               transport: s?.connection?.transport ?? '—',
-              status: s?.error ?? states[s?.state ?? 'unconfigured'],
+              status: states[s?.state ?? 'unconfigured'],
             };
           })}
+          canToggle={(_, i) =>
+            !!auxiliary?.connections.find((c) => c.id === items[i].id)?.connection
+          }
           onAdd={() => open('edit', null)}
           onEdit={(i) => open('edit', items[i])}
           onDelete={(i) => open('delete', items[i])}

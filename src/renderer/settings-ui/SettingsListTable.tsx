@@ -78,6 +78,7 @@ export function SettingsListTable({
   onEdit,
   onDelete,
   onToggle,
+  canToggle,
   onOrder,
   extra,
   titleExtra,
@@ -94,6 +95,7 @@ export function SettingsListTable({
   onEdit(index: number): void;
   onDelete(index: number): void;
   onToggle?(index: number): void;
+  canToggle?(entry: Record<string, unknown>, index: number): boolean;
   onOrder(): void;
   extra?(entry: Record<string, unknown>, index: number): ReactNode;
   titleExtra?(entry: Record<string, unknown>): ReactNode;
@@ -210,7 +212,7 @@ export function SettingsListTable({
                         role="switch"
                         aria-label={`${name}を有効にする`}
                         aria-checked={Boolean(entry[view.enabledKey])}
-                        disabled={busy}
+                        disabled={busy || canToggle?.(entry, index) === false}
                         onClick={() => onToggle?.(index)}
                       >
                         <span />

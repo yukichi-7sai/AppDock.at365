@@ -27,7 +27,7 @@ test('Applet page edits allow absent display overrides and reset them without em
   assert.equal(onlyPage.extensions[id].pages, undefined);
   assert.doesNotThrow(() => require('../out/main/shared/settings-schema').parseSettings(onlyPage));
 });
-function fixture() {
+function fixture(actions = {}) {
   let saved = { value: createDefaultSettings(), revision: 1 };
   saved.value.extensions['private.other'] = {
     enabled: false,
@@ -60,7 +60,7 @@ function fixture() {
       navigation,
       host: () => ({ settings: saved, extensions: applets, dark: false }),
       auxiliary: () => ({}),
-      actions: () => ({ sample: async () => ++calls }),
+      actions: () => ({ sample: async () => ++calls, ...actions }),
       changed() {},
     },
   );
@@ -142,6 +142,30 @@ test('public settings models never expose unrelated values; issued operations ar
   f.page.dispose();
   await assert.rejects(f.act({ kind: 'select', pageId: 'tts' }), /Stale/);
 });
+test('issued action errors return to their control without becoming page errors', async () => {
+  let attempts = 0;
+  const f = fixture({
+    saveDialog: async () => {
+      attempts++;
+      throw Error('MCPのURLを入力してください。');
+    },
+  });
+  const before = structuredClone(f.saved);
+  await assert.rejects(f.act({ kind: 'invoke', actionId: 'unknown' }), /許可/);
+  assert.match(f.page.snapshot().content.editing.error, /許可/);
+  const actionId = f.page.snapshot().content.actions.saveDialog;
+  await assert.rejects(f.act({ kind: 'invoke', actionId }, 'dialog-once'), /MCPのURL/);
+  assert.equal(f.page.snapshot().content.editing.error, '');
+  await assert.rejects(f.act({ kind: 'invoke', actionId }, 'dialog-once'), /MCPのURL/);
+  assert.equal(attempts, 1);
+  assert.deepEqual(f.saved, before);
+  await f.act({ kind: 'invoke', actionId: f.page.snapshot().content.actions.sample });
+  assert.equal(f.calls, 1);
+  assert.equal(f.page.snapshot().content.editing.error, '');
+  await assert.rejects(f.act({ kind: 'edit', action: { type: 'save' } }), /不正/);
+  assert.match(f.page.snapshot().content.editing.error, /不正/);
+});
+
 test('invalid input never enters projection; valid page writes persist with privacy and no global save', async () => {
   const f = fixture();
   await f.act({ kind: 'select', pageId: 'applet:fixture.a.b' });
