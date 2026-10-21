@@ -320,7 +320,7 @@ WallpaperSlideshowのページ内プレビューは、そのHTMLのnative dialog
 
 A〜Cに続き、画像選択の単一選択と重なったプレビュー、壁紙履歴のvendor梱包・Storage保存を実装した。Fの証拠は実行対象の版・hash・fixture条件と一緒に記録する。共通部品の参照だけを理由に、他のAppletを一括変更・再発行しない。
 
-更新が必要な正本文書は、registered-images、shell-pages／shell領域、applet-pagesの標準リボン、settings-sync、共通UIの利用手順、WallpaperSlideshowのREADME／DEVELOPMENT／VERIFICATION。実装完了後に本書の状態と実装到達点を更新する。
+更新が必要な正本文書は、registered-images、shell-pages／shell領域、applet-pagesの標準リボン、settings-sync、共通UIの利用手順、WallpaperSlideshowのdocs/usage.md／DEVELOPMENT／VERIFICATION。実装完了後に本書の状態と実装到達点を更新する。
 
 新しいShell領域を使う提供元のminimumHostVersionは、実際にその公開契約を提供したホスト版に合わせる。WallpaperSlideshowは利用するStorage／pageActions等の最低版を照合し、UI bundleを共用するという理由だけで根拠のない最低版やSDK更新を設定しない。
 

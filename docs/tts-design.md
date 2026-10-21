@@ -243,7 +243,7 @@ TTSジョブは生成から再生までを1件ずつ順番に実行し、先行�
 
 主な対象はsrc/shared/appdock-api.ts、src/main/core/appdock-api.ts、src/main/index.ts、設定Schema/カタログ、Applet/MCPの許可保存、Shell設定モデル・描画、Nodeの共通API型と関連試験。新規サービスはsrc/main/core/配下へ置く。既存通信・SDKを一括置換しない。
 
-利用説明はREADME、API契約は本書とappdock-api/automation/extensions、保存領域はsettings-sync、実測はVERIFICATIONへ記載する。TTS設定とPC専用キー保存の追加により、[共通手順](development-workflow.md)に従って本体を0.34.1から0.35.0へマイナー更新した。未変更Appletの再発行は不要。
+利用説明はusage.md、API契約は本書とappdock-api/automation/extensions、保存領域はsettings-sync、実測はVERIFICATIONへ記載する。TTS設定とPC専用キー保存の追加により、[共通手順](development-workflow.md)に従って本体を0.34.1から0.35.0へマイナー更新した。未変更Appletの再発行は不要。
 
 ## 検証と受入条件
 

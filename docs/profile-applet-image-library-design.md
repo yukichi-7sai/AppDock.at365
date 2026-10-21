@@ -25,7 +25,7 @@
 - `src/main/core/profile.ts`の`saveUserSettings`は画像検証、`data/assets/profile/<元ファイル名>`への登録、設定保存をまとめている。`src/main/index.ts`は画像の読取・hash監視・`appdock://host/avatar.png`配信を持つ。
 - `ui-presentation.ts`は`profile`だけを特別扱いし、画像、名前のツールチップ、頭文字、プロフィール設定への遷移を投影している。
 - 現行のAppletページはリボンへ登録できるが、設定画面だけを開くために空のHTMLページを作る契約にはしない。汎用の宣言型ボタンを追加する。
-- グループとコマンドボタンは共通の`RibbonIconPicker`で7種類の固定アイコンを選ぶ。登録画像への拡張余地は[既存設計](ribbon-customization-design.md#固定アイコンと将来の登録)にある。
+- グループとコマンドボタンは共通の`RibbonIconPicker`で7種類の固定アイコンを選ぶ。登録画像への拡張余地は[既存設計](ribbon-customization-design.md#固定アイコンと登録画像)にある。
 - WebAppletは選択・取得した画像を32pxのPNG data URLにしてレコードの`icon`へ保存し、`PageCollections`がリボン用の`iconImage`へ投影する。これは互換読取として残す。
 - 既存の`images.normalize`、一時的な`pages.registerImages`、共有原素材のライブラリーは用途と寿命が異なる。既存APIの名前・制約・権限を勝手に置き換えない。
 
@@ -247,7 +247,7 @@ null/未指定はその層の画像指定なしとし、下位の提供元表示
 
 本体の主な対象は`src/shared/{contracts,settings-schema,setting-definitions,applet-pages,ribbon,ribbon-layout,shell}.ts`、`src/main/core/{profile,ui-presentation,host-api,page-collections,data-paths}.ts`、`src/main/index.ts`、`src/preload/`、`src/renderer/settings*`、`shells/default`、`dotnet/AppDock.SDK`と`dotnet/AppDock.Runtime`。新しい画像サービスと共通部品は各層へ追加する。実装時に参照箇所を再検索し、既存APIと内部名の混同を防ぐ。
 
-現行文書の更新先は[設定基盤](settings-foundation.md)、[保存領域](settings-sync.md)、[Applet API](extensions.md)、[Appletページ](applet-pages.md)、[リボン](ribbon-customization-design.md)、[Shell API](shell-api.md)、[WebApplet](web-applets.md)、READMEの利用者向け入口。共有先指定設計の素材一覧にも共通画像とグループ設定の境界を追記する。今回はこれらの現行仕様を書き換えない。
+現行文書の更新先は[設定基盤](settings-foundation.md)、[保存領域](settings-sync.md)、[Applet API](extensions.md)、[Appletページ](applet-pages.md)、[リボン](ribbon-customization-design.md)、[Shell API](shell-api.md)、[WebApplet](web-applets.md)、usage.mdの機能・操作・設定の入口。共有先指定設計の素材一覧にも共通画像とグループ設定の境界を追記する。今回はこれらの現行仕様を書き換えない。
 
 ## 受け入れ条件と検証計画
 

@@ -1,6 +1,6 @@
 # 本体とAppletの共通更新
 
-利用者向けの操作は[README](../README.md#アップデート)を参照。framework-dependent .NET 10単一ファイル`AppDock.Updater.exe`をportable本体のresourcesへ同梱する。.NET 10 Runtimeの従来要件以外の導入は不要。
+利用者向けの操作は[アップデートの操作説明](usage.md#アップデート)を参照。framework-dependent .NET 10単一ファイル`AppDock.Updater.exe`をportable本体のresourcesへ同梱する。.NET 10 Runtimeの従来要件以外の導入は不要。
 
 ## 設定と取得
 

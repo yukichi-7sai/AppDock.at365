@@ -1,12 +1,14 @@
 # AppDock.at365 開発ガイド
 
+機能の説明・操作方法・設定・既定値・動作環境は[機能・操作・設定](docs/usage.md)を参照してください。共通の文書構成は[ドキュメント方針](docs/documentation.md)に従います。
+
 全ローカルUIのアクセント色と新しい画面の追加規則は[共通配色](docs/appearance.md)を参照してください。画面ごとにパレットを定義せず、共通CSS変数を利用します。
 
 ## 発行・配置ファイルの保存先
 
 標準発行先は `A:\40.ARTIFACT\AppDock.at365` です。`publish.bat`はソースrepo、`deploy.bat`は発行先から実行します。配置用ファイル・設定の保持とテンプレートの更新は[共通発行手順](docs/publishing.md)を参照してください。
 
-現在のコードを基準に、開発環境と機能別の仕様・検証への入口をまとめます。利用方法は[README](README.md)、作業規則は[AGENTS](AGENTS.md)、実測結果は[VERIFICATION](VERIFICATION.md)を参照してください。
+現在のコードを基準に、開発環境と機能別の仕様・検証への入口をまとめます。インストールとビルドの概要は[README](README.md)、作業規則は[AGENTS](AGENTS.md)、実測結果は[VERIFICATION](VERIFICATION.md)を参照してください。
 
 ## 文書の入口
 

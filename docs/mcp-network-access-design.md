@@ -143,7 +143,7 @@ networkHostnamesの変更は保存後に検査規則を差し替える。bind変
 
 変更箇所は`automation.ts`（保存・状態・操作・切替）、`automation-mcp.ts`（bind・HTTP検査・受付世代・接続分類）、`src/shared/automation.ts`、`src/main/index.ts`の本体／Shell操作接続、`CodexSettings.tsx`、`src/shared/settings-catalog.ts`。Host検証の純粋関数は新しい小さなモジュールへ分けてもよい。共通APIとcodex-registrationの操作契約は変更しない。
 
-実装時に[現行仕様](automation.md)、READMEの利用手順、開発ガイドの関連試験を更新する。設定項目追加なので実装完了時はその時点の本体版からマイナー更新し、通常publishを行う。設計だけの段階では版更新・発行・コミットを行わない。
+実装時に[現行仕様](automation.md)、usage.mdの利用手順、開発ガイドの関連試験を更新する。設定項目追加なので実装完了時はその時点の本体版からマイナー更新し、通常publishを行う。設計だけの段階では版更新・発行・コミットを行わない。
 
 | 確認対象 | 必須の確認 |
 | --- | --- |

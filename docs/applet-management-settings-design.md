@@ -289,7 +289,7 @@ commit後に削除先へ別のフォルダーが作成されていた場合や�
 | 5. 旧ページ廃止 | 本体renderer、標準リボン、ホーム等の移動、AboutSettings | 旧タブを持たず、保存済み入口と代替が必要な実用操作を維持する |
 | 6. 文書・配布 | 関係文書、必要試験、対象版と固定EXE | 共通手順どおりレビュー・必要な検証・発行確認を終える |
 
-実装時には[設定基盤](settings-foundation.md)、[本体統合](settings-host-ui-design.md)、[共通更新](updates.md)、[ショートカット](keybindings.md)、[ジェスチャー](gestures.md)、[本文とログ](shell-pages.md)、[Appletページ](applet-pages.md)、利用者向けREADMEを現行仕様へ更新する。Webサイト管理画面そのものの再設計は混ぜない。
+実装時には[設定基盤](settings-foundation.md)、[本体統合](settings-host-ui-design.md)、[共通更新](updates.md)、[ショートカット](keybindings.md)、[ジェスチャー](gestures.md)、[本文とログ](shell-pages.md)、[Appletページ](applet-pages.md)、機能・操作・設定の開発文書を現行仕様へ更新する。Webサイト管理画面そのものの再設計は混ぜない。
 
 リポジトリの`AGENTS.md`にある「Applet詳細の固定タブ」「Applet詳細と全体設定の両入口」も、実装完了時に新しい管理・移動契約へ更新する。実装に合わせて本体の作業ルールと参照文書も更新する。版更新の区分は実装時の保存／公開契約の変更と直前の発行版を基に、[共通手順](development-workflow.md)で決める。
 

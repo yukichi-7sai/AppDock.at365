@@ -49,7 +49,7 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 3. **保存と表示更新をつなぐ。** 設定はSettingsStore経由で更新し、全JSONの独自書き込みを避けます。状態をメモリへ追加した場合はsnapshotへ含め、`changed()`またはmanagerのchangedイベントでrendererへ通知します。既存の変更通知はまとめて送られます。React側では更新が届くまで待つ必要があります。
 4. **SDKへ公開する。** .NETは[Contracts.cs](../dotnet/AppDock.SDK/Contracts.cs)のインターフェースと型、[ExtensionContext](../dotnet/AppDock.Runtime/ExtensionContext.cs)の実装を対応させます。Nodeは[NodeExtensionContext](../src/main/node-worker.ts)とactivate時に渡すcontextの実装を対応させます。片方だけ対応する場合はAPI仕様に明記し、未対応なのに型だけ存在する状態を避けます。
 5. **購読やリソースの寿命を定める。** 解除用IDisposable／関数を返し、deactivateと通信断で解除します。.NETのコマンド／設定変更を直列化する `commandLock`を保持したまま、同じロックを再取得する処理を呼ばないようにします。ホストへ要求するだけなら別方向のRPCで返答を処理できますが、逆方向の処理完了を相互に待つ循環を作らないでください。
-6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletのREADMEには必要なAppDockバージョンを記載します。manifestの`minimumHostVersion`で起動前に最小ホストバージョンを確認します。配布時にも必要バージョンを明記してください。APIの能力交渉はありません。`apiVersion: 1`だけで旧ホストが新APIを提供すると判断しません。既存引数の意味やSDKの契約を壊す場合は、移行方法とAPIバージョンを別途設計します。
+6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletの開発文書（`docs/usage.md`など）には必要なAppDockバージョンを記載します。manifestの`minimumHostVersion`で起動前に最小ホストバージョンを確認します。配布時にも必要バージョンを明記してください。APIの能力交渉はありません。`apiVersion: 1`だけで旧ホストが新APIを提供すると判断しません。既存引数の意味やSDKの契約を壊す場合は、移行方法とAPIバージョンを別途設計します。
 
 新APIがAppletプロセスからだけ使われる場合、preload/renderer IPCへの追加は不要です。Applet通信とReact用IPCは別の境界です。
 
@@ -123,7 +123,7 @@ node scripts/test-ui.cjs ../../40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at
 
 Windows SDKへのアクセス制限がある環境はビルド未確認として扱い、許可された実行環境で再確認します。実行中EXEの書き込みロックがあれば、その配置先を通常終了するか別出力先を使います。無関係な既存アプリを止めません。
 
-完成後は[ドキュメント方針](documentation.md)に従い、必要なホストバージョンと利用者が配置するファイルをREADMEへ、開発・検証の手順をDEVELOPMENTまたはこのガイドへ、実機条件と限界・結果・成果物のVersion／SHA256をVERIFICATIONへ記録します。Gitではsourceとdocsを管理し、publish・.artifacts・設定・秘密情報は除外します。
+完成後は[ドキュメント方針](documentation.md)に従い、READMEにはインストール方法とビルド方法だけを記載します。必要なホストバージョンと配布ファイルの詳細はdocs/usage.mdへ、開発・検証の手順はDEVELOPMENTまたはこのガイドへ、実機条件と限界・結果・成果物のVersion／SHA256はVERIFICATIONへ記録します。Gitではsourceとdocsを管理し、publish・.artifacts・設定・秘密情報は除外します。
 
 ## 宣言コマンドと構造化フォームの検証
 

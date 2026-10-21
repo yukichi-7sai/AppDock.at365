@@ -5,7 +5,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 ## 文書と作業範囲
 
 - 現行仕様は現在のコードと[開発ガイド](DEVELOPMENT.md)から参照する機能別文書を正本とする。導入版ごとの説明を現行文書へ積み重ねない。実測・未確認事項・成果物のhashはVERIFICATIONへ記録し、過去の成功を現在の動作確認とみなさない。
-- 利用者向けREADME、開発手順、検証記録の分担は[文書方針](docs/documentation.md)に従う。共通仕様を各Appletへ複製せず、変更時は参照先・関連する型・試験を整合させる。
+- READMEはインストール方法とビルド方法だけとし、機能・操作・設定・既定値などは開発文書へ置く。入口と検証記録の分担は[文書方針](docs/documentation.md)に従う。共通仕様を各Appletへ複製せず、変更時は参照先・関連する型・試験を整合させる。
 - 設定は[設定基盤](docs/settings-foundation.md)と[本体統合](docs/settings-host-ui-design.md)を正本とする。全体設定とApplet詳細は本体rendererで共用し、設定をShell差し替え領域へ戻さない。
 
 ## 実装と配布

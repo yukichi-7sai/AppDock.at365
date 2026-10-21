@@ -243,7 +243,7 @@ Window管理・保存済み設定と入力受付・ナビゲーション・通�
 | `src/shared/extension-commands.ts`、`src/main/core/extensions.ts` | manifest条件、利用可否、別名・動的登録との統合 |
 | `src/main/core/host-api.ts`、`src/main/node-worker.ts`、.NET SDK/Runtime | 自己状態の取得・購読と世代検査。既存APIは維持 |
 | 共通コマンド・入力・トレイ・外部操作の投影 | 条件と利用不可理由の共用、実行直前検査 |
-| 現行Shell文書・設定文書・Applet API・README | 実装完了時に現行契約へ反映。本書だけを実装済みにしない |
+| 現行Shell文書・設定文書・Applet API・usage.md | 実装完了時に現行契約へ反映。本書だけを実装済みにしない |
 
 ## 実装の段階と完了条件
 

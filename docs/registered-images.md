@@ -116,7 +116,7 @@ IDはApplet内で安定させる。リボンIDは`applet:<Applet ID>:<id>`。act
 
 ## プロフィールと既存データ
 
-独立repo [Applet.Profile.at365](../../Applet.Profile.at365/README.md)の`at365.profile`が名前・アバターの自己設定と宣言型リボンを提供する。本体はこのIDや設定キーを固定参照しない。初期リボンは下寄せ・画像のみ・固定名「プロフィール」。未選択時はuserアイコン。
+独立repo [Applet.Profile.at365](../../Applet.Profile.at365/docs/usage.md)の`at365.profile`が名前・アバターの自己設定と宣言型リボンを提供する。本体はこのIDや設定キーを固定参照しない。初期リボンは下寄せ・画像のみ・固定名「プロフィール」。未選択時はuserアイコン。
 
 新規ホスト設定にはtop-levelの`profile`を作らない。旧`profile`は解釈しない値として保存時に保持し、旧`profile`リボンIDも設定内に保持する。旧`data/assets/profile/`や`avatar.png`は削除・コピー・自動移行しない。新Appletを導入して名前と画像を選び直す。WebAppletの既存`icon`も保持し、`image`を選んだ場合に優先する。
 

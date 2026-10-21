@@ -1,5 +1,13 @@
 # 検証記録
 
+## 2026-10-21: 本体と全AppletのREADME・開発文書の整理
+
+- 本体とGmail・Profile・WallpaperSlideshow・Watch・WebApplet・WebBrowserTools・WindowsToolsの8repoで、READMEを「インストール方法」「ビルド方法」の2章へ統一。本体は460行から19行、各Appletは17～18行。機能・操作・設定・既定値・動作環境・保存先・互換性等の本文は各`docs/usage.md`へ移し、DEVELOPMENT冒頭から案内した。
+- 移動前のHEADと本文・コードブロックを比較し、説明と2つの設定／配置例を保持した。元のWindowMover独立repoへの無効リンクは統合先WindowsToolsへ整理し、WebAppletの案内を一覧へ追加。移動先を含む相対リンクと見出しを照合し、リンク切れを解消した。
+- 共通AGENTSと本体・対象Appletの指示、`docs/documentation.md`、Applet/ホスト開発・Release手順と設計書の文書更新先を新方針へ統一。既存の機能別仕様は本文を複製せず、参照先を更新した。
+- 壁紙の既存JSON例検証は`docs/usage.md`を読むように追従。`dotnet run --project .\Applet.WallpaperSlideshow.RegressionTests -c Release`は通常ユーザー環境で9つのPASS群・終了0。制限内の同一コマンドは詳細のないビルド失敗（終了1）だったため、製品・依存・検査を変えず再実行した。模擬デスクトップ等の既存回帰であり、実壁紙・実Explorer・物理入力の検証ではない。
+- 8repoと共通repoの`git diff --check`成功。本文保持・READMEの2見出し・DEVELOPMENTからの入口・リンク・文書hashと基準commitの証跡は`.artifacts/readme-docs-20261021/validation.json`、再確認用スクリプトは同じフォルダーの`validate.cjs`。差分レビューで製品コード・manifest・既定値・保存仕様への変更がないことを確認した。文書と参照先テストだけの変更として、版更新・発行・GUI・commit・push・Release・実利用deployは行わない。
+
 ## 2026-10-21: 割り当てカードの見出し・余白と通知の説明位置（0.76.5）
 
 - 全体設定のショートカット一覧を`SettingsSection`へそろえ、「ショートカット割り当て」「マウスジェスチャー割り当て」とhint「＋で割り当てを追加します。」を追加。ジェスチャーだけの上余白を削除し、両方の本文paddingとヘッダーからの距離を同じ共通規則へ統一した。Applet詳細の共用一覧へ見出しを重ねず、割り当ての保存・検索・並べ替え・追加ダイアログは保持した。

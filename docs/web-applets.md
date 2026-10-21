@@ -1,6 +1,6 @@
 # WebApplet
 
-WebAppletは独立した[Applet.WebApplet.at365](../../Applet.WebApplet.at365/README.md)が提供するNode Appletです。AppDock 0.45.0以上で動作し、Applet側に.NETやElectronを含めません。サイト管理・推奨設定の取得はApplet、ページ表示・Webアカウント・Cookie保存はホストの共通APIが担当します。
+WebAppletは独立した[Applet.WebApplet.at365](../../Applet.WebApplet.at365/docs/usage.md)が提供するNode Appletです。AppDock 0.45.0以上で動作し、Applet側に.NETやElectronを含めません。サイト管理・推奨設定の取得はApplet、ページ表示・Webアカウント・Cookie保存はホストの共通APIが担当します。
 
 ## 導入と操作
 

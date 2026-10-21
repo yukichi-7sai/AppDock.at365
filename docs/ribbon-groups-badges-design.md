@@ -268,7 +268,7 @@ type RibbonBadge =
 
 ## Gmailへの接続
 
-[現在の監視処理](../../Applet.Gmail.at365/src/monitor.ts)の`pending`を使う。これは確認できた未読の新着スレッド数で、同一スレッド内の複数メールを1件として数える。起動時に確認した未読の取り込み、既読化、状態未確認の扱いは[現在のGmail仕様](../../Applet.Gmail.at365/README.md)を維持する。
+[現在の監視処理](../../Applet.Gmail.at365/src/monitor.ts)の`pending`を使う。これは確認できた未読の新着スレッド数で、同一スレッド内の複数メールを1件として数える。起動時に確認した未読の取り込み、既読化、状態未確認の扱いは[現在のGmail仕様](../../Applet.Gmail.at365/docs/usage.md)を維持する。
 
 Gmailのworkerで、全体監視がONかつアカウント別監視がONの現在存在するアカウントだけを集計し、`pageId: "gmail"`へ発行する。削除済みアカウントや監視を停止したアカウントを集計しない。既存のmonitor更新が完了した後に合計し、前回と同じ値なら送信を省略する。
 
