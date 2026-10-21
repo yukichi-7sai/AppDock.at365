@@ -4,6 +4,7 @@ import { WindowStateStore, restoreWindowBounds } from './window-state';
 import type { PageDisplay } from '../../shared/applet-pages';
 import { PageImageRegistry } from './page-images';
 import { appearanceArguments, registerAppearance } from './appearance-host';
+import { registerDisplayZoom } from './display-zoom-host';
 
 interface PageHost {
   window(): BrowserWindow | null;
@@ -198,6 +199,7 @@ export class AppletSurface {
       },
     });
     this.contentView.addChildView(this.ui);
+    registerDisplayZoom(this.ui.webContents);
     if (!options.remote && options.preload) registerAppearance(this.ui.webContents, options.url);
     if (options.pageImages && options.key && options.appletId) {
       this.images = new PageImageRegistry(
@@ -274,7 +276,11 @@ export class AppletSurface {
     );
   }
   get size() {
-    if (this.mode === 'page') return { width: bounds?.width ?? 1, height: bounds?.height ?? 1 };
+    // Consumers lay out native child Views in DIPs, not the renderer's CSS coordinates.
+    if (this.mode === 'page') {
+      const { width, height } = this.ui.getBounds();
+      return { width, height };
+    }
     const [width, height] = this.standalone?.getContentSize() ?? [1, 1];
     return { width, height };
   }
@@ -314,6 +320,7 @@ export class AppletSurface {
       },
     });
     this.standalone = window;
+    registerDisplayZoom(window.webContents);
     this.state.track(window);
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     const layout = () => this.layout();
@@ -407,7 +414,16 @@ export class AppletSurface {
       this.parent = window;
     }
     const [width, height] = window.getContentSize();
-    const rect = this.mode === 'page' ? bounds! : { x: 0, y: 0, width, height };
+    const zoom = window.webContents.getZoomFactor();
+    const rect =
+      this.mode === 'page'
+        ? {
+            x: Math.round(bounds!.x * zoom),
+            y: Math.round(bounds!.y * zoom),
+            width: Math.round(bounds!.width * zoom),
+            height: Math.round(bounds!.height * zoom),
+          }
+        : { x: 0, y: 0, width, height };
     const area = {
       x: Math.min(rect.x, width),
       y: Math.min(rect.y, height),

@@ -15,6 +15,7 @@ import {
 
 export const deviceHostKeys = [
   'theme',
+  'zoomFactor',
   'accentColor',
   'customAccentDark',
   'customAccentLight',

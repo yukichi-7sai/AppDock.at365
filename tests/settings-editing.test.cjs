@@ -93,8 +93,8 @@ test('hint visibility defaults on, preserves false, validates input and stays in
   const pages = settingsCatalog(applets, settings);
   const page = pages.find((p) => p.id === 'appearance');
   assert.deepEqual(
-    page.items.slice(0, 3).map((i) => i.key),
-    ['theme', 'accentColor', 'showHints'],
+    page.items.slice(0, 4).map((i) => i.key),
+    ['theme', 'zoomFactor', 'accentColor', 'showHints'],
   );
   const projection = settingsProjection(settings, page, applets);
   projection.host.showHints = false;

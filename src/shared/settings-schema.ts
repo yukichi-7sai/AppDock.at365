@@ -1,4 +1,5 @@
 import { parseMcpRoster } from './mcp-client';
+import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import { defaultAccentColor, defaultCustomAccent, isAccentColor, isAccentHex } from './appearance';
 import { defaultTtsSettings, parseTtsSettings } from './tts';
 import { defaultAiSettings, parseAiSettings } from './ai';
@@ -36,6 +37,7 @@ export const createDefaultSettings = (): Settings => ({
   host: {
     shellProviders: {},
     theme: 'light',
+    zoomFactor: defaultZoomFactor,
     accentColor: defaultAccentColor,
     customAccentDark: defaultCustomAccent.dark,
     customAccentLight: defaultCustomAccent.light,
@@ -97,6 +99,13 @@ export function parseSettings(value: unknown): Settings {
     throw new Error('theme は dark / light / system です。');
   if (!isAccentColor(value.host.accentColor))
     throw new Error('host.accentColor は定義済みのアクセントパレットを指定してください。');
+  if (
+    typeof value.host.zoomFactor !== 'number' ||
+    !Number.isFinite(value.host.zoomFactor) ||
+    value.host.zoomFactor < minimumZoomFactor ||
+    value.host.zoomFactor > maximumZoomFactor
+  )
+    throw new Error('host.zoomFactor は 0.5～2（50～200%）の数値です。');
   for (const key of ['customAccentDark', 'customAccentLight'])
     if (!isAccentHex(value.host[key])) throw new Error(`host.${key} は #RRGGBB 形式の色です。`);
   for (const key of ['closeToTray', 'startMinimized'])

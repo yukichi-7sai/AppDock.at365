@@ -5,7 +5,7 @@ import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 
 const descriptions: Record<string, string> = {
   applets: 'インストール済みAppletの状態・更新・表示順を管理します。',
-  appearance: 'テーマ・アクセントカラー・ヒントの表示と、各領域のShellを設定します。',
+  appearance: 'テーマ・表示倍率・アクセントカラー・ヒントの表示と、各領域のShellを設定します。',
   general: '音の再生や、起動時・ウィンドウを閉じたときの動作を設定します。',
   notifications: '通知の種類ごとに、表示先・表示時間・読み上げを設定します。',
   tts: 'OpenAI互換のTTSサーバーで生成した音声を、このPCで再生します。',

@@ -1,4 +1,5 @@
 import { McpClientSettingsForm } from './McpClientSettings';
+import { displayZoomChoices, displayZoomLabel } from '../../shared/display-zoom';
 import { AccentColorPicker } from './AccentColorPicker';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
@@ -219,6 +220,29 @@ export function SettingsForm({
                   <option value="dark">Dark</option>
                   <option value="light">Light</option>
                   <option value="system">System</option>
+                </select>
+              </SettingRow>
+              <SettingRow pageId={category} itemKey="zoomFactor">
+                <select
+                  aria-label="表示倍率"
+                  value={settings.host.zoomFactor}
+                  onChange={(e) =>
+                    edit({
+                      ...settings,
+                      host: { ...settings.host, zoomFactor: Number(e.target.value) },
+                    })
+                  }
+                >
+                  {!displayZoomChoices.includes(settings.host.zoomFactor) && (
+                    <option value={settings.host.zoomFactor}>
+                      {displayZoomLabel(settings.host.zoomFactor)}
+                    </option>
+                  )}
+                  {displayZoomChoices.map((factor) => (
+                    <option key={factor} value={factor}>
+                      {displayZoomLabel(factor)}
+                    </option>
+                  ))}
                 </select>
               </SettingRow>
               <SettingRow pageId={category} itemKey="accentColor">

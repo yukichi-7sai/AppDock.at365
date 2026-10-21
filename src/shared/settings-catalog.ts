@@ -68,6 +68,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
   ],
   appearance: [
     ['theme', 'テーマ', 'ワークスペースの明るさを選びます。'],
+    [
+      'zoomFactor',
+      '表示倍率',
+      'Electronで表示する本体・リボン・Applet・Webページ・通知を50～200%で拡大・縮小します。.NETのウィンドウは対象外です。',
+    ],
     ['accentColor', 'アクセントカラー', 'テーマとは別に、ボタンや選択状態の配色を選びます。'],
     ['showHints', 'ヒントの表示', '設定画面にヒントを表示します。'],
     ...shellRegions.map(({ id, title }): [string, string] => [
@@ -398,6 +403,7 @@ export function settingsPaths(
     case 'appearance':
       return [
         'theme',
+        'zoomFactor',
         'accentColor',
         'customAccentDark',
         'customAccentLight',

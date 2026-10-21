@@ -1,5 +1,10 @@
 import { McpClientSettings, McpSettingsError } from './core/mcp-client-settings';
 import {
+  configureDisplayZoom,
+  registerDisplayZoom,
+  refreshDisplayZoom,
+} from './core/display-zoom-host';
+import {
   appearanceArguments,
   configureAppearance,
   registerAppearance,
@@ -289,6 +294,7 @@ if (locked) {
   }
 }
 const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
+configureDisplayZoom(() => settings.value.host.zoomFactor);
 configureAppearance(
   () =>
     resolveAppearance(settings.value.host.accentColor, nativeTheme.shouldUseDarkColors, 0, {
@@ -1569,6 +1575,7 @@ function refreshWindowTheme() {
 }
 function applySettings() {
   try {
+    refreshDisplayZoom();
     pageCollections?.reconcile();
     trayClicks?.cancel();
     nativeTheme.themeSource = settings.value.host.theme;
@@ -3311,6 +3318,7 @@ async function initialize() {
     },
   });
   primaryWindowCreated = true;
+  registerDisplayZoom(window.webContents);
   registerAppearance(window.webContents, hostDocumentUrl);
   if (process.platform === 'win32') {
     // Windows Shell needs a real file path, outside app.asar, for the taskbar icon.

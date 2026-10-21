@@ -13,6 +13,7 @@ import {
   type Input,
 } from 'electron';
 import fs from 'node:fs';
+import { registerDisplayZoom } from './display-zoom-host';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -728,6 +729,7 @@ export class WebAccountController {
         backgroundThrottling: false,
       },
     });
+    registerDisplayZoom(view.webContents);
     this.park(view);
     this.views.set(id, view);
     this.statuses.set(id, {
@@ -920,7 +922,19 @@ export class WebAccountController {
     this.checkSurfaceVisibility();
     if (!this.window || !this.attached) return;
     const { width: w, height: h } = this.surface!.size;
-    const area = this.viewport ?? { x: 236, y: 146, width: w - 236, height: h - 146 };
+    const zoom = this.surface!.ui.webContents.getZoomFactor();
+    const logical = this.viewport ?? {
+      x: 236,
+      y: 146,
+      width: w / zoom - 236,
+      height: h / zoom - 146,
+    };
+    const area = {
+      x: Math.round(logical.x * zoom),
+      y: Math.round(logical.y * zoom),
+      width: Math.round(logical.width * zoom),
+      height: Math.round(logical.height * zoom),
+    };
     const visible = this.surface!.visible && this.viewport !== null && area.x < w && area.y < h;
     if (!visible) {
       this.park(this.attached);

@@ -4,12 +4,17 @@ export function desktopNotificationBounds(
   work: Rectangle,
   tray: Rectangle | undefined,
   desiredHeight: number,
+  zoom = 1,
 ) {
   const margin = Math.min(12, Math.max(0, Math.min(work.width, work.height) / 8));
-  const width = Math.max(1, Math.min(440, work.width - margin * 2));
+  const width = Math.max(1, Math.min(440 * zoom, work.width - margin * 2));
   const height = Math.max(
     1,
-    Math.min(Math.ceil(desiredHeight), Math.min(600, work.height * 0.6), work.height - margin * 2),
+    Math.min(
+      Math.ceil(desiredHeight * zoom),
+      Math.min(600 * zoom, work.height * 0.6),
+      work.height - margin * 2,
+    ),
   );
   const anchor =
     tray && tray.width > 0 && tray.height > 0

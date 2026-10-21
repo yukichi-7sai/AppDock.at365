@@ -1,6 +1,27 @@
 # 検証記録
 
-対象の現行版は`0.81.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.82.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+
+## 2026-10-22: 表示倍率0.82.0の動作確認後コミット
+
+- 利用者から表示倍率の動作確認完了とコミット・pushの指示を受けた。mainの変更25パスをレビューし、表示倍率の設定/保存/API、共通登録、Applet/Web/通知の座標、関連試験と文書が今回の対象であることを確認。追加の製品修正は行っていない。
+- 実装時の655入力と現在のSHA256が一致し、型検査/build、関連12ファイル92件、固定EXEのGUI11群とportable smokeの成功を再利用した。未実行だった標準回帰96ファイル740件を追加実行し、標準全108ファイル832/832（fail/skip/cancel 0）の成功が揃った。制限内のWindows/.NET/一時ファイル操作の失敗は保持し、同一コマンドを通常ユーザー権限で再実行して成功。試験前後のソース・生成物hashの一致も確認した。
+- 0.82.0の版・発行物を維持。EXEの168,993,727 bytes / SHA256 `12f602b85064cc27ac060c2512eb1d3e0a82f07d013c331fd38e4278c54d4324`、feed、ASARのpackageと生成モジュール、同梱Default Shell、固定GUI/smokeで用いたコピーとの一致を再確認した。再発行・Release・実利用先deployは行わない。
+- 開始時のGitHub/AQUAのmainは双方`3040c51081be93d08fe76dfff3fd131d92fcbcc5`でローカルHEADと一致。未コミット変更を保持してpull/stash/resetは行わず、実効author/committerを設定と照合した。対象パス、再利用判定、追加回帰のコマンド/完全ログ/終了コードとhash、stage tree/実ファイル/commit tree、commitと両push先端の照合は`.artifacts/commit-validation-display-zoom-0820/`へ記録する。
+
+## 2026-10-22: Electron画面の共通表示倍率（0.82.0）
+
+- cleanなmain `3040c51081be93d08fe76dfff3fd131d92fcbcc5`でbranch/upstream/worktreeを確認し、`pull --ff-only`はAlready up to date。既存の別worktreeは操作していない。
+- 「表示 → 共通」のテーマ直下へ表示倍率を追加。既定100%、フォーム50～200%、JSON/APIは`host.zoomFactor: 0.5～2`。PC専用保存・部分JSON・検索・リセット・共通APIへ接続し、100%は保存から省く。既存の保存値・データを自動変換しない。
+- 本体・Shellの全描画領域・ローカル/リモートApplet・Webアカウントの子WebContentsView・独立通知へ共通登録を接続。isolated zoomでorigin間の影響を分離し、設定変更・新規作成・再読込・遷移・再起動へ適用する。.NETが直接出すWindow、Windows標準UI、音声/画像処理workerは除外。
+- 発行前レビューで設定/API/保存、画面生成口、セキュリティ境界、座標、通知サイズと試験範囲を確認。埋め込み`AppletSurface.size`がCSSサイズをnative子Viewへ渡していた点を修正し、実ViewのDIPサイズへ統一。Applet/Webアカウントの座標変換と通知workAreaの制限を含め再確認し、未解決の指摘なし。レビュー記録は`.artifacts/display-zoom-validation-20261022/review.json`。設定項目追加のため0.81.0→0.82.0のマイナー更新。
+- 固定Node 24.21.0/pnpm 12.10.1、Windows x64、Electron 44.6.0で型検査・build・関連12ファイル92件（fail/skip 0）成功。設定/default/device/JSON/API・配色・通知境界・Webアカウントの既存回帰を含む。標準全回帰や入力フックの実キー試験は今回の変更範囲外のため再実行していない。完全ログ、コマンド/時刻/終了コード、入力一覧/SHA256は`.artifacts/display-zoom-validation-20261022/{typecheck-final,build-final,regression-complete}.json/.log`。
+- ソース隔離GUIは`.artifacts/display-zoom-ui-1792611760912/`で11群成功。50/75/100/125/150/200%、同じWebContentsを保持したpage/window/page切替、Web遷移・ローカル再読込、パレット、埋め込みオフラインWebアカウントのCSS→DIP変換、バナー/独立通知、再起動とPC別JSONを検査。native captureで拡大時の本体を確認し、各子描画面も個別に倍率と境界を検査した。
+- `publish.bat`成功。発行物の隔離コピーで同じGUI11群（`.artifacts/display-zoom-ui-1792611970498/`）と既存portable smoke（`.artifacts/smoke-1792612018732/`）成功。EXEコピー/元EXE/feedのサイズ・SHA256、app.asar内のpackage、同梱Default Shellの版、主要生成モジュール5件と現在outの一致を確認。記録は`.artifacts/display-zoom-validation-20261022/{gui-portable,smoke-portable,publish}.json/.log`と`artifacts.json`。
+- 発行先は`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`、168,993,727 bytes、SHA256 `12f602b85064cc27ac060c2512eb1d3e0a82f07d013c331fd38e4278c54d4324`。package/feed/同梱Default Shellは0.82.0。発行中にGUIドライバーへ実行版のassertだけを追加し、製品入力の不変とASAR内の生成物一致を確認した。最終型検査・回帰・固定EXE GUI/smokeの入力hashは前後一致。
+- 制限内のGUI接続待ちと.NET発行失敗は成功扱いせず、同じコマンドを通常ユーザー権限で再実行して成功。ソースGUIの追加試験ではショートカットを無効化したfixtureでキー操作を使っていたためパレット待ちに失敗し、公開コマンド呼出とfixture終了処理へ修正して再検証した。失敗profile `.artifacts/display-zoom-ui-1792611237339/`、`display-zoom-ui-1792611500175/`を保持。
+- 通知可否はfixtureで許可し、Webアカウントは隔離HTTPSハンドラーでオフライン化した。実ネットワーク、物理DPI変更、Windowsの実受信/ロック/全画面時通知、.NET独自Windowの実表示は今回の検証対象外。利用者による新版の実利用確認は待ち。
+- 整理: 今回の倍率専用ソースGUIの成功3回・固定EXE GUI1回と、失敗/再利用証跡を保持。削除候補なし。既存smokeの過去資料は他作業/再利用状況が不明のため保持し、診断用の一時スクリプトだけ除去。コミット・push・GitHub Release・実利用先deployは行っていない。仕様と画面追加規則の正本は[共通表示倍率](docs/display-zoom.md)。
 
 ## 2026-10-22: 0.81.0のコミット前確認
 

@@ -1,4 +1,5 @@
 import { WebContentsView } from 'electron';
+import { registerDisplayZoom } from './display-zoom-host';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -26,6 +27,7 @@ export function createShellView(
     },
   });
   view.setVisible(false);
+  registerDisplayZoom(view.webContents);
   view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   view.webContents.on('will-navigate', (event) => event.preventDefault());
   view.webContents.on('will-redirect', (event) => event.preventDefault());

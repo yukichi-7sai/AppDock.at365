@@ -5,6 +5,7 @@ import { NotificationSurfaceController } from './notification-surface-controller
 import { NotificationService } from './notification-service';
 import type { NotificationAvailability } from './notification-availability';
 import { desktopNotificationBounds } from './notification-desktop-layout';
+import { displayZoomFactor, registerDisplayZoom } from './display-zoom-host';
 /** One lazy independent presentation window; all content and deadlines remain in the service. */
 export class NotificationDesktopHost {
   private window?: BrowserWindow;
@@ -60,8 +61,9 @@ export class NotificationDesktopHost {
   }
   private viewport() {
     const { work, tray } = this.display();
-    const bounds = desktopNotificationBounds(work, tray, 600);
-    return { width: bounds.width, maxHeight: bounds.height };
+    const zoom = displayZoomFactor();
+    const bounds = desktopNotificationBounds(work, tray, 600, zoom);
+    return { width: bounds.width / zoom, maxHeight: bounds.height / zoom };
   }
   refresh() {
     if (this.disposed) return;
@@ -92,6 +94,7 @@ export class NotificationDesktopHost {
         webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
       });
       this.window = window;
+      registerDisplayZoom(window.webContents);
       window.setMenu(null);
       this.host = new NotificationSurfaceHost({
         window,
@@ -118,10 +121,11 @@ export class NotificationDesktopHost {
             return;
           }
           const { work, tray } = this.display();
-          const bounds = desktopNotificationBounds(work, tray, height);
+          const zoom = displayZoomFactor();
+          const bounds = desktopNotificationBounds(work, tray, height, zoom);
           if (JSON.stringify(window.getBounds()) !== JSON.stringify(bounds))
             window.setBounds(bounds, false);
-          view?.webContents.setZoomFactor(1);
+          view?.webContents.setZoomFactor(zoom);
           view?.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height });
           if (!window.isVisible()) window.showInactive();
         },

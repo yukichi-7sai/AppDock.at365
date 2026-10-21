@@ -1,4 +1,5 @@
 import type { AppletCommand, SettingDefinition } from './contracts';
+import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import {
   accentChoices,
   legacyAccentPalette,
@@ -8,6 +9,16 @@ import {
 
 const switches = ['on', 'off', 'toggle'] as const;
 export const hostSettingDefinitions: SettingDefinition[] = [
+  {
+    key: 'zoomFactor',
+    title: '表示倍率',
+    description: 'Electronの表示倍率。1が100%、0.5～2（50～200%）。',
+    type: 'number',
+    default: defaultZoomFactor,
+    minimum: minimumZoomFactor,
+    maximum: maximumZoomFactor,
+    automation: true,
+  },
   {
     key: 'accentColor',
     title: 'アクセントカラー',
