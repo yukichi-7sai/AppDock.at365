@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.77.8",
+  "version": "0.77.9",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -56,6 +56,7 @@
     "files": [
       "out/**/*",
       "assets/icon.png",
+      "assets/material-design-icons-LICENSE.txt",
       "package.json"
     ],
     "extraResources": [

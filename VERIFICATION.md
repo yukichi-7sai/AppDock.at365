@@ -1,6 +1,16 @@
 # 検証記録
 
-対象の現行版は`0.77.8`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.77.9`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+
+## 2026-10-21: カスタムコマンドのKeyboard Command Keyアイコン（0.77.9）
+
+- 0.77.8の発行・`b37fad2`のGitHub／AQUA push後、追加依頼によりカスタムコマンドのアイコンをGoogle Material DesignのKeyboard Command Keyへ変更。clean／main・追跡先と最新取得を確認し、共通`commandSettingsPages`を通じて設定インデックスと移動ボタンを同時に切り替えた。他のcommand／terminalアイコンは変更しない。
+- 公式リポジトリの24px SVGを取得し、pathが完全一致することを検査。文字フォントに依存せず、共通`Icon`の`currentColor`塗りとstrokeなしで描画する。出典・組み込み時の変更内容・Apache-2.0ライセンスを`assets/material-design-icons-LICENSE.txt`へ収録し、配布対象へ追加。組み立て済みapp.asar内の同ファイルがソースと一致することも確認した。保存仕様・設定キー・公開APIを変えない追加表示変更としてパッチを更新した。
+- 発行前レビューで阻害指摘なし。固定install・型検査・本体／Default Shell build・publishが終了0。固定Node 24.21.0／pnpm 12.10.1、LUNAで確認。693入力・821生成物とログを記録し、試験前後の差分はこの文書だけ。
+- 新しい固定EXEの`settings-hints-ui-test --command-navigation-only` **7群**とsmokeが成功。明暗×1280／760幅で共通アイコン・既存の非表示・左寄せ・左右余白・割り当て色・解除位置・移動／編集を確認し、生成画像の⌘を目視した。12余白条件・33色サンプル・15対象表示の位置を再照合。前段0.77.8のApplet単位判定を含む成功結果を最終版でも確認した。
+- unitの試験・import対象compiled main/shared・依存と条件を前段の証跡へ照合し、非影響の**702件**を再利用。native再生成・版依存の9ファイル**66/66**を追加実行して、標準は計**768/768、fail/skip 0**。この版の回帰は初回成功。
+- EXE／feed／Default Shellは**0.77.9 / 168969677 bytes / SHA256 `86ca07f984aa25c80e6fd1442cdeb2b3501937af392976bbf297cd65f6e07d89`**で一致。`A:\40.ARTIFACT\AppDock.at365`へ発行し、固定EXEコピー・設定／画像の保存先を確認。実利用設定・deploy・全体ZIP・未変更Applet再発行・公開Releaseは対象外。
+- 証跡: `.artifacts/settings-command-key-icon-20261021/validation.json`、`review.json`、`icon-source.json`、入力manifest、`regression-selection.json`、完全ログと隔離profile。前段の資料・失敗／不明出力・固定出力を保持し、今回は削除なし。専用プロセス終了を確認。stage／commit tree・名義・通常push後のGitHub／AQUA両main一致は同フォルダーへ記録する。
 
 ## 2026-10-21: Applet単位の割り当て表示と移動・解除の配置（0.77.8）
 

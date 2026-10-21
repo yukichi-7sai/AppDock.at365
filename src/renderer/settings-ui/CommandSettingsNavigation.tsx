@@ -6,7 +6,7 @@ import { CommandProviderFilter } from './CommandProviderFilter';
 export const commandSettingsPages = [
   { id: 'shortcuts', title: 'ショートカット', icon: 'keyboard' },
   { id: 'gestures', title: 'マウスジェスチャー', icon: 'mouse' },
-  { id: 'custom-commands', title: 'カスタムコマンド', icon: 'terminal' },
+  { id: 'custom-commands', title: 'カスタムコマンド', icon: 'keyboard-command-key' },
 ] as const satisfies { id: string; title: string; icon: IconName }[];
 export type CommandSettingsPage = (typeof commandSettingsPages)[number]['id'];
 export type CommandSettingsTarget = {
