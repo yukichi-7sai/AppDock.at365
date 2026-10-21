@@ -1,18 +1,6 @@
-# カスタムコマンド基盤の詳細設計
+# カスタムコマンド
 
-状態: 基盤を実装。保存版2と種類拡張を検証中。更新日: 2026-10-18。実測・未確認は[VERIFICATION](../VERIFICATION.md)を参照。
-
-[全体概要](mcp-hub-design.md)と[実装計画](mcp-hub-implementation-plan.md)に基づく契約。種類提供APIは0.60.0以降、現行の保存版2は0.62.0向けの変更。Node/.NET/nativeの種類ハンドラーは同じ保存・実行サービスを使用する。
-
-全種類共通の個別説明文、キー送信・プロセス起動、WindowsToolsのキー送信撤去は[拡張設計](custom-command-types-design.md)と[段階的実装計画](custom-command-types-implementation-plan.md)を参照する。保存形式はversion 2に一本化し、旧設定の移行は実装しない。
-
-## 目的と完了範囲
-
-本体および任意のAppletがコマンドの「種類」を提供し、その種類の設定を持つコマンドを共通UI・共通APIで動的に作成、保存、変更、削除できるようにする。保存したコマンドを既存のカタログ・入力経路・MCP公開へ接続する。
-
-基盤は種類の登録、永続定義、CRUD、実行、UI、Node/.NET契約を提供する。本体種類の実行はそれぞれ入力・プロセス・MCPの共通サービスへ接続する。既存の`commands.register`、`host.commands.replace`、`.NET Commands.ReplaceAsync`、manifest.commandsは互換性を維持する。
-
-通常製品に検証用の種類を同梱しない。本体はキー送信・プロセス起動・MCP実行の3種類を提供し、Appletを導入すると宣言された種類を追加できる。
+名前・説明・種類別の設定を保存し、パレット・ショートカット・ジェスチャー・トレイから実行する。保存ブロックはcustomCommands.version = 2。実行と管理は同じ共通API・権限・revision検査を使う。
 
 ## 用語と責務
 
@@ -61,7 +49,7 @@
 | description | 全種類共通の任意の説明。省略時は空文字、1,000 UTF-16コード単位以内。改行はLFへ揃え、公開コマンド一覧にも返す |
 | typeId | 種類宣言のID。作成後は変更不可。別種類への変更は別定義の作成として扱う |
 | owner | 作成時に本体が宣言から設定する。CRUD入力では指定・変更不可。実行時は現在の宣言との一致を必須とする |
-| configVersion | 種類が宣言する設定形式の版。第1段階の各種類は1つの版だけを扱う。版の更新は全configと同時に明示保存し、IDを保持する |
+| configVersion | 種類が宣言する設定形式の版。各種類は1つの版だけを扱う。版の更新は全configと同時に明示保存し、IDを保持する |
 | config | 種類のSchemaに一致するJSONオブジェクト。実行可能な関数や実行文脈を保持しない。種類が宣言したスクリプト文字列はデータとして保存し、基盤自体で評価しない |
 | enabled | 定義を実行可能にする指定。省略時true。提供元の起動・許可とは別 |
 | automation | 外部のcommands.list/executeへの公開指定。省略時false。種類の宣言を超える公開は不可 |
@@ -72,7 +60,7 @@ itemsの配列順は管理一覧の順序だけを表す。ショートカット
 
 このブロックは常に共有する。Appletごとの端末専用設定モードからは独立し、DeviceSettingsStoreで共有へ振り分ける。別PCで未導入の種類は保持して利用不可にする。提供元の有効状態は既存の端末別設定を使う。
 
-未対応の保存版は読込だけで変換・削除せず、実行と通常の定義編集を停止する。設定ページのJSON編集からversion 2の新しい一覧を明示保存できる。旧形式reader・インポート・旧IDの対応表・割当の自動付替えは提供しない。
+未対応の保存版は読込だけで変換・削除せず、実行と通常の定義編集を停止する。設定ページのJSON編集からversion 2の新しい一覧を明示保存できる。
 
 ### 上限と入力検証
 
@@ -85,7 +73,7 @@ itemsの配列順は管理一覧の順序だけを表す。ショートカット
 | configSchema | UTF-8 JSONで32KiB、入れ子32段。外部参照、非同期検証、コード評価を禁止 |
 | 1回の管理更新 | 32操作以内。MCPでは既存の要求本文64KiB制限も適用 |
 | 一覧 | 1ページ最大50件。config/Schema全文を含めない |
-| 実行結果 | JSONオブジェクト64KiB以内。画像・音声bytes・任意ファイル参照は第1段階の結果に含めない |
+| 実行結果 | JSONオブジェクト64KiB以内。画像・音声bytes・任意ファイル参照は結果に含めない |
 
 settings.json全体と設定ページJSONは既存codecの1MiB制限も受ける。個別上限内でも保存全体の上限を超える場合は保存前に拒否する。prototype系キー、重複ID、他提供元へのなりすまし、予約済みcommandIdとの衝突を拒否する。
 
@@ -117,7 +105,7 @@ Appletは新しいcapability `custom-commands`と、manifestの`customCommandTyp
 }
 ```
 
-例はmanifestの関連部分だけを示す。minimumHostVersionは第1段階の実装版を指定する。automationは省略時false。この宣言は「この種類の定義を利用者が外部公開できる」という上限であり、定義を自動公開しない。
+例はmanifestの関連部分だけを示す。minimumHostVersionは実装版を指定する。automationは省略時false。この宣言は「この種類の定義を利用者が外部公開できる」という上限であり、定義を自動公開しない。
 
 configSchemaはJSON Schema 2020-12とdraft-7の共通部分に限定し、SDKのAjv検証器を再利用する。型、properties/required/additionalProperties、items、数値/長さ/件数の境界、enum/const、allOf/anyOf/oneOf/not、ローカル`$defs`/`$ref`を扱う。循環参照・外部参照・pattern/format・未知keywordは宣言時に拒否し、ネットワークからSchemaを取得しない。許可したdialect宣言はSchema位置だけで除去して検証する。Schemaは宣言時に上限検査・コンパイルし、実行ごとに再コンパイルしない。
 
@@ -172,13 +160,11 @@ UIのextensionId/外部のappletIdには実際の提供元IDを投影し、本�
 
 外部同期も同じ検証・投影へ通す。端末間の三方向マージは追加せず、現在の「届いた有効な設定を採用する」規則を使う。自端末設定や別ページの内容を共有側へ書き戻さない。
 
-customCommandsがない旧設定は空として読む。初回読込だけで保存しない。未知の種類/設定版は構造・サイズを検査して保持し、実行とconfig編集を停止する。名前変更、削除、無効化は可能とし、有効化・公開追加・config変更は対応する宣言が確認できるまで拒否する。
+初回読込だけで保存しない。未知の種類/設定版は構造・サイズを検査して保持し、実行とconfig編集を停止する。名前変更、削除、無効化は可能とし、有効化・公開追加・config変更は対応する宣言が確認できるまで拒否する。
 
 提供元の更新で旧configVersionが使えなくなった場合は、旧値を参照できる読み取り専用表示と、現行形式の新しい入力を分ける。利用者が現行Schemaに合う全configとconfigVersionを明示保存したときだけ更新する。自動変換は行わず、定義IDと割当は保つ。
 
 未知のcustomCommands.versionはブロック全体を保持し、この機能を読み取り専用・実行不可にする。他ページの保存で消さないようcodecを設計する。JSON破損や既知形式の構造不正は、既存の正常世代/復旧の規則へ渡す。
-
-0.58.1以前のホストは新ブロックを保存時に保持する保証がない。ダウングレードや同期先の旧ホストで新定義を編集する前提を置かず、最低対応版と既存バックアップによる復旧を利用者向け文書に記載する。
 
 ## 共通APIとMCPの固定入口
 
@@ -276,7 +262,7 @@ sequenceDiagram
 
 同一commandIdの実行中の追加要求はBUSYとし、暗黙にキューへ積まない。異なるIDについては既存dispatcherと共通APIの直列化/再入制約を保つ。`BUSY`/`SELF_CALL`を解除してハンドラーから任意コマンドを再帰実行する仕様にはしない。
 
-第1段階のハンドラー待機は最大30秒。Node/.NETのRPC期限と取消を整合させ、タイムアウトで待機を終えても外部効果の停止を保証しない。長時間ジョブは第2段階以降のサービスで受付/状態取得へ分け、全コマンドのタイムアウトを無制限へ変更しない。
+ハンドラー待機は最大30秒。Node/.NETのRPC期限と取消を整合させ、タイムアウトで待機を終えても外部効果の停止を保証しない。長時間ジョブはサービスで受付/状態取得へ分け、全コマンドのタイムアウトを無制限へ変更しない。
 
 | 変更・障害 | 実行中と次回実行の扱い |
 | --- | --- |
@@ -315,53 +301,134 @@ sequenceDiagram
 
 このページのJSON投影はcustomCommandsの管理可能フィールドだけとし、ownerは変更不可。JSON入力もCRUDと同じ検証・保存経路へ変換し、他ページの設定や許可を更新できないようにする。更新中は対象before値を検査し、無関係な外部編集を上書きしない。検索索引は静的な項目説明だけを含み、config値を索引化しない。
 
-保存モードのツールバーは「共有」と分かる固定表示にし、Appletの保存先切替を流用しない。共有モードを選んだ既存Applet設定と端末専用のApplet設定は、今回のページから変更しない。
+保存モードのツールバーは「共有」と分かる固定表示にし、Appletの保存先切替を流用しない。共有モードを選んだ既存Applet設定と端末専用のApplet設定は、ページから変更しない。
 
-## 実装の主な影響先
+### 保存と編集
 
-以下は配置案。新規ファイル名は役割に応じて調整できるが、既存機能の別実装を作らない。
+`CustomCommandDefinition.description`を文字列として追加する。個別コマンドの用途、実行されること、対象、使用条件を書く任意項目とし、すべての本体／Applet種類に適用する。
 
-| 場所 | 変更する責務 |
-| --- | --- |
-| src/shared/custom-commands.ts（新規） | 保存型、descriptor、共通検証、カタログ型 |
-| src/main/core/custom-commands.ts（新規） | 単一サービス、CRUD、投影、実行前検査 |
-| src/shared/contracts.ts、settings-schema.ts | 任意ブロック、互換読込、未知版の保持 |
-| src/main/core/device-settings-store.ts、settings-commands.ts | 共有保存の振分け、revision、原子的更新 |
-| src/shared/appdock-api.ts、src/main/core/appdock-api.ts、automation-commands.ts | 固定の管理API、管理コマンド、許可、公開カタログへの合流、カスタム結果 |
-| src/main/core/extensions.ts、host-api.ts、node-worker.ts | 種類宣言、所有者、登録、RPC、停止時処理 |
-| dotnet/AppDock.SDK、dotnet/AppDock.Runtime | 互換性を保つ追加サービス、結果、取消、実行文脈 |
-| src/main/index.ts、command-contexts.ts、入力/トレイのカタログ | 同じ一覧と実行経路への接続、所有者、変更通知 |
-| settings-catalog.ts、設定ページController、本体renderer/settings-ui | ページ投影、共通一覧/フォーム/JSON、競合表示 |
-| tests、tests/fixtures、scripts | 保存/権限/実行の契約、Node/.NET fixture、隔離GUI |
+- 未入力は空文字列。最大1,000 UTF-16コード単位（JavaScriptの`string.length`）とする。
+- 複数行を許可し、CRLF／CRはLFへ正規化する。改行・タブ以外のC0制御文字とDELを拒否する。
+- HTMLとして解釈せず、プレーンテキストとして表示する。本文の途中の改行・空白を維持する。
+- 新規追加で省略した場合は空文字列。更新で省略した場合は現在値を保持し、明示的な空文字列で消去する。
+- 種類の`description`を自動コピーしない。コマンドの説明を、種類の説明、下流ツールの説明、実行設定と混同しない。
+- 説明文だけの変更は、commandId・typeId・owner・configVersion・typeRevision・入力割当を変更しない。実行中の処理も取り消さず、次回の一覧取得へ反映する。
 
-既存の命名ではextensionsとAppletが混在するため、型や内部名の一括改名はしない。WindowsToolsのキー送信撤去は[種類拡張の契約](custom-command-types-design.md)に従い、本体の入力APIとSDKは維持する。
+共通の追加／編集ダイアログで「名前」の次に「説明」を置き、その後に種類別の設定を表示する。種類を切り替えても名前と説明は保持する。公開ONの場合に外部AIへ説明が渡ることを短く案内する。JSON編集と`appdock.customCommands.update`でも同じ項目を扱う。
 
-## 検証計画
+説明文の例: 「ブラウザーで新しいタブを開きます。ブラウザーが最前面のときに使います。」。引数や実行ファイル、接続先tokenを説明へ自動展開しない。
 
-| ID | 確認対象 | 成功条件 |
+### 保存形式を1つに揃える
+
+**保存ブロックは`customCommands.version = 2`だけを現行形式とする。** 定義ごとにdescriptionを保存し、configVersionは種類ごとに保持する。種類の登録RPCとSDKのhandler契約を、保存ブロックの版に連動させて作り直さない。
+
+version 1の専用reader、説明の自動補完保存、旧定義の変換、旧IDとの対応表を追加しない。既存のMCP実行カスタムコマンドも、新形式で必要な分を作り直してよい。
+
+未対応の保存版は、既存の一般的な未知版保持の仕組みで保持し、実行しない。読込や無関係なページ保存で、自動的に変換・消去しない。利用者がカスタムコマンドページのJSON編集で**新形式の一覧を明示保存したときだけ**、共通の形式検証・expectedRevision・原子的保存を通して置き換えられるようにする。
+
+作り直した定義には新しいUUIDを付け、必要な割当を選び直す。既存の割当は自動で書き換えず、解決できないIDは既存の利用不可表示とする。MCP接続先・認証・操作許可・他の設定は、この一覧の作り直しの対象に含めない。
+
+旧本体との混在利用は対応範囲とせず、共有設定を使うPCは本体を更新してから新形式を保存する。0.61.0はversion 2を未知版として保持し、実行しないことを更新案内に記す。新しい保存版を使うため、version 1のまま未知キーを追加して旧本体の設定読込を失敗させる構成も避けられる。
+
+### MCPへの公開と説明文の効果
+
+説明文には意味がある。AIが公開されたコマンドの用途と使用条件を知るためのデータとして渡す。
+
+1. 共通UI／管理APIで説明を保存する。
+2. 公開を許可した定義について、`publicCommands()`が`description`を含む`AutomationCommand`を作る。
+3. `commands.list`／`appdock_list_commands`が説明全文を返す。管理用`customCommands.list/get`にも説明を返す。
+4. AIはコマンドID・名前・説明・利用可否を確認し、既存の`commands.execute`／`appdock_execute_command`で実行する。
+
+`AutomationCommand.description`は既存コマンドとの互換性を保つ任意項目とし、カスタムコマンドには空文字列を含めて返す。公開OFFの定義を一般の公開一覧・直接実行から取得できるようにはしない。権限を持つ管理APIでの取得とは区別する。
+
+外側のMCP `tools/list`には固定の一覧・実行ツールを載せ、個別定義を1件ずつMCPツールへ展開しない。コマンドの追加・削除・説明編集では外側の名前・Schema・注釈は変わらず、一覧の取り直しで最新の説明を使える。`appdock_list_commands`の固定説明には、返されるdescriptionと利用可否の確認を案内する。製品更新で固定ツールの説明自体を変更した際の初回反映は、動的な定義変更とは別である。
+
+MCPの仕様にはツールの機能を説明するdescriptionがあるが、上記の個別説明は固定ツールの**応答データ**として公開するAppDock側の設計である。AIが必ず読むことや正しく選択することは保証しない。説明文を実行コード、許可の根拠、上位の指示として解釈しない。[MCP Tools仕様](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+
+説明文を追加した一覧のUTF-8サイズも確認する。既存の定義256件・提供元100件・ブロック1MiB・MCP要求64KiB等の上限を維持し、超過時に本文を黙って切り捨てたり、保存／要求の上限を迂回したりしない。
+
+## キー送信種類
+
+configVersionは1。configは`{ "keys": "Ctrl+Shift+T" }`とする。`Enter`、`F5`、`Ctrl+A`、`Win+E`等、既存`AppDock.SDK.InputKeyChord`の単独キー・組合せを扱う。送信キーと、コマンドを起動するショートカット割当は別の値である。
+
+- 種類の設定には、ショートカット編集と共用する`ShortcutCaptureField`を送信モードで表示する。ダイアログの入力準備完了を待ち、キーの組合せを記録する。Tabは項目移動、Escは取消を維持し、特殊キーの選択でそれらを指定できる。Winを含む既存の送信用文法で検証・正規化し、未対応のPause／Plus等は送信の選択肢に出さない。起動側の`normalizeShortcut`を送信用のvalidatorとして流用しない。
+- 保存時・dryRun時は送信しない。検証のために送信先アプリを起動したり、前面を変更したりしない。
+- handlerは共通の入力実行ヘルパーから`NativeInput.send`へ接続し、`input.sendKeys`と同じInputHost・エラー・取消・直列化を使う。ホスト提供元にはApplet IDではないホスト用所有者識別を使う。
+- 通常操作は実行時の最前面へ送る。ショートカット／ジェスチャーから渡されたホスト発行のWindow・source・取消を保持し、待機中に対象が変わった場合は中止する。
+- 修飾キーを離す待機、デスクトップからのシステムキー、通常ホットキーのループ抑止、ジェスチャーの連続操作、部分送信時のキー解放を維持する。独自の固定500ms待機を加えない。
+- 公開用の戻り値は既存の`{ completion: 'inputSubmitted', effectVerified: false }`を使う。外側の`handlerReturned`とは階層を分け、対象アプリが処理した証明として扱わない。
+
+送信先の権限差など、Windowsの入力制限を回避するための自動昇格は追加しない。SendInputはUIPIの制約を受ける。[Microsoft SendInput](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput)
+
+### 最初の範囲
+
+初期の共通サービスは**プロセスの起動**を扱い、GUIアプリの終了を待たない。起動を確認してhandlerを返すため、カスタムコマンド全体の30秒制限を無制限へ変更する必要はない。CLIの終了コード・出力を必要とする実行種類は、後から別の完了契約として追加できる。
+
+configVersionは1。次の3モードを、1つの「コマンド／プロセスを実行する」種類の入力で選択する。
+
+| モード | 設定 | 起動方法 |
 | --- | --- | --- |
-| C01 | 旧設定/未知版 | 欠落時に空、未知の種類/版を保持、別ページ保存で消さず実行しない。現行版へ明示更新してもID/割当を保持 |
-| C02 | 検証と上限 | 重複・衝突・なりすまし・prototypeキー・サイズ/深さ超過・未対応Schemaを拒否 |
-| C03 | 原子的CRUD | 複数操作の一部が不正でも保存/投影なし。dryRunも副作用なし |
-| C04 | revision/同期 | 外部更新、古いepoch、同期の前後順、保存失敗でデータを上書き/消失しない |
-| C05 | 提供元 | 本体/Node/.NETの登録・停止・更新・異常終了で同じ寿命契約を満たす |
-| C06 | 公開と許可 | 宣言、定義の公開、MCP/Applet許可の各OFFを直接ID指定でも回避できない |
-| C07 | 管理範囲 | Appletは自身のみ、公開設定を変更不可。管理専用configを一般APIから取得不可 |
-| C08 | 安定ID/入力 | 名前/config変更でも割当保持。削除/停止で登録解除。所有者・gesture対象・取消を保持 |
-| C09 | 実行寿命 | 同一IDの多重実行、再入、30秒timeout、許可取消、旧世代応答を適切に扱う |
-| C10 | 結果 | 制限付きresultを返し、サイズ超過・生例外・不正型を安全なエラーへ変換。effectVerifiedはfalse |
-| C11 | 固定MCP入口 | 同じ接続で定義/種類を増減し、外側の名前・Schema・注釈が不変、新一覧で実行可否が更新 |
-| C12 | UI/JSON | 追加/編集/削除/並替、競合、Schema更新中の入力、IME、明暗/狭幅、検索、JSONの範囲を確認 |
-| C13 | 再起動/配布物 | 固定EXEで保存復元、未導入/停止状態、fixture非同梱を確認 |
-| C14 | 既存機能 | 固定/動的コマンド、WindowsTools、設定生成コマンド、既存入力/トレイの必要回帰が成功 |
+| `executable` | 実行ファイルの絶対パス、引数配列 | `spawn(file, args, {shell:false})`。引数を1本のシェル文字列へ結合しない |
+| `cmd` | コマンド文字列 | システムのcmd.exeを明示起動。`/d /s /c`とcmd専用の引数組立てを使う |
+| `powershell` | スクリプト文字列 | Windows PowerShellを`-NoProfile -NonInteractive -EncodedCommand`で明示起動。本文はUTF-16LEのBase64とし、実行ポリシーは変更しない |
 
-Node/.NET fixtureは隔離profileだけで動かし、実キー送信、実プロセス操作、実MCP接続を代用したと扱わない。実装時の必要なGUI/入力確認を別に選ぶ。ChatGPTでの実接続試験は可能な環境で行い、未確認ならその範囲を残す。今回の文書作成では製品テストを実行しない。
+全モード共通の任意項目は絶対パスの`workingDirectory`と`showConsole`（既定false）。作業フォルダー未指定時はexecutableの親フォルダー、シェルモードではAppDockの実EXEのフォルダーとし、起動元cwdに依存させない。showConsoleはコンソールの表示指定で、起動するGUIアプリのウィンドウを隠す指定ではない。
 
-## 関連する種類と実行サービス
+直接起動は`.exe`を対象にする。`.bat/.cmd`やシェル構文を直接モードから暗黙に解釈しない。cmdモードの文字列は明示的なプログラムとして扱い、保存値へ実行要求の任意引数を補間しない。cmd専用の未加工引数と、通常のargvを分ける。ネイティブworkerは前者にProcessStartInfo.Arguments、後者にArgumentListを使い、空白・引用符・Unicode・`&|<>%^!`を含む入力をfixtureで照合する。[Microsoft cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
 
-- MCPクライアントは実行元・取消・共通許可を受け取り、通信とジョブを所有する。通信をカスタムコマンドサービスへ混ぜない。
-- MCPハブは固定入口と動的一覧を公開し、設定revisionとcatalog世代、管理と実行の許可を分ける。
-- MCP実行種類は安定commandIdと固定configを保存し、長時間処理・メディアはMCPクライアントのジョブ結果で返す。
-- キー送信／プロセス起動種類は[拡張設計](custom-command-types-design.md)に従い、同じ実行文脈と共通サービスへ接続する。WindowsToolsの旧キー送信は撤去し、設定移行・旧ID互換・自動付替えは行わない。
+モードの値、`workingDirectory`、`showConsole`を共通項目とし、モード別の入力名は`executable`＋`arguments`、`command`、`script`とする。選択していないモードの項目は保存せず、未知項目も拒否する。
 
-具体的なMCP接続設定やWindows実行引数を汎用保存型へ固定しない。種類固有の詳細は、それぞれのconfigSchemaと実行サービスで定義する。
+実行ファイル／作業フォルダーは4,096文字以内、引数は64件以内・各4,096文字以内、シェル本文は8,192文字以内、config全体は既存16KiB以内とする。cmdはさらに、組み立てた実行文字列を8,191文字以内に制限する。NULを拒否し、構築したWindowsのコマンドライン長も起動前に検査する。保存時の形式検証と起動直前の実在・アクセス確認を分ける。[cmdの上限](https://learn.microsoft.com/en-au/troubleshoot/windows-client/shell-experience/command-line-string-limitation)、[EncodedCommandの符号化](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe?view=powershell-5.1)
+
+### 共通APIと寿命
+
+`ProcessLaunchService`を本体へ置き、本体handlerとApplet向けの`processes.start`が同じ検証・許可・起動処理を使う。Node/.NET/nativeは既存のAppDockApi呼出しを使えるため、同じ機能のSDK専用実装を追加しない。
+
+`processes.start`の入力は上記config。公開結果は`{ completion: 'processStarted', effectVerified: false }`とし、OSの起動受付を確認してから返す。PID・実行ファイル・引数・環境変数・標準出力を公開結果へ自動添付しない。PIDは必要な内部診断にだけ使用する。
+
+- 専用のAppDock.ProcessHostへprivateなJSON-lines pipeで要求し、Process.Startの成功応答までを起動待機とする。workerの準備とファイル・cwd確認を待った後、取消・呼出し元の許可を再検査する。ファイル未発見や権限不足は安全な原因と対処へ変換する。
+- 起動先の標準入出力はNULへ向け、workerのRPCを継承させない。workerは本体終了時に停止し、起動済みアプリを一括終了しない。CreateNoWindowでコンソールだけを制御し、GUIを隠さない。Nodeのdetached起動ではWindows PowerShellが本文を実行しない実測があったため、ネイティブ起動へ集約した。実測はVERIFICATIONへ記録する。
+- 取消は起動前に検査する。起動済みプロセスの終了、強制kill、終了待ちへの取消は初期契約に含めない。許可のOFFや定義削除は新規起動を止め、起動済みアプリの効果を戻さない。
+- 起動受付の前後で接続が失われ、開始の有無を確認できない場合は`OUTCOME_UNKNOWN`。自動再送しない。再入力は別の起動要求である。
+- AppDockと同じユーザー・実行権限で起動する。種類の設定にrunasや自動UACを設けない。AppDockが既に昇格中ならその権限を継承し得ることを案内する。
+- 環境変数の上書き、秘密値の参照、ファイル関連付け、URL起動、サービス／タスク登録は初期対象外。通常の親環境は継承するが、メモリー内のMCP tokenや接続先の秘密を起動引数・環境へ追加しない。
+
+設定は既存どおり共有のcustomCommandsに保存する。PCごとに実行パスが異なり起動できない場合は、利用者がパスを修正する。実在・アクセスの確認は起動直前に行い、一覧取得でUNCを同期走査しない。別ファイルや同名プログラムへ自動置換しない。PC別のカスタムコマンド設定切替はこの拡張では設けない。
+
+## 実行許可と公開
+
+保存型コマンドのすべての外部実行は、種類のautomation宣言、定義のautomation=true、既存のread／execute、種類固有の許可を満たす。新規定義の外部公開は既定OFF。管理用のread／write／manageCustomCommandsは、実行許可の代わりにはならない。
+
+| 保存型コマンドの種類 | Appletからの実行 | MCPからの実行 |
+| --- | --- | --- |
+| キー送信 | 既存の`sendInput`と共通read／execute。既存Appletの保存済み許可を保持 | `allowExecute`と新規`allowSendInput`（初期OFF） |
+| プロセス起動 | 新規`runProcesses`（初期OFF）と共通read／execute | `allowExecute`と新規`allowRunProcesses`（初期OFF） |
+| MCPツール | 現行のread／execute／useMcpと下流の公開条件 | 現行のallowExecute／allowUseMcpと接続先・ツールの公開条件 |
+
+`input.sendKeys`と`processes.start`の生の共通APIはApplet向けとし、外部MCPは公開済みの保存型コマンドを使う。任意キーや実行文字列を受け取る新しいMCPツールを公開しない。MCPに公開する外側ツールは既存の固定入口を使える。
+
+既存Appletの`input.sendKeys`直接呼出しに必要なsendInput許可は、そのまま維持する。上表のread／execute／公開条件は保存型コマンド経由の条件であり、この既存APIへ新たな公開フラグを要求するものではない。
+
+元の呼出し元originと直接のapiCallerをホスト発行の文脈として保持する。MCP→Applet→保存型コマンドでもMCPの許可を失わせず、関与するAppletの許可も検査する。種類固有の検査は、信頼した本体providerのフックと共通操作ヘルパーへ置き、config・説明文・ID接頭辞から許可を推測しない。
+
+公開一覧の実行可否も呼出し元の許可に応じて投影し、実行直前に再検査する。ローカルで利用可能なキー送信が、MCP許可OFFでも外部一覧で実行可能と表示される状態を作らない。管理許可がOFFでも、公開済みの実行可能コマンドは説明を含めて一般の一覧から利用できる。
+
+操作の許可画面は、既存sendInput行のMCP列を有効にし、プロセス起動のApplet／MCP列を追加する。前提不足で保存済みON/OFFを消したり、ほかの許可を連動ONにしたりしない。これらの許可は従来どおりPC専用で保存する。
+
+種類handlerが共通サービスの安全な既知エラーを返した場合、実行前拒否を一律`OUTCOME_UNKNOWN`へ変換しない。未知の生例外は公開せず、最終失敗は[共通エラー報告](error-reporting.md)へ接続する。共通監査へ説明・config・引数・スクリプト・出力本文を記録しない。
+
+## 保存契約とUI
+
+configVersion 1。configは`serverId`、`toolName`、`toolRevision`、固定`arguments`、任意`timeoutMs`（1〜600秒、既定60秒）。commandIdはUUIDのまま、名前/引数/接続先を編集しても入力割当を保持する。種類のconfig全体は16KiB以内。引数に秘密値を保存するための機能は設けず、接続のBearer/暗号化環境変数を使用する。ツール独自の秘密引数参照は初期対象外。
+
+共通のカスタムコマンド画面でこの種類を選ぶと、接続先選択→ツール取得→1ツールのSchema取得→引数JSON入力を表示する。toolRevisionは選択した詳細から保存し、変化を自動承認しない。高度なJSON編集も同じ検証へ通す。新規・config変更・有効化・公開追加時は、直前に取得したカタログと引数を照合する。保存・dryRunはツールを実行しない。提供元の種類登録には、本体が実装する副作用のない検証/利用可否フックを追加する。
+
+接続先未設定/無効化、認証情報欠落、既知のツール削除/Schema不一致は理由付きの利用不可になる。再起動後にキャッシュがない場合は実行時に接続・照合する。静的カタログが利用可能と表示していても、実行直前の最新照合で拒否される場合がある。未知の接続先を同名サーバーへ置き換えない。修正は接続/ツールを再選択し確認して保存する。
+
+## 実行と許可
+
+既存のパレット・ショートカット・ジェスチャー・トレイ・commands.executeから実行する。handlerの戻り値は`{completion:'accepted',jobId,state}`であり、外側のhandlerReturnedと区別する。完了/結果はMCP接続先画面またはmcp.jobs.get、取消はmcp.jobs.cancel。ハンドラーが受付を返した後もジョブは独立して生存し、ハンドラー終了をジョブ取消には使わない。受付前の入力取消は引き継ぐ。
+
+元callerをホストの文脈から確定する。MCP起点はallowUseMcp + allowExecute + 接続先/ツールの公開条件、Applet起点はAppletのread/useMcp/executeを満たす必要がある。MCPからAppletを経由した起点でもMCP条件を失わない。ローカル入力はPCで許可した接続を使う。種類/定義のautomation指定は下流の公開条件を上書きしない。
+
+ジョブ受付後の定義変更は実行中の引数を変更しない。接続/許可/呼出し元の寿命が変われば第2段階で取消する。同一操作の新たな入力は新しいrequestIdを使うが、実行中の接続先にはBUSYを返す。結果不明の操作を自動で再試行しない。

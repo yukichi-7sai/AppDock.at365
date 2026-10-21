@@ -46,7 +46,7 @@ Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewか�
 
 パレットは従来のnative OverlayHostを最前面に置きます。本文・Applet・通知のViewを作り直さず、各バーの位置とzoomを本体枠に合わせます。本体rendererの再読込中は古い配置を非表示にし、新しい枠の報告後に再表示します。
 
-提供元交換は領域ごとにready後に行います。renderer異常終了・応答停止・ロード失敗・ready期限超過では対象領域の故障を記録し、Default Shellへ戻します。設定指定は保持します。故障抑止は既存のプロセス内Registryを使い、新しい保存ファイルは追加しません。提供元の無効化・意図的再起動では故障を作らず、再開後に選択を再適用します。領域別再試行、版更新、`--safe-shell`の共通契約は[領域別割り当て](shell-region-assignment.md)を参照してください。
+提供元交換は領域ごとにready後に行います。renderer異常終了・応答停止・ロード失敗・ready期限超過では対象領域の故障を記録し、Default Shellへ戻します。設定指定は保持します。故障抑止は既存のプロセス内Registryを使い、新しい保存ファイルは追加しません。提供元の無効化・意図的再起動では故障を作らず、再開後に選択を再適用します。領域別再試行、版更新、`--safe-shell`の共通契約は[領域別割り当て](shell-foundation.md)を参照してください。
 
 ## 検証
 
@@ -54,4 +54,4 @@ Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewか�
 
 `scripts/shell-bars-ui-test.cjs [固定EXE]`は実ウィンドウ操作、Windowsのマウス入力によるドラッグ、両テーマ、サイズとzoom、Tab、パレット、別々の提供元、故障・無効化・再試行・safe起動を検査します。`scripts/host-modal-ui-test.cjs [固定EXE]`は実際の3領域とダイアログのWindows合成画像を確認します。更新のHTTP取得・進捗・取消は既存の`update-progress-ui-test.cjs [固定EXE]`で検証します。実測と未確認事項は[VERIFICATION](../VERIFICATION.md)に記録します。
 
-ドラッグ領域の指定は[Electronの公式仕様](https://www.electronjs.org/docs/latest/tutorial/custom-window-interactions#custom-draggable-regions)に従います。非表示Viewのドラッグが残る旧版の[修正記録](https://github.com/electron/electron/issues/51176)も確認し、利用中の固定Electronと実Windows入力で表示・非表示時を検証します。
+ドラッグ領域の指定は[Electronの公式仕様](https://www.electronjs.org/docs/latest/tutorial/custom-window-interactions#custom-draggable-regions)に従います。

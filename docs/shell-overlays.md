@@ -12,7 +12,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
   "id": "example.palette",
   "name": "Example Palette",
   "version": "1.0.0",
-  "minimumHostVersion": "0.26.41",
+  "minimumHostVersion": "0.76.5",
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
@@ -36,7 +36,7 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 
 ## 本体と描画の分担
 
-`overlay.ribbon-group`は一時グループの横1行パネルを担当する独立領域。`RibbonGroupSession`が内容と寿命を持ち、パレットと同じ1つのモーダル枠を共有する。snapshotの`kind: "ribbon-group"`、`content.groupId/title/anchor/items`を描画し、`ribbonChoose`（id/actionId/requestId）または`dismiss`（id）を送る。`asset(id)`はモデルの画像だけを返す。背景は透明でも全面で入力を受け、外側クリックを消費する。対象設定・route・リボン提供元・Window位置／寸法／フォーカスが変われば閉じる。詳細は[グループ仕様](ribbon-groups-badges-design.md)。
+`overlay.ribbon-group`は一時グループの横1行パネルを担当する独立領域。`RibbonGroupSession`が内容と寿命を持ち、パレットと同じ1つのモーダル枠を共有する。snapshotの`kind: "ribbon-group"`、`content.groupId/title/anchor/items`を描画し、`ribbonChoose`（id/actionId/requestId）または`dismiss`（id）を送る。`asset(id)`はモデルの画像だけを返す。背景は透明でも全面で入力を受け、外側クリックを消費する。対象設定・route・リボン提供元・Window位置／寸法／フォーカスが変われば閉じる。詳細は[グループ仕様](ribbon-customization-design.md)。
 
 | 部分                         | 責務                                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------ |

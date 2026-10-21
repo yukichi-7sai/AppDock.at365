@@ -10,17 +10,17 @@ A:/40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-appletをAppDockのex
 
 親Appletの停止は全サイト画面を閉じます。サイト単独の停止はそのページだけを閉じ、再起動はそのSurfaceだけを再生成します。ページ・Window切替は同じViewを使います。Windowの×は非表示です。各サイトのログイン可否は提供サービスに依存し、常時受信は保証しません。
 
-## 保存と既存データ
+## 保存
 
-サイトと初期キーはsettings.jsonのextensions.at365.web-applet.settingsへ保存します。旧webAppletsからの自動取り込みは行いません。移行済みの設定に記録されたIDと保存先の参照情報だけを読み取り、サイトID・リボン・キー・ログイン領域を維持します。参照情報を新たに生成・更新する処理はありません。
+サイトと初期キーはsettings.jsonのextensions.at365.web-applet.settingsへ保存します。旧webAppletsからの自動取り込みは行いません。参照情報を新たに生成・更新する処理はありません。
 
-`migrations.webApplet`は移行完了後も参照する保存情報です。`ids`は以前のページIDを、`owner`は以前のアカウント名簿とPC専用sessionの保存先を維持するために使います。削除すると新方式のID・保存先を参照し、既存アカウントや保存したリボン配置が見つからなくなる場合があります。元のデータは自動削除しません。
+`ids`は以前のページIDを、`owner`は以前のアカウント名簿とPC専用sessionの保存先を維持するために使います。削除すると新方式のID・保存先を参照し、既存アカウントや保存したリボン配置が見つからなくなる場合があります。元のデータは自動削除しません。
 
 アカウント参照の存在確認は、追加・変更したWebページの行に対して行います。名簿未到着や参照情報の変更で既存ページが同期待ちでも、変更していない行を再検査してリボン等の無関係な設定保存を拒否しません。新規/変更行の検証と、アカウント処理中のガードは維持します。
 
-既存の共有名簿data/web-applets/accounts.jsonとPC専用web-applets/sessions、web-applets/windowsを引き続き使い、Cookieを移動しません。新規構成は共有data/web-profiles/at365.web-applet/accounts.jsonとPC専用web-profiles/at365.web-appletを使います。詳しい保存区分は[設定同期](settings-sync.md)、保存先の互換参照は[分離設計](dynamic-pages-webapplet-design.md)を参照してください。
+既存の共有名簿data/web-applets/accounts.jsonとPC専用web-applets/sessions、web-applets/windowsを引き続き使い、Cookieを移動しません。新規構成は共有data/web-profiles/at365.web-applet/accounts.jsonとPC専用web-profiles/at365.web-appletを使います。詳しい保存区分は[設定同期](settings-sync.md)、保存先の互換参照は[分離設計](applet-pages.md)を参照してください。
 
-本体単独更新では新Appletを自動導入しません。移行済みのデータを保持しますが、表示には対応Appletの配置が必要です。古いホストと新しい設定を双方向同期しないでください。旧版へ戻す場合は旧設定のバックアップと旧構成を使用します。
+本体単独更新では新Appletを自動導入しません。古いホストと新しい設定を双方向同期しないでください。
 
 ## Webアカウントと遷移
 
@@ -40,7 +40,7 @@ remoteページはsandbox/contextIsolation/webSecurityを有効にし、preload/
 
 サイトのname/displayだけをsettings.getSchema/get/settings.updateへ公開します。open/back/forward/reload/homeと共通ライフサイクルを提供し、親が停止中の操作を拒否します。revision/dryRun/権限検査を共用します。URL/accountId/遷移規則/icon/imported、追加/削除、Cookie消去は外部公開しません。
 
-通常の管理・公開経路はpageCollectionsの宣言を使います。旧web.<UUID>やat365.web-appletという名前から権限を推測しません。一般Appletでの利用は[動的ページ設計](dynamic-pages-webapplet-design.md)と[Appletページ](applet-pages.md)を参照してください。
+通常の管理・公開経路はpageCollectionsの宣言を使います。旧web.<UUID>やat365.web-appletという名前から権限を推測しません。一般Appletでの利用は[動的ページ設計](applet-pages.md)と[Appletページ](applet-pages.md)を参照してください。
 
 ## 検証
 
@@ -48,4 +48,28 @@ remoteページはsandbox/contextIsolation/webSecurityを有効にし、preload/
 
 ## 共通画像
 
-WebApplet 0.3.0とAppDock 0.69.0以降は、管理ダイアログの画像を共通ライブラリーから選ぶ。提供JSONやメタデータで取得した元画像も、OK時に共通importへ渡す。サイトレコードのimageはRegisteredImageRef、既存iconのdata URLは保持する。imageを優先し、未取得時は既存iconへ戻る。ローカル管理ページは登録画像APIを使い、リモートサイトには渡さない。原画像・制約・グループは[共通画像](registered-images.md)を参照する。
+WebAppletの管理ダイアログでは画像を共通ライブラリーから選ぶ。提供JSONやメタデータで取得した元画像も、OK時に共通importへ渡す。サイトレコードのimageはRegisteredImageRef、既存iconのdata URLは保持する。imageを優先し、未取得時は既存iconへ戻る。ローカル管理ページは登録画像APIを使い、リモートサイトには渡さない。原画像・制約・グループは[共通画像](registered-images.md)を参照する。
+
+## Webプロフィール
+
+`context.webProfiles.list/add/rename/clear/delete`を共通提供する。ID・名前だけを扱い、Cookie、sessionオブジェクト、任意保存パスをAppletへ渡さない。既定はApplet専用名前空間で、同じAppletの同じ枠を選んだページだけがログイン状態を共有する。Gmailの既存webAccountsとは統合しない。
+
+名簿は共有data/web-profiles/<owner>/accounts.json、sessionと削除待ちはPC専用rootのweb-profiles/<owner>へ保存する。名簿未到着時は空のファイルを自動作成しない。明示追加・名称変更は独立ファイルへ即時保存し設定revisionを変更しない。
+
+参照中の削除を拒否し、親停止中の保存済み参照も含める。削除・クリアはホスト警告dialogで確認し、取消を既定とする。確認後に参照を再検査し、処理中の枠を参照する設定保存を拒否する。削除待ち記録、次回起動時の回収、junction拒否、外部同期による名簿削除でCookieを消さない既存契約を継続する。
+
+HTTP(S)・資格情報のないURLを使い、none/same-origin/any＋追加originでトップレベル遷移を検査する。redirect/window.open/履歴も同じ制約とする。サイトのデバイス権限は拒否する。汎用Webページの常時受信は保証しない。
+
+## WebAppletと保存済みデータ
+
+独立AppletのIDはat365.web-applet。サイト設定と初期キーはextensions.at365.web-applet.settingsへ保存する。管理画面は自身のlocalページで、サイト追加/編集はダイアログのOKで1レコードを保存する。不完全入力とエラーは画面内に保持する。アカウント名はIME確定後のblur/Enterで保存する。
+
+推奨JSONの取得/解釈はApplet側に置く。認証なし、同一origin、転送3回、要求全体5秒、HTML/画像256KB・JSON64KBの上限を設ける。name/short_name/start_url/iconsと限定したnavigationだけを採用し、手動変更を上書きしない。画像のデコード/縮小だけを共通ホストAPIへ委譲する。
+
+旧webAppletsのサイト・初期キー・アカウントを取り込む処理は撤去した。既に保存されているmigrations.webAppletのversion/owner/idsは、ページIDと保存領域の参照としてだけ検証・保持する。
+
+既存のdata/web-applets/accounts.json、PC専用web-applets/sessions/<accountId>とweb-applets/windows/<webId>.jsonを継続利用し、Cookieをコピーしない。旧webAppletsは現行設定として読み込まない。
+
+本体単独更新で新Appletが自動導入されるとは扱わない。対応Appletをextensionsへ配置する。
+
+外部公開は従来どおり各サイトのname/displayとopen/back/forward/reload/home、共通ライフサイクルに限定する。URL/accountId/遷移規則/icon/imported/Cookieを公開しない。個別項目は親Appletの配布物に含まれ、別の更新対象にならない。

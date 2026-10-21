@@ -1,8 +1,4 @@
-# MCPハブとカスタムコマンドの全体概要設計
-
-状態: 第1〜4段階と接続先の管理APIを実装。製品版0.61.0、更新日: 2026-10-18。実機・配布物の確認範囲は[VERIFICATION](../VERIFICATION.md)を参照。
-
-本書は全体の役割と段階間の契約を定める。[実装計画](mcp-hub-implementation-plan.md)は順序と到達点、詳細設計は[カスタムコマンド](custom-commands-design.md)、[MCPクライアント](mcp-client-design.md)、[ハブ](mcp-hub-relay-design.md)、[保存型MCPコマンド](mcp-command-design.md)へ分ける。
+# MCPハブ
 
 ## 目的と利用例
 
@@ -14,23 +10,6 @@ AppDockが外部MCPサーバーのクライアントになり、次の両方を�
 利用例は「照明のMCPサーバーを探す → 予約ツールの引数仕様を取得する → 10分後の消灯を予約する設定をコマンドとして保存する → ショートカットを割り当てる」。AIが接続先や引数を選ぶ段階と、保存済みの指定をAppDockが実行する段階を分ける。保存済みコマンドの実行にLLMを必要としない。
 
 接続先のMCPサーバーはAppDockのAppletである必要はない。接続先の登録IDとApplet IDは別の識別子とする。
-
-## 現状と再利用する基盤
-
-当初の調査基準は0.58.1、commit `87d2e02e3f2e500a100c567d9d304edac384824f`。実装はmainの0.59.0、commit `7135a68df661b424eef2e37a296ce79d5f986d2a`から開始し、0.60.0へ版更新した。
-
-| 現行の仕組み | 再利用・拡張の方針 |
-| --- | --- |
-| 単一のAppDockApiと操作カタログ | MCP、Applet、ローカルUIの業務処理を共用する。MCPは通信アダプターとして扱う |
-| `commands.list`と`commands.execute` | 保存済みコマンドの発見とID指定実行の入口を維持する |
-| `host.commands.replace`、.NETの`Commands.ReplaceAsync` | 既存の実行中コマンド登録を保持し、保存型のカスタムコマンドを追加する |
-| manifestによる外部公開宣言 | 新しいコマンド種類にも宣言を設け、実行中の登録だけで公開権限を取得させない |
-| SettingsCommands、DeviceSettingsStore、設定ページ | revision、原子的保存、外部更新、共通の一覧編集を再利用する |
-| コマンドカタログ、入力dispatcher、CommandContexts | 所有者、割当、実行元、開始対象、取消を同じ経路で扱う |
-
-従来の動的登録はID・表示名・ハンドラーの登録であり、外部公開はmanifestの個別ID宣言で決まる。この契約を保持し、保存定義のCRUDと種類別ハンドラーを追加した。通常のAppletコマンドと保存型コマンドの戻り値契約を混同しない。
-
-参照: [共通API](appdock-api.md)、[動的コマンド](extensions.md#動的コマンドとキー送信の一覧設定)、[操作カタログ](../src/shared/appdock-api.ts)、[現在の公開判定](../src/main/core/extensions.ts)、[現在の実行経路](../src/main/core/appdock-api.ts)。
 
 ## 構成と責務
 
@@ -55,8 +34,6 @@ flowchart LR
 | 4. MCP実行コマンド | 接続先・ツール・引数を持つ種類、種類固有の設定UI、利用可否判定 | 保存・ID・割当は1、通信と実行は2 |
 
 3は2に依存し、4は1と2に依存する。4から3のHTTP入口へ戻る呼出しは作らない。実装順序は1→2→3→4とし、段階ごとに検証する。
-
-## 先に固定する契約
 
 ### コマンド定義と実行処理
 
@@ -89,12 +66,12 @@ AppDockのMCP `tools/list`に載せる入口と入力Schemaを固定する。接
 
 ### 保存と同期
 
-- カスタムコマンド定義は第1段階の専用ブロックとして共有settings.jsonへ保存する。既存Appletの「このPCで設定を保持する」設定とは独立する。保存先の切替を本機能へ暗黙に継承しない。
+- カスタムコマンド定義は専用ブロックとして共有settings.jsonへ保存する。既存Appletの「このPCで設定を保持する」設定とは独立する。保存先の切替を本機能へ暗黙に継承しない。
 - 接続先名簿は安定した接続先IDで参照し、URL・実行パス等のPC差と認証情報は第2段階で分離する。同期したIDを別の接続先へ自動で結び直さない。
 - 秘密値は既存のPC専用Secrets/safeStorage系基盤を利用する。コマンド定義へBearer token、パスワード、秘密の環境変数を直接保存する契約は設けない。種類側が必要な秘密を参照先から解決する。
 - 操作許可、接続状態、実行ジョブ、キャッシュはPC専用。共通revision、原子的保存、有効な外部更新の採用、未導入種類の定義保持は既存の保存方針に合わせる。
 
-正本: [設定同期](settings-sync.md)、[端末別設定](device-settings-design.md)。
+正本: [設定同期](settings-sync.md)、[端末別設定](settings-sync.md)。
 
 ### 公開範囲と操作許可
 
@@ -112,28 +89,6 @@ AppDockへの認証と接続先への認証は別物。受信したAppDock用Bea
 
 長時間ツールは受付後にjobIdを返す。1接続先1件・全体4件、待ち時間1〜600秒、完了結果は10分保持する。再起動後は再開・再送しない。保存型コマンドのhandlerReturnedはジョブ受付であり、接続先の応答や実効果とは別である。接続先が対応していない継続実行や重複防止を、AppDock側だけで保証しない。
 
-## 今回の範囲と後続の範囲
-
-MCPクライアントの対象はstdioとStreamable HTTP（JSON/SSE応答）、認証なし/Bearer、2025-11-25方式のツール発見・実行。OAuth、旧HTTP+SSE、Resources、Prompts、MCP AppsのUI中継、Eventsの再配信、Sampling、Elicitation、MCP Tasks、2026-07-28だけに対応する下流は初期対象外。AppDock自身の既存MCPサーバー入口の新旧方式対応は維持する。
-
-| 別工程 | 接続する場所・理由 |
-| --- | --- |
-| 本体のキー送信種類とWindowsToolsの旧機能撤去 | [拡張設計](custom-command-types-design.md)。本体の共通入力を使用し、旧設定の移行・旧ID互換・割当自動付替えは行わない |
-| Windowsでコマンド/プロセスを実行する種類 | [拡張設計](custom-command-types-design.md)と[実装計画](custom-command-types-implementation-plan.md)。初期契約は起動受付とし、終了待ち・出力取得は別拡張 |
-| AppDock自身の予約実行 | 永続予約・再起動・スリープ・取消を扱う。接続先の予約ツールを呼ぶ場合は4で対応可能 |
-| 複数ツールの連結・条件分岐・変数展開 | 単一の保存済み呼出しが安定した後のワークフロー拡張 |
-| 初期対象外の認証/プロトコル | 第2段階の対応表と実サービスの必要性に基づいて追加 |
-
-## 全体としての完了像
-
-1. AIが接続先一覧と必要なツール定義を取得できる。
-2. 許可されたMCPツールを直接実行し、結果と失敗を判別できる。
-3. 同じツール呼出しをカスタムコマンドへ保存し、既存の入力経路へ割り当てられる。
-4. 接続先・ツール・コマンドの増減を、固定入口の再登録なしで発見できる。
-5. 停止、未導入、認証失効、Schema変更、削除、外部同期、応答消失時に、別の操作へすり替えず理由を表示できる。
-
-段階ごとの実測結果は[VERIFICATION](../VERIFICATION.md)へ記録し、fixtureの成功と実接続での成功を分ける。詳細設計・実装・commit・push・Releaseは、それぞれの依頼範囲に従う。
-
 ## 参照した外部仕様
 
 2026-10-18確認。下流クライアントは既存SDK 1.32.0と実接続の対応に基づいて採用版を限定した。
@@ -141,3 +96,19 @@ MCPクライアントの対象はstdioとStreamable HTTP（JSON/SSE応答）、�
 - [採用したMCP Tools仕様](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)、[Transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports): 一覧、ページ分割、Schema、呼出し、結果、注釈、変更通知。上記の`mcp.*`はAppDock固有の共通APIであり、標準メソッド名とは区別する。
 - [MCP Specification](https://modelcontextprotocol.io/specification/2026-07-28): capabilityと拡張の対応範囲。
 - [OpenAI: Connect and test your plugin](https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata): 直接接続における公開メタデータ変更時のRefreshと、公開プラグインとの差。
+
+## 公開と許可
+
+PC専用の接続設定で「MCPへ公開」と公開するツール名の明示リストを保存する。初期はOFF・空リストで、ワイルドカードは使わない。内部AppletのuseMcpと外部MCPのallowUseMcpは独立して初期OFF。発見にはread/useMcp、実行と取消にはexecuteも必要。MCP用の許可があっても、接続先ごとの公開条件を満たさない一覧・詳細・実行は拒否する。元がMCPのAppletハンドラーにも同じ公開条件を引き継ぐ。
+
+接続先や公開許可は本体設定UIに加え、利用者が独立した「MCP接続先の管理」を許可した共通APIから管理できる。管理許可は初期OFFで、保存には設定変更・コマンド実行の許可も必要。URL・実行パス・引数は管理用の個別取得にだけ含め、通常の利用カタログへ含めない。Bearer・環境変数値は書込み専用。管理APIと保存条件は[接続先の管理API](mcp-client-design.md#接続先の管理api)を正本とする。
+
+## 固定入口と結果
+
+`appdock_mcp_list_servers` → `appdock_mcp_list_tools` → `appdock_mcp_get_tool` → `appdock_mcp_call_tool`の順で発見・実行する。ジョブは`appdock_mcp_get_job`、取消は`appdock_mcp_cancel_job`。各Schemaは[操作カタログ](../src/shared/mcp-client.ts)を正本とする。
+
+callは受付のjobIdを返し、get_jobで完了と結果を取得する。MCPでは接続先のcontentをネイティブcontentへ、ジョブのメタデータと接続先のstructuredContent/isErrorを外側structuredContentへ投影する。画像等のbase64をJSONテキストへ重複展開しない。Applet共通APIはMcpJob.resultにcontentも含む。`tool-error`は接続先のisErrorを保持し、通信失敗/結果不明のジョブも成功に置き換えない。HTML、リンク、Resourcesを自動取得・表示実行しない。
+
+呼出し元・認証世代に結び付いたジョブだけを読める。1つのAppDock用Bearerを共有するクライアントは同じ権限主体として扱う。token更新や許可取消後のジョブは再利用しない。AppDockに届いたBearer/Cookieを下流へ転送せず、登録した下流Bearerだけを使う。HTTPのredirectとCookie利用を禁止する。
+
+AppDockと名乗るサーバー、およびAppDockハブの入口を持つ下流は接続を拒否する。未知の第三者ハブの内部経路は推測せず、全要求の時間/件数/容量を制限する。双方向機能、MCP Tasks、新仕様だけのサーバーへ暗黙に代替しない。

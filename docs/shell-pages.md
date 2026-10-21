@@ -2,7 +2,7 @@
 
 ホーム・ログ・通知センター・画像ライブラリーは共通の本文契約を使います。設定画面はShell対象外であり、[設定基盤](settings-foundation.md)を参照してください。
 
-ページViewはリボン・ステータスバー・ホスト通知を除く本文領域全体に配置します。ホストは最大幅や外側余白を付けず、Shellが内部の余白・スクロールを管理します。Appletのログは共通ログViewへ移動してsourceで絞り込みます。設定・Applet管理は本体rendererで描画します。寸法報告とページ別の配置は[Shellページのレイアウト](shell-page-layout.md)を参照してください。
+ページViewはリボン・ステータスバー・ホスト通知を除く本文領域全体に配置します。ホストは最大幅や外側余白を付けず、Shellが内部の余白・スクロールを管理します。Appletのログは共通ログViewへ移動してsourceで絞り込みます。設定・Applet管理は本体rendererで描画します。寸法報告とページ別の配置は[Shellページのレイアウト](shell-pages.md)を参照してください。
 
 WindowとページViewのネイティブ背景は現在のテーマに合わせ、View生成時から設定します。表示待ちのViewもテーマ更新の対象です。Default Shellは読込時に`prefers-color-scheme`を初期値とし、公開モデルを受け取ったら`dark`を同期的に適用してから`ready`を通知します。別Shellも初回表示前にモデルのテーマを適用してください。透明なオーバーレイやリボンの描画契約は変更しません。
 
@@ -13,9 +13,13 @@ WindowとページViewのネイティブ背景は現在のテーマに合わせ�
 ログを差し替える通常Appletへ`shell` capabilityと次の宣言を追加する。`minimumHostVersion`は`0.26.42`以上。通常のコマンド・設定・ページと併用できる。
 
 ```json
-"shell": {
-  "apiVersion": 1,
-  "views": { "page.logs": "logs.html" }
+{
+  "shell": {
+    "apiVersion": 1,
+    "views": {
+      "page.logs": "logs.html"
+    }
+  }
 }
 ```
 
@@ -97,7 +101,7 @@ ready期限は10秒。読込失敗・renderer終了/応答不能では同じCont
 
 ## 通知センター
 
-minimumHostVersion:0.31.0以上のShellはshell.viewsのpage.notificationsへ本文HTMLを指定できます。kind:notificationsのモデルと通知専用actionを同じwindow.appdockPageから取得します。モデル・署名は[notification-center.ts](../src/shared/notification-center.ts)、状態/保存/操作の契約は[通知設計](notification-foundation.md#段階3-通知センター)を参照してください。getSettings/executeCommandは従来どおり自Applet限定です。ShellPageHostのmainFrame/URL/現sessionとControllerのslot IDを検査します。
+minimumHostVersion:0.31.0以上のShellはshell.viewsのpage.notificationsへ本文HTMLを指定できます。kind:notificationsのモデルと通知専用actionを同じwindow.appdockPageから取得します。モデル・署名は[notification-center.ts](../src/shared/notification-center.ts)、状態/保存/操作の契約は[通知設計](notifications.md)を参照してください。getSettings/executeCommandは従来どおり自Applet限定です。ShellPageHostのmainFrame/URL/現sessionとControllerのslot IDを検査します。
 
 設定操作で非表示のWebViewを閉じても現在の設定ページを離れない。閉鎖済み/Windowへ移したAppletページへ遅れて届くViewport更新は状態を変更せず破棄する。表示中ページを閉じた場合は従来どおりホームへ戻る。
 
@@ -106,3 +110,44 @@ minimumHostVersion:0.31.0以上のShellはshell.viewsのpage.notificationsへ本
 設定本文の通常交換では、現在のIPC応答と入力キューを待ち、候補を再解決します。3秒のflushが失敗した場合は、旧Viewが有効なら交換を保留して再試行を提示します。保存済みの割り当ては巻き戻しません。停止・故障時は保存済み値から復旧し、未確定入力を複製しません。設定Controllerと保存済み値は提供元変更で再生成しません。
 
 Applet管理からのログ移動は`scope: all`と`source: appletId`を使う。sourceを解除して全体表示へ戻れるようにし、旧詳細用の固定Applet scopeをこの入口へ流用しない。
+
+### 全体ページ
+
+ホーム・全体ログ・設定を対象とするレイアウトクラスを付ける。対象の `main` と `.page-content` を縦方向のflex配置にし、`min-width: 0` / `min-height: 0` を連続した親子へ設定する。
+
+- `.page-content` の最大幅制限・中央寄せ・paddingを対象ページに限って解除する。
+- エラーバナーなどのホストUIは上部の通常フローに残し、残りの高さをページ枠へ割り当てる。バナーは縮小させず、ページViewが覆わないようにする。
+- ページ枠の背景はリボン側から右端まで、利用可能な上端からステータスバー直前まで広がる。
+- 本体側はShell本文をスクロールしない。`[hidden]` の設定ページがflex指定で再表示されないよう、セレクターを限定する。
+- 共通 `.page-content` 全体の変更は避け、通常Appletページや本体描画の画面への波及を抑える。ホスト配置用CSSは `src/renderer/style.css` に置き、設定Shellもimportする共通コントロールCSSへ不要なホスト指定を広げない。
+
+### 表示枠の寸法報告
+
+`ShellPageSlot` はCSSが割り当てた枠を測定・報告する部品にする。
+
+1. JSで高さを上書きする処理と固定36px控除を除去する。Shell本文枠の最低140px制約も解除する。
+2. Slot自身と必要な配置コンテナの寸法を監視し、実際の矩形を取得する。バナーの表示・非表示や折り返し、詳細見出し・タブの高さ変更による位置変化も再報告する。
+3. Slot矩形と割当領域・ホスト表示範囲との交差を報告する。幅か高さが0以下、非表示、画面外ならnullを送り、古いViewを残さない。
+4. 座標報告は必要に応じてrequestAnimationFrameで集約し、同じ矩形の連続IPCを抑える。解放時は予約処理と監視を回収する。
+5. main側のzoom変換、ready待ち、前面順序、フォーカス移動、旧routeの拒否、故障復旧を維持する。寸法通知のためにControllerやViewを再作成しない。
+
+`ShellPageHost` へページ固有のpaddingやDefault Shell判定を加えない。既存のviewport契約内で対応する方針とする。
+
+### Applet詳細への埋め込み
+
+全体ページ用のクラスを詳細画面全体へ流用しない。詳細見出し・タブ等の既存配置を保ち、その下の `.detail-logs` / 設定用 `.applet-settings-panel` からSlotまでをflexでつなぐ。Shellを持つパネルの外側スクロールを解除し、タブ本文の残り全域をSlotへ渡す。
+
+WebApplet管理の設定とショートカット等、本体が描画するパネルのスクロールは独立させる。タブを切り替えた際の非表示・破棄も現行どおりとする。
+
+## Default Shell側の設計
+
+| ページ | 表示・余白 | スクロール |
+| --- | --- | --- |
+| ホーム | View全体を背景で満たす。ページ内余白は通常24px、View幅600px以下では16px。カードは最小幅約280pxを目安に利用可能幅に応じて1列・2列・3列以上へ増減する。統計カードは幅不足で折り返す | ページ内の1領域でスクロール。内容が少なくてもページ背景は全高を満たす |
+| 全体ログ | ページ内に通常24px、狭い幅では16px。見出し・フィルターを上部、件数等の説明を下部、ログ表を残りの高さへ配置する | ログ表だけをスクロールし、列見出しを表内の上端に維持。フィルターは折り返す |
+| 設定 | 左インデックスをページ左端・上端・下端へ接続する。右本文の既存20px余白を基本とし、外側余白との二重化を解消する。入力欄の個別の適正幅は維持する | 左インデックスと右本文がそれぞれスクロール。保存操作・フォーム/JSON切替は固定領域に置く |
+| 詳細内の設定・ログ | 親のタブ本文が持つ余白を使い、全体ページ用の外周paddingを二重に追加しない。ログは既存scope、設定は既存contextで区別する | 各Shell本文の内側でスクロールし、詳細画面との二重スクロールをなくす |
+
+各Shellの `html/body/#root` とページルートで高さとoverflowの責任を明示する。ログ・設定の固定部分だけで高さを使い切る極端に低い表示領域では、ページ内の単一スクロールへ切り替えて操作を到達可能にする。
+
+レスポンシブ判定は原則として差し込まれたViewの実幅を使う。設定の既存 `hostWidth` は契約の意味を変えずに維持し、折り返し・左幅上限はローカルの実幅でも制約する。保存済みの左幅は狭い表示のためだけに書き換えない。

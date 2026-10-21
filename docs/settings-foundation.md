@@ -1,14 +1,6 @@
 # 設定基盤と本体の共通設定画面
 
-アクセントカラーは[共通配色](appearance.md)に従い、テーマから独立した`host.accentColor`で選ぶ。カスタムの2色は`host.customAccentDark`・`host.customAccentLight`。端末専用保存・即時反映・既定値省略・部分JSON/検索/設定APIの対象とする。
-
-設定画面は本体rendererで描画し、すべてのShellで共通とする。[本体統合の設計](settings-host-ui-design.md)に従い、設定UIはsrc/renderer/settingsとsettings-uiへ集約した。
-
-0.57.0以降のApplet単位の共有／端末専用設定、ツールバーとJSON・ファイル操作の連動、本体の表示／一般設定・有効状態の保存分離は[端末別設定](device-settings-design.md)を参照する。表示・一般の同じチェックボックスはチェック済み・操作不可とし、Appletでは切り替え可能にする。共有・自端末の合成値と共通revisionをDeviceSettingsStoreから取得する。
-
-全設定は変更の確定時に検証して即時保存する。文字・数値・URL・JSONは入力中に設定へ送らず、blurまたはEnterで確定する。正本は保存済みSettingsStoreの値とrevision。共有ドラフト・dirty・全体保存/破棄・未保存通知・mainの途中入力と画像バッファは撤去した。
-
-JSONには既定値と異なる設定だけを表示・保存する。省略した項目は現在の本体スキーマ・Applet宣言の既定値を使い、将来の版で既定値が変われば新しい値に従う。フォームは適用値、JSONは差分を表示し、ページのJSONを`{}`にするとそのページを既定値に戻す。フォームから既定値へ戻した項目も保存JSONから省く。空配列・false・0等は既定値と異なれば保持する。ページリセット、保存形式と互換性、PC専用から共有へ切り替える選択肢は[既定値省略とリセット](settings-defaults-reset-design.md)を正本とする。
+本体rendererで全体設定とApplet設定を共用する。保存場所とファイル同期は[設定同期](settings-sync.md)、複数項目の一覧編集は[一覧とダイアログ](settings-list-editing.md)を正本とする。
 
 ## 保存と入力
 
@@ -36,7 +28,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使�
 
 Applet管理と左インデックスは本体の共通設定ページを開く。個別設定・入力設定・ログの移動先と表示用フィルターは[Applet管理](applet-management-settings-design.md)を参照する。停止・無効でも編集でき、移動だけで起動しない。入力キューと3秒のflush、競合と不正入力の契約を維持する。
 
-「表示」の部分JSONは`host.theme`・`host.accentColor`・`host.customAccentDark`・`host.customAccentLight`・`host.showHints`・`host.shellProviders`です。領域ごとの選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。旧単一キーを部分JSONへ混在させた要求は範囲外として拒否します。領域別指定の移行・未知領域保持・旧設定領域の廃止は[領域別割り当て](shell-region-assignment.md)。
+「表示」の部分JSONは`host.theme`・`host.accentColor`・`host.customAccentDark`・`host.customAccentLight`・`host.showHints`・`host.shellProviders`です。領域ごとの選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。
 
 ## カタログ・JSON・検索
 
@@ -73,12 +65,6 @@ URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・ス�
 `scripts/settings-url-ui-test.cjs [固定EXE]`はURLの連続入力、確定前の保存/通信抑止、Enter/blurの補正と即時保存、IME、不正URLの保持/修正、各URL欄の共通動作を隔離fixtureで確認する。
 
 `scripts/settings-input-ui-test.cjs [固定EXE]`は本体/Appletの文字・数値・URL、上下キー、IME、複数行、ダイアログ/パスワード、ボイス候補欄、検索の確定・取消と、実行時設定/設定ファイル/revisionが入力中に変わらないことを確認する。
-
-## 検証と次の範囲
-
-tests/settings-editing.test.cjs・settings-page.test.cjsは即時保存、失敗/競合、再送、範囲を確認する。scripts/settings-shell-ui-test.cjs [固定EXE]は連続入力/IME、画像、不正入力、保存失敗fixture、外部競合、公開範囲、旧旧設定Shell指定の無視・他領域の継続と再起動を確認する。settings-search/navigation/shortcuts/gestures/ribbon/tray/notification-settings/syncと実Windows起動タスクの関連回帰はVERIFICATIONを参照する。
-
-settings-notice-ui-test.cjsと発行元は廃止した。汎用notification-banner-ui-test.cjsは通知基盤の回帰として維持する。通知基盤の段階1〜5と即時保存移行は今回で完了。新通知種類、履歴の機能拡張、一般の複数Window/MCP通知発行は別途の依頼範囲とする。
 
 ## 関連する設定をまとめて確定するダイアログ
 
@@ -143,7 +129,7 @@ import { SettingsHint } from '../settings-ui/SettingsHint';
 
 操作の許可は「Applet」「MCP」の2列で表示する。MCP連携の状態カード・設定への移動ボタン・即時保存の案内は表示しない。許可不足の状態、エラー、情報取得の固定ON、注意アイコンと保存の処理は維持する。ショートカットとジェスチャーの一覧上部にも、クリック編集と＋追加の定型案内は表示しない。
 
-表示ページは「共通」カードにテーマ・アクセントカラー・ヒントの表示を配置し、その下の「Shellの変更」カードで領域ごとのShellを選ぶ。Shellの各選択欄に同一のdescriptionを繰り返さない。一般ページは見出しなしの「音の再生」トグル、ウィンドウ、スタートアップ、Applet・MCPからの操作、設定ファイルの順に表示する。音の再生は既定ONで即時保存・反映し、設定定義からON/OFF/切り替えのコマンドを生成する。旧PC専用データの確認は警告通知から本体ログを開く。通知ページは受け取り方、読み上げ、提供元グループの順とし、受け取り方と各通知種類は既定で折りたたむ。読み上げページの接続カードは「TTS接続先」とする。ジェスチャーの有効化は単独のトグルにし、動作設定を既定で閉じた共通カードに配置する。通知種類の見出しには現在の通知先・表示時間・読み上げON/OFFを表示する。折りたたみ状態は画面内だけで保持し、設定ファイルへ項目を増やさない。検索で項目を選ぶと必要な親カードを開く。
+表示ページは「共通」カードにテーマ・アクセントカラー・ヒントの表示を配置し、その下の「Shellの変更」カードで領域ごとのShellを選ぶ。Shellの各選択欄に同一のdescriptionを繰り返さない。一般ページは見出しなしの「音の再生」トグル、ウィンドウ、スタートアップ、Applet・MCPからの操作、設定ファイルの順に表示する。音の再生は既定ONで即時保存・反映し、設定定義からON/OFF/切り替えのコマンドを生成する。通知ページは受け取り方、読み上げ、提供元グループの順とし、受け取り方と各通知種類は既定で折りたたむ。読み上げページの接続カードは「TTS接続先」とする。ジェスチャーの有効化は単独のトグルにし、動作設定を既定で閉じた共通カードに配置する。通知種類の見出しには現在の通知先・表示時間・読み上げON/OFFを表示する。折りたたみ状態は画面内だけで保持し、設定ファイルへ項目を増やさない。検索で項目を選ぶと必要な親カードを開く。
 
 新規設定のhost.themeはlight、host.accentColorはmint、gestures.enabledはtrue。保存済みの明示値は上書きしない。通知自体のOFF設定は廃止し、旧host.notificationsと通知種類のenabledは読込時に破棄する。
 
@@ -154,3 +140,122 @@ import { SettingsHint } from '../settings-ui/SettingsHint';
 ## Applet管理と個別の更新元
 
 管理ページはJSON・保存先切り替え・ページリセットを提供しない。個別Appletの更新元は従来の共有保存分類を保って個別設定へ配置し、フォーム／JSONとページリセットの同じ投影へ含める。更新元が未指定ならmanifestを継承し、空文字の無効化と保存済み値を保つ。
+
+## 統合後の構成
+
+```text
+本体renderer
+  SettingsPage（全体設定／Applet詳細で共用）
+    SettingsIndex（全体設定のみ）
+    SettingsPageLayout・SettingsForm・各設定ページ
+    settings-uiの入力／一覧／ダイアログ部品
+    SettingsViewClient（本体用transport）
+          │ 本体preloadの設定ページ専用IPC
+main      ▼
+  SettingsPageSession（Shellから独立）
+    SettingsInputSession → 既存検証／保存処理 → SettingsStore
+    settingsPageAuxiliary／settingsPageActions → 既存機能サービス
+```
+
+設定画面のためのWebContentsView、独立HTML、Shell提供元、ready待機、Default Shellへの復旧は持たない。本体の通常のReactツリーへ描画し、既存の本体ウィンドウ・テーマ・ナビゲーションを使用する。
+
+### ファイル配置
+
+| 現在 | 統合後 | 方針 |
+| --- | --- | --- |
+| `src/shared/settings-ui/*` | `src/renderer/settings-ui/*` | 全ファイルを移動。相対importとCSS参照も更新 |
+| `shells/default/settings/*.tsx` | `src/renderer/settings/*.tsx` | SettingsForm、SettingsIndex、SettingsPageLayout、各ページ・編集ダイアログを移動 |
+| `shells/default/settings/runtime.ts` | `src/renderer/settings/runtime.ts` | 入力キュー等を再利用し、transportを本体用へ変更 |
+| `shells/default/settings.tsx` | `src/renderer/settings/SettingsPage.tsx` | Reactコンポーネントへ変換。createRoot、window宣言、Shell接続・ready・境界フォーカス処理を除く |
+| `shells/default/settings.css` | `src/renderer/settings/settings.css` | 本体へ取り込み。設定画面のルート内へスタイルを限定 |
+| `shells/default/settings.html` | 削除 | 独立HTMLのビルド・配布を終了 |
+| `src/shared/settings-page.ts` | 同じ場所 | mainと本体preload/renderer間の型として再利用。Shell公開型との接続を外す |
+| `src/shared/settings-editing.ts`・`settings-catalog.ts`等 | 同じ場所 | Reactに依存しない型、定義、検索・投影処理は共通側に保持 |
+| `src/main/core/settings-page.ts` | 同じ場所 | ShellPageController実装から本体設定ページのセッションへ変更 |
+
+settings-uiのapi.tsxは本体内部の制御依存として扱う。現在は別documentにある2つの`configureSettingsControls`が、統合後に同じグローバルを書き換える構造を残さない。`SettingsControlsProvider`と`useSettingsControls`によるReact Contextへ変更し、本体ルートでは既存DockApi、SettingsPage配下ではそのSettingsViewClientのcontrolsを渡す。部品の利用側はContextから取得する。設定フォームの操作は発行済み操作IDを通し、本体の他画面は設定画面の表示有無に依存させない。
+
+ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiという名前だけを理由に、設定スキーマや共通操作APIまでrendererへ移さない。
+
+### 本体専用の設定ページbridge
+
+本体preloadのDockApiへ`settingsPage`を追加する。以下は本体の内部APIで、Applet/MCPには公開しない。
+
+| 操作 | 役割 |
+| --- | --- |
+| `open(request)` | fullまたはappletの表示を登録し、接続IDと初回モデルを返す |
+| `get(connectionId)` | 現在の接続に対する最新SettingsPageModelを取得 |
+| `act(connectionId, action)` | 既存SettingsPageActionを検証し、モデルと結果を返す |
+| `close(connectionId)` | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放 |
+| `onChanged(callback)` | 接続ID付きでモデルの更新を受け取る |
+
+接続IDはmainが発行し、開き直した画面へ使い回さない。これはShellの接続ID・提供元IDとは独立する。mainは1つのアクティブな設定ページを管理し、全体設定とApplet詳細を同時にmountしない。新しいopenは既存の入力受付を待った後に古い接続を失効させる。SettingsPageSessionは既存の`settingsNavigation`、`settingsEditing`、補助情報生成と操作関数を再利用する。rendererは購読を登録してからopenし、接続IDとrevisionで初回snapshotと更新通知の順序を判定する。
+
+- 送信元は既存の`dock:*`ハンドラーと同じ本体webContents・mainFrame・hostDocumentUrl検査で限定する。
+- open時に本体の現在routeと表示対象を検査する。Applet詳細は選択中のAppletとpageIdの所有者を照合し、full用の検索・ページ選択を許可しない。
+- get/actは接続IDと現在の表示文脈を照合する。closeは画面遷移後もその接続IDの解放だけを許し、新しい接続へ作用させない。古い画面の操作・応答は新しい画面へ適用しない。
+- sessionId/editRevision、操作ID、ページの許可範囲、発行済みactionId、入力サイズの既存検査を維持する。
+- アカウント認証、APIキー、任意のURL実行等を別の汎用口として追加しない。既存の機能サービスを通す。
+- Shell側のpreloadへこのbridgeを追加しない。エラー記録には入力値・認証値を含めない。
+
+SettingsPageModelの選択ページ単位の投影と補助情報は維持する。Shellへの公開が終わっても、全Settingsを渡して画面内で自由に保存する構造へ置き換えない。schemaVersion:2は既存内部モデルの形式として当初維持できるが、Shell向け互換性の保証とは分離する。
+
+SettingsPageSessionはShellPageRequest/Action/ModelのunionとShellPageControllerに依存しない形へ変え、SettingsPageRequest/Action/Modelを直接受け取る。changed、release等の依存は本体側から渡す。
+
+### 入力キューと寿命
+
+SettingsViewClientのtransportを注入可能にし、`window.appdockPage.connect/act/onChanged`を上記bridgeへ置き換える。最新モデルの取得、自己操作だけのbefore更新、外部競合の拒否、失敗入力の画面内保持は再利用する。長時間操作は入力キューを占有せず、取消操作を受け付ける。
+
+本体のuseSettingsEditorは、Applet一覧・ショートカット等に必要な既存の編集口として整理する。同じ設定フォームの入力をuseSettingsEditorとSettingsViewClientの両方から送らない。両者は同一SettingsInputSessionへ接続し、全体設定の選択・再起動時復元・プロフィール等への移動要求も、その正本のpageIdへ集約する。
+
+既存の本体入力flushの受付に、表示中SettingsViewClientのflushを登録する。ナビゲーション、対象変更、再起動等の前に既存キューを待ち、flushの通信失敗または3秒の期限超過では遷移を成立扱いしない。保存できない入力を自動再送しない。すでに検証・保存の結果が返った失敗入力と、受付完了を確認できないflushを区別する。不正JSON等の画面内入力は既存方針どおり、ページ移動を禁止せず破棄する。
+
+flushはすでに送信を受け付けたキューを待つもので、全体保存ではない。キュー内のact/editSettingsから、その同じキューのflush応答を待つ循環を作らない。旧`dock:flushSettings`、editSettingsのselect-page/mode/reload時のShell flush、およびNavigationCoordinatorの待機順を併せて見直す。
+
+画面終了時には検索移動のobserver、購読、ショートカット記録、一時ダイアログ、キャンセル対象のパレット等を既存release処理で解放する。古いclose通知で新しい接続を閉じない。本体renderer再読込時は全接続を無効にする。
+
+## 表示と操作の維持
+
+- 全体設定は左インデックス・横断検索と右本文、Applet詳細は同じ右本文のみを表示する。
+- 未導入・停止・無効Appletの扱い、宣言型のsettingSections/settings/actions、WebAppletの動的一覧を維持する。設定を開くだけでAppletを起動しない。
+- 部分JSON、外部変更、原子的保存、PC専用権限、Webアカウントの参照検査はそのまま機能サービスで扱う。
+- 入力途中の数値・URL・不正JSON、IME、Enter/blur/Escape、候補欄、フォーカス復帰、一覧の並べ替えを維持する。
+- native dialogが同じ本体documentへ移ることを踏まえ、背面の操作とローカルショートカットの抑止、実行中の重複操作防止を確認する。
+- Shell向けTab境界IPCとショートカット転送は設定から外す。本体documentのTab順序・既存のショートカット経路を使い、1回の入力を二重に実行しない。
+- 設定CSSのhtml/bodyへの指定を本体全体へ持ち込まない。既存の本体テーマを継承し、初期表示時の別テーマ適用を行わない。
+- ShellPageSlot用の高さ・座標計算を設定から外し、flex/min-height/overflowで利用可能な本文領域を使う。狭幅、スクロール、検索項目移動、左一覧幅の既存状態を維持する。
+- `--restore-view`の設定カテゴリ・Applet詳細タブ復元を維持する。カテゴリ更新だけで復元成功とせず、対象本文の描画まで確認する。
+- 設定を開くコマンドIDと既存ナビゲーションの入口は維持する。Shell提供元に依存せず、safe-shellでも本体の共通設定を開く。
+
+## 決定
+
+- 設定JSONは既定値との差分を表す。項目の省略は「現在の版・現在のApplet宣言の既定値を使う」を意味する。将来の版で既定値が変われば、省略した項目は新しい値に従う。
+- フォームには実際に適用する値を表示し、JSONモードには既定値と異なる値だけを表示する。全項目が既定値なら、そのページのJSONは`{}`となる。
+- フォーム・JSON・設定コマンド等の共通保存経路で既定値を省く。既定値の補完は読み込み・実行時だけ行い、補完した値をそのままファイルへ戻さない。
+- ページのリセットと、PC用設定を削除して共有へ戻す操作を分ける。前者は既定値、後者は現在の共有値を使う。
+
+## 既定値と比較単位
+
+本体は既存の設定スキーマ、Appletは宣言済みsetting.default、startupDelaySeconds、pagesのdisplayを正本とする。既定値を別の固定表へ重複させない。宣言が取得できないAppletの設定・未宣言キーには既定値を推測せず、保存済みの値を保持する。
+
+objectは既知の既定値と再帰比較し、差分がなくなった親objectも省く。配列は順序を含む一つの値として比較し、要素単位の差分や番号キーへ変換しない。空配列、false、0、空文字、nullは、それぞれの既定値と一致する場合だけ省く。未知キーは省かない。危険なprototypeキー、型、深さ、サイズの既存検証は維持する。
+
+動的ページのリセットは、そのページに宣言された編集対象フィールドだけを扱う。親の登録一覧、項目ID、他の子ページ、保存先を維持する。子ページで既定値が省略されたフィールドは、親のobject-list内の同名フィールドの既定値を継承する。配列内の登録情報は通常の配列として保持し、既定値との差分表示と必要な登録構造を区別する。設定のリセットで原画像ファイル・session・Secrets等を削除しない。
+
+動的ページの登録行については、宣言されたフィールドの既定値も保存時に省く。登録IDと配列の順序を保ったまま、読込時に親・子の宣言から行の既定値を補い、ページ一覧のドメイン検証へ渡す。これにより子ページのリセット後も将来の既定値へ追従できる。通常の配列の要素削除や部分マージを意味しない。
+
+## JSON編集
+
+JSONを`{}`に置き換えると、そのページの編集対象だけが既定値に戻る。部分的にキーを削除した場合は削除した項目だけが既定値となる。空のテキストや不正なJSONは従来どおり入力エラーとする。
+
+フォーム用の補完済み投影とJSON用の差分投影を分ける。JSON操作のbeforeも差分投影で検査し、既定値を省く表示によって競合検査が緩くならないようにする。ページ外キーは引き続き拒否する。フォーム側では別項目の変更を保持する。
+
+## ページリセット
+
+JSONを持つページのツールバーに「このページを既定値に戻す」を配置し、フォーム・JSONの両モードで表示する。確認にはページ名、対象保存先、共有の場合は他PCにも反映されることを表示する。
+
+リボン設定もこの共通操作へ統一する。配置と動作設定の右クリック割当をまとめて既定値へ戻し、リボン編集の下部には初期化専用ボタンを置かない。公開APIの配置編集`reset`が右クリック割当を保持する契約は維持する。
+
+確認開始時の対象ページ、保存先signature、revision、ページ値を保持し、確定時に再確認する。対象・保存先・値が外部で変わった場合は上書きせず、確認し直せるエラーにする。未確定入力は通常のblurで先に確定し、不正入力が残る場合は修正または再読み込みを案内する。キャンセルでは変更しない。
+
+確定後は既存の検証・prepareSettings・WindowsLaunch・保存経路を通して1回だけ保存し、成功時だけ閉じる。保存先モード、Appletの起動状態、対象外ページ、認証等を維持する。起動設定は既存のOS登録トランザクションを利用する。JSON表示は`{}`となり、再起動後も既定値のキーを再生成しない。

@@ -1,12 +1,12 @@
 # 新しいAppletを作る
 
-ローカル画面のアクセント色はホストの[共通配色](appearance.md)を参照する。0.75.0以降はCSS変数を自動提供するため、Applet内にパレットや`--accent`の固定値を追加しない。警告やエラー等の意味を持つ色は分離する。
+ローカル画面のアクセント色はホストの[共通配色](appearance.md)を参照する。CSS変数を自動提供するため、Applet内にパレットや`--accent`の固定値を追加しない。警告やエラー等の意味を持つ色は分離する。
 
 リボンやコマンドパレットを自作したい場合は、通常Appletに`shell` capabilityと担当領域の`shell.views`を追加します。Shell Appletは通常のコマンド・設定・ページも併用でき、未実装の領域はDefault Shellが担当します。宣言例と自己設定/コマンドの利用は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください（minimumHostVersion 0.26.41）。
 
 AppDock本体の公開機能をAppletから操作する場合は[AppDock共通操作API](appdock-api.md)を使用します。minimumHostVersion 0.26.36、appdock-api capability、PC専用の利用許可が必要です。
 
-新しいAppletにも、同期するデータはAppDock.at365.exeの配置フォルダー、認証・Storage・Secrets・生成キャッシュは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。0.57.0以降、設定APIは共有／端末専用の選択に対応し、有効状態は常に端末別です。Appletが直接JSONを読み分けず、既存のSettings APIを使ってください。登録原素材と共有枠はEXE隣です。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+新しいAppletにも、同期するデータはAppDock.at365.exeの配置フォルダー、認証・Storage・Secrets・生成キャッシュは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。設定APIは共有／端末専用の選択に対応し、有効状態は常に端末別です。Appletが直接JSONを読み分けず、既存のSettings APIを使ってください。登録原素材と共有枠はEXE隣です。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
 現在のAppDock / API v1を対象とする実装手順です。まずこのガイドで構成を決め、個々のAPIは[Applet API](extensions.md)、ホストへの機能追加は[AppDockの実装ガイド](host-development.md)を参照してください。
 
@@ -174,7 +174,7 @@ UIテストは一意の `.artifacts` フォルダーを作り、ホストへ `--
 
 ## 宣言コマンドと構造化フォーム
 
-モニターごとのフォームには`object-list`とフィールド内の`string-list`を使います。旧Folderや数値enumの移行を宣言でき、JSON文字列からも設定を引き継げます。ロード前に設定したいコマンドはmanifestの`commands`へ宣言し、即時ロードを許す開始操作だけ`activateOnExecute`を指定します。旧IDは`aliases`で維持できます。
+モニターごとのフォームには`object-list`とフィールド内の`string-list`を使います。ロード前に設定したいコマンドはmanifestの`commands`へ宣言し、即時ロードを許す開始操作だけ`activateOnExecute`を指定します。旧IDは`aliases`で維持できます。
 
 履歴画像など件数が変わる操作は`PanelAction.ActionId`と`IPanelActionHandler`を使用します。パネルの`Tabs`でモニターを切り替え、画像ごとの操作を一般コマンドへ増やさずに済みます。大きなサムネイルは`local-images`と`Ui.GetImageDirectoryAsync`、`PanelImage.ImageFile`を使い、ページ変更・終了時に自分のキャッシュを削除します。画像プレビューはホストが提供します。
 
@@ -191,12 +191,11 @@ UIテストは一意の `.artifacts` フォルダーを作り、ホストへ `--
 
 TypeScript/Nodeの現行実利用例は[Gmail](../../Applet.Gmail.at365/DEVELOPMENT.md)です。ローカルReact UIとWebアカウントのDOM観測を分け、ログイン領域はホストへ任せます。別途APIクライアントを実装する場合は、一般設定をホストフォーム、秘密をSecrets、履歴をStorageへ分けます。認証やポーリングはコマンド受付から切り離し、停止時にAbortControllerで中止してください。
 
-
 ファイル選択・WAV音声・トレイの通知表示には`file-dialog`、`audio`、`tray-attention`を宣言します。`notifications.show`の`silent`で独自音との二重再生を防げます。[追加API](extensions.md#node-appletの通知ファイル選択)を参照してください。Node SDKの型は`src/main/node-worker.ts`が正本で、任意のパネルHTMLは実行しません。
 
 Webサービスの対話ログインとアカウント別ページが必要なNode Appletは、[WebアカウントAPI](web-accounts.md)を使用できます。Gmail固有のDOM観測はAppletへ置き、WebContentsViewと永続セッションの管理はホストへ委ねます。`report(..., data)`でローカルUIへ一時データを渡し、`window.webAccounts.viewport`で表示領域・非表示を切り替えられます。これらを使用するAppletの最低ホスト版は0.13.0です。.NET専用ラッパーは未提供です。
 
-同じ名簿とPC内ログインを別Appletから使う場合は、最低ホスト版0.56.0と`webAccounts.accountGroup: {id,title}`を宣言します。Gmailと同じグループは`at365.google`です。名前・順番・削除はグループ全体、選択・監視・通知音はApplet単位となるため、操作画面で共有範囲を明示します。詳細は[アカウントグループ設計](web-account-groups-design.md)を参照してください。
+同じ名簿とPC内ログインを別Appletから使う場合は、最低ホスト版0.56.0と`webAccounts.accountGroup: {id,title}`を宣言します。Gmailと同じグループは`at365.google`です。名前・順番・削除はグループ全体、選択・監視・通知音はApplet単位となるため、操作画面で共有範囲を明示します。詳細は[アカウントグループ設計](web-accounts.md)を参照してください。
 
 初回未表示からページの描画を背景で継続する必要がある場合、最低ホスト版は0.15.1としてください。ホストは透明・画面外・非フォーカスの専用WindowへViewを保持し、可視の操作Windowを選択した場合だけ移します。サービス固有の通知・観測処理は引き続きApplet側です。snapshot.darkでホストテーマを受け取り、通知音は管理領域へコピーします。
 
@@ -213,7 +212,7 @@ webAccounts.cycleはウィンドウを開かず、既存の表示/最小化/非�
 
 HTML/Reactで独自画面を作り、リボンから本体ページまたは独立Windowとして開く場合は[Appletページとリボン](applet-pages.md)を参照してください。manifestのpages、安定したページIDとopenCommand、pages capabilityを宣言します。Nodeはcontext.pages.open、.NET/nativeはcontext.Pages.OpenAsyncを利用します。WebアカウントUIはsource:web-accountsと既存openを再利用します。
 
-0.66.1から.NET/nativeは`IPageActionHandler`で`pageActions`のJSON結果を返せます。動的なページ一覧には`IPageService.ListAsync/ReplaceAsync`、画像にはページ別登録を使い、ローカルHTML/JS/CSSをEXEとは別の相対資産として発行物へ含めてください。[ページ連携の契約とfixture](dotnet-applet-pages-design.md)を参照してください。
+.NET/nativeは`IPageActionHandler`で`pageActions`のJSON結果を返せます。動的なページ一覧には`IPageService.ListAsync/ReplaceAsync`、画像にはページ別登録を使い、ローカルHTML/JS/CSSをEXEとは別の相対資産として発行物へ含めてください。[ページ連携の契約とfixture](applet-pages.md)を参照してください。
 
 ページボタンを上寄せ/下寄せへ利用者が配置し、間にセパレーターを置けます。Appletのページ宣言やopen APIは変わらず、配置はホストが管理します。
 
@@ -237,4 +236,4 @@ Node/.NETの両APIで、保存済みユーザー方針をホストが解決し�
 
 ## 音声再生の共通化
 
-音声を鳴らす機能は[共通音声再生API](audio-playback.md)を基本とします。Node Appletの通知音はcontext.audio.play(file)、読み上げは既存TTS APIへ渡します。音を独自再生せず、試聴も同じ入口を使ってください。0.42.0から空文字/省略は無音で、Windows標準ビープは廃止しました。独自通知音を併用する種類指定通知はsilent:trueとminimumHostVersion:0.42.0を指定します。
+音声を鳴らす機能は[共通音声再生API](audio-playback.md)を基本とします。Node Appletの通知音はcontext.audio.play(file)、読み上げは既存TTS APIへ渡します。音を独自再生せず、試聴も同じ入口を使ってください。空文字/省略は無音で、Windows標準ビープは廃止しました。独自通知音を併用する種類指定通知はsilent:trueとminimumHostVersion:0.42.0を指定します。

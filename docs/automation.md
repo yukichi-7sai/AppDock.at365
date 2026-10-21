@@ -1,6 +1,6 @@
 # 共通操作APIとCodex連携
 
-MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-relay-design.md)と[保存型コマンド](mcp-command-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
+MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-design.md)と[保存型コマンド](custom-commands-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 
 接続先管理には`appdock_mcp_get_server_settings`、`appdock_mcp_update_server_settings`、`appdock_mcp_inspect_server_tools`の固定3入口があります。独立した初期OFFの管理許可で、登録・編集・削除と公開前のツール確認を扱います。保存には設定変更・コマンド実行、未公開ツールの確認にはMCP利用・コマンド実行の許可も必要です。[管理APIの契約](mcp-client-design.md#接続先の管理api)を参照してください。
 
@@ -8,9 +8,9 @@ MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/canc
 
 Appletも同じ操作APIを使用します。[Applet向け接続・許可・SDK](appdock-api.md)を参照してください。操作実装とカタログを共有し、Codex連携の許可とは独立しています。
 
-本体に共通操作APIとHTTP MCPを持ちます。初期の接続範囲はこのPCのみで、IPv4のネットワーク接続も選べます。利用者の手順は[Codex連携の操作説明](usage.md#codex連携)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
+本体に共通操作APIとHTTP MCPを持ちます。初期の接続範囲はこのPCのみで、IPv4のネットワーク接続も選べます。利用者の手順は[Codex連携の操作説明](usage.md#カスタムコマンド・mcp・ai)、設定保存は[設定同期](settings-sync.md)を参照してください。App Serverによる会話UIとCLIは未実装です。
 
-LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命は[ネットワーク接続の設計](mcp-network-access-design.md)にまとめています。
+LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命は[ネットワーク接続の設計](automation.md)にまとめています。
 
 ## 構成
 
@@ -55,7 +55,7 @@ MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscri
 
 設定変更はcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
 
-0.57.0以降、読取りは共有とこのPCの設定の合成値、書込みは現在の保存先を使用します。本体のテーマ等とAppletの有効状態は常に端末別です。Appletの共有／端末専用はローカルUIで選択し、MCPへ保存先切り替えや他端末の設定を公開しません。公開項目・許可・dryRun・共通revisionの契約は維持します。
+読取りは共有とこのPCの設定の合成値、書込みは現在の保存先を使用します。本体のテーマ等とAppletの有効状態は常に端末別です。Appletの共有／端末専用はローカルUIで選択し、MCPへ保存先切り替えや他端末の設定を公開しません。公開項目・許可・dryRun・共通revisionの契約は維持します。
 
 | キー | 値 | 適用タイミング |
 | --- | --- | --- |
@@ -77,7 +77,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/desktop/app/pages/owner/applets/browser/exeで、desktopはglobalの直下です。assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未確定入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
-編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。allowEditGesturesはPC専用automation.jsonに保存し、旧設定での省略時も初期OFF。操作の許可画面のMCP列で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
+編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。操作の許可画面のMCP列で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
 
 ```json
 {
@@ -106,7 +106,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 - update: idとchanges（command/gesture/enabled/whenの部分更新）。whenを指定するときはscope/appletIds/processes全体が必要です。入力変更は移動先の末尾、条件だけの変更は現在位置を保ちます。
 - remove: 削除するidを指定します。存在しないIDはNOT_FOUNDです。
 - reorder: gestureとidsを指定。同じ入力の無効行も含む全IDが必要で、別入力の順序は維持します。
-- configure: changesでenabled、activateOnStart、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、executionMode（all/first）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center/monitor-center/none）、indicatorShowNoAction（boolean）を部分更新します。indicatorShowNoActionは「アクションなしを表示する」に対応し、省略時は旧設定を含めtrueです。falseの場合は実行対象のない移動の待機表示を隠し、ジェスチャーの認識・実行・取消は維持します。activateOnStartは非アクティブな対象をアクティブにして開始する設定で、新規・旧設定での省略はfalseです。executionModeは条件一致のすべて／最初の1つ、noneは待機表示なしです。省略された旧executionModeはallになります。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
+- configure: changesでenabled、activateOnStart、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、executionMode（all/first）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center/monitor-center/none）、indicatorShowNoAction（boolean）を部分更新します。falseの場合は実行対象のない移動の待機表示を隠し、ジェスチャーの認識・実行・取消は維持します。executionModeは条件一致のすべて／最初の1つ、noneは待機表示なしです。省略された旧executionModeはallになります。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
 
 desktop条件はデスクトップの背景・アイコン領域だけに一致し、フォルダー画面やタスクバーを含みません。whenの任意のboolean `excludeDesktop`はglobal/exeでtrueを指定でき、省略はfalseです。その行だけをデスクトップの開始候補から除外します。別のdesktop条件の行は維持し、候補がなければ通常の右クリックを通します。例: `{"scope":"exe","appletIds":[],"processes":["explorer"],"excludeDesktop":true}`。他のscopeでtrueを指定するとINVALID_ARGUMENTです。monitor-centerは開始時のカーソルがあるモニター全体の中央へ表示し、window-centerも対象がデスクトップなら同じ表示位置になります。
 
@@ -124,7 +124,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 既存の未公開/未導入コマンドへの割当もbindingsへ返して保持します。それらは無効化・削除できますが、外部からキー/条件を変更したり有効化したりはできません。reorderは既存の同じキーの行だけを並べ替えます。ローカルの編集画面にはこの外部公開制限を加えません。
 
-編集には連携有効に加えallowExecute・allowWrite・allowEditShortcutsの3つが必要です。allowEditShortcutsはPC専用automation.jsonに保存し、初期値/旧設定での省略時はfalse。「操作の許可」のMCP列の「ショートカットの編集」で即時切替、MCP経由で許可を変える操作はありません。permission=shortcuts.write、実効許可はgetInfo/commands.list/shortcuts.getのshortcutEditingAllowedで確認します。既に保存した割当は許可取消後もローカルで使えます。
+編集には連携有効に加えallowExecute・allowWrite・allowEditShortcutsの3つが必要です。「操作の許可」のMCP列の「ショートカットの編集」で即時切替、MCP経由で許可を変える操作はありません。permission=shortcuts.write、実効許可はgetInfo/commands.list/shortcuts.getのshortcutEditingAllowedで確認します。既に保存した割当は許可取消後もローカルで使えます。
 
 ```json
 {
@@ -206,7 +206,6 @@ runtime登録やhost.commands.replaceのautomation値は採用せず、manifest�
 
 本体は宣言の検証・実行許可・稼働状態・同時実行制御・監査ログを管理します。公開宣言は実行許可を有効にするものではありません。現在はPC単位のコマンド実行許可を全Appletで共有し、Applet/コマンド個別の許可スイッチはありません。
 
-
 ## 設定宣言と自動生成コマンド
 
 この宣言にはminimumHostVersion=0.26.30以上、settings capabilityが必要です。各Applet自身のextension.jsonのsettingsへ、必要な項目だけautomation=trueを付けます。型は最上位のboolean/number/string/静的selectに限定し、既存の型・最小最大・選択肢検証を共有します。入れ子、JSON、動的select、アカウント情報を一括公開する機能はありません。
@@ -230,7 +229,7 @@ booleanのgenerateCommandsは任意で、on/off/toggleから必要なものだ�
 
 生成IDとsettings.updateは宣言・alias・runtime登録/置換との重複を拒否します。提供元IDのappdockは本体専用です。生成IDは180文字以内。引数付きsettings.updateを引数なしショートカットの候補へは追加しません。
 
-初期対応: Gmailは監視/通知/ツールバー/未読のみと履歴件数、壁紙は停止と更新間隔を公開します。Gmailの外部リンク確認省略・通知内容表示、認証や画像フォルダーは非公開です。壁紙の旧start/stop/toggle/resume/pauseは廃止し、paused.off/on/toggleへ置換しました。既存割当の自動移行は行わないため、必要なキーを新コマンドへ割り当て直してください。
+初期対応: Gmailは監視/通知/ツールバー/未読のみと履歴件数、壁紙は停止と更新間隔を公開します。Gmailの外部リンク確認省略・通知内容表示、認証や画像フォルダーは非公開です。壁紙の旧start/stop/toggle/resume/pauseは廃止し、paused.off/on/toggleへ置換しました。
 
 ## API監査ログ
 
@@ -262,7 +261,7 @@ MCPは接続経路の表示であり、接続元をCodex固有の本人確認と
 
 登録名の既定値はAppDockで、mcp_servers.AppDockのurl/enabled/required/http_headersだけを追加します。「登録先と接続の詳細」で登録名を変更できます（英字で始まる64文字以内の英数字・ハイフン・アンダースコア）。複数配置にはAppDock_Testなど別の名前を指定します。同名の他登録は上書きしません。serverIdはCodexへの登録名、APIのinstanceIdと管理コメントは配置IDです。
 
-登録名を自動移行しません。旧登録や名前変更前の登録は「登録を解除」してから登録し直します。解除は保存済みの所有hashを照合して旧名の管理範囲だけを削除します。ローカルserverNameが未保存の場合はAppDockを既定値にします。
+旧登録や名前変更前の登録は「登録を解除」してから登録し直します。解除は保存済みの所有hashを照合して旧名の管理範囲だけを削除します。ローカルserverNameが未保存の場合はAppDockを既定値にします。
 
 required=falseなのでAppDock停止をCodex全体の必須起動失敗にしません。Bearer tokenはCodexのローカルconfig.tomlにも平文で保存されます。画面・IPC状態・ログには出しません。
 
@@ -285,13 +284,13 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 ## リボン編集
 
-0.66.0以降、layoutには`buttons`（最大100件のコマンドボタン定義）と任意の`rightClickCommand`も含みます。操作は`addButton { id, title, icon, commandId, iconOnly?, placement }`、`updateButton { id, changes }`、`removeButton { id }`、`setRightClickCommand { commandId }`を追加しました。button IDは`button:<stable-id>`で、表示用items.kindはcommandです。保存済みの未登録コマンドも保持し、通常のretainedIdsへは分類しません。外部の取得・変更結果では公開されていないcommandId／rightClickCommandを省略するため、読取結果を保存型として丸ごと送り返さず、操作と変更対象だけを指定してください。編集はコマンドの実行許可を追加せず、実行時にも元callerと公開宣言・個別許可を検査します。
+layoutには`buttons`（最大100件のコマンドボタン定義）と任意の`rightClickCommand`も含みます。操作は`addButton { id, title, icon, commandId, iconOnly?, placement }`、`updateButton { id, changes }`、`removeButton { id }`、`setRightClickCommand { commandId }`を追加しました。button IDは`button:<stable-id>`で、表示用items.kindはcommandです。保存済みの未登録コマンドも保持し、通常のretainedIdsへは分類しません。外部の取得・変更結果では公開されていないcommandId／rightClickCommandを省略するため、読取結果を保存型として丸ごと送り返さず、操作と変更対象だけを指定してください。編集はコマンドの実行許可を追加せず、実行時にも元callerと公開宣言・個別許可を検査します。
 
-0.65.0以降、layoutに任意の`separatorTitles`（登録済みセパレーターIDから名前へのマップ）を含みます。`updateSeparator { id, changes: { title } }`で80文字以内の名前を変更し、空欄で自動生成名へ戻します。`addGroup`の任意`color`、`updateGroup.changes.color`は`#RRGGBB`またはnullです。色なしのnull、欠落、色の正規化、名前、削除・初期化はGUIと同じ共有検証を使います。グループ削除で色、セパレーター削除で名前も削除されます。保存・dryRunだけではコマンドを実行しません。
+layoutに任意の`separatorTitles`（登録済みセパレーターIDから名前へのマップ）を含みます。`updateSeparator { id, changes: { title } }`で80文字以内の名前を変更し、空欄で自動生成名へ戻します。`addGroup`の任意`color`、`updateGroup.changes.color`は`#RRGGBB`またはnullです。色なしのnull、欠落、色の正規化、名前、削除・初期化はGUIと同じ共有検証を使います。グループ削除で色、セパレーター削除で名前も削除されます。保存・dryRunだけではコマンドを実行しません。
 
 取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。
 
-編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。allowEditRibbonはPC専用automation.jsonへ保存し、初期値と旧設定での省略値はfalse。操作の許可画面のMCP列で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
+編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。操作の許可画面のMCP列で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
 
 取得結果のlayoutはorder/hidden/bottom/separators/groups/itemOverrides/separatorTitles/buttons/rightClickCommand、itemsはid/title/kind（builtin/page/separator/group/command）/appletId/pageId/parentId/placement/visible/enabled/displayedです。titleはリボンの実効表示名、placementは親からの継承を含みます。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは配置・所属・表示設定に保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
 
@@ -371,7 +370,7 @@ parentId=nullはトップレベル、それ以外はグループ項目のID。�
 
 新規/変更先のコマンドはassignableCommandsから指定します。メニューではmenuAllowed=trueだけを使用し、固定「設定」「終了」の重複を防ぎます。クリック割当はmenuAllowedに制約されません。既存の未知/非公開コマンドは保持・移動・並べ替え・削除が可能で、同じ値の再指定は許可しますが、別の項目やクリック先への新規コピーは許可しません。groupのremoveは拒否し、中身を消したい場合も項目ごとに明示削除します。
 
-共有revision/dryRun/no-op/競合拒否/GUIの未確定入力と同一フィールドの競合検査は他の編集コマンドと同じです。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値として更新します。旧形式は読取り時に既存getTrayMenuで投影し、変更保存時に移行します。リボン/キー/ジェスチャー/Applet設定などは保持します。
+共有revision/dryRun/no-op/競合拒否/GUIの未確定入力と同一フィールドの競合検査は他の編集コマンドと同じです。trayMenuが存在すれば空配列も尊重し、旧trayCommandsは派生値として更新します。リボン/キー/ジェスチャー/Applet設定などは保持します。
 
 結果はmenu/clicks/dryRun/changed/revision/warning/applies=trayChanged。completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後のトレイ反映は既存applySettingsが行い、保留中のクリックを取消します。編集自体はコマンド実行ではなく、実クリックの成功を保証しません。ダブル未設定ならシングルを即実行、ダブル設定時はWindowsの判定時間を待ち、ダブル成立時に先行シングルを取消す既存仕様を維持します。
 
@@ -386,3 +385,106 @@ Shell専用コマンドに宣言された`shellRequirement`も共通最終実行
 ## TTS読み上げ
 
 最低ホスト版0.35.0。tts.speak / tts.voices.list / tts.jobs.get / tts.stopをAppletとMCPへ公開します。Appletはappdock-api capability、両入口はそれぞれのuseTts許可を使います。受付・状態・所有者・停止・重複判定とNode/.NET例は[TTS連携](tts-design.md#共通api)を参照してください。
+
+### 3.1 PC専用設定
+
+既存のPC専用`automation.json`へ次を追加する。共有`settings.json`には入れず、保存ファイルも増やさない。
+
+```ts
+connectionScope: 'local' | 'network'; // 省略時 local
+networkHostnames: string[];          // 省略時 []、追加の接続先ホスト名
+```
+
+`version: 1`の追加フィールドとして読み、既存のtoken・port・allow*・configFile・serverName・ownedを保持する。省略は既定値に補完するが、未知のscope、null、型違反、不正なホスト名は設定読込エラーとしてMCPを起動しない。破損ファイルを既定値で上書きしない。
+
+`networkHostnames`は接続元の許可一覧ではなく、AppDockへ接続するURLの名前を追加するもの。通常はIPアドレスで接続でき、追加登録は不要。MagicDNSの完全名や独自DNS別名を使う場合だけ詳細設定で指定する。最大16件、各253文字までのASCII DNS名とし、ラベルは1～63文字の英数字・ハイフン、先頭末尾のハイフンを拒否する。小文字化・末尾ドット除去・重複除去を行い、スキーム、ポート、パス、ユーザー情報、ワイルドカード、IP表記、空文字を拒否する。DNS照会で任意の名前を自動許可しない。
+
+### 3.2 状態と操作
+
+`AutomationState`へ保存済み`connectionScope`・`networkHostnames`、実際の`activeConnectionScope`（停止中null）、`networkEndpoints: string[]`、`lastLocalClientAt`・`lastNetworkClientAt`、`canCopyToken: boolean`を追加する。canCopyTokenは保存済みの有効なtokenが利用できるかだけを示す。既存の`endpoint`はループバック専用のまま維持し、`lastClientAt`も互換用に保持する。トークンやAuthorizationは状態に含めない。
+
+新規操作は本体設定UI専用の`setConnectionScope { scope }`、`setNetworkHostnames { hostnames }`、`copyToken`、`copyEndpoint { endpoint }`、`retryStart`。copyEndpointは現在稼働中のendpointまたはnetworkEndpointsに含むURLだけをmainでコピーする。既存`configure { enabled, allowWrite, port }`へscopeを混ぜず、古い設定画面や操作許可画面からのconfigureでnetworkがlocalへ戻る事故を防ぐ。専用操作は指定されたフィールドだけを更新し、無関係なallow*を上書きしない。既存busyガードで操作を直列化する。
+
+追加操作は`dock:automation`と、既存Shell設定ページの`codex`用action許可一覧へ接続する。`permissions`ページの許可一覧へは追加しない。Settings HostとDefault Shellに別の実装を持たせず、同じAutomationServiceを呼ぶ。公開操作カタログ、MCP、Applet、WebApplet、外部Webページからは呼べないことを確認する。
+
+### 4.1 接続範囲
+
+単一のAutomationMcpでbind先を切り替える。networkでもループバック接続を受け付け、同じポート・APIインスタンスを使用する。`0.0.0.0`は待受指定だけに使い、利用者向け接続URLには出さない。
+
+接続URL候補は、このPCに現在割り当てられた非ループバックのIPv4アドレスから生成する。未指定、マルチキャスト、リンクローカルのアドレスは候補・自動Host許可から除く。候補は到達性を保証せず、ネットワークモードで稼働中の場合だけ表示する。設定状態の取得時に更新し、HTTP側でも要求ごとに現在のインターフェース情報を取得してHostを判定する。DHCP・VPNの切替後に古いIPを許可し続けず、ポートやCodex登録は変えない。
+
+### 4.2 HostとOrigin
+
+接続元IPの制限と、HTTPの接続先名・ブラウザーOriginの検査を分ける。ネットワークモードでも検査を無条件に省略しない。[MCPのStreamable HTTP仕様](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)のOrigin検査を維持する。
+
+| モード／項目 | 許可条件 |
+| --- | --- |
+| localのHost / Origin | 現行と同じ。Hostは`127.0.0.1:<port>`、Originは未指定または`http://127.0.0.1:<port>` |
+| networkのHost | `127.0.0.1`、現在の非ループバックIPv4、`os.hostname()`の正規化名、保存したnetworkHostnamesのいずれかと実ポートが一致 |
+| networkのOrigin | 未指定、または検証済みHostと同じ`http://<host>:<port>`のOriginに限る |
+
+networkのHost/Originは共通の厳密なparserで正規化する。Host欠落・重複、複数Origin、`Origin: null`、userinfo、パス、query、fragment、制御文字、無効なポート、許可外名を拒否する。Hostは明示した実ポートを必須とし、Originはその同一originを要求する。ヘッダー名の大文字小文字とは別に、DNS名だけを小文字化・末尾ドット除去して比較する。IPv4は正規の4区切り十進表記に限定し、整数・16進等の代替表記を許可しない。
+
+Origin未指定はサーバー間のMCPクライアント向けに許可する。ブラウザーからの別originの直接呼出しは本設計の対象にせず、CORS許可やOPTIONS対応を追加しない。AIアプリのバックエンドから接続する。`Forwarded` / `X-Forwarded-*`を信用してHost・Origin・接続元の判定を変えない。HTTPSリバースプロキシとの互換性は別途検証し、この切替だけでTailscale Serveへ対応したとは扱わない。
+
+### 4.3 認証と共通制限
+
+全接続に既存の`Authorization: Bearer <token>`を必須とし、比較方法、本文読込後の再検査、token再発行による旧token失効を維持する。認証をURLやqueryへ埋め込まず、ローカル接続も認証を省略しない。
+
+`/mcp`だけを提供し、POST・JSON応答、GET/DELETEの405、1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒を維持する。同時8要求はローカルとネットワークの合計。操作のBUSYや設定競合も全接続で共有し、API・許可・revisionの状態を接続ごとに作り直さない。ネットワーク利用による混雑がCodexへも影響することは受入試験に含める。
+
+HTTP接続自体はTLS暗号化されない。LAN直結ではトークンと要求がHTTPで流れ、tailnet経由ではTailscaleの経路で保護される。設定画面のネットワーク説明へこの違いを短く示す。証明書管理、HTTPSサーバー、ファイアウォール規則作成、ルーターのポート開放、Tailscale設定変更は実装に含めない。
+
+### 5.1 通常の切替
+
+1. 入力検証とbusy取得後、変更対象だけを候補設定へ反映する。同値なら保存・再起動しない。
+2. 候補をatomicWriteで保存する。失敗したら保存済み値と既存リスナーを維持し、操作失敗を返す。networkからlocalへの変更でも保存失敗ならnetworkのままであることを状態とエラーで示す。
+3. 保存成功後に旧リスナーを受付停止にし、既存socket/要求を閉じる。受付世代を更新し、本文読込中など旧世代の要求が後からAPIを呼ばないよう、API呼出直前にも世代と受付可否を確認する。
+4. 同じポートで新しいbind先へ起動する。ランダムな識別子とBearer認証を使う内部probeで、127.0.0.1への要求を自身のリスナーが受け取ったことを確認する。Windowsでワイルドカードと特定アドレスの待受が共存しても、Codexの接続先が別プロセスになる状態を成功と扱わない。probeは設定・操作APIを呼ばず、接続日時も更新しない。成功してからrunning・activeConnectionScopeを更新する。連携無効なら保存だけで、次の有効化時に適用する。
+5. 失敗した場合、候補設定は保存済み、MCPは停止中としてエラーを表示する。勝手なポート変更や旧networkへの復帰は行わない。利用者は設定の修正または「接続を再試行」で回復できる。
+
+起動処理は「待受成功」と「選択ポートの保存成功」を分けて管理し、両方が成功するまで新リスナーからAPIを実行しない。port=0で選ばれた実ポートを保存できなければ、そのリスナーを閉じて停止状態にする。bind途中のserverも確実に破棄する。retryStartは連携有効・停止中の場合だけ同じ保存設定で起動し、有効化やポート選び直しを兼ねない。
+
+保存や起動の最終失敗は[共通のエラー通知とログ](error-reporting.md)へ接続し、設定欄にも現在の稼働状態と対処を返す。入力検証違反は画面内だけで扱う。例外の生文、token、HTTPヘッダーをログや通知へ出さず、同じ失敗を重複通知しない。
+
+networkHostnamesの変更は保存後に検査規則を差し替える。bind変更は不要。本文読込後にも最新規則を再検査し、削除した名前で新たなAPI実行を開始しない。ポート変更・連携無効化も同じ受付停止の仕組みを使い、登録更新の要否は次節に従う。
+
+### 5.2 既に開始した操作
+
+範囲の切替時にはCodexを含む通信が一時切断される。クライアントの自動再接続は保証しない。既にAPIへ渡った操作・保存・OS操作は、応答が届かなくても完了する場合がある。通信切断を操作の取消や失敗とみなさず、自動再実行もしない。
+
+接続範囲の変更だけではトークンを更新せず、`authorizationChanged`も発火しない。共有APIのインスタンス、AI/TTSジョブと所有者世代、重複判定を維持する。連携無効化・操作許可取消・token再発行はそれぞれ既存の取消／失効経路を使う。範囲変更は、開始済み処理を取り消す機能ではない。
+
+受付世代の切替後に旧initializeが完了しても、新リスナーの接続日時を更新しない。全接続日時をbind変更時にクリアし、自己テストは日時を更新しない。
+
+## Codex連携の互換性
+
+| 操作 | Codexへの影響 |
+| --- | --- |
+| local ⇔ network | URL・token・登録名・所有hashを保持。config.tomlを書き換えず再登録不要。一時切断から復帰しなければCodex側で再接続／再読み込み |
+| 接続先ホスト名の追加・削除 | ループバックURLを使うCodexへの変更なし |
+| LANのIP変更・Tailscale接続切替 | ローカルCodexのURLは不変。外部クライアントのIP指定URLは必要に応じて更新 |
+| ポート変更・0で再選択 | 既存どおり「登録・修復」が必要。外部クライアントのURLも更新 |
+| 認証情報の再発行 | 既存どおりCodex登録を修復し、外部クライアントも新tokenへ更新。旧tokenは全接続で無効 |
+| 連携無効・起動失敗 | Codexから利用不可。登録の`required=false`を保持 |
+
+`registrationBlock()`のループバックURL限定検証と、管理コメント・所有hash・TOML検証・直前bytes照合・backup・原子的置換を変更しない。外部削除後の孤立コメント修復条件も保持する。他PCのCodexやAIアプリの設定ファイルをこの画面から編集しない。
+
+現在の「クライアント接続」日時はCodex専用ではない。ネットワーク接続が増えてもCodexの接続成功と誤認しないよう、「このPCからの最終接続」「ネットワークからの最終接続」に分ける。分類はsocket.remoteAddressのIPv4 loopback判定で行う。このPC側でもクライアント名の自己申告をCodex認証に使わない。実際のCodexからツールが呼べたことは別途確認する。
+
+## 設定画面と外部クライアントへの登録
+
+既存の設定ページID・検索anchorの`codex`は保持する。ページ表示名を「MCP・Codex連携」にし、設定カタログの検索語へMCP・LAN・ネットワーク・tailnetを追加する。Codexへの登録欄とネットワーク接続欄を同じページに置く。
+
+- 「連携を有効にする」の直下へ「接続範囲」の2択selectを追加。選択確定で即時保存する。無効中でも選択できる。保存中だけ操作を抑止し、失敗時は保存済み値とエラーを表示する。
+- 説明: 「このPCのみ」／「ネットワークからも接続可能（IPv4）」。「ネットワークでは、接続トークンを持つクライアントにMCPの操作許可が適用されます。HTTP接続です。利用するネットワークとファイアウォールの設定を確認してください。」
+- 同じ画面に「このPCの接続先」と「ネットワークの接続先候補」を区別して表示。ネットワーク候補はIPを省略せず、URLのコピーを用意する。候補がない場合はその旨を示し、稼働・到達を保証する表示にしない。
+- 詳細欄に「追加の接続先ホスト名」を置く。改行区切りの入力をblur/Enter等の確定操作で一括検証・保存する。入力中や不正値はその画面だけに保持し、全体保存バーを設けない。localでも値を保持し、network時だけ有効にする。
+- ネットワーク設定欄に「接続トークンをコピー」を置く。既存tokenがないときは無効。押下時だけmainでクリップボードへ書き、IPC応答は成功・失敗だけ。トークンを画面、DOM、AutomationState、ログ、通知へ返さない。コピー先がOSクリップボードであることをボタン付近に明記する。共有クリップボード履歴を変更・削除せず、時間差のクリップボード消去も行わない。
+- 「接続テスト」は「このPC内の接続テスト」と表記し、LAN到達性や接続元アプリの対応を判定しない。停止エラーには「接続を再試行」を用意する。
+
+トークンコピーは既存の「状態では秘密値を返さない」契約を保った明示操作として追加する。Electron clipboardへの書込みをmain側で注入し、AutomationServiceが返すReplyへ秘密値を入れない。既存の本体Window/mainFrame/URL検査とShell設定ページの操作検査を通す。MCPの`ui.actions.invoke`や公開ツールへコピー操作を露出しない。
+
+外部クライアントへ渡す情報はStreamable HTTP、`http://<AppDock-PCのIPv4または許可済みホスト名>:<port>/mcp`、Bearer tokenの3点。例の秘密値は`<token>`とし、実値を文書へ書かない。接続元とAppDock双方のルーティング／ファイアウォールで到達可能であることが前提。
+
+同じtokenを持つクライアントは同じMCP主体として扱う。現行のAI/TTSジョブ所有・停止・参照範囲やrequestIdの重複判定も接続元ごとには分離されない。各クライアントはrequestIdにUUID等を使い、ユーザー名やIPから別主体を推測しない。クライアント別トークン・権限・監査識別は対象外とする。

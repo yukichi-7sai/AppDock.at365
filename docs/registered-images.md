@@ -1,8 +1,8 @@
 # 共通画像ライブラリーと宣言型リボン
 
-AppDock 0.69.0以降の現行契約。登録原画像、分類グループ、Applet設定、リボン表示は本体の共通基盤で扱う。プロフィール固有の保存処理や描画分岐は持たない。採用時の判断と境界は[分離設計](profile-applet-image-library-design.md)を参照する。
+AppDock 0.69.0以降の現行契約。登録原画像、分類グループ、Applet設定、リボン表示は本体の共通基盤で扱う。プロフィール固有の保存処理や描画分岐は持たない。採用時の判断と境界は[分離設計](registered-images.md)を参照する。
 
-管理画面は独立した「画像ライブラリー」ページ。左のグループ一覧、カードサイズ変更、複数登録と一括所属を備える。画像選択・壁紙履歴にも同じカードと拡大表示を使用する。表示部品の利用方法は[共通ギャラリー](image-gallery.md)、全体の設計は[ページ化の設計](image-library-gallery-design.md)を参照する。
+管理画面は独立した「画像ライブラリー」ページ。左のグループ一覧、カードサイズ変更、複数登録と一括所属を備える。画像選択・壁紙履歴にも同じカードと拡大表示を使用する。表示部品の利用方法は[共通ギャラリー](image-gallery.md)、全体の設計は[ページ化の設計](image-gallery.md)を参照する。
 
 ## 保存と参照
 
@@ -16,7 +16,7 @@ PNG/JPEG/WebPの静止画像、5MiB以下、各辺8192px以下かつ16Miピク�
 
 PNG/JPEGはNativeImage、WindowsのNativeImageが扱わないWebPは専用の非表示offscreen rendererでdecodeする。sandbox・contextIsolationを有効にし、Node/preload/ホストbridgeを渡さず、CSPでdata画像だけを許可する。元bytesを読み込み、小さい表示用PNGだけを返す。処理は直列、15秒の上限、1秒のidle後に回収し、本体終了後の待機処理は新しいrendererを作らない。原画像は変換しない。起動前の補助Window終了で本体を終了しない。
 
-NASの設定場所切替・分散書込み・ネットワーク切断への完全な回復処理は[共有場所の設計](shared-settings-location-design.md)の別工程。今回のローカルファイル試験を実NASの検証として扱わない。
+NASの設定場所切替・分散書込み・ネットワーク切断への完全な回復処理は[共有場所の設計](shared-settings-location-design.md)の別工程。ローカルファイル試験を実NASの検証として扱わない。
 
 ## グループ
 
@@ -114,11 +114,11 @@ IDはApplet内で安定させる。リボンIDは`applet:<Applet ID>:<id>`。act
 
 グループ・コマンドボタンの`image`、通常／動的ページの`image`、`ribbon.itemOverrides[id].image`も同じ参照を使う。画像が使えない場合は宣言・設定した固定アイコン、WebAppletでは旧inline iconへ戻る。外部リボン編集のadd/updateButton、add/updateGroup、updateItemも参照またはnullを受け付ける。
 
-## プロフィールと既存データ
+## プロフィール
 
 独立repo [Applet.Profile.at365](../../Applet.Profile.at365/docs/usage.md)の`at365.profile`が名前・アバターの自己設定と宣言型リボンを提供する。本体はこのIDや設定キーを固定参照しない。初期リボンは下寄せ・画像のみ・固定名「プロフィール」。未選択時はuserアイコン。
 
-新規ホスト設定にはtop-levelの`profile`を作らない。旧`profile`は解釈しない値として保存時に保持し、旧`profile`リボンIDも設定内に保持する。旧`data/assets/profile/`や`avatar.png`は削除・コピー・自動移行しない。新Appletを導入して名前と画像を選び直す。WebAppletの既存`icon`も保持し、`image`を選んだ場合に優先する。
+新規ホスト設定にはtop-levelの`profile`を作らない。旧`profile`は解釈しない値として保存時に保持し、旧`profile`リボンIDも設定内に保持する。新Appletを導入して名前と画像を選び直す。WebAppletの既存`icon`も保持し、`image`を選んだ場合に優先する。
 
 ## 検証と追加時の規則
 

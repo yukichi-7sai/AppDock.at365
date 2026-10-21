@@ -1,12 +1,12 @@
 # AppDockの作業ルール
 
-A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示](../AGENTS.md)を読む。このファイルはAppDock全体に適用する。兄弟Appletの変更では、そのrepoの指示も確認する。
+A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](../AGENTS.md)を読む。このファイルはAppDock全体に適用する。兄弟Appletの変更では、そのrepoの指示も確認する。
 
 ## 文書と作業範囲
 
 - 現行仕様は現在のコードと[開発ガイド](DEVELOPMENT.md)から参照する機能別文書を正本とする。導入版ごとの説明を現行文書へ積み重ねない。実測・未確認事項・成果物のhashはVERIFICATIONへ記録し、過去の成功を現在の動作確認とみなさない。
 - READMEはインストール方法とビルド方法だけとし、機能・操作・設定・既定値などは開発文書へ置く。入口と検証記録の分担は[文書方針](docs/documentation.md)に従う。共通仕様を各Appletへ複製せず、変更時は参照先・関連する型・試験を整合させる。
-- 設定は[設定基盤](docs/settings-foundation.md)と[本体統合](docs/settings-host-ui-design.md)を正本とする。全体設定とApplet詳細は本体rendererで共用し、設定をShell差し替え領域へ戻さない。
+- 設定は[設定基盤](docs/settings-foundation.md)と[本体統合](docs/settings-foundation.md)を正本とする。全体設定とApplet詳細は本体rendererで共用し、設定をShell差し替え領域へ戻さない。
 
 ## 実装と配布
 
@@ -15,7 +15,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 - 通常publishは本体単一EXEとupdate.json、変更Appletは自身のupdate.zip/update.jsonを生成する。未変更Appletの再発行・全体ZIP作成・旧ZIP整理を通常publishへ含めない。終了コード、版、成果物、固定EXEの隔離起動を確認する。
 - Release依頼では[リリース手順](docs/RELEASING.md)を読み、本体と同梱Appletの未公開版を確認する。公開済み同版は上書き・再作成しない。公開後検証に成功した対象repoごとに最新3件の公開Releaseを保持し、draft・Gitタグ・履歴・無関係repoを保持する。全体ZIPの準備と整理は[オールインワン](docs/all-in-one.md)に従う。
 - deploy先への旧EXEの別フォルダー退避は追加しない。配置hashと利用者データ保持は確認する。この扱いを自己更新helperの復旧用backupへ流用しない。
-- 開発生成物はrepo直下の.artifacts。完了時の整理は[テストフォルダー整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)に従い、終了・成功を確認した種類ごとの直近3回を残す。実行中・状態不明・失敗未解決・移行用・固定出力・再利用資料を削除しない。同期・バックアップ・スナップショットの設定は利用者が管理する。
+- 開発生成物はrepo直下の.artifacts。完了時の整理は[テストフォルダー整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)に従い、終了・成功を確認した種類ごとの直近3回を残す。実行中・状態不明・失敗未解決・固定出力・再利用資料を削除しない。同期・バックアップ・スナップショットの設定は利用者が管理する。
 
 ## ツールとWindows検証
 
@@ -49,7 +49,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 - 自己設定APIのcapability・非公開キー・activate中の契約を保持し、SettingsCommandsへ接続する。外部更新のexpectedRevision・dryRun・原子的保存・公開項目制限を維持する。再入のBUSY/SELF_CALLとNode/.NETの対応を確認する。
 - MCPはlocalhostのHost/Origin/token検査と登録TOMLの所有範囲を維持する。監査ログに引数・認証・生の例外を追加しない。受付・保存完了・OS登録・対象アプリでの効果確認を区別する。
 - 操作許可のUIは専用カテゴリへ集約し、Applet/MCPの独立した列、PC専用保存と共有設定の独立性を維持する。前提不足でも保存済みON/OFFを保ち、他の許可を自動変更しない。
-- 処理の最終失敗は[共通のエラー通知とログ](docs/error-reporting.md)に従い、本体のErrorReporterへ接続する。機能別のエラー通知種類を増やさず、「エラー通知」の設定を使う。安全な原因と対処を通知・ログ・結果に揃え、重複、取消の誤通知、秘密値の混入、通知障害の再帰を防ぐ。入力中の検証エラーと既存機能の移行範囲は同文書の区分に従う。
+- 処理の最終失敗は[共通のエラー通知とログ](docs/error-reporting.md)に従い、本体のErrorReporterへ接続する。機能別のエラー通知種類を増やさず、「エラー通知」の設定を使う。安全な原因と対処を通知・ログ・結果に揃え、重複、取消の誤通知、秘密値の混入、通知障害の再帰を防ぐ。入力中の検証エラーと各機能の適用範囲は同文書の区分に従う。
 - 確認・対処が必要な状態は[共通の警告通知](docs/warning-notifications-design.md)に従い、WarningReporterへ接続する。閉じる・期限切れ・OFFを解消と扱わず、同じ状態の再通知を防ぐ。対象パス等のローカル診断情報を通知・履歴・読み上げへ混ぜず、状態詳細とログから確認できるようにする。
 - Applet管理は共通AppletManagementへ集約する。enabledの保存と再起動を分け、無効Appletを再起動で有効化しない。設定アクションは自身の宣言済みコマンドに限定し、二重実行防止と保存済み入力を保つ。
 - 保存場所と受信・復旧は[設定同期](docs/settings-sync.md)に従う。ログは共通Host APIを使い、停止処理中はhost.logだけを受け付ける。停止完了後・異常終了後の要求や停止中の他APIを許可しない。
@@ -66,7 +66,7 @@ A:配下では[A:の共通指示](../../AGENTS.md)と[30.PROJECTの共通指示]
 ## WebとApplet
 
 - [WebApplet](docs/web-applets.md)と[WebアカウントAPI](docs/web-accounts.md)の保存領域・認証・表示寿命を区別する。リモートページへpreload/Node/ホストIPCを渡さない。提供JSONは検証した初期値だけを取り込み、手動変更・権限を上書きしない。
-- アカウントグループの共有名簿・PC専用session・Applet別設定・旧Gmail移行は[グループ設計](docs/web-account-groups-design.md)に従う。グループ未宣言の専用枠とWebApplet枠は分離を継続し、同一グループを宣言したAppletだけが共用する。
+- アカウントグループの共有名簿・PC専用session・Applet別設定は[グループ設計](docs/web-accounts.md)に従う。グループ未宣言の専用枠とWebApplet枠は分離を継続し、同一グループを宣言したAppletだけが共用する。
 - WebAppletの追加/削除/初期ショートカットは独立したApplet.WebApplet.at365の管理画面と本体の宣言型一覧設定から操作する。一覧は共通部品を使い、追加/編集はダイアログで確定する。個別サイトは汎用pageCollectionsとしてID・設定・リボンを保持し、親Appletだけをruntimeと更新対象にする。公開設定・コマンドは提供元の宣言に従う。
 - Webアカウントは別ファイルへ即時保存する。名前のblur/Enter確定・Escape取消・IME/重複送信防止、削除/クリアの警告と参照中ガードを維持する。削除待ちsessionは検証済み専用root内で次回起動時に回収し、Gmail・別枠・外部リンク先を削除しない。
 - 表示先切替でWebContents/session/入力を再生成しない。非選択/非表示でも背景描画を維持する。rAF・visibilityState・observer.readyやPlaywrightのfocus emulationだけで実受信成功と扱わず、通常起動の描画/取得を確認する。

@@ -4,13 +4,13 @@
 
 ## 保存と初期値
 
-- `bindings`は最大2000行。各行は安定した`id`、`command`、`gesture`、`enabled`、`when`。配列順が実行順。`executionMode`は`all`（条件に一致したすべて、既定値）または`first`（最初の1つ）。旧設定で省略された場合も`all`として読み込む。同一コマンドIDは1回だけ。移動・クリック・ホイール・キーに共通して適用する。
+- `bindings`は最大2000行。各行は安定した`id`、`command`、`gesture`、`enabled`、`when`。配列順が実行順。`executionMode`は`all`（条件に一致したすべて、既定値）または`first`（最初の1つ）。同一コマンドIDは1回だけ。移動・クリック・ホイール・キーに共通して適用する。
 - 待機表示と実行は、開始対象と条件に一致した行から同じ登録順・コマンドID重複除去・実行方法で選ぶ。`indicatorPosition`は`gesture-start`・`window-center`・`monitor-center`・`none`（表示なし）。`monitor-center`は右ボタン押下時のカーソルがあるモニター全体の中央。`window-center`も対象がデスクトップなら同じ位置を使う。モニターは開始時に固定し、移動先の画面へ追従しない。`none`でも入力認識・実行・取消を続け、不透明度の保存値を保持する。
-- `indicatorShowNoAction`（「アクションなしを表示する」）は既定true。旧設定での省略もtrueとして読み込む。falseでは、移動方向と開始条件に一致する実行対象がない場合の待機表示を隠す。一致するアクションの表示・入力認識・実行・取消・通常の右クリック復元は従来どおり。`none`ではこの値にかかわらず表示せず、保存値は保持する。未一致の移動を通常の右クリックへ変換する設定ではない。
+- `indicatorShowNoAction`（「アクションなしを表示する」）は既定true。falseでは、移動方向と開始条件に一致する実行対象がない場合の待機表示を隠す。一致するアクションの表示・入力認識・実行・取消・通常の右クリック復元は従来どおり。`none`ではこの値にかかわらず表示せず、保存値は保持する。未一致の移動を通常の右クリックへ変換する設定ではない。
 - gestureは`move-up/down/left/right`、`click-left/middle`、`wheel-up/down`、`key:<キー>`。キーは既存ショートカットの正規化（Ctrl/Alt/Shift、英数字、F1〜F24、矢印、対応する記号・特殊キー）を使う。WinやOS専用の保護された入力は対象外。Tabは設定画面の特殊キー選択から登録できる。
 - whenは`global/desktop/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`と任意の`excludeDesktop`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。Applet条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。
 - `desktop`はWindows Shellが所有するデスクトップの背景・アイコン領域だけに一致する。プロセス名がexplorerであることだけでは一致させず、通常のフォルダー画面とタスクバーを含めない。`excludeDesktop: true`は`global`と`exe`で使用でき、その行だけをデスクトップの候補から除外する。省略はfalse。他にデスクトップで有効な行がなければ右押下を捕捉せず、通常入力を通す。`desktop`条件の別の行は引き続き利用できる。
-- `activateOnStart`は非アクティブなウィンドウ・デスクトップをアクティブにして同じ右押下で開始する設定。新規・旧設定での省略ともfalse。保存済みの値と他の設定を保持し、設定ファイルの移行・書換えは行わない。
+- `activateOnStart`は非アクティブなウィンドウ・デスクトップをアクティブにして同じ右押下で開始する設定。
 - `excludedProcesses`は全条件より優先。`enabled`は永続設定。トレイの一時停止は稼働中だけで、再起動で解除する。
 - `gestures`がない場合は`defaultGestures()`の空の割り当てを使う。Applet内の旧ジェスチャー設定は読み取らない。保存済みの本体設定と明示的な空配列を保持する。
 - manifestの`defaultGestureBindings`は同じAppletの宣言コマンドのみ・最大100件。新規Appletの初回発見でコピーし、`gestureDefaultsInitialized`で再追加を防ぐ。既存Appletへ更新時の既定値を押し込まない。
@@ -18,7 +18,7 @@
 
 ## 入力・実行
 
-`AppDock.InputHost`は本体の子プロセス。自己完結.NET/WPFで配布EXE内に収録し、利用者へDesktop Runtime追加を要求しない。0.63.0からglobalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。非アクティブ・クリック透過の待機表示はUI Dispatcherへ分離し、表示の初期化はフック登録前に行う。コールバック内でコマンドやRPCを待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
+`AppDock.InputHost`は本体の子プロセス。自己完結.NET/WPFで配布EXE内に収録し、利用者へDesktop Runtime追加を要求しない。globalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。非アクティブ・クリック透過の待機表示はUI Dispatcherへ分離し、表示の初期化はフック登録前に行う。コールバック内でコマンドやRPCを待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
 
 本体は実Windowフォーカスと表示中Appletに対応する行を入力プロセスへ同期する（40ms間隔、内容が変化した時のみ送信）。ネイティブ側は押下時に最前面HWND・exe・カーソル下のWindow・除外・ブラウザクラス条件を確認。ローカル条件は通知済みHWNDにも限定する。状態の同期前に入力した場合に誤ったコマンドを実行しないよう、本体側も受信時と各コマンドの開始前に最新のページ/Window文脈を照合する。
 
@@ -66,7 +66,6 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - コマンド一覧の枠の外側、一番上に独立した折りたたみ「動作設定」を置き、有効、非アクティブなウィンドウ・デスクトップでも開始する、実行方法、操作感（距離・ホイール間隔）、待機表示（表示位置・不透明度・「アクションなしを表示する」トグル）、Webブラウザ、除外の順に共通SettingsFieldでまとめる。表示なしの間だけ不透明度の入力を無効にし、値は保持する。既存の即時保存と設定検索を維持し、OFF中も一覧と編集は利用できる。
 - 「いつ・どこで」のデスクトップはグローバルの直下へ置く。グローバル・指定したexeを選んだ場合だけ、その下に「デスクトップを除外」のチェック項目を表示する。初期OFFで、保存・再編集・条件表示・検索に反映する。キーボードのショートカット条件へは追加しない。
 - scripts/gesture-command-checks.cjsをgestures-ui-test.cjsから呼び、一覧/編集/並べ替え/保存再起動/両テーマ3幅を検証する。APPDOCK_GESTURE_UI_ONLY=1は物理入力試験を省略する明示モードで、実入力の成功とは区別する。ショートカット側の共用部品もshortcuts-ui-test.cjsで検証する。
-
 
 一時停止/再開は本体コマンド`appdock.gestures.togglePause`で切り替えます。トレイ内はチェック付き項目で、検索・キーからの実行も同期します。保存されない実行中の状態で、再起動後は解除します。配置の仕様は[タスクトレイ](tray-menu.md)を参照してください。
 

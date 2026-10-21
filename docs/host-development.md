@@ -30,7 +30,6 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 
 [WebアカウントAPI](web-accounts.md)では、ホストがWebContentsView・独立永続セッション・限定IPC・停止時の破棄を管理します。Gmailのセレクターと新着判定はApplet側です。Node APIは`webAccounts.start/open/read/report`で、.NET SDKのラッパーは提供していません。`report`の一時UIデータと、信頼済みローカルUIの`viewport`による表示領域変更・非表示を追加しています。
 
-
 アカウントのcycle、限定UIのitemOpener、枠別soundの保存/選択/試聴は[WebアカウントAPI](web-accounts.md)に従います。UI/WebContentsのショートカットは本体の共通処理へ渡し、manifestの初期割当と利用者の編集を保持します。操作Windowの位置・サイズ/最大化はWindowStateStoreで保存します。境界/ライフサイクル回帰とGmailのtest-ui-features.cjsを併用し、音は無音WAVで実プレーヤーまで確認します。
 
 | 追加したいもの | 主な変更先 |
@@ -49,7 +48,7 @@ Applet名の画面表示にはsnapshotの`displayName`を使用します。manif
 3. **保存と表示更新をつなぐ。** 設定はSettingsStore経由で更新し、全JSONの独自書き込みを避けます。状態をメモリへ追加した場合はsnapshotへ含め、`changed()`またはmanagerのchangedイベントでrendererへ通知します。既存の変更通知はまとめて送られます。React側では更新が届くまで待つ必要があります。
 4. **SDKへ公開する。** .NETは[Contracts.cs](../dotnet/AppDock.SDK/Contracts.cs)のインターフェースと型、[ExtensionContext](../dotnet/AppDock.Runtime/ExtensionContext.cs)の実装を対応させます。Nodeは[NodeExtensionContext](../src/main/node-worker.ts)とactivate時に渡すcontextの実装を対応させます。片方だけ対応する場合はAPI仕様に明記し、未対応なのに型だけ存在する状態を避けます。
 5. **購読やリソースの寿命を定める。** 解除用IDisposable／関数を返し、deactivateと通信断で解除します。.NETのコマンド／設定変更を直列化する `commandLock`を保持したまま、同じロックを再取得する処理を呼ばないようにします。ホストへ要求するだけなら別方向のRPCで返答を処理できますが、逆方向の処理完了を相互に待つ循環を作らないでください。
-6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletの開発文書（`docs/usage.md`など）には必要なAppDockバージョンを記載します。manifestの`minimumHostVersion`で起動前に最小ホストバージョンを確認します。配布時にも必要バージョンを明記してください。APIの能力交渉はありません。`apiVersion: 1`だけで旧ホストが新APIを提供すると判断しません。既存引数の意味やSDKの契約を壊す場合は、移行方法とAPIバージョンを別途設計します。
+6. **互換性を記録する。** 既存ID・メソッド名・設定名は維持します。新APIを使うAppletの開発文書（`docs/usage.md`など）には必要なAppDockバージョンを記載します。manifestの`minimumHostVersion`で起動前に最小ホストバージョンを確認します。配布時にも必要バージョンを明記してください。APIの能力交渉はありません。
 
 新APIがAppletプロセスからだけ使われる場合、preload/renderer IPCへの追加は不要です。Applet通信とReact用IPCは別の境界です。
 
@@ -137,13 +136,13 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 ## トレイコマンドとメニュー
 
-トレイの正本は[タスクトレイの設定とメニュー](tray-menu.md)。自由なグループと配置をtrayMenuへ保存し、trayMenuが未指定のときだけtrayCommandsから移行します。設定/終了はホストが末尾固定し、一時停止/再開は通常の本体コマンドです。クリック判定は下記に従います。
+トレイの正本は[タスクトレイの設定とメニュー](tray-menu.md)。設定/終了はホストが末尾固定し、一時停止/再開は通常の本体コマンドです。クリック判定は下記に従います。
 
 ## 描画設定
 
 `host.hardwareAcceleration`はboolean、既定true。単一インスタンスのロック取得後、`app.whenReady()`より前に同じ`SettingsStore`で設定を読み込み、falseの場合だけ`app.disableHardwareAcceleration()`を呼びます。不正な設定は既存のエラー表示で起動を中止し、ファイルを保持します。設定保存・外部編集による変更は次の完全起動で適用し、実行中のGPUプロセスへ変更を加えません。
 
-一般設定の説明には完全終了・再起動が必要なことを表示します。[設定回帰](../tests/preferences.test.cjs)は旧設定補完・OFF保持・不正型を確認し、[UIテスト](../scripts/hardware-acceleration-ui-test.cjs)は3回の起動でON→OFF→ONを実測します。GPU情報取得後の`app.isHardwareAccelerationEnabled()`とOFF時の`getGPUFeatureStatus().gpu_compositing`を確認します。Applet APIとSDKは変更しません。
+一般設定の説明には完全終了・再起動が必要なことを表示します。GPU情報取得後の`app.isHardwareAccelerationEnabled()`とOFF時の`getGPUFeatureStatus().gpu_compositing`を確認します。Applet APIとSDKは変更しません。
 
 ## クリック判定
 
@@ -153,7 +152,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 [クリック回帰](../tests/tray-clicks.test.cjs)は即時実行、単クリック待機、ダブル時の単クリック取消、取得完了前の取消、複数単クリック、メニュー・設定・終了の取消、取得失敗を確認します。[トレイUIテスト](../scripts/tray-commands-ui-test.cjs)は実Trayイベント、別コマンドの実行と重複抑止、Windows時間取得、再起動後の保持を確認します。
 
-Webアカウントの仮名とtemporaryNameフラグを保存し、観測accountNameで仮名だけを一度変更します。cycleはアクティブな操作Windowの選択中WebContentsに入力フォーカスがある場合だけ、新しいViewへ引き継ぎます。別Window・ローカル入力欄・非表示/最小化にはフォーカスを移しません。詳細と旧保存形式の互換性は[WebアカウントAPI](web-accounts.md)を参照してください。
+Webアカウントの仮名とtemporaryNameフラグを保存し、観測accountNameで仮名だけを一度変更します。cycleはアクティブな操作Windowの選択中WebContentsに入力フォーカスがある場合だけ、新しいViewへ引き継ぎます。別Window・ローカル入力欄・非表示/最小化にはフォーカスを移しません。
 
 portableランチャーは更新間で実行パスを固定し、tray-identity.tsのUUID v5と併せてWindowsの通知領域の識別を維持します。ビルドはbuild-portable.cjsを経由し、使用中の資産を削除しないkernel lease/gateをportable.nsiで扱います。内部のビルダー連携と再起動/二重起動/設定保持試験は[開発ガイド](../DEVELOPMENT.md)を参照してください。タスクバーのAppUserModelId/元EXEの再起動先とは別の仕組みです。
 
@@ -173,17 +172,15 @@ portableランチャーは更新間で実行パスを固定し、tray-identity.t
 
 契約・検証手順は[Appletページとリボン](applet-pages.md)。shared/applet-pages.tsがmanifestとリボンID、settings-schema.tsが互換性と保存検証、core/applet-pages.tsが移動可能なUI Viewと表示先、src/renderer/settings/RibbonSettings.tsxが即時保存する入力を担当します。WebアカウントIPCはUIのWebContentsに結び付け、本体ページの領域・overlay・最小化/背景parkを独立して扱います。
 
-リボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。現行の導線は下記の設定パネルと表示順の仕様に従います。移行とGUIは[Appletページとリボン](applet-pages.md)を参照してください。
+リボンを上寄せ/下寄せの2グループとして描画し、共有settings-schemaでseparator登録と参照を検証します。現行の導線は下記の設定パネルと表示順の仕様に従います。
 
 WebアカウントのNode navigateコマンドと、外部リンク確認を自身のboolean設定へ保存するexternalLinkSettingは、[WebアカウントAPI](web-accounts.md)を参照してください。
 
-
 ## Applet設定パネルの共用
 
-全体設定とApplet詳細は同じSettingsPageSession/本体SettingsPage本文を使う。0.33.0では保存済みSettingsStoreが正本となり、SettingsInputSessionはページ・モード・操作受付だけを担当する。フォーム/JSONの不完全入力や保存失敗値は現在のUIだけに保持する。全体保存/破棄・共有ドラフト・未保存警告・draft-avatarを撤去した。
+全体設定とApplet詳細は同じSettingsPageSession/本体SettingsPage本文を使う。保存済みSettingsStoreが正本となり、SettingsInputSessionはページ・モード・操作受付だけを担当する。フォーム/JSONの不完全入力や保存失敗値は現在のUIだけに保持する。全体保存/破棄・共有ドラフト・未保存警告・draft-avatarを撤去した。
 
 SettingsPageModel schemaVersion:2は本体内部の投影契約とし、DockApi.settingsPageを使う。旧page.settingsのShell宣言と保存指定は読込可能だが描画には使用しない。部分JSON・入力キュー・外部競合・検索は[設定基盤](settings-foundation.md)を正本とする。scripts/settings-shell-ui-test.cjs [固定EXE]は本体設定の即時保存・IME・画像・失敗/競合・入力flush・復元を確認する。
-
 
 ## Appletの表示順
 

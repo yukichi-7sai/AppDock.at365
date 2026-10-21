@@ -37,7 +37,7 @@
 
 ### エラーで位置を変えないダイアログ
 
-エラーの増減で入力やフッターを動かしたくない場合は、`SettingsDialog`へ`errorLayout="reserved"`を指定する。共通`SettingsError`が正常時も40pxの枠を保持し、エラーは1行で省略、全文は「詳細」のnative popoverへ表示する。詳細は独立してスクロールし、Escapeで詳細だけを閉じて起点へ戻す。本文へ同じエラーを追加したり、詳細のために親ダイアログを拡大しない。入力の`aria-invalid`と境界色を使い、境界の太さや周囲の余白は変えない。今回の適用先はApplet導入だけで、既存画面への一括移行は行わない。
+エラーの増減で入力やフッターを動かしたくない場合は、`SettingsDialog`へ`errorLayout="reserved"`を指定する。共通`SettingsError`が正常時も40pxの枠を保持し、エラーは1行で省略、全文は「詳細」のnative popoverへ表示する。詳細は独立してスクロールし、Escapeで詳細だけを閉じて起点へ戻す。本文へ同じエラーを追加したり、詳細のために親ダイアログを拡大しない。入力の`aria-invalid`と境界色を使い、境界の太さや周囲の余白は変えない。
 
 通常の`onApply`失敗は共通部品が表示し、入力を保持する。準備・検証だけを中止できる処理は、その間だけ`cancelWhilePending`を有効にしてよい。呼出元は閉鎖時の取消と、遅い応答を適用しない検査を所有する。保存・配置交換へ移った後は閉鎖を禁止し、既存のトランザクションを使う。
 
@@ -229,7 +229,7 @@ Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ
 
 `columns`は既存フィールドから1～4列、`titleKey`は主情報、`descriptionKey`はその下の補足。selectの値はラベルで表示する。`enabledKey`はbooleanフィールドのトグル。`idKey`は編集欄に出さず、新規登録時だけUUIDを生成する。`iconKey`は行画像のdata PNG/JPEG/WebP文字列を参照する。`confirmDelete`省略時は即時削除で、ショートカットの既存契約を維持する。
 
-AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出しとした1始まりの番号列を追加する。編集・削除・並べ替えの対象名も`itemTitle`と番号で表示する。モニターのように配列位置が割り当て先を表す設定に使い、番号を永続IDとして保存しない。`string-list`の`format: directory`は共通のフォルダー追加・選択・削除入力を使う。旧JSON文字列の一覧と`aliases`・`numericOptions`を読み、編集した登録だけをOKで正規化して保存する。取消では旧形式を含む保存値を変更しない。
+AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出しとした1始まりの番号列を追加する。編集・削除・並べ替えの対象名も`itemTitle`と番号で表示する。モニターのように配列位置が割り当て先を表す設定に使い、番号を永続IDとして保存しない。`string-list`の`format: directory`は共通のフォルダー追加・選択・削除入力を使う。旧JSON文字列の一覧と`aliases`・`numericOptions`を読み、編集した登録だけをOKで正規化して保存する。
 
 フィールドの`propertyPath`は最大3階層の保存パス（例:`["when", "scope"]`）。prototype系キーは禁止。未知の保存項目は保持する。selectの`optionSource: "web-profiles"`は同じAppletの共通プロフィール名簿だけを選択肢に使い、capabilityを必要とする。空の名簿ではAppletの管理画面で枠を追加してから選択する。
 

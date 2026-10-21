@@ -1,6 +1,6 @@
 # Shell Host / Default Shell
 
-リボンとコマンドパレットの描画は`shells/default`のDefault Shellに集約する。本体は表示領域・状態・操作を管理する。[タイトルバー・ステータスバー](shell-bars.md)、ホーム・画像ライブラリー・ログ・通知センター本文の[ページ用Shell](shell-pages.md)、[通知バナー](notifications.md)も同じShell基盤を使う。設定本文・設定操作の受付調整・未移行の本文・AppletページのWebContentsは本体に残る。保存済みSettingsStoreが正本で、共有ドラフトは持たない。[オーバーレイと部分差し替え](shell-overlays.md)、[設計と後続計画](shell-foundation.md)も参照。
+リボンとコマンドパレットの描画は`shells/default`のDefault Shellに集約する。本体は表示領域・状態・操作を管理する。[タイトルバー・ステータスバー](shell-bars.md)、ホーム・画像ライブラリー・ログ・通知センター本文の[ページ用Shell](shell-pages.md)、[通知バナー](notifications.md)も同じShell基盤を使う。保存済みSettingsStoreが正本で、共有ドラフトは持たない。[オーバーレイと部分差し替え](shell-overlays.md)、[設計と後続計画](shell-foundation.md)も参照。
 
 ## 構成と拡張
 
@@ -19,7 +19,7 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
   "id": "example.shell",
   "name": "Example Shell",
   "version": "1.0.0",
-  "minimumHostVersion": "0.51.0",
+  "minimumHostVersion": "0.76.5",
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
@@ -27,7 +27,7 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 }
 ```
 
-有効化と領域への割り当ては別。「設定 → 表示 → Shell」でリボンなど領域ごとに選び、即時保存します。保存値は`host.shellProviders`の領域マップ、省略は`appdock.default-shell`。旧`host.shellProvider`だけの入力は固定8領域へ正規化し、次の成功した通常保存で旧キーを除きます。新旧併記は新マップが優先し、空マップでも旧値へ戻りません。未導入・無効・故障時は対象領域だけDefault Shellを使い、保存指定を保持します。Default Shellは常時有効・遅延なし、本体の探索元から出自を検証します。外部の予約ID偽装と重複IDは拒否します。詳細は[領域別割り当て](shell-region-assignment.md)。
+有効化と領域への割り当ては別。「設定 → 表示 → Shell」でリボンなど領域ごとに選び、即時保存します。保存値は`host.shellProviders`の領域マップ、省略は`appdock.default-shell`。新旧併記は新マップが優先し、空マップでも旧値へ戻りません。未導入・無効・故障時は対象領域だけDefault Shellを使い、保存指定を保持します。Default Shellは常時有効・遅延なし、本体の探索元から出自を検証します。外部の予約ID偽装と重複IDは拒否します。詳細は[領域別割り当て](shell-foundation.md)。
 
 ## 描画モデルと共通操作
 
@@ -47,13 +47,13 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 ## 選択されたShellの公開bridge
 
-0.66.0以降、登録した任意コマンドのボタンも表示用の`kind: "button"`とactionIdで表します。コマンドID・設定・引数は描画モデルへ渡しません。schema 2に任意の`contextActionEnabled`／`contextDisabledReason`を追加し、右クリックも同じ利用可否・実行時再検査を受けます。省略時の動作はリボン設定を開く操作です。schema 1の形は維持し、これらの任意フィールドは省略します。追加情報を使わない旧Shellから操作されても、本体が利用不可の実行を拒否します。
+登録した任意コマンドのボタンも表示用の`kind: "button"`とactionIdで表します。コマンドID・設定・引数は描画モデルへ渡しません。schema 2に任意の`contextActionEnabled`／`contextDisabledReason`を追加し、右クリックも同じ利用可否・実行時再検査を受けます。省略時の動作はリボン設定を開く操作です。schema 1の形は維持し、これらの任意フィールドは省略します。追加情報を使わない旧Shellから操作されても、本体が利用不可の実行を拒否します。
 
 0.65.0以降のschema 2のグループは任意の`color: "#RRGGBB" | null`を持ちます。省略／nullは色なしです。Default Shellはこの色をグループボタンの左端の2pxのバーへ使い、持続的に開いた子の縦線・接続部分まで1本の直線につなげます。色なしではバー・縦線・接続部分を表示しません。schema 1へ色は返しません。色を表示する追加Shellはこの任意項目を使い、コマンド実行や選択状態と区別してください。
 
 リボンを提供するShellは`minimumHostVersion: "0.51.0"`と`shell.ribbonSchemaVersion: 2`を宣言する。省略／1の提供元はリボン領域だけDefault Shellへ戻し、他領域の割り当てを維持する。ローカルbridgeは常にschema 2。外部`ui.ribbon.get`は省略時にschema 1へ射影し、グループを通常ボタン、開いた持続型の子を後続の通常項目として返す。
 
-schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-groups-badges-design.md)。
+schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-customization-design.md)。
 
 schema 2の項目は任意の`iconOnly: boolean`を持ち、trueなら表示ラベルを省く。`title`と`tooltip`は本体が解決した表示名で、アイコンのみでもアクセシブル名を保持する。表示名の変更でid/actionIdは変わらない。`iconOnly`を必要とする追加Shellの最低ホスト版は0.53.0とする。schema 1にはこのフィールドを返さない。
 

@@ -1,6 +1,6 @@
-# 共通MCPクライアントの詳細設計（第2段階）
+# 共通MCPクライアントの詳細設計
 
-2026-10-18、0.60.0で実装。外部への中継公開と保存型MCPコマンドは[第3段階](mcp-hub-relay-design.md)・[第4段階](mcp-command-design.md)で同じサービスへ接続した。
+2026-10-18、外部への中継公開と保存型MCPコマンドは[第3段階](mcp-hub-design.md)・[第4段階](custom-commands-design.md)で同じサービスへ接続した。
 
 ## 対応範囲
 
@@ -23,7 +23,7 @@
 
 ## 接続先の管理API
 
-「操作の許可」の「MCP接続先の管理」は、Appletの`manageMcpServers`、MCPの`allowManageMcpServers`に対応する。両方とも新規・旧設定で省略時はOFF。URL・EXE・引数・公開範囲を閲覧・編集できる許可なので、通常の`useMcp`とは独立させる。MCP自身から操作許可を変更する入口は設けない。
+「操作の許可」の「MCP接続先の管理」は、Appletの`manageMcpServers`、MCPの`allowManageMcpServers`に対応する。URL・EXE・引数・公開範囲を閲覧・編集できる許可なので、通常の`useMcp`とは独立させる。MCP自身から操作許可を変更する入口は設けない。
 
 | 共通API / MCPツール | 必要許可 | 結果・操作 |
 | --- | --- | --- |

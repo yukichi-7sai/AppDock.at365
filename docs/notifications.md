@@ -4,7 +4,7 @@
 
 選択した種類の新規通知は[MCP Events](mcp-events-design.md)で購読中のdot等へ送信できる。種類をOFFにすると有効な購読を保持して送信待ちを破棄し、ONに戻すと新しい通知から再開する。OFF中も有効購読の更新を受け付ける。通知発行・表示APIとは独立した購読契約を使い、MCPから通知を任意発行するツールは追加しない。
 
-通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、本体0.30.0の種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。実装状態、実装済みWindows表示先と次の即時保存への方針は[移行設計](notification-foundation.md)を参照する。
+通知状態と描画を分離する。バナー契約は[notifications.ts](../src/shared/notifications.ts)、種類定義・設定・方針契約は[notification-types.ts](../src/shared/notification-types.ts)。
 
 ## 本体のサービス
 
@@ -36,9 +36,9 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。ログも残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
 
-確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。同じ状態の間は閉じる・期限切れ後に再表示せず、本体ログで確認できる。現在は旧PC専用データの残存検出を接続する。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
+確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。同じ状態の間は閉じる・期限切れ後に再表示せず、本体ログで確認できる。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
 
-notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。旧設定の移行・削除処理は行わない。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、表示先・時間指定が可能。
+notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、表示先・時間指定が可能。
 
 「設定 → 通知」は本体の共通設定画面と即時保存を使う。通知そのもののOFFは設けず、種類ごとの通知先・表示時間・読み上げを共有settings.jsonのnotificationPreferences.overridesに保存する。targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。各種類のカードは既定で折りたたみ、見出しに現在の通知先・表示時間・読み上げON/OFFを表示する。
 
@@ -57,13 +57,13 @@ TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービス
 
 エラー・警告・インフォメーション通知は`requiredTargets:['banner']`を使う。Appletにも必須先を宣言できる。通知の寿命や閉じる操作は`lifetimePolicy`の別の契約で、バナー必須だけでは常時表示を意味しない。
 
-設定UIは必須先をチェック済みで編集不可にし、理由を表示する。設定更新APIからの必須先解除も検証で拒否する。旧設定・外部受信に必須先がなくても実効方針に補い、読み込みだけでは保存しない。UIでその種類を編集するときは必須先を補完して保存する。これにより読み上げや表示時間の変更が古い制約違反値に妨げられない。
+設定UIは必須先をチェック済みで編集不可にし、理由を表示する。設定更新APIからの必須先解除も検証で拒否する。UIでその種類を編集するときは必須先を補完して保存する。これにより読み上げや表示時間の変更が古い制約違反値に妨げられない。
 
 旧`host.notifications`と種類別`enabled`は読込時に破棄し、旧OFF値で通知を抑止しない。公開設定・ON/OFFコマンドも削除する。manifestの旧`defaultEnabled`・`canDisable`・`disabledControlReason`は互換読込だけを残し、実効定義には含めない。読込だけでファイルを書き換えず、次の通常保存で不要項目がなくなる。実行世代・発行元停止・不整合な通知先を検査する内部方針`NotificationPolicy.enabled`と抑止理由は維持する。
 
 ## インフォメーション通知
 
-本体の操作結果は「インフォメーション通知」へ集約する。通知設定では警告通知の直下に配置し、既定はON・バナーのみ・6秒・読み上げOFF。バナーは必須で、通知全体のOFFは設けない。更新確認、Codex連携、明示保存、Webアカウント、読み上げ受付・停止、既存のコマンド実行結果を接続する。通常の即時保存や入力途中の説明へ通知を増やさない。下側の汎用toastと更新結果表示を撤去し、更新中の進捗・キャンセルは残す。[設計と移行範囲](information-notifications-design.md)を参照する。
+本体の操作結果は「インフォメーション通知」へ集約する。通知設定では警告通知の直下に配置し、既定はON・バナーのみ・6秒・読み上げOFF。バナーは必須で、通知全体のOFFは設けない。更新確認、Codex連携、明示保存、Webアカウント、読み上げ受付・停止、既存のコマンド実行結果を接続する。通常の即時保存や入力途中の説明へ通知を増やさない。下側の汎用toastと更新結果表示を撤去し、更新中の進捗・キャンセルは残す。
 
 ## 履歴
 
@@ -116,15 +116,15 @@ NotificationDesktopHostは通知がある間だけ独立Windowと表示可否que
 
 Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shellも利用不能なdesktopはdelivery:failedとログを使い、勝手にバナーへ配送しない。バナーのDefault Shell全故障時に使うネイティブdialogをdesktopへ複製しない。
 
-## 即時保存への移行
+## 設定画面との境界
 
-0.33.0でSettingsNotificationSourceと未保存種類/保存・破棄操作を削除した。通知基盤は編集状態を持たず、設定エラーは現在の設定ページへ表示する。通常の保存成功通知を出さない。過去の未保存通知の終了履歴は保持期限まで読め、操作を復元しない。
+通知基盤は編集状態を持たず、設定エラーは現在の設定ページへ表示する。通常の保存成功通知を出さない。過去の未保存通知の終了履歴は保持期限まで読め、操作を復元しない。
 
 ## 検証
 
 単体回帰はtests/notification-foundation.test.cjs、関連するsettings-editing/shell-boundaries/ui-presentation/notification-routing/notification-services。scripts/notification-banner-ui-test.cjsは汎用発行元の隔離Electron fixtureで複数通知、期限、操作、フォーカス、provider切替と復旧を確認する。scripts/settings-shell-ui-test.cjsは即時保存とShell復旧を確認する。shell-page-ui-test.cjsとnavigation-ui-test.cjsは重なり順と入力反映待ちの関連回帰。実測と制約はVERIFICATIONへ記録する。
 
-## Windows表示の実装 (0.32.0)
+## Windows表示の実装
 
 NotificationWindowsAdapterはactiveのwindows対象を1件ずつ投影する。startupReady後に受付を開始し、状態はpending/accepted/hidden/failedとして通知状態・既読から分離する。acceptedはOSへの受付で、ユーザーが見た証明ではない。read/busy/配送報告では再送せず、タイトル/本文/レベル/消音が変わった時だけ同じIDのOS記録を置換する。表示先を外す、終了、無効化、発行元停止では自身のOS記録と起動callbackを回収する。撤去はOSへのbest effortで、別表示先へ無断配送しない。
 
@@ -140,4 +140,4 @@ Windowsの集中モード、表示有無、ポップアップ表示時間、manu
 
 「設定 → 一般 → 音の再生」がOFFの間は、読み上げ・通知音・試聴の共通APIでの再生を省略する。OFFへ切り替えると再生中と再生待ち、ロック・サスペンド中の通知音保留を破棄し、ONへ戻しても再生し直さない。通知の表示・履歴・音声生成は継続する。詳細は[共通音声再生API](audio-playback.md#音の再生のonoff)を参照する。
 
-種類指定通知のsilent:true（最低ホスト0.42.0）はWindows自身の音を抑制します。Appletの通知音は[共通音声再生API](audio-playback.md)へ渡し、通知の読み上げ・試聴と重ならないようにします。Gmailはnew-mail種類へ移行し、安全な汎用要約を履歴へ保存します。
+種類指定通知のsilent:true（最低ホスト0.42.0）はWindows自身の音を抑制します。Appletの通知音は[共通音声再生API](audio-playback.md)へ渡し、通知の読み上げ・試聴と重ならないようにします。

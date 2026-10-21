@@ -1,14 +1,14 @@
 # WebアカウントAPI
 
-## アカウントグループ（0.56.0）
+## アカウントグループ
 
-`webAccounts.accountGroup: { id, title }`を宣言したAppletは、同じIDのグループの名簿と同じPCのアカウント別sessionを共用します。Gmail 0.12.0は`at365.google`を使います。省略時は従来のApplet専用領域です。以下の専用領域の記述はグループ未宣言のAppletに適用します。
+`webAccounts.accountGroup: { id, title }`を宣言したAppletは、同じIDのグループの名簿と同じPCのアカウント別sessionを共用します。`Applet.Gmail.at365`は`at365.google`を使います。省略時はApplet専用領域です。以下の専用領域の記述はグループ未宣言のAppletに適用します。
 
 UI snapshotの`group?: {id,title}`で共有範囲を表示できます。既存のadd/rename/move/removeは共通名簿、select/monitoring/soundはAppletごとのPC専用設定へ作用します。read/reportや表示・観測APIは継続します。認証情報や保存先のパスは公開しません。
 
-名簿は共有`data/web-account-groups/<group-id>/accounts.json`、PC専用状態は`web-account-groups/<group-id>/state.json`、新規sessionは同じPC専用グループ配下の`sessions/<UUID>`。旧枠はUUIDを保持し、旧sessionを同じパスで使い続けます。初回グループ割当を`web-accounts/<Applet ID>/group-binding.json`に記録します。移行済みAppletのグループ変更や旧方式への切替は拒否します。
+名簿は共有`data/web-account-groups/<group-id>/accounts.json`、PC専用状態は`web-account-groups/<group-id>/state.json`、新規sessionは同じPC専用グループ配下の`sessions/<UUID>`。旧枠はUUIDを保持し、旧sessionを同じパスで使い続けます。初回グループ割当を`web-accounts/<Applet ID>/group-binding.json`に記録します。
 
-グループ未作成時は空で始まり、UIの明示追加で最初の枠を作ります。既存データ移行は一度だけ行います。名簿の外部受信・削除確認・移行の復旧・信頼境界・検証項目の正本は[アカウントグループ設計](web-account-groups-design.md)です。共有名簿の削除は同期先にも反映し、このPCで明示削除したときだけこのPCの共通ログイン情報を消去します。
+グループ未作成時は空で始まり、UIの明示追加で最初の枠を作ります。共有名簿の削除は同期先にも反映し、このPCで明示削除したときだけこのPCの共通ログイン情報を消去します。
 
 ## 専用アカウントの基本契約
 
@@ -56,7 +56,7 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 画像要求は各アカウントのsessionとcredentials:includeを使用します。Googleの認証依存画像URLは未認証で取り直すと標準画像を返すためです。Cookieの適用と送信先はChromiumの当該セッションに閉じ、他アカウントのCookieをコピーしません。転送先の厳密なorigin制限とサイズ/時間上限は維持します。cycleは保存と既存Viewの切替だけを行い、未表示のUIは作成せず、非表示/最小化や現在のフォーカスを保ちます。明示的なopenは従来どおりウィンドウを表示します。
 
-ローカルUIは`move(id, 1|-1)`（隣の枠と順番を交換、端では変更なし）と`setMonitoring(id, boolean)`を提供します。並べ替えはaccountsの配列順だけを保存し、UUID・選択枠・セッション・通知音を維持します。snapshot/readの各枠は`monitoring:boolean`を持ち、旧保存形式の未指定はtrueです。OFFではホストもattentionとdataを直ちにクリアし、遅延reportからの再計上を抑制します。ページ更新と読取は保持し、検知・通知・音を止める判断はNode Appletが行います。
+ローカルUIは`move(id, 1|-1)`（隣の枠と順番を交換、端では変更なし）と`setMonitoring(id, boolean)`を提供します。並べ替えはaccountsの配列順だけを保存し、UUID・選択枠・セッション・通知音を維持します。OFFではホストもattentionとdataを直ちにクリアし、遅延reportからの再計上を抑制します。ページ更新と読取は保持し、検知・通知・音を止める判断はNode Appletが行います。
 
 `read`は`monitoringResets:string[]`も返します。ON/OFFの遷移を次のreadまで保持し、OFF→ONが読取間隔内に発生しても基準を消去できます。Appletは該当するmonitorをresetし、個別/全体の監視OFFなら履歴・件数を消去してください。再開時の未読取り込みはAppletの方針です。
 
@@ -75,7 +75,7 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 観測JSは式としてJSON化可能な値を返します。ページがobserveOrigin内で読み込み済みの場合だけ、**isolated world 1001**で実行します。1枠の観測結果は60KBまで、待機は800msまで。同じ枠で未完了の観測を並行起動しません。逐次読取で最大10枠を扱い、ナビゲーション世代/URLの変化・停止・削除があれば遅い結果を捨てます。ページの再読込や通信APIポーリングは行いません。ページ遷移/プロセス終了でisolated worldのObserverも破棄されます。
 
-観測の任意の`accountName`（制御文字なしの1〜60文字）を仮名の置換に使います。新規枠は`name:"新しいアカウント"/temporaryName:true`で保存します。取得成功または明示的なrenameで`temporaryName:false`とし、以後は自動変更しません。旧保存形式でフラグがない場合は「新しいアカウント」または「アカウント N」の完全一致だけを仮名と扱い、利用者の名前・UUID・ログイン・順番・音・監視設定を保持します。Gmail固有の名前/メール抽出はAppletのobserverへ置きます。受信トレイのreadyとは独立して処理し、監視OFFでも本人情報を取得できます。
+観測の任意の`accountName`（制御文字なしの1〜60文字）を仮名の置換に使います。新規枠は`name:"新しいアカウント"/temporaryName:true`で保存します。取得成功または明示的なrenameで`temporaryName:false`とし、以後は自動変更しません。Gmail固有の名前/メール抽出はAppletのobserverへ置きます。受信トレイのreadyとは独立して処理し、監視OFFでも本人情報を取得できます。
 
 ローカルReact UIのpreloadは`window.webAccounts`へ`snapshot/add/select/rename/remove/navigate/acknowledge/viewport/onChanged`を公開します。`cycle/openItem/setSound/pickSound/testSound`も利用できます。ホストはsenderのWebContents・main frame・厳密なローカルUI URLを検証し、そのUI自身のAppletへ割り当てます。パネルの任意HTML実行機能とは独立しています。
 
@@ -83,7 +83,7 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 アカウントsnapshotは`sound:{enabled:boolean,file:string,name?:string}`も返します。初期値はfalse/空文字（無音）。`setSound(id,sound)`で保存し、`pickSound(id)`は親付きWAV選択ダイアログでfileを変更、取消は変更なし。設定/試聴にはaudio、選択にはfile-dialogも必要です。`testSound(id)`はON/OFFにかかわらず共通再生キューで試聴します（WAV未選択は無音）。Nodeではsoundをreadから受け取り、通知と独立した条件でaudio.playを呼びます。Windows通知の音との二重再生はsilent:trueで抑制してください。
 
-選択したWAVはRIFF/WAVE・16MB以下を検証し、EXE隣の`data/assets/applets/<Applet ID>/sounds`へ元のファイル名で登録します。同名・同一内容は再利用し、同名で内容が異なる場合は拒否します。元ファイルを変更せず、登録素材を停止時の未参照キャッシュとして削除しません。startでは旧絶対パスを登録ファイル名へ移行し、失敗した枠は元設定を保持してsoundErrorと実効的なOFF/空パスを返します。再選択で復旧できます。詳細は[登録素材](settings-sync.md#ファイル名を使う登録素材)を参照してください。
+選択したWAVはRIFF/WAVE・16MB以下を検証し、EXE隣の`data/assets/applets/<Applet ID>/sounds`へ元のファイル名で登録します。同名・同一内容は再利用し、同名で内容が異なる場合は拒否します。元ファイルを変更せず、登録素材を停止時の未参照キャッシュとして削除しません。再選択で復旧できます。詳細は[登録素材](settings-sync.md#ファイル名を使う登録素材)を参照してください。
 
 snapshot/readには`dark:boolean`も含まれます。AppDockのテーマを反映したnativeTheme.shouldUseDarkColorsで、テーマ変更時にローカルUIへonChangedを通知します。サービス自身のWebページのCSSは変更しません。
 
@@ -91,7 +91,7 @@ snapshot/readには`dark:boolean`も含まれます。AppDockのテーマを反�
 
 cycleは、切替前に操作Windowがアクティブかつ表示中で、選択中WebContents自身が入力フォーカスを持つ場合だけ、接続後の切替先WebContentsへ入力を渡します。Windowのshow/focus/restoreは呼びません。ローカルUIの入力欄、別Windowの前面、未表示/非表示/最小化は保持します。切替後に毎回wc.focusを呼んでからキーを送る試験は不具合を隠すため、最初の1回だけフォーカスを設定し、以後はgetFocusedWebContentsに連続してキーを送る試験を使います。
 
-`viewport({x,y,width,height})`はローカルUIのclient座標・DIPで表示領域を指定し、ホストがclient領域内へ切り詰めます。各値は0〜100000の整数（幅・高さは1以上）です。`viewport(null)`は操作WindowからViewを外して背景Windowへ戻し、アカウント切替後も操作画面へ表示せず、ページと監視を続けます。UIではResizeObserver等で実領域を再送してください。未呼出しの旧UIは既定レイアウトを維持します。
+`viewport({x,y,width,height})`はローカルUIのclient座標・DIPで表示領域を指定し、ホストがclient領域内へ切り詰めます。各値は0〜100000の整数（幅・高さは1以上）です。`viewport(null)`は操作WindowからViewを外して背景Windowへ戻し、アカウント切替後も操作画面へ表示せず、ページと監視を続けます。UIではResizeObserver等で実領域を再送してください。
 
 [Electron WebPreferences](https://www.electronjs.org/docs/latest/api/structures/web-preferences)のbackgroundThrottling=falseだけでは、非表示・切り離しされたViewのrAFを維持できないことを実測しました。document.visibilityStateがvisibleでもrAFが止まるため、DOMの可視性判定だけを検証して済ませません。背景保持はGmailのスクリプト改変やフォーカス移動・周期的reloadを行わず、サイト側の通常の更新を待ちます。描画を維持する資源コストはアカウント数に応じます。
 
@@ -103,7 +103,7 @@ cycleは、切替前に操作Windowがアクティブかつ表示中で、選択
 
 `%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/web-accounts/<extension-id>/accounts.json`に安定したUUIDと表示名、`sessions/<account-id>/`にChromiumの永続セッションを保存します。`session.fromPath`を使うので複数のApplet・アカウント間でCookieを共有しません。アカウント保存はatomicWrite、不正な既存JSONは上書きせず起動エラーとして報告します。停止・異常終了でWebContents/UIを明示破棄し、Cookieをflushします。ウィンドウの×は非表示にし、Appletを止めるまで背景のページ更新を維持します。
 
-soundはaccounts.jsonの各枠へ追加し、旧データは未指定ならOFFで扱います。同じ保存先のwindow-state.jsonへ通常の位置・サイズ/最大化を記録します。共通WindowStateStoreで300ms遅延保存、終了時flush、DIP丸め補正とモニター作業領域への復帰を再利用します。最小化/非表示では通常枠を上書きしません。保存失敗はホストログへ内容を含まない診断を残し、ページを閉じません。
+同じ保存先のwindow-state.jsonへ通常の位置・サイズ/最大化を記録します。共通WindowStateStoreで300ms遅延保存、終了時flush、DIP丸め補正とモニター作業領域への復帰を再利用します。最小化/非表示では通常枠を上書きしません。保存失敗はホストログへ内容を含まない診断を残し、ページを閉じません。
 
 削除は利用者確認後、対象枠のWebContentsを閉じ、storage/cache/Cookieを消去して一覧から外します。最後の枠は残します。削除処理中の枠は観測から除外します。Webページ内のアカウント切替はGoogle自身の操作で、追加枠とは異なります。
 
@@ -123,8 +123,30 @@ snapshot.navigationRevisionはUI/Nodeのnavigate成功ごとに増えます。�
 
 Webアカウントのsession/表示WebContentsView/背景Windowは、ChromiumがWindowsから取得する優先言語を使います。ホストでAccept-Languageやnavigator.languageの独自上書きを行いません。サイト側のアカウント設定やURLによる表示言語は別です。隔離セッションでの実測は[検証記録](../VERIFICATION.md)を参照してください。
 
-## 任意URL向けのWebプロフィール（0.44.0）
+## 任意URL向けのWebプロフィール
 
 web-profiles capabilityとcontext.webProfiles.list/add/rename/clear/deleteは、Applet自身のログイン保存枠を管理します。任意URLのページ表示にはpageCollectionsのsource:remoteを使います。Cookieやsession、任意保存パスはAppletへ渡しません。上記webAccountsのサービス観測・専用UIとは別契約です。Gmail等の既存APIと保存先を維持します。
 
-新規名簿は共有data/web-profiles/<owner>/accounts.json、sessionと削除待ちはPC専用web-profiles/<owner>です。旧WebAppletは既存web-applets領域を継続します。宣言と操作の詳細は[動的ページ設計](dynamic-pages-webapplet-design.md)を参照してください。
+新規名簿は共有data/web-profiles/<owner>/accounts.json、sessionと削除待ちはPC専用web-profiles/<owner>です。宣言と操作の詳細は[動的ページ設計](applet-pages.md)を参照してください。
+
+## 宣言と公開契約
+
+`webAccounts.accountGroup: { id, title }`を追加する。Gmailは`{ "id": "at365.google", "title": "Googleアカウント" }`。IDは安全な小文字の名前空間付き識別子、titleは表示名。同じIDを明示したAppletだけが同じグループを使う。省略したAppletは従来の専用枠を継続する。
+
+従来のweb-accounts capability、Nodeのstart/open/read/report/cycle/navigate、ローカルUIのadd/rename/move/remove/select等を継続する。呼出し先グループはホストがmanifestから確定し、IPC引数で任意のグループ・パスを指定させない。UI snapshotにgroupのid/titleを追加する。Cookieやパスは返さない。
+
+これは信頼済みNode Appletが宣言する共用契約であり、任意のWebページへの権限付与ではない。Node Applet自体をOSサンドボックスと扱わない。各Viewのorigin制限・observer・itemOpener・preloadなし・Nodeなしを維持する。共通sessionのpermission handlerはサービス固有の許可を追加せず、一律拒否を維持する。
+
+## 操作と寿命
+
+- 追加・改名・順序変更は全参加Appletへ反映する。選択の変更は呼出し元だけ。通知音と監視も呼出し元だけに保存する。
+- 追加時は既存上限の10枠。新規グループは空で開始し、明示的な追加で最初の枠を作る。同期未到着時に既定名簿を作らない。最後の1枠は従来どおり削除しない。
+- 仮名の自動更新は最初の有効な観測だけ。利用者が決めた名前を後から上書きしない。
+- 削除確認は全参加Appletの共通一覧から消えることと、このPCの共通ログイン情報を消去することを明記する。確認中の別変更を再照合する。実行中はグループの変更を排他し、全参加Viewを閉じてからセッションを消去し、名簿を保存する。失敗は報告し、成功したと表示しない。
+- 外部名簿から消えた枠は全Viewを閉じるが、このPCのCookieを自動削除しない。別PCの名簿操作をローカル認証の破棄許可と解釈しない。
+- Applet停止では自身のView・購読だけを破棄する。他の参加Appletや永続名簿・sessionを削除しない。最後の購読終了時にファイル監視を閉じる。
+- グループを使うWeb画面内でのログアウトは、同じアカウントを使う他Appletにも影響する。Gmail UIで共有範囲を説明する。
+
+## Gmailの変更
+
+manifestのグループ宣言、最低ホスト版、アカウント設定画面の共有範囲の説明を追加する。メール観測と新着判定、通知、ショートカット、登録音のAPIは継続する。グループの削除後に遅れて届く観測・reportは破棄する。既存UIのアカウント設定から共通名簿を操作できるようにし、本機能専用の管理Appletは増やさない。

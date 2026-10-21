@@ -35,19 +35,19 @@ ZIPは一時ファイルへ完成させてから置換し、feedを最後に保�
 
 PortableUpdatesが上限付き取得、SHA256/サイズ照合、ID/版/entry/最低host照合を行う。ローカルAppletも専用TEMPへコピーして固定する。helperを交換対象外のTEMPへコピーし、対象と再起動引数をjob.jsonへ記載する。
 
-helperは範囲・リンク/ジャンクション・ZIP traversal/重複/サイズを検証する。ready→本体commit後、本体・外側ランチャー・AppletのPID終了を最大60秒待つ。manager.stopのタイムアウトを終了証拠にしない。同じvolumeへ準備を始める前に全対象のjournalを保存し、準備・再ハッシュ照合→旧版一時退避→新しい版を移動する。全交換後にcommitted=trueをjournalへ記録し、結果保存→backup整理→journal削除の順に完了する。JSONはFlush(true)後に一時ファイルから置換する。commit前の失敗は逆順に復元し、commit後の中断は新しい版を検証して保持する。これは論理的な中断からの回復であり、物理的な電源断やディスク故障に対する完全な永続性を保証する試験ではない。
+helperは範囲・リンク/ジャンクション・ZIP traversal/重複/サイズを検証する。ready→本体commit後、本体・外側ランチャー・AppletのPID終了を最大60秒待つ。manager.stopのタイムアウトを終了証拠にしない。全交換後にcommitted=trueをjournalへ記録し、結果保存→backup整理→journal削除の順に完了する。JSONはFlush(true)後に一時ファイルから置換する。commit前の失敗は逆順に復元し、commit後の中断は新しい版を検証して保持する。これは論理的な中断からの回復であり、物理的な電源断やディスク故障に対する完全な永続性を保証する試験ではない。
 
-結果はPC専用rootのupdate-result.json、再起動後の画面・ログへ表示。TEMPは再起動後に専用パスを検証して整理。強制終了で残ったjournalは起動時にhelper --recoverで復旧を試す。復旧前に全対象の範囲・重複・退避名の対・リンクを検証し、commit済みならインストール先のハッシュも照合する。commit前は旧版へ復元、commit後は旧版/準備ファイルの整理を完了する。途中でロック等のエラーになった場合はjournalと必要なファイルを残し、同じ復旧を再試行できる。本体EXEが使用中で復元できない場合は起動を止める。完全終了後、journalのhelperが示す一時EXEへ`--recover <元の配置先> <PC専用保存先>`を渡して復元してから起動する。復元前に一時EXE/journalを削除しない。
+結果はPC専用rootのupdate-result.json、再起動後の画面・ログへ表示。TEMPは再起動後に専用パスを検証して整理。強制終了で残ったjournalは起動時にhelper --recoverで復旧を試す。復旧前に全対象の範囲・重複・退避名の対・リンクを検証し、commit済みならインストール先のハッシュも照合する。途中でロック等のエラーになった場合はjournalと必要なファイルを残し、同じ復旧を再試行できる。本体EXEが使用中で復元できない場合は起動を止める。完全終了後、journalのhelperが示す一時EXEへ`--recover <元の配置先> <PC専用保存先>`を渡して復元してから起動する。復元前に一時EXE/journalを削除しない。
 
 Appletフォルダーは配布単位で交換。共有設定/素材はEXE隣のsettings.json/dataへ、端末状態/認証はSDK/ホストのLOCALAPPDATA領域へ置く。一括は適用可能な候補だけをまとめ、失敗/未設定は各行へ残す。
 
-`installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。本体が未設定/取得失敗/同版の再適用不可/旧版なら現行host版を使う。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。全候補の取得・検証に成功した後だけ1回の確認とhelperへの引渡しを行い、1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
+`installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。全候補の取得・検証に成功した後だけ1回の確認とhelperへの引渡しを行い、1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
 
 AboutSettingsは本体・一括更新・更新動作・実行環境を扱い、Applet別の一覧は設定のApplet管理へ集約する。管理一覧には確認専用の「更新を確認」と「更新」を用意し、個別の更新元はApplet設定で編集する。フッター等のVersionCheckと起動時確認の契約は維持する。WebApplet本体は通常のパッケージで、collectionの子サイトを更新候補・対象件数に加えない。
 
 ## 検証
 
-tests/portable-updates.test.cjsは隔離ディレクトリーで設定移行、ローカル/URL/GitHub metadata、起動時確認だけ、同版再適用、互換性、helper交換/復元/ZIP拒否を検証する。helperは事前にbuild:updaterする。
+helperは事前にbuild:updaterする。
 
 scripts/portable-updates-ui-test.cjsは配布EXEを.artifactsの専用profileへコピーし、実helper/ランチャーで本体/一括/個別交換と再起動を確認する。DevTools/Node inspectorは隔離試験に明示指定し、最終のnative確認ダイアログだけ試験内で差し替える。通常起動にdebug/inspector引数を追加しない。結果/画像は専用profileへ保存。
 
@@ -57,7 +57,7 @@ scripts/portable-updates-ui-test.cjsは配布EXEを.artifactsの専用profileへ
 
 通常のrelaunchとhelperのrestartArgsへ`--restore-view`を付ける。ホストはこの起動時だけstartMinimizedを上書きしてshowし、信頼済みホスト文書の固定URLへrestoreViewクエリーを付ける。IPCはその完全一致URLと送信元WebContents/mainFrameを照合する。通常起動の設定は変更しない。
 
-useRestartViewはページ・選択Applet・設定カテゴリ/タブ・ログの対象だけをプロフィール内localStorageへ保存し、復元指定の起動時だけ読み取る。フォームの未保存値やWebページ内の状態は復元対象外。AppletページはstartupReadyと対象のrunning状態を待ち、既存openAppletPage経路で再表示する。削除/無効/起動失敗した対象はホームへ戻す。更新前の旧版が画面状態を保存していない場合、その状態は復元できない。
+useRestartViewはページ・選択Applet・設定カテゴリ/タブ・ログの対象だけをプロフィール内localStorageへ保存し、復元指定の起動時だけ読み取る。フォームの未保存値やWebページ内の状態は復元対象外。AppletページはstartupReadyと対象のrunning状態を待ち、既存openAppletPage経路で再表示する。削除/無効/起動失敗した対象はホームへ戻す。
 
 portable-updates-ui-testはトレイ開始ONの通常起動非表示、更新後の設定/更新ページへの復帰、通常再起動で別カテゴリとAppletページへの復帰、dark/light・900px・折りたたみ/既定復帰/下書きガードも検証する。
 
@@ -69,7 +69,7 @@ IPCのcancelUpdatesは取得/検証中のAbortControllerだけを停止する。
 
 `scripts/update-progress-ui-test.cjs`は専用profileとループバックHTTPを使い、dark/lightの実progress/容量表示、キャンセル、再試行、最終確認での取消と元ファイル保持を確認する。
 
-`scripts/update-recovery-test.cjs`はhelperソースを.artifactsへコピーし、そのコピーだけに停止点を挿入して試験用EXEをビルドする。準備前、2対象の準備後、各退避/移動後、commit後の8箇所で実プロセスを停止し、製品helperで復旧する。7箇所は旧版、commit後は新版を保持し、journal再実行、使用中ファイルによる復旧失敗→解除後再試行、設定/認証fixture保持を確認する。交換対象は隔離した検査用ファイルで、実portable EXE交換は既存portable-updates-ui-testが担当する。製品helperに故障注入機能は含めない。
+`scripts/update-recovery-test.cjs`はhelperソースを.artifactsへコピーし、そのコピーだけに停止点を挿入して試験用EXEをビルドする。準備前、2対象の準備後、各退避/移動後、commit後の8箇所で実プロセスを停止し、製品helperで復旧する。交換対象は隔離した検査用ファイルで、実portable EXE交換は既存portable-updates-ui-testが担当する。製品helperに故障注入機能は含めない。
 
 ```powershell
 .\dev.bat exec node scripts/update-progress-ui-test.cjs

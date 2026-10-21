@@ -89,7 +89,7 @@ payloadのdataは上記3項目と`notificationId`、`title`、`body`だけ。gen
 `mcp-event-webhook.ts`がHTTPS POSTを担当する。callback検証と通知配信の両方に同じ処理を使う。
 
 - HTTPS限定、URL内の資格情報とfragmentを拒否。接続ごとにDNSを解決し、全候補が公開アドレスか検査する。検査したアドレスへ接続を固定し、元のhostnameでTLS証明書を検査する。自動redirectは行わない。
-- loopback、プライベート、link-local、CGNAT、予約・文書用・multicast等のIPを拒否する。IPv6はglobal unicast範囲に限定し、mapped/移行・文書用等も除外する。通常の公開callbackを対象とし、特殊な予約アドレスの例外は設けない。
+- loopback、プライベート、link-local、CGNAT、予約・文書用・multicast等のIPを拒否する。通常の公開callbackを対象とし、特殊な予約アドレスの例外は設けない。
 - DNS解決を含め要求期限10秒、応答本文16KiB、送信本文256KiBまで。
 - whsec_付きbase64鍵を24〜64bytesへ検証。HMAC-SHA256でStandard Webhooksの`id.timestamp.body`を署名する。JSONは一度だけシリアライズし、署名対象と送信bytesを一致させる。
 - 検証challengeは要求ごとのUUID。2xxとchallengeの定時間比較を満たすまで保存・配信しない。成功検証は主体・callback・鍵の組ごとに最大5分キャッシュし、64件に制限する。
@@ -97,7 +97,7 @@ payloadのdataは上記3項目と`notificationId`、`title`、`body`だけ。gen
 
 ## 保存と再送
 
-PC専用rootの`automation-events.json`へ購読と送信待ちをまとめて保存する。Electron safeStorageで内容全体を暗号化し、既存atomicWriteで置換する。共有data/settingsや登録TOMLへcallback/署名鍵を書かない。再起動後も購読期限を保持し、送信待ちは現在ONかつ有効な購読の分だけ再開する。保存形式と設定項目は変更しない。旧版でOFFにして既に削除された購読は復元しないため、その場合はONにして再登録する。
+PC専用rootの`automation-events.json`へ購読と送信待ちをまとめて保存する。Electron safeStorageで内容全体を暗号化し、既存atomicWriteで置換する。共有data/settingsや登録TOMLへcallback/署名鍵を書かない。再起動後も購読期限を保持し、送信待ちは現在ONかつ有効な購読の分だけ再開する。保存形式と設定項目は変更しない。
 
 最大256送信待ち。新規通知を購読ごとにキューへ入れ、保存できてから送る。1要求ずつ配信し、イベントIDと発生時刻は再送でも保持する。署名時刻・署名は各試行で更新する。
 

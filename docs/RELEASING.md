@@ -12,15 +12,15 @@
 | --- | --- | --- |
 | AppDock | 現行版が未公開ならPrepareから公開・検証。本体版が公開済みなら再作成・上書き・版更新をしない | 単一EXE、update.json、全体ZIP |
 | 全体ZIPの各Applet | 同梱した版が自身のrepoで未公開なら、その同梱版を個別公開・検証。公開済み同版はskip | update.zip、update.json |
-| 今回公開した全repo | 各repoの公開後検証が成功してから、公開日時順で最新3件を保持して古いRelease/assetを削除 | draft・Gitタグ/履歴は保持 |
+| 本機能公開した全repo | 各repoの公開後検証が成功してから、公開日時順で最新3件を保持して古いRelease/assetを削除 | draft・Gitタグ/履歴は保持 |
 
 1. 本体版とGitHubの公開Release/タグを確認します。本体版が未公開なら下記の本体Prepareを実行し、固定した全体ZIPと`bundle.json`のApplet一覧（repository/id/version/commit/updateZipSha256）を公開対象の正本にします。Applet数や名前を固定リストにしません。
 2. 本体版がすでに公開済みの場合は、その公開ZIPと検証済みbundle/planを使います。公開EXE/feed/ZIPのhashと検証済み資料の一致を確認し、未公開Appletのために同版の本体を再ビルド・再公開しません。資料がなければ公開ZIPを隔離して取得・照合し、同梱版を確認します。最新checkoutが同梱版と異なる場合は混ぜず、新しい本体版のフルパッケージを準備するか、差を報告して止めます。
-3. 全同梱Appletのorigin・GitHub main・既存タグ・公開Releaseを読み取ります。同梱manifestの版が公開済みなら、当該タグの公開配布物のID/版を確認してskipと記録します。最新版がローカルより新しい場合や同版の内容/タグが不一致なら、ダウングレードや上書きで合わせず停止します。無関係なrepoやWebAppletのサイト項目は公開対象にしません。
+3. 全同梱Appletのorigin・GitHub main・既存タグ・公開Releaseを読み取ります。同梱manifestの版が公開済みなら、当該タグの公開配布物のID/版を確認してskipと記録します。無関係なrepoやWebAppletのサイト項目は公開対象にしません。
 4. 未公開の各Appletについて、そのrepoの指示・既存検証を確認し、cleanな対象commit/main、ノート、manifest/feedのID/版/最低ホスト版、ZIP全収録ファイルのsize/hashを検証します。同梱の`updateZipSha256`と元update.zip、bundle中の各ファイルとの一致を必須とし、同梱版をそのまま使います。再発行でhashや内容が変われば本体Prepareへ戻します。同梱だけでApplet版を増やしません。
 5. 未公開本体と未公開Appletの下書き/全asset照合を完了してから順番に公開します。各Appletは下記の個別Release手順を使い、既存の一致するdraftは不足assetだけを追加して再利用します。既存の公開済みassetには`--clobber`を使わず、タグを移動しません。
 6. 本体はVerify、各Appletは匿名feed/ZIP取得とsize/hash、実`PortableUpdates.check()`の個別/一括結果（同梱版がavailable/installable）まで確認します。repoごとに公開/検証/整理/skipを記録します。新版が必要とする本体版を先に公開し、Appletが本体更新を待つ関係も確認します。実インストールやdeployは別です。
-7. 今回公開・検証に成功した**すべてのrepo**へ[最新3件の整理](#公開済みreleaseを最新3件に整理)を適用します。この整理はリリース作業の継続承認済み手順です。skipしたrepoには整理を適用しません。失敗時は到達済み段階を記録し、再開時は公開済みを再作成せず未完のrepoだけ続行します。
+7. 本機能公開・検証に成功した**すべてのrepo**へ[最新3件の整理](#公開済みreleaseを最新3件に整理)を適用します。この整理はリリース作業の継続承認済み手順です。skipしたrepoには整理を適用しません。失敗時は到達済み段階を記録し、再開時は公開済みを再作成せず未完のrepoだけ続行します。
 
 この工程は製品の起動・通常publishで自動実行する処理ではありません。複数repoの公開は一括トランザクションではないため、一部の公開/検証が失敗しても他repoの公開成功を取り消したり隠したりしません。
 
@@ -34,7 +34,7 @@
 
 全体ZIPをupdate.jsonのpayloadに指定しません。Appletの個別更新は各repoのupdate.json/update.zipを継続します。
 
-実装完了時は発行前のレビュー・必要な修正と再検証を終えてから、[版更新の判断](development-workflow.md#版更新の判断)に従って変更したAppDock/Appletの版を上げ、各repoのpublishへ発行します。通常publishは対象モジュールだけを作成します。リリースを依頼されたら、版更新済みの各対象モジュールをGitHubへ公開し、AppDockを含む場合はPrepareで全体ZIPも作成・検証して添付します。全体ZIPの旧版整理もこのリリース準備だけで行います。
+実装完了時は発行前のレビュー・必要な修正と再検証を終えてから、[版更新の判断](development-workflow.md#版更新の判断)に従って変更したAppDock/Appletの版を上げ、各repoのpublishへ発行します。通常publishは対象モジュールだけを作成します。リリースを依頼されたら、版更新済みの各対象モジュールをGitHubへ公開し、AppDockを含む場合はPrepareで全体ZIPも作成・検証して添付します。
 
 ## 環境と事前確認
 
@@ -88,7 +88,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
 7. 同`scripts/update-recovery-test.cjs`
 8. 同`scripts/all-in-one-ui-test.cjs`（ZIP全収録ファイルのhash/size、通常EXEとの一致、隔離展開起動、全Appletの版/初期無効/エラーなし、終了）
 
-1件でも失敗するとそこで停止し、GitHubへ接続/公開しません。各ステップのログ、`checks.json`、`bundle-ui.json`をplan隣へ保存します。最後にsealでhost/Appletのcommitとclean状態、同梱一覧、元Applet ZIPハッシュ、3アセット、ノート、検証ログのハッシュを照合します。全検証成功後にpublish直下の旧版オールインワンZIPを削除し、削除名をplanの`removedOldBundles`へ保存して`prepared`にします。対象と失敗時の扱いは[旧版ZIP整理](all-in-one.md#publishの旧版zip整理)を参照してください。通常publishではこの整理を行いません。
+1件でも失敗するとそこで停止し、GitHubへ接続/公開しません。各ステップのログ、`checks.json`、`bundle-ui.json`をplan隣へ保存します。最後にsealでhost/Appletのcommitとclean状態、同梱一覧、元Applet ZIPハッシュ、3アセット、ノート、検証ログのハッシュを照合します。通常publishではこの整理を行いません。
 
 失敗したpublishの後には以前のZIPが残る場合があります。ファイルが存在するだけで成功扱いしません。修正後は新しいPlanPathで準備をやり直します。準備後のソース変更/コミット、ノート変更、再ビルド、Applet追加、証跡変更はplanを無効にするため、必ず新しいplanで準備します。その際も再利用条件が成立する項目だけは再利用できます。
 
@@ -108,7 +108,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
    $taskLogRoot = Split-Path $taskPlan -Parent
    ```
 
-3. `typecheck`/`regression`それぞれについて、再利用できる場合は完全な元ログをplan隣の`typecheck.log`/`regression.log`へコピーします。各コピーの末尾へ「今回の実行ではなく再利用」である旨と、元記録/ログの絶対パス・元SHA256・実行日時・コマンド・終了コード・検証時tree/対応commit・今回のtree/commit・依存/環境照合結果を追記します。この末尾を含めてsealの証跡ハッシュに入ります。元ログ/元記録は変更しません。再利用できない項目は上記1/2のコマンドを実行して同名ログへ出力し、終了0を確認します。
+3. `typecheck`/`regression`それぞれについて、再利用できる場合は完全な元ログをplan隣の`typecheck.log`/`regression.log`へコピーします。各コピーの末尾へ「実行ではなく再利用」である旨と、元記録/ログの絶対パス・元SHA256・実行日時・コマンド・終了コード・検証時tree/対応commit・tree/commit・依存/環境照合結果を追記します。この末尾を含めてsealの証跡ハッシュに入ります。元ログ/元記録は変更しません。再利用できない項目は上記1/2のコマンドを実行して同名ログへ出力し、終了0を確認します。
 4. 上記3〜8の配布物生成・検証を同じ順序/引数で実行します。実行場所は`$taskRepo`、ローカルNodeは`$taskNode`です。ログ名は順に`publish.log`、`pack-all-in-one.log`、`portable-updates.log`、`update-progress.log`、`update-recovery.log`、`all-in-one.log`。最後の試験へ渡す出力先は`Join-Path $taskLogRoot 'bundle-ui.json'`です。各終了コードを確認し、非0/実行不能ならそこで停止します。PowerShellのnative stderr処理は`release.ps1`の実装と同じく終了コードで判定します。
 5. 全8項目が実行成功または上記条件で再利用成功となった場合だけ、以下の内容をUTF-8の`checks.json`へ保存します。各項目の実態とログを確認してから記入し、未確認項目を追加してsealを通す行為は禁止します。
 
@@ -116,14 +116,14 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
    ["typecheck", "regression", "publish", "pack-all-in-one", "portable-updates", "update-progress", "update-recovery", "all-in-one"]
    ```
 
-6. 次のsealを実行し、標準経路と同じくcommit/clean状態、ノート、全ログ、bundle/配布物の照合と旧版ZIP整理を完了させます。成功後は下記Draft/Publish/Verifyへ進みます。seal後にログやノートを追記しません。
+成功後は下記Draft/Publish/Verifyへ進みます。seal後にログやノートを追記しません。
 
    ```powershell
    & $taskNode $taskCore seal $taskPlan
    if ($LASTEXITCODE -ne 0) { throw 'Release seal failed.' }
    ```
 
-Appletのソース回帰も共通の照合条件で再利用できます。全体ZIP生成による再発行後の個別ZIP/feed・同梱ファイルの一致、固定配布物の動作確認と公開後検証は今回の成果物で行います。再利用元の発行物試験を新しいバイナリの成功として流用しません。
+Appletのソース回帰も共通の照合条件で再利用できます。全体ZIP生成による再発行後の個別ZIP/feed・同梱ファイルの一致、固定配布物の動作確認と公開後検証は成果物で行います。再利用元の発行物試験を新しいバイナリの成功として流用しません。
 
 ## 3. mainのpush、下書きと添付
 
@@ -150,7 +150,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
 
 Publishは検証済み下書きと全アセットを再照合してから、最後の公開操作で`gh release edit ... --draft=false --latest`を実行します。Verifyは公開タグ/main/ノート/assets/latestを読み、認証なしで3ファイル全部を取得してsize/SHA256を照合します。本体の実`PortableUpdates.check()`でもGitHub元から対象版がavailable/installableになることを確認します。インストールは行いません。成功するとplanは`verified`、URLと製品のチェック結果を保存し、その後に下記の最新3件を残すRelease整理を実行します。
 
-自己更新処理や配布仕様を変更したReleaseでは、[配布先のチェックリスト](update-checklist.md)に沿って、隔離した旧版からGitHub更新も試験してください。Prepareの実EXE試験はローカル更新元です。Verifyの更新確認と実インストール試験は区別します。
+Prepareの実EXE試験はローカル更新元です。Verifyの更新確認と実インストール試験は区別します。
 
 ## 失敗・中断時
 
@@ -214,4 +214,4 @@ $taskRetention = '<新しい整理結果JSONの絶対パス>'
 if ($LASTEXITCODE -ne 0) { throw 'Release整理が失敗しました。公開結果と整理結果を別々に確認してください。' }
 ```
 
-`$taskRepo`は共通スクリプトのあるAppDock repoです。Nodeの版は現行toolchain.jsonに合わせます。本体/各Appletはそれぞれのrepo内で3件を保持し、今回リリースしていないrepoは整理しません。
+`$taskRepo`は共通スクリプトのあるAppDock repoです。Nodeの版は現行toolchain.jsonに合わせます。本体/各Appletはそれぞれのrepo内で3件を保持し、本機能リリースしていないrepoは整理しません。

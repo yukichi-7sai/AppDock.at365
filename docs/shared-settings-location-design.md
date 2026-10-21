@@ -1,6 +1,6 @@
 # 共有settings.jsonとdataの保存先を端末ごとに指定する設計
 
-状態: 設計・未実装（2026-10-19）。AppDock 0.62.5、main `3af02e52135f78487d0dee9c12a11911974c9fa4`のソースを確認した。本書は追加予定の仕様であり、現在の保存先を変更しない。現行契約は[設定同期と保存領域](settings-sync.md)、[端末別設定](device-settings-design.md)、[設定基盤](settings-foundation.md)を参照する。
+状態: 未実装。現在の保存先・同期・復旧は[設定同期](settings-sync.md)を正本とし、以下は参照先変更を実装する場合の設計とする。
 
 ## 目的と決定
 
@@ -85,7 +85,7 @@ D:/Apps/AppDock/
 | data/assets/applets/<Applet ID> | 宣言済みの登録原素材。通知音は16MB以下のWAV・512件上限・同名別内容拒否を維持 |
 | data/web-profiles、data/web-appletsの共有名簿 | 共有のUUID・表示名を参照。Cookie・session・削除待ち記録はPC専用のまま |
 | data/web-account-groups/<group-id>/accounts.json | 共通名簿だけを共有。選択・監視・音の好み・旧session参照はPC専用のまま |
-| 旧PC専用データ、未知のディレクトリー | 共有対象として勝手に移行・走査・削除しない。既存の固定対象の警告と手動整理の契約を維持 |
+| 旧PC専用データ、未知のディレクトリー | 共有対象として走査・変更しない。既存の固定対象の警告と手動整理の契約を維持 |
 
 切り替え先には、その設定に対応するdata/を利用者が準備する。選択画面では派生するdata/の場所も表示し、登録素材や名簿も切り替わることを明示する。切り替えのために旧・新どちらかのファイルを自動コピーしない。
 
@@ -95,7 +95,7 @@ data/がまだない場合、選択時や起動時に生成しない。設定に
 
 認証・許可・Storage・Secrets・ログ・通知履歴・ページ位置・Chromiumは共有ルートから求めない。Cookieとsessionは従来の配置ID・Applet/グループID・アカウントUUIDの組に対応するPC用パスを継続する。共有名簿に同じUUIDがある場合は、そのPCの既存ログインを再利用できる。名前だけの一致で別UUIDのログインを結び付けない。
 
-名簿の取得済み状態・未完了の名簿トランザクション・素材キャッシュは参照先IDへ結び付ける。共有先を変えたことを理由に、旧名簿を新しい共有先へ移行したり、旧名簿から消えた枠のCookieを削除したりしない。旧名簿のpendingやrosterKnownを新しい名簿へ適用する経路を残さない。既存sessionの場所は変更せず、追加する識別情報はPC専用の管理データに置く。
+名簿の取得状態、未完了トランザクション、素材キャッシュは参照先IDへ結び付ける。切替元の名簿・pending・rosterKnownを切替先へ適用しない。sessionの保存場所は維持し、参照先ごとの取得状態はPC専用メタデータとして分離する。
 
 ## 端末用JSONの形式と参照先の検証
 
@@ -197,8 +197,6 @@ mainからネットワークへの同期stat/read/write/renameを呼ばない。
 
 WindowsのI/O中断とSMB応答の時間はサーバーにも依存する。ここでの期限はUIが待ち続けないための期限であり、NAS側の処理中断が同時に完了したという保証にはしない。
 
-## 複数PCからの保存と排他
-
 ### 排他の方式
 
 共有settings.jsonと同じ実ディレクトリーの`settings.json.appdock-lock`を、SMBサーバー上の共通の排他対象として使う。設定・共有名簿・素材登録の書き込みは同じ排他へ統一する。補助プロセスが`OPEN_ALWAYS`相当・読み書きアクセス・`FileShare.None`で開き、保存または復旧の照合が終わるまでハンドルを保持する。
@@ -226,7 +224,7 @@ Coordinatorは共有を含む操作を1つのトランザクションとして�
 
 ### 名簿と素材の保存
 
-名簿は排他取得後に対象のbefore bytesと版を再照合し、アカウントUUID・現在値・ローカル操作を検証してから保存する。独自のコンストラクターや旧移行コードから共有ファイルを直接書く経路も同じI/Oへ接続する。名簿が未着・破損・読取不能なら、空のaccounts.jsonや旧名簿で置き換えない。
+名簿は排他取得後に対象のbefore bytesと版、UUID、現在値、ローカル操作を再検証して保存する。共有ファイルへの全書き込みを同じI/O経路へ接続し、未着・破損・読取不能時に空の名簿や別の参照先の名簿で上書きしない。
 
 素材登録では、読み取り・形式検証を済ませた後、共通排他内で一覧・件数・大文字小文字を無視した同名を再確認する。同名同内容は再利用し、同名別内容は拒否する。新しい素材は同じ登録ディレクトリー内の固有一時ファイルへ完成したbytesを書き、最終名が存在しないことを排他下で確認してから公開する。受信側は未完成の一時ファイルを一覧・再生対象にしない。
 
@@ -241,14 +239,12 @@ Coordinatorは共有を含む操作を1つのトランザクションとして�
 共有と端末を同時に変更する既存操作は、回復可能なトランザクションを維持する。2ファイルや複数PCをまたいだ原子性を前提にしない。
 
 - 新しい設定journalは版2とし、使用中の共有参照先IDを記録する。復旧時の実パスは、検証済みの使用中の参照先と固定された端末パスからだけ解決する。journal内の任意パスを保存先として実行しない。
-- 名簿専用のpendingにも参照先IDと宣言済み対象の識別子を持たせる。既存のグループ名簿pending、移行記録、Webプロフィールの削除待ちについても旧共有先との対応を確認する。参照先不明の旧記録は既定の共有先でのみ回復し、切り替え先の名簿に再生しない。
+- 名簿専用pending、グループ名簿の復旧状態、Webプロフィールの削除待ちを参照先IDへ結び付け、対応する参照先でだけ回復する。参照先を確認できない記録は切替先へ再生しない。
 - 共有の排他を保持してbefore/afterの照合、順次保存、committedの永続化、必要なrollbackを行う。rollbackは現在bytesがこの操作のafterに一致するものだけを対象とする。
 - 参照先のメタデータ変更は通常の共有データ編集と混在させない。進行中・結果不明・未復旧の操作を先に解決し、変更の保存後は再起動まで共有設定・素材・名簿の書き込みを保留する。これにより、次回参照先を保存した後に旧参照先用journalを新たに作らない。
 - 外部からの端末JSON変更等により、journalの参照先IDと起動時の指定が異なる場合は自動復旧を止める。「元の参照先を選んで復旧」を案内し、選択・検証したパスのIDが一致したときだけ処理する。この選択は元の処理を回復するための一時的な対象登録であり、未解決のjournalを残したまま次回使用の指定を書き換える操作にはしない。新しい指定先へ古いrollbackを実行しない。
 - 従来の版1journalは、既定の共有設定と固定端末JSONに限って既存手順で回復する。未解決の版1journalがある状態でカスタム参照先を適用しない。
 - Windows起動設定は常に端末保存であり、NAS到達不能だけを理由にこのPCの正常な設定変更を止めない。OS登録、UAC取消、既存のlaunch用journalの契約は維持する。
-
-## バックアップ・障害・復帰
 
 ### 参照先ごとの正常世代
 
@@ -269,7 +265,6 @@ Coordinatorは共有を含む操作を1つのトランザクションとして�
 - 名簿を一度も取得できていなければ、その名簿を必要とする機能だけを同期待ちにする。正常な共有設定を取得できている他の機能まで停止しない。
 - 共有障害中はアカウントの追加・改名・共有名簿からの削除を保留する。PC用の選択・監視・音の変更等は、同じ参照先の正常な名簿と対象UUIDが確定しており、共有書き込みを伴わない場合だけ許可する。
 - 接続復帰でアカウント枠が名簿から消えても、Cookie・sessionの物理削除を予約しない。物理削除は既存の明示操作とPC専用の削除待ちに限定し、対象の参照先・UUID・現在の参照・起動中Viewを再照合する。
-- 参照先の切り替えを初回移行として扱わない。旧Gmail等のアカウント取り込みを再実行して、新しいNAS名簿を旧名簿で埋めない。
 
 | 状態 | 動作・保存・回復 |
 | --- | --- |
@@ -305,7 +300,7 @@ Coordinatorは共有を含む操作を1つのトランザクションとして�
 3. 設定・素材・共有名簿はNASの同じ実体を参照する。新しいPCのCookie・APIキー・操作許可はそのPCで準備する。NASの名簿だけでログイン済みと扱わない。
 4. 同じ共有ルートへ書き込むPCは対応版を揃える。旧版や手動編集との競合は、共有排他による保証の対象外として案内する。NAS直接共有へ切り替えた対象に別の同期機構も書き込む場合は、その競合をAppDockの排他だけで防げると扱わない。
 
-共有Settingsのschemaと既存の保存値は変更しない。参照先が未指定の既存配置は、そのまま従来のsettings.jsonを使用する。過去の端末JSON、共有設定、data/、正常世代を自動削除・移行しない。
+共有Settingsのschemaと既存の保存値は変更しない。参照先が未指定の既存配置は、そのまま従来のsettings.jsonを使用する。過去の端末JSON、共有設定、data/、正常世代を自動変更しない。
 
 publish・deploy・自己更新・オールインワンの処理対象は従来のEXE配置先を維持する。NAS上のsettings.json・data/・排他用ファイルと、EXE隣の端末JSON・旧data/を配布生成物に含めたり、EXEと一緒に上書き・削除したりしない。参照先変更だけで、配置ID、通知の起動先、Windows起動タスク、更新先を作り直さない。
 
@@ -318,7 +313,7 @@ publish・deploy・自己更新・オールインワンの処理対象は従来�
 | `src/main/core/settings.ts`、`file-observer.ts` | 非同期I/O接続、参照先別backup、世代・結果不明の管理。既存のschema検証と競合判定を維持 |
 | 新しい`SharedStorageIo`と`dotnet/AppDock.SharedStorageHost` | 設定・素材・名簿の非同期要求、Windows/SMBのハンドル排他、置換、再照合、親子の終了処理、単一EXEへの同梱 |
 | `src/main/core/data-paths.ts`、`registered-images.ts`、`image-library-host.ts`、`registered-sounds.ts` | 共有assetsの解決、原画像・グループと音声の保護、非同期一覧・登録、参照先別の取得状態 |
-| `web-profiles.ts`、`web-account-groups.ts`、`web-accounts.ts`、`page-collections.ts`、`host-api.ts` | 共有名簿I/O、共通排他、参照先別の取得状態・pending、旧移行の再実行防止、PC専用session維持 |
+| `web-profiles.ts`、`web-account-groups.ts`、`web-accounts.ts`、`page-collections.ts`、`host-api.ts` | 共有名簿I/O、共通排他、参照先別の取得状態・pending、既存データの保護、PC専用session維持 |
 | `src/main/index.ts`、`settings-recovery.ts` | 早期端末読込と非同期共有読込の分離、起動前の場所変更、起動・再起動・更新との調停 |
 | `settings-health.ts`、`settings-health-notifications.ts` | 場所変更による再起動理由、参照先別の障害、結果不明状態 |
 | `settings-page.ts`、`settings-page-host.ts`、`settings-catalog.ts`、`src/shared/settings-page.ts` | ローカルUI用の投影・アクション・検索。共有Settingsへパスを出さない |
@@ -363,8 +358,8 @@ publish・deploy・自己更新・オールインワンの処理対象は従来�
 
 ## 参考資料
 
-- [設定の保存分類・受信・復旧](settings-sync.md)、[端末別設定の形式と合成](device-settings-design.md)、[即時保存と入力の契約](settings-foundation.md)
-- [Webアカウントの境界](web-accounts.md)、[共通グループの名簿とPC専用session](web-account-groups-design.md)、[Appletの共有素材・保存領域](applet-development.md)
+- [設定の保存分類・受信・復旧](settings-sync.md)、[端末別設定の形式と合成](settings-sync.md)、[即時保存と入力の契約](settings-foundation.md)
+- [Webアカウントの境界](web-accounts.md)、[共通グループの名簿とPC専用session](web-accounts.md)、[Appletの共有素材・保存領域](applet-development.md)
 - [Windows起動設定](launch-settings.md)、[共通のエラー報告](error-reporting.md)、[実装・コミット・リリースの共通手順](development-workflow.md)
 - [Node.js: fs.watchのネットワークファイルシステムでの注意](https://nodejs.org/docs/latest-v24.x/api/fs.html#availability)。watch単独へ依存しない理由。
 - [Node.js: 同期ファイルAPI](https://nodejs.org/docs/latest-v24.x/api/fs.html#synchronous-example)。同期I/Oがイベントループを止めるため、ネットワークI/Oをmainから分離する。

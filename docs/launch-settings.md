@@ -1,10 +1,10 @@
 # スタートアップ・管理者起動
 
-0.57.0以降、両設定は常にEXE隣の`settings-<端末名>.json`へ保存する。早期起動も共有との合成値を使う。詳細は[端末別設定](device-settings-design.md#本体の起動設定)を参照する。
+両設定は常にEXE隣の`settings-<端末名>.json`へ保存する。早期起動も共有との合成値を使う。詳細は[端末別設定](settings-sync.md#本体の起動設定)を参照する。
 
 Windows操作の前にPC専用settings-transactions/launch.jsonへ元タスクXMLと希望値を記録し、OS確認後に操作後XMLを記録する。途中終了時は読取りだけで登録と保存値を照合し、未解決なら一般設定の明示的な復旧操作へ誘導する。起動時にタスク変更・UACを再実行しない。明示復旧でも登録が記録と異なる場合は外部変更を保持する。復旧元XMLのアクション・元EXE・引数・ユーザー・LogonTypeを検証する。
 
-一般設定の`host.startAtLogon`と`host.runAsAdministrator`で起動方法を設定する。どちらも既定false。旧JSONの欠落だけをfalseへ移行し、null/非booleanは拒否する。通常設定と同じ保存済み値/部分JSON/revisionを使う。トグル変更時に検証・OS登録・原子的保存を行い、失敗時は既存の設定と登録を保持して画面にエラーを表示する。
+一般設定の`host.startAtLogon`と`host.runAsAdministrator`で起動方法を設定する。どちらも既定false。通常設定と同じ保存済み値/部分JSON/revisionを使う。トグル変更時に検証・OS登録・原子的保存を行い、失敗時は既存の設定と登録を保持して画面にエラーを表示する。
 
 ## Windowsの登録
 
@@ -19,7 +19,7 @@ Windows操作の前にPC専用settings-transactions/launch.jsonへ元タスクXM
 
 管理者アカウントの所属判定は、WindowsIdentity.UserClaimsのGroupSid/DenyOnlySidにAdministratorsのSIDがあるかを確認する。WindowsIdentity.GroupsはUACの通常権限トークンでdeny-onlyになった管理者グループを除外するため、所属判定には使わない。現在の管理者権限は従来どおりWindowsPrincipal.IsInRoleで別に判定し、UAC後の同一ユーザー・管理者トークン確認も維持する。
 
-タスクの作成は製品起動時や設定ファイル監視では行わない。外部JSON編集/別PCへのコピーだけでは登録を移行しない。移動前に旧配置から登録を解除し、新配置で保存する。Startupフォルダー/他名タスク/PowerToysの登録は変更しない。
+タスクの作成は製品起動時や設定ファイル監視では行わない。移動前に旧配置から登録を解除し、新配置で保存する。Startupフォルダー/他名タスク/PowerToysの登録は変更しない。
 
 ## 管理者起動
 
@@ -35,4 +35,4 @@ UACヘルパー本体はEncodedCommandを使用し、すでにbase64の本体を
 
 `HostSnapshot.launch`は発行版での対応可否、実トークン、実タスク登録/RunLevel、タスク名、確認エラーを返す。`refreshLaunchState`は読み取りだけ、`restartAsAdministrator`は明示操作だけ。既存のIPC送信元検査を使い、Web/Appletに任意スクリプトや任意EXEの昇格APIを公開しない。開発起動のトグルは無効。
 
-`tests/windows-launch.test.cjs`で移行、引用、通常登録、UACキャンセル、保存競合とXML復元、同時保存、権限不足、PID待機と引数維持を確認する。`scripts/launch-settings-ui-test.cjs`は固定した単一EXEのコピーを使い、日本語/空白/引用符付きパス、実タスク登録/実行/解除、即時保存、失敗値の画面内保持、再起動後の保持、両テーマ/3幅を確認する。検証タスクはfinallyで解除する。UAC承認・管理者トークン・実サインインは別に検証結果を記録し、自動承認やユーザーのログオフを行わない。
+`scripts/launch-settings-ui-test.cjs`は固定した単一EXEのコピーを使い、日本語/空白/引用符付きパス、実タスク登録/実行/解除、即時保存、失敗値の画面内保持、再起動後の保持、両テーマ/3幅を確認する。検証タスクはfinallyで解除する。UAC承認・管理者トークン・実サインインは別に検証結果を記録し、自動承認やユーザーのログオフを行わない。

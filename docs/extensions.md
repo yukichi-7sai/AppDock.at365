@@ -1,10 +1,10 @@
 # Applet API v1
 
-AppDock 0.69.0から`registered-image`設定、`list.imageKey`、`registered-images` API、`ribbon-items`宣言を提供します。.NET SDKは0.27.0。設定・原画像・生成コピーの寿命とNode/.NETの例は[共通画像とリボン](registered-images.md)を参照してください。
+`registered-image`設定、`list.imageKey`、`registered-images` API、`ribbon-items`宣言を提供します。.NET SDKは0.27.0。設定・原画像・生成コピーの寿命とNode/.NETの例は[共通画像とリボン](registered-images.md)を参照してください。
 
-0.66.1から.NET/nativeも`IPageActionHandler`でHTML/JavaScriptからのページ操作に対応します。`IPageService`の動的登録・変更通知・画像登録と解放、`Ui.OpenDetailsAsync`の契約は[Appletページ](applet-pages.md)と[.NETページ連携](dotnet-applet-pages-design.md)を参照してください。Nodeも同じ通知・画像・説明表示APIを使えます。
+.NET/nativeも`IPageActionHandler`でHTML/JavaScriptからのページ操作に対応します。`IPageService`の動的登録・変更通知・画像登録と解放、`Ui.OpenDetailsAsync`の契約は[Appletページ](applet-pages.md)と[.NETページ連携](applet-pages.md)を参照してください。Nodeも同じ通知・画像・説明表示APIを使えます。
 
-保存型のコマンド種類は0.60.0から`custom-commands` capabilityとmanifestの`customCommandTypes`で宣言し、Nodeの`context.customCommands.register(typeId, handler)`、.NET/nativeの`context.CustomCommands.RegisterAsync`へ登録します。configは保存値の複製、実行には取消と元callerを保持します。[カスタムコマンド契約](custom-commands-design.md)を参照してください。既存のcommands.register/replaceやWindowsToolsのキー送信定義は移行しません。
+保存型のコマンド種類は`custom-commands` capabilityとmanifestの`customCommandTypes`で宣言し、Nodeの`context.customCommands.register(typeId, handler)`、.NET/nativeの`context.CustomCommands.RegisterAsync`へ登録します。configは保存値の複製、実行には取消と元callerを保持します。[カスタムコマンド契約](custom-commands-design.md)を参照してください。
 
 Shell Appletは、通常のコマンド・設定・ページとShell描画を同じAppletで提供できます。`shell` capabilityと`shell.views`による領域単位の宣言、自己設定の購読、描画からの自己コマンド実行は[部分Shellと共通オーバーレイ](shell-overlays.md)を参照してください。全領域の実装は不要です。
 
@@ -12,7 +12,7 @@ Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作API
 
 認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
-0.57.0以降、起動時の設定・settingsChanged・自己設定の読書きは、このPCで選択している共有／端末専用の同じ設定へ接続します。既存のNode/.NET APIの形式は維持します。保存モードの切り替えは本体のローカル設定UIだけで行い、Appletからの切り替えAPIは追加しません。
+起動時の設定・settingsChanged・自己設定の読書きは、このPCで選択している共有／端末専用の同じ設定へ接続します。既存のNode/.NET APIの形式は維持します。保存モードの切り替えは本体のローカル設定UIだけで行い、Appletからの切り替えAPIは追加しません。
 
 ## リボンバッジ
 
@@ -32,7 +32,7 @@ await context.Ribbon.SetBadgeAsync(
 
 対象は自分が実際に登録した固定／動的ページ、または自分のpageCollectionsの有効項目。所有者をIDの接頭辞から推測しない。countは0以上の安全な整数、0またはnullは非表示、dotは件数なし。labelは制御文字を含まない1～120文字の説明で、件名・本文・アカウント名を渡さない。戻り値は`{ accepted: true, changed: boolean }`で、描画完了の保証ではない。
 
-値はruntime世代ごとのメモリー状態で、停止・異常終了・無効化・ページ削除で本体が消去する。同値更新は通知しない。失敗時は業務処理を継続できるよう扱い、件数を加算せず最新値を再発行する。表示規則・集約と保存モデルは[グループとバッジ](ribbon-groups-badges-design.md)を参照。
+値はruntime世代ごとのメモリー状態で、停止・異常終了・無効化・ページ削除で本体が消去する。同値更新は通知しない。失敗時は業務処理を継続できるよう扱い、件数を加算せず最新値を再発行する。表示規則・集約と保存モデルは[グループとバッジ](ribbon-customization-design.md)を参照。
 
 ## 動的コマンドとキー送信の一覧設定
 
@@ -48,8 +48,6 @@ await context.Ribbon.SetBadgeAsync(
 
 新規実装の手順は[Applet実装ガイド](applet-development.md)、API・設定・UI等をホストへ足す手順は[AppDock実装ガイド](host-development.md)を参照してください。
 
-## マニフェスト
-
 ### 共通の設定ページ
 
 設定フォームはホストの共通テンプレートで描画します。AppletはHTML/CSSを複製せず、`settings`と任意の`settingSections`を宣言します。設定一覧とApplet詳細の設定タブは同じ本文・編集状態を使います。ページ表示方法と起動待ちはホストが末尾の共通カードへ追加します。
@@ -57,16 +55,22 @@ await context.Ribbon.SetBadgeAsync(
 `settingSections`にはAppDock **0.36.8以上**が必要です。最大32件で、`id`（英小文字から始まる英数字・ハイフン、64文字以内）、`title`（160文字以内）、任意の`description`（500文字以内）、`settings`（自身の設定キー）、`actions`（自身のsettingActionsのコマンドID）、`collapsible`（既定false）を指定します。各セクションには設定か操作を1件以上含めます。ID重複・存在しない参照・複数セクションへの重複配置は起動時に拒否します。
 
 ```json
-"minimumHostVersion": "0.36.8",
-"settingSections": [
-  {
-    "id": "monitoring",
-    "title": "監視",
-    "description": "自動確認の間隔を設定します。",
-    "settings": ["intervalSeconds"],
-    "actions": ["at365.my-tool.check"]
-  }
-]
+{
+  "minimumHostVersion": "0.76.5",
+  "settingSections": [
+    {
+      "id": "monitoring",
+      "title": "監視",
+      "description": "自動確認の間隔を設定します。",
+      "settings": [
+        "intervalSeconds"
+      ],
+      "actions": [
+        "at365.my-tool.check"
+      ]
+    }
+  ]
+}
 ```
 
 セクションとその中の参照は宣言順に表示し、設定の後に操作ボタンを置きます。未配置の設定は「その他の設定」、未配置の操作は「操作」に残ります。セクション省略時も「設定」「操作」の共通カードになるため、後から追加した設定が非表示になりません。主要項目は初期表示し、調査・詳細調整などだけを`collapsible: true`にします。横断検索はセクションの見出し・説明にも対応し、検索した項目の折りたたみを開きます。
@@ -83,14 +87,16 @@ await context.Ribbon.SetBadgeAsync(
 `activateOnExecute` のないコマンドはApplet開始後に利用できます。この機能を使うAppletはminimumHostVersionを0.21.0以上にしてください。
 
 ```json
-"settingActions": [
-  {
-    "title": "今すぐ確認",
-    "command": "at365.my-tool.check",
-    "description": "保存済みの設定を使って確認します。",
-    "successMessage": "確認しました。"
-  }
-]
+{
+  "settingActions": [
+    {
+      "title": "今すぐ確認",
+      "command": "at365.my-tool.check",
+      "description": "保存済みの設定を使って確認します。",
+      "successMessage": "確認しました。"
+    }
+  ]
+}
 ```
 
 ```json
@@ -215,14 +221,14 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 
 `extension.json`の任意項目`displayName`（空白だけではない1～100文字の文字列）で表示名を指定できます。前後の空白を除いた名前をホストの一覧・詳細・設定・コマンド候補・トレイのサブメニュー・起動ログに使用します。明示した表示名はそのまま尊重します。
 
-省略時は`name`の先頭の`Applet.`だけを取り除きます（例: `Applet.Watch.at365` → `Watch.at365`）。除去して空になる場合は元の名前を使います。`name`・`id`・実行ファイル名・設定やコマンドIDは変更しません。検索は表示名・元の名前・IDのすべてに対応します。snapshotは元の`name`と、解決済みの`displayName`を別々に返します。旧ホストはこの項目を無視して従来の`name`を表示するため、既存Appletの最低ホスト版を変更する必要はありません。反映にはAppDockの再起動が必要です。
+省略時は`name`の先頭の`Applet.`だけを取り除きます（例: `Applet.Watch.at365` → `Watch.at365`）。除去して空になる場合は元の名前を使います。`name`・`id`・実行ファイル名・設定やコマンドIDは変更しません。検索は表示名・元の名前・IDのすべてに対応します。snapshotは元の`name`と、解決済みの`displayName`を別々に返します。反映にはAppDockの再起動が必要です。
 
 ## manifestとホスト共通設定
 
 - `minimumHostVersion`: 必要なホストの安定版SemVer (`0.5.0`など)。省略時は従来どおりAPI v1として起動。
 - `startupDelaySeconds`: 既定の遅延秒数、0～86400の整数。省略は0。
 - `updateRepository`: GitHubの`owner/repository`。省略時は更新確認非対応。更新比較には`major.minor.patch`の正式版タグ（先頭`v`も可）が必要。
-- 保存先は`extensions[id].startupDelaySeconds`。Applet固有の`settings`とは別で、旧設定をそのまま読み込める。待機のタイマーを起動・RPCのキューで待たず、ほかのAppletの起動を妨げない。
+- 保存先は`extensions[id].startupDelaySeconds`。待機のタイマーを起動・RPCのキューで待たず、ほかのAppletの起動を妨げない。
 - snapshotの`state: waiting`、`scheduledStartAt`（Unixミリ秒）で待機を表示。無効化・再起動・終了でタイマーを解放。再起動も遅延を適用し、「今すぐ開始」だけ即時にする。
 - `type: json`の設定値は最大10000文字のJSON文字列。ホストで構文、Appletで意味と範囲を検証。
 
@@ -235,7 +241,7 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 
 manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロード前からパレット・ショートカットに表示するコマンドを宣言します。実行中はruntimeの登録内容を優先し、snapshotの`available`で使用可否を知らせます。`activateOnExecute: true`の明示実行は無効化・開始待ち状態から有効化して即時起動します。最低ホストバージョンはこの経路でも検証します。起動時に同じIDをruntimeへ登録してください。`aliases`は同じ名前空間の旧ID（8件まで）を受け付け、未割り当ての別名はコマンド候補に重複表示しません。既存の割り当ては保持します。
 
-`type: object-list`の設定は`fields`と`itemTitle`を持つ64件までのオブジェクト配列です。フォームで追加・並べ替え・削除します。旧JSON文字列も読み取れます。フィールドはboolean / number / string / select / string-listで、一覧の入れ子は不可。`string-list`はフィールド内だけで使用し、64件までの文字列を追加・削除します。`format: directory`でフォルダー選択、`aliases: ["Folder"]`で旧単一文字列を統合します。`select`の`numericOptions: true`は旧数値enumをoptionsの順序で読み取ります。正規化時も未知のフィールドを保持します。
+`type: object-list`の設定は`fields`と`itemTitle`を持つ64件までのオブジェクト配列です。フォームで追加・並べ替え・削除します。旧JSON文字列も読み取れます。フィールドはboolean / number / string / select / string-listで、一覧の入れ子は不可。`string-list`はフィールド内だけで使用し、64件までの文字列を追加・削除します。`select`の`numericOptions: true`は旧数値enumをoptionsの順序で読み取ります。正規化時も未知のフィールドを保持します。
 
 `Panel.Images`は最大1000件、`Tabs`は最大100件です。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
 
@@ -247,7 +253,7 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 | Node API | capability | 動作 |
 | --- | --- | --- |
 | `ui.pickFile('json' \| 'wav')` | `file-dialog` | ホストのファイル選択。絶対パスまたはキャンセル時null。RPC待機は5分 |
-| `audio.play(file?)` | `audio` | ローカルWAVを共通キューで再生。0.42.0以降は空文字/省略が無音。キュー受付時に戻る |
+| `audio.play(file?)` | `audio` | ローカルWAVを共通キューで再生。空文字/省略が無音。キュー受付時に戻る |
 | `tray.attention(boolean)` | `tray-attention` | 稼働中Appletの通知要求を集約し、共通トレイに橙色の印を表示 |
 | `notifications.show(title, body, { silent?, command? })` | `notifications` | 音の抑制とクリック時の自Appletコマンドを任意指定 |
 
@@ -280,7 +286,7 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
 
 ```json
 {
-  "minimumHostVersion": "0.50.0",
+  "minimumHostVersion": "0.76.5",
   "capabilities": ["notifications"],
   "notificationTypes": [{
     "typeId": "new-message",
@@ -298,7 +304,7 @@ page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参
 }
 ```
 
-定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。通知全体のOFFは設けず、requiredTargets:['banner']はバナーの解除とセンターのみへの変更を拒否します。[通知先の必須指定](notifications.md#通知種類の制約)を参照してください。0.50.0以降は旧defaultEnabled/canDisable/disabledControlReasonを互換読込で無視し、新規宣言では省略します。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
+定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。通知全体のOFFは設けず、requiredTargets:['banner']はバナーの解除とセンターのみへの変更を拒否します。[通知先の必須指定](notifications.md#通知種類の制約)を参照してください。旧defaultEnabled/canDisable/disabledControlReasonを互換読込で無視し、新規宣言では省略します。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
 
 | 操作 | Node context.notifications | .NET context.Notifications |
 | --- | --- | --- |
@@ -330,7 +336,7 @@ if (result.status === 'accepted') await context.notifications.end(result.notific
 
 通知先はbanner/desktop/windowsの複数選択に対応します。Windowsへの配送を必要とするAppletはminimumHostVersion:0.32.0以上を指定してください。設定・履歴の保存と寿命は[通知基盤](notifications.md)を参照してください。
 
-本体0.31.0ではtargets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。旧版と併用する種類の予約済みdesktop宣言は読込可能で、0.30.0では未対応先として抑制されます。Shell領域notification.desktopにはminimumHostVersion:0.31.1以上が必要です。0.32.0では予約済みwindowsにも配送します。Windows側の表示時間・集中モード等はOSが管理し、基盤の寿命や既読と区別します。
+本体targets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。Shell領域notification.desktopにはminimumHostVersion:0.31.1以上が必要です。予約済みwindowsにも配送します。Windows側の表示時間・集中モード等はOSが管理し、基盤の寿命や既読と区別します。
 
 ## Shellの採用状態と専用コマンド
 
@@ -338,7 +344,7 @@ if (result.status === 'accepted') await context.notifications.end(result.notific
 
 manifestのcommands[]に任意のshellRequirement: { region: "ribbon", state: "visible" }を指定できます。stateはresolvedまたはvisible、1コマンドに1領域です。resolvedは現在の解決先、visibleは現在のreadyかつ実表示・操作可能なViewで判定します。モーダルで操作を止めている領域もvisible条件を満たしません。activateOnExecute:trueとの併用は拒否します。省略は従来どおりで、自己設定変更や生成された設定コマンドへ条件を自動付与しません。
 
-runtime登録・動的置換はmanifestの条件を解除できず、別名も同じ条件です。available/disabledReasonとExtensionManager.executeの直前検査を共用し、UI・キー・トレイ・MCP・他Applet経由を揃えます。IDを書き換えたり、別Appletへ転送したり、実行のために割り当てや有効状態を変更したりしません。取得後の状態変化では実行を拒否します。型付きViewの一時操作を新設した契約ではなく、任意DOM/JavaScript/renderer RPCは追加しません。詳細は[領域別割り当て](shell-region-assignment.md)。
+runtime登録・動的置換はmanifestの条件を解除できず、別名も同じ条件です。available/disabledReasonとExtensionManager.executeの直前検査を共用し、UI・キー・トレイ・MCP・他Applet経由を揃えます。IDを書き換えたり、別Appletへ転送したり、実行のために割り当てや有効状態を変更したりしません。取得後の状態変化では実行を拒否します。型付きViewの一時操作を新設した契約ではなく、任意DOM/JavaScript/renderer RPCは追加しません。詳細は[領域別割り当て](shell-foundation.md)。
 
 native Appletの入口ではConsole.InputEncoding=Encoding.UTF8、Console.OutputEncoding=new UTF8Encoding(false)をConsole.In/Out取得前に設定し、wire用stdoutを確保して通常ログはstderrへ出してください。UTF-8の状態理由をWindows既定の文字コードで読むとJSONの引用符まで破損するため、ASCIIのみのfixture成功を文字コード契約の検証に代用しません。
 
