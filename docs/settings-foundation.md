@@ -34,6 +34,10 @@ Applet管理と左インデックスは本体の共通設定ページを開く�
 
 settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタデータを定義する。IDはページIDとキーを個別にencodeURIComponentし、ドット入りID/設定キーはキー配列で扱う。未知の未編集フィールド・未導入Appletを保持する。未設定Appletの部分保存ではenabled:true/settings:{}の行を補完する。保存済みのenabled:falseは保持する。無検証マージと変更マーク比較を削除した。JSONは選択ページのみ、Webは対象IDを保つ1行投影の許可フィールドだけを変更する。
 
+左インデックスの本体ページID・表示名は`src/shared/settings-navigation.ts`の`hostSettingsPages`を正本とし、設定カタログと「ページ名設定を開く」コマンドを同じ定義から生成する。本体ページを追加するときはこの定義へ追加し、別のコマンド一覧・公開許可リスト・分岐を増やさない。Appletとcollectionの子ページは現在の一覧から自動生成し、停止・無効でも設定を開ける。ページを開く操作でAppletを開始・有効化しない。
+
+本体のIDは`appdock.settings.<pageId>.open`、Appletは`appdock.settings.applet.<appletId>.open`。既存割り当てのため、リボンは`appdock.ribbon.settings.open`、バージョン情報・更新は`appdock.updates.open`を維持し、同じ生成・実行経路を使う。表示名の変更でもIDを変えない。`appdock.settings.open`は現在選択中の設定を開く従来の動作を維持する。すべて共通操作APIの`commands.list/execute`へ公開し、コマンドパレット・入力割り当て・リボン・トレイでも同じIDを使う。実行は現在のカタログで対象を検査し、入力確定・ページ選択・画面移動を本体が行う。
+
 検索はNFKC/空白区切りAND、項目名/説明/所属/静的キー・別名・固定選択肢・オブジェクトフィールドを対象にする。入力値/秘密/動的選択肢は対象外。入力だけで右ページを変えず、結果選択でフォーム全体へ移動する。data-setting-itemアンカー、details展開、スクロール/フォーカス/2秒強調、最新移動IDの完了照合を維持する。queryはprimaryのSettingsNavigationStateに保持し、不正JSONは移動を妨げない。対象消失時は結果更新/右を利用不可にする。
 
 ## 共通の画面構成

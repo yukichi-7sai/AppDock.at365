@@ -1,5 +1,7 @@
 import type { Command } from './contracts';
 import { generatedSettingCommands, hostSettingDefinitions } from './settings-commands';
+import { hostSettingsPageCommands, appletSettingsPageCommands } from './settings-navigation';
+import { updateCommands } from './update-commands';
 export const hostCommands = [
   { id: 'appdock.open', title: 'AppDockを開く', extension: 'AppDock', available: true },
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
@@ -7,12 +9,6 @@ export const hostCommands = [
   {
     id: 'appdock.image-library.open',
     title: '画像ライブラリーを開く',
-    extension: 'AppDock',
-    available: true,
-  },
-  {
-    id: 'appdock.ribbon.settings.open',
-    title: 'リボン設定を開く',
     extension: 'AppDock',
     available: true,
   },
@@ -24,7 +20,12 @@ export const hostCommands = [
     available: true,
   },
   { id: 'appdock.logs.open', title: 'ログを開く', extension: 'AppDock', available: true },
-  { id: 'appdock.updates.open', title: '更新画面を開く', extension: 'AppDock', available: true },
+  ...hostSettingsPageCommands,
+  ...updateCommands.map(({ scope, ...command }) => ({
+    ...command,
+    extension: 'AppDock',
+    available: true,
+  })),
   { id: 'appdock.restart', title: '再起動', extension: 'AppDock', available: true },
   {
     id: 'appdock.gestures.togglePause',
@@ -38,6 +39,9 @@ export const hostCommands = [
     extension: 'AppDock',
   })),
 ];
+export function hostCommandsForApplets(applets: import('./contracts').ExtensionSnapshot[]) {
+  return [...hostCommands, ...appletSettingsPageCommands(applets)];
+}
 export interface UiCommand extends Command {
   extension: string;
   /** Stable owner ID; null is the host, undefined is an unknown saved command. */

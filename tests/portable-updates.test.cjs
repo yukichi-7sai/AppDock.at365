@@ -69,6 +69,19 @@ test('manual update events publish once with safe counts; silent checks do not r
   assert(!f.notices[1].safeMessage.includes('PRIVATE'));
   assert.notEqual(f.notices[0].notice.id, f.notices[1].notice.id);
 });
+
+test('available updates are notified even when another target fails its check', async (t) => {
+  const f = fixture(t);
+  const failed = { ...f.target, id: 'broken', source: path.join(f.directory, 'missing') };
+  f.updater.options.targets = () => [f.target, failed];
+  await f.updater.check();
+  assert.deepEqual(
+    f.notices.map((n) => n.notice.kind),
+    ['available', 'error'],
+  );
+  assert.equal(f.notices[0].safeMessage, '1件の更新があります。');
+  assert.equal(f.updater.state.notice.kind, 'error');
+});
 test('update settings migrate old settings and validate local, UNC, HTTP and GitHub sources', () => {
   const value = createDefaultSettings();
   delete value.updates;

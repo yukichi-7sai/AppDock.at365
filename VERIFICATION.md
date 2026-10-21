@@ -1,6 +1,24 @@
 # 検証記録
 
-対象の現行版は`0.77.2`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.77.4`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+
+## 2026-10-21: 公開コマンドのコミット前検証（0.77.4）
+
+- 実装時の628入力・821生成物・8完全ログ・固定EXE/feedをSHA256で再照合し、すべて一致。標準767/767、最終固定EXEの公開コマンドGUI6群・更新GUI13群・smokeの成功結果を再利用した。製品・試験・依存・版の後続変更はなく、追加回帰・再発行は不要と判定した。今回の追加はこの検証記録のみ。
+- mainの開始先端・追跡先・今回の25対象ファイルと実効author/committerを確認。GitHub/AQUA両mainの先端、ステージ内容、作業ファイルとの一致、stage/commit tree、通常push後の両先端とcleanの照合を`.artifacts/commit-validation-public-settings-20261021/`へ記録する。実装時の証跡は`.artifacts/public-settings-commands-20261021/`を保持し、過去成功を再実行したように記録しない。公開Release・実利用deployは含めない。
+
+## 2026-10-21: 更新と設定ページの公開コマンド（0.77.4）
+
+- 開始時はmain／origin/main追跡・cleanを確認し、`git pull --ff-only`で最新取得（更新なし）。開始commitは`d218f7302c3f4ce45a295997d3476e53cfd2b2c3`。本体だけを変更し、未変更Appletの再発行・commit・push・GitHub Release・実利用deployは行っていない。
+- 「本体と全Appletを更新」「AppDockを更新」「更新チェック」を公開。設定の同名更新ボタン、既存の更新IPC、MCP／Appletの`commands.execute`を共通のコマンド処理へ接続した。チェックは無効・停止中を含む全パッケージを確認し、適用しない。利用可能な更新は既存通知種類`host/updates/available`へ接続し、一部失敗があっても更新のお知らせと共通エラーをそれぞれ通知する。
+- `settings-navigation.ts`を本体設定インデックスのID・名称の正本とし、各ページとApplet／collection子ページの設定を開くコマンドを自動生成。公開API・パレット・入力割り当て・リボン・トレイ・ホームへ接続した。停止中Appletの設定を開いても開始・有効化しない。既存の`appdock.settings.open`は従来どおり、リボンと更新の既存IDは新しい生成・実行経路で維持する。保存形式・設定項目・保存ファイルの追加削除はなく、パッチ更新とした。
+- 発行前の差分レビューで要件・許可・設定入力確定・既存ID・通知の安全な要約を確認。初回0.77.3発行後の追加確認で、Applet設定コマンドの共有トレイカタログへの反映不足を修正し、同じコマンド一覧を使うよう統一した。全生成コマンドのトレイ解決を回帰へ追加して再確認し、最終版を0.77.4へ進めた。未解決の指摘なし。詳細は`review.json`。
+- 固定依存の`install --frozen-lockfile`、最終版の型検査／本体・Default Shell build、標準回帰**767/767、fail/skip 0**が成功。更新ヘルパーの制限環境でのアクセス拒否は通常ユーザーで同一コマンドを再実行して解消した。最終標準回帰後の入力差分は新しい固定EXE GUIスクリプトの試験追加・fixture修正だけで、製品と標準回帰入力は不変。628入力・821生成物・各完全ログのSHA256と差分理由を証跡へ保存した。
+- 最終固定EXEの専用GUI**6群**が成功。実Node Appletから共通APIで全設定ページを列挙・表示し、停止維持・トレイ割当候補・通常設定コマンドの選択ページ保持・型付き更新通知を確認した。本体のみ／全体の公開コマンドと両設定ボタンが同じ更新scopeを呼び、確認取消で未適用となることも確認。同梱Default Shellの版も実行中のresourcesから照合した。初期fixtureの通知既定値・トレイAPI名の誤りと制限環境のEXE起動失敗の記録を保持し、修正後の成功と区別する。
+- 最終固定EXEの既存更新GUI**13群**が成功。本体と全Appletの一括適用、本体単独の実EXE置換、Applet一括／個別更新、同版再適用、設定・ログインfixture・有効状態の保持、選択設定／Appletページの復元、更新／通常再起動後の外部ジェスチャー実行を確認した。固定EXE smokeも成功し、EXE隣の設定と共通画像保存を確認した。
+- `publish.bat`終了0。最終本体EXEとupdate.jsonは**0.77.4 / 168961535 bytes / SHA256 `3bfdd5ed078632b54c771d6d6fc3d783eeee6ac43222b9a4e119dc0080b0c8a9`**で一致。Default Shellと各隔離コピーの版・hashも照合し、`A:\40.ARTIFACT\AppDock.at365`へ発行した。今回のAppDock関連試験プロセス残存0。出力は現証跡・直近成功・失敗記録と過去の再利用状態が未確定なものを保持し、削除0件とした。
+- 正本は`docs/settings-foundation.md`、`docs/updates.md`、`docs/appdock-api.md`、`docs/usage.md`。変更文書のローカルリンク58件を確認。検証証跡は`.artifacts/public-settings-commands-20261021/validation.json`、`inputs-before/after.json`、`input-deltas.json`、`generated.json`、`review.json`、`cleanup.json`と各完全ログ。初回0.77.3の成功記録は同フォルダーの`first-0773/`に分離し、最終EXEの検証へ読み替えない。GUI profileは`public-settings-commands-1792572156782`、更新は`portable-updates-1792572203903`、smokeは`smoke-1792572330960`。
+- ローカル更新元と隔離fixtureでの成功。実GitHub／UNC／NAS更新、Windows通知の実配信、物理入力・UAC同意後・ロック中の各条件は今回の保証へ含めない。実利用の確認は未実施。
 
 ## 2026-10-21: 共通アクセントボタンとリボン・トレイの編集UI（0.77.2）
 

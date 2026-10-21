@@ -31,10 +31,11 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
       unsubscribe();
     };
   }, []);
-  const action = (callback: () => Promise<UpdateState>) => {
+  const action = (callback: () => Promise<unknown>) => {
     setError('');
     void callback()
-      .then(setState)
+      .then(() => settingsControls.snapshot())
+      .then((snapshot) => setState(snapshot.updates))
       .catch((error) => setError(String(error).replace(/^Error: /, '')));
   };
   return (
@@ -47,7 +48,9 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
         <button
           className="update-primary"
           disabled={state.busy}
-          onClick={() => action(() => settingsControls.installUpdates('all'))}
+          onClick={() =>
+            action(() => settingsControls.executeCommand('appdock.updates.installAll'))
+          }
         >
           本体と全Appletを更新
         </button>
@@ -184,7 +187,10 @@ export function AppletUpdateSource({
     edit(next);
   };
   return (
-    <details className="update-disclosure applet-update-source" {...settingAnchor(`applet:${extension.id}`, 'updateSource')}>
+    <details
+      className="update-disclosure applet-update-source"
+      {...settingAnchor(`applet:${extension.id}`, 'updateSource')}
+    >
       <summary>
         更新元の設定{' '}
         <span className="muted">

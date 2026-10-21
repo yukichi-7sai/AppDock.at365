@@ -20,6 +20,8 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 ## 構造と公開範囲
 
+本体と全Appletの更新・本体のみの更新・更新チェック、および設定インデックスの各ページを開く操作は、`commands.list`で公開コマンドとして取得し、`commands.execute`へそのIDを渡す。設定UIも同じコマンド処理を使う。コマンドID・通知と更新確認の契約は[更新](updates.md)、設定ページの自動生成と既存IDは[設定基盤](settings-foundation.md#カタログjson検索)を参照する。
+
 - `src/main/core/appdock-api.ts`のAppDockApiはMCPの起動状態から独立した単一インスタンスです。MCPはHTTPアダプター、Appletは既存JSON-lines RPCの`host.appdock.call`から呼びます。AppletにHTTPポート・Bearer token・Codex登録は不要です。
 - 操作カタログは`src/shared/appdock-api.ts`のappDockOperationsへ集約します。各操作で`callers`（mcp/applet）、`permissions`、入力JSON SchemaとMCP情報を宣言します。新規処理はAppDockApiのhandlersへ登録し、共通dispatcherが公開先・必要許可・Schemaを検証します。MCP列挙も同じ公開先を使うため、Applet RPC/SDK/MCPの通信実装を追加する必要はありません。既存のcommands.executeから公開コマンドを増やす場合も新しいツールは不要です。
 - 公開操作の正本は操作カタログのcallersです。公開情報・設定・コマンド、カスタムコマンド管理、Applet管理、入力割当編集等を提供し、Applet専用の入力2操作とprocesses.startがあります。非公開コマンド、秘密情報、全settings.jsonをこの入口から取得することはできません。

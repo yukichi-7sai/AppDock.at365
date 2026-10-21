@@ -11,7 +11,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { DockApi, HostSnapshot, ExtensionSnapshot } from '../shared/contracts';
 import './style.css';
-import { hostCommands, shortcutFromEvent, type UiCommand } from '../shared/commands';
+import { hostCommandsForApplets, shortcutFromEvent, type UiCommand } from '../shared/commands';
 import { appletManagementCommands } from '../shared/applet-management';
 import { useSettingsEditor } from './useSettingsEditor';
 import { useRestartView } from './useRestartView';
@@ -91,7 +91,6 @@ function App() {
   const openingRestoredPage = useRef(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [updatesRequest, setUpdatesRequest] = useState(0);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const [generalRequest, setGeneralRequest] = useState(0);
   const appletPageRef = useRef<HTMLDivElement>(null);
@@ -142,9 +141,6 @@ function App() {
       localStorage.setItem(key, JSON.stringify(editor.pageId));
     } catch {}
   }, [snapshot?.startupReady, editor.sessionId, editor.pageId]);
-  useEffect(() => {
-    if (updatesRequest) editor.selectPage('about');
-  }, [updatesRequest]);
   useEffect(() => {
     if (ribbonRequest) editor.selectPage('ribbon');
   }, [ribbonRequest]);
@@ -310,7 +306,10 @@ function App() {
     }
   }
   const commands: UiCommand[] = [
-    ...hostCommands.map((command) => ({ ...command, extensionId: null })),
+    ...hostCommandsForApplets(snapshot?.extensions ?? []).map((command) => ({
+      ...command,
+      extensionId: null,
+    })),
     ...appletManagementCommands(snapshot?.extensions ?? []),
     ...(snapshot?.extensions.flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
@@ -328,11 +327,6 @@ function App() {
     if (id === 'appdock.applets.open' || id === 'appdock.logs.open') {
       if (id === 'appdock.logs.open') setLogSource('');
       setPage(id === 'appdock.applets.open' ? 'extensions' : 'logs');
-      return;
-    }
-    if (id === 'appdock.updates.open') {
-      setUpdatesRequest((value) => value + 1);
-      setPage('settings');
       return;
     }
     if (id === 'appdock.settings.open') {

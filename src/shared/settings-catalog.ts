@@ -10,6 +10,8 @@ import { orderApplets } from './applet-order';
 import { getKeybindings } from './keybindings';
 import { appletApiPermissionLabels } from './appdock-api';
 import { fillSettingDefaults, omitSettingDefaults } from './settings-defaults';
+import { hostSettingsPages, appletSettingsPageId } from './settings-navigation';
+export { hostSettingsPages, appletSettingsPageId } from './settings-navigation';
 import {
   appletConfigurationDefaults,
   compactAppletConfiguration,
@@ -40,25 +42,6 @@ export interface SettingsPageDefinition {
 }
 export const settingsItemId = (pageId: string, key: string) =>
   `${encodeURIComponent(pageId)}/${encodeURIComponent(key)}`;
-export const appletSettingsPageId = (id: string) => `applet:${id}`;
-export const hostSettingsPages = [
-  ['appearance', '表示'],
-  ['general', '一般'],
-  ['applets', 'Applet管理'],
-  ['notifications', '通知'],
-  ['ribbon', 'リボン'],
-  ['tray', 'タスクトレイ'],
-  ['shortcuts', 'ショートカット'],
-  ['gestures', 'マウスジェスチャー'],
-  ['custom-commands', 'カスタムコマンド'],
-  ['web-accounts', 'Webアカウント'],
-  ['permissions', '操作の許可'],
-  ['tts', 'TTS'],
-  ['ai', 'AI'],
-  ['codex', 'MCPサーバー'],
-  ['mcp-client', 'MCPクライアント'],
-  ['about', 'バージョン情報・更新'],
-] as const;
 const hostItems: Record<string, [string, string, string?][]> = {
   applets: [
     ['management', 'Applet管理', 'インストール 有効 無効 更新 再起動 アンインストール 並べ替え'],

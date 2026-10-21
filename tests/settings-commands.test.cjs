@@ -270,7 +270,9 @@ test('switch commands share persistence, preserve no-ops, and private switches s
   f.commands.execute(f.applet.id + '.settings.privateFeature.toggle', {}, false);
   assert.equal(f.settings.value.extensions[f.applet.id].settings.privateFeature, true);
   assert.equal(
-    hostCommands.some((c) => c.id.startsWith('appdock.settings.notifications.')),
+    hostCommands.some(
+      (c) => c.id.startsWith('appdock.settings.notifications.') && !c.id.endsWith('.open'),
+    ),
     false,
   );
   assert.equal(generatedSettingCommands(f.applet.id, f.applet.settings, true).length, 4);

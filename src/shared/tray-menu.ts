@@ -1,5 +1,5 @@
 import type { ExtensionSnapshot, Settings } from './contracts';
-import { hostCommands, validCommandId } from './commands';
+import { hostCommandsForApplets, validCommandId } from './commands';
 import { appletManagementCommands } from './applet-management';
 import { appletDisplayName } from './applet-display-name';
 
@@ -85,7 +85,8 @@ export function getTrayMenu(settings: Settings, extensions: ExtensionSnapshot[])
       });
   }
   if (items.length) items.push({ id: id(), type: 'separator' });
-  for (const c of hostCommands) if (selected.has(c.id)) items.push(command(c.id));
+  for (const c of hostCommandsForApplets(extensions))
+    if (selected.has(c.id)) items.push(command(c.id));
   for (const c of [...selected]) items.push(command(c));
   if (!trayMenuCommandIds(items).includes(gesturePauseCommand))
     items.push(command(gesturePauseCommand));
@@ -133,7 +134,7 @@ export function trayCommandCatalog(
   additional: import('./commands').UiCommand[] = [],
 ) {
   const base = [
-    ...hostCommands,
+    ...hostCommandsForApplets(extensions),
     ...appletManagementCommands(extensions),
     ...extensions.flatMap((e) =>
       e.commands.map((c) => ({

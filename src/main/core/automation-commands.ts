@@ -1,5 +1,7 @@
 import type { ExtensionSnapshot } from '../../shared/contracts';
-import { hostCommands } from '../../shared/commands';
+import { hostCommandsForApplets } from '../../shared/commands';
+import { settingsPageCommands } from '../../shared/settings-navigation';
+import { updateCommands } from '../../shared/update-commands';
 
 export interface AutomationCommand {
   id: string;
@@ -33,11 +35,9 @@ export interface AutomationApplet {
 const hostIds = new Set([
   'appdock.open',
   'appdock.settings.open',
-  'appdock.ribbon.settings.open',
   'appdock.commands.search',
   'appdock.applets.open',
   'appdock.logs.open',
-  'appdock.updates.open',
 ]);
 export function automationApplets(applets: ExtensionSnapshot[]): AutomationApplet[] {
   return applets.map((a) => ({
@@ -56,16 +56,19 @@ export function automationApplets(applets: ExtensionSnapshot[]): AutomationApple
   }));
 }
 export function automationCommands(applets: ExtensionSnapshot[]): AutomationCommand[] {
+  const pages = new Set(settingsPageCommands(applets).map((c) => c.id));
+  const updates = new Set<string>(updateCommands.map((c) => c.id));
   return [
-    ...hostCommands
-      .filter((c) => hostIds.has(c.id))
+    ...hostCommandsForApplets(applets)
+      .filter((c) => hostIds.has(c.id) || pages.has(c.id) || updates.has(c.id))
       .map((c) => ({
         id: c.id,
         title: c.title,
+        ...('description' in c ? { description: c.description } : {}),
         appletId: null,
         available: true,
         unavailableReason: null,
-        completion: 'accepted' as const,
+        completion: updates.has(c.id) ? ('handlerReturned' as const) : ('accepted' as const),
       })),
     ...applets.flatMap((a) => {
       return a.commands

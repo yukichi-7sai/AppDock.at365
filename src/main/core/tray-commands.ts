@@ -1,5 +1,5 @@
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
-import { hostCommands } from '../../shared/commands';
+import { hostCommandsForApplets } from '../../shared/commands';
 import { appletManagementCommands } from '../../shared/applet-management';
 import { appletDisplayName } from '../../shared/applet-display-name';
 
@@ -19,7 +19,7 @@ export function trayCommandGroups(
     {
       extensionId: null,
       title: 'AppDock',
-      commands: [...hostCommands, ...appletManagementCommands(extensions)]
+      commands: [...hostCommandsForApplets(extensions), ...appletManagementCommands(extensions)]
         .filter((command) => selected.has(command.id))
         .map((command) => ({ ...command, enabled: command.available })),
     },

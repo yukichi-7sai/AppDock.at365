@@ -310,7 +310,7 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       ownerId: 'updates',
       typeId: 'available',
       title: '更新のお知らせ',
-      description: '起動時の更新確認で、利用可能な更新を通知します。',
+      description: '起動時や手動の更新チェックで、利用可能な更新を通知します。',
       levels: ['info'],
       defaultLevel: 'info',
       allowedTargets: ['banner', 'desktop', 'windows'],

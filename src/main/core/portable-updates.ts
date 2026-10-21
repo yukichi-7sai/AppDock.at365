@@ -427,17 +427,18 @@ export class PortableUpdates {
       available.length === 1
         ? `${available[0].name} ${available[0].latestVersion} に更新できます。`
         : `${available.length}件の更新があります。`;
-    if (failed.length)
-      this.notice(
-        'error',
-        `${available.length ? `${updates} ` : ''}${failed.length}件の更新を確認できませんでした。${failed[0].name}: ${failed[0].message ?? '更新元を確認してください。'}`,
-      );
-    else if (available.length)
+    if (available.length)
       this.notice(
         'available',
         `${updates}${skipped.length ? ` ${skipped.length}件は更新元が未設定または未公開です。` : ''}`,
         `${available.length}件の更新があります。${skipped.length ? ` ${skipped.length}件は更新元が未設定または未公開です。` : ''}`,
       );
+    if (failed.length)
+      this.notice(
+        'error',
+        `${available.length ? `${updates} ` : ''}${failed.length}件の更新を確認できませんでした。${failed[0].name}: ${failed[0].message ?? '更新元を確認してください。'}`,
+      );
+    else if (available.length) return;
     else if (skipped.length)
       this.notice(
         'info',

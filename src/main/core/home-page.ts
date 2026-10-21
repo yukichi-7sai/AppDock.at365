@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import { orderApplets } from '../../shared/applet-order';
 import { rankCommands, type UiCommand } from '../../shared/commands';
+import { settingsPageCommands } from '../../shared/settings-navigation';
 import type {
   HomePageRequest,
   HomePageModel,
@@ -113,6 +114,7 @@ export class HomePageSession implements HostPageController {
       this.options.appletOrder?.() ?? this.request.appletOrder,
     );
     const commands = this.options.commands();
+    const settingsCommands = new Set(settingsPageCommands(this.options.applets()).map((c) => c.id));
     const pins = this.options.pins();
     const content: HomePageModel['content'] = {
       stats: {
@@ -132,7 +134,9 @@ export class HomePageSession implements HostPageController {
         ...(c.disabledReason ? { disabledReason: c.disabledReason } : {}),
         actionId: action('pin:' + c.id, {
           command: c.id,
-          ...(navigationCommands.has(c.id) ? { navigation: true as const } : {}),
+          ...(navigationCommands.has(c.id) || settingsCommands.has(c.id)
+            ? { navigation: true as const }
+            : {}),
         }),
       })),
       applets: applets.map((e) => ({

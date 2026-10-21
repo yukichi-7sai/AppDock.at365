@@ -110,7 +110,9 @@ import { ShortcutDispatcher } from './core/shortcut-dispatcher';
 import { GestureManager, type GestureInvocation, type ShortcutPress } from './core/gestures';
 import { initializeGestureDefaults } from '../shared/gestures';
 import { normalizeShortcut } from '../shared/commands';
-import { hostCommands, shortcutFromEvent } from '../shared/commands';
+import { hostCommands, hostCommandsForApplets, shortcutFromEvent } from '../shared/commands';
+import { settingsPageCommands } from '../shared/settings-navigation';
+import { updateCommands } from '../shared/update-commands';
 import { AppletManagement } from './core/applet-management';
 import {
   appletManagementCommands,
@@ -847,7 +849,7 @@ const customCommands = new CustomCommandService({
   save: (value, revision) => commitSettings(prepareSettings(value), revision),
   providers: () => manager?.customCommandProviders() ?? [],
   reservedIds: () => [
-    ...hostCommands.map((c) => c.id),
+    ...hostCommandsForApplets(manager ? allApplets() : []).map((c) => c.id),
     ...(manager?.snapshot() ?? []).flatMap((a) => a.commands.map((c) => c.id)),
   ],
   authorized: (context) => {
@@ -1281,7 +1283,7 @@ function executeShellCommand(provider: string, command: string) {
 const knownSettingsCommands = new Map<string, ReturnType<typeof uiCommands>[number]>();
 function uiCommands(): import('../shared/commands').UiCommand[] {
   const commands = [
-    ...hostCommands.map((c) => ({ ...c, extensionId: null })),
+    ...hostCommandsForApplets(allApplets()).map((c) => ({ ...c, extensionId: null })),
     ...customCommands.uiCommands(),
     ...appletManagementCommands(allApplets()),
     ...allApplets().flatMap((e) =>
@@ -1339,10 +1341,27 @@ function openCommandPalette(request: CommandPaletteRequest) {
 }
 async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
-  if (id === 'appdock.ribbon.settings.open') {
+  const settingsPage = settingsPageCommands(allApplets()).find((command) => command.id === id);
+  if (settingsPage) {
     showWindow();
-    await navigation.navigate('settings', 'ribbon');
+    await flushSettingsInputs();
+    const state = settingsEditing.snapshot();
+    await settingsEditing.act({
+      sessionId: state.sessionId,
+      editRevision: state.editRevision,
+      operationId: randomUUID(),
+      action: { type: 'select-page', pageId: settingsPage.pageId },
+    });
+    releaseSettingsView();
+    settingsNavigation.provider = undefined;
+    settingsNavigation.move = undefined;
+    await navigation.navigate('settings');
     return { accepted: true };
+  }
+  const update = updateCommands.find((command) => command.id === id);
+  if (update) {
+    if (!startupReady || !updater) throw Error('AppDockは準備中です。');
+    return update.scope === 'check' ? updater.check() : updater.install(update.scope);
   }
   if (customCommands.has(id)) return customCommands.execute(id, invocation);
   if (id === 'appdock.commands.search') {
@@ -1387,7 +1406,11 @@ function shortcutContext() {
 }
 function availableShortcutCommands() {
   return [
-    ...hostCommands.map((c) => ({ id: c.id, title: c.title, extensionId: null })),
+    ...hostCommandsForApplets(allApplets()).map((c) => ({
+      id: c.id,
+      title: c.title,
+      extensionId: null,
+    })),
     ...customCommands.uiCommands().filter((c) => c.available),
     ...appletManagementCommands(allApplets()).filter((c) => c.available),
     ...allApplets().flatMap((e) =>
@@ -1489,7 +1512,7 @@ let appletApplyGeneration = 0;
 function syncHotKeys(retry = false) {
   if (quitting || !hotKeys) return Promise.resolve();
   const available = [
-    ...hostCommands.map((command) => command.id),
+    ...hostCommandsForApplets(allApplets()).map((command) => command.id),
     ...customCommands
       .uiCommands()
       .filter((c) => c.available)
@@ -2259,13 +2282,21 @@ function settingsPageActions(
       await updater.check([selected ?? 'host']);
       return updater.state.results.find((r) => r.id === (selected ?? 'host'));
     };
-    actions.checkAllUpdates = async () => updater.check();
+    actions.checkAllUpdates = async () => executeCommand('appdock.updates.check');
+    if (page.id === 'about')
+      for (const command of updateCommands)
+        actions[`settingAction:${command.id}`] = async () => executeCommand(command.id);
     if (page.id === 'applets')
       actions.checkAppletUpdates = async () =>
         updater.check(managedApplets(allApplets()).map((a) => a.id));
     actions.cancelUpdates = async () => updater.cancel();
     actions.installUpdates = async ([id]) => {
-      return updater.install(target(id, true)!);
+      const scope = target(id, true)!;
+      return scope === 'all' || scope === 'host'
+        ? executeCommand(
+            scope === 'all' ? 'appdock.updates.installAll' : 'appdock.updates.installHost',
+          )
+        : updater.install(scope);
     };
     actions.openReleases = async ([id]) => {
       const selected = target(id);
@@ -2594,14 +2625,18 @@ function registerIpc() {
     return updater.state.results.find((result) => result.id === (id ?? 'host'))!;
   });
   handle('dock:cancelUpdates', () => updater.cancel());
-  handle('dock:checkAllUpdates', () => updater.check());
+  handle('dock:checkAllUpdates', () => executeCommand('appdock.updates.check'));
   handle('dock:installUpdates', (target: string) => {
     if (
       typeof target !== 'string' ||
       (target !== 'all' && target !== 'host' && target !== 'applets' && !manager.items.has(target))
     )
       throw Error('更新対象が正しくありません。');
-    return updater.install(target);
+    return target === 'all' || target === 'host'
+      ? executeCommand(
+          target === 'all' ? 'appdock.updates.installAll' : 'appdock.updates.installHost',
+        )
+      : updater.install(target);
   });
   handle('dock:openReleases', (id?: string) => {
     updateTarget(id);
@@ -2878,6 +2913,22 @@ async function initialize() {
           title: '更新処理に失敗しました',
           code: 'UPDATE_OPERATION_FAILED',
           message,
+        });
+      } else if (notice.kind === 'available') {
+        typedNotifications!.publish({ ownerKind: 'host', ownerId: 'updates' }, 'available', {
+          level: 'info',
+          title: '更新のお知らせ',
+          body: message,
+          historyText: { title: '更新があります', body: message },
+          windowsSilent: true,
+          windowsClickAction: 'details',
+          actions: [
+            {
+              key: 'details',
+              label: '更新画面を開く',
+              run: () => executeCommand('appdock.updates.open'),
+            },
+          ],
         });
       } else {
         information.report('updates', '更新のお知らせ', message, notice.id, [

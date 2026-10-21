@@ -392,7 +392,7 @@ test('command policy uses provider declarations, projects details and never acti
   const legacy = make('at365.gmail', 'node', ['at365.gmail.open']);
   const input = [native, web, impostor, legacy];
   const catalog = automationCommands(input);
-  assert.equal(catalog.length, 11);
+  assert.equal(catalog.length, automationCommands([]).length + input.length + 4);
   assert(catalog.some((c) => c.id === 'appdock.ribbon.settings.open' && c.available));
   assert.ok(
     !catalog.some(

@@ -87,8 +87,11 @@ export function VersionCheck({
           onClick={() => {
             setError('');
             setBusy(true);
-            void settingsControls
-              .installUpdates(id ?? 'host')
+            void (
+              id
+                ? settingsControls.installUpdates(id)
+                : settingsControls.executeCommand('appdock.updates.installHost')
+            )
               .catch((error) => setError(updateError(error)))
               .finally(() => setBusy(false));
           }}
