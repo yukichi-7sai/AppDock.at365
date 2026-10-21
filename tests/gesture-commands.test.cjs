@@ -79,8 +79,31 @@ test('gesture read is scoped and lists assignable commands while stopped', (t) =
   assert.ok(!value.assignableCommands.some((c) => c.id.endsWith('.update')));
   assert.equal(JSON.stringify(value).includes('SECRET'), false);
   assert.equal(value.settings.host, undefined);
-  assert.equal(value.gestureTypes.length, 8);
+  assert.equal(value.gestureTypes.length, 20);
   assert.throws(() => f.api.call('gestures.get', { unknown: true }), { code: 'INVALID_ARGUMENT' });
+});
+
+test('two-step movements are discoverable, save atomically and survive reload without changing existing bindings', async (t) => {
+  const f = fixture(t);
+  const old = structuredClone(f.get().bindings);
+  const pairs = f.get().gestureTypes.filter((g) => /^move-[a-z]+-[a-z]+$/.test(g.id));
+  assert.equal(pairs.length, 12);
+  const additions = pairs.map(({ id }) => ({
+    kind: 'add',
+    binding: binding(id, 'sample.run', id),
+  }));
+  await f.edit(additions);
+  assert.deepEqual(f.get().bindings, [...old, ...additions.map((op) => op.binding)]);
+  f.settings.load();
+  assert.deepEqual(f.get().bindings, [...old, ...additions.map((op) => op.binding)]);
+  const bytes = fs.readFileSync(f.settings.file, 'utf8');
+  for (const gesture of ['move-up-up', 'move-up-down-left']) {
+    await assert.rejects(
+      () => f.edit([{ kind: 'add', binding: binding('invalid', 'sample.run', gesture) }]),
+      { code: 'INVALID_ARGUMENT' },
+    );
+    assert.equal(fs.readFileSync(f.settings.file, 'utf8'), bytes);
+  }
 });
 test('gesture page targets share discovery and reject undeclared pages atomically', async (t) => {
   const f = fixture(t);

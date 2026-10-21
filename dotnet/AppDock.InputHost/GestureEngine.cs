@@ -27,7 +27,11 @@ internal sealed class GestureEngine : IDisposable
     private GesturePoint origin, checkpoint;
     private GesturePoint monitorCenter;
     private PendingStart? starting;
-    private GestureDirection? direction;
+    private readonly List<GestureDirection> directions = new(2);
+    private string previewGesture = "";
+    private nint activationTarget;
+    private long invokedAt;
+    private bool activationUsed;
     private string process = "", session = "";
     private bool ready, cancelled, otherMode, busy, disposed;
     private readonly HashSet<uint> clicks = [], keys = [];
@@ -50,6 +54,10 @@ internal sealed class GestureEngine : IDisposable
     }
     internal void Configure(Configuration next)
     {
+        // A show command may move focus to the host while its invocation is still completing.
+        // Keep only that command alive across focus-only synchronization.
+        if (busy && activationTarget != 0 && next.Enabled && next.SettingsKey.Length > 0 &&
+            next.SettingsKey == config?.SettingsKey) { config = next; ReleaseHooksIfIdle(); return; }
         // A focus synchronization requested by this press may update its conditions while starting.
         // Actual settings/command changes still cancel, as do all later context changes.
         if (starting != null && next.Enabled && next.ActivateOnStart && next.SettingsKey.Length > 0 &&
@@ -64,7 +72,27 @@ internal sealed class GestureEngine : IDisposable
         HooksChanged?.Invoke();
     }
     private bool Current => target != 0 && GetForegroundWindow() == target && IsWindowVisible(target);
-    internal bool Valid(string id,string window) => id==session && target.ToInt64().ToString()==window && Current && !cancelled && lifetime is {IsCancellationRequested:false};
+    internal bool Valid(string id,string window) => activationTarget == 0 && id==session && target.ToInt64().ToString()==window && Current && !cancelled && lifetime is {IsCancellationRequested:false};
+    private bool IntentionalForeground => busy && activationTarget != 0 &&
+        (GetForegroundWindow() == activationTarget || GetForegroundWindow() == 0);
+    internal (nint Source, uint Process)? ClaimActivation(string id, string source, nint destination)
+    {
+        if (!busy || Environment.TickCount64-invokedAt > 1500 || !Valid(id,source) ||
+            config is not {HostProcessId:>0}) return null;
+        GetWindowThreadProcessId(destination,out var owner);
+        if (owner != config.HostProcessId) return null;
+        activationTarget = destination;
+        activationUsed = false;
+        return (target, owner);
+    }
+    internal (nint Source, uint Process)? ConsumeActivation(string id, string source, nint destination)
+    {
+        if (!busy || cancelled || lifetime is not {IsCancellationRequested:false} || activationUsed ||
+            Environment.TickCount64-invokedAt > 1500 || id != session || target.ToInt64().ToString() != source ||
+            destination != activationTarget || (!Current && !IntentionalForeground) || !IsWindowVisible(destination)) return null;
+        activationUsed = true;
+        return (target, config!.HostProcessId);
+    }
     private bool OnTarget(GesturePoint p) => GestureTarget.Matches(target, GestureTarget.At(p));
     private Binding[] MatchingRows(nint window, bool includeInactive = false)
     {
@@ -101,7 +129,7 @@ internal sealed class GestureEngine : IDisposable
         candidates = MatchingRows(target, preparing && config.ActivateOnStart && hostWindow);
         if (candidates.Length == 0) return;
         CancelPending(); lifetime = new(); session = Guid.NewGuid().ToString("N");
-        origin = checkpoint = p; direction=null; cancelled=false; otherMode=false;
+        origin = checkpoint = p; directions.Clear(); previewGesture=""; activationTarget=0; cancelled=false; otherMode=false;
         monitorCenter = GestureTarget.MonitorCenter(p);
         wheelDelta=0; wheelStarted=false; lastWheel=0; ready=true; timer.Start();
         if (preparing) {
@@ -177,7 +205,7 @@ internal sealed class GestureEngine : IDisposable
             if ((message is 0x202 or 0x208) && clicks.Remove(message)) { ReleaseHooksIfIdle(); return 1; }
             if (message == 0x204 && !ready) { if (starting != null) StopStart(true); Begin(input.Point); if (ready) return 1; }
             else if (ready || starting != null) {
-                if (starting is { } pending ? !StartCurrent(pending) : !Current) { cancelled=true; StopStart(false); CancelPending(); }
+                if (starting is { } pending ? !StartCurrent(pending) : !Current && !IntentionalForeground) { cancelled=true; StopStart(false); CancelPending(); }
                 if (!otherMode && message is 0x200 or 0x205) Move(input.Point);
                 if (message is 0x201 or 0x207) {
                     var gesture = message == 0x201 ? "click-left" : "click-middle";
@@ -244,9 +272,11 @@ internal sealed class GestureEngine : IDisposable
             p.X < checkpoint.X-d ? GestureDirection.Left : p.X > checkpoint.X+d ? GestureDirection.Right : null;
         if (next == null) return;
         checkpoint=p;
-        if (direction != null && direction != next) { cancelled=true; CancelPending(); indicator?.Hide(); return; }
-        direction=next;
+        if (directions.Count > 0 && directions[^1] == next) return;
+        if (directions.Count == 2) { cancelled=true; CancelPending(); indicator?.Hide(); return; }
+        directions.Add(next.Value);
     }
+    private string MovementGesture => "move-"+string.Join("-",directions.Select(d=>d.ToString().ToLowerInvariant()));
     private void Tick()
     {
         if (starting is { } pending) {
@@ -256,19 +286,21 @@ internal sealed class GestureEngine : IDisposable
             return;
         }
         if (!ready && !busy) {timer.Stop();return;}
-        if (!Current) { cancelled=true; CancelPending(); }
+        if (!Current && !IntentionalForeground) { cancelled=true; CancelPending(); }
         if (lastWheel != 0 && Environment.TickCount64-lastWheel >= 100) CancelPending();
         if (!ready) return;
         if (!otherMode && GetCursorPos(out var point)) Move(point);
-        if (cancelled || otherMode || direction == null || config!.IndicatorPosition == "none") { indicator?.Hide(); return; }
-        if (indicator.IsVisible) return;
-        var titles = SelectedRows("move-"+direction.ToString()!.ToLowerInvariant()).Select(r=>r.Title).ToArray();
+        if (cancelled || otherMode || directions.Count == 0 || config!.IndicatorPosition == "none") { indicator?.Hide(); return; }
+        var gesture = MovementGesture;
+        if (indicator.IsVisible && previewGesture == gesture) return;
+        var titles = SelectedRows(gesture).Select(r=>r.Title).ToArray();
         if (titles.Length == 0 && !config.IndicatorShowNoAction) { indicator.Hide(); return; }
         var caption = string.Join("\n",titles.Take(3)) + (titles.Length>3 ? $"\nほか {titles.Length-3} 件" : "");
         var center = origin;
         if (config!.IndicatorPosition == "monitor-center" || config.IndicatorPosition == "window-center" && GestureTarget.IsDesktop(target)) center = monitorCenter;
         else if (config.IndicatorPosition == "window-center" && GetWindowRect(target,out var rect)) center=new((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
-        indicator.Display(center,process+".exe",direction.Value,caption.Length==0?"アクション無し":caption,config.IndicatorOpacity);
+        previewGesture = gesture;
+        indicator.Display(center,process+".exe",string.Concat(directions.Select(d=>GestureConfiguration.Marks[(int)d])),caption.Length==0?"アクション無し":caption,config.IndicatorOpacity);
     }
     private void Wheel(int delta)
     {
@@ -298,12 +330,13 @@ internal sealed class GestureEngine : IDisposable
                 for (var i=0;i<repeats;i++) {
                     if (token.IsCancellationRequested || disposed || !Current || (!released && !ready) ||
                         (wheel && Environment.TickCount64-lastWheel>=100)) break;
+                    invokedAt = Environment.TickCount64;
                     await Invoke!(new {session=capturedSession, window=capturedTarget, process,
                         gesture, rowIds=rows.Select(r=>r.Id).ToArray(), context=capturedConfig.Context, revision=capturedConfig.Revision});
                     if (config!.WheelDelayMs>0) break;
                 }
             } catch (Exception e) { Console.Error.WriteLine(e.Message); }
-            finally { busy=false; }
+            finally { busy=false; activationTarget=0; }
         }));
         return true;
     }
@@ -316,10 +349,10 @@ internal sealed class GestureEngine : IDisposable
     }
     private void Release(GesturePoint point)
     {
-        var replay=!otherMode && !cancelled && direction==null;
-        var stroke=!otherMode && !cancelled && direction!=null;
-        if (stroke) Run("move-"+direction.ToString()!.ToLowerInvariant(),released:true);
-        else CancelPending();
+        var replay=!otherMode && !cancelled && directions.Count==0;
+        var stroke=!otherMode && !cancelled && directions.Count>0;
+        if (stroke) Run(MovementGesture,released:true);
+        else if (activationTarget == 0) CancelPending();
         ready=false; if (!busy) timer.Stop(); indicator?.Hide();
         if (starting is { } pending) {
             pending.Released = true; pending.Replay = replay; pending.ReleasePoint = point; timer.Start();

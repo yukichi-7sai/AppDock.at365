@@ -5,11 +5,22 @@ import { matchesWhen, type ShortcutContext, type ShortcutScope } from './keybind
 import { validShortcutTarget } from './shortcut-pages';
 import type { Settings } from './contracts';
 
+export const moveDirections = [
+  ['up', '↑ 上'],
+  ['down', '↓ 下'],
+  ['left', '← 左'],
+  ['right', '→ 右'],
+] as const;
 export const gestureTypes = [
-  ['move-up', '↑ 上'],
-  ['move-down', '↓ 下'],
-  ['move-left', '← 左'],
-  ['move-right', '→ 右'],
+  ...moveDirections.map(([id, label]) => [`move-${id}`, label] as const),
+  ...moveDirections.flatMap(([first, firstLabel]) =>
+    moveDirections
+      .filter(([second]) => second !== first)
+      .map(
+        ([second, secondLabel]) =>
+          [`move-${first}-${second}`, `${firstLabel} → ${secondLabel}`] as const,
+      ),
+  ),
   ['click-left', '左クリック'],
   ['click-middle', '中クリック'],
   ['wheel-up', 'ホイール上'],

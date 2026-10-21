@@ -10,6 +10,7 @@ const {
   applyGestureBinding,
   applyGestureOrder,
   gestureConditionLabel,
+  gestureTitle,
 } = require('../out/main/shared/gestures');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { ShortcutDispatcher } = require('../out/main/main/core/shortcut-dispatcher');
@@ -20,6 +21,34 @@ const row = (id, scope = 'global', command = 'test.run') => ({
   gesture: 'move-left',
   enabled: true,
   when: { scope, appletIds: [], processes: [] },
+});
+
+test('two-step movements preserve legacy bindings, reject invalid paths and keep separate execution groups', () => {
+  const legacy = row('legacy');
+  const pairs = ['up', 'down', 'left', 'right'].flatMap((first) =>
+    ['up', 'down', 'left', 'right']
+      .filter((second) => first !== second)
+      .map((second) => ({ ...row(`${first}-${second}`), gesture: `move-${first}-${second}` })),
+  );
+  const settings = { ...defaultGestures(), bindings: [legacy, ...pairs] };
+  assert.deepEqual(
+    parseSettings({ ...createDefaultSettings(), gestures: settings }).gestures,
+    settings,
+  );
+  assert.deepEqual(
+    groupGestureBindings(settings.bindings).map((g) => g.gesture),
+    ['move-left', ...pairs.map((r) => r.gesture)],
+  );
+  assert.equal(gestureTitle('move-right-up'), '→ 右 → ↑ 上');
+  assert.equal(gestureTitle('move-up-down'), '↑ 上 → ↓ 下');
+  for (const gesture of [
+    'move-up-up',
+    'move-up-down-left',
+    'move-right-diagonal',
+    'move-up-',
+    'move-',
+  ])
+    assert.throws(() => parseGestures({ ...settings, bindings: [{ ...legacy, gesture }] }));
 });
 
 test('no-action preview defaults on for old settings and preserves an explicit off value', () => {
@@ -115,6 +144,58 @@ test('activation preparation synchronizes the new focus and refuses recording or
   state.recording = true;
   assert.equal(await manager.event('gestures.prepare', { window: '123', hostWindow: true }), false);
   assert.equal(synced, 1);
+});
+
+test('gesture foreground transfer prepares before showing and only activates a live invocation', async () => {
+  const manager = new InputCaptureManager(
+    'unused',
+    () => ({}),
+    {},
+    async () => {},
+    () => {},
+    () => {},
+    {},
+  );
+  const events = [];
+  manager.peer = {
+    closed: false,
+    request: async (method, params) => {
+      events.push([method, params]);
+      return true;
+    },
+  };
+  const invocation = { session: 'live', window: '100' };
+  assert.equal(await manager.activateGesture(invocation, '200', () => events.push('show')), false);
+  assert.deepEqual(events, ['show']);
+  events.length = 0;
+  const controller = new AbortController();
+  manager.active.set('live', controller);
+  assert.equal(await manager.activateGesture(invocation, '100', () => events.push('show')), false);
+  assert.deepEqual(events, ['show']);
+  events.length = 0;
+  assert.equal(await manager.activateGesture(invocation, '200', () => events.push('show')), true);
+  assert.deepEqual(events, [
+    ['gestures.prepareActivation', { session: 'live', source: '100', window: '200' }],
+    'show',
+    ['gestures.activate', { session: 'live', source: '100', window: '200' }],
+  ]);
+  events.length = 0;
+  manager.peer.request = async () => false;
+  assert.equal(await manager.activateGesture(invocation, '200', () => events.push('show')), false);
+  assert.deepEqual(events, ['show']);
+  events.length = 0;
+  manager.peer.request = async () => {
+    throw Error('disconnected');
+  };
+  await assert.rejects(
+    manager.activateGesture(invocation, '200', () => events.push('show')),
+    /disconnected/,
+  );
+  assert.deepEqual(events, ['show']);
+  controller.abort();
+  events.length = 0;
+  assert.equal(await manager.activateGesture(invocation, '200', () => events.push('show')), false);
+  assert.deepEqual(events, ['show']);
 });
 
 test('native foreground replaces stale Electron focus before activation preparation', async () => {

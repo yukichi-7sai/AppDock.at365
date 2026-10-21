@@ -51,7 +51,12 @@ internal static partial class Program
                     releaseBlocker();Thread.Sleep(40);
                     Cursor.Position=new(Cursor.Position.X-85,Cursor.Position.Y);Thread.Sleep(60);Mouse(0x800,120);
                 }
-                if(action=="move-left")Cursor.Position=new(Cursor.Position.X-85,Cursor.Position.Y);
+                if(action.StartsWith("move-")) {
+                    foreach(var direction in action[5..].Split('-')) {
+                        var offset=direction switch {"up"=>new System.Drawing.Point(0,-85),"down"=>new(0,85),"left"=>new(-85,0),"right"=>new(85,0),_=>throw new Exception("Unknown move direction: "+direction)};
+                        Cursor.Position=new(Cursor.Position.X+offset.X,Cursor.Position.Y+offset.Y);Pause(60);
+                    }
+                }
                 else if(action=="key:A"){Key(0x41);Thread.Sleep(80);Key(0x41,true);}
                 else if(action=="key:Ctrl+A"){Key(0x11);Thread.Sleep(20);Key(0x41);Thread.Sleep(80);Key(0x41,true);Key(0x11,true);}
                 else if(action=="click-left"){Mouse(2);Thread.Sleep(80);Mouse(4);}
@@ -75,6 +80,7 @@ internal static partial class Program
         var errors=child.StandardError.ReadToEndAsync();
         await using var peer=new JsonRpcConnection(child.StandardOutput,child.StandardInput);
         var invocations=new List<string>();var selections=new List<string[]>();var cancellations=0;var delay=0;
+        Func<JsonElement,Task>? invocationAction=null;
         var reading=peer.ReadAsync(async(method,p)=>{
             if(method=="gestures.prepare") return true;
             if(method=="gestures.cancel"){Interlocked.Increment(ref cancellations);return null;}
@@ -84,14 +90,19 @@ internal static partial class Program
                 selections.Add(p.GetProperty("rowIds").EnumerateArray().Select(r=>r.GetString()!).ToArray());
             }
             if(delay>0)await Task.Delay(delay);
+            if(invocationAction!=null)await invocationAction(p);
             return null;
         });
         int Count(){lock(invocations)return invocations.Count;}
         string[] LastRows(){lock(invocations)return selections[^1];}
         async Task Sync(string scope="global",string[]? excluded=null,bool enabled=true,int interval=0,string window="",string mode="all",string position="gesture-start",bool selection=false,
-            bool activate=false,bool excludeDesktop=false,string? processOverride=null,bool? showNoAction=null,bool unmatched=false){
-            var triggers=new[]{"move-up","move-down","move-left","move-right","click-left","click-middle","wheel-up","wheel-down","key:A","key:Ctrl+A"};
+            bool activate=false,bool excludeDesktop=false,string? processOverride=null,bool? showNoAction=null,bool unmatched=false,string[]? onlyTriggers=null,bool handoff=false,string context="test"){
+            var directions=new[]{"up","down","left","right"};
+            var triggers=directions.Select(d=>"move-"+d)
+                .Concat(directions.SelectMany(a=>directions.Where(b=>a!=b).Select(b=>$"move-{a}-{b}")))
+                .Concat(new[]{"click-left","click-middle","wheel-up","wheel-down","key:A","key:Ctrl+A"}).ToArray();
             if(unmatched) triggers=["move-left"];
+            if(onlyTriggers!=null) triggers=onlyTriggers;
             var process=processOverride??Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
             object Row(string id,string command,string gesture,string title,string rowScope="global",string rowWindow="",string? exe=null)=>
                 new{id,command,gesture,title,window=rowWindow,when=new{scope=rowScope,appletIds=Array.Empty<string>(),processes=new[]{exe??process},excludeDesktop}};
@@ -102,12 +113,12 @@ internal static partial class Program
                 Row("first-"+g,"test.first",g,"First","exe"),
                 Row("second-"+g,"test.second",g,"Second"),
                 Row("duplicate-"+g,"test.first",g,"Duplicate")}).ToArray();
-            var configuration=JsonSerializer.SerializeToNode(new{enabled,browsers=new[]{process},excludedProcesses=excluded??[],requireChromiumWindowClass=false,distance=30,wheelDelayMs=interval,executionMode=mode,indicatorOpacity=.45,indicatorPosition=position,activateOnStart=activate,hostProcessId=activate?Environment.ProcessId:0,context="test",revision=1,rows})!;
+            var configuration=JsonSerializer.SerializeToNode(new{enabled,browsers=new[]{process},excludedProcesses=excluded??[],requireChromiumWindowClass=false,distance=30,wheelDelayMs=interval,executionMode=mode,indicatorOpacity=.45,indicatorPosition=position,activateOnStart=activate,hostProcessId=activate||handoff?Environment.ProcessId:0,context,revision=1,rows,settingsKey=handoff?new string('a',64):""})!;
             if(showNoAction.HasValue) configuration["indicatorShowNoAction"]=showNoAction.Value;
             await peer.RequestAsync("gestures.sync",configuration,CancellationToken.None);
             await Task.Delay(70);
         }
-        async Task Begin(){FocusTarget(form);await Task.Delay(80);if(GetForegroundWindow()!=form.Handle)throw new Exception("Gesture fixture did not become foreground.");Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
+        async Task Begin(){var deadline=Environment.TickCount64+2000;do{FocusTarget(form);await Task.Delay(80);}while(GetForegroundWindow()!=form.Handle&&Environment.TickCount64<deadline);if(GetForegroundWindow()!=form.Handle)throw new Exception("Gesture fixture did not become foreground.");Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
         async Task End(){Mouse(16);await Task.Delay(150);}
         void Check(bool condition,string name){Console.WriteLine((condition?"PASS ":"FAIL ")+name);if(!condition)failures++;}
         try{
@@ -128,6 +139,33 @@ internal static partial class Program
             string IndicatorCaption(nint window)=>string.Join("|",AutomationElement.FromHandle(window)
                 .FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text))
                 .Cast<AutomationElement>().Select(e=>e.Current.Name));
+            async Task Step(string direction,int distance=80) {
+                var offset=direction switch {"up"=>new System.Drawing.Point(0,-distance),"down"=>new(0,distance),"left"=>new(-distance,0),_=>new(distance,0)};
+                Cursor.Position=new(Cursor.Position.X+offset.X,Cursor.Position.Y+offset.Y);await Task.Delay(60);
+            }
+            var moveNames=new[]{"up","down","left","right"};
+            var marks=new Dictionary<string,string>{{"up","⬆️"},{"down","⬇️"},{"left","⬅️"},{"right","➡️"}};
+            foreach(var first in moveNames) foreach(var second in moveNames.Where(d=>d!=first)) {
+                n=Count();await Begin();await Step(first);
+                Check(Count()==n,$"{first}-{second} first stage waits for release");
+                await Step(second);
+                var previewDeadline=Environment.TickCount64+1000;
+                while((VisibleIndicator()==0||!IndicatorCaption(VisibleIndicator()).Contains($"Test move-{first}-{second}"))&&Environment.TickCount64<previewDeadline)await Task.Delay(20);
+                var preview=VisibleIndicator();
+                Check(preview!=0&&IndicatorCaption(preview).Contains(marks[first]+marks[second]),$"{first}-{second} preview updates both direction marks");
+                Check(Count()==n,$"{first}-{second} second stage waits for release");
+                await End();Check(Count()==n+1&&invocations[^1]==$"move-{first}-{second}",$"{first}-{second} executes only the complete path");
+            }
+            n=Count();await Begin();await Step("right");await Step("right");await Step("up",29);await End();
+            Check(Count()==n+1&&invocations[^1]=="move-right","continued direction and sub-threshold drift stay a single stage");
+            await Sync(onlyTriggers:["move-left"],showNoAction:false);n=Count();right=form.RightUps;
+            await Begin();await Step("left");Check(VisibleIndicator()!=0,"assigned prefix is visible");
+            await Step("up");Check(VisibleIndicator()==0,"unassigned second stage hides the old preview");
+            await End();Check(Count()==n&&form.RightUps==right,"unassigned pair never falls back to the prefix or a right click");
+            await Sync(onlyTriggers:["move-up-down"],showNoAction:false);n=Count();
+            await Begin();await Step("up");Check(VisibleIndicator()==0,"unassigned prefix stays hidden");
+            await Step("down");Check(VisibleIndicator()!=0,"assigned pair appears after an unassigned prefix");
+            await End();Check(Count()==n+1&&invocations[^1]=="move-up-down","pair-only binding executes after reversal");
             foreach(bool? showNoAction in new bool?[]{null,true,false}){
                 await Sync(showNoAction:showNoAction,unmatched:true);n=Count();right=form.RightUps;
                 await Begin();Cursor.Position=new(Cursor.Position.X+80,Cursor.Position.Y);
@@ -154,6 +192,9 @@ internal static partial class Program
                 await End();
                 var expected=mode=="first"?new[]{"first-move-left"}:new[]{"first-move-left","second-move-left"};
                 Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" stroke uses conditions, saved order and command deduplication");
+                n=Count();await Begin();await Step("right");await Step("up");await End();
+                expected=mode=="first"?new[]{"first-move-right-up"}:new[]{"first-move-right-up","second-move-right-up"};
+                Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" two-step uses conditions, saved order and command deduplication");
                 foreach(var gesture in new[]{"click-left","click-middle","wheel-up","key:A"}){
                     n=Count();await Begin();
                     if(gesture=="click-left"){Mouse(2);await Task.Delay(60);Mouse(4);}
@@ -270,7 +311,7 @@ internal static partial class Program
             Check(Count()==n,"captured button release does not start a gesture mid-press");
             n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(70);await End();
             Check(Count()==n+1 && invocations[^1]=="move-left","plain right gesture resumes after blockers are released");
-            n=Count();await Begin();Cursor.Position=new(Cursor.Position.X-80,Cursor.Position.Y);await Task.Delay(30);Cursor.Position=new(Cursor.Position.X,Cursor.Position.Y-80);await Task.Delay(40);await End();Check(Count()==n,"direction change cancels");
+            n=Count();right=form.RightUps;await Begin();await Step("left");await Step("up");await Step("right");await Step("left");await End();Check(Count()==n&&form.RightUps==right,"third direction cancels until release without replay or fallback");
             n=Count();var left=form.LeftUps;await Begin();Mouse(2);await Task.Delay(100);await End();Mouse(4);await Task.Delay(60);Check(Count()==n+1 && form.LeftUps==left,"left click and release after right are consumed");
             n=Count();await Begin();Mouse(0x20);await Task.Delay(80);Mouse(0x40);await End();Check(Count()==n+1 && invocations[^1]=="click-middle","middle click");
             n=Count();var key=form.Keys;await Begin();Key(0x41);Key(0x41);await Task.Delay(80);await End();Key(0x41,true);await Task.Delay(50);Check(Count()==n+1 && form.Keys==key,"key repeat and paired key-up consumed");
@@ -285,9 +326,46 @@ internal static partial class Program
             await Sync(window:"1");n=Count();await Begin();Mouse(0x800,120);await End();Check(Count()==n,"wrong host window never captures");
             await Sync();n=Count();await Begin();using(var other=new Probe()){other.Show();other.Activate();SetForegroundWindow(other.Handle);await Task.Delay(80);Mouse(0x800,120);await End();}Check(Count()==n,"foreground change cancels");
             Check(cancellations>0,"session cancellation notifications");
+            using var destination=new Probe{Text="AppDock foreground destination",Inactive=true};
+            using var unrelated=new Probe{Text="AppDock unrelated foreground"};
+            destination.Show();destination.Hide();
+            foreach(var scenario in new[]{"normal","external-change","expired"}) {
+                await Sync(handoff:true);var completion=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                invocationAction=async p=>{
+                    try {
+                        var id=p.GetProperty("session").GetString()!;var source=p.GetProperty("window").GetString()!;
+                        object Request(string session,string from,nint to)=>new{session,source=from,window=to.ToString()};
+                        async Task<bool> Prepare(string session,string from,nint to)=>(await peer.RequestAsync("gestures.prepareActivation",Request(session,from,to),CancellationToken.None)).GetBoolean();
+                        async Task<bool> Activate()=>(await peer.RequestAsync("gestures.activate",Request(id,source,destination.Handle),CancellationToken.None)).GetBoolean();
+                        if(scenario=="expired") {await Task.Delay(1550);Check(!await Prepare(id,source,destination.Handle),"expired gesture cannot claim foreground transfer");return;}
+                        Check(!await Prepare("invalid",source,destination.Handle),"unknown gesture cannot claim foreground transfer");
+                        Check(!await Prepare(id,"1",destination.Handle),"wrong start HWND cannot claim foreground transfer");
+                        Check(!await Prepare(id,source,GetShellWindow()),"foreign process cannot be the gesture foreground destination");
+                        Check(await Prepare(id,source,destination.Handle),"live gesture prepares its hidden host window");
+                        var cancelledBefore=cancellations;
+                        await form.InvokeAsync(()=>destination.Show());
+                        Check(GetForegroundWindow()==form.Handle,"showing the destination alone preserves source foreground");
+                        Check(await Activate(),"prepared gesture activates its host window");
+                        var foregroundDeadline=Environment.TickCount64+500;
+                        while(GetForegroundWindow()!=destination.Handle&&Environment.TickCount64<foregroundDeadline)await Task.Delay(10);
+                        Check(GetForegroundWindow()==destination.Handle,"foreground transfer changes the actual OS foreground");
+                        Check(!await Activate(),"gesture foreground transfer is single use");
+                        await Sync(handoff:true,context:"after-handoff");await Task.Delay(100);
+                        Check(cancellations==cancelledBefore,"intentional focus and focus-only sync do not cancel the command");
+                        Check(!(await peer.RequestAsync("gestures.valid",new{session=id,window=source},CancellationToken.None)).GetBoolean(),"foreground transfer stops later commands on the old target");
+                        if(scenario=="external-change"){
+                            await form.InvokeAsync(()=>FocusTarget(unrelated));await Task.Delay(100);
+                            Check(cancellations>cancelledBefore,"unrelated foreground change still cancels the command");
+                        }
+                    } catch(Exception error) {completion.TrySetException(error);throw;}
+                    finally {completion.TrySetResult();}
+                };
+                await Begin();await Step("left");await End();await completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                invocationAction=null;destination.Hide();unrelated.Hide();
+            }
         }finally{child.StandardInput.Close();await reading;await child.WaitForExitAsync();Console.Write(await errors);}
     }
-    private sealed class Probe:Form {public int RightDowns,RightUps,LeftUps,Keys;protected override void WndProc(ref Message m){if(m.Msg is 0x204 or 0x206)RightDowns++;if(m.Msg==0x205)RightUps++;if(m.Msg==0x202)LeftUps++;if(m.Msg==0x100)Keys++;base.WndProc(ref m);}}
+    private sealed class Probe:Form {public bool Inactive;protected override bool ShowWithoutActivation=>Inactive;public int RightDowns,RightUps,LeftUps,Keys;protected override void WndProc(ref Message m){if(m.Msg is 0x204 or 0x206)RightDowns++;if(m.Msg==0x205)RightUps++;if(m.Msg==0x202)LeftUps++;if(m.Msg==0x100)Keys++;base.WndProc(ref m);}}
     private sealed class RightButtonProbe : IDisposable
     {
         private readonly MouseCallback callback;

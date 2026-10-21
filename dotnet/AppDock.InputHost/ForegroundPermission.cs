@@ -49,7 +49,11 @@ internal static class ForegroundPermission
         var foreground = GetWindowThreadProcessId(before, out _);
         if (foreground == 0 || foreground == current || !AttachThreadInput(current, foreground, true)) return false;
         var targetAttached = targetThread != current && targetThread != foreground && AttachThreadInput(current, targetThread, true);
-        try { return GetForegroundWindow() == source && SetForegroundWindow(window); }
+        try {
+            if (GetForegroundWindow() != source) return false;
+            BringWindowToTop(window);
+            return GetForegroundWindow() == window || SetForegroundWindow(window);
+        }
         finally {
             if (targetAttached) AttachThreadInput(current, targetThread, false);
             AttachThreadInput(current, foreground, false);
@@ -57,6 +61,7 @@ internal static class ForegroundPermission
     }
     [StructLayout(LayoutKind.Sequential)] private struct Message { public nint Window; public uint Id; public nuint WParam; public nint LParam; public uint Time; public int X,Y; public uint Private; }
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
+    [DllImport("user32.dll")] private static extern bool BringWindowToTop(nint window);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint process);

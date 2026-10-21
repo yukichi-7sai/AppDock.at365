@@ -62,7 +62,7 @@ const fields = {
     minLength: 1,
     maxLength: 84,
     description:
-      'move-up/down/left/right、click-left/middle、wheel-up/down、またはkey:Ctrl+A形式（右ボタンを押しながら入力）',
+      '移動はmove-up/down/left/right、2段階はmove-right-upなど異なる2方向。ほかはclick-left/middle、wheel-up/down、key:Ctrl+A形式（右ボタンを押しながら入力）',
   },
   enabled: { type: 'boolean' },
   when: whenSchema,

@@ -19,11 +19,11 @@ internal partial class GestureIndicator : Window
         // Watch's transparent, topmost, non-activating overlay; also exclude Alt+Tab.
         SetWindowLong(handle, -20, GetWindowLong(handle, -20) | 0x20 | 0x08000000 | 0x80);
     }
-    internal void Display(GesturePoint origin, string process, GestureDirection direction, string caption, double opacity)
+    internal void Display(GesturePoint origin, string process, string gesture, string caption, double opacity)
     {
         Opacity = opacity;
         _textProcessName.Text = process;
-        _textBlockGesture.Text = GestureConfiguration.Marks[(int)direction];
+        _textBlockGesture.Text = gesture;
         _textBlockCaption.Text = caption;
         // Measure while hidden, then position the HWND before its first visible frame.
         var content = (FrameworkElement)Content;

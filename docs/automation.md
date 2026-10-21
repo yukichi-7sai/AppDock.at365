@@ -75,7 +75,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 取得は`gestures.get`（MCP `appdock_get_gestures`）、変更はcommands.executeの`appdock.gestures.update`です。既存のマウスジェスチャー画面・入力処理を使用し、右ボタンを押しながら操作します。
 
-取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは移動4方向・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。scopesはglobal/desktop/app/pages/owner/applets/browser/exeで、desktopはglobalの直下です。assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未確定入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
+取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは1段階移動4方向・2段階移動12種類・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。2段階移動は`move-right-up`や`move-up-down`など異なる2方向を順番に指定します。同方向の重複と3段階以上は拒否します。scopesはglobal/desktop/app/pages/owner/applets/browser/exeで、desktopはglobalの直下です。assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未確定入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
 編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。操作の許可画面のMCP列で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
 

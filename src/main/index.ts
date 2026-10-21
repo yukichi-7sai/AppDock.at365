@@ -1187,8 +1187,26 @@ const changed = () => {
   }, 60);
 };
 const shortcutInvocation = new AsyncLocalStorage<ShortcutPress>();
-function showWindow() {
+async function showWindow(invocation?: InputInvocation) {
   if (window) {
+    if (invocation?.source === 'gesture' && invocation.session && invocation.window && gestures) {
+      const target = window;
+      await gestures
+        .activateGesture(
+          { session: invocation.session, window: invocation.window },
+          target.getNativeWindowHandle().readBigUInt64LE().toString(),
+          () => {
+            if (restoreMaximized) {
+              restoreMaximized = false;
+              target.maximize();
+            }
+            if (target.isMinimized()) target.restore();
+            target.showInactive();
+          },
+        )
+        .catch((error) => log.write('error', 'gestures', String(error)));
+      return;
+    }
     if (restoreMaximized) {
       restoreMaximized = false;
       window.maximize();
@@ -1376,7 +1394,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
   const settingsPage = settingsPageCommands(allApplets()).find((command) => command.id === id);
   if (settingsPage) {
-    showWindow();
+    await showWindow(invocation);
     await flushSettingsInputs();
     const state = settingsEditing.snapshot();
     await settingsEditing.act({
@@ -1398,7 +1416,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
   }
   if (customCommands.has(id)) return customCommands.execute(id, invocation);
   if (id === 'appdock.commands.search') {
-    showWindow();
+    await showWindow(invocation);
     if (overlayHost?.active) overlayHost.cancel('toggle');
     else void openCommandPalette({ requestId: randomUUID(), mode: 'execute' });
     return;
@@ -1416,7 +1434,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
     return;
   }
   if (hostCommands.some((command) => command.id === id)) {
-    showWindow();
+    await showWindow(invocation);
     if (id !== 'appdock.open') window?.webContents.send('dock:hostCommand', id);
     return;
   }

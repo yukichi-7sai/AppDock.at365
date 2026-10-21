@@ -112,6 +112,38 @@ export class InputCaptureManager {
     if (!this.peer || this.peer.closed || this.stopped) return false;
     return !!(await this.peer.request('capture.activate', { pressId, window }));
   }
+  async activateGesture(
+    invocation: Pick<GestureInvocation, 'session' | 'window'>,
+    window: string,
+    show: () => void,
+  ) {
+    const peer = this.peer;
+    const active = this.active.get(invocation.session);
+    if (
+      invocation.window === window ||
+      this.stopped ||
+      this.paused ||
+      !peer ||
+      peer.closed ||
+      !active ||
+      active.signal.aborted
+    ) {
+      show();
+      return false;
+    }
+    const request = {
+      session: invocation.session,
+      source: invocation.window,
+      window,
+    };
+    let prepared: unknown;
+    try {
+      prepared = await peer.request('gestures.prepareActivation', request);
+    } finally {
+      show();
+    }
+    return !!prepared && !!(await peer.request('gestures.activate', request));
+  }
   async activateProcess(pressId: number, processId: number) {
     if (!this.peer || this.peer.closed || this.stopped) return false;
     return !!(await this.peer.request('capture.activateProcess', { pressId, processId }));

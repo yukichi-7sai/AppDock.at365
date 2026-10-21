@@ -261,6 +261,63 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await panel.getByRole('button', { name: 'キャンセル', exact: true }).click();
   checks.push('editing refuses concurrent changes to the same assignment');
 
+  await add('test.gestures.c');
+  await choose('移動');
+  const stages = panel.getByRole('group', { name: '移動の段階', exact: true });
+  await stages.getByRole('button', { name: '2段階移動', exact: true }).click();
+  const firstDirection = panel.getByRole('group', { name: '最初の方向', exact: true });
+  const nextDirection = panel.getByRole('group', { name: '次の方向', exact: true });
+  await firstDirection.getByRole('button', { name: '右', exact: true }).click();
+  await nextDirection.getByRole('button', { name: '上', exact: true }).click();
+  assert(await nextDirection.getByRole('button', { name: '右', exact: true }).isDisabled());
+  await stages.getByRole('button', { name: '1段階移動', exact: true }).click();
+  await stages.getByRole('button', { name: '2段階移動', exact: true }).click();
+  await choose('ホイール', 'ホイール上');
+  await choose('移動');
+  assert.equal(
+    await firstDirection
+      .getByRole('button', { name: '右', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
+  );
+  assert.equal(
+    await nextDirection
+      .getByRole('button', { name: '上', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
+  );
+  await apply(true);
+  await save();
+  const paired = (await saved()).find(
+    (r) => r.command === 'test.gestures.c' && r.gesture === 'move-right-up',
+  );
+  assert(paired);
+  assert.match(await row('test.gestures.c').innerText(), /右.*上/);
+  await row('test.gestures.c')
+    .locator(`[data-binding-id="${paired.id}"] .applet-shortcut-edit`)
+    .click();
+  assert.equal(
+    await nextDirection
+      .getByRole('button', { name: '上', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
+  );
+  await firstDirection.getByRole('button', { name: '上', exact: true }).click();
+  await nextDirection.getByRole('button', { name: '下', exact: true }).click();
+  await apply();
+  await save();
+  assert.equal((await saved()).find((r) => r.id === paired.id).gesture, 'move-up-down');
+  await page.getByRole('button', { name: '実行順…', exact: true }).click();
+  await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('move-up-down');
+  assert.deepEqual(await orderIds(), [paired.id]);
+  await orderPanel.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await menu(paired.id);
+  await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+  await save();
+  checks.push(
+    'two-step add/edit/reversal/order/delete / same direction disabled / selections retained across stages and input families',
+  );
+
   await add('appdock.settings.open');
   assert.equal(await panel.getByLabel('割り当てのいつ・どこで').inputValue(), 'app');
   for (const theme of ['dark', 'light']) {
@@ -274,6 +331,14 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
       const bounds = await panel.boundingBox();
       assert(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.height <= 720);
       await page.screenshot({ path: path.join(profile, `${theme}-${width}-gesture-editor.png`) });
+      await stages.getByRole('button', { name: '2段階移動', exact: true }).click();
+      assert(await panel.evaluate((el) => el.scrollWidth <= el.clientWidth));
+      assert((await panel.boundingBox()).height <= 720);
+      await panel.getByRole('button', { name: '追加', exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: path.join(profile, `${theme}-${width}-gesture-two-step-editor.png`),
+      });
+      await stages.getByRole('button', { name: '1段階移動', exact: true }).click();
     }
   }
   await panel.getByRole('button', { name: 'キャンセル', exact: true }).click();

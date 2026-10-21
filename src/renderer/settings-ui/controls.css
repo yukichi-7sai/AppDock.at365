@@ -3008,6 +3008,13 @@ summary {
 .gesture-choice-wheel {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+.gesture-step-picker {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.gesture-step-picker button {
+  min-height: 40px;
+  padding: 8px;
+}
 .gesture-family-picker button[aria-pressed='true'],
 .gesture-choice-grid button[aria-pressed='true'] {
   color: var(--accent);

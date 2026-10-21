@@ -3,6 +3,7 @@ import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { useState } from 'react';
 import {
   gestureTypes,
+  moveDirections,
   normalizeGesture,
   processNames,
   type GestureBinding,
@@ -19,6 +20,33 @@ const families = [
   { id: 'wheel', title: 'ホイール', icon: '↕' },
   { id: 'key', title: 'キーボード', icon: '⌨' },
 ];
+function MoveDirectionPicker({
+  label,
+  value,
+  disabled,
+  onChoose,
+}: {
+  label: string;
+  value: string;
+  disabled?: string;
+  onChoose(direction: string): void;
+}) {
+  return (
+    <div className="gesture-choice-grid gesture-choice-move" role="group" aria-label={label}>
+      {moveDirections.map(([id, title]) => (
+        <button
+          key={id}
+          aria-pressed={value === id}
+          disabled={disabled === id}
+          onClick={() => onChoose(id)}
+        >
+          <span aria-hidden="true">{title.slice(0, 1)}</span>
+          {title.slice(2)}
+        </button>
+      ))}
+    </div>
+  );
+}
 export function GestureBindingDialog({
   initial,
   title,
@@ -47,10 +75,19 @@ export function GestureBindingDialog({
     key: 'key:',
     [family]: initial.gesture,
   });
+  const initialMove = initial.gesture.startsWith('move-') ? initial.gesture : 'move-up';
+  const [moveChoices, setMoveChoices] = useState<Record<number, string>>({
+    1: 'move-up',
+    2: 'move-up-down',
+    [initialMove.split('-').length - 1]: initialMove,
+  });
+  const movement = choices.move.split('-').slice(1);
   const [processText, setProcessText] = useState(initial.when.processes.join(', '));
   const choose = (gesture: string) => {
     setValue({ ...value, gesture });
     setChoices({ ...choices, [family]: gesture });
+    if (gesture.startsWith('move-'))
+      setMoveChoices({ ...moveChoices, [gesture.split('-').length - 1]: gesture });
   };
   let processes: string[] = [];
   let processError = '';
@@ -121,6 +158,51 @@ export function GestureBindingDialog({
               setError={setError}
               onChange={(key) => choose('key:' + key)}
             />
+          ) : family === 'move' ? (
+            <>
+              <div
+                className="gesture-choice-grid gesture-step-picker"
+                role="group"
+                aria-label="移動の段階"
+              >
+                {[1, 2].map((steps) => (
+                  <button
+                    key={steps}
+                    aria-pressed={movement.length === steps}
+                    onClick={() => choose(moveChoices[steps])}
+                  >
+                    {steps}段階移動
+                  </button>
+                ))}
+              </div>
+              {movement.length === 1 ? (
+                <MoveDirectionPicker
+                  label="ジェスチャーの操作"
+                  value={movement[0]}
+                  onChoose={(direction) => choose('move-' + direction)}
+                />
+              ) : (
+                <>
+                  <span>最初の方向</span>
+                  <MoveDirectionPicker
+                    label="最初の方向"
+                    value={movement[0]}
+                    onChoose={(direction) =>
+                      choose(
+                        `move-${direction}-${direction === movement[1] ? movement[0] : movement[1]}`,
+                      )
+                    }
+                  />
+                  <span>次の方向</span>
+                  <MoveDirectionPicker
+                    label="次の方向"
+                    value={movement[1]}
+                    disabled={movement[0]}
+                    onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
+                  />
+                </>
+              )}
+            </>
           ) : (
             <div
               className={`gesture-choice-grid gesture-choice-${family}`}
@@ -132,15 +214,13 @@ export function GestureBindingDialog({
                 .map(([id, label]) => (
                   <button key={id} aria-pressed={value.gesture === id} onClick={() => choose(id)}>
                     <span aria-hidden="true">
-                      {id.startsWith('move-')
-                        ? label.slice(0, 1)
-                        : id === 'wheel-up'
-                          ? '↑'
-                          : id === 'wheel-down'
-                            ? '↓'
-                            : id === 'click-left'
-                              ? '◧'
-                              : '▣'}
+                      {id === 'wheel-up'
+                        ? '↑'
+                        : id === 'wheel-down'
+                          ? '↓'
+                          : id === 'click-left'
+                            ? '◧'
+                            : '▣'}
                     </span>
                     {label.replace(/^[↑↓←→] /, '')}
                   </button>
@@ -149,7 +229,7 @@ export function GestureBindingDialog({
           )}
           <SettingsHint className="shortcut-capture-hint">
             {family === 'move'
-              ? '右ボタンを離したときに実行。途中で方向を変えるとキャンセルします。'
+              ? '右ボタンを離したときに、動かした順番と一致する操作を実行します。同じ方向の移動は1段階、3方向目へ変えるとキャンセルします。'
               : '右ボタンを押したまま、この操作をしたときに実行します。'}
           </SettingsHint>
           <div className="shortcut-dialog-condition">

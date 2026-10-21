@@ -39,6 +39,8 @@ internal static class Program
                     if (method == "input.cancel") { inputSender.Cancel(p.GetProperty("id").GetString()!); return null; }
                     if (method is "input.sendKeys" or "input.appCommand") return await inputSender.ExecuteAsync(method, p, peer.Lifetime);
                     if (method == "gestures.valid") return await capture.ValidAsync(p.GetProperty("session").GetString()!,p.GetProperty("window").GetString()!);
+                    if (method == "gestures.prepareActivation") return await capture.PrepareGestureActivationAsync(p.GetProperty("session").GetString()!,p.GetProperty("source").GetString()!,p.GetProperty("window").GetString()!);
+                    if (method == "gestures.activate") return await capture.ActivateGestureAsync(p.GetProperty("session").GetString()!,p.GetProperty("source").GetString()!,p.GetProperty("window").GetString()!);
                     if (method == "capture.sync") {
                         var configuration = p.Deserialize<CaptureConfiguration>(JsonRpcConnection.Json) ?? throw new ArgumentException("Missing capture configuration.");
                         return await capture.ConfigureAsync(configuration);

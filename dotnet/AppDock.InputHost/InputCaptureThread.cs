@@ -43,6 +43,20 @@ internal sealed class InputCaptureThread : IDisposable
             !long.TryParse(window, out var target) || !long.TryParse(entry.Press.Window, out var source)) return false;
         return ForegroundPermission.Activate(new nint(target), new nint(source), entry.Press.HostProcessId);
     });
+    internal async Task<bool> PrepareGestureActivationAsync(string session, string source, string window)
+    {
+        if (disposed || !long.TryParse(window,out var destination)) return false;
+        var state = await ready.Task;
+        return await state.Dispatcher.InvokeAsync(() => state.Engine.Gestures.ClaimActivation(session,source,new nint(destination)) != null);
+    }
+    internal async Task<bool> ActivateGestureAsync(string session, string source, string window)
+    {
+        if (disposed || !long.TryParse(window,out var destination)) return false;
+        var state = await ready.Task;
+        var permission = await state.Dispatcher.InvokeAsync(() => state.Engine.Gestures.ConsumeActivation(session,source,new nint(destination)));
+        return permission is { } grant && await Task.Run(() =>
+            ForegroundPermission.Activate(new nint(destination),grant.Source,grant.Process));
+    }
     internal Task<bool> ActivateProcessAsync(long pressId, uint process) => Task.Run(async () => {
         if (disposed || process == 0 || process == uint.MaxValue || !presses.TryRemove(pressId, out var entry) ||
             !long.TryParse(entry.Press.Window, out var source)) return false;

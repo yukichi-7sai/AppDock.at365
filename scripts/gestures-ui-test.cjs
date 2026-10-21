@@ -296,8 +296,18 @@ const checks = [];
           await window.dock.saveSettings(s.settings.value, s.settings.revision);
         }, mode);
         await wait(150);
-        for (const gesture of ['move-left', 'key:A', 'click-left', 'wheel-up']) {
+        for (const gesture of [
+          'move-left',
+          'move-right-up',
+          'move-up-down',
+          'key:A',
+          'click-left',
+          'wheel-up',
+        ]) {
           await save([
+            ...(gesture.split('-').length === 3
+              ? [row('prefix', 'c', 'global', 'move-' + gesture.split('-')[1])]
+              : []),
             row('wrong-owner', 'c', 'owner', gesture),
             row('first', 'a', 'global', gesture),
             row('second', 'b', 'app', gesture),
@@ -317,7 +327,7 @@ const checks = [];
         await window.dock.saveSettings(s.settings.value, s.settings.revision);
       });
       checks.push(
-        'first/all execution with condition skipping, deduplication and hidden indicator for stroke/key/click/wheel',
+        'first/all execution with condition skipping, deduplication, no prefix execution and hidden indicator for single/two-step stroke/key/click/wheel',
       );
       await save([
         row('start-stroke', 'a', 'global'),
