@@ -1,6 +1,11 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { BindingActions } from './BindingActions';
 import type { UiCommand } from '../../shared/commands';
+import {
+  CommandPublication,
+  CommandSettingsLinks,
+  CommandSettingsNavigation,
+} from './CommandSettingsNavigation';
 export type BindingEdit<R> = { row: R; title: string; ownerTitle?: string; adding: boolean };
 export function CommandBindingList<R extends { id: string; command: string; enabled: boolean }>({
   commands,
@@ -32,6 +37,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   renderOrder(row: R, close: () => void): ReactNode;
 }) {
   const [orderKey, setOrderKey] = useState<R | null>(null);
+  const navigation = useContext(CommandSettingsNavigation);
   const [editing, setEditing] = useState<BindingEdit<R> | null>(null);
   const [notice, setNotice] = useState('');
   const root = useRef<HTMLDivElement>(null);
@@ -79,6 +85,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
         <tr>
           <th>コマンド</th>
           <th>割り当て</th>
+          {navigation && <th className="command-settings-heading">移動</th>}
         </tr>
       </thead>
       <tbody>
@@ -88,7 +95,10 @@ export function CommandBindingList<R extends { id: string; command: string; enab
             <tr key={command.id} data-shortcut-command={command.id}>
               <td>
                 <div className="applet-shortcut-command">
-                  <strong>{command.title}</strong>
+                  <strong className="command-title">
+                    {command.title}
+                    <CommandPublication published={command.automation} />
+                  </strong>
                   <button
                     className="applet-shortcut-add"
                     aria-label={`${command.title}に割り当てを追加`}
@@ -161,6 +171,11 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                   <span className="muted">未割り当て</span>
                 )}
               </td>
+              {navigation && (
+                <td className="command-settings-cell">
+                  <CommandSettingsLinks command={command} />
+                </td>
+              )}
             </tr>
           );
         })}

@@ -16,6 +16,10 @@ import { GestureBindingDialog } from './GestureBindingDialog';
 import { GestureOrderDialog } from './GestureOrderDialog';
 import { GestureOptions } from './GestureOptions';
 import { SettingsSection } from '../settings-ui/SettingsSections';
+import {
+  CommandTargetFilter,
+  useCommandSettingsTarget,
+} from '../settings-ui/CommandSettingsNavigation';
 
 export function GesturesEditor({
   settings,
@@ -33,6 +37,7 @@ export function GesturesEditor({
   clearProvider?(): void;
 }) {
   const gestures = settings.gestures ?? defaultGestures();
+  const target = useCommandSettingsTarget();
   const bindings = gestures.bindings;
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -40,7 +45,7 @@ export function GesturesEditor({
   useEffect(() => {
     setFilter('');
     setStatusFilter('all');
-  }, [provider?.request]);
+  }, [provider?.request, target?.request]);
   const change = (patch: Partial<typeof gestures>) =>
     onChange({ ...settings, gestures: { ...gestures, ...patch } });
   const targets = applets
@@ -62,6 +67,7 @@ export function GesturesEditor({
     gestureConditionLabel(row.when, command?.extensionId ? command.extension : undefined, targets);
   const terms = filter.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const visible = catalog.filter((command) => {
+    if (target) return command.id === target.id;
     if (provider && command.extensionId !== provider.id) return false;
     const assigned = bindings.filter((row) => row.command === command.id);
     const text = [
@@ -102,6 +108,7 @@ export function GesturesEditor({
         >
           {provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />}
         </CommandBindingToolbar>
+        <CommandTargetFilter />
         {!gestures.enabled && (
           <p className="settings-help">
             現在、ジェスチャーは無効です。割り当てはそのまま編集できます。

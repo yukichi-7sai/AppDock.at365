@@ -70,7 +70,6 @@
   gap: 20px;
   align-items: start;
 }
-.tray-tree,
 .tray-preview-menu {
   padding: 10px;
   background: var(--panel);
@@ -2491,6 +2490,13 @@ summary {
   background: var(--accent-soft);
 }
 .gesture-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  line-height: 1;
   min-width: 32px;
   font-size: 22px;
   padding: 2px 6px;
@@ -2845,7 +2851,38 @@ summary {
   border-bottom: 0;
 }
 .command-shortcuts .applet-shortcut-overview th:first-child {
-  width: 46%;
+  width: 40%;
+}
+.command-settings-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.shortcut-command-list:has(.command-settings-heading) {
+  overflow-x: auto;
+}
+.applet-shortcut-overview:has(.command-settings-heading) {
+  min-width: 680px;
+}
+.applet-shortcut-overview .command-settings-heading {
+  width: 132px;
+}
+.applet-shortcut-overview .command-settings-cell {
+  vertical-align: middle;
+}
+.command-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.command-publication {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  color: var(--accent);
+}
+.custom-commands-settings .settings-list-actions-heading {
+  text-align: left;
 }
 .shortcut-command-list {
   min-width: 0;

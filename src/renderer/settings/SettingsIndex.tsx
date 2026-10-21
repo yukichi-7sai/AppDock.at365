@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { SettingsPageModel, SettingsPageOperation } from '../../shared/settings-page';
 import { SettingsInput } from '../settings-ui/SettingsInput';
+import { Icon } from '../../shared/ui-icons';
+import { commandSettingsPages } from '../settings-ui/CommandSettingsNavigation';
 
 export function SettingsIndex({
   content,
@@ -31,6 +33,11 @@ export function SettingsIndex({
       onClick={() => act({ kind: 'select', pageId: p.id })}
     >
       <span title={p.title}>{p.title}</span>
+      {commandSettingsPages.find((page) => page.id === p.id) && (
+        <span className="settings-index-icon">
+          <Icon name={commandSettingsPages.find((page) => page.id === p.id)!.icon} />
+        </span>
+      )}
     </button>
   );
   return (

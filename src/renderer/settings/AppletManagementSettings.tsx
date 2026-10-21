@@ -288,8 +288,8 @@ export function AppletManagementSettings({
               </th>
               <th>有効</th>
               <th>状態</th>
-              <th>設定</th>
               <th>操作</th>
+              <th>移動</th>
             </tr>
           </thead>
           <tbody>
@@ -354,33 +354,6 @@ export function AppletManagementSettings({
                     )}
                   </td>
                   <td>
-                    <div
-                      className="applet-management-links"
-                      role="group"
-                      aria-label={`${a.displayName}の設定とログ`}
-                    >
-                      {(
-                        [
-                          ['settings', '設定', 'settings'],
-                          ['shortcuts', 'ショートカット', 'keyboard'],
-                          ['gestures', 'マウスジェスチャー', 'mouse'],
-                          ['logs', 'ログ', 'logs'],
-                        ] satisfies [string, string, IconName][]
-                      ).map(([id, title, icon]) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className="settings-list-icon"
-                          title={title}
-                          aria-label={`${a.displayName}の${title}を開く`}
-                          onClick={() => void move(a.id, id)}
-                        >
-                          <Icon name={icon} />
-                        </button>
-                      ))}
-                    </div>
-                  </td>
-                  <td>
                     <div className="applet-management-actions">
                       <button
                         type="button"
@@ -412,6 +385,33 @@ export function AppletManagementSettings({
                     {management?.packagesAvailable && !mutable && (
                       <small>この配置のファイル操作は利用できません。</small>
                     )}
+                  </td>
+                  <td>
+                    <div
+                      className="applet-management-links"
+                      role="group"
+                      aria-label={`${a.displayName}の設定とログ`}
+                    >
+                      {(
+                        [
+                          ['settings', '設定', 'settings'],
+                          ['shortcuts', 'ショートカット', 'keyboard'],
+                          ['gestures', 'マウスジェスチャー', 'mouse'],
+                          ['logs', 'ログ', 'logs'],
+                        ] satisfies [string, string, IconName][]
+                      ).map(([id, title, icon]) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className="settings-list-icon"
+                          title={title}
+                          aria-label={`${a.displayName}の${title}を開く`}
+                          onClick={() => void move(a.id, id)}
+                        >
+                          <Icon name={icon} />
+                        </button>
+                      ))}
+                    </div>
                   </td>
                 </tr>
               );

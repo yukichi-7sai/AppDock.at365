@@ -307,13 +307,6 @@ export function TraySettings({
             <div className="tray-tree">
               {rows(items)}
               {!items.length && <p className="muted">コマンドやグループを追加できます。</p>}
-              <hr />
-              <div className="tray-fixed">
-                設定…<small>固定</small>
-              </div>
-              <div className="tray-fixed">
-                終了<small>固定</small>
-              </div>
             </div>
             {active && (
               <div className="tray-item-editor" aria-label="選択したメニュー項目">

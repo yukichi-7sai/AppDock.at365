@@ -80,6 +80,8 @@ export function SettingsListTable({
   onToggle,
   onOrder,
   extra,
+  titleExtra,
+  navigation,
   maxItems = 64,
   canAdd = true,
   addInTitle = false,
@@ -94,6 +96,8 @@ export function SettingsListTable({
   onToggle?(index: number): void;
   onOrder(): void;
   extra?(entry: Record<string, unknown>, index: number): ReactNode;
+  titleExtra?(entry: Record<string, unknown>): ReactNode;
+  navigation?(entry: Record<string, unknown>): ReactNode;
   maxItems?: number;
   canAdd?: boolean;
   addInTitle?: boolean;
@@ -155,6 +159,7 @@ export function SettingsListTable({
               ))}
               {view.enabledKey && <th className="settings-list-state">有効</th>}
               <th className="settings-list-actions-heading">操作</th>
+              {navigation && <th className="command-settings-heading">移動</th>}
             </tr>
           </thead>
           <tbody>
@@ -183,8 +188,11 @@ export function SettingsListTable({
                             fallback={legacyIcon}
                           />
                           <div>
-                            <strong>{display(entry, key) || '未設定'}</strong>
-                            {view.descriptionKey && (
+                            <strong className="command-title">
+                              {display(entry, key) || '未設定'}
+                              {titleExtra?.(entry)}
+                            </strong>
+                            {view.descriptionKey && display(entry, view.descriptionKey) && (
                               <small>{display(entry, view.descriptionKey)}</small>
                             )}
                           </div>
@@ -234,6 +242,7 @@ export function SettingsListTable({
                       </button>
                     </div>
                   </td>
+                  {navigation && <td className="command-settings-cell">{navigation(entry)}</td>}
                 </tr>
               );
             })}
@@ -241,7 +250,10 @@ export function SettingsListTable({
               <tr>
                 <td
                   colSpan={
-                    view.columns.length + (view.enabledKey ? 2 : 1) + (view.showIndex ? 1 : 0)
+                    view.columns.length +
+                    (view.enabledKey ? 2 : 1) +
+                    (view.showIndex ? 1 : 0) +
+                    (navigation ? 1 : 0)
                   }
                   className="settings-list-empty"
                 >

@@ -66,6 +66,31 @@ function setup(t) {
     grant: (p) => access.set(p),
   };
 }
+test('internal publication IDs share the external catalog without granting execution', async (t) => {
+  const f = setup(t);
+  f.options.commands = () => [
+    {
+      id: 'test.public',
+      title: 'Published',
+      appletId: null,
+      available: false,
+      unavailableReason: 'stopped',
+      completion: 'handlerReturned',
+    },
+  ];
+  const published = f.api.publishedCommandIds();
+  const listed = await f.call('commands.list');
+  assert.equal(listed.ok, true);
+  assert.deepEqual([...published].sort(), listed.value.commands.map((c) => c.id).sort());
+  assert(published.has('test.public'));
+  f.grant({});
+  assert(f.api.publishedCommandIds().has('test.public'));
+  assert.equal(
+    (await f.call('commands.execute', { id: 'test.public' })).error.code,
+    'API_DISABLED',
+  );
+});
+
 test('Applet grants are default-on, persisted for all Applets, independent of MCP, and revoked immediately', async (t) => {
   const f = setup(t);
   assert.equal((await f.call('system.getInfo')).ok, true);

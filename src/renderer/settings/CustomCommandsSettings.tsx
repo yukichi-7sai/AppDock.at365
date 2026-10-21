@@ -4,6 +4,7 @@ import type { SettingDefinition, Settings } from '../../shared/contracts';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import {
   customItems,
+  customCommandId,
   customCommandVersion,
   type CustomCommandDefinition,
   type CustomCommandDescriptor,
@@ -17,6 +18,13 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { McpCommandFields } from './McpCommandFields';
 import { ProcessCommandFields } from './ProcessCommandFields';
 import { defaultProcessLaunch } from '../../shared/process-launch';
+import type { UiCommand } from '../../shared/commands';
+import {
+  CommandPublication,
+  CommandSettingsLinks,
+  CommandTargetFilter,
+  useCommandSettingsTarget,
+} from '../settings-ui/CommandSettingsNavigation';
 import { ShortcutCaptureField } from '../settings-ui/ShortcutCaptureField';
 
 const list: SettingDefinition = {
@@ -26,14 +34,15 @@ const list: SettingDefinition = {
   itemTitle: 'コマンド',
   fields: [
     { key: 'title', title: '名前', type: 'string' },
-    { key: 'typeTitle', title: '種類・提供元', type: 'string' },
-    { key: 'status', title: '状態', type: 'string' },
-    { key: 'publication', title: '外部公開', type: 'string' },
+    { key: 'typeTitle', title: '種類', type: 'string' },
+    { key: 'providerTitle', title: '提供元', type: 'string' },
+    { key: 'unavailableReason', title: '利用できない理由', type: 'string' },
   ],
   list: {
     idKey: 'id',
     titleKey: 'title',
-    columns: ['title', 'typeTitle', 'status', 'publication'],
+    columns: ['title', 'typeTitle', 'providerTitle'],
+    descriptionKey: 'unavailableReason',
     enabledKey: 'enabled',
   },
 };
@@ -43,14 +52,28 @@ export function CustomCommandsSettings({
   auxiliary,
   invoke,
   busy,
+  commands,
 }: {
   settings: Settings;
   auxiliary?: SettingsPageAuxiliary['customCommands'];
   invoke: Invoke;
   busy: boolean;
+  commands: UiCommand[];
 }) {
   const items = customItems(settings.customCommands),
     types = auxiliary?.types ?? [];
+  const target = useCommandSettingsTarget();
+  const visibleItems = target
+    ? items.filter((item) => customCommandId(item.id) === target.id)
+    : items;
+  const command = (
+    entry: Record<string, unknown>,
+  ): Pick<UiCommand, 'id' | 'title' | 'customDefinitionId' | 'automation'> =>
+    commands.find((c) => c.id === customCommandId(String(entry.id))) ?? {
+      id: customCommandId(String(entry.id)),
+      title: String(entry.title),
+      customDefinitionId: String(entry.id),
+    };
   const supported =
     !settings.customCommands || settings.customCommands.version === customCommandVersion;
   const [error, setError] = useState('');
@@ -74,7 +97,7 @@ export function CustomCommandsSettings({
       revision: auxiliary!.revision,
     });
   return (
-    <div className="settings-sections">
+    <div className="settings-sections custom-commands-settings">
       <SettingsSection
         title="登録済みコマンド"
         hint="種類と固定設定を保存します。保存したコマンドをショートカット、ジェスチャー、トレイに割り当てられます。"
@@ -91,26 +114,25 @@ export function CustomCommandsSettings({
             利用できる種類がありません。種類を提供するAppletを導入すると追加できます。
           </p>
         )}
+        <CommandTargetFilter />
         <SettingsListTable
+          titleExtra={(entry) => <CommandPublication published={command(entry).automation} />}
+          navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
           addInTitle
           definition={list}
           maxItems={256}
-          canAdd={types.length > 0}
-          entries={items.map((item) => ({
+          canAdd={types.length > 0 && items.length < 256}
+          entries={visibleItems.map((item) => ({
             ...item,
-            typeTitle:
-              (types.find((t) => t.id === item.typeId)?.title ?? item.typeId) +
-              ' / ' +
-              (item.owner.kind === 'host' ? 'AppDock' : item.owner.id),
-            status:
-              auxiliary?.summaries.find((s) => s.id === item.id)?.unavailableReason ??
-              '利用できます',
-            publication: item.automation ? 'ON' : 'OFF',
+            typeTitle: types.find((t) => t.id === item.typeId)?.title ?? item.typeId,
+            providerTitle: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
+            unavailableReason:
+              auxiliary?.summaries.find((s) => s.id === item.id)?.unavailableReason ?? '',
           }))}
           busy={busy || !supported || !auxiliary}
           onAdd={() => open('edit', null)}
-          onEdit={(i) => open('edit', items[i])}
-          onDelete={(i) => open('delete', items[i])}
+          onEdit={(i) => open('edit', visibleItems[i])}
+          onDelete={(i) => open('delete', visibleItems[i])}
           onOrder={() =>
             setDialog({
               kind: 'order',
@@ -123,9 +145,10 @@ export function CustomCommandsSettings({
             void update([
               {
                 op: 'update',
-                id: items[i].id,
-                changes: { enabled: !items[i].enabled },
-                expectedTypeRevision: types.find((t) => t.id === items[i].typeId)?.typeRevision,
+                id: visibleItems[i].id,
+                changes: { enabled: !visibleItems[i].enabled },
+                expectedTypeRevision: types.find((t) => t.id === visibleItems[i].typeId)
+                  ?.typeRevision,
               },
             ]).catch((e) => setError(String(e)));
           }}

@@ -9,6 +9,10 @@ import { SettingsIndex } from './SettingsIndex';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
+import {
+  CommandSettingsNavigation,
+  type CommandSettingsTarget,
+} from '../settings-ui/CommandSettingsNavigation';
 import '../settings-ui/controls.css';
 import './settings.css';
 export function SettingsPage({
@@ -24,6 +28,8 @@ export function SettingsPage({
 }) {
   const [model, setModel] = useState<SettingsPageModel>();
   const [error, setError] = useState('');
+  const [commandTarget, setCommandTarget] = useState<CommandSettingsTarget>();
+  const commandNavigationRequest = useRef(0);
   const [movement, setMovement] = useState({ id: '', text: '' });
   const [confirmation, setConfirmation] = useState<{
     kind: 'reset' | 'storage';
@@ -137,7 +143,13 @@ export function SettingsPage({
       target?.classList.remove('setting-highlight');
     };
   }, [ready, model?.content.move?.id, model?.content.page.id, model?.content.editing.mode]);
-  const act = (operation: SettingsPageOperation) => void c?.act(operation).catch(() => {});
+  const act = (operation: SettingsPageOperation) => {
+    if (operation.kind === 'select' || operation.kind === 'move') {
+      commandNavigationRequest.current++;
+      setCommandTarget(undefined);
+    }
+    void c?.act(operation).catch(() => {});
+  };
   const confirm = async (kind: 'reset' | 'storage') => {
     try {
       const current = await c?.preparePageChange();
@@ -254,12 +266,42 @@ export function SettingsPage({
                 }}
               />
             ) : (
-              <SettingsForm
-                model={model}
-                editor={editor}
-                select={(pageId) => act({ kind: 'select', pageId })}
-                invoke={c.invoke}
-              />
+              <CommandSettingsNavigation.Provider
+                value={
+                  context === 'full'
+                    ? {
+                        target: commandTarget?.page === page.id ? commandTarget : undefined,
+                        clear: () => setCommandTarget(undefined),
+                        open: (pageId, command) => {
+                          const request = ++commandNavigationRequest.current;
+                          void c
+                            .act({ kind: 'select', pageId })
+                            .then(() => {
+                              if (
+                                request !== commandNavigationRequest.current ||
+                                c.model?.content.page.id !== pageId
+                              )
+                                return;
+                              setCommandTarget({
+                                page: pageId,
+                                id: command.id,
+                                title: command.title,
+                                request,
+                              });
+                            })
+                            .catch(() => {});
+                        },
+                      }
+                    : null
+                }
+              >
+                <SettingsForm
+                  model={model}
+                  editor={editor}
+                  select={(pageId) => act({ kind: 'select', pageId })}
+                  invoke={c.invoke}
+                />
+              </CommandSettingsNavigation.Provider>
             )}
           </SettingsPageLayout>
           {confirmation && (

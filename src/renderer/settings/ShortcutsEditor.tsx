@@ -13,6 +13,10 @@ import {
 import { ShortcutCommandList } from '../settings-ui/ShortcutCommandList';
 import { ShortcutOrderDialog } from '../settings-ui/ShortcutOrderDialog';
 import { SettingsSection } from '../settings-ui/SettingsSections';
+import {
+  CommandTargetFilter,
+  useCommandSettingsTarget,
+} from '../settings-ui/CommandSettingsNavigation';
 
 /** Settings adds catalog-wide discovery around the same command list used by Applet details. */
 export function ShortcutsEditor({
@@ -33,6 +37,7 @@ export function ShortcutsEditor({
   clearProvider?(): void;
 }) {
   const settingsControls = useSettingsControls();
+  const target = useCommandSettingsTarget();
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [error, setError] = useState('');
@@ -40,7 +45,7 @@ export function ShortcutsEditor({
   useEffect(() => {
     setFilter('');
     setStatusFilter('all');
-  }, [provider?.request]);
+  }, [provider?.request, target?.request]);
   const lastStatuses = useRef(statuses);
   useEffect(() => {
     if (statuses.length) lastStatuses.current = statuses;
@@ -67,6 +72,7 @@ export function ShortcutsEditor({
       : undefined;
   const terms = filter.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const visible = catalog.filter((command) => {
+    if (target) return command.id === target.id;
     if (provider && command.extensionId !== provider.id) return false;
     const assigned = rows.filter((row) => row.command === command.id);
     const text = [
@@ -109,6 +115,7 @@ export function ShortcutsEditor({
         {provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />}
       </CommandBindingToolbar>
       {error && <p role="alert">{error}</p>}
+      <CommandTargetFilter />
       {rows.length >= 2000 && (
         <p role="status">
           割り当ては2000件までです。追加するには既存の割り当てを削除してください。

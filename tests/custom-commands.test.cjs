@@ -246,6 +246,7 @@ test('CRUD is atomic, dry runs are inert and revisions/types are checked', (t) =
   );
   f.update([{ op: 'update', id: item.id, changes: { title: 'Changed' } }]);
   assert.equal(f.service.uiCommands()[0].id, customCommandId(item.id));
+  assert.equal(f.service.uiCommands()[0].customDefinitionId, item.id);
   assert.throws(
     () => f.service.update({ expectedRevision: rev, operations: [{ op: 'remove', id: item.id }] }),
     (e) => e.code === 'REVISION_CONFLICT',

@@ -127,6 +127,7 @@ export function SettingsForm({
   if (category === 'custom-commands')
     return (
       <CustomCommandsSettings
+        commands={commands}
         settings={settings}
         auxiliary={aux.customCommands}
         invoke={invoke}

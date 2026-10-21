@@ -1295,13 +1295,14 @@ function uiCommands(): import('../shared/commands').UiCommand[] {
 }
 function settingsUiCommands() {
   const commands = uiCommands(),
-    ids = new Set(commands.map((c) => c.id));
+    ids = new Set(commands.map((c) => c.id)),
+    published = operationApi.publishedCommandIds();
   return [
     ...commands,
     ...[...knownSettingsCommands.values()]
       .filter((c) => !ids.has(c.id))
-      .map((c) => ({ ...c, available: false })),
-  ];
+      .map((c) => ({ ...c, available: false, customDefinitionId: undefined })),
+  ].map((command) => ({ ...command, automation: published.has(command.id) }));
 }
 function ribbonUiCommands() {
   const applets = allApplets();
@@ -1699,6 +1700,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     };
   if (id === 'custom-commands')
     return {
+      commands: settingsUiCommands(),
       customCommands: {
         types: customCommands.descriptors(),
         summaries: customCommands.summaries(),

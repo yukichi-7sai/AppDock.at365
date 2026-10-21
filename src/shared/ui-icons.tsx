@@ -20,6 +20,8 @@ export type IconName =
   | 'command'
   | 'keyboard'
   | 'mouse'
+  | 'terminal'
+  | 'globe'
   | 'mail'
   | 'clock'
   | 'image'
@@ -104,6 +106,19 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <rect x="6" y="2" width="12" height="20" rx="6" />
       <path d="M12 6v4" />
+    </>
+  ),
+  terminal: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d="M3 8h18m-14 4 3 2-3 2m6 0h4" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <ellipse cx="12" cy="12" rx="4" ry="9" />
+      <path d="M3 12h18" />
     </>
   ),
   mail: (

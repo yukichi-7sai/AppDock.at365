@@ -43,6 +43,9 @@ export function hostCommandsForApplets(applets: import('./contracts').ExtensionS
   return [...hostCommands, ...appletSettingsPageCommands(applets)];
 }
 export interface UiCommand extends Command {
+  /** Effective publication from the shared external command catalog, not execution permission. */
+  automation?: boolean;
+  customDefinitionId?: string;
   extension: string;
   /** Stable owner ID; null is the host, undefined is an unknown saved command. */
   extensionId?: string | null;

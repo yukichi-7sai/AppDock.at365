@@ -26,6 +26,16 @@
   width: 100%;
   margin-bottom: 4px;
 }
+.settings-categories .sidebar-extensions button:has(.settings-index-icon) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.settings-index-icon {
+  display: inline-flex;
+  margin-left: auto;
+  flex: none;
+}
 .settings-surface > .settings-page-layout {
   display: flex;
   flex-direction: column;

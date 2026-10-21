@@ -201,6 +201,7 @@ export class CustomCommandService {
   uiCommands(): UiCommand[] {
     return this.summaries().map((item) => ({
       id: item.commandId,
+      customDefinitionId: item.id,
       title: item.title,
       description: item.description,
       extension: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,

@@ -140,6 +140,9 @@ export class AppDockApi {
       ]),
     ) as AppletApiPermissions;
   }
+  publishedCommandIds(): ReadonlySet<string> {
+    return new Set(this.commands().map((command) => command.id));
+  }
   private commands(context: InputInvocation = {}) {
     return [
       ...new Map(

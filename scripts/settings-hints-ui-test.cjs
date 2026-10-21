@@ -17,6 +17,7 @@ const titlesOnly =
 const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const accentLayoutOnly = process.argv.includes('--accent-layout-only');
+const commandNavigationOnly = process.argv.includes('--command-navigation-only');
 const updateRequests = [];
 const titleSamples = [];
 const layoutSamples = [];
@@ -324,6 +325,45 @@ async function checkSectionTitles() {
     initial.host.trayClickCommand = 'fixture.hints.run';
     initial.host.trayDoubleClickCommand = null;
     initial.tts.baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
+    if (commandNavigationOnly) {
+      initial.keybindings = [
+        {
+          id: 'nav.owner',
+          command: 'fixture.hints.run',
+          key: 'Ctrl+Alt+Q',
+          enabled: true,
+          when: { scope: 'owner', appletIds: [] },
+        },
+        {
+          id: 'nav.global',
+          command: 'fixture.hints.run',
+          key: 'Ctrl+Alt+W',
+          enabled: true,
+          when: { scope: 'global', appletIds: [] },
+        },
+      ];
+      initial.customCommands = {
+        version: 2,
+        items: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'].map(
+          (id, index) => ({
+            id,
+            title: `Custom ${index + 1}`,
+            description: 'Navigation fixture',
+            typeId: 'appdock.process.start',
+            owner: { kind: 'host' },
+            configVersion: 1,
+            config: {
+              mode: 'cmd',
+              command: 'echo fixture',
+              workingDirectory: '',
+              showConsole: false,
+            },
+            enabled: true,
+            automation: index === 1,
+          }),
+        ),
+      };
+    }
     if (accentLayoutOnly) {
       initial.ribbon.groups = [
         {
@@ -363,7 +403,13 @@ async function checkSectionTitles() {
         version: '1.0.0',
         runtime: 'node',
         entry: 'worker.cjs',
-        commands: [{ id: 'fixture.hints.run', title: 'Hint action' }],
+        commands: [
+          {
+            id: 'fixture.hints.run',
+            title: 'Hint action',
+            ...(commandNavigationOnly ? { automation: true } : {}),
+          },
+        ],
         settings: [
           {
             key: 'text',
@@ -411,6 +457,19 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (commandNavigationOnly) {
+      await require('./settings-command-navigation-checks.cjs')({
+        host,
+        select,
+        snapshot,
+        until,
+        profile,
+        checks,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (accentLayoutOnly) {
       assert.equal((await snapshot()).version, require('../package.json').version);
       await require('./settings-accent-layout-checks.cjs')({
@@ -992,6 +1051,7 @@ async function checkSectionTitles() {
       refinementsOnly,
       assignmentSpeechOnly,
       accentLayoutOnly,
+      commandNavigationOnly,
       titleSampleCount: titleSamples.length,
       checks,
       errors,
