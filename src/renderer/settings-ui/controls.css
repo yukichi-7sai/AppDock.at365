@@ -3532,7 +3532,7 @@ summary {
   min-height: 0;
 }
 
-.shell-page-slot {
+.host-page-slot {
   width: 100%;
   min-width: 0;
   min-height: 140px;

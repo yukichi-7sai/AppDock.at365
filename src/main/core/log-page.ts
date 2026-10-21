@@ -1,11 +1,12 @@
 import type { LogEntry } from '../../shared/contracts';
 import type {
   LogFilters,
-  ShellPageAction,
+  HostPageRequest,
+  HostPageAction,
   LogPageModel,
   LogPageRequest,
-} from '../../shared/shell-pages';
-import type { ShellPageController } from './shell-page-controller';
+} from '../../shared/host-pages';
+import type { HostPageController } from './host-page-controller';
 
 export function parseLogPageRequest(value: LogPageRequest): LogPageRequest {
   if (
@@ -27,7 +28,7 @@ export function parseLogPageRequest(value: LogPageRequest): LogPageRequest {
   return structuredClone(value);
 }
 
-export class LogPageSession implements ShellPageController {
+export class LogPageSession implements HostPageController {
   readonly kind = 'logs';
   readonly id: string;
   readonly route: string;
@@ -58,6 +59,13 @@ export class LogPageSession implements ShellPageController {
       level: 'all',
       text: '',
     };
+  }
+  update(request: HostPageRequest) {
+    if (request.kind !== 'logs') throw Error('Invalid log page request');
+    const next = parseLogPageRequest(request);
+    if (next.id !== this.id || next.route !== this.route) throw Error('Stale log page request');
+    if (next.source !== this.request.source) this.filters.source = next.source;
+    this.request = next;
   }
   snapshot(): LogPageModel {
     const entries = this.options.entries().slice(-500);
@@ -96,7 +104,7 @@ export class LogPageSession implements ShellPageController {
       content,
     };
   }
-  async act(action: ShellPageAction) {
+  async act(action: HostPageAction) {
     if (!action || action.id !== this.id) throw Error('Stale page action');
     if (action.type === 'open-directory') return this.options.openDirectory();
     if (action.type !== 'filters') throw Error('Unknown log page action');

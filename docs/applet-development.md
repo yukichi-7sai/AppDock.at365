@@ -226,7 +226,7 @@ WebアカウントのNode navigateコマンドと、外部リンク確認を自�
 
 入力APIを使う場合はminimumHostVersionを0.26.37以上にし、全Applet共通のsendInput許可を使います。Nodeのコマンドhandlerにはsignal/source/window等の実行文脈が渡り、入力APIへはworkerが自動伝播します。詳細は[共通操作API](appdock-api.md)を参照してください。
 
-ログだけを差し替えるShell AppletはminimumHostVersion 0.26.42以上でpage.logsを宣言できます。モデル・操作・フォーカス・復旧の契約は[Shellのページ表示](shell-pages.md)を参照してください。
+ログは本体の共通ページを使う。Shell対象と追加条件は[Shell基盤](shell-foundation.md)、本体ページの構成は[本体のページ表示](host-pages.md)を参照する。
 
 ## 通知種類の宣言と設定
 

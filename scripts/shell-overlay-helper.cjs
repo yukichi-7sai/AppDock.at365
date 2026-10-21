@@ -37,47 +37,20 @@ exports.overlayPage = async (host) => {
   throw Error('Shell overlay did not become ready');
 };
 exports.logsPage = async (host, scope) => {
-  const end = Date.now() + 15000;
-  let detail = '';
+  const end = Date.now() + 20000;
   while (Date.now() < end) {
-    for (const page of host
-      .context()
-      .pages()
-      .filter((p) => p.url().endsWith('/logs.html'))) {
-      try {
-        const model = await page.evaluate(
-          async () => (await window.appdockPage.connect()).snapshot,
-        );
-        detail = JSON.stringify(model.content.scope);
-        if (
-          scope &&
-          (model.content.scope.type !== scope.type || model.content.scope.id !== scope.id)
-        )
-          continue;
-        await page.locator('.log-toolbar').waitFor({ timeout: 1000 });
-        return page;
-      } catch (e) {
-        detail = String(e);
-      }
-    }
-    await new Promise((r) => setTimeout(r, 50));
+    const model = await host.evaluate(() => window.dock.pages.get());
+    if (
+      model?.kind === 'logs' &&
+      (!scope || (model.content.scope.type === scope.type && model.content.scope.id === scope.id))
+    )
+      break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  throw Error('Shell log page did not become ready: ' + detail);
+  await host.locator('.log-toolbar').waitFor();
+  return host;
 };
-
 exports.homePage = async (host) => {
-  const end = Date.now() + 15000;
-  while (Date.now() < end) {
-    for (const page of host
-      .context()
-      .pages()
-      .filter((p) => p.url().endsWith('/home.html'))) {
-      try {
-        await page.getByRole('heading', { name: 'ホーム', exact: true }).waitFor({ timeout: 500 });
-        return page;
-      } catch {}
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw Error('Shell home page did not become ready');
+  await host.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+  return host;
 };

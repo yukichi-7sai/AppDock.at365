@@ -205,7 +205,9 @@ async function save(p) {
   await until(
     () =>
       p.evaluate(() =>
-        window.dock.settingsPage.get(document.querySelector('.settings-surface').dataset.settingsConnection).then((m) => !m.content.editing.pending),
+        window.dock.settingsPage
+          .get(document.querySelector('.settings-surface').dataset.settingsConnection)
+          .then((m) => !m.content.editing.pending),
       ),
     'saved model',
   );
@@ -438,7 +440,7 @@ async function close() {
       await host.evaluate(() => ({
         main: document.querySelector('main')?.outerHTML?.slice(0, 6000),
         hidden: document.querySelector('.settings-page')?.hidden,
-        slots: [...document.querySelectorAll('.shell-page-slot')].map((e) => ({
+        slots: [...document.querySelectorAll('.host-page-slot')].map((e) => ({
           rect: e.getBoundingClientRect().toJSON(),
           html: e.outerHTML,
         })),

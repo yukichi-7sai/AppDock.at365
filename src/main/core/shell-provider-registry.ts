@@ -1,6 +1,7 @@
 import type { ExtensionManifest, ExtensionSnapshot } from '../../shared/contracts';
 import {
   defaultShellId,
+  isRetiredShellRegion,
   shellRegions,
   shellView,
   type ShellRegion,
@@ -175,7 +176,7 @@ export class ShellProviderRegistry {
   }
   lease(provider: string, requirement?: ShellRequirement): (() => boolean) | undefined {
     if (!requirement) return;
-    if (requirement.region === 'page.settings') return () => false;
+    if (isRetiredShellRegion(requirement.region)) return () => false;
     const region = requirement.region;
     const generation = this.providers().find((p) => p.id === provider)?.generation;
     const session = this.probes.get(region)?.().session;
@@ -186,7 +187,7 @@ export class ShellProviderRegistry {
   }
   requirement(provider: string, requirement?: ShellRequirement): string | undefined {
     if (!requirement) return;
-    if (requirement.region === 'page.settings') return '設定画面は本体で共通表示します。';
+    if (isRetiredShellRegion(requirement.region)) return 'このページは本体で共通表示します。';
     const state = this.region(requirement.region);
     if (
       requirement.state === 'resolved'

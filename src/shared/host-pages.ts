@@ -1,5 +1,4 @@
 import type { LogEntry } from './contracts';
-import type { ShellAppletApi } from './shell';
 
 export type LogScope = { type: 'all' } | { type: 'applet'; id: string } | { type: 'web' };
 export interface LogFilters {
@@ -22,17 +21,11 @@ export interface HomePageRequest {
   /** Read-only projection from saved host settings. */
   appletOrder: string[];
 }
-export type ShellPageRequest =
+export type HostPageRequest =
   | LogPageRequest
   | HomePageRequest
   | import('./notification-center').NotificationCenterRequest
   | import('./image-library-page').ImageLibraryPageRequest;
-export interface ShellPageViewport {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 export interface LogPageModel {
   schemaVersion: 1;
   id: string;
@@ -81,7 +74,7 @@ export interface HomePageModel {
     message: string;
   };
 }
-export type ShellPageModel =
+export type HostPageModel =
   | LogPageModel
   | HomePageModel
   | import('./notification-center').NotificationCenterModel
@@ -90,19 +83,17 @@ export interface HomeCommandResult {
   message: string;
   error: string;
 }
-export type ShellPageAction =
+export type HostPageAction =
   | import('./image-library-page').ImageLibraryPageAction
   | import('./notification-center').NotificationCenterAction
   | { id: string; type: 'filters'; filters: LogFilters }
   | { id: string; type: 'open-directory' }
   | { id: string; type: 'invoke'; actionId: string };
-export interface ShellPageApi extends ShellAppletApi {
-  connect(): Promise<{ sessionId: string; providerAppletId: string; snapshot: ShellPageModel }>;
-  ready(sessionId: string): Promise<void>;
-  act(action: ShellPageAction): Promise<unknown>;
-  onChanged(callback: (model: ShellPageModel) => void): () => void;
-  focusHost(edge: 'before' | 'after'): Promise<void>;
-  onFocus(callback: (edge: 'first' | 'last') => void): () => void;
-  /** Keyboard shortcuts retain host routing while text input stays local. */
-  shortcut(key: string): Promise<unknown>;
+/** Private bridge for the trusted host renderer; never exposed to Shells or Applets. */
+export interface HostPageApi {
+  open(request: HostPageRequest): Promise<HostPageModel | null>;
+  get(id?: string): Promise<HostPageModel | null>;
+  act(action: HostPageAction): Promise<unknown>;
+  close(id: string): Promise<void>;
+  onChanged(callback: (model: HostPageModel) => void): () => void;
 }

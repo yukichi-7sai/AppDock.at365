@@ -1,3 +1,9 @@
+export interface ShellBarViewport {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 import type { ShellAppletApi } from './shell';
 
 export type ShellBarRegion = 'titlebar' | 'statusbar';

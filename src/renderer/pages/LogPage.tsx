@@ -1,94 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import type {
   LogFilters,
-  ShellPageAction,
-  ShellPageApi,
-  ShellPageModel,
+  HostPageAction,
+  HostPageModel,
   LogPageModel,
-} from '../../src/shared/shell-pages';
-import { shortcutFromEvent } from '../../src/shared/commands';
-import { Icon } from '../../src/shared/ui-icons';
+} from '../../shared/host-pages';
+import { Icon } from '../../shared/ui-icons';
 import './logs.css';
-document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches
-  ? 'dark'
-  : 'light';
-declare global {
-  interface Window {
-    appdockPage: ShellPageApi;
-  }
-}
-const api = window.appdockPage;
-function App() {
-  const [model, setModel] = useState<LogPageModel>();
-  const [session, setSession] = useState('');
+const api = window.dock.pages;
+export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
+  const [model, setModel] = useState<LogPageModel>(initialModel);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState<LogFilters>({ source: '', level: 'all', text: '' });
   const pending = useRef(0);
-  const latest = useRef<ShellPageModel | undefined>(undefined);
+  const latest = useRef<LogPageModel | undefined>(initialModel);
   useEffect(() => {
-    let live = true;
-    const accept = (next: ShellPageModel) => {
+    const live = true;
+    const accept = (next: HostPageModel) => {
       if (live && next.kind === 'logs') {
         if (latest.current?.id === next.id && latest.current.revision > next.revision) return;
         latest.current = next;
-        document.documentElement.dataset.theme = next.dark ? 'dark' : 'light';
         setModel(next);
         if (!pending.current) setFilters(next.content.filters);
       }
     };
-    const unsubscribe = api.onChanged(accept);
-    void api
-      .connect()
-      .then((c) => {
-        if (live) {
-          accept(c.snapshot);
-          setSession(c.sessionId);
-        }
-      })
-      .catch((e) => setError(String(e)));
-    const focus = api.onFocus((edge) => {
-      const controls = [...document.querySelectorAll<HTMLElement>('button, input, select')];
-      (edge === 'first' ? controls[0] : controls.at(-1))?.focus();
-    });
-    const keys = (event: KeyboardEvent) => {
-      if (event.isComposing || event.repeat || event.defaultPrevented) return;
-      if (event.key === 'Tab') {
-        const controls = [
-          ...document.querySelectorAll<HTMLElement>('button, input, select'),
-        ].filter((e) => !e.matches(':disabled'));
-        if (
-          event.shiftKey
-            ? document.activeElement === controls[0]
-            : document.activeElement === controls.at(-1)
-        ) {
-          event.preventDefault();
-          void api.focusHost(event.shiftKey ? 'before' : 'after');
-        }
-        return;
-      }
-      if (
-        !event.ctrlKey &&
-        !event.altKey &&
-        event.target instanceof Element &&
-        event.target.closest('input, select, textarea')
-      )
-        return;
-      const key = shortcutFromEvent(event);
-      if (key) void api.shortcut(key).catch((e) => setError(String(e)));
-    };
-    document.addEventListener('keydown', keys);
-    return () => {
-      live = false;
-      unsubscribe();
-      focus();
-      document.removeEventListener('keydown', keys);
-    };
-  }, []);
-  useEffect(() => {
-    if (session && model) void api.ready(session).catch((e) => setError(String(e)));
-  }, [session, !!model]);
-  const act = (action: ShellPageAction) => {
+    accept(initialModel);
+  }, [initialModel]);
+  const act = (action: HostPageAction) => {
     setError('');
     void api.act(action).catch((e) => setError(String(e)));
   };
@@ -106,7 +44,7 @@ function App() {
   if (!model) return error ? <p role="alert">{error}</p> : null;
   const content = model.content;
   return (
-    <main className="logs-page" data-embedded={content.scope.type !== 'all'}>
+    <section className="logs-page" data-embedded={content.scope.type !== 'all'}>
       <div className="page-heading compact">
         {content.scope.type === 'all' ? <h1>ログ</h1> : <h3>ログ</h3>}
         <button className="secondary" onClick={() => act({ id: model.id, type: 'open-directory' })}>
@@ -205,7 +143,6 @@ function App() {
       <p className="footnote">
         画面には直近{content.limit}件を表示します。ファイルログは1MBでローテーションします。
       </p>
-    </main>
+    </section>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);

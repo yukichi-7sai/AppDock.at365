@@ -194,7 +194,8 @@ async function until(fn, label) {
     );
     assert.equal(JSON.stringify(await modelOf(shell)).includes('never-in-shell'), false);
     assert.equal(await shell.evaluate(() => typeof window.appdockPage), 'undefined');
-    await require('./shell-page-layout-helper.cjs').exerciseLayout(host, shell, app, 'settings');
+    assert.equal(shell, host);
+    assert(await host.locator('.settings-surface').isVisible());
     await shell.getByLabel('テーマ', { exact: true }).selectOption('light');
     await settleSettings(shell);
     assert.equal(

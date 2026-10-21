@@ -1,4 +1,4 @@
-import { isShellRegion } from './shell';
+import { isRetiredShellRegion, isShellRegion } from './shell';
 import type { Command, DeclaredCommand } from './contracts';
 import { customDescription } from './custom-commands';
 
@@ -29,7 +29,7 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
         Array.isArray(requirement) ||
         Object.keys(requirement).some((k) => !['region', 'state'].includes(k)) ||
         (!isShellRegion((requirement as any).region) &&
-          (requirement as any).region !== 'page.settings') ||
+          !isRetiredShellRegion((requirement as any).region)) ||
         !['resolved', 'visible'].includes((requirement as any).state))
     )
       throw Error('shellRequirementは既知のregionとresolved / visibleです。');

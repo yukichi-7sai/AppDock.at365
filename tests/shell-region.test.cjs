@@ -39,7 +39,7 @@ function provider(id, extra = {}) {
   };
 }
 function fixture(extra = {}) {
-  let assignments = { ribbon: 'shell.a', 'page.home': 'shell.b' };
+  let assignments = { ribbon: 'shell.a', statusbar: 'shell.b' };
   let providers = [provider(defaultShellId), provider('shell.a'), provider('shell.b')];
   const registry = new ShellProviderRegistry({
     assignments: () => assignments,
@@ -50,15 +50,36 @@ function fixture(extra = {}) {
   return { registry, assignments, providers };
 }
 
-test('legacy ribbon providers fall back per region while compatible page and overlay assignments stay active', () => {
+test('all retired page assignments remain inert while their saved values and legacy requirements survive', () => {
+  const f = fixture();
+  const retired = [
+    'page.home',
+    'page.logs',
+    'page.image-library',
+    'page.notifications',
+    'page.settings',
+  ];
+  const assignments = Object.fromEntries(retired.map((region) => [region, 'shell.a']));
+  Object.assign(f.assignments, assignments);
+  assert.deepEqual(parseShellProviders({ shellProviders: assignments }), assignments);
+  assert.equal(f.registry.snapshot().regions.length, 7);
+  for (const region of retired) {
+    assert(!f.registry.snapshot().regions.some((state) => state.region === region));
+    const requirement = { region, state: 'visible' };
+    assert.match(f.registry.requirement('shell.a', requirement), /本体/);
+    assert.equal(f.registry.lease('shell.a', requirement)(), false);
+  }
+});
+
+test('legacy ribbon providers fall back per region while compatible bar and overlay assignments stay active', () => {
   const f = fixture();
   const external = f.providers.find((p) => p.id === 'shell.a');
   delete external.shell.ribbonSchemaVersion;
-  f.assignments['page.logs'] = external.id;
+  f.assignments['titlebar'] = external.id;
   f.assignments['overlay.ribbon-group'] = external.id;
   assert.equal(f.registry.resolve('ribbon').provider.id, defaultShellId);
   assert.match(f.registry.resolve('ribbon').reason, /対応していない/);
-  assert.equal(f.registry.resolve('page.logs').provider.id, external.id);
+  assert.equal(f.registry.resolve('titlebar').provider.id, external.id);
   assert.equal(f.registry.resolve('overlay.ribbon-group').provider.id, external.id);
   external.shell.ribbonSchemaVersion = 2;
   assert.equal(f.registry.resolve('ribbon').provider.id, external.id);
@@ -94,29 +115,29 @@ test('map validates own keys, size, reserved IDs and unknown regions without los
     [],
     null,
     1,
-    { 'page.home': 12 },
+    { statusbar: 12 },
     { constructor: 'shell.a' },
     { 'PAGE.home': 'shell.a' },
-    { 'page.home': 'constructor' },
+    { statusbar: 'constructor' },
     Object.fromEntries(Array.from({ length: 33 }, (_, i) => ['page.x' + i, 'shell.a'])),
   ])
     assert.throws(() => parseShellProviders({ shellProviders: v }));
   assert.deepEqual(parseShellProviders(Object.create({ shellProvider: 'shell.a' })), {});
-  const map = Object.assign(Object.create({ 'page.home': 'shell.b' }), { ribbon: 'shell.a' });
+  const map = Object.assign(Object.create({ statusbar: 'shell.b' }), { ribbon: 'shell.a' });
   assert.deepEqual(parseShellProviders({ shellProviders: map }), { ribbon: 'shell.a' });
 });
 test('appearance projection and field merge preserve dotted keys and unedited concurrent assignments', () => {
   const value = createDefaultSettings();
-  value.host.shellProviders = { 'page.home': 'shell.a', 'future.panel': 'shell.b' };
+  value.host.shellProviders = { statusbar: 'shell.a', 'future.panel': 'shell.b' };
   const page = settingsCatalog([], value).find((p) => p.id === 'appearance');
   const before = settingsProjection(value, page, []);
   const next = structuredClone(before);
-  next.host.shellProviders['page.home'] = 'shell.c';
+  next.host.shellProviders['statusbar'] = 'shell.c';
   const current = structuredClone(before);
   current.host.shellProviders.ribbon = 'shell.b';
   const merged = mergeSettingsInput(before, next, current);
   assert.deepEqual(merged.host.shellProviders, {
-    'page.home': 'shell.c',
+    statusbar: 'shell.c',
     'future.panel': 'shell.b',
     ribbon: 'shell.b',
   });
@@ -137,16 +158,16 @@ test('appearance projection and field merge preserve dotted keys and unedited co
       (i) => i.key === 'shellProviders.notification.desktop',
     ),
   );
-  current.host.shellProviders['page.home'] = 'shell.d';
+  current.host.shellProviders['statusbar'] = 'shell.d';
   assert.throws(() => mergeSettingsInput(before, next, current), /同じ設定/);
 });
 test('all-capability providers mix independently; disable and restoration retain assignments', () => {
   const { registry: r, assignments, providers } = fixture();
   assert.equal(r.resolve('ribbon').provider.id, 'shell.a');
-  assert.equal(r.resolve('page.home').provider.id, 'shell.b');
+  assert.equal(r.resolve('statusbar').provider.id, 'shell.b');
   providers[1].enabled = false;
   assert.equal(r.resolve('ribbon').provider.id, defaultShellId);
-  assert.equal(r.resolve('page.home').provider.id, 'shell.b');
+  assert.equal(r.resolve('statusbar').provider.id, 'shell.b');
   assert.equal(assignments.ribbon, 'shell.a');
   providers[1].enabled = true;
   assert.equal(r.resolve('ribbon').provider.id, 'shell.a');
@@ -155,7 +176,10 @@ test('uninstalled, waiting, partial and incompatible providers fall back only in
   const { registry: r, assignments, providers } = fixture();
   assignments['page.settings'] = 'shell.a';
   providers[1].minimumHostVersion = '0.32.0';
-  assert.equal(r.snapshot().regions.some((v) => v.region === 'page.settings'), false);
+  assert.equal(
+    r.snapshot().regions.some((v) => v.region === 'page.settings'),
+    false,
+  );
   assert.match(r.requirement('shell.a', { region: 'page.settings', state: 'resolved' }), /本体/);
   assert.equal(r.resolve('ribbon').provider.id, 'shell.a');
   delete providers[1].shell.views.ribbon;
@@ -165,23 +189,23 @@ test('uninstalled, waiting, partial and incompatible providers fall back only in
   assignments.ribbon = 'shell.a';
   providers[1].state = 'waiting';
   assert.equal(r.resolve('ribbon').provider.id, defaultShellId);
-  assert.equal(r.resolve('page.home').provider.id, 'shell.b');
+  assert.equal(r.resolve('statusbar').provider.id, 'shell.b');
 });
 test('fault suppression is per region and version, survives enable cycling, and explicit retry clears only one region', () => {
   const { registry: r, assignments, providers } = fixture();
-  assignments['page.home'] = 'shell.a';
+  assignments['statusbar'] = 'shell.a';
   r.fail('ribbon', 'shell.a', '1.0.0');
   assert.equal(r.resolve('ribbon').provider.id, defaultShellId);
-  assert.equal(r.resolve('page.home').provider.id, 'shell.a');
+  assert.equal(r.resolve('statusbar').provider.id, 'shell.a');
   providers[1].enabled = false;
   providers[1].enabled = true;
   assert.equal(r.resolve('ribbon').provider.id, defaultShellId);
-  r.fail('page.home', 'shell.a', '1.0.0');
+  r.fail('statusbar', 'shell.a', '1.0.0');
   r.retry('ribbon');
   assert.equal(r.resolve('ribbon').provider.id, 'shell.a');
-  assert.equal(r.resolve('page.home').provider.id, defaultShellId);
+  assert.equal(r.resolve('statusbar').provider.id, defaultShellId);
   providers[1].version = '1.0.1';
-  assert.equal(r.resolve('page.home').provider.id, 'shell.a');
+  assert.equal(r.resolve('statusbar').provider.id, 'shell.a');
 });
 test('safe mode preserves assignments and never selects an external fallback or forged Default', () => {
   const f = fixture({ safeMode: true });

@@ -261,13 +261,7 @@ export interface DockApi {
     request: import('./settings-editing').SettingsEditRequest,
   ): Promise<import('./settings-editing').SettingsInputState>;
   onSettingsEditingChanged(callback: () => void): () => void;
-  shellPage(
-    request: import('./shell-pages').ShellPageRequest,
-    bounds: import('./shell-pages').ShellPageViewport | null,
-  ): Promise<void>;
-  closeShellPage(id: string): Promise<void>;
-  focusShellPage(id: string, edge: 'first' | 'last'): Promise<void>;
-  onShellPageFocusHost(callback: (id: string, edge: 'before' | 'after') => void): () => void;
+  pages: import('./host-pages').HostPageApi;
   onLogSourceChanged(callback: (source: string) => void): () => void;
   focusShell(edge: 'first' | 'last'): Promise<void>;
   onShellFocusHost(callback: (edge: 'before' | 'after') => void): () => void;
@@ -316,7 +310,7 @@ export interface DockApi {
   onHostCommand(callback: (id: string) => void): () => void;
   onPaletteExecuted(callback: () => void): () => void;
   onHomeCommandResult(
-    callback: (result: import('./shell-pages').HomeCommandResult) => void,
+    callback: (result: import('./host-pages').HomeCommandResult) => void,
   ): () => void;
   snapshot(): Promise<HostSnapshot>;
   saveSettings(value: Settings, revision: number): Promise<SettingsSnapshot>;
@@ -333,7 +327,7 @@ export interface DockApi {
   windowAction(action: 'minimize' | 'maximize' | 'close' | 'quit'): Promise<void>;
   barViewport(
     region: import('./shell-bars').ShellBarRegion,
-    bounds: import('./shell-pages').ShellPageViewport | null,
+    bounds: import('./shell-bars').ShellBarViewport | null,
   ): Promise<void>;
   focusBar(region: import('./shell-bars').ShellBarRegion, edge: 'first' | 'last'): Promise<void>;
   onBarFocusHost(

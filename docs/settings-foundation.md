@@ -171,7 +171,7 @@ main      ▼
 | `shells/default/settings.html` | 削除 | 独立HTMLのビルド・配布を終了 |
 | `src/shared/settings-page.ts` | 同じ場所 | mainと本体preload/renderer間の型として再利用。Shell公開型との接続を外す |
 | `src/shared/settings-editing.ts`・`settings-catalog.ts`等 | 同じ場所 | Reactに依存しない型、定義、検索・投影処理は共通側に保持 |
-| `src/main/core/settings-page.ts` | 同じ場所 | ShellPageController実装から本体設定ページのセッションへ変更 |
+| `src/main/core/settings-page.ts` | 同じ場所 | 本体設定ページのセッション |
 
 settings-uiのapi.tsxは本体内部の制御依存として扱う。現在は別documentにある2つの`configureSettingsControls`が、統合後に同じグローバルを書き換える構造を残さない。`SettingsControlsProvider`と`useSettingsControls`によるReact Contextへ変更し、本体ルートでは既存DockApi、SettingsPage配下ではそのSettingsViewClientのcontrolsを渡す。部品の利用側はContextから取得する。設定フォームの操作は発行済み操作IDを通し、本体の他画面は設定画面の表示有無に依存させない。
 
@@ -200,11 +200,11 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 
 SettingsPageModelの選択ページ単位の投影と補助情報は維持する。Shellへの公開が終わっても、全Settingsを渡して画面内で自由に保存する構造へ置き換えない。schemaVersion:2は既存内部モデルの形式として当初維持できるが、Shell向け互換性の保証とは分離する。
 
-SettingsPageSessionはShellPageRequest/Action/ModelのunionとShellPageControllerに依存しない形へ変え、SettingsPageRequest/Action/Modelを直接受け取る。changed、release等の依存は本体側から渡す。
+SettingsPageSessionは本体の他ページの要求・モデルに依存しない形へ変え、SettingsPageRequest/Action/Modelを直接受け取る。changed、release等の依存は本体側から渡す。
 
 ### 入力キューと寿命
 
-SettingsViewClientのtransportを注入可能にし、`window.appdockPage.connect/act/onChanged`を上記bridgeへ置き換える。最新モデルの取得、自己操作だけのbefore更新、外部競合の拒否、失敗入力の画面内保持は再利用する。長時間操作は入力キューを占有せず、取消操作を受け付ける。
+SettingsViewClientのtransportを注入可能にし、本体専用の上記bridgeを使う。最新モデルの取得、自己操作だけのbefore更新、外部競合の拒否、失敗入力の画面内保持は再利用する。長時間操作は入力キューを占有せず、取消操作を受け付ける。
 
 本体のuseSettingsEditorは、Applet一覧・ショートカット等に必要な既存の編集口として整理する。同じ設定フォームの入力をuseSettingsEditorとSettingsViewClientの両方から送らない。両者は同一SettingsInputSessionへ接続し、全体設定の選択・再起動時復元・プロフィール等への移動要求も、その正本のpageIdへ集約する。
 
@@ -223,7 +223,7 @@ flushはすでに送信を受け付けたキューを待つもので、全体保
 - native dialogが同じ本体documentへ移ることを踏まえ、背面の操作とローカルショートカットの抑止、実行中の重複操作防止を確認する。
 - Shell向けTab境界IPCとショートカット転送は設定から外す。本体documentのTab順序・既存のショートカット経路を使い、1回の入力を二重に実行しない。
 - 設定CSSのhtml/bodyへの指定を本体全体へ持ち込まない。既存の本体テーマを継承し、初期表示時の別テーマ適用を行わない。
-- ShellPageSlot用の高さ・座標計算を設定から外し、flex/min-height/overflowで利用可能な本文領域を使う。狭幅、スクロール、検索項目移動、左一覧幅の既存状態を維持する。
+- 本文の独立View用の高さ・座標計算は使わず、flex/min-height/overflowで利用可能な本文領域を使う。狭幅、スクロール、検索項目移動、左一覧幅の既存状態を維持する。
 - `--restore-view`の設定カテゴリ・Applet詳細タブ復元を維持する。カテゴリ更新だけで復元成功とせず、対象本文の描画まで確認する。
 - 設定を開くコマンドIDと既存ナビゲーションの入口は維持する。Shell提供元に依存せず、safe-shellでも本体の共通設定を開く。
 

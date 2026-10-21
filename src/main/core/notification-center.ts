@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ShellPageAction } from '../../shared/shell-pages';
+import type { HostPageAction } from '../../shared/host-pages';
 import type {
   NotificationCenterFilters,
   NotificationCenterItem,
@@ -8,7 +8,7 @@ import type {
 } from '../../shared/notification-center';
 import { notificationCatalog } from '../../shared/notification-types';
 import type { ExtensionSnapshot } from '../../shared/contracts';
-import type { ShellPageController } from './shell-page-controller';
+import type { HostPageController } from './host-page-controller';
 import type { NotificationService } from './notification-service';
 const exact = (v: any, keys: string[]) =>
   v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).every((k) => keys.includes(k));
@@ -20,7 +20,7 @@ const defaults = (): NotificationCenterFilters => ({
   unread: false,
   text: '',
 });
-export class NotificationCenterController implements ShellPageController {
+export class NotificationCenterController implements HostPageController {
   readonly kind = 'notifications';
   readonly route = 'notifications';
   readonly id: string;
@@ -136,7 +136,7 @@ export class NotificationCenterController implements ShellPageController {
       content,
     };
   }
-  async act(request: ShellPageAction) {
+  async act(request: HostPageAction) {
     if (
       !exact(request, ['id', 'type', 'action']) ||
       request.id !== this.id ||

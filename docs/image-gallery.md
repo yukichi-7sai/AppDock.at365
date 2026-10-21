@@ -33,9 +33,9 @@ WallpaperSlideshowはビルド時に`sync-gallery.ps1`で本体の専用ビル�
 
 ## 本体管理ページの境界
 
-ルート`image-library`、領域`page.image-library`、minimumHostVersion `0.74.0`。`window.appdockPage`の既存経路を使い、公開型は`src/shared/image-library-page.ts`。原画像サービス・保存・グループ競合は本体に置き、Shellは表示モデルと操作IDだけを使う。ページ再生成でIDは失効する。
+ルートimage-libraryは本体rendererのImageLibraryPageで描画する。本体専用のwindow.dock.pagesとsrc/shared/image-library-page.tsの型を使い、画像カードは共通ギャラリーを利用する。原画像サービス・保存・グループ競合は本体mainが管理し、ページ再生成で旧画像IDは失効する。
 
-プレビュー・グループ編集は本体の`ImageLibraryDialogHost`から共通SettingsDialog/SettingsModal/SettingsOrderDialogを開く。本文ViewもHostModalLayerへ登録し、背景をcapture・hideする。モーダル中は本文の選択・グループ編集・サイズ変更などを拒否する。Controllerが明示した画像取得と、遅れて届くWindow内のスクロール位置記録だけは許可する。送信元・frame・sessionの検証は共通で維持し、画像取得ではassetId、位置記録では画像IDと有限なoffsetの範囲を検証する。位置記録は共有設定やPC専用ファイルへ保存しない。閉じると同じViewとフォーカスを復元し、所有元の終了・遷移では待機を取り消す。
+プレビュー・グループ編集は本体の`ImageLibraryDialogHost`から共通SettingsDialog/SettingsModal/SettingsOrderDialogを開く。本文は本体と同じdocumentなので、共通native dialogの背景・入力抑止を使う。別Viewのリボン・タイトルバー・ステータスバーはHostModalLayerでcapture・hideする。モーダル中は本文の選択・グループ編集・サイズ変更などを拒否する。Controllerが明示した画像取得と、遅れて届くWindow内のスクロール位置記録だけは許可する。送信元・frame・sessionの検証は共通で維持し、画像取得ではassetId、位置記録では画像IDと有限なoffsetの範囲を検証する。位置記録は共有設定やPC専用ファイルへ保存しない。閉じると同じ本文DOMとフォーカスを維持し、所有元の終了・遷移では待機を取り消す。
 
 管理ページのカード操作は「グループ」「削除」、画像クリックはプレビュー。削除は本体の確認要求に結び付け、使用中の参照を保護する。[削除の保存境界](registered-images.md)を参照する。管理・選択画面のプレビューは`closeOnBackdrop`を有効にし、背景を押して背景で離したクリックで閉じる。画像内のクリックや内側からのドラッグでは閉じず、所属編集・グループ追加などは背景クリックで取り消さない。
 

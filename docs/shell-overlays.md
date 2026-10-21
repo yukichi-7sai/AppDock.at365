@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`overlay.ribbon-group`、`page.logs`・`page.home`・`page.notifications`、`notification.banner`・`notification.desktop`です。設定画面は本体の共通UIで描画します。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
+公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`overlay.ribbon-group`、`notification.banner`・`notification.desktop`です。ページ本文は本体の共通UIで描画します。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
 
 ```json
 {
@@ -28,9 +28,7 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 
 描画側は`getSettings()`と`onSettingsChanged(callback)`で自Appletの設定を取得・購読できる。例えば`compact`設定をコマンドから通常のsettings APIで変更すれば、リボンとオーバーレイはその設定に応じて描画を更新できる。両bridgeに同じ`ShellAppletApi`を適用する。
 
-`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、未対応の領域は描画しない。`page.logs`は0.26.42以上で[ページ用bridge](shell-pages.md)を実装すると利用できる。
-
-`page.home`は0.26.43以上でホーム用モデル・操作を実装すると利用できる。ホーム専用Appletでも他の領域はDefault Shellが描画する。
+`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、未対応の領域は描画しない。
 
 従来の`shell.ui`は`ribbon`の別名。`views.ribbon`を優先する。リボンだけを提供すればパレットはDefault Shell、パレットだけならリボンはDefault Shell。これは正常な組合せであり、故障表示にしない。
 
@@ -74,7 +72,7 @@ ready期限は10秒。読込失敗・renderer終了/応答不能で同じ要求�
 
 Default Shellも利用できない場合は要求を取消して最小ネイティブ通知を出し、本体の操作停止を解除する。`--safe-shell`では各領域をDefault Shellへ固定する。
 
-次のUI追加では、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画という順で実装する。別モーダルの追加では共有契約のkindと対応領域を追加し、OverlayHostへ内容固有の判断を入れない。ログは本文領域のHostと取得/購読・絞り込み契約を使い、`page.logs`で描画する。詳細は[Shellのページ表示](shell-pages.md)。過去ログ・日付検索・消去、複数Shell/Window、他Appletとの領域競合解決、オーバーレイモデルのMCP公開は未実装。
+新しいUIは原則として本体と共通部品で実装する。Shell化の個別依頼がある場合だけ、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画の順に追加する。別モーダルは共有契約のkindと領域を追加し、OverlayHostへ内容固有の判断を入れない。本体のページは[本体のページ表示](host-pages.md)を参照する。一般Appletの同一領域の多重表示とオーバーレイモデルのMCP公開は未実装。
 
 関連検証: `tests/command-palette.test.cjs`、manifest/boundary/presentation回帰、`scripts/shell-overlay-ui-test.cjs [EXE]`、既存Shell/トレイ/ページ/設定通知/ホストコマンド試験。実測は[VERIFICATION](../VERIFICATION.md)。
 

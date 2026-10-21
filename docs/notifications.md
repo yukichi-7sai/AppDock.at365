@@ -75,7 +75,7 @@ ownerKind/ownerId/typeId/endReasonを任意保存する。旧記録は種類不�
 
 再起動で過去のactive履歴をinterruptedへ変換し、操作を復活させない。現在の発行元が条件を評価して新規通知を作る。通知センターで既読・検索・終了履歴削除を提供する。
 
-バナー・デスクトップ・通知センターの提供元は、それぞれ`host.shellProviders`の`notification.banner`・`notification.desktop`・`page.notifications`で指定します。フォールバックと故障抑止は領域ごと、同じworkerの停止ではそのworkerに依存する領域を失効させます。切替で通知を再発行せず、同じ通知ID・期限・操作状態を使います。通知センターのControllerは検索・ページング・選択を保持します。デスクトップの可視判定は通知専用Windowに従い、本体を隠しても無効にしません。
+バナーとデスクトップのShell提供元はhost.shellProvidersのnotification.banner・notification.desktopで指定する。フォールバックと故障抑止は領域ごとに行い、同じworkerの停止では依存する各領域を失効させる。切替で通知を再発行せず、同じID・期限・操作状態を使う。通知センターは本体rendererで共通描画し、Controllerが検索・ページング・選択を保持する。デスクトップの可視判定は専用Windowに従い、本体を隠しても無効にしない。
 
 ## Shellの領域とbridge
 
@@ -122,7 +122,7 @@ Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shel
 
 ## 検証
 
-単体回帰はtests/notification-foundation.test.cjs、関連するsettings-editing/shell-boundaries/ui-presentation/notification-routing/notification-services。scripts/notification-banner-ui-test.cjsは汎用発行元の隔離Electron fixtureで複数通知、期限、操作、フォーカス、provider切替と復旧を確認する。scripts/settings-shell-ui-test.cjsは即時保存とShell復旧を確認する。shell-page-ui-test.cjsとnavigation-ui-test.cjsは重なり順と入力反映待ちの関連回帰。実測と制約はVERIFICATIONへ記録する。
+単体回帰はtests/notification-foundation.test.cjs、関連するsettings-editing/shell-boundaries/ui-presentation/notification-routing/notification-services。scripts/notification-banner-ui-test.cjsは汎用発行元の隔離Electron fixtureで複数通知、期限、操作、フォーカス、provider切替と復旧を確認する。scripts/settings-shell-ui-test.cjsは即時保存とShell復旧を確認する。host-pages-ui-test.cjsとnavigation-ui-test.cjsは重なり順と入力反映待ちの関連回帰。実測と制約はVERIFICATIONへ記録する。
 
 ## Windows表示の実装
 

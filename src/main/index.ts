@@ -23,7 +23,7 @@ import { ShellBarHost } from './core/shell-bar-host';
 import { WindowBars } from './core/window-bars';
 import { OverlayHost } from './core/overlay-host';
 import { HostModalLayer } from './core/host-modal-layer';
-import { ShellPageHost } from './core/shell-page-host';
+import { HostPages } from './core/host-pages';
 import { HomePageSession, HomeCommandExecution } from './core/home-page';
 import { ImageLibraryPageSession, ImageLibraryPageState } from './core/image-library-page';
 import { ImageLibraryDialogs } from './core/image-library-dialogs';
@@ -335,7 +335,7 @@ let shellHost: ShellHost | undefined;
 let shellBarHost: ShellBarHost | undefined;
 let overlayHost: OverlayHost | undefined;
 let hostModalLayer: HostModalLayer | undefined;
-let shellPageHost: ShellPageHost | undefined;
+let hostPages: HostPages | undefined;
 let imageLibraryDialogs: ImageLibraryDialogs | undefined;
 let galleryViewState: GalleryViewStateStore;
 let galleryImages: GalleryImages;
@@ -1145,7 +1145,7 @@ const changed = () => {
     notificationWindows?.refresh();
     shellHost?.refresh();
     shellBarHost?.refresh();
-    shellPageHost?.refresh();
+    hostPages?.refresh();
     settingsPageHost?.refresh();
     overlayHost?.refresh();
     shellRegistry?.touch();
@@ -1954,7 +1954,7 @@ function settingsPageActions(
       return {
         ...plan,
         siteCount: allApplets().filter((p) => p.collection?.owner === a.id).length,
-        shell: Object.values(settings.value.host.shellProviders ?? {}).includes(a.id),
+        shell: shellRegions.some(({ id }) => settings.value.host.shellProviders?.[id] === a.id),
       };
     };
     actions.applyAppletPackage = async ([id]) => {
@@ -2416,7 +2416,6 @@ async function retryShell(region?: ShellRegion) {
   if (!region || region === 'titlebar' || region === 'statusbar') shellBarHost?.retry(region);
   if (!region || region === 'overlay.command-palette' || region === 'overlay.ribbon-group')
     overlayHost?.retry(region);
-  if (!region || region.startsWith('page.')) shellPageHost?.retry(region);
   if (!region || region === 'notification.banner') notificationBanner?.retry();
   if (!region || region === 'notification.desktop') notificationDesktop?.retry();
   changed();
@@ -2521,9 +2520,10 @@ function registerIpc() {
     restore === true ? navigation.restore(route) : navigation.navigate(route),
   );
   handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
-  handle('dock:shellPage', (request, bounds) => shellPageHost?.mount(request, bounds));
-  handle('dock:closeShellPage', (id) => shellPageHost?.close(id));
-  handle('dock:focusShellPage', (id, edge) => shellPageHost?.focus(id, edge));
+  handle('dock:pages:open', (request) => hostPages!.open(request));
+  handle('dock:pages:get', (id) => hostPages!.get(id));
+  handle('dock:pages:act', (action) => hostPages!.act(action));
+  handle('dock:pages:close', (id) => hostPages?.close(id));
   handle('dock:retryShell', () => retryShell());
   handle('dock:appletApiPermissions', (permissions: unknown) => {
     if (!startupReady || quitting) throw Error('AppDockは準備中です。');
@@ -2628,7 +2628,6 @@ function registerIpc() {
   handle('dock:hostModal', (active: boolean) => {
     if (typeof active !== 'boolean') throw Error('Invalid modal state');
     hostModalLayer?.setActive(active);
-    shellPageHost?.hostModalChanged(active);
   });
   handle('dock:hostModalReady', (revision: number, rendered = true) => {
     if (!Number.isSafeInteger(revision)) throw Error('Invalid modal revision');
@@ -3570,13 +3569,12 @@ async function initialize() {
     galleryState.closed = true;
     galleryDialogs.cancel();
   });
-  shellPageHost = new ShellPageHost({
-    window,
-    modalLayer: hostModalLayer,
-    preload: path.join(__dirname, 'shell-page-preload.js'),
-    providers: () => manager.shellProviders(),
-    registry: shellRegistry!,
+  hostPages = new HostPages({
     route: () => navigation.state.route,
+    blocked: () => !!hostModalLayer?.isActive || !!overlayHost?.active,
+    changed: (model) => {
+      if (window && !window.isDestroyed()) window.webContents.send('dock:pages:changed', model);
+    },
     ready: () => startupReady && !quitting,
     create: (request) =>
       request.kind === 'image-library'
@@ -3631,24 +3629,9 @@ async function initialize() {
                   window?.webContents.send('dock:logSourceChanged', source),
                 changed,
               }),
-    execute: executeShellCommand,
-    settings: (id) => settings.value.extensions[id]?.settings ?? {},
-    shortcut: async (key) => {
-      if (!window?.isFocused()) return;
-      const normalized = normalizeShortcut(key);
-      if (globalShortcutOwnership.has(normalized)) return;
-      return dispatchShortcut(normalized);
-    },
-    layer: () => {
-      notificationBanner?.layout();
-      overlayHost?.layout();
-    },
-    failed: (message, unavailable) => {
-      log.write('error', 'shell-page', message);
-      if (unavailable)
-        void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
-    },
   });
+  window.webContents.on('did-start-loading', () => hostPages?.close());
+  window.webContents.on('render-process-gone', () => hostPages?.close());
   configurePageHost({
     overlay: () => {
       notificationBanner?.layout();
@@ -4132,7 +4115,7 @@ app.on('before-quit', (event) => {
   shellHost?.dispose();
   shellBarHost?.dispose();
   overlayHost?.dispose();
-  shellPageHost?.dispose();
+  hostPages?.dispose();
   settingsPageHost?.dispose();
   void (async () => {
     for (const stop of [

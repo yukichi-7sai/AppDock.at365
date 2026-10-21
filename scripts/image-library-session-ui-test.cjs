@@ -157,26 +157,19 @@ async function launch(restore = false) {
 }
 async function open() {
   await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
-  page = await until(
-    () =>
-      app
-        .context()
-        .pages()
-        .find((p) => p.url().endsWith('/image-library.html')),
-    'gallery',
-  );
+  page = host;
   page.setDefaultTimeout(15000);
   await page.locator('.ad-gallery-card').first().waitFor();
 }
-const model = () => page.evaluate(async () => (await window.appdockPage.connect()).snapshot);
+const model = () => page.evaluate(async () => await window.dock.pages.get());
 const imageSnapshot = () => host.evaluate(() => window.dock.imageLibrary.snapshot());
 const card = (name) =>
   page.locator('.ad-gallery-card').filter({ has: page.locator('h3', { hasText: name }) });
 const action = async (command, fields = {}) =>
   page.evaluate(
     async ({ command, fields }) => {
-      const { snapshot } = await window.appdockPage.connect();
-      return window.appdockPage.act({ id: snapshot.id, type: 'gallery', command, ...fields });
+      const snapshot = await window.dock.pages.get();
+      return window.dock.pages.act({ id: snapshot.id, type: 'gallery', command, ...fields });
     },
     { command, fields },
   );
@@ -236,7 +229,10 @@ const observations = [];
     await ordinaryDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
+        ),
       'ordinary dialog restores page',
     );
     checks.push('host dialog opens with browser automation focus emulation disabled');
@@ -276,7 +272,10 @@ const observations = [];
     await frameDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
+        ),
       'frame-independent dialog restores page',
     );
     await card('image-000.png')
@@ -289,14 +288,21 @@ const observations = [];
     );
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && !v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('dialog:modal') &&
+            document.querySelector('.library-page').inert,
+        ),
       'frame-independent preview covers page',
     );
     await host.screenshot({ path: path.join(profile, 'host-frames-paused-preview.png') });
     await framePreview.getByRole('button', { name: '閉じる', exact: true }).click();
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
+        ),
       'frame-independent preview restores page',
     );
     await app.evaluate(async ({ BrowserWindow }) => {
@@ -338,16 +344,17 @@ const observations = [];
       const failureSurfaces = await modalState();
       observations.push({ phase: `${mode}-failed`, surfaces: failureSurfaces });
       assert(
-        failureSurfaces
-          .filter((v) => /\/(image-library|index|bars)\.html/.test(v.url))
-          .every((v) => !v.visible),
+        failureSurfaces.filter((v) => /\/(index|bars)\.html/.test(v.url)).every((v) => !v.visible),
         'capture failure must hide native surfaces so the host dialog can receive input',
       );
       await host.screenshot({ path: path.join(profile, `${mode}-failure-dialog.png`) });
       await fallbackDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
       await until(
         async () =>
-          (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
+          host.evaluate(
+            () =>
+              !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
+          ),
         'fallback restores page',
       );
       await app.evaluate(({ BrowserWindow }) => {
@@ -375,7 +382,11 @@ const observations = [];
     await dialog.waitFor();
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && !v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('dialog:modal') &&
+            document.querySelector('.library-page').inert,
+        ),
       'modal covers library',
     );
     await page.evaluate(() =>
@@ -389,7 +400,7 @@ const observations = [];
       () => ({ allowed: true }),
       (error) => ({ error: String(error) }),
     );
-    assert.match(background.error, /bound/, 'background edits must still be blocked');
+    assert.match(background.error, /dialog/, 'background edits must still be blocked');
     const invalid = await action('anchor', { anchor: { id: 'foreign-image', offset: 0 } }).then(
       () => ({ allowed: true }),
       (error) => ({ error: String(error) }),
@@ -400,7 +411,10 @@ const observations = [];
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
+        ),
       'library resumes',
     );
     const alertsAfterModal = await page.locator('.library-status [role=alert]').allTextContents();
@@ -429,7 +443,14 @@ const observations = [];
     await until(async () => !!(await model()).content.anchor, 'scroll anchor saved');
     const anchor = (await model()).content.anchor;
     await host.evaluate(() => window.dock.navigate('home'));
-    await until(() => page.isClosed(), 'previous library disposed');
+    await until(
+      () =>
+        host
+          .locator('.library-page')
+          .count()
+          .then((n) => !n),
+      'previous host page unmounted',
+    );
     await open();
     await card('image-001.png').getByRole('checkbox').check();
     await until(async () => (await model()).content.selected === 1, 'checkbox after reopen');
@@ -462,15 +483,20 @@ const observations = [];
     await preview.waitFor();
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && !v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('dialog:modal') &&
+            document.querySelector('.library-page').inert,
+        ),
       'delayed preview covers library',
     );
     await host.screenshot({ path: path.join(profile, 'double-click-dialog.png') });
     await preview.getByRole('button', { name: '閉じる', exact: true }).click();
     await until(
       async () =>
-        (await host.evaluate(() => window.dock.snapshot())).shellRegions.regions.some(
-          (r) => r.region === 'page.image-library' && r.visible,
+        host.evaluate(
+          () =>
+            !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
         ),
       'preview double click returns',
     );

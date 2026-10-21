@@ -160,6 +160,7 @@ const checks = [],
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const executable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
+const managementOnly = process.argv.includes('--management-only');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (executable) {
   fs.copyFileSync(path.resolve(process.argv[2]), executable);
@@ -491,20 +492,13 @@ async function until(fn, name) {
     await open();
     await move('test.a', 'ログ');
     await waitForHost(page, async () => (await window.dock.snapshot()).navigation.route === 'logs');
-    const logs = await until(
-      () =>
-        page
-          .context()
-          .pages()
-          .find((p) => p.url().endsWith('/logs.html')),
-      'log surface',
-    );
-    const logModel = await logs.evaluate(async () => (await window.appdockPage.connect()).snapshot);
+    const logs = await require('./shell-overlay-helper.cjs').logsPage(page, { type: 'all' });
+    const logModel = await logs.evaluate(async () => await window.dock.pages.get());
     assert.equal(logModel.content.filters.source, 'test.a');
     assert.equal(logModel.content.scope.type, 'all');
     await logs.getByRole('button', { name: 'Appletの絞り込みを解除', exact: true }).click();
     await until(async () => {
-      const model = await logs.evaluate(async () => (await window.appdockPage.connect()).snapshot);
+      const model = await logs.evaluate(async () => await window.dock.pages.get());
       return model.content.filters.source === '' && model.content.filters.level === 'all';
     }, 'clear log source with adjacent close icon');
     checks.push('log-source-clear-icon');
@@ -516,18 +510,11 @@ async function until(fn, name) {
     );
     await page.getByRole('button', { name: '検出ログを開く', exact: true }).click();
     await waitForHost(page, async () => (await window.dock.snapshot()).navigation.route === 'logs');
-    const discoveryLogs = await until(
-      () =>
-        page
-          .context()
-          .pages()
-          .find((p) => p.url().endsWith('/logs.html')),
-      'discovery log surface',
-    );
+    const discoveryLogs = await require('./shell-overlay-helper.cjs').logsPage(page, {
+      type: 'all',
+    });
     await until(async () => {
-      const model = await discoveryLogs.evaluate(
-        async () => (await window.appdockPage.connect()).snapshot,
-      );
+      const model = await discoveryLogs.evaluate(async () => await window.dock.pages.get());
       return model.content.scope.type === 'all' && model.content.filters.source === '';
     }, 'unfiltered discovery logs');
     checks.push('discovery-warning-and-unfiltered-log');
@@ -555,7 +542,7 @@ async function until(fn, name) {
     await waitForHost(page, async () => (await window.dock.snapshot()).dark);
     await page.screenshot({ path: path.join(output, 'management-dark.png') });
     checks.push('themes-and-widths');
-    if (executable) {
+    if (executable && !managementOnly) {
       const initialPid = await inspect(inspectPort, 'process.pid');
       await page.getByRole('button', { name: 'Appletをインストール', exact: true }).click();
       let dialog = page.getByRole('dialog');
@@ -732,12 +719,24 @@ async function until(fn, name) {
     fs.writeFileSync(
       path.join(output, 'result.json'),
       JSON.stringify(
-        { checks, profile, executableSha256: executable ? hash(executable) : null, errors },
+        {
+          mode: managementOnly ? 'management-only' : 'full',
+          checks,
+          profile,
+          executableSha256: executable ? hash(executable) : null,
+          errors,
+        },
         null,
         2,
       ),
     );
-    console.log(JSON.stringify({ output, checks }, null, 2));
+    console.log(
+      JSON.stringify(
+        { output, mode: managementOnly ? 'management-only' : 'full', checks },
+        null,
+        2,
+      ),
+    );
   } catch (error) {
     let diagnostic;
     if (browser) {

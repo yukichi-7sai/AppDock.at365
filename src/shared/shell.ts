@@ -1,16 +1,12 @@
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
-/** Only these regions are mounted today. Additional page regions need their own public contract. */
+/** Shell targets are deliberately limited. New targets require an explicit request. */
 export type ShellRegion =
   | 'titlebar'
   | 'ribbon'
   | 'statusbar'
   | 'overlay.command-palette'
   | 'overlay.ribbon-group'
-  | 'page.logs'
-  | 'page.home'
-  | 'page.image-library'
-  | 'page.notifications'
   | 'notification.banner'
   | 'notification.desktop';
 
@@ -19,18 +15,24 @@ export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
   { id: 'ribbon', title: 'リボン' },
   { id: 'statusbar', title: 'ステータスバー' },
   { id: 'overlay.command-palette', title: 'コマンドパレット' },
-  { id: 'overlay.ribbon-group', title: 'リボングループ' },
-  { id: 'page.home', title: 'ホーム' },
-  { id: 'page.image-library', title: '画像ライブラリー' },
-  { id: 'page.logs', title: 'ログ' },
-  { id: 'page.notifications', title: '通知センター' },
+  { id: 'overlay.ribbon-group', title: 'リボングループ（一時展開ポップアップ）' },
   { id: 'notification.banner', title: '通知バナー' },
   { id: 'notification.desktop', title: 'デスクトップ通知' },
 ];
 export function isShellRegion(value: unknown): value is ShellRegion {
   return shellRegions.some((r) => r.id === value);
 }
-export type LegacyShellRegion = 'page.settings';
+export type LegacyShellRegion =
+  'page.settings' | 'page.home' | 'page.logs' | 'page.image-library' | 'page.notifications';
+export function isRetiredShellRegion(value: unknown): value is LegacyShellRegion {
+  return [
+    'page.settings',
+    'page.home',
+    'page.logs',
+    'page.image-library',
+    'page.notifications',
+  ].includes(value as string);
+}
 export type ShellRequirement = {
   region: ShellRegion | LegacyShellRegion;
   state: 'resolved' | 'visible';

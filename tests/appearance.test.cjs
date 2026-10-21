@@ -227,7 +227,6 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
   for (const name of [
     'preload',
     'shell-preload',
-    'shell-page-preload',
     'shell-bar-preload',
     'overlay-preload',
     'notification-surface-preload',

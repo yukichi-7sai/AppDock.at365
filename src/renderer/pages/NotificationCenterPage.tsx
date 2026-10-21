@@ -1,19 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import type { ShellPageApi, ShellPageModel } from '../../src/shared/shell-pages';
+import type { HostPageModel } from '../../shared/host-pages';
 import type {
   NotificationCenterModel,
   NotificationCenterOperation,
   NotificationCenterFilters,
-} from '../../src/shared/notification-center';
-import { shortcutFromEvent } from '../../src/shared/commands';
+} from '../../shared/notification-center';
 import './notification-center.css';
-declare global {
-  interface Window {
-    appdockPage: ShellPageApi;
-  }
-}
-const api = window.appdockPage;
+const api = window.dock.pages;
 const states = {
   active: 'アクティブ',
   resolved: '解消済み',
@@ -31,19 +24,22 @@ const reasons: Record<string, string> = {
   'no-available-targets': '選択した通知先を利用できません',
 };
 const levels = { info: '情報', warning: '警告', error: 'エラー' };
-function App() {
-  const [model, setModel] = useState<NotificationCenterModel>(),
-    [session, setSession] = useState(''),
+export function NotificationCenterPage({
+  initialModel,
+}: {
+  initialModel: NotificationCenterModel;
+}) {
+  const [model, setModel] = useState<NotificationCenterModel>(initialModel),
     [error, setError] = useState('');
   const [selected, setSelected] = useState<string[]>([]),
     [pending, setPending] = useState(false);
   const [filters, setFilters] = useState<NotificationCenterFilters>();
-  const acceptModel = useRef<(next: ShellPageModel) => void>(() => {});
-  const latest = useRef<NotificationCenterModel | undefined>(undefined),
+  const acceptModel = useRef<(next: HostPageModel) => void>(() => {});
+  const latest = useRef<NotificationCenterModel | undefined>(initialModel),
     filterRequests = useRef(0);
   useEffect(() => {
-    let live = true;
-    const accept = (next: ShellPageModel) => {
+    const live = true;
+    const accept = (next: HostPageModel) => {
       if (
         !live ||
         next.kind !== 'notifications' ||
@@ -52,64 +48,12 @@ function App() {
         return;
       latest.current = next;
       setModel(next);
-      document.documentElement.dataset.theme = next.dark ? 'dark' : 'light';
       if (!filterRequests.current) setFilters(next.content.filters);
       setSelected((ids) => ids.filter((id) => next.content.items.some((i) => i.id === id)));
     };
     acceptModel.current = accept;
-    const unsubscribe = api.onChanged(accept);
-    void api
-      .connect()
-      .then((c) => {
-        if (live) {
-          accept(c.snapshot);
-          setSession(c.sessionId);
-        }
-      })
-      .catch((e) => setError(String(e)));
-    const focus = api.onFocus((edge) => {
-      const controls = [...document.querySelectorAll<HTMLElement>('button,input,select')].filter(
-        (e) => !e.matches(':disabled'),
-      );
-      (edge === 'first' ? controls[0] : controls.at(-1))?.focus({ preventScroll: true });
-    });
-    const keys = (e: KeyboardEvent) => {
-      if (e.isComposing || e.repeat || e.defaultPrevented) return;
-      if (e.key === 'Tab') {
-        const controls = [...document.querySelectorAll<HTMLElement>('button,input,select')].filter(
-          (e) => !e.matches(':disabled'),
-        );
-        if (
-          e.shiftKey
-            ? document.activeElement === controls[0]
-            : document.activeElement === controls.at(-1)
-        ) {
-          e.preventDefault();
-          void api.focusHost(e.shiftKey ? 'before' : 'after');
-        }
-        return;
-      }
-      if (
-        !e.ctrlKey &&
-        !e.altKey &&
-        e.target instanceof Element &&
-        e.target.closest('input,select,textarea')
-      )
-        return;
-      const key = shortcutFromEvent(e);
-      if (key) void api.shortcut(key).catch((err) => setError(String(err)));
-    };
-    document.addEventListener('keydown', keys);
-    return () => {
-      live = false;
-      unsubscribe();
-      focus();
-      document.removeEventListener('keydown', keys);
-    };
-  }, []);
-  useEffect(() => {
-    if (session && model) void api.ready(session).catch((e) => setError(String(e)));
-  }, [session, !!model]);
+    accept(initialModel);
+  }, [initialModel]);
   const act = async (action: NotificationCenterOperation) => {
     const current = latest.current;
     if (!current) return;
@@ -123,8 +67,10 @@ function App() {
       // A completed operation may precede the host's aggregated change event.
       // Refresh through the same public bridge before enabling another operation.
       await api
-        .connect()
-        .then((c) => acceptModel.current(c.snapshot))
+        .get(current.id)
+        .then((next) => {
+          if (next) acceptModel.current(next);
+        })
         .catch(() => {});
       setPending(false);
     }
@@ -151,7 +97,7 @@ function App() {
     (i) => selected.includes(i.id) && i.historyPolicy === 'persistent',
   );
   return (
-    <main className="notification-center">
+    <section className="notification-center">
       <header>
         <h1>通知センター</h1>
         <span className="muted">未読 {c.unreadCount}件</span>
@@ -394,7 +340,6 @@ function App() {
           </button>
         </footer>
       )}
-    </main>
+    </section>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);

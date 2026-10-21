@@ -1,7 +1,7 @@
 import { SettingsControlsProvider } from './settings-ui/api';
 import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/RegisteredImagePicker';
 import { flushSettingsPageInputs } from './settings-input-flush';
-import { ShellPageSlot } from './ShellPageSlot';
+import { HostPageSlot } from './pages/HostPageSlot';
 import { ImageLibraryDialogHost } from './ImageLibraryDialogHost';
 import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
@@ -53,7 +53,7 @@ function App() {
         const selector =
           edge === 'before'
             ? '.shell-bar-slot[data-region="titlebar"]'
-            : '.sidebar button, main button, main input, main select, main .shell-page-slot';
+            : '.sidebar button, main button, main input, main select, main summary';
         const elements = [...document.querySelectorAll<HTMLElement>(selector)].filter(
           (e) => e.getClientRects().length && !e.matches(':disabled'),
         );
@@ -370,7 +370,7 @@ function App() {
           page === 'logs' ||
           page === 'notifications' ||
           page === 'image-library'
-            ? 'shell-page-main'
+            ? 'host-page-main'
             : page.startsWith('page:')
               ? 'applet-page-main'
               : undefined
@@ -440,7 +440,7 @@ function App() {
               </div>
             )}
             {page === 'home' && (
-              <ShellPageSlot
+              <HostPageSlot
                 key="home"
                 kind="home"
                 appletOrder={editor.value.appletOrder}
@@ -453,17 +453,17 @@ function App() {
               )}
             </div>
             {page === 'notifications' && (
-              <ShellPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />
+              <HostPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />
             )}
             {page === 'image-library' && (
-              <ShellPageSlot
+              <HostPageSlot
                 key="image-library"
                 kind="image-library"
                 navigationRequest={snapshot.navigation.request}
               />
             )}
             {page === 'logs' && (
-              <ShellPageSlot
+              <HostPageSlot
                 scope={{ type: 'all' }}
                 source={logSource}
                 navigationRequest={snapshot.navigation.request}

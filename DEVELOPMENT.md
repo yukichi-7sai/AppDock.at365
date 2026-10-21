@@ -25,12 +25,12 @@
 | AIと音声 | [AI文章生成](docs/ai.md)、[TTS](docs/tts-design.md)、[共通音声再生](docs/audio-playback.md) |
 | 通知とエラー | [通知基盤](docs/notifications.md)、[通知読み上げ](docs/notification-speech-design.md)、[共通エラー](docs/error-reporting.md)、[共通警告](docs/warning-notifications-design.md) |
 | キー・マウス・トレイ | [ショートカットと入力フック](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
-| Shellとリボン | [領域と割り当て](docs/shell-foundation.md)、[リボンの配置とバッジ](docs/ribbon-customization-design.md)、[Shell API](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本文とログ](docs/shell-pages.md)、[バー](docs/shell-bars.md) |
+| Shellとリボン | [領域と割り当て](docs/shell-foundation.md)、[リボンの配置とバッジ](docs/ribbon-customization-design.md)、[Shell API](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本体のページ](docs/host-pages.md)、[バー](docs/shell-bars.md) |
 | 画像と配色 | [登録画像](docs/registered-images.md)、[共通ギャラリー](docs/image-gallery.md)、[共通配色](docs/appearance.md) |
 | 起動と更新 | [Windows起動設定](docs/launch-settings.md)、[更新](docs/updates.md)、[配布先の検証](docs/update-checklist.md) |
 | 文書と実測 | [文書方針](docs/documentation.md)、[検証記録](VERIFICATION.md) |
 
-本体はTypeScript/Reactで構成し、Nodeと.NET Appletは別プロセスで動作する。設定の描画は本体renderer、Shell領域の描画は選択したShell、native画面は対象Appletが所有する。
+本体はTypeScript/Reactで構成し、Nodeと.NET Appletは別プロセスで動作する。ホーム・画像ライブラリー・通知センター・ログ・設定の描画は本体rendererと共通UI部品、Shell領域の描画は選択したShell、native画面は対象Appletが所有する。
 
 共有設定・dataの参照先変更は[未実装の設計](docs/shared-settings-location-design.md)として分離する。現在の保存仕様は設定同期の文書を正本とする。
 

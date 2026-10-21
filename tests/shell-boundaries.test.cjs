@@ -40,12 +40,10 @@ test('settings UI ships only in the host renderer, with no settings Shell entry'
   assert(fs.existsSync(path.join(host, 'renderer/settings/SettingsPage.tsx')));
   const manifest = JSON.parse(fs.readFileSync(path.join(shell, 'extension.json'), 'utf8'));
   assert.equal(manifest.shell.views['page.settings'], undefined);
-  assert.equal(
-    fs
-      .readFileSync(path.join(root, 'src/main/shell-page-preload.ts'), 'utf8')
-      .includes('dock:settingsPage:'),
-    false,
-  );
+  assert.equal(fs.existsSync(path.join(root, 'src/main/shell-page-preload.ts')), false);
+  for (const name of ['HomePage', 'LogPage', 'NotificationCenterPage', 'ImageLibraryPage'])
+    assert(fs.existsSync(path.join(host, 'renderer/pages', name + '.tsx')));
+  assert(Object.keys(manifest.shell.views).every((region) => !region.startsWith('page.')));
 });
 
 test('window bars are rendered only by the selected Shell and ship in the default manifest', () => {

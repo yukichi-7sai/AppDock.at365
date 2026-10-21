@@ -402,9 +402,13 @@ async function errorNoticeFor(caller) {
     );
     assert(!fs.existsSync(path.join(local, 'ai-access.json')));
     assert(
-      !JSON.stringify(await page.evaluate(() => window.appdockPage.connect())).includes(
-        'fixture-ai-secret',
-      ),
+      !JSON.stringify(
+        await page.evaluate(() =>
+          window.dock.settingsPage.get(
+            document.querySelector('.settings-surface').dataset.settingsConnection,
+          ),
+        ),
+      ).includes('fixture-ai-secret'),
     );
     checks.push(
       'URL/key Enter and model button discover from local draft, IME ignored, one OK saves encrypted key/config',
@@ -634,13 +638,21 @@ async function errorNoticeFor(caller) {
     await page.getByLabel('試験の入力データ', { exact: true }).fill('slow');
     await page.getByRole('button', { name: '文章を生成', exact: true }).click();
     await until(async () => {
-      const m = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+      const m = await page.evaluate(() =>
+        window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        ),
+      );
       return m.content.auxiliary.ai.jobs.at(-1)?.state === 'running';
     }, 'slow started');
     await page.getByLabel('共通プロンプト', { exact: true }).fill('変更後の共通方針');
     await settleSettings(page);
     await until(async () => {
-      const m = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+      const m = await page.evaluate(() =>
+        window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        ),
+      );
       return m.content.auxiliary.ai.jobs.at(-1)?.state === 'canceled';
     }, 'old prompt canceled');
     checks.push('common prompt changes cancel old jobs');

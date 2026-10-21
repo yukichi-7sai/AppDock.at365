@@ -213,9 +213,13 @@ async function configure(patch) {
     const keyfile = path.join(local, 'tts-key.json');
     assert(!fs.readFileSync(keyfile, 'utf8').includes('fixture-secret'));
     assert(
-      !JSON.stringify(await page.evaluate(() => window.appdockPage.connect())).includes(
-        'fixture-secret',
-      ),
+      !JSON.stringify(
+        await page.evaluate(() =>
+          window.dock.settingsPage.get(
+            document.querySelector('.settings-surface').dataset.settingsConnection,
+          ),
+        ),
+      ).includes('fixture-secret'),
     );
     checks.push('encrypted key and public model privacy');
     await page.getByLabel('読み上げ速度', { exact: true }).fill('1.4');
@@ -223,7 +227,11 @@ async function configure(patch) {
     await page.getByLabel('試聴するテキスト', { exact: true }).fill('設定画面の音声テスト。');
     await page.getByRole('button', { name: '試聴する', exact: true }).click();
     await until(async () => {
-      const m = (await page.evaluate(() => window.appdockPage.connect())).snapshot;
+      const m = await page.evaluate(() =>
+        window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        ),
+      );
       return m.content.auxiliary.tts.jobs.at(-1)?.state === 'completed';
     }, 'preview ended');
     assert.equal(requests.at(-1).auth, 'Bearer fixture-secret');

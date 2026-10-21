@@ -43,7 +43,7 @@ for (const [key, id] of Object.entries(ids)) {
   m.id = id;
   m.name = id;
   m.version = '1.0.0';
-  m.minimumHostVersion = '0.34.0';
+  m.minimumHostVersion = require('../package.json').version;
   if (key === 'partial') m.shell = { apiVersion: 1, views: { ribbon: 'index.html' } };
   m.commands = ['probe', 'normal', 'visible', 'resolved'].map((action) => ({
     id: id + '.' + action,
@@ -54,7 +54,7 @@ for (const [key, id] of Object.entries(ids)) {
       : action === 'resolved'
         ? {
             shellRequirement: {
-              region: key === 'partial' ? 'ribbon' : 'page.home',
+              region: key === 'partial' ? 'ribbon' : 'statusbar',
               state: 'resolved',
             },
           }
@@ -98,11 +98,11 @@ for (const [key, id] of Object.entries(ids)) {
 }
 initial.host.shellProviders = {
   ribbon: ids.a,
-  'page.home': ids.b,
+  statusbar: ids.b,
   'overlay.command-palette': ids.a,
   'notification.banner': ids.a,
   'notification.desktop': ids.b,
-  'page.notifications': ids.b,
+  titlebar: ids.b,
   'future.panel': 'missing.future',
 };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
@@ -150,11 +150,15 @@ async function page(region, id) {
               ? 'appdockShell'
               : region === 'overlay.command-palette'
                 ? 'appdockOverlay'
-                : region.startsWith('notification.')
-                  ? 'appdockNotifications'
-                  : 'appdockPage';
+                : ['titlebar', 'statusbar'].includes(region)
+                  ? 'appdockBar'
+                  : region.startsWith('notification.')
+                    ? 'appdockNotifications'
+                    : 'appdockPage';
           const c = await p.evaluate((name) => window[name]?.connect(), name);
           if (c?.providerAppletId === id) {
+            if (['titlebar', 'statusbar'].includes(region) && c.snapshot.region !== region)
+              continue;
             if (region.startsWith('notification.') && c.snapshot.surface !== region.split('.')[1])
               continue;
             if (region.startsWith('page.') && c.snapshot.kind !== region.slice(5)) continue;
@@ -257,7 +261,7 @@ async function close() {
     await launch();
     await host.evaluate(() => window.dock.navigate('home'));
     await bound('ribbon', ids.a);
-    await bound('page.home', ids.b);
+    await bound('statusbar', ids.b);
     assert((await snap()).extensions.find((e) => e.id === ids.n).state === 'running');
     const logs = (await snap()).logs;
     for (const id of [ids.b, ids.n])
@@ -275,15 +279,15 @@ async function close() {
     await assert.rejects(() => execute(ids.a + '.resolved'));
     await execute(ids.a + '.old-visible');
     checks.push(
-      'A ribbon and B home mix; Node/.NET/native activation reads own state before Views; normal, resolved, visible and alias conditions share final execution guard',
+      'A ribbon and B statusbar mix; Node/.NET/native activation reads own state before Views; normal, resolved, visible and alias conditions share final execution guard',
     );
     const ribbonBefore = await page('ribbon', ids.a);
-    await assign({ 'page.home': ids.a });
-    await bound('page.home', ids.a);
+    await assign({ statusbar: ids.a });
+    await bound('statusbar', ids.a);
     assert.equal(await page('ribbon', ids.a), ribbonBefore);
     await execute(ids.a + '.resolved');
-    await assign({ 'page.home': ids.b });
-    await bound('page.home', ids.b);
+    await assign({ statusbar: ids.b });
+    await bound('statusbar', ids.b);
     let palette = await openPalette();
     await assert.rejects(() => execute(ids.a + '.visible'));
     await assign({ 'overlay.command-palette': ids.b });
@@ -301,7 +305,7 @@ async function close() {
     assert((await snap()).overlay.active);
     await closePalette(await page('overlay.command-palette', defaultShellId));
     await bound('ribbon', defaultShellId);
-    await bound('page.home', ids.b);
+    await bound('statusbar', ids.b);
     assert.equal((await snap()).settings.value.host.shellProviders.ribbon, ids.a);
     await enabled(ids.a, true);
     await bound('ribbon', ids.a);
@@ -311,12 +315,12 @@ async function close() {
     checks.push(
       'independent assignment preserves other Views; palette freezes current provider, modal blocks visible commands, disable recovers the same request only to Default, re-enable restores configured ribbon',
     );
-    await assign({ 'page.home': ids.partial });
-    await bound('page.home', defaultShellId);
-    assert.match((await state('page.home')).reason, /提供/);
-    assert.equal((await snap()).settings.value.host.shellProviders['page.home'], ids.partial);
-    await assign({ 'page.home': ids.b });
-    await bound('page.home', ids.b);
+    await assign({ statusbar: ids.partial });
+    await bound('statusbar', defaultShellId);
+    assert.match((await state('statusbar')).reason, /提供/);
+    assert.equal((await snap()).settings.value.host.shellProviders['statusbar'], ids.partial);
+    await assign({ statusbar: ids.b });
+    await bound('statusbar', ids.b);
     await host.evaluate(() => window.dock.navigate('settings'));
     const settingsPage = await require('./settings-host-helper.cjs').settingsPage(host);
     assert.equal(await settingsPage.getByLabel('設定のShell', { exact: true }).count(), 0);
@@ -354,22 +358,23 @@ async function close() {
       noticeBefore.items.map((i) => i.id),
     );
     await host.evaluate(() => window.dock.navigate('notifications'));
-    let center = await page('page.notifications', ids.b);
+    let center = host;
+    await center.getByLabel('通知を検索', { exact: true }).waitFor();
     await center.getByLabel('通知を検索', { exact: true }).fill('Safe');
     await until(
       async () =>
-        (await center.evaluate(() => window.appdockPage.connect())).snapshot.content.filters
-          .text === 'Safe',
+        (await center.evaluate(() => window.dock.pages.get())).content.filters.text === 'Safe',
       'center filter',
     );
-    await assign({ 'page.notifications': ids.a });
-    center = await page('page.notifications', ids.a);
+    await assign({ titlebar: ids.a });
+    await bound('titlebar', ids.a);
+    center = host;
     assert.equal(
-      (await center.evaluate(() => window.appdockPage.connect())).snapshot.content.filters.text,
+      (await center.evaluate(() => window.dock.pages.get())).content.filters.text,
       'Safe',
     );
     await host.evaluate(() => window.dock.navigate('home'));
-    await bound('page.home', ids.b);
+    await bound('statusbar', ids.b);
     if (app) {
       await app.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
@@ -385,7 +390,7 @@ async function close() {
       );
     }
     checks.push(
-      'banner and desktop use independent providers without recreating notification IDs; center filter survives provider swap; desktop binding survives main hiding',
+      'banner and desktop use independent providers without recreating notification IDs; host center filter survives unrelated titlebar provider swap; desktop binding survives main hiding',
     );
     if (app) {
       await app.evaluate(({ webContents }) => {
@@ -395,10 +400,10 @@ async function close() {
         wc.forcefullyCrashRenderer();
       });
       await bound('ribbon', defaultShellId);
-      await bound('page.home', ids.b);
-      assert.equal((await state('page.notifications')).resolvedProvider, ids.a);
+      await bound('statusbar', ids.b);
+      assert.equal((await state('titlebar')).resolvedProvider, ids.a);
       checks.push(
-        'renderer failure suppresses ribbon only and leaves B home and A notification center resolved',
+        'renderer failure suppresses ribbon only and leaves B statusbar and A titlebar resolved',
       );
     }
     await assign({ ribbon: ids.n });
@@ -409,7 +414,7 @@ async function close() {
     await bound('ribbon', ids.a);
     await execute(ids.a + '.crash').catch(() => {});
     await bound('ribbon', defaultShellId);
-    await bound('page.home', ids.b);
+    await bound('statusbar', ids.b);
     assert.equal((await state('notification.banner')).boundProvider, ids.b);
     await enabled(ids.a, false);
     await enabled(ids.a, true);
@@ -423,7 +428,7 @@ async function close() {
     await launch(['--safe-shell']);
     await host.evaluate(() => window.dock.navigate('home'));
     await bound('ribbon', defaultShellId);
-    await bound('page.home', defaultShellId);
+    await bound('statusbar', defaultShellId);
     assert.equal((await snap()).settings.value.host.shellProviders.ribbon, ids.a);
     checks.push('safe launch uses bundled Default while preserving all assignments');
     await host.screenshot({ path: path.join(profile, 'host.png') });

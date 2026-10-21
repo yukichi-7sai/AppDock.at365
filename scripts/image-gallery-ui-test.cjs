@@ -162,26 +162,19 @@ async function launch(restore = false) {
 }
 async function open() {
   await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
-  page = await until(
-    () =>
-      app
-        .context()
-        .pages()
-        .find((p) => p.url().endsWith('/image-library.html')),
-    'gallery',
-  );
+  page = host;
   page.setDefaultTimeout(15000);
   await page.locator('.ad-gallery-card').first().waitFor();
 }
-const model = () => page.evaluate(async () => (await window.appdockPage.connect()).snapshot);
+const model = () => page.evaluate(async () => await window.dock.pages.get());
 const imageSnapshot = () => host.evaluate(() => window.dock.imageLibrary.snapshot());
 const card = (name) =>
   page.locator('.ad-gallery-card').filter({ has: page.locator('h3', { hasText: name }) });
 const action = async (command, fields = {}) =>
   page.evaluate(
     async ({ command, fields }) => {
-      const { snapshot } = await window.appdockPage.connect();
-      return window.appdockPage.act({ id: snapshot.id, type: 'gallery', command, ...fields });
+      const snapshot = await window.dock.pages.get();
+      return window.dock.pages.act({ id: snapshot.id, type: 'gallery', command, ...fields });
     },
     { command, fields },
   );
@@ -324,11 +317,11 @@ async function selectedBorder(label) {
     await until(
       async () =>
         (await modalState())
-          .filter((v) => /\/(image-library|index|bars)\.html/.test(v.url))
+          .filter((v) => /\/(index|bars)\.html/.test(v.url))
           .every((v) => !v.visible),
       'native surfaces hidden',
     );
-    await assert.rejects(action('select-all'), /bound/);
+    await assert.rejects(action('select-all'), /dialog/);
     await host.screenshot({ path: path.join(profile, 'modal.png') });
     await d.getByLabel('画像グループ名').fill('新しいグループ');
     await host.mouse.click(4, 4);
@@ -341,7 +334,10 @@ async function selectedBorder(label) {
     );
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
+        ),
       'gallery restored',
     );
     await action('group', { groupId: 'all' });
@@ -371,11 +367,14 @@ async function selectedBorder(label) {
     await host.mouse.click(4, 4);
     await until(
       async () =>
-        (await modalState()).some((v) => v.url.endsWith('/image-library.html') && v.visible),
+        host.evaluate(
+          () =>
+            !!document.querySelector('.library-page') && !document.querySelector('dialog:modal'),
+        ),
       'preview closed',
     );
     checks.push(
-      'shared host dialogs, native body/bar backdrop, blocked background actions and preview',
+      'shared host dialogs, host page and native bar backdrop, blocked background actions and preview',
     );
     await app.evaluate(
       ({ dialog }, files) => {
@@ -423,6 +422,7 @@ async function selectedBorder(label) {
     );
     await action('group', { groupId: 'all' });
     await action('reload');
+    await card('image-000.png').waitFor();
     assert.deepEqual(
       await card('image-000.png').locator('.ad-gallery-actions button').allTextContents(),
       ['グループ', '削除'],
@@ -493,7 +493,14 @@ async function selectedBorder(label) {
     await action('select', { imageId: (await model()).content.items[0].id, selected: true });
     const beforeRoute = (await model()).content;
     await host.evaluate(() => window.dock.navigate('home'));
-    await until(() => page.isClosed(), 'old view released');
+    await until(
+      () =>
+        host
+          .locator('.library-page')
+          .count()
+          .then((n) => !n),
+      'previous host page unmounted',
+    );
     await open();
     assert.equal((await model()).content.selected, beforeRoute.selected);
     assert.equal((await model()).content.cardWidth, beforeRoute.cardWidth);
@@ -600,7 +607,12 @@ async function selectedBorder(label) {
     const bundleUrl = require('node:url').pathToFileURL(
       path.join(appPath, 'out/ui/image-gallery/image-gallery.js'),
     ).href;
-    const common = await page.evaluate(async (bundleUrl) => {
+    const componentPage = await require('./gallery-component-helper.cjs').galleryComponentPage(
+      app,
+      host,
+      profile,
+    );
+    const common = await componentPage.evaluate(async (bundleUrl) => {
       const { mountImageGallery, mountGallerySizeControl, mountGalleryPreview } = await import(
         bundleUrl
       );

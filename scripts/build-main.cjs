@@ -28,7 +28,6 @@ const appearance = fs.readFileSync(path.join(output, 'main/appearance-preload.js
 for (const name of [
   'preload',
   'shell-preload',
-  'shell-page-preload',
   'shell-bar-preload',
   'overlay-preload',
   'notification-surface-preload',

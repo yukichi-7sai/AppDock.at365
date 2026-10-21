@@ -276,11 +276,11 @@ manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣
 
 公開先をAPIごとのcallers宣言から判定し、Applet専用入力APIを提供します。利用許可は全Applet共通です。Node/.NETのコマンド実行文脈と取消は入力APIまで伝播します。[共通操作API](appdock-api.md)を参照してください。
 
-page.logsとwindow.appdockPageは[Shellのページ表示](shell-pages.md)を参照してください。Shell Appletの自己設定/自己コマンドAPIも共用します。
+Shell対象は[Shell基盤](shell-foundation.md)の7領域に限定する。ページ本文は[本体のページ表示](host-pages.md)を使い、Shell Appletの自己設定/自己コマンドAPIとは分離する。
 
 ## 種類指定通知API
 
-登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、Default Shellのバナー・デスクトップ・通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
+登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、Default Shellのバナー・デスクトップと本体の通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
 
 最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、種類別の通知先・表示時間を適用します。安全な汎用要約だけを履歴へ保存します。
 

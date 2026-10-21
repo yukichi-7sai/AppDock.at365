@@ -27,6 +27,10 @@ export class HostModalLayer {
     window.once('closed', () => this.surfaces.clear());
   }
 
+  get isActive() {
+    return this.active;
+  }
+
   /** Update bounds before setVisible, and dispose the registration with its View. */
   register(view: WebContentsView): HostModalRegistration {
     if (this.surfaces.has(view)) throw Error('Modal surface is already registered');

@@ -178,26 +178,19 @@ async function launch(restore = false) {
 }
 async function open() {
   await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
-  page = await until(
-    () =>
-      app
-        .context()
-        .pages()
-        .find((p) => p.url().endsWith('/image-library.html')),
-    'gallery',
-  );
+  page = host;
   page.setDefaultTimeout(15000);
   await page.locator('.ad-gallery-card').first().waitFor();
 }
-const model = () => page.evaluate(async () => (await window.appdockPage.connect()).snapshot);
+const model = () => page.evaluate(async () => await window.dock.pages.get());
 const imageSnapshot = () => host.evaluate(() => window.dock.imageLibrary.snapshot());
 const card = (name) =>
   page.locator('.ad-gallery-card').filter({ has: page.locator('h3', { hasText: name }) });
 const action = async (command, fields = {}) =>
   page.evaluate(
     async ({ command, fields }) => {
-      const { snapshot } = await window.appdockPage.connect();
-      return window.appdockPage.act({ id: snapshot.id, type: 'gallery', command, ...fields });
+      const snapshot = await window.dock.pages.get();
+      return window.dock.pages.act({ id: snapshot.id, type: 'gallery', command, ...fields });
     },
     { command, fields },
   );
@@ -323,7 +316,12 @@ async function theme(value) {
     const bundleUrl = require('node:url').pathToFileURL(
       path.join(appPath, 'out/ui/image-gallery/image-gallery.js'),
     ).href;
-    const race = await page.evaluate(async (bundleUrl) => {
+    const componentPage = await require('./gallery-component-helper.cjs').galleryComponentPage(
+      app,
+      host,
+      profile,
+    );
+    const race = await componentPage.evaluate(async (bundleUrl) => {
       const { mountImageGallery } = await import(bundleUrl);
       const wait = async (condition) => {
         for (let i = 0; i < 300; i++) {

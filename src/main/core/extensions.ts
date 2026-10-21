@@ -156,12 +156,6 @@ function readManifest(
   }
   m.notificationTypes = parseNotificationTypes(m.notificationTypes);
   if (
-    sourceKind !== 'builtin' &&
-    m.shell?.views?.['page.image-library'] &&
-    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.74.0') < 0)
-  )
-    throw Error('画像ライブラリーにはminimumHostVersion:0.74.0以上が必要です。');
-  if (
     m.notificationTypes.length &&
     (!m.capabilities?.includes('notifications') ||
       !m.minimumHostVersion ||
@@ -170,8 +164,7 @@ function readManifest(
     throw Error('通知種類にはnotifications capabilityとminimumHostVersion:0.30.0以上が必要です。');
   if (
     sourceKind !== 'builtin' &&
-    (m.shell?.views?.['page.notifications'] ||
-      m.notificationTypes.some((t: any) => !t.defaultTargets.length)) &&
+    m.notificationTypes.some((t: any) => !t.defaultTargets.length) &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.31.0') < 0)
   )
     throw Error('通知センターにはminimumHostVersion:0.31.0以上が必要です。');

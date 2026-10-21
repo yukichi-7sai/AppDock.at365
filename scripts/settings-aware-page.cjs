@@ -27,17 +27,6 @@ function settingsAwarePage(host) {
     } catch {}
     if (settings && settings !== host) result.push(settings);
     const route = (await host.evaluate(() => window.dock.snapshot())).navigation.route;
-    if (['home', 'logs'].includes(route)) {
-      for (const p of host
-        .context()
-        .pages()
-        .filter((p) => p.url().endsWith('/' + route + '.html'))) {
-        try {
-          const m = (await p.evaluate(() => window.appdockPage.connect())).snapshot;
-          if (m.kind === route) result.push(p);
-        } catch {}
-      }
-    }
     try {
       result.push(await ribbonPage(host));
     } catch {}

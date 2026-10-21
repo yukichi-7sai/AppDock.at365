@@ -185,19 +185,24 @@ const api: DockApi = {
   onHomeCommandResult: (callback) => {
     const handler = (
       _: Electron.IpcRendererEvent,
-      result: import('../shared/shell-pages').HomeCommandResult,
+      result: import('../shared/host-pages').HomeCommandResult,
     ) => callback(result);
     ipcRenderer.on('dock:homeCommandResult', handler);
     return () => ipcRenderer.removeListener('dock:homeCommandResult', handler);
   },
-  shellPage: (request, bounds) => ipcRenderer.invoke('dock:shellPage', request, bounds),
-  closeShellPage: (id) => ipcRenderer.invoke('dock:closeShellPage', id),
-  focusShellPage: (id, edge) => ipcRenderer.invoke('dock:focusShellPage', id, edge),
-  onShellPageFocusHost: (callback) => {
-    const handler = (_: Electron.IpcRendererEvent, id: string, edge: 'before' | 'after') =>
-      callback(id, edge);
-    ipcRenderer.on('dock:shellPageFocusHost', handler);
-    return () => ipcRenderer.removeListener('dock:shellPageFocusHost', handler);
+  pages: {
+    open: (request) => ipcRenderer.invoke('dock:pages:open', request),
+    get: (id) => ipcRenderer.invoke('dock:pages:get', id),
+    act: (action) => ipcRenderer.invoke('dock:pages:act', action),
+    close: (id) => ipcRenderer.invoke('dock:pages:close', id),
+    onChanged: (callback) => {
+      const handler = (
+        _: Electron.IpcRendererEvent,
+        model: import('../shared/host-pages').HostPageModel,
+      ) => callback(model);
+      ipcRenderer.on('dock:pages:changed', handler);
+      return () => ipcRenderer.removeListener('dock:pages:changed', handler);
+    },
   },
   onLogSourceChanged: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, source: string) => callback(source);

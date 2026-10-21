@@ -5,12 +5,12 @@ import { rankCommands, type UiCommand } from '../../shared/commands';
 import type {
   HomePageRequest,
   HomePageModel,
-  ShellPageRequest,
-  ShellPageAction,
-} from '../../shared/shell-pages';
-import type { ShellPageController } from './shell-page-controller';
+  HostPageRequest,
+  HostPageAction,
+} from '../../shared/host-pages';
+import type { HostPageController } from './host-page-controller';
 
-export function parseHomePageRequest(value: ShellPageRequest): HomePageRequest {
+export function parseHomePageRequest(value: HostPageRequest): HomePageRequest {
   if (
     !value ||
     value.kind !== 'home' ||
@@ -70,7 +70,7 @@ const navigationCommands = new Set([
   'appdock.updates.open',
 ]);
 /** Owns only home presentation/operations. Settings editing remains in the shared editor. */
-export class HomePageSession implements ShellPageController {
+export class HomePageSession implements HostPageController {
   readonly kind = 'home';
   readonly route = 'home';
   readonly id: string;
@@ -95,7 +95,7 @@ export class HomePageSession implements ShellPageController {
     this.request = parseHomePageRequest(request);
     this.id = request.id;
   }
-  update(request: ShellPageRequest) {
+  update(request: HostPageRequest) {
     const next = parseHomePageRequest(request);
     if (next.id !== this.id) throw Error('Stale home page request');
     this.request = next;
@@ -170,7 +170,7 @@ export class HomePageSession implements ShellPageController {
       content,
     };
   }
-  async act(action: ShellPageAction) {
+  async act(action: HostPageAction) {
     if (this.closed || !action || action.id !== this.id) throw Error('Stale page action');
     if (action.type !== 'invoke') throw Error('Unknown home page action');
     // Refresh the catalogue before resolving an issued ID (removed pins/cards become invalid).

@@ -1,29 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import type { ShellPageApi, ShellPageModel } from '../../src/shared/shell-pages';
+import type { HostPageModel } from '../../shared/host-pages';
 import type {
   ImageLibraryPageAction,
   ImageLibraryPageModel,
-} from '../../src/shared/image-library-page';
-import { mountImageGallery, mountGallerySizeControl } from '../../ui/image-gallery';
-import { shortcutFromEvent } from '../../src/shared/commands';
-import { Icon } from '../../src/shared/ui-icons';
-import '../../ui/image-gallery/gallery.css';
+} from '../../shared/image-library-page';
+import { mountImageGallery, mountGallerySizeControl } from '../../../ui/image-gallery';
+import { Icon } from '../../shared/ui-icons';
+import '../../../ui/image-gallery/gallery.css';
 import './image-library.css';
-declare global {
-  interface Window {
-    appdockPage: ShellPageApi;
-  }
-}
-const api = window.appdockPage;
+const api = window.dock.pages;
 type Action = ImageLibraryPageAction extends infer T
   ? T extends ImageLibraryPageAction
     ? Omit<T, 'id' | 'type'>
     : never
   : never;
-function App() {
-  const [model, setModel] = useState<ImageLibraryPageModel>();
-  const latest = useRef<ImageLibraryPageModel | undefined>(undefined);
+export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryPageModel }) {
+  const [model, setModel] = useState<ImageLibraryPageModel>(initialModel);
+  const latest = useRef<ImageLibraryPageModel | undefined>(initialModel);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [width, setWidth] = useState(260);
@@ -81,8 +74,8 @@ function App() {
     })().catch(() => {});
   };
   useEffect(() => {
-    let live = true;
-    const accept = (next: ShellPageModel) => {
+    const live = true;
+    const accept = (next: HostPageModel) => {
       if (
         !live ||
         next.kind !== 'image-library' ||
@@ -90,56 +83,12 @@ function App() {
       )
         return;
       latest.current = next;
-      document.documentElement.dataset.theme = next.dark ? 'dark' : 'light';
       setModel(next);
       setQuery(next.content.query);
       if (!savingSize.current && !sizeDirty.current) setWidth(next.content.cardWidth);
     };
-    const off = api.onChanged(accept);
-    void api
-      .connect()
-      .then(async (connection) => {
-        if (!live) return;
-        accept(connection.snapshot);
-        await api.ready(connection.sessionId);
-      })
-      .catch((e) => setError(String(e)));
-    const controls = () =>
-      [...document.querySelectorAll<HTMLElement>('button,input,select,summary')].filter(
-        (e) => !e.matches(':disabled') && e.getClientRects().length,
-      );
-    const offFocus = api.onFocus((edge) =>
-      (edge === 'first' ? controls()[0] : controls().at(-1))?.focus({ preventScroll: true }),
-    );
-    const keys = (e: KeyboardEvent) => {
-      if (openingDialog.current) return;
-      if (e.defaultPrevented || e.isComposing || e.repeat) return;
-      if (e.key === 'Tab') {
-        const list = controls();
-        if (document.activeElement === (e.shiftKey ? list[0] : list.at(-1))) {
-          e.preventDefault();
-          void api.focusHost(e.shiftKey ? 'before' : 'after');
-        }
-        return;
-      }
-      if (
-        e.target instanceof Element &&
-        e.target.closest('input,textarea,select') &&
-        !e.ctrlKey &&
-        !e.altKey
-      )
-        return;
-      const key = shortcutFromEvent(e);
-      if (key) void api.shortcut(key).catch((err) => setError(String(err)));
-    };
-    document.addEventListener('keydown', keys);
-    return () => {
-      live = false;
-      off();
-      offFocus();
-      document.removeEventListener('keydown', keys);
-    };
-  }, []);
+    accept(initialModel);
+  }, [initialModel]);
   const ready = !!model;
   useLayoutEffect(() => {
     if (!ready) return;
@@ -229,7 +178,7 @@ function App() {
     run({ command: 'dialog', kind, groupId });
   };
   return (
-    <main className="library-page" inert={dialogPending}>
+    <section className="library-page" inert={dialogPending}>
       <header className="library-header">
         <div>
           <h1>画像ライブラリー</h1>
@@ -441,7 +390,6 @@ function App() {
           </div>
         </section>
       </div>
-    </main>
+    </section>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);

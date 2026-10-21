@@ -1,4 +1,4 @@
-@import './notification-levels.css';
+@import '../../ui/notifications/levels.css';
 :root {
   font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
   color: #eff0f5;

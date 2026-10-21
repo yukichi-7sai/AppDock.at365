@@ -1,30 +1,7 @@
-:root {
-  color-scheme: light;
-  --bg: #f6f7fa;
-  --surface: #fff;
-  --soft: #f1f3f7;
-  --text: #202534;
-  --muted: #747c8d;
-  --border: #e5e8ef;
+.library-page {
+  --surface: var(--panel);
+  --soft: var(--raised);
   --danger: #bd4758;
-  --shadow: 0 4px 16px #192b4d06;
-}
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --bg: #14171e;
-  --surface: #1d222c;
-  --soft: #262c38;
-  --text: #e9edf5;
-  --muted: #98a3b6;
-  --border: #303847;
-  --danger: #f49ba7;
-  --shadow: none;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  margin: 0;
   background: var(--bg);
   color: var(--text);
   font:
@@ -33,36 +10,40 @@ body {
     'Yu Gothic UI',
     sans-serif;
 }
-button,
-input,
-select {
+.library-page,
+.library-page * {
+  box-sizing: border-box;
+}
+.library-page button,
+.library-page input,
+.library-page select {
   font: inherit;
   color: inherit;
 }
-button {
+.library-page button {
   cursor: pointer;
 }
-button:disabled {
+.library-page button:disabled {
   cursor: default;
   opacity: 0.45;
 }
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-summary:focus-visible {
+.library-page button:focus-visible,
+.library-page input:focus-visible,
+.library-page select:focus-visible,
+.library-page summary:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 .library-page {
   width: min(100%, 1480px);
-  height: 100vh;
+  height: 100%;
   margin: 0 auto;
   padding: 24px 32px 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.library-header {
+.library-page .library-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -71,26 +52,26 @@ summary:focus-visible {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.library-header h1 {
+.library-page .library-header h1 {
   font-size: 28px;
   font-weight: 650;
   letter-spacing: -0.025em;
   margin: 0 0 4px;
   line-height: 1.35;
 }
-.library-header p {
+.library-page .library-header p {
   margin: 0;
   font-size: 13px;
   color: var(--muted);
 }
-:where(.library-page) button {
+.library-page :where(.library-page) button {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   padding: 7px 10px;
   min-height: 32px;
 }
-:where(.library-page) button:not(.ad-gallery-image):hover:enabled {
+.library-page :where(.library-page) button:not(.ad-gallery-image):hover:enabled {
   background: var(--soft);
 }
 .library-page .library-primary {
@@ -106,7 +87,7 @@ summary:focus-visible {
 .library-page .library-primary:hover:enabled {
   background: var(--accent-hover);
 }
-.library-layout {
+.library-page .library-layout {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr);
   gap: 24px;
@@ -114,17 +95,17 @@ summary:focus-visible {
   min-height: 0;
   padding-top: 24px;
 }
-.library-sidebar {
+.library-page .library-sidebar {
   overflow-y: auto;
   min-width: 0;
   padding-right: 8px;
 }
-.library-sidebar nav {
+.library-page .library-sidebar nav {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.library-sidebar nav button {
+.library-page .library-sidebar nav button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -133,23 +114,23 @@ summary:focus-visible {
   text-align: left;
   color: var(--muted);
 }
-.library-sidebar nav button span {
+.library-page .library-sidebar nav button span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
   min-width: 0;
 }
-.library-sidebar small {
+.library-page .library-sidebar small {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.library-sidebar nav button[aria-current='page'] {
+.library-page .library-sidebar nav button[aria-current='page'] {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
 }
-.library-group-heading {
+.library-page .library-group-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -157,19 +138,19 @@ summary:focus-visible {
   font-size: 12px;
   color: var(--muted);
 }
-.library-group-heading button {
+.library-page .library-group-heading button {
   font-size: 11px;
 }
-.library-group-row {
+.library-page .library-group-row {
   display: flex;
   flex-wrap: wrap;
   min-width: 0;
 }
-.library-group-row > button:nth-child(2) {
+.library-page .library-group-row > button:nth-child(2) {
   flex: 0 0 28px;
   padding: 3px;
 }
-.library-group-menu {
+.library-page .library-group-menu {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -178,10 +159,10 @@ summary:focus-visible {
   background: var(--surface);
   margin: 4px 0;
 }
-.library-group-menu button {
+.library-page .library-group-menu button {
   font-size: 12px;
 }
-.library-add-group {
+.library-page .library-add-group {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -189,20 +170,20 @@ summary:focus-visible {
   font-size: 12px;
   margin-top: 12px;
 }
-.library-content {
+.library-page .library-content {
   min-height: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
 }
-.library-toolbar {
+.library-page .library-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
-.library-search {
+.library-page .library-search {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -214,7 +195,7 @@ summary:focus-visible {
   background: var(--surface);
   color: var(--muted);
 }
-.library-search input {
+.library-page .library-search input {
   background: transparent;
   border: 0;
   min-width: 0;
@@ -222,7 +203,7 @@ summary:focus-visible {
   outline-offset: 4px;
   font-size: 13px;
 }
-.library-summary {
+.library-page .library-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -230,22 +211,22 @@ summary:focus-visible {
   margin-top: 16px;
   flex-wrap: wrap;
 }
-.library-summary > div {
+.library-page .library-summary > div {
   min-width: 0;
   display: flex;
   gap: 10px;
   align-items: center;
 }
-.library-summary strong {
+.library-page .library-summary strong {
   overflow-wrap: anywhere;
 }
-.library-summary span,
-.library-summary button {
+.library-page .library-summary span,
+.library-page .library-summary button {
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
 }
-.library-selection {
+.library-page .library-selection {
   min-height: 40px;
   display: flex;
   align-items: center;
@@ -254,11 +235,11 @@ summary:focus-visible {
   font-size: 12px;
   color: var(--accent);
 }
-.library-selection button {
+.library-page .library-selection button {
   font-size: 12px;
   color: var(--accent);
 }
-.library-status {
+.library-page .library-status {
   font-size: 12px;
   min-height: 22px;
   max-height: 120px;
@@ -266,14 +247,14 @@ summary:focus-visible {
   color: var(--muted);
   white-space: pre-wrap;
 }
-.library-status [role='alert'] {
+.library-page .library-status [role='alert'] {
   color: var(--danger);
 }
-.library-status button {
+.library-page .library-status button {
   font-size: 12px;
   text-decoration: underline;
 }
-.library-scroll {
+.library-page .library-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -282,28 +263,28 @@ summary:focus-visible {
   padding: 2px 5px 20px 2px;
   overflow-anchor: none;
 }
-.library-more {
+.library-page .library-more {
   display: block;
   margin: 24px auto 0;
   border-color: var(--border) !important;
   background: var(--surface) !important;
 }
-.library-empty-actions {
+.library-page .library-empty-actions {
   text-align: center;
   color: var(--muted);
   font-size: 12px;
 }
-.library-empty-actions button {
+.library-page .library-empty-actions button {
   color: var(--accent);
 }
-.library-mobile-groups {
+.library-page .library-mobile-groups {
   display: none;
 }
 @media (max-width: 1000px) {
   .library-page {
     padding: 24px;
   }
-  .library-layout {
+  .library-page .library-layout {
     gap: 18px;
     grid-template-columns: 180px minmax(0, 1fr);
   }
@@ -312,34 +293,34 @@ summary:focus-visible {
   .library-page {
     padding: 16px;
   }
-  .library-header {
+  .library-page .library-header {
     gap: 10px;
     padding-bottom: 16px;
   }
-  .library-header h1 {
+  .library-page .library-header h1 {
     font-size: 23px;
   }
-  .library-header p {
+  .library-page .library-header p {
     font-size: 12px;
   }
-  .library-header .library-primary {
+  .library-page .library-header .library-primary {
     padding: 8px;
     font-size: 12px;
   }
-  .library-header .library-primary svg {
+  .library-page .library-header .library-primary svg {
     display: none;
   }
-  .library-layout {
+  .library-page .library-layout {
     display: flex;
     padding-top: 16px;
   }
-  .library-sidebar {
+  .library-page .library-sidebar {
     display: none;
   }
-  .library-content {
+  .library-page .library-content {
     width: 100%;
   }
-  .library-mobile-groups {
+  .library-page .library-mobile-groups {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -347,7 +328,7 @@ summary:focus-visible {
     margin-bottom: 12px;
     font-size: 12px;
   }
-  .library-mobile-groups label {
+  .library-page .library-mobile-groups label {
     white-space: nowrap;
     display: flex;
     align-items: center;
@@ -355,7 +336,7 @@ summary:focus-visible {
     min-width: 0;
     flex: 1;
   }
-  .library-mobile-groups select {
+  .library-page .library-mobile-groups select {
     min-width: 0;
     max-width: 100%;
     width: 100%;
@@ -364,25 +345,25 @@ summary:focus-visible {
     border-radius: 6px;
     background: var(--surface);
   }
-  .library-mobile-groups details {
+  .library-page .library-mobile-groups details {
     max-width: 100%;
   }
-  .library-mobile-groups summary {
+  .library-page .library-mobile-groups summary {
     cursor: pointer;
   }
-  .library-toolbar {
+  .library-page .library-toolbar {
     gap: 10px;
   }
-  .library-toolbar > div {
+  .library-page .library-toolbar > div {
     margin-left: auto;
   }
-  .library-summary button {
+  .library-page .library-summary button {
     padding-left: 0;
   }
-  .library-header > div {
+  .library-page .library-header > div {
     min-width: 0;
   }
-  .library-status {
+  .library-page .library-status {
     max-height: 90px;
   }
 }

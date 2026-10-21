@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import type { HomePageModel, ShellPageModel, ShellPageApi } from '../../src/shared/shell-pages';
-import { Icon } from '../../src/shared/ui-icons';
-import { shortcutFromEvent } from '../../src/shared/commands';
+import type { HomePageModel, HostPageModel } from '../../shared/host-pages';
+import { Icon } from '../../shared/ui-icons';
 import './home.css';
-document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches
-  ? 'dark'
-  : 'light';
-declare global {
-  interface Window {
-    appdockPage: ShellPageApi;
-  }
-}
-const api = window.appdockPage;
+const api = window.dock.pages;
 const states = {
   waiting: '開始待ち',
   running: '実行中',
@@ -21,74 +11,21 @@ const states = {
   stopping: '停止処理中',
   error: 'エラー',
 };
-function App() {
-  const [model, setModel] = useState<HomePageModel>();
-  const [session, setSession] = useState('');
+export function HomePage({ initialModel }: { initialModel: HomePageModel }) {
+  const [model, setModel] = useState<HomePageModel>(initialModel);
   const [error, setError] = useState('');
-  const latest = useRef<ShellPageModel | undefined>(undefined);
+  const latest = useRef<HomePageModel | undefined>(initialModel);
   useEffect(() => {
-    let live = true;
-    const accept = (next: ShellPageModel) => {
+    const live = true;
+    const accept = (next: HostPageModel) => {
       if (live && next.kind === 'home') {
         if (latest.current?.id === next.id && latest.current.revision > next.revision) return;
         latest.current = next;
-        document.documentElement.dataset.theme = next.dark ? 'dark' : 'light';
         setModel(next);
       }
     };
-    const unsubscribe = api.onChanged(accept);
-    void api
-      .connect()
-      .then((c) => {
-        if (live) {
-          accept(c.snapshot);
-          setSession(c.sessionId);
-        }
-      })
-      .catch((e) => setError(String(e)));
-    const focus = api.onFocus((edge) => {
-      const controls = [...document.querySelectorAll<HTMLElement>('button, input, select')].filter(
-        (e) => !e.matches(':disabled'),
-      );
-      (edge === 'first' ? controls[0] : controls.at(-1))?.focus();
-    });
-    const keys = (event: KeyboardEvent) => {
-      if (event.isComposing || event.repeat || event.defaultPrevented) return;
-      if (event.key === 'Tab') {
-        const controls = [
-          ...document.querySelectorAll<HTMLElement>('button, input, select'),
-        ].filter((e) => !e.matches(':disabled'));
-        if (
-          event.shiftKey
-            ? document.activeElement === controls[0]
-            : document.activeElement === controls.at(-1)
-        ) {
-          event.preventDefault();
-          void api.focusHost(event.shiftKey ? 'before' : 'after');
-        }
-        return;
-      }
-      if (
-        !event.ctrlKey &&
-        !event.altKey &&
-        event.target instanceof Element &&
-        event.target.closest('input, select, textarea')
-      )
-        return;
-      const key = shortcutFromEvent(event);
-      if (key) void api.shortcut(key).catch((e) => setError(String(e)));
-    };
-    document.addEventListener('keydown', keys);
-    return () => {
-      live = false;
-      unsubscribe();
-      focus();
-      document.removeEventListener('keydown', keys);
-    };
-  }, []);
-  useEffect(() => {
-    if (session && model) void api.ready(session).catch((e) => setError(String(e)));
-  }, [session, !!model]);
+    accept(initialModel);
+  }, [initialModel]);
 
   const act = (actionId: string) => {
     if (!model) return;
@@ -98,7 +35,7 @@ function App() {
   if (!model) return error ? <p role="alert">{error}</p> : null;
   const content = model.content;
   return (
-    <main className="home-page">
+    <section className="home-page">
       {(error || content.error) && <p role="alert">{error || content.error}</p>}
 
       <div className="page-heading">
@@ -195,7 +132,6 @@ function App() {
           </button>
         ))}
       </div>
-    </main>
+    </section>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);

@@ -15,10 +15,6 @@
       "statusbar": "bars.html",
       "overlay.command-palette": "overlay.html",
       "overlay.ribbon-group": "overlay.html",
-      "page.logs": "logs.html",
-      "page.home": "home.html",
-      "page.image-library": "image-library.html",
-      "page.notifications": "notification-center.html",
       "notification.banner": "notifications.html",
       "notification.desktop": "notifications.html"
     }

@@ -254,7 +254,7 @@ async function addAndReassign() {
                       height: innerHeight,
                       hidden: document.hidden,
                       elements: [
-                        ...document.querySelectorAll('main,.shell-page-slot,.log-toolbar'),
+                        ...document.querySelectorAll('main,.host-page-slot,.log-toolbar'),
                       ].map((e) => ({
                         tag: e.className,
                         rect: e.getBoundingClientRect().toJSON(),

@@ -1,7 +1,7 @@
 @import './logs.css';
-@import './notification-levels.css';
+@import '../../../ui/notifications/levels.css';
 .notification-center {
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -10,11 +10,11 @@
 }
 .notification-center header,
 .notification-center nav,
-.notification-tools,
-.notification-filters,
-.center-card-heading,
-.center-card-actions,
-.center-pagination {
+.notification-center .notification-tools,
+.notification-center .notification-filters,
+.notification-center .center-card-heading,
+.notification-center .center-card-actions,
+.notification-center .center-pagination {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -28,18 +28,18 @@
   color: var(--accent);
   background: var(--accent-soft);
 }
-.notification-filters input[type='text'],
-.notification-filters input:not([type]) {
+.notification-center .notification-filters input[type='text'],
+.notification-center .notification-filters input:not([type]) {
   flex: 1;
   min-width: 180px;
 }
-.notification-list {
+.notification-center .notification-list {
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: 2px 8px 8px 2px;
 }
-.center-card {
+.notification-center .center-card {
   margin-bottom: 14px;
   padding: 20px;
   border: 1px solid var(--border);
@@ -47,29 +47,29 @@
   background: var(--panel);
   border-left: 3px solid var(--notification-accent);
 }
-.center-card-level {
+.notification-center .center-card-level {
   color: var(--notification-accent);
 }
-.center-card-heading strong {
+.notification-center .center-card-heading strong {
   flex: 1;
   overflow-wrap: anywhere;
 }
-.notification-body {
+.notification-center .notification-body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.6;
 }
-.unread-mark {
+.notification-center .unread-mark {
   color: var(--accent);
   font-size: 12px;
 }
-.center-error {
+.notification-center .center-error {
   color: #e37583;
 }
-.center-card .muted {
+.notification-center .center-card .muted {
   overflow-wrap: anywhere;
 }
-.center-pagination {
+.notification-center .center-pagination {
   justify-content: flex-end;
 }
 @media (max-width: 760px) {
@@ -77,10 +77,10 @@
     padding: 18px 16px;
     gap: 12px;
   }
-  .center-card {
+  .notification-center .center-card {
     padding: 16px;
   }
-  .notification-filters input {
+  .notification-center .notification-filters input {
     width: 100%;
   }
 }

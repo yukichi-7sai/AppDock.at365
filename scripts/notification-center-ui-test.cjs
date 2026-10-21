@@ -191,17 +191,22 @@ async function launch() {
     });
   });
   host.setDefaultTimeout(12000);
-  await host.waitForFunction(async () => {
-    const s = await window.dock?.snapshot();
-    return (
-      s?.startupReady &&
-      s.extensions
-        .filter(
-          (e) => e.id === 'fixture.notifications.node' || e.id === 'fixture.notifications.native',
-        )
-        .every((e) => e.state === 'running')
-    );
-  });
+  await until(
+    () =>
+      host.evaluate(async () => {
+        const s = await window.dock.snapshot();
+        return (
+          s.startupReady &&
+          s.extensions
+            .filter(
+              (e) =>
+                e.id === 'fixture.notifications.node' || e.id === 'fixture.notifications.native',
+            )
+            .every((e) => e.state === 'running')
+        );
+      }),
+    'host and notification fixtures ready',
+  );
   await require('./shell-overlay-helper.cjs').homePage(host);
   await host.waitForFunction(
     () => document.querySelector('.shell')?.getAttribute('data-route') === 'home',
@@ -228,7 +233,9 @@ async function save(p) {
   await until(
     () =>
       p.evaluate(() =>
-        window.dock.settingsPage.get(document.querySelector('.settings-surface').dataset.settingsConnection).then((m) => !m.content.editing.pending),
+        window.dock.settingsPage
+          .get(document.querySelector('.settings-surface').dataset.settingsConnection)
+          .then((m) => !m.content.editing.pending),
       ),
     'saved model',
   );
@@ -275,15 +282,12 @@ async function close() {
     await command(ids.native + '.publish');
     const openCenter = async () => {
       await command('appdock.notifications.open');
-      const p = await until(
-        () => pages().find((p) => p.url().endsWith('/notification-center.html')),
-        'center page',
-      );
+      const p = host;
       await p.getByRole('heading', { name: '通知センター', exact: true }).waitFor();
       return p;
     };
     let center = await openCenter();
-    const model = () => center.evaluate(() => window.appdockPage.connect().then((c) => c.snapshot));
+    const model = () => center.evaluate(() => window.dock.pages.get());
     const tab = async (name) => {
       await center.getByRole('button', { name: new RegExp('^' + name + ' ') }).click();
       await until(
@@ -429,13 +433,17 @@ async function close() {
       );
       await center.screenshot({ path: path.join(profile, 'center-' + theme + '.png') });
     }
-    checks.push('Default Shell center renders both themes without a separate host renderer');
-    // Provider crash recovery preserves the controller state; fixture uses the public center region.
+    checks.push('host notification center renders both themes in the root renderer');
+    // A retired page assignment must stay inert and preserve ordinary Shell operation.
     if (!portable) {
       const p = path.join(profile, 'extensions/fixture.center');
       fs.mkdirSync(p, { recursive: true });
       // Installed before restart below, so discovery never starts an Applet merely for history.
-      fs.cpSync(path.join(root, 'out/shells/default'), p, { recursive: true });
+      fs.writeFileSync(path.join(p, 'worker.cjs'), 'exports.activate=async()=>{};');
+      fs.writeFileSync(
+        path.join(p, 'notification-center.html'),
+        '<!doctype html><p>Retired page Shell must never start</p>',
+      );
       fs.writeFileSync(
         path.join(p, 'extension.json'),
         JSON.stringify({
@@ -450,10 +458,12 @@ async function close() {
           shell: { apiVersion: 1, views: { 'page.notifications': 'notification-center.html' } },
         }),
       );
-      const settings = saved();
-      settings.extensions['fixture.center'] = { enabled: true, settings: {} };
-      settings.host.shellProviders = { 'page.notifications': 'fixture.center' };
-      fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+      await host.evaluate(async () => {
+        const state = await window.dock.snapshot();
+        state.settings.value.extensions['fixture.center'] = { enabled: true, settings: {} };
+        state.settings.value.host.shellProviders = { 'page.notifications': 'fixture.center' };
+        await window.dock.saveSettings(state.settings.value, state.settings.revision);
+      });
     }
     await close();
     await launch();
@@ -479,21 +489,22 @@ async function close() {
       'restart preserves safe interrupted history and read/deletion; updater receipt prevents replay of the same success',
     );
     if (!portable) {
-      assert.ok(center.url().includes('/fixture.center/'));
-      await app.evaluate(({ webContents }) =>
-        webContents
-          .getAllWebContents()
-          .find((w) => w.getURL().includes('/fixture.center/notification-center.html'))
-          .forcefullyCrashRenderer(),
+      assert.equal(center, host);
+      assert(!pages().some((p) => p.url().includes('/fixture.center/')));
+      assert(
+        !(await host.evaluate(() => window.dock.snapshot())).shellRegions.regions.some((r) =>
+          r.region.startsWith('page.'),
+        ),
       );
-      center = await until(
-        () => pages().find((p) => p.url().endsWith('/shells/default/notification-center.html')),
-        'center fallback',
+      assert.equal(
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.host.shellProviders[
+          'page.notifications'
+        ],
+        'fixture.center',
       );
-      await center.getByRole('heading', { name: '通知センター', exact: true }).waitFor();
       assert.equal((await model()).content.filters.text, 'Native');
       checks.push(
-        'public custom center Shell crashes back to Default Shell with filters and history intact',
+        'retired center assignment is preserved without loading a page Shell or losing history',
       );
     }
     success = true;

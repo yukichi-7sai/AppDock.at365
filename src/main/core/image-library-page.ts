@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { ShellPageController } from './shell-page-controller';
-import type { ShellPageAction } from '../../shared/shell-pages';
+import type { HostPageController } from './host-page-controller';
+import type { HostPageAction } from '../../shared/host-pages';
 import type {
   ImageLibraryPageModel,
   ImageLibraryPageRequest,
@@ -42,7 +42,7 @@ export class ImageLibraryPageState {
     this.viewRevision++;
   }
 }
-export class ImageLibraryPageSession implements ShellPageController {
+export class ImageLibraryPageSession implements HostPageController {
   readonly kind = 'image-library';
   readonly route = 'image-library';
   readonly id: string;
@@ -141,7 +141,7 @@ export class ImageLibraryPageSession implements ShellPageController {
         value.entry.ref.file.toLocaleLowerCase().includes(s.query.toLocaleLowerCase()),
     );
   }
-  passive(action: ShellPageAction) {
+  passive(action: HostPageAction) {
     // Scrolling can report its last frame after a host dialog has blocked page input.
     return (
       !!action &&
@@ -224,7 +224,7 @@ export class ImageLibraryPageSession implements ShellPageController {
       content,
     };
   }
-  async act(action: ShellPageAction) {
+  async act(action: HostPageAction) {
     if (this.closed || !action || action.id !== this.id || action.type !== 'gallery')
       throw Error('Stale gallery action');
     const s = this.options.state;
