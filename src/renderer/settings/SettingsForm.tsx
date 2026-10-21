@@ -265,7 +265,14 @@ export function SettingsForm({
                       provider ??
                       '未生成');
                 return (
-                  <SettingRow key={id} pageId={category} itemKey={'shellProviders.' + id}>
+                  <SettingRow
+                    key={id}
+                    pageId={category}
+                    itemKey={'shellProviders.' + id}
+                    description={`使用先: ${name(state?.boundProvider ?? state?.resolvedProvider)}${
+                      state?.pendingProvider ? ' ／適用待ち: ' + name(state.pendingProvider) : ''
+                    }`}
+                  >
                     <div className="shell-region-controls">
                       <select
                         aria-label={title + 'のShell'}
@@ -296,12 +303,6 @@ export function SettingsForm({
                           </option>
                         ))}
                       </select>
-                      <p className="muted">
-                        使用先: {name(state?.boundProvider ?? state?.resolvedProvider)}
-                        {state?.pendingProvider
-                          ? ' ／適用待ち: ' + name(state.pendingProvider)
-                          : ''}
-                      </p>
                       {state?.reason && (
                         <>
                           <p role="status">{state.reason}</p>

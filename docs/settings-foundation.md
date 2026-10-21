@@ -46,6 +46,10 @@ settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタ
 
 ## 共通の画面構成
 
+カードのタイトルは共通の`--text`を参照し、折りたたみの有無や開閉状態に関わらず同じ明瞭な文字色にする。`summary`の補助文字色をタイトルへ継承せず、説明文・ヒント・開閉記号はそれぞれの既存スタイルを使う。
+
+入力欄がトグルだけの項目は、広い画面でも入力欄の左端にそろえる。「表示 → Shellの変更」の各領域の使用先と適用待ちは、その項目の`description`へ表示する。ヒントのON/OFFに関わらず現在の使用先を表示し、未適用の理由と再試行操作は従来どおり入力側へ残す。
+
 本体の設定ページは`SettingsPageLayout`（`src/renderer/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。ページ側で同じ見出しを重ねない。フォーム/JSONの切替と共通の操作欄を上部に固定し、間隔を置いた本文だけをスクロールする。Applet詳細でも同じ本文部品を使い、ショートカット一覧の内部にタイトル・説明を追加しない。
 
 本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ）、`SettingsField`（項目名・説明と入力）、`SettingsChoice`（選択カード）、`SettingsFeedback`（処理・結果・エラー）を再利用する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。

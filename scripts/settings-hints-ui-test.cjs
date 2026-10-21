@@ -10,7 +10,12 @@ const { settingsPage } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', 'settings-hints-ui-' + Date.now());
-const source = process.argv[2] ? path.resolve(process.argv[2]) : null;
+const source =
+  process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
+const titlesOnly =
+  process.argv.includes('--sections-only') || process.argv.includes('--titles-only');
+const titleSamples = [];
+const layoutSamples = [];
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const checks = [],
   errors = [];
@@ -143,7 +148,7 @@ async function appearance() {
       .getByRole('region', { name: 'Shellの変更', exact: true })
       .locator('.settings-field-label p')
       .count(),
-    0,
+    require('../out/main/shared/shell').shellRegions.length,
   );
   assert.equal(
     await host
@@ -154,6 +159,127 @@ async function appearance() {
     'empty catalog hints do not produce icons',
   );
   return common;
+}
+async function checkSectionTitles() {
+  const checkToggles = async (theme, width, page) => {
+    const rows = await host
+      .locator('.settings-field-control > .toggle:only-child')
+      .evaluateAll((elements) =>
+        elements
+          .filter((el) => el.getClientRects().length)
+          .map((el) => ({
+            name: el.getAttribute('aria-label'),
+            left: el.getBoundingClientRect().left,
+            controlLeft: el.parentElement.getBoundingClientRect().left,
+            checked: el.getAttribute('aria-checked'),
+          })),
+      );
+    for (const row of rows) {
+      layoutSamples.push({ theme, width, page, ...row });
+      assert(Math.abs(row.left - row.controlLeft) <= 1, `${page}/${row.name} aligned left`);
+    }
+  };
+  const checkShellDescriptions = async () => {
+    const card = host.getByRole('region', { name: 'Shellの変更', exact: true });
+    const descriptions = await card.locator('.settings-field-label > p').allTextContents();
+    assert.equal(descriptions.length, require('../out/main/shared/shell').shellRegions.length);
+    assert(descriptions.every((text) => text.startsWith('使用先: ')));
+    assert.equal(await card.locator('.shell-region-controls > p.muted').count(), 0);
+  };
+  for (const theme of ['light', 'dark']) {
+    await host.evaluate(async (theme) => {
+      const s = await window.dock.snapshot();
+      await window.dock.saveSettings(
+        { ...s.settings.value, host: { ...s.settings.value.host, theme } },
+        s.settings.revision,
+      );
+    }, theme);
+    await host.waitForFunction((theme) => document.documentElement.dataset.theme === theme, theme);
+    await select('表示');
+    const reference = await host
+      .locator('.settings-section > header h2')
+      .first()
+      .evaluate((el) => getComputedStyle(el).color);
+    for (const width of [1280, 760]) {
+      await inspect(
+        inspector,
+        electronExpression +
+          `.BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().startsWith('appdock://host/')).setSize(${width},850)`,
+      );
+      for (const title of [
+        '表示',
+        '一般',
+        '通知',
+        'AI',
+        '読み上げ',
+        'リボン',
+        'マウスジェスチャー',
+        'MCP・Codex連携',
+        'バージョン情報・更新',
+      ]) {
+        await select(title);
+        await checkToggles(theme, width, title);
+        if (title === '表示') {
+          await checkShellDescriptions();
+          const hintToggle = host.getByRole('switch', { name: 'ヒントの表示', exact: true });
+          const initialHints = (await snapshot()).settings.value.host.showHints;
+          for (const expected of [!initialHints, initialHints]) {
+            await hintToggle.click();
+            await settleSettings(host);
+            assert.equal((await snapshot()).settings.value.host.showHints, expected);
+            await checkShellDescriptions();
+            await checkToggles(theme, width, '表示/' + expected);
+          }
+          await host.screenshot({ path: path.join(profile, `layout-${theme}-${width}.png`) });
+          checks.push(
+            `${theme}/${width}: standalone toggles align left and persist ON/OFF; Shell descriptions survive hints ON/OFF`,
+          );
+        }
+        const read = async (state) => {
+          const rows = await host
+            .locator('.settings-section > :is(header,summary) h2')
+            .evaluateAll((elements) =>
+              elements.map((el) => ({
+                title: el.textContent,
+                color: getComputedStyle(el).color,
+                opacity: getComputedStyle(el).opacity,
+                collapsible: !!el.closest('summary'),
+              })),
+            );
+          assert(rows.length > 0, title + ' section titles');
+          for (const row of rows) {
+            titleSamples.push({ theme, width, page: title, state, ...row });
+            assert.equal(row.color, reference, `${theme}/${width}/${title}/${row.title}/${state}`);
+            assert.equal(row.opacity, '1');
+          }
+        };
+        await read('initial');
+        const details = host.locator('details.settings-section:visible').first();
+        if (await details.count()) {
+          const summary = details.locator(':scope > summary');
+          const initial = await details.evaluate((el) => el.open);
+          await summary.focus();
+          await summary.press('Space');
+          assert.equal(await details.evaluate((el) => el.open), !initial);
+          await read('toggled');
+          if (title === '通知')
+            await host.screenshot({
+              path: path.join(profile, `titles-${theme}-${width}-open.png`),
+            });
+          await summary.press('Enter');
+          assert.equal(await details.evaluate((el) => el.open), initial);
+          await read('restored');
+        }
+        if (title === '通知')
+          await host.screenshot({
+            path: path.join(profile, `titles-${theme}-${width}-closed.png`),
+          });
+      }
+      checks.push(
+        `${theme}/${width}: section titles match normal cards across nine settings pages; Space/Enter preserve colors and toggle state`,
+      );
+    }
+  }
 }
 (async () => {
   try {
@@ -214,6 +340,12 @@ async function appearance() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (titlesOnly) {
+      assert.equal((await snapshot()).version, require('../package.json').version);
+      await checkSectionTitles();
+      success = true;
+      return;
+    }
     assert.equal((await snapshot()).settings.value.host.showHints, true);
     let common = await appearance();
     const titleTooltip = host.locator('.settings-hint-tooltip:popover-open');
@@ -718,8 +850,19 @@ async function appearance() {
     }
     if (server) await new Promise((resolve) => server.close(resolve));
     fs.writeFileSync(path.join(profile, 'process.log'), output);
+    fs.writeFileSync(
+      path.join(profile, 'section-titles.json'),
+      JSON.stringify(titleSamples, null, 2),
+    );
+    fs.writeFileSync(
+      path.join(profile, 'section-layout.json'),
+      JSON.stringify(layoutSamples, null, 2),
+    );
     const result = {
+      layoutSampleCount: layoutSamples.length,
       success,
+      titlesOnly,
+      titleSampleCount: titleSamples.length,
       checks,
       errors,
       profile,

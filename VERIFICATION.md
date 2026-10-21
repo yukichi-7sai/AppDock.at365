@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-10-21: 設定カードのタイトル・トグル配置・Shellの使用先表示（0.76.3）
+
+- 折りたたみカードのタイトルが`summary`の補助文字色を継承し、通常カードと異なる状態をGUIで再現。共通の`.settings-section h2`が`--text`を参照するようにし、開閉状態・明暗によらず同じ文字色にした。説明文・ヒント・開閉記号のスタイルは保持した。
+- 共通の単独トグルを入力欄の左端へ配置し、狭幅だけの重複規則を削除。「Shellの変更」の各領域の使用先/適用待ちは`SettingRow`の`description`へ移した。bound/resolved/pendingの値の選び方、不適用理由・再試行、設定の保存/公開契約は変更しない。
+- 発行前に共通CSS、SettingsFormの表示と動的状態、ヒントON/OFF、保存と開閉の影響をレビュー。阻害指摘なし。タイトルだけの0.76.2発行が完了した後、追加の配置要求を反映して0.76.3へパッチ更新した。途中成果物のhashと理由は証跡に保持し、最終確認は0.76.3で行った。
+- 型検査・本体/Default Shellビルド成功。最終版のCSS/版入力の回帰**20/20**を実行し、影響しない**740件**を前回の入力manifest/完全ログと照合して再利用。計**760/760、fail/skip 0**。差分は本体rendererの表示・共通CSS・対象GUI・版番号・文書だけで、main/shared/SDK/保存処理・残りの試験・依存/ツールは一致した。
+- 固定EXEの`settings-hints-ui-test.cjs --sections-only` **8群**成功。9ページ×明暗×広幅/狭幅で、タイトル色**372件**、トグルの左配置**64件**を検査。Space/Enterの開閉/復元、ON/OFF保存、11個のShell領域のdescription、ヒントOFFでも使用先が残ることを確認した。画像を目視確認し、実行時ホスト版と固定EXEのsmokeも成功。
+- `publish.bat`終了0。本体EXE/feed/Default Shellは**0.76.3 / 168971481 bytes / SHA256 `a1cc11e9237540167fb0fb3d55d4a2ed2a28dcaa8e04ed0557e294c8b08e76c5`**。`A:\40.ARTIFACT\AppDock.at365`へ発行し、GUI/smoke用コピーと最終EXEのhashを照合した。実利用の設定変更・deploy・未変更Applet再発行・全体ZIP・GitHub Releaseは行っていない。
+- 証跡: `.artifacts/section-titles-20261021/validation.json`、入力manifest、再現/完全ログ、`.artifacts/settings-hints-ui-1792554573240/`の`section-titles.json`・`section-layout.json`と明暗/狭幅画像、`.artifacts/smoke-1792554591898/smoke-result.json`。再利用元は`.artifacts/ribbon-readability-20261021/validation.json`。
+
 ## 2026-10-21: リボンの文字・標準アイコンの視認性（0.76.1）
 
 - 未選択ボタンが装飾用の`--faint`を文字とSVGへ使い、Darkの通常背景とのコントラストが**3.55**しかない状態を隔離GUIで再現。Default Shellの共通`--ribbon-text`へ置き換え、Darkは`#b7bfd1`、Lightは`#535e73`とした。Darkの通常文字は**10.53**、Lightは**5.71**へ改善した。
