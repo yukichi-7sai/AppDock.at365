@@ -342,6 +342,45 @@ async function checkSectionTitles() {
           when: { scope: 'global', appletIds: [] },
         },
       ];
+      initial.keybindings.push(
+        ...['one', 'two'].map((suffix, index) => ({
+          id: `nav.custom1.${suffix}`,
+          command: 'appdock.custom.00000000-0000-0000-0000-000000000001',
+          key: `Ctrl+Alt+F${20 + index}`,
+          enabled: false,
+          when: { scope: 'app', appletIds: [] },
+        })),
+        {
+          id: 'nav.missing',
+          command: 'missing.command',
+          key: 'Ctrl+Alt+F23',
+          enabled: false,
+          when: { scope: 'app', appletIds: [] },
+        },
+      );
+      initial.gestures.bindings = [
+        {
+          id: 'nav.custom2.gesture',
+          command: 'appdock.custom.00000000-0000-0000-0000-000000000002',
+          gesture: 'move-up',
+          enabled: false,
+          when: { scope: 'app', appletIds: [], processes: [] },
+        },
+        {
+          id: 'nav.prefix.gesture',
+          command: 'fixture.hints.run.child',
+          gesture: 'move-right',
+          enabled: false,
+          when: { scope: 'app', appletIds: [], processes: [] },
+        },
+        {
+          id: 'nav.missing.gesture',
+          command: 'missing.command',
+          gesture: 'move-down',
+          enabled: false,
+          when: { scope: 'app', appletIds: [], processes: [] },
+        },
+      ];
       initial.customCommands = {
         version: 2,
         items: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'].map(

@@ -17,6 +17,7 @@ export type CommandSettingsTarget = {
 };
 export const CommandSettingsNavigation = createContext<{
   page: string;
+  assignments: { shortcuts: ReadonlySet<string>; gestures: ReadonlySet<string> };
   target?: CommandSettingsTarget;
   open(page: CommandSettingsPage, command: Pick<UiCommand, 'id' | 'title'>): void;
   clear(): void;
@@ -46,17 +47,23 @@ export function CommandSettingsLinks({
   return (
     <div className="command-settings-links" role="group" aria-label={`${command.title}の移動先`}>
       {commandSettingsPages
-        .filter((page) => page.id !== navigation.page)
+        .filter(
+          (page) =>
+            page.id !== navigation.page &&
+            (page.id !== 'custom-commands' || !!command.customDefinitionId),
+        )
         .map((page) => {
-          const unavailable = page.id === 'custom-commands' && !command.customDefinitionId;
+          const assigned =
+            page.id !== 'custom-commands' && navigation.assignments[page.id].has(command.id);
           return (
             <button
               key={page.id}
               type="button"
-              className="settings-list-icon"
-              title={unavailable ? '登録済みのカスタムコマンドではありません' : page.title}
+              className={`settings-list-icon${assigned ? ' accent-action' : ''}`}
+              title={`${page.title}${assigned ? '（割り当てあり）' : ''}`}
               aria-label={`${command.title}の${page.title}を開く`}
-              disabled={unavailable}
+              aria-description={assigned ? 'このコマンドの割り当てがあります。' : undefined}
+              data-assigned={assigned}
               onClick={() => navigation.open(page.id, command)}
             >
               <Icon name={page.icon} />

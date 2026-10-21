@@ -271,6 +271,14 @@ export function SettingsPage({
                   context === 'full'
                     ? {
                         page: page.id,
+                        assignments: {
+                          shortcuts: new Set(
+                            model.content.auxiliary.commandAssignments?.shortcuts ?? [],
+                          ),
+                          gestures: new Set(
+                            model.content.auxiliary.commandAssignments?.gestures ?? [],
+                          ),
+                        },
                         target: commandTarget?.page === page.id ? commandTarget : undefined,
                         clear: () => setCommandTarget(undefined),
                         open: (pageId, command) => {

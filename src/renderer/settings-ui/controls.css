@@ -2856,6 +2856,7 @@ summary {
 .command-settings-links {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
 }
 .shortcut-command-list:has(.command-settings-heading) {

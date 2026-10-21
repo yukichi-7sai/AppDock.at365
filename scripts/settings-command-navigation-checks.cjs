@@ -4,6 +4,7 @@ const assert = require('node:assert/strict'),
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
   const id = 'appdock.custom.00000000-0000-0000-0000-000000000002';
+  const firstId = 'appdock.custom.00000000-0000-0000-0000-000000000001';
   const row = (command) => host.locator(`[data-shortcut-command="${command}"]`);
   const customRow = (title) =>
     host
@@ -22,26 +23,62 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
   const spacing = [];
   const checkLinks = async (page, theme, width) => {
     const cells = host.locator('.command-settings-cell');
-    const measurements = await cells.evaluateAll((elements) =>
-      elements.map((cell) => {
-        const buttons = [...cell.querySelectorAll('button')];
-        return {
-          buttons: buttons.length,
-          gap: cell.getBoundingClientRect().right - buttons.at(-1).getBoundingClientRect().right,
-          padding: parseFloat(getComputedStyle(cell).paddingRight),
-          labels: buttons.map((button) => button.getAttribute('aria-label')),
-        };
-      }),
+    const measurements = await cells.evaluateAll(
+      (elements, customIds) =>
+        elements.map((cell) => {
+          const buttons = [...cell.querySelectorAll('button')];
+          return {
+            buttons: buttons.length,
+            custom: customIds.includes(cell.closest('tr').dataset.shortcutCommand),
+            gap: cell.getBoundingClientRect().right - buttons.at(-1).getBoundingClientRect().right,
+            padding: parseFloat(getComputedStyle(cell).paddingRight),
+            labels: buttons.map((button) => button.getAttribute('aria-label')),
+          };
+        }),
+      [firstId, id],
     );
     assert(measurements.length > 0);
     for (const item of measurements) {
-      assert.equal(item.buttons, 2);
+      assert.equal(item.buttons, page === 'カスタムコマンド' || item.custom ? 2 : 1);
       assert(item.labels.every((label) => !label.endsWith(`の${page}を開く`)));
       assert(item.gap >= item.padding - 0.5 && item.gap > 0, JSON.stringify(item));
       if (page !== 'カスタムコマンド')
         assert(Math.abs(item.gap - item.padding) < 1, JSON.stringify(item));
     }
     spacing.push({ page, theme, width, measurements });
+  };
+  const assignmentSamples = [];
+  const checkAssigned = async (from, title, page, assigned) => {
+    await host.getByRole('heading', { level: 1 }).hover();
+    const button = from.getByRole('button', { name: `${title}の${page}を開く`, exact: true });
+    await until(
+      async () => (await button.getAttribute('data-assigned')) === String(assigned),
+      'assignment indicator',
+    );
+    assert.equal(
+      await button.getAttribute('title'),
+      `${page}${assigned ? '（割り当てあり）' : ''}`,
+    );
+    if (assigned) {
+      const colors = await button.evaluate((e) => {
+        const probe = document.createElement('span');
+        probe.style.cssText = 'display:none;color:var(--accent);background:var(--accent-soft)';
+        document.body.append(probe);
+        const actual = getComputedStyle(e),
+          expected = getComputedStyle(probe);
+        const result = {
+          foreground: actual.color,
+          background: actual.backgroundColor,
+          expectedForeground: expected.color,
+          expectedBackground: expected.backgroundColor,
+        };
+        probe.remove();
+        return result;
+      });
+      assert.equal(colors.foreground, colors.expectedForeground);
+      assert.equal(colors.background, colors.expectedBackground);
+      assignmentSamples.push({ title, page, assigned, ...colors });
+    } else assert(!/accent-action/.test(await button.getAttribute('class')));
   };
   for (const theme of ['light', 'dark'])
     for (const width of [1280, 760]) {
@@ -116,11 +153,13 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         await row('appdock.quit').getByRole('img', { name: '外部公開コマンド' }).count(),
         0,
       );
-      assert(
+      assert.equal(
         await row('fixture.hints.run')
           .getByRole('button', { name: 'Hint actionのカスタムコマンドを開く', exact: true })
-          .isDisabled(),
+          .count(),
+        0,
       );
+      await checkAssigned(row('fixture.hints.run'), 'Hint action', 'マウスジェスチャー', false);
       const geometry = await row('fixture.hints.run')
         .locator('.applet-shortcut-pair')
         .evaluateAll((elements) =>
@@ -139,6 +178,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       await host.keyboard.press('Escape');
       await move(row('fixture.hints.run'), 'Hint action', 'マウスジェスチャー');
       await checkLinks('マウスジェスチャー', theme, width);
+      await checkAssigned(row('fixture.hints.run'), 'Hint action', 'ショートカット', true);
       assert.equal(await host.locator('[data-shortcut-command]').count(), 1);
       assert.equal(
         await row('fixture.hints.run').getByText('未割り当て', { exact: true }).count(),
@@ -146,8 +186,13 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       );
       await host.getByRole('button', { name: 'Hint actionの絞り込みを解除', exact: true }).click();
       assert((await host.locator('[data-shortcut-command]').count()) > 1);
+      await checkAssigned(row('missing.command'), 'missing.command', 'ショートカット', true);
       await select('カスタムコマンド');
       await checkLinks('カスタムコマンド', theme, width);
+      await checkAssigned(customRow('Custom 1'), 'Custom 1', 'ショートカット', true);
+      await checkAssigned(customRow('Custom 1'), 'Custom 1', 'マウスジェスチャー', false);
+      await checkAssigned(customRow('Custom 2'), 'Custom 2', 'ショートカット', false);
+      await checkAssigned(customRow('Custom 2'), 'Custom 2', 'マウスジェスチャー', true);
       assert.deepEqual(await host.locator('.custom-commands-settings thead th').allTextContents(), [
         '名前＋',
         '種類',
@@ -211,6 +256,45 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     'normal index selection clears command target',
   );
   checks.push('index-navigation-clears-command-target-without-saving-or-executing');
+  await select('カスタムコマンド');
+  const updateAssignments = (patch) =>
+    host.evaluate(async (patch) => {
+      const s = await window.dock.snapshot(),
+        next = structuredClone(s.settings.value);
+      if (patch.add)
+        next.keybindings.push({
+          id: 'nav.custom2.key',
+          command: patch.add,
+          key: 'Ctrl+Alt+F22',
+          enabled: false,
+          when: { scope: 'app', appletIds: [] },
+        });
+      if (patch.remove)
+        next.keybindings = next.keybindings.filter((b) => !patch.remove.includes(b.id));
+      if (patch.removeGestures)
+        next.gestures.bindings = next.gestures.bindings.filter(
+          (b) => b.command !== patch.removeGestures,
+        );
+      if (patch.accent) next.host.accentColor = patch.accent;
+      await window.dock.saveSettings(next, s.settings.revision);
+    }, patch);
+  await updateAssignments({ add: id });
+  await checkAssigned(customRow('Custom 2'), 'Custom 2', 'ショートカット', true);
+  await checkAssigned(customRow('Custom 2'), 'Custom 2', 'マウスジェスチャー', true);
+  await updateAssignments({ remove: ['nav.custom1.one'] });
+  await checkAssigned(customRow('Custom 1'), 'Custom 1', 'ショートカット', true);
+  await updateAssignments({ remove: ['nav.custom1.two'], removeGestures: id });
+  await checkAssigned(customRow('Custom 1'), 'Custom 1', 'ショートカット', false);
+  await checkAssigned(customRow('Custom 2'), 'Custom 2', 'マウスジェスチャー', false);
+  await updateAssignments({ accent: 'alice-blue' });
+  await checkAssigned(customRow('Custom 2'), 'Custom 2', 'ショートカット', true);
+  checks.push(
+    'assignment-colors-live-add-remove-duplicates-disabled-missing-exact-id-and-alice-palette',
+  );
   fs.writeFileSync(path.join(profile, 'command-navigation.json'), JSON.stringify(samples, null, 2));
   fs.writeFileSync(path.join(profile, 'navigation-spacing.json'), JSON.stringify(spacing, null, 2));
+  fs.writeFileSync(
+    path.join(profile, 'assignment-colors.json'),
+    JSON.stringify(assignmentSamples, null, 2),
+  );
 };

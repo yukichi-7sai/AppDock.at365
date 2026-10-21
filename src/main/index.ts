@@ -1304,6 +1304,14 @@ function settingsUiCommands() {
       .map((c) => ({ ...c, available: false, customDefinitionId: undefined })),
   ].map((command) => ({ ...command, automation: published.has(command.id) }));
 }
+function settingsCommandAssignments() {
+  return {
+    shortcuts: [...new Set(getKeybindings(settings.value).map((binding) => binding.command))],
+    gestures: [
+      ...new Set((settings.value.gestures?.bindings ?? []).map((binding) => binding.command)),
+    ],
+  };
+}
 function ribbonUiCommands() {
   const applets = allApplets();
   return settingsUiCommands().map((command) => ({
@@ -1701,6 +1709,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (id === 'custom-commands')
     return {
       commands: settingsUiCommands(),
+      commandAssignments: settingsCommandAssignments(),
       customCommands: {
         types: customCommands.descriptors(),
         summaries: customCommands.summaries(),
@@ -1808,6 +1817,9 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (id === 'ribbon') return { applets: applets.map(summary), commands: ribbonUiCommands() };
   if (['shortcuts', 'gestures', 'tray'].includes(id))
     return {
+      ...(['shortcuts', 'gestures'].includes(id)
+        ? { commandAssignments: settingsCommandAssignments() }
+        : {}),
       provider:
         settingsNavigation.provider?.page === id
           ? {
