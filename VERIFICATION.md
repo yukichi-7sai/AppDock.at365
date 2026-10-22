@@ -1,6 +1,22 @@
 # 検証記録
 
-対象の現行版は`0.83.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.83.1`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+
+## 2026-10-22: Electron45更新のコミット前確認（0.83.1）
+
+- 利用者からcommit/pushの指示を受領。main/origin/mainと対象4ファイル、実効author/committerを確認した。GitHubのmainは`b94173a`、AQUAはその祖先`c0b287a`で、双方へ通常pushできる履歴と照合した。既存の未コミット変更を保持し、pull/stash/resetや履歴の統合は行わない。
+- 実装完了時の全追跡入力・9コマンドの成功ログ・EXE/feedのSHA256、導入済みElectron/builder・Default Shellの版が現在と一致した。型検査・標準833/833（fail/skip 0）、固定EXEのsmoke・倍率11群・画像/Node/.NET9群・更新/再起動13群・進捗9群・信頼診断6結果を再利用する。後続の製品/試験/依存変更がないため、回帰再実行・再発行・追加版更新は行わない。今回の追記は本項の文書記録だけ。
+- 対象一覧、再利用元と入力/配布物照合、stageと実ファイル/tree、identity、commitとGitHub/AQUA mainの最終照合結果は`.artifacts/commit-validation-electron45-0831-20261022/validation.json`へ記録する。0.83.1と検証済み配布物を維持し、GitHub Releaseや実利用先deployは行わない。
+
+## 2026-10-22: Electron最新安定版45.0.0でのビルド確認（0.83.1）
+
+- 利用者からElectron最新版への更新とビルド確認を依頼された。cleanなmain/origin/mainからpull --ff-onlyし、先行していたLICENSE追加`b94173a`を取得した。公式Releaseとnpmのlatestを照合し、Electronを **44.9.3 → 45.0.0** へ完全版指定で更新した。共通の最新版選択器で開発Nodeの最新LTSが導入済み24.22.1と一致することも確認した。今回の対象はElectronだけなので、他の依存やbuilderの一括更新は行わない。
+- lockfile差分はElectronの版とintegrityだけ。パッケージ全体の待機免除を使い、ほかの7日待機・供給網検査（403 entries）を維持した。制限内の依存リンク作成はアクセス拒否となったため、失敗ログを保存し、同一コマンドを通常ユーザーで再実行して成功した。frozen installと明示postinstallも成功した。
+- 45の[公式変更点](https://www.electronjs.org/docs/latest/breaking-changes)を確認した。sandboxed preloadの削除されたBuffer/events/timers/url依存はなく、共通appearance追記もElectronだけを使う。window.open・sandbox・ASARのfd利用も確認し、製品コードの互換修正は不要と判断した。同期safeStorageは45で引き続き利用できるが非推奨のため、46以降の更新前に非同期API対応を確認する。固定builder26.15.3とportable templateの連携は維持した。発行前レビューは未解決指摘なし。
+- 型検査とbuild、標準 **833/833（fail/skip 0）** が成功した。依存更新だけでアプリの設定/保存/API契約の追加・削除がないため、通常のパッチ更新として **0.83.1** を発行した。`publish.bat`終了0、EXE/feed/Default Shellの版が一致。EXEは **170470683 bytes / SHA256 `e138f565e1ac8b0e0177dea7be34e0890b6f6f64be717fcd95dbd2806523d7c3`**、`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。
+- 固定EXEの実起動で **Electron45.0.0 / Chromium156.0.8078.48 / 内蔵Node24.22.0** を確認した。smoke、表示倍率11群、共通画像/Node・.NET接続9群、更新・実入力・再起動13群、進捗/取消/テーマ9群がすべて成功した。150%の設定画面と狭幅の画像一覧の画像も確認した。2つのeMudhra問題チェーンをNode/Chromiumが証明書エラーで拒否し、正常サイトは両方で成功（計6結果）。内蔵Nodeの表示版を開発用Node24.22.1へ読み替えない。
+- GUIはビルド完了後に直列実行し、毎回今回の固定EXEを使った。通知のOS可否/ロックを明示するfixtureと、現行UIの既存driverを再利用し、元の行動・倍率・更新検査は維持した。検査を緩めず期待する本体/Electron版だけを0.83.1/45.0.0へ変更した。物理DPI/ロック画面/UAC/実スピーカー/実Google受信の成功は追加していない。
+- コマンド・終了コード・完全ログとhash、検証前後の入力hash・レビュー・driverの元/変更後hash・配布物一致は`.artifacts/electron45-20261022/validation.json`と各phase記録を正本とする。今回の6方式のGUIは正常終了し、当該試験プロセス0を確認した。各方式の今回分とRelease/比較/再利用資料・他作業を保持し、フォルダー削除0件（cleanup.json）。通常publishだけで、全体ZIP・未変更Appletの再発行・GitHub Release・deploy・commit/pushは行っていない。
 
 ## 2026-10-22: ランタイム更新規則のコミット前確認
 
