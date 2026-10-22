@@ -1,6 +1,12 @@
 # 設定基盤と本体の共通設定画面
 
-本体rendererで全体設定とApplet設定を共用する。保存場所とファイル同期は[設定同期](settings-sync.md)、複数項目の一覧編集は[一覧とダイアログ](settings-list-editing.md)を正本とする。
+本体rendererで全体設定とApplet設定を共用する。画面構成・説明・状態・エラー表示の設計基準は[共通レイアウト指針](settings-ui-guidelines.md)、保存場所とファイル同期は[設定同期](settings-sync.md)、複数項目の一覧編集は[一覧とダイアログ](settings-list-editing.md)を正本とする。
+
+## 共通レイアウト指針との対応
+
+共通レイアウト指針は新規作成・改修時の設計基準であり、本書に記載する現行APIの全面対応を示すものではない。`SettingsSection`/`SettingsField`は既に`description`と`hint`を受け取るが、既存画面と共通部品には`SettingsHint`や`SettingsFeedback`の直接利用が残っている。
+
+現行の[SettingsDialog](../src/renderer/settings-ui/SettingsModal.tsx)の`errorLayout`は`inline`/`custom`で、[SettingsError](../src/renderer/settings-ui/SettingsError.tsx)はアイコン式のエラー表示部品である。ページ・ダイアログの常設エラー領域、対象を識別する共通の受け渡し口、処理中表示等の統一は共通部品側の対応対象とする。個別画面に独自の表示欄を追加して補わず、指針に沿って共通部品を整える。
 
 ## 保存と入力
 
@@ -54,7 +60,7 @@ settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタ
 
 本体の設定ページは`SettingsPageLayout`（`src/renderer/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。ページ側で同じ見出しを重ねない。フォーム/JSONの切替と共通の操作欄を上部に固定し、間隔を置いた本文だけをスクロールする。Applet詳細でも同じ本文部品を使い、ショートカット一覧の内部にタイトル・説明を追加しない。
 
-本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ）、`SettingsField`（項目名・説明と入力）、`SettingsChoice`（選択カード）、`SettingsFeedback`（処理・結果・エラー）を再利用する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。
+本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ）、`SettingsField`（項目名・説明と入力）、`SettingsChoice`（選択カード）を再利用する。説明・状態・エラーの表示は共通レイアウト指針に従って共通部品側へ集約する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。
 
 通知のボイス候補は`SettingsCombobox`を使う。入力欄の位置と幅に合わせた同一Surfaceのポップオーバーで、スクロール枠に切られず、下に空きがない場合は上に開く。IDの直接入力・ID/名前による候補絞り込み・クリック・上下キーとEnterでの選択・Escape/Tabでの終了に対応し、IME入力の確定は共通入力部品へ委ねる。取得済み一覧は通知の声・速度や無関係な設定の保存で破棄せず、TTS設定またはAPIキーの変更時に無効化する。取得中に接続設定が変わった場合は古い応答を破棄する。
 
@@ -86,7 +92,9 @@ AIのモデル取得は設定ページ専用の操作として未保存の接続
 
 `host.showHints`は既定trueで、表示ページの「共通」カードから即時保存・反映する。既存設定の欠落時だけtrueを補い、保存済みfalseは保持する。設定定義から`appdock.settings.showHints.on`、`.off`、`.toggle`を生成する。保存分類は他の表示設定と同じ端末専用とする。
 
-消してよい操作説明は、タイトルに結びつくものを`SettingsSection`/`SettingsField`の`hint`、本文内の補足を`src/renderer/settings-ui/SettingsHint.tsx`で表示する。どちらも`useSettingsHints()`を通して同じContextを参照する。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・個別Applet設定・portal内のダイアログへ適用する。本文ヒントの見た目は`settings-hint.css`、タイトルのヒントは`settings-hint-icon.css`を正本とする。
+説明・補足情報はレイアウト部品の`description`/`hint`へ渡す。内容の使い分けは[共通レイアウト指針](settings-ui-guidelines.md#説明補足情報)を正本とし、`SettingsHint`を使用する案内や個別配置の実装例は設けない。
+
+ヒント表示設定の共有には、現行の`src/renderer/settings-ui/SettingsHint.tsx`内の`SettingsHintsContext`と`useSettingsHints()`を使う。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・個別Applet設定・portal内のダイアログへ適用する。ヒントの見た目と表示制御は共通部品側で管理する。
 
 `SettingsSection`/`SettingsField`の`hint?: string`は、空白を除いた内容があるときだけタイトルのすぐ右に丸付きの「？」を表示する。`description?: ReactNode`と併用できる。タイトルなしのセクションにはアイコンを表示しない。ヒントOFF時にはアイコン・ツールチップ・その参照をまとめて取り除き、入力欄やdescriptionは保持する。表示の切り替え用の設定や保存形式を追加しない。
 
@@ -104,30 +112,17 @@ AIのモデル取得は設定ページ専用の操作として未保存の接続
 
 ツールチップは既存の候補選択部品と同じnative popoverのtop layerへ表示する。ダイアログ/スクロール領域に切り取られず、画面端では左右位置と上下の表示方向を調整し、長文は折り返す。アイコンからツールチップへポインターを移しても読める状態を保つ。各画面で独自のアイコン・ブラウザー標準title・非表示制御を追加しない。
 
-追加・移動する文言は、静的か動的かだけで判断せず、次の役割で分ける。
-
-| 内容                                                                                    | 表示先                                     |
-| --------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 入力方法、単位、空欄/既定値の意味、任意の使い方の補足                                   | タイトルに対応する`hint`                   |
-| 現在の設定・起動状態、通知の要約、コマンドID、保存先などの実データ                      | 常時表示する`description`や専用の値表示    |
-| 外部送信・料金・認証、接続切断、再登録/再起動など操作結果の重要な注意、前提不足、エラー | 常時表示する`description`や警告/エラー表示 |
-| 説明と重要な注意が混在する文章                                                          | 文を分けて`hint`と`description`を併用      |
+入力方法・単位・空欄や既定値の意味も、理解や判断に必要かどうかを基準に表示先を選ぶ。外部送信・料金・認証、接続切断、再登録/再起動などの重要な注意は、常時表示する`description`や用途に合った共通の警告・エラー表示で扱う。任意の補足と重要な注意が混在する文章は分ける。
 
 本体の`SettingRow`も同じ共通部品を使う。明確な補助説明をhintへ渡し、起動状態の明示descriptionやUAC・描画設定の再起動に関する注意は保持する。検索カタログのdescriptionは検索用メタデータとして引き続き利用する。Applet manifestや宣言型一覧のdescriptionは提供元の機能説明・ラベルとの関連付けを含むため、自動でhintへ読み替えない。共通のページ表示・起動待ち時間など、本体が所有する補助説明だけを個別にhintへ渡す。
 
 通知種類カタログのdescriptionは各通知カードの`hint`へ渡し、エラー通知・警告通知を含めてタイトル横の「？」から表示する。通知先・表示時間・読み上げ等の現在の設定要約はカードの`description`に残す。実際の警告状態、必要な通知先の固定表示、接続不足やエラーの表示はヒントOFFでも保持する。
 
-```tsx
-import { SettingsHint } from '../settings-ui/SettingsHint';
+ヒントIDを`aria-describedby`で参照する共通部品は、`useSettingsHints()`がfalseのとき参照も外す。既存のdescriptionを移すときも共通レイアウト指針で内容を確認し、役割が曖昧な文言や操作に必要なラベルを一括して非表示にしない。
 
-<SettingsHint>入力後にEnterで確定します。</SettingsHint>;
-```
+現行の`SettingsFeedback`を使う既存箇所では、進行・正常結果と保存中メッセージを、視覚的な行を増減させずスクリーンリーダー向けの通知として扱っている。ボタンの無効化、二重実行防止、処理状態、エラー表示は維持する。新規作成・改修時は、共通レイアウト指針に従って状態・エラーの表示を共通部品側へ集約する。この一時表示の整理はヒント表示のON/OFFと独立する。
 
-本文の`SettingsHint`は、インラインに`as="span"`、小さな補足に`as="small"`を使用できる。ヒントIDを`aria-describedby`で参照する部品は、`useSettingsHints()`がfalseのとき参照も外す。既存のdescriptionを移すときも上表で内容を確認し、役割が曖昧な文言や操作に必要なラベルを一括して非表示にしない。
-
-共通`SettingsFeedback`の進行・正常結果と、保存中メッセージは視覚的な行を増減させず、スクリーンリーダー向けの通知として扱う。ボタンの無効化、二重実行防止、処理状態、エラー表示は維持する。この一時表示の整理はヒント表示のON/OFFと独立する。
-
-入力確定の常設案内と「このPCに自動保存」の表示は、ヒントON時も表示しない。ジェスチャーの通常右クリックの補足、Webアカウントの削除/クリアの補足は`SettingsHint`とする。許可不足の補足は末尾の「許可の適用とログについて」の折りたたみ内へ配置する。実際の削除/クリア確認と使用中ガード、許可の不足表示・注意アイコンは引き続き表示・実行する。
+入力確定の常設案内と「このPCに自動保存」の表示は、ヒントON時も表示しない。ジェスチャーの通常右クリックの補足、Webアカウントの削除/クリアの補足は、対応するレイアウト部品の`hint`へ渡す。許可不足の補足は末尾の「許可の適用とログについて」の折りたたみ内へ配置する。実際の削除/クリア確認と使用中ガード、許可の不足表示・注意アイコンは引き続き表示・実行する。
 
 ## 設定ページの配置と初期表示
 

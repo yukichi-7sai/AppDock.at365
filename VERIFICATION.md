@@ -2,6 +2,14 @@
 
 対象の現行版は`0.83.1`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
 
+## 2026-10-23: 設定画面の共通レイアウト指針
+
+- cleanなmain/origin/mainから`pull --ff-only`で最新を確認し、`docs/settings-ui-guidelines.md`を共通指針の正本として追加した。`description`は現在の設定値・状態・重要な説明を常時表示し、`hint`は任意の補足として表示設定に従う。エラーの対象、通知を出す条件、操作位置の安定、狭幅・文字拡大・キーボード操作、共通部品の責務を定めた。
+- DEVELOPMENTと本体AGENTSから参照を追加し、設定基盤・一覧編集の文書を同じ指針へ接続した。`SettingsHint`の利用を勧める記述と実装例を整理し、現行APIに存在しない`errorLayout="reserved"`の案内を除いた。現行の`inline`/`custom`とアイコン式`SettingsError`、共通レイアウト側の未対応事項を区別した。差分レビューで確定した指針との一致、参照の一元化、保存・入力の既存契約を確認し、未解決の指摘なし。
+- 関連5文書のローカルリンク **152件**、Markdown見出し参照 **16件**、コードブロックの対応と`git diff --check`が成功した。検査対象・SHA256・結果は`.artifacts/commit-validation-settings-ui-guidelines-20261023/documentation-check.json`、最終対象・stage tree・実効identity・commit照合は同フォルダーの`validation.json`へ記録する。
+- コミット前のGitHub/AQUA mainはいずれも`aea52e990f16087166fb1201f0b4cd726438bf9c`と一致した。AQUAの読み取りは制限内のGit補助プロセス起動が拒否されたため、同一コマンドを通常ユーザーで再実行して確認した。
+- 変更は文書6ファイルに限定し、製品コード・設定・保存形式・依存・配布物は変更しない。文書のみの例外に従い、製品回帰・GUI試験・版更新・発行は実施しない。現行版0.83.1を維持し、push・Release・実利用先deployは行わない。
+
 ## 2026-10-22: Electron45更新のコミット前確認（0.83.1）
 
 - 利用者からcommit/pushの指示を受領。main/origin/mainと対象4ファイル、実効author/committerを確認した。GitHubのmainは`b94173a`、AQUAはその祖先`c0b287a`で、双方へ通常pushできる履歴と照合した。既存の未コミット変更を保持し、pull/stash/resetや履歴の統合は行わない。
