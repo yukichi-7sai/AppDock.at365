@@ -1,7 +1,17 @@
 # 検証記録
 
-対象の現行版は`0.82.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.83.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
 
+## 2026-10-22: eMudhra対策とランタイム更新（0.83.0）
+
+- cleanなmain `ecb1603`から`pull --ff-only`で最新を確認。利用者指定によりマイナーを0.83.0へ更新し、Electron 44.6.0→44.9.3、開発用Node 24.21.0→24.22.1 LTSを採用した。lockfileの製品依存差分はElectronだけ。pnpm 12.10.1・builder 26.15.3とportable template、設定・保存・公開APIは維持する。
+- 7日未満の採用は今回の明示許可に従い、Node/Electronの完全版だけを例外化。既に成熟した旧例外6件は除去し、他の依存の7日待機・供給元検査・frozen-lockfileを維持。Nodeは公式LTSとZIPのSHA256を確認し、setupの初回・再実行が成功した。制限環境のリンク作成拒否は同一の依存更新コマンドを通常ユーザーで再実行して成功。
+- 発行前レビュー1回で版・lockfile・例外・起動/更新経路とABI149を確認し、阻害指摘なし。型検査・標準832/832（fail/skip 0）とWindows PowerShellでのツール方針18件が成功。PowerShell 7での方針fixture起動はJSON整数型の違いで停止したため、setupと同じWindows PowerShellで検証した。製品や検査条件を緩めていない。
+- 通常publish成功。固定EXEの起動smoke、表示倍率11群、共通画像9群（Node/.NET接続・Profile・Webを含む）、更新/再起動13群（実入力のジェスチャーを含む）が成功。独立画像ページ待機を現行本体documentへ合わせた既存driverと、通知のOS可否/ロックを明示するfixtureを使用し、元の行動・倍率の検査を維持した。
+- 固定EXEのElectron44.9.3 / Chromium152.0.7977.167 / 内蔵Node24.22.0とDefault Shell0.83.0を確認。2種類の問題証明書チェーンをNode側がCERT_REVOKED、Chromium側がERR_CERT_REVOKED/ERR_CERT_AUTHORITY_INVALIDで拒否し、正常対照は両側で接続成功。独立した開発Node24.22.1でも拒否を確認した。内蔵Nodeの表示版を24.22.1へ読み替えず、eMudhra対策のバックポートを実測する。Nodeの診断はTLSハンドシェイクのみ、Chromiumの診断は隔離profileで認証情報なしのHEAD要求。短い待ち時間/正常サイトの転送で止まった記録も保存し、タイムアウトを拒否成功に数えない。
+- 実行コマンド・終了コード・ログhash・試験前後の入力hash・EXE一致と失敗/再実行は`.artifacts/security-update-0830-20261022/`、事前調査は`.artifacts/security-audit-20261022/`。Node/Electron更新は完了したが、OS trust-list反映や全Node上流CVEの個別実証、実Google受信・物理DPI/ロック・実NASは今回の追加成功として扱わない。
+- Release作業は0.83.0へ切り替える。旧0.82.0とProfile0.1.0は下書きのまま、旧planで再公開しない。新規planと同梱照合・公開後の匿名取得/実更新検出・最新1件を残す整理の最終記録先は`.artifacts/release-0.83.0-20261022/`。利用者から本体と同梱7Applet全ての過去の公開Release16件の削除指示を受領し、全対象の公開後検証成功を条件にする。下書き・Gitタグ/履歴を保持する。
+- 全Release作業後、Electron/Nodeのみを7日待機から恒久的に除外し、依存更新時に最新安定Electron/最新LTS Nodeを選ぶ方針変更も依頼された。今回のRelease入力を変えないよう、その変更はReleaseと旧公開物整理の完了後に行う。
 ## 2026-10-22: 0.82.0のGitHub Release準備
 
 - 利用者から0.82.0のRelease指示を受領。GitHubではv0.82.0が未公開、直近公開版はv0.68.1であることを確認した。対象本体の製品実装は`bfe63f9`、同梱候補は7Applet。公開済み同版は上書きせず、未公開のProfile 0.1.0・WallpaperSlideshow 0.7.2・WebApplet 0.3.1を本体と合わせて扱う。

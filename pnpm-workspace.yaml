@@ -5,15 +5,10 @@ minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeExcludePrune: true
-# Preserve the previously installed 0.26.25 lockfile during policy adoption.
-# These exact versions mature by 2026-10-14 07:39:15 JST; remove then or on update.
+# Security exception: eMudhra CA mitigation and Chromium security backports.
+# https://emudhra.we-have-a-problem.com/ and Electron v44.9.3 release notes.
 minimumReleaseAgeExclude:
-  - '@vitejs/plugin-react@6.1.2'
-  - 'electron@44.6.0'
-  - 'http-cache-semantics@4.3.0'
-  - 'nanoid@3.3.20'
-  - 'postcss@8.5.29'
-  - 'vite@8.3.3'
+  - 'electron@44.9.3'
 verifyDepsBeforeRun: error
 allowBuilds:
   electron: true

@@ -209,7 +209,7 @@ Appletも、上記の公開後検証がすべて成功した時点で公開済�
 # すべて公開後検証に成功した対象Appletの実際の値へ置き換える。
 $taskReceipt = '<対象Appletの公開後検証結果JSONの絶対パス>'
 $taskRetention = '<新しい整理結果JSONの絶対パス>'
-& "$taskRepo\.tools\node\24.21.0\node.exe" "$taskRepo\scripts\release-retention.cjs" `
+& "$taskRepo\.tools\node\24.22.1\node.exe" "$taskRepo\scripts\release-retention.cjs" `
   $taskReceipt $taskRetention $taskGh
 if ($LASTEXITCODE -ne 0) { throw 'Release整理が失敗しました。公開結果と整理結果を別々に確認してください。' }
 ```

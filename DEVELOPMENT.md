@@ -77,9 +77,9 @@ Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして�
 
 Node.js／pnpmの更新は、`toolchain.json` の完全なバージョン番号を変更してから `.\setup-tools.bat` を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは `.tools/node/<version>` と `.tools/pnpm/<version>` に残すので、設定を戻してsetupを実行すると切り戻せます。winget等の更新対象にはなりません。更新後は `.\dev.bat run typecheck`、`.\dev.bat test`、`.\publish.bat` で確認してください。
 
-現在の固定ツールはNode.js 24.21.0（24 LTS）とpnpm 12.10.1です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。
+現在の固定ツールはNode.js 24.22.1（24 LTS）とpnpm 12.10.1です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。
 
-Electron 44.6.0はバイナリを初回実行時に取得するため、[公式手順](https://www.electronjs.org/docs/latest/tutorial/installation)の`install-electron`をプロジェクトの`postinstall`で明示実行します。pnpmが変更なしのインストールを省略する場合、バイナリが必要なら次を実行してください。
+Electron 44.9.3はバイナリを初回実行時に取得するため、[公式手順](https://www.electronjs.org/docs/latest/tutorial/installation)の`install-electron`をプロジェクトの`postinstall`で明示実行します。pnpmが変更なしのインストールを省略する場合、バイナリが必要なら次を実行してください。
 
 ```powershell
 .\dev.bat run postinstall
@@ -97,11 +97,13 @@ Electron 44.6.0はバイナリを初回実行時に取得するため、[公式�
 
 公開後待機の例外は設定ファイルの完全版指定を正本とし、依存更新時に必要性を確認します。`minimumReleaseAgeExcludePrune: true`でlockfileから消えた版の例外を整理します。導入済みの固定pnpmは再利用し、新規取得には待機条件を適用します。
 
-Node.jsは`toolchain.json`で完全な版を固定し、`nodeChannel: "lts"`を維持します。現在の24.21.0はKrypton LTSです。新規取得前に公式の`dist/index.json`で対象版のLTS表示と公開日を確認します。公開日が日単位なので、そのUTC日が終わってから7日待ちます。導入済みNodeは実行ファイル自身のLTS表示を確認して再利用します。
+Node.jsは`toolchain.json`で完全な版を固定し、`nodeChannel: "lts"`を維持します。現在の24.22.1はKrypton LTSです。新規取得前に公式の`dist/index.json`で対象版のLTS表示と公開日を確認します。公開日が日単位なので、そのUTC日が終わってから7日待ちます。導入済みNodeは実行ファイル自身のLTS表示を確認して再利用します。
 
 pnpm本体はnpmで導入するため、workspace設定だけでは保護されません。setupは公式npmレジストリで固定版のpnpmとWindows x64ネイティブパッケージの公開日時を確認し、npmにも`--min-release-age=7`を渡します。新規取得でメタデータの取得・検証に失敗したら停止します。導入済みの固定ツールは再利用し、通常ビルドのたびにツール公開情報を取得しません。
 
-重大なセキュリティ修正を急いで導入する場合は、出所・告知・差分を確認し、対象の完全な版だけを例外にします。npm依存は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`へ`package-name@1.2.3`を追加し、理由をコメントとVERIFICATIONへ記録します。名前だけやワイルドカードで全バージョンを除外しません。ツールは`toolchain.json`の`releaseAgeExceptions`へ`{"package":"pnpm","version":"12.10.1","reason":"確認した修正内容"}`形式で記録します（これは書式例で、現在の例外は空です）。対象は`node`、`pnpm`、`@pnpm/exe.win32-x64`です。pnpmとそのバイナリはそれぞれ確認し、必要ならそれぞれ版指定で例外にします。Nodeの例外は待機日数だけを免除し、LTS要件や公開日時の確認は維持します。待機期間経過後や対象版の不使用時に例外を取り除きます。
+重大なセキュリティ修正を急いで導入する場合は、出所・告知・差分を確認し、対象の完全な版だけを例外にします。npm依存は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`へ`package-name@1.2.3`を追加し、理由をコメントとVERIFICATIONへ記録します。名前だけやワイルドカードで全バージョンを除外しません。ツールは`toolchain.json`の`releaseAgeExceptions`へ`{"package":"pnpm","version":"12.10.1","reason":"確認した修正内容"}`形式で記録します（これは書式例です）。対象は`node`、`pnpm`、`@pnpm/exe.win32-x64`です。pnpmとそのバイナリはそれぞれ確認し、必要ならそれぞれ版指定で例外にします。Nodeの例外は待機日数だけを免除し、LTS要件や公開日時の確認は維持します。待機期間経過後や対象版の不使用時に例外を取り除きます。
+
+現在の待機例外はNode.js `24.22.1`とElectron `44.9.3`だけです。[Nodeのセキュリティ告知](https://nodejs.org/en/blog/release/v24.22.1)と[eMudhra対策案内](https://emudhra.we-have-a-problem.com/)・[Electronの修正](https://releases.electronjs.org/release/v44.9.3)を確認し、失効した証明書の拒否と正常サイトへの接続を実測して採用します。Electron内蔵のNodeと開発用Nodeは別に照合し、版名だけで対策の有無を決めません。
 
 待機は不正コードの検出を保証する機能ではありません。lockfile固定、導入前の告知・差分確認、導入後の必要な回帰確認も継続します。仕組みの回帰は`node --test tests/release-age.test.cjs`（ローカルNodeを使用）で、公開時刻の境界、版限定例外、非LTS拒否、pnpm実体の直接・間接・日時欠落・lockfile復元時の拒否を隔離レジストリで確認します。
 

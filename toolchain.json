@@ -1,7 +1,13 @@
 {
-  "node": "24.21.0",
+  "node": "24.22.1",
   "pnpm": "12.10.1",
   "nodeChannel": "lts",
   "minimumReleaseAgeDays": 7,
-  "releaseAgeExceptions": []
+  "releaseAgeExceptions": [
+    {
+      "package": "node",
+      "version": "24.22.1",
+      "reason": "2026-10-21 security release: reject compromised eMudhra keys and update the CA store, TLS, DNS and Brotli fixes."
+    }
+  ]
 }
