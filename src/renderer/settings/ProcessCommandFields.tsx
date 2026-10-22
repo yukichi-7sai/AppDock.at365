@@ -1,4 +1,3 @@
-import { SettingsHint } from '../settings-ui/SettingsHint';
 import { useState } from 'react';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
@@ -16,7 +15,10 @@ export function ProcessCommandFields({
   const [error, setError] = useState('');
   return (
     <>
-      <SettingsField title="実行方法">
+      <SettingsField
+        title="実行方法"
+        description="起動受付を返します。終了待ち・標準出力の取得は行いません。"
+      >
         <select
           aria-label="実行方法"
           value={String(config.mode ?? 'executable')}
@@ -53,6 +55,7 @@ export function ProcessCommandFields({
             />
           </SettingsField>
           <SettingsField
+            error={error ? error : ''}
             title="引数"
             hint={'文字列のJSON配列で指定します。例: ["ファイル名.txt", "--option"]'}
           >
@@ -75,7 +78,6 @@ export function ProcessCommandFields({
                 }
               }}
             />
-            {error && <p role="alert">{error}</p>}
           </SettingsField>
         </>
       ) : (
@@ -108,7 +110,6 @@ export function ProcessCommandFields({
         checked={config.showConsole === true}
         onChange={(showConsole) => onChange({ ...config, showConsole })}
       />
-      <SettingsHint>起動受付を返します。終了待ち・標準出力の取得は行いません。</SettingsHint>
     </>
   );
 }

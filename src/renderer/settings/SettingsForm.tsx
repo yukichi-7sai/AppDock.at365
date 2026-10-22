@@ -27,7 +27,6 @@ import { CodexSettings } from './CodexSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { AppletSettingsForm } from '../settings-ui/AppletSettingsForm';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
-import { SettingsHint } from '../settings-ui/SettingsHint';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
@@ -296,7 +295,7 @@ export function SettingsForm({
                     itemKey={'shellProviders.' + id}
                     description={`使用先: ${name(state?.boundProvider ?? state?.resolvedProvider)}${
                       state?.pendingProvider ? ' ／適用待ち: ' + name(state.pendingProvider) : ''
-                    }`}
+                    }${state?.reason ? '。' + state.reason + '。workerの再起動が必要な場合は、このAppletの他の領域も再接続します。' : ''}`}
                   >
                     <div className="shell-region-controls">
                       <select
@@ -330,16 +329,12 @@ export function SettingsForm({
                       </select>
                       {state?.reason && (
                         <>
-                          <p role="status">{state.reason}</p>
                           <button
                             disabled={busy}
                             onClick={() => void invoke('retryShellRegion', [id])}
                           >
                             この領域を再試行
                           </button>
-                          <SettingsHint>
-                            workerの再起動が必要な場合は、このAppletの他の領域も再接続します。
-                          </SettingsHint>
                         </>
                       )}
                     </div>
@@ -401,9 +396,10 @@ export function SettingsForm({
               <SettingRow
                 pageId={category}
                 itemKey="launch"
+                error={launch.error}
                 description={
                   launch.supported
-                    ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。`
+                    ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。`
                     : '起動設定はWindowsの発行版AppDockで使用できます。'
                 }
               >
@@ -422,12 +418,6 @@ export function SettingsForm({
                   </button>
                 </div>
               </SettingRow>
-              {launch.error && <p role="alert">{launch.error}</p>}
-              {launch.supported && (
-                <p className="muted">
-                  起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。設定は変更時に保存されます。
-                </p>
-              )}
             </SettingsSection>
             <SettingsSection
               title="Applet・MCPからの操作"
@@ -441,23 +431,21 @@ export function SettingsForm({
             <SettingsSection
               title="設定ファイル"
               hint="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
+              error={[...new Set(aux.settingsHealth?.errors)].join('\n')}
+              description={[
+                !aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired
+                  ? '設定は正常です。'
+                  : '',
+                aux.settingsHealth?.recovered
+                  ? '最後の正常な設定で動作しています。問題のあるファイルは保持しています。'
+                  : '',
+                ...(aux.settingsHealth?.reasons ?? []),
+                aux.settingsHealth?.errors.length ? '原因を確認して再起動してください。' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
               <div {...settingAnchor(category, 'settingsFile')}>
-                {!aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired && (
-                  <p>設定は正常です。</p>
-                )}
-                {aux.settingsHealth?.recovered && (
-                  <p>最後の正常な設定で動作しています。問題のあるファイルは保持しています。</p>
-                )}
-                {aux.settingsHealth?.reasons.map((reason) => (
-                  <p key={reason}>{reason}</p>
-                ))}
-                {[...new Set(aux.settingsHealth?.errors)].map((reason) => (
-                  <p role="alert" key={reason}>
-                    {reason}
-                  </p>
-                ))}
-                {!!aux.settingsHealth?.errors.length && <p>原因を確認して再起動してください。</p>}
                 {aux.settingsHealth?.launchRecovery && (
                   <button
                     disabled={busy}
@@ -467,14 +455,18 @@ export function SettingsForm({
                   </button>
                 )}
                 {aux.settingsFiles?.map((file) => (
-                  <div className="settings-file-diagnostic" key={file.scope}>
-                    <strong>{file.scope === 'device' ? 'このPCの設定' : '共有設定'}</strong>
-                    <code>{file.path}</code>
-                    <p>
-                      {file.recovered
-                        ? '正常な設定で継続中です。ファイルを確認してください。'
-                        : '正常'}
-                    </p>
+                  <SettingsField
+                    key={file.scope}
+                    title={file.scope === 'device' ? 'このPCの設定' : '共有設定'}
+                    description={
+                      <>
+                        <code>{file.path}</code> —{' '}
+                        {file.recovered
+                          ? '正常な設定で継続中です。ファイルを確認してください。'
+                          : '正常'}
+                      </>
+                    }
+                  >
                     {file.canRestore && (
                       <button
                         disabled={busy || aux.settingsHealth?.busy}
@@ -485,7 +477,7 @@ export function SettingsForm({
                         このファイルをバックアップで復元
                       </button>
                     )}
-                  </div>
+                  </SettingsField>
                 ))}
                 <div className="button-row">
                   <button
@@ -516,11 +508,13 @@ function SettingRow({
   pageId,
   itemKey,
   description,
+  error,
   children,
 }: {
   pageId: string;
   itemKey: string;
   description?: string;
+  error?: string;
   children: React.ReactNode;
 }) {
   const item = hostSettingItem(pageId, itemKey);
@@ -529,6 +523,7 @@ function SettingRow({
   return (
     <SettingsField
       title={item.title}
+      error={error}
       hint={description === undefined && !requiredDescription ? item.description : undefined}
       description={description ?? (requiredDescription ? item.description : undefined)}
       {...settingAnchor(pageId, itemKey)}

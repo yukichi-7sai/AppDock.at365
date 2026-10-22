@@ -1,3 +1,4 @@
+import { useSettingsFeedback } from './SettingsStatus';
 import { useEffect, useRef, useState } from 'react';
 import { SettingsInput } from './SettingsInput';
 import { useSettingsControls } from './api';
@@ -34,9 +35,9 @@ export function DirectoryListInput({
       if (active.current) setChoosing(false);
     }
   };
+  useSettingsFeedback({ error });
   return (
     <div className="source-folders">
-      {error && <p role="alert">{error}</p>}
       {value.map((folder, index) => (
         <div className="source-folder" key={index}>
           <SettingsInput

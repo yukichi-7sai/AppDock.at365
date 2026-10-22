@@ -172,9 +172,10 @@ export const SettingsTextarea = forwardRef<
   return <textarea {...textareaProps} {...text} ref={ref} />;
 });
 /** URL normalization waits for confirmation even inside a grouped dialog. */
-export const SettingsUrlInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
-  (props, ref) => <SettingsInput {...props} ref={ref} commitOn="blur-or-enter" />,
-);
+export const SettingsUrlInput = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & Pick<Confirmation, 'confirmation'>
+>((props, ref) => <SettingsInput {...props} ref={ref} commitOn="blur-or-enter" />);
 export const SettingsUrlTextarea = forwardRef<
   HTMLTextAreaElement,
   TextareaHTMLAttributes<HTMLTextAreaElement>

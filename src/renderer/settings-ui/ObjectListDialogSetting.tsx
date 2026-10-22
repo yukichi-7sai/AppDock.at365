@@ -9,10 +9,12 @@ import {
 import { validateSettingValue } from '../../shared/setting-definitions';
 import { SettingsOrderDialog } from './SettingsOrderDialog';
 import { SettingsDialog } from './SettingsModal';
+import { SettingsField } from './SettingsSections';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
 import { SettingsListTable, ListIcon, settingsListText } from './SettingsListTable';
 import { DirectoryListInput } from './DirectoryListInput';
 import { RegisteredImageInput } from './RegisteredImagePicker';
+import { useSettingsFeedback } from './SettingsStatus';
 
 export function ObjectListDialogSetting({
   definition,
@@ -84,7 +86,8 @@ export function ObjectListDialogSetting({
       return { ...current, draft };
     });
   };
-  if (loadError) return <p role="alert">{loadError}</p>;
+  useSettingsFeedback({ error: loadError || error, busy: pending, target: definition.title });
+  if (loadError) return null;
   return (
     <>
       <SettingsListTable
@@ -124,7 +127,6 @@ export function ObjectListDialogSetting({
           )
         }
       />
-      {error && <p role="alert">{error}</p>}
       {dialog?.kind === 'order' && (
         <SettingsOrderDialog
           title={definition.title + 'の並べ替え'}
@@ -176,8 +178,11 @@ export function ObjectListDialogSetting({
                 const current = objectFieldValue(dialog.draft, field),
                   choices = options[field.key] ?? field.options ?? [];
                 return (
-                  <div key={field.key} className="settings-list-editor-field">
-                    <span>{field.title}</span>
+                  <SettingsField
+                    key={field.key}
+                    title={field.title}
+                    description={field.description}
+                  >
                     {field.type === 'boolean' ? (
                       <input
                         type="checkbox"
@@ -242,8 +247,7 @@ export function ObjectListDialogSetting({
                         }
                       />
                     )}
-                    {field.description && <small>{field.description}</small>}
-                  </div>
+                  </SettingsField>
                 );
               })
           )}

@@ -1,9 +1,10 @@
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
-import { SettingsHint } from '../settings-ui/SettingsHint';
+import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import {
   appletApiPermissionLabels,
   type AppletApiPermission,
@@ -199,139 +200,141 @@ export function ApiPermissionsSettings({
     const missing = needs(key, applet ? grants : mcpPermissions, applet);
     return missing.length ? `未有効：${missing.join('・')}の許可が必要です` : '';
   }
+  useSettingsFeedback({
+    busy,
+    error: [error || appletError || state?.error ? error || appletError || state?.error : '']
+      .filter(Boolean)
+      .join('\n'),
+  });
   return (
-    <section className="api-permissions" aria-label="操作の許可">
-      {(error || appletError || state?.error) && (
-        <p className="error-text" role="alert">
-          {error || appletError || state?.error}
-        </p>
-      )}
-      <span className="sr-only" role="status">
-        {busy ? '保存しています…' : ''}
-      </span>
-      <table className="permission-table">
-        <thead>
-          <tr>
-            <th scope="col">操作</th>
-            <th scope="col">Applet</th>
-            <th scope="col">MCP</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const appletOn = grants[row.key] === true;
-            const mcpOn = row.mcp && state?.[row.mcp] === true;
-            return (
-              <tr key={row.key} {...settingAnchor('permissions', row.key)}>
-                <th scope="row">
-                  <strong>{appletApiPermissionLabels[row.key]}</strong>
-                  <p>{row.description}</p>
-                </th>
-                <td data-caller="Applet">
-                  <Toggle
-                    label={`Applet：${appletApiPermissionLabels[row.key]}`}
-                    checked={appletOn}
-                    disabled={hostBusy || busy || !!appletError}
-                    onChange={(value) =>
-                      void save(() =>
-                        settingsControls.setAppletApiPermissions({ ...grants, [row.key]: value }),
-                      )
-                    }
-                  />
-                  {appletOn && reason(row.key, true) && (
-                    <small className="permission-pending">{reason(row.key, true)}</small>
-                  )}
-                </td>
-                <td data-caller="MCP">
-                  {row.key === 'read' ? (
-                    <span className="permission-fixed" title="MCP連携中は常に許可">
-                      <Toggle
-                        label="Codexからの情報取得を許可する（MCP連携中は常に許可）"
-                        checked
-                        disabled
-                        onChange={() => {}}
-                      />
-                    </span>
-                  ) : (
-                    <>
-                      <div className="permission-control">
+    <section className="api-permissions settings-sections" aria-label="操作の許可">
+      <SettingsSection variant="card" title="APIの公開">
+        <table className="permission-table">
+          <thead>
+            <tr>
+              <th scope="col">操作</th>
+              <th scope="col">Applet</th>
+              <th scope="col">MCP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const appletOn = grants[row.key] === true;
+              const mcpOn = row.mcp && state?.[row.mcp] === true;
+              return (
+                <tr key={row.key} {...settingAnchor('permissions', row.key)}>
+                  <th scope="row">
+                    <strong>{appletApiPermissionLabels[row.key]}</strong>
+                    <p>{row.description}</p>
+                  </th>
+                  <td data-caller="Applet">
+                    <Toggle
+                      label={`Applet：${appletApiPermissionLabels[row.key]}`}
+                      checked={appletOn}
+                      disabled={hostBusy || busy || !!appletError}
+                      onChange={(value) =>
+                        void save(() =>
+                          settingsControls.setAppletApiPermissions({ ...grants, [row.key]: value }),
+                        )
+                      }
+                    />
+                    {appletOn && reason(row.key, true) && (
+                      <small className="permission-pending">{reason(row.key, true)}</small>
+                    )}
+                  </td>
+                  <td data-caller="MCP">
+                    {row.key === 'read' ? (
+                      <span className="permission-fixed" title="MCP連携中は常に許可">
                         <Toggle
-                          label={`Codexからの${row.label}を許可する`}
-                          checked={!!mcpOn}
-                          disabled={hostBusy || busy || !state}
-                          onChange={(allowed) =>
-                            void save(async () => {
-                              const action =
-                                row.key === 'write'
-                                  ? ({
-                                      kind: 'configure',
-                                      enabled: state!.enabled,
-                                      allowWrite: allowed,
-                                      port: state!.port,
-                                    } as const)
-                                  : ({ kind: row.action, allowed } as AutomationAction);
-                              setState((await settingsControls.automation(action)).state);
-                            })
-                          }
+                          label="Codexからの情報取得を許可する（MCP連携中は常に許可）"
+                          checked
+                          disabled
+                          onChange={() => {}}
                         />
-                        {row.mcpWarning && (
-                          <span className="permission-warning">
-                            <span
-                              className="permission-warning-icon"
-                              role="img"
-                              tabIndex={0}
-                              aria-label={`MCP：${appletApiPermissionLabels[row.key]}の注意点`}
-                              aria-describedby={`permission-warning-${row.key}`}
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path
-                                  d="M10.3 3.9 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
-                                  stroke="currentColor"
-                                  strokeWidth="1.8"
-                                  strokeLinejoin="round"
-                                />
-                                <path
-                                  d="M12 9v4"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                />
-                                <circle cx="12" cy="17" r="1" fill="currentColor" />
-                              </svg>
+                      </span>
+                    ) : (
+                      <>
+                        <div className="permission-control">
+                          <Toggle
+                            label={`Codexからの${row.label}を許可する`}
+                            checked={!!mcpOn}
+                            disabled={hostBusy || busy || !state}
+                            onChange={(allowed) =>
+                              void save(async () => {
+                                const action =
+                                  row.key === 'write'
+                                    ? ({
+                                        kind: 'configure',
+                                        enabled: state!.enabled,
+                                        allowWrite: allowed,
+                                        port: state!.port,
+                                      } as const)
+                                    : ({ kind: row.action, allowed } as AutomationAction);
+                                setState((await settingsControls.automation(action)).state);
+                              })
+                            }
+                          />
+                          {row.mcpWarning && (
+                            <span className="permission-warning">
+                              <span
+                                className="permission-warning-icon"
+                                role="img"
+                                tabIndex={0}
+                                aria-label={`MCP：${appletApiPermissionLabels[row.key]}の注意点`}
+                                aria-describedby={`permission-warning-${row.key}`}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                  <path
+                                    d="M10.3 3.9 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M12 9v4"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                  />
+                                  <circle cx="12" cy="17" r="1" fill="currentColor" />
+                                </svg>
+                              </span>
+                              <span
+                                id={`permission-warning-${row.key}`}
+                                className="permission-tooltip"
+                                role="tooltip"
+                              >
+                                {row.mcpWarning}
+                              </span>
                             </span>
-                            <span
-                              id={`permission-warning-${row.key}`}
-                              className="permission-tooltip"
-                              role="tooltip"
-                            >
-                              {row.mcpWarning}
-                            </span>
-                          </span>
+                          )}
+                        </div>
+                        {mcpOn && reason(row.key, false) && (
+                          <small className="permission-pending">{reason(row.key, false)}</small>
                         )}
-                      </div>
-                      {mcpOn && reason(row.key, false) && (
-                        <small className="permission-pending">{reason(row.key, false)}</small>
-                      )}
-                    </>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <details className="permission-help">
-        <summary>許可の適用とログについて</summary>
-        <SettingsHint>
-          必要な許可が不足している操作は、ONでも有効になりません。連携がOFFの間も、MCPの許可を設定できます。
-        </SettingsHint>
-        <p>
-          MCPで公開されたAppletコマンドが共通APIを呼ぶ場合、Appletと元のMCPの両方の許可を確認します。キー送信やプロセス起動には、それぞれの操作許可も必要です。
-        </p>
-        <p>
-          APIの呼出しと結果は、MCPはautomation、Appletは各Appletのログに記録します。引数の値や認証情報は記録しません。
-        </p>
-      </details>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </SettingsSection>
+      <SettingsSection
+        title="許可の適用とログについて"
+        collapsible
+        description="必要な許可が不足している操作は、ONでも有効になりません。連携がOFFの間も、MCPの許可を設定できます。"
+      >
+        <SettingsField
+          title="操作時の確認"
+          description="MCPで公開されたAppletコマンドが共通APIを呼ぶ場合、Appletと元のMCPの両方の許可を確認します。キー送信やプロセス起動には、それぞれの操作許可も必要です。"
+        />
+        <SettingsField
+          title="ログ"
+          description="APIの呼出しと結果は、MCPはautomation、Appletは各Appletのログに記録します。引数の値や認証情報は記録しません。"
+        />
+      </SettingsSection>
     </section>
   );
 }

@@ -4,9 +4,9 @@
 
 ## 共通レイアウト指針との対応
 
-共通レイアウト指針は新規作成・改修時の設計基準であり、本書に記載する現行APIの全面対応を示すものではない。`SettingsSection`/`SettingsField`は既に`description`と`hint`を受け取るが、既存画面と共通部品には`SettingsHint`や`SettingsFeedback`の直接利用が残っている。
+本体・Applet設定と設定ダイアログは`SettingsSection`/`SettingsField`の`description`と`hint`を共用する。`description`は現在の値・継続的な状態・重要な説明を常時表示し、`hint`は任意の補足だけを表示する。入力欄を個別のラベルとCSSで配置せず、`SettingsField`へタイトル・説明・入力を渡す。共通の選択候補・キー記録・一覧等のウィジェットは、その内部の操作契約を保つ。
 
-現行の[SettingsDialog](../src/renderer/settings-ui/SettingsModal.tsx)の`errorLayout`は`inline`/`custom`で、[SettingsError](../src/renderer/settings-ui/SettingsError.tsx)はアイコン式のエラー表示部品である。ページ・ダイアログの常設エラー領域、対象を識別する共通の受け渡し口、処理中表示等の統一は共通部品側の対応対象とする。個別画面に独自の表示欄を追加して補わず、指針に沿って共通部品を整える。
+ページと[SettingsModal/SettingsDialog](../src/renderer/settings-ui/SettingsModal.tsx)は、常設の[SettingsStatusArea](../src/renderer/settings-ui/SettingsStatus.tsx)と[SettingsError](../src/renderer/settings-ui/SettingsError.tsx)を持つ。エラーの有無・長さによらず40pxの表示領域を確保し、要約と「詳細」から全文を確認できる。個別配置の`SettingsHint`・`SettingsFeedback`と`errorLayout`は使用しない。
 
 ## 保存と入力
 
@@ -60,13 +60,17 @@ settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタ
 
 本体の設定ページは`SettingsPageLayout`（`src/renderer/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。ページ側で同じ見出しを重ねない。フォーム/JSONの切替と共通の操作欄を上部に固定し、間隔を置いた本文だけをスクロールする。Applet詳細でも同じ本文部品を使い、ショートカット一覧の内部にタイトル・説明を追加しない。
 
-本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ）、`SettingsField`（項目名・説明と入力）、`SettingsChoice`（選択カード）を再利用する。説明・状態・エラーの表示は共通レイアウト指針に従って共通部品側へ集約する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。
+本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ、`variant="group"`で枠のない見出しグループ）、`SettingsField`（項目名・説明と入力、入力なしの状態表示）、`SettingsChoice`（選択カード）を再利用する。説明・状態・エラーの表示は共通レイアウト指針に従って共通部品側へ集約する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。
+
+`SettingsField.group?: string`は項目名の左に小さなグループ名を常時表示する。色・文字サイズ・配置で項目名と区別し、groupの有無でタイトルの高さを変えない。同じ行に表示し、fieldsetの読み上げ名にもグループ名を含める。関連する項目には同じgroupを指定し、SettingsSectionや複数列の専用グリッドで囲まず同じ階層へ並べる。マウスジェスチャーの操作感・待機表示と、両入力方式のWebブラウザ設定はこの形を使う。枠なしの`SettingsSection variant="group"`は上部に共通の20pxの余白を設ける。Fieldのgroupとは別の構成部品として扱う。
+
+通知一覧は提供元ごとの`SettingsSection variant="card"`内へ、通知種類のカードを共通の`settings-sections`で間隔を保って並べる。通知先も共通のField/Choiceを使い、汎用fieldsetやカードを画面専用CSSで上書きしない。操作の許可一覧は`SettingsSection variant="card" title="APIの公開"`で囲み、一覧の背景をカードと揃える。テーブルの外枠はSectionへ任せる。Applet/MCPの独立した許可列と専用テーブルの操作契約を保つ。これと同種の2列テーブルの共通部品化は今後の検討対象で、現行では専用テーブルを使用する。
 
 通知のボイス候補は`SettingsCombobox`を使う。入力欄の位置と幅に合わせた同一Surfaceのポップオーバーで、スクロール枠に切られず、下に空きがない場合は上に開く。IDの直接入力・ID/名前による候補絞り込み・クリック・上下キーとEnterでの選択・Escape/Tabでの終了に対応し、IME入力の確定は共通入力部品へ委ねる。取得済み一覧は通知の声・速度や無関係な設定の保存で破棄せず、TTS設定またはAPIキーの変更時に無効化する。取得中に接続設定が変わった場合は古い応答を破棄する。
 
 検索対象の項目に`settingAnchor`を付け、折りたたみの展開と項目への移動を維持する。高度な設定だけを閉じ、主要な設定と状態は最初から表示する。読み上げは接続先→モデルと声→試聴→詳細、通知は受け取り方→読み上げの共通上書き→MCP Eventの接続案内→提供元別の通知種類、Codexは状態と操作許可へのリンク→登録/接続テスト→登録先や接続の詳細を基本構成とする。トレイはクリック動作と右クリックメニューを分離し、バージョン情報は一括更新・本体・Applet・共通更新設定・実行環境を共通カードで配置する。
 
-`scripts/settings-usability-ui-test.cjs [固定EXE]`は共通構成、8ページの明暗テーマと狭い幅、モデル候補・直接入力、通知先と声/速度の継承、隔離したCodex登録/解除を確認する。保存と公開範囲の契約は上記を維持する。
+`scripts/settings-usability-ui-test.cjs [固定EXE]`は共通構成、8ページの明暗テーマと狭い幅、モデル候補・直接入力、通知先と声/速度の継承、隔離したCodex登録/解除を確認する。`scripts/settings-layout-refinements-ui-test.cjs [固定EXE]`はgroupとタイトルの高さ、入力列・全幅区切り線、通知カード・暗色の枠、許可一覧の背景、導入description、AIの同一階層と保存/取消、操作文字の中心を確認する。保存と公開範囲の契約は上記を維持する。
 
 Applet本文は`src/renderer/settings-ui/AppletSettingsForm.tsx`を共通テンプレートとする。manifestの`settingSections`を検証し、設定ページのauxiliaryへ投影する。セクションへ配置されなかった設定・操作も表示し、設定保存/JSONの投影に表示メタデータを混ぜない。設定アンカーは既存のキーのままで、セクションの再配置や折りたたみに依存しない。WebAppletもSettingsSection/SettingsFieldでサイト・表示とページ遷移・アカウント・管理を描画する。
 
@@ -94,7 +98,7 @@ AIのモデル取得は設定ページ専用の操作として未保存の接続
 
 説明・補足情報はレイアウト部品の`description`/`hint`へ渡す。内容の使い分けは[共通レイアウト指針](settings-ui-guidelines.md#説明補足情報)を正本とし、`SettingsHint`を使用する案内や個別配置の実装例は設けない。
 
-ヒント表示設定の共有には、現行の`src/renderer/settings-ui/SettingsHint.tsx`内の`SettingsHintsContext`と`useSettingsHints()`を使う。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・個別Applet設定・portal内のダイアログへ適用する。ヒントの見た目と表示制御は共通部品側で管理する。
+ヒント表示設定の共有には、`src/renderer/settings-ui/SettingsHints.tsx`内の`SettingsHintsContext`と`useSettingsHints()`を使う。各画面で設定を読み直したり、`muted`や`small`をまとめて非表示にしたりしない。本体の設定ページモデルはページ値とは別に現在の`showHints`を渡し、`SettingsPage`のContextから全体設定・個別Applet設定・portal内のダイアログへ適用する。ヒントの見た目と表示制御は共通部品側で管理する。
 
 `SettingsSection`/`SettingsField`の`hint?: string`は、空白を除いた内容があるときだけタイトルのすぐ右に丸付きの「？」を表示する。`description?: ReactNode`と併用できる。タイトルなしのセクションにはアイコンを表示しない。ヒントOFF時にはアイコン・ツールチップ・その参照をまとめて取り除き、入力欄やdescriptionは保持する。表示の切り替え用の設定や保存形式を追加しない。
 
@@ -120,7 +124,9 @@ AIのモデル取得は設定ページ専用の操作として未保存の接続
 
 ヒントIDを`aria-describedby`で参照する共通部品は、`useSettingsHints()`がfalseのとき参照も外す。既存のdescriptionを移すときも共通レイアウト指針で内容を確認し、役割が曖昧な文言や操作に必要なラベルを一括して非表示にしない。
 
-現行の`SettingsFeedback`を使う既存箇所では、進行・正常結果と保存中メッセージを、視覚的な行を増減させずスクリーンリーダー向けの通知として扱っている。ボタンの無効化、二重実行防止、処理状態、エラー表示は維持する。新規作成・改修時は、共通レイアウト指針に従って状態・エラーの表示を共通部品側へ集約する。この一時表示の整理はヒント表示のON/OFFと独立する。
+項目のエラーは`SettingsField.error`、セクションのエラーは`SettingsSection.error`へ渡す。複合ウィジェットや非同期操作は`useSettingsFeedback({ error, target, busy, message, onRetry, retryLabel })`を使う。`target`を省略すると親の項目名を使い、共通領域で「対象: メッセージ」に揃える。`SettingsField`はfieldset/legendで項目をまとめ、エラー時は共通エラーIDを`aria-describedby`で参照する。モーダルごとに表示先を分けるため、背後のページへエラーを重複表示しない。
+
+共通領域の進行・正常結果と保存中メッセージは、視覚的な行を増減させずスクリーンリーダーへ通知する。継続して確認する状態は`description`へ渡す。非同期の操作ボタンは[SettingsButton](../src/renderer/settings-ui/SettingsButton.tsx)の`pending`を使い、同じラベル・幅・文字の中央位置を保ってスピナーと無効状態を表示する。アイコンだけの操作は`icon`を指定する。実際の二重送信ガードと取消の可否は既存の処理側でも維持する。これらはヒント表示設定と独立する。
 
 入力確定の常設案内と「このPCに自動保存」の表示は、ヒントON時も表示しない。ジェスチャーの通常右クリックの補足、Webアカウントの削除/クリアの補足は、対応するレイアウト部品の`hint`へ渡す。許可不足の補足は末尾の「許可の適用とログについて」の折りたたみ内へ配置する。実際の削除/クリア確認と使用中ガード、許可の不足表示・注意アイコンは引き続き表示・実行する。
 

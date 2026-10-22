@@ -1,3 +1,4 @@
+import { SettingsField } from './SettingsSections';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   imageKey,
@@ -11,7 +12,6 @@ import { SettingsDialog, SettingsModal } from './SettingsModal';
 import { ImageGallery, GallerySizeControl, ImageGalleryPreview } from './ImageGallery';
 import { gallerySize } from '../../shared/image-gallery';
 import { SettingsInput } from './SettingsInput';
-import { SettingsHint } from './SettingsHint';
 import { Icon } from '../Icon';
 import './registered-images.css';
 
@@ -162,8 +162,7 @@ export function ImageLibraryBrowser({
   return (
     <>
       <div className="image-library-toolbar">
-        <label>
-          グループ
+        <SettingsField title="グループ">
           <select
             aria-label="画像のグループ"
             value={group}
@@ -177,16 +176,15 @@ export function ImageLibraryBrowser({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          検索
+        </SettingsField>
+        <SettingsField title="検索">
           <SettingsInput
             type="search"
             aria-label="画像のファイル名を検索"
             value={query}
             onChange={(e) => onQuery(e.target.value)}
           />
-        </label>
+        </SettingsField>
       </div>
       <ImageGallery
         resetKey={`${group}:${query}`}
@@ -286,6 +284,16 @@ export function RegisteredImagePicker({
   return (
     <SettingsDialog
       title="画像を選択"
+      description="登録した原画像は、この編集をキャンセルしてもライブラリーに残ります。"
+      error={[library.error, sizeError].filter(Boolean).join('\n')}
+      errorTarget="画像の選択"
+      errorAction={
+        sizeError ? (
+          <button type="button" onClick={() => saveWidth(cardWidth)}>
+            保存を再試行
+          </button>
+        ) : undefined
+      }
       className="image-library-dialog"
       applyLabel="画像を使う"
       valid={!!library.api && !!selected && !registering}
@@ -325,10 +333,6 @@ export function RegisteredImagePicker({
         </button>
         <span>{selected?.file ?? '画像なし'}</span>
       </div>
-      <SettingsHint>
-        登録した原画像は、この編集をキャンセルしてもライブラリーに残ります。
-      </SettingsHint>
-      {library.error && <p role="alert">{library.error}</p>}
       <GallerySizeControl
         value={cardWidth}
         onChange={(value) => {
@@ -337,14 +341,6 @@ export function RegisteredImagePicker({
         }}
         onCommit={saveWidth}
       />
-      {sizeError && (
-        <p role="alert">
-          {sizeError}{' '}
-          <button type="button" onClick={() => saveWidth(cardWidth)}>
-            保存を再試行
-          </button>
-        </p>
-      )}
       <ImageLibraryBrowser
         snapshot={library.snapshot}
         selected={selected}
@@ -363,13 +359,15 @@ export function RegisteredImagePicker({
           className="image-library-preview-modal"
           closeOnBackdrop
           onClose={() => setPreview(null)}
+          header={
+            <header className="image-library-preview-heading">
+              <h2 id="picker-preview-title">{preview.ref.file}</h2>
+              <button type="button" data-initial-focus onClick={() => setPreview(null)}>
+                閉じる
+              </button>
+            </header>
+          }
         >
-          <header className="image-library-preview-heading">
-            <h2 id="picker-preview-title">{preview.ref.file}</h2>
-            <button type="button" data-initial-focus onClick={() => setPreview(null)}>
-              閉じる
-            </button>
-          </header>
           <RegisteredGalleryPreview entry={preview} groups={library.snapshot.groups} />
         </SettingsModal>
       )}

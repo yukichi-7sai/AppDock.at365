@@ -90,6 +90,14 @@ export function GesturesEditor({
       <GestureOptions gestures={gestures} change={change} />
       <SettingsSection
         title="マウスジェスチャー割り当て"
+        description={[
+          !gestures.enabled ? '現在、ジェスチャーは無効です。割り当てはそのまま編集できます。' : '',
+          bindings.length >= 2000
+            ? '割り当ては2000件までです。追加するには既存の割り当てを削除してください。'
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         hint="＋で割り当てを追加します。"
         className="gestures-editor command-shortcuts"
         {...settingAnchor('gestures', 'gestures')}
@@ -111,16 +119,6 @@ export function GesturesEditor({
             provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />
           )}
         </CommandBindingToolbar>
-        {!gestures.enabled && (
-          <p className="settings-help">
-            現在、ジェスチャーは無効です。割り当てはそのまま編集できます。
-          </p>
-        )}
-        {bindings.length >= 2000 && (
-          <p role="status">
-            割り当ては2000件までです。追加するには既存の割り当てを削除してください。
-          </p>
-        )}
         <CommandBindingList<GestureBinding>
           commands={visible}
           bindings={bindings}

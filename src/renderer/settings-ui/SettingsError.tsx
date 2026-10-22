@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { settingsPopoverScroll } from './settings-popover-scroll';
 import './settings-error.css';
 
-/** Reserve an icon beside the field; errors remain available even when hints are off. */
+/** Stable summary row with keyboard-readable, scrollable error details. */
 export function SettingsError({ error, id }: { error?: string; id: string }) {
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLSpanElement>(null);
@@ -14,7 +15,11 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
   const leave = () => {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
-      if (document.activeElement !== trigger.current) setOpen(false);
+      if (
+        document.activeElement !== trigger.current &&
+        !popup.current?.contains(document.activeElement)
+      )
+        setOpen(false);
     }, 100);
   };
   useEffect(() => {
@@ -45,8 +50,9 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
+        button.focus({ preventScroll: true });
         setOpen(false);
-      } else if (document.activeElement === button) {
+      } else if (document.activeElement === button || tooltip.contains(document.activeElement)) {
         const amounts: Record<string, number> = {
           ArrowDown: 40,
           ArrowUp: -40,
@@ -62,9 +68,7 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
       }
     };
     const dismiss = () => setOpen(false);
-    const scroll = (event: Event) => {
-      if (!tooltip.contains(event.target as Node)) dismiss();
-    };
+    const scroll = settingsPopoverScroll(button, tooltip, dismiss);
     document.addEventListener('pointerdown', outside);
     document.addEventListener('keydown', keydown, true);
     window.addEventListener('scroll', scroll, true);
@@ -78,8 +82,17 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
     };
   }, [open, error]);
   return (
-    <span className="settings-error-icon">
-      <span id={id} className="sr-only" role="alert" aria-atomic="true">
+    <div className="settings-error" data-error={!!error}>
+      <span
+        id={id}
+        className="sr-only"
+        role={error ? 'alert' : undefined}
+        aria-live="assertive"
+        aria-atomic="true"
+      >
+        {error}
+      </span>
+      <span className="settings-error-summary" aria-hidden="true">
         {error}
       </span>
       <button
@@ -88,27 +101,38 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
         className="settings-error-trigger"
         style={{ visibility: error ? 'visible' : 'hidden' }}
         disabled={!error}
-        aria-label="インストールのエラー"
+        aria-label="エラーの詳細"
         aria-describedby={`${id}-tooltip`}
         onPointerEnter={show}
         onPointerLeave={leave}
         onFocus={show}
-        onBlur={() => setOpen(false)}
+        onBlur={(event) => {
+          if (!popup.current?.contains(event.relatedTarget) && !popup.current?.matches(':hover'))
+            setOpen(false);
+        }}
         onClick={show}
       >
-        <span aria-hidden="true">!</span>
+        詳細
       </button>
       <span
         ref={popup}
         id={`${id}-tooltip`}
         className="settings-error-tooltip"
         role="tooltip"
+        tabIndex={-1}
         popover="manual"
         onPointerEnter={show}
         onPointerLeave={leave}
+        onBlur={(event) => {
+          if (
+            event.relatedTarget !== trigger.current &&
+            !popup.current?.contains(event.relatedTarget)
+          )
+            setOpen(false);
+        }}
       >
         {error}
       </span>
-    </span>
+    </div>
   );
 }

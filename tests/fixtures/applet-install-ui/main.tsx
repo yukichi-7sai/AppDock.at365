@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import { AppletManagementSettings } from '../../../src/renderer/settings/AppletManagementSettings';
 import { SettingsControlsProvider } from '../../../src/renderer/settings-ui/api';
-import { SettingsHintsContext } from '../../../src/renderer/settings-ui/SettingsHint';
+import { SettingsHintsContext } from '../../../src/renderer/settings-ui/SettingsHints';
 import '../../../src/renderer/settings-ui/controls.css';
 import '../../../src/renderer/settings/settings.css';
 

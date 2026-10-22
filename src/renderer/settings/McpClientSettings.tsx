@@ -1,3 +1,4 @@
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useRef, useState } from 'react';
 import type { Settings, SettingDefinition } from '../../shared/contracts';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
@@ -104,6 +105,9 @@ export function McpClientSettingsForm({
       status: structuredClone(auxiliary?.connections.find((c) => c.id === item?.id)),
       revision: auxiliary?.revision ?? '',
     });
+  useSettingsFeedback({
+    error: [auxiliary?.error ? auxiliary.error : '', error ? error : ''].filter(Boolean).join('\n'),
+  });
   return (
     <div className="settings-sections">
       <SettingsSection
@@ -112,7 +116,6 @@ export function McpClientSettingsForm({
         description="名前は共有し、接続設定・認証情報・許可はこのPCだけに保存します。"
         {...settingAnchor('mcp-client', 'connections')}
       >
-        {auxiliary?.error && <p role="alert">{auxiliary.error}</p>}
         <SettingsListTable
           addInTitle
           definition={definition}
@@ -189,7 +192,10 @@ export function McpClientSettingsForm({
           接続してツールを取得
         </button>
         {tools.length > 0 && (
-          <SettingsField title="ツール">
+          <SettingsField
+            title="ツール"
+            description={[tool?.description, tool?.unsupportedReason].filter(Boolean).join(' ／ ')}
+          >
             <select
               aria-label="MCPツール"
               value={tool?.name ?? ''}
@@ -227,8 +233,6 @@ export function McpClientSettingsForm({
         )}
         {tool && (
           <>
-            <p>{tool.description}</p>
-            {tool.unsupportedReason && <p role="status">{tool.unsupportedReason}</p>}
             <details>
               <summary>引数のSchema</summary>
               <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
@@ -264,46 +268,43 @@ export function McpClientSettingsForm({
             </button>
           </>
         )}
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
       </SettingsSection>
       <SettingsSection
         title="実行状況"
-        description="完了後10分間保持します。受付・応答の受領と、操作先での効果は別です。"
+        description={`${!auxiliary?.jobs.length ? '実行したジョブはありません。' : ''}完了後10分間保持します。受付・応答の受領と、操作先での効果は別です。`}
       >
-        {!auxiliary?.jobs.length && <p className="muted">実行したジョブはありません。</p>}
         {auxiliary?.jobs.map((j) => (
-          <div key={j.jobId} className="settings-field">
-            <strong>
-              {items.find((s) => s.id === j.serverId)?.name ?? j.serverId} / {j.toolName}
-            </strong>
-            <span>
-              {jobStates[j.state]}
-              {j.progress
+          <SettingsField
+            key={j.jobId}
+            title={`${items.find((s) => s.id === j.serverId)?.name ?? j.serverId} / ${j.toolName}`}
+            description={`${jobStates[j.state]}${
+              j.progress
                 ? ` (${j.progress.progress}${j.progress.total ? '/' + j.progress.total : ''})`
-                : ''}
-            </span>
-            {j.error && <p>{j.error.message}</p>}
-            <button
-              disabled={pending}
-              onClick={() => void run(async () => setResult(await invoke('mcpGetJob', [j.jobId])))}
-            >
-              結果を表示
-            </button>
-            {j.state === 'running' && (
+                : ''
+            }`}
+            error={j.error?.message}
+          >
+            <div className="settings-actions">
               <button
                 disabled={pending}
                 onClick={() =>
-                  void run(async () => setResult(await invoke('mcpCancelJob', [j.jobId])))
+                  void run(async () => setResult(await invoke('mcpGetJob', [j.jobId])))
                 }
               >
-                取り消す
+                結果を表示
               </button>
-            )}
-          </div>
+              {j.state === 'running' && (
+                <button
+                  disabled={pending}
+                  onClick={() =>
+                    void run(async () => setResult(await invoke('mcpCancelJob', [j.jobId])))
+                  }
+                >
+                  取り消す
+                </button>
+              )}
+            </div>
+          </SettingsField>
         ))}
         {result && (
           <pre aria-label="MCP実行結果">{JSON.stringify(result, null, 2).slice(0, 65536)}</pre>
@@ -443,7 +444,10 @@ function McpConnectionDialog({
             </select>
           </SettingsField>
           {connection.authentication === 'bearer' && (
-            <>
+            <SettingsField
+              title="Bearer token"
+              description="認証情報はこのPCに暗号化保存します。URLを変えたときは再入力してください。"
+            >
               <SettingsChoice
                 label="Bearerを入力・置換する"
                 checked={replaceToken}
@@ -458,10 +462,7 @@ function McpConnectionDialog({
                   onChange={(e) => setToken(e.target.value)}
                 />
               )}
-              <p className="muted">
-                認証情報はこのPCに暗号化保存します。URLを変えたときは再入力してください。
-              </p>
-            </>
+            </SettingsField>
           )}
         </>
       ) : (

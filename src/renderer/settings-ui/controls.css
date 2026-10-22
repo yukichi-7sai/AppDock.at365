@@ -8,7 +8,7 @@
   --panel: #191b23;
   --raised: #20232d;
   --settings-group-background: color-mix(in srgb, var(--raised) 20%, var(--panel));
-  --border: #282b35;
+  --border: #4b5262;
   --text: #eff0f5;
   --muted: #8e93a6;
   --faint: #62697e;
@@ -2048,37 +2048,6 @@ summary {
   height: 34px;
   padding: 0;
 }
-.ribbon-edit-fields {
-  display: grid;
-  gap: 22px;
-  min-width: 0;
-}
-.ribbon-edit-fields > label {
-  display: grid;
-  gap: 8px;
-}
-.ribbon-command-field {
-  display: grid;
-  gap: 8px;
-}
-.ribbon-edit-fields input:not([type='checkbox']),
-.ribbon-edit-fields select {
-  width: 100%;
-  min-width: 0;
-}
-.ribbon-edit-fields > .ribbon-icon-only {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.ribbon-edit-fields .ribbon-icon-only input {
-  width: auto;
-  flex: 0 0 auto;
-  margin: 0;
-}
-.ribbon-edit-fields p {
-  margin: 0;
-}
 @media (max-width: 900px) {
   .ribbon-setting-row {
     flex-wrap: wrap;
@@ -3052,17 +3021,17 @@ summary {
 .gesture-binding-dialog .shortcut-capture-label {
   margin-top: 18px;
 }
-.applet-shortcut-dialog header {
+.applet-shortcut-dialog > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 24px;
 }
-.applet-shortcut-dialog header small {
+.applet-shortcut-dialog > header small {
   color: var(--accent);
 }
-.applet-shortcut-dialog h2 {
+.applet-shortcut-dialog > header h2 {
   font-size: 18px;
   margin: 6px 0 0;
   overflow-wrap: anywhere;
@@ -3192,7 +3161,7 @@ summary {
   justify-content: space-between;
   gap: 12px;
 }
-.applet-shortcut-dialog footer {
+.applet-shortcut-dialog > footer {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -3202,16 +3171,16 @@ summary {
   padding-top: 18px;
   border-top: 1px solid var(--border);
 }
-.applet-shortcut-dialog footer small {
+.applet-shortcut-dialog > footer small {
   color: var(--muted);
   font-size: 11px;
 }
-.applet-shortcut-dialog footer > div {
+.applet-shortcut-dialog > footer > div {
   display: flex;
   gap: 8px;
   margin-left: auto;
 }
-.applet-shortcut-dialog footer button {
+.applet-shortcut-dialog > footer button {
   border-radius: 8px;
   padding: 9px 16px;
 }
@@ -3611,6 +3580,17 @@ summary {
 }
 
 /* Common grouped settings dialogs keep actions visible while their content scrolls. */
+.settings-modal[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  container: settings-dialog / inline-size;
+}
+.settings-modal > header,
+.settings-modal > footer,
+.settings-modal > .settings-status-area {
+  flex: none;
+}
 .settings-group-dialog[open] {
   display: flex;
   flex-direction: column;
@@ -3658,6 +3638,15 @@ summary {
   grid-template-columns: minmax(100px, 0.55fr) minmax(0, 1.45fr);
   gap: 20px;
   padding: 14px 0;
+}
+.settings-dialog-body .settings-field:is(.settings-field-wide, [data-readonly='true']) {
+  grid-template-columns: minmax(0, 1fr);
+}
+@container settings-dialog (max-width: 520px) {
+  .settings-dialog-body .settings-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
 }
 .settings-dialog-body input:not([type='checkbox']):not([type='radio']),
 .settings-dialog-body select {

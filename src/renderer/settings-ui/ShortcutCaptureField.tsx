@@ -1,4 +1,4 @@
-import { SettingsHint, useSettingsHints } from './SettingsHint';
+import { SettingsField } from './SettingsSections';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useSettingsControls } from './api';
 import { normalizeShortcut, shortcutFromEvent } from '../../shared/commands';
@@ -28,7 +28,6 @@ export function ShortcutCaptureField({
 }) {
   const controls = useSettingsControls();
   const id = useId();
-  const showHints = useSettingsHints();
   const recorder = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState(false);
   const [captureReady, setCaptureReady] = useState(false);
@@ -95,25 +94,23 @@ export function ShortcutCaptureField({
     setError('');
   };
   return (
-    <>
-      {' '}
-      <div className="shortcut-capture-label">
-        <span>{label}</span>
-        <small>
-          {!recordingReady
-            ? '入力を準備中…'
-            : !focused
-              ? 'クリックして入力'
-              : mode === 'send' || captureReady
-                ? '押して入力'
-                : '入力を準備中…'}
-        </small>
-      </div>
+    <SettingsField
+      title={label}
+      hint="Tabで次の項目へ・Escでキャンセル。これらのキーは特殊キーから選べます。"
+      description={
+        !recordingReady
+          ? '入力を準備中…'
+          : !focused
+            ? 'クリックして入力'
+            : mode === 'send' || captureReady
+              ? '押して入力'
+              : '入力を準備中…'
+      }
+    >
       <button
         ref={recorder}
         className="shortcut-capture"
         aria-label={`${label}を入力`}
-        aria-describedby={showHints ? `${id}-hint` : undefined}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onKeyDown={(event) => {
@@ -143,9 +140,6 @@ export function ShortcutCaptureField({
           <span>キーの組み合わせを押してください</span>
         )}
       </button>
-      <SettingsHint className="shortcut-capture-hint" id={`${id}-hint`}>
-        Tabで次の項目へ・Escでキャンセル。これらのキーは特殊キーから選べます。
-      </SettingsHint>
       <button
         className="shortcut-special-trigger"
         aria-expanded={special}
@@ -174,8 +168,7 @@ export function ShortcutCaptureField({
             ))}
             <small>組み合わせて選択</small>
           </div>
-          <label>
-            英数字
+          <SettingsField title="英数字">
             <select
               aria-label="英数字のキーを選択"
               value=""
@@ -191,7 +184,7 @@ export function ShortcutCaptureField({
                 <option key={key}>{key}</option>
               ))}
             </select>
-          </label>
+          </SettingsField>
           {specialGroups.map(([name, keys]) => (
             <div className="shortcut-special-group" key={name}>
               <small>{name}</small>
@@ -214,6 +207,6 @@ export function ShortcutCaptureField({
           ))}
         </div>
       )}
-    </>
+    </SettingsField>
   );
 }

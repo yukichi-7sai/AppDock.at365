@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { processNames } from '../../shared/command-conditions';
 import type { Keybinding } from '../../shared/keybindings';
-import { SettingsHint } from './SettingsHint';
+import { SettingsField } from './SettingsSections';
+import { Toggle } from './Toggle';
 import { SettingsTextarea } from './SettingsInput';
 
 export function useConditionProcesses(when: Keybinding['when']) {
@@ -42,23 +43,20 @@ export function CommandConditionDetails({
   return (
     <>
       {['global', 'exe'].includes(when.scope) && (
-        <label className="gesture-desktop-exclusion">
-          <input
-            type="checkbox"
+        <SettingsField title="デスクトップを除外">
+          <Toggle
+            label="デスクトップを除外"
             checked={when.excludeDesktop ?? false}
-            onChange={(event) => onChange({ ...when, excludeDesktop: event.target.checked })}
+            onChange={(excludeDesktop) => onChange({ ...when, excludeDesktop })}
           />
-          デスクトップを除外
-        </label>
-      )}
-      {when.scope === 'browser' && (
-        <SettingsHint as="small" className="gesture-condition-hint">
-          画面上部の「動作設定」で指定したブラウザに適用します。
-        </SettingsHint>
+        </SettingsField>
       )}
       {when.scope === 'exe' && (
-        <label className="gesture-processes">
-          <span>対象のexe名</span>
+        <SettingsField
+          title="対象のexe名"
+          hint="複数指定した場合は、いずれかに一致すると実行します。"
+          error={processError || (!processes.length ? 'exe名を1件以上入力してください。' : '')}
+        >
           <SettingsTextarea
             aria-label="対象のexe名"
             rows={2}
@@ -66,13 +64,7 @@ export function CommandConditionDetails({
             placeholder="notepad.exe, explorer.exe"
             onChange={(event) => setProcessText(event.target.value)}
           />
-          <SettingsHint as="small">
-            複数指定した場合は、いずれかに一致すると実行します。
-          </SettingsHint>
-          {(processError || !processes.length) && (
-            <small role="alert">{processError || 'exe名を1件以上入力してください。'}</small>
-          )}
-        </label>
+        </SettingsField>
       )}
     </>
   );

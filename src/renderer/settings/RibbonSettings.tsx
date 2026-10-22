@@ -1,4 +1,4 @@
-import { SettingsHint } from '../settings-ui/SettingsHint';
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { ribbonItems, type RibbonItem } from '../../shared/applet-pages';
@@ -384,6 +384,7 @@ export function RibbonSettings({
       </div>
     );
   };
+  useSettingsFeedback({ error });
   return (
     <div className="settings-sections ribbon-settings" aria-label="リボン設定">
       <SettingsSection title="動作設定" collapsible>
@@ -406,11 +407,11 @@ export function RibbonSettings({
           )}
         </SettingsField>
       </SettingsSection>
-      <SettingsSection title="リボン編集" {...settingAnchor('ribbon', 'ribbon')}>
-        <SettingsHint>
-          設定ボタンを非表示にしても、トレイの「設定…」や「設定を開く」コマンドから戻れます。
-        </SettingsHint>
-        {error && <p role="alert">{error}</p>}
+      <SettingsSection
+        title="リボン編集"
+        hint="設定ボタンを非表示にしても、トレイの「設定…」や「設定を開く」コマンドから戻れます。"
+        {...settingAnchor('ribbon', 'ribbon')}
+      >
         {(['top', 'bottom'] as const).map((position) => {
           const title = position === 'top' ? '上寄せ' : '下寄せ';
           const siblings = roots.filter(
@@ -521,7 +522,6 @@ export function RibbonSettings({
           onClose={() => setDialog(undefined)}
           valid={dialog.group.title.trim().length <= 80 && colorValid}
           applyLabel={dialog.adding ? '追加' : '適用'}
-          footer="確定するとすぐに反映・保存されます。"
           onApply={async () => {
             if (dialog.before !== JSON.stringify(layout))
               throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
@@ -562,10 +562,10 @@ export function RibbonSettings({
             );
           }}
         >
-          <div className="ribbon-edit-fields">
-            <label>
-              グループ名
+          <div>
+            <SettingsField title="グループ名">
               <SettingsInput
+                aria-label="グループ名"
                 data-initial-focus
                 value={dialog.group.title}
                 maxLength={80}
@@ -574,7 +574,7 @@ export function RibbonSettings({
                   setDialog({ ...dialog, group: { ...dialog.group, title: e.target.value } })
                 }
               />
-            </label>
+            </SettingsField>
             <RibbonIconPicker
               key={dialog.group.id}
               label="グループのアイコン"
@@ -584,18 +584,17 @@ export function RibbonSettings({
               onImage={(image) => setDialog({ ...dialog, group: { ...dialog.group, image } })}
               onChange={(icon) => setDialog({ ...dialog, group: { ...dialog.group, icon } })}
             />
-            <label className="ribbon-icon-only">
+            <SettingsField title="リボンにアイコンのみを表示する">
               <input
+                aria-label="リボンにアイコンのみを表示する"
                 type="checkbox"
                 checked={!!dialog.group.iconOnly}
                 onChange={(e) =>
                   setDialog({ ...dialog, group: { ...dialog.group, iconOnly: e.target.checked } })
                 }
               />
-              リボンにアイコンのみを表示する
-            </label>
-            <label>
-              展開方法
+            </SettingsField>
+            <SettingsField title="展開方法">
               <select
                 aria-label="展開方法"
                 value={dialog.group.expansion}
@@ -612,9 +611,8 @@ export function RibbonSettings({
                 <option value="persistent">持続的</option>
                 <option value="temporary">一時的</option>
               </select>
-            </label>
-            <div>
-              <strong>色</strong>
+            </SettingsField>
+            <SettingsField title="色">
               <SettingsColorPicker
                 value={dialog.group.color ?? null}
                 allowNone
@@ -625,7 +623,7 @@ export function RibbonSettings({
                   )
                 }
               />
-            </div>
+            </SettingsField>
           </div>
         </SettingsDialog>
       )}
@@ -634,7 +632,6 @@ export function RibbonSettings({
           title="リボンボタンを編集"
           applyLabel="適用"
           valid={itemDialog.title.trim().length <= 80}
-          footer="確定するとすぐに反映・保存されます。"
           onClose={() => setItemDialog(undefined)}
           onApply={async () => {
             if (itemDialog.before !== JSON.stringify(layout))
@@ -650,33 +647,35 @@ export function RibbonSettings({
             });
           }}
         >
-          <div className="ribbon-edit-fields">
-            <label>
-              ボタン名
+          <div>
+            <SettingsField
+              title="ボタン名"
+              hint="空欄にすると登録元の名前を使います。変更はリボン内の表示だけに反映されます。"
+            >
               <SettingsInput
+                aria-label="ボタン名"
                 data-initial-focus
                 maxLength={80}
                 value={itemDialog.title}
                 placeholder={itemDialog.originalTitle}
                 onChange={(e) => setItemDialog({ ...itemDialog, title: e.target.value })}
               />
-            </label>
-            <SettingsHint>
-              空欄にすると登録元の名前を使います。変更はリボン内の表示だけに反映されます。
-            </SettingsHint>
-            <RegisteredImageInput
-              label="リボンの画像"
-              value={itemDialog.image}
-              onChange={(image) => setItemDialog({ ...itemDialog, image })}
-            />
-            <label className="ribbon-icon-only">
+            </SettingsField>
+            <SettingsField title="リボンの画像">
+              <RegisteredImageInput
+                label="リボンの画像"
+                value={itemDialog.image}
+                onChange={(image) => setItemDialog({ ...itemDialog, image })}
+              />
+            </SettingsField>
+            <SettingsField title="リボンにアイコンのみを表示する">
               <input
+                aria-label="リボンにアイコンのみを表示する"
                 type="checkbox"
                 checked={itemDialog.iconOnly}
                 onChange={(e) => setItemDialog({ ...itemDialog, iconOnly: e.target.checked })}
               />
-              リボンにアイコンのみを表示する
-            </label>
+            </SettingsField>
           </div>
         </SettingsDialog>
       )}
@@ -696,16 +695,16 @@ export function RibbonSettings({
             });
           }}
         >
-          <label>
-            名前
+          <SettingsField title="名前">
             <SettingsInput
+              aria-label="名前"
               data-initial-focus
               maxLength={80}
               value={separatorDialog.title}
               placeholder="空欄なら自動生成した名前を使います"
               onChange={(e) => setSeparatorDialog({ ...separatorDialog, title: e.target.value })}
             />
-          </label>
+          </SettingsField>
         </SettingsDialog>
       )}
       {buttonDialog && !picker && (
@@ -729,9 +728,16 @@ export function RibbonSettings({
             );
           }}
         >
-          <div className="ribbon-edit-fields">
-            <div className="ribbon-command-field">
-              <span>コマンド</span>
+          <div>
+            <SettingsField
+              title="コマンド"
+              description={
+                buttonDialog.button.commandId &&
+                !commands.some((c) => c.id === buttonDialog.button.commandId && c.available)
+                  ? '現在利用できません。'
+                  : undefined
+              }
+            >
               <button
                 type="button"
                 className="secondary"
@@ -742,14 +748,10 @@ export function RibbonSettings({
                   ? commandTitle(buttonDialog.button.commandId)
                   : 'コマンドを選択'}
               </button>
-              {buttonDialog.button.commandId &&
-                !commands.some((c) => c.id === buttonDialog.button.commandId && c.available) && (
-                  <small>現在利用できません。</small>
-                )}
-            </div>
-            <label>
-              ボタン名
+            </SettingsField>
+            <SettingsField title="ボタン名">
               <SettingsInput
+                aria-label="ボタン名"
                 data-initial-focus
                 maxLength={80}
                 value={buttonDialog.button.title}
@@ -761,7 +763,7 @@ export function RibbonSettings({
                   })
                 }
               />
-            </label>
+            </SettingsField>
             <RibbonIconPicker
               key={buttonDialog.button.id}
               label="ボタンのアイコン"
@@ -775,8 +777,9 @@ export function RibbonSettings({
                 setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, icon } })
               }
             />
-            <label className="ribbon-icon-only">
+            <SettingsField title="リボンにアイコンのみを表示する">
               <input
+                aria-label="リボンにアイコンのみを表示する"
                 type="checkbox"
                 checked={!!buttonDialog.button.iconOnly}
                 onChange={(e) =>
@@ -786,8 +789,7 @@ export function RibbonSettings({
                   })
                 }
               />
-              リボンにアイコンのみを表示する
-            </label>
+            </SettingsField>
           </div>
         </SettingsDialog>
       )}

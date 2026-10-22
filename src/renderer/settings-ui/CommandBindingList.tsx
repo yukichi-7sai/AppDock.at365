@@ -1,5 +1,6 @@
 import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { BindingActions } from './BindingActions';
+import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
 import {
   CommandPublication,
@@ -40,6 +41,18 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   const navigation = useContext(CommandSettingsNavigation);
   const [editing, setEditing] = useState<BindingEdit<R> | null>(null);
   const [notice, setNotice] = useState('');
+  const registrationErrors = bindings
+    .filter((row) => commands.some((command) => command.id === row.command) && statusError?.(row))
+    .map(
+      (row) =>
+        `${commands.find((command) => command.id === row.command)?.title ?? row.command} (${inputLabel(row)}): ${statusError?.(row)}`,
+    );
+  useSettingsFeedback({
+    error: registrationErrors.join('\n'),
+    message: notice,
+    onRetry,
+    retryLabel: '入力を再試行',
+  });
   const root = useRef<HTMLDivElement>(null);
   const restore = useRef<(() => void) | null>(null);
   const rememberPosition = (target?: HTMLElement | null) => {
@@ -130,17 +143,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                         <kbd>{inputLabel(row)}</kbd>
                         <span>{conditionLabel(row, command)}</span>
                         {!row.enabled && <small>無効</small>}
-                        {statusError?.(row) && (
-                          <small role="alert" className="shortcut-conflict">
-                            {statusError(row)}
-                          </small>
-                        )}
                       </button>
-                      {statusError?.(row) && (
-                        <button className="text-button" onClick={onRetry}>
-                          入力を再試行
-                        </button>
-                      )}
                       <BindingActions
                         label={`${command.title}の${inputLabel(row)}のその他の操作`}
                         removalKind="binding"
@@ -184,9 +187,6 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   );
   return (
     <div className="shortcut-command-list" ref={root} tabIndex={-1}>
-      <span className="sr-only" role="status">
-        {notice}
-      </span>
       {commands.length ? table(commands) : <p className="muted">表示するコマンドはありません。</p>}
       {orderKey !== null && renderOrder(orderKey, () => setOrderKey(null))}
       {editing && renderEditor(editing, apply, () => setEditing(null))}

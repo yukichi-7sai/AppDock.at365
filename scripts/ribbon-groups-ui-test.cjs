@@ -478,24 +478,24 @@ async function launch() {
       .click();
     await page.getByLabel('グループ名', { exact: true }).fill('Created group');
     await page.getByLabel('展開方法', { exact: true }).selectOption('temporary');
-    const gaps = await page
-      .locator('.ribbon-edit-fields > label')
-      .evaluateAll((labels) =>
-        labels
-          .slice(1)
-          .map(
-            (label, i) =>
-              label.getBoundingClientRect().top - labels[i].getBoundingClientRect().bottom,
-          ),
-      );
-    assert(gaps.every((gap) => gap >= 20));
-    const checkboxGeometry = await page.locator('.ribbon-icon-only').evaluate((label) => {
-      const checkbox = label.querySelector('input').getBoundingClientRect();
-      return { width: checkbox.width, left: checkbox.left - label.getBoundingClientRect().left };
-    });
+    const fieldLayout = await page.locator('dialog[open] .settings-field').evaluateAll((fields) =>
+      fields.map((field) => ({
+        padding: parseFloat(getComputedStyle(field).paddingTop),
+        gap: parseFloat(getComputedStyle(field).gap),
+      })),
+    );
+    assert(fieldLayout.length >= 3, 'group editor uses shared fields');
+    assert(fieldLayout.every(({ padding, gap }) => padding >= 14 && gap >= 14));
+    const checkboxGeometry = await page
+      .getByRole('group', { name: 'リボンにアイコンのみを表示する', exact: true })
+      .evaluate((field) => {
+        const checkbox = field.querySelector('input').getBoundingClientRect();
+        const control = field.querySelector('.settings-field-control').getBoundingClientRect();
+        return { width: checkbox.width, left: checkbox.left - control.left };
+      });
     assert(
       checkboxGeometry.width < 24 && checkboxGeometry.left < 2,
-      'compact checkbox at start of label',
+      `compact checkbox at start of shared field control: ${JSON.stringify(checkboxGeometry)}`,
     );
     await page.screenshot({ path: path.join(profile, 'group-dialog.png') });
     await page.getByRole('button', { name: '追加', exact: true }).click();

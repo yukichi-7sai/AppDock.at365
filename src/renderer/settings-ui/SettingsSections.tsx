@@ -1,6 +1,7 @@
 import { useId, type ReactNode, type HTMLAttributes } from 'react';
 import { SettingsInput } from './SettingsInput';
 import { SettingsHintIcon } from './SettingsHintIcon';
+import { useSettingsFeedback, SettingsFieldTarget } from './SettingsStatus';
 import './settings-sections.css';
 
 /** Reusable content blocks inside SettingsPageLayout. */
@@ -8,17 +9,22 @@ export function SettingsSection({
   title,
   description,
   hint,
+  error,
   children,
   collapsible = false,
+  variant = 'card',
   ...props
 }: {
   title?: string;
   description?: ReactNode;
   hint?: string;
+  error?: string;
   children: ReactNode;
   collapsible?: boolean;
+  variant?: 'card' | 'group';
 } & Omit<HTMLAttributes<HTMLElement>, 'title'>) {
   const id = useId();
+  useSettingsFeedback({ error, target: title });
   const heading = (
     <>
       <div className="settings-title-with-hint">
@@ -31,7 +37,7 @@ export function SettingsSection({
   return collapsible ? (
     <details
       {...props}
-      className={`settings-section settings-section-details ${props.className ?? ''}`}
+      className={`settings-section settings-section-details settings-section-${variant} ${props.className ?? ''}`}
     >
       <summary>{heading}</summary>
       <div className="settings-section-content">{children}</div>
@@ -39,7 +45,7 @@ export function SettingsSection({
   ) : (
     <section
       {...props}
-      className={`settings-section ${props.className ?? ''}`}
+      className={`settings-section settings-section-${variant} ${props.className ?? ''}`}
       aria-labelledby={title ? id : undefined}
     >
       {title && <header>{heading}</header>}
@@ -50,27 +56,44 @@ export function SettingsSection({
 
 export function SettingsField({
   title,
+  group,
   description,
   hint,
+  error,
   children,
   ...props
 }: {
   title: string;
+  group?: string;
   description?: ReactNode;
   hint?: string;
-  children: ReactNode;
-} & Omit<HTMLAttributes<HTMLDivElement>, 'title'>) {
+  error?: string;
+  children?: ReactNode;
+} & Omit<HTMLAttributes<HTMLFieldSetElement>, 'title'>) {
+  const errorId = useSettingsFeedback({ error, target: title });
   return (
-    <div {...props} className={`settings-field ${props.className ?? ''}`}>
+    <fieldset
+      {...props}
+      className={`settings-field ${props.className ?? ''}`}
+      aria-describedby={error ? errorId : undefined}
+      data-invalid={!!error}
+      data-readonly={children == null || children === false}
+    >
+      <legend className="sr-only">{group ? `${group}：${title}` : title}</legend>
       <div className="settings-field-label">
         <div className="settings-title-with-hint">
+          {group && <small className="settings-field-group">{group}</small>}
           <strong>{title}</strong>
           <SettingsHintIcon title={title} hint={hint} />
         </div>
         {description && <p>{description}</p>}
       </div>
-      <div className="settings-field-control">{children}</div>
-    </div>
+      {children != null && children !== false && (
+        <SettingsFieldTarget.Provider value={title}>
+          <div className="settings-field-control">{children}</div>
+        </SettingsFieldTarget.Provider>
+      )}
+    </fieldset>
   );
 }
 
@@ -107,30 +130,5 @@ export function SettingsChoice({
         {description && <small>{description}</small>}
       </span>
     </label>
-  );
-}
-
-export function SettingsFeedback({
-  error,
-  message,
-  busy,
-}: {
-  error?: string;
-  message?: string;
-  busy?: boolean;
-}) {
-  return (
-    <div className="settings-feedback">
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
-      {(busy || message) && (
-        <p className="sr-only" role="status">
-          {busy ? '処理しています…' : message}
-        </p>
-      )}
-    </div>
   );
 }

@@ -552,7 +552,7 @@ async function until(fn, name) {
       const geometry = () =>
         dialog.evaluate((element) =>
           Object.fromEntries(
-            ['input', 'footer', '.primary', '.settings-error-icon']
+            ['input', 'footer', '.primary', '.settings-error']
               .map((selector) => [
                 selector,
                 element.querySelector(selector).getBoundingClientRect().toJSON(),
@@ -601,7 +601,7 @@ async function until(fn, name) {
       await dialog.getByRole('alert').filter({ hasText: '404' }).waitFor();
       await unchanged();
       await noBackgroundError();
-      await dialog.getByRole('button', { name: 'インストールのエラー', exact: true }).click();
+      await dialog.getByRole('button', { name: 'エラーの詳細', exact: true }).click();
       await dialog.getByRole('tooltip').waitFor();
       await unchanged();
       await page.screenshot({ path: path.join(output, 'install-error-details.png') });

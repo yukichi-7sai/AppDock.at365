@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SettingsHint } from './SettingsHint';
+import { SettingsField } from './SettingsSections';
 import { normalizeShortcut } from '../../shared/commands';
 import {
   protectedShortcut,
@@ -44,6 +44,8 @@ export function AppletShortcutDialog({
       title={title}
       adding={adding}
       valid={valid}
+      error={protectedKey ? 'Windowsが保護するキーのため割り当てられません。' : undefined}
+      errorTarget="ショートカットキー"
       onApply={() =>
         onApply({
           ...value,
@@ -64,76 +66,79 @@ export function AppletShortcutDialog({
             recordingReady={ready}
             setError={setError}
           />
-          <div className="shortcut-dialog-condition">
-            <span>いつ・どこで</span>
-            <div>
-              <ShortcutConditionField
-                value={{
-                  scope: externalShortcutScope(value.when.scope) ? 'global' : value.when.scope,
-                  appletIds: value.when.appletIds,
-                }}
-                selectedScope={value.when.scope}
-                extraScopes={externalShortcutScopes.slice()}
-                onExtraScope={(scope) =>
+          <SettingsField
+            title="いつ・どこで"
+            hint={
+              value.when.scope === 'browser'
+                ? '画面上部の「動作設定」で指定したブラウザに適用します。'
+                : undefined
+            }
+          >
+            <ShortcutConditionField
+              value={{
+                scope: externalShortcutScope(value.when.scope) ? 'global' : value.when.scope,
+                appletIds: value.when.appletIds,
+              }}
+              selectedScope={value.when.scope}
+              extraScopes={externalShortcutScopes.slice()}
+              onExtraScope={(scope) =>
+                setValue({
+                  ...value,
+                  when: {
+                    scope: scope as Keybinding['when']['scope'],
+                    appletIds: [],
+                    processes: [],
+                    ...(scope === 'exe' && value.when.excludeDesktop !== undefined
+                      ? { excludeDesktop: value.when.excludeDesktop }
+                      : {}),
+                  },
+                })
+              }
+              label="割り当てのいつ・どこで"
+              ownerTitle={ownerTitle}
+              applets={applets}
+              onChange={(when) => {
+                if (when.scope !== 'default')
                   setValue({
                     ...value,
                     when: {
-                      scope: scope as Keybinding['when']['scope'],
-                      appletIds: [],
-                      processes: [],
-                      ...(scope === 'exe' && value.when.excludeDesktop !== undefined
+                      scope: when.scope,
+                      appletIds: when.appletIds,
+                      ...(when.scope === 'global' && value.when.excludeDesktop !== undefined
                         ? { excludeDesktop: value.when.excludeDesktop }
                         : {}),
                     },
-                  })
-                }
-                label="割り当てのいつ・どこで"
-                ownerTitle={ownerTitle}
-                applets={applets}
-                onChange={(when) => {
-                  if (when.scope !== 'default')
-                    setValue({
-                      ...value,
-                      when: {
-                        scope: when.scope,
-                        appletIds: when.appletIds,
-                        ...(when.scope === 'global' && value.when.excludeDesktop !== undefined
-                          ? { excludeDesktop: value.when.excludeDesktop }
-                          : {}),
-                      },
-                    });
-                }}
-              />
-              <CommandConditionDetails
-                when={value.when}
-                onChange={(when) => setValue({ ...value, when })}
-                {...draft}
-              />
-            </div>
-          </div>
-          <div className="shortcut-dialog-enabled">
-            <span>元のキー入力をブロックする</span>
+                  });
+              }}
+            />
+          </SettingsField>
+          <CommandConditionDetails
+            when={value.when}
+            onChange={(when) => setValue({ ...value, when })}
+            {...draft}
+          />
+          <SettingsField
+            title="元のキー入力をブロックする"
+            hint={
+              externalShortcutScope(value.when.scope)
+                ? '条件が一致した場合に使います。OFFにすると、入力をWindowsやほかのアプリにも渡します。'
+                : 'グローバル・デスクトップ・Webブラウザ・指定したexeの割り当てで使用します。'
+            }
+          >
             <Toggle
               checked={value.blockOriginalInput !== false}
               disabled={!externalShortcutScope(value.when.scope)}
               label="元のキー入力をブロックする"
               onChange={(blockOriginalInput) => setValue({ ...value, blockOriginalInput })}
             />
-          </div>
-          <SettingsHint as="small">
-            {externalShortcutScope(value.when.scope)
-              ? '条件が一致した場合に使います。OFFにすると、入力をWindowsやほかのアプリにも渡します。'
-              : 'グローバル・デスクトップ・Webブラウザ・指定したexeの割り当てで使用します。'}
-          </SettingsHint>
-          {protectedKey && <p role="alert">Windowsが保護するキーのため割り当てられません。</p>}
-          <div className="shortcut-dialog-enabled">
-            <span>この割り当てを有効にする</span>
+          </SettingsField>
+          <SettingsField title="この割り当てを有効にする">
             <Toggle
               checked={value.enabled}
               label="この割り当てを有効にする"
               onChange={(enabled) => setValue({ ...value, enabled })}
             />
-          </div>
+          </SettingsField>
         </>
       )}
     </BindingEditDialog>

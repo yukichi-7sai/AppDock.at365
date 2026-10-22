@@ -1,3 +1,4 @@
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ExtensionSnapshot, UpdateState } from '../../shared/contracts';
 import type { AppletPackagePlan, AppletPackagePreviewResult } from '../../shared/applet-packages';
@@ -6,7 +7,7 @@ import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput } from '../settings-ui/SettingsInput';
-import { SettingsError } from '../settings-ui/SettingsError';
+import { SettingsField } from '../settings-ui/SettingsSections';
 import { ListIcon } from '../settings-ui/SettingsListTable';
 import { Toggle } from '../settings-ui/Toggle';
 import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
@@ -64,7 +65,9 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
       }}
       valid={!choosing}
       applyLabel="インストールして再起動"
-      errorLayout="custom"
+      message={checking ? '配布物を取得・検証しています…' : ''}
+      errorTarget="配布元"
+      description="AppletはこのPCでコードを実行します。信頼できる配布元を指定してください。インストール時に内容を検証し、問題がなければ導入してAppDockを再起動します。"
       cancelWhilePending={checking}
       onApply={async () => {
         // Read the current field at the explicit action, including a pending blur commit.
@@ -99,18 +102,18 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
     >
       {(_ready, setError, { error }) => (
         <>
-          <div className="applet-install-field">
-            <div className="applet-install-label">
-              <label htmlFor={`${errorId}-source`}>配布元（URLまたはフォルダー）</label>
-              <SettingsError error={error} id={errorId} />
-            </div>
+          <SettingsField
+            title="配布元"
+            description="URLまたはフォルダー"
+            error={error}
+            hint="URL、配布フォルダー、または展開済みAppletのフォルダーを指定できます。"
+          >
             <div className="applet-install-source">
               <SettingsInput
                 ref={input}
                 id={`${errorId}-source`}
                 aria-label="Appletの配布元"
                 aria-invalid={!!error}
-                aria-describedby={error ? errorId : undefined}
                 value={source}
                 disabled={choosing}
                 commitOn="blur-or-enter"
@@ -144,15 +147,7 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
                 <Icon name="folder" />
               </button>
             </div>
-            <p>URL、配布フォルダー、または展開済みAppletのフォルダーを指定できます。</p>
-          </div>
-          <p className="applet-install-notice">
-            AppletはこのPCでコードを実行します。信頼できる配布元を指定してください。
-            インストール時に内容を検証し、問題がなければ導入してAppDockを再起動します。
-          </p>
-          <span className="sr-only" role="status">
-            {checking ? '配布物を取得・検証しています…' : ''}
-          </span>
+          </SettingsField>
         </>
       )}
     </SettingsDialog>
@@ -197,6 +192,7 @@ export function AppletManagementSettings({
   const move = (id: string, destination: string) =>
     run(id, () => invoke('openAppletDestination', [id, destination]));
   const status = !updates?.busy ? (updates?.completion?.message ?? updates?.phase) : '';
+  useSettingsFeedback({ error, message: status, busy, target: 'Appletの管理' });
   return (
     <section
       className="settings-list applet-management"
@@ -214,28 +210,28 @@ export function AppletManagementSettings({
           />
         </div>
       </div>
-      {!management?.packagesAvailable && (
-        <p className="muted">
-          インストール・更新の適用・アンインストールは配布版のAppDockで利用できます。
-        </p>
-      )}
-      {!!management?.discoveryIssueCount && (
-        <p role="status">
-          読み込めなかったAppletがあります（{management.discoveryIssueCount}件）。
+      <SettingsField
+        title="導入状況"
+        description={[
+          !management?.packagesAvailable
+            ? 'インストール・更新の適用・アンインストールは配布版のAppDockで利用できます。'
+            : '',
+          management?.discoveryIssueCount
+            ? `読み込めなかったAppletがあります（${management.discoveryIssueCount}件）。`
+            : 'インストール済みAppletを管理できます。',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        {!!management?.discoveryIssueCount && (
           <button
             className="text-button"
             onClick={() => void run('discovery', () => invoke('openAppletDiscoveryLogs'))}
           >
             検出ログを開く
           </button>
-        </p>
-      )}
-      {error && <p role="alert">{error}</p>}
-      {status && status !== '適用できる更新はありません。' && (
-        <p className="applet-package-status" role="status">
-          {status}
-        </p>
-      )}
+        )}
+      </SettingsField>
       <div className="command-shortcut-summary">
         <span role="status">
           {visible.length} / {applets.length} Appletを表示

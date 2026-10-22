@@ -1,10 +1,11 @@
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useState, useEffect, useRef } from 'react';
 import type { SettingsControlEditor } from '../settings-ui/api';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { defaultTtsSettings, type TtsSettings, type TtsVoice } from '../../shared/tts';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, SettingsTextarea, SettingsUrlInput } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField, SettingsFeedback } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 
 export function TtsSettingsForm({
   editor,
@@ -80,6 +81,19 @@ export function TtsSettingsForm({
   const active = auxiliary?.jobs.some((j) =>
     ['queued', 'generating', 'waitingPlayback', 'playing'].includes(j.state),
   );
+  const previewJob = auxiliary?.jobs.at(-1);
+  const previewState =
+    previewJob &&
+    {
+      queued: '待機中',
+      generating: '生成中',
+      waitingPlayback: '再生待ち',
+      playing: '再生中',
+      completed: '完了',
+      failed: '失敗',
+      canceled: '取消',
+    }[previewJob.state];
+  useSettingsFeedback({ busy: pending, error: error || auxiliary?.error, message });
   return (
     <div className="settings-sections tts-settings" aria-label="読み上げ">
       <SettingsSection
@@ -251,14 +265,21 @@ export function TtsSettingsForm({
             }
           />
         </SettingsField>
-        <SettingsFeedback busy={pending} error={error || auxiliary?.error} message={message} />
       </SettingsSection>
       <SettingsSection
         title="試聴"
         description="保存済みのモデル・声・速度で確認します。入力した文章はサーバーへ送信されますが、保存されません。"
         {...settingAnchor('tts', 'preview')}
       >
-        <SettingsField title="試聴するテキスト">
+        <SettingsField
+          title="試聴するテキスト"
+          description={
+            !value.baseUrl || !value.model || !value.defaultVoice
+              ? '接続先・モデル・声を設定すると試聴できます。'
+              : (previewState ?? '試聴できます。')
+          }
+          error={previewJob?.error?.message}
+        >
           <SettingsTextarea
             aria-label="試聴するテキスト"
             commitOn="input"
@@ -297,25 +318,6 @@ export function TtsSettingsForm({
               すべての読み上げを停止
             </button>
           </div>
-          {(!value.baseUrl || !value.model || !value.defaultVoice) && (
-            <p>接続先・モデル・声を設定すると試聴できます。</p>
-          )}
-          {auxiliary?.jobs.slice(-1).map((j) => (
-            <p key={j.jobId} role="status">
-              {
-                {
-                  queued: '待機中',
-                  generating: '生成中',
-                  waitingPlayback: '再生待ち',
-                  playing: '再生中',
-                  completed: '完了',
-                  failed: '失敗',
-                  canceled: '取消',
-                }[j.state]
-              }
-              {j.error ? '：' + j.error.message : ''}
-            </p>
-          ))}
         </SettingsField>
       </SettingsSection>
       <SettingsSection

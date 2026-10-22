@@ -1,9 +1,10 @@
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useRef, useState } from 'react';
 import type { SettingsControlEditor } from '../settings-ui/api';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { defaultAiSettings, type AiConnectionSettings } from '../../shared/ai';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField, SettingsFeedback } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsListAddButton } from '../settings-ui/SettingsListTable';
@@ -100,6 +101,7 @@ export function AiSettingsForm({
       original: original ? structuredClone(original) : null,
       status: auxiliary?.connections.find((v) => v.id === original?.id),
     });
+  useSettingsFeedback({ busy: pending, error });
   return (
     <div className="settings-sections ai-settings">
       <SettingsSection
@@ -350,25 +352,24 @@ export function AiSettingsForm({
             生成を取り消す
           </button>
         </div>
-        <SettingsFeedback busy={pending} error={error} />
+
         {job && (
-          <div role="status">
-            <p>
+          <SettingsField
+            title="生成結果"
+            className="settings-field-wide"
+            description={`${
               {
-                {
-                  queued: '待機中',
-                  running: '生成中',
-                  completed: '完了',
-                  failed: '失敗',
-                  canceled: '取消',
-                }[job.state]
-              }
-              ：{job.model}
-              {job.error ? ' — ' + job.error.message : ''}
-            </p>
+                queued: '待機中',
+                running: '生成中',
+                completed: '完了',
+                failed: '失敗',
+                canceled: '取消',
+              }[job.state]
+            }：${job.model}${job.resultExpired ? ' ／ 生成結果の保持期限を過ぎました。' : ''}`}
+            error={job.error?.message}
+          >
             {job.text && <pre className="ai-preview-result">{job.text}</pre>}
-            {job.resultExpired && <p>生成結果の保持期限を過ぎました。</p>}
-          </div>
+          </SettingsField>
         )}
       </SettingsSection>
     </div>

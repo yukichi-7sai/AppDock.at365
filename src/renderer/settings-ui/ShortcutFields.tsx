@@ -1,3 +1,4 @@
+import { useSettingsFeedback } from './SettingsStatus';
 import { SettingsInput } from './SettingsInput';
 import { useSettingsControls } from './api';
 import { useState } from 'react';
@@ -99,6 +100,11 @@ export function ShortcutConditionField({
       .filter((id) => !applets.some((applet) => applet.id === id))
       .map((id) => ({ id, title: shortcutTargetTitle(id, applets) })),
   ];
+  useSettingsFeedback({
+    error: [value.scope === 'applets' && !value.appletIds.length ? '1件以上選択してください。' : '']
+      .filter(Boolean)
+      .join('\n'),
+  });
   return (
     <div className="shortcut-condition-field">
       <select
@@ -177,7 +183,6 @@ export function ShortcutConditionField({
               <button onClick={() => setOpen(false)}>閉じる</button>
             </div>
           )}
-          {!value.appletIds.length && <small role="alert">1件以上選択してください。</small>}
         </>
       )}
     </div>

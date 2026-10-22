@@ -1,3 +1,4 @@
+import { SettingsField } from './SettingsSections';
 import { SettingsInput } from './SettingsInput';
 import { validSendKeys } from '../../shared/setting-definitions';
 
@@ -26,26 +27,23 @@ export function ShortcutListSetting({
       {!entries.length && <p>「コマンドを追加」から、名前と送信するキーを登録できます。</p>}
       {entries.map((entry, index) => (
         <div className="send-key-entry" key={index}>
-          <label>
-            ID
+          <SettingsField title="ID">
             <SettingsInput
               aria-label={`${title} ${index + 1} ID`}
               placeholder="ID（例: new-tab）"
               value={entry.id}
               onChange={(event) => update(index, 'id', event.target.value)}
             />
-          </label>
-          <label>
-            名前
+          </SettingsField>
+          <SettingsField title="名前">
             <SettingsInput
               aria-label={`${title} ${index + 1} 名前`}
               placeholder="名前（例: 新しいタブ）"
               value={entry.title}
               onChange={(event) => update(index, 'title', event.target.value)}
             />
-          </label>
-          <label>
-            送信するキー
+          </SettingsField>
+          <SettingsField title="送信するキー">
             <SettingsInput
               aria-label={`${title} ${index + 1} キー`}
               placeholder="Ctrl+T"
@@ -53,7 +51,7 @@ export function ShortcutListSetting({
               aria-invalid={!validSendKeys(entry.keys)}
               onChange={(event) => update(index, 'keys', event.target.value)}
             />
-          </label>
+          </SettingsField>
           <button
             type="button"
             aria-label={`${title} ${index + 1} 削除`}

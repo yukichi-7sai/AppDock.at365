@@ -56,7 +56,7 @@ const same = (a, b) => {
     const geometry = () =>
       dialog.evaluate((element) =>
         Object.fromEntries(
-          ['input', 'footer', '.primary', '.settings-error-icon']
+          ['input', 'footer', '.primary', '.primary .settings-action-label', '.settings-error']
             .map((selector) => [
               selector,
               element.querySelector(selector).getBoundingClientRect().toJSON(),
@@ -80,11 +80,11 @@ const same = (a, b) => {
           0,
         );
         const before = await geometry();
-        assert(await dialog.getByRole('button', { name: 'インストールのエラー' }).isHidden());
+        assert(await dialog.getByRole('button', { name: 'エラーの詳細' }).isHidden());
         await apply.click();
         await dialog.getByRole('alert').filter({ hasText: '配布元' }).waitFor();
         same(before, await geometry());
-        const icon = dialog.getByRole('button', { name: 'インストールのエラー' });
+        const icon = dialog.getByRole('button', { name: 'エラーの詳細' });
         const details = dialog.getByRole('tooltip');
         await icon.hover();
         await details.waitFor();
@@ -128,7 +128,7 @@ const same = (a, b) => {
         assert(await dialog.isVisible());
         assert(
           await dialog
-            .getByRole('button', { name: 'インストールのエラー' })
+            .getByRole('button', { name: 'エラーの詳細' })
             .evaluate((e) => e === document.activeElement),
         );
         await page.screenshot({ path: path.join(output, `error-${theme}-${width}.png`) });
@@ -154,7 +154,7 @@ const same = (a, b) => {
     const small = await geometry();
     assert(small.dialog.y >= 0 && small.dialog.y + small.dialog.height <= 421);
     assert(small.footer.y + small.footer.height <= small.dialog.y + small.dialog.height);
-    await dialog.getByRole('button', { name: 'インストールのエラー' }).focus();
+    await dialog.getByRole('button', { name: 'エラーの詳細' }).focus();
     const smallTip = dialog.getByRole('tooltip');
     await smallTip.waitFor();
     const smallBounds = await smallTip.boundingBox();
@@ -176,11 +176,17 @@ const same = (a, b) => {
       window.installDelay = true;
       window.installCalls = [];
     });
+    const beforePending = await geometry();
     await apply.evaluate((element) => {
       element.click();
       element.click();
     });
     await until(() => page.evaluate(() => typeof window.releaseInstall === 'function'));
+    const duringPending = await geometry();
+    same(beforePending, duringPending);
+    const button = duringPending['.primary'];
+    const label = duringPending['.primary .settings-action-label'];
+    assert(Math.abs(label.x + label.width / 2 - button.x - button.width / 2) < 0.75);
     assert(await apply.isDisabled());
     assert(await source.isDisabled());
     assert(await dialog.getByRole('button', { name: 'キャンセル', exact: true }).isEnabled());

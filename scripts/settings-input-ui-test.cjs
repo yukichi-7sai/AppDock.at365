@@ -54,12 +54,12 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
         runtime: 'node',
         entry: 'index.cjs',
         settings: [
-          { key: 'text', title: 'Fixture text', type: 'string', default: 'Original text' },
+          { key: 'text', title: 'Fixture text', type: 'string', default: 'Default text' },
           {
             key: 'amount',
             title: 'Fixture amount',
             type: 'number',
-            default: 1,
+            default: 0,
             minimum: 0,
             maximum: 100,
           },
@@ -68,7 +68,7 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
             title: 'Fixture URL',
             type: 'string',
             format: 'url',
-            default: 'https://example.invalid/old',
+            default: 'https://example.invalid/default',
           },
         ],
       }),
@@ -287,7 +287,7 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
 
     await select('AI');
     const prompt = page.getByLabel('共通プロンプト', { exact: true });
-    await pending(prompt, 'first line', (s) => s.ai.commonPrompt);
+    await pending(prompt, 'first line', (s) => s.ai?.commonPrompt ?? '');
     await prompt.press('End');
     await prompt.press('Shift+Enter');
     await prompt.pressSequentially('second line');

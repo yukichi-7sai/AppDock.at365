@@ -3,6 +3,7 @@ import { ribbonGroupIcons, type RibbonBuiltinIcon } from '../../shared/ribbon';
 import { Icon } from '../Icon';
 import { RegisteredImageInput } from './RegisteredImagePicker';
 import type { RegisteredImageRef } from '../../shared/registered-images';
+import { SettingsField } from './SettingsSections';
 
 const labels: Record<RibbonBuiltinIcon, string> = {
   folder: 'フォルダー',
@@ -40,8 +41,7 @@ export function RibbonIconPicker({
     onImage?.(next === 'image' ? draftImage : null);
   };
   return (
-    <div className="ribbon-icon-picker" role="group" aria-labelledby={id}>
-      <span id={id}>{label}</span>
+    <SettingsField title={label}>
       {onImage && (
         <div className="ribbon-icon-modes" role="group" aria-label="アイコンの種類">
           {(['image', 'builtin'] as const).map((source) => (
@@ -88,6 +88,6 @@ export function RibbonIconPicker({
           ))}
         </div>
       )}
-    </div>
+    </SettingsField>
   );
 }

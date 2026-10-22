@@ -286,7 +286,7 @@ async function expectCalls(suffix, expected) {
       assert.equal(await panel.locator('.keybinding-picker label').count(), 1);
       await panel.getByLabel('対象ページを検索').fill('');
       await panel.getByRole('checkbox', { name: '別ページ', exact: true }).check();
-      assert.equal(await panel.locator('.shortcut-dialog-error').count(), 0);
+      assert.equal(await panel.locator('.settings-error[data-error="true"]').count(), 0);
       await host.screenshot({ path: path.join(profile, rowId + '-picker.png') });
       await panel.getByRole('button', { name: '適用', exact: true }).click();
       await require('./settings-immediate-helper.cjs').settleSettings(page);

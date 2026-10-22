@@ -11,6 +11,8 @@ import { resolveSettingSections } from '../../shared/setting-sections';
 import { settingAnchor } from './setting-anchor';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
 import { SettingsSection, SettingsField } from './SettingsSections';
+import { SettingsButton } from './SettingsButton';
+import { useSettingsFeedback } from './SettingsStatus';
 import { ShortcutListSetting } from './ShortcutListSetting';
 import { ObjectListSetting } from './ObjectListSetting';
 import { ObjectListDialogSetting } from './ObjectListDialogSetting';
@@ -71,6 +73,10 @@ export function AppletSettingsForm({
       setRunningAction(null);
     }
   };
+  useSettingsFeedback({
+    message: result && !result.error ? result.message : undefined,
+    busy: runningAction !== null,
+  });
   const action = (item: SettingAction) => {
     const available =
       applet.enabled &&
@@ -81,25 +87,28 @@ export function AppletSettingsForm({
       <SettingsField
         key={item.command}
         title={item.title}
-        description={<span id={help}>{item.description}</span>}
+        description={
+          <span id={help}>
+            {[item.description, !available ? 'Appletを開始してから操作できます。' : '']
+              .filter(Boolean)
+              .join(' ')}
+          </span>
+        }
+        error={result?.command === item.command && result.error ? result.message : undefined}
         {...settingAnchor(pageId, `action:${item.command}`)}
       >
         <div className="settings-actions">
-          <button
+          <SettingsButton
             type="button"
             className="secondary"
             aria-describedby={help}
             disabled={!available || runningAction !== null}
-            aria-busy={runningAction === item.command}
+            pending={runningAction === item.command}
             onClick={() => void executeAction(item)}
           >
-            {runningAction === item.command ? '実行中…' : item.title}
-          </button>
+            {item.title}
+          </SettingsButton>
         </div>
-        {!available && <p>Appletを開始してから操作できます。</p>}
-        {result?.command === item.command && (
-          <p role={result.error ? 'alert' : 'status'}>{result.message}</p>
-        )}
       </SettingsField>
     );
   };

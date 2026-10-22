@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { SettingsHint } from './SettingsHint';
 import { OrderDialogFrame } from './OrderDialogFrame';
 
 export interface SettingsOrderItem {
@@ -45,6 +44,8 @@ export function SettingsOrderDialog({
   return (
     <OrderDialogFrame
       title={title}
+      hint="ドラッグ、上下ボタン、またはAlt＋↑↓で移動できます。OKで一覧の表示順を保存します。"
+      message={notice}
       className="settings-order-dialog"
       onClose={onClose}
       onReady={setReady}
@@ -73,9 +74,6 @@ export function SettingsOrderDialog({
         }
       }}
     >
-      <SettingsHint className="shortcut-order-help">
-        ドラッグ、上下ボタン、またはAlt＋↑↓で移動できます。
-      </SettingsHint>
       <ol className="shortcut-order-list" aria-label={listLabel}>
         {rows.map((item, index) => (
           <li
@@ -153,12 +151,6 @@ export function SettingsOrderDialog({
           </li>
         ))}
       </ol>
-      <SettingsHint as="div" className="shortcut-order-notice">
-        OKで一覧の表示順を保存します。
-      </SettingsHint>
-      <span className="sr-only" role="status">
-        {notice}
-      </span>
     </OrderDialogFrame>
   );
 }

@@ -3,7 +3,6 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import { Toggle } from '../settings-ui/Toggle';
 import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections';
-import { SettingsHint } from '../settings-ui/SettingsHint';
 import type { GestureSettings } from '../../shared/gestures';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
 import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
@@ -11,15 +10,16 @@ function Names({
   itemKey,
   values,
   change,
+  hint,
 }: {
   itemKey: string;
   values: string[];
   change: (values: string[]) => void;
+  hint?: string;
 }) {
   const label = hostSettingItem('gestures', itemKey).title;
   return (
-    <label className="gesture-option" {...settingAnchor('gestures', itemKey)}>
-      <span>{label}</span>
+    <SettingsField title={label} hint={hint} {...settingAnchor('gestures', itemKey)}>
       <SettingsInput
         aria-label={label}
         value={values.join(', ')}
@@ -33,7 +33,7 @@ function Names({
           )
         }
       />
-    </label>
+    </SettingsField>
   );
 }
 
@@ -49,7 +49,7 @@ export function GestureOptions({
       collapsible
       className="gesture-settings-section"
       title={hostSettingItem('gestures', 'options').title}
-      hint={hostSettingItem('gestures', 'options').description}
+      hint={`${hostSettingItem('gestures', 'options').description ?? ''} 何も操作せず右ボタンを離すと、通常の右クリックになります。`}
       {...settingAnchor('gestures', 'options')}
     >
       <SettingsField
@@ -79,85 +79,90 @@ export function GestureOptions({
         value={gestures.executionMode}
         onChange={(executionMode) => change({ executionMode })}
       />
-      <SettingsField title="操作感">
-        <div className="gesture-options-grid">
-          <label className="gesture-option" {...settingAnchor('gestures', 'distance')}>
-            <span>{hostSettingItem('gestures', 'distance').title}</span>
-            <SettingsInput
-              type="number"
-              min="5"
-              max="500"
-              value={gestures.distance}
-              onChange={(e) => change({ distance: numberInput(e.target.value) })}
-            />
-          </label>
-          <label className="gesture-option" {...settingAnchor('gestures', 'wheelDelayMs')}>
-            <span>{hostSettingItem('gestures', 'wheelDelayMs').title}</span>
-            <SettingsInput
-              type="number"
-              min="0"
-              max="5000"
-              value={gestures.wheelDelayMs}
-              onChange={(e) => change({ wheelDelayMs: numberInput(e.target.value) })}
-            />
-          </label>
-        </div>
-      </SettingsField>
       <SettingsField
-        title="待機表示"
-        hint="選択した実行方法に合わせて、実行対象のコマンドを表示します。「アクションなしを表示する」がOFFの場合、割り当てに一致しない移動では表示しません。"
+        group="操作感"
+        title={hostSettingItem('gestures', 'distance').title}
+        {...settingAnchor('gestures', 'distance')}
       >
-        <div className="gesture-options-grid">
-          <label className="gesture-option" {...settingAnchor('gestures', 'indicatorPosition')}>
-            <span>{hostSettingItem('gestures', 'indicatorPosition').title}</span>
-            <select
-              aria-label={hostSettingItem('gestures', 'indicatorPosition').title}
-              value={gestures.indicatorPosition}
-              onChange={(e) =>
-                change({
-                  indicatorPosition: e.target.value as GestureSettings['indicatorPosition'],
-                })
-              }
-            >
-              <option value="gesture-start">ジェスチャー開始地点</option>
-              <option value="window-center">対象ウィンドウの中央</option>
-              <option value="monitor-center">カーソルのあるモニターの中央</option>
-              <option value="none">表示なし</option>
-            </select>
-          </label>
-          <label className="gesture-option" {...settingAnchor('gestures', 'indicatorOpacity')}>
-            <span>{hostSettingItem('gestures', 'indicatorOpacity').title}</span>
-            <SettingsInput
-              type="number"
-              min="0.1"
-              max="1"
-              step="0.05"
-              disabled={gestures.indicatorPosition === 'none'}
-              value={gestures.indicatorOpacity}
-              onChange={(e) => change({ indicatorOpacity: numberInput(e.target.value) })}
-            />
-          </label>
-        </div>
-        <label className="gesture-option" {...settingAnchor('gestures', 'indicatorShowNoAction')}>
-          <span>{hostSettingItem('gestures', 'indicatorShowNoAction').title}</span>
-          <Toggle
-            label={hostSettingItem('gestures', 'indicatorShowNoAction').title}
-            checked={gestures.indicatorShowNoAction}
-            onChange={(indicatorShowNoAction) => change({ indicatorShowNoAction })}
-          />
-        </label>
-      </SettingsField>
-      <InputBrowserOptions pageId="gestures" value={gestures} onChange={change} />
-      <SettingsField title="除外" hint="この一覧のアプリでは、すべてのジェスチャーを無効にします。">
-        <Names
-          itemKey="excludedProcesses"
-          values={gestures.excludedProcesses}
-          change={(excludedProcesses) => change({ excludedProcesses })}
+        <SettingsInput
+          aria-label={hostSettingItem('gestures', 'distance').title}
+          type="number"
+          min="5"
+          max="500"
+          value={gestures.distance}
+          onChange={(e) => change({ distance: numberInput(e.target.value) })}
         />
       </SettingsField>
-      <SettingsHint className="settings-help">
-        何も操作せず右ボタンを離すと、通常の右クリックになります。
-      </SettingsHint>
+      <SettingsField
+        group="操作感"
+        title={hostSettingItem('gestures', 'wheelDelayMs').title}
+        {...settingAnchor('gestures', 'wheelDelayMs')}
+      >
+        <SettingsInput
+          aria-label={hostSettingItem('gestures', 'wheelDelayMs').title}
+          type="number"
+          min="0"
+          max="5000"
+          value={gestures.wheelDelayMs}
+          onChange={(e) => change({ wheelDelayMs: numberInput(e.target.value) })}
+        />
+      </SettingsField>
+      <SettingsField
+        group="待機表示"
+        title={hostSettingItem('gestures', 'indicatorPosition').title}
+        hint="選択した実行方法に合わせて、実行対象のコマンドを表示します。"
+        {...settingAnchor('gestures', 'indicatorPosition')}
+      >
+        <select
+          aria-label={hostSettingItem('gestures', 'indicatorPosition').title}
+          value={gestures.indicatorPosition}
+          onChange={(e) =>
+            change({
+              indicatorPosition: e.target.value as GestureSettings['indicatorPosition'],
+            })
+          }
+        >
+          <option value="gesture-start">ジェスチャー開始地点</option>
+          <option value="window-center">対象ウィンドウの中央</option>
+          <option value="monitor-center">カーソルのあるモニターの中央</option>
+          <option value="none">表示なし</option>
+        </select>
+      </SettingsField>
+      <SettingsField
+        group="待機表示"
+        title={hostSettingItem('gestures', 'indicatorOpacity').title}
+        {...settingAnchor('gestures', 'indicatorOpacity')}
+      >
+        <SettingsInput
+          aria-label={hostSettingItem('gestures', 'indicatorOpacity').title}
+          type="number"
+          min="0.1"
+          max="1"
+          step="0.05"
+          disabled={gestures.indicatorPosition === 'none'}
+          value={gestures.indicatorOpacity}
+          onChange={(e) => change({ indicatorOpacity: numberInput(e.target.value) })}
+        />
+      </SettingsField>
+      <SettingsField
+        group="待機表示"
+        title={hostSettingItem('gestures', 'indicatorShowNoAction').title}
+        hint="OFFの場合、割り当てに一致しない移動では表示しません。"
+        {...settingAnchor('gestures', 'indicatorShowNoAction')}
+      >
+        <Toggle
+          label={hostSettingItem('gestures', 'indicatorShowNoAction').title}
+          checked={gestures.indicatorShowNoAction}
+          onChange={(indicatorShowNoAction) => change({ indicatorShowNoAction })}
+        />
+      </SettingsField>
+      <InputBrowserOptions pageId="gestures" value={gestures} onChange={change} />
+      <Names
+        hint="この一覧のアプリでは、すべてのジェスチャーを無効にします。"
+        itemKey="excludedProcesses"
+        values={gestures.excludedProcesses}
+        change={(excludedProcesses) => change({ excludedProcesses })}
+      />
     </SettingsSection>
   );
 }

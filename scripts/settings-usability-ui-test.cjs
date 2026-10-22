@@ -129,7 +129,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     modelStatus = 404;
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
     await page
-      .locator('.tts-settings')
+      .locator('.settings-page-layout > .settings-status-area')
       .getByRole('alert')
       .filter({ hasText: 'モデル一覧に対応していません' })
       .waitFor();
@@ -298,7 +298,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
           'MCPサーバー',
           '一般',
           '表示',
-          'プロフィール',
+          'Applet管理',
           'タスクトレイ',
           'バージョン情報・更新',
         ]) {
@@ -323,10 +323,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       }
     }
     await select('タスクトレイ');
-    assert.equal(
-      await page.getByRole('region', { name: '動作設定', exact: true }).count(),
-      1,
-    );
+    assert.equal(await page.getByRole('region', { name: '動作設定', exact: true }).count(), 1);
     assert.equal(
       await page.getByRole('region', { name: 'コンテキストメニュー', exact: true }).count(),
       1,
@@ -346,7 +343,13 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     );
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
     assert.equal(await page.locator('.about-applets').isVisible(), false);
-    assert.equal(await page.locator('.about-installed-version .settings-badge').count(), 1);
+    assert.equal(
+      await page
+        .getByRole('group', { name: '現在のバージョン', exact: true })
+        .locator('.settings-badge')
+        .count(),
+      1,
+    );
     assert.equal(await page.locator('.update-result-details').count(), 0);
     checks.push(
       'eight pages fit light/dark at 1280 and 760; tray cards are separated and about offers update-only actions',

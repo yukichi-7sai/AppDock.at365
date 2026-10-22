@@ -1,12 +1,16 @@
 import { useId, type ReactNode } from 'react';
 import { SettingsModal } from './SettingsModal';
+import { SettingsHintIcon } from './SettingsHintIcon';
+import { SettingsButton } from './SettingsButton';
 
 /** Shared presentation for display-order and execution-order editors. */
 export function OrderDialogFrame({
   title,
   eyebrow,
   children,
-  footer,
+  description,
+  hint,
+  message,
   error,
   pending = false,
   applyDisabled = false,
@@ -22,7 +26,9 @@ export function OrderDialogFrame({
   title: string;
   eyebrow?: string;
   children: ReactNode;
-  footer?: ReactNode;
+  description?: ReactNode;
+  hint?: string;
+  message?: string;
   error?: string;
   pending?: boolean;
   applyDisabled?: boolean;
@@ -45,46 +51,51 @@ export function OrderDialogFrame({
       onError={onError}
       closeDisabled={pending}
       initialFocus={initialFocus}
-    >
-      <header>
-        <div>
-          {eyebrow && <small>{eyebrow}</small>}
-          <h2 id={id}>{title}</h2>
-        </div>
-        <button
-          type="button"
-          className="shortcut-dialog-close"
-          aria-label={closeLabel}
-          disabled={pending}
-          onClick={onClose}
-        >
-          ×
-        </button>
-      </header>
-      <div className="order-dialog-body" inert={pending} aria-busy={pending}>
-        {children}
-      </div>
-      {error && (
-        <p className="shortcut-dialog-error" role="alert">
-          {error}
-        </p>
-      )}
-      <footer>
-        <small>{footer}</small>
-        <div>
-          <button type="button" disabled={pending} onClick={onClose}>
-            キャンセル
-          </button>
+      busy={pending}
+      error={error}
+      message={message}
+      bodyClassName="order-dialog-body"
+      header={
+        <header>
+          <div>
+            {eyebrow && <small>{eyebrow}</small>}
+            <div className="settings-title-with-hint">
+              <h2 id={id}>{title}</h2>
+              <SettingsHintIcon title={title} hint={hint} />
+            </div>
+            {description && <p>{description}</p>}
+          </div>
           <button
             type="button"
-            className="primary"
-            disabled={pending || applyDisabled}
-            onClick={onApply}
+            className="shortcut-dialog-close"
+            aria-label={closeLabel}
+            disabled={pending}
+            onClick={onClose}
           >
-            {applyLabel}
+            ×
           </button>
-        </div>
-      </footer>
+        </header>
+      }
+      footer={
+        <footer>
+          <div>
+            <button type="button" disabled={pending} onClick={onClose}>
+              キャンセル
+            </button>
+            <SettingsButton
+              type="button"
+              className="primary"
+              pending={pending}
+              disabled={pending || applyDisabled}
+              onClick={onApply}
+            >
+              {applyLabel}
+            </SettingsButton>
+          </div>
+        </footer>
+      }
+    >
+      {children}
     </SettingsModal>
   );
 }

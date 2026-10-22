@@ -1,3 +1,4 @@
+import { SettingsField } from './settings-ui/SettingsSections';
 import { useEffect, useState } from 'react';
 import type {
   ImageLibraryDialogRequest,
@@ -51,13 +52,15 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
         onApply={() => save({ kind: 'delete-image' })}
         applyLabel="削除"
         valid={!r.deleteBlocked}
+        description={`「${r.images[0]?.file ?? ''}」をごみ箱へ移します。すべてのグループからも外れます。`}
+        error={
+          r.deleteBlocked
+            ? 'この画像は使用中です。リボンやAppletの画像設定を外してから削除してください。'
+            : error
+        }
+        errorTarget={r.images[0]?.file}
       >
-        <p>「{r.images[0]?.file}」をごみ箱へ移します。すべてのグループからも外れます。</p>
-        {r.deleteBlocked && (
-          <p role="alert">
-            この画像は使用中です。リボンやAppletの画像設定を外してから削除してください。
-          </p>
-        )}
+        {null}
       </SettingsDialog>
     );
   if (r.kind === 'preview')
@@ -67,14 +70,16 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
         className="image-library-preview-modal"
         closeOnBackdrop
         onClose={close}
+        error={error}
+        header={
+          <header className="image-library-preview-heading">
+            <h2 id="image-library-preview-title">{r.images[0]?.file}</h2>
+            <button type="button" data-initial-focus onClick={close}>
+              閉じる
+            </button>
+          </header>
+        }
       >
-        <header className="image-library-preview-heading">
-          <h2 id="image-library-preview-title">{r.images[0]?.file}</h2>
-          <button type="button" data-initial-focus onClick={close}>
-            閉じる
-          </button>
-        </header>
-        {error && <p role="alert">{error}</p>}
         {r.entry && <RegisteredGalleryPreview entry={r.entry} groups={r.groups} />}
       </SettingsModal>
     );
@@ -106,6 +111,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   return (
     <SettingsDialog
       title={titles[r.kind]}
+      error={error}
       onClose={close}
       onApply={apply}
       applyLabel={
@@ -125,10 +131,8 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
             : true
       }
     >
-      {error && <p role="alert">{error}</p>}
       {['add', 'rename'].includes(r.kind) && (
-        <label>
-          グループ名
+        <SettingsField title="グループ名">
           <SettingsInput
             data-initial-focus
             aria-label="画像グループ名"
@@ -136,12 +140,18 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-        </label>
+        </SettingsField>
       )}
       {r.kind === 'delete' && <p>「{current?.name}」を削除します。画像と使用先は残ります。</p>}
       {r.kind === 'membership' && (
-        <>
-          <p>{r.images[0].file}</p>
+        <SettingsField
+          title="所属グループ"
+          description={
+            r.groups.length
+              ? r.images[0].file
+              : 'ページの「グループを追加」から、先にグループを作成してください。'
+          }
+        >
           {r.groups.map((g) => (
             <label className="image-group-choice" key={g.id}>
               <input
@@ -154,16 +164,12 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
               {g.name}
             </label>
           ))}
-          {!r.groups.length && (
-            <p>ページの「グループを追加」から、先にグループを作成してください。</p>
-          )}
-        </>
+        </SettingsField>
       )}
       {r.kind === 'batch-add' && (
         <>
           <p>{r.images.length}枚の画像を追加します。ほかのグループへの所属は残ります。</p>
-          <label>
-            追加先
+          <SettingsField title="追加先">
             <select
               aria-label="追加先グループ"
               value={target}
@@ -175,7 +181,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
                 </option>
               ))}
             </select>
-          </label>
+          </SettingsField>
           {!r.groups.length && <p>先にグループを追加してください。</p>}
         </>
       )}

@@ -2,13 +2,15 @@ import { registerSettingsInputs } from '../settings-input-flush';
 import { useEffect, useRef, useState } from 'react';
 import type { SettingsPageModel, SettingsPageOperation } from '../../shared/settings-page';
 import { SettingsControlsProvider } from '../settings-ui/api';
-import { SettingsHintsContext } from '../settings-ui/SettingsHint';
+import { SettingsHintsContext } from '../settings-ui/SettingsHints';
 import { SettingsViewClient } from './runtime';
 import { SettingsForm } from './SettingsForm';
 import { SettingsIndex } from './SettingsIndex';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
+import { SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsStatusProvider, SettingsStatusArea } from '../settings-ui/SettingsStatus';
 import {
   CommandSettingsNavigation,
   type CommandSettingsTarget,
@@ -162,7 +164,15 @@ export function SettingsPage({
     }
   };
   if (!ready || !model || !c || !controls)
-    return <p role="status">設定を読み込んでいます…{ready && error}</p>;
+    return (
+      <SettingsStatusProvider error={ready ? error : undefined} target="設定の読み込み">
+        <SettingsField
+          title="設定"
+          description={error ? '設定を読み込めませんでした。' : '設定を読み込んでいます…'}
+        />
+        <SettingsStatusArea />
+      </SettingsStatusProvider>
+    );
   const { page, navigation, editing } = model.content;
   const editor = c.editor(model);
   const resize = (width: number) => {
@@ -255,7 +265,7 @@ export function SettingsPage({
             }
           >
             {page.unavailableReason ? (
-              <p role="status">{page.unavailableReason}</p>
+              <SettingsField title="利用状況" description={page.unavailableReason} />
             ) : editing.mode === 'json' ? (
               <SettingsTextarea
                 aria-label="設定JSON"
@@ -343,26 +353,40 @@ export function SettingsPage({
                   });
               }}
             >
-              <p>対象: {confirmation.model.content.page.title}</p>
+              <SettingsField title="対象" description={confirmation.model.content.page.title} />
               {confirmation.kind === 'reset' ? (
                 <>
-                  <p>
-                    このページの設定を既定値に戻します。省略した設定は、今後の版の既定値に従います。
-                  </p>
-                  <p>
-                    保存先:{' '}
-                    {confirmation.model.content.auxiliary.storage?.files
+                  <SettingsField
+                    title="初期化の内容"
+                    description="このページの設定を既定値に戻します。省略した設定は、今後の版の既定値に従います。"
+                  />
+                  <SettingsField
+                    title="保存先"
+                    description={confirmation.model.content.auxiliary.storage?.files
                       .map(
                         (file) => `${file.scope === 'device' ? 'このPC' : '共有'} (${file.name})`,
                       )
                       .join('、')}
-                  </p>
+                  />
                   {confirmation.model.content.auxiliary.storage?.files.some(
                     (file) => file.scope === 'shared',
-                  ) && <p>共有設定の変更は、ほかのPCにも反映されます。</p>}
+                  ) && (
+                    <SettingsField
+                      title="共有設定への反映"
+                      description="共有設定の変更は、ほかのPCにも反映されます。"
+                    />
+                  )}
                 </>
               ) : (
-                <>
+                <SettingsField
+                  title="このPCの設定"
+                  className="settings-field-wide"
+                  description={
+                    disposition === 'share'
+                      ? '対象Appletの共有設定を置き換えます。ほかのPCにも反映されます。'
+                      : undefined
+                  }
+                >
                   <label>
                     <input
                       type="radio"
@@ -372,7 +396,6 @@ export function SettingsPage({
                     />
                     このPCの設定を共有設定に反映する
                   </label>
-                  <p>対象Appletの共有設定を置き換えます。ほかのPCにも反映されます。</p>
                   <label>
                     <input
                       type="radio"
@@ -391,7 +414,7 @@ export function SettingsPage({
                     />
                     このPCの設定を残して共有設定に戻す
                   </label>
-                </>
+                </SettingsField>
               )}
             </SettingsDialog>
           )}

@@ -121,10 +121,16 @@ async function hints(enabled) {
         ? (await host
             .getByRole('switch', { name: 'ヒントの表示', exact: true })
             .getAttribute('aria-checked')) === String(enabled)
-        : enabled || (await host.locator('.settings-hint, .settings-hint-icon').count()) === 0)
+        : enabled || (await host.locator('.settings-hint-icon').count()) === 0)
     );
   }, 'hint rendering');
-  assert.equal(await host.locator('.settings-page-error').count(), 0, 'no unexpected page errors');
+  assert.equal(
+    await host
+      .locator('.settings-page-layout > .settings-status-area .settings-error[data-error=true]')
+      .count(),
+    0,
+    'no unexpected page errors',
+  );
 }
 async function appearance() {
   await select('表示');
@@ -141,14 +147,14 @@ async function appearance() {
   const common = host.getByRole('region', { name: '共通', exact: true });
   const visible = (await snapshot()).settings.value.host.showHints;
   assert.equal(
-    await common.getByText('ワークスペースの配色を選びます。', { exact: true }).count(),
+    await common.getByText('ワークスペースの明るさを選びます。', { exact: true }).count(),
     visible ? 1 : 0,
   );
   assert.equal(
     await common.getByText('設定画面にヒントを表示します。', { exact: true }).count(),
     visible ? 1 : 0,
   );
-  assert.equal(await common.locator('.settings-hint-trigger').count(), visible ? 2 : 0);
+  assert.equal(await common.locator('.settings-hint-trigger').count(), visible ? 4 : 0);
   assert.equal(
     await host
       .getByRole('region', { name: 'Shellの変更', exact: true })
@@ -620,7 +626,7 @@ async function checkSectionTitles() {
     const themeHint = common.getByRole('button', { name: 'テーマのヒント', exact: true });
     await themeHint.hover();
     await titleTooltip.waitFor();
-    assert.equal(await titleTooltip.innerText(), 'ワークスペースの配色を選びます。');
+    assert.equal(await titleTooltip.innerText(), 'ワークスペースの明るさを選びます。');
     await titleTooltip.hover();
     await host.screenshot({ path: path.join(profile, 'title-tooltip-hover.png') });
     assert.equal(await titleTooltip.isVisible(), true, 'tooltip remains hoverable');
@@ -750,16 +756,16 @@ async function checkSectionTitles() {
       'current launch/speech state, command IDs and security descriptions survive OFF; hint and description coexist',
     );
 
-    for (const title of ['リボン', 'Webアカウント', 'ショートカットキー', 'マウスジェスチャー']) {
+    for (const title of ['リボン', 'ショートカットキー', 'マウスジェスチャー']) {
       await select(title);
       await hints(true);
       await until(
-        async () => (await host.locator('.settings-hint').count()) > 0,
+        async () => (await host.locator('.settings-hint-icon').count()) > 0,
         title + ' hints rendered',
       );
-      assert.ok((await host.locator('.settings-hint').count()) > 0, title);
+      assert.ok((await host.locator('.settings-hint-icon').count()) > 0, title);
       await hints(false);
-      assert.equal(await host.locator('.settings-hint').count(), 0, title);
+      assert.equal(await host.locator('.settings-hint-icon').count(), 0, title);
       assert.equal(
         await host.getByRole('heading', { name: title, level: 1, exact: true }).count(),
         1,
@@ -809,7 +815,9 @@ async function checkSectionTitles() {
     );
     await gestureOptions.locator('summary').click();
     const rightClickHint = '何も操作せず右ボタンを離すと、通常の右クリックになります。';
-    await gestureOptions.getByText(rightClickHint, { exact: true }).waitFor();
+    await optionsHint.hover();
+    await titleTooltip.waitFor();
+    assert.ok((await titleTooltip.innerText()).includes(rightClickHint));
     await hints(false);
     assert.equal(await gestureOptions.getByText(rightClickHint, { exact: true }).count(), 0);
 
@@ -819,14 +827,16 @@ async function checkSectionTitles() {
     await hints(true);
     await host.getByText(accountHint, { exact: true }).waitFor();
     await hints(false);
-    assert.equal(await host.getByText(accountHint, { exact: true }).count(), 0);
+    assert.equal(await host.getByText(accountHint, { exact: true }).count(), 1);
 
     await select('操作の許可');
     await hints(true);
     const permissionHint =
       '必要な許可が不足している操作は、ONでも有効になりません。連携がOFFの間も、MCPの許可を設定できます。';
     const saveHint = '変更は保存ボタンを押さずに保存されます。';
-    const permissionHelp = host.locator('.permission-help');
+    const permissionHelp = host.locator('details.settings-section').filter({
+      has: host.getByRole('heading', { name: '許可の適用とログについて', exact: true }),
+    });
     assert.equal(await host.getByText('このPCに自動保存', { exact: true }).count(), 0);
     assert.equal(
       await host
@@ -838,16 +848,13 @@ async function checkSectionTitles() {
     );
     assert.equal(await permissionHelp.getAttribute('open'), null);
     assert.equal(await permissionHelp.getByText(permissionHint, { exact: true }).count(), 1);
-    assert.equal(
-      await permissionHelp.getByText(permissionHint, { exact: true }).isVisible(),
-      false,
-    );
+    assert.equal(await permissionHelp.getByText(permissionHint, { exact: true }).isVisible(), true);
     assert.equal(await host.getByText(saveHint, { exact: true }).count(), 0);
     await permissionHelp.locator('summary').click();
     await permissionHelp.getByText(permissionHint, { exact: true }).waitFor();
     await hints(false);
     assert.notEqual(await permissionHelp.getAttribute('open'), null);
-    assert.equal(await host.getByText(permissionHint, { exact: true }).count(), 0);
+    assert.equal(await host.getByText(permissionHint, { exact: true }).count(), 1);
     assert.equal(await host.getByText(saveHint, { exact: true }).count(), 0);
     assert.equal(await host.locator('.permission-warning-icon').count(), 6);
     assert.equal(await host.locator('.permission-fixed').getByRole('switch').isDisabled(), true);
@@ -868,13 +875,18 @@ async function checkSectionTitles() {
         'permission save',
       );
       assert.equal(await host.locator('.permission-save-status').count(), 0);
-      assert.equal(await host.locator('.settings-page-error').count(), 0);
+      assert.equal(
+        await host
+          .locator('.settings-page-layout > .settings-status-area .settings-error[data-error=true]')
+          .count(),
+        0,
+      );
     }
     await host.screenshot({ path: path.join(profile, 'permission-hints-on.png') });
     await hints(false);
     await host.screenshot({ path: path.join(profile, 'permission-hints-off.png') });
     checks.push(
-      'added gesture/account/permission hints toggle; prerequisite stays in help; removed guides stay absent; permission saves and six warnings remain',
+      'optional gesture hints toggle; account deletion warnings and permission prerequisites stay visible; permission saves and six warnings remain',
     );
 
     for (const title of ['ショートカットキー', 'マウスジェスチャー']) {
@@ -884,11 +896,11 @@ async function checkSectionTitles() {
       const dialog = host.locator('dialog[open]');
       await dialog.waitFor();
       await until(
-        async () => (await dialog.locator('.settings-hint').count()) >= 2,
+        async () => (await dialog.locator('.settings-hint-icon').count()) >= 2,
         'portal hints',
       );
       await hints(false);
-      assert.equal(await dialog.locator('.settings-hint').count(), 0);
+      assert.equal(await dialog.locator('.settings-hint-icon').count(), 0);
       assert.equal(
         await dialog.getByRole('button', { name: 'キャンセル', exact: true }).count(),
         1,
@@ -900,7 +912,7 @@ async function checkSectionTitles() {
         );
       await hints(true);
       await until(
-        async () => (await dialog.locator('.settings-hint').count()) >= 2,
+        async () => (await dialog.locator('.settings-hint-icon').count()) >= 2,
         'portal hints restored',
       );
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -943,6 +955,19 @@ async function checkSectionTitles() {
       'tooltip is above the modal scrolling surface',
     );
     await host.screenshot({ path: path.join(profile, 'dialog-title-tooltip.png') });
+    fs.writeFileSync(
+      path.join(profile, 'dialog-before-escape.json'),
+      JSON.stringify(
+        await host.evaluate(() => ({
+          active: document.activeElement?.outerHTML,
+          popovers: [...document.querySelectorAll(':popover-open')].map((node) => node.outerHTML),
+          dialogs: document.querySelectorAll('dialog[open]').length,
+        })),
+        null,
+        2,
+      ),
+    );
+    assert.equal(await titleTooltip.isVisible(), true, 'focused hint stays open before Escape');
     await host.keyboard.press('Escape');
     await until(async () => (await titleTooltip.count()) === 0, 'dialog tooltip dismissal');
     assert.equal(await processDialog.isVisible(), true, 'first Escape only dismisses tooltip');
@@ -950,7 +975,7 @@ async function checkSectionTitles() {
     await argumentsHint.focus();
     await titleTooltip.waitFor();
     await hints(false);
-    assert.equal(await processDialog.locator('.settings-hint').count(), 0);
+    assert.equal(await processDialog.locator('.settings-hint-icon').count(), 0);
     assert.equal(await processDialog.locator('.settings-hint-trigger').count(), 0);
     assert.equal(await host.locator('.settings-hint-tooltip').count(), 0);
     assert.equal(
@@ -967,6 +992,25 @@ async function checkSectionTitles() {
       .getByRole('alert')
       .filter({ hasText: '文字列のJSON配列を指定してください。' })
       .waitFor();
+    assert.equal(
+      await host.locator('.settings-page-layout > .settings-status-area [role=alert]').count(),
+      0,
+      'dialog errors stay in the modal',
+    );
+    const argumentErrorId = await processDialog
+      .getByRole('group', { name: '引数', exact: true })
+      .getAttribute('aria-describedby');
+    assert.ok(argumentErrorId, 'field refers to the common error');
+    assert.equal(await processDialog.locator(`[id="${argumentErrorId}"][role=alert]`).count(), 1);
+    assert.equal(
+      await processDialog
+        .locator('input:not([type=checkbox]), select, textarea')
+        .evaluateAll(
+          (controls) => controls.filter((control) => !control.closest('.settings-field')).length,
+        ),
+      0,
+      'dialog controls use shared fields',
+    );
     await processDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     checks.push(
       'modal title hints stay in the top layer and viewport, Escape preserves dialog; OFF removes hints but retains validation errors',
@@ -975,22 +1019,20 @@ async function checkSectionTitles() {
     await hints(false);
     await select('Hint fixture');
     await host.getByText('Card description stays visible.', { exact: true }).waitFor();
-    assert.equal(await host.locator('.settings-hint').count(), 0);
-    await host.evaluate(() => window.dock.navigate('extensions'));
-    await host
-      .getByRole('complementary', { name: 'Applet一覧' })
-      .getByRole('button', { name: /^Hint fixture/ })
-      .click();
-    await host.getByRole('tab', { name: '設定', exact: true }).click();
+    assert.equal(await host.locator('.settings-hint-icon').count(), 0);
+    await select('Applet管理');
+    await host.getByRole('button', { name: 'Hint fixtureの設定を開く', exact: true }).click();
     await settingsPage(host);
     await host.getByText('Card description stays visible.', { exact: true }).waitFor();
-    assert.equal(await host.locator('.settings-hint').count(), 0);
+    assert.equal(await host.locator('.settings-hint-icon').count(), 0);
     await hints(true);
     await until(
-      async () => (await host.locator('.settings-hint').count()) > 0,
+      async () => (await host.locator('.settings-hint-icon').count()) > 0,
       'detail hints restored',
     );
-    checks.push('Applet settings and detail share the preference and retain card descriptions');
+    checks.push(
+      'Applet index and management entry share settings and retain descriptions with hints OFF',
+    );
 
     await host.evaluate(() => window.dock.navigate('settings'));
     await settingsPage(host);
@@ -1017,7 +1059,13 @@ async function checkSectionTitles() {
       JSON.stringify({ before, during }),
     );
     assert.ok(Math.abs(before - during) < 1, 'pending feedback must not move layout');
-    assert.equal(await host.locator('.settings-feedback p:not(.sr-only)').count(), 0);
+    assert.equal(await host.locator('.settings-status-area [role=status]').count(), 1);
+    assert.ok(
+      await host.locator('.settings-status-area [role=status]').evaluate((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width <= 1 && rect.height <= 1;
+      }),
+    );
     modelResponse();
     await until(async () => !(await models.isDisabled()), 'model success');
     const after = await position();
@@ -1026,12 +1074,22 @@ async function checkSectionTitles() {
       JSON.stringify({ before, during, after }),
     );
     assert.ok(Math.abs(before - after) < 1, 'success feedback must not move layout');
-    assert.equal(await host.locator('.settings-feedback p:not(.sr-only)').count(), 0);
+    assert.equal(await host.locator('.settings-status-area [role=status]').count(), 1);
+    assert.ok(
+      await host.locator('.settings-status-area [role=status]').evaluate((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width <= 1 && rect.height <= 1;
+      }),
+    );
     modelStatus = 404;
     await models.click();
     await until(() => modelResponse, 'failing model request');
     modelResponse();
-    await host.locator('.tts-settings').getByRole('alert').waitFor();
+    await host
+      .locator('.settings-page-layout > .settings-status-area')
+      .getByRole('alert')
+      .waitFor();
+    assert.ok(Math.abs(before - (await position())) < 1, 'failure feedback must not move layout');
     checks.push(
       'pending and success feedback do not shift layout; busy controls and failure errors remain',
     );
@@ -1096,7 +1154,7 @@ async function checkSectionTitles() {
     await launch();
     await appearance();
     assert.equal((await snapshot()).settings.value.host.showHints, false);
-    assert.equal(await host.locator('.settings-hint').count(), 0);
+    assert.equal(await host.locator('.settings-hint-icon').count(), 0);
     assert.equal(await host.locator('.settings-hint-trigger').count(), 0);
     assert.deepEqual(errors, []);
     checks.push('OFF survives an actual process restart; no renderer errors');

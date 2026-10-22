@@ -1,4 +1,3 @@
-import { SettingsHint } from './SettingsHint';
 import { useId, useState, type ReactNode } from 'react';
 import { SettingsModal } from './SettingsModal';
 export function BindingEditDialog({
@@ -9,6 +8,8 @@ export function BindingEditDialog({
   onClose,
   children,
   className = '',
+  error: validationError,
+  errorTarget,
 }: {
   title: string;
   adding: boolean;
@@ -17,6 +18,8 @@ export function BindingEditDialog({
   onClose(): void;
   children(ready: boolean, setError: (error: string) => void): ReactNode;
   className?: string;
+  error?: string;
+  errorTarget?: string;
 }) {
   const [error, setError] = useState('');
   const [recordingReady, setRecordingReady] = useState(false);
@@ -37,31 +40,31 @@ export function BindingEditDialog({
       onClose={onClose}
       onReady={setRecordingReady}
       onError={setError}
-    >
-      <header>
-        <div>
-          <small>{adding ? '割り当てを追加' : '割り当てを編集'}</small>
-          <h2 id={`${id}-title`}>{title}</h2>
-        </div>
-        <button className="shortcut-dialog-close" aria-label="編集をキャンセル" onClick={onClose}>
-          ×
-        </button>
-      </header>
-      {children(recordingReady, setError)}
-      {error && (
-        <p className="shortcut-dialog-error" role="alert">
-          {error}
-        </p>
-      )}
-      <footer>
-        <SettingsHint as="small">適用すると設定に反映されます。</SettingsHint>
-        <div>
-          <button onClick={onClose}>キャンセル</button>
-          <button className="primary" disabled={!valid || !recordingReady} onClick={apply}>
-            {adding ? '追加' : '適用'}
+      error={[error, validationError].filter(Boolean).join('\n')}
+      errorTarget={errorTarget}
+      header={
+        <header>
+          <div>
+            <small>{adding ? '割り当てを追加' : '割り当てを編集'}</small>
+            <h2 id={`${id}-title`}>{title}</h2>
+          </div>
+          <button className="shortcut-dialog-close" aria-label="編集をキャンセル" onClick={onClose}>
+            ×
           </button>
-        </div>
-      </footer>
+        </header>
+      }
+      footer={
+        <footer>
+          <div>
+            <button onClick={onClose}>キャンセル</button>
+            <button className="primary" disabled={!valid || !recordingReady} onClick={apply}>
+              {adding ? '追加' : '適用'}
+            </button>
+          </div>
+        </footer>
+      }
+    >
+      {children(recordingReady, setError)}
     </SettingsModal>
   );
 }

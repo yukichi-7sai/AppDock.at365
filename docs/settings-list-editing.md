@@ -123,6 +123,7 @@
 import { useState } from 'react';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsInput } from '../settings-ui/SettingsInput';
+import { SettingsField } from '../settings-ui/SettingsSections';
 
 export function ItemNameDialog({
   original,
@@ -141,14 +142,14 @@ export function ItemNameDialog({
       onApply={() => onSave(name.trim())}
       onClose={onClose}
     >
-      <label>
-        名前
+      <SettingsField title="名前">
         <SettingsInput
+          aria-label="名前"
           data-initial-focus
           value={name}
           onChange={(event) => setName(event.currentTarget.value)}
         />
-      </label>
+      </SettingsField>
     </SettingsDialog>
   );
 }
@@ -160,7 +161,7 @@ export function ItemNameDialog({
 
 `SettingsDialog`はnative dialogの開始、見出し、本文とフッター、保存中の二重送信・閉鎖防止を扱う。`applyLabel`で「追加」「削除」等を指定できる。`children`に`(ready, setError) => ...`を渡すと入力受付の準備状態とエラー表示口を利用できる。この`ready`はショートカット等の入力停止の準備であり、背景画像の描画準備とは別の状態である。
 
-`SettingsModal`を直接使う場合は、見出しIDを`labelledBy`へ渡す。初期フォーカスは`data-initial-focus`または`initialFocus`で指定し、`onReady`で入力受付を制御し、失敗は`onError`へ接続する。非同期処理中は`closeDisabled`と自前のボタン無効化・重複防止を揃える。同じ本体documentの開く前の要素へフォーカスを戻し、その要素が削除された場合は`data-dialog-focus-fallback`を付けた安定した操作へ戻す。
+`SettingsModal`を直接使う場合は、見出しIDを`labelledBy`へ渡し、見出し・操作は`header`/`footer`スロットへ渡す。本文のスクロール領域と常設エラー領域は共通部品が配置する。エラーは`error`と`errorTarget`、処理中は`busy`へ渡す。`SettingsDialog`も同じエラーの受け渡し口を持ち、項目固有のエラーは`SettingsField.error`で関連付ける。初期フォーカスは`data-initial-focus`または`initialFocus`で指定し、`onReady`で入力受付を制御し、準備失敗は`onError`へ接続する。非同期処理中は`closeDisabled`と`SettingsButton.pending`・処理側の重複防止を揃える。同じ本体documentの開く前の要素へフォーカスを戻し、その要素が削除された場合は`data-dialog-focus-fallback`を付けた安定した操作へ戻す。
 
 ### 描画順と背景の管理
 

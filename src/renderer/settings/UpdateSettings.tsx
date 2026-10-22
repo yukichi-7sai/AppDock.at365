@@ -1,3 +1,4 @@
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, SettingsUrlInput, numberInput } from '../settings-ui/SettingsInput';
@@ -6,7 +7,7 @@ import { useEffect, useState } from 'react';
 import type { Settings, ExtensionSnapshot, UpdateState } from '../../shared/contracts';
 import { createDefaultSettings } from '../../shared/settings-schema';
 import { UpdateCheckTime } from '../settings-ui/VersionCheck';
-import { SettingsSection, SettingsField, SettingsFeedback } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { Toggle } from '../settings-ui/Toggle';
 
 export function UpdateActions({ appletCount }: { appletCount: number }) {
@@ -38,6 +39,7 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
       .then((snapshot) => setState(snapshot.updates))
       .catch((error) => setError(String(error).replace(/^Error: /, '')));
   };
+  useSettingsFeedback({ error });
   return (
     <SettingsSection
       {...settingAnchor('about', 'updateActions')}
@@ -65,7 +67,6 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
       <div className="update-last-checked">
         <UpdateCheckTime checkedAt={checkedAt} />
       </div>
-      <SettingsFeedback error={error} />
     </SettingsSection>
   );
 }

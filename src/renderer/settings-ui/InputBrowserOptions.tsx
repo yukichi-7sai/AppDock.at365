@@ -15,17 +15,18 @@ export function InputBrowserOptions({
 }) {
   const title = hostSettingItem(pageId, 'requireChromiumWindowClass').title;
   return (
-    <SettingsField
-      title="Webブラウザ"
-      hint={
-        'exe名のみを指定し、パスは含めません。' +
-        (pageId === 'gestures'
-          ? 'WebBrowserToolsの操作対象もこの一覧を使います。'
-          : 'ショートカットキーのブラウザ条件に使います。')
-      }
-    >
-      <label className="gesture-option" {...settingAnchor(pageId, 'browsers')}>
-        <span>{hostSettingItem(pageId, 'browsers').title}</span>
+    <>
+      <SettingsField
+        group="Webブラウザ"
+        title={hostSettingItem(pageId, 'browsers').title}
+        hint={
+          'exe名のみを指定し、パスは含めません。' +
+          (pageId === 'gestures'
+            ? 'WebBrowserToolsの操作対象もこの一覧を使います。'
+            : 'ショートカットキーのブラウザ条件に使います。')
+        }
+        {...settingAnchor(pageId, 'browsers')}
+      >
         <SettingsInput
           aria-label={hostSettingItem(pageId, 'browsers').title}
           value={value.browsers.join(', ')}
@@ -39,16 +40,19 @@ export function InputBrowserOptions({
             })
           }
         />
-      </label>
-      <div className="gesture-enabled" {...settingAnchor(pageId, 'requireChromiumWindowClass')}>
+      </SettingsField>
+      <SettingsField
+        group="Webブラウザ"
+        title={title}
+        description="FirefoxなどではChromiumウィンドウの条件をオフにします。"
+        {...settingAnchor(pageId, 'requireChromiumWindowClass')}
+      >
         <Toggle
           label={title}
           checked={value.requireChromiumWindowClass}
           onChange={(requireChromiumWindowClass) => onChange({ requireChromiumWindowClass })}
         />
-        <span>{title}</span>
-      </div>
-      <p className="settings-help">FirefoxなどではChromiumウィンドウの条件をオフにします。</p>
-    </SettingsField>
+      </SettingsField>
+    </>
   );
 }

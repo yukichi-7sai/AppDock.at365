@@ -1,7 +1,7 @@
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { SettingsSection } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { VersionCheck, VersionDisplay, useUpdateState } from '../settings-ui/VersionCheck';
 import { UpdateActions, UpdateSettings, AppletUpdateSource } from './UpdateSettings';
 
@@ -32,13 +32,12 @@ export function AboutSettings({
         description="このPCで使用している本体です。"
         {...settingAnchor('about', 'versions')}
       >
-        <div className="about-installed-version">
-          <span>現在のバージョン</span>
+        <SettingsField title="現在のバージョン">
           <VersionDisplay
             version={version}
             result={updates.results.find((result) => result.id === 'host')}
           />
-        </div>
+        </SettingsField>
         <VersionCheck details disabled={busy} />
       </SettingsSection>
       <button className="text-button" onClick={openApplets}>
@@ -51,19 +50,16 @@ export function AboutSettings({
         collapsible
         {...settingAnchor('about', 'runtime')}
       >
-        <dl className="settings-status-grid">
+        <>
           {Object.entries({
             Electron: runtime.electron,
             Chromium: runtime.chrome,
             'Node.js': runtime.node,
             OS: `${runtime.platform} / ${runtime.arch}`,
           }).map(([name, value]) => (
-            <div key={name}>
-              <dt>{name}</dt>
-              <dd>{value}</dd>
-            </div>
+            <SettingsField key={name} title={name} description={value} />
           ))}
-        </dl>
+        </>
       </SettingsSection>
     </section>
   );

@@ -311,8 +311,7 @@ export function TraySettings({
             {active && (
               <div className="tray-item-editor" aria-label="選択したメニュー項目">
                 {active.item.type === 'group' ? (
-                  <label>
-                    グループ名
+                  <SettingsField title="グループ名">
                     <SettingsInput
                       aria-label="グループ名"
                       maxLength={80}
@@ -324,10 +323,9 @@ export function TraySettings({
                         })
                       }
                     />
-                  </label>
+                  </SettingsField>
                 ) : (
-                  <label>
-                    配置先
+                  <SettingsField title="配置先">
                     <select
                       aria-label="メニュー項目の配置先"
                       value={active.parent ?? ''}
@@ -342,7 +340,7 @@ export function TraySettings({
                           </option>
                         ))}
                     </select>
-                  </label>
+                  </SettingsField>
                 )}
                 {active.item.type === 'group' && (
                   <small>解除すると、中の項目をその位置のトップレベルへ戻します。</small>

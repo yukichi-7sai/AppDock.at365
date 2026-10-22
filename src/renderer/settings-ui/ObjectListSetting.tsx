@@ -5,6 +5,7 @@ import { SettingsField } from './SettingsSections';
 import type { SettingDefinition } from '../../shared/contracts';
 import { readObjectList, objectFieldValue, normalizeObject } from '../../shared/object-list';
 import { RegisteredImageInput } from './RegisteredImagePicker';
+import { useSettingsFeedback } from './SettingsStatus';
 
 export function ObjectListSetting({
   definition,
@@ -17,21 +18,22 @@ export function ObjectListSetting({
 }) {
   const settingsControls = useSettingsControls();
   const [error, setError] = useState('');
-  let entries: Record<string, unknown>[];
+  let entries: Record<string, unknown>[] = [];
+  let loadError = '';
   try {
     entries = readObjectList(value ?? []);
     for (const item of entries)
       for (const field of definition.fields ?? []) objectFieldValue(item, field);
   } catch {
-    return (
-      <div role="alert">
-        保存された設定を読み取れません。
-        <button className="secondary" onClick={() => onChange([])}>
-          新しい一覧を作る
-        </button>
-      </div>
-    );
+    loadError = '保存された設定を読み取れません。';
   }
+  useSettingsFeedback({ error: loadError || error, target: definition.title });
+  if (loadError)
+    return (
+      <button className="secondary" onClick={() => onChange([])}>
+        新しい一覧を作る
+      </button>
+    );
   const fields = definition.fields ?? [];
   const label = definition.itemTitle ?? '項目';
   const update = (index: number, key: string, next: unknown) =>
@@ -42,7 +44,6 @@ export function ObjectListSetting({
     );
   return (
     <div className="object-list-setting">
-      {error && <p role="alert">{error}</p>}
       {!entries.length && <p>まだ{label}の設定がありません。</p>}
       {entries.map((entry, index) => (
         <fieldset key={index} className="object-list-item">

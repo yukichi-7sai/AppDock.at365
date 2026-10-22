@@ -1,3 +1,6 @@
+import { SettingsButton } from './SettingsButton';
+import { SettingsField } from './SettingsSections';
+import { useSettingsFeedback } from './SettingsStatus';
 import { useSettingsControls } from './api';
 import { useEffect, useState } from 'react';
 import type { UpdateResult, UpdateState } from '../../shared/contracts';
@@ -77,10 +80,23 @@ export function VersionCheck({
   const [error, setError] = useState('');
   const state = useUpdateState();
   const result = state.results.find((result) => result.id === (id ?? 'host'));
+  useSettingsFeedback({ error, busy, target: '更新' });
+  const summary = !result
+    ? 'まだ更新を確認していません。'
+    : result.status === 'available'
+      ? `${result.latestVersion} が公開されています。`
+      : result.status === 'unpublished'
+        ? '公開リリースが見つかりません。'
+        : result.status === 'unsupported'
+          ? '更新元が設定されていません。'
+          : result.status === 'current'
+            ? '最新のバージョンです。'
+            : result.message;
   return (
-    <span className="version-check">
+    <SettingsField title="更新" description={details ? summary : undefined}>
       <span className="update-check-control">
-        <button
+        <SettingsButton
+          pending={!!busy}
           className={compact ? 'text-button' : 'update-primary'}
           disabled={busy || state.busy || disabled}
           title={disabled ? '設定の処理が完了するまでお待ちください。' : undefined}
@@ -96,23 +112,12 @@ export function VersionCheck({
               .finally(() => setBusy(false));
           }}
         >
-          {busy ? '処理中…' : id ? 'このAppletを更新' : 'AppDockを更新'}
-        </button>
+          {id ? 'このAppletを更新' : 'AppDockを更新'}
+        </SettingsButton>
         {details && <UpdateCheckTime checkedAt={result?.checkedAt} />}
       </span>
       {details && result?.status !== 'current' && (
-        <span className="update-result-inline" role="status">
-          <span>
-            {!result
-              ? 'まだ更新を確認していません。'
-              : result.status === 'available'
-                ? `${result.latestVersion} が公開されています。`
-                : result.status === 'unpublished'
-                  ? '公開リリースが見つかりません。'
-                  : result.status === 'unsupported'
-                    ? '更新元が設定されていません。'
-                    : result.message}
-          </span>
+        <>
           {result?.status === 'available' && result.releaseUrl && (
             <button
               className="text-button"
@@ -125,13 +130,8 @@ export function VersionCheck({
               リリースを開く
             </button>
           )}
-        </span>
+        </>
       )}
-      {error && (
-        <span className="error-text" role="alert">
-          {error}
-        </span>
-      )}
-    </span>
+    </SettingsField>
   );
 }

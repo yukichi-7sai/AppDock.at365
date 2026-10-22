@@ -15,20 +15,23 @@
   min-width: 0;
   background: var(--panel);
 }
-.gesture-settings-section .gesture-options-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+.settings-section.settings-section-group {
+  padding-top: 20px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-.gesture-settings-section .gesture-enabled {
-  margin: 0;
-  align-items: flex-start;
+.settings-section.settings-section-group > :is(header, summary) {
+  padding: 0 0 14px;
+  border-bottom: 0;
 }
-.gesture-settings-section .gesture-option {
-  min-width: 0;
-  margin: 0;
+.settings-section.settings-section-group > .settings-section-content {
+  display: grid;
+  gap: 16px;
+  padding: 0;
 }
-.gesture-settings-section .gesture-option select {
-  min-width: 0;
-  width: 100%;
+.settings-section.settings-section-group > .settings-section-content > :first-child {
+  margin-top: 0;
 }
 .settings-section > header,
 .settings-section > summary {
@@ -77,6 +80,9 @@
   margin-top: 16px;
 }
 .settings-field {
+  min-width: 0;
+  margin: 0;
+  border: 0;
   display: grid;
   grid-template-columns: minmax(160px, 0.8fr) minmax(0, 1.2fr);
   gap: 24px;
@@ -91,6 +97,17 @@
 .settings-field.settings-field-wide {
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
+}
+.settings-field[data-readonly='true'] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.settings-field-control > input:is([type='checkbox'], [type='radio']) {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  justify-self: start;
 }
 .settings-field-wide > .settings-field-label {
   padding-top: 0;
@@ -146,8 +163,18 @@
   min-width: 0;
 }
 .settings-field-label strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 13px;
   font-weight: 500;
+}
+.settings-field-group {
+  flex: none;
+  max-width: 35%;
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .settings-field-label p,
 .settings-field-control > p {
@@ -285,35 +312,8 @@
   font-size: 11px;
   margin-top: 3px;
 }
-.settings-feedback:empty {
-  display: none;
-}
-.settings-feedback p {
-  padding: 10px 12px;
-  background: var(--settings-group-background);
-  border-radius: 8px;
-}
-.settings-status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin: 16px 0;
-}
-.settings-status-grid > div {
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--settings-group-background);
-  min-width: 0;
-}
-.settings-status-grid dt {
-  color: var(--muted);
-  font-size: 11px;
-  margin-bottom: 6px;
-}
-.settings-status-grid dd {
-  margin: 0;
-  font-size: 13px;
-  overflow-wrap: anywhere;
+.settings-field[data-invalid='true'] :is(input, select, textarea, .shortcut-capture) {
+  border-color: var(--settings-error-color);
 }
 .settings-badge {
   display: inline-block;
@@ -334,9 +334,6 @@
   }
   .settings-field-label {
     padding-top: 0;
-  }
-  .settings-status-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
   .settings-section > header,
   .settings-section > summary {

@@ -233,12 +233,14 @@ async function errorNoticeFor(caller) {
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     let page = await settingsPage(host);
     await page.getByRole('button', { name: '通知', exact: true }).click();
-    await page.getByRole('switch', { name: 'エラー通知を通知', exact: true }).waitFor();
+    await page.getByRole('heading', { name: '通知', exact: true, level: 1 }).waitFor();
     assert.equal(await page.locator('[aria-label="AppDockの通知"]').count(), 1);
-    const errorToggle = page.getByRole('switch', { name: 'エラー通知を通知', exact: true });
+    const errorCard = page
+      .locator('.notification-setting-card')
+      .filter({ has: page.getByRole('heading', { name: 'エラー通知', exact: true }) });
+    await errorCard.locator(':scope > summary').click();
     const errorBanner = page.getByLabel('エラー通知のバナー', { exact: true });
     const centerOnly = page.getByLabel('エラー通知の通知センターのみ', { exact: true });
-    assert.equal(await errorToggle.isEnabled(), true);
     assert.equal(await errorBanner.isChecked(), true);
     assert.equal(await errorBanner.isDisabled(), true);
     assert.equal(await centerOnly.isChecked(), false);
@@ -247,32 +249,6 @@ async function errorNoticeFor(caller) {
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
         .overrides[0].targets,
       [],
-    );
-    await errorToggle.click();
-    await settleSettings(host);
-    await until(
-      async () =>
-        (await snapshot()).settings.value.notificationPreferences.overrides.find(
-          (r) => r.ownerId === 'errors',
-        )?.enabled === false,
-      'error notifications off',
-    );
-    assert.equal(await page.getByText('この種類の通知はオフです。', { exact: true }).count(), 0);
-    assert.equal(await errorBanner.isChecked(), true);
-    assert.deepEqual(
-      JSON.parse(
-        fs.readFileSync(path.join(profile, 'settings.json')),
-      ).notificationPreferences.overrides.find((r) => r.ownerId === 'errors').targets,
-      ['banner'],
-    );
-    await errorToggle.click();
-    await settleSettings(host);
-    await until(
-      async () =>
-        (await snapshot()).settings.value.notificationPreferences.overrides.find(
-          (r) => r.ownerId === 'errors',
-        )?.enabled === true,
-      'error notifications on',
     );
     await page.getByLabel('エラー通知のデスクトップ通知', { exact: true }).check();
     await settleSettings(host);
@@ -296,7 +272,7 @@ async function errorNoticeFor(caller) {
       .locator('[aria-label="AppDockの通知"]')
       .screenshot({ path: path.join(profile, 'error-notification-settings.png') });
     checks.push(
-      'required banner cannot be unchecked or replaced by center-only; independent off/on and legacy preference edits work without an off-status message',
+      'required banner cannot be unchecked or replaced by center-only; optional targets save and normalize legacy empty targets',
     );
     assert.equal(
       await page.getByLabel('エラー通知を読み上げる', { exact: true }).isChecked(),
@@ -315,7 +291,6 @@ async function errorNoticeFor(caller) {
     assert.equal(await page.getByLabel('このPCでAI接続を使用', { exact: true }).count(), 0);
     await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
     let dialog = page.getByRole('dialog');
-    await dialog.locator('summary').click();
     assert.equal(await dialog.getByLabel('AIの既定の出力トークン上限').inputValue(), '8192');
     assert.equal(await dialog.getByLabel('AIの既定の待ち時間（秒）').inputValue(), '60');
     await dialog.getByLabel('AIの既定の出力トークン上限').fill('100000');
@@ -368,15 +343,14 @@ async function errorNoticeFor(caller) {
     await until(() => modelRequests.length === count + 2, 'model button discovery');
     await dialog.getByText(/1件のモデルを取得しました/).waitFor();
     const revision = (await snapshot()).settings.revision;
-    await dialog.locator('summary').click();
     await dialog.getByLabel('AIの既定の出力トークン上限').fill('131073');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
-    await dialog.getByText(/既定の出力トークン上限は/).waitFor();
+    await dialog.getByRole('alert').filter({ hasText: '既定の出力トークン上限は' }).waitFor();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
     await dialog.getByLabel('AIの既定の出力トークン上限').fill('100000');
     await dialog.getByLabel('AIの既定の待ち時間（秒）').fill('601');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
-    await dialog.getByText(/既定の待ち時間は/).waitFor();
+    await dialog.getByRole('alert').filter({ hasText: '既定の待ち時間は' }).waitFor();
     assert.equal(fs.readFileSync(settingsFile, 'utf8'), before);
     await dialog.getByLabel('AIの既定の待ち時間（秒）').fill('120');
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
@@ -478,7 +452,11 @@ async function errorNoticeFor(caller) {
     checks.push('generation works immediately after registration without connection approval');
     await page.getByLabel('試験の入力データ', { exact: true }).fill('token-limit');
     await page.getByRole('button', { name: '文章を生成', exact: true }).click();
-    await page.getByText(/出力トークンの上限に達したため/).waitFor();
+    await page
+      .locator('.settings-page-layout > .settings-status-area')
+      .getByRole('alert')
+      .filter({ hasText: '出力トークンの上限に達したため' })
+      .waitFor();
     const errorNotice = await errorNoticeFor('試験画面');
     assert.equal(errorNotice.title, 'AI文章生成に失敗しました');
     assert(
@@ -646,6 +624,7 @@ async function errorNoticeFor(caller) {
       return m.content.auxiliary.ai.jobs.at(-1)?.state === 'running';
     }, 'slow started');
     await page.getByLabel('共通プロンプト', { exact: true }).fill('変更後の共通方針');
+    await page.getByLabel('共通プロンプト', { exact: true }).press('Enter');
     await settleSettings(page);
     await until(async () => {
       const m = await page.evaluate(() =>
@@ -662,7 +641,7 @@ async function errorNoticeFor(caller) {
       .getByLabel('AIのAPIのURL')
       .fill(settings.ai.connections[0].baseUrl.replace('/v1', '/changed/v1'));
     await dialog.getByLabel('AIのAPIのURL').press('Enter');
-    await dialog.getByText(/再入力が必要/).waitFor();
+    await dialog.getByRole('alert').filter({ hasText: '再入力が必要' }).waitFor();
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     checks.push('a changed endpoint cannot reuse the saved key during discovery');
     await page
@@ -676,7 +655,7 @@ async function errorNoticeFor(caller) {
     const draftUrl = dialog.getByLabel('AIのAPIのURL');
     await draftUrl.fill(settings.ai.connections[0].baseUrl.replace('/v1', '/invalid/v1'));
     await draftUrl.press('Enter');
-    await dialog.getByText(/モデル一覧に対応していません/).waitFor();
+    await dialog.getByRole('alert').filter({ hasText: 'モデル一覧に対応していません' }).waitFor();
     await draftUrl.fill(settings.ai.connections[0].baseUrl.replace('/v1', '/slow/v1'));
     const startedModels = modelRequests.length;
     await draftUrl.press('Enter');
@@ -696,7 +675,7 @@ async function errorNoticeFor(caller) {
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
     await dialog.getByRole('button', { name: 'OK', exact: true }).click();
-    await dialog.getByText(/別の場所で変更されました/).waitFor();
+    await dialog.getByRole('alert').filter({ hasText: '別の場所で変更されました' }).waitFor();
     assert.equal(await dialog.getByLabel('AI接続の名前').inputValue(), 'local-draft');
     assert.equal(
       (await snapshot()).settings.value.ai.connections.find((c) => c.id === 'sdk').name,
@@ -748,7 +727,6 @@ async function errorNoticeFor(caller) {
       await page.getByRole('button', { name: 'previewの設定', exact: true }).click();
       dialog = page.getByRole('dialog');
       await dialog.screenshot({ path: path.join(profile, theme + '-' + width + '-dialog.png') });
-      await dialog.locator('summary').click();
       await dialog.getByLabel('AIの保存指定').scrollIntoViewIfNeeded();
       assert(await dialog.getByRole('button', { name: 'OK', exact: true }).isVisible());
       assert.equal(await dialog.evaluate((el) => el.scrollWidth > el.clientWidth + 2), false);

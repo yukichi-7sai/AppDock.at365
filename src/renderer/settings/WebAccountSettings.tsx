@@ -1,4 +1,5 @@
-import { SettingsHint } from '../settings-ui/SettingsHint';
+import { SettingsField } from '../settings-ui/SettingsSections';
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { useSettingsControls } from '../settings-ui/api';
@@ -116,6 +117,7 @@ export function WebAccountSettings({
 }) {
   const settingsControls = useSettingsControls();
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -127,12 +129,13 @@ export function WebAccountSettings({
     }
     const task = queue.current.then(async () => {
       setMessage('');
+      setError('');
       try {
         const result = await work();
         if (result === false) setMessage('操作をキャンセルしました。');
         return result !== false;
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : '操作に失敗しました。');
+        setError(error instanceof Error ? error.message : '操作に失敗しました。');
         return false;
       } finally {
         if (lock) {
@@ -144,13 +147,15 @@ export function WebAccountSettings({
     queue.current = task;
     return task;
   }
+  useSettingsFeedback({ error, message, busy, target: 'Webアカウント' });
   return (
-    <section
-      className="web-account-settings"
+    <SettingsField
+      title="アカウント枠"
+      description="使用中の枠は削除できません。WebAppletの設定で別のアカウントを選択してください。削除は枠と保存データをまとめて消し、クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。"
+      className="settings-field-wide web-account-settings"
       {...settingAnchor('web-accounts', 'accounts')}
       aria-label="Webアカウント設定"
     >
-      <SettingsHint>ここでの操作はすぐに反映されます。設定の保存は不要です。</SettingsHint>
       <div className="actions">
         <button
           className="secondary"
@@ -187,10 +192,6 @@ export function WebAccountSettings({
           />
         );
       })}
-      {message && <p role="status">{message}</p>}
-      <SettingsHint>
-        使用中の枠は削除できません。WebAppletの設定で別のアカウントを選択してください。削除は枠と保存データをまとめて消し、クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。
-      </SettingsHint>
-    </section>
+    </SettingsField>
   );
 }

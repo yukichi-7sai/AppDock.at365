@@ -1,4 +1,4 @@
-import { SettingsHint } from '../settings-ui/SettingsHint';
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useState } from 'react';
 import type { SettingDefinition, Settings } from '../../shared/contracts';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
@@ -96,24 +96,24 @@ export function CustomCommandsSettings({
       types: structuredClone(types),
       revision: auxiliary!.revision,
     });
+  useSettingsFeedback({ error });
   return (
     <div className="settings-sections custom-commands-settings">
       <SettingsSection
         title="登録済みコマンド"
+        description={[
+          !supported
+            ? 'この保存版には対応していません。自動移行は行いません。JSON編集でversion 2の一覧を保存して作り直してください。'
+            : '',
+          !types.length
+            ? '利用できる種類がありません。種類を提供するAppletを導入すると追加できます。'
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         hint="種類と固定設定を保存します。保存したコマンドをショートカット、ジェスチャー、トレイに割り当てられます。"
         {...settingAnchor('custom-commands', 'definitions')}
       >
-        {!supported && (
-          <p role="status">
-            この保存版には対応していません。自動移行は行いません。JSON編集でversion
-            2の一覧を保存して作り直してください。
-          </p>
-        )}
-        {!types.length && (
-          <p role="status">
-            利用できる種類がありません。種類を提供するAppletを導入すると追加できます。
-          </p>
-        )}
         <CommandTargetFilter />
         <SettingsListTable
           titleExtra={(entry) => <CommandPublication published={command(entry).automation} />}
@@ -153,7 +153,6 @@ export function CustomCommandsSettings({
             ]).catch((e) => setError(String(e)));
           }}
         />
-        {error && <p role="alert">{error}</p>}
       </SettingsSection>
       {dialog?.kind === 'edit' && (
         <CustomCommandDialog
@@ -275,7 +274,7 @@ function CustomCommandDialog({
     >
       {(ready, setError) => (
         <>
-          <SettingsField title="種類">
+          <SettingsField title="種類" description={type?.description}>
             <select
               aria-label="種類"
               value={typeId}
@@ -298,7 +297,6 @@ function CustomCommandDialog({
               ))}
             </select>
           </SettingsField>
-          {type?.description && <SettingsHint>{type.description}</SettingsHint>}
           <SettingsField title="名前">
             <SettingsInput
               aria-label="名前"
@@ -477,6 +475,7 @@ function JsonField({
 }) {
   const [text, setText] = useState(JSON.stringify(value ?? null, null, 2));
   const [error, setError] = useState('');
+  useSettingsFeedback({ error });
   return (
     <>
       <SettingsTextarea
@@ -495,7 +494,6 @@ function JsonField({
           }
         }}
       />
-      {error && <p role="alert">{error}</p>}
     </>
   );
 }

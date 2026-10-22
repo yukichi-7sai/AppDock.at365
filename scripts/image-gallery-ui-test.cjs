@@ -458,7 +458,10 @@ async function selectedBorder(label) {
     await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像を削除', exact: true });
     await d.getByRole('button', { name: '削除', exact: true }).click();
-    await d.getByText(/画像をごみ箱へ移せませんでした/).waitFor();
+    await d
+      .getByRole('alert')
+      .filter({ hasText: /画像をごみ箱へ移せませんでした/ })
+      .waitFor();
     assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
     const recycled = path.join(profile, 'recycled-image-000.png');
     await app.evaluate(

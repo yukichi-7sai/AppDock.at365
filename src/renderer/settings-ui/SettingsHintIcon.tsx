@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { useSettingsHints } from './SettingsHint';
+import { useSettingsHints } from './SettingsHints';
+import { settingsPopoverScroll } from './settings-popover-scroll';
 import './settings-hint-icon.css';
 
 /** Optional title guidance shares the same preference as inline settings hints. */
@@ -52,9 +53,7 @@ function HintPopover({ title, hint }: { title: string; hint: string }) {
       event.stopPropagation();
       setOpen(false);
     };
-    const scroll = (event: Event) => {
-      if (!tooltip.contains(event.target as Node)) setOpen(false);
-    };
+    const scroll = settingsPopoverScroll(button, tooltip, () => setOpen(false));
     const resize = () => setOpen(false);
     document.addEventListener('pointerdown', outside);
     document.addEventListener('keydown', escape, true);

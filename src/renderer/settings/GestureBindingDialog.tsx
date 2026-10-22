@@ -1,4 +1,4 @@
-import { SettingsHint } from '../settings-ui/SettingsHint';
+import { SettingsField } from '../settings-ui/SettingsSections';
 import {
   CommandConditionDetails,
   useConditionProcesses,
@@ -120,26 +120,25 @@ export function GestureBindingDialog({
     >
       {(ready, setError) => (
         <>
-          <SettingsHint className="gesture-input-hint">
-            右ボタンを押しながら行う操作を選びます。
-          </SettingsHint>
-          <div className="gesture-family-picker" role="group" aria-label="ジェスチャーの種類">
-            {families.map((item) => (
-              <button
-                key={item.id}
-                data-initial-focus={item.id === family ? '' : undefined}
-                aria-pressed={family === item.id}
-                onClick={() => {
-                  setFamily(item.id);
-                  setValue({ ...value, gesture: choices[item.id] });
-                  setError('');
-                }}
-              >
-                <span aria-hidden="true">{item.icon}</span>
-                {item.title}
-              </button>
-            ))}
-          </div>
+          <SettingsField title="ジェスチャーの種類" hint="右ボタンを押しながら行う操作を選びます。">
+            <div className="gesture-family-picker" role="group" aria-label="ジェスチャーの種類">
+              {families.map((item) => (
+                <button
+                  key={item.id}
+                  data-initial-focus={item.id === family ? '' : undefined}
+                  aria-pressed={family === item.id}
+                  onClick={() => {
+                    setFamily(item.id);
+                    setValue({ ...value, gesture: choices[item.id] });
+                    setError('');
+                  }}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.title}
+                </button>
+              ))}
+            </div>
+          </SettingsField>
           {family === 'key' ? (
             <ShortcutCaptureField
               allowWin={false}
@@ -151,136 +150,148 @@ export function GestureBindingDialog({
             />
           ) : family === 'move' ? (
             <>
-              <div
-                className="gesture-choice-grid gesture-step-picker"
-                role="group"
-                aria-label="移動の段階"
+              <SettingsField
+                title="移動の段階"
+                hint="右ボタンを離したときに、動かした順番と一致する操作を実行します。同じ方向の移動は1段階、3方向目へ変えるとキャンセルします。"
               >
-                {[1, 2].map((steps) => (
-                  <button
-                    key={steps}
-                    aria-pressed={movement.length === steps}
-                    onClick={() => choose(moveChoices[steps])}
-                  >
-                    {steps}段階移動
-                  </button>
-                ))}
-              </div>
+                <div
+                  className="gesture-choice-grid gesture-step-picker"
+                  role="group"
+                  aria-label="移動の段階"
+                >
+                  {[1, 2].map((steps) => (
+                    <button
+                      key={steps}
+                      aria-pressed={movement.length === steps}
+                      onClick={() => choose(moveChoices[steps])}
+                    >
+                      {steps}段階移動
+                    </button>
+                  ))}
+                </div>
+              </SettingsField>
               {movement.length === 1 ? (
-                <MoveDirectionPicker
-                  label="ジェスチャーの操作"
-                  value={movement[0]}
-                  onChoose={(direction) => choose('move-' + direction)}
-                />
+                <SettingsField title="ジェスチャーの操作">
+                  <MoveDirectionPicker
+                    label="ジェスチャーの操作"
+                    value={movement[0]}
+                    onChoose={(direction) => choose('move-' + direction)}
+                  />
+                </SettingsField>
               ) : (
                 <>
-                  <span>最初の方向</span>
-                  <MoveDirectionPicker
-                    label="最初の方向"
-                    value={movement[0]}
-                    onChoose={(direction) =>
-                      choose(
-                        `move-${direction}-${direction === movement[1] ? movement[0] : movement[1]}`,
-                      )
-                    }
-                  />
-                  <span>次の方向</span>
-                  <MoveDirectionPicker
-                    label="次の方向"
-                    value={movement[1]}
-                    disabled={movement[0]}
-                    onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
-                  />
+                  <SettingsField title="最初の方向">
+                    <MoveDirectionPicker
+                      label="最初の方向"
+                      value={movement[0]}
+                      onChoose={(direction) =>
+                        choose(
+                          `move-${direction}-${direction === movement[1] ? movement[0] : movement[1]}`,
+                        )
+                      }
+                    />
+                  </SettingsField>
+                  <SettingsField title="次の方向">
+                    <MoveDirectionPicker
+                      label="次の方向"
+                      value={movement[1]}
+                      disabled={movement[0]}
+                      onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
+                    />
+                  </SettingsField>
                 </>
               )}
             </>
           ) : (
-            <div
-              className={`gesture-choice-grid gesture-choice-${family}`}
-              role="group"
-              aria-label="ジェスチャーの操作"
+            <SettingsField
+              title="ジェスチャーの操作"
+              hint="右ボタンを押したまま、この操作をしたときに実行します。"
             >
-              {gestureTypes
-                .filter(([id]) => id.startsWith(family + '-'))
-                .map(([id, label]) => (
-                  <button key={id} aria-pressed={value.gesture === id} onClick={() => choose(id)}>
-                    <span aria-hidden="true">
-                      {id === 'wheel-up'
-                        ? '↑'
-                        : id === 'wheel-down'
-                          ? '↓'
-                          : id === 'click-left'
-                            ? '◧'
-                            : '▣'}
-                    </span>
-                    {label.replace(/^[↑↓←→] /, '')}
-                  </button>
-                ))}
-            </div>
+              <div
+                className={`gesture-choice-grid gesture-choice-${family}`}
+                role="group"
+                aria-label="ジェスチャーの操作"
+              >
+                {gestureTypes
+                  .filter(([id]) => id.startsWith(family + '-'))
+                  .map(([id, label]) => (
+                    <button key={id} aria-pressed={value.gesture === id} onClick={() => choose(id)}>
+                      <span aria-hidden="true">
+                        {id === 'wheel-up'
+                          ? '↑'
+                          : id === 'wheel-down'
+                            ? '↓'
+                            : id === 'click-left'
+                              ? '◧'
+                              : '▣'}
+                      </span>
+                      {label.replace(/^[↑↓←→] /, '')}
+                    </button>
+                  ))}
+              </div>
+            </SettingsField>
           )}
-          <SettingsHint className="shortcut-capture-hint">
-            {family === 'move'
-              ? '右ボタンを離したときに、動かした順番と一致する操作を実行します。同じ方向の移動は1段階、3方向目へ変えるとキャンセルします。'
-              : '右ボタンを押したまま、この操作をしたときに実行します。'}
-          </SettingsHint>
-          <div className="shortcut-dialog-condition">
-            <span>いつ・どこで</span>
-            <div>
-              <ShortcutConditionField
-                value={{ scope: commonScope, appletIds: value.when.appletIds }}
-                selectedScope={value.when.scope}
-                extraScopes={externalShortcutScopes.slice()}
-                onExtraScope={(scope) =>
+          <SettingsField
+            title="いつ・どこで"
+            hint={
+              value.when.scope === 'browser'
+                ? '画面上部の「動作設定」で指定したブラウザに適用します。'
+                : undefined
+            }
+          >
+            <ShortcutConditionField
+              value={{ scope: commonScope, appletIds: value.when.appletIds }}
+              selectedScope={value.when.scope}
+              extraScopes={externalShortcutScopes.slice()}
+              onExtraScope={(scope) =>
+                setValue({
+                  ...value,
+                  when: {
+                    scope: scope as GestureScope,
+                    appletIds: [],
+                    processes: [],
+                    ...(scope === 'exe' && value.when.excludeDesktop !== undefined
+                      ? { excludeDesktop: value.when.excludeDesktop }
+                      : {}),
+                  },
+                })
+              }
+              label="割り当てのいつ・どこで"
+              ownerTitle={ownerTitle}
+              applets={applets}
+              onChange={(when) => {
+                if (when.scope !== 'default')
                   setValue({
                     ...value,
                     when: {
-                      scope: scope as GestureScope,
-                      appletIds: [],
+                      scope: when.scope,
+                      appletIds: when.appletIds,
                       processes: [],
-                      ...(scope === 'exe' && value.when.excludeDesktop !== undefined
+                      ...(when.scope === 'global' && value.when.excludeDesktop !== undefined
                         ? { excludeDesktop: value.when.excludeDesktop }
                         : {}),
                     },
-                  })
-                }
-                label="割り当てのいつ・どこで"
-                ownerTitle={ownerTitle}
-                applets={applets}
-                onChange={(when) => {
-                  if (when.scope !== 'default')
-                    setValue({
-                      ...value,
-                      when: {
-                        scope: when.scope,
-                        appletIds: when.appletIds,
-                        processes: [],
-                        ...(when.scope === 'global' && value.when.excludeDesktop !== undefined
-                          ? { excludeDesktop: value.when.excludeDesktop }
-                          : {}),
-                      },
-                    });
-                }}
-              />
-              <CommandConditionDetails
-                when={value.when}
-                onChange={(when) =>
-                  setValue({ ...value, when: { ...when, processes: when.processes ?? [] } })
-                }
-                processText={processText}
-                setProcessText={setProcessText}
-                processes={processes}
-                processError={processError}
-              />
-            </div>
-          </div>
-          <div className="shortcut-dialog-enabled">
-            <span>この割り当てを有効にする</span>
+                  });
+              }}
+            />
+          </SettingsField>
+          <CommandConditionDetails
+            when={value.when}
+            onChange={(when) =>
+              setValue({ ...value, when: { ...when, processes: when.processes ?? [] } })
+            }
+            processText={processText}
+            setProcessText={setProcessText}
+            processes={processes}
+            processError={processError}
+          />
+          <SettingsField title="この割り当てを有効にする">
             <Toggle
               checked={value.enabled}
               label="この割り当てを有効にする"
               onChange={(enabled) => setValue({ ...value, enabled })}
             />
-          </div>
+          </SettingsField>
         </>
       )}
     </BindingEditDialog>

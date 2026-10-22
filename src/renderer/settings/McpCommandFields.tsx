@@ -1,3 +1,4 @@
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useRef, useState } from 'react';
 import type { McpServerEntry, McpToolDescriptor } from '../../shared/mcp-client';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
@@ -67,6 +68,13 @@ export function McpCommandFields({
       setTool(reply.tool);
       onChange({ ...config, toolName: name, toolRevision: reply.tool.toolRevision });
     });
+  useSettingsFeedback({
+    busy: pending,
+    message: pending ? 'ツールを確認しています…' : '',
+    error: [tool && tool.unsupportedReason ? tool.unsupportedReason : '', error ? error : '']
+      .filter(Boolean)
+      .join('\n'),
+  });
   return (
     <>
       <SettingsField title="MCP接続先">
@@ -102,7 +110,11 @@ export function McpCommandFields({
           </button>
         )}
       </SettingsField>
-      <SettingsField title="MCPツール">
+      <SettingsField
+        title="MCPツール"
+        description={tool?.description}
+        hint="詳細を再取得すると、現在のツール仕様を選び直します。引数を確認してから保存してください。"
+      >
         <select
           aria-label="MCPツール"
           value={name}
@@ -131,21 +143,16 @@ export function McpCommandFields({
             詳細を再取得
           </button>
         )}
-        <p className="muted">
-          詳細を再取得すると、現在のツール仕様を選び直します。引数を確認してから保存してください。
-        </p>
       </SettingsField>
       {tool && (
         <>
-          <p>{tool.description}</p>
-          {tool.unsupportedReason && <p role="alert">{tool.unsupportedReason}</p>}
           <details>
             <summary>ツールの引数Schema</summary>
             <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
           </details>
         </>
       )}
-      <SettingsField title="固定引数（JSON）">
+      <SettingsField error={argsError ? argsError : ''} title="固定引数（JSON）">
         <SettingsTextarea
           aria-label="固定引数（JSON）"
           disabled={pending}
@@ -165,7 +172,6 @@ export function McpCommandFields({
             }
           }}
         />
-        {argsError && <p role="alert">{argsError}</p>}
       </SettingsField>
       <SettingsField title="待ち時間（ミリ秒）">
         <SettingsInput
@@ -179,8 +185,6 @@ export function McpCommandFields({
           onChange={(e) => onChange({ ...config, timeoutMs: Number(e.target.value) })}
         />
       </SettingsField>
-      {pending && <p role="status">ツールを確認しています…</p>}
-      {error && <p role="alert">{error}</p>}
     </>
   );
 }

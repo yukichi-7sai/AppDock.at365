@@ -4,7 +4,8 @@ import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
 import type { AutomationAction, AutomationState } from '../../shared/automation';
-import { SettingsSection, SettingsField, SettingsFeedback } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 
 export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void }) {
   const settingsControls = useSettingsControls();
@@ -71,10 +72,15 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
       setBusy(false);
     }
   }
+  useSettingsFeedback({
+    error: error || state?.error || state?.registrationError,
+    busy,
+    target: 'MCPサーバー',
+    message: !state && !error ? '連携状態を読み込んでいます…' : '',
+  });
   if (!state)
     return (
       <div className="settings-sections">
-        <SettingsFeedback error={error} message={!error ? '連携状態を読み込んでいます…' : ''} />
         <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
           連携状態を再読み込み
         </button>
@@ -97,34 +103,26 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         title="接続の状態"
         hint="同じPCのCodexや、ネットワーク上のMCPクライアントからAppDockを操作できます。"
       >
-        <dl className="settings-status-grid">
-          <div>
-            <dt>サーバー</dt>
-            <dd>{state.running ? '稼働中' : state.enabled ? '起動できません' : '停止中'}</dd>
-          </div>
-          <div>
-            <dt>Codexへの登録</dt>
-            <dd>{registration}</dd>
-          </div>
-          <div>
-            <dt>このPCからの最終接続</dt>
-            <dd>
-              {state.lastLocalClientAt
-                ? new Date(state.lastLocalClientAt).toLocaleString()
-                : 'まだ確認されていません'}
-            </dd>
-          </div>
-          <div>
-            <dt>ネットワークからの最終接続</dt>
-            <dd>
-              {state.lastNetworkClientAt
-                ? new Date(state.lastNetworkClientAt).toLocaleString()
-                : 'まだ確認されていません'}
-            </dd>
-          </div>
-        </dl>
+        <SettingsField title="Codexへの登録" description={registration} />
+        <SettingsField
+          title="このPCからの最終接続"
+          description={
+            state.lastLocalClientAt
+              ? new Date(state.lastLocalClientAt).toLocaleString()
+              : 'まだ確認されていません'
+          }
+        />
+        <SettingsField
+          title="ネットワークからの最終接続"
+          description={
+            state.lastNetworkClientAt
+              ? new Date(state.lastNetworkClientAt).toLocaleString()
+              : 'まだ確認されていません'
+          }
+        />
         <SettingsField
           title="連携を有効にする"
+          description={`サーバー: ${state.running ? '稼働中' : state.enabled ? '起動できません' : '停止中'}`}
           hint="AppDockの起動中に接続できます。"
           {...settingAnchor('codex', 'automation')}
         >
@@ -137,7 +135,12 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         </SettingsField>
         <SettingsField
           title="接続範囲"
-          description="変更時に通信が一時切断されます。同じPCのCodexの再登録は不要です。"
+          description={
+            '変更時に通信が一時切断されます。同じPCのCodexの再登録は不要です。' +
+            (state.connectionScope === 'network'
+              ? '到達可能な接続元に、認証トークンとMCPの操作許可を適用します。LAN直結は暗号化されないHTTP接続です。tailnet経由はTailscaleで保護されます。利用するネットワークとファイアウォールの設定を確認してください。'
+              : '')
+          }
           {...settingAnchor('codex', 'connectionScope')}
         >
           <select
@@ -151,11 +154,6 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             <option value="local">このPCのみ</option>
             <option value="network">ネットワークからも接続可能（IPv4）</option>
           </select>
-          {state.connectionScope === 'network' && (
-            <p>
-              到達可能な接続元に、認証トークンとMCPの操作許可を適用します。LAN直結は暗号化されないHTTP接続です。tailnet経由はTailscaleで保護されます。利用するネットワークとファイアウォールの設定を確認してください。
-            </p>
-          )}
         </SettingsField>
         {state.enabled && !state.running && (
           <div className="settings-actions">
@@ -173,10 +171,19 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             <button onClick={onOpenPermissions}>操作の許可を開く</button>
           </div>
         </SettingsField>
-        <SettingsFeedback error={error || state.error || state.registrationError} busy={busy} />
       </SettingsSection>
       <SettingsSection
         title="Codexへ登録"
+        description={[
+          !state.running ? '先に「連携を有効にする」をオンにしてください。' : '',
+          file !== state.configFile
+            ? '変更した設定ファイルの場所を保存してから登録してください。'
+            : '',
+          '登録後はCodexを再読み込みまたは再起動し、新しいチャットで「AppDockの状態を確認して」と依頼してください。',
+          '接続テストはAppDock内の疎通確認です。最終接続日時はCodex以外のMCPクライアントも含みます。Codexでの操作や別端末からの疎通は、それぞれのクライアントで確認してください。',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         hint="このPCのCodexにMCPでのAppDockの接続情報を追加します。"
         {...settingAnchor('codex', 'registration')}
       >
@@ -192,91 +199,89 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             このPC内の接続テスト
           </button>
         </div>
-        {!state.running && <p>先に「連携を有効にする」をオンにしてください。</p>}
-        {file !== state.configFile && (
-          <p>変更した設定ファイルの場所を保存してから登録してください。</p>
-        )}
-        <p>
-          登録後はCodexを再読み込みまたは再起動し、新しいチャットで「AppDockの状態を確認して」と依頼してください。
-        </p>
-        <p>
-          接続テストはAppDock内の疎通確認です。最終接続日時はCodex以外のMCPクライアントも含みます。Codexでの操作や別端末からの疎通は、それぞれのクライアントで確認してください。
-        </p>
       </SettingsSection>
       <SettingsSection
         title="ネットワークからの接続"
+        description={
+          state.connectionScope !== 'network'
+            ? '接続範囲を「ネットワークからも接続可能」にすると利用できます。'
+            : !state.running
+              ? 'MCPは停止中です。'
+              : state.networkEndpoints.length === 0
+                ? 'ネットワークの接続先候補がありません。ネットワーク接続を確認してください。'
+                : undefined
+        }
         hint="別端末のMCPクライアントへ、Streamable HTTPの接続先とBearerトークンを設定します。"
         {...settingAnchor('codex', 'network')}
       >
-        {state.connectionScope !== 'network' ? (
-          <p>接続範囲を「ネットワークからも接続可能」にすると利用できます。</p>
-        ) : !state.running ? (
-          <p>MCPは停止中です。</p>
-        ) : state.networkEndpoints.length === 0 ? (
-          <p>ネットワークの接続先候補がありません。ネットワーク接続を確認してください。</p>
-        ) : (
-          <SettingsField
-            title="ネットワークの接続先候補"
-            hint="接続できるかどうかは、利用する端末から確認してください。"
-          >
-            {state.networkEndpoints.map((endpoint) => (
-              <div key={endpoint} className="settings-actions codex-network-endpoint">
-                <SettingsInput aria-label={`接続先 ${endpoint}`} readOnly value={endpoint} />
-                <button
-                  disabled={busy}
-                  onClick={() => void run({ kind: 'copyEndpoint', endpoint })}
-                >
-                  接続先をコピー
-                </button>
-              </div>
-            ))}
-          </SettingsField>
-        )}
-        <div className="settings-actions">
-          <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
-            接続の状態を再読み込み
-          </button>
-          <button
-            disabled={busy || !state.canCopyToken}
-            onClick={() => void run({ kind: 'copyToken' })}
-          >
-            接続トークンをコピー
-          </button>
-        </div>
-        <p>
-          接続トークンはOSのクリップボードへコピーします。同じトークンを使うクライアントは、操作許可とAI・読み上げのジョブ管理を共有します。
-        </p>
+        {state.connectionScope === 'network' &&
+          state.running &&
+          state.networkEndpoints.length > 0 && (
+            <SettingsField
+              title="ネットワークの接続先候補"
+              hint="接続できるかどうかは、利用する端末から確認してください。"
+            >
+              {state.networkEndpoints.map((endpoint) => (
+                <div key={endpoint} className="settings-actions codex-network-endpoint">
+                  <SettingsInput aria-label={`接続先 ${endpoint}`} readOnly value={endpoint} />
+                  <button
+                    disabled={busy}
+                    onClick={() => void run({ kind: 'copyEndpoint', endpoint })}
+                  >
+                    接続先をコピー
+                  </button>
+                </div>
+              ))}
+            </SettingsField>
+          )}
         <SettingsField
-          title="認証の設定例"
-          hint="「接続トークンをコピー」で取得したトークンを、接続元アプリの方式に合わせて設定してください。"
+          title="接続トークン"
+          description="接続トークンはOSのクリップボードへコピーします。同じトークンを使うクライアントは、操作許可とAI・読み上げのジョブ管理を共有します。"
         >
-          <div>
-            <p>
-              <strong>環境変数を使う場合</strong>
-              <br />
-              Bearerトークンを設定する環境変数の名前：<code>MCP_BEARER_TOKEN</code>（例）
-              <br />
-              接続元アプリが参照できる環境変数に、コピーしたトークンだけを保存します。
-              <code>Bearer </code>
-              は付けません。環境変数を追加・変更したら、接続元アプリを再起動してください。
-            </p>
-            <p>
-              <strong>ヘッダーを直接設定する場合</strong>
-              <br />
-              ヘッダーのキー：<code>Authorization</code>
-              <br />
-              ヘッダーの値：<code>{'Bearer <コピーしたトークン>'}</code>
-              <br />
-              <code>Bearer</code>の後に半角スペースを1つ入れ、
-              <code>{'<コピーしたトークン>'}</code>を実際のトークンに置き換えます。
-            </p>
-            <p>
-              通常はどちらか一方を設定します。環境変数名は接続元アプリの指定と一致させてください。
-              ヘッダーの値に<code>MCP_BEARER_TOKEN</code>
-              と書くだけでは、トークンに置き換わりません。
-            </p>
+          <div className="settings-actions">
+            <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
+              接続の状態を再読み込み
+            </button>
+            <button
+              disabled={busy || !state.canCopyToken}
+              onClick={() => void run({ kind: 'copyToken' })}
+            >
+              接続トークンをコピー
+            </button>
           </div>
         </SettingsField>
+        <SettingsSection
+          variant="group"
+          title="認証の設定例"
+          description="通常はどちらか一方を設定します。環境変数名は接続元アプリの指定と一致させてください。ヘッダーの値にMCP_BEARER_TOKENと書くだけでは、トークンに置き換わりません。"
+          hint="「接続トークンをコピー」で取得したトークンを、接続元アプリの方式に合わせて設定してください。"
+        >
+          <SettingsField
+            title="環境変数を使う場合"
+            description={
+              <>
+                Bearerトークンを設定する環境変数の名前：<code>MCP_BEARER_TOKEN</code>（例）
+                <br />
+                接続元アプリが参照できる環境変数に、コピーしたトークンだけを保存します。
+                <code>Bearer </code>
+                は付けません。環境変数を追加・変更したら、接続元アプリを再起動してください。
+              </>
+            }
+          />
+          <SettingsField
+            title="ヘッダーを直接設定する場合"
+            description={
+              <>
+                ヘッダーのキー：<code>Authorization</code>
+                <br />
+                ヘッダーの値：<code>{'Bearer <コピーしたトークン>'}</code>
+                <br />
+                <code>Bearer</code>の後に半角スペースを1つ入れ、
+                <code>{'<コピーしたトークン>'}</code>を実際のトークンに置き換えます。
+              </>
+            }
+          />
+        </SettingsSection>
       </SettingsSection>
       <SettingsSection
         title="登録先や接続の詳細"
@@ -348,7 +353,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         <SettingsField
           title="接続ポート"
           hint="0を指定すると空きポートを選んで保存します。"
-          description="変更後は登録を修復してください。"
+          description={`変更後は登録を修復してください。このPCの接続先: ${state.endpoint || '連携を有効にすると決まります'}`}
         >
           <SettingsInput
             type="number"
@@ -371,7 +376,6 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
               ポートを適用
             </button>
           </div>
-          <p>このPCの接続先: {state.endpoint || '連携を有効にすると決まります'}</p>
         </SettingsField>
         <SettingsField
           title="認証と登録の管理"
