@@ -19,7 +19,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 
 ## ツールとWindows検証
 
-- Node/pnpmはtoolchain.jsonに従うプロジェクト内の.toolsをdev.bat経由で使用する。グローバル導入はしない。依存・ツールの公開後7日待機、完全版指定の例外、Node LTSの固定は[依存方針](DEVELOPMENT.md#依存とツールの公開後待機)に従う。pnpmのshim生成とElectron取得を含め、更新時は初回setupと再実行も確認する。
+- Node/pnpmはtoolchain.jsonに従うプロジェクト内の.toolsをdev.bat経由で使用する。グローバル導入はしない。パッケージ更新はupdate-packages.batを使い、Electronは最新安定版・Node.jsは最新LTSを毎回選び完全版で固定する。この2つは7日待機の恒久免除、ほかの依存・pnpmは7日待機と版指定例外を維持する。[依存方針](DEVELOPMENT.md#依存とツールの公開後待機)に従い、pnpmのshim生成とElectron取得を含め、更新時は初回setupと再実行も確認する。
 - node_modulesをjunction共有したworktreeで依存をインストールしない。依存更新用checkoutは独立node_modulesを使い、整理前後は元checkoutへの参照と動作を確認する。
 - GUI試験は直列・隔離profileで行う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。
 - 単一EXEのportable展開mutex・lease・子プロセス寿命・hProc形式のHANDLE変換・安定したTray識別を維持する。electron-builder更新時は独自templateの連携と実EXEの更新・再起動・同時起動・異常終了を確認する。設定・data・認証と展開物の寿命を混ぜない。

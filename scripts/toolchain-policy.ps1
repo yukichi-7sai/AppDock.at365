@@ -4,6 +4,12 @@
     if ($Policy.minimumReleaseAgeDays -isnot [int] -or $Policy.minimumReleaseAgeDays -lt 1) {
         throw 'minimumReleaseAgeDays must be a positive integer.'
     }
+    $exempt = @($Policy.releaseAgeExemptPackages)
+    if ($exempt.Count -ne 2 -or @($exempt | Where-Object { $_ -cnotin @('node', 'electron') }).Count -ne 0 -or
+        @($exempt | Select-Object -Unique).Count -ne 2 -or
+        $WorkspaceText -notmatch '(?m)^\s+- [''"]?electron[''"]?\s*$') {
+        throw 'Permanent release-age exemptions must be node and electron, with electron in pnpm-workspace.yaml.'
+    }
     $minutes = $Policy.minimumReleaseAgeDays * 1440
     if ($WorkspaceText -notmatch "(?m)^minimumReleaseAge: $minutes\s*$" -or
         $WorkspaceText -notmatch '(?m)^minimumReleaseAgeStrict: true\s*$' -or
@@ -29,6 +35,9 @@ function Assert-ToolRelease {
         # Node's index has a date, not a timestamp. Wait through that entire UTC day.
         if ($Published -match '^\d{4}-\d{2}-\d{2}$') { $publishedAt = $publishedAt.AddDays(1) }
     } catch { throw "Invalid publication date: $Package@$Version" }
+    if ($Package -cin $Policy.releaseAgeExemptPackages) {
+        return $true
+    }
     if ($publishedAt -gt $Now.AddDays(-$Policy.minimumReleaseAgeDays)) {
         $exception = @($Policy.releaseAgeExceptions | Where-Object {
             $_.package -ceq $Package -and $_.version -ceq $Version
@@ -40,6 +49,31 @@ function Assert-ToolRelease {
         return $true
     }
     return $false
+}
+
+function Get-LatestRuntimeVersions {
+    param($Policy)
+    $releases = Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json' -TimeoutSec 30
+    $lts = @($releases | Where-Object {
+        $_.version -cmatch '^v\d+\.\d+\.\d+$' -and $_.lts -is [string] -and
+        -not [string]::IsNullOrWhiteSpace($_.lts)
+    } | Sort-Object { [version]$_.version.Substring(1) } -Descending)
+    if ($lts.Count -eq 0) { throw 'No official stable Node.js LTS release was found.' }
+    $node = $lts[0]
+    $nodeVersion = $node.version.Substring(1)
+    $null = Assert-ToolRelease $Policy 'node' $nodeVersion $node.date
+    $metadata = Invoke-RestMethod -Uri 'https://registry.npmjs.org/electron' -TimeoutSec 30
+    $electron = $metadata.'dist-tags'.latest
+    if ($electron -isnot [string] -or $electron -cnotmatch '^\d+\.\d+\.\d+$' -or
+        $metadata.versions.$electron.version -cne $electron -or
+        $metadata.versions.$electron.name -cne 'electron') {
+        throw 'The official Electron latest tag must identify a stable electron release.'
+    }
+    $null = Assert-ToolRelease $Policy 'electron' $electron $metadata.time.$electron
+    return [pscustomobject]@{
+        node = $nodeVersion; nodeLts = $node.lts; nodePublished = $node.date
+        electron = $electron; electronPublished = $metadata.time.$electron
+    }
 }
 
 function Get-ApprovedNodeRelease {

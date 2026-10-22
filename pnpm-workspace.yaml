@@ -5,10 +5,9 @@ minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeExcludePrune: true
-# Security exception: eMudhra CA mitigation and Chromium security backports.
-# https://emudhra.we-have-a-problem.com/ and Electron v44.9.3 release notes.
+# Runtime updates use the latest stable Electron without a release-age delay.
 minimumReleaseAgeExclude:
-  - 'electron@44.9.3'
+  - 'electron'
 verifyDepsBeforeRun: error
 allowBuilds:
   electron: true

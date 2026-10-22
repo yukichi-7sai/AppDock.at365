@@ -39,6 +39,36 @@ test('toolchain release boundaries, LTS and exact exceptions', async () => {
   assert.match(result.output, /checks passed/);
 });
 
+test('package update selects latest stable runtimes and stops safely on failure', async () => {
+  const invalid = await run(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(root, 'scripts/update-packages.ps1'),
+      '-CheckOnly',
+      '-UnknownUpdateOption',
+    ],
+    root,
+  );
+  assert.notEqual(invalid.code, 0, invalid.output);
+  const result = await run(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(__dirname, 'package-update.tests.ps1'),
+    ],
+    root,
+  );
+  assert.equal(result.code, 0, result.output);
+  assert.match(result.output, /checks passed/);
+});
+
 test('real pnpm enforces age for direct, transitive and frozen dependencies', async () => {
   const folder = fs.mkdtempSync(path.join(root, '.artifacts', 'release-age-'));
   const old = new Date(Date.now() - 30 * 86400000).toISOString();
@@ -88,6 +118,16 @@ test('real pnpm enforces age for direct, transitive and frozen dependencies', as
     'dist-tags': { latest: '1.0.0' },
     versions: { '1.0.0': manifest('age-undated', '1.0.0') },
   };
+  packages.electron = {
+    name: 'electron',
+    'dist-tags': { latest: '45.0.0', beta: '46.0.0-beta.1' },
+    time: { '44.9.3': old, '45.0.0': recent, '46.0.0-beta.1': recent },
+    versions: {
+      '44.9.3': manifest('electron', '44.9.3'),
+      '45.0.0': manifest('electron', '45.0.0'),
+      '46.0.0-beta.1': manifest('electron', '46.0.0-beta.1'),
+    },
+  };
   const policy = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8');
   function fixture(name, dependencies, extra = '') {
     const cwd = path.join(folder, name);
@@ -136,9 +176,30 @@ test('real pnpm enforces age for direct, transitive and frozen dependencies', as
     const restore = await install(frozen, ['--frozen-lockfile']);
     assert.notEqual(restore.code, 0, restore.output);
     assert.match(restore.output, /RELEASE_AGE|release age|minimumReleaseAge/i);
+    const runtime = fixture('electron-latest', { electron: '44.9.3' });
+    const initialRuntime = await install(runtime);
+    assert.equal(initialRuntime.code, 0, initialRuntime.output);
+    const updatedRuntime = await run(
+      pnpm,
+      ['update', '--latest', '--lockfile-only', '--ignore-scripts', '--reporter=append-only'],
+      runtime,
+    );
+    assert.equal(updatedRuntime.code, 0, updatedRuntime.output);
+    assert.equal(
+      JSON.parse(fs.readFileSync(path.join(runtime, 'package.json'), 'utf8')).dependencies.electron,
+      '45.0.0',
+    );
+    assert.match(
+      fs.readFileSync(path.join(runtime, 'pnpm-lock.yaml'), 'utf8'),
+      /version: 45\.0\.0/,
+    );
+    assert.match(
+      fs.readFileSync(path.join(runtime, 'pnpm-workspace.yaml'), 'utf8'),
+      /- 'electron'/,
+    );
     fs.writeFileSync(
       path.join(folder, 'result.json'),
-      JSON.stringify({ checks: 5, passed: true }, null, 2),
+      JSON.stringify({ checks: 6, passed: true }, null, 2),
     );
   } finally {
     await new Promise((resolve) => server.close(resolve));

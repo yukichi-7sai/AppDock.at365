@@ -75,7 +75,7 @@ Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして�
 .\dev.bat exec node scripts/smoke.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe
 ```
 
-Node.js／pnpmの更新は、`toolchain.json` の完全なバージョン番号を変更してから `.\setup-tools.bat` を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは `.tools/node/<version>` と `.tools/pnpm/<version>` に残すので、設定を戻してsetupを実行すると切り戻せます。winget等の更新対象にはなりません。更新後は `.\dev.bat run typecheck`、`.\dev.bat test`、`.\publish.bat` で確認してください。
+Node.jsを含む通常のパッケージ更新は、下記の`.\update-packages.bat`を使います。pnpmの更新や固定版への切り戻しは、`toolchain.json`の完全なバージョン番号を変更してから`.\setup-tools.bat`を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは`.tools/node/<version>`と`.tools/pnpm/<version>`に残します。winget等の更新対象にはなりません。更新後は`.\dev.bat run typecheck`、影響範囲の回帰、`.\publish.bat`で確認してください。
 
 現在の固定ツールはNode.js 24.22.1（24 LTS）とpnpm 12.10.1です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。
 
@@ -85,27 +85,31 @@ Electron 44.9.3はバイナリを初回実行時に取得するため、[公式�
 .\dev.bat run postinstall
 ```
 
-依存更新は`.\dev.bat update --latest`、残りの確認は`.\dev.bat outdated --format json`です。安定版の直接依存と、それが要求する間接依存をlockfileに固定します。Node系Appletは本体のツールチェーンを共有し、.NET系Appletは共通SDKを参照します。変更が影響するAppletの既存回帰テストも実行してください。
+パッケージ更新は`.\update-packages.bat`を使います。公式メタデータから最新安定版のElectronと最新LTSのNode.jsを選び、Nodeの固定版を更新してsetupを実行し、Electronを完全版指定で追加してからほかの直接依存を`update --latest`で更新します。Electronはメジャー番号をまたぐ更新も対象です。NodeのCurrent版とElectronのbeta/nightlyは選びません。更新後は選んだ版と間接依存をtoolchain.json・package.json・lockfileへ固定します。
+
+`.\update-packages.bat -CheckOnly`は候補の取得・検証だけを行い、ファイルや導入済みのツールを変更しません。公式情報を取得・検証できなければ停止し、古い候補へ黙って切り替えません。setup失敗時はNodeの指定を戻します。setup後の依存更新で失敗した場合は途中までの変更を残して停止するため、差分を確認してから再実行してください。残りの確認は`.\dev.bat outdated --format json`です。`dev.bat update`はpnpm単独の低水準操作で、Node更新を含まないため通常のパッケージ更新の入口には使いません。
+
+通常のsetup・install・ビルド・発行では固定版を使い、最新版の選択は更新操作のときだけ行います。Node系Appletは本体のツールチェーンを共有し、.NET系Appletは共通SDKを参照します。更新後は型検査・影響範囲の回帰・発行物を確認し、Electronやbuilderのメジャー更新ではportableとGUIの互換性も確認してください。
 
 ### 依存とツールの公開後待機
 
-通常更新は各バージョンの公開から7日待機します。`pnpm-workspace.yaml`の`minimumReleaseAge: 10080`（分）、`minimumReleaseAgeStrict: true`、`minimumReleaseAgeIgnoreMissingTime: false`を使い、実行時・開発用・間接依存へ適用します。条件を満たす版がなければ停止し、公開日時がない場合も停止します。既存lockfileを使ったインストールにも適用するため、若い版を別環境から持ち込んでも待機を回避できません。`outdated`に新版が残っても、待機中なら無理に導入しません。日数を変える場合は`toolchain.json`の`minimumReleaseAgeDays`も揃えます。setupは両設定の一致を確認します。
+ElectronとNode.jsは公開後7日の待機対象から恒久的に除外します。`toolchain.json`の`releaseAgeExemptPackages`と、pnpmの`minimumReleaseAgeExclude`にある`electron`を正本とします。パッケージ名全体での免除はこの2つだけです。ほかの実行時・開発用・間接依存は、`minimumReleaseAge: 10080`（分）、`minimumReleaseAgeStrict: true`、`minimumReleaseAgeIgnoreMissingTime: false`により各版の公開から7日待機します。条件を満たす版がなければ停止し、公開日時がない場合も停止します。既存lockfileの復元にも同じ待機設定を適用します。日数を変える場合は`toolchain.json`の`minimumReleaseAgeDays`も揃えます。
 
-`verifyDepsBeforeRun: error`により、`dev.bat run`によるビルド・試験前に依存の不整合があれば自動インストールせず停止します。導入・復元は明示的な`dev.bat install --frozen-lockfile`、依存版更新は`dev.bat update --latest`で行います。`publish.bat`は発行前に`dev.bat install --frozen-lockfile`を実行し、現在のworkspaceと固定依存を同期します。同期が非0で終わったら、その終了コードを返して発行を開始しません。同期と発行の両方が成功した場合だけ終了0となります。
+`verifyDepsBeforeRun: error`により、`dev.bat run`によるビルド・試験前に依存の不整合があれば自動インストールせず停止します。導入・復元は明示的な`dev.bat install --frozen-lockfile`、依存版更新は`update-packages.bat`で行います。`publish.bat`は発行前に`dev.bat install --frozen-lockfile`を実行し、現在のworkspaceと固定依存を同期します。同期が非0で終わったら、その終了コードを返して発行を開始しません。同期と発行の両方が成功した場合だけ終了0となります。
 
 `package.json`の製品バージョンを変更した場合も、pnpmが記録するworkspaceの版との不一致で`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`になることがあります。`publish.bat`だけを実行すれば発行前に記録が同期されるため、製品の版更新後に手動でinstallする必要はありません。`dev.bat run typecheck`などを先に行う場合は、`dev.bat install --frozen-lockfile`で同期してください。同期には固定lockfileと公開後待機・供給網検査を適用し、検査の失敗を無視しません。復元後にTypeScriptの構文エラーが出る場合は、報告されたソースを修正して型検査を通します。依存の再インストールだけではソースの構文エラーは直りません。
 
-公開後待機の例外は設定ファイルの完全版指定を正本とし、依存更新時に必要性を確認します。`minimumReleaseAgeExcludePrune: true`でlockfileから消えた版の例外を整理します。導入済みの固定pnpmは再利用し、新規取得には待機条件を適用します。
+ElectronとNode以外の公開後待機の例外は完全版指定とし、依存更新時に必要性を確認します。`minimumReleaseAgeExcludePrune: true`でlockfileから消えた版の例外を整理します。Electronのパッケージ全体の免除は恒久設定として残します。導入済みの固定pnpmは再利用し、新規取得には待機条件を適用します。
 
-Node.jsは`toolchain.json`で完全な版を固定し、`nodeChannel: "lts"`を維持します。現在の24.22.1はKrypton LTSです。新規取得前に公式の`dist/index.json`で対象版のLTS表示と公開日を確認します。公開日が日単位なので、そのUTC日が終わってから7日待ちます。導入済みNodeは実行ファイル自身のLTS表示を確認して再利用します。
+Node.jsは`toolchain.json`で完全な版を固定し、`nodeChannel: "lts"`を維持します。現在の24.22.1はKrypton LTSです。更新時は公式の`dist/index.json`から最新LTSを数値で比較して選び、新規取得前にも対象版のLTS表示と公開日を確認します。待機日数だけを免除し、公式SHA256照合と実行ファイルのLTS表示・版の確認は維持します。通常setupは指定された固定版を再利用します。
 
 pnpm本体はnpmで導入するため、workspace設定だけでは保護されません。setupは公式npmレジストリで固定版のpnpmとWindows x64ネイティブパッケージの公開日時を確認し、npmにも`--min-release-age=7`を渡します。新規取得でメタデータの取得・検証に失敗したら停止します。導入済みの固定ツールは再利用し、通常ビルドのたびにツール公開情報を取得しません。
 
-重大なセキュリティ修正を急いで導入する場合は、出所・告知・差分を確認し、対象の完全な版だけを例外にします。npm依存は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`へ`package-name@1.2.3`を追加し、理由をコメントとVERIFICATIONへ記録します。名前だけやワイルドカードで全バージョンを除外しません。ツールは`toolchain.json`の`releaseAgeExceptions`へ`{"package":"pnpm","version":"12.10.1","reason":"確認した修正内容"}`形式で記録します（これは書式例です）。対象は`node`、`pnpm`、`@pnpm/exe.win32-x64`です。pnpmとそのバイナリはそれぞれ確認し、必要ならそれぞれ版指定で例外にします。Nodeの例外は待機日数だけを免除し、LTS要件や公開日時の確認は維持します。待機期間経過後や対象版の不使用時に例外を取り除きます。
+ほかのパッケージの重大なセキュリティ修正を急いで導入する場合は、出所・告知・差分を確認し、対象の完全な版だけを例外にします。npm依存は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`へ`package-name@1.2.3`を追加し、理由をコメントとVERIFICATIONへ記録します。Electron以外を名前だけやワイルドカードで除外しません。ツールは`toolchain.json`の`releaseAgeExceptions`へ`{"package":"pnpm","version":"12.10.1","reason":"確認した修正内容"}`形式で記録します（書式例）。pnpmと`@pnpm/exe.win32-x64`は個別に確認し、待機期間経過後や対象版の不使用時に例外を取り除きます。
 
-現在の待機例外はNode.js `24.22.1`とElectron `44.9.3`だけです。[Nodeのセキュリティ告知](https://nodejs.org/en/blog/release/v24.22.1)と[eMudhra対策案内](https://emudhra.we-have-a-problem.com/)・[Electronの修正](https://releases.electronjs.org/release/v44.9.3)を確認し、失効した証明書の拒否と正常サイトへの接続を実測して採用します。Electron内蔵のNodeと開発用Nodeは別に照合し、版名だけで対策の有無を決めません。
+0.83.0は[Nodeのセキュリティ告知](https://nodejs.org/en/blog/release/v24.22.1)と[eMudhra対策案内](https://emudhra.we-have-a-problem.com/)・[Electronの修正](https://releases.electronjs.org/release/v44.9.3)を確認し、失効した証明書の拒否と正常サイトへの接続を実測して採用しています。Electron内蔵のNodeと開発用Nodeは別に照合し、版名だけで対策の有無を決めません。恒久免除の[pnpm公式仕様](https://github.com/pnpm/pnpm/blob/main/pnpm/docs/settings/dependency-resolution.md#minimumreleaseageexclude)も参照してください。
 
-待機は不正コードの検出を保証する機能ではありません。lockfile固定、導入前の告知・差分確認、導入後の必要な回帰確認も継続します。仕組みの回帰は`node --test tests/release-age.test.cjs`（ローカルNodeを使用）で、公開時刻の境界、版限定例外、非LTS拒否、pnpm実体の直接・間接・日時欠落・lockfile復元時の拒否を隔離レジストリで確認します。
+待機は不正コードの検出を保証する機能ではありません。lockfile固定、導入前の告知・差分確認、導入後の必要な回帰確認も継続します。仕組みの回帰は`dev.bat exec node --test tests/release-age.test.cjs`で、公開時刻の境界、恒久免除と版限定例外、最新安定版/LTSの選択と取得失敗、pnpm実体のElectron即時更新・ほかの直接/間接依存・日時欠落・lockfile復元時の拒否を隔離レジストリで確認します。
 
 `.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 

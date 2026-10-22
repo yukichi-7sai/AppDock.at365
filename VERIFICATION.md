@@ -2,6 +2,28 @@
 
 対象の現行版は`0.83.0`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
 
+## 2026-10-22: ランタイム更新規則のコミット前確認
+
+- 利用者から追加の更新規則のcommit/push指示を受領。main/origin/main、未stageの対象11パスと実効author/committer、GitHub/AQUAのmain先端`248f35a`を照合した。未コミット変更を保持し、pull/stash/resetは行わない。
+- 実装完了時のmanifest11ファイル・完全ログ5件のSHA256が現在と全て一致した。方針fixture24項目・更新fixture16項目・実pnpm6群を含む関連3テスト（fail/skip 0）、frozen installとsetup2回の成功を再利用する。製品コード・package.json・lockfile・固定ツールに後続変更がなく、追加の製品回帰・版更新・再発行は不要と判断した。今回の追記は本項の記録のみ。
+- 対象一覧、再利用元/入力照合、stageと実ファイル・tree・実効identity、commitと各push先mainの照合結果を`.artifacts/commit-validation-runtime-policy-20261022/validation.json`へ記録する。今回の11ファイルだけをコミットし、設定済みのGitHub/AQUAへ通常pushする。
+
+## 2026-10-22: 0.83.0の公開完了・過去Release整理
+
+- 本体`248f35a`、WallpaperSlideshowの生成元記録`8454f59`をGitHub/AQUAへpushし、今回の全体ZIPに同梱した7Appletを照合した。型検査・標準832件の成功は入力hash一致を確認して再利用し、publish・全体ZIP・固定EXEのsmoke/倍率11群/画像9群/信頼診断、portable更新13群・進捗9群・復旧8群、壁紙履歴10群と全体ZIP起動を新たに確認した。UI driverの適応は当該フォルダーの元/変更後hashを記録し、旧ページ構造や既定OFFへの期待だけを現行仕様へ合わせて検査を維持した。
+- 本体[0.83.0](https://github.com/yukichi-7sai/AppDock.at365/releases/tag/v0.83.0)、[Profile 0.1.0](https://github.com/yukichi-7sai/Applet.Profile.at365/releases/tag/v0.1.0)、[WallpaperSlideshow 0.7.2](https://github.com/yukichi-7sai/Applet.WallpaperSlideshow.at365/releases/tag/v0.7.2)、[WebApplet 0.3.1](https://github.com/yukichi-7sai/Applet.WebApplet.at365/releases/tag/v0.3.1)を公開した。既存のGmail 0.12.1・Watch 0.1.5・WebBrowserTools 0.3.4・WindowsTools 0.2.2は再作成しなかった。
+- 全8repoの匿名ダウンロードsize/SHA256、feedのID/版/payload、実更新検出のavailable/installable/最新版本を照合してから、今回指定された過去の公開Release **16件** を削除した。8repoとも最新の公開Release **1件ずつ** を保持した。通常の最新3件保持は今回の明示指示で1件へ変更し、下書きと削除前のGitタグ参照を維持した。本体0.82.0の下書きは非公開のまま保持した。
+- 正式EXEは **169152526 bytes / SHA256 `b3c1d1cc6d964d65df2288ced29fd59dc79c68c0bd52cf01ed42c0eb40c70a75`**、全体ZIPは **285321188 bytes / SHA256 `2e9ebc8a906e99587055f19d176565714587384618530d1141b7ba9dda09d976`**。正式再発行で前回通常publishのhashから変わったため、新しいEXEを固定して全GUIを再確認した。最終時点でもローカル配布物と公開検証済みhashの一致を再確認した。
+- source/asset封印、全コマンド・終了コード・ログhash、匿名取得、更新判定、削除前の候補16件・各削除結果・保持したdraft/tagは`.artifacts/release-0.83.0-20261022/`の`plan.json`、`applet-plans.json`、`all-eight-public-verification.json`、`latest-only-cleanup-plan.json`、`latest-only-cleanup-results.json`を正本とする。GitHub作成直後に一覧への反映が遅れた際は、既存draftのID/commit/本文を確認して不足アセット登録だけを再開した。公開済みアセットの上書きや実利用先deployは行っていない。
+
+## 2026-10-22: Release完了後のElectron/Node恒久待機免除
+
+- 全Releaseと過去16件の整理が完了してから着手した。cleanなmain/origin/mainを確認してpull --ff-only成功。`releaseAgeExemptPackages`をNode/Electronだけに限定し、pnpmのElectron免除を版指定からパッケージ全体へ変更した。ほかの依存・pnpm本体/Windows実体の7日待機、公開日時検査、Node LTS/SHA256検査は維持した。
+- `update-packages.bat`を更新入口として追加した。公式Node indexの最新LTSとnpmのElectron latest安定版を選び、Nodeの固定版とローカルsetup、Electronの完全版指定、ほかの依存更新の順に実行する。取得/検証失敗では停止し、setup失敗時は元のtoolchain.jsonを復元する。通常ビルドは固定版を使う。開発手順とAGENTSの今後の更新規則を揃えた。
+- レビューで選択元・安定版/LTS限定・完全版固定・失敗時停止・junction共有禁止・通常ビルドへの影響を確認し、未解決の指摘なし。Windows PowerShellの方針fixture **24項目**、更新fixture **16項目**、実pnpmの隔離レジストリ **6群** を含む関連3テストが成功（fail/skip 0）。最新版の数値順、beta/Current除外、日時欠落・通信/コマンド失敗、setup後の復元、Electronの即時更新と他依存の待機を確認した。
+- `-CheckOnly`の実接続はNode **24.22.1 LTS / Krypton** とElectron **45.0.0** を選択した。今回の依頼は更新規則の設定なので候補照会までとし、新たな依存更新は実行していない。公開済み0.83.0のElectron **44.9.3**・開発Node **24.22.1**、package.json/lockfile/配布物を維持した。設定変更後のfrozen install（403 entries）とsetup2回も成功し、固定環境のhashは不変。製品コード/依存/配布物の変更がないため、追加の製品版更新・再発行・全製品回帰は行わず、公開時の成功結果を保持した。追加の更新規則の差分は未コミット。
+- 証跡は`.artifacts/runtime-update-policy-20261022/`と更新fixtureの結果JSON。今回の新しいfixtureは同方式の成功分3回以内を保持し、release-age旧方式も今回の直近3回を保持した。Release/失敗/比較・再利用資料と他作業は保護し、今回作成した成功済み更新fixtureの古い1件だけを削除して直近3回を保持した（cleanup.json）。制限内ではCIM照会不可だったため同一照会を通常ユーザーで再実行し、該当する試験用Electron/Node/.NETプロセス0を確認した。記録・公開物の最終一致確認を除き、後続の製品変更はない。
+
 ## 2026-10-22: eMudhra対策とランタイム更新（0.83.0）
 
 - cleanなmain `ecb1603`から`pull --ff-only`で最新を確認。利用者指定によりマイナーを0.83.0へ更新し、Electron 44.6.0→44.9.3、開発用Node 24.21.0→24.22.1 LTSを採用した。lockfileの製品依存差分はElectronだけ。pnpm 12.10.1・builder 26.15.3とportable template、設定・保存・公開APIは維持する。
