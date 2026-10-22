@@ -4,9 +4,10 @@
 
 ## 2026-10-22: 0.82.0のGitHub Release準備
 
-- 利用者から0.82.0のRelease指示を受領。GitHubではv0.82.0が未公開、直近公開版はv0.68.1であることを確認した。対象本体は`bfe63f9`、同梱候補7Appletはすべてcleanなmain。公開済み同版は上書きせず、未公開のProfile 0.1.0・WallpaperSlideshow 0.7.2・WebApplet 0.3.0を本体と合わせて扱う。
+- 利用者から0.82.0のRelease指示を受領。GitHubではv0.82.0が未公開、直近公開版はv0.68.1であることを確認した。対象本体の製品実装は`bfe63f9`、同梱候補は7Applet。公開済み同版は上書きせず、未公開のProfile 0.1.0・WallpaperSlideshow 0.7.2・WebApplet 0.3.1を本体と合わせて扱う。
 - 本体の実装時型検査と標準832件、固定EXE GUI11群/smokeの記録を照合した。Release Prepareのregressionには単一の`dev.bat test`全成功ログが必要なため、部分ログの合算で代用せず、今回の準備で実行する。typecheckは製品/試験/依存入力の一致と文書だけの差分を確認して再利用する。
-- リリースノートは[docs/releases/v0.82.0.md](docs/releases/v0.82.0.md)。準備・新規発行物・更新/復旧/全体ZIP・Applet個別公開・匿名取得/更新検出・最新3件保持の実測結果、各コマンド/終了コード/完全ログ/size/SHA256、対象commitと公開URLの記録先は`.artifacts/release-0.82.0-20261022/`とし、最終状態は同フォルダーの`plan.json`およびApplet公開結果を正本とする。実利用先deployは今回の範囲に含めない。
+- 最初の準備では標準832/832とpublishが成功したが、同梱WebAppletの共通画像API型不足によりpackが停止し、外部公開は行っていない。WebAppletのみを0.3.1へ互換修正し、標準2件/build/publishと固定本体の共通画像GUI9群で確認。本体の製品変更・版更新は行わない。旧GUIの独立ページ待機は、検査内容を維持したdriverで本体documentへ適応した。
+- リリースノートは[docs/releases/v0.82.0.md](docs/releases/v0.82.0.md)。初回の完全記録は`.artifacts/release-0.82.0-20261022/`へ保持し、修正後の新規plan・配布物・更新/復旧/全体ZIP・Applet個別公開・匿名取得/更新検出・最新3件保持の実測結果、各コマンド/終了コード/完全ログ/size/SHA256、対象commitと公開URLの最終記録先は`.artifacts/release-0.82.0-20261022-final/plan.json`および同フォルダーのApplet公開結果とする。実利用先deployは今回の範囲に含めない。
 
 ## 2026-10-22: 表示倍率0.82.0の動作確認後コミット
 
