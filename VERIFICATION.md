@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-24: Webアカウント設定0.86.3のコミット・プッシュ前照合
+
+- 実装時の653入力・完全ログ15件と現在のSHA256一致、発行EXEとGUI2種/smokeコピーの一致を確認し、型検査/build・関連26件・固定EXE GUI7+10群・smokeの成功を再利用した。未実行だった残りの標準回帰825件を通常権限で追加実行し、合計851/851成功、fail/skip 0。実装時からの製品変更・版更新・再発行なし。
+- 対象12ファイルを再レビューし、追加指摘なし。実効author/committerとGitHub/AQUA両mainの開始時先端`cd42150200470d879bb8625d519598ea7c2aa447`を確認した。stage/作業ファイル・最終tree・commitと送信先mainの照合は`.artifacts/commit-validation-web-account-list-0863/`へ記録する。実装時の資料と今回の回帰ログは保持する。GitHub Release/実利用deployは行わない。
+
+## 2026-10-24: Webアカウント設定の共通一覧化 0.86.3
+
+- cleanなmain `cd42150`から開始し、`git pull --ff-only`で最新一致。設定・保存ファイル・公開APIの変更を伴わないレイアウト変更のため0.86.2→0.86.3へパッチ更新した。今回分は未commit、push/Release/実利用deployなし。
+- アカウントごとの独自カードを「名前・使用先・操作」の3列へ変更。件数・上限、見出し横の共通＋、32pxのクリア/削除アイコンを配置し、名前のblur/Enter確定・Escape取消・IME/二重送信抑制、使用中の削除禁止、ホストの警告確認と保存処理を保持した。既存SettingsListTableの表枠をSettingsListLayoutとして共用し、使用先の折り返しと入力幅を共通CSSへ集約。重要な説明と共通エラー領域を維持した。追加ルールはdocs/settings-list-editing.md、利用仕様はdocs/web-applets.md。
+- 発行前自己レビューを1回実施。折り返し指定が後続のnowrap指定に上書きされる問題を修正し、長い使用先名のGUIで再確認した。未解決の製品差分指摘なし。型検査/build、関連回帰26/26（WebProfileStore、PageCollection、設定編集、object-list、翻訳）成功。標準全回帰は表示変更に対する実装段階の範囲として未実行。
+- 隔離したソースGUIでWebアカウント7群と既存一覧10群が成功。発行EXEでもWebアカウント7群、共通一覧10群、smoke成功。明暗・通常/最小幅（1280/760指定、ウィンドウの最小幅制約あり）・ヒントON/OFF、長い名前/使用先、空/32枠上限、Enter/blur/Escape/IME、不正入力保持とエラー時の配置、参照中ガード、クリア/削除の取消/確定、実プロセス再起動後のID/名前保持を確認。画像も目視確認した。renderer error 0。確認画面の応答はfixtureで与えたもので、Windowsネイティブ画面の物理操作・実ログインは未検証。
+- 固定EXEの最初の2回は、サイズ変更のviewport操作と試験の設定変更が重なりrevision競合を検出した。試験側だけを、名前確定後のflush、表示ページからのテーマ変更、リサイズ後のhostWidth投影一致待ちへ修正し、同じEXEで再検証して成功。発行後の製品変更はない。途中の失敗ログも保持した。制限内のDNS・一時ファイル置換EPERM・GUI接続EACCES・依存確認停止は、同じ処理を通常権限で実行して確認した。依存版/lockfile/供給網検査は維持。
+- `publish.bat`成功。EXEのFileVersion/ProductVersion、update.json、同梱package/Default Shellは0.86.3。170,670,769 bytes、SHA256 `569880f5ef3c87b9e30124d149b0a47987ee5c00b0d6deb5809c210760460714`。GUI2種とsmokeコピーの一致、同梱日本語JSONとソース一致、653入力の最終hashを確認。証跡は`.artifacts/web-account-list-20261024/validation.json`、review.json、完全ログ。固定GUIは`.artifacts/settings-hints-ui-1792773000143/`と`settings-hints-ui-1792773030646/`、smokeは`.artifacts/smoke-1792773062333/`。
+- テストランナーの終了を確認。今回の成功/失敗profileは検証資料として保持し、既存の関連24資料は他作業の使用状況・再利用保護を未確認のため自動削除せず、削除0件。確認結果と一覧はcleanup.json/cleanup-inventory.jsonへ記録した。
+
 ## 2026-10-24: 共通処理翻訳0.86.2のコミット前照合
 
 - 実装時と現在の686入力、完全ログ10件、native出力2件、固定EXE/同梱日本語JSON/Default Shell、GUI・smokeコピーのSHA256一致を確認した。型検査/build、最終標準851件、固定EXEの設定翻訳GUI7群・共通サービスGUI4群・smokeの成功を再利用。途中段階の対象37件は最終851件に包含されるため、最終ソースの証明には使わない。

@@ -26,6 +26,8 @@ A:/40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-appletをAppDockのex
 
 アカウントはApplet所有範囲で隔離します。同じ枠のサイトだけがログイン状態を共有し、GmailのwebAccountsとは別です。枠の名前はblur/Enterで即時保存し、Escapeで保存前の値に戻せます。枠の操作は設定revisionを変えません。使用中の枠は削除できず、クリア/削除にはホスト警告確認が必要です。取消を既定とし、削除待ち・junction拒否・外部同期との競合検査を維持します。
 
+本体の「Webアカウント」設定は、共通の一覧枠で「名前・使用先・操作」の3列を表示します。件数と上限は一覧上部、追加の「＋」は名前の列見出しの横に置きます。名前は一覧内で直接編集し、クリア・削除は右端の共通アイコンから操作します。使用先は登録サイト名を表示し、未使用の枠も判別できます。削除・クリアの重要な説明はヒントを非表示にしても残ります。
+
 noneは開始文書とhash移動、same-originは同じscheme/host/port、anyはHTTP(S)へのトップレベル遷移を許可します。allowedOriginsは認証先等の完全なoriginを追加します。redirect/window.open/履歴にも同じ規則を適用します。画像や通信全体を遮断するネットワークフィルターではありません。
 
 remoteページはsandbox/contextIsolation/webSecurityを有効にし、preload/Node/ホストIPCを公開しません。サイトのデバイス権限は拒否します。CookieやURLのquery/fragmentを外部操作APIへ返しません。

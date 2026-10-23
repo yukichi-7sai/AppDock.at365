@@ -1932,8 +1932,7 @@ summary {
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.web-applet-settings,
-.web-account-settings {
+.web-applet-settings {
   display: grid;
   gap: 14px;
   min-width: 0;
@@ -1991,28 +1990,6 @@ summary {
 .web-applet-form textarea {
   width: 100%;
   min-width: 0;
-}
-.web-account-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.web-account-row input {
-  flex: 1;
-  min-width: 150px;
-}
-.web-account-card {
-  display: grid;
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  min-width: 0;
-}
-.web-account-card p {
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 .ribbon-setting-list {
   display: grid;

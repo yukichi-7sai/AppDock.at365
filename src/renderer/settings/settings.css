@@ -353,7 +353,6 @@
   flex-wrap: wrap;
   padding-block: 8px;
 }
-.settings-panel .web-account-card,
 .settings-panel .gesture-settings-card {
   background: var(--settings-group-background);
 }

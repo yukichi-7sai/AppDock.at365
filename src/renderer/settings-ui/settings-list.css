@@ -51,9 +51,18 @@
   width: 50%;
   min-width: 170px;
 }
+.settings-list-primary > input {
+  width: 100%;
+  min-width: 0;
+}
 .settings-list th,
 .settings-list td:not(.settings-list-primary) {
   white-space: nowrap;
+}
+.settings-list td.settings-list-wrap {
+  min-width: 150px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .settings-list-index {
   width: 1%;

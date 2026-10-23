@@ -20,7 +20,11 @@ export function settingsListText(
   );
 }
 
-export function ListIcon({ kind }: { kind: 'edit' | 'pencil' | 'delete' | 'order' | 'open' }) {
+export function ListIcon({
+  kind,
+}: {
+  kind: 'edit' | 'pencil' | 'delete' | 'clear' | 'order' | 'open';
+}) {
   return (
     <svg
       width="18"
@@ -42,6 +46,8 @@ export function ListIcon({ kind }: { kind: 'edit' | 'pencil' | 'delete' | 'order
         <path d="m16 3 5 5L9 20l-6 1 1-6L16 3Zm-2 2 5 5M4 15l5 5" />
       ) : kind === 'delete' ? (
         <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+      ) : kind === 'clear' ? (
+        <path d="m14 3 7 7-10 10H6l-4-4L14 3Zm-7 8 7 7M11 20h10" />
       ) : kind === 'order' ? (
         <path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4" />
       ) : (
@@ -73,6 +79,31 @@ export function SettingsListAddButton({
     </button>
   );
 }
+
+/** Shared table frame for declared lists and lists with inline controls. */
+export function SettingsListLayout({
+  title,
+  toolbar,
+  commandListScroll = false,
+  children,
+}: {
+  title: string;
+  toolbar: ReactNode;
+  commandListScroll?: boolean;
+  children: ReactNode;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useCommandListScroll(scrollRef, commandListScroll);
+  return (
+    <div className="settings-list">
+      {commandListScroll ? <CommandListToolbar>{toolbar}</CommandListToolbar> : toolbar}
+      <div className="settings-list-scroll" ref={scrollRef}>
+        <table aria-label={title}>{children}</table>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsListTable({
   definition,
   entries,
@@ -113,8 +144,6 @@ export function SettingsListTable({
   toolbarFilter?: ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useCommandListScroll(scrollRef, commandListScroll);
   const view = definition.list!;
   const fields = definition.fields ?? [];
   const display = (entry: Record<string, unknown>, key: string) =>
@@ -155,9 +184,11 @@ export function SettingsListTable({
     </>
   );
   return (
-    <div className="settings-list">
-      {commandListScroll ? (
-        <CommandListToolbar>
+    <SettingsListLayout
+      title={definition.title}
+      commandListScroll={commandListScroll}
+      toolbar={
+        commandListScroll ? (
           <CommandListSummary
             className="settings-list-toolbar"
             filter={toolbarFilter}
@@ -165,166 +196,162 @@ export function SettingsListTable({
           >
             {count}
           </CommandListSummary>
-        </CommandListToolbar>
-      ) : (
-        <div className="settings-list-toolbar">
-          {count}
-          <div>{actions}</div>
-        </div>
-      )}
-      <div className="settings-list-scroll" ref={scrollRef}>
-        <table aria-label={definition.title}>
-          <thead>
-            <tr>
-              {view.showIndex && (
-                <th>{definition.itemTitle ?? translate('settings.settingsListTable.item')}</th>
+        ) : (
+          <div className="settings-list-toolbar">
+            {count}
+            <div>{actions}</div>
+          </div>
+        )
+      }
+    >
+      <thead>
+        <tr>
+          {view.showIndex && (
+            <th>{definition.itemTitle ?? translate('settings.settingsListTable.item')}</th>
+          )}
+          {view.columns.map((key) => (
+            <th key={key}>
+              {addInTitle && key === view.titleKey ? (
+                <span className="settings-list-heading">
+                  {fields.find((field) => field.key === key)!.title}
+                  <SettingsListAddButton
+                    label={translate('settings.settingsListTable.add', {
+                      value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
+                    })}
+                    disabled={busy || !canAdd || entries.length >= maxItems}
+                    onClick={onAdd}
+                  />
+                </span>
+              ) : (
+                fields.find((field) => field.key === key)!.title
               )}
+            </th>
+          ))}
+          {view.enabledKey && (
+            <th className="settings-list-state">
+              {translate('settings.settingsListTable.enabled')}
+            </th>
+          )}
+          <th className="settings-list-actions-heading">
+            {translate('settings.settingsListTable.actions')}
+          </th>
+          {navigation && (
+            <th className="command-settings-heading">
+              {translate('settings.settingsListTable.navigation')}
+            </th>
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map((entry, index) => {
+          const name = view.showIndex
+            ? `${definition.itemTitle ?? translate('settings.settingsListTable.item')}${index + 1}`
+            : display(entry, view.titleKey);
+          const legacyIcon =
+            view.iconKey &&
+            typeof entry[view.iconKey] === 'string' &&
+            /^data:image\/(?:png|jpeg|webp);base64,/.test(String(entry[view.iconKey]))
+              ? String(entry[view.iconKey])
+              : undefined;
+          return (
+            <tr key={view.idKey ? String(entry[view.idKey]) : index} data-list-index={index}>
+              {view.showIndex && <td className="settings-list-index">{index + 1}</td>}
               {view.columns.map((key) => (
-                <th key={key}>
-                  {addInTitle && key === view.titleKey ? (
-                    <span className="settings-list-heading">
-                      {fields.find((field) => field.key === key)!.title}
-                      <SettingsListAddButton
-                        label={translate('settings.settingsListTable.add', {
-                          value:
-                            definition.itemTitle ?? translate('settings.settingsListTable.item'),
-                        })}
-                        disabled={busy || !canAdd || entries.length >= maxItems}
-                        onClick={onAdd}
+                <td
+                  key={key}
+                  className={key === view.titleKey ? 'settings-list-primary' : undefined}
+                >
+                  {key === view.titleKey ? (
+                    <div className="settings-list-title">
+                      <RegisteredImagePreview
+                        value={view.imageKey ? entry[view.imageKey] : null}
+                        fallback={legacyIcon}
                       />
-                    </span>
+                      <div>
+                        <strong className="command-title">
+                          {display(entry, key) || translate('settings.settingsListTable.unset')}
+                          {titleExtra?.(entry)}
+                        </strong>
+                        {view.descriptionKey && display(entry, view.descriptionKey) && (
+                          <small>{display(entry, view.descriptionKey)}</small>
+                        )}
+                      </div>
+                    </div>
                   ) : (
-                    fields.find((field) => field.key === key)!.title
+                    display(entry, key)
                   )}
-                </th>
+                </td>
               ))}
               {view.enabledKey && (
-                <th className="settings-list-state">
-                  {translate('settings.settingsListTable.enabled')}
-                </th>
-              )}
-              <th className="settings-list-actions-heading">
-                {translate('settings.settingsListTable.actions')}
-              </th>
-              {navigation && (
-                <th className="command-settings-heading">
-                  {translate('settings.settingsListTable.navigation')}
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((entry, index) => {
-              const name = view.showIndex
-                ? `${definition.itemTitle ?? translate('settings.settingsListTable.item')}${index + 1}`
-                : display(entry, view.titleKey);
-              const legacyIcon =
-                view.iconKey &&
-                typeof entry[view.iconKey] === 'string' &&
-                /^data:image\/(?:png|jpeg|webp);base64,/.test(String(entry[view.iconKey]))
-                  ? String(entry[view.iconKey])
-                  : undefined;
-              return (
-                <tr key={view.idKey ? String(entry[view.idKey]) : index} data-list-index={index}>
-                  {view.showIndex && <td className="settings-list-index">{index + 1}</td>}
-                  {view.columns.map((key) => (
-                    <td
-                      key={key}
-                      className={key === view.titleKey ? 'settings-list-primary' : undefined}
-                    >
-                      {key === view.titleKey ? (
-                        <div className="settings-list-title">
-                          <RegisteredImagePreview
-                            value={view.imageKey ? entry[view.imageKey] : null}
-                            fallback={legacyIcon}
-                          />
-                          <div>
-                            <strong className="command-title">
-                              {display(entry, key) || translate('settings.settingsListTable.unset')}
-                              {titleExtra?.(entry)}
-                            </strong>
-                            {view.descriptionKey && display(entry, view.descriptionKey) && (
-                              <small>{display(entry, view.descriptionKey)}</small>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        display(entry, key)
-                      )}
-                    </td>
-                  ))}
-                  {view.enabledKey && (
-                    <td>
-                      <button
-                        type="button"
-                        className="toggle settings-list-toggle"
-                        role="switch"
-                        aria-label={translate('settings.settingsListTable.enable', { name: name })}
-                        aria-checked={Boolean(entry[view.enabledKey])}
-                        disabled={busy || canToggle?.(entry, index) === false}
-                        onClick={() => onToggle?.(index)}
-                      >
-                        <span />
-                      </button>
-                    </td>
-                  )}
-                  <td>
-                    <div className="settings-list-actions">
-                      {extra?.(entry, index)}
-                      <button
-                        type="button"
-                        className="settings-list-icon"
-                        title={translate('settings.settingsListTable.edit')}
-                        aria-label={translate('settings.settingsListTable.editLabel', {
-                          name: name,
-                        })}
-                        disabled={busy}
-                        onClick={() => onEdit(index)}
-                      >
-                        <ListIcon kind="edit" />
-                      </button>
-                      <button
-                        type="button"
-                        className="settings-list-icon settings-list-delete"
-                        title={translate('settings.settingsListTable.delete')}
-                        aria-label={translate('settings.settingsListTable.deleteLabel', {
-                          name: name,
-                        })}
-                        disabled={busy}
-                        onClick={() => onDelete(index)}
-                      >
-                        <ListIcon kind="delete" />
-                      </button>
-                    </div>
-                  </td>
-                  {navigation && <td className="command-settings-cell">{navigation(entry)}</td>}
-                </tr>
-              );
-            })}
-            {!entries.length && (
-              <tr>
-                <td
-                  colSpan={
-                    view.columns.length +
-                    (view.enabledKey ? 2 : 1) +
-                    (view.showIndex ? 1 : 0) +
-                    (navigation ? 1 : 0)
-                  }
-                  className="settings-list-empty"
-                >
-                  {addInTitle
-                    ? translate('settings.settingsListTable.emptyHeader', {
-                        title: fields.find((field) => field.key === view.titleKey)!.title,
-                      })
-                    : translate('settings.settingsListTable.emptyButton', {
-                        value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
-                      })}
+                <td>
+                  <button
+                    type="button"
+                    className="toggle settings-list-toggle"
+                    role="switch"
+                    aria-label={translate('settings.settingsListTable.enable', { name: name })}
+                    aria-checked={Boolean(entry[view.enabledKey])}
+                    disabled={busy || canToggle?.(entry, index) === false}
+                    onClick={() => onToggle?.(index)}
+                  >
+                    <span />
+                  </button>
                 </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              )}
+              <td>
+                <div className="settings-list-actions">
+                  {extra?.(entry, index)}
+                  <button
+                    type="button"
+                    className="settings-list-icon"
+                    title={translate('settings.settingsListTable.edit')}
+                    aria-label={translate('settings.settingsListTable.editLabel', {
+                      name: name,
+                    })}
+                    disabled={busy}
+                    onClick={() => onEdit(index)}
+                  >
+                    <ListIcon kind="edit" />
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-list-icon settings-list-delete"
+                    title={translate('settings.settingsListTable.delete')}
+                    aria-label={translate('settings.settingsListTable.deleteLabel', {
+                      name: name,
+                    })}
+                    disabled={busy}
+                    onClick={() => onDelete(index)}
+                  >
+                    <ListIcon kind="delete" />
+                  </button>
+                </div>
+              </td>
+              {navigation && <td className="command-settings-cell">{navigation(entry)}</td>}
+            </tr>
+          );
+        })}
+        {!entries.length && (
+          <tr>
+            <td
+              colSpan={
+                view.columns.length +
+                (view.enabledKey ? 2 : 1) +
+                (view.showIndex ? 1 : 0) +
+                (navigation ? 1 : 0)
+              }
+              className="settings-list-empty"
+            >
+              {addInTitle
+                ? translate('settings.settingsListTable.emptyHeader', {
+                    title: fields.find((field) => field.key === view.titleKey)!.title,
+                  })
+                : translate('settings.settingsListTable.emptyButton', {
+                    value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
+                  })}
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </SettingsListLayout>
   );
 }

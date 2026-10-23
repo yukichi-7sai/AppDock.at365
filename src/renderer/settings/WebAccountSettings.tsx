@@ -1,5 +1,10 @@
 import { useHostTranslation } from '../HostTranslation';
-import { SettingsField } from '../settings-ui/SettingsSections';
+import { CommandListSection, CommandListSummary } from '../settings-ui/CommandListScroll';
+import {
+  ListIcon,
+  SettingsListAddButton,
+  SettingsListLayout,
+} from '../settings-ui/SettingsListTable';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput } from '../settings-ui/SettingsInput';
@@ -53,8 +58,8 @@ function AccountRow({
     }
   }
   return (
-    <div className="web-account-card">
-      <div className="web-account-row">
+    <tr data-account-id={account.id}>
+      <td className="settings-list-primary">
         <SettingsInput
           commitOn="input"
           aria-label={translate('settings.webAccountSettings.nameLabel', { name: account.name })}
@@ -88,27 +93,37 @@ function AccountRow({
             }
           }}
         />
-        <button
-          className="secondary"
-          disabled={busy || !name.trim() || name.trim() === account.name}
-          onPointerDown={(e) => e.preventDefault()}
-          onClick={() => void commit()}
-        >
-          {translate('settings.webAccountSettings.rename')}
-        </button>
-        <button className="secondary" disabled={busy} onClick={clear}>
-          {translate('settings.webAccountSettings.clear')}
-        </button>
-        <button className="text-button danger" disabled={busy || users.length > 0} onClick={remove}>
-          {translate('settings.webAccountSettings.delete')}
-        </button>
-      </div>
-      <p className="muted">
-        {users.length
-          ? translate('settings.webAccountSettings.usedBy', { value: users.join('、') })
-          : translate('settings.webAccountSettings.unused')}
-      </p>
-    </div>
+      </td>
+      <td className="settings-list-wrap">
+        {users.length ? users.join('、') : translate('settings.webAccountSettings.unused')}
+      </td>
+      <td>
+        <div className="settings-list-actions">
+          <button
+            type="button"
+            className="settings-list-icon"
+            title={translate('settings.webAccountSettings.clear')}
+            aria-label={translate('settings.webAccountSettings.clearLabel', { name: account.name })}
+            disabled={busy}
+            onClick={clear}
+          >
+            <ListIcon kind="clear" />
+          </button>
+          <button
+            type="button"
+            className="settings-list-icon settings-list-delete"
+            title={translate('settings.webAccountSettings.delete')}
+            aria-label={translate('settings.webAccountSettings.deleteLabel', {
+              name: account.name,
+            })}
+            disabled={busy || users.length > 0}
+            onClick={remove}
+          >
+            <ListIcon kind="delete" />
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -161,53 +176,83 @@ export function WebAccountSettings({
     target: translate('settings.webAccountSettings.title'),
   });
   return (
-    <SettingsField
-      title={translate('settings.webAccountSettings.account')}
+    <CommandListSection
+      title={translate('settings.webAccountSettings.settings')}
       description={translate('settings.webAccountSettings.hint')}
-      className="settings-field-wide web-account-settings"
       {...settingAnchor('web-accounts', 'accounts')}
-      aria-label={translate('settings.webAccountSettings.settings')}
     >
-      <div className="actions">
-        <button
-          className="secondary"
-          disabled={busy || accounts.length >= 32}
-          onClick={() =>
-            void run(() =>
-              settingsControls.createWebAccount(
-                translate('settings.webAccountSettings.defaultName', {
-                  value: accounts.length + 1,
-                }),
-              ),
-            )
-          }
-        >
-          {translate('settings.webAccountSettings.add')}
-        </button>
-      </div>
-      {!accounts.length && (
-        <p className="muted">{translate('settings.webAccountSettings.empty')}</p>
-      )}
-      {accounts.map((account) => {
-        const users = [
-          ...new Map(
-            savedItems
-              .filter((item) => item.accountId === account.id)
-              .map((item) => [item.id, item.name]),
-          ).values(),
-        ];
-        return (
-          <AccountRow
-            key={account.id}
-            account={account}
-            users={users}
-            busy={busy}
-            rename={(name) => run(() => settingsControls.renameWebAccount(account.id, name), false)}
-            remove={() => void run(() => settingsControls.deleteWebAccount(account.id))}
-            clear={() => void run(() => settingsControls.clearWebAccount(account.id))}
-          />
-        );
-      })}
-    </SettingsField>
+      <SettingsListLayout
+        title={translate('settings.webAccountSettings.title')}
+        commandListScroll
+        toolbar={
+          <CommandListSummary className="settings-list-toolbar" actions={null}>
+            <span role="status">
+              {translate('settings.settingsListTable.entryCount', {
+                count: accounts.length,
+                limit: 32,
+              })}
+            </span>
+          </CommandListSummary>
+        }
+      >
+        <thead>
+          <tr>
+            <th>
+              <span className="settings-list-heading">
+                {translate('settings.webAccountSettings.name')}
+                <SettingsListAddButton
+                  label={translate('settings.webAccountSettings.add')}
+                  disabled={busy || accounts.length >= 32}
+                  onClick={() =>
+                    void run(() =>
+                      settingsControls.createWebAccount(
+                        translate('settings.webAccountSettings.defaultName', {
+                          value: accounts.length + 1,
+                        }),
+                      ),
+                    )
+                  }
+                />
+              </span>
+            </th>
+            <th>{translate('settings.webAccountSettings.usage')}</th>
+            <th className="settings-list-actions-heading">
+              {translate('settings.settingsListTable.actions')}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {accounts.map((account) => {
+            const users = [
+              ...new Map(
+                savedItems
+                  .filter((item) => item.accountId === account.id)
+                  .map((item) => [item.id, item.name]),
+              ).values(),
+            ];
+            return (
+              <AccountRow
+                key={account.id}
+                account={account}
+                users={users}
+                busy={busy}
+                rename={(name) =>
+                  run(() => settingsControls.renameWebAccount(account.id, name), false)
+                }
+                remove={() => void run(() => settingsControls.deleteWebAccount(account.id))}
+                clear={() => void run(() => settingsControls.clearWebAccount(account.id))}
+              />
+            );
+          })}
+          {!accounts.length && (
+            <tr>
+              <td colSpan={3} className="settings-list-empty">
+                {translate('settings.webAccountSettings.empty')}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </SettingsListLayout>
+    </CommandListSection>
   );
 }
