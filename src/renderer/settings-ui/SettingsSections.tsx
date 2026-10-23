@@ -21,7 +21,7 @@ export function SettingsSection({
   error?: string;
   children: ReactNode;
   collapsible?: boolean;
-  variant?: 'card' | 'group';
+  variant?: 'card' | 'group' | 'row';
 } & Omit<HTMLAttributes<HTMLElement>, 'title'>) {
   const id = useId();
   useSettingsFeedback({ error, target: title });
@@ -39,7 +39,14 @@ export function SettingsSection({
       {...props}
       className={`settings-section settings-section-details settings-section-${variant} ${props.className ?? ''}`}
     >
-      <summary>{heading}</summary>
+      <summary>
+        {heading}
+        <span className="settings-section-toggle" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
+      </summary>
       <div className="settings-section-content">{children}</div>
     </details>
   ) : (

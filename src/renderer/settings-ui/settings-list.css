@@ -88,15 +88,30 @@
   justify-content: center;
   align-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 7px;
   color: var(--text);
-  background: var(--panel);
+  background: transparent;
 }
-.settings-list-delete:hover:not(:disabled) {
+.settings-list-icon:is(:hover, :focus-visible):enabled {
+  border-color: var(--border);
+  background: var(--panel);
+  filter: none;
+}
+button.settings-list-icon.accent-action {
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+}
+button.settings-list-icon.accent-action:is(:hover, :focus-visible):enabled {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+  color: var(--accent-text);
+}
+.settings-list-delete:is(:hover, :focus-visible):not(:disabled) {
   color: #d24f59;
 }
 .settings-list .settings-list-toggle {

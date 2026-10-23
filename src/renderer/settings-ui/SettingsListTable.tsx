@@ -18,7 +18,7 @@ export function settingsListText(
   );
 }
 
-export function ListIcon({ kind }: { kind: 'edit' | 'delete' | 'order' | 'open' }) {
+export function ListIcon({ kind }: { kind: 'edit' | 'pencil' | 'delete' | 'order' | 'open' }) {
   return (
     <svg
       width="18"
@@ -36,6 +36,8 @@ export function ListIcon({ kind }: { kind: 'edit' | 'delete' | 'order' | 'open' 
           <path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-2Z" />
           <circle cx="11.5" cy="10.5" r="3" />
         </>
+      ) : kind === 'pencil' ? (
+        <path d="m16 3 5 5L9 20l-6 1 1-6L16 3Zm-2 2 5 5M4 15l5 5" />
       ) : kind === 'delete' ? (
         <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
       ) : kind === 'order' ? (
@@ -117,7 +119,7 @@ export function SettingsListTable({
         <div>
           <button
             type="button"
-            className="settings-list-icon accent-action"
+            className="settings-list-icon"
             title="並べ替え"
             aria-label={`${definition.title}を並べ替え`}
             disabled={busy || entries.length < 2}

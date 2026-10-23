@@ -40,16 +40,12 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     }
     throw Error('Shortcut model did not reflect external write');
   };
-  const fromMenu = async (id) => {
-    await page
-      .locator(`[data-binding-id="${id}"]`)
-      .getByRole('button', { name: /その他の操作/ })
-      .click();
-    await page.getByRole('menuitem', { name: 'このキーの実行順…', exact: true }).click();
+  const fromRow = async (id) => {
+    await page.locator(`[data-binding-id="${id}"]`).locator('.binding-order').click();
     await panel.waitFor();
   };
   await filter.fill('test.a.second');
-  await fromMenu('a2');
+  await fromRow('a2');
   assert.deepEqual(await order(), ['b1', 'a2']);
   assert.match(await item('b1').innerText(), /UI B/);
   assert(
@@ -65,7 +61,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   assert.equal(await filter.inputValue(), 'test.a.second');
   assert(
     await page
-      .locator('[data-binding-id="a2"] .gesture-menu-trigger')
+      .locator('[data-binding-id="a2"] .binding-order')
       .evaluate((el) => el === document.activeElement),
   );
   assert.equal(
@@ -98,7 +94,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     .locator('[data-applet-id="test.a"]')
     .getByRole('button', { name: 'UI Aのショートカットを開く', exact: true })
     .click();
-  await fromMenu('a2');
+  await fromRow('a2');
   assert.match(await item('b1').innerText(), /B first[\s\S]*UI B/);
   await item('a2').locator('.shortcut-order-handle').press('Alt+ArrowDown');
   await apply();

@@ -124,6 +124,7 @@ export function GesturesEditor({
           bindings={bindings}
           showProvider
           inputName="ジェスチャー"
+          inputKey={(row) => row.gesture}
           inputLabel={(row) => gestureTitle(row.gesture)}
           conditionLabel={conditionLabel}
           newBinding={(command) => ({

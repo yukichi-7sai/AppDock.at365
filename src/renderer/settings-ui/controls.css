@@ -2036,16 +2036,15 @@ summary {
 }
 .ribbon-row-controls {
   display: grid;
-  grid-template-columns: 100px repeat(4, 34px);
+  grid-template-columns: 100px repeat(4, 32px);
   gap: 8px;
   align-items: center;
   flex: none;
   margin-left: auto;
 }
-.ribbon-row-controls > button,
 .ribbon-action-placeholder {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   padding: 0;
 }
 @media (max-width: 900px) {
@@ -2458,58 +2457,6 @@ summary {
   outline-offset: -2px;
   background: var(--accent-soft);
 }
-.gesture-menu-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  line-height: 1;
-  min-width: 32px;
-  font-size: 22px;
-  padding: 2px 6px;
-  border-radius: 8px;
-  color: var(--muted);
-}
-.gesture-menu-trigger:hover,
-.gesture-menu-trigger:focus-visible {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-.gesture-menu-trigger[aria-expanded='true'] {
-  background: var(--raised);
-}
-.gesture-actions-popup {
-  position: fixed;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  min-width: 160px;
-  width: max-content;
-  max-width: calc(100vw - 16px);
-  max-height: calc(100vh - 16px);
-  overflow: auto;
-  padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-}
-.gesture-actions-popup > button {
-  text-align: left;
-  padding: 9px 14px;
-  border: 0;
-  background: transparent;
-}
-.gesture-actions-popup > button:hover,
-.gesture-actions-popup > button:focus-visible {
-  background: var(--raised);
-}
-.gesture-actions-popup p {
-  margin: 8px 12px;
-  font-size: 13px;
-}
 .gesture-table .toggle {
   margin-top: 6px;
 }
@@ -2670,13 +2617,6 @@ summary {
   color: var(--muted);
   margin-top: 4px;
 }
-.applet-shortcut-pair {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
-}
 .applet-shortcut-command {
   display: flex;
   align-items: center;
@@ -2693,11 +2633,7 @@ summary {
   background: var(--accent-soft);
   font-size: 18px;
 }
-.applet-shortcut-pair {
-  flex-wrap: nowrap;
-  align-items: center;
-}
-.applet-shortcut-edit {
+.applet-shortcut-value {
   display: flex;
   flex: 1;
   min-width: 0;
@@ -2706,14 +2642,35 @@ summary {
   justify-content: flex-start;
   gap: 8px;
   text-align: left;
-  padding: 7px 0;
-  background: transparent;
-  border-color: transparent;
-  border-radius: 9px;
+  min-height: 32px;
 }
-.applet-shortcut-edit > span,
-.applet-shortcut-edit > small {
+.applet-shortcut-value > span,
+.applet-shortcut-value > small {
   color: var(--muted);
+}
+.applet-shortcut-value kbd {
+  color: var(--text);
+}
+.binding-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.command-binding-table {
+  min-width: 660px;
+}
+.command-binding-table .binding-actions-heading {
+  width: calc(3 * 32px + 2 * 6px + 2 * var(--command-settings-cell-padding, 12px));
+}
+.shortcut-command-list .command-binding-table td:is(.binding-value-cell, .binding-actions-cell) {
+  vertical-align: middle;
+  padding-block: 8px;
+}
+.command-binding-table
+  tbody
+  > tr:not(:last-child)
+  > td:is(.binding-value-cell, .binding-actions-cell) {
+  border-bottom: 0;
 }
 .command-shortcut-tools {
   display: flex;
@@ -2722,6 +2679,10 @@ summary {
 }
 .command-provider-filter {
   display: inline-flex;
+  width: fit-content;
+  box-sizing: border-box;
+  align-self: flex-start;
+  justify-self: start;
   align-items: center;
   gap: 6px;
   max-width: 100%;
@@ -2816,7 +2777,8 @@ summary {
 .command-shortcuts .applet-shortcut-overview td {
   padding: 16px 18px;
 }
-.command-shortcuts .applet-shortcut-overview tr:last-child td {
+.command-shortcuts .applet-shortcut-overview tbody:last-child > tr:last-child > td,
+.command-shortcuts .applet-shortcut-overview tbody:last-child > tr > td[rowspan] {
   border-bottom: 0;
 }
 .command-shortcuts .applet-shortcut-overview th:first-child {
@@ -2829,11 +2791,12 @@ summary {
   gap: 6px;
 }
 .shortcuts-editor .command-settings-links,
+.gestures-editor .command-settings-links,
 .custom-commands-settings .command-settings-links,
 .custom-commands-settings .settings-list-actions {
   justify-content: flex-start;
 }
-.shortcut-command-list:has(.command-settings-heading) {
+.shortcut-command-list {
   overflow-x: auto;
 }
 .applet-shortcut-overview:has(.command-settings-heading) {
@@ -2841,7 +2804,10 @@ summary {
   min-width: 680px;
 }
 .applet-shortcut-overview .command-settings-heading {
-  width: calc(2 * 34px + 6px + 2 * var(--command-settings-cell-padding));
+  width: calc(2 * 32px + 6px + 2 * var(--command-settings-cell-padding));
+}
+.command-binding-table:has(.command-settings-heading) {
+  min-width: 780px;
 }
 .applet-shortcut-overview .command-settings-cell {
   vertical-align: middle;
@@ -2867,10 +2833,6 @@ summary {
   flex-basis: 100%;
   color: var(--text);
   font-size: 11px;
-}
-.shortcut-command-list .applet-shortcut-pair > .text-button {
-  font-size: 11px;
-  flex: none;
 }
 @media (max-width: 800px) {
   .command-shortcut-tools {
@@ -3648,20 +3610,25 @@ summary {
     gap: 8px;
   }
 }
-.settings-dialog-body input:not([type='checkbox']):not([type='radio']),
-.settings-dialog-body select {
+.settings-dialog-body input:not([type='checkbox']):not([type='radio']) {
   min-width: 0;
   width: 100%;
+  box-sizing: border-box;
+}
+.settings-dialog-body select {
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  justify-self: start;
   box-sizing: border-box;
 }
 .settings-dialog-body .settings-section {
   margin-top: 20px;
 }
 .settings-dialog-body .settings-section > summary {
-  padding: 14px 16px;
+  padding: 14px 58px 14px 16px;
 }
-.settings-dialog-body .settings-section > summary::after {
-  top: 12px;
+.settings-dialog-body .settings-section > summary > .settings-section-toggle {
   right: 16px;
 }
 .settings-dialog-body .settings-section h2 {

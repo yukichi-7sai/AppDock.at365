@@ -15,6 +15,9 @@ const descriptions: Record<string, string> = {
   tray: 'トレイアイコンのクリック操作と、メニューに表示するコマンドを設定します。',
   shortcuts: 'コマンドを見つけて、キーと使う場面を設定できます。',
   gestures: 'コマンドを見つけて、操作と使う場面を設定できます。',
+  'custom-commands': 'よく使う操作をコマンドとして登録し、実行内容や外部への公開を設定します。',
+  ai: 'AIサーバーの接続先・モデル・応答の既定値を設定します。',
+  'mcp-client': 'MCPサーバーへの接続先と、利用を許可するツールを設定します。',
   'web-accounts':
     'WebApplet専用のアカウント枠を管理します。同じ枠を選んだWebAppletはログイン状態を共有し、Gmailのアカウントとは別管理です。',
   permissions:

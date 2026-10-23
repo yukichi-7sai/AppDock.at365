@@ -120,10 +120,10 @@ module.exports = async function ({
       ]) {
         await select(page);
         const order = host
-          .locator('button.accent-action')
+          .locator('button.settings-list-icon')
           .filter({ has: host.locator('svg') })
           .first();
-        assert(await order.count(), page + ' order accent');
+        assert(await order.count(), page + ' shared list action');
       }
       await select('リボン');
       for (const position of ['上寄せ', '下寄せ']) {

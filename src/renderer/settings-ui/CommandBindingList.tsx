@@ -1,5 +1,5 @@
 import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { BindingActions } from './BindingActions';
+import { ListIcon } from './SettingsListTable';
 import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
 import {
@@ -15,6 +15,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   statusError,
   onRetry,
   inputName,
+  inputKey,
   inputLabel,
   conditionLabel,
   newBinding,
@@ -29,6 +30,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   statusError?(row: R): string | undefined;
   onRetry?(): void;
   inputName: string;
+  inputKey(row: R): string;
   inputLabel(row: R): string;
   conditionLabel(row: R, command: UiCommand): string;
   newBinding(command: UiCommand): R;
@@ -41,6 +43,12 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   const navigation = useContext(CommandSettingsNavigation);
   const [editing, setEditing] = useState<BindingEdit<R> | null>(null);
   const [notice, setNotice] = useState('');
+  const commandsByInput = new Map<string, Set<string>>();
+  for (const row of bindings) {
+    const key = inputKey(row);
+    if (!commandsByInput.has(key)) commandsByInput.set(key, new Set());
+    commandsByInput.get(key)!.add(row.command);
+  }
   const registrationErrors = bindings
     .filter((row) => commands.some((command) => command.id === row.command) && statusError?.(row))
     .map(
@@ -59,6 +67,18 @@ export function CommandBindingList<R extends { id: string; command: string; enab
     const scroll = root.current?.closest<HTMLElement>('.applet-settings-panel, .settings-body');
     const trigger =
       target ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    const commandId =
+      trigger?.closest<HTMLElement>('[data-shortcut-command]')?.dataset.shortcutCommand;
+    const bindingId = trigger?.closest<HTMLElement>('[data-binding-id]')?.dataset.bindingId;
+    const action = ['applet-shortcut-edit', 'binding-order', 'binding-delete'].find((name) =>
+      trigger?.classList.contains(name),
+    );
+    const selector =
+      trigger?.classList.contains('applet-shortcut-add') && commandId
+        ? `[data-shortcut-command="${CSS.escape(commandId)}"] .applet-shortcut-add`
+        : bindingId && action
+          ? `[data-binding-id="${CSS.escape(bindingId)}"] .${action}`
+          : undefined;
     const top = scroll?.scrollTop ?? 0;
     const left = scroll?.scrollLeft ?? 0;
     restore.current = () => {
@@ -66,7 +86,8 @@ export function CommandBindingList<R extends { id: string; command: string; enab
         scroll.scrollTop = top;
         scroll.scrollLeft = left;
       }
-      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+      const restored = selector ? root.current?.querySelector<HTMLElement>(selector) : trigger;
+      if (restored?.isConnected) restored.focus({ preventScroll: true });
       else root.current?.focus({ preventScroll: true });
     };
   };
@@ -93,96 +114,126 @@ export function CommandBindingList<R extends { id: string; command: string; enab
     setEditing(null);
   };
   const table = (items: typeof commands) => (
-    <table className="applet-shortcut-overview">
+    <table className="applet-shortcut-overview command-binding-table">
       <thead>
         <tr>
           <th>コマンド</th>
           <th>割り当て</th>
+          <th className="binding-actions-heading">操作</th>
           {navigation && <th className="command-settings-heading">移動</th>}
         </tr>
       </thead>
-      <tbody>
-        {items.map((command) => {
-          const assigned = bindings.filter((row) => row.command === command.id);
-          return (
-            <tr key={command.id} data-shortcut-command={command.id}>
-              <td>
-                <div className="applet-shortcut-command">
-                  <strong className="command-title">
-                    {command.title}
-                    <CommandPublication published={command.automation} />
-                  </strong>
-                  <button
-                    className="applet-shortcut-add"
-                    aria-label={`${command.title}に割り当てを追加`}
-                    title="割り当てを追加"
-                    onClick={() => open(command)}
-                  >
-                    ＋
-                  </button>
-                </div>
-                {command.description && <small>{command.description}</small>}
-                <small className="command-id">{command.id}</small>
-                {showProvider && (
-                  <small className="shortcut-provider">
-                    {command.extension}
-                    {command.hidden ? ' · 互換コマンド' : ''}
-                  </small>
-                )}
-                {!command.available && <small>現在利用できません</small>}
-              </td>
-              <td>
-                {assigned.length ? (
-                  assigned.map((row) => (
-                    <div className="applet-shortcut-pair" key={row.id} data-binding-id={row.id}>
-                      <button
-                        className="applet-shortcut-edit"
-                        aria-label={`${command.title}の${inputLabel(row)}を編集`}
-                        onClick={() => open(command, row)}
-                      >
+      {items.map((command) => {
+        const assigned = bindings.filter((row) => row.command === command.id);
+        return (
+          <tbody key={command.id} data-shortcut-command={command.id}>
+            {(assigned.length ? assigned : [null]).map((row, index) => {
+              const multiple = row ? commandsByInput.get(inputKey(row))!.size > 1 : false;
+              return (
+                <tr key={index === 0 ? 'command' : row!.id} data-binding-id={row?.id}>
+                  {index === 0 && (
+                    <td rowSpan={Math.max(1, assigned.length)} className="binding-command-cell">
+                      <div className="applet-shortcut-command">
+                        <strong className="command-title">
+                          {command.title}
+                          <CommandPublication published={command.automation} />
+                        </strong>
+                        <button
+                          className="applet-shortcut-add"
+                          aria-label={`${command.title}に割り当てを追加`}
+                          title="割り当てを追加"
+                          onClick={() => open(command)}
+                        >
+                          ＋
+                        </button>
+                      </div>
+                      {command.description && <small>{command.description}</small>}
+                      <small className="command-id">{command.id}</small>
+                      {showProvider && (
+                        <small className="shortcut-provider">
+                          {command.extension}
+                          {command.hidden ? ' · 互換コマンド' : ''}
+                        </small>
+                      )}
+                      {!command.available && <small>現在利用できません</small>}
+                    </td>
+                  )}
+                  <td className="binding-value-cell">
+                    {row ? (
+                      <div className="applet-shortcut-value">
                         <kbd>{inputLabel(row)}</kbd>
                         <span>{conditionLabel(row, command)}</span>
                         {!row.enabled && <small>無効</small>}
-                      </button>
-                      <BindingActions
-                        label={`${command.title}の${inputLabel(row)}のその他の操作`}
-                        removalKind="binding"
-                        confirmDelete={false}
-                        extraActions={[
-                          { title: '編集', onClick: () => open(command, row) },
-                          {
-                            title: `この${inputName}の実行順…`,
-                            onClick: () => {
-                              rememberPosition();
-                              setOrderKey(row);
-                            },
-                          },
-                        ]}
-                        onDelete={() => {
-                          rememberPosition(
-                            root.current?.querySelector<HTMLButtonElement>(
-                              `[data-shortcut-command="${CSS.escape(command.id)}"] .applet-shortcut-add`,
-                            ),
-                          );
-                          deleteBinding(row);
-                          setNotice(`${command.title}の割り当てを削除しました。`);
-                        }}
-                      />
-                    </div>
-                  ))
-                ) : (
-                  <span className="muted">未割り当て</span>
-                )}
-              </td>
-              {navigation && (
-                <td className="command-settings-cell">
-                  <CommandSettingsLinks command={command} />
-                </td>
-              )}
-            </tr>
-          );
-        })}
-      </tbody>
+                      </div>
+                    ) : (
+                      <span className="muted">未割り当て</span>
+                    )}
+                  </td>
+                  <td className="binding-actions-cell">
+                    {row && (
+                      <div
+                        className="binding-row-actions"
+                        role="group"
+                        aria-label={`${command.title}の${inputLabel(row)}の操作`}
+                      >
+                        <button
+                          type="button"
+                          className="settings-list-icon applet-shortcut-edit"
+                          title="編集"
+                          aria-label={`${command.title}の${inputLabel(row)}を編集`}
+                          onClick={() => open(command, row)}
+                        >
+                          <ListIcon kind="pencil" />
+                        </button>
+                        <button
+                          type="button"
+                          className={`settings-list-icon binding-order${multiple ? ' accent-action' : ''}`}
+                          title={`この${inputName}の実行順${multiple ? '（複数のコマンド）' : ''}`}
+                          aria-label={`${command.title}の${inputLabel(row)}の実行順`}
+                          aria-description={
+                            multiple
+                              ? `この${inputName}に複数のコマンドが割り当てられています。`
+                              : undefined
+                          }
+                          data-multiple-commands={multiple}
+                          onClick={() => {
+                            rememberPosition();
+                            setOrderKey(row);
+                          }}
+                        >
+                          <ListIcon kind="order" />
+                        </button>
+                        <button
+                          type="button"
+                          className="settings-list-icon settings-list-delete binding-delete"
+                          title="削除"
+                          aria-label={`${command.title}の${inputLabel(row)}の割り当てを削除`}
+                          onClick={() => {
+                            rememberPosition(
+                              root.current?.querySelector<HTMLButtonElement>(
+                                `[data-shortcut-command="${CSS.escape(command.id)}"] .applet-shortcut-add`,
+                              ),
+                            );
+                            deleteBinding(row);
+                            setNotice(`${command.title}の割り当てを削除しました。`);
+                          }}
+                        >
+                          <ListIcon kind="delete" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  {navigation && index === 0 && (
+                    <td className="command-settings-cell" rowSpan={Math.max(1, assigned.length)}>
+                      <CommandSettingsLinks command={command} />
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        );
+      })}
     </table>
   );
   return (

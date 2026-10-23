@@ -7,7 +7,7 @@ import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { SettingsListAddButton } from '../settings-ui/SettingsListTable';
+import { ListIcon, SettingsListAddButton } from '../settings-ui/SettingsListTable';
 import {
   AiConnectionDialog,
   AiConnectionOrderDialog,
@@ -15,36 +15,6 @@ import {
   type AiInvoke,
 } from './AiConnectionDialog';
 
-function ActionIcon({ kind }: { kind: 'edit' | 'delete' | 'order' }) {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {kind === 'edit' ? (
-        <>
-          <path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 3-1 2 2 3-1 1-3 3-1 2-3-2-2 1-3-3-2-3 1-2-2Z" />
-          <circle cx="11.5" cy="10.5" r="3" />
-        </>
-      ) : kind === 'delete' ? (
-        <>
-          <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
-        </>
-      ) : (
-        <>
-          <path d="M8 4v16m-4-4 4 4 4-4M16 20V4m-4 4 4-4 4 4" />
-        </>
-      )}
-    </svg>
-  );
-}
 export function AiSettingsForm({
   editor,
   auxiliary,
@@ -113,7 +83,7 @@ export function AiSettingsForm({
           <span className="muted">{value.connections.length} / 8 サーバー</span>
           <div>
             <button
-              className="ai-icon-button accent-action"
+              className="settings-list-icon ai-icon-button"
               aria-label="AIサーバーを並べ替え"
               title="並べ替え"
               disabled={busy || value.connections.length < 2}
@@ -121,7 +91,7 @@ export function AiSettingsForm({
                 setDialog({ kind: 'order', connections: structuredClone(value.connections) })
               }
             >
-              <ActionIcon kind="order" />
+              <ListIcon kind="order" />
             </button>
           </div>
         </div>
@@ -167,22 +137,22 @@ export function AiSettingsForm({
                   <td>
                     <div className="ai-row-actions">
                       <button
-                        className="ai-icon-button"
+                        className="settings-list-icon ai-icon-button"
                         aria-label={server.name + 'の設定'}
                         title="設定"
                         disabled={busy}
                         onClick={() => open('edit', server)}
                       >
-                        <ActionIcon kind="edit" />
+                        <ListIcon kind="edit" />
                       </button>
                       <button
-                        className="ai-icon-button ai-delete-button"
+                        className="settings-list-icon settings-list-delete ai-icon-button ai-delete-button"
                         aria-label={server.name + 'を削除'}
                         title="削除"
                         disabled={busy}
                         onClick={() => open('delete', server)}
                       >
-                        <ActionIcon kind="delete" />
+                        <ListIcon kind="delete" />
                       </button>
                     </div>
                   </td>

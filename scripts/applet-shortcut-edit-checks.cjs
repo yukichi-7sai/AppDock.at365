@@ -108,13 +108,13 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   );
 
   // Deletion immediately updates the saved settings and can be discarded before saving.
-  await assigned.getByRole('button', { name: /その他の操作/ }).click();
-  assert.deepEqual(await page.getByRole('menuitem').allTextContents(), [
-    '編集',
-    'このキーの実行順…',
-    '削除',
-  ]);
-  await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+  assert.deepEqual(
+    await assigned
+      .locator('.binding-row-actions button')
+      .evaluateAll((buttons) => buttons.map((button) => button.title)),
+    ['編集', 'このキーの実行順（複数のコマンド）', '削除'],
+  );
+  await assigned.locator('.binding-delete').click();
   assert.equal(await page.getByRole('alertdialog').count(), 0);
   assert.equal(await assigned.count(), 0);
   await save();
@@ -139,11 +139,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   }
   const extras = assigned.filter({ hasText: 'Shift+F12' });
   for (let i = 0; i < 2; i++) {
-    await extras
-      .first()
-      .getByRole('button', { name: /その他の操作/ })
-      .click();
-    await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+    await extras.first().locator('.binding-delete').click();
     assert.equal(await page.getByRole('alertdialog').count(), 0);
   }
   await save();

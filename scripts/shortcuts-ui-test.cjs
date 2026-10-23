@@ -215,15 +215,13 @@ const checks = [];
       beforeEdit,
     );
     await status().selectOption('assigned');
-    await row('a2')
-      .getByRole('button', { name: /その他の操作/ })
-      .click();
-    assert.deepEqual(await page.getByRole('menuitem').allTextContents(), [
-      '編集',
-      'このキーの実行順…',
-      '削除',
-    ]);
-    await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+    assert.deepEqual(
+      await row('a2')
+        .locator('.binding-row-actions button')
+        .evaluateAll((buttons) => buttons.map((button) => button.title)),
+      ['編集', 'このキーの実行順（複数のコマンド）', '削除'],
+    );
+    await row('a2').locator('.binding-delete').click();
     assert.equal(await page.getByRole('alertdialog').count(), 0);
     assert.equal(await command('test.a.second').count(), 0);
     assert(

@@ -25,6 +25,12 @@
   padding: 0 0 14px;
   border-bottom: 0;
 }
+.settings-section.settings-section-group > summary {
+  padding-right: 42px;
+}
+.settings-section-group > summary > .settings-section-toggle {
+  right: 0;
+}
 .settings-section.settings-section-group > .settings-section-content {
   display: grid;
   gap: 16px;
@@ -42,21 +48,48 @@
   cursor: pointer;
   list-style: none;
   position: relative;
-  padding-right: 52px;
+  padding-right: 64px;
+  border-radius: 14px;
 }
 .settings-section > summary::-webkit-details-marker {
   display: none;
 }
-.settings-section > summary::after {
-  content: '+';
+.settings-section > summary:is(:hover, :focus-visible) {
+  background: var(--accent-soft);
+}
+.settings-section > summary:is(:hover, :focus-visible) > p {
+  color: var(--accent);
+}
+.settings-section > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.settings-section[open] > summary {
+  border-radius: 14px 14px 0 0;
+}
+.settings-section-toggle {
   position: absolute;
   right: 22px;
-  top: 20px;
-  font-size: 20px;
-  color: var(--muted);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--settings-group-background);
+  color: var(--text);
+  pointer-events: none;
 }
-.settings-section[open] > summary::after {
-  content: '−';
+.settings-section-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+.settings-section[open] > summary > .settings-section-toggle svg {
+  transform: rotate(180deg);
 }
 .settings-section:not([open]) > summary {
   border-bottom: 0;
@@ -76,8 +109,40 @@
   padding: 4px 22px 20px;
   min-width: 0;
 }
-.settings-section-content > :first-child:not(.settings-field) {
+.settings-section-content > :first-child:not(.settings-field, .settings-section-row) {
   margin-top: 16px;
+}
+.settings-section.settings-section-row {
+  --settings-row-inset: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.settings-section.settings-section-row:last-child {
+  border-bottom: 0;
+}
+.settings-section.settings-section-row > :is(header, summary) {
+  padding: 18px 42px 18px 0;
+  border-bottom: 0;
+  border-radius: 6px;
+}
+.settings-section.settings-section-row > summary {
+  margin-inline: calc(-1 * var(--settings-row-inset));
+  padding-inline: var(--settings-row-inset) calc(42px + var(--settings-row-inset));
+}
+.settings-section-row > :is(header, summary) h2 {
+  font-size: 13px;
+  font-weight: 500;
+}
+.settings-section.settings-section-row > summary > .settings-section-toggle {
+  right: var(--settings-row-inset);
+}
+.settings-section.settings-section-row > .settings-section-content {
+  padding: 0 0 18px;
+}
+.settings-section-row > .settings-section-content > .settings-field:first-child {
+  padding-top: 0;
 }
 .settings-field {
   min-width: 0;
@@ -191,6 +256,12 @@
   width: 100%;
   min-width: 0;
   max-width: none;
+}
+.settings-field .settings-field-control select {
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+  justify-self: start;
 }
 .settings-field-control textarea {
   min-height: 100px;
@@ -340,7 +411,13 @@
     padding: 16px;
   }
   .settings-section > summary {
-    padding-right: 44px;
+    padding-right: 58px;
+  }
+  .settings-section > summary > .settings-section-toggle {
+    right: 16px;
+  }
+  .settings-section.settings-section-row {
+    --settings-row-inset: 8px;
   }
   .settings-section-content {
     padding: 0 16px 16px;

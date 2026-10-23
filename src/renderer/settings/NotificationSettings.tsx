@@ -274,150 +274,149 @@ export function NotificationSettings({
             title={rows[0].ownerTitle}
             aria-label={rows[0].ownerTitle + 'の通知'}
           >
-            <div className="settings-sections">
-              {rows.map((type) => {
-                const policy = resolveNotificationPolicy(type, settings);
-                const row = overrides.find(
-                  (r) => notificationTypeKey(r) === notificationTypeKey(type),
-                );
-                const speaking = row?.speak === true;
-                const eventSending = row?.mcpEvents === true;
-                const delivery = policy.selectedTargets.map((target) => targetTitles[target]);
-                const deliverySummary = delivery.length
-                  ? delivery.join('・')
-                  : eventSending
-                    ? speaking
-                      ? '音声・MCP Eventsのみ'
-                      : 'MCP Eventsのみ'
-                    : speaking
-                      ? '音声のみ'
-                      : '通知センターのみ';
-                const duration =
-                  type.lifetimePolicy === 'condition'
-                    ? '問題が解消するまで'
-                    : policy.durationSeconds === null
-                      ? '閉じるまで表示'
-                      : `表示時間: ${policy.durationSeconds}秒`;
-                const summary = [
-                  deliverySummary,
-                  duration,
-                  `読み上げ: ${speaking ? 'ON' : 'OFF'}`,
-                  `MCP Events: ${eventSending ? 'ON' : 'OFF'}`,
-                ].join(' ／ ');
-                return (
-                  <SettingsSection
-                    title={type.title}
-                    hint={type.description}
-                    description={[
-                      summary,
-                      type.ownerKind === 'applet' &&
-                      !['starting', 'running'].includes(type.ownerState)
-                        ? 'Appletは停止中です。通知設定を編集できます。'
-                        : '',
-                      policy.reason ? (reasonTitles[policy.reason] ?? policy.reason) : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ／ ')}
-                    collapsible
-                    className="notification-setting-card"
-                    key={notificationTypeKey(type)}
-                    {...settingAnchor('notifications', notificationSettingKey(type))}
-                  >
-                    <SettingsField title="通知先" className="settings-field-wide">
-                      <div className="settings-choice-grid">
-                        {type.allowedTargets.map((target) => (
-                          <SettingsChoice
-                            key={target}
-                            label={targetTitles[target]}
-                            ariaLabel={type.title + 'の' + targetTitles[target]}
-                            checked={policy.selectedTargets.includes(target)}
-                            disabled={type.requiredTargets.includes(target)}
-                            description={
-                              type.requiredTargets.includes(target) ? 'この通知では必須' : undefined
-                            }
-                            onChange={(on) =>
-                              change(type, {
-                                targets: on
-                                  ? [...policy.selectedTargets, target]
-                                  : policy.selectedTargets.filter((t) => t !== target),
-                              })
-                            }
-                          />
-                        ))}
+            {rows.map((type) => {
+              const policy = resolveNotificationPolicy(type, settings);
+              const row = overrides.find(
+                (r) => notificationTypeKey(r) === notificationTypeKey(type),
+              );
+              const speaking = row?.speak === true;
+              const eventSending = row?.mcpEvents === true;
+              const delivery = policy.selectedTargets.map((target) => targetTitles[target]);
+              const deliverySummary = delivery.length
+                ? delivery.join('・')
+                : eventSending
+                  ? speaking
+                    ? '音声・MCP Eventsのみ'
+                    : 'MCP Eventsのみ'
+                  : speaking
+                    ? '音声のみ'
+                    : '通知センターのみ';
+              const duration =
+                type.lifetimePolicy === 'condition'
+                  ? '問題が解消するまで'
+                  : policy.durationSeconds === null
+                    ? '閉じるまで表示'
+                    : `表示時間: ${policy.durationSeconds}秒`;
+              const summary = [
+                deliverySummary,
+                duration,
+                `読み上げ: ${speaking ? 'ON' : 'OFF'}`,
+                `MCP Events: ${eventSending ? 'ON' : 'OFF'}`,
+              ].join(' ／ ');
+              return (
+                <SettingsSection
+                  variant="row"
+                  title={type.title}
+                  hint={type.description}
+                  description={[
+                    summary,
+                    type.ownerKind === 'applet' &&
+                    !['starting', 'running'].includes(type.ownerState)
+                      ? 'Appletは停止中です。通知設定を編集できます。'
+                      : '',
+                    policy.reason ? (reasonTitles[policy.reason] ?? policy.reason) : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ／ ')}
+                  collapsible
+                  className="notification-setting-card"
+                  key={notificationTypeKey(type)}
+                  {...settingAnchor('notifications', notificationSettingKey(type))}
+                >
+                  <SettingsField title="通知先" className="settings-field-wide">
+                    <div className="settings-choice-grid">
+                      {type.allowedTargets.map((target) => (
                         <SettingsChoice
-                          label="読み上げ"
-                          description="タイトルと本文を音声で通知"
-                          ariaLabel={type.title + 'を読み上げる'}
-                          checked={speaking}
-                          onChange={(speak) => change(type, { speak })}
+                          key={target}
+                          label={targetTitles[target]}
+                          ariaLabel={type.title + 'の' + targetTitles[target]}
+                          checked={policy.selectedTargets.includes(target)}
+                          disabled={type.requiredTargets.includes(target)}
+                          description={
+                            type.requiredTargets.includes(target) ? 'この通知では必須' : undefined
+                          }
+                          onChange={(on) =>
+                            change(type, {
+                              targets: on
+                                ? [...policy.selectedTargets, target]
+                                : policy.selectedTargets.filter((t) => t !== target),
+                            })
+                          }
                         />
-                        <SettingsChoice
-                          label="MCP Events"
-                          description="購読中のdot等へタイトルと本文を送信。OFF中は送信を止め、購読は有効期限まで保持"
-                          ariaLabel={type.title + 'をMCP Eventsで送信'}
-                          checked={eventSending}
-                          onChange={(mcpEvents) => change(type, { mcpEvents })}
-                        />
-                      </div>
+                      ))}
                       <SettingsChoice
-                        label="通知センターのみ"
-                        ariaLabel={type.title + 'の通知センターのみ'}
-                        checked={!policy.selectedTargets.length && !speaking && !eventSending}
-                        disabled={!!type.requiredTargets.length}
-                        onChange={(on) => {
-                          if (on) change(type, { targets: [], speak: false, mcpEvents: false });
+                        label="読み上げ"
+                        description="タイトルと本文を音声で通知"
+                        ariaLabel={type.title + 'を読み上げる'}
+                        checked={speaking}
+                        onChange={(speak) => change(type, { speak })}
+                      />
+                      <SettingsChoice
+                        label="MCP Events"
+                        description="購読中のdot等へタイトルと本文を送信。OFF中は送信を止め、購読は有効期限まで保持"
+                        ariaLabel={type.title + 'をMCP Eventsで送信'}
+                        checked={eventSending}
+                        onChange={(mcpEvents) => change(type, { mcpEvents })}
+                      />
+                    </div>
+                    <SettingsChoice
+                      label="通知センターのみ"
+                      ariaLabel={type.title + 'の通知センターのみ'}
+                      checked={!policy.selectedTargets.length && !speaking && !eventSending}
+                      disabled={!!type.requiredTargets.length}
+                      onChange={(on) => {
+                        if (on) change(type, { targets: [], speak: false, mcpEvents: false });
+                      }}
+                    />
+                  </SettingsField>
+                  {speaking && (!auxiliary?.configured || !effective.voice) && (
+                    <SettingsField
+                      title="読み上げ設定"
+                      description="読み上げには接続先・モデル・声の設定が必要です。"
+                    >
+                      <button onClick={() => select('tts')}>読み上げ設定を開く</button>
+                    </SettingsField>
+                  )}
+                  {type.lifetimePolicy === 'userDuration' ? (
+                    <SettingsField
+                      title="自動消去までの秒数"
+                      hint="1〜86,400秒。空欄なら閉じるまで表示します。"
+                    >
+                      <SettingsInput
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={type.title + 'の表示時間'}
+                        placeholder="閉じるまで表示"
+                        value={
+                          row?.durationSeconds === undefined
+                            ? (type.defaultDurationSeconds ?? '')
+                            : (row.durationSeconds ?? '')
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          change(type, {
+                            durationSeconds: (value === ''
+                              ? null
+                              : /^\d+$/.test(value)
+                                ? Number(value)
+                                : value) as number | null,
+                          });
                         }}
                       />
                     </SettingsField>
-                    {speaking && (!auxiliary?.configured || !effective.voice) && (
-                      <SettingsField
-                        title="読み上げ設定"
-                        description="読み上げには接続先・モデル・声の設定が必要です。"
-                      >
-                        <button onClick={() => select('tts')}>読み上げ設定を開く</button>
-                      </SettingsField>
-                    )}
-                    {type.lifetimePolicy === 'userDuration' ? (
-                      <SettingsField
-                        title="自動消去までの秒数"
-                        hint="1〜86,400秒。空欄なら閉じるまで表示します。"
-                      >
-                        <SettingsInput
-                          type="text"
-                          inputMode="numeric"
-                          aria-label={type.title + 'の表示時間'}
-                          placeholder="閉じるまで表示"
-                          value={
-                            row?.durationSeconds === undefined
-                              ? (type.defaultDurationSeconds ?? '')
-                              : (row.durationSeconds ?? '')
-                          }
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            change(type, {
-                              durationSeconds: (value === ''
-                                ? null
-                                : /^\d+$/.test(value)
-                                  ? Number(value)
-                                  : value) as number | null,
-                            });
-                          }}
-                        />
-                      </SettingsField>
-                    ) : (
-                      <SettingsField
-                        title="表示時間"
-                        description={
-                          type.lifetimePolicy === 'condition'
-                            ? '問題が解消するまで表示します。'
-                            : '閉じるまで表示します。'
-                        }
-                      />
-                    )}
-                  </SettingsSection>
-                );
-              })}
-            </div>
+                  ) : (
+                    <SettingsField
+                      title="表示時間"
+                      description={
+                        type.lifetimePolicy === 'condition'
+                          ? '問題が解消するまで表示します。'
+                          : '閉じるまで表示します。'
+                      }
+                    />
+                  )}
+                </SettingsSection>
+              );
+            })}
           </SettingsSection>
         );
       })}

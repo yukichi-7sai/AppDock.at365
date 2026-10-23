@@ -210,35 +210,37 @@ export function AppletManagementSettings({
           />
         </div>
       </div>
-      <SettingsField
-        title="導入状況"
-        description={[
-          !management?.packagesAvailable
-            ? 'インストール・更新の適用・アンインストールは配布版のAppDockで利用できます。'
-            : '',
-          management?.discoveryIssueCount
-            ? `読み込めなかったAppletがあります（${management.discoveryIssueCount}件）。`
-            : 'インストール済みAppletを管理できます。',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        {!!management?.discoveryIssueCount && (
-          <button
-            className="text-button"
-            onClick={() => void run('discovery', () => invoke('openAppletDiscoveryLogs'))}
-          >
-            検出ログを開く
-          </button>
-        )}
-      </SettingsField>
+      {management && (!management.packagesAvailable || !!management.discoveryIssueCount) && (
+        <SettingsField
+          title={management.discoveryIssueCount ? 'Appletの検出' : '利用できる操作'}
+          description={[
+            !management?.packagesAvailable
+              ? 'インストール・更新の適用・アンインストールは配布版のAppDockで利用できます。'
+              : '',
+            management?.discoveryIssueCount
+              ? `読み込めなかったAppletがあります（${management.discoveryIssueCount}件）。`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {!!management?.discoveryIssueCount && (
+            <button
+              className="text-button"
+              onClick={() => void run('discovery', () => invoke('openAppletDiscoveryLogs'))}
+            >
+              検出ログを開く
+            </button>
+          )}
+        </SettingsField>
+      )}
       <div className="command-shortcut-summary">
         <span role="status">
           {visible.length} / {applets.length} Appletを表示
         </span>
         <button
           type="button"
-          className="settings-list-icon shortcut-order-open accent-action"
+          className="settings-list-icon shortcut-order-open"
           aria-label="Appletを並べ替え"
           title="Appletの表示順"
           disabled={busy || applets.length < 2}

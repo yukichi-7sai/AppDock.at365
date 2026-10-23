@@ -308,6 +308,11 @@ async function until(fn, name) {
     await separator.press('ArrowRight');
     checks.push('settings-sidebar-keyboard-resize');
     assert.deepEqual(await ids(), ['test.a', 'test.b', 'at365.web-applet']);
+    assert.equal(await page.getByText('導入状況', { exact: true }).count(), 0);
+    assert.equal(
+      await page.getByText('インストール済みAppletを管理できます。', { exact: true }).count(),
+      0,
+    );
     const search = page.getByRole('searchbox', { name: 'Appletを検索', exact: true });
     await search.fill('WebApplet');
     await until(

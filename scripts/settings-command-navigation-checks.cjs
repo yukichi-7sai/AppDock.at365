@@ -11,7 +11,47 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       .locator('.custom-commands-settings tbody tr')
       .filter({ has: host.getByText(title, { exact: true }) });
   const filterPositions = [];
+  const checkFilterFit = async (kind) => {
+    const fit = await host.locator('.command-provider-filter').evaluate((e) => {
+      const rect = e.getBoundingClientRect(),
+        style = getComputedStyle(e);
+      const span = e.querySelector('span').getBoundingClientRect(),
+        button = e.querySelector('button').getBoundingClientRect();
+      const content =
+        span.width +
+        button.width +
+        parseFloat(style.gap) +
+        parseFloat(style.paddingLeft) +
+        parseFloat(style.paddingRight) +
+        parseFloat(style.borderLeftWidth) +
+        parseFloat(style.borderRightWidth);
+      const clone = e.cloneNode(true);
+      clone.querySelector('strong').textContent = 'Long provider and command name '.repeat(25);
+      e.parentElement.append(clone);
+      const long = {
+        width: clone.getBoundingClientRect().width,
+        parent: e.parentElement.clientWidth,
+        scrollWidth: clone.scrollWidth,
+        clientWidth: clone.clientWidth,
+        buttonInside:
+          clone.querySelector('button').getBoundingClientRect().right <=
+          clone.getBoundingClientRect().right,
+      };
+      clone.remove();
+      return { width: rect.width, parent: e.parentElement.clientWidth, content, long };
+    });
+    assert(Math.abs(fit.width - fit.content) < 2, kind + ' chip fits its text and clear action');
+    assert(fit.width < fit.parent - 20, kind + ' chip does not stretch across the list');
+    assert(
+      fit.long.width <= fit.long.parent + 1 &&
+        fit.long.scrollWidth <= fit.long.clientWidth + 1 &&
+        fit.long.buttonInside,
+      kind + ' long names wrap without hiding the clear action',
+    );
+    filterPositions.push({ kind: 'fit-' + kind, ...fit });
+  };
   const checkFilterPlacement = async (kind) => {
+    await checkFilterFit(kind);
     const position = await host.locator('.command-shortcuts').evaluate((section) => {
       const filter = section.querySelector('.command-provider-filter');
       const tools = section.querySelector('.command-shortcut-tools');
@@ -43,6 +83,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       'command target filter',
     );
     if (page !== 'カスタムコマンド') await checkFilterPlacement('command-' + page);
+    else await checkFilterFit('command-' + page);
   };
   const samples = [];
   const spacing = [];
@@ -54,7 +95,9 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
           const buttons = [...cell.querySelectorAll('button')];
           return {
             buttons: buttons.length,
-            custom: customIds.includes(cell.closest('tr').dataset.shortcutCommand),
+            custom: customIds.includes(
+              cell.closest('[data-shortcut-command]')?.dataset.shortcutCommand,
+            ),
             gap: cell.getBoundingClientRect().right - buttons.at(-1).getBoundingClientRect().right,
             padding: parseFloat(getComputedStyle(cell).paddingRight),
             leftGap: buttons[0].getBoundingClientRect().left - cell.getBoundingClientRect().left,
@@ -69,9 +112,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       assert.equal(item.buttons, page === 'カスタムコマンド' || item.custom ? 2 : 1);
       assert(item.labels.every((label) => !label.endsWith(`の${page}を開く`)));
       assert(item.gap >= item.padding - 0.5 && item.gap > 0, JSON.stringify(item));
-      if (page === 'マウスジェスチャー')
-        assert(Math.abs(item.gap - item.padding) < 1, JSON.stringify(item));
-      else assert(Math.abs(item.leftGap - item.leftPadding) < 1, JSON.stringify(item));
+      assert(Math.abs(item.leftGap - item.leftPadding) < 1, JSON.stringify(item));
     }
     spacing.push({ page, theme, width, measurements });
   };
@@ -90,7 +131,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     if (assigned) {
       const colors = await button.evaluate((e) => {
         const probe = document.createElement('span');
-        probe.style.cssText = 'display:none;color:var(--accent);background:var(--accent-soft)';
+        probe.style.cssText = 'display:none;color:var(--accent);background:transparent';
         document.body.append(probe);
         const actual = getComputedStyle(e),
           expected = getComputedStyle(probe);
@@ -182,6 +223,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       assert.deepEqual(await host.locator('.applet-shortcut-overview th').allTextContents(), [
         'コマンド',
         '割り当て',
+        '操作',
         '移動',
       ]);
       await checkLinks('ショートカット', theme, width);
@@ -201,11 +243,11 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       );
       await checkAssigned(row('fixture.hints.run'), 'Hint action', 'マウスジェスチャー', false);
       const geometry = await row('fixture.hints.run')
-        .locator('.applet-shortcut-pair')
+        .locator('[data-binding-id]')
         .evaluateAll((elements) =>
           elements.map((e) => {
-            const a = e.querySelector('.applet-shortcut-edit').getBoundingClientRect(),
-              b = e.querySelector('.gesture-menu-trigger svg').getBoundingClientRect();
+            const a = e.querySelector('.applet-shortcut-value').getBoundingClientRect(),
+              b = e.querySelector('.binding-row-actions').getBoundingClientRect();
             return { delta: Math.abs(a.top + a.height / 2 - b.top - b.height / 2) };
           }),
         );
@@ -213,9 +255,10 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       assert(geometry.every((g) => g.delta < 1));
       await row('fixture.hints.run').scrollIntoViewIfNeeded();
       await host.screenshot({ path: path.join(profile, `bindings-center-${theme}-${width}.png`) });
-      await row('fixture.hints.run').locator('.gesture-menu-trigger').first().click();
-      await host.getByRole('menu').waitFor();
-      await host.keyboard.press('Escape');
+      assert.equal(await host.locator('.gesture-menu-trigger').count(), 0);
+      await row('fixture.hints.run').locator('.binding-order').first().click();
+      await host.locator('.shortcut-order-dialog').waitFor();
+      await host.locator('.shortcut-order-dialog').press('Escape');
       await move(row('fixture.hints.run'), 'Hint action', 'マウスジェスチャー');
       await checkLinks('マウスジェスチャー', theme, width);
       await checkAssigned(row('fixture.hints.run'), 'Hint action', 'ショートカット', true);

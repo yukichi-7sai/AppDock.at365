@@ -11,7 +11,7 @@ import {
 import { AppletShortcutDialog } from './AppletShortcutDialog';
 import { ShortcutOrderDialog } from './ShortcutOrderDialog';
 import { CommandBindingList } from './CommandBindingList';
-import type { UiCommand } from '../../shared/commands';
+import { normalizeShortcut, type UiCommand } from '../../shared/commands';
 
 export function ShortcutCommandList({
   commands,
@@ -41,6 +41,7 @@ export function ShortcutCommandList({
       statusError={statusError}
       onRetry={onRetry}
       inputName="キー"
+      inputKey={(row) => normalizeShortcut(row.key)}
       inputLabel={(row) => row.key}
       conditionLabel={(row, command) =>
         keybindingConditionLabel(

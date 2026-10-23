@@ -187,7 +187,7 @@ export function TraySettings({
           <div className="tray-row-controls">
             <button
               type="button"
-              className="settings-list-icon accent-action"
+              className="settings-list-icon"
               aria-label={`${title(item)}を上へ`}
               title="上へ移動"
               disabled={index === 0}
@@ -197,7 +197,7 @@ export function TraySettings({
             </button>
             <button
               type="button"
-              className="settings-list-icon accent-action"
+              className="settings-list-icon"
               aria-label={`${title(item)}を下へ`}
               title="下へ移動"
               disabled={index === list.length - 1}

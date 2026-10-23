@@ -79,7 +79,46 @@ async function fields(container, narrow) {
       assert(row.titleRect.y - row.label.y < 12, row.title + ' has no extra group row');
     }
   }
-  measurements.push({ type: 'fields', narrow, rows });
+  const selects = await container
+    .locator('.settings-field-control select')
+    .evaluateAll((elements) =>
+      elements
+        .filter((e) => e.getBoundingClientRect().width > 0)
+        .map((e) => {
+          const style = getComputedStyle(e),
+            clone = e.cloneNode(true);
+          clone.removeAttribute('id');
+          Object.assign(clone.style, {
+            position: 'fixed',
+            visibility: 'hidden',
+            font: style.font,
+            padding: style.padding,
+            borderWidth: style.borderWidth,
+            borderStyle: style.borderStyle,
+            boxSizing: style.boxSizing,
+          });
+          clone.style.setProperty('width', 'max-content', 'important');
+          clone.style.setProperty('min-width', '0', 'important');
+          clone.style.setProperty('max-width', 'none', 'important');
+          document.body.append(clone);
+          const natural = clone.getBoundingClientRect().width;
+          clone.remove();
+          return {
+            label: e.getAttribute('aria-label'),
+            width: e.getBoundingClientRect().width,
+            available: e.parentElement.clientWidth,
+            natural,
+          };
+        }),
+    );
+  for (const select of selects) {
+    assert(select.width <= select.available + 1, select.label + ' fits its value column');
+    assert(
+      Math.abs(select.width - Math.min(select.natural, select.available)) < 2,
+      select.label + ' uses the natural option width instead of filling the column',
+    );
+  }
+  measurements.push({ type: 'fields', narrow, rows, selects });
   return rows;
 }
 async function centered(button) {
@@ -90,6 +129,76 @@ async function centered(button) {
   });
   measurements.push({ type: 'button', ...value });
   assert(Math.abs(value.offset) < 0.75, value.label + ' is centered: ' + value.offset);
+}
+async function disclosureLayout(summary) {
+  return summary.evaluate((e) => {
+    const bounds = (element) => element.getBoundingClientRect().toJSON();
+    const sample = document.createElement('span');
+    sample.style.cssText = 'position:absolute;background:var(--accent-soft);color:var(--accent)';
+    e.append(sample);
+    const colors = getComputedStyle(sample);
+    const expectedBackground = colors.backgroundColor,
+      expectedText = colors.color;
+    sample.remove();
+    return {
+      summary: bounds(e),
+      row: bounds(e.parentElement),
+      owner: bounds(e.closest('.settings-section-card')),
+      title: bounds(e.querySelector('h2')),
+      description: bounds(e.querySelector(':scope > p')),
+      icon: bounds(e.querySelector('.settings-section-toggle')),
+      background: getComputedStyle(e).backgroundColor,
+      titleColor: getComputedStyle(e.querySelector('h2')).color,
+      descriptionColor: getComputedStyle(e.querySelector(':scope > p')).color,
+      expectedBackground,
+      expectedText,
+    };
+  });
+}
+function assertDisclosurePadding(sample) {
+  const left = sample.title.x - sample.summary.x;
+  const right = sample.summary.right - sample.icon.right;
+  assert(left >= 7.9 && right >= 7.9, 'highlight leaves space beside text and disclosure icon');
+  assert(Math.abs(left - right) < 1, 'highlight has balanced horizontal insets');
+  assert(Math.abs(sample.title.x - sample.row.x) < 1, 'title stays aligned with the divider');
+  assert(Math.abs(sample.icon.right - sample.row.right) < 1, 'disclosure icon stays in its column');
+  assert(
+    sample.summary.x > sample.owner.x + 3 && sample.summary.right < sample.owner.right - 3,
+    'highlight remains inside the card frame',
+  );
+}
+function assertDisclosureColors(sample) {
+  assert.equal(
+    sample.background,
+    sample.expectedBackground,
+    'highlight uses the selected soft accent',
+  );
+  assert.equal(
+    sample.descriptionColor,
+    sample.expectedText,
+    'description uses readable accent text',
+  );
+  assert(contrast(sample.titleColor, sample.background) >= 4.5, 'title remains readable');
+  assert(
+    contrast(sample.descriptionColor, sample.background) >= 4.5,
+    'description remains readable',
+  );
+}
+async function tableAppearance(table) {
+  return table.evaluate((e) => {
+    const style = getComputedStyle(e);
+    return Object.fromEntries(
+      [
+        'border-top-width',
+        'border-top-style',
+        'border-top-color',
+        'border-radius',
+        'background-color',
+        'border-collapse',
+        'border-spacing',
+      ].map((key) => [key, style.getPropertyValue(key)]),
+    );
+  });
 }
 (async () => {
   let success = false;
@@ -133,6 +242,29 @@ async function centered(button) {
       await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
       await settleSettings(page);
     };
+    for (const [name, expected] of [
+      ['カスタムコマンド', /操作.*コマンド.*実行内容.*公開/],
+      ['AI', /AIサーバー.*接続先.*モデル/],
+      ['MCPクライアント', /MCPサーバー.*接続先.*ツール/],
+    ]) {
+      await select(name);
+      assert.match(await page.locator('.settings-page-heading > p').innerText(), expected);
+    }
+    await select('Applet管理');
+    assert.equal(await page.getByText('導入状況', { exact: true }).count(), 0);
+    assert.equal(
+      await page.getByText('インストール済みAppletを管理できます。', { exact: true }).count(),
+      0,
+    );
+    if (portable)
+      assert.equal(
+        await page.locator('.applet-management > .settings-field').count(),
+        0,
+        'normal Applet management goes directly from search to count and table',
+      );
+    checks.push(
+      'three page descriptions explain their purpose; Applet management omits redundant installation guidance',
+    );
     for (const theme of ['light', 'dark']) {
       await select('表示');
       await page.getByLabel('テーマ', { exact: true }).selectOption(theme);
@@ -142,6 +274,7 @@ async function centered(button) {
         theme,
       );
       for (const width of [1280, 760]) {
+        let bindingListAppearance;
         await app.evaluate(
           ({ BrowserWindow }, width) =>
             BrowserWindow.getAllWindows()
@@ -181,6 +314,10 @@ async function centered(button) {
           );
           await options.scrollIntoViewIfNeeded();
           await screenshot(`${theme}-${width}-${name}`);
+          if (name === 'ショートカットキー')
+            bindingListAppearance = await tableAppearance(
+              page.locator('.command-shortcuts .applet-shortcut-overview'),
+            );
         }
         await select('通知');
         const notifications = page.locator('.notification-settings');
@@ -197,6 +334,9 @@ async function centered(button) {
               radius: parseFloat(style.borderRadius),
               background: style.backgroundColor,
               gaps: rows.slice(1).map((row, index) => row.top - rows[index].bottom),
+              separators: [...e.querySelectorAll('.notification-setting-card')]
+                .slice(0, -1)
+                .map((row) => parseFloat(getComputedStyle(row).borderBottomWidth)),
             };
           });
           assert(
@@ -204,9 +344,14 @@ async function centered(button) {
             'notification owner is a surfaced card',
           );
           assert(
-            layout.gaps.every((gap) => gap >= 16),
-            'notification rows keep their spacing inside the owner card',
+            layout.gaps.every((gap) => Math.abs(gap) < 1) &&
+              layout.separators.every((border) => border > 0),
+            'notification rows meet at full-width separators inside the owner card',
           );
+          if (theme === 'dark') {
+            const borderColor = await ownerCard.evaluate((e) => getComputedStyle(e).borderTopColor);
+            assert(contrast(borderColor, layout.background) >= 2, 'dark owner border is visible');
+          }
           measurements.push({ type: 'notification-owner', theme, width, ...layout });
         }
         for (const name of ['読み上げ', 'MCP Event']) {
@@ -229,24 +374,71 @@ async function centered(button) {
               radius: parseFloat(getComputedStyle(e).borderRadius),
               background: getComputedStyle(e).backgroundColor,
               borderColor: getComputedStyle(e).borderColor,
+              titleSize: getComputedStyle(e.querySelector('summary h2')).fontSize,
+              icon: e.querySelector('.settings-section-toggle').getBoundingClientRect().toJSON(),
+              width: e.getBoundingClientRect().width,
+              summaryWidth: e.querySelector('summary').getBoundingClientRect().width,
             })),
           );
         assert(cards.length >= 2);
         for (const card of cards) {
-          assert(parseFloat(card.border) > 0, 'card has a visible border');
+          assert.equal(parseFloat(card.border), 0, 'notification row has no extra card frame');
           assert(
-            card.radius >= 10 && card.background !== 'rgba(0, 0, 0, 0)',
-            'notification is a surfaced card',
+            card.radius === 0 && card.background === 'rgba(0, 0, 0, 0)',
+            'notification row uses the containing card surface',
           );
-          if (theme === 'dark')
-            assert(contrast(card.borderColor, card.background) >= 2, 'dark card border is visible');
+          assert.equal(card.titleSize, '13px', 'row title matches a SettingsField title');
+          assert(card.icon.width >= 24 && card.icon.height >= 24, 'disclosure icon is visible');
+          assert(
+            card.summaryWidth >= card.width + 15.9,
+            'disclosure target includes horizontal highlight insets',
+          );
         }
         measurements.push({ type: 'cards', theme, width, cards });
         const errorCard = notifications
           .locator('.notification-setting-card')
           .filter({ has: page.getByRole('heading', { name: 'エラー通知', exact: true }) });
-        if (!(await errorCard.evaluate((e) => e.open)))
-          await errorCard.locator(':scope > summary').click();
+        await errorCard.scrollIntoViewIfNeeded();
+        await screenshot(`${theme}-${width}-notification-rows-collapsed`);
+        const savedNotifications = await page.evaluate(
+          async () => (await window.dock.snapshot()).settings.value.notificationPreferences,
+        );
+        const summary = errorCard.locator(':scope > summary');
+        if (await errorCard.evaluate((e) => e.open)) await summary.click();
+        await page.mouse.move(2, 2);
+        const idle = await disclosureLayout(summary);
+        assertDisclosurePadding(idle);
+        await summary.hover();
+        const hovered = await disclosureLayout(summary);
+        assertDisclosureColors(hovered);
+        for (const key of ['summary', 'title', 'description', 'icon'])
+          assert.deepEqual(hovered[key], idle[key], 'hover preserves ' + key + ' geometry');
+        measurements.push({ type: 'disclosure-highlight', theme, width, idle, hovered });
+        await screenshot(`${theme}-${width}-notification-hover`);
+        await summary.focus();
+        await summary.press('Enter');
+        assert(await errorCard.evaluate((e) => e.open), 'Enter expands the row');
+        await page.mouse.move(2, 2);
+        assertDisclosureColors(await disclosureLayout(summary));
+        assert(
+          await summary.evaluate((e) => parseFloat(getComputedStyle(e).outlineWidth) >= 2),
+          'keyboard focus is visible',
+        );
+        await summary.press('Space');
+        assert(!(await errorCard.evaluate((e) => e.open)), 'Space collapses the row');
+        const summaryBox = await summary.boundingBox();
+        await summary.click({ position: { x: summaryBox.width - 14, y: summaryBox.height / 2 } });
+        assert(
+          await errorCard.evaluate((e) => e.open),
+          'clicking the disclosure icon expands the row',
+        );
+        assert.deepEqual(
+          await page.evaluate(
+            async () => (await window.dock.snapshot()).settings.value.notificationPreferences,
+          ),
+          savedNotifications,
+          'opening and closing rows never changes saved notification settings',
+        );
         assert(await errorCard.getByLabel('エラー通知のバナー', { exact: true }).isDisabled());
         await fields(
           errorCard,
@@ -254,6 +446,11 @@ async function centered(button) {
         );
         await errorCard.scrollIntoViewIfNeeded();
         await screenshot(`${theme}-${width}-notification-card`);
+        assert.equal(
+          await page.locator('.settings-body').evaluate((e) => e.scrollWidth > e.clientWidth + 2),
+          false,
+          'highlight does not introduce horizontal scrolling',
+        );
         await select('操作の許可');
         const publication = page.getByRole('region', { name: 'APIの公開', exact: true });
         assert.equal(
@@ -282,6 +479,13 @@ async function centered(button) {
           return result;
         });
         assert.equal(background.table, background.card, 'permissions use the card background');
+        const permissionAppearance = await tableAppearance(page.locator('.permission-table'));
+        assert.deepEqual(
+          permissionAppearance,
+          bindingListAppearance,
+          'permission frame matches CommandBindingList',
+        );
+        measurements.push({ type: 'permission-frame', theme, width, permissionAppearance });
         await screenshot(`${theme}-${width}-permissions`);
         await select('MCPサーバー');
         const group = page.getByRole('region', { name: '認証の設定例', exact: true });
@@ -344,6 +548,35 @@ async function centered(button) {
         );
       }
     }
+    const { accentChoices } = require('../out/main/shared/appearance');
+    for (const theme of ['light', 'dark']) {
+      await select('表示');
+      await page.getByLabel('テーマ', { exact: true }).selectOption(theme);
+      await settleSettings(page);
+      for (const palette of accentChoices) {
+        await select('表示');
+        await page
+          .getByRole('group', { name: 'アクセントカラー', exact: true })
+          .getByRole('button', { name: palette.title, exact: true })
+          .click();
+        await settleSettings(page);
+        await page.waitForFunction(
+          (id) => document.documentElement.dataset.accent === id,
+          palette.id,
+        );
+        await select('通知');
+        const summary = page.locator('.notification-setting-card > summary').first();
+        await summary.hover();
+        const sample = await disclosureLayout(summary);
+        assertDisclosurePadding(sample);
+        assertDisclosureColors(sample);
+        measurements.push({ type: 'disclosure-palette', theme, palette: palette.id, sample });
+        await screenshot(`${theme}-palette-${palette.id}-notification-hover`);
+      }
+    }
+    checks.push(
+      'notification highlights keep padded geometry and readable soft accent colors for all presets and custom in both themes',
+    );
     await select('AI');
     await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();
     let aiDialog = page.getByRole('dialog');

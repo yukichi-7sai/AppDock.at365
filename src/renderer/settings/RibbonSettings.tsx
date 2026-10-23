@@ -244,7 +244,8 @@ export function RibbonSettings({
             </select>
             <button
               aria-label={`${item.title}を上へ`}
-              className="settings-list-icon accent-action"
+              className="settings-list-icon"
+              title="上へ移動"
               disabled={pending || index === 0}
               onClick={() => move(item.id, siblings[index - 1].id)}
             >
@@ -252,7 +253,8 @@ export function RibbonSettings({
             </button>
             <button
               aria-label={`${item.title}を下へ`}
-              className="settings-list-icon accent-action"
+              className="settings-list-icon"
+              title="下へ移動"
               disabled={pending || index === siblings.length - 1}
               onClick={() => move(item.id, siblings[index + 1].id)}
             >

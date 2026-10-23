@@ -72,7 +72,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 
 共通設定画面はShortcutCommandListを使用する。Applet管理から開くと提供元IDで絞り込み、未割り当ての宣言コマンドも表示する。表示用フィルターは実行条件・実行順を変更せず、解除で全体表示へ戻る。入力の適用エラーと再試行の既存契約を維持する。
 
-コマンド横の＋で追加、キー/条件ペアまたはその他メニューの編集で小さなdialogを開く。キー記録、修飾キー付き特殊キー／英数字選択、条件、元入力のブロック、有効状態を編集できる。Win+WもJSON編集なしで記録・選択できる。記録欄が実際にフォーカスされている間だけ、tokenと本体HWNDに限定したネイティブ記録を使い、コマンドとWidgets等を抑止する。ローカル条件ではブロックの値を保持して操作を無効にする。新規はowner/appの既定条件と有効状態で開始する。空キーや対象Appletが0件の条件は適用できない。記録欄のEnter/Delete/Spaceはキー入力、Tabは移動、Escapeは取消。特殊キーからTab/Escapeや修飾キー付きの組み合わせも選べる。
+コマンド横の＋で追加、割り当てごとの操作列にある鉛筆アイコンで小さなdialogを開く。キー記録、修飾キー付き特殊キー／英数字選択、条件、元入力のブロック、有効状態を編集できる。Win+WもJSON編集なしで記録・選択できる。記録欄が実際にフォーカスされている間だけ、tokenと本体HWNDに限定したネイティブ記録を使い、コマンドとWidgets等を抑止する。ローカル条件ではブロックの値を保持して操作を無効にする。新規はowner/appの既定条件と有効状態で開始する。空キーや対象Appletが0件の条件は適用できない。記録欄のEnter/Delete/Spaceはキー入力、Tabは移動、Escapeは取消。特殊キーからTab/Escapeや修飾キー付きの組み合わせも選べる。
 
 `globalHotKeys.registered`は捕捉設定の適用成功を表す互換フィールド。`backend: "hook"`とキー単位の`effectiveBlockOriginalInput`も取得できる。Windows標準の排他的な予約やコマンドの実効果を保証する値ではない。入力プロセス停止では新規捕捉を解除し、設定保存／「入力を再試行」／再起動で復旧する。通知枠は64件、枠がない新規押下は通し、既に抑止したキーは障害後に再送しない。管理者アプリ、UAC／ロック画面、他の入力フックとの優先順位は通常デスクトップと同一に保証しない。
 
@@ -80,7 +80,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 
 追加/適用は最新の保存済み設定へ反映し、その操作で即時保存する。追加とキー変更は同キー末尾、条件/有効状態だけの変更は位置を保持する。元の割り当てが編集中に外部更新・削除されていたら上書きを拒否する。追加/取消後に一覧を自動スクロールせず、元の操作ボタンへpreventScrollでfocusを戻す。絞り込みで元のボタンが消えた場合は一覧へ戻す。
 
-その他メニューは「編集」「このキーの実行順…」「削除」。設定/通常Appletの削除は確認なしで対象IDを保存済み設定から除き、最後の割り当てを消してもコマンド行は未割り当てとして残る。一括初期化は置かず、利用者が削除した既定割り当てを再生成しない。WebApplet管理項目の将来サイト用テンプレートは既存画面を維持する。
+操作列は鉛筆の編集・このキーの実行順・削除のアイコンを直接並べる。寸法・配色と複数コマンドの実行順表示は[共通一覧UI](settings-list-editing.md)に従う。設定/通常Appletの削除は確認なしで対象IDを保存済み設定から除き、最後の割り当てを消してもコマンド行は未割り当てとして残る。一括初期化は置かず、利用者が削除した既定割り当てを再生成しない。WebApplet管理項目の将来サイト用テンプレートは既存画面を維持する。
 
 ## 実行順の専用パネル
 
@@ -93,7 +93,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 - 条件一致/無効/利用可能性/同じコマンドの最初の一致を1回実行する仕様は既存resolver/dispatcherのまま。実行順の編集は行数やコマンドを変えない。
 ## マウスジェスチャーと共通の編集UI
 
-CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用する。両一覧のメニューは編集・同じ入力の実行順・確認なし削除。追加時のフィルター・表示位置を保ち、自動スクロールしない。適用後に行が非表示になった場合は一覧へpreventScrollでフォーカスを戻す。ジェスチャー固有の入力・条件は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照する。保存形式・revision・JSON・useSettingsEditorの共有を維持する。
+CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用する。両一覧の操作列は編集・同じ入力の実行順・確認なし削除を直接表示する。追加時のフィルター・表示位置を保ち、自動スクロールしない。適用後に行が非表示になった場合は一覧へpreventScrollでフォーカスを戻す。ジェスチャー固有の入力・条件は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照する。保存形式・revision・JSON・useSettingsEditorの共有を維持する。
 
 主要な回帰はtests/keybindings.test.cjs、scripts/shortcuts-ui-test.cjs（全コマンド一覧とApplet編集）、scripts/keybindings-ui-test.cjs（実OS入力/ページ条件）、navigation/applet-order GUI。発行した単一EXEは隔離コピーで同じ一覧・保存・再起動を確認する。
 

@@ -312,12 +312,18 @@
 }
 .settings-panel .permission-table {
   background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
   border-collapse: separate;
   border-spacing: 0;
   overflow: hidden;
 }
 .settings-panel .permission-table thead {
   background: var(--settings-group-background);
+}
+.settings-panel .permission-table tbody tr:last-child,
+.settings-panel .permission-table tbody tr:last-child > :is(th, td) {
+  border-bottom: 0;
 }
 .settings-panel .command-shortcut-summary {
   flex-wrap: wrap;
@@ -528,27 +534,6 @@ pre.ai-preview-result {
   gap: 8px;
   align-items: center;
 }
-.ai-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--raised);
-  color: var(--text);
-}
-.ai-icon-button:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.ai-delete-button:hover:not(:disabled) {
-  color: #e15b64;
-  border-color: #e15b64;
-}
 .ai-connection-table {
   margin-bottom: 4px;
 }
@@ -557,7 +542,7 @@ pre.ai-preview-result {
   width: 100%;
 }
 .ai-connection-table .applet-shortcut-overview th:last-child {
-  width: 100px;
+  width: 108px;
 }
 .ai-connection-table td {
   vertical-align: middle;
@@ -618,19 +603,15 @@ pre.ai-preview-result {
   font-size: 23px;
 }
 @container settings-page (max-width: 540px) {
-  .ai-connection-table .applet-shortcut-overview th,
-  .ai-connection-table .applet-shortcut-overview td {
+  .ai-settings .ai-connection-table .applet-shortcut-overview th,
+  .ai-settings .ai-connection-table .applet-shortcut-overview td {
     padding: 12px 8px;
   }
-  .ai-connection-table .applet-shortcut-overview th:last-child {
-    width: 82px;
+  .ai-settings .ai-connection-table .applet-shortcut-overview th:last-child {
+    width: 84px;
   }
   .ai-row-actions {
     gap: 4px;
-  }
-  .ai-icon-button {
-    width: 32px;
-    height: 34px;
   }
 }
 
@@ -686,11 +667,6 @@ pre.ai-preview-result {
 .applet-management-actions {
   flex-wrap: nowrap;
   gap: 4px;
-}
-.applet-management-links .settings-list-icon,
-.applet-management-actions .settings-list-icon {
-  width: 32px;
-  height: 32px;
 }
 .applet-management .applet-update-check {
   width: 28px;

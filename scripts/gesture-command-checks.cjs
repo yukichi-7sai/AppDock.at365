@@ -22,33 +22,26 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     await filter.focus();
     const styles = await page.locator('.shortcut-command-list').evaluate((root) => {
       const add = root.querySelector('.applet-shortcut-add');
-      const edit = root.querySelector('.applet-shortcut-edit');
-      const menu = root.querySelector('.gesture-menu-trigger');
+      const edit = root.querySelector('.applet-shortcut-value');
+      const button = root.querySelector('.applet-shortcut-edit');
       return {
         addWidth: add.getBoundingClientRect().width,
         addHeight: add.getBoundingClientRect().height,
         addPadding: getComputedStyle(add).padding,
         editBackground: getComputedStyle(edit).backgroundColor,
-        editBorder: getComputedStyle(edit).borderLeftWidth,
-        editPaddingLeft: getComputedStyle(edit).paddingLeft,
-        menuBackground: getComputedStyle(menu).backgroundColor,
-        menuFontSize: getComputedStyle(menu).fontSize,
+        buttonWidth: button.getBoundingClientRect().width,
+        buttonHeight: button.getBoundingClientRect().height,
+        buttonBackground: getComputedStyle(button).backgroundColor,
+        expectedBackground: getComputedStyle(root).getPropertyValue('--panel').trim(),
       };
     });
-    assert.deepEqual(
-      styles,
-      {
-        addWidth: 30,
-        addHeight: 30,
-        addPadding: '0px',
-        editBackground: 'rgba(0, 0, 0, 0)',
-        editBorder: '0px',
-        editPaddingLeft: '0px',
-        menuBackground: 'rgba(0, 0, 0, 0)',
-        menuFontSize: '22px',
-      },
-      'assignment controls retain their dedicated styles inside the section',
-    );
+    assert.equal(styles.addWidth, 30);
+    assert.equal(styles.addHeight, 30);
+    assert.equal(styles.addPadding, '0px');
+    assert.equal(styles.editBackground, 'rgba(0, 0, 0, 0)');
+    assert.equal(styles.buttonWidth, 32);
+    assert.equal(styles.buttonHeight, 32);
+    assert.equal(styles.buttonBackground, 'rgba(0, 0, 0, 0)');
   };
   await bindingStyles();
   const row = (id) => page.locator(`[data-shortcut-command="${id}"]`);
@@ -83,12 +76,6 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
         .getByRole('group', { name: 'ジェスチャーの操作', exact: true })
         .getByRole('button', { name: input, exact: true })
         .click();
-  };
-  const menu = async (binding) => {
-    await page
-      .locator(`[data-binding-id="${binding}"]`)
-      .getByRole('button', { name: /その他の操作/ })
-      .click();
   };
   const before = await saved();
   const keysBefore = (await snapshot()).settings.value.keybindings;
@@ -141,9 +128,9 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await choose('移動', '左');
   await panel.getByLabel('割り当てのいつ・どこで').selectOption('exe');
   assert(await panel.getByRole('button', { name: '追加', exact: true }).isDisabled());
-  await panel.getByLabel('対象のexe名').fill('C:\\Windows\\notepad.exe');
+  await panel.getByLabel('対象のexe名', { exact: true }).fill('C:\\Windows\\notepad.exe');
   assert(await panel.getByRole('button', { name: '追加', exact: true }).isDisabled());
-  await panel.getByLabel('対象のexe名').fill('NOTEPAD.exe, explorer');
+  await panel.getByLabel('対象のexe名', { exact: true }).fill('NOTEPAD.exe, explorer');
   await apply(true);
   await save();
   let rows = await saved();
@@ -156,13 +143,13 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   );
 
   await filter.fill('test.gestures.b');
-  await menu(b);
-  assert.deepEqual(await page.getByRole('menuitem').allTextContents(), [
-    '編集',
-    'このジェスチャーの実行順…',
-    '削除',
-  ]);
-  await page.getByRole('menuitem', { name: 'このジェスチャーの実行順…', exact: true }).click();
+  assert.deepEqual(
+    await page
+      .locator(`[data-binding-id="${b}"] .binding-row-actions button`)
+      .evaluateAll((buttons) => buttons.map((button) => button.title)),
+    ['編集', 'このジェスチャーの実行順（複数のコマンド）', '削除'],
+  );
+  await page.locator(`[data-binding-id="${b}"] .binding-order`).click();
   assert.deepEqual(await orderIds(), [b, a], 'full gesture group despite filtered command list');
   await orderPanel
     .locator(`[data-order-binding="${a}"] .shortcut-order-handle`)
@@ -201,7 +188,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
 
   await filter.fill('test.gestures.a');
   await page.locator(`[data-binding-id="${a}"] .applet-shortcut-edit`).click();
-  await panel.getByRole('switch').click();
+  await panel.getByRole('switch', { name: 'この割り当てを有効にする', exact: true }).click();
   await apply();
   await save();
   assert.deepEqual(
@@ -209,8 +196,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     ['key', a, b],
   );
   assert.equal((await saved()).find((r) => r.id === a).enabled, false);
-  await menu(a);
-  await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+  await page.locator(`[data-binding-id="${a}"] .binding-delete`).click();
   assert.equal(await page.getByRole('alertdialog').count(), 0);
   assert.equal(await page.locator(`[data-binding-id="${a}"]`).count(), 0);
   await save();
@@ -311,8 +297,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('move-up-down');
   assert.deepEqual(await orderIds(), [paired.id]);
   await orderPanel.getByRole('button', { name: 'キャンセル', exact: true }).click();
-  await menu(paired.id);
-  await page.getByRole('menuitem', { name: '削除', exact: true }).click();
+  await page.locator(`[data-binding-id="${paired.id}"] .binding-delete`).click();
   await save();
   checks.push(
     'two-step add/edit/reversal/order/delete / same direction disabled / selections retained across stages and input families',
@@ -377,12 +362,13 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
       .evaluateAll((items) => items.map((item) => item.value));
     assert.equal(choices[choices.indexOf('global') + 1], 'desktop');
     await condition.selectOption(scope);
-    const exclude = panel.getByRole('checkbox', { name: 'デスクトップを除外', exact: true });
+    const exclude = panel.getByRole('switch', { name: 'デスクトップを除外', exact: true });
     if (scope === 'desktop') assert.equal(await exclude.count(), 0);
     else {
-      assert.equal(await exclude.isChecked(), false);
-      await exclude.check();
-      if (scope === 'exe') await panel.getByLabel('対象のexe名').fill('explorer.exe');
+      assert.equal(await exclude.getAttribute('aria-checked'), 'false');
+      await exclude.click();
+      if (scope === 'exe')
+        await panel.getByLabel('対象のexe名', { exact: true }).fill('explorer.exe');
     }
     await apply(true);
     const added = (await saved()).filter((item) => item.command === 'test.gestures.c').at(-1);
@@ -392,22 +378,32 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
       .locator(`[data-binding-id="${added.id}"] .applet-shortcut-edit`)
       .click();
     assert.equal(await condition.inputValue(), scope);
-    if (scope !== 'desktop') assert(await exclude.isChecked());
+    if (scope !== 'desktop') assert.equal(await exclude.getAttribute('aria-checked'), 'true');
     await panel.getByRole('button', { name: 'キャンセル', exact: true }).click();
   }
   checks.push(
     'desktop immediately follows global / global and exe desktop exclusions save and reopen',
   );
   await page.locator('summary').filter({ hasText: '動作設定' }).click();
-  assert.deepEqual(await options.locator('.settings-field-label strong').allTextContents(), [
-    'マウスジェスチャーを有効にする',
-    '非アクティブなウィンドウ・デスクトップでも開始する',
-    '条件に一致したコマンドの実行方法',
-    '操作感',
-    '待機表示',
-    'Webブラウザ',
-    '除外',
-  ]);
+  assert.deepEqual(
+    await options.locator('.settings-field-label strong').allTextContents(),
+    [
+      'enabled',
+      'activateOnStart',
+      'executionMode',
+      'distance',
+      'wheelDelayMs',
+      'indicatorPosition',
+      'indicatorOpacity',
+      'indicatorShowNoAction',
+      'browsers',
+      'requireChromiumWindowClass',
+      'excludedProcesses',
+    ].map(
+      (key) =>
+        require('../out/main/shared/settings-catalog').hostSettingItem('gestures', key).title,
+    ),
+  );
   assert.equal(
     await page.getByLabel('条件に一致したコマンドの実行方法', { exact: true }).inputValue(),
     'all',
@@ -431,8 +427,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert.equal(await noAction.getAttribute('aria-checked'), 'true');
   assert.equal(
     await noAction.evaluate(
-      (el) =>
-        el.closest('.settings-field').querySelector('.settings-field-label strong').textContent,
+      (el) => el.closest('.settings-field').querySelector('.settings-field-group').textContent,
     ),
     '待機表示',
   );
@@ -452,8 +447,8 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert.equal((await snapshot()).settings.value.gestures.indicatorPosition, 'monitor-center');
   await page.getByLabel('表示位置', { exact: true }).selectOption('none');
   await page.getByLabel('Webブラウザのexe', { exact: true }).fill('firefox.exe, msedge.exe');
-  await page.getByLabel('移動距離（px）').fill('70');
-  await page.getByLabel('移動距離（px）').press('Enter');
+  await page.getByLabel('移動距離（px）', { exact: true }).fill('70');
+  await page.getByLabel('移動距離（px）', { exact: true }).press('Enter');
   await save();
   const state = (await snapshot()).settings.value;
   assert.equal(state.gestures.distance, 70);

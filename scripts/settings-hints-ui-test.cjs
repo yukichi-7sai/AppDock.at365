@@ -17,7 +17,8 @@ const titlesOnly =
 const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const accentLayoutOnly = process.argv.includes('--accent-layout-only');
-const commandNavigationOnly = process.argv.includes('--command-navigation-only');
+const listActionsOnly = process.argv.includes('--list-actions-only');
+const commandNavigationOnly = process.argv.includes('--command-navigation-only') || listActionsOnly;
 const listScrollbarOnly = process.argv.includes('--list-scrollbar-only');
 const updateRequests = [];
 const titleSamples = [];
@@ -417,7 +418,7 @@ async function checkSectionTitles() {
         ),
       };
     }
-    if (accentLayoutOnly) {
+    if (accentLayoutOnly || listActionsOnly) {
       initial.ribbon.groups = [
         {
           id: 'group:color',
@@ -439,6 +440,56 @@ async function checkSectionTitles() {
         },
         { id: 'tray.last', type: 'separator' },
       ];
+    }
+    if (listActionsOnly) {
+      initial.ai.connections = [
+        {
+          ...require('../out/main/shared/ai').newAiConnection('actions.ai'),
+          name: 'Action server',
+        },
+      ];
+      initial.mcpServers = {
+        version: 1,
+        items: [
+          {
+            id: '00000000-0000-0000-0000-000000000039',
+            name: 'Action MCP',
+            description: 'Unconfigured test entry',
+          },
+        ],
+      };
+      initial.keybindings.push(
+        {
+          ...initial.keybindings[0],
+          id: 'actions.shared',
+          command: 'missing.command',
+          enabled: false,
+        },
+        ...['one', 'two'].map((suffix) => ({
+          ...initial.keybindings[0],
+          id: 'actions.duplicate.' + suffix,
+          key: 'Ctrl+F16',
+          enabled: false,
+        })),
+      );
+      initial.gestures.bindings.push(
+        {
+          id: 'actions.gesture',
+          command: 'fixture.hints.run',
+          gesture: 'move-up',
+          enabled: false,
+          when: {
+            scope: 'exe',
+            appletIds: [],
+            processes: [
+              'long-application-process-name',
+              'another-long-process-name',
+              'third-long-process-name',
+            ],
+          },
+        },
+        { ...initial.gestures.bindings.at(-1), id: 'actions.gesture.duplicate' },
+      );
     }
     if (assignmentSpeechOnly) {
       initial.tts.defaultVoice = 'fixture-voice';
@@ -533,6 +584,22 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (listActionsOnly) {
+      await require('./settings-list-actions-checks.cjs')({
+        host,
+        select,
+        snapshot,
+        until,
+        inspect,
+        inspector,
+        electronExpression,
+        profile,
+        checks,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (listScrollbarOnly) {
       await require('./settings-list-scrollbar-checks.cjs')({
         host,
@@ -1192,6 +1259,7 @@ async function checkSectionTitles() {
       assignmentSpeechOnly,
       accentLayoutOnly,
       commandNavigationOnly,
+      listActionsOnly,
       listScrollbarOnly,
       titleSampleCount: titleSamples.length,
       checks,

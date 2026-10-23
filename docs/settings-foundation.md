@@ -64,7 +64,11 @@ settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタ
 
 `SettingsField.group?: string`は項目名の左に小さなグループ名を常時表示する。色・文字サイズ・配置で項目名と区別し、groupの有無でタイトルの高さを変えない。同じ行に表示し、fieldsetの読み上げ名にもグループ名を含める。関連する項目には同じgroupを指定し、SettingsSectionや複数列の専用グリッドで囲まず同じ階層へ並べる。マウスジェスチャーの操作感・待機表示と、両入力方式のWebブラウザ設定はこの形を使う。枠なしの`SettingsSection variant="group"`は上部に共通の20pxの余白を設ける。Fieldのgroupとは別の構成部品として扱う。
 
-通知一覧は提供元ごとの`SettingsSection variant="card"`内へ、通知種類のカードを共通の`settings-sections`で間隔を保って並べる。通知先も共通のField/Choiceを使い、汎用fieldsetやカードを画面専用CSSで上書きしない。操作の許可一覧は`SettingsSection variant="card" title="APIの公開"`で囲み、一覧の背景をカードと揃える。テーブルの外枠はSectionへ任せる。Applet/MCPの独立した許可列と専用テーブルの操作契約を保つ。これと同種の2列テーブルの共通部品化は今後の検討対象で、現行では専用テーブルを使用する。
+折りたたみSectionのhoverとキーボードフォーカスは共通の`--accent-soft`を背景に使い、説明文は読みやすい`--accent`で表示する。rowのsummaryは親カードの内側の余白へ左右12px（狭い幅では8px）広げ、その分を内側の余白へ戻す。タイトル・説明・開閉アイコン・区切り線の位置と折り返し幅を変えず、背景と文字の間に余裕を設ける。カードの枠からはみ出さず、ハイライトの有無で寸法を変えない。
+
+設定値のnative selectは共通Fieldとダイアログで`fit-content`を使い、最長の選択肢が収まる自然な幅を基本とする。最大幅は親の100%に制限し、文字・URL・JSONなどの入力欄は従来の入力列の幅を保つ。Applet/コマンドの対象フィルターも共通`CommandProviderFilter`で内容に合う幅にし、flex/gridの親で横へ引き伸ばさない。長い名前は枠内で折り返し、解除ボタンを隠さない。一覧中心の画面はApplet管理を参考に構成し、トップレベルのカードを必須にしない。
+
+通知一覧は提供元ごとの`SettingsSection variant="card"`内へ、通知種類を`SettingsSection variant="row" collapsible`で直接並べる。rowはSettingsFieldと同じ文字サイズ・行の余白・全幅の区切り線を使い、タイトルと常時表示のdescriptionを持つ枠なしの行にする。共通の開閉アイコンを右端へ表示し、行全体のクリック、Enter/Space、hoverとフォーカス表示で開閉箇所を分かりやすくする。通知先も共通のField/Choiceを使い、汎用fieldsetやカードを画面専用CSSで上書きしない。操作の許可一覧は`SettingsSection variant="card" title="APIの公開"`で囲み、一覧自体にもCommandBindingListと同じ境界色・12pxの角丸・カード背景の外枠を付ける。Applet/MCPの独立した許可列と専用テーブルの操作契約を保つ。これと同種の2列テーブルの共通部品化は今後の検討対象で、現行では専用テーブルを使用する。
 
 通知のボイス候補は`SettingsCombobox`を使う。入力欄の位置と幅に合わせた同一Surfaceのポップオーバーで、スクロール枠に切られず、下に空きがない場合は上に開く。IDの直接入力・ID/名前による候補絞り込み・クリック・上下キーとEnterでの選択・Escape/Tabでの終了に対応し、IME入力の確定は共通入力部品へ委ねる。取得済み一覧は通知の声・速度や無関係な設定の保存で破棄せず、TTS設定またはAPIキーの変更時に無効化する。取得中に接続設定が変わった場合は古い応答を破棄する。
 
