@@ -177,49 +177,7 @@ export function parseGestures(value: unknown): GestureSettings {
     v.bindings.length > 2000
   )
     throw Error('ジェスチャーの距離・間隔・表示・割り当てを確認してください。');
-  const ids = new Set<string>();
-  const bindings = v.bindings.map((r) => {
-    if (
-      !r ||
-      !validCommandId(r.id) ||
-      ids.has(r.id) ||
-      !validCommandId(r.command) ||
-      typeof r.enabled !== 'boolean' ||
-      !r.when ||
-      !['global', 'browser', 'exe', 'desktop', 'app', 'pages', 'owner', 'applets'].includes(
-        r.when.scope,
-      ) ||
-      (r.when.excludeDesktop !== undefined && typeof r.when.excludeDesktop !== 'boolean') ||
-      (r.when.excludeDesktop === true && !['global', 'exe'].includes(r.when.scope)) ||
-      !Array.isArray(r.when.appletIds) ||
-      r.when.appletIds.length > 500 ||
-      r.when.appletIds.some((id) => !validShortcutTarget(id)) ||
-      (r.when.scope === 'applets' ? !r.when.appletIds.length : !!r.when.appletIds.length)
-    )
-      throw Error('ジェスチャー割り当てのID・コマンド・条件を確認してください。');
-    ids.add(r.id);
-    const processes = processNames(r.when.processes);
-    if (r.when.scope === 'exe' ? !processes.length : !!processes.length)
-      throw Error('指定したexe条件にはexe名が必要です。');
-    if (
-      Object.keys(r.when).some(
-        (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
-      )
-    )
-      throw Error('未知のジェスチャー条件です。');
-    return {
-      id: r.id,
-      command: r.command,
-      enabled: r.enabled,
-      gesture: normalizeGesture(r.gesture),
-      when: {
-        scope: r.when.scope,
-        appletIds: [...new Set(r.when.appletIds)],
-        processes,
-        ...(r.when.excludeDesktop === undefined ? {} : { excludeDesktop: r.when.excludeDesktop }),
-      },
-    };
-  });
+  const bindings = parseGestureBindings(v.bindings);
   return {
     ...v,
     activateOnStart: v.activateOnStart ?? false,
@@ -313,4 +271,56 @@ export function planGestureCommands(
       requireChromiumWindowClass: settings.requireChromiumWindowClass,
     },
   );
+}
+
+export function parseGestureBindings(
+  value: unknown,
+  normalize: (value: unknown) => string = normalizeGesture,
+): GestureBinding[] {
+  if (!Array.isArray(value) || value.length > 2000)
+    throw Error('ジェスチャー割り当ては2000件以内です。');
+  const rows = value as GestureBinding[];
+  const ids = new Set<string>();
+  return rows.map((r) => {
+    if (
+      !r ||
+      !validCommandId(r.id) ||
+      ids.has(r.id) ||
+      !validCommandId(r.command) ||
+      typeof r.enabled !== 'boolean' ||
+      !r.when ||
+      !['global', 'browser', 'exe', 'desktop', 'app', 'pages', 'owner', 'applets'].includes(
+        r.when.scope,
+      ) ||
+      (r.when.excludeDesktop !== undefined && typeof r.when.excludeDesktop !== 'boolean') ||
+      (r.when.excludeDesktop === true && !['global', 'exe'].includes(r.when.scope)) ||
+      !Array.isArray(r.when.appletIds) ||
+      r.when.appletIds.length > 500 ||
+      r.when.appletIds.some((id) => !validShortcutTarget(id)) ||
+      (r.when.scope === 'applets' ? !r.when.appletIds.length : !!r.when.appletIds.length)
+    )
+      throw Error('ジェスチャー割り当てのID・コマンド・条件を確認してください。');
+    ids.add(r.id);
+    const processes = processNames(r.when.processes);
+    if (r.when.scope === 'exe' ? !processes.length : !!processes.length)
+      throw Error('指定したexe条件にはexe名が必要です。');
+    if (
+      Object.keys(r.when).some(
+        (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
+      )
+    )
+      throw Error('未知のジェスチャー条件です。');
+    return {
+      id: r.id,
+      command: r.command,
+      enabled: r.enabled,
+      gesture: normalize(r.gesture),
+      when: {
+        scope: r.when.scope,
+        appletIds: [...new Set(r.when.appletIds)],
+        processes,
+        ...(r.when.excludeDesktop === undefined ? {} : { excludeDesktop: r.when.excludeDesktop }),
+      },
+    };
+  });
 }

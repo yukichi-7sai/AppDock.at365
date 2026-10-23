@@ -495,3 +495,9 @@ networkHostnamesの変更は保存後に検査規則を差し替える。bind変
 外部クライアントへ渡す情報はStreamable HTTP、`http://<AppDock-PCのIPv4または許可済みホスト名>:<port>/mcp`、Bearer tokenの3点。例の秘密値は`<token>`とし、実値を文書へ書かない。接続元とAppDock双方のルーティング／ファイアウォールで到達可能であることが前提。
 
 同じtokenを持つクライアントは同じMCP主体として扱う。現行のAI/TTSジョブ所有・停止・参照範囲やrequestIdの重複判定も接続元ごとには分離されない。各クライアントはrequestIdにUUID等を使い、ユーザー名やIPから別主体を推測しない。クライアント別トークン・権限・監査識別は対象外とする。
+
+## タッチパッドジェスチャー
+
+MCP appdock_get_touchpad_gestures（touchpadGestures.get）でrevision・割り当て・接続状態を取得します。変更はcommands.executeのappdock.touchpadGestures.update / set-enabled / reconnect / clearを使用します。MCP列のallowEditTouchpadGesturesはallowExecute/allowWriteと独立した専用許可で、既定falseです。updateには既存ジェスチャーと同じadd/update/remove/configure/reorder操作、明示接続にはenabledまたはgestureを渡します。Windows反映や入力状態は返却stateと再取得で確認し、effectVerifiedは実機入力を検証していないためfalseです。
+
+詳細は[タッチパッドとWindowsの接続仕様](touchpad-gestures-design.md)を参照してください。

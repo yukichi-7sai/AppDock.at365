@@ -6,6 +6,7 @@ import { CommandProviderFilter } from './CommandProviderFilter';
 export const commandSettingsPages = [
   { id: 'shortcuts', title: 'ショートカット', icon: 'keyboard' },
   { id: 'gestures', title: 'マウスジェスチャー', icon: 'mouse' },
+  { id: 'touchpad-gestures', title: 'タッチパッドジェスチャー', icon: 'touchpad' },
   { id: 'custom-commands', title: 'カスタムコマンド', icon: 'keyboard-command-key' },
 ] as const satisfies { id: string; title: string; icon: IconName }[];
 export type CommandSettingsPage = (typeof commandSettingsPages)[number]['id'];
@@ -17,7 +18,11 @@ export type CommandSettingsTarget = {
 };
 export const CommandSettingsNavigation = createContext<{
   page: string;
-  assignments: { shortcuts: ReadonlySet<string>; gestures: ReadonlySet<string> };
+  assignments: {
+    shortcuts: ReadonlySet<string>;
+    gestures: ReadonlySet<string>;
+    'touchpad-gestures': ReadonlySet<string>;
+  };
   target?: CommandSettingsTarget;
   open(page: CommandSettingsPage, command: Pick<UiCommand, 'id' | 'title'>): void;
   clear(): void;

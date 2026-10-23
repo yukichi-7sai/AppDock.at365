@@ -10,6 +10,7 @@ export const hostSettingsPages = [
   ['tray', 'タスクトレイ'],
   ['shortcuts', 'ショートカットキー'],
   ['gestures', 'マウスジェスチャー'],
+  ['touchpad-gestures', 'タッチパッドジェスチャー'],
   ['custom-commands', 'カスタムコマンド'],
   ['web-accounts', 'Webアカウント'],
   ['permissions', '操作の許可'],

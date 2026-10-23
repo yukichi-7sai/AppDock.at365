@@ -43,7 +43,9 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
-  commandAssignments?: { shortcuts: string[]; gestures: string[] };
+  commandAssignments?: { shortcuts: string[]; gestures: string[]; 'touchpad-gestures': string[] };
+  touchpad?: import('./touchpad-gestures').TouchpadSnapshot;
+  touchpadShortcuts?: import('./keybindings').Keybinding[];
   provider?: { id: string; title: string; request: number };
   appletManagement?: {
     assignments: { shortcuts: string[]; gestures: string[] };
@@ -129,7 +131,7 @@ export type SettingsPageOperation =
 /** UI selection state lives for the primary context, independently of a Shell View. */
 export interface SettingsNavigationState {
   query: string;
-  provider?: { id: string; page: 'shortcuts' | 'gestures'; request: number };
+  provider?: { id: string; page: 'shortcuts' | 'gestures' | 'touchpad-gestures'; request: number };
   move?: SettingsPageModel['content']['move'];
 }
 export interface SettingsPageAction {

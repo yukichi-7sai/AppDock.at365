@@ -40,6 +40,7 @@ export interface DeviceSettings {
     string,
     { enabled: boolean; useLocalSettings: boolean; configuration?: DeviceConfiguration }
   >;
+  touchpadGestures: { enabled: boolean };
   collectionEnabled: Record<string, Record<string, Record<string, boolean>>>;
 }
 export interface DeviceCollection {
@@ -95,6 +96,7 @@ export function initialDeviceSettings(
       deviceHostKeys.map((key) => [key, structuredClone(shared.host[key] ?? {})]),
     ) as DeviceSettings['host'],
     extensions: {},
+    touchpadGestures: { enabled: false },
     collectionEnabled: {},
   };
   for (const [owner, entry] of Object.entries(shared.extensions))
@@ -125,9 +127,19 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
     !object(raw.host) ||
     !object(raw.extensions) ||
     !object(raw.collectionEnabled) ||
+    !object(raw.touchpadGestures) ||
+    typeof raw.touchpadGestures.enabled !== 'boolean' ||
+    Object.keys(raw.touchpadGestures).some((key) => key !== 'enabled') ||
     Object.keys(raw).some(
       (key) =>
-        !['schemaVersion', 'machineName', 'host', 'extensions', 'collectionEnabled'].includes(key),
+        ![
+          'schemaVersion',
+          'machineName',
+          'host',
+          'extensions',
+          'collectionEnabled',
+          'touchpadGestures',
+        ].includes(key),
     )
   )
     throw Error('このPCの設定JSONの形式を確認してください。');
@@ -232,6 +244,10 @@ export function combineSettings(
 ): Settings {
   const result = structuredClone(shared);
   Object.assign(result.host, structuredClone(device.host));
+  result.touchpadGestures = {
+    ...parseSettings(shared).touchpadGestures!,
+    enabled: device.touchpadGestures?.enabled ?? false,
+  };
   for (const owner of new Set([
     ...Object.keys(shared.extensions),
     ...Object.keys(device.extensions),
@@ -279,7 +295,14 @@ export function splitSettings(
         else target[key] = structuredClone(after[key]);
       }
   };
-  copyChanges(shared, before, next, ['host', 'extensions']);
+  copyChanges(shared, before, next, ['host', 'extensions', 'touchpadGestures']);
+  if (!equal(before.touchpadGestures, next.touchpadGestures)) {
+    const previous = { ...before.touchpadGestures, enabled: false };
+    const updated = { ...next.touchpadGestures, enabled: false };
+    if (!equal(previous, updated))
+      shared.touchpadGestures = structuredClone(updated) as Settings['touchpadGestures'];
+    device.touchpadGestures = { enabled: next.touchpadGestures?.enabled ?? false };
+  }
   copyChanges(shared.host, before.host, next.host, [...deviceHostKeys]);
   for (const key of deviceHostKeys)
     if (!equal(before.host[key], next.host[key]))

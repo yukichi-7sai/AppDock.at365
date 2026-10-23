@@ -5,7 +5,8 @@ namespace AppDock.InputHost;
 
 internal sealed record ShortcutCondition(Condition When, bool BlockOriginalInput = true);
 internal sealed record ShortcutInput(string Shortcut, bool BlockOriginalInput = true,
-    ShortcutCondition[]? Conditions = null, ConditionEnvironment? Environment = null);
+    ShortcutCondition[]? Conditions = null, ConditionEnvironment? Environment = null,
+    string? Owner = null, long TouchpadGeneration = 0);
 internal sealed record ShortcutStatus(string Shortcut, bool Registered, string[] InputKeys,
     string Backend = "hook", bool EffectiveBlockOriginalInput = true, string? Error = null);
 internal readonly record struct ShortcutChord(uint Key, int Modifiers);

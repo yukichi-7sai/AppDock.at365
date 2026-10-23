@@ -186,7 +186,9 @@ internal sealed class InputCaptureEngine : IDisposable
                 return CallNextHookEx(keyboardHook, code, message, pointer);
             var capturedWindow = GetForegroundWindow();
             if (capturedWindow == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
-            var target = rows.Any(row => row.Conditions is {Length:>0}) ? CommandTargetCapture.Capture(capturedWindow) : null;
+            rows = rows.Where(row => row.Owner == null || (row.Owner.StartsWith("touchpad:", StringComparison.Ordinal) && TouchpadInputLease.Accepts(row.TouchpadGeneration))).ToList();
+            if (rows.Count == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
+            var target = rows.Any(row => row.Owner != null || row.Conditions is {Length:>0}) ? CommandTargetCapture.Capture(capturedWindow) : null;
             // A local binding sharing this key still dispatches through the native owner, without blocking ordinary input.
             GetWindowThreadProcessId(capturedWindow, out var foregroundProcess);
             var local = foregroundProcess == configuration.HostProcessId;

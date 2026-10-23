@@ -57,6 +57,13 @@ const rows: {
     label: 'ジェスチャー編集',
   },
   {
+    key: 'editTouchpadGestures',
+    description: hostSettingItem('permissions', 'editTouchpadGestures').description,
+    mcp: 'allowEditTouchpadGestures',
+    action: 'setTouchpadGestureEditing',
+    label: 'タッチパッドジェスチャー編集',
+  },
+  {
     key: 'editRibbon',
     description: hostSettingItem('permissions', 'editRibbon').description,
     mcp: 'allowEditRibbon',

@@ -1,3 +1,4 @@
+import { touchpadGestureTypes, touchpadId } from '../../shared/touchpad-gestures';
 import { SettingsField } from '../settings-ui/SettingsSections';
 import {
   CommandConditionDetails,
@@ -51,6 +52,7 @@ function MoveDirectionPicker({
   );
 }
 export function GestureBindingDialog({
+  touchpad = false,
   initial,
   title,
   ownerTitle,
@@ -59,6 +61,7 @@ export function GestureBindingDialog({
   onApply,
   onClose,
 }: {
+  touchpad?: boolean;
   initial: GestureBinding;
   title: string;
   ownerTitle?: string;
@@ -113,123 +116,149 @@ export function GestureBindingDialog({
       onApply={() =>
         onApply({
           ...value,
-          gesture: normalizeGesture(value.gesture),
+          gesture: touchpad ? touchpadId(value.gesture) : normalizeGesture(value.gesture),
           when: { ...value.when, processes },
         })
       }
     >
       {(ready, setError) => (
         <>
-          <SettingsField title="ジェスチャーの種類" hint="右ボタンを押しながら行う操作を選びます。">
-            <div className="gesture-family-picker" role="group" aria-label="ジェスチャーの種類">
-              {families.map((item) => (
-                <button
-                  key={item.id}
-                  data-initial-focus={item.id === family ? '' : undefined}
-                  aria-pressed={family === item.id}
-                  onClick={() => {
-                    setFamily(item.id);
-                    setValue({ ...value, gesture: choices[item.id] });
-                    setError('');
-                  }}
-                >
-                  <span aria-hidden="true">{item.icon}</span>
-                  {item.title}
-                </button>
-              ))}
-            </div>
-          </SettingsField>
-          {family === 'key' ? (
-            <ShortcutCaptureField
-              allowWin={false}
-              label="ジェスチャーのキー"
-              value={value.gesture.slice(4)}
-              recordingReady={ready}
-              setError={setError}
-              onChange={(key) => choose('key:' + key)}
-            />
-          ) : family === 'move' ? (
+          {touchpad ? (
+            <SettingsField title="ジェスチャーの操作">
+              <select
+                aria-label="ジェスチャーの操作"
+                data-initial-focus
+                value={value.gesture}
+                onChange={(e) => choose(e.target.value)}
+              >
+                {touchpadGestureTypes.map(([id, title]) => (
+                  <option key={id} value={id}>
+                    {title}
+                  </option>
+                ))}
+              </select>
+            </SettingsField>
+          ) : (
             <>
               <SettingsField
-                title="移動の段階"
-                hint="右ボタンを離したときに、動かした順番と一致する操作を実行します。同じ方向の移動は1段階、3方向目へ変えるとキャンセルします。"
+                title="ジェスチャーの種類"
+                hint="右ボタンを押しながら行う操作を選びます。"
               >
-                <div
-                  className="gesture-choice-grid gesture-step-picker"
-                  role="group"
-                  aria-label="移動の段階"
-                >
-                  {[1, 2].map((steps) => (
+                <div className="gesture-family-picker" role="group" aria-label="ジェスチャーの種類">
+                  {families.map((item) => (
                     <button
-                      key={steps}
-                      aria-pressed={movement.length === steps}
-                      onClick={() => choose(moveChoices[steps])}
+                      key={item.id}
+                      data-initial-focus={item.id === family ? '' : undefined}
+                      aria-pressed={family === item.id}
+                      onClick={() => {
+                        setFamily(item.id);
+                        setValue({ ...value, gesture: choices[item.id] });
+                        setError('');
+                      }}
                     >
-                      {steps}段階移動
+                      <span aria-hidden="true">{item.icon}</span>
+                      {item.title}
                     </button>
                   ))}
                 </div>
               </SettingsField>
-              {movement.length === 1 ? (
-                <SettingsField title="ジェスチャーの操作">
-                  <MoveDirectionPicker
-                    label="ジェスチャーの操作"
-                    value={movement[0]}
-                    onChoose={(direction) => choose('move-' + direction)}
-                  />
-                </SettingsField>
-              ) : (
+              {family === 'key' ? (
+                <ShortcutCaptureField
+                  allowWin={false}
+                  label="ジェスチャーのキー"
+                  value={value.gesture.slice(4)}
+                  recordingReady={ready}
+                  setError={setError}
+                  onChange={(key) => choose('key:' + key)}
+                />
+              ) : family === 'move' ? (
                 <>
-                  <SettingsField title="最初の方向">
-                    <MoveDirectionPicker
-                      label="最初の方向"
-                      value={movement[0]}
-                      onChoose={(direction) =>
-                        choose(
-                          `move-${direction}-${direction === movement[1] ? movement[0] : movement[1]}`,
-                        )
-                      }
-                    />
+                  <SettingsField
+                    title="移動の段階"
+                    hint="右ボタンを離したときに、動かした順番と一致する操作を実行します。同じ方向の移動は1段階、3方向目へ変えるとキャンセルします。"
+                  >
+                    <div
+                      className="gesture-choice-grid gesture-step-picker"
+                      role="group"
+                      aria-label="移動の段階"
+                    >
+                      {[1, 2].map((steps) => (
+                        <button
+                          key={steps}
+                          aria-pressed={movement.length === steps}
+                          onClick={() => choose(moveChoices[steps])}
+                        >
+                          {steps}段階移動
+                        </button>
+                      ))}
+                    </div>
                   </SettingsField>
-                  <SettingsField title="次の方向">
-                    <MoveDirectionPicker
-                      label="次の方向"
-                      value={movement[1]}
-                      disabled={movement[0]}
-                      onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
-                    />
-                  </SettingsField>
+                  {movement.length === 1 ? (
+                    <SettingsField title="ジェスチャーの操作">
+                      <MoveDirectionPicker
+                        label="ジェスチャーの操作"
+                        value={movement[0]}
+                        onChoose={(direction) => choose('move-' + direction)}
+                      />
+                    </SettingsField>
+                  ) : (
+                    <>
+                      <SettingsField title="最初の方向">
+                        <MoveDirectionPicker
+                          label="最初の方向"
+                          value={movement[0]}
+                          onChoose={(direction) =>
+                            choose(
+                              `move-${direction}-${direction === movement[1] ? movement[0] : movement[1]}`,
+                            )
+                          }
+                        />
+                      </SettingsField>
+                      <SettingsField title="次の方向">
+                        <MoveDirectionPicker
+                          label="次の方向"
+                          value={movement[1]}
+                          disabled={movement[0]}
+                          onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
+                        />
+                      </SettingsField>
+                    </>
+                  )}
                 </>
+              ) : (
+                <SettingsField
+                  title="ジェスチャーの操作"
+                  hint="右ボタンを押したまま、この操作をしたときに実行します。"
+                >
+                  <div
+                    className={`gesture-choice-grid gesture-choice-${family}`}
+                    role="group"
+                    aria-label="ジェスチャーの操作"
+                  >
+                    {gestureTypes
+                      .filter(([id]) => id.startsWith(family + '-'))
+                      .map(([id, label]) => (
+                        <button
+                          key={id}
+                          aria-pressed={value.gesture === id}
+                          onClick={() => choose(id)}
+                        >
+                          <span aria-hidden="true">
+                            {id === 'wheel-up'
+                              ? '↑'
+                              : id === 'wheel-down'
+                                ? '↓'
+                                : id === 'click-left'
+                                  ? '◧'
+                                  : '▣'}
+                          </span>
+                          {label.replace(/^[↑↓←→] /, '')}
+                        </button>
+                      ))}
+                  </div>
+                </SettingsField>
               )}
             </>
-          ) : (
-            <SettingsField
-              title="ジェスチャーの操作"
-              hint="右ボタンを押したまま、この操作をしたときに実行します。"
-            >
-              <div
-                className={`gesture-choice-grid gesture-choice-${family}`}
-                role="group"
-                aria-label="ジェスチャーの操作"
-              >
-                {gestureTypes
-                  .filter(([id]) => id.startsWith(family + '-'))
-                  .map(([id, label]) => (
-                    <button key={id} aria-pressed={value.gesture === id} onClick={() => choose(id)}>
-                      <span aria-hidden="true">
-                        {id === 'wheel-up'
-                          ? '↑'
-                          : id === 'wheel-down'
-                            ? '↓'
-                            : id === 'click-left'
-                              ? '◧'
-                              : '▣'}
-                      </span>
-                      {label.replace(/^[↑↓←→] /, '')}
-                    </button>
-                  ))}
-              </div>
-            </SettingsField>
           )}
           <SettingsField
             title="いつ・どこで"

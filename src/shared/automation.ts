@@ -14,6 +14,7 @@ export interface AutomationState {
   allowManageApplets: boolean;
   allowEditShortcuts: boolean;
   allowEditGestures: boolean;
+  allowEditTouchpadGestures: boolean;
   allowEditRibbon: boolean;
   allowUseTts: boolean;
   allowUseAi: boolean;
@@ -54,6 +55,7 @@ export type AutomationAction =
   | { kind: 'setAppletManagement'; allowed: boolean }
   | { kind: 'setShortcutEditing'; allowed: boolean }
   | { kind: 'setGestureEditing'; allowed: boolean }
+  | { kind: 'setTouchpadGestureEditing'; allowed: boolean }
   | { kind: 'setRibbonEditing'; allowed: boolean }
   | { kind: 'setCustomCommandManagement'; allowed: boolean }
   | { kind: 'setTrayEditing'; allowed: boolean };

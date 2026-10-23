@@ -31,10 +31,12 @@
   align-items: center;
   gap: 10px;
 }
-.settings-index-icon {
+.settings-categories .sidebar-extensions button > .settings-index-icon {
   display: inline-flex;
-  margin-left: auto;
-  flex: none;
+  width: 20px;
+  min-width: 20px;
+  justify-content: center;
+  flex: 0 0 20px;
 }
 .settings-surface > .settings-page-layout {
   display: flex;

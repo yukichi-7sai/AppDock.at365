@@ -15,6 +15,7 @@ import type { BindingInputFilter } from './useBindingCommandFilter';
 import { normalizeShortcut, type UiCommand } from '../../shared/commands';
 
 export function ShortcutCommandList({
+  owned = [],
   commands,
   allCommands = commands,
   settings,
@@ -26,6 +27,7 @@ export function ShortcutCommandList({
   selectedInput,
   onInputFilter,
 }: {
+  owned?: Keybinding[];
   commands: UiCommand[];
   allCommands?: UiCommand[];
   settings: Settings;
@@ -41,7 +43,10 @@ export function ShortcutCommandList({
   return (
     <CommandBindingList<Keybinding>
       commands={commands}
-      bindings={bindings}
+      bindings={[...bindings, ...owned]}
+      readOnly={(row) =>
+        owned.some((item) => item.id === row.id) ? 'タッチパッドジェスチャーで編集' : undefined
+      }
       showProvider={showProvider}
       statusError={statusError}
       onRetry={onRetry}

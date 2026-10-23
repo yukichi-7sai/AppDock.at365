@@ -38,12 +38,10 @@ export function SettingsIndex({
       aria-current={p.id === content.page.id ? 'true' : undefined}
       onClick={() => act({ kind: 'select', pageId: p.id })}
     >
+      <span className="settings-index-icon" aria-hidden="true">
+        {indexIcons[p.id] && <Icon name={indexIcons[p.id]!} />}
+      </span>
       <span title={p.title}>{p.title}</span>
-      {indexIcons[p.id] && (
-        <span className="settings-index-icon">
-          <Icon name={indexIcons[p.id]!} />
-        </span>
-      )}
     </button>
   );
   return (

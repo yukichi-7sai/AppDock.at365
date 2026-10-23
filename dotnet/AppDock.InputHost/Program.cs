@@ -9,6 +9,7 @@ namespace AppDock.InputHost;
 internal static class Program
 {
     [DllImport("shell32.dll")] private static extern int SHQueryUserNotificationState(out int state);
+    [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     private static async Task<int> NotificationState(TextWriter output)
     {
         await using var peer = new JsonRpcConnection(Console.In, output);
@@ -30,12 +31,16 @@ internal static class Program
         _ = Task.Run(async () => {
             await using var peer = new JsonRpcConnection(Console.In, output);
             using var inputSender = new InputSender();
+            var touchpad = new TouchpadWindowsController(() => { _ = peer.NotifyAsync("touchpad.changed", new { }); });
             await capture.BindAsync(p => peer.RequestAsync("gestures.invoke", p, peer.Lifetime),
                 id => { _ = peer.NotifyAsync("gestures.cancel", new { session = id }); },
                 p => peer.RequestAsync("gestures.prepare", p, peer.Lifetime));
             var pumping = capture.PumpAsync((method, p) => peer.NotifyAsync(method, p), peer.Lifetime);
             try {
                 await peer.ReadAsync(async (method, p) => {
+                    if (method.StartsWith("touchpad.", StringComparison.Ordinal))
+                        return await app.Dispatcher.InvokeAsync(() => touchpad.Handle(method, p));
+                    if (method == "capture.validTarget") return long.TryParse(p.GetProperty("window").GetString(), out var target) && target != 0 && GetForegroundWindow().ToInt64() == target;
                     if (method == "input.cancel") { inputSender.Cancel(p.GetProperty("id").GetString()!); return null; }
                     if (method is "input.sendKeys" or "input.appCommand") return await inputSender.ExecuteAsync(method, p, peer.Lifetime);
                     if (method == "gestures.valid") return await capture.ValidAsync(p.GetProperty("session").GetString()!,p.GetProperty("window").GetString()!);
@@ -53,7 +58,7 @@ internal static class Program
                     return null;
                 });
             } catch (Exception e) { Console.Error.WriteLine(e); }
-            finally { capture.Dispose(); await app.Dispatcher.InvokeAsync(() => app.Shutdown()); }
+            finally { capture.Dispose(); await app.Dispatcher.InvokeAsync(() => { touchpad.Dispose(); app.Shutdown(); }); }
         });
         return app.Run();
     }

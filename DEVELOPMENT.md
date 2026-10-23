@@ -25,7 +25,7 @@
 | カスタムコマンド | [保存・種類・キー送信・プロセス起動・MCP実行](docs/custom-commands-design.md) |
 | AIと音声 | [AI文章生成](docs/ai.md)、[TTS](docs/tts-design.md)、[共通音声再生](docs/audio-playback.md) |
 | 通知とエラー | [通知基盤](docs/notifications.md)、[通知読み上げ](docs/notification-speech-design.md)、[共通エラー](docs/error-reporting.md)、[共通警告](docs/warning-notifications-design.md) |
-| キー・マウス・トレイ | [ショートカットと入力フック](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[トレイ](docs/tray-menu.md) |
+| キー・マウス・タッチパッド・トレイ | [ショートカットと入力フック](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[タッチパッド](docs/touchpad-gestures-design.md)、[トレイ](docs/tray-menu.md) |
 | Shellとリボン | [領域と割り当て](docs/shell-foundation.md)、[リボンの配置とバッジ](docs/ribbon-customization-design.md)、[Shell API](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本体のページ](docs/host-pages.md)、[バー](docs/shell-bars.md) |
 | 画像と配色 | [登録画像](docs/registered-images.md)、[共通ギャラリー](docs/image-gallery.md)、[共通配色](docs/appearance.md) |
 | 起動と更新 | [Windows起動設定](docs/launch-settings.md)、[更新](docs/updates.md)、[配布先の検証](docs/update-checklist.md) |
@@ -36,6 +36,8 @@
 共有設定・dataの参照先変更は[未実装の設計](docs/shared-settings-location-design.md)として分離する。現在の保存仕様は設定同期の文書を正本とする。
 
 入力の「いつ・どこで」と実行方法は[共通コマンド実行基盤](docs/command-execution-foundation-design.md)へ接続する。共通基盤・キー設定/公開編集API・キーの外部条件は実装済み。キーとジェスチャーは同じ条件判定と実行基盤へ、独立したfirst/all・ブラウザ設定と入力時の対象を渡す。
+
+Windowsが判定する3本指・4本指の10種類を専用キーで接続する[タッチパッドジェスチャー](docs/touchpad-gestures-design.md)を実装。端末別の既定OFF、明示操作でのWindows設定、ジェスチャーごとの競合停止、専用キーの所有権と共通実行基盤への接続を提供する。
 
 ## 開発環境・ビルド・テスト
 

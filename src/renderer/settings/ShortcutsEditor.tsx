@@ -24,6 +24,7 @@ import { CommandTargetFilter } from '../settings-ui/CommandSettingsNavigation';
 
 /** Settings adds catalog-wide discovery around the same command list used by Applet details. */
 export function ShortcutsEditor({
+  owned = [],
   commands,
   settings,
   onChange,
@@ -32,6 +33,7 @@ export function ShortcutsEditor({
   provider,
   clearProvider,
 }: {
+  owned?: Keybinding[];
   commands: UiCommand[];
   settings: Settings;
   onChange(value: Settings): void;
@@ -58,7 +60,7 @@ export function ShortcutsEditor({
     if (statuses.length) lastStatuses.current = statuses;
   }, [statuses]);
   const displayedStatuses = statuses.length ? statuses : lastStatuses.current;
-  const rows = getKeybindings(settings);
+  const rows = [...getKeybindings(settings), ...owned];
   const known = new Map(commands.map((command) => [command.id, command]));
   for (const row of rows)
     if (!known.has(row.command))
@@ -167,6 +169,7 @@ export function ShortcutsEditor({
         </CommandBindingToolbar>
 
         <ShortcutCommandList
+          owned={owned}
           commands={visible}
           allCommands={catalog}
           settings={settings}

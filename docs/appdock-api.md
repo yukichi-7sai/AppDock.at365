@@ -149,3 +149,9 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 ## AI文章生成
 
 最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。本体の共通プロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、どちらも初期OFFです。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
+
+## タッチパッドジェスチャー
+
+touchpadGestures.getはreadで取得できます。commands.executeのappdock.touchpadGestures.update / set-enabled / reconnect / clearにはread・execute・write・editTouchpadGesturesが必要です。専用許可はApplet/MCPで独立し、既定falseです。updateはAppDockの設定だけを保存し、Windows変更にはset-enabledまたはreconnectを明示的に呼びます。全変更にexpectedRevisionと任意dryRunを使います。shortcuts.getのownedBindingsは読取専用で、通常bindings編集・削除の対象外です。
+
+詳細は[タッチパッドとWindowsの接続仕様](touchpad-gestures-design.md)を参照してください。

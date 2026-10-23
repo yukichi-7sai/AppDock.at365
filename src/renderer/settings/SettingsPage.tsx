@@ -282,6 +282,9 @@ export function SettingsPage({
                     ? {
                         page: page.id,
                         assignments: {
+                          'touchpad-gestures': new Set(
+                            model.content.auxiliary.commandAssignments?.['touchpad-gestures'] ?? [],
+                          ),
                           shortcuts: new Set(
                             model.content.auxiliary.commandAssignments?.shortcuts ?? [],
                           ),

@@ -1,4 +1,8 @@
 import type { Settings, SettingsSnapshot, GlobalHotKeyStatus } from '../../shared/contracts';
+import {
+  touchpadShortcutProjection,
+  validateTouchpadKeyEdit,
+} from '../../shared/touchpad-gestures';
 import { normalizeShortcut, validCommandId } from '../../shared/commands';
 import {
   getKeybindings,
@@ -171,6 +175,11 @@ export class ShortcutCommands {
   get() {
     return {
       bindings: structuredClone(getKeybindings(this.options.settings.value)),
+      ownedBindings: touchpadShortcutProjection(this.options.settings.value).map((row) => ({
+        ...row,
+        owner: 'touchpadGestures',
+        readOnly: true,
+      })),
       options: this.publicOptions(getKeybindingOptions(this.options.settings.value)),
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
@@ -307,6 +316,10 @@ export class ShortcutCommands {
       if (error instanceof SettingsCommandError) throw error;
       throw invalid();
     }
+    validateTouchpadKeyEdit(
+      withKeybindings({ ...store.value, keybindingOptions: options }, rows),
+      store.value,
+    );
     const changed =
       JSON.stringify(before) !== JSON.stringify(rows) ||
       JSON.stringify(beforeOptions) !== JSON.stringify(options);

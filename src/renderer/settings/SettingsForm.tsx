@@ -175,10 +175,14 @@ export function SettingsForm({
   return (
     <div className="settings-layout">
       <div
-        className={`settings-form${['general', 'appearance', 'shortcuts', 'gestures'].includes(category) ? ' settings-sections' : ''}`}
+        className={`settings-form${['general', 'appearance', 'shortcuts', 'gestures', 'touchpad-gestures'].includes(category) ? ' settings-sections' : ''}`}
       >
-        {category === 'gestures' && (
+        {(category === 'gestures' || category === 'touchpad-gestures') && (
           <GesturesEditor
+            key={category}
+            touchpad={
+              category === 'touchpad-gestures' ? { snapshot: aux.touchpad, invoke } : undefined
+            }
             provider={aux.provider}
             clearProvider={() => void invoke('clearProvider')}
             settings={settings}
@@ -189,6 +193,7 @@ export function SettingsForm({
         )}
         {category === 'shortcuts' && (
           <ShortcutsEditor
+            owned={aux.touchpadShortcuts}
             provider={aux.provider}
             clearProvider={() => void invoke('clearProvider')}
             key={category}

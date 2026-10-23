@@ -33,6 +33,7 @@ interface LocalConfig {
   allowManageApplets: boolean;
   allowEditShortcuts: boolean;
   allowEditGestures: boolean;
+  allowEditTouchpadGestures: boolean;
   allowEditRibbon: boolean;
   allowUseTts: boolean;
   allowUseAi: boolean;
@@ -113,6 +114,7 @@ export class AutomationService {
       allowManageApplets: false,
       allowEditShortcuts: false,
       allowEditGestures: false,
+      allowEditTouchpadGestures: false,
       allowEditRibbon: false,
       allowUseTts: false,
       allowUseAi: false,
@@ -151,6 +153,8 @@ export class AutomationService {
           (c.allowManageCustomCommands !== undefined &&
             typeof c.allowManageCustomCommands !== 'boolean') ||
           (c.allowEditRibbon !== undefined && typeof c.allowEditRibbon !== 'boolean') ||
+          (c.allowEditTouchpadGestures !== undefined &&
+            typeof c.allowEditTouchpadGestures !== 'boolean') ||
           (c.allowEditGestures !== undefined && typeof c.allowEditGestures !== 'boolean') ||
           (c.allowEditShortcuts !== undefined && typeof c.allowEditShortcuts !== 'boolean') ||
           !Number.isInteger(c.port) ||
@@ -173,6 +177,7 @@ export class AutomationService {
         c.allowManageApplets ??= false;
         c.allowEditShortcuts ??= false;
         c.allowEditGestures ??= false;
+        c.allowEditTouchpadGestures ??= false;
         c.allowEditRibbon ??= false;
         c.allowUseTts ??= false;
         c.allowUseAi ??= false;
@@ -256,6 +261,7 @@ export class AutomationService {
       | 'allowManageApplets'
       | 'allowEditShortcuts'
       | 'allowEditGestures'
+      | 'allowEditTouchpadGestures'
       | 'allowEditRibbon'
       | 'allowManageCustomCommands'
       | 'allowEditTray',
@@ -293,6 +299,7 @@ export class AutomationService {
       allowManageApplets: this.config.allowManageApplets,
       allowEditShortcuts: this.config.allowEditShortcuts,
       allowEditGestures: this.config.allowEditGestures,
+      allowEditTouchpadGestures: this.config.allowEditTouchpadGestures,
       allowEditRibbon: this.config.allowEditRibbon,
       allowUseTts: this.config.allowUseTts,
       allowUseAi: this.config.allowUseAi,
@@ -578,6 +585,13 @@ export class AutomationService {
           this.config.allowEditRibbon = action.allowed;
           this.save();
           message = 'このPCのリボン編集許可を保存しました。';
+          break;
+        case 'setTouchpadGestureEditing':
+          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          this.config.allowEditTouchpadGestures = action.allowed;
+          this.save();
+          this.options.authorizationChanged?.();
+          message = 'このPCのタッチパッドジェスチャー編集許可を保存しました。';
           break;
         case 'setGestureEditing':
           if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');

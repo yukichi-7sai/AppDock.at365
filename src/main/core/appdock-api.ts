@@ -1,3 +1,4 @@
+import { touchpadBridgeCommands, executeTouchpadBridgeCommand } from './touchpad-commands';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import type { InputInvocation } from './command-contexts';
 import type { CustomCommandService } from './custom-commands';
@@ -44,6 +45,7 @@ export class AppDockApi {
   private settingsCommands: SettingsCommands;
   private shortcuts: ShortcutCommands;
   private gestures: GestureCommands;
+  private touchpadGestures: GestureCommands;
   private tray: TrayEditingCommands;
   private ribbon: RibbonCommands;
   constructor(
@@ -73,6 +75,14 @@ export class AppDockApi {
       shortcutsEditable?(): boolean;
       inputPages?(): ShortcutPageChoice[];
       gesturesEditable?(): boolean;
+      touchpadGesturesEditable?(): boolean;
+      touchpadBridge?: {
+        snapshot(): unknown;
+        connect(
+          ids: import('../../shared/touchpad-gestures').TouchpadGestureId[],
+        ): Promise<unknown>;
+        afterLocalEdit(before: Settings): Promise<unknown>;
+      };
       ribbonEditable?(): boolean;
       trayEditable?(): boolean;
       trayApplets?(): ExtensionSnapshot[];
@@ -103,6 +113,12 @@ export class AppDockApi {
       settingsCommands: this.settingsCommands,
       commands: () => this.commands(),
     });
+    this.touchpadGestures = new GestureCommands({
+      ...options,
+      touchpad: true,
+      settingsCommands: this.settingsCommands,
+      commands: () => this.commands(),
+    });
     this.shortcuts = new ShortcutCommands({
       ...options,
       settingsCommands: this.settingsCommands,
@@ -125,6 +141,7 @@ export class AppDockApi {
       manageApplets: this.options.manageable?.() ?? false,
       editShortcuts: this.options.shortcutsEditable?.() ?? false,
       editGestures: this.options.gesturesEditable?.() ?? false,
+      editTouchpadGestures: this.options.touchpadGesturesEditable?.() ?? false,
       editRibbon: this.options.ribbonEditable?.() ?? false,
       editTray: this.options.trayEditable?.() ?? false,
       manageCustomCommands: this.options.customCommandsManageable?.() ?? false,
@@ -160,6 +177,8 @@ export class AppDockApi {
           ...(this.options.appletManagement?.commands() ?? []),
           ...this.shortcuts.commands(),
           ...this.gestures.commands(),
+          ...this.touchpadGestures.commands(),
+          ...touchpadBridgeCommands,
           ...this.ribbon.commands(),
           ...this.tray.commands(),
         ].map((c) => [
@@ -302,6 +321,12 @@ export class AppDockApi {
           executable: permissions.execute === true,
           ribbonEditingAllowed: permissions.editRibbon === true,
         };
+      case 'touchpadGestures.get':
+        return {
+          ...this.touchpadGestures.get(),
+          state: this.options.touchpadBridge?.snapshot(),
+          editingAllowed: permissions.editTouchpadGestures === true,
+        };
       case 'gestures.get':
         return {
           ...this.gestures.get(),
@@ -383,6 +408,7 @@ export class AppDockApi {
         'customCommands.write',
         'shortcuts.write',
         'gestures.write',
+        'touchpadGestures.write',
         'ribbon.write',
         'tray.write',
       ].includes(command.permission ?? '') &&
@@ -398,6 +424,7 @@ export class AppDockApi {
         'customCommands.write',
         'shortcuts.write',
         'gestures.write',
+        'touchpadGestures.write',
         'ribbon.write',
         'tray.write',
       ].includes(command.permission ?? '') &&
@@ -426,6 +453,14 @@ export class AppDockApi {
       throw new AutomationError(
         'RIBBON_EDITING_DISABLED',
         '呼び出し元の許可設定でリボン編集を許可してください。',
+      );
+    if (
+      command.permission === 'touchpadGestures.write' &&
+      (!permissions.read || !permissions.editTouchpadGestures)
+    )
+      throw new AutomationError(
+        'TOUCHPAD_EDITING_DISABLED',
+        '情報の取得とタッチパッドジェスチャーの編集を許可してください。',
       );
     if (command.permission === 'gestures.write' && !permissions.editGestures)
       throw new AutomationError(
@@ -478,6 +513,22 @@ export class AppDockApi {
           effectVerified: false,
           ...result,
         };
+      }
+      if (command.permission === 'touchpadGestures.write') {
+        if (id === 'appdock.touchpadGestures.update') {
+          const result = this.touchpadGestures.execute(args);
+          return {
+            id,
+            completion: result.dryRun ? 'validated' : 'settingsSaved',
+            effectVerified: false,
+            ...result,
+          };
+        }
+        const result = await executeTouchpadBridgeCommand(id, args, {
+          ...this.options,
+          settingsCommands: this.settingsCommands,
+        });
+        return { id, ...result };
       }
       if (command.permission === 'shortcuts.write' || command.permission === 'gestures.write') {
         const result = (

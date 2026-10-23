@@ -10,6 +10,7 @@ import {
 } from './CommandSettingsNavigation';
 export type BindingEdit<R> = { row: R; title: string; ownerTitle?: string; adding: boolean };
 export function CommandBindingList<R extends { id: string; command: string; enabled: boolean }>({
+  readOnly,
   commands,
   bindings,
   showProvider = false,
@@ -27,6 +28,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   renderEditor,
   renderOrder,
 }: {
+  readOnly?(row: R): string | undefined;
   commands: UiCommand[];
   bindings: R[];
   showProvider?: boolean;
@@ -193,13 +195,14 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                         )}
                         <span>{conditionLabel(row, command)}</span>
                         {!row.enabled && <small>無効</small>}
+                        {readOnly?.(row) && <small>{readOnly(row)}</small>}
                       </div>
                     ) : (
                       <span className="muted">未割り当て</span>
                     )}
                   </td>
                   <td className="binding-actions-cell">
-                    {row && (
+                    {row && !readOnly?.(row) && (
                       <div
                         className="binding-row-actions"
                         role="group"

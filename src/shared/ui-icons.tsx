@@ -19,6 +19,7 @@ export type IconName =
   | 'square'
   | 'command'
   | 'keyboard'
+  | 'touchpad'
   | 'mouse'
   | 'terminal'
   | 'keyboard-command-key'
@@ -95,6 +96,12 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M8 8h8v8H8Z" />
       <path d="M8 8H5a3 3 0 1 1 3-3v14a3 3 0 1 1-3-3h14a3 3 0 1 1-3 3V5a3 3 0 1 1 3 3Z" />
+    </>
+  ),
+  touchpad: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 14h18M12 14v5" />
     </>
   ),
   keyboard: (

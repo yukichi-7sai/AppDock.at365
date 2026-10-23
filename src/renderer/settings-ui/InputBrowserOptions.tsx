@@ -9,7 +9,7 @@ export function InputBrowserOptions({
   value,
   onChange,
 }: {
-  pageId: 'shortcuts' | 'gestures';
+  pageId: 'shortcuts' | 'gestures' | 'touchpad-gestures';
   value: { browsers: string[]; requireChromiumWindowClass: boolean };
   onChange(patch: Partial<typeof value>): void;
 }) {
@@ -23,7 +23,7 @@ export function InputBrowserOptions({
           'exe名のみを指定し、パスは含めません。' +
           (pageId === 'gestures'
             ? 'WebBrowserToolsの操作対象もこの一覧を使います。'
-            : 'ショートカットキーのブラウザ条件に使います。')
+            : 'この入力のブラウザ条件に使います。')
         }
         {...settingAnchor(pageId, 'browsers')}
       >

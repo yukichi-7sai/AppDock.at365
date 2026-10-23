@@ -2,6 +2,7 @@
   <ItemGroup><ProjectReference Include="../AppDock.SDK/AppDock.SDK.csproj" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="AppDock.InputHost" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="AppDock.InputTests" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="AppDock.TouchpadTests" /></ItemGroup>
   <PropertyGroup>
     <Version>0.27.0</Version>
     <AssemblyVersion>0.10.0.0</AssemblyVersion>

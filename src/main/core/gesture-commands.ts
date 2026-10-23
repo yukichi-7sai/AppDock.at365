@@ -1,3 +1,11 @@
+import {
+  defaultTouchpadGestures,
+  parseTouchpadGestures,
+  touchpadGestureTypes,
+  touchpadId,
+  validateTouchpadKeyEdit,
+  type TouchpadGestureSettings,
+} from '../../shared/touchpad-gestures';
 import type { Settings, SettingsSnapshot } from '../../shared/contracts';
 import { validCommandId } from '../../shared/commands';
 import { shortcutScopes } from '../../shared/keybindings';
@@ -110,6 +118,7 @@ const parseRows = (bindings: unknown) => parseGestures({ ...defaultGestures(), b
 export class GestureCommands {
   constructor(
     private options: {
+      touchpad?: boolean;
       settings: SettingsStore;
       settingsCommands: SettingsCommands;
       save(value: Settings, revision: number): SettingsSnapshot;
@@ -118,16 +127,74 @@ export class GestureCommands {
       inputPages?(): ShortcutPageChoice[];
     },
   ) {}
+  private get commandId() {
+    return this.options.touchpad ? 'appdock.touchpadGestures.update' : commandId;
+  }
+  private get fields() {
+    return this.options.touchpad
+      ? { ...fields, gesture: { type: 'string', enum: touchpadGestureTypes.map(([id]) => id) } }
+      : fields;
+  }
+  private get configurationFields(): Record<string, unknown> {
+    return this.options.touchpad
+      ? {
+          executionMode: configurationFields.executionMode,
+          browsers: processesSchema,
+          requireChromiumWindowClass: { type: 'boolean' },
+          connections: {
+            type: 'object',
+            additionalProperties: false,
+            properties: Object.fromEntries(
+              touchpadGestureTypes.map(([id]) => [
+                id,
+                {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: {
+                    key: { type: 'string', pattern: '^F(1[3-9]|2[0-4])$' },
+                    modifiers: {
+                      type: 'array',
+                      maxItems: 4,
+                      uniqueItems: true,
+                      items: { enum: ['Ctrl', 'Alt', 'Shift', 'Win'] },
+                    },
+                  },
+                  required: ['key', 'modifiers'],
+                },
+              ]),
+            ),
+          },
+        }
+      : configurationFields;
+  }
+  private parse(value: unknown): GestureSettings | TouchpadGestureSettings {
+    return this.options.touchpad ? parseTouchpadGestures(value) : parseGestures(value);
+  }
+  private parseRows(value: unknown) {
+    return this.options.touchpad
+      ? parseTouchpadGestures({ ...defaultTouchpadGestures(), bindings: value }).bindings
+      : parseRows(value);
+  }
+  private gestureSettings(settings: Settings) {
+    return this.options.touchpad
+      ? parseTouchpadGestures(settings.touchpadGestures)
+      : gestureSettings(settings);
+  }
   commands(): AutomationCommand[] {
     return [
       {
-        id: commandId,
-        title: 'マウスジェスチャー設定を変更',
+        id: this.commandId,
+        title: this.options.touchpad
+          ? 'タッチパッドジェスチャー設定を変更'
+          : 'マウスジェスチャー設定を変更',
+        description: this.options.touchpad
+          ? 'AppDockの割り当てと希望キーだけを保存します。Windowsへ反映するにはset-enabledまたはreconnectを明示的に実行します。'
+          : undefined,
         appletId: null,
         available: true,
         unavailableReason: null,
         completion: 'settingsSaved',
-        permission: 'gestures.write',
+        permission: this.options.touchpad ? 'touchpadGestures.write' : 'gestures.write',
         inputSchema: {
           type: 'object',
           properties: {
@@ -142,8 +209,8 @@ export class GestureCommands {
                   operation('add', {
                     binding: {
                       type: 'object',
-                      properties: { id: idSchema, ...fields },
-                      required: ['id', ...Object.keys(fields)],
+                      properties: { id: idSchema, ...this.fields },
+                      required: ['id', ...Object.keys(this.fields)],
                       additionalProperties: false,
                     },
                   }),
@@ -151,7 +218,7 @@ export class GestureCommands {
                     id: idSchema,
                     changes: {
                       type: 'object',
-                      properties: fields,
+                      properties: this.fields,
                       minProperties: 1,
                       additionalProperties: false,
                     },
@@ -160,13 +227,13 @@ export class GestureCommands {
                   operation('configure', {
                     changes: {
                       type: 'object',
-                      properties: configurationFields,
+                      properties: this.configurationFields,
                       minProperties: 1,
                       additionalProperties: false,
                     },
                   }),
                   operation('reorder', {
-                    gesture: fields.gesture,
+                    gesture: this.fields.gesture,
                     ids: {
                       type: 'array',
                       items: idSchema,
@@ -191,13 +258,13 @@ export class GestureCommands {
       .commands()
       .filter(
         (c) =>
-          c.id !== commandId &&
+          c.id !== this.commandId &&
           (!c.inputSchema || Object.keys((c.inputSchema.properties as object) ?? {}).length === 0),
       );
   }
   get() {
     return {
-      bindings: structuredClone(gestureSettings(this.options.settings.value).bindings),
+      bindings: structuredClone(this.gestureSettings(this.options.settings.value).bindings),
       pages: this.options.inputPages?.() ?? shortcutPageChoices([]),
       revision: this.options.settingsCommands.revision(),
       warning: this.options.settings.syncError ?? null,
@@ -214,8 +281,10 @@ export class GestureCommands {
         available: c.available,
         ownerId: c.permission === 'applets.manage' ? null : c.appletId,
       })),
-      settings: gestureSettings(this.options.settings.value),
-      gestureTypes: gestureTypes.map(([id, title]) => ({ id, title })),
+      settings: this.gestureSettings(this.options.settings.value),
+      gestureTypes: (this.options.touchpad ? touchpadGestureTypes : gestureTypes).map(
+        ([id, title]) => ({ id, title }),
+      ),
     };
   }
   private validateAssignment(row: GestureBinding) {
@@ -251,16 +320,19 @@ export class GestureCommands {
       throw invalid();
     this.options.settingsCommands.checkRevision(args.expectedRevision);
     const store = this.options.settings;
-    const before = gestureSettings(store.value);
+    const before = this.gestureSettings(store.value);
     let next = structuredClone(before);
     let rows = next.bindings;
     try {
       for (const op of args.operations) {
         if (!object(op)) throw invalid();
         if (op.kind === 'add') {
-          if (!exact(op, ['kind', 'binding']) || !exact(op.binding, ['id', ...Object.keys(fields)]))
+          if (
+            !exact(op, ['kind', 'binding']) ||
+            !exact(op.binding, ['id', ...Object.keys(this.fields)])
+          )
             throw invalid();
-          const [row] = parseRows([op.binding]);
+          const [row] = this.parseRows([op.binding]);
           if (rows.some((r) => r.id === row.id)) throw invalid();
           this.validateAssignment(row);
           rows = applyGestureBinding(rows, row);
@@ -280,9 +352,9 @@ export class GestureCommands {
             rows = rows.filter((r) => r.id !== op.id);
             continue;
           }
-          if (!exact(op.changes, Object.keys(fields)) || !Object.keys(op.changes).length)
+          if (!exact(op.changes, Object.keys(this.fields)) || !Object.keys(op.changes).length)
             throw invalid();
-          const [row] = parseRows([{ ...old, ...op.changes }]);
+          const [row] = this.parseRows([{ ...old, ...op.changes }]);
           // Disabling an old private/missing target remains possible without granting new access.
           if (!(Object.keys(op.changes).length === 1 && op.changes.enabled === false))
             this.validateAssignment(row);
@@ -290,11 +362,11 @@ export class GestureCommands {
         } else if (op.kind === 'configure') {
           if (
             !exact(op, ['kind', 'changes']) ||
-            !exact(op.changes, Object.keys(configurationFields)) ||
+            !exact(op.changes, Object.keys(this.configurationFields)) ||
             !Object.keys(op.changes).length
           )
             throw invalid();
-          next = parseGestures({ ...next, ...op.changes, bindings: rows });
+          next = this.parse({ ...next, ...op.changes, bindings: rows });
         } else if (op.kind === 'reorder') {
           if (
             !exact(op, ['kind', 'gesture', 'ids']) ||
@@ -304,7 +376,7 @@ export class GestureCommands {
             op.ids.some((id) => !validCommandId(id))
           )
             throw invalid();
-          const key = normalizeGesture(op.gesture),
+          const key = this.options.touchpad ? touchpadId(op.gesture) : normalizeGesture(op.gesture),
             group = rows.filter((r) => r.gesture === key);
           const ids = op.ids as string[];
           if (
@@ -321,20 +393,27 @@ export class GestureCommands {
           });
           rows = applyGestureOrder(rows, rows, ordered);
         } else throw invalid();
-        rows = parseRows(rows);
+        rows = this.parseRows(rows);
       }
     } catch (error) {
       if (error instanceof SettingsCommandError) throw error;
       throw invalid();
     }
-    next = parseGestures({ ...next, bindings: rows });
+    next = this.parse({ ...next, bindings: rows });
+    if (this.options.touchpad)
+      validateTouchpadKeyEdit(
+        { ...store.value, touchpadGestures: next as TouchpadGestureSettings },
+        store.value,
+      );
     const changed = JSON.stringify(before) !== JSON.stringify(next);
     if (changed && args.dryRun !== true) {
       try {
         this.options.save(
           {
             ...structuredClone(store.value),
-            gestures: { ...structuredClone(store.value.gestures), ...next },
+            [this.options.touchpad ? 'touchpadGestures' : 'gestures']: this.options.touchpad
+              ? next
+              : { ...structuredClone(store.value.gestures), ...next },
           },
           store.revision,
         );

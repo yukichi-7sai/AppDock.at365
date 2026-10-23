@@ -29,6 +29,8 @@ export interface GestureInvocation {
 export interface ShortcutInput {
   shortcut: string;
   blockOriginalInput: boolean;
+  owner?: string;
+  touchpadGeneration?: number;
   conditions?: {
     when: { scope: string; appletIds: string[]; processes: string[]; excludeDesktop: boolean };
     blockOriginalInput: boolean;
@@ -53,6 +55,9 @@ export class InputCaptureManager {
   private revision = 0;
   private shortcutRevision = 0;
   private inputs: ShortcutInput[] = [];
+  private touchpadInputs: ShortcutInput[] = [];
+  private touchpadReserved: string[] = [];
+  touchpadCallbacks?: { changed(): void; failed(): void };
   private statuses: NativeShortcutStatus[] = [];
   private recording?: { token: string; window: string; allowWin: boolean };
   private faultSettings?: string;
@@ -114,6 +119,22 @@ export class InputCaptureManager {
     }
     return this.refresh(force);
   }
+  async syncTouchpad(inputs: ShortcutInput[], reserved: string[]) {
+    if (
+      JSON.stringify([inputs, reserved]) !==
+      JSON.stringify([this.touchpadInputs, this.touchpadReserved])
+    ) {
+      this.touchpadInputs = structuredClone(inputs);
+      this.touchpadReserved = [...reserved];
+      this.shortcutRevision++;
+    }
+    return this.refresh();
+  }
+  async touchpadRequest<T = unknown>(method: string, params: unknown): Promise<T> {
+    if (this.stopped) throw Error('入力ホストを終了しています。');
+    if (!this.peer || this.peer.closed) this.connect();
+    return this.peer!.request(method, params) as Promise<T>;
+  }
   async record(request: { token: string; active: boolean; allowWin: boolean }, window: string) {
     if (request.active && !this.endedRecordings.has(request.token))
       this.recording = { token: request.token, window, allowWin: request.allowWin };
@@ -170,6 +191,10 @@ export class InputCaptureManager {
     return !!(await this.peer.request('capture.activateProcess', { pressId, processId }));
   }
   private async event(method: string, p: any) {
+    if (method === 'touchpad.changed') {
+      this.touchpadCallbacks?.changed();
+      return;
+    }
     if (method === 'capture.foreground') {
       if (typeof p.window !== 'string' || !/^\d{1,20}$/.test(p.window) || this.stopped) return;
       this.foregroundWindow = p.window;
@@ -207,8 +232,8 @@ export class InputCaptureManager {
       const keys = p.shortcuts.filter((key: string) =>
         this.statuses.some((s) => s.registered && s.shortcut === key),
       );
-      const conditional = this.inputs.some(
-        (input) => keys.includes(input.shortcut) && input.conditions?.length,
+      const conditional = [...this.inputs, ...this.touchpadInputs].some(
+        (input) => keys.includes(input.shortcut) && (input.owner || input.conditions?.length),
       );
       const target = p.target == null ? undefined : readCommandTarget(p.target);
       if ((conditional && !target) || (p.target != null && (!target || target.window !== p.window)))
@@ -350,6 +375,7 @@ export class InputCaptureManager {
       this.shortcuts.failed(
         new Error('入力プロセスが停止しました。設定を保存するか再試行してください。'),
       );
+      this.touchpadCallbacks?.failed();
       void this.shortcuts.ownership([]).catch(() => {});
     });
     return peer;
@@ -369,7 +395,12 @@ export class InputCaptureManager {
       hostProcessId: process.pid,
       enabled: settings.enabled && !this.paused && !state.recording,
     };
-    const inputs = state.recording ? [] : this.inputs;
+    const inputs = state.recording
+      ? []
+      : [
+          ...this.inputs.filter((input) => !this.touchpadReserved.includes(input.shortcut)),
+          ...this.touchpadInputs,
+        ];
     const config = {
       gestures: gesture,
       shortcuts: inputs,

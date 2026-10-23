@@ -26,6 +26,7 @@ export class SettingsInputSession {
         value: Settings,
         revision: number,
         resetPage?: import('../../shared/settings-catalog').SettingsPageDefinition,
+        source?: 'form' | 'json',
       ): Promise<SettingsSnapshot>;
       changed(): void;
     },
@@ -99,7 +100,7 @@ export class SettingsInputSession {
     this.state.pending = true;
     this.notify();
     try {
-      await this.options.save(parsed, revision, force ? this.page() : undefined);
+      await this.options.save(parsed, revision, force ? this.page() : undefined, this.state.mode);
     } finally {
       this.state.pending = false;
       this.state.revision = this.options.current().revision;

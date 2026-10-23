@@ -1,3 +1,8 @@
+import {
+  defaultTouchpadGestures,
+  touchpadTitle,
+  touchpadGestureTypes,
+} from '../../shared/touchpad-gestures';
 import type { Settings } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
 import {
@@ -10,6 +15,7 @@ import {
 } from '../../shared/gestures';
 import { BindingOrderDialog } from '../settings-ui/BindingOrderDialog';
 export function GestureOrderDialog({
+  touchpad = false,
   settings,
   commands,
   applets,
@@ -17,6 +23,7 @@ export function GestureOrderDialog({
   onChange,
   onClose,
 }: {
+  touchpad?: boolean;
   settings: Settings;
   commands: UiCommand[];
   applets: { id: string; title: string }[];
@@ -24,7 +31,9 @@ export function GestureOrderDialog({
   onChange(value: Settings): void;
   onClose(): void;
 }) {
-  const gestures = settings.gestures ?? defaultGestures();
+  const gestures = touchpad
+    ? (settings.touchpadGestures ?? defaultTouchpadGestures())
+    : (settings.gestures ?? defaultGestures());
   return (
     <BindingOrderDialog
       bindings={gestures.bindings}
@@ -32,7 +41,7 @@ export function GestureOrderDialog({
       initialInput={initialGesture}
       title="ジェスチャーの実行順"
       inputName="ジェスチャー"
-      inputLabel={gestureTitle}
+      inputLabel={touchpad ? touchpadTitle : gestureTitle}
       conditionLabel={(row, command) =>
         gestureConditionLabel(
           row.when,
@@ -41,13 +50,19 @@ export function GestureOrderDialog({
         )
       }
       groupRows={(rows) =>
-        groupGestureBindings(rows).map((group) => [group.gesture, group.bindings])
+        touchpad
+          ? touchpadGestureTypes
+              .map(
+                ([id]) => [id, rows.filter((row) => row.gesture === id)] as [string, typeof rows],
+              )
+              .filter(([, group]) => group.length)
+          : groupGestureBindings(rows).map((group) => [group.gesture, group.bindings])
       }
       moveRow={moveGestureBinding}
       onApply={(ordered, original) =>
         onChange({
           ...settings,
-          gestures: {
+          [touchpad ? 'touchpadGestures' : 'gestures']: {
             ...gestures,
             bindings: applyGestureOrder(gestures.bindings, original, ordered),
           },

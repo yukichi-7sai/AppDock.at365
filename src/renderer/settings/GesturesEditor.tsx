@@ -1,3 +1,9 @@
+import {
+  defaultTouchpadGestures,
+  touchpadTitle,
+  touchpadAsGestureSettings,
+} from '../../shared/touchpad-gestures';
+import { TouchpadOptions, type TouchpadEditorStatus } from './TouchpadOptions';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { useState } from 'react';
 import { useBindingCommandFilter } from '../settings-ui/useBindingCommandFilter';
@@ -27,7 +33,9 @@ export function GesturesEditor({
   applets,
   provider,
   clearProvider,
+  touchpad,
 }: {
+  touchpad?: TouchpadEditorStatus;
   settings: Settings;
   onChange(value: Settings): void;
   commands: UiCommand[];
@@ -35,7 +43,12 @@ export function GesturesEditor({
   provider?: { id: string; title: string; request: number };
   clearProvider?(): void;
 }) {
-  const gestures = settings.gestures ?? defaultGestures();
+  const touchpadValue = settings.touchpadGestures ?? defaultTouchpadGestures();
+  const gestures = touchpad
+    ? touchpadAsGestureSettings(touchpadValue)
+    : (settings.gestures ?? defaultGestures());
+  const label = touchpad ? touchpadTitle : gestureTitle;
+  const page = touchpad ? 'touchpad-gestures' : 'gestures';
   const {
     target,
     filter,
@@ -49,7 +62,11 @@ export function GesturesEditor({
   const bindings = gestures.bindings;
   const [orderOpen, setOrderOpen] = useState(false);
   const change = (patch: Partial<typeof gestures>) =>
-    onChange({ ...settings, gestures: { ...gestures, ...patch } });
+    onChange(
+      touchpad
+        ? { ...settings, touchpadGestures: { ...touchpadValue, ...patch } }
+        : { ...settings, gestures: { ...gestures, ...patch } },
+    );
   const targets = shortcutPageChoices(applets);
   const known = new Map(commands.map((command) => [command.id, command]));
   for (const row of bindings)
@@ -78,7 +95,7 @@ export function GesturesEditor({
       command.id,
       command.extension,
       ...assigned.map(
-        (row) => `${gestureTitle(row.gesture)} ${row.gesture} ${conditionLabel(row, command)}`,
+        (row) => `${label(row.gesture)} ${row.gesture} ${conditionLabel(row, command)}`,
       ),
     ]
       .join(' ')
@@ -91,9 +108,13 @@ export function GesturesEditor({
   });
   return (
     <>
-      <GestureOptions gestures={gestures} change={change} />
+      {touchpad ? (
+        <TouchpadOptions value={touchpadValue} change={change} {...touchpad} />
+      ) : (
+        <GestureOptions gestures={gestures} change={change} />
+      )}
       <SettingsSection
-        title="マウスジェスチャー割り当て"
+        title={touchpad ? 'タッチパッドジェスチャー割り当て' : 'マウスジェスチャー割り当て'}
         description={[
           !gestures.enabled ? '現在、ジェスチャーは無効です。割り当てはそのまま編集できます。' : '',
           bindings.length >= 2000
@@ -104,8 +125,8 @@ export function GesturesEditor({
           .join(' ')}
         hint="＋で割り当てを追加します。"
         className="gestures-editor command-shortcuts"
-        {...settingAnchor('gestures', 'gestures')}
-        aria-label="マウスジェスチャー設定"
+        {...settingAnchor(page, touchpad ? 'bindings' : 'gestures')}
+        aria-label={touchpad ? 'タッチパッドジェスチャー設定' : 'マウスジェスチャー設定'}
       >
         <CommandBindingToolbar
           inputName="ジェスチャー"
@@ -133,12 +154,12 @@ export function GesturesEditor({
           onInputFilter={selectInput}
           inputName="ジェスチャー"
           inputKey={(row) => row.gesture}
-          inputLabel={(row) => gestureTitle(row.gesture)}
+          inputLabel={(row) => label(row.gesture)}
           conditionLabel={conditionLabel}
           newBinding={(command) => ({
             id: crypto.randomUUID(),
             command: command.id,
-            gesture: 'move-up',
+            gesture: touchpad ? 'three.tap' : 'move-up',
             enabled: true,
             when: { scope: command.extensionId ? 'owner' : 'app', appletIds: [], processes: [] },
           })}
@@ -150,6 +171,7 @@ export function GesturesEditor({
           }
           renderEditor={(edit, apply, close) => (
             <GestureBindingDialog
+              touchpad={!!touchpad}
               initial={edit.row}
               title={edit.title}
               ownerTitle={edit.ownerTitle}
@@ -161,6 +183,7 @@ export function GesturesEditor({
           )}
           renderOrder={(row, close) => (
             <GestureOrderDialog
+              touchpad={!!touchpad}
               settings={settings}
               commands={catalog}
               applets={targets}
@@ -172,6 +195,7 @@ export function GesturesEditor({
         />
         {orderOpen && (
           <GestureOrderDialog
+            touchpad={!!touchpad}
             settings={settings}
             commands={catalog}
             applets={targets}

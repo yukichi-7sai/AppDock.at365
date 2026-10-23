@@ -161,6 +161,25 @@ internal static partial class Program
             await Sync([Conditional("exe",["no-such-input-test"])],revision:12);
             count=Count();downs=form.Downs.GetValueOrDefault(0x7Fu);await Chord([0xA2,0xA4],0x7F);
             Check(Count()==count+1&&form.Downs.GetValueOrDefault(0x7Fu)==downs+1,"host-local fallback notifies without blocking on external condition mismatch");
+            // Read-only Windows inspection supplies a real generation. No OS assignment is changed.
+            var touchpad = await peer.RequestAsync("touchpad.read", new { }, CancellationToken.None);
+            var generation = touchpad.GetProperty("generation").GetInt64();
+            var lease = await peer.RequestAsync("touchpad.lease", new { enabled = true }, CancellationToken.None);
+            Check(lease.GetBoolean(), "isolated touchpad lease acquired");
+            object Owned(long stamp) => new { shortcut="F24", blockOriginalInput=true, owner="touchpad:four.tap", touchpadGeneration=stamp };
+            await Sync([Owned(generation)], revision:13, hostProcess:0);
+            count=Count();downs=form.Downs.GetValueOrDefault(0x87u);ups=form.Ups.GetValueOrDefault(0x87u);
+            await Chord([],0x87,3);
+            Check(Count()==count+1 && form.Downs.GetValueOrDefault(0x87u)==downs && form.Ups.GetValueOrDefault(0x87u)==ups,"owned injected key blocks down/up and repeat without condition rows");
+            lock(events)Check(events.Last().GetProperty("target").GetProperty("window").GetString()==form.Handle.ToString(),"owned key captures target with no condition rows");
+            count=Count();await Chord([],0x87,marker:0x365B012);Check(Count()==count,"owned key ignores AppDock self injection");
+            await Sync([Owned(generation+1)],revision:14,hostProcess:0);
+            count=Count();downs=form.Downs.GetValueOrDefault(0x87u);await Chord([],0x87);
+            Check(Count()==count&&form.Downs.GetValueOrDefault(0x87u)==downs+1,"stale touchpad generation passes input without execution");
+            await Sync([Owned(generation)],revision:15,hostProcess:0);
+            await peer.RequestAsync("touchpad.lease",new {enabled=false},CancellationToken.None);
+            count=Count();downs=form.Downs.GetValueOrDefault(0x87u);await Chord([],0x87);
+            Check(Count()==count&&form.Downs.GetValueOrDefault(0x87u)==downs+1,"released touchpad ownership passes input");
             Console.WriteLine("PASS shortcut hook native acceptance");
         } finally {
             child.StandardInput.Close();

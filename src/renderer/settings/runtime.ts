@@ -26,6 +26,7 @@ export class SettingsViewClient {
   private listeners = new Set<() => void>();
   private input?: { pageId: string; values?: Record<string, unknown>; text?: string };
   private inputVersion = 0;
+  private rejectedTouchpadInputVersion = -1;
   private ownRevision = -1;
   private display(m: SettingsPageModel) {
     return this.input?.pageId === m.content.page.id && this.input.values
@@ -92,8 +93,14 @@ export class SettingsViewClient {
       this.inputVersion++;
     }
     const version = this.inputVersion;
+    const touchpadForm =
+      operation.kind === 'edit' &&
+      operation.action.type === 'page-values' &&
+      operation.action.pageId === 'touchpad-gestures';
     this.queued++;
     const work = this.chain.then(async () => {
+      // Later queued edits include the optimistic values of the rejected form.
+      if (touchpadForm && version <= this.rejectedTouchpadInputVersion) return;
       this.accept(await this.transport.get(this.connectionId));
       const m = this.model!;
       const inputOperation =
@@ -135,6 +142,14 @@ export class SettingsViewClient {
         () => {},
         async (e) => {
           this.failed(String(e));
+          if (touchpadForm) {
+            this.rejectedTouchpadInputVersion = this.inputVersion;
+            this.ownRevision = -1;
+            if (this.input?.pageId === 'touchpad-gestures' && this.input.values) {
+              this.input = undefined;
+              if (this.model) this.render(this.display(this.model));
+            }
+          }
           try {
             this.accept(await this.transport.get(this.connectionId));
           } catch {}

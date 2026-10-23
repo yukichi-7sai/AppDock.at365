@@ -16,6 +16,7 @@ export interface AutomationCommand {
     | 'settings.write'
     | 'applets.manage'
     | 'shortcuts.write'
+    | 'touchpadGestures.write'
     | 'gestures.write'
     | 'ribbon.write'
     | 'tray.write';

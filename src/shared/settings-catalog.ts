@@ -1,4 +1,5 @@
 import { collectionRecord } from './page-collections';
+import { touchpadGestureTypes } from './touchpad-gestures';
 import { accentChoices } from './appearance';
 import { defaultAppletEnabled } from './applet-state';
 import { shellRegions } from './shell';
@@ -156,6 +157,24 @@ const hostItems: Record<string, [string, string, string?][]> = {
       'ショートカットキー 割り当て コマンド 条件 デスクトップ Webブラウザ 指定したexe 実行順 入力の適用エラー Win ブロック',
     ],
   ],
+  'touchpad-gestures': [
+    ['executionMode', '条件に一致したコマンドの実行方法', '最初の1つ すべて 登録順'],
+    ['browsers', 'Webブラウザの実行ファイル', 'chrome.exe firefox.exe'],
+    ['requireChromiumWindowClass', 'Chromiumウィンドウに限定', 'ブラウザ 条件'],
+    ['enabled', 'タッチパッドジェスチャーを有効にする', 'このPC Windows 接続'],
+    ['options', '動作設定', '条件に一致したコマンドの実行方法 最初の1つ すべて ブラウザ'],
+    [
+      'connections',
+      '接続用キー設定',
+      'F13 F24 Ctrl Alt Shift Win 3本指 4本指 タップ 上 下 左 右 Windows 再設定 競合',
+    ],
+    ...touchpadGestureTypes.map(([id, title]): [string, string, string] => [
+      `connection.${id}`,
+      `${title}の接続用キー`,
+      'Windows 再設定 競合',
+    ]),
+    ['bindings', 'タッチパッドジェスチャー割り当て', 'いつ どこで 条件 実行順'],
+  ],
   gestures: [
     ['gestures', 'マウスジェスチャー割り当て', 'マウスジェスチャー 条件 実行順'],
     ['enabled', 'マウスジェスチャーを有効にする'],
@@ -222,6 +241,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
         manageApplets: 'Appletの有効・無効・再起動を操作します。',
         editShortcuts: 'キー・条件・実行順を編集します。',
         editGestures: '割り当て・条件・実行順・動作設定を編集します。',
+        editTouchpadGestures:
+          'タッチパッドの割り当てを編集し、明示した操作でWindowsのジェスチャー設定を変更します。',
         editRibbon: '表示・配置・並び順・区切り線を編集します。',
         editTray: 'メニューとクリック・ダブルクリックの割り当てを編集します。',
         useMcp:
@@ -422,6 +443,8 @@ export function settingsPaths(
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
       return [['keybindings'], ['keybindingOptions']];
+    case 'touchpad-gestures':
+      return [['touchpadGestures']];
     case 'gestures':
       return [
         'enabled',

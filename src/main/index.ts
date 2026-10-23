@@ -1,3 +1,13 @@
+import { TouchpadBridgeManager } from './core/touchpad-bridge';
+import {
+  defaultTouchpadGestures,
+  planTouchpadCommands,
+  reservedTouchpadKeys,
+  touchpadId,
+  touchpadShortcutProjection,
+  validateTouchpadKeyEdit,
+  TouchpadKeyConflictError,
+} from '../shared/touchpad-gestures';
 import { McpClientSettings, McpSettingsError } from './core/mcp-client-settings';
 import {
   configureDisplayZoom,
@@ -421,15 +431,18 @@ const settingsEditing = new SettingsInputSession({
   current: () => settings.snapshot(),
   scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
-  save: async (value, revision, resetPage) => {
+  save: async (value, revision, resetPage, source) => {
+    const before = settings.value;
     assertSettingsWritable();
     const next = prepareSettings(value);
-    return launch.save(
+    const saved = await launch.save(
       next.host,
       settings.value.host,
       () => settings.assertRevision(revision),
       () => commitSettings(next, revision, resetPage),
     );
+    if (!resetPage && source === 'form') await touchpad?.afterLocalEdit(before);
+    return saved;
   },
   changed: () => {
     if (window && !window.isDestroyed()) window.webContents.send('dock:settingsEditingChanged');
@@ -456,6 +469,7 @@ const settingsCommands = new SettingsCommands({
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
 let gestures: GestureManager | undefined;
+let touchpad: TouchpadBridgeManager | undefined;
 let shortcutRecording = false;
 let shortcutCaptured: { token: string; key: string; sequence: number } | undefined;
 let globalShortcutOwnership = new Set<string>();
@@ -1136,6 +1150,18 @@ const operationApi = new AppDockApi({
   manageable: () => mcpAllowed('allowManageApplets'),
   shortcutsEditable: () => mcpAllowed('allowEditShortcuts'),
   gesturesEditable: () => mcpAllowed('allowEditGestures'),
+  touchpadGesturesEditable: () => mcpAllowed('allowEditTouchpadGestures'),
+  touchpadBridge: {
+    snapshot: () => touchpad?.snapshot(),
+    connect: (ids) => {
+      if (!touchpad) throw Error('入力を準備中です。');
+      return touchpad.connect(ids);
+    },
+    afterLocalEdit: (before) => {
+      if (!touchpad) throw Error('入力を準備中です。');
+      return touchpad.afterLocalEdit(before);
+    },
+  },
   ribbonEditable: () => mcpAllowed('allowEditRibbon'),
   trayEditable: () => mcpAllowed('allowEditTray'),
   ribbonApplets: allApplets,
@@ -1343,6 +1369,9 @@ function settingsUiCommands() {
 }
 function settingsCommandAssignments() {
   return {
+    'touchpad-gestures': [
+      ...new Set((settings.value.touchpadGestures?.bindings ?? []).map((row) => row.command)),
+    ],
     shortcuts: [...new Set(getKeybindings(settings.value).map((binding) => binding.command))],
     gestures: [
       ...new Set((settings.value.gestures?.bindings ?? []).map((binding) => binding.command)),
@@ -1362,7 +1391,10 @@ function settingsAppletAssignments() {
       ),
     ];
   };
-  return { shortcuts: owners(assignments.shortcuts), gestures: owners(assignments.gestures) };
+  return {
+    shortcuts: owners(assignments.shortcuts),
+    gestures: owners([...assignments.gestures, ...assignments['touchpad-gestures']]),
+  };
 }
 function ribbonUiCommands() {
   const applets = allApplets();
@@ -1521,7 +1553,13 @@ function dispatchShortcutPlan(key: string, plan: CommandBatchPlan, press?: Short
     : commandDispatcher.dispatch(input, plan);
 }
 function dispatchShortcut(key: string, globalEvent = false, press?: ShortcutPress) {
-  if (shortcutRecording || quitting || overlayHost?.active) return Promise.resolve();
+  if (
+    shortcutRecording ||
+    quitting ||
+    overlayHost?.active ||
+    reservedTouchpadKeys(settings.value).has(key)
+  )
+    return Promise.resolve();
   return dispatchShortcutPlan(key, prepareShortcut(key, globalEvent, press), press);
 }
 function runTrayCommand(id: string) {
@@ -1714,7 +1752,21 @@ function prepareSettings(value: Settings) {
 }
 function commitSettings(value: Settings, revision: number, resetPage?: SettingsPageDefinition) {
   assertSettingsWritable();
+  settings.assertRevision(revision);
   customCommands.validateReplacement(value);
+  try {
+    validateTouchpadKeyEdit(value, settings.value);
+  } catch (error) {
+    if (error instanceof TouchpadKeyConflictError)
+      errors.report({
+        eventId: randomUUID(),
+        source: 'touchpad',
+        title: '接続用キーの重複で設定を保存できませんでした',
+        code: error.code,
+        message: error.message,
+      });
+    throw error;
+  }
   return settings.save(
     value,
     revision,
@@ -1731,6 +1783,7 @@ function settingsPageStorage(
       ? settings.localSettings(owner!)
       : ['appearance', 'general'].includes(page.id);
   const scopes = new Set<'shared' | 'device'>();
+  if (page.id === 'touchpad-gestures') scopes.add('device');
   for (const p of settingsPaths(page, allApplets())) {
     scopes.add(
       p[0] === 'host' && (deviceHostKeys as readonly string[]).includes(p[1])
@@ -1809,7 +1862,8 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     panel: null,
     settingOptions: {},
     pages:
-      page.kind === 'applet' || ['ribbon', 'gestures', 'shortcuts'].includes(id)
+      page.kind === 'applet' ||
+      ['ribbon', 'gestures', 'shortcuts', 'touchpad-gestures'].includes(id)
         ? a.pages
         : undefined,
     ribbonItems: id === 'ribbon' ? a.ribbonItems : undefined,
@@ -1892,9 +1946,9 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       },
     };
   if (id === 'ribbon') return { applets: applets.map(summary), commands: ribbonUiCommands() };
-  if (['shortcuts', 'gestures', 'tray'].includes(id))
+  if (['shortcuts', 'gestures', 'tray', 'touchpad-gestures'].includes(id))
     return {
-      ...(['shortcuts', 'gestures'].includes(id)
+      ...(['shortcuts', 'gestures', 'touchpad-gestures'].includes(id)
         ? { commandAssignments: settingsCommandAssignments() }
         : {}),
       provider:
@@ -1909,6 +1963,9 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       applets: applets.map(summary),
       commands: settingsUiCommands(),
       statuses: id === 'shortcuts' ? host.globalHotKeys : undefined,
+      touchpad: id === 'touchpad-gestures' ? touchpad?.snapshot() : undefined,
+      touchpadShortcuts:
+        id === 'shortcuts' ? touchpadShortcutProjection(settings.value) : undefined,
     };
   if (id === 'about')
     return {
@@ -2336,6 +2393,7 @@ function settingsPageActions(
     [
       'shortcuts',
       'gestures',
+      'touchpad-gestures',
       'ai',
       'ribbon',
       'custom-commands',
@@ -2359,10 +2417,10 @@ function settingsPageActions(
     };
     actions.setShortcutCapture = async ([value]) =>
       setShortcutCapture(value as Parameters<typeof setShortcutCapture>[0]);
-    if (['shortcuts', 'gestures'].includes(page.id))
+    if (['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id))
       actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
-  if (['shortcuts', 'gestures', 'tray', 'ribbon'].includes(page.id)) {
+  if (['shortcuts', 'gestures', 'tray', 'ribbon', 'touchpad-gestures'].includes(page.id)) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;
       if (!value || value.mode !== 'select') throw Error('選択操作だけを利用できます。');
@@ -2372,6 +2430,29 @@ function settingsPageActions(
     actions.cancelCommandPalette = async ([id]) => {
       if (paletteSession && paletteSession.request.requestId === id)
         paletteSession.cancel('owner-disposed');
+    };
+  }
+  if (page.id === 'touchpad-gestures') {
+    actions['touchpad.openWindows'] = async () =>
+      shell.openExternal('ms-settings:devices-touchpad');
+    actions['touchpad.reconnect'] = async ([id]) => touchpad?.connect([touchpadId(id)]);
+    actions['touchpad.ignore'] = async ([id]) => {
+      touchpadId(id);
+      await touchpad?.reconcile();
+    };
+    actions['touchpad.clear'] = async ([id]) => {
+      const gesture = touchpadId(id),
+        value = settings.value.touchpadGestures ?? defaultTouchpadGestures();
+      commitSettings(
+        {
+          ...settings.value,
+          touchpadGestures: {
+            ...value,
+            bindings: value.bindings.filter((row) => row.gesture !== gesture),
+          },
+        },
+        settings.revision,
+      );
     };
   }
   if (page.id === 'about' || page.id === 'applets') {
@@ -2438,6 +2519,7 @@ function settingsPageActions(
               'setAppletManagement',
               'setShortcutEditing',
               'setGestureEditing',
+              'setTouchpadGestureEditing',
               'setRibbonEditing',
               'setTts',
               'setAi',
@@ -3172,7 +3254,10 @@ async function initialize() {
     (message) => log.write('error', 'gestures', message),
     {
       pressed: (press) => {
-        void hotKeys?.pressed(press).catch((error) => log.write('error', 'hotkeys', String(error)));
+        const owned = press.shortcuts.some((key) => reservedTouchpadKeys(settings.value).has(key));
+        void (owned ? touchpad?.pressed(press) : hotKeys?.pressed(press))?.catch((error) =>
+          log.write('error', 'hotkeys', String(error)),
+        );
       },
       applied: (statuses) => hotKeys?.applied(statuses),
       failed: (error) => {
@@ -3189,6 +3274,61 @@ async function initialize() {
       },
     },
   );
+  gestures.touchpadCallbacks = {
+    changed: () => touchpad?.windowsChanged(),
+    failed: () => touchpad?.inputFailed(),
+  };
+  touchpad = new TouchpadBridgeManager({
+    stateFile: path.join(dataDirectory, 'touchpad-bridge-state.json'),
+    settings: () => settings.value,
+    input: gestures,
+    changed,
+    warnings,
+    suspended: () => shortcutRecording || !!overlayHost?.active,
+    open: async (gesture) => {
+      await executeCommand('appdock.settings.touchpad-gestures.open');
+      settingsNavigation.move = {
+        id: randomUUID(),
+        pageId: 'touchpad-gestures',
+        itemId: `touchpad-gestures/connection.${gesture}`,
+      };
+      changed();
+    },
+    report: (error) => {
+      errors.report({
+        eventId: randomUUID(),
+        source: 'touchpad',
+        title: 'タッチパッドの接続に失敗しました',
+        code: 'TOUCHPAD_APPLY_FAILED',
+        message: error.message,
+      });
+    },
+    dispatch: async (gesture, press, valid) => {
+      const current = shortcutContext();
+      const context =
+        press.window ===
+          BrowserWindow.getFocusedWindow()?.getNativeWindowHandle().readBigUInt64LE().toString() &&
+        press.context === JSON.stringify({ ...current, window: press.window })
+          ? current
+          : { appFocused: false };
+      const plan = planTouchpadCommands(
+        settings.value.touchpadGestures ?? defaultTouchpadGestures(),
+        gesture,
+        {
+          host: {
+            focused: context.appFocused,
+            appletId: 'appletId' in context ? context.appletId : undefined,
+            pageId: 'pageId' in context ? context.pageId : undefined,
+          },
+          target: press.target,
+        },
+        availableShortcutCommands(),
+      );
+      return shortcutInvocation.run(press, () =>
+        commandDispatcher.dispatch('touchpad:' + gesture, plan, { valid, execute: executeCommand }),
+      );
+    },
+  });
   manager.on('changed', () => {
     imageLibraryHost.reconcile(
       new Set(
@@ -3213,6 +3353,7 @@ async function initialize() {
     changed();
   });
   settings.on('changed', () => {
+    touchpad?.settingsChanged();
     try {
       customCommands.reconcile();
       mcpClient.reconcile();
@@ -3882,6 +4023,7 @@ async function initialize() {
   await manager.reconcile();
   await syncHotKeys();
   await gestures.start();
+  await touchpad.start();
   startupReady = true;
   customCommands.reconcile();
   mcpClient.reconcile();
@@ -4245,6 +4387,7 @@ app.on('before-quit', (event) => {
       () => ai.close(),
       () => mcpClient.shutdown(),
       () => automation?.close(),
+      () => touchpad?.close(),
       () => gestures?.close(),
       () => nativeInput?.close(),
       () => processLauncher.close(),

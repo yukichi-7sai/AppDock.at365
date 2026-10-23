@@ -9,7 +9,7 @@ export function CommandExecutionModeField({
   value,
   onChange,
 }: {
-  pageId: 'shortcuts' | 'gestures';
+  pageId: 'shortcuts' | 'gestures' | 'touchpad-gestures';
   value: CommandExecutionMode;
   onChange(value: CommandExecutionMode): void;
 }) {

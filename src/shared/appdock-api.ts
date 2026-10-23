@@ -383,6 +383,20 @@ export const appDockOperations = {
       openWorldHint: false,
     },
   },
+  'touchpadGestures.get': {
+    callers: ['mcp', 'applet'],
+    permissions: ['read'],
+    name: 'appdock_get_touchpad_gestures',
+    description:
+      'タッチパッドの割り当て・接続用キー・Windowsとの接続状態・revisionを取得します。updateはAppDock設定だけを保存します。Windowsの変更にはset-enabledまたはreconnectを明示的に実行します。',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
   'gestures.get': {
     callers: ['mcp', 'applet'],
     permissions: ['read'],
@@ -460,6 +474,7 @@ export const appletApiPermissionLabels = {
   manageApplets: 'Appletの有効・無効・再起動',
   editShortcuts: 'ショートカットの編集',
   editGestures: 'マウスジェスチャーの編集',
+  editTouchpadGestures: 'タッチパッドジェスチャーの編集・Windowsとの接続',
   editRibbon: 'リボンの編集',
   editTray: 'タスクトレイの編集',
 } as const;
