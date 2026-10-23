@@ -4,7 +4,8 @@ import { useSettingsControls } from '../settings-ui/api';
 import { CommandBindingToolbar } from '../settings-ui/CommandBindingToolbar';
 import { CommandProviderFilter } from '../settings-ui/CommandProviderFilter';
 import { useEffect, useRef, useState } from 'react';
-import type { UiCommand } from '../../shared/commands';
+import { normalizeShortcut, type UiCommand } from '../../shared/commands';
+import { useBindingCommandFilter } from '../settings-ui/useBindingCommandFilter';
 import type { Settings, GlobalHotKeyStatus } from '../../shared/contracts';
 import {
   getKeybindings,
@@ -19,10 +20,7 @@ import { SettingsSection } from '../settings-ui/SettingsSections';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
 import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
-import {
-  CommandTargetFilter,
-  useCommandSettingsTarget,
-} from '../settings-ui/CommandSettingsNavigation';
+import { CommandTargetFilter } from '../settings-ui/CommandSettingsNavigation';
 
 /** Settings adds catalog-wide discovery around the same command list used by Applet details. */
 export function ShortcutsEditor({
@@ -43,15 +41,18 @@ export function ShortcutsEditor({
   clearProvider?(): void;
 }) {
   const settingsControls = useSettingsControls();
-  const target = useCommandSettingsTarget();
-  const [filter, setFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const {
+    target,
+    filter,
+    setFilter,
+    statusFilter,
+    setStatusFilter,
+    inputFilter,
+    selectInput,
+    clearInput,
+  } = useBindingCommandFilter(provider?.request, clearProvider);
   const [error, setError] = useState('');
   const [orderOpen, setOrderOpen] = useState(false);
-  useEffect(() => {
-    setFilter('');
-    setStatusFilter('all');
-  }, [provider?.request, target?.request]);
   const lastStatuses = useRef(statuses);
   useEffect(() => {
     if (statuses.length) lastStatuses.current = statuses;
@@ -78,9 +79,13 @@ export function ShortcutsEditor({
       : undefined;
   const terms = filter.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const visible = catalog.filter((command) => {
-    if (target) return command.id === target.id;
-    if (provider && command.extensionId !== provider.id) return false;
+    if (!inputFilter) {
+      if (target) return command.id === target.id;
+      if (provider && command.extensionId !== provider.id) return false;
+    }
     const assigned = rows.filter((row) => row.command === command.id);
+    if (inputFilter && !assigned.some((row) => normalizeShortcut(row.key) === inputFilter.key))
+      return false;
     const text = [
       command.title,
       command.id,
@@ -151,6 +156,8 @@ export function ShortcutsEditor({
           setStatusFilter={setStatusFilter}
           onOrder={() => setOrderOpen(true)}
           showRegistrationErrors
+          inputFilter={inputFilter}
+          clearInputFilter={clearInput}
         >
           {target ? (
             <CommandTargetFilter />
@@ -166,6 +173,8 @@ export function ShortcutsEditor({
           applets={applets}
           onChange={onChange}
           showProvider
+          selectedInput={inputFilter?.key}
+          onInputFilter={selectInput}
           statusError={statusError}
           onRetry={() =>
             void settingsControls.retryGlobalHotKeys().catch((reason) => setError(String(reason)))

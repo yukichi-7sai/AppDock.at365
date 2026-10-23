@@ -1,5 +1,6 @@
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useBindingCommandFilter } from '../settings-ui/useBindingCommandFilter';
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
@@ -17,10 +18,7 @@ import { GestureBindingDialog } from './GestureBindingDialog';
 import { GestureOrderDialog } from './GestureOrderDialog';
 import { GestureOptions } from './GestureOptions';
 import { SettingsSection } from '../settings-ui/SettingsSections';
-import {
-  CommandTargetFilter,
-  useCommandSettingsTarget,
-} from '../settings-ui/CommandSettingsNavigation';
+import { CommandTargetFilter } from '../settings-ui/CommandSettingsNavigation';
 
 export function GesturesEditor({
   settings,
@@ -38,15 +36,18 @@ export function GesturesEditor({
   clearProvider?(): void;
 }) {
   const gestures = settings.gestures ?? defaultGestures();
-  const target = useCommandSettingsTarget();
+  const {
+    target,
+    filter,
+    setFilter,
+    statusFilter,
+    setStatusFilter,
+    inputFilter,
+    selectInput,
+    clearInput,
+  } = useBindingCommandFilter(provider?.request, clearProvider);
   const bindings = gestures.bindings;
-  const [filter, setFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [orderOpen, setOrderOpen] = useState(false);
-  useEffect(() => {
-    setFilter('');
-    setStatusFilter('all');
-  }, [provider?.request, target?.request]);
   const change = (patch: Partial<typeof gestures>) =>
     onChange({ ...settings, gestures: { ...gestures, ...patch } });
   const targets = shortcutPageChoices(applets);
@@ -66,9 +67,12 @@ export function GesturesEditor({
     gestureConditionLabel(row.when, command?.extensionId ? command.extension : undefined, targets);
   const terms = filter.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const visible = catalog.filter((command) => {
-    if (target) return command.id === target.id;
-    if (provider && command.extensionId !== provider.id) return false;
+    if (!inputFilter) {
+      if (target) return command.id === target.id;
+      if (provider && command.extensionId !== provider.id) return false;
+    }
     const assigned = bindings.filter((row) => row.command === command.id);
+    if (inputFilter && !assigned.some((row) => row.gesture === inputFilter.key)) return false;
     const text = [
       command.title,
       command.id,
@@ -112,6 +116,8 @@ export function GesturesEditor({
           setFilter={setFilter}
           setStatusFilter={setStatusFilter}
           onOrder={() => setOrderOpen(true)}
+          inputFilter={inputFilter}
+          clearInputFilter={clearInput}
         >
           {target ? (
             <CommandTargetFilter />
@@ -123,6 +129,8 @@ export function GesturesEditor({
           commands={visible}
           bindings={bindings}
           showProvider
+          selectedInput={inputFilter?.key}
+          onInputFilter={selectInput}
           inputName="ジェスチャー"
           inputKey={(row) => row.gesture}
           inputLabel={(row) => gestureTitle(row.gesture)}

@@ -2,6 +2,7 @@ import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'r
 import { ListIcon } from './SettingsListTable';
 import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
+import type { BindingInputFilter } from './useBindingCommandFilter';
 import {
   CommandPublication,
   CommandSettingsLinks,
@@ -17,6 +18,8 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   inputName,
   inputKey,
   inputLabel,
+  selectedInput,
+  onInputFilter,
   conditionLabel,
   newBinding,
   applyBinding,
@@ -32,6 +35,8 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   inputName: string;
   inputKey(row: R): string;
   inputLabel(row: R): string;
+  selectedInput?: string;
+  onInputFilter?(input: BindingInputFilter, trigger: HTMLButtonElement): void;
   conditionLabel(row: R, command: UiCommand): string;
   newBinding(command: UiCommand): R;
   applyBinding(row: R, original?: R): void;
@@ -161,7 +166,31 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                   <td className="binding-value-cell">
                     {row ? (
                       <div className="applet-shortcut-value">
-                        <kbd>{inputLabel(row)}</kbd>
+                        {onInputFilter ? (
+                          <button
+                            type="button"
+                            className={`binding-input-filter${multiple ? ' has-multiple-commands' : ''}`}
+                            aria-label={`${inputLabel(row)}を割り当てたコマンドで絞り込む`}
+                            title={`${inputLabel(row)}で絞り込む${multiple ? '（複数のコマンド）' : ''}`}
+                            aria-pressed={selectedInput === inputKey(row)}
+                            aria-description={
+                              multiple
+                                ? `この${inputName}に複数のコマンドが割り当てられています。`
+                                : undefined
+                            }
+                            data-multiple-commands={multiple}
+                            onClick={(event) =>
+                              onInputFilter(
+                                { key: inputKey(row), label: inputLabel(row) },
+                                event.currentTarget,
+                              )
+                            }
+                          >
+                            <kbd>{inputLabel(row)}</kbd>
+                          </button>
+                        ) : (
+                          <kbd>{inputLabel(row)}</kbd>
+                        )}
                         <span>{conditionLabel(row, command)}</span>
                         {!row.enabled && <small>無効</small>}
                       </div>

@@ -11,6 +11,7 @@ import {
 import { AppletShortcutDialog } from './AppletShortcutDialog';
 import { ShortcutOrderDialog } from './ShortcutOrderDialog';
 import { CommandBindingList } from './CommandBindingList';
+import type { BindingInputFilter } from './useBindingCommandFilter';
 import { normalizeShortcut, type UiCommand } from '../../shared/commands';
 
 export function ShortcutCommandList({
@@ -22,6 +23,8 @@ export function ShortcutCommandList({
   showProvider = false,
   statusError,
   onRetry,
+  selectedInput,
+  onInputFilter,
 }: {
   commands: UiCommand[];
   allCommands?: UiCommand[];
@@ -31,6 +34,8 @@ export function ShortcutCommandList({
   showProvider?: boolean;
   statusError?(row: Keybinding): string | undefined;
   onRetry?(): void;
+  selectedInput?: string;
+  onInputFilter?(input: BindingInputFilter, trigger: HTMLButtonElement): void;
 }) {
   const bindings = getKeybindings(settings);
   return (
@@ -40,6 +45,8 @@ export function ShortcutCommandList({
       showProvider={showProvider}
       statusError={statusError}
       onRetry={onRetry}
+      selectedInput={selectedInput}
+      onInputFilter={onInputFilter}
       inputName="キー"
       inputKey={(row) => normalizeShortcut(row.key)}
       inputLabel={(row) => row.key}

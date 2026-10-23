@@ -2651,6 +2651,27 @@ summary {
 .applet-shortcut-value kbd {
   color: var(--text);
 }
+.binding-input-filter {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-weight: inherit;
+}
+.binding-input-filter.has-multiple-commands {
+  color: var(--accent);
+}
+.binding-input-filter kbd {
+  color: inherit;
+}
+.binding-input-filter:hover:not(:disabled) {
+  background: var(--accent-soft);
+  filter: none;
+}
+.binding-input-filter:is(:hover, :focus-visible) kbd {
+  border-color: var(--accent);
+}
 .binding-row-actions {
   display: flex;
   align-items: center;

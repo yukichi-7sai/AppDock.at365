@@ -3,17 +3,19 @@ import type { Ref } from 'react';
 
 export function CommandProviderFilter({
   title,
+  label = '対象',
   onClear,
   ref,
 }: {
   title: string;
+  label?: string;
   onClear?(): void;
   ref?: Ref<HTMLParagraphElement>;
 }) {
   return (
     <p className="command-provider-filter" ref={ref}>
       <span>
-        対象: <strong>{title}</strong>
+        {label}: <strong>{title}</strong>
       </span>
       <button
         type="button"

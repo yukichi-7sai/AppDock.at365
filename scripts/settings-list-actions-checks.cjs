@@ -231,6 +231,7 @@ module.exports = async ({
                 rowHeight: tr.getBoundingClientRect().height,
                 badgeColor: getComputedStyle(tr.querySelector('kbd')).color,
                 textColor: getComputedStyle(tr).color,
+                orderColor: getComputedStyle(tr.querySelector('.binding-order')).color,
                 lastAssignment: tr === tr.parentElement.lastElementChild,
                 lastCommand: tr.parentElement === tr.closest('table').lastElementChild,
                 padding: [...tr.querySelectorAll('.binding-value-cell, .binding-actions-cell')].map(
@@ -245,8 +246,8 @@ module.exports = async ({
             assert(alignment.delta < 1, JSON.stringify(alignment));
             assert.equal(
               alignment.badgeColor,
-              alignment.textColor,
-              'input badge matches body text',
+              multiple ? alignment.orderColor : alignment.textColor,
+              'input badge uses accent only for multiple commands',
             );
             (samples.at(-1).bindings ??= []).push({ id: row.id, ...alignment });
           }
@@ -269,6 +270,14 @@ module.exports = async ({
       );
     }
   }
+  await require('./binding-input-filter-checks.cjs')({
+    host,
+    select,
+    snapshot,
+    until,
+    profile,
+    checks,
+  });
   for (const [page, id, editor] of [
     ['ショートカットキー', 'nav.owner', '.applet-shortcut-dialog'],
     ['マウスジェスチャー', 'actions.gesture', '.gesture-binding-dialog'],

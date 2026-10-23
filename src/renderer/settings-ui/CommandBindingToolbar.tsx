@@ -1,6 +1,8 @@
 import { SettingsInput } from './SettingsInput';
 import { ListIcon } from './SettingsListTable';
 import type { ReactNode } from 'react';
+import { CommandProviderFilter } from './CommandProviderFilter';
+import type { BindingInputFilter } from './useBindingCommandFilter';
 export function CommandBindingToolbar({
   inputName,
   count,
@@ -12,6 +14,8 @@ export function CommandBindingToolbar({
   onOrder,
   showRegistrationErrors = false,
   children,
+  inputFilter,
+  clearInputFilter,
 }: {
   inputName: string;
   count: number;
@@ -23,10 +27,20 @@ export function CommandBindingToolbar({
   onOrder(): void;
   showRegistrationErrors?: boolean;
   children?: ReactNode;
+  inputFilter?: BindingInputFilter | null;
+  clearInputFilter?(): void;
 }) {
   return (
     <>
-      {children}
+      {inputFilter ? (
+        <CommandProviderFilter
+          label={inputName === 'ジェスチャー' ? 'ジェスチャー' : 'キー'}
+          title={inputFilter.label}
+          onClear={clearInputFilter}
+        />
+      ) : (
+        children
+      )}
       <div className="command-shortcut-tools">
         <div className="command-shortcut-search">
           <span aria-hidden="true">⌕</span>
@@ -63,12 +77,13 @@ export function CommandBindingToolbar({
         >
           <ListIcon kind="order" />
         </button>
-        {(filter || statusFilter !== 'all') && (
+        {(filter || statusFilter !== 'all' || inputFilter) && (
           <button
             className="text-button"
             onClick={() => {
               setFilter('');
               setStatusFilter('all');
+              clearInputFilter?.();
             }}
           >
             絞り込みを解除
