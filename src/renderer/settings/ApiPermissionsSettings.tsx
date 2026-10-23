@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -25,114 +27,111 @@ const rows: {
     key: 'write',
     description: hostSettingItem('permissions', 'write').description,
     mcp: 'allowWrite',
-    label: '設定変更',
+    label: hostText('settings.apiPermissionsSettings.settings'),
   },
   {
     key: 'manageApplets',
     description: hostSettingItem('permissions', 'manageApplets').description,
     mcp: 'allowManageApplets',
     action: 'setAppletManagement',
-    label: 'Applet管理',
+    label: hostText('settings.apiPermissionsSettings.applets'),
   },
   {
     key: 'execute',
     description: hostSettingItem('permissions', 'execute').description,
     mcp: 'allowExecute',
     action: 'setExecution',
-    label: 'コマンド実行',
-    mcpWarning: '公開されたコマンドを実行します。操作内容によってPCや外部サービスへ影響します。',
+    label: hostText('settings.apiPermissionsSettings.commands'),
+    mcpWarning: hostText('settings.apiPermissionsSettings.commandsWarning'),
   },
   {
     key: 'editShortcuts',
     description: hostSettingItem('permissions', 'editShortcuts').description,
     mcp: 'allowEditShortcuts',
     action: 'setShortcutEditing',
-    label: 'ショートカット編集',
+    label: hostText('settings.apiPermissionsSettings.shortcuts'),
   },
   {
     key: 'editGestures',
     description: hostSettingItem('permissions', 'editGestures').description,
     mcp: 'allowEditGestures',
     action: 'setGestureEditing',
-    label: 'ジェスチャー編集',
+    label: hostText('settings.apiPermissionsSettings.gestures'),
   },
   {
     key: 'editTouchpadGestures',
     description: hostSettingItem('permissions', 'editTouchpadGestures').description,
     mcp: 'allowEditTouchpadGestures',
     action: 'setTouchpadGestureEditing',
-    label: 'タッチパッドジェスチャー編集',
+    label: hostText('settings.apiPermissionsSettings.touchpad'),
   },
   {
     key: 'editRibbon',
     description: hostSettingItem('permissions', 'editRibbon').description,
     mcp: 'allowEditRibbon',
     action: 'setRibbonEditing',
-    label: 'リボン編集',
+    label: hostText('settings.apiPermissionsSettings.ribbon'),
   },
   {
     key: 'editTray',
     description: hostSettingItem('permissions', 'editTray').description,
     mcp: 'allowEditTray',
     action: 'setTrayEditing',
-    label: 'タスクトレイ編集',
+    label: hostText('settings.apiPermissionsSettings.tray'),
   },
   {
     key: 'manageCustomCommands',
     description: hostSettingItem('permissions', 'manageCustomCommands').description,
     mcp: 'allowManageCustomCommands',
     action: 'setCustomCommandManagement',
-    label: 'カスタムコマンド管理',
+    label: hostText('settings.apiPermissionsSettings.customCommands'),
   },
   {
     key: 'sendInput',
     description: hostSettingItem('permissions', 'sendInput').description,
     mcp: 'allowSendInput',
     action: 'setInputSending',
-    label: 'Windowsへのキー・操作メッセージ送信',
-    mcpWarning:
-      '他のアプリへキーや操作メッセージを送信します。意図しない操作につながる場合があります。',
+    label: hostText('settings.apiPermissionsSettings.input'),
+    mcpWarning: hostText('settings.apiPermissionsSettings.inputWarning'),
   },
   {
     key: 'runProcesses',
     description: hostSettingItem('permissions', 'runProcesses').description,
     mcp: 'allowRunProcesses',
     action: 'setProcessLaunching',
-    label: 'コマンド・プロセスの起動',
-    mcpWarning:
-      'このPCでコマンドやプログラムを起動します。ファイルやシステムへ影響する場合があります。',
+    label: hostText('settings.apiPermissionsSettings.process'),
+    mcpWarning: hostText('settings.apiPermissionsSettings.processWarning'),
   },
   {
     key: 'manageMcpServers',
     description: hostSettingItem('permissions', 'manageMcpServers').description,
     mcp: 'allowManageMcpServers',
     action: 'setMcpServerManagement',
-    label: 'MCP接続先の管理',
+    label: hostText('settings.apiPermissionsSettings.mcpManage'),
   },
   {
     key: 'useMcp',
     description: hostSettingItem('permissions', 'useMcp').description,
     mcp: 'allowUseMcp',
     action: 'setMcpClient',
-    label: 'MCP接続先の利用',
-    mcpWarning:
-      '接続先のMCPツールを利用します。ツールによって外部サービスやPC上の操作を実行します。',
+    label: hostText('settings.apiPermissionsSettings.mcpUse'),
+    mcpWarning: hostText('settings.apiPermissionsSettings.mcpWarning'),
   },
   {
     key: 'useAi',
     description: hostSettingItem('permissions', 'useAi').description,
     mcp: 'allowUseAi',
     action: 'setAi',
-    label: 'AI文章生成',
-    mcpWarning: '設定したAIサーバーへ入力した文章を送信します。',
+    label: hostText('settings.apiPermissionsSettings.ai'),
+    mcpWarning: hostText('settings.apiPermissionsSettings.aiWarning'),
   },
   {
     key: 'useTts',
     description: hostSettingItem('permissions', 'useTts').description,
     mcp: 'allowUseTts',
     action: 'setTts',
-    label: '読み上げ',
-    mcpWarning: '設定したTTSサーバーへ読み上げる文章を送信します。',
+    label: hostText('settings.apiPermissionsSettings.tts'),
+    mcpWarning: hostText('settings.apiPermissionsSettings.ttsWarning'),
   },
 ];
 
@@ -161,6 +160,7 @@ export function ApiPermissionsSettings({
   error?: string;
   busy: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [state, setState] = useState<AutomationState>();
   const [busy, setBusy] = useState(false);
@@ -203,9 +203,11 @@ export function ApiPermissionsSettings({
     write: state?.allowWrite,
   };
   function reason(key: AppletApiPermission, applet: boolean) {
-    if (!applet && !state?.running) return '連携が停止中です';
+    if (!applet && !state?.running) return translate('settings.apiPermissionsSettings.stopped');
     const missing = needs(key, applet ? grants : mcpPermissions, applet);
-    return missing.length ? `未有効：${missing.join('・')}の許可が必要です` : '';
+    return missing.length
+      ? translate('settings.apiPermissionsSettings.prerequisites', { value: missing.join('・') })
+      : '';
   }
   useSettingsFeedback({
     busy,
@@ -214,25 +216,31 @@ export function ApiPermissionsSettings({
       .join('\n'),
   });
   return (
-    <section className="api-permissions settings-sections" aria-label="操作の許可">
+    <section
+      className="api-permissions settings-sections"
+      aria-label={translate('settings.apiPermissionsSettings.title')}
+    >
       <SettingsSection
-        title="許可の適用とログについて"
+        title={translate('settings.apiPermissionsSettings.details')}
         collapsible
-        description="必要な許可が不足している操作は、ONでも有効になりません。連携がOFFの間も、MCPの許可を設定できます。"
+        description={translate('settings.apiPermissionsSettings.prerequisiteHint')}
       >
         <SettingsField
-          title="操作時の確認"
-          description="MCPで公開されたAppletコマンドが共通APIを呼ぶ場合、Appletと元のMCPの両方の許可を確認します。キー送信やプロセス起動には、それぞれの操作許可も必要です。"
+          title={translate('settings.apiPermissionsSettings.operationCheck')}
+          description={translate('settings.apiPermissionsSettings.operationHint')}
         />
         <SettingsField
-          title="ログ"
-          description="APIの呼出しと結果は、MCPはautomation、Appletは各Appletのログに記録します。引数の値や認証情報は記録しません。"
+          title={translate('settings.apiPermissionsSettings.logs')}
+          description={translate('settings.apiPermissionsSettings.logsHint')}
         />
       </SettingsSection>
-      <table className="permission-table" aria-label="APIの公開">
+      <table
+        className="permission-table"
+        aria-label={translate('settings.apiPermissionsSettings.api')}
+      >
         <thead>
           <tr>
-            <th scope="col">操作</th>
+            <th scope="col">{translate('settings.apiPermissionsSettings.actions')}</th>
             <th scope="col">Applet</th>
             <th scope="col">MCP</th>
           </tr>
@@ -264,9 +272,12 @@ export function ApiPermissionsSettings({
                 </td>
                 <td data-caller="MCP">
                   {row.key === 'read' ? (
-                    <span className="permission-fixed" title="MCP連携中は常に許可">
+                    <span
+                      className="permission-fixed"
+                      title={translate('settings.apiPermissionsSettings.alwaysAllowed')}
+                    >
                       <Toggle
-                        label="Codexからの情報取得を許可する（MCP連携中は常に許可）"
+                        label={translate('settings.apiPermissionsSettings.infoAllowed')}
                         checked
                         disabled
                         onChange={() => {}}
@@ -276,7 +287,9 @@ export function ApiPermissionsSettings({
                     <>
                       <div className="permission-control">
                         <Toggle
-                          label={`Codexからの${row.label}を許可する`}
+                          label={translate('settings.apiPermissionsSettings.allow', {
+                            label: row.label ?? appletApiPermissionLabels[row.key],
+                          })}
                           checked={!!mcpOn}
                           disabled={hostBusy || busy || !state}
                           onChange={(allowed) =>
@@ -300,7 +313,9 @@ export function ApiPermissionsSettings({
                               className="permission-warning-icon"
                               role="img"
                               tabIndex={0}
-                              aria-label={`MCP：${appletApiPermissionLabels[row.key]}の注意点`}
+                              aria-label={translate('settings.apiPermissionsSettings.warning', {
+                                value: appletApiPermissionLabels[row.key] ?? row.key,
+                              })}
                               aria-describedby={`permission-warning-${row.key}`}
                             >
                               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">

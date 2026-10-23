@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-24: 本体設定画面の日本語リソース移行 0.86.1
+
+- 先行0.86.0を依頼どおり755c6b8へコミットし、stage/commit tree一致を確認。その後cleanなmainでgit pull --ff-onlyは最新一致。今回分は未commit。設定項目・保存ファイル・公開操作の変更を伴わない文言抽出のため0.86.1へパッチ更新した。
+- 設定17ページの本文・選択肢・ヒント・検索・アクセシブル名、共通の一覧/編集/並べ替え/確認部品と、共有入力検証・設定操作・一部の設定状態診断をJSONへ移行。日本語リソースは259→1,816項目。カスタムコマンド、リボングループ、接続名、Applet提供文言は入力されたまま表示する。HostMessageは強調等のReact nodeを翻訳後に挿入し、HTMLとして解析しない。現行範囲と残りはdocs/localization.mdに整理。
+- 発行前自己レビュー1回と修正確認を実施。文章断片を名前付き差し込みへ統合、表示文字列による分岐を安定したinputKindへ変更、従来の検索文言を保持、未定義になり得る差し込み値を正規化。80ソースのAST比較で既存の非日本語リテラルの削除0件、保存ID/操作IDの保持を確認。未解決指摘なし。review.json/literal-review.jsonを保存。
+- 型検査/build、標準回帰848/848成功。設定renderer全体と移行済み共有部品の日本語直書き再混入検査を拡張。685入力の試験前後SHA256一致。バージョン変更後のworkspace検証はinstall --frozen-lockfileで更新し、固定依存・lockfileと408件のsupply-chain検査を維持。制限環境のCOM/ファイル置換、Electron、.NET発行失敗は同じ処理を通常ユーザーで再実行した。
+- 固定EXEの翻訳GUI7群成功（.artifacts/settings-hints-ui-1792768204223/）。17ページ×明暗×1280/760の68画面、未翻訳キー/外側の横溢れ、先頭の日本語1択、検索/保存/JSON拒否、実再起動を確認。HTML風文字・{{name}}・$t(...)を含む接続名の確認ダイアログで無変換と取消後の保持も確認。settings.jsonという実ファイル名と翻訳キーの衝突による試験側の誤検出を修正した。
+- 固定EXEの一覧操作GUI10群（.artifacts/settings-hints-ui-1792768268820/）成功。8一覧の明暗/狭幅、3入力方式のフィルター、ショートカット/マウスの直接編集・実行順・即時削除・取消・フォーカス、ヒントOFFを検査。renderer error 0。固定smoke（.artifacts/smoke-1792768340693/）も成功。AI/権限/通知/リボンの画像を目視確認した。
+- publish.bat成功。固定EXEはFileVersion/ProductVersion/feed/同梱Default Shellとも0.86.1、170,651,295 bytes、SHA256 `8ff4f3056cf0e7e565af3538f570118ea3d0477cb761669b4c7ada237fb6e00e`。GUI2種/smokeコピーのhash、ASAR内日本語JSONとソースの一致を確認。正本は `.artifacts/localization-settings-20261023/validation.json`、完全ログ・入力hash・artifacts.json。
+- 共通サービスが返す実行結果/native確認画面と他の本体ページは次段階。Applet自身の翻訳、多言語切替、外部AI/MCP/TTS・実入力機器・実UACの操作は未検証。テスト終了処理成功、参照可能な隔離profileプロセス0。保護すべき既存証跡・不明/失敗資料は保持し、試験ディレクトリ削除0件、今回の使い捨て編集補助6ファイルだけ削除。push/Release/実利用deployなし。
+
 ## 2026-10-23: 翻訳基盤0.86.0のコミット前照合
 
 - 実装時の685入力・完全ログ・固定EXE/同梱JSONのSHA256一致を確認し、型検査/build・標準848件・固定EXE GUI6群・smokeの成功を再利用。製品変更・版更新・再発行なし。利用者による動作確認も受領した。

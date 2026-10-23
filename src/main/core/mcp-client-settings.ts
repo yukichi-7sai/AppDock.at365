@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -51,7 +52,7 @@ export class McpClientSettings {
     } catch {
       throw new McpSettingsError(
         'CONFIGURATION_REQUIRED',
-        'MCPのPC専用設定を読み取れません。設定ファイルを確認してください。',
+        hostText('settings.mcp-client-settings.unreadable'),
       );
     }
   }
@@ -65,7 +66,10 @@ export class McpClientSettings {
       (value.secret !== undefined &&
         (typeof value.secret !== 'string' || value.secret.length > 131072))
     )
-      throw new McpSettingsError('CONFIGURATION_REQUIRED', 'MCPのPC専用設定を確認してください。');
+      throw new McpSettingsError(
+        'CONFIGURATION_REQUIRED',
+        hostText('settings.mcp-client-settings.invalidDeviceSettings'),
+      );
     parseMcpConnection(value.connection);
     return value as unknown as LocalEntry;
   }
@@ -81,8 +85,7 @@ export class McpClientSettings {
     } catch {
       return {
         revision: '',
-        error:
-          'MCPのPC専用設定を読み取れません。mcp-client.jsonを確認してください。内容を保持して読み取り専用にしています。',
+        error: hostText('settings.mcp-client-settings.readonly'),
       };
     }
   }
@@ -119,7 +122,7 @@ export class McpClientSettings {
     } catch {
       throw new McpSettingsError(
         'CONFIGURATION_REQUIRED',
-        'MCPの認証情報を復号できません。接続設定で再入力してください。',
+        hostText('settings.mcp-client-settings.decryptFailed'),
       );
     }
   }
@@ -151,7 +154,7 @@ export class McpClientSettings {
           tokenConfigured: false,
           environmentNames: [],
           state: disabled ? 'disabled' : 'error',
-          error: 'PC専用設定または認証情報を確認してください。',
+          error: hostText('settings.mcp-client-settings.unhealthy'),
         };
       }
     });
@@ -170,21 +173,23 @@ export class McpClientSettings {
       };
     }
     const item = items.find((item) => item.id === serverId);
-    if (!item) throw new McpSettingsError('NOT_FOUND', 'MCP接続先が見つかりません。');
+    if (!item)
+      throw new McpSettingsError(
+        'NOT_FOUND',
+        hostText('settings.mcp-client-settings.missingServer'),
+      );
     return { revision, item, ...this.statuses().find((s) => s.id === serverId) };
   }
   private asset(entries: Record<string, unknown>, expectedRevision: string) {
     const content = JSON.stringify({ version: 1, entries }) + '\n';
     if (Object.keys(entries).length > 64 || Buffer.byteLength(content, 'utf8') > 1024 * 1024)
-      throw Error(
-        'MCPのPC専用設定が保存上限を超えます。不要な接続設定や環境変数を整理してください。',
-      );
+      throw Error(hostText('settings.mcp-client-settings.size'));
     const previous = fs.existsSync(this.file) ? fs.readFileSync(this.file) : undefined;
     let committed = false;
     return {
       commit: () => {
         if (this.revision() !== expectedRevision)
-          throw new SettingsConflictError('MCP接続設定が変更されました。');
+          throw new SettingsConflictError(hostText('settings.mcp-client-settings.changed'));
         atomicWrite(this.file, content, { previous });
         committed = true;
       },
@@ -194,7 +199,7 @@ export class McpClientSettings {
         if (previous) atomicWrite(this.file, previous, { previous: written });
         else {
           if (!fs.readFileSync(this.file).equals(written))
-            throw new SettingsConflictError('MCP接続設定が変更されました。');
+            throw new SettingsConflictError(hostText('settings.mcp-client-settings.changed'));
           fs.rmSync(this.file);
         }
       },
@@ -202,7 +207,7 @@ export class McpClientSettings {
   }
   update(request: unknown) {
     if (!jsonObject(request) || typeof request.expectedRevision !== 'string')
-      throw Error('MCP接続設定の更新要求が不正です。');
+      throw Error(hostText('settings.mcp-client-settings.invalidUpdate'));
     const fields: Record<string, string[]> = {
       save: ['item', 'connection', 'token', 'environment'],
       remove: ['id'],
@@ -217,20 +222,20 @@ export class McpClientSettings {
       ) ||
       (request.dryRun !== undefined && typeof request.dryRun !== 'boolean')
     )
-      throw Error('MCP接続設定の更新要求が不正です。');
+      throw Error(hostText('settings.mcp-client-settings.invalidUpdate'));
     boundedJson(request, 262144, 8, 4096);
     try {
       this.settings.assertRevision(this.settings.revision);
     } catch {
       throw new McpSettingsError(
         'REVISION_CONFLICT',
-        '設定が別の場所で変更されました。設定を再取得してください。',
+        hostText('settings.mcp-client-settings.conflict'),
       );
     }
     if (request.expectedRevision !== this.revision())
       throw new McpSettingsError(
         'REVISION_CONFLICT',
-        '設定が別の場所で変更されました。キャンセルして開き直してください。',
+        hostText('settings.mcp-client-settings.editConflict'),
       );
     const entries = this.read();
     let items = this.roster();
@@ -249,7 +254,7 @@ export class McpClientSettings {
           previous = this.secrets(item.id);
         } catch {
           if (request.token === undefined && request.environment === undefined)
-            throw Error('認証情報を再入力してください。');
+            throw Error(hostText('settings.mcp-client-settings.credentialRequired'));
         }
       }
       const token = request.token === undefined ? previous.token : request.token;
@@ -257,7 +262,7 @@ export class McpClientSettings {
         token !== undefined &&
         (typeof token !== 'string' || token.length > 8192 || /[\x00-\x1f\x7f]/.test(token))
       )
-        throw Error('Bearerは改行を含まない8192文字以下で入力してください。');
+        throw Error(hostText('settings.mcp-client-settings.invalidBearer'));
       const env = request.environment === undefined ? previous.env : request.environment;
       if (
         !jsonObject(env) ||
@@ -270,10 +275,10 @@ export class McpClientSettings {
             /[\x00]/.test(v),
         )
       )
-        throw Error('環境変数は32件以内の名前と文字列のJSONです。');
+        throw Error(hostText('settings.mcp-client-settings.invalidEnvironment'));
       boundedJson(env, 32768, 2, 100);
       if (connection.authentication === 'bearer' && !token)
-        throw Error('Bearerを入力してください。接続先変更後は再入力が必要です。');
+        throw Error(hostText('settings.mcp-client-settings.bearerRequired'));
       const secretData = {
         binding: mcpEndpointIdentity(connection),
         token: connection.authentication === 'bearer' ? token : undefined,
@@ -300,7 +305,7 @@ export class McpClientSettings {
         : [...items, item];
     } else if (request.op === 'remove') {
       if (!mcpUuid(request.id) || !items.some((v) => v.id === request.id))
-        throw Error('接続先が見つかりません。');
+        throw Error(hostText('settings.mcp-client-settings.missingConnection'));
       items = items.filter((v) => v.id !== request.id);
       delete entries[request.id];
     } else if (request.op === 'reorder') {
@@ -310,7 +315,7 @@ export class McpClientSettings {
         new Set(request.ids).size !== items.length ||
         request.ids.some((id) => !items.some((v) => v.id === id))
       )
-        throw Error('並び順が一致しません。');
+        throw Error(hostText('settings.mcp-client-settings.order'));
       items = request.ids.map((id) => items.find((v) => v.id === id)!);
     } else if (request.op === 'enabled') {
       if (
@@ -319,19 +324,19 @@ export class McpClientSettings {
         !entries[request.id] ||
         typeof request.enabled !== 'boolean'
       )
-        throw Error('接続先のPC設定を先に保存してください。');
+        throw Error(hostText('settings.mcp-client-settings.configureFirst'));
       const entry = this.entry(request.id, entries);
-      if (!entry) throw Error('接続先のPC設定を先に保存してください。');
+      if (!entry) throw Error(hostText('settings.mcp-client-settings.configureFirst'));
       entry.connection.enabled = request.enabled;
-    } else throw Error('対応していない更新です。');
+    } else throw Error(hostText('settings.mcp-client-settings.unsupported'));
     const mcpServers = parseMcpRoster({ version: 1, items });
     const next = { ...this.settings.value, mcpServers };
     if (Buffer.byteLength(JSON.stringify(next, null, 2) + '\n', 'utf8') > 4 * 1024 * 1024)
-      throw Error('設定ファイルは4MB以下にしてください。');
+      throw Error(hostText('settings.mcp-client-settings.fileSize'));
     if (request.expectedRevision !== this.revision())
       throw new McpSettingsError(
         'REVISION_CONFLICT',
-        '設定が別の場所で変更されました。設定を再取得してください。',
+        hostText('settings.mcp-client-settings.conflict'),
       );
     const asset = this.asset(entries, request.expectedRevision);
     if (request.dryRun === true)
@@ -342,11 +347,11 @@ export class McpClientSettings {
       if (error instanceof SettingsConflictError)
         throw new McpSettingsError(
           'REVISION_CONFLICT',
-          '設定が別の場所で変更されました。設定を再取得してください。',
+          hostText('settings.mcp-client-settings.conflict'),
         );
       throw new McpSettingsError(
         'SAVE_FAILED',
-        'MCP接続設定を保存できません。保存先のアクセス権と空き容量を確認してください。',
+        hostText('settings.mcp-client-settings.saveFailed'),
       );
     }
     this.changed();

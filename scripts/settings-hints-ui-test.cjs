@@ -610,6 +610,16 @@ async function checkSectionTitles() {
     }
     if (localizationOnly) {
       delete initial.host.language;
+      initial.ai = {
+        commonPrompt: '',
+        connections: [
+          {
+            ...require('../out/main/shared/ai').newAiConnection('localization'),
+            name: '<b>language.ja</b> {{name}} $t(language.ja)',
+            baseUrl: 'http://127.0.0.1:1/v1',
+          },
+        ],
+      };
       initial.ribbon.groups = [
         {
           id: 'group:localization',

@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useRef, type ReactNode } from 'react';
 import { CommandListSummary, CommandListToolbar, useCommandListScroll } from './CommandListScroll';
 import type { SettingDefinition, SettingOption } from '../../shared/contracts';
@@ -111,6 +112,7 @@ export function SettingsListTable({
   commandListScroll?: boolean;
   toolbarFilter?: ReactNode;
 }) {
+  const { t: translate } = useHostTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   useCommandListScroll(scrollRef, commandListScroll);
   const view = definition.list!;
@@ -119,7 +121,10 @@ export function SettingsListTable({
     settingsListText(definition, entry, key, options);
   const count = (
     <span>
-      {entries.length} / {maxItems} 件
+      {translate('settings.settingsListTable.entryCount', {
+        count: entries.length,
+        limit: maxItems,
+      })}
     </span>
   );
   const actions = (
@@ -127,8 +132,8 @@ export function SettingsListTable({
       <button
         type="button"
         className="settings-list-icon"
-        title="並べ替え"
-        aria-label={`${definition.title}を並べ替え`}
+        title={translate('settings.settingsListTable.order')}
+        aria-label={translate('settings.settingsListTable.orderLabel', { title: definition.title })}
         disabled={busy || entries.length < 2}
         onClick={onOrder}
       >
@@ -142,7 +147,9 @@ export function SettingsListTable({
           disabled={busy || !canAdd || entries.length >= maxItems}
           onClick={onAdd}
         >
-          {definition.itemTitle ?? '項目'}を追加
+          {translate('settings.settingsListTable.add', {
+            value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
+          })}
         </button>
       )}
     </>
@@ -169,14 +176,19 @@ export function SettingsListTable({
         <table aria-label={definition.title}>
           <thead>
             <tr>
-              {view.showIndex && <th>{definition.itemTitle ?? '項目'}</th>}
+              {view.showIndex && (
+                <th>{definition.itemTitle ?? translate('settings.settingsListTable.item')}</th>
+              )}
               {view.columns.map((key) => (
                 <th key={key}>
                   {addInTitle && key === view.titleKey ? (
                     <span className="settings-list-heading">
                       {fields.find((field) => field.key === key)!.title}
                       <SettingsListAddButton
-                        label={`${definition.itemTitle ?? '項目'}を追加`}
+                        label={translate('settings.settingsListTable.add', {
+                          value:
+                            definition.itemTitle ?? translate('settings.settingsListTable.item'),
+                        })}
                         disabled={busy || !canAdd || entries.length >= maxItems}
                         onClick={onAdd}
                       />
@@ -186,15 +198,25 @@ export function SettingsListTable({
                   )}
                 </th>
               ))}
-              {view.enabledKey && <th className="settings-list-state">有効</th>}
-              <th className="settings-list-actions-heading">操作</th>
-              {navigation && <th className="command-settings-heading">移動</th>}
+              {view.enabledKey && (
+                <th className="settings-list-state">
+                  {translate('settings.settingsListTable.enabled')}
+                </th>
+              )}
+              <th className="settings-list-actions-heading">
+                {translate('settings.settingsListTable.actions')}
+              </th>
+              {navigation && (
+                <th className="command-settings-heading">
+                  {translate('settings.settingsListTable.navigation')}
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
             {entries.map((entry, index) => {
               const name = view.showIndex
-                ? `${definition.itemTitle ?? '項目'}${index + 1}`
+                ? `${definition.itemTitle ?? translate('settings.settingsListTable.item')}${index + 1}`
                 : display(entry, view.titleKey);
               const legacyIcon =
                 view.iconKey &&
@@ -218,7 +240,7 @@ export function SettingsListTable({
                           />
                           <div>
                             <strong className="command-title">
-                              {display(entry, key) || '未設定'}
+                              {display(entry, key) || translate('settings.settingsListTable.unset')}
                               {titleExtra?.(entry)}
                             </strong>
                             {view.descriptionKey && display(entry, view.descriptionKey) && (
@@ -237,7 +259,7 @@ export function SettingsListTable({
                         type="button"
                         className="toggle settings-list-toggle"
                         role="switch"
-                        aria-label={`${name}を有効にする`}
+                        aria-label={translate('settings.settingsListTable.enable', { name: name })}
                         aria-checked={Boolean(entry[view.enabledKey])}
                         disabled={busy || canToggle?.(entry, index) === false}
                         onClick={() => onToggle?.(index)}
@@ -252,8 +274,10 @@ export function SettingsListTable({
                       <button
                         type="button"
                         className="settings-list-icon"
-                        title="編集"
-                        aria-label={`${name}を編集`}
+                        title={translate('settings.settingsListTable.edit')}
+                        aria-label={translate('settings.settingsListTable.editLabel', {
+                          name: name,
+                        })}
                         disabled={busy}
                         onClick={() => onEdit(index)}
                       >
@@ -262,8 +286,10 @@ export function SettingsListTable({
                       <button
                         type="button"
                         className="settings-list-icon settings-list-delete"
-                        title="削除"
-                        aria-label={`${name}を削除`}
+                        title={translate('settings.settingsListTable.delete')}
+                        aria-label={translate('settings.settingsListTable.deleteLabel', {
+                          name: name,
+                        })}
                         disabled={busy}
                         onClick={() => onDelete(index)}
                       >
@@ -287,8 +313,12 @@ export function SettingsListTable({
                   className="settings-list-empty"
                 >
                   {addInTitle
-                    ? `登録がありません。「${fields.find((field) => field.key === view.titleKey)!.title}」の横の＋から登録できます。`
-                    : `登録がありません。「${definition.itemTitle ?? '項目'}を追加」から登録できます。`}
+                    ? translate('settings.settingsListTable.emptyHeader', {
+                        title: fields.find((field) => field.key === view.titleKey)!.title,
+                      })
+                    : translate('settings.settingsListTable.emptyButton', {
+                        value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
+                      })}
                 </td>
               </tr>
             )}

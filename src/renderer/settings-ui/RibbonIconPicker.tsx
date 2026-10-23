@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useId, useState } from 'react';
 import { ribbonGroupIcons, type RibbonBuiltinIcon } from '../../shared/ribbon';
 import { Icon } from '../Icon';
@@ -6,14 +8,14 @@ import type { RegisteredImageRef } from '../../shared/registered-images';
 import { SettingsField } from './SettingsSections';
 
 const labels: Record<RibbonBuiltinIcon, string> = {
-  folder: 'フォルダー',
-  mail: 'メール',
-  clock: '時計',
-  image: '画像',
-  extensions: 'アプレット',
-  settings: '設定',
-  bell: '通知',
-  user: 'ユーザー',
+  folder: hostText('settings.ribbonIconPicker.folder'),
+  mail: hostText('settings.ribbonIconPicker.mail'),
+  clock: hostText('settings.ribbonIconPicker.clock'),
+  image: hostText('settings.ribbonIconPicker.image'),
+  extensions: hostText('settings.ribbonIconPicker.applet'),
+  settings: hostText('settings.ribbonIconPicker.settings'),
+  bell: hostText('settings.ribbonIconPicker.notifications'),
+  user: hostText('settings.ribbonIconPicker.user'),
 };
 /** Only the active source is sent to the parent draft; inactive choices live until close. */
 export function RibbonIconPicker({
@@ -31,6 +33,7 @@ export function RibbonIconPicker({
   onImage?(image: RegisteredImageRef | null): void;
   preferImage?: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const id = useId();
   const [mode, setMode] = useState<'image' | 'builtin'>(
     onImage && (image || preferImage) ? 'image' : 'builtin',
@@ -43,7 +46,11 @@ export function RibbonIconPicker({
   return (
     <SettingsField title={label}>
       {onImage && (
-        <div className="ribbon-icon-modes" role="group" aria-label="アイコンの種類">
+        <div
+          className="ribbon-icon-modes"
+          role="group"
+          aria-label={translate('settings.ribbonIconPicker.kind')}
+        >
           {(['image', 'builtin'] as const).map((source) => (
             <label key={source}>
               <input
@@ -53,14 +60,18 @@ export function RibbonIconPicker({
                 checked={mode === source}
                 onChange={() => chooseMode(source)}
               />
-              <span>{source === 'image' ? '画像' : '既定のアイコン'}</span>
+              <span>
+                {source === 'image'
+                  ? translate('settings.ribbonIconPicker.image')
+                  : translate('settings.ribbonIconPicker.default')}
+              </span>
             </label>
           ))}
         </div>
       )}
       {mode === 'image' && onImage ? (
         <RegisteredImageInput
-          label={label + 'の画像'}
+          label={translate('settings.ribbonIconPicker.imageLabel', { label })}
           value={draftImage}
           onChange={(next) => {
             setDraftImage(next);
@@ -68,7 +79,11 @@ export function RibbonIconPicker({
           }}
         />
       ) : (
-        <div className="ribbon-builtin-icons" role="group" aria-label="既定のアイコン一覧">
+        <div
+          className="ribbon-builtin-icons"
+          role="group"
+          aria-label={translate('settings.ribbonIconPicker.defaultList')}
+        >
           {ribbonGroupIcons.map((icon) => (
             <button
               type="button"

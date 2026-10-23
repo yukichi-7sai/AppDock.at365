@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 export type CommandScope =
   'global' | 'app' | 'pages' | 'owner' | 'applets' | 'desktop' | 'browser' | 'exe';
 
@@ -31,7 +32,7 @@ export function processNames(value: unknown): string[] {
     value.length > 100 ||
     value.some((v) => typeof v !== 'string' || !/^[\p{L}\p{N}_. -]{1,120}$/u.test(v.trim()))
   )
-    throw Error('exe名は100件以内で、パスを含めずに指定してください。');
+    throw Error(hostText('settings.command-conditions.processes'));
   return [
     ...new Set(
       value.map((v) =>

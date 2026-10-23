@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { getHostTranslator } from './i18n';
 import { defaultHostLanguage, type HostLanguage } from './host-language';
 import { collectionRecord } from './page-collections';
@@ -47,167 +48,315 @@ export const settingsItemId = (pageId: string, key: string) =>
   `${encodeURIComponent(pageId)}/${encodeURIComponent(key)}`;
 const hostItems: Record<string, [string, string, string?][]> = {
   applets: [
-    ['management', 'Applet管理', 'インストール 有効 無効 更新 再起動 アンインストール 並べ替え'],
+    [
+      'management',
+      hostText('settings.settings-catalog.applets'),
+      hostText('settings.settings-catalog.appletsKeywords'),
+    ],
   ],
   'mcp-client': [
-    ['connections', 'MCP接続先', 'サーバー stdio HTTP 接続 設定 認証 ツール ジョブ 取消'],
+    [
+      'connections',
+      hostText('settings.settings-catalog.mcpClient'),
+      hostText('settings.settings-catalog.mcpClientKeywords'),
+    ],
   ],
   'custom-commands': [
     [
       'definitions',
-      'カスタムコマンド',
-      '種類を選んで固定設定を保存し、ショートカット・ジェスチャー・MCPから実行します。',
+      hostText('settings.settings-catalog.customCommands'),
+      hostText('settings.settings-catalog.customCommandsHint'),
     ],
   ],
   ai: [
-    ['commonPrompt', '共通プロンプト', '各AppletとMCPからの追加プロンプトに組み合わせる基本方針'],
-    ['defaultConnectionId', '既定のAI接続', '呼出し側が接続を省略したときに使用'],
+    [
+      'commonPrompt',
+      hostText('settings.settings-catalog.aiPrompt'),
+      hostText('settings.settings-catalog.aiPromptHint'),
+    ],
+    [
+      'defaultConnectionId',
+      hostText('settings.settings-catalog.aiDefault'),
+      hostText('settings.settings-catalog.aiDefaultHint'),
+    ],
     [
       'connections',
-      'AI接続設定',
-      'Ollama LM Studio llama.cpp OpenAI サーバー URL モデル 認証 APIキー 互換性 トークン 上限 待ち時間 タイムアウト',
+      hostText('settings.settings-catalog.aiConnections'),
+      hostText('settings.settings-catalog.aiKeywords'),
     ],
-    ['preview', '文章生成の試験', 'モデル 追加プロンプト 入力 生成結果 停止'],
+    [
+      'preview',
+      hostText('settings.settings-catalog.aiPreview'),
+      hostText('settings.settings-catalog.aiPreviewKeywords'),
+    ],
   ],
 
   tts: [
-    ['baseUrl', 'APIのURL', 'OpenAI互換TTSサーバーのベースURL'],
-    ['apiKey', 'APIキー', 'このPCに暗号化保存。空欄で認証なし'],
-    ['model', 'TTSモデル', 'モデル一覧を更新 サーバーから取得 手動入力'],
-    ['defaultVoice', '既定のボイス'],
-    ['defaultSpeed', '読み上げ速度'],
-    ['speedMode', '速度の適用先', 'AppDockの再生速度 サーバーの生成速度'],
-    ['voicesSource', 'ボイス一覧の取得方式'],
-    ['voicesPath', 'ボイス一覧のパス'],
-    ['manualVoices', '手動ボイス一覧'],
-    ['preview', '試聴と停止', 'テキストを入力して読み上げ'],
+    [
+      'baseUrl',
+      hostText('settings.settings-catalog.ttsUrl'),
+      hostText('settings.settings-catalog.ttsUrlHint'),
+    ],
+    [
+      'apiKey',
+      hostText('settings.settings-catalog.ttsKey'),
+      hostText('settings.settings-catalog.ttsKeyHint'),
+    ],
+    [
+      'model',
+      hostText('settings.settings-catalog.ttsModel'),
+      hostText('settings.settings-catalog.ttsModelKeywords'),
+    ],
+    ['defaultVoice', hostText('settings.settings-catalog.ttsVoice')],
+    ['defaultSpeed', hostText('settings.settings-catalog.ttsSpeed')],
+    [
+      'speedMode',
+      hostText('settings.settings-catalog.ttsSpeedMode'),
+      hostText('settings.settings-catalog.ttsSpeedModeKeywords'),
+    ],
+    ['voicesSource', hostText('settings.settings-catalog.ttsVoiceSource')],
+    ['voicesPath', hostText('settings.settings-catalog.ttsVoicePath')],
+    ['manualVoices', hostText('settings.settings-catalog.ttsManualVoices')],
+    [
+      'preview',
+      hostText('settings.settings-catalog.ttsPreview'),
+      hostText('settings.settings-catalog.ttsPreviewHint'),
+    ],
   ],
   notifications: [
-    ['speech.voice', '通知の声', '共通の読み上げ設定を継承 または上書き'],
-    ['speech.speed', '通知の読み上げ速度', '共通の読み上げ設定を継承 または上書き'],
-    ['speech.preview', '通知の読み上げを試聴', '試聴と停止'],
+    [
+      'speech.voice',
+      hostText('settings.settings-catalog.notificationVoice'),
+      hostText('settings.settings-catalog.notificationInherit'),
+    ],
+    [
+      'speech.speed',
+      hostText('settings.settings-catalog.notificationSpeed'),
+      hostText('settings.settings-catalog.notificationInherit'),
+    ],
+    [
+      'speech.preview',
+      hostText('settings.settings-catalog.notificationPreview'),
+      hostText('settings.settings-catalog.ttsPreview'),
+    ],
   ],
   ribbon: [
-    ['rightClickCommand', '右クリックのコマンド', '動作設定 リボン 右クリック コマンド'],
+    [
+      'rightClickCommand',
+      hostText('settings.settings-catalog.ribbonRightClick'),
+      hostText('settings.settings-catalog.ribbonRightClickKeywords'),
+    ],
     [
       'ribbon',
-      'リボン',
-      '表示 配置 並べ替え 上部 下部 セパレーター 名前 色 パレット グループ 展開 折りたたみ バッジ コマンドボタン',
+      hostText('settings.settings-catalog.ribbon'),
+      hostText('settings.settings-catalog.ribbonKeywords'),
     ],
   ],
   tray: [
-    ['trayClickCommand', 'トレイクリックのコマンド', 'シングルクリック'],
-    ['trayDoubleClickCommand', 'トレイダブルクリックのコマンド', 'ダブルクリック'],
-    ['trayMenu', 'コンテキストメニュー', '追加 削除 グループ 区切り線 表示イメージ'],
+    [
+      'trayClickCommand',
+      hostText('settings.settings-catalog.trayClick'),
+      hostText('settings.settings-catalog.trayClickKeywords'),
+    ],
+    [
+      'trayDoubleClickCommand',
+      hostText('settings.settings-catalog.trayDoubleClick'),
+      hostText('settings.settings-catalog.trayDoubleClickKeywords'),
+    ],
+    [
+      'trayMenu',
+      hostText('settings.settings-catalog.trayMenu'),
+      hostText('settings.settings-catalog.trayMenuKeywords'),
+    ],
   ],
   shortcuts: [
-    ['options', '動作設定', '条件に一致したコマンドの実行方法 Webブラウザ'],
-    ['executionMode', '条件に一致したコマンドの実行方法', '最初の1つ すべて 登録順'],
-    ['browsers', 'Webブラウザのexe'],
-    ['requireChromiumWindowClass', 'ブラウザ条件でChromiumウィンドウだけを対象にする'],
+    [
+      'options',
+      hostText('settings.settings-catalog.inputOptions'),
+      hostText('settings.settings-catalog.inputOptionsKeywords'),
+    ],
+    [
+      'executionMode',
+      hostText('settings.settings-catalog.executionMode'),
+      hostText('settings.settings-catalog.executionModeKeywords'),
+    ],
+    ['browsers', hostText('settings.settings-catalog.browsers')],
+    ['requireChromiumWindowClass', hostText('settings.settings-catalog.chromium')],
     [
       'keybindings',
-      'ショートカットキー割り当て',
-      'ショートカットキー 割り当て コマンド 条件 デスクトップ Webブラウザ 指定したexe 実行順 入力の適用エラー Win ブロック',
+      hostText('settings.settings-catalog.shortcuts'),
+      hostText('settings.settings-catalog.shortcutsKeywords'),
     ],
   ],
   'touchpad-gestures': [
-    ['executionMode', '条件に一致したコマンドの実行方法', '最初の1つ すべて 登録順'],
-    ['browsers', 'Webブラウザの実行ファイル', 'chrome.exe firefox.exe'],
-    ['requireChromiumWindowClass', 'Chromiumウィンドウに限定', 'ブラウザ 条件'],
-    ['enabled', 'タッチパッドジェスチャーを有効にする', 'このPC Windows 接続'],
-    ['options', '動作設定', '条件に一致したコマンドの実行方法 最初の1つ すべて ブラウザ'],
+    [
+      'executionMode',
+      hostText('settings.settings-catalog.executionMode'),
+      hostText('settings.settings-catalog.executionModeKeywords'),
+    ],
+    ['browsers', hostText('settings.settings-catalog.touchpadBrowsers'), 'chrome.exe firefox.exe'],
+    [
+      'requireChromiumWindowClass',
+      hostText('settings.settings-catalog.touchpadChromium'),
+      hostText('settings.settings-catalog.touchpadBrowserKeywords'),
+    ],
+    [
+      'enabled',
+      hostText('settings.settings-catalog.touchpadEnabled'),
+      hostText('settings.settings-catalog.touchpadEnabledKeywords'),
+    ],
+    [
+      'options',
+      hostText('settings.settings-catalog.inputOptions'),
+      hostText('settings.settings-catalog.touchpadOptionsKeywords'),
+    ],
     [
       'connections',
-      '接続用キー設定',
-      'F13 F24 Ctrl Alt Shift Win 3本指 4本指 タップ 上 下 左 右 Windows 再設定 競合',
+      hostText('settings.settings-catalog.touchpadKeys'),
+      hostText('settings.settings-catalog.touchpadKeysKeywords'),
     ],
     ...touchpadGestureTypes.map(([id, title]): [string, string, string] => [
       `connection.${id}`,
-      `${title}の接続用キー`,
-      'Windows 再設定 競合',
+      hostText('settings.settings-catalog.touchpadKeyLabel', { title: title }),
+      hostText('settings.settings-catalog.touchpadKeyKeywords'),
     ]),
-    ['bindings', 'タッチパッドジェスチャー割り当て', 'いつ どこで 条件 実行順'],
+    [
+      'bindings',
+      hostText('settings.settings-catalog.touchpadBindings'),
+      hostText('settings.settings-catalog.touchpadBindingsKeywords'),
+    ],
   ],
   gestures: [
-    ['gestures', 'マウスジェスチャー割り当て', 'マウスジェスチャー 条件 実行順'],
-    ['enabled', 'マウスジェスチャーを有効にする'],
+    [
+      'gestures',
+      hostText('settings.settings-catalog.gestures'),
+      hostText('settings.settings-catalog.gesturesKeywords'),
+    ],
+    ['enabled', hostText('settings.settings-catalog.gesturesEnabled')],
     [
       'activateOnStart',
-      '非アクティブなウィンドウ・デスクトップでも開始する',
-      '右ボタン アクティブ化',
+      hostText('settings.settings-catalog.gesturesInactive'),
+      hostText('settings.settings-catalog.gesturesInactiveKeywords'),
     ],
-    ['options', '動作設定', '有効・実行方法・操作感・待機表示・Webブラウザ・除外'],
-    ['executionMode', '条件に一致したコマンドの実行方法', '最初の1つ すべて 登録順'],
-    ['browsers', 'Webブラウザのexe'],
-    ['excludedProcesses', 'ジェスチャーを除外するexe'],
-    ['requireChromiumWindowClass', 'ブラウザ条件でChromiumウィンドウだけを対象にする'],
-    ['distance', '移動距離（px）'],
-    ['wheelDelayMs', 'ホイールの最小実行間隔（ms）'],
+    [
+      'options',
+      hostText('settings.settings-catalog.inputOptions'),
+      hostText('settings.settings-catalog.gesturesOptionsKeywords'),
+    ],
+    [
+      'executionMode',
+      hostText('settings.settings-catalog.executionMode'),
+      hostText('settings.settings-catalog.executionModeKeywords'),
+    ],
+    ['browsers', hostText('settings.settings-catalog.browsers')],
+    ['excludedProcesses', hostText('settings.settings-catalog.gesturesExcluded')],
+    ['requireChromiumWindowClass', hostText('settings.settings-catalog.chromium')],
+    ['distance', hostText('settings.settings-catalog.gesturesDistance')],
+    ['wheelDelayMs', hostText('settings.settings-catalog.gesturesWheelDelay')],
     [
       'indicatorPosition',
-      '表示位置',
-      '待機表示 ジェスチャー開始地点 対象ウィンドウの中央 カーソルのあるモニターの中央 表示なし',
+      hostText('settings.settings-catalog.gesturesPosition'),
+      hostText('settings.settings-catalog.gesturesPositionKeywords'),
     ],
-    ['indicatorOpacity', '不透明度', '待機表示'],
-    ['indicatorShowNoAction', 'アクションなしを表示する', '待機表示 割り当てなし'],
+    [
+      'indicatorOpacity',
+      hostText('settings.settings-catalog.gesturesOpacity'),
+      hostText('settings.settings-catalog.gesturesIndicatorKeyword'),
+    ],
+    [
+      'indicatorShowNoAction',
+      hostText('settings.settings-catalog.gesturesNoAction'),
+      hostText('settings.settings-catalog.gesturesNoActionKeywords'),
+    ],
   ],
-  'web-accounts': [['accounts', 'Webアカウント', 'アカウント名 追加 削除 ログイン情報をクリア']],
+  'web-accounts': [
+    [
+      'accounts',
+      hostText('settings.settings-catalog.webAccounts'),
+      hostText('settings.settings-catalog.webAccountsKeywords'),
+    ],
+  ],
   codex: [
-    ['connectionScope', '接続範囲', 'このPCのみ ネットワーク LAN tailnet IPv4 MCP'],
-    ['network', 'ネットワークからの接続', '接続先 トークン コピー Bearer Streamable HTTP'],
-    ['automation', '連携を有効にする', 'AppDockの起動中に接続できます。'],
-    ['permissions', '操作の許可を開く'],
-    ['registration', 'Codexへ登録', '設定ファイル 設定先を変更 登録・修復 登録を解除 接続テスト'],
+    [
+      'connectionScope',
+      hostText('settings.settings-catalog.connectionScope'),
+      hostText('settings.settings-catalog.connectionScopeKeywords'),
+    ],
+    [
+      'network',
+      hostText('settings.settings-catalog.network'),
+      hostText('settings.settings-catalog.networkKeywords'),
+    ],
+    [
+      'automation',
+      hostText('settings.settings-catalog.automation'),
+      hostText('settings.settings-catalog.automationHint'),
+    ],
+    ['permissions', hostText('settings.settings-catalog.permissions')],
+    [
+      'registration',
+      hostText('settings.settings-catalog.register'),
+      hostText('settings.settings-catalog.registerKeywords'),
+    ],
     [
       'connection',
-      '登録先と接続の詳細',
-      '設定ファイル 登録名 接続ポート ポートを適用 認証情報を再発行 登録を解除',
+      hostText('settings.settings-catalog.registrationDetails'),
+      hostText('settings.settings-catalog.registrationKeywords'),
     ],
   ],
   about: [
-    ['updateActions', '更新を適用', 'すべて更新 Appletを更新 更新を中止 更新を確認'],
-    ['versions', 'バージョン情報', 'AppDock 現在のバージョン 本体を更新'],
-    ['runtime', '実行環境の詳細', 'Electron Chromium Node.js OS プラットフォーム'],
-    ['updates', '更新の設定', '起動時の更新確認と更新元を設定します。'],
+    [
+      'updateActions',
+      hostText('settings.settings-catalog.updates'),
+      hostText('settings.settings-catalog.updatesKeywords'),
+    ],
+    [
+      'versions',
+      hostText('settings.settings-catalog.versions'),
+      hostText('settings.settings-catalog.versionsKeywords'),
+    ],
+    [
+      'runtime',
+      hostText('settings.settings-catalog.runtime'),
+      hostText('settings.settings-catalog.runtimeKeywords'),
+    ],
+    [
+      'updates',
+      hostText('settings.settings-catalog.updateSettings'),
+      hostText('settings.settings-catalog.updateSettingsHint'),
+    ],
     [
       'hostSource',
-      'AppDockの更新元',
-      '既定: github:yukichi-7sai/AppDock.at365。ローカルの絶対パス・UNC・更新情報JSONのHTTP(S) URL・GitHubリポジトリURLに対応します。空欄で更新確認を無効にします。',
+      hostText('settings.settings-catalog.updateSource'),
+      hostText('settings.settings-catalog.updateSourceHint'),
     ],
-    ['checkHostOnStartup', '起動時にAppDockの更新を確認'],
-    ['checkAppletsOnStartup', '起動時にAppletの更新を確認'],
-    ['notifyOnStartup', '起動時に更新が見つかったら通知'],
-    ['allowSameVersion', '同じバージョンの再適用を許可（開発用）'],
-    ['startupDelaySeconds', '起動から確認までの秒数'],
+    ['checkHostOnStartup', hostText('settings.settings-catalog.checkHost')],
+    ['checkAppletsOnStartup', hostText('settings.settings-catalog.checkApplets')],
+    ['notifyOnStartup', hostText('settings.settings-catalog.notifyStartup')],
+    ['allowSameVersion', hostText('settings.settings-catalog.allowSameVersion')],
+    ['startupDelaySeconds', hostText('settings.settings-catalog.updateDelay')],
   ],
   permissions: Object.entries(appletApiPermissionLabels).map(([key, title]) => [
     key,
     title,
     (
       {
-        useTts: 'TTSサーバーへ接続し、テキストから音声を生成・再生します。',
-        useAi:
-          'AIサーバーへ入力を送信し、文章生成やモデル一覧を利用します。生成にはコマンド実行の許可も必要です。',
-        read: '公開された状態・設定・コマンド一覧を取得します。',
-        execute: '公開されたコマンドを実行します。',
-        write: '本体とAppletが公開した設定を変更します。',
-        manageApplets: 'Appletの有効・無効・再起動を操作します。',
-        editShortcuts: 'キー・条件・実行順を編集します。',
-        editGestures: '割り当て・条件・実行順・動作設定を編集します。',
-        editTouchpadGestures:
-          'タッチパッドの割り当てを編集し、明示した操作でWindowsのジェスチャー設定を変更します。',
-        editRibbon: '表示・配置・並び順・区切り線を編集します。',
-        editTray: 'メニューとクリック・ダブルクリックの割り当てを編集します。',
-        useMcp:
-          '登録されたMCP接続先のツールを取得・実行します。実行にはコマンド実行の許可も必要です。',
-        manageMcpServers:
-          '接続先の登録・変更・削除と、URL・実行ファイル・公開範囲の閲覧・編集を許可します。保存には設定変更とコマンド実行、未公開ツールの取得にはMCP接続先の利用とコマンド実行の許可も必要です。',
-        manageCustomCommands:
-          '定義の設定値を含む閲覧と編集を許可します。公開したコマンドの実行許可とは別です。',
-        sendInput: 'アクティブなウィンドウへキーや操作メッセージを送ります。',
-        runProcesses:
-          'コマンドやアプリのプロセスを起動します。保存したコマンドからの外部実行には、この許可も必要です。',
+        useTts: hostText('settings.settings-catalog.permissionTts'),
+        useAi: hostText('settings.settings-catalog.permissionAi'),
+        read: hostText('settings.settings-catalog.permissionRead'),
+        execute: hostText('settings.settings-catalog.permissionExecute'),
+        write: hostText('settings.settings-catalog.permissionWrite'),
+        manageApplets: hostText('settings.settings-catalog.permissionApplets'),
+        editShortcuts: hostText('settings.settings-catalog.permissionShortcuts'),
+        editGestures: hostText('settings.settings-catalog.permissionGestures'),
+        editTouchpadGestures: hostText('settings.settings-catalog.permissionTouchpad'),
+        editRibbon: hostText('settings.settings-catalog.permissionRibbon'),
+        editTray: hostText('settings.settings-catalog.permissionTray'),
+        useMcp: hostText('settings.settings-catalog.permissionMcpUse'),
+        manageMcpServers: hostText('settings.settings-catalog.permissionMcpManage'),
+        manageCustomCommands: hostText('settings.settings-catalog.permissionCustom'),
+        sendInput: hostText('settings.settings-catalog.permissionInput'),
+        runProcesses: hostText('settings.settings-catalog.permissionProcess'),
       } as Record<string, string>
     )[key],
   ]),
@@ -271,9 +420,8 @@ export function hostSettingItem(
   return item(pageId, row[0], row[1], row[2]);
 }
 export const appletCommonDescriptions = {
-  display: '同じ画面をAppDock本体のページ、または別ウィンドウで表示します。',
-  startupDelaySeconds:
-    '有効化・再起動からAppletを起動するまで待ちます。0で即時開始。実行中の変更は次の起動から適用します。',
+  display: hostText('settings.settings-catalog.appletDisplay'),
+  startupDelaySeconds: hostText('settings.settings-catalog.appletDelay'),
 };
 const generalKeys = [
   'soundEnabled',
@@ -373,17 +521,29 @@ export function settingsCatalog(
         json: true,
         items: [
           ...(!a.collection
-            ? [item(id, 'updateSource', 'Appletの更新元', '更新元 URL GitHub')]
+            ? [
+                item(
+                  id,
+                  'updateSource',
+                  hostText('settings.settings-catalog.appletSource'),
+                  hostText('settings.settings-catalog.appletSourceKeywords'),
+                ),
+              ]
             : []),
           ...(!a.collection ? (a.pages ?? []) : []).map((p) =>
-            item(id, `page:${p.id}`, `${p.title}の表示方法`, appletCommonDescriptions.display),
+            item(
+              id,
+              `page:${p.id}`,
+              hostText('settings.settings-catalog.appletPageDisplay', { title: p.title }),
+              appletCommonDescriptions.display,
+            ),
           ),
           ...(!a.collection
             ? [
                 item(
                   id,
                   'startupDelaySeconds',
-                  '開始までの秒数',
+                  hostText('settings.settings-catalog.appletDelayTitle'),
                   appletCommonDescriptions.startupDelaySeconds,
                 ),
               ]
@@ -395,7 +555,7 @@ export function settingsCatalog(
               .flatMap((section) => [section.title, section.description ?? '']),
             unavailableReason:
               !a.enabled || a.state !== 'running'
-                ? 'Appletを開始してから操作できます。'
+                ? hostText('settings.settings-catalog.appletStartRequired')
                 : undefined,
           })),
           ...(a.settings ?? []).map((s) => ({
@@ -419,7 +579,7 @@ export function settingsPaths(
   if (!page.json) return [];
   if (page.kind === 'applet') {
     const a = applets.find((a) => a.id === page.owner);
-    if (!a) throw Error('設定対象が見つかりません。');
+    if (!a) throw Error(hostText('settings.settings-catalog.missingTarget'));
     return [
       ['extensions', a.id, 'settings'],
       ['extensions', a.id, 'startupDelaySeconds'],
@@ -526,7 +686,7 @@ export function settingsProjection(
   page: SettingsPageDefinition,
   applets: ExtensionSnapshot[],
 ): Record<string, unknown> {
-  if (!page.json) throw Error('このページはJSON編集に対応していません。');
+  if (!page.json) throw Error(hostText('settings.settings-catalog.jsonUnsupported'));
   if (page.collection) {
     const applet = applets.find((a) => a.id === page.owner);
     const fields = applet?.settings ?? [];
@@ -593,11 +753,11 @@ const object = (v: unknown): v is Record<string, any> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 function assertScope(value: unknown, paths: SettingsPath[], prefix: string[] = []) {
   if (paths.some((p) => p.length === prefix.length)) return;
-  if (!object(value)) throw Error('JSONの親キーはオブジェクトで指定してください。');
+  if (!object(value)) throw Error(hostText('settings.settings-catalog.parentObject'));
   for (const [key, child] of Object.entries(value)) {
     const matching = paths.filter((p) => p[prefix.length] === key);
     if (!matching.length || ['__proto__', 'prototype', 'constructor'].includes(key))
-      throw Error(`このページでは変更できないキーです: ${key}`);
+      throw Error(hostText('settings.settings-catalog.forbiddenKey', { key: key }));
     assertScope(child, matching, [...prefix, key]);
   }
 }
@@ -609,9 +769,9 @@ export function applySettingsJson(
   text: string,
 ): Settings {
   if (new TextEncoder().encode(text).length > settingsTextLimit)
-    throw Error('JSONは1MB以下にしてください。');
+    throw Error(hostText('settings.settings-catalog.jsonSize'));
   const value = JSON.parse(text);
-  if (!object(value) || !page.json) throw Error('部分JSONはオブジェクトで指定してください。');
+  if (!object(value) || !page.json) throw Error(hostText('settings.settings-catalog.jsonObject'));
   const next = structuredClone(current);
   if (page.collection) {
     const applet = applets.find((a) => a.id === page.owner);
@@ -621,7 +781,8 @@ export function applySettingsJson(
       fields.map((field) => ['extensions', page.owner!, 'settings', field.key]),
     );
     const input = value.extensions?.[page.owner!]?.settings;
-    if (input !== undefined && !object(input)) throw Error('ページ設定を指定してください。');
+    if (input !== undefined && !object(input))
+      throw Error(hostText('settings.settings-catalog.pageRequired'));
     const row = collectionRecord(next, page.collection);
     for (const field of fields) {
       const part = input?.[field.key] === undefined ? field.default : input[field.key];

@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { CommandListSection } from '../settings-ui/CommandListScroll';
@@ -43,6 +44,7 @@ export function ShortcutsEditor({
   provider?: { id: string; title: string; request: number };
   clearProvider?(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const {
     target,
@@ -68,7 +70,7 @@ export function ShortcutsEditor({
       known.set(row.command, {
         id: row.command,
         title: row.command,
-        extension: '未確認のコマンド',
+        extension: translate('settings.shortcutsEditor.unknownCommand'),
         available: false,
       });
   const catalog = [...known.values()].filter(
@@ -140,16 +142,13 @@ export function ShortcutsEditor({
       </SettingsSection>
       <CommandListSection
         title={hostSettingItem('shortcuts', 'keybindings').title}
-        description={
-          rows.length >= 2000
-            ? '割り当ては2000件までです。追加するには既存の割り当てを削除してください。'
-            : undefined
-        }
+        description={rows.length >= 2000 ? translate('settings.shortcutsEditor.limit') : undefined}
         className="shortcuts-editor command-shortcuts"
         {...settingAnchor('shortcuts', 'keybindings')}
       >
         <CommandBindingToolbar
-          inputName="ショートカットキー"
+          inputKind="shortcut"
+          inputName={translate('settings.shortcutsEditor.title')}
           count={catalog.length}
           visibleCount={visible.length}
           filter={filter}

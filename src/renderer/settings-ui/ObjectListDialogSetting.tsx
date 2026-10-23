@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useRef, useState } from 'react';
 import type { SettingDefinition, SettingOption } from '../../shared/contracts';
 import {
@@ -29,6 +30,7 @@ export function ObjectListDialogSetting({
   onCommit(value: Record<string, unknown>[], before: Record<string, unknown>[]): Promise<unknown>;
   onOpen?(entry: Record<string, unknown>): Promise<unknown>;
 }) {
+  const { t: translate } = useHostTranslation();
   let entries: Record<string, unknown>[] = [],
     loadError = '';
   try {
@@ -36,7 +38,7 @@ export function ObjectListDialogSetting({
     for (const entry of entries)
       for (const field of definition.fields ?? []) objectFieldValue(entry, field);
   } catch {
-    loadError = '保存された一覧を読み取れません。JSON設定を確認してください。';
+    loadError = translate('settings.objectListDialogSetting.unreadable');
   }
   const view = definition.list!,
     fields = definition.fields ?? [];
@@ -50,7 +52,7 @@ export function ObjectListDialogSetting({
     [error, setError] = useState('');
   const running = useRef(false);
   const commit = async (next: Record<string, unknown>[], before: Record<string, unknown>[]) => {
-    if (running.current) throw Error('保存の完了を待ってください。');
+    if (running.current) throw Error(translate('settings.objectListDialogSetting.pending'));
     running.current = true;
     setPending(true);
     setError('');
@@ -101,8 +103,10 @@ export function ObjectListDialogSetting({
                 <button
                   type="button"
                   className="settings-list-icon"
-                  title="開く"
-                  aria-label={`${String(entry[view.titleKey])}を開く`}
+                  title={translate('settings.objectListDialogSetting.open')}
+                  aria-label={translate('settings.objectListDialogSetting.openItem', {
+                    value: String(entry[view.titleKey]),
+                  })}
                   disabled={!entry.enabled || pending}
                   onClick={() =>
                     void onOpen(entry).catch((error) => setError(String(error.message ?? error)))
@@ -129,12 +133,16 @@ export function ObjectListDialogSetting({
       />
       {dialog?.kind === 'order' && (
         <SettingsOrderDialog
-          title={definition.title + 'の並べ替え'}
-          listLabel={definition.title + 'の表示順'}
+          title={translate('settings.objectListDialogSetting.orderTitle', {
+            title: definition.title,
+          })}
+          listLabel={translate('settings.objectListDialogSetting.displayOrderTitle', {
+            title: definition.title,
+          })}
           items={dialog.before.map((entry, index) => ({
             id: String(index),
             title: view.showIndex
-              ? `${definition.itemTitle ?? '項目'}${index + 1}`
+              ? `${definition.itemTitle ?? translate('settings.objectListDialogSetting.item')}${index + 1}`
               : settingsListText(definition, entry, view.titleKey, options),
             description: view.showIndex
               ? settingsListText(definition, entry, view.titleKey, options)
@@ -153,9 +161,21 @@ export function ObjectListDialogSetting({
       )}
       {dialog && dialog.kind !== 'order' && (
         <SettingsDialog
-          title={`${definition.itemTitle ?? '項目'}${view.showIndex && dialog.index >= 0 ? dialog.index + 1 : ''}を${dialog.kind === 'delete' ? '削除' : dialog.index < 0 ? '追加' : '編集'}`}
+          title={translate(
+            dialog.kind === 'delete'
+              ? 'settings.objectListDialogSetting.deleteTitle'
+              : dialog.index < 0
+                ? 'settings.objectListDialogSetting.addTitle'
+                : 'settings.objectListDialogSetting.editTitle',
+            {
+              item: definition.itemTitle ?? translate('settings.objectListDialogSetting.item'),
+              index: view.showIndex && dialog.index >= 0 ? dialog.index + 1 : '',
+            },
+          )}
           onClose={() => setDialog(null)}
-          applyLabel={dialog.kind === 'delete' ? '削除' : 'OK'}
+          applyLabel={
+            dialog.kind === 'delete' ? translate('settings.objectListDialogSetting.delete') : 'OK'
+          }
           onApply={async () => {
             const next =
               dialog.kind === 'delete'
@@ -168,8 +188,9 @@ export function ObjectListDialogSetting({
         >
           {dialog.kind === 'delete' ? (
             <p>
-              「{String(dialog.draft[view.titleKey])}
-              」を削除します。関連するアカウントやログイン情報は削除しません。
+              {translate('settings.objectListDialogSetting.deleteConfirm', {
+                name: String(dialog.draft[view.titleKey]),
+              })}
             </p>
           ) : (
             fields
@@ -198,7 +219,11 @@ export function ObjectListDialogSetting({
                       >
                         {!choices.some((choice) => choice.value === current) && (
                           <option value={String(current ?? '')}>
-                            {current ? `現在の値: ${current}` : '選択してください'}
+                            {current
+                              ? translate('settings.objectListDialogSetting.currentValue', {
+                                  current: String(current),
+                                })
+                              : translate('settings.objectListDialogSetting.select')}
                           </option>
                         )}
                         {choices.map((choice) => (

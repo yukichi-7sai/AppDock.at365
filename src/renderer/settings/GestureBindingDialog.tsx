@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { touchpadGestureTypes, touchpadId } from '../../shared/touchpad-gestures';
 import { SettingsField } from '../settings-ui/SettingsSections';
 import {
@@ -19,10 +21,10 @@ import { ShortcutConditionField } from '../settings-ui/ShortcutFields';
 import { Toggle } from '../settings-ui/Toggle';
 
 const families = [
-  { id: 'move', title: '移動', icon: '↗' },
-  { id: 'click', title: 'クリック', icon: '◉' },
-  { id: 'wheel', title: 'ホイール', icon: '↕' },
-  { id: 'key', title: 'キーボード', icon: '⌨' },
+  { id: 'move', title: hostText('settings.gestureBindingDialog.move'), icon: '↗' },
+  { id: 'click', title: hostText('settings.gestureBindingDialog.click'), icon: '◉' },
+  { id: 'wheel', title: hostText('settings.gestureBindingDialog.wheel'), icon: '↕' },
+  { id: 'key', title: hostText('settings.gestureBindingDialog.keyboard'), icon: '⌨' },
 ];
 function MoveDirectionPicker({
   label,
@@ -70,6 +72,7 @@ export function GestureBindingDialog({
   onApply(row: GestureBinding): void;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [value, setValue] = useState(() => structuredClone(initial));
   const [family, setFamily] = useState(
     initial.gesture.startsWith('key:') ? 'key' : initial.gesture.split('-')[0],
@@ -124,9 +127,9 @@ export function GestureBindingDialog({
       {(ready, setError) => (
         <>
           {touchpad ? (
-            <SettingsField title="ジェスチャーの操作">
+            <SettingsField title={translate('settings.gestureBindingDialog.action')}>
               <select
-                aria-label="ジェスチャーの操作"
+                aria-label={translate('settings.gestureBindingDialog.action')}
                 data-initial-focus
                 value={value.gesture}
                 onChange={(e) => choose(e.target.value)}
@@ -141,10 +144,14 @@ export function GestureBindingDialog({
           ) : (
             <>
               <SettingsField
-                title="ジェスチャーの種類"
-                hint="右ボタンを押しながら行う操作を選びます。"
+                title={translate('settings.gestureBindingDialog.kind')}
+                hint={translate('settings.gestureBindingDialog.hint')}
               >
-                <div className="gesture-family-picker" role="group" aria-label="ジェスチャーの種類">
+                <div
+                  className="gesture-family-picker"
+                  role="group"
+                  aria-label={translate('settings.gestureBindingDialog.kind')}
+                >
                   {families.map((item) => (
                     <button
                       key={item.id}
@@ -165,7 +172,7 @@ export function GestureBindingDialog({
               {family === 'key' ? (
                 <ShortcutCaptureField
                   allowWin={false}
-                  label="ジェスチャーのキー"
+                  label={translate('settings.gestureBindingDialog.key')}
                   value={value.gesture.slice(4)}
                   recordingReady={ready}
                   setError={setError}
@@ -174,13 +181,13 @@ export function GestureBindingDialog({
               ) : family === 'move' ? (
                 <>
                   <SettingsField
-                    title="移動の段階"
-                    hint="右ボタンを離したときに、動かした順番と一致する操作を実行します。同じ方向の移動は1段階、3方向目へ変えるとキャンセルします。"
+                    title={translate('settings.gestureBindingDialog.stages')}
+                    hint={translate('settings.gestureBindingDialog.stagesHint')}
                   >
                     <div
                       className="gesture-choice-grid gesture-step-picker"
                       role="group"
-                      aria-label="移動の段階"
+                      aria-label={translate('settings.gestureBindingDialog.stages')}
                     >
                       {[1, 2].map((steps) => (
                         <button
@@ -188,24 +195,26 @@ export function GestureBindingDialog({
                           aria-pressed={movement.length === steps}
                           onClick={() => choose(moveChoices[steps])}
                         >
-                          {steps}段階移動
+                          {translate('settings.gestureBindingDialog.stagesLabel', { count: steps })}
                         </button>
                       ))}
                     </div>
                   </SettingsField>
                   {movement.length === 1 ? (
-                    <SettingsField title="ジェスチャーの操作">
+                    <SettingsField title={translate('settings.gestureBindingDialog.action')}>
                       <MoveDirectionPicker
-                        label="ジェスチャーの操作"
+                        label={translate('settings.gestureBindingDialog.action')}
                         value={movement[0]}
                         onChoose={(direction) => choose('move-' + direction)}
                       />
                     </SettingsField>
                   ) : (
                     <>
-                      <SettingsField title="最初の方向">
+                      <SettingsField
+                        title={translate('settings.gestureBindingDialog.firstDirection')}
+                      >
                         <MoveDirectionPicker
-                          label="最初の方向"
+                          label={translate('settings.gestureBindingDialog.firstDirection')}
                           value={movement[0]}
                           onChoose={(direction) =>
                             choose(
@@ -214,9 +223,11 @@ export function GestureBindingDialog({
                           }
                         />
                       </SettingsField>
-                      <SettingsField title="次の方向">
+                      <SettingsField
+                        title={translate('settings.gestureBindingDialog.nextDirection')}
+                      >
                         <MoveDirectionPicker
-                          label="次の方向"
+                          label={translate('settings.gestureBindingDialog.nextDirection')}
                           value={movement[1]}
                           disabled={movement[0]}
                           onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
@@ -227,13 +238,13 @@ export function GestureBindingDialog({
                 </>
               ) : (
                 <SettingsField
-                  title="ジェスチャーの操作"
-                  hint="右ボタンを押したまま、この操作をしたときに実行します。"
+                  title={translate('settings.gestureBindingDialog.action')}
+                  hint={translate('settings.gestureBindingDialog.actionHint')}
                 >
                   <div
                     className={`gesture-choice-grid gesture-choice-${family}`}
                     role="group"
-                    aria-label="ジェスチャーの操作"
+                    aria-label={translate('settings.gestureBindingDialog.action')}
                   >
                     {gestureTypes
                       .filter(([id]) => id.startsWith(family + '-'))
@@ -261,10 +272,10 @@ export function GestureBindingDialog({
             </>
           )}
           <SettingsField
-            title="いつ・どこで"
+            title={translate('settings.gestureBindingDialog.scope')}
             hint={
               value.when.scope === 'browser'
-                ? '画面上部の「動作設定」で指定したブラウザに適用します。'
+                ? translate('settings.gestureBindingDialog.browserHint')
                 : undefined
             }
           >
@@ -285,7 +296,7 @@ export function GestureBindingDialog({
                   },
                 })
               }
-              label="割り当てのいつ・どこで"
+              label={translate('settings.gestureBindingDialog.scopeLabel')}
               ownerTitle={ownerTitle}
               applets={applets}
               onChange={(when) => {
@@ -314,10 +325,10 @@ export function GestureBindingDialog({
             processes={processes}
             processError={processError}
           />
-          <SettingsField title="この割り当てを有効にする">
+          <SettingsField title={translate('settings.gestureBindingDialog.enabled')}>
             <Toggle
               checked={value.enabled}
-              label="この割り当てを有効にする"
+              label={translate('settings.gestureBindingDialog.enabled')}
               onChange={(enabled) => setValue({ ...value, enabled })}
             />
           </SettingsField>

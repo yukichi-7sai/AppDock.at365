@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { applyBindingOrder } from './binding-order';
 import {
   defaultShortcuts,
@@ -19,17 +20,17 @@ import {
 import { planCommandBatch, type CommandExecutionMode } from './command-execution';
 
 export const shortcutScopes = [
-  { id: 'global', title: 'グローバル' },
-  { id: 'app', title: 'AppDock全体' },
-  { id: 'pages', title: 'AppDockのすべてのページ' },
-  { id: 'owner', title: '提供元のApplet' },
-  { id: 'applets', title: 'AppDockの指定したページ' },
+  { id: 'global', title: hostText('settings.keybindings.global') },
+  { id: 'app', title: hostText('settings.keybindings.app') },
+  { id: 'pages', title: hostText('settings.keybindings.pages') },
+  { id: 'owner', title: hostText('settings.keybindings.owner') },
+  { id: 'applets', title: hostText('settings.keybindings.selectedPages') },
 ] as const;
 export type ShortcutScope = (typeof shortcutScopes)[number]['id'];
 export const externalShortcutScopes = [
-  { id: 'browser', title: 'Webブラウザ' },
-  { id: 'exe', title: '指定したexe' },
-  { id: 'desktop', title: 'デスクトップ', after: 'global' },
+  { id: 'browser', title: hostText('settings.keybindings.browser') },
+  { id: 'exe', title: hostText('settings.keybindings.exe') },
+  { id: 'desktop', title: hostText('settings.keybindings.desktop'), after: 'global' },
 ] as const;
 export type KeybindingScope = ShortcutScope | (typeof externalShortcutScopes)[number]['id'];
 export const keybindingScopes: readonly { id: KeybindingScope; title: string }[] = [
@@ -72,19 +73,19 @@ export const defaultKeybindingOptions = (): KeybindingOptions => ({
 export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   if (value === undefined) return defaultKeybindingOptions();
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw Error('ショートカットキーの動作設定を確認してください。');
+    throw Error(hostText('settings.keybindings.options'));
   const source = value as Record<string, unknown>;
   if (
     source.executionMode !== undefined &&
     source.executionMode !== 'first' &&
     source.executionMode !== 'all'
   )
-    throw Error('ショートカットキーの実行方法は「最初の1つ」または「すべて」です。');
+    throw Error(hostText('settings.keybindings.executionMode'));
   if (
     source.requireChromiumWindowClass !== undefined &&
     typeof source.requireChromiumWindowClass !== 'boolean'
   )
-    throw Error('Chromiumウィンドウの条件はONまたはOFFで指定してください。');
+    throw Error(hostText('settings.keybindings.chromium'));
   return {
     ...defaultKeybindingOptions(),
     ...source,
@@ -104,7 +105,7 @@ const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export function parseKeybindings(value: unknown): Keybinding[] {
   if (!Array.isArray(value) || value.length > 2000)
-    throw Error('キーバインドは2000件以内の配列です。');
+    throw Error(hostText('settings.keybindings.list'));
   const ids = new Set<string>();
   return value.map((row) => {
     if (
@@ -116,7 +117,7 @@ export function parseKeybindings(value: unknown): Keybinding[] {
       !object(row.when) ||
       (row.blockOriginalInput !== undefined && typeof row.blockOriginalInput !== 'boolean')
     )
-      throw Error('キーバインドのID・コマンド・有効状態・条件を確認してください。');
+      throw Error(hostText('settings.keybindings.binding'));
     ids.add(row.id);
     const when = row.when;
     if (
@@ -132,13 +133,11 @@ export function parseKeybindings(value: unknown): Keybinding[] {
         (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
       )
     )
-      throw Error(
-        '「いつ・どこで」の条件を確認してください。指定したページは1件以上選んでください。',
-      );
+      throw Error(hostText('settings.keybindings.scope'));
     const key = normalizeShortcut(row.key);
     const processes = when.processes === undefined ? [] : processNames(when.processes);
     if (when.scope === 'exe' ? !processes.length : !!processes.length)
-      throw Error('指定したexeには対象のexe名を1件以上指定してください。');
+      throw Error(hostText('settings.keybindings.processes'));
     return {
       id: row.id,
       command: row.command,
@@ -166,7 +165,7 @@ export function parseKeybindingDefaults(
 ): KeybindingDefault[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > limit)
-    throw Error(`既定のキーバインドは${limit}件以内の配列です。`);
+    throw Error(hostText('settings.keybindings.defaultLimit', { limit: limit }));
   const allowed = new Set(commands);
   return parseKeybindings(
     value.map((row, index) => {
@@ -177,7 +176,7 @@ export function parseKeybindingDefaults(
           (key) => !['command', 'key', 'enabled', 'when', 'blockOriginalInput'].includes(key),
         )
       )
-        throw Error('既定のキーバインドには自身の登録コマンドだけを指定してください。');
+        throw Error(hostText('settings.keybindings.defaultOwner'));
       return { ...row, id: `default.${index}` };
     }),
   ).map(({ id: _id, ...row }) => row);
@@ -438,16 +437,19 @@ export function keybindingConditionLabel(
   ownerTitle: string | undefined,
   applets: { id: string; title: string }[],
 ) {
-  if (when.scope === 'owner') return ownerTitle ?? '提供元不明';
+  if (when.scope === 'owner') return ownerTitle ?? hostText('settings.keybindings.unknownOwner');
   if (when.scope === 'applets')
     return (
-      when.appletIds.map((id) => shortcutTargetTitle(id, applets)).join(' / ') || 'ページ未選択'
+      when.appletIds.map((id) => shortcutTargetTitle(id, applets)).join(' / ') ||
+      hostText('settings.keybindings.noPages')
     );
   if (when.scope === 'exe')
     return (
-      (when.processes ?? []).join(' / ') + (when.excludeDesktop ? '（デスクトップを除外）' : '')
+      (when.processes ?? []).join(' / ') +
+      (when.excludeDesktop ? hostText('settings.keybindings.excludeDesktop') : '')
     );
-  if (when.scope === 'global' && when.excludeDesktop) return 'グローバル（デスクトップを除外）';
+  if (when.scope === 'global' && when.excludeDesktop)
+    return hostText('settings.keybindings.globalExcludeDesktop');
   return keybindingScopes.find((scope) => scope.id === when.scope)?.title ?? when.scope;
 }
 /** Legacy fields are derived display/compatibility data once keybindings exists. */

@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
@@ -39,6 +40,7 @@ export function RibbonSettings({
   commands: UiCommand[];
   onEdit(operation: unknown, before: Settings['ribbon']): Promise<unknown>;
 }) {
+  const { t: translate } = useHostTranslation();
   const layout = settings.ribbon;
   const groups = layout.groups ?? [];
   const [dragged, setDragged] = useState<string | null>(null);
@@ -201,7 +203,7 @@ export function RibbonSettings({
             <input
               type="checkbox"
               disabled={pending || missing}
-              aria-label={`${item.title}をリボンに表示`}
+              aria-label={translate('settings.ribbonSettings.show', { title: item.title })}
               checked={!layout.hidden.includes(item.id)}
               onChange={(e) =>
                 run({ kind: 'update', id: item.id, changes: { visible: e.target.checked } })
@@ -211,20 +213,26 @@ export function RibbonSettings({
               {item.title}
               <small>
                 {missing
-                  ? '登録元がありません。配置を保持しています。'
+                  ? translate('settings.ribbonSettings.missing')
                   : item.group
-                    ? `${item.group.expansion === 'persistent' ? '持続的' : '一時的'}・${item.group.children.length}項目`
+                    ? translate('settings.ribbonSettings.groupSummary', {
+                        value:
+                          item.group.expansion === 'persistent'
+                            ? translate('settings.ribbonSettings.persistent')
+                            : translate('settings.ribbonSettings.temporary'),
+                        length: item.group.children.length,
+                      })
                     : item.command
-                      ? `${commandTitle(item.command.commandId)}${commands.some((c) => c.id === item.command!.commandId && c.available) ? '' : '・現在利用できません'}`
+                      ? `${commandTitle(item.command.commandId)}${commands.some((c) => c.id === item.command!.commandId && c.available) ? '' : translate('settings.ribbonSettings.unavailable')}`
                       : item.kind === 'separator'
-                        ? '区切り線'
+                        ? translate('settings.ribbonSettings.separator')
                         : (item.extensionId ?? 'AppDock')}
               </small>
             </span>
           </label>
           <div className="ribbon-row-controls">
             <select
-              aria-label={`${item.title}の配置`}
+              aria-label={translate('settings.ribbonSettings.placement', { title: item.title })}
               disabled={pending}
               value={parent?.id ?? ribbonPlacement(layout, item.id, items)}
               onChange={(e) =>
@@ -233,28 +241,28 @@ export function RibbonSettings({
                   : moveTo(item.id, null, e.target.value as RibbonPlacement)
               }
             >
-              <option value="top">上寄せ</option>
-              <option value="bottom">下寄せ</option>
+              <option value="top">{translate('settings.ribbonSettings.top')}</option>
+              <option value="bottom">{translate('settings.ribbonSettings.bottom')}</option>
               {item.kind !== 'group' &&
                 groups.map((group) => (
                   <option key={group.id} value={group.id}>
-                    {group.title || 'グループ'}
+                    {group.title || translate('settings.ribbonSettings.group')}
                   </option>
                 ))}
             </select>
             <button
-              aria-label={`${item.title}を上へ`}
+              aria-label={translate('settings.ribbonSettings.up', { title: item.title })}
               className="settings-list-icon"
-              title="上へ移動"
+              title={translate('settings.ribbonSettings.upAction')}
               disabled={pending || index === 0}
               onClick={() => move(item.id, siblings[index - 1].id)}
             >
               ↑
             </button>
             <button
-              aria-label={`${item.title}を下へ`}
+              aria-label={translate('settings.ribbonSettings.down', { title: item.title })}
               className="settings-list-icon"
-              title="下へ移動"
+              title={translate('settings.ribbonSettings.downAction')}
               disabled={pending || index === siblings.length - 1}
               onClick={() => move(item.id, siblings[index + 1].id)}
             >
@@ -263,9 +271,9 @@ export function RibbonSettings({
             {
               <button
                 className="settings-list-icon"
-                title="編集"
+                title={translate('settings.ribbonSettings.edit')}
                 disabled={pending}
-                aria-label={`${item.title}を編集`}
+                aria-label={translate('settings.ribbonSettings.editLabel', { title: item.title })}
                 onClick={() =>
                   item.kind === 'separator'
                     ? setSeparatorDialog({
@@ -299,9 +307,9 @@ export function RibbonSettings({
             {item.kind === 'separator' ? (
               <button
                 className="settings-list-icon settings-list-delete"
-                title="削除"
+                title={translate('settings.ribbonSettings.delete')}
                 disabled={pending}
-                aria-label={`${item.title}を削除`}
+                aria-label={translate('settings.ribbonSettings.deleteLabel', { title: item.title })}
                 onClick={() => run({ kind: 'removeSeparator', id: item.id })}
               >
                 <ListIcon kind="delete" />
@@ -309,9 +317,9 @@ export function RibbonSettings({
             ) : command ? (
               <button
                 className="settings-list-icon settings-list-delete"
-                title="削除"
+                title={translate('settings.ribbonSettings.delete')}
                 disabled={pending}
-                aria-label={`${item.title}を削除`}
+                aria-label={translate('settings.ribbonSettings.deleteLabel', { title: item.title })}
                 onClick={() =>
                   setConfirmation({
                     kind: 'button',
@@ -325,9 +333,11 @@ export function RibbonSettings({
             ) : group ? (
               <button
                 className="settings-list-icon settings-list-delete"
-                title="グループを解除"
+                title={translate('settings.ribbonSettings.ungroup')}
                 disabled={pending}
-                aria-label={`${item.title}のグループを解除`}
+                aria-label={translate('settings.ribbonSettings.ungroupLabel', {
+                  title: item.title,
+                })}
                 onClick={() =>
                   setConfirmation({
                     kind: 'group',
@@ -341,9 +351,9 @@ export function RibbonSettings({
             ) : missing ? (
               <button
                 className="settings-list-icon settings-list-delete"
-                title="設定から削除"
+                title={translate('settings.ribbonSettings.remove')}
                 disabled={pending}
-                aria-label={`${item.title}を設定から削除`}
+                aria-label={translate('settings.ribbonSettings.removeLabel', { title: item.title })}
                 onClick={() =>
                   setConfirmation({
                     kind: 'missing',
@@ -363,7 +373,7 @@ export function RibbonSettings({
           <div
             className="ribbon-setting-children"
             role="group"
-            aria-label={`${item.title}の項目`}
+            aria-label={translate('settings.ribbonSettings.children', { title: item.title })}
             onDragOver={(e) => {
               if (dragged && !groups.some((g) => g.id === dragged)) e.preventDefault();
             }}
@@ -376,9 +386,7 @@ export function RibbonSettings({
               return children.length ? (
                 children.map((child, i) => row(child, i, children))
               ) : (
-                <p className="muted">
-                  ボタンの配置からこのグループを選ぶか、ここへドラッグしてください。
-                </p>
+                <p className="muted">{translate('settings.ribbonSettings.childrenHint')}</p>
               );
             })()}
           </div>
@@ -388,11 +396,14 @@ export function RibbonSettings({
   };
   useSettingsFeedback({ error });
   return (
-    <div className="settings-sections ribbon-settings" aria-label="リボン設定">
-      <SettingsSection title="動作設定" collapsible>
+    <div
+      className="settings-sections ribbon-settings"
+      aria-label={translate('settings.ribbonSettings.title')}
+    >
+      <SettingsSection title={translate('settings.ribbonSettings.behavior')} collapsible>
         <SettingsField
-          title="右クリックのコマンド"
-          hint="リボンを右クリックしたときに実行するコマンドです。"
+          title={translate('settings.ribbonSettings.rightClick')}
+          hint={translate('settings.ribbonSettings.rightClickHint')}
           {...settingAnchor('ribbon', 'rightClickCommand')}
         >
           <button
@@ -400,22 +411,25 @@ export function RibbonSettings({
             className="secondary"
             disabled={pending}
             onClick={() => setPicker('rightClick')}
-            aria-label="右クリックのコマンドを選択"
+            aria-label={translate('settings.ribbonSettings.chooseRightClick')}
           >
             {commandTitle(rightClickCommand)}
           </button>
           {!commands.some((c) => c.id === rightClickCommand && c.available) && (
-            <small>現在利用できません。</small>
+            <small>{translate('settings.ribbonSettings.commandUnavailable')}</small>
           )}
         </SettingsField>
       </SettingsSection>
       <SettingsSection
-        title="リボン編集"
-        hint="設定ボタンを非表示にしても、トレイの「設定…」や「設定を開く」コマンドから戻れます。"
+        title={translate('settings.ribbonSettings.editor')}
+        hint={translate('settings.ribbonSettings.hiddenSettingsHint')}
         {...settingAnchor('ribbon', 'ribbon')}
       >
         {(['top', 'bottom'] as const).map((position) => {
-          const title = position === 'top' ? '上寄せ' : '下寄せ';
+          const title =
+            position === 'top'
+              ? translate('settings.ribbonSettings.top')
+              : translate('settings.ribbonSettings.bottom');
           const siblings = roots.filter(
             (item) => ribbonPlacement(layout, item.id, items) === position,
           );
@@ -423,7 +437,7 @@ export function RibbonSettings({
             <section
               key={position}
               className="ribbon-placement"
-              aria-label={`${title}のリボン設定`}
+              aria-label={translate('settings.ribbonSettings.panel', { title: title })}
               onDragOver={(e) => {
                 if (dragged) e.preventDefault();
               }}
@@ -450,14 +464,14 @@ export function RibbonSettings({
                       })
                     }
                   >
-                    ＋ コマンド
+                    {translate('settings.ribbonSettings.addCommand')}
                   </button>
                   <button
                     className="secondary accent-action"
                     disabled={pending || groups.length >= 50}
                     onClick={() => open(undefined, position)}
                   >
-                    ＋ グループ
+                    {translate('settings.ribbonSettings.addGroup')}
                   </button>
                   <button
                     className="secondary accent-action"
@@ -470,16 +484,14 @@ export function RibbonSettings({
                       })
                     }
                   >
-                    ＋ 区切り線
+                    {translate('settings.ribbonSettings.addSeparator')}
                   </button>
                 </div>
               </div>
               <div className="ribbon-setting-list">
                 {siblings.map((item, i) => row(item, i, siblings))}
                 {!siblings.length && (
-                  <p className="empty">
-                    ここに表示するボタンはありません。配置の選択やドラッグで移動できます。
-                  </p>
+                  <p className="empty">{translate('settings.ribbonSettings.empty')}</p>
                 )}
               </div>
             </section>
@@ -490,16 +502,20 @@ export function RibbonSettings({
         <SettingsDialog
           title={
             confirmation.kind === 'button'
-              ? 'コマンドボタンを削除'
+              ? translate('settings.ribbonSettings.deleteButton')
               : confirmation.kind === 'group'
-                ? 'グループを解除'
-                : 'リボン項目を設定から削除'
+                ? translate('settings.ribbonSettings.ungroup')
+                : translate('settings.ribbonSettings.removeMissing')
           }
           onClose={() => setConfirmation(undefined)}
-          applyLabel={confirmation.kind === 'group' ? '解除' : '削除'}
+          applyLabel={
+            confirmation.kind === 'group'
+              ? translate('settings.ribbonSettings.ungroupAction')
+              : translate('settings.ribbonSettings.delete')
+          }
           onApply={async () => {
             if (confirmation.before !== JSON.stringify(layout))
-              throw Error('リボン設定が変更されています。閉じてからやり直してください。');
+              throw Error(translate('settings.ribbonSettings.conflict'));
             await apply(
               confirmation.kind === 'button'
                 ? { kind: 'removeButton', id: confirmation.button.id }
@@ -511,22 +527,36 @@ export function RibbonSettings({
         >
           <p>
             {confirmation.kind === 'button'
-              ? `「${confirmation.button.title}」の登録と配置を削除します。実行先のコマンドとその設定は残ります。`
+              ? translate('settings.ribbonSettings.deleteButtonConfirm', {
+                  title: confirmation.button.title,
+                })
               : confirmation.kind === 'group'
-                ? `「${confirmation.group.title || 'グループ'}」の名前・アイコン・展開方法を削除します。中のボタンはグループの位置に戻り、順序・上下配置・非表示状態を引き継ぎます。`
-                : `「${confirmation.missing.title}」の配置・グループ所属・表示名を設定から削除します。登録元を追加し直した場合は既定の表示に戻ります。`}
+                ? translate('settings.ribbonSettings.ungroupConfirm', {
+                    value: confirmation.group.title || translate('settings.ribbonSettings.group'),
+                  })
+                : translate('settings.ribbonSettings.removeMissingConfirm', {
+                    title: confirmation.missing.title,
+                  })}
           </p>
         </SettingsDialog>
       )}
       {dialog && (
         <SettingsDialog
-          title={dialog.adding ? 'リボングループを追加' : 'リボングループを編集'}
+          title={
+            dialog.adding
+              ? translate('settings.ribbonSettings.newGroup')
+              : translate('settings.ribbonSettings.editGroup')
+          }
           onClose={() => setDialog(undefined)}
           valid={dialog.group.title.trim().length <= 80 && colorValid}
-          applyLabel={dialog.adding ? '追加' : '適用'}
+          applyLabel={
+            dialog.adding
+              ? translate('settings.ribbonSettings.add')
+              : translate('settings.ribbonSettings.apply')
+          }
           onApply={async () => {
             if (dialog.before !== JSON.stringify(layout))
-              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+              throw Error(translate('settings.ribbonSettings.editConflict'));
             const {
               id,
               title,
@@ -565,13 +595,13 @@ export function RibbonSettings({
           }}
         >
           <div>
-            <SettingsField title="グループ名">
+            <SettingsField title={translate('settings.ribbonSettings.groupName')}>
               <SettingsInput
-                aria-label="グループ名"
+                aria-label={translate('settings.ribbonSettings.groupName')}
                 data-initial-focus
                 value={dialog.group.title}
                 maxLength={80}
-                placeholder="空欄ならアイコンだけを表示"
+                placeholder={translate('settings.ribbonSettings.groupNameHint')}
                 onChange={(e) =>
                   setDialog({ ...dialog, group: { ...dialog.group, title: e.target.value } })
                 }
@@ -579,16 +609,16 @@ export function RibbonSettings({
             </SettingsField>
             <RibbonIconPicker
               key={dialog.group.id}
-              label="グループのアイコン"
+              label={translate('settings.ribbonSettings.groupIcon')}
               preferImage={dialog.adding}
               value={dialog.group.icon}
               image={dialog.group.image}
               onImage={(image) => setDialog({ ...dialog, group: { ...dialog.group, image } })}
               onChange={(icon) => setDialog({ ...dialog, group: { ...dialog.group, icon } })}
             />
-            <SettingsField title="リボンにアイコンのみを表示する">
+            <SettingsField title={translate('settings.ribbonSettings.iconOnly')}>
               <input
-                aria-label="リボンにアイコンのみを表示する"
+                aria-label={translate('settings.ribbonSettings.iconOnly')}
                 type="checkbox"
                 checked={!!dialog.group.iconOnly}
                 onChange={(e) =>
@@ -596,9 +626,9 @@ export function RibbonSettings({
                 }
               />
             </SettingsField>
-            <SettingsField title="展開方法">
+            <SettingsField title={translate('settings.ribbonSettings.expansion')}>
               <select
-                aria-label="展開方法"
+                aria-label={translate('settings.ribbonSettings.expansion')}
                 value={dialog.group.expansion}
                 onChange={(e) =>
                   setDialog({
@@ -610,11 +640,13 @@ export function RibbonSettings({
                   })
                 }
               >
-                <option value="persistent">持続的</option>
-                <option value="temporary">一時的</option>
+                <option value="persistent">
+                  {translate('settings.ribbonSettings.persistent')}
+                </option>
+                <option value="temporary">{translate('settings.ribbonSettings.temporary')}</option>
               </select>
             </SettingsField>
-            <SettingsField title="色">
+            <SettingsField title={translate('settings.ribbonSettings.color')}>
               <SettingsColorPicker
                 value={dialog.group.color ?? null}
                 allowNone
@@ -631,13 +663,13 @@ export function RibbonSettings({
       )}
       {itemDialog && (
         <SettingsDialog
-          title="リボンボタンを編集"
-          applyLabel="適用"
+          title={translate('settings.ribbonSettings.editButton')}
+          applyLabel={translate('settings.ribbonSettings.apply')}
           valid={itemDialog.title.trim().length <= 80}
           onClose={() => setItemDialog(undefined)}
           onApply={async () => {
             if (itemDialog.before !== JSON.stringify(layout))
-              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+              throw Error(translate('settings.ribbonSettings.editConflict'));
             await apply({
               kind: 'updateItem',
               id: itemDialog.id,
@@ -651,11 +683,11 @@ export function RibbonSettings({
         >
           <div>
             <SettingsField
-              title="ボタン名"
-              hint="空欄にすると登録元の名前を使います。変更はリボン内の表示だけに反映されます。"
+              title={translate('settings.ribbonSettings.buttonName')}
+              hint={translate('settings.ribbonSettings.buttonNameHint')}
             >
               <SettingsInput
-                aria-label="ボタン名"
+                aria-label={translate('settings.ribbonSettings.buttonName')}
                 data-initial-focus
                 maxLength={80}
                 value={itemDialog.title}
@@ -663,16 +695,16 @@ export function RibbonSettings({
                 onChange={(e) => setItemDialog({ ...itemDialog, title: e.target.value })}
               />
             </SettingsField>
-            <SettingsField title="リボンの画像">
+            <SettingsField title={translate('settings.ribbonSettings.image')}>
               <RegisteredImageInput
-                label="リボンの画像"
+                label={translate('settings.ribbonSettings.image')}
                 value={itemDialog.image}
                 onChange={(image) => setItemDialog({ ...itemDialog, image })}
               />
             </SettingsField>
-            <SettingsField title="リボンにアイコンのみを表示する">
+            <SettingsField title={translate('settings.ribbonSettings.iconOnly')}>
               <input
-                aria-label="リボンにアイコンのみを表示する"
+                aria-label={translate('settings.ribbonSettings.iconOnly')}
                 type="checkbox"
                 checked={itemDialog.iconOnly}
                 onChange={(e) => setItemDialog({ ...itemDialog, iconOnly: e.target.checked })}
@@ -683,13 +715,13 @@ export function RibbonSettings({
       )}
       {separatorDialog && (
         <SettingsDialog
-          title="セパレーターを編集"
-          applyLabel="適用"
+          title={translate('settings.ribbonSettings.editSeparator')}
+          applyLabel={translate('settings.ribbonSettings.apply')}
           valid={separatorDialog.title.trim().length <= 80}
           onClose={() => setSeparatorDialog(undefined)}
           onApply={async () => {
             if (separatorDialog.before !== JSON.stringify(layout))
-              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+              throw Error(translate('settings.ribbonSettings.editConflict'));
             await apply({
               kind: 'updateSeparator',
               id: separatorDialog.id,
@@ -697,13 +729,13 @@ export function RibbonSettings({
             });
           }}
         >
-          <SettingsField title="名前">
+          <SettingsField title={translate('settings.ribbonSettings.name')}>
             <SettingsInput
-              aria-label="名前"
+              aria-label={translate('settings.ribbonSettings.name')}
               data-initial-focus
               maxLength={80}
               value={separatorDialog.title}
-              placeholder="空欄なら自動生成した名前を使います"
+              placeholder={translate('settings.ribbonSettings.nameHint')}
               onChange={(e) => setSeparatorDialog({ ...separatorDialog, title: e.target.value })}
             />
           </SettingsField>
@@ -711,8 +743,16 @@ export function RibbonSettings({
       )}
       {buttonDialog && !picker && (
         <SettingsDialog
-          title={buttonDialog.adding ? 'コマンドボタンを追加' : 'コマンドボタンを編集'}
-          applyLabel={buttonDialog.adding ? '追加' : '適用'}
+          title={
+            buttonDialog.adding
+              ? translate('settings.ribbonSettings.newCommand')
+              : translate('settings.ribbonSettings.editCommand')
+          }
+          applyLabel={
+            buttonDialog.adding
+              ? translate('settings.ribbonSettings.add')
+              : translate('settings.ribbonSettings.apply')
+          }
           valid={
             !!buttonDialog.button.title.trim() &&
             buttonDialog.button.title.trim().length <= 80 &&
@@ -721,7 +761,7 @@ export function RibbonSettings({
           onClose={() => setButtonDialog(undefined)}
           onApply={async () => {
             if (buttonDialog.before !== JSON.stringify(layout))
-              throw Error('リボン設定が変更されています。閉じてから編集し直してください。');
+              throw Error(translate('settings.ribbonSettings.editConflict'));
             const { id, ...changes } = buttonDialog.button;
             await apply(
               buttonDialog.adding
@@ -732,28 +772,28 @@ export function RibbonSettings({
         >
           <div>
             <SettingsField
-              title="コマンド"
+              title={translate('settings.ribbonSettings.command')}
               description={
                 buttonDialog.button.commandId &&
                 !commands.some((c) => c.id === buttonDialog.button.commandId && c.available)
-                  ? '現在利用できません。'
+                  ? translate('settings.ribbonSettings.commandUnavailable')
                   : undefined
               }
             >
               <button
                 type="button"
                 className="secondary"
-                aria-label="実行コマンドを選択"
+                aria-label={translate('settings.ribbonSettings.chooseCommand')}
                 onClick={() => setPicker('button')}
               >
                 {buttonDialog.button.commandId
                   ? commandTitle(buttonDialog.button.commandId)
-                  : 'コマンドを選択'}
+                  : translate('settings.ribbonSettings.selectCommand')}
               </button>
             </SettingsField>
-            <SettingsField title="ボタン名">
+            <SettingsField title={translate('settings.ribbonSettings.buttonName')}>
               <SettingsInput
-                aria-label="ボタン名"
+                aria-label={translate('settings.ribbonSettings.buttonName')}
                 data-initial-focus
                 maxLength={80}
                 value={buttonDialog.button.title}
@@ -768,7 +808,7 @@ export function RibbonSettings({
             </SettingsField>
             <RibbonIconPicker
               key={buttonDialog.button.id}
-              label="ボタンのアイコン"
+              label={translate('settings.ribbonSettings.buttonIcon')}
               preferImage={buttonDialog.adding}
               value={buttonDialog.button.icon}
               image={buttonDialog.button.image}
@@ -779,9 +819,9 @@ export function RibbonSettings({
                 setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, icon } })
               }
             />
-            <SettingsField title="リボンにアイコンのみを表示する">
+            <SettingsField title={translate('settings.ribbonSettings.iconOnly')}>
               <input
-                aria-label="リボンにアイコンのみを表示する"
+                aria-label={translate('settings.ribbonSettings.iconOnly')}
                 type="checkbox"
                 checked={!!buttonDialog.button.iconOnly}
                 onChange={(e) =>

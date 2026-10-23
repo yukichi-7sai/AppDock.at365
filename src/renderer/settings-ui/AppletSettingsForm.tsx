@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useRef, useState } from 'react';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import type {
@@ -39,6 +40,7 @@ export function AppletSettingsForm({
   ): Promise<unknown>;
   accounts?: { id: string; name: string }[];
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const pageId = appletSettingsPageId(applet.id);
   const executing = useRef(false);
@@ -63,7 +65,7 @@ export function AppletSettingsForm({
       await settingsControls.executeCommand(item.command);
       setResult({
         command: item.command,
-        message: item.successMessage ?? '実行しました。',
+        message: item.successMessage ?? translate('settings.appletSettingsForm.completed'),
         error: false,
       });
     } catch (error) {
@@ -89,7 +91,10 @@ export function AppletSettingsForm({
         title={item.title}
         description={
           <span id={help}>
-            {[item.description, !available ? 'Appletを開始してから操作できます。' : '']
+            {[
+              item.description,
+              !available ? translate('settings.appletSettingsForm.startRequired') : '',
+            ]
               .filter(Boolean)
               .join(' ')}
           </span>
@@ -188,7 +193,8 @@ export function AppletSettingsForm({
           >
             {!options.some((o) => o.value === value) && value !== undefined && (
               <option value={String(value)}>
-                保存された選択（現在利用できません）: {String(value)}
+                {translate('settings.appletSettingsForm.savedUnavailable')}
+                {String(value)}
               </option>
             )}
             {options.map((o) => (
@@ -235,21 +241,26 @@ export function AppletSettingsForm({
         </SettingsSection>
       ))}
       {!sections.length && (
-        <SettingsSection title="このAppletの設定">
-          <p>個別の設定項目はありません。操作キーは本体の「ショートカット」で設定できます。</p>
+        <SettingsSection title={translate('settings.appletSettingsForm.settings')}>
+          <p>{translate('settings.appletSettingsForm.noSettings')}</p>
         </SettingsSection>
       )}
       {!applet.collection && !!applet.pages?.length && (
-        <SettingsSection title="ページの表示" hint="Appletのページをどこに表示するか選びます。">
+        <SettingsSection
+          title={translate('settings.appletSettingsForm.display')}
+          hint={translate('settings.appletSettingsForm.displayHint')}
+        >
           {applet.pages.map((page) => (
             <SettingsField
               key={page.id}
-              title={`${page.title}の表示方法`}
+              title={translate('settings.appletSettingsForm.displayLabel', { title: page.title })}
               hint={appletCommonDescriptions.display}
               {...settingAnchor(pageId, `page:${page.id}`)}
             >
               <select
-                aria-label={`${page.title}の表示方法`}
+                aria-label={translate('settings.appletSettingsForm.displayLabel', {
+                  title: page.title,
+                })}
                 value={current.pages?.[page.id]?.display ?? page.defaultDisplay ?? 'page'}
                 onChange={(e) =>
                   update({
@@ -261,22 +272,25 @@ export function AppletSettingsForm({
                   })
                 }
               >
-                <option value="page">AppDock本体のページ</option>
-                <option value="window">別ウィンドウ</option>
+                <option value="page">{translate('settings.appletSettingsForm.hostPage')}</option>
+                <option value="window">{translate('settings.appletSettingsForm.window')}</option>
               </select>
             </SettingsField>
           ))}
         </SettingsSection>
       )}
       {!applet.collection && (
-        <SettingsSection title="起動" hint="AppDockを起動したときの動作です。">
+        <SettingsSection
+          title={translate('settings.appletSettingsForm.startup')}
+          hint={translate('settings.appletSettingsForm.startupHint')}
+        >
           <SettingsField
-            title="開始までの秒数"
+            title={translate('settings.appletSettingsForm.delay')}
             hint={appletCommonDescriptions.startupDelaySeconds}
             {...settingAnchor(pageId, 'startupDelaySeconds')}
           >
             <SettingsInput
-              aria-label="開始までの秒数"
+              aria-label={translate('settings.appletSettingsForm.delay')}
               type="number"
               min={0}
               max={86400}

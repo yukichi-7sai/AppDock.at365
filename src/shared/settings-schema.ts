@@ -96,7 +96,7 @@ export function parseSettings(value: unknown): Settings {
     !object(value.host) ||
     !object(value.extensions)
   )
-    throw new Error('schemaVersion: 1、host、extensions が必要です。');
+    throw new Error(hostText('settings.settings-schema.required'));
   if (
     typeof value.host.theme !== 'string' ||
     !['dark', 'light', 'system'].includes(value.host.theme)
@@ -141,11 +141,11 @@ export function parseSettings(value: unknown): Settings {
   const trayClickCommand =
     value.host.trayClickCommand === undefined ? 'appdock.open' : value.host.trayClickCommand;
   if (!validCommandId(trayClickCommand))
-    throw new Error('host.trayClickCommand はコマンドIDです。');
+    throw new Error(hostText('settings.settings-schema.trayClick'));
   const trayDoubleClickCommand =
     value.host.trayDoubleClickCommand === undefined ? null : value.host.trayDoubleClickCommand;
   if (trayDoubleClickCommand !== null && !validCommandId(trayDoubleClickCommand))
-    throw new Error('host.trayDoubleClickCommand はコマンドIDまたはnullです。');
+    throw new Error(hostText('settings.settings-schema.trayDoubleClick'));
   const trayMenu = value.trayMenu === undefined ? undefined : parseTrayMenu(value.trayMenu);
   const trayCommands =
     trayMenu !== undefined
@@ -159,7 +159,7 @@ export function parseSettings(value: unknown): Settings {
     trayCommands.some((id) => !validCommandId(id)) ||
     new Set(trayCommands).size !== trayCommands.length
   )
-    throw new Error('trayCommands は重複のないコマンドIDの配列です。');
+    throw new Error(hostText('settings.settings-schema.trayCommands'));
   for (const [id, item] of Object.entries(value.extensions)) {
     if (
       !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(id) ||
@@ -168,14 +168,14 @@ export function parseSettings(value: unknown): Settings {
       typeof item.enabled !== 'boolean' ||
       !object(item.settings)
     )
-      throw new Error(`拡張設定 ${id} の形式が正しくありません。`);
+      throw new Error(hostText('settings.settings-schema.extension', { id: id }));
     if (
       item.startupDelaySeconds !== undefined &&
       (!Number.isInteger(item.startupDelaySeconds) ||
         Number(item.startupDelaySeconds) < 0 ||
         Number(item.startupDelaySeconds) > 86400)
     )
-      throw new Error(`拡張設定 ${id} の開始までの秒数は0～86400の整数です。`);
+      throw new Error(hostText('settings.settings-schema.extensionDelay', { id: id }));
     if (item.updateSource !== undefined) validateUpdateSource(item.updateSource);
     if (
       item.pages !== undefined &&
@@ -187,7 +187,7 @@ export function parseSettings(value: unknown): Settings {
             !['page', 'window'].includes(String(page.display)),
         ))
     )
-      throw Error(`拡張設定 ${id} のページ表示方法が不正です。`);
+      throw Error(hostText('settings.settings-schema.extensionDisplay', { id: id }));
   }
   const appletOrder = value.appletOrder === undefined ? [] : value.appletOrder;
   if (
@@ -201,7 +201,7 @@ export function parseSettings(value: unknown): Settings {
     ) ||
     new Set(appletOrder).size !== appletOrder.length
   )
-    throw Error('appletOrder は重複のないApplet IDの配列です。');
+    throw Error(hostText('settings.settings-schema.appletOrder'));
   const ribbon = parseRibbon(value.ribbon);
   const keybindings =
     value.keybindings === undefined ? undefined : parseKeybindings(value.keybindings);
@@ -215,7 +215,7 @@ export function parseSettings(value: unknown): Settings {
     ) ||
     new Set(keybindingDefaultsInitialized).size !== keybindingDefaultsInitialized.length
   )
-    throw Error('既定ショートカット適用済みAppletの一覧が不正です。');
+    throw Error(hostText('settings.settings-schema.shortcutsApplied'));
   const shortcuts = keybindings
     ? {}
     : parseShortcuts(value.shortcuts === undefined ? {} : value.shortcuts);
@@ -230,7 +230,7 @@ export function parseSettings(value: unknown): Settings {
     globalShortcutCommands.some((id) => !validCommandId(id)) ||
     new Set(globalShortcutCommands).size !== globalShortcutCommands.length
   )
-    throw new Error('globalShortcutCommands は重複のないコマンドIDの配列です。');
+    throw new Error(hostText('settings.settings-schema.globalShortcuts'));
   const pinnedCommands = value.pinnedCommands === undefined ? [] : value.pinnedCommands;
   if (
     !Array.isArray(pinnedCommands) ||
@@ -238,13 +238,13 @@ export function parseSettings(value: unknown): Settings {
     pinnedCommands.some((id) => !validCommandId(id)) ||
     new Set(pinnedCommands).size !== pinnedCommands.length
   )
-    throw new Error('pinnedCommands は重複のないコマンドIDの配列です。');
+    throw new Error(hostText('settings.settings-schema.pinnedCommands'));
   const updates = {
     ...createDefaultSettings().updates,
     ...(object(value.updates) ? value.updates : {}),
   };
   if (value.updates !== undefined && !object(value.updates))
-    throw Error('updates はオブジェクトです。');
+    throw Error(hostText('settings.settings-schema.updates'));
   validateUpdateSource(updates.hostSource);
   for (const key of [
     'checkHostOnStartup',
@@ -252,13 +252,14 @@ export function parseSettings(value: unknown): Settings {
     'notifyOnStartup',
     'allowSameVersion',
   ] as const)
-    if (typeof updates[key] !== 'boolean') throw Error(`updates.${key} は true / false です。`);
+    if (typeof updates[key] !== 'boolean')
+      throw Error(hostText('settings.settings-schema.updateBoolean', { key: key }));
   if (
     !Number.isInteger(updates.startupDelaySeconds) ||
     updates.startupDelaySeconds < 0 ||
     updates.startupDelaySeconds > 3600
   )
-    throw Error('更新確認の開始までの秒数は0～3600の整数です。');
+    throw Error(hostText('settings.settings-schema.updateDelay'));
   const next = {
     ...(value.mcpServers === undefined ? {} : { mcpServers: parseMcpRoster(value.mcpServers) }),
     ...(value.customCommands === undefined
@@ -316,18 +317,18 @@ export function parseSettings(value: unknown): Settings {
       web.ids.some((id) => typeof id !== 'string' || !/^web\.[a-f0-9-]{36}$/.test(id)) ||
       new Set(web.ids).size !== web.ids.length
     )
-      throw Error('保存済みページの識別情報が不正です。');
+      throw Error(hostText('settings.settings-schema.pageIdentity'));
     parsed.migrations = structuredClone(marker);
   }
   const result = keybindings ? withKeybindings(parsed, keybindings) : parsed;
   if (new TextEncoder().encode(JSON.stringify(result)).length > 1024 * 1024)
-    throw new Error('設定は1MB以下にしてください。');
+    throw new Error(hostText('settings.settings-schema.size'));
   return result;
 }
 function parseGestureInitialized(value: unknown): string[] {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > 500 || value.some((v) => !validCommandId(v)))
-    throw Error('ジェスチャー初期設定の適用済み一覧が不正です。');
+    throw Error(hostText('settings.settings-schema.gesturesApplied'));
   return [...new Set(value)] as string[];
 }
 import { parseCustomCommands } from './custom-commands';

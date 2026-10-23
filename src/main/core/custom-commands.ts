@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash, randomUUID } from 'node:crypto';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import {
@@ -169,22 +170,22 @@ export class CustomCommandService {
       (r) => r.type.id === item.typeId && sameCustomOwner(r.provider.owner, item.owner),
     );
     let reason: string | null = null;
-    if (!item.enabled) reason = 'コマンドが無効です。';
-    else if (!record) reason = '種類が未導入、または提供元が一致しません。';
+    if (!item.enabled) reason = hostText('settings.customCommandState.disabled');
+    else if (!record) reason = hostText('settings.customCommandState.missingType');
     else if (
       !record.provider.available ||
       (item.owner.kind === 'applet' &&
         this.bindings.get(item.typeId) !== record.provider.generation)
     )
-      reason = '提供元が停止中、またはハンドラーが未登録です。';
+      reason = hostText('settings.customCommandState.stopped');
     else if (item.configVersion !== record.type.configVersion)
-      reason = '設定の版を明示的に更新してください。';
+      reason = hostText('settings.customCommandState.configVersion');
     else {
       try {
         if (!this.validator(record.type)(item.config).valid)
-          reason = '設定が現在のSchemaに一致しません。';
+          reason = hostText('settings.customCommandState.schemaMismatch');
       } catch {
-        reason = '種類のSchemaを利用できません。';
+        reason = hostText('settings.customCommandState.schemaUnavailable');
       }
       if (!reason) reason = record.provider.unavailableReason?.(item.config) ?? null;
     }

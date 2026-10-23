@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsButton } from '../settings-ui/SettingsButton';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
@@ -18,7 +20,7 @@ export const aiPresetNames = {
   'lm-studio': 'LM Studio',
   'llama-cpp': 'llama.cpp',
   openai: 'OpenAI',
-  custom: 'その他の互換サーバー',
+  custom: hostText('settings.aiConnectionDialog.otherServer'),
 };
 export type AiInvoke = (name: string, args?: unknown[]) => Promise<any>;
 export function AiConnectionDialog({
@@ -32,6 +34,7 @@ export function AiConnectionDialog({
   invoke: AiInvoke;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [draft, setDraft] = useState(() =>
     structuredClone(original ?? newAiConnection(crypto.randomUUID())),
   );
@@ -106,12 +109,14 @@ export function AiConnectionDialog({
       setModels(result.models);
       setMessage(
         result.models.length
-          ? `${result.models.length}件のモデルを取得しました。入力欄から選択できます。`
-          : 'モデル一覧は空です。モデルIDを直接入力できます。',
+          ? translate('settings.aiConnectionDialog.modelsLoaded', { length: result.models.length })
+          : translate('settings.aiConnectionDialog.noModels'),
       );
     } catch (e) {
       if (live.current && started === generation.current)
-        setError(e instanceof Error ? e.message : 'モデル一覧を取得できませんでした。');
+        setError(
+          e instanceof Error ? e.message : translate('settings.aiConnectionDialog.loadFailed'),
+        );
     } finally {
       fetching.current = false;
       if (live.current) setPending(false);
@@ -134,14 +139,18 @@ export function AiConnectionDialog({
   const savedKey = status?.apiKeyConfigured && sameEndpoint;
   return (
     <SettingsDialog
-      title={original ? 'AIサーバーを編集' : 'AIサーバーを追加'}
-      description="OpenAI互換APIに接続します。モデルIDは直接入力することもできます。"
+      title={
+        original
+          ? translate('settings.aiConnectionDialog.edit')
+          : translate('settings.aiConnectionDialog.add')
+      }
+      description={translate('settings.aiConnectionDialog.hint')}
       className="ai-connection-dialog"
       onClose={onClose}
       valid={!pending && !!draft.name.trim() && urlReady}
       error={error}
-      errorTarget="AI接続"
-      message={pending ? 'モデル一覧を取得しています…' : message}
+      errorTarget={translate('settings.aiConnectionDialog.connection')}
+      message={pending ? translate('settings.aiConnectionDialog.loading') : message}
       onApply={async () => {
         const next = {
           ...draft,
@@ -156,10 +165,10 @@ export function AiConnectionDialog({
         await invoke('aiSaveConnection', [next, original, apiKey, status?.keyRevision]);
       }}
     >
-      <SettingsField title="種類">
+      <SettingsField title={translate('settings.aiConnectionDialog.kind')}>
         <select
           data-initial-focus
-          aria-label="AI接続の種類"
+          aria-label={translate('settings.aiConnectionDialog.kindLabel')}
           value={draft.preset}
           onChange={(e) => {
             const preset = e.target.value as AiConnectionSettings['preset'];
@@ -182,9 +191,12 @@ export function AiConnectionDialog({
           ))}
         </select>
       </SettingsField>
-      <SettingsField title="APIのURL" hint="/v1まで入力し、Enterでモデルを取得します。">
+      <SettingsField
+        title={translate('settings.aiConnectionDialog.url')}
+        hint={translate('settings.aiConnectionDialog.urlHint')}
+      >
         <SettingsUrlInput
-          aria-label="AIのAPIのURL"
+          aria-label={translate('settings.aiConnectionDialog.urlLabel')}
           confirmation={urlConfirmation}
           value={draft.baseUrl}
           spellCheck={false}
@@ -211,51 +223,56 @@ export function AiConnectionDialog({
           }}
         />
       </SettingsField>
-      <SettingsField title="名前">
+      <SettingsField title={translate('settings.aiConnectionDialog.name')}>
         <SettingsInput
-          aria-label="AI接続の名前"
+          aria-label={translate('settings.aiConnectionDialog.nameLabel')}
           maxLength={160}
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
       </SettingsField>
-      <SettingsField title="認証">
+      <SettingsField title={translate('settings.aiConnectionDialog.auth')}>
         <select
-          aria-label="AIの認証方式"
+          aria-label={translate('settings.aiConnectionDialog.authLabel')}
           value={draft.authentication}
           onChange={(e) => patch({ authentication: e.target.value as 'none' | 'bearer' })}
         >
-          <option value="none">認証なし</option>
-          <option value="bearer">APIキー（Bearer）</option>
+          <option value="none">{translate('settings.aiConnectionDialog.noAuth')}</option>
+          <option value="bearer">{translate('settings.aiConnectionDialog.bearer')}</option>
         </select>
         {draft.authentication === 'bearer' && (
           <>
             <SettingsInput
-              aria-label="AIのAPIキー"
+              aria-label={translate('settings.aiConnectionDialog.apiKey')}
               type="password"
               autoComplete="off"
               maxLength={8192}
               value={apiKey ?? ''}
-              placeholder={savedKey ? '保存済み・変更する場合だけ入力' : 'APIキーを入力'}
+              placeholder={
+                savedKey
+                  ? translate('settings.aiConnectionDialog.storedKey')
+                  : translate('settings.aiConnectionDialog.enterKey')
+              }
               onChange={(e) => {
                 invalidate();
                 setApiKey(e.target.value || undefined);
               }}
               onKeyDown={(e) => enter(e, 'key')}
             />
-            <small className="muted">
-              このPCに暗号化して保存します。Enterでモデルを取得できます。
-            </small>
+            <small className="muted">{translate('settings.aiConnectionDialog.keyHint')}</small>
           </>
         )}
       </SettingsField>
-      <SettingsField title="モデル" hint="呼出し側で省略したときに使う既定モデルです。">
+      <SettingsField
+        title={translate('settings.aiConnectionDialog.model')}
+        hint={translate('settings.aiConnectionDialog.modelHint')}
+      >
         <div className="ai-model-picker">
           <SettingsInput
-            aria-label="AIの既定モデル"
+            aria-label={translate('settings.aiConnectionDialog.modelLabel')}
             list={modelListId}
             maxLength={200}
-            placeholder="モデルを選択、またはIDを入力"
+            placeholder={translate('settings.aiConnectionDialog.modelPlaceholder')}
             value={draft.defaultModel ?? ''}
             onChange={(e) => setDraft({ ...draft, defaultModel: e.target.value })}
           />
@@ -263,8 +280,8 @@ export function AiConnectionDialog({
             pending={pending}
             icon
             className="ai-icon-button"
-            aria-label="モデル一覧を取得"
-            title="モデル一覧を取得"
+            aria-label={translate('settings.aiConnectionDialog.loadModels')}
+            title={translate('settings.aiConnectionDialog.loadModels')}
             disabled={pending || !draft.baseUrl}
             onClick={() => void fetchModels()}
           >
@@ -280,13 +297,13 @@ export function AiConnectionDialog({
         </datalist>
       </SettingsField>
       <SettingsField
-        title="既定の出力トークン上限"
-        hint="APIで未指定のときと文章生成の試験に使います。思考もこの枠を使うモデルがあります。"
-        description="大きな値では待ち時間や料金が増える場合があります。"
+        title={translate('settings.aiConnectionDialog.maxTokens')}
+        hint={translate('settings.aiConnectionDialog.maxTokensHint')}
+        description={translate('settings.aiConnectionDialog.maxTokensWarning')}
       >
         <SettingsInput
           type="number"
-          aria-label="AIの既定の出力トークン上限"
+          aria-label={translate('settings.aiConnectionDialog.maxTokensLabel')}
           min={aiOutputTokenLimits.minimum}
           max={aiOutputTokenLimits.maximum}
           step={1}
@@ -295,12 +312,12 @@ export function AiConnectionDialog({
         />
       </SettingsField>
       <SettingsField
-        title="既定の待ち時間（秒）"
-        hint="受付から待機・生成までの期限です。1〜600秒で指定し、APIで指定された待ち時間を優先します。"
+        title={translate('settings.aiConnectionDialog.timeout')}
+        hint={translate('settings.aiConnectionDialog.timeoutHint')}
       >
         <SettingsInput
           type="number"
-          aria-label="AIの既定の待ち時間（秒）"
+          aria-label={translate('settings.aiConnectionDialog.timeoutLabel')}
           min={aiTimeoutLimits.minimumSeconds}
           max={aiTimeoutLimits.maximumSeconds}
           step={1}
@@ -308,9 +325,9 @@ export function AiConnectionDialog({
           onChange={(e) => setTimeoutSeconds(e.target.value)}
         />
       </SettingsField>
-      <SettingsField title="出力トークン上限の形式">
+      <SettingsField title={translate('settings.aiConnectionDialog.tokenFormat')}>
         <select
-          aria-label="AIの出力上限形式"
+          aria-label={translate('settings.aiConnectionDialog.tokenFormatLabel')}
           value={draft.compatibility.tokenLimitField}
           onChange={(e) =>
             setDraft({
@@ -322,21 +339,29 @@ export function AiConnectionDialog({
             })
           }
         >
-          <option value="max_tokens">max_tokens（ローカル互換API）</option>
+          <option value="max_tokens">
+            {translate('settings.aiConnectionDialog.localTokenFormat')}
+          </option>
           <option value="max_completion_tokens">max_completion_tokens（OpenAI）</option>
         </select>
       </SettingsField>
-      <SettingsField title="Temperature" hint="空欄はサーバーの既定値です。">
+      <SettingsField
+        title="Temperature"
+        hint={translate('settings.aiConnectionDialog.temperatureHint')}
+      >
         <SettingsInput
-          aria-label="AIのTemperature"
+          aria-label={translate('settings.aiConnectionDialog.temperatureLabel')}
           inputMode="decimal"
           value={temperature}
           onChange={(e) => setTemperature(e.target.value)}
         />
       </SettingsField>
-      <SettingsField title="推論の強さ" hint="reasoning_effortに対応するモデルだけ指定します。">
+      <SettingsField
+        title={translate('settings.aiConnectionDialog.reasoning')}
+        hint={translate('settings.aiConnectionDialog.reasoningHint')}
+      >
         <SettingsInput
-          aria-label="AIの推論の強さ"
+          aria-label={translate('settings.aiConnectionDialog.reasoningLabel')}
           value={draft.compatibility.reasoningEffort ?? ''}
           onChange={(e) =>
             setDraft({
@@ -349,9 +374,9 @@ export function AiConnectionDialog({
           }
         />
       </SettingsField>
-      <SettingsField title="生成結果の保存指定">
+      <SettingsField title={translate('settings.aiConnectionDialog.store')}>
         <select
-          aria-label="AIの保存指定"
+          aria-label={translate('settings.aiConnectionDialog.storeLabel')}
           value={draft.compatibility.store}
           onChange={(e) =>
             setDraft({
@@ -363,8 +388,8 @@ export function AiConnectionDialog({
             })
           }
         >
-          <option value="omit">指定しない</option>
-          <option value="false">store:falseを送信</option>
+          <option value="omit">{translate('settings.aiConnectionDialog.unspecified')}</option>
+          <option value="false">{translate('settings.aiConnectionDialog.noStore')}</option>
         </select>
       </SettingsField>
     </SettingsDialog>
@@ -380,10 +405,11 @@ export function AiConnectionOrderDialog({
   invoke: AiInvoke;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   return (
     <SettingsOrderDialog
-      title="AIサーバーの並べ替え"
-      listLabel="AIサーバーの表示順"
+      title={translate('settings.aiConnectionDialog.order')}
+      listLabel={translate('settings.aiConnectionDialog.displayOrder')}
       items={connections.map((connection) => ({
         id: connection.id,
         title: connection.name,

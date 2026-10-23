@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
@@ -44,17 +45,20 @@ export function GestureOptions({
   gestures: GestureSettings;
   change(patch: Partial<GestureSettings>): void;
 }) {
+  const { t: translate } = useHostTranslation();
   return (
     <SettingsSection
       collapsible
       className="gesture-settings-section"
       title={hostSettingItem('gestures', 'options').title}
-      hint={`${hostSettingItem('gestures', 'options').description ?? ''} 何も操作せず右ボタンを離すと、通常の右クリックになります。`}
+      hint={translate('settings.gestureOptions.hint', {
+        value: hostSettingItem('gestures', 'options').description ?? '',
+      })}
       {...settingAnchor('gestures', 'options')}
     >
       <SettingsField
         title={hostSettingItem('gestures', 'enabled').title}
-        hint="右ボタンを押しながら、移動・クリック・ホイール・キーで操作。一時停止はトレイから切り替えられます。"
+        hint={translate('settings.gestureOptions.enabledHint')}
         {...settingAnchor('gestures', 'enabled')}
       >
         <Toggle
@@ -65,7 +69,7 @@ export function GestureOptions({
       </SettingsField>
       <SettingsField
         title={hostSettingItem('gestures', 'activateOnStart').title}
-        hint="右ボタンを押した場所をアクティブにして、その対象でジェスチャーを開始します。"
+        hint={translate('settings.gestureOptions.activateHint')}
         {...settingAnchor('gestures', 'activateOnStart')}
       >
         <Toggle
@@ -80,7 +84,7 @@ export function GestureOptions({
         onChange={(executionMode) => change({ executionMode })}
       />
       <SettingsField
-        group="操作感"
+        group={translate('settings.gestureOptions.feel')}
         title={hostSettingItem('gestures', 'distance').title}
         {...settingAnchor('gestures', 'distance')}
       >
@@ -94,7 +98,7 @@ export function GestureOptions({
         />
       </SettingsField>
       <SettingsField
-        group="操作感"
+        group={translate('settings.gestureOptions.feel')}
         title={hostSettingItem('gestures', 'wheelDelayMs').title}
         {...settingAnchor('gestures', 'wheelDelayMs')}
       >
@@ -108,9 +112,9 @@ export function GestureOptions({
         />
       </SettingsField>
       <SettingsField
-        group="待機表示"
+        group={translate('settings.gestureOptions.indicator')}
         title={hostSettingItem('gestures', 'indicatorPosition').title}
-        hint="選択した実行方法に合わせて、実行対象のコマンドを表示します。"
+        hint={translate('settings.gestureOptions.indicatorHint')}
         {...settingAnchor('gestures', 'indicatorPosition')}
       >
         <select
@@ -122,14 +126,18 @@ export function GestureOptions({
             })
           }
         >
-          <option value="gesture-start">ジェスチャー開始地点</option>
-          <option value="window-center">対象ウィンドウの中央</option>
-          <option value="monitor-center">カーソルのあるモニターの中央</option>
-          <option value="none">表示なし</option>
+          <option value="gesture-start">
+            {translate('settings.gestureOptions.startPosition')}
+          </option>
+          <option value="window-center">{translate('settings.gestureOptions.windowCenter')}</option>
+          <option value="monitor-center">
+            {translate('settings.gestureOptions.monitorCenter')}
+          </option>
+          <option value="none">{translate('settings.gestureOptions.hidden')}</option>
         </select>
       </SettingsField>
       <SettingsField
-        group="待機表示"
+        group={translate('settings.gestureOptions.indicator')}
         title={hostSettingItem('gestures', 'indicatorOpacity').title}
         {...settingAnchor('gestures', 'indicatorOpacity')}
       >
@@ -145,9 +153,9 @@ export function GestureOptions({
         />
       </SettingsField>
       <SettingsField
-        group="待機表示"
+        group={translate('settings.gestureOptions.indicator')}
         title={hostSettingItem('gestures', 'indicatorShowNoAction').title}
-        hint="OFFの場合、割り当てに一致しない移動では表示しません。"
+        hint={translate('settings.gestureOptions.noActionHint')}
         {...settingAnchor('gestures', 'indicatorShowNoAction')}
       >
         <Toggle
@@ -158,7 +166,7 @@ export function GestureOptions({
       </SettingsField>
       <InputBrowserOptions pageId="gestures" value={gestures} onChange={change} />
       <Names
-        hint="この一覧のアプリでは、すべてのジェスチャーを無効にします。"
+        hint={translate('settings.gestureOptions.excludedHint')}
         itemKey="excludedProcesses"
         values={gestures.excludedProcesses}
         change={(excludedProcesses) => change({ excludedProcesses })}

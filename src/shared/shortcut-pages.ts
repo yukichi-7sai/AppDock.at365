@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { builtinRibbon, pageKey, validPageId } from './applet-pages';
 import { validCommandId } from './commands';
 
@@ -67,9 +68,11 @@ export function shortcutPageChoices(
 }
 
 export function shortcutTargetTitle(id: string, pages: ShortcutPageChoice[]): string {
-  if (id === 'host:home') return '廃止: ホーム';
+  if (id === 'host:home') return hostText('settings.shortcut-pages.legacyHome');
   const page = pages.find((item) => item.id === id);
   if (page) return page.title;
   const legacy = pages.find((item) => item.appletId === id);
-  return legacy ? `${legacy.appletTitle}（Applet内のすべてのページ）` : `未導入: ${id}`;
+  return legacy
+    ? hostText('settings.shortcut-pages.legacyApplet', { appletTitle: String(legacy.appletTitle) })
+    : hostText('settings.shortcut-pages.missing', { id: id });
 }

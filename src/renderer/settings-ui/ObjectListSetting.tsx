@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsInput, numberInput } from './SettingsInput';
 import { useSettingsControls } from './api';
 import { useState } from 'react';
@@ -16,6 +17,7 @@ export function ObjectListSetting({
   value: unknown;
   onChange(value: unknown): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [error, setError] = useState('');
   let entries: Record<string, unknown>[] = [];
@@ -25,17 +27,17 @@ export function ObjectListSetting({
     for (const item of entries)
       for (const field of definition.fields ?? []) objectFieldValue(item, field);
   } catch {
-    loadError = '保存された設定を読み取れません。';
+    loadError = translate('settings.objectListSetting.unreadable');
   }
   useSettingsFeedback({ error: loadError || error, target: definition.title });
   if (loadError)
     return (
       <button className="secondary" onClick={() => onChange([])}>
-        新しい一覧を作る
+        {translate('settings.objectListSetting.create')}
       </button>
     );
   const fields = definition.fields ?? [];
-  const label = definition.itemTitle ?? '項目';
+  const label = definition.itemTitle ?? translate('settings.objectListSetting.item');
   const update = (index: number, key: string, next: unknown) =>
     onChange(
       entries.map((item, i) =>
@@ -44,7 +46,7 @@ export function ObjectListSetting({
     );
   return (
     <div className="object-list-setting">
-      {!entries.length && <p>まだ{label}の設定がありません。</p>}
+      {!entries.length && <p>{translate('settings.objectListSetting.empty', { label })}</p>}
       {entries.map((entry, index) => (
         <fieldset key={index} className="object-list-item">
           <legend>
@@ -55,33 +57,42 @@ export function ObjectListSetting({
             <button
               className="text-button"
               disabled={index === 0}
-              aria-label={`${label}${index + 1}を前へ移動`}
+              aria-label={translate('settings.objectListSetting.moveBefore', {
+                label: label,
+                value: index + 1,
+              })}
               onClick={() => {
                 const next = [...entries];
                 [next[index - 1], next[index]] = [next[index], next[index - 1]];
                 onChange(next);
               }}
             >
-              前へ
+              {translate('settings.objectListSetting.before')}
             </button>
             <button
               className="text-button"
               disabled={index === entries.length - 1}
-              aria-label={`${label}${index + 1}を後ろへ移動`}
+              aria-label={translate('settings.objectListSetting.moveAfter', {
+                label: label,
+                value: index + 1,
+              })}
               onClick={() => {
                 const next = [...entries];
                 [next[index + 1], next[index]] = [next[index], next[index + 1]];
                 onChange(next);
               }}
             >
-              後ろへ
+              {translate('settings.objectListSetting.after')}
             </button>
             <button
               className="text-button"
-              aria-label={`${label}${index + 1}の設定を削除`}
+              aria-label={translate('settings.objectListSetting.deleteSettings', {
+                label: label,
+                value: index + 1,
+              })}
               onClick={() => onChange(entries.filter((_, i) => i !== index))}
             >
-              設定を削除
+              {translate('settings.objectListSetting.deleteSettingsAction')}
             </button>
           </div>
           {fields.map((field) => {
@@ -111,7 +122,10 @@ export function ObjectListSetting({
                         {field.format === 'directory' && (
                           <button
                             className="secondary"
-                            aria-label={`${name} ${slot + 1}を選ぶ`}
+                            aria-label={translate('settings.objectListSetting.chooseItem', {
+                              name: name,
+                              value: slot + 1,
+                            })}
                             onClick={() => {
                               void settingsControls
                                 .chooseDirectory()
@@ -125,12 +139,15 @@ export function ObjectListSetting({
                                 .catch((err: Error) => setError(err.message));
                             }}
                           >
-                            選ぶ
+                            {translate('settings.objectListSetting.choose')}
                           </button>
                         )}
                         <button
                           className="text-button"
-                          aria-label={`${name} ${slot + 1}を削除`}
+                          aria-label={translate('settings.objectListSetting.deleteItem', {
+                            name: name,
+                            value: slot + 1,
+                          })}
                           onClick={() =>
                             update(
                               index,
@@ -139,17 +156,17 @@ export function ObjectListSetting({
                             )
                           }
                         >
-                          削除
+                          {translate('settings.objectListSetting.delete')}
                         </button>
                       </div>
                     ))}
                     <button
                       className="secondary"
                       disabled={(current as string[]).length >= 64}
-                      aria-label={`${name}を追加`}
+                      aria-label={translate('settings.objectListSetting.addItem', { name: name })}
                       onClick={() => update(index, field.key, [...(current as string[]), ''])}
                     >
-                      フォルダーを追加
+                      {translate('settings.objectListSetting.addDirectory')}
                     </button>
                   </div>
                 ) : field.type === 'boolean' ? (
@@ -202,7 +219,7 @@ export function ObjectListSetting({
         disabled={entries.length >= 64}
         onClick={() => onChange([...entries, normalizeObject({}, fields)])}
       >
-        {label}を追加
+        {translate('settings.objectListSetting.add', { label })}
       </button>
     </div>
   );

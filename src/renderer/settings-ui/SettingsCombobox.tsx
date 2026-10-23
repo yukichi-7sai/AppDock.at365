@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { SettingsInput } from './SettingsInput';
 
@@ -13,6 +14,7 @@ export function SettingsCombobox({
   options: { id: string; name: string }[];
   onChange(value: string): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const popup = useRef<HTMLDivElement>(null);
@@ -127,7 +129,7 @@ export function SettingsCombobox({
       <button
         type="button"
         className="settings-combobox-toggle"
-        aria-label={`${label}の候補を表示`}
+        aria-label={translate('settings.settingsCombobox.showOptions', { label: label })}
         aria-expanded={visible}
         disabled={options.length === 0}
         tabIndex={-1}
@@ -145,7 +147,7 @@ export function SettingsCombobox({
         id={id}
         popover="manual"
         role="listbox"
-        aria-label={`${label}の候補`}
+        aria-label={translate('settings.settingsCombobox.options', { label: label })}
         className="settings-combobox-options"
       >
         {matches.map((option, index) => (

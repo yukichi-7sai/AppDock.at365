@@ -1,3 +1,4 @@
+import type { HostTextKey } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import type { ReactNode } from 'react';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
@@ -6,25 +7,21 @@ import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { CommandListScrollProvider, CommandListScrollbar } from '../settings-ui/CommandListScroll';
 
-const descriptions: Record<string, string> = {
-  applets: 'インストール済みAppletの状態・更新・表示順を管理します。',
-  notifications: '通知の種類ごとに、表示先・表示時間・読み上げを設定します。',
-  tts: 'OpenAI互換のTTSサーバーで生成した音声を、このPCで再生します。',
-  ribbon:
-    '右クリックの動作と、ボタン・グループ・区切り線の表示や配置を設定します。確定した変更は自動保存します。',
-  tray: 'トレイアイコンのクリック操作と、メニューに表示するコマンドを設定します。',
-  shortcuts: 'コマンドを見つけて、キーと使う場面を設定できます。',
-  gestures: 'コマンドを見つけて、操作と使う場面を設定できます。',
-  'custom-commands': 'よく使う操作をコマンドとして登録し、実行内容や外部への公開を設定します。',
-  ai: 'AIサーバーの接続先・モデル・応答の既定値を設定します。',
-  'mcp-client': 'MCPサーバーへの接続先と、利用を許可するツールを設定します。',
-  'web-accounts':
-    'WebApplet専用のアカウント枠を管理します。同じ枠を選んだWebAppletはログイン状態を共有し、Gmailのアカウントとは別管理です。',
-  permissions:
-    'AppletとMCPの許可を、それぞれ設定します。Applet側はすべてのAppletに共通です。変更はすぐに反映されます。',
-  codex:
-    '同じPCのCodexやネットワーク上のMCPクライアントから、AppDockの状態確認・設定変更・公開コマンドの実行ができます。連携の設定はこのPCへ即時反映されます。',
-  about: 'AppDockとインストール済みAppletのバージョンを確認し、更新を管理します。',
+const descriptions: Record<string, HostTextKey> = {
+  applets: 'settings.settingsPageLayout.applets',
+  notifications: 'settings.settingsPageLayout.notifications',
+  tts: 'settings.settingsPageLayout.tts',
+  ribbon: 'settings.settingsPageLayout.ribbon',
+  tray: 'settings.settingsPageLayout.tray',
+  shortcuts: 'settings.settingsPageLayout.shortcuts',
+  gestures: 'settings.settingsPageLayout.gestures',
+  'custom-commands': 'settings.settingsPageLayout.customCommands',
+  ai: 'settings.settingsPageLayout.ai',
+  'mcp-client': 'settings.settingsPageLayout.mcpClient',
+  'web-accounts': 'settings.settingsPageLayout.webAccounts',
+  permissions: 'settings.settingsPageLayout.permissions',
+  codex: 'settings.settingsPageLayout.codex',
+  about: 'settings.settingsPageLayout.about',
 };
 
 /** One frame for host settings, Applets, and both form / JSON views. */
@@ -62,6 +59,8 @@ export function SettingsPageLayout({
       ? page.id === 'appearance' || page.id === 'general'
         ? t(`pages.${page.id}.description`)
         : descriptions[page.id]
+          ? t(descriptions[page.id])
+          : undefined
       : page.collection
         ? t('settings.collectionDescription')
         : t('settings.appletDescription');

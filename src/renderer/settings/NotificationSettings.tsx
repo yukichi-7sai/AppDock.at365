@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useState, useRef } from 'react';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
@@ -23,11 +25,15 @@ import {
   SettingsChoice,
   SettingsActions,
 } from '../settings-ui/SettingsSections';
-const targetTitles = { banner: 'バナー', desktop: 'デスクトップ通知', windows: 'Windows通知' };
+const targetTitles = {
+  banner: hostText('settings.notificationSettings.banner'),
+  desktop: hostText('settings.notificationSettings.desktop'),
+  windows: hostText('settings.notificationSettings.windows'),
+};
 const ownerGroup = (type: NotificationTypeEntry) =>
   type.ownerKind === 'host' ? 'host' : JSON.stringify([type.ownerKind, type.ownerId]);
 const reasonTitles: Record<string, string> = {
-  'type-definition-changed': '通知種類の仕様が変わりました。設定を確認してください。',
+  'type-definition-changed': hostText('settings.notificationSettings.changed'),
 };
 export function NotificationSettings({
   editor,
@@ -44,6 +50,7 @@ export function NotificationSettings({
   busy: boolean;
   select(id: string): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const settings = editor.value;
   const speech = settings.notificationPreferences?.speech ?? {};
   const effective = resolveNotificationSpeech(settings, auxiliary?.defaults);
@@ -116,57 +123,76 @@ export function NotificationSettings({
   const previewState =
     previewJob &&
     {
-      queued: '待機中',
-      generating: '生成中',
-      waitingPlayback: '再生待ち',
-      playing: '再生中',
-      completed: '完了',
-      failed: '失敗',
-      canceled: '取消',
+      queued: translate('settings.notificationSettings.queued'),
+      generating: translate('settings.notificationSettings.generating'),
+      waitingPlayback: translate('settings.notificationSettings.waitingPlayback'),
+      playing: translate('settings.notificationSettings.playing'),
+      completed: translate('settings.notificationSettings.completed'),
+      failed: translate('settings.notificationSettings.failed'),
+      canceled: translate('settings.notificationSettings.canceled'),
     }[previewJob.state];
   useSettingsFeedback({ busy: pending, error });
   return (
     <div className="settings-sections notification-settings">
       <SettingsSection
-        title="通知の受け取り方"
-        hint="種類ごとに通知先を組み合わせて設定できます。"
+        title={translate('settings.notificationSettings.delivery')}
+        hint={translate('settings.notificationSettings.deliveryHint')}
         collapsible
       >
-        <SettingsField title="通知センター" description="全ての通知を確認できます。" />
-        <SettingsField title="バナー" description="画面上部に表示されます。" />
-        <SettingsField title="デスクトップ通知" description="タスクトレイ付近に表示されます。" />
         <SettingsField
-          title="Windows通知"
-          description="Windowsが表示・持続時間などを管理するため、自動消去までの秒数の設定は反映されません。"
+          title={translate('settings.notificationSettings.center')}
+          description={translate('settings.notificationSettings.centerHint')}
         />
-        <SettingsField title="読み上げ" description="接続先・モデル・声の設定が必要です。" />
+        <SettingsField
+          title={translate('settings.notificationSettings.banner')}
+          description={translate('settings.notificationSettings.bannerHint')}
+        />
+        <SettingsField
+          title={translate('settings.notificationSettings.desktop')}
+          description={translate('settings.notificationSettings.desktopHint')}
+        />
+        <SettingsField
+          title={translate('settings.notificationSettings.windows')}
+          description={translate('settings.notificationSettings.windowsHint')}
+        />
+        <SettingsField
+          title={translate('settings.notificationSettings.speech')}
+          description={translate('settings.notificationSettings.speechRequirements')}
+        />
         <SettingsField
           title="MCP Event"
-          description="ChatGPT Work/Dotsのイベントトリガーとして使用します。Secure MCP Tunnel等を使用して、ChatGPTからプラグインとしてAppDockを使用するための連携が必要です。"
+          description={translate('settings.notificationSettings.eventHint')}
         />
       </SettingsSection>
       <SettingsSection
-        title="読み上げ"
-        description={`現在の声: ${effective.voice || '未設定'} ／ 速度: ${effective.speed}倍`}
+        title={translate('settings.notificationSettings.speech')}
+        description={translate('settings.notificationSettings.currentVoiceAndSpeed', {
+          value: effective.voice || translate('settings.notificationSettings.unset'),
+          speed: effective.speed,
+        })}
         collapsible
       >
         <SettingsField
-          title="TTS設定"
-          description="通知のタイトルと本文は共通設定のTTSサーバーへ送信されます。接続先・モデル・声を設定してください。"
+          title={translate('settings.notificationSettings.ttsSettings')}
+          description={translate('settings.notificationSettings.ttsHint')}
         >
           <SettingsActions>
-            <button onClick={() => select('tts')}>設定を開く</button>
+            <button onClick={() => select('tts')}>
+              {translate('settings.notificationSettings.openSettings')}
+            </button>
           </SettingsActions>
         </SettingsField>
         <SettingsField
-          title="声"
-          description={`現在の声: ${effective.voice || '未設定'}`}
-          hint="共通の声を使うか、通知だけ別の声に変更できます。"
+          title={translate('settings.notificationSettings.voice')}
+          description={translate('settings.notificationSettings.currentVoice', {
+            value: effective.voice || translate('settings.notificationSettings.unset'),
+          })}
+          hint={translate('settings.notificationSettings.voiceHint')}
           {...settingAnchor('notifications', 'speech.voice')}
         >
           <SettingsActions>
             <Toggle
-              label="通知の声に共通設定を使う"
+              label={translate('settings.notificationSettings.inheritVoice')}
               checked={speech.voice === undefined && !voiceOverride}
               onChange={(inherit) => {
                 setVoiceOverride(!inherit);
@@ -174,12 +200,12 @@ export function NotificationSettings({
                 else if (effective.voice) changeSpeech('voice', effective.voice);
               }}
             />
-            <span>共通設定を使う</span>
+            <span>{translate('settings.notificationSettings.inherit')}</span>
           </SettingsActions>
           {(speech.voice !== undefined || voiceOverride) && (
             <>
               <SettingsCombobox
-                label="通知用のボイスID"
+                label={translate('settings.notificationSettings.voiceId')}
                 value={speech.voice ?? ''}
                 onChange={(value) => changeSpeech('voice', value)}
                 options={voices}
@@ -194,25 +220,27 @@ export function NotificationSettings({
                     });
                   }}
                 >
-                  ボイス一覧を更新
+                  {translate('settings.notificationSettings.refreshVoices')}
                 </button>
               </SettingsActions>
             </>
           )}
         </SettingsField>
         <SettingsField
-          title="速度"
-          description={`現在の速度: ${effective.speed}`}
-          hint="1倍が標準速度です。"
+          title={translate('settings.notificationSettings.speed')}
+          description={translate('settings.notificationSettings.currentSpeed', {
+            speed: effective.speed,
+          })}
+          hint={translate('settings.notificationSettings.speedHint')}
           {...settingAnchor('notifications', 'speech.speed')}
         >
           <SettingsActions>
             <Toggle
-              label="通知の速度に共通設定を使う"
+              label={translate('settings.notificationSettings.inheritSpeed')}
               checked={speech.speed === undefined}
               onChange={(inherit) => changeSpeech('speed', inherit ? undefined : effective.speed)}
             />
-            <span>共通設定を使う</span>
+            <span>{translate('settings.notificationSettings.inherit')}</span>
           </SettingsActions>
           {speech.speed !== undefined && (
             <SettingsInput
@@ -220,7 +248,7 @@ export function NotificationSettings({
               min={0.25}
               max={4}
               step={0.05}
-              aria-label="通知用の読み上げ速度"
+              aria-label={translate('settings.notificationSettings.speechSpeed')}
               value={speech.speed}
               onChange={(e) =>
                 changeSpeech('speed', e.target.value.trim() ? Number(e.target.value) : NaN)
@@ -229,11 +257,11 @@ export function NotificationSettings({
           )}
         </SettingsField>
         <SettingsField
-          title="試聴"
+          title={translate('settings.notificationSettings.preview')}
           description={
             !auxiliary?.configured || !effective.voice
-              ? '読み上げには、接続先・モデル・声の設定が必要です。'
-              : (previewState ?? '通知の読み上げを試聴できます。')
+              ? translate('settings.notificationSettings.previewRequirements')
+              : (previewState ?? translate('settings.notificationSettings.previewHint'))
           }
           error={previewJob?.error?.message}
         >
@@ -245,28 +273,30 @@ export function NotificationSettings({
               }
               onClick={() => void run('notificationPreview', [crypto.randomUUID()])}
             >
-              通知の読み上げを試聴
+              {translate('settings.notificationSettings.previewAction')}
             </button>
             <button
               disabled={pending || !previewActive}
               onClick={() => void run('notificationPreviewStop')}
             >
-              試聴を停止
+              {translate('settings.notificationSettings.stopPreview')}
             </button>
           </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection
         title="MCP Event"
-        hint="ChatGPT Work/Dotsのイベントトリガーとして使用するための機能です。"
+        hint={translate('settings.notificationSettings.eventsHint')}
         collapsible
       >
         <SettingsField
-          title="MCP連携設定"
-          description="MCP Eventを使用するには、MCPサーバーの設定と連携が必要です。"
+          title={translate('settings.notificationSettings.mcpSettings')}
+          description={translate('settings.notificationSettings.mcpHint')}
         >
           <SettingsActions>
-            <button onClick={() => select('codex')}>設定を開く</button>
+            <button onClick={() => select('codex')}>
+              {translate('settings.notificationSettings.openSettings')}
+            </button>
           </SettingsActions>
         </SettingsField>
       </SettingsSection>
@@ -277,7 +307,9 @@ export function NotificationSettings({
             key={owner}
             variant="card"
             title={rows[0].ownerTitle}
-            aria-label={rows[0].ownerTitle + 'の通知'}
+            aria-label={translate('settings.notificationSettings.ownerLabel', {
+              owner: rows[0].ownerTitle,
+            })}
           >
             {rows.map((type) => {
               const policy = resolveNotificationPolicy(type, settings);
@@ -291,21 +323,25 @@ export function NotificationSettings({
                 ? delivery.join('・')
                 : eventSending
                   ? speaking
-                    ? '音声・MCP Eventsのみ'
-                    : 'MCP Eventsのみ'
+                    ? translate('settings.notificationSettings.speechAndEvents')
+                    : translate('settings.notificationSettings.eventsOnly')
                   : speaking
-                    ? '音声のみ'
-                    : '通知センターのみ';
+                    ? translate('settings.notificationSettings.speechOnly')
+                    : translate('settings.notificationSettings.centerOnly');
               const duration =
                 type.lifetimePolicy === 'condition'
-                  ? '問題が解消するまで'
+                  ? translate('settings.notificationSettings.untilResolved')
                   : policy.durationSeconds === null
-                    ? '閉じるまで表示'
-                    : `表示時間: ${policy.durationSeconds}秒`;
+                    ? translate('settings.notificationSettings.untilClosed')
+                    : translate('settings.notificationSettings.duration', {
+                        durationSeconds: policy.durationSeconds,
+                      });
               const summary = [
                 deliverySummary,
                 duration,
-                `読み上げ: ${speaking ? 'ON' : 'OFF'}`,
+                translate('settings.notificationSettings.speechState', {
+                  value: speaking ? 'ON' : 'OFF',
+                }),
                 `MCP Events: ${eventSending ? 'ON' : 'OFF'}`,
               ].join(' ／ ');
               return (
@@ -317,7 +353,7 @@ export function NotificationSettings({
                     summary,
                     type.ownerKind === 'applet' &&
                     !['starting', 'running'].includes(type.ownerState)
-                      ? 'Appletは停止中です。通知設定を編集できます。'
+                      ? translate('settings.notificationSettings.appletStopped')
                       : '',
                     policy.reason ? (reasonTitles[policy.reason] ?? policy.reason) : '',
                   ]
@@ -328,17 +364,25 @@ export function NotificationSettings({
                   key={notificationTypeKey(type)}
                   {...settingAnchor('notifications', notificationSettingKey(type))}
                 >
-                  <SettingsField title="通知先" className="settings-field-wide">
+                  <SettingsField
+                    title={translate('settings.notificationSettings.targets')}
+                    className="settings-field-wide"
+                  >
                     <div className="settings-choice-grid">
                       {type.allowedTargets.map((target) => (
                         <SettingsChoice
                           key={target}
                           label={targetTitles[target]}
-                          ariaLabel={type.title + 'の' + targetTitles[target]}
+                          ariaLabel={translate('settings.notificationSettings.targetLabel', {
+                            title: type.title,
+                            target: targetTitles[target],
+                          })}
                           checked={policy.selectedTargets.includes(target)}
                           disabled={type.requiredTargets.includes(target)}
                           description={
-                            type.requiredTargets.includes(target) ? 'この通知では必須' : undefined
+                            type.requiredTargets.includes(target)
+                              ? translate('settings.notificationSettings.required')
+                              : undefined
                           }
                           onChange={(on) =>
                             change(type, {
@@ -350,23 +394,29 @@ export function NotificationSettings({
                         />
                       ))}
                       <SettingsChoice
-                        label="読み上げ"
-                        description="タイトルと本文を音声で通知"
-                        ariaLabel={type.title + 'を読み上げる'}
+                        label={translate('settings.notificationSettings.speech')}
+                        description={translate('settings.notificationSettings.speechDescription')}
+                        ariaLabel={translate('settings.notificationSettings.speechLabel', {
+                          title: type.title,
+                        })}
                         checked={speaking}
                         onChange={(speak) => change(type, { speak })}
                       />
                       <SettingsChoice
                         label="MCP Events"
-                        description="購読中のdot等へタイトルと本文を送信。OFF中は送信を止め、購読は有効期限まで保持"
-                        ariaLabel={type.title + 'をMCP Eventsで送信'}
+                        description={translate('settings.notificationSettings.eventDescription')}
+                        ariaLabel={translate('settings.notificationSettings.eventLabel', {
+                          title: type.title,
+                        })}
                         checked={eventSending}
                         onChange={(mcpEvents) => change(type, { mcpEvents })}
                       />
                     </div>
                     <SettingsChoice
-                      label="通知センターのみ"
-                      ariaLabel={type.title + 'の通知センターのみ'}
+                      label={translate('settings.notificationSettings.centerOnly')}
+                      ariaLabel={translate('settings.notificationSettings.centerLabel', {
+                        title: type.title,
+                      })}
                       checked={!policy.selectedTargets.length && !speaking && !eventSending}
                       disabled={!!type.requiredTargets.length}
                       onChange={(on) => {
@@ -376,22 +426,28 @@ export function NotificationSettings({
                   </SettingsField>
                   {speaking && (!auxiliary?.configured || !effective.voice) && (
                     <SettingsField
-                      title="読み上げ設定"
-                      description="読み上げには接続先・モデル・声の設定が必要です。"
+                      title={translate('settings.notificationSettings.speechSettings')}
+                      description={translate(
+                        'settings.notificationSettings.speechSettingsRequirements',
+                      )}
                     >
-                      <button onClick={() => select('tts')}>読み上げ設定を開く</button>
+                      <button onClick={() => select('tts')}>
+                        {translate('settings.notificationSettings.openSpeech')}
+                      </button>
                     </SettingsField>
                   )}
                   {type.lifetimePolicy === 'userDuration' ? (
                     <SettingsField
-                      title="自動消去までの秒数"
-                      hint="1〜86,400秒。空欄なら閉じるまで表示します。"
+                      title={translate('settings.notificationSettings.durationSeconds')}
+                      hint={translate('settings.notificationSettings.durationHint')}
                     >
                       <SettingsInput
                         type="text"
                         inputMode="numeric"
-                        aria-label={type.title + 'の表示時間'}
-                        placeholder="閉じるまで表示"
+                        aria-label={translate('settings.notificationSettings.durationLabel', {
+                          title: type.title,
+                        })}
+                        placeholder={translate('settings.notificationSettings.untilClosed')}
                         value={
                           row?.durationSeconds === undefined
                             ? (type.defaultDurationSeconds ?? '')
@@ -411,11 +467,11 @@ export function NotificationSettings({
                     </SettingsField>
                   ) : (
                     <SettingsField
-                      title="表示時間"
+                      title={translate('settings.notificationSettings.durationTitle')}
                       description={
                         type.lifetimePolicy === 'condition'
-                          ? '問題が解消するまで表示します。'
-                          : '閉じるまで表示します。'
+                          ? translate('settings.notificationSettings.unresolvedHint')
+                          : translate('settings.notificationSettings.closedHint')
                       }
                     />
                   )}
@@ -425,21 +481,21 @@ export function NotificationSettings({
           </SettingsSection>
         );
       })}
-      <SettingsSection title="通知の表示時間について" collapsible>
+      <SettingsSection title={translate('settings.notificationSettings.durationHelp')} collapsible>
         <SettingsField
-          title="変更の反映"
-          description="表示時間の変更は次の通知から反映されます。現在表示中の通知の期限は変わりません。"
+          title={translate('settings.notificationSettings.changes')}
+          description={translate('settings.notificationSettings.changesHint')}
         />
         <SettingsField
-          title="Windows通知"
-          description="Windowsが表示・持続時間などを管理するため、自動消去までの秒数の設定は反映されません。ここで指定する表示時間は、通知センターで操作できる期間に反映されます。"
+          title={translate('settings.notificationSettings.windows')}
+          description={translate('settings.notificationSettings.windowsDurationHint')}
         />
       </SettingsSection>
       {!!unknown.length && (
         <SettingsSection
-          title="現在利用できない種類"
-          description="再導入に備えて、以前の設定を保持しています。"
-          aria-label="現在利用できない通知種類"
+          title={translate('settings.notificationSettings.unavailable')}
+          description={translate('settings.notificationSettings.unavailableHint')}
+          aria-label={translate('settings.notificationSettings.unavailableType')}
           collapsible
         >
           {unknown.map((row) => (
@@ -458,7 +514,7 @@ export function NotificationSettings({
                     })
                   }
                 >
-                  この種類の設定を削除
+                  {translate('settings.notificationSettings.deleteType')}
                 </button>
               </SettingsActions>
             </SettingsField>

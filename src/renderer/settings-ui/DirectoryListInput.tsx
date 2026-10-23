@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from './SettingsStatus';
 import { useEffect, useRef, useState } from 'react';
 import { SettingsInput } from './SettingsInput';
@@ -12,6 +13,7 @@ export function DirectoryListInput({
   value: string[];
   onChange(value: string[]): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [choosing, setChoosing] = useState(false);
   const [error, setError] = useState('');
@@ -51,31 +53,37 @@ export function DirectoryListInput({
           <button
             type="button"
             className="secondary"
-            aria-label={`${label} ${index + 1}を選ぶ`}
+            aria-label={translate('settings.directoryListInput.chooseItem', {
+              label: label,
+              value: index + 1,
+            })}
             disabled={choosing}
             onClick={() => void choose(index)}
           >
-            選ぶ
+            {translate('settings.directoryListInput.choose')}
           </button>
           <button
             type="button"
             className="text-button"
-            aria-label={`${label} ${index + 1}を削除`}
+            aria-label={translate('settings.directoryListInput.deleteItem', {
+              label: label,
+              value: index + 1,
+            })}
             disabled={choosing}
             onClick={() => onChange(value.filter((_, i) => i !== index))}
           >
-            削除
+            {translate('settings.directoryListInput.delete')}
           </button>
         </div>
       ))}
       <button
         type="button"
         className="secondary"
-        aria-label={`${label}を追加`}
+        aria-label={translate('settings.directoryListInput.add', { label: label })}
         disabled={choosing || value.length >= 64}
         onClick={() => onChange([...value, ''])}
       >
-        フォルダーを追加
+        {translate('settings.directoryListInput.addDirectory')}
       </button>
     </div>
   );

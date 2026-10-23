@@ -103,6 +103,9 @@ module.exports = async function ({
       for (const [page, id] of [
         ['表示', 'appearance'],
         ['一般', 'general'],
+        ...require('../out/main/shared/settings-navigation')
+          .hostSettingsPages.filter(([id]) => !['appearance', 'general'].includes(id))
+          .map(([id, title]) => [title, id]),
       ]) {
         await select(page);
         const untranslated = await host.locator('.settings-body').evaluate(
@@ -116,9 +119,12 @@ module.exports = async function ({
             }
             return found;
           },
-          Object.keys(require('../src/shared/locales/ja/host.json')),
+          // The visible storage filename also happens to be the JSON-mode resource key.
+          Object.keys(require('../src/shared/locales/ja/host.json')).filter(
+            (key) => key !== 'settings.json',
+          ),
         );
-        assert.deepEqual(untranslated, []);
+        assert.deepEqual(untranslated, [], `${page}/${theme}/${width} untranslated keys`);
         assert.equal(
           await host.locator('.settings-body').evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
           true,
@@ -141,7 +147,20 @@ module.exports = async function ({
   await sound.click();
   await settleSettings(host);
   checks.push(
-    'appearance and general render without raw translation keys or horizontal overflow at 1280/760 in light/dark; General toggle saves',
+    'all 17 host settings pages render without raw translation keys or horizontal overflow at 1280/760 in light/dark; General toggle saves',
+  );
+
+  await select('AI');
+  const serverName = '<b>language.ja</b> {{name}} $t(language.ja)';
+  await host.getByRole('button', { name: `${serverName}を削除`, exact: true }).click();
+  const confirmation = host.getByRole('dialog', { name: 'AIサーバーを削除', exact: true });
+  assert.equal(await confirmation.locator('strong').innerText(), serverName);
+  assert.equal(await confirmation.locator('strong b').count(), 0);
+  assert.ok((await confirmation.innerText()).includes(`${serverName}を削除しますか？`));
+  await confirmation.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  assert.equal((await snapshot()).settings.value.ai.connections[0].name, serverName);
+  checks.push(
+    'rich confirmation preserves literal HTML, interpolation tokens and key-like user names; cancel preserves the entry',
   );
 
   await select('カスタムコマンド');

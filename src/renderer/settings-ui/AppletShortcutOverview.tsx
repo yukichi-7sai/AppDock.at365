@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { getKeybindings } from '../../shared/keybindings';
 import { ShortcutCommandList } from './ShortcutCommandList';
@@ -16,6 +17,7 @@ export function AppletShortcutOverview({
   applets: { id: string; title: string }[];
   onChange(settings: Settings): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const bindings = getKeybindings(settings);
   const commands = applet.commands.map((command) => ({
     ...command,
@@ -37,7 +39,7 @@ export function AppletShortcutOverview({
       />
       {!!aliases.length && (
         <>
-          <h3>互換コマンドへの割り当て</h3>
+          <h3>{translate('settings.appletShortcutOverview.compatibilityBindings')}</h3>
           <ShortcutCommandList
             commands={aliases}
             allCommands={allCommands}

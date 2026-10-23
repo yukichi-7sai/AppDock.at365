@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Settings } from '../../shared/contracts';
@@ -51,7 +52,7 @@ interface BridgeHistory {
 const fingerprint = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const message = (error: unknown) =>
-  error instanceof Error ? error.message : 'Windowsのタッチパッド設定を確認できません。';
+  error instanceof Error ? error.message : hostText('settings.touchpad-bridge.windowsUnavailable');
 
 export class TouchpadBridgeManager {
   private history: BridgeHistory = { schemaVersion: 1, attempted: {} };
@@ -102,7 +103,7 @@ export class TouchpadBridgeManager {
     try {
       if (!fs.existsSync(this.options.stateFile)) return;
       if (fs.statSync(this.options.stateFile).size > 128 * 1024)
-        throw Error('接続履歴が大きすぎます。');
+        throw Error(hostText('settings.touchpad-bridge.historySize'));
       this.historyBytes = fs.readFileSync(this.options.stateFile);
       const value = JSON.parse(this.historyBytes.toString('utf8')) as BridgeHistory;
       if (
@@ -146,10 +147,10 @@ export class TouchpadBridgeManager {
                 ),
             )))
       )
-        throw Error('接続履歴の形式を確認できません。');
+        throw Error(hostText('settings.touchpad-bridge.historyFormat'));
       this.history = value;
     } catch {
-      this.historyError = 'このPCの接続履歴を確認できません。Windowsの設定を再設定してください。';
+      this.historyError = hostText('settings.touchpad-bridge.historyUnreadable');
     }
   }
   private saveHistory(next: BridgeHistory) {
@@ -189,14 +190,16 @@ export class TouchpadBridgeManager {
           {
             eventId: 'touchpad/' + status.gesture,
             source: 'touchpad',
-            title: touchpadTitle(status.gesture) + 'の接続を確認してください',
+            title: hostText('settings.touchpad-bridge.checkConnection', {
+              title: touchpadTitle(status.gesture),
+            }),
             code: 'TOUCHPAD_' + status.state.toUpperCase(),
-            message: status.message ?? 'このジェスチャーのAppDockでの制御を停止しています。',
+            message: status.message ?? hostText('settings.touchpad-bridge.stopped'),
           },
           [
             {
               key: 'settings',
-              label: '設定を開く',
+              label: hostText('settings.touchpad-bridge.openSettings'),
               primary: true,
               run: async () => {
                 await this.options.open(status.gesture);
@@ -246,7 +249,11 @@ export class TouchpadBridgeManager {
     this.invalidate();
     this.statuses = this.statuses.map((status) =>
       status.state === 'checking'
-        ? { ...status, state: 'unavailable', message: '入力ホストを確認できません。' }
+        ? {
+            ...status,
+            state: 'unavailable',
+            message: hostText('settings.touchpad-bridge.inputUnavailable'),
+          }
         : status,
     );
     this.publish();
@@ -289,7 +296,7 @@ export class TouchpadBridgeManager {
       this.lease = await this.options.input.touchpadRequest<boolean>('touchpad.lease', {
         enabled: true,
       });
-      if (!this.lease) throw Error('別のAppDockがタッチパッドの接続を使用しています。');
+      if (!this.lease) throw Error(hostText('settings.touchpad-bridge.owned'));
       const conflicts = new Set(getKeybindings(this.options.settings()).map((row) => row.key));
       const recovered = (this.history.pending ?? []).filter(
         (pending) =>
@@ -329,39 +336,38 @@ export class TouchpadBridgeManager {
           return {
             ...base,
             state: 'error',
-            message: '前回の設定が完了していません。Windowsの設定を再設定してください。',
+            message: hostText('settings.touchpad-bridge.incomplete'),
           };
         if (!this.history.attempted[gesture])
           return {
             ...base,
             state: 'unconnected',
-            message: 'このPCでは未接続です。Windowsの設定を再設定してください。',
+            message: hostText('settings.touchpad-bridge.unconnected'),
           };
         if (!observed?.supported)
           return {
             ...base,
             state: 'unavailable',
-            message: 'このWindows設定の形式には対応していません。',
+            message: hostText('settings.touchpad-bridge.unsupported'),
           };
         if (conflicts.has(key))
           return {
             ...base,
             state: 'conflict',
-            message: 'ショートカットキーの割り当てと接続用キーが重複しています。',
+            message: hostText('settings.touchpad-bridge.shortcutConflict'),
           };
         if (snapshot.gestures.filter((row) => row.key === key).length > 1)
           return {
             ...base,
             state: 'conflict',
-            message: 'Windowsの別のジェスチャーと接続用キーが重複しています。',
+            message: hostText('settings.touchpad-bridge.windowsConflict'),
           };
         if (observed.key !== key)
           return {
             ...base,
             state: 'conflict',
-            actual: observed.key ?? 'Windowsの別の操作',
-            message:
-              'Windowsの設定がAppDockの接続用キーと異なるため、このジェスチャーを停止しています。',
+            actual: observed.key ?? hostText('settings.touchpad-bridge.otherWindowsAction'),
+            message: hostText('settings.touchpad-bridge.changed'),
           };
         inputs.push({
           shortcut: key,
@@ -383,7 +389,11 @@ export class TouchpadBridgeManager {
       );
       this.statuses = this.statuses.map((status) =>
         status.state === 'connected' && !this.active.has(status.key)
-          ? { ...status, state: 'unavailable', message: '接続用キーの入力捕捉を確認できません。' }
+          ? {
+              ...status,
+              state: 'unavailable',
+              message: hostText('settings.touchpad-bridge.captureUnavailable'),
+            }
           : status,
       );
       this.publish();
@@ -452,13 +462,13 @@ export class TouchpadBridgeManager {
     const requested = [...new Set(ids.map(touchpadId))];
     return this.serial(async () => {
       if (this.stopped || !this.value().enabled)
-        throw Error('このPCのタッチパッドジェスチャーを有効にしてください。');
+        throw Error(hostText('settings.touchpad-bridge.enableFirst'));
       const value = this.value();
       if (
         !requested.length ||
         requested.some((id) => !value.bindings.some((row) => row.gesture === id))
       )
-        throw Error('割り当てのあるジェスチャーを選んでください。');
+        throw Error(hostText('settings.touchpad-bridge.assignmentRequired'));
       const expectedSettings = fingerprint(value);
       this.busy = true;
       this.invalidate();
@@ -471,13 +481,13 @@ export class TouchpadBridgeManager {
         this.lease = await this.options.input.touchpadRequest<boolean>('touchpad.lease', {
           enabled: true,
         });
-        if (!this.lease) throw Error('別のAppDockがタッチパッドの接続を使用しています。');
+        if (!this.lease) throw Error(hostText('settings.touchpad-bridge.owned'));
         const keys = new Set(getKeybindings(this.options.settings()).map((row) => row.key));
         const connections = Object.fromEntries(
           requested.map((id) => [id, connectionKey(value.connections[id])]),
         );
         if (Object.values(connections).some((key) => keys.has(key)))
-          throw Error('接続用キーがショートカットキーと重複しています。');
+          throw Error(hostText('settings.touchpad-bridge.keyConflict'));
         const plan = await this.options.input.touchpadRequest<WindowsPlan>('touchpad.plan', {
           connections,
         });
@@ -486,11 +496,9 @@ export class TouchpadBridgeManager {
             ([id, key]) => !plan.before.some((row) => row.gesture === id && row.key === key),
           )
         )
-          throw Error(
-            'Windowsの設定が変更されています。このジェスチャーは、Windowsの設定を再設定する操作で接続してください。',
-          );
+          throw Error(hostText('settings.touchpad-bridge.windowsChanged'));
         if (fingerprint(this.value()) !== expectedSettings)
-          throw Error('接続設定が操作中に変更されました。');
+          throw Error(hostText('settings.touchpad-bridge.changedDuringAction'));
         const operationId = randomUUID();
         this.saveHistory({
           schemaVersion: 1,

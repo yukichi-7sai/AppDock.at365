@@ -1,12 +1,23 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useSettingsControls } from './api';
 import { normalizeShortcut, shortcutFromEvent } from '../../shared/commands';
 import { inputKeysFromEvent, normalizeInputKeys } from '../../shared/input-command';
 const specialGroups = [
-  ['操作', ['Tab', 'Enter', 'Escape', 'Space', 'Backspace', 'Delete', 'Insert', 'Pause', 'Plus']],
-  ['移動', ['Up', 'Down', 'Left', 'Right', 'Home', 'End', 'PageUp', 'PageDown']],
-  ['ファンクション', Array.from({ length: 24 }, (_, i) => `F${i + 1}`)],
+  [
+    hostText('settings.shortcutCaptureField.operation'),
+    ['Tab', 'Enter', 'Escape', 'Space', 'Backspace', 'Delete', 'Insert', 'Pause', 'Plus'],
+  ],
+  [
+    hostText('settings.shortcutCaptureField.navigation'),
+    ['Up', 'Down', 'Left', 'Right', 'Home', 'End', 'PageUp', 'PageDown'],
+  ],
+  [
+    hostText('settings.shortcutCaptureField.function'),
+    Array.from({ length: 24 }, (_, i) => `F${i + 1}`),
+  ],
 ] as const;
 
 export function ShortcutCaptureField({
@@ -14,7 +25,7 @@ export function ShortcutCaptureField({
   onChange,
   recordingReady,
   setError,
-  label = 'ショートカットキー',
+  label = hostText('settings.shortcutCaptureField.key'),
   mode = 'shortcut',
   allowWin = true,
 }: {
@@ -26,6 +37,7 @@ export function ShortcutCaptureField({
   mode?: 'shortcut' | 'send';
   allowWin?: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const controls = useSettingsControls();
   const id = useId();
   const recorder = useRef<HTMLButtonElement>(null);
@@ -96,21 +108,21 @@ export function ShortcutCaptureField({
   return (
     <SettingsField
       title={label}
-      hint="Tabで次の項目へ・Escでキャンセル。これらのキーは特殊キーから選べます。"
+      hint={translate('settings.shortcutCaptureField.keyboardHint')}
       description={
         !recordingReady
-          ? '入力を準備中…'
+          ? translate('settings.shortcutCaptureField.preparing')
           : !focused
-            ? 'クリックして入力'
+            ? translate('settings.shortcutCaptureField.click')
             : mode === 'send' || captureReady
-              ? '押して入力'
-              : '入力を準備中…'
+              ? translate('settings.shortcutCaptureField.press')
+              : translate('settings.shortcutCaptureField.preparing')
       }
     >
       <button
         ref={recorder}
         className="shortcut-capture"
-        aria-label={`${label}を入力`}
+        aria-label={translate('settings.shortcutCaptureField.enter', { label: label })}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onKeyDown={(event) => {
@@ -131,13 +143,13 @@ export function ShortcutCaptureField({
           const key = (mode === 'send' ? inputKeysFromEvent : shortcutFromEvent)(event.nativeEvent);
           if (key && supported(key)) choose(key);
           else if (!['Control', 'Alt', 'Shift', 'Meta'].includes(event.key))
-            setError('このキーは使用できません。特殊キーから選択することもできます。');
+            setError(translate('settings.shortcutCaptureField.invalid'));
         }}
       >
         {value ? (
           value.split('+').map((part, index) => <kbd key={index}>{part}</kbd>)
         ) : (
-          <span>キーの組み合わせを押してください</span>
+          <span>{translate('settings.shortcutCaptureField.recording')}</span>
         )}
       </button>
       <button
@@ -146,11 +158,16 @@ export function ShortcutCaptureField({
         aria-controls={`${id}-special`}
         onClick={() => setSpecial(!special)}
       >
-        特殊キーから選ぶ <span aria-hidden="true">{special ? '−' : '＋'}</span>
+        {translate('settings.shortcutCaptureField.special')}
+        <span aria-hidden="true">{special ? '−' : '＋'}</span>
       </button>
       {special && (
         <div className="shortcut-special-picker" id={`${id}-special`}>
-          <div className="shortcut-modifiers" role="group" aria-label="特殊キーの修飾キー">
+          <div
+            className="shortcut-modifiers"
+            role="group"
+            aria-label={translate('settings.shortcutCaptureField.modifiers')}
+          >
             {['Ctrl', 'Alt', 'Shift', ...(allowWin ? ['Win'] : [])].map((modifier) => (
               <button
                 key={modifier}
@@ -166,11 +183,11 @@ export function ShortcutCaptureField({
                 {modifier}
               </button>
             ))}
-            <small>組み合わせて選択</small>
+            <small>{translate('settings.shortcutCaptureField.combine')}</small>
           </div>
-          <SettingsField title="英数字">
+          <SettingsField title={translate('settings.shortcutCaptureField.alphanumeric')}>
             <select
-              aria-label="英数字のキーを選択"
+              aria-label={translate('settings.shortcutCaptureField.alphanumericLabel')}
               value=""
               onChange={(event) => {
                 if (!event.target.value) return;
@@ -179,7 +196,7 @@ export function ShortcutCaptureField({
                 recorder.current?.focus({ preventScroll: true });
               }}
             >
-              <option value="">キーを選択…</option>
+              <option value="">{translate('settings.shortcutCaptureField.select')}</option>
               {Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789').map((key) => (
                 <option key={key}>{key}</option>
               ))}

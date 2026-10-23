@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { boundedJson, jsonObject, type JsonObject } from './custom-commands';
 
 export interface McpServerEntry {
@@ -69,7 +70,7 @@ export function parseMcpRoster(value: unknown): McpServerRoster {
     value.items.length > 32 ||
     Object.keys(value).some((k) => !['version', 'items'].includes(k))
   )
-    throw Error('MCP接続先名簿はversion 1、32件以内です。');
+    throw Error(hostText('settings.mcp-client.directory'));
   const ids = new Set<string>();
   return {
     version: 1,
@@ -83,7 +84,7 @@ export function parseMcpRoster(value: unknown): McpServerRoster {
         !mcpText(v.description, 1024) ||
         Object.keys(v).some((k) => !['id', 'name', 'description'].includes(k))
       )
-        throw Error('MCP接続先のID・名前・説明を確認してください。');
+        throw Error(hostText('settings.mcp-client.server'));
       ids.add(v.id);
       return { id: v.id, name: v.name.trim(), description: v.description };
     }),
@@ -120,13 +121,13 @@ export function parseMcpConnection(value: unknown): McpConnection {
     !value.publishedTools.every((v) => typeof v === 'string' && /^[\w.-]{1,128}$/.test(v)) ||
     new Set(value.publishedTools).size !== value.publishedTools.length
   )
-    throw Error('MCP接続設定の形式が不正です。');
+    throw Error(hostText('settings.mcp-client.connection'));
   if (value.transport === 'http') {
     let url: URL;
     try {
       url = new URL(value.url);
     } catch {
-      throw Error('MCPのURLを入力してください。');
+      throw Error(hostText('settings.mcp-client.urlRequired'));
     }
     if (
       !['http:', 'https:'].includes(url.protocol) ||
@@ -135,9 +136,9 @@ export function parseMcpConnection(value: unknown): McpConnection {
       url.search ||
       url.hash
     )
-      throw Error('URLはHTTP(S)で、認証情報・クエリ・フラグメントを含められません。');
+      throw Error(hostText('settings.mcp-client.url'));
     if (value.command || value.cwd || value.args.length)
-      throw Error('HTTP接続に実行パスを指定できません。');
+      throw Error(hostText('settings.mcp-client.httpPath'));
     return { ...value, url: url.href } as unknown as McpConnection;
   }
   if (
@@ -147,7 +148,7 @@ export function parseMcpConnection(value: unknown): McpConnection {
     value.url ||
     value.authentication !== 'none'
   )
-    throw Error('stdioは絶対パスのEXE、引数配列と作業フォルダーを指定してください。');
+    throw Error(hostText('settings.mcp-client.stdio'));
   return value as unknown as McpConnection;
 }
 

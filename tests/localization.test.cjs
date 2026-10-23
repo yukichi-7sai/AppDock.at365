@@ -47,6 +47,14 @@ test('interpolation preserves user names, resource-looking strings, and external
   ]) {
     assert.equal(hostText('appearance.shell.active', { name }), `使用先: ${name}`);
     assert.equal(hostText('settings.moved', { name }), `${name}へ移動しました。`);
+    assert.equal(
+      hostText('settings.aiSettings.deleteConfirmation', { name }),
+      `${name}を削除しますか？`,
+    );
+    assert.equal(
+      hostText('settings.notificationSettings.targetLabel', { title: name, target: 'Windows通知' }),
+      `${name}のWindows通知`,
+    );
   }
 });
 
@@ -150,6 +158,33 @@ test('saving Japanese remains PC-local and preserves user commands, groups and s
 test('localized settings views and owned diagnostic modules do not reintroduce inline Japanese', () => {
   const parser = require('prettier/plugins/typescript').parsers.typescript;
   const files = [
+    ...['src/renderer/settings', 'src/renderer/settings-ui'].flatMap((directory) =>
+      fs
+        .readdirSync(directory)
+        .filter((name) => /\.tsx?$/.test(name))
+        .map((name) => `${directory}/${name}`),
+    ),
+    ...[
+      'settings-catalog',
+      'settings-navigation',
+      'settings-schema',
+      'setting-definitions',
+      'setting-sections',
+      'shortcut-pages',
+      'keybindings',
+      'gestures',
+      'touchpad-gestures',
+      'notification-types',
+      'tts',
+      'tray-menu',
+      'applet-pages',
+      'input-command',
+      'command-conditions',
+      'ribbon',
+    ].map((name) => `src/shared/${name}.ts`),
+    ...['ai-settings', 'mcp-client-settings', 'touchpad-bridge'].map(
+      (name) => `src/main/core/${name}.ts`,
+    ),
     'src/renderer/settings/SettingsForm.tsx',
     'src/renderer/settings/AccentColorPicker.tsx',
     'src/renderer/settings/SettingsPage.tsx',
@@ -160,7 +195,7 @@ test('localized settings views and owned diagnostic modules do not reintroduce i
     'src/main/core/windows-launch.ts',
     'src/main/core/shell-provider-registry.ts',
   ];
-  for (const file of files) {
+  for (const file of new Set(files)) {
     const ast = parser.parse(fs.readFileSync(path.resolve(file), 'utf8'), { filepath: file });
     function visit(node) {
       if (!node || typeof node !== 'object') return;

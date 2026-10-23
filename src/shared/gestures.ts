@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { normalizeShortcut, validCommandId } from './commands';
 import { applyBindingOrder } from './binding-order';
 import { keybindingConditionLabel } from './keybindings';
@@ -14,10 +15,10 @@ export { processNames } from './command-conditions';
 import { planCommandBatch } from './command-execution';
 
 export const moveDirections = [
-  ['up', '↑ 上'],
-  ['down', '↓ 下'],
-  ['left', '← 左'],
-  ['right', '→ 右'],
+  ['up', hostText('settings.gestures.up')],
+  ['down', hostText('settings.gestures.down')],
+  ['left', hostText('settings.gestures.left')],
+  ['right', hostText('settings.gestures.right')],
 ] as const;
 export const gestureTypes = [
   ...moveDirections.map(([id, label]) => [`move-${id}`, label] as const),
@@ -29,10 +30,10 @@ export const gestureTypes = [
           [`move-${first}-${second}`, `${firstLabel} → ${secondLabel}`] as const,
       ),
   ),
-  ['click-left', '左クリック'],
-  ['click-middle', '中クリック'],
-  ['wheel-up', 'ホイール上'],
-  ['wheel-down', 'ホイール下'],
+  ['click-left', hostText('settings.gestures.clickLeft')],
+  ['click-middle', hostText('settings.gestures.clickMiddle')],
+  ['wheel-up', hostText('settings.gestures.wheelUp')],
+  ['wheel-down', hostText('settings.gestures.wheelDown')],
 ] as const;
 export type GestureScope = ShortcutScope | 'browser' | 'exe' | 'desktop';
 export interface GestureBinding {
@@ -72,18 +73,25 @@ export function groupGestureBindings(rows: GestureBinding[]) {
     .filter((g) => g.bindings.length);
 }
 export function gestureTitle(gesture: string) {
-  return gestureTypes.find(([id]) => id === gesture)?.[1] ?? `キー: ${gesture.slice(4)}`;
+  return (
+    gestureTypes.find(([id]) => id === gesture)?.[1] ??
+    hostText('settings.gestures.key', { value: gesture.slice(4) })
+  );
 }
 export function gestureConditionLabel(
   when: GestureBinding['when'],
   ownerTitle?: string,
   applets: { id: string; title: string }[] = [],
 ) {
-  if (when.scope === 'browser') return 'Webブラウザ';
-  if (when.scope === 'desktop') return 'デスクトップ';
+  if (when.scope === 'browser') return hostText('settings.gestures.browser');
+  if (when.scope === 'desktop') return hostText('settings.gestures.desktop');
   if (when.scope === 'exe')
-    return when.processes.join(' / ') + (when.excludeDesktop ? '（デスクトップを除外）' : '');
-  if (when.scope === 'global' && when.excludeDesktop) return 'グローバル（デスクトップを除外）';
+    return (
+      when.processes.join(' / ') +
+      (when.excludeDesktop ? hostText('settings.gestures.excludeDesktop') : '')
+    );
+  if (when.scope === 'global' && when.excludeDesktop)
+    return hostText('settings.gestures.globalExcludeDesktop');
   return keybindingConditionLabel(
     { scope: when.scope, appletIds: when.appletIds },
     ownerTitle,
@@ -107,8 +115,8 @@ export function applyGestureBinding(
     original &&
     JSON.stringify(rows.find((item) => item.id === original.id)) !== JSON.stringify(original)
   )
-    throw Error('編集中に割り当てが変更されました。キャンセルして開き直してください。');
-  if (!original && rows.length >= 2000) throw Error('ジェスチャー割り当ては2000件以内です。');
+    throw Error(hostText('settings.gestures.conflict'));
+  if (!original && rows.length >= 2000) throw Error(hostText('settings.gestures.limit'));
   if (original?.gesture === row.gesture)
     return rows.map((item) => (item.id === row.id ? row : item));
   const next = rows.filter((item) => item.id !== row.id);
@@ -147,15 +155,14 @@ export function normalizeGesture(value: unknown): string {
   if (gestureTypes.some(([id]) => id === value)) return value as string;
   if (typeof value === 'string' && value.startsWith('key:')) {
     const key = normalizeShortcut(value.slice(4));
-    if (key.split('+').includes('Win'))
-      throw Error('ジェスチャーではWin修飾キーを使用できません。');
+    if (key.split('+').includes('Win')) throw Error(hostText('settings.gestures.windowsModifier'));
     return 'key:' + key;
   }
-  throw Error('ジェスチャーは移動・左/中クリック・ホイール・キーから選んでください。');
+  throw Error(hostText('settings.gestures.gesture'));
 }
 export function parseGestures(value: unknown): GestureSettings {
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw Error('マウスジェスチャー設定が不正です。');
+    throw Error(hostText('settings.gestures.settings'));
   const v = value as GestureSettings;
   if (
     typeof v.enabled !== 'boolean' ||
@@ -176,7 +183,7 @@ export function parseGestures(value: unknown): GestureSettings {
     !Array.isArray(v.bindings) ||
     v.bindings.length > 2000
   )
-    throw Error('ジェスチャーの距離・間隔・表示・割り当てを確認してください。');
+    throw Error(hostText('settings.gestures.options'));
   const bindings = parseGestureBindings(v.bindings);
   return {
     ...v,
@@ -278,7 +285,7 @@ export function parseGestureBindings(
   normalize: (value: unknown) => string = normalizeGesture,
 ): GestureBinding[] {
   if (!Array.isArray(value) || value.length > 2000)
-    throw Error('ジェスチャー割り当ては2000件以内です。');
+    throw Error(hostText('settings.gestures.limit'));
   const rows = value as GestureBinding[];
   const ids = new Set<string>();
   return rows.map((r) => {
@@ -299,17 +306,17 @@ export function parseGestureBindings(
       r.when.appletIds.some((id) => !validShortcutTarget(id)) ||
       (r.when.scope === 'applets' ? !r.when.appletIds.length : !!r.when.appletIds.length)
     )
-      throw Error('ジェスチャー割り当てのID・コマンド・条件を確認してください。');
+      throw Error(hostText('settings.gestures.binding'));
     ids.add(r.id);
     const processes = processNames(r.when.processes);
     if (r.when.scope === 'exe' ? !processes.length : !!processes.length)
-      throw Error('指定したexe条件にはexe名が必要です。');
+      throw Error(hostText('settings.gestures.processes'));
     if (
       Object.keys(r.when).some(
         (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
       )
     )
-      throw Error('未知のジェスチャー条件です。');
+      throw Error(hostText('settings.gestures.scope'));
     return {
       id: r.id,
       command: r.command,

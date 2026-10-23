@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useState } from 'react';
 import { SettingsField } from './SettingsSections';
 import { normalizeShortcut } from '../../shared/commands';
@@ -30,6 +31,7 @@ export function AppletShortcutDialog({
   onApply(row: Keybinding): void;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [value, setValue] = useState(() => structuredClone(initial));
   const draft = useConditionProcesses(value.when);
   const protectedKey =
@@ -44,8 +46,8 @@ export function AppletShortcutDialog({
       title={title}
       adding={adding}
       valid={valid}
-      error={protectedKey ? 'Windowsが保護するキーのため割り当てられません。' : undefined}
-      errorTarget="ショートカットキー"
+      error={protectedKey ? translate('settings.appletShortcutDialog.protectedKey') : undefined}
+      errorTarget={translate('settings.appletShortcutDialog.key')}
       onApply={() =>
         onApply({
           ...value,
@@ -67,10 +69,10 @@ export function AppletShortcutDialog({
             setError={setError}
           />
           <SettingsField
-            title="いつ・どこで"
+            title={translate('settings.appletShortcutDialog.scope')}
             hint={
               value.when.scope === 'browser'
-                ? '画面上部の「動作設定」で指定したブラウザに適用します。'
+                ? translate('settings.appletShortcutDialog.browserHint')
                 : undefined
             }
           >
@@ -94,7 +96,7 @@ export function AppletShortcutDialog({
                   },
                 })
               }
-              label="割り当てのいつ・どこで"
+              label={translate('settings.appletShortcutDialog.scopeLabel')}
               ownerTitle={ownerTitle}
               applets={applets}
               onChange={(when) => {
@@ -118,24 +120,24 @@ export function AppletShortcutDialog({
             {...draft}
           />
           <SettingsField
-            title="元のキー入力をブロックする"
+            title={translate('settings.appletShortcutDialog.blockOriginal')}
             hint={
               externalShortcutScope(value.when.scope)
-                ? '条件が一致した場合に使います。OFFにすると、入力をWindowsやほかのアプリにも渡します。'
-                : 'グローバル・デスクトップ・Webブラウザ・指定したexeの割り当てで使用します。'
+                ? translate('settings.appletShortcutDialog.blockHint')
+                : translate('settings.appletShortcutDialog.blockScopes')
             }
           >
             <Toggle
               checked={value.blockOriginalInput !== false}
               disabled={!externalShortcutScope(value.when.scope)}
-              label="元のキー入力をブロックする"
+              label={translate('settings.appletShortcutDialog.blockOriginal')}
               onChange={(blockOriginalInput) => setValue({ ...value, blockOriginalInput })}
             />
           </SettingsField>
-          <SettingsField title="この割り当てを有効にする">
+          <SettingsField title={translate('settings.appletShortcutDialog.enabled')}>
             <Toggle
               checked={value.enabled}
-              label="この割り当てを有効にする"
+              label={translate('settings.appletShortcutDialog.enabled')}
               onChange={(enabled) => setValue({ ...value, enabled })}
             />
           </SettingsField>

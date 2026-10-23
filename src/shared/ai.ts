@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 export interface AiConnectionSettings {
   id: string;
   name: string;
@@ -68,25 +69,22 @@ export const aiString = (v: unknown, max: number): v is string =>
   Array.from(v).length <= max &&
   !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
 const keys = (v: Record<string, unknown>, names: string[]) => {
-  if (Object.keys(v).some((k) => !names.includes(k)))
-    throw Error('AI設定に未対応の項目があります。APIキーは専用欄で設定してください。');
+  if (Object.keys(v).some((k) => !names.includes(k))) throw Error(hostText('settings.ai.fields'));
 };
 export function aiBaseUrl(value: string): string {
   if (!value) return '';
   if (value.length > 2048 || /[\\\s?#]/.test(value))
-    throw Error('AIのURLは認証情報・クエリー・フラグメントを含まないHTTP(S) URLにしてください。');
+    throw Error(hostText('settings.ai.urlCredentials'));
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    throw Error('AIのURLが不正です。');
+    throw Error(hostText('settings.ai.urlInvalid'));
   }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
-    throw Error('AIのURLはHTTP(S) URLにしてください。');
-  if (/\/api\/?$/.test(url.pathname))
-    throw Error('Ollamaの互換APIには /api ではなく /v1 を指定してください。');
-  if (/\/chat\/completions\/?$/.test(url.pathname))
-    throw Error('生成パスを除いたベースURLを指定してください。');
+    throw Error(hostText('settings.ai.urlProtocol'));
+  if (/\/api\/?$/.test(url.pathname)) throw Error(hostText('settings.ai.ollamaUrl'));
+  if (/\/chat\/completions\/?$/.test(url.pathname)) throw Error(hostText('settings.ai.baseUrl'));
   return url.href.replace(/\/+$/, '');
 }
 export function newAiConnection(
@@ -95,7 +93,7 @@ export function newAiConnection(
 ): AiConnectionSettings {
   return {
     id,
-    name: '新しい接続',
+    name: hostText('settings.ai.newConnection'),
     protocol: 'openai-chat-completions',
     preset,
     baseUrl: preset === 'openai' ? 'https://api.openai.com/v1' : '',
@@ -111,7 +109,7 @@ export function newAiConnection(
 }
 export function parseAiSettings(value: unknown): AiSettings {
   if (value === undefined) return defaultAiSettings();
-  if (!aiObject(value)) throw Error('aiはオブジェクトです。');
+  if (!aiObject(value)) throw Error(hostText('settings.ai.object'));
   keys(value, ['commonPrompt', 'defaultConnectionId', 'connections']);
   if (
     !aiString(value.commonPrompt ?? '', 2048) ||
@@ -119,10 +117,10 @@ export function parseAiSettings(value: unknown): AiSettings {
     !Array.isArray(value.connections) ||
     value.connections.length > 8
   )
-    throw Error('共通プロンプトは2048文字、接続は8件以下です。');
+    throw Error(hostText('settings.ai.limit'));
   const ids = new Set<string>();
   const connections = value.connections.map((item) => {
-    if (!aiObject(item)) throw Error('AI接続設定が不正です。');
+    if (!aiObject(item)) throw Error(hostText('settings.ai.connection'));
     keys(item, [
       'id',
       'name',
@@ -147,7 +145,7 @@ export function parseAiSettings(value: unknown): AiSettings {
       !['none', 'bearer'].includes(String(item.authentication)) ||
       !aiObject(item.compatibility)
     )
-      throw Error('AI接続のID・名前・モデル・認証方式を確認してください。');
+      throw Error(hostText('settings.ai.identity'));
     ids.add(item.id);
     const defaultMaxOutputTokens =
       item.defaultMaxOutputTokens === undefined
@@ -157,15 +155,14 @@ export function parseAiSettings(value: unknown): AiSettings {
       item.defaultTimeoutSeconds === undefined
         ? aiTimeoutLimits.defaultSeconds
         : item.defaultTimeoutSeconds;
-    if (!aiTokenLimit(defaultMaxOutputTokens))
-      throw Error('既定の出力トークン上限は32〜131,072の整数で指定してください。');
+    if (!aiTokenLimit(defaultMaxOutputTokens)) throw Error(hostText('settings.ai.maxTokens'));
     if (
       typeof defaultTimeoutSeconds !== 'number' ||
       !Number.isInteger(defaultTimeoutSeconds) ||
       defaultTimeoutSeconds < aiTimeoutLimits.minimumSeconds ||
       defaultTimeoutSeconds > aiTimeoutLimits.maximumSeconds
     )
-      throw Error('既定の待ち時間は1〜600秒の整数で指定してください。');
+      throw Error(hostText('settings.ai.timeout'));
     const c = item.compatibility;
     keys(c, ['tokenLimitField', 'temperature', 'reasoningEffort', 'store']);
     if (
@@ -179,10 +176,10 @@ export function parseAiSettings(value: unknown): AiSettings {
       (c.reasoningEffort !== undefined &&
         (typeof c.reasoningEffort !== 'string' || !/^[a-z0-9_-]{1,32}$/.test(c.reasoningEffort)))
     )
-      throw Error('AIの互換性設定を確認してください。');
+      throw Error(hostText('settings.ai.compatibility'));
     const baseUrl = aiBaseUrl(item.baseUrl);
     if (item.preset === 'openai' && baseUrl && !baseUrl.startsWith('https://'))
-      throw Error('OpenAIの接続にはHTTPSを使用してください。');
+      throw Error(hostText('settings.ai.https'));
     return {
       ...item,
       baseUrl,

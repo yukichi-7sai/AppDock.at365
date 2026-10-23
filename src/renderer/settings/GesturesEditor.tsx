@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import {
   defaultTouchpadGestures,
   touchpadTitle,
@@ -43,6 +44,7 @@ export function GesturesEditor({
   provider?: { id: string; title: string; request: number };
   clearProvider?(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const touchpadValue = settings.touchpadGestures ?? defaultTouchpadGestures();
   const gestures = touchpad
     ? touchpadAsGestureSettings(touchpadValue)
@@ -74,7 +76,7 @@ export function GesturesEditor({
       known.set(row.command, {
         id: row.command,
         title: row.command,
-        extension: '未確認のコマンド',
+        extension: translate('settings.gesturesEditor.unknownCommand'),
         available: false,
       });
   const catalog = [...known.values()].filter(
@@ -114,21 +116,28 @@ export function GesturesEditor({
         <GestureOptions gestures={gestures} change={change} />
       )}
       <CommandListSection
-        title={touchpad ? 'タッチパッドジェスチャー割り当て' : 'マウスジェスチャー割り当て'}
+        title={
+          touchpad
+            ? translate('settings.gesturesEditor.touchpadBindings')
+            : translate('settings.gesturesEditor.mouseBindings')
+        }
         description={[
-          !gestures.enabled ? '現在、ジェスチャーは無効です。割り当てはそのまま編集できます。' : '',
-          bindings.length >= 2000
-            ? '割り当ては2000件までです。追加するには既存の割り当てを削除してください。'
-            : '',
+          !gestures.enabled ? translate('settings.gesturesEditor.disabled') : '',
+          bindings.length >= 2000 ? translate('settings.gesturesEditor.limit') : '',
         ]
           .filter(Boolean)
           .join(' ')}
         className="gestures-editor command-shortcuts"
         {...settingAnchor(page, touchpad ? 'bindings' : 'gestures')}
-        aria-label={touchpad ? 'タッチパッドジェスチャー設定' : 'マウスジェスチャー設定'}
+        aria-label={
+          touchpad
+            ? translate('settings.gesturesEditor.touchpadSettings')
+            : translate('settings.gesturesEditor.mouseSettings')
+        }
       >
         <CommandBindingToolbar
-          inputName="ジェスチャー"
+          inputKind="gesture"
+          inputName={translate('settings.gesturesEditor.inputName')}
           count={catalog.length}
           visibleCount={visible.length}
           filter={filter}
@@ -151,7 +160,7 @@ export function GesturesEditor({
           showProvider
           selectedInput={inputFilter?.key}
           onInputFilter={selectInput}
-          inputName="ジェスチャー"
+          inputName={translate('settings.gesturesEditor.inputName')}
           inputKey={(row) => row.gesture}
           inputLabel={(row) => label(row.gesture)}
           conditionLabel={conditionLabel}

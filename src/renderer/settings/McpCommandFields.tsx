@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useRef, useState } from 'react';
 import type { McpServerEntry, McpToolDescriptor } from '../../shared/mcp-client';
@@ -15,6 +16,7 @@ export function McpCommandFields({
   onValidity(valid: boolean): void;
   invoke(name: string, args?: unknown[]): Promise<any>;
 }) {
+  const { t: translate } = useHostTranslation();
   const [servers, setServers] = useState<McpServerEntry[]>([]);
   const [tools, setTools] = useState<Partial<McpToolDescriptor>[]>([]);
   const [cursor, setCursor] = useState<string>();
@@ -70,16 +72,16 @@ export function McpCommandFields({
     });
   useSettingsFeedback({
     busy: pending,
-    message: pending ? 'ツールを確認しています…' : '',
+    message: pending ? translate('settings.mcpCommandFields.loading') : '',
     error: [tool && tool.unsupportedReason ? tool.unsupportedReason : '', error ? error : '']
       .filter(Boolean)
       .join('\n'),
   });
   return (
     <>
-      <SettingsField title="MCP接続先">
+      <SettingsField title={translate('settings.mcpCommandFields.server')}>
         <select
-          aria-label="MCP接続先"
+          aria-label={translate('settings.mcpCommandFields.server')}
           value={serverId}
           disabled={pending}
           onChange={(e) => {
@@ -91,9 +93,12 @@ export function McpCommandFields({
             onChange({ ...config, serverId: e.target.value, toolName: '', toolRevision: '' });
           }}
         >
-          <option value="">選択してください</option>
+          <option value="">{translate('settings.mcpCommandFields.select')}</option>
           {serverId && !servers.some((s) => s.id === serverId) && (
-            <option value={serverId}>{serverId}（未登録）</option>
+            <option value={serverId}>
+              {serverId}
+              {translate('settings.mcpCommandFields.unregistered')}
+            </option>
           )}
           {servers.map((s) => (
             <option key={s.id} value={s.id}>
@@ -102,35 +107,38 @@ export function McpCommandFields({
           ))}
         </select>
         <button type="button" disabled={!serverId || pending} onClick={() => void fetchTools()}>
-          ツールを取得
+          {translate('settings.mcpCommandFields.fetch')}
         </button>
         {cursor && (
           <button type="button" disabled={pending} onClick={() => void fetchTools(cursor)}>
-            続きを取得
+            {translate('settings.mcpCommandFields.more')}
           </button>
         )}
       </SettingsField>
       <SettingsField
-        title="MCPツール"
+        title={translate('settings.mcpCommandFields.tool')}
         description={tool?.description}
-        hint="詳細を再取得すると、現在のツール仕様を選び直します。引数を確認してから保存してください。"
+        hint={translate('settings.mcpCommandFields.schemaHint')}
       >
         <select
-          aria-label="MCPツール"
+          aria-label={translate('settings.mcpCommandFields.tool')}
           value={name}
           disabled={!tools.length || pending}
           onChange={(e) => {
             if (e.target.value) void selectTool(e.target.value);
           }}
         >
-          <option value="">選択してください</option>
+          <option value="">{translate('settings.mcpCommandFields.select')}</option>
           {name && !tools.some((t) => t.name === name) && (
-            <option value={name}>{name}（保存値）</option>
+            <option value={name}>
+              {name}
+              {translate('settings.mcpCommandFields.saved')}
+            </option>
           )}
           {tools.map((t) => (
             <option key={t.name} value={t.name}>
               {t.title ?? t.name}
-              {t.unsupportedReason ? '（未対応）' : ''}
+              {t.unsupportedReason ? translate('settings.mcpCommandFields.unsupported') : ''}
             </option>
           ))}
         </select>
@@ -140,21 +148,24 @@ export function McpCommandFields({
             disabled={pending || !serverId}
             onClick={() => void selectTool(name)}
           >
-            詳細を再取得
+            {translate('settings.mcpCommandFields.refresh')}
           </button>
         )}
       </SettingsField>
       {tool && (
         <>
           <details>
-            <summary>ツールの引数Schema</summary>
+            <summary>{translate('settings.mcpCommandFields.schema')}</summary>
             <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
           </details>
         </>
       )}
-      <SettingsField error={argsError ? argsError : ''} title="固定引数（JSON）">
+      <SettingsField
+        error={argsError ? argsError : ''}
+        title={translate('settings.mcpCommandFields.args')}
+      >
         <SettingsTextarea
-          aria-label="固定引数（JSON）"
+          aria-label={translate('settings.mcpCommandFields.args')}
           disabled={pending}
           rows={7}
           value={args}
@@ -167,15 +178,15 @@ export function McpCommandFields({
               setArgsError('');
               onValidity(true);
             } catch {
-              setArgsError('引数はJSONオブジェクトで入力してください。');
+              setArgsError(translate('settings.mcpCommandFields.argsObject'));
               onValidity(false);
             }
           }}
         />
       </SettingsField>
-      <SettingsField title="待ち時間（ミリ秒）">
+      <SettingsField title={translate('settings.mcpCommandFields.timeout')}>
         <SettingsInput
-          aria-label="待ち時間（ミリ秒）"
+          aria-label={translate('settings.mcpCommandFields.timeout')}
           disabled={pending}
           type="number"
           min={1000}

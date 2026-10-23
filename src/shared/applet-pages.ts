@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { ExtensionManifest, ExtensionSnapshot, Settings } from './contracts';
 import { validCommandId } from './commands';
 import { imageReference, type RegisteredImageRef } from './registered-images';
@@ -35,11 +36,11 @@ export interface RibbonItem {
   pageId?: string;
 }
 export const builtinRibbon: RibbonItem[] = [
-  { id: 'image-library', title: '画像ライブラリー', icon: 'image' },
-  { id: 'settings', title: '設定', icon: 'settings' },
-  { id: 'logs', title: 'ログ', icon: 'logs' },
-  { id: 'notifications', title: '通知センター', icon: 'bell' },
-  { id: 'theme', title: 'テーマを切り替え', icon: 'sun' },
+  { id: 'image-library', title: hostText('settings.applet-pages.images'), icon: 'image' },
+  { id: 'settings', title: hostText('settings.applet-pages.settings'), icon: 'settings' },
+  { id: 'logs', title: hostText('settings.applet-pages.logs'), icon: 'logs' },
+  { id: 'notifications', title: hostText('settings.applet-pages.notifications'), icon: 'bell' },
+  { id: 'theme', title: hostText('settings.applet-pages.theme'), icon: 'sun' },
 ];
 export const pageKey = (extensionId: string, pageId: string) => `page:${extensionId}:${pageId}`;
 export const validPageId = (id: unknown): id is string =>
@@ -77,7 +78,7 @@ export function parseAppletPages(manifest: ExtensionManifest): AppletPageDefinit
   const pages = manifest.pages;
   if (pages === undefined) return [];
   if (!Array.isArray(pages) || pages.length > 10 || !manifest.capabilities?.includes('pages'))
-    throw Error('ページは10件以下の配列とpages capabilityが必要です。');
+    throw Error(hostText('settings.applet-pages.pageLimit'));
   const ids = new Set<string>();
   let web = false;
   return pages.map((page) => {
@@ -97,12 +98,12 @@ export function parseAppletPages(manifest: ExtensionManifest): AppletPageDefinit
         (command) => command.id === page.openCommand && command.activateOnExecute,
       )
     )
-      throw Error('ページのID・名前・アイコン・表示方法・起動コマンドを確認してください。');
+      throw Error(hostText('settings.applet-pages.pageDefinition'));
     if (
       page.source === 'local' &&
       (typeof page.ui !== 'string' || !page.ui || !/\.html$/i.test(page.ui))
     )
-      throw Error('ローカルページにはApplet内のHTMLファイルが必要です。');
+      throw Error(hostText('settings.applet-pages.html'));
     if (page.source === 'web-accounts') {
       if (
         web ||
@@ -110,7 +111,7 @@ export function parseAppletPages(manifest: ExtensionManifest): AppletPageDefinit
         !manifest.capabilities?.includes('web-accounts') ||
         page.ui !== undefined
       )
-        throw Error('Webアカウントのページは1つだけ宣言できます。');
+        throw Error(hostText('settings.applet-pages.webAccountPage'));
       web = true;
     }
     ids.add(page.id);
@@ -149,13 +150,13 @@ export function ribbonItems(
     ...builtinRibbon.filter((item) => item.id === 'theme'),
     ...separators.map((id): RibbonItem => ({
       id,
-      title: '区切り線',
+      title: hostText('settings.applet-pages.separator'),
       icon: '',
       kind: 'separator',
     })),
     ...groups.map((group): RibbonItem => ({
       id: group.id,
-      title: group.title || 'グループ',
+      title: group.title || hostText('settings.applet-pages.group'),
       icon: group.icon,
       kind: 'group',
       group,
@@ -227,19 +228,19 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       );
     })
   )
-    throw Error('ribbon.order / hidden / bottom / separators は重複のないリボンIDの配列です。');
+    throw Error(hostText('settings.applet-pages.ribbonIds'));
   for (const key of ['order', 'hidden', 'bottom'])
     if (
       (ribbon[key] as string[]).some(
         (id) => validSeparatorId(id) && !(ribbon.separators as string[]).includes(id),
       )
     )
-      throw Error('セパレーターを使うにはribbon.separatorsへ登録してください。');
+      throw Error(hostText('settings.applet-pages.separatorRequired'));
   if (!Array.isArray(ribbon.groups) || ribbon.groups.length > 50)
-    throw Error('リボングループは50件以下で指定してください。');
+    throw Error(hostText('settings.applet-pages.groupLimit'));
   const groups = ribbon.groups as RibbonGroup[];
   if (!Array.isArray(ribbon.buttons) || ribbon.buttons.length > 100)
-    throw Error('コマンドボタンは100件以下で指定してください。');
+    throw Error(hostText('settings.applet-pages.buttonLimit'));
   const buttonIds = new Set<string>();
   ribbon.buttons = (ribbon.buttons as RibbonCommandButton[]).map((button) => {
     if (
@@ -258,18 +259,18 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       !validCommandId(button.commandId) ||
       (button.iconOnly !== undefined && typeof button.iconOnly !== 'boolean')
     )
-      throw Error('コマンドボタンのID・名前・アイコン・コマンドを確認してください。');
+      throw Error(hostText('settings.applet-pages.button'));
     buttonIds.add(button.id);
     return { ...button, title: button.title.trim() };
   });
   if (ribbon.rightClickCommand !== undefined && !validCommandId(ribbon.rightClickCommand))
-    throw Error('右クリックのコマンドIDを確認してください。');
+    throw Error(hostText('settings.applet-pages.rightClick'));
   const missingButton = (id: string) => validRibbonButtonId(id) && !buttonIds.has(id);
   if (
     ['order', 'hidden', 'bottom'].some((k) => (ribbon[k] as string[]).some(missingButton)) ||
     groups.some((g) => object(g) && Array.isArray(g.children) && g.children.some(missingButton))
   )
-    throw Error('コマンドボタンを使うにはribbon.buttonsへ登録してください。');
+    throw Error(hostText('settings.applet-pages.buttonRequired'));
   const groupIds = new Set<string>();
   const children = new Set<string>();
   for (const g of groups) {
@@ -301,7 +302,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       ) ||
       new Set(g.children).size !== g.children.length
     )
-      throw Error('グループのID・名前・アイコン・展開方法・子の所属を確認してください。');
+      throw Error(hostText('settings.applet-pages.groupDefinition'));
     groupIds.add(g.id);
     for (const id of g.children) children.add(id);
   }
@@ -316,7 +317,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
     ) ||
     order.filter((id) => !validGroupId(id)).length + children.size > 500
   )
-    throw Error('グループの子は1つの所属先だけに置き、グループをトップレベルへ配置してください。');
+    throw Error(hostText('settings.applet-pages.groupChildren'));
   ribbon.groups = groups.map((g) => ({
     ...g,
     title: g.title.trim(),
@@ -325,7 +326,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
   }));
   if (ribbon.separatorTitles !== undefined) {
     if (!object(ribbon.separatorTitles) || Object.keys(ribbon.separatorTitles).length > 50)
-      throw Error('セパレーター名は50件以下で指定してください。');
+      throw Error(hostText('settings.applet-pages.separatorLimit'));
     const titles: Record<string, string> = {};
     for (const [id, title] of Object.entries(ribbon.separatorTitles)) {
       if (
@@ -334,13 +335,13 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
         title.trim().length > 80 ||
         /[\x00-\x1f\x7f]/.test(title)
       )
-        throw Error('セパレーターのIDと80文字以内の名前を確認してください。');
+        throw Error(hostText('settings.applet-pages.separatorName'));
       if (title.trim()) titles[id] = title.trim();
     }
     ribbon.separatorTitles = titles;
   }
   if (!object(ribbon.itemOverrides) || Object.keys(ribbon.itemOverrides).length > 500)
-    throw Error('リボンの表示設定は500件以下のオブジェクトです。');
+    throw Error(hostText('settings.applet-pages.displayLimit'));
   const overrides: Record<string, RibbonItemOverride> = {};
   for (const [id, value] of Object.entries(ribbon.itemOverrides)) {
     if (
@@ -363,7 +364,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       ) ||
       (value.iconOnly !== undefined && typeof value.iconOnly !== 'boolean')
     )
-      throw Error('リボンのボタン名・アイコンのみ表示を確認してください。');
+      throw Error(hostText('settings.applet-pages.displayName'));
     const title = (value.title as string | undefined)?.trim();
     const lastKnownTitle = (value.lastKnownTitle as string | undefined)?.trim();
     if (

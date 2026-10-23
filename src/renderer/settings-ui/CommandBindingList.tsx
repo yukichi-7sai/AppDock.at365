@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ListIcon } from './SettingsListTable';
 import { useSettingsFeedback } from './SettingsStatus';
@@ -47,6 +48,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   renderEditor(edit: BindingEdit<R>, apply: (row: R) => void, close: () => void): ReactNode;
   renderOrder(row: R, close: () => void): ReactNode;
 }) {
+  const { t: translate } = useHostTranslation();
   const [orderKey, setOrderKey] = useState<R | null>(null);
   const navigation = useContext(CommandSettingsNavigation);
   const [editing, setEditing] = useState<BindingEdit<R> | null>(null);
@@ -67,7 +69,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
     error: registrationErrors.join('\n'),
     message: notice,
     onRetry,
-    retryLabel: '入力を再試行',
+    retryLabel: translate('settings.commandBindingList.retry'),
   });
   const root = useRef<HTMLDivElement>(null);
   useCommandListScroll(root);
@@ -121,17 +123,30 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   const apply = (row: R) => {
     if (!editing) return;
     applyBinding(row, editing.adding ? undefined : editing.row);
-    setNotice(`${editing.title}の割り当てを${editing.adding ? '追加' : '変更'}しました。`);
+    setNotice(
+      translate(
+        editing.adding
+          ? 'settings.commandBindingList.added'
+          : 'settings.commandBindingList.updated',
+        { title: editing.title },
+      ),
+    );
     setEditing(null);
   };
   const table = (items: typeof commands) => (
     <table className="applet-shortcut-overview command-binding-table">
       <thead>
         <tr>
-          <th>コマンド</th>
-          <th>割り当て</th>
-          <th className="binding-actions-heading">操作</th>
-          {navigation && <th className="command-settings-heading">移動</th>}
+          <th>{translate('settings.commandBindingList.command')}</th>
+          <th>{translate('settings.commandBindingList.binding')}</th>
+          <th className="binding-actions-heading">
+            {translate('settings.commandBindingList.actions')}
+          </th>
+          {navigation && (
+            <th className="command-settings-heading">
+              {translate('settings.commandBindingList.navigation')}
+            </th>
+          )}
         </tr>
       </thead>
       {items.map((command) => {
@@ -151,8 +166,10 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                         </strong>
                         <button
                           className="applet-shortcut-add"
-                          aria-label={`${command.title}に割り当てを追加`}
-                          title="割り当てを追加"
+                          aria-label={translate('settings.commandBindingList.addForCommand', {
+                            title: command.title,
+                          })}
+                          title={translate('settings.commandBindingList.addBinding')}
                           onClick={() => open(command)}
                         >
                           ＋
@@ -163,10 +180,14 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                       {showProvider && (
                         <small className="shortcut-provider">
                           {command.extension}
-                          {command.hidden ? ' · 互換コマンド' : ''}
+                          {command.hidden
+                            ? translate('settings.commandBindingList.compatibility')
+                            : ''}
                         </small>
                       )}
-                      {!command.available && <small>現在利用できません</small>}
+                      {!command.available && (
+                        <small>{translate('settings.commandBindingList.unavailable')}</small>
+                      )}
                     </td>
                   )}
                   <td className="binding-value-cell">
@@ -176,12 +197,21 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                           <button
                             type="button"
                             className={`binding-input-filter${multiple ? ' has-multiple-commands' : ''}`}
-                            aria-label={`${inputLabel(row)}を割り当てたコマンドで絞り込む`}
-                            title={`${inputLabel(row)}で絞り込む${multiple ? '（複数のコマンド）' : ''}`}
+                            aria-label={translate('settings.commandBindingList.filterInput', {
+                              value: inputLabel(row),
+                            })}
+                            title={translate('settings.commandBindingList.filterMultiple', {
+                              value: inputLabel(row),
+                              value2: multiple
+                                ? translate('settings.commandBindingList.multiple')
+                                : '',
+                            })}
                             aria-pressed={selectedInput === inputKey(row)}
                             aria-description={
                               multiple
-                                ? `この${inputName}に複数のコマンドが割り当てられています。`
+                                ? translate('settings.commandBindingList.multipleHint', {
+                                    inputName: inputName,
+                                  })
                                 : undefined
                             }
                             data-multiple-commands={multiple}
@@ -198,11 +228,15 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                           <kbd>{inputLabel(row)}</kbd>
                         )}
                         <span>{conditionLabel(row, command)}</span>
-                        {!row.enabled && <small>無効</small>}
+                        {!row.enabled && (
+                          <small>{translate('settings.commandBindingList.disabled')}</small>
+                        )}
                         {readOnly?.(row) && <small>{readOnly(row)}</small>}
                       </div>
                     ) : (
-                      <span className="muted">未割り当て</span>
+                      <span className="muted">
+                        {translate('settings.commandBindingList.unassigned')}
+                      </span>
                     )}
                   </td>
                   <td className="binding-actions-cell">
@@ -210,13 +244,19 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                       <div
                         className="binding-row-actions"
                         role="group"
-                        aria-label={`${command.title}の${inputLabel(row)}の操作`}
+                        aria-label={translate('settings.commandBindingList.actionsForInput', {
+                          title: command.title,
+                          value: inputLabel(row),
+                        })}
                       >
                         <button
                           type="button"
                           className="settings-list-icon applet-shortcut-edit"
-                          title="編集"
-                          aria-label={`${command.title}の${inputLabel(row)}を編集`}
+                          title={translate('settings.commandBindingList.edit')}
+                          aria-label={translate('settings.commandBindingList.editInput', {
+                            title: command.title,
+                            value: inputLabel(row),
+                          })}
                           onClick={() => open(command, row)}
                         >
                           <ListIcon kind="pencil" />
@@ -224,11 +264,21 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                         <button
                           type="button"
                           className={`settings-list-icon binding-order${multiple ? ' accent-action' : ''}`}
-                          title={`この${inputName}の実行順${multiple ? '（複数のコマンド）' : ''}`}
-                          aria-label={`${command.title}の${inputLabel(row)}の実行順`}
+                          title={translate('settings.commandBindingList.inputOrder', {
+                            inputName: inputName,
+                            value: multiple
+                              ? translate('settings.commandBindingList.multiple')
+                              : '',
+                          })}
+                          aria-label={translate('settings.commandBindingList.executionOrder', {
+                            title: command.title,
+                            value: inputLabel(row),
+                          })}
                           aria-description={
                             multiple
-                              ? `この${inputName}に複数のコマンドが割り当てられています。`
+                              ? translate('settings.commandBindingList.multipleHint', {
+                                  inputName: inputName,
+                                })
                               : undefined
                           }
                           data-multiple-commands={multiple}
@@ -242,8 +292,11 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                         <button
                           type="button"
                           className="settings-list-icon settings-list-delete binding-delete"
-                          title="削除"
-                          aria-label={`${command.title}の${inputLabel(row)}の割り当てを削除`}
+                          title={translate('settings.commandBindingList.delete')}
+                          aria-label={translate('settings.commandBindingList.deleteBinding', {
+                            title: command.title,
+                            value: inputLabel(row),
+                          })}
                           onClick={() => {
                             rememberPosition(
                               root.current?.querySelector<HTMLButtonElement>(
@@ -251,7 +304,11 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                               ),
                             );
                             deleteBinding(row);
-                            setNotice(`${command.title}の割り当てを削除しました。`);
+                            setNotice(
+                              translate('settings.commandBindingList.deleted', {
+                                title: command.title,
+                              }),
+                            );
                           }}
                         >
                           <ListIcon kind="delete" />
@@ -274,7 +331,11 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   );
   return (
     <div className="shortcut-command-list" ref={root} tabIndex={-1}>
-      {commands.length ? table(commands) : <p className="muted">表示するコマンドはありません。</p>}
+      {commands.length ? (
+        table(commands)
+      ) : (
+        <p className="muted">{translate('settings.commandBindingList.empty')}</p>
+      )}
       {orderKey !== null && renderOrder(orderKey, () => setOrderKey(null))}
       {editing && renderEditor(editing, apply, () => setEditing(null))}
     </div>

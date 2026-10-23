@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from '../settings-ui/SettingsSections';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -21,6 +22,7 @@ function AccountRow({
   remove(): void;
   clear(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [name, setName] = useState(account.name);
   const savedName = useRef(account.name);
   const pending = useRef<{ value: string; sequence: number } | null>(null);
@@ -55,7 +57,7 @@ function AccountRow({
       <div className="web-account-row">
         <SettingsInput
           commitOn="input"
-          aria-label={`アカウント名 ${account.name}`}
+          aria-label={translate('settings.webAccountSettings.nameLabel', { name: account.name })}
           maxLength={80}
           value={name}
           disabled={busy}
@@ -92,17 +94,19 @@ function AccountRow({
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => void commit()}
         >
-          名前を変更
+          {translate('settings.webAccountSettings.rename')}
         </button>
         <button className="secondary" disabled={busy} onClick={clear}>
-          ログイン情報をクリア
+          {translate('settings.webAccountSettings.clear')}
         </button>
         <button className="text-button danger" disabled={busy || users.length > 0} onClick={remove}>
-          枠を削除
+          {translate('settings.webAccountSettings.delete')}
         </button>
       </div>
       <p className="muted">
-        {users.length ? `使用中：${users.join('、')}` : 'この枠を使うWebAppletはありません。'}
+        {users.length
+          ? translate('settings.webAccountSettings.usedBy', { value: users.join('、') })
+          : translate('settings.webAccountSettings.unused')}
       </p>
     </div>
   );
@@ -115,6 +119,7 @@ export function WebAccountSettings({
   accounts: WebProfile[];
   savedItems: Pick<WebApplet, 'id' | 'name' | 'accountId'>[];
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -132,10 +137,12 @@ export function WebAccountSettings({
       setError('');
       try {
         const result = await work();
-        if (result === false) setMessage('操作をキャンセルしました。');
+        if (result === false) setMessage(translate('settings.webAccountSettings.canceled'));
         return result !== false;
       } catch (error) {
-        setError(error instanceof Error ? error.message : '操作に失敗しました。');
+        setError(
+          error instanceof Error ? error.message : translate('settings.webAccountSettings.failed'),
+        );
         return false;
       } finally {
         if (lock) {
@@ -147,14 +154,19 @@ export function WebAccountSettings({
     queue.current = task;
     return task;
   }
-  useSettingsFeedback({ error, message, busy, target: 'Webアカウント' });
+  useSettingsFeedback({
+    error,
+    message,
+    busy,
+    target: translate('settings.webAccountSettings.title'),
+  });
   return (
     <SettingsField
-      title="アカウント枠"
-      description="使用中の枠は削除できません。WebAppletの設定で別のアカウントを選択してください。削除は枠と保存データをまとめて消し、クリアは枠を残してログイン情報とサイトデータを消します。どちらも警告画面で確認します。"
+      title={translate('settings.webAccountSettings.account')}
+      description={translate('settings.webAccountSettings.hint')}
       className="settings-field-wide web-account-settings"
       {...settingAnchor('web-accounts', 'accounts')}
-      aria-label="Webアカウント設定"
+      aria-label={translate('settings.webAccountSettings.settings')}
     >
       <div className="actions">
         <button
@@ -162,15 +174,19 @@ export function WebAccountSettings({
           disabled={busy || accounts.length >= 32}
           onClick={() =>
             void run(() =>
-              settingsControls.createWebAccount(`Webアカウント ${accounts.length + 1}`),
+              settingsControls.createWebAccount(
+                translate('settings.webAccountSettings.defaultName', {
+                  value: accounts.length + 1,
+                }),
+              ),
             )
           }
         >
-          アカウント枠を追加
+          {translate('settings.webAccountSettings.add')}
         </button>
       </div>
       {!accounts.length && (
-        <p className="muted">アカウント枠がありません。枠を追加してWebAppletから選択できます。</p>
+        <p className="muted">{translate('settings.webAccountSettings.empty')}</p>
       )}
       {accounts.map((account) => {
         const users = [

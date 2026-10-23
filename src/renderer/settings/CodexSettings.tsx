@@ -1,3 +1,4 @@
+import { HostMessage, useHostTranslation } from '../HostTranslation';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { useSettingsControls } from '../settings-ui/api';
@@ -8,6 +9,7 @@ import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 
 export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [state, setState] = useState<AutomationState>();
   const [busy, setBusy] = useState(false);
@@ -75,14 +77,14 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   useSettingsFeedback({
     error: error || state?.error || state?.registrationError,
     busy,
-    target: 'MCPサーバー',
-    message: !state && !error ? '連携状態を読み込んでいます…' : '',
+    target: translate('settings.codexSettings.title'),
+    message: !state && !error ? translate('settings.codexSettings.loading') : '',
   });
   if (!state)
     return (
       <div className="settings-sections">
         <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
-          連携状態を再読み込み
+          {translate('settings.codexSettings.reload')}
         </button>
       </div>
     );
@@ -93,98 +95,110 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   ) => void run({ kind: 'configure', enabled, allowWrite, port: nextPort });
   const registration =
     state.registration === 'registered'
-      ? '登録済み'
+      ? translate('settings.codexSettings.registered')
       : state.registration === 'conflict'
-        ? '確認が必要'
-        : '未登録';
+        ? translate('settings.codexSettings.attention')
+        : translate('settings.codexSettings.unregistered');
   return (
-    <section className="settings-sections codex-settings" aria-label="MCP・Codex連携">
+    <section
+      className="settings-sections codex-settings"
+      aria-label={translate('settings.codexSettings.integration')}
+    >
       <SettingsSection
-        title="接続の状態"
-        hint="同じPCのCodexや、ネットワーク上のMCPクライアントからAppDockを操作できます。"
+        title={translate('settings.codexSettings.connection')}
+        hint={translate('settings.codexSettings.connectionHint')}
       >
-        <SettingsField title="Codexへの登録" description={registration} />
         <SettingsField
-          title="このPCからの最終接続"
+          title={translate('settings.codexSettings.registration')}
+          description={registration}
+        />
+        <SettingsField
+          title={translate('settings.codexSettings.lastLocal')}
           description={
             state.lastLocalClientAt
               ? new Date(state.lastLocalClientAt).toLocaleString()
-              : 'まだ確認されていません'
+              : translate('settings.codexSettings.never')
           }
         />
         <SettingsField
-          title="ネットワークからの最終接続"
+          title={translate('settings.codexSettings.lastNetwork')}
           description={
             state.lastNetworkClientAt
               ? new Date(state.lastNetworkClientAt).toLocaleString()
-              : 'まだ確認されていません'
+              : translate('settings.codexSettings.never')
           }
         />
         <SettingsField
-          title="連携を有効にする"
-          description={`サーバー: ${state.running ? '稼働中' : state.enabled ? '起動できません' : '停止中'}`}
-          hint="AppDockの起動中に接続できます。"
+          title={translate('settings.codexSettings.enable')}
+          description={translate('settings.codexSettings.serverState', {
+            value: state.running
+              ? translate('settings.codexSettings.running')
+              : state.enabled
+                ? translate('settings.codexSettings.startFailed')
+                : translate('settings.codexSettings.stopped'),
+          })}
+          hint={translate('settings.codexSettings.runningHint')}
           {...settingAnchor('codex', 'automation')}
         >
           <Toggle
-            label="Codex連携を有効にする"
+            label={translate('settings.codexSettings.enableLabel')}
             checked={state.enabled}
             disabled={busy}
             onChange={(v) => configure(v)}
           />
         </SettingsField>
         <SettingsField
-          title="接続範囲"
+          title={translate('settings.codexSettings.scope')}
           description={
-            '変更時に通信が一時切断されます。同じPCのCodexの再登録は不要です。' +
+            translate('settings.codexSettings.scopeHint') +
             (state.connectionScope === 'network'
-              ? '到達可能な接続元に、認証トークンとMCPの操作許可を適用します。LAN直結は暗号化されないHTTP接続です。tailnet経由はTailscaleで保護されます。利用するネットワークとファイアウォールの設定を確認してください。'
+              ? translate('settings.codexSettings.networkWarning')
               : '')
           }
           {...settingAnchor('codex', 'connectionScope')}
         >
           <select
-            aria-label="接続範囲"
+            aria-label={translate('settings.codexSettings.scope')}
             value={state.connectionScope}
             disabled={busy}
             onChange={(e) =>
               void run({ kind: 'setConnectionScope', scope: e.target.value as 'local' | 'network' })
             }
           >
-            <option value="local">このPCのみ</option>
-            <option value="network">ネットワークからも接続可能（IPv4）</option>
+            <option value="local">{translate('settings.codexSettings.localOnly')}</option>
+            <option value="network">{translate('settings.codexSettings.network')}</option>
           </select>
         </SettingsField>
         {state.enabled && !state.running && (
           <SettingsActions>
             <button disabled={busy} onClick={() => void run({ kind: 'retryStart' })}>
-              接続を再試行
+              {translate('settings.codexSettings.retry')}
             </button>
           </SettingsActions>
         )}
         <SettingsField
-          title="操作できる範囲"
-          hint="AppletとMCPの許可を別々に設定できます。"
+          title={translate('settings.codexSettings.permissions')}
+          hint={translate('settings.codexSettings.permissionsHint')}
           {...settingAnchor('codex', 'permissions')}
         >
           <SettingsActions>
-            <button onClick={onOpenPermissions}>操作の許可を開く</button>
+            <button onClick={onOpenPermissions}>
+              {translate('settings.codexSettings.openPermissions')}
+            </button>
           </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection
-        title="Codexへ登録"
+        title={translate('settings.codexSettings.register')}
         description={[
-          !state.running ? '先に「連携を有効にする」をオンにしてください。' : '',
-          file !== state.configFile
-            ? '変更した設定ファイルの場所を保存してから登録してください。'
-            : '',
-          '登録後はCodexを再読み込みまたは再起動し、新しいチャットで「AppDockの状態を確認して」と依頼してください。',
-          '接続テストはAppDock内の疎通確認です。最終接続日時はCodex以外のMCPクライアントも含みます。Codexでの操作や別端末からの疎通は、それぞれのクライアントで確認してください。',
+          !state.running ? translate('settings.codexSettings.enableFirst') : '',
+          file !== state.configFile ? translate('settings.codexSettings.savePathFirst') : '',
+          translate('settings.codexSettings.afterRegistration'),
+          translate('settings.codexSettings.testHint'),
         ]
           .filter(Boolean)
           .join(' ')}
-        hint="このPCのCodexにMCPでのAppDockの接続情報を追加します。"
+        hint={translate('settings.codexSettings.registerHint')}
         {...settingAnchor('codex', 'registration')}
       >
         <SettingsActions>
@@ -193,108 +207,124 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             disabled={busy || !state.running || file !== state.configFile}
             onClick={() => void run({ kind: 'register' })}
           >
-            {state.registration === 'registered' ? '登録を修復' : 'Codexへ登録'}
+            {state.registration === 'registered'
+              ? translate('settings.codexSettings.repair')
+              : translate('settings.codexSettings.register')}
           </button>
           <button disabled={busy || !state.running} onClick={() => void run({ kind: 'test' })}>
-            このPC内の接続テスト
+            {translate('settings.codexSettings.testLocal')}
           </button>
         </SettingsActions>
       </SettingsSection>
       <SettingsSection
-        title="ネットワークからの接続"
+        title={translate('settings.codexSettings.networkConnection')}
         description={
           state.connectionScope !== 'network'
-            ? '接続範囲を「ネットワークからも接続可能」にすると利用できます。'
+            ? translate('settings.codexSettings.networkDisabled')
             : !state.running
-              ? 'MCPは停止中です。'
+              ? translate('settings.codexSettings.serverStopped')
               : state.networkEndpoints.length === 0
-                ? 'ネットワークの接続先候補がありません。ネットワーク接続を確認してください。'
+                ? translate('settings.codexSettings.noEndpoints')
                 : undefined
         }
-        hint="別端末のMCPクライアントへ、Streamable HTTPの接続先とBearerトークンを設定します。"
+        hint={translate('settings.codexSettings.networkSetup')}
         {...settingAnchor('codex', 'network')}
       >
         {state.connectionScope === 'network' &&
           state.running &&
           state.networkEndpoints.length > 0 && (
             <SettingsField
-              title="ネットワークの接続先候補"
-              hint="接続できるかどうかは、利用する端末から確認してください。"
+              title={translate('settings.codexSettings.endpoints')}
+              hint={translate('settings.codexSettings.endpointsHint')}
             >
               {state.networkEndpoints.map((endpoint) => (
                 <SettingsActions key={endpoint} className="codex-network-endpoint">
-                  <SettingsInput aria-label={`接続先 ${endpoint}`} readOnly value={endpoint} />
+                  <SettingsInput
+                    aria-label={translate('settings.codexSettings.endpoint', {
+                      endpoint: endpoint,
+                    })}
+                    readOnly
+                    value={endpoint}
+                  />
                   <button
                     disabled={busy}
                     onClick={() => void run({ kind: 'copyEndpoint', endpoint })}
                   >
-                    接続先をコピー
+                    {translate('settings.codexSettings.copyEndpoint')}
                   </button>
                 </SettingsActions>
               ))}
             </SettingsField>
           )}
         <SettingsField
-          title="接続トークン"
-          description="接続トークンはOSのクリップボードへコピーします。同じトークンを使うクライアントは、操作許可とAI・読み上げのジョブ管理を共有します。"
+          title={translate('settings.codexSettings.token')}
+          description={translate('settings.codexSettings.tokenHint')}
         >
           <SettingsActions>
             <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
-              接続の状態を再読み込み
+              {translate('settings.codexSettings.reloadConnection')}
             </button>
             <button
               disabled={busy || !state.canCopyToken}
               onClick={() => void run({ kind: 'copyToken' })}
             >
-              接続トークンをコピー
+              {translate('settings.codexSettings.copyToken')}
             </button>
           </SettingsActions>
         </SettingsField>
         <SettingsSection
           variant="group"
-          title="認証の設定例"
-          description="通常はどちらか一方を設定します。環境変数名は接続元アプリの指定と一致させてください。ヘッダーの値にMCP_BEARER_TOKENと書くだけでは、トークンに置き換わりません。"
-          hint="「接続トークンをコピー」で取得したトークンを、接続元アプリの方式に合わせて設定してください。"
+          title={translate('settings.codexSettings.authExamples')}
+          description={translate('settings.codexSettings.authExamplesHint')}
+          hint={translate('settings.codexSettings.tokenSetup')}
         >
           <SettingsField
-            title="環境変数を使う場合"
+            title={translate('settings.codexSettings.environment')}
             description={
-              <>
-                Bearerトークンを設定する環境変数の名前：<code>MCP_BEARER_TOKEN</code>（例）
-                <br />
-                接続元アプリが参照できる環境変数に、コピーしたトークンだけを保存します。
-                <code>Bearer </code>
-                は付けません。環境変数を追加・変更したら、接続元アプリを再起動してください。
-              </>
+              <HostMessage
+                message="settings.codexSettings.environmentInstructions"
+                values={{
+                  variable: <code>MCP_BEARER_TOKEN</code>,
+                  break: <br />,
+                  scheme: <code>Bearer </code>,
+                }}
+              />
             }
           />
           <SettingsField
-            title="ヘッダーを直接設定する場合"
+            title={translate('settings.codexSettings.header')}
             description={
               <>
-                ヘッダーのキー：<code>Authorization</code>
+                {translate('settings.codexSettings.headerKey')}
+                <code>Authorization</code>
                 <br />
-                ヘッダーの値：<code>{'Bearer <コピーしたトークン>'}</code>
+                {translate('settings.codexSettings.headerValue')}
+                <code>{translate('settings.codexSettings.bearerExample')}</code>
                 <br />
-                <code>Bearer</code>の後に半角スペースを1つ入れ、
-                <code>{'<コピーしたトークン>'}</code>を実際のトークンに置き換えます。
+                <HostMessage
+                  message="settings.codexSettings.headerInstructions"
+                  values={{
+                    scheme: <code>Bearer</code>,
+                    token: <code>{translate('settings.codexSettings.tokenPlaceholder')}</code>,
+                  }}
+                />
               </>
             }
           />
         </SettingsSection>
       </SettingsSection>
       <SettingsSection
-        title="登録先や接続の詳細"
-        hint="設定ファイル・登録名・ポートの変更や、登録の解除ができます。"
+        title={translate('settings.codexSettings.details')}
+        hint={translate('settings.codexSettings.detailsHint')}
         collapsible
         {...settingAnchor('codex', 'connection')}
       >
         <SettingsField
-          title="追加の接続先ホスト名"
-          hint="IPアドレスで接続する場合は不要です。MagicDNSの完全名やDNS別名をShift+Enterで1行ずつ指定します。Enterか入力欄を離れる操作で保存します（16件まで）。"
+          title={translate('settings.codexSettings.hosts')}
+          hint={translate('settings.codexSettings.hostsHint')}
         >
           <SettingsTextarea
-            aria-label="追加の接続先ホスト名"
+            aria-label={translate('settings.codexSettings.hosts')}
             value={hostnames}
             rows={3}
             disabled={busy}
@@ -306,12 +336,12 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           />
         </SettingsField>
         <SettingsField
-          title="Codexの設定ファイル"
-          hint="通常は初期表示の場所を使います。"
-          description="別PCやWSLはこの画面の登録対象ではありません。"
+          title={translate('settings.codexSettings.configFile')}
+          hint={translate('settings.codexSettings.configFileHint')}
+          description={translate('settings.codexSettings.unsupportedTarget')}
         >
           <SettingsInput
-            aria-label="Codexの設定ファイル"
+            aria-label={translate('settings.codexSettings.configFile')}
             commitOn="input"
             value={file}
             disabled={busy}
@@ -323,17 +353,17 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
               disabled={busy || !file.trim() || file === state.configFile}
               onClick={() => void run({ kind: 'selectConfig', file })}
             >
-              設定先を変更
+              {translate('settings.codexSettings.changePath')}
             </button>
           </SettingsActions>
         </SettingsField>
         <SettingsField
-          title="Codexへの登録名"
-          hint="複数のAppDockを使う場合は別の名前にします。"
-          description="登録済みの名前を変更する前に、登録を解除してください。"
+          title={translate('settings.codexSettings.registrationName')}
+          hint={translate('settings.codexSettings.registrationNameHint')}
+          description={translate('settings.codexSettings.unregisterFirst')}
         >
           <SettingsInput
-            aria-label="Codexへの登録名"
+            aria-label={translate('settings.codexSettings.registrationName')}
             commitOn="input"
             value={name}
             maxLength={64}
@@ -346,21 +376,23 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
               disabled={busy || !name.trim() || name === state.serverId}
               onClick={() => void run({ kind: 'selectName', name })}
             >
-              登録名を保存
+              {translate('settings.codexSettings.saveName')}
             </button>
           </SettingsActions>
         </SettingsField>
         <SettingsField
-          title="接続ポート"
-          hint="0を指定すると空きポートを選んで保存します。"
-          description={`変更後は登録を修復してください。このPCの接続先: ${state.endpoint || '連携を有効にすると決まります'}`}
+          title={translate('settings.codexSettings.port')}
+          hint={translate('settings.codexSettings.portHint')}
+          description={translate('settings.codexSettings.portEndpoint', {
+            value: state.endpoint || translate('settings.codexSettings.endpointPending'),
+          })}
         >
           <SettingsInput
             type="number"
             min={0}
             max={65535}
             step={1}
-            aria-label="接続ポート"
+            aria-label={translate('settings.codexSettings.port')}
             commitOn="input"
             value={port}
             disabled={busy}
@@ -373,26 +405,26 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
               }
               onClick={() => configure(state.enabled, state.allowWrite, Number(port))}
             >
-              ポートを適用
+              {translate('settings.codexSettings.applyPort')}
             </button>
           </SettingsActions>
         </SettingsField>
         <SettingsField
-          title="認証と登録の管理"
-          description="認証情報の再発行後はCodexの登録を修復し、他のMCPクライアントのトークンも更新してください。接続トークンはCodexのローカル設定にも保存されます。"
+          title={translate('settings.codexSettings.authManagement')}
+          description={translate('settings.codexSettings.authManagementHint')}
         >
           <SettingsActions>
             <button
               disabled={busy || !state.port}
               onClick={() => void run({ kind: 'rotateToken' })}
             >
-              認証情報を再発行
+              {translate('settings.codexSettings.rotateToken')}
             </button>
             <button
               disabled={busy || state.registration === 'absent'}
               onClick={() => void run({ kind: 'unregister' })}
             >
-              登録を解除
+              {translate('settings.codexSettings.unregister')}
             </button>
           </SettingsActions>
         </SettingsField>

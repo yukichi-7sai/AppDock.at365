@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { ExtensionSnapshot, Settings } from './contracts';
 import type { NotificationLevel, NotificationLifetime, NotificationTarget } from './notifications';
 export interface NotificationOwner {
@@ -74,8 +75,8 @@ const targetNames = ['banner', 'desktop', 'windows'];
 export const legacyNotificationTypeId = 'appdock.legacy';
 const legacyNotificationType: NotificationTypeDefinition = {
   typeId: legacyNotificationTypeId,
-  title: '旧方式の通知',
-  description: '種類を指定しない旧通知APIの通知です。本文から種類は推定しません。',
+  title: hostText('settings.notification-types.legacy'),
+  description: hostText('settings.notification-types.legacyHint'),
   levels: ['info'],
   defaultLevel: 'info',
   allowedTargets: ['banner', 'desktop', 'windows'],
@@ -98,7 +99,8 @@ export const notificationSettingKey = (v: NotificationOwner & { typeId: string }
   encodeURIComponent(notificationTypeKey(v));
 export function parseNotificationTypes(value: unknown, host = false): NotificationTypeDefinition[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 64) throw Error('通知種類は64件以下です。');
+  if (!Array.isArray(value) || value.length > 64)
+    throw Error(hostText('settings.notification-types.limit'));
   const keys = [
     'typeId',
     'title',
@@ -146,13 +148,13 @@ export function parseNotificationTypes(value: unknown, host = false): Notificati
       (v.defaultDurationSeconds !== undefined &&
         (v.lifetimePolicy !== 'userDuration' || !duration(v.defaultDurationSeconds)))
     )
-      throw Error('通知種類の定義が不正です。');
+      throw Error(hostText('settings.notification-types.definition'));
     // Accept obsolete manifest fields without using them to suppress notifications.
     const { defaultEnabled, canDisable, disabledControlReason, ...definition } = v;
     return structuredClone(definition) as NotificationTypeDefinition;
   });
   if (new Set(result.map((v) => v.typeId)).size !== result.length)
-    throw Error('通知種類IDが重複しています。');
+    throw Error(hostText('settings.notification-types.duplicateType'));
   return result;
 }
 export function parseNotificationPreferences(value: unknown): NotificationPreferences {
@@ -163,7 +165,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
     !Array.isArray(value.overrides) ||
     value.overrides.length > 1024
   )
-    throw Error('通知設定の形式が不正です。');
+    throw Error(hostText('settings.notification-types.format'));
   const rows = value.overrides.map((v: unknown) => {
     if (
       !object(v) ||
@@ -189,13 +191,13 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
       (v.targets !== undefined && !targets(v.targets)) ||
       (v.durationSeconds !== undefined && !duration(v.durationSeconds))
     )
-      throw Error('通知設定の値が不正です。');
+      throw Error(hostText('settings.notification-types.value'));
     // Old ON/OFF values are readable but no longer participate in delivery or persistence.
     const { enabled, ...preference } = v;
     return structuredClone(preference) as NotificationPreference;
   });
   if (new Set(rows.map(notificationTypeKey)).size !== rows.length)
-    throw Error('通知設定が重複しています。');
+    throw Error(hostText('settings.notification-types.duplicate'));
   const speech = value.speech;
   if (
     speech !== undefined &&
@@ -209,7 +211,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
           speech.speed < 0.25 ||
           speech.speed > 4)))
   )
-    throw Error('通知の読み上げ設定が不正です。');
+    throw Error(hostText('settings.notification-types.speech'));
   return { overrides: rows, ...(speech === undefined ? {} : { speech: structuredClone(speech) }) };
 }
 export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationTypeEntry[] {
@@ -220,9 +222,8 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       ownerState: 'running',
       ownerId: 'errors',
       typeId: 'operation-failed',
-      title: 'エラー通知',
-      description:
-        'AI文章生成、設定の読み込み・保存・反映・復旧、更新処理、接続テストの失敗を通知します。バナーで必ず通知し、本体ログにも記録します。',
+      title: hostText('settings.notification-types.error'),
+      description: hostText('settings.notification-types.errorHint'),
       levels: ['error'],
       defaultLevel: 'error',
       allowedTargets: ['banner', 'desktop', 'windows'],
@@ -238,9 +239,8 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       ownerState: 'running',
       ownerId: 'warnings',
       typeId: 'attention-required',
-      title: '警告通知',
-      description:
-        '旧PC専用データなど、確認や対処が必要な状態を通知します。バナーで必ず通知し、本体ログでも確認できます。',
+      title: hostText('settings.notification-types.warning'),
+      description: hostText('settings.notification-types.warningHint'),
       levels: ['warning'],
       defaultLevel: 'warning',
       allowedTargets: ['banner', 'desktop', 'windows'],
@@ -256,9 +256,8 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       ownerState: 'running',
       ownerId: 'information',
       typeId: 'operation-completed',
-      title: 'インフォメーション通知',
-      description:
-        '更新確認や接続テスト、保存などの操作結果を通知します。バナーで必ず通知し、本体ログにも記録します。',
+      title: hostText('settings.notification-types.information'),
+      description: hostText('settings.notification-types.informationHint'),
       levels: ['info'],
       defaultLevel: 'info',
       allowedTargets: ['banner', 'desktop', 'windows'],
@@ -274,9 +273,8 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       ownerState: 'running',
       ownerId: 'settings',
       typeId: 'restart-required',
-      title: '設定の反映に再起動が必要',
-      description:
-        '保存済みのハードウェアアクセラレーションを反映するため、再起動が必要な間表示します。',
+      title: hostText('settings.notification-types.restart'),
+      description: hostText('settings.notification-types.restartHint'),
       levels: ['warning'],
       defaultLevel: 'warning',
       allowedTargets: ['banner', 'desktop', 'windows'],
@@ -293,8 +291,8 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       defaultTargets: ['banner'],
       ownerId: 'updates',
       typeId: 'applied',
-      title: '更新適用完了',
-      description: '更新後の再起動で、更新を適用したことを通知します。',
+      title: hostText('settings.notification-types.updated'),
+      description: hostText('settings.notification-types.updatedHint'),
       levels: ['info'],
       defaultLevel: 'info',
       allowedTargets: ['banner', 'desktop', 'windows'],
@@ -309,8 +307,8 @@ export function notificationCatalog(applets: ExtensionSnapshot[]): NotificationT
       history: 'persistent',
       ownerId: 'updates',
       typeId: 'available',
-      title: '更新のお知らせ',
-      description: '起動時や手動の更新チェックで、利用可能な更新を通知します。',
+      title: hostText('settings.notification-types.updateAvailable'),
+      description: hostText('settings.notification-types.updateAvailableHint'),
       levels: ['info'],
       defaultLevel: 'info',
       allowedTargets: ['banner', 'desktop', 'windows'],
@@ -388,7 +386,7 @@ export function validateNotificationPreferenceChanges(
       row.targets?.some((t) => !type.allowedTargets.includes(t)) ||
       type.requiredTargets.some((t) => row.targets !== undefined && !row.targets.includes(t))
     )
-      throw Error(type.title + ': 通知種類の制約に合わない設定です。');
+      throw Error(hostText('settings.notification-types.constraintMessage', { title: type.title }));
   }
 }
 

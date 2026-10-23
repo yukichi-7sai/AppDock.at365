@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import type { Settings } from '../../shared/contracts';
 import {
   appendKeybinding,
@@ -39,20 +40,23 @@ export function ShortcutCommandList({
   selectedInput?: string;
   onInputFilter?(input: BindingInputFilter, trigger: HTMLButtonElement): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const bindings = getKeybindings(settings);
   return (
     <CommandBindingList<Keybinding>
       commands={commands}
       bindings={[...bindings, ...owned]}
       readOnly={(row) =>
-        owned.some((item) => item.id === row.id) ? 'タッチパッドジェスチャーで編集' : undefined
+        owned.some((item) => item.id === row.id)
+          ? translate('settings.shortcutCommandList.editTouchpad')
+          : undefined
       }
       showProvider={showProvider}
       statusError={statusError}
       onRetry={onRetry}
       selectedInput={selectedInput}
       onInputFilter={onInputFilter}
-      inputName="キー"
+      inputName={translate('settings.shortcutCommandList.key')}
       inputKey={(row) => normalizeShortcut(row.key)}
       inputLabel={(row) => row.key}
       conditionLabel={(row, command) =>
@@ -63,8 +67,8 @@ export function ShortcutCommandList({
         ) +
         (externalShortcutScope(row.when.scope)
           ? row.blockOriginalInput === false
-            ? '・入力を通す'
-            : '・入力をブロック'
+            ? translate('settings.shortcutCommandList.pass')
+            : translate('settings.shortcutCommandList.block')
           : '')
       }
       newBinding={(command) => ({
@@ -77,14 +81,14 @@ export function ShortcutCommandList({
       applyBinding={(row, original) => {
         let next: Keybinding[];
         if (!original) {
-          if (bindings.length >= 2000) throw Error('キーバインドは2000件以内です。');
+          if (bindings.length >= 2000) throw Error(translate('settings.shortcutCommandList.limit'));
           next = appendKeybinding(bindings, row);
         } else {
           if (
             JSON.stringify(bindings.find((binding) => binding.id === row.id)) !==
             JSON.stringify(original)
           )
-            throw Error('編集中に割り当てが変更されました。キャンセルして開き直してください。');
+            throw Error(translate('settings.shortcutCommandList.conflict'));
           next = changeKeybindingKey(bindings, row.id, row.key).map((binding) =>
             binding.id === row.id ? row : binding,
           );

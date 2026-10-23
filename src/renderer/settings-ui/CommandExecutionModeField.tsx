@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import type { CommandExecutionMode } from '../../shared/command-execution';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from './setting-anchor';
@@ -13,11 +14,12 @@ export function CommandExecutionModeField({
   value: CommandExecutionMode;
   onChange(value: CommandExecutionMode): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const item = hostSettingItem(pageId, 'executionMode');
   return (
     <SettingsField
       title={item.title}
-      hint="操作と「いつ・どこで」の条件に一致したコマンドを、登録順に選びます。"
+      hint={translate('settings.commandExecutionModeField.hint')}
       {...settingAnchor(pageId, 'executionMode')}
     >
       <select
@@ -25,8 +27,8 @@ export function CommandExecutionModeField({
         value={value}
         onChange={(event) => onChange(event.target.value as CommandExecutionMode)}
       >
-        <option value="first">最初の1つ</option>
-        <option value="all">すべて</option>
+        <option value="first">{translate('settings.commandExecutionModeField.first')}</option>
+        <option value="all">{translate('settings.commandExecutionModeField.all')}</option>
       </select>
     </SettingsField>
   );

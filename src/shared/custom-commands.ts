@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 /** Persisted command definitions are data; only current declarations grant authority. */
 export type JsonObject = Record<string, unknown>;
 export type CustomCommandOwner = { kind: 'host' } | { kind: 'applet'; id: string };
@@ -50,7 +51,7 @@ export function customDescription(value: unknown): string {
     value.length > 1000 ||
     /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value)
   )
-    throw Error('説明は1,000文字以内で入力してください。');
+    throw Error(hostText('settings.custom-commands.descriptionLength'));
   return value.replace(/\r\n?/g, '\n');
 }
 export const jsonObject = (v: unknown): v is JsonObject =>
@@ -67,30 +68,31 @@ const text = (v: unknown, max: number): v is string =>
 export function boundedJson(value: unknown, bytes: number, depth = 16, count = 2048) {
   const seen = new Set<object>();
   const visit = (v: unknown, level: number) => {
-    if (--count < 0 || level > depth) throw Error('JSONの深さ・件数の上限を超えています。');
+    if (--count < 0 || level > depth) throw Error(hostText('settings.custom-commands.jsonDepth'));
     if (v === null || typeof v === 'string' || typeof v === 'boolean') return;
     if (typeof v === 'number' && Number.isFinite(v)) return;
-    if (!v || typeof v !== 'object' || seen.has(v)) throw Error('JSONの値が不正です。');
+    if (!v || typeof v !== 'object' || seen.has(v))
+      throw Error(hostText('settings.custom-commands.jsonValue'));
     if (!Array.isArray(v) && ![Object.prototype, null].includes(Object.getPrototypeOf(v)))
-      throw Error('JSONオブジェクトを指定してください。');
+      throw Error(hostText('settings.custom-commands.jsonObject'));
     seen.add(v);
     for (const [key, child] of Object.entries(v)) {
       if (['__proto__', 'prototype', 'constructor'].includes(key))
-        throw Error('JSONキーが不正です。');
+        throw Error(hostText('settings.custom-commands.jsonKey'));
       visit(child, level + 1);
     }
     seen.delete(v);
   };
   visit(value, 0);
   if (new TextEncoder().encode(JSON.stringify(value)).length > bytes)
-    throw Error('JSONのサイズ上限を超えています。');
+    throw Error(hostText('settings.custom-commands.jsonSize'));
 }
 export function customItems(block: CustomCommandBlock | undefined): CustomCommandDefinition[] {
   return block?.version === customCommandVersion ? (block.items as CustomCommandDefinition[]) : [];
 }
 export function parseCustomCommands(value: unknown): CustomCommandBlock {
   if (!jsonObject(value) || !version(value.version))
-    throw Error('カスタムコマンドの保存形式が不正です。');
+    throw Error(hostText('settings.custom-commands.format'));
   boundedJson(value, 1024 * 1024, 40, 100000);
   if (value.version !== customCommandVersion) return structuredClone(value) as CustomCommandBlock;
   if (
@@ -98,7 +100,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
     !Array.isArray(value.items) ||
     value.items.length > 256
   )
-    throw Error('カスタムコマンドは256件以内です。');
+    throw Error(hostText('settings.custom-commands.limit'));
   const ids = new Set<string>(),
     counts = new Map<string, number>();
   const items = value.items.map((item: unknown) => {
@@ -132,12 +134,12 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
         ? Object.keys(item.owner).length !== 1
         : Object.keys(item.owner).length !== 2 || !identifier(item.owner.id))
     )
-      throw Error('カスタムコマンドのID・名前・種類・保存値を確認してください。');
+      throw Error(hostText('settings.custom-commands.command'));
     boundedJson(item.config, 16 * 1024);
     ids.add(item.id);
     const owner = item.owner.kind === 'host' ? 'host' : `applet:${item.owner.id}`;
     counts.set(owner, (counts.get(owner) ?? 0) + 1);
-    if (counts.get(owner)! > 100) throw Error('同じ提供元のコマンドは100件以内です。');
+    if (counts.get(owner)! > 100) throw Error(hostText('settings.custom-commands.ownerLimit'));
     return {
       ...item,
       title: item.title.trim(),
@@ -151,7 +153,7 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
 // references, regex, formats or asynchronous validators are accepted.
 export function checkCustomSchema(schema: unknown) {
   if (!jsonObject(schema) || schema.type !== 'object')
-    throw Error('設定Schemaのルートはobjectです。');
+    throw Error(hostText('settings.custom-commands.schemaRoot'));
   boundedJson(schema, 32 * 1024, 32, 8192);
   const scalar = new Set([
     'type',
@@ -176,9 +178,11 @@ export function checkCustomSchema(schema: unknown) {
   ]);
   let visits = 0;
   const walk = (node: unknown, stack: Set<unknown>) => {
-    if (++visits > 10000 || stack.size > 64) throw Error('Schema参照の上限を超えています。');
+    if (++visits > 10000 || stack.size > 64)
+      throw Error(hostText('settings.custom-commands.schemaLimit'));
     if (typeof node === 'boolean') return;
-    if (!jsonObject(node) || stack.has(node)) throw Error('循環するSchema参照は使えません。');
+    if (!jsonObject(node) || stack.has(node))
+      throw Error(hostText('settings.custom-commands.schemaCycle'));
     const next = new Set(stack).add(node);
     for (const [key, value] of Object.entries(node)) {
       if (key === '$schema') {
@@ -186,10 +190,10 @@ export function checkCustomSchema(schema: unknown) {
           value !== 'https://json-schema.org/draft/2020-12/schema' &&
           value !== 'http://json-schema.org/draft-07/schema#'
         )
-          throw Error('未対応のSchemaです。');
+          throw Error(hostText('settings.custom-commands.schemaUnsupported'));
       } else if (key === '$ref') {
         if (typeof value !== 'string' || !value.startsWith('#/$defs/'))
-          throw Error('ローカル$defs参照だけを使用できます。');
+          throw Error(hostText('settings.custom-commands.schemaReference'));
         let target: unknown = schema;
         for (const part of value.slice(2).split('/'))
           target = jsonObject(target)
@@ -197,22 +201,24 @@ export function checkCustomSchema(schema: unknown) {
             : undefined;
         walk(target, next);
       } else if (['properties', '$defs'].includes(key)) {
-        if (!jsonObject(value)) throw Error('Schemaの宣言を確認してください。');
+        if (!jsonObject(value)) throw Error(hostText('settings.custom-commands.schemaDeclaration'));
         for (const child of Object.values(value)) walk(child, next);
       } else if (['items', 'additionalProperties', 'not', 'if', 'then', 'else'].includes(key))
         walk(value, next);
       else if (['allOf', 'anyOf', 'oneOf'].includes(key)) {
         if (!Array.isArray(value) || !value.length || value.length > 16)
-          throw Error('Schemaの分岐が不正です。');
+          throw Error(hostText('settings.custom-commands.schemaBranch'));
         for (const child of value) walk(child, next);
-      } else if (!scalar.has(key)) throw Error(`未対応のSchemaキーワード: ${key}`);
+      } else if (!scalar.has(key))
+        throw Error(hostText('settings.custom-commands.schemaKeyword', { key: key }));
     }
   };
   walk(schema, new Set());
 }
 export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCommandType[] {
   if (raw === undefined) return [];
-  if (!Array.isArray(raw) || raw.length > 16) throw Error('カスタムコマンドの種類は16件以内です。');
+  if (!Array.isArray(raw) || raw.length > 16)
+    throw Error(hostText('settings.custom-commands.typeLimit'));
   const ids = new Set<string>();
   return raw.map((value) => {
     boundedJson(value, 64 * 1024, 36, 10000);
@@ -238,11 +244,11 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
       !version(value.configVersion) ||
       (value.automation !== undefined && typeof value.automation !== 'boolean')
     )
-      throw Error('カスタムコマンドの種類宣言が不正です。');
+      throw Error(hostText('settings.custom-commands.typeDefinition'));
     checkCustomSchema(value.configSchema);
     if (value.fields !== undefined) {
       if (!Array.isArray(value.fields) || value.fields.length > 64)
-        throw Error('入力項目は64件以内です。');
+        throw Error(hostText('settings.custom-commands.fieldLimit'));
       const keys = new Set<string>();
       for (const field of value.fields) {
         if (
@@ -255,7 +261,7 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
             (k) => !['key', 'title', 'type', 'default', 'options'].includes(k),
           )
         )
-          throw Error('入力項目の宣言が不正です。');
+          throw Error(hostText('settings.custom-commands.fieldDefinition'));
         keys.add(field.key);
         const property = (value.configSchema as any).properties?.[field.key];
         if (
@@ -264,7 +270,7 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
             property.type !== (field.type === 'select' ? 'string' : field.type) &&
             !(field.type === 'number' && property.type === 'integer'))
         )
-          throw Error('入力項目とSchemaの型を揃えてください。');
+          throw Error(hostText('settings.custom-commands.fieldType'));
         if (
           field.type === 'select' &&
           (!Array.isArray(field.options) ||
@@ -279,7 +285,7 @@ export function parseCustomTypes(ownerId: string | null, raw: unknown): CustomCo
                 !property.enum.includes(o.value),
             ))
         )
-          throw Error('選択肢はSchemaのenumと揃えてください。');
+          throw Error(hostText('settings.custom-commands.fieldOptions'));
       }
     }
     ids.add(value.id);

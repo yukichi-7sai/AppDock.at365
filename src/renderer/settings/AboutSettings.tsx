@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -22,17 +23,21 @@ export function AboutSettings({
   busy: boolean;
   openApplets(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const updates = useUpdateState();
   const applets = extensions.filter((extension) => !extension.collection);
   return (
-    <section className="settings-sections about-page" aria-label="バージョン情報・更新">
+    <section
+      className="settings-sections about-page"
+      aria-label={translate('settings.aboutSettings.title')}
+    >
       <UpdateActions appletCount={applets.length} />
       <SettingsSection
         title="AppDock.at365"
-        description="このPCで使用している本体です。"
+        description={translate('settings.aboutSettings.hostHint')}
         {...settingAnchor('about', 'versions')}
       >
-        <SettingsField title="現在のバージョン">
+        <SettingsField title={translate('settings.aboutSettings.currentVersion')}>
           <VersionDisplay
             version={version}
             result={updates.results.find((result) => result.id === 'host')}
@@ -41,12 +46,12 @@ export function AboutSettings({
         <VersionCheck details disabled={busy} />
       </SettingsSection>
       <button className="text-button" onClick={openApplets}>
-        Appletの管理と更新
+        {translate('settings.aboutSettings.applets')}
       </button>
       <UpdateSettings settings={settings} edit={edit} />
       <SettingsSection
-        title="実行環境の詳細"
-        hint="動作環境の確認や、不具合の調査に使う情報です。"
+        title={translate('settings.aboutSettings.environment')}
+        hint={translate('settings.aboutSettings.environmentHint')}
         collapsible
         {...settingAnchor('about', 'runtime')}
       >

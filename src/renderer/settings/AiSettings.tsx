@@ -1,3 +1,4 @@
+import { HostMessage, useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useRef, useState } from 'react';
 import type { SettingsControlEditor } from '../settings-ui/api';
@@ -31,6 +32,7 @@ export function AiSettingsForm({
   invoke: AiInvoke;
   busy: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const value = editor.value.ai ?? defaultAiSettings();
   const [selected, setSelected] = useState('');
   const c =
@@ -60,7 +62,7 @@ export function AiSettingsForm({
     try {
       await work();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'AIの操作に失敗しました。');
+      setError(e instanceof Error ? e.message : translate('settings.aiSettings.operationFailed'));
     } finally {
       operation.current = false;
       setPending(false);
@@ -80,17 +82,19 @@ export function AiSettingsForm({
   return (
     <div className="settings-sections ai-settings">
       <SettingsSection
-        title="AI接続設定"
-        hint="ローカルサーバーやクラウドのAIを登録します。接続先は8件まで追加できます。"
+        title={translate('settings.aiSettings.connections')}
+        hint={translate('settings.aiSettings.connectionsHint')}
         {...settingAnchor('ai', 'connections')}
       >
         <SettingsActions className="ai-connections-toolbar">
-          <span className="muted">{value.connections.length} / 8 サーバー</span>
+          <span className="muted">
+            {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
+          </span>
           <div>
             <button
               className="settings-list-icon ai-icon-button"
-              aria-label="AIサーバーを並べ替え"
-              title="並べ替え"
+              aria-label={translate('settings.aiSettings.order')}
+              title={translate('settings.aiSettings.orderAction')}
               disabled={busy || value.connections.length < 2}
               onClick={() =>
                 setDialog({ kind: 'order', connections: structuredClone(value.connections) })
@@ -101,22 +105,27 @@ export function AiSettingsForm({
           </div>
         </SettingsActions>
         <SettingsContent className="command-shortcuts ai-connection-table">
-          <table className="applet-shortcut-overview" aria-label="登録済みAIサーバー">
+          <table
+            className="applet-shortcut-overview"
+            aria-label={translate('settings.aiSettings.registered')}
+          >
             <thead>
               <tr>
                 <th>
                   <span className="settings-list-heading">
-                    サーバー
+                    {translate('settings.aiSettings.server')}
                     <SettingsListAddButton
-                      label="AIサーバーを追加"
+                      label={translate('settings.aiSettings.add')}
                       disabled={busy || value.connections.length >= 8}
                       onClick={() => open('edit', null)}
                     />
                   </span>
                 </th>
-                <th>モデル</th>
+                <th>{translate('settings.aiSettings.model')}</th>
                 <th>
-                  <span className="ai-action-heading">操作</span>
+                  <span className="ai-action-heading">
+                    {translate('settings.aiSettings.actions')}
+                  </span>
                 </th>
               </tr>
             </thead>
@@ -127,24 +136,34 @@ export function AiSettingsForm({
                     <div className="ai-server-heading">
                       <strong>{server.name || server.id}</strong>
                       {server.id === value.defaultConnectionId && (
-                        <span className="ai-default-badge">既定</span>
+                        <span className="ai-default-badge">
+                          {translate('settings.aiSettings.default')}
+                        </span>
                       )}
                     </div>
                     <small>{aiPresetNames[server.preset]}</small>
-                    <small className="ai-server-url">{server.baseUrl || 'URL未設定'}</small>
+                    <small className="ai-server-url">
+                      {server.baseUrl || translate('settings.aiSettings.unsetUrl')}
+                    </small>
                   </td>
                   <td>
-                    <span className="ai-model-name">{server.defaultModel || '呼出し時に指定'}</span>
+                    <span className="ai-model-name">
+                      {server.defaultModel || translate('settings.aiSettings.perCall')}
+                    </span>
                     {auxiliary?.connections.find((v) => v.id === server.id)?.error && (
-                      <small className="error-text">APIキーを確認してください</small>
+                      <small className="error-text">
+                        {translate('settings.aiSettings.checkKey')}
+                      </small>
                     )}
                   </td>
                   <td>
                     <div className="ai-row-actions">
                       <button
                         className="settings-list-icon ai-icon-button"
-                        aria-label={server.name + 'の設定'}
-                        title="設定"
+                        aria-label={translate('settings.aiSettings.serverSettings', {
+                          name: server.name,
+                        })}
+                        title={translate('settings.aiSettings.settings')}
                         disabled={busy}
                         onClick={() => open('edit', server)}
                       >
@@ -152,8 +171,10 @@ export function AiSettingsForm({
                       </button>
                       <button
                         className="settings-list-icon settings-list-delete ai-icon-button ai-delete-button"
-                        aria-label={server.name + 'を削除'}
-                        title="削除"
+                        aria-label={translate('settings.aiSettings.deleteServerLabel', {
+                          name: server.name,
+                        })}
+                        title={translate('settings.aiSettings.delete')}
                         disabled={busy}
                         onClick={() => open('delete', server)}
                       >
@@ -167,8 +188,8 @@ export function AiSettingsForm({
                 <tr>
                   <td colSpan={3}>
                     <div className="ai-empty">
-                      <strong>AIサーバーを追加しましょう</strong>
-                      <p>「サーバー」の横の＋から接続先とモデルを設定できます。</p>
+                      <strong>{translate('settings.aiSettings.empty')}</strong>
+                      <p>{translate('settings.aiSettings.emptyHint')}</p>
                     </div>
                   </td>
                 </tr>
@@ -177,18 +198,25 @@ export function AiSettingsForm({
           </table>
         </SettingsContent>
       </SettingsSection>
-      <SettingsSection title="共通設定" hint="AppletやMCPからの文章生成に使う共通の設定です。">
-        <SettingsField title="既定のAI接続" {...settingAnchor('ai', 'defaultConnectionId')}>
+      <SettingsSection
+        title={translate('settings.aiSettings.common')}
+        hint={translate('settings.aiSettings.commonHint')}
+      >
+        <SettingsField
+          title={translate('settings.aiSettings.defaultConnection')}
+          {...settingAnchor('ai', 'defaultConnectionId')}
+        >
           <select
-            aria-label="既定のAI接続"
+            aria-label={translate('settings.aiSettings.defaultConnection')}
             value={value.defaultConnectionId ?? ''}
             onChange={(e) => change({ ...value, defaultConnectionId: e.target.value || undefined })}
           >
-            <option value="">呼出し時に指定</option>
+            <option value="">{translate('settings.aiSettings.perCall')}</option>
             {value.defaultConnectionId &&
               !value.connections.some((v) => v.id === value.defaultConnectionId) && (
                 <option value={value.defaultConnectionId}>
-                  未配置の接続：{value.defaultConnectionId}
+                  {translate('settings.aiSettings.missingConnection')}
+                  {value.defaultConnectionId}
                 </option>
               )}
             {value.connections.map((v) => (
@@ -199,12 +227,12 @@ export function AiSettingsForm({
           </select>
         </SettingsField>
         <SettingsField
-          title="共通プロンプト"
-          hint="すべての用途に共通する方針を入力します。"
+          title={translate('settings.aiSettings.prompt')}
+          hint={translate('settings.aiSettings.promptHint')}
           {...settingAnchor('ai', 'commonPrompt')}
         >
           <SettingsTextarea
-            aria-label="共通プロンプト"
+            aria-label={translate('settings.aiSettings.prompt')}
             maxLength={2048}
             value={value.commonPrompt}
             onChange={(e) => change({ ...value, commonPrompt: e.target.value })}
@@ -228,35 +256,36 @@ export function AiSettingsForm({
       )}
       {dialog?.kind === 'delete' && dialog.original && (
         <SettingsDialog
-          title="AIサーバーを削除"
-          applyLabel="削除"
+          title={translate('settings.aiSettings.deleteServer')}
+          applyLabel={translate('settings.aiSettings.delete')}
           onClose={() => setDialog(null)}
           onApply={() =>
             invoke('aiDeleteConnection', [dialog.original, dialog.status?.keyRevision])
           }
         >
           <p>
-            <strong>{dialog.original.name}</strong>を削除しますか？
+            <HostMessage
+              message="settings.aiSettings.deleteConfirmation"
+              values={{ name: <strong>{dialog.original.name}</strong> }}
+            />
           </p>
-          <p className="muted">
-            このPCのAPIキーも削除します。この接続を指定しているAppletやMCPからは利用できなくなります。
-          </p>
+          <p className="muted">{translate('settings.aiSettings.deleteHint')}</p>
         </SettingsDialog>
       )}
       <SettingsSection
-        title="文章生成の試験"
+        title={translate('settings.aiSettings.test')}
         collapsible
-        description="入力は選択した接続先に送信され、課金される場合があります。最初は架空の入力で確認してください。共通プロンプトも適用されます。"
+        description={translate('settings.aiSettings.testHint')}
         {...settingAnchor('ai', 'preview')}
       >
-        <SettingsField title="試験するAIサーバー">
+        <SettingsField title={translate('settings.aiSettings.testServer')}>
           <select
-            aria-label="試験するAIサーバー"
+            aria-label={translate('settings.aiSettings.testServer')}
             value={c?.id ?? ''}
             onChange={(e) => setSelected(e.target.value)}
           >
             <option value="" disabled>
-              サーバーを選択
+              {translate('settings.aiSettings.selectServer')}
             </option>
             {value.connections.map((v) => (
               <option key={v.id} value={v.id}>
@@ -265,25 +294,28 @@ export function AiSettingsForm({
             ))}
           </select>
         </SettingsField>
-        <SettingsField title="今回のモデル" hint="空欄なら選択した接続の既定モデルを使います。">
+        <SettingsField
+          title={translate('settings.aiSettings.modelOverride')}
+          hint={translate('settings.aiSettings.modelOverrideHint')}
+        >
           <SettingsInput
-            aria-label="試験のAIモデル"
+            aria-label={translate('settings.aiSettings.testModel')}
             commitOn="input"
             value={model}
             onChange={(e) => setModel(e.target.value)}
           />
         </SettingsField>
-        <SettingsField title="追加プロンプト">
+        <SettingsField title={translate('settings.aiSettings.extraPrompt')}>
           <SettingsTextarea
-            aria-label="試験の追加プロンプト"
+            aria-label={translate('settings.aiSettings.extraPromptLabel')}
             commitOn="input"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
         </SettingsField>
-        <SettingsField title="入力データ">
+        <SettingsField title={translate('settings.aiSettings.input')}>
           <SettingsTextarea
-            aria-label="試験の入力データ"
+            aria-label={translate('settings.aiSettings.inputLabel')}
             commitOn="input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -313,7 +345,7 @@ export function AiSettingsForm({
               })
             }
           >
-            文章を生成
+            {translate('settings.aiSettings.generate')}
           </button>
           <button
             disabled={pending || !active}
@@ -324,23 +356,23 @@ export function AiSettingsForm({
               })
             }
           >
-            生成を取り消す
+            {translate('settings.aiSettings.cancel')}
           </button>
         </SettingsActions>
 
         {job && (
           <SettingsField
-            title="生成結果"
+            title={translate('settings.aiSettings.result')}
             className="settings-field-wide"
             description={`${
               {
-                queued: '待機中',
-                running: '生成中',
-                completed: '完了',
-                failed: '失敗',
-                canceled: '取消',
+                queued: translate('settings.aiSettings.queued'),
+                running: translate('settings.aiSettings.generating'),
+                completed: translate('settings.aiSettings.completed'),
+                failed: translate('settings.aiSettings.failed'),
+                canceled: translate('settings.aiSettings.canceled'),
               }[job.state]
-            }：${job.model}${job.resultExpired ? ' ／ 生成結果の保持期限を過ぎました。' : ''}`}
+            }：${job.model}${job.resultExpired ? translate('settings.aiSettings.expired') : ''}`}
             error={job.error?.message}
           >
             {job.text && <pre className="ai-preview-result">{job.text}</pre>}

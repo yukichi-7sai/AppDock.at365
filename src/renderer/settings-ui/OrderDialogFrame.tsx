@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useId, type ReactNode } from 'react';
 import { SettingsModal } from './SettingsModal';
 import { SettingsHintIcon } from './SettingsHintIcon';
@@ -15,7 +17,7 @@ export function OrderDialogFrame({
   pending = false,
   applyDisabled = false,
   applyLabel = 'OK',
-  closeLabel = 'ダイアログを閉じる',
+  closeLabel = hostText('settings.orderDialogFrame.close'),
   className = '',
   initialFocus,
   onReady,
@@ -41,6 +43,7 @@ export function OrderDialogFrame({
   onApply(): void;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const id = useId();
   return (
     <SettingsModal
@@ -80,7 +83,7 @@ export function OrderDialogFrame({
         <footer>
           <div>
             <button type="button" disabled={pending} onClick={onClose}>
-              キャンセル
+              {translate('settings.orderDialogFrame.cancel')}
             </button>
             <SettingsButton
               type="button"

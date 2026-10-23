@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { Settings } from '../../shared/contracts';
 import type {
   SettingsPageModel,
@@ -60,8 +61,9 @@ export class SettingsViewClient {
     const pageId = this.model?.content.page.id;
     await this.flush();
     this.accept(await this.transport.get(this.connectionId));
-    if (this.input) throw Error('入力のエラーを修正するか、設定を再読み込みしてください。');
-    if (this.model?.content.page.id !== pageId) throw Error('設定ページが変わりました。');
+    if (this.input) throw Error(hostText('settings.runtime.invalidInput'));
+    if (this.model?.content.page.id !== pageId)
+      throw Error(hostText('settings.runtime.pageChanged'));
     return this.model!;
   }
   accept(next: unknown) {
@@ -169,12 +171,13 @@ export class SettingsViewClient {
       this.accept(await this.transport.get(this.connectionId));
       const m = this.model!;
       const id = m.content.actions[name];
-      if (!id || m.content.page.id !== pageId) throw Error('この設定では利用できない操作です。');
+      if (!id || m.content.page.id !== pageId)
+        throw Error(hostText('settings.runtime.unavailable'));
       if (name === 'set-local-settings' || name === 'open-settings') {
         if (m.content.auxiliary.storage?.signature !== storageSignature)
-          throw Error('設定の保存先が変わりました。再取得してください。');
+          throw Error(hostText('settings.runtime.storageChanged'));
         if (name === 'set-local-settings' && this.input)
-          throw Error('入力のエラーを修正するか、設定を再読み込みしてから切り替えてください。');
+          throw Error(hostText('settings.runtime.invalidSwitch'));
         if (name === 'open-settings' || args.length < 2)
           args = [...args, m.content.auxiliary.storage?.revision];
       }

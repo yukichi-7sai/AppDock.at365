@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { SettingAction, SettingDefinition, SettingSection } from './contracts';
 
 /** Validate references once at the manifest boundary; sections never own settings data. */
@@ -8,17 +9,17 @@ export function parseSettingSections(
 ): SettingSection[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > 32)
-    throw Error('settingSections は32件以下の配列です。');
+    throw Error(hostText('settings.setting-sections.limit'));
   const ids = new Set<string>(),
     usedSettings = new Set<string>(),
     usedActions = new Set<string>();
   const references = (raw: unknown, available: string[], used: Set<string>) => {
     if (raw === undefined) return undefined;
     if (!Array.isArray(raw) || raw.length > available.length)
-      throw Error('設定セクションの参照を確認してください。');
+      throw Error(hostText('settings.setting-sections.reference'));
     return raw.map((key: unknown) => {
       if (typeof key !== 'string' || !available.includes(key) || used.has(key))
-        throw Error('設定セクションには自身の設定・操作を重複なく指定してください。');
+        throw Error(hostText('settings.setting-sections.duplicate'));
       used.add(key);
       return key;
     });
@@ -38,7 +39,7 @@ export function parseSettingSections(
         (typeof section.description !== 'string' || section.description.length > 500)) ||
       (section.collapsible !== undefined && typeof section.collapsible !== 'boolean')
     )
-      throw Error('設定セクションの見出し・IDを確認してください。');
+      throw Error(hostText('settings.setting-sections.heading'));
     ids.add(section.id);
     const fields = references(
       section.settings,
@@ -51,7 +52,7 @@ export function parseSettingSections(
       usedActions,
     );
     if (!fields?.length && !buttons?.length)
-      throw Error('設定セクションには設定か操作が必要です。');
+      throw Error(hostText('settings.setting-sections.empty'));
     return {
       id: section.id,
       title: section.title,
@@ -81,11 +82,18 @@ export function resolveSettingSections(
   if (rest.length)
     result.push({
       id: '$settings',
-      title: sections.length ? 'その他の設定' : '設定',
+      title: sections.length
+        ? hostText('settings.setting-sections.other')
+        : hostText('settings.setting-sections.settings'),
       settings: rest,
       actions: [],
     });
   if (remainingActions.length)
-    result.push({ id: '$actions', title: '操作', settings: [], actions: remainingActions });
+    result.push({
+      id: '$actions',
+      title: hostText('settings.setting-sections.actions'),
+      settings: [],
+      actions: remainingActions,
+    });
   return result;
 }

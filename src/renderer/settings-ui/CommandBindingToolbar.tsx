@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsInput } from './SettingsInput';
 import { ListIcon } from './SettingsListTable';
 import type { ReactNode } from 'react';
@@ -6,6 +7,7 @@ import type { BindingInputFilter } from './useBindingCommandFilter';
 import { CommandListSummary, CommandListToolbar } from './CommandListScroll';
 export function CommandBindingToolbar({
   inputName,
+  inputKind,
   count,
   visibleCount,
   filter,
@@ -19,6 +21,7 @@ export function CommandBindingToolbar({
   clearInputFilter,
 }: {
   inputName: string;
+  inputKind: 'shortcut' | 'gesture';
   count: number;
   visibleCount: number;
   filter: string;
@@ -31,6 +34,7 @@ export function CommandBindingToolbar({
   inputFilter?: BindingInputFilter | null;
   clearInputFilter?(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   return (
     <CommandListToolbar>
       <div className="command-shortcut-tools">
@@ -38,22 +42,32 @@ export function CommandBindingToolbar({
           <span aria-hidden="true">⌕</span>
           <SettingsInput
             type="search"
-            aria-label={`${inputName}のコマンドを検索`}
-            placeholder={`コマンド・${inputName === 'ショートカット' ? 'キー' : inputName}・提供元を検索…`}
+            aria-label={translate('settings.commandBindingToolbar.search', {
+              inputName: inputName,
+            })}
+            placeholder={translate('settings.commandBindingToolbar.searchPlaceholder', {
+              value: inputName,
+            })}
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
           />
         </div>
         <select
           className="shortcut-status-filter"
-          aria-label={`${inputName}の絞り込み`}
+          aria-label={translate('settings.commandBindingToolbar.filter', { inputName: inputName })}
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
         >
-          <option value="all">すべて</option>
-          <option value="assigned">割り当て済み</option>
-          <option value="unassigned">未割り当て</option>
-          {showRegistrationErrors && <option value="conflict">入力の適用エラー</option>}
+          <option value="all">{translate('settings.commandBindingToolbar.all')}</option>
+          <option value="assigned">{translate('settings.commandBindingToolbar.assigned')}</option>
+          <option value="unassigned">
+            {translate('settings.commandBindingToolbar.unassigned')}
+          </option>
+          {showRegistrationErrors && (
+            <option value="conflict">
+              {translate('settings.commandBindingToolbar.applyError')}
+            </option>
+          )}
         </select>
       </div>
       <CommandListSummary
@@ -61,7 +75,11 @@ export function CommandBindingToolbar({
         filter={
           inputFilter ? (
             <CommandProviderFilter
-              label={inputName === 'ジェスチャー' ? 'ジェスチャー' : 'キー'}
+              label={
+                inputKind === 'gesture'
+                  ? translate('settings.commandBindingToolbar.gesture')
+                  : translate('settings.commandBindingToolbar.key')
+              }
               title={inputFilter.label}
               onClear={clearInputFilter}
             />
@@ -74,8 +92,10 @@ export function CommandBindingToolbar({
             <button
               type="button"
               className="settings-list-icon shortcut-order-open"
-              aria-label="実行順…"
-              title={`${inputName}の実行順`}
+              aria-label={translate('settings.commandBindingToolbar.order')}
+              title={translate('settings.commandBindingToolbar.orderLabel', {
+                inputName: inputName,
+              })}
               onClick={onOrder}
             >
               <ListIcon kind="order" />
@@ -89,14 +109,17 @@ export function CommandBindingToolbar({
                   clearInputFilter?.();
                 }}
               >
-                絞り込みを解除
+                {translate('settings.commandBindingToolbar.clear')}
               </button>
             )}
           </>
         }
       >
         <span role="status">
-          {visibleCount} / {count} コマンドを表示
+          {translate('settings.commandBindingToolbar.visibleCount', {
+            visible: visibleCount,
+            total: count,
+          })}
         </span>
       </CommandListSummary>
     </CommandListToolbar>

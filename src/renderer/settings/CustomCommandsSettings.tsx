@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useState } from 'react';
 import type { SettingDefinition, Settings } from '../../shared/contracts';
@@ -30,14 +32,22 @@ import { CommandListSection } from '../settings-ui/CommandListScroll';
 
 const list: SettingDefinition = {
   key: 'definitions',
-  title: 'カスタムコマンド',
+  title: hostText('settings.customCommandsSettings.title'),
   type: 'object-list',
-  itemTitle: 'コマンド',
+  itemTitle: hostText('settings.customCommandsSettings.command'),
   fields: [
-    { key: 'title', title: '名前', type: 'string' },
-    { key: 'typeTitle', title: '種類', type: 'string' },
-    { key: 'providerTitle', title: '提供元', type: 'string' },
-    { key: 'unavailableReason', title: '利用できない理由', type: 'string' },
+    { key: 'title', title: hostText('settings.customCommandsSettings.name'), type: 'string' },
+    { key: 'typeTitle', title: hostText('settings.customCommandsSettings.kind'), type: 'string' },
+    {
+      key: 'providerTitle',
+      title: hostText('settings.customCommandsSettings.owner'),
+      type: 'string',
+    },
+    {
+      key: 'unavailableReason',
+      title: hostText('settings.customCommandsSettings.unavailableReason'),
+      type: 'string',
+    },
   ],
   list: {
     idKey: 'id',
@@ -61,6 +71,7 @@ export function CustomCommandsSettings({
   busy: boolean;
   commands: UiCommand[];
 }) {
+  const { t: translate } = useHostTranslation();
   const items = customItems(settings.customCommands),
     types = auxiliary?.types ?? [];
   const target = useCommandSettingsTarget();
@@ -101,14 +112,10 @@ export function CustomCommandsSettings({
   return (
     <div className="settings-sections custom-commands-settings">
       <CommandListSection
-        title="登録済みコマンド"
+        title={translate('settings.customCommandsSettings.registered')}
         description={[
-          !supported
-            ? 'この保存版には対応していません。自動移行は行いません。JSON編集でversion 2の一覧を保存して作り直してください。'
-            : '',
-          !types.length
-            ? '利用できる種類がありません。種類を提供するAppletを導入すると追加できます。'
-            : '',
+          !supported ? translate('settings.customCommandsSettings.unsupportedVersion') : '',
+          !types.length ? translate('settings.customCommandsSettings.noTypes') : '',
         ]
           .filter(Boolean)
           .join(' ')}
@@ -166,9 +173,9 @@ export function CustomCommandsSettings({
       )}
       {dialog?.kind === 'delete' && (
         <SettingsDialog
-          title="カスタムコマンドを削除"
-          description="割り当ては保持されます。このIDのコマンドが戻るまで実行できません。"
-          applyLabel="削除"
+          title={translate('settings.customCommandsSettings.deleteTitle')}
+          description={translate('settings.customCommandsSettings.deleteHint')}
+          applyLabel={translate('settings.customCommandsSettings.delete')}
           onClose={() => setDialog(null)}
           onApply={() => update([{ op: 'remove', id: dialog.item!.id }], dialog.revision)}
         >
@@ -177,8 +184,8 @@ export function CustomCommandsSettings({
       )}
       {dialog?.kind === 'order' && (
         <SettingsOrderDialog
-          title="コマンドの表示順"
-          listLabel="カスタムコマンド"
+          title={translate('settings.customCommandsSettings.order')}
+          listLabel={translate('settings.customCommandsSettings.title')}
           items={dialog.items}
           onClose={() => setDialog(null)}
           onApply={(ids) => update([{ op: 'reorder', ids }], dialog.revision)}
@@ -200,6 +207,7 @@ function CustomCommandDialog({
   onClose(): void;
   invoke: Invoke;
 }) {
+  const { t: translate } = useHostTranslation();
   const defaults = (id: string) =>
     id === 'appdock.process.start'
       ? { ...defaultProcessLaunch() }
@@ -227,7 +235,11 @@ function CustomCommandDialog({
   const jsonOnly = !type?.fields?.length && typeId !== 'appdock.process.start';
   return (
     <SettingsDialog
-      title={original ? 'カスタムコマンドの編集' : 'カスタムコマンドの追加'}
+      title={
+        original
+          ? translate('settings.customCommandsSettings.edit')
+          : translate('settings.customCommandsSettings.add')
+      }
       onClose={onClose}
       valid={
         !!title.trim() &&
@@ -275,9 +287,12 @@ function CustomCommandDialog({
     >
       {(ready, setError) => (
         <>
-          <SettingsField title="種類" description={type?.description}>
+          <SettingsField
+            title={translate('settings.customCommandsSettings.kind')}
+            description={type?.description}
+          >
             <select
-              aria-label="種類"
+              aria-label={translate('settings.customCommandsSettings.kind')}
               value={typeId}
               disabled={!!original}
               onChange={(e) => {
@@ -290,7 +305,11 @@ function CustomCommandDialog({
                 setInvalidFields({});
               }}
             >
-              {!type && <option value={typeId}>{typeId || '種類がありません'}</option>}
+              {!type && (
+                <option value={typeId}>
+                  {typeId || translate('settings.customCommandsSettings.noType')}
+                </option>
+              )}
               {types.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}
@@ -298,9 +317,9 @@ function CustomCommandDialog({
               ))}
             </select>
           </SettingsField>
-          <SettingsField title="名前">
+          <SettingsField title={translate('settings.customCommandsSettings.name')}>
             <SettingsInput
-              aria-label="名前"
+              aria-label={translate('settings.customCommandsSettings.name')}
               data-initial-focus
               value={title}
               maxLength={100}
@@ -308,11 +327,11 @@ function CustomCommandDialog({
             />
           </SettingsField>
           <SettingsField
-            title="説明"
-            hint="公開すると、MCP・Appletのコマンド一覧にも表示されます。"
+            title={translate('settings.customCommandsSettings.description')}
+            hint={translate('settings.customCommandsSettings.publicHint')}
           >
             <SettingsTextarea
-              aria-label="説明"
+              aria-label={translate('settings.customCommandsSettings.description')}
               value={description}
               maxLength={1000}
               rows={3}
@@ -320,21 +339,25 @@ function CustomCommandDialog({
             />
           </SettingsField>
           <SettingsChoice
-            label="有効"
+            label={translate('settings.customCommandsSettings.enabled')}
             checked={enabled}
             disabled={!type && !enabled}
             onChange={setEnabled}
           />
           <SettingsChoice
-            label="MCP・Appletの共通APIへ公開"
+            label={translate('settings.customCommandsSettings.public')}
             checked={automation}
             disabled={!type?.automation && !automation}
             onChange={setAutomation}
           />
-          {!type?.automation && <p className="muted">この種類は外部公開を許可していません。</p>}
+          {!type?.automation && (
+            <p className="muted">{translate('settings.customCommandsSettings.publicForbidden')}</p>
+          )}
           {oldVersion && type && (
             <SettingsChoice
-              label={`現在の設定形式（${type.configVersion}）へ明示的に更新する`}
+              label={translate('settings.customCommandsSettings.upgradeConfig', {
+                configVersion: type.configVersion,
+              })}
               checked={migrate}
               onChange={(checked) => {
                 setMigrate(checked);
@@ -347,7 +370,7 @@ function CustomCommandDialog({
           )}
           {!jsonOnly && editableConfig && (
             <SettingsChoice
-              label="設定をJSONで編集"
+              label={translate('settings.customCommandsSettings.editJson')}
               checked={jsonMode}
               onChange={(checked) => {
                 if (checked) setJson(JSON.stringify(config, null, 2));
@@ -366,9 +389,9 @@ function CustomCommandDialog({
             />
           )}
           {!editableConfig || jsonMode || jsonOnly ? (
-            <SettingsField title="固定設定（JSON）">
+            <SettingsField title={translate('settings.customCommandsSettings.configJson')}>
               <SettingsTextarea
-                aria-label="固定設定（JSON）"
+                aria-label={translate('settings.customCommandsSettings.configJson')}
                 value={json}
                 readOnly={!editableConfig}
                 rows={10}
@@ -378,7 +401,7 @@ function CustomCommandDialog({
           ) : typeId === 'appdock.input.sendKeys' ? (
             <ShortcutCaptureField
               mode="send"
-              label="送信キー"
+              label={translate('settings.customCommandsSettings.inputKeys')}
               value={typeof config.keys === 'string' ? config.keys : ''}
               onChange={(keys) => setConfig({ ...config, keys })}
               recordingReady={ready}
@@ -417,7 +440,7 @@ function CustomCommandDialog({
                     value={String(config[field.key] ?? '')}
                     onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}
                   >
-                    <option value="">選択してください</option>
+                    <option value="">{translate('settings.customCommandsSettings.select')}</option>
                     {field.options?.map((o) => (
                       <option key={o.value} value={o.value}>
                         {o.label}
@@ -454,7 +477,7 @@ function CustomCommandDialog({
           )}
           {type && (
             <details>
-              <summary>設定Schema</summary>
+              <summary>{translate('settings.customCommandsSettings.schema')}</summary>
               <pre>{JSON.stringify(type.configSchema, null, 2)}</pre>
             </details>
           )}
@@ -474,6 +497,7 @@ function JsonField({
   onChange(value: unknown): void;
   onValidity(valid: boolean): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [text, setText] = useState(JSON.stringify(value ?? null, null, 2));
   const [error, setError] = useState('');
   useSettingsFeedback({ error });
@@ -490,7 +514,7 @@ function JsonField({
             setError('');
             onValidity(true);
           } catch {
-            setError('JSONを修正してください。');
+            setError(translate('settings.customCommandsSettings.invalidJson'));
             onValidity(false);
           }
         }}

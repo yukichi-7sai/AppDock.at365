@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useState } from 'react';
 import { processNames } from '../../shared/command-conditions';
 import type { Keybinding } from '../../shared/keybindings';
@@ -18,7 +20,7 @@ export function useConditionProcesses(when: Keybinding['when']) {
           .filter(Boolean),
       );
     } catch {
-      processError = 'パスを含めず、exe名をカンマまたは改行で区切ってください。';
+      processError = hostText('settings.commandConditionDetails.processHint');
     }
   }
   return { processText, setProcessText, processes, processError };
@@ -40,12 +42,13 @@ export function CommandConditionDetails({
   processes: string[];
   processError: string;
 }) {
+  const { t: translate } = useHostTranslation();
   return (
     <>
       {['global', 'exe'].includes(when.scope) && (
-        <SettingsField title="デスクトップを除外">
+        <SettingsField title={translate('settings.commandConditionDetails.excludeDesktop')}>
           <Toggle
-            label="デスクトップを除外"
+            label={translate('settings.commandConditionDetails.excludeDesktop')}
             checked={when.excludeDesktop ?? false}
             onChange={(excludeDesktop) => onChange({ ...when, excludeDesktop })}
           />
@@ -53,12 +56,15 @@ export function CommandConditionDetails({
       )}
       {when.scope === 'exe' && (
         <SettingsField
-          title="対象のexe名"
-          hint="複数指定した場合は、いずれかに一致すると実行します。"
-          error={processError || (!processes.length ? 'exe名を1件以上入力してください。' : '')}
+          title={translate('settings.commandConditionDetails.processes')}
+          hint={translate('settings.commandConditionDetails.anyProcess')}
+          error={
+            processError ||
+            (!processes.length ? translate('settings.commandConditionDetails.processRequired') : '')
+          }
         >
           <SettingsTextarea
-            aria-label="対象のexe名"
+            aria-label={translate('settings.commandConditionDetails.processes')}
             rows={2}
             value={processText}
             placeholder="notepad.exe, explorer.exe"

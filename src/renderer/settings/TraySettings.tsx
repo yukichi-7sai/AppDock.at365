@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput } from '../settings-ui/SettingsInput';
@@ -34,6 +35,7 @@ export function TraySettings({
   commands: UiCommand[];
   onChange(value: Settings): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [selected, select] = useState<string | null>(null);
   const [dragged, drag] = useState<string | null>(null);
   const [picker, setPicker] = useState<
@@ -45,7 +47,7 @@ export function TraySettings({
     item.type === 'group'
       ? item.title
       : item.type === 'separator'
-        ? '区切り線'
+        ? translate('settings.traySettings.separator')
         : (catalog.find((c) => c.id === item.command)?.title ?? item.command);
   const find = (list: TrayMenuItem[], id: string | null) => {
     for (const item of list) {
@@ -74,7 +76,7 @@ export function TraySettings({
     const id = `tray.${crypto.randomUUID()}`;
     const item: TrayMenuItem =
       type === 'group'
-        ? { id, type, title: '新しいグループ', children: [] }
+        ? { id, type, title: translate('settings.traySettings.newGroup'), children: [] }
         : type === 'separator'
           ? { id, type }
           : { id, type, command: command! };
@@ -154,7 +156,7 @@ export function TraySettings({
           <button
             className="tray-drag"
             draggable
-            aria-label={`${title(item)}をドラッグして移動`}
+            aria-label={translate('settings.traySettings.drag', { value: title(item) })}
             onClick={() => select(item.id)}
             onDragStart={(e) => {
               drag(item.id);
@@ -179,22 +181,27 @@ export function TraySettings({
           >
             <span>
               {item.type === 'group' ? '▾ ' : ''}
-              {title(item) || 'グループ名を入力'}
+              {title(item) || translate('settings.traySettings.groupNamePlaceholder')}
             </span>
             {item.type === 'command' && (
               <small className="command-id">
                 {item.command}
-                {!catalog.find((c) => c.id === item.command)?.available && ' · 現在利用できません'}
+                {!catalog.find((c) => c.id === item.command)?.available &&
+                  translate('settings.traySettings.unavailable')}
               </small>
             )}
-            {item.type === 'group' && <small>グループ · {item.children.length}項目</small>}
+            {item.type === 'group' && (
+              <small>
+                {translate('settings.traySettings.groupSummary', { count: item.children.length })}
+              </small>
+            )}
           </button>
           <div className="tray-row-controls">
             <button
               type="button"
               className="settings-list-icon"
-              aria-label={`${title(item)}を上へ`}
-              title="上へ移動"
+              aria-label={translate('settings.traySettings.up', { value: title(item) })}
+              title={translate('settings.traySettings.upAction')}
               disabled={index === 0}
               onClick={() => move(-1, item.id)}
             >
@@ -203,8 +210,8 @@ export function TraySettings({
             <button
               type="button"
               className="settings-list-icon"
-              aria-label={`${title(item)}を下へ`}
-              title="下へ移動"
+              aria-label={translate('settings.traySettings.down', { value: title(item) })}
+              title={translate('settings.traySettings.downAction')}
               disabled={index === list.length - 1}
               onClick={() => move(1, item.id)}
             >
@@ -213,8 +220,17 @@ export function TraySettings({
             <button
               type="button"
               className="settings-list-icon settings-list-delete"
-              aria-label={`${title(item)}${item.type === 'group' ? 'のグループを解除' : 'をメニューから外す'}`}
-              title={item.type === 'group' ? 'グループを解除' : 'メニューから外す'}
+              aria-label={translate(
+                item.type === 'group'
+                  ? 'settings.traySettings.ungroupLabel'
+                  : 'settings.traySettings.removeLabel',
+                { name: title(item) },
+              )}
+              title={
+                item.type === 'group'
+                  ? translate('settings.traySettings.ungroup')
+                  : translate('settings.traySettings.remove')
+              }
               onClick={() => remove(item.id)}
             >
               <ListIcon kind="delete" />
@@ -240,18 +256,23 @@ export function TraySettings({
       ),
     );
   const commandTitle = (id: string | null) =>
-    id ? (commands.find((c) => c.id === id)?.title ?? id) : '未設定';
+    id
+      ? (commands.find((c) => c.id === id)?.title ?? id)
+      : translate('settings.traySettings.unset');
   return (
-    <section className="settings-sections tray-settings" aria-label="タスクトレイ設定">
-      <SettingsSection title="動作設定">
+    <section
+      className="settings-sections tray-settings"
+      aria-label={translate('settings.traySettings.title')}
+    >
+      <SettingsSection title={translate('settings.traySettings.behavior')}>
         {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
           <SettingsField
             key={key}
             title={hostSettingItem('tray', key).title}
             hint={
               key === 'trayDoubleClickCommand'
-                ? '未設定ならクリックをすぐ実行。設定するとWindowsのダブルクリック判定時間だけ待機します。'
-                : '1回クリックしたときに実行するコマンドです。'
+                ? translate('settings.traySettings.doubleClickHint')
+                : translate('settings.traySettings.clickHint')
             }
             {...settingAnchor('tray', key)}
           >
@@ -260,8 +281,8 @@ export function TraySettings({
                 className="secondary"
                 aria-label={
                   key === 'trayClickCommand'
-                    ? 'トレイクリックのコマンドを選択'
-                    : 'トレイダブルクリックのコマンドを選択'
+                    ? translate('settings.traySettings.chooseClick')
+                    : translate('settings.traySettings.chooseDoubleClick')
                 }
                 onClick={() => setPicker(key)}
               >
@@ -271,7 +292,7 @@ export function TraySettings({
                 <small className="tray-click-id command-id">
                   {settings.host[key]}
                   {!commands.find((c) => c.id === settings.host[key])?.available &&
-                    ' · 現在利用できません'}
+                    translate('settings.traySettings.unavailable')}
                 </small>
               )}
               {key === 'trayDoubleClickCommand' && settings.host[key] && (
@@ -284,7 +305,7 @@ export function TraySettings({
                     })
                   }
                 >
-                  未設定に戻す
+                  {translate('settings.traySettings.clear')}
                 </button>
               )}
             </div>
@@ -292,33 +313,36 @@ export function TraySettings({
         ))}
       </SettingsSection>
       <SettingsSection
-        title="コンテキストメニュー"
-        hint="右クリックで開くメニューです。コマンド・グループ・区切り線を追加し、順番を調整できます。"
+        title={translate('settings.traySettings.menu')}
+        hint={translate('settings.traySettings.menuHint')}
         {...settingAnchor('tray', 'trayMenu')}
       >
         <SettingsActions className="tray-toolbar">
           <button className="secondary accent-action" onClick={() => setPicker('add')}>
-            ＋ コマンド
+            {translate('settings.traySettings.addCommand')}
           </button>
           <button className="secondary accent-action" onClick={() => add('group')}>
-            ＋ グループ
+            {translate('settings.traySettings.addGroup')}
           </button>
           <button className="secondary accent-action" onClick={() => add('separator')}>
-            ＋ 区切り線
+            {translate('settings.traySettings.addSeparator')}
           </button>
         </SettingsActions>
         <SettingsContent className="tray-workspace">
           <div>
             <div className="tray-tree">
               {rows(items)}
-              {!items.length && <p className="muted">コマンドやグループを追加できます。</p>}
+              {!items.length && <p className="muted">{translate('settings.traySettings.empty')}</p>}
             </div>
             {active && (
-              <div className="tray-item-editor" aria-label="選択したメニュー項目">
+              <div
+                className="tray-item-editor"
+                aria-label={translate('settings.traySettings.selected')}
+              >
                 {active.item.type === 'group' ? (
-                  <SettingsField title="グループ名">
+                  <SettingsField title={translate('settings.traySettings.groupName')}>
                     <SettingsInput
-                      aria-label="グループ名"
+                      aria-label={translate('settings.traySettings.groupName')}
                       maxLength={80}
                       value={active.item.title}
                       onChange={(e) =>
@@ -330,36 +354,39 @@ export function TraySettings({
                     />
                   </SettingsField>
                 ) : (
-                  <SettingsField title="配置先">
+                  <SettingsField title={translate('settings.traySettings.location')}>
                     <select
-                      aria-label="メニュー項目の配置先"
+                      aria-label={translate('settings.traySettings.locationLabel')}
                       value={active.parent ?? ''}
                       onChange={(e) => place(e.target.value)}
                     >
-                      <option value="">トップレベル</option>
+                      <option value="">{translate('settings.traySettings.top')}</option>
                       {items
                         .filter((item) => item.type === 'group')
                         .map((item) => (
                           <option key={item.id} value={item.id}>
-                            {item.title || '名前未入力のグループ'}
+                            {item.title || translate('settings.traySettings.unnamedGroup')}
                           </option>
                         ))}
                     </select>
                   </SettingsField>
                 )}
                 {active.item.type === 'group' && (
-                  <small>解除すると、中の項目をその位置のトップレベルへ戻します。</small>
+                  <small>{translate('settings.traySettings.ungroupHint')}</small>
                 )}
               </div>
             )}
           </div>
-          <aside className="tray-preview" aria-label="トレイメニューの表示イメージ">
-            <h4>表示イメージ</h4>
+          <aside
+            className="tray-preview"
+            aria-label={translate('settings.traySettings.previewLabel')}
+          >
+            <h4>{translate('settings.traySettings.preview')}</h4>
             <div className="tray-preview-menu">
               {preview(resolveTrayMenu(items, catalog))}
               {resolveTrayMenu(items, catalog).length > 0 && <hr />}
-              <div className="tray-preview-item">設定…</div>
-              <div className="tray-preview-item">終了</div>
+              <div className="tray-preview-item">{translate('settings.traySettings.settings')}</div>
+              <div className="tray-preview-item">{translate('settings.traySettings.exit')}</div>
             </div>
           </aside>
         </SettingsContent>

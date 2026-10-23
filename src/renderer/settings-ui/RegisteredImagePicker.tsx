@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -38,7 +40,7 @@ export function useImageLibrary() {
   const reload = async () => {
     const current = ++sequence.current;
     try {
-      if (!api) throw Error('画像ライブラリーは利用できません。');
+      if (!api) throw Error(hostText('settings.registeredImagePicker.unavailable'));
       const next = await api.snapshot();
       if (sequence.current === current) {
         setSnapshot(next);
@@ -71,6 +73,7 @@ export function RegisteredImagePreview({
   label?: string;
   fallback?: string;
 }) {
+  const { t: translate } = useHostTranslation();
   const api = useRegisteredImages();
   const [url, setUrl] = useState<string | null>(null);
   const file = imageReference(value) ? value.file : '';
@@ -96,8 +99,11 @@ export function RegisteredImagePreview({
   return url || fallback ? (
     <img className={`registered-image-preview ${className}`} src={url || fallback} alt={label} />
   ) : file ? (
-    <span className="registered-image-missing" aria-label="画像がありません">
-      画像がありません
+    <span
+      className="registered-image-missing"
+      aria-label={translate('settings.registeredImagePicker.empty')}
+    >
+      {translate('settings.registeredImagePicker.empty')}
     </span>
   ) : null;
 }
@@ -124,6 +130,7 @@ export function ImageLibraryBrowser({
   disabled?: boolean;
   onPreview(entry: RegisteredImageEntry): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const api = useRegisteredImages();
   const [limit, setLimit] = useState(64);
   useEffect(() => setLimit(64), [group, query]);
@@ -162,14 +169,14 @@ export function ImageLibraryBrowser({
   return (
     <>
       <div className="image-library-toolbar">
-        <SettingsField title="グループ">
+        <SettingsField title={translate('settings.registeredImagePicker.group')}>
           <select
-            aria-label="画像のグループ"
+            aria-label={translate('settings.registeredImagePicker.groupLabel')}
             value={group}
             onChange={(e) => onGroup(e.target.value)}
           >
-            <option value="all">すべて</option>
-            <option value="unfiled">未分類</option>
+            <option value="all">{translate('settings.registeredImagePicker.all')}</option>
+            <option value="unfiled">{translate('settings.registeredImagePicker.ungrouped')}</option>
             {snapshot.groups.map((g) => (
               <option key={g.id} value={`group:${g.id}`}>
                 {g.name}
@@ -177,10 +184,10 @@ export function ImageLibraryBrowser({
             ))}
           </select>
         </SettingsField>
-        <SettingsField title="検索">
+        <SettingsField title={translate('settings.registeredImagePicker.search')}>
           <SettingsInput
             type="search"
-            aria-label="画像のファイル名を検索"
+            aria-label={translate('settings.registeredImagePicker.searchPlaceholder')}
             value={query}
             onChange={(e) => onQuery(e.target.value)}
           />
@@ -192,19 +199,27 @@ export function ImageLibraryBrowser({
           cardWidth,
           fit: 'contain',
           selection: 'single',
-          empty: '該当する画像はありません。',
+          empty: translate('settings.registeredImagePicker.noMatches'),
           items: filtered.slice(0, limit).map((image) => ({
             id: imageKey(image.ref),
             assetId: `${imageKey(image.ref)}:${image.generation ?? ''}`,
             title: image.ref.file,
-            detail: image.available ? `${image.width} × ${image.height}` : '未到着・読取待ち',
+            detail: image.available
+              ? `${image.width} × ${image.height}`
+              : translate('settings.registeredImagePicker.pending'),
             labels: snapshot.groups
               .filter((g) => g.images.some((ref) => imageKey(ref) === imageKey(image.ref)))
               .map((g) => g.name),
             state: image.available ? 'ready' : (image.state ?? 'missing'),
             selected: !!selected && imageKey(selected) === imageKey(image.ref),
             selectable: !disabled,
-            actions: [{ id: 'preview', title: '拡大', disabled: disabled || !image.available }],
+            actions: [
+              {
+                id: 'preview',
+                title: translate('settings.registeredImagePicker.enlarge'),
+                disabled: disabled || !image.available,
+              },
+            ],
           })),
         }}
         options={{
@@ -212,7 +227,7 @@ export function ImageLibraryBrowser({
             const item = [...images.values()].find(
               (image) => `${imageKey(image.ref)}:${image.generation ?? ''}` === assetId,
             );
-            if (!item || !api) throw Error('画像が更新されました。');
+            if (!item || !api) throw Error(translate('settings.registeredImagePicker.updated'));
             return api.galleryImage(item.ref, item.generation ?? '', edge);
           },
           select: (id) => {
@@ -226,7 +241,7 @@ export function ImageLibraryBrowser({
       />
       {filtered.length > limit && (
         <button type="button" className="secondary" onClick={() => setLimit(limit + 64)}>
-          さらに表示（残り{filtered.length - limit}件）
+          {translate('settings.registeredImagePicker.more', { count: filtered.length - limit })}
         </button>
       )}
     </>
@@ -241,6 +256,7 @@ export function RegisteredImagePicker({
   onSelect(image: RegisteredImageRef | null): Promise<unknown> | void;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const library = useImageLibrary();
   const [selected, setSelected] = useState(current),
     [group, setGroup] = useState('all'),
@@ -262,7 +278,7 @@ export function RegisteredImagePicker({
         setSizeError(view.error);
       })
       .catch(() => {
-        if (live) setSizeError('表示サイズを読み取れませんでした。');
+        if (live) setSizeError(translate('settings.registeredImagePicker.sizeUnreadable'));
       });
     return () => {
       live = false;
@@ -283,19 +299,19 @@ export function RegisteredImagePicker({
   };
   return (
     <SettingsDialog
-      title="画像を選択"
-      description="登録した原画像は、この編集をキャンセルしてもライブラリーに残ります。"
+      title={translate('settings.registeredImagePicker.select')}
+      description={translate('settings.registeredImagePicker.keepOriginal')}
       error={[library.error, sizeError].filter(Boolean).join('\n')}
-      errorTarget="画像の選択"
+      errorTarget={translate('settings.registeredImagePicker.selection')}
       errorAction={
         sizeError ? (
           <button type="button" onClick={() => saveWidth(cardWidth)}>
-            保存を再試行
+            {translate('settings.registeredImagePicker.retry')}
           </button>
         ) : undefined
       }
       className="image-library-dialog"
-      applyLabel="画像を使う"
+      applyLabel={translate('settings.registeredImagePicker.use')}
       valid={!!library.api && !!selected && !registering}
       onClose={() => {
         if (!applied.current) onClose();
@@ -329,9 +345,9 @@ export function RegisteredImagePicker({
             }
           }}
         >
-          ライブラリーに登録
+          {translate('settings.registeredImagePicker.register')}
         </button>
-        <span>{selected?.file ?? '画像なし'}</span>
+        <span>{selected?.file ?? translate('settings.registeredImagePicker.none')}</span>
       </div>
       <GallerySizeControl
         value={cardWidth}
@@ -363,7 +379,7 @@ export function RegisteredImagePicker({
             <header className="image-library-preview-heading">
               <h2 id="picker-preview-title">{preview.ref.file}</h2>
               <button type="button" data-initial-focus onClick={() => setPreview(null)}>
-                閉じる
+                {translate('settings.registeredImagePicker.close')}
               </button>
             </header>
           }
@@ -381,6 +397,7 @@ export function RegisteredGalleryPreview({
   entry: RegisteredImageEntry;
   groups: ImageLibrarySnapshot['groups'];
 }) {
+  const { t: translate } = useHostTranslation();
   const api = useRegisteredImages();
   const labels = groups
     .filter((g) => g.images.some((ref) => imageKey(ref) === imageKey(entry.ref)))
@@ -392,11 +409,11 @@ export function RegisteredGalleryPreview({
         title: entry.ref.file,
         state: entry.available ? 'ready' : (entry.state ?? 'missing'),
         detail: `${entry.width} × ${entry.height} · ${entry.ref.file.split('.').at(-1)?.toUpperCase()} · ${(entry.bytes / 1024).toFixed(1)} KiB`,
-        labels: labels.length ? labels : ['未分類'],
+        labels: labels.length ? labels : [translate('settings.registeredImagePicker.ungrouped')],
       }}
       image={async () => {
         const source = await api?.preview(entry.ref, true);
-        if (!source) throw Error('画像を読み込めません。');
+        if (!source) throw Error(translate('settings.registeredImagePicker.unreadable'));
         return source;
       }}
     />
@@ -405,7 +422,7 @@ export function RegisteredGalleryPreview({
 export function RegisteredImageInput({
   value,
   onChange,
-  label = '画像',
+  label = hostText('settings.registeredImagePicker.image'),
   disabled = false,
 }: {
   value: unknown;
@@ -413,24 +430,41 @@ export function RegisteredImageInput({
   label?: string;
   disabled?: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const [open, setOpen] = useState(false);
   const ref = imageReference(value) ? value : null;
   const api = useRegisteredImages();
-  const action = ref ? '変更' : '選択';
+
   return (
     <div className="registered-image-input" role="group" aria-label={label}>
       <button
         type="button"
         className="registered-image-input-preview"
-        aria-label={`${label}を${action}`}
-        title={`画像を${action}`}
+        aria-label={translate(
+          ref
+            ? 'settings.registeredImagePicker.changeLabel'
+            : 'settings.registeredImagePicker.chooseLabel',
+          { label },
+        )}
+        title={translate(
+          ref
+            ? 'settings.registeredImagePicker.changeImage'
+            : 'settings.registeredImagePicker.chooseImage',
+        )}
         disabled={disabled || !api}
         onClick={() => setOpen(true)}
       >
         {ref ? (
-          <RegisteredImagePreview value={ref} label={`${label}のプレビュー`} />
+          <RegisteredImagePreview
+            value={ref}
+            label={translate('settings.registeredImagePicker.preview', { label: label })}
+          />
         ) : (
-          <span className="registered-image-empty" role="img" aria-label="画像なし">
+          <span
+            className="registered-image-empty"
+            role="img"
+            aria-label={translate('settings.registeredImagePicker.none')}
+          >
             <Icon name="image" size={28} />
           </span>
         )}
@@ -438,8 +472,8 @@ export function RegisteredImageInput({
       <button
         type="button"
         className="registered-image-action"
-        aria-label={`${label}を外す`}
-        title="画像を外す"
+        aria-label={translate('settings.registeredImagePicker.remove', { label: label })}
+        title={translate('settings.registeredImagePicker.removeImage')}
         disabled={disabled || !ref}
         onClick={() => onChange(null)}
       >

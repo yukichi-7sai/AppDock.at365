@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import { aiId, parseAiSettings, type AiConnectionSettings } from '../../shared/ai';
 import { AiOpenAiChat } from './ai-openai-chat';
@@ -15,7 +16,7 @@ export class AiSettingsController {
   ) {}
   private connection(value: unknown) {
     const c = parseAiSettings({ connections: [value] }).connections[0];
-    if (!c.name.trim() || !c.baseUrl) throw Error('名前とAPIのURLを入力してください。');
+    if (!c.name.trim() || !c.baseUrl) throw Error(hostText('settings.ai-settings.nameAndUrl'));
     return { ...c, name: c.name.trim() };
   }
   private current() {
@@ -29,7 +30,7 @@ export class AiSettingsController {
       JSON.stringify(found ?? null) !== JSON.stringify(original) ||
       (found && keyRevision !== this.secrets.revision(c.id))
     )
-      throw Error('この接続は別の場所で変更されました。キャンセルして開き直してください。');
+      throw Error(hostText('settings.ai-settings.conflict'));
   }
   private key(c: AiConnectionSettings, key: unknown) {
     if (
@@ -37,11 +38,10 @@ export class AiSettingsController {
       key !== null &&
       (typeof key !== 'string' || key.length > 8192 || /[\x00-\x1f\x7f]/.test(key))
     )
-      throw Error('APIキーは改行を含まない8192文字以下の文字列です。');
+      throw Error(hostText('settings.ai-settings.invalidKey'));
     if (c.authentication === 'none') return undefined;
     const resolved = key == null ? this.secrets.key(c) : (key as string);
-    if (!resolved)
-      throw Error('APIキーを入力してください。接続先を変更した場合は再入力が必要です。');
+    if (!resolved) throw Error(hostText('settings.ai-settings.keyRequired'));
     return resolved;
   }
   save(value: unknown, original: unknown, key: unknown, keyRevision: unknown) {
@@ -96,7 +96,7 @@ export class AiSettingsController {
       new Set(ordered).size !== ids.length ||
       ordered.some((id) => !ids.includes(id))
     )
-      throw Error('接続の一覧が変更されました。キャンセルして開き直してください。');
+      throw Error(hostText('settings.ai-settings.orderConflict'));
     const ai = {
       ...current,
       connections: ordered.map((id) => current.connections.find((c) => c.id === id)!),
@@ -105,7 +105,7 @@ export class AiSettingsController {
     this.changed();
   }
   async models(value: unknown, key: unknown, requestId: unknown = randomUUID()) {
-    if (!aiId(requestId)) throw Error('モデル取得の要求IDが不正です。');
+    if (!aiId(requestId)) throw Error(hostText('settings.ai-settings.invalidRequest'));
     const c = this.connection(value),
       resolved = this.key(c, key);
     this.cancelModels();
@@ -114,7 +114,7 @@ export class AiSettingsController {
     const timer = setTimeout(() => abort.abort(), 5000);
     try {
       const result = await this.adapter.models(c, resolved, abort.signal);
-      if (abort.signal.aborted) throw Error('モデル一覧の取得を取り消しました。');
+      if (abort.signal.aborted) throw Error(hostText('settings.ai-settings.canceled'));
       return result;
     } finally {
       clearTimeout(timer);

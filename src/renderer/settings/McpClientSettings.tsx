@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useRef, useState } from 'react';
 import type { Settings, SettingDefinition } from '../../shared/contracts';
@@ -25,13 +27,13 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 type Invoke = (name: string, args?: unknown[]) => Promise<any>;
 const definition: SettingDefinition = {
   key: 'connections',
-  title: 'MCP接続先',
+  title: hostText('settings.mcpClientSettings.title'),
   type: 'object-list',
-  itemTitle: '接続先',
+  itemTitle: hostText('settings.mcpClientSettings.server'),
   fields: [
-    { key: 'name', title: '名前', type: 'string' },
-    { key: 'transport', title: '接続方式', type: 'string' },
-    { key: 'status', title: 'このPCの状態', type: 'string' },
+    { key: 'name', title: hostText('settings.mcpClientSettings.name'), type: 'string' },
+    { key: 'transport', title: hostText('settings.mcpClientSettings.transport'), type: 'string' },
+    { key: 'status', title: hostText('settings.mcpClientSettings.deviceState'), type: 'string' },
   ],
   list: {
     idKey: 'id',
@@ -41,20 +43,20 @@ const definition: SettingDefinition = {
   },
 };
 const states: Record<string, string> = {
-  unconfigured: '未設定',
+  unconfigured: hostText('settings.mcpClientSettings.unconfigured'),
   disabled: 'OFF',
-  disconnected: '未接続',
-  connecting: '接続中',
-  connected: '接続済み',
-  error: '要確認',
+  disconnected: hostText('settings.mcpClientSettings.disconnected'),
+  connecting: hostText('settings.mcpClientSettings.connecting'),
+  connected: hostText('settings.mcpClientSettings.connected'),
+  error: hostText('settings.mcpClientSettings.attention'),
 };
 const jobStates: Record<string, string> = {
-  running: '実行中',
-  succeeded: '応答を受領',
-  'tool-error': 'ツール側のエラー',
-  failed: '失敗',
-  cancelled: '待機を取消',
-  'outcome-unknown': '結果不明',
+  running: hostText('settings.mcpClientSettings.running'),
+  succeeded: hostText('settings.mcpClientSettings.completed'),
+  'tool-error': hostText('settings.mcpClientSettings.toolError'),
+  failed: hostText('settings.mcpClientSettings.failed'),
+  cancelled: hostText('settings.mcpClientSettings.canceled'),
+  'outcome-unknown': hostText('settings.mcpClientSettings.unknownResult'),
 };
 export function McpClientSettingsForm({
   settings,
@@ -67,6 +69,7 @@ export function McpClientSettingsForm({
   invoke: Invoke;
   busy: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const items = settings.mcpServers?.items ?? [];
   const [dialog, setDialog] = useState<
     | null
@@ -116,9 +119,9 @@ export function McpClientSettingsForm({
   return (
     <div className="settings-sections">
       <SettingsSection
-        title="登録した接続先"
-        hint="登録したツールをAppDockから利用できます。"
-        description="名前は共有し、接続設定・認証情報・許可はこのPCだけに保存します。"
+        title={translate('settings.mcpClientSettings.registered')}
+        hint={translate('settings.mcpClientSettings.registeredHint')}
+        description={translate('settings.mcpClientSettings.localHint')}
         {...settingAnchor('mcp-client', 'connections')}
       >
         <SettingsListTable
@@ -157,13 +160,13 @@ export function McpClientSettingsForm({
         />
       </SettingsSection>
       <SettingsSection
-        title="ツールの確認と実行"
-        hint="接続先を選ぶと、そのサーバーのツールを取得できます。"
-        description="実行ボタンを押すと操作先へ引数を送信します。"
+        title={translate('settings.mcpClientSettings.tools')}
+        hint={translate('settings.mcpClientSettings.toolsHint')}
+        description={translate('settings.mcpClientSettings.executionHint')}
       >
-        <SettingsField title="接続先">
+        <SettingsField title={translate('settings.mcpClientSettings.server')}>
           <select
-            aria-label="確認するMCP接続先"
+            aria-label={translate('settings.mcpClientSettings.serverLabel')}
             value={serverId}
             disabled={pending}
             onChange={(e) => {
@@ -174,7 +177,7 @@ export function McpClientSettingsForm({
               setResult(undefined);
             }}
           >
-            <option value="">選択してください</option>
+            <option value="">{translate('settings.mcpClientSettings.select')}</option>
             {items.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.name}
@@ -194,15 +197,15 @@ export function McpClientSettingsForm({
             })
           }
         >
-          接続してツールを取得
+          {translate('settings.mcpClientSettings.fetchTools')}
         </button>
         {tools.length > 0 && (
           <SettingsField
-            title="ツール"
+            title={translate('settings.mcpClientSettings.tool')}
             description={[tool?.description, tool?.unsupportedReason].filter(Boolean).join(' ／ ')}
           >
             <select
-              aria-label="MCPツール"
+              aria-label={translate('settings.mcpClientSettings.toolLabel')}
               value={tool?.name ?? ''}
               disabled={pending}
               onChange={(e) => {
@@ -212,11 +215,11 @@ export function McpClientSettingsForm({
                   void run(async () => setTool((await invoke('mcpTool', [serverId, name])).tool));
               }}
             >
-              <option value="">選択してください</option>
+              <option value="">{translate('settings.mcpClientSettings.select')}</option>
               {tools.map((t) => (
                 <option key={t.name} value={t.name}>
                   {t.title ?? t.name}
-                  {t.unsupportedReason ? '（未対応）' : ''}
+                  {t.unsupportedReason ? translate('settings.mcpClientSettings.unsupported') : ''}
                 </option>
               ))}
             </select>
@@ -233,18 +236,18 @@ export function McpClientSettingsForm({
               })
             }
           >
-            続きを取得
+            {translate('settings.mcpClientSettings.more')}
           </button>
         )}
         {tool && (
           <>
             <details>
-              <summary>引数のSchema</summary>
+              <summary>{translate('settings.mcpClientSettings.schema')}</summary>
               <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
             </details>
-            <SettingsField title="引数（JSON）">
+            <SettingsField title={translate('settings.mcpClientSettings.args')}>
               <SettingsTextarea
-                aria-label="MCPツールの引数"
+                aria-label={translate('settings.mcpClientSettings.argsLabel')}
                 rows={6}
                 value={args}
                 onChange={(e) => setArgs(e.target.value)}
@@ -269,14 +272,16 @@ export function McpClientSettingsForm({
                 )
               }
             >
-              ツールを実行
+              {translate('settings.mcpClientSettings.execute')}
             </button>
           </>
         )}
       </SettingsSection>
       <SettingsSection
-        title="実行状況"
-        description={`${!auxiliary?.jobs.length ? '実行したジョブはありません。' : ''}完了後10分間保持します。受付・応答の受領と、操作先での効果は別です。`}
+        title={translate('settings.mcpClientSettings.jobs')}
+        description={translate('settings.mcpClientSettings.jobsHint', {
+          value: !auxiliary?.jobs.length ? translate('settings.mcpClientSettings.noJobs') : '',
+        })}
       >
         {auxiliary?.jobs.map((j) => (
           <SettingsField
@@ -296,7 +301,7 @@ export function McpClientSettingsForm({
                   void run(async () => setResult(await invoke('mcpGetJob', [j.jobId])))
                 }
               >
-                結果を表示
+                {translate('settings.mcpClientSettings.showResult')}
               </button>
               {j.state === 'running' && (
                 <button
@@ -305,14 +310,16 @@ export function McpClientSettingsForm({
                     void run(async () => setResult(await invoke('mcpCancelJob', [j.jobId])))
                   }
                 >
-                  取り消す
+                  {translate('settings.mcpClientSettings.cancel')}
                 </button>
               )}
             </SettingsActions>
           </SettingsField>
         ))}
         {result && (
-          <pre aria-label="MCP実行結果">{JSON.stringify(result, null, 2).slice(0, 65536)}</pre>
+          <pre aria-label={translate('settings.mcpClientSettings.result')}>
+            {JSON.stringify(result, null, 2).slice(0, 65536)}
+          </pre>
         )}
       </SettingsSection>
       {dialog?.kind === 'edit' && (
@@ -325,9 +332,9 @@ export function McpClientSettingsForm({
       )}
       {dialog?.kind === 'delete' && (
         <SettingsDialog
-          title="接続先の削除"
-          description="共有名簿から削除します。参照するコマンドと入力割当は残り、利用できなくなります。"
-          applyLabel="削除"
+          title={translate('settings.mcpClientSettings.deleteTitle')}
+          description={translate('settings.mcpClientSettings.deleteHint')}
+          applyLabel={translate('settings.mcpClientSettings.delete')}
           onClose={() => setDialog(null)}
           onApply={() => update({ op: 'remove', id: dialog.item!.id }, dialog.revision)}
         >
@@ -336,8 +343,8 @@ export function McpClientSettingsForm({
       )}
       {dialog?.kind === 'order' && (
         <SettingsOrderDialog
-          title="接続先の表示順"
-          listLabel="MCP接続先"
+          title={translate('settings.mcpClientSettings.order')}
+          listLabel={translate('settings.mcpClientSettings.title')}
           items={dialog.items.map((i) => ({ ...i, title: i.name }))}
           onClose={() => setDialog(null)}
           onApply={(ids) => update({ op: 'reorder', ids }, dialog.revision)}
@@ -357,6 +364,7 @@ function McpConnectionDialog({
   onApply(value: Record<string, unknown>): Promise<unknown>;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [id] = useState(() => original?.id ?? crypto.randomUUID()),
     [name, setName] = useState(original?.name ?? ''),
     [description, setDescription] = useState(original?.description ?? '');
@@ -371,7 +379,11 @@ function McpConnectionDialog({
   const set = (part: Partial<McpConnection>) => setConnection({ ...connection, ...part });
   return (
     <SettingsDialog
-      title={original ? 'MCP接続先の編集' : 'MCP接続先の追加'}
+      title={
+        original
+          ? translate('settings.mcpClientSettings.edit')
+          : translate('settings.mcpClientSettings.add')
+      }
       onClose={onClose}
       valid={!!name.trim()}
       onApply={() =>
@@ -387,31 +399,31 @@ function McpConnectionDialog({
         })
       }
     >
-      <SettingsField title="名前">
+      <SettingsField title={translate('settings.mcpClientSettings.name')}>
         <SettingsInput
-          aria-label="名前"
+          aria-label={translate('settings.mcpClientSettings.name')}
           data-initial-focus
           value={name}
           maxLength={160}
           onChange={(e) => setName(e.target.value)}
         />
       </SettingsField>
-      <SettingsField title="説明">
+      <SettingsField title={translate('settings.mcpClientSettings.description')}>
         <SettingsTextarea
-          aria-label="説明"
+          aria-label={translate('settings.mcpClientSettings.description')}
           value={description}
           maxLength={1024}
           onChange={(e) => setDescription(e.target.value)}
         />
       </SettingsField>
       <SettingsChoice
-        label="このPCで接続を許可する"
+        label={translate('settings.mcpClientSettings.allow')}
         checked={connection.enabled}
         onChange={(enabled) => set({ enabled })}
       />
-      <SettingsField title="接続方式">
+      <SettingsField title={translate('settings.mcpClientSettings.transport')}>
         <select
-          aria-label="接続方式"
+          aria-label={translate('settings.mcpClientSettings.transport')}
           value={connection.transport}
           onChange={(e) => {
             setConnection({
@@ -425,36 +437,36 @@ function McpConnectionDialog({
           }}
         >
           <option value="http">Streamable HTTP</option>
-          <option value="stdio">stdio（EXEを起動）</option>
+          <option value="stdio">{translate('settings.mcpClientSettings.transportStdio')}</option>
         </select>
       </SettingsField>
       {connection.transport === 'http' ? (
         <>
-          <SettingsField title="MCPのURL">
+          <SettingsField title={translate('settings.mcpClientSettings.url')}>
             <SettingsInput
-              aria-label="MCPのURL"
+              aria-label={translate('settings.mcpClientSettings.url')}
               value={connection.url}
               placeholder="http://localhost:3000/mcp"
               onChange={(e) => set({ url: e.target.value })}
             />
           </SettingsField>
-          <SettingsField title="認証">
+          <SettingsField title={translate('settings.mcpClientSettings.auth')}>
             <select
-              aria-label="認証"
+              aria-label={translate('settings.mcpClientSettings.auth')}
               value={connection.authentication}
               onChange={(e) => set({ authentication: e.target.value as 'none' | 'bearer' })}
             >
-              <option value="none">なし</option>
+              <option value="none">{translate('settings.mcpClientSettings.none')}</option>
               <option value="bearer">Bearer</option>
             </select>
           </SettingsField>
           {connection.authentication === 'bearer' && (
             <SettingsField
               title="Bearer token"
-              description="認証情報はこのPCに暗号化保存します。URLを変えたときは再入力してください。"
+              description={translate('settings.mcpClientSettings.authHint')}
             >
               <SettingsChoice
-                label="Bearerを入力・置換する"
+                label={translate('settings.mcpClientSettings.bearer')}
                 checked={replaceToken}
                 onChange={setReplaceToken}
               />
@@ -472,68 +484,67 @@ function McpConnectionDialog({
         </>
       ) : (
         <>
-          <SettingsField title="実行ファイル">
+          <SettingsField title={translate('settings.mcpClientSettings.executable')}>
             <SettingsInput
-              aria-label="実行ファイル"
+              aria-label={translate('settings.mcpClientSettings.executable')}
               value={connection.command}
               placeholder="C:\\Tools\\server.exe"
               onChange={(e) => set({ command: e.target.value })}
             />
           </SettingsField>
-          <SettingsField title="起動引数（JSON配列）">
+          <SettingsField title={translate('settings.mcpClientSettings.argsArray')}>
             <SettingsTextarea
-              aria-label="起動引数（JSON配列）"
+              aria-label={translate('settings.mcpClientSettings.argsArray')}
               value={args}
               rows={3}
               onChange={(e) => setArgs(e.target.value)}
             />
           </SettingsField>
-          <SettingsField title="作業フォルダー">
+          <SettingsField title={translate('settings.mcpClientSettings.workingDirectory')}>
             <SettingsInput
-              aria-label="作業フォルダー"
+              aria-label={translate('settings.mcpClientSettings.workingDirectory')}
               value={connection.cwd}
               onChange={(e) => set({ cwd: e.target.value })}
             />
           </SettingsField>
           <SettingsChoice
-            label="環境変数を入力・置換する"
+            label={translate('settings.mcpClientSettings.environment')}
             checked={replaceEnvironment}
             onChange={setReplaceEnvironment}
           />
           {!!status?.environmentNames.length && (
-            <p>登録済み: {status.environmentNames.join(', ')}</p>
+            <p>
+              {translate('settings.mcpClientSettings.registeredEnvironment')}
+              {status.environmentNames.join(', ')}
+            </p>
           )}
           {replaceEnvironment && (
-            <SettingsField title="環境変数（JSON）">
+            <SettingsField title={translate('settings.mcpClientSettings.environmentJson')}>
               <SettingsTextarea
-                aria-label="環境変数（JSON）"
+                aria-label={translate('settings.mcpClientSettings.environmentJson')}
                 value={environment}
                 rows={4}
                 onChange={(e) => setEnvironment(e.target.value)}
               />
             </SettingsField>
           )}
-          <p className="muted">
-            指定したEXEを引数配列で起動します。環境変数の値は暗号化保存します。秘密値を起動引数に入れないでください。
-          </p>
+          <p className="muted">{translate('settings.mcpClientSettings.processHint')}</p>
         </>
       )}
       <SettingsChoice
-        label="MCPへ公開する"
+        label={translate('settings.mcpClientSettings.publish')}
         checked={connection.published}
         onChange={(published) => set({ published })}
       />
-      <SettingsField title="公開するツール名（1行1件）">
+      <SettingsField title={translate('settings.mcpClientSettings.publishedTools')}>
         <SettingsTextarea
-          aria-label="公開するツール名（1行1件）"
+          aria-label={translate('settings.mcpClientSettings.publishedTools')}
           rows={4}
           value={connection.publishedTools.join('\n')}
           onChange={(e) => set({ publishedTools: e.target.value.split('\n') })}
         />
       </SettingsField>
-      <p className="muted">
-        公開する名前を正確に指定してください。空の一覧ではツールを公開しません。操作の許可でMCP接続先の利用をONにした場合だけ外部から利用できます。
-      </p>
+      <p className="muted">{translate('settings.mcpClientSettings.publishedToolsHint')}</p>
     </SettingsDialog>
   );
 }

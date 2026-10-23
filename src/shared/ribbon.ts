@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 export type RibbonPlacement = 'top' | 'bottom';
 export interface AppletRibbonItem {
   id: string;
@@ -61,7 +62,7 @@ export interface RibbonLayout {
 export function parseRibbonColor(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== 'string' || !/^#[a-fA-F0-9]{6}$/.test(value))
-    throw Error('色は #RRGGBB または色なしで指定してください。');
+    throw Error(hostText('settings.ribbon.color'));
   return value.toUpperCase();
 }
 export type RibbonBadgeTarget = { pageId: string } | { collectionKey: string; itemId: string };
@@ -73,7 +74,7 @@ export type RibbonAnchor = { x: number; y: number; width: number; height: number
 export function parseRibbonBadge(value: unknown): RibbonBadge {
   if (value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw Error('バッジの形式が不正です。');
+    throw Error(hostText('settings.ribbon.badge'));
   const v = value as Record<string, unknown>;
   if (
     !['count', 'dot'].includes(v.kind as string) ||
@@ -87,7 +88,7 @@ export function parseRibbonBadge(value: unknown): RibbonBadge {
         /[\x00-\x1f\x7f]/.test(v.label))) ||
     (v.kind === 'count' && (!Number.isSafeInteger(v.count) || (v.count as number) < 0))
   )
-    throw Error('バッジは0以上の整数または点と、120文字以下の説明で指定してください。');
+    throw Error(hostText('settings.ribbon.badgeValue'));
   if (v.kind === 'count' && v.count === 0) return null;
   return {
     kind: v.kind,
@@ -101,7 +102,7 @@ export function ribbonBadgeView(badge: RibbonBadge): RibbonBadgeView | undefined
     ? {
         kind: 'count',
         text: badge.count > 99 ? '99+' : String(badge.count),
-        description: `${badge.label ?? '件数'}: ${badge.count}`,
+        description: `${badge.label ?? hostText('settings.ribbon.count')}: ${badge.count}`,
       }
-    : { kind: 'dot', text: '', description: badge.label ?? '新しい情報があります' };
+    : { kind: 'dot', text: '', description: badge.label ?? hostText('settings.ribbon.newInfo') };
 }

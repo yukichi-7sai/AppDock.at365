@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ExtensionSnapshot, UpdateState } from '../../shared/contracts';
@@ -15,12 +17,12 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { CommandListToolbar } from '../settings-ui/CommandListScroll';
 
 const states = {
-  running: '実行中',
-  stopped: '停止中',
-  waiting: '開始待ち',
-  starting: '起動中',
-  stopping: '停止処理中',
-  error: 'エラー',
+  running: hostText('settings.appletManagementSettings.running'),
+  stopped: hostText('settings.appletManagementSettings.stopped'),
+  waiting: hostText('settings.appletManagementSettings.waiting'),
+  starting: hostText('settings.appletManagementSettings.starting'),
+  stopping: hostText('settings.appletManagementSettings.stopping'),
+  error: hostText('settings.appletManagementSettings.error'),
 };
 type Invoke = (name: string, args?: unknown[]) => Promise<any>;
 async function applyPackage(invoke: Invoke, id: string) {
@@ -37,6 +39,7 @@ async function applyPackage(invoke: Invoke, id: string) {
 }
 
 function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
+  const { t: translate } = useHostTranslation();
   const errorId = useId();
   const [source, setSource] = useState('');
   const [choosing, setChoosing] = useState(false);
@@ -59,16 +62,16 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
   }, []);
   return (
     <SettingsDialog
-      title="Appletをインストール"
+      title={translate('settings.appletManagementSettings.install')}
       className="applet-install-dialog"
       onClose={() => {
         if (!currentPlan.current) close();
       }}
       valid={!choosing}
-      applyLabel="インストールして再起動"
-      message={checking ? '配布物を取得・検証しています…' : ''}
-      errorTarget="配布元"
-      description="AppletはこのPCでコードを実行します。信頼できる配布元を指定してください。インストール時に内容を検証し、問題がなければ導入してAppDockを再起動します。"
+      applyLabel={translate('settings.appletManagementSettings.installRestart')}
+      message={checking ? translate('settings.appletManagementSettings.downloading') : ''}
+      errorTarget={translate('settings.appletManagementSettings.source')}
+      description={translate('settings.appletManagementSettings.sourceHint')}
       cancelWhilePending={checking}
       onApply={async () => {
         // Read the current field at the explicit action, including a pending blur commit.
@@ -104,29 +107,29 @@ function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
       {(_ready, setError, { error }) => (
         <>
           <SettingsField
-            title="配布元"
-            description="URLまたはフォルダー"
+            title={translate('settings.appletManagementSettings.source')}
+            description={translate('settings.appletManagementSettings.location')}
             error={error}
-            hint="URL、配布フォルダー、または展開済みAppletのフォルダーを指定できます。"
+            hint={translate('settings.appletManagementSettings.locationHint')}
           >
             <div className="applet-install-source">
               <SettingsInput
                 ref={input}
                 id={`${errorId}-source`}
-                aria-label="Appletの配布元"
+                aria-label={translate('settings.appletManagementSettings.locationLabel')}
                 aria-invalid={!!error}
                 value={source}
                 disabled={choosing}
                 commitOn="blur-or-enter"
                 data-initial-focus
-                placeholder="https://github.com/owner/repository または C:\Applets\Sample"
+                placeholder={translate('settings.appletManagementSettings.locationPlaceholder')}
                 onChange={(event) => setSource(event.target.value)}
               />
               <button
                 type="button"
                 className="settings-list-icon"
-                title="配布フォルダーを選ぶ"
-                aria-label="配布フォルダーを選ぶ"
+                title={translate('settings.appletManagementSettings.selectFolder')}
+                aria-label={translate('settings.appletManagementSettings.selectFolder')}
                 disabled={choosing}
                 onClick={() => {
                   setChoosing(true);
@@ -165,6 +168,7 @@ export function AppletManagementSettings({
   updates?: UpdateState;
   invoke: Invoke;
 }) {
+  const { t: translate } = useHostTranslation();
   const [query, setQuery] = useState('');
   const [pending, setPending] = useState('');
   const [error, setError] = useState('');
@@ -193,7 +197,12 @@ export function AppletManagementSettings({
   const move = (id: string, destination: string) =>
     run(id, () => invoke('openAppletDestination', [id, destination]));
   const status = !updates?.busy ? (updates?.completion?.message ?? updates?.phase) : '';
-  useSettingsFeedback({ error, message: status, busy, target: 'Appletの管理' });
+  useSettingsFeedback({
+    error,
+    message: status,
+    busy,
+    target: translate('settings.appletManagementSettings.title'),
+  });
   return (
     <section
       className="settings-list applet-management"
@@ -201,13 +210,19 @@ export function AppletManagementSettings({
     >
       {management && (!management.packagesAvailable || !!management.discoveryIssueCount) && (
         <SettingsField
-          title={management.discoveryIssueCount ? 'Appletの検出' : '利用できる操作'}
+          title={
+            management.discoveryIssueCount
+              ? translate('settings.appletManagementSettings.discovery')
+              : translate('settings.appletManagementSettings.operations')
+          }
           description={[
             !management?.packagesAvailable
-              ? 'インストール・更新の適用・アンインストールは配布版のAppDockで利用できます。'
+              ? translate('settings.appletManagementSettings.portableOnly')
               : '',
             management?.discoveryIssueCount
-              ? `読み込めなかったAppletがあります（${management.discoveryIssueCount}件）。`
+              ? translate('settings.appletManagementSettings.discoveryIssues', {
+                  discoveryIssueCount: management.discoveryIssueCount,
+                })
               : '',
           ]
             .filter(Boolean)
@@ -218,7 +233,7 @@ export function AppletManagementSettings({
               className="text-button"
               onClick={() => void run('discovery', () => invoke('openAppletDiscoveryLogs'))}
             >
-              検出ログを開く
+              {translate('settings.appletManagementSettings.openDiscoveryLog')}
             </button>
           )}
         </SettingsField>
@@ -229,8 +244,8 @@ export function AppletManagementSettings({
             <span aria-hidden="true">⌕</span>
             <SettingsInput
               type="search"
-              aria-label="Appletを検索"
-              placeholder="Appletを検索…"
+              aria-label={translate('settings.appletManagementSettings.search')}
+              placeholder={translate('settings.appletManagementSettings.searchPlaceholder')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -238,13 +253,16 @@ export function AppletManagementSettings({
         </div>
         <div className="command-shortcut-summary">
           <span role="status">
-            {visible.length} / {applets.length} Appletを表示
+            {translate('settings.appletManagementSettings.visibleCount', {
+              visible: visible.length,
+              total: applets.length,
+            })}
           </span>
           <button
             type="button"
             className="settings-list-icon shortcut-order-open"
-            aria-label="Appletを並べ替え"
-            title="Appletの表示順"
+            aria-label={translate('settings.appletManagementSettings.order')}
+            title={translate('settings.appletManagementSettings.displayOrder')}
             disabled={busy || applets.length < 2}
             onClick={() => setOrder(true)}
           >
@@ -258,13 +276,13 @@ export function AppletManagementSettings({
             <tr>
               <th>
                 <span className="applet-management-column-title">
-                  Applet名
+                  {translate('settings.appletManagementSettings.name')}
                   <button
                     type="button"
                     className="applet-shortcut-add"
                     data-dialog-focus-fallback
-                    aria-label="Appletをインストール"
-                    title="Appletをインストール"
+                    aria-label={translate('settings.appletManagementSettings.install')}
+                    title={translate('settings.appletManagementSettings.install')}
                     disabled={busy || !management?.packagesAvailable}
                     onClick={() => setInstall(true)}
                   >
@@ -274,12 +292,12 @@ export function AppletManagementSettings({
               </th>
               <th>
                 <span className="applet-management-column-title">
-                  バージョン
+                  {translate('settings.appletManagementSettings.version')}
                   <button
                     type="button"
                     className="settings-list-icon applet-update-check"
-                    title="すべてのAppletの更新を確認"
-                    aria-label="すべてのAppletの更新を確認"
+                    title={translate('settings.appletManagementSettings.checkAll')}
+                    aria-label={translate('settings.appletManagementSettings.checkAll')}
                     disabled={busy || !applets.length}
                     onClick={() => void run('updates', () => invoke('checkAppletUpdates'))}
                   >
@@ -287,10 +305,10 @@ export function AppletManagementSettings({
                   </button>
                 </span>
               </th>
-              <th>有効</th>
-              <th>状態</th>
-              <th>操作</th>
-              <th>移動</th>
+              <th>{translate('settings.appletManagementSettings.enabled')}</th>
+              <th>{translate('settings.appletManagementSettings.state')}</th>
+              <th>{translate('settings.appletManagementSettings.actions')}</th>
+              <th>{translate('settings.appletManagementSettings.navigation')}</th>
             </tr>
           </thead>
           <tbody>
@@ -320,14 +338,16 @@ export function AppletManagementSettings({
                         disabled={busy || !mutable}
                         onClick={() => void run(a.id, () => invoke('installUpdates', [a.id]))}
                       >
-                        更新
+                        {translate('settings.appletManagementSettings.update')}
                       </button>
                     )}
                     {result?.message && <small>{result.message}</small>}
                   </td>
                   <td>
                     <Toggle
-                      label={`${a.displayName}を有効にする`}
+                      label={translate('settings.appletManagementSettings.enable', {
+                        displayName: a.displayName,
+                      })}
                       checked={a.enabled}
                       disabled={changing}
                       onChange={(value) =>
@@ -339,7 +359,11 @@ export function AppletManagementSettings({
                   </td>
                   <td>
                     <span className={`state ${a.state}`}>{states[a.state]}</span>
-                    {a.error && <small>起動・停止に失敗しました。ログを確認してください。</small>}
+                    {a.error && (
+                      <small>
+                        {translate('settings.appletManagementSettings.lifecycleFailed')}
+                      </small>
+                    )}
                     {a.state === 'waiting' && (
                       <>
                         <small>
@@ -349,7 +373,7 @@ export function AppletManagementSettings({
                           disabled={changing}
                           onClick={() => void run(a.id, () => invoke('startAppletNow', [a.id]))}
                         >
-                          今すぐ開始
+                          {translate('settings.appletManagementSettings.start')}
                         </button>
                       </>
                     )}
@@ -359,8 +383,10 @@ export function AppletManagementSettings({
                       <button
                         type="button"
                         className="settings-list-icon"
-                        title="再起動"
-                        aria-label={`${a.displayName}を再起動`}
+                        title={translate('settings.appletManagementSettings.restart')}
+                        aria-label={translate('settings.appletManagementSettings.restartApplet', {
+                          displayName: a.displayName,
+                        })}
                         disabled={changing || !a.enabled}
                         onClick={() =>
                           void run(a.id, () => invoke('manageApplet', [a.id, 'restart']))
@@ -371,8 +397,10 @@ export function AppletManagementSettings({
                       <button
                         type="button"
                         className="settings-list-icon settings-list-delete"
-                        title="アンインストール"
-                        aria-label={`${a.displayName}をアンインストール`}
+                        title={translate('settings.appletManagementSettings.uninstall')}
+                        aria-label={translate('settings.appletManagementSettings.uninstallApplet', {
+                          displayName: a.displayName,
+                        })}
                         disabled={changing || !mutable}
                         onClick={() =>
                           void run(a.id, async () =>
@@ -384,21 +412,37 @@ export function AppletManagementSettings({
                       </button>
                     </div>
                     {management?.packagesAvailable && !mutable && (
-                      <small>この配置のファイル操作は利用できません。</small>
+                      <small>
+                        {translate('settings.appletManagementSettings.fileOperationsUnavailable')}
+                      </small>
                     )}
                   </td>
                   <td>
                     <div
                       className="applet-management-links"
                       role="group"
-                      aria-label={`${a.displayName}の設定とログ`}
+                      aria-label={translate('settings.appletManagementSettings.settingsAndLogs', {
+                        displayName: a.displayName,
+                      })}
                     >
                       {(
                         [
-                          ['settings', '設定', 'settings'],
-                          ['shortcuts', 'ショートカット', 'keyboard'],
-                          ['gestures', 'マウスジェスチャー', 'mouse'],
-                          ['logs', 'ログ', 'logs'],
+                          [
+                            'settings',
+                            translate('settings.appletManagementSettings.settings'),
+                            'settings',
+                          ],
+                          [
+                            'shortcuts',
+                            translate('settings.appletManagementSettings.shortcuts'),
+                            'keyboard',
+                          ],
+                          [
+                            'gestures',
+                            translate('settings.appletManagementSettings.gestures'),
+                            'mouse',
+                          ],
+                          ['logs', translate('settings.appletManagementSettings.logs'), 'logs'],
                         ] satisfies [string, string, IconName][]
                       ).map(([id, title, icon]) => {
                         const assigned =
@@ -409,10 +453,15 @@ export function AppletManagementSettings({
                             key={id}
                             type="button"
                             className={`settings-list-icon${assigned ? ' accent-action' : ''}`}
-                            title={`${title}${assigned ? '（割り当てあり）' : ''}`}
-                            aria-label={`${a.displayName}の${title}を開く`}
+                            title={`${title}${assigned ? translate('settings.appletManagementSettings.assigned') : ''}`}
+                            aria-label={translate('settings.appletManagementSettings.open', {
+                              displayName: a.displayName,
+                              title: title,
+                            })}
                             aria-description={
-                              assigned ? 'このAppletのコマンドに割り当てがあります。' : undefined
+                              assigned
+                                ? translate('settings.appletManagementSettings.assignedHint')
+                                : undefined
                             }
                             data-assigned={assigned}
                             onClick={() => void move(a.id, id)}
@@ -432,15 +481,15 @@ export function AppletManagementSettings({
       {!visible.length && (
         <p>
           {applets.length
-            ? '該当するAppletはありません。'
-            : 'インストール済みのAppletはありません。'}
+            ? translate('settings.appletManagementSettings.noMatches')
+            : translate('settings.appletManagementSettings.empty')}
         </p>
       )}
       {install && <InstallDialog invoke={invoke} close={() => setInstall(false)} />}
       {order && (
         <SettingsOrderDialog
-          title="Appletの表示順"
-          listLabel="Appletの表示順"
+          title={translate('settings.appletManagementSettings.displayOrder')}
+          listLabel={translate('settings.appletManagementSettings.displayOrder')}
           items={applets.map((a) => ({ id: a.id, title: a.displayName }))}
           onClose={() => setOrder(false)}
           onApply={(ordered, original) => invoke('reorderApplets', [ordered, original])}
@@ -448,8 +497,8 @@ export function AppletManagementSettings({
       )}
       {removal && (
         <SettingsDialog
-          title="Appletをアンインストール"
-          applyLabel="アンインストールして再起動"
+          title={translate('settings.appletManagementSettings.uninstallTitle')}
+          applyLabel={translate('settings.appletManagementSettings.uninstallRestart')}
           onClose={() => {
             void invoke('discardAppletPackage', [removal.planId]).catch(() => {});
             setRemoval(undefined);
@@ -457,20 +506,20 @@ export function AppletManagementSettings({
           onApply={() => applyPackage(invoke, removal.planId)}
         >
           <p>
-            {removal.name}（v{removal.version}）をアンインストールします。
+            {translate('settings.appletManagementSettings.uninstallConfirm', {
+              name: removal.name,
+              version: removal.version,
+            })}
           </p>
-          <p>
-            このAppletの配置フォルダー内のファイルを削除します。設定と保存データは残ります。AppDockを再起動します。
-          </p>
+          <p>{translate('settings.appletManagementSettings.uninstallHint')}</p>
           {!!removal.siteCount && (
             <p>
-              登録された{removal.siteCount}
-              件のサイトを利用できなくなります。登録内容・アカウント・sessionは保持します。
+              {translate('settings.appletManagementSettings.sitesHint', {
+                count: removal.siteCount,
+              })}
             </p>
           )}
-          {removal.shell && (
-            <p>使用中のShellは再起動後にDefault Shellへ戻ります。保存された指定は保持します。</p>
-          )}
+          {removal.shell && <p>{translate('settings.appletManagementSettings.shellFallback')}</p>}
         </SettingsDialog>
       )}
     </section>

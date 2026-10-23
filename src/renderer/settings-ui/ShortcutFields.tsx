@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from './SettingsStatus';
 import { SettingsInput } from './SettingsInput';
 import { useSettingsControls } from './api';
@@ -21,6 +22,7 @@ export function ShortcutKeyField({
   onError(error: unknown): void;
   finishOnChange?: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [recording, setRecording] = useState(false);
   return (
@@ -30,7 +32,11 @@ export function ShortcutKeyField({
         data-shortcut-recorder="true"
         aria-label={label}
         value={value}
-        placeholder={recording ? 'キーを押してください…' : 'キーを入力…'}
+        placeholder={
+          recording
+            ? translate('settings.shortcutFields.recording')
+            : translate('settings.shortcutFields.enter')
+        }
         onFocus={() => {
           setRecording(true);
           void settingsControls.setShortcutRecording(true).catch(onError);
@@ -55,13 +61,13 @@ export function ShortcutKeyField({
         }}
       />
       <select
-        aria-label={`${label}の特殊キー`}
+        aria-label={translate('settings.shortcutFields.special', { label: label })}
         value=""
         onChange={(event) => {
           if (event.target.value) onChange(event.target.value);
         }}
       >
-        <option value="">特殊キーを選択…</option>
+        <option value="">{translate('settings.shortcutFields.specialSelect')}</option>
         {['Tab', 'Ctrl+Tab', 'Ctrl+Shift+Tab', 'Escape', 'Enter', 'Space', 'Pause'].map((key) => (
           <option key={key}>{key}</option>
         ))}
@@ -91,6 +97,7 @@ export function ShortcutConditionField({
   onExtraScope?(scope: string): void;
   onChange(value: ShortcutCondition): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -101,7 +108,11 @@ export function ShortcutConditionField({
       .map((id) => ({ id, title: shortcutTargetTitle(id, applets) })),
   ];
   useSettingsFeedback({
-    error: [value.scope === 'applets' && !value.appletIds.length ? '1件以上選択してください。' : '']
+    error: [
+      value.scope === 'applets' && !value.appletIds.length
+        ? translate('settings.shortcutFields.required')
+        : '',
+    ]
       .filter(Boolean)
       .join('\n'),
   });
@@ -122,7 +133,9 @@ export function ShortcutConditionField({
           setFilter('');
         }}
       >
-        {allowDefault && <option value="default">コマンドの既定</option>}
+        {allowDefault && (
+          <option value="default">{translate('settings.shortcutFields.default')}</option>
+        )}
         {extraScopes
           .filter((scope) => !scope.after)
           .map((scope) => (
@@ -135,7 +148,9 @@ export function ShortcutConditionField({
           .flatMap((scope) => [scope, ...extraScopes.filter((extra) => extra.after === scope.id)])
           .map((scope) => (
             <option key={scope.id} value={scope.id} disabled={scope.id === 'owner' && !ownerTitle}>
-              {scope.id === 'owner' ? (ownerTitle ?? '提供元不明') : scope.title}
+              {scope.id === 'owner'
+                ? (ownerTitle ?? translate('settings.shortcutFields.unknownOwner'))
+                : scope.title}
             </option>
           ))}
       </select>
@@ -150,13 +165,17 @@ export function ShortcutConditionField({
               ? value.appletIds
                   .map((id) => choices.find((a) => a.id === id)?.title ?? id)
                   .join(' / ')
-              : 'ページを選択…'}
+              : translate('settings.shortcutFields.selectPages')}
           </button>
           {open && (
-            <div className="keybinding-picker" role="group" aria-label={`${label}の対象ページ`}>
+            <div
+              className="keybinding-picker"
+              role="group"
+              aria-label={translate('settings.shortcutFields.targetPages', { label: label })}
+            >
               <SettingsInput
-                aria-label="対象ページを検索"
-                placeholder="ページを検索…"
+                aria-label={translate('settings.shortcutFields.searchPages')}
+                placeholder={translate('settings.shortcutFields.searchPlaceholder')}
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
               />
@@ -179,8 +198,10 @@ export function ShortcutConditionField({
                     {a.title}
                   </label>
                 ))}
-              {!choices.length && <small>ページが登録されていません。</small>}
-              <button onClick={() => setOpen(false)}>閉じる</button>
+              {!choices.length && <small>{translate('settings.shortcutFields.noPages')}</small>}
+              <button onClick={() => setOpen(false)}>
+                {translate('settings.shortcutFields.close')}
+              </button>
             </div>
           )}
         </>

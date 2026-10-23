@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import {
   createContext,
   useCallback,
@@ -111,6 +112,7 @@ export function CommandListSummary({
 
 /** A native, keyboard-accessible horizontal scrollbar below the page scrollport. */
 export function CommandListScrollbar() {
+  const { t: translate } = useHostTranslation();
   const viewport = useContext(CommandListScrollContext)?.viewport;
   const slotRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -192,7 +194,7 @@ export function CommandListScrollbar() {
         ref={barRef}
         tabIndex={0}
         role="region"
-        aria-label="コマンド一覧を横にスクロール"
+        aria-label={translate('settings.commandListScroll.horizontalScroll')}
         onKeyDown={(event) => {
           if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
           const bar = event.currentTarget;

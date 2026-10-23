@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { mcpClientOperations } from './mcp-client';
 import { aiOperations } from './ai-api';
 import { customCommandOperations } from './custom-commands';
@@ -461,22 +462,22 @@ export function operationsFor(caller: ApiCaller) {
 export type AppDockMethod = keyof typeof appDockOperations;
 export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
 export const appletApiPermissionLabels = {
-  useMcp: 'MCP接続先の利用',
-  manageCustomCommands: 'カスタムコマンド定義の閲覧・編集',
-  manageMcpServers: 'MCP接続先の管理',
-  useAi: 'AIサーバーへの送信・文章生成',
-  useTts: 'TTSサーバーへの送信・読み上げ',
-  sendInput: 'Windowsへのキー・操作メッセージ送信',
-  runProcesses: 'コマンド・プロセスの起動',
-  read: '情報の取得',
-  execute: 'コマンドの実行',
-  write: '設定の変更',
-  manageApplets: 'Appletの有効・無効・再起動',
-  editShortcuts: 'ショートカットの編集',
-  editGestures: 'マウスジェスチャーの編集',
-  editTouchpadGestures: 'タッチパッドジェスチャーの編集・Windowsとの接続',
-  editRibbon: 'リボンの編集',
-  editTray: 'タスクトレイの編集',
+  useMcp: hostText('settings.appdock-api.mcpUse'),
+  manageCustomCommands: hostText('settings.appdock-api.customCommands'),
+  manageMcpServers: hostText('settings.appdock-api.mcpManage'),
+  useAi: hostText('settings.appdock-api.ai'),
+  useTts: hostText('settings.appdock-api.tts'),
+  sendInput: hostText('settings.appdock-api.input'),
+  runProcesses: hostText('settings.appdock-api.process'),
+  read: hostText('settings.appdock-api.read'),
+  execute: hostText('settings.appdock-api.execute'),
+  write: hostText('settings.appdock-api.write'),
+  manageApplets: hostText('settings.appdock-api.applets'),
+  editShortcuts: hostText('settings.appdock-api.shortcuts'),
+  editGestures: hostText('settings.appdock-api.gestures'),
+  editTouchpadGestures: hostText('settings.appdock-api.touchpad'),
+  editRibbon: hostText('settings.appdock-api.ribbon'),
+  editTray: hostText('settings.appdock-api.tray'),
 } as const;
 export type AppletApiPermission = keyof typeof appletApiPermissionLabels;
 export type AppletApiPermissions = Partial<Record<AppletApiPermission, boolean>>;

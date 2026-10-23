@@ -1,9 +1,11 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { Icon } from '../../shared/ui-icons';
 import type { Ref } from 'react';
 
 export function CommandProviderFilter({
   title,
-  label = '対象',
+  label = hostText('settings.commandProviderFilter.target'),
   onClear,
   ref,
 }: {
@@ -12,6 +14,7 @@ export function CommandProviderFilter({
   onClear?(): void;
   ref?: Ref<HTMLParagraphElement>;
 }) {
+  const { t: translate } = useHostTranslation();
   return (
     <p className="command-provider-filter" ref={ref}>
       <span>
@@ -20,8 +23,8 @@ export function CommandProviderFilter({
       <button
         type="button"
         className="command-provider-clear"
-        title="絞り込みを解除"
-        aria-label={`${title}の絞り込みを解除`}
+        title={translate('settings.commandProviderFilter.clear')}
+        aria-label={translate('settings.commandProviderFilter.clearTarget', { title: title })}
         onClick={onClear}
       >
         <Icon name="close" size={16} />

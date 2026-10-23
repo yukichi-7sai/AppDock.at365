@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 export interface TtsVoice {
   id: string;
   name: string;
@@ -35,25 +36,25 @@ const object = (v: unknown): v is Record<string, unknown> =>
 export function ttsBaseUrl(value: string): string {
   if (!value) return '';
   if (value.length > 2048 || /[\\\s?#]/.test(value))
-    throw Error('TTSのURLは認証情報・クエリー・フラグメントを含まないHTTP(S) URLにしてください。');
+    throw Error(hostText('settings.tts.urlCredentials'));
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    throw Error('TTSのURLが不正です。');
+    throw Error(hostText('settings.tts.urlInvalid'));
   }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
-    throw Error('TTSのURLはHTTP(S) URLにしてください。');
+    throw Error(hostText('settings.tts.urlProtocol'));
   return url.href.replace(/\/+$/, '');
 }
 export function ttsVoicesPath(value: string): string {
   if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(value) || value.length > 256)
-    throw Error('ボイス一覧のパスはベースURL配下の相対パスにしてください。');
+    throw Error(hostText('settings.tts.voicePath'));
   return value;
 }
 export function parseTtsVoices(value: unknown): TtsVoice[] {
   if (!Array.isArray(value) || value.length > 1000)
-    throw Error('ボイス一覧は1000件以下の配列です。');
+    throw Error(hostText('settings.tts.voiceLimit'));
   const ids = new Set<string>();
   return value.map((v) => {
     if (
@@ -64,20 +65,20 @@ export function parseTtsVoices(value: unknown): TtsVoice[] {
       (v.name !== undefined && (typeof v.name !== 'string' || v.name.length > 200)) ||
       ids.has(v.id)
     )
-      throw Error('ボイス一覧のID・表示名・重複を確認してください。');
+      throw Error(hostText('settings.tts.voiceItem'));
     ids.add(v.id);
     return { id: v.id, name: typeof v.name === 'string' ? v.name : v.id };
   });
 }
 /** OpenAI-compatible catalogs and Qwen3-TTS catalogs use different envelopes. */
 export function parseTtsModels(value: unknown): TtsVoice[] {
-  if (!object(value)) throw Error('モデル一覧はオブジェクトです。');
+  if (!object(value)) throw Error(hostText('settings.tts.modelObject'));
   if (Object.hasOwn(value, 'data')) return parseTtsVoices(value.data);
   if (!Array.isArray(value.models) || value.models.length > 1000)
-    throw Error('モデル一覧は1000件以下の配列です。');
+    throw Error(hostText('settings.tts.modelLimit'));
   const rows = value.models.map((model) => {
     if (!object(model) || (model.downloaded !== undefined && typeof model.downloaded !== 'boolean'))
-      throw Error('モデル一覧の項目が不正です。');
+      throw Error(hostText('settings.tts.modelItem'));
     return { id: model.id ?? model.name, name: model.name, downloaded: model.downloaded };
   });
   const models = parseTtsVoices(rows);
@@ -86,21 +87,21 @@ export function parseTtsModels(value: unknown): TtsVoice[] {
 }
 export function parseTtsSettings(value: unknown): TtsSettings {
   if (value === undefined) return defaultTtsSettings();
-  if (!object(value)) throw Error('ttsはオブジェクトです。');
+  if (!object(value)) throw Error(hostText('settings.tts.object'));
   const defaults = defaultTtsSettings();
   if (Object.keys(value).some((k) => !Object.hasOwn(defaults, k)))
-    throw Error('TTSに未対応の設定があります。APIキーは専用欄で設定してください。');
+    throw Error(hostText('settings.tts.fields'));
   const v = { ...defaults, ...value };
   for (const key of ['baseUrl', 'model', 'defaultVoice', 'voicesPath'] as const)
-    if (typeof v[key] !== 'string') throw Error('TTSの文字列設定が不正です。');
+    if (typeof v[key] !== 'string') throw Error(hostText('settings.tts.strings'));
   if (v.model.length > 200 || v.defaultVoice.length > 200)
-    throw Error('モデルとボイスは200文字以下です。');
+    throw Error(hostText('settings.tts.nameLength'));
   if (!Number.isFinite(v.defaultSpeed) || v.defaultSpeed < 0.25 || v.defaultSpeed > 4)
-    throw Error('読み上げ速度は0.25～4.0です。');
+    throw Error(hostText('settings.tts.speed'));
   if (!['playback', 'server'].includes(v.speedMode))
-    throw Error('速度の適用先はplayback/serverです。');
+    throw Error(hostText('settings.tts.speedMode'));
   if (!['endpoint', 'manual'].includes(v.voicesSource))
-    throw Error('ボイス一覧方式はendpoint/manualです。');
+    throw Error(hostText('settings.tts.voiceSource'));
   return {
     ...v,
     baseUrl: ttsBaseUrl(v.baseUrl),

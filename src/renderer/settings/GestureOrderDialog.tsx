@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import {
   defaultTouchpadGestures,
   touchpadTitle,
@@ -31,6 +32,7 @@ export function GestureOrderDialog({
   onChange(value: Settings): void;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const gestures = touchpad
     ? (settings.touchpadGestures ?? defaultTouchpadGestures())
     : (settings.gestures ?? defaultGestures());
@@ -39,8 +41,8 @@ export function GestureOrderDialog({
       bindings={gestures.bindings}
       commands={commands}
       initialInput={initialGesture}
-      title="ジェスチャーの実行順"
-      inputName="ジェスチャー"
+      title={translate('settings.gestureOrderDialog.title')}
+      inputName={translate('settings.gestureOrderDialog.inputName')}
       inputLabel={touchpad ? touchpadTitle : gestureTitle}
       conditionLabel={(row, command) =>
         gestureConditionLabel(

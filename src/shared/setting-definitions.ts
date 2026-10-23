@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { ExtensionManifest, Settings, SettingDefinition, SettingOption } from './contracts';
 import { readObjectList, objectFieldValue } from './object-list';
 import { imageReference } from './registered-images';
@@ -19,12 +20,12 @@ export function parseSettingOptions(value: unknown): SettingOption[] {
     ) ||
     new Set(value.map((o) => o.value)).size !== value.length
   )
-    throw new Error('設定の選択肢は重複のないラベルと値の配列です。');
+    throw new Error(hostText('settings.setting-definitions.options'));
   return value.map((o) => ({ label: o.label, value: o.value }));
 }
 export function validateSettingValue(definition: SettingDefinition, value: unknown) {
   const fail = () => {
-    throw new Error(`${definition.title} の値を確認してください。`);
+    throw new Error(hostText('settings.setting-definitions.value', { title: definition.title }));
   };
   if (definition.type === 'boolean' && typeof value !== 'boolean') fail();
   if (
@@ -130,7 +131,7 @@ export function parseSettingDefinitions(
 ): SettingDefinition[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > 128)
-    throw new Error('settings の形式が正しくありません。');
+    throw new Error(hostText('settings.setting-definitions.definitions'));
   const keys = new Set<string>();
   return value.map((s) => {
     if (
@@ -156,16 +157,16 @@ export function parseSettingDefinitions(
       (s.description !== undefined &&
         (typeof s.description !== 'string' || s.description.length > 500))
     )
-      throw new Error('settings の項目定義を確認してください。');
+      throw new Error(hostText('settings.setting-definitions.definition'));
     keys.add(s.key);
     for (const key of ['minLength', 'maxLength'])
       if (
         s[key] !== undefined &&
         (s.type !== 'string' || !Number.isInteger(s[key]) || s[key] < 0 || s[key] > 10000)
       )
-        throw Error('文字数の範囲を確認してください。');
+        throw Error(hostText('settings.setting-definitions.textLength'));
     if (s.minLength !== undefined && s.maxLength !== undefined && s.minLength > s.maxLength)
-      throw Error('文字数の範囲を確認してください。');
+      throw Error(hostText('settings.setting-definitions.textLength'));
     if (
       (s.automation !== undefined && typeof s.automation !== 'boolean') ||
       ((s.automation === true || s.generateCommands !== undefined) &&
@@ -182,7 +183,7 @@ export function parseSettingDefinitions(
           ) ||
           new Set(s.generateCommands).size !== s.generateCommands.length))
     )
-      throw new Error('外部公開・生成コマンドの設定宣言を確認してください。');
+      throw new Error(hostText('settings.setting-definitions.external'));
     if (
       (s.type === 'object-list' && (depth > 0 || !Array.isArray(s.fields) || !s.fields.length)) ||
       (depth === 0 && s.type === 'string-list') ||
@@ -202,16 +203,16 @@ export function parseSettingDefinitions(
               ['__proto__', 'prototype', 'constructor'].includes(alias),
           )))
     )
-      throw new Error('一覧設定の項目定義を確認してください。');
+      throw new Error(hostText('settings.setting-definitions.objectFields'));
     for (const key of ['minimum', 'maximum', 'step'])
       if (s[key] !== undefined && (typeof s[key] !== 'number' || !Number.isFinite(s[key])))
-        throw new Error(`${s.title} の範囲が正しくありません。`);
+        throw new Error(hostText('settings.setting-definitions.range', { title: s.title }));
     if (
       (s.minimum !== undefined && s.maximum !== undefined && s.minimum > s.maximum) ||
       (s.step !== undefined && s.step <= 0) ||
       (s.dynamic !== undefined && typeof s.dynamic !== 'boolean')
     )
-      throw new Error(`${s.title} の範囲が正しくありません。`);
+      throw new Error(hostText('settings.setting-definitions.range', { title: s.title }));
     const definition = {
       ...s,
       ...(s.type === 'select' ? { options: parseSettingOptions(s.options) } : {}),
@@ -229,12 +230,12 @@ export function parseSettingDefinitions(
         s.propertyPath.length > 3 ||
         !s.propertyPath.every(safeKey))
     )
-      throw Error('一覧項目の保存パスが不正です。');
+      throw Error(hostText('settings.setting-definitions.fieldPath'));
     if (
       s.optionSource !== undefined &&
       (depth !== 1 || s.type !== 'select' || s.optionSource !== 'web-profiles')
     )
-      throw Error('一覧項目の選択肢取得元が不正です。');
+      throw Error(hostText('settings.setting-definitions.optionSource'));
     if (s.list !== undefined) {
       const list = s.list,
         fields = definition.fields ?? [];
@@ -258,7 +259,7 @@ export function parseSettingDefinitions(
         (list.confirmDelete !== undefined && typeof list.confirmDelete !== 'boolean') ||
         (list.showIndex !== undefined && typeof list.showIndex !== 'boolean')
       )
-        throw Error('一覧の表示列・識別子・操作定義を確認してください。');
+        throw Error(hostText('settings.setting-definitions.listView'));
     }
     if (definition.default !== undefined) validateSettingValue(definition, definition.default);
     return definition;

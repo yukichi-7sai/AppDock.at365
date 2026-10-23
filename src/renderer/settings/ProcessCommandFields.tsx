@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useState } from 'react';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
@@ -11,16 +12,17 @@ export function ProcessCommandFields({
   onChange(value: Record<string, unknown>): void;
   onValidity(valid: boolean): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [args, setArgs] = useState(() => JSON.stringify(config.arguments ?? [], null, 2));
   const [error, setError] = useState('');
   return (
     <>
       <SettingsField
-        title="実行方法"
-        description="起動受付を返します。終了待ち・標準出力の取得は行いません。"
+        title={translate('settings.processCommandFields.mode')}
+        description={translate('settings.processCommandFields.modeHint')}
       >
         <select
-          aria-label="実行方法"
+          aria-label={translate('settings.processCommandFields.mode')}
           value={String(config.mode ?? 'executable')}
           onChange={(e) => {
             const mode = e.target.value;
@@ -38,29 +40,31 @@ export function ProcessCommandFields({
             onValidity(true);
           }}
         >
-          <option value="executable">実行ファイル</option>
-          <option value="cmd">コマンドプロンプト</option>
+          <option value="executable">
+            {translate('settings.processCommandFields.executable')}
+          </option>
+          <option value="cmd">{translate('settings.processCommandFields.cmd')}</option>
           <option value="powershell">Windows PowerShell</option>
         </select>
       </SettingsField>
       {config.mode === 'executable' ? (
         <>
-          <SettingsField title="実行ファイル">
+          <SettingsField title={translate('settings.processCommandFields.executable')}>
             <SettingsInput
-              aria-label="実行ファイル"
+              aria-label={translate('settings.processCommandFields.executable')}
               value={String(config.executable ?? '')}
               maxLength={4096}
-              placeholder="実行する.exeの絶対パス"
+              placeholder={translate('settings.processCommandFields.path')}
               onChange={(e) => onChange({ ...config, executable: e.target.value })}
             />
           </SettingsField>
           <SettingsField
             error={error ? error : ''}
-            title="引数"
-            hint={'文字列のJSON配列で指定します。例: ["ファイル名.txt", "--option"]'}
+            title={translate('settings.processCommandFields.args')}
+            hint={translate('settings.processCommandFields.argsHint')}
           >
             <SettingsTextarea
-              aria-label="引数"
+              aria-label={translate('settings.processCommandFields.args')}
               value={args}
               rows={4}
               onChange={(e) => {
@@ -73,7 +77,7 @@ export function ProcessCommandFields({
                   setError('');
                   onValidity(true);
                 } catch {
-                  setError('文字列のJSON配列を指定してください。');
+                  setError(translate('settings.processCommandFields.argsArray'));
                   onValidity(false);
                 }
               }}
@@ -81,9 +85,19 @@ export function ProcessCommandFields({
           </SettingsField>
         </>
       ) : (
-        <SettingsField title={config.mode === 'cmd' ? 'コマンド' : 'スクリプト'}>
+        <SettingsField
+          title={
+            config.mode === 'cmd'
+              ? translate('settings.processCommandFields.command')
+              : translate('settings.processCommandFields.script')
+          }
+        >
           <SettingsTextarea
-            aria-label={config.mode === 'cmd' ? 'コマンド' : 'スクリプト'}
+            aria-label={
+              config.mode === 'cmd'
+                ? translate('settings.processCommandFields.command')
+                : translate('settings.processCommandFields.script')
+            }
             rows={6}
             maxLength={8192}
             value={String(config[config.mode === 'cmd' ? 'command' : 'script'] ?? '')}
@@ -96,17 +110,17 @@ export function ProcessCommandFields({
           />
         </SettingsField>
       )}
-      <SettingsField title="作業フォルダー">
+      <SettingsField title={translate('settings.processCommandFields.directory')}>
         <SettingsInput
-          aria-label="作業フォルダー"
+          aria-label={translate('settings.processCommandFields.directory')}
           value={String(config.workingDirectory ?? '')}
           maxLength={4096}
-          placeholder="省略可。指定する場合は絶対パス"
+          placeholder={translate('settings.processCommandFields.directoryHint')}
           onChange={(e) => onChange({ ...config, workingDirectory: e.target.value })}
         />
       </SettingsField>
       <SettingsChoice
-        label="コンソールを表示する"
+        label={translate('settings.processCommandFields.showConsole')}
         checked={config.showConsole === true}
         onChange={(showConsole) => onChange({ ...config, showConsole })}
       />

@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { ExtensionSnapshot, Settings } from './contracts';
 import { hostCommandsForApplets, validCommandId } from './commands';
 import { appletManagementCommands } from './applet-management';
@@ -15,13 +16,13 @@ export type TrayMenuItem =
 export function parseTrayMenu(value: unknown): TrayMenuItem[] {
   const ids = new Set<string>();
   function parse(items: unknown, nested = false): TrayMenuItem[] {
-    if (!Array.isArray(items)) throw Error('trayMenu はメニュー項目の配列です。');
+    if (!Array.isArray(items)) throw Error(hostText('settings.tray-menu.array'));
     return items.map((item) => {
       if (!item || typeof item !== 'object' || !validCommandId(item.id) || ids.has(item.id))
-        throw Error('トレイの項目IDは重複のない有効なIDにしてください。');
+        throw Error(hostText('settings.tray-menu.id'));
       ids.add(item.id);
       if (ids.size > maximumTrayItems)
-        throw Error(`トレイの項目は${maximumTrayItems}件以下にしてください。`);
+        throw Error(hostText('settings.tray-menu.limit', { maximumTrayItems: maximumTrayItems }));
       const id = item.id as string;
       if (item.type === 'separator') return { id, type: 'separator' };
       if (
@@ -43,7 +44,7 @@ export function parseTrayMenu(value: unknown): TrayMenuItem[] {
           title: item.title.trim(),
           children: parse(item.children, true) as TrayMenuLeaf[],
         };
-      throw Error('トレイ項目を確認してください。グループは1段、設定と終了は末尾固定です。');
+      throw Error(hostText('settings.tray-menu.item'));
     });
   }
   return parse(value);

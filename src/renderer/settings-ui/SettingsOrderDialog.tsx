@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useRef, useState } from 'react';
 import { OrderDialogFrame } from './OrderDialogFrame';
 
@@ -21,6 +22,7 @@ export function SettingsOrderDialog({
   onApply(ordered: string[], original: string[]): Promise<unknown>;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [original] = useState(() => items.map((item) => item.id));
   const [rows, setRows] = useState(items);
   const [over, setOver] = useState('');
@@ -39,12 +41,14 @@ export function SettingsOrderDialog({
     const [row] = next.splice(source, 1);
     next.splice(target, 0, row);
     setRows(next);
-    setNotice(`${row.title}を${target + 1}番目に移動しました。`);
+    setNotice(
+      translate('settings.settingsOrderDialog.moved', { title: row.title, value: target + 1 }),
+    );
   };
   return (
     <OrderDialogFrame
       title={title}
-      hint="ドラッグ、上下ボタン、またはAlt＋↑↓で移動できます。OKで一覧の表示順を保存します。"
+      hint={translate('settings.settingsOrderDialog.hint')}
       message={notice}
       className="settings-order-dialog"
       onClose={onClose}
@@ -67,7 +71,11 @@ export function SettingsOrderDialog({
           );
           onClose();
         } catch (reason) {
-          setError(reason instanceof Error ? reason.message : '保存できませんでした。');
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : translate('settings.settingsOrderDialog.saveFailed'),
+          );
         } finally {
           saving.current = false;
           setPending(false);
@@ -99,7 +107,7 @@ export function SettingsOrderDialog({
               draggable={!pending}
               disabled={pending}
               data-initial-focus={index === 0 || undefined}
-              aria-label={`${item.title}の順番をドラッグで変更`}
+              aria-label={translate('settings.settingsOrderDialog.drag', { title: item.title })}
               onDragStart={(event) => {
                 if (saving.current) {
                   event.preventDefault();
@@ -131,7 +139,7 @@ export function SettingsOrderDialog({
             <div className="shortcut-order-moves">
               <button
                 type="button"
-                aria-label={`${item.title}を上へ`}
+                aria-label={translate('settings.settingsOrderDialog.up', { title: item.title })}
                 className="accent-action"
                 disabled={pending || !index}
                 onClick={() => move(item.id, rows[index - 1].id)}
@@ -140,7 +148,7 @@ export function SettingsOrderDialog({
               </button>
               <button
                 type="button"
-                aria-label={`${item.title}を下へ`}
+                aria-label={translate('settings.settingsOrderDialog.down', { title: item.title })}
                 className="accent-action"
                 disabled={pending || index === rows.length - 1}
                 onClick={() => move(item.id, rows[index + 1].id)}

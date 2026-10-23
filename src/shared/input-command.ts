@@ -1,10 +1,11 @@
+import { hostText } from './i18n';
 import type { CustomCommandType } from './custom-commands';
 import type { KeyStroke } from './commands';
 
 /** The sending grammar mirrors SDK InputKeyChord, independently of trigger shortcuts. */
 export function normalizeInputKeys(value: unknown): string {
   if (typeof value !== 'string' || !value.length || value.length > 100)
-    throw Error('送信キーを100文字以内で指定してください。');
+    throw Error(hostText('settings.input-command.length'));
   const parts = value.split('+').map((part) => part.trim().toUpperCase());
   const key = parts.pop()!;
   const modifiers = parts.map(
@@ -20,7 +21,7 @@ export function normalizeInputKeys(value: unknown): string {
       })[part],
   );
   if (modifiers.some((part) => !part) || new Set(modifiers).size !== modifiers.length)
-    throw Error('送信キーの修飾キーを確認してください。');
+    throw Error(hostText('settings.input-command.modifiers'));
   const special: Record<string, string> = {
     WIN: 'Win',
     WINDOWS: 'Win',
@@ -63,9 +64,9 @@ export function normalizeInputKeys(value: unknown): string {
   };
   const normalized =
     /^[A-Z0-9]$/.test(key) || /^F([1-9]|1[0-9]|2[0-4])$/.test(key) ? key : special[key];
-  if (!normalized) throw Error('未対応の送信キーです。例: Ctrl+Shift+T、Enter、Win+E');
+  if (!normalized) throw Error(hostText('settings.input-command.unsupported'));
   if (normalized === 'Win' && modifiers.length)
-    throw Error('Win単独は修飾キーなしで指定してください。');
+    throw Error(hostText('settings.input-command.standaloneWin'));
   return [
     ...['Ctrl', 'Alt', 'Shift', 'Win'].filter((part) => modifiers.includes(part)),
     normalized,
@@ -100,8 +101,8 @@ export function inputKeysFromEvent(event: KeyStroke): string | null {
 
 export const inputCommandType: CustomCommandType = {
   id: 'appdock.input.sendKeys',
-  title: 'キーを送信する',
-  description: '単独キーや修飾キーとの組合せを、実行時の最前面へ送信します。',
+  title: hostText('settings.input-command.title'),
+  description: hostText('settings.input-command.hint'),
   configVersion: 1,
   automation: true,
   configSchema: {
@@ -110,5 +111,12 @@ export const inputCommandType: CustomCommandType = {
     required: ['keys'],
     additionalProperties: false,
   },
-  fields: [{ key: 'keys', title: '送信キー', type: 'string', default: 'Enter' }],
+  fields: [
+    {
+      key: 'keys',
+      title: hostText('settings.input-command.keys'),
+      type: 'string',
+      default: 'Enter',
+    },
+  ],
 };

@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useState } from 'react';
 import {
   parseTouchpadGestures,
@@ -29,6 +30,7 @@ export function TouchpadOptions({
   value: TouchpadGestureSettings;
   change(patch: Partial<TouchpadGestureSettings>): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [errors, setErrors] = useState<Partial<Record<TouchpadGestureId, string>>>({});
   const changeConnection = (gesture: TouchpadGestureId, connection: TouchpadConnection) => {
     try {
@@ -48,23 +50,23 @@ export function TouchpadOptions({
   return (
     <>
       <SettingsSection
-        title="Windowsとの接続"
-        description="判定のタイミングと移動量はWindowsの設定に従います。OFFにしたときや最後の割り当てを削除したときも、Windowsの設定はそのまま残ります。"
+        title={translate('settings.touchpadOptions.connection')}
+        description={translate('settings.touchpadOptions.connectionHint')}
       >
         <SettingsField
-          title="タッチパッドジェスチャーを使う"
-          description="ONにすると、割り当てのあるジェスチャーを接続します。このPCだけの設定です。"
+          title={translate('settings.touchpadOptions.enabled')}
+          description={translate('settings.touchpadOptions.enabledHint')}
           {...settingAnchor('touchpad-gestures', 'enabled')}
         >
           <Toggle
-            label="タッチパッドジェスチャーを使う"
+            label={translate('settings.touchpadOptions.enabled')}
             checked={value.enabled}
             disabled={snapshot?.busy}
             onChange={(enabled) => change({ enabled })}
           />
         </SettingsField>
         <SettingsButton onClick={() => void invoke('touchpad.openWindows')}>
-          Windowsのタッチパッド設定を開く
+          {translate('settings.touchpadOptions.openWindowsSettings')}
         </SettingsButton>
         {snapshot?.statuses
           .filter((row) => ['conflict', 'unconnected', 'unavailable', 'error'].includes(row.state))
@@ -72,32 +74,32 @@ export function TouchpadOptions({
             <SettingsField
               key={row.gesture}
               title={touchpadTitle(row.gesture)}
-              description={row.message ?? 'Windowsとの接続を確認してください。'}
+              description={row.message ?? translate('settings.touchpadOptions.connectionRequired')}
             >
               <SettingsButton
                 pending={snapshot.busy}
                 disabled={!value.enabled}
                 onClick={() => void invoke('touchpad.reconnect', [row.gesture])}
               >
-                Windowsの設定を再設定する
+                {translate('settings.touchpadOptions.reconnect')}
               </SettingsButton>
               <SettingsButton
                 disabled={snapshot.busy}
                 onClick={() => void invoke('touchpad.ignore', [row.gesture])}
               >
-                AppDockでの制御をしない
+                {translate('settings.touchpadOptions.disconnect')}
               </SettingsButton>
               <SettingsButton
                 disabled={snapshot.busy}
                 onClick={() => void invoke('touchpad.clear', [row.gesture])}
               >
-                このジェスチャーの割り当てを全部解除する
+                {translate('settings.touchpadOptions.removeBindings')}
               </SettingsButton>
             </SettingsField>
           ))}
       </SettingsSection>
       <SettingsSection
-        title="動作設定"
+        title={translate('settings.touchpadOptions.behavior')}
         collapsible
         {...settingAnchor('touchpad-gestures', 'options')}
       >
@@ -109,9 +111,9 @@ export function TouchpadOptions({
         <InputBrowserOptions pageId="touchpad-gestures" value={value} onChange={change} />
       </SettingsSection>
       <SettingsSection
-        title="接続用キー設定"
+        title={translate('settings.touchpadOptions.keys')}
         collapsible
-        description="割り当てのある接続用キーはAppDock専用になり、入力をブロックします。条件に一致しない場所では何もしません。同じキーを使うWindowsの機能などにも影響します。"
+        description={translate('settings.touchpadOptions.keysHint')}
         {...settingAnchor('touchpad-gestures', 'connections')}
       >
         {touchpadGestureTypes.map(([gesture, title]) => {
@@ -126,10 +128,10 @@ export function TouchpadOptions({
               <div
                 className="settings-inline-choices"
                 role="group"
-                aria-label={`${title}の接続用キー設定`}
+                aria-label={translate('settings.touchpadOptions.keysLabel', { title: title })}
               >
                 <select
-                  aria-label={`${title}の接続用キー`}
+                  aria-label={translate('settings.touchpadOptions.keyLabel', { title: title })}
                   value={connection.key}
                   disabled={snapshot?.busy}
                   onChange={(event) =>
@@ -144,7 +146,10 @@ export function TouchpadOptions({
                   <SettingsChoice
                     key={modifier}
                     label={modifier}
-                    ariaLabel={`${title}の${modifier}`}
+                    ariaLabel={translate('settings.touchpadOptions.modifierLabel', {
+                      title: title,
+                      modifier: modifier,
+                    })}
                     disabled={snapshot?.busy}
                     checked={connection.modifiers.includes(modifier)}
                     onChange={(checked) =>

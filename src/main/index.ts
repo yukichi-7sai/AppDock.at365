@@ -1868,7 +1868,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     entry: '',
     folder: '',
     state: a.state,
-    error: id === 'applets' && a.error ? '起動または停止に失敗しました。' : null,
+    error: id === 'applets' && a.error ? hostText('settings.index.appletLifecycle') : null,
     scheduledStartAt: a.scheduledStartAt,
     enabled: a.enabled,
     commands: page.kind === 'applet' || id === 'tray' ? a.commands : [],
@@ -2059,20 +2059,20 @@ function settingsPageActions(
     };
     const target = (value: unknown) => {
       const found = managedApplets(allApplets()).find((a) => a.id === value);
-      if (!found) throw Error('管理対象のAppletが見つかりません。');
+      if (!found) throw Error(hostText('settings.index.missingApplet'));
       return found;
     };
     actions.manageApplet = async ([id, operation]) => {
       target(id);
       assertSettingsWritable();
-      if (updater.state.busy) throw Error('パッケージ操作の完了を待ってください。');
+      if (updater.state.busy) throw Error(hostText('settings.index.packageBusy'));
       if (!['enable', 'disable', 'restart'].includes(operation as string))
-        throw Error('操作が不正です。');
+        throw Error(hostText('settings.index.invalidAction'));
       return appletManagement.run(id as string, operation as 'enable' | 'disable' | 'restart');
     };
     actions.startAppletNow = async ([id]) => {
       if (target(id).state !== 'waiting' || updater.state.busy)
-        throw Error('開始待ちのAppletが見つかりません。');
+        throw Error(hostText('settings.index.missingScheduledApplet'));
       return manager.restart(id as string, true);
     };
     actions.reorderApplets = async ([ordered, original]) => {
@@ -2084,7 +2084,7 @@ function settingsPageActions(
     actions.openAppletDestination = async ([id, destination]) => {
       const a = target(id);
       if (!['settings', 'shortcuts', 'gestures', 'logs'].includes(destination as string))
-        throw Error('移動先が不正です。');
+        throw Error(hostText('settings.index.invalidDestination'));
       await flushSettingsInputs();
       target(id);
       if (destination === 'logs') {
@@ -2125,7 +2125,7 @@ function settingsPageActions(
     actions.chooseAppletInstallDirectory = async () => {
       try {
         const result = await dialog.showOpenDialog(window!, {
-          title: 'Appletの配布フォルダーを選ぶ',
+          title: hostText('settings.index.selectAppletFolder'),
           properties: ['openDirectory'],
         });
         return { path: result.canceled ? null : (result.filePaths[0] ?? null) };
@@ -2208,9 +2208,9 @@ function settingsPageActions(
         typeof revision !== 'number' ||
         !['keep', 'share', 'clear'].includes(String(disposition))
       )
-        throw Error('設定操作が不正です。');
+        throw Error(hostText('settings.index.invalidSettingsAction'));
       if (expectedScope !== undefined && expectedScope !== settingsPageStorage(page).signature)
-        throw Error('設定の保存先が変わりました。もう一度確認してください。');
+        throw Error(hostText('settings.index.storageChanged'));
       settings.setLocalSettings(
         page.owner!,
         enabled,
@@ -2232,7 +2232,7 @@ function settingsPageActions(
         save: (value, revision) => commitSettings(prepareSettings(value), revision),
       });
       if (!isDeepStrictEqual(commands.get().layout, before))
-        throw Error('リボン設定が変更されています。再取得してください。');
+        throw Error(hostText('settings.index.ribbonChanged'));
       return commands.execute({
         operations: [operation],
         expectedRevision: settingsCommands.revision(),
@@ -2241,7 +2241,7 @@ function settingsPageActions(
   if (page.kind === 'applet')
     actions.replaceAppletList = async ([key, value, before]) => {
       const owner = manager.items.get(page.owner!);
-      if (!owner) throw Error('Appletがありません。');
+      if (!owner) throw Error(hostText('settings.index.noApplet'));
       return settingsCommands.replaceOwnList(owner.manifest, key, value, before);
     };
   if (page.kind === 'applet')
@@ -2252,28 +2252,27 @@ function settingsPageActions(
           (item) =>
             item.binding.owner === page.owner && item.binding.key === key && item.item.id === id,
         );
-      if (!item) throw Error('ページがありません。');
+      if (!item) throw Error(hostText('settings.index.noPage'));
       return pageCollections.open(item.id);
     };
   const string = (v: unknown) => {
-    if (typeof v !== 'string') throw Error('入力が不正です。');
+    if (typeof v !== 'string') throw Error(hostText('settings.index.invalidInput'));
     return v;
   };
   if (page.json)
     actions['open-settings'] = async ([scope, revision]) => {
-      if (typeof revision !== 'number') throw Error('設定の保存先を再取得してください。');
+      if (typeof revision !== 'number') throw Error(hostText('settings.index.refreshStorage'));
       settings.assertRevision(revision);
       if (!settingsPageStorage(page).files.some((file) => file.scope === scope))
-        throw Error('このページの保存先ではありません。');
+        throw Error(hostText('settings.index.wrongStorage'));
       const file = settings.targetFile(scope as 'shared' | 'device');
-      if (!fs.existsSync(file))
-        throw Error('設定ファイルがありません。復旧状態を確認してください。');
+      if (!fs.existsSync(file)) throw Error(hostText('settings.index.missingFile'));
       const error = await shell.openPath(file);
       if (error) throw Error(error);
     };
   if (page.id === 'appearance')
     actions.retryShellRegion = async ([region]) => {
-      if (!isShellRegion(region)) throw Error('領域が不正です。');
+      if (!isShellRegion(region)) throw Error(hostText('settings.index.invalidRegion'));
       await retryShell(region);
     };
   if (page.id === 'ai') {
@@ -2308,8 +2307,8 @@ function settingsPageActions(
       changed();
       information.report(
         'tts',
-        '読み上げ設定',
-        value ? 'APIキーをこのPCに保存しました。' : 'APIキーを削除しました。',
+        hostText('settings.index.ttsSettings'),
+        value ? hostText('settings.index.keySaved') : hostText('settings.index.keyDeleted'),
       );
     };
     actions.ttsVoices = async () => tts.voices('host');
@@ -2318,13 +2317,22 @@ function settingsPageActions(
       const job = tts.speak('host', { text, requestId });
       previewJobs.add(job.jobId as string);
       while (previewJobs.size > 512) previewJobs.delete(previewJobs.values().next().value!);
-      information.report('tts', '読み上げ', '読み上げを受け付けました。', job.jobId as string);
+      information.report(
+        'tts',
+        hostText('settings.index.tts'),
+        hostText('settings.index.speechAccepted'),
+        job.jobId as string,
+      );
       return job;
     };
     actions.ttsStop = async () => {
       notificationSpeech?.stopAll();
       await tts.stopAll();
-      information.report('tts', '読み上げ', '読み上げを停止しました。');
+      information.report(
+        'tts',
+        hostText('settings.index.tts'),
+        hostText('settings.index.speechStopped'),
+      );
       // The stop receipt must not start another spoken notification.
       notificationSpeech?.stopAll();
     };
@@ -2343,9 +2351,9 @@ function settingsPageActions(
           }
         })
       )
-        throw Error('試聴はすでに実行中です。');
+        throw Error(hostText('settings.index.previewRunning'));
       const job = tts.speak('notification-preview', {
-        text: '新しい通知が届きました。通知の読み上げを試聴しています。',
+        text: hostText('settings.index.notificationPreview'),
         ...resolveNotificationSpeech(settings.value),
         requestId,
       });
@@ -2364,7 +2372,8 @@ function settingsPageActions(
   }
   if (page.id === 'general') {
     actions.restoreScopedSettings = async ([scope]) => {
-      if (scope !== 'shared' && scope !== 'device') throw Error('復元対象が不正です。');
+      if (scope !== 'shared' && scope !== 'device')
+        throw Error(hostText('settings.index.invalidRecovery'));
       await restoreSettingsBackup(scope);
       return null;
     };
@@ -2394,7 +2403,7 @@ function settingsPageActions(
       return result;
     };
     actions.restartAsAdministrator = async () => {
-      if (settingsOperationBusy()) throw Error('設定の処理が完了してから再起動してください。');
+      if (settingsOperationBusy()) throw Error(hostText('settings.index.restartBusy'));
       await launch.restartElevated([
         ...launch.args,
         '--restore-view',
@@ -2419,7 +2428,7 @@ function settingsPageActions(
     page.kind === 'applet'
   ) {
     actions.setShortcutRecording = async ([value]) => {
-      if (typeof value !== 'boolean') throw Error('入力状態が不正です。');
+      if (typeof value !== 'boolean') throw Error(hostText('settings.index.invalidInputState'));
       settingsRecording = value;
       shortcutRecording = value && !!window?.isFocused();
       if (!value) {
@@ -2437,7 +2446,7 @@ function settingsPageActions(
   if (['shortcuts', 'gestures', 'tray', 'ribbon', 'touchpad-gestures'].includes(page.id)) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;
-      if (!value || value.mode !== 'select') throw Error('選択操作だけを利用できます。');
+      if (!value || value.mode !== 'select') throw Error(hostText('settings.index.selectOnly'));
       settingsPalette = value.requestId;
       return openCommandPalette(value);
     };
@@ -2477,7 +2486,7 @@ function settingsPageActions(
         !allApplets().some((a) => a.id === id) &&
         !(groups && ['all', 'host', 'applets'].includes(id))
       )
-        throw Error('更新対象が不正です。');
+        throw Error(hostText('settings.index.invalidUpdateTarget'));
       return id;
     };
     actions.checkUpdates = async ([id]) => {
@@ -2505,7 +2514,7 @@ function settingsPageActions(
       const selected = target(id);
       const url = updater.state.results.find((r) => r.id === (selected ?? 'host'))?.releaseUrl;
       if (!url || !/^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+\/releases$/.test(url))
-        throw Error('更新元を確認してください。');
+        throw Error(hostText('settings.index.invalidUpdateSource'));
       await shell.openExternal(url);
     };
   }
@@ -2516,7 +2525,7 @@ function settingsPageActions(
     actions.deleteWebAccount = async ([id]) => {
       const target = string(id);
       if (pageCollections.entries().some((a) => a.item.accountId === target))
-        throw Error('WebAppletがこのアカウントを使用しています。');
+        throw Error(hostText('settings.index.accountInUse'));
       return pageCollections.deleteAccount(target);
     };
     actions.clearWebAccount = async ([id]) => pageCollections.clearAccount(string(id));
@@ -2560,7 +2569,7 @@ function settingsPageActions(
               'retryStart',
             ];
       if (!value || !permitted.includes(value.kind))
-        throw Error('このページでは利用できない操作です。');
+        throw Error(hostText('settings.index.actionUnavailable'));
       const reply = await automation!.action(value);
       customCommands.reconcile();
       mcpClient.reconcile();
@@ -2577,7 +2586,11 @@ function settingsPageActions(
         tts.reconcile();
         for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
         changed();
-        information.report('permissions', '操作許可', 'このPCに保存しました。');
+        information.report(
+          'permissions',
+          hostText('settings.index.permissions'),
+          hostText('settings.index.saved'),
+        );
       };
   }
   if (page.kind === 'applet') {
@@ -2594,7 +2607,7 @@ function settingsPageActions(
             !current?.settingActions?.some((s) => s.command === item.command) ||
             !current.commands.some((c) => c.id === item.command && c.available)
           )
-            throw Error('操作は現在利用できません。');
+            throw Error(hostText('settings.index.operationUnavailable'));
           return executeCommand(item.command);
         };
     if (
@@ -2604,7 +2617,7 @@ function settingsPageActions(
     )
       actions.chooseDirectory = async () => {
         const result = await dialog.showOpenDialog(window!, {
-          title: '画像ソースフォルダーを選ぶ',
+          title: hostText('settings.index.selectImageFolder'),
           properties: ['openDirectory'],
         });
         return result.canceled ? null : (result.filePaths[0] ?? null);
@@ -2614,19 +2627,23 @@ function settingsPageActions(
     Object.entries(actions).map(([key, run]) => [
       key,
       async (args: unknown[]) => {
-        if (!startupReady || quitting) throw Error('AppDockは準備中です。');
+        if (!startupReady || quitting) throw Error(hostText('settings.index.preparing'));
         const result = await run(args);
         const accountMessages: Record<string, string> = {
-          createWebAccount: 'アカウント枠を追加しました。',
-          renameWebAccount: 'アカウント名を変更しました。',
+          createWebAccount: hostText('settings.index.accountAdded'),
+          renameWebAccount: hostText('settings.index.accountRenamed'),
           deleteWebAccount:
             result === 'deferred'
-              ? 'アカウント枠を削除しました。残る保存ファイルは次回起動時に自動で片づけます。'
-              : 'アカウント枠と保存データを削除しました。',
-          clearWebAccount: 'ログイン情報とサイトデータをクリアしました。',
+              ? hostText('settings.index.accountDeletionPending')
+              : hostText('settings.index.accountDeleted'),
+          clearWebAccount: hostText('settings.index.accountCleared'),
         };
         if (page.id === 'web-accounts' && accountMessages[key] && result !== false)
-          information.report('web-accounts', 'Webアカウント', accountMessages[key]);
+          information.report(
+            'web-accounts',
+            hostText('settings.index.webAccounts'),
+            accountMessages[key],
+          );
         return result;
       },
     ]),

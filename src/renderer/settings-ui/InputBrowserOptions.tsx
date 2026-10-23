@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { SettingsInput } from './SettingsInput';
 import { SettingsField } from './SettingsSections';
@@ -13,17 +14,18 @@ export function InputBrowserOptions({
   value: { browsers: string[]; requireChromiumWindowClass: boolean };
   onChange(patch: Partial<typeof value>): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const title = hostSettingItem(pageId, 'requireChromiumWindowClass').title;
   return (
     <>
       <SettingsField
-        group="Webブラウザ"
+        group={translate('settings.inputBrowserOptions.browser')}
         title={hostSettingItem(pageId, 'browsers').title}
         hint={
-          'exe名のみを指定し、パスは含めません。' +
+          translate('settings.inputBrowserOptions.executableHint') +
           (pageId === 'gestures'
-            ? 'WebBrowserToolsの操作対象もこの一覧を使います。'
-            : 'この入力のブラウザ条件に使います。')
+            ? translate('settings.inputBrowserOptions.webToolsHint')
+            : translate('settings.inputBrowserOptions.conditionHint'))
         }
         {...settingAnchor(pageId, 'browsers')}
       >
@@ -42,9 +44,9 @@ export function InputBrowserOptions({
         />
       </SettingsField>
       <SettingsField
-        group="Webブラウザ"
+        group={translate('settings.inputBrowserOptions.browser')}
         title={title}
-        description="FirefoxなどではChromiumウィンドウの条件をオフにします。"
+        description={translate('settings.inputBrowserOptions.chromiumHint')}
         {...settingAnchor(pageId, 'requireChromiumWindowClass')}
       >
         <Toggle

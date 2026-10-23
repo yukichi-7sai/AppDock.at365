@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import type { Settings } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
 import {
@@ -26,13 +27,14 @@ export function ShortcutOrderDialog({
   onChange(value: Settings): void;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   return (
     <BindingOrderDialog
       bindings={getKeybindings(settings)}
       commands={commands}
       initialInput={initialKey}
-      title="ショートカットの実行順"
-      inputName="キー"
+      title={translate('settings.shortcutOrderDialog.title')}
+      inputName={translate('settings.shortcutOrderDialog.key')}
       inputLabel={(key) => key}
       conditionLabel={(row, command) =>
         keybindingConditionLabel(
@@ -42,8 +44,8 @@ export function ShortcutOrderDialog({
         ) +
         (externalShortcutScope(row.when.scope)
           ? row.blockOriginalInput === false
-            ? '・入力を通す'
-            : '・入力をブロック'
+            ? translate('settings.shortcutOrderDialog.pass')
+            : translate('settings.shortcutOrderDialog.block')
           : '')
       }
       groupRows={keybindingGroups}

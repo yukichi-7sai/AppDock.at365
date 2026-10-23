@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
 import { useRef, useState } from 'react';
 import { OrderDialogFrame } from './OrderDialogFrame';
@@ -27,6 +28,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   onApply(ordered: R[], original: R[]): void;
   onClose(): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const [original] = useState(() => structuredClone(bindings));
   const [ordered, setOrdered] = useState(original);
   const groups = groupRows(ordered);
@@ -52,25 +54,31 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
     setOrdered((value) => moveRow(value, from, to));
     const source = rows.find((row) => row.id === from);
     setNotice(
-      `${catalog.get(source?.command ?? '')?.title ?? source?.command ?? '割り当て'}を${rows.findIndex((row) => row.id === to) + 1}番目に移動しました。`,
+      translate('settings.bindingOrderDialog.moved', {
+        value:
+          catalog.get(source?.command ?? '')?.title ??
+          source?.command ??
+          translate('settings.bindingOrderDialog.binding'),
+        value2: rows.findIndex((row) => row.id === to) + 1,
+      }),
     );
     setError('');
   };
   return (
     <OrderDialogFrame
       title={title}
-      eyebrow="アプリ全体の割り当て"
+      eyebrow={translate('settings.bindingOrderDialog.allBindings')}
       className="shortcut-order-dialog"
-      closeLabel="実行順の編集をキャンセル"
+      closeLabel={translate('settings.bindingOrderDialog.cancel')}
       onClose={onClose}
       onReady={setReady}
       onError={setError}
       initialFocus="select"
       error={error}
-      description={`${changed}種類の順序を変更`}
+      description={translate('settings.bindingOrderDialog.changedCount', { changed: changed })}
       message={notice}
-      hint="条件に一致する割り当てを、上から順に実行します。無効・利用できないものは実行されません。同じコマンドが複数の条件に一致した場合は、最初の一致位置で1回だけ実行します。ドラッグ・上下ボタン・Alt＋↑↓で並べ替えられます。"
-      applyLabel="適用"
+      hint={translate('settings.bindingOrderDialog.hint')}
+      applyLabel={translate('settings.bindingOrderDialog.apply')}
       applyDisabled={!changed || !ready}
       onApply={() => {
         try {
@@ -86,14 +94,14 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
         description={
           rows.length < 2
             ? rows.length
-              ? `この${inputName}の割り当ては1件です。並べ替える相手がありません。`
-              : `${inputName}の割り当てを追加すると、ここで実行順を変更できます。`
+              ? translate('settings.bindingOrderDialog.single', { inputName: inputName })
+              : translate('settings.bindingOrderDialog.emptyHint', { inputName: inputName })
             : undefined
         }
       >
         <select
           ref={selector}
-          aria-label={`実行順を変更する${inputName}`}
+          aria-label={translate('settings.bindingOrderDialog.input', { inputName: inputName })}
           value={key}
           disabled={!groups.length}
           onChange={(event) => {
@@ -103,15 +111,25 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
             setNotice('');
           }}
         >
-          {!groups.length && <option value="">割り当てがありません</option>}
+          {!groups.length && (
+            <option value="">{translate('settings.bindingOrderDialog.noBindings')}</option>
+          )}
           {groups.map(([name, group]) => (
             <option key={name} value={name}>
-              {inputLabel(name)} · {group.length}件
+              {translate('settings.bindingOrderDialog.groupCount', {
+                name: inputLabel(name),
+                count: group.length,
+              })}
             </option>
           ))}
         </select>
       </SettingsField>
-      <ol className="shortcut-order-list" aria-label={`${inputLabel(key)}の実行順`}>
+      <ol
+        className="shortcut-order-list"
+        aria-label={translate('settings.bindingOrderDialog.executionOrder', {
+          value: inputLabel(key),
+        })}
+      >
         {rows.map((row, index) => {
           const command = catalog.get(row.command);
           const title = command?.title ?? row.command;
@@ -137,8 +155,8 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
               <button
                 className="shortcut-order-handle"
                 draggable
-                aria-label={`${title}の順番をドラッグで変更`}
-                title="ドラッグ、またはAlt＋↑↓で移動"
+                aria-label={translate('settings.bindingOrderDialog.drag', { title: title })}
+                title={translate('settings.bindingOrderDialog.dragHint')}
                 onDragStart={(event) => {
                   dragged.current = row.id;
                   event.dataTransfer.effectAllowed = 'move';
@@ -158,22 +176,30 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
               >
                 ⠿
               </button>
-              <span className="shortcut-order-number" aria-label={`${index + 1}番目`}>
+              <span
+                className="shortcut-order-number"
+                aria-label={translate('settings.bindingOrderDialog.position', { value: index + 1 })}
+              >
                 {index + 1}
               </span>
               <div className="shortcut-order-command">
                 <strong>{title}</strong>
                 <small>
-                  {command?.extension ?? '未確認のコマンド'} · {conditionLabel(row, command)}
+                  {command?.extension ?? translate('settings.bindingOrderDialog.unknown')} ·{' '}
+                  {conditionLabel(row, command)}
                 </small>
                 <small className="command-id">{row.command}</small>
                 {(!row.enabled || !command?.available) && (
-                  <small>{!row.enabled ? '無効' : '現在利用できません'}</small>
+                  <small>
+                    {!row.enabled
+                      ? translate('settings.bindingOrderDialog.disabled')
+                      : translate('settings.bindingOrderDialog.unavailable')}
+                  </small>
                 )}
               </div>
               <div className="shortcut-order-moves">
                 <button
-                  aria-label={`${title}を上へ`}
+                  aria-label={translate('settings.bindingOrderDialog.up', { title: title })}
                   className="accent-action"
                   disabled={index === 0}
                   onClick={() => move(row.id, rows[index - 1].id)}
@@ -181,7 +207,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
                   ↑
                 </button>
                 <button
-                  aria-label={`${title}を下へ`}
+                  aria-label={translate('settings.bindingOrderDialog.down', { title: title })}
                   className="accent-action"
                   disabled={index === rows.length - 1}
                   onClick={() => move(row.id, rows[index + 1].id)}

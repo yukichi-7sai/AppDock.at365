@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -16,6 +17,7 @@ import {
 import { Toggle } from '../settings-ui/Toggle';
 
 export function UpdateActions({ appletCount }: { appletCount: number }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [state, setState] = useState<UpdateState>({ busy: false, phase: '', results: [] });
   const [error, setError] = useState('');
@@ -48,8 +50,8 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
   return (
     <SettingsSection
       {...settingAnchor('about', 'updateActions')}
-      title="まとめて更新"
-      hint="更新候補を確認して準備します。最後の確認でキャンセルでき、適用する場合は1回の再起動にまとめます。"
+      title={translate('settings.updateSettings.batch')}
+      hint={translate('settings.updateSettings.batchHint')}
     >
       <SettingsActions className="update-actions">
         <button
@@ -59,14 +61,14 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
             action(() => settingsControls.executeCommand('appdock.updates.installAll'))
           }
         >
-          本体と全Appletを更新
+          {translate('settings.updateSettings.updateAll')}
         </button>
         <button
           className="text-button"
           disabled={state.busy || appletCount === 0}
           onClick={() => action(() => settingsControls.installUpdates('applets'))}
         >
-          Appletを一括更新
+          {translate('settings.updateSettings.updateApplets')}
         </button>
       </SettingsActions>
       <SettingsContent className="update-last-checked">
@@ -83,6 +85,7 @@ export function UpdateSettings({
   settings: Settings;
   edit(next: Settings): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const edit = (change: (next: Settings) => void) => {
     const next = structuredClone(settings);
@@ -91,25 +94,25 @@ export function UpdateSettings({
   };
   return (
     <SettingsSection
-      title="更新の設定"
-      hint="起動時の確認方法と、本体の更新元を変更できます。"
+      title={translate('settings.updateSettings.settings')}
+      hint={translate('settings.updateSettings.settingsHint')}
       collapsible
       {...settingAnchor('about', 'updates')}
     >
       <SettingsField
-        title="AppDockの更新元"
+        title={translate('settings.updateSettings.hostSource')}
         hint={hostSettingItem('about', 'hostSource').description}
         {...settingAnchor('about', 'hostSource')}
       >
         <SettingsUrlInput
-          aria-label="AppDockの更新元"
+          aria-label={translate('settings.updateSettings.hostSource')}
           value={settings.updates.hostSource}
           onChange={(event) =>
             edit((next) => {
               next.updates.hostSource = event.target.value;
             })
           }
-          placeholder="publishフォルダー / URL / github:owner/repo"
+          placeholder={translate('settings.updateSettings.sourcePlaceholder')}
         />
         <button
           className="text-button"
@@ -120,7 +123,7 @@ export function UpdateSettings({
             })
           }
         >
-          AppDockの更新元を既定に戻す
+          {translate('settings.updateSettings.resetSource')}
         </button>
       </SettingsField>
       {(
@@ -149,11 +152,11 @@ export function UpdateSettings({
       ))}
       <SettingsField
         title={hostSettingItem('about', 'startupDelaySeconds').title}
-        hint="0〜3,600秒で指定します。"
+        hint={translate('settings.updateSettings.delayHint')}
         {...settingAnchor('about', 'startupDelaySeconds')}
       >
         <SettingsInput
-          aria-label="起動から確認までの秒数"
+          aria-label={translate('settings.updateSettings.delay')}
           type="number"
           min={0}
           max={3600}
@@ -165,9 +168,7 @@ export function UpdateSettings({
           }
         />
       </SettingsField>
-      <p className="muted">
-        起動時は更新情報の確認だけを行います。配布ファイルのダウンロードや適用は行いません。同じ版の再適用を許可しても古い版には戻しません。
-      </p>
+      <p className="muted">{translate('settings.updateSettings.startupHint')}</p>
     </SettingsSection>
   );
 }
@@ -181,6 +182,7 @@ export function AppletUpdateSource({
   settings: Settings;
   edit(next: Settings): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const source = settings.extensions[extension.id]?.updateSource;
   const defaultSource = extension.updateRepository ? `github:${extension.updateRepository}` : '';
@@ -198,31 +200,41 @@ export function AppletUpdateSource({
       {...settingAnchor(`applet:${extension.id}`, 'updateSource')}
     >
       <summary>
-        更新元の設定{' '}
+        {translate('settings.updateSettings.sources')}{' '}
         <span className="muted">
-          {source === undefined ? '既定' : source === '' ? '無効' : 'カスタム'}
+          {source === undefined
+            ? translate('settings.updateSettings.default')
+            : source === ''
+              ? translate('settings.updateSettings.disabled')
+              : translate('settings.updateSettings.custom')}
         </span>
       </summary>
       <div className="update-settings-content">
         <label className="update-source">
-          <span>{extension.displayName}の更新元</span>
+          <span>
+            {translate('settings.updateSettings.sourceTitle', { name: extension.displayName })}
+          </span>
           <SettingsUrlInput
-            aria-label={`${extension.displayName}の更新元`}
+            aria-label={translate('settings.updateSettings.sourceLabel', {
+              displayName: extension.displayName,
+            })}
             value={source ?? defaultSource}
-            placeholder="publishフォルダー / URL / github:owner/repo"
+            placeholder={translate('settings.updateSettings.sourcePlaceholder')}
             onChange={(event) => change(event.target.value)}
           />
         </label>
         <p className="muted">
-          {defaultSource ? `既定: ${defaultSource}` : 'このAppletには既定の更新元がありません。'}{' '}
-          空欄を保存すると更新確認を無効にします。
+          {defaultSource
+            ? translate('settings.updateSettings.defaultSource', { defaultSource: defaultSource })
+            : translate('settings.updateSettings.noDefaultSource')}{' '}
+          {translate('settings.updateSettings.disableHint')}
         </p>
         <button
           className="text-button"
           disabled={source === undefined}
           onClick={() => change(undefined)}
         >
-          既定に戻す
+          {translate('settings.updateSettings.reset')}
         </button>
       </div>
     </details>

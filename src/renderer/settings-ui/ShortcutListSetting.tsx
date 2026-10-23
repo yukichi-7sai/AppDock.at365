@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
 import { SettingsInput } from './SettingsInput';
 import { validSendKeys } from '../../shared/setting-definitions';
@@ -12,6 +13,7 @@ export function ShortcutListSetting({
   value: unknown;
   onChange(value: Entry[]): void;
 }) {
+  const { t: translate } = useHostTranslation();
   const entries: Entry[] = Array.isArray(value)
     ? value.map((entry) => ({
         id: typeof entry?.id === 'string' ? entry.id : '',
@@ -23,29 +25,37 @@ export function ShortcutListSetting({
     onChange(entries.map((entry, i) => (i === index ? { ...entry, [field]: text } : entry)));
   return (
     <div className="send-key-list" role="group" aria-label={title}>
-      <p className="send-key-count">{entries.length} / 32 件のコマンド</p>
-      {!entries.length && <p>「コマンドを追加」から、名前と送信するキーを登録できます。</p>}
+      <p className="send-key-count">
+        {translate('settings.shortcutListSetting.entryCount', { count: entries.length })}
+      </p>
+      {!entries.length && <p>{translate('settings.shortcutListSetting.empty')}</p>}
       {entries.map((entry, index) => (
         <div className="send-key-entry" key={index}>
           <SettingsField title="ID">
             <SettingsInput
               aria-label={`${title} ${index + 1} ID`}
-              placeholder="ID（例: new-tab）"
+              placeholder={translate('settings.shortcutListSetting.id')}
               value={entry.id}
               onChange={(event) => update(index, 'id', event.target.value)}
             />
           </SettingsField>
-          <SettingsField title="名前">
+          <SettingsField title={translate('settings.shortcutListSetting.name')}>
             <SettingsInput
-              aria-label={`${title} ${index + 1} 名前`}
-              placeholder="名前（例: 新しいタブ）"
+              aria-label={translate('settings.shortcutListSetting.nameLabel', {
+                title: title,
+                value: index + 1,
+              })}
+              placeholder={translate('settings.shortcutListSetting.namePlaceholder')}
               value={entry.title}
               onChange={(event) => update(index, 'title', event.target.value)}
             />
           </SettingsField>
-          <SettingsField title="送信するキー">
+          <SettingsField title={translate('settings.shortcutListSetting.keys')}>
             <SettingsInput
-              aria-label={`${title} ${index + 1} キー`}
+              aria-label={translate('settings.shortcutListSetting.keysLabel', {
+                title: title,
+                value: index + 1,
+              })}
               placeholder="Ctrl+T"
               value={entry.keys}
               aria-invalid={!validSendKeys(entry.keys)}
@@ -54,10 +64,13 @@ export function ShortcutListSetting({
           </SettingsField>
           <button
             type="button"
-            aria-label={`${title} ${index + 1} 削除`}
+            aria-label={translate('settings.shortcutListSetting.deleteLabel', {
+              title: title,
+              value: index + 1,
+            })}
             onClick={() => onChange(entries.filter((_, i) => i !== index))}
           >
-            削除
+            {translate('settings.shortcutListSetting.delete')}
           </button>
         </div>
       ))}
@@ -69,16 +82,17 @@ export function ShortcutListSetting({
           while (entries.some((entry) => entry.id === `shortcut-${n}`)) n++;
           onChange([
             ...entries,
-            { id: `shortcut-${n}`, title: '新しいショートカット', keys: 'Ctrl+T' },
+            {
+              id: `shortcut-${n}`,
+              title: translate('settings.shortcutListSetting.new'),
+              keys: 'Ctrl+T',
+            },
           ]);
         }}
       >
-        コマンドを追加
+        {translate('settings.shortcutListSetting.add')}
       </button>
-      <p>
-        IDを変えると別のコマンドになります。キーは Ctrl+Shift+T、Alt+F4、Win+E
-        などを指定できます。保存すると反映されます。
-      </p>
+      <p>{translate('settings.shortcutListSetting.hint')}</p>
     </div>
   );
 }

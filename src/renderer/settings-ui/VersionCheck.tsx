@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { useHostTranslation } from '../HostTranslation';
 import { SettingsButton } from './SettingsButton';
 import { SettingsField } from './SettingsSections';
 import { useSettingsFeedback } from './SettingsStatus';
@@ -5,15 +7,16 @@ import { useSettingsControls } from './api';
 import { useEffect, useState } from 'react';
 import type { UpdateResult, UpdateState } from '../../shared/contracts';
 export function UpdateCheckTime({ checkedAt }: { checkedAt?: string }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   return (
     <time dateTime={checkedAt} className="muted">
-      最終確認:{' '}
+      {translate('settings.versionCheck.lastChecked')}{' '}
       {checkedAt
         ? new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(
             new Date(checkedAt),
           )
-        : '未確認'}
+        : translate('settings.versionCheck.unchecked')}
     </time>
   );
 }
@@ -22,7 +25,7 @@ const updateError = (error: unknown) => {
     /^Error invoking remote method '[^']+': (?:Error: )?/,
     '',
   );
-  return message || '更新を確認できませんでした。通信環境を確認して、もう一度お試しください。';
+  return message || hostText('settings.versionCheck.failed');
 };
 
 export function useUpdateState() {
@@ -46,6 +49,7 @@ export function useUpdateState() {
 }
 
 export function VersionDisplay({ version, result }: { version: string; result?: UpdateResult }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const available = result?.status === 'available' && result.currentVersion === version;
   return (
@@ -54,7 +58,9 @@ export function VersionDisplay({ version, result }: { version: string; result?: 
       {available && result.latestVersion && (
         <span
           className="version-available"
-          aria-label={`更新後のバージョン ${result.latestVersion}`}
+          aria-label={translate('settings.versionCheck.nextVersion', {
+            latestVersion: result.latestVersion,
+          })}
         >
           <span aria-hidden="true">→</span>
           <span className="settings-badge">{result.latestVersion}</span>
@@ -75,31 +81,37 @@ export function VersionCheck({
   disabled?: boolean;
   compact?: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const state = useUpdateState();
   const result = state.results.find((result) => result.id === (id ?? 'host'));
-  useSettingsFeedback({ error, busy, target: '更新' });
+  useSettingsFeedback({ error, busy, target: translate('settings.versionCheck.update') });
   const summary = !result
-    ? 'まだ更新を確認していません。'
+    ? translate('settings.versionCheck.notChecked')
     : result.status === 'available'
-      ? `${result.latestVersion} が公開されています。`
+      ? translate('settings.versionCheck.available', {
+          latestVersion: String(result.latestVersion),
+        })
       : result.status === 'unpublished'
-        ? '公開リリースが見つかりません。'
+        ? translate('settings.versionCheck.noRelease')
         : result.status === 'unsupported'
-          ? '更新元が設定されていません。'
+          ? translate('settings.versionCheck.noRepository')
           : result.status === 'current'
-            ? '最新のバージョンです。'
+            ? translate('settings.versionCheck.latest')
             : result.message;
   return (
-    <SettingsField title="更新" description={details ? summary : undefined}>
+    <SettingsField
+      title={translate('settings.versionCheck.update')}
+      description={details ? summary : undefined}
+    >
       <span className="update-check-control">
         <SettingsButton
           pending={!!busy}
           className={compact ? 'text-button' : 'update-primary'}
           disabled={busy || state.busy || disabled}
-          title={disabled ? '設定の処理が完了するまでお待ちください。' : undefined}
+          title={disabled ? translate('settings.versionCheck.pending') : undefined}
           onClick={() => {
             setError('');
             setBusy(true);
@@ -112,7 +124,9 @@ export function VersionCheck({
               .finally(() => setBusy(false));
           }}
         >
-          {id ? 'このAppletを更新' : 'AppDockを更新'}
+          {id
+            ? translate('settings.versionCheck.updateApplet')
+            : translate('settings.versionCheck.updateHost')}
         </SettingsButton>
         {details && <UpdateCheckTime checkedAt={result?.checkedAt} />}
       </span>
@@ -127,7 +141,7 @@ export function VersionCheck({
                   .catch((err: Error) => setError(updateError(err)));
               }}
             >
-              リリースを開く
+              {translate('settings.versionCheck.openRelease')}
             </button>
           )}
         </>

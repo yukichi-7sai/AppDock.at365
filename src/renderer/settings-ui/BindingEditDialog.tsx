@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useId, useState, type ReactNode } from 'react';
 import { SettingsModal } from './SettingsModal';
 export function BindingEditDialog({
@@ -21,6 +22,7 @@ export function BindingEditDialog({
   error?: string;
   errorTarget?: string;
 }) {
+  const { t: translate } = useHostTranslation();
   const [error, setError] = useState('');
   const [recordingReady, setRecordingReady] = useState(false);
   const id = useId();
@@ -45,10 +47,18 @@ export function BindingEditDialog({
       header={
         <header>
           <div>
-            <small>{adding ? '割り当てを追加' : '割り当てを編集'}</small>
+            <small>
+              {adding
+                ? translate('settings.bindingEditDialog.add')
+                : translate('settings.bindingEditDialog.edit')}
+            </small>
             <h2 id={`${id}-title`}>{title}</h2>
           </div>
-          <button className="shortcut-dialog-close" aria-label="編集をキャンセル" onClick={onClose}>
+          <button
+            className="shortcut-dialog-close"
+            aria-label={translate('settings.bindingEditDialog.cancelEdit')}
+            onClick={onClose}
+          >
             ×
           </button>
         </header>
@@ -56,9 +66,11 @@ export function BindingEditDialog({
       footer={
         <footer>
           <div>
-            <button onClick={onClose}>キャンセル</button>
+            <button onClick={onClose}>{translate('settings.bindingEditDialog.cancel')}</button>
             <button className="primary" disabled={!valid || !recordingReady} onClick={apply}>
-              {adding ? '追加' : '適用'}
+              {adding
+                ? translate('settings.bindingEditDialog.addAction')
+                : translate('settings.bindingEditDialog.apply')}
             </button>
           </div>
         </footer>

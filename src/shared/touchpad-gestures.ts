@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { normalizeShortcut } from './commands';
 import {
   commandCondition,
@@ -10,16 +11,16 @@ import { getKeybindings, parseKeybindingOptions } from './keybindings';
 import type { Settings } from './contracts';
 
 export const touchpadGestureTypes = [
-  ['three.tap', '3本指・タップ'],
-  ['three.up', '3本指・上'],
-  ['three.down', '3本指・下'],
-  ['three.left', '3本指・左'],
-  ['three.right', '3本指・右'],
-  ['four.tap', '4本指・タップ'],
-  ['four.up', '4本指・上'],
-  ['four.down', '4本指・下'],
-  ['four.left', '4本指・左'],
-  ['four.right', '4本指・右'],
+  ['three.tap', hostText('settings.touchpad-gestures.threeTap')],
+  ['three.up', hostText('settings.touchpad-gestures.threeUp')],
+  ['three.down', hostText('settings.touchpad-gestures.threeDown')],
+  ['three.left', hostText('settings.touchpad-gestures.threeLeft')],
+  ['three.right', hostText('settings.touchpad-gestures.threeRight')],
+  ['four.tap', hostText('settings.touchpad-gestures.fourTap')],
+  ['four.up', hostText('settings.touchpad-gestures.fourUp')],
+  ['four.down', hostText('settings.touchpad-gestures.fourDown')],
+  ['four.left', hostText('settings.touchpad-gestures.fourLeft')],
+  ['four.right', hostText('settings.touchpad-gestures.fourRight')],
 ] as const;
 export type TouchpadGestureId = (typeof touchpadGestureTypes)[number][0];
 export const touchpadModifiers = ['Ctrl', 'Alt', 'Shift', 'Win'] as const;
@@ -62,7 +63,7 @@ export const touchpadTitle = (gesture: string) =>
   touchpadGestureTypes.find(([id]) => id === gesture)?.[1] ?? gesture;
 export function touchpadId(value: unknown): TouchpadGestureId {
   if (!touchpadGestureTypes.some(([id]) => id === value))
-    throw Error('タッチパッドのジェスチャーを確認してください。');
+    throw Error(hostText('settings.touchpad-gestures.gesture'));
   return value as TouchpadGestureId;
 }
 export const connectionKey = (connection: TouchpadConnection) =>
@@ -87,14 +88,14 @@ export function defaultTouchpadGestures(): TouchpadGestureSettings {
 export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
   if (raw === undefined) return defaultTouchpadGestures();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw))
-    throw Error('タッチパッドジェスチャー設定を確認してください。');
+    throw Error(hostText('settings.touchpad-gestures.settings'));
   const value = raw as TouchpadGestureSettings;
   const defaults = defaultTouchpadGestures();
   if (
     (value.enabled !== undefined && typeof value.enabled !== 'boolean') ||
     Object.keys(value).some((key) => !Object.keys(defaults).includes(key))
   )
-    throw Error('タッチパッドの設定項目を確認してください。');
+    throw Error(hostText('settings.touchpad-gestures.fields'));
   const source = value.connections ?? defaults.connections;
   if (
     !source ||
@@ -102,7 +103,7 @@ export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
     Array.isArray(source) ||
     Object.keys(source).some((key) => !touchpadGestureTypes.some(([id]) => id === key))
   )
-    throw Error('接続用キーの対応を確認してください。');
+    throw Error(hostText('settings.touchpad-gestures.keys'));
   const keys = new Set<string>();
   const connections = Object.fromEntries(
     touchpadGestureTypes.map(([id]) => {
@@ -117,9 +118,9 @@ export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
         entry.modifiers.some((modifier) => !touchpadModifiers.includes(modifier)) ||
         new Set(entry.modifiers).size !== entry.modifiers.length
       )
-        throw Error('接続用キーはF13～F24と修飾キーから選んでください。');
+        throw Error(hostText('settings.touchpad-gestures.keyRange'));
       const key = normalizeShortcut(connectionKey(entry));
-      if (keys.has(key)) throw Error('別のタッチパッドジェスチャーと接続用キーが重複しています。');
+      if (keys.has(key)) throw Error(hostText('settings.touchpad-gestures.duplicate'));
       keys.add(key);
       return [
         id,
@@ -154,9 +155,7 @@ export function reservedTouchpadKeys(settings: Settings): Map<string, TouchpadGe
 export class TouchpadKeyConflictError extends Error {
   readonly code = 'TOUCHPAD_KEY_CONFLICT';
   constructor(readonly keys: string[]) {
-    super(
-      `接続用キー「${keys.join('、')}」がショートカットキーの割り当てと重複しています。タッチパッドジェスチャーの「接続用キー設定」で接続用キーを変更してください。`,
-    );
+    super(hostText('settings.touchpad-gestures.shortcutConflict', { value: keys.join('、') }));
     this.name = 'TouchpadKeyConflictError';
   }
 }

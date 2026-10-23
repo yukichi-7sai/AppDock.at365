@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useState, useEffect, useRef } from 'react';
 import type { SettingsControlEditor } from '../settings-ui/api';
@@ -18,6 +19,7 @@ export function TtsSettingsForm({
   invoke(name: string, args?: unknown[]): Promise<any>;
   busy: boolean;
 }) {
+  const { t: translate } = useHostTranslation();
   const value = editor.value.tts ?? defaultTtsSettings();
   const [key, setKey] = useState('');
   const [text, setText] = useState('');
@@ -74,8 +76,14 @@ export function TtsSettingsForm({
       (kind === 'models' ? setModels : setVoices)(items);
       setMessage(
         items.length
-          ? `${items.length}件の${kind === 'models' ? 'モデル' : 'ボイス'}を取得しました。候補から選ぶか、IDを直接入力できます。`
-          : '一覧は空でした。IDを直接入力できます。',
+          ? translate('settings.ttsSettings.loaded', {
+              length: items.length,
+              value:
+                kind === 'models'
+                  ? translate('settings.ttsSettings.model')
+                  : translate('settings.ttsSettings.voice'),
+            })
+          : translate('settings.ttsSettings.empty'),
       );
     });
   const active = auxiliary?.jobs.some((j) =>
@@ -85,28 +93,31 @@ export function TtsSettingsForm({
   const previewState =
     previewJob &&
     {
-      queued: '待機中',
-      generating: '生成中',
-      waitingPlayback: '再生待ち',
-      playing: '再生中',
-      completed: '完了',
-      failed: '失敗',
-      canceled: '取消',
+      queued: translate('settings.ttsSettings.queued'),
+      generating: translate('settings.ttsSettings.generating'),
+      waitingPlayback: translate('settings.ttsSettings.waitingPlayback'),
+      playing: translate('settings.ttsSettings.playing'),
+      completed: translate('settings.ttsSettings.completed'),
+      failed: translate('settings.ttsSettings.failed'),
+      canceled: translate('settings.ttsSettings.canceled'),
     }[previewJob.state];
   useSettingsFeedback({ busy: pending, error: error || auxiliary?.error, message });
   return (
-    <div className="settings-sections tts-settings" aria-label="読み上げ">
+    <div
+      className="settings-sections tts-settings"
+      aria-label={translate('settings.ttsSettings.title')}
+    >
       <SettingsSection
-        title="TTS接続先"
-        hint="使用するTTSサーバーを設定します。APIキーが不要なサーバーでは空欄のまま使えます。"
+        title={translate('settings.ttsSettings.connection')}
+        hint={translate('settings.ttsSettings.connectionHint')}
       >
         <SettingsField
-          title="APIのURL"
-          hint="サーバーのベースURLを入力します。"
+          title={translate('settings.ttsSettings.url')}
+          hint={translate('settings.ttsSettings.urlHint')}
           {...settingAnchor('tts', 'baseUrl')}
         >
           <SettingsUrlInput
-            aria-label="APIのURL"
+            aria-label={translate('settings.ttsSettings.url')}
             value={value.baseUrl}
             placeholder="http://host:8080/v1"
             spellCheck={false}
@@ -114,18 +125,20 @@ export function TtsSettingsForm({
           />
         </SettingsField>
         <SettingsField
-          title="APIキー"
-          description="このPCだけに暗号化保存します。接続先を変更したら再設定してください。"
+          title={translate('settings.ttsSettings.apiKey')}
+          description={translate('settings.ttsSettings.apiKeyHint')}
           {...settingAnchor('tts', 'apiKey')}
         >
           <SettingsInput
-            aria-label="APIキー"
+            aria-label={translate('settings.ttsSettings.apiKey')}
             commitOn="input"
             type="password"
             autoComplete="off"
             value={key}
             placeholder={
-              auxiliary?.apiKeyConfigured ? '設定済み・変更する場合だけ入力' : '未設定・認証なし'
+              auxiliary?.apiKeyConfigured
+                ? translate('settings.ttsSettings.storedKey')
+                : translate('settings.ttsSettings.noKey')
             }
             onChange={(e) => setKey(e.target.value)}
           />
@@ -141,7 +154,7 @@ export function TtsSettingsForm({
                 })
               }
             >
-              APIキーを設定
+              {translate('settings.ttsSettings.setKey')}
             </button>
             <button
               disabled={busy || pending || (!auxiliary?.apiKeyConfigured && !auxiliary?.error)}
@@ -154,25 +167,25 @@ export function TtsSettingsForm({
                 })
               }
             >
-              APIキーを削除
+              {translate('settings.ttsSettings.deleteKey')}
             </button>
           </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection
-        title="モデルと声"
-        hint="候補を取得して選択するか、サーバーで使えるIDを直接入力します。"
+        title={translate('settings.ttsSettings.modelsAndVoices')}
+        hint={translate('settings.ttsSettings.modelsAndVoicesHint')}
       >
         <SettingsField
-          title="TTSモデル"
-          hint="一覧には音声生成以外のモデルも含まれる場合があります。TTS対応のモデルを選んでください。"
+          title={translate('settings.ttsSettings.modelLabel')}
+          hint={translate('settings.ttsSettings.modelHint')}
           {...settingAnchor('tts', 'model')}
         >
           <SettingsInput
-            aria-label="TTSモデル"
+            aria-label={translate('settings.ttsSettings.modelLabel')}
             list="tts-models"
             value={value.model}
-            placeholder="モデルID"
+            placeholder={translate('settings.ttsSettings.modelId')}
             onChange={(e) => change({ model: e.target.value })}
           />
           <datalist id="tts-models">
@@ -184,13 +197,13 @@ export function TtsSettingsForm({
           </datalist>
           {models.length > 0 && (
             <select
-              aria-label="取得したTTSモデル"
+              aria-label={translate('settings.ttsSettings.fetchedModels')}
               value={models.some((m) => m.id === value.model) ? value.model : ''}
               onChange={(e) => {
                 if (e.target.value) change({ model: e.target.value });
               }}
             >
-              <option value="">一覧から選択…</option>
+              <option value="">{translate('settings.ttsSettings.select')}</option>
               {models.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
@@ -200,20 +213,20 @@ export function TtsSettingsForm({
           )}
           <SettingsActions>
             <button disabled={busy || pending || !value.baseUrl} onClick={() => load('models')}>
-              モデル一覧を更新
+              {translate('settings.ttsSettings.refreshModels')}
             </button>
           </SettingsActions>
         </SettingsField>
         <SettingsField
-          title="既定のボイス"
-          hint="通常の読み上げで使う声です。"
+          title={translate('settings.ttsSettings.defaultVoice')}
+          hint={translate('settings.ttsSettings.defaultVoiceHint')}
           {...settingAnchor('tts', 'defaultVoice')}
         >
           <SettingsInput
-            aria-label="既定のボイス"
+            aria-label={translate('settings.ttsSettings.defaultVoice')}
             list="tts-voices"
             value={value.defaultVoice}
-            placeholder="ボイスID"
+            placeholder={translate('settings.ttsSettings.voiceId')}
             onChange={(e) => change({ defaultVoice: e.target.value })}
           />
           <datalist id="tts-voices">
@@ -225,13 +238,13 @@ export function TtsSettingsForm({
           </datalist>
           {voices.length > 0 && (
             <select
-              aria-label="取得したボイス"
+              aria-label={translate('settings.ttsSettings.fetchedVoices')}
               value={voices.some((v) => v.id === value.defaultVoice) ? value.defaultVoice : ''}
               onChange={(e) => {
                 if (e.target.value) change({ defaultVoice: e.target.value });
               }}
             >
-              <option value="">一覧から選択…</option>
+              <option value="">{translate('settings.ttsSettings.select')}</option>
               {voices.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
@@ -244,17 +257,17 @@ export function TtsSettingsForm({
               disabled={busy || pending || (value.voicesSource === 'endpoint' && !value.baseUrl)}
               onClick={() => load('voices')}
             >
-              ボイス一覧を更新
+              {translate('settings.ttsSettings.refreshVoices')}
             </button>
           </SettingsActions>
         </SettingsField>
         <SettingsField
-          title="読み上げ速度"
-          hint="1が標準速度です。0.25〜4の範囲で調整できます。"
+          title={translate('settings.ttsSettings.speed')}
+          hint={translate('settings.ttsSettings.speedHint')}
           {...settingAnchor('tts', 'defaultSpeed')}
         >
           <SettingsInput
-            aria-label="読み上げ速度"
+            aria-label={translate('settings.ttsSettings.speed')}
             type="number"
             min={0.25}
             max={4}
@@ -267,24 +280,24 @@ export function TtsSettingsForm({
         </SettingsField>
       </SettingsSection>
       <SettingsSection
-        title="試聴"
-        description="保存済みのモデル・声・速度で確認します。入力した文章はサーバーへ送信されますが、保存されません。"
+        title={translate('settings.ttsSettings.preview')}
+        description={translate('settings.ttsSettings.previewHint')}
         {...settingAnchor('tts', 'preview')}
       >
         <SettingsField
-          title="試聴するテキスト"
+          title={translate('settings.ttsSettings.text')}
           description={
             !value.baseUrl || !value.model || !value.defaultVoice
-              ? '接続先・モデル・声を設定すると試聴できます。'
-              : (previewState ?? '試聴できます。')
+              ? translate('settings.ttsSettings.previewRequirements')
+              : (previewState ?? translate('settings.ttsSettings.previewReady'))
           }
           error={previewJob?.error?.message}
         >
           <SettingsTextarea
-            aria-label="試聴するテキスト"
+            aria-label={translate('settings.ttsSettings.text')}
             commitOn="input"
             value={text}
-            placeholder="読み上げたい文章を入力…"
+            placeholder={translate('settings.ttsSettings.textPlaceholder')}
             onChange={(e) => setText(e.target.value)}
           />
           <SettingsActions>
@@ -305,7 +318,7 @@ export function TtsSettingsForm({
                 })
               }
             >
-              試聴する
+              {translate('settings.ttsSettings.play')}
             </button>
             <button
               disabled={pending}
@@ -315,56 +328,62 @@ export function TtsSettingsForm({
                 })
               }
             >
-              すべての読み上げを停止
+              {translate('settings.ttsSettings.stop')}
             </button>
           </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection
-        title="サーバーに合わせた詳細設定"
-        hint="速度の適用先や、ボイス一覧の取得方法を調整できます。"
+        title={translate('settings.ttsSettings.advanced')}
+        hint={translate('settings.ttsSettings.advancedHint')}
         collapsible
       >
-        <SettingsField title="速度の適用先" {...settingAnchor('tts', 'speedMode')}>
+        <SettingsField
+          title={translate('settings.ttsSettings.speedMode')}
+          {...settingAnchor('tts', 'speedMode')}
+        >
           <select
-            aria-label="速度の適用先"
+            aria-label={translate('settings.ttsSettings.speedMode')}
             value={value.speedMode}
             onChange={(e) => change({ speedMode: e.target.value as TtsSettings['speedMode'] })}
           >
-            <option value="playback">AppDockで再生速度を変更</option>
-            <option value="server">サーバーで生成速度を変更</option>
+            <option value="playback">{translate('settings.ttsSettings.localSpeed')}</option>
+            <option value="server">{translate('settings.ttsSettings.serverSpeed')}</option>
           </select>
         </SettingsField>
-        <SettingsField title="ボイス一覧の取得方式" {...settingAnchor('tts', 'voicesSource')}>
+        <SettingsField
+          title={translate('settings.ttsSettings.voiceMode')}
+          {...settingAnchor('tts', 'voicesSource')}
+        >
           <select
-            aria-label="ボイス一覧の取得方式"
+            aria-label={translate('settings.ttsSettings.voiceMode')}
             value={value.voicesSource}
             onChange={(e) =>
               change({ voicesSource: e.target.value as TtsSettings['voicesSource'] })
             }
           >
-            <option value="endpoint">サーバーから取得</option>
-            <option value="manual">手動一覧</option>
+            <option value="endpoint">{translate('settings.ttsSettings.serverVoices')}</option>
+            <option value="manual">{translate('settings.ttsSettings.manualVoices')}</option>
           </select>
         </SettingsField>
         <SettingsField
-          title="ボイス一覧のパス"
-          hint="サーバーから取得する場合に使う、ベースURL配下の相対パスです。"
+          title={translate('settings.ttsSettings.voicePath')}
+          hint={translate('settings.ttsSettings.voicePathHint')}
           {...settingAnchor('tts', 'voicesPath')}
         >
           <SettingsInput
-            aria-label="ボイス一覧のパス"
+            aria-label={translate('settings.ttsSettings.voicePath')}
             value={value.voicesPath}
             onChange={(e) => change({ voicesPath: e.target.value })}
           />
         </SettingsField>
         <SettingsField
-          title="手動ボイス一覧"
-          hint="idとnameを持つJSON配列です。取得方式を「手動一覧」にすると使用します。"
+          title={translate('settings.ttsSettings.manualList')}
+          hint={translate('settings.ttsSettings.manualListHint')}
           {...settingAnchor('tts', 'manualVoices')}
         >
           <SettingsTextarea
-            aria-label="手動ボイス一覧"
+            aria-label={translate('settings.ttsSettings.manualList')}
             value={manual ?? JSON.stringify(value.manualVoices, null, 2)}
             onChange={(e) => {
               const v = e.target.value;
@@ -373,7 +392,7 @@ export function TtsSettingsForm({
                 change({ manualVoices: JSON.parse(v) });
                 setError('');
               } catch {
-                setError('手動ボイス一覧をJSON配列で入力してください。');
+                setError(translate('settings.ttsSettings.manualListInvalid'));
               }
             }}
           />

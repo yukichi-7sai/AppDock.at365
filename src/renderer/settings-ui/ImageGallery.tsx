@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useRef } from 'react';
 import {
   mountImageGallery,
@@ -18,6 +19,7 @@ export function ImageGallery({
   options: Omit<GalleryOptions, 'scrollElement'>;
   resetKey?: string;
 }) {
+  const { t: translate } = useHostTranslation();
   const container = useRef<HTMLDivElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const current = useRef({ model, options });
@@ -46,7 +48,11 @@ export function ImageGallery({
   }, [resetKey]);
   return (
     <div className="image-picker-scroll" ref={scroll}>
-      <div ref={container} role="group" aria-label="登録画像" />
+      <div
+        ref={container}
+        role="group"
+        aria-label={translate('settings.imageGallery.registeredImages')}
+      />
     </div>
   );
 }

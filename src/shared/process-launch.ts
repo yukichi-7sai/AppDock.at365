@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { boundedJson, jsonObject, type CustomCommandType } from './custom-commands';
 
 interface ProcessOptions {
@@ -23,7 +24,7 @@ const absolute = (value: string) =>
   /^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/.?][^\\/]*[\\/][^\\/]+)/.test(value) &&
   !/[\x00-\x1f]/.test(value);
 export function parseProcessLaunch(value: unknown): ProcessLaunchConfig {
-  if (!jsonObject(value)) throw Error('プロセス起動の設定を確認してください。');
+  if (!jsonObject(value)) throw Error(hostText('settings.process-launch.settings'));
   boundedJson(value, 16 * 1024);
   const mode = value.mode;
   const fields =
@@ -40,7 +41,7 @@ export function parseProcessLaunch(value: unknown): ProcessLaunchConfig {
       (key) => !['mode', 'workingDirectory', 'showConsole', ...fields].includes(key),
     )
   )
-    throw Error('実行方法と設定項目を確認してください。');
+    throw Error(hostText('settings.process-launch.mode'));
   const workingDirectory = value.workingDirectory === undefined ? '' : value.workingDirectory,
     showConsole = value.showConsole === undefined ? false : value.showConsole;
   if (
@@ -48,7 +49,7 @@ export function parseProcessLaunch(value: unknown): ProcessLaunchConfig {
     (workingDirectory !== '' && !absolute(workingDirectory)) ||
     typeof showConsole !== 'boolean'
   )
-    throw Error('作業フォルダーは絶対パスで指定してください。');
+    throw Error(hostText('settings.process-launch.directory'));
   if (mode === 'executable') {
     if (
       !string(value.executable, 4096) ||
@@ -58,11 +59,11 @@ export function parseProcessLaunch(value: unknown): ProcessLaunchConfig {
       value.arguments.length > 64 ||
       value.arguments.some((arg) => !string(arg, 4096))
     )
-      throw Error('実行ファイルの絶対パスと引数の配列を確認してください。');
+      throw Error(hostText('settings.process-launch.executable'));
   } else {
     const code = value[mode === 'cmd' ? 'command' : 'script'];
     if (!string(code, 8192) || !code.trim() || (mode === 'cmd' && /[\r\n]/.test(code)))
-      throw Error('実行するコマンドを指定してください。cmdは1行で入力してください。');
+      throw Error(hostText('settings.process-launch.command'));
   }
   return { ...value, workingDirectory, showConsole } as unknown as ProcessLaunchConfig;
 }
@@ -95,8 +96,8 @@ export const processLaunchSchema = {
 };
 export const processCommandType: CustomCommandType = {
   id: 'appdock.process.start',
-  title: 'コマンド／プロセスを実行する',
-  description: 'アプリやコマンドを起動します。起動受付を返し、終了や出力は待ちません。',
+  title: hostText('settings.process-launch.title'),
+  description: hostText('settings.process-launch.hint'),
   configVersion: 1,
   automation: true,
   configSchema: processLaunchSchema,
