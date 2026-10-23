@@ -10,7 +10,7 @@ import { appletSettingsPageId, appletCommonDescriptions } from '../../shared/set
 import { resolveSettingSections } from '../../shared/setting-sections';
 import { settingAnchor } from './setting-anchor';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
-import { SettingsSection, SettingsField } from './SettingsSections';
+import { SettingsSection, SettingsField, SettingsActions } from './SettingsSections';
 import { SettingsButton } from './SettingsButton';
 import { useSettingsFeedback } from './SettingsStatus';
 import { ShortcutListSetting } from './ShortcutListSetting';
@@ -97,7 +97,7 @@ export function AppletSettingsForm({
         error={result?.command === item.command && result.error ? result.message : undefined}
         {...settingAnchor(pageId, `action:${item.command}`)}
       >
-        <div className="settings-actions">
+        <SettingsActions>
           <SettingsButton
             type="button"
             className="secondary"
@@ -108,7 +108,7 @@ export function AppletSettingsForm({
           >
             {item.title}
           </SettingsButton>
-        </div>
+        </SettingsActions>
       </SettingsField>
     );
   };

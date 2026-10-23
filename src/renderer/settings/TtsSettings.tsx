@@ -5,7 +5,7 @@ import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { defaultTtsSettings, type TtsSettings, type TtsVoice } from '../../shared/tts';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput, SettingsTextarea, SettingsUrlInput } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
 
 export function TtsSettingsForm({
   editor,
@@ -129,7 +129,7 @@ export function TtsSettingsForm({
             }
             onChange={(e) => setKey(e.target.value)}
           />
-          <div className="settings-actions">
+          <SettingsActions>
             <button
               disabled={busy || pending || !key || !value.baseUrl}
               onClick={() =>
@@ -156,7 +156,7 @@ export function TtsSettingsForm({
             >
               APIキーを削除
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection
@@ -198,11 +198,11 @@ export function TtsSettingsForm({
               ))}
             </select>
           )}
-          <div className="settings-actions">
+          <SettingsActions>
             <button disabled={busy || pending || !value.baseUrl} onClick={() => load('models')}>
               モデル一覧を更新
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
         <SettingsField
           title="既定のボイス"
@@ -239,14 +239,14 @@ export function TtsSettingsForm({
               ))}
             </select>
           )}
-          <div className="settings-actions">
+          <SettingsActions>
             <button
               disabled={busy || pending || (value.voicesSource === 'endpoint' && !value.baseUrl)}
               onClick={() => load('voices')}
             >
               ボイス一覧を更新
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
         <SettingsField
           title="読み上げ速度"
@@ -287,7 +287,7 @@ export function TtsSettingsForm({
             placeholder="読み上げたい文章を入力…"
             onChange={(e) => setText(e.target.value)}
           />
-          <div className="settings-actions">
+          <SettingsActions>
             <button
               className="primary"
               disabled={
@@ -317,7 +317,7 @@ export function TtsSettingsForm({
             >
               すべての読み上げを停止
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection

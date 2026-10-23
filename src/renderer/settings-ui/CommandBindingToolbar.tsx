@@ -3,6 +3,7 @@ import { ListIcon } from './SettingsListTable';
 import type { ReactNode } from 'react';
 import { CommandProviderFilter } from './CommandProviderFilter';
 import type { BindingInputFilter } from './useBindingCommandFilter';
+import { CommandListSummary, CommandListToolbar } from './CommandListScroll';
 export function CommandBindingToolbar({
   inputName,
   count,
@@ -31,16 +32,7 @@ export function CommandBindingToolbar({
   clearInputFilter?(): void;
 }) {
   return (
-    <>
-      {inputFilter ? (
-        <CommandProviderFilter
-          label={inputName === 'ジェスチャー' ? 'ジェスチャー' : 'キー'}
-          title={inputFilter.label}
-          onClear={clearInputFilter}
-        />
-      ) : (
-        children
-      )}
+    <CommandListToolbar>
       <div className="command-shortcut-tools">
         <div className="command-shortcut-search">
           <span aria-hidden="true">⌕</span>
@@ -64,32 +56,49 @@ export function CommandBindingToolbar({
           {showRegistrationErrors && <option value="conflict">入力の適用エラー</option>}
         </select>
       </div>
-      <div className="command-shortcut-summary">
+      <CommandListSummary
+        className="command-shortcut-summary"
+        filter={
+          inputFilter ? (
+            <CommandProviderFilter
+              label={inputName === 'ジェスチャー' ? 'ジェスチャー' : 'キー'}
+              title={inputFilter.label}
+              onClear={clearInputFilter}
+            />
+          ) : (
+            children
+          )
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              className="settings-list-icon shortcut-order-open"
+              aria-label="実行順…"
+              title={`${inputName}の実行順`}
+              onClick={onOrder}
+            >
+              <ListIcon kind="order" />
+            </button>
+            {(filter || statusFilter !== 'all' || inputFilter) && (
+              <button
+                className="text-button"
+                onClick={() => {
+                  setFilter('');
+                  setStatusFilter('all');
+                  clearInputFilter?.();
+                }}
+              >
+                絞り込みを解除
+              </button>
+            )}
+          </>
+        }
+      >
         <span role="status">
           {visibleCount} / {count} コマンドを表示
         </span>
-        <button
-          type="button"
-          className="settings-list-icon shortcut-order-open"
-          aria-label="実行順…"
-          title={`${inputName}の実行順`}
-          onClick={onOrder}
-        >
-          <ListIcon kind="order" />
-        </button>
-        {(filter || statusFilter !== 'all' || inputFilter) && (
-          <button
-            className="text-button"
-            onClick={() => {
-              setFilter('');
-              setStatusFilter('all');
-              clearInputFilter?.();
-            }}
-          >
-            絞り込みを解除
-          </button>
-        )}
-      </div>
-    </>
+      </CommandListSummary>
+    </CommandListToolbar>
   );
 }

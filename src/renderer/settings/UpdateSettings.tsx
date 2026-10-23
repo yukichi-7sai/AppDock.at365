@@ -7,7 +7,12 @@ import { useEffect, useState } from 'react';
 import type { Settings, ExtensionSnapshot, UpdateState } from '../../shared/contracts';
 import { createDefaultSettings } from '../../shared/settings-schema';
 import { UpdateCheckTime } from '../settings-ui/VersionCheck';
-import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsActions,
+  SettingsContent,
+} from '../settings-ui/SettingsSections';
 import { Toggle } from '../settings-ui/Toggle';
 
 export function UpdateActions({ appletCount }: { appletCount: number }) {
@@ -46,7 +51,7 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
       title="まとめて更新"
       hint="更新候補を確認して準備します。最後の確認でキャンセルでき、適用する場合は1回の再起動にまとめます。"
     >
-      <div className="settings-actions update-actions">
+      <SettingsActions className="update-actions">
         <button
           className="update-primary"
           disabled={state.busy}
@@ -63,10 +68,10 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
         >
           Appletを一括更新
         </button>
-      </div>
-      <div className="update-last-checked">
+      </SettingsActions>
+      <SettingsContent className="update-last-checked">
         <UpdateCheckTime checkedAt={checkedAt} />
-      </div>
+      </SettingsContent>
     </SettingsSection>
   );
 }

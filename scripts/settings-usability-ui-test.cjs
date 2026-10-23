@@ -129,7 +129,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     modelStatus = 404;
     await page.getByRole('button', { name: 'モデル一覧を更新', exact: true }).click();
     await page
-      .locator('.settings-page-layout > .settings-status-area')
+      .locator('.settings-page-layout .settings-status-area')
       .getByRole('alert')
       .filter({ hasText: 'モデル一覧に対応していません' })
       .waitFor();

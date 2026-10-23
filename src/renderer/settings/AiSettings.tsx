@@ -4,7 +4,12 @@ import type { SettingsControlEditor } from '../settings-ui/api';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { defaultAiSettings, type AiConnectionSettings } from '../../shared/ai';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsActions,
+  SettingsContent,
+} from '../settings-ui/SettingsSections';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { ListIcon, SettingsListAddButton } from '../settings-ui/SettingsListTable';
@@ -79,7 +84,7 @@ export function AiSettingsForm({
         hint="ローカルサーバーやクラウドのAIを登録します。接続先は8件まで追加できます。"
         {...settingAnchor('ai', 'connections')}
       >
-        <div className="ai-connections-toolbar">
+        <SettingsActions className="ai-connections-toolbar">
           <span className="muted">{value.connections.length} / 8 サーバー</span>
           <div>
             <button
@@ -94,8 +99,8 @@ export function AiSettingsForm({
               <ListIcon kind="order" />
             </button>
           </div>
-        </div>
-        <div className="command-shortcuts ai-connection-table">
+        </SettingsActions>
+        <SettingsContent className="command-shortcuts ai-connection-table">
           <table className="applet-shortcut-overview" aria-label="登録済みAIサーバー">
             <thead>
               <tr>
@@ -170,7 +175,7 @@ export function AiSettingsForm({
               )}
             </tbody>
           </table>
-        </div>
+        </SettingsContent>
       </SettingsSection>
       <SettingsSection title="共通設定" hint="AppletやMCPからの文章生成に使う共通の設定です。">
         <SettingsField title="既定のAI接続" {...settingAnchor('ai', 'defaultConnectionId')}>
@@ -284,7 +289,7 @@ export function AiSettingsForm({
             onChange={(e) => setInput(e.target.value)}
           />
         </SettingsField>
-        <div className="settings-actions">
+        <SettingsActions>
           <button
             className="primary"
             disabled={
@@ -321,7 +326,7 @@ export function AiSettingsForm({
           >
             生成を取り消す
           </button>
-        </div>
+        </SettingsActions>
 
         {job && (
           <SettingsField

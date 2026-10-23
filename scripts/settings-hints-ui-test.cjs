@@ -127,7 +127,7 @@ async function hints(enabled) {
   }, 'hint rendering');
   assert.equal(
     await host
-      .locator('.settings-page-layout > .settings-status-area .settings-error[data-error=true]')
+      .locator('.settings-page-layout .settings-status-area .settings-error[data-error=true]')
       .count(),
     0,
     'no unexpected page errors',
@@ -333,7 +333,7 @@ async function checkSectionTitles() {
     initial.host.trayClickCommand = 'fixture.hints.run';
     initial.host.trayDoubleClickCommand = null;
     initial.tts.baseUrl = `http://127.0.0.1:${server.address().port}/v1`;
-    if (commandNavigationOnly) {
+    if (commandNavigationOnly || listScrollbarOnly) {
       initial.keybindings = [
         {
           id: 'nav.owner',
@@ -417,6 +417,16 @@ async function checkSectionTitles() {
           }),
         ),
       };
+      if (listScrollbarOnly) {
+        const template = initial.customCommands.items[0];
+        initial.customCommands.items.push(
+          ...Array.from({ length: 38 }, (_, index) => ({
+            ...template,
+            id: `00000000-0000-0000-0000-${String(index + 3).padStart(12, '0')}`,
+            title: `Custom ${index + 3}`,
+          })),
+        );
+      }
     }
     if (accentLayoutOnly || listActionsOnly) {
       initial.ribbon.groups = [
@@ -577,6 +587,26 @@ async function checkSectionTitles() {
         };
       }
     }
+    if (listScrollbarOnly) {
+      for (let index = 0; index < 24; index++) {
+        const id = `fixture.scroll.${index}`;
+        const folder = path.join(profile, 'extensions', id);
+        fs.mkdirSync(folder, { recursive: true });
+        fs.writeFileSync(
+          path.join(folder, 'extension.json'),
+          JSON.stringify({
+            apiVersion: 1,
+            id,
+            name: `Scroll fixture ${index}`,
+            version: '1.0.0',
+            runtime: 'node',
+            entry: 'worker.cjs',
+          }),
+        );
+        fs.writeFileSync(path.join(folder, 'worker.cjs'), 'exports.activate=()=>{};');
+        initial.extensions[id] = { enabled: false, settings: {} };
+      }
+    }
     require('../out/main/shared/settings-schema').parseSettings(initial);
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
     if (source) {
@@ -601,7 +631,7 @@ async function checkSectionTitles() {
       return;
     }
     if (listScrollbarOnly) {
-      await require('./settings-list-scrollbar-checks.cjs')({
+      await require('./command-list-scroll-checks.cjs')({
         host,
         select,
         until,
@@ -621,6 +651,15 @@ async function checkSectionTitles() {
         profile,
         checks,
       });
+      if (!listActionsOnly)
+        await require('./binding-input-filter-checks.cjs')({
+          host,
+          select,
+          snapshot,
+          until,
+          profile,
+          checks,
+        });
       assert.deepEqual(errors, []);
       success = true;
       return;
@@ -944,7 +983,7 @@ async function checkSectionTitles() {
       assert.equal(await host.locator('.permission-save-status').count(), 0);
       assert.equal(
         await host
-          .locator('.settings-page-layout > .settings-status-area .settings-error[data-error=true]')
+          .locator('.settings-page-layout .settings-status-area .settings-error[data-error=true]')
           .count(),
         0,
       );
@@ -1060,7 +1099,7 @@ async function checkSectionTitles() {
       .filter({ hasText: '文字列のJSON配列を指定してください。' })
       .waitFor();
     assert.equal(
-      await host.locator('.settings-page-layout > .settings-status-area [role=alert]').count(),
+      await host.locator('.settings-page-layout .settings-status-area [role=alert]').count(),
       0,
       'dialog errors stay in the modal',
     );
@@ -1152,10 +1191,7 @@ async function checkSectionTitles() {
     await models.click();
     await until(() => modelResponse, 'failing model request');
     modelResponse();
-    await host
-      .locator('.settings-page-layout > .settings-status-area')
-      .getByRole('alert')
-      .waitFor();
+    await host.locator('.settings-page-layout .settings-status-area').getByRole('alert').waitFor();
     assert.ok(Math.abs(before - (await position())) < 1, 'failure feedback must not move layout');
     checks.push(
       'pending and success feedback do not shift layout; busy controls and failure errors remain',

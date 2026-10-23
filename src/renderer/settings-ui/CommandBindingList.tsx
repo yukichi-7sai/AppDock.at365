@@ -3,6 +3,7 @@ import { ListIcon } from './SettingsListTable';
 import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
 import type { BindingInputFilter } from './useBindingCommandFilter';
+import { useCommandListScroll } from './CommandListScroll';
 import {
   CommandPublication,
   CommandSettingsLinks,
@@ -69,6 +70,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
     retryLabel: '入力を再試行',
   });
   const root = useRef<HTMLDivElement>(null);
+  useCommandListScroll(root);
   const restore = useRef<(() => void) | null>(null);
   const rememberPosition = (target?: HTMLElement | null) => {
     const scroll = root.current?.closest<HTMLElement>('.applet-settings-panel, .settings-body');
@@ -88,11 +90,13 @@ export function CommandBindingList<R extends { id: string; command: string; enab
           : undefined;
     const top = scroll?.scrollTop ?? 0;
     const left = scroll?.scrollLeft ?? 0;
+    const tableLeft = root.current?.scrollLeft ?? 0;
     restore.current = () => {
       if (scroll) {
         scroll.scrollTop = top;
         scroll.scrollLeft = left;
       }
+      if (root.current) root.current.scrollLeft = tableLeft;
       const restored = selector ? root.current?.querySelector<HTMLElement>(selector) : trigger;
       if (restored?.isConnected) restored.focus({ preventScroll: true });
       else root.current?.focus({ preventScroll: true });

@@ -4,6 +4,16 @@ import { SettingsHintIcon } from './SettingsHintIcon';
 import { useSettingsFeedback, SettingsFieldTarget } from './SettingsStatus';
 import './settings-sections.css';
 
+/** A shared, wrapping action row for section bodies and field controls. */
+export function SettingsActions({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} className={`settings-actions ${className}`} />;
+}
+
+/** A section content slot for structured widgets with their own internal layout. */
+export function SettingsContent({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} className={`settings-content ${className}`} />;
+}
+
 /** Reusable content blocks inside SettingsPageLayout. */
 export function SettingsSection({
   title,

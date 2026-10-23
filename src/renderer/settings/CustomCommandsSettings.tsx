@@ -13,7 +13,7 @@ import { SettingsListTable } from '../settings-ui/SettingsListTable';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
+import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { McpCommandFields } from './McpCommandFields';
 import { ProcessCommandFields } from './ProcessCommandFields';
@@ -26,6 +26,7 @@ import {
   useCommandSettingsTarget,
 } from '../settings-ui/CommandSettingsNavigation';
 import { ShortcutCaptureField } from '../settings-ui/ShortcutCaptureField';
+import { CommandListSection } from '../settings-ui/CommandListScroll';
 
 const list: SettingDefinition = {
   key: 'definitions',
@@ -99,7 +100,7 @@ export function CustomCommandsSettings({
   useSettingsFeedback({ error });
   return (
     <div className="settings-sections custom-commands-settings">
-      <SettingsSection
+      <CommandListSection
         title="登録済みコマンド"
         description={[
           !supported
@@ -111,14 +112,14 @@ export function CustomCommandsSettings({
         ]
           .filter(Boolean)
           .join(' ')}
-        hint="種類と固定設定を保存します。保存したコマンドをショートカット、ジェスチャー、トレイに割り当てられます。"
         {...settingAnchor('custom-commands', 'definitions')}
       >
-        <CommandTargetFilter />
         <SettingsListTable
+          toolbarFilter={<CommandTargetFilter />}
           titleExtra={(entry) => <CommandPublication published={command(entry).automation} />}
           navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
           addInTitle
+          commandListScroll
           definition={list}
           maxItems={256}
           canAdd={types.length > 0 && items.length < 256}
@@ -153,7 +154,7 @@ export function CustomCommandsSettings({
             ]).catch((e) => setError(String(e)));
           }}
         />
-      </SettingsSection>
+      </CommandListSection>
       {dialog?.kind === 'edit' && (
         <CustomCommandDialog
           original={dialog.item}

@@ -88,11 +88,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
       'AppDockの読み上げ・通知音・試聴を再生します。OFFにすると再生中の音を止め、再生待ちとOFF中に届いた音を破棄します。',
     ],
     [
-      'permissions',
-      'Applet・MCPからの操作',
-      '操作ごとの許可は、専用の画面でまとめて設定できます。',
-    ],
-    [
       'startAtLogon',
       'スタートアップに登録',
       'Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。',

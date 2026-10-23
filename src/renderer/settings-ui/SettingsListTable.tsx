@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
+import { CommandListSummary, CommandListToolbar, useCommandListScroll } from './CommandListScroll';
 import type { SettingDefinition, SettingOption } from '../../shared/contracts';
 import { objectFieldValue } from '../../shared/object-list';
 import './settings-list.css';
@@ -88,6 +89,8 @@ export function SettingsListTable({
   maxItems = 64,
   canAdd = true,
   addInTitle = false,
+  commandListScroll = false,
+  toolbarFilter,
 }: {
   definition: SettingDefinition;
   entries: Record<string, unknown>[];
@@ -105,42 +108,64 @@ export function SettingsListTable({
   maxItems?: number;
   canAdd?: boolean;
   addInTitle?: boolean;
+  commandListScroll?: boolean;
+  toolbarFilter?: ReactNode;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useCommandListScroll(scrollRef, commandListScroll);
   const view = definition.list!;
   const fields = definition.fields ?? [];
   const display = (entry: Record<string, unknown>, key: string) =>
     settingsListText(definition, entry, key, options);
+  const count = (
+    <span>
+      {entries.length} / {maxItems} 件
+    </span>
+  );
+  const actions = (
+    <>
+      <button
+        type="button"
+        className="settings-list-icon"
+        title="並べ替え"
+        aria-label={`${definition.title}を並べ替え`}
+        disabled={busy || entries.length < 2}
+        onClick={onOrder}
+      >
+        <ListIcon kind="order" />
+      </button>
+      {!addInTitle && (
+        <button
+          type="button"
+          className="primary"
+          data-dialog-focus-fallback
+          disabled={busy || !canAdd || entries.length >= maxItems}
+          onClick={onAdd}
+        >
+          {definition.itemTitle ?? '項目'}を追加
+        </button>
+      )}
+    </>
+  );
   return (
     <div className="settings-list">
-      <div className="settings-list-toolbar">
-        <span>
-          {entries.length} / {maxItems} 件
-        </span>
-        <div>
-          <button
-            type="button"
-            className="settings-list-icon"
-            title="並べ替え"
-            aria-label={`${definition.title}を並べ替え`}
-            disabled={busy || entries.length < 2}
-            onClick={onOrder}
+      {commandListScroll ? (
+        <CommandListToolbar>
+          <CommandListSummary
+            className="settings-list-toolbar"
+            filter={toolbarFilter}
+            actions={actions}
           >
-            <ListIcon kind="order" />
-          </button>
-          {!addInTitle && (
-            <button
-              type="button"
-              className="primary"
-              data-dialog-focus-fallback
-              disabled={busy || !canAdd || entries.length >= maxItems}
-              onClick={onAdd}
-            >
-              {definition.itemTitle ?? '項目'}を追加
-            </button>
-          )}
+            {count}
+          </CommandListSummary>
+        </CommandListToolbar>
+      ) : (
+        <div className="settings-list-toolbar">
+          {count}
+          <div>{actions}</div>
         </div>
-      </div>
-      <div className="settings-list-scroll">
+      )}
+      <div className="settings-list-scroll" ref={scrollRef}>
         <table aria-label={definition.title}>
           <thead>
             <tr>

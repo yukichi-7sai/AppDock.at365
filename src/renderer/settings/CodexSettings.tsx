@@ -4,7 +4,7 @@ import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
 import type { AutomationAction, AutomationState } from '../../shared/automation';
-import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 
 export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void }) {
@@ -156,20 +156,20 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           </select>
         </SettingsField>
         {state.enabled && !state.running && (
-          <div className="settings-actions">
+          <SettingsActions>
             <button disabled={busy} onClick={() => void run({ kind: 'retryStart' })}>
               接続を再試行
             </button>
-          </div>
+          </SettingsActions>
         )}
         <SettingsField
           title="操作できる範囲"
           hint="AppletとMCPの許可を別々に設定できます。"
           {...settingAnchor('codex', 'permissions')}
         >
-          <div className="settings-actions">
+          <SettingsActions>
             <button onClick={onOpenPermissions}>操作の許可を開く</button>
-          </div>
+          </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection
@@ -187,7 +187,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
         hint="このPCのCodexにMCPでのAppDockの接続情報を追加します。"
         {...settingAnchor('codex', 'registration')}
       >
-        <div className="settings-actions">
+        <SettingsActions>
           <button
             className="primary"
             disabled={busy || !state.running || file !== state.configFile}
@@ -198,7 +198,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           <button disabled={busy || !state.running} onClick={() => void run({ kind: 'test' })}>
             このPC内の接続テスト
           </button>
-        </div>
+        </SettingsActions>
       </SettingsSection>
       <SettingsSection
         title="ネットワークからの接続"
@@ -222,7 +222,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
               hint="接続できるかどうかは、利用する端末から確認してください。"
             >
               {state.networkEndpoints.map((endpoint) => (
-                <div key={endpoint} className="settings-actions codex-network-endpoint">
+                <SettingsActions key={endpoint} className="codex-network-endpoint">
                   <SettingsInput aria-label={`接続先 ${endpoint}`} readOnly value={endpoint} />
                   <button
                     disabled={busy}
@@ -230,7 +230,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
                   >
                     接続先をコピー
                   </button>
-                </div>
+                </SettingsActions>
               ))}
             </SettingsField>
           )}
@@ -238,7 +238,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           title="接続トークン"
           description="接続トークンはOSのクリップボードへコピーします。同じトークンを使うクライアントは、操作許可とAI・読み上げのジョブ管理を共有します。"
         >
-          <div className="settings-actions">
+          <SettingsActions>
             <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
               接続の状態を再読み込み
             </button>
@@ -248,7 +248,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             >
               接続トークンをコピー
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
         <SettingsSection
           variant="group"
@@ -318,14 +318,14 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             spellCheck={false}
             onChange={(e) => setFile(e.target.value)}
           />
-          <div className="settings-actions">
+          <SettingsActions>
             <button
               disabled={busy || !file.trim() || file === state.configFile}
               onClick={() => void run({ kind: 'selectConfig', file })}
             >
               設定先を変更
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
         <SettingsField
           title="Codexへの登録名"
@@ -341,14 +341,14 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             spellCheck={false}
             onChange={(e) => setName(e.target.value)}
           />
-          <div className="settings-actions">
+          <SettingsActions>
             <button
               disabled={busy || !name.trim() || name === state.serverId}
               onClick={() => void run({ kind: 'selectName', name })}
             >
               登録名を保存
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
         <SettingsField
           title="接続ポート"
@@ -366,7 +366,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             disabled={busy}
             onChange={(e) => setPort(e.target.value)}
           />
-          <div className="settings-actions">
+          <SettingsActions>
             <button
               disabled={
                 busy || !/^\d+$/.test(port) || Number(port) > 65535 || Number(port) === state.port
@@ -375,13 +375,13 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             >
               ポートを適用
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
         <SettingsField
           title="認証と登録の管理"
           description="認証情報の再発行後はCodexの登録を修復し、他のMCPクライアントのトークンも更新してください。接続トークンはCodexのローカル設定にも保存されます。"
         >
-          <div className="settings-actions">
+          <SettingsActions>
             <button
               disabled={busy || !state.port}
               onClick={() => void run({ kind: 'rotateToken' })}
@@ -394,7 +394,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             >
               登録を解除
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
       </SettingsSection>
     </section>

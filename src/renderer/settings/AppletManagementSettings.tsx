@@ -12,6 +12,7 @@ import { ListIcon } from '../settings-ui/SettingsListTable';
 import { Toggle } from '../settings-ui/Toggle';
 import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { CommandListToolbar } from '../settings-ui/CommandListScroll';
 
 const states = {
   running: '実行中',
@@ -198,18 +199,6 @@ export function AppletManagementSettings({
       className="settings-list applet-management"
       {...settingAnchor('applets', 'management')}
     >
-      <div className="command-shortcut-tools">
-        <div className="command-shortcut-search">
-          <span aria-hidden="true">⌕</span>
-          <SettingsInput
-            type="search"
-            aria-label="Appletを検索"
-            placeholder="Appletを検索…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-      </div>
       {management && (!management.packagesAvailable || !!management.discoveryIssueCount) && (
         <SettingsField
           title={management.discoveryIssueCount ? 'Appletの検出' : '利用できる操作'}
@@ -234,21 +223,35 @@ export function AppletManagementSettings({
           )}
         </SettingsField>
       )}
-      <div className="command-shortcut-summary">
-        <span role="status">
-          {visible.length} / {applets.length} Appletを表示
-        </span>
-        <button
-          type="button"
-          className="settings-list-icon shortcut-order-open"
-          aria-label="Appletを並べ替え"
-          title="Appletの表示順"
-          disabled={busy || applets.length < 2}
-          onClick={() => setOrder(true)}
-        >
-          <ListIcon kind="order" />
-        </button>
-      </div>
+      <CommandListToolbar>
+        <div className="command-shortcut-tools">
+          <div className="command-shortcut-search">
+            <span aria-hidden="true">⌕</span>
+            <SettingsInput
+              type="search"
+              aria-label="Appletを検索"
+              placeholder="Appletを検索…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+        </div>
+        <div className="command-shortcut-summary">
+          <span role="status">
+            {visible.length} / {applets.length} Appletを表示
+          </span>
+          <button
+            type="button"
+            className="settings-list-icon shortcut-order-open"
+            aria-label="Appletを並べ替え"
+            title="Appletの表示順"
+            disabled={busy || applets.length < 2}
+            onClick={() => setOrder(true)}
+          >
+            <ListIcon kind="order" />
+          </button>
+        </div>
+      </CommandListToolbar>
       <div className="settings-list-scroll">
         <table className="settings-list-table applet-management-table">
           <thead>

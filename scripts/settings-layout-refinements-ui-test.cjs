@@ -282,6 +282,72 @@ async function tableAppearance(table) {
               .setSize(width, 950),
           width,
         );
+        await app.evaluate(({ app }) => {
+          const req = process
+            .getBuiltinModule('module')
+            .createRequire(app.getAppPath() + '/package.json');
+          const { WindowsLaunch } = req('./out/main/main/core/windows-launch');
+          const descriptor = Object.getOwnPropertyDescriptor(WindowsLaunch.prototype, 'isBusy');
+          const fixture = (globalThis.settingsLayoutRecovery = {
+            descriptor,
+            original: undefined,
+            launch: undefined,
+          });
+          Object.defineProperty(WindowsLaunch.prototype, 'isBusy', {
+            ...descriptor,
+            get() {
+              if (!fixture.launch) {
+                fixture.launch = this;
+                fixture.original = this.recoveryPending;
+              }
+              this.recoveryPending = true;
+              return descriptor.get.call(this);
+            },
+          });
+        });
+        await select('一般');
+        assert.equal(
+          await page.getByRole('heading', { name: 'Applet・MCPからの操作', exact: true }).count(),
+          0,
+        );
+        const fileCard = page.getByRole('region', { name: '設定ファイル', exact: true });
+        const fileActions = fileCard.locator(
+          ':scope > .settings-section-content > .settings-actions',
+        );
+        assert.deepEqual(await fileActions.getByRole('button').allTextContents(), [
+          '再起動',
+          'バックアップで復元',
+          '保存先を開く',
+          '中断したWindows起動設定を復旧',
+        ]);
+        const actionSpacing = await fileActions.evaluate((e) => {
+          const style = getComputedStyle(e),
+            rect = e.getBoundingClientRect();
+          return {
+            gap: parseFloat(style.gap),
+            top: e.firstElementChild.getBoundingClientRect().top - rect.top,
+            bottom: rect.bottom - e.lastElementChild.getBoundingClientRect().bottom,
+            inside: [...e.children].every((c) => c.getBoundingClientRect().right <= rect.right + 1),
+          };
+        });
+        assert(
+          actionSpacing.gap >= 12 &&
+            actionSpacing.top >= 12 &&
+            actionSpacing.bottom >= 12 &&
+            actionSpacing.inside,
+        );
+        await fileActions.scrollIntoViewIfNeeded();
+        await screenshot(`${theme}-${width}-general-file-actions`);
+        await app.evaluate(({ app }) => {
+          const req = process
+            .getBuiltinModule('module')
+            .createRequire(app.getAppPath() + '/package.json');
+          const { WindowsLaunch } = req('./out/main/main/core/windows-launch');
+          const fixture = globalThis.settingsLayoutRecovery;
+          Object.defineProperty(WindowsLaunch.prototype, 'isBusy', fixture.descriptor);
+          if (fixture.launch) fixture.launch.recoveryPending = fixture.original;
+          delete globalThis.settingsLayoutRecovery;
+        });
         for (const name of ['マウスジェスチャー', 'ショートカットキー']) {
           await select(name);
           const options = page
@@ -452,20 +518,23 @@ async function tableAppearance(table) {
           'highlight does not introduce horizontal scrolling',
         );
         await select('操作の許可');
-        const publication = page.getByRole('region', { name: 'APIの公開', exact: true });
+        const publication = page.getByRole('region', { name: '操作の許可', exact: true });
+        assert.equal(await publication.locator(':scope > .permission-table').count(), 1);
         assert.equal(
-          await publication
-            .locator(':scope > .settings-section-content > .permission-table')
-            .count(),
-          1,
+          await page.getByRole('heading', { name: 'APIの公開', exact: true }).count(),
+          0,
         );
-        const publicationStyle = await publication.evaluate((e) => ({
-          border: parseFloat(getComputedStyle(e).borderTopWidth),
-          radius: parseFloat(getComputedStyle(e).borderRadius),
-        }));
         assert(
-          publicationStyle.border > 0 && publicationStyle.radius >= 10,
-          'API publication table is wrapped in a card',
+          await publication.evaluate((e) => {
+            const help = e.querySelector(':scope > details.settings-section');
+            const table = e.querySelector(':scope > .permission-table');
+            return (
+              !!help &&
+              !help.open &&
+              !!(help.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING)
+            );
+          }),
+          'collapsed help card precedes the top-level permission table',
         );
         const background = await page.locator('.permission-table').evaluate((e) => {
           const sample = document.createElement('span');
@@ -480,6 +549,7 @@ async function tableAppearance(table) {
         });
         assert.equal(background.table, background.card, 'permissions use the card background');
         const permissionAppearance = await tableAppearance(page.locator('.permission-table'));
+        await screenshot(`${theme}-${width}-permissions-top-level`);
         assert.deepEqual(
           permissionAppearance,
           bindingListAppearance,

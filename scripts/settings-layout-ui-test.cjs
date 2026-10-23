@@ -161,7 +161,7 @@ async function save(p) {
     );
     assert.deepEqual(
       await p.locator('.settings-form > .settings-section > header h2').allTextContents(),
-      ['ウィンドウ', 'スタートアップ', 'Applet・MCPからの操作', '設定ファイル'],
+      ['ウィンドウ', 'スタートアップ', '設定ファイル'],
     );
     assert.equal(await p.getByText('旧PC専用データ', { exact: true }).count(), 0);
     await p.getByRole('switch', { name: '閉じるとトレイに収納', exact: true }).waitFor();

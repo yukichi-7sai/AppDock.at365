@@ -17,7 +17,12 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { SettingsCombobox } from '../settings-ui/SettingsCombobox';
 import { Toggle } from '../settings-ui/Toggle';
-import { SettingsSection, SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsChoice,
+  SettingsActions,
+} from '../settings-ui/SettingsSections';
 const targetTitles = { banner: 'バナー', desktop: 'デスクトップ通知', windows: 'Windows通知' };
 const ownerGroup = (type: NotificationTypeEntry) =>
   type.ownerKind === 'host' ? 'host' : JSON.stringify([type.ownerKind, type.ownerId]);
@@ -149,9 +154,9 @@ export function NotificationSettings({
           title="TTS設定"
           description="通知のタイトルと本文は共通設定のTTSサーバーへ送信されます。接続先・モデル・声を設定してください。"
         >
-          <div className="settings-actions">
+          <SettingsActions>
             <button onClick={() => select('tts')}>設定を開く</button>
-          </div>
+          </SettingsActions>
         </SettingsField>
         <SettingsField
           title="声"
@@ -159,7 +164,7 @@ export function NotificationSettings({
           hint="共通の声を使うか、通知だけ別の声に変更できます。"
           {...settingAnchor('notifications', 'speech.voice')}
         >
-          <div className="settings-actions">
+          <SettingsActions>
             <Toggle
               label="通知の声に共通設定を使う"
               checked={speech.voice === undefined && !voiceOverride}
@@ -170,7 +175,7 @@ export function NotificationSettings({
               }}
             />
             <span>共通設定を使う</span>
-          </div>
+          </SettingsActions>
           {(speech.voice !== undefined || voiceOverride) && (
             <>
               <SettingsCombobox
@@ -179,7 +184,7 @@ export function NotificationSettings({
                 onChange={(value) => changeSpeech('voice', value)}
                 options={voices}
               />
-              <div className="settings-actions">
+              <SettingsActions>
                 <button
                   disabled={busy || pending}
                   onClick={() => {
@@ -191,7 +196,7 @@ export function NotificationSettings({
                 >
                   ボイス一覧を更新
                 </button>
-              </div>
+              </SettingsActions>
             </>
           )}
         </SettingsField>
@@ -201,14 +206,14 @@ export function NotificationSettings({
           hint="1倍が標準速度です。"
           {...settingAnchor('notifications', 'speech.speed')}
         >
-          <div className="settings-actions">
+          <SettingsActions>
             <Toggle
               label="通知の速度に共通設定を使う"
               checked={speech.speed === undefined}
               onChange={(inherit) => changeSpeech('speed', inherit ? undefined : effective.speed)}
             />
             <span>共通設定を使う</span>
-          </div>
+          </SettingsActions>
           {speech.speed !== undefined && (
             <SettingsInput
               type="number"
@@ -232,7 +237,7 @@ export function NotificationSettings({
           }
           error={previewJob?.error?.message}
         >
-          <div className="settings-actions" {...settingAnchor('notifications', 'speech.preview')}>
+          <SettingsActions {...settingAnchor('notifications', 'speech.preview')}>
             <button
               className="primary"
               disabled={
@@ -248,7 +253,7 @@ export function NotificationSettings({
             >
               試聴を停止
             </button>
-          </div>
+          </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsSection
@@ -260,9 +265,9 @@ export function NotificationSettings({
           title="MCP連携設定"
           description="MCP Eventを使用するには、MCPサーバーの設定と連携が必要です。"
         >
-          <div className="settings-actions">
+          <SettingsActions>
             <button onClick={() => select('codex')}>設定を開く</button>
-          </div>
+          </SettingsActions>
         </SettingsField>
       </SettingsSection>
       {owners.map((owner) => {
@@ -439,7 +444,7 @@ export function NotificationSettings({
         >
           {unknown.map((row) => (
             <SettingsField key={notificationTypeKey(row)} title={row.ownerId + ' / ' + row.typeId}>
-              <div className="settings-actions">
+              <SettingsActions>
                 <button
                   onClick={() =>
                     editor.edit({
@@ -455,7 +460,7 @@ export function NotificationSettings({
                 >
                   この種類の設定を削除
                 </button>
-              </div>
+              </SettingsActions>
             </SettingsField>
           ))}
         </SettingsSection>

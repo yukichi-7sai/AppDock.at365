@@ -36,6 +36,13 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         buttonInside:
           clone.querySelector('button').getBoundingClientRect().right <=
           clone.getBoundingClientRect().right,
+        actionsInside: (() => {
+          const summary = e.closest('.command-list-summary');
+          return (
+            summary.querySelector('.command-list-summary-actions').getBoundingClientRect().right <=
+            summary.getBoundingClientRect().right + 1
+          );
+        })(),
       };
       clone.remove();
       return { width: rect.width, parent: e.parentElement.clientWidth, content, long };
@@ -45,26 +52,93 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     assert(
       fit.long.width <= fit.long.parent + 1 &&
         fit.long.scrollWidth <= fit.long.clientWidth + 1 &&
-        fit.long.buttonInside,
+        fit.long.buttonInside &&
+        fit.long.actionsInside,
       kind + ' long names wrap without hiding the clear action',
     );
     filterPositions.push({ kind: 'fit-' + kind, ...fit });
   };
   const checkFilterPlacement = async (kind) => {
     await checkFilterFit(kind);
-    const position = await host.locator('.command-shortcuts').evaluate((section) => {
-      const filter = section.querySelector('.command-provider-filter');
-      const tools = section.querySelector('.command-shortcut-tools');
+    const position = await host.locator('.command-provider-filter').evaluate((filter) => {
+      const summary = filter.closest('.command-list-summary');
+      const count = summary.querySelector('.command-list-summary-main > span');
+      const actions = summary.querySelector('.command-list-summary-actions');
+      const toolbar = summary.closest('.command-list-toolbar');
+      const tools = toolbar.querySelector('.command-shortcut-tools');
+      const rect = filter.getBoundingClientRect();
+      const heightWithFilter = summary.getBoundingClientRect().height;
+      filter.style.display = 'none';
+      const heightWithoutFilter = summary.getBoundingClientRect().height;
+      filter.style.removeProperty('display');
+      const color = (value) => {
+        const sample = document.createElement('span');
+        sample.style.color = value;
+        filter.append(sample);
+        const resolved = getComputedStyle(sample).color;
+        sample.remove();
+        return resolved;
+      };
       return {
-        count: section.querySelectorAll('.command-provider-filter').length,
-        beforeSearch: !!(filter.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING),
-        gap: tools.getBoundingClientRect().top - filter.getBoundingClientRect().bottom,
-        left: filter.getBoundingClientRect().left - tools.getBoundingClientRect().left,
+        count: toolbar.querySelectorAll('.command-provider-filter').length,
+        heightWithFilter,
+        heightWithoutFilter,
+        afterCount: !!(count.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING),
+        afterSearch: !tools || rect.top >= tools.getBoundingClientRect().bottom,
+        inside:
+          rect.right <= actions.getBoundingClientRect().left + 1 &&
+          rect.left >= summary.getBoundingClientRect().left,
+        sameRow:
+          Math.abs(
+            rect.top +
+              rect.height / 2 -
+              count.getBoundingClientRect().top -
+              count.getBoundingClientRect().height / 2,
+          ) < 1,
+        color: getComputedStyle(filter).color,
+        background: getComputedStyle(filter).backgroundColor,
+        accent: color('var(--accent)'),
+        soft: color('var(--accent-soft)'),
       };
     });
     assert.equal(position.count, 1);
-    assert(position.beforeSearch && position.gap >= 0);
-    assert(Math.abs(position.left) < 1);
+    assert(
+      position.afterCount && position.afterSearch && position.inside,
+      JSON.stringify(position),
+    );
+    if (host.viewportSize().width >= 1280) assert(position.sameRow);
+    assert.equal(position.color, position.accent);
+    assert.equal(position.background, position.soft);
+    assert(
+      Math.abs(position.heightWithFilter - position.heightWithoutFilter) < 1,
+      'temporary filter does not change summary height: ' + JSON.stringify(position),
+    );
+    const clear = host.locator('.command-provider-clear');
+    await clear.focus();
+    await host.keyboard.press('Shift+Tab');
+    await host.keyboard.press('Tab');
+    for (const state of ['focus', 'hover']) {
+      if (state === 'hover') await clear.hover();
+      const colors = await clear.evaluate((e) => {
+        const sample = document.createElement('span');
+        e.append(sample);
+        sample.style.color = 'var(--accent-hover)';
+        const background = getComputedStyle(sample).color;
+        sample.style.color = 'var(--accent-text)';
+        const foreground = getComputedStyle(sample).color;
+        sample.remove();
+        return {
+          background,
+          foreground,
+          actualBackground: getComputedStyle(e).backgroundColor,
+          actualForeground: getComputedStyle(e).color,
+        };
+      });
+      assert.equal(colors.actualBackground, colors.background, state);
+      assert.equal(colors.actualForeground, colors.foreground, state);
+    }
+    await host.mouse.move(1, 1);
+    await clear.evaluate((e) => e.blur());
     filterPositions.push({ kind, ...position });
     return position;
   };
@@ -82,8 +156,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         (await host.locator('.command-provider-filter').filter({ hasText: title }).count()) === 1,
       'command target filter',
     );
-    if (page !== 'カスタムコマンド') await checkFilterPlacement('command-' + page);
-    else await checkFilterFit('command-' + page);
+    await checkFilterPlacement('command-' + page);
   };
   const samples = [];
   const spacing = [];
@@ -109,7 +182,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     );
     assert(measurements.length > 0);
     for (const item of measurements) {
-      assert.equal(item.buttons, page === 'カスタムコマンド' || item.custom ? 2 : 1);
+      assert.equal(item.buttons, page === 'カスタムコマンド' || item.custom ? 3 : 2);
       assert(item.labels.every((label) => !label.endsWith(`の${page}を開く`)));
       assert(item.gap >= item.padding - 0.5 && item.gap > 0, JSON.stringify(item));
       assert(Math.abs(item.leftGap - item.leftPadding) < 1, JSON.stringify(item));
@@ -207,14 +280,19 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
           .locator('svg')
           .innerHTML();
       await select('ショートカットキー');
-      for (const title of ['ショートカットキー', 'マウスジェスチャー', 'カスタムコマンド']) {
+      for (const title of [
+        'ショートカットキー',
+        'マウスジェスチャー',
+        'タッチパッドジェスチャー',
+        'カスタムコマンド',
+      ]) {
         const index = host
           .locator('.settings-categories')
           .getByRole('button', { name: title, exact: true });
         const geometry = await index.evaluate((e) => {
           const r = e.getBoundingClientRect(),
             s = e.querySelector('.settings-index-icon').getBoundingClientRect();
-          return { gap: r.right - s.right, padding: parseFloat(getComputedStyle(e).paddingRight) };
+          return { gap: s.left - r.left, padding: parseFloat(getComputedStyle(e).paddingLeft) };
         });
         assert(Math.abs(geometry.gap - geometry.padding) < 1);
         const icon = icons[title === 'ショートカットキー' ? 'ショートカット' : title];
@@ -318,6 +396,8 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       assert.equal(await row(id).count(), 1);
       await move(row(id), 'Custom 2', 'マウスジェスチャー');
       assert.equal(await host.locator('[data-shortcut-command]').count(), 1);
+      assert.equal(await row(id).count(), 1);
+      await move(row(id), 'Custom 2', 'タッチパッドジェスチャー');
       assert.equal(await row(id).count(), 1);
       await move(row(id), 'Custom 2', 'カスタムコマンド');
       assert.equal(await host.locator('.custom-commands-settings tbody tr').count(), 1);
@@ -423,12 +503,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     'owner-filtered gesture',
   );
   assert.equal(await host.locator('[data-shortcut-command]').count(), 1);
-  const providerPosition = await checkFilterPlacement('applet-マウスジェスチャー');
-  assert(
-    filterPositions
-      .filter((p) => p.kind === 'command-マウスジェスチャー')
-      .every((p) => Math.abs(p.gap - providerPosition.gap) < 1),
-  );
+  await checkFilterPlacement('applet-マウスジェスチャー');
   await host.getByRole('button', { name: 'fixture.otherの絞り込みを解除', exact: true }).click();
   await until(
     async () =>
@@ -445,12 +520,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     async () => (await host.locator('.command-provider-filter').count()) === 1,
     'shortcut owner filter',
   );
-  const shortcutPosition = await checkFilterPlacement('applet-ショートカット');
-  assert(
-    filterPositions
-      .filter((p) => p.kind === 'command-ショートカット')
-      .every((p) => Math.abs(p.gap - shortcutPosition.gap) < 1),
-  );
+  await checkFilterPlacement('applet-ショートカット');
   assert.equal((await snapshot()).settings.value.extensions['fixture.other'].enabled, false);
   checks.push(
     'applet-owner-exact-aggregation-stopped-disabled-live-duplicates-filter-without-activation',

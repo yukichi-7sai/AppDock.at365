@@ -23,7 +23,7 @@ import { CommandProviderFilter } from '../settings-ui/CommandProviderFilter';
 import { GestureBindingDialog } from './GestureBindingDialog';
 import { GestureOrderDialog } from './GestureOrderDialog';
 import { GestureOptions } from './GestureOptions';
-import { SettingsSection } from '../settings-ui/SettingsSections';
+import { CommandListSection } from '../settings-ui/CommandListScroll';
 import { CommandTargetFilter } from '../settings-ui/CommandSettingsNavigation';
 
 export function GesturesEditor({
@@ -113,7 +113,7 @@ export function GesturesEditor({
       ) : (
         <GestureOptions gestures={gestures} change={change} />
       )}
-      <SettingsSection
+      <CommandListSection
         title={touchpad ? 'タッチパッドジェスチャー割り当て' : 'マウスジェスチャー割り当て'}
         description={[
           !gestures.enabled ? '現在、ジェスチャーは無効です。割り当てはそのまま編集できます。' : '',
@@ -123,7 +123,6 @@ export function GesturesEditor({
         ]
           .filter(Boolean)
           .join(' ')}
-        hint="＋で割り当てを追加します。"
         className="gestures-editor command-shortcuts"
         {...settingAnchor(page, touchpad ? 'bindings' : 'gestures')}
         aria-label={touchpad ? 'タッチパッドジェスチャー設定' : 'マウスジェスチャー設定'}
@@ -203,7 +202,7 @@ export function GesturesEditor({
             onClose={() => setOrderOpen(false)}
           />
         )}
-      </SettingsSection>
+      </CommandListSection>
     </>
   );
 }

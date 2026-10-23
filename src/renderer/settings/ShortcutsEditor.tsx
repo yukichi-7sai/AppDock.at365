@@ -1,5 +1,6 @@
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { CommandListSection } from '../settings-ui/CommandListScroll';
 import { useSettingsControls } from '../settings-ui/api';
 import { CommandBindingToolbar } from '../settings-ui/CommandBindingToolbar';
 import { CommandProviderFilter } from '../settings-ui/CommandProviderFilter';
@@ -137,14 +138,13 @@ export function ShortcutsEditor({
           }
         />
       </SettingsSection>
-      <SettingsSection
+      <CommandListSection
         title={hostSettingItem('shortcuts', 'keybindings').title}
         description={
           rows.length >= 2000
             ? '割り当ては2000件までです。追加するには既存の割り当てを削除してください。'
             : undefined
         }
-        hint="＋で割り当てを追加します。"
         className="shortcuts-editor command-shortcuts"
         {...settingAnchor('shortcuts', 'keybindings')}
       >
@@ -192,7 +192,7 @@ export function ShortcutsEditor({
             onClose={() => setOrderOpen(false)}
           />
         )}
-      </SettingsSection>
+      </CommandListSection>
     </>
   );
 }

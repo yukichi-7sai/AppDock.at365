@@ -26,7 +26,7 @@ import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { CodexSettings } from './CodexSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { AppletSettingsForm } from '../settings-ui/AppletSettingsForm';
-import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
@@ -54,7 +54,6 @@ export function SettingsForm({
   const launch = aux.launch!,
     runtime = aux.runtime!,
     version = aux.version ?? '';
-  const setCategory = select;
   const run = async (work: () => Promise<unknown>) => {
     try {
       await work();
@@ -408,7 +407,7 @@ export function SettingsForm({
                     : '起動設定はWindowsの発行版AppDockで使用できます。'
                 }
               >
-                <div className="button-row">
+                <SettingsActions>
                   <button
                     disabled={!launch.supported || busy}
                     onClick={() => void run(() => invoke('refreshLaunchState'))}
@@ -421,20 +420,12 @@ export function SettingsForm({
                   >
                     管理者として再起動
                   </button>
-                </div>
+                </SettingsActions>
               </SettingRow>
             </SettingsSection>
             <SettingsSection
-              title="Applet・MCPからの操作"
-              hint={hostSettingItem(category, 'permissions').description}
-              {...settingAnchor(category, 'permissions')}
-            >
-              <div className="settings-actions">
-                <button onClick={() => setCategory('permissions')}>操作の許可を開く</button>
-              </div>
-            </SettingsSection>
-            <SettingsSection
               title="設定ファイル"
+              {...settingAnchor(category, 'settingsFile')}
               hint="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
               error={[...new Set(aux.settingsHealth?.errors)].join('\n')}
               description={[
@@ -450,7 +441,45 @@ export function SettingsForm({
                 .filter(Boolean)
                 .join(' ')}
             >
-              <div {...settingAnchor(category, 'settingsFile')}>
+              {aux.settingsFiles?.map((file) => (
+                <SettingsField
+                  key={file.scope}
+                  title={file.scope === 'device' ? 'このPCの設定' : '共有設定'}
+                  description={
+                    <>
+                      <code>{file.path}</code> —{' '}
+                      {file.recovered
+                        ? '正常な設定で継続中です。ファイルを確認してください。'
+                        : '正常'}
+                    </>
+                  }
+                >
+                  {file.canRestore && (
+                    <button
+                      disabled={busy || aux.settingsHealth?.busy}
+                      onClick={() => void run(() => invoke('restoreScopedSettings', [file.scope]))}
+                    >
+                      このファイルをバックアップで復元
+                    </button>
+                  )}
+                </SettingsField>
+              ))}
+              <SettingsActions>
+                <button
+                  disabled={busy || aux.settingsHealth?.busy}
+                  onClick={() => void run(() => invoke('restart'))}
+                >
+                  再起動
+                </button>
+                <button
+                  disabled={busy || aux.settingsHealth?.busy || !aux.settingsHealth?.canRestore}
+                  onClick={() => void run(() => invoke('restoreSettingsBackup'))}
+                >
+                  バックアップで復元
+                </button>
+                <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
+                  保存先を開く
+                </button>
                 {aux.settingsHealth?.launchRecovery && (
                   <button
                     disabled={busy}
@@ -459,49 +488,7 @@ export function SettingsForm({
                     中断したWindows起動設定を復旧
                   </button>
                 )}
-                {aux.settingsFiles?.map((file) => (
-                  <SettingsField
-                    key={file.scope}
-                    title={file.scope === 'device' ? 'このPCの設定' : '共有設定'}
-                    description={
-                      <>
-                        <code>{file.path}</code> —{' '}
-                        {file.recovered
-                          ? '正常な設定で継続中です。ファイルを確認してください。'
-                          : '正常'}
-                      </>
-                    }
-                  >
-                    {file.canRestore && (
-                      <button
-                        disabled={busy || aux.settingsHealth?.busy}
-                        onClick={() =>
-                          void run(() => invoke('restoreScopedSettings', [file.scope]))
-                        }
-                      >
-                        このファイルをバックアップで復元
-                      </button>
-                    )}
-                  </SettingsField>
-                ))}
-                <div className="button-row">
-                  <button
-                    disabled={busy || aux.settingsHealth?.busy}
-                    onClick={() => void run(() => invoke('restart'))}
-                  >
-                    再起動
-                  </button>
-                  <button
-                    disabled={busy || aux.settingsHealth?.busy || !aux.settingsHealth?.canRestore}
-                    onClick={() => void run(() => invoke('restoreSettingsBackup'))}
-                  >
-                    バックアップで復元
-                  </button>
-                  <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
-                    保存先を開く
-                  </button>
-                </div>
-              </div>
+              </SettingsActions>
             </SettingsSection>
           </>
         )}

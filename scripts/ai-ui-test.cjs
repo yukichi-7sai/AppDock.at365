@@ -453,7 +453,7 @@ async function errorNoticeFor(caller) {
     await page.getByLabel('試験の入力データ', { exact: true }).fill('token-limit');
     await page.getByRole('button', { name: '文章を生成', exact: true }).click();
     await page
-      .locator('.settings-page-layout > .settings-status-area')
+      .locator('.settings-page-layout .settings-status-area')
       .getByRole('alert')
       .filter({ hasText: '出力トークンの上限に達したため' })
       .waitFor();

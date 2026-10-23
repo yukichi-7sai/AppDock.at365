@@ -1,7 +1,12 @@
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsActions,
+  SettingsContent,
+} from '../settings-ui/SettingsSections';
 import { useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
@@ -291,7 +296,7 @@ export function TraySettings({
         hint="右クリックで開くメニューです。コマンド・グループ・区切り線を追加し、順番を調整できます。"
         {...settingAnchor('tray', 'trayMenu')}
       >
-        <div className="tray-toolbar">
+        <SettingsActions className="tray-toolbar">
           <button className="secondary accent-action" onClick={() => setPicker('add')}>
             ＋ コマンド
           </button>
@@ -301,8 +306,8 @@ export function TraySettings({
           <button className="secondary accent-action" onClick={() => add('separator')}>
             ＋ 区切り線
           </button>
-        </div>
-        <div className="tray-workspace">
+        </SettingsActions>
+        <SettingsContent className="tray-workspace">
           <div>
             <div className="tray-tree">
               {rows(items)}
@@ -357,7 +362,7 @@ export function TraySettings({
               <div className="tray-preview-item">終了</div>
             </div>
           </aside>
-        </div>
+        </SettingsContent>
       </SettingsSection>
       {picker && (
         <CommandPicker

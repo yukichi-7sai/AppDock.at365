@@ -14,7 +14,12 @@ import { SettingsListTable } from '../settings-ui/SettingsListTable';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
-import { SettingsSection, SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsChoice,
+  SettingsActions,
+} from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 
 type Invoke = (name: string, args?: unknown[]) => Promise<any>;
@@ -284,7 +289,7 @@ export function McpClientSettingsForm({
             }`}
             error={j.error?.message}
           >
-            <div className="settings-actions">
+            <SettingsActions>
               <button
                 disabled={pending}
                 onClick={() =>
@@ -303,7 +308,7 @@ export function McpClientSettingsForm({
                   取り消す
                 </button>
               )}
-            </div>
+            </SettingsActions>
           </SettingsField>
         ))}
         {result && (
