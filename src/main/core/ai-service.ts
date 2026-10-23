@@ -373,8 +373,9 @@ export class AiService {
     const { c, key } = this.connection(id);
     const identity = JSON.stringify([owner, c.id]);
     const prior = this.lists.get(identity);
-    if (prior) return prior.promise as ReturnType<AiOpenAiChat['models']>;
-    if (this.lists.size >= this.limits.modelLists)
+    if (prior && !prior.abort.signal.aborted)
+      return prior.promise as ReturnType<AiOpenAiChat['models']>;
+    if (!prior && this.lists.size >= this.limits.modelLists)
       aiFail('AI_QUEUE_FULL', hostText('services.aiService.listQueueLimit'));
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), this.limits.modelMs);
@@ -392,7 +393,7 @@ export class AiService {
       })
       .finally(() => {
         clearTimeout(timer);
-        this.lists.delete(identity);
+        if (this.lists.get(identity)?.abort === abort) this.lists.delete(identity);
       });
     this.lists.set(identity, { owner, c, abort, promise });
     return promise;

@@ -133,6 +133,68 @@ test('local state paths separate placements and leave the shared asset root besi
   assert.equal(a.local.startsWith(local), true);
   assert.equal(path.dirname(a.local), path.join(local, 'at365', 'AppDock', 'profiles'));
 });
+test('shared roster changes during local deletion bookkeeping are preserved', (t) => {
+  const root = fixture(t),
+    file = path.join(root, 'shared', 'accounts.json'),
+    local = path.join(root, 'local'),
+    store = new WebProfileStore(file, local);
+  store.loadStandalone(() => false);
+  const added = store.add('original');
+  const remote = JSON.stringify({
+    schemaVersion: 1,
+    accounts: [{ ...added, name: 'received from another PC' }],
+  });
+  const rename = fs.renameSync;
+  let delivered = false;
+  fs.renameSync = (source, destination) => {
+    rename(source, destination);
+    if (!delivered && destination === path.join(local, 'pending-deletion.json')) {
+      delivered = true;
+      fs.writeFileSync(file, remote);
+    }
+  };
+  try {
+    assert.throws(() => store.remove(added.id), /別の場所/);
+  } finally {
+    fs.renameSync = rename;
+  }
+  assert.equal(delivered, true);
+  assert.equal(fs.readFileSync(file, 'utf8'), remote);
+  assert.deepEqual(store.snapshot(), [added]);
+  assert.deepEqual(store.pendingDeletion(), []);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(local, 'pending-deletion.json'))), []);
+});
+
+test('a roster delivered during the first local save is not overwritten', (t) => {
+  const root = fixture(t),
+    file = path.join(root, 'shared', 'accounts.json'),
+    local = path.join(root, 'local'),
+    store = new WebProfileStore(file, local);
+  store.loadStandalone(() => false);
+  const remote = JSON.stringify({
+    schemaVersion: 1,
+    accounts: [{ id: 'account.00000000-0000-0000-0000-000000000001', name: 'delivered' }],
+  });
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const rename = fs.renameSync;
+  let delivered = false;
+  fs.renameSync = (source, destination) => {
+    rename(source, destination);
+    if (!delivered && destination === path.join(local, 'pending-deletion.json')) {
+      delivered = true;
+      fs.writeFileSync(file, remote);
+    }
+  };
+  try {
+    assert.throws(() => store.add('local addition'), /別の場所/);
+  } finally {
+    fs.renameSync = rename;
+  }
+  assert.equal(delivered, true);
+  assert.equal(fs.readFileSync(file, 'utf8'), remote);
+  assert.deepEqual(store.snapshot(), []);
+});
+
 test('startup never writes an empty shared roster while metadata is still in transit', (t) => {
   const root = fixture(t),
     settings = new SettingsStore(path.join(root, 'settings.json'));

@@ -238,7 +238,10 @@ internal sealed class GestureEngine : IDisposable
             }
             var gesture = KeyGesture(input.Key);
             if (gesture != null && candidates.Any(r=>r.Gesture==gesture)) {
-                keys.Add(input.Key); otherMode=true; lastWheel=0; indicator?.Hide(); Run(gesture); return 1;
+                // Pause is a down-only pulse; waiting for a paired up would capture
+                // every later Pause, including ordinary input outside the gesture.
+                if (input.Key != 0x13) keys.Add(input.Key);
+                otherMode=true; lastWheel=0; indicator?.Hide(); Run(gesture); return 1;
             }
             if (input.Key == 0x1B) { keys.Add(input.Key); cancelled=true; CancelPending(); indicator?.Hide(); return 1; }
         } catch (Exception e) { Console.Error.WriteLine(e); cancelled=true; CancelPending(); }

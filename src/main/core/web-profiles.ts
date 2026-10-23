@@ -82,16 +82,27 @@ export class WebProfileStore {
     return { ...result };
   }
   private unchanged(allowEmptyInitialization = false) {
-    if (!allowEmptyInitialization && !fs.existsSync(this.file) && this.referenced?.())
+    let previous: Buffer | undefined;
+    try {
+      previous = fs.readFileSync(this.file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    if (!allowEmptyInitialization && previous === undefined && this.referenced?.())
       throw Error(hostText('services.webProfiles.syncPending'));
+    const current =
+      previous === undefined
+        ? { accounts: [], pendingDeletion: [...this.pending] }
+        : this.read(previous.toString('utf8'));
     if (
-      JSON.stringify(this.read()) !==
+      JSON.stringify(current) !==
       JSON.stringify({ accounts: this.value, pendingDeletion: this.pending })
     )
       throw Error(hostText('services.webProfiles.changed'));
+    return previous;
   }
   private save(next: WebProfile[], pending = this.pending, allowEmptyInitialization = false) {
-    this.unchanged(allowEmptyInitialization);
+    const previous = this.unchanged(allowEmptyInitialization);
     const validated = parseWebProfiles(next);
     const text =
       JSON.stringify(
@@ -106,7 +117,7 @@ export class WebProfileStore {
     if (Buffer.byteLength(text) > 65536) throw Error(hostText('services.webProfiles.sizeLimit'));
     if (this.pendingFile) atomicWrite(this.pendingFile, JSON.stringify(pending));
     try {
-      atomicWrite(this.file, text);
+      atomicWrite(this.file, text, { previous });
     } catch (error) {
       if (this.pendingFile) atomicWrite(this.pendingFile, JSON.stringify(this.pending));
       throw error;

@@ -561,6 +561,31 @@ test('models coalesce by owner, reject unsupported lists and cancel on settings 
     (e) => e.code === 'AI_MODELS_UNSUPPORTED',
   );
 });
+test('model refresh replaces an aborted request without losing the new in-flight request', async (t) => {
+  const pending = [];
+  const f = setup(t, {
+    limits: { modelLists: 1 },
+    fetcher: (url, init) => new Promise((resolve) => pending.push({ url, init, resolve })),
+  });
+  const first = f.s.models('owner');
+  const rejected = assert.rejects(first, (e) => e.code === 'AI_CANCELED');
+  f.connection({ baseUrl: 'http://changed/v1' });
+  const refreshed = f.s.models('owner');
+  assert.notEqual(refreshed, first);
+  assert.equal(pending.length, 2);
+  assert.equal(pending[0].init.signal.aborted, true);
+  assert.equal(pending[1].url, 'http://changed/v1/models');
+  const models = (id) =>
+    new Response(JSON.stringify({ data: [{ id }] }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  pending[0].resolve(models('stale'));
+  await rejected;
+  assert.equal(f.s.models('owner'), refreshed);
+  assert.equal(pending.length, 2);
+  pending[1].resolve(models('fresh'));
+  assert.equal((await refreshed).models[0].id, 'fresh');
+});
 test('keys are endpoint-bound encrypted and carry an opaque revision', () => {
   const dir = temp(),
     store = new AiSecrets(path.join(dir, 'keys.json'), {

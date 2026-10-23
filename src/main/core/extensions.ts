@@ -680,36 +680,41 @@ class ExtensionManager extends EventEmitter {
       }
       e.child = child;
       const generation = e.runtimeSession;
-      e.peer = new JsonLinePeer(child.stdout, child.stdin, (method, p) => {
-        if (e.child !== child || e.runtimeSession !== generation)
-          throw Error(hostText('services.extensions.generationChanged'));
+      const current = () => e.child === child && e.runtimeSession === generation;
+      const peer = (e.peer = new JsonLinePeer(child.stdout, child.stdin, (method, p) => {
+        if (!current()) throw Error(hostText('services.extensions.generationChanged'));
         return this.api(e, method, p);
-      });
-      e.peer.on('closed', () => {
-        if (e.state === 'running') {
+      }));
+      peer.on('closed', () => {
+        if (current() && e.state === 'running') {
           child.kill();
           this.crashed(e, hostText('services.extensions.disconnected'));
         }
       });
-      child.on('error', (err) => this.crashed(e, err.message));
+      child.on('error', (err) => {
+        if (current()) this.crashed(e, err.message);
+      });
       child.on('exit', (code, signal) => {
-        e.peer?.close();
-        if (e.state !== 'stopping')
+        peer.close();
+        if (current() && e.state !== 'stopping')
           this.crashed(
             e,
             hostText('services.extensions.exited', { reason: String(code ?? signal) }),
           );
       });
       child.stderr.setEncoding('utf8');
-      child.stderr.on('data', (data) => this.log('warn', m.id, data.slice(0, 4000).trim()));
-      e.peer.on('protocolError', (err) => {
+      child.stderr.on('data', (data) => {
+        if (current()) this.log('warn', m.id, data.slice(0, 4000).trim());
+      });
+      peer.on('protocolError', (err) => {
+        if (!current()) return;
         this.log('error', m.id, err.message);
-        if (e.peer?.closed) {
+        if (peer.closed) {
           child.kill();
           this.crashed(e, err.message);
         }
       });
-      const result = await e.peer.request('activate', {
+      const result = await peer.request('activate', {
         id: m.id,
         settings: this.settings.value.extensions[m.id]?.settings ?? {},
       });

@@ -13,6 +13,7 @@ internal static partial class Program
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         if(args is ["--external-gesture",var exchange]) return RunExternalGesture(exchange);
         if(args is ["--shortcuts",var shortcutHelper]) return RunShortcutTests(shortcutHelper);
+        if(args is ["--gesture-key-state",var gestureAssembly]) return RunGestureKeyStateTests(gestureAssembly);
         if(args is ["--send" or "--send-inactive",var handle,var action]) {
             var sendCursor=Cursor.Position;
             Action? releaseBlocker=null;

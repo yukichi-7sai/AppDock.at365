@@ -7,6 +7,7 @@ import type {
 } from '../../shared/settings-page';
 import { createDefaultSettings } from '../../shared/settings-schema';
 import { settingsProjection } from '../../shared/settings-catalog';
+import { mergeSettingsInput } from '../../shared/settings-input';
 import type { SettingsControlsApi } from '../settings-ui/api';
 /** Values absent from this page are local defaults, never another page's value. */
 export function materialize(model: SettingsPageModel): Settings {
@@ -20,19 +21,37 @@ export function materialize(model: SettingsPageModel): Settings {
   };
   return merge(createDefaultSettings(), model.content.values);
 }
+type InputBasis = { before: Record<string, unknown>; revision: number };
+type SavedInput = InputBasis & {
+  pageId: string;
+  value: Record<string, unknown>;
+  savedRevision: number;
+};
 export class SettingsViewClient {
   model?: SettingsPageModel;
   private queued = 0;
   private chain = Promise.resolve();
   private listeners = new Set<() => void>();
-  private input?: { pageId: string; values?: Record<string, unknown>; text?: string };
+  private input?: InputBasis & {
+    pageId: string;
+    values?: Record<string, unknown>;
+    text?: string;
+  };
   private inputVersion = 0;
   private rejectedTouchpadInputVersion = -1;
-  private ownRevision = -1;
+  private savedInputs: SavedInput[] = [];
+  // Values retain their identity when presentation-only fields (sidebar width)
+  // are copied. Their comparison basis must not become the optimistic display.
+  private displayedBases = new WeakMap<Record<string, unknown>, InputBasis>();
   private display(m: SettingsPageModel) {
-    return this.input?.pageId === m.content.page.id && this.input.values
-      ? { ...m, content: { ...m.content, values: this.input.values } }
-      : m;
+    if (this.input?.pageId === m.content.page.id && this.input.values) {
+      this.displayedBases.set(this.input.values, {
+        before: this.input.before,
+        revision: this.input.revision,
+      });
+      return { ...m, content: { ...m.content, values: this.input.values } };
+    }
+    return m;
   }
   text(m: SettingsPageModel) {
     return this.input?.pageId === m.content.page.id && this.input.text !== undefined
@@ -41,14 +60,23 @@ export class SettingsViewClient {
   }
   setText(value: string) {
     const m = this.model!;
-    const before = m.content.jsonValues ?? m.content.values;
-    this.input = { pageId: m.content.page.id, text: value };
+    const basis =
+      this.input?.pageId === m.content.page.id
+        ? { before: this.input.before, revision: this.input.revision }
+        : {
+            before: m.content.jsonValues ?? m.content.values,
+            revision: m.content.editing.editRevision,
+          };
+    this.input = { pageId: m.content.page.id, text: value, ...basis };
     this.inputVersion++;
     this.render(this.display(m));
-    void this.act({
-      kind: 'edit',
-      action: { type: 'partial-text', pageId: m.content.page.id, before, value },
-    }).catch(() => {});
+    void this.act(
+      {
+        kind: 'edit',
+        action: { type: 'partial-text', pageId: m.content.page.id, before: basis.before, value },
+      },
+      basis.revision,
+    ).catch(() => {});
   }
   constructor(
     private render: (model: SettingsPageModel) => void,
@@ -74,7 +102,10 @@ export class SettingsViewClient {
     if (!this.queued) this.render(this.display(m));
     for (const fn of this.listeners) fn();
   }
-  act(operation: SettingsPageOperation): Promise<any> {
+  act(
+    operation: SettingsPageOperation,
+    inputRevision = this.model?.content.editing.editRevision ?? -1,
+  ): Promise<any> {
     if (
       operation.kind === 'edit' &&
       ['page-values', 'partial-text'].includes(operation.action.type)
@@ -110,19 +141,20 @@ export class SettingsViewClient {
         ['page-values', 'partial-text'].includes(operation.action.type);
       if (
         operation.kind === 'edit' &&
-        inputOperation &&
-        this.ownRevision === m.content.editing.editRevision
-      )
+        (operation.action.type === 'page-values' || operation.action.type === 'partial-text')
+      ) {
+        let before = operation.action.before;
+        for (const saved of this.savedInputs)
+          if (saved.pageId === operation.action.pageId && saved.savedRevision > inputRevision)
+            before = mergeSettingsInput(saved.before, saved.value, before);
         operation = {
           ...operation,
           action: {
             ...operation.action,
-            before:
-              operation.action.type === 'partial-text'
-                ? (m.content.jsonValues ?? m.content.values)
-                : m.content.values,
+            before,
           },
         } as SettingsPageOperation;
+      }
       const response = (await this.transport.act(this.connectionId, {
         id: m.id,
         type: 'settings',
@@ -133,7 +165,34 @@ export class SettingsViewClient {
       })) as { model: SettingsPageModel; result: unknown };
       this.accept(response.model);
       if (inputOperation) {
-        this.ownRevision = response.model.content.editing.editRevision;
+        if (
+          operation.kind === 'edit' &&
+          (operation.action.type === 'page-values' || operation.action.type === 'partial-text')
+        ) {
+          // Keep only submitted changes, not the external fields merged by Store.
+          const saved: SavedInput = {
+            pageId: operation.action.pageId,
+            before: operation.action.before,
+            value:
+              operation.action.type === 'partial-text'
+                ? (JSON.parse(operation.action.value) as Record<string, unknown>)
+                : operation.action.value,
+            revision: inputRevision,
+            savedRevision: response.model.content.editing.editRevision,
+          };
+          this.savedInputs.push(saved);
+          if (this.input?.pageId === saved.pageId && this.input.revision < saved.savedRevision) {
+            try {
+              this.input = {
+                ...this.input,
+                before: mergeSettingsInput(saved.before, saved.value, this.input.before),
+                revision: saved.savedRevision,
+              };
+            } catch {
+              // A separately started input retains its basis and conflict check.
+            }
+          }
+        }
         if (version === this.inputVersion) this.input = undefined;
       }
       this.failed('');
@@ -146,7 +205,6 @@ export class SettingsViewClient {
           this.failed(String(e));
           if (touchpadForm) {
             this.rejectedTouchpadInputVersion = this.inputVersion;
-            this.ownRevision = -1;
             if (this.input?.pageId === 'touchpad-gestures' && this.input.values) {
               this.input = undefined;
               if (this.model) this.render(this.display(this.model));
@@ -159,7 +217,10 @@ export class SettingsViewClient {
       )
       .finally(() => {
         this.queued--;
-        if (!this.queued && this.model) this.render(this.display(this.model));
+        if (!this.queued) {
+          this.savedInputs = [];
+          if (this.model) this.render(this.display(this.model));
+        }
       });
     return work;
   }
@@ -196,6 +257,10 @@ export class SettingsViewClient {
   };
   editor(model: SettingsPageModel) {
     const ignore = (p: Promise<unknown>) => void p.catch(() => {});
+    const basis = this.displayedBases.get(model.content.values) ?? {
+      before: model.content.values,
+      revision: model.content.editing.editRevision,
+    };
     return {
       value: materialize(this.display(model)),
       edit: (value: Settings) => {
@@ -204,15 +269,20 @@ export class SettingsViewClient {
           model.content.page,
           model.content.auxiliary.applets ?? [],
         );
-        const before = this.model!.content.values;
-        this.input = { pageId: model.content.page.id, values };
+        // Async controls can finish after an external update. Compare against the
+        // values that produced this editor, not the newly accepted server values.
+        const before = basis.before;
+        this.input = { pageId: model.content.page.id, values, ...basis };
         this.inputVersion++;
         this.render(this.display(model));
         ignore(
-          this.act({
-            kind: 'edit',
-            action: { type: 'page-values', pageId: model.content.page.id, before, value: values },
-          }),
+          this.act(
+            {
+              kind: 'edit',
+              action: { type: 'page-values', pageId: model.content.page.id, before, value: values },
+            },
+            basis.revision,
+          ),
         );
       },
     };

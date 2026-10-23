@@ -59,6 +59,8 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 
 ## 入力とトレイ
 
+- 実環境のテストではPauseキーとF13〜F24キーをOSへ送信・登録しない。使用中の割り当てがあるため、該当キーの検証はフックを登録しない模擬イベントで行う。
+
 - ジェスチャーから本体を開くコマンドは共通`showWindow(invocation)`へ入力元を渡し、InputHostの表示前準備・表示後の前面化を使う。開始元・生存session・本体所有HWND・1回限りの制約と、前面移動後の後続コマンド停止を保つ。新しい入口も[ジェスチャーの前面化](docs/gestures.md#本体を開くコマンドの前面化)に従う。
 
 - [条件付きショートカット](docs/keybindings.md)と[ジェスチャー](docs/gestures.md)を正本とする。本体・ローカルUI・Web・Windows入力は[共通条件・実行基盤](docs/command-execution-foundation-design.md)へ接続し、押下時の条件、保存順、同一コマンド1回、再入防止・取消を維持する。新しいトリガーも同じ計画とCommandDispatcherを使い、独自の条件判定・first/all選択・実行ループを追加しない。nativeの事前判定は共通fixtureとの一致を検査する。
