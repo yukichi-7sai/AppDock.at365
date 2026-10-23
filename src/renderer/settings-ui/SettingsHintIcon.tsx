@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useSettingsHints } from './SettingsHints';
 import { settingsPopoverScroll } from './settings-popover-scroll';
@@ -10,6 +11,7 @@ export function SettingsHintIcon({ title, hint }: { title: string; hint?: string
 }
 
 function HintPopover({ title, hint }: { title: string; hint: string }) {
+  const { t } = useHostTranslation();
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLSpanElement>(null);
@@ -73,7 +75,7 @@ function HintPopover({ title, hint }: { title: string; hint: string }) {
         ref={trigger}
         type="button"
         className="settings-hint-trigger"
-        aria-label={`${title}のヒント`}
+        aria-label={t('common.hint', { title })}
         aria-describedby={id}
         onFocus={show}
         onBlur={() => setOpen(false)}

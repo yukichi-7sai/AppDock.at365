@@ -119,6 +119,7 @@ data/                         既存の共有名簿・登録素材
   "schemaVersion": 1,
   "machineName": "PC-A",
   "host": {
+    "language": "ja",
     "theme": "light",
     "accentColor": "mint",
     "customAccentDark": "#217a65",
@@ -229,7 +230,7 @@ OFFにする際は共有側も直前に再検証する。共有設定が読め�
 
 表示と一般の設定JSON対象はすべて常時端末専用とし、共有へ戻すトグルは設けない。テーマ・音・GPU描画を含めて各PCで独立させる。Shell選択も、端末ごとにAppletの有効状態や使用可能なShellが異なることに合わせる。リボンの配置、通知の種類別設定、タスクトレイの割り当て等は引き続き共有とする。
 
-theme、accentColor、customAccentDark、customAccentLight、showHints、soundEnabledは端末値の保存・受信から現在の共通適用経路へ即時反映する。soundEnabledをOFFにしたときの再生・待機中音声の取消と、TTS生成の扱いは[共通音声再生](audio-playback.md)に従う。hardwareAccelerationは早期起動から端末値を読み、変更後の再起動通知と完全終了後の反映を維持する。保存先の変更を、起動専用項目の即時反映へ置き換えない。
+language（現在はjaのみ）、theme、accentColor、customAccentDark、customAccentLight、showHints、soundEnabledは端末値の保存・受信から現在の共通適用経路へ即時反映する。soundEnabledをOFFにしたときの再生・待機中音声の取消と、TTS生成の扱いは[共通音声再生](audio-playback.md)に従う。hardwareAccelerationは早期起動から端末値を読み、変更後の再起動通知と完全終了後の反映を維持する。保存先の変更を、起動専用項目の即時反映へ置き換えない。
 
 ### 本体の起動設定
 

@@ -17,6 +17,7 @@ const titlesOnly =
 const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const accentLayoutOnly = process.argv.includes('--accent-layout-only');
+const localizationOnly = process.argv.includes('--localization-only');
 const listActionsOnly = process.argv.includes('--list-actions-only');
 const commandNavigationOnly = process.argv.includes('--command-navigation-only') || listActionsOnly;
 const listScrollbarOnly = process.argv.includes('--list-scrollbar-only');
@@ -607,6 +608,40 @@ async function checkSectionTitles() {
         initial.extensions[id] = { enabled: false, settings: {} };
       }
     }
+    if (localizationOnly) {
+      delete initial.host.language;
+      initial.ribbon.groups = [
+        {
+          id: 'group:localization',
+          title: 'pages.general.title {{name}}',
+          icon: 'folder',
+          expansion: 'persistent',
+          children: ['logs'],
+        },
+      ];
+      initial.ribbon.order = ['group:localization', 'settings'];
+      initial.customCommands = {
+        version: 2,
+        items: [
+          {
+            id: '00000000-0000-0000-0000-000000000001',
+            title: 'language.ja $t(language.ja)',
+            description: 'Localization fixture',
+            typeId: 'appdock.process.start',
+            owner: { kind: 'host' },
+            configVersion: 1,
+            config: {
+              mode: 'cmd',
+              command: 'echo fixture',
+              workingDirectory: '',
+              showConsole: false,
+            },
+            enabled: true,
+            automation: false,
+          },
+        ],
+      };
+    }
     require('../out/main/shared/settings-schema').parseSettings(initial);
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
     if (source) {
@@ -614,6 +649,28 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (localizationOnly) {
+      await require('./settings-localization-checks.cjs')({
+        host,
+        select,
+        snapshot,
+        until,
+        inspect,
+        inspector,
+        electronExpression,
+        profile,
+        checks,
+      });
+      await stop();
+      await launch();
+      await select('表示');
+      assert.equal(await host.getByTestId('host-language').inputValue(), 'ja');
+      assert.equal((await snapshot()).settings.value.host.language, 'ja');
+      checks.push('Japanese language survives a real process restart');
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (listActionsOnly) {
       await require('./settings-list-actions-checks.cjs')({
         host,
@@ -1294,6 +1351,7 @@ async function checkSectionTitles() {
       refinementsOnly,
       assignmentSpeechOnly,
       accentLayoutOnly,
+      localizationOnly,
       commandNavigationOnly,
       listActionsOnly,
       listScrollbarOnly,

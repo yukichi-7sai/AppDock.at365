@@ -24,6 +24,7 @@ export interface SettingsPageModel {
     sidebarWidth: number;
     hostWidth: number;
     showHints: boolean;
+    language: import('./host-language').HostLanguage;
     page: SettingsPageDefinition;
     values: Record<string, unknown>;
     jsonValues?: Record<string, unknown>;

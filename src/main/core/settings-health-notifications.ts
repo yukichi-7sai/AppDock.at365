@@ -1,11 +1,11 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import type { SettingsIssue } from './settings-health';
 import type { ErrorReporter, ErrorEpisode } from './error-reporter';
 import type { NotificationInput } from './notification-service';
 import type { TypedNotifications } from './typed-notifications';
 
-export const settingsRestartReason =
-  'ハードウェアアクセラレーションの変更を反映するには、AppDockの再起動が必要です。';
+export const settingsRestartReason = hostText('health.restartReason');
 
 /** Notification episodes are separate from health: hiding a notice never clears a failure. */
 export class SettingsHealthNotifications {
@@ -53,7 +53,7 @@ export class SettingsHealthNotifications {
         {
           eventId: this.error.id,
           source: 'settings',
-          title: '設定を確認して再起動してください',
+          title: hostText('health.errorTitle'),
           code: [...new Set(issues.map((i) => i.kind))].sort().join(', '),
           message: [...new Set(issues.map((i) => i.message))].join('\n'),
         },
@@ -83,7 +83,7 @@ export class SettingsHealthNotifications {
     );
     if (this.restart.publication === publication) return;
     this.restart.publication = publication;
-    const title = '再起動が必要です',
+    const title = hostText('health.restartTitle'),
       body = settingsRestartReason;
     const result = this.options.notifications.publish(owner, 'restart-required', {
       title,

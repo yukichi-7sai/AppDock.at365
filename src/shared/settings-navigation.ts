@@ -1,9 +1,10 @@
+import { hostText } from './i18n';
 import type { ExtensionSnapshot } from './contracts';
 
 /** The settings index and its commands share these stable page IDs and labels. */
 export const hostSettingsPages = [
-  ['appearance', '表示'],
-  ['general', '一般'],
+  ['appearance', hostText('pages.appearance.title')],
+  ['general', hostText('pages.general.title')],
   ['applets', 'Applet管理'],
   ['notifications', '通知'],
   ['ribbon', 'リボン'],

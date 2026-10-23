@@ -1,3 +1,5 @@
+import { defaultHostLanguage, isHostLanguage } from './host-language';
+import { hostText } from './i18n';
 import { parseMcpRoster } from './mcp-client';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import { defaultAccentColor, defaultCustomAccent, isAccentColor, isAccentHex } from './appearance';
@@ -37,6 +39,7 @@ export const createDefaultSettings = (): Settings => ({
   gestureDefaultsInitialized: [],
   schemaVersion: 1,
   host: {
+    language: defaultHostLanguage,
     shellProviders: {},
     theme: 'light',
     zoomFactor: defaultZoomFactor,
@@ -98,26 +101,29 @@ export function parseSettings(value: unknown): Settings {
     typeof value.host.theme !== 'string' ||
     !['dark', 'light', 'system'].includes(value.host.theme)
   )
-    throw new Error('theme は dark / light / system です。');
-  if (!isAccentColor(value.host.accentColor))
-    throw new Error('host.accentColor は定義済みのアクセントパレットを指定してください。');
+    throw new Error(hostText('validation.theme'));
+  if (!isAccentColor(value.host.accentColor)) throw new Error(hostText('validation.accent'));
   if (
     typeof value.host.zoomFactor !== 'number' ||
     !Number.isFinite(value.host.zoomFactor) ||
     value.host.zoomFactor < minimumZoomFactor ||
     value.host.zoomFactor > maximumZoomFactor
   )
-    throw new Error('host.zoomFactor は 0.5～2（50～200%）の数値です。');
+    throw new Error(hostText('validation.zoom'));
   for (const key of ['customAccentDark', 'customAccentLight'])
-    if (!isAccentHex(value.host[key])) throw new Error(`host.${key} は #RRGGBB 形式の色です。`);
+    if (!isAccentHex(value.host[key])) throw new Error(hostText('validation.hostColor', { key }));
   for (const key of ['closeToTray', 'startMinimized'])
-    if (typeof value.host[key] !== 'boolean') throw new Error(`host.${key} は true / false です。`);
+    if (typeof value.host[key] !== 'boolean')
+      throw new Error(hostText('validation.hostBoolean', { key }));
   const shellProviders = parseShellProviders(value.host);
+  const language = value.host.language === undefined ? defaultHostLanguage : value.host.language;
+  if (!isHostLanguage(language)) throw new Error(hostText('language.invalid'));
   const showHints = value.host.showHints === undefined ? true : value.host.showHints;
-  if (typeof showHints !== 'boolean') throw new Error('host.showHints は true / false です。');
+  if (typeof showHints !== 'boolean')
+    throw new Error(hostText('validation.hostBoolean', { key: 'showHints' }));
   const soundEnabled = value.host.soundEnabled === undefined ? true : value.host.soundEnabled;
   if (typeof soundEnabled !== 'boolean')
-    throw new Error('host.soundEnabled は true / false です。');
+    throw new Error(hostText('validation.hostBoolean', { key: 'soundEnabled' }));
   const {
     shellProvider: legacyShellProvider,
     notifications: legacyNotifications,
@@ -126,12 +132,12 @@ export function parseSettings(value: unknown): Settings {
   const hardwareAcceleration =
     value.host.hardwareAcceleration === undefined ? false : value.host.hardwareAcceleration;
   if (typeof hardwareAcceleration !== 'boolean')
-    throw new Error('host.hardwareAcceleration は true / false です。');
+    throw new Error(hostText('validation.hostBoolean', { key: 'hardwareAcceleration' }));
   const startAtLogon = value.host.startAtLogon ?? false;
   const runAsAdministrator = value.host.runAsAdministrator ?? false;
   for (const key of ['startAtLogon', 'runAsAdministrator'])
     if (value.host[key] !== undefined && typeof value.host[key] !== 'boolean')
-      throw new Error(`host.${key} は true / false です。`);
+      throw new Error(hostText('validation.hostBoolean', { key }));
   const trayClickCommand =
     value.host.trayClickCommand === undefined ? 'appdock.open' : value.host.trayClickCommand;
   if (!validCommandId(trayClickCommand))
@@ -272,6 +278,7 @@ export function parseSettings(value: unknown): Settings {
     host: {
       ...host,
       shellProviders,
+      language,
       showHints,
       soundEnabled,
       trayClickCommand,

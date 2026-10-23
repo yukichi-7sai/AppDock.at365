@@ -1,4 +1,5 @@
 export interface HostSettings {
+  language: import('./host-language').HostLanguage;
   /** Input compatibility only; parseSettings removes this key. */
   shellProvider?: string;
   shellProviders?: Record<string, string>;

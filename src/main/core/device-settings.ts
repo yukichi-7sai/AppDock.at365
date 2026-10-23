@@ -14,6 +14,7 @@ import {
 } from '../../shared/page-collections';
 
 export const deviceHostKeys = [
+  'language',
   'theme',
   'zoomFactor',
   'accentColor',

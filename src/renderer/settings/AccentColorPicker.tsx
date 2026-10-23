@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import React from 'react';
 import {
   accentChoices,
@@ -19,12 +20,15 @@ export function AccentColorPicker({
   onChange(value: AccentColor): void;
   onCustomChange(tone: keyof CustomAccentColors, color: string): void;
 }) {
+  const { t } = useHostTranslation();
   return (
     <>
       {value === legacyAccentPalette.id && (
-        <p className="muted">現在の配色: {legacyAccentPalette.title}</p>
+        <p className="muted">
+          {t('appearance.accent.current', { name: t('appearance.accent.palette.sky-blue') })}
+        </p>
       )}
-      <div className="accent-palettes" role="group" aria-label="アクセントカラー">
+      <div className="accent-palettes" role="group" aria-label={t('appearance.accent.label')}>
         {accentChoices.map((palette) => {
           const colors =
             palette.id === 'custom'
@@ -42,7 +46,7 @@ export function AccentColorPicker({
                 <i style={{ background: colors[0] }} />
                 <i style={{ background: colors[1] }} />
               </span>
-              <span>{palette.title}</span>
+              <span>{t(`appearance.accent.palette.${palette.id}`)}</span>
             </button>
           );
         })}
@@ -50,14 +54,15 @@ export function AccentColorPicker({
       {value === 'custom' && (
         <div className="accent-custom-colors">
           {(['dark', 'light'] as const).map((tone) => {
-            const title = tone === 'dark' ? '濃い色' : '淡い色';
+            const title =
+              tone === 'dark' ? t('appearance.accent.dark') : t('appearance.accent.light');
             return (
               <SettingsField
                 key={tone}
                 role="group"
                 aria-label={title}
                 title={title}
-                hint="明暗テーマに合わせて、表示する色の明るさを自動調整します。入力した色はそのまま保存します。"
+                hint={t('appearance.accent.customHint')}
               >
                 <SettingsColorPicker
                   value={custom[tone]}

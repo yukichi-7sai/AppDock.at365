@@ -1,9 +1,11 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { settingsPopoverScroll } from './settings-popover-scroll';
 import './settings-error.css';
 
 /** Stable summary row with keyboard-readable, scrollable error details. */
 export function SettingsError({ error, id }: { error?: string; id: string }) {
+  const { t } = useHostTranslation();
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLSpanElement>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -101,7 +103,7 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
         className="settings-error-trigger"
         style={{ visibility: error ? 'visible' : 'hidden' }}
         disabled={!error}
-        aria-label="エラーの詳細"
+        aria-label={t('common.errorDetails')}
         aria-describedby={`${id}-tooltip`}
         onPointerEnter={show}
         onPointerLeave={leave}
@@ -112,7 +114,7 @@ export function SettingsError({ error, id }: { error?: string; id: string }) {
         }}
         onClick={show}
       >
-        詳細
+        {t('common.details')}
       </button>
       <span
         ref={popup}

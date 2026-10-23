@@ -18,6 +18,7 @@
 | 開発・コミット・配布 | [共通手順](docs/development-workflow.md)、[ローカル発行](docs/publishing.md)、[GitHub Release](docs/RELEASING.md)、[全体ZIP](docs/all-in-one.md) |
 | Appletの開発とAPI | [実装ガイド](docs/applet-development.md)、[Applet API](docs/extensions.md)、[ホスト拡張](docs/host-development.md)、[ページ](docs/applet-pages.md) |
 | 設定・入力・保存 | [共通レイアウト指針](docs/settings-ui-guidelines.md)、[設定UIと既定値・リセット](docs/settings-foundation.md)、[一覧とダイアログ](docs/settings-list-editing.md)、[端末別保存・同期・復旧](docs/settings-sync.md) |
+| 表示言語・翻訳 | [本体の翻訳基盤・文言変更・段階移行](docs/localization.md) |
 | 表示倍率 | [Electron画面の共通倍率・対象・画面追加規則](docs/display-zoom.md) |
 | Appletの導入と管理 | [管理一覧・導入・更新・削除](docs/applet-management-settings-design.md) |
 | Webとアカウント | [WebApplet](docs/web-applets.md)、[Webアカウントとグループ](docs/web-accounts.md) |

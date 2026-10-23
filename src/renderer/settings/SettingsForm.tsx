@@ -1,3 +1,5 @@
+import { useHostTranslation } from '../HostTranslation';
+import { hostLanguages } from '../../shared/host-language';
 import { McpClientSettingsForm } from './McpClientSettings';
 import { displayZoomChoices, displayZoomLabel } from '../../shared/display-zoom';
 import { AccentColorPicker } from './AccentColorPicker';
@@ -42,6 +44,7 @@ export function SettingsForm({
   select(id: string): void;
   invoke(name: string, args?: unknown[]): Promise<any>;
 }) {
+  const { t, language } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const { page, auxiliary: aux, editing } = model.content;
   const category = page.id,
@@ -205,10 +208,32 @@ export function SettingsForm({
         )}
         {category === 'appearance' && (
           <>
-            <SettingsSection title="共通">
+            <SettingsSection title={t('common.section')}>
+              <SettingRow pageId={category} itemKey="language">
+                <select
+                  data-testid="host-language"
+                  aria-label={t('language.label')}
+                  value={settings.host.language}
+                  onChange={(e) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        language: e.target.value as Settings['host']['language'],
+                      },
+                    })
+                  }
+                >
+                  {hostLanguages.map((value) => (
+                    <option key={value} value={value}>
+                      {t(`language.${value}`)}
+                    </option>
+                  ))}
+                </select>
+              </SettingRow>
               <SettingRow pageId={category} itemKey="theme">
                 <select
-                  aria-label="テーマ"
+                  aria-label={t('appearance.theme.label')}
                   value={settings.host.theme}
                   onChange={(e) =>
                     edit({
@@ -220,14 +245,14 @@ export function SettingsForm({
                     })
                   }
                 >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                  <option value="system">System</option>
+                  <option value="dark">{t('appearance.theme.dark')}</option>
+                  <option value="light">{t('appearance.theme.light')}</option>
+                  <option value="system">{t('appearance.theme.system')}</option>
                 </select>
               </SettingRow>
               <SettingRow pageId={category} itemKey="zoomFactor">
                 <select
-                  aria-label="表示倍率"
+                  aria-label={t('appearance.zoom.label')}
                   value={settings.host.zoomFactor}
                   onChange={(e) =>
                     edit({
@@ -271,7 +296,7 @@ export function SettingsForm({
               </SettingRow>
               <SettingRow pageId={category} itemKey="showHints">
                 <Toggle
-                  label="ヒントの表示"
+                  label={t('appearance.hints.label')}
                   checked={settings.host.showHints}
                   onChange={(showHints) =>
                     edit({ ...settings, host: { ...settings.host, showHints } })
@@ -279,8 +304,9 @@ export function SettingsForm({
                 />
               </SettingRow>
             </SettingsSection>
-            <SettingsSection title="Shellの変更">
-              {shellRegions.map(({ id, title }) => {
+            <SettingsSection title={t('appearance.shell.section')}>
+              {shellRegions.map(({ id }) => {
+                const title = t(`appearance.shell.region.${id}`);
                 const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
                 const candidates = extensions.filter(
                   (e) => e.id !== defaultShellId && shellView(e.shell, id),
@@ -288,22 +314,28 @@ export function SettingsForm({
                 const state = aux.shellRegions?.regions.find((r) => r.region === id);
                 const name = (provider: string | null | undefined) =>
                   provider === defaultShellId
-                    ? 'Default Shell'
+                    ? t('appearance.shell.default')
                     : (extensions.find((e) => e.id === provider)?.displayName ??
                       provider ??
-                      '未生成');
+                      t('appearance.shell.notCreated'));
                 return (
                   <SettingRow
                     key={id}
                     pageId={category}
                     itemKey={'shellProviders.' + id}
-                    description={`使用先: ${name(state?.boundProvider ?? state?.resolvedProvider)}${
-                      state?.pendingProvider ? ' ／適用待ち: ' + name(state.pendingProvider) : ''
-                    }${state?.reason ? '。' + state.reason + '。workerの再起動が必要な場合は、このAppletの他の領域も再接続します。' : ''}`}
+                    description={[
+                      t('appearance.shell.active', {
+                        name: name(state?.boundProvider ?? state?.resolvedProvider),
+                      }),
+                      state?.pendingProvider
+                        ? t('appearance.shell.pending', { name: name(state.pendingProvider) })
+                        : '',
+                      state?.reason ? t('appearance.shell.reason', { reason: state.reason }) : '',
+                    ].join('')}
                   >
                     <div className="shell-region-controls">
                       <select
-                        aria-label={title + 'のShell'}
+                        aria-label={t('appearance.shell.label', { region: title })}
                         value={configured}
                         disabled={busy}
                         onChange={(e) =>
@@ -319,15 +351,19 @@ export function SettingsForm({
                           })
                         }
                       >
-                        <option value={defaultShellId}>Default Shell（常時有効）</option>
+                        <option value={defaultShellId}>
+                          {t('appearance.shell.defaultOption')}
+                        </option>
                         {configured !== defaultShellId &&
                           !candidates.some((e) => e.id === configured) && (
-                            <option value={configured}>{configured}（未導入・領域未提供）</option>
+                            <option value={configured}>
+                              {t('appearance.shell.unavailable', { name: configured })}
+                            </option>
                           )}
                         {candidates.map((e) => (
                           <option key={e.id} value={e.id}>
                             {e.displayName}
-                            {!e.enabled ? '（無効）' : ''}
+                            {!e.enabled ? t('appearance.shell.disabledSuffix') : ''}
                           </option>
                         ))}
                       </select>
@@ -337,7 +373,7 @@ export function SettingsForm({
                             disabled={busy}
                             onClick={() => void invoke('retryShellRegion', [id])}
                           >
-                            この領域を再試行
+                            {t('appearance.shell.retry')}
                           </button>
                         </>
                       )}
@@ -354,7 +390,7 @@ export function SettingsForm({
             <SettingsSection>
               <SettingRow pageId={category} itemKey="soundEnabled">
                 <Toggle
-                  label="音の再生"
+                  label={t('general.sound.label')}
                   checked={settings.host.soundEnabled}
                   onChange={(v) =>
                     edit({ ...settings, host: { ...settings.host, soundEnabled: v } })
@@ -362,24 +398,21 @@ export function SettingsForm({
                 />
               </SettingRow>
             </SettingsSection>
-            <SettingsSection title="ウィンドウ">
+            <SettingsSection title={t('general.window.section')}>
               {(['closeToTray', 'startMinimized', 'hardwareAcceleration'] as const).map((key) => (
                 <SettingRow key={key} pageId={category} itemKey={key}>
                   <Toggle
-                    label={hostSettingItem(category, key).title}
+                    label={hostSettingItem(category, key, language).title}
                     checked={settings.host[key]}
                     onChange={(v) => edit({ ...settings, host: { ...settings.host, [key]: v } })}
                   />
                 </SettingRow>
               ))}
             </SettingsSection>
-            <SettingsSection
-              title="スタートアップ"
-              hint="Windowsへのサインイン時や、AppDockを起動したときの動作を設定します。"
-            >
+            <SettingsSection title={t('general.startup.section')} hint={t('general.startup.hint')}>
               <SettingRow pageId={category} itemKey="startAtLogon">
                 <Toggle
-                  label="スタートアップに登録"
+                  label={t('general.startAtLogon.label')}
                   checked={settings.host.startAtLogon}
                   disabled={!launch.supported}
                   onChange={(v) =>
@@ -389,7 +422,7 @@ export function SettingsForm({
               </SettingRow>
               <SettingRow pageId={category} itemKey="runAsAdministrator">
                 <Toggle
-                  label="常に管理者として起動"
+                  label={t('general.runAsAdministrator.label')}
                   checked={settings.host.runAsAdministrator}
                   disabled={!launch.supported}
                   onChange={(v) =>
@@ -403,8 +436,17 @@ export function SettingsForm({
                 error={launch.error}
                 description={
                   launch.supported
-                    ? `${launch.elevated ? '管理者権限で動作中' : '通常権限で動作中'}。スタートアップ: ${launch.registered ? (launch.taskElevated ? '登録済み（管理者）' : '登録済み（通常権限）') : '未登録'}。起動設定はこのEXEの配置先ごとに登録します。移動する前に登録を解除してください。管理者設定をOFFにした場合は、AppDockを完全終了し、通常の方法で起動し直してください。`
-                    : '起動設定はWindowsの発行版AppDockで使用できます。'
+                    ? t('general.launch.status', {
+                        privilege: launch.elevated
+                          ? t('general.launch.elevated')
+                          : t('general.launch.normal'),
+                        registration: launch.registered
+                          ? launch.taskElevated
+                            ? t('general.launch.registeredElevated')
+                            : t('general.launch.registeredNormal')
+                          : t('general.launch.notRegistered'),
+                      })
+                    : t('general.launch.unsupported')
                 }
               >
                 <SettingsActions>
@@ -412,31 +454,29 @@ export function SettingsForm({
                     disabled={!launch.supported || busy}
                     onClick={() => void run(() => invoke('refreshLaunchState'))}
                   >
-                    状態を確認
+                    {t('general.launch.refresh')}
                   </button>
                   <button
                     disabled={!launch.supported || launch.elevated || busy}
                     onClick={() => void run(() => invoke('restartAsAdministrator'))}
                   >
-                    管理者として再起動
+                    {t('general.launch.restartElevated')}
                   </button>
                 </SettingsActions>
               </SettingRow>
             </SettingsSection>
             <SettingsSection
-              title="設定ファイル"
+              title={t('general.files.title')}
               {...settingAnchor(category, 'settingsFile')}
-              hint="通知を閉じた後も、設定の状態と復旧操作を確認できます。"
+              hint={t('general.files.hint')}
               error={[...new Set(aux.settingsHealth?.errors)].join('\n')}
               description={[
                 !aux.settingsHealth?.errors.length && !aux.settingsHealth?.restartRequired
-                  ? '設定は正常です。'
+                  ? t('general.files.healthy')
                   : '',
-                aux.settingsHealth?.recovered
-                  ? '最後の正常な設定で動作しています。問題のあるファイルは保持しています。'
-                  : '',
+                aux.settingsHealth?.recovered ? t('general.files.recovered') : '',
                 ...(aux.settingsHealth?.reasons ?? []),
-                aux.settingsHealth?.errors.length ? '原因を確認して再起動してください。' : '',
+                aux.settingsHealth?.errors.length ? t('general.files.restartAdvice') : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -444,13 +484,13 @@ export function SettingsForm({
               {aux.settingsFiles?.map((file) => (
                 <SettingsField
                   key={file.scope}
-                  title={file.scope === 'device' ? 'このPCの設定' : '共有設定'}
+                  title={
+                    file.scope === 'device' ? t('general.files.device') : t('general.files.shared')
+                  }
                   description={
                     <>
                       <code>{file.path}</code> —{' '}
-                      {file.recovered
-                        ? '正常な設定で継続中です。ファイルを確認してください。'
-                        : '正常'}
+                      {file.recovered ? t('general.files.continuing') : t('general.files.normal')}
                     </>
                   }
                 >
@@ -459,7 +499,7 @@ export function SettingsForm({
                       disabled={busy || aux.settingsHealth?.busy}
                       onClick={() => void run(() => invoke('restoreScopedSettings', [file.scope]))}
                     >
-                      このファイルをバックアップで復元
+                      {t('general.files.restoreOne')}
                     </button>
                   )}
                 </SettingsField>
@@ -469,23 +509,23 @@ export function SettingsForm({
                   disabled={busy || aux.settingsHealth?.busy}
                   onClick={() => void run(() => invoke('restart'))}
                 >
-                  再起動
+                  {t('general.files.restart')}
                 </button>
                 <button
                   disabled={busy || aux.settingsHealth?.busy || !aux.settingsHealth?.canRestore}
                   onClick={() => void run(() => invoke('restoreSettingsBackup'))}
                 >
-                  バックアップで復元
+                  {t('general.files.restore')}
                 </button>
                 <button onClick={() => void run(() => invoke('openSettingsDirectory'))}>
-                  保存先を開く
+                  {t('general.files.open')}
                 </button>
                 {aux.settingsHealth?.launchRecovery && (
                   <button
                     disabled={busy}
                     onClick={() => void run(() => invoke('recoverLaunchSettings'))}
                   >
-                    中断したWindows起動設定を復旧
+                    {t('general.files.recoverLaunch')}
                   </button>
                 )}
               </SettingsActions>
@@ -509,7 +549,8 @@ function SettingRow({
   error?: string;
   children: React.ReactNode;
 }) {
-  const item = hostSettingItem(pageId, itemKey);
+  const { language } = useHostTranslation();
+  const item = hostSettingItem(pageId, itemKey, language);
   const requiredDescription =
     pageId === 'general' && ['runAsAdministrator', 'hardwareAcceleration'].includes(itemKey);
   return (

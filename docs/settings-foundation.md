@@ -34,7 +34,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使�
 
 Applet管理と左インデックスは本体の共通設定ページを開く。個別設定・入力設定・ログの移動先と表示用フィルターは[Applet管理](applet-management-settings-design.md)を参照する。停止・無効でも編集でき、移動だけで起動しない。入力キューと3秒のflush、競合と不正入力の契約を維持する。
 
-「表示」の部分JSONは`host.theme`・`host.accentColor`・`host.customAccentDark`・`host.customAccentLight`・`host.showHints`・`host.shellProviders`です。領域ごとの選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。
+「表示」の部分JSONは`host.language`・`host.zoomFactor`・`host.theme`・`host.accentColor`・`host.customAccentDark`・`host.customAccentLight`・`host.showHints`・`host.shellProviders`です。領域ごとの選択・現在の使用先・適用待ちと理由・領域ごとの再試行を表示します。
 
 ## カタログ・JSON・検索
 
@@ -141,6 +141,8 @@ AIのモデル取得は設定ページ専用の操作として未保存の接続
 操作の許可は「Applet」「MCP」の2列で表示する。MCP連携の状態カード・設定への移動ボタン・即時保存の案内は表示しない。許可不足の状態、エラー、情報取得の固定ON、注意アイコンと保存の処理は維持する。ショートカットとジェスチャーの一覧上部にも、クリック編集と＋追加の定型案内は表示しない。
 
 表示ページは「共通」カードにテーマ・アクセントカラー・ヒントの表示を配置し、その下の「Shellの変更」カードで領域ごとのShellを選ぶ。Shellの各選択欄に同一のdescriptionを繰り返さない。一般ページは見出しなしの「音の再生」トグル、ウィンドウ、スタートアップ、Applet・MCPからの操作、設定ファイルの順に表示する。音の再生は既定ONで即時保存・反映し、設定定義からON/OFF/切り替えのコマンドを生成する。通知ページは受け取り方、読み上げ、提供元グループの順とし、受け取り方と各通知種類は既定で折りたたむ。読み上げページの接続カードは「TTS接続先」とする。ジェスチャーの有効化は単独のトグルにし、動作設定を既定で閉じた共通カードに配置する。通知種類の見出しには現在の通知先・表示時間・読み上げON/OFFを表示する。折りたたみ状態は画面内だけで保持し、設定ファイルへ項目を増やさない。検索で項目を選ぶと必要な親カードを開く。
+
+表示→共通の先頭に表示言語を置き、日本語だけを選べる。`host.language`は端末専用、既定`ja`。翻訳範囲・追加規則は[表示言語と翻訳](localization.md)を参照する。
 
 新規設定のhost.themeはlight、host.accentColorはmint、gestures.enabledはtrue。保存済みの明示値は上書きしない。通知自体のOFF設定は廃止し、旧host.notificationsと通知種類のenabledは読込時に破棄する。
 

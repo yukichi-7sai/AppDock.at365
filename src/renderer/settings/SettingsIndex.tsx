@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useState } from 'react';
 import type { SettingsPageModel, SettingsPageOperation } from '../../shared/settings-page';
 import { SettingsInput } from '../settings-ui/SettingsInput';
@@ -17,6 +18,7 @@ export function SettingsIndex({
   content: SettingsPageModel['content'];
   act(op: SettingsPageOperation): void;
 }) {
+  const { t } = useHostTranslation();
   const [query, setQuery] = useState(content.query),
     [selected, setSelected] = useState(-1);
   useEffect(() => setQuery(content.query), [content.query]);
@@ -50,8 +52,8 @@ export function SettingsIndex({
         className="settings-search"
         type="search"
         role="combobox"
-        aria-label="設定を検索"
-        placeholder="設定を検索…"
+        aria-label={t('settings.search')}
+        placeholder={t('settings.searchPlaceholder')}
         maxLength={512}
         value={query}
         aria-expanded={searching}
@@ -82,9 +84,9 @@ export function SettingsIndex({
         {searching ? (
           <>
             <p className="settings-result-count" role="status">
-              {content.results.length}件の設定
+              {t('settings.resultCount', { count: content.results.length })}
             </p>
-            <div id="settings-results" role="listbox" aria-label="設定の検索結果">
+            <div id="settings-results" role="listbox" aria-label={t('settings.searchResults')}>
               {content.results.map((item, index) => (
                 <button
                   id={`setting-result-${index}`}
@@ -103,13 +105,15 @@ export function SettingsIndex({
                 </button>
               ))}
             </div>
-            {!content.results.length && <p className="muted">該当する設定はありません。</p>}
+            {!content.results.length && <p className="muted">{t('settings.searchEmpty')}</p>}
           </>
         ) : (
           <>
-            <div aria-label="本体の設定">{content.navigation.filter((p) => !p.owner).map(row)}</div>
+            <div aria-label={t('settings.host')}>
+              {content.navigation.filter((p) => !p.owner).map(row)}
+            </div>
             <h3 className="settings-applet-heading">Applet</h3>
-            <div aria-label="Appletの設定">
+            <div aria-label={t('settings.applets')}>
               {content.navigation.filter((p) => p.owner).map(row)}
             </div>
           </>

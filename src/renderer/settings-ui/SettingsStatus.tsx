@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import {
   createContext,
   useCallback,
@@ -62,9 +63,11 @@ export function useSettingsFeedback({
   message,
   busy,
   onRetry,
-  retryLabel = '再試行',
+  retryLabel,
 }: Omit<Feedback, 'retry'> & { onRetry?(): void; retryLabel?: string }) {
+  const { t } = useHostTranslation();
   const scope = useContext(SettingsStatusContext);
+  retryLabel ??= t('common.retry');
   const inheritedTarget = useContext(SettingsFieldTarget);
   target ??= inheritedTarget;
   const id = useId();
@@ -89,6 +92,7 @@ export function useSettingsFeedback({
 
 /** Only common layouts place this reserved area. */
 export function SettingsStatusArea({ action }: { action?: ReactNode }) {
+  const { t } = useHostTranslation();
   const scope = useContext(SettingsStatusContext);
   const entries = useContext(SettingsStatusEntries);
   const errors = [
@@ -101,7 +105,7 @@ export function SettingsStatusArea({ action }: { action?: ReactNode }) {
   const messages = [
     ...new Set(
       entries.flatMap((entry) =>
-        entry.message ? [entry.message] : entry.busy ? ['処理しています…'] : [],
+        entry.message ? [entry.message] : entry.busy ? [t('common.processing')] : [],
       ),
     ),
   ];

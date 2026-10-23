@@ -1,3 +1,5 @@
+import { getHostTranslator } from './i18n';
+import { defaultHostLanguage, type HostLanguage } from './host-language';
 import { collectionRecord } from './page-collections';
 import { touchpadGestureTypes } from './touchpad-gestures';
 import { accentChoices } from './appearance';
@@ -67,50 +69,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ],
     ['preview', '文章生成の試験', 'モデル 追加プロンプト 入力 生成結果 停止'],
   ],
-  appearance: [
-    ['theme', 'テーマ', 'ワークスペースの明るさを選びます。'],
-    [
-      'zoomFactor',
-      '表示倍率',
-      'Electronで表示する本体・リボン・Applet・Webページ・通知を50～200%で拡大・縮小します。.NETのウィンドウは対象外です。',
-    ],
-    ['accentColor', 'アクセントカラー', 'テーマとは別に、ボタンや選択状態の配色を選びます。'],
-    ['showHints', 'ヒントの表示', '設定画面にヒントを表示します。'],
-    ...shellRegions.map(({ id, title }): [string, string] => [
-      'shellProviders.' + id,
-      title + 'のShell',
-    ]),
-  ],
-  general: [
-    [
-      'soundEnabled',
-      '音の再生',
-      'AppDockの読み上げ・通知音・試聴を再生します。OFFにすると再生中の音を止め、再生待ちとOFF中に届いた音を破棄します。',
-    ],
-    [
-      'startAtLogon',
-      'スタートアップに登録',
-      'Windowsへのサインイン時に、この場所のAppDockを起動します。変更は保存時に反映します。',
-    ],
-    [
-      'runAsAdministrator',
-      '常に管理者として起動',
-      '次の起動から管理者権限を使います。管理者でのスタートアップ登録・変更にはUAC確認が必要です。登録後のサインイン時には確認を出しません。手動起動ではUAC確認が表示されます。',
-    ],
-    ['launch', '現在の起動状態', '状態を確認 管理者として再起動'],
-    ['closeToTray', '閉じるとトレイに収納', 'ウィンドウを閉じた後もAppletを動かします。'],
-    [
-      'hardwareAcceleration',
-      'ハードウェアアクセラレーション',
-      'GPUを使ってAppDockの画面を描画します。変更は保存後、AppDockを完全終了して起動し直すと反映されます。',
-    ],
-    [
-      'startMinimized',
-      '起動時にトレイに収納',
-      '次の起動時はウィンドウを表示せず、トレイに常駐します。',
-    ],
-    ['settingsFile', '設定ファイル', '状態 再起動 バックアップで復元 保存先を開く'],
-  ],
+
   tts: [
     ['baseUrl', 'APIのURL', 'OpenAI互換TTSサーバーのベースURL'],
     ['apiKey', 'APIキー', 'このPCに暗号化保存。空欄で認証なし'],
@@ -253,8 +212,61 @@ const hostItems: Record<string, [string, string, string?][]> = {
     )[key],
   ]),
 };
-export function hostSettingItem(pageId: string, key: string): SettingsItem {
-  const row = hostItems[pageId]?.find((row) => row[0] === key);
+const localizedHostFields = {
+  appearance: [
+    ['language', 'language.label', 'language.description'],
+    ['theme', 'appearance.theme.label', 'appearance.theme.description'],
+    ['zoomFactor', 'appearance.zoom.label', 'appearance.zoom.description'],
+    ['accentColor', 'appearance.accent.label', 'appearance.accent.description'],
+    ['showHints', 'appearance.hints.label', 'appearance.hints.description'],
+  ],
+  general: [
+    ['soundEnabled', 'general.sound.label', 'general.sound.description'],
+    ['startAtLogon', 'general.startAtLogon.label', 'general.startAtLogon.description'],
+    [
+      'runAsAdministrator',
+      'general.runAsAdministrator.label',
+      'general.runAsAdministrator.description',
+    ],
+    ['launch', 'general.launch.label', 'general.launch.keywords'],
+    ['closeToTray', 'general.closeToTray.label', 'general.closeToTray.description'],
+    [
+      'hardwareAcceleration',
+      'general.hardwareAcceleration.label',
+      'general.hardwareAcceleration.description',
+    ],
+    ['startMinimized', 'general.startMinimized.label', 'general.startMinimized.description'],
+    ['settingsFile', 'general.files.title', 'general.files.keywords'],
+  ],
+} as const;
+function hostRows(
+  pageId: string,
+  language: HostLanguage = defaultHostLanguage,
+): [string, string, string?][] {
+  const t = getHostTranslator(language);
+  if (pageId !== 'appearance' && pageId !== 'general') return hostItems[pageId] ?? [];
+  return [
+    ...localizedHostFields[pageId].map(([key, title, description]): [string, string, string] => [
+      key,
+      t(title),
+      t(description),
+    ]),
+    ...(pageId === 'appearance'
+      ? shellRegions.map(({ id }): [string, string] => [
+          'shellProviders.' + id,
+          t('appearance.shell.label', {
+            region: t(`appearance.shell.region.${id}`),
+          }),
+        ])
+      : []),
+  ];
+}
+export function hostSettingItem(
+  pageId: string,
+  key: string,
+  language: HostLanguage = defaultHostLanguage,
+): SettingsItem {
+  const row = hostRows(pageId, language).find((row) => row[0] === key);
   if (!row) throw Error('Unknown settings item: ' + pageId + '/' + key);
   return item(pageId, row[0], row[1], row[2]);
 }
@@ -310,28 +322,38 @@ export function settingsCatalog(
   applets: ExtensionSnapshot[],
   current: Settings,
 ): SettingsPageDefinition[] {
+  const t = getHostTranslator(current.host.language);
   return [
     ...hostSettingsPages.map(([id, title]) => ({
       id,
-      title,
+      title: id === 'appearance' || id === 'general' ? t(`pages.${id}.title`) : title,
       kind: 'host' as const,
       json: !['applets', 'web-accounts', 'permissions', 'codex'].includes(id),
       items: [
-        ...hostItems[id].map(([key, title, description]) => ({
+        ...hostRows(id, current.host.language).map(([key, title, description]) => ({
           ...item(id, key, title, description),
           keywords:
-            id === 'appearance' && key === 'theme'
-              ? ['Dark', 'Light', 'System']
-              : id === 'appearance' && key === 'accentColor'
+            id === 'appearance' && key === 'language'
+              ? [t('language.ja'), 'ja']
+              : id === 'appearance' && key === 'theme'
                 ? [
-                    ...accentChoices.flatMap((p) => [p.id, p.title]),
-                    '濃い色',
-                    '淡い色',
-                    'HEX',
-                    'customAccentDark',
-                    'customAccentLight',
+                    t('appearance.theme.dark'),
+                    t('appearance.theme.light'),
+                    t('appearance.theme.system'),
                   ]
-                : undefined,
+                : id === 'appearance' && key === 'accentColor'
+                  ? [
+                      ...accentChoices.flatMap((p) => [
+                        p.id,
+                        t(`appearance.accent.palette.${p.id}`),
+                      ]),
+                      t('appearance.accent.dark'),
+                      t('appearance.accent.light'),
+                      'HEX',
+                      'customAccentDark',
+                      'customAccentLight',
+                    ]
+                  : undefined,
         })),
         ...(id === 'notifications'
           ? notificationCatalog(orderApplets(applets, current.appletOrder)).map((t) =>
@@ -418,6 +440,7 @@ export function settingsPaths(
       return [['customCommands']];
     case 'appearance':
       return [
+        'language',
         'theme',
         'zoomFactor',
         'accentColor',

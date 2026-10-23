@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSettingsControls } from './api';
@@ -205,6 +206,7 @@ export function SettingsDialog({
   errorAction?: ReactNode;
   cancelWhilePending?: boolean;
 }) {
+  const { t } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [id] = useState(() => `dialog-${crypto.randomUUID()}`);
   const [ready, setReady] = useState(false),
@@ -220,7 +222,7 @@ export function SettingsDialog({
       await onApply();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存できませんでした。');
+      setError(e instanceof Error ? e.message : t('common.saveFailed'));
     } finally {
       running.current = false;
       setPending(false);
@@ -250,7 +252,7 @@ export function SettingsDialog({
           </div>
           <button
             className="shortcut-dialog-close"
-            aria-label="ダイアログを閉じる"
+            aria-label={t('common.closeDialog')}
             disabled={pending && !cancelWhilePending}
             onClick={onClose}
           >
@@ -262,7 +264,7 @@ export function SettingsDialog({
         <footer>
           <div>
             <button disabled={pending && !cancelWhilePending} onClick={onClose}>
-              キャンセル
+              {t('common.cancel')}
             </button>
             <SettingsButton
               className="primary"

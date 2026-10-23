@@ -1,13 +1,23 @@
+import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useState } from 'react';
 import { SettingsInput } from './SettingsInput';
 import { Icon } from '../Icon';
 import { parseRibbonColor } from '../../shared/ribbon';
 import './settings-color-picker.css';
 
-const colorNames = ['赤', '橙', '黄', '緑', '青', '紫', '桃', '灰'] as const;
+const colorNames = [
+  'color.red',
+  'color.orange',
+  'color.yellow',
+  'color.green',
+  'color.blue',
+  'color.purple',
+  'color.pink',
+  'color.gray',
+] as const;
 const palettes = [
   {
-    name: 'パステル',
+    name: 'color.pastel',
     colors: [
       '#F2AAAA',
       '#F6C397',
@@ -20,7 +30,7 @@ const palettes = [
     ],
   },
   {
-    name: 'くすみ',
+    name: 'color.muted',
     colors: [
       '#CC8F95',
       '#D8AF88',
@@ -33,7 +43,7 @@ const palettes = [
     ],
   },
   {
-    name: 'ベーシック',
+    name: 'color.basic',
     colors: [
       '#E5484D',
       '#F08C2E',
@@ -59,6 +69,7 @@ export function SettingsColorPicker({
   onChange(value: string | null): void;
   onValidityChange?(valid: boolean): void;
 }) {
+  const { t } = useHostTranslation();
   const [raw, setRaw] = useState(value ?? '');
   const [paletteIndex, setPaletteIndex] = useState(0);
   const palette = palettes[paletteIndex];
@@ -83,26 +94,28 @@ export function SettingsColorPicker({
     <div className="settings-color-picker">
       <div className="settings-color-toolbar">
         <span className="settings-color-palette-name" role="status" aria-atomic="true">
-          {palette.name}
+          {t(palette.name)}
         </span>
         <button
           type="button"
           className="settings-color-cycle"
-          aria-label="パレットを切り替え"
-          title={`次のパレット: ${palettes[(paletteIndex + 1) % palettes.length].name}`}
+          aria-label={t('color.cycle')}
+          title={t('color.nextPalette', {
+            name: t(palettes[(paletteIndex + 1) % palettes.length].name),
+          })}
           onClick={() => setPaletteIndex((current) => (current + 1) % palettes.length)}
         >
           <Icon name="refresh" size={16} />
         </button>
       </div>
-      <div className="settings-color-swatches" role="group" aria-label="色見本">
+      <div className="settings-color-swatches" role="group" aria-label={t('color.swatches')}>
         {palette.colors.map((color, index) => (
           <button
             type="button"
             className="settings-color-swatch"
             key={color}
-            aria-label={colorNames[index]}
-            title={`${colorNames[index]} ${color}`}
+            aria-label={t(colorNames[index])}
+            title={`${t(colorNames[index])} ${color}`}
             aria-pressed={value === color}
             onClick={() => choose(color)}
             style={{ backgroundColor: color }}
@@ -120,20 +133,20 @@ export function SettingsColorPicker({
             onClick={() => choose(null)}
           >
             <span className="settings-color-none-mark" aria-hidden="true" />
-            色なし
+            {t('color.none')}
           </button>
         )}
         <div className={`settings-color-custom${invalid ? ' is-invalid' : ''}`}>
           <input
-            aria-label="自由な色"
-            title="色を選択"
+            aria-label={t('color.custom')}
+            title={t('color.choose')}
             className="settings-color-native"
             type="color"
             value={value ?? palettes[0].colors[3]}
             onChange={(e) => choose(e.target.value.toUpperCase())}
           />
           <SettingsInput
-            aria-label="色のHEX値"
+            aria-label={t('color.hex')}
             className="settings-color-hex"
             type="text"
             value={raw}

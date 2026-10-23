@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-23: 翻訳基盤0.86.0のコミット前照合
+
+- 実装時の685入力・完全ログ・固定EXE/同梱JSONのSHA256一致を確認し、型検査/build・標準848件・固定EXE GUI6群・smokeの成功を再利用。製品変更・版更新・再発行なし。利用者による動作確認も受領した。
+- 対象差分を再確認し、実効author/committer、stageと作業ファイル・commit treeを照合。証跡は `.artifacts/commit-validation-localization-0860/reuse.json`。このコミット後に残りの本体設定文言を移行する。push/Release/実利用deployは行わない。
+
+## 2026-10-23: 本体翻訳基盤・表示/一般設定 0.86.0
+
+- cleanなmain（e6c95db、origin/main追跡）から開始し、git pull --ff-onlyは最新一致。host.language設定追加のため0.85.9→0.86.0。i18next 26.4.7/react-i18next 17.0.19は公開後7日条件を満たす固定版を導入し、既存のsupply-chain検査・固定lockfileを維持。
+- 日本語259項目をsrc/shared/locales/ja/host.jsonへ抽出し、表示/一般本文・設定共通部品・検索/ヒント/ダイアログ・関連状態/入力エラーを接続。「表示→共通」の先頭は表示言語、日本語だけ。端末専用・既定ja・既定省略・部分JSON/リセット/公開定義を統合。入力されたコマンド名・リボングループ名・外部文字列は翻訳せず保持。設計と段階移行方針はdocs/localization.md、README不変。
+- 発行前自己レビュー1回を実施。インスタンス間の辞書共有を分離し、動的キーの広い型キャストを除去。文言抽出で処理条件・保存ID・Windows操作を変更しないことを確認。新設定の既存期待値2か所と、新GUI試験の検出条件を補正。未解決指摘なし（.artifacts/localization-20261023/review.json）。
+- 型検査/build、対象117件、最終標準回帰848/848成功。dev.bat testは前提ビルド後に既存期待値1件で失敗し、期待値更新後のnode --test tests/*.test.cjsで全成功。685入力の前後SHA256一致を記録。制限内の.NET/GUI/COM/ファイル置換失敗は検査を弱めず通常ユーザーで再実行した。
+- 固定EXE GUI6群成功（.artifacts/settings-hints-ui-1792765111429/result.json）。先頭位置・日本語1択・検索・即時保存・未対応言語拒否/入力保持・共通ヒント・明暗×1280/760・一般トグル・カスタム名無変換・実プロセス再起動を確認。8画像と通常/狭幅の目視確認、renderer error 0。smoke（.artifacts/smoke-1792765175982/）も成功し、隔離AppDock残存0。実UAC承認・Windowsタスク変更・native復旧ダイアログの実操作は未検証。
+- publish.bat成功。A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exeはFileVersion/ProductVersion/feed/同梱Default Shellとも0.86.0、170,638,878 bytes、SHA256 86fa93fa2a2e23c446302ec0367be27467f9ba9124fc73dc3d4d9360edb9c247。GUI/smokeコピーのhash一致とASAR内日本語JSON一致を確認。検証正本: .artifacts/localization-20261023/validation.json、完全ログ・入力hash・artifacts.json。
+- 本体の他ページとApplet自身の翻訳、多言語の実切替、日時/地域形式は未対応。commit/push/Release/実利用deployなし。既存証跡・状態不明/失敗資料は保持し、試験フォルダー削除0件。今回作成した使い捨て編集補助5ファイルだけ削除、検証スクリプトと証跡は保持。
+
 対象の現行版は`0.85.9`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
 
 ## 2026-10-23: メディア・音量送信0.85.9のコミット・プッシュ前照合

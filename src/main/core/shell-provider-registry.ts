@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { ExtensionManifest, ExtensionSnapshot } from '../../shared/contracts';
 import {
   defaultShellId,
@@ -72,15 +73,14 @@ export class ShellProviderRegistry {
   }
   private rejection(region: ShellRegion, p: ShellProvider | undefined): string | null {
     if (!p || (p.id === defaultShellId && p.sourceKind !== 'builtin'))
-      return '提供元が未導入です。';
-    if (!p.enabled) return '提供元が無効です。割り当ては保持しています。';
-    if (!shellView(p.shell, region)) return 'この領域を提供していません。';
+      return hostText('shell.status.missing');
+    if (!p.enabled) return hostText('shell.status.disabled');
+    if (!shellView(p.shell, region)) return hostText('shell.status.unsupported');
     if (region === 'ribbon' && p.shell?.ribbonSchemaVersion !== 2)
-      return 'グループとバッジに対応していないリボンShellです。';
-    if (p.state === 'error') return '提供元のworkerが停止しました。再試行してください。';
-    if (p.state !== 'running') return '提供元の起動を待っています。';
-    if (this.failed(region, p.id, p.version))
-      return 'この領域の故障を抑止しています。再試行してください。';
+      return hostText('shell.status.oldRibbon');
+    if (p.state === 'error') return hostText('shell.status.stopped');
+    if (p.state !== 'running') return hostText('shell.status.starting');
+    if (this.failed(region, p.id, p.version)) return hostText('shell.status.suppressed');
     return null;
   }
   resolve(region: ShellRegion, fallbackOnly = false) {
@@ -91,10 +91,13 @@ export class ShellProviderRegistry {
     if (requested?.state === 'error') this.fail(region, requested.id, requested.version);
     let reason = this.rejection(region, requested);
     if (!reason)
-      return { provider: requested!, reason: this.options.safeMode ? 'safe起動中です。' : null };
+      return {
+        provider: requested!,
+        reason: this.options.safeMode ? hostText('shell.status.safeMode') : null,
+      };
     const fallback = providers.find((p) => p.id === defaultShellId);
     if (id === defaultShellId || this.rejection(region, fallback))
-      return { provider: undefined, reason: 'Default Shellを利用できません。再試行してください。' };
+      return { provider: undefined, reason: hostText('shell.status.defaultUnavailable') };
     return { provider: fallback!, reason };
   }
   usable(
@@ -137,7 +140,7 @@ export class ShellProviderRegistry {
       reason:
         b?.reason ??
         (bound && bound !== resolved.provider?.id
-          ? '新しい割り当ての適用待ちです。'
+          ? hostText('shell.status.pending')
           : resolved.reason),
     };
   }
@@ -170,7 +173,7 @@ export class ShellProviderRegistry {
             r.resolvedProvider === provider ||
             r.boundProvider === provider
               ? r.reason
-              : 'この領域に割り当てられていません。',
+              : hostText('shell.status.unassigned'),
         })),
     };
   }
@@ -187,13 +190,16 @@ export class ShellProviderRegistry {
   }
   requirement(provider: string, requirement?: ShellRequirement): string | undefined {
     if (!requirement) return;
-    if (isRetiredShellRegion(requirement.region)) return 'このページは本体で共通表示します。';
+    if (isRetiredShellRegion(requirement.region)) return hostText('shell.status.hostPage');
     const state = this.region(requirement.region);
     if (
       requirement.state === 'resolved'
         ? state.resolvedProvider !== provider
         : state.boundProvider !== provider || !state.ready || !state.visible
     )
-      return `${shellRegions.find((r) => r.id === requirement.region)!.title}: このAppletのShellは${requirement.state === 'resolved' ? '現在の提供元ではありません。' : '現在操作できる状態で表示されていません。'}`;
+      return hostText(
+        requirement.state === 'resolved' ? 'shell.status.notProvider' : 'shell.status.notVisible',
+        { region: hostText(`appearance.shell.region.${requirement.region}`) },
+      );
   }
 }

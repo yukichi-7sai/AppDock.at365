@@ -1,3 +1,4 @@
+import { hostText } from '../shared/i18n';
 import { TouchpadBridgeManager } from './core/touchpad-bridge';
 import {
   defaultTouchpadGestures,
@@ -1677,9 +1678,8 @@ async function reconcileSettingsApplets() {
   }
 }
 function assertSettingsWritable() {
-  if (quitting || settingsRecoveryBusy)
-    throw Error('設定の復元・再起動中です。完了後に操作してください。');
-  if (launch.recoveryPending) throw Error('一般設定で中断したWindows起動設定を復旧してください。');
+  if (quitting || settingsRecoveryBusy) throw Error(hostText('recovery.busy'));
+  if (launch.recoveryPending) throw Error(hostText('recovery.launchPending'));
 }
 const settingsRestartRequired = () =>
   settings.value.host.hardwareAcceleration !== startupHardwareAcceleration;
@@ -1688,16 +1688,21 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
     (
       await dialog.showMessageBox({
         type: 'warning',
-        message: `正常な設定で${plan.scope === 'device' ? 'このPCの設定ファイル' : '共有ファイル'}を復元しますか？`,
-        detail: `復元元の更新日時: ${new Date(plan.modifiedAt).toLocaleString()}\n${plan.scope === 'device' ? 'このPCの設定だけを復元します。' : '復元した共有設定は同期先のPCにも届きます。'}現在の破損ファイルはこのPCへ退避します。`,
-        buttons: ['キャンセル', '復元'],
+        message: hostText(
+          plan.scope === 'device' ? 'recovery.confirmDevice' : 'recovery.confirmShared',
+        ),
+        detail: hostText(
+          plan.scope === 'device' ? 'recovery.detailDevice' : 'recovery.detailShared',
+          { modifiedAt: new Date(plan.modifiedAt).toLocaleString() },
+        ),
+        buttons: [hostText('recovery.cancel'), hostText('recovery.restore')],
         defaultId: 0,
         cancelId: 0,
       })
     ).response === 1,
   chooseJson: async () => {
     const result = await dialog.showOpenDialog({
-      title: '正常な設定JSONを選択',
+      title: hostText('recovery.chooseJson'),
       properties: ['openFile'],
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
@@ -1705,15 +1710,24 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
   },
   openDirectory: async () => {
     const error = await shell.openPath(path.dirname(settings.file));
-    if (error) throw Error('保存先を開けませんでした。');
+    if (error) throw Error(hostText('recovery.openFailed'));
   },
   chooseStartupAction: async (message) => {
     const result = await dialog.showMessageBox({
       type: 'error',
-      title: 'AppDock — 設定の復旧',
-      message: '設定を確認して再起動してください',
-      detail: `${message}\n\n${settings.recoveryPath()}\n復旧記録: ${path.join(dataDirectory, 'settings-transactions')}`,
-      buttons: ['正常なJSONから復元', '保存先を開く', '再読み込み', '終了'],
+      title: hostText('recovery.title'),
+      message: hostText('recovery.checkRestart'),
+      detail: hostText('recovery.startupDetail', {
+        message,
+        path: settings.recoveryPath(),
+        recoveryPath: path.join(dataDirectory, 'settings-transactions'),
+      }),
+      buttons: [
+        hostText('recovery.restoreJson'),
+        hostText('recovery.open'),
+        hostText('recovery.reload'),
+        hostText('recovery.quit'),
+      ],
       defaultId: 2,
       cancelId: 3,
     });

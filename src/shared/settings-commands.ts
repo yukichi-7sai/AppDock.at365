@@ -1,3 +1,5 @@
+import { hostText } from './i18n';
+import { defaultHostLanguage, hostLanguages } from './host-language';
 import type { AppletCommand, SettingDefinition } from './contracts';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import {
@@ -9,6 +11,15 @@ import {
 
 const switches = ['on', 'off', 'toggle'] as const;
 export const hostSettingDefinitions: SettingDefinition[] = [
+  {
+    key: 'language',
+    title: hostText('language.label'),
+    description: hostText('language.description'),
+    type: 'select',
+    default: defaultHostLanguage,
+    automation: true,
+    options: hostLanguages.map((value) => ({ value, label: hostText(`language.${value}`) })),
+  },
   {
     key: 'zoomFactor',
     title: '表示倍率',

@@ -30,6 +30,8 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 
 ## Shellと画面
 
+- 本体の固定文言は[表示言語と翻訳](docs/localization.md)に従い、移行済みの画面では意味のある固定キーと日本語JSONを使う。ユーザー入力・Applet提供文言を翻訳キーにせず、保存IDや列挙値を翻訳しない。文言変更時は表示検査と操作検査への影響を区別する。
+
 - アクセント色は[共通配色](docs/appearance.md)を正本とする。新しい本体/Shell/Appletのローカル画面は共通preloadの配色変数を参照し、画面ごとにパレットや同名変数を定義しない。専用preload追加時は共通配色の同梱・URL登録・明暗テーマの検証も接続する。
 
 - [Shell基盤](docs/shell-foundation.md)に従い、本体は状態・操作・表示寿命、Default Shell/Shell AppletはShell対象領域の描画を所有する。メイン画面の枠組み・画像ライブラリー・通知センター・ログ・設定は本体rendererが共通UI部品で描画し、ページ用Shell機構を設けない。Shell対象は既存7領域に限定し、新しい領域のShell化は個別に依頼された場合だけ行う。両Shellは同じ公開API/実行経路を使い、相互の内部import・Default Shell専用API・本体側の復旧用重複描画を作らない。

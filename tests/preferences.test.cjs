@@ -16,6 +16,7 @@ test('legacy settings gain Ctrl+P and pins without creating a host profile', () 
   const result = parseSettings(original);
   assert.deepEqual(result.extensions, original.extensions);
   assert.deepEqual(result.host, {
+    language: 'ja',
     theme: 'light',
     zoomFactor: 1,
     accentColor: 'mint',

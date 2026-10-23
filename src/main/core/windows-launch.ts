@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import net from 'node:net';
@@ -49,9 +50,14 @@ export async function runPowerShell(script: string, encode = true): Promise<stri
   } catch (error) {
     const failure = error as { code?: string | number; stderr?: string };
     if (failure.code === 1223)
-      throw new WindowsOperationCancelled('Windowsの操作をキャンセルしました。');
+      throw new WindowsOperationCancelled(hostText('launch.errors.cancelled'));
     throw Error(
-      `Windowsの操作に失敗しました (${failure.code ?? 'timeout'})。${failure.stderr?.includes('CLIXML') ? '' : (failure.stderr?.trim().slice(0, 500) ?? '')}`,
+      hostText('launch.errors.operationFailed', {
+        code: failure.code ?? 'timeout',
+        details: failure.stderr?.includes('CLIXML')
+          ? ''
+          : (failure.stderr?.trim().slice(0, 500) ?? ''),
+      }),
     );
   }
 }
@@ -107,7 +113,7 @@ export class WindowsLaunch {
   private recoveryRecord(): LaunchRecovery | undefined {
     if (!this.recovery || !fs.existsSync(this.recovery.file)) return;
     if (fs.statSync(this.recovery.file).size > 2 * 1024 * 1024)
-      throw Error('起動設定の復旧記録が不正です。');
+      throw Error(hostText('launch.errors.invalidRecovery'));
     const record = JSON.parse(fs.readFileSync(this.recovery.file, 'utf8')) as LaunchRecovery;
     if (
       record.version !== 1 ||
@@ -124,7 +130,7 @@ export class WindowsLaunch {
         record.afterXml !== null &&
         typeof record.afterXml !== 'string')
     )
-      throw Error('起動設定の復旧記録が不正です。');
+      throw Error(hostText('launch.errors.invalidRecovery'));
     return record;
   }
   private completeRecovery() {
@@ -141,8 +147,7 @@ export class WindowsLaunch {
       const record = this.recoveryRecord();
       if (!record) return;
       const actual = await this.read();
-      if (actual.sid !== record.before.sid)
-        throw Error('起動設定の復旧記録の利用者が一致しません。');
+      if (actual.sid !== record.before.sid) throw Error(hostText('launch.errors.wrongOwner'));
       if (
         record.committed ||
         actual.xml === record.before.xml ||
@@ -161,7 +166,7 @@ export class WindowsLaunch {
     }
   }
   async recoverSavedTask() {
-    if (this.busy) throw Error('起動設定を変更中です。');
+    if (this.busy) throw Error(hostText('launch.errors.busy'));
     this.busy = true;
     try {
       const record = this.recoveryRecord();
@@ -170,12 +175,10 @@ export class WindowsLaunch {
         return;
       }
       const actual = await this.read();
-      if (actual.sid !== record.before.sid) throw Error('同じWindowsユーザーで復旧してください。');
+      if (actual.sid !== record.before.sid) throw Error(hostText('launch.errors.sameUser'));
       if (actual.xml !== record.before.xml) {
         if (record.afterXml === undefined || actual.xml !== record.afterXml)
-          throw Error(
-            'Windowsの登録が復旧記録と異なります。外部の変更を保持したため、登録を確認してください。',
-          );
+          throw Error(hostText('launch.errors.externalChanges'));
         const elevated = !actual.elevated && (actual.taskElevated || record.before.taskElevated);
         const restore = record.before.xml
           ? `
@@ -195,7 +198,7 @@ $null=$folder.RegisterTaskDefinition($name,$restore,6,$sid,$null,3,'D:P(A;;FA;;;
         await this.read();
       }
       this.completeRecovery();
-      if (this.recoveryPending) throw Error('起動設定の復旧記録を保存先から削除できません。');
+      if (this.recoveryPending) throw Error(hostText('launch.errors.deleteRecovery'));
       this.health?.succeeded();
     } finally {
       this.busy = false;
@@ -245,7 +248,10 @@ if ($task) {
     try {
       await this.read();
     } catch (error) {
-      this.state = { ...this.state, error: `起動設定を確認できません: ${String(error)}` };
+      this.state = {
+        ...this.state,
+        error: hostText('launch.errors.inspectFailed', { error: String(error) }),
+      };
     }
     return this.state;
   }
@@ -269,8 +275,8 @@ if ($child.ExitCode -ne 0) { throw 'Windows could not update the startup task' }
     preflight: () => void,
     commit: () => T,
   ): Promise<T> {
-    if (this.busy) throw Error('起動設定を変更中です。完了後に保存してください。');
-    if (this.recoveryPending) throw Error('一般設定で中断したWindows起動設定を復旧してください。');
+    if (this.busy) throw Error(hostText('launch.errors.busySave'));
+    if (this.recoveryPending) throw Error(hostText('launch.errors.recoveryPending'));
     this.busy = true;
     this.health?.changed();
     const read = async () => {
@@ -287,9 +293,7 @@ if ($child.ExitCode -ne 0) { throw 'Windows could not update the startup task' }
       if (this.state.supported && next.runAsAdministrator && !previous.runAsAdministrator) {
         checked = await read();
         if (!checked.administratorAccount && !checked.elevated)
-          throw Error(
-            'このWindowsユーザーは管理者ではありません。管理者ユーザーでAppDockを使用してください。',
-          );
+          throw Error(hostText('launch.errors.notAdministrator'));
       }
       const changed =
         next.startAtLogon !== previous.startAtLogon ||
@@ -299,15 +303,12 @@ if ($child.ExitCode -ne 0) { throw 'Windows could not update the startup task' }
           (this.state.registered !== next.startAtLogon ||
             (next.startAtLogon && this.state.taskElevated !== next.runAsAdministrator)));
       if (!changed) return commit();
-      if (!this.state.supported)
-        throw Error('起動設定はWindowsの発行版AppDockで変更してください。');
+      if (!this.state.supported) throw Error(hostText('launch.errors.packagedOnly'));
       const before = checked ?? (await read());
       const elevate =
         !before.elevated && ((next.startAtLogon && next.runAsAdministrator) || before.taskElevated);
       if (elevate && !before.administratorAccount)
-        throw Error(
-          'このWindowsユーザーは管理者ではありません。同じユーザーの管理者権限が必要です。',
-        );
+        throw Error(hostText('launch.errors.sameAdministrator'));
       const script = next.startAtLogon
         ? `${this.context()}
 $definition=$service.NewTask(0)
@@ -355,9 +356,7 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
         }
         if (error instanceof WindowsOperationCancelled) throw error;
         this.health?.failed();
-        throw Error(
-          `スタートアップの変更は完了しませんでした。UACをキャンセルした場合や権限がない場合、設定は保存されません。${String(error)}`,
-        );
+        throw Error(hostText('launch.errors.startupFailed', { error: String(error) }));
       }
       try {
         const after = await read();
@@ -370,7 +369,7 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
           (next.startAtLogon && after.taskElevated !== next.runAsAdministrator)
         ) {
           this.health?.failed();
-          throw Error('Windowsの登録結果が設定と一致しません。');
+          throw Error(hostText('launch.errors.registrationMismatch'));
         }
         preflight();
         const result = commit();
@@ -393,7 +392,10 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
           this.recoveryPending = !!this.recovery;
           this.health?.failed();
           throw Error(
-            `${String(error)} / Windowsの起動設定を元に戻せませんでした: ${String(rollback)}`,
+            hostText('launch.errors.rollbackFailed', {
+              error: String(error),
+              rollback: String(rollback),
+            }),
           );
         }
         throw error;
@@ -404,13 +406,10 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
     }
   }
   async restartElevated(args: string[], pid = process.pid) {
-    if (!this.state.supported) throw Error('管理者起動はWindowsの発行版AppDockで使用できます。');
+    if (!this.state.supported) throw Error(hostText('launch.errors.elevatedPackagedOnly'));
     const before = await this.read();
-    if (before.elevated) throw Error('AppDockはすでに管理者として起動しています。');
-    if (!before.administratorAccount)
-      throw Error(
-        'このWindowsユーザーは管理者ではありません。同じユーザーの管理者権限が必要です。',
-      );
+    if (before.elevated) throw Error(hostText('launch.errors.alreadyElevated'));
+    if (!before.administratorAccount) throw Error(hostText('launch.errors.sameAdministrator'));
     const pipeName = `appdock-elevation-${randomUUID()}`;
     let accept!: (value: boolean) => void;
     const ready = new Promise<boolean>((resolve) => {
@@ -453,10 +452,7 @@ $null=Start-Process -FilePath ${psString(powershell())} -Verb RunAs -WindowStyle
           timer = setTimeout(() => resolve(false), 15000);
         }),
       ]);
-      if (!acknowledged)
-        throw Error(
-          '管理者起動を確認できませんでした。同じWindowsユーザーでUACを承認してください。',
-        );
+      if (!acknowledged) throw Error(hostText('launch.errors.elevationUnconfirmed'));
     } finally {
       clearTimeout(timer);
       server.close();

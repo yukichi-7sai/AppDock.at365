@@ -1,3 +1,4 @@
+import { useHostTranslation } from '../HostTranslation';
 import type { ReactNode } from 'react';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
 import { SettingsStatusProvider, SettingsStatusArea } from '../settings-ui/SettingsStatus';
@@ -7,8 +8,6 @@ import { CommandListScrollProvider, CommandListScrollbar } from '../settings-ui/
 
 const descriptions: Record<string, string> = {
   applets: 'インストール済みAppletの状態・更新・表示順を管理します。',
-  appearance: 'テーマ・表示倍率・アクセントカラー・ヒントの表示と、各領域のShellを設定します。',
-  general: '音の再生や、起動時・ウィンドウを閉じたときの動作を設定します。',
   notifications: '通知の種類ごとに、表示先・表示時間・読み上げを設定します。',
   tts: 'OpenAI互換のTTSサーバーで生成した音声を、このPCで再生します。',
   ribbon:
@@ -56,24 +55,27 @@ export function SettingsPageLayout({
   children: ReactNode;
   announcement: ReactNode;
 }) {
+  const { t } = useHostTranslation();
   const modes: ('form' | 'json')[] = page.json ? ['form', 'json'] : ['form'];
   const description =
     page.kind === 'host'
-      ? descriptions[page.id]
+      ? page.id === 'appearance' || page.id === 'general'
+        ? t(`pages.${page.id}.description`)
+        : descriptions[page.id]
       : page.collection
-        ? '表示方法・アカウント・サイトの動作を設定します。'
-        : 'Appletの表示方法・起動時の動作と、個別の設定を変更します。';
+        ? t('settings.collectionDescription')
+        : t('settings.appletDescription');
   return (
     <SettingsStatusProvider key={page.id + mode} error={error} target={page.title} busy={pending}>
       <CommandListScrollProvider>
-        <section className="settings-page-layout" aria-label="設定本文">
+        <section className="settings-page-layout" aria-label={t('settings.body')}>
           <div className="settings-body settings-page-scroll">
             <header className="settings-page-heading">
               <h1>{page.title}</h1>
-              <p>{description ?? 'このページの設定を変更します。'}</p>
+              <p>{description ?? t('settings.defaultDescription')}</p>
             </header>
             <div className="settings-page-toolbar">
-              <div className="tabs" role="group" aria-label="設定の表示形式">
+              <div className="tabs" role="group" aria-label={t('settings.mode')}>
                 {modes.map((value) => (
                   <button
                     key={value}
@@ -82,7 +84,7 @@ export function SettingsPageLayout({
                     aria-pressed={value === mode}
                     onClick={() => onMode(value)}
                   >
-                    {value === 'form' ? 'フォーム' : 'JSON'}
+                    {value === 'form' ? t('settings.form') : t('settings.json')}
                   </button>
                 ))}
               </div>
@@ -94,39 +96,35 @@ export function SettingsPageLayout({
                     disabled={!storage.canSwitch || pending}
                     onChange={(event) => onLocalSettings?.(event.target.checked)}
                   />
-                  このPCで設定を保持する
+                  {t('settings.local.label')}
                   <SettingsHintIcon
-                    title="このPCで設定を保持する"
-                    hint={
-                      storage.local
-                        ? 'このPC専用の設定を使います。OFFにするときに、共有への反映・このPCの設定の削除・保持を選べます。'
-                        : '共有設定を使います。初めてONにすると現在の設定をコピーし、保存済みの端末設定があれば再開します。'
-                    }
+                    title={t('settings.local.label')}
+                    hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
                   />
                 </label>
               ) : null}
               <p className="settings-save-status" role="status">
                 {storage && page.json && (
                   <span className="settings-storage-status">
-                    設定JSON:{' '}
+                    {t('settings.storage.json')}{' '}
                     {storage.files.length > 1
-                      ? '共有＋このPC'
+                      ? t('settings.storage.both')
                       : storage.local
-                        ? 'このPC専用'
-                        : '共有'}
+                        ? t('settings.storage.deviceOnly')
+                        : t('settings.storage.shared')}
                     　
                   </span>
                 )}
-                <span className="sr-only">{pending ? '保存中…' : ''}</span>
+                <span className="sr-only">{pending ? t('settings.saving') : ''}</span>
               </p>
               {page.json && !page.unavailableReason && (
                 <button type="button" disabled={pending} onClick={onReset}>
-                  このページを既定値に戻す
+                  {t('settings.reset')}
                 </button>
               )}
               {page.json && storage && storage.files.length > 1 ? (
                 <details className="settings-file-menu">
-                  <summary>ファイルを開く</summary>
+                  <summary>{t('settings.openFile')}</summary>
                   <div>
                     {storage.files.map((file) => (
                       <button
@@ -137,7 +135,10 @@ export function SettingsPageLayout({
                           onOpenFile(file.scope);
                         }}
                       >
-                        {file.scope === 'device' ? 'このPC' : '共有'}: {file.name}
+                        {file.scope === 'device'
+                          ? t('settings.storage.device')
+                          : t('settings.storage.shared')}
+                        : {file.name}
                       </button>
                     ))}
                   </div>
@@ -149,7 +150,7 @@ export function SettingsPageLayout({
                     className="settings-file-button"
                     onClick={() => onOpenFile(storage?.files[0]?.scope)}
                   >
-                    ファイルを開く
+                    {t('settings.openFile')}
                   </button>
                 )
               )}
@@ -158,7 +159,7 @@ export function SettingsPageLayout({
               action={
                 error ? (
                   <button type="button" className="secondary" onClick={onReload}>
-                    設定を再読み込み
+                    {t('settings.reload')}
                   </button>
                 ) : undefined
               }

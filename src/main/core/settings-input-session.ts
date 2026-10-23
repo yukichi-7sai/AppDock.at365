@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import type { ExtensionSnapshot, Settings, SettingsSnapshot } from '../../shared/contracts';
 import type { SettingsEditRequest, SettingsInputState } from '../../shared/settings-editing';
@@ -63,7 +64,7 @@ export class SettingsInputSession {
   }
   page(id = this.state.pageId) {
     const page = this.catalog().find((p) => p.id === id);
-    if (!page) throw Error('設定対象が見つかりません。');
+    if (!page) throw Error(hostText('settings.inputError.missing'));
     return page;
   }
   projection(id = this.state.pageId) {
@@ -80,13 +81,13 @@ export class SettingsInputSession {
       !request.operationId ||
       request.operationId.length > 100
     )
-      throw Error('編集セッションが古くなっています。再取得してください。');
+      throw Error(hostText('settings.inputError.stale'));
     const existing = this.operations.get(request.operationId);
     if (existing) return existing;
     this.synchronize();
     if (request.editRevision !== this.state.editRevision)
-      throw Error('設定が別の画面で変わりました。再取得して入力し直してください。');
-    if (this.state.pending) throw Error('設定操作の完了を待ってください。');
+      throw Error(hostText('settings.inputError.conflict'));
+    if (this.state.pending) throw Error(hostText('settings.inputError.pending'));
     const result = this.perform(request.action);
     this.operations.set(request.operationId, result);
     while (this.operations.size > 512) this.operations.delete(this.operations.keys().next().value!);
@@ -117,7 +118,8 @@ export class SettingsInputSession {
         }
         break;
       case 'mode':
-        if (!['form', 'json'].includes(action.value)) throw Error('表示方法が不正です。');
+        if (!['form', 'json'].includes(action.value))
+          throw Error(hostText('settings.inputError.mode'));
         this.state.mode = action.value;
         break;
       case 'reload':
@@ -129,7 +131,7 @@ export class SettingsInputSession {
           action.storageScope !== this.options.scope?.(this.page()) ||
           !sameSetting(action.before, this.jsonProjection())
         )
-          throw Error('設定または保存先が変更されています。もう一度確認してください。');
+          throw Error(hostText('settings.inputError.confirmationChanged'));
         await this.save(
           applySettingsJson(this.value, this.page(), this.options.applets(), '{}'),
           true,
@@ -142,23 +144,23 @@ export class SettingsInputSession {
           action.storageScope !== undefined &&
           action.storageScope !== this.options.scope?.(this.page())
         )
-          throw Error('設定の保存先が変わりました。再読み込みして入力し直してください。');
+          throw Error(hostText('settings.inputError.storageChanged'));
         if (
           action.pageId !== this.state.pageId ||
           this.state.mode !== (action.type === 'partial-text' ? 'json' : 'form')
         )
-          throw Error('表示中の設定ページが変わりました。');
+          throw Error(hostText('settings.inputError.pageChanged'));
         let value: Record<string, unknown>;
         if (action.type === 'partial-text') {
           if (
             typeof action.value !== 'string' ||
             new TextEncoder().encode(action.value).length > 1024 * 1024
           )
-            throw Error('JSONは1MB以下にしてください。');
+            throw Error(hostText('settings.inputError.jsonSize'));
           try {
             value = JSON.parse(action.value);
           } catch {
-            throw Error('JSONの内容を修正してください。');
+            throw Error(hostText('settings.inputError.jsonSyntax'));
           }
         } else value = action.value;
         const projection = mergeSettingsInput(
@@ -180,7 +182,7 @@ export class SettingsInputSession {
         await this.save(mergeSettingsInput(action.before, action.value, this.value));
         break;
       default:
-        throw Error('設定操作が不正です。');
+        throw Error(hostText('settings.inputError.invalidOperation'));
     }
     this.notify();
     return this.snapshot();
