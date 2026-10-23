@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import { atomicWrite } from './settings';
@@ -56,7 +57,7 @@ function readText(file: string): string | null {
   try {
     const stat = fs.statSync(file);
     if (!stat.isFile() || stat.size > 1024 * 1024)
-      throw Error('アカウントグループの保存ファイルが不正です。');
+      throw Error(hostText('services.webAccountGroups.invalidFile'));
     return fs.readFileSync(file, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -73,7 +74,7 @@ function roster(text: string): Identity[] {
     raw.accounts.some((a: unknown) => !identity(a)) ||
     new Set(raw.accounts.map((a: Identity) => a.id)).size !== raw.accounts.length
   )
-    throw Error('アカウントグループの名簿が不正です。元のファイルを保持しています。');
+    throw Error(hostText('services.webAccountGroups.invalidRoster'));
   return raw.accounts.map((a: Identity) => ({
     id: a.id,
     name: a.name,
@@ -114,7 +115,7 @@ export class WebAccountGroup {
     readonly localRoot: string,
     private validateSound: (sound: unknown) => WebAccountSound,
   ) {
-    if (!groupId(id)) throw Error('アカウントグループIDが不正です。');
+    if (!groupId(id)) throw Error(hostText('services.webAccountGroups.invalidGroup'));
     this.file = path.join(sharedRoot, 'web-account-groups', id, 'accounts.json');
     this.localFile = path.join(localRoot, 'web-account-groups', id, 'state.json');
     const localText = readText(this.localFile);
@@ -130,13 +131,13 @@ export class WebAccountGroup {
         (p.before !== null && typeof p.before !== 'string') ||
         typeof p.after !== 'string'
       )
-        throw Error('アカウントグループの復旧記録が不正です。');
+        throw Error(hostText('services.webAccountGroups.invalidRecovery'));
       roster(p.after);
       if (p.before !== null) roster(p.before);
       const next = this.validateLocal(p.state);
       const current = readText(this.file);
       if (current !== p.before && current !== p.after)
-        throw Error('アカウント移行中に共有名簿が変更されました。保存データを確認してください。');
+        throw Error(hostText('services.webAccountGroups.rosterChanged'));
       if (current !== p.after)
         atomicWrite(this.file, p.after, {
           previous: current === null ? undefined : Buffer.from(current),
@@ -161,7 +162,7 @@ export class WebAccountGroup {
       !object(raw.legacySessions) ||
       (raw.rosterKnown !== undefined && typeof raw.rosterKnown !== 'boolean')
     )
-      throw Error('アカウントグループのPC専用設定が不正です。');
+      throw Error(hostText('services.webAccountGroups.invalidDevice'));
     for (const [owner, m] of Object.entries(raw.members)) {
       if (
         !ownerId(owner) ||
@@ -172,7 +173,7 @@ export class WebAccountGroup {
         m.preferences.length > 10 ||
         new Set(m.preferences.map((p: any) => p?.id)).size !== m.preferences.length
       )
-        throw Error('アカウントグループのApplet設定が不正です。');
+        throw Error(hostText('services.webAccountGroups.invalidApplet'));
       for (const p of m.preferences) {
         if (
           !object(p) ||
@@ -180,12 +181,13 @@ export class WebAccountGroup {
           Object.keys(p).some((key) => !['id', 'monitoring', 'sound'].includes(key)) ||
           (p.monitoring !== undefined && typeof p.monitoring !== 'boolean')
         )
-          throw Error('アカウント設定が不正です。');
+          throw Error(hostText('services.webAccountGroups.invalidAccount'));
         if (p.sound !== undefined) this.validateSound(p.sound);
       }
     }
     for (const [id, owner] of Object.entries(raw.legacySessions))
-      if (!accountId(id) || !ownerId(owner)) throw Error('アカウントのログイン保存先が不正です。');
+      if (!accountId(id) || !ownerId(owner))
+        throw Error(hostText('services.webAccountGroups.invalidSession'));
     return {
       version: 1,
       rosterKnown: raw.rosterKnown === true,
@@ -194,12 +196,11 @@ export class WebAccountGroup {
     };
   }
   private unchanged() {
-    if (this.broken)
-      throw Error('アカウント設定の保存が中断しました。AppDockを再起動して復旧してください。');
+    if (this.broken) throw Error(hostText('services.webAccountGroups.interrupted'));
     if (this.text === null && this.local.rosterKnown)
-      throw Error('共通アカウント一覧の同期を待っています。名簿が届いてから操作してください。');
+      throw Error(hostText('services.webAccountGroups.syncPending'));
     if (readText(this.file) !== this.text)
-      throw Error('アカウント一覧が別の場所で変更されました。同期を待ってから操作してください。');
+      throw Error(hostText('services.webAccountGroups.externallyChanged'));
   }
   private commit(accounts: Identity[], local: LocalState) {
     this.unchanged();
@@ -248,14 +249,15 @@ export class WebAccountGroup {
     }
   }
   connect(owner: string, legacy?: AccountState) {
-    if (!ownerId(owner) || this.busy) throw Error('アカウントグループに接続できません。');
+    if (!ownerId(owner) || this.busy)
+      throw Error(hostText('services.webAccountGroups.connectionFailed'));
     this.unchanged();
     const bindingFile = path.join(this.localRoot, 'web-accounts', owner, 'group-binding.json');
     const bindingText = readText(bindingFile);
     if (bindingText !== null) {
       const binding = JSON.parse(bindingText);
       if (binding?.version !== 1 || binding.groupId !== this.id)
-        throw Error('既存アカウントのグループ変更には移行が必要です。');
+        throw Error(hostText('services.webAccountGroups.migrationRequired'));
     }
     if (bindingText === null)
       atomicWrite(bindingFile, JSON.stringify({ version: 1, groupId: this.id }));
@@ -264,14 +266,14 @@ export class WebAccountGroup {
     let accounts = [...this.accounts];
     if (legacy) {
       for (const a of legacy.accounts) {
-        if (!identity(a)) throw Error('移行元のアカウントが不正です。');
+        if (!identity(a)) throw Error(hostText('services.webAccountGroups.invalidSource'));
         if (!accounts.some((p) => p.id === a.id)) accounts.push(identityOf(a));
         const bound = local.legacySessions[a.id];
-        if (bound && bound !== owner) throw Error('同じUUIDのログイン保存先が競合しています。');
+        if (bound && bound !== owner)
+          throw Error(hostText('services.webAccountGroups.sessionConflict'));
         local.legacySessions[a.id] = owner;
       }
-      if (accounts.length > 10)
-        throw Error('共有後のアカウントが10件を超えます。元の一覧を保持しています。');
+      if (accounts.length > 10) throw Error(hostText('services.webAccountGroups.accountLimit'));
       local.members[owner] = memberOf(legacy);
     } else local.members[owner] = { selected: '', preferences: [] };
     if (legacy) this.commit(accounts, local);
@@ -282,7 +284,7 @@ export class WebAccountGroup {
   }
   snapshot(owner: string): AccountState {
     const member = this.hasMember(owner) ? this.local.members[owner] : undefined;
-    if (!member) throw Error('このAppletはグループに接続していません。');
+    if (!member) throw Error(hostText('services.webAccountGroups.notConnected'));
     return {
       version: 1,
       selected: this.accounts.some((a) => a.id === member.selected)
@@ -295,9 +297,9 @@ export class WebAccountGroup {
     };
   }
   update(owner: string, next: AccountState) {
-    if (this.busy) throw Error('アカウント削除の完了を待ってください。');
+    if (this.busy) throw Error(hostText('services.webAccountGroups.deletionPending'));
     this.unchanged();
-    if (!this.hasMember(owner)) throw Error('このAppletはグループに接続していません。');
+    if (!this.hasMember(owner)) throw Error(hostText('services.webAccountGroups.notConnected'));
     const accounts = next.accounts.map(identityOf);
     roster(rosterText(accounts));
     const local = structuredClone(this.local);
@@ -306,17 +308,17 @@ export class WebAccountGroup {
     else this.commit(accounts, local);
   }
   sessionPath(id: string) {
-    if (!accountId(id)) throw Error('アカウントIDが不正です。');
+    if (!accountId(id)) throw Error(hostText('services.webAccountGroups.invalidId'));
     const owner = this.local.legacySessions[id];
     return owner
       ? path.join(this.localRoot, 'web-accounts', owner, 'sessions', id)
       : path.join(this.localRoot, 'web-account-groups', this.id, 'sessions', id);
   }
   async remove(id: string, clear: () => Promise<void>) {
-    if (this.busy) throw Error('アカウント削除の完了を待ってください。');
+    if (this.busy) throw Error(hostText('services.webAccountGroups.deletionPending'));
     this.unchanged();
     if (this.accounts.length < 2 || !this.accounts.some((a) => a.id === id))
-      throw Error('最後のアカウント、または変更されたアカウントは削除できません。');
+      throw Error(hostText('services.webAccountGroups.cannotDelete'));
     this.busy = true;
     this.removingId = id;
     try {
@@ -344,7 +346,7 @@ export class WebAccountGroup {
       this.observer = observeFile(
         this.file,
         (text) => {
-          if (this.busy || this.broken) throw Error('アカウント変更処理中です。');
+          if (this.busy || this.broken) throw Error(hostText('services.webAccountGroups.busy'));
           if (text === this.text) return;
           const accounts = roster(text);
           const local = this.reconcile({ ...this.local, rosterKnown: true }, accounts);

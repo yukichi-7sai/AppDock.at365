@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
@@ -18,7 +19,7 @@ export class NativeInput {
     invocation: InputInvocation = {},
   ) {
     if (this.stopped || invocation.signal?.aborted)
-      throw new AutomationError('CANCELLED', '入力操作は取り消されました。');
+      throw new AutomationError('CANCELLED', hostText('services.nativeInput.cancelled'));
     if (!this.peer) {
       const child = spawn(this.executable, [], {
         windowsHide: true,
@@ -63,10 +64,7 @@ export class NativeInput {
     } catch (e) {
       cancel();
       if (e instanceof AutomationError) throw e;
-      throw new AutomationError(
-        'INPUT_FAILED',
-        '入力処理との接続に失敗しました。結果を確認してから再実行してください。',
-      );
+      throw new AutomationError('INPUT_FAILED', hostText('services.nativeInput.connectionFailed'));
     } finally {
       invocation.signal?.removeEventListener('abort', cancel);
       this.active.delete(id);

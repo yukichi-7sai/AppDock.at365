@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { atomicWrite } from './settings';
 import { validGroupId } from '../../shared/applet-pages';
@@ -23,7 +24,7 @@ export class RibbonState {
           ([id, open]) => !validGroupId(id) || typeof open !== 'boolean',
         )
       )
-        throw Error('リボンの開閉状態を読み込めません。保存先を確認してください。');
+        throw Error(hostText('services.ribbonState.readFailed'));
       this.expanded = value.expanded;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') failed(error);
@@ -34,7 +35,7 @@ export class RibbonState {
   }
   set(id: string, open: boolean) {
     if (!validGroupId(id) || (this.groupIds && !this.groupIds().includes(id)))
-      throw Error('グループIDが不正です。');
+      throw Error(hostText('services.ribbonState.invalidId'));
     if (this.isExpanded(id) === open) return false;
     const next = {
       ...Object.fromEntries(
@@ -48,7 +49,7 @@ export class RibbonState {
       atomicWrite(this.file, JSON.stringify({ schemaVersion: 1, expanded: next }, null, 2) + '\n');
     } catch (error) {
       this.failed(error);
-      throw Error('リボンの開閉状態を保存できません。保存先を確認してください。');
+      throw Error(hostText('services.ribbonState.saveFailed'));
     }
     this.expanded = next;
     this.changed();

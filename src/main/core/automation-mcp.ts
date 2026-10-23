@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { operationsFor } from '../../shared/appdock-api';
 import http, { type IncomingMessage } from 'node:http';
 import { timingSafeEqual, randomUUID } from 'node:crypto';
@@ -180,7 +181,7 @@ export class AutomationMcp {
           if (!current() || !validHeaders())
             throw new AutomationError(
               'NOT_READY',
-              '接続設定が変更されました。接続を確認してください。',
+              hostText('services.automationMcp.settingsChanged'),
             );
           const latestToken = Buffer.from(`Bearer ${this.token()}`);
           if (
@@ -189,9 +190,13 @@ export class AutomationMcp {
           )
             throw new AutomationError(
               'NOT_READY',
-              '認証情報が変更されました。接続を確認してください。',
+              hostText('services.automationMcp.credentialsChanged'),
             );
-          if (index < 0) throw new AutomationError('NOT_FOUND', '対応していないツールです。');
+          if (index < 0)
+            throw new AutomationError(
+              'NOT_FOUND',
+              hostText('services.automationMcp.unsupportedTool'),
+            );
           const value = await this.api.call(methods[index], request.params.arguments ?? {});
           this.audit(
             'info',
@@ -217,7 +222,10 @@ export class AutomationMcp {
         } catch (error) {
           const value = {
             code: error instanceof AutomationError ? error.code : 'INTERNAL_ERROR',
-            message: error instanceof AutomationError ? error.message : '処理に失敗しました。',
+            message:
+              error instanceof AutomationError
+                ? error.message
+                : hostText('services.automationMcp.failed'),
           };
           this.audit(
             'warn',

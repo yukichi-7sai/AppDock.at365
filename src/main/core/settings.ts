@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
@@ -52,7 +53,7 @@ function atomicWrite(
       {
         const current = readPrevious();
         if (!sameBytes(previous, current))
-          throw new SettingsConflictError('保存先が別の場所で変更されました。再取得してください。');
+          throw new SettingsConflictError(hostText('services.settings.pathChanged'));
       }
       try {
         fs.renameSync(tmp, file);
@@ -188,7 +189,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
                 name === 'last-good.json' || /^(settings-.*\.json|invalid-.*\.txt)$/.test(name),
             )
         )
-          throw Error('設定ファイルがありません。');
+          throw Error(hostText('services.settings.missing'));
         try {
           atomicWrite(this.file, this.serialize(this.value), {
             previous: undefined,
@@ -269,23 +270,21 @@ class SettingsStore<T = Settings> extends EventEmitter {
       this.accept(disk);
     }
     if (revision !== this.revision)
-      throw new SettingsConflictError(
-        '設定が別の場所で変更されました。再読み込みしてから保存してください。',
-      );
+      throw new SettingsConflictError(hostText('services.settings.changedBeforeSave'));
   }
   save(value: unknown, revision: number, asset?: { commit(): void; rollback(): void }) {
-    if (this.writesBlocked) throw Error('設定を復元中です。完了後に保存してください。');
+    if (this.writesBlocked) throw Error(hostText('services.settings.restoring'));
     this.assertRevision(revision);
     const parsed = this.codec ? this.codec.parse(value) : (validate(value) as T);
     const serialized = this.serialize(parsed);
     const next = this.parse(serialized);
     if (Buffer.byteLength(serialized, 'utf8') > 4 * 1024 * 1024)
-      throw Error('設定ファイルは4MB以下にしてください。');
+      throw Error(hostText('services.settings.sizeLimit'));
     this.tryBackup(this.value);
     const previous = this.readBytes(this.file);
     if (JSON.stringify(this.parse(previous)) !== JSON.stringify(this.value)) {
       this.accept(this.parse(previous));
-      throw new SettingsConflictError('設定が別の場所で変更されました。再読み込みしてください。');
+      throw new SettingsConflictError(hostText('services.settings.changed'));
     }
     try {
       asset?.commit();
@@ -296,7 +295,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
         asset?.rollback();
       } catch (rollbackError) {
         this.health.set('save', 'save-failed');
-        throw new Error('設定の関連データを復元できませんでした。保存先を確認してください。');
+        throw new Error(hostText('services.settings.dataRestoreFailed'));
       }
       throw error;
     }
@@ -329,7 +328,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
   }
   restoreBackup(revision: number) {
     if (!this.recovered || revision !== this.revision)
-      throw Error('復元する設定を再確認してください。');
+      throw Error(hostText('services.settings.confirmRestore'));
     return this.restoreRecovery(this.prepareRecovery());
   }
   /** Read only: unlike load(), this never creates a missing shared file. */
@@ -352,7 +351,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
     }
     if (incoming) {
       this.accept(incoming);
-      throw new SettingsConflictError('正常な設定が届いたため、復元を中止しました。');
+      throw new SettingsConflictError(hostText('services.settings.recoveryCancelled'));
     }
     try {
       fs.lstatSync(this.file);
@@ -363,7 +362,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
     return this.readBytes(this.file);
   }
   prepareRecovery(file = this.backupCandidate()?.file): SettingsRecoveryPlan {
-    if (!file) throw Error('正常なバックアップがありません。');
+    if (!file) throw Error(hostText('services.settings.noBackup'));
     const bytes = this.readBytes(file);
     this.parse(bytes);
     return {
@@ -377,15 +376,15 @@ class SettingsStore<T = Settings> extends EventEmitter {
   restoreRecovery(plan: SettingsRecoveryPlan) {
     const previous = this.recoveryTarget();
     if (this.revision !== plan.revision || !sameBytes(previous, plan.previous))
-      throw new SettingsConflictError('復元中に設定が変わりました。もう一度確認してください。');
+      throw new SettingsConflictError(hostText('services.settings.changedDuringRestore'));
     const bytes = this.readBytes(plan.candidate);
     const serialized = this.serialize(this.parse(bytes));
     const next = this.parse(serialized);
     if (hashBytes(bytes) !== plan.candidateHash)
-      throw new SettingsConflictError('復元元が変わりました。もう一度確認してください。');
+      throw new SettingsConflictError(hostText('services.settings.sourceChanged'));
     try {
       if (previous !== undefined) {
-        if (!this.backupDirectory) throw Error('退避先がありません。');
+        if (!this.backupDirectory) throw Error(hostText('services.settings.noBackupDestination'));
         atomicWrite(
           path.join(this.backupDirectory, `invalid-${Date.now()}-${randomUUID()}.txt`),
           previous,
@@ -393,7 +392,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
       }
     } catch {
       this.health.set('backup', 'backup-failed');
-      throw Error('破損ファイルを退避できないため復元を中止しました。保存先を確認してください。');
+      throw Error(hostText('services.settings.backupFailed'));
     }
     try {
       atomicWrite(this.file, serialized, { previous });

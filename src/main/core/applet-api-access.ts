@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { InputInvocation } from './command-contexts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +19,7 @@ function permissions(value: unknown): AppletApiPermissions {
       ([k, v]) => !Object.hasOwn(appletApiPermissionLabels, k) || typeof v !== 'boolean',
     )
   )
-    throw Error('Appletの操作許可が不正です。');
+    throw Error(hostText('services.appletApiAccess.invalidPermissions'));
   return { ...value };
 }
 export class AppletApiAccess {
@@ -53,7 +54,7 @@ export class AppletApiAccess {
       if (saved.version !== 2) throw Error();
       this.grants = permissions(saved.permissions);
     } catch {
-      this.error = 'Applet操作の許可設定を読み取れません。applet-api.jsonを確認してください。';
+      this.error = hostText('services.appletApiAccess.readFailed');
     }
   }
   get(applet?: { capabilities?: string[] }): AppletApiPermissions {
@@ -89,11 +90,14 @@ export async function callAppletApi(
       Object.keys(request).some((k) => !['method', 'params', 'executionId'].includes(k)) ||
       method === 'unknown'
     )
-      throw new AutomationError('INVALID_ARGUMENT', '対応するmethodとparamsを指定してください。');
+      throw new AutomationError('INVALID_ARGUMENT', hostText('services.appletApiAccess.arguments'));
     if (!applet.manifest.capabilities?.includes('appdock-api'))
-      throw new AutomationError('CAPABILITY_REQUIRED', 'manifestにappdock-apiが必要です。');
+      throw new AutomationError(
+        'CAPABILITY_REQUIRED',
+        hostText('services.appletApiAccess.capability'),
+      );
     if (!['starting', 'running'].includes(applet.state))
-      throw new AutomationError('UNAVAILABLE', 'Appletは停止しています。');
+      throw new AutomationError('UNAVAILABLE', hostText('services.appletApiAccess.stopped'));
     audit('info', applet.manifest.id, `${context} result=started`);
     const value = await api.call(
       method,
@@ -111,7 +115,7 @@ export async function callAppletApi(
     const result =
       error instanceof AutomationError
         ? { code: error.code, message: error.message }
-        : { code: 'INTERNAL_ERROR', message: '処理に失敗しました。' };
+        : { code: 'INTERNAL_ERROR', message: hostText('services.appletApiAccess.failed') };
     audit(
       'warn',
       applet.manifest.id,

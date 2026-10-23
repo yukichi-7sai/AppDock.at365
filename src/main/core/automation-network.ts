@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import os from 'node:os';
 import { isIPv4 } from 'node:net';
 import type { IncomingMessage } from 'node:http';
@@ -19,12 +20,10 @@ function hostname(value: string): string | undefined {
 
 export function networkHostnames(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > 16)
-    throw Error('接続先ホスト名は16件以内で指定してください。');
+    throw Error(hostText('services.automationNetwork.hostnameLimit'));
   const names = value.map((entry) => (typeof entry === 'string' ? hostname(entry) : undefined));
   if (names.some((name) => !name))
-    throw Error(
-      '接続先ホスト名にはDNS名だけを指定してください。URL・ポート・IP・ワイルドカードは使えません。',
-    );
+    throw Error(hostText('services.automationNetwork.hostnameFormat'));
   return [...new Set(names as string[])];
 }
 

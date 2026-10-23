@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID, createHash } from 'node:crypto';
 import { defaultNavigation, isPageRoute } from '../../shared/navigation';
 import { visibleRibbonItems, type RibbonItem } from '../../shared/applet-pages';
@@ -173,8 +174,8 @@ export class UiPresentation {
               disabledReason:
                 provider?.commands?.find((c) => c.id === action.command)?.disabledReason ??
                 (available
-                  ? 'この接続からは実行できません。'
-                  : 'コマンドが未登録・停止中、または現在利用できません。'),
+                  ? hostText('services.uiPresentation.connectionForbidden')
+                  : hostText('services.uiPresentation.commandUnavailable')),
             }
           : {}),
         ...(item.kind === 'separator' ? {} : { actionId }),
@@ -245,7 +246,10 @@ export class UiPresentation {
           expanded,
           selected: children.some((c) => c.selected),
           badge: children.some((c) => c.badge)
-            ? ribbonBadgeView({ kind: 'dot', label: 'グループ内に新しい情報があります' })
+            ? ribbonBadgeView({
+                kind: 'dot',
+                label: hostText('services.uiPresentation.groupAttention'),
+              })
             : undefined,
           childCount: children.filter((c) => c.kind !== 'separator').length,
           children: persistentOpen ? children : [],
@@ -267,7 +271,11 @@ export class UiPresentation {
         ? {
             contextActionEnabled: contextEnabled,
             ...(!contextEnabled
-              ? { contextDisabledReason: '右クリックのコマンドは現在利用できません。' }
+              ? {
+                  contextDisabledReason: hostText(
+                    'services.uiPresentation.contextCommandUnavailable',
+                  ),
+                }
               : {}),
           }
         : {}),
@@ -353,7 +361,7 @@ export class UiPresentation {
       if (JSON.stringify(this.actions.get(request.actionId)) !== JSON.stringify(action))
         throw Error('Action target changed');
       if (request.actionId === current.contextActionId && current.contextActionEnabled === false)
-        throw Error('右クリックのコマンドは現在利用できません。');
+        throw Error(hostText('services.uiPresentation.contextCommandUnavailable'));
       const candidates = local?.groupId
         ? (this.children.get(local.groupId) ?? [])
         : current.items.flatMap((item) => [item, ...(item.children ?? [])]);
@@ -364,15 +372,16 @@ export class UiPresentation {
         throw Error('Action is no longer available');
       if (action.group && !execute) {
         const group = this.group(action.group);
-        if (!group) throw Error('グループは現在利用できません。');
+        if (!group) throw Error(hostText('services.uiPresentation.groupUnavailable'));
         if (group.group.expansion === 'temporary') {
-          if (!local?.openGroup) throw Error('一時グループはローカルのリボンから開いてください。');
+          if (!local?.openGroup) throw Error(hostText('services.uiPresentation.localRibbonOnly'));
           local.openGroup(action.group, request.anchor);
         } else this.toggleGroup(action.group);
         return { accepted: true };
       }
       if (action.command) {
-        if (this.runningCommands.has(action.command)) throw Error('コマンドは実行中です。');
+        if (this.runningCommands.has(action.command))
+          throw Error(hostText('services.uiPresentation.commandBusy'));
         this.runningCommands.add(action.command);
         try {
           return await (execute ? execute(action) : this.options.execute(action.command));
@@ -402,7 +411,7 @@ export class UiPresentation {
   toggleGroup(id: string) {
     const group = this.group(id);
     if (!group || group.group.expansion !== 'persistent' || !this.options.toggleGroup)
-      throw Error('持続的グループは現在利用できません。');
+      throw Error(hostText('services.uiPresentation.persistentGroupUnavailable'));
     this.options.toggleGroup(id);
   }
   disconnect(scope: string) {

@@ -1,3 +1,4 @@
+import { hostText } from '../shared/i18n';
 import type { OwnShellState } from '../shared/shell';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAppDockClient, type AppDockClient } from '../shared/appdock-api';
@@ -193,7 +194,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
               input.base64.length > 700000 ||
               Buffer.from(input.base64, 'base64').length > 512 * 1024
             )
-              return Promise.reject(Error('画像は512KiB以下で指定してください。'));
+              return Promise.reject(Error(hostText('services.nodeWorker.imageSizeLimit')));
             return peer.request('host.registeredImages.import', input) as Promise<
               import('../shared/registered-images').RegisteredImageRef
             >;
@@ -378,7 +379,8 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       return null;
     }
     case 'page.action':
-      if (!extension?.onPageAction) throw Error('ページ操作は提供されていません。');
+      if (!extension?.onPageAction)
+        throw Error(hostText('services.nodeWorker.pageActionUnsupported'));
       return extension.onPageAction(p.id, p.input, p.pageId);
     case 'panel.action':
       if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');

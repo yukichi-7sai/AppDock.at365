@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash } from 'node:crypto';
 import type { HostPageAction } from '../../shared/host-pages';
 import type {
@@ -72,7 +73,8 @@ export class NotificationCenterController implements HostPageController {
             type?.ownerTitle ??
             this.options.applets().find((a) => a.id === item.ownerId)?.displayName ??
             (item.source.startsWith('host.') ? 'AppDock' : (item.ownerId ?? item.source)),
-          typeTitle: type?.title ?? item.typeId ?? '種類不明',
+          typeTitle:
+            type?.title ?? item.typeId ?? hostText('services.notificationCenter.unknownType'),
         };
       })
       .sort(
@@ -159,7 +161,7 @@ export class NotificationCenterController implements HostPageController {
         typeof f.unread !== 'boolean' ||
         !['all', 'resolved', 'dismissed', 'expired', 'withdrawn', 'interrupted'].includes(f.status)
       )
-        throw Error('通知の検索条件が不正です。');
+        throw Error(hostText('services.notificationCenter.invalidFilter'));
       this.filters = { ...f };
       this.offset = 0;
       this.options.changed();
@@ -186,7 +188,7 @@ export class NotificationCenterController implements HostPageController {
         offset % 50 !== 0 ||
         this.filters.tab !== 'history'
       )
-        throw Error('一覧が更新されました。再読み込みしてください。');
+        throw Error(hostText('services.notificationCenter.changed'));
       this.offset = offset;
       this.options.changed();
       return;
@@ -197,7 +199,7 @@ export class NotificationCenterController implements HostPageController {
         this.filters.tab !== 'active' ||
         !query.eligible.some((i) => i.id === a.request?.notificationId)
       )
-        throw Error('表示中のアクティブ通知だけを操作できます。');
+        throw Error(hostText('services.notificationCenter.activeOnly'));
       return this.options.service.invoke(a.request);
     }
     if (a.type !== 'read' && a.type !== 'delete') throw Error('Unknown center action');
@@ -215,16 +217,16 @@ export class NotificationCenterController implements HostPageController {
           new Set(a.ids).size !== a.ids.length)) ||
       (a.ids === undefined && a.scope === undefined)
     )
-      throw Error('一覧が更新されました。対象を確認してください。');
+      throw Error(hostText('services.notificationCenter.targetChanged'));
     if (a.type === 'delete' && this.filters.tab !== 'history')
-      throw Error('終了履歴だけを削除できます。');
+      throw Error(hostText('services.notificationCenter.endedOnly'));
     const eligible =
       a.scope === 'all' ? query.rows.filter((i) => i.status !== 'active') : query.eligible;
     const ids = a.ids ?? eligible.map((i) => i.id);
     if (ids.some((id) => !eligible.some((i) => i.id === id)))
-      throw Error('表示対象にない通知です。');
+      throw Error(hostText('services.notificationCenter.notDisplayed'));
     if (!ids.length) return;
-    if (this.writing) throw Error('通知履歴の処理中です。');
+    if (this.writing) throw Error(hostText('services.notificationCenter.busy'));
     this.writing = true;
     try {
       // Capture IDs before the dialog: notifications arriving during confirmation are preserved.

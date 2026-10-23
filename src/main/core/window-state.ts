@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import type { BrowserWindow, Rectangle } from 'electron';
 import { atomicWrite } from './settings';
@@ -39,7 +40,7 @@ export function parseWindowState(value: unknown): WindowState {
     bounds.height <= 0 ||
     typeof state?.maximized !== 'boolean'
   )
-    throw new Error('ウィンドウ状態が不正です。');
+    throw new Error(hostText('services.windowState.invalidState'));
   return {
     bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
     maximized: state.maximized,

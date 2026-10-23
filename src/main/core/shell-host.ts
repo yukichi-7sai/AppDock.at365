@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import { WebContentsView, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron';
 import { randomUUID } from 'node:crypto';
@@ -139,7 +140,7 @@ export class ShellHost {
             (anchor.y + anchor.height) * zoom > bounds.height + 1 ||
             !options.openGroup
           )
-            throw Error('グループボタンの位置を取得できません。');
+            throw Error(hostText('services.shellHost.groupPosition'));
           const hostZoom = options.window.webContents.getZoomFactor();
           options.openGroup(id, {
             x: (bounds.x + anchor.x * zoom) / hostZoom,
@@ -191,7 +192,13 @@ export class ShellHost {
     };
   }
   focus(edge: 'first' | 'last') {
-    if (!['first', 'last'].includes(edge) || !this.active || !this.bounds || this.active.modal?.blocked) return;
+    if (
+      !['first', 'last'].includes(edge) ||
+      !this.active ||
+      !this.bounds ||
+      this.active.modal?.blocked
+    )
+      return;
     this.active.view.webContents.focus();
     this.active.view.webContents.send('shell:focus', edge);
   }
@@ -327,7 +334,7 @@ export class ShellHost {
       fs.mkdirSync(path.dirname(this.options.failureFile), { recursive: true });
       fs.writeFileSync(this.options.failureFile, JSON.stringify(this.failedVersions));
     } catch {
-      this.error = 'Shellの復旧状態を保存できません。ログと保存先を確認してください。';
+      this.error = hostText('services.shellHost.recoverySaveFailed');
     }
   }
   private recordFailure(id: string, version: string, message: string) {

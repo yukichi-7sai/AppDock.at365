@@ -339,12 +339,12 @@ let notificationSession: NotificationSession | undefined;
 const settingsInputFlushes = new Map<string, () => void>();
 async function flushSettingsInputs() {
   if (!window || window.isDestroyed() || window.webContents.isLoading())
-    throw Error('設定画面の準備中です。');
+    throw Error(hostText('services.index.settingsNotReady'));
   const id = randomUUID();
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       settingsInputFlushes.delete(id);
-      reject(Error('設定入力の反映を確認できませんでした。もう一度お試しください。'));
+      reject(Error(hostText('services.index.inputApplyFailed')));
     }, 3000);
     settingsInputFlushes.set(id, () => {
       clearTimeout(timer);
@@ -385,7 +385,7 @@ const presentation = new UiPresentation({
   expanded: (id) => ribbonState?.isExpanded(id) ?? false,
   temporaryExpanded: (id) => overlayHost?.kind === 'ribbon-group' && overlayHost.sourceId === id,
   toggleGroup: (id) => {
-    if (!ribbonState) throw Error('リボンは準備中です。');
+    if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
     ribbonState.set(id, !ribbonState.isExpanded(id));
   },
   badge: (id) => ribbonBadges.get(id),
@@ -497,7 +497,7 @@ async function setShortcutOwnership(keys: string[]) {
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
       ownershipAcks.delete(generation);
-      reject(Error('入力所有情報を画面へ適用できませんでした。'));
+      reject(Error(hostText('services.index.inputOwnershipFailed')));
     }, 2000);
     ownershipAcks.set(generation, {
       sender: contents.id,
@@ -518,9 +518,9 @@ async function setShortcutCapture(request: { token: string; active: boolean; all
     typeof request.active !== 'boolean' ||
     typeof request.allowWin !== 'boolean'
   )
-    throw Error('キー記録の状態が不正です。');
+    throw Error(hostText('services.index.invalidRecording'));
   if (request.active && (!shortcutRecording || !window?.isFocused()))
-    throw Error('記録欄を最前面にしてください。');
+    throw Error(hostText('services.index.foregroundRecording'));
   await gestures?.record(
     request,
     window?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
@@ -568,12 +568,13 @@ const sendInput =
     id: string | undefined,
     context: import('./core/command-contexts').InputInvocation,
   ) => {
-    if (!id || !nativeInput) throw Error('入力機能は準備中です。');
+    if (!id || !nativeInput) throw Error(hostText('services.index.inputNotReady'));
     return nativeInput.send(method, params, id, context);
   };
 const ttsSecrets = new TtsSecrets(path.join(dataDirectory, 'tts-key.json'), {
   encrypt: (value) => {
-    if (!safeStorage.isEncryptionAvailable()) throw Error('APIキーの暗号化が利用できません。');
+    if (!safeStorage.isEncryptionAvailable())
+      throw Error(hostText('services.index.keyEncryptionUnavailable'));
     return safeStorage.encryptString(value).toString('base64');
   },
   decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
@@ -626,7 +627,7 @@ const tts = new TtsService({
 const aiSecrets = new AiSecrets(path.join(dataDirectory, 'ai-keys.json'), {
   encrypt: (value) => {
     if (!safeStorage.isEncryptionAvailable())
-      throw Error('Windowsの認証情報保護を利用できません。');
+      throw Error(hostText('services.index.credentialProtectionUnavailable'));
     return safeStorage.encryptString(value).toString('base64');
   },
   decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
@@ -694,16 +695,17 @@ const ai = new AiService({
     errors.report({
       eventId: id,
       source: owner.startsWith('applet:') ? owner.split(':')[1] : 'host',
-      title: 'AI文章生成に失敗しました',
+      title: hostText('services.index.aiFailed'),
       code: error.code,
-      message:
-        error.message +
-        '\n実行元: ' +
-        (owner === 'host'
-          ? '試験画面'
-          : owner.startsWith('applet:')
-            ? 'Applet (' + owner.split(':')[1] + ')'
-            : 'MCP'),
+      message: hostText('services.index.aiErrorSource', {
+        message: error.message,
+        source:
+          owner === 'host'
+            ? hostText('services.index.aiTestSource')
+            : owner.startsWith('applet:')
+              ? 'Applet (' + owner.split(':')[1] + ')'
+              : 'MCP',
+      }),
     }),
 });
 const aiPreviewJobs = new Set<string>();
@@ -719,10 +721,9 @@ function mcpChanged() {
     (mcpConfigurationWarning ??= warnings.episode()).update({
       eventId: 'mcp-configuration',
       source: 'mcp-client',
-      title: 'MCP接続先を確認してください',
+      title: hostText('services.index.mcpWarningTitle'),
       code: 'MCP_CONFIGURATION_REQUIRED',
-      message:
-        'このPCで利用できないMCP接続先があります。設定の「MCP接続先」で状態と認証情報を確認してください。',
+      message: hostText('services.index.mcpWarningBody'),
     });
   else {
     mcpConfigurationWarning?.resolve();
@@ -734,7 +735,7 @@ function mcpConnectionWarning(warning: { code: string; message: string }) {
   (mcpConfigurationWarning ??= warnings.episode()).update({
     eventId: 'mcp-configuration',
     source: 'mcp-client',
-    title: 'MCP接続を確認できませんでした',
+    title: hostText('services.index.mcpCheckFailed'),
     code: warning.code,
     message: warning.message,
   });
@@ -773,7 +774,7 @@ const mcpSettings = new McpClientSettings(
   {
     encrypt: (v) => {
       if (!safeStorage.isEncryptionAvailable())
-        throw Error('Windowsの認証情報保護を利用できません。');
+        throw Error(hostText('services.index.credentialProtectionUnavailable'));
       return safeStorage.encryptString(v).toString('base64');
     },
     decrypt: (v) => safeStorage.decryptString(Buffer.from(v, 'base64')),
@@ -818,7 +819,7 @@ const mcpClient = new McpClientService({
     errors.report({
       eventId: id,
       source: 'mcp-client',
-      title: 'MCPツールの処理を完了できませんでした',
+      title: hostText('services.index.mcpToolFailed'),
       ...error,
     }),
   audit: (job) =>
@@ -911,10 +912,9 @@ const customCommands = new CustomCommandService({
     (customCommandWarning ??= warnings.episode()).update({
       eventId: 'custom-commands-unavailable',
       source: 'custom-commands',
-      title: 'カスタムコマンドを確認してください',
+      title: hostText('services.index.customCommandWarningTitle'),
       code: 'CUSTOM_COMMAND_UNAVAILABLE',
-      message:
-        '利用できない種類または設定があります。カスタムコマンド設定で提供元と設定形式を確認してください。',
+      message: hostText('services.index.customCommandWarningBody'),
       logDetails: ids,
     });
   },
@@ -923,9 +923,9 @@ const customCommands = new CustomCommandService({
     errors.report({
       eventId: randomUUID(),
       source: 'commands',
-      title: 'コマンドを完了できませんでした',
+      title: hostText('services.index.commandFailed'),
       code,
-      message: '操作先の状態を確認してから再実行してください。',
+      message: hostText('services.index.commandFailedHint'),
     });
   },
 });
@@ -934,7 +934,7 @@ const validateProcessConfig = (config: Record<string, unknown>) => {
     processLaunchSpec(config, processAppDirectory);
     return null;
   } catch {
-    return '実行ファイル・引数・コマンドの長さ・実行方法を確認してください。';
+    return hostText('services.index.processArguments');
   }
 };
 const validateInputConfig = (config: Record<string, unknown>) => {
@@ -942,7 +942,7 @@ const validateInputConfig = (config: Record<string, unknown>) => {
     normalizeInputKeys(config.keys);
     return null;
   } catch {
-    return '送信キーを確認してください。例: Ctrl+Shift+T、Enter、Win+E';
+    return hostText('services.index.inputKeys');
   }
 };
 customCommands.registerHost(
@@ -968,8 +968,9 @@ customCommands.registerHost(
   inputCommandType,
   async (config, context) => {
     if (!customExecutionAllowed('sendInput', context))
-      throw new CustomCommandError('API_DISABLED', 'キー送信を許可してください。');
-    if (!nativeInput) throw new CustomCommandError('NOT_READY', '入力機能は準備中です。');
+      throw new CustomCommandError('API_DISABLED', hostText('services.index.inputPermission'));
+    if (!nativeInput)
+      throw new CustomCommandError('NOT_READY', hostText('services.index.inputNotReady'));
     try {
       return await nativeInput.send(
         'input.sendKeys',
@@ -1031,12 +1032,12 @@ function mcpSettingsOperation<T>(operation: () => T): T {
     const message =
       error instanceof McpSettingsError
         ? error.message
-        : 'MCP接続設定の入力形式と認証情報を確認してください。';
+        : hostText('services.index.mcpSettingsHint');
     if (code === 'SAVE_FAILED')
       errors.report({
         eventId: randomUUID(),
         source: 'mcp-client',
-        title: 'MCP接続設定を保存できませんでした',
+        title: hostText('services.index.mcpSettingsSaveFailed'),
         code,
         message,
       });
@@ -1051,7 +1052,7 @@ const operationApi = new AppDockApi({
       try {
         assertSettingsWritable();
       } catch {
-        throw new AutomationError('BUSY', '設定の復元・再起動が完了してから操作してください。');
+        throw new AutomationError('BUSY', hostText('services.index.settingsRestoring'));
       }
       return mcpSettingsOperation(() => mcpSettings.update(p));
     },
@@ -1096,7 +1097,10 @@ const operationApi = new AppDockApi({
         id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp',
         async (action) => {
           if (!externalUiPermissions(id).execute)
-            throw new AutomationError('API_DISABLED', '操作が許可されていません。');
+            throw new AutomationError(
+              'API_DISABLED',
+              hostText('services.index.operationForbidden'),
+            );
           if (action.group) {
             presentation.toggleGroup(action.group);
             return { accepted: true };
@@ -1104,7 +1108,8 @@ const operationApi = new AppDockApi({
           if (action.command)
             return operationApi.call('commands.execute', { id: action.command }, id, context);
           if (action.theme) {
-            if (!externalUiPermissions(id).write) throw Error('設定変更が許可されていません。');
+            if (!externalUiPermissions(id).write)
+              throw Error(hostText('services.index.settingsForbidden'));
             return toggleTheme();
           }
           navigation.navigate(action.route!, action.section);
@@ -1155,11 +1160,11 @@ const operationApi = new AppDockApi({
   touchpadBridge: {
     snapshot: () => touchpad?.snapshot(),
     connect: (ids) => {
-      if (!touchpad) throw Error('入力を準備中です。');
+      if (!touchpad) throw Error(hostText('services.index.preparingInput'));
       return touchpad.connect(ids);
     },
     afterLocalEdit: (before) => {
-      if (!touchpad) throw Error('入力を準備中です。');
+      if (!touchpad) throw Error(hostText('services.index.preparingInput'));
       return touchpad.afterLocalEdit(before);
     },
   },
@@ -1276,7 +1281,7 @@ function trayMenu() {
       }
     tray.setImage(nativeImage.createFromBitmap(pixels, { width: 20, height: 20 }));
   } else tray.setImage(icon);
-  tray.setToolTip(attention ? 'AppDock.at365 — 新しい通知があります' : 'AppDock.at365');
+  tray.setToolTip(attention ? hostText('services.index.trayAttention') : 'AppDock.at365');
   const applets = allApplets();
   const entries = resolveTrayMenu(
     getTrayMenu(settings.value, applets),
@@ -1302,16 +1307,18 @@ function trayMenu() {
   const menu = Menu.buildFromTemplate([
     ...template(entries),
     ...(entries.length ? [{ type: 'separator' as const }] : []),
-    { label: '設定…', click: () => runTrayCommand('appdock.settings.open') },
-    { label: '終了', click: () => runTrayCommand('appdock.quit') },
+    {
+      label: hostText('services.index.traySettings'),
+      click: () => runTrayCommand('appdock.settings.open'),
+    },
+    { label: hostText('services.index.quit'), click: () => runTrayCommand('appdock.quit') },
   ]);
   menu.on('menu-will-show', () => trayClicks?.cancel());
   tray.setContextMenu(menu);
 }
 function quitHost(restart = false) {
   if (quitting) return;
-  if (restart && settingsOperationBusy())
-    throw Error('設定の保存・復元が完了してから再起動してください。');
+  if (restart && settingsOperationBusy()) throw Error(hostText('services.index.restartDuringSave'));
   if (restart) {
     const portableExecutable = app.isPackaged && process.env.PORTABLE_EXECUTABLE_FILE;
     if (portableExecutable) {
@@ -1408,7 +1415,7 @@ function ribbonUiCommands() {
   }));
 }
 function openCommandPalette(request: CommandPaletteRequest) {
-  if (!startupReady || quitting || !overlayHost) throw Error('AppDockは準備中です。');
+  if (!startupReady || quitting || !overlayHost) throw Error(hostText('services.index.notReady'));
   const session = new CommandPaletteSession(request, {
     commands: uiCommands,
     pins: () => settings.value.pinnedCommands,
@@ -1454,7 +1461,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
   }
   const update = updateCommands.find((command) => command.id === id);
   if (update) {
-    if (!startupReady || !updater) throw Error('AppDockは準備中です。');
+    if (!startupReady || !updater) throw Error(hostText('services.index.notReady'));
     return update.scope === 'check' ? updater.check() : updater.install(update.scope);
   }
   if (customCommands.has(id)) return customCommands.execute(id, invocation);
@@ -1735,8 +1742,7 @@ const settingsRecoveryUi: SettingsRecoveryUi = {
   },
 };
 async function restoreSettingsBackup(scope?: 'shared' | 'device') {
-  if (settingsOperationBusy() || quitting)
-    throw Error('設定を処理中です。完了後に操作してください。');
+  if (settingsOperationBusy() || quitting) throw Error(hostText('services.index.settingsBusy'));
   settingsRecoveryBusy = true;
   settings.writesBlocked = true;
   settingsHealthNotifications?.refresh();
@@ -1748,7 +1754,7 @@ async function restoreSettingsBackup(scope?: 'shared' | 'device') {
   } catch (error) {
     if (error instanceof SettingsConflictError) throw error;
     settings.health.set('save', 'save-failed');
-    throw Error('設定を復元できませんでした。元のファイルは保持しています。');
+    throw Error(hostText('services.index.restoreFailed'));
   } finally {
     settings.writesBlocked = false;
     settingsRecoveryBusy = false;
@@ -1775,7 +1781,7 @@ function commitSettings(value: Settings, revision: number, resetPage?: SettingsP
       errors.report({
         eventId: randomUUID(),
         source: 'touchpad',
-        title: '接続用キーの重複で設定を保存できませんでした',
+        title: hostText('services.index.duplicateConnectionKey'),
         code: error.code,
         message: error.message,
       });
@@ -2677,7 +2683,7 @@ function registerIpc() {
     if (id === undefined)
       return { version: app.getVersion(), repository: 'yukichi-7sai/AppDock.at365' };
     if (typeof id !== 'string' || !manager.items.has(id))
-      throw new Error('Appletが見つかりません。');
+      throw new Error(hostText('services.index.appletMissing'));
     const manifest = manager.items.get(id)!.manifest;
     return { version: manifest.version, repository: manifest.updateRepository };
   };
@@ -2689,7 +2695,7 @@ function registerIpc() {
         event.senderFrame !== window.webContents.mainFrame ||
         event.senderFrame?.url !== hostDocumentUrl
       )
-        throw new Error('許可されていない画面からの要求です。');
+        throw new Error(hostText('services.index.unauthorizedSurface'));
       try {
         return await callback(...args);
       } catch (error) {
@@ -2721,9 +2727,9 @@ function registerIpc() {
       errors.report({
         eventId: randomUUID(),
         source: 'image-library',
-        title: '画像サイズを保存できませんでした',
+        title: hostText('services.index.imageSizeTitle'),
         code: 'IMAGE_LIBRARY_SAVE',
-        message: '画像選択の表示サイズを保存できませんでした。保存先を確認してください。',
+        message: hostText('services.index.imageSizeBody'),
       });
       throw error;
     }
@@ -2731,14 +2737,14 @@ function registerIpc() {
   handle('dock:imageLibrary:galleryImage', async (ref, generation, edge) => {
     const entry = registeredImages.entry(ref);
     if (!entry?.available || !entry.generation || generation !== entry.generation)
-      throw Error('画像が更新されました。再取得してください。');
+      throw Error(hostText('services.index.imageChanged'));
     const source = await galleryImages.get(entry.ref, generation, edge);
     if (registeredImages.entry(ref)?.generation !== generation)
-      throw Error('画像が更新されました。再取得してください。');
+      throw Error(hostText('services.index.imageChanged'));
     return source;
   });
   handle('dock:imageLibrary:preview', async (ref, original = false) => {
-    if (!imageReference(ref)) throw Error('画像の参照を確認してください。');
+    if (!imageReference(ref)) throw Error(hostText('services.index.imageReference'));
     if (original === true) {
       const saved = await registeredImages.read(ref);
       const extension = path.extname(saved.ref.file).slice(1).toLowerCase();
@@ -2778,7 +2784,7 @@ function registerIpc() {
   handle('dock:pages:close', (id) => hostPages?.close(id));
   handle('dock:retryShell', () => retryShell());
   handle('dock:appletApiPermissions', (permissions: unknown) => {
-    if (!startupReady || quitting) throw Error('AppDockは準備中です。');
+    if (!startupReady || quitting) throw Error(hostText('services.index.notReady'));
     appletApiAccess.set(permissions);
     customCommands.reconcile();
     ai.reconcile();
@@ -2788,7 +2794,7 @@ function registerIpc() {
     changed();
   });
   handle('dock:automation', async (action: AutomationAction) => {
-    if (!automation || quitting) throw Error('連携機能の準備中です。');
+    if (!automation || quitting) throw Error(hostText('services.index.automationNotReady'));
     const reply = await automation.action(action);
     ai.reconcile();
     tts.reconcile();
@@ -2814,7 +2820,7 @@ function registerIpc() {
     const page = [...(extension?.manifest.pages ?? []), ...(extension?.dynamicPages ?? [])].find(
       (page) => page.id === pageId,
     );
-    if (!page) throw Error('Appletページがありません。');
+    if (!page) throw Error(hostText('services.index.appletPageMissing'));
     await executeCommand(page.openCommand);
   });
   handle('dock:pageViewport', updatePageViewport);
@@ -2830,12 +2836,12 @@ function registerIpc() {
   ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
   ipcMain.handle('applet-page:call', (event, operation: unknown, input: unknown) => {
     const source = localPageSource(event);
-    if (!source.call) throw Error('このページは操作APIに対応していません。');
+    if (!source.call) throw Error(hostText('services.index.pageApiUnsupported'));
     return source.call(operation, input);
   });
   handle('dock:chooseDirectory', async () => {
     const result = await dialog.showOpenDialog(window!, {
-      title: '画像ソースフォルダーを選ぶ',
+      title: hostText('services.index.imageSourceTitle'),
       properties: ['openDirectory'],
     });
     return result.canceled ? null : (result.filePaths[0] ?? null);
@@ -2852,7 +2858,7 @@ function registerIpc() {
       typeof target !== 'string' ||
       (target !== 'all' && target !== 'host' && target !== 'applets' && !manager.items.has(target))
     )
-      throw Error('更新対象が正しくありません。');
+      throw Error(hostText('services.index.invalidUpdateTarget'));
     return target === 'all' || target === 'host'
       ? executeCommand(
           target === 'all' ? 'appdock.updates.installAll' : 'appdock.updates.installHost',
@@ -2866,12 +2872,12 @@ function registerIpc() {
       !result?.releaseUrl ||
       !/^https:\/\/github\.com\/[A-Za-z0-9-]+\/[A-Za-z0-9._-]+\/releases$/.test(result.releaseUrl)
     )
-      throw new Error('GitHubの更新元を確認してから開いてください。');
+      throw new Error(hostText('services.index.invalidGithubSource'));
     return shell.openExternal(result.releaseUrl);
   });
   handle('dock:startExtensionNow', (id: string) => {
     if (manager.items.get(id)?.state !== 'waiting')
-      throw new Error('開始待ちのAppletが見つかりません。');
+      throw new Error(hostText('services.index.delayedAppletMissing'));
     return manager.restart(id, true);
   });
   handle('dock:dispatchShortcut', async (key: unknown) => {
@@ -2891,7 +2897,7 @@ function registerIpc() {
     return hostModalLayer?.ready(revision, rendered) ?? false;
   });
   handle('dock:setShortcutRecording', async (recording: boolean) => {
-    if (typeof recording !== 'boolean') throw new Error('キー入力状態が正しくありません。');
+    if (typeof recording !== 'boolean') throw new Error(hostText('services.index.invalidKeyState'));
     shortcutRecording = recording && !!window?.isFocused();
     if (!recording) {
       shortcutCaptured = undefined;
@@ -2907,13 +2913,13 @@ function registerIpc() {
     return state;
   });
   handle('dock:restartAsAdministrator', async () => {
-    if (settingsOperationBusy()) throw Error('設定の処理が完了してから再起動してください。');
+    if (settingsOperationBusy()) throw Error(hostText('services.index.restartWhileBusy'));
     await launch.restartElevated([...launch.args, '--restore-view', '--appdock-elevation-attempt']);
     quitHost();
   });
   handle('dock:restoreSettingsBackup', async (revision: number) => {
     if (revision !== settings.revision)
-      throw new SettingsConflictError('設定が変わりました。もう一度確認してください。');
+      throw new SettingsConflictError(hostText('services.index.settingsChanged'));
     return restoreSettingsBackup();
   });
   handle('dock:saveSettings', async (value: Settings, revision: number) => {
@@ -2930,12 +2936,12 @@ function registerIpc() {
     settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision),
   );
   handle('dock:toggleExtension', async (id: string, enabled: boolean) => {
-    if (typeof enabled !== 'boolean') throw Error('有効状態が不正です。');
+    if (typeof enabled !== 'boolean') throw Error(hostText('services.index.invalidEnabled'));
     await appletManagement.run(id, enabled ? 'enable' : 'disable');
   });
   handle('dock:restartExtension', async (id: string) => {
     await appletManagement.run(id, 'restart');
-    information.report('applets', 'Applet', 'Appletを再起動しました。');
+    information.report('applets', 'Applet', hostText('services.index.appletRestarted'));
   });
   handle('dock:executeCommand', (id: string) => executeCommand(id));
   handle('dock:executePanelAction', (id: string, actionId: string) =>
@@ -2949,7 +2955,7 @@ function registerIpc() {
         logs: log.directory,
       } as Record<string, string>
     )[kind];
-    if (!target) throw new Error('保存先が見つかりません。');
+    if (!target) throw new Error(hostText('services.index.directoryMissing'));
     const error = await shell.openPath(target);
     if (error) throw new Error(error);
   });
@@ -2972,7 +2978,7 @@ function applyWindowAction(action: string) {
       quitHost();
       break;
     default:
-      throw new Error('未対応のウィンドウ操作です。');
+      throw new Error(hostText('services.index.unsupportedWindowAction'));
   }
 }
 async function initialize() {
@@ -2989,9 +2995,9 @@ async function initialize() {
       errors.report({
         eventId: randomUUID(),
         source: 'ribbon',
-        title: 'リボンの開閉状態を保存・読込できません',
+        title: hostText('services.index.ribbonStateTitle'),
         code: 'RIBBON_STATE_IO',
-        message: 'PC専用の保存先の空き容量とアクセス権を確認してください。',
+        message: hostText('services.index.storageHint'),
       });
     },
     () => (settings.value.ribbon.groups ?? []).map((group) => group.id),
@@ -3004,8 +3010,11 @@ async function initialize() {
       execFileSync(helperPath, ['--recover', baseDirectory, dataDirectory], { windowsHide: true });
     } catch (error) {
       dialog.showErrorBox(
-        'AppDock — 更新の復元が必要です',
-        `中断された更新を復元できませんでした。\n${String(error)}\n${dataDirectory} の更新記録と一時フォルダーを保持しています。`,
+        hostText('services.index.updateRecoveryTitle'),
+        hostText('services.index.updateRecoveryBody', {
+          error: String(String(error)),
+          directory: String(dataDirectory),
+        }),
       );
       app.quit();
       return;
@@ -3058,8 +3067,8 @@ async function initialize() {
             eventId: randomUUID(),
             source: id,
             code: 'APPLET_PAGE_ACTION',
-            title: 'ページの操作に失敗しました',
-            message: 'ページの表示とAppletのログを確認してから、必要な操作をやり直してください。',
+            title: hostText('services.index.pageActionTitle'),
+            message: hostText('services.index.pageActionBody'),
           }),
       },
       imageLibraryHost,
@@ -3131,31 +3140,31 @@ async function initialize() {
         errors.report({
           eventId: notice.id,
           source: 'updates',
-          title: '更新処理に失敗しました',
+          title: hostText('services.index.updateFailed'),
           code: 'UPDATE_OPERATION_FAILED',
           message,
         });
       } else if (notice.kind === 'available') {
         typedNotifications!.publish({ ownerKind: 'host', ownerId: 'updates' }, 'available', {
           level: 'info',
-          title: '更新のお知らせ',
+          title: hostText('services.index.updateNotice'),
           body: message,
-          historyText: { title: '更新があります', body: message },
+          historyText: { title: hostText('services.index.updateAvailable'), body: message },
           windowsSilent: true,
           windowsClickAction: 'details',
           actions: [
             {
               key: 'details',
-              label: '更新画面を開く',
+              label: hostText('services.index.openUpdates'),
               run: () => executeCommand('appdock.updates.open'),
             },
           ],
         });
       } else {
-        information.report('updates', '更新のお知らせ', message, notice.id, [
+        information.report('updates', hostText('services.index.updateNotice'), message, notice.id, [
           {
             key: 'details',
-            label: '更新画面を開く',
+            label: hostText('services.index.openUpdates'),
             run: () => executeCommand('appdock.updates.open'),
           },
         ]);
@@ -3164,10 +3173,10 @@ async function initialize() {
     confirm: async (names) => {
       const response = await dialog.showMessageBox(window!, {
         type: 'question',
-        title: '更新して再起動',
-        message: 'AppDockとすべてのAppletを終了し、更新して再起動します。',
+        title: hostText('services.index.updateRestartTitle'),
+        message: hostText('services.index.updateRestartMessage'),
         detail: names.join('\n'),
-        buttons: ['更新して再起動', 'キャンセル'],
+        buttons: [hostText('services.index.updateRestartTitle'), hostText('services.index.cancel')],
         defaultId: 0,
         cancelId: 1,
         noLink: true,
@@ -3200,7 +3209,8 @@ async function initialize() {
     failed: (error) => log.write('error', 'web-profiles', error.message),
     openLocal: async (page) => {
       const parent = manager.items.get(page.binding.owner);
-      if (!parent || parent.state !== 'running') throw Error('ページの提供元が停止しています。');
+      if (!parent || parent.state !== 'running')
+        throw Error(hostText('services.index.pageProviderStopped'));
       return openLocalPage(
         {
           appletId: page.id,
@@ -3236,7 +3246,7 @@ async function initialize() {
               parent.state !== 'running' ||
               !parent.commands.some((command) => command.id === id)
             )
-              throw Error('自身のコマンドだけを実行できます。');
+              throw Error(hostText('services.index.ownCommandOnly'));
             return executeCommand(id);
           },
           changed: (callback) => {
@@ -3329,7 +3339,7 @@ async function initialize() {
       errors.report({
         eventId: randomUUID(),
         source: 'touchpad',
-        title: 'タッチパッドの接続に失敗しました',
+        title: hostText('services.index.touchpadFailed'),
         code: 'TOUCHPAD_APPLY_FAILED',
         message: error.message,
       });
@@ -3457,7 +3467,11 @@ async function initialize() {
   session.defaultSession.setPermissionCheckHandler(() => false);
   Menu.setApplicationMenu(null);
   windowState = new WindowStateStore(path.join(dataDirectory, 'window-state.json'), (error) =>
-    log.write('error', 'window', `ウィンドウ状態の読み込み・保存に失敗しました: ${String(error)}`),
+    log.write(
+      'error',
+      'window',
+      hostText('services.index.windowStateFailed', { error: String(String(error)) }),
+    ),
   );
   const primary = screen.getPrimaryDisplay();
   const displays = [
@@ -3523,7 +3537,7 @@ async function initialize() {
       log.write(
         'error',
         'notifications',
-        '通知の表示・読み上げ可否を確認できません。通知センターから確認できます。',
+        hostText('services.index.notificationAvailabilityFailed'),
       ),
   });
   notificationSession = new NotificationSession({
@@ -3568,7 +3582,7 @@ async function initialize() {
     published: (event) => automation?.publishEvent(event),
     presented: (event) => notificationSpeech?.publish(event),
     publicationFailed: () =>
-      log.write('error', 'notifications', '通知の読み上げ受付に失敗しました。'),
+      log.write('error', 'notifications', hostText('services.index.notificationSpeechFailed')),
     policyChanged: (id) => {
       const peer = manager.items.get(id)?.peer;
       if (peer && !peer.closed)
@@ -3579,11 +3593,7 @@ async function initialize() {
     ready: () => startupReady && !quitting,
     openCenter: () => executeCommand('appdock.notifications.open'),
     failed: () =>
-      log.write(
-        'error',
-        'notifications',
-        'Windows通知の表示または操作を完了できません。通知センターから確認できます。',
-      ),
+      log.write('error', 'notifications', hostText('services.index.windowsNotificationFailed')),
   });
   notificationBanner = new NotificationSurfaceHost({
     window,
@@ -3602,7 +3612,11 @@ async function initialize() {
     failed: (message, unavailable) => {
       log.write('error', 'notifications', message);
       if (unavailable)
-        void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
+        void dialog.showMessageBox(window!, {
+          type: 'error',
+          message,
+          buttons: [hostText('common.ok')],
+        });
     },
   });
   notificationDesktop = new NotificationDesktopHost({
@@ -3689,7 +3703,11 @@ async function initialize() {
             type: 'error',
             title: 'Default Shell',
             message,
-            buttons: ['再試行', 'ログを開く', '終了'],
+            buttons: [
+              hostText('services.index.retry'),
+              hostText('services.index.openLogs'),
+              hostText('services.index.quit'),
+            ],
             defaultId: 0,
           })
           .then((result) => {
@@ -3715,9 +3733,9 @@ async function initialize() {
           errors.report({
             eventId: randomUUID(),
             source: 'ribbon',
-            title: 'リボンの操作を完了できません',
+            title: hostText('services.index.ribbonOperationTitle'),
             code: 'RIBBON_ACTION_FAILED',
-            message: 'ボタンの登録元とログを確認し、もう一度操作してください。',
+            message: hostText('services.index.ribbonOperationBody'),
           });
         }),
       ),
@@ -3738,9 +3756,13 @@ async function initialize() {
         .showMessageBox(window!, {
           type: 'error',
           title: 'Default Shell',
-          message: 'リボンを起動できません。',
+          message: hostText('services.index.ribbonStartFailed'),
           detail: message,
-          buttons: ['再試行', 'ログを開く', '終了'],
+          buttons: [
+            hostText('services.index.retry'),
+            hostText('services.index.openLogs'),
+            hostText('services.index.quit'),
+          ],
           defaultId: 0,
         })
         .then(async (result) => {
@@ -3793,7 +3815,11 @@ async function initialize() {
     failed: (message) => {
       log.write('error', 'overlay', message);
       if (!overlayHost?.active)
-        void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
+        void dialog.showMessageBox(window!, {
+          type: 'error',
+          message,
+          buttons: [hostText('common.ok')],
+        });
     },
   });
   settingsPageHost = new SettingsPageHost({
@@ -3850,7 +3876,7 @@ async function initialize() {
     errors.report({
       eventId: randomUUID(),
       source: 'image-library',
-      title: '画像ライブラリーの操作を完了できませんでした',
+      title: hostText('services.index.imageOperationTitle'),
       code: 'IMAGE_LIBRARY_SAVE',
       message,
     });
@@ -3862,15 +3888,12 @@ async function initialize() {
     edit: (operation, request) => {
       if (operation.kind === 'delete-image') {
         if (!request.entry || request.deleteBlocked)
-          throw Error('削除する画像を確認してください。');
+          throw Error(hostText('services.index.invalidDeletion'));
         return imageLibraryHost.remove(request.entry);
       }
       return imageLibraryHost.edit(operation);
     },
-    failed: () =>
-      galleryFailed(
-        '画像ライブラリーの操作を完了できませんでした。画面の表示と保存先を確認してください。',
-      ),
+    failed: () => galleryFailed(hostText('services.index.imageOperationBody')),
   });
   imageLibraryDialogs = galleryDialogs;
   window.webContents.on('did-start-loading', () => galleryDialogs.cancel());
@@ -3908,9 +3931,9 @@ async function initialize() {
                 (
                   await dialog.showMessageBox(window!, {
                     type: 'warning',
-                    message: '通知履歴を' + count + '件削除しますか？',
-                    detail: '終了した通知の履歴だけを削除します。',
-                    buttons: ['キャンセル', '削除'],
+                    message: hostText('services.index.historyDeleteConfirmation', { count }),
+                    detail: hostText('services.index.historyDeleteDetails'),
+                    buttons: [hostText('services.index.cancel'), hostText('services.index.delete')],
                     defaultId: 0,
                     cancelId: 0,
                   })
@@ -4025,7 +4048,10 @@ async function initialize() {
         log.write(
           'warn',
           'tray',
-          `${String(error)} 既定のダブルクリック判定時間${DEFAULT_DOUBLE_CLICK_TIME_MS}msで待機します。`,
+          hostText('services.index.trayIntervalFallback', {
+            error: String(String(error)),
+            milliseconds: String(DEFAULT_DOUBLE_CLICK_TIME_MS),
+          }),
         );
         return DEFAULT_DOUBLE_CLICK_TIME_MS;
       }),
@@ -4065,15 +4091,11 @@ async function initialize() {
     issues: () => settings.health.all(),
     restartRequired: settingsRestartRequired,
     failed: () =>
-      log.write(
-        'error',
-        'notifications',
-        '設定の通知を表示できませんでした。一般設定で状態を確認してください。',
-      ),
+      log.write('error', 'notifications', hostText('services.index.settingsNotificationFailed')),
     actions: (error) => [
       {
         key: 'restart',
-        label: '再起動',
+        label: hostText('services.index.restart'),
         primary: true,
         disabled: settingsOperationBusy() || quitting,
         run: async () => {
@@ -4084,7 +4106,7 @@ async function initialize() {
         ? [
             {
               key: 'restore',
-              label: 'バックアップで復元',
+              label: hostText('services.index.restoreBackup'),
               disabled: settingsOperationBusy() || quitting,
               run: async () => {
                 await restoreSettingsBackup();
@@ -4092,7 +4114,11 @@ async function initialize() {
             },
           ]
         : []),
-      { key: 'open', label: '保存先を開く', run: settingsRecoveryUi.openDirectory },
+      {
+        key: 'open',
+        label: hostText('services.index.openDirectory'),
+        run: settingsRecoveryUi.openDirectory,
+      },
     ],
   });
   settingsHealthNotifications.refresh();
@@ -4103,7 +4129,7 @@ async function initialize() {
     actions: [
       {
         key: 'details',
-        label: '詳細を見る',
+        label: hostText('services.index.viewDetails'),
         primary: true,
         run: async () => {
           showWindow();
@@ -4130,7 +4156,7 @@ async function initialize() {
       ),
     encrypt: (value) => {
       if (!safeStorage.isEncryptionAvailable())
-        throw Error('Windowsの認証情報保護を利用できません。');
+        throw Error(hostText('services.index.credentialProtectionUnavailable'));
       return safeStorage.encryptString(value).toString('base64');
     },
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64')),
@@ -4150,12 +4176,13 @@ async function initialize() {
     },
     audit: (level, message) => log.write(level, 'automation', message),
     writeClipboard: (value) => clipboard.writeText(value),
-    informed: (message) => information.report('automation', 'Codex連携', message),
+    informed: (message) =>
+      information.report('automation', hostText('services.index.codexIntegration'), message),
     failed: (code, message) =>
       errors.report({
         eventId: randomUUID(),
         source: 'automation',
-        title: 'MCP連携の処理に失敗しました',
+        title: hostText('services.index.automationFailed'),
         code,
         message,
       }),
@@ -4163,7 +4190,7 @@ async function initialize() {
   });
   await automation.initialize();
   changed();
-  log.write('info', 'host', 'AppDockを起動しました。');
+  log.write('info', 'host', hostText('services.index.started'));
   const updateResultFile = path.join(dataDirectory, 'update-result.json');
   if (fs.existsSync(updateResultFile)) {
     try {
@@ -4183,9 +4210,9 @@ async function initialize() {
         errors.report({
           eventId: randomUUID(),
           source: 'updates',
-          title: '更新適用に失敗しました',
+          title: hostText('services.index.updateApplyTitle'),
           code: 'UPDATE_APPLY_FAILED',
-          message: '更新の適用を完了できませんでした。更新画面とログで結果を確認してください。',
+          message: hostText('services.index.updateApplyBody'),
         });
       }
       log.write(result.ok ? 'info' : 'error', 'updates', String(result.message));
@@ -4207,7 +4234,7 @@ async function initialize() {
                 log.write(
                   'warn',
                   'updates',
-                  `更新用一時ファイルを削除できませんでした: ${String(error)}`,
+                  hostText('services.index.updateCleanupFailed', { error: String(String(error)) }),
                 ),
               );
         }, 5000);
@@ -4218,22 +4245,29 @@ async function initialize() {
   }
   startupUpdateTimer = updater.scheduleStartup(smoke, (results) => {
     if (!results.length || quitting) return;
-    log.write('info', 'updates', `${results.length}件の更新があります。`);
+    log.write(
+      'info',
+      'updates',
+      hostText('services.index.availableCount', { count: String(results.length) }),
+    );
     try {
       typedNotifications!.publish({ ownerKind: 'host', ownerId: 'updates' }, 'available', {
         level: 'info',
-        title: 'AppDock — 更新があります',
+        title: hostText('services.index.updateAvailableTitle'),
         body: results
           .map((result) => `${result.name}: ${result.latestVersion}`)
           .join('\n')
           .slice(0, 2000),
-        historyText: { title: '更新があります', body: '利用可能な更新があります。' },
+        historyText: {
+          title: hostText('services.index.updateAvailable'),
+          body: hostText('services.index.updateAvailableBody'),
+        },
         windowsSilent: true,
         windowsClickAction: 'details',
         actions: [
           {
             key: 'details',
-            label: '更新画面を開く',
+            label: hostText('services.index.openUpdates'),
             run: () => executeCommand('appdock.updates.open'),
           },
         ],
@@ -4429,7 +4463,7 @@ app.on('before-quit', (event) => {
       try {
         await stop();
       } catch {
-        log.write('error', 'host', '終了処理の一部に失敗しました。');
+        log.write('error', 'host', hostText('services.index.shutdownFailed'));
       }
     }
   })().finally(() => {
@@ -4473,8 +4507,7 @@ else
         } catch {
           launch.state = {
             ...launch.state,
-            error:
-              '管理者起動がキャンセルされたか、許可されませんでした。現在は通常権限で動作しています。',
+            error: hostText('services.index.elevationCancelled'),
           };
         }
       }

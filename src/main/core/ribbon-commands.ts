@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { Settings, SettingsSnapshot, ExtensionSnapshot } from '../../shared/contracts';
 import { ribbonItems, orderRibbon } from '../../shared/applet-pages';
 import type { SettingsStore } from './settings';
@@ -21,7 +22,10 @@ const object = (v: unknown): v is Record<string, unknown> =>
 const exact = (v: unknown, keys: string[]): v is Record<string, unknown> =>
   object(v) && Object.keys(v).every((k) => keys.includes(k));
 const invalid = () =>
-  new SettingsCommandError('INVALID_ARGUMENT', 'リボンの操作・ID・配置・順序を確認してください。');
+  new SettingsCommandError(
+    'INVALID_ARGUMENT',
+    hostText('services.ribbonCommands.invalidArguments'),
+  );
 const idSchema = {
   type: 'string',
   minLength: 1,
@@ -84,7 +88,7 @@ export class RibbonCommands {
     return [
       {
         id: commandId,
-        title: 'リボン設定を変更',
+        title: hostText('services.ribbonCommands.title'),
         appletId: null,
         available: true,
         unavailableReason: null,
@@ -350,7 +354,7 @@ export class RibbonCommands {
       } catch {
         throw new SettingsCommandError(
           'SAVE_FAILED',
-          'リボンを保存できませんでした。設定を再取得して確認してください。',
+          hostText('services.ribbonCommands.saveFailed'),
         );
       }
     }
@@ -361,7 +365,7 @@ export class RibbonCommands {
       revision: this.options.settingsCommands.revision(),
       warning: store.syncError ?? null,
       applies: 'ribbonChanged',
-      message: 'リボン設定を反映します。Appletの有効状態や起動状態は変更しません。',
+      message: hostText('services.ribbonCommands.savedEffect'),
     };
   }
 }

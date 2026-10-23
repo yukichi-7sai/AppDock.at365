@@ -1,13 +1,14 @@
+import { hostText } from './i18n';
 // Stable SemVer only: prereleases never masquerade as stable updates.
 export function parseVersion(value: unknown): number[] {
   if (
     typeof value !== 'string' ||
     !/^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\+[0-9A-Za-z.-]+)?$/.test(value)
   )
-    throw new Error('バージョンは major.minor.patch の正式版で指定してください。');
+    throw new Error(hostText('services.sharedVersions.invalidVersion'));
   const parts = value.replace(/^v/, '').split('+')[0].split('.').map(Number);
   if (parts.some((part) => !Number.isSafeInteger(part)))
-    throw new Error('バージョンの数値が大きすぎます。');
+    throw new Error(hostText('services.sharedVersions.versionLimit'));
   return parts;
 }
 export function compareVersions(left: string, right: string): number {

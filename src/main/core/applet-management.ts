@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import { appletManagementCommands, type AppletOperation } from '../../shared/applet-management';
 import type { SettingsStore } from './settings';
@@ -27,7 +28,9 @@ export class AppletManagement {
       ...c,
       available: c.available && !this.busy.has(c.appletId),
       unavailableReason:
-        c.available && !this.busy.has(c.appletId) ? null : 'Appletが無効、または状態を変更中です。',
+        c.available && !this.busy.has(c.appletId)
+          ? null
+          : hostText('services.appletManagement.disabledOrChanging'),
       completion: 'lifecycleApplied' as const,
       permission: 'applets.manage' as const,
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
@@ -38,32 +41,50 @@ export class AppletManagement {
   }
   execute(id: string) {
     const command = this.commands().find((c) => c.id === id);
-    if (!command) throw new AppletManagementError('NOT_FOUND', 'Applet管理コマンドがありません。');
+    if (!command)
+      throw new AppletManagementError(
+        'NOT_FOUND',
+        hostText('services.appletManagement.commandMissing'),
+      );
     return this.run(command.appletId, command.operation);
   }
   async run(id: string, operation: AppletOperation) {
     if (!this.options.ready())
-      throw new AppletManagementError('NOT_READY', 'AppDockは起動中または終了中です。');
+      throw new AppletManagementError(
+        'NOT_READY',
+        hostText('services.appletManagement.unavailable'),
+      );
     if (!['enable', 'disable', 'restart'].includes(operation))
-      throw new AppletManagementError('INVALID_ARGUMENT', '操作が不正です。');
-    if (this.busy.has(id)) throw new AppletManagementError('BUSY', 'このAppletを操作中です。');
+      throw new AppletManagementError(
+        'INVALID_ARGUMENT',
+        hostText('services.appletManagement.invalidOperation'),
+      );
+    if (this.busy.has(id))
+      throw new AppletManagementError('BUSY', hostText('services.appletManagement.busy'));
     const { settings } = this.options;
     try {
       settings.assertRevision(settings.revision);
     } catch {
       throw new AppletManagementError(
         'CONFLICT',
-        '設定が変更されています。現在の設定を確認してから再実行してください。',
+        hostText('services.appletManagement.settingsChanged'),
       );
     }
     const applet = this.options.applets().find((a) => a.id === id);
-    if (!applet) throw new AppletManagementError('NOT_FOUND', 'Appletがありません。');
+    if (!applet)
+      throw new AppletManagementError('NOT_FOUND', hostText('services.appletManagement.missing'));
     if (applet.sourceKind === 'builtin' && operation !== 'restart')
-      throw new AppletManagementError('UNAVAILABLE', 'Default Shellは無効化できません。');
+      throw new AppletManagementError(
+        'UNAVAILABLE',
+        hostText('services.appletManagement.defaultShellRequired'),
+      );
     if (['starting', 'stopping'].includes(applet.state))
-      throw new AppletManagementError('BUSY', 'Appletの状態を変更中です。');
+      throw new AppletManagementError('BUSY', hostText('services.appletManagement.changing'));
     if (operation === 'restart' && !applet.enabled)
-      throw new AppletManagementError('UNAVAILABLE', '無効なAppletは再起動できません。');
+      throw new AppletManagementError(
+        'UNAVAILABLE',
+        hostText('services.appletManagement.disabled'),
+      );
     this.busy.add(id);
     try {
       const savedEnabled = applet.collection
@@ -74,7 +95,11 @@ export class AppletManagement {
         const next = structuredClone(settings.value);
         if (applet.collection) {
           const item = collectionRecord(next, applet.collection);
-          if (!item) throw new AppletManagementError('NOT_FOUND', 'Appletがありません。');
+          if (!item)
+            throw new AppletManagementError(
+              'NOT_FOUND',
+              hostText('services.appletManagement.missing'),
+            );
           item.enabled = operation === 'enable';
         } else {
           next.extensions[id] = {
@@ -91,7 +116,7 @@ export class AppletManagement {
       if (!current || !['running', 'waiting', 'stopped'].includes(current.state))
         throw new AppletManagementError(
           'LIFECYCLE_FAILED',
-          'Appletの起動または停止を確認できません。現在の状態とAppDockのログを確認してください。',
+          hostText('services.appletManagement.unconfirmed'),
         );
       return {
         changed,

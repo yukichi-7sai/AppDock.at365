@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { app, Notification } from 'electron';
 import { createHash } from 'node:crypto';
 import type { NotificationLevel } from '../../shared/notifications';
@@ -36,7 +37,8 @@ export function showNotification(input: NativeNotificationInput): NativeNotifica
       registration.executable,
       registration.args,
     );
-  if (routes && !registered) throw Error('Windows通知の起動先を登録できませんでした。');
+  if (routes && !registered)
+    throw Error(hostText('services.notifications.activationRegistrationFailed'));
   const uri = routes?.add(input.clicked);
   let notification: Notification;
   try {

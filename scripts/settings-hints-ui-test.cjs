@@ -18,6 +18,7 @@ const refinementsOnly = process.argv.includes('--refinements-only');
 const assignmentSpeechOnly = process.argv.includes('--assignment-speech-only');
 const accentLayoutOnly = process.argv.includes('--accent-layout-only');
 const localizationOnly = process.argv.includes('--localization-only');
+const serviceLocalizationOnly = process.argv.includes('--service-localization-only');
 const listActionsOnly = process.argv.includes('--list-actions-only');
 const commandNavigationOnly = process.argv.includes('--command-navigation-only') || listActionsOnly;
 const listScrollbarOnly = process.argv.includes('--list-scrollbar-only');
@@ -299,6 +300,11 @@ async function checkSectionTitles() {
   try {
     fs.mkdirSync(profile, { recursive: true });
     server = http.createServer((request, response) => {
+      if (serviceLocalizationOnly) {
+        response.writeHead(401, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ error: 'private server detail' }));
+        return;
+      }
       if (refinementsOnly && request.url.startsWith('/updates/')) {
         const id = request.url.split('/')[2];
         updateRequests.push(id);
@@ -608,7 +614,7 @@ async function checkSectionTitles() {
         initial.extensions[id] = { enabled: false, settings: {} };
       }
     }
-    if (localizationOnly) {
+    if (localizationOnly || serviceLocalizationOnly) {
       delete initial.host.language;
       initial.ai = {
         commonPrompt: '',
@@ -616,7 +622,9 @@ async function checkSectionTitles() {
           {
             ...require('../out/main/shared/ai').newAiConnection('localization'),
             name: '<b>language.ja</b> {{name}} $t(language.ja)',
-            baseUrl: 'http://127.0.0.1:1/v1',
+            baseUrl: serviceLocalizationOnly
+              ? `http://127.0.0.1:${server.address().port}/v1`
+              : 'http://127.0.0.1:1/v1',
           },
         ],
       };
@@ -659,6 +667,22 @@ async function checkSectionTitles() {
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();
+    if (serviceLocalizationOnly) {
+      await require('./service-localization-checks.cjs')({
+        host,
+        select,
+        snapshot,
+        until,
+        inspect,
+        inspector,
+        electronExpression,
+        profile,
+        checks,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     if (localizationOnly) {
       await require('./settings-localization-checks.cjs')({
         host,
@@ -1362,6 +1386,7 @@ async function checkSectionTitles() {
       assignmentSpeechOnly,
       accentLayoutOnly,
       localizationOnly,
+      serviceLocalizationOnly,
       commandNavigationOnly,
       listActionsOnly,
       listScrollbarOnly,

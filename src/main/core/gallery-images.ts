@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash } from 'node:crypto';
 import type { RegisteredImages } from './registered-images';
 import type { RegisteredImageRef } from '../../shared/registered-images';
@@ -12,7 +13,7 @@ export class GalleryImages {
   constructor(private images: RegisteredImages) {}
   get(ref: RegisteredImageRef, generation: string, edge: number) {
     if (![512, 1024, 2048].includes(edge))
-      return Promise.reject(Error('画像サイズを確認してください。'));
+      return Promise.reject(Error(hostText('services.galleryImages.invalidSize')));
     const key = `${generation}:${edge}`;
     const cached = this.cache.get(key);
     if (cached) {
@@ -26,7 +27,7 @@ export class GalleryImages {
       .then(async () => {
         const { bytes } = await this.images.read(ref);
         if (createHash('sha256').update(bytes).digest('hex') !== generation)
-          throw Error('画像が更新されました。再取得してください。');
+          throw Error(hostText('services.galleryImages.changed'));
         const image = await decodeRegisteredImage(bytes, edge);
         const scale = Math.min(1, edge / Math.max(image.width, image.height));
         const cost =

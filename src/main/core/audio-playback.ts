@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 /** One host-wide FIFO for prepared audio. Generation stays outside this queue. */
 export interface AudioPlaybackRequest {
   bytes: Buffer;
@@ -29,11 +30,11 @@ export class AudioPlaybackQueue {
     if (!enabled) this.discard();
   }
   play(request: AudioPlaybackRequest): Promise<void> {
-    if (this.closed) return Promise.reject(Error('音声再生サービスは終了しています。'));
+    if (this.closed) return Promise.reject(Error(hostText('services.audioPlayback.closed')));
     if (!this.enabled) return Promise.resolve();
     if (request.signal?.aborted) return Promise.resolve();
     if (this.queue.length + (this.active ? 1 : 0) >= this.capacity)
-      return Promise.reject(Error('音声の再生待ちが多すぎます。'));
+      return Promise.reject(Error(hostText('services.audioPlayback.queueLimit')));
     return new Promise((resolve, reject) => {
       const controller = new AbortController();
       const entry: Entry = { request, controller, resolve, reject, cleanup: () => {} };
@@ -51,7 +52,7 @@ export class AudioPlaybackQueue {
         if (index < 0) return;
         this.queue.splice(index, 1);
         entry.cleanup();
-        reject(Error('音声の再生待ち時間を超えました。'));
+        reject(Error(hostText('services.audioPlayback.timeout')));
       }, this.waitMs);
       entry.cleanup = () => {
         clearTimeout(timer);

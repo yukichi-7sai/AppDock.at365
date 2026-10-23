@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 /** Deferred Applet notification sounds; the host audio FIFO still owns playback. */
 export class NotificationSounds {
   private paused = false;
@@ -30,7 +31,7 @@ export class NotificationSounds {
     if (this.closed || !this.enabled || !alive()) return;
     this.pending = this.pending.filter((job) => job.alive());
     if (this.pending.length + (this.active ? 1 : 0) >= 32)
-      throw Error('通知音の再生待ちが多すぎます。');
+      throw Error(hostText('services.notificationSounds.queueLimit'));
     this.pending.push({ file, alive, failed });
     this.pump();
   }

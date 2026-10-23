@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 
 export interface InputInvocation {
@@ -51,14 +52,15 @@ export class CommandContexts {
           (e) => e.appletId === appletId && e.origin && e.origin.kind !== 'local',
         )
       )
-        throw Error('外部起点のコマンド処理にはホスト発行の実行情報が必要です。');
+        throw Error(hostText('services.commandContexts.invocationRequired'));
       return {};
     }
     const entry = typeof id === 'string' ? this.pending.get(id) : undefined;
-    if (!entry || entry.appletId !== appletId) throw Error('コマンドの実行情報が失効しています。');
+    if (!entry || entry.appletId !== appletId)
+      throw Error(hostText('services.commandContexts.invocationExpired'));
     if (entry.valid && !entry.valid()) {
       entry.controller.abort();
-      throw Error('コマンドのShell対象が失効しています。');
+      throw Error(hostText('services.commandContexts.shellTargetExpired'));
     }
     return {
       signal: entry.controller.signal,

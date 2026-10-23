@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { ExtensionManifest } from './contracts';
 import { validPageId } from './applet-pages';
 import { ribbonGroupIcons, type AppletRibbonItem } from './ribbon';
@@ -8,7 +9,7 @@ export function parseRibbonItems(manifest: ExtensionManifest): AppletRibbonItem[
     !Array.isArray(manifest.ribbonItems) ||
     manifest.ribbonItems.length > 16
   )
-    throw Error('リボン項目は16件以下とribbon-items capabilityが必要です。');
+    throw Error(hostText('services.sharedRibbonItems.capabilityLimit'));
   const ids = new Set<string>();
   return manifest.ribbonItems.map((item) => {
     if (
@@ -43,7 +44,7 @@ export function parseRibbonItems(manifest: ExtensionManifest): AppletRibbonItem[
       (item.iconOnly !== undefined && typeof item.iconOnly !== 'boolean') ||
       (item.defaultPlacement !== undefined && !['top', 'bottom'].includes(item.defaultPlacement))
     )
-      throw Error('リボン項目の宣言と自己設定参照を確認してください。');
+      throw Error(hostText('services.sharedRibbonItems.invalidDeclaration'));
     ids.add(item.id);
     return { ...item, title: item.title.trim() };
   });

@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash } from 'node:crypto';
 import type { TypedNotifications } from './typed-notifications';
 import type { NotificationInput } from './notification-service';
@@ -43,7 +44,10 @@ export class WarningReporter {
       update: (warning, actions) => {
         if (resolved) return;
         const title = warning.title.slice(0, 200);
-        const body = `${warning.message}\n警告コード: ${warning.code}`.slice(0, 2000);
+        const body = hostText('services.warningReporter.bodyWithCode', {
+          message: String(warning.message),
+          code: String(warning.code),
+        }).slice(0, 2000);
         const next = JSON.stringify([title, body, warning.logDetails]);
         if (next !== fingerprint) {
           fingerprint = next;
@@ -77,10 +81,7 @@ export class WarningReporter {
           if (result.status === 'accepted') id = result.notificationId;
         } catch {
           failed = true;
-          write(
-            warning.source,
-            '警告通知を表示できませんでした。ログと設定画面で状態を確認してください。',
-          );
+          write(warning.source, hostText('services.warningReporter.notificationFailed'));
         }
       },
       resolve: () => {

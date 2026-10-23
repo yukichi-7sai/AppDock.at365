@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { shellView, type ShellRequirement } from '../../shared/shell';
 import type { ShellProvider } from './shell-provider-registry';
 import { parseNotificationTypes } from '../../shared/notification-types';
@@ -47,7 +48,7 @@ function contained(root: string, entry: string) {
   const resolved = fs.realpathSync(path.resolve(root, entry));
   const relative = path.relative(fs.realpathSync(root), resolved);
   if (relative.startsWith('..') || path.isAbsolute(relative))
-    throw new Error('entry は拡張フォルダ内に置いてください。');
+    throw new Error(hostText('services.extensions.entryPath'));
   return resolved;
 }
 function readManifest(
@@ -68,29 +69,29 @@ function readManifest(
     !['node', 'dotnet', 'native'].includes(m.runtime) ||
     typeof m.entry !== 'string'
   )
-    throw new Error('拡張マニフェストの形式が正しくありません。');
+    throw new Error(hostText('services.extensions.manifestFormat'));
   if (m.runtime === 'dotnet' && (typeof m.type !== 'string' || !m.type))
-    throw new Error('.NET拡張のtypeが必要です。');
+    throw new Error(hostText('services.extensions.dotnetType'));
   if (
     m.displayName !== undefined &&
     (typeof m.displayName !== 'string' || !m.displayName.trim() || m.displayName.length > 100)
   )
-    throw new Error('displayName は空白だけではない1～100文字の文字列です。');
+    throw new Error(hostText('services.extensions.displayName'));
   if (m.minimumHostVersion !== undefined) parseVersion(m.minimumHostVersion);
   if (m.updateRepository !== undefined && !validRepository(m.updateRepository))
-    throw new Error('updateRepository はGitHubの owner/repo を指定してください。');
+    throw new Error(hostText('services.extensions.updateRepository'));
   if (
     m.startupDelaySeconds !== undefined &&
     (!Number.isInteger(m.startupDelaySeconds) ||
       m.startupDelaySeconds < 0 ||
       m.startupDelaySeconds > 86400)
   )
-    throw new Error('startupDelaySeconds は0～86400の整数です。');
+    throw new Error(hostText('services.extensions.startupDelay'));
   if (
     m.capabilities !== undefined &&
     (!Array.isArray(m.capabilities) || m.capabilities.some((c: any) => typeof c !== 'string'))
   )
-    throw new Error('capabilities の形式が正しくありません。');
+    throw new Error(hostText('services.extensions.capabilities'));
   const customCommandTypes = parseCustomTypes(m.id, m.customCommandTypes);
   if (
     customCommandTypes.length &&
@@ -98,11 +99,11 @@ function readManifest(
       !m.minimumHostVersion ||
       compareVersions(m.minimumHostVersion, '0.60.0') < 0)
   )
-    throw Error('カスタムコマンドにはcustom-commandsとminimumHostVersion:0.60.0以上が必要です。');
+    throw Error(hostText('services.extensions.customCommandCapability'));
   for (const type of customCommandTypes) compileCustomType(type);
   if (m.webAccounts) {
     if (!m.capabilities?.includes('web-accounts'))
-      throw Error('Webアカウントにはweb-accounts capabilityが必要です。');
+      throw Error(hostText('services.extensions.webAccountCapability'));
     validateWebAccounts(folder, m.webAccounts);
     if (
       m.webAccounts.externalLinkSetting !== undefined &&
@@ -112,7 +113,7 @@ function readManifest(
             setting.key === m.webAccounts.externalLinkSetting && setting.type === 'boolean',
         ))
     )
-      throw Error('externalLinkSettingには自身のboolean設定とsettings capabilityが必要です。');
+      throw Error(hostText('services.extensions.externalLinkSetting'));
     if (
       m.webAccounts.returnToStartOnHideSetting !== undefined &&
       (!m.capabilities?.includes('settings') ||
@@ -121,9 +122,7 @@ function readManifest(
             setting.key === m.webAccounts.returnToStartOnHideSetting && setting.type === 'boolean',
         ))
     )
-      throw Error(
-        'returnToStartOnHideSettingには自身のboolean設定とsettings capabilityが必要です。',
-      );
+      throw Error(hostText('services.extensions.returnToStartSetting'));
   }
   delete m.sourceKind;
   if (m.id === 'appdock.default-shell' && sourceKind !== 'builtin')
@@ -161,19 +160,19 @@ function readManifest(
       !m.minimumHostVersion ||
       compareVersions(m.minimumHostVersion, '0.30.0') < 0)
   )
-    throw Error('通知種類にはnotifications capabilityとminimumHostVersion:0.30.0以上が必要です。');
+    throw Error(hostText('services.extensions.notificationCapability'));
   if (
     sourceKind !== 'builtin' &&
     m.notificationTypes.some((t: any) => !t.defaultTargets.length) &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.31.0') < 0)
   )
-    throw Error('通知センターにはminimumHostVersion:0.31.0以上が必要です。');
+    throw Error(hostText('services.extensions.notificationCenterVersion'));
   if (
     sourceKind !== 'builtin' &&
     m.shell?.views?.['notification.desktop'] &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.31.1') < 0)
   )
-    throw Error('デスクトップ通知にはminimumHostVersion:0.31.1以上が必要です。');
+    throw Error(hostText('services.extensions.desktopNotificationVersion'));
   m.pages = parseAppletPages(m as unknown as ExtensionManifest);
   for (const page of m.pages) if (page.source === 'local') contained(folder, page.ui!);
   m.pageCollections = parsePageCollections(m as unknown as ExtensionManifest);
@@ -183,7 +182,7 @@ function readManifest(
       m.pageActions) &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.44.0') < 0)
   )
-    throw Error('動的ページにはminimumHostVersion:0.44.0以上が必要です。');
+    throw Error(hostText('services.extensions.dynamicPageVersion'));
   if (
     m.pageActions !== undefined &&
     (!Array.isArray(m.pageActions) ||
@@ -203,7 +202,7 @@ function readManifest(
       ) ||
       new Set(m.pageActions.map((action: any) => action.id)).size !== m.pageActions.length)
   )
-    throw Error('ページ操作の宣言を確認してください。');
+    throw Error(hostText('services.extensions.pageActions'));
   for (const collection of m.pageCollections)
     if (collection.source === 'local') contained(folder, collection.ui!);
   const commands = parseDeclaredCommands(m.id, m.commands);
@@ -217,9 +216,7 @@ function readManifest(
         !m.minimumHostVersion ||
         compareVersions(m.minimumHostVersion, '0.34.0') < 0)
     )
-      throw Error(
-        'shellRequirementには対象領域の提供、shell capability、minimumHostVersion:0.34.0以上が必要です。activateOnExecuteとは併用できません。',
-      );
+      throw Error(hostText('services.extensions.shellRequirement'));
   }
   const settingDefinitions = parseSettingDefinitions(m.settings);
   m.ribbonItems = parseRibbonItems({
@@ -235,25 +232,25 @@ function readManifest(
       )) &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.69.0') < 0)
   )
-    throw Error('共通画像と宣言型リボン項目にはminimumHostVersion:0.69.0以上が必要です。');
+    throw Error(hostText('services.extensions.sharedImageVersion'));
   if (
     settingDefinitions?.some((s) => s.list) &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.45.0') < 0)
   )
-    throw Error('一覧ダイアログにはminimumHostVersion:0.45.0以上が必要です。');
+    throw Error(hostText('services.extensions.listDialogVersion'));
   if (
     settingDefinitions?.some((s) =>
       s.fields?.some((field) => field.optionSource === 'web-profiles'),
     ) &&
     !m.capabilities?.includes('web-profiles')
   )
-    throw Error('プロフィールの選択肢にはweb-profiles capabilityが必要です。');
+    throw Error(hostText('services.extensions.profileCapability'));
   validateSettingCommandIds(m.id, settingDefinitions ?? [], commands ?? []);
   if (
     settingDefinitions?.some((s) => s.automation || s.generateCommands) &&
     !m.capabilities?.includes('settings')
   )
-    throw Error('設定コマンドにはsettings capabilityが必要です。');
+    throw Error(hostText('services.extensions.settingsCapability'));
   const bindingCommands = [
     ...(commands ?? []),
     ...generatedSettingCommands(m.id, settingDefinitions ?? [], false),
@@ -270,7 +267,7 @@ function readManifest(
     defaultGestureBindings.length > 100 ||
     defaultGestureBindings.some((r) => !bindingCommands.some((c) => c.id === r.command))
   )
-    throw Error('既定ジェスチャーには自身の宣言コマンドだけを指定してください。');
+    throw Error(hostText('services.extensions.gestureOwnership'));
   const settingActions = parseSettingActions(m.settingActions, bindingCommands);
   const settingSections = parseSettingSections(
     m.settingSections,
@@ -281,7 +278,7 @@ function readManifest(
     settingSections &&
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.36.8') < 0)
   )
-    throw Error('設定セクションにはminimumHostVersion:0.36.8以上が必要です。');
+    throw Error(hostText('services.extensions.settingsSectionVersion'));
   return {
     ...m,
     customCommandTypes,
@@ -394,7 +391,7 @@ class ExtensionManager extends EventEmitter {
   }
   validateInstall(folder: string) {
     const manifest = readManifest(folder);
-    if (this.items.has(manifest.id)) throw Error('同じIDのAppletが存在します。');
+    if (this.items.has(manifest.id)) throw Error(hostText('services.extensions.duplicateApplet'));
     const existingTypes = [
       ...this.reservedCustomTypeIds(),
       ...[...this.items.values()].flatMap((e) =>
@@ -405,7 +402,7 @@ class ExtensionManager extends EventEmitter {
       existingTypes.length + (manifest.customCommandTypes?.length ?? 0) > 256 ||
       manifest.customCommandTypes?.some((t) => existingTypes.includes(t.id))
     )
-      throw Error('カスタムコマンドの種類が重複、または上限を超えています。');
+      throw Error(hostText('services.extensions.customTypeLimit'));
   }
   discover() {
     this.discoveryIssueCount = 0;
@@ -432,11 +429,7 @@ class ExtensionManager extends EventEmitter {
               this.items.delete(manifest.id);
               rejected.add(manifest.id);
             }
-            this.log(
-              'warn',
-              manifest.id,
-              '同じIDの拡張が重複しています。外部の重複した拡張は起動しません。',
-            );
+            this.log('warn', manifest.id, hostText('services.extensions.duplicateExtension'));
             continue;
           }
           const existingTypes = [
@@ -449,7 +442,7 @@ class ExtensionManager extends EventEmitter {
             existingTypes.length + (manifest.customCommandTypes?.length ?? 0) > 256 ||
             manifest.customCommandTypes?.some((t) => existingTypes.includes(t.id))
           )
-            throw Error('カスタムコマンドの種類が重複、または全体256件の上限を超えています。');
+            throw Error(hostText('services.extensions.globalTypeLimit'));
           this.items.set(manifest.id, {
             manifest,
             state: 'stopped',
@@ -502,7 +495,7 @@ class ExtensionManager extends EventEmitter {
     for (const page of e.dynamicPages ?? [])
       catalog.set(page.openCommand, {
         id: page.openCommand,
-        title: `${page.title}を開く`,
+        title: hostText('services.extensions.openPage', { name: String(page.title) }),
         automation: false,
         available: e.state === 'running',
       });
@@ -598,7 +591,12 @@ class ExtensionManager extends EventEmitter {
   checkCompatibility(e: ExtensionInstance) {
     const minimum = e.manifest.minimumHostVersion;
     if (minimum && compareVersions(this.hostVersion, minimum) < 0)
-      throw new Error(`AppDock v${minimum}以降が必要です（現在 v${this.hostVersion}）。`);
+      throw new Error(
+        hostText('services.extensions.hostVersion', {
+          minimum: String(minimum),
+          current: String(this.hostVersion),
+        }),
+      );
   }
   async schedule(e: ExtensionInstance) {
     this.cancelStart(e);
@@ -637,7 +635,10 @@ class ExtensionManager extends EventEmitter {
     this.log(
       'info',
       e.manifest.id,
-      `${delay}秒後に ${appletDisplayName(e.manifest)} を起動します。`,
+      hostText('services.extensions.delayedStart', {
+        seconds: String(delay),
+        name: String(appletDisplayName(e.manifest)),
+      }),
     );
     this.emit('changed');
   }
@@ -670,8 +671,7 @@ class ExtensionManager extends EventEmitter {
         });
       } else {
         const exe = path.join(this.dotnetHost, 'AppDock.ExtensionHost.exe');
-        if (!fs.existsSync(exe))
-          throw new Error('.NETホストがありません。pnpm run build:dotnet を実行してください。');
+        if (!fs.existsSync(exe)) throw new Error(hostText('services.extensions.dotnetHostMissing'));
         child = spawn(exe, [m.entryPath, m.type!], {
           cwd: m.folder,
           windowsHide: true,
@@ -682,19 +682,23 @@ class ExtensionManager extends EventEmitter {
       const generation = e.runtimeSession;
       e.peer = new JsonLinePeer(child.stdout, child.stdin, (method, p) => {
         if (e.child !== child || e.runtimeSession !== generation)
-          throw Error('Appletの実行世代が変わりました。');
+          throw Error(hostText('services.extensions.generationChanged'));
         return this.api(e, method, p);
       });
       e.peer.on('closed', () => {
         if (e.state === 'running') {
           child.kill();
-          this.crashed(e, '拡張との接続が終了しました。');
+          this.crashed(e, hostText('services.extensions.disconnected'));
         }
       });
       child.on('error', (err) => this.crashed(e, err.message));
       child.on('exit', (code, signal) => {
         e.peer?.close();
-        if (e.state !== 'stopping') this.crashed(e, `拡張プロセス終了 (${code ?? signal})`);
+        if (e.state !== 'stopping')
+          this.crashed(
+            e,
+            hostText('services.extensions.exited', { reason: String(code ?? signal) }),
+          );
       });
       child.stderr.setEncoding('utf8');
       child.stderr.on('data', (data) => this.log('warn', m.id, data.slice(0, 4000).trim()));
@@ -722,7 +726,7 @@ class ExtensionManager extends EventEmitter {
             typeof c.title !== 'string',
         )
       )
-        throw new Error('コマンド登録の形式が正しくありません。');
+        throw new Error(hostText('services.extensions.commandRegistration'));
       e.commands = parseExtensionCommands(m.id, result.commands);
       validateSettingCommandIds(m.id, m.settings ?? [], e.commands);
       e.tray = Array.isArray(result.tray)
@@ -736,7 +740,11 @@ class ExtensionManager extends EventEmitter {
           )
         : [];
       e.state = 'running';
-      this.log('info', m.id, `${appletDisplayName(m)} を起動しました。`);
+      this.log(
+        'info',
+        m.id,
+        hostText('services.extensions.started', { name: String(appletDisplayName(m)) }),
+      );
     } catch (err: any) {
       e.child?.kill();
       this.crashed(e, err.message);
@@ -795,7 +803,8 @@ class ExtensionManager extends EventEmitter {
     for (const item of this.items.values()) {
       const page = item.dynamicPages?.find((candidate) => candidate.openCommand === id);
       if (page) {
-        if (item.state !== 'running') throw Error('ページの提供元は停止しています。');
+        if (item.state !== 'running')
+          throw Error(hostText('services.extensions.pageProviderStopped'));
         return this.api(item, 'host.pages.open', { id: page.id });
       }
     }
@@ -815,7 +824,8 @@ class ExtensionManager extends EventEmitter {
         running.manifest.commands?.find((c) => c.id === id)?.shellRequirement,
       );
       if (reason) throw Error(reason);
-      if (!running.peer || running.peer.closed) throw new Error('拡張との接続が終了しました。');
+      if (!running.peer || running.peer.closed)
+        throw new Error(hostText('services.extensions.disconnected'));
       const valid = this.shellExecution?.(
         running.manifest.id,
         running.manifest.commands?.find((c) => c.id === id)?.shellRequirement,
@@ -842,14 +852,14 @@ class ExtensionManager extends EventEmitter {
       );
     }
     const e = [...this.items.values()].find((item) => this.canActivateForCommand(item, id));
-    if (!e) throw new Error('このコマンドは現在利用できません。');
+    if (!e) throw new Error(hostText('services.extensions.commandUnavailable'));
     const execution = this.queue
       .catch((err) => this.log('error', 'host', err.message))
       .then(async () => {
-        if (this.shuttingDown) throw new Error('AppDockは終了中です。');
+        if (this.shuttingDown) throw new Error(hostText('services.extensions.quitting'));
         if (e.state !== 'running') {
           if (!this.canActivateForCommand(e, id))
-            throw new Error('このコマンドは現在利用できません。');
+            throw new Error(hostText('services.extensions.commandUnavailable'));
           await this.stop(e);
           this.settings.updateExtension(e.manifest.id, { enabled: true });
           await this.start(e);
@@ -860,7 +870,7 @@ class ExtensionManager extends EventEmitter {
           !e.peer ||
           e.peer.closed
         )
-          throw new Error(e.error ?? 'Appletがコマンドを登録できませんでした。');
+          throw new Error(e.error ?? hostText('services.extensions.commandNotRegistered'));
         return this.executions.run(e.manifest.id, invocation, (executionId) =>
           e.peer!.request('command.execute', {
             id,
@@ -897,7 +907,7 @@ class ExtensionManager extends EventEmitter {
           const peer = e.peer,
             generation = e.runtimeSession;
           if (!peer || peer.closed || e.state !== 'running')
-            throw Error('提供元が停止しています。');
+            throw Error(hostText('services.extensions.providerStopped'));
           return this.executions.run(e.manifest.id, invocation, async (executionId) => {
             const cancel = () => {
               try {
@@ -912,7 +922,8 @@ class ExtensionManager extends EventEmitter {
             };
             invocation.signal?.addEventListener('abort', cancel, { once: true });
             try {
-              if (invocation.signal?.aborted) throw Error('実行が取り消されました。');
+              if (invocation.signal?.aborted)
+                throw Error(hostText('services.extensions.cancelled'));
               const result = await peer.request(
                 'customCommand.execute',
                 {
@@ -931,7 +942,7 @@ class ExtensionManager extends EventEmitter {
                 30000,
               );
               if (generation !== e.runtimeSession || e.state !== 'running')
-                throw Error('提供元の実行世代が変わりました。');
+                throw Error(hostText('services.extensions.providerChanged'));
               return result;
             } finally {
               invocation.signal?.removeEventListener('abort', cancel);
@@ -955,7 +966,7 @@ class ExtensionManager extends EventEmitter {
       typeof actionId !== 'string' ||
       !actions.some((action) => action.actionId === actionId)
     )
-      throw new Error('この操作は現在利用できません。履歴を更新してください。');
+      throw new Error(hostText('services.extensions.operationUnavailable'));
     return extension.peer.request('panel.action', { id: actionId });
   }
   restart(id: string, immediate = false) {
@@ -963,7 +974,7 @@ class ExtensionManager extends EventEmitter {
       .catch(() => {})
       .then(async () => {
         const e = this.items.get(id);
-        if (!e) throw new Error('拡張が見つかりません。');
+        if (!e) throw new Error(hostText('services.extensions.missing'));
         await this.stop(e);
         if (
           (e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, id)) &&

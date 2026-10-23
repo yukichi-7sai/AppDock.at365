@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { Settings, SettingsSnapshot, GlobalHotKeyStatus } from '../../shared/contracts';
 import {
   touchpadShortcutProjection,
@@ -33,7 +34,7 @@ const object = (v: unknown): v is Record<string, unknown> =>
 const invalid = () =>
   new SettingsCommandError(
     'INVALID_ARGUMENT',
-    'ショートカットの操作・ID・キー・条件を確認してください。',
+    hostText('services.shortcutCommands.invalidArguments'),
   );
 const exact = (v: unknown, keys: string[]): v is Record<string, unknown> =>
   object(v) && Object.keys(v).every((k) => keys.includes(k));
@@ -91,7 +92,7 @@ export class ShortcutCommands {
     return [
       {
         id: commandId,
-        title: 'ショートカット設定を変更',
+        title: hostText('services.shortcutCommands.title'),
         appletId: null,
         available: true,
         unavailableReason: null,
@@ -197,9 +198,7 @@ export class ShortcutCommands {
         registered: s.registered,
         backend: s.backend,
         effectiveBlockOriginalInput: s.effectiveBlockOriginalInput,
-        warning: s.error
-          ? '入力の適用に失敗しました。AppDockのショートカット画面で確認してください。'
-          : null,
+        warning: s.error ? hostText('services.shortcutCommands.applyFailed') : null,
       })),
     };
   }
@@ -209,7 +208,7 @@ export class ShortcutCommands {
     if (!command)
       throw new SettingsCommandError(
         'COMMAND_NOT_ASSIGNABLE',
-        '公開された引数なしコマンドだけを割り当てられます。既存の未公開コマンドの割当は保持・無効化・削除できます。',
+        hostText('services.shortcutCommands.publicCommandOnly'),
       );
     if (
       row.when.scope === 'owner' &&
@@ -261,7 +260,7 @@ export class ShortcutCommands {
           if (!old)
             throw new SettingsCommandError(
               'NOT_FOUND',
-              '指定された割当IDがありません。再取得してください。',
+              hostText('services.shortcutCommands.bindingMissing'),
             );
           if (op.kind === 'remove') {
             rows = rows.filter((r) => r.id !== op.id);
@@ -332,7 +331,7 @@ export class ShortcutCommands {
       } catch {
         throw new SettingsCommandError(
           'SAVE_FAILED',
-          'ショートカットを保存できませんでした。設定を再取得して確認してください。',
+          hostText('services.shortcutCommands.saveFailed'),
         );
       }
     }
@@ -344,8 +343,7 @@ export class ShortcutCommands {
       revision: this.options.settingsCommands.revision(),
       warning: store.syncError ?? null,
       applies: 'shortcutsChanged',
-      message:
-        '保存後の入力適用結果はshortcuts.getで確認してください。条件を満たすコマンドから、動作設定の実行方法に従って登録順に選びます。',
+      message: hostText('services.shortcutCommands.savedEffect'),
     };
   }
   private publicOptions(options: ReturnType<typeof getKeybindingOptions>) {

@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import {
   defaultTouchpadGestures,
   parseTouchpadGestures,
@@ -34,7 +35,7 @@ const object = (v: unknown): v is Record<string, unknown> =>
 const invalid = () =>
   new SettingsCommandError(
     'INVALID_ARGUMENT',
-    'マウスジェスチャーの操作・ID・キー・条件を確認してください。',
+    hostText('services.gestureCommands.invalidArguments'),
   );
 const exact = (v: unknown, keys: string[]): v is Record<string, unknown> =>
   object(v) && Object.keys(v).every((k) => keys.includes(k));
@@ -185,8 +186,8 @@ export class GestureCommands {
       {
         id: this.commandId,
         title: this.options.touchpad
-          ? 'タッチパッドジェスチャー設定を変更'
-          : 'マウスジェスチャー設定を変更',
+          ? hostText('services.gestureCommands.touchpadTitle')
+          : hostText('services.gestureCommands.mouseTitle'),
         description: this.options.touchpad
           ? 'AppDockの割り当てと希望キーだけを保存します。Windowsへ反映するにはset-enabledまたはreconnectを明示的に実行します。'
           : undefined,
@@ -270,10 +271,12 @@ export class GestureCommands {
       warning: this.options.settings.syncError ?? null,
       scopes: [
         ...shortcutScopes.flatMap((scope) =>
-          scope.id === 'global' ? [scope, { id: 'desktop', title: 'デスクトップ' }] : [scope],
+          scope.id === 'global'
+            ? [scope, { id: 'desktop', title: hostText('services.gestureCommands.desktop') }]
+            : [scope],
         ),
-        { id: 'browser', title: 'Webブラウザ' },
-        { id: 'exe', title: '指定したexe' },
+        { id: 'browser', title: hostText('services.gestureCommands.browser') },
+        { id: 'exe', title: hostText('services.gestureCommands.executable') },
       ],
       assignableCommands: this.assignable().map((c) => ({
         id: c.id,
@@ -292,7 +295,7 @@ export class GestureCommands {
     if (!command)
       throw new SettingsCommandError(
         'COMMAND_NOT_ASSIGNABLE',
-        '公開された引数なしコマンドだけを割り当てられます。既存の未公開コマンドの割当は保持・無効化・削除できます。',
+        hostText('services.gestureCommands.publicCommandOnly'),
       );
     if (
       row.when.scope === 'owner' &&
@@ -346,7 +349,7 @@ export class GestureCommands {
           if (!old)
             throw new SettingsCommandError(
               'NOT_FOUND',
-              '指定された割当IDがありません。再取得してください。',
+              hostText('services.gestureCommands.bindingMissing'),
             );
           if (op.kind === 'remove') {
             rows = rows.filter((r) => r.id !== op.id);
@@ -420,7 +423,7 @@ export class GestureCommands {
       } catch {
         throw new SettingsCommandError(
           'SAVE_FAILED',
-          'マウスジェスチャーを保存できませんでした。設定を再取得して確認してください。',
+          hostText('services.gestureCommands.saveFailed'),
         );
       }
     }
@@ -432,8 +435,7 @@ export class GestureCommands {
       revision: this.options.settingsCommands.revision(),
       warning: store.syncError ?? null,
       applies: 'gesturesChanged',
-      message:
-        '保存後に既存の入力処理へ非同期に反映します。実際の入力効果は未確認です。条件に一致したコマンドは実行方法の設定に従って登録順に選びます。',
+      message: hostText('services.gestureCommands.savedEffect'),
     };
   }
 }

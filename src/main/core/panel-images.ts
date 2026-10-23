@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -21,7 +22,7 @@ export function registerLocalImages(panel: Panel, root: string, id: string): Pan
       !/\.(png|jpe?g|webp)$/i.test(file) ||
       !fs.statSync(file).isFile()
     )
-      throw new Error('パネル画像は専用キャッシュ内の画像ファイルを指定してください。');
+      throw new Error(hostText('services.panelImages.cachePath'));
     return {
       ...item,
       imageFile: file,

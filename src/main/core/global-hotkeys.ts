@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import {
   getKeybindings,
   getKeybindingOptions,
@@ -24,7 +25,7 @@ export class InputCaptureHotKeyBackend implements HotKeyBackend {
   constructor(private capture: () => InputCaptureManager | undefined) {}
   sync(shortcuts: string[], inputs?: ShortcutInput[], retry = false) {
     const capture = this.capture();
-    if (!capture) return Promise.reject(new Error('入力ホストを初期化中です。'));
+    if (!capture) return Promise.reject(new Error(hostText('services.globalHotkeys.initializing')));
     return capture.syncShortcuts(
       inputs ?? shortcuts.map((shortcut) => ({ shortcut, blockOriginalInput: true })),
       retry,

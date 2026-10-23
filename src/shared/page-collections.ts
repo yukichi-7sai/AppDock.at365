@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type {
   ExtensionManifest,
   ExtensionSnapshot,
@@ -53,7 +54,7 @@ export function parsePageCollections(manifest: ExtensionManifest): PageCollectio
     !Array.isArray(value) ||
     value.length > 4
   )
-    throw Error('ページ一覧の宣言を確認してください。');
+    throw Error(hostText('services.sharedPageCollections.invalidDeclaration'));
   const keys = new Set<string>();
   return value.map((raw) => {
     if (
@@ -82,7 +83,7 @@ export function parsePageCollections(manifest: ExtensionManifest): PageCollectio
       (raw.managementCommand !== undefined &&
         !manifest.commands?.some((command) => command.id === raw.managementCommand))
     )
-      throw Error('ページ一覧には自身のobject-list設定と表示内容の宣言が必要です。');
+      throw Error(hostText('services.sharedPageCollections.settingRequired'));
     keys.add(raw.key);
     return { ...raw, fields: parseSettingDefinitions(raw.fields) ?? [] };
   });
@@ -91,7 +92,7 @@ export function parsePageCollections(manifest: ExtensionManifest): PageCollectio
 export function collectionRecord(settings: Settings, binding: CollectionBinding): CollectionRecord {
   const rows = settings.extensions[binding.owner]?.settings[binding.key];
   const item = Array.isArray(rows) && rows.find((row) => row?.id === binding.itemId);
-  if (!item) throw Error('ページの設定対象がありません。');
+  if (!item) throw Error(hostText('services.sharedPageCollections.settingMissing'));
   return item;
 }
 export function collectionIdentity(settings: Settings, owner: string, key: string, id: string) {
@@ -104,7 +105,8 @@ export function validateCollectionRecords(
   definition: PageCollectionDefinition,
   value: unknown,
 ): CollectionRecord[] {
-  if (!Array.isArray(value) || value.length > 64) throw Error('ページ一覧は64件以下です。');
+  if (!Array.isArray(value) || value.length > 64)
+    throw Error(hostText('services.sharedPageCollections.countLimit'));
   const ids = new Set<string>();
   return value.map((item) => {
     if (
@@ -119,7 +121,7 @@ export function validateCollectionRecords(
       typeof item.enabled !== 'boolean' ||
       !['page', 'window'].includes(item.display)
     )
-      throw Error('ページのID・名前・有効状態・表示先を確認してください。');
+      throw Error(hostText('services.sharedPageCollections.invalidPage'));
     if (definition.source === 'remote') {
       webUrl(item.url);
       if (
@@ -128,10 +130,10 @@ export function validateCollectionRecords(
         !Array.isArray(item.allowedOrigins) ||
         item.allowedOrigins.length > 32
       )
-        throw Error('Webページのアカウント・遷移規則を確認してください。');
+        throw Error(hostText('services.sharedPageCollections.invalidNavigation'));
       for (const origin of item.allowedOrigins)
         if (typeof origin !== 'string' || new URL(webUrl(origin)).origin !== origin)
-          throw Error('追加許可先は完全なoriginで指定してください。');
+          throw Error(hostText('services.sharedPageCollections.invalidOrigin'));
     }
     if (
       item.icon !== undefined &&
@@ -140,9 +142,9 @@ export function validateCollectionRecords(
         !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(item.icon) ||
         item.icon.length > 24576)
     )
-      throw Error('ページのアイコンは検証したPNGを指定してください。');
+      throw Error(hostText('services.sharedPageCollections.invalidIcon'));
     if (item.image != null && !imageReference(item.image))
-      throw Error('登録画像の参照を確認してください。');
+      throw Error(hostText('services.sharedPageCollections.invalidImage'));
     ids.add(item.id);
     return structuredClone(item);
   });
@@ -160,7 +162,7 @@ export function collectionPages(
       return validateCollectionRecords(definition, rows).map((item) => {
         const id = collectionIdentity(settings, parent.id, definition.key, item.id);
         if (id.length > 100 || ids.has(id) || ++count > 64)
-          throw Error('ページの識別子の重複・長さ・件数を確認してください。');
+          throw Error(hostText('services.sharedPageCollections.invalidIds'));
         ids.add(id);
         return {
           id,

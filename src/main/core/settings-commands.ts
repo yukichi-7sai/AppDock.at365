@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import { appletEnabled, defaultAppletEnabled } from '../../shared/applet-state';
 import { readObjectList } from '../../shared/object-list';
@@ -80,11 +81,11 @@ export class SettingsCommands {
     const field = owner.settings?.find(
       (field) => field.key === key && field.type === 'object-list' && field.list,
     );
-    if (!field) throw Error('一覧設定の宣言がありません。');
+    if (!field) throw Error(hostText('services.settingsCommands.listDeclaration'));
     const current =
       this.options.settings.value.extensions[owner.id]?.settings[field.key] ?? field.default ?? [];
     if (JSON.stringify(readObjectList(current)) !== JSON.stringify(readObjectList(before)))
-      throw Error('一覧が別の場所で変更されました。閉じて開き直してください。');
+      throw Error(hostText('services.settingsCommands.listChanged'));
     this.setOwnSetting(owner, field.key, value);
   }
   private validateChanges(
@@ -97,7 +98,7 @@ export class SettingsCommands {
       if (!field && declared)
         throw new SettingsCommandError(
           'INVALID_ARGUMENT',
-          '公開された設定項目と値を確認してください。',
+          hostText('services.settingsCommands.invalidSetting'),
         );
       if (field) validateSettingValue(field, value);
     }
@@ -112,7 +113,10 @@ export class SettingsCommands {
   private owner(appletId?: string) {
     const owner = this.owners().find((o) => o.id === (appletId ?? 'appdock'));
     if (!owner || !owner.fields.some((f) => f.automation))
-      throw new SettingsCommandError('NOT_FOUND', '公開された設定が見つかりません。');
+      throw new SettingsCommandError(
+        'NOT_FOUND',
+        hostText('services.settingsCommands.settingMissing'),
+      );
     return owner;
   }
   private values(
@@ -163,7 +167,9 @@ export class SettingsCommands {
       const base = {
         appletId: owner.id === 'appdock' ? null : owner.id,
         available: owner.available,
-        unavailableReason: owner.available ? null : 'Appletが有効・稼働中である必要があります。',
+        unavailableReason: owner.available
+          ? null
+          : hostText('services.settingsCommands.appletRunningRequired'),
         completion: 'settingsSaved' as const,
         permission: 'settings.write' as const,
       };
@@ -171,7 +177,7 @@ export class SettingsCommands {
         {
           ...base,
           id: `${owner.id}.settings.update`,
-          title: `${owner.title}の設定を更新`,
+          title: hostText('services.settingsCommands.updateTitle', { name: String(owner.title) }),
           inputSchema: {
             type: 'object',
             properties: {
@@ -204,7 +210,10 @@ export class SettingsCommands {
   }
   execute(id: string, args: unknown = {}, external = true) {
     if (!object(args))
-      throw new SettingsCommandError('INVALID_ARGUMENT', 'argsはオブジェクトです。');
+      throw new SettingsCommandError(
+        'INVALID_ARGUMENT',
+        hostText('services.settingsCommands.argumentObject'),
+      );
     for (const owner of this.owners()) {
       const fields = external ? owner.fields.filter((f) => f.automation) : owner.fields;
       if (id === `${owner.id}.settings.update` && fields.length && external) {
@@ -217,7 +226,7 @@ export class SettingsCommands {
         )
           throw new SettingsCommandError(
             'INVALID_ARGUMENT',
-            'changesとexpectedRevisionを指定してください。',
+            hostText('services.settingsCommands.patchArguments'),
           );
         return this.update(
           owner,
@@ -233,7 +242,7 @@ export class SettingsCommands {
           if (Object.keys(args).length)
             throw new SettingsCommandError(
               'INVALID_ARGUMENT',
-              'このコマンドに引数は指定できません。',
+              hostText('services.settingsCommands.noArguments'),
             );
           // Check disk before deriving a toggle; never retry a conflicting toggle.
           const revision = this.revision();
@@ -242,7 +251,7 @@ export class SettingsCommands {
           if (typeof current !== 'boolean')
             throw new SettingsCommandError(
               'INVALID_ARGUMENT',
-              '現在の設定値がbooleanではありません。',
+              hostText('services.settingsCommands.notBoolean'),
             );
           return this.update(
             owner,
@@ -253,24 +262,30 @@ export class SettingsCommands {
           );
         }
     }
-    throw new SettingsCommandError('NOT_FOUND', '設定コマンドが見つかりません。');
+    throw new SettingsCommandError(
+      'NOT_FOUND',
+      hostText('services.settingsCommands.commandMissing'),
+    );
   }
   checkRevision(revision: string) {
     if (revision !== this.revision())
       throw new SettingsCommandError(
         'REVISION_CONFLICT',
-        '設定を再取得して変更内容を確認してください。',
+        hostText('services.settingsCommands.refreshChanges'),
       );
     try {
       this.options.settings.assertRevision(this.options.settings.revision);
     } catch {
       throw new SettingsCommandError(
         'REVISION_CONFLICT',
-        '設定ファイルが変更されたか読み取れません。再取得してください。',
+        hostText('services.settingsCommands.fileChanged'),
       );
     }
     if (revision !== this.revision())
-      throw new SettingsCommandError('REVISION_CONFLICT', '設定を再取得してください。');
+      throw new SettingsCommandError(
+        'REVISION_CONFLICT',
+        hostText('services.settingsCommands.refresh'),
+      );
   }
   private applies(owner: string, key: string) {
     if (this.options.applets().some((a) => a.id === owner && a.collection)) return 'immediate';
@@ -286,14 +301,17 @@ export class SettingsCommands {
     dryRun: boolean,
   ) {
     if (!owner.available)
-      throw new SettingsCommandError('UNAVAILABLE', 'Appletが有効・稼働中である必要があります。');
+      throw new SettingsCommandError(
+        'UNAVAILABLE',
+        hostText('services.settingsCommands.appletRunningRequired'),
+      );
     try {
       this.validateChanges(fields, changes, true);
     } catch (error) {
       if (error instanceof SettingsCommandError) throw error;
       throw new SettingsCommandError(
         'INVALID_ARGUMENT',
-        '設定値の型・範囲・選択肢を確認してください。',
+        hostText('services.settingsCommands.valueFormat'),
       );
     }
     this.checkRevision(revision);
@@ -305,27 +323,33 @@ export class SettingsCommands {
         if (Object.hasOwn(changes, key) && !isAccentHex(changes[key]))
           throw new SettingsCommandError(
             'INVALID_ARGUMENT',
-            'カスタムの色は #RRGGBB 形式で指定してください。',
+            hostText('services.settingsCommands.colorFormat'),
           );
       Object.assign(next.host, changes);
     } else if (owner.collection) {
       const item = collectionRecord(next, owner.collection);
       if (!item?.enabled)
-        throw new SettingsCommandError('UNAVAILABLE', 'ページが有効である必要があります。');
+        throw new SettingsCommandError(
+          'UNAVAILABLE',
+          hostText('services.settingsCommands.pageEnabledRequired'),
+        );
       try {
         Object.assign(item, changes);
         if (typeof item.name === 'string') item.name = item.name.trim();
         if (!item.name || item.name.length > 80 || /[\x00-\x1f\x7f]/.test(item.name))
-          throw Error('ページ名が不正です。');
+          throw Error(hostText('services.settingsCommands.pageName'));
       } catch {
         throw new SettingsCommandError(
           'INVALID_ARGUMENT',
-          '公開されたページ設定の値を確認してください。',
+          hostText('services.settingsCommands.pageValue'),
         );
       }
     } else {
       if (!appletEnabled(next, owner.id))
-        throw new SettingsCommandError('UNAVAILABLE', 'Appletが有効である必要があります。');
+        throw new SettingsCommandError(
+          'UNAVAILABLE',
+          hostText('services.settingsCommands.appletEnabledRequired'),
+        );
       this.applyAppletChanges(next, owner.id, changes);
     }
     const after = this.values(owner, next, fields);
@@ -336,7 +360,7 @@ export class SettingsCommands {
       } catch {
         throw new SettingsCommandError(
           'SAVE_FAILED',
-          '設定を保存できませんでした。AppDockのログを確認してください。',
+          hostText('services.settingsCommands.saveFailed'),
         );
       }
     }

@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { isRetiredShellRegion, isShellRegion } from './shell';
 import type { Command, DeclaredCommand } from './contracts';
 import { customDescription } from './custom-commands';
@@ -11,16 +12,14 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
   return commands.map((command, index) => {
     const declaration = (value as Record<string, unknown>[])[index];
     if (declaration.automation !== undefined && typeof declaration.automation !== 'boolean')
-      throw new Error('automation はtrue / falseで指定してください。');
+      throw new Error(hostText('services.sharedExtensionCommands.invalidAutomation'));
     if (declaration.automation === true && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(command.id))
-      throw new Error(
-        '外部公開コマンドのIDは英数字・ピリオド・ハイフン・アンダースコアで指定してください。',
-      );
+      throw new Error(hostText('services.sharedExtensionCommands.invalidExternalId'));
     if (
       declaration.activateOnExecute !== undefined &&
       typeof declaration.activateOnExecute !== 'boolean'
     )
-      throw new Error('activateOnExecute はtrue / falseで指定してください。');
+      throw new Error(hostText('services.sharedExtensionCommands.invalidActivation'));
     const requirement = declaration.shellRequirement;
     if (
       requirement !== undefined &&
@@ -32,11 +31,11 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
           !isRetiredShellRegion((requirement as any).region)) ||
         !['resolved', 'visible'].includes((requirement as any).state))
     )
-      throw Error('shellRequirementは既知のregionとresolved / visibleです。');
+      throw Error(hostText('services.sharedExtensionCommands.invalidShellRequirement'));
     const aliases = declaration.aliases;
     if (aliases !== undefined) {
       if (!Array.isArray(aliases) || aliases.length > 8)
-        throw new Error('コマンドの別名は8件以内です。');
+        throw new Error(hostText('services.sharedExtensionCommands.aliasLimit'));
       for (const alias of aliases) {
         if (
           typeof alias !== 'string' ||
@@ -44,7 +43,7 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
           alias.length > 200 ||
           ids.has(alias)
         )
-          throw new Error('コマンドの別名が重複しているか形式が不正です。');
+          throw new Error(hostText('services.sharedExtensionCommands.invalidAliases'));
         ids.add(alias);
       }
     }
@@ -66,7 +65,11 @@ export function parseDeclaredCommands(id: string, value: unknown): DeclaredComma
 
 export function parseExtensionCommands(id: string, value: unknown): Command[] {
   if (!Array.isArray(value) || value.length > maxExtensionCommands)
-    throw new Error(`コマンド登録は${maxExtensionCommands}件以下の配列です。`);
+    throw new Error(
+      hostText('services.sharedExtensionCommands.countLimit', {
+        count: String(maxExtensionCommands),
+      }),
+    );
   const seen = new Set<string>();
   return value.map((command) => {
     if (
@@ -80,7 +83,7 @@ export function parseExtensionCommands(id: string, value: unknown): Command[] {
       command.title.length > 200 ||
       seen.has(command.id)
     )
-      throw new Error('コマンド登録の形式が正しくありません。');
+      throw new Error(hostText('services.sharedExtensionCommands.invalidRegistration'));
     seen.add(command.id);
     return {
       id: command.id,

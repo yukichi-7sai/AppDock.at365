@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -29,7 +30,7 @@ export function processLaunchSpec(
     config.mode !== 'executable' &&
     (!systemRoot || !path.win32.isAbsolute(systemRoot) || /[\x00-\x1f]/.test(systemRoot))
   )
-    return fail('CONFIGURATION_REQUIRED', 'Windowsの実行環境を確認してください。');
+    return fail('CONFIGURATION_REQUIRED', hostText('services.processLaunch.windowsEnvironment'));
   const file =
     config.mode === 'executable'
       ? config.executable
@@ -59,7 +60,7 @@ export function processLaunchSpec(
     1 +
     args.map(config.mode === 'cmd' ? (value) => value : quote).join(' ').length;
   if (length >= 32767 || (config.mode === 'cmd' && length > 8191))
-    return fail('INVALID_ARGUMENT', '実行するコマンドが長すぎます。');
+    return fail('INVALID_ARGUMENT', hostText('services.processLaunch.commandLength'));
   return { file, args, cwd, showConsole: config.showConsole, verbatim: config.mode === 'cmd' };
 }
 export class ProcessLaunchService {
@@ -108,12 +109,13 @@ export class ProcessLaunchService {
       spec = processLaunchSpec(raw, this.appDirectory);
     } catch (error) {
       if (error instanceof ProcessLaunchError) throw error;
-      return fail('INVALID_ARGUMENT', '実行ファイル・引数・作業フォルダーを確認してください。');
+      return fail('INVALID_ARGUMENT', hostText('services.processLaunch.invalidRequest'));
     }
     const check = () => {
-      if (this.closed) return fail('NOT_READY', 'プロセス起動は終了しています。');
-      if (context.signal?.aborted) return fail('CANCELLED', '起動前に取り消されました。');
-      if (!authorized()) return fail('API_DISABLED', 'プロセスの起動を許可してください。');
+      if (this.closed) return fail('NOT_READY', hostText('services.processLaunch.closed'));
+      if (context.signal?.aborted)
+        return fail('CANCELLED', hostText('services.processLaunch.cancelled'));
+      if (!authorized()) return fail('API_DISABLED', hostText('services.processLaunch.permission'));
     };
     check();
     let peer: JsonLinePeer;
@@ -121,30 +123,21 @@ export class ProcessLaunchService {
       peer = await this.worker();
       const [file, cwd] = await Promise.all([fs.stat(spec.file), fs.stat(spec.cwd)]);
       if (!file.isFile() || !cwd.isDirectory())
-        return fail('INVALID_ARGUMENT', '実行ファイルと作業フォルダーを確認してください。');
+        return fail('INVALID_ARGUMENT', hostText('services.processLaunch.invalidPaths'));
     } catch (error) {
       check();
       if (error instanceof ProcessLaunchError) throw error;
-      return fail(
-        'PROCESS_START_FAILED',
-        '実行環境・実行ファイル・作業フォルダーの存在とアクセス権を確認してください。',
-      );
+      return fail('PROCESS_START_FAILED', hostText('services.processLaunch.environment'));
     }
     check();
     let result: { ok: boolean; processId?: number };
     try {
       result = await peer.request('processes.start', spec);
     } catch {
-      return fail(
-        'OUTCOME_UNKNOWN',
-        'プロセスの起動を確認できません。結果を確認してから再実行してください。',
-      );
+      return fail('OUTCOME_UNKNOWN', hostText('services.processLaunch.launchUnconfirmed'));
     }
     if (!result?.ok)
-      return fail(
-        'PROCESS_START_FAILED',
-        'プロセスを起動できません。実行ファイルと権限を確認してください。',
-      );
+      return fail('PROCESS_START_FAILED', hostText('services.processLaunch.launchFailed'));
     if (Number.isSafeInteger(result.processId) && result.processId! > 0)
       await this.started?.(result.processId!);
     return { completion: 'processStarted' as const, effectVerified: false as const };

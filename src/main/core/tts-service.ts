@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID, createHash } from 'node:crypto';
 import { AutomationError } from './appdock-api';
 import {
@@ -24,7 +25,7 @@ export const ttsLimits = {
   retentionMs: 1800000,
 };
 export function waveDuration(b: Buffer): number {
-  const invalid = () => fail('TTS_INVALID_AUDIO', '返されたWAV音声が不正または未対応です。');
+  const invalid = () => fail('TTS_INVALID_AUDIO', hostText('services.ttsService.invalidWav'));
   if (
     b.length < 44 ||
     b.toString('ascii', 0, 4) !== 'RIFF' ||
@@ -87,9 +88,9 @@ export function waveDuration(b: Buffer): number {
     return invalid();
   const duration = data / byteRate;
   if (duration > ttsLimits.durationSeconds)
-    return fail('TTS_AUDIO_TOO_LONG', '読み上げ音声は10分以下にしてください。');
+    return fail('TTS_AUDIO_TOO_LONG', hostText('services.ttsService.durationLimit'));
   if (duration * rate * channels * 4 > 256 * 1024 * 1024)
-    return fail('TTS_AUDIO_TOO_LARGE', 'デコード後の音声が大きすぎます。');
+    return fail('TTS_AUDIO_TOO_LARGE', hostText('services.ttsService.decodedSizeLimit'));
   return duration;
 }
 export interface TtsInternalOptions {
@@ -162,12 +163,13 @@ export class TtsService {
   private config(requireModel = true) {
     const config = parseTtsSettings(this.options.settings());
     if (!config.baseUrl || (requireModel && !config.model))
-      fail('TTS_NOT_CONFIGURED', 'TTSの接続先とモデルを設定してください。');
+      fail('TTS_NOT_CONFIGURED', hostText('services.ttsService.configure'));
     return config;
   }
   private authorize(owner: string, speak: boolean) {
-    if (this.closed) fail('NOT_READY', '読み上げサービスは終了しています。');
-    if (!this.options.canUse(owner, speak)) fail('API_DISABLED', '読み上げが許可されていません。');
+    if (this.closed) fail('NOT_READY', hostText('services.ttsService.closed'));
+    if (!this.options.canUse(owner, speak))
+      fail('API_DISABLED', hostText('services.ttsService.permission'));
   }
   private prune() {
     const ended = [...this.jobs.values()]
@@ -199,7 +201,7 @@ export class TtsService {
       (speed !== undefined &&
         (typeof speed !== 'number' || !Number.isFinite(speed) || speed < 0.25 || speed > 4))
     )
-      fail('INVALID_ARGUMENT', '本文・ボイス・速度・requestIdを確認してください。');
+      fail('INVALID_ARGUMENT', hostText('services.ttsService.requestFormat'));
     const fingerprint = createHash('sha256')
       .update(JSON.stringify({ text, voice, speed }))
       .digest('hex');
@@ -209,19 +211,19 @@ export class TtsService {
     );
     if (previous) {
       if (previous.fingerprint !== fingerprint)
-        fail('TTS_REQUEST_CONFLICT', '同じrequestIdを異なる入力には使えません。');
+        fail('TTS_REQUEST_CONFLICT', hostText('services.ttsService.requestIdConflict'));
       return { ...previous.view, completion: 'accepted' };
     }
     const config = this.config();
     const selected = (voice as string | undefined) ?? config.defaultVoice;
-    if (!selected) fail('INVALID_ARGUMENT', 'ボイスを指定するか、既定のボイスを設定してください。');
+    if (!selected) fail('INVALID_ARGUMENT', hostText('services.ttsService.voiceRequired'));
     if ([...this.jobs.values()].filter((j) => !j.ended).length >= this.limits.capacity)
-      fail('TTS_QUEUE_FULL', '読み上げの待ち件数が上限に達しました。');
+      fail('TTS_QUEUE_FULL', hostText('services.ttsService.queueLimit'));
     let key: string | undefined;
     try {
       key = this.options.key(config.baseUrl);
     } catch {
-      fail('TTS_AUTH_FAILED', 'TTSのAPIキーを確認してください。');
+      fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
     const now = new Date().toISOString();
     const j: InternalJob = {
@@ -250,7 +252,7 @@ export class TtsService {
         this.finish(
           j,
           'failed',
-          new TtsError('TTS_QUEUE_TIMEOUT', '読み上げの待ち時間を超えました。'),
+          new TtsError('TTS_QUEUE_TIMEOUT', hostText('services.ttsService.timeout')),
         );
       }
     }, this.limits.queueMs);
@@ -261,7 +263,7 @@ export class TtsService {
   get(owner: string, id: unknown): TtsJob {
     this.prune();
     const j = typeof id === 'string' ? this.jobs.get(id) : undefined;
-    if (!j || j.owner !== owner) fail('NOT_FOUND', '読み上げジョブが見つかりません。');
+    if (!j || j.owner !== owner) fail('NOT_FOUND', hostText('services.ttsService.jobMissing'));
     return structuredClone(j!.view);
   }
   async stop(owner: string, id: unknown): Promise<TtsJob> {
@@ -341,7 +343,7 @@ export class TtsService {
       j.internal?.canStart?.() === false
     ) {
       this.cancel(j);
-      throw new TtsError('TTS_START_CANCELED', '読み上げの開始を取り消しました。');
+      throw new TtsError('TTS_START_CANCELED', hostText('services.ttsService.cancelled'));
     }
   }
   private async run(j: InternalJob) {
@@ -393,7 +395,7 @@ export class TtsService {
           'failed',
           error instanceof TtsError
             ? error
-            : new TtsError('TTS_PLAYBACK_FAILED', '読み上げ処理に失敗しました。'),
+            : new TtsError('TTS_PLAYBACK_FAILED', hostText('services.ttsService.failed')),
         );
     } finally {
       clearTimeout(j.timer);
@@ -417,16 +419,16 @@ export class TtsService {
       if (!response.ok) {
         const s = response.status;
         if (s === 401 || s === 403)
-          fail('TTS_AUTH_FAILED', 'TTSサーバーの認証を確認してください。');
-        if (s === 429) fail('TTS_RATE_LIMITED', 'TTSサーバーが受付を制限しています。');
+          fail('TTS_AUTH_FAILED', hostText('services.ttsService.authentication'));
+        if (s === 429) fail('TTS_RATE_LIMITED', hostText('services.ttsService.rateLimited'));
         if (voices && [404, 405].includes(s))
           fail(
             voices === 'models' ? 'TTS_MODELS_UNSUPPORTED' : 'TTS_VOICES_UNSUPPORTED',
             voices === 'models'
-              ? 'このサーバーはモデル一覧に対応していません。モデルIDを直接入力してください。'
-              : 'このサーバーはボイス一覧の取得に対応していません。',
+              ? hostText('services.ttsService.modelsUnsupported')
+              : hostText('services.ttsService.voicesUnsupported'),
           );
-        fail('TTS_SERVER_ERROR', `TTSサーバーがHTTP ${s}を返しました。`);
+        fail('TTS_SERVER_ERROR', hostText('services.ttsService.httpError', { status: String(s) }));
       }
       const mime = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
       if (
@@ -440,8 +442,8 @@ export class TtsService {
               'application/octet-stream',
             ].includes(mime)
       )
-        fail(invalidCode, 'TTSサーバーの応答形式が不正です。');
-      if (!response.body) fail(invalidCode, 'TTSサーバーの応答が空です。');
+        fail(invalidCode, hostText('services.ttsService.responseFormat'));
+      if (!response.body) fail(invalidCode, hostText('services.ttsService.emptyResponse'));
       const reader = response.body!.getReader(),
         chunks: Buffer[] = [];
       let size = 0;
@@ -453,7 +455,7 @@ export class TtsService {
           if (size > limit)
             fail(
               voices ? invalidCode : 'TTS_AUDIO_TOO_LARGE',
-              'TTSサーバーの応答が上限を超えました。',
+              hostText('services.ttsService.responseLimit'),
             );
           chunks.push(Buffer.from(next.value));
         }
@@ -464,8 +466,9 @@ export class TtsService {
       return Buffer.concat(chunks, size);
     } catch (error) {
       if (error instanceof TtsError) throw error;
-      if (init.signal?.aborted) fail('TTS_TIMEOUT', 'TTSサーバーの応答待ちが終了しました。');
-      return fail('TTS_CONNECTION_FAILED', 'TTSサーバーに接続できません。');
+      if (init.signal?.aborted)
+        fail('TTS_TIMEOUT', hostText('services.ttsService.responseTimeout'));
+      return fail('TTS_CONNECTION_FAILED', hostText('services.ttsService.connectionFailed'));
     } finally {
       if (response?.body && !response.body.locked) await response.body.cancel().catch(() => {});
     }
@@ -479,7 +482,7 @@ export class TtsService {
     try {
       key = this.options.key(config.baseUrl);
     } catch {
-      fail('TTS_AUTH_FAILED', 'TTSのAPIキーを確認してください。');
+      fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
     const abort = new AbortController();
     const promise = (async () => {
@@ -494,16 +497,14 @@ export class TtsService {
           this.limits.voiceBytes,
           'models',
         );
-        if (abort.signal.aborted) fail('TTS_TIMEOUT', 'モデル一覧の取得を取り消しました。');
+        if (abort.signal.aborted)
+          fail('TTS_TIMEOUT', hostText('services.ttsService.modelsCancelled'));
         this.authorize(owner, false);
         try {
           const value = JSON.parse(bytes.toString('utf8'));
           return { models: parseTtsModels(value) };
         } catch {
-          return fail(
-            'TTS_INVALID_MODELS',
-            'モデル一覧の応答が不正です。モデルIDを直接入力できます。',
-          );
+          return fail('TTS_INVALID_MODELS', hostText('services.ttsService.modelsFormat'));
         }
       } finally {
         clearTimeout(timer);
@@ -518,14 +519,15 @@ export class TtsService {
     const config = parseTtsSettings(this.options.settings());
     if (config.voicesSource === 'manual')
       return Promise.resolve({ voices: config.manualVoices, source: 'manual' });
-    if (!config.baseUrl) fail('TTS_NOT_CONFIGURED', 'TTSの接続先を設定してください。');
+    if (!config.baseUrl)
+      fail('TTS_NOT_CONFIGURED', hostText('services.ttsService.configureConnection'));
     const existing = this.lists.get(owner);
     if (existing && !existing.abort.signal.aborted) return existing.promise;
     let key: string | undefined;
     try {
       key = this.options.key(config.baseUrl);
     } catch {
-      fail('TTS_AUTH_FAILED', 'TTSのAPIキーを確認してください。');
+      fail('TTS_AUTH_FAILED', hostText('services.ttsService.apiKey'));
     }
     const abort = new AbortController();
     const promise = (async () => {
@@ -537,13 +539,14 @@ export class TtsService {
           this.limits.voiceBytes,
           true,
         );
-        if (abort.signal.aborted) fail('TTS_TIMEOUT', 'ボイス一覧の取得を取り消しました。');
+        if (abort.signal.aborted)
+          fail('TTS_TIMEOUT', hostText('services.ttsService.voicesCancelled'));
         this.authorize(owner, false);
         try {
           const v = JSON.parse(bytes.toString('utf8'));
           return { voices: parseTtsVoices(v.voices), source: 'endpoint' as const };
         } catch {
-          return fail('TTS_INVALID_VOICES', 'ボイス一覧の応答が不正です。');
+          return fail('TTS_INVALID_VOICES', hostText('services.ttsService.voicesFormat'));
         }
       } finally {
         clearTimeout(timer);

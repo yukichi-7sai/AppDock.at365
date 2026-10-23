@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs/promises';
 import { watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
@@ -23,7 +24,7 @@ export function imageFormat(bytes: Buffer) {
   if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'jpeg';
   if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP')
     return 'webp';
-  throw Error('PNG・JPEG・WebP画像を選んでください。');
+  throw Error(hostText('services.registeredImages.selectFormat'));
 }
 export class RegisteredImages {
   private entries = new Map<
@@ -52,15 +53,15 @@ export class RegisteredImages {
       real.toLowerCase() !== path.resolve(this.directory).toLowerCase() ||
       (await fs.lstat(this.directory)).isSymbolicLink()
     )
-      throw Error('画像ライブラリーの保存先が転送されています。');
+      throw Error(hostText('services.registeredImages.redirectedDirectory'));
   }
   private async validate(bytes: Buffer, name: string) {
     if (!imageFilename(name) || !bytes.length || bytes.length > maxBytes)
-      throw Error('画像は5MiB以下のPNG・JPEG・WebPで指定してください。');
+      throw Error(hostText('services.registeredImages.sizeFormat'));
     const format = imageFormat(bytes),
       ext = path.extname(name).slice(1).toLowerCase();
     if (!(format === 'jpeg' ? ['jpg', 'jpeg'].includes(ext) : format === ext))
-      throw Error('画像の形式とファイル名が一致しません。');
+      throw Error(hostText('services.registeredImages.extensionMismatch'));
     // Inspect chunk types, never arbitrary compressed bytes that happen to spell a marker.
     if (format === 'png' || format === 'webp') {
       for (let offset = format === 'png' ? 8 : 12; offset + 8 <= bytes.length;) {
@@ -71,7 +72,8 @@ export class RegisteredImages {
           offset + (format === 'png' ? 4 : 0),
           offset + (format === 'png' ? 8 : 4),
         );
-        if (type === 'acTL' || type === 'ANIM') throw Error('静止画像を選んでください。');
+        if (type === 'acTL' || type === 'ANIM')
+          throw Error(hostText('services.registeredImages.staticOnly'));
         const next = offset + (format === 'png' ? length + 12 : length + 8 + (length % 2));
         if (!Number.isSafeInteger(next) || next <= offset || next > bytes.length) break;
         offset = next;
@@ -85,22 +87,22 @@ export class RegisteredImages {
       image.height > 8192 ||
       image.width * image.height > 16 * 1024 * 1024
     )
-      throw Error('画像を読み込めません。画像サイズを小さくして試してください。');
+      throw Error(hostText('services.registeredImages.decodeFailed'));
     return image;
   }
   async read(ref: unknown) {
-    if (!imageReference(ref)) throw Error('登録画像の参照を確認してください。');
+    if (!imageReference(ref)) throw Error(hostText('services.registeredImages.invalidReference'));
     await this.root();
     const files = await fs.readdir(this.directory, { withFileTypes: true });
     const found = files.find((f) => f.name.toLowerCase() === imageKey(ref));
     if (!found?.isFile() || !imageFilename(found.name))
-      throw Error('登録画像がありません。同期の完了を待ってください。');
+      throw Error(hostText('services.registeredImages.missing'));
     const bytes = await this.fileBytes(found.name);
     await this.validate(bytes, found.name);
     return { ref: { file: found.name }, bytes };
   }
   private async fileBytes(name: string) {
-    if (!imageFilename(name)) throw Error('画像ファイル名を確認してください。');
+    if (!imageFilename(name)) throw Error(hostText('services.registeredImages.invalidFilename'));
     const file = path.join(this.directory, name);
     const stat = await fs.lstat(file);
     if (
@@ -109,9 +111,9 @@ export class RegisteredImages {
       stat.size > maxBytes ||
       (await fs.realpath(file)).toLowerCase() !== file.toLowerCase()
     )
-      throw Error('登録画像を安全に読み取れません。');
+      throw Error(hostText('services.registeredImages.unsafeFile'));
     const bytes = await fs.readFile(file);
-    if (bytes.length > maxBytes) throw Error('画像は5MiB以下で指定してください。');
+    if (bytes.length > maxBytes) throw Error(hostText('services.registeredImages.sizeLimit'));
     return bytes;
   }
   async add(bytes: Buffer, filename: string): Promise<RegisteredImageRef> {
@@ -126,7 +128,7 @@ export class RegisteredImages {
     const run = async () => {
       const original = await this.read(ref);
       if (!generation || createHash('sha256').update(original.bytes).digest('hex') !== generation)
-        throw Error('画像が変更されました。再取得してから削除してください。');
+        throw Error(hostText('services.registeredImages.changed'));
       const commit = options.prepare();
       const file = path.join(this.directory, original.ref.file);
       let recycled = false;
@@ -147,13 +149,9 @@ export class RegisteredImages {
               throw restoreError;
           }
         } catch {
-          throw Error(
-            '画像の削除を完了できず、元の画像も復元できませんでした。保存先とごみ箱を確認してください。',
-          );
+          throw Error(hostText('services.registeredImages.restoreFailed'));
         }
-        throw recycled
-          ? error
-          : Error('画像をごみ箱へ移せませんでした。ファイルと保存先を確認してください。');
+        throw recycled ? error : Error(hostText('services.registeredImages.trashFailed'));
       } finally {
         if (this.refreshing) await this.refreshing;
         await this.refresh();
@@ -182,13 +180,11 @@ export class RegisteredImages {
       const duplicate = async () => {
         const saved = await this.read(ref);
         if (!saved.bytes.equals(bytes))
-          throw Error(
-            `「${name}」と同名の別画像が登録されています。元のファイル名を変えてください。`,
-          );
+          throw Error(hostText('services.registeredImages.duplicateName', { name: String(name) }));
         return { ref: saved.ref, reused: true };
       };
       if (existing) return duplicate();
-      if (files.length >= 512) throw Error('登録できる画像は512件までです。');
+      if (files.length >= 512) throw Error(hostText('services.registeredImages.countLimit'));
       const temp = path.join(this.directory, `.${randomUUID()}.tmp`);
       const handle = await fs.open(temp, 'wx');
       try {
@@ -221,10 +217,10 @@ export class RegisteredImages {
       input.base64.length > 700000 ||
       !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(input.base64)
     )
-      throw Error('画像データを確認してください。');
+      throw Error(hostText('services.registeredImages.invalidData'));
     const bytes = Buffer.from(input.base64, 'base64');
     if (bytes.length > 512 * 1024)
-      throw Error('プログラムから登録する画像は512KiB以下で指定してください。');
+      throw Error(hostText('services.registeredImages.programmaticSizeLimit'));
     const format = imageFormat(bytes);
     return this.add(
       bytes,
@@ -335,7 +331,7 @@ export class RegisteredImages {
       }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
-        this.error = '画像ライブラリーを読み取れません。保存先を確認してください。';
+        this.error = hostText('services.registeredImages.readFailed');
       for (const value of this.entries.values()) {
         value.entry.available = false;
         value.entry.state =

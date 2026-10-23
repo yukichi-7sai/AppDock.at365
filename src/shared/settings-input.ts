@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -11,11 +12,11 @@ export function mergeSettingsInput<T>(before: T, next: T, current: T): T {
         typeof p === 'symbol' ||
         typeof p === 'bigint'
       )
-        throw Error('設定値が不正です。');
+        throw Error(hostText('services.sharedSettingsInput.invalidValue'));
       return p;
     });
     if (!text || new TextEncoder().encode(text).length > 1024 * 1024)
-      throw Error('設定は1MB以下にしてください。');
+      throw Error(hostText('services.sharedSettingsInput.sizeLimit'));
   };
   check(before);
   check(next);
@@ -25,7 +26,7 @@ export function mergeSettingsInput<T>(before: T, next: T, current: T): T {
       const result = { ...c };
       for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
         if (['__proto__', 'constructor', 'prototype'].includes(key))
-          throw Error('設定キーが不正です。');
+          throw Error(hostText('services.sharedSettingsInput.invalidKey'));
         if (!equal(a[key], b[key])) {
           const part = merge(a[key], b[key], c[key]);
           if (part === undefined) delete result[key];
@@ -35,7 +36,7 @@ export function mergeSettingsInput<T>(before: T, next: T, current: T): T {
       return result;
     }
     if (!equal(c, a) && !equal(c, b))
-      throw Error('同じ設定が別の場所で変わりました。再読み込みして入力し直してください。');
+      throw Error(hostText('services.sharedSettingsInput.conflict'));
     return structuredClone(b);
   };
   return merge(before, next, current) as T;

@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
@@ -118,16 +119,16 @@ function safeError(error: unknown, sent = false): { code: string; message: strin
   if (status === 401 || status === 403 || (error as any)?.constructor?.name === 'UnauthorizedError')
     return {
       code: 'AUTH_REQUIRED',
-      message: '接続先の認証情報を確認してください。OAuthには対応していません。',
+      message: hostText('services.mcpClient.authentication'),
     };
   return sent
     ? {
         code: 'OUTCOME_UNKNOWN',
-        message: '接続先の応答を確認できません。操作先の状態を確認してから再実行してください。',
+        message: hostText('services.mcpClient.responseUnconfirmed'),
       }
     : {
         code: 'CONNECTION_FAILED',
-        message: 'MCP接続を確認してください。接続先・対応方式・起動状態を設定画面で確認できます。',
+        message: hostText('services.mcpClient.connectionFailed'),
       };
 }
 export class McpClientService {
@@ -153,32 +154,32 @@ export class McpClientService {
   }
   private allow(actor: McpActor, execute = false) {
     if (!this.options.authorized(actor, execute || actor.management === true))
-      fail('API_DISABLED', 'MCPの利用が許可されていません。');
+      fail('API_DISABLED', hostText('services.mcpClient.permission'));
   }
   private configuration(actor: McpActor, id: unknown, tool?: string) {
     this.allow(actor);
     if (!mcpUuid(id) || !this.options.settings.roster().some((v) => v.id === id))
-      return fail('NOT_FOUND', 'MCP接続先が見つかりません。');
+      return fail('NOT_FOUND', hostText('services.mcpClient.connectionMissing'));
     let c: McpConnection | undefined;
     try {
       c = this.options.settings.connection(id);
     } catch {
-      return fail('CONFIGURATION_REQUIRED', 'MCPのPC専用設定を確認してください。');
+      return fail('CONFIGURATION_REQUIRED', hostText('services.mcpClient.invalidSettings'));
     }
     if (
       actor.external &&
       !actor.management &&
       (!c?.published || (tool && !c.publishedTools.includes(tool)))
     )
-      return fail('NOT_FOUND', '公開されたMCP接続先またはツールが見つかりません。');
+      return fail('NOT_FOUND', hostText('services.mcpClient.publishedToolMissing'));
     if (!c?.enabled)
-      return fail('CONNECTION_DISABLED', 'このPCでMCP接続先を設定して有効にしてください。');
+      return fail('CONNECTION_DISABLED', hostText('services.mcpClient.configureConnection'));
     return c;
   }
   private page<T>(items: T[], params: Record<string, unknown>, identity: string) {
     const limit = params.limit === undefined ? 20 : params.limit;
     if (!Number.isInteger(limit) || Number(limit) < 1 || Number(limit) > 50)
-      return fail('INVALID_ARGUMENT', 'limitは1〜50です。');
+      return fail('INVALID_ARGUMENT', hostText('services.mcpClient.pageSize'));
     const revision = mcpDigest([identity, items]);
     let offset = 0;
     if (params.cursor !== undefined) {
@@ -193,7 +194,7 @@ export class McpClientService {
           throw Error();
         offset = value.o;
       } catch {
-        return fail('STALE_CURSOR', '一覧が変更されました。先頭から取得してください。');
+        return fail('STALE_CURSOR', hostText('services.mcpClient.listChanged'));
       }
     }
     const next = offset + Number(limit);
@@ -240,7 +241,7 @@ export class McpClientService {
   }
   private async connectionAttempt<T>(id: string, work: () => Promise<T>) {
     if (this.connectionChecks.has(id))
-      return { warning: { code: 'BUSY', message: 'この接続先の接続確認が進行中です。' } };
+      return { warning: { code: 'BUSY', message: hostText('services.mcpClient.connecting') } };
     this.connectionChecks.add(id);
     try {
       return { result: await work() };
@@ -273,7 +274,7 @@ export class McpClientService {
       return {
         saved: false,
         revision: this.options.settings.revision(),
-        warning: { code: 'BUSY', message: 'この接続先の接続確認が進行中です。' },
+        warning: { code: 'BUSY', message: hostText('services.mcpClient.connecting') },
       };
     // Suppress persistent diagnostics before the temporary ON value is published.
     this.connectionChecks.add(id);
@@ -320,7 +321,7 @@ export class McpClientService {
       const target =
         typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
       if (new URL(target).href !== url)
-        return fail('UNSUPPORTED_REDIRECT', 'MCP接続先のリダイレクトには対応していません。');
+        return fail('UNSUPPORTED_REDIRECT', hostText('services.mcpClient.redirectsUnsupported'));
       const headers = new Headers(init.headers);
       if (token) headers.set('Authorization', 'Bearer ' + token);
       else headers.delete('Authorization');
@@ -331,13 +332,10 @@ export class McpClientService {
         credentials: 'omit',
       });
       if (response.status === 401 || response.status === 403)
-        return fail(
-          'AUTH_REQUIRED',
-          '接続先の認証情報を確認してください。OAuthには対応していません。',
-        );
+        return fail('AUTH_REQUIRED', hostText('services.mcpClient.authentication'));
       if (Number(response.headers.get('content-length') ?? 0) > 2 * 1024 * 1024) {
         await response.body?.cancel();
-        return fail('RESULT_TOO_LARGE', 'MCP応答が上限を超えました。');
+        return fail('RESULT_TOO_LARGE', hostText('services.mcpClient.responseLimit'));
       }
       if (!response.body) return response;
       let bytes = 0;
@@ -366,10 +364,11 @@ export class McpClientService {
       record = undefined;
     }
     if (!record) {
-      if (this.sessions.size >= 32) return fail('BUSY', '接続数の上限に達しました。');
+      if (this.sessions.size >= 32)
+        return fail('BUSY', hostText('services.mcpClient.connectionLimit'));
       const secret = this.options.settings.secrets(id);
       if (c.authentication === 'bearer' && !secret.token)
-        return fail('AUTH_REQUIRED', 'Bearerを再入力してください。');
+        return fail('AUTH_REQUIRED', hostText('services.mcpClient.bearerRequired'));
       const transport: Transport =
         c.transport === 'stdio'
           ? new StdioClientTransport({
@@ -414,7 +413,7 @@ export class McpClientService {
       client.onerror = () => {}; // Raw protocol errors can contain credentials or tool arguments.
       client.onclose = () => {
         if (!current.closed) {
-          current.error = '接続が閉じられました。再取得で接続を確認してください。';
+          current.error = hostText('services.mcpClient.connectionClosed');
           current.fetchedAt = 0;
           this.options.changed?.();
         }
@@ -429,13 +428,17 @@ export class McpClientService {
             current.controller.signal.aborted ||
             this.options.settings.identity(id) !== identity
           )
-            return fail('CANCELLED', '接続設定が変更されました。');
+            return fail('CANCELLED', hostText('services.mcpClient.settingsChanged'));
           if (!client.getServerCapabilities()?.tools)
-            return fail('UNSUPPORTED_CAPABILITY', '接続先はtoolsに対応していません。');
+            return fail('UNSUPPORTED_CAPABILITY', hostText('services.mcpClient.toolsUnsupported'));
           if (/^appdock(?:$|[ ._-])/i.test(client.getServerVersion()?.name ?? ''))
-            return fail('HUB_CYCLE', 'AppDock自身・別のAppDockへの中継接続はできません。');
+            return fail('HUB_CYCLE', hostText('services.mcpClient.relayForbidden'));
         } catch (error) {
-          if (current.closed) throw new AutomationError('CANCELLED', '接続は取り消されました。');
+          if (current.closed)
+            throw new AutomationError(
+              'CANCELLED',
+              hostText('services.mcpClient.connectionCancelled'),
+            );
           const safe = safeError(error);
           this.connectionErrors.set(id, safe.message);
           current.error = safe.message;
@@ -451,7 +454,8 @@ export class McpClientService {
     }
     await record.ready;
     this.configuration(actor, id);
-    if (record.closed) return fail('CONNECTION_FAILED', 'MCP接続が閉じられました。');
+    if (record.closed)
+      return fail('CONNECTION_FAILED', hostText('services.mcpClient.disconnected'));
     return record;
   }
   private async catalog(actor: McpActor, id: string, refresh = false) {
@@ -475,18 +479,18 @@ export class McpClientService {
           boundedJson(reply, 1024 * 1024, 48, 65536);
           for (const raw of reply.tools) {
             if (tools.length >= 512 || names.has(raw.name) || !/^[\w.-]{1,128}$/.test(raw.name))
-              return fail('INVALID_CATALOG', 'ツールの件数・名前・重複を確認してください。');
+              return fail('INVALID_CATALOG', hostText('services.mcpClient.invalidToolList'));
             boundedJson(raw, 65536, 40, 8192);
             names.add(raw.name);
             if (raw.name.startsWith('appdock_mcp_'))
-              return fail('HUB_CYCLE', 'MCPハブの再中継には対応していません。');
+              return fail('HUB_CYCLE', hostText('services.mcpClient.hubRelayForbidden'));
             let unsupportedReason: string | undefined;
             try {
               safeSchema(raw.inputSchema);
               if (raw.outputSchema) safeSchema(raw.outputSchema);
               if (raw.execution?.taskSupport === 'required') throw Error();
             } catch {
-              unsupportedReason = 'このツールのSchemaまたはMCP Tasksには対応していません。';
+              unsupportedReason = hostText('services.mcpClient.schemaUnsupported');
             }
             tools.push({
               name: raw.name,
@@ -502,7 +506,7 @@ export class McpClientService {
           cursor = reply.nextCursor;
           if (!cursor) break;
           if (cursors.has(cursor) || page === 15)
-            return fail('INVALID_CATALOG', 'ツール一覧のページ上限または循環を検出しました。');
+            return fail('INVALID_CATALOG', hostText('services.mcpClient.pageLimit'));
           cursors.add(cursor);
         }
         boundedJson(tools, 1024 * 1024, 48, 65536);
@@ -511,7 +515,7 @@ export class McpClientService {
           record.toolsEpoch !== epoch ||
           this.options.settings.identity(id) !== record.identity
         )
-          return fail('STALE_CATALOG', 'ツール一覧が変更されました。再取得してください。');
+          return fail('STALE_CATALOG', hostText('services.mcpClient.toolsChanged'));
         record.tools = tools;
         this.connectionErrors.delete(id);
         record.fetchedAt = Date.now();
@@ -519,7 +523,8 @@ export class McpClientService {
         this.options.changed?.();
         return tools;
       } catch (error) {
-        if (record.closed) throw new AutomationError('CANCELLED', '一覧取得は取り消されました。');
+        if (record.closed)
+          throw new AutomationError('CANCELLED', hostText('services.mcpClient.listCancelled'));
         const safe = safeError(error);
         record.error = safe.message;
         this.connectionErrors.set(id, safe.message);
@@ -548,13 +553,13 @@ export class McpClientService {
   }
   async tool(actor: McpActor, params: Record<string, unknown>) {
     if (typeof params.name !== 'string')
-      return fail('INVALID_ARGUMENT', 'ツール名を指定してください。');
+      return fail('INVALID_ARGUMENT', hostText('services.mcpClient.toolNameRequired'));
     this.configuration(actor, params.serverId, params.name);
     const tool = (
       await this.catalog(actor, params.serverId as string, params.refresh === true)
     ).find((v) => v.name === params.name);
     this.configuration(actor, params.serverId, params.name);
-    if (!tool) return fail('NOT_FOUND', 'ツールが見つかりません。');
+    if (!tool) return fail('NOT_FOUND', hostText('services.mcpClient.toolMissing'));
     return { tool: structuredClone(tool) };
   }
   inspectTools(actor: McpActor, params: Record<string, unknown>) {
@@ -566,7 +571,7 @@ export class McpClientService {
       !mcpUuid(config.serverId) ||
       !this.options.settings.roster().some((s) => s.id === config.serverId)
     )
-      return '登録済みのMCP接続先を選択してください。';
+      return hostText('services.mcpClient.registeredConnectionRequired');
     const record = this.sessions.get(config.serverId);
     if (
       !record?.tools ||
@@ -575,14 +580,14 @@ export class McpClientService {
       Date.now() - record.fetchedAt >= 30000 ||
       record.identity !== this.options.settings.identity(config.serverId)
     )
-      return '接続先のツールを取得してから保存してください。';
+      return hostText('services.mcpClient.fetchToolsFirst');
     const tool = record.tools.find((t) => t.name === config.toolName);
     if (!tool || tool.toolRevision !== config.toolRevision)
-      return 'ツールの詳細を再取得し、現在の引数と仕様を確認してください。';
+      return hostText('services.mcpClient.refreshTool');
     if (tool.unsupportedReason) return tool.unsupportedReason;
     return jsonObject(config.arguments) && safeSchema(tool.inputSchema)(config.arguments).valid
       ? null
-      : '固定引数がツールのSchemaに一致しません。';
+      : hostText('services.mcpClient.fixedArgumentsSchema');
   }
   commandUnavailable(config: JsonObject): string | null {
     try {
@@ -590,14 +595,14 @@ export class McpClientService {
         !mcpUuid(config.serverId) ||
         !this.options.settings.roster().some((s) => s.id === config.serverId)
       )
-        return 'MCP接続先が未登録です。';
+        return hostText('services.mcpClient.unregisteredConnection');
       const connection = this.options.settings.connection(config.serverId);
-      if (!connection?.enabled) return 'このPCのMCP接続先が未設定またはOFFです。';
+      if (!connection?.enabled) return hostText('services.mcpClient.connectionDisabled');
       if (
         connection.authentication === 'bearer' &&
         !this.options.settings.secrets(config.serverId).token
       )
-        return 'MCP接続先のBearerを再入力してください。';
+        return hostText('services.mcpClient.resetBearer');
       const record = this.sessions.get(config.serverId);
       if (record?.tools && Date.now() - record.fetchedAt < 30000)
         return this.commandValidation(config);
@@ -605,7 +610,7 @@ export class McpClientService {
         return this.connectionErrors.get(config.serverId)!;
       return null; // No current catalog after restart: validate on execution.
     } catch {
-      return 'MCP接続先の設定または認証情報を確認してください。';
+      return hostText('services.mcpClient.invalidCredentials');
     }
   }
   start(
@@ -616,7 +621,7 @@ export class McpClientService {
   ): Promise<McpJob> {
     if (actor.management)
       return Promise.reject(
-        new AutomationError('API_DISABLED', '管理用のツール確認では実行できません。'),
+        new AutomationError('API_DISABLED', hostText('services.mcpClient.managementOnly')),
       );
     this.allow(actor, true);
     this.expire();
@@ -633,7 +638,7 @@ export class McpClientService {
           Number(params.timeoutMs) > 600000))
     )
       return Promise.reject(
-        new AutomationError('INVALID_ARGUMENT', 'MCP呼出しの引数を確認してください。'),
+        new AutomationError('INVALID_ARGUMENT', hostText('services.mcpClient.callArguments')),
       );
     boundedJson(params.arguments, 65536, 32, 8192);
     this.configuration(actor, params.serverId, params.name);
@@ -645,7 +650,7 @@ export class McpClientService {
     if (existing) {
       if (existing.signature !== signature)
         return Promise.reject(
-          new AutomationError('REQUEST_CONFLICT', '同じrequestIdに別の入力を指定できません。'),
+          new AutomationError('REQUEST_CONFLICT', hostText('services.mcpClient.requestIdConflict')),
         );
       return Promise.resolve(this.get(actor, existing.job.jobId));
     }
@@ -654,10 +659,15 @@ export class McpClientService {
       return pending.signature === signature
         ? pending.promise
         : Promise.reject(
-            new AutomationError('REQUEST_CONFLICT', '同じrequestIdに別の入力を指定できません。'),
+            new AutomationError(
+              'REQUEST_CONFLICT',
+              hostText('services.mcpClient.requestIdConflict'),
+            ),
           );
     if (this.starts.size >= 8)
-      return Promise.reject(new AutomationError('BUSY', 'MCPの受付数の上限に達しました。'));
+      return Promise.reject(
+        new AutomationError('BUSY', hostText('services.mcpClient.admissionLimit')),
+      );
     const promise = this.createJob(actor, params, signature, signal, detachAfterAcceptance).finally(
       () => this.starts.delete(key),
     );
@@ -676,16 +686,13 @@ export class McpClientService {
     const tool = (await this.catalog(actor, serverId, true)).find((t) => t.name === name);
     this.allow(actor, true);
     this.configuration(actor, serverId, name);
-    if (signal?.aborted) return fail('CANCELLED', '呼出しは取り消されました。');
-    if (!tool) return fail('NOT_FOUND', 'ツールが見つかりません。');
+    if (signal?.aborted) return fail('CANCELLED', hostText('services.mcpClient.cancelled'));
+    if (!tool) return fail('NOT_FOUND', hostText('services.mcpClient.toolMissing'));
     if (tool.unsupportedReason) return fail('UNSUPPORTED_SCHEMA', tool.unsupportedReason);
     if (tool.toolRevision !== p.toolRevision)
-      return fail(
-        'SCHEMA_CHANGED',
-        'ツールまたは接続設定が変わりました。詳細を再取得して設定を確認してください。',
-      );
+      return fail('SCHEMA_CHANGED', hostText('services.mcpClient.toolChanged'));
     if (!safeSchema(tool.inputSchema)(p.arguments).valid)
-      return fail('INVALID_ARGUMENT', '引数がツールのSchemaに一致しません。');
+      return fail('INVALID_ARGUMENT', hostText('services.mcpClient.argumentSchema'));
     const running = [...this.jobs.values()].filter((r) => r.job.state === 'running');
     if (
       running.length >= 4 ||
@@ -695,10 +702,7 @@ export class McpClientService {
         (r) => r.actor.owner === actor.owner && r.job.state === 'running',
       ).length >= 4
     )
-      return fail(
-        'BUSY',
-        'MCPツールを実行中か保持件数が上限です。完了・保持期限を待ってください。',
-      );
+      return fail('BUSY', hostText('services.mcpClient.busy'));
     const session = this.sessions.get(serverId)!;
     const job: McpJob = {
       jobId: randomUUID(),
@@ -712,7 +716,7 @@ export class McpClientService {
     const abort = () =>
       this.finish(record, 'cancelled', {
         code: 'CANCELLED',
-        message: '待機を取り消しました。操作先で発生した効果は戻りません。',
+        message: hostText('services.mcpClient.waitCancelled'),
       });
     const record: JobRecord = {
       actor: structuredClone(actor),
@@ -726,7 +730,7 @@ export class McpClientService {
         () =>
           this.finish(record, record.sent ? 'outcome-unknown' : 'failed', {
             code: 'TIMEOUT',
-            message: '待ち時間を超えました。操作先を確認してから再実行してください。',
+            message: hostText('services.mcpClient.timeout'),
           }),
         Number(p.timeoutMs ?? 60000),
       ),
@@ -773,7 +777,7 @@ export class McpClientService {
         )
           return this.finish(record, 'outcome-unknown', {
             code: 'INVALID_RESULT',
-            message: '接続先の結果が出力Schemaに一致しません。操作先を確認してください。',
+            message: hostText('services.mcpClient.outputSchema'),
           });
         const result: McpResult = {
           content: raw.content as JsonObject[],
@@ -791,7 +795,7 @@ export class McpClientService {
           raw.isError
             ? {
                 code: 'TOOL_ERROR',
-                message: '接続先ツールがエラーを返しました。結果を確認してください。',
+                message: hostText('services.mcpClient.toolError'),
               }
             : undefined,
         );
@@ -821,7 +825,7 @@ export class McpClientService {
     this.reconcile();
     const record = this.jobs.get(String(id));
     if (!record || (actor.kind !== 'host' && record.actor.owner !== actor.owner))
-      return fail('NOT_FOUND', 'ジョブが見つかりません。期限切れ・再起動後は再開できません。');
+      return fail('NOT_FOUND', hostText('services.mcpClient.jobMissing'));
     this.configuration(actor, record.job.serverId, record.job.toolName);
     return structuredClone(record.job);
   }
@@ -831,7 +835,7 @@ export class McpClientService {
     const record = this.jobs.get(String(id))!;
     this.finish(record, 'cancelled', {
       code: 'CANCELLED',
-      message: '待機を取り消しました。操作先で発生した効果は戻りません。',
+      message: hostText('services.mcpClient.waitCancelled'),
     });
     return structuredClone(record.job);
   }
@@ -876,7 +880,7 @@ export class McpClientService {
         delete r.job.result;
         this.finish(r, 'cancelled', {
           code: 'PERMISSION_REVOKED',
-          message: '許可・接続設定・呼出し元が変わったため取り消しました。',
+          message: hostText('services.mcpClient.authorizationChanged'),
         });
       }
     }
@@ -884,7 +888,10 @@ export class McpClientService {
   async shutdown() {
     clearInterval(this.reaper);
     for (const r of this.jobs.values())
-      this.finish(r, 'cancelled', { code: 'SHUTDOWN', message: 'AppDockを終了しています。' });
+      this.finish(r, 'cancelled', {
+        code: 'SHUTDOWN',
+        message: hostText('services.mcpClient.quitting'),
+      });
     await Promise.allSettled([...this.sessions.values()].map((s) => this.close(s)));
     this.jobs.clear();
   }

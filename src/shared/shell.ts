@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
 /** Shell targets are deliberately limited. New targets require an explicit request. */
@@ -11,13 +12,13 @@ export type ShellRegion =
   | 'notification.desktop';
 
 export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
-  { id: 'titlebar', title: 'タイトルバー' },
-  { id: 'ribbon', title: 'リボン' },
-  { id: 'statusbar', title: 'ステータスバー' },
-  { id: 'overlay.command-palette', title: 'コマンドパレット' },
-  { id: 'overlay.ribbon-group', title: 'リボングループ（一時展開ポップアップ）' },
-  { id: 'notification.banner', title: '通知バナー' },
-  { id: 'notification.desktop', title: 'デスクトップ通知' },
+  { id: 'titlebar', title: hostText('services.sharedShell.titleBar') },
+  { id: 'ribbon', title: hostText('services.sharedShell.ribbon') },
+  { id: 'statusbar', title: hostText('services.sharedShell.statusBar') },
+  { id: 'overlay.command-palette', title: hostText('services.sharedShell.commandPalette') },
+  { id: 'overlay.ribbon-group', title: hostText('services.sharedShell.ribbonGroup') },
+  { id: 'notification.banner', title: hostText('services.sharedShell.banner') },
+  { id: 'notification.desktop', title: hostText('services.sharedShell.desktopNotifications') },
 ];
 export function isShellRegion(value: unknown): value is ShellRegion {
   return shellRegions.some((r) => r.id === value);
@@ -79,7 +80,7 @@ export function parseShellProviders(host: Record<string, unknown>): Record<strin
       Array.isArray(value) ||
       Object.keys(value).length > 32
     )
-      throw Error('host.shellProviders は32件以内の領域とShell IDのオブジェクトです。');
+      throw Error(hostText('services.sharedShell.providerLimit'));
     const entries = Object.entries(value);
     if (
       entries.some(
@@ -89,11 +90,11 @@ export function parseShellProviders(host: Record<string, unknown>): Record<strin
           !id(provider),
       )
     )
-      throw Error('host.shellProviders の領域またはShell IDが不正です。');
+      throw Error(hostText('services.sharedShell.invalidProvider'));
     return Object.fromEntries(entries) as Record<string, string>;
   }
   if (!Object.hasOwn(host, 'shellProvider') || host.shellProvider === undefined) return {};
-  if (!id(host.shellProvider)) throw Error('host.shellProvider はShellのIDです。');
+  if (!id(host.shellProvider)) throw Error(hostText('services.sharedShell.invalidLegacyProvider'));
   return Object.fromEntries(
     [
       'ribbon',

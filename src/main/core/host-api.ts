@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { TypedNotifications } from './typed-notifications';
 import { SettingsCommands } from './settings-commands';
 import fs from 'node:fs';
@@ -55,7 +56,7 @@ export function createHostApi(
     params: unknown,
     localPage = false,
   ): Promise<unknown> => {
-    if (!isObject(params)) throw new Error('API引数はオブジェクトで指定してください。');
+    if (!isObject(params)) throw new Error(hostText('services.hostApi.argumentObject'));
     const p = params;
     const id = e.manifest.id;
     const validAction = (action: unknown) =>
@@ -72,10 +73,12 @@ export function createHostApi(
           !action.command));
     const stoppingLog = e.state === 'stopping' && method === 'host.log';
     if (['stopped', 'stopping', 'error'].includes(e.state) && !stoppingLog)
-      throw new Error('拡張は停止しています。');
+      throw new Error(hostText('services.hostApi.stopped'));
     const requireCapability = (cap: string) => {
       if (!e.manifest.capabilities?.includes(cap))
-        throw new Error(`manifest の capabilities に ${cap} が必要です。`);
+        throw new Error(
+          hostText('services.hostApi.capabilityRequired', { capability: String(cap) }),
+        );
     };
     const key = () => {
       if (
@@ -83,14 +86,14 @@ export function createHostApi(
         !/^[a-zA-Z0-9._-]{1,100}$/.test(p.key) ||
         ['__proto__', 'constructor', 'prototype'].includes(p.key)
       )
-        throw new Error('key の形式が正しくありません。');
+        throw new Error(hostText('services.hostApi.invalidKey'));
       return p.key as string;
     };
     switch (method) {
       case 'host.customCommands.register':
         requireCapability('custom-commands');
         if (!customCommands || !e.runtimeSession || Object.keys(p).some((k) => k !== 'typeId'))
-          throw Error('種類登録を利用できません。');
+          throw Error(hostText('services.hostApi.typeRegistrationUnavailable'));
         customCommands.registerApplet(id, e.runtimeSession, p.typeId);
         return null;
       case 'host.ribbon.setBadge': {
@@ -101,7 +104,7 @@ export function createHostApi(
           Object.keys(p).some((key) => !['target', 'badge'].includes(key)) ||
           !isObject(p.target)
         )
-          throw Error('バッジの対象ページを指定してください。');
+          throw Error(hostText('services.hostApi.badgePage'));
         const target = p.target;
         let item: string | undefined;
         if (Object.keys(target).length === 1 && typeof target.pageId === 'string') {
@@ -125,7 +128,7 @@ export function createHostApi(
             );
           if (page) item = pageKey(page.id, 'main');
         }
-        if (!item) throw Error('自身が登録したページだけにバッジを設定できます。');
+        if (!item) throw Error(hostText('services.hostApi.ownBadgePage'));
         return ribbonBadges.set(id, e.runtimeSession, item, p.badge);
       }
       case 'host.webProfiles.list':
@@ -134,11 +137,11 @@ export function createHostApi(
       case 'host.webProfiles.clear':
       case 'host.webProfiles.delete': {
         requireCapability('web-profiles');
-        if (!collectionHost) throw Error('WebプロフィールAPIは準備中です。');
+        if (!collectionHost) throw Error(hostText('services.hostApi.webProfilesNotReady'));
         const profiles = collectionHost().profiles(id);
         if (method === 'host.webProfiles.list') return profiles.accounts();
         if (method === 'host.webProfiles.add') return profiles.addAccount(p.name);
-        if (typeof p.id !== 'string') throw Error('アカウントIDを指定してください。');
+        if (typeof p.id !== 'string') throw Error(hostText('services.hostApi.accountId'));
         if (method === 'host.webProfiles.rename') return profiles.renameAccount(p.id, p.name);
         if (method === 'host.webProfiles.clear') return profiles.clearAccount(p.id);
         return profiles.deleteAccount(p.id);
@@ -149,7 +152,7 @@ export function createHostApi(
       case 'host.registeredImages.import':
       case 'host.registeredImages.copyToCache': {
         requireCapability('registered-images');
-        if (!imageLibrary) throw Error('画像ライブラリーは準備中です。');
+        if (!imageLibrary) throw Error(hostText('services.hostApi.imageLibraryNotReady'));
         if (
           [
             'host.registeredImages.snapshot',
@@ -158,7 +161,7 @@ export function createHostApi(
           ].includes(method) &&
           !localPage
         )
-          throw Error('画像の一覧と選択はローカル画面から利用してください。');
+          throw Error(hostText('services.hostApi.localImageSelectionOnly'));
         if (method === 'host.registeredImages.snapshot') {
           const snapshot = await imageLibrary.snapshot();
           return {
@@ -177,12 +180,12 @@ export function createHostApi(
             () => e.state === 'running' && generation === e.runtimeSession,
           );
           if (e.state !== 'running' || generation !== e.runtimeSession)
-            throw Error('画像選択の提供元が終了しました。');
+            throw Error(hostText('services.hostApi.imageSelectionProviderStopped'));
           return result;
         }
         if (method === 'host.registeredImages.import') {
           if (settings.writesBlocked)
-            throw Error('設定ファイルを復旧してから画像を登録してください。');
+            throw Error(hostText('services.hostApi.settingsRecoveryRequired'));
           return imageLibrary.images.import(p as { base64: string; filename?: string });
         }
         const generation = e.runtimeSession;
@@ -196,7 +199,7 @@ export function createHostApi(
         );
         if (!['starting', 'running'].includes(e.state) || generation !== e.runtimeSession) {
           await imageLibrary.release(`${id}:${generation ?? ''}`);
-          throw Error('画像の提供元が終了しました。');
+          throw Error(hostText('services.hostApi.imageProviderStopped'));
         }
         return file;
       }
@@ -207,25 +210,25 @@ export function createHostApi(
           p.bytes.length > 4 * 1024 * 1024 ||
           !p.bytes.every((v: unknown) => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 255)
         )
-          throw Error('画像は4MB以下で指定してください。');
+          throw Error(hostText('services.hostApi.imageSizeLimit'));
         const bytes = Buffer.from(p.bytes);
         const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
         const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
         const webp =
           bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
-        if (!png && !jpeg && !webp) throw Error('PNG・JPEG・WebP画像を指定してください。');
+        if (!png && !jpeg && !webp) throw Error(hostText('services.hostApi.imageFormat'));
         const source = nativeImage.createFromBuffer(bytes);
         const size = source.getSize();
         if (source.isEmpty() || size.width > 2048 || size.height > 2048)
-          throw Error('画像の形式・サイズを確認してください。');
+          throw Error(hostText('services.hostApi.invalidImage'));
         const result = source.resize({ width: 32, height: 32 }).toDataURL();
-        if (result.length > 24576) throw Error('画像が大きすぎます。');
+        if (result.length > 24576) throw Error(hostText('services.hostApi.imageTooLarge'));
         return result;
       }
       case 'host.settings.update': {
         requireCapability('settings');
         if (!Number.isSafeInteger(p.expectedRevision))
-          throw Error('現在の設定revisionを指定してください。');
+          throw Error(hostText('services.hostApi.settingsRevision'));
         settings.assertRevision(p.expectedRevision as number);
         settingsCommands.setOwnSetting(e.manifest, key(), p.value);
         return { revision: settings.revision };
@@ -233,9 +236,10 @@ export function createHostApi(
       case 'host.pages.openItem': {
         requireCapability('pages');
         if (!collectionHost || typeof p.id !== 'string')
-          throw Error('ページIDを指定してください。');
+          throw Error(hostText('services.hostApi.pageId'));
         const page = collectionHost().find(p.id);
-        if (!page || page.binding.owner !== id) throw Error('自身のページだけを開けます。');
+        if (!page || page.binding.owner !== id)
+          throw Error(hostText('services.hostApi.ownPageOnly'));
         return collectionHost().open(page.id);
       }
       case 'host.pages.list':
@@ -251,7 +255,8 @@ export function createHostApi(
         const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find(
           (page) => page.id === p.id,
         );
-        if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
+        if (!page || page.source !== 'local')
+          throw Error(hostText('services.hostApi.localPageMissing'));
         const allowedKeys =
           method === 'host.pages.changed'
             ? ['id']
@@ -259,16 +264,16 @@ export function createHostApi(
               ? ['id', 'files']
               : ['id', 'imageIds'];
         if (Object.keys(p).some((key) => !allowedKeys.includes(key)))
-          throw Error('ページ操作の引数を確認してください。');
+          throw Error(hostText('services.hostApi.pageArguments'));
         const target = pageKey(id, page.id);
         if (method === 'host.pages.changed')
           return { accepted: true, delivered: notifyAppletPage(target) };
         requireCapability('local-images');
         const images = localPageImages(target);
-        if (!images) throw Error('画像を登録するページを先に開いてください。');
+        if (!images) throw Error(hostText('services.hostApi.openPageFirst'));
         if (method.endsWith('.register')) {
           if (Buffer.byteLength(JSON.stringify(p)) > 256 * 1024 - 512)
-            throw Error('画像の登録を分割してください。');
+            throw Error(hostText('services.hostApi.batchImages'));
           return images.register(p.files);
         }
         images.release(p.imageIds);
@@ -280,10 +285,10 @@ export function createHostApi(
           !Number.isSafeInteger(p.expectedRevision) ||
           p.expectedRevision !== (e.pageRevision ?? 0)
         )
-          throw Error('ページの登録が変更されています。現在の一覧を取得してください。');
+          throw Error(hostText('services.hostApi.pagesChanged'));
         for (const page of next) contained(e.manifest.folder, page.ui!);
         if (next.some((page) => e.commands.some((command) => command.id === page.openCommand)))
-          throw Error('ページ操作が実行中のコマンドと重複しています。');
+          throw Error(hostText('services.hostApi.pageCommandBusy'));
         for (const page of e.dynamicPages ?? []) {
           const replacement = next.find((candidate) => candidate.id === page.id);
           if (!replacement || replacement.ui !== page.ui || replacement.source !== page.source)
@@ -302,26 +307,28 @@ export function createHostApi(
         const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find(
           (page) => page.id === p.id,
         );
-        if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
+        if (!page || page.source !== 'local')
+          throw Error(hostText('services.hostApi.localPageMissing'));
         if (method === 'host.pages.hide') hideAppletPage(pageKey(id, page.id));
         else disposeAppletPage(pageKey(id, page.id));
         return null;
       }
       case 'host.shell.getState': {
         requireCapability('shell');
-        if (!shellState) throw Error('Shell状態APIは準備中です。');
+        if (!shellState) throw Error(hostText('services.hostApi.shellNotReady'));
         e.shellStateRequested = true;
         return shellState(id);
       }
       case 'host.appdock.call':
-        if (!appdockCall) throw Error('AppDock操作APIは準備中です。');
+        if (!appdockCall) throw Error(hostText('services.hostApi.appdockApiNotReady'));
         return appdockCall(e, p);
       case 'host.pages.open': {
         requireCapability('pages');
         const page = [...(e.manifest.pages ?? []), ...(e.dynamicPages ?? [])].find(
           (page) => page.id === p.id,
         );
-        if (!page || page.source !== 'local') throw Error('ローカルページがありません。');
+        if (!page || page.source !== 'local')
+          throw Error(hostText('services.hostApi.localPageMissing'));
         const pageGeneration = e.runtimeSession;
         return openLocalPage(
           {
@@ -381,7 +388,7 @@ export function createHostApi(
                   ...generatedSettingCommands(id, e.manifest.settings ?? [], true),
                 ].some((item) => item.id === command)
               )
-                throw Error('自身の実行中コマンドだけを呼び出せます。');
+                throw Error(hostText('services.hostApi.ownCommandOnly'));
               return executeCommand(command);
             },
             call: async (operation, input) => {
@@ -392,7 +399,7 @@ export function createHostApi(
                   typeof input.id !== 'string' ||
                   !isObject(input.input)
                 )
-                  throw Error('ページ操作の引数を確認してください。');
+                  throw Error(hostText('services.hostApi.pageArguments'));
                 const declaration = e.manifest.pageActions?.find(
                   (action) => action.id === input.id,
                 );
@@ -405,11 +412,12 @@ export function createHostApi(
                     ([key, type]) => typeof (input.input as Record<string, unknown>)[key] !== type,
                   )
                 )
-                  throw Error('宣言されたページ操作と引数だけを使用できます。');
+                  throw Error(hostText('services.hostApi.declaredPageActionOnly'));
                 const generation = e.runtimeSession;
                 let result: unknown;
                 try {
-                  if (!e.peer || e.peer.closed) throw Error('ページの提供元が終了しました。');
+                  if (!e.peer || e.peer.closed)
+                    throw Error(hostText('services.hostApi.pageProviderStopped'));
                   result = await e.peer.request('page.action', {
                     id: declaration.id,
                     input: input.input,
@@ -421,7 +429,7 @@ export function createHostApi(
                   throw error;
                 }
                 if (e.state !== 'running' || e.runtimeSession !== generation)
-                  throw Error('ページの提供元が終了しました。');
+                  throw Error(hostText('services.hostApi.pageProviderStopped'));
                 return result;
               }
               const allowed = [
@@ -443,7 +451,7 @@ export function createHostApi(
                 typeof operation !== 'string' ||
                 !allowed.includes(operation)
               )
-                throw Error('このページから利用できない操作です。');
+                throw Error(hostText('services.hostApi.pageOperationUnavailable'));
               return api(e, `host.${operation}`, input, true);
             },
             changed: (callback) => {
@@ -506,7 +514,7 @@ export function createHostApi(
                   (definition.type === 'boolean' ||
                     (definition.type === 'select' && !definition.dynamic)),
               );
-              if (!definition) throw Error('宣言されたboolean/静的select設定を指定してください。');
+              if (!definition) throw Error(hostText('services.hostApi.staticSettingRequired'));
               validateSettingValue(definition, value);
               const current = settings.value.extensions[id]?.settings ?? {};
               settings.updateExtension(id, { settings: { ...current, [definition.key]: value } });
@@ -544,9 +552,12 @@ export function createHostApi(
       case 'host.ui.pickFile': {
         requireCapability('file-dialog');
         if (p.kind !== 'json' && p.kind !== 'wav')
-          throw new Error('JSONまたはWAVを指定してください。');
+          throw new Error(hostText('services.hostApi.fileType'));
         const result = await dialog.showOpenDialog({
-          title: p.kind === 'json' ? 'OAuthクライアントJSONを選択' : '通知音を選択',
+          title:
+            p.kind === 'json'
+              ? hostText('services.hostApi.oauthJsonTitle')
+              : hostText('services.hostApi.notificationSoundTitle'),
           properties: ['openFile'],
           filters: [{ name: p.kind.toUpperCase(), extensions: [p.kind] }],
         });
@@ -554,20 +565,21 @@ export function createHostApi(
       }
       case 'host.audio.play': {
         requireCapability('audio');
-        if (typeof p.file !== 'string') throw new Error('音声ファイルを指定してください。');
+        if (typeof p.file !== 'string') throw new Error(hostText('services.hostApi.audioFile'));
         const child = e.child;
         queueSound(
           p.file && !path.isAbsolute(p.file)
             ? await new RegisteredSounds(path.join(assetRoot, id, 'sounds')).resolve(p.file)
             : p.file,
           () => e.child === child && ['starting', 'running'].includes(e.state),
-          () => log('error', id, '通知音を再生できません。WAVファイルを確認してください。'),
+          () => log('error', id, hostText('services.hostApi.soundPlaybackFailed')),
         );
         return null;
       }
       case 'host.tray.attention':
         requireCapability('tray-attention');
-        if (typeof p.active !== 'boolean') throw new Error('activeはbooleanです。');
+        if (typeof p.active !== 'boolean')
+          throw new Error(hostText('services.hostApi.invalidActive'));
         e.attention = p.active;
         commandsChanged();
         return null;
@@ -603,7 +615,7 @@ export function createHostApi(
         requireCapability('settings');
         const k = key();
         if (!e.manifest.settings?.some((s) => s.key === k && s.type === 'select' && s.dynamic))
-          throw new Error('動的な選択肢を宣言した設定項目が必要です。');
+          throw new Error(hostText('services.hostApi.dynamicOptionsRequired'));
         const options = parseSettingOptions(p.options);
         if (JSON.stringify(e.settingOptions[k]) !== JSON.stringify(options)) {
           e.settingOptions[k] = options;
@@ -616,17 +628,17 @@ export function createHostApi(
       case 'host.notifications.end': {
         requireCapability('notifications');
         const service = typedNotifications?.();
-        if (!service) throw Error('通知基盤は準備中です。');
+        if (!service) throw Error(hostText('services.hostApi.notificationsNotReady'));
         const owner = { ownerKind: 'applet' as const, ownerId: id };
         const generation = e.runtimeSession;
-        if (!generation) throw Error('通知の実行世代がありません。');
+        if (!generation) throw Error(hostText('services.hostApi.notificationGeneration'));
         if (method === 'host.notifications.end') {
           if (
             Object.keys(p).some((k) => !['notificationId', 'status'].includes(k)) ||
             typeof p.notificationId !== 'string' ||
             (p.status !== undefined && !['resolved', 'withdrawn'].includes(p.status))
           )
-            throw Error('通知終了の引数が不正です。');
+            throw Error(hostText('services.hostApi.endNotificationArguments'));
           service.end(
             owner,
             p.notificationId,
@@ -635,11 +647,12 @@ export function createHostApi(
           );
           return null;
         }
-        if (typeof p.typeId !== 'string') throw Error('typeIdが必要です。');
+        if (typeof p.typeId !== 'string') throw Error(hostText('services.hostApi.typeIdRequired'));
         const type = e.manifest.notificationTypes?.find((t) => t.typeId === p.typeId);
-        if (!type) throw Error('自身の宣言された通知種類だけを使用できます。');
+        if (!type) throw Error(hostText('services.hostApi.ownNotificationType'));
         if (method === 'host.notifications.policy') {
-          if (Object.keys(p).some((k) => k !== 'typeId')) throw Error('通知方針の引数が不正です。');
+          if (Object.keys(p).some((k) => k !== 'typeId'))
+            throw Error(hostText('services.hostApi.policyArguments'));
           return service.policy(owner, p.typeId);
         }
         if (
@@ -666,7 +679,7 @@ export function createHostApi(
               Object.keys(p.historyText).some((k) => !['title', 'body'].includes(k)))) ||
           (p.actions != null && (!Array.isArray(p.actions) || p.actions.length > 3))
         )
-          throw Error('通知発行の引数が不正です。');
+          throw Error(hostText('services.hostApi.publishArguments'));
         const actions = (p.actions ?? []).map((a: unknown) => {
           if (
             !isObject(a) ||
@@ -684,7 +697,7 @@ export function createHostApi(
             typeof a.command !== 'string' ||
             !e.commands.some((c) => c.id === a.command)
           )
-            throw Error('自身の登録済みコマンドだけを通知操作に使用できます。');
+            throw Error(hostText('services.hostApi.ownNotificationCommand'));
           const command = a.command;
           return {
             key: a.key,
@@ -697,13 +710,13 @@ export function createHostApi(
                 e.runtimeSession !== generation ||
                 !e.commands.some((c) => c.id === command)
               )
-                throw Error('通知操作の発行元が停止しました。');
+                throw Error(hostText('services.hostApi.notificationProviderStopped'));
               await executeCommand(command);
             },
           };
         });
         if (new Set(actions.map((a: { key: string }) => a.key)).size !== actions.length)
-          throw Error('通知操作keyが重複しています。');
+          throw Error(hostText('services.hostApi.duplicateActionKey'));
         return service.publish(
           owner,
           p.typeId,
@@ -723,9 +736,9 @@ export function createHostApi(
       case 'host.notifications.show': {
         requireCapability('notifications');
         if (typeof p.title !== 'string' || typeof p.body !== 'string')
-          throw new Error('title と body が必要です。');
+          throw new Error(hostText('services.hostApi.titleBodyRequired'));
         if (p.silent != null && typeof p.silent !== 'boolean')
-          throw new Error('silentはbooleanです。');
+          throw new Error(hostText('services.hostApi.invalidSilent'));
         if (
           p.command != null &&
           (typeof p.command !== 'string' ||
@@ -733,9 +746,9 @@ export function createHostApi(
               (c) => c.id === p.command,
             ))
         )
-          throw new Error('このAppletの登録済みコマンドを指定してください。');
+          throw new Error(hostText('services.hostApi.ownRegisteredCommand'));
         const service = typedNotifications?.();
-        if (!service) throw Error('通知基盤は準備中です。');
+        if (!service) throw Error(hostText('services.hostApi.notificationsNotReady'));
         const owner = { ownerKind: 'applet' as const, ownerId: id };
         if (!service.policy(owner, legacyNotificationTypeId).enabled) return null;
         const generation = e.runtimeSession,
@@ -748,14 +761,17 @@ export function createHostApi(
             title: p.title.slice(0, 100),
             body: p.body.slice(0, 500),
             windowsSilent: p.silent === true,
-            historyText: { title: '旧方式の通知', body: 'Appletから通知がありました。' },
+            historyText: {
+              title: hostText('services.hostApi.legacyNotificationTitle'),
+              body: hostText('services.hostApi.legacyNotificationBody'),
+            },
             ...(p.command
               ? {
                   windowsClickAction: 'open',
                   actions: [
                     {
                       key: 'open',
-                      label: '開く',
+                      label: hostText('services.hostApi.open'),
                       run: async () => {
                         if (
                           e.state !== 'running' ||
@@ -766,7 +782,7 @@ export function createHostApi(
                             ...generatedSettingCommands(id, e.manifest.settings ?? [], true),
                           ].some((c) => c.id === p.command)
                         )
-                          throw Error('通知の発行元または操作が変わりました。');
+                          throw Error(hostText('services.hostApi.notificationChanged'));
                         await executeCommand(p.command);
                       },
                     },
@@ -782,7 +798,7 @@ export function createHostApi(
         requireCapability('browser');
         const url = new URL(String(p.url));
         if (url.protocol !== 'https:' || url.username || url.password)
-          throw new Error('ブラウザでは資格情報を含まないHTTPS URLを指定してください。');
+          throw new Error(hostText('services.hostApi.browserUrl'));
         await shell.openExternal(url.href);
         return null;
       }
@@ -791,7 +807,8 @@ export function createHostApi(
         return imageDirectory(dataRoot, id);
       case 'host.ui.openDetails':
         requireCapability('ui');
-        if (Object.keys(p).length || !pageUi) throw Error('自身のApplet詳細だけを開けます。');
+        if (Object.keys(p).length || !pageUi)
+          throw Error(hostText('services.hostApi.ownAppletDetails'));
         return pageUi.openDetails(id);
       case 'host.ui.panel': {
         requireCapability('ui');
@@ -824,7 +841,7 @@ export function createHostApi(
                     item.actions.some((a: unknown) => !validAction(a)))),
             ))
         )
-          throw new Error('パネルの画像は1000件以内のサムネイルを指定してください。');
+          throw new Error(hostText('services.hostApi.panelImageLimit'));
         if (
           typeof p.title !== 'string' ||
           (p.tabs != null &&
@@ -845,7 +862,7 @@ export function createHostApi(
               p.actions.length > 100 ||
               p.actions.some((a: unknown) => !validAction(a))))
         )
-          throw new Error('パネルの形式が正しくありません。');
+          throw new Error(hostText('services.hostApi.panelFormat'));
         e.panel = registerLocalImages(structuredClone(p) as unknown as Panel, dataRoot, id);
         changed();
         return null;
@@ -858,7 +875,8 @@ export function createHostApi(
         if (method.endsWith('.get'))
           return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
         const text = JSON.stringify(p.value ?? null);
-        if (Buffer.byteLength(text) > 1024 * 1024) throw new Error('保存データは1MB以下です。');
+        if (Buffer.byteLength(text) > 1024 * 1024)
+          throw new Error(hostText('services.hostApi.dataSizeLimit'));
         atomicWrite(file, text);
         return null;
       }
@@ -867,7 +885,7 @@ export function createHostApi(
       case 'host.secrets.delete': {
         requireCapability('secrets');
         if (!safeStorage.isEncryptionAvailable())
-          throw new Error('Windowsの暗号化機能を利用できません。');
+          throw new Error(hostText('services.hostApi.encryptionUnavailable'));
         const file = path.join(dataRoot, 'secrets', id, key() + '.dat');
         if (method.endsWith('.get'))
           return fs.existsSync(file)
@@ -878,13 +896,13 @@ export function createHostApi(
           return null;
         }
         if (typeof p.value !== 'string' || p.value.length > 100000)
-          throw new Error('secret は100,000文字以下の文字列です。');
+          throw new Error(hostText('services.hostApi.secretSizeLimit'));
         // Base64 is used only for the atomic writer, never exposed through the renderer.
         atomicWrite(file, safeStorage.encryptString(p.value).toString('base64'));
         return null;
       }
       default:
-        throw new Error(`未対応のHost API: ${method}`);
+        throw new Error(hostText('services.hostApi.unsupportedMethod', { method: String(method) }));
     }
   };
   return api;

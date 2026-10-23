@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -27,9 +28,9 @@ export class WebProfileStore {
     if (received === undefined && !fs.existsSync(this.file) && this.value.length === 0)
       return { accounts: [], pendingDeletion: [...this.pending] };
     const text = (received ?? fs.readFileSync(this.file, 'utf8')).replace(/^\uFEFF/, '');
-    if (Buffer.byteLength(text) > 65536) throw Error('Webアカウントの保存ファイルが大きすぎます。');
+    if (Buffer.byteLength(text) > 65536) throw Error(hostText('services.webProfiles.sizeLimit'));
     const raw = JSON.parse(text);
-    if (raw?.schemaVersion !== 1) throw Error('Webアカウントの保存形式に対応していません。');
+    if (raw?.schemaVersion !== 1) throw Error(hostText('services.webProfiles.unsupportedFormat'));
     const accounts = parseWebProfiles(raw.accounts);
     const pending = this.pendingFile
       ? fs.existsSync(this.pendingFile)
@@ -43,7 +44,7 @@ export class WebProfileStore {
       ) ||
       new Set(pending).size !== pending.length
     )
-      throw Error('Webアカウントの削除待ち記録が不正です。');
+      throw Error(hostText('services.webProfiles.invalidDeletion'));
     return { accounts, pendingDeletion: pending as string[] };
   }
   loadStandalone(referenced: () => boolean) {
@@ -77,19 +78,17 @@ export class WebProfileStore {
   }
   get(id: unknown) {
     const result = profileId(id) ? this.value.find((a) => a.id === id) : undefined;
-    if (!result) throw Error('Webアカウント枠がありません。');
+    if (!result) throw Error(hostText('services.webProfiles.missing'));
     return { ...result };
   }
   private unchanged(allowEmptyInitialization = false) {
     if (!allowEmptyInitialization && !fs.existsSync(this.file) && this.referenced?.())
-      throw Error('Webアカウント一覧の同期を待っています。枠が届いてから操作してください。');
+      throw Error(hostText('services.webProfiles.syncPending'));
     if (
       JSON.stringify(this.read()) !==
       JSON.stringify({ accounts: this.value, pendingDeletion: this.pending })
     )
-      throw Error(
-        'Webアカウントが別の場所で変更されました。一覧の同期を待ってから操作してください。',
-      );
+      throw Error(hostText('services.webProfiles.changed'));
   }
   private save(next: WebProfile[], pending = this.pending, allowEmptyInitialization = false) {
     this.unchanged(allowEmptyInitialization);
@@ -104,7 +103,7 @@ export class WebProfileStore {
         null,
         2,
       ) + '\n';
-    if (Buffer.byteLength(text) > 65536) throw Error('Webアカウントの保存ファイルが大きすぎます。');
+    if (Buffer.byteLength(text) > 65536) throw Error(hostText('services.webProfiles.sizeLimit'));
     if (this.pendingFile) atomicWrite(this.pendingFile, JSON.stringify(pending));
     try {
       atomicWrite(this.file, text);
@@ -147,7 +146,7 @@ export class WebProfileStore {
       // Only a validated ID directly below our own, non-redirected session root.
       const target = path.resolve(root, id);
       if (!profileId(id) || path.dirname(target) !== root)
-        throw Error('削除対象の保存先が不正です。');
+        throw Error(hostText('services.webProfiles.invalidPath'));
       try {
         let rootStat: fs.Stats | undefined;
         try {
@@ -158,9 +157,9 @@ export class WebProfileStore {
         if (rootStat) {
           const actual = fs.realpathSync(root);
           if (rootStat.isSymbolicLink() || actual.toLowerCase() !== root.toLowerCase())
-            throw Error('保存先が別の場所へ転送されています。');
+            throw Error(hostText('services.webProfiles.redirectedPath'));
           if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink())
-            throw Error('削除対象が別の場所へ転送されています。');
+            throw Error(hostText('services.webProfiles.redirectedTarget'));
           fs.rmSync(target, { recursive: true, force: true });
         }
       } catch {

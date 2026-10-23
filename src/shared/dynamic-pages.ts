@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { ExtensionManifest } from './contracts';
 import { validPageId, type AppletPageDefinition } from './applet-pages';
 
@@ -15,9 +16,9 @@ export function parseDynamicPages(
   value: unknown,
 ): DynamicPageDefinition[] {
   if (!manifest.capabilities?.includes('pages') || !manifest.capabilities.includes('dynamic-pages'))
-    throw Error('pagesとdynamic-pages capabilityが必要です。');
+    throw Error(hostText('services.sharedDynamicPages.capabilities'));
   if (!Array.isArray(value) || value.length > 64)
-    throw Error('動的ページは64件以下の配列で指定してください。');
+    throw Error(hostText('services.sharedDynamicPages.countLimit'));
   const ids = new Set((manifest.pages ?? []).map((page) => page.id));
   return value.map((raw) => {
     if (
@@ -42,7 +43,7 @@ export function parseDynamicPages(
         !['mail', 'clock', 'image', 'folder', 'extensions'].includes(raw.icon)) ||
       (raw.defaultDisplay !== undefined && !['page', 'window'].includes(raw.defaultDisplay))
     )
-      throw Error('動的ページのID・名前・表示内容を確認してください。');
+      throw Error(hostText('services.sharedDynamicPages.invalidDefinition'));
     if (
       raw.context !== undefined &&
       (!raw.context ||
@@ -50,13 +51,15 @@ export function parseDynamicPages(
         Array.isArray(raw.context) ||
         new TextEncoder().encode(JSON.stringify(raw.context)).length > 16384)
     )
-      throw Error('ページのcontextは16KB以下のオブジェクトで指定してください。');
+      throw Error(hostText('services.sharedDynamicPages.contextLimit'));
     const openCommand = dynamicPageCommand(manifest.id, raw.id);
     if (
       openCommand.length > 200 ||
-      manifest.commands?.some((command) => command.id === openCommand || command.aliases?.includes(openCommand))
+      manifest.commands?.some(
+        (command) => command.id === openCommand || command.aliases?.includes(openCommand),
+      )
     )
-      throw Error('ページ操作のIDが既存コマンドと重複しています。');
+      throw Error(hostText('services.sharedDynamicPages.duplicateAction'));
     ids.add(raw.id);
     return { ...structuredClone(raw), title: raw.title.trim(), openCommand };
   });

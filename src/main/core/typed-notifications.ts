@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash } from 'node:crypto';
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
 import {
@@ -66,7 +67,7 @@ export class TypedNotifications {
     const type = notificationCatalog(this.options.applets()).find(
       (t) => notificationTypeKey(t) === notificationTypeKey({ ...owner, typeId }),
     );
-    if (!type) throw Error('宣言された通知種類がありません。');
+    if (!type) throw Error(hostText('services.typedNotifications.typeMissing'));
     return resolveNotificationPolicy(type, this.options.settings());
   }
   publish(
@@ -79,13 +80,14 @@ export class TypedNotifications {
     const type = notificationCatalog(this.options.applets()).find(
       (t) => notificationTypeKey(t) === notificationTypeKey({ ...owner, typeId }),
     );
-    if (!type) throw Error('宣言された通知種類がありません。');
-    if (!type.levels.includes(content.level)) throw Error('通知のレベルが種類の定義に合いません。');
+    if (!type) throw Error(hostText('services.typedNotifications.typeMissing'));
+    if (!type.levels.includes(content.level))
+      throw Error(hostText('services.typedNotifications.invalidLevel'));
     if (
       owner.ownerKind === 'applet' &&
       (!generation || this.options.generation(owner.ownerId) !== generation)
     )
-      throw Error('通知の発行元が停止しました。');
+      throw Error(hostText('services.typedNotifications.providerStopped'));
     // Validate content even when preferences suppress delivery.
     if (
       typeof content.title !== 'string' ||
@@ -100,7 +102,7 @@ export class TypedNotifications {
           typeof content.historyText.body !== 'string' ||
           content.historyText.body.length > 2000))
     )
-      throw Error('通知の内容が不正です。');
+      throw Error(hostText('services.typedNotifications.invalidContent'));
     if (owner.ownerKind === 'applet') {
       const now = (this.options.now ?? Date.now)(),
         key = owner.ownerId;
@@ -108,7 +110,7 @@ export class TypedNotifications {
       rate.tokens = Math.min(20, rate.tokens + Math.max(0, now - rate.at) / 100);
       rate.at = now;
       this.rates.set(key, rate);
-      if (rate.tokens < 1) throw Error('通知の発行頻度を超えました。');
+      if (rate.tokens < 1) throw Error(hostText('services.typedNotifications.rateLimit'));
       rate.tokens--;
     }
     const policy = resolveNotificationPolicy(type, this.options.settings());
@@ -212,7 +214,7 @@ export class TypedNotifications {
       binding.generation !== generation ||
       (owner.ownerKind === 'applet' && this.options.generation(owner.ownerId) !== generation)
     )
-      throw Error('通知の所有者または実行世代が一致しません。');
+      throw Error(hostText('services.typedNotifications.ownership'));
     this.service.end(this.source(owner), id, status);
   }
   reconcile() {

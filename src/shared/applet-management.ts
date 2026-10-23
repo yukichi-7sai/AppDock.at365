@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { ExtensionSnapshot } from './contracts';
 import { orderApplets } from './applet-order';
 
@@ -26,7 +27,7 @@ export function reorderManagedApplets(
     new Set(ordered).size !== current.length ||
     ordered.some((id) => !ids.has(id))
   )
-    throw Error('Appletの一覧や順序が変更されています。開き直して並べ替えてください。');
+    throw Error(hostText('services.sharedAppletManagement.orderChanged'));
   let index = 0;
   return sequence.map((id) => (ids.has(id) ? (ordered[index++] as string) : id));
 }
@@ -42,7 +43,7 @@ export function appletManagementCommands(applets: ExtensionSnapshot[]) {
       .filter((operation) => a.sourceKind !== 'builtin' || operation === 'restart')
       .map((operation) => ({
         id: appletManagementId(a.id, operation),
-        title: `${a.displayName}を${{ enable: '有効にする', disable: '無効にする', restart: '再起動する' }[operation]}`,
+        title: hostText(`services.sharedAppletManagement.${operation}`, { name: a.displayName }),
         extension: 'AppDock',
         extensionId: null,
         appletId: a.id,

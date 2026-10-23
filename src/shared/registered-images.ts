@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import { assetFilename } from './asset-names';
 
 export interface RegisteredImageRef {
@@ -81,7 +82,7 @@ export function parseImageLibrary(value: unknown): ImageLibrary {
     !Array.isArray(value.groups) ||
     value.groups.length > 64
   )
-    throw Error('画像グループは64件以下で指定してください。');
+    throw Error(hostText('services.sharedRegisteredImages.groupLimit'));
   const ids = new Set<string>(),
     names = new Set<string>();
   let count = 0;
@@ -101,12 +102,12 @@ export function parseImageLibrary(value: unknown): ImageLibrary {
       g.images.length > 512 ||
       !g.images.every(imageReference)
     )
-      throw Error('画像グループのID・名前・画像を確認してください。');
+      throw Error(hostText('services.sharedRegisteredImages.invalidGroup'));
     if (
       new Set(g.images.map(imageKey)).size !== g.images.length ||
       (count += g.images.length) > 4096
     )
-      throw Error('画像グループ内の重複または所属件数の上限を確認してください。');
+      throw Error(hostText('services.sharedRegisteredImages.membershipLimit'));
     ids.add(g.id);
     names.add(g.name.trim().toLowerCase());
     return { id: g.id, name: g.name.trim(), images: structuredClone(g.images) };
@@ -120,9 +121,9 @@ export function editImageLibrary(
 ): ImageLibrary {
   const next = parseImageLibrary(current);
   const conflict = () => {
-    throw Error('画像グループが別の場所で変更されました。再取得してください。');
+    throw Error(hostText('services.sharedRegisteredImages.changed'));
   };
-  if (!object(op)) throw Error('画像グループの操作を確認してください。');
+  if (!object(op)) throw Error(hostText('services.sharedRegisteredImages.invalidOperation'));
   if (op.kind === 'add') {
     if (next.groups.some((g) => g.id === op.group?.id)) conflict();
     next.groups.push(op.group);
@@ -153,7 +154,7 @@ export function editImageLibrary(
       new Set(op.ids).size !== op.ids.length ||
       op.ids.some((id) => !next.groups.some((g) => g.id === id))
     )
-      throw Error('画像の所属先を確認してください。');
+      throw Error(hostText('services.sharedRegisteredImages.invalidDestination'));
     const memberships = next.groups
       .filter((g) => g.images.some((i) => imageKey(i) === imageKey(op.image)))
       .map((g) => g.id)
@@ -179,7 +180,7 @@ export function editImageLibrary(
       ) ||
       new Set(op.images.map((v) => imageKey(v.image))).size !== op.images.length
     )
-      throw Error('画像の所属先と選択を確認してください。');
+      throw Error(hostText('services.sharedRegisteredImages.invalidSelection'));
     // Validate every prior membership before applying anything. Save the whole result once.
     for (const item of op.images) {
       const before = next.groups
@@ -193,6 +194,6 @@ export function editImageLibrary(
       group.images = group.images.filter((i) => imageKey(i) !== imageKey(image));
       if (op.mode === 'add') group.images.push(image);
     }
-  } else throw Error('未対応の画像グループ操作です。');
+  } else throw Error(hostText('services.sharedRegisteredImages.unsupportedOperation'));
   return parseImageLibrary(next);
 }

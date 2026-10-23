@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { Settings, SettingsSnapshot, ExtensionSnapshot } from '../../shared/contracts';
 import { validCommandId } from '../../shared/commands';
 import {
@@ -19,10 +20,10 @@ const exact = (v: unknown, keys: string[]): v is Record<string, unknown> =>
 const invalid = () =>
   new SettingsCommandError(
     'INVALID_ARGUMENT',
-    'トレイの操作・項目ID・配置・クリック割当を確認してください。',
+    hostText('services.trayEditingCommands.invalidArguments'),
   );
 const missing = () =>
-  new SettingsCommandError('NOT_FOUND', '指定したトレイ項目またはグループがありません。');
+  new SettingsCommandError('NOT_FOUND', hostText('services.trayEditingCommands.missing'));
 const idSchema = {
   type: 'string',
   minLength: 1,
@@ -58,7 +59,7 @@ export class TrayEditingCommands {
     return [
       {
         id: commandId,
-        title: 'タスクトレイ設定を変更',
+        title: hostText('services.trayEditingCommands.title'),
         appletId: null,
         available: true,
         unavailableReason: null,
@@ -145,7 +146,7 @@ export class TrayEditingCommands {
     if (!this.assignable().some((c) => c.id === id))
       throw new SettingsCommandError(
         'COMMAND_NOT_ASSIGNABLE',
-        '新しい割当は公開された引数なしコマンドだけを指定してください。',
+        hostText('services.trayEditingCommands.publicCommandOnly'),
       );
   }
   private value() {
@@ -329,7 +330,7 @@ export class TrayEditingCommands {
       } catch {
         throw new SettingsCommandError(
           'SAVE_FAILED',
-          'トレイ設定を保存できませんでした。設定を再取得してください。',
+          hostText('services.trayEditingCommands.saveFailed'),
         );
       }
     }
@@ -340,7 +341,7 @@ export class TrayEditingCommands {
       revision: this.options.settingsCommands.revision(),
       warning: store.syncError ?? null,
       applies: 'trayChanged',
-      message: 'トレイ設定を保存します。割り当てたコマンドは実行しません。',
+      message: hostText('services.trayEditingCommands.savedEffect'),
     };
   }
 }

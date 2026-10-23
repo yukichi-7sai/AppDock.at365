@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import {
   ipcMain,
   type BrowserWindow,
@@ -228,11 +229,7 @@ export class ShellBarHost {
       }
       if (!provider && !bar.unavailable) {
         bar.unavailable = true;
-        this.options.failed(
-          bar.region,
-          'Default Shellを利用できません。Shellを再試行してください。',
-          true,
-        );
+        this.options.failed(bar.region, hostText('services.shellBarHost.defaultUnavailable'), true);
       }
       if (provider) bar.unavailable = false;
       const model = this.options.content.snapshot(bar.region);
@@ -279,7 +276,7 @@ export class ShellBarHost {
       return true;
     } catch {
       this.options.registry.fail(bar.region, provider.id, provider.version);
-      this.options.failed(bar.region, 'Shellの描画ファイルを読み込めません。', false);
+      this.options.failed(bar.region, hostText('services.shellBarHost.loadFailed'), false);
       return false;
     }
   }

@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 export interface WebProfile {
   id: string;
   name: string;
@@ -26,10 +27,10 @@ export const profileId = (id: unknown): id is string =>
   /^account\.[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
 export function webUrl(raw: unknown): string {
   if (typeof raw !== 'string' || raw.length > 4096 || /[\x00-\x20\x7f]/.test(raw))
-    throw Error('WebページにはHTTP(S)のURLを指定してください。');
+    throw Error(hostText('services.sharedWebContent.url'));
   const url = new URL(raw);
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password)
-    throw Error('Webページには資格情報を含まないHTTP(S)のURLを指定してください。');
+    throw Error(hostText('services.sharedWebContent.unsafeUrl'));
   return url.href;
 }
 export function webProfileName(value: unknown): string {
@@ -39,15 +40,16 @@ export function webProfileName(value: unknown): string {
     value.length > 80 ||
     /[\x00-\x1f\x7f]/.test(value)
   )
-    throw Error('名前は1～80文字で指定してください。');
+    throw Error(hostText('services.sharedWebContent.nameFormat'));
   return value.trim();
 }
 export function parseWebProfiles(raw: unknown): WebProfile[] {
-  if (!Array.isArray(raw) || raw.length > 32) throw Error('Webアカウントは32枠までです。');
+  if (!Array.isArray(raw) || raw.length > 32)
+    throw Error(hostText('services.sharedWebContent.accountLimit'));
   const ids = new Set<string>();
   return raw.map((account) => {
     if (!account || typeof account !== 'object' || !profileId(account.id) || ids.has(account.id))
-      throw Error('WebアカウントのIDが不正または重複しています。');
+      throw Error(hostText('services.sharedWebContent.invalidId'));
     ids.add(account.id);
     return { id: account.id, name: webProfileName(account.name) };
   });

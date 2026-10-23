@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import type { OverlayController } from './overlay-controller';
 import type { UiPresentation } from './ui-presentation';
@@ -23,7 +24,7 @@ export class RibbonGroupSession implements OverlayController {
   ) {
     const current = ui.group(groupId);
     if (!current || current.group.expansion !== 'temporary')
-      throw Error('一時グループは現在利用できません。');
+      throw Error(hostText('services.ribbonGroupSession.unavailable'));
     this.initial = current;
     this.signature = this.membership(current);
   }

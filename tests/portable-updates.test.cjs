@@ -82,6 +82,36 @@ test('available updates are notified even when another target fails its check', 
   assert.equal(f.notices[0].safeMessage, '1件の更新があります。');
   assert.equal(f.updater.state.notice.kind, 'error');
 });
+test('localized update summaries preserve target names, external details and count-only notifications', (t) => {
+  const f = fixture(t);
+  const name = 'language.ja {{name}} $t(common.cancel) <&>';
+  const message = 'external {{message}} $t(language.ja)';
+  const available = { id: 'available', status: 'available', name, latestVersion: '2.0.0' };
+  const skipped = { id: 'skipped', status: 'unsupported' };
+  f.updater.checkedNotice([available, skipped]);
+  assert.equal(
+    f.notices[0].notice.message,
+    `${name} 2.0.0 に更新できます。 1件は更新元が未設定または未公開です。`,
+  );
+  assert.equal(
+    f.notices[0].safeMessage,
+    '1件の更新があります。 1件は更新元が未設定または未公開です。',
+  );
+  f.updater.checkedNotice([available, { id: 'failed', status: 'error', name, message }]);
+  assert.equal(
+    f.notices.at(-1).notice.message,
+    `${name} 2.0.0 に更新できます。 1件の更新を確認できませんでした。${name}: ${message}`,
+  );
+  assert(!f.notices.at(-1).safeMessage.includes(name));
+  f.updater.checkedNotice([skipped]);
+  assert.equal(
+    f.notices.at(-1).notice.message,
+    '確認できた対象に更新はありません。1件は更新元が未設定または未公開です。',
+  );
+  f.updater.checkedNotice([]);
+  assert.equal(f.notices.at(-1).notice.message, '更新を確認する対象がありません。');
+});
+
 test('update settings migrate old settings and validate local, UNC, HTTP and GitHub sources', () => {
   const value = createDefaultSettings();
   delete value.updates;

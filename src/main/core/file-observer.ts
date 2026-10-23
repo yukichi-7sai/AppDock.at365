@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -17,7 +18,7 @@ export function observeFile(
     try {
       const stat = fs.statSync(file);
       if (!stat.isFile() || stat.size > 4 * 1024 * 1024)
-        throw Error('保存ファイルのサイズ・種類が不正です。');
+        throw Error(hostText('services.fileObserver.invalidFile'));
       const text = fs.readFileSync(file, 'utf8');
       if (text !== candidate) {
         candidate = text;

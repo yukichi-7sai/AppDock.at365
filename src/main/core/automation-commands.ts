@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import { hostCommandsForApplets } from '../../shared/commands';
 import { settingsPageCommands } from '../../shared/settings-navigation';
@@ -52,7 +53,7 @@ export function automationApplets(applets: ExtensionSnapshot[]): AutomationApple
     // Raw startup errors can contain paths, URLs, and credentials.
     errorSummary:
       a.error || a.state === 'error'
-        ? 'Appletの起動または表示に問題があります。AppDockのログで確認してください。'
+        ? hostText('services.automationCommands.appletDisplayFailed')
         : null,
   }));
 }
@@ -84,7 +85,7 @@ export function automationCommands(applets: ExtensionSnapshot[]): AutomationComm
             available,
             unavailableReason: available
               ? null
-              : 'Appletが有効・稼働中で、操作を利用できる必要があります。',
+              : hostText('services.automationCommands.appletUnavailable'),
             completion: 'handlerReturned' as const,
           };
         });

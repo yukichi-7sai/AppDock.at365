@@ -158,6 +158,30 @@ test('saving Japanese remains PC-local and preserves user commands, groups and s
 test('localized settings views and owned diagnostic modules do not reintroduce inline Japanese', () => {
   const parser = require('prettier/plugins/typescript').parsers.typescript;
   const files = [
+    ...fs
+      .readdirSync('src/main/core')
+      .filter((name) => name.endsWith('.ts'))
+      .map((name) => `src/main/core/${name}`),
+    'src/main/index.ts',
+    'src/main/node-worker.ts',
+    ...[
+      'applet-management',
+      'binding-order',
+      'dynamic-pages',
+      'extension-commands',
+      'legacy-local-data',
+      'object-list',
+      'page-collections',
+      'registered-images',
+      'ribbon-items',
+      'ribbon-layout',
+      'setting-actions',
+      'settings-input',
+      'shell',
+      'update-sources',
+      'versions',
+      'web-content',
+    ].map((name) => `src/shared/${name}.ts`),
     ...['src/renderer/settings', 'src/renderer/settings-ui'].flatMap((directory) =>
       fs
         .readdirSync(directory)
@@ -197,9 +221,28 @@ test('localized settings views and owned diagnostic modules do not reintroduce i
   ];
   for (const file of new Set(files)) {
     const ast = parser.parse(fs.readFileSync(path.resolve(file), 'utf8'), { filepath: file });
-    function visit(node) {
+    function visit(node, parent) {
       if (!node || typeof node !== 'object') return;
-      if (Array.isArray(node)) return node.forEach(visit);
+      if (Array.isArray(node)) return node.forEach((child) => visit(child, parent));
+      if (
+        file === 'src/main/core/web-accounts.ts' &&
+        parent?.type === 'VariableDeclarator' &&
+        parent.id?.name === 'temporaryAccountName'
+      )
+        return;
+      // API schema documentation is deliberately outside the display-language contract.
+      if (
+        [
+          'gesture-commands',
+          'ribbon-commands',
+          'shortcut-commands',
+          'touchpad-commands',
+          'tray-editing-commands',
+        ].some((name) => file === `src/main/core/${name}.ts`) &&
+        parent?.type === 'Property' &&
+        parent.key?.name === 'description'
+      )
+        return;
       const text =
         node.type === 'TemplateElement'
           ? node.value.cooked
@@ -209,8 +252,77 @@ test('localized settings views and owned diagnostic modules do not reintroduce i
       if (typeof text === 'string')
         assert.doesNotMatch(text, /[ぁ-んァ-ヶ一-龯]/, `${file}:${node.loc?.start.line}`);
       for (const [key, child] of Object.entries(node))
-        if (!['loc', 'range', 'comments', 'tokens', 'raw'].includes(key)) visit(child);
+        if (!['loc', 'range', 'comments', 'tokens', 'raw'].includes(key)) visit(child, node);
     }
     visit(ast);
+  }
+});
+
+test('service messages preserve external text and complete lifecycle command labels', () => {
+  const { appletManagementCommands } = require('../out/main/shared/applet-management');
+  const name = '<b>language.ja</b> {{name}} $t(language.ja)';
+  const message = 'OS error {{message}} $t(common.cancel) <&>';
+  assert.equal(
+    hostText('services.errorReporter.bodyWithCode', { message, code: 'IO_ERROR' }),
+    `${message}\nエラーコード: IO_ERROR`,
+  );
+  assert.equal(
+    hostText('services.webAccounts.sharedDeleteConfirmation', { name, group: message }),
+    `「${name}」を${message}から削除しますか？`,
+  );
+  assert.equal(
+    hostText('services.index.historyDeleteConfirmation', { count: 12 }),
+    '通知履歴を12件削除しますか？',
+  );
+  assert.deepEqual(
+    appletManagementCommands([
+      { id: 'sample', displayName: name, enabled: true, state: 'running' },
+    ]).map(({ id, title }) => [id, title]),
+    [
+      ['appdock.applets.sample.enable', `${name}を有効にする`],
+      ['appdock.applets.sample.disable', `${name}を無効にする`],
+      ['appdock.applets.sample.restart', `${name}を再起動する`],
+    ],
+  );
+});
+
+test('owned service translation calls supply every named interpolation value', () => {
+  const parser = require('prettier/plugins/typescript').parsers.typescript;
+  const files = [
+    'src/main/index.ts',
+    'src/main/node-worker.ts',
+    ...['src/main/core', 'src/shared'].flatMap((dir) =>
+      fs
+        .readdirSync(dir)
+        .filter((name) => name.endsWith('.ts'))
+        .map((name) => `${dir}/${name}`),
+    ),
+  ];
+  for (const file of files) {
+    function visit(node) {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) return node.forEach(visit);
+      if (
+        node.type === 'CallExpression' &&
+        node.callee?.name === 'hostText' &&
+        node.arguments[0]?.value?.startsWith('services.')
+      ) {
+        const key = node.arguments[0].value;
+        assert.equal(typeof resources[key], 'string', `${file}: ${key}`);
+        const required = [...resources[key].matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1]);
+        const supplied =
+          node.arguments[1]?.properties?.map(
+            (property) => property.key?.name ?? property.key?.value,
+          ) ?? [];
+        assert.deepEqual(
+          [...new Set(supplied)].sort(),
+          [...new Set(required)].sort(),
+          `${file}:${node.loc.start.line} ${key}`,
+        );
+      }
+      for (const [key, child] of Object.entries(node))
+        if (!['loc', 'range', 'comments', 'tokens', 'raw'].includes(key)) visit(child);
+    }
+    visit(parser.parse(fs.readFileSync(file, 'utf8'), { filepath: file }));
   }
 });

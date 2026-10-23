@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { dialog, shell, type BrowserWindow } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -73,17 +74,23 @@ export class ImageLibraryHost {
   async register() {
     this.options.writable();
     const parent = this.options.window();
-    if (!parent || parent.isDestroyed()) throw Error('画像の選択画面は準備中です。');
+    if (!parent || parent.isDestroyed())
+      throw Error(hostText('services.imageLibraryHost.notReady'));
     const selected = await dialog.showOpenDialog(parent, {
-      title: 'ライブラリーに画像を登録',
+      title: hostText('services.imageLibraryHost.registerTitle'),
       properties: ['openFile'],
-      filters: [{ name: '画像', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      filters: [
+        {
+          name: hostText('services.imageLibraryHost.imageFilter'),
+          extensions: ['png', 'jpg', 'jpeg', 'webp'],
+        },
+      ],
     });
     if (selected.canceled || !selected.filePaths[0]) return null;
     const source = selected.filePaths[0],
       stat = await fs.stat(source);
     if (!stat.isFile() || stat.size > 5 * 1024 * 1024)
-      throw Error('画像は5MiB以下で指定してください。');
+      throw Error(hostText('services.imageLibraryHost.sizeLimit'));
     this.options.writable();
     return this.images.add(await fs.readFile(source), path.basename(source));
   }
@@ -112,17 +119,12 @@ export class ImageLibraryHost {
       prepare: () => {
         const store = this.options.settings;
         this.options.writable();
-        if (this.inUse(entry.ref))
-          throw Error(
-            'この画像は使用中です。リボンやAppletの画像設定を外してから削除してください。',
-          );
+        if (this.inUse(entry.ref)) throw Error(hostText('services.imageLibraryHost.inUse'));
         const revision = store.revision;
         return () => {
           this.options.writable();
           if (store.revision !== revision || this.inUse(entry.ref))
-            throw Error(
-              '設定が変更されました。元の画像を復元したので、再取得してから削除してください。',
-            );
+            throw Error(hostText('services.imageLibraryHost.conflictRestored'));
           if (
             store.value.imageLibrary?.groups.some((g) =>
               g.images.some((r) => imageKey(r) === imageKey(entry.ref)),
@@ -147,11 +149,17 @@ export class ImageLibraryHost {
   async registerMany() {
     this.options.writable();
     const parent = this.options.window();
-    if (!parent || parent.isDestroyed()) throw Error('画像の選択画面は準備中です。');
+    if (!parent || parent.isDestroyed())
+      throw Error(hostText('services.imageLibraryHost.notReady'));
     const selected = await dialog.showOpenDialog(parent, {
-      title: 'ライブラリーに画像を追加',
+      title: hostText('services.imageLibraryHost.addTitle'),
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: '画像', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      filters: [
+        {
+          name: hostText('services.imageLibraryHost.imageFilter'),
+          extensions: ['png', 'jpg', 'jpeg', 'webp'],
+        },
+      ],
     });
     const results: {
       name: string;
@@ -166,7 +174,7 @@ export class ImageLibraryHost {
         this.options.writable();
         const stat = await fs.stat(source);
         if (!stat.isFile() || stat.size > 5 * 1024 * 1024)
-          throw Error('画像は5MiB以下で指定してください。');
+          throw Error(hostText('services.imageLibraryHost.sizeLimit'));
         const { ref: image, reused } = await this.images.addWithResult(
           await fs.readFile(source),
           name,
@@ -178,7 +186,7 @@ export class ImageLibraryHost {
           error:
             e instanceof Error && !(e as NodeJS.ErrnoException).code
               ? e.message
-              : '画像を登録できませんでした。ファイルと保存先を確認してください。',
+              : hostText('services.imageLibraryHost.registrationFailed'),
         });
       }
     }
@@ -188,8 +196,9 @@ export class ImageLibraryHost {
     return this.pending ? { id: this.pending.id, current: this.pending.current } : null;
   }
   async pick(current: unknown = null, alive?: () => boolean): Promise<ImagePickResult> {
-    if (current !== null && !imageReference(current)) throw Error('画像の参照を確認してください。');
-    if (this.picking) throw Error('開いている画像選択を終えてください。');
+    if (current !== null && !imageReference(current))
+      throw Error(hostText('services.imageLibraryHost.invalidReference'));
+    if (this.picking) throw Error(hostText('services.imageLibraryHost.pickerOpen'));
     this.picking = true;
     this.pickerAlive = alive;
     let restore: (() => void) | undefined;
@@ -198,7 +207,8 @@ export class ImageLibraryHost {
       this.options.show();
       if (alive && !alive()) return { cancelled: true };
       const window = this.options.window();
-      if (!window || window.isDestroyed()) throw Error('画像選択は準備中です。');
+      if (!window || window.isDestroyed())
+        throw Error(hostText('services.imageLibraryHost.pickerNotReady'));
       return await new Promise<ImagePickResult>((resolve) => {
         const id = randomUUID();
         const timer = setTimeout(() => this.complete(id, { cancelled: true }), 10 * 60 * 1000);
@@ -212,13 +222,14 @@ export class ImageLibraryHost {
     }
   }
   complete(id: string, result: ImagePickResult) {
-    if (!this.pending || this.pending.id !== id) throw Error('画像選択の要求が終了しています。');
+    if (!this.pending || this.pending.id !== id)
+      throw Error(hostText('services.imageLibraryHost.requestEnded'));
     if (
       !result ||
       typeof result.cancelled !== 'boolean' ||
       (!result.cancelled && result.image !== null && !imageReference(result.image))
     )
-      throw Error('画像の選択結果を確認してください。');
+      throw Error(hostText('services.imageLibraryHost.invalidSelection'));
     const pending = this.pending;
     this.pending = undefined;
     const window = this.options.window();
@@ -251,11 +262,11 @@ export class ImageLibraryHost {
       !ownsImage(manifest, values, ref) ||
       !['original', 'thumbnail'].includes(String(variant))
     )
-      throw Error('自Appletの画像設定で参照している画像を指定してください。');
+      throw Error(hostText('services.imageLibraryHost.ownImageOnly'));
     const { bytes } = await this.images.read(ref);
     const directory = imageDirectory(dataRoot, manifest.id);
     if ((await fs.realpath(directory)).toLowerCase() !== path.resolve(directory).toLowerCase())
-      throw Error('画像キャッシュの保存先が転送されています。');
+      throw Error(hostText('services.imageLibraryHost.redirectedCache'));
     const output =
       variant === 'thumbnail'
         ? Buffer.from((await decodeRegisteredImage(bytes)).thumbnail.split(',')[1], 'base64')

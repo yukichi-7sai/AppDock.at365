@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { atomicWrite } from './settings';
@@ -20,17 +21,17 @@ export class TtsSecrets {
       if (v.endpoint !== this.endpoint(baseUrl)) return undefined;
       return this.encryption.decrypt(v.key);
     } catch {
-      throw Error('TTSのAPIキーを読み取れません。専用欄で再設定してください。');
+      throw Error(hostText('services.ttsSecrets.readFailed'));
     }
   }
   set(baseUrl: string, value: unknown) {
     if (typeof value !== 'string' || value.length > 8192 || /[\r\n\x00-\x1f\x7f]/.test(value))
-      throw Error('APIキーは改行を含まない8192文字以下の文字列です。');
+      throw Error(hostText('services.ttsSecrets.keyFormat'));
     if (!value) {
       if (fs.existsSync(this.file)) fs.unlinkSync(this.file);
       return;
     }
-    if (!baseUrl) throw Error('APIキーを保存する前に接続先を設定してください。');
+    if (!baseUrl) throw Error(hostText('services.ttsSecrets.configureFirst'));
     atomicWrite(
       this.file,
       JSON.stringify({
@@ -46,7 +47,7 @@ export class TtsSecrets {
     } catch {
       return {
         apiKeyConfigured: false,
-        error: 'TTSのAPIキーを読み取れません。再設定または削除してください。',
+        error: hostText('services.ttsSecrets.decryptFailed'),
       };
     }
   }

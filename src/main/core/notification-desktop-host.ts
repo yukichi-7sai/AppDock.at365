@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import { BrowserWindow, screen, type Rectangle, type Tray } from 'electron';
 import { NotificationSurfaceHost } from './notification-surface-host';
@@ -78,7 +79,7 @@ export class NotificationDesktopHost {
     this.options.availability.use('desktop', true);
     if (!this.window) {
       const window = new BrowserWindow({
-        title: 'AppDock デスクトップ通知',
+        title: hostText('services.notificationDesktopHost.title'),
         width: 440,
         height: 114,
         show: false,

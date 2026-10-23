@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ExtensionManifest, ExtensionSettings, Settings } from '../../shared/contracts';
@@ -63,15 +64,16 @@ export function deviceName(name: string) {
     name === '.' ||
     name === '..'
   )
-    throw Error('端末名を設定ファイル名に使用できません。');
+    throw Error(hostText('services.deviceSettings.invalidComputerName'));
   return name;
 }
 function safeJson(value: unknown, depth = 0, budget = { count: 0 }) {
-  if (++budget.count > 100000 || depth > 40) throw Error('設定の深さ・件数の上限を超えています。');
+  if (++budget.count > 100000 || depth > 40)
+    throw Error(hostText('services.deviceSettings.structureLimit'));
   if (value && typeof value === 'object')
     for (const [key, child] of Object.entries(value)) {
       if (['__proto__', 'constructor', 'prototype'].includes(key))
-        throw Error('設定キーが不正です。');
+        throw Error(hostText('services.deviceSettings.invalidKey'));
       safeJson(child, depth + 1, budget);
     }
 }
@@ -143,10 +145,10 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
         ].includes(key),
     )
   )
-    throw Error('このPCの設定JSONの形式を確認してください。');
+    throw Error(hostText('services.deviceSettings.invalidJson'));
   safeJson(raw);
   if (Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)))
-    throw Error('このPCの表示・一般設定を確認してください。');
+    throw Error(hostText('services.deviceSettings.invalidHost'));
   const probe = createDefaultSettings();
   probe.host = { ...probe.host, ...raw.host };
   for (const [owner, entry] of Object.entries(raw.extensions)) {
@@ -160,7 +162,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
       ) ||
       (entry.useLocalSettings && !object(entry.configuration))
     )
-      throw Error('Appletの端末設定を確認してください。');
+      throw Error(hostText('services.deviceSettings.invalidApplet'));
     if (entry.configuration !== undefined) {
       if (
         !object(entry.configuration) ||
@@ -168,7 +170,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           (key) => !['settings', 'startupDelaySeconds', 'pages'].includes(key),
         )
       )
-        throw Error('Applet設定の保存範囲が不正です。');
+        throw Error(hostText('services.deviceSettings.invalidScope'));
       probe.extensions[owner] = {
         ...entry.configuration,
         enabled: entry.enabled,
@@ -177,11 +179,14 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
   }
   const parsedHost = parseSettings(probe).host;
   for (const [owner, groups] of Object.entries(raw.collectionEnabled)) {
-    if (!id(owner) || !object(groups)) throw Error('ページの端末設定が不正です。');
+    if (!id(owner) || !object(groups))
+      throw Error(hostText('services.deviceSettings.invalidPages'));
     for (const [key, rows] of Object.entries(groups)) {
-      if (!id(key) || !object(rows)) throw Error('ページ一覧の端末設定が不正です。');
+      if (!id(key) || !object(rows))
+        throw Error(hostText('services.deviceSettings.invalidCollection'));
       for (const [item, enabled] of Object.entries(rows))
-        if (!id(item) || typeof enabled !== 'boolean') throw Error('ページの有効状態が不正です。');
+        if (!id(item) || typeof enabled !== 'boolean')
+          throw Error(hostText('services.deviceSettings.invalidEnabled'));
     }
   }
   return {

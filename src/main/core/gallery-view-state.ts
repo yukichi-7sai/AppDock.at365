@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { atomicWrite } from './settings';
 import { gallerySize, validGalleryWidth } from '../../shared/image-gallery';
@@ -28,7 +29,7 @@ export class GalleryViewStateStore {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
         this.blocked = true;
-        this.error = '表示サイズの保存ファイルを読み取れません。元のファイルを確認してください。';
+        this.error = hostText('services.galleryViewState.readFailed');
       }
     }
   }
@@ -37,14 +38,14 @@ export class GalleryViewStateStore {
   }
   save(surface: 'library' | 'picker', cardWidth: number) {
     if (!['library', 'picker'].includes(surface) || !validGalleryWidth(cardWidth))
-      throw Error('画像サイズを確認してください。');
+      throw Error(hostText('services.galleryViewState.invalidSize'));
     if (this.blocked) throw Error(this.error);
     const next: State = { ...this.state, [surface]: { cardWidth } };
     const bytes = Buffer.from(JSON.stringify(next, null, 2));
     try {
       atomicWrite(this.file, bytes, { previous: this.previous });
     } catch {
-      throw Error('表示サイズを保存できませんでした。保存先を確認して再試行してください。');
+      throw Error(hostText('services.galleryViewState.saveFailed'));
     }
     this.state = next;
     this.previous = bytes;

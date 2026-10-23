@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
@@ -131,7 +132,7 @@ export class InputCaptureManager {
     return this.refresh();
   }
   async touchpadRequest<T = unknown>(method: string, params: unknown): Promise<T> {
-    if (this.stopped) throw Error('入力ホストを終了しています。');
+    if (this.stopped) throw Error(hostText('services.gestures.closing'));
     if (!this.peer || this.peer.closed) this.connect();
     return this.peer!.request(method, params) as Promise<T>;
   }
@@ -265,7 +266,9 @@ export class InputCaptureManager {
       return;
     }
     if (method === 'input.error') {
-      this.report(typeof p.message === 'string' ? p.message : '入力処理に失敗しました。');
+      this.report(
+        typeof p.message === 'string' ? p.message : hostText('services.gestures.inputFailed'),
+      );
       return;
     }
     if (method === 'gestures.cancel') {
@@ -370,11 +373,9 @@ export class InputCaptureManager {
       this.statuses = this.statuses.map((s) => ({
         ...s,
         registered: false,
-        error: '入力プロセスとの接続が終了しました。',
+        error: hostText('services.gestures.disconnected'),
       }));
-      this.shortcuts.failed(
-        new Error('入力プロセスが停止しました。設定を保存するか再試行してください。'),
-      );
+      this.shortcuts.failed(new Error(hostText('services.gestures.stopped')));
       this.touchpadCallbacks?.failed();
       void this.shortcuts.ownership([]).catch(() => {});
     });
@@ -454,7 +455,7 @@ export class InputCaptureManager {
       this.statuses = inputs.map((row) => ({
         shortcut: row.shortcut,
         registered: false,
-        error: '入力の適用に失敗しました。',
+        error: hostText('services.gestures.applyFailed'),
       }));
       this.peer?.close();
       this.shortcuts.failed(error instanceof Error ? error : new Error(String(error)));

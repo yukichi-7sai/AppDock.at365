@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { IpcMain, WebContents } from 'electron';
 import {
   defaultAccentColor,
@@ -25,7 +26,7 @@ export function configureAppearance(reader: typeof read, ipc: Pick<IpcMain, 'han
       event.senderFrame !== event.sender.mainFrame ||
       surfaces.get(event.sender) !== event.senderFrame?.url
     )
-      throw Error('許可されていない画面からの配色取得です。');
+      throw Error(hostText('services.appearanceHost.unauthorizedSurface'));
     return appearanceSnapshot();
   });
 }
@@ -34,7 +35,7 @@ export function appearanceArguments(): string[] {
 }
 export function registerAppearance(contents: WebContents, url: string) {
   if (!url.startsWith('file:') && !url.startsWith('appdock://host/'))
-    throw Error('配色の共有はローカル画面だけに許可されています。');
+    throw Error(hostText('services.appearanceHost.localOnly'));
   surfaces.set(contents, url);
   contents.once('destroyed', () => surfaces.delete(contents));
   // Reloads must receive current colors, even if their creation arguments are older.

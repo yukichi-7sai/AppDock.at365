@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
@@ -35,7 +36,7 @@ export class PageCollectionManager {
               result.some((item) => item.id === page.id),
           )
         )
-          throw Error('ページIDが重複しています。');
+          throw Error(hostText('services.pageCollections.duplicateId'));
         result.push(...pages);
         this.lastGood.set(parent.id, pages);
         this.invalid.delete(parent.id);
@@ -44,9 +45,7 @@ export class PageCollectionManager {
         if (!this.invalid.has(parent.id)) {
           this.invalid.add(parent.id);
           queueMicrotask(() =>
-            this.options.failed(
-              Error('Appletのページ一覧が不正です。提供元の設定を確認してください。'),
-            ),
+            this.options.failed(Error(hostText('services.pageCollections.invalidCollection'))),
           );
         }
       }
@@ -75,7 +74,8 @@ export class PageCollectionManager {
           .parents()
           .filter((parent) => parent.capabilities?.includes('web-profiles'))
           .map((parent) => parent.id);
-    if (owners.length !== 1) throw Error('対象Appletの管理画面からアカウントを操作してください。');
+    if (owners.length !== 1)
+      throw Error(hostText('services.pageCollections.manageAccountsAtProvider'));
     return this.profiles(owners[0]);
   }
   addAccount(name: unknown) {
@@ -105,7 +105,7 @@ export class PageCollectionManager {
   profiles(owner: string) {
     const parent = this.options.parents().find((parent) => parent.id === owner);
     if (!parent?.capabilities?.includes('web-profiles'))
-      throw Error('web-profiles capabilityが必要です。');
+      throw Error(hostText('services.pageCollections.profilesCapability'));
     let service = this.services.get(owner);
     if (!service) {
       const locations = this.locations(owner);
@@ -113,7 +113,7 @@ export class PageCollectionManager {
         () => {
           const entries = this.entries();
           if (this.invalid.has(owner))
-            throw Error('ページ一覧が不正なため、Webアカウントの操作を保留しています。');
+            throw Error(hostText('services.pageCollections.invalidCollectionAccounts'));
           return entries
             .filter((page) => page.binding.owner === owner && page.definition.source === 'remote')
             .map(
@@ -160,9 +160,11 @@ export class PageCollectionManager {
         enabled,
         state: !enabled ? 'stopped' : accountMissing || state?.error ? 'error' : page.parent.state,
         error: accountMissing
-          ? 'Webアカウント一覧の同期を待っています。'
+          ? hostText('services.pageCollections.syncPending')
           : state?.error || page.parent.error,
-        description: page.parent.displayName + 'のページ',
+        description: hostText('services.pageCollections.pageTitle', {
+          name: page.parent.displayName,
+        }),
         settings: page.definition.fields.map((field) => {
           const inherited = page.parent.settings
             ?.find((setting) => setting.key === page.binding.key)
@@ -187,11 +189,11 @@ export class PageCollectionManager {
           id: `${page.id}.${action}`,
           title: (
             {
-              open: '開く',
-              back: '戻る',
-              forward: '進む',
-              reload: 'リロード',
-              home: '開始ページへ',
+              open: hostText('services.pageCollections.open'),
+              back: hostText('services.pageCollections.back'),
+              forward: hostText('services.pageCollections.forward'),
+              reload: hostText('services.pageCollections.reload'),
+              home: hostText('services.pageCollections.home'),
             } as Record<string, string>
           )[action],
           available: enabled && page.parent.state === 'running' && !accountMissing,
@@ -214,11 +216,18 @@ export class PageCollectionManager {
         settingOptions: {},
         panel: {
           title: page.item.name,
-          description: page.parent.displayName + 'が提供するページです。',
+          description: hostText('services.pageCollections.description', {
+            name: page.parent.displayName,
+          }),
           actions: [
-            { title: 'ページを開く', command: `${page.id}.open` },
+            { title: hostText('services.pageCollections.openPage'), command: `${page.id}.open` },
             ...(page.definition.managementCommand
-              ? [{ title: '管理画面を開く', command: page.definition.managementCommand }]
+              ? [
+                  {
+                    title: hostText('services.pageCollections.openManagement'),
+                    command: page.definition.managementCommand,
+                  },
+                ]
               : []),
           ],
         },
@@ -258,7 +267,7 @@ export class PageCollectionManager {
   async open(id: string) {
     const page = this.find(id);
     if (!page || !page.item.enabled || !page.parent.enabled || page.parent.state !== 'running')
-      throw Error('ページまたは提供元が停止しています。');
+      throw Error(hostText('services.pageCollections.stopped'));
     return page.definition.source === 'remote'
       ? this.profiles(page.binding.owner).open(id)
       : this.options.openLocal(page);
@@ -271,13 +280,13 @@ export class PageCollectionManager {
       !page.parent.enabled ||
       page.parent.state !== 'running'
     )
-      throw Error('Webページは現在利用できません。');
+      throw Error(hostText('services.pageCollections.unavailable'));
     return this.profiles(page.binding.owner).navigate(id, action);
   }
   async restart(id: string) {
     const page = this.find(id);
     if (!page || !page.item.enabled || !page.parent.enabled || page.parent.state !== 'running')
-      throw Error('ページまたは提供元が停止しています。');
+      throw Error(hostText('services.pageCollections.stopped'));
     if (page.definition.source === 'remote') return this.profiles(page.binding.owner).restart(id);
     closeAppletPages(id);
     return this.open(id);

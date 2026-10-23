@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { HostSettings } from '../../shared/contracts';
@@ -12,7 +13,7 @@ export async function readDoubleClickTime(executable: string): Promise<number> {
   });
   const delay = Number(stdout.trim());
   if (!Number.isInteger(delay) || delay < 1 || delay > 5000)
-    throw new Error('Windowsのダブルクリック判定時間を取得できませんでした。');
+    throw new Error(hostText('services.trayClicks.intervalFailed'));
   return delay;
 }
 

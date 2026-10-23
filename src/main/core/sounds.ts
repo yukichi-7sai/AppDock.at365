@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { audioPlayback } from './audio-service';
@@ -9,7 +10,7 @@ export const notificationSounds = new NotificationSounds({
 });
 export async function readWave(file: string): Promise<Buffer> {
   if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
-    throw new Error('通知音にはWAVの絶対パスが必要です。');
+    throw new Error(hostText('services.sounds.absoluteWavPath'));
   const handle = await fs.open(file, 'r');
   let bytes: Buffer;
   try {
@@ -27,6 +28,6 @@ export async function readWave(file: string): Promise<Buffer> {
 export function queueSound(file: string, alive: () => boolean, failed: () => void): void {
   if (!file) return;
   if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
-    throw new Error('通知音にはWAVの絶対パスが必要です。');
+    throw new Error(hostText('services.sounds.absoluteWavPath'));
   notificationSounds.enqueue(file, alive, failed);
 }

@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-24: 共通処理翻訳0.86.2のコミット前照合
+
+- 実装時と現在の686入力、完全ログ10件、native出力2件、固定EXE/同梱日本語JSON/Default Shell、GUI・smokeコピーのSHA256一致を確認した。型検査/build、最終標準851件、固定EXEの設定翻訳GUI7群・共通サービスGUI4群・smokeの成功を再利用。途中段階の対象37件は最終851件に包含されるため、最終ソースの証明には使わない。
+- 実装後の製品変更なし。追加はこの検証記録だけで、版更新・再発行・回帰再実行は行わない。レビューの未解決指摘なし、対象108ファイルと実効author/committer、stage/作業ツリーの一致を確認する。照合・stage/commit tree・commit SHAの正本は`.artifacts/commit-validation-localization-0862/reuse.json`。push/Release/deployは行わない。
+
+## 2026-10-24: 共通サービス結果・標準ダイアログの日本語リソース移行 0.86.2
+
+- 先行0.86.1の685入力・完全ログ・固定EXE/同梱JSONを照合し、標準848件とGUIの成功を再利用して`3de77a6`へコミット。87ファイルのstage/commit tree一致を確認した。証跡は`.artifacts/commit-validation-localization-0861/reuse.json`。その後cleanなmainで`git pull --ff-only`は最新一致。今回0.86.2分は未commit。
+- 本体TypeScriptの共通サービスと共有検証100モジュールを移行。AI/MCP/TTS、音声、更新、Applet管理、設定保存/復旧、Webアカウント、画像、通知、Shell/入力/コマンドの結果・状態説明、および本体標準ダイアログの本文/説明/ボタン/画像フィルターをJSONへ抽出した。日本語リソースは1,816→2,897項目。Applet自身の文言と、受け取った名前・OS/外部エラー詳細は無変換。設定項目・保存ファイル・公開操作の変更がないため0.86.2へパッチ更新。
+- 発行前自己レビューと修正確認を実施。通知件数、Applet操作、AIエラー、ページ説明、更新要約を文章単位に整理した。保存初期値と旧データの判定を兼ねるWebアカウントの仮名は翻訳辞書から除外し、文言編集が既存データの判定へ影響しないよう維持した。100ソースの非日本語リテラル比較で削除は辞書へ移した`OK`2か所と通知タイトルの区切りだけ。操作ID/エラーコード/権限/ボタン順序/既定・キャンセルIDを保持し、未解決指摘なし。`review.json`/`literal-review.json`参照。
+- 型検査/build、最終標準回帰851/851成功（失敗・skip 0）。日本語再混入検査をmain共通サービスへ広げ、差し込み変数の一致、入力名と外部文字列の保持、更新の詳細と安全な通知要約を検査した。686入力の試験前後SHA256一致。固定依存・lockfileを保持し、`install --frozen-lockfile`の408件のsupply-chain検査も成功。制限環境のWindowsファイル操作/Electron/.NET発行失敗はログを保持して同じ処理を通常ユーザーで再実行した。
+- 固定EXEの設定翻訳GUI7群成功（`.artifacts/settings-hints-ui-1792770668604/`）。17ページ×明暗×1280/760の68画面、未翻訳キー/横溢れ、先頭の日本語1択、入力保存/検索/JSON拒否、カスタム名、実プロセス再起動を確認。固定EXEの共通サービスGUI4群成功（`.artifacts/settings-hints-ui-1792770710209/`）。ローカルHTTP 401からAI設定画面への日本語エラー表示、アカウント削除/クリアと画像選択のElectronダイアログ引数、取消時の保持と確定時の対象限定を検査した。使用中セッションの削除保留も既存仕様どおり。画面を目視確認し、renderer error 0。ダイアログ応答はfixtureでありWindowsネイティブ画面のレイアウト/物理操作の証明ではない。
+- `publish.bat`と固定smoke（`.artifacts/smoke-1792770725044/`）成功。EXEのFileVersion/ProductVersion/feed/Default Shellは0.86.2、170,667,000 bytes、SHA256 `e376baac66911aeeb657771f4d50ae490367810d2a839e011014162a3d19aa6e`。GUI2種/smokeコピーのhashとASAR内日本語JSONのソース一致を確認した。正本は`.artifacts/localization-services-20261024/validation.json`、完全ログ・入力hash・`artifacts.json`。
+- 本体rendererの残り、Default Shell固定文言、.NET補助プログラム自身の診断は次段階。Applet翻訳、多言語切替、外部AI/MCP/TTS・実UAC・実入力機器は対象外/未検証。今回のテスト終了処理成功、参照可能な隔離profileプロセス0。既存証跡・不明/失敗資料は保持し、試験ディレクトリ削除0件、今回の使い捨て編集補助4ファイルのみ削除。push/Release/実利用deployなし。
+
 ## 2026-10-24: 本体設定画面の日本語リソース移行 0.86.1
 
 - 先行0.86.0を依頼どおり755c6b8へコミットし、stage/commit tree一致を確認。その後cleanなmainでgit pull --ff-onlyは最新一致。今回分は未commit。設定項目・保存ファイル・公開操作の変更を伴わない文言抽出のため0.86.1へパッチ更新した。

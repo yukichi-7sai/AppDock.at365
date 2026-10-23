@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -64,19 +65,23 @@ export class LegacyLocalDataMonitor {
         {
           eventId: this.warning.id,
           source: 'storage',
-          title: '旧保存領域の確認が必要です',
+          title: hostText('services.legacyLocalData.title'),
           code: next.scanFailed ? 'LEGACY_LOCAL_DATA_UNREADABLE' : 'LEGACY_LOCAL_DATA',
           message: [
-            next.targets.length ? `旧PC専用データを${next.targets.length}か所検出しました。` : '',
-            next.scanFailed
-              ? '一部の旧保存先を確認できません。アクセス権と保存先を確認してください。'
+            next.targets.length
+              ? hostText('services.legacyLocalData.detected', {
+                  count: String(next.targets.length),
+                })
               : '',
-            '対象は本体ログの「整理対象」から確認できます。',
+            next.scanFailed ? hostText('services.legacyLocalData.inaccessible') : '',
+            hostText('services.legacyLocalData.detailsHint'),
             legacyLocalDataInstructions,
           ]
             .filter(Boolean)
             .join('\n'),
-          logDetails: next.targets.map((target) => `整理対象: ${target}`),
+          logDetails: next.targets.map((target) =>
+            hostText('services.legacyLocalData.target', { path: String(target) }),
+          ),
         },
         this.options.actions,
       );

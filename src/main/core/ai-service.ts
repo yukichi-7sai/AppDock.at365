@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   aiObject,
@@ -73,25 +74,26 @@ export class AiService {
     this.signature = JSON.stringify(options.settings());
   }
   private authorize(owner: string, kind: Kind) {
-    if (this.closed) aiFail('NOT_READY', 'AIサービスは終了しています。');
+    if (this.closed) aiFail('NOT_READY', hostText('services.aiService.closed'));
     if (!this.options.canUse(owner, kind))
-      aiFail('API_DISABLED', 'このAI操作を設定画面で許可してください。');
+      aiFail('API_DISABLED', hostText('services.aiService.permission'));
   }
   private connection(id: unknown) {
     const settings = parseAiSettings(this.options.settings());
     const selected = id ?? settings.defaultConnectionId;
     if (id !== undefined && (typeof id !== 'string' || !id))
-      aiFail('INVALID_ARGUMENT', '接続IDを確認してください。');
+      aiFail('INVALID_ARGUMENT', hostText('services.aiService.connectionId'));
     const c = settings.connections.find((c) => c.id === selected);
-    if (!c || !c.baseUrl) return aiFail('AI_NOT_CONFIGURED', 'AIの接続先を設定してください。');
+    if (!c || !c.baseUrl)
+      return aiFail('AI_NOT_CONFIGURED', hostText('services.aiService.configureConnection'));
     let key: string | undefined;
     try {
       key = c.authentication === 'bearer' ? this.options.key(c) : undefined;
     } catch {
-      return aiFail('AI_AUTH_FAILED', 'AIのAPIキーを再設定してください。');
+      return aiFail('AI_AUTH_FAILED', hostText('services.aiService.resetKey'));
     }
     if (c.authentication === 'bearer' && !key)
-      aiFail('AI_AUTH_FAILED', 'AIのAPIキーを設定してください。');
+      aiFail('AI_AUTH_FAILED', hostText('services.aiService.configureKey'));
     return { settings, c, key };
   }
   private prune() {
@@ -148,10 +150,7 @@ export class AiService {
           Number(value.timeoutMs) > aiTimeoutLimits.maximumSeconds * 1000)) ||
       (value.maxOutputTokens !== undefined && !aiTokenLimit(value.maxOutputTokens))
     )
-      return aiFail(
-        'INVALID_ARGUMENT',
-        'モデル・プロンプト・入力・期限・requestIdを確認してください。',
-      );
+      return aiFail('INVALID_ARGUMENT', hostText('services.aiService.requestFormat'));
     const input = {
       ...value,
       additionalPrompt: value.additionalPrompt ?? '',
@@ -176,24 +175,21 @@ export class AiService {
     );
     if (prior) {
       if (prior.fingerprint !== fingerprint)
-        aiFail('AI_REQUEST_CONFLICT', '同じrequestIdを異なる引数には使えません。');
+        aiFail('AI_REQUEST_CONFLICT', hostText('services.aiService.requestIdConflict'));
       return { ...this.view(prior), completion: 'accepted' };
     }
     const { settings, c, key } = this.connection(input.connectionId);
     const model = input.model ?? c.defaultModel;
     if (!model?.trim())
-      return aiFail(
-        'AI_MODEL_REQUIRED',
-        'モデルを指定するか、接続の既定モデルを設定してください。',
-      );
+      return aiFail('AI_MODEL_REQUIRED', hostText('services.aiService.selectModel'));
     if (![settings.commonPrompt, input.additionalPrompt, input.input].some((v) => v.trim()))
-      aiFail('INVALID_ARGUMENT', 'プロンプトか入力を指定してください。');
+      aiFail('INVALID_ARGUMENT', hostText('services.aiService.promptRequired'));
     const pending = [...this.records.values()].filter((j) => j.ended === undefined);
     if (
       pending.length >= this.limits.capacity ||
       pending.filter((j) => j.owner === owner).length >= this.limits.ownerCapacity
     )
-      aiFail('AI_QUEUE_FULL', 'AIの待ち件数が上限に達しました。');
+      aiFail('AI_QUEUE_FULL', hostText('services.aiService.queueLimit'));
     const body = JSON.stringify({
       model,
       messages: aiMessages(settings.commonPrompt, input.additionalPrompt, input.input),
@@ -208,7 +204,7 @@ export class AiService {
       ...(c.compatibility.store === 'false' ? { store: false } : {}),
     });
     if (Buffer.byteLength(body) > 65536)
-      aiFail('INVALID_ARGUMENT', '合成後のAIリクエストは64KiB以下です。');
+      aiFail('INVALID_ARGUMENT', hostText('services.aiService.requestSize'));
     const now = Date.now();
     const rate = this.rates.get(c.id) ?? { tokens: this.limits.burst, at: now };
     rate.tokens = Math.min(
@@ -217,8 +213,7 @@ export class AiService {
     );
     rate.at = now;
     this.rates.set(c.id, rate);
-    if (rate.tokens < 1)
-      aiFail('AI_RATE_LIMITED', 'AIの実行頻度が上限に達しました。少し待って再試行してください。');
+    if (rate.tokens < 1) aiFail('AI_RATE_LIMITED', hostText('services.aiService.rateLimit'));
     rate.tokens--;
     const time = new Date(now).toISOString();
     const j: Record = {
@@ -242,14 +237,7 @@ export class AiService {
       },
     };
     j.timer = setTimeout(() => {
-      this.finish(
-        j,
-        'failed',
-        new AiError(
-          'AI_TIMEOUT',
-          'AIの待ち時間を超えました。サーバーの状態や、設定した待ち時間を確認してください。',
-        ),
-      );
+      this.finish(j, 'failed', new AiError('AI_TIMEOUT', hostText('services.aiService.timeout')));
       j.abort.abort();
     }, j.deadline - now);
     this.records.set(j.view.jobId, j);
@@ -265,7 +253,8 @@ export class AiService {
     this.authorize(owner, 'read');
     this.prune();
     const j = typeof id === 'string' ? this.records.get(id) : undefined;
-    if (!j || j.owner !== owner) return aiFail('NOT_FOUND', 'AIジョブが見つかりません。');
+    if (!j || j.owner !== owner)
+      return aiFail('NOT_FOUND', hostText('services.aiService.jobMissing'));
     return this.view(j);
   }
   cancel(owner: string, id: unknown): AiJob {
@@ -330,14 +319,7 @@ export class AiService {
         continue;
       }
       if (Date.now() >= j.deadline) {
-        this.finish(
-          j,
-          'failed',
-          new AiError(
-            'AI_TIMEOUT',
-            'AIの待ち時間を超えました。サーバーの状態や、設定した待ち時間を確認してください。',
-          ),
-        );
+        this.finish(j, 'failed', new AiError('AI_TIMEOUT', hostText('services.aiService.timeout')));
         continue;
       }
       this.active.add(j);
@@ -360,10 +342,7 @@ export class AiService {
             this.finish(
               j,
               'failed',
-              new AiError(
-                'AI_TIMEOUT',
-                'AIの待ち時間を超えました。サーバーの状態や、設定した待ち時間を確認してください。',
-              ),
+              new AiError('AI_TIMEOUT', hostText('services.aiService.timeout')),
             );
             return;
           }
@@ -377,7 +356,10 @@ export class AiService {
               'failed',
               e instanceof AiError
                 ? e
-                : new AiError('AI_CONNECTION_FAILED', 'AI生成に失敗しました。'),
+                : new AiError(
+                    'AI_CONNECTION_FAILED',
+                    hostText('services.aiService.generationFailed'),
+                  ),
             );
         })
         .finally(() => {
@@ -393,7 +375,7 @@ export class AiService {
     const prior = this.lists.get(identity);
     if (prior) return prior.promise as ReturnType<AiOpenAiChat['models']>;
     if (this.lists.size >= this.limits.modelLists)
-      aiFail('AI_QUEUE_FULL', 'AI一覧取得の待ち件数が上限に達しました。');
+      aiFail('AI_QUEUE_FULL', hostText('services.aiService.listQueueLimit'));
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), this.limits.modelMs);
     const promise = this.adapter
@@ -405,7 +387,7 @@ export class AiService {
           JSON.stringify(this.options.settings().connections.find((v) => v.id === c.id)) !==
             JSON.stringify(c)
         )
-          return aiFail('AI_CANCELED', '古い接続設定の一覧を破棄しました。');
+          return aiFail('AI_CANCELED', hostText('services.aiService.staleList'));
         return value;
       })
       .finally(() => {

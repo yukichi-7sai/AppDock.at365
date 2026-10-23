@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import type {
   NotificationActionRequest,
@@ -287,7 +288,8 @@ export class NotificationService {
   }
   markRead(ids: string[]) {
     const rows = this.centerEntries();
-    if (ids.some((id) => !rows.some((i) => i.id === id))) throw Error('通知が更新されました。');
+    if (ids.some((id) => !rows.some((i) => i.id === id)))
+      throw Error(hostText('services.notificationService.changed'));
     const persistent = ids.filter(
       (id) => rows.find((i) => i.id === id)!.historyPolicy === 'persistent',
     );
@@ -304,7 +306,7 @@ export class NotificationService {
   deleteHistory(ids: string[]) {
     const rows = this.centerEntries();
     if (ids.some((id) => !rows.some((i) => i.id === id && i.status !== 'active')))
-      throw Error('終了履歴だけを削除できます。');
+      throw Error(hostText('services.notificationService.endedOnly'));
     const persistent = ids.filter(
       (id) => rows.find((i) => i.id === id)!.historyPolicy === 'persistent',
     );
@@ -397,16 +399,17 @@ export class NotificationService {
     this.expire();
     const r = this.records.get(request.notificationId);
     if (this.closed || !r || r.item.status !== 'active' || r.item.revision !== request.revision)
-      throw Error('通知が更新されました。最新の内容を確認してください。');
-    if (r.executing || r.item.busy) throw Error('通知の処理中です。');
+      throw Error(hostText('services.notificationService.refresh'));
+    if (r.executing || r.item.busy) throw Error(hostText('services.notificationService.busy'));
     if (request.type === 'dismiss') {
-      if (!r.item.dismissible) throw Error('この通知は閉じられません。');
+      if (!r.item.dismissible) throw Error(hostText('services.notificationService.cannotDismiss'));
       this.finish(r, 'dismissed');
       return;
     }
     const action = r.item.actions.find((a) => a.id === request.actionId);
     const callback = action && r.actions.get(action.id);
-    if (!action || action.disabled || !callback) throw Error('通知の操作は利用できません。');
+    if (!action || action.disabled || !callback)
+      throw Error(hostText('services.notificationService.actionUnavailable'));
     r.executing = true;
     r.item.busy = true;
     r.item.revision++;

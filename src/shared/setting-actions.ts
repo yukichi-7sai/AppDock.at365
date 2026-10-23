@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { DeclaredCommand, SettingAction } from './contracts';
 
 /** Actions invoke declared commands; they never create persisted settings. */
@@ -7,7 +8,7 @@ export function parseSettingActions(
 ): SettingAction[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > 16)
-    throw new Error('settingActions は16件以下の配列です。');
+    throw new Error(hostText('services.sharedSettingActions.countLimit'));
   const seen = new Set<string>();
   return value.map((action) => {
     if (
@@ -27,7 +28,7 @@ export function parseSettingActions(
           !action.successMessage.trim() ||
           action.successMessage.length > 500))
     )
-      throw new Error('設定アクションには自身の宣言済みコマンドと表示文を指定してください。');
+      throw new Error(hostText('services.sharedSettingActions.invalidDeclaration'));
     seen.add(action.command);
     return {
       title: action.title,

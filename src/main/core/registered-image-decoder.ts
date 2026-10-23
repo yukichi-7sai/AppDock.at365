@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { BrowserWindow, nativeImage } from 'electron';
 import type { DecodedImage } from './registered-images';
 
@@ -41,7 +42,7 @@ const browserDecode = `(async ({source,edge}) => {
 
 function decodeWebP(bytes: Buffer, edge = 64): Promise<DecodedImage> {
   const task = queue.then(async () => {
-    if (stopped) throw Error('画像の読み込みを終了しました。');
+    if (stopped) throw Error(hostText('services.registeredImageDecoder.closed'));
     clearTimeout(idle);
     if (!worker || worker.isDestroyed()) {
       worker = new BrowserWindow({
@@ -82,7 +83,7 @@ function decodeWebP(bytes: Buffer, edge = 64): Promise<DecodedImage> {
         }),
       ]);
     } catch {
-      throw Error('WebP画像を読み込めません。画像の形式・寸法を確認してください。');
+      throw Error(hostText('services.registeredImageDecoder.webpFailed'));
     } finally {
       clearTimeout(timeout);
       idle = setTimeout(disposeRegisteredImageDecoder, 1000);
@@ -97,7 +98,8 @@ function decodeWebP(bytes: Buffer, edge = 64): Promise<DecodedImage> {
 }
 
 export async function decodeRegisteredImage(bytes: Buffer, edge = 64): Promise<DecodedImage> {
-  if (![64, 512, 1024, 2048].includes(edge)) throw Error('画像サイズを確認してください。');
+  if (![64, 512, 1024, 2048].includes(edge))
+    throw Error(hostText('services.registeredImageDecoder.invalidSize'));
   if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP')
     return decodeWebP(bytes, edge);
   const source = nativeImage.createFromBuffer(bytes),
@@ -108,7 +110,7 @@ export async function decodeRegisteredImage(bytes: Buffer, edge = 64): Promise<D
     size.height > 8192 ||
     size.width * size.height > 16 * 1024 * 1024
   )
-    throw Error('画像の寸法を確認してください。');
+    throw Error(hostText('services.registeredImageDecoder.invalidDimensions'));
   const target = edge === 64 ? 64 : Math.min(edge, Math.max(size.width, size.height));
   const thumbnail = source
     .resize(size.width >= size.height ? { width: target } : { height: target })

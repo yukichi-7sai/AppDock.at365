@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { BrowserWindow } from 'electron';
 import type { AudioPlaybackRequest } from './audio-playback';
 export async function playAudioWave({
@@ -34,12 +35,12 @@ export async function playAudioWave({
   };
   const closed = () => {
     if (signal.aborted) canceled();
-    else failed(new Error('音声プレイヤーが終了しました。'));
+    else failed(new Error(hostText('services.audioPlayer.closed')));
   };
   player.once('closed', closed);
   signal.addEventListener('abort', stop, { once: true });
   const timeout = setTimeout(() => {
-    failed(new Error('音声の再生期限を超えました。'));
+    failed(new Error(hostText('services.audioPlayer.timeout')));
     destroy();
   }, playbackTimeoutMs);
   try {
@@ -67,7 +68,7 @@ export async function playAudioWave({
       interrupted,
     ]);
   } catch {
-    if (!signal.aborted) throw new Error('音声を再生できません。');
+    if (!signal.aborted) throw new Error(hostText('services.audioPlayer.playbackFailed'));
   } finally {
     clearTimeout(timeout);
     signal.removeEventListener('abort', stop);

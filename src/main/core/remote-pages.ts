@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { session, nativeImage, dialog, net, type WebContents } from 'electron';
 import path from 'node:path';
 import { AppletSurface, pageHostShortcut } from './applet-pages';
@@ -31,9 +32,7 @@ export class RemotePageService {
     try {
       this.profiles.cleanupSessions(this.items().map((a) => a.accountId));
     } catch {
-      queueMicrotask(() =>
-        failed(Error('ページ参照を確認できないためアカウントの後処理を保留しました。')),
-      );
+      queueMicrotask(() => failed(Error(hostText('services.remotePages.cleanupDeferred'))));
     }
     this.profiles.watch(() => {
       this.reconcile();
@@ -47,45 +46,43 @@ export class RemotePageService {
     for (const item of items) {
       this.profiles.get(item.accountId);
       if (this.clearing.has(item.accountId))
-        throw Error('Webアカウントを処理中です。少し待って保存してください。');
+        throw Error(hostText('services.remotePages.accountBusySave'));
     }
   }
   addAccount(name: unknown) {
-    if (this.closed) throw Error('Webアカウント管理を終了しています。');
+    if (this.closed) throw Error(hostText('services.remotePages.closed'));
     const account = this.profiles.add(name);
     this.changed();
     return account;
   }
   renameAccount(id: string, name: unknown) {
-    if (this.closed || this.clearing.has(id)) throw Error('Webアカウントを処理中です。');
+    if (this.closed || this.clearing.has(id))
+      throw Error(hostText('services.remotePages.accountBusy'));
     this.profiles.rename(id, name);
     this.changed();
   }
   async deleteAccount(id: string) {
     const account = this.profiles.get(id);
     const used = () => this.items().some((a) => a.accountId === id);
-    if (this.closed || this.clearing.has(id)) throw Error('Webアカウントを処理中です。');
-    if (used())
-      throw Error(
-        '使用中の枠は削除できません。ページのアカウントを変更して設定を保存してください。',
-      );
+    if (this.closed || this.clearing.has(id))
+      throw Error(hostText('services.remotePages.accountBusy'));
+    if (used()) throw Error(hostText('services.remotePages.accountInUse'));
     this.clearing.add(id);
     try {
       const answer = await dialog.showMessageBox({
         type: 'warning',
-        message: `「${account.name}」のアカウント枠を削除しますか？`,
-        detail:
-          'この枠と保存されたログイン情報・サイトデータを削除します。元に戻せません。使用中で消せないファイルは次回起動時に自動で片づけます。ほかのAppletのアカウントには影響しません。',
-        buttons: ['キャンセル', '枠を削除'],
+        message: hostText('services.remotePages.deleteAccount', { name: String(account.name) }),
+        detail: hostText('services.remotePages.deleteDetails'),
+        buttons: [hostText('services.remotePages.cancel'), hostText('services.remotePages.delete')],
         defaultId: 0,
         cancelId: 0,
       });
       if (answer.response !== 1 || this.closed) return false;
-      if (used()) throw Error('この枠がWebページに割り当てられたため、削除を中止しました。');
+      if (used()) throw Error(hostText('services.remotePages.accountAssigned'));
       const ses = this.sessions.get(id);
       if (ses) await this.eraseSession(ses);
       if (this.closed) return false;
-      if (used()) throw Error('この枠がWebページに割り当てられたため、削除を中止しました。');
+      if (used()) throw Error(hostText('services.remotePages.accountAssigned'));
       this.profiles.remove(id);
       this.changed();
       const remaining = this.profiles.cleanupSessions(
@@ -133,10 +130,10 @@ export class RemotePageService {
     }
   }
   async open(id: string) {
-    if (this.closed) throw Error('Webページがありません。');
+    if (this.closed) throw Error(hostText('services.remotePages.pageMissing'));
     const a = this.items().find((a) => a.id === id);
     if (!a?.enabled || this.clearing.has(a.accountId))
-      throw Error('Webページが無効またはアカウント処理中です。');
+      throw Error(hostText('services.remotePages.unavailable'));
     let v = this.views.get(id);
     if (!v) {
       const state: WebPageState = {
@@ -163,7 +160,7 @@ export class RemotePageService {
           const current = () => this.items().find((item) => item.id === id) ?? a;
           const permitted = (url: string) => allowedWebNavigation(current(), url);
           const blocked = () => {
-            state.error = '設定で許可されていないページへの移動を止めました。';
+            state.error = hostText('services.remotePages.navigationBlocked');
             this.changed();
           };
           wc.on('will-navigate', (event, url) => {
@@ -219,12 +216,12 @@ export class RemotePageService {
           });
           wc.on('did-fail-load', (_event, code, _description, _url, main) => {
             if (main && code !== -3) {
-              state.error = `ページを読み込めませんでした（${code}）。`;
+              state.error = hostText('services.remotePages.loadFailedCode', { code: String(code) });
               this.changed();
             }
           });
           wc.on('render-process-gone', () => {
-            state.error = 'Webページの処理が終了しました。再起動してください。';
+            state.error = hostText('services.remotePages.rendererStopped');
             this.changed();
           });
         },
@@ -235,7 +232,7 @@ export class RemotePageService {
     try {
       await v.surface.open();
     } catch {
-      v.state.error = 'ページを読み込めませんでした。URLと接続を確認してください。';
+      v.state.error = hostText('services.remotePages.loadFailed');
       this.changed();
       throw Error(v.state.error);
     }
@@ -244,7 +241,7 @@ export class RemotePageService {
   async navigate(id: string, action: unknown) {
     const v = this.views.get(id);
     if (!v || !v.item.enabled || v.surface.ui.webContents.isDestroyed())
-      throw Error('Webページを先に開いてください。');
+      throw Error(hostText('services.remotePages.openFirst'));
     const wc = v.surface.ui.webContents;
     if (action === 'reload') wc.reload();
     else if (action === 'home') await wc.loadURL(v.item.url);
@@ -254,7 +251,7 @@ export class RemotePageService {
         offset = action === 'back' ? -1 : 1;
       const target = entries[h.getActiveIndex() + offset];
       if (target && allowedWebNavigation(v.item, target.url)) h.goToOffset(offset);
-    } else throw Error('Webページの操作が不正です。');
+    } else throw Error(hostText('services.remotePages.invalidOperation'));
   }
   restart(id: string) {
     const v = this.views.get(id);
@@ -265,14 +262,14 @@ export class RemotePageService {
   async clearAccount(id: string) {
     const account = this.profiles.get(id);
     const ses = this.account(id);
-    if (this.clearing.has(id)) throw Error('アカウントを処理しています。');
+    if (this.clearing.has(id)) throw Error(hostText('services.remotePages.processing'));
     this.clearing.add(id);
     try {
       const answer = await dialog.showMessageBox({
         type: 'warning',
-        message: `「${account.name}」のログイン情報とサイトデータをクリアしますか？`,
-        detail: 'この枠を使うWebページを閉じます。ほかのAppletのアカウントには影響しません。',
-        buttons: ['キャンセル', 'クリア'],
+        message: hostText('services.remotePages.clearAccount', { name: String(account.name) }),
+        detail: hostText('services.remotePages.clearDetails'),
+        buttons: [hostText('services.remotePages.cancel'), hostText('services.remotePages.clear')],
         defaultId: 0,
         cancelId: 0,
       });
@@ -320,6 +317,6 @@ export class RemotePageService {
         }),
     );
     if (cleanupFailed || results.some((r) => r.status === 'rejected'))
-      throw Error('Webアカウントの保存に失敗しました。');
+      throw Error(hostText('services.remotePages.saveFailed'));
   }
 }

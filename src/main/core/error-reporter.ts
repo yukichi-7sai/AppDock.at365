@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash } from 'node:crypto';
 import type { TypedNotifications } from './typed-notifications';
 import type { NotificationInput } from './notification-service';
@@ -38,7 +39,10 @@ export class ErrorReporter {
       update: (error, actions) => {
         if (resolved) return;
         const title = error.title.slice(0, 200);
-        const body = `${error.message}\nエラーコード: ${error.code}`.slice(0, 2000);
+        const body = hostText('services.errorReporter.bodyWithCode', {
+          message: String(error.message),
+          code: String(error.code),
+        }).slice(0, 2000);
         const next = JSON.stringify([title, body]);
         if (next !== fingerprint) {
           fingerprint = next;
@@ -92,7 +96,10 @@ export class ErrorReporter {
     this.seen.add(key);
     while (this.seen.size > 512) this.seen.delete(this.seen.values().next().value!);
     const title = error.title.slice(0, 200),
-      body = `${error.message}\nエラーコード: ${error.code}`.slice(0, 2000);
+      body = hostText('services.errorReporter.bodyWithCode', {
+        message: String(error.message),
+        code: String(error.code),
+      }).slice(0, 2000);
     const write = (message: string) => {
       try {
         this.options.log(error.source, message);
@@ -112,7 +119,7 @@ export class ErrorReporter {
           dedupeKey: createHash('sha256').update(key).digest('hex'),
         });
     } catch {
-      write('エラー通知を表示できませんでした。失敗の内容は直前のログを確認してください。');
+      write(hostText('services.errorReporter.notificationFailed'));
     }
   }
 }

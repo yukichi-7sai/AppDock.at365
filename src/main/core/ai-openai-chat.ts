@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { AutomationError } from './appdock-api';
 import {
   aiObject,
@@ -33,22 +34,22 @@ export class AiOpenAiChat {
       });
       if (!response.ok) {
         if ([401, 403].includes(response.status))
-          aiFail('AI_AUTH_FAILED', 'AIサーバーの認証を確認してください。');
+          aiFail('AI_AUTH_FAILED', hostText('services.aiOpenaiChat.authentication'));
         if (response.status === 429)
-          aiFail('AI_RATE_LIMITED', 'AIサーバーが受付を制限しています。');
+          aiFail('AI_RATE_LIMITED', hostText('services.aiOpenaiChat.rateLimited'));
         if (path === 'models' && [404, 405].includes(response.status))
-          aiFail(
-            'AI_MODELS_UNSUPPORTED',
-            'モデル一覧に対応していません。モデルIDを直接入力してください。',
-          );
-        aiFail('AI_SERVER_ERROR', `AIサーバーがHTTP ${response.status}を返しました。`);
+          aiFail('AI_MODELS_UNSUPPORTED', hostText('services.aiOpenaiChat.modelListUnsupported'));
+        aiFail(
+          'AI_SERVER_ERROR',
+          hostText('services.aiOpenaiChat.httpError', { status: String(response.status) }),
+        );
       }
       if (
         (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase() !==
           'application/json' ||
         !response.body
       )
-        aiFail('AI_INVALID_RESPONSE', 'AIサーバーの応答形式が不正です。');
+        aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.responseFormat'));
       const reader = response.body!.getReader();
       const chunks: Uint8Array[] = [];
       let size = 0;
@@ -58,7 +59,7 @@ export class AiOpenAiChat {
           if (part.done) break;
           size += part.value.byteLength;
           if (size > 1024 * 1024)
-            aiFail('AI_RESPONSE_TOO_LARGE', 'AIサーバーの応答が大きすぎます。');
+            aiFail('AI_RESPONSE_TOO_LARGE', hostText('services.aiOpenaiChat.responseTooLarge'));
           chunks.push(part.value);
         }
       } finally {
@@ -67,15 +68,12 @@ export class AiOpenAiChat {
       try {
         return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
       } catch {
-        return aiFail('AI_INVALID_RESPONSE', 'AIサーバーのJSON応答が不正です。');
+        return aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.jsonResponse'));
       }
     } catch (e) {
       if (e instanceof AiError) throw e;
-      if (signal.aborted) return aiFail('AI_CANCELED', 'AIの通信を取り消しました。');
-      return aiFail(
-        'AI_CONNECTION_FAILED',
-        'AIサーバーへ接続できません。URLとサーバーの状態を確認してください。',
-      );
+      if (signal.aborted) return aiFail('AI_CANCELED', hostText('services.aiOpenaiChat.cancelled'));
+      return aiFail('AI_CONNECTION_FAILED', hostText('services.aiOpenaiChat.connectionFailed'));
     } finally {
       await response?.body?.cancel().catch(() => {});
     }
@@ -88,13 +86,10 @@ export class AiOpenAiChat {
   ): Promise<Pick<AiJob, 'text' | 'usage'>> {
     const v = await this.json(c, key, 'chat/completions', signal, body);
     if (!aiObject(v) || !Array.isArray(v.choices) || !aiObject(v.choices[0]))
-      return aiFail('AI_INVALID_RESPONSE', '生成結果が不正です。');
+      return aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.generationFormat'));
     const choice = v.choices[0];
     if (choice.finish_reason === 'length')
-      return aiFail(
-        'AI_OUTPUT_LIMIT',
-        '出力トークンの上限に達したため、文章を最後まで生成できませんでした。トークン上限を増やすか、推論の強さを調整してください。',
-      );
+      return aiFail('AI_OUTPUT_LIMIT', hostText('services.aiOpenaiChat.tokenLimit'));
     if (
       choice.finish_reason !== 'stop' ||
       !aiObject(choice.message) ||
@@ -104,13 +99,11 @@ export class AiOpenAiChat {
       !aiString(choice.message.content, 4096) ||
       !choice.message.content.trim()
     )
-      return aiFail(
-        'AI_INVALID_RESPONSE',
-        '生成が完了していないか、有効な文章が返されませんでした。',
-      );
+      return aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.incompleteGeneration'));
     const result: Pick<AiJob, 'text' | 'usage'> = { text: choice.message.content };
     if (v.usage !== undefined && v.usage !== null) {
-      if (!aiObject(v.usage)) return aiFail('AI_INVALID_RESPONSE', 'トークン使用量が不正です。');
+      if (!aiObject(v.usage))
+        return aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.tokenUsage'));
       result.usage = {};
       for (const [wire, field] of [
         ['prompt_tokens', 'promptTokens'],
@@ -120,7 +113,7 @@ export class AiOpenAiChat {
         const n = v.usage[wire];
         if (n !== undefined) {
           if (!Number.isSafeInteger(n) || Number(n) < 0)
-            return aiFail('AI_INVALID_RESPONSE', 'トークン使用量が不正です。');
+            return aiFail('AI_INVALID_RESPONSE', hostText('services.aiOpenaiChat.tokenUsage'));
           result.usage[field] = n as number;
         }
       }
@@ -134,7 +127,7 @@ export class AiOpenAiChat {
   ): Promise<{ models: AiModel[] }> {
     const v = await this.json(c, key, 'models', signal);
     if (!aiObject(v) || !Array.isArray(v.data) || v.data.length > 1000)
-      return aiFail('AI_INVALID_MODELS', 'モデル一覧の形式が不正です。');
+      return aiFail('AI_INVALID_MODELS', hostText('services.aiOpenaiChat.modelListFormat'));
     const ids = new Set<string>();
     return {
       models: v.data.map((m) => {
@@ -146,7 +139,7 @@ export class AiOpenAiChat {
           ids.has(m.id) ||
           (m.name !== undefined && !aiString(m.name, 200))
         )
-          return aiFail('AI_INVALID_MODELS', 'モデル一覧のID・名前・重複を確認してください。');
+          return aiFail('AI_INVALID_MODELS', hostText('services.aiOpenaiChat.modelListIds'));
         ids.add(m.id);
         return { id: m.id, name: typeof m.name === 'string' ? m.name : m.id };
       }),

@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import { movePinnedCommand, validCommandId, type UiCommand } from '../../shared/commands';
 import type {
@@ -68,7 +69,12 @@ export class CommandPaletteSession implements OverlayController {
       this.request.mode === 'select'
         ? (this.request.commandIds ?? [])
             .filter((id) => !catalog.some((c) => c.id === id))
-            .map((id) => ({ id, title: id, extension: '未確認のコマンド', available: false }))
+            .map((id) => ({
+              id,
+              title: id,
+              extension: hostText('services.commandPalette.unverifiedCommand'),
+              available: false,
+            }))
         : [];
     return [...catalog, ...missing].filter(
       (c) =>

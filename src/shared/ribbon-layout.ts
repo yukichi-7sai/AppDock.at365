@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import {
   orderRibbon,
   parseRibbon,
@@ -13,7 +14,7 @@ import type { RibbonLayout, RibbonPlacement, RibbonGroup } from './ribbon';
 export class RibbonLayoutError extends Error {
   constructor(
     readonly code: 'INVALID_ARGUMENT' | 'NOT_FOUND',
-    message = 'リボンの操作・ID・配置・順序を確認してください。',
+    message = hostText('services.sharedRibbonLayout.invalidArguments'),
   ) {
     super(message);
   }
@@ -47,7 +48,7 @@ export function ribbonPresentation(layout: RibbonLayout, item: RibbonItem) {
   const override = layout.itemOverrides?.[item.id];
   return {
     title: item.group
-      ? item.group.title || 'グループ'
+      ? item.group.title || hostText('services.sharedRibbonLayout.group')
       : item.kind === 'separator'
         ? layout.separatorTitles?.[item.id] || item.title
         : item.command?.title || override?.title || item.title,
@@ -110,7 +111,11 @@ export function editRibbon(
   const roots = () => ribbonRootIds(next, items);
   const group = (id: unknown): RibbonGroup => {
     const g = next.groups!.find((g) => g.id === id);
-    if (!g) throw new RibbonLayoutError('NOT_FOUND', '指定されたグループがありません。');
+    if (!g)
+      throw new RibbonLayoutError(
+        'NOT_FOUND',
+        hostText('services.sharedRibbonLayout.groupMissing'),
+      );
     return g;
   };
   const known = (id: unknown, retained = false) => {
@@ -121,7 +126,10 @@ export function editRibbon(
       !(next.buttons ?? []).some((b) => b.id === id) &&
       !(retained && ribbonRetainedIds(next, items).includes(id as string))
     )
-      throw new RibbonLayoutError('NOT_FOUND', '現在登録されているリボン項目ではありません。');
+      throw new RibbonLayoutError(
+        'NOT_FOUND',
+        hostText('services.sharedRibbonLayout.unregisteredItem'),
+      );
   };
   const placement = (v: unknown): RibbonPlacement => {
     if (v !== 'top' && v !== 'bottom') invalid();
@@ -234,7 +242,10 @@ export function editRibbon(
   } else if (op.kind === 'removeSeparator') {
     if (!exact(op, ['kind', 'id']) || !validSeparatorId(op.id)) invalid();
     if (!next.separators.includes(op.id))
-      throw new RibbonLayoutError('NOT_FOUND', '指定された区切り線がありません。');
+      throw new RibbonLayoutError(
+        'NOT_FOUND',
+        hostText('services.sharedRibbonLayout.separatorMissing'),
+      );
     remove(op.id);
     next.separators = next.separators.filter((id) => id !== op.id);
     next.hidden = next.hidden.filter((id) => id !== op.id);
@@ -315,7 +326,11 @@ export function editRibbon(
     )
       invalid();
     const button = next.buttons?.find((b) => b.id === op.id);
-    if (!button) throw new RibbonLayoutError('NOT_FOUND', '指定されたコマンドボタンがありません。');
+    if (!button)
+      throw new RibbonLayoutError(
+        'NOT_FOUND',
+        hostText('services.sharedRibbonLayout.buttonMissing'),
+      );
     Object.assign(button, op.changes);
   } else if (op.kind === 'removeButton') {
     if (!exact(op, ['kind', 'id']) || !next.buttons?.some((b) => b.id === op.id)) invalid();

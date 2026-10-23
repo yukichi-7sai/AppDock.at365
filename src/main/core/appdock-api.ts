@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { touchpadBridgeCommands, executeTouchpadBridgeCommand } from './touchpad-commands';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import type { InputInvocation } from './command-contexts';
@@ -215,18 +216,25 @@ export class AppDockApi {
       : undefined;
     const caller = appletId === undefined ? 'mcp' : 'applet';
     if (!definition || !(definition.callers as readonly string[]).includes(caller))
-      throw new AutomationError('NOT_FOUND', '対応していない操作です。');
+      throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.unsupported'));
     for (const permission of definition.permissions)
       if (!permissions[permission])
-        throw new AutomationError('API_DISABLED', 'この操作を設定画面で許可してください。');
+        throw new AutomationError('API_DISABLED', hostText('services.appdockApi.permission'));
     if (!this.options.ready())
-      throw new AutomationError('NOT_READY', 'AppDockは起動中または終了中です。');
-    if (!object(params)) throw new AutomationError('INVALID_ARGUMENT', '引数はオブジェクトです。');
+      throw new AutomationError('NOT_READY', hostText('services.appdockApi.unavailable'));
+    if (!object(params))
+      throw new AutomationError('INVALID_ARGUMENT', hostText('services.appdockApi.argumentObject'));
     if (method.startsWith('customCommands.')) {
       if (!inputValidators.get(method)!(params).valid)
-        throw new AutomationError('INVALID_ARGUMENT', '引数が操作の形式に一致しません。');
+        throw new AutomationError(
+          'INVALID_ARGUMENT',
+          hostText('services.appdockApi.argumentSchema'),
+        );
       if (!this.options.customCommands)
-        throw new AutomationError('NOT_READY', 'カスタムコマンドを利用できません。');
+        throw new AutomationError(
+          'NOT_READY',
+          hostText('services.appdockApi.customCommandsUnavailable'),
+        );
       try {
         return this.options.customCommands.read(method, params, appletId);
       } catch (error) {
@@ -238,14 +246,17 @@ export class AppDockApi {
     const handler = this.options.handlers?.[method as AppDockMethod];
     if (handler) {
       if (!inputValidators.get(method)!(params).valid)
-        throw new AutomationError('INVALID_ARGUMENT', '引数が操作の形式に一致しません。');
+        throw new AutomationError(
+          'INVALID_ARGUMENT',
+          hostText('services.appdockApi.argumentSchema'),
+        );
       return handler(params, appletId, context);
     }
     if (
       !['settings.get', 'settings.getSchema', 'applets.get', 'commands.execute'].includes(method) &&
       Object.keys(params).length
     )
-      throw new AutomationError('INVALID_ARGUMENT', 'この操作には引数がありません。');
+      throw new AutomationError('INVALID_ARGUMENT', hostText('services.appdockApi.noArguments'));
     switch (method) {
       case 'system.getInfo':
         return {
@@ -274,7 +285,8 @@ export class AppDockApi {
       case 'applets.get': {
         const id = this.id(params);
         const applet = this.options.applets().find((a) => a.id === id);
-        if (!applet) throw new AutomationError('NOT_FOUND', 'Appletが見つかりません。');
+        if (!applet)
+          throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.appletMissing'));
         return {
           applet,
           commands: this.commands({
@@ -353,7 +365,7 @@ export class AppDockApi {
         )
           throw new AutomationError(
             'INVALID_ARGUMENT',
-            'Appletの設定はappletIdだけを指定してください。',
+            hostText('services.appdockApi.appletSettingsArguments'),
           );
         try {
           return method === 'settings.get'
@@ -369,7 +381,7 @@ export class AppDockApi {
         }
       }
       default:
-        throw new AutomationError('NOT_FOUND', '対応していない操作です。');
+        throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.unsupported'));
     }
   }
   private id(params: Record<string, unknown>, argumentsAllowed = false): string {
@@ -380,7 +392,7 @@ export class AppDockApi {
     )
       throw new AutomationError(
         'INVALID_ARGUMENT',
-        '正しいidと対応する引数だけを指定してください。',
+        hostText('services.appdockApi.commandArguments'),
       );
     return params.id;
   }
@@ -394,13 +406,13 @@ export class AppDockApi {
     if (!permissions.execute)
       throw new AutomationError(
         'EXECUTION_DISABLED',
-        '呼び出し元の許可設定でコマンド実行を許可してください。',
+        hostText('services.appdockApi.executionPermission'),
       );
     const command = this.commands().find((c) => c.id === id);
     if (!command)
-      throw new AutomationError('NOT_FOUND', '外部に公開されているコマンドではありません。');
+      throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.privateCommand'));
     if (!command.available)
-      throw new AutomationError('UNAVAILABLE', 'このコマンドは現在利用できません。');
+      throw new AutomationError('UNAVAILABLE', hostText('services.appdockApi.commandUnavailable'));
     if (
       !object(args) ||
       (![
@@ -414,10 +426,7 @@ export class AppDockApi {
       ].includes(command.permission ?? '') &&
         Object.keys(args).length)
     )
-      throw new AutomationError(
-        'INVALID_ARGUMENT',
-        'コマンドのinputSchemaに合うargsを指定してください。',
-      );
+      throw new AutomationError('INVALID_ARGUMENT', hostText('services.appdockApi.commandSchema'));
     if (
       [
         'settings.write',
@@ -432,27 +441,27 @@ export class AppDockApi {
     )
       throw new AutomationError(
         'WRITE_DISABLED',
-        '呼び出し元の許可設定で設定変更を許可してください。',
+        hostText('services.appdockApi.settingsPermission'),
       );
     if (
       appletId &&
       command.appletId === appletId &&
       (command.permission === 'applets.manage' || !command.permission)
     )
-      throw new AutomationError('SELF_CALL', '自身の実行・停止・再起動はこの入口から行えません。');
+      throw new AutomationError('SELF_CALL', hostText('services.appdockApi.selfCall'));
     // Synchronous settings edits can complete while an Applet handler awaits this API.
     // Further asynchronous dispatch is refused, preventing A -> B -> A wait cycles.
     if (this.executing && !(appletId && command.permission?.endsWith('.write')))
-      throw new AutomationError('BUSY', '別のAPIコマンドを実行中です。');
+      throw new AutomationError('BUSY', hostText('services.appdockApi.busy'));
     if (command.permission === 'tray.write' && !permissions.editTray)
       throw new AutomationError(
         'TRAY_EDITING_DISABLED',
-        '呼び出し元の許可設定でタスクトレイ編集を許可してください。',
+        hostText('services.appdockApi.trayPermission'),
       );
     if (command.permission === 'ribbon.write' && !permissions.editRibbon)
       throw new AutomationError(
         'RIBBON_EDITING_DISABLED',
-        '呼び出し元の許可設定でリボン編集を許可してください。',
+        hostText('services.appdockApi.ribbonPermission'),
       );
     if (
       command.permission === 'touchpadGestures.write' &&
@@ -460,28 +469,31 @@ export class AppDockApi {
     )
       throw new AutomationError(
         'TOUCHPAD_EDITING_DISABLED',
-        '情報の取得とタッチパッドジェスチャーの編集を許可してください。',
+        hostText('services.appdockApi.touchpadPermission'),
       );
     if (command.permission === 'gestures.write' && !permissions.editGestures)
       throw new AutomationError(
         'GESTURE_EDITING_DISABLED',
-        '呼び出し元の許可設定でジェスチャー編集を許可してください。',
+        hostText('services.appdockApi.gesturePermission'),
       );
     if (command.permission === 'shortcuts.write' && !permissions.editShortcuts)
       throw new AutomationError(
         'SHORTCUT_EDITING_DISABLED',
-        '呼び出し元の許可設定でショートカット編集を許可してください。',
+        hostText('services.appdockApi.shortcutPermission'),
       );
     if (command.permission === 'applets.manage' && !permissions.manageApplets)
       throw new AutomationError(
         'APPLET_MANAGEMENT_DISABLED',
-        '呼び出し元の許可設定でApplet管理を許可してください。',
+        hostText('services.appdockApi.appletPermission'),
       );
     this.executing++;
     try {
       if (command.permission === 'customCommands.write') {
         if (!permissions.manageCustomCommands || !this.options.customCommands)
-          throw new AutomationError('API_DISABLED', 'カスタムコマンドの管理を許可してください。');
+          throw new AutomationError(
+            'API_DISABLED',
+            hostText('services.appdockApi.customCommandPermission'),
+          );
         const result = this.options.customCommands.update(args, appletId);
         return {
           id: customUpdateCommand,
@@ -543,7 +555,10 @@ export class AppDockApi {
       }
       if (command.permission === 'applets.manage') {
         if (!this.options.appletManagement)
-          throw new AppletManagementError('NOT_FOUND', 'Applet管理を利用できません。');
+          throw new AppletManagementError(
+            'NOT_FOUND',
+            hostText('services.appdockApi.appletManagementUnavailable'),
+          );
         const result = await this.options.appletManagement.execute(id);
         return { id, completion: 'lifecycleApplied', effectVerified: false, ...result };
       }
@@ -566,8 +581,8 @@ export class AppDockApi {
         effectVerified: false,
         message:
           command.completion === 'accepted'
-            ? '表示要求を受け付けました。表示の完了は未確認です。'
-            : 'コマンド処理から応答が返りました。操作先での効果は未確認です。',
+            ? hostText('services.appdockApi.displayAccepted')
+            : hostText('services.appdockApi.commandResponded'),
       };
     } catch (error) {
       if (error instanceof AutomationError) throw error;
@@ -575,7 +590,7 @@ export class AppDockApi {
         throw new AutomationError(error.code, error.message);
       throw new AutomationError(
         'COMMAND_FAILED',
-        '実行に失敗したか、完了を確認できません。再実行する前に操作先の状態を確認してください。',
+        hostText('services.appdockApi.executionUnconfirmed'),
       );
     } finally {
       this.executing--;

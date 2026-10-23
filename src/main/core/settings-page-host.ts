@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import type {
   SettingsPageAction,
@@ -20,18 +21,19 @@ export class SettingsPageHost {
   ) {}
   async open(request: SettingsPageRequest): Promise<SettingsPageConnection> {
     const sequence = ++this.opening;
-    if (!request || !this.options.allowed(request)) throw Error('設定画面の対象が変わりました。');
+    if (!request || !this.options.allowed(request))
+      throw Error(hostText('services.settingsPageHost.targetChanged'));
     // The first mount has no UI to acknowledge a flush yet.
     if (this.current) await this.options.flush();
     if (sequence !== this.opening || !this.options.allowed(request))
-      throw Error('設定画面の対象が変わりました。');
+      throw Error(hostText('services.settingsPageHost.targetChanged'));
     this.close();
     const id = randomUUID();
     const bound = { ...request, id };
     const page = await this.options.create(bound);
     if (sequence !== this.opening || !this.options.allowed(request)) {
       page.dispose();
-      throw Error('設定画面の対象が変わりました。');
+      throw Error(hostText('services.settingsPageHost.targetChanged'));
     }
     this.current = { id, request: bound, page };
     return { connectionId: id, snapshot: this.current.page.snapshot() };
@@ -44,7 +46,7 @@ export class SettingsPageHost {
       !this.options.allowed(current.request) ||
       !current.page.isCurrent()
     )
-      throw Error('設定画面の接続が古くなっています。');
+      throw Error(hostText('services.settingsPageHost.staleConnection'));
     return current;
   }
   get(id: string) {

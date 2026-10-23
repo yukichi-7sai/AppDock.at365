@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { SettingsStore, SettingsRecoveryPlan } from './settings';
 import { SettingsConflictError } from './settings';
 
@@ -10,8 +11,7 @@ export interface SettingsRecoveryUi {
 
 /** The minimal recovery loop runs before Applets, Shells and settings-dependent services. */
 export async function recoverSettingsAtStartup(store: SettingsStore, ui: SettingsRecoveryUi) {
-  let message =
-    '設定ファイルとこのPCのバックアップを読み込めません。正常なJSONから復元するか、ファイルを修正して再読み込みしてください。再起動だけでは修復されません。';
+  let message = hostText('services.settingsRecovery.recoveryRequired');
   for (;;) {
     const choice = await ui.chooseStartupAction(message);
     if (choice === 'quit') return false;
@@ -36,7 +36,7 @@ export async function recoverSettingsAtStartup(store: SettingsStore, ui: Setting
       message =
         error instanceof SettingsConflictError
           ? error.message
-          : '復旧を完了できませんでした。JSONの形式、ファイルの大きさ（4MB以下）、保存先の空き容量とアクセス権を確認してください。元のファイルは保持しています。';
+          : hostText('services.settingsRecovery.failed');
     }
   }
 }

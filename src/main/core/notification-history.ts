@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -48,7 +49,7 @@ export class NotificationHistoryStore {
       const data = JSON.parse(fs.readFileSync(file, 'utf8'));
       if (!data || data.schemaVersion !== 1) {
         this.writable = false;
-        this.report('通知履歴の形式が未対応のため、上書きせずメモリー内で管理します。');
+        this.report(hostText('services.notificationHistory.unsupportedRead'));
         return;
       }
       if (!Array.isArray(data.entries) || data.entries.length > 1200 || !data.entries.every(valid))
@@ -86,7 +87,7 @@ export class NotificationHistoryStore {
       } catch {
         this.writable = false;
       }
-      this.report('通知履歴を読み込めませんでした。通知の表示と操作は継続します。');
+      this.report(hostText('services.notificationHistory.readFailed'));
     }
   }
   private report(message: string) {
@@ -99,7 +100,7 @@ export class NotificationHistoryStore {
     return { writable: this.writable, saveError: this.reported };
   }
   private edit(ids: string[], deleting: boolean) {
-    if (!this.writable) throw Error('通知履歴の保存形式が未対応のため、変更できません。');
+    if (!this.writable) throw Error(hostText('services.notificationHistory.unsupportedWrite'));
     const prior = new Map([...this.records].map(([id, e]) => [id, structuredClone(e)]));
     for (const id of ids) {
       const entry = this.records.get(id);
@@ -110,7 +111,7 @@ export class NotificationHistoryStore {
     }
     if (!this.flush()) {
       this.records = prior;
-      throw Error('通知履歴を保存できません。変更は適用されていません。');
+      throw Error(hostText('services.notificationHistory.changeFailed'));
     }
   }
   markRead(ids: string[]) {
@@ -170,7 +171,7 @@ export class NotificationHistoryStore {
       this.reported = false;
       success = true;
     } catch {
-      this.report('通知履歴を保存できませんでした。通知の表示と操作は継続します。');
+      this.report(hostText('services.notificationHistory.saveFailed'));
     } finally {
       if (temp && fs.existsSync(temp))
         try {

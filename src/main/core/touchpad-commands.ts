@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { Settings, SettingsSnapshot } from '../../shared/contracts';
 import {
   defaultTouchpadGestures,
@@ -17,10 +18,10 @@ export const touchpadBridgeCommands: AutomationCommand[] = [
   id: 'appdock.touchpadGestures.' + kind,
   title:
     kind === 'set-enabled'
-      ? 'このPCのタッチパッド接続を切り替え'
+      ? hostText('services.touchpadCommands.toggleTitle')
       : kind === 'reconnect'
-        ? 'Windowsのタッチパッド設定を再設定'
-        : 'ジェスチャーの割り当てを全部解除',
+        ? hostText('services.touchpadCommands.reconnectTitle')
+        : hostText('services.touchpadCommands.clearTitle'),
   description:
     kind === 'set-enabled'
       ? 'このPCをONにし、未接続の割り当てがあればWindowsを変更します。OFFではWindowsを変更しません。'
@@ -70,7 +71,7 @@ export async function executeTouchpadBridgeCommand(
   )
     throw new SettingsCommandError(
       'INVALID_ARGUMENT',
-      'タッチパッド接続の引数を確認してください。',
+      hostText('services.touchpadCommands.invalidArguments'),
     );
   options.settingsCommands.checkRevision(args.expectedRevision);
   const before = structuredClone(options.settings.value);
@@ -88,14 +89,14 @@ export async function executeTouchpadBridgeCommand(
   )
     throw new SettingsCommandError(
       'INVALID_ARGUMENT',
-      '有効で割り当てのあるジェスチャーを指定してください。',
+      hostText('services.touchpadCommands.assignedGestureRequired'),
     );
   const changed = JSON.stringify(current) !== JSON.stringify(next);
   if (args.dryRun !== true) {
     if (changed) options.save({ ...before, touchpadGestures: next }, options.settings.revision);
     if (kind === 'reconnect' || kind === 'set-enabled') {
       if (!options.touchpadBridge)
-        throw new SettingsCommandError('NOT_READY', '入力ホストを準備中です。');
+        throw new SettingsCommandError('NOT_READY', hostText('services.touchpadCommands.notReady'));
       if (kind === 'reconnect') await options.touchpadBridge.connect([gesture!]);
       else await options.touchpadBridge.afterLocalEdit(before);
     }
@@ -107,6 +108,6 @@ export async function executeTouchpadBridgeCommand(
     effectVerified: false,
     revision: options.settingsCommands.revision(),
     state: options.touchpadBridge?.snapshot(),
-    message: '設定状態を返します。実際のタッチパッド入力による動作は未確認です。',
+    message: hostText('services.touchpadCommands.resultEffect'),
   };
 }

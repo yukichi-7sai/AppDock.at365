@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { readWave } from './sounds';
@@ -23,7 +24,7 @@ export class RegisteredSounds {
       actual.toLowerCase() !== path.resolve(this.directory).toLowerCase() ||
       (await fs.lstat(this.directory)).isSymbolicLink()
     )
-      throw Error('登録素材の保存先が転送されています。');
+      throw Error(hostText('services.registeredSounds.redirectedDirectory'));
   }
   async list(): Promise<string[]> {
     await this.safe();
@@ -34,17 +35,17 @@ export class RegisteredSounds {
       .sort((a, b) => a.localeCompare(b, 'ja'));
   }
   async resolve(name: unknown) {
-    if (!soundFilename(name)) throw Error('登録済みのWAVファイル名を指定してください。');
+    if (!soundFilename(name)) throw Error(hostText('services.registeredSounds.invalidFilename'));
     const canonical = (await this.list()).find((n) => n.toLowerCase() === name.toLowerCase());
-    if (!canonical)
-      throw Error('登録済みの通知音がありません。同期の完了を待つか、別の音を選んでください。');
+    if (!canonical) throw Error(hostText('services.registeredSounds.missing'));
     const file = path.join(this.directory, canonical);
-    if ((await fs.lstat(file)).isSymbolicLink()) throw Error('通知音にリンクを使用できません。');
+    if ((await fs.lstat(file)).isSymbolicLink())
+      throw Error(hostText('services.registeredSounds.link'));
     await readWave(file);
     return file;
   }
   async add(source: string, filename = path.basename(source)) {
-    if (!soundFilename(filename)) throw Error('通知音に使用できないファイル名です。');
+    if (!soundFilename(filename)) throw Error(hostText('services.registeredSounds.invalidName'));
     const bytes = await readWave(source);
     await this.safe();
     const existing = (await this.list()).find((n) => n.toLowerCase() === filename.toLowerCase());
@@ -53,13 +54,12 @@ export class RegisteredSounds {
     const duplicate = async () => {
       const saved = await readWave(await this.resolve(name));
       if (!saved.equals(bytes))
-        throw Error(
-          `「${name}」と同名の別ファイルが登録されています。元ファイルの名前を変えてから登録してください。`,
-        );
+        throw Error(hostText('services.registeredSounds.duplicateName', { name: String(name) }));
       return name;
     };
     if (existing) return duplicate();
-    if ((await this.list()).length >= 512) throw Error('登録できる通知音は512件までです。');
+    if ((await this.list()).length >= 512)
+      throw Error(hostText('services.registeredSounds.countLimit'));
     let handle;
     try {
       handle = await fs.open(file, 'wx');

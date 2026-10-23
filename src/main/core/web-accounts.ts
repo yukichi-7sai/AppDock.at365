@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { safePageShortcut } from '../../shared/keybindings';
 import {
   BrowserWindow,
@@ -42,6 +43,7 @@ type Saved = {
     monitoring?: boolean;
   }[];
 };
+// A persisted default also used to recognize older unnamed accounts; not display copy.
 const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
   sharedRoot?: string;
@@ -96,7 +98,7 @@ export function parseWebAccountSound(raw: unknown): WebAccountSound {
       !soundFilename(sound.file) &&
       (!path.isAbsolute(sound.file) || path.extname(sound.file).toLowerCase() !== '.wav'))
   )
-    throw Error('通知音にはWAVの絶対パスまたは登録済みファイル名を指定してください。');
+    throw Error(hostText('services.webAccounts.soundPath'));
   return {
     enabled: sound.enabled,
     file: sound.file,
@@ -279,7 +281,7 @@ export class WebAccountController {
     this.file = path.join(root, 'accounts.json');
     fs.mkdirSync(root, { recursive: true });
     if (definition.accountGroup) {
-      if (!services.sharedRoot) throw Error('共通アカウントの保存先が設定されていません。');
+      if (!services.sharedRoot) throw Error(hostText('services.webAccounts.sharedPathRequired'));
       this.group = getWebAccountGroup(
         definition.accountGroup.id,
         services.sharedRoot,
@@ -287,7 +289,7 @@ export class WebAccountController {
         parseWebAccountSound,
       );
     } else if (fs.existsSync(path.join(root, 'group-binding.json')))
-      throw Error('このAppletのアカウントはグループへ移行済みです。対応版を利用してください。');
+      throw Error(hostText('services.webAccounts.migrated'));
     if (!this.group?.hasMember(id) && fs.existsSync(this.file)) {
       this.state = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       const s = this.state;
@@ -307,13 +309,13 @@ export class WebAccountController {
         new Set(s.accounts.map((a) => a.id)).size !== s.accounts.length ||
         !s.accounts.some((a) => a.id === s.selected)
       )
-        throw Error('アカウント設定を読み込めません。元のファイルを保持しています。');
+        throw Error(hostText('services.webAccounts.readAccountsFailed'));
       for (const a of s.accounts) {
         if (a.temporaryName !== undefined && typeof a.temporaryName !== 'boolean')
-          throw Error('アカウントの仮名設定を読み込めません。元のファイルを保持しています。');
+          throw Error(hostText('services.webAccounts.readAliasesFailed'));
         if (a.sound !== undefined) parseWebAccountSound(a.sound);
         if (a.monitoring !== undefined && typeof a.monitoring !== 'boolean')
-          throw Error('アカウントの監視設定を読み込めません。元のファイルを保持しています。');
+          throw Error(hostText('services.webAccounts.readMonitoringFailed'));
       }
     } else if (!this.group) {
       const id = randomUUID();
@@ -333,10 +335,7 @@ export class WebAccountController {
           this.deleting.add(accountId);
           this.dropView(accountId);
         },
-        failed: () =>
-          this.services.failed(
-            '共通アカウント一覧を反映できませんでした。保存ファイルと同期状態を確認してください。',
-          ),
+        failed: () => this.services.failed(hostText('services.webAccounts.syncFailed')),
       });
     }
     nativeTheme.on('updated', this.themeChanged);
@@ -411,7 +410,7 @@ export class WebAccountController {
   }
   private account(id: unknown) {
     const a = this.state.accounts.find((a) => a.id === id);
-    if (!a || this.deleting.has(a.id)) throw Error('アカウントがありません。');
+    if (!a || this.deleting.has(a.id)) throw Error(hostText('services.webAccounts.missing'));
     return a;
   }
   private accountSession(id: string) {
@@ -519,7 +518,9 @@ export class WebAccountController {
   }
   private requireCapability(capability: string) {
     if (!this.services.capabilities.includes(capability))
-      throw Error(`manifest の capabilities に ${capability} が必要です。`);
+      throw Error(
+        hostText('services.webAccounts.capabilityRequired', { capability: String(capability) }),
+      );
   }
   private async sound(id: unknown, sound: unknown) {
     this.requireCapability('audio');
@@ -642,7 +643,7 @@ export class WebAccountController {
           canGoBack: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoBack(),
           canGoForward: !!wc && !wc.isDestroyed() && wc.navigationHistory.canGoForward(),
           observation: status?.observation ?? null,
-          status: status?.status ?? '受信トレイの表示を待っています',
+          status: status?.status ?? hostText('services.webAccounts.waitingInbox'),
           attention: status?.attention ?? false,
           data: includeData ? JSON.parse(status?.data ?? 'null') : null,
           sound: this.soundFailures.has(a.id)
@@ -677,20 +678,25 @@ export class WebAccountController {
       }
       const result = await dialog.showMessageBox(this.window, {
         type: 'question',
-        title: 'リンクを外部で開く',
-        message: 'このリンクを既定のアプリで開きますか？',
-        detail: url.protocol === 'mailto:' ? 'メール作成リンク' : url.origin,
-        buttons: ['キャンセル', '開く'],
+        title: hostText('services.webAccounts.externalTitle'),
+        message: hostText('services.webAccounts.externalConfirmation'),
+        detail: url.protocol === 'mailto:' ? hostText('services.webAccounts.mailLink') : url.origin,
+        buttons: [hostText('services.webAccounts.cancel'), hostText('services.webAccounts.open')],
         defaultId: 0,
         cancelId: 0,
-        ...(canRemember ? { checkboxLabel: '次回から聞かずに開く', checkboxChecked: false } : {}),
+        ...(canRemember
+          ? {
+              checkboxLabel: hostText('services.webAccounts.rememberChoice'),
+              checkboxChecked: false,
+            }
+          : {}),
       });
       if (!this.disposed && result.response === 1) {
         if (canRemember && result.checkboxChecked) this.services.setSetting!(key, true);
         await shell.openExternal(url.href);
       }
     } catch {
-      if (!this.disposed) this.services.failed('外部リンクを開けませんでした。');
+      if (!this.disposed) this.services.failed(hostText('services.webAccounts.externalOpenFailed'));
     } finally {
       this.openingExternal = false;
     }
@@ -699,7 +705,7 @@ export class WebAccountController {
     if (!['back', 'forward', 'reload', 'inbox'].includes(action as string))
       throw Error('Invalid navigation action');
     await this.start();
-    if (this.disposed) throw Error('Webアカウントは停止しています。');
+    if (this.disposed) throw Error(hostText('services.webAccounts.stopped'));
     if (!this.state.selected) return;
     const wc = this.view(this.state.selected).webContents;
     if (action === 'back' && wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack();
@@ -734,7 +740,7 @@ export class WebAccountController {
     this.views.set(id, view);
     this.statuses.set(id, {
       error: '',
-      status: '受信トレイの表示を待っています',
+      status: hostText('services.webAccounts.waitingInbox'),
       attention: false,
       observation: null,
       data: 'null',
@@ -746,7 +752,7 @@ export class WebAccountController {
       this.activityCleanup.set(
         id,
         keepWebPageActive(wc, this.definition.observeOrigin, () =>
-          this.services.failed('背景のWebページをアクティブにできませんでした。'),
+          this.services.failed(hostText('services.webAccounts.activationFailed')),
         ),
       );
     this.bindShortcuts(wc);
@@ -765,8 +771,9 @@ export class WebAccountController {
     wc.on('will-redirect', (event) => {
       if (event.isMainFrame && !allowed(event.url)) {
         event.preventDefault();
-        this.statuses.get(id)!.error =
-          `アプリ内で未対応の移動先です（${new URL(event.url).origin}）。`;
+        this.statuses.get(id)!.error = hostText('services.webAccounts.unsupportedOrigin', {
+          origin: String(new URL(event.url).origin),
+        });
         this.changed();
       }
     });
@@ -781,7 +788,7 @@ export class WebAccountController {
       const s = this.statuses.get(id);
       if (s) {
         s.error = '';
-        s.status = '受信トレイの表示を待っています';
+        s.status = hostText('services.webAccounts.waitingInbox');
       }
       this.changed();
     });
@@ -794,14 +801,15 @@ export class WebAccountController {
     wc.on('did-fail-load', (_event, code, _description, _url, main) => {
       if (main && code !== -3) {
         invalidate();
-        this.statuses.get(id)!.error =
-          `ページを読み込めませんでした（${code}）。再読み込みしてください。`;
+        this.statuses.get(id)!.error = hostText('services.webAccounts.loadFailed', {
+          code: String(code),
+        });
         this.changed();
       }
     });
     wc.on('render-process-gone', () => {
       invalidate();
-      this.statuses.get(id)!.error = '表示処理が終了しました。再読み込みしてください。';
+      this.statuses.get(id)!.error = hostText('services.webAccounts.rendererStopped');
       this.changed();
     });
     void wc.loadURL(this.definition.url).catch(() => {});
@@ -830,13 +838,8 @@ export class WebAccountController {
               };
               changed = true;
             } catch {
-              this.soundFailures.set(
-                a.id,
-                '以前の通知音をコピーできませんでした。WAVを選び直してください。',
-              );
-              this.services.failed(
-                '以前の通知音をコピーできませんでした。WAVを選び直してください。',
-              );
+              this.soundFailures.set(a.id, hostText('services.webAccounts.soundCopyFailed'));
+              this.services.failed(hostText('services.webAccounts.soundCopyFailed'));
             }
           }
           accounts.push(next);
@@ -894,7 +897,7 @@ export class WebAccountController {
       ]);
     } catch {
       if (!this.disposed && !wc.isDestroyed())
-        this.services.failed('非表示のWeb画面を開始ページへ戻せませんでした。');
+        this.services.failed(hostText('services.webAccounts.returnHomeFailed'));
     }
   }
   private checkSurfaceVisibility() {
@@ -1003,7 +1006,7 @@ export class WebAccountController {
     } catch {
       this.surface?.close();
       this.surface = undefined;
-      throw Error('Web画面を開けませんでした。');
+      throw Error(hostText('services.webAccounts.openFailed'));
     }
   }
   private async invoke(method: string, args: unknown[]) {
@@ -1016,11 +1019,12 @@ export class WebAccountController {
         return this.snapshot();
       case 'setSetting':
         if (!this.services.capabilities.includes('settings') || !this.services.setSetting)
-          throw Error('このAppletの設定は変更できません。');
+          throw Error(hostText('services.webAccounts.settingsForbidden'));
         this.services.setSetting(args[0], args[1]);
         return;
       case 'add': {
-        if (this.state.accounts.length >= 10) throw Error('10アカウントまで追加できます。');
+        if (this.state.accounts.length >= 10)
+          throw Error(hostText('services.webAccounts.accountLimit'));
         const id = randomUUID();
         this.save({
           ...this.state,
@@ -1048,7 +1052,7 @@ export class WebAccountController {
           next = index + direction;
         if (next < 0 || next >= accounts.length) return;
         if (this.deleting.has(accounts[next].id))
-          throw Error('アカウントの削除完了を待ってください。');
+          throw Error(hostText('services.webAccounts.deletionPending'));
         [accounts[index], accounts[next]] = [accounts[next], accounts[index]];
         this.save({ ...this.state, accounts });
         return;
@@ -1068,7 +1072,9 @@ export class WebAccountController {
         if (status) {
           status.attention = false;
           status.data = 'null';
-          status.status = monitoring ? '監視を再開しています…' : 'このアカウントの監視はOFFです';
+          status.status = monitoring
+            ? hostText('services.webAccounts.resuming')
+            : hostText('services.webAccounts.monitorOff');
         }
         // A worker can miss a rapid OFF/ON between reads. Explicitly reset its
         // baseline on either transition, independently of display clearing.
@@ -1080,7 +1086,7 @@ export class WebAccountController {
         const a = this.account(args[0]),
           name = args[1];
         if (typeof name !== 'string' || !name.trim() || name.length > 60)
-          throw Error('表示名は1～60文字です。');
+          throw Error(hostText('services.webAccounts.invalidName'));
         this.save({
           ...this.state,
           accounts: this.state.accounts.map((item) =>
@@ -1102,7 +1108,7 @@ export class WebAccountController {
         this.requireCapability('audio');
         const a = this.account(args[0]);
         const result = await dialog.showOpenDialog(this.window!, {
-          title: '通知音を選択',
+          title: hostText('services.webAccounts.soundTitle'),
           properties: ['openFile'],
           filters: [{ name: 'WAV', extensions: ['wav'] }],
         });
@@ -1123,7 +1129,7 @@ export class WebAccountController {
             !this.disposed &&
             this.state.accounts.some((item) => item.id === a.id) &&
             !this.deleting.has(a.id),
-          () => this.services.failed('通知音を再生できません。WAVファイルを確認してください。'),
+          () => this.services.failed(hostText('services.webAccounts.soundPlaybackFailed')),
         );
         return;
       }
@@ -1150,23 +1156,27 @@ export class WebAccountController {
       }
       case 'remove': {
         const a = this.account(args[0]);
-        if (this.state.accounts.length < 2)
-          throw Error('最後のアカウントは残してください。ログアウトはWeb画面から行えます。');
+        if (this.state.accounts.length < 2) throw Error(hostText('services.webAccounts.keepLast'));
         if (this.group) {
           const before = JSON.stringify(this.state.accounts.map(({ id, name }) => ({ id, name })));
           const result = await dialog.showMessageBox(this.window!, {
             type: 'warning',
-            title: '共有アカウントを削除',
-            message: `「${a.name}」を${this.definition.accountGroup!.title}から削除しますか？`,
-            detail:
-              'このグループを使うすべてのAppletの一覧から削除し、このPCの共通ログイン情報とサイトデータを消去します。同期先にも一覧の削除が反映されます。サービス上のアカウントやデータは削除しません。',
-            buttons: ['キャンセル', '削除'],
+            title: hostText('services.webAccounts.sharedDeleteTitle'),
+            message: hostText('services.webAccounts.sharedDeleteConfirmation', {
+              name: String(a.name),
+              group: String(this.definition.accountGroup!.title),
+            }),
+            detail: hostText('services.webAccounts.sharedDeleteDetails'),
+            buttons: [
+              hostText('services.webAccounts.cancel'),
+              hostText('services.webAccounts.delete'),
+            ],
             defaultId: 0,
             cancelId: 0,
           });
           if (this.disposed || result.response !== 1) return;
           if (before !== JSON.stringify(this.state.accounts.map(({ id, name }) => ({ id, name }))))
-            throw Error('確認中にアカウント一覧が変更されました。もう一度確認してください。');
+            throw Error(hostText('services.webAccounts.changedDuringConfirmation'));
           await this.group.remove(a.id, async () => {
             const ses = this.accountSession(a.id);
             await ses.clearStorageData();
@@ -1179,15 +1189,19 @@ export class WebAccountController {
         try {
           const result = await dialog.showMessageBox(this.window!, {
             type: 'warning',
-            title: 'アカウントを削除',
-            message: `「${a.name}」の保存済みログイン情報とサイトデータを削除しますか？`,
-            detail: 'Googleアカウントやメールそのものは削除しません。',
-            buttons: ['キャンセル', '削除'],
+            title: hostText('services.webAccounts.deleteTitle'),
+            message: hostText('services.webAccounts.deleteConfirmation', { name: String(a.name) }),
+            detail: hostText('services.webAccounts.deleteDetails'),
+            buttons: [
+              hostText('services.webAccounts.cancel'),
+              hostText('services.webAccounts.delete'),
+            ],
             defaultId: 0,
             cancelId: 0,
           });
           if (this.disposed || result.response !== 1) return;
-          if (this.state.accounts.length < 2) throw Error('最後のアカウントは残してください。');
+          if (this.state.accounts.length < 2)
+            throw Error(hostText('services.webAccounts.keepLastSimple'));
           const view = this.views.get(a.id);
           if (view && this.attached === view) {
             this.contentView!.removeChildView(view);
@@ -1242,7 +1256,7 @@ export class WebAccountController {
       if (origin !== this.definition.observeOrigin) {
         this.updateAvatar(a.id, null);
         status.observation = null;
-        status.status = 'ログインが必要です';
+        status.status = hostText('services.webAccounts.loginRequired');
         continue;
       }
       const generation = this.generation.get(a.id);
@@ -1269,7 +1283,7 @@ export class WebAccountController {
         ]).finally(() => clearTimeout(timer));
         if (result === timedOut) {
           status.observation = null;
-          status.status = '画面の応答を待っています';
+          status.status = hostText('services.webAccounts.waitingResponse');
           continue;
         }
         if (
@@ -1297,7 +1311,7 @@ export class WebAccountController {
           this.activityCleanup.get(a.id)?.ready();
       } catch {
         status.observation = null;
-        status.status = '画面の解析を待っています';
+        status.status = hostText('services.webAccounts.waitingAnalysis');
       }
     }
     const acknowledged = [...this.acknowledgements];
@@ -1316,7 +1330,7 @@ export class WebAccountController {
       throw Error('Invalid Web account report');
     const s = this.statuses.get(id);
     if (account.monitoring === false) {
-      status = 'このアカウントの監視はOFFです';
+      status = hostText('services.webAccounts.monitorOff');
       attention = false;
       data = null;
     }
@@ -1372,7 +1386,7 @@ export function getWebAccounts(
 ) {
   const existing = controllers.get(id);
   if (existing) return existing;
-  if (!definition) throw Error('manifest.webAccounts が必要です。');
+  if (!definition) throw Error(hostText('services.webAccounts.manifestRequired'));
   const controller = new WebAccountController(
     id,
     name,

@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { parseRibbonBadge, type RibbonBadge } from '../../shared/ribbon';
 
 export class RibbonBadges {
@@ -9,7 +10,7 @@ export class RibbonBadges {
   set(owner: string, generation: string, id: string, value: unknown) {
     const live = this.live(owner);
     if (!live || live.generation !== generation || !live.ids.has(id))
-      throw Error('自身の有効なページだけにバッジを設定できます。');
+      throw Error(hostText('services.ribbonBadges.ownPageOnly'));
     const badge = parseRibbonBadge(value);
     const previous = this.values.get(id);
     let changed = false;

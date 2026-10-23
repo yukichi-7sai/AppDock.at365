@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import { legacyNotificationTypeId } from '../../shared/notification-types';
 import {
@@ -105,11 +106,23 @@ export class NotificationWindowsAdapter {
         const legacy =
           item.typeId === legacyNotificationTypeId ||
           this.service.windowsOptions(item.id).actionId !== undefined;
-        const labels = { info: 'インフォメーション', warning: '警告', error: 'エラー' };
+        const labels = {
+          info: hostText('services.notificationWindowsAdapter.information'),
+          warning: hostText('services.notificationWindowsAdapter.warning'),
+          error: hostText('services.notificationWindowsAdapter.error'),
+        };
         slot.handle = (this.options.deliver ?? showNotification)({
           id: item.id,
-          title: legacy ? item.title : labels[item.level] + '：' + item.title,
-          body: item.body + (item.actions.length && !legacy ? '\n通知を開いて操作できます。' : ''),
+          title: legacy
+            ? item.title
+            : hostText('services.notificationWindowsAdapter.titleWithLevel', {
+                level: labels[item.level],
+                title: item.title,
+              }),
+          body:
+            item.actions.length && !legacy
+              ? hostText('services.notificationWindowsAdapter.bodyWithActions', { body: item.body })
+              : item.body,
           level: item.level,
           silent: silent || (old?.paused === true && old.signature === signature),
           clicked: () => {

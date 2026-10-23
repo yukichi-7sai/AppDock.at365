@@ -68,7 +68,7 @@ export function compileCustomType(type: CustomCommandType) {
     if (field.default !== undefined) {
       const schema = { ...executableSchema(type.configSchema), required: [field.key] };
       if (!validator.getValidator(schema)({ [field.key]: field.default }).valid)
-        throw Error('入力項目の既定値がSchemaに一致しません。');
+        throw Error(hostText('services.customCommands.defaultSchema'));
     }
   return validate;
 }
@@ -109,9 +109,9 @@ export class CustomCommandService {
     checks: Pick<CustomCommandProvider, 'validateConfig' | 'unavailableReason' | 'authorized'> = {},
   ) {
     const [parsed] = parseCustomTypes(null, [type]);
-    if (this.hosts.has(parsed.id)) throw Error('種類は登録済みです。');
+    if (this.hosts.has(parsed.id)) throw Error(hostText('services.customCommands.duplicateType'));
     compileCustomType(parsed);
-    if (this.records().length >= 256) throw Error('種類は256件以内です。');
+    if (this.records().length >= 256) throw Error(hostText('services.customCommands.typeLimit'));
     this.hosts.set(parsed.id, {
       owner: { kind: 'host' },
       title: 'AppDock',
@@ -129,9 +129,9 @@ export class CustomCommandService {
         r.type.id === typeId && r.provider.owner.kind === 'applet' && r.provider.owner.id === owner,
     );
     if (!record || !generation || record.provider.generation !== generation)
-      throw Error('自身の宣言済みの種類だけを登録できます。');
+      throw Error(hostText('services.customCommands.ownTypeOnly'));
     if (this.bindings.get(record.type.id) === generation)
-      throw Error('種類はこの実行世代で登録済みです。');
+      throw Error(hostText('services.customCommands.generationDuplicate'));
     this.validator(record.type);
     this.bindings.set(record.type.id, generation);
     this.options.changed?.();
@@ -142,7 +142,7 @@ export class CustomCommandService {
       provider.types.map((type) => ({ provider, type })),
     );
     if (result.length > 256 || new Set(result.map((r) => r.type.id)).size !== result.length)
-      return failure('TYPE_UNAVAILABLE', '種類宣言の重複または上限超過を解消してください。');
+      return failure('TYPE_UNAVAILABLE', hostText('services.customCommands.invalidDeclarations'));
     return result;
   }
   private validator(type: CustomCommandType) {
@@ -217,7 +217,7 @@ export class CustomCommandService {
       const reason =
         state.reason ??
         (state.record?.provider.authorized?.(context) === false
-          ? '呼び出し元にこの種類の実行が許可されていません。'
+          ? hostText('services.customCommands.typePermission')
           : null);
       return state.published
         ? [
@@ -237,7 +237,7 @@ export class CustomCommandService {
   managementCommand(): AutomationCommand {
     return {
       id: customUpdateCommand,
-      title: 'カスタムコマンドを編集',
+      title: hostText('services.customCommands.editTitle'),
       appletId: null,
       available:
         !this.options.settings.value.customCommands ||
@@ -256,14 +256,14 @@ export class CustomCommandService {
     const descriptors = this.descriptors().filter((d) => this.owned(d.owner, caller));
     if (method === 'customCommands.types.get') {
       const type = descriptors.find((d) => d.id === params.typeId);
-      if (!type) return failure('NOT_FOUND', '種類が見つかりません。');
+      if (!type) return failure('NOT_FOUND', hostText('services.customCommands.typeMissing'));
       return { type };
     }
     if (method === 'customCommands.get') {
       const item = customItems(this.options.settings.value.customCommands).find(
         (i) => i.id === params.id && this.owned(i.owner, caller),
       );
-      if (!item) return failure('NOT_FOUND', 'カスタムコマンドが見つかりません。');
+      if (!item) return failure('NOT_FOUND', hostText('services.customCommands.missing'));
       return {
         item: structuredClone(item),
         typeRevision:
@@ -273,7 +273,7 @@ export class CustomCommandService {
       };
     }
     if (caller !== undefined && params.ownerId !== undefined && params.ownerId !== caller)
-      return failure('PERMISSION_DENIED', '自身の提供元だけを管理できます。');
+      return failure('PERMISSION_DENIED', hostText('services.customCommands.ownProviderOnly'));
     const values =
       method === 'customCommands.types.list'
         ? descriptors.map(({ configSchema, fields, ...d }) => d)
@@ -296,12 +296,12 @@ export class CustomCommandService {
       const match =
         typeof params.cursor === 'string' ? /^(\d+):([a-f0-9]{64})$/.exec(params.cursor) : null;
       if (!match || match[2] !== signature || Number(match[1]) >= filtered.length)
-        return failure('STALE_CURSOR', '一覧を先頭から再取得してください。');
+        return failure('STALE_CURSOR', hostText('services.customCommands.restartList'));
       offset = Number(match[1]);
     }
     const limit = params.limit === undefined ? 20 : Number(params.limit);
     if (!Number.isInteger(limit) || limit < 1 || limit > 50)
-      return failure('INVALID_ARGUMENT', '一覧は1～50件です。');
+      return failure('INVALID_ARGUMENT', hostText('services.customCommands.pageSize'));
     const items = filtered.slice(offset, offset + limit);
     return {
       items,
@@ -322,10 +322,7 @@ export class CustomCommandService {
       !raw.operations.length ||
       raw.operations.length > (replacement ? 513 : 32)
     )
-      return failure(
-        'INVALID_ARGUMENT',
-        'expectedRevisionと1～32件のoperationsを指定してください。',
-      );
+      return failure('INVALID_ARGUMENT', hostText('services.customCommands.patchArguments'));
     this.options.settingsCommands.checkRevision(raw.expectedRevision);
     const store = this.options.settings;
     if (
@@ -333,33 +330,40 @@ export class CustomCommandService {
       store.value.customCommands &&
       store.value.customCommands.version !== customCommandVersion
     )
-      return failure('UNSUPPORTED_VERSION', '未対応の保存版は編集できません。');
+      return failure('UNSUPPORTED_VERSION', hostText('services.customCommands.unsupportedVersion'));
     let items = structuredClone(customItems(store.value.customCommands));
     const descriptors = this.descriptors();
     const validate = (item: CustomCommandDefinition, expected: unknown) => {
       const type = descriptors.find(
         (d) => d.id === item.typeId && sameCustomOwner(d.owner, item.owner),
       );
-      if (!type) return failure('TYPE_UNAVAILABLE', '種類を導入してから編集してください。');
+      if (!type)
+        return failure('TYPE_UNAVAILABLE', hostText('services.customCommands.installType'));
       if (type.typeRevision !== expected)
-        return failure('TYPE_CHANGED', '種類を再取得して入力を確認してください。');
+        return failure('TYPE_CHANGED', hostText('services.customCommands.refreshType'));
       if (type.configVersion !== item.configVersion)
-        return failure('UNSUPPORTED_CONFIG_VERSION', '現在の設定版と全configを指定してください。');
+        return failure(
+          'UNSUPPORTED_CONFIG_VERSION',
+          hostText('services.customCommands.configVersion'),
+        );
       if (!jsonObject(item.config))
-        return failure('INVALID_ARGUMENT', 'configはオブジェクトです。');
+        return failure('INVALID_ARGUMENT', hostText('services.customCommands.configObject'));
       boundedJson(item.config, 16 * 1024);
       if (!this.validator(type)(item.config).valid)
-        return failure('INVALID_ARGUMENT', 'configが種類のSchemaに一致しません。');
+        return failure('INVALID_ARGUMENT', hostText('services.customCommands.configSchema'));
       const provider = this.records().find((r) => r.type.id === item.typeId)?.provider;
       const invalid = provider?.validateConfig?.(item.config);
       if (invalid) return failure('INVALID_ARGUMENT', invalid);
       if (item.automation && !type.automation)
-        return failure('PERMISSION_DENIED', 'この種類は外部公開を許可していません。');
+        return failure(
+          'PERMISSION_DENIED',
+          hostText('services.customCommands.automationForbidden'),
+        );
     };
     try {
       for (const operation of raw.operations) {
         if (!jsonObject(operation))
-          return failure('INVALID_ARGUMENT', '操作の形式を確認してください。');
+          return failure('INVALID_ARGUMENT', hostText('services.customCommands.operationFormat'));
         const allowed = (
           {
             add: ['op', 'item', 'expectedTypeRevision'],
@@ -369,7 +373,10 @@ export class CustomCommandService {
           } as Record<string, string[]>
         )[String(operation.op)];
         if (!allowed || Object.keys(operation).some((k) => !allowed.includes(k)))
-          return failure('INVALID_ARGUMENT', '未対応の操作または項目です。');
+          return failure(
+            'INVALID_ARGUMENT',
+            hostText('services.customCommands.unsupportedOperation'),
+          );
         if (operation.op === 'add') {
           const input = operation.item;
           if (
@@ -388,13 +395,23 @@ export class CustomCommandService {
                 ].includes(k),
             )
           )
-            return failure('INVALID_ARGUMENT', '新規定義の形式を確認してください。');
+            return failure(
+              'INVALID_ARGUMENT',
+              hostText('services.customCommands.definitionFormat'),
+            );
           const type = descriptors.find(
             (d) => d.id === input.typeId && this.owned(d.owner, caller),
           );
-          if (!type) return failure('TYPE_UNAVAILABLE', '管理できる種類が見つかりません。');
+          if (!type)
+            return failure(
+              'TYPE_UNAVAILABLE',
+              hostText('services.customCommands.managedTypeMissing'),
+            );
           if (caller && input.automation !== undefined && input.automation !== false)
-            return failure('PERMISSION_DENIED', 'Appletは外部公開を設定できません。');
+            return failure(
+              'PERMISSION_DENIED',
+              hostText('services.customCommands.appletAutomationForbidden'),
+            );
           const item = {
             ...input,
             description: customDescription(
@@ -409,7 +426,7 @@ export class CustomCommandService {
             items.some((i) => i.id === item.id) ||
             this.options.reservedIds?.().includes(customCommandId(item.id))
           )
-            return failure('INVALID_ARGUMENT', 'コマンドIDが重複しています。');
+            return failure('INVALID_ARGUMENT', hostText('services.customCommands.duplicateId'));
           items.push(item);
         } else if (operation.op === 'reorder') {
           const owned = items.filter((i) => this.owned(i.owner, caller));
@@ -419,14 +436,18 @@ export class CustomCommandService {
             new Set(operation.ids).size !== owned.length ||
             operation.ids.some((id) => !owned.some((i) => i.id === id))
           )
-            return failure('INVALID_ARGUMENT', '管理対象の全IDを1回ずつ指定してください。');
+            return failure('INVALID_ARGUMENT', hostText('services.customCommands.orderIds'));
           const ordered = operation.ids.map((id) => owned.find((i) => i.id === id)!);
           items = items.map((i) => (this.owned(i.owner, caller) ? ordered.shift()! : i));
         } else {
           const index = items.findIndex(
             (i) => i.id === operation.id && this.owned(i.owner, caller),
           );
-          if (index < 0) return failure('NOT_FOUND', '管理できる定義が見つかりません。');
+          if (index < 0)
+            return failure(
+              'NOT_FOUND',
+              hostText('services.customCommands.managedDefinitionMissing'),
+            );
           if (operation.op === 'remove') items.splice(index, 1);
           else {
             const changes = operation.changes;
@@ -445,11 +466,17 @@ export class CustomCommandService {
                   ].includes(k),
               )
             )
-              return failure('INVALID_ARGUMENT', '変更する項目を確認してください。');
+              return failure('INVALID_ARGUMENT', hostText('services.customCommands.patchFields'));
             if (caller && Object.hasOwn(changes, 'automation'))
-              return failure('PERMISSION_DENIED', 'Appletは公開設定を変更できません。');
+              return failure(
+                'PERMISSION_DENIED',
+                hostText('services.customCommands.appletPermissionChangeForbidden'),
+              );
             if (Object.hasOwn(changes, 'configVersion') && !Object.hasOwn(changes, 'config'))
-              return failure('INVALID_ARGUMENT', '設定版の変更には全configを指定してください。');
+              return failure(
+                'INVALID_ARGUMENT',
+                hostText('services.customCommands.fullConfigRequired'),
+              );
             const before = items[index],
               item = { ...before, ...changes };
             if (
@@ -470,7 +497,7 @@ export class CustomCommandService {
           this.options.save({ ...store.value, customCommands: block }, store.revision);
         } catch (error) {
           if (error instanceof SettingsCommandError) throw error;
-          return failure('SAVE_FAILED', '保存できませんでした。設定を再取得して確認してください。');
+          return failure('SAVE_FAILED', hostText('services.customCommands.saveFailed'));
         }
         this.reconcile();
       }
@@ -481,7 +508,7 @@ export class CustomCommandService {
       };
     } catch (error) {
       if (error instanceof SettingsCommandError) throw error;
-      return failure('INVALID_ARGUMENT', '保存内容の形式・上限・現在の設定を確認してください。');
+      return failure('INVALID_ARGUMENT', hostText('services.customCommands.invalidStorage'));
     }
   }
   has(id: string) {
@@ -493,7 +520,10 @@ export class CustomCommandService {
     const current = this.options.settings.value.customCommands;
     if (JSON.stringify(current) === JSON.stringify(next.customCommands)) return;
     if (!next.customCommands || next.customCommands.version !== customCommandVersion)
-      return failure('UNSUPPORTED_VERSION', '保存ブロックの版は変更できません。');
+      return failure(
+        'UNSUPPORTED_VERSION',
+        hostText('services.customCommands.fixedStorageVersion'),
+      );
     const before = customItems(current),
       after = customItems(parseCustomCommands(next.customCommands));
     const types = this.descriptors();
@@ -504,12 +534,16 @@ export class CustomCommandService {
       const old = before.find((i) => i.id === item.id);
       const type = types.find((t) => t.id === item.typeId && sameCustomOwner(t.owner, item.owner));
       if (!old) {
-        if (!type) return failure('TYPE_UNAVAILABLE', '新規定義の提供元と種類を確認してください。');
+        if (!type)
+          return failure(
+            'TYPE_UNAVAILABLE',
+            hostText('services.customCommands.newDefinitionProvider'),
+          );
         const { owner, ...input } = item;
         operations.push({ op: 'add', item: input, expectedTypeRevision: type.typeRevision });
       } else {
         if (old.typeId !== item.typeId || !sameCustomOwner(old.owner, item.owner))
-          return failure('INVALID_ARGUMENT', '種類と提供元は変更できません。');
+          return failure('INVALID_ARGUMENT', hostText('services.customCommands.fixedProvider'));
         const changes = Object.fromEntries(
           ['title', 'description', 'configVersion', 'config', 'enabled', 'automation']
             .filter(
@@ -584,19 +618,23 @@ export class CustomCommandService {
     const item = customItems(this.options.settings.value.customCommands).find(
       (i) => customCommandId(i.id) === id,
     );
-    if (!item) return failure('NOT_FOUND', 'カスタムコマンドが見つかりません。');
+    if (!item) return failure('NOT_FOUND', hostText('services.customCommands.missing'));
     const state = this.state(item),
       external = context.origin && context.origin.kind !== 'local';
     if (state.reason || !state.record)
-      return failure('TYPE_UNAVAILABLE', state.reason ?? '種類を利用できません。');
+      return failure(
+        'TYPE_UNAVAILABLE',
+        state.reason ?? hostText('services.customCommands.typeUnavailable'),
+      );
     if (
       (external && !state.published) ||
       this.options.authorized?.(context) === false ||
       state.record.provider.authorized?.(context) === false
     )
-      return failure('PERMISSION_DENIED', 'このコマンドの実行は許可されていません。');
-    if (context.signal?.aborted) return failure('CANCELLED', '実行は取り消されました。');
-    if (this.active.has(id)) return failure('BUSY', 'このコマンドを実行中です。');
+      return failure('PERMISSION_DENIED', hostText('services.customCommands.executionForbidden'));
+    if (context.signal?.aborted)
+      return failure('CANCELLED', hostText('services.customCommands.cancelled'));
+    if (this.active.has(id)) return failure('BUSY', hostText('services.customCommands.busy'));
     const controller = new AbortController(),
       definition = structuredClone(item),
       provider = state.record.provider;
@@ -618,8 +656,8 @@ export class CustomCommandService {
               new CustomCommandError(
                 timeout ? 'OUTCOME_UNKNOWN' : 'CANCELLED',
                 timeout
-                  ? '処理結果を確認できません。操作先を確認してから再実行してください。'
-                  : '実行待機を取り消しました。操作先での効果は戻りません。',
+                  ? hostText('services.customCommands.resultUnconfirmed')
+                  : hostText('services.customCommands.waitCancelled'),
               ),
             );
           controller.signal.addEventListener('abort', aborted, { once: true });
@@ -628,10 +666,7 @@ export class CustomCommandService {
       ]);
       this.reconcile();
       if (controller.signal.aborted)
-        return failure(
-          'OUTCOME_UNKNOWN',
-          '実行中に提供元または許可が変わりました。操作先の状態を確認してください。',
-        );
+        return failure('OUTCOME_UNKNOWN', hostText('services.customCommands.providerChanged'));
       if (result !== null && result !== undefined) {
         if (!jsonObject(result)) throw Error('result');
         boundedJson(result, 64 * 1024, 32, 8192);
@@ -649,10 +684,7 @@ export class CustomCommandService {
         throw error;
       }
       this.options.failed?.('CUSTOM_COMMAND_FAILED', id);
-      return failure(
-        'OUTCOME_UNKNOWN',
-        '処理に失敗したか結果を確認できません。操作先を確認してから再実行してください。',
-      );
+      return failure('OUTCOME_UNKNOWN', hostText('services.customCommands.executionUnconfirmed'));
     } finally {
       clearTimeout(timer);
       controller.signal.removeEventListener('abort', aborted);

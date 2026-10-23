@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { createHash, randomUUID } from 'node:crypto';
 import type { TypedNotifications } from './typed-notifications';
 import type { NotificationInput } from './notification-service';
@@ -45,7 +46,7 @@ export class InformationReporter {
           dedupeKey: createHash('sha256').update(key).digest('hex'),
         });
     } catch {
-      log('情報通知を表示できませんでした。操作結果は直前のログを確認してください。');
+      log(hostText('services.informationReporter.notificationFailed'));
     }
   }
 }

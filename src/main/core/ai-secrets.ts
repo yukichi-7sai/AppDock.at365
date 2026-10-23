@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import { atomicWrite } from './settings';
@@ -13,7 +14,7 @@ export class AiSecrets {
       if (fs.statSync(file).size > 262144) throw Error();
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {};
-      throw Error('AIのPC専用設定を読み取れません。');
+      throw Error(hostText('services.aiSecrets.readFailed'));
     }
     try {
       const v = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -37,7 +38,7 @@ export class AiSecrets {
       }
       return v.entries as Record<string, { fingerprint: string; key?: string }>;
     } catch {
-      throw Error('AIのPC専用設定を読み取れません。ファイルを確認してください。');
+      throw Error(hostText('services.aiSecrets.readFileFailed'));
     }
   }
   key(c: AiConnectionSettings): string | undefined {
@@ -46,7 +47,7 @@ export class AiSecrets {
     try {
       return this.encryption.decrypt(v.key);
     } catch {
-      throw Error('AIのAPIキーを復号できません。再設定してください。');
+      throw Error(hostText('services.aiSecrets.decryptFailed'));
     }
   }
   revision(id: string) {
@@ -54,14 +55,14 @@ export class AiSecrets {
   }
   prepareKey(c: AiConnectionSettings, value: unknown) {
     if (typeof value !== 'string' || value.length > 8192 || /[\x00-\x1f\x7f]/.test(value))
-      throw Error('APIキーは改行を含まない8192文字以下の文字列です。');
+      throw Error(hostText('services.aiSecrets.keyFormat'));
     const entries = this.read(this.keysFile);
     const previous = fs.existsSync(this.keysFile) ? fs.readFileSync(this.keysFile) : undefined;
     if (value) {
-      if (!c.baseUrl) throw Error('APIキーの保存前に接続先を設定してください。');
+      if (!c.baseUrl) throw Error(hostText('services.aiSecrets.configureFirst'));
       entries[c.id] = { fingerprint: hash(c.baseUrl), key: this.encryption.encrypt(value) };
     } else delete entries[c.id];
-    if (Object.keys(entries).length > 128) throw Error('AIのAPIキー保存件数が上限に達しました。');
+    if (Object.keys(entries).length > 128) throw Error(hostText('services.aiSecrets.keyLimit'));
     return {
       commit: () => atomicWrite(this.keysFile, JSON.stringify({ version: 1, entries }) + '\n'),
       rollback: () => {
@@ -87,7 +88,7 @@ export class AiSecrets {
         id: c.id,
         apiKeyConfigured: false,
         keyRevision,
-        error: e instanceof Error ? e.message : 'AIのPC専用設定を確認してください。',
+        error: e instanceof Error ? e.message : hostText('services.aiSecrets.invalidSettings'),
       };
     }
   }

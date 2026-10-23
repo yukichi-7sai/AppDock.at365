@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import {
   BrowserWindow,
@@ -179,7 +180,7 @@ export class OverlayHost {
     const provider = this.options.registry.resolve(region, this.fallbackOnly).provider;
     if (!provider) {
       this.cancel('unavailable');
-      this.options.failed('オーバーレイを起動できません。Shellを再試行してください。');
+      this.options.failed(hostText('services.overlayHost.startFailed'));
       return;
     }
     try {
@@ -209,7 +210,9 @@ export class OverlayHost {
     } catch {
       this.options.registry.fail(region, provider.id, provider.version);
       this.fallbackOnly = true;
-      this.options.failed(`${provider.id}: オーバーレイを読み込めません。`);
+      this.options.failed(
+        hostText('services.overlayHost.loadFailed', { provider: String(provider.id) }),
+      );
       this.present();
     }
   }

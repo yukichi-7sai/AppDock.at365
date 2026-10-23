@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import {
   ipcMain,
@@ -207,7 +208,10 @@ export class NotificationSurfaceHost {
       void view.webContents.loadURL(url).catch(() => this.fail(s, 'load failed'));
     } catch {
       this.options.registry.fail(this.region(), p.id, p.version);
-      this.options.failed(p.id + ': 通知領域を読み込めません。', false);
+      this.options.failed(
+        hostText('services.notificationSurfaceHost.loadFailed', { provider: p.id }),
+        false,
+      );
       queueMicrotask(() => this.refresh());
     }
   }
@@ -258,7 +262,7 @@ export class NotificationSurfaceHost {
         this.options.controller.delivery(ids, 'failed');
         if (!this.unavailable) {
           this.unavailable = true;
-          this.options.failed('通知領域を起動できません。Shellを再試行してください。', true);
+          this.options.failed(hostText('services.notificationSurfaceHost.startFailed'), true);
         }
         return;
       }

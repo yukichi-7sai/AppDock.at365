@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import path from 'node:path';
@@ -73,14 +74,17 @@ async function readBounded(
   if (!/^https?:/i.test(location)) {
     const stat = await fs.stat(location);
     if (!stat.isFile() || stat.size > max)
-      throw Error('更新ファイルが大きすぎるか、通常ファイルではありません。');
+      throw Error(hostText('services.portableUpdates.invalidFile'));
     stream = createReadStream(location, { signal: combined });
   } else {
     const response = await fetcher(location, { signal: combined, redirect: 'follow' });
-    if (!response.ok) throw Error(`更新ファイルを取得できませんでした (HTTP ${response.status})。`);
+    if (!response.ok)
+      throw Error(
+        hostText('services.portableUpdates.httpError', { status: String(response.status) }),
+      );
     if (new URL(response.url || location).protocol !== new URL(location).protocol)
-      throw Error('更新URLの転送で通信方式が変更されました。');
-    if (!response.body) throw Error('更新ファイルの内容がありません。');
+      throw Error(hostText('services.portableUpdates.protocolChanged'));
+    if (!response.body) throw Error(hostText('services.portableUpdates.emptyPayload'));
     stream = response.body as unknown as AsyncIterable<Uint8Array>;
   }
   const chunks: Buffer[] = [];
@@ -88,7 +92,7 @@ async function readBounded(
   for await (const chunk of stream) {
     combined.throwIfAborted();
     size += chunk.length;
-    if (size > max) throw Error('更新ファイルが大きすぎます。');
+    if (size > max) throw Error(hostText('services.portableUpdates.sizeLimit'));
     chunks.push(Buffer.from(chunk));
     progress?.(size);
   }
@@ -97,7 +101,7 @@ async function readBounded(
 }
 function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Feed {
   if (value?.schemaVersion !== 1 || value.kind !== target.kind || value.id !== target.id)
-    throw Error('更新情報の対象ID・配布形式が一致しません。');
+    throw Error(hostText('services.portableUpdates.targetMismatch'));
   parseVersion(value.version);
   if (value.minimumHostVersion !== undefined) parseVersion(value.minimumHostVersion);
   const p = value.payload;
@@ -110,7 +114,7 @@ function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Fe
     p.size > limit ||
     p.format !== (target.kind === 'host' ? 'exe' : 'zip')
   )
-    throw Error('更新情報の配布ファイル・ハッシュ・サイズが正しくありません。');
+    throw Error(hostText('services.portableUpdates.invalidPayload'));
   return value;
 }
 async function resolveFeedSource(
@@ -137,11 +141,12 @@ async function resolveFeedSource(
         signal,
       ),
     );
-    if (release.draft || release.prerelease) throw Error('正式版のリリースではありません。');
+    if (release.draft || release.prerelease)
+      throw Error(hostText('services.portableUpdates.stableReleaseRequired'));
     assets = release.assets;
     const info = assets?.find((a) => a.name === 'update.json');
     if (!info || !/^https:\/\//i.test(info.browser_download_url))
-      throw Error('リリースに update.json がありません。');
+      throw Error(hostText('services.portableUpdates.feedMissing'));
     location = info.browser_download_url;
   } else if (/^https?:/i.test(source)) {
     if (source.endsWith('/')) location = new URL('update.json', source).href;
@@ -153,7 +158,7 @@ async function resolveFeedSource(
       !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(raw.id) ||
       !safeRelative(raw.id))
   )
-    throw Error('配布情報のApplet IDが正しくありません。');
+    throw Error(hostText('services.portableUpdates.appletIdMissing'));
   const feed = validateFeed(raw, expected ?? { kind: 'applet', id: raw.id });
   const payload = assets
     ? assets.find((a) => a.name === feed.payload.file)?.browser_download_url
@@ -161,7 +166,7 @@ async function resolveFeedSource(
       ? new URL(feed.payload.file, location).href
       : path.join(path.dirname(location), feed.payload.file);
   if (!payload || (assets && !/^https:\/\//i.test(payload)))
-    throw Error('配布ファイルがありません。');
+    throw Error(hostText('services.portableUpdates.payloadMissing'));
   return { feed, payload, version: feed.version };
 }
 async function copyTree(
@@ -173,11 +178,11 @@ async function copyTree(
 ) {
   signal.throwIfAborted();
   const stat = await fs.lstat(source);
-  if (stat.isSymbolicLink()) throw Error('更新元のリンクは使用できません。');
+  if (stat.isSymbolicLink()) throw Error(hostText('services.portableUpdates.sourceLink'));
   if (stat.isDirectory()) {
     await fs.mkdir(destination, { recursive: true });
     for (const entry of await fs.readdir(source)) {
-      if (!safeRelative(entry)) throw Error('更新元に使用できないファイル名があります。');
+      if (!safeRelative(entry)) throw Error(hostText('services.portableUpdates.invalidFilename'));
       // Generated update packages are distribution metadata, not installed Applet files.
       if (entry === 'update.json' || entry === 'update.zip') continue;
       await copyTree(
@@ -190,7 +195,7 @@ async function copyTree(
     }
   } else {
     if (!stat.isFile() || ++budget.files > 10000 || (budget.bytes += stat.size) > limit)
-      throw Error('更新元のファイル数・サイズが上限を超えました。');
+      throw Error(hostText('services.portableUpdates.sourceLimit'));
     await fs.copyFile(source, destination);
     signal.throwIfAborted();
     progress(budget.bytes);
@@ -199,12 +204,12 @@ async function copyTree(
 async function treeHash(directory: string, signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted();
   if ((await fs.lstat(directory)).isSymbolicLink())
-    throw Error('配置フォルダーのリンクは使用できません。');
+    throw Error(hostText('services.portableUpdates.destinationLink'));
   const files: string[] = [];
   async function walk(current: string) {
     for (const entry of await fs.readdir(current, { withFileTypes: true })) {
       const file = path.join(current, entry.name);
-      if (entry.isSymbolicLink()) throw Error('準備済み更新にリンクがあります。');
+      if (entry.isSymbolicLink()) throw Error(hostText('services.portableUpdates.preparedLink'));
       if (entry.isDirectory()) await walk(file);
       else files.push(path.relative(directory, file).replace(/\\/g, '/'));
     }
@@ -246,7 +251,8 @@ export class PortableUpdates {
       };
   }
   packageStatus(id: unknown) {
-    if (typeof id !== 'string') throw Error('操作IDが不正です。');
+    if (typeof id !== 'string')
+      throw Error(hostText('services.portableUpdates.invalidOperationId'));
     if (this.state.completion?.operationId === id)
       return { id, status: 'completed', result: this.state.completion };
     return this.packageOperation?.id === id
@@ -270,7 +276,7 @@ export class PortableUpdates {
   cancel(): boolean {
     if (!this.state.busy || !this.state.cancellable || !this.controller) return false;
     this.state.cancellable = false;
-    this.state.phase = '更新を取り消しています…';
+    this.state.phase = hostText('services.portableUpdates.cancelling');
     this.controller.abort();
     this.options.changed();
     return true;
@@ -324,13 +330,13 @@ export class PortableUpdates {
         ),
       );
       if (manifest.id !== target.id || manifest.apiVersion !== 1)
-        throw Error('更新元AppletのIDが一致しません。');
+        throw Error(hostText('services.portableUpdates.sourceIdMismatch'));
       parseVersion(manifest.version);
       if (
         manifest.minimumHostVersion &&
         compareVersions(manifest.minimumHostVersion, hostVersion) > 0
       )
-        throw Error('必要な本体バージョンが不足しています。先に本体を更新してください。');
+        throw Error(hostText('services.portableUpdates.hostUpdateRequired'));
       return { target, directory: source, version: manifest.version };
     }
     const candidate = await resolveFeedSource(
@@ -343,7 +349,7 @@ export class PortableUpdates {
       candidate.feed.minimumHostVersion &&
       compareVersions(candidate.feed.minimumHostVersion, hostVersion) > 0
     )
-      throw Error('必要な本体バージョンが不足しています。先に本体を更新してください。');
+      throw Error(hostText('services.portableUpdates.hostUpdateRequired'));
     return { target, ...candidate };
   }
   private async checkTarget(
@@ -388,7 +394,7 @@ export class PortableUpdates {
   }
   private begin(phase: string) {
     if (this.state.busy || this.packagePlans.size)
-      throw Error('パッケージ操作が進行中です。確認中のダイアログを閉じてください。');
+      throw Error(hostText('services.portableUpdates.pendingDialog'));
     this.controller = new AbortController();
     this.state.busy = true;
     this.state.cancellable = true;
@@ -407,9 +413,7 @@ export class PortableUpdates {
     try {
       this.options.notified?.(
         this.state.notice,
-        kind === 'error'
-          ? '更新処理を完了できませんでした。更新画面で対象と結果を確認して、もう一度実行してください。'
-          : safeMessage,
+        kind === 'error' ? hostText('services.portableUpdates.operationFailed') : safeMessage,
       );
     } catch {
       /* Preserve update outcome. */
@@ -425,35 +429,57 @@ export class PortableUpdates {
     );
     const updates =
       available.length === 1
-        ? `${available[0].name} ${available[0].latestVersion} に更新できます。`
-        : `${available.length}件の更新があります。`;
+        ? hostText('services.portableUpdates.availableSingle', {
+            name: String(available[0].name),
+            version: String(available[0].latestVersion),
+          })
+        : hostText('services.portableUpdates.availableCount', { count: String(available.length) });
     if (available.length)
       this.notice(
         'available',
-        `${updates}${skipped.length ? ` ${skipped.length}件は更新元が未設定または未公開です。` : ''}`,
-        `${available.length}件の更新があります。${skipped.length ? ` ${skipped.length}件は更新元が未設定または未公開です。` : ''}`,
+        skipped.length
+          ? hostText('services.portableUpdates.updatesWithSkipped', {
+              updates,
+              count: skipped.length,
+            })
+          : updates,
+        skipped.length
+          ? hostText('services.portableUpdates.availableWithSkipped', {
+              count: available.length,
+              skipped: skipped.length,
+            })
+          : hostText('services.portableUpdates.availableCount', { count: available.length }),
       );
-    if (failed.length)
+    if (failed.length) {
+      const failure = hostText('services.portableUpdates.checkFailures', {
+        count: failed.length,
+        name: String(failed[0].name),
+        message: failed[0].message ?? hostText('services.portableUpdates.checkSource'),
+      });
       this.notice(
         'error',
-        `${available.length ? `${updates} ` : ''}${failed.length}件の更新を確認できませんでした。${failed[0].name}: ${failed[0].message ?? '更新元を確認してください。'}`,
+        available.length
+          ? hostText('services.portableUpdates.updatesWithFailure', { updates, failure })
+          : failure,
       );
-    else if (available.length) return;
+    } else if (available.length) return;
     else if (skipped.length)
       this.notice(
         'info',
-        `確認できた対象に更新はありません。${skipped.length}件は更新元が未設定または未公開です。`,
+        hostText('services.portableUpdates.noUpdatesWithSkipped', {
+          count: String(skipped.length),
+        }),
       );
     else
       this.notice(
         'info',
         results.length
-          ? '更新はありません。最新版を使用しています。'
-          : '更新を確認する対象がありません。',
+          ? hostText('services.portableUpdates.upToDate')
+          : hostText('services.portableUpdates.noTargets'),
       );
   }
   async check(ids?: string[], silent = false): Promise<UpdateState> {
-    this.begin('更新を確認中…');
+    this.begin(hostText('services.portableUpdates.checking'));
     try {
       const results: UpdateResult[] = [];
       for (const target of this.options.targets().filter((t) => !ids || ids.includes(t.id))) {
@@ -468,7 +494,7 @@ export class PortableUpdates {
         this.notice('error', String(error).replace(/^Error: /, ''));
         throw error;
       }
-      this.state.phase = '更新確認を取り消しました。';
+      this.state.phase = hostText('services.portableUpdates.checkCancelled');
       if (!silent) this.notice('info', this.state.phase);
     } finally {
       this.state.busy = false;
@@ -479,7 +505,7 @@ export class PortableUpdates {
     return structuredClone(this.state);
   }
   async install(scope: string): Promise<UpdateState> {
-    this.begin('更新を準備中…');
+    this.begin(hostText('services.portableUpdates.preparing'));
     const signal = this.controller!.signal;
     let temporary: string | undefined;
     let handedOff = false;
@@ -492,8 +518,9 @@ export class PortableUpdates {
       // Check the host first so Applets can use the version installed in this same transaction.
       if (scope === 'all')
         targets.sort((a, b) => Number(b.kind === 'host') - Number(a.kind === 'host'));
-      if (!targets.length) throw Error('更新対象がありません。');
-      if (!this.options.executable) throw Error('更新の適用は配布版のAppDockで行ってください。');
+      if (!targets.length) throw Error(hostText('services.portableUpdates.noTargetsForApply'));
+      if (!this.options.executable)
+        throw Error(hostText('services.portableUpdates.portableRequired'));
       const candidates: Candidate[] = [];
       const results: UpdateResult[] = [];
       let hostVersion = this.options.hostVersion;
@@ -508,7 +535,7 @@ export class PortableUpdates {
         }
       }
       if (!candidates.length) {
-        this.state.phase = '適用できる更新はありません。';
+        this.state.phase = hostText('services.portableUpdates.noApplicableUpdates');
         this.checkedNotice(results);
         return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
@@ -525,7 +552,9 @@ export class PortableUpdates {
       }[] = [];
       for (const [index, candidate] of candidates.entries()) {
         signal.throwIfAborted();
-        this.state.phase = `${candidate.target.name} を取得中…`;
+        this.state.phase = hostText('services.portableUpdates.downloading', {
+          name: String(candidate.target.name),
+        });
         this.state.progress = {
           id: candidate.target.id,
           name: candidate.target.name,
@@ -547,14 +576,20 @@ export class PortableUpdates {
         if (candidate.directory) await copyTree(candidate.directory, staged, signal, report);
         else {
           const data = await readBounded(candidate.payload!, limit, this.fetcher, signal, report);
-          this.state.phase = `${candidate.target.name} を検証中…`;
+          this.state.phase = hostText('services.portableUpdates.verifying', {
+            name: String(candidate.target.name),
+          });
           this.options.changed();
           const hash = createHash('sha256').update(data).digest('hex');
           if (
             data.length !== candidate.feed!.payload.size ||
             hash.toLowerCase() !== candidate.feed!.payload.sha256.toLowerCase()
           )
-            throw Error(`${candidate.target.name}: 配布ファイルのサイズ・ハッシュが一致しません。`);
+            throw Error(
+              hostText('services.portableUpdates.hashMismatch', {
+                name: String(candidate.target.name),
+              }),
+            );
           if (candidate.target.kind === 'host') await fs.writeFile(staged, data, { flag: 'wx' });
           else {
             const archive = `${staged}.zip`;
@@ -581,17 +616,17 @@ export class PortableUpdates {
             m.apiVersion !== 1 ||
             !safeRelative(m.entry)
           )
-            throw Error('展開したAppletのID・版・エントリーが更新情報と一致しません。');
+            throw Error(hostText('services.portableUpdates.manifestMismatch'));
           if (!['node', 'native', 'dotnet'].includes(m.runtime))
-            throw Error('Appletの実行形式が正しくありません。');
+            throw Error(hostText('services.portableUpdates.invalidRuntime'));
           if (m.minimumHostVersion && compareVersions(m.minimumHostVersion, hostVersion) > 0)
-            throw Error('更新するAppletに必要な本体バージョンが不足しています。');
+            throw Error(hostText('services.portableUpdates.requiredHostVersion'));
           await fs.access(path.join(staged, m.entry));
           readManifest(staged);
         } else {
           const header = await fs.readFile(staged);
           if (header[0] !== 0x4d || header[1] !== 0x5a)
-            throw Error('本体の配布ファイルがEXEではありません。');
+            throw Error(hostText('services.portableUpdates.exeRequired'));
         }
         items.push({
           kind: candidate.target.kind,
@@ -608,18 +643,18 @@ export class PortableUpdates {
       signal.throwIfAborted();
       this.state.cancellable = false;
       this.state.progress = undefined;
-      this.state.phase = '更新内容の確認を待っています…';
+      this.state.phase = hostText('services.portableUpdates.awaitingConfirmation');
       this.options.changed();
       if (
         !(await this.options.confirm(
           candidates.map((c) => `${c.target.name} ${c.target.version} → ${c.version}`),
         ))
       ) {
-        this.state.phase = '更新を取り消しました。';
+        this.state.phase = hostText('services.portableUpdates.cancelled');
         this.notice('info', this.state.phase);
         return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
-      this.state.phase = '再起動を準備中…';
+      this.state.phase = hostText('services.portableUpdates.preparingRestart');
       this.options.changed();
       const jobItems = await Promise.all(
         items.map(async (item) => ({
@@ -635,13 +670,13 @@ export class PortableUpdates {
       );
       await this.handoff(temporary, jobItems);
       handedOff = true;
-      this.state.phase = '終了して更新を適用します…';
+      this.state.phase = hostText('services.portableUpdates.applying');
       this.options.changed();
       this.options.shutdown();
       return structuredClone(this.state);
     } catch (error) {
       if (signal.aborted) {
-        this.state.phase = '更新を取り消しました。インストール済みのファイルは変更していません。';
+        this.state.phase = hostText('services.portableUpdates.cancelledUnchanged');
         this.notice('info', this.state.phase);
       } else {
         this.state.phase = String(error).replace(/^Error: /, '');
@@ -689,32 +724,32 @@ export class PortableUpdates {
       !safeRelative(id) ||
       id === 'appdock.default-shell'
     )
-      throw Error('インストール先のIDが正しくありません。');
+      throw Error(hostText('services.portableUpdates.invalidInstallId'));
     const root = path.join(this.options.baseDirectory, 'extensions');
     if (
       this.options.targets().some((t) => t.id === id) ||
       (await fs.lstat(path.join(root, id)).catch(() => null))
     )
-      throw Error('同じIDのAppletまたは配置先が存在します。管理一覧から更新してください。');
+      throw Error(hostText('services.portableUpdates.alreadyInstalled'));
     for (const dir of await fs.readdir(root, { withFileTypes: true }).catch(() => [])) {
       if (!dir.isDirectory() || dir.name === '.transactions') continue;
       const file = path.join(root, dir.name, 'extension.json');
       const m = await readBounded(file, 1024 * 1024, this.fetcher)
         .then(json)
         .catch(() => undefined);
-      if (m?.id === id)
-        throw Error('同じIDのAppletが別のフォルダーにあります。管理一覧とログを確認してください。');
+      if (m?.id === id) throw Error(hostText('services.portableUpdates.duplicateInstallFolder'));
     }
   }
   async prepareAppletInstall(input: unknown): Promise<AppletPackagePlan | undefined> {
-    if (!this.packagesAvailable) throw Error('インストールは配布版のAppDockで行ってください。');
+    if (!this.packagesAvailable)
+      throw Error(hostText('services.portableUpdates.portableInstallRequired'));
     if (typeof input !== 'string' || !input.trim())
-      throw Error('配布元のURLまたはフォルダーを入力してください。');
+      throw Error(hostText('services.portableUpdates.sourceRequired'));
     const source = input.trim();
     validateUpdateSource(source);
-    if (this.state.busy) throw Error('パッケージ操作中です。');
+    if (this.state.busy) throw Error(hostText('services.portableUpdates.packageBusy'));
     await this.discardPackagePlans();
-    this.begin('Appletを取得・検証中…');
+    this.begin(hostText('services.portableUpdates.retrievingApplet'));
     this.packagePreview = true;
     const signal = this.controller!.signal;
     let temporary: string | undefined;
@@ -722,7 +757,8 @@ export class PortableUpdates {
       let directory: string | undefined;
       if (!/^https?:|^github:/i.test(source)) {
         const sourceStat = await fs.lstat(source);
-        if (sourceStat.isSymbolicLink()) throw Error('配布元のリンクは使用できません。');
+        if (sourceStat.isSymbolicLink())
+          throw Error(hostText('services.portableUpdates.distributionLink'));
         if (
           sourceStat.isDirectory() &&
           !(await fs.lstat(path.join(source, 'update.json')).catch(() => undefined))
@@ -738,7 +774,7 @@ export class PortableUpdates {
         original.minimumHostVersion &&
         compareVersions(original.minimumHostVersion, this.options.hostVersion) > 0
       )
-        throw Error('必要な本体バージョンが不足しています。先に本体を更新してください。');
+        throw Error(hostText('services.portableUpdates.hostUpdateRequired'));
       temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'AppDock-update-'));
       const helper = path.join(temporary, 'AppDock.Updater.exe');
       await fs.copyFile(this.options.helper, helper);
@@ -751,7 +787,7 @@ export class PortableUpdates {
           createHash('sha256').update(bytes).digest('hex') !==
             candidate!.feed.payload.sha256.toLowerCase()
         )
-          throw Error('配布物のサイズ・ハッシュが一致しません。');
+          throw Error(hostText('services.portableUpdates.distributionHash'));
         const archive = path.join(temporary, 'package.zip');
         await fs.writeFile(archive, bytes, { flag: 'wx' });
         await execute(helper, ['--extract', archive, staged], {
@@ -762,12 +798,12 @@ export class PortableUpdates {
       }
       const m = readManifest(staged);
       if (m.id !== original.id || m.version !== original.version || !safeRelative(m.entry))
-        throw Error('配布情報とmanifestのID・版・エントリーが一致しません。');
+        throw Error(hostText('services.portableUpdates.distributionManifest'));
       if (
         m.minimumHostVersion &&
         compareVersions(m.minimumHostVersion, this.options.hostVersion) > 0
       )
-        throw Error('必要な本体バージョンが不足しています。');
+        throw Error(hostText('services.portableUpdates.requiredInstallHost'));
       this.options.validateApplet?.(staged);
       signal.throwIfAborted();
       const preview: AppletPackagePlan = {
@@ -807,17 +843,17 @@ export class PortableUpdates {
   }
   async prepareAppletUninstall(id: unknown): Promise<AppletPackagePlan> {
     if (typeof id !== 'string' || !this.canManageApplet(id))
-      throw Error('このAppletはアンインストールできません。');
-    if (this.state.busy) throw Error('パッケージ操作中です。');
+      throw Error(hostText('services.portableUpdates.uninstallForbidden'));
+    if (this.state.busy) throw Error(hostText('services.portableUpdates.packageBusy'));
     await this.discardPackagePlans();
-    this.begin('削除対象を確認中…');
+    this.begin(hostText('services.portableUpdates.checkingRemoval'));
     this.packagePreview = true;
     let temporary: string | undefined;
     try {
       const target = this.options.targets().find((t) => t.id === id)!;
       const manifest = readManifest(target.destination);
       if (manifest.id !== target.id || manifest.version !== target.version)
-        throw Error('対象Appletが変更されています。');
+        throw Error(hostText('services.portableUpdates.targetChanged'));
       const sha256 = await treeHash(target.destination, this.controller!.signal);
       temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'AppDock-update-'));
       await fs.copyFile(this.options.helper, path.join(temporary, 'AppDock.Updater.exe'));
@@ -837,12 +873,12 @@ export class PortableUpdates {
     }
   }
   async applyAppletPackage(id: unknown) {
-    if (typeof id !== 'string') throw Error('導入・削除の計画が不正です。');
+    if (typeof id !== 'string') throw Error(hostText('services.portableUpdates.invalidPlan'));
     const plan = this.packagePlans.get(id);
-    if (!plan) throw Error('確認内容が古くなっています。もう一度内容を確認してください。');
-    if (this.state.busy) throw Error('パッケージ操作中です。');
+    if (!plan) throw Error(hostText('services.portableUpdates.stalePlan'));
+    if (this.state.busy) throw Error(hostText('services.portableUpdates.packageBusy'));
     this.packagePlans.delete(id);
-    this.begin('再起動を準備中…');
+    this.begin(hostText('services.portableUpdates.preparingRestart'));
     this.packageOperation = { id, status: 'preparing' };
     let handedOff = false;
     try {
@@ -851,13 +887,13 @@ export class PortableUpdates {
         await this.assertNewApplet(target.id);
         this.options.validateApplet?.(plan.staged!);
         if ((await treeHash(plan.staged!)) !== plan.sha256)
-          throw Error('準備済みの配布物が変更されています。');
+          throw Error(hostText('services.portableUpdates.preparedChanged'));
       } else {
         if (
           !this.canManageApplet(target.id) ||
           (await treeHash(target.destination)) !== plan.sha256
         )
-          throw Error('削除対象が変更されています。もう一度確認してください。');
+          throw Error(hostText('services.portableUpdates.removalTargetChanged'));
       }
       this.state.cancellable = false;
       await this.handoff(
@@ -883,7 +919,7 @@ export class PortableUpdates {
       return structuredClone(this.state);
     } catch (error) {
       this.packageOperation = { id, status: 'failed' };
-      this.notice('error', 'Appletの導入・削除を完了できませんでした。内容を再確認してください。');
+      this.notice('error', hostText('services.portableUpdates.packageFailed'));
       throw error;
     } finally {
       if (!handedOff) {
@@ -928,7 +964,7 @@ export class PortableUpdates {
       if (failure) throw failure;
       if (await fs.stat(`${jobPath}.ready`).catch(() => null)) break;
       if (child.exitCode !== null || attempt === 99)
-        throw Error('更新ミニプログラムを開始できませんでした。');
+        throw Error(hostText('services.portableUpdates.updaterStartFailed'));
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     // Commit only after the helper validated the entire job. No payload may be applied before this marker.

@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { EventEmitter } from 'node:events';
 import type { Readable, Writable } from 'node:stream';
 const MAX_LINE = 1024 * 1024;
@@ -43,19 +44,19 @@ class JsonLinePeer extends EventEmitter {
       const line = this.buffer.slice(0, newline);
       this.buffer = this.buffer.slice(newline + 1);
       if (Buffer.byteLength(line) > MAX_LINE) {
-        this.fail(new Error('RPCメッセージが1MBを超えました。'));
+        this.fail(new Error(hostText('services.rpc.sizeLimit')));
         return;
       }
       if (line.trim()) this.dispatch(line);
     }
     if (Buffer.byteLength(this.buffer) > MAX_LINE)
-      this.fail(new Error('RPCメッセージが1MBを超えました。'));
+      this.fail(new Error(hostText('services.rpc.sizeLimit')));
   }
   async dispatch(line: string) {
     let msg: any;
     try {
       msg = JSON.parse(line);
-      if (!msg || msg.jsonrpc !== '2.0') throw new Error('JSON-RPC 2.0 が必要です。');
+      if (!msg || msg.jsonrpc !== '2.0') throw new Error(hostText('services.rpc.versionRequired'));
     } catch (e) {
       this.emit('protocolError', e);
       return;
@@ -87,9 +88,9 @@ class JsonLinePeer extends EventEmitter {
     }
   }
   send(msg: unknown) {
-    if (this.closed || this.output.destroyed) throw new Error('拡張との接続が閉じています。');
+    if (this.closed || this.output.destroyed) throw new Error(hostText('services.rpc.closed'));
     const line = JSON.stringify(msg) + '\n';
-    if (Buffer.byteLength(line) > MAX_LINE) throw new Error('RPCメッセージが1MBを超えました。');
+    if (Buffer.byteLength(line) > MAX_LINE) throw new Error(hostText('services.rpc.sizeLimit'));
     this.output.write(line);
   }
   request(method: string, params: unknown = {}, timeout = this.timeout): Promise<any> {
@@ -97,7 +98,7 @@ class JsonLinePeer extends EventEmitter {
       const id = `host-${++this.sequence}`;
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`${method} がタイムアウトしました。`));
+        reject(new Error(hostText('services.rpc.timeout', { method: String(method) })));
       }, timeout);
       this.pending.set(id, { resolve, reject, timer });
       try {
@@ -118,7 +119,7 @@ class JsonLinePeer extends EventEmitter {
     this.closed = true;
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
-      p.reject(new Error('拡張との接続が終了しました。'));
+      p.reject(new Error(hostText('services.rpc.disconnected')));
     }
     this.pending.clear();
     this.emit('closed');

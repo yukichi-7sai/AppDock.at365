@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 import type { SettingDefinition } from './contracts';
 
 export function readObjectList(value: unknown): Record<string, unknown>[] {
@@ -7,7 +8,7 @@ export function readObjectList(value: unknown): Record<string, unknown>[] {
     list.length > 64 ||
     list.some((item) => !item || typeof item !== 'object' || Array.isArray(item))
   )
-    throw new Error('設定は64件以内の項目の配列です。');
+    throw new Error(hostText('services.sharedObjectList.itemLimit'));
   return list;
 }
 export function objectFieldValue(item: Record<string, unknown>, field: SettingDefinition): unknown {
@@ -28,7 +29,9 @@ export function objectFieldValue(item: Record<string, unknown>, field: SettingDe
       value !== undefined &&
       (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))
     )
-      throw new Error(`${field.title} はフォルダーの一覧です。`);
+      throw new Error(
+        hostText('services.sharedObjectList.directoryList', { name: String(field.title) }),
+      );
     const strings = Array.isArray(value) ? [...value] : [];
     for (const alias of field.aliases ?? []) {
       const previous = item[alias];

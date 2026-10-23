@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -51,7 +52,7 @@ interface LocalConfig {
 }
 class AutomationStorageError extends Error {
   constructor() {
-    super('連携設定を保存できません。保存先のアクセス権と空き容量を確認してください。');
+    super(hostText('services.automation.saveFailed'));
   }
 }
 export class AutomationService {
@@ -194,7 +195,7 @@ export class AutomationService {
         this.config = c;
       }
     } catch {
-      this.loadError = '連携設定を読み取れません。PC専用のautomation.jsonを確認してください。';
+      this.loadError = hostText('services.automation.readFailed');
     }
     this.persistedConfig = structuredClone(this.config);
     this.persistedToken = this.token;
@@ -206,11 +207,7 @@ export class AutomationService {
       principal: () => createHash('sha256').update(this.token).digest('hex'),
       types: () => options.eventTypes?.() ?? [],
       audit: (code) => options.audit?.('warn', '[MCP Events] code=' + code),
-      failed: (code) =>
-        options.failed?.(
-          code,
-          'MCP Eventsの保存または配信を完了できませんでした。ログとMCP接続、通知の監視登録を確認してください。',
-        ),
+      failed: (code) => options.failed?.(code, hostText('services.automation.eventsFailed')),
     });
     if (!this.config.enabled) this.events.reconcile(true);
   }
@@ -398,7 +395,7 @@ export class AutomationService {
       this.error =
         error instanceof AutomationStorageError
           ? error.message
-          : 'MCPを開始できません。ポートの競合や連携設定の保存先を確認して、接続を再試行してください。';
+          : hostText('services.automation.startFailed');
       this.reportFailure(
         error instanceof AutomationStorageError ? 'MCP_SAVE_FAILED' : 'MCP_START_FAILED',
         this.error,
@@ -416,9 +413,9 @@ export class AutomationService {
   }
   async action(action: AutomationAction): Promise<AutomationReply> {
     if (!action || typeof action !== 'object' || typeof action.kind !== 'string')
-      throw Error('連携操作が不正です。');
+      throw Error(hostText('services.automation.invalidOperation'));
     if (action.kind === 'status') return { state: this.state() };
-    if (this.busy || this.closed) throw Error('連携の処理中です。しばらく待ってください。');
+    if (this.busy || this.closed) throw Error(hostText('services.automation.busy'));
     if (this.loadError) throw Error(this.loadError);
     this.busy = true;
     const previous = structuredClone(this.config);
@@ -427,16 +424,14 @@ export class AutomationService {
       switch (action.kind) {
         case 'setConnectionScope': {
           if (action.scope !== 'local' && action.scope !== 'network')
-            throw Error('接続範囲が不正です。');
+            throw Error(hostText('services.automation.invalidScope'));
           if (action.scope === this.config.connectionScope) break;
           this.config.connectionScope = action.scope;
           this.save();
           await this.stop();
           this.error = undefined;
           await this.start();
-          message =
-            this.error ||
-            '接続範囲を変更しました。同じPCのCodexの再登録は不要です。通信が戻らない場合は接続を再読み込みしてください。';
+          message = this.error || hostText('services.automation.scopeSaved');
           break;
         }
         case 'setNetworkHostnames': {
@@ -444,18 +439,18 @@ export class AutomationService {
           if (JSON.stringify(names) === JSON.stringify(this.config.networkHostnames)) break;
           this.config.networkHostnames = names;
           this.save();
-          message = '追加の接続先ホスト名を保存しました。';
+          message = hostText('services.automation.hostnamesSaved');
           break;
         }
         case 'copyToken':
           if (!this.state().canCopyToken || !this.options.writeClipboard)
-            throw Error('接続トークンをコピーできません。先に連携設定を保存してください。');
+            throw Error(hostText('services.automation.tokenCopyNotReady'));
           try {
             this.options.writeClipboard(this.token);
           } catch {
-            throw Error('接続トークンをコピーできません。クリップボードを確認してください。');
+            throw Error(hostText('services.automation.tokenCopyFailed'));
           }
-          message = '接続トークンをクリップボードへコピーしました。';
+          message = hostText('services.automation.tokenCopied');
           break;
         case 'copyEndpoint': {
           const state = this.state();
@@ -464,19 +459,19 @@ export class AutomationService {
             ![state.endpoint, ...state.networkEndpoints].includes(action.endpoint) ||
             !this.options.writeClipboard
           )
-            throw Error('接続先をコピーできません。接続の状態を再読み込みしてください。');
+            throw Error(hostText('services.automation.endpointCopyNotReady'));
           try {
             this.options.writeClipboard(action.endpoint);
           } catch {
-            throw Error('接続先をコピーできません。クリップボードを確認してください。');
+            throw Error(hostText('services.automation.endpointCopyFailed'));
           }
-          message = '接続先をクリップボードへコピーしました。';
+          message = hostText('services.automation.endpointCopied');
           break;
         }
         case 'retryStart':
-          if (!this.config.enabled) throw Error('先に連携を有効にしてください。');
+          if (!this.config.enabled) throw Error(hostText('services.automation.enableFirst'));
           await this.start();
-          message = this.error || 'MCPは稼働中です。';
+          message = this.error || hostText('services.automation.running');
           break;
         case 'configure': {
           if (
@@ -487,7 +482,7 @@ export class AutomationService {
             action.port > 65535 ||
             (action.port > 0 && action.port < 1024)
           )
-            throw Error('連携設定が不正です。ポートは1024～65535、または0（自動選択）です。');
+            throw Error(hostText('services.automation.invalidPort'));
           if (
             action.enabled === this.config.enabled &&
             action.allowWrite === this.config.allowWrite &&
@@ -507,7 +502,7 @@ export class AutomationService {
           }
           this.error = undefined;
           await this.start();
-          message = this.error || 'このPCの連携設定を保存しました。';
+          message = this.error || hostText('services.automation.configured');
           break;
         }
         case 'selectConfig':
@@ -517,97 +512,109 @@ export class AutomationService {
         case 'selectName':
           this.config.serverName = codexServerName(action.name);
           this.save();
-          message = '登録名を保存しました。既存の登録は解除してから登録し直してください。';
+          message = hostText('services.automation.registrationNameSaved');
           break;
         case 'setTts':
-          if (typeof action.allowed !== 'boolean') throw Error('読み上げの許可が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidTtsPermission'));
           this.config.allowUseTts = action.allowed;
           this.save();
-          message = 'このPCの読み上げ許可を保存しました。';
+          message = hostText('services.automation.ttsPermissionSaved');
           break;
         case 'setInputSending':
         case 'setProcessLaunching':
-          if (typeof action.allowed !== 'boolean') throw Error('実行許可が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidExecutionPermission'));
           this.config[action.kind === 'setInputSending' ? 'allowSendInput' : 'allowRunProcesses'] =
             action.allowed;
           this.save();
           this.options.authorizationChanged?.();
-          message = 'このPCの実行許可を保存しました。';
+          message = hostText('services.automation.executionPermissionSaved');
           break;
         case 'setMcpClient':
-          if (typeof action.allowed !== 'boolean') throw Error('MCP利用許可が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidMcpPermission'));
           this.config.allowUseMcp = action.allowed;
           this.save();
           this.options.authorizationChanged?.();
-          message = 'このPCのMCP利用許可を保存しました。';
+          message = hostText('services.automation.mcpPermissionSaved');
           break;
         case 'setMcpServerManagement':
-          if (typeof action.allowed !== 'boolean') throw Error('MCP接続先の管理許可が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidMcpManagementPermission'));
           this.config.allowManageMcpServers = action.allowed;
           this.save();
           this.options.authorizationChanged?.();
-          message = 'このPCのMCP接続先の管理許可を保存しました。';
+          message = hostText('services.automation.mcpManagementPermissionSaved');
           break;
         case 'setAi':
-          if (typeof action.allowed !== 'boolean') throw Error('AIの許可が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidAiPermission'));
           this.config.allowUseAi = action.allowed;
           this.save();
           if (!action.allowed) this.options.authorizationChanged?.();
-          message = 'このPCのAI利用許可を保存しました。';
+          message = hostText('services.automation.aiPermissionSaved');
           break;
         case 'setExecution':
-          if (typeof action.allowed !== 'boolean') throw Error('コマンド実行の許可が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidCommandPermission'));
           this.config.allowExecute = action.allowed;
           this.save();
-          message = 'このPCのコマンド実行許可を保存しました。';
+          message = hostText('services.automation.commandPermissionSaved');
           break;
         case 'setAppletManagement':
-          if (typeof action.allowed !== 'boolean') throw Error('Applet管理の許可が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidAppletPermission'));
           this.config.allowManageApplets = action.allowed;
           this.save();
-          message = 'このPCのApplet管理許可を保存しました。';
+          message = hostText('services.automation.appletPermissionSaved');
           break;
         case 'setTrayEditing':
-          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidPermission'));
           this.config.allowEditTray = action.allowed;
           this.save();
-          message = 'このPCのタスクトレイ編集許可を保存しました。';
+          message = hostText('services.automation.trayPermissionSaved');
           break;
         case 'setCustomCommandManagement':
-          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidPermission'));
           this.config.allowManageCustomCommands = action.allowed;
           this.save();
           this.options.authorizationChanged?.();
-          message = 'このPCのカスタムコマンド管理許可を保存しました。';
+          message = hostText('services.automation.customCommandPermissionSaved');
           break;
         case 'setRibbonEditing':
-          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidPermission'));
           this.config.allowEditRibbon = action.allowed;
           this.save();
-          message = 'このPCのリボン編集許可を保存しました。';
+          message = hostText('services.automation.ribbonPermissionSaved');
           break;
         case 'setTouchpadGestureEditing':
-          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidPermission'));
           this.config.allowEditTouchpadGestures = action.allowed;
           this.save();
           this.options.authorizationChanged?.();
-          message = 'このPCのタッチパッドジェスチャー編集許可を保存しました。';
+          message = hostText('services.automation.touchpadPermissionSaved');
           break;
         case 'setGestureEditing':
-          if (typeof action.allowed !== 'boolean') throw Error('許可設定が不正です。');
+          if (typeof action.allowed !== 'boolean')
+            throw Error(hostText('services.automation.invalidPermission'));
           this.config.allowEditGestures = action.allowed;
           this.save();
-          message = 'このPCのジェスチャー編集許可を保存しました。';
+          message = hostText('services.automation.gesturePermissionSaved');
           break;
         case 'setShortcutEditing':
           if (typeof action.allowed !== 'boolean')
-            throw Error('ショートカット編集の許可が不正です。');
+            throw Error(hostText('services.automation.invalidShortcutPermission'));
           this.config.allowEditShortcuts = action.allowed;
           this.save();
-          message = 'このPCのショートカット編集許可を保存しました。';
+          message = hostText('services.automation.shortcutPermissionSaved');
           break;
         case 'register':
-          if (!this.server) throw Error('先に連携を有効にしてMCPを起動してください。');
+          if (!this.server) throw Error(hostText('services.automation.startFirst'));
           this.config.owned[this.config.configFile] = changeRegistration(
             this.config.configFile,
             this.id,
@@ -615,11 +622,10 @@ export class AutomationService {
             this.config.owned[this.config.configFile],
           )!;
           this.save();
-          message =
-            '登録しました。Codexを再読み込みまたは再起動して、新しいチャットから接続を確認してください。';
+          message = hostText('services.automation.registered');
           break;
         case 'unregister':
-          if (!this.token) throw Error('解除する登録がありません。');
+          if (!this.token) throw Error(hostText('services.automation.registrationMissing'));
           changeRegistration(
             this.config.configFile,
             this.id,
@@ -629,21 +635,20 @@ export class AutomationService {
           );
           delete this.config.owned[this.config.configFile];
           this.save();
-          message = 'このAppDockの登録を解除しました。Codexを再読み込みしてください。';
+          message = hostText('services.automation.unregistered');
           break;
         case 'rotateToken':
-          if (!this.token) throw Error('先に連携を有効にしてください。');
+          if (!this.token) throw Error(hostText('services.automation.enableFirst'));
           this.token = randomBytes(32).toString('hex');
           this.config.token = this.options.encrypt(this.token);
           this.save();
           this.clearConnections();
           this.events.reconcile(true);
           this.options.authorizationChanged?.();
-          message =
-            '認証情報を再発行しました。「登録・修復」でCodexの登録を更新し、他のMCPクライアントにも新しいトークンを設定してください。';
+          message = hostText('services.automation.credentialsRenewed');
           break;
         case 'test': {
-          if (!this.server) throw Error('MCPが起動していません。');
+          if (!this.server) throw Error(hostText('services.automation.notRunning'));
           const response = await fetch(this.state().endpoint, {
             method: 'POST',
             signal: AbortSignal.timeout(5000),
@@ -665,12 +670,13 @@ export class AutomationService {
             }),
           });
           const value = (await response.json()) as any;
-          if (!response.ok || !value.result?.serverInfo) throw Error('接続テストに失敗しました。');
-          message = 'AppDock内の疎通に成功しました。Codexからの接続確認は別途必要です。';
+          if (!response.ok || !value.result?.serverInfo)
+            throw Error(hostText('services.automation.testFailed'));
+          message = hostText('services.automation.testSucceeded');
           break;
         }
         default:
-          throw Error('対応していない連携操作です。');
+          throw Error(hostText('services.automation.unsupportedOperation'));
       }
       this.options.changed();
       if (message && message !== this.error) {
@@ -684,15 +690,14 @@ export class AutomationService {
     } catch (e) {
       this.restoreSaved();
       if (action.kind === 'test') {
-        const message =
-          'AppDock内の疎通を確認できませんでした。連携が有効でMCPが稼働中かを確認して、もう一度接続テストを実行してください。';
+        const message = hostText('services.automation.testUnconfirmed');
         this.reportFailure('MCP_CONNECTION_TEST_FAILED', message);
         throw Error(message);
       }
       if (e instanceof AutomationStorageError) this.reportFailure('MCP_SAVE_FAILED', e.message);
       // Never echo credentials or raw TOML in an IPC error.
       if (e instanceof Error && !/Bearer |authorization|token =/i.test(e.message)) throw e;
-      throw Error('連携操作に失敗しました。設定とアクセス権を確認してください。');
+      throw Error(hostText('services.automation.operationFailed'));
     } finally {
       this.busy = false;
     }

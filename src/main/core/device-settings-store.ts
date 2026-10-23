@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { appletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
@@ -35,7 +36,8 @@ interface Journal {
 }
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const read = (file: string) => {
-  if (fs.statSync(file).size > 4 * 1024 * 1024) throw Error('設定は4MB以下にしてください。');
+  if (fs.statSync(file).size > 4 * 1024 * 1024)
+    throw Error(hostText('services.deviceSettingsStore.sizeLimit'));
   return fs.readFileSync(file);
 };
 
@@ -108,7 +110,14 @@ export class DeviceSettingsStore extends SettingsStore {
           issue.kind,
           0,
           issue.immediate,
-          `${scope === 'device' ? 'このPCの設定' : '共有設定'}: ${issue.message.replaceAll('settings.json', path.basename(store.file))}`,
+          hostText('services.deviceSettingsStore.scopedIssue', {
+            scope: String(
+              scope === 'device'
+                ? hostText('services.deviceSettingsStore.deviceScope')
+                : hostText('services.deviceSettingsStore.sharedScope'),
+            ),
+            message: String(issue.message.replaceAll('settings.json', path.basename(store.file))),
+          }),
         );
       }
     }
@@ -136,7 +145,7 @@ export class DeviceSettingsStore extends SettingsStore {
       if (fs.existsSync(this.marker)) {
         this.device.recovered = true;
         this.device.health.set('read', 'read-unavailable');
-        throw Error('このPCの設定と正常なバックアップがありません。復元してください。');
+        throw Error(hostText('services.deviceSettingsStore.recoveryRequired'));
       }
       atomicWrite(
         this.device.file,
@@ -159,7 +168,7 @@ export class DeviceSettingsStore extends SettingsStore {
   }
   override assertRevision(revision: number) {
     if (this.mutating || fs.existsSync(this.journal))
-      throw Error('設定を処理中です。復旧を完了してから再実行してください。');
+      throw Error(hostText('services.deviceSettingsStore.busy'));
     for (const store of [this.shared, this.device]) {
       try {
         store.assertRevision(store.revision);
@@ -169,7 +178,7 @@ export class DeviceSettingsStore extends SettingsStore {
     }
     this.syncHealth();
     if (revision !== this.revision)
-      throw new SettingsConflictError('設定または保存先が変更されています。再取得してください。');
+      throw new SettingsConflictError(hostText('services.deviceSettingsStore.revisionConflict'));
   }
   private fileFor(scope: Scope) {
     return scope === 'shared' ? this.shared.file : this.device.file;
@@ -224,9 +233,7 @@ export class DeviceSettingsStore extends SettingsStore {
       this.health.clear('transaction');
     } catch {
       this.health.set('transaction', 'save-failed');
-      throw Error(
-        '途中の設定保存を安全に復旧できません。設定ファイルと復旧記録を確認してください。',
-      );
+      throw Error(hostText('services.deviceSettingsStore.unsafeRecovery'));
     }
   }
   private commitPair(
@@ -236,7 +243,7 @@ export class DeviceSettingsStore extends SettingsStore {
     asset?: { commit(): void; rollback(): void },
     rewrite: Scope[] = [],
   ) {
-    if (this.writesBlocked) throw Error('設定を復元中です。完了後に保存してください。');
+    if (this.writesBlocked) throw Error(hostText('services.deviceSettingsStore.restoring'));
     this.assertRevision(revision);
     const files: Journal['files'] = [];
     if (!same(shared, this.shared.value) || rewrite.includes('shared'))
@@ -253,10 +260,10 @@ export class DeviceSettingsStore extends SettingsStore {
       });
     for (const item of files)
       if (Buffer.from(item.after, 'base64').length > 4 * 1024 * 1024)
-        throw Error('設定ファイルは4MB以下にしてください。');
+        throw Error(hostText('services.deviceSettingsStore.fileSizeLimit'));
     for (const item of files)
       if ((item.scope === 'shared' ? this.shared : this.device).recovered)
-        throw Error('保存対象の設定ファイルを復旧してください。');
+        throw Error(hostText('services.deviceSettingsStore.targetRecoveryRequired'));
     if (!files.length && !asset) return this.snapshot();
     this.mutating = true;
     const journal: Journal = { version: 1, machineName: this.machineName, committed: false, files };
@@ -323,9 +330,10 @@ export class DeviceSettingsStore extends SettingsStore {
     disposition: 'keep' | 'share' | 'clear' = 'keep',
   ) {
     this.assertRevision(revision);
-    if (typeof enabled !== 'boolean') throw Error('Appletの設定対象がありません。');
+    if (typeof enabled !== 'boolean')
+      throw Error(hostText('services.deviceSettingsStore.appletMissing'));
     if (!['keep', 'share', 'clear'].includes(disposition) || (enabled && disposition !== 'keep'))
-      throw Error('設定の切り替え方法が不正です。');
+      throw Error(hostText('services.deviceSettingsStore.invalidScope'));
     const shared = structuredClone(this.shared.value);
     const next = structuredClone(this.device.value);
     const entry = (next.extensions[owner] ??= {
@@ -334,11 +342,12 @@ export class DeviceSettingsStore extends SettingsStore {
     });
     if (entry.useLocalSettings === enabled) return this.snapshot();
     if (enabled && !entry.configuration) {
-      if (this.shared.recovered) throw Error('共有設定を復旧してから端末用にコピーしてください。');
+      if (this.shared.recovered)
+        throw Error(hostText('services.deviceSettingsStore.sharedRecoveryBeforeCopy'));
       entry.configuration = configuration(this.value, owner);
     }
     if (!enabled && this.shared.recovered)
-      throw Error('共有設定を復旧してから切り替えてください。');
+      throw Error(hostText('services.deviceSettingsStore.sharedRecoveryBeforeSwitch'));
     if (!enabled && disposition === 'share') {
       const stored = (shared.extensions[owner] ??= { enabled: false, settings: {} });
       const candidate = configuration(this.value, owner);
@@ -424,7 +433,8 @@ export class DeviceSettingsStore extends SettingsStore {
     return this.snapshot();
   }
   override restoreBackup(revision: number) {
-    if (revision !== this.revision) throw new SettingsConflictError('設定が変更されています。');
+    if (revision !== this.revision)
+      throw new SettingsConflictError(hostText('services.deviceSettingsStore.changed'));
     return this.restoreRecovery(this.prepareRecovery());
   }
   override close() {

@@ -1,3 +1,4 @@
+import { hostText } from '../../shared/i18n';
 import { BrowserWindow, WebContentsView, View, screen, type Input, type Rectangle } from 'electron';
 import path from 'node:path';
 import { WindowStateStore, restoreWindowBounds } from './window-state';
@@ -121,7 +122,7 @@ export function updatePageViewport(key: string | null, area: Rectangle | null) {
         );
       }))
   )
-    throw Error('ページ領域が不正です。');
+    throw Error(hostText('services.appletPages.invalidArea'));
   selected = key;
   bounds = area;
   for (const surface of surfaces.values()) surface.layout();
@@ -180,7 +181,7 @@ export class AppletSurface {
   constructor(readonly options: SurfaceOptions) {
     this.mode = this.requestedDisplay();
     this.state = new WindowStateStore(options.stateFile, () =>
-      host?.failed('Appletウィンドウの位置・サイズを読み込み/保存できませんでした。'),
+      host?.failed(hostText('services.appletPages.windowStateFailed')),
     );
     this.ui = new WebContentsView({
       webPreferences: {
@@ -229,7 +230,9 @@ export class AppletSurface {
     this.ui.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     this.ui.webContents.on('render-process-gone', (_, details) => {
       if (this.images) this.close();
-      host?.failed(`Applet画面が終了しました: ${details.reason}`);
+      host?.failed(
+        hostText('services.appletPages.rendererExited', { reason: String(details.reason) }),
+      );
     });
     options.onCreated?.(this.ui.webContents);
     this.ready = this.ui.webContents.loadURL(options.url);
@@ -344,9 +347,9 @@ export class AppletSurface {
     return window;
   }
   async open() {
-    if (this.closed) throw Error('Appletページは停止しています。');
+    if (this.closed) throw Error(hostText('services.appletPages.stopped'));
     await this.ready;
-    if (this.closed) throw Error('Appletページは停止しています。');
+    if (this.closed) throw Error(hostText('services.appletPages.stopped'));
     this.opened = true;
     this.refreshDisplay();
     if (this.mode === 'page') {
@@ -488,6 +491,6 @@ export function openLocalPage(options: SurfaceOptions, services: LocalPageServic
 export function localPageSource(event: Electron.IpcMainInvokeEvent) {
   const page = localPages.get(event.sender);
   if (!page || event.senderFrame !== event.sender.mainFrame || event.senderFrame.url !== page.url)
-    throw Error('許可されていないAppletページからの要求です。');
+    throw Error(hostText('services.appletPages.unauthorized'));
   return page.services;
 }

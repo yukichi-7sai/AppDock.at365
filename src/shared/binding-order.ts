@@ -1,3 +1,4 @@
+import { hostText } from './i18n';
 /** Merge reordered groups atomically without overwriting concurrent changes to other inputs. */
 export function applyBindingOrder<R extends { id: string }>(
   current: R[],
@@ -19,7 +20,7 @@ export function applyBindingOrder<R extends { id: string }>(
       new Set(after.map((row) => row.id)).size !== before.length ||
       after.some((row) => !before.some((old) => old.id === row.id))
     )
-      throw Error(`${label(key)}の割り当てが変更されました。キャンセルして開き直してください。`);
+      throw Error(hostText('services.sharedBindingOrder.changed', { name: String(label(key)) }));
     replacements.set(
       key,
       after.map((row) => live.find((item) => item.id === row.id)!),
