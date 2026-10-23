@@ -259,7 +259,7 @@ async function close() {
 (async () => {
   try {
     await launch();
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate(null));
     await bound('ribbon', ids.a);
     await bound('statusbar', ids.b);
     assert((await snap()).extensions.find((e) => e.id === ids.n).state === 'running');
@@ -373,7 +373,7 @@ async function close() {
       (await center.evaluate(() => window.dock.pages.get())).content.filters.text,
       'Safe',
     );
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate(null));
     await bound('statusbar', ids.b);
     if (app) {
       await app.evaluate(({ BrowserWindow }) =>
@@ -426,7 +426,7 @@ async function close() {
     );
     await close();
     await launch(['--safe-shell']);
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate(null));
     await bound('ribbon', defaultShellId);
     await bound('statusbar', defaultShellId);
     assert.equal((await snap()).settings.value.host.shellProviders.ribbon, ids.a);

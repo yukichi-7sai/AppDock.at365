@@ -78,7 +78,7 @@ test('appearance edits preserve source identity and missing removal rechecks the
   f.applets.push(source);
   await assert.rejects(
     f.edit([
-      { kind: 'updateItem', id: 'home', changes: { title: 'Must not save' } },
+      { kind: 'updateItem', id: 'image-library', changes: { title: 'Must not save' } },
       { kind: 'removeMissing', id: 'page:sample:main' },
     ]),
   );
@@ -100,13 +100,13 @@ test('group operations stay atomic with shared revisions and expose parent place
       expansion: 'temporary',
       placement: 'bottom',
     },
-    { kind: 'moveItem', id: 'home', parentId: 'group:work', beforeId: null },
-    { kind: 'moveItem', id: 'page:sample:main', parentId: 'group:work', beforeId: 'home' },
+    { kind: 'moveItem', id: 'image-library', parentId: 'group:work', beforeId: null },
+    { kind: 'moveItem', id: 'page:sample:main', parentId: 'group:work', beforeId: 'image-library' },
   ];
   const before = JSON.stringify(f.settings.value);
   const dry = await f.edit(ops, { dryRun: true });
   assert.equal(JSON.stringify(f.settings.value), before);
-  assert.deepEqual(dry.layout.groups[0].children, ['page:sample:main', 'home']);
+  assert.deepEqual(dry.layout.groups[0].children, ['page:sample:main', 'image-library']);
   await f.edit(ops);
   const page = f.get().items.find((i) => i.id === 'page:sample:main');
   assert.equal(page.parentId, 'group:work');
@@ -115,13 +115,13 @@ test('group operations stay atomic with shared revisions and expose parent place
   await assert.rejects(
     f.edit([
       { kind: 'updateGroup', id: 'group:work', changes: { title: 'Changed' } },
-      { kind: 'reorderChildren', id: 'group:work', ids: ['home'] },
+      { kind: 'reorderChildren', id: 'group:work', ids: ['image-library'] },
     ]),
   );
   assert.equal(f.get().layout.groups[0].title, 'Work');
   await f.edit([{ kind: 'ungroup', id: 'group:work' }]);
   assert.deepEqual(f.get().layout.groups, []);
-  assert(f.get().layout.bottom.includes('home'));
+  assert(f.get().layout.bottom.includes('image-library'));
 });
 test('ribbon read exposes scoped metadata and retains disabled and missing pages', (t) => {
   const f = fixture(t),
@@ -144,7 +144,7 @@ test('ribbon atomic edit, dry run, disabled page visibility, placement and unrel
     bytes = fs.readFileSync(f.settings.file, 'utf8');
   const ops = [
     { kind: 'addSeparator', id: 'separator:test', placement: 'bottom' },
-    update('home', { visible: false }),
+    update('image-library', { visible: false }),
     update('page:sample:main', { placement: 'bottom' }),
   ];
   const dry = await f.edit(ops, { dryRun: true });
@@ -154,7 +154,7 @@ test('ribbon atomic edit, dry run, disabled page visibility, placement and unrel
   const saved = await f.edit(ops);
   assert.equal(saved.completion, 'settingsSaved');
   assert.equal(saved.effectVerified, false);
-  assert.ok(saved.layout.hidden.includes('home'));
+  assert.ok(saved.layout.hidden.includes('image-library'));
   assert.ok(saved.layout.bottom.includes('page:sample:main'));
   assert.equal(saved.items.find((i) => i.id === 'page:sample:main').displayed, false);
   for (const key of ['host', 'extensions', 'keybindings', 'gestures', 'appletOrder'])
@@ -168,7 +168,7 @@ test('reorder includes hidden and disabled items and preserves other group and r
     s = structuredClone(f.settings.value);
   s.ribbon.order = ['page:missing:main', 'logs'];
   s.ribbon.bottom.push('page:missing:main');
-  s.ribbon.hidden = ['home', 'page:missing:main'];
+  s.ribbon.hidden = ['image-library', 'page:missing:main'];
   s.ribbon.custom = { secret: 'PRIVATE_EXTRA' };
   f.settings.save(s, f.settings.revision);
   const before = f.get(),
@@ -195,11 +195,11 @@ test('reorder includes hidden and disabled items and preserves other group and r
 });
 test('no-op visibility, placement and order do not save', async (t) => {
   const f = fixture(t);
-  await f.edit([update('home', { visible: false }), update('logs', { visible: false })]);
+  await f.edit([update('image-library', { visible: false }), update('logs', { visible: false })]);
   const rev = f.get().revision,
     bytes = fs.readFileSync(f.settings.file, 'utf8');
   const result = await f.edit([
-    update('home', { visible: false, placement: 'top' }),
+    update('image-library', { visible: false, placement: 'top' }),
     {
       kind: 'reorder',
       placement: 'top',
@@ -217,16 +217,16 @@ test('invalid operations and late errors reject all changes', async (t) => {
   const f = fixture(t),
     bytes = fs.readFileSync(f.settings.file, 'utf8');
   for (const op of [
-    update('home', {}),
-    update('home', { visible: 'yes' }),
-    update('home', { placement: 'left' }),
-    update('home', { extra: true }),
+    update('image-library', {}),
+    update('image-library', { visible: 'yes' }),
+    update('image-library', { placement: 'left' }),
+    update('image-library', { extra: true }),
     { kind: 'reset', extra: 1 },
-    { kind: 'removeSeparator', id: 'home' },
+    { kind: 'removeSeparator', id: 'image-library' },
     { kind: 'addSeparator', id: 'bad', placement: 'top' },
     { kind: 'addSeparator', id: 'separator:test', placement: 'wrong' },
-    { kind: 'reorder', placement: 'top', ids: ['home'] },
-    { kind: 'reorder', placement: 'top', ids: ['home', 'home'] },
+    { kind: 'reorder', placement: 'top', ids: ['image-library'] },
+    { kind: 'reorder', placement: 'top', ids: ['image-library', 'image-library'] },
     { kind: 'unknown' },
   ]) {
     await assert.rejects(f.edit([update('logs', { visible: false }), op]), {
@@ -287,7 +287,7 @@ test('all three write permissions independently gate edits and leave reads avail
     ['ribbon', 'RIBBON_EDITING_DISABLED'],
   ]) {
     f.permissions[permission] = false;
-    await assert.rejects(f.edit([update('home', { visible: false })]), { code });
+    await assert.rejects(f.edit([update('image-library', { visible: false })]), { code });
     assert.ok(f.get().items.length);
     f.permissions[permission] = true;
   }
@@ -307,9 +307,12 @@ test('shared revision rejects stale edits, restarted API tokens, and disk confli
     id: 'appdock.settings.update',
     args: { expectedRevision: old, changes: { theme: 'dark' } },
   });
-  await assert.rejects(f.edit([update('home', { visible: false })], { expectedRevision: old }), {
-    code: 'REVISION_CONFLICT',
-  });
+  await assert.rejects(
+    f.edit([update('image-library', { visible: false })], { expectedRevision: old }),
+    {
+      code: 'REVISION_CONFLICT',
+    },
+  );
   const restarted = new AutomationApi(f.options);
   await assert.rejects(
     restarted.call('commands.execute', {
@@ -321,7 +324,7 @@ test('shared revision rejects stale edits, restarted API tokens, and disk confli
   const disk = JSON.parse(fs.readFileSync(f.settings.file, 'utf8'));
   disk.host.theme = 'light';
   fs.writeFileSync(f.settings.file, JSON.stringify(disk));
-  await assert.rejects(f.edit([update('home', { visible: false })]));
+  await assert.rejects(f.edit([update('image-library', { visible: false })]));
   assert.equal(JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).host.theme, 'light');
 });
 test('save failure is sanitized and leaves settings intact', async (t) => {
@@ -337,7 +340,7 @@ test('save failure is sanitized and leaves settings intact', async (t) => {
       id,
       args: {
         expectedRevision: api.call('ribbon.get').revision,
-        operations: [update('home', { visible: false })],
+        operations: [update('image-library', { visible: false })],
       },
     }),
     (e) => e.code === 'SAVE_FAILED' && !e.message.includes('PRIVATE'),

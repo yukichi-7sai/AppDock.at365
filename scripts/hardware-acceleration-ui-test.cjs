@@ -23,7 +23,7 @@ async function launch() {
   const page = require('./settings-aware-page.cjs').settingsAwarePage(
     await application.firstWindow(),
   );
-  await require('./shell-overlay-helper.cjs').homePage(page);
+  await require('./shell-overlay-helper.cjs').startupPage(page);
   await application.evaluate(async ({ app }) => {
     await app.getGPUInfo('basic');
   });

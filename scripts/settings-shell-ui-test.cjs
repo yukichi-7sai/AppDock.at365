@@ -447,7 +447,7 @@ async function until(fn, label) {
           () => app.evaluate(() => !!globalThis.settingsDrainFixture.release),
           'queued host settings edit',
         );
-        const navigating = host.evaluate(() => window.dock.navigate('home'));
+        const navigating = host.evaluate(() => window.dock.navigate('logs'));
         await new Promise((resolve) => setTimeout(resolve, 100));
         assert.equal(
           (await host.evaluate(() => window.dock.snapshot())).navigation.route,
@@ -475,7 +475,7 @@ async function until(fn, label) {
         });
       }
     }
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate('logs'));
     const state = await host.evaluate(() => window.dock.settingsEditing());
     for (const key of ['draft', 'dirty', 'buffers', 'text', 'avatarChanged', 'saveError'])
       assert.equal(key in state, false);

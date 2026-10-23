@@ -122,7 +122,7 @@ async function save(p) {
       'host',
     );
     await host.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
-    await require('./shell-overlay-helper.cjs').homePage(host);
+    await require('./shell-overlay-helper.cjs').startupPage(host);
     let p = await page('appearance');
     const cards = p.locator('.settings-form > .settings-section');
     assert.equal(await cards.count(), 2);

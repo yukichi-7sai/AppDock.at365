@@ -357,7 +357,7 @@ async function assertRibbonReadability(rail, id, dark) {
     );
     assert.equal(await remote.evaluate(() => typeof window.appdockAppearance), 'undefined');
     checks.push('local Applet root/body overrides and remote isolation');
-    for (const route of ['home', 'logs', 'image-library', 'notifications']) {
+    for (const route of ['logs', 'image-library', 'notifications']) {
       await host.evaluate((route) => window.dock.navigate(route), route);
       const page = await until(
         () =>

@@ -107,7 +107,7 @@ module.exports = async function checkCodex({ executable, configFile, server, out
         args: {
           expectedRevision: ribbon.structuredContent.revision,
           dryRun: true,
-          operations: [{ kind: 'update', id: 'home', changes: { visible: false } }],
+          operations: [{ kind: 'update', id: 'image-library', changes: { visible: false } }],
         },
       });
       assert.equal(dry.structuredContent.completion, 'validated');

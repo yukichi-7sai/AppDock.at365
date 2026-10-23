@@ -167,7 +167,7 @@ test('command buttons and right-click share current availability without changin
   await f.ui.invoke(request, 'local');
   await f.ui.invoke(request, 'local');
   assert.deepEqual(f.calls, ['fixture.run']);
-  assert.equal(f.navigation.state.route, 'home');
+  assert.equal(f.navigation.state.route, 'settings');
   f.settings.ribbon.rightClickCommand = 'fixture.run';
   await f.ui.invoke({ ...request, actionId: view.contextActionId, requestId: 'context' }, 'local');
   assert.equal(f.calls.length, 2);
@@ -356,7 +356,7 @@ test('only schema 2 groups project decoration color and renamed separators', () 
   settings.ribbon = edit(defaultRibbon(), { ...addGroup, color: '#123abc' });
   settings.ribbon = edit(settings.ribbon, {
     kind: 'moveItem',
-    id: 'home',
+    id: 'image-library',
     parentId: addGroup.id,
     beforeId: null,
   });

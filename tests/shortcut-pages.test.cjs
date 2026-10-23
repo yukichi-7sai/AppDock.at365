@@ -1,6 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { shortcutPageChoices, validShortcutTarget } = require('../out/main/shared/shortcut-pages');
+const {
+  shortcutPageChoices,
+  validShortcutTarget,
+  hostShortcutPage,
+  shortcutTargetTitle,
+} = require('../out/main/shared/shortcut-pages');
 const {
   parseKeybindings,
   resolveKeybindings,
@@ -33,11 +38,11 @@ const row = (id, scope, appletIds = []) => ({
   when: { scope, appletIds },
 });
 
-test('candidates include five host pages and each declared page, excluding background Applets', () => {
+test('candidates include four host pages and each declared page, excluding background Applets', () => {
   const pages = shortcutPageChoices(applets);
   assert.deepEqual(
     pages.filter((p) => p.id.startsWith('host:')).map((p) => p.title),
-    ['ホーム', '画像ライブラリー', '設定', 'ログ', '通知センター'],
+    ['画像ライブラリー', '設定', 'ログ', '通知センター'],
   );
   assert.equal(pages.find((p) => p.id === 'page:test.wallpaper:history').title, '壁紙履歴');
   assert.equal(
@@ -45,7 +50,7 @@ test('candidates include five host pages and each declared page, excluding backg
     'プレビュー（Wallpaper）',
   );
   assert.equal(pages.find((p) => p.id === 'page:test.other:preview').title, 'プレビュー（Other）');
-  assert.equal(pages.length, 8);
+  assert.equal(pages.length, 7);
   assert.equal(
     pages.some((p) => p.id.includes('background')),
     false,
@@ -57,7 +62,12 @@ test('candidates include five host pages and each declared page, excluding backg
 });
 
 test('targets preserve legacy assignments and reject unknown host pages and malformed page identities', () => {
-  for (const id of ['test.wallpaper', 'host:settings', 'page:test.wallpaper:history']) {
+  for (const id of [
+    'test.wallpaper',
+    'host:settings',
+    'host:home',
+    'page:test.wallpaper:history',
+  ]) {
     const value = row('one', 'applets', [id]);
     assert.equal(validShortcutTarget(id), true);
     assert.deepEqual(parseKeybindings([value]), [value]);
@@ -105,7 +115,7 @@ test('page conditions distinguish sibling pages, settings, actual focus and lega
     }),
     ['all', 'legacy', 'owner'],
   );
-  for (const pageId of ['host:home', 'host:image-library', 'host:logs', 'host:notifications'])
+  for (const pageId of ['host:image-library', 'host:logs', 'host:notifications'])
     assert.deepEqual(resolve({ appFocused: true, pageId }), ['all']);
   assert.deepEqual(resolve({ appFocused: true, pageId: 'host:settings' }), ['all', 'settings']);
   assert.deepEqual(resolve({ appFocused: false, pageId: 'host:settings' }), []);
@@ -129,4 +139,22 @@ test('page conditions distinguish sibling pages, settings, actual focus and lega
       ['settings', '123'],
     ],
   );
+});
+
+test('retired home references remain saved but have no active page or candidate', () => {
+  assert.equal(hostShortcutPage('home'), undefined);
+  assert.equal(
+    shortcutPageChoices(applets).some((page) => page.id === 'host:home'),
+    false,
+  );
+  assert.equal(shortcutTargetTitle('host:home', []), '廃止: ホーム');
+  const saved = row('retired', 'applets', ['host:home']);
+  for (const page of shortcutPageChoices(applets)) {
+    assert.deepEqual(
+      resolveKeybindings([saved], 'Ctrl+F12', { appFocused: true, pageId: page.id }, [
+        { id: saved.command, title: 'Retired' },
+      ]),
+      [],
+    );
+  }
 });

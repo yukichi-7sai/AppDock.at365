@@ -70,7 +70,7 @@ settings.host.hardwareAcceleration = false;
 settings.globalShortcutCommands = [];
 settings.extensions['test.input-pages'] = { enabled: true, settings: {} };
 settings.extensions['test.background'] = { enabled: true, settings: {} };
-const hostRoutes = ['home', 'image-library', 'settings', 'logs', 'notifications'];
+const hostRoutes = ['image-library', 'settings', 'logs', 'notifications'];
 const selected = [...hostRoutes.map((route) => 'host:' + route), 'page:test.input-pages:history'];
 const binding = (id, command, scope, appletIds = []) => ({
   id,
@@ -272,7 +272,6 @@ async function expectCalls(suffix, expected) {
       await panel.locator('.keybinding-targets').click();
       const labels = await panel.locator('.keybinding-picker label').allTextContents();
       assert.deepEqual(labels, [
-        'ホーム',
         '画像ライブラリー',
         '設定',
         'ログ',

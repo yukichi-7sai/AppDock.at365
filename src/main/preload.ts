@@ -182,14 +182,6 @@ const api: DockApi = {
     ipcRenderer.on('dock:settingsEditingChanged', handler);
     return () => ipcRenderer.removeListener('dock:settingsEditingChanged', handler);
   },
-  onHomeCommandResult: (callback) => {
-    const handler = (
-      _: Electron.IpcRendererEvent,
-      result: import('../shared/host-pages').HomeCommandResult,
-    ) => callback(result);
-    ipcRenderer.on('dock:homeCommandResult', handler);
-    return () => ipcRenderer.removeListener('dock:homeCommandResult', handler);
-  },
   pages: {
     open: (request) => ipcRenderer.invoke('dock:pages:open', request),
     get: (id) => ipcRenderer.invoke('dock:pages:get', id),

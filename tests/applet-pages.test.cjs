@@ -77,7 +77,7 @@ test('Ribbon separators and lower placement validate and survive save', () => {
   const settings = createDefaultSettings();
   const id = 'separator:fixture-one';
   settings.ribbon = {
-    order: ['home', id, 'settings'],
+    order: ['image-library', id, 'settings'],
     hidden: [id],
     bottom: ['profile', id],
     separators: [id],
@@ -114,7 +114,11 @@ test('Ribbon inserts new Applets without dropping, duplicating or mutating saved
     source.map((item) => item.id).sort(),
   );
   assert.ok(ordered.some((item) => item.id === 'notifications'));
-  assert.equal(source[0].id, 'home');
+  assert.equal(source[0].id, 'image-library');
+  assert.equal(
+    source.some((item) => item.id === 'home'),
+    false,
+  );
 });
 test('Disabled Applets disappear from the ribbon while the settings catalogue and placement remain', () => {
   const web = { ...manifest, id: 'web.fixture', runtime: 'web', enabled: true, state: 'running' };

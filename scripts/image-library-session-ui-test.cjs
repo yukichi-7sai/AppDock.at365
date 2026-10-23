@@ -442,7 +442,7 @@ const observations = [];
     });
     await until(async () => !!(await model()).content.anchor, 'scroll anchor saved');
     const anchor = (await model()).content.anchor;
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate(null));
     await until(
       () =>
         host

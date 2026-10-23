@@ -114,7 +114,7 @@ const checks = [];
       ? detailTab('ショートカット')
       : name === '設定項目'
         ? detailTab('設定')
-        : (['ホーム', 'Applet', '設定', 'ログ', 'Appletに戻る'].includes(name)
+        : (['画像ライブラリー', 'Applet', '設定', 'ログ', 'Appletに戻る'].includes(name)
             ? shell
             : ['JSON', 'フォーム', '表示', '一般', 'ショートカット', '検証操作'].includes(name)
               ? body
@@ -131,7 +131,7 @@ const checks = [];
   const button = (name) => {
     const locator = rawButton(name);
     const route = {
-      ホーム: 'home',
+      画像ライブラリー: 'image-library',
       Applet: 'extensions',
       Appletに戻る: 'extensions',
       設定: 'settings',
@@ -207,13 +207,13 @@ const checks = [];
     await detailTab(view === 'shortcuts' ? 'ショートカット' : '設定').click();
   };
   try {
-    await require('./shell-overlay-helper.cjs').homePage(page);
+    await require('./shell-overlay-helper.cjs').startupPage(page);
     await page.waitForFunction(() =>
       window.dock
         .snapshot()
         .then((s) => s.extensions.find((e) => e.id === 'appdock.dotnet-demo')?.state === 'running'),
     );
-    for (const name of ['ホーム', 'Applet', '設定', 'ログ'])
+    for (const name of ['画像ライブラリー', 'Applet', '設定', 'ログ'])
       assert.equal(await button(name).count(), 1);
     assert.equal(await page.getByText('My Dock', { exact: true }).count(), 0);
     await button('Applet').click();
@@ -784,7 +784,7 @@ const checks = [];
         await page.screenshot({ path: path.join(profile, `${theme}-${width}-shortcuts.png`) });
       }
       await page.setViewportSize({ width: 900, height: 620 });
-      for (const name of ['ホーム', 'Applet', 'ログ']) {
+      for (const name of ['画像ライブラリー', 'Applet', 'ログ']) {
         await button(name).click();
         await page.locator('main').evaluate((el) => {
           el.scrollTop = 0;

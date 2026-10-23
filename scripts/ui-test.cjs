@@ -24,9 +24,9 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       await application.firstWindow(),
     );
     const shell = await require('./shell-overlay-helper.cjs').ribbonPage(page);
-    await require('./shell-overlay-helper.cjs').homePage(page);
+    await require('./shell-overlay-helper.cjs').startupPage(page);
     assert.deepEqual(await shell.locator('.activity-rail .rail-label').allTextContents(), [
-      'ホーム',
+      '画像ライブラリー',
       'Applet',
       '設定',
       'ログ',
@@ -127,8 +127,9 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
       ).state,
       'stopped',
     );
-    await shell.getByRole('button', { name: 'ホーム', exact: true }).first().click();
-    await page.screenshot({ path: path.join(profile, 'home.png') });
+    await page.evaluate(() => window.dock.navigate(null));
+    await require('./shell-overlay-helper.cjs').startupPage(page);
+    await page.screenshot({ path: path.join(profile, 'startup.png') });
     console.log(
       JSON.stringify(
         {

@@ -173,9 +173,9 @@ async function launch() {
         .every((e) => e.state === 'running')
     );
   });
-  await require('./shell-overlay-helper.cjs').homePage(host);
+  await require('./shell-overlay-helper.cjs').startupPage(host);
   await host.waitForFunction(
-    () => document.querySelector('.shell')?.getAttribute('data-route') === 'home',
+    () => document.querySelector('.shell')?.getAttribute('data-route') === 'settings',
   );
 }
 const command = (id) => host.evaluate((id) => window.dock.executeCommand(id), id);
@@ -213,7 +213,7 @@ async function save(p) {
   );
 }
 async function banner() {
-  await host.evaluate(() => window.dock.navigate('home'));
+  await host.evaluate(() => window.dock.navigate(null));
   const p = await until(
     () => pages().find((p) => p.url().endsWith('/shells/default/notifications.html')),
     'banner',

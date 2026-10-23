@@ -426,7 +426,7 @@ async function checkSectionTitles() {
           icon: 'folder',
           expansion: 'persistent',
           color: '#D249A1',
-          children: ['home', 'logs'],
+          children: ['image-library', 'logs'],
         },
       ];
       initial.ribbon.order = ['group:color', 'settings'];

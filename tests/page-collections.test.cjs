@@ -88,10 +88,10 @@ test('ribbon saving succeeds with an unchanged missing Web account and never rep
   });
   const result = ribbon.execute({
     expectedRevision: settingsCommands.revision(),
-    operations: [{ kind: 'update', id: 'home', changes: { visible: false } }],
+    operations: [{ kind: 'update', id: 'image-library', changes: { visible: false } }],
   });
   assert.equal(result.changed, true);
-  assert(store.value.ribbon.hidden.includes('home'));
+  assert(store.value.ribbon.hidden.includes('image-library'));
   assert.equal(JSON.stringify(store.value.extensions[owner.id]), oldRows);
   assert.equal(store.value.migrations, undefined);
   assert.equal(JSON.parse(fs.readFileSync(store.file)).migrations, undefined);

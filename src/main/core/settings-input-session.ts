@@ -19,6 +19,7 @@ export class SettingsInputSession {
   constructor(
     private options: {
       current(): SettingsSnapshot;
+      initialPageId?: string;
       scope?(page: import('../../shared/settings-catalog').SettingsPageDefinition): string;
       applets(): ExtensionSnapshot[];
       save(
@@ -35,7 +36,7 @@ export class SettingsInputSession {
       revision: options.current().revision,
       mode: 'form',
       pending: false,
-      pageId: 'appearance',
+      pageId: options.initialPageId ?? 'appearance',
     };
   }
   private notify() {

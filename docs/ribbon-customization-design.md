@@ -244,9 +244,9 @@ interface RibbonCommandButton {
 ```json
 {
   "ribbon": {
-    "order": ["home", "group:messages", "extensions", "settings", "logs", "notifications", "theme", "profile"],
+    "order": ["image-library", "group:messages", "settings", "logs", "notifications", "theme"],
     "hidden": [],
-    "bottom": ["theme", "profile"],
+    "bottom": ["theme"],
     "separators": [],
     "groups": [
       {

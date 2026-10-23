@@ -1,4 +1,5 @@
 import { randomUUID, createHash } from 'node:crypto';
+import { defaultNavigation, isPageRoute } from '../../shared/navigation';
 import { visibleRibbonItems, type RibbonItem } from '../../shared/applet-pages';
 import { ribbonRoots, ribbonPlacement, ribbonPresentation } from '../../shared/ribbon-layout';
 import { ribbonBadgeView, type RibbonBadge, type RibbonAnchor } from '../../shared/ribbon';
@@ -8,7 +9,7 @@ import type { UiCommand } from '../../shared/commands';
 
 export class NavigationCoordinator {
   private requestSequence = 0;
-  state: NavigationState = { route: 'home', request: 0 };
+  state: NavigationState = { ...defaultNavigation, request: 0 };
   constructor(
     private changed: () => void,
     private beforeNavigate?: () => Promise<void>,
@@ -17,25 +18,23 @@ export class NavigationCoordinator {
   restore(route: string) {
     // Startup restoration has lower priority than any explicit or pending navigation.
     if (this.requestSequence !== 0) return;
-    return this.navigate(route);
+    return this.navigate(isPageRoute(route) ? route : null);
   }
   navigate(
-    route: string,
+    route: string | null,
     section?: NavigationState['section'],
     appletId?: string,
     appletDetail?: NavigationState['appletDetail'],
   ) {
+    if (route === null) {
+      route = defaultNavigation.route;
+      section = defaultNavigation.section;
+    }
     if (route === 'extensions') {
       route = 'settings';
       if (appletDetail !== 'settings') section = 'applets';
     }
-    if (
-      !['home', 'image-library', 'extensions', 'settings', 'logs', 'notifications'].includes(
-        route,
-      ) &&
-      !/^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(route)
-    )
-      throw Error('Unknown route');
+    if (!isPageRoute(route)) throw Error('Unknown route');
     const sequence = ++this.requestSequence;
     if (route === this.state.route && !section && !appletId) return;
     const apply = () => {

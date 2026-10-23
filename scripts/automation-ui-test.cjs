@@ -887,7 +887,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       id: 'appdock.ribbon.update',
       args: {
         expectedRevision: (await call(client, 'appdock_get_ribbon')).revision,
-        operations: [{ kind: 'update', id: 'home', changes: { placement: 'bottom' } }],
+        operations: [{ kind: 'update', id: 'image-library', changes: { placement: 'bottom' } }],
       },
     });
     await call(client, 'appdock_execute_command', {
@@ -905,7 +905,10 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       (await page.evaluate(() => window.dock.snapshot())).settings.value.host.theme,
     );
     assert.equal((await call(client, 'appdock_get_tray')).clicks.doubleClickCommand, null);
-    assert.equal((await call(client, 'appdock_get_ribbon')).layout.bottom.includes('home'), true);
+    assert.equal(
+      (await call(client, 'appdock_get_ribbon')).layout.bottom.includes('image-library'),
+      true,
+    );
     await page.getByRole('button', { name: 'フォーム', exact: true }).click();
     await page.getByRole('button', { name: 'MCPサーバー', exact: true }).click();
     checks.push('immediate GUI settings and subsequent MCP updates converge to persisted state');

@@ -191,7 +191,7 @@ const storage = (id, key) => {
         ).every((e) => e.state === 'running')
       );
     });
-    await require('./shell-overlay-helper.cjs').homePage(host);
+    await require('./shell-overlay-helper.cjs').startupPage(host);
     assert.equal(await main(desktopWindow + '?.isVisible() ?? false'), false);
     await main(parentWindow + '.focus()');
     const focused = await main('electron.BrowserWindow.getFocusedWindow()?.id');
@@ -244,7 +244,10 @@ const storage = (id, key) => {
     await wait(1300);
     assert.equal(await main(desktopWindow + '?.isVisible() ?? false'), false);
     await main('electron.powerMonitor.emit("unlock-screen")');
-    await until(() => main(desktopWindow + '?.isVisible() ?? false'), 'unlock resumes manual notifications');
+    await until(
+      () => main(desktopWindow + '?.isVisible() ?? false'),
+      'unlock resumes manual notifications',
+    );
     d = await surface('desktop', executable ? 'appdock.default-shell' : customId);
     const resumed = (await d.evaluate(() => window.appdockNotifications.connect())).snapshot;
     assert.ok(resumed.items.some((i) => i.title === 'Timed desktop'));

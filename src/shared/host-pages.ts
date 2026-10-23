@@ -14,16 +14,8 @@ export interface LogPageRequest {
   scope: LogScope;
   source: string;
 }
-export interface HomePageRequest {
-  id: string;
-  route: 'home';
-  kind: 'home';
-  /** Read-only projection from saved host settings. */
-  appletOrder: string[];
-}
 export type HostPageRequest =
   | LogPageRequest
-  | HomePageRequest
   | import('./notification-center').NotificationCenterRequest
   | import('./image-library-page').ImageLibraryPageRequest;
 export interface LogPageModel {
@@ -41,54 +33,15 @@ export interface LogPageModel {
     limit: number;
   };
 }
-export interface HomePageModel {
-  schemaVersion: 1;
-  id: string;
-  contextId: 'primary';
-  kind: 'home';
-  revision: number;
-  dark: boolean;
-  content: {
-    stats: { running: number; errors: number; applets: number; commands: number };
-    pins: {
-      id: string;
-      title: string;
-      extension: string;
-      available: boolean;
-      disabledReason?: string;
-      actionId: string;
-    }[];
-    applets: {
-      id: string;
-      title: string;
-      description: string;
-      state: 'waiting' | 'running' | 'stopped' | 'starting' | 'stopping' | 'error';
-      runtime: 'node' | 'dotnet' | 'native' | 'web';
-      collection?: boolean;
-      version: string;
-      actionId: string;
-    }[];
-    actions: { palette: string; logs: string; applets: string };
-    busy: boolean;
-    error: string;
-    message: string;
-  };
-}
 export type HostPageModel =
   | LogPageModel
-  | HomePageModel
   | import('./notification-center').NotificationCenterModel
   | import('./image-library-page').ImageLibraryPageModel;
-export interface HomeCommandResult {
-  message: string;
-  error: string;
-}
 export type HostPageAction =
   | import('./image-library-page').ImageLibraryPageAction
   | import('./notification-center').NotificationCenterAction
   | { id: string; type: 'filters'; filters: LogFilters }
-  | { id: string; type: 'open-directory' }
-  | { id: string; type: 'invoke'; actionId: string };
+  | { id: string; type: 'open-directory' };
 /** Private bridge for the trusted host renderer; never exposed to Shells or Applets. */
 export interface HostPageApi {
   open(request: HostPageRequest): Promise<HostPageModel | null>;

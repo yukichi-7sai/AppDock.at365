@@ -267,7 +267,7 @@ export interface DockApi {
   onLogSourceChanged(callback: (source: string) => void): () => void;
   focusShell(edge: 'first' | 'last'): Promise<void>;
   onShellFocusHost(callback: (edge: 'before' | 'after') => void): () => void;
-  navigate(route: string, restore?: true): Promise<void>;
+  navigate(route: string | null, restore?: true): Promise<void>;
   shellViewport(
     bounds: { x: number; y: number; width: number; height: number } | null,
   ): Promise<void>;
@@ -311,9 +311,6 @@ export interface DockApi {
   ownsGlobalShortcut(key: string): boolean;
   onHostCommand(callback: (id: string) => void): () => void;
   onPaletteExecuted(callback: () => void): () => void;
-  onHomeCommandResult(
-    callback: (result: import('./host-pages').HomeCommandResult) => void,
-  ): () => void;
   snapshot(): Promise<HostSnapshot>;
   saveSettings(value: Settings, revision: number): Promise<SettingsSnapshot>;
   setPinnedCommands(ids: string[]): Promise<SettingsSnapshot>;

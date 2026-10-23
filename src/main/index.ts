@@ -29,7 +29,7 @@ import { WindowBars } from './core/window-bars';
 import { OverlayHost } from './core/overlay-host';
 import { HostModalLayer } from './core/host-modal-layer';
 import { HostPages } from './core/host-pages';
-import { HomePageSession, HomeCommandExecution } from './core/home-page';
+import { defaultNavigation } from '../shared/navigation';
 import { ImageLibraryPageSession, ImageLibraryPageState } from './core/image-library-page';
 import { ImageLibraryDialogs } from './core/image-library-dialogs';
 import { GalleryViewStateStore } from './core/gallery-view-state';
@@ -417,6 +417,7 @@ const ribbonBadges = new RibbonBadges(
 );
 const settingsNavigation: import('../shared/settings-page').SettingsNavigationState = { query: '' };
 const settingsEditing = new SettingsInputSession({
+  initialPageId: defaultNavigation.section,
   current: () => settings.snapshot(),
   scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
@@ -2654,8 +2655,8 @@ function registerIpc() {
   handle('dock:focusShell', (edge) => shellHost?.focus(edge));
   handle('dock:barViewport', (region, bounds) => shellBarHost?.viewport(region, bounds));
   handle('dock:focusBar', (region, edge) => shellBarHost?.focus(region, edge));
-  handle('dock:navigate', (route: string, restore?: true) =>
-    restore === true ? navigation.restore(route) : navigation.navigate(route),
+  handle('dock:navigate', (route: string | null, restore?: true) =>
+    restore === true && route !== null ? navigation.restore(route) : navigation.navigate(route),
   );
   handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
   handle('dock:pages:open', (request) => hostPages!.open(request));
@@ -3623,15 +3624,6 @@ async function initialize() {
         void dialog.showMessageBox(window!, { type: 'error', message, buttons: ['OK'] });
     },
   });
-  const homeExecution = new HomeCommandExecution({
-    execute: executeCommand,
-    changed,
-    completed: (result) => {
-      if (!quitting && window && !window.isDestroyed() && navigation.state.route !== 'home')
-        window.webContents.send('dock:homeCommandResult', result);
-    },
-  });
-  window.once('closed', () => homeExecution.dispose());
   settingsPageHost = new SettingsPageHost({
     allowed: (request) =>
       startupReady &&
@@ -3752,29 +3744,17 @@ async function initialize() {
                   })
                 ).response === 1,
             })
-          : request.kind === 'home'
-            ? new HomePageSession(request, {
-                applets: allApplets,
-                commands: uiCommands,
-                pins: () => settings.value.pinnedCommands,
-                appletOrder: () => settingsEditing.value.appletOrder,
-                dark: () => nativeTheme.shouldUseDarkColors,
-                execution: homeExecution,
-                navigate: executeCommand,
-                openApplet: (id) => navigation.navigate('extensions', undefined, id),
-              })
-            : new LogPageSession(request, {
-                entries: () => log.entries,
-                sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
-                dark: () => nativeTheme.shouldUseDarkColors,
-                openDirectory: async () => {
-                  const error = await shell.openPath(log.directory);
-                  if (error) throw Error(error);
-                },
-                sourceChanged: (source) =>
-                  window?.webContents.send('dock:logSourceChanged', source),
-                changed,
-              }),
+          : new LogPageSession(request, {
+              entries: () => log.entries,
+              sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
+              dark: () => nativeTheme.shouldUseDarkColors,
+              openDirectory: async () => {
+                const error = await shell.openPath(log.directory);
+                if (error) throw Error(error);
+              },
+              sourceChanged: (source) => window?.webContents.send('dock:logSourceChanged', source),
+              changed,
+            }),
   });
   window.webContents.on('did-start-loading', () => hostPages?.close());
   window.webContents.on('render-process-gone', () => hostPages?.close());
@@ -3798,7 +3778,7 @@ async function initialize() {
     selected: (key) => {
       // Closing Applet surfaces during shutdown must not overwrite the restart destination.
       if (!quitting && (key || navigation.state.route.startsWith('page:'))) {
-        navigation.navigate(key || 'home');
+        navigation.navigate(key || null);
         window?.webContents.send('dock:appletPage', key);
       }
     },

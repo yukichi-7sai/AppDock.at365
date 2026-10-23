@@ -212,7 +212,7 @@ module.exports = async function iconChecks(context) {
   await saved((r) => r.buttons[0].image?.file === filename);
   await rail.locator('[data-ribbon-id="button:icon"] img').waitFor();
   await page
-    .locator('[data-ribbon-setting="home"]')
+    .locator('[data-ribbon-setting="image-library"]')
     .getByRole('button', { name: /を編集$/ })
     .click();
   dialog = host.getByRole('dialog', { name: 'リボンボタンを編集', exact: true });
@@ -220,15 +220,15 @@ module.exports = async function iconChecks(context) {
   assert.equal(await dialog.locator('.ribbon-icon-modes').count(), 0);
   await selectImage(dialog, 'リボンの画像を選択');
   await dialog.getByRole('button', { name: '適用', exact: true }).click();
-  await saved((r) => r.itemOverrides?.home?.image?.file === filename);
+  await saved((r) => r.itemOverrides?.['image-library']?.image?.file === filename);
   await page
-    .locator('[data-ribbon-setting="home"]')
+    .locator('[data-ribbon-setting="image-library"]')
     .getByRole('button', { name: /を編集$/ })
     .click();
   dialog = host.getByRole('dialog', { name: 'リボンボタンを編集', exact: true });
   await dialog.getByRole('button', { name: 'リボンの画像を外す', exact: true }).click();
   await dialog.getByRole('button', { name: '適用', exact: true }).click();
-  await saved((r) => !r.itemOverrides?.home?.image);
+  await saved((r) => !r.itemOverrides?.['image-library']?.image);
   checks.push(
     'command editor shares source controls; ordinary ribbon item shares image input and persists removal',
   );

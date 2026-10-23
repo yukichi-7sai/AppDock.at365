@@ -88,7 +88,7 @@ const button = (title) =>
     ? rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]')
     : require('./settings-host-helper.cjs')
         .deferred(async () => {
-          if (['ホーム', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title))
+          if (['画像ライブラリー', '設定', 'Applet', 'ログ', 'ページ検証', 'Gmail'].includes(title))
             return rail;
           const snapshot = await dock.evaluate(() => window.dock.snapshot());
           return snapshot.navigation.route === 'settings' ? settingsUi() : dock;
@@ -140,8 +140,8 @@ async function launch() {
       .find((p) => p.url().includes('/shells/default/index.html'));
     return !!rail;
   }, 'Shell renderer');
-  await rail.locator('[data-ribbon-id="home"]').waitFor();
-  await require('./shell-overlay-helper.cjs').homePage(dock);
+  await rail.locator('[data-ribbon-id="image-library"]').waitFor();
+  await require('./shell-overlay-helper.cjs').startupPage(dock);
   await app.evaluate(({ app }) => {
     app.on('session-created', (ses) => {
       if (!ses.isPersistent()) return;
@@ -337,16 +337,16 @@ async function launch() {
       '保持',
     );
     await setDisplay('at365.gmail', 'gmail', 'page');
-    await button('ホーム').click();
-    const homeFocus = await app.evaluate(
+    await button('画像ライブラリー').click();
+    const hostFocus = await app.evaluate(
       ({ webContents }) => webContents.getFocusedWebContents()?.id,
     );
     await dock.evaluate(() => window.dock.executeCommand('at365.gmail.nextAccount'));
     assert.equal(
       await app.evaluate(({ webContents }) => webContents.getFocusedWebContents()?.id),
-      homeFocus,
+      hostFocus,
     );
-    await require('./shell-overlay-helper.cjs').homePage(dock);
+    await dock.locator('.library-page').waitFor();
     await remote(
       account,
       'document.querySelector(\'tbody\').insertAdjacentHTML(\'afterbegin\', \'<tr class="zA zE"><td class="yW"><span name="Fixture">Fixture</span></td><td><span class="bog" data-legacy-thread-id="new">背景で到着</span></td></tr>\')',
@@ -450,7 +450,7 @@ async function launch() {
       'Hidden Settings',
     );
     assert.equal(await rail.locator('[data-ribbon-id="settings"]').count(), 0);
-    await button('ホーム').click();
+    await button('画像ライブラリー').click();
     await rail.getByLabel('リボン', { exact: true }).click({ button: 'right' });
     await (
       await settingsUi()
@@ -523,7 +523,7 @@ async function launch() {
     );
     await until(
       async () =>
-        (await dock.evaluate(() => window.dock.snapshot())).navigation.route === 'home' &&
+        (await dock.evaluate(() => window.dock.snapshot())).navigation.route === 'settings' &&
         (await dock.locator('.applet-page-viewport').count()) === 0,
       'Stopped page returns Home and removes the viewport',
     );

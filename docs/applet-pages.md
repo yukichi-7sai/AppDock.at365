@@ -43,7 +43,7 @@ WebアカウントUIでは`source:"web-accounts"`を使い、uiを重複指定�
 
 本体の「Applet → 対象Applet → 設定」でページごとの表示方法を選択できます。保存先は`settings.json`の`extensions.<id>.pages.<pageId>.display`（page/window）。省略時はmanifestのdefaultDisplay、さらに省略時はpage。既存のApplet設定とは別のホスト管理領域です。表示先変更は次のopenへ反映し、表示中の画面なら直ちに載せ替えます。非表示の画面を設定変更だけで前面へ出しません。
 
-独立ウィンドウの通常位置/サイズ/最大化は保存します。Webアカウントは既存`web-accounts/<id>/window-state.json`を引き続き使用し、localは`pages/<id>/<pageId>/window-state.json`です。閉じる操作では隠し、停止/異常終了時に画面を破棄します。表示中のページを停止した場合は本体をホームへ戻します。
+独立ウィンドウの通常位置/サイズ/最大化は保存します。Webアカウントは既存`web-accounts/<id>/window-state.json`を引き続き使用し、localは`pages/<id>/<pageId>/window-state.json`です。閉じる操作では隠し、停止/異常終了時に画面を破棄します。表示中のページを停止した場合は本体の[既定の表示先](host-pages.md#起動と戻り先)へ戻します。
 
 本体Reactのページ領域はホストpreloadの`pageViewport`経由でDIP/整数座標を報告し、ホスト側でも検証・client領域へclipします。AppletのUIにはページ内の0,0から始まる座標を見せます。リボン・タイトルバー・ステータスバーを覆いません。コマンドパレット中はページViewを外し、本体overlayへの入力を確保します。GmailのviewportはそのローカルUI内の座標のままです。
 
@@ -51,7 +51,7 @@ GmailのアカウントViewとsessionを表示先の変更で再作成しませ�
 
 ## リボン
 
-標準項目（home/image-library/extensions/settings/logs/theme/notifications）と、導入Appletのpagesおよび宣言型ribbonItemsを一覧にします。画像ライブラリーの新規既定位置はホームの次で、既存の保存順・非表示・上下配置は維持します。ページIDは`page:<extensionId>:<pageId>`、宣言型IDは`applet:<extensionId>:<localId>`です。プロフィールは独立Appletの自己設定への宣言型ボタンです。[共通画像とリボン](registered-images.md)を参照してください。
+標準項目（image-library/settings/logs/notifications/theme）と、導入Appletのpagesおよび宣言型ribbonItemsを一覧にします。画像ライブラリーの新規既定位置は先頭で、既存の保存順・非表示・上下配置は維持します。ページIDは`page:<extensionId>:<pageId>`、宣言型IDは`applet:<extensionId>:<localId>`です。プロフィールは独立Appletの自己設定への宣言型ボタンです。[共通画像とリボン](registered-images.md)を参照してください。
 
 すべてのApplet（Gmail/WebAppletを含む）は無効化中だけ実リボンから隠し、有効化時に元の配置へ戻します。リボン設定の一覧と保存済みの表示・配置は保持します。開始待ちやエラー状態でも、有効なAppletのリボンは表示します。
 
@@ -252,4 +252,4 @@ pageActionsの入力はJSON文字列表現で64K文字以下。Node処理の応�
 
 1ページにつき1つのSurfaceを持つ。同じViewを本体ページと別Windowで移動し、入力・履歴を維持する。本体本文の選択は1ページ、異なるページの独立Windowは同時に保持できる。同じページの複製Windowや分割表示は対象外。
 
-Windowの×は非表示、登録解除・停止・異常終了では破棄する。停止回収はホストが担当しdeactivate成功に依存しない。選択中のページを破棄した場合はホームへ戻す。保存済みリボン/キー/表示先を一時的な登録解除では削除しない。既存のrestore-viewは親の起動とページ登録を待つ。
+Windowの×は非表示、登録解除・停止・異常終了では破棄する。停止回収はホストが担当しdeactivate成功に依存しない。選択中のページを破棄した場合は[既定の表示先](host-pages.md#起動と戻り先)へ戻す。保存済みリボン/キー/表示先を一時的な登録解除では削除しない。既存のrestore-viewは親の起動とページ登録を待つ。

@@ -39,7 +39,7 @@ module.exports = async function ({
   const ops = [
     { kind: 'addSeparator', id: 'separator:mcp-test', placement: 'bottom' },
     { kind: 'update', id: 'logs', changes: { visible: false } },
-    { kind: 'update', id: 'home', changes: { placement: 'bottom' } },
+    { kind: 'update', id: 'image-library', changes: { placement: 'bottom' } },
   ];
   assert.equal((await edit(ops, { dryRun: true })).completion, 'validated');
   assert.equal(fs.readFileSync(file, 'utf8'), bytes);
@@ -50,8 +50,8 @@ module.exports = async function ({
     async () => !(await row('logs').getByRole('checkbox').isChecked()),
     'hidden logs reflected',
   );
-  assert.equal(await row('home').getByRole('combobox').inputValue(), 'bottom');
-  await shell.locator('.ribbon-bottom [data-ribbon-id="home"]').waitFor();
+  assert.equal(await row('image-library').getByRole('combobox').inputValue(), 'bottom');
+  await shell.locator('.ribbon-bottom [data-ribbon-id="image-library"]').waitFor();
   await shell.locator('.ribbon-bottom [data-ribbon-id="separator:mcp-test"]').waitFor();
   await shell.locator('[data-ribbon-id="logs"]').waitFor({ state: 'detached' });
   const bottom = (await read()).items

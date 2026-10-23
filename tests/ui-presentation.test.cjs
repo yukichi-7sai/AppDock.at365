@@ -49,14 +49,14 @@ function fixture() {
 }
 test('full presentation preserves order, placement, selected route and opaque assets without local paths', () => {
   const f = fixture();
-  f.settings.ribbon.order = ['page:test.page:main', 'home'];
-  f.settings.ribbon.bottom.push('home');
+  f.settings.ribbon.order = ['page:test.page:main', 'image-library'];
+  f.settings.ribbon.bottom.push('image-library');
   f.nav.navigate('page:test.page:main');
   const a = f.ui.get();
   const b = f.ui.get();
   assert.deepEqual(a, b);
   assert.equal(a.items[0].selected, true);
-  assert.equal(a.items.find((i) => i.id === 'home').placement, 'bottom');
+  assert.equal(a.items.find((i) => i.id === 'image-library').placement, 'bottom');
   assert.ok(!JSON.stringify(a).includes('openCommand'));
   const asset = a.items.find((i) => i.id === 'page:test.page:main').icon.assetId;
   assert.match(asset, /^[a-f0-9]{64}$/);
@@ -80,7 +80,13 @@ test('ribbon aliases and icon-only are presentation settings, preserving actions
   assert.equal(f.ui.get(() => true, 1).items.find((i) => i.id === item.id).iconOnly, undefined);
   f.settings.ribbon.order = ['group:blank'];
   f.settings.ribbon.groups = [
-    { id: 'group:blank', title: '', icon: 'folder', expansion: 'persistent', children: ['home'] },
+    {
+      id: 'group:blank',
+      title: '',
+      icon: 'folder',
+      expansion: 'persistent',
+      children: ['image-library'],
+    },
   ];
   const blank = f.ui.get().items.find((i) => i.id === 'group:blank');
   assert.equal(blank.title, 'グループ');
@@ -140,16 +146,16 @@ test('navigation waits for pending input and only applies the latest request', a
     () => new Promise((resolve, reject) => releases.push({ resolve, reject })),
     (e) => errors.push(e),
   );
-  const first = nav.navigate('settings'),
+  const first = nav.navigate('settings', 'general'),
     second = nav.navigate('logs');
-  assert.equal(nav.state.route, 'home');
+  assert.equal(nav.state.route, 'settings');
   releases[1].resolve();
   await second;
   releases[0].resolve();
   await first;
   assert.equal(nav.state.route, 'logs');
   assert.equal(changes, 1);
-  const failure = nav.navigate('home');
+  const failure = nav.navigate(null);
   releases[2].reject(Error('pending input'));
   await failure;
   assert.equal(nav.state.route, 'logs');
@@ -163,11 +169,11 @@ test('startup restoration yields to explicit navigation before and during its in
     () => new Promise((resolve) => releases.push(resolve)),
   );
   const restored = nav.restore('extensions');
-  const explicit = nav.navigate('settings');
+  const explicit = nav.navigate('settings', 'general');
   assert.equal(nav.restore('home'), undefined);
   releases[0]();
   await restored;
-  assert.equal(nav.state.route, 'home');
+  assert.equal(nav.state.route, 'settings');
   releases[1]();
   await explicit;
   assert.equal(nav.state.route, 'settings');
@@ -178,4 +184,20 @@ test('startup restoration yields to explicit navigation before and during its in
   first.navigate('settings');
   first.restore('home');
   assert.equal(first.state.route, 'settings');
+});
+
+test('startup and recovery select version information; retired and invalid routes cannot open', () => {
+  const nav = new NavigationCoordinator(() => {});
+  assert.deepEqual(nav.state, { route: 'settings', section: 'about', request: 0 });
+  nav.navigate('logs');
+  nav.navigate(null);
+  assert.equal(nav.state.route, 'settings');
+  assert.equal(nav.state.section, 'about');
+  assert.throws(() => nav.navigate('home'));
+  for (const route of ['home', 'private:route', 'page:invalid']) {
+    const restored = new NavigationCoordinator(() => {});
+    restored.restore(route);
+    assert.equal(restored.state.route, 'settings');
+    assert.equal(restored.state.section, 'about');
+  }
 });

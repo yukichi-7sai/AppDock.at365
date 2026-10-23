@@ -198,7 +198,7 @@ async function close() {
             .find((p) => p !== crashed && p.url().includes('/shells/default/index.html')),
         'Default Shell renderer recovered',
       );
-      await rail.getByRole('button', { name: 'ホーム', exact: true }).waitFor();
+      await rail.getByRole('button', { name: '画像ライブラリー', exact: true }).waitFor();
       checks.push(
         'Default Shell renderer crash reaches native retry and reconnects (dialog response fixture)',
       );
@@ -208,11 +208,11 @@ async function close() {
       () => document.activeElement?.getAttribute('data-ribbon-id') === 'profile',
     );
     await rail.keyboard.press('Tab');
-    const home = await require('./shell-overlay-helper.cjs').homePage(dock);
-    await home.waitForFunction(
+    const startup = await require('./shell-overlay-helper.cjs').startupPage(dock);
+    await startup.waitForFunction(
       () => document.hasFocus() && document.activeElement?.tagName === 'BUTTON',
     );
-    await rail.getByRole('button', { name: 'ホーム', exact: true }).focus();
+    await rail.getByRole('button', { name: '画像ライブラリー', exact: true }).focus();
     await rail.keyboard.press('Shift+Tab');
     const titlebar = await require('./shell-bars-helper.cjs').barPage(dock, 'titlebar');
     await titlebar.waitForFunction(
@@ -221,12 +221,13 @@ async function close() {
     checks.push('Tab and Shift+Tab cross renderer boundary');
     await rail.getByRole('button', { name: '設定', exact: true }).click();
     const setting = deferred(() => getSettingsPage(dock));
+    await setting.getByRole('button', { name: '表示', exact: true }).click();
     await setting.getByLabel('テーマ', { exact: true }).waitFor();
     const oldTheme = await setting.getByLabel('テーマ', { exact: true }).inputValue();
     const newTheme = oldTheme === 'light' ? 'dark' : 'light';
     await setting.getByLabel('テーマ', { exact: true }).selectOption(newTheme);
-    await rail.getByRole('button', { name: 'ホーム', exact: true }).click();
-    await require('./shell-overlay-helper.cjs').homePage(dock);
+    await rail.getByRole('button', { name: '画像ライブラリー', exact: true }).click();
+    await dock.locator('.library-page').waitFor();
     await rail.getByRole('button', { name: '設定', exact: true }).click();
     assert.equal(await setting.getByLabel('テーマ', { exact: true }).inputValue(), newTheme);
     await settleSettings(setting);

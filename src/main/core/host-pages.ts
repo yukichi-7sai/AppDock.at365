@@ -20,7 +20,7 @@ export class HostPages {
       typeof request.id !== 'string' ||
       !request.id ||
       request.id.length > 100 ||
-      !['home', 'logs', 'notifications', 'image-library'].includes(request.kind)
+      !['logs', 'notifications', 'image-library'].includes(request.kind)
     )
       throw Error('Invalid host page request');
     // Navigation may still be confirming the renderer's restored route.

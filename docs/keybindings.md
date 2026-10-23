@@ -19,7 +19,7 @@
 `Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。
 Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に宣言したコマンドの初期割り当てを指定できる。ID以外の`command`/`key`/`enabled`/`when`を各行へ書き、未宣言のコマンドはmanifest読込時に拒否する。初回発見時だけsettings.jsonにコピーし、適用済みIDは`keybindingDefaultsInitialized`へ記録する。行を消した後の再起動やApplet更新でも再追加しない。
 新しいWebAppletは`webApplets.shortcutDefaults`から追加時の保存トランザクションでコピーする。このテンプレートのコマンドは`open`/`reload`/`back`/`forward`/`home`に限定し、コマンドIDの`web.<UUID>.`を追加時に補う。既存WebAppletの行は変更しない。Applet詳細は割り当てごとの追加・編集・削除に対応し、一括初期化の操作は置かない。WebApplet管理項目の新規サイト用テンプレート編集は維持する。
-新規割り当ては、対象コマンドに登録元extensionIdがあればowner、なければappを既定にする。既存行のキー変更は条件を保持する。コマンドIDはショートカット表・パレット・ホームのピン留め・トレイ動作選択で完全な文字列を表示し、表示名による検索も維持する。
+新規割り当ては、対象コマンドに登録元extensionIdがあればowner、なければappを既定にする。既存行のキー変更は条件を保持する。コマンドIDはショートカット表・パレット・トレイ動作選択で完全な文字列を表示し、表示名による検索も維持する。
 
 ```json
 {
@@ -35,7 +35,9 @@ scopeはglobal/desktop/app/pages/owner/applets/browser/exe。globalは常時、a
 
 ### ページ候補と識別
 
-`shared/shortcut-pages`をショートカット・ジェスチャー・公開編集APIの共通候補とする。本体はホーム・画像ライブラリー・設定・ログ・通知センターの5ページ。設定内のカテゴリやApplet設定も「設定」に含む。Appletは`pages`の各`id/title`を使い、ページを持たないAppletを候補へ含めない。停止中・無効でも宣言済みページは選択できるが、入力判定は実際にフォーカスされた表示Surfaceだけに一致する。WebApplet等のcollection子ページも同じ規則で扱う。同名ページには提供元名を添え、同じ提供元内でも重複するときはページIDを添える。
+`shared/shortcut-pages`をショートカット・ジェスチャー・公開編集APIの共通候補とする。本体は画像ライブラリー・設定・ログ・通知センターの4ページ。設定内のカテゴリやApplet設定も「設定」に含む。Appletは`pages`の各`id/title`を使い、ページを持たないAppletを候補へ含めない。停止中・無効でも宣言済みページは選択できるが、入力判定は実際にフォーカスされた表示Surfaceだけに一致する。WebApplet等のcollection子ページも同じ規則で扱う。同名ページには提供元名を添え、同じ提供元内でも重複するときはページIDを添える。
+
+旧ホームの保存済み条件`host:home`は「廃止: ホーム」と表示して保持する。新規候補には出さず、現在のページには一致しない。他のページへ自動変換せず、保存済みの割り当てを自動削除しない。
 
 保存する対象IDは本体が`host:<route>`、Appletが既存の`page:<appletId>:<pageId>`。`when.appletIds`のフィールド名とscope IDは保持する。保存済みのApplet IDは、そのApplet内の全ページに一致する指定として保持し、編集時はその意味を表示する。設定の自動変換・削除は行わない。未導入ページの保存済み選択も保持する。新規候補は常にページ単位である。
 

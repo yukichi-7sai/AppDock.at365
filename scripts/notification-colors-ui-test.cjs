@@ -206,7 +206,7 @@ async function main() {
       ids.every((id) => s.extensions.some((e) => e.id === id && e.state === 'running'))
     );
   }, 'fixtures running');
-  await require('./shell-overlay-helper.cjs').homePage(host);
+  await require('./shell-overlay-helper.cjs').startupPage(host);
   await command(ids[0] + '.publish');
   const banner = await surface('banner'),
     desktop = await surface('desktop');

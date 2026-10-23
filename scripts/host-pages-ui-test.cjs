@@ -20,12 +20,29 @@ fs.writeFileSync(
     version: '1.0.0',
     runtime: 'node',
     entry: 'worker.cjs',
-    commands: [{ id: 'fixture.host-pages.mark', title: 'Record host page mark' }],
+    capabilities: ['pages'],
+    pages: [
+      {
+        id: 'main',
+        title: 'Recovery fixture',
+        source: 'local',
+        ui: 'page.html',
+        openCommand: 'fixture.host-pages.open',
+      },
+    ],
+    commands: [
+      { id: 'fixture.host-pages.mark', title: 'Record host page mark' },
+      { id: 'fixture.host-pages.open', title: 'Open recovery fixture', activateOnExecute: true },
+    ],
   }),
 );
 fs.writeFileSync(
   path.join(fixture, 'worker.cjs'),
-  "exports.activate=async c=>c.commands.register('fixture.host-pages.mark','Record host page mark',()=>c.log.info('host-page-mark')); ",
+  "exports.activate=async c=>{c.commands.register('fixture.host-pages.mark','Record host page mark',()=>c.log.info('host-page-mark'));c.commands.register('fixture.host-pages.open','Open recovery fixture',()=>c.pages.open('main'));};",
+);
+fs.writeFileSync(
+  path.join(fixture, 'page.html'),
+  '<!doctype html><title>Recovery fixture</title><h1>Recovery fixture</h1>',
 );
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.closeToTray = false;
@@ -33,6 +50,16 @@ settings.host.soundEnabled = false;
 settings.keybindings = [];
 settings.extensions['fixture.host-pages'] = { enabled: true, settings: {} };
 settings.pinnedCommands = ['fixture.host-pages.mark'];
+settings.ribbon.order = ['home', 'image-library', 'settings'];
+settings.keybindings = [
+  {
+    id: 'retired-home',
+    command: 'fixture.host-pages.mark',
+    key: 'Ctrl+F12',
+    enabled: true,
+    when: { scope: 'applets', appletIds: ['host:home'] },
+  },
+];
 settings.host.shellProviders = Object.fromEntries(
   ['home', 'logs', 'image-library', 'notifications', 'settings'].map((kind) => [
     'page.' + kind,
@@ -158,6 +185,24 @@ async function launch(restore = false) {
   });
 }
 const model = () => host.evaluate(() => window.dock.pages.get());
+async function defaultPage() {
+  await host.locator('.about-page').waitFor();
+  const state = await host.evaluate(() => window.dock.snapshot());
+  assert.equal(state.navigation.route, 'settings');
+  assert.equal(
+    await host.evaluate(async () => (await window.dock.settingsEditing()).pageId),
+    'about',
+  );
+}
+async function seedRestore(route, category = 'appearance') {
+  await host.evaluate(
+    ({ route, category }) => {
+      localStorage.setItem('appdock.restart-view.page', JSON.stringify(route));
+      localStorage.setItem('appdock.restart-view.category', JSON.stringify(category));
+    },
+    { route, category },
+  );
+}
 async function open(kind) {
   await host.evaluate((kind) => window.dock.navigate(kind), kind);
   await until(async () => (await model())?.kind === kind, 'host page ' + kind);
@@ -189,14 +234,26 @@ async function geometry() {
   let success = false;
   try {
     await launch();
-    await open('home');
-    await host.getByRole('button', { name: /Record host page mark/ }).click();
+    await defaultPage();
+    const ribbon = await require('./shell-overlay-helper.cjs').ribbonPage(host);
+    assert.equal(await ribbon.locator('[data-ribbon-id="home"]').count(), 0);
+    await assert.rejects(() => host.evaluate(() => window.dock.navigate('home')), /Unknown route/);
+    await assert.rejects(() =>
+      host.evaluate(() => window.dock.pages.open({ id: 'retired', kind: 'home' })),
+    );
+    await host.evaluate(() => window.dock.executeCommand('appdock.commands.search'));
+    const palette = await require('./shell-overlay-helper.cjs').overlayPage(host);
+    const pin = palette.locator('[data-command-id="fixture.host-pages.mark"]');
+    await pin.locator('.pin-badge').waitFor();
+    await require('./shell-overlay-helper.cjs').closingAction(
+      pin.locator('.palette-execute').click(),
+    );
     await until(
       async () =>
         (await host.evaluate(() => window.dock.snapshot())).logs.some(
           (l) => l.message === 'host-page-mark',
         ),
-      'home command',
+      'palette command',
     );
     await open('logs');
     await host.getByLabel('ログを検索', { exact: true }).fill('host-page-mark');
@@ -209,7 +266,7 @@ async function geometry() {
     await until(async () => (await model()).content.filters.source === '', 'clear source');
     assert.equal((await model()).content.filters.text, 'host-page-mark');
     checks.push(
-      'host home executes pinned commands; host logs filter and clear the source without losing search',
+      'startup selects version information, home is absent and rejected; palette pins execute and logs retain their filters',
     );
     await open('image-library');
     const previewButton = host.getByRole('button', { name: 'preview.pngを拡大', exact: true });
@@ -245,7 +302,10 @@ async function geometry() {
         () => host.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
         'theme',
       );
-      for (const kind of ['home', 'logs', 'image-library', 'notifications']) {
+      await host.evaluate(() => window.dock.navigate(null));
+      await defaultPage();
+      await host.screenshot({ path: path.join(profile, `startup-${theme}.png`) });
+      for (const kind of ['logs', 'image-library', 'notifications']) {
         await open(kind);
         await geometry();
         await host.screenshot({ path: path.join(profile, `${kind}-${theme}.png`) });
@@ -262,7 +322,7 @@ async function geometry() {
       }
     }
     checks.push(
-      'all four pages render within the host in both themes; only seven Shell regions remain and retired page documents never start',
+      'version information and all three host pages render in both themes; only seven Shell regions remain and retired page documents never start',
     );
     for (const zoom of [1, 1.5, 2]) {
       await app.evaluate(({ BrowserWindow }, zoom) => {
@@ -273,7 +333,7 @@ async function geometry() {
         w.setSize(680, 620);
         w.webContents.setZoomFactor(zoom);
       }, zoom);
-      for (const kind of ['home', 'logs', 'image-library', 'notifications']) {
+      for (const kind of ['logs', 'image-library', 'notifications']) {
         await open(kind);
         await geometry();
       }
@@ -308,8 +368,106 @@ async function geometry() {
     app = null;
     await launch(true);
     await until(async () => (await model())?.kind === 'notifications', 'restore view');
+    checks.push('restart restores a selected host page');
+    await host.evaluate(() => window.dock.navigate(null));
+    await defaultPage();
+    await host.evaluate(async () => {
+      const current = await window.dock.settingsEditing();
+      await window.dock.editSettings({
+        sessionId: current.sessionId,
+        editRevision: current.editRevision,
+        operationId: crypto.randomUUID(),
+        action: { type: 'select-page', pageId: 'appearance' },
+      });
+    });
+    await host.getByLabel('テーマ', { exact: true }).waitFor();
+    await app.close();
+    app = null;
+    await launch(true);
+    await host.getByLabel('テーマ', { exact: true }).waitFor();
+    checks.push('restart restores the settings category');
+    await app.close();
+    app = null;
+    await launch();
+    await defaultPage();
+    checks.push('ordinary startup ignores the previous settings category');
+    for (const route of ['home', 'invalid:route', 'page:missing:main']) {
+      await seedRestore(route);
+      await app.close();
+      app = null;
+      await launch(true);
+      await defaultPage();
+      checks.push(`restoration of ${route} returns to version information`);
+    }
+    await host.evaluate(async () => {
+      const current = await window.dock.settingsEditing();
+      await window.dock.editSettings({
+        sessionId: current.sessionId,
+        editRevision: current.editRevision,
+        operationId: crypto.randomUUID(),
+        action: { type: 'select-page', pageId: 'appearance' },
+      });
+    });
+    await host.getByLabel('テーマ', { exact: true }).waitFor();
+    await host.evaluate(() => window.dock.executeCommand('fixture.host-pages.open'));
+    await until(
+      async () =>
+        (await host.evaluate(() => window.dock.snapshot())).navigation.route ===
+        'page:fixture.host-pages:main',
+      'selected Applet',
+    );
+    await until(
+      () =>
+        host.evaluate(
+          () =>
+            document.querySelector('.shell')?.getAttribute('data-route') ===
+              'page:fixture.host-pages:main' &&
+            localStorage.getItem('appdock.restart-view.page') ===
+              JSON.stringify('page:fixture.host-pages:main'),
+        ),
+      'Applet renderer selection persisted',
+    );
+    await app.close();
+    app = null;
+    await launch(true);
+    await until(
+      async () =>
+        (await host.evaluate(() => window.dock.snapshot())).navigation.route ===
+        'page:fixture.host-pages:main',
+      'restored Applet',
+    );
+    await until(
+      () =>
+        app
+          .context()
+          .pages()
+          .some((p) => p.url().includes('page.html')),
+      'Applet contents',
+    );
+    checks.push('restart restores a running local Applet');
+    await host.evaluate(() =>
+      window.dock.executeCommand('appdock.applets.fixture.host-pages.disable'),
+    );
+    await defaultPage();
+    checks.push('stopping the selected Applet returns to version information');
+    await seedRestore('page:fixture.host-pages:main');
+    await app.close();
+    app = null;
+    await launch(true);
+    await defaultPage();
+    checks.push(
+      'a disabled Applet is not enabled by restoration and returns to version information',
+    );
     const final = await host.evaluate(() => window.dock.snapshot());
+    assert.equal(final.version, require('../package.json').version);
+    assert.equal(
+      final.extensions.find((a) => a.id === 'appdock.default-shell').version,
+      final.version,
+    );
     assert.deepEqual(final.settings.value.host.shellProviders, settings.host.shellProviders);
+    assert.deepEqual(final.settings.value.ribbon.order, settings.ribbon.order);
+    assert.deepEqual(final.settings.value.keybindings, settings.keybindings);
+    assert.deepEqual(final.settings.value.pinnedCommands, settings.pinnedCommands);
     assert.equal(hash(original), imageHash);
     assert.deepEqual(errors, []);
     checks.push(
@@ -319,6 +477,19 @@ async function geometry() {
   } catch (error) {
     console.error(error);
     process.exitCode = 1;
+    if (host)
+      await host
+        .evaluate(async () => ({
+          snapshot: await window.dock.snapshot(),
+          route: localStorage.getItem('appdock.restart-view.page'),
+        }))
+        .then((state) =>
+          fs.writeFileSync(
+            path.join(profile, 'failure-state.json'),
+            JSON.stringify(state, null, 2),
+          ),
+        )
+        .catch(() => {});
     await host?.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
   } finally {
     await app?.close().catch((error) => {

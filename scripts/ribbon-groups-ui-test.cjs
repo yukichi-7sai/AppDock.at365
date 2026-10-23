@@ -102,7 +102,7 @@ settings.ribbon = {
       title: 'Persistent',
       icon: 'folder',
       expansion: 'persistent',
-      children: ['home', 'page:fixture.ribbon:main', 'page:missing:child'],
+      children: ['image-library', 'page:fixture.ribbon:main', 'page:missing:child'],
     },
     {
       id: 'group:temporary',
@@ -369,7 +369,7 @@ async function launch() {
     await rail.evaluate(() => window.appdockShell.invalidateAnchor());
     await until(() => flyout.isClosed(), 'scroll invalidation cancels overlay');
     flyout = await openTemporary();
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate(null));
     await until(() => flyout.isClosed(), 'navigation cancels overlay');
     checks.push('Window resize, source invalidation and route changes close temporary group');
 
@@ -443,23 +443,34 @@ async function launch() {
     assert(controls.length > 4);
     for (const row of controls)
       assert.deepEqual(row, controls[0], 'all action slots align across root and child rows');
-    assert.equal(await settingRow('home').locator('.settings-list-icon svg').count(), 1);
-    assert.equal(await settingRow('home').locator('.ribbon-action-placeholder').count(), 1);
-    await page.getByRole('button', { name: 'ホームを編集', exact: true }).click();
-    await page.getByLabel('ボタン名', { exact: true }).fill('My home');
+    assert.equal(await settingRow('image-library').locator('.settings-list-icon svg').count(), 1);
+    assert.equal(
+      await settingRow('image-library').locator('.ribbon-action-placeholder').count(),
+      1,
+    );
+    await page.getByRole('button', { name: '画像ライブラリーを編集', exact: true }).click();
+    await page.getByLabel('ボタン名', { exact: true }).fill('My gallery');
     await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
     await page.getByRole('button', { name: '適用', exact: true }).click();
-    await saved((r) => r.itemOverrides.home?.title === 'My home' && r.itemOverrides.home.iconOnly);
+    await saved(
+      (r) =>
+        r.itemOverrides['image-library']?.title === 'My gallery' &&
+        r.itemOverrides['image-library'].iconOnly,
+    );
     await until(
-      async () => (await button('home').getAttribute('aria-label')) === 'My home',
+      async () => (await button('image-library').getAttribute('aria-label')) === 'My gallery',
       'custom accessible name',
     );
-    assert.equal(await button('home').locator('.rail-label').count(), 0);
-    await page.getByRole('button', { name: 'My homeを編集', exact: true }).click();
+    assert.equal(await button('image-library').locator('.rail-label').count(), 0);
+    await page.getByRole('button', { name: 'My galleryを編集', exact: true }).click();
     await page.getByLabel('ボタン名', { exact: true }).fill('');
     await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).uncheck();
     await page.getByRole('button', { name: '適用', exact: true }).click();
-    await saved((r) => !r.itemOverrides.home?.title && r.itemOverrides.home?.iconOnly === false);
+    await saved(
+      (r) =>
+        !r.itemOverrides['image-library']?.title &&
+        r.itemOverrides['image-library']?.iconOnly === false,
+    );
     for (const [id, title] of [
       ['page:missing:root', 'Missing root'],
       ['page:missing:child', 'Missing child'],
@@ -501,8 +512,10 @@ async function launch() {
     await page.getByRole('button', { name: '追加', exact: true }).click();
     const newLayout = await saved((r) => r.groups.find((g) => g.title === 'Created group'));
     const createdId = newLayout.id;
-    await page.getByLabel('ホームの配置', { exact: true }).selectOption(createdId);
-    await saved((r) => r.groups.find((g) => g.id === createdId)?.children.includes('home'));
+    await page.getByLabel('画像ライブラリーの配置', { exact: true }).selectOption(createdId);
+    await saved((r) =>
+      r.groups.find((g) => g.id === createdId)?.children.includes('image-library'),
+    );
     await page.getByRole('button', { name: 'Created groupを編集', exact: true }).click();
     await page.getByLabel('グループ名', { exact: true }).fill('');
     await page.getByRole('button', { name: '適用', exact: true }).click();
@@ -528,7 +541,9 @@ async function launch() {
       .getByRole('dialog', { name: 'グループを解除', exact: true })
       .getByRole('button', { name: '解除', exact: true })
       .click();
-    await saved((r) => !r.groups.some((g) => g.id === createdId) && r.bottom.includes('home'));
+    await saved(
+      (r) => !r.groups.some((g) => g.id === createdId) && r.bottom.includes('image-library'),
+    );
     assert.deepEqual((await snapshot()).settings.value.ribbon.custom, { preserved: true });
     await page.screenshot({ path: path.join(profile, 'settings.png') });
     checks.push(

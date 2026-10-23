@@ -125,7 +125,7 @@ let output = '';
       );
       // Exercise the public show command before waiting for a visible native page surface.
       await page.evaluate(() => window.dock.executeCommand('appdock.open'));
-      await require('./shell-overlay-helper.cjs').homePage(page);
+      await require('./shell-overlay-helper.cjs').startupPage(page);
       assert.equal(
         await page.evaluate(() => window.dock.snapshot().then((s) => s.dataDirectory)),
         path.join(profile, 'data'),
@@ -216,7 +216,8 @@ let output = '';
         .pages()
         .find(
           (p) =>
-            p.url().startsWith('appdock://host/index.html') && !p.url().endsWith('/notifications.html'),
+            p.url().startsWith('appdock://host/index.html') &&
+            !p.url().endsWith('/notifications.html'),
         );
       await page
         ?.evaluate(() => {

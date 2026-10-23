@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { HostPageModel, HostPageRequest, LogScope } from '../../shared/host-pages';
-import { HomePage } from './HomePage';
 import { LogPage } from './LogPage';
 import { ImageLibraryPage } from './ImageLibraryPage';
 import { NotificationCenterPage } from './NotificationCenterPage';
@@ -10,13 +9,11 @@ export function HostPageSlot({
   kind = 'logs',
   scope = { type: 'all' },
   source = '',
-  appletOrder = [],
   navigationRequest,
 }: {
   kind?: HostPageRequest['kind'];
   scope?: LogScope;
   source?: string;
-  appletOrder?: string[];
   navigationRequest: number;
 }) {
   const id = useRef(crypto.randomUUID());
@@ -26,11 +23,9 @@ export function HostPageSlot({
   const request: HostPageRequest =
     kind === 'logs'
       ? { id: id.current, kind, route: scope.type === 'all' ? 'logs' : 'extensions', scope, source }
-      : kind === 'home'
-        ? { id: id.current, kind, route: kind, appletOrder }
-        : kind === 'image-library'
-          ? { id: id.current, kind, route: 'image-library' }
-          : { id: id.current, kind, route: 'notifications' };
+      : kind === 'image-library'
+        ? { id: id.current, kind, route: 'image-library' }
+        : { id: id.current, kind, route: 'notifications' };
   const signature = JSON.stringify(request);
   const accept = (next: HostPageModel | null) => {
     if (!next || next.id !== id.current) return;
@@ -65,7 +60,6 @@ export function HostPageSlot({
   return (
     <div className="host-page-slot" data-page={kind}>
       {error && <p role="alert">{error}</p>}
-      {model?.kind === 'home' && <HomePage initialModel={model} />}
       {model?.kind === 'logs' && <LogPage initialModel={model} />}
       {model?.kind === 'image-library' && <ImageLibraryPage initialModel={model} />}
       {model?.kind === 'notifications' && <NotificationCenterPage initialModel={model} />}

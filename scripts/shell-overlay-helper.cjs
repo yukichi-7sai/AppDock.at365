@@ -50,7 +50,7 @@ exports.logsPage = async (host, scope) => {
   await host.locator('.log-toolbar').waitFor();
   return host;
 };
-exports.homePage = async (host) => {
-  await host.getByRole('heading', { name: 'ホーム', exact: true }).waitFor();
+exports.startupPage = async (host) => {
+  await host.locator('.about-page').waitFor();
   return host;
 };

@@ -52,7 +52,7 @@ async function connect(port) {
       if (!page) {
         throw Error('host renderer not ready');
       }
-      await require('./shell-overlay-helper.cjs').homePage(page);
+      await require('./shell-overlay-helper.cjs').startupPage(page);
       return { browser, page };
     } catch (error) {
       last = error;
@@ -99,7 +99,10 @@ async function about(page) {
     assert.equal(s.version, bundle.hostVersion);
     const external = s.extensions.filter((e) => e.sourceKind !== 'builtin');
     const builtin = s.extensions.filter((e) => e.sourceKind === 'builtin');
-    assert.deepEqual(builtin.map((e) => e.id), ['appdock.default-shell']);
+    assert.deepEqual(
+      builtin.map((e) => e.id),
+      ['appdock.default-shell'],
+    );
     assert.equal(builtin[0].state, 'running');
     assert.ok(!builtin[0].error, builtin[0].error);
     assert.deepEqual(external.map((e) => e.id).sort(), bundle.applets.map((a) => a.id).sort());

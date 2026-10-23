@@ -33,7 +33,7 @@ settings.ribbon.groups = [
     icon: 'folder',
     expansion: 'persistent',
     color: '#D249A1',
-    children: ['home'],
+    children: ['image-library'],
   },
 ];
 fs.mkdirSync(profile, { recursive: true });
@@ -273,7 +273,7 @@ async function colorGeometry() {
       return;
     }
     await button('group:colored').click();
-    await button('home').waitFor();
+    await button('image-library').waitFor();
     const initial = await colorGeometry();
     assert.equal(initial.shadow, 'none');
     assert.equal(initial.bar.color, 'rgb(210, 73, 161)');
@@ -288,7 +288,7 @@ async function colorGeometry() {
     assert(Math.abs(initial.lineLeft - initial.left) < 1);
     await rail.screenshot({ path: path.join(profile, 'colored-expanded.png') });
     await button('group:colored').click();
-    await button('home').waitFor({ state: 'hidden' });
+    await button('image-library').waitFor({ state: 'hidden' });
     const collapsed = await colorGeometry();
     assert.deepEqual(collapsed.bar, initial.bar);
     assert.equal(collapsed.shadow, 'none');
@@ -312,7 +312,7 @@ async function colorGeometry() {
         await rail.screenshot({ path: path.join(profile, 'colored-temporary.png') });
     }
     await button('group:colored').click();
-    await button('home').waitFor();
+    await button('image-library').waitFor();
     const page = await openRibbonSettings();
     await page.getByRole('button', { name: 'Color fixtureを編集', exact: true }).click();
     await page

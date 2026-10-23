@@ -234,10 +234,12 @@ module.exports = async function ({
   const groupButton = rail.locator('[data-ribbon-id="group:color"]');
   if ((await groupButton.getAttribute('aria-expanded')) !== 'true') await groupButton.click();
   const children = rail.locator('.ribbon-children').first();
-  await children.locator('[data-ribbon-id="home"]').click();
+  await children.locator('[data-ribbon-id="image-library"]').click();
   await until(
     async () =>
-      /active/.test(await children.locator('[data-ribbon-id="home"]').getAttribute('class')),
+      /active/.test(
+        await children.locator('[data-ribbon-id="image-library"]').getAttribute('class'),
+      ),
     'selected ribbon child',
   );
   for (const state of ['selected', 'hover', 'focus']) {

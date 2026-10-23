@@ -34,7 +34,7 @@ settings.extensions['at365.web-applet'] = {
   enabled: true,
   settings: { items: [row], shortcutDefaults: [] },
 };
-settings.ribbon.order = [`page:${row.id}:main`, 'home', 'settings'];
+settings.ribbon.order = [`page:${row.id}:main`, 'image-library', 'settings'];
 const referenceBefore = JSON.stringify(settings.extensions['at365.web-applet']);
 const profileSource = path.resolve(root, '../Applet.Profile.at365');
 const profileDirectory = path.join(profile, 'extensions', 'at365.profile');
@@ -202,9 +202,11 @@ function assertReferences() {
 
     await host.evaluate(() => window.dock.executeCommand('appdock.ribbon.settings.open'));
     await settingsPage(host);
-    await host.getByRole('checkbox', { name: 'ホームをリボンに表示', exact: true }).uncheck();
+    await host
+      .getByRole('checkbox', { name: '画像ライブラリーをリボンに表示', exact: true })
+      .uncheck();
     await until(
-      async () => (await snapshot()).settings.value.ribbon.hidden.includes('home'),
+      async () => (await snapshot()).settings.value.ribbon.hidden.includes('image-library'),
       'ribbon form saved',
     );
     await host.getByRole('button', { name: 'JSON', exact: true }).click();
@@ -213,7 +215,7 @@ function assertReferences() {
     await host.getByLabel('設定JSON').fill(JSON.stringify(json));
     await host.getByLabel('設定JSON').press('Enter');
     await until(
-      async () => !(await snapshot()).settings.value.ribbon.hidden.includes('home'),
+      async () => !(await snapshot()).settings.value.ribbon.hidden.includes('image-library'),
       'ribbon JSON saved',
     );
     assertReferences();

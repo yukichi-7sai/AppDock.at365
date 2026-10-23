@@ -283,7 +283,7 @@ async function until(fn, label) {
     checks.push(
       'NFKC AND/legacy keys, zero results, complete right page, keyboard movement, scroll/focus/highlight without starting disabled Applet',
     );
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate('logs'));
     await host.evaluate(() => window.dock.navigate('settings'));
     shell = await settingsPage();
     assert.equal(await search().inputValue(), 'Fixture field 47');

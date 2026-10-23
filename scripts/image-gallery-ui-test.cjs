@@ -495,7 +495,7 @@ async function selectedBorder(label) {
     );
     await action('select', { imageId: (await model()).content.items[0].id, selected: true });
     const beforeRoute = (await model()).content;
-    await host.evaluate(() => window.dock.navigate('home'));
+    await host.evaluate(() => window.dock.navigate(null));
     await until(
       () =>
         host

@@ -16,6 +16,7 @@ import { hostCommandsForApplets, shortcutFromEvent, type UiCommand } from '../sh
 import { appletManagementCommands } from '../shared/applet-management';
 import { useSettingsEditor } from './useSettingsEditor';
 import { useRestartView } from './useRestartView';
+import { defaultNavigation, isPageRoute, type PageRoute } from '../shared/navigation';
 import { useAppletSidebar } from './useAppletSidebar';
 
 declare global {
@@ -23,29 +24,27 @@ declare global {
     dock: DockApi;
   }
 }
-type Page =
-  | 'home'
-  | 'image-library'
-  | 'extensions'
-  | 'settings'
-  | 'logs'
-  | 'notifications'
-  | `page:${string}`;
+type Page = PageRoute;
 function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
   const [pagePlacementRevision, setPagePlacementRevision] = useState(0);
-  const [page, setLocalPage] = useRestartView<Page>(
-    'page',
-    'home',
-    (value) =>
-      ['home', 'image-library', 'extensions', 'settings', 'logs', 'notifications'].includes(
-        value,
-      ) || /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value),
-  );
+  // Capture this before useRestartView replaces a retired/invalid saved route.
+  const [restoreSettingsCategory] = useState(() => {
+    if (new URLSearchParams(location.search).get('restoreView') !== '1') return false;
+    try {
+      return isPageRoute(JSON.parse(localStorage.getItem('appdock.restart-view.page') ?? 'null'));
+    } catch {
+      return false;
+    }
+  });
+  const [page, setLocalPage] = useRestartView<Page>('page', defaultNavigation.route, isPageRoute);
   const setPage = (next: Page) => {
     void window.dock.navigate(next).catch((e) => setError(String(e)));
+  };
+  const openDefaultPage = () => {
+    void window.dock.navigate(null).catch((e) => setError(String(e)));
   };
   const ribbonSlot = useRef<HTMLDivElement>(null);
   useEffect(
@@ -82,7 +81,8 @@ function App() {
     }
     setLocalPage(nav.route as Page);
     if (nav.route === 'logs' && typeof nav.appletId === 'string') setLogSource(nav.appletId);
-    if (nav.section === 'applets') editor.selectPage('applets');
+    if (nav.section === defaultNavigation.section) editor.selectPage(defaultNavigation.section);
+    else if (nav.section === 'applets') editor.selectPage('applets');
     else if (nav.route === 'settings' && nav.appletId && nav.appletDetail === 'settings')
       editor.selectPage(`applet:${nav.appletId}`);
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
@@ -128,7 +128,7 @@ function App() {
     const key = 'appdock.restart-view.category';
     if (!settingsViewRestored.current) {
       settingsViewRestored.current = true;
-      if (new URLSearchParams(location.search).get('restoreView') === '1') {
+      if (restoreSettingsCategory) {
         try {
           const saved: unknown = JSON.parse(localStorage.getItem(key) ?? 'null');
           if (typeof saved === 'string' && saved.length < 200 && saved !== editor.pageId) {
@@ -177,13 +177,6 @@ function App() {
   }, []);
   useEffect(
     () =>
-      window.dock.onHomeCommandResult(({ error }) => {
-        if (error) setError(error);
-      }),
-    [],
-  );
-  useEffect(
-    () =>
       window.dock.onAppletPage(() => {
         // Main already owns navigation. Re-selecting the route can cancel its pending
         // input drain; the same route still needs fresh bounds after a Window move.
@@ -204,7 +197,7 @@ function App() {
       extension.state === 'error' ||
       !extension.pages?.some((p) => p.id === pageId)
     ) {
-      setPage('home');
+      openDefaultPage();
       setRestoringPage(false);
       return;
     }
@@ -214,7 +207,7 @@ function App() {
       .openAppletPage(id, pageId)
       .catch((error) => {
         setError(String(error));
-        setPage('home');
+        openDefaultPage();
       })
       .finally(() => setRestoringPage(false));
   }, [snapshot, page, restoringPage]);
@@ -362,7 +355,6 @@ function App() {
       <main
         className={
           page === 'settings' ||
-          page === 'home' ||
           page === 'logs' ||
           page === 'notifications' ||
           page === 'image-library'
@@ -434,14 +426,6 @@ function App() {
                   aria-label="Appletページ"
                 />
               </div>
-            )}
-            {page === 'home' && (
-              <HostPageSlot
-                key="home"
-                kind="home"
-                appletOrder={editor.value.appletOrder}
-                navigationRequest={snapshot.navigation.request}
-              />
             )}
             <div className="settings-page" hidden={page !== 'settings'}>
               {page === 'settings' && (

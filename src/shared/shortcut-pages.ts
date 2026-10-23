@@ -15,6 +15,8 @@ export function hostShortcutPage(route: string): string | undefined {
 }
 
 export function validShortcutTarget(id: unknown): id is string {
+  // Saved conditions stay inert; never reinterpret them as another host page.
+  if (id === 'host:home') return true;
   if (validCommandId(id)) return true;
   if (typeof id !== 'string') return false;
   if (id.startsWith('host:')) return hostShortcutPage(id.slice(5)) === id;
@@ -27,7 +29,7 @@ export function validShortcutTarget(id: unknown): id is string {
 export const shortcutTargetSchema = {
   anyOf: [
     { type: 'string', pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]{0,179}$' },
-    { enum: builtinRibbon.flatMap((item) => hostShortcutPage(item.id) ?? []) },
+    { enum: ['host:home', ...builtinRibbon.flatMap((item) => hostShortcutPage(item.id) ?? [])] },
     { type: 'string', pattern: '^page:[a-zA-Z0-9][a-zA-Z0-9._-]{0,179}:[a-z0-9][a-z0-9.-]{0,79}$' },
   ],
 };
@@ -65,6 +67,7 @@ export function shortcutPageChoices(
 }
 
 export function shortcutTargetTitle(id: string, pages: ShortcutPageChoice[]): string {
+  if (id === 'host:home') return '廃止: ホーム';
   const page = pages.find((item) => item.id === id);
   if (page) return page.title;
   const legacy = pages.find((item) => item.appletId === id);

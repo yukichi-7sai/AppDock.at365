@@ -20,7 +20,7 @@ async function launch() {
   if (
     await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())
   )
-    await require('./shell-overlay-helper.cjs').homePage(page);
+    await require('./shell-overlay-helper.cjs').startupPage(page);
 }
 async function waitFor(check) {
   for (let i = 0; i < 100; i++) {

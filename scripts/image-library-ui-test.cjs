@@ -70,7 +70,7 @@ settings.ribbon.groups = [
     title: 'Fixture group',
     icon: 'folder',
     expansion: 'persistent',
-    children: ['home'],
+    children: ['logs'],
   },
 ];
 settings.ribbon.buttons = [

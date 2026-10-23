@@ -77,7 +77,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   assert.match(await recorder().innerText(), /Ctrl[\s\S]*Escape/);
   await dialog.getByLabel('割り当てのいつ・どこで', { exact: true }).selectOption('applets');
   assert(await dialog.getByRole('button', { name: '追加', exact: true }).isDisabled());
-  await dialog.getByRole('checkbox', { name: 'ホーム', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: '画像ライブラリー', exact: true }).check();
   await dialog.getByRole('switch', { name: 'この割り当てを有効にする', exact: true }).click();
   await page.screenshot({ path: path.join(profile, 'applet-shortcut-targets.png') });
   const position = await page.locator('.settings-body').evaluate((el) => el.scrollTop);
@@ -92,7 +92,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   const saved = (await snapshot()).settings.value.keybindings.find((row) => row.id === id);
   assert.equal(saved.key, 'Ctrl+Escape');
   assert.equal(saved.enabled, false);
-  assert.deepEqual(saved.when, { scope: 'applets', appletIds: ['host:home'] });
+  assert.deepEqual(saved.when, { scope: 'applets', appletIds: ['host:image-library'] });
 
   await assigned.locator('.applet-shortcut-edit').click();
   await ready();

@@ -226,9 +226,9 @@ async function dismiss(p) {
         new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }),
       ),
     );
-    assert.equal((await dock.evaluate(() => window.dock.snapshot())).navigation.route, 'home');
+    assert.equal((await dock.evaluate(() => window.dock.snapshot())).navigation.route, 'settings');
     await p.keyboard.press('Control+,');
-    assert.equal((await dock.evaluate(() => window.dock.snapshot())).navigation.route, 'home');
+    assert.equal((await dock.evaluate(() => window.dock.snapshot())).navigation.route, 'settings');
     await closingAction(input.press('Enter'));
     await until(
       async () => (await dock.evaluate(() => window.dock.snapshot())).navigation.route === 'logs',
@@ -288,10 +288,11 @@ async function dismiss(p) {
     await dock.waitForFunction(() => window.selection?.status === 'selected');
     assert.equal(fs.existsSync(path.join(external, 'probe.json')), false);
     checks.push('selection returns ID without executing the command');
-    await dock.evaluate(() => window.dock.navigate('home'));
+    await dock.evaluate(() => window.dock.navigate(null));
     await until(
-      async () => (await dock.evaluate(() => window.dock.snapshot())).navigation.route === 'home',
-      'owner returned home',
+      async () =>
+        (await dock.evaluate(() => window.dock.snapshot())).navigation.route === 'settings',
+      'owner returned to default page',
     );
     await save({ shellProvider: 'fixture.ribbon' });
     await until(

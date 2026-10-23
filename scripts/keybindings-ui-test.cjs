@@ -296,7 +296,7 @@ const expectCalls = async (before, expected) => {
     let before = calls().length;
     await send('appdock://host/index.html');
     await expectCalls(before, ['a', 'b']);
-    checks.push('all pages includes the host home page');
+    checks.push('all pages includes the host settings page');
     await dock.evaluate(() => window.dock.executeCommand('test.keys.open'));
     await until(
       () =>
@@ -567,19 +567,6 @@ const expectCalls = async (before, expected) => {
       s.settings.value.pinnedCommands = ['test.keys.a'];
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
-    await (
-      await require('./shell-overlay-helper.cjs').ribbonPage(dock)
-    )
-      .locator('[data-ribbon-id="home"]')
-      .click();
-    assert.equal(
-      await (
-        await require('./shell-overlay-helper.cjs').homePage(dock)
-      )
-        .locator('.home-pins .command-id')
-        .textContent(),
-      'test.keys.a',
-    );
     await dock.evaluate(() => window.dock.executeCommand('appdock.commands.search'));
     const palette = await require('./shell-overlay-helper.cjs').overlayPage(dock);
     await palette.getByPlaceholder('コマンドを入力…').fill('test.keys.a');
@@ -591,7 +578,7 @@ const expectCalls = async (before, expected) => {
     await palette.getByPlaceholder('コマンドを入力…').fill('キー検証');
     assert.ok((await palette.locator('.palette-command').count()) >= 5);
     checks.push(
-      'new Applet/host binding defaults, unchanged existing scopes and full searchable IDs in settings, palette and home',
+      'new Applet/host binding defaults, unchanged existing scopes and full searchable IDs in settings and palette',
     );
     await require('./shortcut-options-checks.cjs')({
       app,

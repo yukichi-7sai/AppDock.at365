@@ -18,7 +18,7 @@ let application;
       env,
     });
     const page = await application.firstWindow();
-    await require('./shell-overlay-helper.cjs').homePage(page);
+    await require('./shell-overlay-helper.cjs').startupPage(page);
     await page.keyboard.press('Control+,');
     const settingsPage = await require('./settings-host-helper.cjs').settingsPage(page);
     for (const width of [1280, 900, 760]) {

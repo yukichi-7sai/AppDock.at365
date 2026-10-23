@@ -64,7 +64,7 @@ async function launch() {
         .find((p) => p.url().startsWith('appdock://host')),
     'host page',
   );
-  await require('./shell-overlay-helper.cjs').homePage(page);
+  await require('./shell-overlay-helper.cjs').startupPage(page);
   await until(
     () => page.evaluate(async () => (await window.dock.snapshot()).startupReady),
     'host ready',

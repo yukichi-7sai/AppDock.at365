@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { HostPages } = require('../out/main/main/core/host-pages');
 const { LogPageSession } = require('../out/main/main/core/log-page');
 function fixture() {
-  let route = 'home',
+  let route = 'image-library',
     ready = true,
     blocked = false,
     disposed = [],
@@ -40,27 +40,27 @@ function fixture() {
     blocked: (v) => (blocked = v),
   };
 }
-const home = (id = 'home-1') => ({ id, kind: 'home', route: 'home', appletOrder: [] });
+const gallery = (id = 'gallery-1') => ({ id, kind: 'image-library', route: 'image-library' });
 test('page content waits for startup readiness and publishes the pending connection once ready', () => {
   const f = fixture();
   f.ready(false);
-  assert.equal(f.pages.open(home()), null);
+  assert.equal(f.pages.open(gallery()), null);
   assert.equal(f.pages.get(), null);
   f.pages.refresh();
   assert.equal(f.events.length, 0);
   f.ready(true);
   f.pages.refresh();
   assert.equal(f.events.length, 1);
-  assert.equal(f.events[0].id, 'home-1');
-  assert.equal(f.pages.get().id, 'home-1');
+  assert.equal(f.events[0].id, 'gallery-1');
+  assert.equal(f.pages.get().id, 'gallery-1');
   assert.equal(f.created.length, 1);
 });
 test('host pages reuse content, publish revisions, and do not bind a Shell provider', () => {
   const f = fixture();
-  assert.equal(f.pages.open(home()).id, 'home-1');
-  f.pages.open({ ...home(), appletOrder: ['one'] });
+  assert.equal(f.pages.open(gallery()).id, 'gallery-1');
+  f.pages.open(gallery());
   assert.equal(f.created.length, 1);
-  assert.deepEqual(f.created[0].updated.appletOrder, ['one']);
+  assert.deepEqual(f.created[0].updated, gallery());
   f.pages.refresh();
   assert.equal(f.events.length, 0);
   f.created[0].revision++;
@@ -71,27 +71,37 @@ test('host pages reuse content, publish revisions, and do not bind a Shell provi
 });
 test('stale pages cannot operate or close a newer page, and navigation disposes content', async () => {
   const f = fixture();
-  f.pages.open(home());
-  f.pages.open(home('home-2'));
-  f.pages.close('home-1');
-  assert.equal(f.pages.get().id, 'home-2');
-  await assert.rejects(f.pages.act({ id: 'home-1', type: 'invoke' }), /stale/);
+  f.pages.open(gallery());
+  f.pages.open(gallery('gallery-2'));
+  f.pages.close('gallery-1');
+  assert.equal(f.pages.get().id, 'gallery-2');
+  await assert.rejects(
+    f.pages.act({ id: 'gallery-1', type: 'gallery', command: 'select-all' }),
+    /stale/,
+  );
   f.route('logs');
   assert.equal(f.pages.get(), null);
-  assert.throws(() => f.pages.get('home-2'), /stale/);
+  assert.throws(() => f.pages.get('gallery-2'), /stale/);
   f.pages.refresh();
-  assert.deepEqual(f.disposed, ['home-1', 'home-2']);
-  assert.equal(f.pages.open(home()), null);
+  assert.deepEqual(f.disposed, ['gallery-1', 'gallery-2']);
+  assert.equal(f.pages.open(gallery()), null);
 });
 test('modal operations are blocked while scoped image requests may finish', async () => {
   const f = fixture();
-  f.pages.open(home());
+  f.pages.open(gallery());
   f.blocked(true);
-  await assert.rejects(f.pages.act({ id: 'home-1', type: 'invoke' }), /dialog/);
-  await f.pages.act({ id: 'home-1', type: 'gallery', command: 'image' });
+  await assert.rejects(
+    f.pages.act({ id: 'gallery-1', type: 'gallery', command: 'select-all' }),
+    /dialog/,
+  );
+  await f.pages.act({ id: 'gallery-1', type: 'gallery', command: 'image' });
   f.ready(false);
-  await assert.rejects(f.pages.act({ id: 'home-1', type: 'gallery', command: 'image' }), /stale/);
-  assert.throws(() => f.pages.open({ ...home(), kind: 'unknown' }), /Invalid/);
+  await assert.rejects(
+    f.pages.act({ id: 'gallery-1', type: 'gallery', command: 'image' }),
+    /stale/,
+  );
+  assert.throws(() => f.pages.open({ ...gallery(), kind: 'unknown' }), /Invalid/);
+  assert.throws(() => f.pages.open({ id: 'retired', kind: 'home', route: 'home' }), /Invalid/);
 });
 test('updating the log source preserves search and level filters', async () => {
   const request = {

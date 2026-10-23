@@ -27,10 +27,13 @@ const until = async (fn, label) => {
   throw Error(label);
 };
 const button = (label) =>
-  (['設定', 'ホーム', 'Applet', 'ログ'].includes(label) ? rail : dock).getByRole('button', {
-    name: label,
-    exact: true,
-  });
+  (['設定', '画像ライブラリー', 'Applet', 'ログ'].includes(label) ? rail : dock).getByRole(
+    'button',
+    {
+      name: label,
+      exact: true,
+    },
+  );
 const ribbonIds = (group) =>
   rail
     .locator(`.ribbon-${group} [data-ribbon-id]`)
@@ -53,7 +56,7 @@ async function launch() {
   });
   dock = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
   dock.setDefaultTimeout(15000);
-  await require('./shell-overlay-helper.cjs').homePage(dock);
+  await require('./shell-overlay-helper.cjs').startupPage(dock);
   await until(() => {
     rail = app
       .context()
@@ -61,7 +64,7 @@ async function launch() {
       .find((p) => p.url().includes('/shells/default/index.html'));
     return !!rail;
   }, 'Shell page');
-  await rail.locator('[data-ribbon-id="home"]').waitFor();
+  await rail.locator('[data-ribbon-id="image-library"]').waitFor();
   await app.evaluate(({ app }) =>
     app.on('session-created', (session) => {
       if (!session.isPersistent()) return;
@@ -134,7 +137,7 @@ async function launch() {
     const gmailRow = dock.locator('[data-ribbon-setting="page:at365.gmail:gmail"]');
     await gmailRow
       .locator('.drag-handle')
-      .dragTo(dock.locator('[data-ribbon-setting="home"] .drag-handle'));
+      .dragTo(dock.locator('[data-ribbon-setting="image-library"] .drag-handle'));
     assert.equal(await dock.getByLabel('Gmailの配置', { exact: true }).inputValue(), 'top');
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()

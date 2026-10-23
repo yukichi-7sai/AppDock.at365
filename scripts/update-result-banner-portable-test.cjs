@@ -44,7 +44,7 @@ async function connect(port) {
         await browser.close();
         throw Error('host renderer not ready: ' + JSON.stringify(urls));
       }
-      await require('./shell-overlay-helper.cjs').homePage(page);
+      await require('./shell-overlay-helper.cjs').startupPage(page);
       return { browser, page };
     } catch (error) {
       last = error;

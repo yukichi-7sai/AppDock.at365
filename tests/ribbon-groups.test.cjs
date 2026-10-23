@@ -69,20 +69,23 @@ test('blank group names and display overrides preserve source identities and val
   assert.equal(layout.groups[0].title, '');
   layout = edit(layout, {
     kind: 'updateItem',
-    id: 'home',
-    changes: { title: '  Custom home  ', iconOnly: true },
+    id: 'image-library',
+    changes: { title: '  Custom gallery  ', iconOnly: true },
   });
-  assert.deepEqual(layout.itemOverrides.home, { title: 'Custom home', iconOnly: true });
-  assert.equal(ribbonItems([]).find((i) => i.id === 'home').title, 'ホーム');
-  layout = edit(layout, { kind: 'updateItem', id: 'home', changes: { title: '' } });
-  assert.deepEqual(layout.itemOverrides.home, { iconOnly: true });
+  assert.deepEqual(layout.itemOverrides['image-library'], {
+    title: 'Custom gallery',
+    iconOnly: true,
+  });
+  assert.equal(ribbonItems([]).find((i) => i.id === 'image-library').title, '画像ライブラリー');
+  layout = edit(layout, { kind: 'updateItem', id: 'image-library', changes: { title: '' } });
+  assert.deepEqual(layout.itemOverrides['image-library'], { iconOnly: true });
   for (const changes of [
     { title: 'x'.repeat(81) },
     { title: 'bad\nname' },
     { iconOnly: 'yes' },
     { other: true },
   ])
-    assert.throws(() => edit(layout, { kind: 'updateItem', id: 'home', changes }));
+    assert.throws(() => edit(layout, { kind: 'updateItem', id: 'image-library', changes }));
   assert.throws(() =>
     edit(layout, { kind: 'updateItem', id: 'group:empty', changes: { title: 'no' } }),
   );
@@ -103,7 +106,7 @@ test('remove missing item clears every placement and override while refusing liv
     order: [root, 'group:one'],
     hidden: [root, child],
     bottom: [root],
-    groups: [group('group:one', [child, 'home'])],
+    groups: [group('group:one', [child, 'image-library'])],
     itemOverrides: {
       [root]: { title: 'Root' },
       [child]: { iconOnly: true },
@@ -112,11 +115,11 @@ test('remove missing item clears every placement and override while refusing liv
   });
   for (const id of [root, child, only]) layout = edit(layout, { kind: 'removeMissing', id });
   assert.deepEqual(layout.order, ['group:one']);
-  assert.deepEqual(layout.groups[0].children, ['home']);
+  assert.deepEqual(layout.groups[0].children, ['image-library']);
   assert.deepEqual(layout.hidden, []);
   assert.deepEqual(layout.bottom, []);
   assert.deepEqual(layout.itemOverrides, {});
-  for (const id of ['home', 'group:one', 'page:absent:unknown'])
+  for (const id of ['image-library', 'group:one', 'page:absent:unknown'])
     assert.throws(() => edit(layout, { kind: 'removeMissing', id }));
 });
 
@@ -299,7 +302,7 @@ function presentation(expansion = 'persistent') {
   settings.ribbon = {
     ...defaultRibbon(),
     order: ['group:one'],
-    groups: [group('group:one', ['home', 'page:owner:main'], expansion)],
+    groups: [group('group:one', ['image-library', 'page:owner:main'], expansion)],
   };
   const applets = [
     {
@@ -347,7 +350,7 @@ test('persistent projection, aggregate dot, schema 1 flattening and request dedu
   assert.equal(expanded.items[1].badge.text, '99+');
   f.settings.ribbon.hidden.push('page:owner:main');
   assert.equal(f.ui.group(group.id).group.badge, undefined);
-  f.settings.ribbon.hidden.push('home');
+  f.settings.ribbon.hidden.push('image-library');
   assert.equal(f.ui.group(group.id), undefined);
 });
 

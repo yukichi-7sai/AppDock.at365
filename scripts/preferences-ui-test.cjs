@@ -25,7 +25,7 @@ async function launch() {
   const page = require('./settings-aware-page.cjs').settingsAwarePage(
     await application.firstWindow(),
   );
-  await require('./shell-overlay-helper.cjs').homePage(page);
+  await require('./shell-overlay-helper.cjs').startupPage(page);
   await application.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().startsWith('appdock:'),
@@ -120,10 +120,10 @@ async function waitPins(page, pins) {
     await (
       await require('./shell-overlay-helper.cjs').ribbonPage(page)
     )
-      .getByRole('button', { name: 'ホーム', exact: true })
+      .getByRole('button', { name: '画像ライブラリー', exact: true })
       .first()
       .click();
-    await require('./shell-overlay-helper.cjs').homePage(page);
+    await page.locator('.library-page').waitFor();
     await page.keyboard.press('Control+p');
     assert.equal((await page.evaluate(() => window.dock.snapshot())).overlay.active, false);
     await page.keyboard.press('Control+Alt+p');
@@ -163,10 +163,10 @@ async function waitPins(page, pins) {
     await (
       await require('./shell-overlay-helper.cjs').ribbonPage(page)
     )
-      .getByRole('button', { name: 'ホーム', exact: true })
+      .getByRole('button', { name: '画像ライブラリー', exact: true })
       .first()
       .click();
-    await require('./shell-overlay-helper.cjs').homePage(page);
+    await page.locator('.library-page').waitFor();
     await page.keyboard.press('Control+Alt+d');
     await page.waitForFunction(
       (previous) =>

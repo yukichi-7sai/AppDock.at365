@@ -41,7 +41,9 @@ test('settings UI ships only in the host renderer, with no settings Shell entry'
   const manifest = JSON.parse(fs.readFileSync(path.join(shell, 'extension.json'), 'utf8'));
   assert.equal(manifest.shell.views['page.settings'], undefined);
   assert.equal(fs.existsSync(path.join(root, 'src/main/shell-page-preload.ts')), false);
-  for (const name of ['HomePage', 'LogPage', 'NotificationCenterPage', 'ImageLibraryPage'])
+  assert.equal(fs.existsSync(path.join(host, 'renderer/pages/HomePage.tsx')), false);
+  assert.equal(fs.existsSync(path.join(host, 'main/core/home-page.ts')), false);
+  for (const name of ['LogPage', 'NotificationCenterPage', 'ImageLibraryPage'])
     assert(fs.existsSync(path.join(host, 'renderer/pages', name + '.tsx')));
   assert(Object.keys(manifest.shell.views).every((region) => !region.startsWith('page.')));
 });

@@ -159,7 +159,7 @@ const main = (fn) =>
     const page = require('./settings-aware-page.cjs').settingsAwarePage(host);
     let statusbar = await require('./shell-bars-helper.cjs').barPage(page, 'statusbar');
     page.setDefaultTimeout(15000);
-    await require('./shell-overlay-helper.cjs').homePage(page);
+    await require('./shell-overlay-helper.cjs').startupPage(page);
     await page.getByRole('button', { name: '設定', exact: true }).click();
     await page
       .locator('.settings-categories')

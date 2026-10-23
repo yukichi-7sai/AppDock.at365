@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Settings, SettingsSnapshot } from '../shared/contracts';
 import type { SettingsEdit, SettingsInputState } from '../shared/settings-editing';
 import { createDefaultSettings } from '../shared/settings-schema';
+import { defaultNavigation } from '../shared/navigation';
 /** Renderer input queue. No global draft or save/discard state. */
 export function useSettingsEditor(current: SettingsSnapshot | undefined) {
   const [state, setState] = useState<SettingsInputState>(() => ({
@@ -12,7 +13,7 @@ export function useSettingsEditor(current: SettingsSnapshot | undefined) {
     value: current?.value ?? createDefaultSettings(),
     mode: 'form',
     pending: false,
-    pageId: 'appearance',
+    pageId: defaultNavigation.section,
   }));
   const [error, setError] = useState('');
   const local = useRef(state),
@@ -82,7 +83,9 @@ export function useSettingsEditor(current: SettingsSnapshot | undefined) {
         void send({ type: 'values', before, value }).catch(() => {});
       },
       selectPage: (pageId: string) => {
-        void flushSettingsPageInputs().then(() => send({ type: 'select-page', pageId })).catch((e) => setError(String(e)));
+        void flushSettingsPageInputs()
+          .then(() => send({ type: 'select-page', pageId }))
+          .catch((e) => setError(String(e)));
       },
       reset: () => {
         setError('');
