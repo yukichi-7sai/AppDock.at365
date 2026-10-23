@@ -302,6 +302,28 @@ async function execute(id) {
         : path.join(root, '.artifacts/dotnet-host/input/AppDock.InputHost.exe'),
     );
     const focused = await focus();
+    for (const key of [
+      'MediaPlayPause',
+      'MediaStop',
+      'MediaNextTrack',
+      'MediaPrevTrack',
+      'VolumeMute',
+      'VolumeUp',
+      'VolumeDown',
+    ]) {
+      await sleep(170);
+      await focus();
+      await clear();
+      await sender.send('input.sendKeys', { keys: key }, 'fixture');
+      const targetKey = key === 'MediaPrevTrack' ? 'MediaPreviousTrack' : key;
+      await until(
+        async () => (await events()).includes('key:' + targetKey),
+        'media/volume key received: ' + key,
+      );
+    }
+    checks.push(
+      'seven media and volume keys delivered to the consuming input fixture through the common worker',
+    );
     await clear();
     await assert.rejects(
       sender.send('input.sendKeys', { keys: 'A' }, 'fixture', { window: '1', source: 'gesture' }),

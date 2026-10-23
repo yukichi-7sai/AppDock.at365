@@ -1,6 +1,22 @@
 # 検証記録
 
-対象の現行版は`0.85.8`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+対象の現行版は`0.85.9`。以下は記録した条件での検証結果であり、外部サービスや実機条件の現在の動作保証とは区別する。
+
+## 2026-10-23: メディア・音量送信0.85.9のコミット・プッシュ前照合
+
+- main 34c1f14上の先行変更7パスを今回の対象として確認し、未コミット変更を保持した。情報の追加はWindowsTools側の12件descriptionとterminalの実行エイリアス修正で、本体は製品を追加変更していない。実効author/committerとGitHub/AQUA両mainの開始時一致を確認した。
+- 前回の入力最終hashと現ソース・型検査/build/関連JS10件・固定EXE・入力7群・smoke・完全ログを照合して再利用。標準109ファイルのうち変更試験はinput-command.testだけ。compiled input-commandへの依存グラフは当該試験だけで、process-launchの6件を含む実装時10件が該当する旧成功を置き換える。他832件は0.85.8の成功と全108試験/関連入力の一致から再利用し、合計 **842件成功・fail/skip 0**。設定/renderer/他サービス/公開API・依存は変えていない。
+- SDK parsingはWindowsToolsの42件で新旧キー・記号解決を確認済み。本体を再発行せず、0.85.9 EXE（170,504,756 bytes／SHA256 `39297303f8e28aa28bb7bb2899a0eb96934c224b76118f39d654ef0c1f9c0514`）を維持した。新しいWindowsTools 0.2.4と組み合わせた固定GUI7群は実行し、91件の説明・実Terminal起動と新規窓だけの終了・終了選択画面/取消・設定/API/停止/再起動を確認した。
+- 正本: `.artifacts/commit-validation-media-keys-20261023/reuse.json`、前工程 `.artifacts/media-keys-20261023/validation.json`、WindowsTools `.artifacts/commit-validation-system-commands-20261023/validation.json`。stage/commit treeと送信先mainは今回の証跡へ記録。コミット時の製品変更・版更新・再発行なし。GitHub Release・実利用deployなし。再利用/途中失敗/状態不明の資料を保持し、削除0件。
+
+## 2026-10-23: メディア・音量の送信キー追加（0.85.9）
+
+- main 34c1f14／clean／origin/main追跡からpull --ff-onlyで更新なし。WindowsToolsの12コマンド追加に合わせ、共通送信文法のTypeScriptとSDK InputKeyChordへMediaPlayPause/Stop/NextTrack/PrevTrack、VolumeMute/Up/Downを追加。既存InputSenderの押下・解放送信を使用し、受信フック・登録/記録文法・設定・保存ファイル・既存APIの名称/許可/寿命は維持した。WindowsToolsは0.2.3、最低本体0.85.9。
+- 発行前レビューは阻害指摘なし。設定/保存ファイルの増減や破壊的変更がないため0.85.8→0.85.9のパッチ更新。型検査、input-command/process-launchの関連JS **10/10**、WindowsToolsのSDKを含む.NET **42/42**、発行DLLの実プロセス/模擬API試験が成功。
+- 最終固定EXEのnative-input-ui-test **7群** が成功。7つのメディア/音量キーを専用WinFormsへ実送信し、既存Node Applet11コマンド・ローカル/MCPの保存コマンド・sendInputの独立許可・許可撤回/前面変更/取消・記号の配列解決・連続ジェスチャーに150ms待機を課さない契約も確認した。キー送信の成功と実プレイヤー/スピーカーの効果は区別し、後者は未確認。
+- WindowsToolsの最終固定EXE GUIで91件のコマンドと説明、設定変更/再起動/停止後の状態、MCP設定経路と旧値保持を確認。追加した終了選択画面コマンドから実際の「Windows のシャットダウン」ダイアログが開き、選択欄・OK・キャンセルを確認してキャンセルした。実シャットダウン/再起動/サインアウトは模擬起動要求だけを検証し、実行していない。固定EXEのsmokeも成功。
+- 既存publish.batで40.ARTIFACTへ発行。EXE/FileVersion/ProductVersion/feedは0.85.9、170,504,756 bytes／SHA256 `39297303f8e28aa28bb7bb2899a0eb96934c224b76118f39d654ef0c1f9c0514`。Default Shell同梱と隔離EXE起動を確認。全体ZIP、他Appletの再発行、commit/push/Release/実利用deployなし。
+- 証跡: `.artifacts/media-keys-20261023/validation.json` と完全ログ、`.artifacts/native-input-ui-1792760127527/result.json`、`.artifacts/smoke-1792760209974/result.json`、WindowsTools `.artifacts/system-commands-20261023/`と `.artifacts/host-1792760191365/`。版更新でpnpmのinstall状態の差が検出されたため固定lockfileの通常installで同期。制限内.NET発行/EXE起動の失敗を保持し同一処理を通常ユーザーで成功させた。発行後は試験スクリプトの期待値/表示参照/DPI画像取得だけを修正し、製品入力のhashは不変。必要範囲外の全回帰は未実行。過去の再利用/失敗資料と状態不明資料を保持し、テストフォルダー削除0件。
 
 ## 2026-10-23: 設定一覧UI 0.85.8のコミット・プッシュ前照合
 

@@ -79,6 +79,8 @@ sendKeysはデスクトップが最前面でも使用でき、Win+EなどのWind
 
 Win単独、Pause、PrintScreen（PrtScn）、Period（.）、Semicolon（;）、Slash（/）、Plus、Minus（-）も送信できます。プラス記号は区切りと区別して`Win+Plus`のように指定します。記号は送信直前の対象スレッドのキーボード配列から、必要な仮想キーと修飾キーへ解決します。配列で表せない場合は失敗し、配列やWindowsの設定は変更しません。呼び出し側のショートカット登録文法とは独立しています。
 
+本体0.85.9以降はMediaPlayPause、MediaStop、MediaNextTrack、MediaPrevTrack、VolumeMute、VolumeUp、VolumeDownも送信できます。メディアはWindowsと対応アプリ、音量はWindowsの音声出力へ処理を委ねます。これらは送信キー名の追加であり、ショートカット登録・記録・入力フックの対応キーを追加するものではありません。
+
 成功は`{completion:'inputSubmitted',effectVerified:false}`です。対象アプリの実際の動作成功を保証せず、自動再送しません。対象のアプリによるキー解釈やWindowsの権限制約があります。
 
 Node workerはコマンドごとのAbortSignalを提供し、AsyncLocalStorageでホスト発行executionIdをAPIへ付加します。.NET Runtimeも実行文脈を保持します。本体がApplet/実行寿命/開始対象を照合するので、通信層から任意HWNDを送信先として指定しません。コマンド外の通常呼出しは実行時の最前面を使います。

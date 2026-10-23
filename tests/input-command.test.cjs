@@ -67,6 +67,13 @@ test('sending grammar accepts SDK keys and Win separately from trigger bindings'
     ['Win+/', 'Win+Slash'],
     ['Win+Plus', 'Win+Plus'],
     ['Win+-', 'Win+Minus'],
+    ['volumemute', 'VolumeMute'],
+    ['volumedown', 'VolumeDown'],
+    ['volumeup', 'VolumeUp'],
+    ['medianexttrack', 'MediaNextTrack'],
+    ['mediaprevtrack', 'MediaPrevTrack'],
+    ['mediastop', 'MediaStop'],
+    ['mediaplaypause', 'MediaPlayPause'],
   ])
     assert.equal(normalizeInputKeys(input), expected);
   for (const input of [

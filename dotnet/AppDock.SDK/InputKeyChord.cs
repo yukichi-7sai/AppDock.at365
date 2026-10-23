@@ -23,6 +23,10 @@ public sealed record InputKeyChord(ushort[] Modifiers, ushort Key, bool Extended
         var key = Symbol is char symbol ? symbol switch { '.' => "Period", ';' => "Semicolon", '/' => "Slash", '+' => "Plus", '-' => "Minus", _ => throw new ArgumentException("Invalid symbol") }
             : Key is >= 0x41 and <= 0x5A or >= 0x30 and <= 0x39 ? ((char)Key).ToString()
             : Key is >= 0x70 and <= 0x87 ? "F" + (Key - 0x6F)
+            : Key is >= 0xAD and <= 0xB3 ? Key switch {
+                0xAD => "VolumeMute", 0xAE => "VolumeDown", 0xAF => "VolumeUp",
+                0xB0 => "MediaNextTrack", 0xB1 => "MediaPrevTrack", 0xB2 => "MediaStop", _ => "MediaPlayPause"
+            }
             : Key switch { 0x5B => "Win", 0x13 => "Pause", 0x2C => "PrintScreen", 0x0D => "Enter", 0x09 => "Tab", 0x1B => "Escape", 0x20 => "Space", 0x08 => "Backspace", 0x2E => "Delete", 0x2D => "Insert", 0x24 => "Home", 0x23 => "End", 0x21 => "PageUp", 0x22 => "PageDown", 0x25 => "Left", 0x27 => "Right", 0x26 => "Up", 0x28 => "Down", _ => throw new ArgumentException("Invalid key") };
         return string.Join("+", modifiers.Append(key));
     }
@@ -44,11 +48,13 @@ public sealed record InputKeyChord(ushort[] Modifiers, ushort Key, bool Extended
             : name switch {
                 "WIN" or "WINDOWS" or "META" when modifiers.Length == 0 => (ushort)0x5B,
                 "PAUSE" => 0x13, "PRINTSCREEN" or "PRTSCN" => 0x2C,
+                "VOLUMEMUTE" => 0xAD, "VOLUMEDOWN" => 0xAE, "VOLUMEUP" => 0xAF,
+                "MEDIANEXTTRACK" => 0xB0, "MEDIAPREVTRACK" => 0xB1, "MEDIASTOP" => 0xB2, "MEDIAPLAYPAUSE" => 0xB3,
                 "ENTER" => (ushort)0x0D, "TAB" => 0x09, "ESC" or "ESCAPE" => 0x1B, "SPACE" => 0x20,
                 "BACKSPACE" => 0x08, "DELETE" => 0x2E, "INSERT" => 0x2D, "HOME" => 0x24, "END" => 0x23,
                 "PAGEUP" => 0x21, "PAGEDOWN" => 0x22, "LEFT" => 0x25, "RIGHT" => 0x27, "UP" => 0x26, "DOWN" => 0x28,
                 _ => throw new ArgumentException($"未対応の送信キー: {value}（例: Ctrl+Shift+T）")
             };
-        return new(modifiers, (ushort)key, key is >= 0x21 and <= 0x28 or 0x2C or 0x2D or 0x2E or 0x5B);
+        return new(modifiers, (ushort)key, key is >= 0x21 and <= 0x28 or 0x2C or 0x2D or 0x2E or 0x5B or >= 0xAD and <= 0xB3);
     }
 }
