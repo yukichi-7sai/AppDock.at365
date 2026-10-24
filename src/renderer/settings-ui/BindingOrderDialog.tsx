@@ -37,6 +37,12 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   );
   const rows = groups.find(([name]) => name === key)?.[1] ?? [];
   const catalog = new Map(commands.map((command) => [command.id, command]));
+  const commandTitle = (id: string) => {
+    const command = catalog.get(id);
+    return command && command.title !== id
+      ? command.title
+      : translate('settings.bindingOrderDialog.unknown');
+  };
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState('');
@@ -55,10 +61,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
     const source = rows.find((row) => row.id === from);
     setNotice(
       translate('settings.bindingOrderDialog.moved', {
-        value:
-          catalog.get(source?.command ?? '')?.title ??
-          source?.command ??
-          translate('settings.bindingOrderDialog.binding'),
+        value: commandTitle(source?.command ?? ''),
         value2: rows.findIndex((row) => row.id === to) + 1,
       }),
     );
@@ -132,7 +135,13 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
       >
         {rows.map((row, index) => {
           const command = catalog.get(row.command);
-          const title = command?.title ?? row.command;
+          const title = commandTitle(row.command);
+          const detail = [
+            command && command.title !== row.command ? command.extension : '',
+            conditionLabel(row, command),
+          ]
+            .filter(Boolean)
+            .join(' · ');
           return (
             <li
               key={row.id}
@@ -183,14 +192,10 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
                 {index + 1}
               </span>
               <div className="shortcut-order-command">
-                <strong>{title}</strong>
-                <small>
-                  {command?.extension ?? translate('settings.bindingOrderDialog.unknown')} ·{' '}
-                  {conditionLabel(row, command)}
-                </small>
-                <small className="command-id">{row.command}</small>
+                <strong title={title}>{title}</strong>
+                <small title={detail}>{detail}</small>
                 {(!row.enabled || !command?.available) && (
-                  <small>
+                  <small className="shortcut-order-state">
                     {!row.enabled
                       ? translate('settings.bindingOrderDialog.disabled')
                       : translate('settings.bindingOrderDialog.unavailable')}
@@ -200,7 +205,8 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
               <div className="shortcut-order-moves">
                 <button
                   aria-label={translate('settings.bindingOrderDialog.up', { title: title })}
-                  className="accent-action"
+                  className="secondary"
+                  data-testid={`binding-order-up:${row.id}`}
                   disabled={index === 0}
                   onClick={() => move(row.id, rows[index - 1].id)}
                 >
@@ -208,7 +214,8 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
                 </button>
                 <button
                   aria-label={translate('settings.bindingOrderDialog.down', { title: title })}
-                  className="accent-action"
+                  className="secondary"
+                  data-testid={`binding-order-down:${row.id}`}
                   disabled={index === rows.length - 1}
                   onClick={() => move(row.id, rows[index + 1].id)}
                 >

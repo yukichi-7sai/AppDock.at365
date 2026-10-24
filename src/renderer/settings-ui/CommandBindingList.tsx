@@ -1,6 +1,7 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ListIcon } from './SettingsListTable';
+import { SettingsDialog } from './SettingsModal';
 import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
 import type { BindingInputFilter } from './useBindingCommandFilter';
@@ -52,6 +53,9 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   const [orderKey, setOrderKey] = useState<R | null>(null);
   const navigation = useContext(CommandSettingsNavigation);
   const [editing, setEditing] = useState<BindingEdit<R> | null>(null);
+  const [deleting, setDeleting] = useState<{ row: R; title: string; description: string } | null>(
+    null,
+  );
   const [notice, setNotice] = useState('');
   const commandsByInput = new Map<string, Set<string>>();
   for (const row of bindings) {
@@ -115,11 +119,11 @@ export function CommandBindingList<R extends { id: string; command: string; enab
     });
   };
   useLayoutEffect(() => {
-    if (!editing && !orderKey && restore.current) {
+    if (!editing && !orderKey && !deleting && restore.current) {
       restore.current();
       restore.current = null;
     }
-  }, [editing, orderKey, bindings]);
+  }, [editing, orderKey, deleting, bindings]);
   const apply = (row: R) => {
     if (!editing) return;
     applyBinding(row, editing.adding ? undefined : editing.row);
@@ -292,23 +296,20 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                         <button
                           type="button"
                           className="settings-list-icon settings-list-delete binding-delete"
+                          data-testid={`binding-delete:${row.id}`}
                           title={translate('settings.commandBindingList.delete')}
                           aria-label={translate('settings.commandBindingList.deleteBinding', {
                             title: command.title,
                             value: inputLabel(row),
                           })}
                           onClick={() => {
-                            rememberPosition(
-                              root.current?.querySelector<HTMLButtonElement>(
-                                `[data-shortcut-command="${CSS.escape(command.id)}"] .applet-shortcut-add`,
-                              ),
-                            );
-                            deleteBinding(row);
-                            setNotice(
-                              translate('settings.commandBindingList.deleted', {
-                                title: command.title,
-                              }),
-                            );
+                            rememberPosition();
+                            setNotice('');
+                            setDeleting({
+                              row: structuredClone(row),
+                              title: command.title,
+                              description: `${inputLabel(row)} · ${conditionLabel(row, command)}`,
+                            });
                           }}
                         >
                           <ListIcon kind="delete" />
@@ -338,6 +339,33 @@ export function CommandBindingList<R extends { id: string; command: string; enab
       )}
       {orderKey !== null && renderOrder(orderKey, () => setOrderKey(null))}
       {editing && renderEditor(editing, apply, () => setEditing(null))}
+      {deleting && (
+        <SettingsDialog
+          title={translate('settings.commandBindingList.deleteTitle')}
+          description={translate('settings.commandBindingList.deleteHint')}
+          applyLabel={translate('settings.commandBindingList.delete')}
+          onClose={() => setDeleting(null)}
+          onApply={async () => {
+            const current = bindings.find((row) => row.id === deleting.row.id);
+            if (
+              !current ||
+              readOnly?.(current) ||
+              JSON.stringify(current) !== JSON.stringify(deleting.row)
+            )
+              throw Error(translate('settings.commandBindingList.deleteChanged'));
+            rememberPosition(
+              root.current?.querySelector<HTMLButtonElement>(
+                `[data-shortcut-command="${CSS.escape(deleting.row.command)}"] .applet-shortcut-add`,
+              ),
+            );
+            deleteBinding(deleting.row);
+            setNotice(translate('settings.commandBindingList.deleted', { title: deleting.title }));
+          }}
+        >
+          <p>{deleting.title}</p>
+          <p>{deleting.description}</p>
+        </SettingsDialog>
+      )}
     </div>
   );
 }

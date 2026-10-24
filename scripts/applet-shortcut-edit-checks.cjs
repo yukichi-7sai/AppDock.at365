@@ -115,7 +115,10 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
     ['編集', 'このキーの実行順（複数のコマンド）', '削除'],
   );
   await assigned.locator('.binding-delete').click();
-  assert.equal(await page.getByRole('alertdialog').count(), 0);
+  await page.getByTestId('settings-dialog-cancel').click();
+  assert.equal(await assigned.count(), 1);
+  await assigned.locator('.binding-delete').click();
+  await page.getByTestId('settings-dialog-confirm').click();
   assert.equal(await assigned.count(), 0);
   await save();
   assert.equal(
@@ -140,7 +143,7 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   const extras = assigned.filter({ hasText: 'Shift+F12' });
   for (let i = 0; i < 2; i++) {
     await extras.first().locator('.binding-delete').click();
-    assert.equal(await page.getByRole('alertdialog').count(), 0);
+    await page.getByTestId('settings-dialog-confirm').click();
   }
   await save();
   assert.equal(await assigned.count(), 0);

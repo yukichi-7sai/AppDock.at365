@@ -3,7 +3,7 @@ const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
@@ -11,6 +11,7 @@ const profile = path.join(root, '.artifacts', `tray-menu-ui-${Date.now()}`);
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const pause = 'appdock.gestures.togglePause';
 const settings = createDefaultSettings();
+settings.updates.checkHostOnAboutOpen = false;
 settings.keybindings = [
   ...require('../out/main/shared/keybindings').getKeybindings(settings),
   {
@@ -100,19 +101,33 @@ async function launch() {
     app = {
       firstWindow: async () => page,
       close: async () => {
-        await page
-          .evaluate(() => {
-            void window.dock.executeCommand('appdock.quit');
-          })
-          .catch(() => {});
-        await until(() => child.exitCode !== null, 'shutdown');
+        if (child.exitCode === null && child.signalCode === null)
+          spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+            windowsHide: true,
+            stdio: 'ignore',
+          });
         await browser.close().catch(() => {});
       },
     };
   }
-  const page = require('./settings-aware-page.cjs').settingsAwarePage(await app.firstWindow());
+  const page = await app.firstWindow();
   page.setDefaultTimeout(12000);
   await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
+  if (!portable) {
+    const launched = app;
+    const close = launched.close.bind(launched);
+    let closed = false;
+    launched.close = async () => {
+      if (closed) return;
+      closed = true;
+      // This UI fixture verifies saved-state restart, not the application's quit workflow.
+      spawnSync('taskkill', ['/PID', String(launched.process().pid), '/T', '/F'], {
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+      void close().catch(() => {});
+    };
+  }
   if (app.evaluate)
     await app.evaluate(({ Tray }) => {
       const original = Tray.prototype.setContextMenu;
@@ -131,16 +146,19 @@ async function launch() {
 const checks = [];
 (async () => {
   let { app, page } = await launch();
-  page = require('./settings-aware-page.cjs').settingsAwarePage(page);
+  page = await require('./settings-host-helper.cjs').settingsPage(page);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   try {
     const snapshot = () => page.evaluate(() => window.dock.snapshot());
     const button = (name) => page.getByRole('button', { name, exact: true });
-    const nav = (name) =>
-      page.locator('.settings-categories button').filter({
-        has: page.locator('span[title]').filter({ hasText: new RegExp('^' + name + '$') }),
-      });
+    const nav = (name) => ({
+      click: async () => {
+        const id = { 一般: 'general', ショートカットキー: 'shortcuts', タスクトレイ: 'tray' }[name];
+        await page.getByTestId('settings-nav:' + id).click();
+        await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
+      },
+    });
     const save = async () => {
       await settleSettings(page);
     };
@@ -165,7 +183,7 @@ const checks = [];
     assert(s.settings.value.trayCommands.includes('missing.run'));
     assert(!s.settings.value.trayCommands.includes('appdock.quit'));
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await page.getByRole('heading', { name: '設定', exact: true, level: 1 }).waitFor();
+    await page.getByTestId('settings-index').waitFor();
     await nav('一般').click();
     assert.equal(
       await page
@@ -173,7 +191,7 @@ const checks = [];
         .count(),
       0,
     );
-    await nav('ショートカット').click();
+    await nav('ショートカットキー').click();
     assert.equal(await page.getByRole('checkbox', { name: /トレイに表示/ }).count(), 0);
     await nav('タスクトレイ').click();
     assert.equal(await commandRow('missing.run').count(), 1);
@@ -243,6 +261,7 @@ const checks = [];
     await require('./shell-overlay-helper.cjs').closingAction(addPalette.keyboard.press('Escape'));
     await choose('トレイクリックのコマンドを選択', 'a.run');
     await choose('トレイダブルクリックのコマンドを選択', 'b.run');
+    assert.equal(await page.locator('.tray-click-controls .command-id').count(), 0);
     await save();
     if (app.evaluate) {
       const native = () =>
@@ -319,7 +338,7 @@ const checks = [];
       );
     }
     // The registered host command must be selectable in keyboard bindings too.
-    await nav('ショートカット').click();
+    await nav('ショートカットキー').click();
     assert.equal(await page.locator(`[data-shortcut-command="${pause}"]`).count(), 1);
     await nav('タスクトレイ').click();
     await choose('トレイクリックのコマンドを選択', 'appdock.open');
@@ -330,9 +349,13 @@ const checks = [];
       .locator(`[data-tray-item="${groupId}"]`)
       .getByTitle('グループを解除', { exact: true })
       .click();
+    await page.getByTestId('settings-dialog-cancel').click();
+    assert.equal(await page.locator(`[data-tray-item="${groupId}"]`).count(), 1);
+    await page.getByTestId(`tray-remove:${groupId}`).click();
+    await page.getByTestId('settings-dialog-confirm').click();
     assert.equal(await commandRow('a.run').count(), 1);
     assert.equal(await commandRow('b.run').count(), 1);
-    // Ungrouping is saved immediately; no shared discard state exists.
+    // Confirmed ungrouping is saved immediately; no shared discard state exists.
     await settleSettings(page);
     assert.equal(await page.locator(`[data-tray-item="${groupId}"]`).count(), 0);
     for (const theme of ['dark', 'light']) {
@@ -361,8 +384,52 @@ const checks = [];
           await page
             .locator('.tray-select')
             .first()
-            .evaluate((el) => getComputedStyle(el).alignItems === 'flex-start'),
+            .evaluate((el) => getComputedStyle(el).alignItems === 'center'),
         );
+        const layout = await page.locator('.tray-editor-row').evaluateAll((rows) =>
+          rows.map((row) => {
+            const box = row.getBoundingClientRect();
+            const labels = [
+              ...row.querySelectorAll('.tray-select > span, .tray-select > small'),
+            ].map((e) => {
+              const r = e.getBoundingClientRect(),
+                s = getComputedStyle(e);
+              return { y: r.y, height: r.height, whiteSpace: s.whiteSpace };
+            });
+            return { height: box.height, border: getComputedStyle(row).borderTopWidth, labels };
+          }),
+        );
+        for (const row of layout) {
+          assert.equal(row.border, '0px');
+          assert(row.height >= 36 && row.height <= 44);
+          for (const label of row.labels) assert.equal(label.whiteSpace, 'nowrap');
+          if (row.labels.length === 2)
+            assert(
+              Math.abs(
+                row.labels[0].y +
+                  row.labels[0].height / 2 -
+                  row.labels[1].y -
+                  row.labels[1].height / 2,
+              ) < 2,
+            );
+        }
+        assert(
+          await page
+            .locator('.tray-group-children')
+            .evaluateAll((groups) =>
+              groups.every((group) => parseFloat(getComputedStyle(group).borderLeftWidth) > 0),
+            ),
+        );
+        assert.equal(await page.locator('.settings-categories > h2').count(), 0);
+        const index = await page.locator('.settings-categories').evaluate((e) => {
+          const search = e.querySelector('.settings-search'),
+            list = e.querySelector('.sidebar-extensions'),
+            r = e.getBoundingClientRect(),
+            s = search.getBoundingClientRect(),
+            l = list.getBoundingClientRect();
+          return { above: s.y - r.y, below: l.y - s.bottom };
+        });
+        assert(Math.abs(index.above - index.below) <= 1, JSON.stringify(index));
         await page.screenshot({ path: path.join(profile, `${theme}-${width}.png`) });
       }
     }
@@ -373,7 +440,7 @@ const checks = [];
     await app.close();
     ({ app, page } = await launch());
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-    await page.getByRole('heading', { name: '設定', exact: true, level: 1 }).waitFor();
+    await page.getByTestId('settings-index').waitFor();
     await nav('タスクトレイ').click();
     assert.deepEqual((await snapshot()).settings.value.trayMenu, expected);
     await page.evaluate(() => window.dock.toggleExtension('a', false));
@@ -407,6 +474,7 @@ const checks = [];
       const dissolve = selectedRow.getByTitle('グループを解除', { exact: true });
       if (await dissolve.count()) await dissolve.click();
       else await selectedRow.getByTitle('メニューから外す', { exact: true }).click();
+      await page.getByTestId('settings-dialog-confirm').click();
     }
     await save();
     assert.deepEqual((await snapshot()).settings.value.trayMenu, []);
@@ -440,7 +508,10 @@ const checks = [];
   } finally {
     await app.close();
   }
-})().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+})().then(
+  () => process.exit(0),
+  (error) => {
+    console.error(error);
+    process.exit(1);
+  },
+);

@@ -173,6 +173,21 @@ export function RibbonSettings({
     const { command, group } = item;
     const parent = ribbonParent(layout, item.id);
     const missing = !catalog.some((value) => value.id === item.id);
+    const detail = missing
+      ? translate('settings.ribbonSettings.missing')
+      : item.group
+        ? translate('settings.ribbonSettings.groupSummary', {
+            value:
+              item.group.expansion === 'persistent'
+                ? translate('settings.ribbonSettings.persistent')
+                : translate('settings.ribbonSettings.temporary'),
+            length: item.group.children.length,
+          })
+        : item.command
+          ? `${commandTitle(item.command.commandId)}${commands.some((c) => c.id === item.command!.commandId && c.available) ? '' : translate('settings.ribbonSettings.unavailable')}`
+          : item.kind === 'separator'
+            ? translate('settings.ribbonSettings.separator')
+            : (item.extensionId ?? 'AppDock');
     return (
       <div key={item.id} className="ribbon-setting-entry">
         <div
@@ -209,25 +224,11 @@ export function RibbonSettings({
                 run({ kind: 'update', id: item.id, changes: { visible: e.target.checked } })
               }
             />
-            <span>
-              {item.title}
-              <small>
-                {missing
-                  ? translate('settings.ribbonSettings.missing')
-                  : item.group
-                    ? translate('settings.ribbonSettings.groupSummary', {
-                        value:
-                          item.group.expansion === 'persistent'
-                            ? translate('settings.ribbonSettings.persistent')
-                            : translate('settings.ribbonSettings.temporary'),
-                        length: item.group.children.length,
-                      })
-                    : item.command
-                      ? `${commandTitle(item.command.commandId)}${commands.some((c) => c.id === item.command!.commandId && c.available) ? '' : translate('settings.ribbonSettings.unavailable')}`
-                      : item.kind === 'separator'
-                        ? translate('settings.ribbonSettings.separator')
-                        : (item.extensionId ?? 'AppDock')}
-              </small>
+            <span className="ribbon-setting-summary">
+              <span className="ribbon-setting-name" title={item.title}>
+                {item.title}
+              </span>
+              <small title={detail}>{detail}</small>
             </span>
           </label>
           <div className="ribbon-row-controls">

@@ -23,6 +23,7 @@ import {
 } from '../../shared/tray-menu';
 import { CommandPicker } from '../settings-ui/CommandPicker';
 import { ListIcon } from '../settings-ui/SettingsListTable';
+import { SettingsDialog } from '../settings-ui/SettingsModal';
 
 export function TraySettings({
   settings,
@@ -38,6 +39,7 @@ export function TraySettings({
   const { t: translate } = useHostTranslation();
   const [selected, select] = useState<string | null>(null);
   const [dragged, drag] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<{ item: TrayMenuItem; before: string } | null>(null);
   const [picker, setPicker] = useState<
     'add' | 'trayClickCommand' | 'trayDoubleClickCommand' | null
   >(null);
@@ -179,12 +181,12 @@ export function TraySettings({
             aria-pressed={selected === item.id}
             onClick={() => select(item.id)}
           >
-            <span>
+            <span title={title(item)}>
               {item.type === 'group' ? '▾ ' : ''}
               {title(item) || translate('settings.traySettings.groupNamePlaceholder')}
             </span>
             {item.type === 'command' && (
-              <small className="command-id">
+              <small className="command-id" title={item.command}>
                 {item.command}
                 {!catalog.find((c) => c.id === item.command)?.available &&
                   translate('settings.traySettings.unavailable')}
@@ -220,6 +222,7 @@ export function TraySettings({
             <button
               type="button"
               className="settings-list-icon settings-list-delete"
+              data-testid={`tray-remove:${item.id}`}
               aria-label={translate(
                 item.type === 'group'
                   ? 'settings.traySettings.ungroupLabel'
@@ -231,13 +234,17 @@ export function TraySettings({
                   ? translate('settings.traySettings.ungroup')
                   : translate('settings.traySettings.remove')
               }
-              onClick={() => remove(item.id)}
+              onClick={() =>
+                setDeleting({ item: structuredClone(item), before: JSON.stringify(items) })
+              }
             >
               <ListIcon kind="delete" />
             </button>
           </div>
         </div>
-        {item.type === 'group' && rows(item.children, true)}
+        {item.type === 'group' && (
+          <div className="tray-group-children">{rows(item.children, true)}</div>
+        )}
       </div>
     ));
   const preview = (list: ResolvedTrayItem[]) =>
@@ -257,7 +264,8 @@ export function TraySettings({
     );
   const commandTitle = (id: string | null) =>
     id
-      ? (commands.find((c) => c.id === id)?.title ?? id)
+      ? (commands.find((c) => c.id === id)?.title ??
+        translate('settings.traySettings.unavailableCommand'))
       : translate('settings.traySettings.unset');
   return (
     <section
@@ -288,13 +296,10 @@ export function TraySettings({
               >
                 {commandTitle(settings.host[key])}
               </button>
-              {settings.host[key] && (
-                <small className="tray-click-id command-id">
-                  {settings.host[key]}
-                  {!commands.find((c) => c.id === settings.host[key])?.available &&
-                    translate('settings.traySettings.unavailable')}
-                </small>
-              )}
+              {settings.host[key] &&
+                commands.find((c) => c.id === settings.host[key])?.available === false && (
+                  <small className="muted">{translate('settings.traySettings.unavailable')}</small>
+                )}
               {key === 'trayDoubleClickCommand' && settings.host[key] && (
                 <button
                   className="secondary"
@@ -405,6 +410,33 @@ export function TraySettings({
           }}
           onClose={() => setPicker(null)}
         />
+      )}
+      {deleting && (
+        <SettingsDialog
+          title={translate(
+            deleting.item.type === 'group'
+              ? 'settings.traySettings.ungroup'
+              : 'settings.traySettings.removeTitle',
+          )}
+          description={translate(
+            deleting.item.type === 'group'
+              ? 'settings.traySettings.ungroupHint'
+              : 'settings.traySettings.removeHint',
+          )}
+          applyLabel={translate(
+            deleting.item.type === 'group'
+              ? 'settings.traySettings.ungroup'
+              : 'settings.traySettings.remove',
+          )}
+          onClose={() => setDeleting(null)}
+          onApply={async () => {
+            if (deleting.before !== JSON.stringify(items))
+              throw Error(translate('settings.traySettings.removeChanged'));
+            remove(deleting.item.id);
+          }}
+        >
+          <p>{title(deleting.item)}</p>
+        </SettingsDialog>
       )}
     </section>
   );

@@ -84,7 +84,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 
 追加/適用は最新の保存済み設定へ反映し、その操作で即時保存する。追加とキー変更は同キー末尾、条件/有効状態だけの変更は位置を保持する。元の割り当てが編集中に外部更新・削除されていたら上書きを拒否する。追加/取消後に一覧を自動スクロールせず、元の操作ボタンへpreventScrollでfocusを戻す。絞り込みで元のボタンが消えた場合は一覧へ戻す。
 
-操作列は鉛筆の編集・このキーの実行順・削除のアイコンを直接並べる。寸法・配色と複数コマンドの実行順表示は[共通一覧UI](settings-list-editing.md)に従う。設定/通常Appletの削除は確認なしで対象IDを保存済み設定から除き、最後の割り当てを消してもコマンド行は未割り当てとして残る。一括初期化は置かず、利用者が削除した既定割り当てを再生成しない。WebApplet管理項目の将来サイト用テンプレートは既存画面を維持する。
+操作列は鉛筆の編集・このキーの実行順・削除のアイコンを直接並べる。寸法・配色と複数コマンドの実行順表示は[共通一覧UI](settings-list-editing.md)に従う。設定/通常Appletの削除は対象名・入力・条件を共通ダイアログで確認してから対象IDを保存済み設定から除き、最後の割り当てを消してもコマンド行は未割り当てとして残る。一括初期化は置かず、利用者が削除した既定割り当てを再生成しない。WebApplet管理項目の将来サイト用テンプレートは既存画面を維持する。
 
 ## 実行順の専用パネル
 
@@ -97,7 +97,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 - 条件一致/無効/利用可能性/同じコマンドの最初の一致を1回実行する仕様は既存resolver/dispatcherのまま。実行順の編集は行数やコマンドを変えない。
 ## マウスジェスチャーと共通の編集UI
 
-CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用する。両一覧の操作列は編集・同じ入力の実行順・確認なし削除を直接表示する。追加時のフィルター・表示位置を保ち、自動スクロールしない。適用後に行が非表示になった場合は一覧へpreventScrollでフォーカスを戻す。ジェスチャー固有の入力・条件は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照する。保存形式・revision・JSON・useSettingsEditorの共有を維持する。
+CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用する。両一覧の操作列は編集・同じ入力の実行順・削除確認の入口を直接表示する。追加時のフィルター・表示位置を保ち、自動スクロールしない。適用後に行が非表示になった場合は一覧へpreventScrollでフォーカスを戻す。ジェスチャー固有の入力・条件は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照する。保存形式・revision・JSON・useSettingsEditorの共有を維持する。
 
 主要な回帰はtests/keybindings.test.cjs、scripts/shortcuts-ui-test.cjs（全コマンド一覧とApplet編集）、scripts/keybindings-ui-test.cjs（実OS入力/ページ条件）、navigation/applet-order GUI。発行した単一EXEは隔離コピーで同じ一覧・保存・再起動を確認する。
 

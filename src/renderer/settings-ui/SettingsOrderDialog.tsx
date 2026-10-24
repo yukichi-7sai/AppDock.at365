@@ -134,14 +134,14 @@ export function SettingsOrderDialog({
             </button>
             <span className="shortcut-order-number">{index + 1}</span>
             <div className="shortcut-order-command">
-              <strong>{item.title}</strong>
-              {item.description && <small>{item.description}</small>}
+              <strong title={item.title}>{item.title}</strong>
+              {item.description && <small title={item.description}>{item.description}</small>}
             </div>
             <div className="shortcut-order-moves">
               <button
                 type="button"
                 aria-label={translate('settings.settingsOrderDialog.up', { title: item.title })}
-                className="accent-action"
+                className="secondary"
                 data-testid={`settings-order-up:${item.id}`}
                 disabled={pending || !index}
                 onClick={() => move(item.id, rows[index - 1].id)}
@@ -152,7 +152,7 @@ export function SettingsOrderDialog({
                 type="button"
                 aria-label={translate('settings.settingsOrderDialog.down', { title: item.title })}
                 data-testid={`settings-order-down:${item.id}`}
-                className="accent-action"
+                className="secondary"
                 disabled={pending || index === rows.length - 1}
                 onClick={() => move(item.id, rows[index + 1].id)}
               >

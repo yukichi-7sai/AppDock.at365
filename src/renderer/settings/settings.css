@@ -10,6 +10,10 @@
   flex-shrink: 0;
   overflow: hidden;
 }
+.settings-surface .settings-categories {
+  padding-block: 16px;
+  gap: 0;
+}
 .settings-surface .sidebar-resizer {
   display: block;
 }
@@ -411,9 +415,9 @@
     min-height: 180px;
   }
 }
-.settings-search {
+.settings-categories .settings-search {
   width: 100%;
-  margin: 0 0 12px;
+  margin: 0 0 16px;
 }
 .settings-applet-heading {
   font-size: 12px;

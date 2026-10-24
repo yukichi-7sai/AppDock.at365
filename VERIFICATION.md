@@ -1,5 +1,42 @@
 # 検証記録
 
+## 2026-10-25: 設定UI 0.87.2～0.87.4のコミット検証
+
+- 利用者が0.87.4の表示・操作を確認し、今回の設定UI変更のcommit/pushを依頼。main `35d72c4`上の23対象ファイルをレビューし、未解決指摘なし。設定インデックス・トレイ/リボン・共通順番変更・削除確認と関連文書/試験だけを対象とした。dirtyなためpull/stash/統合はせず、fetchと両プッシュ先のmain読取でGitHub/AQUAとも`35d72c4`に一致、実効author/committerを確認した。
+- 標準回帰は**113ファイル・879/879、fail/skip 0**。前回の標準879件と全113試験ファイル、main/shared/native/Shellソース・依存/固定ツール・ビルド定義を照合した。変更はrenderer、UI試験/文書、版番号とrenderer用翻訳7キーの追加だけで、既存の翻訳値・バックエンド処理は不変。renderer全体を読むappearance/shell-boundariesと、再発行したnative/更新helperを使うall-in-one/applet-defaults/lifecycle/dotnet-pages/applet-packages/portable-updatesの**8ファイル・63件**を追加実行し、残る**105ファイル・816件**を成功証跡と依存関係の照合で再利用した。最新実装時の関連114件・直前の134件、型検査/buildとソース/固定GUI・smokeも対応する入力/ログ/配布物hashを照合した。
+- 更新した既存`tray-menu-ui-test.cjs`を最終固定EXEで追加実行し**4群**成功。確認を経た解除・削除、子項目保持、ドラッグ/移動、未知ID、明暗3幅、空配列と再起動後の保存を確認した。最新の削除確認GUI4群と固定smokeを再利用。リボンのコンパクト表示は0.87.3のRibbonSettings/controls.css、インデックスは0.87.2のSettingsPage/settings.cssが現行と同じことを照合した。実OS入力・通常終了・実利用先を新たに検証した扱いにはしていない。
+- 製品ソースは修正せず、検証済み**0.87.4**の発行物を維持し再発行なし。EXEは**170,688,000 bytes**、SHA256 `291d291cae6f9eba5e21db13ac151bf9527c11a63b91682b5ec8c1688a313b7f`。証跡は`.artifacts/commit-validation-settings-0874/`の対象差分・入力一覧・再利用判定/旧証跡照合、追加63件/固定トレイGUIの完全log、stage/commit tree・実効名義・両remote先端の照合。元証跡は`commit-validation-about-0871`・`tray-index-0872`・`compact-editors-0873`・`delete-confirm-0874`。参照資料、途中の調査と種類/方式ごとの直近成功を保持し削除0件。Release/deployは行わない。
+
+## 2026-10-25: 削除確認と順番変更ボタンの通常色 0.87.4
+
+- main `35d72c4`上の0.87.3の未コミット変更を保持して追加修正。dirtyなためpull/stash/統合はしていない。`CommandBindingList`でショートカット・マウス/タッチパッドジェスチャーとApplet詳細に共通の削除確認を追加。対象名・入力・条件を表示し、取消/Escapeでは変更せず、確定時に安定ID・対象内容・編集可否を再確認する。確認中に対象が変わった場合は削除を止めてダイアログにエラーを残す。取消で削除ボタン、確定後は対象コマンドの追加ボタンへフォーカスを戻し、一覧位置を保持する。
+- トレイはコマンド・区切り線の削除とグループ解除に共通`SettingsDialog`を追加。メニューが確認中に変わった場合も削除を止める。グループ解除は確定後に子を同じ位置へ展開する既存仕様を保持。カスタムコマンド本体の削除は既存の確認画面を保持し、取消・確定と割り当てを残す動作を再確認した。コマンド実行・保存形式・公開編集APIへの確認ダイアログは追加していない。
+- `SettingsOrderDialog`と`BindingOrderDialog`の上下ボタンを`accent-action`から標準面の`secondary`へ変更。32px角と移動処理を保持する。一覧側の複数コマンド用実行順入口の強調は保持。以前の確認なし削除に関する本体AGENTS・一覧/入力/トレイ仕様と既存GUIヘルパーの削除操作を更新した。宣言型object-listの`confirmDelete`省略時の契約は変更していない。
+- 発行前に上記差分と呼出元をレビューし、未解決の発行阻害指摘なし。固定依存照合・型検査/build・発行は終了0。関連回帰はtray-menu/editing-commands/commands/clicks、keybindings、gestures、touchpad-gestures、custom-commands、setting-list-draft、object-list-dialog、localization、settings-view-clientの**12ファイル・114/114、fail/skip 0**。標準回帰全体と既存の全GUIヘルパーは実行していない。
+- `.artifacts/delete-confirm-0874/probe.cjs`・`behavior.cjs`の今回用隔離fixtureで、ソース/最終固定EXEそれぞれ**4群**が成功、pageerrorなし。ショートカット/マウス/タッチパッドの削除前不変・取消/Escape・確定・フォーカス・外部変更時の拒否、未知ID/無効行と他の割り当て保持、トレイの解除/コマンド/区切り線の取消と確定・子の順序保持・競合拒否、カスタムコマンドの既存削除確認と割り当て保持、両共通順序画面の通常色ボタンによる移動と取消を確認。ソースprofileは`settings-delete-confirm-ui-1792874027897`、固定EXEは`settings-delete-confirm-ui-1792874248136`。固定EXEのsmoke `smoke-1792874274117`も成功。途中の試験側のエラー表示重複selector・空設定省略に関する失敗は修正し、そのprofileとlogを保持した。恒久的な見た目比較テストは追加していない。
+- 本体/EXE/ASAR内Default Shell/feedは**0.87.4**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170,688,000 bytes**、SHA256 `291d291cae6f9eba5e21db13ac151bf9527c11a63b91682b5ec8c1688a313b7f`。feedのsize/hash、EXEのFileVersion/ProductVersionとGUI用コピーを照合した。証跡は`.artifacts/delete-confirm-0874/`のレビュー・入力一覧/照合・コマンド/終了コード/完全logとhash・配布物確認。種類/方式ごとの直近3回以内の成功、参照資料と失敗調査を保持してprofile削除0件。実利用設定・物理OS入力・Pause/F13～F24登録/送信・実サービス実行・通常終了は未確認。コミット/プッシュ/Release/deployは行っていない。
+
+## 2026-10-25: リボン編集と順番変更ダイアログのコンパクト表示 0.87.3
+
+- main `35d72c4`上の0.87.2の未コミット変更を保持して追加修正。dirtyなためpull/stash/統合は行っていない。リボン編集は枠なし・通常40px以上の項目行とし、名前と補足を1行へ配置、グループの子項目を共通境界色の1px縦線とインデントで示した。32px角の操作ボタン、チェック、配置選択、ドラッグと保存経路を保持し、狭幅では操作列を次の行へ移す。
+- 共通`SettingsOrderDialog`/`BindingOrderDialog`の行も枠なし・40px以上へ統一。名前と補足を横並びにし、上下操作は32px角の横並びを保つ。コマンドIDの専用表示を除去し、名前不明時もIDを代用せず「未確認のコマンド」と表示する。移動の読み上げ用案内にも同じ名前を使う。条件・無効/利用不可の状態は残し、長い名前/補足は省略と全文tooltip、540px以下では名前と補足を縦配置にする。ID・設定・競合検査・実行順の意味は変更していない。
+- 発行前レビューで長い名前によるgridの横はみ出しと、カタログが未確認コマンドの名前へIDを補う経路を検出し修正。最終GUIで操作列と状態表示が収まることを再確認し、未解決の発行阻害指摘なし。共通の並べ替え指針とリボン設計を更新。設定・保存ファイル・公開APIの追加削除を伴わない表示修正としてパッチ更新した。
+- 固定lockfile同期・型検査/build・`publish.bat`はいずれも終了0。関連回帰はribbon-groups/customization/commands、keybindings、gestures、touchpad-gestures、applet-order、ai-settings、mcp-client、object-list-dialog、localization、settings-view-clientの**12ファイル・134/134、fail/skip 0**。標準回帰全体は未実行。
+- 隔離したソースGUIと最終固定EXEのGUIはそれぞれ**5群**成功、pageerrorなし。明暗1280/900/720pxでリボン・表示順・実行順、追加の480pxでダイアログを確認。720/480pxは試験用Windowだけ最小幅制限を緩めた確認。長短名、縦線、ボタン寸法、枠とページ横はみ出し、条件/状態とID非表示、AIのドラッグ/Alt+上下/取消/保存、ショートカット・マウス・タッチパッド各実行順の取消/適用、未知ID・無効値の保持、Applet/MCPの共通表示、リボンのグループ移動/下寄せ/表示切替/編集入口を確認。固定EXEのsmokeも成功した。
+- 今回の確認用fixtureと画面は`.artifacts/compact-editors-0873/`へ保存し、恒久的な見た目比較テストは追加していない。ソース成功profileは`settings-compact-editors-ui-1792872583763`、固定EXE成功profileは`settings-compact-editors-ui-1792872909861`、smokeは`smoke-1792872947510`。起動直後にCDPへ接続できてもhostページが未生成だった配布版の試験失敗は、試験側の待機追加で解消。途中の未確認ID・長名overflow・Window最小幅・MCP操作名の試験失敗と修正も各profileのfailure/結果へ保持した。最終確認用プロセスのみ終了し、通常終了の実動作や実OS入力、実AI/MCP接続、利用者の設定は試験していない。Pause/F13～F24は送信・登録していない。
+- 本体/EXE/ASAR内Default Shell/feedは**0.87.3**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170,689,638 bytes**、SHA256 `be891a3312e86830f66598288dc585704b1e71eace8a2e4793b72d4651bc4cf5`。feedのsize/hash、FileVersion/ProductVersion、固定GUIコピーを照合した。実行コマンド/終了コード/log hash・入力一覧/照合・レビュー・版/配布物確認の正本は`.artifacts/compact-editors-0873/`。種類/方式ごとの直近成功3回以内と参照資料、途中の調査記録を保持してprofile削除0件。コミット/プッシュ/Release/実利用先deployは行っていない。
+
+## 2026-10-25: 設定インデックスとトレイのコンパクト表示 0.87.2
+
+- cleanなmain `35d72c4`で通常環境の`git pull --ff-only`はAlready up to date。インデックス先頭の「設定」見出しを除去し、検索ボックス上下の余白をそろえた。汎用sidebarのpadding/gapが重なる箇所は、設定インデックス側の優先度で明示した。asideのアクセシブル名、検索、項目の選択とリサイズは保持した。
+- トレイ編集は名前とコマンドID/グループ件数を横1行にし、長い文字は省略表示、名前とIDに全文のtooltipを付けた。行の枠を除去して40pxを基本とし、32pxの上下/削除ボタンとドラッグ/選択の余白を保持した。グループの子項目はインデントと共通境界色の縦線で示す。クリック/ダブルクリックのFieldはIDを表示せず、利用できない状態は保持する。見つからないコマンド名もIDの代わりに案内文を表示し、保存済みIDを変更しない。保存型・メニュー解決/実行・配置操作の変更がないUI調整としてパッチを進めた。
+- 発行前の差分レビューで未解決指摘なし。固定lockfile同期・最終型検査/buildは終了0。トレイの解決/操作/クリック/編集コマンド、配色・翻訳・設定ナビゲーション・Viewの関連8ファイルは **55/55（fail/skip 0）**。標準全回帰は再実行していない。仕様と追加規則は設定基盤とトレイ文書へ反映した。
+- 最終ソースGUIは **5群**、最終固定EXEのGUIは **4群** が成功。混在Applet/未知IDの保持、グループ/区切り線の追加・配置・上下/drag・解除、入力検証、保存と再起動後の一致、空一覧の保持を確認。ソースでは実メニューの固定末尾、callback、単/ダブルクリックの振分け、IPC/menu/ウィンドウ内キー操作によるpause状態も確認した。Pause/F13〜F24をOSへ送信/登録する試験は行っていない。
+- 明暗・1280/1000/900幅で横はみ出しなし、行の枠0・高さ36〜44px、名前/補足の単一行と中心位置、子グループの縦線、見出しなし、検索欄上下の等間隔を検査し、最終固定画像も目視確認した。初回は旧試験の見出し/画面名/移動待機とDPIによる罫線幅の丸めを修正し、失敗log/profileを保持した。
+- 既存GUI試験の終了待機が残ったため、今回のUI fixtureは自身が起動したPID配下のプロセスツリーを終了して、保存済み状態の再起動を検証する形へ揃えた。一般利用の通常終了経路の検証とは区別する。残存した旧隔離試験もそのprofile/PIDに限定して後片付けし、通常利用のAppDockには触れていない。固定EXEのsmokeは **ok=true**。物理キーボード/実トレイ手操作/実利用先は未確認。
+- `publish.bat`終了0。本体/EXE/Default Shell/feedは **0.87.2**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は **170,675,873 bytes**、SHA256 `aacda9fbd0086fd0ff7b47303b9c1e7a91b80dde68064d88659ccf5ccc384d4b`。feedのsize/hash、EXE版、ASAR内のDefault Shell版と固定GUIコピーが一致した。
+- 証跡は`.artifacts/tray-index-0872/`のreview・inputs-before/verified/final・input-verification・型/build/単体/GUI/smokeの完全logとJSON・package-verification・environment・evidence-hashes・cleanup。最終ソースは`.artifacts/tray-menu-ui-1792871075795/`、固定画像/結果は`.artifacts/tray-menu-ui-1792871378328/`、smokeは`.artifacts/smoke-1792871422747/`。種類/方式別の直近3回、参照資料と失敗調査、所有/参照の不明な旧資料を保持し、削除0件。未コミット、push/Release/実利用先deployなし。
+
 ## 2026-10-25: About改善のコミット前照合と一括更新名 0.87.1
 
 - 0.86.13〜0.87.0の未コミット変更を保持し、一括更新のボタンと公開コマンドの表示名を「AppDockとAppletをすべて更新」へ統一した。`appdock.updates.installAll`のID・scope・保存済み割り当てと更新処理は不変。現行仕様書・GUIの期待文言も更新し、表示変更のパッチとして0.87.1を発行した。

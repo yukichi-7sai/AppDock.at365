@@ -197,7 +197,10 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   );
   assert.equal((await saved()).find((r) => r.id === a).enabled, false);
   await page.locator(`[data-binding-id="${a}"] .binding-delete`).click();
-  assert.equal(await page.getByRole('alertdialog').count(), 0);
+  await page.getByTestId('settings-dialog-cancel').click();
+  assert.equal(await page.locator(`[data-binding-id="${a}"]`).count(), 1);
+  await page.getByTestId(`binding-delete:${a}`).click();
+  await page.getByTestId('settings-dialog-confirm').click();
   assert.equal(await page.locator(`[data-binding-id="${a}"]`).count(), 0);
   await save();
   await filter.fill('test.gestures.b');
@@ -282,7 +285,9 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     await row('test.gestures.c').locator('.binding-input-filter').innerText(),
     '移動: 右, 上',
   );
-  await row('test.gestures.c').screenshot({ path: path.join(profile, 'movement-label-right-up.png') });
+  await row('test.gestures.c').screenshot({
+    path: path.join(profile, 'movement-label-right-up.png'),
+  });
   await row('test.gestures.c')
     .locator(`[data-binding-id="${paired.id}"] .applet-shortcut-edit`)
     .click();
@@ -301,7 +306,9 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     await row('test.gestures.c').locator('.binding-input-filter').innerText(),
     '移動: 上, 下',
   );
-  await row('test.gestures.c').screenshot({ path: path.join(profile, 'movement-label-up-down.png') });
+  await row('test.gestures.c').screenshot({
+    path: path.join(profile, 'movement-label-up-down.png'),
+  });
   await page.getByRole('button', { name: '実行順…', exact: true }).click();
   await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('move-up-down');
   assert.equal(
@@ -314,6 +321,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert.deepEqual(await orderIds(), [paired.id]);
   await orderPanel.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await page.locator(`[data-binding-id="${paired.id}"] .binding-delete`).click();
+  await page.getByTestId('settings-dialog-confirm').click();
   await save();
   checks.push(
     'two-step add/edit/reversal/order/delete / same direction disabled / selections retained across stages and input families',

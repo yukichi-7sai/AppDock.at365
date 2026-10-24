@@ -202,12 +202,12 @@ export function SettingsPage({
             {context === 'full' && (
               <aside
                 className="sidebar settings-categories"
+                data-testid="settings-index"
                 style={{
                   width: Math.min(model.content.sidebarWidth, model.content.hostWidth * 0.4),
                 }}
                 aria-label={t('settings.index')}
               >
-                <h2>{t('settings.title')}</h2>
                 <SettingsIndex content={model.content} act={act} />
                 <div
                   className="sidebar-resizer"

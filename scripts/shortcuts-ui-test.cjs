@@ -222,7 +222,10 @@ const checks = [];
       ['編集', 'このキーの実行順（複数のコマンド）', '削除'],
     );
     await row('a2').locator('.binding-delete').click();
-    assert.equal(await page.getByRole('alertdialog').count(), 0);
+    await page.getByTestId('settings-dialog-cancel').click();
+    assert.equal(await row('a2').count(), 1);
+    await page.getByTestId('binding-delete:a2').click();
+    await page.getByTestId('settings-dialog-confirm').click();
     assert.equal(await command('test.a.second').count(), 0);
     assert(
       await page
