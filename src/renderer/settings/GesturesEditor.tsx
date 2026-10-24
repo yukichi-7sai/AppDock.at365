@@ -2,6 +2,7 @@ import { useHostTranslation } from '../HostTranslation';
 import {
   defaultTouchpadGestures,
   touchpadTitle,
+  touchpadGestureTypes,
   touchpadAsGestureSettings,
 } from '../../shared/touchpad-gestures';
 import { TouchpadOptions, type TouchpadEditorStatus } from './TouchpadOptions';
@@ -13,6 +14,7 @@ import type { UiCommand } from '../../shared/commands';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import {
   defaultGestures,
+  groupGestureBindings,
   gestureTitle,
   gestureConditionLabel,
   applyGestureBinding,
@@ -62,6 +64,9 @@ export function GesturesEditor({
     clearInput,
   } = useBindingCommandFilter(provider?.request, clearProvider);
   const bindings = gestures.bindings;
+  const displayBindings = touchpad
+    ? touchpadGestureTypes.flatMap(([gesture]) => bindings.filter((row) => row.gesture === gesture))
+    : groupGestureBindings(bindings).flatMap((group) => group.bindings);
   const [orderOpen, setOrderOpen] = useState(false);
   const change = (patch: Partial<typeof gestures>) =>
     onChange(
@@ -156,7 +161,7 @@ export function GesturesEditor({
         </CommandBindingToolbar>
         <CommandBindingList<GestureBinding>
           commands={visible}
-          bindings={bindings}
+          bindings={displayBindings}
           showProvider
           selectedInput={inputFilter?.key}
           onInputFilter={selectInput}

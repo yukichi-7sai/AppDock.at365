@@ -50,8 +50,8 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
   const chip = host.locator('.command-provider-filter');
   for (const [page, destination, otherPage, label] of [
     ['ショートカットキー', 'ショートカット', 'マウスジェスチャー', 'F1'],
-    ['マウスジェスチャー', 'マウスジェスチャー', 'ショートカットキー', '↑ 上'],
-    ['タッチパッドジェスチャー', 'タッチパッドジェスチャー', 'ショートカットキー', '3本指・タップ'],
+    ['マウスジェスチャー', 'マウスジェスチャー', 'ショートカットキー', '移動: 上'],
+    ['タッチパッドジェスチャー', 'タッチパッドジェスチャー', 'ショートカットキー', '3本指: タップ'],
   ]) {
     await save(fixture);
     const openTarget = async () => {
@@ -225,6 +225,83 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       `${page}: exact input badge filter, provider/command switching, Enter/Space, clear/focus, no persistence, duplicates and live edits/empty results`,
     );
   }
+  const orderFixture = structuredClone(fixture);
+  orderFixture.gestures.bindings = [
+    'key:F1',
+    'wheel-down',
+    'move-up-down',
+    'click-left',
+    'move-up',
+    'click-middle',
+    'wheel-up',
+    'move-right-up',
+    'move-left',
+    'move-up',
+  ].map((gesture, index) => ({
+    id: `display-order.${index}`,
+    command: 'fixture.hints.run',
+    gesture,
+    enabled: false,
+    when: { scope: 'app', appletIds: [], processes: [] },
+  }));
+  await save(orderFixture);
+  await host.setViewportSize({ width: 1600, height: 1000 });
+  await select('マウスジェスチャー');
+  const orderBefore = (await snapshot()).settings;
+  const assigned = host.locator('[data-shortcut-command="fixture.hints.run"]');
+  assert.deepEqual(
+    await assigned
+      .locator('[data-binding-id]')
+      .evaluateAll((rows) => rows.map((row) => row.dataset.bindingId)),
+    [4, 9, 8, 2, 7, 3, 5, 6, 1, 0].map((index) => `display-order.${index}`),
+  );
+  assert.deepEqual(
+    (await snapshot()).settings,
+    orderBefore,
+    'display order does not save or reorder execution',
+  );
+  await assigned.screenshot({ path: path.join(profile, 'mouse-assignment-display-order.png') });
+  checks.push(
+    'mouse assignment display: one-step, two-step, click, wheel, key; same-input order and saved settings retained',
+  );
+  orderFixture.touchpadGestures.enabled = false;
+  orderFixture.touchpadGestures.bindings = [
+    'four.right',
+    'three.left',
+    'four.tap',
+    'three.down',
+    'four.up',
+    'three.tap',
+    'four.left',
+    'three.right',
+    'four.down',
+    'three.up',
+    'three.tap',
+  ].map((gesture, index) => ({
+    id: `touchpad-display-order.${index}`,
+    command: 'fixture.hints.run',
+    gesture,
+    enabled: false,
+    when: { scope: 'app', appletIds: [], processes: [] },
+  }));
+  await save(orderFixture);
+  await select('タッチパッドジェスチャー');
+  const touchpadBefore = (await snapshot()).settings;
+  assert.deepEqual(
+    await assigned
+      .locator('[data-binding-id]')
+      .evaluateAll((rows) => rows.map((row) => row.dataset.bindingId)),
+    [5, 10, 9, 3, 1, 7, 2, 4, 8, 6, 0].map((index) => `touchpad-display-order.${index}`),
+  );
+  assert.deepEqual(
+    (await snapshot()).settings,
+    touchpadBefore,
+    'touchpad display order preserves saved settings',
+  );
+  await assigned.screenshot({ path: path.join(profile, 'touchpad-assignment-display-order.png') });
+  checks.push(
+    'touchpad assignment display: three/four fingers, tap/up/down/left/right; same-input order and saved settings retained',
+  );
   await save(original);
   await select('ショートカットキー');
 };

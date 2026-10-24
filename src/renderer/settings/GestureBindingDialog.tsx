@@ -26,6 +26,7 @@ const families = [
   { id: 'wheel', title: hostText('settings.gestureBindingDialog.wheel'), icon: '↕' },
   { id: 'key', title: hostText('settings.gestureBindingDialog.keyboard'), icon: '⌨' },
 ];
+const directionIcons = { up: '↑', down: '↓', left: '←', right: '→' } as const;
 function MoveDirectionPicker({
   label,
   value,
@@ -46,8 +47,8 @@ function MoveDirectionPicker({
           disabled={disabled === id}
           onClick={() => onChoose(id)}
         >
-          <span aria-hidden="true">{title.slice(0, 1)}</span>
-          {title.slice(2)}
+          <span aria-hidden="true">{directionIcons[id]}</span>
+          {title}
         </button>
       ))}
     </div>

@@ -30,6 +30,21 @@ test('strict ten gesture/chord model and reserved read-only projection', () => {
   const v = defaultTouchpadGestures();
   assert.equal(v.enabled, false);
   assert.deepEqual(
+    touchpadGestureTypes.map(([, label]) => label),
+    [
+      '3本指: タップ',
+      '3本指: 上',
+      '3本指: 下',
+      '3本指: 左',
+      '3本指: 右',
+      '4本指: タップ',
+      '4本指: 上',
+      '4本指: 下',
+      '4本指: 左',
+      '4本指: 右',
+    ],
+  );
+  assert.deepEqual(
     Object.values(v.connections).map(connectionKey),
     Array.from({ length: 10 }, (_, i) => 'F' + (13 + i)),
   );

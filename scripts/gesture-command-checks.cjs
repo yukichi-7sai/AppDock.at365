@@ -202,8 +202,8 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await save();
   await filter.fill('test.gestures.b');
   await page.locator(`[data-binding-id="${b}"] .applet-shortcut-edit`).click();
-  await choose('ホイール', 'ホイール下');
-  await choose('クリック', '中クリック');
+  await choose('ホイール', 'ホイール: 下');
+  await choose('クリック', 'クリック: 中');
   await choose('キーボード');
   assert(await panel.getByRole('button', { name: '適用', exact: true }).isDisabled());
   await panel.getByLabel('ジェスチャーのキーを入力').press('Control+K');
@@ -258,7 +258,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert(await nextDirection.getByRole('button', { name: '右', exact: true }).isDisabled());
   await stages.getByRole('button', { name: '1段階移動', exact: true }).click();
   await stages.getByRole('button', { name: '2段階移動', exact: true }).click();
-  await choose('ホイール', 'ホイール上');
+  await choose('ホイール', 'ホイール: 上');
   await choose('移動');
   assert.equal(
     await firstDirection
@@ -278,7 +278,11 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     (r) => r.command === 'test.gestures.c' && r.gesture === 'move-right-up',
   );
   assert(paired);
-  assert.match(await row('test.gestures.c').innerText(), /右.*上/);
+  assert.equal(
+    await row('test.gestures.c').locator('.binding-input-filter').innerText(),
+    '移動: 右, 上',
+  );
+  await row('test.gestures.c').screenshot({ path: path.join(profile, 'movement-label-right-up.png') });
   await row('test.gestures.c')
     .locator(`[data-binding-id="${paired.id}"] .applet-shortcut-edit`)
     .click();
@@ -293,8 +297,20 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   await apply();
   await save();
   assert.equal((await saved()).find((r) => r.id === paired.id).gesture, 'move-up-down');
+  assert.equal(
+    await row('test.gestures.c').locator('.binding-input-filter').innerText(),
+    '移動: 上, 下',
+  );
+  await row('test.gestures.c').screenshot({ path: path.join(profile, 'movement-label-up-down.png') });
   await page.getByRole('button', { name: '実行順…', exact: true }).click();
   await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('move-up-down');
+  assert.equal(
+    await orderPanel
+      .getByLabel('実行順を変更するジェスチャー')
+      .locator('option:checked')
+      .innerText(),
+    '移動: 上, 下 · 1件',
+  );
   assert.deepEqual(await orderIds(), [paired.id]);
   await orderPanel.getByRole('button', { name: 'キャンセル', exact: true }).click();
   await page.locator(`[data-binding-id="${paired.id}"] .binding-delete`).click();

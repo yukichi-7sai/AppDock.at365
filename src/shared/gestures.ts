@@ -21,13 +21,22 @@ export const moveDirections = [
   ['right', hostText('settings.gestures.right')],
 ] as const;
 export const gestureTypes = [
-  ...moveDirections.map(([id, label]) => [`move-${id}`, label] as const),
+  ...moveDirections.map(
+    ([id, label]) =>
+      [`move-${id}`, hostText('settings.gestures.movement', { direction: label })] as const,
+  ),
   ...moveDirections.flatMap(([first, firstLabel]) =>
     moveDirections
       .filter(([second]) => second !== first)
       .map(
         ([second, secondLabel]) =>
-          [`move-${first}-${second}`, `${firstLabel} → ${secondLabel}`] as const,
+          [
+            `move-${first}-${second}`,
+            hostText('settings.gestures.movementSequence', {
+              first: firstLabel,
+              second: secondLabel,
+            }),
+          ] as const,
       ),
   ),
   ['click-left', hostText('settings.gestures.clickLeft')],

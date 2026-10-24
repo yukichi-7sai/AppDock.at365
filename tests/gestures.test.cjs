@@ -39,8 +39,17 @@ test('two-step movements preserve legacy bindings, reject invalid paths and keep
     groupGestureBindings(settings.bindings).map((g) => g.gesture),
     ['move-left', ...pairs.map((r) => r.gesture)],
   );
-  assert.equal(gestureTitle('move-right-up'), '→ 右 → ↑ 上');
-  assert.equal(gestureTitle('move-up-down'), '↑ 上 → ↓ 下');
+  assert.equal(gestureTitle('move-up'), '移動: 上');
+  assert.equal(gestureTitle('move-down'), '移動: 下');
+  assert.equal(gestureTitle('move-left'), '移動: 左');
+  assert.equal(gestureTitle('move-right'), '移動: 右');
+  assert.equal(gestureTitle('move-right-up'), '移動: 右, 上');
+  assert.equal(gestureTitle('move-up-down'), '移動: 上, 下');
+  assert.equal(gestureTitle('click-left'), 'クリック: 左');
+  assert.equal(gestureTitle('click-middle'), 'クリック: 中');
+  assert.equal(gestureTitle('wheel-up'), 'ホイール: 上');
+  assert.equal(gestureTitle('wheel-down'), 'ホイール: 下');
+  assert.equal(gestureTitle('key:F1'), 'キー: F1');
   for (const gesture of [
     'move-up-up',
     'move-up-down-left',

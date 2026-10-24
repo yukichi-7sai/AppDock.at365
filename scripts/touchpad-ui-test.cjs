@@ -211,7 +211,7 @@ const checks = [];
     );
     await connections.locator('summary').click();
     const connectionKey = p.getByRole('combobox', {
-      name: '4本指・タップの接続用キー',
+      name: '4本指: タップの接続用キー',
       exact: true,
     });
     assert.equal(await connectionKey.locator('option').count(), 12);
@@ -272,7 +272,7 @@ const checks = [];
       );
     }, 'edit conflict banner');
     await until(
-      async () => (await command.locator('kbd').innerText()) === '4本指・タップ',
+      async () => (await command.locator('kbd').innerText()) === '4本指: タップ',
       'existing row restored after failed edit',
     );
     assert.deepEqual(
@@ -285,7 +285,7 @@ const checks = [];
     checks.push('touchpad order dialog');
     await connections.locator('summary').click();
     await connectionKey.selectOption('F24');
-    await p.getByRole('checkbox', { name: '4本指・タップのCtrl', exact: true }).check();
+    await p.getByRole('checkbox', { name: '4本指: タップのCtrl', exact: true }).check();
     await until(
       async () =>
         (await host.evaluate(() => window.dock.snapshot())).settings.value.touchpadGestures
@@ -296,7 +296,7 @@ const checks = [];
       'chord persisted',
     );
     for (const modifier of ['Alt', 'Shift', 'Win']) {
-      const checkbox = p.getByRole('checkbox', { name: `4本指・タップの${modifier}`, exact: true });
+      const checkbox = p.getByRole('checkbox', { name: `4本指: タップの${modifier}`, exact: true });
       await checkbox.check();
       await until(
         async () =>
@@ -314,7 +314,7 @@ const checks = [];
         `${modifier} cleared`,
       );
     }
-    const inline = p.getByRole('group', { name: '4本指・タップの接続用キー設定', exact: true });
+    const inline = p.getByRole('group', { name: '4本指: タップの接続用キー設定', exact: true });
     const boxes = await inline.locator('select, label').evaluateAll((elements) =>
       elements.map((e) => {
         const r = e.getBoundingClientRect();
@@ -429,7 +429,7 @@ const checks = [];
       .first()
       .waitFor();
     await p
-      .getByRole('group', { name: '3本指・タップ', exact: true })
+      .getByRole('group', { name: '3本指: タップ', exact: true })
       .getByRole('button', { name: 'AppDockでの制御をしない', exact: true })
       .click();
     assert.equal(
@@ -448,7 +448,7 @@ const checks = [];
       .evaluate((element) => element.scrollWidth - element.clientWidth);
     assert.ok(overflow <= 2, 'settings body should not overflow horizontally');
     await p
-      .getByRole('group', { name: '3本指・タップ', exact: true })
+      .getByRole('group', { name: '3本指: タップ', exact: true })
       .getByRole('button', { name: 'このジェスチャーの割り当てを全部解除する', exact: true })
       .click();
     await until(
