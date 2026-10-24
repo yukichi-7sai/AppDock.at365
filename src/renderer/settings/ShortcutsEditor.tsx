@@ -17,7 +17,6 @@ import {
   type Keybinding,
 } from '../../shared/keybindings';
 import { ShortcutCommandList } from '../settings-ui/ShortcutCommandList';
-import { ShortcutOrderDialog } from '../settings-ui/ShortcutOrderDialog';
 import { SettingsSection } from '../settings-ui/SettingsSections';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
@@ -57,7 +56,6 @@ export function ShortcutsEditor({
     clearInput,
   } = useBindingCommandFilter(provider?.request, clearProvider);
   const [error, setError] = useState('');
-  const [orderOpen, setOrderOpen] = useState(false);
   const lastStatuses = useRef(statuses);
   useEffect(() => {
     if (statuses.length) lastStatuses.current = statuses;
@@ -116,7 +114,6 @@ export function ShortcutsEditor({
       <SettingsSection
         collapsible
         title={hostSettingItem('shortcuts', 'options').title}
-        hint={hostSettingItem('shortcuts', 'options').description}
         {...settingAnchor('shortcuts', 'options')}
       >
         <CommandExecutionModeField
@@ -155,7 +152,6 @@ export function ShortcutsEditor({
           statusFilter={statusFilter}
           setFilter={setFilter}
           setStatusFilter={setStatusFilter}
-          onOrder={() => setOrderOpen(true)}
           showRegistrationErrors
           inputFilter={inputFilter}
           clearInputFilter={clearInput}
@@ -182,15 +178,6 @@ export function ShortcutsEditor({
             void settingsControls.retryGlobalHotKeys().catch((reason) => setError(String(reason)))
           }
         />
-        {orderOpen && (
-          <ShortcutOrderDialog
-            settings={settings}
-            commands={catalog}
-            applets={applets}
-            onChange={onChange}
-            onClose={() => setOrderOpen(false)}
-          />
-        )}
       </CommandListSection>
     </>
   );

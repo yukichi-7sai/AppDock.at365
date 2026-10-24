@@ -126,9 +126,19 @@ module.exports = async function ({
       await settleSettings(host);
       for (const enabled of [true, false]) {
         await hints(enabled);
+        assert.equal(await host.locator('.command-list-description').count(), 0);
+        assert.equal(
+          await host
+            .locator('.command-list-toolbar')
+            .evaluate((e) => getComputedStyle(e).borderBottomWidth),
+          '0px',
+        );
         await host
+          .locator('.settings-page-heading > p')
           .getByText(
-            require('../src/shared/locales/ja/host.json')['settings.webAccountSettings.hint'],
+            require('../src/shared/locales/ja/host.json')[
+              'settings.settingsPageLayout.webAccounts'
+            ],
             { exact: true },
           )
           .waitFor();

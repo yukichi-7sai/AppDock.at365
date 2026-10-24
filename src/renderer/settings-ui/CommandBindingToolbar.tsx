@@ -1,6 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsInput } from './SettingsInput';
-import { ListIcon } from './SettingsListTable';
 import type { ReactNode } from 'react';
 import { CommandProviderFilter } from './CommandProviderFilter';
 import type { BindingInputFilter } from './useBindingCommandFilter';
@@ -14,7 +13,6 @@ export function CommandBindingToolbar({
   statusFilter,
   setFilter,
   setStatusFilter,
-  onOrder,
   showRegistrationErrors = false,
   children,
   inputFilter,
@@ -28,7 +26,6 @@ export function CommandBindingToolbar({
   statusFilter: string;
   setFilter(value: string): void;
   setStatusFilter(value: string): void;
-  onOrder(): void;
   showRegistrationErrors?: boolean;
   children?: ReactNode;
   inputFilter?: BindingInputFilter | null;
@@ -89,17 +86,6 @@ export function CommandBindingToolbar({
         }
         actions={
           <>
-            <button
-              type="button"
-              className="settings-list-icon shortcut-order-open"
-              aria-label={translate('settings.commandBindingToolbar.order')}
-              title={translate('settings.commandBindingToolbar.orderLabel', {
-                inputName: inputName,
-              })}
-              onClick={onOrder}
-            >
-              <ListIcon kind="order" />
-            </button>
             {(filter || statusFilter !== 'all' || inputFilter) && (
               <button
                 className="text-button"

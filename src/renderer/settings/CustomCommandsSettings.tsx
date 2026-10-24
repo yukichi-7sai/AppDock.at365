@@ -13,7 +13,6 @@ import {
 } from '../../shared/custom-commands';
 import { SettingsListTable } from '../settings-ui/SettingsListTable';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
-import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -89,16 +88,12 @@ export function CustomCommandsSettings({
   const supported =
     !settings.customCommands || settings.customCommands.version === customCommandVersion;
   const [error, setError] = useState('');
-  const [dialog, setDialog] = useState<
-    | null
-    | {
-        kind: 'edit' | 'delete';
-        item: CustomCommandDefinition | null;
-        types: CustomCommandDescriptor[];
-        revision: string;
-      }
-    | { kind: 'order'; items: CustomCommandDefinition[]; revision: string }
-  >(null);
+  const [dialog, setDialog] = useState<null | {
+    kind: 'edit' | 'delete';
+    item: CustomCommandDefinition | null;
+    types: CustomCommandDescriptor[];
+    revision: string;
+  }>(null);
   const update = (operations: unknown[], revision = auxiliary?.revision) =>
     invoke('updateCustomCommands', [{ expectedRevision: revision, operations }]);
   const open = (kind: 'edit' | 'delete', item: CustomCommandDefinition | null) =>
@@ -141,13 +136,6 @@ export function CustomCommandsSettings({
           onAdd={() => open('edit', null)}
           onEdit={(i) => open('edit', visibleItems[i])}
           onDelete={(i) => open('delete', visibleItems[i])}
-          onOrder={() =>
-            setDialog({
-              kind: 'order',
-              items: structuredClone(items),
-              revision: auxiliary!.revision,
-            })
-          }
           onToggle={(i) => {
             setError('');
             void update([
@@ -181,15 +169,6 @@ export function CustomCommandsSettings({
         >
           <p>{dialog.item!.title}</p>
         </SettingsDialog>
-      )}
-      {dialog?.kind === 'order' && (
-        <SettingsOrderDialog
-          title={translate('settings.customCommandsSettings.order')}
-          listLabel={translate('settings.customCommandsSettings.title')}
-          items={dialog.items}
-          onClose={() => setDialog(null)}
-          onApply={(ids) => update([{ op: 'reorder', ids }], dialog.revision)}
-        />
       )}
     </div>
   );

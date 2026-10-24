@@ -26,6 +26,9 @@
   width: 100%;
   margin-bottom: 4px;
 }
+.settings-categories .sidebar-extensions button:focus-visible {
+  outline-offset: -3px;
+}
 .settings-categories .sidebar-extensions button:has(.settings-index-icon) {
   display: flex;
   align-items: center;
@@ -262,7 +265,6 @@
   z-index: 3;
   padding-block: 8px;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
   margin-bottom: 12px;
 }
 .command-list-toolbar:empty {
@@ -568,7 +570,7 @@ pre.ai-preview-result {
   margin-bottom: 4px;
 }
 .ai-connection-table .applet-shortcut-overview {
-  table-layout: fixed;
+  table-layout: auto;
   width: 100%;
 }
 .ai-connection-table .applet-shortcut-overview th:last-child {

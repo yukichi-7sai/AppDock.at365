@@ -50,8 +50,10 @@ export function TouchpadOptions({
   return (
     <>
       <SettingsSection
-        title={translate('settings.touchpadOptions.connection')}
-        description={translate('settings.touchpadOptions.connectionHint')}
+        title={translate('settings.touchpadOptions.behavior')}
+        data-testid="touchpad-options"
+        collapsible
+        {...settingAnchor('touchpad-gestures', 'options')}
       >
         <SettingsField
           title={translate('settings.touchpadOptions.enabled')}
@@ -65,9 +67,28 @@ export function TouchpadOptions({
             onChange={(enabled) => change({ enabled })}
           />
         </SettingsField>
-        <SettingsButton onClick={() => void invoke('touchpad.openWindows')}>
-          {translate('settings.touchpadOptions.openWindowsSettings')}
-        </SettingsButton>
+        <CommandExecutionModeField
+          pageId="touchpad-gestures"
+          value={value.executionMode}
+          onChange={(executionMode) => change({ executionMode })}
+        />
+        <InputBrowserOptions pageId="touchpad-gestures" value={value} onChange={change} />
+      </SettingsSection>
+      <SettingsSection
+        title={translate('settings.touchpadOptions.connection')}
+        data-testid="touchpad-connection"
+        collapsible
+        description={`${translate('settings.touchpadOptions.connectionHint')} ${translate('settings.touchpadOptions.keysHint')}`}
+        {...settingAnchor('touchpad-gestures', 'connections')}
+      >
+        <SettingsField
+          title={translate('settings.touchpadOptions.windowsSettings')}
+          data-testid="touchpad-windows-settings"
+        >
+          <SettingsButton onClick={() => void invoke('touchpad.openWindows')}>
+            {translate('settings.touchpadOptions.openWindowsSettings')}
+          </SettingsButton>
+        </SettingsField>
         {snapshot?.statuses
           .filter((row) => ['conflict', 'unconnected', 'unavailable', 'error'].includes(row.state))
           .map((row) => (
@@ -97,25 +118,6 @@ export function TouchpadOptions({
               </SettingsButton>
             </SettingsField>
           ))}
-      </SettingsSection>
-      <SettingsSection
-        title={translate('settings.touchpadOptions.behavior')}
-        collapsible
-        {...settingAnchor('touchpad-gestures', 'options')}
-      >
-        <CommandExecutionModeField
-          pageId="touchpad-gestures"
-          value={value.executionMode}
-          onChange={(executionMode) => change({ executionMode })}
-        />
-        <InputBrowserOptions pageId="touchpad-gestures" value={value} onChange={change} />
-      </SettingsSection>
-      <SettingsSection
-        title={translate('settings.touchpadOptions.keys')}
-        collapsible
-        description={translate('settings.touchpadOptions.keysHint')}
-        {...settingAnchor('touchpad-gestures', 'connections')}
-      >
         {touchpadGestureTypes.map(([gesture, title]) => {
           const connection = value.connections[gesture];
           return (

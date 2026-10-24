@@ -22,6 +22,9 @@ assert.equal(parseSettings(explicit).host.theme, 'dark');
 assert.equal('notifications' in parseSettings(explicit).host, false);
 assert.equal(parseSettings(explicit).gestures.enabled, false);
 initial.globalShortcutCommands = [];
+initial.keybindings = [];
+initial.touchpadGestures.enabled = false;
+initial.touchpadGestures.bindings = [];
 initial.notificationPreferences = {
   overrides: [
     {
@@ -61,8 +64,11 @@ async function page(category) {
     notifications: '通知',
     tts: 'TTS',
     gestures: 'マウスジェスチャー',
+    permissions: '操作の許可',
+    'touchpad-gestures': 'タッチパッドジェスチャー',
   }[category];
-  await p.locator('.settings-categories').getByRole('button', { name: title, exact: true }).click();
+  await p.getByRole('combobox', { name: '設定を検索', exact: true }).fill('');
+  await p.getByTestId(`settings-nav:${category}`).click();
   await p.getByRole('heading', { name: title, level: 1, exact: true }).waitFor();
   await until(
     () =>
@@ -139,6 +145,22 @@ async function save(p) {
     await save(p);
     checks.push('common theme/hint card precedes Shell selection; theme saves immediately');
     p = await page('general');
+    await p.getByTestId('settings-nav:appearance').focus();
+    await p.keyboard.press('Tab');
+    const focus = await p.getByTestId('settings-nav:general').evaluate((e) => {
+      const style = getComputedStyle(e);
+      return {
+        visible: e.matches(':focus-visible'),
+        offset: parseFloat(style.outlineOffset),
+        width: parseFloat(style.outlineWidth),
+      };
+    });
+    assert(
+      focus.visible && focus.width > 0 && focus.offset + focus.width <= 0,
+      'keyboard focus stays inside the index row',
+    );
+    await capture(p, 'index-keyboard-focus');
+    checks.push('index keyboard focus stays visible inside the row and scroll frame');
     const sound = p.getByRole('switch', { name: '音の再生', exact: true });
     assert.equal(
       await p.locator('.settings-form').getByRole('switch').first().getAttribute('aria-label'),
@@ -170,16 +192,15 @@ async function save(p) {
     checks.push('general card order, window labels, startup status, removed legacy section');
     p = await page('notifications');
     assert.equal(await section(p, '通知の受け取り方').evaluate((e) => e.open), false);
-    assert.deepEqual(
-      (
-        await p
-          .locator(
-            '.notification-settings > .settings-section > summary h2, .notification-settings > .settings-section > header h2',
-          )
-          .allTextContents()
-      ).slice(0, 4),
-      ['通知の受け取り方', '読み上げ', 'MCP Event', 'AppDock'],
-    );
+    const notificationSections = await p
+      .locator(
+        '.notification-settings > .settings-section > summary h2, .notification-settings > .settings-section > header h2',
+      )
+      .allTextContents();
+    assert.equal(notificationSections[0], 'AppDock');
+    assert.deepEqual(notificationSections.slice(-2), ['読み上げ', '通知の受け取り方']);
+    assert(!notificationSections.includes('MCP Event'));
+    assert(!notificationSections.includes('通知の表示時間について'));
     const notices = p.locator('.notification-setting-card');
     assert.ok((await notices.count()) >= 3);
     assert.ok(
@@ -268,6 +289,45 @@ async function save(p) {
       saved.notificationPreferences.overrides.some(
         (r) => r.ownerId === 'errors' && r.durationSeconds === 12,
       ),
+    );
+    p = await page('permissions');
+    assert.equal(
+      await p
+        .getByTestId('permissions-help')
+        .evaluate((e) => e === e.parentElement.lastElementChild),
+      true,
+    );
+    await capture(p, 'permissions-help-last');
+    p = await page('touchpad-gestures');
+    const options = p.getByTestId('touchpad-options');
+    const connection = p.getByTestId('touchpad-connection');
+    assert.equal(await options.evaluate((e) => e === e.parentElement.firstElementChild), true);
+    assert.equal(await options.getAttribute('open'), null);
+    await options.locator(':scope > summary').click();
+    assert.equal(
+      await options
+        .locator('.settings-field')
+        .first()
+        .getByRole('switch')
+        .getAttribute('aria-label'),
+      'タッチパッドジェスチャーを使う',
+    );
+    assert.equal(
+      await connection.evaluate((e) => e.previousElementSibling?.dataset.testid),
+      'touchpad-options',
+    );
+    assert.equal(await connection.getAttribute('open'), null);
+    await connection.locator(':scope > summary').click();
+    assert.equal(await connection.getByRole('combobox').count(), 10);
+    assert.equal(await connection.getByRole('checkbox').count(), 40);
+    await connection
+      .getByTestId('touchpad-windows-settings')
+      .getByRole('button', { name: 'Windowsのタッチパッド設定を開く', exact: true })
+      .waitFor();
+    assert.equal(await p.getByRole('heading', { name: '接続用キー設定', exact: true }).count(), 0);
+    await capture(p, 'touchpad-reordered');
+    checks.push(
+      'permission help is last; touchpad options first with enabled field; Windows connection owns all ten keys and settings button',
     );
     ok = true;
   } finally {

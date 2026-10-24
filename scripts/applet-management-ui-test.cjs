@@ -431,14 +431,11 @@ async function until(fn, name) {
       }),
       searchStyle,
     );
-    assert.deepEqual(
-      await page.locator('.shortcut-order-open').evaluate((element) => {
-        const s = getComputedStyle(element);
-        return [s.width, s.height, s.borderRadius, s.backgroundColor];
-      }),
-      orderStyle,
+    assert.equal(await page.locator('.command-list-toolbar .shortcut-order-open').count(), 0);
+    assert.deepEqual(orderStyle.slice(0, 2), ['32px', '32px']);
+    checks.push(
+      'toolbar search matches command settings; Applet header order stays 32px and shortcut filter has no order action',
     );
-    checks.push('toolbar-search-and-order-match-command-settings');
     assert.deepEqual(
       await page
         .locator('[data-shortcut-command]')

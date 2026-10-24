@@ -30,6 +30,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
         body: body.getBoundingClientRect().toJSON(),
         bar: bar.getBoundingClientRect().toJSON(),
         toolbar: toolbar.getBoundingClientRect().toJSON(),
+        toolbarBorder: getComputedStyle(toolbar).borderBottomWidth,
         heading: body.querySelector('.settings-page-heading')?.getBoundingClientRect().toJSON(),
         pageToolbar: body.querySelector('.settings-page-toolbar')?.getBoundingClientRect().toJSON(),
         outerScroll: body.classList.contains('settings-page-scroll'),
@@ -78,6 +79,22 @@ module.exports = async ({ host, select, until, profile, checks }) => {
           return g.barVisible === g.scrollWidth > g.clientWidth + 1;
         }, 'scrollbar width measured');
         let g = await geometry();
+        assert.equal(g.toolbarBorder, '0px', page + ' filter has no bottom divider');
+        assert.equal(await host.locator('.command-list-toolbar .shortcut-order-open').count(), 0);
+        if (page === 'カスタムコマンド')
+          assert.equal(
+            await host.locator('.command-list-toolbar button[aria-label*="並べ替え"]').count(),
+            0,
+          );
+        if (['ショートカットキー', 'マウスジェスチャー'].includes(page))
+          assert.equal(
+            await host
+              .locator(
+                '.settings-section > summary > .settings-title-with-hint .settings-hint-icon',
+              )
+              .count(),
+            0,
+          );
         assert(
           g.outerScroll && g.heading && g.pageToolbar,
           'page header and controls share the outer scrollport',
@@ -309,6 +326,12 @@ module.exports = async ({ host, select, until, profile, checks }) => {
     ]) {
       await host.setViewportSize({ width, height });
       await select('Applet管理');
+      assert.equal(
+        await host
+          .locator('.command-list-toolbar')
+          .evaluate((e) => getComputedStyle(e).borderBottomWidth),
+        '0px',
+      );
       await body.evaluate((e) => {
         const toolbar = e.querySelector('.command-list-toolbar');
         e.scrollTop += toolbar.getBoundingClientRect().top - e.getBoundingClientRect().top + 250;

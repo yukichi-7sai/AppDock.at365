@@ -220,20 +220,6 @@ export function ApiPermissionsSettings({
       className="api-permissions settings-sections"
       aria-label={translate('settings.apiPermissionsSettings.title')}
     >
-      <SettingsSection
-        title={translate('settings.apiPermissionsSettings.details')}
-        collapsible
-        description={translate('settings.apiPermissionsSettings.prerequisiteHint')}
-      >
-        <SettingsField
-          title={translate('settings.apiPermissionsSettings.operationCheck')}
-          description={translate('settings.apiPermissionsSettings.operationHint')}
-        />
-        <SettingsField
-          title={translate('settings.apiPermissionsSettings.logs')}
-          description={translate('settings.apiPermissionsSettings.logsHint')}
-        />
-      </SettingsSection>
       <table
         className="permission-table"
         aria-label={translate('settings.apiPermissionsSettings.api')}
@@ -355,6 +341,21 @@ export function ApiPermissionsSettings({
           })}
         </tbody>
       </table>
+      <SettingsSection
+        title={translate('settings.apiPermissionsSettings.details')}
+        data-testid="permissions-help"
+        collapsible
+        description={translate('settings.apiPermissionsSettings.prerequisiteHint')}
+      >
+        <SettingsField
+          title={translate('settings.apiPermissionsSettings.operationCheck')}
+          description={translate('settings.apiPermissionsSettings.operationHint')}
+        />
+        <SettingsField
+          title={translate('settings.apiPermissionsSettings.logs')}
+          description={translate('settings.apiPermissionsSettings.logsHint')}
+        />
+      </SettingsSection>
     </section>
   );
 }

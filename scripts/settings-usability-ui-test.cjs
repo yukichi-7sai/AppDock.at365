@@ -233,7 +233,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await select('通知');
     const events = page
       .locator('.settings-section')
-      .filter({ has: page.getByRole('heading', { name: 'MCP Event', exact: true }) });
+      .filter({ has: page.getByRole('heading', { name: '通知の受け取り方', exact: true }) });
     await events.locator(':scope > summary').click();
     await events.getByRole('button', { name: '設定を開く', exact: true }).click();
     await page.getByRole('heading', { name: 'MCPサーバー', exact: true, level: 1 }).waitFor();
@@ -307,12 +307,16 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
             const m = document.querySelector('.settings-page-layout'),
               b = document.querySelector('.settings-body'),
               h = document.querySelector('.settings-page-heading'),
-              t = document.querySelector('.settings-page-toolbar');
+              t = document.querySelector('.settings-page-toolbar'),
+              c = document.querySelector('.settings-page-content');
             return {
               overflow: b.scrollWidth > b.clientWidth + 2,
               order:
+                b.contains(h) &&
+                b.contains(t) &&
+                b.contains(c) &&
                 h.getBoundingClientRect().bottom <= t.getBoundingClientRect().top + 1 &&
-                t.getBoundingClientRect().bottom < b.getBoundingClientRect().top,
+                t.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1,
               mainScroll: m.scrollTop,
             };
           });

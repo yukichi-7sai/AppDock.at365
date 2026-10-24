@@ -258,16 +258,6 @@ export function AppletManagementSettings({
               total: applets.length,
             })}
           </span>
-          <button
-            type="button"
-            className="settings-list-icon shortcut-order-open"
-            aria-label={translate('settings.appletManagementSettings.order')}
-            title={translate('settings.appletManagementSettings.displayOrder')}
-            disabled={busy || applets.length < 2}
-            onClick={() => setOrder(true)}
-          >
-            <ListIcon kind="order" />
-          </button>
         </div>
       </CommandListToolbar>
       <div className="settings-list-scroll">
@@ -287,6 +277,16 @@ export function AppletManagementSettings({
                     onClick={() => setInstall(true)}
                   >
                     ＋
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-list-icon shortcut-order-open"
+                    aria-label={translate('settings.appletManagementSettings.order')}
+                    title={translate('settings.appletManagementSettings.displayOrder')}
+                    disabled={busy || applets.length < 2}
+                    onClick={() => setOrder(true)}
+                  >
+                    <ListIcon kind="order" />
                   </button>
                 </span>
               </th>

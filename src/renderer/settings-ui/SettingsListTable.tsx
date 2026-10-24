@@ -122,6 +122,7 @@ export function SettingsListTable({
   maxItems = 64,
   canAdd = true,
   addInTitle = false,
+  orderInTitle = false,
   commandListScroll = false,
   toolbarFilter,
 }: {
@@ -135,13 +136,14 @@ export function SettingsListTable({
   onDelete(index: number): void;
   onToggle?(index: number): void;
   canToggle?(entry: Record<string, unknown>, index: number): boolean;
-  onOrder(): void;
+  onOrder?(): void;
   extra?(entry: Record<string, unknown>, index: number): ReactNode;
   titleExtra?(entry: Record<string, unknown>): ReactNode;
   navigation?(entry: Record<string, unknown>): ReactNode;
   maxItems?: number;
   canAdd?: boolean;
   addInTitle?: boolean;
+  orderInTitle?: boolean;
   commandListScroll?: boolean;
   toolbarFilter?: ReactNode;
 }) {
@@ -158,19 +160,23 @@ export function SettingsListTable({
       })}
     </span>
   );
+  const orderInHeading = !!onOrder && addInTitle && orderInTitle;
+  const orderButton = (
+    <button
+      type="button"
+      className="settings-list-icon"
+      data-testid={testId ? `${testId}:list:order` : undefined}
+      title={translate('settings.settingsListTable.order')}
+      aria-label={translate('settings.settingsListTable.orderLabel', { title: definition.title })}
+      disabled={busy || entries.length < 2}
+      onClick={onOrder}
+    >
+      <ListIcon kind="order" />
+    </button>
+  );
   const actions = (
     <>
-      <button
-        type="button"
-        className="settings-list-icon"
-        data-testid={testId ? `${testId}:list:order` : undefined}
-        title={translate('settings.settingsListTable.order')}
-        aria-label={translate('settings.settingsListTable.orderLabel', { title: definition.title })}
-        disabled={busy || entries.length < 2}
-        onClick={onOrder}
-      >
-        <ListIcon kind="order" />
-      </button>
+      {!!onOrder && !orderInHeading && orderButton}
       {!addInTitle && (
         <button
           type="button"
@@ -225,6 +231,7 @@ export function SettingsListTable({
                     disabled={busy || !canAdd || entries.length >= maxItems}
                     onClick={onAdd}
                   />
+                  {orderInHeading && orderButton}
                 </span>
               ) : (
                 fields.find((field) => field.key === key)!.title

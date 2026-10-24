@@ -385,6 +385,32 @@ async function tableAppearance(table) {
               page.locator('.command-shortcuts .applet-shortcut-overview'),
             );
         }
+        await select('タッチパッドジェスチャー');
+        const touchpadOptions = page.getByTestId('touchpad-options');
+        if (!(await touchpadOptions.evaluate((e) => e.open)))
+          await touchpadOptions.locator(':scope > summary').click();
+        const touchpadConnection = page.getByTestId('touchpad-connection');
+        if (!(await touchpadConnection.evaluate((e) => e.open)))
+          await touchpadConnection.locator(':scope > summary').click();
+        assert.equal(await touchpadConnection.getByRole('combobox').count(), 10);
+        assert.equal(await touchpadConnection.getByRole('checkbox').count(), 40);
+        await fields(
+          touchpadConnection,
+          await page.locator('.settings-page-layout').evaluate((e) => e.clientWidth <= 660),
+        );
+        await touchpadConnection.scrollIntoViewIfNeeded();
+        const touchpadOverflow = await page.locator('.settings-body').evaluate((body) => {
+          return {
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+          };
+        });
+        assert(
+          touchpadOverflow.scrollWidth <= touchpadOverflow.clientWidth + 2,
+          'touchpad page keeps horizontal table scrolling inside its table wrapper',
+        );
+        measurements.push({ type: 'touchpad-overflow', theme, width, ...touchpadOverflow });
+        await screenshot(`${theme}-${width}-touchpad-connection`);
         await select('通知');
         const notifications = page.locator('.notification-settings');
         const ownerCards = notifications.locator(':scope > [aria-label$="の通知"]');
@@ -420,7 +446,7 @@ async function tableAppearance(table) {
           }
           measurements.push({ type: 'notification-owner', theme, width, ...layout });
         }
-        for (const name of ['読み上げ', 'MCP Event']) {
+        for (const name of ['読み上げ', '通知の受け取り方']) {
           const card = notifications
             .locator(':scope > .settings-section')
             .filter({ has: page.getByRole('heading', { name, exact: true }) });
@@ -531,10 +557,11 @@ async function tableAppearance(table) {
             return (
               !!help &&
               !help.open &&
-              !!(help.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING)
+              !!(table.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+              e.lastElementChild === help
             );
           }),
-          'collapsed help card precedes the top-level permission table',
+          'collapsed help card follows the top-level permission table at the end',
         );
         const background = await page.locator('.permission-table').evaluate((e) => {
           const sample = document.createElement('span');

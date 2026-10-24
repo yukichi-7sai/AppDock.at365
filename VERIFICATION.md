@@ -1,5 +1,45 @@
 # 検証記録
 
+## 2026-10-25: 設定UI 0.86.9〜0.86.12のコミット前照合
+
+- main `13ce177`上の32ファイルを対象として実装差分と影響先を再レビューし、追加修正を要する指摘なし。stage前に実効author/committerとremote設定を確認した。新しいAbout画面の実装はこのコミットの後に分離する。
+- 0.86.12の686入力、完全ログ・記録のhash、固定EXE/feed/GUIコピーを照合。型/build・固定GUI4系統65群・smokeの成功を再利用した。旧標準回帰874件の入力とも比較し、差分はrenderer・UI文言・検証スクリプト・版・文書に限定された。
+- 現行の翻訳/設定ナビゲーション10件を再利用。CSSを直接読むappearance 7件と、再発行でhashが変わったnative生成物を読む3ファイル7件を追加し、全件成功した。nativeのソース/SDK契約は不変で、SDKのInformationalVersionは現在のHEADを含む。残る850件の標準成功を再利用し、**標準112ファイル・874/874、fail/skip 0**を確認した。製品コードや版は修正せず、再発行していない。
+- 証跡は`.artifacts/commit-validation-settings-ui-08612/`のaudit/reuse、delta-from-standard、追加試験JSON/完全log、stage/commit。標準の再利用元は`.artifacts/commit-validation-gesture-labels-0868/`と`.artifacts/touchpad-labels-20261025/`、UIの再利用元は`.artifacts/settings-list-08611/`・`settings-list-08612/`。既存の参照資料を保持し、push/Release/実利用先deployは行わない。
+
+## 2026-10-25: 一覧ヘッダー・固定フィルターと説明の整理 0.86.12
+
+- main `13ce177`上で0.86.9〜0.86.10の未コミット変更を保持して追加修正。dirty状態のpull/stash/branch変更・commitは行わず、Fluid worktreeは変更していない。前回入力は`.artifacts/settings-ui-08610/inputs-final.json`、今回の差分レビュー/入力一覧は`.artifacts/settings-list-08611/`と`settings-list-08612/`へ記録した。
+- Applet管理・ショートカット・マウス/タッチパッドジェスチャー・カスタムコマンド・Webアカウントが使う共通固定フィルターの下端罫線を除去。背景・sticky位置・横スクロールとの連動を保持した。Webアカウントの使用中/削除/クリアの説明はページ最上部の説明へ統合し、一覧直上の重複段落を削除した。使用中の削除ガードや確認ダイアログは変更なし。
+- Applet管理・AI・MCPクライアントの順番変更ボタンを、名前列ヘッダーの追加ボタン直後へ移動。`SettingsListTable.orderInTitle`を追加し、`onOrder`省略時は順番変更を表示しない。ショートカット・両ジェスチャー・カスタムコマンドのフィルターにある順序変更ボタンと専用の未使用UI接続を除去した。各割り当て行の実行順操作と、保存済みの順序・公開APIは保持した。
+- ショートカット/マウスジェスチャーの「動作設定」Sectionだけhintを除去し、Field単位のhintは保持。「Windowsとの接続」は初期状態で閉じた共通Sectionへ変更し、開くと全10種類の接続キー・修飾キー・Windows設定ボタンを表示する。共通の設定アンカーを保持した。レイアウト追加規則と現構成を設定基盤・一覧編集・タッチパッド設計へ反映した。
+- 型検査/build・固定lockfileの依存同期は終了0。翻訳/設定ナビゲーションは **10/10（fail/skip 0）**。0.86.11ではソースと固定EXEで一覧操作12群・スクロール38群・Webアカウント7群・配置8群とsmokeが成功。その後の目視確認で狭幅AIヘッダーの「サーバー」の折り返しを見つけ、共通ヘッダーのnowrapとAIの内容に応じた列幅へ追加修正した。再レビュー・型検査/build・ソースGUI12群・画像確認後に、規定どおりパッチを進めて **0.86.12**を発行した。
+- 最終固定EXEでも **一覧操作12群・スクロール38群・Webアカウント7群・配置8群、計4系統65群** とsmoke（ok=true）が成功。明暗/1280・760幅、名前と2ボタンの一行配置・セル内収まり、移した操作の起動/取消、各行の実行順・検索/絞り込み/横スクロール、折りたたみの初期状態、Webアカウントの変更/確認/実プロセス再起動を隔離fixtureで検証した。最終画像も目視確認した。
+- 0.86.11以降の4入力差分はpackageの版、GUI検証、renderer CSS 2ファイルのみ。翻訳/カタログ/単体試験/依存が不変な10件はhash差分を照合して再利用した。全標準回帰と実タッチパッド/実Windows設定変更・実アカウント・実利用先の確認は未実行。設定モデル・保存形式・公開API・入力処理の変更を含まないためパッチ更新とした。
+- `publish.bat`終了0。本体/EXE/Default Shell/feedは **0.86.12**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は170,683,530 bytes、SHA256 `c462f21814e4e743cb16473bb2f01f001c6aaf999757f6212907d610302e1a0c`。feedのsize/hashと各固定GUIコピーが一致した。
+- 証跡は`.artifacts/settings-list-08612/`のreview/reuse、changed-inputs-since-08611、686入力のinputs-final/input-verification、コマンド別JSON/完全log、package-verification、evidence-hashes。初期変更・0.86.11の証跡は`.artifacts/settings-list-08611/`へ保持。最終画像/測定は`.artifacts/settings-hints-ui-1792859937761/`、`-1792859971768/`、`-1792860013324/`、配置は`.artifacts/settings-layout-1792860043707/`、smokeは`.artifacts/smoke-1792860060424/`。今回の成功は種類/実行方式別の直近3回と参照用証跡を保持し、他作業との共有/参照関係が不明な旧資料も保持。削除0件。未コミット、push/Release/実利用先deployなし。
+
+## 2026-10-25: mainの設定インデックスとSection配置整理 0.86.10
+
+- main `13ce177`上で、前回0.86.9の未コミット変更を保持して追加修正した。開始差分は`.artifacts/settings-ui-08610/baseline.patch`。dirty状態のpull/stash/branch変更は行わず、Fluid worktreeは変更していない。
+- インデックスの通常項目・検索結果のフォーカス枠をボタン内側へ配置し、スクロール枠による欠けを解消。キーボードTabによるfocus-visibleを実際に発生させ、枠がボタン内に収まることを検査・目視確認した。
+- 操作の許可はテーブル→「許可の適用とログについて」の順。通知は提供元別の種類→利用できない種類（存在時）→読み上げ→通知の受け取り方の順。表示時間とMCP連携の説明・設定リンクを受け取り方へ統合し、Windows通知の説明とMCPの接続条件の重複をまとめた。旧表示時間/MCP Eventの独立Sectionは削除した。
+- タッチパッドは先頭の折りたたみ「動作設定」の最初に有効スイッチを配置。「Windowsとの接続」へ全10種類の接続キーと40個の修飾キーチェックをまとめ、Windows設定ボタンを共通Fieldへ配置。元の設定アンカー・即時保存・操作ハンドラーを保持した。共通指針/設定基盤/タッチパッド設計を現構成へ更新した。
+- 型検査/build、固定lockfileの依存同期は終了0。翻訳・設定ナビゲーション・タッチパッドの模擬回帰は **18/18（fail/skip 0）**。設定モデル・保存形式・公開API・OS入力処理に変更なしの表示整理としてパッチ更新した。全標準回帰は未実行。
+- 発行前レビューで未解決指摘なし。既存GUIのページ移動前の検索解除、本文内スクロールに対する旧フレーム判定、許可説明の旧配置期待を修正して再検証した。初回失敗ログは保存。ソースGUI3系統成功後に発行し、固定EXEでも`settings-layout-ui-test` **8群**、`settings-usability-ui-test` **9群**、`settings-layout-refinements-ui-test` **8群**、smoke（ok=true）が成功した。移動後のリンク/保存、閉じた設定への検索移動、明暗/1280・760幅、接続キーの折り返し・ページ外への横はみ出しなしを確認した。Pause/F13〜F24をOSへ送信・登録する実入力試験は行っていない。既存`touchpad-ui-test`の変更は構文検査のみ。実タッチパッド/Windows設定の書き換え・実サービス/実利用先では未確認。
+- 本体/EXE/Default Shell/feedは **0.86.10**。`publish.bat`終了0。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は170,676,501 bytes、SHA256 `c2f0ebfe9442334563570f38dfa20040b4dafcb0699f7c2b092b237bfb3d36d0`。feedのsize/hash、固定GUIのコピーと一致した。
+- 証跡は`.artifacts/settings-ui-08610/`のbaseline、inputs-before/final（686入力）、input-verification、review、environment、コマンド別JSON/完全log、package-verification、evidence-hashes。固定GUI画像・測定は`.artifacts/settings-layout-1792858235647/`、`.artifacts/settings-usability-1792858252877/`、`.artifacts/settings-layout-refinements-ui-1792858274664/`。成功試験は種別/実行方式別の直近3回を保持し、今回の失敗調査と過去資料の参照/所有状況未確認分も保持。削除0件。未コミット、push/Release/実利用先deployなし。
+
+## 2026-10-25: SettingsFieldタイトルの縦中央配置 0.86.9
+
+- main `13ce177`のclean状態と追跡先origin/mainを確認し、通常ユーザー環境の`pull --ff-only`で最新取得済み。別worktreeのFluid UIは変更せず、既存のnative共通部品だけを修正した。
+- タイトルの上8pxの固定余白を取り除き、タイトル・ヒントの共通行を最小32pxに統一。20pxのスイッチには上下6pxを確保し、入力行と中心をそろえた。説明文や複数行入力全体には中央寄せせず、wide・読み取り専用・狭い幅の縦積みではタイトルの最小高さを解除する。個別ページ、設定・保存ファイル・公開API・入力イベントは変更なし。配置の追加ルールを共通レイアウト指針へ記載した。
+- 固定lockfileの依存同期後、型検査/buildは終了0。版更新直後の型検査は依存構造記録不一致で実行前に停止し、`install --frozen-lockfile`で同期後に同じ検査が成功した。依存版・lockfile・供給網検査は維持した。
+- 発行前に差分と影響先を自己レビューし、未解決指摘なし。既存`settings-layout-refinements-ui-test.cjs`はソース版・固定EXEの各8群が成功。明暗テーマ、1280/760幅、グループ名、説明・通知・権限・AIダイアログ、ヒントOFF、入力確定・取消・保存を確認した。CSS変更のため無関係な全標準回帰は実行していない。
+- `publish.bat`終了0。発行したEXEを隔離profileへコピーし、SHA256一致を確認して「音の再生」を測定。明暗ともタイトルとスイッチの中心差は約0.00001 CSS px、ヒントは0px。狭い幅で縦積み・タイトル最小高さ0pxを確認し、スクリーンショットを目視確認した。固定EXEのsmokeも終了0・ok=true。
+- 本体/EXE/Default Shell/feedは **0.86.9**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は170,677,596 bytes、SHA256 `bca6fd435bd291e004aa49db3ae6a0aa44cb30024a985d6b88d4676c46cd0ef4`。feedのsize/hashと一致。通常の表示修正としてパッチ更新した。
+- 証跡は`.artifacts/settings-field-title-0869/`のinputs-before/input-verification（686入力が検証前後一致）、review、コマンド別JSON/完全log、title-result、明暗/狭幅画像、package-verification、evidence-hashes。既存GUIのprofileは`.artifacts/settings-layout-refinements-ui-1792856786052/`と`-1792857017264/`、smokeは`.artifacts/smoke-1792857047620/`。未コミット、push/Release/実利用先deployなし。
+
 ## 2026-10-25: ジェスチャー表記・表示順0.86.8のコミット前照合
 
 - 0.86.6〜0.86.8の表記統一と割り当て表示順に関する13ファイルを再レビューし、追加修正を要する指摘なし。実効author/committerとGitHub/AQUA両mainの開始先端`865e0240993eaf80eb132118aaf301d3001d56d2`を確認した。

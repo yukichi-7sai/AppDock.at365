@@ -90,19 +90,6 @@ export function AiSettingsForm({
           <span className="muted">
             {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
           </span>
-          <div>
-            <button
-              className="settings-list-icon ai-icon-button"
-              aria-label={translate('settings.aiSettings.order')}
-              title={translate('settings.aiSettings.orderAction')}
-              disabled={busy || value.connections.length < 2}
-              onClick={() =>
-                setDialog({ kind: 'order', connections: structuredClone(value.connections) })
-              }
-            >
-              <ListIcon kind="order" />
-            </button>
-          </div>
         </SettingsActions>
         <SettingsContent className="command-shortcuts ai-connection-table">
           <table
@@ -119,6 +106,20 @@ export function AiSettingsForm({
                       disabled={busy || value.connections.length >= 8}
                       onClick={() => open('edit', null)}
                     />
+                    <button
+                      className="settings-list-icon ai-icon-button"
+                      aria-label={translate('settings.aiSettings.order')}
+                      title={translate('settings.aiSettings.orderAction')}
+                      disabled={busy || value.connections.length < 2}
+                      onClick={() =>
+                        setDialog({
+                          kind: 'order',
+                          connections: structuredClone(value.connections),
+                        })
+                      }
+                    >
+                      <ListIcon kind="order" />
+                    </button>
                   </span>
                 </th>
                 <th>{translate('settings.aiSettings.model')}</th>

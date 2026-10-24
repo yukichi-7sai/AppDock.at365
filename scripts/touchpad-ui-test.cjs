@@ -102,6 +102,7 @@ const checks = [];
       window.dock.executeCommand('appdock.settings.touchpad-gestures.open'),
     );
     const p = require('./settings-aware-page.cjs').settingsAwarePage(host);
+    await p.getByTestId('touchpad-options').locator(':scope > summary').click();
     await p.getByRole('switch', { name: 'タッチパッドジェスチャーを使う', exact: true }).waitFor();
     const nav = await host
       .locator('.settings-categories [aria-label="本体の設定"] > button')
@@ -192,24 +193,22 @@ const checks = [];
         }),
       errorItem,
     );
-    const connections = p
-      .locator('details')
-      .filter({ has: p.locator('summary h2').filter({ hasText: '接続用キー設定' }) });
-    const options = p
-      .locator('details')
-      .filter({ has: p.locator('summary h2').filter({ hasText: '動作設定' }) });
+    const connections = p.getByTestId('touchpad-connection');
     assert.equal(await connections.getAttribute('open'), null);
+    await connections.locator(':scope > summary').click();
+    const options = p.getByTestId('touchpad-options');
     assert.equal(
-      await connections.evaluate(
-        (e) => e.previousElementSibling?.querySelector('summary h2')?.textContent,
-      ),
-      '動作設定',
+      await connections.evaluate((e) => e.previousElementSibling?.dataset.testid),
+      'touchpad-options',
     );
     assert.equal(
       await connections.locator('..').evaluate((e) => e.tagName),
       await options.locator('..').evaluate((e) => e.tagName),
     );
-    await connections.locator('summary').click();
+    assert.equal(
+      await connections.getByTestId('touchpad-windows-settings').getByRole('button').count(),
+      1,
+    );
     const connectionKey = p.getByRole('combobox', {
       name: '4本指: タップの接続用キー',
       exact: true,

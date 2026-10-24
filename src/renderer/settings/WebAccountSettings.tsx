@@ -178,7 +178,6 @@ export function WebAccountSettings({
   return (
     <CommandListSection
       title={translate('settings.webAccountSettings.settings')}
-      description={translate('settings.webAccountSettings.hint')}
       {...settingAnchor('web-accounts', 'accounts')}
     >
       <SettingsListLayout

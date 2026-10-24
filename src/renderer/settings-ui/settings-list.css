@@ -6,6 +6,7 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
 }
 .settings-list-toolbar,
 .settings-list-toolbar > div,

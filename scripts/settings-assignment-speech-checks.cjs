@@ -25,7 +25,8 @@ module.exports = async function ({
         .getByText(title, { exact: true }),
     });
   const description = (title) => field(title).locator('.settings-field-label > p');
-  const mcpDescription = 'MCP Eventを使用するには、MCPサーバーの設定と連携が必要です。';
+  const mcpDescription =
+    'MCP EventはChatGPT Work/Dotsのイベントトリガーとして使用します。MCPサーバーの設定と、Secure MCP Tunnel等によるChatGPTとの連携が必要です。';
   for (const theme of ['light', 'dark']) {
     await select('表示');
     await host.getByLabel('テーマ', { exact: true }).selectOption(theme);
@@ -113,7 +114,7 @@ module.exports = async function ({
       assert.equal(await description('速度').innerText(), '現在の速度: 1.25');
       for (const title of ['声', '速度'])
         assert.equal(await field(title).locator('.settings-field-control > p').count(), 0);
-      await card('MCP Event').locator(':scope > summary').click();
+      await card('通知の受け取り方').locator(':scope > summary').click();
       assert.equal(await description('MCP連携設定').innerText(), mcpDescription);
       await hints(false);
       assert.equal(await description('声').isVisible(), true);
@@ -161,7 +162,7 @@ module.exports = async function ({
   await field('TTS設定').getByRole('button', { name: '設定を開く', exact: true }).click();
   await host.getByRole('heading', { name: 'TTS', exact: true, level: 1 }).waitFor();
   await select('通知');
-  await card('MCP Event').locator(':scope > summary').click();
+  await card('通知の受け取り方').locator(':scope > summary').click();
   await field('MCP連携設定').getByRole('button', { name: '設定を開く', exact: true }).click();
   await host.getByRole('heading', { name: 'MCPサーバー', exact: true, level: 1 }).waitFor();
   checks.push('notification-TTS-and-MCP-settings-links-retain-destinations');

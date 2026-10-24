@@ -7,7 +7,6 @@ import {
 } from '../../shared/touchpad-gestures';
 import { TouchpadOptions, type TouchpadEditorStatus } from './TouchpadOptions';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { useState } from 'react';
 import { useBindingCommandFilter } from '../settings-ui/useBindingCommandFilter';
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
@@ -67,7 +66,6 @@ export function GesturesEditor({
   const displayBindings = touchpad
     ? touchpadGestureTypes.flatMap(([gesture]) => bindings.filter((row) => row.gesture === gesture))
     : groupGestureBindings(bindings).flatMap((group) => group.bindings);
-  const [orderOpen, setOrderOpen] = useState(false);
   const change = (patch: Partial<typeof gestures>) =>
     onChange(
       touchpad
@@ -149,7 +147,6 @@ export function GesturesEditor({
           statusFilter={statusFilter}
           setFilter={setFilter}
           setStatusFilter={setStatusFilter}
-          onOrder={() => setOrderOpen(true)}
           inputFilter={inputFilter}
           clearInputFilter={clearInput}
         >
@@ -206,16 +203,6 @@ export function GesturesEditor({
             />
           )}
         />
-        {orderOpen && (
-          <GestureOrderDialog
-            touchpad={!!touchpad}
-            settings={settings}
-            commands={catalog}
-            applets={targets}
-            onChange={onChange}
-            onClose={() => setOrderOpen(false)}
-          />
-        )}
       </CommandListSection>
     </>
   );

@@ -174,9 +174,6 @@
   accent-color: var(--accent);
   justify-self: start;
 }
-.settings-field-wide > .settings-field-label {
-  padding-top: 0;
-}
 .applet-settings .object-list-item {
   border-radius: 12px;
   background: var(--settings-group-background);
@@ -224,8 +221,15 @@
   color: var(--muted);
 }
 .settings-field-label {
-  padding-top: 8px;
   min-width: 0;
+}
+.settings-field-label > .settings-title-with-hint {
+  min-height: 32px;
+}
+.settings-field:is(.settings-field-wide, [data-readonly='true'])
+  > .settings-field-label
+  > .settings-title-with-hint {
+  min-height: 0;
 }
 .settings-field-label strong {
   min-width: 0;
@@ -269,7 +273,7 @@
 }
 .settings-field-control > .toggle {
   justify-self: start;
-  margin-top: 5px;
+  margin-block: 6px;
 }
 .settings-field-control p,
 .settings-section p {
@@ -420,8 +424,8 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
-  .settings-field-label {
-    padding-top: 0;
+  .settings-field-label > .settings-title-with-hint {
+    min-height: 0;
   }
   .settings-section > header,
   .settings-section > summary {

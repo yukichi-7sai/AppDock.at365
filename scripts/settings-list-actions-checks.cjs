@@ -65,6 +65,42 @@ module.exports = async ({
       let reference;
       for (const [title, selector] of pages) {
         await select(title);
+        if (['Applet管理', 'AI', 'MCPクライアント'].includes(title)) {
+          const order = host.getByRole('button', { name: /並べ替え/ });
+          assert.equal(await order.count(), 1, title + ' has one order action');
+          assert.equal(
+            await order.evaluate(
+              (e) =>
+                !!e.closest('thead th') &&
+                e.previousElementSibling?.matches('.applet-shortcut-add') &&
+                e.parentElement.getBoundingClientRect().right <=
+                  e.closest('th').getBoundingClientRect().right + 1 &&
+                getComputedStyle(e.parentElement).whiteSpace === 'nowrap',
+            ),
+            true,
+            title + ' places order immediately after add in its name header',
+          );
+          assert.equal(
+            await host
+              .locator('.command-list-toolbar, .settings-list-toolbar, .ai-connections-toolbar')
+              .getByRole('button', { name: /並べ替え/ })
+              .count(),
+            0,
+            title + ' toolbar has no duplicate order action',
+          );
+          if (!(await order.isDisabled())) {
+            const before = (await snapshot()).settings.value;
+            await order.click();
+            const dialog = host.getByRole('dialog');
+            await dialog.waitFor();
+            await dialog.press('Escape');
+            await dialog.waitFor({ state: 'hidden' });
+            assert.deepEqual((await snapshot()).settings.value, before);
+          }
+          await host.screenshot({
+            path: path.join(profile, `header-actions-${theme}-${width}-${title}.png`),
+          });
+        }
         await host.getByRole('heading', { level: 1 }).hover();
         const geometry = await host.locator(selector).evaluateAll((buttons) => {
           const probe = document.createElement('span');

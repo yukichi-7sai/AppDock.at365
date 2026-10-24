@@ -51,9 +51,6 @@ export function GestureOptions({
       collapsible
       className="gesture-settings-section"
       title={hostSettingItem('gestures', 'options').title}
-      hint={translate('settings.gestureOptions.hint', {
-        value: hostSettingItem('gestures', 'options').description ?? '',
-      })}
       {...settingAnchor('gestures', 'options')}
     >
       <SettingsField
