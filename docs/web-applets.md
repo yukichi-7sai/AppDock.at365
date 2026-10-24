@@ -1,12 +1,12 @@
 # WebApplet
 
-WebAppletは独立した[Applet.WebApplet.at365](../../Applet.WebApplet.at365/docs/usage.md)が提供するNode Appletです。AppDock 0.45.0以上で動作し、Applet側に.NETやElectronを含めません。サイト管理・推奨設定の取得はApplet、ページ表示・Webアカウント・Cookie保存はホストの共通APIが担当します。
+WebAppletは独立した[Applet.WebApplet.at365](../../Applet.WebApplet.at365/docs/usage.md)が提供するNode Appletです。現行AppletはAppDock 0.86.5以上で動作し、Applet側に.NETやElectronを含めません。推奨設定の取得処理はApplet、設定フォーム・ページ表示・Webアカウント・Cookie保存はホストの共通機構が担当します。
 
 ## 導入と操作
 
-A:/40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-appletをAppDockのextensionsへ配置し、Applet一覧で有効にします。「WebAppletを管理」でサイト・アカウント・新規サイトの初期ショートカットを編集します。サイトは個別の管理項目とリボンとして現れ、名前・表示先・キー割当を個別に設定できます。最大64サイト、1Appletにつき32アカウント枠です。
+A:/40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-appletをAppDockのextensionsへ配置し、Applet一覧で有効にします。設定画面の「WebApplet」でサイトと新規サイトの初期ショートカットを編集し、「Webアカウント」でアカウント枠を管理します。WebApplet自身の管理ページは持たず、登録サイトだけがリボンのページになります。サイトの名前・表示先・キー割当を個別に設定できます。最大64サイト、1Appletにつき32アカウント枠です。
 
-登録サイトと初期ショートカットは本体の宣言型一覧を使い、管理ページと設定ページで同じ表を表示します。編集は歯車、削除はゴミ箱、有効状態はトグルで操作します。追加/編集はダイアログのOKで1レコードを即時保存します。不正入力や競合時は入力を残します。URL、許可origin、枠の選択は両画面から編集でき、アイコンとWeb側の推奨設定取得は管理ページで扱います。管理ページでは枠がなければ明示追加時に「個人用」を作ります。サイトの削除は枠を削除しません。新規サイトのキー既定値は既存の割り当てへ遡及しません。
+登録サイトと初期ショートカットは本体の宣言型一覧を使います。編集は歯車、削除はゴミ箱、有効状態はトグルで操作します。追加/編集はダイアログのOKで1レコードを即時保存し、不正入力や競合時は入力を残します。URL、許可origin、アカウント枠、画像を同じダイアログで編集し、URL欄からWebの推奨設定を読み込めます。手入力・取得中の入力・選択済み画像を保持し、推奨画像もOKまで登録しません。取得元は同一originへ制限します。サイトの削除は枠を削除しません。新規サイトのキー既定値は既存の割り当てへ遡及しません。
 
 親Appletの停止は全サイト画面を閉じます。サイト単独の停止はそのページだけを閉じ、再起動はそのSurfaceだけを再生成します。ページ・Window切替は同じViewを使います。Windowの×は非表示です。各サイトのログイン可否は提供サービスに依存し、常時受信は保証しません。
 
@@ -36,7 +36,7 @@ remoteページはsandbox/contextIsolation/webSecurityを有効にし、preload/
 
 開始URLのlink rel=manifest、なければ同じoriginの/.well-known/appdock.jsonを取得します。name/short_name/start_url/iconsとappdock.schemaVersion=1のnavigation（none/same-origin）だけを解釈します。any、追加origin、アカウント、コマンド、ホスト設定は採用しません。
 
-取得は認証なし、同一origin、最大3転送、要求全体5秒、HTML/画像256KB・JSON64KB。取得失敗でも手動登録できます。前回の取り込み値を記録し、手動変更と取得中の入力を保持します。PNG/JPEGの取得画像はホストで検証・32px PNG化します。手動画像はPNG/JPEG/WebP、4MB・2048px以下です。
+取得は認証なし、同一origin、最大3転送、要求全体5秒、HTML/画像256KB・JSON64KB。取得失敗でも手動登録できます。前回の取り込み値を記録し、手動変更と取得中の入力を保持します。PNG/JPEGの取得画像はホストで検証し、共通ライブラリーへ原画像を登録します。手動画像はPNG/JPEG/WebP、4MB・2048px以下です。
 
 ## 公開操作
 
@@ -50,7 +50,7 @@ remoteページはsandbox/contextIsolation/webSecurityを有効にし、preload/
 
 ## 共通画像
 
-WebAppletの管理ダイアログでは画像を共通ライブラリーから選ぶ。提供JSONやメタデータで取得した元画像も、OK時に共通importへ渡す。サイトレコードのimageはRegisteredImageRef、既存iconのdata URLは保持する。imageを優先し、未取得時は既存iconへ戻る。ローカル管理ページは登録画像APIを使い、リモートサイトには渡さない。原画像・制約・グループは[共通画像](registered-images.md)を参照する。
+WebAppletの設定ダイアログでは画像を共通ライブラリーから選ぶ。提供JSONやメタデータで取得した元画像も、OK時に共通importへ渡す。サイトレコードのimageはRegisteredImageRef、既存iconのdata URLは保持する。imageを優先し、未取得時は既存iconへ戻る。設定フォームが登録画像APIを使い、リモートサイトには渡さない。原画像・制約・グループは[共通画像](registered-images.md)を参照する。
 
 ## Webプロフィール
 
@@ -64,7 +64,7 @@ HTTP(S)・資格情報のないURLを使い、none/same-origin/any＋追加origi
 
 ## WebAppletと保存済みデータ
 
-独立AppletのIDはat365.web-applet。サイト設定と初期キーはextensions.at365.web-applet.settingsへ保存する。管理画面は自身のlocalページで、サイト追加/編集はダイアログのOKで1レコードを保存する。不完全入力とエラーは画面内に保持する。アカウント名はIME確定後のblur/Enterで保存する。
+独立AppletのIDはat365.web-applet。サイト設定と初期キーはextensions.at365.web-applet.settingsへ保存する。管理は本体設定のWebAppletページへ集約し、サイト追加/編集は共通ダイアログのOKで1レコードを保存する。不完全入力とエラーはダイアログ内に保持する。Webアカウント設定のアカウント名はIME確定後のblur/Enterで保存する。
 
 推奨JSONの取得/解釈はApplet側に置く。認証なし、同一origin、転送3回、要求全体5秒、HTML/画像256KB・JSON64KBの上限を設ける。name/short_name/start_url/iconsと限定したnavigationだけを採用し、手動変更を上書きしない。画像のデコード/縮小だけを共通ホストAPIへ委譲する。
 

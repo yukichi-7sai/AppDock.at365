@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-24: Fluidを含めずWebApplet設定基盤をmainへ移植 0.86.5
+
+- cleanな本体main`63ca00a`とWebApplet main`ef4ecf7`を各追跡先からff-only取得し、更新なし。Fluid側`e8494b9`の宣言型一覧ダイアログの機能差分と、WebApplet `fb48e89`の管理ページ削除・設定集約を選択した。ブランチ全体のmerge/cherry-pickはせず、3方向比較でmainのnative部品を維持した。本体の元のUI・配色・密度・レイアウト・フォーカス、Select/Input/パレット、CSSなど31ファイルと依存・ビルド設定のハッシュが不変。Fluidのコード/依存/ビルド、後続の見た目調整、設定専用倍率は移植していない。
+- 共通`list.draftAction`の宣言・検証、現在のAppletへ束縛したpage.action呼び出し、runtime交代の拒否、手動/取得中の入力を保つ推奨値合成、取消/画面変更後の応答破棄、画像の一時プレビューとOK時だけのimportを移植した。画像選択・一覧/ダイアログ/ナビゲーションには非表示の安定test IDだけを補い、既存のタグとクラス・操作契約を維持した。設定/保存ファイルの追加・移行はなく、本体mainは通常パッチ0.86.5。SDK宣言の最低対応版も0.86.5へ接続し、WebAppletは既に発行済みの0.4.0から0.4.1、minimumHostVersionは0.86.5とした。Default Shellのソース版0.0.0は変更せず、既存buildが同梱版0.86.5を生成する。
+- 発行前レビューの未解決指摘なし。通常ユーザー環境で固定Node 24.22.1/pnpm 12.10.1のfrozen install・型検査・build・fixture build・WebApplet buildが成功。本体標準874/874、WebApplet単体2/2が成功。ソースGUIは設定一覧5、推奨取得/遠隔ページ8、動的ページ4の17群が成功した。新しい見た目・寸法・色・配置・画像比較assertは追加していない。
+- 両publish終了0。最終固定EXEは設定一覧5群、推奨取得/画像/実プロセス再起動8群、画像ライブラリ9群、smokeが成功した。取消では設定と画像を保存せず、OKでだけ登録し、手入力・未確定入力・選択済み画像・旧icon・保存済みサイトID・アカウント名簿・Cookieを維持する。追加/編集/削除/順序/競合/フォーカス、共通画像選択、リモートページのbridge非公開、親停止時の破棄も確認した。固定profileは`web-list-ui-1792849177459`、`web-portable-1792849194462`、`image-library-ui-1792849485724`、`smoke-1792849523653`。ソースは`web-list-ui-1792848815545`、`web-portable-1792848820996`、`dynamic-pages-ui-1792848826589`。
+- 画像ライブラリの初回試験は、mainで既に本体内表示となった画面を古い`/image-library.html`として待って失敗した。`image-library-ui-1792849224657`と失敗ログを保持し、試験の画面検出だけをsnapshot.navigation.routeと本体hostへ接続して再実行した。登録/選択/保存のassertは維持し、製品や配布物は変更していない。発行後の非同梱GUIスクリプト修正であり、これを参照しない874単体と他の成功GUIは入力を照合して再利用した。対象画像GUI9群と未実行smokeは同じEXEで成功した。
+- EXE/FileVersion/ProductVersion/feed/同梱Default Shellは0.86.5で一致。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は170,681,235 bytes / SHA256 `c5ff249d053754066906497cec33e95922e5de3d6310ee065c57297c0bf18ffc`、ASAR `d3f02d6bfb5854cb02b4ec320406f59297263f30f18fe259a5e40e38d4ae0cfc`。out 228ファイルとwin-unpackedを照合した。WebApplet ZIPは5,427 bytes / SHA256 `e68b02a0024dd60e562141ca3c1c8941266b4fa4a8525288635a3830b68416d6`。版/minimumHost、runtime4ファイル、MIT License、既知の旧管理資産が含まれないことを照合した。
+- 証跡は`.artifacts/web-settings-port/`のbaseline/web-baseline/extraction/review、各build/unit/source-gui/publish/fixed/fixed-remainingのJSON・入力manifest・完全log、package/verification.json、file-version.json、final-validation.json、cleanup-audit.json、commit-validation.json。画像試験修正以外の発行後差分は検証文書のみとする。実利用先・認証・実サービス・実キー/Pause/F13～F24登録や物理タッチの確認ではなく、隔離fixture/loopbackである。
+- 元のFluid worktreeのHEADと未commit11ファイル、WebAppletのcodex/fluid-ui、試行06a6265を保持した。GitHub/AQUA本体mainは開始時63ca00a。WebAppletはGitHub main ef4ecf7、AQUA main 28476bc（前者に含まれる既存の差）を確認し、remoteを変更していない。ローカルmainのstage/commit treeと実効identityを別記録へ照合する。push・Release・実利用先deployは行わない。古い成功profile62件を、終了/成功・絶対パス・リンクなし・参照なしを確認して削除し、直近3回と参照/失敗/固定証跡48件を保持した。削除名とsuccess proofはcleanup-results、整理前後はcleanup-audit-before/cleanup-auditへ記録する。今回のprofile参照プロセスは0。
+
 ## 2026-10-24: 本体レビュー0.86.4のコミット・プッシュ前照合
 
 - 実装時からの697入力、226生成物、完全ログ45件、発行EXEと固定GUI2種/smokeコピーのSHA256一致を確認した。型検査/build、標準866/866、固定EXE GUI9+7群、模擬native10件とsmokeの成功を再利用。製品修正・版更新・再発行は行わない。証跡は`.artifacts/commit-validation-host-review-0864/reuse.json`。

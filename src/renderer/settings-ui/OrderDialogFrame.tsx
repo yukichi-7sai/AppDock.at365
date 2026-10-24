@@ -82,10 +82,16 @@ export function OrderDialogFrame({
       footer={
         <footer>
           <div>
-            <button type="button" disabled={pending} onClick={onClose}>
+            <button
+              type="button"
+              data-testid="settings-dialog-cancel"
+              disabled={pending}
+              onClick={onClose}
+            >
               {translate('settings.orderDialogFrame.cancel')}
             </button>
             <SettingsButton
+              data-testid="settings-dialog-confirm"
               type="button"
               className="primary"
               pending={pending}

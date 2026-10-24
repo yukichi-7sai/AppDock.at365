@@ -104,6 +104,7 @@ export function SettingsOrderDialog({
             <button
               type="button"
               className="shortcut-order-handle"
+              data-testid={`settings-order-handle:${item.id}`}
               draggable={!pending}
               disabled={pending}
               data-initial-focus={index === 0 || undefined}
@@ -141,6 +142,7 @@ export function SettingsOrderDialog({
                 type="button"
                 aria-label={translate('settings.settingsOrderDialog.up', { title: item.title })}
                 className="accent-action"
+                data-testid={`settings-order-up:${item.id}`}
                 disabled={pending || !index}
                 onClick={() => move(item.id, rows[index - 1].id)}
               >
@@ -149,6 +151,7 @@ export function SettingsOrderDialog({
               <button
                 type="button"
                 aria-label={translate('settings.settingsOrderDialog.down', { title: item.title })}
+                data-testid={`settings-order-down:${item.id}`}
                 className="accent-action"
                 disabled={pending || index === rows.length - 1}
                 onClick={() => move(item.id, rows[index + 1].id)}

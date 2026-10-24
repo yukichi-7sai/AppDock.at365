@@ -36,6 +36,7 @@ export function SettingsIndex({
   const row = (p: SettingsPageModel['content']['navigation'][number]) => (
     <button
       key={p.id}
+      data-testid={`settings-nav:${p.id}`}
       className={p.id === content.page.id ? 'selected' : undefined}
       aria-current={p.id === content.page.id ? 'true' : undefined}
       onClick={() => act({ kind: 'select', pageId: p.id })}

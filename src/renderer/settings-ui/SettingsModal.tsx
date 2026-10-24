@@ -118,6 +118,7 @@ export function SettingsModal({
     >
       <SettingsInputMode.Provider value="input">
         <dialog
+          data-testid="settings-dialog"
           ref={dialog}
           className={`applet-shortcut-dialog settings-modal ${className}`}
           aria-labelledby={labelledBy}
@@ -263,10 +264,15 @@ export function SettingsDialog({
       footer={
         <footer>
           <div>
-            <button disabled={pending && !cancelWhilePending} onClick={onClose}>
+            <button
+              data-testid="settings-dialog-cancel"
+              disabled={pending && !cancelWhilePending}
+              onClick={onClose}
+            >
               {t('common.cancel')}
             </button>
             <SettingsButton
+              data-testid="settings-dialog-confirm"
               className="primary"
               disabled={!ready || !valid}
               pending={pending}

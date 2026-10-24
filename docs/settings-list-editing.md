@@ -273,7 +273,7 @@ Appletでは[Applet設定の公開契約](extensions.md#共通の設定ページ
 
 AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出しとした1始まりの番号列を追加する。編集・削除・並べ替えの対象名も`itemTitle`と番号で表示する。モニターのように配列位置が割り当て先を表す設定に使い、番号を永続IDとして保存しない。`string-list`の`format: directory`は共通のフォルダー追加・選択・削除入力を使う。旧JSON文字列の一覧と`aliases`・`numericOptions`を読み、編集した登録だけをOKで正規化して保存する。
 
-フィールドの`propertyPath`は最大3階層の保存パス（例:`["when", "scope"]`）。prototype系キーは禁止。未知の保存項目は保持する。selectの`optionSource: "web-profiles"`は同じAppletの共通プロフィール名簿だけを選択肢に使い、capabilityを必要とする。空の名簿ではAppletの管理画面で枠を追加してから選択する。
+フィールドの`propertyPath`は最大3階層の保存パス（例:`["when", "scope"]`）。prototype系キーは禁止。未知の保存項目は保持する。selectの`optionSource: "web-profiles"`は同じAppletの共通プロフィール名簿だけを選択肢に使い、capabilityを必要とする。空の名簿では本体のWebアカウント設定で枠を追加してから選択する。
 
 本体の保存操作は表示中Appletの宣言済み一覧だけを受け付け、開いた時点の一覧と現在値を照合する。変更があればダイアログへ競合を返す。正常時は最新設定へその一覧だけを合成し、共通SettingsCommandsで検証・保存する。任意のApplet向けSettingsPage操作は公開しない。
 
@@ -297,3 +297,11 @@ AppDock 0.46.0以降の`showIndex: true`は、先頭へ`itemTitle`を見出し�
 ## 共通画像を含む編集
 
 object-listのregistered-imageフィールドは共通RegisteredImageInputを使い、list.imageKeyで一覧プレビューを宣言する。画像選択は親ダイアログの一時入力へ返し、親のOKで参照を保存する。画像登録だけは独立保存し、親の取消で消さない。入れ子のSettingsModalは最後のモーダルを閉じるまで入力抑止を解除しない。ローカルAppletの独自HTMLはホストのregisteredImages.pickを使い、Viewの背景・フォーカスを自己実装しない。[共通画像](registered-images.md)を参照。
+
+## ダイアログ内の推奨値取得
+
+minimumHostVersion 0.86.5以上で、`list.draftAction`に`id`・`title`・入力元の文字列フィールド`inputKey`・反映を許すフィールド名配列`fields`・前回取得値を保持する`historyKey`を宣言できる。同じidを`pageActions`へ宣言し、parametersはinputKeyのstringパラメーター1つとする。独立したローカルページは不要。対象Appletと一覧はホストの現在の設定ページから束縛し、停止中や取得中に交代したruntimeの結果は拒否する。
+
+ホストは既存`page.action` RPCを使い、pageIdを`settings:<設定キー>`として渡す。応答はfieldsにあるキーの推奨値、任意のmessage、任意のPNG/JPEG `imageBytes`（最大256,000 bytes）からなるオブジェクト。未宣言の値は反映せず、識別子・有効状態・画像参照はfieldsに指定できない。historyKeyは宣言済みフィールドと重複させない。
+
+取得結果はダイアログの一時入力だけに適用する。既定値と前回取得値は更新できるが、手入力・未確定の入力・選択済み画像は保持する。URL等の入力元が取得中に変わった場合、取消・画面変更の場合は古い応答を使わない。画像はlist.imageKeyがある場合だけプレビューし、親のOKで共通登録画像へimportする。取得だけでは設定や画像ライブラリーを保存しない。メッセージ・失敗・処理中は共通ダイアログの表示と操作抑止を使う。

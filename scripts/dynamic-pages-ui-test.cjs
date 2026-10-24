@@ -1,4 +1,5 @@
 const { _electron: electron } = require('playwright');
+const { settingsPage } = require('./settings-host-helper.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -6,7 +7,10 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `dynamic-pages-ui-${Date.now()}`);
 const fixture = path.join(profile, 'extensions', 'test.dynamic');
 fs.mkdirSync(fixture, { recursive: true });
-const source = path.resolve(root, '../../40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-applet');
+const source = path.resolve(
+  process.env.APPDOCK_WEB_APPLET_TEST_SOURCE ??
+    path.resolve(root, '../../40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-applet'),
+);
 fs.cpSync(source, path.join(profile, 'extensions', 'at365.web-applet'), { recursive: true });
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
@@ -42,7 +46,7 @@ c.commands.register('test.dynamic.dispose','Dispose',()=>c.pages.dispose('one'))
 c.commands.register('test.dynamic.remove','Remove',async()=>c.pages.replace([], (await c.pages.list()).revision));
 c.commands.register('test.dynamic.stale','Stale',async()=>{let rejected=false;try{await c.pages.replace([],0);}catch{rejected=true;} if(!rejected)throw Error('Stale revision accepted');
 if((await c.webProfiles.list()).length)throw Error('Foreign profiles exposed');
-for(const action of [()=>c.pages.open('manage'),()=>c.pages.openItem('web.11111111-2222-3333-4444-555555555555'),async()=>c.pages.replace([{id:'escape',title:'Escape',source:'local',ui:'../at365.web-applet/web/index.html'}],(await c.pages.list()).revision)]){let blocked=false;try{await action();}catch{blocked=true;}if(!blocked)throw Error('Ownership boundary failed');}
+for(const action of [()=>c.pages.open('manage'),()=>c.pages.openItem('web.11111111-2222-3333-4444-555555555555'),async()=>c.pages.replace([{id:'escape',title:'Escape',source:'local',ui:'../at365.web-applet/extension.json'}],(await c.pages.list()).revision)]){let blocked=false;try{await action();}catch{blocked=true;}if(!blocked)throw Error('Ownership boundary failed');}
 });
 };`,
 );
@@ -57,6 +61,8 @@ fs.writeFileSync(
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.globalShortcutCommands = [];
+settings.keybindings = [];
+settings.gestures.enabled = false;
 const legacy = 'web.11111111-2222-3333-4444-555555555555';
 const account = 'account.11111111-2222-3333-4444-555555555555';
 settings.extensions['at365.web-applet'] = { enabled: true, settings: {} };
@@ -159,17 +165,16 @@ const ui = (suffix) =>
     await command('test.dynamic.dispose');
     assert.equal(await second.getByLabel('Document text').inputValue(), 'Second page');
     checks.push('local dynamic pages preserve state on update/hide; dispose recreates');
-    await command('at365.web-applet.manage');
-    const manage = await ui('/at365.web-applet/web/index.html');
-    await manage.getByRole('button', { name: 'サイトを追加', exact: true }).waitFor();
-    await manage.getByRole('button', { name: 'サイトを追加', exact: true }).click();
-    await manage.locator('[name=name]').fill('追加サイト');
-    await manage.locator('[name=url]').fill('https://second.test/');
-    await manage.getByRole('button', { name: 'OK', exact: true }).click();
-    await until(
-      async () => !(await manage.locator('#editor').evaluate((e) => e.open)),
-      'site saved',
-    );
+    await command('appdock.settings.open');
+    const manage = await settingsPage(dock);
+    await manage.getByTestId('settings-nav:applet:at365.web-applet').click();
+    const siteField = (field) =>
+      manage.getByTestId(`setting:applet%3Aat365.web-applet/setting%3Aitems/${field}:input`);
+    await manage.getByTestId('setting:applet%3Aat365.web-applet/setting%3Aitems:add').click();
+    await siteField('name').fill('追加サイト');
+    await siteField('url').fill('https://second.test/');
+    await manage.getByTestId('settings-dialog-confirm').click();
+    await until(async () => !(await manage.getByTestId('settings-dialog').count()), 'site saved');
     const saved = await snapshot();
     const added = saved.extensions.find((e) => e.displayName === '追加サイト');
     assert.ok(added?.collection);
@@ -177,7 +182,6 @@ const ui = (suffix) =>
       saved.settings.value.keybindings.filter((b) => b.command.startsWith(added.id + '.')).length,
       3,
     );
-    await manage.screenshot({ path: path.join(profile, 'management.png') });
     await app.evaluate(({ app }) =>
       app.on('session-created', (ses) => {
         if (ses.isPersistent())

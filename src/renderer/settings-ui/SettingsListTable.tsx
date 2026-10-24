@@ -105,6 +105,7 @@ export function SettingsListLayout({
 }
 
 export function SettingsListTable({
+  testId,
   definition,
   entries,
   options = {},
@@ -124,6 +125,7 @@ export function SettingsListTable({
   commandListScroll = false,
   toolbarFilter,
 }: {
+  testId?: string;
   definition: SettingDefinition;
   entries: Record<string, unknown>[];
   options?: Record<string, SettingOption[]>;
@@ -161,6 +163,7 @@ export function SettingsListTable({
       <button
         type="button"
         className="settings-list-icon"
+        data-testid={testId ? `${testId}:list:order` : undefined}
         title={translate('settings.settingsListTable.order')}
         aria-label={translate('settings.settingsListTable.orderLabel', { title: definition.title })}
         disabled={busy || entries.length < 2}
@@ -172,6 +175,7 @@ export function SettingsListTable({
         <button
           type="button"
           className="primary"
+          data-testid={testId ? `${testId}:add` : undefined}
           data-dialog-focus-fallback
           disabled={busy || !canAdd || entries.length >= maxItems}
           onClick={onAdd}
@@ -254,7 +258,15 @@ export function SettingsListTable({
               ? String(entry[view.iconKey])
               : undefined;
           return (
-            <tr key={view.idKey ? String(entry[view.idKey]) : index} data-list-index={index}>
+            <tr
+              key={view.idKey ? String(entry[view.idKey]) : index}
+              data-list-index={index}
+              data-testid={
+                testId
+                  ? `${testId}:list:row:${view.idKey ? String(entry[view.idKey]) : index}`
+                  : undefined
+              }
+            >
               {view.showIndex && <td className="settings-list-index">{index + 1}</td>}
               {view.columns.map((key) => (
                 <td
@@ -287,6 +299,11 @@ export function SettingsListTable({
                   <button
                     type="button"
                     className="toggle settings-list-toggle"
+                    data-testid={
+                      testId
+                        ? `${testId}:list:toggle:${view.idKey ? String(entry[view.idKey]) : index}`
+                        : undefined
+                    }
                     role="switch"
                     aria-label={translate('settings.settingsListTable.enable', { name: name })}
                     aria-checked={Boolean(entry[view.enabledKey])}
@@ -303,6 +320,11 @@ export function SettingsListTable({
                   <button
                     type="button"
                     className="settings-list-icon"
+                    data-testid={
+                      testId
+                        ? `${testId}:list:edit:${view.idKey ? String(entry[view.idKey]) : index}`
+                        : undefined
+                    }
                     title={translate('settings.settingsListTable.edit')}
                     aria-label={translate('settings.settingsListTable.editLabel', {
                       name: name,
@@ -315,6 +337,11 @@ export function SettingsListTable({
                   <button
                     type="button"
                     className="settings-list-icon settings-list-delete"
+                    data-testid={
+                      testId
+                        ? `${testId}:list:delete:${view.idKey ? String(entry[view.idKey]) : index}`
+                        : undefined
+                    }
                     title={translate('settings.settingsListTable.delete')}
                     aria-label={translate('settings.settingsListTable.deleteLabel', {
                       name: name,

@@ -219,6 +219,19 @@ function readManifest(
       throw Error(hostText('services.extensions.shellRequirement'));
   }
   const settingDefinitions = parseSettingDefinitions(m.settings);
+  for (const definition of settingDefinitions ?? []) {
+    const action = definition.list?.draftAction;
+    if (!action) continue;
+    if (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.86.5') < 0)
+      throw Error(hostText('services.extensions.settingDraftActionVersion'));
+    const declaration = m.pageActions?.find((item: any) => item.id === action.id);
+    if (
+      !declaration ||
+      Object.keys(declaration.parameters ?? {}).length !== 1 ||
+      declaration.parameters?.[action.inputKey] !== 'string'
+    )
+      throw Error(hostText('services.extensions.pageActions'));
+  }
   m.ribbonItems = parseRibbonItems({
     ...m,
     settings: settingDefinitions,

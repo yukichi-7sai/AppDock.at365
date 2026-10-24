@@ -1,4 +1,5 @@
 import { hostText } from '../shared/i18n';
+import { settingListDraftAction } from './core/setting-list-draft';
 import { TouchpadBridgeManager } from './core/touchpad-bridge';
 import {
   defaultTouchpadGestures,
@@ -2260,6 +2261,12 @@ function settingsPageActions(
         );
       if (!item) throw Error(hostText('settings.index.noPage'));
       return pageCollections.open(item.id);
+    };
+  if (page.kind === 'applet' && !page.collection)
+    actions.appletListDraftAction = async ([key, request]) => {
+      const owner = manager.items.get(page.owner!);
+      if (!owner) throw Error(hostText('settings.index.noApplet'));
+      return settingListDraftAction(owner, key, request, (input) => registeredImages.import(input));
     };
   const string = (v: unknown) => {
     if (typeof v !== 'string') throw Error(hostText('settings.index.invalidInput'));

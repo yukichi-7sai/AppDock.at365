@@ -2899,5 +2899,6 @@
   "services.notificationWindowsAdapter.bodyWithActions": "{{body}}\n通知を開いて操作できます。",
   "services.portableUpdates.updatesWithSkipped": "{{updates}} {{count}}件は更新元が未設定または未公開です。",
   "services.portableUpdates.updatesWithFailure": "{{updates}} {{failure}}",
+  "services.extensions.settingDraftActionVersion": "一覧ダイアログの推奨設定取得にはminimumHostVersion 0.86.5以上が必要です。",
   "common.ok": "OK"
 }

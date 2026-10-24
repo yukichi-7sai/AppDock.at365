@@ -420,12 +420,16 @@ export function RegisteredGalleryPreview({
   );
 }
 export function RegisteredImageInput({
+  testId,
   value,
+  preview,
   onChange,
   label = hostText('settings.registeredImagePicker.image'),
   disabled = false,
 }: {
+  testId?: string;
   value: unknown;
+  preview?: string;
   onChange(image: RegisteredImageRef | null): void;
   label?: string;
   disabled?: boolean;
@@ -440,6 +444,7 @@ export function RegisteredImageInput({
       <button
         type="button"
         className="registered-image-input-preview"
+        data-testid={testId ? `${testId}:choose` : undefined}
         aria-label={translate(
           ref
             ? 'settings.registeredImagePicker.changeLabel'
@@ -459,6 +464,13 @@ export function RegisteredImageInput({
             value={ref}
             label={translate('settings.registeredImagePicker.preview', { label: label })}
           />
+        ) : preview ? (
+          <img
+            data-testid={testId ? `${testId}:preview` : undefined}
+            className="registered-image-preview"
+            src={preview}
+            alt={label}
+          />
         ) : (
           <span
             className="registered-image-empty"
@@ -472,9 +484,10 @@ export function RegisteredImageInput({
       <button
         type="button"
         className="registered-image-action"
+        data-testid={testId ? `${testId}:clear` : undefined}
         aria-label={translate('settings.registeredImagePicker.remove', { label: label })}
         title={translate('settings.registeredImagePicker.removeImage')}
-        disabled={disabled || !ref}
+        disabled={disabled || (!ref && !preview)}
         onClick={() => onChange(null)}
       >
         <Icon name="close" size={20} />

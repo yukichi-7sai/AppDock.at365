@@ -120,6 +120,14 @@ export interface SettingDefinition {
     imageKey?: string;
     confirmDelete?: boolean;
     showIndex?: boolean;
+    /** A declared provider action supplies suggestions for an unsaved list record. */
+    draftAction?: {
+      id: string;
+      title: string;
+      inputKey: string;
+      fields: string[];
+      historyKey: string;
+    };
   };
   /** Nested storage path for an object-list field; never a JavaScript expression. */
   propertyPath?: string[];

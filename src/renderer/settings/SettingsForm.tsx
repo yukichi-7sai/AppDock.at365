@@ -74,6 +74,12 @@ export function SettingsForm({
           accounts={aux.accounts}
           onListCommit={(key, value, before) => invoke('replaceAppletList', [key, value, before])}
           onListOpen={(key, id) => invoke('openAppletListItem', [key, id])}
+          onListDraftAction={(key, input) =>
+            invoke('appletListDraftAction', [key, { kind: 'fetch', input }])
+          }
+          onListDraftImage={(key, base64) =>
+            invoke('appletListDraftAction', [key, { kind: 'image', base64 }])
+          }
         />
         {!page.collection && (
           <AppletUpdateSource

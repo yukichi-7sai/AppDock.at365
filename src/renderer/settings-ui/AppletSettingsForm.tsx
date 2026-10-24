@@ -7,7 +7,11 @@ import type {
   SettingDefinition,
   SettingAction,
 } from '../../shared/contracts';
-import { appletSettingsPageId, appletCommonDescriptions } from '../../shared/settings-catalog';
+import {
+  appletSettingsPageId,
+  appletCommonDescriptions,
+  settingsItemId,
+} from '../../shared/settings-catalog';
 import { resolveSettingSections } from '../../shared/setting-sections';
 import { settingAnchor } from './setting-anchor';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
@@ -27,12 +31,22 @@ export function AppletSettingsForm({
   onChange,
   onListCommit,
   onListOpen,
+  onListDraftAction,
+  onListDraftImage,
   accounts = [],
 }: {
   applet: ExtensionSnapshot;
   settings: Settings;
   onChange(value: Settings): void;
   onListOpen?(key: string, id: unknown): Promise<unknown>;
+  onListDraftAction?(
+    key: string,
+    input: string,
+  ): Promise<import('../../shared/setting-list-draft').SettingListDraftResult>;
+  onListDraftImage?(
+    key: string,
+    base64: string,
+  ): Promise<import('../../shared/registered-images').RegisteredImageRef>;
   onListCommit?(
     key: string,
     value: Record<string, unknown>[],
@@ -134,6 +148,7 @@ export function AppletSettingsForm({
       >
         {item.type === 'object-list' && item.list && onListCommit ? (
           <ObjectListDialogSetting
+            testId={`setting:${settingsItemId(pageId, `setting:${item.key}`)}`}
             definition={item}
             value={value}
             onOpen={
@@ -150,6 +165,16 @@ export function AppletSettingsForm({
                 ]),
             )}
             onCommit={(next, before) => onListCommit(item.key, next, before)}
+            onDraftAction={
+              item.list.draftAction && onListDraftAction
+                ? (input) => onListDraftAction(item.key, input)
+                : undefined
+            }
+            onDraftImage={
+              item.list.draftAction && onListDraftImage
+                ? (base64) => onListDraftImage(item.key, base64)
+                : undefined
+            }
           />
         ) : item.type === 'object-list' ? (
           <ObjectListSetting definition={item} value={value} onChange={set} />

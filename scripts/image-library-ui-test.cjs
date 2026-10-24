@@ -282,11 +282,7 @@ async function openLibrary() {
   });
   await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
   libraryPage = await until(
-    () =>
-      app
-        .context()
-        .pages()
-        .find((p) => p.url().endsWith('/image-library.html')),
+    async () => ((await snapshot()).navigation.route === 'image-library' ? host : null),
     'image library page',
   );
   await libraryPage.getByRole('button', { name: 'グループを追加', exact: true }).waitFor();
@@ -659,48 +655,18 @@ async function chooseInPicker(file) {
     await rail.locator('[data-ribbon-id="group:photos"] img').waitFor();
     await rail.locator('[data-ribbon-id="button:logs"] img').waitFor();
     checks.push('group and command buttons share library image rendering');
-    await rail.locator('[data-ribbon-id="page:at365.web-applet:manage"]').click();
-    const web = await until(
-      () =>
-        app
-          .context()
-          .pages()
-          .find((p) => p.url().includes('/at365.web-applet/web/index.html')),
-      'WebApplet manager',
-    );
-    await web.getByRole('button', { name: 'Fixture siteを編集', exact: true }).click();
-    const identity = await web.evaluate(() => {
-      window.__pickerIdentity = crypto.randomUUID();
-      return window.__pickerIdentity;
-    });
-    const viewState = () =>
-      app.evaluate(({ BrowserWindow }) => {
-        const window = BrowserWindow.getAllWindows().find((w) =>
-          w.webContents.getURL().startsWith('appdock:'),
-        );
-        const view = window.contentView.children.find((v) =>
-          v.children?.some((c) =>
-            c.webContents?.getURL().includes('/at365.web-applet/web/index.html'),
-          ),
-        );
-        return view
-          ? {
-              visible: view.getVisible(),
-              id: view.children.find((c) => c.webContents).webContents.id,
-            }
-          : null;
-      });
-    const beforeView = await viewState();
-    assert.equal(beforeView.visible, true);
-    await web.locator('#icon').click();
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    const web = await settingsPage(host);
+    await web.getByTestId('settings-nav:applet:at365.web-applet').click();
+    const webField = (part) =>
+      web.getByTestId(`setting:applet%3Aat365.web-applet/setting%3Aitems:${part}`);
+    await webField('list:edit:site.fixture').click();
+    await web
+      .getByTestId('setting:applet%3Aat365.web-applet/setting%3Aitems/image:image:choose')
+      .click();
     await host.getByRole('dialog', { name: '画像を選択', exact: true }).waitFor();
-    assert.equal((await viewState()).visible, false);
-    await host.screenshot({ path: path.join(profile, 'web-image-picker.png') });
     await chooseInPicker('sample.png');
-    await until(async () => (await viewState()).visible, 'Web view restored');
-    assert.equal((await viewState()).id, beforeView.id);
-    assert.equal(await web.evaluate(() => window.__pickerIdentity), identity);
-    await web.locator('#save').click();
+    await web.getByTestId('settings-dialog-confirm').click();
     await until(
       async () =>
         (await snapshot()).settings.value.extensions['at365.web-applet'].settings.items[0].image
@@ -713,9 +679,7 @@ async function chooseInPicker(file) {
       (e) => e.collection?.itemId === 'site.fixture',
     );
     await rail.locator(`[data-ribbon-id="page:${child.id}:main"] img`).waitFor();
-    checks.push(
-      'WebApplet host picker covers/restores existing local View and preserves legacy icon',
-    );
+    checks.push('WebApplet settings use the shared image picker and preserve legacy icon');
     for (const theme of ['dark', 'light']) {
       await host.evaluate(async (theme) => {
         const s = await window.dock.snapshot();

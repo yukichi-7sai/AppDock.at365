@@ -260,6 +260,29 @@ export function parseSettingDefinitions(
         (list.showIndex !== undefined && typeof list.showIndex !== 'boolean')
       )
         throw Error(hostText('settings.setting-definitions.listView'));
+      const action = list.draftAction;
+      if (
+        action !== undefined &&
+        (!object(action) ||
+          typeof action.id !== 'string' ||
+          !/^[a-z][a-z0-9.-]{0,79}$/.test(action.id) ||
+          typeof action.title !== 'string' ||
+          !action.title.trim() ||
+          action.title.length > 160 ||
+          !has(action.inputKey, 'string') ||
+          !Array.isArray(action.fields) ||
+          !action.fields.length ||
+          action.fields.length > 16 ||
+          action.fields.some(
+            (key: unknown) =>
+              !has(key) || key === list.idKey || key === list.enabledKey || key === list.imageKey,
+          ) ||
+          new Set(action.fields).size !== action.fields.length ||
+          !safeKey(action.historyKey) ||
+          has(action.historyKey) ||
+          action.historyKey === list.idKey)
+      )
+        throw Error(hostText('settings.setting-definitions.listView'));
     }
     if (definition.default !== undefined) validateSettingValue(definition, definition.default);
     return definition;

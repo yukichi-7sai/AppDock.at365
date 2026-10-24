@@ -67,7 +67,11 @@ export function SettingsPageLayout({
   return (
     <SettingsStatusProvider key={page.id + mode} error={error} target={page.title} busy={pending}>
       <CommandListScrollProvider>
-        <section className="settings-page-layout" aria-label={t('settings.body')}>
+        <section
+          className="settings-page-layout"
+          data-testid={`settings-page:${page.id}`}
+          aria-label={t('settings.body')}
+        >
           <div className="settings-body settings-page-scroll">
             <header className="settings-page-heading">
               <h1>{page.title}</h1>
