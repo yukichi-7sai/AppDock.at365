@@ -526,7 +526,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
         await page.getByRole('textbox', { name: 'ログを検索' }).waitFor({ state: 'visible' });
       if (id === 'appdock.updates.open')
         await page
-          .getByRole('region', { name: 'バージョン情報・更新' })
+          .getByRole('region', { name: 'AppDockについて' })
           .waitFor({ state: 'visible' });
     }
     await call(client, 'appdock_execute_command', { id: 'appdock.settings.open' });

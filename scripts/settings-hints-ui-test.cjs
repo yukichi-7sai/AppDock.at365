@@ -231,7 +231,7 @@ async function checkSectionTitles() {
         'リボン',
         'マウスジェスチャー',
         'MCPサーバー',
-        'バージョン情報・更新',
+        'AppDockについて',
       ]) {
         await select(title);
         await checkToggles(theme, width, title);

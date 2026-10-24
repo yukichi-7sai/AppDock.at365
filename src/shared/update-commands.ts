@@ -1,7 +1,7 @@
 export const updateCommands = [
   {
     id: 'appdock.updates.installAll',
-    title: '本体と全Appletを更新',
+    title: 'AppDockとAppletをすべて更新',
     description: 'AppDockとすべてのAppletの更新を行います。',
     scope: 'all',
   },

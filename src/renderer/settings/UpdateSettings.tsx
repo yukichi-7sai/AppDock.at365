@@ -15,8 +15,17 @@ import {
   SettingsContent,
 } from '../settings-ui/SettingsSections';
 import { Toggle } from '../settings-ui/Toggle';
+import { SettingsButton } from '../settings-ui/SettingsButton';
+import { SettingsInputActions } from '../settings-ui/SettingsSections';
+import { Icon } from '../../shared/ui-icons';
 
-export function UpdateActions({ appletCount }: { appletCount: number }) {
+export function UpdateActions({
+  appletCount,
+  embedded = false,
+}: {
+  appletCount: number;
+  embedded?: boolean;
+}) {
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [state, setState] = useState<UpdateState>({ busy: false, phase: '', results: [] });
@@ -47,12 +56,8 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
       .catch((error) => setError(String(error).replace(/^Error: /, '')));
   };
   useSettingsFeedback({ error });
-  return (
-    <SettingsSection
-      {...settingAnchor('about', 'updateActions')}
-      title={translate('settings.updateSettings.batch')}
-      hint={translate('settings.updateSettings.batchHint')}
-    >
+  const content = (
+    <>
       <SettingsActions className="update-actions">
         <button
           className="update-primary"
@@ -63,17 +68,34 @@ export function UpdateActions({ appletCount }: { appletCount: number }) {
         >
           {translate('settings.updateSettings.updateAll')}
         </button>
-        <button
-          className="text-button"
-          disabled={state.busy || appletCount === 0}
-          onClick={() => action(() => settingsControls.installUpdates('applets'))}
-        >
-          {translate('settings.updateSettings.updateApplets')}
-        </button>
+        {!embedded && (
+          <button
+            className="text-button"
+            disabled={state.busy || appletCount === 0}
+            onClick={() => action(() => settingsControls.installUpdates('applets'))}
+          >
+            {translate('settings.updateSettings.updateApplets')}
+          </button>
+        )}
       </SettingsActions>
-      <SettingsContent className="update-last-checked">
-        <UpdateCheckTime checkedAt={checkedAt} />
-      </SettingsContent>
+      {!embedded && (
+        <SettingsContent className="update-last-checked">
+          <UpdateCheckTime checkedAt={checkedAt} />
+        </SettingsContent>
+      )}
+    </>
+  );
+  return embedded ? (
+    <div className="about-update-group" {...settingAnchor('about', 'updateActions')}>
+      {content}
+    </div>
+  ) : (
+    <SettingsSection
+      {...settingAnchor('about', 'updateActions')}
+      title={translate('settings.updateSettings.batch')}
+      hint={translate('settings.updateSettings.batchHint')}
+    >
+      {content}
     </SettingsSection>
   );
 }
@@ -104,30 +126,36 @@ export function UpdateSettings({
         hint={hostSettingItem('about', 'hostSource').description}
         {...settingAnchor('about', 'hostSource')}
       >
-        <SettingsUrlInput
-          aria-label={translate('settings.updateSettings.hostSource')}
-          value={settings.updates.hostSource}
-          onChange={(event) =>
-            edit((next) => {
-              next.updates.hostSource = event.target.value;
-            })
-          }
-          placeholder={translate('settings.updateSettings.sourcePlaceholder')}
-        />
-        <button
-          className="text-button"
-          disabled={settings.updates.hostSource === createDefaultSettings().updates.hostSource}
-          onClick={() =>
-            edit((next) => {
-              next.updates.hostSource = createDefaultSettings().updates.hostSource;
-            })
-          }
-        >
-          {translate('settings.updateSettings.resetSource')}
-        </button>
+        <SettingsInputActions>
+          <SettingsUrlInput
+            aria-label={translate('settings.updateSettings.hostSource')}
+            value={settings.updates.hostSource}
+            onChange={(event) =>
+              edit((next) => {
+                next.updates.hostSource = event.target.value;
+              })
+            }
+            placeholder={translate('settings.updateSettings.sourcePlaceholder')}
+          />
+          <SettingsButton
+            icon
+            className="settings-list-icon"
+            title={translate('settings.updateSettings.resetSource')}
+            aria-label={translate('settings.updateSettings.resetSource')}
+            disabled={settings.updates.hostSource === createDefaultSettings().updates.hostSource}
+            onClick={() =>
+              edit((next) => {
+                next.updates.hostSource = createDefaultSettings().updates.hostSource;
+              })
+            }
+          >
+            <Icon name="refresh" size={16} />
+          </SettingsButton>
+        </SettingsInputActions>
       </SettingsField>
       {(
         [
+          'checkHostOnAboutOpen',
           'checkHostOnStartup',
           'checkAppletsOnStartup',
           'notifyOnStartup',
@@ -137,6 +165,9 @@ export function UpdateSettings({
         <SettingsField
           key={key}
           title={hostSettingItem('about', key).title}
+          hint={
+            key === 'checkHostOnAboutOpen' ? hostSettingItem('about', key).description : undefined
+          }
           {...settingAnchor('about', key)}
         >
           <Toggle
@@ -168,7 +199,6 @@ export function UpdateSettings({
           }
         />
       </SettingsField>
-      <p className="muted">{translate('settings.updateSettings.startupHint')}</p>
     </SettingsSection>
   );
 }

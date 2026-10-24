@@ -4,6 +4,12 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `smoke-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
+const initial = require('../out/main/shared/settings-schema.js').createDefaultSettings();
+initial.updates.checkHostOnAboutOpen = false;
+fs.writeFileSync(
+  path.join(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 const portable = !!process.argv[2];
 const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) fs.copyFileSync(path.resolve(process.argv[2]), executable);

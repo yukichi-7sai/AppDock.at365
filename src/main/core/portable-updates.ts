@@ -273,6 +273,7 @@ export class PortableUpdates {
   }
   state: UpdateState = { busy: false, phase: '', results: [] };
   private controller?: AbortController;
+  private lastCheckedHostSource?: string;
   cancel(): boolean {
     if (!this.state.busy || !this.state.cancellable || !this.controller) return false;
     this.state.cancellable = false;
@@ -356,6 +357,7 @@ export class PortableUpdates {
     target: UpdateTarget,
     hostVersion = this.options.hostVersion,
   ): Promise<{ result: UpdateResult; candidate?: Candidate }> {
+    if (target.kind === 'host') this.lastCheckedHostSource = target.source;
     const github =
       target.source.match(/^github:(.+)$/i) ??
       target.source.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)(?:\/releases.*)?$/i);
@@ -419,7 +421,7 @@ export class PortableUpdates {
       /* Preserve update outcome. */
     }
   }
-  private checkedNotice(results: UpdateResult[]) {
+  private checkedNotice(results: UpdateResult[], notifyCurrent = false) {
     const available = results.filter((result) => result.status === 'available');
     const failed = results.filter(
       (result) => result.status === 'error' || result.status === 'incompatible',
@@ -463,6 +465,7 @@ export class PortableUpdates {
           : failure,
       );
     } else if (available.length) return;
+    else if (!notifyCurrent) return;
     else if (skipped.length)
       this.notice(
         'info',
@@ -477,6 +480,21 @@ export class PortableUpdates {
           ? hostText('services.portableUpdates.upToDate')
           : hostText('services.portableUpdates.noTargets'),
       );
+  }
+  async checkHostOnAboutOpen(): Promise<void> {
+    if (!this.options.settings().checkHostOnAboutOpen || this.state.busy || this.packagePlans.size)
+      return;
+    const host = this.options.targets().find((target) => target.kind === 'host');
+    if (!host?.source.trim()) return;
+    const checkedAt = this.state.results.find((result) => result.id === host.id)?.checkedAt;
+    const checked = checkedAt ? Date.parse(checkedAt) : NaN;
+    if (
+      this.lastCheckedHostSource === host.source &&
+      Number.isFinite(checked) &&
+      Date.now() - checked < 60 * 60 * 1000
+    )
+      return;
+    await this.check([host.id]);
   }
   async check(ids?: string[], silent = false): Promise<UpdateState> {
     this.begin(hostText('services.portableUpdates.checking'));
@@ -536,7 +554,7 @@ export class PortableUpdates {
       }
       if (!candidates.length) {
         this.state.phase = hostText('services.portableUpdates.noApplicableUpdates');
-        this.checkedNotice(results);
+        this.checkedNotice(results, true);
         return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
       temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'AppDock-update-'));

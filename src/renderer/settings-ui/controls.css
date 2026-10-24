@@ -219,6 +219,11 @@ button:disabled {
 button:hover:not(:disabled) {
   filter: brightness(1.14);
 }
+:where(.settings-surface, .settings-panel, .settings-group-dialog, .settings-modal)
+  button:hover:not(:disabled) {
+  filter: none;
+  border-color: var(--accent);
+}
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,

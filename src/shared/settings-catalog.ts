@@ -330,6 +330,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.updateSource'),
       hostText('settings.settings-catalog.updateSourceHint'),
     ],
+    [
+      'checkHostOnAboutOpen',
+      hostText('settings.updateSettings.autoCheckHost'),
+      hostText('settings.updateSettings.autoCheckHostHint'),
+    ],
     ['checkHostOnStartup', hostText('settings.settings-catalog.checkHost')],
     ['checkAppletsOnStartup', hostText('settings.settings-catalog.checkApplets')],
     ['notifyOnStartup', hostText('settings.settings-catalog.notifyStartup')],
@@ -433,6 +438,7 @@ const generalKeys = [
 ];
 const updateKeys = [
   'hostSource',
+  'checkHostOnAboutOpen',
   'checkHostOnStartup',
   'checkAppletsOnStartup',
   'startupDelaySeconds',

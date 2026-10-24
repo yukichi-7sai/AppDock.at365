@@ -341,8 +341,8 @@ const checks = [];
     await chooseApplet('検証Applet 01');
     assert.equal(await body.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
     await button('設定').click();
-    await settingsNav().getByRole('button', { name: 'バージョン情報・更新', exact: true }).click();
-    await body.getByRole('region', { name: 'バージョン情報・更新', exact: true }).waitFor();
+    await settingsNav().getByRole('button', { name: 'AppDockについて', exact: true }).click();
+    await body.getByRole('region', { name: 'AppDockについて', exact: true }).waitFor();
     assert.equal(
       await saveSurface.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
       0,

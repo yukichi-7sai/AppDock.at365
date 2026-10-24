@@ -231,7 +231,7 @@ async function selected(id) {
       'host command dispatch',
     );
     await until(async () => !(await snapshot()).updates.busy, 'host button');
-    await host.getByRole('button', { name: '本体と全Appletを更新', exact: true }).click();
+    await host.getByRole('button', { name: 'AppDockとAppletをすべて更新', exact: true }).click();
     await until(
       async () => (await inspect(mainPort, 'globalThis.updateScopes.length')) === 4,
       'all command dispatch',

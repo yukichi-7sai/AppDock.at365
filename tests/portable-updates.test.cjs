@@ -103,12 +103,12 @@ test('localized update summaries preserve target names, external details and cou
     `${name} 2.0.0 に更新できます。 1件の更新を確認できませんでした。${name}: ${message}`,
   );
   assert(!f.notices.at(-1).safeMessage.includes(name));
-  f.updater.checkedNotice([skipped]);
+  f.updater.checkedNotice([skipped], true);
   assert.equal(
     f.notices.at(-1).notice.message,
     '確認できた対象に更新はありません。1件は更新元が未設定または未公開です。',
   );
-  f.updater.checkedNotice([]);
+  f.updater.checkedNotice([], true);
   assert.equal(f.notices.at(-1).notice.message, '更新を確認する対象がありません。');
 });
 

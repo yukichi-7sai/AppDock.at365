@@ -72,7 +72,7 @@ module.exports = async function ({
       );
       const colors = [];
       for (const [page, kind, selector] of [
-        ['バージョン情報・更新', 'update', '.update-primary'],
+        ['AppDockについて', 'update', '.update-primary'],
         [portable ? 'Applet管理' : 'AI', 'add', '.applet-shortcut-add'],
       ]) {
         await select(page);

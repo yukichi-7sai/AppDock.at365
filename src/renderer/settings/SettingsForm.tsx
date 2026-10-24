@@ -106,6 +106,7 @@ export function SettingsForm({
         edit={edit}
         extensions={extensions}
         runtime={runtime}
+        stats={aux.aboutStats}
         version={version}
         busy={busy}
         openApplets={() => select('applets')}

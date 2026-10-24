@@ -368,7 +368,7 @@ async function main() {
   await (
     await settingsPage(host)
   )
-    .getByRole('region', { name: 'バージョン情報・更新', exact: true })
+    .getByRole('region', { name: 'AppDockについて', exact: true })
     .waitFor();
   checks.push('manual current/available results and details navigation; no footer result');
   await dismissAll();

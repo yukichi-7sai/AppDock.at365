@@ -4,19 +4,19 @@
 
 ## 設定と取得
 
-更新操作は共通の公開コマンドへ接続する。`appdock.updates.installAll`（本体と全Appletを更新）は`all`、`appdock.updates.installHost`（AppDockを更新）は`host`を既存のPortableUpdatesへ渡す。設定の同名ボタンもこのコマンドを呼び、確認・取消・適用・再起動を共有する。`appdock.updates.check`（更新チェック）は本体と無効・停止中を含む全パッケージのメタデータだけを確認し、ダウンロード・適用しない。Appletのcollection子ページは親パッケージで更新する。
+更新操作は共通の公開コマンドへ接続する。`appdock.updates.installAll`（AppDockとAppletをすべて更新）は`all`、`appdock.updates.installHost`（AppDockを更新）は`host`を既存のPortableUpdatesへ渡す。設定の同名ボタンもこのコマンドを呼び、確認・取消・適用・再起動を共有する。`appdock.updates.check`（更新チェック）は本体と無効・停止中を含む全パッケージのメタデータだけを確認し、ダウンロード・適用しない。Appletのcollection子ページは親パッケージで更新する。
 
 3コマンドはMCP・Applet共通APIの`commands.list/execute`で列挙・実行でき、既存のコマンド実行許可を使う。入力引数はなく、戻り値の`completion:handlerReturned`は処理からの応答を示す。更新適用は確認後の再起動を伴い、再起動後の適用結果は従来の更新結果通知で確認する。
 
-取得中・確認中の進捗とキャンセルだけを`UpdateProgress`でステータスバーへ表示する。固定フッター内の配置を維持し、本文やWebContentsViewの領域を動かさない。手動確認で更新があれば既存の通知種類「更新のお知らせ」（host/updates/available）へ接続し、通知先・時間・読み上げ等は同種類の保存済み設定に従う。通知本文は安全な件数の要約を使う。一部の対象の確認に失敗しても、確認できた更新を通知し、失敗は共通エラー通知へ別に渡す。更新なし・未設定・未公開・取消は共通インフォメーション通知（既定バナー・6秒）へ接続する。ステータスバーに完了結果を重ねず、表示時間・履歴・閉じる操作は通知基盤へ委ねる。「更新画面を開く」から詳細を確認できる。
+取得中・確認中の進捗とキャンセルだけを`UpdateProgress`でステータスバーへ表示する。固定フッター内の配置を維持し、本文やWebContentsViewの領域を動かさない。手動確認で更新があれば既存の通知種類「更新のお知らせ」（host/updates/available）へ接続し、通知先・時間・読み上げ等は同種類の保存済み設定に従う。通知本文は安全な件数の要約を使う。一部の対象の確認に失敗しても、確認できた更新を通知し、失敗は共通エラー通知へ別に渡す。確認のみで更新なし・未設定・未公開の場合は通知しない。更新実行で更新がなかった場合と取消は共通インフォメーション通知（既定バナー・6秒）へ接続する。ステータスバーに完了結果を重ねず、表示時間・履歴・閉じる操作は通知基盤へ委ねる。「更新画面を開く」から詳細を確認できる。
 
-明示操作の結果は一意ID・種別・メッセージを持つ`UpdateState.notice`に渡し、同じ内容を続けて確認しても再表示する。確認時の失敗/未設定を「更新なし」と混同しない。起動時の自動チェックは従来のWindows通知設定を維持し、通常結果のバーを追加しない。再起動後の適用結果は既存の`completion`から同じUIへ渡す。新しい操作開始時にnotice/completionをクリアし、保存済みの結果ファイル・ログの形式は変えない。
+明示操作の結果は一意ID・種別・メッセージを持つ`UpdateState.notice`に渡し、通知対象の同じ結果を続けて受け取った場合も再表示する。確認時の失敗/未設定を「更新なし」と混同しない。起動時の自動チェックは従来のWindows通知設定を維持し、通常結果のバーを追加しない。再起動後の適用結果は既存の`completion`から同じUIへ渡す。新しい操作開始時にnotice/completionをクリアし、保存済みの結果ファイル・ログの形式は変えない。
 
-通知の「更新画面を開く」から設定へ移動できる。各更新ボタンの隣は未確認時から日時欄の幅を確保し、結果文とリリースへのリンクはカード内へ直接表示する。確認結果のポップアップは使わない。本体とAppletの現在版は共通VersionDisplayの色付きバッジとし、statusがavailableで確認時のcurrentVersionが現在版に一致する場合だけ右側へ「→ 新しい版」を表示する。同版再適用、古い版、確認失敗を新バージョン表示に使わない。
+通知の「更新画面を開く」から設定へ移動できる。本体の最終確認日時はAboutの版の行、Appletの日時は管理一覧の版の欄へ表示する。確認結果のポップアップは使わない。本体とAppletの現在版は共通VersionDisplayの色付きバッジとし、statusがavailableで確認時のcurrentVersionが現在版に一致する場合だけ右側へ「→ 新しい版」を表示する。同版再適用、古い版、確認失敗を新バージョン表示に使わない。
 
 statusがcurrentの場合は結果本文を表示せず、現在のバージョンと最終確認日時だけを残す。「最新版です。」の表示は行わない。
 
-`settings.updates`はhostSource、checkHostOnStartup、checkAppletsOnStartup、startupDelaySeconds（0～3600）、notifyOnStartup、allowSameVersion。本体のhostSourceの既定は`github:yukichi-7sai/AppDock.at365`。保存済みの更新元は保持し、「AppDockの更新元を既定に戻す」で現在の既定値へ戻す。Appletは`extensions.<id>.updateSource`を使い、未指定ならmanifest.updateRepositoryを継承、空文字は無効。
+`settings.updates`はhostSource、checkHostOnAboutOpen、checkHostOnStartup、checkAppletsOnStartup、startupDelaySeconds（0～3600）、notifyOnStartup、allowSameVersion。本体のhostSourceの既定は`github:yukichi-7sai/AppDock.at365`。保存済みの更新元は保持し、「AppDockの更新元を既定に戻す」で現在の既定値へ戻す。Appletは`extensions.<id>.updateSource`を使い、未指定ならmanifest.updateRepositoryを継承、空文字は無効。
 
 ローカル/UNCはupdate.jsonまたは発行フォルダー。Appletフォルダーにupdate.jsonがなければextension.jsonを読む。HTTP(S)はfeed URLまたは末尾/の配布ベースURL。GitHubはリポジトリ/Release URLからAPIとRelease assetsを使い、Source code ZIPは使わない。IDと正式版SemVer、最低本体版を照合する。非公開の認証トークンとプレリリースは扱わない。
 
@@ -47,7 +47,7 @@ Appletフォルダーは配布単位で交換。共有設定/素材はEXE隣のs
 
 `installUpdates('all')`は本体と全ファイル型Appletを同じjobへまとめる。更新元一覧の順序に関係なく本体のmetadataを先に確認し、適用候補に入った本体版でAppletのfeed・ローカルmanifest・展開後manifestの最低host版を照合する。通常の確認・Appletだけの更新では現行host版を使い、互換性不足は本体を先に更新するよう表示する。全候補の取得・検証に成功した後だけ1回の確認とhelperへの引渡しを行い、1回再起動する。準備中の破損や取消で本体/Appletを交換しない。WebAppletは本体管理のため個別候補に含めない。
 
-AboutSettingsは本体・一括更新・更新動作・実行環境を扱い、Applet別の一覧は設定のApplet管理へ集約する。管理一覧には確認専用の「更新を確認」と「更新」を用意し、個別の更新元はApplet設定で編集する。フッター等のVersionCheckと起動時確認の契約は維持する。WebApplet本体は通常のパッケージで、collectionの子サイトを更新候補・対象件数に加えない。
+「AppDockについて」のAboutSettingsは最上部の単一情報パネルに本体情報・実行環境・更新操作をまとめる。バージョン横の確認アイコンは本体metadataだけを取得し、現在版の隣に更新版、右側に最終確認日時を表示する。下部は本体+全Appletと本体のみの2つの更新ボタンを同じ大きさで横に並べる。Appletだけの一括更新リンク、独立した本体・実行環境Section、管理ボタンは置かず、Applet数タイルから管理画面へ移動する。「更新の設定」はその下に初期状態で折りたたんで表示する。Applet別の一覧は設定のApplet管理へ集約する。管理一覧には確認専用の「更新を確認」と「更新」を用意し、個別の更新元はApplet設定で編集する。更新処理・フッター等のVersionCheck・起動時確認の契約は維持する。WebApplet本体は通常のパッケージで、collectionの子サイトを更新候補・対象件数に加えない。
 
 ## 検証
 

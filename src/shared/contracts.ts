@@ -365,6 +365,7 @@ export interface UpdateResult {
 }
 export interface UpdateSettings {
   hostSource: string;
+  checkHostOnAboutOpen: boolean;
   checkHostOnStartup: boolean;
   checkAppletsOnStartup: boolean;
   startupDelaySeconds: number;

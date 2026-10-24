@@ -256,6 +256,20 @@
   gap: 10px;
   min-width: 0;
 }
+.settings-input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.settings-input-actions > input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+}
+.settings-input-actions > button {
+  flex: none;
+}
 .settings-field-control > :is(input, select, textarea) {
   width: 100%;
   min-width: 0;

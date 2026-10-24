@@ -3,6 +3,9 @@ import { SettingsInput } from './SettingsInput';
 import { SettingsHintIcon } from './SettingsHintIcon';
 import { useSettingsFeedback, SettingsFieldTarget } from './SettingsStatus';
 import './settings-sections.css';
+export function SettingsInputActions({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} className={`settings-input-actions ${className}`} />;
+}
 
 /** A shared, wrapping action row for section bodies and field controls. */
 export function SettingsActions({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
@@ -22,6 +25,7 @@ export function SettingsSection({
   error,
   children,
   collapsible = false,
+  defaultOpen = false,
   variant = 'card',
   ...props
 }: {
@@ -31,6 +35,7 @@ export function SettingsSection({
   error?: string;
   children: ReactNode;
   collapsible?: boolean;
+  defaultOpen?: boolean;
   variant?: 'card' | 'group' | 'row';
 } & Omit<HTMLAttributes<HTMLElement>, 'title'>) {
   const id = useId();
@@ -47,6 +52,7 @@ export function SettingsSection({
   return collapsible ? (
     <details
       {...props}
+      open={defaultOpen || undefined}
       className={`settings-section settings-section-details settings-section-${variant} ${props.className ?? ''}`}
     >
       <summary>

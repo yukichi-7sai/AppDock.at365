@@ -42,6 +42,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const base = `http://127.0.0.1:${server.address().port}`;
     const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+    settings.updates.checkHostOnAboutOpen = false;
     settings.host.hardwareAcceleration = false;
     settings.host.notifications = false;
     settings.keybindings = [];
@@ -179,20 +180,18 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       'blur',
     );
     checks.push('TTS uses identical deferred input and normalizes on blur');
-    await select('バージョン情報・更新');
-    await page
-      .locator('details')
-      .filter({ has: page.getByRole('heading', { name: '更新の設定', exact: true }) })
-      .locator(':scope > summary')
-      .click();
+    await select('AppDockについて');
+    assert.equal(
+      await page
+        .locator('details')
+        .filter({ has: page.getByRole('heading', { name: '更新の設定', exact: true }) })
+        .getAttribute('open'),
+      null,
+    );
+    await page.locator('.about-page > details.settings-section > summary').click();
     assert.equal(
       await page.getByLabel('AppDockの更新元', { exact: true }).inputValue(),
       'github:yukichi-7sai/AppDock.at365',
-    );
-    assert.ok(
-      (await page.locator('.about-page').innerText()).includes(
-        '既定: github:yukichi-7sai/AppDock.at365',
-      ),
     );
     await confirmed('AppDockの更新元', (s) => s.updates.hostSource, {
       raw: base + '/update.json',
@@ -205,20 +204,17 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
       'github:yukichi-7sai/AppDock.at365',
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).updates.hostSource,
-      'github:yukichi-7sai/AppDock.at365',
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).updates?.hostSource,
+      undefined,
     );
-    checks.push('new GitHub default and description, reset saved immediately');
+    checks.push('GitHub default reset saves immediately');
     await page.screenshot({ path: path.join(profile, 'github-update-default.png') });
+    await page.getByRole('button', { name: 'Appletの管理と更新', exact: true }).click();
     await page
-      .locator('details')
-      .filter({ has: page.getByRole('heading', { name: 'インストール済みのApplet', exact: true }) })
-      .locator(':scope > summary')
+      .locator('[data-applet-id="fixture.url"]')
+      .getByRole('button', { name: 'URL fixture', exact: true })
       .click();
-    await page
-      .getByRole('article', { name: 'URL fixture', exact: true })
-      .locator('.applet-update-source > summary')
-      .click();
+    await page.locator('.applet-update-source > summary').click();
     await confirmed(
       'URL fixtureの更新元',
       (s) => s.extensions['fixture.url'].updateSource,

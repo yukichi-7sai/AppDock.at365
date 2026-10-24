@@ -1,5 +1,48 @@
 # 検証記録
 
+## 2026-10-25: About改善のコミット前照合と一括更新名 0.87.1
+
+- 0.86.13〜0.87.0の未コミット変更を保持し、一括更新のボタンと公開コマンドの表示名を「AppDockとAppletをすべて更新」へ統一した。`appdock.updates.installAll`のID・scope・保存済み割り当てと更新処理は不変。現行仕様書・GUIの期待文言も更新し、表示変更のパッチとして0.87.1を発行した。
+- main `2312153`上の全42対象ファイルをレビューし、未解決指摘なし。dirty状態のpull/stash/統合は行わず、fetchと両プッシュ先の読取でGitHub/AQUAのmainが`13ce177`、local mainの親側にあることを確認した。実効author/committerも確認した。今回の対象はAbout情報パネル、自動確認/通知、共通設定ボタンと関連文書/検証に限定し、Fluidは変更していない。
+- 標準回帰は **113ファイル・879/879、fail/skip 0**。保存既定値・カタログ・更新処理への実行時依存を追跡し、未実行の影響先72ファイルと文言に関わる2ファイルで **638件**、ソース読取/発行/ランチャー境界12ファイルで **48件** を追加実行した。前回の関連134件のうち、文言に影響されない **124件** を再利用。残る未変更の純粋モジュール16ファイル **69件** は、試験入力hashと旧成功log内の全試験名、依存/実行条件と動作が不変なことを照合して再利用した。古い結果を全体成功へ読み替えていない。
+- 固定lockfile同期・型検査/buildは終了0。ソース/最終固定EXEのAbout GUI **6群** と固定smokeが成功。新しい長い表示名が明暗・600/760/900/1280幅で収まり、更新確認/通知の区分、2ボタンの実行対象、設定保存/リセット/件数タイルの移動を確認した。直前0.87.0の共通設定9群とURL保存6群は、変更のない入力/保存/操作経路の成功を再利用し、文言による配置の影響を新しいAbout GUIで確認した。実サービスへの更新適用・物理入力・実利用先は未確認。
+- `publish.bat`終了0。本体/EXE/Default Shell/feedは **0.87.1**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は **170,686,321 bytes**、SHA256 `904e28cc5f73080963db1596583e5a99e1ad1d43d2b352b0bf913e8d41fcc7c2`。feedのsize/hash、EXE版、ASAR内のDefault Shell版、固定GUIコピーを照合した。
+- 証跡は`.artifacts/commit-validation-about-0871/`のrename・regression-plan・reuse・review・delta-from-0870・入力一覧、追加実行とGUI/smokeのJSON/完全log、package-verification。最終stage tree/実効ID/commit tree/各remote先端の照合はstage/commit/pushへ記録する。旧成功の再利用元は`.artifacts/commit-validation-settings-ui-08612/`・`commit-validation-gesture-labels-0868/`・`about-auto-0870/`。参照証跡と種類/方式別の直近3回、失敗調査、所有/参照が不明な旧資料を保持し、削除0件。Release/実利用先deployは行わない。
+
+## 2026-10-25: Aboutの自動確認と更新通知・標準ボタン 0.87.0
+
+- main `2312153`上の0.86.14までの未コミット変更を保持して追加修正。dirty状態のpull/stash/commitは行わず、Fluid worktreeも変更していない。前回758入力との差分、レビューと今回759入力のhashを`.artifacts/about-auto-0870/`へ記録した。
+- 確認アイコンを枠なしに変更。共通の設定画面/ダイアログでは、標準面ボタンのhoverに明るさfilterをかけず、枠をアクセント色へそろえた。意味を持つ強調/削除・タブ・トグル・アイコンの専用外観は保持する。更新設定は初期状態を閉じ、末尾の説明段落を除去。更新元のリセットは共通の`SettingsInputActions`でテキストボックス右の小さいアイコンへ移し、操作名と既定値での無効化、blur/Enter確定・Escape取消を維持した。
+- `updates.checkHostOnAboutOpen`を追加し、依頼で選択された既定ON・1時間の間隔を実装した。Aboutを開くと本体metadataだけを確認し、同じプロセス内の最終確認から1時間未満なら実行しない。手動確認/更新実行の時刻も使い、更新元変更後の初回は確認する。OFF/空の更新元/更新処理中/導入確認待ちは実行せず、同時に複数画面が開いても重複しない。画面を開いたままの定期処理や、結果保存ファイルは追加しない。起動後初回は未確認として確認する。新しい保存項目のためマイナーを進めて0.87.0とし、既存値と明示OFFを保持する。移行コードは追加していない。
+- 自動確認はAbout専用の内部actionに接続し、DockApiへ新しい操作を公開していない。確認だけで更新なし/未設定/未公開なら通知しない。更新あり/確認失敗は従来の通知へ渡し、更新ボタン/更新実行コマンドで更新がなかった場合の結果通知も保持する。設定/操作/間隔/結果の仕様とボタン追加規則を開発文書へ反映した。
+- 発行前に差分と影響先を自己レビューし、未解決指摘なし。初回型検査でルートのDockApi providerとの型差を検出し、設定ページ専用の任意capabilityへ修正した。固定lockfile同期・最終型検査/buildは終了0。自動確認の1時間境界/手動確認による間隔更新/更新元変更/重複抑止/設定のJSON投影/明示OFF/通知の出し分けと、既存の更新・設定保存・既定値・端末分離等の関連13ファイルは **134/134（fail/skip 0）**。
+- ソースと最終固定EXEの両方でAbout **6群**・既存共通設定 **9群**・URL確定/保存 **6群**、計 **3系統21群** が成功。初回の自動確認1回と無通知、再訪/最近確認済みでのON切替の抑止、確認アイコンと公開「更新チェック」コマンドの更新なし無通知、更新ボタンでの更新なし通知、更新版と日時、2種類の更新対象、折りたたみ/設定保存/隣接リセットの寸法と実際のリセットを確認した。明暗・実幅600/760/900/1280で本文の横はみ出しなし、枠なし確認アイコンと標準面2系統のhover枠色/filter、ボタン寸法を検査し、最終画像も目視確認した。
+- 固定EXEのsmokeもok=true。初回smokeは、自動確認を無効にするため試験スクリプトへ追加したJSONにschemaVersion/host/extensionsがなく、設定復旧待ちでタイムアウトした。試験側を正しい既定設定のfixtureへ修正し、**同じEXE/hash**で再確認して成功した。失敗log/profileも保持し、製品の修正/再発行は行っていない。全標準回帰、実サービスからの更新適用/再起動、物理入力/実利用先は未確認。ローカルfeedの更新版は表示検証用で、実在する公開版を示さない。
+- `publish.bat`終了0。本体/EXE/Default Shell/feedは **0.87.0**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は **170,680,112 bytes**、SHA256 `85e9d22ed376f7b944215cb1330b557118f7412fe855b282ebc5a357a35668d8`。feedのsize/hash、EXEのFileVersion/ProductVersion、ASAR内のDefault Shell版、各固定GUIコピーが一致した。
+- 証跡は`.artifacts/about-auto-0870/`のreview・delta-from-08614・inputs-before-final/inputs-final・input-verification・environment・コマンド別JSON/完全log・package-verification・evidence-hashes・cleanup。固定About画像/測定は`.artifacts/about-ui-1792866502971/`、共通設定は`.artifacts/settings-usability-1792866521398/`、URL/リセットは`.artifacts/settings-url-1792866543208/`、成功smokeは`.artifacts/smoke-1792866738474/`。種類/実行方式別の直近3回と参照資料、失敗調査、他作業との参照/所有関係が不明な旧資料を保持し、削除0件。今回も未コミット、push/Release/実利用先deployなし。
+
+## 2026-10-25: 情報パネルの文言と更新操作の調整 0.86.14
+
+- main `2312153`上の0.86.13未コミット変更を保持して追加調整した。dirty状態のpull/stash/commit・Fluid worktreeの変更は行わない。前回758入力との差分は`.artifacts/about-panel-08614/delta-from-08613.json`、修正前/検証時/最終入力はinputs-before/inputs-verified/inputs-finalへ記録した。
+- 紹介文をアプリ名の上へ1回だけ配置し、歓迎文・現在のバージョンのラベル・最新である旨・実行環境/まとめて更新/本体更新の見出しを除去。Appletだけの一括更新リンクとフッターの管理ボタンも非表示にした。既存の公開コマンドや管理画面側の更新操作は保持した。
+- 現在版の隣へ共通VersionDisplayによる更新版、確認アイコン、最終確認日時を1行で配置。確認アイコンは既存の`checkUpdates()`で本体metadataだけを取得し、共通のエラー表示を使う。更新は適用しない。「本体と全Appletを更新」「AppDockを更新」を等幅・等高で同じ行へ並べ、本体のみのボタンはLightで白、Darkで共通の標準面を使用する。Applet数のタイルを、クリックとキーボードで管理画面へ移動できるボタンにした。件数の定義、初期展開の更新設定、保存形式は不変。
+- 発行前に実装差分と影響先をレビューした。GUIで見つかった本体確認APIの対象指定（既定の引数なしを使う）、タイルへの汎用buttonのflex継承、600px幅で縦並びになる本文幅を修正。最終ソースGUIと画像で再確認し、未解決指摘なし。初回失敗log/profileも保持した。設定項目・保存ファイル・公開API契約の変更がない表示と既存操作の接続としてパッチを進めた。
+- 固定lockfileの依存同期、最終型検査/buildは終了0。関連の翻訳/ナビゲーション/設定ページ/接続/配色は **28/28（fail/skip 0）**。ソースと最終固定EXEの両方でAbout **6群**・既存共通設定 **9群**、計 **2系統15群** が成功。固定EXEのsmokeもok=true。不要文言の除去、既存カタログとの件数整合・登録後の表示更新、metadataだけによる更新版の表示/解除・日時、2種類の更新対象、手動で閉じた設定の維持と保存、件数タイルのEnter操作を確認した。
+- 明暗テーマ・実幅600/760/900/1280で本文の横はみ出しなしを検査し、全幅で更新ボタンの同一y座標・幅・高さとLightの本体ボタンの白背景を測定した。1280幅では版と日時の同じ行を測定し、600幅では版の行内だけで横スクロールする。固定版の画像も目視確認した。ローカルfeedの`999.0.0`は表示検証用で、実在する公開版ではない。更新ボタンの対象検証は同版feedで行い、実ファイルの更新適用/再起動・実サービス・実利用先は未確認。標準全回帰とportable-updatesの全適用試験は未実行。
+- `publish.bat`終了0。本体/EXE/Default Shell/feedは **0.86.14**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は **170,677,435 bytes**、SHA256 `7a84233f99c4fa5f46bed7d0ca3b79b84aa4e1e99ac93e48c24d58829ea465a6`。feedのsize/hash、EXEのFileVersion/ProductVersion、ASAR内のDefault Shell版、固定GUIコピーが一致した。
+- 証跡は`.artifacts/about-panel-08614/`のreview・入力照合・environment・コマンド別JSON/完全log・package-verification・evidence-hashes・cleanup。最終固定About画像/測定は`.artifacts/about-ui-1792864182307/`（更新ありはhost-update-available.png）、共通設定は`.artifacts/settings-usability-1792864199505/`、smokeは`.artifacts/smoke-1792864221072/`。種類/実行方式別の直近3回・参照証跡・失敗調査・他作業との所有/参照が不明な旧資料を保持し、削除0件。今回も未コミット、push/Release/実利用先deployなし。
+
+## 2026-10-25: AppDockについての情報パネル 0.86.13
+
+- 前回の設定UI変更0.86.9〜0.86.12を、標準874件と発行物の照合後にmainへ`2312153`（tree `605ed3352fefd169311ee03405f4bb3a7486fd2e`）としてコミットした。実効author/committerとstage一致を確認し、clean状態の通常環境で`git pull --ff-only`はAlready up to date。今回の実装はその後の別差分とし、commit/push/Release/実利用先deployは行っていない。Fluid worktreeも変更していない。
+- 設定インデックス・ページタイトルを「AppDockについて」へ変更。既存の`settings/about`、公開コマンドID、検索アンカー、保存形式は保持した。最上部の単一情報パネルへアイコン・アプリ名・版・Applet/コマンド件数・実行環境と、一括/本体更新の操作・状態・最終確認日時、Applet管理へのリンクを統合した。独立した実行環境Sectionは除去し、「更新の設定」は初期状態で開いた共通Sectionとして配置した。利用者による折りたたみと即時保存は保持した。
+- 情報パネルだけは依頼された共通レイアウト規則の例外とし、専用CSSで配置・文字・枠を構成。共通配色変数と既存の更新ハンドラー・エラー表示は共有する。Applet数は組み込み/collectionを除くパッケージ数と稼働中の数、コマンド数は入力設定と同じカタログのID重複を除いた総数と利用可能数。Aboutのauxiliaryへは集計数だけを追加した。設定項目・保存ファイル・公開操作の追加/削除がないためパッチ更新と判定した。構成・件数・例外の適用範囲を設定基盤/共通指針/更新仕様等へ反映した。
+- 発行前に差分と影響先を自己レビューし、更新日時をボタン横で縦中央にそろえる修正後に再確認。未解決指摘なし。固定lockfileの依存同期、最終型検査/buildは終了0。翻訳・ナビゲーション・設定ページ/接続・配色の関連試験は、入力hash記録を揃えた最終入力で **28/28（fail/skip 0）**。最終ソースGUIと固定GUIも成功し、標準全回帰は再実行していない。
+- ソースGUIはAbout **5群**と既存の共通設定 **9群**が成功。最終固定EXEではAbout **5群**・共通設定 **9群**・URL入力 **6群**、計 **3系統20群**、smoke（ok=true）が成功した。3種類の更新ボタンは同版のローカルfeedで本体/全Applet/全体の対象を検証し、実サービスからの更新適用は行っていない。件数のカタログ整合・登録後の表示更新、初期展開/手動で閉じた状態の維持・保存、Applet管理への移動、明暗テーマと実幅600/760/900/1280の収まりを確認し、固定EXEの画像も目視確認した。
+- 初回GUIでは開発版の更新制限と検証用の旧コマンド名、固定版ではモデル投影から描画までの待機不足を検出。検証側の経路/実行条件/描画待機を修正して成功した。既存URL試験の旧説明文・旧Applet一覧導線・既定値を省略する保存形式への期待も現行に合わせて修正し、最終6群が成功。失敗log/profileは調査資料として保持した。既存portable-updates等の名称/初期展開の期待値は更新・構文検査済みで、その全更新適用/再起動試験は今回未実行。実アカウント・実入力・実利用先は未確認。
+- `publish.bat`終了0。本体/EXE/Default Shell/feedは **0.86.13**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は **170,667,449 bytes**、SHA256 `3288867dc686d14ec55a569749d2242b2a180502ab6a959941ed59a42fef544c`。feedのsize/hash、実EXEのFileVersion/ProductVersion、ASAR内のDefault Shell版、固定GUIコピーのhashが一致した。
+- 証跡は`.artifacts/about-panel-08613/`のreview、758入力のinputs-before-final/inputs-finalとinput-verification、environment、コマンド別JSON/完全log、package-verification、evidence-hashes、cleanup。新規CSS・検証スクリプトも入力へ含めた。最終About画像/測定は`.artifacts/about-ui-1792862406332/`、共通設定は`.artifacts/settings-usability-1792862434454/`、URLは`.artifacts/settings-url-1792862548598/`、smokeは`.artifacts/smoke-1792862585083/`。証跡と種類/実行方式別の直近3回、失敗調査、他作業との参照/所有関係が不明な旧資料を保持し、削除0件。今回の実装は未コミット。
+
 ## 2026-10-25: 設定UI 0.86.9〜0.86.12のコミット前照合
 
 - main `13ce177`上の32ファイルを対象として実装差分と影響先を再レビューし、追加修正を要する指摘なし。stage前に実効author/committerとremote設定を確認した。新しいAbout画面の実装はこのコミットの後に分離する。

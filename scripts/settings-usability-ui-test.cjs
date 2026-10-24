@@ -56,6 +56,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
+    initial.updates.checkHostOnAboutOpen = false;
     initial.host.hardwareAcceleration = false;
     initial.keybindings = [];
     initial.gestures.enabled = false;
@@ -300,7 +301,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
           '表示',
           'Applet管理',
           'タスクトレイ',
-          'バージョン情報・更新',
+          'AppDockについて',
         ]) {
           await select(name);
           const result = await page.evaluate(() => {
@@ -332,8 +333,8 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       await page.getByRole('region', { name: 'コンテキストメニュー', exact: true }).count(),
       1,
     );
-    await select('バージョン情報・更新');
-    assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 0);
+    await select('AppDockについて');
+    assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 1);
     assert.equal(
       await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
       0,
@@ -347,16 +348,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     );
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
     assert.equal(await page.locator('.about-applets').isVisible(), false);
-    assert.equal(
-      await page
-        .getByRole('group', { name: '現在のバージョン', exact: true })
-        .locator('.settings-badge')
-        .count(),
-      1,
-    );
+    assert.equal(await page.getByTestId('about-version').locator('.settings-badge').count(), 1);
     assert.equal(await page.locator('.update-result-details').count(), 0);
     checks.push(
-      'eight pages fit light/dark at 1280 and 760; tray cards are separated and about offers update-only actions',
+      'eight pages fit light/dark at 1280 and 760; tray cards are separated and about offers version check and update actions',
     );
     assert.deepEqual(failures, []);
     fs.writeFileSync(path.join(profile, 'process.log'), output);

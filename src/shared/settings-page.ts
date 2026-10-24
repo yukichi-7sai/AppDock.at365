@@ -109,6 +109,7 @@ export interface SettingsPageAuxiliary {
   statuses?: GlobalHotKeyStatus[];
   launch?: HostSnapshot['launch'];
   runtime?: HostSnapshot['runtime'];
+  aboutStats?: { commandCount: number; availableCommandCount: number };
   version?: string;
   updates?: HostSnapshot['updates'];
   accounts?: HostSnapshot['webAccounts'];

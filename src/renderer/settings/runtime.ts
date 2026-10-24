@@ -301,6 +301,7 @@ export class SettingsViewClient {
       },
       checkUpdates: (id) => invoke('checkUpdates', [id]),
       checkAllUpdates: () => invoke('checkAllUpdates'),
+      checkHostOnAboutOpen: () => invoke('checkHostOnAboutOpen'),
       installUpdates: (id) => invoke('installUpdates', [id]),
       cancelUpdates: () => invoke('cancelUpdates'),
       openReleases: (id) => invoke('openReleases', [id]),

@@ -1988,13 +1988,21 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       touchpadShortcuts:
         id === 'shortcuts' ? touchpadShortcutProjection(settings.value) : undefined,
     };
-  if (id === 'about')
+  if (id === 'about') {
+    const commands = settingsUiCommands();
     return {
       version: host.version,
       runtime: host.runtime,
       updates: host.updates,
       applets: applets.filter((a) => a.sourceKind !== 'builtin').map(summary),
+      aboutStats: {
+        commandCount: new Set(commands.map((command) => command.id)).size,
+        availableCommandCount: new Set(
+          commands.filter((command) => command.available).map((command) => command.id),
+        ).size,
+      },
     };
+  }
   if (id === 'web-accounts')
     return {
       accounts: host.webAccounts,
@@ -2508,6 +2516,8 @@ function settingsPageActions(
       return updater.state.results.find((r) => r.id === (selected ?? 'host'));
     };
     actions.checkAllUpdates = async () => executeCommand('appdock.updates.check');
+    if (page.id === 'about')
+      actions.checkHostOnAboutOpen = async () => updater.checkHostOnAboutOpen();
     if (page.id === 'about')
       for (const command of updateCommands)
         actions[`settingAction:${command.id}`] = async () => executeCommand(command.id);

@@ -20,7 +20,7 @@ export function UpdateCheckTime({ checkedAt }: { checkedAt?: string }) {
     </time>
   );
 }
-const updateError = (error: unknown) => {
+export const updateError = (error: unknown) => {
   const message = (error instanceof Error ? error.message : '').replace(
     /^Error invoking remote method '[^']+': (?:Error: )?/,
     '',
@@ -75,11 +75,13 @@ export function VersionCheck({
   details = false,
   disabled = false,
   compact = false,
+  embedded = false,
 }: {
   id?: string;
   details?: boolean;
   disabled?: boolean;
   compact?: boolean;
+  embedded?: boolean;
 }) {
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -101,15 +103,13 @@ export function VersionCheck({
           : result.status === 'current'
             ? translate('settings.versionCheck.latest')
             : result.message;
-  return (
-    <SettingsField
-      title={translate('settings.versionCheck.update')}
-      description={details ? summary : undefined}
-    >
+  const content = (
+    <>
       <span className="update-check-control">
         <SettingsButton
           pending={!!busy}
-          className={compact ? 'text-button' : 'update-primary'}
+          icon={embedded}
+          className={embedded ? 'about-host-update' : compact ? 'text-button' : 'update-primary'}
           disabled={busy || state.busy || disabled}
           title={disabled ? translate('settings.versionCheck.pending') : undefined}
           onClick={() => {
@@ -146,6 +146,16 @@ export function VersionCheck({
           )}
         </>
       )}
+    </>
+  );
+  return embedded ? (
+    <div className="about-update-group">{content}</div>
+  ) : (
+    <SettingsField
+      title={translate('settings.versionCheck.update')}
+      description={details ? summary : undefined}
+    >
+      {content}
     </SettingsField>
   );
 }

@@ -13,6 +13,7 @@ fs.mkdirSync(profile, { recursive: true });
 const executable = path.join(profile, 'AppDock.at365.exe');
 fs.copyFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe'), executable);
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
+settings.updates.checkHostOnAboutOpen = false;
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
 settings.host.startMinimized = true;
@@ -137,7 +138,7 @@ async function about(page) {
   await page.getByRole('navigation').count();
   await page
     .locator('.settings-categories')
-    .getByRole('button', { name: 'バージョン情報・更新', exact: true })
+    .getByRole('button', { name: 'AppDockについて', exact: true })
     .click();
 }
 const electronExpression =
@@ -346,8 +347,9 @@ async function restarted(inspectPort, predicate, previousPid) {
     );
     await about(page);
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
-    assert.equal(await page.locator('.about-page > .settings-section').count(), 4);
-    assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 0);
+    assert.equal(await page.locator('.about-page > .settings-section').count(), 1);
+    assert.equal(await page.getByTestId('about-overview').count(), 1);
+    assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 1);
     assert.equal(
       await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
       0,
@@ -357,14 +359,16 @@ async function restarted(inspectPort, predicate, previousPid) {
       await page.getByRole('button', { name: 'Appletの管理と更新', exact: true }).count(),
       1,
     );
-    for (const control of await page.locator('.about-page .update-check-control').all()) {
-      const button = await control.getByRole('button').boundingBox();
+    for (const control of await page.locator('.about-page .about-version').all()) {
+      const button = await control
+        .getByRole('button', { name: '更新を確認', exact: true })
+        .boundingBox();
       const time = await control.locator('time').boundingBox();
       assert.ok(time.x >= button.x + button.width, 'last-check time is beside the update button');
       assert.ok(Math.abs(time.y + time.height / 2 - button.y - button.height / 2) < 2);
     }
     checks.push(
-      'shared cards and update-only controls, per-target last-check times beside update buttons',
+      'welcome panel and initially open update settings, per-target last-check times beside update buttons',
     );
     await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
     // Both source resets save immediately and preserve unrelated settings.
@@ -397,7 +401,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       'github:yukichi-7sai/AppDock.at365',
     );
     checks.push(
-      'collapsed settings, prominent actions, per-Applet sources, host/Applet default resets',
+      'initially open settings, prominent actions, per-Applet sources, host/Applet default resets',
     );
     await page
       .getByLabel('AppDockの更新元', { exact: true })
@@ -436,7 +440,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     // Electron dialogs are native. Stub only the final approval UI; the real updater, shutdown, swap and restart all run.
     await approve(inspectPort);
     const combinedPid = await inspect(inspectPort, 'process.pid');
-    await page.getByRole('button', { name: '本体と全Appletを更新', exact: true }).click();
+    await page.getByRole('button', { name: 'AppDockとAppletをすべて更新', exact: true }).click();
     await wait(1500);
     const updated = await restarted(
       inspectPort,

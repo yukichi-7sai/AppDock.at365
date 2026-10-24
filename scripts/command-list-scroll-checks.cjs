@@ -397,7 +397,7 @@ module.exports = async ({ host, select, until, profile, checks }) => {
         'AI',
         'MCPサーバー',
         'MCPクライアント',
-        'バージョン情報・更新',
+        'AppDockについて',
         'Hint fixture',
       ]) {
         await select(title);

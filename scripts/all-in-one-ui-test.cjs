@@ -76,7 +76,7 @@ async function about(page) {
   await page.getByRole('navigation').count();
   await page
     .locator('.settings-categories')
-    .getByRole('button', { name: 'バージョン情報・更新', exact: true })
+    .getByRole('button', { name: 'AppDockについて', exact: true })
     .click();
 }
 (async () => {

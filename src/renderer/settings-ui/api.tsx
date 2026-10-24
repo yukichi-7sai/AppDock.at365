@@ -23,7 +23,10 @@ export type SettingsControlsApi = Pick<
   | 'setAppletApiPermissions'
   | 'automation'
   | 'executeCommand'
-> & { snapshot(): Promise<{ updates: UpdateState }> };
+> & {
+  snapshot(): Promise<{ updates: UpdateState }>;
+  checkHostOnAboutOpen?(): Promise<void>;
+};
 const ControlsContext = createContext<SettingsControlsApi | null>(null);
 export function SettingsControlsProvider({
   api,

@@ -25,6 +25,7 @@ module.exports = async function ({
     'タスクトレイ',
     'ショートカットキー',
     'マウスジェスチャー',
+    'タッチパッドジェスチャー',
     'カスタムコマンド',
     'Webアカウント',
     '操作の許可',
@@ -32,7 +33,7 @@ module.exports = async function ({
     'AI',
     'MCPサーバー',
     'MCPクライアント',
-    'バージョン情報・更新',
+    'AppDockについて',
   ];
   assert.deepEqual(
     await host.locator('[aria-label="本体の設定"] > button').allTextContents(),

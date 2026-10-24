@@ -163,7 +163,7 @@ const main = (fn) =>
     await page.getByRole('button', { name: '設定', exact: true }).click();
     await page
       .locator('.settings-categories')
-      .getByRole('button', { name: 'バージョン情報・更新', exact: true })
+      .getByRole('button', { name: 'AppDockについて', exact: true })
       .click();
     const update = page
       .getByRole('article', { name: '更新進捗テスト', exact: true })

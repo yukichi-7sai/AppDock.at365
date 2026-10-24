@@ -59,6 +59,7 @@ export const createDefaultSettings = (): Settings => ({
   extensions: {},
   updates: {
     hostSource: 'github:yukichi-7sai/AppDock.at365',
+    checkHostOnAboutOpen: true,
     checkHostOnStartup: false,
     checkAppletsOnStartup: false,
     startupDelaySeconds: 10,
@@ -247,6 +248,7 @@ export function parseSettings(value: unknown): Settings {
     throw Error(hostText('settings.settings-schema.updates'));
   validateUpdateSource(updates.hostSource);
   for (const key of [
+    'checkHostOnAboutOpen',
     'checkHostOnStartup',
     'checkAppletsOnStartup',
     'notifyOnStartup',
