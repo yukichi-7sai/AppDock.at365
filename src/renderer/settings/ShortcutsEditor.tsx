@@ -46,6 +46,9 @@ export function ShortcutsEditor({
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const {
+    provider: activeProvider,
+    selectProvider,
+    clearProvider: clearProviderFilter,
     target,
     filter,
     setFilter,
@@ -54,7 +57,7 @@ export function ShortcutsEditor({
     inputFilter,
     selectInput,
     clearInput,
-  } = useBindingCommandFilter(provider?.request, clearProvider);
+  } = useBindingCommandFilter(provider, clearProvider);
   const [error, setError] = useState('');
   const lastStatuses = useRef(statuses);
   useEffect(() => {
@@ -84,7 +87,7 @@ export function ShortcutsEditor({
   const visible = catalog.filter((command) => {
     if (!inputFilter) {
       if (target) return command.id === target.id;
-      if (provider && command.extensionId !== provider.id) return false;
+      if (activeProvider && command.extensionId !== activeProvider.id) return false;
     }
     const assigned = rows.filter((row) => row.command === command.id);
     if (inputFilter && !assigned.some((row) => normalizeShortcut(row.key) === inputFilter.key))
@@ -159,7 +162,9 @@ export function ShortcutsEditor({
           {target ? (
             <CommandTargetFilter />
           ) : (
-            provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />
+            activeProvider && (
+              <CommandProviderFilter title={activeProvider.title} onClear={clearProviderFilter} />
+            )
           )}
         </CommandBindingToolbar>
 
@@ -173,6 +178,8 @@ export function ShortcutsEditor({
           showProvider
           selectedInput={inputFilter?.key}
           onInputFilter={selectInput}
+          selectedProvider={activeProvider?.id}
+          onProviderFilter={selectProvider}
           statusError={statusError}
           onRetry={() =>
             void settingsControls.retryGlobalHotKeys().catch((reason) => setError(String(reason)))

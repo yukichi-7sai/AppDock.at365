@@ -14,7 +14,7 @@ import { ListIcon } from '../settings-ui/SettingsListTable';
 import { Toggle } from '../settings-ui/Toggle';
 import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { CommandListToolbar } from '../settings-ui/CommandListScroll';
+import { CommandListToolbar, CommandListSummary } from '../settings-ui/CommandListScroll';
 
 const states = {
   running: hostText('settings.appletManagementSettings.running'),
@@ -241,7 +241,9 @@ export function AppletManagementSettings({
       <CommandListToolbar>
         <div className="command-shortcut-tools">
           <div className="command-shortcut-search">
-            <span aria-hidden="true">⌕</span>
+            <span aria-hidden="true">
+              <Icon name="search" size={18} />
+            </span>
             <SettingsInput
               type="search"
               aria-label={translate('settings.appletManagementSettings.search')}
@@ -251,14 +253,14 @@ export function AppletManagementSettings({
             />
           </div>
         </div>
-        <div className="command-shortcut-summary">
+        <CommandListSummary className="command-shortcut-summary" actions={null}>
           <span role="status">
             {translate('settings.appletManagementSettings.visibleCount', {
               visible: visible.length,
               total: applets.length,
             })}
           </span>
-        </div>
+        </CommandListSummary>
       </CommandListToolbar>
       <div className="settings-list-scroll">
         <table className="settings-list-table applet-management-table">

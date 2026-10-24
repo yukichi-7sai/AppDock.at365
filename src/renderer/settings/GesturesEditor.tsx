@@ -53,6 +53,9 @@ export function GesturesEditor({
   const label = touchpad ? touchpadTitle : gestureTitle;
   const page = touchpad ? 'touchpad-gestures' : 'gestures';
   const {
+    provider: activeProvider,
+    selectProvider,
+    clearProvider: clearProviderFilter,
     target,
     filter,
     setFilter,
@@ -61,7 +64,7 @@ export function GesturesEditor({
     inputFilter,
     selectInput,
     clearInput,
-  } = useBindingCommandFilter(provider?.request, clearProvider);
+  } = useBindingCommandFilter(provider, clearProvider);
   const bindings = gestures.bindings;
   const displayBindings = touchpad
     ? touchpadGestureTypes.flatMap(([gesture]) => bindings.filter((row) => row.gesture === gesture))
@@ -91,7 +94,7 @@ export function GesturesEditor({
   const visible = catalog.filter((command) => {
     if (!inputFilter) {
       if (target) return command.id === target.id;
-      if (provider && command.extensionId !== provider.id) return false;
+      if (activeProvider && command.extensionId !== activeProvider.id) return false;
     }
     const assigned = bindings.filter((row) => row.command === command.id);
     if (inputFilter && !assigned.some((row) => row.gesture === inputFilter.key)) return false;
@@ -153,7 +156,9 @@ export function GesturesEditor({
           {target ? (
             <CommandTargetFilter />
           ) : (
-            provider && <CommandProviderFilter title={provider.title} onClear={clearProvider} />
+            activeProvider && (
+              <CommandProviderFilter title={activeProvider.title} onClear={clearProviderFilter} />
+            )
           )}
         </CommandBindingToolbar>
         <CommandBindingList<GestureBinding>
@@ -162,6 +167,8 @@ export function GesturesEditor({
           showProvider
           selectedInput={inputFilter?.key}
           onInputFilter={selectInput}
+          selectedProvider={activeProvider?.id}
+          onProviderFilter={selectProvider}
           inputName={translate('settings.gesturesEditor.inputName')}
           inputKey={(row) => row.gesture}
           inputLabel={(row) => label(row.gesture)}

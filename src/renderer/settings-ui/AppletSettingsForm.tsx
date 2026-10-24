@@ -1,5 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import type {
   ExtensionSnapshot,
@@ -34,6 +34,7 @@ export function AppletSettingsForm({
   onListDraftAction,
   onListDraftImage,
   accounts = [],
+  commonFields,
 }: {
   applet: ExtensionSnapshot;
   settings: Settings;
@@ -53,6 +54,7 @@ export function AppletSettingsForm({
     before: Record<string, unknown>[],
   ): Promise<unknown>;
   accounts?: { id: string; name: string }[];
+  commonFields?: ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -306,8 +308,10 @@ export function AppletSettingsForm({
       )}
       {!applet.collection && (
         <SettingsSection
-          title={translate('settings.appletSettingsForm.startup')}
-          hint={translate('settings.appletSettingsForm.startupHint')}
+          title={translate('settings.appletSettingsForm.common')}
+          key={`common:${applet.id}`}
+          collapsible
+          data-testid="applet-common-settings"
         >
           <SettingsField
             title={translate('settings.appletSettingsForm.delay')}
@@ -330,6 +334,7 @@ export function AppletSettingsForm({
               }
             />
           </SettingsField>
+          {commonFields}
         </SettingsSection>
       )}
     </div>

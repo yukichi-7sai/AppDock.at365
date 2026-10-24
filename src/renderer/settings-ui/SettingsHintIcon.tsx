@@ -10,7 +10,32 @@ export function SettingsHintIcon({ title, hint }: { title: string; hint?: string
   return visible && hint?.trim() ? <HintPopover title={title} hint={hint} /> : null;
 }
 
-function HintPopover({ title, hint }: { title: string; hint: string }) {
+/** Command explanations remain available independently of optional settings hints. */
+export function SettingsDescriptionIcon({
+  title,
+  description,
+  testId,
+}: {
+  title: string;
+  description?: string;
+  testId?: string;
+}) {
+  return description?.trim() ? (
+    <HintPopover title={title} hint={description} description testId={testId} />
+  ) : null;
+}
+
+function HintPopover({
+  title,
+  hint,
+  description = false,
+  testId,
+}: {
+  title: string;
+  hint: string;
+  description?: boolean;
+  testId?: string;
+}) {
   const { t } = useHostTranslation();
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -70,12 +95,17 @@ function HintPopover({ title, hint }: { title: string; hint: string }) {
     };
   }, [open, hint]);
   return (
-    <span className="settings-hint-icon" onPointerEnter={show} onPointerLeave={leave}>
+    <span
+      className={description ? 'settings-description-icon' : 'settings-hint-icon'}
+      onPointerEnter={show}
+      onPointerLeave={leave}
+    >
       <button
         ref={trigger}
         type="button"
-        className="settings-hint-trigger"
-        aria-label={t('common.hint', { title })}
+        className={description ? 'settings-description-trigger' : 'settings-hint-trigger'}
+        data-testid={testId}
+        aria-label={t(description ? 'common.description' : 'common.hint', { title })}
         aria-describedby={id}
         onFocus={show}
         onBlur={() => setOpen(false)}
@@ -90,13 +120,22 @@ function HintPopover({ title, hint }: { title: string; hint: string }) {
       >
         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
           <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />
-          <path
-            d="M7.8 7.5a2.2 2.2 0 0 1 4.4 0c0 1.6-2.2 1.8-2.2 3.5"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-          <circle cx="10" cy="14" r=".9" fill="currentColor" />
+          {description ? (
+            <>
+              <path d="M10 9v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <circle cx="10" cy="6" r=".9" fill="currentColor" />
+            </>
+          ) : (
+            <>
+              <path
+                d="M7.8 7.5a2.2 2.2 0 0 1 4.4 0c0 1.6-2.2 1.8-2.2 3.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <circle cx="10" cy="14" r=".9" fill="currentColor" />
+            </>
+          )}
         </svg>
       </button>
       <span

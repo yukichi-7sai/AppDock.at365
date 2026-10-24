@@ -7,11 +7,13 @@
 .settings-title-with-hint > :is(h2, strong) {
   min-width: 0;
 }
-.settings-hint-icon {
+.settings-hint-icon,
+.settings-description-icon {
   display: inline-flex;
   flex: none;
 }
-.settings-hint-trigger {
+.settings-hint-trigger,
+.settings-description-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -25,15 +27,18 @@
   color: var(--muted);
   cursor: help;
 }
-.settings-hint-trigger svg {
+.settings-hint-trigger svg,
+.settings-description-trigger svg {
   width: 16px;
   height: 16px;
 }
-.settings-hint-trigger:hover {
+.settings-hint-trigger:hover,
+.settings-description-trigger:hover {
   color: var(--text);
   background: var(--raised);
 }
-.settings-hint-trigger:focus-visible {
+.settings-hint-trigger:focus-visible,
+.settings-description-trigger:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

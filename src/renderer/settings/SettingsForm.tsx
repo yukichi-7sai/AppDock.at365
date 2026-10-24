@@ -72,6 +72,15 @@ export function SettingsForm({
           settings={settings}
           onChange={edit}
           accounts={aux.accounts}
+          commonFields={
+            !page.collection && (
+              <AppletUpdateSource
+                extension={extensions.find((a) => a.id === page.owner)!}
+                settings={settings}
+                edit={edit}
+              />
+            )
+          }
           onListCommit={(key, value, before) => invoke('replaceAppletList', [key, value, before])}
           onListOpen={(key, id) => invoke('openAppletListItem', [key, id])}
           onListDraftAction={(key, input) =>
@@ -81,13 +90,6 @@ export function SettingsForm({
             invoke('appletListDraftAction', [key, { kind: 'image', base64 }])
           }
         />
-        {!page.collection && (
-          <AppletUpdateSource
-            extension={extensions.find((a) => a.id === page.owner)!}
-            settings={settings}
-            edit={edit}
-          />
-        )}
       </>
     );
   if (category === 'applets')

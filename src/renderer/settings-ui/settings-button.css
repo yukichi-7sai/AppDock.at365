@@ -4,8 +4,9 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 34px;
-  padding: 7px 12px;
+  min-height: var(--settings-control-height, 34px);
+  padding: var(--settings-control-padding-y, 7px) 12px;
+  line-height: 1.5;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--raised);

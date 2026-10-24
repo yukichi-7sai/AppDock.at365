@@ -91,6 +91,7 @@ export function CommandSettingsLinks({
                 assigned ? translate('settings.commandSettingsNavigation.assignedHint') : undefined
               }
               data-assigned={assigned}
+              data-testid={`command-settings:${command.id}:${page.id}`}
               onClick={() => navigation.open(page.id, command)}
             >
               <Icon name={page.icon} />

@@ -224,8 +224,8 @@
 .settings-file-button,
 .settings-page-error > button,
 .settings-panel :where(button:not([class]), button.secondary) {
-  min-height: 34px;
-  padding: 7px 12px;
+  min-height: var(--settings-control-height, 34px);
+  padding: var(--settings-control-padding-y, 7px) 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--raised);
@@ -363,13 +363,6 @@
   background: var(--settings-group-background);
 }
 @container settings-page (max-width: 600px) {
-  .settings-panel .command-list-summary > .command-list-summary-main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 18px minmax(32px, auto);
-    gap: 8px;
-    align-content: start;
-  }
   .settings-page-heading h1 {
     font-size: 21px;
   }
@@ -425,6 +418,9 @@
   letter-spacing: 0.08em;
   margin: 18px 12px 8px;
   color: var(--muted);
+}
+.sidebar-extensions > .settings-applet-heading:first-child {
+  margin-top: 0;
 }
 .settings-categories [role='option'] {
   display: flex;

@@ -350,8 +350,8 @@
 }
 /* Dedicated controls own their appearance; only plain action buttons use the defaults. */
 .settings-section :where(button:not([class]), button.primary, button.secondary) {
-  min-height: 34px;
-  padding: 7px 12px;
+  min-height: var(--settings-control-height, 34px);
+  padding: var(--settings-control-padding-y, 7px) 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--raised);

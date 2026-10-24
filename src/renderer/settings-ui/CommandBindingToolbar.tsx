@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { CommandProviderFilter } from './CommandProviderFilter';
 import type { BindingInputFilter } from './useBindingCommandFilter';
 import { CommandListSummary, CommandListToolbar } from './CommandListScroll';
+import { Icon } from '../../shared/ui-icons';
 export function CommandBindingToolbar({
   inputName,
   inputKind,
@@ -36,7 +37,9 @@ export function CommandBindingToolbar({
     <CommandListToolbar>
       <div className="command-shortcut-tools">
         <div className="command-shortcut-search">
-          <span aria-hidden="true">⌕</span>
+          <span aria-hidden="true">
+            <Icon name="search" size={18} />
+          </span>
           <SettingsInput
             type="search"
             aria-label={translate('settings.commandBindingToolbar.search', {

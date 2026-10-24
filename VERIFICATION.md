@@ -1,5 +1,37 @@
 # 検証記録
 
+## 2026-10-25: 設定UI 0.87.5～0.87.7のコミット検証
+
+- 利用者が0.87.7までの表示・動作を確認してcommit/pushを依頼。main `55bba3a`上の27対象ファイルをレビューし、阻害指摘なし。コマンドセル/提供元の一時フィルター・説明アイコン、設定索引とApplet内部設定、共通部品の密度/集計配置、および正本文書・版・検証記録を対象とする。新規の共通`CommandProviderBadge.tsx`を含め、別作業の変更は含まない。dirtyなためpull/stash/統合は行わず、fetchと両push先の読取でGitHub/AQUAのmainが`55bba3a`に一致し、実効author/committerを確認した。
+- 標準回帰は**113ファイル・879/879、fail/skip 0**。前回標準の全試験ファイルとmain/shared/native/Shell・依存/固定ツール/ビルド定義を入力hashで照合。差分はrenderer・文書・版とrenderer用翻訳キー追加だけで、既存翻訳値は同一。実装時の91件・66件・15件、型検査/build・発行・ソース/固定GUI・smokeの完全log/終了コード/入力一覧と証跡hashも照合した。現行の翻訳/renderer検査を含む**107ファイル・826件を再利用**し、最終発行で生成したnative/updaterを使用するall-in-one/applet-defaults/lifecycle/dotnet-pages/applet-packages/portable-updatesの**6ファイル・53件**を追加実行して成功した。
+- 共通CSS/集計行変更後のコマンド操作を補足するため、`command-cells-0875/probe.cjs`を最終固定EXEで実行し**5群**成功、pageerrorなし。提供元の表示名短縮と安定IDフィルター、説明popover、ヒントOFF時の説明、複数フィルターの置換と解除focus、検索/状態リセットと保存不変、明暗・幅を確認した。profileは`command-cells-ui-1792879651680`。Applet内部設定と6画面の密度/検索配置は0.87.7の固定GUI4群とsmokeの実行物hashが現行と一致するため再利用した。物理OS入力・通常終了・実利用設定・実サービス操作を追加確認した扱いにはしていない。
+- 製品修正なし、確認済み**0.87.7**を維持し再発行なし。固定EXEは**170,689,015 bytes**、SHA256 `7280bd9e0122a537cf932890a2a9259995ae4d471e48b02c91b04c7e29ec2de1`。証跡は`.artifacts/commit-validation-settings-0877/`の対象/入力一覧、再利用判定・旧証跡hash照合、追加53件/固定GUIの完全log、stage/commit tree・実効名義・両remote先端の照合。元資料は`commit-validation-settings-0874`・`command-cells-0875`・`settings-density-0876`・`applet-internal-label-0877`。種類/方式ごとの直近成功と再利用資料を保持し、削除0件。GitHub Release/実利用先deployは行わない。
+
+## 2026-10-25: Applet共通欄の見出し変更 0.87.7
+
+- 利用者指定により共通Sectionの既存翻訳値だけを「Appletの内部設定」へ変更し、設定基盤の正本文書を整合させた。初期折りたたみ、起動待ち時間と更新元の配置、保存設定・公開APIは変更していない。main `55bba3a`上の未コミット変更を保持し、pull/stash/統合なし。表示文言のみのため発行版0.87.6からパッチ更新とし、発行前レビューで阻害指摘なし。
+- 固定lockfile照合・型検査・build・publishは終了0。appearance/localizationの**2ファイル・15/15、fail/skip 0**が成功。最初のdev起動は版変更後の依存構成照合を求めたため固定installで解消。初回の翻訳検査は古いout/mainリソースとの比較で失敗し、build後に再実行成功。製品修正を追加した扱いにはせず、途中のlogも保持。0.87.6の入力一覧との照合で、変更は翻訳JSONの1値・版・正本文書だけ、ほかの製品/試験入力は不変。標準回帰全体は未実行。
+- 最終固定EXEを`.artifacts/applet-internal-label-0877/probe.cjs`の隔離profileで確認し、更新した見出しと初期折りたたみ、Applet切替、検索展開、既存Field保存/取消/既定復帰、6画面の集計と入力寸法、ダイアログ取消の**4群**が成功、pageerrorなし。profileは`applet-internal-label-ui-1792879005622`。固定EXEのsmokeも成功。共通の一時fixtureを再利用し、恒久的な見た目比較テストは追加していない。
+- 本体・EXE・ASAR内Default Shell・feedは**0.87.7**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170,689,015 bytes**、SHA256 `7280bd9e0122a537cf932890a2a9259995ae4d471e48b02c91b04c7e29ec2de1`。feedのsize/hash・FileVersion/ProductVersion・隔離コピーを照合。証跡は`.artifacts/applet-internal-label-0877/`のレビュー・入力ハッシュ・完全log/コマンド/終了コード・最終照合。今回のGUI成功は方式ごと3回以内、参照資料と途中の検査失敗を保持して削除0件。実利用設定・物理入力・通常終了・実サービスは未確認。commit/push/Release/deployは行っていない。
+
+## 2026-10-25: 設定インデックス・Applet共通設定・入力部品の密度 0.87.6
+
+- main `55bba3a`上の0.87.5未コミット変更を保持して追加修正。dirtyなためpull/stash/統合は行っていない。設定インデックスの本体群に指定表記`APPPDOCK`を既存APPLETと同じスタイルで追加し、Default Shellを通常ナビゲーションと検索結果から除外した。登録ページ・実行時のShell・公開操作・保存設定は保持している。
+- Applet共通の起動欄は「Appletの設定」として初期折りたたみ、その中へ既存の開始秒数と更新元SettingsFieldを配置。更新元の既定復帰は入力欄隣のアイコンを使用する。レビューでApplet切替時の開閉状態が残らないようowner単位のkeyを確認した。検索結果からは該当Sectionを自動展開し、collection子ページの除外を維持する。見出しは確認待ちの間に説明した「Appletの設定」の解釈で実装した。
+- 共通部品の単行テキスト・数値・URL・select・通常ボタンの標準高を32pxへ縮小し、専用アイコン/トグル等の操作寸法を維持。6画面のフィルターパネルの件数を同じ集計行の右端へ配置し、検索欄も標準高へ合わせ、虫眼鏡をSVGの中央配置へ統一した。狭幅で必要な折返しは保持する。共通レイアウト指針・設定基盤の正本も更新した。設定キー・保存ファイル・公開APIの追加削除はなく、0.87.5からパッチ更新。発行阻害指摘なし。
+- 固定lockfile照合・format・型検査・build・publishはいずれも終了0。関連回帰はappearance/localization/settings-view-client/settings-page/settings-page-host/settings-navigation/applet-settings/setting-sections/settings-defaults-reset/shell-boundariesの**10ファイル・66/66、fail/skip 0**。標準回帰全体は未実行。
+- `.artifacts/settings-density-0876/probe.cjs`・`behavior.cjs`の隔離GUIで、ソースと最終固定EXEそれぞれ**4群**成功、pageerrorなし。Default Shellの索引非表示とページ登録維持、Applet切替時の初期折りたたみ、開始秒数/文字/選択の保存とEnter/blur/Escape、更新元の個別値・空欄・既定復帰とowner分離、検索からの自動展開、共通入力/選択/ボタン32px、6画面の集計右寄せと検索SVG中央、共通ダイアログの取消を確認。明るい1280px・暗い900pxを目視した。初回fixtureは既定値と同じ文字列を保存後も残る想定が誤りで失敗し、fixtureの既定値を別値に訂正して再実行成功。製品の既定値省略処理は変更していない。恒久的な見た目比較テストは追加していない。
+- 成功したソースprofileは`settings-density-ui-1792878360125`、固定EXEは`settings-density-ui-1792878672639`。本体・EXE・ASAR内Default Shell・feedは**0.87.6**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170,691,300 bytes**、SHA256 `98036797be8d071e821a1b38f3399920040c0faef2113f898298d39dfc0458f1`。feedのsize/hash・FileVersion/ProductVersion・隔離GUI用コピーを照合し、固定EXEのsmokeも成功。証跡は`.artifacts/settings-density-0876/`のレビュー、入力ハッシュ/最終照合、完全log/コマンド/終了コードとhash、配布物確認。今回の種類/方式別の成功は各3回以内、途中の失敗と参照資料も保持し削除0件。物理OS入力・実利用設定・通常終了・実サービス操作は未確認。commit/push/Release/deployは行っていない。
+
+## 2026-10-25: コマンドセルの2行表示・提供元マーク・説明アイコン 0.87.5
+
+- cleanなmain `55bba3a`で通常環境の`git pull --ff-only`はAlready up to date。合意した提供元マーク＋名前＋説明/公開アイコン、その下にIDの基本2行を共通`CommandBindingList`へ実装し、ショートカット・マウス/タッチパッドジェスチャーへ適用。セル上下8px・IDとの間2pxとし、長い名前・複数割り当てに必要な高さ、利用不可/互換表示と既存操作を保持した。
+- `CommandProviderBadge`は所有元IDで一時フィルターを適用する。押下時は検索/登録状態/入力/コマンド対象を解除し、既存の提供元タグで解除できる。入力マークとは相互に置換し、解除で元のマークまたは検索欄へfocusを戻す。ページ移動で破棄し、保存操作は行わない。AppDockはowner null、未知コマンドのundefinedは押せない表示とする。`at365.*`の表示名だけ先頭`Applet.`・末尾`.at365`を省き、元名はtooltipへ保持、他の提供元名・manifest名・ID・検索元は変更していない。
+- 共通`SettingsDescriptionIcon`は既存ヒントのnative popover処理を共有し、説明のある場合だけ情報アイコンを表示。hover/focus/クリック/Enterで開き、Escape/外側操作で閉じる。設定ヒントOFFでも残し、長文/改行/外部テキストをそのまま表示する。レビューで任意ヒントのselectorと説明用selectorを区別し、既存のヒント検査・表示設定に影響しないよう整理した。共通一覧と設定基盤の仕様を更新し、未解決の発行阻害指摘なし。
+- 固定lockfile照合・型検査/build・発行はいずれも終了0。関連回帰はappearance/localization/settings-view-client/settings-page/settings-page-host/shortcut-pages/keybindings/gestures/touchpad-gestures/shell-boundariesの**10ファイル・91/91、fail/skip 0**。レビュー後のselector/CSS差分についてappearance/localizationの**15件**を再確認し成功。残る試験は当該差分で使う型/動作/依存が変わらない成功を維持した。標準回帰全体は未実行。
+- `.artifacts/command-cells-0875/probe.cjs`・`behavior.cjs`の今回用隔離GUIで、ソースと最終固定EXEそれぞれ**5群**成功、pageerrorなし。3画面の通常2行の構造、純正名短縮/全文tooltip・外部名保持、説明なし/利用不可、ヒントOFFでの説明のキーボード/マウス操作と外部テキスト保持、所有元IDによる正しい絞り込み、検索/登録状態のリセット、入力フィルターとの双方向切替、host/unknownの区別、解除focus・画面移動時の解除、設定snapshot不変を確認。画面間のコマンド対象とApplet管理から渡った提供元を置き換え、非同期clear後も新しいフィルターが残ることを確認した。明るい1280px/暗い900pxとリボン設定コマンドのサンプル画面を目視した。恒久的な見た目比較テストは追加していない。
+- ソースprofileは`command-cells-ui-1792876698614`、固定EXEは`command-cells-ui-1792876919653`。本体/EXE/ASAR内Default Shell/feedは**0.87.5**、`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170,679,417 bytes**、SHA256 `a8cd99cf5b1e572b5ebba85e0783933dd8506534095c559a524ffff27629515a`。feedのsize/hash・FileVersion/ProductVersion・GUI用コピーを照合。固定EXEのsmokeも成功。証跡は`.artifacts/command-cells-0875/`のレビュー・入力一覧/最終照合・実行コマンド/終了コード/完全logとhash・配布物確認。種類/方式ごとの直近3回以内の成功と参照資料を保持し、削除0件。物理OS入力・実利用データ・通常終了・実サービス/コマンド実行は未確認。設定/保存ファイル/公開APIに追加削除はなくパッチ更新とし、commit/push/Release/deployは行っていない。
+
 ## 2026-10-25: 設定UI 0.87.2～0.87.4のコミット検証
 
 - 利用者が0.87.4の表示・操作を確認し、今回の設定UI変更のcommit/pushを依頼。main `35d72c4`上の23対象ファイルをレビューし、未解決指摘なし。設定インデックス・トレイ/リボン・共通順番変更・削除確認と関連文書/試験だけを対象とした。dirtyなためpull/stash/統合はせず、fetchと両プッシュ先のmain読取でGitHub/AQUAとも`35d72c4`に一致、実効author/committerを確認した。

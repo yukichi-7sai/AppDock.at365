@@ -2,9 +2,11 @@ import { useHostTranslation } from '../HostTranslation';
 import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ListIcon } from './SettingsListTable';
 import { SettingsDialog } from './SettingsModal';
+import { SettingsDescriptionIcon } from './SettingsHintIcon';
+import { CommandProviderBadge } from './CommandProviderBadge';
 import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
-import type { BindingInputFilter } from './useBindingCommandFilter';
+import type { BindingInputFilter, BindingProviderFilter } from './useBindingCommandFilter';
 import { useCommandListScroll } from './CommandListScroll';
 import {
   CommandPublication,
@@ -24,6 +26,8 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   inputLabel,
   selectedInput,
   onInputFilter,
+  selectedProvider,
+  onProviderFilter,
   conditionLabel,
   newBinding,
   applyBinding,
@@ -42,6 +46,8 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   inputLabel(row: R): string;
   selectedInput?: string;
   onInputFilter?(input: BindingInputFilter, trigger: HTMLButtonElement): void;
+  selectedProvider?: string | null;
+  onProviderFilter?(provider: BindingProviderFilter, trigger: HTMLButtonElement): void;
   conditionLabel(row: R, command: UiCommand): string;
   newBinding(command: UiCommand): R;
   applyBinding(row: R, original?: R): void;
@@ -164,10 +170,22 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                   {index === 0 && (
                     <td rowSpan={Math.max(1, assigned.length)} className="binding-command-cell">
                       <div className="applet-shortcut-command">
-                        <strong className="command-title">
-                          {command.title}
+                        <div className="binding-command-heading">
+                          {showProvider && (
+                            <CommandProviderBadge
+                              command={command}
+                              selected={selectedProvider}
+                              onSelect={onProviderFilter}
+                            />
+                          )}
+                          <strong className="command-title">{command.title}</strong>
+                          <SettingsDescriptionIcon
+                            title={command.title}
+                            description={command.description}
+                            testId={`command-description:${command.id}`}
+                          />
                           <CommandPublication published={command.automation} />
-                        </strong>
+                        </div>
                         <button
                           className="applet-shortcut-add"
                           aria-label={translate('settings.commandBindingList.addForCommand', {
@@ -179,16 +197,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                           ＋
                         </button>
                       </div>
-                      {command.description && <small>{command.description}</small>}
                       <small className="command-id">{command.id}</small>
-                      {showProvider && (
-                        <small className="shortcut-provider">
-                          {command.extension}
-                          {command.hidden
-                            ? translate('settings.commandBindingList.compatibility')
-                            : ''}
-                        </small>
-                      )}
                       {!command.available && (
                         <small>{translate('settings.commandBindingList.unavailable')}</small>
                       )}

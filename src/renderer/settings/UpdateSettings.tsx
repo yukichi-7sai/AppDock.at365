@@ -225,48 +225,42 @@ export function AppletUpdateSource({
     edit(next);
   };
   return (
-    <details
-      className="update-disclosure applet-update-source"
+    <SettingsField
+      title={translate('settings.updateSettings.sources')}
+      className="applet-update-source"
+      description={[
+        source === undefined
+          ? translate('settings.updateSettings.default')
+          : source === ''
+            ? translate('settings.updateSettings.disabled')
+            : translate('settings.updateSettings.custom'),
+        defaultSource
+          ? translate('settings.updateSettings.defaultSource', { defaultSource })
+          : translate('settings.updateSettings.noDefaultSource'),
+        translate('settings.updateSettings.disableHint'),
+      ].join(' ')}
       {...settingAnchor(`applet:${extension.id}`, 'updateSource')}
     >
-      <summary>
-        {translate('settings.updateSettings.sources')}{' '}
-        <span className="muted">
-          {source === undefined
-            ? translate('settings.updateSettings.default')
-            : source === ''
-              ? translate('settings.updateSettings.disabled')
-              : translate('settings.updateSettings.custom')}
-        </span>
-      </summary>
-      <div className="update-settings-content">
-        <label className="update-source">
-          <span>
-            {translate('settings.updateSettings.sourceTitle', { name: extension.displayName })}
-          </span>
-          <SettingsUrlInput
-            aria-label={translate('settings.updateSettings.sourceLabel', {
-              displayName: extension.displayName,
-            })}
-            value={source ?? defaultSource}
-            placeholder={translate('settings.updateSettings.sourcePlaceholder')}
-            onChange={(event) => change(event.target.value)}
-          />
-        </label>
-        <p className="muted">
-          {defaultSource
-            ? translate('settings.updateSettings.defaultSource', { defaultSource: defaultSource })
-            : translate('settings.updateSettings.noDefaultSource')}{' '}
-          {translate('settings.updateSettings.disableHint')}
-        </p>
-        <button
-          className="text-button"
+      <SettingsInputActions>
+        <SettingsUrlInput
+          aria-label={translate('settings.updateSettings.sourceLabel', {
+            displayName: extension.displayName,
+          })}
+          value={source ?? defaultSource}
+          placeholder={translate('settings.updateSettings.sourcePlaceholder')}
+          onChange={(event) => change(event.target.value)}
+        />
+        <SettingsButton
+          icon
+          className="settings-list-icon"
+          aria-label={translate('settings.updateSettings.reset')}
+          title={translate('settings.updateSettings.reset')}
           disabled={source === undefined}
           onClick={() => change(undefined)}
         >
-          {translate('settings.updateSettings.reset')}
-        </button>
-      </div>
-    </details>
+          <Icon name="refresh" size={16} />
+        </SettingsButton>
+      </SettingsInputActions>
+    </SettingsField>
   );
 }

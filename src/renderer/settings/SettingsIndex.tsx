@@ -4,6 +4,8 @@ import type { SettingsPageModel, SettingsPageOperation } from '../../shared/sett
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { Icon, type IconName } from '../../shared/ui-icons';
 import { commandSettingsPages } from '../settings-ui/CommandSettingsNavigation';
+import { defaultShellId } from '../../shared/shell';
+import { appletSettingsPageId } from '../../shared/settings-catalog';
 
 const indexIcons: Partial<Record<string, IconName>> = {
   applets: 'extensions',
@@ -21,8 +23,11 @@ export function SettingsIndex({
   const { t } = useHostTranslation();
   const [query, setQuery] = useState(content.query),
     [selected, setSelected] = useState(-1);
+  const results = content.results.filter(
+    (item) => item.pageId !== appletSettingsPageId(defaultShellId),
+  );
   useEffect(() => setQuery(content.query), [content.query]);
-  useEffect(() => setSelected(-1), [content.query, content.results.map((r) => r.id).join('\n')]);
+  useEffect(() => setSelected(-1), [content.query, results.map((r) => r.id).join('\n')]);
   useEffect(() => {
     if (selected >= 0)
       document.getElementById(`setting-result-${selected}`)?.scrollIntoView({ block: 'nearest' });
@@ -70,14 +75,14 @@ export function SettingsIndex({
             setSelected(-1);
           } else if (searching && ['ArrowDown', 'ArrowUp'].includes(e.key)) {
             e.preventDefault();
-            const length = content.results.length;
+            const length = results.length;
             if (length)
               setSelected((i) =>
                 e.key === 'ArrowDown' ? Math.min(i + 1, length - 1) : Math.max(i - 1, 0),
               );
-          } else if (e.key === 'Enter' && searching && selected >= 0 && content.results[selected]) {
+          } else if (e.key === 'Enter' && searching && selected >= 0 && results[selected]) {
             e.preventDefault();
-            choose(content.results[selected].id);
+            choose(results[selected].id);
           }
         }}
       />
@@ -85,10 +90,10 @@ export function SettingsIndex({
         {searching ? (
           <>
             <p className="settings-result-count" role="status">
-              {t('settings.resultCount', { count: content.results.length })}
+              {t('settings.resultCount', { count: results.length })}
             </p>
             <div id="settings-results" role="listbox" aria-label={t('settings.searchResults')}>
-              {content.results.map((item, index) => (
+              {results.map((item, index) => (
                 <button
                   id={`setting-result-${index}`}
                   key={item.id}
@@ -106,16 +111,19 @@ export function SettingsIndex({
                 </button>
               ))}
             </div>
-            {!content.results.length && <p className="muted">{t('settings.searchEmpty')}</p>}
+            {!results.length && <p className="muted">{t('settings.searchEmpty')}</p>}
           </>
         ) : (
           <>
+            <h3 className="settings-applet-heading" data-testid="settings-host-heading">
+              {t('settings.index.hostHeading')}
+            </h3>
             <div aria-label={t('settings.host')}>
               {content.navigation.filter((p) => !p.owner).map(row)}
             </div>
             <h3 className="settings-applet-heading">Applet</h3>
             <div aria-label={t('settings.applets')}>
-              {content.navigation.filter((p) => p.owner).map(row)}
+              {content.navigation.filter((p) => p.owner && p.owner !== defaultShellId).map(row)}
             </div>
           </>
         )}

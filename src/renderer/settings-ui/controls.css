@@ -35,6 +35,29 @@
   --hero: #edf3f7;
   --shadow: 0 20px 70px #34445f22;
 }
+:where(.settings-surface, .settings-panel, .settings-modal, .settings-group-dialog) {
+  --settings-control-height: 32px;
+  --settings-control-padding-y: 5px;
+}
+:where(.settings-surface, .settings-panel, .settings-modal, .settings-group-dialog)
+  :is(
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='color'],
+      [type='range'],
+      [type='file'],
+      [type='hidden'],
+      [type='button'],
+      [type='submit'],
+      [type='reset']
+    ),
+    select
+  ) {
+  box-sizing: border-box;
+  min-height: var(--settings-control-height);
+  line-height: 1.4;
+}
 .tray-settings {
   display: grid;
   gap: 16px;
@@ -246,7 +269,7 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 9px 12px;
+  padding: var(--settings-control-padding-y, 9px) 12px;
 }
 p {
   line-height: 1.8;
@@ -576,7 +599,8 @@ main {
   color: var(--accent-text);
   border: 1px solid transparent;
   border-radius: 7px;
-  padding: 10px 15px;
+  min-height: var(--settings-control-height, 0px);
+  padding: var(--settings-control-padding-y, 10px) 15px;
   font-size: 11px;
   font-weight: 600;
   gap: 10px;
@@ -585,7 +609,8 @@ main {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 9px 13px;
+  min-height: var(--settings-control-height, 0px);
+  padding: var(--settings-control-padding-y, 9px) 13px;
   white-space: nowrap;
   font-size: 11px;
 }
@@ -2638,6 +2663,43 @@ summary {
   justify-content: space-between;
   gap: 12px;
 }
+.binding-command-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.binding-command-heading .command-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.command-provider-badge {
+  display: inline-block;
+  flex: 0 1 auto;
+  min-width: 32px;
+  max-width: 104px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.command-provider-badge[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.command-binding-table .binding-command-cell {
+  padding-block: 8px;
+}
+.command-binding-table .binding-command-cell > .command-id {
+  margin-top: 2px;
+}
 .applet-shortcut-add {
   flex: none;
   width: 30px;
@@ -2789,7 +2851,11 @@ summary {
   flex: none;
   align-items: center;
   gap: 12px;
+}
+.command-list-summary-count {
+  flex: none;
   margin-left: auto;
+  white-space: nowrap;
 }
 .command-list-toolbar > .settings-list-toolbar {
   margin: 0;
@@ -2810,12 +2876,17 @@ summary {
 }
 .command-shortcut-search > span {
   color: var(--muted);
-  font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  line-height: 1;
 }
 .command-shortcut-search input {
   width: 100%;
   min-width: 0;
-  padding: 12px 0;
+  min-height: calc(var(--settings-control-height, 40px) - 2px);
+  padding: var(--settings-control-padding-y, 12px) 0;
   background: transparent;
   border: 0;
   outline: 0;
@@ -2825,7 +2896,7 @@ summary {
   flex: none;
   margin: 0;
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: var(--settings-control-padding-y, 10px) 12px;
 }
 .command-shortcut-summary {
   display: flex;
@@ -3220,7 +3291,8 @@ summary {
 }
 .applet-shortcut-dialog > footer button {
   border-radius: 8px;
-  padding: 9px 16px;
+  min-height: var(--settings-control-height, 34px);
+  padding: var(--settings-control-padding-y, 9px) 16px;
 }
 .shortcut-dialog-error {
   color: var(--text);
