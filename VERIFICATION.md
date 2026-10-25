@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-26: Applet有効状態と管理表示順のMCP接続 0.90.5
+
+- 専用worktree `AppDock.at365-mcp-settings-design`、追跡先のない`codex/mcp-settings-design`のcleanな`0627d35`から継続。現在のbranchを保ち、pull先の追加、main統合、push/Release/deployは行わない。既存のenabled/appletOrderへMCP adapterを追加する変更で、設定項目・保存ファイルの追加削除と破壊的変更を含まないため、発行済み0.90.4から**0.90.5**へパッチ更新した。
+- 外部パッケージのapplet-common対象へenabledを接続。booleanの明示set、resettable=false、inherited=nullとし、組込み/collection子ページは共通対象へ含めない。AppletManagementの準備・対象検証をUI/既存コマンドと共用し、ready・同一Appletのbusy・起動/停止中・既定の有効状態と保存済みOFFを保持する。任意の内部呼出し、再起動、開始待ちの即時開始、導入・削除、保存先切替を設定APIへ追加しない。
+- enabledは共有/PC専用の通常設定指定によらず既存の端末設定へ保存する。起動待ちやページ表示先との同時変更も同じ候補・検証・保存にまとめ、未編集の共有値、ローカルconfiguration、固有設定と暗号化情報を保持する。通常の設定通知で起動/停止/待機予約を再適用し、settingsSaved/effectVerified=falseは保存完了だけを表す。dryRunは保存・起動停止をせず、同値/再送で保存や再起動を繰り返さない。read + writeで使え、executeは追加条件にしない。
+- 管理順序はkind=list/category=applet-management、id/nameが読取り専用、操作はreorderだけ、最大500行。共通の一覧基盤に所有対象ごとの対応操作を持たせ、targets.listとoperationSchemasへ同じ範囲を返し、未対応操作を計画前に拒否する。既存の宣言型/AI/TTS一覧のCRUDは維持する。
+- 管理画面と同じmanagedApplets/reorderManagedAppletsを使い、共有appletOrderの管理対象位置だけを変更する。未導入/子ページ/組込みの保存位置と相互順序、未記録IDの補完、PC専用の有効状態を保持する。検出/起動順、入力割当の実行順とリボン配置へ流用しない。提供元の増減はSchema、保存順や値の変更はrevision/itemRefへ反映し、古い要求・不足/重複/偽造参照を拒否する。
+- 発行前に所有処理の共用、非公開/秘密投影、設定/一覧の許可、原子的保存、適用境界、既存UIと必要回帰をレビューした。管理ownerを持たない既存構成で無関係な通常項目へguardが働かないよう修正し、既存の共通設定回帰を再実行。専用一覧の期待操作とGUIのswitch識別も整合し、阻害指摘なし。製品UI/CSSと8行の操作許可を変更していない。
+- 固定依存install、型検査、本体/Default Shell build、関連標準回帰**70ファイル693/693件、fail/skip 0**が成功。新規所有adapter回帰12件は、dryRun/同値/再送/許可取消、既定ON/明示OFF、busy、同時項目の原子的検証、端末保存、管理対象の動的増減、対応操作制限、子/欠落/組込み位置、保存失敗と両ファイル保持を確認。以前の通常項目自動登録・一覧・秘密保護も同じ回帰で確認した。標準全体は未実行。
+- 隔離source/最終固定EXEの実MCP・画面試験は各**32群**、固定EXE smokeも成功。enabledのdryRunでworkerを停止せず、MCP/UIの無効→有効で合計起動回数3、待機取消→再予約では未起動を確認した。管理順のMCP/UI相互反映、保存済み欠落IDの位置、共有/端末ファイル分離、古い要求の拒否、秘密bytes保持、execute OFFとtools/list不変を確認。実利用の設定/認証、OS登録や物理入力は変更していない。
+- 最終**747入力**と参照するWebApplet/WallpaperSlideshow manifestのSHA256は、回帰前後・発行前後・固定試験後で一致。Node 24.22.1、pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.402、Windows AMD64で実行した。整形は既存のsrc/scripts/tests範囲を確認し、package.jsonは版番号だけを変更。発行後は文書と証跡だけを追加した。
+- publish.bat終了0。EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170699611 bytes / SHA256 `2adb7a54671fe1caa416eb3711e786fd3dc1d7b026773c2c6e69a0bdaad927ae`**。File/ProductVersion、feed版/size/hash、ASAR内package/同梱Default Shellと固定試験コピーを照合した。
+- 正本は[設定API](docs/settings-api.md)、[設定基盤](docs/settings-foundation.md)、[Applet管理](docs/applet-management-settings-design.md)、[外部操作](docs/automation.md)。証跡は`.artifacts/mcp-settings-applet-management-20261026/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-applet-management-20261026/`。source=`mcp-settings-foundation-source-1792953636830`、固定EXE=`mcp-settings-foundation-portable-1792953892452`、smoke=`smoke-1792953926516`。
+- 試験プロセス0。今回の成功profileはsource 2回/固定1回/smoke 1回で各方式の直近3回以内。過去の検証証跡/参照profile、失敗診断、固定ビルド出力と別作業を保持し、削除0件。初期診断はowner-initial.log（保存先切替fixtureのrevision不足）、owner-verified.log（optional管理ownerのguardと専用操作の期待値）、source-gui-initial.log（既存switchをcheckboxとした識別）に残し、最終回帰で解消を確認した。
+
 ## 2026-10-26: Applet共通設定の宣言共有とMCP接続 0.90.4
 
 - cleanな`e781d4d`から専用worktree `AppDock.at365-mcp-settings-design`の`codex/mcp-settings-design`を継続。Applet共通の起動待ち時間とページ表示先を既存の固定6入口へ接続した。通常の共通項目も定義追加だけで公開できるよう、型/画面/検証/カタログ/JSON/保存を共通化。追跡先の追加、main統合、push/Release/deployは行わない。

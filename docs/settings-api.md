@@ -20,7 +20,8 @@
 | 本体の更新設定 | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可 |
 | Appletの更新元 | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外 |
 | Shell選択 | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成 |
-| Applet共通設定 | 起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成 |
+| Applet共通設定 | 有効状態、起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成 |
+| Applet管理順序 | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない |
 
 起動・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
 
@@ -86,6 +87,8 @@ itemRefは主体・target・Schema・値のrevision・行の識別に結び付�
 
 addは宣言済みの既定値とID生成を使い、非公開列を要求から設定させない。汎用の全体置換・一覧resetは提供しない。removeは非公開列や未対応列に値があればローカル操作とし、画像参照等の寿命管理が必要なデータを汎用削除で消さない。dryRunは公開列だけの変更計画を返す。保存結果のchangesは操作種別と公開された変更内容で、行参照は取得時のもの。保存後の参照はitems.listで再取得する。
 
+所有サービスの一覧は、targets.listのoperationsとschema.getのoperationSchemasに対応操作だけを返す。未対応操作は計画・保存前に拒否する。Applet管理順序はreorderだけを公開し、既存のappletOrderと同じ最大500件を使う。
+
 ### AI接続一覧
 
 AI接続一覧は最大8行。IDは読取り専用で追加時にUUIDを生成し、protocolは既存のOpenAI互換方式に固定する。追加時のpresetに応じて既存UIと同じ初期値を使い、名前とURLの検証・正規化も共有する。`name`・`baseUrl`を指定する通常の追加は、認証なしの接続として保存できる。Bearer認証を必要とする新規接続はLOCAL_ACTION_REQUIREDとし、暗号化キーの登録はローカル設定画面で行う。追加のdryRunに含まれるIDはプレビュー用であり、実保存後はitems.listで確認する。
@@ -114,13 +117,23 @@ Appletの更新元はmanifestのupdateRepositoryを既定値とし、上書き�
 
 ## Applet共通設定
 
-外部Appletごとにfields対象を提供し、停止・無効でも編集できる。組込みとcollectionの子ページは対象外。現在の通常項目はstartupDelaySeconds（0～86,400の整数）で、manifestの指定、未指定なら0を既定値とする。有効状態・起動/停止/再起動・保存先切替・管理順序はこの対象へ含めない。更新元は既存の独立した更新設定対象を使う。
+外部Appletごとにfields対象を提供し、停止・無効でも編集できる。組込みとcollectionの子ページは対象外。現在の通常項目はstartupDelaySeconds（0～86,400の整数）で、manifestの指定、未指定なら0を既定値とする。保存先切替と再起動はこの対象へ含めない。更新元と管理順序はそれぞれの所有対象を使う。
+
+enabledは既存AppletManagementの検証を使う明示的な有効状態。booleanのsetだけに対応し、resettable=false、inherited=null。保存先は通常項目の共有/PC専用指定によらず、このPCの設定。read + writeで変更でき、executeを追加条件にしない。起動/停止中や同じAppletの管理操作中は書込み不可となり、最新のSchemaと保存直前にも状態を検査する。適用時点はappletEnabledChangedで、保存後の通常の再適用が起動・停止・起動待ち予約を行う。dryRunは保存も起動状態変更もせず、settingsSavedは保存完了だけを表し、effectVerified=false。既に同じ有効状態なら保存せず再起動しない。独立した再起動は既存のexecute操作を使う。
 
 ページの表示先は現在のApplet snapshotのpagesから生成し、keyは`page:<ページID>`、候補はpage/window。ドットを含むページIDも分割しない。manifest/runtimeのページや既定値が変わるとschemaRevisionへ反映し、現在のSchemaを再取得する。消えたページの保存指定と未編集データは保持し、そのキーへの直接編集はNOT_FOUND。ページ行に未対応の追加データがあれば、その行を除去するreset/既定値setはresettable=falseとして拒否する。通常保存で残る追加データには既存parserが必要とするdisplayも保持し、再読込可能な形を維持する。
 
-共有設定とPC専用設定は、そのAppletの現在の「このPCで設定を保持する」に従う。既定値set/resetは現在の保存先の上書きを除去し、manifest/共通定義へ継承する。PC専用の編集で休眠中の共有値を書き換えず、保存先の切替はschemaRevisionも変える。固有設定・更新元・有効状態・他のページ・暗号化情報を保持し、read + writeで操作する。
+共有設定とPC専用設定は、そのAppletの現在の「このPCで設定を保持する」に従う。既定値set/resetは現在の保存先の上書きを除去し、manifest/共通定義へ継承する。PC専用の編集で休眠中の共有値を書き換えず、保存先の切替はschemaRevisionも変える。未編集の固有設定・更新元・有効状態・他のページ・暗号化情報を保持し、read + writeで操作する。
 
 startupDelaySecondsのappliesはappletStartupScheduleChanged。実行中のworkerを再起動せず、待機中なら既存のschedule処理が起動予定を再計算する。無効Appletを有効化しない。表示先はpageDisplayChangedで、開かれている同じSurfaceを載せ替えてWebContentsと入力を保持し、未表示の画面を設定だけで開かない。新しい通常項目はappliesを定義でき、省略時はappletConfigurationChanged。保存後は既存の設定変更・再適用経路を使い、所有処理を必要とする項目に適用完了を推測しない。dryRunは保存・再計算・ページ表示を行わず、保存完了のeffectVerifiedもfalse。
+
+## Applet管理の表示順
+
+kind=list、category=applet-managementで、現在の管理対象パッケージのid/nameを読取り専用の列として返す。組込みDefault Shellとcollectionの子ページは管理行へ含めない。追加・部分編集・削除は提供せず、全行のitemRefを指定するreorderだけを受け付ける。同名でもidとitemRefで区別する。導入・削除はローカルのパッケージ操作を使う。
+
+既存UIと同じmanagedApplets/reorderManagedAppletsを使い、共有appletOrderの管理対象が占める位置だけを入れ替える。未導入ID、子ページIDと組込みの保存位置・相互順序を保ち、未記録の検出済みIDは通常の順で補う。PC専用の有効状態・設定、起動順、入力割当の実行順、リボン配置を変更しない。提供元の増減はschemaRevisionへ反映し、順序・行・保存状態が変われば古いitemRefとrevisionを拒否する。
+
+read + writeで保存でき、appliesはappletDisplayOrderChanged。dryRunは検証だけを行い、保存後は通常の設定通知で管理画面・設定インデックス等へ反映する。無変更・同じ要求の再送では保存やworker再起動を繰り返さない。MCPツール定義は増やさない。
 
 ## Shell選択
 

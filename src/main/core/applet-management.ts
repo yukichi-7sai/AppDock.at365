@@ -1,8 +1,9 @@
 import { hostText } from '../../shared/i18n';
-import type { ExtensionSnapshot } from '../../shared/contracts';
+import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { appletManagementCommands, type AppletOperation } from '../../shared/applet-management';
 import type { SettingsStore } from './settings';
 import { collectionRecord } from '../../shared/page-collections';
+import { appletEnabled } from '../../shared/applet-state';
 
 export class AppletManagementError extends Error {
   constructor(
@@ -48,7 +49,36 @@ export class AppletManagement {
       );
     return this.run(command.appletId, command.operation);
   }
-  async run(id: string, operation: AppletOperation) {
+  canEditEnabled(id: string) {
+    const applet = this.options.applets().find((item) => item.id === id);
+    return !!(
+      this.options.ready() &&
+      applet &&
+      applet.sourceKind !== 'builtin' &&
+      !this.busy.has(id) &&
+      !['starting', 'stopping'].includes(applet.state)
+    );
+  }
+  /** Plan a saved preference; normal settings reconciliation owns the later lifecycle effect. */
+  prepareEnabled(id: string, enabled: boolean, next?: Settings) {
+    if (typeof enabled !== 'boolean')
+      throw new AppletManagementError(
+        'INVALID_ARGUMENT',
+        hostText('services.appletManagement.invalidOperation'),
+      );
+    const applet = this.target(id, enabled ? 'enable' : 'disable');
+    const value = next ?? structuredClone(this.options.settings.value);
+    if (applet.collection) {
+      const item = collectionRecord(value, applet.collection);
+      if (!item)
+        throw new AppletManagementError('NOT_FOUND', hostText('services.appletManagement.missing'));
+      item.enabled = enabled;
+    } else {
+      value.extensions[id] = { ...(value.extensions[id] ?? { settings: {} }), enabled };
+    }
+    return value;
+  }
+  private target(id: string, operation: AppletOperation) {
     if (!this.options.ready())
       throw new AppletManagementError(
         'NOT_READY',
@@ -85,28 +115,19 @@ export class AppletManagement {
         'UNAVAILABLE',
         hostText('services.appletManagement.disabled'),
       );
+    return applet;
+  }
+  async run(id: string, operation: AppletOperation) {
+    const applet = this.target(id, operation);
+    const { settings } = this.options;
+    const savedEnabled = applet.collection
+      ? collectionRecord(settings.value, applet.collection).enabled
+      : appletEnabled(settings.value, id);
+    const changed = operation !== 'restart' && savedEnabled !== (operation === 'enable');
+    const next = changed ? this.prepareEnabled(id, operation === 'enable') : undefined;
     this.busy.add(id);
     try {
-      const savedEnabled = applet.collection
-        ? collectionRecord(settings.value, applet.collection).enabled
-        : applet.enabled;
-      const changed = operation !== 'restart' && savedEnabled !== (operation === 'enable');
-      if (changed) {
-        const next = structuredClone(settings.value);
-        if (applet.collection) {
-          const item = collectionRecord(next, applet.collection);
-          if (!item)
-            throw new AppletManagementError(
-              'NOT_FOUND',
-              hostText('services.appletManagement.missing'),
-            );
-          item.enabled = operation === 'enable';
-        } else {
-          next.extensions[id] = {
-            ...(next.extensions[id] ?? { settings: {} }),
-            enabled: operation === 'enable',
-          };
-        }
+      if (next) {
         settings.save(next, settings.revision);
         await this.options.reconcile();
       } else if (operation === 'restart') {

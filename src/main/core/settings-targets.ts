@@ -10,7 +10,6 @@ import {
   type SettingsListTarget,
 } from './settings-target-types';
 import {
-  listOperationSchemas,
   settingsListOperationSchemas,
   listValues,
   listRemovable,
@@ -155,7 +154,10 @@ export class SettingsTargets {
       title: target.title,
       category: target.category,
       available: target.available,
-      operations: target.kind === 'list' ? Object.keys(listOperationSchemas) : ['set', 'reset'],
+      operations:
+        target.kind === 'list'
+          ? Object.keys(settingsListOperationSchemas(target))
+          : ['set', 'reset'],
       schemaRevision: this.schemaRevision(target),
     };
   }

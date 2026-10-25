@@ -671,6 +671,7 @@ const serviceSettings = new SettingsServiceTargets({
   tts: ttsSecrets,
   notifications: () => notificationCatalog(allApplets()),
   applets: allApplets,
+  appletManagement,
 });
 let aiMcpGeneration = 0;
 const aiOwner = (id?: string) =>

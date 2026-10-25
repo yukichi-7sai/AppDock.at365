@@ -54,19 +54,26 @@ export const listOperationSchemas = {
     additionalProperties: false,
   },
 };
-export const settingsListOperationSchemas = (target: SettingsListTarget) => ({
-  ...listOperationSchemas,
-  reorder: {
-    ...listOperationSchemas.reorder,
-    properties: {
-      ...listOperationSchemas.reorder.properties,
-      itemRefs: {
-        ...listOperationSchemas.reorder.properties.itemRefs,
-        maxItems: target.maxItems ?? 64,
+export const settingsListOperationSchemas = (target: SettingsListTarget) => {
+  const schemas = {
+    ...listOperationSchemas,
+    reorder: {
+      ...listOperationSchemas.reorder,
+      properties: {
+        ...listOperationSchemas.reorder.properties,
+        itemRefs: {
+          ...listOperationSchemas.reorder.properties.itemRefs,
+          maxItems: target.maxItems ?? 64,
+        },
       },
     },
-  },
-});
+  };
+  return Object.fromEntries(
+    Object.entries(schemas).filter(
+      ([kind]) => !target.operations || target.operations.some((operation) => operation === kind),
+    ),
+  );
+};
 export function listValues(target: SettingsListTarget, row: Record<string, unknown>) {
   return Object.fromEntries(
     target.fields.flatMap((field) => {
@@ -77,6 +84,7 @@ export function listValues(target: SettingsListTarget, row: Record<string, unkno
 }
 export function listRemovable(target: SettingsListTarget, row: Record<string, unknown>) {
   return (
+    (!target.operations || target.operations.includes('remove')) &&
     target.removable?.(row) !== false &&
     !(target.definition.fields ?? []).some(
       (field) =>
@@ -139,7 +147,7 @@ export function planSettingsList(
     if (!jsonObject(raw)) fail();
     const operation = raw as Record<string, unknown>;
     const kind = operation.kind as keyof typeof listOperationSchemas;
-    const schema = listOperationSchemas[kind];
+    const schema = settingsListOperationSchemas(target)[kind];
     if (
       !Object.hasOwn(listOperationSchemas, kind) ||
       !schema ||

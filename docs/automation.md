@@ -2,7 +2,7 @@
 
 設定編集許可の統合と、宣言済み単純設定・object-listのMCP既定公開に対応する。設定の探索・Schema・値・行・選択候補・変更は[設定APIの固定6入口](settings-api.md)を使用する。特殊設定のadapterは[拡張設計](mcp-settings-design.md)の後続範囲。
 
-通知、AI共通/接続、TTSと更新の通常値、AI接続/TTS手動ボイス一覧の行操作、Shell選択とApplet共通の起動待ち時間・ページ表示先も同じ固定入口で扱う。更新は本体設定と外部Appletごとの更新元に対応する。Shellは共通の領域一覧とview宣言から項目/候補を生成し、領域の増減でもツール定義を変えない。保存の検証を各所有サービスへ委譲し、生成・読み上げ・試験接続・更新実行・暗号化情報の操作は設定変更に含めない。対象ごとの境界と継承/リセットは[設定API](settings-api.md)を参照する。
+通知、AI共通/接続、TTSと更新の通常値、AI接続/TTS手動ボイス一覧の行操作、Shell選択とApplet共通の有効状態・起動待ち時間・ページ表示先、管理表示順も同じ固定入口で扱う。更新は本体設定と外部Appletごとの更新元に対応する。Shellは共通の領域一覧とview宣言から項目/候補を生成し、領域の増減でもツール定義を変えない。保存の検証を各所有サービスへ委譲し、生成・読み上げ・試験接続・更新実行・暗号化情報の操作は設定変更に含めない。対象ごとの境界と継承/リセットは[設定API](settings-api.md)を参照する。
 
 MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-design.md)と[保存型コマンド](custom-commands-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 

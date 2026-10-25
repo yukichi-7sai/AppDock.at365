@@ -137,6 +137,7 @@ fs.writeFileSync(
 );
 require('./settings-shell-gateway-checks.cjs').install(root, profile);
 require('./settings-applet-common-gateway-checks.cjs').install(profile);
+require('./settings-applet-management-gateway-checks.cjs').install(profile);
 let child, browser, page, client;
 async function until(fn, label) {
   const end = Date.now() + 60000;
@@ -326,6 +327,16 @@ async function main() {
     until,
   });
   await require('./settings-applet-common-gateway-checks.cjs')({
+    page,
+    client,
+    profile,
+    local,
+    checks,
+    tool,
+    value,
+    until,
+  });
+  await require('./settings-applet-management-gateway-checks.cjs')({
     page,
     client,
     profile,

@@ -27,6 +27,9 @@ import {
   mcpSettingSupported,
 } from '../../shared/mcp-setting-fields';
 import { appletCommonDefinitions } from '../../shared/applet-common-settings';
+import { appletEnabled, defaultAppletEnabled } from '../../shared/applet-state';
+import { managedApplets, reorderManagedApplets } from '../../shared/applet-management';
+import { AppletManagement, AppletManagementError } from './applet-management';
 import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import type { SettingsStore } from './settings';
 import {
@@ -113,6 +116,7 @@ export class SettingsServiceTargets {
       tts: TtsSecrets;
       notifications(): NotificationTypeEntry[];
       applets?(): ExtensionSnapshot[];
+      appletManagement?: AppletManagement;
     },
   ) {}
   targets(): SettingsTarget[] {
@@ -136,6 +140,7 @@ export class SettingsServiceTargets {
       ].map((target) => this.target(target)),
       this.aiConnections(),
       this.ttsVoices(),
+      this.appletOrder(),
     ];
   }
   private shell(): Target {
@@ -381,6 +386,19 @@ export class SettingsServiceTargets {
     );
     const pageIds = new Map(pages.map((page) => ['page:' + page.id, page.id]));
     const fields: Field[] = [
+      ...(this.options.appletManagement
+        ? [
+            {
+              key: 'enabled',
+              title: hostText('settings.appletManagementSettings.enabled'),
+              type: 'boolean' as const,
+              default: defaultAppletEnabled,
+              inherit: false,
+              resettable: false,
+              writable: this.options.appletManagement.canEditEnabled(applet.id),
+            },
+          ]
+        : []),
       ...ordinary.map((field) => ({
         ...field,
         ...(field.integer
@@ -424,10 +442,15 @@ export class SettingsServiceTargets {
       values: (settings) => projectCommon(object(settings.extensions[applet.id]), true),
       overrides: (raw) => projectCommon(raw, false),
       applies: (key) =>
-        pageIds.has(key)
-          ? 'pageDisplayChanged'
-          : (ordinary.find((field) => field.key === key)?.applies ?? 'appletConfigurationChanged'),
+        key === 'enabled'
+          ? 'appletEnabledChanged'
+          : pageIds.has(key)
+            ? 'pageDisplayChanged'
+            : (ordinary.find((field) => field.key === key)?.applies ??
+              'appletConfigurationChanged'),
       replace: (settings, changes, reset) => {
+        if (Object.hasOwn(changes, 'enabled'))
+          this.prepareAppletEnabled(applet.id, changes.enabled as boolean, settings);
         const entry = settings.extensions[applet.id] ?? { enabled: applet.enabled, settings: {} };
         for (const field of ordinary) {
           if (Object.hasOwn(changes, field.key))
@@ -445,6 +468,112 @@ export class SettingsServiceTargets {
         }
         settings.extensions[applet.id] = entry;
         return settings;
+      },
+      guard: (next) => {
+        if (
+          this.options.appletManagement &&
+          appletEnabled(next, applet.id) !== appletEnabled(this.options.settings.value, applet.id)
+        )
+          this.prepareAppletEnabled(applet.id, appletEnabled(next, applet.id), next);
+      },
+    };
+  }
+  private prepareAppletEnabled(id: string, enabled: boolean, next: Settings) {
+    try {
+      return this.options.appletManagement!.prepareEnabled(id, enabled, next);
+    } catch (error) {
+      if (error instanceof AppletManagementError)
+        throw new SettingsTargetError(error.code, error.message);
+      throw error;
+    }
+  }
+  private appletOrder(): SettingsListTarget {
+    const applets = this.options.applets?.() ?? [];
+    const rows = () =>
+      managedApplets(applets, this.options.settings.value.appletOrder).map((applet) => ({
+        id: applet.id,
+        name: applet.displayName,
+      }));
+    const fields: Field[] = [
+      { key: 'id', title: hostText('settings.appletManagementSettings.appletId'), type: 'string' },
+      { key: 'name', title: hostText('settings.appletManagementSettings.name'), type: 'string' },
+    ];
+    const definition: SettingDefinition = {
+      key: 'appletOrder',
+      title: hostText('settings.appletManagementSettings.displayOrder'),
+      type: 'object-list',
+      fields,
+      list: { idKey: 'id', titleKey: 'name', columns: ['name'] },
+    };
+    return {
+      kind: 'list',
+      targetId: 'service.applets.order',
+      ownerId: 'appdock',
+      title: definition.title,
+      category: 'applet-management',
+      available: rows().length <= 500,
+      operations: ['reorder'],
+      definition,
+      fields,
+      maxItems: 500,
+      rows,
+      applies: () => 'appletDisplayOrderChanged',
+      schemaContext: () =>
+        managedApplets(applets)
+          .map((applet) => applet.id)
+          .sort(),
+      writable: () => false,
+      itemWritable: () => false,
+      removable: () => false,
+      overrides: () => {
+        try {
+          return { appletOrder: this.options.settings.storedValue().appletOrder };
+        } catch {
+          return undefined;
+        }
+      },
+      plan: (updated, revision) => {
+        this.options.checkRevision(revision);
+        const store = this.options.settings,
+          original = rows().map((row) => row.id);
+        const ordered = updated.map((row) => row.id);
+        const replace = () => {
+          try {
+            return this.options.validate({
+              ...structuredClone(store.value),
+              appletOrder: reorderManagedApplets(
+                this.options.applets?.() ?? [],
+                store.value.appletOrder,
+                ordered,
+                original,
+              ),
+            });
+          } catch {
+            return fail();
+          }
+        };
+        replace();
+        const changed = sameSetting(original, ordered) ? [] : ['appletOrder'];
+        return {
+          changed,
+          before: { appletOrder: original },
+          values: { appletOrder: ordered },
+          applies: { appletOrder: 'appletDisplayOrderChanged' },
+          commit: () => {
+            this.options.checkRevision(revision);
+            if (!changed.length) return;
+            const current = replace();
+            try {
+              this.options.save(current, store.revision, []);
+            } catch (error) {
+              if (error instanceof SettingsTargetError) throw error;
+              throw new SettingsTargetError(
+                'SAVE_FAILED',
+                hostText('services.settingsCommands.saveFailed'),
+              );
+            }
+          },
+        };
       },
     };
   }

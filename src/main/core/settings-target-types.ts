@@ -31,6 +31,7 @@ export interface SettingsFieldTarget extends SettingsTargetBase {
 }
 export interface SettingsListTarget extends SettingsTargetBase {
   kind: 'list';
+  operations?: readonly ('add' | 'update' | 'remove' | 'reorder')[];
   definition: SettingDefinition;
   maxItems?: number;
   createRow?(values: Record<string, unknown>): Record<string, unknown>;

@@ -121,7 +121,10 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   );
   await reset(id);
   await until(
-    async () => (await read(id)).fields.every((item) => item.inherited),
+    async () =>
+      (await read(id)).fields
+        .filter((item) => item.key !== 'enabled')
+        .every((item) => item.inherited),
     'local common reset removes overrides',
   );
   assert.deepEqual(fs.readFileSync(sharedFile), shared);

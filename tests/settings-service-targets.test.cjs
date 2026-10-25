@@ -184,7 +184,11 @@ test('service settings discovery uses existing six entry points and never expose
   for (const target of targets) {
     assert.deepEqual(
       target.operations,
-      target.kind === 'list' ? ['add', 'update', 'remove', 'reorder'] : ['set', 'reset'],
+      target.targetId === 'service.applets.order'
+        ? ['reorder']
+        : target.kind === 'list'
+          ? ['add', 'update', 'remove', 'reorder']
+          : ['set', 'reset'],
     );
     const data = JSON.stringify([
       f.call('schema.get', { targetId: target.targetId }),

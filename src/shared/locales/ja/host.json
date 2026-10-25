@@ -423,6 +423,7 @@
   "settings.appletManagementSettings.order": "Appletを並べ替え",
   "settings.appletManagementSettings.displayOrder": "Appletの表示順",
   "settings.appletManagementSettings.name": "Applet名",
+  "settings.appletManagementSettings.appletId": "Applet ID",
   "settings.appletManagementSettings.version": "バージョン",
   "settings.appletManagementSettings.checkAll": "すべてのAppletの更新を確認",
   "settings.appletManagementSettings.enabled": "有効",
