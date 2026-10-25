@@ -114,6 +114,7 @@ export class SettingsServiceTargets {
         ...this.options.notifications().map((type) => this.notification(type)),
       ].map((target) => this.target(target)),
       this.aiConnections(),
+      this.ttsVoices(),
     ];
   }
   private target(spec: Target): SettingsFieldTarget {
@@ -603,6 +604,64 @@ export class SettingsServiceTargets {
           fail('LOCAL_ACTION_REQUIRED');
       },
       guardRevision: () => this.options.tts.configurationState().revision,
+    };
+  }
+  private ttsVoices(): SettingsListTarget {
+    const fields: Field[] = [
+      {
+        key: 'id',
+        title: hostText('settings.ttsSettings.voiceId'),
+        type: 'string',
+        minLength: 1,
+        maxLength: 200,
+      },
+      {
+        key: 'name',
+        title: hostText('settings.ttsSettings.voiceName'),
+        type: 'string',
+        maxLength: 200,
+      },
+    ];
+    const definition: Field = {
+      key: 'manualVoices',
+      title: hostText('settings.ttsSettings.manualList'),
+      type: 'object-list',
+      default: [],
+      fields,
+      list: { titleKey: 'name', columns: ['id', 'name'] },
+    };
+    const owner = this.target({
+      id: 'service.tts.manual-voices',
+      title: definition.title,
+      category: 'tts',
+      fields: [definition],
+      values: (settings) => ({ manualVoices: parseTtsSettings(settings.tts).manualVoices }),
+      overrides: (raw) => project(raw.tts, [definition]),
+      replace: (settings, changes) => {
+        settings.tts = parseTtsSettings({
+          ...parseTtsSettings(settings.tts),
+          manualVoices: changes.manualVoices ?? [],
+        });
+        return settings;
+      },
+    });
+    return {
+      kind: 'list',
+      targetId: owner.targetId,
+      ownerId: owner.ownerId,
+      title: owner.title,
+      category: owner.category,
+      available: true,
+      fields,
+      definition,
+      maxItems: 1000,
+      rows: () =>
+        parseTtsSettings(this.options.settings.value.tts).manualVoices as unknown as RecordValue[],
+      // Voice IDs identify the server's voices and are edited explicitly, never generated.
+      createRow: (values) => (values.name === undefined ? { name: values.id } : {}),
+      overrides: owner.overrides,
+      applies: owner.applies,
+      plan: (rows, revision) => owner.plan({ manualVoices: rows }, [], revision),
     };
   }
   private speech(): Target {

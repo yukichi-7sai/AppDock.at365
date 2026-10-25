@@ -893,3 +893,262 @@ test('AI owner rechecks credentials immediately before committing a planned dele
   assert.equal(f.writes(), 0);
   assert.equal(f.decrypts(), 0);
 });
+
+const ttsList = 'service.tts.manual-voices';
+const voiceRows = (f) => f.call('items.list', { targetId: ttsList, limit: 100 }).items;
+const voiceApply = (f, operations, dryRun = false) =>
+  f.call('apply', f.request(ttsList, operations, dryRun));
+
+test('TTS manual voices use explicit server IDs, owner defaults and independent shared storage', (t) => {
+  const f = fixture(t, { device: true }),
+    schema = f.call('schema.get', { targetId: ttsList });
+  assert.equal(schema.maxItems, 1000);
+  assert.equal(schema.operationSchemas.reorder.properties.itemRefs.maxItems, 1000);
+  assert.equal(schema.items.find((field) => field.key === 'id').writable, true);
+  const before = fs.readFileSync(f.store.shared.file),
+    device = fs.readFileSync(f.store.device.file),
+    operation = { kind: 'add', values: { id: ' Voice-ID_大文字😀 ' } },
+    preview = voiceApply(f, [operation], true);
+  assert.deepEqual(preview.changes[0].values, {
+    id: ' Voice-ID_大文字😀 ',
+    name: ' Voice-ID_大文字😀 ',
+  });
+  assert.equal(preview.completion, 'validated');
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  assert.equal(f.writes(), 0);
+  const request = f.request(ttsList, [operation]),
+    saved = f.call('apply', request);
+  assert.deepEqual(f.call('apply', request), saved);
+  assert.equal(f.writes(), 1);
+  assert.deepEqual(f.store.value.tts.manualVoices, [preview.changes[0].values]);
+  assert.equal(f.store.value.tts.voicesSource, 'endpoint');
+  assert.equal(f.store.value.tts.defaultVoice, 'voice');
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  assert(!fs.existsSync(f.ttsFile));
+  assert.equal(f.decrypts(), 0);
+});
+
+test('TTS list ID edits and removals preserve defaults, notification references, server mode and user-entered names', (t) => {
+  const f = fixture(t);
+  const next = structuredClone(f.store.value);
+  next.tts.defaultVoice = 'VoiceA';
+  next.tts.manualVoices = [
+    { id: 'VoiceA', name: ' Same ' },
+    { id: 'VoiceB', name: ' Same ' },
+  ];
+  next.notificationPreferences.speech = { voice: 'VoiceA' };
+  f.store.save(next, f.store.revision);
+  let rows = voiceRows(f);
+  assert.notEqual(rows[0].itemRef, rows[1].itemRef);
+  voiceApply(f, [{ kind: 'update', itemRef: rows[0].itemRef, changes: { id: 'VoiceNew' } }]);
+  rows = voiceRows(f);
+  assert.deepEqual(
+    rows.map((row) => row.values),
+    [
+      { id: 'VoiceNew', name: ' Same ' },
+      { id: 'VoiceB', name: ' Same ' },
+    ],
+  );
+  voiceApply(f, [{ kind: 'remove', itemRef: rows[0].itemRef }]);
+  assert.equal(f.store.value.tts.defaultVoice, 'VoiceA');
+  assert.equal(f.store.value.notificationPreferences.speech.voice, 'VoiceA');
+  assert.equal(f.store.value.tts.voicesSource, 'endpoint');
+  assert.equal(f.store.value.tts.model, 'model');
+  voiceApply(f, [{ kind: 'remove', itemRef: voiceRows(f)[0].itemRef }]);
+  assert.deepEqual(f.store.value.tts.manualVoices, []);
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(f.store.file)).tts, 'manualVoices'), false);
+});
+
+test('TTS list validates duplicate IDs and complete update batches while preserving case, whitespace and optional names', (t) => {
+  const f = fixture(t);
+  voiceApply(f, [{ kind: 'add', values: { id: 'VOICE', name: '' } }]);
+  voiceApply(f, [{ kind: 'add', values: { id: 'voice', name: ' Same ' } }]);
+  const before = fs.readFileSync(f.store.file),
+    writes = f.writes(),
+    rows = voiceRows(f);
+  for (const operation of [
+    { kind: 'add', values: {} },
+    { kind: 'add', values: { id: '  ' } },
+    { kind: 'add', values: { id: 'VOICE' } },
+    { kind: 'add', values: { id: 'long'.repeat(51) } },
+    { kind: 'add', values: { id: 'new', name: '😀'.repeat(101) } },
+    { kind: 'update', itemRef: rows[1].itemRef, changes: { id: 'VOICE' } },
+  ])
+    assert.throws(() => voiceApply(f, [operation]), { code: 'INVALID_ARGUMENT' });
+  assert.throws(
+    () =>
+      voiceApply(f, [
+        { kind: 'update', itemRef: rows[0].itemRef, changes: { name: 'Valid' } },
+        { kind: 'update', itemRef: rows[1].itemRef, changes: { id: '' } },
+      ]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  for (const key of ['apiKey', 'token', 'baseUrl', 'unknown'])
+    assert.throws(() => voiceApply(f, [{ kind: 'add', values: { id: 'new', [key]: 'PRIVATE' } }]), {
+      code: 'NOT_FOUND',
+    });
+  assert.equal(f.writes(), writes);
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  assert.deepEqual(
+    rows.map((row) => row.values),
+    [
+      { id: 'VOICE', name: '' },
+      { id: 'voice', name: ' Same ' },
+    ],
+  );
+});
+
+test('TTS list paginates 1000 rows and reorders all references within the unchanged transport bounds', (t) => {
+  const f = fixture(t),
+    initial = Array.from({ length: 1000 }, (_, index) => ({ id: 'v' + index, name: 'Same' }));
+  f.store.save(
+    { ...f.store.value, tts: { ...f.store.value.tts, manualVoices: initial } },
+    f.store.revision,
+  );
+  const rows = [];
+  let cursor, firstCursor;
+  do {
+    const page = f.call('items.list', {
+      targetId: ttsList,
+      limit: 100,
+      ...(cursor ? { cursor } : {}),
+    });
+    rows.push(...page.items);
+    cursor = page.nextCursor;
+    firstCursor ??= cursor;
+  } while (cursor);
+  assert.equal(rows.length, 1000);
+  assert.equal(new Set(rows.map((row) => row.itemRef)).size, 1000);
+  const request = f.request(ttsList, [
+    { kind: 'reorder', itemRefs: rows.map((row) => row.itemRef).reverse() },
+  ]);
+  assert(Buffer.byteLength(JSON.stringify(request), 'utf8') < 65536);
+  const preview = f.call('apply', { ...request, requestId: randomUUID(), dryRun: true });
+  assert.equal(preview.changed, true);
+  assert.equal(f.writes(), 0);
+  f.call('apply', request);
+  assert.deepEqual(f.store.value.tts.manualVoices, initial.slice().reverse());
+  assert.throws(
+    () => f.call('items.list', { targetId: ttsList, limit: 100, cursor: firstCursor }),
+    { code: 'REVISION_CONFLICT' },
+  );
+  assert.throws(() => voiceApply(f, [{ kind: 'add', values: { id: 'v1000' } }]), {
+    code: 'INVALID_ARGUMENT',
+  });
+  assert.equal(
+    f.call('schema.get', { targetId: aiList }).operationSchemas.reorder.properties.itemRefs
+      .maxItems,
+    8,
+  );
+});
+
+test('TTS list dryRun/no-op/replay and stale refs obey revisions and current permissions', (t) => {
+  const f = fixture(t);
+  voiceApply(f, [{ kind: 'add', values: { id: 'one' } }]);
+  voiceApply(f, [{ kind: 'add', values: { id: 'two' } }]);
+  let rows = voiceRows(f),
+    before = f.call('items.list', { targetId: ttsList }),
+    writes = f.writes();
+  assert.equal(
+    voiceApply(f, [
+      { kind: 'update', itemRef: rows[0].itemRef, changes: { id: 'one', name: 'one' } },
+    ]).changed,
+    false,
+  );
+  assert.equal(
+    voiceApply(f, [{ kind: 'reorder', itemRefs: rows.map((row) => row.itemRef) }]).changed,
+    false,
+  );
+  assert.equal(f.writes(), writes);
+  assert.equal(f.call('items.list', { targetId: ttsList }).revision, before.revision);
+  const operation = { kind: 'update', itemRef: rows[0].itemRef, changes: { name: 'Updated' } },
+    request = f.request(ttsList, [operation]);
+  f.call('apply', request);
+  f.setWrite(false);
+  assert.throws(() => f.call('apply', request), { code: 'WRITE_DISABLED' });
+  f.setWrite(true);
+  assert.throws(() => voiceApply(f, [{ kind: 'remove', itemRef: rows[0].itemRef }]), {
+    code: 'REVISION_CONFLICT',
+  });
+  rows = voiceRows(f);
+  const stale = f.request(ttsList, [{ kind: 'remove', itemRef: rows[0].itemRef }]);
+  const raw = JSON.parse(fs.readFileSync(f.store.file));
+  raw.tts.manualVoices[0].name = 'External';
+  fs.writeFileSync(f.store.file, JSON.stringify(raw));
+  assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
+});
+
+test('TTS manual list keeps encrypted bytes intact even with unreadable or damaged credential metadata', (t) => {
+  const f = fixture(t);
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS_KEY');
+  const encrypted = fs.readFileSync(f.ttsFile);
+  voiceApply(f, [{ kind: 'add', values: { id: 'voice' } }]);
+  assert.deepEqual(fs.readFileSync(f.ttsFile), encrypted);
+  fs.writeFileSync(f.ttsFile, 'DAMAGED_METADATA');
+  const stat = fs.statSync;
+  t.mock.method(fs, 'statSync', (file, ...args) => {
+    if (file === f.ttsFile) throw Object.assign(Error('Denied'), { code: 'EACCES' });
+    return stat(file, ...args);
+  });
+  voiceApply(f, [{ kind: 'update', itemRef: voiceRows(f)[0].itemRef, changes: { name: 'Safe' } }]);
+  const output = JSON.stringify([
+    f.call('schema.get', { targetId: ttsList }),
+    f.call('items.list', { targetId: ttsList }),
+  ]);
+  assert(!/PRIVATE_|DAMAGED|keyRevision|fingerprint|\$guard/.test(output));
+  assert.equal(fs.readFileSync(f.ttsFile, 'utf8'), 'DAMAGED_METADATA');
+  assert.equal(f.decrypts(), 0);
+});
+
+test('TTS manual list owner save failure never persists rows or modifies encrypted credentials', (t) => {
+  const f = fixture(t),
+    before = fs.readFileSync(f.store.file),
+    rename = fs.renameSync;
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS_KEY');
+  const cipher = fs.readFileSync(f.ttsFile);
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (to === f.store.file) throw Error('Injected atomic write failure');
+    return rename(from, to);
+  });
+  assert.throws(() => voiceApply(f, [{ kind: 'add', values: { id: 'unsaved' } }]), {
+    code: 'SAVE_FAILED',
+  });
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  assert.deepEqual(fs.readFileSync(f.ttsFile), cipher);
+  assert.deepEqual(f.store.value.tts.manualVoices, []);
+  assert.equal(f.decrypts(), 0);
+});
+
+test('TTS manual candidate reads use the edited list without network, credential decryption or speech', async (t) => {
+  const f = fixture(t),
+    { TtsService } = require('../out/main/main/core/tts-service');
+  f.store.save(
+    { ...f.store.value, tts: { ...f.store.value.tts, voicesSource: 'manual' } },
+    f.store.revision,
+  );
+  const service = new TtsService({
+    settings: () => f.store.value.tts,
+    canUse: () => true,
+    key: () => {
+      throw Error('Unexpected credential read');
+    },
+    fetcher: () => {
+      throw Error('Unexpected network');
+    },
+    play: () => {
+      throw Error('Unexpected speech');
+    },
+  });
+  t.after(() => service.close());
+  f.store.on('changed', () => service.reconcile());
+  assert.deepEqual((await service.voices('test')).voices, []);
+  voiceApply(f, [{ kind: 'add', values: { id: 'ActualVoice', name: 'Display voice' } }]);
+  assert.deepEqual(await service.voices('test'), {
+    source: 'manual',
+    voices: [{ id: 'ActualVoice', name: 'Display voice' }],
+  });
+  voiceApply(f, [{ kind: 'remove', itemRef: voiceRows(f)[0].itemRef }]);
+  assert.deepEqual((await service.voices('test')).voices, []);
+  assert.equal(f.store.value.tts.defaultVoice, 'voice');
+  assert.equal(f.decrypts(), 0);
+});

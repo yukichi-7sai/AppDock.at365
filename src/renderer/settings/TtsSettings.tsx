@@ -384,6 +384,7 @@ export function TtsSettingsForm({
         >
           <SettingsTextarea
             aria-label={translate('settings.ttsSettings.manualList')}
+            data-testid="tts-manual-voices"
             value={manual ?? JSON.stringify(value.manualVoices, null, 2)}
             onChange={(e) => {
               const v = e.target.value;

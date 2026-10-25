@@ -54,6 +54,19 @@ export const listOperationSchemas = {
     additionalProperties: false,
   },
 };
+export const settingsListOperationSchemas = (target: SettingsListTarget) => ({
+  ...listOperationSchemas,
+  reorder: {
+    ...listOperationSchemas.reorder,
+    properties: {
+      ...listOperationSchemas.reorder.properties,
+      itemRefs: {
+        ...listOperationSchemas.reorder.properties.itemRefs,
+        maxItems: target.maxItems ?? 64,
+      },
+    },
+  },
+});
 export function listValues(target: SettingsListTarget, row: Record<string, unknown>) {
   return Object.fromEntries(
     target.fields.flatMap((field) => {
@@ -175,6 +188,7 @@ export function planSettingsList(
     } else {
       if (
         !Array.isArray(operation.itemRefs) ||
+        operation.itemRefs.length > (target.maxItems ?? 64) ||
         operation.itemRefs.length !== rows.length ||
         new Set(operation.itemRefs).size !== rows.length
       )

@@ -950,6 +950,7 @@
   "settings.ttsSettings.modelHint": "一覧には音声生成以外のモデルも含まれる場合があります。TTS対応のモデルを選んでください。",
   "settings.ttsSettings.defaultVoice": "既定のボイス",
   "settings.ttsSettings.voiceId": "ボイスID",
+  "settings.ttsSettings.voiceName": "ボイス名",
   "settings.ttsSettings.fetchedVoices": "取得したボイス",
   "settings.ttsSettings.refreshVoices": "ボイス一覧を更新",
   "settings.ttsSettings.defaultVoiceHint": "通常の読み上げで使う声です。",

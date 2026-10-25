@@ -291,6 +291,16 @@ async function main() {
     value,
     until,
   });
+  await require('./settings-tts-list-gateway-checks.cjs')({
+    page,
+    client,
+    profile,
+    local,
+    checks,
+    tool,
+    value,
+    until,
+  });
   const values = await value('appdock_get_settings', { appletId: fixtureId });
   assert.deepEqual(values.values, { flag: false, text: '' });
   const schema = await value('appdock_get_settings_schema', { appletId: fixtureId });

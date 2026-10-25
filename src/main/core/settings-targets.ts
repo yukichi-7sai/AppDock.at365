@@ -11,6 +11,7 @@ import {
 } from './settings-target-types';
 import {
   listOperationSchemas,
+  settingsListOperationSchemas,
   listValues,
   listRemovable,
   planSettingsList,
@@ -127,7 +128,8 @@ export class SettingsTargets {
       kind: target.kind ?? 'fields',
       context: target.schemaContext?.(),
       ...(target.kind === 'list' ? { maxItems: target.maxItems ?? 64 } : {}),
-      operationSchemas: target.kind === 'list' ? listOperationSchemas : operationSchemas,
+      operationSchemas:
+        target.kind === 'list' ? settingsListOperationSchemas(target) : operationSchemas,
     });
   }
   private revision(target: SettingsTarget) {
@@ -315,7 +317,8 @@ export class SettingsTargets {
         {
           ...envelope,
           kind: target.kind ?? 'fields',
-          operationSchemas: target.kind === 'list' ? listOperationSchemas : operationSchemas,
+          operationSchemas:
+            target.kind === 'list' ? settingsListOperationSchemas(target) : operationSchemas,
           ...(target.kind === 'list' ? { maxItems: target.maxItems ?? 64 } : {}),
         },
       );
