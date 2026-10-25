@@ -55,7 +55,7 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-customization-design.md)。
 
-schema 2の項目は任意の`iconOnly: boolean`を持ち、trueなら表示ラベルを省く。`title`と`tooltip`は本体が解決した表示名で、アイコンのみでもアクセシブル名を保持する。表示名の変更でid/actionIdは変わらない。`iconOnly`を必要とする追加Shellの最低ホスト版は0.53.0とする。schema 1にはこのフィールドを返さない。
+schema 2の項目は任意の`iconOnly: boolean`を持ち、現在のリボン全体の表示モードから導出する。trueなら表示ラベルを省く。`title`と`tooltip`は本体が解決した表示名で、アイコンのみでもアクセシブル名を保持する。表示名の変更でid/actionIdは変わらない。`iconOnly`を必要とする追加Shellの最低ホスト版は0.53.0とする。schema 1にはこのフィールドを返さない。
 
 専用preloadはDefault Shell/Shell Applet共通の`window.appdockShell`を公開する。`window.dock`やNodeの直接アクセスは渡さない。送信元のWebContents・main frame・登録URL・現session・active状態を照合する。Shellのローカル操作権限は従来リボンと同じで、通常Applet/MCPの包括的な操作許可とは分離する。
 
@@ -85,3 +85,7 @@ AppDockを終了してから`--safe-shell`で起動すると、選択とリボ�
 ## 共通ライブラリーの画像
 
 リボンの登録画像も既存assetIdで取得する。プロフィール固有の名前・頭文字・ファイル参照をShellへ投影しない。通常項目、グループ、コマンド、宣言型Appletは同じ画像解決を使い、円形等の加工はホスト側で行う。schema 1/2の描画側に原画像保存や画像ライブラリーの管理APIを追加しない。[共通画像](registered-images.md)を参照。
+
+## リボンの表示モード
+
+schema 2は任意のdisplayMode（compact / expanded）を持つ。0.89.0以降のローカルリボンモデルはdisplayModeToggle（actionId / title / enabled）を追加し、Shellは本体発行のactionIdをinvokeへ渡して切り替える。切替は通常のribbon-display-mode項目として配置し、Default Shellは独立した固定ボタンを重ねない。displayModeToggleは表示中の切替項目に対する互換メタデータとして保持する。通常Applet/MCP向けモデルとschema 1の切替項目は無効でactionIdを渡さず、外部invokeは拒否する。グループpopupでは、実際にそのグループへ配置された切替項目だけを候補検査後に選択できる。モードはPC専用UI状態で、本体の予約幅はcompact 56px / expanded 200px。追加Shellも同じモデルと操作を利用し、Default Shell専用のAPIは設けない。

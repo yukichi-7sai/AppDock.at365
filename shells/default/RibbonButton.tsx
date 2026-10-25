@@ -5,9 +5,11 @@ import { Icon, type IconName } from '../../src/shared/ui-icons';
 export function RibbonIcon({
   item,
   asset,
+  showLabel,
 }: {
   item: RibbonView['items'][number];
   asset(id: string): Promise<{ dataUrl: string }>;
+  showLabel?: boolean;
 }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
@@ -25,17 +27,19 @@ export function RibbonIcon({
   }, [item.icon.assetId]);
   return (
     <>
-      {url ? (
-        <img src={url} alt="" />
-      ) : (
-        item.icon.text || <Icon name={item.icon.name as IconName} size={21} />
-      )}
-      {!(item.iconOnly ?? !!item.icon.text) && <span className="rail-label">{item.title}</span>}
-      {item.badge && (
-        <span aria-hidden="true" className={`ribbon-badge ${item.badge.kind}`}>
-          {item.badge.text}
-        </span>
-      )}
+      <span className={`ribbon-icon${item.icon.text ? ' avatar' : ''}`}>
+        {url ? (
+          <img src={url} alt="" />
+        ) : (
+          item.icon.text || <Icon name={item.icon.name as IconName} size={21} />
+        )}
+        {item.badge && (
+          <span aria-hidden="true" className={`ribbon-badge ${item.badge.kind}`}>
+            {item.badge.text}
+          </span>
+        )}
+      </span>
+      {(showLabel ?? !item.iconOnly) && <span className="rail-label">{item.title}</span>}
     </>
   );
 }

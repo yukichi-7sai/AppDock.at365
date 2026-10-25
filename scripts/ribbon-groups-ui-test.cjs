@@ -450,27 +450,25 @@ async function launch() {
     );
     await page.getByRole('button', { name: '画像ライブラリーを編集', exact: true }).click();
     await page.getByLabel('ボタン名', { exact: true }).fill('My gallery');
-    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
-    await page.getByRole('button', { name: '適用', exact: true }).click();
-    await saved(
-      (r) =>
-        r.itemOverrides['image-library']?.title === 'My gallery' &&
-        r.itemOverrides['image-library'].iconOnly,
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
     );
+    await page.getByRole('button', { name: '適用', exact: true }).click();
+    await saved((r) => r.itemOverrides['image-library']?.title === 'My gallery');
     await until(
       async () => (await button('image-library').getAttribute('aria-label')) === 'My gallery',
       'custom accessible name',
     );
-    assert.equal(await button('image-library').locator('.rail-label').count(), 0);
+    assert.equal(await button('image-library').locator('.rail-label').isVisible(), false);
     await page.getByRole('button', { name: 'My galleryを編集', exact: true }).click();
     await page.getByLabel('ボタン名', { exact: true }).fill('');
-    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).uncheck();
-    await page.getByRole('button', { name: '適用', exact: true }).click();
-    await saved(
-      (r) =>
-        !r.itemOverrides['image-library']?.title &&
-        r.itemOverrides['image-library']?.iconOnly === false,
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
     );
+    await page.getByRole('button', { name: '適用', exact: true }).click();
+    await saved((r) => !r.itemOverrides['image-library']?.title);
     for (const [id, title] of [
       ['page:missing:root', 'Missing root'],
       ['page:missing:child', 'Missing child'],
@@ -497,16 +495,9 @@ async function launch() {
     );
     assert(fieldLayout.length >= 3, 'group editor uses shared fields');
     assert(fieldLayout.every(({ padding, gap }) => padding >= 14 && gap >= 14));
-    const checkboxGeometry = await page
-      .getByRole('group', { name: 'リボンにアイコンのみを表示する', exact: true })
-      .evaluate((field) => {
-        const checkbox = field.querySelector('input').getBoundingClientRect();
-        const control = field.querySelector('.settings-field-control').getBoundingClientRect();
-        return { width: checkbox.width, left: checkbox.left - control.left };
-      });
-    assert(
-      checkboxGeometry.width < 24 && checkboxGeometry.left < 2,
-      `compact checkbox at start of shared field control: ${JSON.stringify(checkboxGeometry)}`,
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
     );
     await page.screenshot({ path: path.join(profile, 'group-dialog.png') });
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -524,16 +515,19 @@ async function launch() {
       async () => (await button(createdId).getAttribute('aria-label')) === 'グループ',
       'empty group retains accessible fallback',
     );
-    assert.equal(await button(createdId).locator('.rail-label').count(), 0);
+    assert.equal(await button(createdId).locator('.rail-label').isVisible(), false);
     await settingRow(createdId)
       .getByRole('button', { name: 'グループを編集', exact: true })
       .click();
     await page.getByLabel('グループ名', { exact: true }).fill('Renamed group');
-    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
+    );
     await page.getByLabel('展開方法', { exact: true }).selectOption('persistent');
     await page.getByRole('button', { name: '適用', exact: true }).click();
     await saved((r) => r.groups.find((g) => g.id === createdId)?.title === 'Renamed group');
-    assert.equal(await button(createdId).locator('.rail-label').count(), 0);
+    assert.equal(await button(createdId).locator('.rail-label').isVisible(), false);
     await page.getByLabel('Renamed groupの配置', { exact: true }).selectOption('bottom');
     await saved((r) => r.bottom.includes(createdId));
     await page.getByRole('button', { name: 'Renamed groupのグループを解除', exact: true }).click();
@@ -550,7 +544,7 @@ async function launch() {
       'Settings dialog add/edit; immediate persisted membership and placement; ungroup returns child with inherited bottom placement',
     );
     checks.push(
-      'Popup alignment and stable rail positions; overflow-only controls; aligned shared action icons; aliases, icon-only, blank group names, missing root/child removal and spacious dialog',
+      'Popup alignment and stable rail positions; overflow-only controls; aligned shared action icons; aliases, global label mode, blank group names, missing root/child removal and spacious dialog',
     );
     await app.close();
     app = undefined;

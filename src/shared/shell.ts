@@ -123,6 +123,8 @@ export interface RibbonView {
   dark: boolean;
   route: string;
   contextActionId: string;
+  displayMode?: import('./ribbon').RibbonDisplayMode;
+  displayModeToggle?: { actionId: string; title: string; enabled: boolean };
   contextActionEnabled?: boolean;
   contextDisabledReason?: string;
   items: {

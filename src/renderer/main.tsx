@@ -18,6 +18,7 @@ import { useSettingsEditor } from './useSettingsEditor';
 import { useRestartView } from './useRestartView';
 import { defaultNavigation, isPageRoute, type PageRoute } from '../shared/navigation';
 import { useAppletSidebar } from './useAppletSidebar';
+import { ribbonDisplayWidth } from '../shared/ribbon';
 
 declare global {
   interface Window {
@@ -119,7 +120,8 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [!!snapshot]);
+    // Native Applet views can cover this renderer; mode changes must not wait for an observer frame.
+  }, [!!snapshot, snapshot?.ribbonDisplayMode]);
   const settingsPageReady = snapshot?.startupReady === true && snapshot.navigation.route === page;
   const editor = useSettingsEditor(snapshot?.settings);
   const settingsViewRestored = useRef(false);
@@ -239,7 +241,15 @@ function App() {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [page, error, !!snapshot, restoringPage, pagePlacementRevision, snapshot?.navigation.request]);
+  }, [
+    page,
+    error,
+    !!snapshot,
+    restoringPage,
+    pagePlacementRevision,
+    snapshot?.navigation.request,
+    snapshot?.ribbonDisplayMode,
+  ]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (
@@ -334,7 +344,12 @@ function App() {
     <div
       className="shell"
       data-route={page}
-      style={{ '--applet-sidebar-width': `${appletSidebar.width}px` } as React.CSSProperties}
+      style={
+        {
+          '--applet-sidebar-width': `${appletSidebar.width}px`,
+          '--ribbon-width': `${ribbonDisplayWidth(snapshot?.ribbonDisplayMode)}px`,
+        } as React.CSSProperties
+      }
     >
       <ShellBarSlot region="titlebar" />
       <div

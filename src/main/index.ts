@@ -391,6 +391,13 @@ const presentation = new UiPresentation({
     if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
     ribbonState.set(id, !ribbonState.isExpanded(id));
   },
+  displayMode: () => (safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact')),
+  toggleDisplayMode: safeShell
+    ? undefined
+    : () => {
+        if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
+        ribbonState.setDisplayMode(ribbonState.displayMode === 'compact' ? 'expanded' : 'compact');
+      },
   badge: (id) => ribbonBadges.get(id),
 });
 async function toggleTheme() {
@@ -1583,6 +1590,7 @@ function runTrayCommand(id: string) {
 }
 function snapshot(): HostSnapshot {
   return {
+    ribbonDisplayMode: safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact'),
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
     navigation: navigation.state,
     shellRegions: shellRegistry?.snapshot(),

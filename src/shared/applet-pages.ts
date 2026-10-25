@@ -8,6 +8,7 @@ import {
   type RibbonGroup,
   type RibbonItemOverride,
   type RibbonCommandButton,
+  type RibbonPlacement,
 } from './ribbon';
 
 export type PageDisplay = 'page' | 'window';
@@ -23,6 +24,7 @@ export interface AppletPageDefinition {
   defaultDisplay?: PageDisplay;
 }
 export interface RibbonItem {
+  defaultPlacement?: RibbonPlacement;
   image?: RegisteredImageRef | null;
   contribution?: import('./ribbon').AppletRibbonItem;
   iconImage?: string;
@@ -41,6 +43,12 @@ export const builtinRibbon: RibbonItem[] = [
   { id: 'logs', title: hostText('settings.applet-pages.logs'), icon: 'logs' },
   { id: 'notifications', title: hostText('settings.applet-pages.notifications'), icon: 'bell' },
   { id: 'theme', title: hostText('settings.applet-pages.theme'), icon: 'sun' },
+  {
+    id: 'ribbon-display-mode',
+    title: hostText('settings.applet-pages.ribbonDisplayMode'),
+    icon: 'chevron',
+    defaultPlacement: 'bottom',
+  },
 ];
 export const pageKey = (extensionId: string, pageId: string) => `page:${extensionId}:${pageId}`;
 export const validPageId = (id: unknown): id is string =>

@@ -14,6 +14,7 @@ export type IconName =
   | 'check'
   | 'folder'
   | 'chevron'
+  | 'chevron-left'
   | 'close'
   | 'minus'
   | 'square'
@@ -89,6 +90,7 @@ const paths: Record<IconName, React.ReactNode> = {
   check: <path d="m5 12 4 4L19 6" />,
   folder: <path d="M3 7V5a1 1 0 0 1 1-1h6l2 3h8a1 1 0 0 1 1 1v11H3Z" />,
   chevron: <path d="m9 5 7 7-7 7" />,
+  'chevron-left': <path d="m15 5-7 7 7 7" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
   minus: <path d="M5 12h14" />,
   square: <rect x="6" y="6" width="12" height="12" rx="1" />,

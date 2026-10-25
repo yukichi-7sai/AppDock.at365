@@ -2938,5 +2938,9 @@
   "settings.aboutSettings.running": "稼働中 {{count}}",
   "settings.aboutSettings.available": "利用可能 {{count}}",
   "settings.aboutSettings.runtime": "実行環境",
-  "settings.versionCheck.hostUpdates": "本体の更新"
+  "settings.versionCheck.hostUpdates": "本体の更新",
+  "services.ribbonState.invalidMode": "リボンの表示モードが正しくありません。",
+  "services.uiPresentation.expandRibbon": "アイコンと名前で表示",
+  "services.uiPresentation.collapseRibbon": "アイコンのみで表示",
+  "settings.applet-pages.ribbonDisplayMode": "表示モードの切り替え"
 }

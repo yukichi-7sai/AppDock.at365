@@ -228,6 +228,7 @@ export interface LogEntry {
   message: string;
 }
 export interface HostSnapshot {
+  ribbonDisplayMode?: import('./ribbon').RibbonDisplayMode;
   navigation: import('./shell').NavigationState;
   shell: import('./shell').ShellStatus;
   shellRegions?: import('./shell').ShellRegionsSnapshot;

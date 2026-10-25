@@ -211,7 +211,7 @@ async function colorGeometry() {
       width: rect.width,
       height: rect.height,
       bottom: rect.bottom,
-      line: children && getComputedStyle(children).borderLeftColor,
+      line: children && getComputedStyle(children, ':after').backgroundColor,
       lineLeft: childRect?.left,
       bridge: bridge?.backgroundColor,
       bridgeTop: childRect && childRect.top + parseFloat(bridge.top),
@@ -659,7 +659,7 @@ async function commandChecks() {
     .getByRole('dialog', { name: 'コマンドボタンを編集', exact: true })
     .screenshot({ path: path.join(profile, 'command-button-editor.png') });
   await page.getByLabel('ボタン名', { exact: true }).fill('Renamed action');
-  await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
+  assert.equal(await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(), 0);
   await page.getByRole('button', { name: '適用', exact: true }).click();
   await saved((r) => r.buttons.find((b) => b.id === run)?.title === 'Renamed action');
   await page.getByLabel('Renamed actionの配置', { exact: true }).selectOption('group:colored');

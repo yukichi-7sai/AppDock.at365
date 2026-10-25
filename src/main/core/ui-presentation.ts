@@ -66,6 +66,7 @@ type Action = {
   command?: string;
   theme?: true;
   group?: string;
+  displayMode?: true;
 };
 export class UiPresentation {
   readonly epoch = randomUUID();
@@ -90,6 +91,8 @@ export class UiPresentation {
       expanded?(id: string): boolean;
       temporaryExpanded?(id: string): boolean;
       toggleGroup?(id: string): void;
+      displayMode?(): import('../../shared/ribbon').RibbonDisplayMode;
+      toggleDisplayMode?(): void;
       badge?(id: string): RibbonBadge;
     },
   ) {}
@@ -110,6 +113,7 @@ export class UiPresentation {
     local = true,
   ): RibbonView {
     const settings = this.options.settings();
+    const displayMode = this.options.displayMode?.() ?? 'compact';
     const applets = this.options.applets();
     const dark = this.options.dark();
     const route = this.options.navigation.state.route;
@@ -134,11 +138,20 @@ export class UiPresentation {
     );
     const project = (item: RibbonItem): RibbonView['items'][number] => {
       const appearance = ribbonPresentation(settings.ribbon, item);
-      const actionId = `ribbon.${item.id}`;
+      const modeItem = item.id === 'ribbon-display-mode';
+      const modeTitle = hostText(
+        displayMode === 'compact'
+          ? 'services.uiPresentation.expandRibbon'
+          : 'services.uiPresentation.collapseRibbon',
+      );
+      const title =
+        modeItem && !settings.ribbon.itemOverrides?.[item.id]?.title ? modeTitle : appearance.title;
+      const actionId = modeItem ? 'ribbon.display-mode' : `ribbon.${item.id}`;
       const provider = applets.find((e) => e.id === item.extensionId);
       const page = provider?.pages?.find((p) => p.id === item.pageId);
-      const action: Action =
-        item.kind === 'group'
+      const action: Action = modeItem
+        ? { displayMode: true }
+        : item.kind === 'group'
           ? { group: item.id }
           : item.contribution
             ? { route: 'extensions', appletId: item.extensionId, appletDetail: 'settings' }
@@ -150,18 +163,20 @@ export class UiPresentation {
                   ? { theme: true }
                   : { route: item.id };
       if (item.kind !== 'separator') this.actions.set(actionId, action);
-      const available = commandAvailable(action, provider);
+      const available = modeItem
+        ? local && schemaVersion === 2 && !!this.options.toggleDisplayMode
+        : commandAvailable(action, provider);
       const enabled =
         item.kind === 'separator' ||
-        (!!(action.route || action.theme || action.command || action.group) &&
+        (!!(action.route || action.theme || action.command || action.group || action.displayMode) &&
           available &&
           allowed(action) &&
           (item.group?.expansion !== 'temporary' || local));
       return {
         id: item.id,
         kind: item.kind === 'command' ? 'button' : (item.kind ?? 'button'),
-        title: appearance.title,
-        tooltip: appearance.title,
+        title,
+        tooltip: modeItem && title !== modeTitle ? `${title}（${modeTitle}）` : title,
         placement: ribbonPlacement(settings.ribbon, item.id, catalog),
         selected: item.contribution
           ? route === 'extensions' &&
@@ -178,11 +193,13 @@ export class UiPresentation {
                   : hostText('services.uiPresentation.commandUnavailable')),
             }
           : {}),
-        ...(item.kind === 'separator' ? {} : { actionId }),
+        ...(item.kind === 'separator' || (modeItem && (!local || schemaVersion !== 2))
+          ? {}
+          : { actionId }),
         ...(schemaVersion === 2
           ? {
               badge: ribbonBadgeView(this.options.badge?.(item.id) ?? null),
-              iconOnly: appearance.iconOnly,
+              iconOnly: displayMode === 'compact',
             }
           : {}),
         icon: {
@@ -203,7 +220,15 @@ export class UiPresentation {
               .map((ref) => this.options.image?.(ref, item.contribution?.imageShape))
               .find(Boolean) ?? item.iconImage,
           ),
-          name: item.id === 'theme' ? (dark ? 'sun' : 'moon') : item.icon,
+          name: modeItem
+            ? displayMode === 'expanded'
+              ? 'chevron-left'
+              : 'chevron'
+            : item.id === 'theme'
+              ? dark
+                ? 'sun'
+                : 'moon'
+              : item.icon,
         },
       };
     };
@@ -260,6 +285,9 @@ export class UiPresentation {
       prune(grouped.filter((item) => item.placement === p)),
     );
     this.children = allChildren;
+    const modeItem = items
+      .flatMap((item) => [item, ...(item.children ?? [])])
+      .find((item) => item.id === 'ribbon-display-mode');
     const body = {
       schemaVersion,
       epoch: this.epoch,
@@ -269,6 +297,16 @@ export class UiPresentation {
       contextActionId: 'ribbon.configure',
       ...(schemaVersion === 2
         ? {
+            displayMode,
+            ...(local && modeItem
+              ? {
+                  displayModeToggle: {
+                    actionId: 'ribbon.display-mode',
+                    enabled: modeItem.enabled,
+                    title: modeItem.title,
+                  },
+                }
+              : {}),
             contextActionEnabled: contextEnabled,
             ...(!contextEnabled
               ? {
@@ -287,6 +325,7 @@ export class UiPresentation {
       commands,
       route,
       dark,
+      displayMode,
       applets: applets.map((e) => [e.id, e.state, e.enabled, e.pages, e.commands]),
       assets: [...this.assets.keys()],
       state: roots.map((i) => [i.id, this.options.expanded?.(i.id)]),
@@ -370,6 +409,12 @@ export class UiPresentation {
         !candidates.some((i) => i.actionId === request.actionId && i.enabled)
       )
         throw Error('Action is no longer available');
+      if (action.displayMode) {
+        if (execute || !this.options.toggleDisplayMode)
+          throw Error(hostText('services.uiPresentation.localRibbonOnly'));
+        this.options.toggleDisplayMode();
+        return { accepted: true };
+      }
       if (action.group && !execute) {
         const group = this.group(action.group);
         if (!group) throw Error(hostText('services.uiPresentation.groupUnavailable'));
