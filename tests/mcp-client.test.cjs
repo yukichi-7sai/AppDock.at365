@@ -22,6 +22,62 @@ const host = { owner: 'host', kind: 'host', external: false },
   applet = { owner: 'applet:a:1', kind: 'applet', external: false };
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+test('public settings and external metadata edits never decrypt a damaged cipher and keep its exact bytes', (t) => {
+  const f = fixture(t),
+    id = f.add(
+      { url: 'http://127.0.0.1:12345/mcp', authentication: 'bearer' },
+      { token: 'PRIVATE_TOKEN' },
+    ),
+    file = path.join(f.dir, 'mcp-client.json');
+  const document = JSON.parse(fs.readFileSync(file));
+  document.entries[id].secret = 'DAMAGED_CIPHER';
+  fs.writeFileSync(file, JSON.stringify(document, null, 3));
+  let crypts = 0,
+    changes = 0;
+  const owner = new McpClientSettings(
+    f.store,
+    file,
+    {
+      encrypt: () => {
+        crypts++;
+        throw Error('Unexpected encryption');
+      },
+      decrypt: () => {
+        crypts++;
+        throw Error('Unexpected decryption');
+      },
+    },
+    () => changes++,
+  );
+  const detail = owner.publicSettings(id),
+    before = fs.readFileSync(file);
+  assert.equal(detail.connection.authentication, 'bearer');
+  assert(!JSON.stringify(detail).includes('DAMAGED_CIPHER'));
+  const request = {
+    op: 'save',
+    item: { ...detail.item, name: 'Renamed' },
+    connection: detail.connection,
+    expectedRevision: detail.revision,
+  };
+  assert.equal(owner.update({ ...request, dryRun: true }, true).validated, true);
+  assert.deepEqual(fs.readFileSync(file), before);
+  assert.equal(owner.update(request, true).saved, true);
+  assert.deepEqual(fs.readFileSync(file), before);
+  assert.equal(owner.roster()[0].name, 'Renamed');
+  assert.throws(
+    () => owner.update({ op: 'remove', id, expectedRevision: owner.revision() }, true),
+    { code: 'PRIVATE_SETTING' },
+  );
+  const snapshot = owner.publicConfiguration();
+  snapshot.rows[0].connection.url = 'http://other.test/mcp';
+  assert.throws(() => owner.planPublicConfiguration(snapshot.rows, snapshot.revision), {
+    code: 'PRIVATE_SETTING',
+  });
+  assert.deepEqual(fs.readFileSync(file), before);
+  assert.equal(crypts, 0);
+  assert.equal(changes, 1);
+});
+
 test('external configuration excludes encrypted credentials and cannot erase or rebind them', (t) => {
   const f = fixture(t);
   const id = f.add(
