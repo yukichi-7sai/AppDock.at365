@@ -32,6 +32,11 @@ export interface SettingsFieldTarget extends SettingsTargetBase {
 export interface SettingsListTarget extends SettingsTargetBase {
   kind: 'list';
   definition: SettingDefinition;
+  maxItems?: number;
+  createRow?(values: Record<string, unknown>): Record<string, unknown>;
+  prepareRow?(row: Record<string, unknown>, keys: string[]): void;
+  removable?(row: Record<string, unknown>): boolean;
+  itemWritable?(row: Record<string, unknown>, field: SettingDefinition): boolean;
   rows(): Record<string, unknown>[];
   plan(rows: Record<string, unknown>[], revision: string): SettingsFieldPlan;
 }

@@ -1,10 +1,12 @@
 import type { Settings, SettingDefinition } from '../../shared/contracts';
+import { randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import {
   parseAiSettings,
   newAiConnection,
   aiOutputTokenLimits,
   aiTimeoutLimits,
+  type AiConnectionSettings,
 } from '../../shared/ai';
 import { defaultTtsSettings, parseTtsSettings } from '../../shared/tts';
 import { replaceNotificationPreference } from '../../shared/notification-preference-edit';
@@ -18,7 +20,12 @@ import {
 import { sameSetting } from '../../shared/settings-defaults';
 import { settingInputSchema } from '../../shared/settings-commands';
 import type { SettingsStore } from './settings';
-import { SettingsTargetError, type SettingsFieldTarget } from './settings-target-types';
+import {
+  SettingsTargetError,
+  type SettingsFieldTarget,
+  type SettingsListTarget,
+  type SettingsTarget,
+} from './settings-target-types';
 import type { AiSettingsController } from './ai-settings';
 import type { TtsSecrets } from './tts-secrets';
 
@@ -95,16 +102,19 @@ export class SettingsServiceTargets {
       notifications(): NotificationTypeEntry[];
     },
   ) {}
-  targets(): SettingsFieldTarget[] {
+  targets(): SettingsTarget[] {
     return [
-      this.aiGeneral(),
-      ...parseAiSettings(this.options.settings.value.ai).connections.map((connection) =>
-        this.aiConnection(connection.id),
-      ),
-      this.tts(),
-      this.speech(),
-      ...this.options.notifications().map((type) => this.notification(type)),
-    ].map((target) => this.target(target));
+      ...[
+        this.aiGeneral(),
+        ...parseAiSettings(this.options.settings.value.ai).connections.map((connection) =>
+          this.aiConnection(connection.id),
+        ),
+        this.tts(),
+        this.speech(),
+        ...this.options.notifications().map((type) => this.notification(type)),
+      ].map((target) => this.target(target)),
+      this.aiConnections(),
+    ];
   }
   private target(spec: Target): SettingsFieldTarget {
     const readOverrides = (): RecordValue | undefined => {
@@ -268,9 +278,52 @@ export class SettingsServiceTargets {
       parseAiSettings(settings.ai).connections.find((connection) => connection.id === id) ??
       fail('NOT_FOUND');
     const current = connection(this.options.settings.value),
-      defaults = newAiConnection(id, current.preset),
-      protectedKey = this.options.ai.configurationState(id).protected;
-    const fields: Field[] = [
+      fields = this.aiConnectionFields(current, this.options.ai.configurationState(id).protected);
+    return {
+      id: 'service.ai.connection.' + Buffer.from(id).toString('base64url'),
+      title: current.name,
+      category: 'ai',
+      fields,
+      values: (settings) =>
+        Object.fromEntries(
+          fields.map((field) => [
+            field.key,
+            at(connection(settings), field.key.split('.')) ?? field.default,
+          ]),
+        ),
+      overrides: (raw) =>
+        project(
+          (object(raw.ai).connections as unknown[] | undefined)?.find(
+            (value) => object(value).id === id,
+          ),
+          fields,
+        ),
+      replace: (settings, changes, reset) => {
+        const ai = parseAiSettings(settings.ai),
+          value = ai.connections.find((connection) => connection.id === id)!;
+        updateRecord(value as unknown as RecordValue, changes, reset, fields);
+        for (const key of reset) {
+          const field = fields.find((field) => field.key === key)!;
+          if (field.default !== undefined)
+            assign(value as unknown as RecordValue, key.split('.'), field.default);
+        }
+        Object.assign(
+          value,
+          this.options.ai.preparePublicConnection(
+            value,
+            Object.hasOwn(changes, 'name') || reset.includes('name'),
+          ),
+        );
+        settings.ai = parseAiSettings(ai);
+        return settings;
+      },
+      guard: (settings) => this.options.ai.validatePublic(parseAiSettings(settings.ai)),
+      guardRevision: () => this.options.ai.configurationState(id).revision,
+    };
+  }
+  private aiConnectionFields(current: AiConnectionSettings, protectedKey: boolean): Field[] {
+    const defaults = newAiConnection(current.id, current.preset);
+    return [
       {
         key: 'name',
         title: hostText('settings.aiConnectionDialog.name'),
@@ -361,46 +414,115 @@ export class SettingsServiceTargets {
         default: defaults.compatibility.store,
       },
     ].map((field) => ({ ...field, inherit: false }) as Field);
-    return {
-      id: 'service.ai.connection.' + Buffer.from(id).toString('base64url'),
-      title: current.name,
-      category: 'ai',
+  }
+  private aiConnections(): SettingsListTarget {
+    const rows = () =>
+      parseAiSettings(this.options.settings.value.ai).connections as unknown as RecordValue[];
+    const protectedKey = (row: RecordValue) =>
+      this.options.ai.configurationState(String(row.id)).protected;
+    const fields: Field[] = [
+      { key: 'id', title: hostText('settings.aiSettings.connectionId'), type: 'string' },
+      ...this.aiConnectionFields(newAiConnection('defaults'), false).map((field) => ({
+        ...field,
+        propertyPath: field.key.split('.'),
+      })),
+    ];
+    const definition: SettingDefinition = {
+      key: 'connections',
+      title: hostText('settings.aiSettings.connections'),
+      type: 'object-list',
       fields,
-      values: (settings) =>
-        Object.fromEntries(
-          fields.map((field) => [
-            field.key,
-            at(connection(settings), field.key.split('.')) ?? field.default,
-          ]),
-        ),
-      overrides: (raw) =>
-        project(
-          (object(raw.ai).connections as unknown[] | undefined)?.find(
-            (value) => object(value).id === id,
-          ),
-          fields,
-        ),
-      replace: (settings, changes, reset) => {
-        const ai = parseAiSettings(settings.ai),
-          value = ai.connections.find((connection) => connection.id === id)!;
-        updateRecord(value as unknown as RecordValue, changes, reset, fields);
-        for (const key of reset) {
-          const field = fields.find((field) => field.key === key)!;
-          if (field.default !== undefined)
-            assign(value as unknown as RecordValue, key.split('.'), field.default);
+      list: { idKey: 'id', titleKey: 'name', columns: ['name', 'baseUrl'] },
+    };
+    return {
+      kind: 'list',
+      targetId: 'service.ai.connections',
+      ownerId: 'appdock',
+      title: definition.title,
+      category: 'ai',
+      available: true,
+      definition,
+      fields,
+      maxItems: 8,
+      rows,
+      applies: () => 'aiSettingsChanged',
+      inputSchema: (field) => (field as Field).schema ?? settingInputSchema(field),
+      writable: (field) => field.key !== 'id',
+      removable: (row) => !protectedKey(row),
+      itemWritable: (row, field) =>
+        field.key !== 'id' &&
+        (field.key === 'baseUrl'
+          ? !protectedKey(row)
+          : field.key !== 'authentication' ||
+            (!protectedKey(row) && row.authentication === 'bearer')),
+      overrides: () => {
+        try {
+          return {
+            connections: object(this.options.settings.storedValue().ai).connections,
+            $guard: rows().map(
+              (row) => this.options.ai.configurationState(String(row.id)).revision,
+            ),
+          };
+        } catch {
+          return undefined;
         }
-        Object.assign(
-          value,
-          this.options.ai.preparePublicConnection(
-            value,
-            Object.hasOwn(changes, 'name') || reset.includes('name'),
-          ),
-        );
-        settings.ai = parseAiSettings(ai);
-        return settings;
       },
-      guard: (settings) => this.options.ai.validatePublic(parseAiSettings(settings.ai)),
-      guardRevision: () => this.options.ai.configurationState(id).revision,
+      createRow: (values) => {
+        const preset = values.preset ?? 'ollama';
+        if (!['ollama', 'lm-studio', 'llama-cpp', 'openai', 'custom'].includes(String(preset)))
+          fail();
+        return newAiConnection(
+          randomUUID(),
+          preset as AiConnectionSettings['preset'],
+        ) as unknown as RecordValue;
+      },
+      prepareRow: (row, keys) => {
+        try {
+          Object.assign(
+            row,
+            this.options.ai.preparePublicConnection(
+              row as unknown as AiConnectionSettings,
+              keys.includes('name'),
+            ),
+          );
+        } catch {
+          fail();
+        }
+      },
+      plan: (connections, revision) => {
+        this.options.checkRevision(revision);
+        const store = this.options.settings,
+          before = parseAiSettings(store.value.ai);
+        let next: Settings;
+        try {
+          const ai = this.options.ai.preparePublicConnections(connections);
+          next = this.options.validate({ ...structuredClone(store.value), ai });
+        } catch (error) {
+          if (error instanceof SettingsTargetError) throw error;
+          return fail();
+        }
+        const changed = sameSetting(before, next.ai) ? [] : ['connections'];
+        return {
+          changed,
+          before: { connections: before.connections },
+          values: { connections: next.ai!.connections },
+          applies: Object.fromEntries(changed.map((key) => [key, 'aiSettingsChanged'])),
+          commit: () => {
+            this.options.checkRevision(revision);
+            this.options.ai.validatePublic(next.ai!);
+            if (!changed.length) return;
+            try {
+              this.options.save(next, store.revision, []);
+            } catch (error) {
+              if (error instanceof SettingsTargetError) throw error;
+              throw new SettingsTargetError(
+                'SAVE_FAILED',
+                hostText('services.settingsCommands.saveFailed'),
+              );
+            }
+          },
+        };
+      },
     };
   }
   private tts(): Target {

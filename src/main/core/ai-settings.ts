@@ -53,20 +53,60 @@ export class AiSettingsController {
     if (!normalizeName) next.name = value.name;
     return next;
   }
+  private withConnections(current: AiSettings, connections: AiConnectionSettings[]) {
+    return parseAiSettings({
+      ...current,
+      connections,
+      defaultConnectionId:
+        current.defaultConnectionId &&
+        current.connections.some((c) => c.id === current.defaultConnectionId) &&
+        !connections.some((c) => c.id === current.defaultConnectionId)
+          ? undefined
+          : (current.defaultConnectionId ??
+            (!current.connections.length ? connections[0]?.id : undefined)),
+    });
+  }
+  preparePublicConnections(rows: Record<string, unknown>[]) {
+    const current = this.current();
+    const parsed = parseAiSettings({ ...current, connections: rows });
+    const connections = parsed.connections.map((value) => {
+      const before = current.connections.find((c) => c.id === value.id);
+      return JSON.stringify(before) === JSON.stringify(value)
+        ? value
+        : this.preparePublicConnection(value, !before || before.name !== value.name);
+    });
+    const next = this.withConnections(current, connections);
+    this.validatePublic(next);
+    return next;
+  }
   validatePublic(next: AiSettings) {
     const current = this.current();
     if (
-      JSON.stringify(current.connections.map((c) => c.id)) !==
-      JSON.stringify(next.connections.map((c) => c.id))
+      current.connections.some(
+        (c) =>
+          !next.connections.some((value) => value.id === c.id) &&
+          this.secrets.configurationState(c.id).protected,
+      )
     )
       throw new SettingsTargetError(
         'LOCAL_ACTION_REQUIRED',
         hostText('services.settingsTargets.localAction'),
       );
     for (const connection of next.connections) {
-      const before = current.connections.find((c) => c.id === connection.id)!;
+      const before = current.connections.find((c) => c.id === connection.id);
       if (JSON.stringify(before) === JSON.stringify(connection)) continue;
       this.connection(connection);
+      if (!before) {
+        if (
+          connection.authentication !== 'none' ||
+          this.secrets.configurationState(connection.id).protected
+        )
+          throw new SettingsTargetError(
+            'LOCAL_ACTION_REQUIRED',
+            hostText('services.settingsTargets.localAction'),
+          );
+        continue;
+      }
       if (
         before.authentication !== connection.authentication &&
         connection.authentication === 'bearer' &&
@@ -96,12 +136,7 @@ export class AiSettingsController {
     const connections = exists
       ? current.connections.map((v) => (v.id === c.id ? c : v))
       : [...current.connections, c];
-    const ai = parseAiSettings({
-      ...current,
-      connections,
-      defaultConnectionId:
-        current.defaultConnectionId ?? (!exists && !current.connections.length ? c.id : undefined),
-    });
+    const ai = this.withConnections(current, connections);
     const asset =
       c.authentication === 'none'
         ? this.secrets.prepareKey(c, '')
@@ -116,12 +151,7 @@ export class AiSettingsController {
       current = this.current();
     this.assertOriginal(c, original, keyRevision);
     const connections = current.connections.filter((v) => v.id !== c.id);
-    const ai = {
-      ...current,
-      connections,
-      defaultConnectionId:
-        current.defaultConnectionId === c.id ? undefined : current.defaultConnectionId,
-    };
+    const ai = this.withConnections(current, connections);
     this.settings.save(
       { ...this.settings.value, ai },
       this.settings.revision,

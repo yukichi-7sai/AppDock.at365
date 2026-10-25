@@ -23,7 +23,7 @@ import { GestureCommands } from './gesture-commands';
 import { ShortcutCommands } from './shortcut-commands';
 import { SettingsTargets, SettingsTargetError } from './settings-targets';
 import { settingsOperations, type SettingsMethod } from '../../shared/settings-operations';
-import type { SettingsFieldTarget } from './settings-target-types';
+import type { SettingsTarget } from './settings-target-types';
 import type { GlobalHotKeyStatus, ExtensionSnapshot } from '../../shared/contracts';
 import type { ShortcutPageChoice } from '../../shared/shortcut-pages';
 
@@ -72,7 +72,7 @@ export class AppDockApi {
       save(value: Settings, revision: number): SettingsSnapshot;
       settingsCommands?: SettingsCommands;
       settingsPrincipal?(): string;
-      serviceSettingsTargets?(): SettingsFieldTarget[];
+      serviceSettingsTargets?(): SettingsTarget[];
       customCommands?: CustomCommandService;
       mcpClientAllowed?(): boolean;
       inputAllowed?(): boolean;

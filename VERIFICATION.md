@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-25: AI接続一覧の共通MCP操作 0.88.8
+
+- cleanな`c5133ad`から、追跡先なしの`codex/mcp-settings-design`で次の所有サービス単位を実装。AI接続をlist対象として探索・取得し、固定6入口のadd/update/remove/reorderから操作できる。外側のツールSchemaと権限は変更せず、read + writeで保存できる。mainの変更・統合と追跡先の設定は行わない。
+- ID生成、preset別初期値、名前/URLの正規化、8件上限、接続の検証を既存所有サービスへ接続。ローカルUIとMCPで最初の登録時の既定選択と既定接続削除時の解除を共有する。並べ替えはIDと表示順だけを使い、既定・生成優先度を変えない。既存fields対象の任意値resetも保持する。
+- 共通一覧へ所有サービス用の行生成/確定、上限、削除可否、行ごとの書込み可否を追加し、SchemaのmaxItemsとitemsのwritableKeysへ反映。宣言型一覧は既存経路を維持する。正規化後の値をプレビューへ返し、無変更時は無書込み。秘密付き行の削除・URL/認証方式変更とキー必須の新規接続をLOCAL_ACTION_REQUIREDで拒否し、通常編集・追加・削除・並べ替えで暗号化ファイルを変更しない。保護判定は復号せず、破損/読取拒否も保護ありとして扱う。
+- 発行前に公開列/ID、既存UIと所有サービス、許可と固定入口、外部競合/原子的保存、秘密の改訂と保存直前の再検査をレビュー。行の内容をschemaRevisionへ含めると保存要求の再送を拒否する問題を修正し、秘密の改訂は値のrevisionへ束縛した。初期の型推論を修正し、版更新後に依存メタデータを固定lockfileで再照合。阻害指摘なし。失敗ログも証跡へ保持した。
+- 固定依存のinstall、整形検査、型検査、本体/Default Shell build、関連標準回帰**50ファイル504/504件、fail/skip 0**が成功。新規11件を含む所有adapterの25件で追加/削除/順序、同名行、部分編集、既定解除、8件上限、無書込み/再送、競合/許可取消、失敗時の無保存、復号0と暗号化bytes維持、計画後に追加された秘密の保存直前拒否を確認した。製品/試験/依存/ビルド等737入力とWebApplet/WallpaperSlideshowの参照manifestは検証・発行前後のSHAが一致。標準回帰全体は未実行。
+- 隔離sourceと最終固定EXEの実MCP/GUIは各**15群**、固定EXE smokeも成功。新しい一覧の追加/再送、同名IDの区別、MCPと既存UIの編集往復、表示順、既定の解除、ローカル追加/削除ダイアログ、秘密付き行の操作拒否と暗号化bytes維持を確認した。接続・行・値が変わってもtools/listの名前と引数Schemaは不変。既存の通知・TTS・宣言型一覧・動的候補・秘密除外・許可取消も成功した。
+- 既存の設定項目/保存ファイルと公開操作契約を保持する追加adapterのため**0.88.8**へパッチ更新。publish.bat終了0で.NET各Host/Updaterも発行。本体EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170683454 bytes / SHA256 `36d59d4196291dbed3ed1debbfe66d01f99d62c0dee0b61a34d8d8e7f15c07a2`**。File/ProductVersion、feedの版/size/hash、ASAR内package/同梱Default Shellと隔離コピーを照合した。
+- 正本は[設定API](docs/settings-api.md)、[AI](docs/ai.md)、[外部操作](docs/automation.md)、後続範囲は[拡張設計](docs/mcp-settings-design.md)。TTS手動ボイス一覧、起動/更新等の専用adapterは後続。実AI/TTSサーバーの接続・生成・音声再生、実利用の設定/認証、物理入力/OS効果は対象外。push・Release・実利用先deployなし。
+- 完全ログ・前後入力・環境・レビューと成果物は`.artifacts/mcp-settings-ai-list-20261025/`、最終照合は`.artifacts/commit-validation-mcp-settings-ai-list-20261025/`。source=`mcp-settings-foundation-source-1792931183933`、固定EXE=`mcp-settings-foundation-portable-1792931411051`、smoke=`smoke-1792931430708`。発行後の変更は関連文書と本記録のみ。試験プロセス0を確認し、今回の成功は方式ごとの直近3回以内、以前の再利用資料/失敗診断/固定出力は保持、削除0件。
+
 ## 2026-10-25: 通知・AI/TTS通常値のMCP所有adapter 0.88.7
 
 - `codex/mcp-settings-design`のcleanな`5bddccc`から、次の所有サービス単位を実装。追跡先なしの専用worktreeを維持し、mainへの統合・追跡先変更を行わない。既存の固定6入口へ通知種類別/共通音声、AI共通/既存接続、TTS通常値のfields対象を追加し、外側のツールSchemaと8権限は維持した。

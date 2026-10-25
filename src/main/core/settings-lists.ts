@@ -63,10 +63,13 @@ export function listValues(target: SettingsListTarget, row: Record<string, unkno
   );
 }
 export function listRemovable(target: SettingsListTarget, row: Record<string, unknown>) {
-  return !(target.definition.fields ?? []).some(
-    (field) =>
-      !target.fields.some((publicField) => publicField.key === field.key) &&
-      objectFieldValue(row, field) != null,
+  return (
+    target.removable?.(row) !== false &&
+    !(target.definition.fields ?? []).some(
+      (field) =>
+        !target.fields.some((publicField) => publicField.key === field.key) &&
+        objectFieldValue(row, field) != null,
+    )
   );
 }
 export function planSettingsList(
@@ -91,6 +94,7 @@ export function planSettingsList(
   const update = (row: Record<string, unknown>, raw: unknown) => {
     if (!jsonObject(raw) || Object.keys(raw).length > 128) return fail();
     const result: Record<string, unknown> = {};
+    const previousRow = structuredClone(row);
     for (const [key, value] of Object.entries(raw)) {
       const field = fields.find((field) => field.key === key) ?? fail('NOT_FOUND');
       if (key === target.definition.list?.idKey) fail();
@@ -101,12 +105,20 @@ export function planSettingsList(
       }
       const previous = objectFieldValue(row, field);
       if (sameSetting(previous, value)) continue;
+      if (target.itemWritable?.(row, field) === false) fail('LOCAL_ACTION_REQUIRED');
       setObjectField(row, field, structuredClone(value));
       for (const alias of field.aliases ?? []) delete row[alias];
-      result[key] = {
-        ...(previous === undefined ? {} : { before: structuredClone(previous) }),
-        value: structuredClone(value),
-      };
+    }
+    target.prepareRow?.(row, Object.keys(raw));
+    for (const key of Object.keys(raw)) {
+      const field = fields.find((field) => field.key === key)!;
+      const previous = objectFieldValue(previousRow, field),
+        value = objectFieldValue(row, field);
+      if (!sameSetting(previous, value))
+        result[key] = {
+          ...(previous === undefined ? {} : { before: structuredClone(previous) }),
+          ...(value === undefined ? {} : { value: structuredClone(value) }),
+        };
     }
     return result;
   };
@@ -124,12 +136,16 @@ export function planSettingsList(
       fail();
     if (kind !== 'update' && operations.length !== 1) fail();
     if (kind === 'add') {
-      if (rows.length >= 64) fail();
-      const row: Record<string, unknown> = {};
-      for (const field of target.definition.fields ?? [])
-        if (field.default !== undefined) setObjectField(row, field, structuredClone(field.default));
-      const id = target.definition.list?.idKey;
-      if (id) row[id] = randomUUID();
+      if (rows.length >= (target.maxItems ?? 64) || !jsonObject(operation.values)) fail();
+      const row: Record<string, unknown> =
+        target.createRow?.(operation.values as Record<string, unknown>) ?? {};
+      if (!target.createRow) {
+        for (const field of target.definition.fields ?? [])
+          if (field.default !== undefined)
+            setObjectField(row, field, structuredClone(field.default));
+        const id = target.definition.list?.idKey;
+        if (id) row[id] = randomUUID();
+      }
       update(row, operation.values);
       const position =
         operation.beforeItemRef === undefined ? rows.length : resolve(operation.beforeItemRef);

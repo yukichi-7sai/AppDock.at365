@@ -328,6 +328,7 @@
   "settings.aiSettings.empty": "AIサーバーを追加しましょう",
   "settings.aiSettings.emptyHint": "「サーバー」の横の＋から接続先とモデルを設定できます。",
   "settings.aiSettings.registered": "登録済みAIサーバー",
+  "settings.aiSettings.connectionId": "接続ID",
   "settings.aiSettings.connections": "AI接続設定",
   "settings.aiSettings.connectionsHint": "ローカルサーバーやクラウドのAIを登録します。接続先は8件まで追加できます。",
   "settings.aiSettings.missingConnection": "未配置の接続：",

@@ -126,6 +126,7 @@ export class SettingsTargets {
       fields: target.fields.map((field) => this.field(field, target)),
       kind: target.kind ?? 'fields',
       context: target.schemaContext?.(),
+      ...(target.kind === 'list' ? { maxItems: target.maxItems ?? 64 } : {}),
       operationSchemas: target.kind === 'list' ? listOperationSchemas : operationSchemas,
     });
   }
@@ -315,7 +316,7 @@ export class SettingsTargets {
           ...envelope,
           kind: target.kind ?? 'fields',
           operationSchemas: target.kind === 'list' ? listOperationSchemas : operationSchemas,
-          ...(target.kind === 'list' ? { maxItems: 64 } : {}),
+          ...(target.kind === 'list' ? { maxItems: target.maxItems ?? 64 } : {}),
         },
       );
     if (method === 'settings.items.list') {
@@ -328,6 +329,18 @@ export class SettingsTargets {
           itemRef: refs[index],
           values: listValues(target, row),
           removable: listRemovable(target, row),
+          ...(target.itemWritable
+            ? {
+                writableKeys: target.fields
+                  .filter(
+                    (field) =>
+                      field.key !== target.definition.list?.idKey &&
+                      target.writable?.(field) !== false &&
+                      target.itemWritable!(row, field),
+                  )
+                  .map((field) => field.key),
+              }
+            : {}),
         })),
         params,
         [method, target.targetId],
