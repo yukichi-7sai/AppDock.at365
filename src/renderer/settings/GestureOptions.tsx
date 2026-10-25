@@ -6,7 +6,6 @@ import { Toggle } from '../settings-ui/Toggle';
 import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections';
 import type { GestureSettings } from '../../shared/gestures';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
-import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
 import { GestureIndicatorPreview } from './GestureIndicatorPreview';
 function Names({
   itemKey,
@@ -61,13 +60,6 @@ export function GestureOptions({
             onChange={(enabled) => change({ enabled })}
           />
         </SettingsField>
-      </SettingsSection>
-      <SettingsSection
-        collapsible
-        className="gesture-settings-section"
-        title={hostSettingItem('gestures', 'options').title}
-        {...settingAnchor('gestures', 'options')}
-      >
         <SettingsField
           title={hostSettingItem('gestures', 'activateOnStart').title}
           hint={translate('settings.gestureOptions.activateHint')}
@@ -197,7 +189,6 @@ export function GestureOptions({
             onChange={(indicatorShowNoAction) => change({ indicatorShowNoAction })}
           />
         </SettingsField>
-        <InputBrowserOptions pageId="gestures" value={gestures} onChange={change} />
         <Names
           hint={translate('settings.gestureOptions.excludedHint')}
           itemKey="excludedProcesses"

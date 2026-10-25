@@ -26,15 +26,14 @@ const {
   getKeybindingOptions,
 } = require('../out/main/shared/keybindings');
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
+const { defaultCommandTriggerOptions } = require('../out/main/shared/command-trigger-options');
 
 test('shortcut options default to all, validate explicit values and retain local future fields', () => {
   const defaults = {
     executionMode: 'all',
-    browsers: ['chrome', 'msedge', 'brave', 'vivaldi', 'opera', 'chromium', 'thorium'],
-    requireChromiumWindowClass: false,
   };
   assert.deepEqual(defaultKeybindingOptions(), defaults);
-  assert.deepEqual(getKeybindingOptions({}), defaults);
+  assert.deepEqual(getKeybindingOptions({}), { ...defaults, ...defaultCommandTriggerOptions() });
   assert.deepEqual(parseKeybindingOptions({}), defaults);
   assert.deepEqual(parseKeybindingOptions({ executionMode: 'first', future: false }), {
     ...defaults,
@@ -48,9 +47,6 @@ test('shortcut options default to all, validate explicit values and retain local
     { executionMode: null },
     { executionMode: 'unknown' },
     { executionMode: 0 },
-    { browsers: null },
-    { browsers: ['C:\\chrome.exe'] },
-    { requireChromiumWindowClass: 'true' },
   ])
     assert.throws(() => parseKeybindingOptions(value));
   const old = createDefaultSettings();
@@ -151,13 +147,12 @@ test('external shortcut conditions normalize and match captured targets through 
   const old = [row('old', 'test.run')];
   assert.deepEqual(parseKeybindings(old), old);
   const settings = createDefaultSettings();
-  settings.keybindingOptions = {
-    ...defaultsForTest(),
+  settings.commandTriggerOptions = {
     browsers: ['FIREFOX.EXE'],
     requireChromiumWindowClass: true,
   };
-  assert.deepEqual(parseSettings(settings).keybindingOptions.browsers, ['firefox']);
-  assert.equal(parseSettings(settings).gestures.requireChromiumWindowClass, false);
+  assert.deepEqual(parseSettings(settings).commandTriggerOptions.browsers, ['firefox']);
+  assert.equal(parseSettings(settings).gestures.requireChromiumWindowClass, undefined);
   function defaultsForTest() {
     return defaultKeybindingOptions();
   }

@@ -7,12 +7,12 @@ import {
   validCommandId,
 } from './commands';
 import type { Settings } from './contracts';
+import { getCommandTriggerOptions } from './command-trigger-options';
 import { collectionPages, collectionIdentity } from './page-collections';
 import { shortcutTargetTitle, validShortcutTarget } from './shortcut-pages';
 import {
   commandCondition,
   matchesCommandCondition,
-  defaultConditionEnvironment,
   processNames,
   type CommandTarget,
   type ConditionEnvironment,
@@ -63,12 +63,9 @@ export interface ShortcutContext {
 }
 export interface KeybindingOptions {
   executionMode: CommandExecutionMode;
-  browsers: string[];
-  requireChromiumWindowClass: boolean;
 }
 export const defaultKeybindingOptions = (): KeybindingOptions => ({
   executionMode: 'all',
-  ...defaultConditionEnvironment(),
 });
 export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   if (value === undefined) return defaultKeybindingOptions();
@@ -81,25 +78,20 @@ export function parseKeybindingOptions(value: unknown): KeybindingOptions {
     source.executionMode !== 'all'
   )
     throw Error(hostText('settings.keybindings.executionMode'));
-  if (
-    source.requireChromiumWindowClass !== undefined &&
-    typeof source.requireChromiumWindowClass !== 'boolean'
-  )
-    throw Error(hostText('settings.keybindings.chromium'));
+  const { browsers: _browsers, requireChromiumWindowClass: _chromium, ...current } = source;
   return {
-    ...defaultKeybindingOptions(),
-    ...source,
+    ...current,
     executionMode: source.executionMode ?? 'all',
-    browsers:
-      source.browsers === undefined
-        ? defaultConditionEnvironment().browsers
-        : processNames(source.browsers),
   } as KeybindingOptions;
 }
 export function getKeybindingOptions(
-  settings: Pick<Settings, 'keybindingOptions'>,
-): KeybindingOptions {
-  return { ...defaultKeybindingOptions(), ...settings.keybindingOptions };
+  settings: Pick<Settings, 'keybindingOptions' | 'commandTriggerOptions'>,
+) {
+  return {
+    ...defaultKeybindingOptions(),
+    ...settings.keybindingOptions,
+    ...getCommandTriggerOptions(settings),
+  };
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);

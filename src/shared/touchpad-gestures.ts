@@ -3,6 +3,7 @@ import { normalizeShortcut } from './commands';
 import {
   commandCondition,
   defaultConditionEnvironment,
+  type ConditionEnvironment,
   type TriggerContext,
 } from './command-conditions';
 import { planCommandBatch, type CommandCatalogEntry } from './command-execution';
@@ -33,8 +34,6 @@ export interface TouchpadGestureSettings {
   enabled: boolean;
   connections: Record<TouchpadGestureId, TouchpadConnection>;
   executionMode: 'first' | 'all';
-  browsers: string[];
-  requireChromiumWindowClass: boolean;
   bindings: GestureBinding[];
 }
 export type TouchpadState =
@@ -74,7 +73,6 @@ export const connectionKey = (connection: TouchpadConnection) =>
 export function defaultTouchpadGestures(): TouchpadGestureSettings {
   return {
     enabled: false,
-    ...defaultConditionEnvironment(),
     executionMode: 'all',
     bindings: [],
     connections: Object.fromEntries(
@@ -93,7 +91,11 @@ export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
   const defaults = defaultTouchpadGestures();
   if (
     (value.enabled !== undefined && typeof value.enabled !== 'boolean') ||
-    Object.keys(value).some((key) => !Object.keys(defaults).includes(key))
+    Object.keys(value).some(
+      (key) =>
+        !Object.keys(defaults).includes(key) &&
+        !['browsers', 'requireChromiumWindowClass'].includes(key),
+    )
   )
     throw Error(hostText('settings.touchpad-gestures.fields'));
   const source = value.connections ?? defaults.connections;
@@ -133,9 +135,6 @@ export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
   ) as TouchpadGestureSettings['connections'];
   const options = parseKeybindingOptions({
     executionMode: value.executionMode ?? 'all',
-    browsers: value.browsers ?? defaults.browsers,
-    requireChromiumWindowClass:
-      value.requireChromiumWindowClass ?? defaults.requireChromiumWindowClass,
   });
   return {
     enabled: value.enabled ?? false,
@@ -181,6 +180,7 @@ export function planTouchpadCommands(
   gesture: TouchpadGestureId,
   context: TriggerContext,
   commands: readonly CommandCatalogEntry[],
+  environment: ConditionEnvironment = defaultConditionEnvironment(),
 ) {
   return planCommandBatch(
     settings.bindings
@@ -189,7 +189,7 @@ export function planTouchpadCommands(
     context,
     commands,
     settings.executionMode,
-    settings,
+    environment,
   );
 }
 /** Shared row editor helpers accept the same condition model as mouse gestures. */

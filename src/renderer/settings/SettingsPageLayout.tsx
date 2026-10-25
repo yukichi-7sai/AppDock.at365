@@ -5,9 +5,14 @@ import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
 import { SettingsStatusProvider, SettingsStatusArea } from '../settings-ui/SettingsStatus';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
-import { CommandListScrollProvider, CommandListScrollbar } from '../settings-ui/CommandListScroll';
+import {
+  CommandListPageCanvas,
+  CommandListScrollProvider,
+  CommandListScrollbar,
+} from '../settings-ui/CommandListScroll';
 
 const descriptions: Record<string, HostTextKey> = {
+  'command-triggers': 'settings.commandTriggers.description',
   applets: 'settings.settingsPageLayout.applets',
   notifications: 'settings.settingsPageLayout.notifications',
   tts: 'settings.settingsPageLayout.tts',
@@ -15,6 +20,7 @@ const descriptions: Record<string, HostTextKey> = {
   tray: 'settings.settingsPageLayout.tray',
   shortcuts: 'settings.settingsPageLayout.shortcuts',
   gestures: 'settings.settingsPageLayout.gestures',
+  'touchpad-gestures': 'settings.settingsPageLayout.touchpad',
   'custom-commands': 'settings.settingsPageLayout.customCommands',
   ai: 'settings.settingsPageLayout.ai',
   'mcp-client': 'settings.settingsPageLayout.mcpClient',
@@ -53,6 +59,7 @@ export function SettingsPageLayout({
   announcement: ReactNode;
 }) {
   const { t } = useHostTranslation();
+  const pageScroll = page.id === 'command-triggers' && mode === 'form';
   const modes: ('form' | 'json')[] = page.json ? ['form', 'json'] : ['form'];
   const description =
     page.kind === 'host'
@@ -66,114 +73,118 @@ export function SettingsPageLayout({
         : t('settings.appletDescription');
   return (
     <SettingsStatusProvider key={page.id + mode} error={error} target={page.title} busy={pending}>
-      <CommandListScrollProvider>
+      <CommandListScrollProvider pageScroll={pageScroll}>
         <section
           className="settings-page-layout"
           data-testid={`settings-page:${page.id}`}
           aria-label={t('settings.body')}
         >
-          <div className="settings-body settings-page-scroll">
-            <header className="settings-page-heading">
-              <h1>{page.title}</h1>
-              <p>{description ?? t('settings.defaultDescription')}</p>
-            </header>
-            <div className="settings-page-toolbar">
-              <div className="tabs" role="group" aria-label={t('settings.mode')}>
-                {modes.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={value === mode ? 'selected' : ''}
-                    aria-pressed={value === mode}
-                    onClick={() => onMode(value)}
-                  >
-                    {value === 'form' ? t('settings.form') : t('settings.json')}
-                  </button>
-                ))}
-              </div>
-              {storage && (storage.canSwitch || ['appearance', 'general'].includes(page.id)) ? (
-                <label className="settings-storage-toggle">
-                  <input
-                    data-testid="settings-storage-local"
-                    type="checkbox"
-                    checked={storage.local}
-                    disabled={!storage.canSwitch || pending}
-                    onChange={(event) => onLocalSettings?.(event.target.checked)}
-                  />
-                  {t('settings.local.label')}
-                  <SettingsHintIcon
-                    title={t('settings.local.label')}
-                    hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
-                  />
-                </label>
-              ) : null}
-              <p className="settings-save-status" role="status">
-                {storage && page.json && (
-                  <span className="settings-storage-status">
-                    {t('settings.storage.json')}{' '}
-                    {storage.files.length > 1
-                      ? t('settings.storage.both')
-                      : storage.local
-                        ? t('settings.storage.deviceOnly')
-                        : t('settings.storage.shared')}
-                    　
-                  </span>
-                )}
-                <span className="sr-only">{pending ? t('settings.saving') : ''}</span>
-              </p>
-              {page.json && !page.unavailableReason && (
-                <button type="button" disabled={pending} onClick={onReset}>
-                  {t('settings.reset')}
-                </button>
-              )}
-              {page.json && storage && storage.files.length > 1 ? (
-                <details className="settings-file-menu">
-                  <summary>{t('settings.openFile')}</summary>
-                  <div>
-                    {storage.files.map((file) => (
-                      <button
-                        type="button"
-                        key={file.scope}
-                        onClick={(event) => {
-                          event.currentTarget.closest('details')!.open = false;
-                          onOpenFile(file.scope);
-                        }}
-                      >
-                        {file.scope === 'device'
-                          ? t('settings.storage.device')
+          <div
+            className={`settings-body settings-page-scroll${pageScroll ? ' settings-page-shared-scroll' : ''}`}
+          >
+            <CommandListPageCanvas>
+              <header className="settings-page-heading">
+                <h1>{page.title}</h1>
+                <p>{description ?? t('settings.defaultDescription')}</p>
+              </header>
+              <div className="settings-page-toolbar">
+                <div className="tabs" role="group" aria-label={t('settings.mode')}>
+                  {modes.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={value === mode ? 'selected' : ''}
+                      aria-pressed={value === mode}
+                      onClick={() => onMode(value)}
+                    >
+                      {value === 'form' ? t('settings.form') : t('settings.json')}
+                    </button>
+                  ))}
+                </div>
+                {storage && (storage.canSwitch || ['appearance', 'general'].includes(page.id)) ? (
+                  <label className="settings-storage-toggle">
+                    <input
+                      data-testid="settings-storage-local"
+                      type="checkbox"
+                      checked={storage.local}
+                      disabled={!storage.canSwitch || pending}
+                      onChange={(event) => onLocalSettings?.(event.target.checked)}
+                    />
+                    {t('settings.local.label')}
+                    <SettingsHintIcon
+                      title={t('settings.local.label')}
+                      hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
+                    />
+                  </label>
+                ) : null}
+                <p className="settings-save-status" role="status">
+                  {storage && page.json && (
+                    <span className="settings-storage-status">
+                      {t('settings.storage.json')}{' '}
+                      {storage.files.length > 1
+                        ? t('settings.storage.both')
+                        : storage.local
+                          ? t('settings.storage.deviceOnly')
                           : t('settings.storage.shared')}
-                        : {file.name}
-                      </button>
-                    ))}
-                  </div>
-                </details>
-              ) : (
-                page.json && (
-                  <button
-                    type="button"
-                    className="settings-file-button"
-                    onClick={() => onOpenFile(storage?.files[0]?.scope)}
-                  >
-                    {t('settings.openFile')}
+                      　
+                    </span>
+                  )}
+                  <span className="sr-only">{pending ? t('settings.saving') : ''}</span>
+                </p>
+                {page.json && !page.unavailableReason && (
+                  <button type="button" disabled={pending} onClick={onReset}>
+                    {t('settings.reset')}
                   </button>
-                )
-              )}
-            </div>
-            <SettingsStatusArea
-              action={
-                error ? (
-                  <button type="button" className="secondary" onClick={onReload}>
-                    {t('settings.reload')}
-                  </button>
-                ) : undefined
-              }
-            />
-            <div
-              className={`settings-page-content settings-panel settings-panel-${mode}${mode === 'form' ? ' settings-panel-flat' : ''}`}
-              key={page.id + mode}
-            >
-              {children}
-            </div>
+                )}
+                {page.json && storage && storage.files.length > 1 ? (
+                  <details className="settings-file-menu">
+                    <summary className="settings-file-button">{t('settings.openFile')}</summary>
+                    <div>
+                      {storage.files.map((file) => (
+                        <button
+                          type="button"
+                          key={file.scope}
+                          onClick={(event) => {
+                            event.currentTarget.closest('details')!.open = false;
+                            onOpenFile(file.scope);
+                          }}
+                        >
+                          {file.scope === 'device'
+                            ? t('settings.storage.device')
+                            : t('settings.storage.shared')}
+                          : {file.name}
+                        </button>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
+                  page.json && (
+                    <button
+                      type="button"
+                      className="settings-file-button"
+                      onClick={() => onOpenFile(storage?.files[0]?.scope)}
+                    >
+                      {t('settings.openFile')}
+                    </button>
+                  )
+                )}
+              </div>
+              <SettingsStatusArea
+                action={
+                  error ? (
+                    <button type="button" className="secondary" onClick={onReload}>
+                      {t('settings.reload')}
+                    </button>
+                  ) : undefined
+                }
+              />
+              <div
+                className={`settings-page-content settings-panel settings-panel-${mode}${mode === 'form' ? ' settings-panel-flat' : ''}`}
+                key={page.id + mode}
+              >
+                {children}
+              </div>
+            </CommandListPageCanvas>
           </div>
           <CommandListScrollbar />
           {announcement}

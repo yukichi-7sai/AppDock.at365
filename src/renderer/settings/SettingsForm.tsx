@@ -4,7 +4,6 @@ import { McpClientSettingsForm } from './McpClientSettings';
 import { displayZoomChoices, displayZoomLabel } from '../../shared/display-zoom';
 import { AccentColorPicker } from './AccentColorPicker';
 import { hostSettingItem } from '../../shared/settings-catalog';
-import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings } from '../../shared/contracts';
@@ -17,6 +16,7 @@ import { AppletManagementSettings } from './AppletManagementSettings';
 import { AppletUpdateSource } from './UpdateSettings';
 
 import { ShortcutsEditor } from './ShortcutsEditor';
+import { CommandTriggersEditor } from './CommandTriggersEditor';
 import { GesturesEditor } from './GesturesEditor';
 import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
@@ -186,34 +186,31 @@ export function SettingsForm({
   return (
     <div className="settings-layout">
       <div
-        className={`settings-form${['general', 'appearance', 'shortcuts', 'gestures', 'touchpad-gestures'].includes(category) ? ' settings-sections' : ''}`}
+        className={`settings-form${['general', 'appearance', 'shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(category) ? ' settings-sections' : ''}`}
       >
-        {(category === 'gestures' || category === 'touchpad-gestures') && (
-          <GesturesEditor
-            key={category}
-            touchpad={
-              category === 'touchpad-gestures' ? { snapshot: aux.touchpad, invoke } : undefined
-            }
+        {category === 'command-triggers' && (
+          <CommandTriggersEditor
             provider={aux.provider}
             clearProvider={() => void invoke('clearProvider')}
             settings={settings}
             onChange={edit}
             commands={commands}
             applets={extensions}
+            statuses={globalHotKeys}
+          />
+        )}
+        {(category === 'gestures' || category === 'touchpad-gestures') && (
+          <GesturesEditor
+            key={category}
+            touchpad={
+              category === 'touchpad-gestures' ? { snapshot: aux.touchpad, invoke } : undefined
+            }
+            settings={settings}
+            onChange={edit}
           />
         )}
         {category === 'shortcuts' && (
-          <ShortcutsEditor
-            owned={aux.touchpadShortcuts}
-            provider={aux.provider}
-            clearProvider={() => void invoke('clearProvider')}
-            key={category}
-            commands={commands}
-            settings={settings}
-            onChange={edit}
-            applets={shortcutPageChoices(extensions)}
-            statuses={globalHotKeys}
-          />
+          <ShortcutsEditor key={category} settings={settings} onChange={edit} />
         )}
         {category === 'appearance' && (
           <>

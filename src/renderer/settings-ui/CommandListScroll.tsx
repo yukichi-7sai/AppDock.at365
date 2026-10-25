@@ -32,38 +32,55 @@ export function CommandListSection({
 
 const CommandListScrollContext = createContext<{
   viewport: HTMLElement | null;
+  pageScroll: boolean;
   register(element: HTMLElement): () => void;
 } | null>(null);
 
-export function CommandListScrollProvider({ children }: { children: ReactNode }) {
+export function CommandListScrollProvider({
+  children,
+  pageScroll = false,
+}: {
+  children: ReactNode;
+  pageScroll?: boolean;
+}) {
   const [viewport, setViewport] = useState<HTMLElement | null>(null);
   const register = useCallback((element: HTMLElement) => {
     setViewport(element);
     return () => setViewport((current) => (current === element ? null : current));
   }, []);
   return (
-    <CommandListScrollContext.Provider value={{ viewport, register }}>
+    <CommandListScrollContext.Provider value={{ viewport, register, pageScroll }}>
       {children}
     </CommandListScrollContext.Provider>
   );
 }
 
-/** Opt in per table; other settings lists retain their native scrollbar. */
+/** Give horizontal sticky content the same containing block as the full table. */
+export function CommandListPageCanvas({ children }: { children: ReactNode }) {
+  const pageScroll = useContext(CommandListScrollContext)?.pageScroll;
+  return pageScroll ? <div className="command-list-page-canvas">{children}</div> : <>{children}</>;
+}
+
+/** Register the table viewport or its shared page viewport for the bottom scrollbar. */
 export function useCommandListScroll(ref: RefObject<HTMLDivElement | null>, enabled = true) {
-  const register = useContext(CommandListScrollContext)?.register;
+  const context = useContext(CommandListScrollContext);
+  const register = context?.register;
+  const pageScroll = context?.pageScroll;
   useLayoutEffect(() => {
     const element = ref.current;
     if (!enabled || !element || !register) return;
+    const viewport = pageScroll ? element.closest<HTMLElement>('.settings-body') : element;
+    if (!viewport) return;
     element.classList.add('command-list-page-scroll');
-    const unregister = register(element);
+    const unregister = register(viewport);
     return () => {
       element.classList.remove('command-list-page-scroll');
       unregister();
     };
-  }, [enabled, ref, register]);
+  }, [enabled, ref, register, pageScroll]);
 }
 
-/** Keep filters outside the table's horizontal scroll container. */
+/** Keep filters visible while the selected table or page viewport scrolls. */
 export function CommandListToolbar({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -89,11 +106,13 @@ export function CommandListToolbar({ children }: { children: ReactNode }) {
 
 /** Filters and actions precede the result count at the trailing edge. */
 export function CommandListSummary({
+  leading,
   children,
   filter,
   actions,
   className = '',
 }: {
+  leading?: ReactNode;
   children: ReactNode;
   filter?: ReactNode;
   actions: ReactNode;
@@ -101,6 +120,7 @@ export function CommandListSummary({
 }) {
   return (
     <div className={`command-list-summary ${className}`}>
+      {leading && <div className="command-list-summary-leading">{leading}</div>}
       {filter && <div className="command-list-summary-main">{filter}</div>}
       {actions && <div className="command-list-summary-actions">{actions}</div>}
       <div className="command-list-summary-count">{children}</div>

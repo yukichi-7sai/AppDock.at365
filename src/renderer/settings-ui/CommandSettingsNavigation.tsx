@@ -7,20 +7,9 @@ import { CommandProviderFilter } from './CommandProviderFilter';
 
 export const commandSettingsPages = [
   {
-    id: 'shortcuts',
-    title: hostText('settings.commandSettingsNavigation.shortcuts'),
-    icon: 'keyboard',
-  },
-  { id: 'gestures', title: hostText('settings.commandSettingsNavigation.gestures'), icon: 'mouse' },
-  {
-    id: 'touchpad-gestures',
-    title: hostText('settings.commandSettingsNavigation.touchpad'),
-    icon: 'touchpad',
-  },
-  {
-    id: 'custom-commands',
-    title: hostText('settings.commandSettingsNavigation.customCommands'),
-    icon: 'keyboard-command-key',
+    id: 'command-triggers',
+    title: hostText('settings.commandTriggers.title'),
+    icon: 'bolt',
   },
 ] as const satisfies { id: string; title: string; icon: IconName }[];
 export type CommandSettingsPage = (typeof commandSettingsPages)[number]['id'];
@@ -69,14 +58,9 @@ export function CommandSettingsLinks({
       aria-label={translate('settings.commandSettingsNavigation.target', { title: command.title })}
     >
       {commandSettingsPages
-        .filter(
-          (page) =>
-            page.id !== navigation.page &&
-            (page.id !== 'custom-commands' || !!command.customDefinitionId),
-        )
+        .filter((page) => page.id !== navigation.page)
         .map((page) => {
-          const assigned =
-            page.id !== 'custom-commands' && navigation.assignments[page.id].has(command.id);
+          const assigned = Object.values(navigation.assignments).some((ids) => ids.has(command.id));
           return (
             <button
               key={page.id}
@@ -101,16 +85,16 @@ export function CommandSettingsLinks({
     </div>
   );
 }
-export function CommandPublication({ published }: { published?: boolean }) {
+export function CommandPrivacy({ published }: { published?: boolean }) {
   const { t: translate } = useHostTranslation();
-  return published ? (
+  return published === false ? (
     <span
-      className="command-publication"
+      className="command-privacy"
       role="img"
-      aria-label={translate('settings.commandSettingsNavigation.public')}
-      title={translate('settings.commandSettingsNavigation.public')}
+      aria-label={translate('settings.commandSettingsNavigation.private')}
+      title={translate('settings.commandSettingsNavigation.private')}
     >
-      <Icon name="globe" size={16} />
+      <Icon name="lock" size={16} />
     </span>
   ) : null;
 }

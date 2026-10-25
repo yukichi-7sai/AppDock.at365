@@ -29,6 +29,41 @@ export const accentChoices = [
 ] as const;
 export type AccentColor = (typeof accentPalettes)[number]['id'] | 'sky-blue' | 'custom';
 export const defaultAccentColor: AccentColor = 'mint';
+/** Shared scrollbars for registered local UI surfaces; neutral colors match the host settings. */
+export const scrollbarCss = `
+:root {
+  --appdock-scrollbar-thumb: #8e93a6;
+  --appdock-scrollbar-track: transparent;
+}
+:root[data-theme='light'] {
+  --appdock-scrollbar-thumb: #71798a;
+}
+* {
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+}
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  background: var(--appdock-scrollbar-track);
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track-piece,
+*::-webkit-scrollbar-corner {
+  background: var(--appdock-scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--appdock-scrollbar-thumb);
+  border: 3px solid var(--appdock-scrollbar-track);
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+`;
 export interface CustomAccentColors {
   dark: string;
   light: string;

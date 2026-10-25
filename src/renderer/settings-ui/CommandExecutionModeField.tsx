@@ -4,7 +4,7 @@ import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from './setting-anchor';
 import { SettingsField } from './SettingsSections';
 
-/** Both input settings use the same label, choices, hint and layout. */
+/** All trigger settings use the same label, choices, hint and layout. */
 export function CommandExecutionModeField({
   pageId,
   value,

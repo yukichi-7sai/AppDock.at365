@@ -34,6 +34,7 @@ export interface Settings {
   ai?: import('./ai').AiSettings;
   notificationPreferences?: import('./notification-types').NotificationPreferences;
   appletOrder: string[];
+  commandTriggerOptions?: import('./command-trigger-options').CommandTriggerOptions;
   touchpadGestures?: import('./touchpad-gestures').TouchpadGestureSettings;
   gestures?: import('./gestures').GestureSettings;
   gestureDefaultsInitialized?: string[];

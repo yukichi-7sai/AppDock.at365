@@ -9,6 +9,7 @@ export const hostSettingsPages = [
   ['notifications', hostText('settings.settings-navigation.notifications')],
   ['ribbon', hostText('settings.settings-navigation.ribbon')],
   ['tray', hostText('settings.settings-navigation.tray')],
+  ['command-triggers', hostText('settings.commandTriggers.title')],
   ['shortcuts', hostText('settings.settings-navigation.shortcuts')],
   ['gestures', hostText('settings.settings-navigation.gestures')],
   ['touchpad-gestures', hostText('settings.settings-navigation.touchpad')],

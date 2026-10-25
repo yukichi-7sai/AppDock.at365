@@ -93,6 +93,7 @@ export function AiSettingsForm({
       >
         <SettingsListLayout
           title={translate('settings.aiSettings.registered')}
+          actionsAlign="start"
           toolbar={
             <CommandListSummary className="settings-list-toolbar" actions={null}>
               {translate('settings.aiSettings.serverCount', { count: value.connections.length })}

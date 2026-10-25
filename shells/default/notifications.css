@@ -37,7 +37,6 @@ body {
   gap: 8px;
   padding: 8px;
   overflow: auto;
-  scrollbar-width: thin;
 }
 .notification-card {
   flex-shrink: 0;

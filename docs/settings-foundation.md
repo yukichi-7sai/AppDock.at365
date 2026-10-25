@@ -44,6 +44,8 @@ Appletのホスト管理共通項目は[共通定義](../src/shared/applet-commo
 
 有効状態は通常項目の宣言と分け、UIとMCPの両方でAppletManagementの同じ検証・候補作成を使う。MCPは共通設定対象のenabledを明示setし、PC専用へ保存した後の通常再適用に起動・停止を任せる。管理の表示順は既存managedApplets/reorderManagedAppletsを共有する並べ替え専用一覧として公開し、共有appletOrderの対象位置だけを更新する。秘密情報、独立した再起動とパッケージ導入・削除はこの設定処理へ含めない。
 
+キー・マウス・タッチパッドの割り当てを横断して編集する[コマンドトリガー](command-triggers.md)を提供する。従来の設定ページを保持し、同じ3種類の割り当て保存先へ接続する。
+
 settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタデータを定義する。IDはページIDとキーを個別にencodeURIComponentし、ドット入りID/設定キーはキー配列で扱う。未知の未編集フィールド・未導入Appletを保持する。未設定Appletの部分保存ではenabled:true/settings:{}の行を補完する。保存済みのenabled:falseは保持する。無検証マージと変更マーク比較を削除した。JSONは選択ページのみ、Webは対象IDを保つ1行投影の許可フィールドだけを変更する。
 
 左インデックスの本体ページID・表示名は`src/shared/settings-navigation.ts`の`hostSettingsPages`を正本とし、設定カタログと「ページ名設定を開く」コマンドを同じ定義から生成する。本体ページを追加するときはこの定義へ追加し、別のコマンド一覧・公開許可リスト・分岐を増やさない。Appletとcollectionの子ページは現在の一覧から自動生成し、停止・無効でも設定を開ける。ページを開く操作でAppletを開始・有効化しない。

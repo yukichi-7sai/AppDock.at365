@@ -98,6 +98,53 @@
   border-radius: 0;
   background: transparent;
 }
+.settings-page-shared-scroll {
+  container: command-list-page / inline-size;
+}
+.settings-page-shared-scroll::-webkit-scrollbar {
+  height: 0;
+}
+.command-list-page-canvas {
+  width: min-content;
+  min-width: 100%;
+}
+.command-list-page-canvas .settings-layout {
+  grid-template-columns: minmax(min-content, 1fr);
+}
+.command-list-page-canvas
+  :is(
+    .settings-page-content,
+    .settings-layout,
+    .settings-form,
+    .command-list-section,
+    .shortcut-command-list
+  ) {
+  min-width: min-content;
+  box-sizing: border-box;
+}
+.settings-surface
+  .settings-page-shared-scroll
+  .settings-page-content.settings-panel.settings-panel-flat {
+  padding-inline-end: 0;
+}
+.command-list-page-canvas
+  > :is(.settings-page-heading, .settings-page-toolbar, .settings-status-area),
+.command-list-page-canvas .command-list-toolbar {
+  position: sticky;
+  left: 0;
+  width: 100cqw;
+  box-sizing: border-box;
+}
+.command-list-page-canvas
+  > :is(.settings-page-heading, .settings-page-toolbar, .settings-status-area) {
+  z-index: 2;
+}
+.settings-page-shared-scroll .shortcut-command-list {
+  overflow: visible;
+}
+.settings-page-shared-scroll .command-binding-table {
+  overflow: clip;
+}
 .settings-page-content {
   min-width: 0;
 }
@@ -194,9 +241,9 @@
   font-size: 12px;
 }
 .settings-file-menu summary {
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
   list-style: none;
 }
 .settings-file-menu > div {
@@ -295,21 +342,9 @@
   overflow-x: scroll;
   overflow-y: hidden;
   height: 14px;
-  scrollbar-width: auto;
 }
 .command-list-scrollbar > div {
   height: 1px;
-}
-.command-list-scrollbar::-webkit-scrollbar {
-  height: 12px;
-}
-.command-list-scrollbar::-webkit-scrollbar-track {
-  background: var(--settings-group-background);
-}
-.command-list-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--muted);
-  border: 3px solid var(--settings-group-background);
-  border-radius: 8px;
 }
 .settings-panel h3,
 .settings-panel h4 {

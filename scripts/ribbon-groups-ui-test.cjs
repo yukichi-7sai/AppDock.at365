@@ -8,13 +8,16 @@ const fs = require('node:fs'),
   assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `ribbon-groups-ui-${Date.now()}`);
-const portable = process.argv[2] && path.resolve(process.argv[2]);
+const portable =
+  process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
+const scrollbarsOnly = process.argv.includes('--scrollbars-only');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const { ribbonPage, closingAction } = require('./shell-overlay-helper.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
+settings.host.theme = 'light';
 settings.globalShortcutCommands = [];
 Object.assign(settings.updates, {
   checkHostOnStartup: false,
@@ -172,6 +175,41 @@ const overlay = () =>
       if (!page.isClosed() && (await page.locator('.ribbon-flyout').count())) return page;
     }
   }, 'ribbon group');
+const recordSuccess = () => {
+  const result = {
+    ok: true,
+    checks,
+    profile,
+    errors,
+    scrollbarsOnly,
+    portable,
+    executableSha256: portable ? hash(exe) : null,
+  };
+  fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result));
+};
+const checkScrollbars = async (page, selector, dark) => {
+  const sample = await require('./shared-scrollbar-checks.cjs')(page, dark);
+  const actual = await page.locator(selector).evaluateAll((elements) =>
+    elements.map((element) => ({
+      width: getComputedStyle(element, '::-webkit-scrollbar').width,
+      thumb: getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor,
+    })),
+  );
+  assert(actual.length > 0);
+  for (const scrollbar of actual) {
+    assert.equal(scrollbar.width, sample.width);
+    assert.equal(scrollbar.thumb, sample.thumb);
+  }
+  const bounds = await page.locator(`${selector} button .ribbon-icon`).evaluateAll((icons) =>
+    icons.map((icon) => {
+      const bounds = icon.getBoundingClientRect();
+      const button = icon.closest('button').getBoundingClientRect();
+      return bounds.left >= button.left && bounds.right <= button.right;
+    }),
+  );
+  assert(bounds.length > 0 && bounds.every(Boolean), 'compact ribbon icons fit inside buttons');
+};
 async function openTemporary() {
   await button('group:temporary').click();
   return overlay();
@@ -278,6 +316,7 @@ async function launch() {
     const beforeSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).ribbon;
     assert(!JSON.stringify(beforeSettings).includes('expanded'));
     await rail.screenshot({ path: path.join(profile, 'persistent.png') });
+    await checkScrollbars(rail, '.ribbon-buttons', false);
     checks.push(
       'Node and .NET badge API; 99+ and raw accessible count; collapsed aggregate dot; separate local expansion state',
     );
@@ -323,6 +362,7 @@ async function launch() {
       el.scrollTop = el.scrollHeight;
     });
     assert(await flyout.locator('.ribbon-flyout-list').evaluate((el) => el.scrollTop > 0));
+    await checkScrollbars(flyout, '.ribbon-flyout-list', false);
     await flyout.locator('.ribbon-flyout-list button').first().focus();
     await app.evaluate(async ({ BrowserWindow, webContents }) => {
       BrowserWindow.getAllWindows()
@@ -416,6 +456,8 @@ async function launch() {
     flyout = await openTemporary();
     await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await flyout.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    await checkScrollbars(rail, '.ribbon-buttons', true);
+    await checkScrollbars(flyout, '.ribbon-flyout-list', true);
     const box = await flyout.locator('.ribbon-flyout').boundingBox();
     const viewport = await flyout.evaluate(() => ({ width: innerWidth, height: innerHeight }));
     assert(
@@ -427,6 +469,14 @@ async function launch() {
     await flyout.screenshot({ path: path.join(profile, 'temporary-dark.png') });
     await closingAction(flyout.keyboard.press('Escape'));
     await until(() => flyout.isClosed(), 'dark panel closes');
+    if (scrollbarsOnly) {
+      checks.push(
+        'Common scrollbars and compact icons in light/dark ribbon and overflowing flyout',
+      );
+      assert.deepEqual(errors, []);
+      recordSuccess();
+      return;
+    }
 
     await host.evaluate(() => window.dock.executeCommand('fixture.ribbon.clear'));
     await until(
@@ -589,22 +639,7 @@ async function launch() {
       'Real host restart restores persistent expansion and keeps temporary groups closed',
     );
     assert.deepEqual(errors, []);
-    fs.writeFileSync(
-      path.join(profile, 'result.json'),
-      JSON.stringify(
-        {
-          ok: true,
-          checks,
-          profile,
-          errors,
-          portable: portable ?? null,
-          executableSha256: portable ? hash(exe) : null,
-        },
-        null,
-        2,
-      ),
-    );
-    console.log(JSON.stringify({ ok: true, checks, profile }, null, 2));
+    recordSuccess();
   } catch (error) {
     fs.writeFileSync(
       path.join(profile, 'result.json'),

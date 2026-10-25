@@ -28,6 +28,8 @@ function fixture(t) {
   );
   const permissions = { write: true, execute: true, gestures: true };
   const options = {
+    shortcutsEditable: () => true,
+    touchpadGesturesEditable: () => true,
     settings,
     save: (v, r) => settings.save(v, r),
     writable: () => permissions.write,

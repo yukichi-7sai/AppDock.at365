@@ -159,7 +159,12 @@ test('appearance delivery authorizes registered main frames, updates once per ch
   contents.getURL = () => contents.mainFrame.url;
   contents.isDestroyed = () => false;
   const sent = [];
+  const styles = [];
   contents.send = (channel, value) => sent.push({ channel, value });
+  contents.insertCSS = async (css) => {
+    styles.push(css);
+    return 'shared-scrollbars';
+  };
   host.registerAppearance(contents, contents.getURL());
   const event = { sender: contents, senderFrame: contents.mainFrame };
   assert.equal(handler(event).palette, 'mint');
@@ -176,12 +181,20 @@ test('appearance delivery authorizes registered main frames, updates once per ch
   assert.equal(sent.at(-1).value.dark, true);
   contents.emit('dom-ready');
   assert.equal(sent.length, length + 2);
+  assert.equal(styles.length, 1);
+  assert.equal(styles[0], require('../out/main/shared/appearance').scrollbarCss);
   contents.mainFrame.url = 'file:///other.html';
   assert.throws(() => handler(event));
   const before = sent.length;
+  contents.emit('dom-ready');
   palette = 'rose';
   host.refreshAppearance();
   assert.equal(sent.length, before);
+  assert.equal(
+    styles.length,
+    1,
+    'remote or different local documents do not receive the shared style',
+  );
   contents.emit('destroyed');
   assert.throws(() => handler(event));
 });

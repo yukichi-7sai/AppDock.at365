@@ -1,7 +1,7 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CommandSettingsNavigation } from './CommandSettingsNavigation';
 
-export type BindingInputFilter = { key: string; label: string };
+export type BindingInputFilter = { key: string; label: string; content?: ReactNode };
 export type BindingProviderFilter = { id: string | null; title: string };
 
 /** Input discovery replaces remote command/provider targets without saving settings. */

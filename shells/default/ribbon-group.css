@@ -21,21 +21,7 @@
   overflow-x: hidden;
   min-height: 0;
   gap: 6px;
-  scrollbar-width: auto;
   scrollbar-gutter: stable;
-}
-.ribbon-flyout-list::-webkit-scrollbar {
-  width: 6px;
-}
-.ribbon-flyout-list::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-.ribbon-flyout-list::-webkit-scrollbar-thumb:hover {
-  background: var(--ribbon-text);
-}
-.ribbon-flyout-list::-webkit-scrollbar-button {
-  display: none;
 }
 .ribbon-flyout[data-direction='up'] .ribbon-children::before {
   top: auto;

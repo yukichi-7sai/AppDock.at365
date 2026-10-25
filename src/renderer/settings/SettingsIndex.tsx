@@ -3,14 +3,17 @@ import { useEffect, useState } from 'react';
 import type { SettingsPageModel, SettingsPageOperation } from '../../shared/settings-page';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { Icon, type IconName } from '../../shared/ui-icons';
-import { commandSettingsPages } from '../settings-ui/CommandSettingsNavigation';
 import { defaultShellId } from '../../shared/shell';
 import { appletSettingsPageId } from '../../shared/settings-catalog';
 
 const indexIcons: Partial<Record<string, IconName>> = {
   applets: 'extensions',
   notifications: 'bell',
-  ...Object.fromEntries(commandSettingsPages.map(({ id, icon }) => [id, icon])),
+  'command-triggers': 'bolt',
+  shortcuts: 'keyboard',
+  gestures: 'mouse',
+  'touchpad-gestures': 'touchpad',
+  'custom-commands': 'keyboard-command-key',
 };
 
 export function SettingsIndex({

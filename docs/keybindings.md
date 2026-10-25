@@ -1,4 +1,4 @@
-# 条件付きショートカットキー
+# 条件付きキージェスチャー
 
 入力の条件判定と実行は本体へ集約する。グローバル入力はInputHostの単一ローレベルフックを使い、ローカル入力と同じresolver/dispatcherへ渡す。
 
@@ -8,13 +8,15 @@
 
 割り当てマークからキーの完全一致でコマンド一覧を絞り込める。対象の切り替え、解除、複数コマンドの色とキーボード操作は[入力マークによる絞り込み](settings-list-editing.md#入力マークによる絞り込み)に従う。
 
-設定インデックスとページの名称は「ショートカットキー」。割り当て一覧「ショートカットキー割り当て」の上に、初期状態で閉じた「動作設定」を置く。「条件に一致したコマンドの実行方法」は「最初の1つ」「すべて」の順で表示し、ジェスチャーと同じ部品・hintを使う。
+設定インデックスとページの名称は「キージェスチャー」。割り当ての追加・編集・実行順・削除は[コマンドトリガー](command-triggers.md)で行う。このページには一覧を置かず、タイトルなしのSectionに「条件に一致したコマンドの実行方法」を表示する。選択肢は「最初の1つ」「すべて」の順で、マウス・タッチパッドと同じ部品・hintを使う。ページID`shortcuts`、保存済みのキー/割り当てIDと公開コマンドIDは変えない。
 
-`Settings.keybindingOptions.executionMode`は`first`または`all`で、欠落時と初期値は`all`（すべて）。既定値は差分JSONから省略する。不正値は保存せず、ジェスチャーの`gestures.executionMode`とは独立した共有設定として保存する。フォーム・ページJSON・外部ファイル更新・ページリセットは同じ項目へ接続する。リセットはキー側の割り当てと実行方法だけを戻す。設定の自動移行・既存行の書き換えは行わない。
+`Settings.keybindingOptions.executionMode`は`first`または`all`で、欠落時と初期値は`all`（すべて）。既定値は差分JSONから省略する。不正値は保存せず、マウスとタッチパッドの実行方法とは独立して保存する。フォーム・ページJSON・外部ファイル更新・ページリセットは同じ項目へ接続する。このページのリセットは実行方法と下記の共通設定を戻し、割り当てを変更しない。
 
-同じ動作設定の`browsers`と`requireChromiumWindowClass`が、キー用のWebブラウザ条件を定義する。既定はChrome/Edge/Brave/Vivaldi/Opera/Chromium/Thoriumのexe名とChromium条件OFF。空の一覧はブラウザ条件に一致しない。ジェスチャーの同名設定とは独立して保存し、初期値とexe名検証だけを共用する。ブラウザ設定と割り当ての条件詳細は、ジェスチャーと同じUI部品を使う。
+タイトルなしSectionの下に「ジェスチャー共通の設定」を置く。WebブラウザのexeとChromiumウィンドウ条件は`Settings.commandTriggerOptions`の1つの値で、3種類の画面・入力判定・ネイティブ投影が共用する。共通の既定値はChrome/Edge/Brave/Vivaldi/Opera/Chromium/ThoriumとChromium条件OFF。空の一覧はブラウザ条件に一致しない。方式別の同名設定は参照・保存せず、共通設定が未指定なら共通の既定値を使う。
 
-「いつ・どこで」はジェスチャーと同じ8種類に対応する。`desktop`はWindows Shellのデスクトップ面、`browser`はキー側のブラウザ一覧、`exe`は`when.processes`のexe名のいずれかへの一致。`global`と`exe`の任意boolean `when.excludeDesktop`でデスクトップを除外する。対象はキーを押した瞬間の前面Windowであり、カーソル下のWindowへは切り替えない。exe名はパスを受け付けず、大文字小文字と`.exe`の有無を正規化する。processesはexe条件で1件以上、他の条件では空または省略とする。古い行に空配列やfalseを書き足す自動移行は行わない。
+公開編集APIの既存`configure`のブラウザ項目も共通値を読み書きする。共通値の変更には設定/実行の許可に加え、キー・マウス・タッチパッドの編集許可をすべて必要とする。実行方法だけの変更と割り当て編集は、それぞれの既存の許可境界を保つ。
+
+「いつ・どこで」はジェスチャーと同じ8種類に対応する。`desktop`はWindows Shellのデスクトップ面、`browser`は共通のブラウザ一覧、`exe`は`when.processes`のexe名のいずれかへの一致。`global`と`exe`の任意boolean `when.excludeDesktop`でデスクトップを除外する。対象はキーを押した瞬間の前面Windowであり、カーソル下のWindowへは切り替えない。exe名はパスを受け付けず、大文字小文字と`.exe`の有無を正規化する。processesはexe条件で1件以上、他の条件では空または省略とする。古い行に空配列やfalseを書き足す自動移行は行わない。
 
 `Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。
 Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に宣言したコマンドの初期割り当てを指定できる。ID以外の`command`/`key`/`enabled`/`when`を各行へ書き、未宣言のコマンドはmanifest読込時に拒否する。初回発見時だけsettings.jsonにコピーし、適用済みIDは`keybindingDefaultsInitialized`へ記録する。行を消した後の再起動やApplet更新でも再追加しない。
@@ -95,6 +97,7 @@ keybindings未指定時のみ旧shortcuts/globalShortcutCommandsを割り当て�
 - 適用時に変更したキーだけを同キーの既存スロットへ書き戻し、安定ID/キー/条件/有効状態と他キーの相対順序を維持する。他キーや他設定の新しい編集は最新の保存済み設定から保持する。変更したキーに外部から追加/削除/条件等の変更/並べ替えが届いた場合は全適用を拒否して開き直しを案内する。
 - 適用は既存保存済み設定、その操作で即時保存する。取消/Escape/×はパネル内の変更を破棄。パネルを閉じたらスクロールを伴わず元ボタンへfocusを戻す。表示中のショートカット抑止は既存キー編集と同じ契約を使う。
 - 条件一致/無効/利用可能性/同じコマンドの最初の一致を1回実行する仕様は既存resolver/dispatcherのまま。実行順の編集は行数やコマンドを変えない。
+
 ## マウスジェスチャーと共通の編集UI
 
 CommandBindingToolbar/CommandBindingList/BindingEditDialog/BindingOrderDialogを共用する。両一覧の操作列は編集・同じ入力の実行順・削除確認の入口を直接表示する。追加時のフィルター・表示位置を保ち、自動スクロールしない。適用後に行が非表示になった場合は一覧へpreventScrollでフォーカスを戻す。ジェスチャー固有の入力・条件は[ジェスチャー仕様](gestures.md#コマンド一覧と編集パネル)を参照する。保存形式・revision・JSON・useSettingsEditorの共有を維持する。

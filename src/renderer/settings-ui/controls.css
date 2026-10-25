@@ -1477,10 +1477,9 @@ main {
   grid-template-columns: var(--ribbon-width, 56px) minmax(0, 1fr);
 }
 .shell.with-sidebar {
-  grid-template-columns: var(--ribbon-width, 56px) min(
-      var(--applet-sidebar-width, 280px),
-      40vw
-    ) minmax(0, 1fr);
+  grid-template-columns:
+    var(--ribbon-width, 56px) min(var(--applet-sidebar-width, 280px), 40vw)
+    minmax(0, 1fr);
 }
 .settings-sidebar-slot {
   grid-column: 2;
@@ -2688,7 +2687,7 @@ summary {
 .command-binding-table .binding-command-cell {
   padding-block: 8px;
 }
-.command-binding-table .binding-command-cell > .command-id {
+.command-binding-table .binding-command-summary > .command-id {
   margin-top: 2px;
 }
 .applet-shortcut-add {
@@ -2745,6 +2744,162 @@ summary {
   align-items: center;
   gap: 6px;
 }
+.command-list-summary-leading,
+.binding-kind-filters,
+.binding-add-options {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+.binding-kind-filters button[aria-pressed='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.binding-add-options .applet-shortcut-add {
+  position: relative;
+  width: 32px;
+  height: 32px;
+}
+.binding-conditions-layout .binding-add-options {
+  opacity: 0;
+  pointer-events: none;
+}
+.binding-conditions-layout tbody:is(:hover, :focus-within) .binding-add-options {
+  opacity: 1;
+  pointer-events: auto;
+}
+.binding-conditions-layout .binding-add-options .applet-shortcut-add {
+  background: transparent;
+  border-color: transparent;
+}
+.binding-conditions-layout
+  .binding-add-options
+  .applet-shortcut-add:is(:hover, :focus-visible):enabled {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-text);
+}
+.binding-command-summary > .binding-add-options {
+  margin-top: 6px;
+}
+.binding-add-plus {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+.command-binding-table.binding-conditions-layout {
+  min-width: 800px;
+}
+.command-binding-table.binding-conditions-layout th:first-child {
+  width: 34%;
+}
+.command-binding-table.binding-conditions-layout .binding-gesture-heading {
+  width: 20%;
+}
+.binding-conditions-layout .binding-condition-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.binding-conditions-layout .binding-row-actions {
+  flex: none;
+  opacity: 0;
+  pointer-events: none;
+}
+.binding-conditions-layout tr:is(:hover, :focus-within) .binding-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.binding-conditions-layout .binding-condition-edit {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  justify-content: flex-start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.binding-conditions-layout .binding-condition-edit:is(:hover, :focus-visible) {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.shortcut-command-list .binding-conditions-layout .binding-condition-cell {
+  vertical-align: middle;
+  padding-block: 8px;
+  color: var(--muted);
+}
+.binding-conditions-layout tbody > tr:not(:last-child) > .binding-condition-cell {
+  border-bottom: 0;
+}
+.binding-command-follow .binding-command-cell {
+  vertical-align: top;
+}
+.binding-command-follow .binding-command-summary {
+  position: sticky;
+  top: calc(var(--command-list-toolbar-height, 0px) + 8px);
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  column-gap: 12px;
+}
+.binding-command-follow .binding-command-summary > .applet-shortcut-command {
+  grid-column: 1;
+  grid-row: 1;
+}
+.binding-command-follow .binding-command-summary > .command-id {
+  grid-column: 1;
+  grid-row: 2;
+}
+.binding-command-follow .binding-command-summary > small:not(.command-id) {
+  grid-column: 1;
+  grid-row: 3;
+  align-self: start;
+}
+.binding-command-follow .binding-command-summary > .binding-add-options {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 0;
+  align-self: start;
+  justify-self: end;
+}
+.binding-command-follow .applet-shortcut-command {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.binding-trigger-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.binding-trigger-icon {
+  display: inline-flex;
+  flex: none;
+}
+.binding-trigger-icon svg {
+  width: max(1cap, 16px);
+  height: max(1cap, 16px);
+}
+.command-triggers-editor .command-provider-filter .binding-trigger-mark {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+}
 .command-binding-table {
   min-width: 660px;
 }
@@ -2754,6 +2909,20 @@ summary {
 .shortcut-command-list .command-binding-table td:is(.binding-value-cell, .binding-actions-cell) {
   vertical-align: middle;
   padding-block: 8px;
+}
+.shortcut-command-list
+  .binding-conditions-layout
+  tbody
+  > tr:not(:first-child)
+  > td:is(.binding-value-cell, .binding-condition-cell) {
+  padding-top: 2px;
+}
+.shortcut-command-list
+  .binding-conditions-layout
+  tbody
+  > tr:not(:last-child)
+  > td:is(.binding-value-cell, .binding-condition-cell) {
+  padding-bottom: 2px;
 }
 .command-binding-table
   tbody
@@ -2925,7 +3094,7 @@ summary {
   min-width: 680px;
 }
 .applet-shortcut-overview .command-settings-heading {
-  width: calc(3 * 32px + 2 * 6px + 2 * var(--command-settings-cell-padding));
+  width: calc(4 * 32px + 3 * 6px + 2 * var(--command-settings-cell-padding));
 }
 .command-binding-table:has(.command-settings-heading) {
   min-width: 780px;
@@ -2938,11 +3107,11 @@ summary {
   align-items: center;
   gap: 6px;
 }
-.command-publication {
+.command-privacy {
   display: inline-flex;
   align-items: center;
   flex: none;
-  color: var(--accent);
+  color: var(--muted);
 }
 .custom-commands-settings .settings-list-actions-heading {
   text-align: left;

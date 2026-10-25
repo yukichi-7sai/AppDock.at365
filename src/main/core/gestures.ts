@@ -7,7 +7,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
 import {
-  defaultGestures,
+  getGestureSettings,
   nativeGestureRows,
   planGestureCommands,
   type GestureContext,
@@ -294,7 +294,7 @@ export class InputCaptureManager {
     if (method !== 'gestures.invoke') throw Error('Unknown input event.');
     if (p.revision !== this.revision || this.stopped || this.paused) return;
     const current = this.state();
-    const gestureSettings = current.settings.gestures ?? defaultGestures();
+    const gestureSettings = getGestureSettings(current.settings);
     if (
       current.recording ||
       !gestureSettings.enabled ||
@@ -338,7 +338,7 @@ export class InputCaptureManager {
             !this.paused &&
             !latest.recording &&
             p.revision === this.revision &&
-            configurationKey(latest.settings.gestures ?? defaultGestures(), latest.commands) ===
+            configurationKey(getGestureSettings(latest.settings), latest.commands) ===
               p.settingsKey &&
             JSON.stringify(latest.context) === p.context &&
             !!(await peer.request('gestures.valid', { session: p.session, window: p.window }))
@@ -402,7 +402,7 @@ export class InputCaptureManager {
     const state = this.state();
     if (this.faultSettings && !force && this.faultSettings === JSON.stringify(state.settings))
       return this.statuses;
-    const settings = state.settings.gestures ?? defaultGestures();
+    const settings = getGestureSettings(state.settings);
     const context = JSON.stringify(state.context);
     const gesture = {
       ...settings,

@@ -1,5 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import type { Settings, SettingsSnapshot, GlobalHotKeyStatus } from '../../shared/contracts';
+import { parseCommandTriggerOptions } from '../../shared/command-trigger-options';
 import {
   touchpadShortcutProjection,
   validateTouchpadKeyEdit,
@@ -282,7 +283,10 @@ export class ShortcutCommands {
             Object.values(op.changes).some((v) => v === undefined)
           )
             throw invalid();
-          options = parseKeybindingOptions({ ...options, ...op.changes });
+          options = {
+            ...parseKeybindingOptions({ ...options, ...op.changes }),
+            ...parseCommandTriggerOptions({ ...options, ...op.changes }),
+          };
         } else if (op.kind === 'reorder') {
           if (
             !exact(op, ['kind', 'key', 'ids']) ||
@@ -316,7 +320,14 @@ export class ShortcutCommands {
       throw invalid();
     }
     validateTouchpadKeyEdit(
-      withKeybindings({ ...store.value, keybindingOptions: options }, rows),
+      withKeybindings(
+        {
+          ...store.value,
+          keybindingOptions: parseKeybindingOptions(options),
+          commandTriggerOptions: parseCommandTriggerOptions(options),
+        },
+        rows,
+      ),
       store.value,
     );
     const changed =
@@ -325,7 +336,14 @@ export class ShortcutCommands {
     if (changed && args.dryRun !== true) {
       try {
         this.options.save(
-          withKeybindings({ ...structuredClone(store.value), keybindingOptions: options }, rows),
+          withKeybindings(
+            {
+              ...structuredClone(store.value),
+              keybindingOptions: parseKeybindingOptions(options),
+              commandTriggerOptions: parseCommandTriggerOptions(options),
+            },
+            rows,
+          ),
           store.revision,
         );
       } catch {

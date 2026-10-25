@@ -9,7 +9,6 @@ import {
   planTouchpadCommands,
   reservedTouchpadKeys,
   touchpadId,
-  touchpadShortcutProjection,
   validateTouchpadKeyEdit,
   TouchpadKeyConflictError,
 } from '../shared/touchpad-gestures';
@@ -132,6 +131,7 @@ import { CommandDispatcher } from './core/command-dispatcher';
 import type { CommandBatchPlan } from '../shared/command-execution';
 import { GestureManager, type GestureInvocation, type ShortcutPress } from './core/gestures';
 import { initializeGestureDefaults } from '../shared/gestures';
+import { getCommandTriggerOptions } from '../shared/command-trigger-options';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, hostCommandsForApplets, shortcutFromEvent } from '../shared/commands';
 import { settingsPageCommands } from '../shared/settings-navigation';
@@ -1909,10 +1909,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     panel: null,
     settingOptions: {},
     pages:
-      page.kind === 'applet' ||
-      ['ribbon', 'gestures', 'shortcuts', 'touchpad-gestures'].includes(id)
-        ? a.pages
-        : undefined,
+      page.kind === 'applet' || ['ribbon', 'command-triggers'].includes(id) ? a.pages : undefined,
     ribbonItems: id === 'ribbon' ? a.ribbonItems : undefined,
     shell: id === 'appearance' ? a.shell : undefined,
     updateRepository: id === 'about' || page.kind === 'applet' ? a.updateRepository : undefined,
@@ -1993,11 +1990,11 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       },
     };
   if (id === 'ribbon') return { applets: applets.map(summary), commands: ribbonUiCommands() };
-  if (['shortcuts', 'gestures', 'tray', 'touchpad-gestures'].includes(id))
+  if (id === 'shortcuts' || id === 'gestures') return {};
+  if (id === 'touchpad-gestures') return { touchpad: touchpad?.snapshot() };
+  if (['tray', 'command-triggers'].includes(id))
     return {
-      ...(['shortcuts', 'gestures', 'touchpad-gestures'].includes(id)
-        ? { commandAssignments: settingsCommandAssignments() }
-        : {}),
+      ...(id === 'command-triggers' ? { commandAssignments: settingsCommandAssignments() } : {}),
       provider:
         settingsNavigation.provider?.page === id
           ? {
@@ -2009,10 +2006,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
           : undefined,
       applets: applets.map(summary),
       commands: settingsUiCommands(),
-      statuses: id === 'shortcuts' ? host.globalHotKeys : undefined,
-      touchpad: id === 'touchpad-gestures' ? touchpad?.snapshot() : undefined,
-      touchpadShortcuts:
-        id === 'shortcuts' ? touchpadShortcutProjection(settings.value) : undefined,
+      statuses: id === 'command-triggers' ? host.globalHotKeys : undefined,
     };
   if (id === 'about') {
     const commands = settingsUiCommands();
@@ -2124,7 +2118,11 @@ function settingsPageActions(
     };
     actions.openAppletDestination = async ([id, destination]) => {
       const a = target(id);
-      if (!['settings', 'shortcuts', 'gestures', 'logs'].includes(destination as string))
+      if (
+        !['settings', 'command-triggers', 'shortcuts', 'gestures', 'logs'].includes(
+          destination as string,
+        )
+      )
         throw Error(hostText('settings.index.invalidDestination'));
       await flushSettingsInputs();
       target(id);
@@ -2138,14 +2136,13 @@ function settingsPageActions(
           operationId: randomUUID(),
           action: {
             type: 'select-page',
-            pageId:
-              destination === 'settings' ? appletSettingsPageId(a.id) : (destination as string),
+            pageId: destination === 'settings' ? appletSettingsPageId(a.id) : 'command-triggers',
           },
         });
         settingsNavigation.provider =
           destination === 'settings'
             ? undefined
-            : { id: a.id, page: destination as 'shortcuts' | 'gestures', request: Date.now() };
+            : { id: a.id, page: 'command-triggers', request: Date.now() };
         changed();
       }
     };
@@ -2193,7 +2190,7 @@ function settingsPageActions(
     };
     actions.appletPackageStatus = async ([id]) => updater.packageStatus(id);
   }
-  if (page.id === 'shortcuts' || page.id === 'gestures')
+  if (page.id === 'command-triggers')
     actions.clearProvider = async () => {
       settingsNavigation.provider = undefined;
       changed();
@@ -2498,10 +2495,14 @@ function settingsPageActions(
     };
     actions.setShortcutCapture = async ([value]) =>
       setShortcutCapture(value as Parameters<typeof setShortcutCapture>[0]);
-    if (['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id))
+    if (['shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(page.id))
       actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
-  if (['shortcuts', 'gestures', 'tray', 'ribbon', 'touchpad-gestures'].includes(page.id)) {
+  if (
+    ['shortcuts', 'gestures', 'tray', 'ribbon', 'touchpad-gestures', 'command-triggers'].includes(
+      page.id,
+    )
+  ) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;
       if (!value || value.mode !== 'select') throw Error(hostText('settings.index.selectOnly'));
@@ -3418,6 +3419,7 @@ async function initialize() {
           target: press.target,
         },
         availableShortcutCommands(),
+        getCommandTriggerOptions(settings.value),
       );
       return shortcutInvocation.run(press, () =>
         commandDispatcher.dispatch('touchpad:' + gesture, plan, { valid, execute: executeCommand }),
