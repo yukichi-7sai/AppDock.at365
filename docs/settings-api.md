@@ -6,7 +6,7 @@
 
 本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/selectは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listも列の値として編集できる。自由JSON・shortcut-list・画像参照の編集と未対応の専用サービスは、adapterを実装する後続範囲。
 
-通知・AI/TTSの通常設定も所有サービスのadapterから公開する。通常値はfields、AI接続とTTS手動ボイスの一覧はlist対象として扱う。既存の解析・検証・共有保存と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
+通知・AI/TTS・更新の通常設定も所有サービスのadapterから公開する。通常値はfields、AI接続とTTS手動ボイスの一覧はlist対象として扱う。既存の解析・検証・共有保存と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
 
 | 対象 | 公開する設定 |
 | --- | --- |
@@ -17,8 +17,10 @@
 | TTS手動ボイス一覧 | id/nameの取得・追加・部分編集・削除・並べ替え。既存の上限1,000件と解析規則を使用 |
 | 通知の共通音声 | voice/speedの上書きと解除。解除するとTTSの既定値を継承 |
 | 通知種類ごと | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない |
+| 本体の更新設定 | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可 |
+| Appletの更新元 | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外 |
 
-起動・更新・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
+起動・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
 
 暗号化情報を持つAI/TTSの接続先や認証方式を変更し、秘密の結び付け先や消去に影響する操作はLOCAL_ACTION_REQUIRED。キーが必要になる新しい認証方式への切替もローカル操作とする。モデル・速度等の非秘密値は暗号化ファイルをそのまま保持する。Schema/値/プレビュー/ログへキー・暗号文・キーrevisionを出さず、設定用の保護判定は秘密を復号しない。破損・読取拒否のメタデータも保護ありとして扱う。Schemaのwritable/resettableで現在の操作範囲を確認する。
 
@@ -95,6 +97,16 @@ AI接続一覧は最大8行。IDは読取り専用で追加時にUUIDを生成�
 一覧はボイス候補であり、サーバーの音声登録や寿命を管理しない。追加・ID変更・削除・並べ替えではdefaultVoice、通知の音声指定、voicesSourceや接続先を自動変更しない。endpoint方式でも手動一覧を編集できるが、実際の候補取得にはvoicesSourceの指定が適用される。取得方式の変更はTTSのfields対象で行う。最後の行を削除して空配列に戻すと、共有保存のmanualVoices上書きを省略する。
 
 既存の手動JSON編集と同じparseTtsSettings・共有保存・通常の再適用を使う。一覧の探索・取得・dryRun・保存はボイス取得通信、音声生成・再生や秘密情報の操作を開始しない。read + writeで編集でき、useTts/executeは追加条件にしない。暗号化ファイルはそのまま保持する。
+
+## 更新設定
+
+本体の7項目は既存UpdateSettingsの既定値と本体カタログから登録し、validateUpdateSourceとparseSettingsを使って保存する。startupDelaySecondsは0～3,600の整数。更新元は既存のGitHub指定、HTTP(S)、Windows絶対パス/UNCと空欄を受け付け、書式検証で配布先を開いたり通信したりしない。保存済み文字列の大文字小文字・パスを維持する。
+
+Appletの更新元はmanifestのupdateRepositoryを既定値とし、上書きがなければinherited=true。既定がなければdefault/valueを省略し、hasValue=falseとする。空文字を明示すると更新を無効化し、既定がない場合もその意図を保存する。manifestに後から既定が追加されても明示した空文字は維持し、resetで上書きを取り除いて継承へ戻す。manifestの既定変更はschemaRevisionへ反映する。同名Appletは提供元IDで区別し、停止/無効のAppletも更新元の保存だけで起動・有効化しない。固有設定やenabled、PC専用値を変更しない。
+
+適用時点は、更新元/同版許可がnextUpdateCheck、About自動確認がnextAboutOpen、起動時確認の対象/通知がnextStartupCheck、起動時の待ち時間がnextStart。起動時チェックが既に予約されていれば、対象/通知の変更はその確認でも使われるが、待ち時間を保存しても既存タイマーを作り直さない。About表示中の保存やONへの変更で通信せず、次に開いた時に通常の1時間間隔判定を行う。
+
+設定保存はread + write、更新チェック/取得/インストールは既存の独立した更新操作を使う。設定APIの取得・dryRun・保存は更新操作、確認ダイアログ、helper起動や再起動を開始しない。
 
 ## 変更とリセット
 

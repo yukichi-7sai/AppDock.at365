@@ -120,11 +120,13 @@ export function UpdateSettings({
       hint={translate('settings.updateSettings.settingsHint')}
       collapsible
       {...settingAnchor('about', 'updates')}
+      data-testid="update-settings"
     >
       <SettingsField
         title={translate('settings.updateSettings.hostSource')}
         hint={hostSettingItem('about', 'hostSource').description}
         {...settingAnchor('about', 'hostSource')}
+        data-testid="update-setting-hostSource"
       >
         <SettingsInputActions>
           <SettingsUrlInput
@@ -169,6 +171,7 @@ export function UpdateSettings({
             key === 'checkHostOnAboutOpen' ? hostSettingItem('about', key).description : undefined
           }
           {...settingAnchor('about', key)}
+          data-testid={'update-setting-' + key}
         >
           <Toggle
             label={hostSettingItem('about', key).title}
@@ -185,6 +188,7 @@ export function UpdateSettings({
         title={hostSettingItem('about', 'startupDelaySeconds').title}
         hint={translate('settings.updateSettings.delayHint')}
         {...settingAnchor('about', 'startupDelaySeconds')}
+        data-testid="update-setting-startupDelaySeconds"
       >
         <SettingsInput
           aria-label={translate('settings.updateSettings.delay')}
@@ -240,6 +244,7 @@ export function AppletUpdateSource({
         translate('settings.updateSettings.disableHint'),
       ].join(' ')}
       {...settingAnchor(`applet:${extension.id}`, 'updateSource')}
+      data-testid={'applet-update-source-' + extension.id}
     >
       <SettingsInputActions>
         <SettingsUrlInput

@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-25: 更新設定とApplet更新元の共通MCP操作 0.88.10
+
+- cleanな`010845e`から、追跡先なしの`codex/mcp-settings-design`で本体の更新設定7項目と外部Appletごとの更新元adapterを実装。固定6入口のfields対象として取得・set/resetでき、外側のツール定義と8権限は維持した。mainの変更/統合と追跡先の設定は行わない。
+- 本体は既存UpdateSettingsの既定値と共通カタログから通常フィールドを生成し、型・更新元の書式・整数0～3,600秒を既存validator/parseSettingsで検証する。GitHub、HTTP(S)、Windows絶対パス/UNC、空欄を受け付け、保存の検証で配布先のファイル読取り・通信を行わない。未登録キーと更新操作そのものは設定APIから受け付けない。
+- Appletはmanifest更新元の継承、明示的な空文字による無効化、resetによる上書き解除を区別する。既定がない場合はdefault/valueを省略し、明示した無効化は後から既定が追加されても保持する。同名提供元の分離、既定変更時のSchema競合、提供元の除外/消失、停止・無効時の保存を確認。組込みとcollection子ページは更新対象外であり、固有設定・enabled・PC専用値を変更しない。
+- 設定保存はread + write、更新チェック・インストールは既存の独立したexecute経路へ分離。About表示中の保存/ONで自動確認が再発火しないよう、既存UIの自動確認を各表示につき1回へ限定した。次に開いた時は従来の1時間間隔判定を使う。既存の予約済み起動時チェックが最新の対象/通知を参照することをレビューし、適用時点をnextStartupCheck、待ち時間をnextStart、更新元/同版許可をnextUpdateCheckとして公開する。
+- 発行前に公開定義/保存先、継承/既定省略、秘密情報、設定と実行の分離、自動確認、外部競合/再送/失敗時の原子性をレビュー。起動時の適用時点を修正し、再検証した。GUI初期のAbout再表示後とApplet共通設定の折りたたみを試験側で開くよう修正。最終の阻害指摘なし。失敗ログは保持した。
+- 固定依存install・整形/型検査・本体/Default Shell build、最終関連標準回帰**53ファイル559/559件、fail/skip 0**が成功。所有adapterの41件は今回の新規8件を含み、更新元書式、非公開/未登録情報、明示無効化、既定継承、停止提供元、device/資格情報bytes保持、無通信、保存失敗、競合と許可取消を検証。About・起動時確認・既存PortableUpdatesも対象とし、標準全体は未実行。739入力とWebApplet/WallpaperSlideshow参照manifestは最終回帰から発行までSHA一致。
+- 隔離sourceと最終固定EXEの実MCP/GUIは各**21群**、固定EXE smokeも成功。MCP保存と本体/Applet既存UIの相互反映、空欄とreset、古い要求の拒否、暗号化キーbytes保持、更新execute OFFでの拒否、保存中の無通信を確認した。ループバックの既知feedへ次回About表示時だけmetadataを1回取得し、payload取得・適用を行わない。既存のAI/TTS/通知/一覧/動的候補/秘密除外/許可取消とtools/list不変も成功。
+- 発行後にGUI試験だけを補強し、2描画フレーム後・画面遷移前にも要求0件を確認した。source/固定EXEの21群を再実行して成功。変更は`scripts/settings-update-gateway-checks.cjs`のみで、製品/標準回帰の依存入力と発行EXEは不変。前後739入力の差分を照合し、型検査/build・559回帰・smokeの成功を再利用した。全入力照合と試験ごとの影響判定はcommit-validationのvalidation.jsonへ記録した。
+- 既存設定項目/保存ファイルと公開操作契約を保持する追加adapterとAbout動作修正のため**0.88.10**へパッチ更新。publish.bat終了0で.NET各Host/Updaterも発行。本体EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170677589 bytes / SHA256 `e98f0c9f6a56718084a383bb60313d5b1f243c9b7a2bb4bb0c1f6059759b8cf3`**。File/ProductVersion、feedの版/size/hash、ASAR内package/同梱Default Shell、隔離コピーと最終EXEを照合した。
+- 正本は[設定API](docs/settings-api.md)、[更新](docs/updates.md)、[外部操作](docs/automation.md)、後続範囲は[拡張設計](docs/mcp-settings-design.md)。起動/Shell等の専用adapterは後続。実利用の設定/認証・実配布元の更新取得/適用・helper交換/再起動・物理入力/OS効果は今回の対象外。push・Release・実利用先deployなし。
+- 証跡は`.artifacts/mcp-settings-updates-20261025/`、最終照合は`.artifacts/commit-validation-mcp-settings-updates-20261025/`。最終source=`mcp-settings-foundation-source-1792935149475`、固定EXE=`mcp-settings-foundation-portable-1792935159831`、smoke=`smoke-1792935003324`。発行後は上記GUI確認追加と関連文書だけを変更。試験プロセス0、今回の成功は方式ごとの直近3回以内、以前の再利用資料/診断/固定出力は保持し、削除0件。
+
 ## 2026-10-25: TTS手動ボイス一覧の共通MCP操作 0.88.9
 
 - cleanな`cf8c558`から、追跡先なしの`codex/mcp-settings-design`でTTS手動ボイス一覧の所有adapterを実装。固定6入口の探索・Schema・行取得とadd/update/remove/reorderへ接続し、外側のツール定義と8権限を維持した。read + writeで編集でき、useTts/executeを保存の追加条件にしない。mainの変更/統合、追跡先の設定は行わない。

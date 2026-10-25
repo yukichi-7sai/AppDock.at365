@@ -663,6 +663,7 @@ const serviceSettings = new SettingsServiceTargets({
   ai: aiSettings,
   tts: ttsSecrets,
   notifications: () => notificationCatalog(allApplets()),
+  applets: allApplets,
 });
 let aiMcpGeneration = 0;
 const aiOwner = (id?: string) =>

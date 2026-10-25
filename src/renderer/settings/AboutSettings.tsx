@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import appIcon from '../../../assets/icon.svg';
 import { useHostTranslation } from '../HostTranslation';
 import type { Settings, ExtensionSnapshot } from '../../shared/contracts';
@@ -47,8 +47,11 @@ export function AboutSettings({
   const hostUpdate = updates.results.find((result) => result.id === 'host');
   const checkLabel = translate('settings.aboutSettings.checkUpdates');
   useSettingsFeedback({ error, busy: checking, target: checkLabel });
+  const autoCheckedOnOpen = useRef(false);
   useEffect(() => {
-    if (!settings.updates.checkHostOnAboutOpen || !controls.checkHostOnAboutOpen) return;
+    if (autoCheckedOnOpen.current || !controls.checkHostOnAboutOpen) return;
+    autoCheckedOnOpen.current = true;
+    if (!settings.updates.checkHostOnAboutOpen) return;
     let active = true;
     void controls.checkHostOnAboutOpen().catch((reason) => {
       if (active) setError(updateError(reason));

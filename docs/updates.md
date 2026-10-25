@@ -4,6 +4,8 @@
 
 ## 設定と取得
 
+本体の更新設定と外部Appletごとの更新元は、MCPの[固定設定API](settings-api.md#更新設定)からread/writeで取得・変更・resetできる。空欄による無効化とmanifestからの継承を区別し、保存だけで更新チェック・取得・適用を行わない。Aboutの自動確認は画面を開いた時に判定し、表示中に設定をONにしたり更新元を変えたりしても通信しない。起動時の対象/通知は次の起動時確認（予約済みを含む）、待ち時間は次回起動から適用する。更新実行の許可・確認・取得検証は従来の操作へ接続する。
+
 更新操作は共通の公開コマンドへ接続する。`appdock.updates.installAll`（AppDockとAppletをすべて更新）は`all`、`appdock.updates.installHost`（AppDockを更新）は`host`を既存のPortableUpdatesへ渡す。設定の同名ボタンもこのコマンドを呼び、確認・取消・適用・再起動を共有する。`appdock.updates.check`（更新チェック）は本体と無効・停止中を含む全パッケージのメタデータだけを確認し、ダウンロード・適用しない。Appletのcollection子ページは親パッケージで更新する。
 
 3コマンドはMCP・Applet共通APIの`commands.list/execute`で列挙・実行でき、既存のコマンド実行許可を使う。入力引数はなく、戻り値の`completion:handlerReturned`は処理からの応答を示す。更新適用は確認後の再起動を伴い、再起動後の適用結果は従来の更新結果通知で確認する。

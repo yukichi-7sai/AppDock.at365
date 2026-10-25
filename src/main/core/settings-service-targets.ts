@@ -1,4 +1,4 @@
-import type { Settings, SettingDefinition } from '../../shared/contracts';
+import type { Settings, SettingDefinition, ExtensionSnapshot } from '../../shared/contracts';
 import { randomUUID } from 'node:crypto';
 import { hostText } from '../../shared/i18n';
 import {
@@ -19,6 +19,9 @@ import {
 } from '../../shared/notification-types';
 import { sameSetting } from '../../shared/settings-defaults';
 import { settingInputSchema } from '../../shared/settings-commands';
+import { hostSettingItem } from '../../shared/settings-catalog';
+import { createDefaultSettings } from '../../shared/settings-schema';
+import { validateMcpSetting } from '../../shared/mcp-setting-fields';
 import type { SettingsStore } from './settings';
 import {
   SettingsTargetError,
@@ -48,6 +51,7 @@ interface Target {
   guard?(next: Settings): void;
   context?: unknown;
   guardRevision?(): string;
+  applies?(key: string): string;
 }
 const fail = (code = 'INVALID_ARGUMENT'): never => {
   throw new SettingsTargetError(
@@ -100,11 +104,16 @@ export class SettingsServiceTargets {
       ai: AiSettingsController;
       tts: TtsSecrets;
       notifications(): NotificationTypeEntry[];
+      applets?(): ExtensionSnapshot[];
     },
   ) {}
   targets(): SettingsTarget[] {
     return [
       ...[
+        this.updates(),
+        ...(this.options.applets?.() ?? [])
+          .filter((applet) => !applet.collection && applet.sourceKind !== 'builtin')
+          .map((applet) => this.appletUpdateSource(applet)),
         this.aiGeneral(),
         ...parseAiSettings(this.options.settings.value.ai).connections.map((connection) =>
           this.aiConnection(connection.id),
@@ -118,6 +127,13 @@ export class SettingsServiceTargets {
     ];
   }
   private target(spec: Target): SettingsFieldTarget {
+    const applies = (key: string) =>
+      spec.applies?.(key) ??
+      (spec.category === 'ai'
+        ? 'aiSettingsChanged'
+        : spec.category === 'tts'
+          ? 'ttsSettingsChanged'
+          : 'notificationPreferencesChanged');
     const readOverrides = (): RecordValue | undefined => {
       try {
         const raw = spec.overrides(this.options.settings.storedValue());
@@ -140,12 +156,7 @@ export class SettingsServiceTargets {
       resettable: (field) => (field as Field).resettable !== false,
       inheritable: (field) => (field as Field).inherit !== false,
       schemaContext: () => spec.context,
-      applies: () =>
-        spec.category === 'ai'
-          ? 'aiSettingsChanged'
-          : spec.category === 'tts'
-            ? 'ttsSettingsChanged'
-            : 'notificationPreferencesChanged',
+      applies,
       plan: (changes, reset, revision) => {
         this.options.checkRevision(revision);
         const store = this.options.settings,
@@ -224,19 +235,81 @@ export class SettingsServiceTargets {
           before,
           values: after,
           overrides,
-          applies: Object.fromEntries(
-            changed.map((key) => [
-              key,
-              spec.category === 'ai'
-                ? 'aiSettingsChanged'
-                : spec.category === 'tts'
-                  ? 'ttsSettingsChanged'
-                  : 'notificationPreferencesChanged',
-            ]),
-          ),
+          applies: Object.fromEntries(changed.map((key) => [key, applies(key)])),
           commit,
         };
       },
+    };
+  }
+  private updates(): Target {
+    const defaults = createDefaultSettings().updates;
+    const fields: Field[] = Object.entries(defaults)
+      .filter(([, value]) => ['boolean', 'string', 'number'].includes(typeof value))
+      .map(([key, value]) => ({
+        key,
+        title: hostSettingItem('about', key).title,
+        description: hostSettingItem('about', key).description,
+        type: typeof value as 'boolean' | 'string' | 'number',
+        default: value,
+        ...(key === 'hostSource' ? { maxLength: 4096 } : {}),
+        ...(key === 'startupDelaySeconds'
+          ? { schema: { type: 'integer', minimum: 0, maximum: 3600 } }
+          : {}),
+      }));
+    return {
+      id: 'service.updates',
+      title: hostSettingItem('about', 'updates').title,
+      category: 'updates',
+      fields,
+      values: (settings) => project(settings.updates, fields),
+      overrides: (raw) => project(raw.updates, fields),
+      replace: (settings, changes, reset) => {
+        for (const [key, value] of Object.entries(changes))
+          validateMcpSetting(
+            fields.find((field) => field.key === key)!,
+            value,
+          );
+        updateRecord(settings.updates as unknown as RecordValue, changes, reset, fields);
+        return settings;
+      },
+      applies: (key) =>
+        key === 'checkHostOnAboutOpen'
+          ? 'nextAboutOpen'
+          : ['hostSource', 'allowSameVersion'].includes(key)
+            ? 'nextUpdateCheck'
+            : key === 'startupDelaySeconds'
+              ? 'nextStart'
+              : 'nextStartupCheck',
+    };
+  }
+  private appletUpdateSource(applet: ExtensionSnapshot): Target {
+    const defaults = applet.updateRepository ? `github:${applet.updateRepository}` : undefined;
+    const fields: Field[] = [
+      {
+        key: 'updateSource',
+        title: hostText('settings.updateSettings.sources'),
+        type: 'string',
+        maxLength: 4096,
+        default: defaults,
+      },
+    ];
+    return {
+      id: 'service.updates.applet.' + Buffer.from(applet.id).toString('base64url'),
+      ownerId: applet.id,
+      title: applet.displayName,
+      category: 'updates',
+      fields,
+      values: (settings) => ({
+        updateSource: settings.extensions[applet.id]?.updateSource ?? defaults,
+      }),
+      overrides: (raw) => project(object(raw.extensions)[applet.id], fields),
+      replace: (settings, changes, reset) => {
+        const entry = settings.extensions[applet.id] ?? { enabled: applet.enabled, settings: {} };
+        updateRecord(entry as unknown as RecordValue, changes, reset, fields);
+        settings.extensions[applet.id] = entry;
+        return settings;
+      },
+      applies: () => 'nextUpdateCheck',
     };
   }
   private aiGeneral(): Target {

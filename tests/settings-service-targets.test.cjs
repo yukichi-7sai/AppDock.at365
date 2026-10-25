@@ -21,7 +21,7 @@ const {
 const {
   replaceNotificationPreference,
 } = require('../out/main/shared/notification-preference-edit');
-function fixture(t, { device = false } = {}) {
+function fixture(t, { device = false, updateApplets = [] } = {}) {
   const dir = path.resolve('.artifacts/settings-service-targets-unit', randomUUID());
   fs.mkdirSync(dir, { recursive: true });
   const store = device
@@ -99,6 +99,7 @@ function fixture(t, { device = false } = {}) {
     ai,
     tts: ttsSecrets,
     notifications: () => types,
+    applets: () => updateApplets,
   });
   const api = new AppDockApi({
     settings: store,
@@ -167,6 +168,7 @@ function fixture(t, { device = false } = {}) {
     writes: () => writes,
     decrypts: () => decrypts,
     setWrite: (value) => (write = value),
+    updateApplets,
   };
 }
 test('service settings discovery uses existing six entry points and never exposes credentials', (t) => {
@@ -1150,5 +1152,307 @@ test('TTS manual candidate reads use the edited list without network, credential
   voiceApply(f, [{ kind: 'remove', itemRef: voiceRows(f)[0].itemRef }]);
   assert.deepEqual((await service.voices('test')).voices, []);
   assert.equal(f.store.value.tts.defaultVoice, 'voice');
+  assert.equal(f.decrypts(), 0);
+});
+
+const updatesId = 'service.updates';
+const updateApplet = (id, extra = {}) => ({
+  id,
+  name: id,
+  displayName: 'Same',
+  version: '1.0.0',
+  apiVersion: 1,
+  runtime: 'node',
+  entry: 'index.cjs',
+  folder: 'unused',
+  enabled: false,
+  state: 'stopped',
+  sourceKind: 'external',
+  error: null,
+  settings: [],
+  settingOptions: {},
+  commands: [],
+  tray: [],
+  panel: null,
+  ...extra,
+});
+const sourceTarget = (f, ownerId) =>
+  f.services.targets().find((target) => target.category === 'updates' && target.ownerId === ownerId)
+    ?.targetId;
+const setUpdate = (f, changes, dryRun = false) =>
+  f.call('apply', f.request(updatesId, [{ kind: 'set', changes }], dryRun));
+
+test('update fields follow existing defaults and catalog, with explicit application timing and no lifecycle commands', (t) => {
+  const f = fixture(t),
+    defaults = require('../out/main/shared/settings-schema').createDefaultSettings().updates,
+    schema = f.call('schema.get', { targetId: updatesId });
+  assert.deepEqual(schema.items.map((field) => field.key).sort(), Object.keys(defaults).sort());
+  assert.deepEqual(schema.operationSchemas && Object.keys(schema.operationSchemas), [
+    'set',
+    'reset',
+  ]);
+  assert.equal(
+    schema.items.find((field) => field.key === 'startupDelaySeconds').inputSchema.type,
+    'integer',
+  );
+  assert.equal(schema.items.find((field) => field.key === 'hostSource').applies, 'nextUpdateCheck');
+  assert.equal(
+    schema.items.find((field) => field.key === 'checkHostOnAboutOpen').applies,
+    'nextAboutOpen',
+  );
+  assert.equal(
+    schema.items.find((field) => field.key === 'checkHostOnStartup').applies,
+    'nextStartupCheck',
+  );
+  assert.deepEqual(f.values(updatesId), defaults);
+  f.store.save(
+    {
+      ...f.store.value,
+      updates: { ...f.store.value.updates, privateFuture: 'PRIVATE_UPDATE_STATE' },
+    },
+    f.store.revision,
+  );
+  assert(!JSON.stringify(f.read(updatesId)).includes('PRIVATE_UPDATE_STATE'));
+  for (const key of ['check', 'install', 'executable', 'token', 'unregistered'])
+    assert.throws(() => setUpdate(f, { [key]: true }), { code: 'NOT_FOUND' });
+  assert.equal(f.writes(), 0);
+});
+
+test('update fields dryRun and batched reset share atomic, default-omitting storage without changing device or unrelated settings', (t) => {
+  const f = fixture(t, { device: true }),
+    before = fs.readFileSync(f.store.shared.file),
+    device = fs.readFileSync(f.store.device.file),
+    ai = structuredClone(f.store.value.ai),
+    notifications = structuredClone(f.store.value.notificationPreferences),
+    changes = {
+      hostSource: 'https://example.test/update.json?v=1',
+      checkHostOnAboutOpen: false,
+      checkHostOnStartup: true,
+      checkAppletsOnStartup: true,
+      startupDelaySeconds: 120,
+      notifyOnStartup: false,
+      allowSameVersion: true,
+    };
+  const preview = setUpdate(f, changes, true);
+  assert.equal(preview.completion, 'validated');
+  assert.equal(preview.effectVerified, false);
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  assert.equal(f.writes(), 0);
+  const request = f.request(updatesId, [{ kind: 'set', changes }]),
+    saved = f.call('apply', request);
+  assert.deepEqual(f.call('apply', request), saved);
+  assert.equal(f.writes(), 1);
+  assert.deepEqual(f.values(updatesId), changes);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  assert.deepEqual(f.store.value.ai, ai);
+  assert.deepEqual(f.store.value.notificationPreferences, notifications);
+  f.call('apply', f.request(updatesId, [{ kind: 'reset', keys: Object.keys(changes) }]));
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(f.store.shared.file)), 'updates'), false);
+  assert(f.read(updatesId).fields.every((field) => field.inherited));
+  const writes = f.writes(),
+    revision = f.read(updatesId).revision;
+  assert.equal(setUpdate(f, f.values(updatesId)).changed, false);
+  assert.equal(f.writes(), writes);
+  assert.equal(f.read(updatesId).revision, revision);
+});
+
+test('update sources validate saved syntax without network or filesystem lookups and malformed batches do not persist', (t) => {
+  const f = fixture(t);
+  let sourceLookups = 0;
+  for (const method of ['statSync', 'readFileSync']) {
+    const original = fs[method];
+    t.mock.method(fs, method, (file, ...args) => {
+      if (
+        String(file).startsWith('A:\\Missing') ||
+        String(file).startsWith('\\\\unavailable-server')
+      ) {
+        sourceLookups++;
+        throw Error('Unexpected source lookup');
+      }
+      return original(file, ...args);
+    });
+  }
+  for (const source of [
+    'github:Owner/repository',
+    'https://example.test/feed.json?v=1',
+    'A:\\Missing\\publish',
+    '\\\\unavailable-server\\publish\\update.json',
+    '',
+    '   ',
+  ]) {
+    setUpdate(f, { hostSource: source });
+    assert.equal(f.values(updatesId).hostSource, source);
+  }
+  const before = fs.readFileSync(f.store.file),
+    writes = f.writes();
+  for (const source of [
+    'https://user:secret@example.test/feed',
+    'https://example.test/feed#fragment',
+    'github:owner',
+    'relative/path',
+    '\\\\?\\A:\\device',
+    'https://example.test/feed\n',
+  ])
+    assert.throws(() => setUpdate(f, { notifyOnStartup: false, hostSource: source }), {
+      code: 'INVALID_ARGUMENT',
+    });
+  for (const delay of [-1, 3601, 1.5, '10', null])
+    assert.throws(() => setUpdate(f, { hostSource: '', startupDelaySeconds: delay }), {
+      code: 'INVALID_ARGUMENT',
+    });
+  assert.throws(() => setUpdate(f, { checkHostOnStartup: 'true' }), { code: 'INVALID_ARGUMENT' });
+  assert.equal(f.writes(), writes);
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  assert.equal(f.decrypts(), 0);
+  assert.equal(sourceLookups, 0);
+});
+
+test('Applet update sources distinguish same-name providers, remain editable when stopped and preserve unrelated configuration', (t) => {
+  const a = updateApplet('first', { updateRepository: 'owner/first' }),
+    b = updateApplet('second', { updateRepository: 'owner/second' }),
+    builtin = updateApplet('builtin', { sourceKind: 'builtin' }),
+    child = updateApplet('child', {
+      collection: { owner: 'first', key: 'pages', itemId: 'child' },
+    }),
+    f = fixture(t, { device: true, updateApplets: [a, b, builtin, child] });
+  f.store.save(
+    {
+      ...f.store.value,
+      extensions: {
+        first: { enabled: false, settings: { private: 'PRIVATE_VALUE' }, startupDelaySeconds: 77 },
+      },
+    },
+    f.store.revision,
+  );
+  const device = fs.readFileSync(f.store.device.file),
+    id = sourceTarget(f, 'first');
+  assert(id);
+  assert.notEqual(id, sourceTarget(f, 'second'));
+  assert.equal(sourceTarget(f, 'builtin'), undefined);
+  assert.equal(sourceTarget(f, 'child'), undefined);
+  assert.equal(f.values(id).updateSource, 'github:owner/first');
+  assert.equal(f.read(id).fields[0].inherited, true);
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { updateSource: '' } }]));
+  assert.equal(f.values(id).updateSource, '');
+  assert.equal(f.values(sourceTarget(f, 'second')).updateSource, 'github:owner/second');
+  assert.equal(f.store.value.extensions.first.enabled, false);
+  assert.equal(f.store.value.extensions.first.startupDelaySeconds, 77);
+  assert.deepEqual(f.store.value.extensions.first.settings, { private: 'PRIVATE_VALUE' });
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  f.call('apply', f.request(id, [{ kind: 'reset', keys: ['updateSource'] }]));
+  assert.equal(f.store.value.extensions.first.updateSource, undefined);
+  assert.equal(f.values(id).updateSource, 'github:owner/first');
+  assert.equal(f.read(id).fields[0].inherited, true);
+  assert(
+    !JSON.stringify([f.read(id), f.call('schema.get', { targetId: id })]).includes('PRIVATE_VALUE'),
+  );
+  assert.throws(() => f.read(id, ['settings']), { code: 'NOT_FOUND' });
+});
+
+test('explicitly disabled Applet sources stay disabled when a manifest gains a default and default changes invalidate stale schemas', (t) => {
+  const provider = updateApplet('without-default'),
+    f = fixture(t, { updateApplets: [provider] }),
+    id = sourceTarget(f, provider.id);
+  assert.equal(f.read(id).fields[0].hasValue, false);
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { updateSource: '' } }]));
+  assert.equal(f.read(id).fields[0].inherited, false);
+  const stale = f.request(id, [{ kind: 'set', changes: { updateSource: 'github:new/source' } }]);
+  provider.updateRepository = 'owner/new-default';
+  assert.throws(() => f.call('apply', stale), { code: 'SCHEMA_CONFLICT' });
+  assert.equal(f.values(id).updateSource, '');
+  f.call('apply', f.request(id, [{ kind: 'reset', keys: ['updateSource'] }]));
+  assert.equal(f.values(id).updateSource, 'github:owner/new-default');
+  assert.equal(f.read(id).fields[0].inherited, true);
+  const hidden = f.request(id, [{ kind: 'set', changes: { updateSource: '' } }]);
+  provider.sourceKind = 'builtin';
+  assert.throws(() => f.call('apply', hidden), { code: 'NOT_FOUND' });
+});
+
+test('update settings use current write permission and external revision, including cached requests', (t) => {
+  const f = fixture(t),
+    request = f.request(updatesId, [{ kind: 'set', changes: { allowSameVersion: true } }]);
+  f.call('apply', request);
+  f.setWrite(false);
+  assert.throws(() => f.call('apply', request), { code: 'WRITE_DISABLED' });
+  f.setWrite(true);
+  const stale = f.request(updatesId, [{ kind: 'set', changes: { notifyOnStartup: false } }]),
+    raw = JSON.parse(fs.readFileSync(f.store.file));
+  raw.updates.startupDelaySeconds = 77;
+  fs.writeFileSync(f.store.file, JSON.stringify(raw));
+  assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
+  assert.equal(f.writes(), 1);
+});
+
+test('update save failure preserves settings and both credential files byte-for-byte', (t) => {
+  const f = fixture(t),
+    before = fs.readFileSync(f.store.file),
+    rename = fs.renameSync;
+  f.aiSecrets.setKey(f.store.value.ai.connections[0], 'PRIVATE_AI');
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS');
+  const ai = fs.readFileSync(f.aiFile),
+    tts = fs.readFileSync(f.ttsFile);
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (to === f.store.file) throw Error('Injected write failure');
+    return rename(from, to);
+  });
+  assert.throws(() => setUpdate(f, { hostSource: 'https://example.test/feed.json' }), {
+    code: 'SAVE_FAILED',
+  });
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  assert.deepEqual(fs.readFileSync(f.aiFile), ai);
+  assert.deepEqual(fs.readFileSync(f.ttsFile), tts);
+  assert.equal(f.decrypts(), 0);
+});
+
+test('update saves do not run checks, and the existing updater reads the latest saved source on an explicit check', async (t) => {
+  const f = fixture(t),
+    { PortableUpdates } = require('../out/main/main/core/portable-updates'),
+    requests = [];
+  const updater = new PortableUpdates({
+    settings: () => f.store.value.updates,
+    targets: () => [
+      {
+        id: 'host',
+        name: 'Host',
+        kind: 'host',
+        version: '1.0.0',
+        source: f.store.value.updates.hostSource,
+        destination: 'unused',
+      },
+    ],
+    hostVersion: '1.0.0',
+    helper: 'unused',
+    executable: 'unused',
+    baseDirectory: f.dir,
+    stateDirectory: f.dir,
+    restartArgs: [],
+    confirm: () => {
+      throw Error('Unexpected install');
+    },
+    shutdown: () => {
+      throw Error('Unexpected shutdown');
+    },
+    changed: () => {},
+    fetcher: async (url) => {
+      requests.push(String(url));
+      return new Response(
+        JSON.stringify({
+          schemaVersion: 1,
+          kind: 'host',
+          id: 'host',
+          version: '1.0.0',
+          payload: { file: 'AppDock.exe', format: 'exe', sha256: 'a'.repeat(64), size: 20 },
+        }),
+      );
+    },
+  });
+  setUpdate(f, { hostSource: 'https://example.test/one.json', checkHostOnAboutOpen: true });
+  assert.deepEqual(requests, []);
+  await updater.checkHostOnAboutOpen();
+  assert.deepEqual(requests, ['https://example.test/one.json']);
+  setUpdate(f, { hostSource: 'https://example.test/two.json' });
+  assert.equal(requests.length, 1);
+  await updater.checkHostOnAboutOpen();
+  assert.deepEqual(requests, ['https://example.test/one.json', 'https://example.test/two.json']);
   assert.equal(f.decrypts(), 0);
 });
