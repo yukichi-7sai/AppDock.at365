@@ -1,6 +1,7 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { ListIcon } from './SettingsListTable';
+import { SettingsTable } from './SettingsTable';
 import { SettingsDialog } from './SettingsModal';
 import { SettingsDescriptionIcon } from './SettingsHintIcon';
 import { CommandProviderBadge } from './CommandProviderBadge';
@@ -144,7 +145,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
     setEditing(null);
   };
   const table = (items: typeof commands) => (
-    <table className="applet-shortcut-overview command-binding-table">
+    <SettingsTable framed className="applet-shortcut-overview command-binding-table">
       <thead>
         <tr>
           <th>{translate('settings.commandBindingList.command')}</th>
@@ -337,7 +338,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
           </tbody>
         );
       })}
-    </table>
+    </SettingsTable>
   );
   return (
     <div className="shortcut-command-list" ref={root} tabIndex={-1}>

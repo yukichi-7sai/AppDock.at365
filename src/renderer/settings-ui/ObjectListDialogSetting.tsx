@@ -202,6 +202,7 @@ export function ObjectListDialogSetting({
     <>
       <SettingsListTable
         testId={testId}
+        actionsAlign="start"
         definition={definition}
         entries={entries}
         options={options}

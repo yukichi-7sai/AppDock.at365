@@ -13,7 +13,12 @@ import {
 } from '../settings-ui/SettingsSections';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { ListIcon, SettingsListAddButton } from '../settings-ui/SettingsListTable';
+import {
+  ListIcon,
+  SettingsListAddButton,
+  SettingsListLayout,
+} from '../settings-ui/SettingsListTable';
+import { CommandListSummary } from '../settings-ui/CommandListScroll';
 import {
   AiConnectionDialog,
   AiConnectionOrderDialog,
@@ -81,19 +86,18 @@ export function AiSettingsForm({
   useSettingsFeedback({ busy: pending, error });
   return (
     <div className="settings-sections ai-settings">
-      <SettingsActions className="ai-connections-toolbar">
-        <span className="muted">
-          {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
-        </span>
-      </SettingsActions>
       <SettingsContent
-        className="command-shortcuts ai-connection-table"
+        className="ai-connection-table"
         data-testid="ai-connections"
         {...settingAnchor('ai', 'connections')}
       >
-        <table
-          className="applet-shortcut-overview"
-          aria-label={translate('settings.aiSettings.registered')}
+        <SettingsListLayout
+          title={translate('settings.aiSettings.registered')}
+          toolbar={
+            <CommandListSummary className="settings-list-toolbar" actions={null}>
+              {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
+            </CommandListSummary>
+          }
         >
           <thead>
             <tr>
@@ -122,17 +126,15 @@ export function AiSettingsForm({
                 </span>
               </th>
               <th>{translate('settings.aiSettings.model')}</th>
-              <th>
-                <span className="ai-action-heading">
-                  {translate('settings.aiSettings.actions')}
-                </span>
+              <th className="settings-list-actions-heading">
+                {translate('settings.aiSettings.actions')}
               </th>
             </tr>
           </thead>
           <tbody>
             {value.connections.map((server) => (
               <tr key={server.id} data-ai-connection={server.id}>
-                <td>
+                <td className="settings-list-wrap">
                   <div className="ai-server-heading">
                     <strong>{server.name || server.id}</strong>
                     {server.id === value.defaultConnectionId && (
@@ -146,7 +148,7 @@ export function AiSettingsForm({
                     {server.baseUrl || translate('settings.aiSettings.unsetUrl')}
                   </small>
                 </td>
-                <td>
+                <td className="settings-list-wrap">
                   <span className="ai-model-name">
                     {server.defaultModel || translate('settings.aiSettings.perCall')}
                   </span>
@@ -156,8 +158,8 @@ export function AiSettingsForm({
                     </small>
                   )}
                 </td>
-                <td>
-                  <div className="ai-row-actions">
+                <td className="settings-list-actions-cell">
+                  <div className="settings-list-actions ai-row-actions">
                     <button
                       className="settings-list-icon ai-icon-button"
                       aria-label={translate('settings.aiSettings.serverSettings', {
@@ -195,7 +197,7 @@ export function AiSettingsForm({
               </tr>
             )}
           </tbody>
-        </table>
+        </SettingsListLayout>
       </SettingsContent>
       <SettingsSection
         title={translate('settings.aiSettings.common')}

@@ -3,7 +3,7 @@
   min-width: 0;
 }
 .settings-list-heading {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   white-space: nowrap;
@@ -27,25 +27,45 @@
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.settings-list table {
+.settings-data-table {
   width: 100%;
   border-collapse: collapse;
   background: var(--panel);
   font-size: 13px;
 }
-.settings-list th {
+.settings-data-table :where(thead th) {
   text-align: left;
   font-size: 12px;
   color: var(--muted);
   background: var(--settings-group-background, var(--bg));
 }
-.settings-list th,
-.settings-list td {
+.settings-data-table :where(th, td) {
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  text-align: left;
 }
-.settings-list tbody tr:last-child td {
+.settings-data-table thead th {
+  box-sizing: content-box;
+  height: 32px;
+  padding-block: 6px;
+}
+button.settings-list-add.applet-shortcut-add {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  filter: none;
+}
+button.settings-list-add.applet-shortcut-add:is(:hover, :focus-visible):enabled {
+  border: 0;
+  background: var(--accent-soft);
+  color: var(--accent);
+  filter: none;
+}
+.settings-data-table tbody:last-child > tr:last-child > :is(th, td),
+.settings-data-table tbody:last-child > tr > td[rowspan] {
   border-bottom: 0;
 }
 .settings-list td.settings-list-primary {
@@ -69,7 +89,7 @@
   width: 1%;
   color: var(--muted);
 }
-.settings-list small {
+.settings-data-table small {
   display: block;
   color: var(--muted);
   font-size: 12px;
@@ -167,13 +187,20 @@ button.settings-list-icon.accent-action:is(:hover, :focus-visible):enabled {
   margin: 12px 0;
 }
 @media (max-width: 800px) {
-  .settings-list th,
-  .settings-list td {
+  .settings-data-table :where(th, td) {
     padding: 12px 10px;
   }
   .settings-list-actions {
     gap: 5px;
   }
+}
+
+.settings-data-table-framed {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
 }
 
 .settings-list .settings-list-toggle[aria-checked='true'] span {

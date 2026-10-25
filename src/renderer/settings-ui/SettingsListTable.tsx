@@ -5,6 +5,7 @@ import type { SettingDefinition, SettingOption } from '../../shared/contracts';
 import { objectFieldValue } from '../../shared/object-list';
 import './settings-list.css';
 import { RegisteredImagePreview } from './RegisteredImagePicker';
+import { SettingsTable } from './SettingsTable';
 
 export function settingsListText(
   definition: SettingDefinition,
@@ -68,7 +69,7 @@ export function SettingsListAddButton({
   return (
     <button
       type="button"
-      className="applet-shortcut-add"
+      className="settings-list-icon settings-list-add applet-shortcut-add"
       data-dialog-focus-fallback
       aria-label={label}
       title={label}
@@ -86,12 +87,14 @@ export function SettingsListLayout({
   toolbar,
   commandListScroll = false,
   actionsAlign = 'end',
+  tableClassName,
   children,
 }: {
   title: string;
   toolbar: ReactNode;
   commandListScroll?: boolean;
   actionsAlign?: 'start' | 'end';
+  tableClassName?: string;
   children: ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -100,7 +103,9 @@ export function SettingsListLayout({
     <div className="settings-list" data-actions-align={actionsAlign}>
       {commandListScroll ? <CommandListToolbar>{toolbar}</CommandListToolbar> : toolbar}
       <div className="settings-list-scroll" ref={scrollRef}>
-        <table aria-label={title}>{children}</table>
+        <SettingsTable className={tableClassName} aria-label={title}>
+          {children}
+        </SettingsTable>
       </div>
     </div>
   );
@@ -127,6 +132,7 @@ export function SettingsListTable({
   orderInTitle = false,
   commandListScroll = false,
   toolbarFilter,
+  actionsAlign = 'end',
 }: {
   testId?: string;
   definition: SettingDefinition;
@@ -148,6 +154,7 @@ export function SettingsListTable({
   orderInTitle?: boolean;
   commandListScroll?: boolean;
   toolbarFilter?: ReactNode;
+  actionsAlign?: 'start' | 'end';
 }) {
   const { t: translate } = useHostTranslation();
   const view = definition.list!;
@@ -199,21 +206,15 @@ export function SettingsListTable({
     <SettingsListLayout
       title={definition.title}
       commandListScroll={commandListScroll}
+      actionsAlign={actionsAlign}
       toolbar={
-        commandListScroll ? (
-          <CommandListSummary
-            className="settings-list-toolbar"
-            filter={toolbarFilter}
-            actions={actions}
-          >
-            {count}
-          </CommandListSummary>
-        ) : (
-          <div className="settings-list-toolbar">
-            {count}
-            <div>{actions}</div>
-          </div>
-        )
+        <CommandListSummary
+          className="settings-list-toolbar"
+          filter={toolbarFilter}
+          actions={actions}
+        >
+          {count}
+        </CommandListSummary>
       }
     >
       <thead>
@@ -323,7 +324,7 @@ export function SettingsListTable({
                   </button>
                 </td>
               )}
-              <td>
+              <td className="settings-list-actions-cell">
                 <div className="settings-list-actions">
                   {extra?.(entry, index)}
                   <button

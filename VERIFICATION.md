@@ -1,5 +1,33 @@
 # 検証記録
 
+## 2026-10-25: 共通テーブル整備・ヘッダー調整のコミット前検証 0.87.16
+
+- 利用者確認済み0.87.15～0.87.16の13ファイルを対象とし、main b0f5ccc上の差分・未追跡SettingsTable・実効Git名義を確認。GitHubをfetchし、GitHub/AQUAのmainが開始HEADと一致していることを確認した。製品内容・発行物は変更せず0.87.16を維持、再発行なし。
+- 標準回帰114ファイル・**885/885件、fail/skip 0**を入力SHAと証跡で照合。前回コミットの未変更対象91ファイル・692件、共通化時の17ファイル・140件を再利用（うちappearance/localization/shell-boundariesの18件は最終ヘッダー変更後の成功へ置換）。最終native/updater発行物を利用するall-in-one/applet-defaults/lifecycle/dotnet-pages/applet-packages/portable-updatesの6ファイル・53件を追加実行し成功した。試験スクリプト、main/shared/SDK/native/Shellロジック、設定schema、依存/ビルド定義は前回成功時と一致。変更したrenderer/CSSは実装時GUIと最新の静的試験で確認した。
+- 0.87.15の一覧編集/取消/順序/検索/行結合等の3群GUIは、後続変更がヘッダーCSS/追加ボタンクラスのみで操作処理が不変であることを照合して再利用。0.87.16の11画面・明暗/狭幅ヘッダーGUI2群とsmokeは現在EXE・検証コピーのhash一致を確認。型検査/build/publishログ、Node/pnpm/.NET/OSと兄弟manifest/payload、各証跡hashを照合した。pnpm版ログの末尾空行差は実値12.10.1で一致確認。物理入力や外部サービスの新規検証はしていない。
+- EXE **170,683,878 bytes / SHA256 be162efa2ee99f6fe57bd4f6fae11971270eb4a8dcdc89cb0e62e89fc92a4231**。証跡は .artifacts/commit-validation-shared-tables-08716/ の入力一覧/環境/再利用判定/追加53件ログ/stageとcommit tree/両remote先端照合。元資料はcommit-validation-notification-table-08714、applet-list-toolbar-08715、table-header-08716および検証済みの参照鎖。検証後は本記録だけ追記。再利用資料と今回の回帰出力を保持して削除0件。GitHub Release/実利用先deployは行わない。
+
+
+## 2026-10-25: コンパクトな共通テーブルヘッダー 0.87.16
+
+- 利用者の追記に従い、ボタン付きヘッダーの上下余白を縮めてボタンなしと高さを統一。共通SettingsTableのthead thを内容32px＋上下6pxとし、見出しの共通flexでbaselineの余白を除去した。通常の単行ヘッダーは約44px（罫線のDPI丸めを除く）、複数行は必要に応じて拡張。共通SettingsListAddButtonに専用クラスを付け、32pxの操作対象、アクセント文字、通常透明・枠なし、hover/focus時の淡い背景とキーボードoutlineを使用する。本文の追加ボタンや保存/操作処理は変更しない。
+- main上の未コミット0.87.15の共通化を保持して追加修正。変更は共通CSS/追加ボタンクラス・文書・版のみ。既存の余白/hover規則との詳細度、狭幅、権限の非表示ヘッダー、focusとdisabledをレビューし阻害指摘なし。0.87.15の発行完了後の追加修正につき0.87.16へパッチ更新。設定キー/保存ファイル/公開APIの変更なし。
+- 固定lockfile照合、整形、型検査、build、publish成功。appearance/localization/shell-boundariesの3ファイル・**18/18件、fail/skip 0**。前回の機能回帰140件は保存/操作処理が不変のため全再実行せず、ヘッダーに絞った実画面検証を追加した。ソース/固定EXEとも各**2群成功**、pageerrorなし。Applet管理/通知/Webアカウント/操作の許可/AI/MCPクライアント/ショートカット/マウス・タッチパッドジェスチャー/カスタムコマンド/WebAppletの11画面で、明暗1280px・明720pxの高さを計測。ボタン有無の差は罫線丸めの範囲内、ページ横はみ出しなし。追加ボタンの枠0・通常透明・32px対象・hover背景・Tab focus outline・追加ダイアログの開閉/取消を確認し、画像を目視した。恒久的な見た目比較試験は追加していない。
+- 最終EXEは**170,683,878 bytes / SHA256 be162efa2ee99f6fe57bd4f6fae11971270eb4a8dcdc89cb0e62e89fc92a4231**、A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exeへ発行。File/ProductVersion、feedの版/size/hash、ASAR内package/Default Shell版、固定GUI/smokeコピーが0.87.16と一致し、smoke成功。
+- 証跡は .artifacts/table-header-08716/ の入力SHA、環境、レビュー、各log、header-measurementsと画像、最終照合。source=table-header-ui-1792907710261、portable=table-header-ui-1792907899153、smoke=smoke-1792907931302。製品入力は検証前後で一致、本記録のみ後続変更。今回成功profileは各方式1件で直近3回以内、削除0。前回の機能検証・失敗診断・固定出力を保持。物理入力、外部サービス、実利用データや通常終了は未検証。commit/push/Release/deployなし。
+
+
+## 2026-10-25: 設定テーブルの共通化とApplet一覧の操作配置 0.87.15
+
+- main b0f5cccから開始し、clean時にpull --ff-onlyで最新を確認。一連の作業中の変更を保持して、WebApplet/WallpaperSlideshowの宣言型一覧、Applet管理と追加指定の本体設定を整備。共通SettingsTableへ背景・ヘッダー・セル余白・罫線・末尾行を集約した。通知/Webアカウント/MCPクライアント/カスタムコマンドは既存SettingsListLayout/Table経由、AI/Applet管理は同レイアウトへ移行、操作の許可とショートカット/マウス・タッチパッドジェスチャーは専用行構造内で同じ土台を利用する。
+- Appletの宣言型一覧は件数を右端、追加/順序操作を左へ配置し、操作列のヘッダーとセル内ボタンを左寄せ。列位置は変更しない。AIの件数も共通Summaryで右端に配置。Applet管理の検索/集計/追加/操作/横スクロールを共通化し、バージョン・状態・更新・再起動等の専用表示とguard/callbackを保持。コマンドのrowSpan/owned割り当て/スクロールとフォーカス復帰、権限のApplet/MCP独立列と狭幅表示を保持した。Appletソース変更なし、設定キー・保存ファイル・公開API変更なしのため0.87.14からパッチ更新。
+- 発行前に実装差分・影響先・保存/削除/順序契約・専用CSSをレビューし、阻害指摘なし。固定lockfile照合、整形、型検査、build、publishは成功。object-list-dialog/setting-list-draft/applet-settings/applet-management/applet-order/settings-page/settings-page-host/localization/appearance/shell-boundaries/ai-settings/web-accounts/notification-preference-edit/mcp-client/keybindings/gestures/touchpad-gesturesの**17ファイル・140/140件、fail/skip 0**が成功。標準回帰全体は未実行。
+- ソースGUIと最終固定EXEの隔離GUIは各**3群成功**、pageerrorなし。明1280/暗900/明720の対象全画面で共通表・32px操作・ページ横はみ出しなしを確認して目視。実際の発行済みWebApplet/WallpaperSlideshowのmanifest/payloadをhash照合し、両Appletを無効のまま、サイト編集保存/取消、追加/削除取消、順序保存、初期キー取消、モニターMode保存を確認。Applet管理の検索/設定遷移/順序取消、AI編集/追加取消、WebアカウントEnter保存/Escape取消、通知編集取消、3入力一覧の行結合/編集取消/削除取消と保存値維持も確認した。fixtureの名前/OKボタン/アカウント参照/保存待機/表示倍率/owned行数の不一致を修正し、全確認を再実行して成功。製品側の検証やガードは緩めていない。
+- 発行先は A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe。**0.87.15 / 170,695,182 bytes / SHA256 cf3ee59f040dd84c744214b928707f647f9fb6ee3575bbf6b84668e64fb86eab**。固定EXE smoke成功。EXEのFile/ProductVersion、update.jsonの版/size/hash、ASAR内package/Default Shell版、固定GUI/smokeコピーを照合した。
+- 証跡は .artifacts/applet-list-toolbar-08715/ の入力SHA一覧・環境/兄弟依存情報・レビュー・各完全log・最終照合/証跡hash。ソースprofileはapplet-list-toolbar-ui-1792906500294、固定EXEはapplet-list-toolbar-ui-1792906702035、smokeはsmoke-1792906750773。試験前後の製品入力は一致し、後続差分は仕様文書/本記録のみ。対象profileを成功/方式別に確認し、各方式の今回成功は3回以内のため削除0。失敗診断・固定helper・過去の再利用証跡を保持。恒久的な見た目比較テストは追加していない。
+- 物理キー/ジェスチャー、外部AI/MCPサービス、実壁紙適用、実利用設定、通常終了は新規検証していない。隔離fixtureのキーはapp scope Ctrl+F8/Alt+F8、ジェスチャー機能は無効、Pause/F13〜F24のOS送信/登録なし。コミット・push・Release・実利用先deployは行っていない。
+
+
 ## 2026-10-25: 通知設定 0.87.14のコミット検証
 
 - 利用者が0.87.14を確認してcommit/pushを依頼。main `ce1c630`上の今回の11対象ファイルだけをレビューし、阻害指摘なし。通知テーブル、共通編集ダイアログ、種類単位の保存/競合検査、追加6試験、翻訳8キー、版と関連文書を対象とした。dirtyのためpull/stash/統合なし。fetchとGitHub/AQUAの読取で両mainが`ce1c630`に一致し、実効author/committerを確認した。

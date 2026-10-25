@@ -10,11 +10,15 @@ import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { SettingsField } from '../settings-ui/SettingsSections';
-import { ListIcon } from '../settings-ui/SettingsListTable';
+import {
+  ListIcon,
+  SettingsListLayout,
+  SettingsListAddButton,
+} from '../settings-ui/SettingsListTable';
 import { Toggle } from '../settings-ui/Toggle';
 import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
 import { settingAnchor } from '../settings-ui/setting-anchor';
-import { CommandListToolbar, CommandListSummary } from '../settings-ui/CommandListScroll';
+import { CommandListSummary } from '../settings-ui/CommandListScroll';
 
 const states = {
   running: hostText('settings.appletManagementSettings.running'),
@@ -204,10 +208,7 @@ export function AppletManagementSettings({
     target: translate('settings.appletManagementSettings.title'),
   });
   return (
-    <section
-      className="settings-list applet-management"
-      {...settingAnchor('applets', 'management')}
-    >
+    <section className="applet-management" {...settingAnchor('applets', 'management')}>
       {management && (!management.packagesAvailable || !!management.discoveryIssueCount) && (
         <SettingsField
           title={
@@ -238,248 +239,247 @@ export function AppletManagementSettings({
           )}
         </SettingsField>
       )}
-      <CommandListToolbar>
-        <div className="command-shortcut-tools">
-          <div className="command-shortcut-search">
-            <span aria-hidden="true">
-              <Icon name="search" size={18} />
-            </span>
-            <SettingsInput
-              type="search"
-              aria-label={translate('settings.appletManagementSettings.search')}
-              placeholder={translate('settings.appletManagementSettings.searchPlaceholder')}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-        </div>
-        <CommandListSummary className="command-shortcut-summary" actions={null}>
-          <span role="status">
-            {translate('settings.appletManagementSettings.visibleCount', {
-              visible: visible.length,
-              total: applets.length,
-            })}
-          </span>
-        </CommandListSummary>
-      </CommandListToolbar>
-      <div className="settings-list-scroll">
-        <table className="settings-list-table applet-management-table">
-          <thead>
-            <tr>
-              <th>
-                <span className="applet-management-column-title">
-                  {translate('settings.appletManagementSettings.name')}
-                  <button
-                    type="button"
-                    className="applet-shortcut-add"
-                    data-dialog-focus-fallback
-                    aria-label={translate('settings.appletManagementSettings.install')}
-                    title={translate('settings.appletManagementSettings.install')}
-                    disabled={busy || !management?.packagesAvailable}
-                    onClick={() => setInstall(true)}
-                  >
-                    ＋
-                  </button>
-                  <button
-                    type="button"
-                    className="settings-list-icon shortcut-order-open"
-                    aria-label={translate('settings.appletManagementSettings.order')}
-                    title={translate('settings.appletManagementSettings.displayOrder')}
-                    disabled={busy || applets.length < 2}
-                    onClick={() => setOrder(true)}
-                  >
-                    <ListIcon kind="order" />
-                  </button>
+      <SettingsListLayout
+        title={translate('settings.appletManagementSettings.title')}
+        tableClassName="settings-list-table applet-management-table"
+        actionsAlign="start"
+        commandListScroll
+        toolbar={
+          <>
+            <div className="command-shortcut-tools">
+              <div className="command-shortcut-search">
+                <span aria-hidden="true">
+                  <Icon name="search" size={18} />
                 </span>
-              </th>
-              <th>
-                <span className="applet-management-column-title">
-                  {translate('settings.appletManagementSettings.version')}
+                <SettingsInput
+                  type="search"
+                  aria-label={translate('settings.appletManagementSettings.search')}
+                  placeholder={translate('settings.appletManagementSettings.searchPlaceholder')}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
+            </div>
+            <CommandListSummary className="command-shortcut-summary" actions={null}>
+              <span role="status">
+                {translate('settings.appletManagementSettings.visibleCount', {
+                  visible: visible.length,
+                  total: applets.length,
+                })}
+              </span>
+            </CommandListSummary>
+          </>
+        }
+      >
+        <thead>
+          <tr>
+            <th>
+              <span className="settings-list-heading">
+                {translate('settings.appletManagementSettings.name')}
+                <SettingsListAddButton
+                  label={translate('settings.appletManagementSettings.install')}
+                  disabled={busy || !management?.packagesAvailable}
+                  onClick={() => setInstall(true)}
+                />
+                <button
+                  type="button"
+                  className="settings-list-icon shortcut-order-open"
+                  aria-label={translate('settings.appletManagementSettings.order')}
+                  title={translate('settings.appletManagementSettings.displayOrder')}
+                  disabled={busy || applets.length < 2}
+                  onClick={() => setOrder(true)}
+                >
+                  <ListIcon kind="order" />
+                </button>
+              </span>
+            </th>
+            <th>
+              <span className="settings-list-heading">
+                {translate('settings.appletManagementSettings.version')}
+                <button
+                  type="button"
+                  className="settings-list-icon applet-update-check"
+                  title={translate('settings.appletManagementSettings.checkAll')}
+                  aria-label={translate('settings.appletManagementSettings.checkAll')}
+                  disabled={busy || !applets.length}
+                  onClick={() => void run('updates', () => invoke('checkAppletUpdates'))}
+                >
+                  <Icon name="refresh" size={16} />
+                </button>
+              </span>
+            </th>
+            <th>{translate('settings.appletManagementSettings.enabled')}</th>
+            <th>{translate('settings.appletManagementSettings.state')}</th>
+            <th className="settings-list-actions-heading">
+              {translate('settings.appletManagementSettings.actions')}
+            </th>
+            <th>{translate('settings.appletManagementSettings.navigation')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visible.map((a) => {
+            const result = updates?.results.find((r) => r.id === a.id);
+            const changing = busy || ['starting', 'stopping'].includes(a.state);
+            const mutable = management?.mutableIds.includes(a.id);
+            return (
+              <tr key={a.id} data-applet-id={a.id}>
+                <td>
                   <button
-                    type="button"
-                    className="settings-list-icon applet-update-check"
-                    title={translate('settings.appletManagementSettings.checkAll')}
-                    aria-label={translate('settings.appletManagementSettings.checkAll')}
-                    disabled={busy || !applets.length}
-                    onClick={() => void run('updates', () => invoke('checkAppletUpdates'))}
+                    className="text-button applet-management-name"
+                    onClick={() => void move(a.id, 'settings')}
                   >
-                    <Icon name="refresh" size={16} />
+                    <strong>{a.displayName}</strong>
                   </button>
-                </span>
-              </th>
-              <th>{translate('settings.appletManagementSettings.enabled')}</th>
-              <th>{translate('settings.appletManagementSettings.state')}</th>
-              <th>{translate('settings.appletManagementSettings.actions')}</th>
-              <th>{translate('settings.appletManagementSettings.navigation')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((a) => {
-              const result = updates?.results.find((r) => r.id === a.id);
-              const changing = busy || ['starting', 'stopping'].includes(a.state);
-              const mutable = management?.mutableIds.includes(a.id);
-              return (
-                <tr key={a.id} data-applet-id={a.id}>
-                  <td>
+                  <small>{a.id}</small>
+                </td>
+                <td>
+                  <div className="applet-management-version">
+                    <VersionDisplay version={a.version} result={result} />
+                  </div>
+                  <UpdateCheckTime checkedAt={result?.checkedAt} />
+                  {result?.installable && (
                     <button
-                      className="text-button applet-management-name"
-                      onClick={() => void move(a.id, 'settings')}
+                      className="text-button applet-update-install"
+                      disabled={busy || !mutable}
+                      onClick={() => void run(a.id, () => invoke('installUpdates', [a.id]))}
                     >
-                      <strong>{a.displayName}</strong>
+                      {translate('settings.appletManagementSettings.update')}
                     </button>
-                    <small>{a.id}</small>
-                  </td>
-                  <td>
-                    <div className="applet-management-version">
-                      <VersionDisplay version={a.version} result={result} />
-                    </div>
-                    <UpdateCheckTime checkedAt={result?.checkedAt} />
-                    {result?.installable && (
+                  )}
+                  {result?.message && <small>{result.message}</small>}
+                </td>
+                <td>
+                  <Toggle
+                    label={translate('settings.appletManagementSettings.enable', {
+                      displayName: a.displayName,
+                    })}
+                    checked={a.enabled}
+                    disabled={changing}
+                    onChange={(value) =>
+                      void run(a.id, () =>
+                        invoke('manageApplet', [a.id, value ? 'enable' : 'disable']),
+                      )
+                    }
+                  />
+                </td>
+                <td>
+                  <span className={`state ${a.state}`}>{states[a.state]}</span>
+                  {a.error && (
+                    <small>{translate('settings.appletManagementSettings.lifecycleFailed')}</small>
+                  )}
+                  {a.state === 'waiting' && (
+                    <>
+                      <small>
+                        {a.scheduledStartAt && new Date(a.scheduledStartAt).toLocaleTimeString()}
+                      </small>
                       <button
-                        className="text-button applet-update-install"
-                        disabled={busy || !mutable}
-                        onClick={() => void run(a.id, () => invoke('installUpdates', [a.id]))}
+                        disabled={changing}
+                        onClick={() => void run(a.id, () => invoke('startAppletNow', [a.id]))}
                       >
-                        {translate('settings.appletManagementSettings.update')}
+                        {translate('settings.appletManagementSettings.start')}
                       </button>
-                    )}
-                    {result?.message && <small>{result.message}</small>}
-                  </td>
-                  <td>
-                    <Toggle
-                      label={translate('settings.appletManagementSettings.enable', {
+                    </>
+                  )}
+                </td>
+                <td className="settings-list-actions-cell">
+                  <div className="settings-list-actions applet-management-actions">
+                    <button
+                      type="button"
+                      className="settings-list-icon"
+                      title={translate('settings.appletManagementSettings.restart')}
+                      aria-label={translate('settings.appletManagementSettings.restartApplet', {
                         displayName: a.displayName,
                       })}
-                      checked={a.enabled}
-                      disabled={changing}
-                      onChange={(value) =>
-                        void run(a.id, () =>
-                          invoke('manageApplet', [a.id, value ? 'enable' : 'disable']),
+                      disabled={changing || !a.enabled}
+                      onClick={() =>
+                        void run(a.id, () => invoke('manageApplet', [a.id, 'restart']))
+                      }
+                    >
+                      <Icon name="power" />
+                    </button>
+                    <button
+                      type="button"
+                      className="settings-list-icon settings-list-delete"
+                      title={translate('settings.appletManagementSettings.uninstall')}
+                      aria-label={translate('settings.appletManagementSettings.uninstallApplet', {
+                        displayName: a.displayName,
+                      })}
+                      disabled={changing || !mutable}
+                      onClick={() =>
+                        void run(a.id, async () =>
+                          setRemoval(await invoke('prepareAppletUninstall', [a.id])),
                         )
                       }
-                    />
-                  </td>
-                  <td>
-                    <span className={`state ${a.state}`}>{states[a.state]}</span>
-                    {a.error && (
-                      <small>
-                        {translate('settings.appletManagementSettings.lifecycleFailed')}
-                      </small>
-                    )}
-                    {a.state === 'waiting' && (
-                      <>
-                        <small>
-                          {a.scheduledStartAt && new Date(a.scheduledStartAt).toLocaleTimeString()}
-                        </small>
-                        <button
-                          disabled={changing}
-                          onClick={() => void run(a.id, () => invoke('startAppletNow', [a.id]))}
-                        >
-                          {translate('settings.appletManagementSettings.start')}
-                        </button>
-                      </>
-                    )}
-                  </td>
-                  <td>
-                    <div className="applet-management-actions">
-                      <button
-                        type="button"
-                        className="settings-list-icon"
-                        title={translate('settings.appletManagementSettings.restart')}
-                        aria-label={translate('settings.appletManagementSettings.restartApplet', {
-                          displayName: a.displayName,
-                        })}
-                        disabled={changing || !a.enabled}
-                        onClick={() =>
-                          void run(a.id, () => invoke('manageApplet', [a.id, 'restart']))
-                        }
-                      >
-                        <Icon name="power" />
-                      </button>
-                      <button
-                        type="button"
-                        className="settings-list-icon settings-list-delete"
-                        title={translate('settings.appletManagementSettings.uninstall')}
-                        aria-label={translate('settings.appletManagementSettings.uninstallApplet', {
-                          displayName: a.displayName,
-                        })}
-                        disabled={changing || !mutable}
-                        onClick={() =>
-                          void run(a.id, async () =>
-                            setRemoval(await invoke('prepareAppletUninstall', [a.id])),
-                          )
-                        }
-                      >
-                        <ListIcon kind="delete" />
-                      </button>
-                    </div>
-                    {management?.packagesAvailable && !mutable && (
-                      <small>
-                        {translate('settings.appletManagementSettings.fileOperationsUnavailable')}
-                      </small>
-                    )}
-                  </td>
-                  <td>
-                    <div
-                      className="applet-management-links"
-                      role="group"
-                      aria-label={translate('settings.appletManagementSettings.settingsAndLogs', {
-                        displayName: a.displayName,
-                      })}
                     >
-                      {(
+                      <ListIcon kind="delete" />
+                    </button>
+                  </div>
+                  {management?.packagesAvailable && !mutable && (
+                    <small>
+                      {translate('settings.appletManagementSettings.fileOperationsUnavailable')}
+                    </small>
+                  )}
+                </td>
+                <td>
+                  <div
+                    className="applet-management-links"
+                    role="group"
+                    aria-label={translate('settings.appletManagementSettings.settingsAndLogs', {
+                      displayName: a.displayName,
+                    })}
+                  >
+                    {(
+                      [
                         [
-                          [
-                            'settings',
-                            translate('settings.appletManagementSettings.settings'),
-                            'settings',
-                          ],
-                          [
-                            'shortcuts',
-                            translate('settings.appletManagementSettings.shortcuts'),
-                            'keyboard',
-                          ],
-                          [
-                            'gestures',
-                            translate('settings.appletManagementSettings.gestures'),
-                            'mouse',
-                          ],
-                          ['logs', translate('settings.appletManagementSettings.logs'), 'logs'],
-                        ] satisfies [string, string, IconName][]
-                      ).map(([id, title, icon]) => {
-                        const assigned =
-                          (id === 'shortcuts' || id === 'gestures') &&
-                          !!management?.assignments[id].includes(a.id);
-                        return (
-                          <button
-                            key={id}
-                            type="button"
-                            className={`settings-list-icon${assigned ? ' accent-action' : ''}`}
-                            title={`${title}${assigned ? translate('settings.appletManagementSettings.assigned') : ''}`}
-                            aria-label={translate('settings.appletManagementSettings.open', {
-                              displayName: a.displayName,
-                              title: title,
-                            })}
-                            aria-description={
-                              assigned
-                                ? translate('settings.appletManagementSettings.assignedHint')
-                                : undefined
-                            }
-                            data-assigned={assigned}
-                            onClick={() => void move(a.id, id)}
-                          >
-                            <Icon name={icon} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                          'settings',
+                          translate('settings.appletManagementSettings.settings'),
+                          'settings',
+                        ],
+                        [
+                          'shortcuts',
+                          translate('settings.appletManagementSettings.shortcuts'),
+                          'keyboard',
+                        ],
+                        [
+                          'gestures',
+                          translate('settings.appletManagementSettings.gestures'),
+                          'mouse',
+                        ],
+                        ['logs', translate('settings.appletManagementSettings.logs'), 'logs'],
+                      ] satisfies [string, string, IconName][]
+                    ).map(([id, title, icon]) => {
+                      const assigned =
+                        (id === 'shortcuts' || id === 'gestures') &&
+                        !!management?.assignments[id].includes(a.id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className={`settings-list-icon${assigned ? ' accent-action' : ''}`}
+                          title={`${title}${assigned ? translate('settings.appletManagementSettings.assigned') : ''}`}
+                          aria-label={translate('settings.appletManagementSettings.open', {
+                            displayName: a.displayName,
+                            title: title,
+                          })}
+                          aria-description={
+                            assigned
+                              ? translate('settings.appletManagementSettings.assignedHint')
+                              : undefined
+                          }
+                          data-assigned={assigned}
+                          onClick={() => void move(a.id, id)}
+                        >
+                          <Icon name={icon} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </SettingsListLayout>
       {!visible.length && (
         <p>
           {applets.length

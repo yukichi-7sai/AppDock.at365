@@ -2637,25 +2637,13 @@ summary {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 .applet-shortcut-overview {
-  width: 100%;
-  border-collapse: collapse;
   table-layout: fixed;
-}
-.applet-shortcut-overview th,
-.applet-shortcut-overview td {
-  text-align: left;
-  vertical-align: top;
-  padding: 12px;
-  border-bottom: 1px solid var(--border);
-  overflow-wrap: anywhere;
 }
 .applet-shortcut-overview th:first-child {
   width: 42%;
 }
-.applet-shortcut-overview td > small {
-  display: block;
-  color: var(--muted);
-  margin-top: 4px;
+.applet-shortcut-overview td {
+  overflow-wrap: anywhere;
 }
 .applet-shortcut-command {
   display: flex;
@@ -2911,27 +2899,6 @@ summary {
   color: var(--muted);
   font-size: 12px;
 }
-.command-shortcuts .applet-shortcut-overview {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  border-collapse: separate;
-  border-spacing: 0;
-  overflow: hidden;
-}
-.command-shortcuts .applet-shortcut-overview th {
-  padding: 14px 18px;
-  color: var(--muted);
-  font-size: 12px;
-  background: var(--settings-group-background);
-}
-.command-shortcuts .applet-shortcut-overview td {
-  padding: 16px 18px;
-}
-.command-shortcuts .applet-shortcut-overview tbody:last-child > tr:last-child > td,
-.command-shortcuts .applet-shortcut-overview tbody:last-child > tr > td[rowspan] {
-  border-bottom: 0;
-}
 .command-shortcuts .applet-shortcut-overview th:first-child {
   width: 40%;
 }
@@ -2993,12 +2960,8 @@ summary {
     width: 125px;
     padding: 8px;
   }
-  .command-shortcuts .applet-shortcut-overview th,
-  .command-shortcuts .applet-shortcut-overview td {
-    padding: 12px;
-  }
   .applet-shortcut-overview:has(.command-settings-heading) {
-    --command-settings-cell-padding: 12px;
+    --command-settings-cell-padding: 10px;
   }
 }
 .applet-shortcut-dialog {
@@ -3569,26 +3532,16 @@ summary {
   line-height: 1.7;
 }
 .permission-table {
-  width: 100%;
-  border-collapse: collapse;
   table-layout: fixed;
-  font-size: 13px;
 }
-.permission-table thead th {
-  color: var(--muted);
-  font-weight: 500;
-  padding: 12px 18px;
-  border-bottom: 1px solid var(--border);
+.permission-table thead th:not(:first-child) {
+  text-align: center;
 }
 .permission-table thead th:first-child {
   width: 46%;
-  text-align: left;
 }
 .permission-table tbody th {
-  text-align: left;
   font-weight: 400;
-  padding: 22px 18px;
-  border-bottom: 1px solid var(--border);
 }
 .permission-table tbody th p {
   margin: 8px 0 0;
@@ -3596,10 +3549,7 @@ summary {
   line-height: 1.6;
 }
 .permission-table td {
-  padding: 20px 12px;
   text-align: center;
-  vertical-align: top;
-  border-bottom: 1px solid var(--border);
   overflow-wrap: anywhere;
 }
 .permission-pending {

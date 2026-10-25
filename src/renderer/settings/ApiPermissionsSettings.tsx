@@ -6,6 +6,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
+import { SettingsTable } from '../settings-ui/SettingsTable';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
 import {
   appletApiPermissionLabels,
@@ -220,7 +221,8 @@ export function ApiPermissionsSettings({
       className="api-permissions settings-sections"
       aria-label={translate('settings.apiPermissionsSettings.title')}
     >
-      <table
+      <SettingsTable
+        framed
         className="permission-table"
         aria-label={translate('settings.apiPermissionsSettings.api')}
       >
@@ -340,7 +342,7 @@ export function ApiPermissionsSettings({
             );
           })}
         </tbody>
-      </table>
+      </SettingsTable>
       <SettingsSection
         title={translate('settings.apiPermissionsSettings.details')}
         data-testid="permissions-help"

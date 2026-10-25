@@ -342,21 +342,6 @@
 .settings-panel :where(input, select, textarea) {
   border-radius: 9px;
 }
-.settings-panel .permission-table {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  border-collapse: separate;
-  border-spacing: 0;
-  overflow: hidden;
-}
-.settings-panel .permission-table thead {
-  background: var(--settings-group-background);
-}
-.settings-panel .permission-table tbody tr:last-child,
-.settings-panel .permission-table tbody tr:last-child > :is(th, td) {
-  border-bottom: 0;
-}
 .settings-panel .command-shortcut-summary {
   flex-wrap: wrap;
   padding-block: 8px;
@@ -554,39 +539,11 @@ pre.ai-preview-result {
   background: var(--panel);
 }
 
-.ai-connections-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  font-size: 12px;
-}
-.ai-connections-toolbar > div,
-.ai-row-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
 .ai-connection-table {
   margin-bottom: 4px;
 }
-.ai-connection-table .applet-shortcut-overview {
-  table-layout: auto;
-  width: 100%;
-}
-.ai-connection-table .applet-shortcut-overview th:last-child {
+.ai-connection-table th:last-child {
   width: 108px;
-}
-.ai-connection-table td {
-  vertical-align: middle;
-  overflow-wrap: anywhere;
-}
-.ai-connection-table td > small {
-  display: block;
-  margin-top: 5px;
-  color: var(--muted);
-  font-size: 11px;
 }
 .ai-server-heading {
   display: flex;
@@ -607,13 +564,6 @@ pre.ai-preview-result {
 }
 .ai-model-name {
   font-size: 12px;
-}
-.ai-row-actions {
-  justify-content: flex-end;
-}
-.ai-action-heading {
-  display: block;
-  text-align: right;
 }
 .ai-empty {
   text-align: center;
@@ -636,29 +586,11 @@ pre.ai-preview-result {
 .ai-model-picker > button {
   font-size: 23px;
 }
-@container settings-page (max-width: 540px) {
-  .ai-settings .ai-connection-table .applet-shortcut-overview th,
-  .ai-settings .ai-connection-table .applet-shortcut-overview td {
-    padding: 12px 8px;
-  }
-  .ai-settings .ai-connection-table .applet-shortcut-overview th:last-child {
-    width: 84px;
-  }
-  .ai-row-actions {
-    gap: 4px;
-  }
-}
-
 .ai-connection-dialog[open] {
   height: min(740px, calc(100dvh - 40px));
 }
 .ai-connection-dialog .settings-dialog-body {
   flex: 1;
-}
-.applet-management-table th,
-.applet-management-table td {
-  padding: 14px 12px;
-  vertical-align: middle;
 }
 .applet-management-table td:first-child {
   width: 30%;
@@ -686,19 +618,13 @@ pre.ai-preview-result {
 .applet-management-name strong {
   font-weight: 600;
 }
-.applet-management-column-title,
 .applet-management-version,
-.applet-management-links,
-.applet-management-actions {
+.applet-management-links {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.applet-management-column-title {
-  gap: 10px;
-}
-.applet-management-links,
-.applet-management-actions {
+.applet-management-links {
   flex-wrap: nowrap;
   gap: 4px;
 }
