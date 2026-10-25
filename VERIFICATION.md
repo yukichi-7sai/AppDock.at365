@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-26: 共通ブラウザ設定の宣言共有とMCP接続 0.91.4
+
+- main `49d3c0b`の統合commit `a802b73`から、同じ専用worktree/branchで共通ブラウザ設定のMCP対応を実装した。マージと別の実装単位とし、追跡先の追加、primary mainの変更、push/Release/deployは行わない。既存commandTriggerOptionsのbrowsers/requireChromiumWindowClassと共有settings.jsonを使い、製品設定項目/保存ファイルの追加削除はないため、発行済み0.91.3から**0.91.4**へパッチ更新した。
+- command-trigger-options.tsの共通宣言から型/既定値/検証、既存3画面の通常入力、検索/JSON、差分保存とMCP項目を生成する。トグル/文字/数値/固定選択は宣言だけで反映し、MCP側に別表を作らない。正規化関数は内部に保持して公開定義から除外し、構造化複製とIPCを維持する。方式別の動作・割当・接続と衝突するキーは宣言へ入れない。通常の見た目/入力確定/既存ラベルを保った。
+- 固定6入口へcategory=command-triggersのfields対象を接続。ブラウザ名は所有するprocessNamesで検証・正規化し、上限100件、空配列の明示値を維持する。正規化した候補から無変更/既定値一致を判定し、大小文字や.exe/重複だけの差で保存せず、正規化後の既定値setとresetで上書きを除去する。rawの変更キー以外をプレビューへ増やさない。
+- 保存は共有commandTriggerOptionsだけを変更し、3入力方式の読取りと次の条件判定へ通常通知で反映する。割当、方式別executionMode、動作/接続設定、PC専用値と暗号化情報を保持する。read + writeで利用し、executeを追加条件にしない。applies=commandTriggerOptionsChanged、dryRunは検証だけ、settingsSaved/effectVerified=falseは保存完了だけを表す。物理入力とOS登録の完了は保証しない。
+- automation=false/secret/localOnlyをSchema・値・検索・更新から除外する。従来の3方式の取得、configure用Schema/検証、返却プレビューにも同じ公開判定を適用し、明示非公開を旧入口から変更できないようにした。外側の案内は現在の公開inputSchemaを参照し、共通フィールド名を二重登録しない。MCPのツール名/外側Schemaと8行の操作許可は維持した。
+- 発行前に宣言の共有、型/既定値、構造化複製、正規化と既定省略、原子的保存、公開/許可/競合、旧入口、UIと必要回帰をレビュー。機能ページのカタログ早期returnにも共通宣言を接続し、JSONの既定値だけのblockを省略する契約を試験へ反映して再検証した。阻害指摘なし。
+- 固定依存install、型検査、本体/Default Shell build、関連標準**75ファイル777/777件、fail/skip 0**が成功。新規の所有adapter回帰7件は、探索/配列Schema、dryRun/正規化/再送/無変更/既定復帰、100件境界/明示空配列、共有/PC分離と暗号化bytes保持、原子的拒否/許可取消/外部更新、宣言追加によるカタログ/JSON/保存/MCP反映、非公開の旧入口保護と保存失敗を確認した。標準全体は未実行。
+- 隔離source/最終固定EXEで実MCP・画面**各36群**、ジェスチャー機能設定/共通ブラウザ設定**各8群**、コマンドトリガー**各18群**と固定EXE smokeが成功した。MCPから3画面への反映、既存入力/トグルからMCPへの反映、古い要求拒否、実再起動後の保存保持、未編集設定/暗号化bytesとexecute OFF、tools/list不変を確認。Applet workerの合計起動3回と無効/待機worker未起動も保持した。実利用の設定/認証、OS登録、物理入力を変更する検証は行っていない。
+- 最終**757入力**と参照Applet manifestのSHAは、回帰前後・発行前後・固定検証後で一致。Node 24.22.1、pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.402、Windows x64で実行した。整形はsrc/scripts/testsの変更範囲を検査し、package.jsonは版番号だけを変更。発行後は文書と証跡だけを追加した。
+- publish.bat終了0。EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170695215 bytes / SHA256 `a7adf008ed601fc83e96870bd3e5d24c43de7c581de4f2fb069b4ef3d39646e5`**。File/ProductVersion、feedの版/size/hash、ASAR内package/同梱Default Shellと、全固定試験コピーを照合した。
+- 正本は[設定API](docs/settings-api.md)、[設定基盤](docs/settings-foundation.md)、[コマンドトリガー](docs/command-triggers.md)、[外部操作](docs/automation.md)。証跡は`.artifacts/mcp-settings-browser-options-20261026/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-browser-options-20261026/`。全GUIのprofile/result/hashはsource-profiles.json/fixed-profiles.json、smokeはsmoke-profile.jsonに記録した。
+- 専用テストプロセス0。今回の各script/方式の成功は3回以内。main統合/過去の参照profile、診断、固定ビルド出力、別作業を保持し、削除0件。初期のカタログ経路はowner-tests.log、JSON既定省略の期待値はowner-final.logに診断を残し、owner-complete.logと最終回帰で解消を確認した。
+
 ## 2026-10-26: 最新mainのMCP設定worktreeへの統合 0.91.3
 
 - `codex/mcp-settings-design`のcleanな`c194c36`へ、fetchで確認した最新`origin/main=49d3c0b`を通常mergeした。mainのコマンドトリガー統合、共有ブラウザ判定、共通スクロールバーとジェスチャー機能設定の変更を取り込み、MCPの固定6入口、通常設定/一覧/所有adapterと秘密保護を保持した。primary main checkout、追跡先、push/Release/deployは変更しない。

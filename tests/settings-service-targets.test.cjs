@@ -21,6 +21,12 @@ const {
 const {
   replaceNotificationPreference,
 } = require('../out/main/shared/notification-preference-edit');
+const {
+  commandTriggerOptionDeclarations,
+  commandTriggerSettingDefinitions,
+  defaultCommandTriggerOptions,
+  parseCommandTriggerOptions,
+} = require('../out/main/shared/command-trigger-options');
 function fixture(t, { device = false, updateApplets = [] } = {}) {
   const dir = path.resolve('.artifacts/settings-service-targets-unit', randomUUID());
   fs.mkdirSync(dir, { recursive: true });
@@ -171,6 +177,330 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
     updateApplets,
   };
 }
+
+test('shared browser discovery uses declared defaults, a bounded array and existing six settings operations', (t) => {
+  const f = fixture(t),
+    id = 'service.command-triggers';
+  assert.equal(f.target('command-triggers').targetId, id);
+  const schema = f.call('schema.get', { targetId: id });
+  assert.deepEqual(
+    schema.items.map((field) => field.key),
+    ['browsers', 'requireChromiumWindowClass'],
+  );
+  assert.equal(schema.items[0].inputSchema.type, 'array');
+  assert.equal(schema.items[0].inputSchema.maxItems, 100);
+  assert.deepEqual(f.values(id), defaultCommandTriggerOptions());
+  assert(f.read(id).fields.every((field) => field.inherited && field.writable));
+  assert.doesNotThrow(() => structuredClone(commandTriggerSettingDefinitions()));
+  assert.equal(f.writes(), 0);
+  assert.equal(f.decrypts(), 0);
+});
+
+test('shared browser normalization, dryRun, replay, normalized no-op and defaults agree across all three existing readers', (t) => {
+  const f = fixture(t),
+    id = 'service.command-triggers',
+    before = fs.readFileSync(f.store.file);
+  const operations = [
+    {
+      kind: 'set',
+      changes: { browsers: [' CHROME.EXE ', 'chrome'], requireChromiumWindowClass: true },
+    },
+  ];
+  const preview = f.call('apply', f.request(id, operations, true));
+  assert.deepEqual(preview.changes.find((field) => field.key === 'browsers').value, ['chrome']);
+  assert.equal(preview.completion, 'validated');
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  const request = f.request(id, operations),
+    saved = f.call('apply', request);
+  assert.deepEqual(f.call('apply', request), saved);
+  assert.equal(saved.effectVerified, false);
+  assert.equal(f.writes(), 1);
+  for (const name of ['shortcuts', 'gestures', 'touchpadGestures']) {
+    const state = f.api.call(name + '.get');
+    const options = state.options ?? state.settings;
+    assert.deepEqual(options.browsers, ['chrome']);
+    assert.equal(options.requireChromiumWindowClass, true);
+  }
+  const bytes = fs.readFileSync(f.store.file);
+  assert.equal(
+    f.call(
+      'apply',
+      f.request(id, [{ kind: 'set', changes: { browsers: ['CHROME.exe', 'chrome'] } }]),
+    ).changed,
+    false,
+  );
+  assert.deepEqual(fs.readFileSync(f.store.file), bytes);
+  const defaults = defaultCommandTriggerOptions();
+  f.call(
+    'apply',
+    f.request(id, [
+      {
+        kind: 'set',
+        changes: {
+          browsers: defaults.browsers.map((name) => name.toUpperCase() + '.EXE'),
+          requireChromiumWindowClass: false,
+        },
+      },
+    ]),
+  );
+  assert(f.read(id).fields.every((field) => field.inherited));
+  assert.equal(f.store.storedValue().commandTriggerOptions, undefined);
+});
+
+test('shared browser changes retain PC settings, assignments, other preferences and ciphertext, with 100 names and explicit empty supported', (t) => {
+  const f = fixture(t, { device: true }),
+    id = 'service.command-triggers';
+  f.aiSecrets.setKey(f.store.value.ai.connections[0], 'PRIVATE_AI_KEY');
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS_KEY');
+  const files = [f.store.device.file, f.aiFile, f.ttsFile],
+    bytes = files.map((file) => fs.readFileSync(file));
+  const withoutCommon = (value) => {
+    const clone = structuredClone(value);
+    delete clone.commandTriggerOptions;
+    return clone;
+  };
+  const before = withoutCommon(f.store.value);
+  const browsers = Array.from({ length: 100 }, (_, index) => `browser${index}.EXE`);
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { browsers } }]));
+  assert.equal(f.values(id).browsers.length, 100);
+  assert.deepEqual(withoutCommon(f.store.value), before);
+  assert.deepEqual(
+    files.map((file) => fs.readFileSync(file)),
+    bytes,
+  );
+  const stored = fs.readFileSync(f.store.file);
+  assert.throws(
+    () =>
+      f.call(
+        'apply',
+        f.request(id, [{ kind: 'set', changes: { browsers: [...browsers, 'extra'] } }]),
+      ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.deepEqual(fs.readFileSync(f.store.file), stored);
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { browsers: [] } }]));
+  assert.deepEqual(f.values(id).browsers, []);
+  assert.equal(f.read(id, ['browsers']).fields[0].inherited, false);
+  f.call('apply', f.request(id, [{ kind: 'reset', keys: ['browsers'] }]));
+  assert.deepEqual(f.values(id).browsers, defaultCommandTriggerOptions().browsers);
+  assert.deepEqual(
+    files.map((file) => fs.readFileSync(file)),
+    bytes,
+  );
+});
+
+test('shared browser invalid batches, permission revocation and external revisions never overwrite unrelated settings', (t) => {
+  const f = fixture(t),
+    id = 'service.command-triggers',
+    before = fs.readFileSync(f.store.file);
+  for (const changes of [
+    { browsers: 'chrome' },
+    { browsers: ['C:/browser.exe'] },
+    { browsers: ['  '] },
+    { browsers: ['valid'], requireChromiumWindowClass: 'true' },
+    { executionMode: 'first' },
+  ])
+    assert.throws(() => f.call('apply', f.request(id, [{ kind: 'set', changes }])));
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  const request = f.request(id, [{ kind: 'set', changes: { requireChromiumWindowClass: true } }]);
+  f.call('apply', request);
+  f.setWrite(false);
+  assert.throws(() => f.call('apply', request), { code: 'WRITE_DISABLED' });
+  f.setWrite(true);
+  const stale = f.request(id, [{ kind: 'set', changes: { browsers: [] } }]);
+  const changed = JSON.parse(fs.readFileSync(f.store.file));
+  changed.host = { ...changed.host, theme: 'dark' };
+  fs.writeFileSync(f.store.file, JSON.stringify(changed));
+  assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
+  assert.equal(JSON.parse(fs.readFileSync(f.store.file)).host.theme, 'dark');
+});
+
+test('adding common browser declarations drives parser, types of defaults, catalogs, JSON, storage and MCP without a second field table', (t) => {
+  const additions = {
+    futureText: { type: 'string', title: 'Future text', default: '', maxLength: 8 },
+    futureToggle: { type: 'boolean', title: 'Future toggle', default: false },
+    futureNumber: { type: 'number', title: 'Future number', default: 1, minimum: 0, maximum: 4 },
+    futureSelect: {
+      type: 'select',
+      title: 'Future select',
+      default: 'one',
+      options: [
+        { value: 'one', label: 'One' },
+        { value: 'two', label: 'Two' },
+      ],
+    },
+    privateText: {
+      type: 'string',
+      title: 'PRIVATE_BROWSER_TITLE',
+      default: 'PRIVATE_BROWSER_VALUE',
+      automation: false,
+    },
+    secretText: {
+      type: 'string',
+      title: 'SECRET_BROWSER_TITLE',
+      default: 'SECRET_BROWSER_VALUE',
+      secret: true,
+      automation: true,
+    },
+    localText: {
+      type: 'string',
+      title: 'LOCAL_BROWSER_TITLE',
+      default: 'LOCAL_BROWSER_VALUE',
+      localOnly: true,
+    },
+  };
+  Object.assign(commandTriggerOptionDeclarations, additions);
+  try {
+    const f = fixture(t),
+      id = 'service.command-triggers';
+    const {
+      settingsCatalog,
+      settingsJsonProjection,
+      applySettingsJson,
+    } = require('../out/main/shared/settings-catalog');
+    const pages = settingsCatalog([], f.store.value);
+    for (const name of ['shortcuts', 'gestures', 'touchpad-gestures']) {
+      const page = pages.find((item) => item.id === name);
+      for (const key of Object.keys(additions)) assert(page.items.some((item) => item.key === key));
+      const json = settingsJsonProjection(f.store.value, page, []);
+      assert.equal(parseCommandTriggerOptions(json.commandTriggerOptions).futureNumber, 1);
+      const edited = applySettingsJson(
+        f.store.value,
+        page,
+        [],
+        JSON.stringify({
+          ...json,
+          commandTriggerOptions: { ...json.commandTriggerOptions, futureText: 'JSON' },
+        }),
+      );
+      assert.equal(edited.commandTriggerOptions.futureText, 'JSON');
+    }
+    const output = JSON.stringify([f.call('schema.get', { targetId: id }), f.read(id)]);
+    assert(!/PRIVATE_BROWSER|SECRET_BROWSER|LOCAL_BROWSER/.test(output));
+    assert.equal(f.call('targets.list', { query: 'PRIVATE_BROWSER_TITLE' }).items.length, 0);
+    assert.equal(f.values(id).futureNumber, 1);
+    f.call(
+      'apply',
+      f.request(id, [
+        {
+          kind: 'set',
+          changes: {
+            futureText: 'saved',
+            futureToggle: true,
+            futureNumber: 4,
+            futureSelect: 'two',
+          },
+        },
+      ]),
+    );
+    assert.equal(
+      JSON.parse(fs.readFileSync(f.store.file)).commandTriggerOptions.futureText,
+      'saved',
+    );
+    for (const changes of [
+      { futureText: 'too-long-value' },
+      { futureNumber: 5 },
+      { futureSelect: 'missing' },
+      { privateText: 'write' },
+      { secretText: 'write' },
+      { localText: 'write' },
+    ])
+      assert.throws(() => f.call('apply', f.request(id, [{ kind: 'set', changes }])));
+    for (const name of ['shortcuts', 'gestures', 'touchpadGestures'])
+      assert(
+        !/PRIVATE_BROWSER|SECRET_BROWSER|LOCAL_BROWSER/.test(
+          JSON.stringify(f.api.call(name + '.get')),
+        ),
+      );
+    assert.doesNotThrow(() => structuredClone(commandTriggerSettingDefinitions()));
+  } finally {
+    for (const key of Object.keys(additions)) delete commandTriggerOptionDeclarations[key];
+  }
+});
+
+test('explicitly private common browser fields are also hidden and protected through legacy configure schemas and previews', (t) => {
+  const declaration = commandTriggerOptionDeclarations.browsers;
+  declaration.automation = false;
+  try {
+    const f = fixture(t),
+      id = 'service.command-triggers';
+    assert.throws(() => f.read(id, ['browsers']), { code: 'NOT_FOUND' });
+    const { ShortcutCommands } = require('../out/main/main/core/shortcut-commands');
+    const { GestureCommands } = require('../out/main/main/core/gesture-commands');
+    const options = {
+      settings: f.store,
+      settingsCommands: f.commands,
+      save: (value, revision) => f.store.save(value, revision),
+      commands: () => [],
+      applets: () => [],
+      statuses: () => [],
+    };
+    for (const service of [
+      new ShortcutCommands(options),
+      new GestureCommands(options),
+      new GestureCommands({ ...options, touchpad: true }),
+    ]) {
+      const state = service.get();
+      assert.equal(Object.hasOwn(state.options ?? state.settings, 'browsers'), false);
+      const configure = service
+        .commands()[0]
+        .inputSchema.properties.operations.items.oneOf.find(
+          (operation) => operation.properties.kind.const === 'configure',
+        );
+      assert.equal(Object.hasOwn(configure.properties.changes.properties, 'browsers'), false);
+      assert.throws(
+        () =>
+          service.execute({
+            expectedRevision: f.commands.revision(),
+            operations: [{ kind: 'configure', changes: { browsers: ['hidden'] } }],
+            dryRun: true,
+          }),
+        { code: 'INVALID_ARGUMENT' },
+      );
+      const result = service.execute({
+        expectedRevision: f.commands.revision(),
+        operations: [{ kind: 'configure', changes: { executionMode: 'first' } }],
+        dryRun: true,
+      });
+      assert.equal(Object.hasOwn(result.options ?? result.settings, 'browsers'), false);
+    }
+    assert.equal(f.writes(), 0);
+  } finally {
+    delete declaration.automation;
+  }
+});
+
+test('common browser failed saves retain shared/device and credential bytes and deduplicate the safe error', (t) => {
+  const f = fixture(t, { device: true }),
+    id = 'service.command-triggers';
+  f.aiSecrets.setKey(f.store.value.ai.connections[0], 'PRIVATE_AI_KEY');
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS_KEY');
+  const files = [f.store.file, f.store.device.file, f.aiFile, f.ttsFile],
+    before = files.map((file) => fs.readFileSync(file));
+  const request = f.request(id, [
+    { kind: 'set', changes: { browsers: [], requireChromiumWindowClass: true } },
+  ]);
+  const save = f.store.save;
+  f.store.save = () => {
+    throw Error('PRIVATE_FAILURE_DETAIL');
+  };
+  try {
+    for (let attempt = 0; attempt < 2; attempt++)
+      assert.throws(
+        () => f.call('apply', request),
+        (error) =>
+          error.code === 'SAVE_FAILED' && !error.message.includes('PRIVATE_FAILURE_DETAIL'),
+      );
+  } finally {
+    f.store.save = save;
+  }
+  assert.deepEqual(
+    files.map((file) => fs.readFileSync(file)),
+    before,
+  );
+  assert.equal(f.writes(), 1);
+  assert.equal(f.decrypts(), 0);
+});
 test('service settings discovery uses existing six entry points and never exposes credentials', (t) => {
   const f = fixture(t);
   f.aiSecrets.setKey(f.store.value.ai.connections[0], 'PRIVATE_AI_KEY');

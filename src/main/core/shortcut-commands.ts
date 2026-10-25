@@ -1,6 +1,9 @@
 import { hostText } from '../../shared/i18n';
 import type { Settings, SettingsSnapshot, GlobalHotKeyStatus } from '../../shared/contracts';
-import { parseCommandTriggerOptions } from '../../shared/command-trigger-options';
+import {
+  parseCommandTriggerOptions,
+  publicCommandTriggerFields,
+} from '../../shared/command-trigger-options';
 import {
   touchpadShortcutProjection,
   validateTouchpadKeyEdit,
@@ -131,7 +134,7 @@ export class ShortcutCommands {
                   operation('configure', {
                     changes: {
                       type: 'object',
-                      properties: {
+                      properties: publicCommandTriggerFields({
                         executionMode: { type: 'string', enum: ['first', 'all'] },
                         browsers: {
                           type: 'array',
@@ -139,7 +142,7 @@ export class ShortcutCommands {
                           maxItems: 100,
                         },
                         requireChromiumWindowClass: { type: 'boolean' },
-                      },
+                      }),
                       minProperties: 1,
                       additionalProperties: false,
                     },
@@ -279,6 +282,8 @@ export class ShortcutCommands {
           if (
             !exact(op, ['kind', 'changes']) ||
             !exact(op.changes, ['executionMode', 'browsers', 'requireChromiumWindowClass']) ||
+            Object.keys(publicCommandTriggerFields(op.changes)).length !==
+              Object.keys(op.changes).length ||
             !Object.keys(op.changes).length ||
             Object.values(op.changes).some((v) => v === undefined)
           )
@@ -365,10 +370,10 @@ export class ShortcutCommands {
     };
   }
   private publicOptions(options: ReturnType<typeof getKeybindingOptions>) {
-    return {
+    return publicCommandTriggerFields({
       executionMode: options.executionMode,
       browsers: [...options.browsers],
       requireChromiumWindowClass: options.requireChromiumWindowClass,
-    };
+    });
   }
 }

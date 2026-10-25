@@ -12,6 +12,7 @@ import type { Settings, SettingsSnapshot } from '../../shared/contracts';
 import {
   getCommandTriggerOptions,
   parseCommandTriggerOptions,
+  publicCommandTriggerFields,
   type CommandTriggerOptions,
 } from '../../shared/command-trigger-options';
 import { validCommandId } from '../../shared/commands';
@@ -241,7 +242,7 @@ export class GestureCommands {
                   operation('configure', {
                     changes: {
                       type: 'object',
-                      properties: this.configurationFields,
+                      properties: publicCommandTriggerFields(this.configurationFields),
                       minProperties: 1,
                       additionalProperties: false,
                     },
@@ -297,7 +298,7 @@ export class GestureCommands {
         available: c.available,
         ownerId: c.permission === 'applets.manage' ? null : c.appletId,
       })),
-      settings: this.gestureSettings(this.options.settings.value),
+      settings: publicCommandTriggerFields(this.gestureSettings(this.options.settings.value)),
       gestureTypes: (this.options.touchpad ? touchpadGestureTypes : gestureTypes).map(
         ([id, title]) => ({ id, title }),
       ),
@@ -379,7 +380,7 @@ export class GestureCommands {
         } else if (op.kind === 'configure') {
           if (
             !exact(op, ['kind', 'changes']) ||
-            !exact(op.changes, Object.keys(this.configurationFields)) ||
+            !exact(op.changes, Object.keys(publicCommandTriggerFields(this.configurationFields))) ||
             !Object.keys(op.changes).length ||
             Object.values(op.changes).some((value) => value === undefined)
           )
@@ -448,7 +449,7 @@ export class GestureCommands {
       dryRun: args.dryRun === true,
       changed,
       bindings: rows,
-      settings: next,
+      settings: publicCommandTriggerFields(next),
       revision: this.options.settingsCommands.revision(),
       warning: store.syncError ?? null,
       applies: 'gesturesChanged',

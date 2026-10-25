@@ -1,6 +1,7 @@
 import { hostText } from './i18n';
 import { hostSettingDefinitions } from './host-settings';
 import { appletCommonDefinitions, appletCommonKeys } from './applet-common-settings';
+import { commandTriggerSettingDefinitions } from './command-trigger-options';
 import { getHostTranslator } from './i18n';
 import { defaultHostLanguage, type HostLanguage } from './host-language';
 import { collectionRecord } from './page-collections';
@@ -184,8 +185,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
     ],
-    ['browsers', hostText('settings.settings-catalog.browsers')],
-    ['requireChromiumWindowClass', hostText('settings.settings-catalog.chromium')],
     [
       'commonOptions',
       hostText('settings.commandTriggerOptions.title'),
@@ -197,12 +196,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
       'executionMode',
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
-    ],
-    ['browsers', hostText('settings.settings-catalog.browsers'), 'chrome.exe firefox.exe'],
-    [
-      'requireChromiumWindowClass',
-      hostText('settings.settings-catalog.chromium'),
-      hostText('settings.settings-catalog.touchpadBrowserKeywords'),
     ],
     [
       'enabled',
@@ -242,9 +235,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
     ],
-    ['browsers', hostText('settings.settings-catalog.browsers')],
     ['excludedProcesses', hostText('settings.settings-catalog.gesturesExcluded')],
-    ['requireChromiumWindowClass', hostText('settings.settings-catalog.chromium')],
     ['distance', hostText('settings.settings-catalog.gesturesDistance')],
     ['wheelDelayMs', hostText('settings.settings-catalog.gesturesWheelDelay')],
     [
@@ -389,7 +380,17 @@ function hostRows(
   language: HostLanguage = defaultHostLanguage,
 ): [string, string, string?][] {
   const t = getHostTranslator(language);
-  if (pageId !== 'appearance' && pageId !== 'general') return hostItems[pageId] ?? [];
+  if (pageId !== 'appearance' && pageId !== 'general')
+    return [
+      ...(hostItems[pageId] ?? []),
+      ...(['shortcuts', 'gestures', 'touchpad-gestures'].includes(pageId)
+        ? commandTriggerSettingDefinitions().map((field): [string, string, string?] => [
+            field.key,
+            field.title,
+            field.description,
+          ])
+        : []),
+    ];
   const rows: [string, string, string?][] = [
     ...localizedHostFields[pageId].map(([key, title, description]): [string, string, string] => [
       key,

@@ -373,7 +373,7 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_shortcuts',
     description:
-      'キージェスチャーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktopに対応します。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesはexecutionMode（first/all、既定all）・browsers（exe名の配列）・requireChromiumWindowClass（boolean）です。判定対象は押下時の前面ウィンドウです。情報取得と設定変更の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。' +
+      'キージェスチャーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktopに対応します。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesは現在の公開inputSchemaに従います。判定対象は押下時の前面ウィンドウです。情報取得と設定変更の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。' +
       hostText('settings.commandTriggerOptions.apiHint'),
     inputSchema: {
       type: 'object',

@@ -1,7 +1,7 @@
 {
   "services.appdockApi.commonGesturePermission": "ジェスチャー共通のブラウザ設定の変更には、キー・マウス・タッチパッドの編集許可がすべて必要です。",
   "settings.settingsPageLayout.touchpad": "タッチパッドジェスチャーの動作・Windowsとの接続と、ジェスチャー共通の設定を変更します。",
-  "settings.commandTriggerOptions.apiHint": "browsersとrequireChromiumWindowClassはキー・マウス・タッチパッドで共有します。これらの変更には情報取得と設定変更の許可が必要です。executionModeは方式別です。",
+  "settings.commandTriggerOptions.apiHint": "ブラウザ判定の設定はキー・マウス・タッチパッドで共有します。これらの変更には情報取得と設定変更の許可が必要です。executionModeは方式別です。",
   "settings.commandTriggerOptions.title": "ジェスチャー共通の設定",
   "settings.commandTriggerOptions.invalid": "ジェスチャー共通の設定を確認してください。",
   "settings.commandTriggers.title": "コマンドトリガー",

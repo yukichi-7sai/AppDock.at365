@@ -30,6 +30,11 @@ import { appletCommonDefinitions } from '../../shared/applet-common-settings';
 import { appletEnabled, defaultAppletEnabled } from '../../shared/applet-state';
 import { managedApplets, reorderManagedApplets } from '../../shared/applet-management';
 import { AppletManagement, AppletManagementError } from './applet-management';
+import {
+  commandTriggerSettingDefinitions,
+  getCommandTriggerOptions,
+  parseCommandTriggerOptions,
+} from '../../shared/command-trigger-options';
 import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import type { SettingsStore } from './settings';
 import {
@@ -60,6 +65,7 @@ interface Target {
   rewriteScope?: 'shared' | 'device';
   replace(settings: Settings, changes: RecordValue, reset: string[]): Settings;
   guard?(next: Settings): void;
+  normalize?(changes: RecordValue): RecordValue;
   context?: unknown;
   guardRevision?(): string;
   applies?(key: string): string;
@@ -124,6 +130,7 @@ export class SettingsServiceTargets {
       ...[
         this.shell(),
         this.updates(),
+        this.commandTriggerOptions(),
         ...(this.options.applets?.() ?? [])
           .filter((applet) => !applet.collection && applet.sourceKind !== 'builtin')
           .map((applet) => this.appletUpdateSource(applet)),
@@ -229,8 +236,13 @@ export class SettingsServiceTargets {
         const store = this.options.settings,
           before = spec.values(store.value),
           original = readOverrides();
-        const actual = { ...changes },
-          resets = new Set(reset);
+        let actual: RecordValue;
+        try {
+          actual = spec.normalize?.(changes) ?? { ...changes };
+        } catch {
+          return fail();
+        }
+        const resets = new Set(reset);
         for (const field of spec.fields) {
           if (Object.hasOwn(actual, field.key)) {
             if (
@@ -347,6 +359,50 @@ export class SettingsServiceTargets {
             : key === 'startupDelaySeconds'
               ? 'nextStart'
               : 'nextStartupCheck',
+    };
+  }
+  private commandTriggerOptions(): Target {
+    const fields: Field[] = commandTriggerSettingDefinitions()
+      .filter(
+        (field) =>
+          mcpSettingPublished(field) &&
+          (field.type === 'string-list' || mcpSettingSupported(field)),
+      )
+      .map((field) => ({
+        ...field,
+        ...(field.type === 'string-list'
+          ? {
+              schema: {
+                type: 'array',
+                maxItems: field.maxItems ?? 64,
+                items: { type: 'string', minLength: 1 },
+              },
+            }
+          : {}),
+      }));
+    return {
+      id: 'service.command-triggers',
+      title: hostText('settings.commandTriggerOptions.title'),
+      category: 'command-triggers',
+      fields,
+      applies: () => 'commandTriggerOptionsChanged',
+      values: (settings) => project(getCommandTriggerOptions(settings), fields),
+      overrides: (raw) => project(raw.commandTriggerOptions, fields),
+      normalize: (changes) => {
+        const normalized = parseCommandTriggerOptions({
+          ...getCommandTriggerOptions(this.options.settings.value),
+          ...changes,
+        });
+        return Object.fromEntries(
+          Object.keys(changes).map((key) => [key, (normalized as Record<string, unknown>)[key]]),
+        );
+      },
+      replace: (settings, changes, reset) => {
+        const value = { ...getCommandTriggerOptions(settings) };
+        updateRecord(value, changes, reset, fields);
+        settings.commandTriggerOptions = parseCommandTriggerOptions(value);
+        return settings;
+      },
     };
   }
   private appletUpdateSource(applet: ExtensionSnapshot): Target {

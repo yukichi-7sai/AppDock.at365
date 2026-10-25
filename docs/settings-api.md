@@ -22,6 +22,7 @@
 | Shell選択 | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成 |
 | Applet共通設定 | 有効状態、起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成 |
 | Applet管理順序 | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない |
+| ジェスチャー共通設定 | 3入力方式で共有するブラウザexe名の配列とChromiumウィンドウ条件。通常項目は共通宣言から生成 |
 
 起動・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
 
@@ -114,6 +115,18 @@ Appletの更新元はmanifestのupdateRepositoryを既定値とし、上書き�
 適用時点は、更新元/同版許可がnextUpdateCheck、About自動確認がnextAboutOpen、起動時確認の対象/通知がnextStartupCheck、起動時の待ち時間がnextStart。起動時チェックが既に予約されていれば、対象/通知の変更はその確認でも使われるが、待ち時間を保存しても既存タイマーを作り直さない。About表示中の保存やONへの変更で通信せず、次に開いた時に通常の1時間間隔判定を行う。
 
 設定保存はread + write、更新チェック/取得/インストールは既存の独立した更新操作を使う。設定APIの取得・dryRun・保存は更新操作、確認ダイアログ、helper起動や再起動を開始しない。
+
+## ジェスチャー共通のブラウザ設定
+
+category=command-triggersのfields対象から、共有commandTriggerOptionsをset/resetできる。browsersは最大100件の文字列配列で、空配列も明示値として保持する。既存processNamesと同じ、前後空白の除去・末尾.exeの除去・小文字化・重複除去を行い、trim後1～120文字のexe名として検証する。パスや不正文字列は保存しない。requireChromiumWindowClassはboolean。Schemaはstring-listに対してtype=arrayと所有サービスのmaxItemsを返す。
+
+[共通宣言](../src/shared/command-trigger-options.ts)から型、既定値、検証、既存3画面の通常入力、検索/JSON、差分保存、MCPの項目を生成する。通常のトグル・文字・数値・固定選択は同じ宣言に追加する。独自の正規化関数は内部だけに保持し、画面/MCPへ渡す定義は構造化複製できるデータにする。方式別の動作・割当・接続に属するキーは共通宣言へ混ぜない。
+
+automation=false/secret/localOnlyはSchema・値・検索・変更から除外し、従来の入力設定取得・configure用Schema・返却プレビューにも同じ公開判定を適用する。非公開のキーを従来のconfigureから設定することも拒否する。外側のMCP Schemaや案内へ共通フィールド名を二重登録せず、現在の公開inputSchemaを参照する。
+
+保存先は共有settings.jsonのcommandTriggerOptions。既存の割当、方式別executionMode、動作/接続設定、端末専用値と認証情報を保持する。MCPは正規化した候補で既定値との一致・無変更を判定し、resetまたは既定値setで上書きを除去する。正規化後に同じ値なら保存せず、dryRunは検証だけを行う。旧方式別のブラウザ値を継承しない。
+
+read + writeで利用でき、executeや利用許可を追加条件にしない。applies=commandTriggerOptionsChangedで、通常の設定通知を通して次の入力判定へ反映する。settingsSaved/effectVerified=falseは保存完了であり、物理入力やOS登録完了を保証しない。新しい項目や候補の追加でも固定6入口のツール更新は不要。
 
 ## Applet共通設定
 
