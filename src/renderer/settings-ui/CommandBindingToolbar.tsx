@@ -16,11 +16,14 @@ export function CommandBindingToolbar({
   setStatusFilter,
   showRegistrationErrors = false,
   children,
+  filters,
+  hasAdditionalFilters = false,
+  clearAdditionalFilters,
   inputFilter,
   clearInputFilter,
 }: {
   inputName: string;
-  inputKind: 'shortcut' | 'gesture';
+  inputKind: 'shortcut' | 'gesture' | 'trigger';
   count: number;
   visibleCount: number;
   filter: string;
@@ -29,6 +32,9 @@ export function CommandBindingToolbar({
   setStatusFilter(value: string): void;
   showRegistrationErrors?: boolean;
   children?: ReactNode;
+  filters?: ReactNode;
+  hasAdditionalFilters?: boolean;
+  clearAdditionalFilters?(): void;
   inputFilter?: BindingInputFilter | null;
   clearInputFilter?(): void;
 }) {
@@ -72,30 +78,36 @@ export function CommandBindingToolbar({
       </div>
       <CommandListSummary
         className="command-shortcut-summary"
+        leading={filters}
         filter={
           inputFilter ? (
             <CommandProviderFilter
               label={
-                inputKind === 'gesture'
-                  ? translate('settings.commandBindingToolbar.gesture')
-                  : translate('settings.commandBindingToolbar.key')
+                inputKind === 'trigger'
+                  ? translate('settings.commandTriggers.trigger')
+                  : inputKind === 'gesture'
+                    ? translate('settings.commandBindingToolbar.gesture')
+                    : translate('settings.commandBindingToolbar.key')
               }
               title={inputFilter.label}
               onClear={clearInputFilter}
-            />
+            >
+              {inputFilter.content}
+            </CommandProviderFilter>
           ) : (
             children
           )
         }
         actions={
           <>
-            {(filter || statusFilter !== 'all' || inputFilter) && (
+            {(filter || statusFilter !== 'all' || inputFilter || hasAdditionalFilters) && (
               <button
                 className="text-button"
                 onClick={() => {
                   setFilter('');
                   setStatusFilter('all');
                   clearInputFilter?.();
+                  clearAdditionalFilters?.();
                 }}
               >
                 {translate('settings.commandBindingToolbar.clear')}

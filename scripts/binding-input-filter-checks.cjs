@@ -95,15 +95,12 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     assert.equal(await chip.count(), 1);
     assert(
       await chip.evaluate((e) => {
-        const main = e.closest('.command-list-summary-main');
-        return (
-          !!main &&
-          !!(
-            main.querySelector('span').compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING
-          )
-        );
+        const count = e
+          .closest('.command-list-summary')
+          .querySelector('.command-list-summary-count');
+        return !!count && !!(e.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING);
       }),
-      'input filter follows the result count',
+      'input filter precedes the trailing result count',
     );
     assert.equal(await badge('input.a').getAttribute('data-multiple-commands'), 'true');
     assert.equal(await badge('input.b').getAttribute('aria-pressed'), 'true');

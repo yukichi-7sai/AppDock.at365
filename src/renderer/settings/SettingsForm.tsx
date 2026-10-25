@@ -17,6 +17,7 @@ import { AppletManagementSettings } from './AppletManagementSettings';
 import { AppletUpdateSource } from './UpdateSettings';
 
 import { ShortcutsEditor } from './ShortcutsEditor';
+import { CommandTriggersEditor } from './CommandTriggersEditor';
 import { GesturesEditor } from './GesturesEditor';
 import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
@@ -186,8 +187,17 @@ export function SettingsForm({
   return (
     <div className="settings-layout">
       <div
-        className={`settings-form${['general', 'appearance', 'shortcuts', 'gestures', 'touchpad-gestures'].includes(category) ? ' settings-sections' : ''}`}
+        className={`settings-form${['general', 'appearance', 'shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(category) ? ' settings-sections' : ''}`}
       >
+        {category === 'command-triggers' && (
+          <CommandTriggersEditor
+            settings={settings}
+            onChange={edit}
+            commands={commands}
+            applets={extensions}
+            statuses={globalHotKeys}
+          />
+        )}
         {(category === 'gestures' || category === 'touchpad-gestures') && (
           <GesturesEditor
             key={category}

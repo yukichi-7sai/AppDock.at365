@@ -21,7 +21,7 @@ import { ProcessCommandFields } from './ProcessCommandFields';
 import { defaultProcessLaunch } from '../../shared/process-launch';
 import type { UiCommand } from '../../shared/commands';
 import {
-  CommandPublication,
+  CommandPrivacy,
   CommandSettingsLinks,
   CommandTargetFilter,
   useCommandSettingsTarget,
@@ -118,7 +118,7 @@ export function CustomCommandsSettings({
       >
         <SettingsListTable
           toolbarFilter={<CommandTargetFilter />}
-          titleExtra={(entry) => <CommandPublication published={command(entry).automation} />}
+          titleExtra={(entry) => <CommandPrivacy published={command(entry).automation} />}
           navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
           addInTitle
           commandListScroll

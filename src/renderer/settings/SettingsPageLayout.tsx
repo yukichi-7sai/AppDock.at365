@@ -8,6 +8,7 @@ import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import { CommandListScrollProvider, CommandListScrollbar } from '../settings-ui/CommandListScroll';
 
 const descriptions: Record<string, HostTextKey> = {
+  'command-triggers': 'settings.commandTriggers.description',
   applets: 'settings.settingsPageLayout.applets',
   notifications: 'settings.settingsPageLayout.notifications',
   tts: 'settings.settingsPageLayout.tts',

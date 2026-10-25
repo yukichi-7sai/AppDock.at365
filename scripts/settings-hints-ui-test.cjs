@@ -362,14 +362,14 @@ async function checkSectionTitles() {
         ...['one', 'two'].map((suffix, index) => ({
           id: `nav.custom1.${suffix}`,
           command: 'appdock.custom.00000000-0000-0000-0000-000000000001',
-          key: `Ctrl+Alt+F${20 + index}`,
+          key: `Ctrl+Alt+F${8 + index}`,
           enabled: false,
           when: { scope: 'app', appletIds: [] },
         })),
         {
           id: 'nav.missing',
           command: 'missing.command',
-          key: 'Ctrl+Alt+F23',
+          key: 'Ctrl+Alt+F10',
           enabled: false,
           when: { scope: 'app', appletIds: [] },
         },
@@ -486,7 +486,7 @@ async function checkSectionTitles() {
         ...['one', 'two'].map((suffix) => ({
           ...initial.keybindings[0],
           id: 'actions.duplicate.' + suffix,
-          key: 'Ctrl+F16',
+          key: 'Ctrl+F9',
           enabled: false,
         })),
       );

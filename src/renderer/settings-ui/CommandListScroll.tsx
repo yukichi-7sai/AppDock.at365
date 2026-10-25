@@ -89,11 +89,13 @@ export function CommandListToolbar({ children }: { children: ReactNode }) {
 
 /** Filters and actions precede the result count at the trailing edge. */
 export function CommandListSummary({
+  leading,
   children,
   filter,
   actions,
   className = '',
 }: {
+  leading?: ReactNode;
   children: ReactNode;
   filter?: ReactNode;
   actions: ReactNode;
@@ -101,6 +103,7 @@ export function CommandListSummary({
 }) {
   return (
     <div className={`command-list-summary ${className}`}>
+      {leading && <div className="command-list-summary-leading">{leading}</div>}
       {filter && <div className="command-list-summary-main">{filter}</div>}
       {actions && <div className="command-list-summary-actions">{actions}</div>}
       <div className="command-list-summary-count">{children}</div>

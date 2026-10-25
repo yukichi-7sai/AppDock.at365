@@ -1978,9 +1978,9 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       },
     };
   if (id === 'ribbon') return { applets: applets.map(summary), commands: ribbonUiCommands() };
-  if (['shortcuts', 'gestures', 'tray', 'touchpad-gestures'].includes(id))
+  if (['shortcuts', 'gestures', 'tray', 'touchpad-gestures', 'command-triggers'].includes(id))
     return {
-      ...(['shortcuts', 'gestures', 'touchpad-gestures'].includes(id)
+      ...(['shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(id)
         ? { commandAssignments: settingsCommandAssignments() }
         : {}),
       provider:
@@ -1994,7 +1994,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
           : undefined,
       applets: applets.map(summary),
       commands: settingsUiCommands(),
-      statuses: id === 'shortcuts' ? host.globalHotKeys : undefined,
+      statuses: ['shortcuts', 'command-triggers'].includes(id) ? host.globalHotKeys : undefined,
       touchpad: id === 'touchpad-gestures' ? touchpad?.snapshot() : undefined,
       touchpadShortcuts:
         id === 'shortcuts' ? touchpadShortcutProjection(settings.value) : undefined,
@@ -2483,10 +2483,14 @@ function settingsPageActions(
     };
     actions.setShortcutCapture = async ([value]) =>
       setShortcutCapture(value as Parameters<typeof setShortcutCapture>[0]);
-    if (['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id))
+    if (['shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(page.id))
       actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
-  if (['shortcuts', 'gestures', 'tray', 'ribbon', 'touchpad-gestures'].includes(page.id)) {
+  if (
+    ['shortcuts', 'gestures', 'tray', 'ribbon', 'touchpad-gestures', 'command-triggers'].includes(
+      page.id,
+    )
+  ) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;
       if (!value || value.mode !== 'select') throw Error(hostText('settings.index.selectOnly'));

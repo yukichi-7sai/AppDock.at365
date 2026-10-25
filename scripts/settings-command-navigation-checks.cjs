@@ -38,9 +38,11 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
           clone.getBoundingClientRect().right,
         actionsInside: (() => {
           const summary = e.closest('.command-list-summary');
+          const trailing =
+            summary.querySelector('.command-list-summary-actions') ??
+            summary.querySelector('.command-list-summary-count');
           return (
-            summary.querySelector('.command-list-summary-actions').getBoundingClientRect().right <=
-            summary.getBoundingClientRect().right + 1
+            trailing.getBoundingClientRect().right <= summary.getBoundingClientRect().right + 1
           );
         })(),
       };
@@ -62,8 +64,8 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     await checkFilterFit(kind);
     const position = await host.locator('.command-provider-filter').evaluate((filter) => {
       const summary = filter.closest('.command-list-summary');
-      const count = summary.querySelector('.command-list-summary-main > span');
-      const actions = summary.querySelector('.command-list-summary-actions');
+      const count = summary.querySelector('.command-list-summary-count');
+      const actions = summary.querySelector('.command-list-summary-actions') ?? count;
       const toolbar = summary.closest('.command-list-toolbar');
       const tools = toolbar.querySelector('.command-shortcut-tools');
       const rect = filter.getBoundingClientRect();
@@ -83,7 +85,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         count: toolbar.querySelectorAll('.command-provider-filter').length,
         heightWithFilter,
         heightWithoutFilter,
-        afterCount: !!(count.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING),
+        beforeCount: !!(filter.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING),
         afterSearch: !tools || rect.top >= tools.getBoundingClientRect().bottom,
         inside:
           rect.right <= actions.getBoundingClientRect().left + 1 &&
@@ -103,7 +105,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     });
     assert.equal(position.count, 1);
     assert(
-      position.afterCount && position.afterSearch && position.inside,
+      position.beforeCount && position.afterSearch && position.inside,
       JSON.stringify(position),
     );
     if (host.viewportSize().width >= 1280) assert(position.sameRow);
@@ -182,7 +184,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
     );
     assert(measurements.length > 0);
     for (const item of measurements) {
-      assert.equal(item.buttons, page === 'カスタムコマンド' || item.custom ? 3 : 2);
+      assert.equal(item.buttons, page === 'カスタムコマンド' || item.custom ? 4 : 3);
       assert(item.labels.every((label) => !label.endsWith(`の${page}を開く`)));
       assert(item.gap >= item.padding - 0.5 && item.gap > 0, JSON.stringify(item));
       assert(Math.abs(item.leftGap - item.leftPadding) < 1, JSON.stringify(item));
@@ -306,13 +308,14 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       ]);
       await checkLinks('ショートカット', theme, width);
       assert.equal(
-        await row('fixture.hints.run').getByRole('img', { name: '外部公開コマンド' }).count(),
-        1,
-      );
-      assert.equal(
-        await row('appdock.quit').getByRole('img', { name: '外部公開コマンド' }).count(),
+        await row('fixture.hints.run').getByRole('img', { name: '外部非公開コマンド' }).count(),
         0,
       );
+      assert.equal(
+        await row('appdock.quit').getByRole('img', { name: '外部非公開コマンド' }).count(),
+        1,
+      );
+      assert.equal(await row('missing.command').locator('.command-privacy').count(), 0);
       assert.equal(
         await row('fixture.hints.run')
           .getByRole('button', { name: 'Hint actionのカスタムコマンドを開く', exact: true })
@@ -378,12 +381,12 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         '移動',
       ]);
       assert.equal(
-        await customRow('Custom 1').getByRole('img', { name: '外部公開コマンド' }).count(),
-        0,
+        await customRow('Custom 1').getByRole('img', { name: '外部非公開コマンド' }).count(),
+        1,
       );
       assert.equal(
-        await customRow('Custom 2').getByRole('img', { name: '外部公開コマンド' }).count(),
-        1,
+        await customRow('Custom 2').getByRole('img', { name: '外部非公開コマンド' }).count(),
+        0,
       );
       assert.equal(
         await host
@@ -443,7 +446,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
         next.keybindings.push({
           id: 'nav.custom2.key',
           command: patch.add,
-          key: 'Ctrl+Alt+F22',
+          key: 'Ctrl+Alt+F11',
           enabled: false,
           when: { scope: 'app', appletIds: [] },
         });

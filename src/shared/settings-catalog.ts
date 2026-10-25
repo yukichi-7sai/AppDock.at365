@@ -47,6 +47,13 @@ export interface SettingsPageDefinition {
 export const settingsItemId = (pageId: string, key: string) =>
   `${encodeURIComponent(pageId)}/${encodeURIComponent(key)}`;
 const hostItems: Record<string, [string, string, string?][]> = {
+  'command-triggers': [
+    [
+      'bindings',
+      hostText('settings.commandTriggers.title'),
+      hostText('settings.commandTriggers.keywords'),
+    ],
+  ],
   applets: [
     [
       'management',
@@ -632,6 +639,8 @@ export function settingsPaths(
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
       return [['keybindings'], ['keybindingOptions']];
+    case 'command-triggers':
+      return [['keybindings'], ['gestures', 'bindings'], ['touchpadGestures', 'bindings']];
     case 'touchpad-gestures':
       return [['touchpadGestures']];
     case 'gestures':

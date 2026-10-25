@@ -399,7 +399,7 @@ const checks = [];
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
     await page.locator('[data-binding-id="final-order-fixture"]').waitFor();
-    await button('実行順…').click();
+    await page.locator('[data-binding-id="final-order-fixture"] .binding-order').click();
     const orderPanel = page.locator('.shortcut-order-dialog');
     await orderPanel.getByLabel('実行順を変更するキー').selectOption('Ctrl+F8');
     const previousOrder = await orderPanel

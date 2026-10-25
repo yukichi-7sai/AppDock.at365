@@ -18,7 +18,9 @@ module.exports = async ({ page, snapshot, save, until, profile, checks }) => {
   };
   const original = (await snapshot()).settings.value.keybindings;
   const emptyLeft = (
-    await page.locator('[data-shortcut-command="test.a.second"] td > .muted').boundingBox()
+    await page
+      .locator('[data-shortcut-command="test.a.second"] .binding-value-cell .muted')
+      .boundingBox()
   ).x;
   const keyLeft = (await page.locator('[data-binding-id="overview.extra"] kbd').boundingBox()).x;
   assert(Math.abs(emptyLeft - keyLeft) < 1, 'unassigned and assigned keys share a left edge');

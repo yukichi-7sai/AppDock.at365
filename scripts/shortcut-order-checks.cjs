@@ -5,7 +5,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   const original = structuredClone((await snapshot()).settings.value.keybindings);
   const panel = page.locator('.shortcut-order-dialog');
   const filter = page.getByLabel('ショートカットキーのコマンドを検索');
-  const openTop = () => page.getByRole('button', { name: '実行順…', exact: true }).click();
+  const openFromVisibleRow = () => page.locator('.shortcuts-editor .binding-order').first().click();
   await page
     .locator('.command-shortcut-summary')
     .screenshot({ path: path.join(profile, 'shortcut-order-button.png') });
@@ -68,7 +68,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     await page.getByRole('button', { name: '変更をすべて保存', exact: true }).count(),
     0,
   );
-  await openTop();
+  await openFromVisibleRow();
   await item('a2')
     .getByRole('button', { name: /を上へ/ })
     .click();
@@ -115,7 +115,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   ];
   await write(extra);
   await page.locator('[data-binding-id="order.disabled"]').waitFor();
-  await openTop();
+  await openFromVisibleRow();
   await choose('Ctrl+F8');
   assert.match(await item('order.disabled').innerText(), /未確認のコマンド[\s\S]*無効/);
   await item('a2')
@@ -137,7 +137,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     ['a1', 'a2', 'b1', 'order.disabled', 'order.other2', 'order.other'],
   );
   assert.equal(merged[0].enabled, false);
-  await openTop();
+  await openFromVisibleRow();
   await choose('Ctrl+F8');
   await item('b1')
     .getByRole('button', { name: /を上へ/ })
@@ -150,7 +150,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await cancel();
   assert.deepEqual((await snapshot()).settings.value.keybindings, conflict);
   await write(original);
-  await openTop();
+  await openFromVisibleRow();
   await choose('Ctrl+F8');
   const setTheme = async (theme) => {
     await page.evaluate(async (theme) => {
@@ -188,7 +188,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     ...original,
     ...Array.from({ length: 20 }, (_, index) => ({ ...original[1], id: `order.long.${index}` })),
   ]);
-  await openTop();
+  await openFromVisibleRow();
   await choose('Ctrl+F8');
   await page.setViewportSize({ width: 700, height: 540 });
   assert(
@@ -200,12 +200,10 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await cancel();
   await page.setViewportSize({ width: 1280, height: 840 });
   await write([]);
-  await openTop();
-  assert(await panel.getByLabel('実行順を変更するキー').isDisabled());
-  assert(await panel.getByRole('button', { name: '適用', exact: true }).isDisabled());
-  await cancel();
+  assert.equal(await page.locator('.shortcuts-editor .binding-order').count(), 0);
+  assert.equal(await panel.count(), 0, 'empty list has no execution-order entry');
   await write(original);
   checks.push(
-    'order dialog: full same-key group from filtered settings and Applet / drag, arrows and keyboard / cancel and focus / multi-key draft apply / other-key merge and stale-group rejection / empty and single groups / both themes and three widths',
+    'order dialog: full same-key group from filtered settings and Applet / drag, arrows and keyboard / cancel and focus / multi-key draft apply / other-key merge and stale-group rejection / empty list has no order entry / single groups / both themes and three widths',
   );
 };
