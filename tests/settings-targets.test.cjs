@@ -568,13 +568,24 @@ test('a real MCP client uses newly registered settings and owners without refres
   );
   const tools = JSON.stringify((await client.listTools()).tools);
   f.fields.push({ key: 'newBoolean', title: 'New boolean', type: 'boolean', default: false });
+  f.fields.push(
+    ...parseSettingDefinitions([
+      {
+        key: 'lateRecords',
+        title: 'Later records',
+        type: 'object-list',
+        default: [],
+        fields: [{ key: 'name', title: 'Name', type: 'string', default: 'New' }],
+      },
+    ]),
+  );
   f.owners.push({ ...f.owner, id: 'test.new-owner', displayName: 'New owner' });
   const discovered = await client.callTool({
     name: 'appdock_settings_list_targets',
     arguments: { ownerId: 'test.new-owner' },
   });
   assert.equal(discovered.isError, undefined);
-  assert.equal(discovered.structuredContent.items.length, 1);
+  assert.equal(discovered.structuredContent.items.length, 3);
   const targetId = f.target();
   const schema = await client.callTool({
     name: 'appdock_settings_get_schema',
@@ -597,5 +608,36 @@ test('a real MCP client uses newly registered settings and owners without refres
   });
   assert.equal(saved.structuredContent.completion, 'settingsSaved');
   assert.equal(f.store.value.extensions[f.owner.id].settings.newBoolean, true);
+  const listTarget = discovered.structuredContent.items.find((target) =>
+    target.title.endsWith('/ Later records'),
+  ).targetId;
+  const listSchema = await client.callTool({
+    name: 'appdock_settings_get_schema',
+    arguments: { targetId: listTarget },
+  });
+  const listBefore = await client.callTool({
+    name: 'appdock_settings_list_items',
+    arguments: { targetId: listTarget },
+  });
+  const added = await client.callTool({
+    name: 'appdock_settings_apply',
+    arguments: {
+      targetId: listTarget,
+      expectedSchemaRevision: listSchema.structuredContent.schemaRevision,
+      expectedRevision: listBefore.structuredContent.revision,
+      requestId: randomUUID(),
+      operations: [{ kind: 'add', values: { name: 'Added after connection' } }],
+    },
+  });
+  assert.equal(added.isError, undefined);
+  assert.equal(
+    (
+      await client.callTool({
+        name: 'appdock_settings_list_items',
+        arguments: { targetId: listTarget },
+      })
+    ).structuredContent.items[0].values.name,
+    'Added after connection',
+  );
   assert.equal(JSON.stringify((await client.listTools()).tools), tools);
 });

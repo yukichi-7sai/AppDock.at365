@@ -4,35 +4,22 @@ import type { SettingsMethod } from '../../shared/settings-operations';
 import { settingInputSchema } from '../../shared/settings-commands';
 import { boundedJson, jsonObject } from '../../shared/custom-commands';
 import { hostText } from '../../shared/i18n';
-
-export interface SettingsFieldPlan {
-  changed: string[];
-  before: Record<string, unknown>;
-  values: Record<string, unknown>;
-  applies: Record<string, string>;
-  overrides?: Record<string, unknown>;
-  commit(): void;
-}
-export interface SettingsFieldTarget {
-  targetId: string;
-  ownerId: string;
-  title: string;
-  category: string;
-  available: boolean;
-  fields: SettingDefinition[];
-  applies(key: string): string;
-  values(): Record<string, unknown>;
-  overrides(): Record<string, unknown> | undefined;
-  plan(changes: Record<string, unknown>, reset: string[], revision: string): SettingsFieldPlan;
-}
-export class SettingsTargetError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+import {
+  SettingsTargetError,
+  type SettingsTarget,
+  type SettingsListTarget,
+} from './settings-target-types';
+import {
+  listOperationSchemas,
+  listValues,
+  listRemovable,
+  planSettingsList,
+} from './settings-lists';
+export {
+  SettingsTargetError,
+  type SettingsFieldPlan,
+  type SettingsFieldTarget,
+} from './settings-target-types';
 const canonical = (value: unknown): unknown =>
   Array.isArray(value)
     ? value.map(canonical)
@@ -91,7 +78,7 @@ export class SettingsTargets {
   private lastPrincipal = '';
   constructor(
     private options: {
-      targets(): SettingsFieldTarget[];
+      targets(): SettingsTarget[];
       revision(): string;
       principal(): string;
     },
@@ -107,45 +94,60 @@ export class SettingsTargets {
       this.fail('RESULT_TOO_LARGE', 'services.settingsTargets.tooLarge');
     return value;
   }
-  private field(field: SettingDefinition, target: SettingsFieldTarget) {
+  private field(field: SettingDefinition, target: SettingsTarget) {
     return {
       key: field.key,
       title: field.title,
       description: field.description ?? '',
       type: field.type,
-      inputSchema: settingInputSchema(field),
+      inputSchema:
+        field.type === 'string-list'
+          ? {
+              type: 'array',
+              maxItems: 64,
+              items: { type: 'string', minLength: 1, maxLength: 32767 },
+            }
+          : settingInputSchema({ ...field, options: target.options?.(field) ?? field.options }),
       ...(field.default === undefined ? {} : { default: structuredClone(field.default) }),
       ...(field.step === undefined ? {} : { step: field.step }),
-      writable: true,
+      writable: target.kind !== 'list' || field.key !== target.definition.list?.idKey,
       applies: target.applies(field.key),
     };
   }
-  private schemaRevision(target: SettingsFieldTarget) {
+  private schemaRevision(target: SettingsTarget) {
     return digest({
       targetId: target.targetId,
       ownerId: target.ownerId,
       category: target.category,
       fields: target.fields.map((field) => this.field(field, target)),
-      operationSchemas,
+      kind: target.kind ?? 'fields',
+      operationSchemas: target.kind === 'list' ? listOperationSchemas : operationSchemas,
     });
   }
-  private revision(target: SettingsFieldTarget) {
+  private revision(target: SettingsTarget) {
     return createHmac('sha256', this.cursorSecret)
       .update(
         'values:' +
-          JSON.stringify(canonical([target.targetId, this.options.revision(), target.overrides()])),
+          JSON.stringify(
+            canonical([
+              target.targetId,
+              this.options.revision(),
+              target.overrides(),
+              target.kind === 'list' ? target.rows() : undefined,
+            ]),
+          ),
       )
       .digest('hex');
   }
-  private metadata(target: SettingsFieldTarget) {
+  private metadata(target: SettingsTarget) {
     return {
       targetId: target.targetId,
-      kind: 'fields',
+      kind: target.kind ?? 'fields',
       ownerId: target.ownerId,
       title: target.title,
       category: target.category,
       available: target.available,
-      operations: ['set', 'reset'],
+      operations: target.kind === 'list' ? Object.keys(listOperationSchemas) : ['set', 'reset'],
       schemaRevision: this.schemaRevision(target),
     };
   }
@@ -210,10 +212,30 @@ export class SettingsTargets {
   private sign(payload: string) {
     return createHmac('sha256', this.cursorSecret).update(payload).digest('base64url');
   }
+  private itemRefs(target: SettingsListTarget) {
+    const revision = this.revision(target),
+      schemaRevision = this.schemaRevision(target);
+    return target
+      .rows()
+      .map(
+        (row, index) =>
+          'item:' +
+          this.sign(
+            JSON.stringify([
+              this.options.principal(),
+              target.targetId,
+              revision,
+              schemaRevision,
+              index,
+              target.definition.list?.idKey ? row[target.definition.list.idKey] : null,
+            ]),
+          ),
+      );
+  }
   private state(
     field: SettingDefinition,
     value: unknown,
-    target: SettingsFieldTarget,
+    target: SettingsTarget,
     overrides?: Record<string, unknown>,
   ) {
     return {
@@ -281,28 +303,59 @@ export class SettingsTargets {
         params,
         [method, target.targetId],
         schemaRevision,
-        { ...envelope, kind: 'fields', operationSchemas },
+        {
+          ...envelope,
+          kind: target.kind ?? 'fields',
+          operationSchemas: target.kind === 'list' ? listOperationSchemas : operationSchemas,
+          ...(target.kind === 'list' ? { maxItems: 64 } : {}),
+        },
       );
-    if (method === 'settings.items.list')
-      return this.fail('INVALID_ARGUMENT', 'services.settingsTargets.notList');
+    if (method === 'settings.items.list') {
+      if (target.kind !== 'list')
+        return this.fail('INVALID_ARGUMENT', 'services.settingsTargets.notList');
+      const refs = this.itemRefs(target),
+        revision = this.revision(target);
+      return this.page(
+        target.rows().map((row, index) => ({
+          itemRef: refs[index],
+          values: listValues(target, row),
+          removable: listRemovable(target, row),
+        })),
+        params,
+        [method, target.targetId],
+        digest([revision, schemaRevision]),
+        { ...envelope, revision },
+      );
+    }
     if (method === 'settings.options.list') {
       const field = target.fields.find((field) => field.key === params.key);
       if (!field) return this.fail('NOT_FOUND', 'services.settingsTargets.notFound');
-      if (
-        field.type !== 'select' ||
-        params.itemRef !== undefined ||
-        params.draftValues !== undefined
-      )
+      if (field.type !== 'select')
         return this.fail('INVALID_ARGUMENT', 'services.settingsTargets.notOptions');
+      if (
+        params.itemRef !== undefined &&
+        (target.kind !== 'list' || !this.itemRefs(target).includes(String(params.itemRef)))
+      )
+        this.invalid();
+      if (
+        params.draftValues !== undefined &&
+        (!jsonObject(params.draftValues) ||
+          Object.keys(params.draftValues).some(
+            (key) => !target.fields.some((field) => field.key === key),
+          ))
+      )
+        this.invalid();
       return this.page(
-        field.options ?? [],
+        target.options?.(field) ?? field.options ?? [],
         params,
-        [method, target.targetId, field.key],
+        [method, target.targetId, field.key, params.itemRef, params.draftValues],
         schemaRevision,
         { ...envelope, key: field.key },
       );
     }
     if (method === 'settings.values.get') {
+      if (target.kind === 'list')
+        return this.fail('INVALID_ARGUMENT', 'services.settingsTargets.notFields');
       let fields = target.fields;
       if (params.keys !== undefined) {
         if (
@@ -347,7 +400,7 @@ export class SettingsTargets {
       params.operations.length > 32
     )
       this.invalid();
-    for (const operation of params.operations) {
+    for (const operation of target.kind === 'list' ? [] : params.operations) {
       if (!jsonObject(operation)) this.invalid();
       const permitted =
         operation.kind === 'set'
@@ -400,27 +453,57 @@ export class SettingsTargets {
     try {
       if (params.expectedRevision !== this.revision(target))
         return this.fail('REVISION_CONFLICT', 'services.settingsCommands.refreshChanges');
-      const plan = target.plan(changes, reset, this.options.revision());
-      const changed = plan.changed.map((key) => {
-        const field = target.fields.find((field) => field.key === key)!;
-        return {
-          ...this.state(field, plan.values[key], target, plan.overrides),
-          ...(plan.before[key] === undefined ? {} : { before: structuredClone(plan.before[key]) }),
+      let plan: {
+        changed: boolean;
+        changes: unknown[];
+        applies: Record<string, string>;
+        commit(): void;
+      };
+      if (target.kind === 'list')
+        plan = planSettingsList(
+          target,
+          params.operations,
+          this.itemRefs(target),
+          this.options.revision(),
+        );
+      else {
+        const fieldsPlan = target.plan(changes, reset, this.options.revision());
+        plan = {
+          changed: !!fieldsPlan.changed.length,
+          applies: fieldsPlan.applies,
+          commit: fieldsPlan.commit,
+          changes: fieldsPlan.changed.map((key) => {
+            const field = target.fields.find((field) => field.key === key)!;
+            return {
+              ...this.state(field, fieldsPlan.values[key], target, fieldsPlan.overrides),
+              ...(fieldsPlan.before[key] === undefined
+                ? {}
+                : { before: structuredClone(fieldsPlan.before[key]) }),
+            };
+          }),
         };
-      });
+      }
       const value = {
         ...envelope,
         requestId: params.requestId,
         dryRun: params.dryRun === true,
         completion: params.dryRun ? 'validated' : 'settingsSaved',
-        changed: !!changed.length,
-        changes: changed,
+        changed: plan.changed,
+        changes: plan.changes,
         applies: plan.applies,
         effectVerified: false,
         revision: this.revision(target),
       };
       // Reject oversized results before the owner is allowed to persist anything.
       this.bounded({ ...value, revision: 'x'.repeat(256) });
+      const current = this.options
+        .targets()
+        .find((current) => current.targetId === target.targetId);
+      if (!current) return this.fail('NOT_FOUND', 'services.settingsTargets.notFound');
+      if (!current.available)
+        return this.fail('UNAVAILABLE', 'services.settingsTargets.unavailable');
+      if (this.schemaRevision(current) !== schemaRevision)
+        return this.fail('SCHEMA_CONFLICT', 'services.settingsTargets.schemaConflict');
       if (params.dryRun !== true) {
         if (params.expectedRevision !== this.revision(target))
           return this.fail('REVISION_CONFLICT', 'services.settingsCommands.refreshChanges');

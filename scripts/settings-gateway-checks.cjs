@@ -94,7 +94,7 @@ module.exports = async ({ client, page, fixtureId, checks, tool, value }) => {
   const appletSchema = await value('appdock_settings_get_schema', { targetId: applet.targetId });
   assert.deepEqual(
     appletSchema.items.map((field) => field.key),
-    ['flag', 'text'],
+    ['flag', 'text', 'monitor'],
   );
   assert.equal(
     (await tool('appdock_settings_get_values', { targetId: applet.targetId, keys: ['secret'] }))
@@ -132,7 +132,15 @@ module.exports = async ({ client, page, fixtureId, checks, tool, value }) => {
   });
   assert.equal(JSON.stringify((await client.listTools()).tools), JSON.stringify(allTools));
   checks.push(
-    'fixed settings entries reuse Applet validation/save, preserve private fields and tool definitions, and do not advertise list editing',
+    'fixed settings entries reuse Applet validation/save and preserve private fields and tool definitions',
   );
+  await require('./settings-list-gateway-checks.cjs')({
+    client,
+    page,
+    fixtureId,
+    checks,
+    tool,
+    value,
+  });
   return replayRequest;
 };

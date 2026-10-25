@@ -1,6 +1,6 @@
 # 共通操作APIとCodex連携
 
-設定編集許可の統合と、宣言済み単純設定のMCP既定公開に対応する。設定の探索・Schema・値・選択候補・変更は[設定APIの固定6入口](settings-api.md)を使用する。通常の一覧編集と特殊設定のadapterは[拡張設計](mcp-settings-design.md)の後続範囲。
+設定編集許可の統合と、宣言済み単純設定・object-listのMCP既定公開に対応する。設定の探索・Schema・値・行・選択候補・変更は[設定APIの固定6入口](settings-api.md)を使用する。特殊設定のadapterは[拡張設計](mcp-settings-design.md)の後続範囲。
 
 MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-design.md)と[保存型コマンド](custom-commands-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 
@@ -221,7 +221,7 @@ runtime登録やhost.commands.replaceのautomation値は採用せず、manifest�
 
 MCPの既定公開とsecret/localOnlyの除外を利用するAppletはminimumHostVersionを0.88.0以上にします。これらのフラグは公開範囲を定めるもので、通常の設定値を暗号化する機能ではありません。認証情報の保存には既存Secrets APIを使います。
 
-この宣言にはminimumHostVersion=0.26.30以上、settings capabilityが必要です。各Applet自身のextension.jsonのsettingsにある対応型はMCPへ既定公開します。automation:false、secret:true、localOnly:trueは公開しません。他Appletからの共通APIにはautomation:trueを必要とします。型は最上位のboolean/number/string/静的selectに限定し、既存の型・最小最大・選択肢検証を共有します。入れ子、JSON、動的select、アカウント情報を一括公開する機能はありません。
+この生成コマンドの宣言にはminimumHostVersion=0.26.30以上、settings capabilityが必要です。各Applet自身のextension.jsonのsettingsにある対応型はMCPへ既定公開します。automation:false、secret:true、localOnly:trueは公開しません。他Appletからの共通APIにはautomation:trueを必要とします。旧settings.getSchema/settings.getと生成コマンドは最上位のboolean/number/string/静的selectを扱い、既存の型・最小最大・選択肢検証を共有します。宣言型一覧と動的selectは[固定設定API](settings-api.md)を使い、非公開の認証・セッションを一括公開しません。
 
 ```json
 {

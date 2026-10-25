@@ -468,6 +468,8 @@ const appletManagement = new AppletManagement({
 const settingsCommands = new SettingsCommands({
   settings,
   applets: allApplets,
+  settingOptions: (owner, field) =>
+    field.optionSource === 'web-profiles' ? pageCollections.settingOptions(owner) : [],
   save: (value, revision, reset) => {
     const rewrite = new Set<'shared' | 'device'>();
     if (reset) {

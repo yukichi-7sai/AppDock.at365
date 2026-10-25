@@ -171,10 +171,11 @@ export function parseSettingDefinitions(
       (s.automation !== undefined && typeof s.automation !== 'boolean') ||
       (s.secret !== undefined && typeof s.secret !== 'boolean') ||
       (s.localOnly !== undefined && typeof s.localOnly !== 'boolean') ||
-      ((s.automation === true || s.generateCommands !== undefined) &&
-        (depth !== 0 ||
-          !['boolean', 'number', 'string', 'select'].includes(s.type) ||
-          s.dynamic === true)) ||
+      (s.automation === true &&
+        !['boolean', 'number', 'string', 'select', 'object-list', 'string-list'].includes(
+          s.type,
+        )) ||
+      (s.generateCommands !== undefined && (depth !== 0 || s.dynamic === true)) ||
       (s.generateCommands !== undefined &&
         (s.type !== 'boolean' ||
           typeof s.default !== 'boolean' ||

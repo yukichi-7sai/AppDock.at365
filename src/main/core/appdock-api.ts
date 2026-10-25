@@ -102,7 +102,10 @@ export class AppDockApi {
     this.settingsCommands =
       options.settingsCommands ?? new SettingsCommands({ ...options, applets: () => [] });
     this.settingsTargets = new SettingsTargets({
-      targets: () => this.settingsCommands.fieldTargets(),
+      targets: () => [
+        ...this.settingsCommands.fieldTargets(),
+        ...this.settingsCommands.listTargets(),
+      ],
       revision: () => this.settingsCommands.revision(),
       principal: () => this.options.settingsPrincipal?.() ?? this.options.instanceId,
     });
@@ -256,7 +259,7 @@ export class AppDockApi {
       } catch (error) {
         if (error instanceof SettingsTargetError || error instanceof SettingsCommandError)
           throw new AutomationError(error.code, error.message);
-        throw error;
+        throw new AutomationError('INTERNAL_ERROR', hostText('services.settingsTargets.failed'));
       }
     }
     if (method.startsWith('customCommands.')) {

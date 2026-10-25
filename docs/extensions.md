@@ -274,6 +274,8 @@ manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣
 
 設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。settings capabilityが必要です。対応する単純設定はMCPへ既定公開し、automation:false・secret:true・localOnly:trueは除外します。他Applet向けの公開とON/OFF/toggle生成は明示宣言を維持します。
 
+MCPの[固定設定API](settings-api.md)は宣言済みobject-listの行操作と既存providerの動的selectにも対応します。一覧の親・子の非公開指定、ID列の読取り専用、非公開の保存先と重なる別名の除外を適用します。通常一覧をMCPへ公開するための個別ツール登録は不要です。
+
 公開先をAPIごとのcallers宣言から判定し、Applet専用入力APIを提供します。利用許可は全Applet共通です。Node/.NETのコマンド実行文脈と取消は入力APIまで伝播します。[共通操作API](appdock-api.md)を参照してください。
 
 Shell対象は[Shell基盤](shell-foundation.md)の7領域に限定する。ページ本文は[本体のページ表示](host-pages.md)を使い、Shell Appletの自己設定/自己コマンドAPIとは分離する。

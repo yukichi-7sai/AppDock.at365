@@ -5,6 +5,7 @@ import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { collectionPages, type CollectionPage } from '../../shared/page-collections';
 import type { RemotePageDefinition } from '../../shared/web-content';
 import { RemotePageService } from './remote-pages';
+import { WebProfileStore } from './web-profiles';
 import { closeAppletPages } from './applet-pages';
 import { parseKeybindingDefaults } from '../../shared/keybindings';
 
@@ -64,6 +65,22 @@ export class PageCollectionManager {
           .accounts()
           .map((account) => ({ ...account, owner: parent.id })),
       );
+  }
+  settingOptions(owner: string) {
+    if (
+      !this.options
+        .parents()
+        .some((parent) => parent.id === owner && parent.capabilities?.includes('web-profiles'))
+    )
+      return [];
+    return this.readProfiles(owner)
+      .snapshot()
+      .map((account) => ({ value: account.id, label: account.name }));
+  }
+  private readProfiles(owner: string) {
+    const store = new WebProfileStore(this.locations(owner).file);
+    store.loadStandalone(() => false);
+    return store;
   }
   private accountService(id?: string) {
     const owners = id
@@ -244,10 +261,12 @@ export class PageCollectionManager {
           Array.isArray(rows) &&
           rows.some((old) => old?.id === page.binding.itemId && isDeepStrictEqual(old, page.item))
         )
-      )
-        this.profiles(page.binding.owner).validateAccounts([
-          { ...page.item, id: page.id } as RemotePageDefinition,
-        ]);
+      ) {
+        this.readProfiles(page.binding.owner).get(page.item.accountId);
+        this.services
+          .get(page.binding.owner)
+          ?.validateAccounts([{ ...page.item, id: page.id } as RemotePageDefinition]);
+      }
     }
   }
   states() {

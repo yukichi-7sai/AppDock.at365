@@ -8,6 +8,7 @@ import type {
   Settings,
   SettingsSnapshot,
   SettingDefinition,
+  SettingOption,
 } from '../../shared/contracts';
 import {
   generatedSettingCommands,
@@ -20,8 +21,18 @@ import type { AutomationCommand } from './automation-commands';
 import { collectionRecord } from '../../shared/page-collections';
 import { isAccentHex } from '../../shared/appearance';
 import { sameSetting } from '../../shared/settings-defaults';
-import type { SettingsFieldTarget, SettingsFieldPlan } from './settings-targets';
-import { SettingsTargetError } from './settings-targets';
+import type {
+  SettingsFieldTarget,
+  SettingsFieldPlan,
+  SettingsListTarget,
+} from './settings-target-types';
+import { SettingsTargetError } from './settings-target-types';
+import {
+  mcpSettingPublished,
+  mcpSettingSupported,
+  publicListFields,
+  validateMcpSetting,
+} from '../../shared/mcp-setting-fields';
 import type { HostSettingDefinition } from '../../shared/host-settings';
 import { parseSettings } from '../../shared/settings-schema';
 
@@ -34,6 +45,7 @@ interface Owner {
   title: string;
   fields: SettingDefinition[];
   available: boolean;
+  options?: Record<string, SettingOption[]>;
 }
 export interface SettingsResetOwner {
   ownerId: string;
@@ -49,6 +61,7 @@ export class SettingsCommands {
       applets(): ExtensionSnapshot[];
       save(value: Settings, revision: number, reset?: SettingsResetOwner): SettingsSnapshot;
       validate?(value: Settings): Settings;
+      settingOptions?(owner: string, field: SettingDefinition): SettingOption[];
     },
   ) {}
   private owners(): Owner[] {
@@ -59,6 +72,7 @@ export class SettingsCommands {
         id: a.id,
         title: a.displayName,
         fields: a.settings ?? [],
+        options: a.settingOptions,
         available: a.enabled && a.state === 'running',
       })),
     ];
@@ -117,7 +131,9 @@ export class SettingsCommands {
   }
   fieldTargets(): SettingsFieldTarget[] {
     return this.owners().flatMap((owner) => {
-      const fields = owner.fields.filter((field) => isSettingAccessible(field, 'mcp'));
+      const fields = owner.fields.filter(
+        (field) => mcpSettingPublished(field) && mcpSettingSupported(field),
+      );
       const categories =
         owner.id === 'appdock'
           ? [...new Set(fields.map((field) => (field as HostSettingDefinition).pageId))]
@@ -139,12 +155,29 @@ export class SettingsCommands {
             category,
             available: owner.available,
             fields: selected,
+            options: (field: SettingDefinition) => this.fieldOptions(owner, field),
             applies: (key: string) => this.applies(owner.id, key),
             values: () => this.values(owner, this.options.settings.value, selected),
             overrides: () => this.overrides(owner),
             plan: (changes: Record<string, unknown>, reset: string[], revision: string) => {
               const actual = { ...changes },
                 resets = [...reset];
+              for (const field of selected) {
+                const value = Object.hasOwn(changes, field.key)
+                  ? changes[field.key]
+                  : reset.includes(field.key)
+                    ? field.default
+                    : undefined;
+                if (value !== undefined)
+                  try {
+                    validateMcpSetting(field, value, this.fieldOptions(owner, field));
+                  } catch {
+                    throw new SettingsCommandError(
+                      'INVALID_ARGUMENT',
+                      hostText('services.settingsCommands.valueFormat'),
+                    );
+                  }
+              }
               for (const field of selected)
                 if (
                   Object.hasOwn(actual, field.key) &&
@@ -159,6 +192,48 @@ export class SettingsCommands {
         ];
       });
     });
+  }
+  private fieldOptions(owner: Owner, field: SettingDefinition): SettingOption[] {
+    if (field.optionSource) {
+      try {
+        return this.options.settingOptions?.(owner.collection?.owner ?? owner.id, field) ?? [];
+      } catch {
+        return [];
+      }
+    }
+    return (field.dynamic ? owner.options?.[field.key] : undefined) ?? field.options ?? [];
+  }
+  listTargets(): SettingsListTarget[] {
+    return this.owners().flatMap((owner) =>
+      owner.fields.flatMap((definition) => {
+        if (definition.type !== 'object-list' || !mcpSettingPublished(definition)) return [];
+        const fields = publicListFields(definition);
+        if (!fields.length) return [];
+        return [
+          {
+            kind: 'list' as const,
+            targetId:
+              'list.' +
+              Buffer.from(JSON.stringify([owner.id, definition.key])).toString('base64url'),
+            ownerId: owner.id,
+            title: owner.title + ' / ' + definition.title,
+            category: 'settings',
+            available: owner.available,
+            fields,
+            definition,
+            options: (field: SettingDefinition) => this.fieldOptions(owner, field),
+            applies: (key: string) => this.applies(owner.id, key),
+            overrides: () => this.overrides(owner),
+            rows: () =>
+              readObjectList(
+                this.values(owner, this.options.settings.value, [definition])[definition.key] ?? [],
+              ),
+            plan: (rows: Record<string, unknown>[], revision: string) =>
+              this.plan(owner, [definition], { [definition.key]: rows }, revision),
+          },
+        ];
+      }),
+    );
   }
   private owner(appletId?: string, caller: SettingsCaller = 'mcp') {
     const owner = this.owners().find((o) => o.id === (appletId ?? 'appdock'));

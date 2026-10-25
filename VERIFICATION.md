@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-25: MCPの宣言型一覧と動的候補 0.88.6
+
+- main `cc0a1fe`を取り込んだ`f1d3334`から、専用worktree `AppDock.at365-mcp-settings-design`の次の実装単位を完成。既存の固定6入口の外側Schemaを増やさず、宣言型object-listの探索・Schema・公開列・行参照とadd/update/remove/reorderへ対応した。動的selectは既存runtime候補、Web名簿の選択は所有元だけの既存parserによる読取りへ接続した。
+- itemRefを主体・target・Schema・値のrevision・行ID/位置へ束縛。同名行とIDなし一覧、保存後/再起動後/他主体の古い参照、全件並べ替え、重複操作と構造操作の混在、応答上限前の保存拒否を確認。ID列は読取り専用で新規行だけUUID生成し、IDなし一覧へ保存IDを追加しない。指定列だけを既存行へマージし、非公開/未知列、未編集の入れ子・別名・旧数値selectとJSON文字列の無変更時表現を保持する。
+- 親の非公開指定、秘密/localOnly、未対応列と重なるpropertyPath/aliases、IDの別名経由の書換えを除外。保護値を持つ行の削除はLOCAL_ACTION_REQUIRED。汎用の一覧reset/全体置換と画像参照編集は公開しない。既存のread + write、暗号化情報保護、再送と旧API/他Appletの契約を維持した。
+- 発行前レビューで、Web行の検証がRemotePageServiceの生成とsession整理を起こす経路を読取り専用へ修正し、既存serviceの処理中ガードは保持。候補取得・検証前後の名簿/セッションファイル不変を確認した。旧JSON文字列の無変更時再出力、非公開保存パスとIDの重なりも修正・検証した。0.88.5発行後の追加確認で、同名ルート動的設定の候補が固定の一覧列へ混ざる問題を再現。dynamic宣言だけがruntime候補を使うよう修正し、0.88.6へ進めて全関連検証を再実行した。未解決指摘なし。
+- 最終版の固定依存install・型検査・本体/Default Shell build・関連標準回帰**37ファイル354/354件、fail/skip 0**が成功。WebApplet/WallpaperSlideshowの参照manifestは前後SHA一致、製品・試験・依存/ビルドの696入力も前後一致。標準回帰全体は未実行。初期の未宣言キーのエラー期待値とGUI fixtureの最低ホスト版不足は試験を修正し、失敗記録を保持して再実行した。
+- 隔離sourceと最終固定EXEの専用GUI/MCPは各**8群**成功。実SDKで接続後に一覧・提供元・通常設定を追加してもtools/list不変のまま探索・保存でき、実Node Appletの候補も取得・変更できた。実アプリで一覧の追加・部分編集・削除・並べ替え、MCP編集と既存ダイアログ編集の相互反映、未知値/秘密の保持、許可取消・再送拒否を確認。通常のPC専用設定に加え、宣言型ページ一覧のenabledだけを変えても共有ファイルが不変であることを単体試験で確認した。最終固定EXEのsmokeも成功。
+- 設定キー/保存ファイルの増減や既存APIの破壊を含まない追加機能。mainの0.88.4から0.88.5を発行後に追加修正したため、最終版は**0.88.6**。publish.bat終了0、.NET各Host/Updaterも発行。本体EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170682302 bytes / SHA256 `2a07d82687fe4b25ba095c9c027f23c117b327bbb9439604899b0846a8442add`**。EXEのFile/ProductVersion、feedの版・size/hash、ASAR内package/同梱Default Shell版、各隔離コピーのhashを照合した。
+- 正本は[設定API](docs/settings-api.md)と[拡張設計](docs/mcp-settings-design.md)。通知・起動・AI/TTS等の専用adapter、画像参照とアカウントの寿命操作は次段階。実利用の設定・鍵・Cookie・外部接続・物理入力・実機効果は試験対象外。mainへの逆統合・push・Release・実利用先deployは行わない。
+- 完全ログ・レビュー・入力/成果物・環境と失敗記録は`.artifacts/mcp-settings-lists-20261025/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-lists-20261025/`。最終source=`mcp-settings-foundation-source-1792922979730`、固定EXE=`mcp-settings-foundation-portable-1792923230222`、smoke=`smoke-1792923246981`。後続変更は関連文書だけ。試験プロセス終了を確認し、今回成功と失敗診断・過去の再利用証跡を保持、削除0件。
+
 ## 2026-10-25: MCP設定worktreeへmainの最新を統合
 
 - 利用者の指定に従い、cleanな`codex/mcp-settings-design`の`bc9d404`へorigin/main `cc0a1fe`を通常merge。fetch後のlocal mainとorigin/mainは一致し、main checkoutもclean。版は新しい0.88.4を採用し、検証記録は両方を保持。コードの自動統合箇所と関連定義を確認した。

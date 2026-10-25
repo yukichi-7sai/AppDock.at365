@@ -2947,6 +2947,8 @@
   "services.settingsTargets.cursorConflict": "設定の一覧が変わりました。最初から取得してください。",
   "services.settingsTargets.schemaConflict": "設定の型または公開範囲が変わりました。Schemaを再取得してください。",
   "services.settingsTargets.notList": "この対象は一覧ではありません。通常設定の値を取得してください。",
+  "services.settingsTargets.notFields": "この対象は一覧です。一覧の行を取得してください。",
+  "services.settingsTargets.localAction": "保護された情報を含むため、ローカルの設定画面から操作してください。",
   "services.settingsTargets.notOptions": "この項目の選択候補は、この要求では取得できません。",
   "services.settingsTargets.requestConflict": "同じrequestIdに異なる要求が指定されています。",
   "services.settingsTargets.unavailable": "この設定対象は現在変更できません。",

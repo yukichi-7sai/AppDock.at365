@@ -37,9 +37,9 @@ function fixture() {
       throw Error('No page opening');
     },
   });
-  manager.profiles = () => ({
-    validateAccounts: (rows) => {
-      calls.push(rows);
+  manager.readProfiles = () => ({
+    get: (id) => {
+      calls.push(id);
       throw Error('Account missing');
     },
   });
@@ -63,7 +63,7 @@ test('unrelated settings retain missing Web references; new and edited page rows
   assert.doesNotThrow(() => manager.validate(remove, before));
   const invalidBefore = structuredClone(before);
   invalidBefore.extensions[owner.id].settings.items[0].name = '';
-  manager.profiles = () => ({ validateAccounts: () => {} });
+  manager.readProfiles = () => ({ get: () => {} });
   assert.doesNotThrow(() => manager.validate(before, invalidBefore));
 });
 test('ribbon saving succeeds with an unchanged missing Web account and never repairs or removes reference data', (t) => {

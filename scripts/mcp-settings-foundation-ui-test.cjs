@@ -41,6 +41,7 @@ fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({
     apiVersion: 1,
+    minimumHostVersion: '0.88.5',
     id: fixtureId,
     name: 'Settings fixture',
     version: '1.0.0',
@@ -51,6 +52,39 @@ fs.writeFileSync(
     settings: [
       { key: 'flag', title: 'Flag', type: 'boolean', default: false, generateCommands: ['toggle'] },
       { key: 'text', title: 'Text', type: 'string', default: '' },
+      {
+        key: 'monitor',
+        title: 'Monitor',
+        type: 'select',
+        dynamic: true,
+        options: [{ value: 'primary', label: 'Primary' }],
+        default: 'primary',
+      },
+      {
+        key: 'records',
+        title: 'Records',
+        type: 'object-list',
+        default: [
+          { id: 'one', name: 'Same', enabled: false, unknown: { retained: 7 } },
+          { id: 'two', name: 'Same', enabled: true },
+        ],
+        fields: [
+          { key: 'id', title: 'ID', type: 'string' },
+          { key: 'name', title: 'Record name', type: 'string', default: 'New', minLength: 1 },
+          { key: 'enabled', title: 'Enabled', type: 'boolean', default: false },
+        ],
+        list: { idKey: 'id', titleKey: 'name', columns: ['name'], enabledKey: 'enabled' },
+      },
+      {
+        key: 'protectedRecords',
+        title: 'Protected records',
+        type: 'object-list',
+        default: [{ name: 'Protected', credential: 'PRIVATE_LIST_VALUE' }],
+        fields: [
+          { key: 'name', title: 'Name', type: 'string', default: 'New' },
+          { key: 'credential', title: 'PRIVATE_LIST_TITLE', type: 'string', secret: true },
+        ],
+      },
       {
         key: 'private',
         title: 'Private',
@@ -80,7 +114,7 @@ fs.writeFileSync(
 );
 fs.writeFileSync(
   path.join(fixture, 'index.cjs'),
-  `exports.activate=async context=>{context.commands.register('${fixtureId}.run','Run',async()=>{});};`,
+  `exports.activate=async context=>{context.commands.register('${fixtureId}.run','Run',async()=>{});await context.settings.setOptions('monitor',[{value:'primary',label:'Primary'},{value:'secondary',label:'Secondary'}]);};`,
 );
 let child, browser, page, client;
 async function until(fn, label) {
