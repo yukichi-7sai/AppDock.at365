@@ -40,6 +40,8 @@ Applet管理と左インデックスは本体の共通設定ページを開く�
 
 ## カタログ・JSON・検索
 
+Appletのホスト管理共通項目は[共通定義](../src/shared/applet-common-settings.ts)から画面・型・検証・既定値・検索/JSON・共有/PC専用保存・MCPへ接続する。通常のトグル・文字・数値・選択項目は同じ宣言に追加し、MCP側の二重登録を作らない。ページ表示先は現在のページ宣言から生成する。公開判定と所有サービスの適用時点は[設定API](settings-api.md#applet共通設定)を参照する。
+
 settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタデータを定義する。IDはページIDとキーを個別にencodeURIComponentし、ドット入りID/設定キーはキー配列で扱う。未知の未編集フィールド・未導入Appletを保持する。未設定Appletの部分保存ではenabled:true/settings:{}の行を補完する。保存済みのenabled:falseは保持する。無検証マージと変更マーク比較を削除した。JSONは選択ページのみ、Webは対象IDを保つ1行投影の許可フィールドだけを変更する。
 
 左インデックスの本体ページID・表示名は`src/shared/settings-navigation.ts`の`hostSettingsPages`を正本とし、設定カタログと「ページ名設定を開く」コマンドを同じ定義から生成する。本体ページを追加するときはこの定義へ追加し、別のコマンド一覧・公開許可リスト・分岐を増やさない。Appletとcollectionの子ページは現在の一覧から自動生成し、停止・無効でも設定を開ける。ページを開く操作でAppletを開始・有効化しない。

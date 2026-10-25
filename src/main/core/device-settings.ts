@@ -1,5 +1,10 @@
 import { hostText } from '../../shared/i18n';
 import { hostSettingDefinitions } from '../../shared/host-settings';
+import {
+  appletCommonKeys,
+  validateAppletCommonValues,
+  type AppletCommonKey,
+} from '../../shared/applet-common-settings';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ExtensionManifest, ExtensionSettings, Settings } from '../../shared/contracts';
@@ -21,10 +26,7 @@ export const deviceHostKeys = [
   'startAtLogon',
   'runAsAdministrator',
 ] as const;
-export type DeviceConfiguration = Pick<
-  ExtensionSettings,
-  'settings' | 'startupDelaySeconds' | 'pages'
->;
+export type DeviceConfiguration = Pick<ExtensionSettings, 'settings' | AppletCommonKey | 'pages'>;
 export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
@@ -72,9 +74,9 @@ export function configuration(settings: Settings, owner: string): DeviceConfigur
   const entry = settings.extensions[owner];
   return structuredClone({
     settings: entry?.settings ?? {},
-    ...(entry?.startupDelaySeconds !== undefined
-      ? { startupDelaySeconds: entry.startupDelaySeconds }
-      : {}),
+    ...Object.fromEntries(
+      appletCommonKeys().flatMap((key) => (entry?.[key] === undefined ? [] : [[key, entry[key]]])),
+    ),
     ...(entry?.pages !== undefined ? { pages: entry.pages } : {}),
   });
 }
@@ -158,7 +160,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
       if (
         !object(entry.configuration) ||
         Object.keys(entry.configuration).some(
-          (key) => !['settings', 'startupDelaySeconds', 'pages'].includes(key),
+          (key) => !['settings', ...appletCommonKeys(), 'pages'].includes(key),
         )
       )
         throw Error(hostText('services.deviceSettings.invalidScope'));
@@ -211,13 +213,7 @@ export function readDeviceManifests(roots: string[]): ExtensionManifest[] {
         if (fs.statSync(file).size > 1024 * 1024) continue;
         const manifest = JSON.parse(fs.readFileSync(file, 'utf8')) as ExtensionManifest;
         if (!id(manifest.id) || result.some((item) => item.id === manifest.id)) continue;
-        if (
-          manifest.startupDelaySeconds !== undefined &&
-          (!Number.isInteger(manifest.startupDelaySeconds) ||
-            manifest.startupDelaySeconds < 0 ||
-            manifest.startupDelaySeconds > 86400)
-        )
-          continue;
+        validateAppletCommonValues(manifest as unknown as Record<string, unknown>, true);
         manifest.settings = parseSettingDefinitions(manifest.settings);
         manifest.pages = parseAppletPages(manifest);
         manifest.pageCollections = parsePageCollections(manifest);
@@ -255,7 +251,7 @@ export function combineSettings(
     entry.enabled = local?.enabled ?? defaultAppletEnabled;
     if (owner === 'appdock.default-shell') entry.enabled = true;
     if (local?.useLocalSettings) {
-      delete entry.startupDelaySeconds;
+      for (const key of appletCommonKeys()) delete entry[key];
       delete entry.pages;
       Object.assign(entry, structuredClone(local.configuration));
     }
@@ -325,7 +321,7 @@ export function splitSettings(
       'enabled',
       'settings',
       'pages',
-      'startupDelaySeconds',
+      ...appletCommonKeys(),
     ]);
     const changedConfiguration = !equal(configuration(next, owner), configuration(before, owner));
     if (!changedConfiguration) continue;
@@ -353,7 +349,7 @@ export function splitSettings(
     if (local.useLocalSettings) local.configuration = candidate;
     else {
       stored.settings = candidate.settings;
-      for (const key of ['pages', 'startupDelaySeconds'] as const) {
+      for (const key of ['pages', ...appletCommonKeys()] as const) {
         delete stored[key];
         if (candidate[key] !== undefined) (stored as any)[key] = candidate[key];
       }

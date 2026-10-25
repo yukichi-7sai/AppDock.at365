@@ -41,6 +41,8 @@ WebアカウントUIでは`source:"web-accounts"`を使い、uiを重複指定�
 
 ## 表示先
 
+ページ表示先と起動待ち時間は[共通MCP設定API](settings-api.md#applet共通設定)からも編集できる。ページの項目は現在のpagesから生成し、表示先変更は本節と同じSurface/寿命・保存経路を使用する。通常のApplet共通項目は[共通定義](../src/shared/applet-common-settings.ts)を正本とする。
+
 本体の「Applet → 対象Applet → 設定」でページごとの表示方法を選択できます。保存先は`settings.json`の`extensions.<id>.pages.<pageId>.display`（page/window）。省略時はmanifestのdefaultDisplay、さらに省略時はpage。既存のApplet設定とは別のホスト管理領域です。表示先変更は次のopenへ反映し、表示中の画面なら直ちに載せ替えます。非表示の画面を設定変更だけで前面へ出しません。
 
 独立ウィンドウの通常位置/サイズ/最大化は保存します。Webアカウントは既存`web-accounts/<id>/window-state.json`を引き続き使用し、localは`pages/<id>/<pageId>/window-state.json`です。閉じる操作では隠し、停止/異常終了時に画面を破棄します。表示中のページを停止した場合は本体の[既定の表示先](host-pages.md#起動と戻り先)へ戻します。

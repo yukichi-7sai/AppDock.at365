@@ -30,7 +30,7 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
         path.join(dir, 'local'),
         'TEST',
         () => [],
-        () => [],
+        () => updateApplets,
       )
     : new SettingsStore(path.join(dir, 'settings.json'));
   store.load();
@@ -1181,6 +1181,427 @@ const sourceTarget = (f, ownerId) =>
     ?.targetId;
 const setUpdate = (f, changes, dryRun = false) =>
   f.call('apply', f.request(updatesId, [{ kind: 'set', changes }], dryRun));
+
+const commonApplet = (id = 'common.applet', extra = {}) =>
+  updateApplet(id, {
+    startupDelaySeconds: 12,
+    pages: [
+      {
+        id: 'main.part',
+        title: 'Same page',
+        source: 'local',
+        ui: 'page.html',
+        openCommand: id + '.open',
+        defaultDisplay: 'window',
+      },
+    ],
+    ...extra,
+  });
+const commonTarget = (f, owner) =>
+  f.call('targets.list', { ownerId: owner }).items.find((item) => item.category === 'applet-common')
+    ?.targetId;
+const setCommon = (f, id, changes, dryRun = false) =>
+  f.call('apply', f.request(id, [{ kind: 'set', changes }], dryRun));
+
+test('new primitive common declarations automatically join discovery, validation, catalog, JSON projection and both storage scopes', (t) => {
+  const {
+    appletCommonSettingDeclarations: declarations,
+  } = require('../out/main/shared/applet-common-settings');
+  const additions = {
+    futureFlag: { title: 'Future flag', type: 'boolean', default: false },
+    futureText: { title: 'Future text', type: 'string', default: '', maxLength: 20 },
+    futureMode: {
+      title: 'Future mode',
+      type: 'select',
+      default: 'one',
+      options: [
+        { value: 'one', label: 'One' },
+        { value: 'two', label: 'Two' },
+      ],
+    },
+    futureScale: { title: 'Future scale', type: 'number', default: 1.5, minimum: 0, maximum: 3 },
+    privateCommon: {
+      title: 'PRIVATE_COMMON_TITLE',
+      type: 'string',
+      default: 'PRIVATE_DEFAULT',
+      automation: false,
+    },
+    secretCommon: {
+      title: 'SECRET_COMMON_TITLE',
+      type: 'string',
+      default: '',
+      secret: true,
+      automation: true,
+    },
+    localCommon: {
+      title: 'LOCAL_COMMON_TITLE',
+      type: 'boolean',
+      default: false,
+      localOnly: true,
+      automation: true,
+    },
+  };
+  t.after(() => {
+    for (const key of Object.keys(additions)) delete declarations[key];
+  });
+  Object.assign(declarations, additions);
+  const provider = commonApplet(),
+    f = fixture(t, { device: true, updateApplets: [provider] }),
+    id = commonTarget(f, provider.id);
+  f.store.save(
+    {
+      ...f.store.value,
+      extensions: {
+        [provider.id]: {
+          enabled: false,
+          settings: {},
+          privateCommon: 'PRIVATE_VALUE',
+          secretCommon: 'SECRET_VALUE',
+          localCommon: true,
+        },
+      },
+    },
+    f.store.revision,
+  );
+  const schema = f.call('schema.get', { targetId: id });
+  for (const key of ['futureFlag', 'futureText', 'futureMode', 'futureScale'])
+    assert(schema.items.some((field) => field.key === key));
+  for (const key of ['privateCommon', 'secretCommon', 'localCommon'])
+    assert.throws(() => f.read(id, [key]), { code: 'NOT_FOUND' });
+  assert.equal(f.call('targets.list', { query: 'PRIVATE_COMMON_TITLE' }).items.length, 0);
+  const {
+      settingsCatalog,
+      settingsProjection,
+      applySettingsJson,
+    } = require('../out/main/shared/settings-catalog'),
+    page = settingsCatalog([provider], f.store.value).find((page) => page.owner === provider.id);
+  assert(page.items.some((item) => item.key === 'futureFlag'));
+  const projected = settingsProjection(f.store.value, page, [provider]);
+  const json = structuredClone(projected);
+  json.extensions[provider.id].futureText = 'From JSON';
+  assert.equal(
+    applySettingsJson(f.store.value, page, [provider], JSON.stringify(json)).extensions[provider.id]
+      .futureText,
+    'From JSON',
+  );
+  const changes = {
+    futureFlag: true,
+    futureText: 'Automatic',
+    futureMode: 'two',
+    futureScale: 2.25,
+  };
+  const device = fs.readFileSync(f.store.device.file);
+  setCommon(f, id, changes);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  for (const [key, value] of Object.entries(changes)) assert.equal(f.values(id)[key], value);
+  assert.equal(
+    JSON.parse(fs.readFileSync(f.store.shared.file)).extensions[provider.id].futureFlag,
+    true,
+  );
+  for (const bad of [
+    { futureFlag: 'true' },
+    { futureText: 'x'.repeat(21) },
+    { futureMode: 'other' },
+    { futureScale: 4 },
+  ])
+    assert.throws(() => setCommon(f, id, bad), { code: 'INVALID_ARGUMENT' });
+  f.store.setLocalSettings(provider.id, true, f.store.revision);
+  const shared = fs.readFileSync(f.store.shared.file);
+  setCommon(f, id, { futureText: 'Local' });
+  assert.equal(f.values(id).futureText, 'Local');
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), shared);
+  const config = JSON.parse(fs.readFileSync(f.store.device.file)).extensions[provider.id]
+    .configuration;
+  assert.equal(config.futureFlag, true);
+  assert.equal(config.privateCommon, 'PRIVATE_VALUE');
+  assert.equal(config.secretCommon, 'SECRET_VALUE');
+  f.call('apply', f.request(id, [{ kind: 'reset', keys: Object.keys(changes) }]));
+  assert.equal(f.values(id).futureFlag, false);
+  assert.equal(f.values(id).futureText, '');
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), shared);
+  assert.equal(f.decrypts(), 0);
+});
+
+test('Applet common fields follow declared defaults and pages for stopped owners without exposing lifecycle or private configuration', (t) => {
+  const a = commonApplet(),
+    b = commonApplet('other.applet', { startupDelaySeconds: undefined, pages: undefined }),
+    f = fixture(t, {
+      updateApplets: [
+        a,
+        b,
+        commonApplet('builtin', { sourceKind: 'builtin' }),
+        commonApplet('child', { collection: { owner: a.id, key: 'pages', itemId: 'child' } }),
+      ],
+    }),
+    id = commonTarget(f, a.id);
+  assert(id);
+  assert.notEqual(id, commonTarget(f, b.id));
+  assert.equal(commonTarget(f, 'builtin'), undefined);
+  assert.equal(commonTarget(f, 'child'), undefined);
+  assert.deepEqual(f.values(id), { startupDelaySeconds: 12, 'page:main.part': 'window' });
+  assert.deepEqual(f.values(commonTarget(f, b.id)), { startupDelaySeconds: 0 });
+  assert(f.read(id).fields.every((field) => field.inherited));
+  const schema = f.call('schema.get', { targetId: id });
+  assert.deepEqual(schema.items[0].inputSchema, { type: 'integer', minimum: 0, maximum: 86400 });
+  assert.deepEqual(
+    f.call('options.list', { targetId: id, key: 'page:main.part' }).items.map((item) => item.value),
+    ['page', 'window'],
+  );
+  for (const key of [
+    'enabled',
+    'settings',
+    'updateSource',
+    'useLocalSettings',
+    'appletOrder',
+    'page:missing',
+  ])
+    assert.throws(() => setCommon(f, id, { [key]: true }), { code: 'NOT_FOUND' });
+  assert.equal(f.writes(), 0);
+  assert.equal(f.decrypts(), 0);
+  assert.equal(a.state, 'stopped');
+});
+
+test('Applet common dryRun/replay/reset keep literal dotted page IDs and unrelated settings intact', (t) => {
+  const provider = commonApplet(),
+    f = fixture(t, { updateApplets: [provider] }),
+    id = commonTarget(f, provider.id);
+  f.store.save(
+    {
+      ...f.store.value,
+      extensions: {
+        [provider.id]: {
+          enabled: false,
+          settings: { private: 'PRIVATE_COMMON' },
+          updateSource: '',
+          future: { retained: true },
+          pages: { retired: { display: 'window', metadata: 7 } },
+        },
+      },
+    },
+    f.store.revision,
+  );
+  const before = fs.readFileSync(f.store.file),
+    changes = { startupDelaySeconds: 86400, 'page:main.part': 'page' },
+    preview = setCommon(f, id, changes, true);
+  assert.equal(preview.completion, 'validated');
+  assert.equal(preview.effectVerified, false);
+  assert.equal(preview.applies.startupDelaySeconds, 'appletStartupScheduleChanged');
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  const request = f.request(id, [{ kind: 'set', changes }]),
+    saved = f.call('apply', request);
+  assert.deepEqual(f.call('apply', request), saved);
+  assert.equal(f.writes(), 1);
+  assert.equal(f.store.value.extensions[provider.id].pages['main.part'].display, 'page');
+  assert.equal(f.store.value.extensions[provider.id].pages.main, undefined);
+  f.call('apply', f.request(id, [{ kind: 'reset', keys: Object.keys(changes) }]));
+  assert(f.read(id).fields.every((field) => field.inherited));
+  const entry = f.store.value.extensions[provider.id];
+  assert.equal(entry.startupDelaySeconds, undefined);
+  assert.deepEqual(entry.pages, { retired: { display: 'window', metadata: 7 } });
+  assert.equal(entry.enabled, false);
+  assert.equal(entry.updateSource, '');
+  assert.deepEqual(entry.future, { retained: true });
+  assert.deepEqual(entry.settings, { private: 'PRIVATE_COMMON' });
+  const writes = f.writes();
+  setCommon(f, id, { startupDelaySeconds: 12, 'page:main.part': 'window' });
+  assert.equal(f.writes(), writes);
+  assert(!JSON.stringify(f.read(id)).includes('PRIVATE_COMMON'));
+});
+
+test('shared common preferences omit explicit defaults and never change device bytes', (t) => {
+  const provider = commonApplet(),
+    f = fixture(t, { device: true, updateApplets: [provider] }),
+    id = commonTarget(f, provider.id);
+  f.store.save(
+    {
+      ...f.store.value,
+      extensions: { ...f.store.value.extensions, [provider.id]: { enabled: false, settings: {} } },
+    },
+    f.store.revision,
+  );
+  const device = fs.readFileSync(f.store.device.file);
+  setCommon(f, id, { startupDelaySeconds: 45, 'page:main.part': 'page' });
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  assert.equal(
+    JSON.parse(fs.readFileSync(f.store.shared.file)).extensions[provider.id].startupDelaySeconds,
+    45,
+  );
+  setCommon(f, id, { startupDelaySeconds: 12, 'page:main.part': 'window' });
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  const raw = JSON.parse(fs.readFileSync(f.store.shared.file));
+  raw.extensions[provider.id].startupDelaySeconds = 12;
+  raw.extensions[provider.id].pages = { 'main.part': { display: 'window' } };
+  fs.writeFileSync(f.store.shared.file, JSON.stringify(raw));
+  f.store.shared.reload();
+  assert(f.read(id).fields.every((field) => !field.inherited));
+  f.call(
+    'apply',
+    f.request(id, [{ kind: 'reset', keys: ['startupDelaySeconds', 'page:main.part'] }]),
+  );
+  const stored = JSON.parse(fs.readFileSync(f.store.shared.file)).extensions[provider.id];
+  assert.equal(stored.startupDelaySeconds, undefined);
+  assert.equal(stored.pages, undefined);
+  assert(f.read(id).fields.every((field) => field.inherited));
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+});
+
+test('PC-only common preferences use their current configuration and preserve dormant shared values and permission state', (t) => {
+  const provider = commonApplet(),
+    f = fixture(t, { device: true, updateApplets: [provider] }),
+    id = commonTarget(f, provider.id);
+  setCommon(f, id, { startupDelaySeconds: 33, 'page:main.part': 'page' });
+  f.store.setLocalSettings(provider.id, true, f.store.revision);
+  const shared = fs.readFileSync(f.store.shared.file),
+    device = JSON.parse(fs.readFileSync(f.store.device.file));
+  setCommon(f, id, { startupDelaySeconds: 77 });
+  assert.equal(f.values(id).startupDelaySeconds, 77);
+  assert.equal(
+    f.read(id).fields.find((field) => field.key === 'startupDelaySeconds').inherited,
+    false,
+  );
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), shared);
+  const after = JSON.parse(fs.readFileSync(f.store.device.file));
+  device.extensions[provider.id].configuration = after.extensions[provider.id].configuration;
+  assert.deepEqual(after, device);
+  f.call(
+    'apply',
+    f.request(id, [{ kind: 'reset', keys: ['startupDelaySeconds', 'page:main.part'] }]),
+  );
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), shared);
+  assert(f.read(id).fields.every((field) => field.inherited));
+  const stale = f.request(id, [{ kind: 'set', changes: { startupDelaySeconds: 88 } }]);
+  f.store.setLocalSettings(provider.id, false, f.store.revision);
+  assert.throws(() => f.call('apply', stale), { code: 'SCHEMA_CONFLICT' });
+  assert.equal(f.values(id).startupDelaySeconds, 33);
+});
+
+test('Applet common schemas follow page/default changes and removed owners while dormant page preferences remain saved', (t) => {
+  const provider = commonApplet(),
+    f = fixture(t, { updateApplets: [provider] }),
+    id = commonTarget(f, provider.id);
+  setCommon(f, id, { 'page:main.part': 'page' });
+  const stale = f.request(id, [{ kind: 'reset', keys: ['page:main.part'] }]),
+    cursor = f.call('schema.get', { targetId: id, limit: 1 }).nextCursor;
+  provider.pages = [{ id: 'new', title: 'New', defaultDisplay: 'page' }];
+  assert.throws(() => f.call('apply', stale), { code: 'SCHEMA_CONFLICT' });
+  assert.throws(() => f.call('schema.get', { targetId: id, limit: 1, cursor }), {
+    code: 'REVISION_CONFLICT',
+  });
+  setCommon(f, id, { startupDelaySeconds: 50 });
+  assert.equal(f.store.value.extensions[provider.id].pages['main.part'].display, 'page');
+  assert.throws(() => f.read(id, ['page:main.part']), { code: 'NOT_FOUND' });
+  const defaults = f.call('schema.get', { targetId: id }).schemaRevision;
+  provider.startupDelaySeconds = 100;
+  assert.notEqual(f.call('schema.get', { targetId: id }).schemaRevision, defaults);
+  const absent = f.request(id, [{ kind: 'reset', keys: ['startupDelaySeconds'] }]);
+  f.updateApplets.splice(0);
+  assert.throws(() => f.call('apply', absent), { code: 'NOT_FOUND' });
+});
+
+test('Applet common input validation, write revocation and external revisions protect atomic saves', (t) => {
+  const provider = commonApplet(),
+    f = fixture(t, { updateApplets: [provider] }),
+    id = commonTarget(f, provider.id),
+    before = fs.readFileSync(f.store.file);
+  for (const value of [-1, 86401, 1.5, '12', true, null])
+    assert.throws(
+      () => setCommon(f, id, { startupDelaySeconds: value, 'page:main.part': 'page' }),
+      { code: 'INVALID_ARGUMENT' },
+    );
+  for (const value of ['other', {}, ['page'], null])
+    assert.throws(() => setCommon(f, id, { startupDelaySeconds: 66, 'page:main.part': value }), {
+      code: 'INVALID_ARGUMENT',
+    });
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  const request = f.request(id, [{ kind: 'set', changes: { startupDelaySeconds: 25 } }]);
+  f.call('apply', request);
+  f.setWrite(false);
+  assert.throws(() => f.call('apply', request), { code: 'WRITE_DISABLED' });
+  f.setWrite(true);
+  const stale = f.request(id, [{ kind: 'set', changes: { startupDelaySeconds: 26 } }]),
+    raw = JSON.parse(fs.readFileSync(f.store.file));
+  raw.extensions[provider.id].startupDelaySeconds = 99;
+  fs.writeFileSync(f.store.file, JSON.stringify(raw));
+  assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
+});
+
+test('Applet common save failures preserve both settings files and encrypted credentials', (t) => {
+  const provider = commonApplet(),
+    f = fixture(t, { device: true, updateApplets: [provider] }),
+    id = commonTarget(f, provider.id);
+  f.store.setLocalSettings(provider.id, true, f.store.revision);
+  f.aiSecrets.setKey(f.store.value.ai.connections[0], 'PRIVATE_AI');
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS');
+  const files = [f.store.shared.file, f.store.device.file, f.aiFile, f.ttsFile],
+    bytes = files.map((file) => fs.readFileSync(file)),
+    rename = fs.renameSync;
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (to === f.store.device.file) throw Error('Injected write failure');
+    return rename(from, to);
+  });
+  assert.throws(() => setCommon(f, id, { startupDelaySeconds: 77, 'page:main.part': 'page' }), {
+    code: 'SAVE_FAILED',
+  });
+  assert.deepEqual(
+    files.map((file) => fs.readFileSync(file)),
+    bytes,
+  );
+  assert.equal(f.decrypts(), 0);
+});
+
+test('Applet common edits retain unknown page metadata and refuse resets that would remove it', (t) => {
+  const provider = commonApplet('future.common', {
+      pages: [
+        { id: 'main', title: 'Page' },
+        { id: 'default', title: 'Default page' },
+      ],
+    }),
+    f = fixture(t, { device: true, updateApplets: [provider] }),
+    id = commonTarget(f, provider.id);
+  f.store.save(
+    {
+      ...f.store.value,
+      extensions: {
+        [provider.id]: {
+          enabled: false,
+          settings: {},
+          pages: {
+            main: { display: 'window', future: { keep: true } },
+            default: { display: 'page', future: { keep: true } },
+          },
+        },
+      },
+    },
+    f.store.revision,
+  );
+  assert.equal(
+    f.call('schema.get', { targetId: id }).items.find((field) => field.key === 'page:main')
+      .resettable,
+    false,
+  );
+  const before = fs.readFileSync(f.store.shared.file);
+  assert.throws(() => setCommon(f, id, { 'page:main': 'page' }), { code: 'INVALID_ARGUMENT' });
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  setCommon(f, id, { startupDelaySeconds: 30 });
+  assert.deepEqual(f.store.value.extensions[provider.id].pages.main, {
+    display: 'window',
+    future: { keep: true },
+  });
+  assert.equal(
+    JSON.parse(fs.readFileSync(f.store.shared.file)).extensions[provider.id].pages.default.display,
+    'page',
+  );
+  f.store.shared.reload();
+  f.store.setLocalSettings(provider.id, true, f.store.revision);
+  const shared = fs.readFileSync(f.store.shared.file);
+  setCommon(f, id, { startupDelaySeconds: 31 });
+  f.store.device.reload();
+  assert.deepEqual(f.store.value.extensions[provider.id].pages.default, {
+    display: 'page',
+    future: { keep: true },
+  });
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), shared);
+});
 
 const { shellRegions, defaultShellId } = require('../out/main/shared/shell');
 const shellId = 'service.shell';

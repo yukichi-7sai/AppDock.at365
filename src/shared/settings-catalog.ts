@@ -1,5 +1,6 @@
 import { hostText } from './i18n';
 import { hostSettingDefinitions } from './host-settings';
+import { appletCommonDefinitions, appletCommonKeys } from './applet-common-settings';
 import { getHostTranslator } from './i18n';
 import { defaultHostLanguage, type HostLanguage } from './host-language';
 import { collectionRecord } from './page-collections';
@@ -556,14 +557,9 @@ export function settingsCatalog(
             ),
           ),
           ...(!a.collection
-            ? [
-                item(
-                  id,
-                  'startupDelaySeconds',
-                  hostText('settings.settings-catalog.appletDelayTitle'),
-                  appletCommonDescriptions.startupDelaySeconds,
-                ),
-              ]
+            ? appletCommonDefinitions(a).map((field) =>
+                item(id, field.key, field.title, field.description),
+              )
             : []),
           ...(a.settingActions ?? []).map((s) => ({
             ...item(id, `action:${s.command}`, s.title, s.description),
@@ -599,7 +595,7 @@ export function settingsPaths(
     if (!a) throw Error(hostText('settings.settings-catalog.missingTarget'));
     return [
       ['extensions', a.id, 'settings'],
-      ['extensions', a.id, 'startupDelaySeconds'],
+      ...appletCommonKeys().map((key) => ['extensions', a.id, key]),
       ...(!a.collection ? [['extensions', a.id, 'updateSource']] : []),
       ...(!a.collection ? (a.pages ?? []) : []).map((p) => [
         'extensions',
@@ -835,7 +831,7 @@ export function applySettingsJson(
       next.extensions[page.owner!],
       applets.find((a) => a.id === page.owner),
     );
-    for (const key of ['settings', 'startupDelaySeconds', 'pages'] as const) {
+    for (const key of ['settings', ...appletCommonKeys(), 'pages'] as const) {
       delete next.extensions[page.owner!][key];
       if (compact[key] !== undefined) (next.extensions[page.owner!] as any)[key] = compact[key];
     }

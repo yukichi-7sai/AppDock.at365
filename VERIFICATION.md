@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-26: Applet共通設定の宣言共有とMCP接続 0.90.4
+
+- cleanな`e781d4d`から専用worktree `AppDock.at365-mcp-settings-design`の`codex/mcp-settings-design`を継続。Applet共通の起動待ち時間とページ表示先を既存の固定6入口へ接続した。通常の共通項目も定義追加だけで公開できるよう、型/画面/検証/カタログ/JSON/保存を共通化。追跡先の追加、main統合、push/Release/deployは行わない。
+- 正本を[src/shared/applet-common-settings.ts](src/shared/applet-common-settings.ts)のappletCommonSettingDeclarationsへ集約。boolean/number/string/selectの通常項目は同じ宣言から生成し、MCP専用の項目表を持たない。fromManifestの既定値と検証も共用する。automation省略時は公開、false/secret/localOnlyはMCPの名前/Schema/値/検索/更新から除外し、trueでも秘密を公開しない。起動/停止・認証・更新元等の所有処理は通常項目へ混ぜない。
+- 共通設定は停止/無効の外部Appletも編集でき、組込みとcollection子ページは対象外。起動待ち時間は0～86,400の整数、表示先は現在のpagesから`page:<ID>`を生成してpage/windowを選択する。ドット入りIDをそのまま扱い、消えたページの指定と未編集の固有値を保持する。ページ/既定値/保存先の変更はSchemaへ反映し、古いSchema・cursor・値要求を拒否する。
+- 現在の共有/PC専用設定から上書きを読み、同じ保存先で既定値set/resetを行う。PC専用編集で休眠中の共有値を変更せず、有効状態・更新元・固有設定・他ページと暗号化ファイルを保持。未対応のページ追加データを消すresetを拒否し、既定省略時も残る行にはparserが必要とするdisplayを保持して、両ファイルの再読込を確認した。read + writeを使い、execute許可を保存条件にしない。
+- 既存の設定変更・worker schedule・Surface表示先変更へ接続。実行中workerを再起動せず、待機中は保存後に予定を再計算し、無効Appletを有効化しない。ページを明示的に開いた後のpage/window往復ではWebContentsと入力を保持する。探索/値取得/dryRunでページを開かず、dryRunでは保存/起動予定変更をしない。適用時点とeffectVerified=falseを公開する。
+- 発行前に公開判定、型/共通宣言、通常入力の即時保存、共有/端末別の分離、既定継承、ページID/追加データ、worker/Surfaceの寿命と必要回帰をレビュー。追加データが残るページのdisplay既定省略を修正して再検証し、阻害指摘なし。UIは既存共通部品と見た目を保ち、共通項目の描画を宣言駆動へ置き換えた。保存先切替には検証用test-idだけを追加した。
+- 固定依存install・型検査・本体/Default Shell build、最終の関連標準回帰**69ファイル681/681件、fail/skip 0**が成功。所有adapterは58件、今回の新規9件を含む。試験用宣言へのトグル/文字/選択/数値追加だけで探索・検証・検索/JSON・両保存先へ反映し、非公開3種類を除外することを確認。dryRun/無変更/再送、原子的失敗、外部競合/許可取消、ページ増減/既定変更、追加データ保持と再読込も検証した。標準全体は未実行。
+- 隔離source/最終固定EXEの実MCP・画面試験は各**28群**、固定EXE smokeも成功。通常保存とUIの相互反映、PC専用への切替/旧Schema拒否/既定復帰、既存画面の入力保持、待機予定の再計算、worker起動回数1・無効/待機worker未起動、暗号化キーbytes保持、execute OFF、tools/list不変を確認。GUIの初期失敗は保存先の識別子、簡略MCP応答にない予定時刻の取得元、後続試験前の設定画面復帰を修正して解消し、診断ログを保持した。
+- 最終**745入力**と参照するWebApplet/WallpaperSlideshow manifestのSHAは回帰前後・発行前後・固定試験後まで一致。整形は既存手順のsrc/scripts/testsを確認した。package.jsonはGit checkout時のCRLFを保ち、元版との差が版番号だけであることを別途照合した。発行後は関連文書と本記録だけを変更した。
+- 既存の設定/保存ファイルと公開操作契約を保つadapter・共通化のため**0.90.4**へパッチ更新。publish.bat終了0。EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170688089 bytes / SHA256 `cec37d666a039069e8d74eda1d64fa65c09f5898cf3e64c6e95143d01cf1666d`**。File/ProductVersion、feed版/size/hash、ASAR内package/同梱Default Shell、固定試験コピーの一致を照合した。
+- 正本は[設定API](docs/settings-api.md)、[設定基盤](docs/settings-foundation.md)、[Appletページ](docs/applet-pages.md)、[外部操作](docs/automation.md)。有効/無効・管理順序と他の専用adapterは後続。検証は隔離profile、合成した通常/非公開値と暗号化fixtureキー、loopback feedのみで、実利用の設定/認証・OS登録・物理入力を変更していない。
+- 証跡は`.artifacts/mcp-settings-applet-common-20261026/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-applet-common-20261026/`。source=`mcp-settings-foundation-source-1792946169889`、固定EXE=`mcp-settings-foundation-portable-1792946601945`、smoke=`smoke-1792946629011`。試験プロセス0、今回の成功は方式ごとの直近3回以内。過去の再利用資料/診断/固定出力を保持し、削除0件。
+
 ## 2026-10-26: 最新mainのMCP設定worktreeへの統合 0.90.3
 
 - cleanな`codex/mcp-settings-design`の`5064a09`へ、fetchで確認した最新`origin/main`=`28b24c6`を通常merge。mainの`6a3536c`/`28b24c6`によるリボン表示モードと一時グループ統合を取り込み、MCP設定の既存変更を保持した。追跡先の追加、primary main checkoutの変更、push/Release/deployは行わない。次の所有adapterは推薦のみとし、今回追加実装していない。

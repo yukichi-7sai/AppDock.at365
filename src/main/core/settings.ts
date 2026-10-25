@@ -137,6 +137,13 @@ class SettingsStore<T = Settings> extends EventEmitter {
   storedSettingOverrides(owner: string, collection?: CollectionBinding) {
     return storedSettingRecord(this.storedValue(), owner, collection);
   }
+  appletConfigurationScope(_owner: string): 'shared' | 'device' {
+    return 'shared';
+  }
+  storedAppletConfiguration(owner: string): Record<string, unknown> {
+    const entry = this.storedValue().extensions?.[owner];
+    return isObject(entry) ? entry : {};
+  }
   private readBytes(file: string): Buffer {
     try {
       const stat = fs.statSync(file);

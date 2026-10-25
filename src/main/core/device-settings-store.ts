@@ -12,6 +12,7 @@ import {
 import type { Settings, ExtensionManifest } from '../../shared/contracts';
 import type { CollectionBinding } from '../../shared/page-collections';
 import { parseSettings } from '../../shared/settings-schema';
+import { appletCommonKeys } from '../../shared/applet-common-settings';
 import {
   settingsStorageValue,
   restoreSettingsCollections,
@@ -53,6 +54,16 @@ export class DeviceSettingsStore extends SettingsStore {
   private mutating = false;
   private loaded = false;
   private healthKeys = new Set<string>();
+  override appletConfigurationScope(owner: string): 'shared' | 'device' {
+    return this.localSettings(owner) ? 'device' : 'shared';
+  }
+  override storedAppletConfiguration(owner: string): Record<string, unknown> {
+    const local = this.device.storedValue().extensions?.[owner];
+    const entry = local?.useLocalSettings
+      ? local.configuration
+      : this.shared.storedValue().extensions?.[owner];
+    return entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {};
+  }
   override storedSettingOverrides(owner: string, collection?: CollectionBinding) {
     const shared = this.shared.storedValue(),
       device = this.device.storedValue();
@@ -394,7 +405,7 @@ export class DeviceSettingsStore extends SettingsStore {
       }
       stored.settings = candidate.settings;
       delete stored.pages;
-      delete stored.startupDelaySeconds;
+      for (const key of appletCommonKeys()) delete stored[key];
       Object.assign(stored, candidate);
     }
     if (!enabled && disposition !== 'keep') delete entry.configuration;

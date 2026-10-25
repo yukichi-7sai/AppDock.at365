@@ -20,6 +20,7 @@
 | 本体の更新設定 | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可 |
 | Appletの更新元 | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外 |
 | Shell選択 | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成 |
+| Applet共通設定 | 起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成 |
 
 起動・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
 
@@ -30,6 +31,8 @@ AI接続は所有サービスが必須値を具体的に保存するため、inh
 通知の必須通知先・許可された通知先・表示時間の型/範囲・固定寿命を既存の通知編集と同じ検証へ渡す。表示時間は整数またはnull（手動で閉じるまで）で、固定寿命の種類は変更できず、古い上書きのresetだけを受け付ける。指定した上書きだけを解除し、何も残らなければその種類の上書き行を除去する。停止中の提供元も通知設定の保存で起動しない。通知規則や音声継承元の変更はschemaRevisionへ反映する。
 
 本体の通常設定は[src/shared/host-settings.ts](../src/shared/host-settings.ts)へ登録し、HostSettingsの型と画面の操作を追加する。既定値・通常の型検証・設定カタログ・JSON投影・PC専用保存・MCP公開は同じ登録を使う。Appletは既存のmanifest設定定義を使い、MCP専用の登録を増やさない。特殊な適用手順を持つ起動登録・管理者実行・Shell・トレイ割当は、通常設定の登録へ混ぜない。
+
+Appletのホスト管理共通項目は[src/shared/applet-common-settings.ts](../src/shared/applet-common-settings.ts)のappletCommonSettingDeclarationsへ定義する。boolean/number/string/selectは、この1か所から型、共通設定画面、既定値、入力検証、検索カタログ、部分JSON、共有/PC専用の保存とMCP投影を生成する。通常項目を追加するときにMCP用のフィールド表や外側のツールSchemaを変更する必要はない。公開判定は同じautomation/secret/localOnlyを使用する。fromManifestを指定した項目はApplet側の同名プロパティを既定値に使い、その検証も同じ定義へ接続する。専用の寿命処理・OS操作・認証編集や複雑な入力は、その所有サービスとの接続を実装する。
 
 `automation`省略またはtrueをMCP公開、falseを非公開とする。secret/localOnlyはtrueでも公開しない。未宣言キー、保存ファイル全体、認証サービスや暗号化情報は探索しない。非公開項目は名前・Schema・既定値・値・検索・プレビューにも出さず、指定されてもNOT_FOUNDを返す。Appletから他のAppletを操作する既存APIは明示的なautomation:trueを維持する。
 
@@ -50,7 +53,7 @@ targets/schema/items/optionsはitemsと任意nextCursorを返す。limitは既�
 
 catalogRevisionは公開対象の構成、schemaRevisionは対象の公開定義、revisionは値と保存上書きの状態を表す。それぞれ用途が異なり、旧settings.getやコマンドAPIのrevisionとも交換できない。プロセス再起動後は値を再取得する。targetIdは探索結果を使い、名称から合成しない。
 
-schemaのitemsはkey/title/type/inputSchema/default/writable/applies、operationSchemasは操作の構造を返す。valuesのfieldsはkey/value/hasValue/default/inherited/writable/appliesを返す。既定値や値が存在しなければ該当プロパティを省略する。inheritedは保存上書きがなければtrue、あればfalse。保存ファイルを読めない場合はnullとし、値は最後の有効なスナップショットを返す。読取りだけで再読込・復旧・書込みを行わない。対象が停止・無効ならavailable/writable=falseであり、applyはUNAVAILABLEを返す。
+schemaのitemsはkey/title/type/inputSchema/default/writable/applies、operationSchemasは操作の構造を返す。valuesのfieldsはkey/value/hasValue/default/inherited/writable/appliesを返す。既定値や値が存在しなければ該当プロパティを省略する。inheritedは保存上書きがなければtrue、あればfalse。保存ファイルを読めない場合はnullとし、値は最後の有効なスナップショットを返す。読取りだけで再読込・復旧・書込みを行わない。Applet固有のmanifest設定対象は停止・無効ならavailable/writable=falseであり、applyはUNAVAILABLEを返す。所有サービスが公開する共通設定・更新元などは各節の可用性に従う。
 
 動的selectはAppletの既存settings.setOptionsが公開した現在の候補を使用する。一覧のoptionSource:web-profilesは提供元自身のWeb名簿のIDと名前だけを既存parserで読み取り、候補取得や検証のためにRemotePageServiceの初期化・session整理・接続・ページ表示を行わない。現在の候補をSchemaと保存前の検証へ反映する。候補変更でschemaRevisionも変わる。候補を取得できない場合は空とし、未知候補への変更は拒否する。保存済みで候補から消えた値は、未編集なら保持できる。itemRefは存在する行、draftValuesは公開列のキーだけを受け付ける。現在のproviderの候補はdraftValuesに依存しない。
 
@@ -108,6 +111,16 @@ Appletの更新元はmanifestのupdateRepositoryを既定値とし、上書き�
 適用時点は、更新元/同版許可がnextUpdateCheck、About自動確認がnextAboutOpen、起動時確認の対象/通知がnextStartupCheck、起動時の待ち時間がnextStart。起動時チェックが既に予約されていれば、対象/通知の変更はその確認でも使われるが、待ち時間を保存しても既存タイマーを作り直さない。About表示中の保存やONへの変更で通信せず、次に開いた時に通常の1時間間隔判定を行う。
 
 設定保存はread + write、更新チェック/取得/インストールは既存の独立した更新操作を使う。設定APIの取得・dryRun・保存は更新操作、確認ダイアログ、helper起動や再起動を開始しない。
+
+## Applet共通設定
+
+外部Appletごとにfields対象を提供し、停止・無効でも編集できる。組込みとcollectionの子ページは対象外。現在の通常項目はstartupDelaySeconds（0～86,400の整数）で、manifestの指定、未指定なら0を既定値とする。有効状態・起動/停止/再起動・保存先切替・管理順序はこの対象へ含めない。更新元は既存の独立した更新設定対象を使う。
+
+ページの表示先は現在のApplet snapshotのpagesから生成し、keyは`page:<ページID>`、候補はpage/window。ドットを含むページIDも分割しない。manifest/runtimeのページや既定値が変わるとschemaRevisionへ反映し、現在のSchemaを再取得する。消えたページの保存指定と未編集データは保持し、そのキーへの直接編集はNOT_FOUND。ページ行に未対応の追加データがあれば、その行を除去するreset/既定値setはresettable=falseとして拒否する。通常保存で残る追加データには既存parserが必要とするdisplayも保持し、再読込可能な形を維持する。
+
+共有設定とPC専用設定は、そのAppletの現在の「このPCで設定を保持する」に従う。既定値set/resetは現在の保存先の上書きを除去し、manifest/共通定義へ継承する。PC専用の編集で休眠中の共有値を書き換えず、保存先の切替はschemaRevisionも変える。固有設定・更新元・有効状態・他のページ・暗号化情報を保持し、read + writeで操作する。
+
+startupDelaySecondsのappliesはappletStartupScheduleChanged。実行中のworkerを再起動せず、待機中なら既存のschedule処理が起動予定を再計算する。無効Appletを有効化しない。表示先はpageDisplayChangedで、開かれている同じSurfaceを載せ替えてWebContentsと入力を保持し、未表示の画面を設定だけで開かない。新しい通常項目はappliesを定義でき、省略時はappletConfigurationChanged。保存後は既存の設定変更・再適用経路を使い、所有処理を必要とする項目に適用完了を推測しない。dryRunは保存・再計算・ページ表示を行わず、保存完了のeffectVerifiedもfalse。
 
 ## Shell選択
 

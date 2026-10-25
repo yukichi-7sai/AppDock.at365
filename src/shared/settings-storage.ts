@@ -3,6 +3,7 @@ import { createDefaultSettings } from './settings-schema';
 import { defaultKeybindings } from './keybindings';
 import { fillSettingDefaults, omitSettingDefaults, settingsObject } from './settings-defaults';
 import { customCommandVersion } from './custom-commands';
+import { appletCommonDefinitions, type AppletCommonKey } from './applet-common-settings';
 
 export function appletConfigurationDefaults(applet?: ExtensionManifest) {
   return {
@@ -11,7 +12,11 @@ export function appletConfigurationDefaults(applet?: ExtensionManifest) {
         .filter((field) => field.default !== undefined)
         .map((field) => [field.key, field.default]),
     ),
-    startupDelaySeconds: applet?.startupDelaySeconds ?? 0,
+    ...Object.fromEntries(
+      appletCommonDefinitions(applet)
+        .filter((field) => field.default !== undefined)
+        .map((field) => [field.key, field.default]),
+    ),
     pages: Object.fromEntries(
       (applet?.pages ?? []).map((page) => [page.id, { display: page.defaultDisplay ?? 'page' }]),
     ),
@@ -19,10 +24,14 @@ export function appletConfigurationDefaults(applet?: ExtensionManifest) {
 }
 
 export function compactAppletConfiguration<
-  T extends Pick<ExtensionSettings, 'settings' | 'pages' | 'startupDelaySeconds'>,
+  T extends Pick<ExtensionSettings, 'settings' | 'pages' | AppletCommonKey>,
 >(value: T, applet?: ExtensionManifest): T {
   if (!applet) return structuredClone(value);
   const result = omitSettingDefaults(value, appletConfigurationDefaults(applet)) ?? {};
+  // A retained future page property still needs display for the existing page parser.
+  for (const [id, page] of Object.entries(value.pages ?? {}))
+    if (result.pages?.[id] && result.pages[id].display === undefined)
+      result.pages[id].display = page.display;
   // A configuration's presence isolates it from the shared file, even when all fields use defaults.
   result.settings ??= {};
   for (const collection of applet.pageCollections ?? []) {
@@ -55,7 +64,7 @@ function collectionFieldDefaults(
 }
 
 export function restoreAppletConfiguration<
-  T extends Pick<ExtensionSettings, 'settings' | 'pages' | 'startupDelaySeconds'>,
+  T extends Pick<ExtensionSettings, 'settings' | 'pages' | AppletCommonKey>,
 >(value: T, applet?: ExtensionManifest): T {
   const result = structuredClone(value);
   if (!applet) return result;

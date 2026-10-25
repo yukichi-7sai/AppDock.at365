@@ -1,6 +1,8 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useRef, useState, type ReactNode } from 'react';
 import { defaultAppletEnabled } from '../../shared/applet-state';
+import { appletCommonDefinitions } from '../../shared/applet-common-settings';
+import { Toggle } from './Toggle';
 import type {
   ExtensionSnapshot,
   Settings,
@@ -285,6 +287,7 @@ export function AppletSettingsForm({
               {...settingAnchor(pageId, `page:${page.id}`)}
             >
               <select
+                data-testid={'applet-page-display-' + applet.id + ':' + page.id}
                 aria-label={translate('settings.appletSettingsForm.displayLabel', {
                   title: page.title,
                 })}
@@ -313,27 +316,58 @@ export function AppletSettingsForm({
           collapsible
           data-testid="applet-common-settings"
         >
-          <SettingsField
-            title={translate('settings.appletSettingsForm.delay')}
-            hint={appletCommonDescriptions.startupDelaySeconds}
-            {...settingAnchor(pageId, 'startupDelaySeconds')}
-          >
-            <SettingsInput
-              aria-label={translate('settings.appletSettingsForm.delay')}
-              type="number"
-              min={0}
-              max={86400}
-              step={1}
-              value={current.startupDelaySeconds ?? applet.startupDelaySeconds ?? 0}
-              onChange={(e) =>
-                update({
-                  ...current,
-                  startupDelaySeconds:
-                    e.target.value === '' ? ('' as unknown as number) : numberInput(e.target.value),
-                })
-              }
-            />
-          </SettingsField>
+          {appletCommonDefinitions(applet)
+            .filter((field) => !field.secret)
+            .map((field) => {
+              const value =
+                (current as unknown as Record<string, unknown>)[field.key] ?? field.default;
+              const set = (next: unknown) => update({ ...current, [field.key]: next });
+              const testId = 'applet-common-' + applet.id + ':' + field.key;
+              return (
+                <SettingsField
+                  key={field.key}
+                  title={field.title}
+                  hint={field.description}
+                  {...settingAnchor(pageId, field.key)}
+                >
+                  {field.type === 'boolean' ? (
+                    <Toggle label={field.title} checked={Boolean(value)} onChange={set} />
+                  ) : field.type === 'select' ? (
+                    <select
+                      data-testid={testId}
+                      aria-label={field.title}
+                      value={String(value ?? '')}
+                      onChange={(event) => set(event.target.value)}
+                    >
+                      {(field.options ?? []).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <SettingsInput
+                      data-testid={testId}
+                      aria-label={field.title}
+                      type={field.type === 'number' ? 'number' : 'text'}
+                      min={field.minimum}
+                      max={field.maximum}
+                      step={field.step}
+                      minLength={field.minLength}
+                      maxLength={field.maxLength}
+                      value={(value as string | number) ?? ''}
+                      onChange={(event) =>
+                        set(
+                          field.type === 'number' && event.target.value !== ''
+                            ? numberInput(event.target.value)
+                            : event.target.value,
+                        )
+                      }
+                    />
+                  )}
+                </SettingsField>
+              );
+            })}
           {commonFields}
         </SettingsSection>
       )}

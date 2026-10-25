@@ -23,6 +23,7 @@ import { parseImageLibrary } from './registered-images';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
 import { fillSettingDefaults } from './settings-defaults';
+import { validateAppletCommonValues } from './applet-common-settings';
 import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
@@ -156,13 +157,7 @@ export function parseSettings(value: unknown): Settings {
       !object(item.settings)
     )
       throw new Error(hostText('settings.settings-schema.extension', { id: id }));
-    if (
-      item.startupDelaySeconds !== undefined &&
-      (!Number.isInteger(item.startupDelaySeconds) ||
-        Number(item.startupDelaySeconds) < 0 ||
-        Number(item.startupDelaySeconds) > 86400)
-    )
-      throw new Error(hostText('settings.settings-schema.extensionDelay', { id: id }));
+    validateAppletCommonValues(item);
     if (item.updateSource !== undefined) validateUpdateSource(item.updateSource);
     if (
       item.pages !== undefined &&

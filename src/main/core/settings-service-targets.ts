@@ -19,9 +19,14 @@ import {
 } from '../../shared/notification-types';
 import { sameSetting } from '../../shared/settings-defaults';
 import { settingInputSchema } from '../../shared/settings-commands';
-import { hostSettingItem } from '../../shared/settings-catalog';
+import { hostSettingItem, appletCommonDescriptions } from '../../shared/settings-catalog';
 import { createDefaultSettings } from '../../shared/settings-schema';
-import { validateMcpSetting } from '../../shared/mcp-setting-fields';
+import {
+  validateMcpSetting,
+  mcpSettingPublished,
+  mcpSettingSupported,
+} from '../../shared/mcp-setting-fields';
+import { appletCommonDefinitions } from '../../shared/applet-common-settings';
 import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import type { SettingsStore } from './settings';
 import {
@@ -118,6 +123,9 @@ export class SettingsServiceTargets {
         ...(this.options.applets?.() ?? [])
           .filter((applet) => !applet.collection && applet.sourceKind !== 'builtin')
           .map((applet) => this.appletUpdateSource(applet)),
+        ...(this.options.applets?.() ?? [])
+          .filter((applet) => !applet.collection && applet.sourceKind !== 'builtin')
+          .map((applet) => this.appletCommon(applet)),
         this.aiGeneral(),
         ...parseAiSettings(this.options.settings.value.ai).connections.map((connection) =>
           this.aiConnection(connection.id),
@@ -364,6 +372,80 @@ export class SettingsServiceTargets {
         return settings;
       },
       applies: () => 'nextUpdateCheck',
+    };
+  }
+  private appletCommon(applet: ExtensionSnapshot): Target {
+    const pages = applet.pages ?? [];
+    const ordinary = appletCommonDefinitions(applet).filter(
+      (field) => mcpSettingPublished(field) && mcpSettingSupported(field),
+    );
+    const pageIds = new Map(pages.map((page) => ['page:' + page.id, page.id]));
+    const fields: Field[] = [
+      ...ordinary.map((field) => ({
+        ...field,
+        ...(field.integer
+          ? { schema: { type: 'integer', minimum: field.minimum, maximum: field.maximum } }
+          : {}),
+      })),
+      ...pages.map((page): Field => ({
+        key: 'page:' + page.id,
+        title: hostText('settings.appletSettingsForm.displayLabel', { title: page.title }),
+        description: appletCommonDescriptions.display,
+        type: 'select',
+        default: page.defaultDisplay ?? 'page',
+        resettable: !Object.keys(
+          object(this.options.settings.value.extensions[applet.id]?.pages?.[page.id]),
+        ).some((key) => key !== 'display'),
+        options: [
+          { value: 'page', label: hostText('settings.appletSettingsForm.hostPage') },
+          { value: 'window', label: hostText('settings.appletSettingsForm.window') },
+        ],
+      })),
+    ];
+    const scope = this.options.settings.appletConfigurationScope(applet.id);
+    const projectCommon = (entry: RecordValue, defaults: boolean) =>
+      Object.fromEntries(
+        fields.flatMap((field) => {
+          const value = pageIds.has(field.key)
+            ? object(object(entry.pages)[pageIds.get(field.key)!]).display
+            : entry[field.key];
+          return value === undefined && !defaults ? [] : [[field.key, value ?? field.default]];
+        }),
+      );
+    return {
+      id: 'service.applets.common.' + Buffer.from(applet.id).toString('base64url'),
+      ownerId: applet.id,
+      title: applet.displayName,
+      category: 'applet-common',
+      fields,
+      stored: () => this.options.settings.storedAppletConfiguration(applet.id),
+      rewriteScope: scope,
+      context: { scope },
+      values: (settings) => projectCommon(object(settings.extensions[applet.id]), true),
+      overrides: (raw) => projectCommon(raw, false),
+      applies: (key) =>
+        pageIds.has(key)
+          ? 'pageDisplayChanged'
+          : (ordinary.find((field) => field.key === key)?.applies ?? 'appletConfigurationChanged'),
+      replace: (settings, changes, reset) => {
+        const entry = settings.extensions[applet.id] ?? { enabled: applet.enabled, settings: {} };
+        for (const field of ordinary) {
+          if (Object.hasOwn(changes, field.key))
+            (entry as unknown as RecordValue)[field.key] = changes[field.key];
+          if (reset.includes(field.key)) delete (entry as unknown as RecordValue)[field.key];
+        }
+        for (const page of pages) {
+          const key = 'page:' + page.id;
+          if (!Object.hasOwn(changes, key) && !reset.includes(key)) continue;
+          const rows = { ...entry.pages };
+          if (reset.includes(key)) delete rows[page.id];
+          else rows[page.id] = { ...rows[page.id], display: changes[key] as 'page' | 'window' };
+          if (Object.keys(rows).length) entry.pages = rows;
+          else delete entry.pages;
+        }
+        settings.extensions[applet.id] = entry;
+        return settings;
+      },
     };
   }
   private aiGeneral(): Target {

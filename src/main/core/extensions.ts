@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { validateAppletCommonValues } from '../../shared/applet-common-settings';
 import { shellView, type ShellRequirement } from '../../shared/shell';
 import type { ShellProvider } from './shell-provider-registry';
 import { parseNotificationTypes } from '../../shared/notification-types';
@@ -80,13 +81,7 @@ function readManifest(
   if (m.minimumHostVersion !== undefined) parseVersion(m.minimumHostVersion);
   if (m.updateRepository !== undefined && !validRepository(m.updateRepository))
     throw new Error(hostText('services.extensions.updateRepository'));
-  if (
-    m.startupDelaySeconds !== undefined &&
-    (!Number.isInteger(m.startupDelaySeconds) ||
-      m.startupDelaySeconds < 0 ||
-      m.startupDelaySeconds > 86400)
-  )
-    throw new Error(hostText('services.extensions.startupDelay'));
+  validateAppletCommonValues(m, true);
   if (
     m.capabilities !== undefined &&
     (!Array.isArray(m.capabilities) || m.capabilities.some((c: any) => typeof c !== 'string'))

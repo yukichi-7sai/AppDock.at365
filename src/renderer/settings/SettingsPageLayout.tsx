@@ -94,6 +94,7 @@ export function SettingsPageLayout({
               {storage && (storage.canSwitch || ['appearance', 'general'].includes(page.id)) ? (
                 <label className="settings-storage-toggle">
                   <input
+                    data-testid="settings-storage-local"
                     type="checkbox"
                     checked={storage.local}
                     disabled={!storage.canSwitch || pending}

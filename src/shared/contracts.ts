@@ -18,10 +18,11 @@ export interface HostSettings {
   trayClickCommand: string;
   trayDoubleClickCommand: string | null;
 }
-export interface ExtensionSettings {
+export interface ExtensionSettings extends Partial<
+  import('./applet-common-settings').AppletCommonValues
+> {
   enabled: boolean;
   updateSource?: string;
-  startupDelaySeconds?: number;
   pages?: Record<string, { display: import('./applet-pages').PageDisplay }>;
   settings: Record<string, unknown>;
 }
@@ -175,7 +176,9 @@ export interface PanelAction {
   actionId?: string;
   selected?: boolean;
 }
-export interface ExtensionManifest {
+export interface ExtensionManifest extends Partial<
+  import('./applet-common-settings').AppletCommonValues
+> {
   ribbonItems?: import('./ribbon').AppletRibbonItem[];
   customCommandTypes?: import('./custom-commands').CustomCommandType[];
   pageActions?: { id: string; parameters?: Record<string, 'string' | 'number' | 'boolean'> }[];
@@ -195,7 +198,6 @@ export interface ExtensionManifest {
   version: string;
   minimumHostVersion?: string;
   updateRepository?: string;
-  startupDelaySeconds?: number;
   description?: string;
   runtime: 'node' | 'dotnet' | 'native' | 'web';
   entry: string;
