@@ -1,5 +1,18 @@
 # 検証記録
 
+## 2026-10-25: 通知・AI/TTS通常値のMCP所有adapter 0.88.7
+
+- `codex/mcp-settings-design`のcleanな`5bddccc`から、次の所有サービス単位を実装。追跡先なしの専用worktreeを維持し、mainへの統合・追跡先変更を行わない。既存の固定6入口へ通知種類別/共通音声、AI共通/既存接続、TTS通常値のfields対象を追加し、外側のツールSchemaと8権限は維持した。
+- 所有サービスの既存parser・AI接続検証・通知編集・共有保存/再適用へ接続。read + writeだけで更新でき、useAi/useTts/executeを設定保存の条件にしない。生成・試聴・モデル/ボイス取得・接続試験を兼ねず、AI接続の追加/削除/順序とTTS手動一覧は今回の対象外。任意のJSONパスや保存ファイル全体は公開しない。
+- 暗号化情報はSchema/値/プレビューへ含めず、保護判定は復号しないメタデータ読取りで行う。暗号化ファイルの破損・読取拒否も保護ありとし、秘密付きURL/認証方式と、新たにキーを必要とする認証方式への変更をローカル操作へ制限。通常値の更新でAI/TTSの暗号化ファイルのbytesを保持する。秘密の改訂は公開revisionの内部HMACに束縛し、生のkeyRevisionは返さない。
+- 通知の必須/許可先・固定寿命・整数/nullの表示時間を共通検証し、指定フィールドのresetで何も残らなくなった行は既存UIの編集経路でも除去する。未導入提供元・他の通知行を保持し、停止中の通知提供元を起動しない。音声はresetでTTSへ継承。AI接続の必須値はinherited=nullとし、temperature等の任意値はresetで除去する。明示的な名前編集だけUIと同じtrimを行い、別項目の更新で既存の名前を正規化しない。
+- 発行前に公開投影、認証の結び付け、原子的保存/外部競合、継承、既存UIとSDKへの影響をレビュー。読取拒否を「秘密なし」と誤認しない処理、新しいBearer認証への切替防止、明示編集だけの名前正規化を確認・修正した。初期型検査のRecord型推論と、compact保存で省略されるnotificationPreferencesを扱うGUI fixtureを修正し再検証。最終の阻害指摘なし。
+- 固定lockfileのinstall・型検査・本体/Default Shell build、関連標準回帰**50ファイル493/493件、fail/skip 0**が成功。通知・AI/TTS・設定MCP/API・一覧・共有/端末別保存・権限・既存編集を対象とし、標準全体は未実行。14件の専用回帰で復号0、dryRun/無変更の無書込み、認証保護、Unicode上限、所有項目の網羅、reset・競合・停止/同名提供元を確認。699入力と参照するWebApplet/WallpaperSlideshow manifestの前後SHAが一致した。
+- 隔離sourceと最終固定EXEの実MCP/GUIは各**11群**、固定EXE smokeも成功。AI/TTSのMCP更新と既存UI編集の相互反映、ローカルで暗号化したfixtureキーのbytes保持と外部の接続先/認証変更拒否、通知の上書き解除と音声継承を確認した。キーの登録は隔離UIからだけ行い、実利用の認証・設定は変更しない。既存の一覧・動的候補・秘密除外・許可取消とtools/list不変も確認した。
+- 設定キー/保存ファイルの追加・削除と既存公開APIの破壊を含まない追加adapterにつき**0.88.7**へパッチ更新。publish.bat終了0で.NET各Host/Updaterも発行。本体EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170690725 bytes / SHA256 `c93e295463c0f60d2ff0946fd8c641264c267b16acbed4656a128c08da569ca4`**。Windows File/ProductVersion、feedの版・size/hash、ASARのpackage/同梱Default Shell、隔離コピーを照合した。
+- 正本は[設定API](docs/settings-api.md)、[AI](docs/ai.md)、[TTS](docs/tts-design.md)、後続範囲は[拡張設計](docs/mcp-settings-design.md)。実AI/TTSサーバーへの接続・生成・音声再生、実アカウント、物理入力/OS効果は今回の検証対象外。main逆統合・push・Release・実利用先deployなし。
+- 証跡は`.artifacts/mcp-settings-services-20261025/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-services-20261025/`。source=`mcp-settings-foundation-source-1792928814460`、固定EXE=`mcp-settings-foundation-portable-1792929245003`、smoke=`smoke-1792929263669`。後続変更は関連文書と本記録だけ。試験プロセスの終了を確認し、成功/失敗診断と過去の再利用証跡を保持、削除0件。
+
 ## 2026-10-25: MCPの宣言型一覧と動的候補 0.88.6
 
 - main `cc0a1fe`を取り込んだ`f1d3334`から、専用worktree `AppDock.at365-mcp-settings-design`の次の実装単位を完成。既存の固定6入口の外側Schemaを増やさず、宣言型object-listの探索・Schema・公開列・行参照とadd/update/remove/reorderへ対応した。動的selectは既存runtime候補、Web名簿の選択は所有元だけの既存parserによる読取りへ接続した。

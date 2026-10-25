@@ -53,6 +53,15 @@ export class AiSecrets {
   revision(id: string) {
     return hash(JSON.stringify(this.read(this.keysFile)[id] ?? null));
   }
+  /** Internal credential metadata for configuration guards; never decrypts a key. */
+  configurationState(id: string) {
+    try {
+      const entry = this.read(this.keysFile)[id];
+      return { protected: entry?.key !== undefined, revision: hash(JSON.stringify(entry ?? null)) };
+    } catch {
+      return { protected: true, revision: 'unavailable' };
+    }
+  }
   prepareKey(c: AiConnectionSettings, value: unknown) {
     if (typeof value !== 'string' || value.length > 8192 || /[\x00-\x1f\x7f]/.test(value))
       throw Error(hostText('services.aiSecrets.keyFormat'));

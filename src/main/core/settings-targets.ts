@@ -101,16 +101,20 @@ export class SettingsTargets {
       description: field.description ?? '',
       type: field.type,
       inputSchema:
-        field.type === 'string-list'
+        target.inputSchema?.(field) ??
+        (field.type === 'string-list'
           ? {
               type: 'array',
               maxItems: 64,
               items: { type: 'string', minLength: 1, maxLength: 32767 },
             }
-          : settingInputSchema({ ...field, options: target.options?.(field) ?? field.options }),
+          : settingInputSchema({ ...field, options: target.options?.(field) ?? field.options })),
       ...(field.default === undefined ? {} : { default: structuredClone(field.default) }),
       ...(field.step === undefined ? {} : { step: field.step }),
-      writable: target.kind !== 'list' || field.key !== target.definition.list?.idKey,
+      writable:
+        target.writable?.(field) ??
+        (target.kind !== 'list' || field.key !== target.definition.list?.idKey),
+      ...(target.resettable ? { resettable: target.resettable(field) } : {}),
       applies: target.applies(field.key),
     };
   }
@@ -121,6 +125,7 @@ export class SettingsTargets {
       category: target.category,
       fields: target.fields.map((field) => this.field(field, target)),
       kind: target.kind ?? 'fields',
+      context: target.schemaContext?.(),
       operationSchemas: target.kind === 'list' ? listOperationSchemas : operationSchemas,
     });
   }
@@ -243,8 +248,11 @@ export class SettingsTargets {
       ...(value === undefined ? {} : { value: structuredClone(value) }),
       hasValue: value !== undefined,
       ...(field.default === undefined ? {} : { default: structuredClone(field.default) }),
-      inherited: overrides === undefined ? null : !Object.hasOwn(overrides, field.key),
-      writable: target.available,
+      inherited:
+        target.inheritable?.(field) === false || overrides === undefined
+          ? null
+          : !Object.hasOwn(overrides, field.key),
+      writable: target.available && (target.writable?.(field) ?? true),
       applies: target.applies(field.key),
     };
   }

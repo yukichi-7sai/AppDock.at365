@@ -17,6 +17,11 @@ interface SettingsTargetBase {
   fields: SettingDefinition[];
   applies(key: string): string;
   options?(field: SettingDefinition): SettingOption[];
+  inputSchema?(field: SettingDefinition): Record<string, unknown>;
+  writable?(field: SettingDefinition): boolean;
+  resettable?(field: SettingDefinition): boolean;
+  inheritable?(field: SettingDefinition): boolean;
+  schemaContext?(): unknown;
   overrides(): Record<string, unknown> | undefined;
 }
 export interface SettingsFieldTarget extends SettingsTargetBase {

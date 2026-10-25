@@ -1,11 +1,12 @@
 import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
-import { aiId, parseAiSettings, type AiConnectionSettings } from '../../shared/ai';
+import { aiId, parseAiSettings, type AiConnectionSettings, type AiSettings } from '../../shared/ai';
+import { SettingsTargetError } from './settings-target-types';
 import { AiOpenAiChat } from './ai-openai-chat';
 import type { AiSecrets } from './ai-secrets';
 import type { SettingsStore } from './settings';
 
-/** Settings-only transactions and ephemeral discovery. Never exposed to Applets/MCP. */
+/** Local credential transactions, public non-secret validation, and explicit discovery. */
 export class AiSettingsController {
   private discovery?: { id: string; abort: AbortController };
   constructor(
@@ -43,6 +44,48 @@ export class AiSettingsController {
     const resolved = key == null ? this.secrets.key(c) : (key as string);
     if (!resolved) throw Error(hostText('settings.ai-settings.keyRequired'));
     return resolved;
+  }
+  configurationState(id: string) {
+    return this.secrets.configurationState(id);
+  }
+  preparePublicConnection(value: AiConnectionSettings, normalizeName: boolean) {
+    const next = this.connection(value);
+    if (!normalizeName) next.name = value.name;
+    return next;
+  }
+  validatePublic(next: AiSettings) {
+    const current = this.current();
+    if (
+      JSON.stringify(current.connections.map((c) => c.id)) !==
+      JSON.stringify(next.connections.map((c) => c.id))
+    )
+      throw new SettingsTargetError(
+        'LOCAL_ACTION_REQUIRED',
+        hostText('services.settingsTargets.localAction'),
+      );
+    for (const connection of next.connections) {
+      const before = current.connections.find((c) => c.id === connection.id)!;
+      if (JSON.stringify(before) === JSON.stringify(connection)) continue;
+      this.connection(connection);
+      if (
+        before.authentication !== connection.authentication &&
+        connection.authentication === 'bearer' &&
+        !this.secrets.configurationState(connection.id).protected
+      )
+        throw new SettingsTargetError(
+          'LOCAL_ACTION_REQUIRED',
+          hostText('services.settingsTargets.localAction'),
+        );
+      if (
+        (before.baseUrl !== connection.baseUrl ||
+          before.authentication !== connection.authentication) &&
+        this.secrets.configurationState(connection.id).protected
+      )
+        throw new SettingsTargetError(
+          'LOCAL_ACTION_REQUIRED',
+          hostText('services.settingsTargets.localAction'),
+        );
+    }
   }
   save(value: unknown, original: unknown, key: unknown, keyRevision: unknown) {
     const c = this.connection(value),

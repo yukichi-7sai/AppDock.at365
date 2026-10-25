@@ -11,6 +11,25 @@ export class TtsSecrets {
   private endpoint(baseUrl: string) {
     return createHash('sha256').update(ttsBaseUrl(baseUrl)).digest('hex');
   }
+  /** Internal credential metadata for configuration guards; never decrypts a key. */
+  configurationState() {
+    try {
+      if (fs.statSync(this.file).size > 32768) throw Error();
+      const bytes = fs.readFileSync(this.file),
+        value = JSON.parse(bytes.toString('utf8'));
+      if (
+        value.version !== 1 ||
+        typeof value.endpoint !== 'string' ||
+        typeof value.key !== 'string'
+      )
+        throw Error();
+      return { protected: true, revision: createHash('sha256').update(bytes).digest('hex') };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+        return { protected: false, revision: 'absent' };
+      return { protected: true, revision: 'unavailable' };
+    }
+  }
   get(baseUrl: string): string | undefined {
     if (!baseUrl || !fs.existsSync(this.file)) return undefined;
     try {

@@ -1,4 +1,5 @@
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
+import { SettingsServiceTargets } from './core/settings-service-targets';
 import { hostText } from '../shared/i18n';
 import { GestureIndicatorHost } from './core/gesture-indicator-host';
 import { settingListDraftAction } from './core/setting-list-draft';
@@ -652,6 +653,17 @@ const aiSettings = new AiSettingsController(settings, aiSecrets, (id) => {
   ai.reconcile(id ?? false);
   changed();
 });
+const serviceSettings = new SettingsServiceTargets({
+  settings,
+  revision: () => settingsCommands.revision(),
+  checkRevision: (revision) => settingsCommands.checkRevision(revision),
+  validate: prepareSettings,
+  save: (value, revision, rewrite) =>
+    commitSettings(prepareSettings(value), revision, undefined, rewrite),
+  ai: aiSettings,
+  tts: ttsSecrets,
+  notifications: () => notificationCatalog(allApplets()),
+});
 let aiMcpGeneration = 0;
 const aiOwner = (id?: string) =>
   id ? 'applet:' + id + ':' + manager.items.get(id)?.runtimeSession : 'mcp:' + aiMcpGeneration;
@@ -1051,6 +1063,7 @@ function mcpSettingsOperation<T>(operation: () => T): T {
   }
 }
 const operationApi = new AppDockApi({
+  serviceSettingsTargets: () => serviceSettings.targets(),
   settingsPrincipal: () => automation?.principal() ?? '',
   handlers: {
     'mcp.servers.getSettings': async (p) =>

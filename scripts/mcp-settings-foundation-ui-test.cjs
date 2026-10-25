@@ -36,6 +36,24 @@ Object.assign(settings.updates, {
 });
 settings.keybindings = [];
 settings.gestures.enabled = false;
+settings.ai = {
+  commonPrompt: 'Initial policy',
+  connections: [
+    {
+      ...require('../out/main/shared/ai').newAiConnection('service-fixture'),
+      name: 'Service fixture',
+      baseUrl: 'http://127.0.0.1:9/v1',
+      defaultModel: 'fixture-model',
+    },
+  ],
+};
+Object.assign(settings.tts, {
+  baseUrl: 'http://127.0.0.1:9/tts',
+  model: 'fixture-model',
+  defaultVoice: 'fixture-voice',
+  voicesSource: 'manual',
+  manualVoices: [{ id: 'fixture-voice', name: 'Fixture voice' }],
+});
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
@@ -252,6 +270,16 @@ async function main() {
     checks,
     tool,
     value,
+  });
+  await require('./settings-service-gateway-checks.cjs')({
+    page,
+    client,
+    profile,
+    local,
+    checks,
+    tool,
+    value,
+    until,
   });
   const values = await value('appdock_get_settings', { appletId: fixtureId });
   assert.deepEqual(values.values, { flag: false, text: '' });

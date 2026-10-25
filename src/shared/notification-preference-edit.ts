@@ -45,7 +45,9 @@ export function replaceNotificationPreference(
     notificationPreferences: {
       ...settings.notificationPreferences,
       overrides: current
-        ? overrides.map((item) => (notificationTypeKey(item) === key ? row : item))
+        ? Object.keys(row).length === 3
+          ? overrides.filter((item) => notificationTypeKey(item) !== key)
+          : overrides.map((item) => (notificationTypeKey(item) === key ? row : item))
         : [...overrides, row],
     },
   };

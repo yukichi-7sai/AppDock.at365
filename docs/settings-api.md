@@ -4,7 +4,25 @@
 
 ## 対象と公開判定
 
-本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/selectは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listも列の値として編集できる。自由JSON・shortcut-list・画像参照の編集と専用サービスの設定は、対応adapterを実装する後続範囲。
+本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/selectは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listも列の値として編集できる。自由JSON・shortcut-list・画像参照の編集と未対応の専用サービスは、adapterを実装する後続範囲。
+
+通知・AI/TTSの通常設定も所有サービスのadapterからfields対象として公開する。既存の解析・検証・共有保存と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
+
+| 対象 | 公開する設定 |
+| --- | --- |
+| AI共通 | 共通プロンプト、既定の接続ID。候補は現在の登録接続 |
+| 既存AI接続 | 名前、preset、URL、認証方式、モデル、出力上限、待ち時間、compatibilityの通常値。IDとprotocolは変更対象外 |
+| TTS | URL、モデル、既定ボイス/速度、速度適用先、ボイス候補取得方式/相対パス |
+| 通知の共通音声 | voice/speedの上書きと解除。解除するとTTSの既定値を継承 |
+| 通知種類ごと | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない |
+
+AI接続の追加/削除/並べ替え、TTSの手動ボイス一覧、起動・更新・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
+
+暗号化情報を持つAI/TTSの接続先や認証方式を変更し、秘密の結び付け先や消去に影響する操作はLOCAL_ACTION_REQUIRED。キーが必要になる新しい認証方式への切替もローカル操作とする。モデル・速度等の非秘密値は暗号化ファイルをそのまま保持する。Schema/値/プレビュー/ログへキー・暗号文・キーrevisionを出さず、設定用の保護判定は秘密を復号しない。破損・読取拒否のメタデータも保護ありとして扱う。Schemaのwritable/resettableで現在の操作範囲を確認する。
+
+AI接続は所有サービスが必須値を具体的に保存するため、inheritedはnull。resetは所有サービスの既定値への復帰、任意のtemperature/reasoningEffort等では項目の除去を行う。必須URLはresettable=false。一般の差分保存対象とは継承の意味が異なる。AI/TTSのAPIキー入力や認証の試験は含まない。
+
+通知の必須通知先・許可された通知先・表示時間の型/範囲・固定寿命を既存の通知編集と同じ検証へ渡す。表示時間は整数またはnull（手動で閉じるまで）で、固定寿命の種類は変更できず、古い上書きのresetだけを受け付ける。指定した上書きだけを解除し、何も残らなければその種類の上書き行を除去する。停止中の提供元も通知設定の保存で起動しない。通知規則や音声継承元の変更はschemaRevisionへ反映する。
 
 本体の通常設定は[src/shared/host-settings.ts](../src/shared/host-settings.ts)へ登録し、HostSettingsの型と画面の操作を追加する。既定値・通常の型検証・設定カタログ・JSON投影・PC専用保存・MCP公開は同じ登録を使う。Appletは既存のmanifest設定定義を使い、MCP専用の登録を増やさない。特殊な適用手順を持つ起動登録・管理者実行・Shell・トレイ割当は、通常設定の登録へ混ぜない。
 
