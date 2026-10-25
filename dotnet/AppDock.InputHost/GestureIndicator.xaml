@@ -19,14 +19,15 @@
     WindowStartupLocation="Manual"
     WindowStyle="None"
     ThemeMode="None">
-    <Window.Resources>
-        <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}">
-            <Setter Property="FontWeight" Value="Black" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="White" />
-        </Style>
-    </Window.Resources>
     <Grid>
+      <Grid Name="_classic" Visibility="Collapsed">
+        <Grid.Resources>
+            <Style TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="Black" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="White" />
+            </Style>
+        </Grid.Resources>
         <Rectangle
             Name="_rectangle"
             Fill="Black"
@@ -65,5 +66,7 @@
                 TextAlignment="Center"
                 FontSize="22" />
         </StackPanel>
+      </Grid>
+      <ContentControl Name="_modern" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
     </Grid>
 </Window>

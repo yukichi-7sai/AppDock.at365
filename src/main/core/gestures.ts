@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { appearanceSnapshot } from './appearance-host';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
@@ -388,8 +389,14 @@ export class InputCaptureManager {
       return this.statuses;
     const settings = state.settings.gestures ?? defaultGestures();
     const context = JSON.stringify(state.context);
+    const appearance = appearanceSnapshot();
     const gesture = {
       ...settings,
+      indicatorStyle: settings.indicatorStyle ?? 'compact',
+      indicatorAccent: appearance.colors.accent,
+      indicatorDark: appearance.dark,
+      indicatorNoActionText: hostText('services.gestures.indicatorNoAction'),
+      indicatorMoreText: hostText('services.gestures.indicatorMore', { count: '{count}' }),
       rows: nativeGestureRows(settings, state.context, state.commands, settings.activateOnStart),
       context,
       settingsKey: configurationKey(settings, state.commands),

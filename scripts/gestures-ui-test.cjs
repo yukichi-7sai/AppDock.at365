@@ -99,6 +99,8 @@ const until = async (fn, label) => {
   throw Error(label);
 };
 const checks = [];
+const indicatorOnly = process.env.APPDOCK_GESTURE_INDICATOR_ONLY === '1';
+const uiOnly = process.env.APPDOCK_GESTURE_UI_ONLY === '1' || indicatorOnly;
 (async () => {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   settings.extensions['at365.web-applet'] = {
@@ -244,7 +246,7 @@ const checks = [];
       }
       assert.deepEqual(calls().slice(n), expected);
     };
-    if (process.env.APPDOCK_GESTURE_UI_ONLY === '1') {
+    if (uiOnly) {
       await save([row('key', 'a', 'global', 'key:Ctrl+A')]);
       checks.push('native input checks skipped explicitly: UI-only mode');
     } else {
@@ -415,14 +417,16 @@ const checks = [];
     await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     const settingsPage = await require('./settings-host-helper.cjs').settingsPage(dock);
     await settingsPage.getByRole('button', { name: 'マウスジェスチャー', exact: true }).click();
-    await require('./gesture-command-checks.cjs')({
+    await require(
+      indicatorOnly ? './gesture-indicator-checks.cjs' : './gesture-command-checks.cjs',
+    )({
       page: settingsPage,
       host: dock,
       profile,
       checks,
       calls,
       until,
-      send: process.env.APPDOCK_GESTURE_UI_ONLY === '1' ? null : send,
+      send: uiOnly ? null : send,
     });
     const errors = (await dock.evaluate(() => window.dock.snapshot())).logs.filter(
       (l) => l.level === 'error',
@@ -448,13 +452,17 @@ const checks = [];
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify(
-        { ok: true, checks, profile, portable, sha256: portableHash, webInputs },
+        { ok: true, checks, profile, portable, indicatorOnly, sha256: portableHash, webInputs },
         null,
         2,
       ),
     );
     console.log(
-      JSON.stringify({ ok: true, checks, profile, portable, sha256: portableHash }, null, 2),
+      JSON.stringify(
+        { ok: true, checks, profile, portable, indicatorOnly, sha256: portableHash },
+        null,
+        2,
+      ),
     );
   } finally {
     try {

@@ -138,7 +138,9 @@ internal static partial class Program
                 return found;
             }
             string IndicatorCaption(nint window)=>string.Join("|",AutomationElement.FromHandle(window)
-                .FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text))
+                .FindAll(TreeScope.Descendants,new OrCondition(
+                    new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Text),
+                    new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Image)))
                 .Cast<AutomationElement>().Select(e=>e.Current.Name));
             async Task Step(string direction,int distance=80) {
                 var offset=direction switch {"up"=>new System.Drawing.Point(0,-distance),"down"=>new(0,distance),"left"=>new(-distance,0),_=>new(distance,0)};

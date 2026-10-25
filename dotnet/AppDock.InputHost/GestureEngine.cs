@@ -9,7 +9,9 @@ internal sealed record Binding(string Id, string Command, string Gesture, string
 internal sealed record Configuration(bool Enabled, string[] Browsers, string[] ExcludedProcesses,
     bool RequireChromiumWindowClass, int Distance, int WheelDelayMs, double IndicatorOpacity,
     string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all",
-    bool ActivateOnStart = false, string SettingsKey = "", uint HostProcessId = 0, bool IndicatorShowNoAction = true);
+    bool ActivateOnStart = false, string SettingsKey = "", uint HostProcessId = 0, bool IndicatorShowNoAction = true,
+    string IndicatorStyle = "compact", string IndicatorAccent = "#7ce1c5", bool IndicatorDark = true,
+    string IndicatorNoActionText = "アクション無し", string IndicatorMoreText = "ほか {count} 件");
 internal enum GestureDirection { Up, Down, Left, Right }
 [StructLayout(LayoutKind.Sequential)] internal readonly record struct GesturePoint(int X, int Y);
 internal static class GestureConfiguration { internal static readonly string[] Marks = ["⬆️","⬇️","⬅️","➡️"]; }
@@ -301,12 +303,15 @@ internal sealed class GestureEngine : IDisposable
         if (indicator.IsVisible && previewGesture == gesture) return;
         var titles = SelectedRows(gesture).Select(r=>r.Title).ToArray();
         if (titles.Length == 0 && !config.IndicatorShowNoAction) { indicator.Hide(); return; }
-        var caption = string.Join("\n",titles.Take(3)) + (titles.Length>3 ? $"\nほか {titles.Length-3} 件" : "");
+        var captions = titles.Length == 0 ? new[] { config.IndicatorNoActionText } :
+            titles.Take(3).Concat(titles.Length > 3 ? new[] { config.IndicatorMoreText.Replace("{count}", (titles.Length - 3).ToString()) } : []).ToArray();
         var center = origin;
         if (config!.IndicatorPosition == "monitor-center" || config.IndicatorPosition == "window-center" && GestureTarget.IsDesktop(target)) center = monitorCenter;
         else if (config.IndicatorPosition == "window-center" && GetWindowRect(target,out var rect)) center=new((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
         previewGesture = gesture;
-        indicator.Display(center,process+".exe",string.Concat(directions.Select(d=>GestureConfiguration.Marks[(int)d])),caption.Length==0?"アクション無し":caption,config.IndicatorOpacity);
+        indicator.Display(center, process+".exe", directions.ToArray(), captions, config.IndicatorOpacity,
+            config.IndicatorStyle, config.IndicatorAccent, config.IndicatorDark,
+            config.IndicatorStyle == "pill" ? PillCaptionRows : 0);
     }
     private void Wheel(int delta)
     {
@@ -353,6 +358,9 @@ internal sealed class GestureEngine : IDisposable
         // Preview and execution must use the same ordered, command-deduplicated selection.
         return CommandConditions.Select(candidates.Where(r => r.Gesture == gesture), r => r.Command, config!.ExecutionMode);
     }
+    // Reserve the largest displayed command batch for this start target before showing its first direction.
+    private int PillCaptionRows => Math.Clamp(candidates.Where(row => row.Gesture.StartsWith("move-"))
+        .Select(row => row.Gesture).Distinct().Select(gesture => SelectedRows(gesture).Length).DefaultIfEmpty(0).Max(), 1, 4);
     private void Release(GesturePoint point)
     {
         var replay=!otherMode && !cancelled && directions.Count==0;

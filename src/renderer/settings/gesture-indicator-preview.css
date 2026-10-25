@@ -1,0 +1,165 @@
+.gesture-preview-stage {
+  min-width: 0;
+  min-height: 250px;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: repeating-conic-gradient(var(--raised) 0% 25%, var(--bg) 0% 50%) 0 / 24px 24px;
+  border-radius: 8px;
+}
+.gesture-preview-indicator {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
+  color: var(--text);
+  zoom: var(--gesture-preview-scale);
+}
+.gesture-preview-indicator::before,
+.gesture-preview-ring-circle::before,
+.gesture-preview-ring-label::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--border);
+  border-radius: inherit;
+  background: var(--panel);
+  opacity: var(--gesture-preview-opacity);
+}
+.gesture-preview-process {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gesture-preview-caption {
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gesture-preview-arrows {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+.gesture-preview-arrow-up {
+  display: inline-flex;
+  transform: rotate(-90deg);
+}
+.gesture-preview-compact {
+  width: 320px;
+  padding: 22px;
+  border-radius: 18px;
+  display: grid;
+  gap: 12px;
+  isolation: isolate;
+}
+.gesture-preview-pill {
+  width: 400px;
+  padding: 14px 18px;
+  border-radius: 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  isolation: isolate;
+}
+.gesture-preview-pill-label {
+  min-width: 0;
+  min-height: 44px;
+}
+.gesture-preview-pill .gesture-preview-arrows {
+  flex: 0 0 60px;
+}
+.gesture-preview-pill .gesture-preview-process {
+  height: 16px;
+  line-height: 16px;
+  margin-bottom: 4px;
+}
+.gesture-preview-pill .gesture-preview-arrows svg {
+  width: 26px;
+  height: 26px;
+}
+.gesture-preview-pill .gesture-preview-caption {
+  font-size: 17px;
+  height: 24px;
+  line-height: 24px;
+}
+.gesture-preview-ring {
+  width: 320px;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+.gesture-preview-ring::before {
+  display: none;
+}
+.gesture-preview-ring-circle {
+  width: 106px;
+  height: 106px;
+  position: relative;
+  isolation: isolate;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border: 3px solid var(--accent);
+}
+.gesture-preview-ring-circle .gesture-preview-arrows svg {
+  width: 30px;
+  height: 30px;
+}
+.gesture-preview-ring-label {
+  width: 320px;
+  max-width: 320px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  position: relative;
+  isolation: isolate;
+  text-align: center;
+  box-sizing: border-box;
+}
+.gesture-preview-ring-label .gesture-preview-caption {
+  font-size: 18px;
+  margin-top: 4px;
+}
+.gesture-preview-classic {
+  width: 500px;
+  height: 300px;
+  padding: 20px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: var(--gesture-preview-opacity);
+  background: black;
+  color: white;
+  font-weight: 900;
+}
+.gesture-preview-classic::before {
+  display: none;
+}
+.gesture-preview-classic .gesture-preview-process {
+  font-size: 20px;
+  color: white;
+}
+.gesture-preview-classic .gesture-preview-caption {
+  font-size: 22px;
+  font-weight: 900;
+  max-width: 460px;
+}
+.gesture-preview-emoji {
+  font-family: 'Segoe UI Emoji', sans-serif;
+  font-size: 80px;
+  margin: 20px;
+}
+.gesture-preview-hidden {
+  color: var(--muted);
+}
