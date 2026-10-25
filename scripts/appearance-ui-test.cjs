@@ -14,6 +14,7 @@ fs.mkdirSync(profile, { recursive: true });
 const checks = [],
   errors = [];
 const ribbonSamples = [];
+const scrollbarSamples = [];
 const luminance = (rgb) => {
   const [r, g, b] = rgb
     .match(/[\d.]+/g)
@@ -44,7 +45,9 @@ let child,
   server,
   mainPort,
   output = '';
-const source = process.argv[2] ? path.resolve(process.argv[2]) : null;
+const source =
+  process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
+const scrollbarsOnly = process.argv.includes('--scrollbars-only');
 const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (source) {
   fs.copyFileSync(source, exe);
@@ -110,6 +113,11 @@ async function assertColors(page, id, dark, custom) {
   const snapshot = await page.evaluate(() => window.appdockAppearance.snapshot());
   assert.equal(snapshot.palette, id);
   assert.equal(snapshot.dark, dark);
+  scrollbarSamples.push({
+    url: page.url(),
+    dark,
+    ...(await require('./shared-scrollbar-checks.cjs')(page, dark)),
+  });
 }
 async function assertRibbonReadability(rail, id, dark) {
   const normal = rail
@@ -170,9 +178,28 @@ async function assertRibbonReadability(rail, id, dark) {
         runtime: 'node',
         entry: 'index.cjs',
         minimumHostVersion: '0.75.0',
-        capabilities: ['pages'],
+        capabilities: ['pages', 'notifications'],
         commands: [
           { id: 'fixture.accent.open', title: 'Open accent fixture', activateOnExecute: true },
+          { id: 'fixture.accent.notice', title: 'Scrollbar notice' },
+        ],
+        notificationTypes: [
+          {
+            typeId: 'message',
+            title: 'Scrollbar fixture notice',
+            description: 'Fixture',
+            levels: ['info'],
+            defaultLevel: 'info',
+            defaultEnabled: true,
+            canDisable: true,
+            disabledControlReason: '',
+            allowedTargets: ['banner', 'desktop'],
+            defaultTargets: ['banner', 'desktop'],
+            requiredTargets: [],
+            lifetimePolicy: 'userDuration',
+            defaultDurationSeconds: null,
+            history: 'persistent',
+          },
         ],
         pages: [
           {
@@ -187,7 +214,7 @@ async function assertRibbonReadability(rail, id, dark) {
     );
     fs.writeFileSync(
       path.join(folder, 'index.cjs'),
-      "exports.activate=async c=>{c.commands.register('fixture.accent.open','Open accent fixture',()=>c.pages.open('main'));};",
+      "exports.activate=async c=>{c.commands.register('fixture.accent.open','Open accent fixture',()=>c.pages.open('main'));c.commands.register('fixture.accent.notice','Scrollbar notice',()=>c.notifications.publish({typeId:'message',title:'Scrollbar fixture',body:'Local notification surface',historyText:{title:'Scrollbar fixture',body:'Safe'}}));};",
     );
     fs.writeFileSync(
       path.join(folder, 'main.html'),
@@ -208,9 +235,99 @@ async function assertRibbonReadability(rail, id, dark) {
       (await host.evaluate(() => window.dock.snapshot())).version,
       require('../package.json').version,
     );
+    if (scrollbarsOnly) {
+      await host.evaluate(() => window.dock.executeCommand('fixture.accent.open'));
+      const local = await until(
+        () =>
+          context
+            .pages()
+            .find(
+              (page) => page.url().includes('fixture.accent') && page.url().endsWith('/main.html'),
+            ),
+        'local scrollbar fixture',
+      );
+      await host.evaluate(() =>
+        window.dock.executeCommand('appdock.settings.command-triggers.open'),
+      );
+      await host.locator('.command-triggers-editor').waitFor();
+      // Only this isolated process simulates notification availability; no OS setting is changed.
+      await inspect(
+        mainPort,
+        `const e=${electronExpression};const {NotificationAvailability}=process.getBuiltinModule('module').createRequire(e.app.getAppPath()+'/package.json')('./out/main/main/core/notification-availability.js');NotificationAvailability.prototype.status=()=> 'allowed';`,
+      );
+      await host.evaluate(() => window.dock.executeCommand('fixture.accent.notice'));
+      await until(
+        () =>
+          context.pages().filter((page) => page.url().endsWith('/notifications.html')).length >= 2,
+        'banner and desktop notification surfaces',
+      );
+      await host.evaluate(() => {
+        void window.dock.openCommandPalette({ requestId: 'scrollbar-preview', mode: 'execute' });
+      });
+      await until(
+        () => context.pages().find((page) => page.url().endsWith('/overlay.html')),
+        'overlay',
+      );
+      for (const theme of ['light', 'dark'])
+        for (const palette of ['mint', 'rose']) {
+          await host.evaluate(
+            async ({ theme, palette }) => {
+              const snapshot = await window.dock.snapshot();
+              await window.dock.saveSettings(
+                {
+                  ...snapshot.settings.value,
+                  host: { ...snapshot.settings.value.host, theme, accentColor: palette },
+                },
+                snapshot.settings.revision,
+              );
+            },
+            { theme, palette },
+          );
+          await settleSettings(host);
+          let surfaces = 0;
+          for (const page of context.pages()) {
+            if (
+              page.isClosed() ||
+              !(await page
+                .evaluate(() => typeof window.appdockAppearance !== 'undefined')
+                .catch(() => false))
+            )
+              continue;
+            await assertColors(page, palette, theme === 'dark');
+            surfaces++;
+          }
+          assert(
+            surfaces >= 9,
+            'host, Shell, overlay, notifications and local Applet receive common scrollbars',
+          );
+          checks.push(`shared-scrollbars-${theme}-${palette}-${surfaces}-surfaces`);
+          if (palette === 'rose')
+            await host.screenshot({ path: path.join(profile, `scrollbars-${theme}.png`) });
+        }
+      await host.evaluate(() => window.dock.cancelCommandPalette('scrollbar-preview'));
+      await local.reload();
+      await assertColors(local, 'rose', true);
+      checks.push('shared-scrollbars-reload-and-hidden-local-surface');
+      const remote = await until(
+        () => local.frames().find((frame) => frame.url().startsWith('http://127.0.0.1:')),
+        'remote frame',
+      );
+      assert.equal(
+        await remote.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue('--appdock-scrollbar-thumb')
+            .trim(),
+        ),
+        '',
+      );
+      assert.equal(await remote.evaluate(() => typeof window.appdockAppearance), 'undefined');
+      checks.push('remote-frame-keeps-site-scrollbars-and-no-local-appearance-API');
+      success = true;
+      return;
+    }
     await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await host.getByRole('button', { name: '表示', exact: true }).click();
-    await host.getByRole('group', { name: 'アクセントカラー', exact: true }).waitFor();
+    await host.locator('.accent-palettes').waitFor();
     await assertColors(host, 'sky-blue', false);
     assert.equal(await host.getByRole('button', { name: 'スカイブルー', exact: true }).count(), 0);
     assert(await host.getByText('現在の配色: スカイブルー', { exact: true }).isVisible());
@@ -356,6 +473,14 @@ async function assertRibbonReadability(rail, id, dark) {
       'remote frame',
     );
     assert.equal(await remote.evaluate(() => typeof window.appdockAppearance), 'undefined');
+    assert.equal(
+      await remote.evaluate(() =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue('--appdock-scrollbar-thumb')
+          .trim(),
+      ),
+      '',
+    );
     checks.push('local Applet root/body overrides and remote isolation');
     for (const route of ['logs', 'image-library', 'notifications']) {
       await host.evaluate((route) => window.dock.navigate(route), route);
@@ -500,9 +625,11 @@ async function assertRibbonReadability(rail, id, dark) {
           success,
           portable: !!source,
           sourceHash: source && hash(source),
+          scrollbarsOnly,
           checks,
           errors,
           ribbonSamples,
+          scrollbarSamples,
         },
         null,
         2,

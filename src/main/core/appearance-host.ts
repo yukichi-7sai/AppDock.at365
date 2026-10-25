@@ -3,6 +3,7 @@ import type { IpcMain, WebContents } from 'electron';
 import {
   defaultAccentColor,
   resolveAppearance,
+  scrollbarCss,
   type AppearanceSnapshot,
 } from '../../shared/appearance';
 
@@ -40,8 +41,12 @@ export function registerAppearance(contents: WebContents, url: string) {
   contents.once('destroyed', () => surfaces.delete(contents));
   // Reloads must receive current colors, even if their creation arguments are older.
   contents.on('dom-ready', () => {
-    if (!contents.isDestroyed() && contents.getURL() === url)
+    if (!contents.isDestroyed() && contents.getURL() === url) {
+      void contents.insertCSS(scrollbarCss).catch(() => {
+        // A navigation/destruction race is retried on the next registered local document.
+      });
       contents.send('appearance:changed', appearanceSnapshot());
+    }
   });
 }
 let publishedRevision = -1;

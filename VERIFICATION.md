@@ -1,5 +1,34 @@
 # 検証記録
 
+## 2026-10-26: スクロールバー背景の透明化とコミット 0.90.11
+
+- 0.90.9/0.90.10の未コミット変更を保持し、共通スクロールバーの本体・トラック・track-piece・縦横の交差部・つまみ周囲を透明に変更。つまみは`background-clip: padding-box`で透明な境界へ色が回り込まないようにし、その場所の背景が見える構成にした。明暗のつまみ色、12px幅、3pxの余白、角丸8pxと既存のスクロール構造は保つ。正本は[共通スクロールバー](docs/appearance.md#共通スクロールバー)。
+- 発行前レビューで透明なtrack/境界とつまみの描画範囲、非表示バーの優先、テーマ切替、登録済みローカル画面だけへの適用を確認し、発行阻害の指摘なし。0.90.10の入力733件と比較し、この追加修正は`src/shared/appearance.ts`・配色文書・版の3ファイルだけと確認。先行する本文縦横共通スクロール/CSS追従と共通配色のレビュー記録も参照した。設定・保存ファイル・公開APIの変更はない通常パッチとして0.90.11へ更新。
+- 利用者の明示指示により、今回の単体・GUI・smokeを含む回帰テストは実行せずコミットする。前段0.90.9/0.90.10の成功は各版の履歴として保持し、透明化後の動作確認済みとは扱わない。固定EXEの起動/画面確認も今回は実行していない。
+- 固定Node24.22.1/pnpm12.10.1、同一lockfile/供給網検査で整形・frozen install・build/publish成功。版更新によるworkspace情報の照合要求はfrozen installで更新し、検査は無効化していない。確認はビルドと発行物の整合に限定し、EXEのFile/ProductVersion、feedの版/サイズ/hash、同梱ASARの本体/Default Shell版とout全236ファイルを照合した。
+- **0.90.11 / 170,685,873 bytes / SHA256 `f68fb36a89c772209af44954ab0edf929efb5845f29732dfdaed7f83e367c463`**。発行先は`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。証跡は`.artifacts/shared-scrollbars-transparent-20261026/`のレビュー・差分前ソース・ログ・bundle/validation・入力hashとstage/commit記録。新規の回帰テスト用プロセス/フォルダーと整理候補はなく、先行の成功/再利用/診断資料を保持する。
+- ここまでのスクロール改善と背景透明化の関連23ファイルを対象にstage/作業ファイルの一致と`git write-tree`を確認し、通常commit後にtree一致・cleanを照合して完了とする。push・Release・実利用deployは行わない。
+
+## 2026-10-26: AppDock共通スクロールバー 0.90.10
+
+- 0.90.9の未コミット変更を保持し、コマンドトリガー本文と同じスクロールバーを本体・設定インデックス・各一覧/ダイアログ・Default Shell・通知・登録ローカルAppletへ共通適用。縦横12px、つまみ周囲3px・角丸8px、中立色の明暗テーマ、矢印なしを`src/shared/appearance.ts`の`scrollbarCss`へ集約した。Shellのthin指定とグループ独自6px、設定横バーの独自配色を除去。重複する内側横バーの非表示と既存のスクロール構造は保つ。
+- 既存の配色登録を使い、正確なローカルURLとmain frameを照合した`dom-ready`でCSSを挿入する。再読込後にも適用し、共通preloadのテーマ更新へ追従。任意のWebサイト・リモートiframeには適用しない。発行前レビューで共通定義、URL/フレームの境界、再読込/破棄、意図した非表示の優先、狭幅のアイコンとスクロール、既存一覧への影響を確認。保存項目・ファイル・公開API・入力実行の変更はなく、通常パッチとして0.90.10へ更新。未解決の発行阻害指摘なし。
+- 固定Node24.22.1/pnpm12.10.1・同一lockfile/供給網検査で整形・型検査・build・frozen install・publish成功。配色/翻訳/Shell境界/ローカルページ/Webアカウント/通知の関連6ファイルは **45/45件、fail/skip 0**。無関係な全回帰は再実行していない。
+- 最終固定EXEで共通配色のスクロールバー専用 **6群**、リボン専用 **3群**、統合一覧 **18群**、従来スクロール **38群**と隔離smoke成功。本体・Shellの各領域・コマンドパレット・バナー/デスクトップ通知・ローカルAppletの9 WebContentsを明暗×mint/roseで確認し、再読込を含む37試料で縦横の実スクロール、幅/色/角丸/矢印/トラック一致を検査。通知の利用可能状態だけを隔離プロセス内で模擬し、OS設定は変更しない。リモートiframeには共通変数/APIがないことを確認。リボンの実オーバーフロー、末尾へのEndとEscape、フォーカス復帰、選択実行とコンパクトなアイコンの収まりも確認した。従来一覧・全ホスト/Appletのフォーム/JSONは明暗と複数幅、統合一覧はCSS追従・横固定・横バー同期・編集/再起動を維持した。明暗の画像も確認した。
+- GUIの初回診断で、古い選択子と単一Appletの24ページfixture、グループの固定URL参照を特定。現行の10ページ上限を守る複数fixtureと実URLの照合へ直し、今回の見た目とスクロールに必要な専用モードを追加した。3px境界の検査はDPIの物理ピクセル丸めを許容する。廃止済み要素や別機能の全フローの成功とは扱わず、今回の対象範囲をsource/固定EXEで再実行した。途中の診断資料は保持する。
+- **0.90.10 / 170,671,784 bytes / SHA256 `18d9705da529770953acccf401b229e15e5d3eb7c1925bf47263b45c5d64fa81`**。EXEのFile/ProductVersion、feedの版/サイズ/hash、同梱ASARの本体/Default Shell版とout全236ファイルを照合。固定GUI/smoke用コピー5本も同じhash。発行先は`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。
+- 正本は[共通配色とスクロールバー](docs/appearance.md#共通スクロールバー)。証跡は`.artifacts/shared-scrollbars-20261026/`のレビュー・各ログ・bundle/validation・入力hash。固定GUIは`.artifacts/appearance-ui-1792958380724/result.json`、`.artifacts/ribbon-groups-ui-1792958512032/result.json`、`.artifacts/command-triggers-ui-1792958411918/result.json`、`.artifacts/settings-hints-ui-1792958461522/result.json`、smokeは`.artifacts/smoke-1792958548304/smoke-result.json`。今回のテスト用プロセスの終了を確認。成功資料・旧版の再利用資料・診断資料を保護し、削除0件。任意のWebサイトやWindowsネイティブダイアログのスクロールバーは対象外。本件のcommit/push/Release/実利用deployは行っていない。
+
+## 2026-10-26: 本文の縦横共通スクロールとCSSセル内追従 0.90.9
+
+- cleanなmain `3455315` で `pull --ff-only` し最新を確認。「コマンドトリガー」のフォームだけ、右側の設定本文を縦横共通のスクロール枠へ変更。共通キャンバス内の見出し・操作欄・状態表示・一覧フィルターは表示幅を保って横stickyにし、見出しと上部操作は縦に流す。フィルターの縦固定は継続する。共通部品のpageScroll指定を使い、JSONと従来ページは既定の表専用スクロールを使う。
+- コマンド名・ID・縦3追加ボタンのまとまりをCSS stickyにし、フィルター直下からセル下端まで追従させる。scrollイベント/rAFによる全コマンドの寸法確認とtransform更新、および不要になった `useCommandCellFollow.ts` を除去。横スクロールではコマンドも表と一緒に動く。フィルター高さのCSS変数と画面下の共通横バーは継続し、バーを本文へ接続して双方向同期と矢印/Home/Endを保つ。
+- 発行前レビューと実寸GUIで、枠付き表のoverflow:hiddenがstickyの参照先になる問題を特定し、角丸を保つclipへ変更。既存の0まで縮むグリッドを含め親へ表の最小幅を伝え、横stickyが親の右端で流れないよう修正した。本文右paddingが生む4pxの余分な横はみ出しもこのページだけ除去。横バーは共通下部の1つにし、縦バーは共通の中立色で維持した。取消後の本文縦横位置・同じ操作へのフォーカス、空結果、JSON切替、従来画面への影響を確認し、未解決の発行阻害指摘なし。
+- 設定キー・保存ファイル・割り当てID・公開API・実行基盤は変更しない通常パッチとして0.90.9へ更新。固定Node24.22.1/pnpm12.10.1、同一lockfile/供給網検査で整形・型検査・build・frozen install・publish成功。保存/競合/翻訳/共通UI境界の関連4ファイルは **32/32件、fail/skip 0**。変更に影響しない全回帰は再実行していない。
+- 最終固定EXEで統合一覧 **18群**、従来スクロール **38群**、隔離smoke成功。新たに明暗/1280・700pxでイベント待ちなしの連続scrollTop変更直後の座標、inline transformなし、セル下端停止、本文横移動時の見出し/操作/フィルター座標維持、広幅の横はみ出しなし、横バーのキー操作と同期、横移動後のダイアログ取消による縦横位置/フォーカス復帰、空検索時の横バー消失と位置0、JSON/フォームの寿命を確認。従来4一覧・Applet管理・全ホスト/Appletページの見出しとフォーム/JSONも明暗・複数幅で成功した。追加/編集/削除確認/実行順・実再起動保存も維持した。画像で狭幅の明暗と広幅の外観を確認。物理操作での体感やFPSの測定は未実施。
+- **0.90.9 / 170,675,378 bytes / SHA256 `275299643a69a595d6050316d3a80436c4467da66f6a515270b1a983aeba1e50`**。EXEのFile/ProductVersion、feedの版/サイズ/hash、同梱ASARの本体/Default Shell版と関連コード・翻訳・renderer計11ファイルを照合。固定GUI用コピー2本も同じhash。発行先は `A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。
+- 正本は[コマンドトリガー](docs/command-triggers.md)。証跡は `.artifacts/command-trigger-native-scroll-20261026/` のレビュー・ログ・bundle/validation・入力hashと削除ソース一覧。固定GUIは `.artifacts/command-triggers-ui-1792956160465/result.json`、`.artifacts/settings-hints-ui-1792956199502/result.json`、smokeは `.artifacts/smoke-1792956244267/smoke-result.json`。テスト用プロセスの終了を確認。今回のsource成功3回・固定EXE成功と先行版の再利用/診断資料を保持し、削除0件。本件のcommit/push/Release/実利用deployは行っていない。
+
 ## 2026-10-26: コマンドトリガー0.90.8のコミット・プッシュ検証
 
 - main `28b24c6` 上の承認済み35ファイルを対象に、現行0.90.8の入力660件と発行EXE、先行0.90.2の標準回帰896件・証跡鎖180件を照合。GitHub/AQUAの両mainは `28b24c6` で競合なし。未コミット変更を保持してfetchのみ行い、確認済み0.90.8を同じ版のまま通常commit/pushする。
@@ -122,7 +151,6 @@
 - 最終EXEは**170,670,439 bytes / SHA256 b5a4f6af51dea10f3bde49673867e15a176d46edb947c2d394e9144261990d79**、A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exeへ0.89.2を発行。File/ProductVersion、feed版/size/hash、ASAR内package/Default Shell版、固定GUI/過渡検査/smokeコピーを照合しsmoke成功。source=ribbon-alignment-ui-1792929552006、fixed=ribbon-alignment-ui-1792929974780、旧過渡比較=ribbon-transition-ui-1792929464363、新固定過渡=ribbon-transition-ui-1792929991198、smoke=smoke-1792930005050。
 - 証跡は .artifacts/ribbon-alignment-0892/ の完全log・入力SHA/環境・レビュー・fixture/計測JSON/画像・最終照合。検証後の変更は本記録のみ。今回成功のsource/portable各方式は3回以内で削除0件、旧EXE比較・失敗診断・前回機能の再利用証跡を保護。通常終了、外部Shell/実サービス、実利用データ、物理入力は新規検証していない。commit/push/Release/deployなし。
 
-
 ## 2026-10-25: リボン上端整理・切替項目編集・Applet本文の追従 0.89.1
 
 - 未コミット0.89.0を保持し、リボン上端の装飾ロゴ/専用余白を除去、両モードの先頭項目を通常余白6pxから配置した。切替ボタンを安定ID ribbon-display-modeの通常builtin項目へ統合し、既定は下寄せ。リボン編集の共通操作で名前/画像・上寄せ/下寄せ・順序・表示/非表示・グループ配置を保存できる。未指定名はモード別の操作名、指定名は両モードに共用。独立した固定ボタンを重ねず、共通アイコンの左右chevronを表示する。既存itemOverrides/order/hidden/groupsだけを使用し、新しい設定キー/保存ファイルなしの通常追加修正として0.89.1へパッチ更新。
@@ -133,7 +161,6 @@
 - 最終EXEは**170,673,511 bytes / SHA256 4479fb79cb19399228b3bccf237088f712e7dfbd800fa4c9393e4e2327fbbb27**、A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exeへ0.89.1を発行。File/ProductVersion、feed版/size/hash、ASAR内package/Default Shell版、GUI/native/smokeコピーを照合しsmoke成功。完全log/入力SHA/環境/レビュー/画像とnative計測/最終照合は .artifacts/ribbon-top-0891/。試験後は本記録だけ変更。
 - 最新GUI、修正前後のnative比較、失敗診断と元機能の再利用証跡を保持。最新方式の直近分と比較に必要な資料を保護し削除0件。OSキー/ジェスチャー・外部サービス・実利用設定・通常終了は新規検証していない。commit/push/Release/deployなし。
 
-
 ## 2026-10-25: リボンの2モード切替と項目別表示設定の整理 0.89.0
 
 - cleanなmain cc0a1feでpull --ff-only後、リボン下部の共通chevronボタンで「アイコンのみ」compact 56px／「アイコン＋名前」expanded 200pxを切り替える機能を実装。既定はcompact。展開時の名前は右側の1行・省略表示とし、tooltip/アクセシブル名を維持。グループのインデント・色の縦線・バッジと上下配置を保持し、本文とリボンの予約幅を共通ribbonDisplayWidth/既存viewport経路で連動させた。狭幅に残っていた68pxの固定ルールも共通変数へ修正した。上端の装飾アイコンは今回の変更対象に含めていない。
@@ -143,7 +170,6 @@
 - ソース/最終固定EXEの隔離GUI各**2群成功**、各同一profileの新規プロセス再起動も**1群成功**、pageerrorなし。明1280/暗900/明720で56/200pxの本体/Shell幅・名前/省略・バッジ・32px以上の操作対象・横はみ出しなしを計測/目視。持続グループの開閉・子ページ選択、一時popupとEscape、3種の編集画面で旧checkboxなし/取消、settings.ribbon不変、Enter/Spaceとfocus維持を確認。ローカルNode Appletの実WebContentsとprobeIdがモード切替後も同じであること、再起動後の200px復元を確認した。閉じるとWebContentsが破棄されるoverlayの待機は、本体overlay状態に合わせてfixtureを修正した。
 - 最終EXEは**170,676,521 bytes / SHA256 c989339af36644838d4ae7f9231e76197797e344a0cb5e9cb44b4c2210ea8591**、A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exeへ0.89.0を発行。File/ProductVersion、feed版/size/hash、ASAR内package/Default Shell版、固定GUI/smokeコピーを照合しsmoke成功。source=ribbon-modes-ui-1792922032291、portable=ribbon-modes-ui-1792922238397、smoke=smoke-1792922303022。完全log・入力SHA/環境・レビュー・fixtureと画像/計測・最終照合は .artifacts/ribbon-modes-0890/。最終検証後の変更は本記録のみ。
 - 完了時に方式別の今回成功を確認し、source成功2件/portable成功1件とstate試験の直近分は3回以内で削除0。失敗診断・固定helper・参照証跡も保持。外部Shell実装/実サービス、実利用データ、物理入力と通常終了は未検証。キー割り当てとジェスチャーは無効、外部ネットワークへ接続しないfixtureを使用した。commit/push/Release/deployなし。
-
 
 ## 2026-10-25: デスクトップ前面化修正0.88.4のコミット検証
 
@@ -231,7 +257,6 @@
 - 0.87.15の一覧編集/取消/順序/検索/行結合等の3群GUIは、後続変更がヘッダーCSS/追加ボタンクラスのみで操作処理が不変であることを照合して再利用。0.87.16の11画面・明暗/狭幅ヘッダーGUI2群とsmokeは現在EXE・検証コピーのhash一致を確認。型検査/build/publishログ、Node/pnpm/.NET/OSと兄弟manifest/payload、各証跡hashを照合した。pnpm版ログの末尾空行差は実値12.10.1で一致確認。物理入力や外部サービスの新規検証はしていない。
 - EXE **170,683,878 bytes / SHA256 be162efa2ee99f6fe57bd4f6fae11971270eb4a8dcdc89cb0e62e89fc92a4231**。証跡は .artifacts/commit-validation-shared-tables-08716/ の入力一覧/環境/再利用判定/追加53件ログ/stageとcommit tree/両remote先端照合。元資料はcommit-validation-notification-table-08714、applet-list-toolbar-08715、table-header-08716および検証済みの参照鎖。検証後は本記録だけ追記。再利用資料と今回の回帰出力を保持して削除0件。GitHub Release/実利用先deployは行わない。
 
-
 ## 2026-10-25: コンパクトな共通テーブルヘッダー 0.87.16
 
 - 利用者の追記に従い、ボタン付きヘッダーの上下余白を縮めてボタンなしと高さを統一。共通SettingsTableのthead thを内容32px＋上下6pxとし、見出しの共通flexでbaselineの余白を除去した。通常の単行ヘッダーは約44px（罫線のDPI丸めを除く）、複数行は必要に応じて拡張。共通SettingsListAddButtonに専用クラスを付け、32pxの操作対象、アクセント文字、通常透明・枠なし、hover/focus時の淡い背景とキーボードoutlineを使用する。本文の追加ボタンや保存/操作処理は変更しない。
@@ -239,7 +264,6 @@
 - 固定lockfile照合、整形、型検査、build、publish成功。appearance/localization/shell-boundariesの3ファイル・**18/18件、fail/skip 0**。前回の機能回帰140件は保存/操作処理が不変のため全再実行せず、ヘッダーに絞った実画面検証を追加した。ソース/固定EXEとも各**2群成功**、pageerrorなし。Applet管理/通知/Webアカウント/操作の許可/AI/MCPクライアント/ショートカット/マウス・タッチパッドジェスチャー/カスタムコマンド/WebAppletの11画面で、明暗1280px・明720pxの高さを計測。ボタン有無の差は罫線丸めの範囲内、ページ横はみ出しなし。追加ボタンの枠0・通常透明・32px対象・hover背景・Tab focus outline・追加ダイアログの開閉/取消を確認し、画像を目視した。恒久的な見た目比較試験は追加していない。
 - 最終EXEは**170,683,878 bytes / SHA256 be162efa2ee99f6fe57bd4f6fae11971270eb4a8dcdc89cb0e62e89fc92a4231**、A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exeへ発行。File/ProductVersion、feedの版/size/hash、ASAR内package/Default Shell版、固定GUI/smokeコピーが0.87.16と一致し、smoke成功。
 - 証跡は .artifacts/table-header-08716/ の入力SHA、環境、レビュー、各log、header-measurementsと画像、最終照合。source=table-header-ui-1792907710261、portable=table-header-ui-1792907899153、smoke=smoke-1792907931302。製品入力は検証前後で一致、本記録のみ後続変更。今回成功profileは各方式1件で直近3回以内、削除0。前回の機能検証・失敗診断・固定出力を保持。物理入力、外部サービス、実利用データや通常終了は未検証。commit/push/Release/deployなし。
-
 
 ## 2026-10-25: 設定テーブルの共通化とApplet一覧の操作配置 0.87.15
 
@@ -251,12 +275,12 @@
 - 証跡は .artifacts/applet-list-toolbar-08715/ の入力SHA一覧・環境/兄弟依存情報・レビュー・各完全log・最終照合/証跡hash。ソースprofileはapplet-list-toolbar-ui-1792906500294、固定EXEはapplet-list-toolbar-ui-1792906702035、smokeはsmoke-1792906750773。試験前後の製品入力は一致し、後続差分は仕様文書/本記録のみ。対象profileを成功/方式別に確認し、各方式の今回成功は3回以内のため削除0。失敗診断・固定helper・過去の再利用証跡を保持。恒久的な見た目比較テストは追加していない。
 - 物理キー/ジェスチャー、外部AI/MCPサービス、実壁紙適用、実利用設定、通常終了は新規検証していない。隔離fixtureのキーはapp scope Ctrl+F8/Alt+F8、ジェスチャー機能は無効、Pause/F13〜F24のOS送信/登録なし。コミット・push・Release・実利用先deployは行っていない。
 
-
 ## 2026-10-25: 通知設定 0.87.14のコミット検証
 
 - 利用者が0.87.14を確認してcommit/pushを依頼。main `ce1c630`上の今回の11対象ファイルだけをレビューし、阻害指摘なし。通知テーブル、共通編集ダイアログ、種類単位の保存/競合検査、追加6試験、翻訳8キー、版と関連文書を対象とした。dirtyのためpull/stash/統合なし。fetchとGitHub/AQUAの読取で両mainが`ce1c630`に一致し、実効author/committerを確認した。
 - 標準回帰は**114ファイル・885/885、fail/skip 0**。既存113試験と既存locale値・設定スキーマ・SDK/native/Shell/runtime・共通UI・依存/固定ツール/ビルド定義は前回と同じ。mainは新しい内部通知actionとimportを除いて既存コードと一致し、新helperはこのactionだけが使用する。影響のない**89ファイル・683件を前回標準から再利用**、今回の実装時に最終入力で成功した**18ファイル・138件を再利用**、最終native/updater生成物を使うall-in-one/applet-defaults/lifecycle/dotnet-pages/applet-packages/portable-updatesとmain静的参照のribbon-commandsの**7ファイル・64件を追加実行して成功**した。型検査/buildの完全logと終了コード、Node/pnpm/.NET/OS、全ソース・試験・依存・fixtureと証跡hashを照合した。
 - 今回の最終固定EXEの通知GUI 2群とsmokeは、入力・試験・実行方式・隔離コピーとEXEのSHA256一致を確認して再利用。確認済みの0.87.14の製品変更・再発行なし。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170,693,021 bytes**、SHA256 `606b48cfe671623b7018264ad4028cc479c014bd04a9416f179f188974ec13a9`。既存feedと版も一致する。検証後の変更はこの記録だけ。stage/worktreeの一致・tree ID・commit/tree・両remote headとclean状態は`.artifacts/commit-validation-notification-table-08714/`へ記録する。今回の追加試験出力と再利用証跡は保護し削除0件。Release/deployは行わない。
+
 ## 2026-10-25: 通知種類のテーブルと編集ダイアログ 0.87.14
 
 - cleanなmain `ce1c630`で`git pull --ff-only`を実行し、Already up to dateを確認して着手。通知種類を共通SettingsContent/SettingsListLayoutの1テーブル（通知名・通知先・表示時間・読み上げ・MCP Events・編集）にし、提供元マークと説明ヒント、必須・固定・停止中・仕様変更・読み上げ前提不足を表示。鉛筆から共通SettingsDialogで編集し、OKで種類単位に保存する。利用できない種類の設定削除、読み上げ共通値、受け取り方の案内は保持した。
@@ -265,6 +289,7 @@
 - ソースと最終固定EXEの隔離GUIで各**2群**成功、pageerrorなし。必須/固定/停止中/仕様変更/TTS不足、取消/Escape/変更なしOK、入力不正時の保持、通知設定の一括確定、別種類・共通音声の外部変更の保持、同一種類競合拒否、停止Applet編集、未知の設定保持、検索anchor、編集ボタンへのfocus復帰を確認。明るい1280px・暗い900px・明るい720pxとヒントOFFの重要状態表示を確認。途中の3失敗はfixtureの最低ホスト版宣言・検索結果の表示前提・非同期focus待ちを修正して解消した。成功profileはソース`notification-table-ui-1792891035029`、固定EXE`notification-table-ui-1792891227202`。
 - `publish.bat`終了0。本体・EXE・ASAR内Default Shell・feedは**0.87.14**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170693021 bytes**、SHA256 `606b48cfe671623b7018264ad4028cc479c014bd04a9416f179f188974ec13a9`。feedのsize/hash、FileVersion/ProductVersion、隔離コピーを照合し固定smokeも成功。証跡は`.artifacts/notification-table-08714/`のレビュー・完全log/コマンド/終了コード・入力hash・最終照合・証跡hash。発行後の製品変更なし。
 - 整理は削除0件。今回のGUI成功はソース2回・固定EXE1回で方式別3回以内、途中失敗と過去の照合用証跡は保持。今回のfixtureプロセス終了を確認した。実利用設定・物理入力・実TTS/MCP送信・Windows/desktop通知配送・通常終了は今回未確認。commit/push/Release/deployは行っていない。
+
 ## 2026-10-25: 設定UI 0.87.8～0.87.13のコミット検証
 
 - 利用者が最終0.87.13を確認してcommit/pushを依頼。main `9685a04`上の23対象ファイルをレビューし、阻害指摘なし。索引間隔、Section/一覧/操作列の整理、ジェスチャー有効化・フィルター高さ、MCPクライアント自動取得/Schema、Codex連携/接続設定/トークン・登録操作と関連文書だけを対象とする。dirtyのためpull/stash/統合なし。fetchと両push先の読取でGitHub/AQUAのmainが`9685a04`に一致し、実効author/committerを確認した。
@@ -870,6 +895,7 @@
 - 実行コマンド・終了コード・ログhash・試験前後の入力hash・EXE一致と失敗/再実行は`.artifacts/security-update-0830-20261022/`、事前調査は`.artifacts/security-audit-20261022/`。Node/Electron更新は完了したが、OS trust-list反映や全Node上流CVEの個別実証、実Google受信・物理DPI/ロック・実NASは今回の追加成功として扱わない。
 - Release作業は0.83.0へ切り替える。旧0.82.0とProfile0.1.0は下書きのまま、旧planで再公開しない。新規planと同梱照合・公開後の匿名取得/実更新検出・最新1件を残す整理の最終記録先は`.artifacts/release-0.83.0-20261022/`。利用者から本体と同梱7Applet全ての過去の公開Release16件の削除指示を受領し、全対象の公開後検証成功を条件にする。下書き・Gitタグ/履歴を保持する。
 - 全Release作業後、Electron/Nodeのみを7日待機から恒久的に除外し、依存更新時に最新安定Electron/最新LTS Nodeを選ぶ方針変更も依頼された。今回のRelease入力を変えないよう、その変更はReleaseと旧公開物整理の完了後に行う。
+
 ## 2026-10-22: 0.82.0のGitHub Release準備
 
 - 利用者から0.82.0のRelease指示を受領。GitHubではv0.82.0が未公開、直近公開版はv0.68.1であることを確認した。対象本体の製品実装は`bfe63f9`、同梱候補は7Applet。公開済み同版は上書きせず、未公開のProfile 0.1.0・WallpaperSlideshow 0.7.2・WebApplet 0.3.1を本体と合わせて扱う。

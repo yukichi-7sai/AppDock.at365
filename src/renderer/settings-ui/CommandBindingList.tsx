@@ -9,7 +9,6 @@ import { useSettingsFeedback } from './SettingsStatus';
 import type { UiCommand } from '../../shared/commands';
 import type { BindingInputFilter, BindingProviderFilter } from './useBindingCommandFilter';
 import { useCommandListScroll } from './CommandListScroll';
-import { useCommandCellFollow } from './useCommandCellFollow';
 import {
   CommandPrivacy,
   CommandSettingsLinks,
@@ -101,7 +100,6 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   });
   const root = useRef<HTMLDivElement>(null);
   useCommandListScroll(root);
-  useCommandCellFollow(root, followCommands);
   const restore = useRef<(() => void) | null>(null);
   const rememberPosition = (target?: HTMLElement | null) => {
     const scroll = root.current?.closest<HTMLElement>('.applet-settings-panel, .settings-body');

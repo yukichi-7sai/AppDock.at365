@@ -2844,7 +2844,8 @@ summary {
   vertical-align: top;
 }
 .binding-command-follow .binding-command-summary {
-  position: relative;
+  position: sticky;
+  top: calc(var(--command-list-toolbar-height, 0px) + 8px);
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;

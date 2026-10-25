@@ -8,17 +8,20 @@ const fs = require('node:fs'),
   assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `ribbon-groups-ui-${Date.now()}`);
-const portable = process.argv[2] && path.resolve(process.argv[2]);
+const portable =
+  process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
+const scrollbarsOnly = process.argv.includes('--scrollbars-only');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const { ribbonPage, closingAction } = require('./shell-overlay-helper.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
+settings.host.theme = 'light';
 settings.globalShortcutCommands = [];
 const fixture = path.join(profile, 'extensions', 'ribbon');
 fs.mkdirSync(fixture, { recursive: true });
-const pages = Array.from({ length: 24 }, (_, i) => ({
+const pages = Array.from({ length: 10 }, (_, i) => ({
   id: i === 0 ? 'main' : 'p' + i,
   title: i === 0 ? 'Badge fixture' : 'Item ' + i,
   source: 'local',
@@ -46,13 +49,27 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(fixture, 'worker.cjs'),
   `exports.activate=async c=>{
-  for(let i=0;i<24;i++) c.commands.register('fixture.ribbon.open'+i,'Open '+i,()=>c.pages.open(i===0?'main':'p'+i));
+  for(let i=0;i<${pages.length};i++) c.commands.register('fixture.ribbon.open'+i,'Open '+i,()=>c.pages.open(i===0?'main':'p'+i));
   c.commands.register('fixture.ribbon.clear','Clear badge',()=>c.ribbon.setBadge({pageId:'main'},null));
   c.commands.register('fixture.ribbon.dot','Dot badge',()=>c.ribbon.setBadge({pageId:'main'},{kind:'dot'}));
   await c.ribbon.setBadge({pageId:'main'},{kind:'count',count:123,label:'Pending fixture'});
 };`,
 );
 settings.extensions['fixture.ribbon'] = { enabled: true, settings: {} };
+// Keep each Applet within its ten-page limit while overflowing the popup's screen bounds.
+const extraItems = [];
+for (let index = 0; index < 2; index++) {
+  const id = `fixture.ribbon-extra${index}`;
+  const folder = path.join(profile, 'extensions', id);
+  fs.mkdirSync(folder, { recursive: true });
+  for (const file of ['extension.json', 'worker.cjs', 'page.html'])
+    fs.writeFileSync(
+      path.join(folder, file),
+      fs.readFileSync(path.join(fixture, file), 'utf8').replaceAll('fixture.ribbon', id),
+    );
+  settings.extensions[id] = { enabled: true, settings: {} };
+  extraItems.push(...pages.map((page) => `page:${id}:${page.id}`));
+}
 const native = path.join(profile, 'extensions', 'native');
 fs.mkdirSync(native, { recursive: true });
 fs.copyFileSync(
@@ -114,6 +131,7 @@ settings.ribbon = {
         'extensions',
         'notifications',
         ...pages.slice(1).map((p) => 'page:fixture.ribbon:' + p.id),
+        ...extraItems,
       ],
     },
   ],
@@ -155,6 +173,41 @@ const overlay = () =>
       if (!page.isClosed() && (await page.locator('.ribbon-flyout').count())) return page;
     }
   }, 'ribbon group');
+const recordSuccess = () => {
+  const result = {
+    ok: true,
+    checks,
+    profile,
+    errors,
+    scrollbarsOnly,
+    portable,
+    executableSha256: portable ? hash(exe) : null,
+  };
+  fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result));
+};
+const checkScrollbars = async (page, selector, dark) => {
+  const sample = await require('./shared-scrollbar-checks.cjs')(page, dark);
+  const actual = await page.locator(selector).evaluateAll((elements) =>
+    elements.map((element) => ({
+      width: getComputedStyle(element, '::-webkit-scrollbar').width,
+      thumb: getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor,
+    })),
+  );
+  assert(actual.length > 0);
+  for (const scrollbar of actual) {
+    assert.equal(scrollbar.width, sample.width);
+    assert.equal(scrollbar.thumb, sample.thumb);
+  }
+  const bounds = await page.locator(`${selector} button .ribbon-icon`).evaluateAll((icons) =>
+    icons.map((icon) => {
+      const bounds = icon.getBoundingClientRect();
+      const button = icon.closest('button').getBoundingClientRect();
+      return bounds.left >= button.left && bounds.right <= button.right;
+    }),
+  );
+  assert(bounds.length > 0 && bounds.every(Boolean), 'compact ribbon icons fit inside buttons');
+};
 async function openTemporary() {
   await button('group:temporary').click();
   return overlay();
@@ -254,6 +307,7 @@ async function launch() {
     const beforeSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).ribbon;
     assert(!JSON.stringify(beforeSettings).includes('expanded'));
     await rail.screenshot({ path: path.join(profile, 'persistent.png') });
+    await checkScrollbars(rail, '.ribbon-buttons', false);
     checks.push(
       'Node and .NET badge API; 99+ and raw accessible count; collapsed aggregate dot; separate local expansion state',
     );
@@ -299,18 +353,19 @@ async function launch() {
       el.scrollTop = el.scrollHeight;
     });
     assert(await flyout.locator('.ribbon-flyout-list').evaluate((el) => el.scrollTop > 0));
+    await checkScrollbars(flyout, '.ribbon-flyout-list', false);
     await flyout.locator('.ribbon-flyout-list button').first().focus();
-    await app.evaluate(({ BrowserWindow, webContents }) => {
+    await app.evaluate(({ BrowserWindow, webContents }, url) => {
       BrowserWindow.getAllWindows()[0].focus();
       webContents
         .getAllWebContents()
-        .find((c) => c.getURL().endsWith('/overlay.html'))
+        .find((c) => c.getURL() === url)
         .focus();
-    });
+    }, flyout.url());
     await flyout.locator('.ribbon-flyout-list button').first().press('End');
     assert.equal(
       await flyout.evaluate(() => document.activeElement.dataset.ribbonId),
-      'page:fixture.ribbon:p23',
+      extraItems.at(-1),
     );
     await flyout.screenshot({ path: path.join(profile, 'temporary.png') });
     await closingAction(flyout.keyboard.press('Escape'));
@@ -354,20 +409,22 @@ async function launch() {
       'Temporary vertical overflow; keyboard End/Escape and focus return; outside click consumed; selection closes and executes; persistent state retained on navigation',
     );
 
-    flyout = await openTemporary();
-    await app.evaluate(({ BrowserWindow }) => {
-      const window = BrowserWindow.getAllWindows()[0];
-      const [w, h] = window.getSize();
-      window.setSize(w + 20, h);
-    });
-    await until(() => flyout.isClosed(), 'resize cancels overlay');
-    flyout = await openTemporary();
-    await rail.evaluate(() => window.appdockShell.invalidateAnchor());
-    await until(() => flyout.isClosed(), 'scroll invalidation cancels overlay');
-    flyout = await openTemporary();
-    await host.evaluate(() => window.dock.navigate(null));
-    await until(() => flyout.isClosed(), 'navigation cancels overlay');
-    checks.push('Window resize, source invalidation and route changes close temporary group');
+    if (!scrollbarsOnly) {
+      flyout = await openTemporary();
+      await app.evaluate(({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        const [w, h] = window.getSize();
+        window.setSize(w + 20, h);
+      });
+      await until(() => flyout.isClosed(), 'resize cancels overlay');
+      flyout = await openTemporary();
+      await rail.evaluate(() => window.appdockShell.invalidateAnchor());
+      await until(() => flyout.isClosed(), 'scroll invalidation cancels overlay');
+      flyout = await openTemporary();
+      await host.evaluate(() => window.dock.navigate(null));
+      await until(() => flyout.isClosed(), 'navigation cancels overlay');
+      checks.push('Window resize, source invalidation and route changes close temporary group');
+    }
 
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
@@ -379,6 +436,8 @@ async function launch() {
     flyout = await openTemporary();
     await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await flyout.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    await checkScrollbars(rail, '.ribbon-buttons', true);
+    await checkScrollbars(flyout, '.ribbon-flyout-list', true);
     const box = await flyout.locator('.ribbon-flyout').boundingBox();
     const viewport = await flyout.evaluate(() => ({ width: innerWidth, height: innerHeight }));
     assert(
@@ -390,6 +449,14 @@ async function launch() {
     await flyout.screenshot({ path: path.join(profile, 'temporary-dark.png') });
     await closingAction(flyout.keyboard.press('Escape'));
     await until(() => flyout.isClosed(), 'dark panel closes');
+    if (scrollbarsOnly) {
+      checks.push(
+        'Common scrollbars and compact icons in light/dark ribbon and overflowing flyout',
+      );
+      assert.deepEqual(errors, []);
+      recordSuccess();
+      return;
+    }
 
     await host.evaluate(() => window.dock.executeCommand('fixture.ribbon.clear'));
     await until(
@@ -552,22 +619,7 @@ async function launch() {
       'Real host restart restores persistent expansion and keeps temporary groups closed',
     );
     assert.deepEqual(errors, []);
-    fs.writeFileSync(
-      path.join(profile, 'result.json'),
-      JSON.stringify(
-        {
-          ok: true,
-          checks,
-          profile,
-          errors,
-          portable: portable ?? null,
-          executableSha256: portable ? hash(exe) : null,
-        },
-        null,
-        2,
-      ),
-    );
-    console.log(JSON.stringify({ ok: true, checks, profile }, null, 2));
+    recordSuccess();
   } catch (error) {
     fs.writeFileSync(
       path.join(profile, 'result.json'),

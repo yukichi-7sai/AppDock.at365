@@ -349,6 +349,23 @@ module.exports = async ({ host, command, row, checks, profile }) => {
         toolbarBottom: toolbar.getBoundingClientRect().bottom,
         padding: parseFloat(getComputedStyle(cell).paddingBottom),
         transform: element.style.transform,
+        position: getComputedStyle(element).position,
+        inset: getComputedStyle(element).top,
+        ancestors: (() => {
+          const values = [];
+          for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+            const style = getComputedStyle(parent);
+            values.push({
+              className: parent.className,
+              overflowX: style.overflowX,
+              overflowY: style.overflowY,
+              height: parent.getBoundingClientRect().height,
+              contain: style.contain,
+            });
+            if (parent === body) break;
+          }
+          return values;
+        })(),
       };
     });
   const position = async (edge) => {
@@ -366,13 +383,64 @@ module.exports = async ({ host, command, row, checks, profile }) => {
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     );
   };
-  for (const width of [1280, 700]) {
+  for (const { width, theme } of [
+    { width: 1280, theme: 'light' },
+    { width: 700, theme: 'light' },
+    { width: 700, theme: 'dark' },
+    { width: 1280, theme: 'dark' },
+  ]) {
+    await host.evaluate(async (theme) => {
+      const snapshot = await window.dock.snapshot();
+      await window.dock.saveSettings(
+        { ...snapshot.settings.value, host: { ...snapshot.settings.value.host, theme } },
+        snapshot.settings.revision,
+      );
+    }, theme);
+    await settleSettings(host);
     await host.setViewportSize({ width, height: 760 });
     await position('middle');
     let value = await measure();
+    assert.equal(value.position, 'sticky');
+    assert.equal(value.transform, '', 'native sticky does not write a JS transform');
     assert(Math.abs(value.top - value.toolbarBottom - 8) <= 2, JSON.stringify({ width, ...value }));
     assert(value.top >= value.cellTop && value.bottom <= value.cellBottom + 1);
+    const immediate = await summary.evaluate((element) => {
+      const body = element.closest('.settings-body');
+      return [16, 40, -20, 80, -40].map((delta) => {
+        body.scrollTop += delta;
+        return {
+          top: element.getBoundingClientRect().top,
+          target: body.querySelector('.command-list-toolbar').getBoundingClientRect().bottom + 8,
+          transform: element.style.transform,
+        };
+      });
+    });
+    assert(
+      immediate.every(
+        (sample) => Math.abs(sample.top - sample.target) <= 2 && sample.transform === '',
+      ),
+      JSON.stringify(immediate),
+    );
     if (width === 1280) {
+      const fit = await host.locator('.settings-body').evaluate((element) => {
+        const parents = [];
+        for (let parent = element.querySelector('table'); parent; parent = parent.parentElement) {
+          const style = getComputedStyle(parent);
+          parents.push({
+            className: parent.className,
+            width: parent.getBoundingClientRect().width,
+            client: parent.clientWidth,
+            scroll: parent.scrollWidth,
+            minWidth: style.minWidth,
+            padding: style.padding,
+            border: style.borderWidth,
+            boxSizing: style.boxSizing,
+          });
+          if (parent === element) break;
+        }
+        return { client: element.clientWidth, scroll: element.scrollWidth, parents };
+      });
+      assert(fit.scroll <= fit.client + 1, JSON.stringify(fit));
       const add = host.getByTestId('binding-add:fixture.triggers.long:gestures');
       await command('fixture.triggers.long').locator('.command-title').hover();
       await add.click();
@@ -387,17 +455,118 @@ module.exports = async ({ host, command, row, checks, profile }) => {
       assert(await add.evaluate((button) => button === document.activeElement));
     }
     const list = host.locator('.command-triggers-editor .shortcut-command-list');
+    const body = host.locator('.settings-body');
     if (width === 700) {
+      const fixed = host.locator(
+        '.settings-page-heading, .settings-page-toolbar, .command-list-toolbar',
+      );
+      const fixedBefore = await fixed.evaluateAll((elements) =>
+        elements.map((element) => ({
+          left: element.getBoundingClientRect().left,
+          width: element.getBoundingClientRect().width,
+        })),
+      );
       const before = await measure();
-      const moved = await list.evaluate((element) => {
+      const moved = await body.evaluate((element) => {
         const before = element.scrollLeft;
         element.scrollLeft += 64;
         return element.scrollLeft - before;
       });
+      await host.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
       const after = await measure();
       assert(moved > 0 && Math.abs(after.left - before.left + moved) < 2);
       assert(Math.abs(after.top - before.top) < 2, 'horizontal scroll preserves vertical follow');
-      await list.evaluate((element) => {
+      const fixedAfter = await fixed.evaluateAll((elements) =>
+        elements.map((element) => ({
+          left: element.getBoundingClientRect().left,
+          width: element.getBoundingClientRect().width,
+        })),
+      );
+      await host.screenshot({ path: path.join(profile, `native-scroll-700-${theme}.png`) });
+      assert(
+        fixedAfter.every(
+          (value, index) =>
+            Math.abs(value.left - fixedBefore[index].left) < 1 &&
+            Math.abs(value.width - fixedBefore[index].width) < 1,
+        ),
+        JSON.stringify({
+          fixedBefore,
+          fixedAfter,
+          layout: await fixed.evaluateAll((elements) =>
+            elements.map((element) => {
+              const parents = [];
+              for (let parent = element; parent; parent = parent.parentElement) {
+                const style = getComputedStyle(parent);
+                parents.push({
+                  className: parent.className,
+                  width: parent.getBoundingClientRect().width,
+                  scrollWidth: parent.scrollWidth,
+                  position: style.position,
+                  left: style.left,
+                  overflowX: style.overflowX,
+                  overflowY: style.overflowY,
+                  grid: style.gridTemplateColumns,
+                });
+                if (parent.classList.contains('settings-body')) break;
+              }
+              return parents;
+            }),
+          ),
+        }),
+      );
+      assert.equal(
+        await list.evaluate((element) => getComputedStyle(element).overflowX),
+        'visible',
+      );
+      assert.equal(await list.evaluate((element) => element.scrollLeft), 0);
+      await command('fixture.triggers.long').locator('.command-title').hover();
+      const preserved = await body.evaluate((element) => ({
+        top: element.scrollTop,
+        left: element.scrollLeft,
+      }));
+      const add = host.getByTestId('binding-add:fixture.triggers.long:gestures');
+      await add.click();
+      await host
+        .getByTestId('settings-dialog')
+        .getByRole('button', { name: 'キャンセル', exact: true })
+        .click();
+      const restored = await body.evaluate((element) => ({
+        top: element.scrollTop,
+        left: element.scrollLeft,
+      }));
+      assert.deepEqual(restored, preserved, 'closing the dialog restores both page scroll axes');
+      assert(await add.evaluate((button) => button === document.activeElement));
+      const bar = host.getByRole('region', { name: 'コマンド一覧を横にスクロール', exact: true });
+      await bar.waitFor({ state: 'visible' });
+      assert(
+        Math.abs(
+          (await bar.evaluate((element) => element.scrollLeft)) -
+            (await body.evaluate((element) => element.scrollLeft)),
+        ) <= 1,
+      );
+      await bar.focus();
+      await bar.press('End');
+      await host.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
+      assert(
+        await body.evaluate(
+          (element) =>
+            Math.abs(element.scrollLeft - (element.scrollWidth - element.clientWidth)) <= 1,
+        ),
+      );
+      await bar.press('Home');
+      await host.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
+      assert.equal(await body.evaluate((element) => element.scrollLeft), 0);
+      assert(
+        await body.evaluate((element) => element.offsetHeight - element.clientHeight <= 1),
+        'the body does not add a second horizontal scrollbar',
+      );
+      await body.evaluate((element) => {
         element.scrollLeft = 0;
       });
     }
@@ -418,6 +587,51 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   );
   assert.equal((await measure()).transform, '');
   checks.push(
-    'rowspan command summary follows below filters / stops at its own cell bottom / horizontal scrolling and resize / returns to natural position',
+    'native sticky command summary follows immediately without JS transforms / stops at its own cell bottom / shared page horizontal scrolling preserves headings and filters / keyboard bottom scrollbar / resize and natural position',
+  );
+  await host.setViewportSize({ width: 700, height: 760 });
+  const search = host.getByRole('searchbox', { name: 'トリガーのコマンドを検索', exact: true });
+  const bar = host.getByRole('region', { name: 'コマンド一覧を横にスクロール', exact: true });
+  await bar.focus();
+  await bar.press('End');
+  await search.fill('no-command-matches-this-filter');
+  await host.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  assert.equal(await host.locator('.command-triggers-editor table').count(), 0);
+  assert(
+    await host
+      .locator('.settings-body')
+      .evaluate(
+        (element) => element.scrollLeft === 0 && element.scrollWidth <= element.clientWidth + 1,
+      ),
+  );
+  assert.equal(await bar.isVisible(), false);
+  await search.fill('');
+  await bar.waitFor({ state: 'visible' });
+  await host.getByRole('button', { name: 'JSON', exact: true }).click();
+  await host.locator('.settings-panel-json textarea').waitFor();
+  assert.equal(await host.locator('.settings-page-shared-scroll').count(), 0);
+  assert.equal(await host.locator('.command-list-page-canvas').count(), 0);
+  assert.equal(await bar.isVisible(), false);
+  await host.getByRole('button', { name: 'フォーム', exact: true }).click();
+  await host.locator('.command-triggers-editor').waitFor();
+  assert.equal(await host.locator('.settings-page-shared-scroll').count(), 1);
+  assert.equal(await host.locator('.command-list-page-canvas').count(), 1);
+  await host.setViewportSize({ width: 1280, height: 840 });
+  await host.evaluate(async () => {
+    const snapshot = await window.dock.snapshot();
+    await window.dock.saveSettings(
+      { ...snapshot.settings.value, host: { ...snapshot.settings.value.host, theme: 'light' } },
+      snapshot.settings.revision,
+    );
+  });
+  await settleSettings(host);
+  await host.locator('.settings-body').evaluate((element) => {
+    element.scrollTop = 0;
+    element.scrollLeft = 0;
+  });
+  checks.push(
+    'empty filter removes horizontal overflow / JSON mode keeps its original frame / form restores native shared scrolling',
   );
 };

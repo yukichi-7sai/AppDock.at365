@@ -61,6 +61,8 @@ Applet・コマンド・キー・ジェスチャーの一時フィルターは�
 
 `SettingsPageLayout`が全設定ページのフォーム/JSONとApplet設定のヘッダー・本文を同じ`.settings-body.settings-page-scroll`へ収め、`CommandListScrollProvider`と`CommandListScrollbar`で横バーの配置・寿命を管理する。対象のテーブルは`useCommandListScroll`で登録する。外側のまとまりは枠と見出しを持たない`CommandListSection`を使い、検索アンカー・アクセシブルな名前・必要な状態説明を保つ。`CommandBindingList`は共通の登録を使い、カスタムコマンドは`SettingsListTable.commandListScroll`を明示して利用する。フィルターを追加する際はテーブルの横スクロール枠の外で`CommandListToolbar`へまとめ、背景・重なり順・スクロール余白を共通部品へ任せる。リサイズ、検索結果、行の増減、ページ／JSON表示の切り替えに追従し、ダイアログの終了時は外側の縦位置・表の横位置・元の操作へのフォーカスを保つ。
 
+[コマンドトリガー](command-triggers.md)のフォームだけは、`CommandListScrollProvider.pageScroll`で本文を縦横共通のスクロール枠として登録する。共通キャンバスの中で見出し・操作・状態・フィルターを表示幅の横stickyにし、コマンドはセル内の縦stickyにする。共通の下端バーは本文へ接続し、JSONと他の一覧では従来のテーブルを登録する。
+
 Applet管理のフォームも上部ヘッダーを含めた外側の縦スクロールを使い、検索・件数を同じ`CommandListToolbar`で固定する。固定フィルターパネルに下端罫線は付けない。導入可否や検出の説明は固定領域の外へ置く。Applet一覧の横スクロールも共通の下端バーへ接続する。全設定ページのタイトルと上部操作も本文と一緒にスクロールする。
 
 Applet管理・AI・MCPクライアントの順番変更ボタンは、一覧の名前列ヘッダーで追加ボタンの直後へ配置する。件数・フィルター領域へ同じ操作を重ねない。名前とヘッダー操作は折り返さず、セル内へ収める。AI一覧の列幅は内容に応じて配分する。宣言型の`SettingsListTable`では`addInTitle`と`orderInTitle`を指定するとこの配置を使い、未指定の一覧は既存の操作位置を保つ。`onOrder`を省略した一覧には順番変更ボタンを表示しない。Webアカウントの使用中・削除・クリアに関する説明はページ最上部の説明文へまとめ、一覧の上へ重ねて表示しない。

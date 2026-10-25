@@ -20,19 +20,29 @@ Lightでは濃い色を強調色、淡い色を選択背景の基にし、Dark�
 
 本体、Shellの全領域、通知Surface、WebアカウントのローカルUI、Node/.NET/native Appletのローカルページに、共通preloadが次のCSS変数を設定する。画面は変数を参照し、色コードや同名変数の独自定義を追加しない。古いUIの`:root`や`body.dark`より共通値を優先するため、documentElement/bodyのinline custom propertiesをホストが所有する。固有の別名は`--component-highlight: var(--accent)`のように参照で作る。
 
-| 変数 | 用途 |
-| --- | --- |
-| `--accent` | 強調文字、選択枠・線、塗りつぶしボタン、チェック |
-| `--accent-soft` | 淡い選択背景。上の文字は`--accent` |
-| `--accent-text` | `--accent`/`--accent-hover`の面の文字・アイコン・トグルのつまみ |
-| `--accent-hover` | 塗りつぶしボタンのホバー |
-| `--accent-focus` | キーボードフォーカスの枠 |
+| 変数             | 用途                                                            |
+| ---------------- | --------------------------------------------------------------- |
+| `--accent`       | 強調文字、選択枠・線、塗りつぶしボタン、チェック                |
+| `--accent-soft`  | 淡い選択背景。上の文字は`--accent`                              |
+| `--accent-text`  | `--accent`/`--accent-hover`の面の文字・アイコン・トグルのつまみ |
+| `--accent-hover` | 塗りつぶしボタンのホバー                                        |
+| `--accent-focus` | キーボードフォーカスの枠                                        |
 
 ```css
-.action { background: var(--accent); color: var(--accent-text); }
-.action:hover:enabled { background: var(--accent-hover); }
-.action:focus-visible { outline: 2px solid var(--accent-focus); }
-.selected { background: var(--accent-soft); color: var(--accent); }
+.action {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.action:hover:enabled {
+  background: var(--accent-hover);
+}
+.action:focus-visible {
+  outline: 2px solid var(--accent-focus);
+}
+.selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 ```
 
 設定の追加・並べ替え・上下移動には共通の`accent-action`を使う。通常は`--accent-soft`と`--accent`、ホバーは`--accent-hover`と`--accent-text`を組にして切り替える。更新ボタンと一覧ヘッダーの追加ボタンも同じ規則を使う。背景だけを切り替えたり、`filter: brightness()`で解決済みの色を変えたりしない。寸法は既存のテキスト/アイコンボタンの部品に任せ、削除は既存の意味色を保つ。
@@ -48,6 +58,16 @@ renderAppearance(await window.appdockAppearance.snapshot());
 snapshotは`{revision,palette,dark,colors:{accent,soft,text,hover}}`。revisionはプロセス内の配色変更で増加する。購読を先に登録し、非同期取得より新しいrevisionを描画済みなら古い応答を無視する。通常のHTML/CSS画面に購読コードは不要で、preloadが自動反映する。APIは全設定・PC名・パス・認証を公開しない。外部からの設定変更は既存の`appdock.settings.update`とrevision/許可を使い、配色APIに書き込み口を追加しない。
 
 任意のWebサイト・Webアカウントのリモート本文に配色preload・引数・IPCを渡さない。登録した正確なローカルURLとmain frameを照合し、別URLやiframeからの取得を拒否する。登録はWebContents破棄時に解除する。
+
+## 共通スクロールバー
+
+本体、設定インデックス、各一覧とダイアログ、Default Shell、通知、登録されたローカルApplet画面には、コマンドトリガーの設定本文を基準にした共通スクロールバーを使う。縦横とも12px、つまみは周囲3pxの余白と8pxの角丸を持ち、矢印ボタンは表示しない。中立色のつまみを明暗テーマに合わせ、アクセントカラーで見た目を変えない。バー本体・トラック・縦横の交差部・つまみ周囲は透明にし、その場所の背景を見せる。つまみの背景色はpadding-box内だけへ描き、透明な境界まで塗りつぶさない。
+
+寸法・色・CSSの正本は`src/shared/appearance.ts`の`scrollbarCss`。`appearance-host.ts`が、既存の配色登録で照合した正確なローカルURLのmain frameへ`dom-ready`ごとに挿入する。再読込後にも適用し、テーマ変更は共通preloadが更新する`data-theme`へ追従する。新しい設定項目や公開APIは追加しない。任意のWebサイト、Webアカウントのリモート本文、リモートiframeには挿入しない。
+
+各画面には、必要な方向の表示・非表示とスクロール領域の構造だけを残す。例えば共通の下部横バーを持つ設定一覧は、重複する内側の横バーを引き続き隠す。個別の幅・つまみ・トラック・矢印スタイルは追加せず、共通CSSへ集約する。
+
+`scripts/appearance-ui-test.cjs [固定EXE] --scrollbars-only`で、本体・Shell・通知・オーバーレイ・ローカルAppletの実スクロール、明暗とアクセント切替、再読込、リモートiframeへの非適用を確認する。設定一覧のスクロール構造は既存のコマンドトリガーGUIと一覧スクロールGUIで確認する。
 
 ## 新しい画面・パレットの追加規則
 
