@@ -17,7 +17,7 @@ export function CommandProviderFilter({
   const { t: translate } = useHostTranslation();
   return (
     <p className="command-provider-filter" ref={ref} data-testid="command-provider-filter">
-      <span>
+      <span title={`${label}: ${title}`}>
         {label}: <strong>{title}</strong>
       </span>
       <button

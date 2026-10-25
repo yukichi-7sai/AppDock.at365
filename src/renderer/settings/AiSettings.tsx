@@ -81,124 +81,122 @@ export function AiSettingsForm({
   useSettingsFeedback({ busy: pending, error });
   return (
     <div className="settings-sections ai-settings">
-      <SettingsSection
-        title={translate('settings.aiSettings.connections')}
-        hint={translate('settings.aiSettings.connectionsHint')}
+      <SettingsActions className="ai-connections-toolbar">
+        <span className="muted">
+          {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
+        </span>
+      </SettingsActions>
+      <SettingsContent
+        className="command-shortcuts ai-connection-table"
+        data-testid="ai-connections"
         {...settingAnchor('ai', 'connections')}
       >
-        <SettingsActions className="ai-connections-toolbar">
-          <span className="muted">
-            {translate('settings.aiSettings.serverCount', { count: value.connections.length })}
-          </span>
-        </SettingsActions>
-        <SettingsContent className="command-shortcuts ai-connection-table">
-          <table
-            className="applet-shortcut-overview"
-            aria-label={translate('settings.aiSettings.registered')}
-          >
-            <thead>
-              <tr>
-                <th>
-                  <span className="settings-list-heading">
-                    {translate('settings.aiSettings.server')}
-                    <SettingsListAddButton
-                      label={translate('settings.aiSettings.add')}
-                      disabled={busy || value.connections.length >= 8}
-                      onClick={() => open('edit', null)}
-                    />
+        <table
+          className="applet-shortcut-overview"
+          aria-label={translate('settings.aiSettings.registered')}
+        >
+          <thead>
+            <tr>
+              <th>
+                <span className="settings-list-heading">
+                  {translate('settings.aiSettings.server')}
+                  <SettingsListAddButton
+                    label={translate('settings.aiSettings.add')}
+                    disabled={busy || value.connections.length >= 8}
+                    onClick={() => open('edit', null)}
+                  />
+                  <button
+                    className="settings-list-icon ai-icon-button"
+                    aria-label={translate('settings.aiSettings.order')}
+                    title={translate('settings.aiSettings.orderAction')}
+                    disabled={busy || value.connections.length < 2}
+                    onClick={() =>
+                      setDialog({
+                        kind: 'order',
+                        connections: structuredClone(value.connections),
+                      })
+                    }
+                  >
+                    <ListIcon kind="order" />
+                  </button>
+                </span>
+              </th>
+              <th>{translate('settings.aiSettings.model')}</th>
+              <th>
+                <span className="ai-action-heading">
+                  {translate('settings.aiSettings.actions')}
+                </span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {value.connections.map((server) => (
+              <tr key={server.id} data-ai-connection={server.id}>
+                <td>
+                  <div className="ai-server-heading">
+                    <strong>{server.name || server.id}</strong>
+                    {server.id === value.defaultConnectionId && (
+                      <span className="ai-default-badge">
+                        {translate('settings.aiSettings.default')}
+                      </span>
+                    )}
+                  </div>
+                  <small>{aiPresetNames[server.preset]}</small>
+                  <small className="ai-server-url">
+                    {server.baseUrl || translate('settings.aiSettings.unsetUrl')}
+                  </small>
+                </td>
+                <td>
+                  <span className="ai-model-name">
+                    {server.defaultModel || translate('settings.aiSettings.perCall')}
+                  </span>
+                  {auxiliary?.connections.find((v) => v.id === server.id)?.error && (
+                    <small className="error-text">
+                      {translate('settings.aiSettings.checkKey')}
+                    </small>
+                  )}
+                </td>
+                <td>
+                  <div className="ai-row-actions">
                     <button
                       className="settings-list-icon ai-icon-button"
-                      aria-label={translate('settings.aiSettings.order')}
-                      title={translate('settings.aiSettings.orderAction')}
-                      disabled={busy || value.connections.length < 2}
-                      onClick={() =>
-                        setDialog({
-                          kind: 'order',
-                          connections: structuredClone(value.connections),
-                        })
-                      }
+                      aria-label={translate('settings.aiSettings.serverSettings', {
+                        name: server.name,
+                      })}
+                      title={translate('settings.aiSettings.settings')}
+                      disabled={busy}
+                      onClick={() => open('edit', server)}
                     >
-                      <ListIcon kind="order" />
+                      <ListIcon kind="edit" />
                     </button>
-                  </span>
-                </th>
-                <th>{translate('settings.aiSettings.model')}</th>
-                <th>
-                  <span className="ai-action-heading">
-                    {translate('settings.aiSettings.actions')}
-                  </span>
-                </th>
+                    <button
+                      className="settings-list-icon settings-list-delete ai-icon-button ai-delete-button"
+                      aria-label={translate('settings.aiSettings.deleteServerLabel', {
+                        name: server.name,
+                      })}
+                      title={translate('settings.aiSettings.delete')}
+                      disabled={busy}
+                      onClick={() => open('delete', server)}
+                    >
+                      <ListIcon kind="delete" />
+                    </button>
+                  </div>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {value.connections.map((server) => (
-                <tr key={server.id} data-ai-connection={server.id}>
-                  <td>
-                    <div className="ai-server-heading">
-                      <strong>{server.name || server.id}</strong>
-                      {server.id === value.defaultConnectionId && (
-                        <span className="ai-default-badge">
-                          {translate('settings.aiSettings.default')}
-                        </span>
-                      )}
-                    </div>
-                    <small>{aiPresetNames[server.preset]}</small>
-                    <small className="ai-server-url">
-                      {server.baseUrl || translate('settings.aiSettings.unsetUrl')}
-                    </small>
-                  </td>
-                  <td>
-                    <span className="ai-model-name">
-                      {server.defaultModel || translate('settings.aiSettings.perCall')}
-                    </span>
-                    {auxiliary?.connections.find((v) => v.id === server.id)?.error && (
-                      <small className="error-text">
-                        {translate('settings.aiSettings.checkKey')}
-                      </small>
-                    )}
-                  </td>
-                  <td>
-                    <div className="ai-row-actions">
-                      <button
-                        className="settings-list-icon ai-icon-button"
-                        aria-label={translate('settings.aiSettings.serverSettings', {
-                          name: server.name,
-                        })}
-                        title={translate('settings.aiSettings.settings')}
-                        disabled={busy}
-                        onClick={() => open('edit', server)}
-                      >
-                        <ListIcon kind="edit" />
-                      </button>
-                      <button
-                        className="settings-list-icon settings-list-delete ai-icon-button ai-delete-button"
-                        aria-label={translate('settings.aiSettings.deleteServerLabel', {
-                          name: server.name,
-                        })}
-                        title={translate('settings.aiSettings.delete')}
-                        disabled={busy}
-                        onClick={() => open('delete', server)}
-                      >
-                        <ListIcon kind="delete" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!value.connections.length && (
-                <tr>
-                  <td colSpan={3}>
-                    <div className="ai-empty">
-                      <strong>{translate('settings.aiSettings.empty')}</strong>
-                      <p>{translate('settings.aiSettings.emptyHint')}</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </SettingsContent>
-      </SettingsSection>
+            ))}
+            {!value.connections.length && (
+              <tr>
+                <td colSpan={3}>
+                  <div className="ai-empty">
+                    <strong>{translate('settings.aiSettings.empty')}</strong>
+                    <p>{translate('settings.aiSettings.emptyHint')}</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </SettingsContent>
       <SettingsSection
         title={translate('settings.aiSettings.common')}
         hint={translate('settings.aiSettings.commonHint')}

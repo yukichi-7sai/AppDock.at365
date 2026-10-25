@@ -21,6 +21,7 @@ import {
   SettingsField,
   SettingsChoice,
   SettingsActions,
+  SettingsContent,
 } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 
@@ -118,10 +119,8 @@ export function McpClientSettingsForm({
   });
   return (
     <div className="settings-sections">
-      <SettingsSection
-        title={translate('settings.mcpClientSettings.registered')}
-        hint={translate('settings.mcpClientSettings.registeredHint')}
-        description={translate('settings.mcpClientSettings.localHint')}
+      <SettingsContent
+        data-testid="mcp-client-connections"
         {...settingAnchor('mcp-client', 'connections')}
       >
         <SettingsListTable
@@ -159,7 +158,7 @@ export function McpClientSettingsForm({
             })
           }
         />
-      </SettingsSection>
+      </SettingsContent>
       <SettingsSection
         title={translate('settings.mcpClientSettings.tools')}
         hint={translate('settings.mcpClientSettings.toolsHint')}
@@ -171,11 +170,19 @@ export function McpClientSettingsForm({
             value={serverId}
             disabled={pending}
             onChange={(e) => {
-              setServer(e.target.value);
+              const id = e.target.value;
+              setServer(id);
               setTools([]);
               setTool(undefined);
               setCursor(undefined);
               setResult(undefined);
+              setError('');
+              if (id)
+                void run(async () => {
+                  const r = await invoke('mcpTools', [id]);
+                  setTools(r.items);
+                  setCursor(r.nextCursor);
+                });
             }}
           >
             <option value="">{translate('settings.mcpClientSettings.select')}</option>
@@ -186,20 +193,6 @@ export function McpClientSettingsForm({
             ))}
           </select>
         </SettingsField>
-        <button
-          className="secondary"
-          disabled={!serverId || pending}
-          onClick={() =>
-            void run(async () => {
-              const r = await invoke('mcpTools', [serverId]);
-              setTools(r.items);
-              setCursor(r.nextCursor);
-              setTool(undefined);
-            })
-          }
-        >
-          {translate('settings.mcpClientSettings.fetchTools')}
-        </button>
         {tools.length > 0 && (
           <SettingsField
             title={translate('settings.mcpClientSettings.tool')}
@@ -227,25 +220,31 @@ export function McpClientSettingsForm({
           </SettingsField>
         )}
         {cursor && (
-          <button
-            disabled={pending}
-            onClick={() =>
-              void run(async () => {
-                const r = await invoke('mcpTools', [serverId, cursor]);
-                setTools([...tools, ...r.items]);
-                setCursor(r.nextCursor);
-              })
-            }
-          >
-            {translate('settings.mcpClientSettings.more')}
-          </button>
+          <SettingsActions data-testid="mcp-client-more-actions">
+            <button
+              disabled={pending}
+              onClick={() =>
+                void run(async () => {
+                  const r = await invoke('mcpTools', [serverId, cursor]);
+                  setTools([...tools, ...r.items]);
+                  setCursor(r.nextCursor);
+                })
+              }
+            >
+              {translate('settings.mcpClientSettings.more')}
+            </button>
+          </SettingsActions>
         )}
         {tool && (
           <>
-            <details>
-              <summary>{translate('settings.mcpClientSettings.schema')}</summary>
-              <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
-            </details>
+            <SettingsField title={translate('settings.mcpClientSettings.schema')}>
+              <SettingsTextarea
+                aria-label={translate('settings.mcpClientSettings.schema')}
+                rows={6}
+                readOnly
+                value={JSON.stringify(tool.inputSchema, null, 2)}
+              />
+            </SettingsField>
             <SettingsField title={translate('settings.mcpClientSettings.args')}>
               <SettingsTextarea
                 aria-label={translate('settings.mcpClientSettings.argsLabel')}
@@ -254,27 +253,29 @@ export function McpClientSettingsForm({
                 onChange={(e) => setArgs(e.target.value)}
               />
             </SettingsField>
-            <button
-              className="primary"
-              disabled={pending || !!tool.unsupportedReason}
-              onClick={() =>
-                void run(async () =>
-                  setResult(
-                    await invoke('mcpCall', [
-                      {
-                        serverId,
-                        name: tool.name,
-                        toolRevision: tool.toolRevision,
-                        arguments: JSON.parse(args),
-                        requestId: crypto.randomUUID(),
-                      },
-                    ]),
-                  ),
-                )
-              }
-            >
-              {translate('settings.mcpClientSettings.execute')}
-            </button>
+            <SettingsActions data-testid="mcp-client-execute-actions">
+              <button
+                className="primary"
+                disabled={pending || !!tool.unsupportedReason}
+                onClick={() =>
+                  void run(async () =>
+                    setResult(
+                      await invoke('mcpCall', [
+                        {
+                          serverId,
+                          name: tool.name,
+                          toolRevision: tool.toolRevision,
+                          arguments: JSON.parse(args),
+                          requestId: crypto.randomUUID(),
+                        },
+                      ]),
+                    ),
+                  )
+                }
+              >
+                {translate('settings.mcpClientSettings.execute')}
+              </button>
+            </SettingsActions>
           </>
         )}
       </SettingsSection>

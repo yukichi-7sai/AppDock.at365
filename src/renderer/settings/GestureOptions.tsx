@@ -47,127 +47,133 @@ export function GestureOptions({
 }) {
   const { t: translate } = useHostTranslation();
   return (
-    <SettingsSection
-      collapsible
-      className="gesture-settings-section"
-      title={hostSettingItem('gestures', 'options').title}
-      {...settingAnchor('gestures', 'options')}
-    >
-      <SettingsField
-        title={hostSettingItem('gestures', 'enabled').title}
-        hint={translate('settings.gestureOptions.enabledHint')}
-        {...settingAnchor('gestures', 'enabled')}
-      >
-        <Toggle
-          label={hostSettingItem('gestures', 'enabled').title}
-          checked={gestures.enabled}
-          onChange={(enabled) => change({ enabled })}
-        />
-      </SettingsField>
-      <SettingsField
-        title={hostSettingItem('gestures', 'activateOnStart').title}
-        hint={translate('settings.gestureOptions.activateHint')}
-        {...settingAnchor('gestures', 'activateOnStart')}
-      >
-        <Toggle
-          label={hostSettingItem('gestures', 'activateOnStart').title}
-          checked={gestures.activateOnStart ?? false}
-          onChange={(activateOnStart) => change({ activateOnStart })}
-        />
-      </SettingsField>
-      <CommandExecutionModeField
-        pageId="gestures"
-        value={gestures.executionMode}
-        onChange={(executionMode) => change({ executionMode })}
-      />
-      <SettingsField
-        group={translate('settings.gestureOptions.feel')}
-        title={hostSettingItem('gestures', 'distance').title}
-        {...settingAnchor('gestures', 'distance')}
-      >
-        <SettingsInput
-          aria-label={hostSettingItem('gestures', 'distance').title}
-          type="number"
-          min="5"
-          max="500"
-          value={gestures.distance}
-          onChange={(e) => change({ distance: numberInput(e.target.value) })}
-        />
-      </SettingsField>
-      <SettingsField
-        group={translate('settings.gestureOptions.feel')}
-        title={hostSettingItem('gestures', 'wheelDelayMs').title}
-        {...settingAnchor('gestures', 'wheelDelayMs')}
-      >
-        <SettingsInput
-          aria-label={hostSettingItem('gestures', 'wheelDelayMs').title}
-          type="number"
-          min="0"
-          max="5000"
-          value={gestures.wheelDelayMs}
-          onChange={(e) => change({ wheelDelayMs: numberInput(e.target.value) })}
-        />
-      </SettingsField>
-      <SettingsField
-        group={translate('settings.gestureOptions.indicator')}
-        title={hostSettingItem('gestures', 'indicatorPosition').title}
-        hint={translate('settings.gestureOptions.indicatorHint')}
-        {...settingAnchor('gestures', 'indicatorPosition')}
-      >
-        <select
-          aria-label={hostSettingItem('gestures', 'indicatorPosition').title}
-          value={gestures.indicatorPosition}
-          onChange={(e) =>
-            change({
-              indicatorPosition: e.target.value as GestureSettings['indicatorPosition'],
-            })
-          }
+    <>
+      <SettingsSection data-testid="mouse-gesture-enablement">
+        <SettingsField
+          title={hostSettingItem('gestures', 'enabled').title}
+          hint={translate('settings.gestureOptions.enabledHint')}
+          {...settingAnchor('gestures', 'enabled')}
         >
-          <option value="gesture-start">
-            {translate('settings.gestureOptions.startPosition')}
-          </option>
-          <option value="window-center">{translate('settings.gestureOptions.windowCenter')}</option>
-          <option value="monitor-center">
-            {translate('settings.gestureOptions.monitorCenter')}
-          </option>
-          <option value="none">{translate('settings.gestureOptions.hidden')}</option>
-        </select>
-      </SettingsField>
-      <SettingsField
-        group={translate('settings.gestureOptions.indicator')}
-        title={hostSettingItem('gestures', 'indicatorOpacity').title}
-        {...settingAnchor('gestures', 'indicatorOpacity')}
+          <Toggle
+            label={hostSettingItem('gestures', 'enabled').title}
+            checked={gestures.enabled}
+            onChange={(enabled) => change({ enabled })}
+          />
+        </SettingsField>
+      </SettingsSection>
+      <SettingsSection
+        collapsible
+        className="gesture-settings-section"
+        title={hostSettingItem('gestures', 'options').title}
+        {...settingAnchor('gestures', 'options')}
       >
-        <SettingsInput
-          aria-label={hostSettingItem('gestures', 'indicatorOpacity').title}
-          type="number"
-          min="0.1"
-          max="1"
-          step="0.05"
-          disabled={gestures.indicatorPosition === 'none'}
-          value={gestures.indicatorOpacity}
-          onChange={(e) => change({ indicatorOpacity: numberInput(e.target.value) })}
+        <SettingsField
+          title={hostSettingItem('gestures', 'activateOnStart').title}
+          hint={translate('settings.gestureOptions.activateHint')}
+          {...settingAnchor('gestures', 'activateOnStart')}
+        >
+          <Toggle
+            label={hostSettingItem('gestures', 'activateOnStart').title}
+            checked={gestures.activateOnStart ?? false}
+            onChange={(activateOnStart) => change({ activateOnStart })}
+          />
+        </SettingsField>
+        <CommandExecutionModeField
+          pageId="gestures"
+          value={gestures.executionMode}
+          onChange={(executionMode) => change({ executionMode })}
         />
-      </SettingsField>
-      <SettingsField
-        group={translate('settings.gestureOptions.indicator')}
-        title={hostSettingItem('gestures', 'indicatorShowNoAction').title}
-        hint={translate('settings.gestureOptions.noActionHint')}
-        {...settingAnchor('gestures', 'indicatorShowNoAction')}
-      >
-        <Toggle
-          label={hostSettingItem('gestures', 'indicatorShowNoAction').title}
-          checked={gestures.indicatorShowNoAction}
-          onChange={(indicatorShowNoAction) => change({ indicatorShowNoAction })}
+        <SettingsField
+          group={translate('settings.gestureOptions.feel')}
+          title={hostSettingItem('gestures', 'distance').title}
+          {...settingAnchor('gestures', 'distance')}
+        >
+          <SettingsInput
+            aria-label={hostSettingItem('gestures', 'distance').title}
+            type="number"
+            min="5"
+            max="500"
+            value={gestures.distance}
+            onChange={(e) => change({ distance: numberInput(e.target.value) })}
+          />
+        </SettingsField>
+        <SettingsField
+          group={translate('settings.gestureOptions.feel')}
+          title={hostSettingItem('gestures', 'wheelDelayMs').title}
+          {...settingAnchor('gestures', 'wheelDelayMs')}
+        >
+          <SettingsInput
+            aria-label={hostSettingItem('gestures', 'wheelDelayMs').title}
+            type="number"
+            min="0"
+            max="5000"
+            value={gestures.wheelDelayMs}
+            onChange={(e) => change({ wheelDelayMs: numberInput(e.target.value) })}
+          />
+        </SettingsField>
+        <SettingsField
+          group={translate('settings.gestureOptions.indicator')}
+          title={hostSettingItem('gestures', 'indicatorPosition').title}
+          hint={translate('settings.gestureOptions.indicatorHint')}
+          {...settingAnchor('gestures', 'indicatorPosition')}
+        >
+          <select
+            aria-label={hostSettingItem('gestures', 'indicatorPosition').title}
+            value={gestures.indicatorPosition}
+            onChange={(e) =>
+              change({
+                indicatorPosition: e.target.value as GestureSettings['indicatorPosition'],
+              })
+            }
+          >
+            <option value="gesture-start">
+              {translate('settings.gestureOptions.startPosition')}
+            </option>
+            <option value="window-center">
+              {translate('settings.gestureOptions.windowCenter')}
+            </option>
+            <option value="monitor-center">
+              {translate('settings.gestureOptions.monitorCenter')}
+            </option>
+            <option value="none">{translate('settings.gestureOptions.hidden')}</option>
+          </select>
+        </SettingsField>
+        <SettingsField
+          group={translate('settings.gestureOptions.indicator')}
+          title={hostSettingItem('gestures', 'indicatorOpacity').title}
+          {...settingAnchor('gestures', 'indicatorOpacity')}
+        >
+          <SettingsInput
+            aria-label={hostSettingItem('gestures', 'indicatorOpacity').title}
+            type="number"
+            min="0.1"
+            max="1"
+            step="0.05"
+            disabled={gestures.indicatorPosition === 'none'}
+            value={gestures.indicatorOpacity}
+            onChange={(e) => change({ indicatorOpacity: numberInput(e.target.value) })}
+          />
+        </SettingsField>
+        <SettingsField
+          group={translate('settings.gestureOptions.indicator')}
+          title={hostSettingItem('gestures', 'indicatorShowNoAction').title}
+          hint={translate('settings.gestureOptions.noActionHint')}
+          {...settingAnchor('gestures', 'indicatorShowNoAction')}
+        >
+          <Toggle
+            label={hostSettingItem('gestures', 'indicatorShowNoAction').title}
+            checked={gestures.indicatorShowNoAction}
+            onChange={(indicatorShowNoAction) => change({ indicatorShowNoAction })}
+          />
+        </SettingsField>
+        <InputBrowserOptions pageId="gestures" value={gestures} onChange={change} />
+        <Names
+          hint={translate('settings.gestureOptions.excludedHint')}
+          itemKey="excludedProcesses"
+          values={gestures.excludedProcesses}
+          change={(excludedProcesses) => change({ excludedProcesses })}
         />
-      </SettingsField>
-      <InputBrowserOptions pageId="gestures" value={gestures} onChange={change} />
-      <Names
-        hint={translate('settings.gestureOptions.excludedHint')}
-        itemKey="excludedProcesses"
-        values={gestures.excludedProcesses}
-        change={(excludedProcesses) => change({ excludedProcesses })}
-      />
-    </SettingsSection>
+      </SettingsSection>
+    </>
   );
 }

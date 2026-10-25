@@ -401,7 +401,7 @@ export function RibbonSettings({
       className="settings-sections ribbon-settings"
       aria-label={translate('settings.ribbonSettings.title')}
     >
-      <SettingsSection title={translate('settings.ribbonSettings.behavior')} collapsible>
+      <SettingsSection data-testid="ribbon-behavior-settings">
         <SettingsField
           title={translate('settings.ribbonSettings.rightClick')}
           hint={translate('settings.ribbonSettings.rightClickHint')}
@@ -421,11 +421,7 @@ export function RibbonSettings({
           )}
         </SettingsField>
       </SettingsSection>
-      <SettingsSection
-        title={translate('settings.ribbonSettings.editor')}
-        hint={translate('settings.ribbonSettings.hiddenSettingsHint')}
-        {...settingAnchor('ribbon', 'ribbon')}
-      >
+      <SettingsSection data-testid="ribbon-editor-settings" {...settingAnchor('ribbon', 'ribbon')}>
         {(['top', 'bottom'] as const).map((position) => {
           const title =
             position === 'top'

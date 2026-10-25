@@ -90,6 +90,13 @@
 .settings-list .settings-list-actions-heading {
   text-align: right;
 }
+.settings-list[data-actions-align='start']
+  :is(.settings-list-actions-heading, .settings-list-actions-cell) {
+  text-align: left;
+}
+.settings-list[data-actions-align='start'] .settings-list-actions {
+  justify-content: flex-start;
+}
 .settings-list-state {
   white-space: nowrap;
 }

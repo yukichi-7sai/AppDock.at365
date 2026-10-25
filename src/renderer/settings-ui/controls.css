@@ -2828,7 +2828,7 @@ summary {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  min-height: 42px;
+  min-height: 48px;
 }
 .command-list-summary > .command-list-summary-main {
   display: flex;
@@ -2845,6 +2845,11 @@ summary {
 .command-list-summary-main .command-provider-filter {
   min-width: 0;
   align-self: center;
+}
+.command-list-summary .command-provider-filter > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .command-list-summary > .command-list-summary-actions {
   display: flex;
@@ -2903,7 +2908,6 @@ summary {
   justify-content: space-between;
   gap: 12px;
   align-items: center;
-  min-height: 42px;
   color: var(--muted);
   font-size: 12px;
 }

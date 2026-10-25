@@ -49,15 +49,10 @@ export function TouchpadOptions({
   };
   return (
     <>
-      <SettingsSection
-        title={translate('settings.touchpadOptions.behavior')}
-        data-testid="touchpad-options"
-        collapsible
-        {...settingAnchor('touchpad-gestures', 'options')}
-      >
+      <SettingsSection data-testid="touchpad-gesture-enablement">
         <SettingsField
           title={translate('settings.touchpadOptions.enabled')}
-          description={translate('settings.touchpadOptions.enabledHint')}
+          hint={translate('settings.touchpadOptions.enabledHint')}
           {...settingAnchor('touchpad-gestures', 'enabled')}
         >
           <Toggle
@@ -67,6 +62,13 @@ export function TouchpadOptions({
             onChange={(enabled) => change({ enabled })}
           />
         </SettingsField>
+      </SettingsSection>
+      <SettingsSection
+        title={translate('settings.touchpadOptions.behavior')}
+        data-testid="touchpad-options"
+        collapsible
+        {...settingAnchor('touchpad-gestures', 'options')}
+      >
         <CommandExecutionModeField
           pageId="touchpad-gestures"
           value={value.executionMode}

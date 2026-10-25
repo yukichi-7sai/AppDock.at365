@@ -85,17 +85,19 @@ export function SettingsListLayout({
   title,
   toolbar,
   commandListScroll = false,
+  actionsAlign = 'end',
   children,
 }: {
   title: string;
   toolbar: ReactNode;
   commandListScroll?: boolean;
+  actionsAlign?: 'start' | 'end';
   children: ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useCommandListScroll(scrollRef, commandListScroll);
   return (
-    <div className="settings-list">
+    <div className="settings-list" data-actions-align={actionsAlign}>
       {commandListScroll ? <CommandListToolbar>{toolbar}</CommandListToolbar> : toolbar}
       <div className="settings-list-scroll" ref={scrollRef}>
         <table aria-label={title}>{children}</table>

@@ -127,10 +127,7 @@ export function GesturesEditor({
             ? translate('settings.gesturesEditor.touchpadBindings')
             : translate('settings.gesturesEditor.mouseBindings')
         }
-        description={[
-          !gestures.enabled ? translate('settings.gesturesEditor.disabled') : '',
-          bindings.length >= 2000 ? translate('settings.gesturesEditor.limit') : '',
-        ]
+        description={[bindings.length >= 2000 ? translate('settings.gesturesEditor.limit') : '']
           .filter(Boolean)
           .join(' ')}
         className="gestures-editor command-shortcuts"

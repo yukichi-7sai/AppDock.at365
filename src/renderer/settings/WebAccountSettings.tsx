@@ -97,7 +97,7 @@ function AccountRow({
       <td className="settings-list-wrap">
         {users.length ? users.join('、') : translate('settings.webAccountSettings.unused')}
       </td>
-      <td>
+      <td className="settings-list-actions-cell">
         <div className="settings-list-actions">
           <button
             type="button"
@@ -182,6 +182,7 @@ export function WebAccountSettings({
     >
       <SettingsListLayout
         title={translate('settings.webAccountSettings.title')}
+        actionsAlign="start"
         commandListScroll
         toolbar={
           <CommandListSummary className="settings-list-toolbar" actions={null}>

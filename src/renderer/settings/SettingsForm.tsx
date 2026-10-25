@@ -217,7 +217,7 @@ export function SettingsForm({
         )}
         {category === 'appearance' && (
           <>
-            <SettingsSection title={t('common.section')}>
+            <SettingsSection data-testid="appearance-common-settings">
               <SettingRow pageId={category} itemKey="language">
                 <select
                   data-testid="host-language"

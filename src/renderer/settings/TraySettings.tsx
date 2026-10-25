@@ -272,7 +272,7 @@ export function TraySettings({
       className="settings-sections tray-settings"
       aria-label={translate('settings.traySettings.title')}
     >
-      <SettingsSection title={translate('settings.traySettings.behavior')}>
+      <SettingsSection data-testid="tray-behavior-settings">
         {(['trayClickCommand', 'trayDoubleClickCommand'] as const).map((key) => (
           <SettingsField
             key={key}

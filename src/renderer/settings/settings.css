@@ -28,7 +28,9 @@
 }
 .settings-categories .sidebar-extensions button {
   width: 100%;
-  margin-bottom: 4px;
+  min-height: 32px;
+  padding-block: 6px;
+  margin-bottom: 2px;
 }
 .settings-categories .sidebar-extensions button:focus-visible {
   outline-offset: -3px;
