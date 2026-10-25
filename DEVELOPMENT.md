@@ -23,6 +23,7 @@
 | Appletの導入と管理 | [管理一覧・導入・更新・削除](docs/applet-management-settings-design.md) |
 | Webとアカウント | [WebApplet](docs/web-applets.md)、[Webアカウントとグループ](docs/web-accounts.md) |
 | MCP・外部操作 | [共通操作API](docs/appdock-api.md)、[Codex登録・ネットワーク・許可](docs/automation.md)、[MCPクライアント](docs/mcp-client-design.md)、[MCPハブ](docs/mcp-hub-design.md)、[通知イベント](docs/mcp-events-design.md) |
+| MCP設定の拡張（未実装） | [既定公開・一覧編集・設定変更権限の統合設計](docs/mcp-settings-design.md) |
 | カスタムコマンド | [保存・種類・キー送信・プロセス起動・MCP実行](docs/custom-commands-design.md) |
 | AIと音声 | [AI文章生成](docs/ai.md)、[TTS](docs/tts-design.md)、[共通音声再生](docs/audio-playback.md) |
 | 通知とエラー | [通知基盤](docs/notifications.md)、[通知読み上げ](docs/notification-speech-design.md)、[共通エラー](docs/error-reporting.md)、[共通警告](docs/warning-notifications-design.md) |

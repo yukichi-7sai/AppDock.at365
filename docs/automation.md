@@ -1,5 +1,7 @@
 # 共通操作APIとCodex連携
 
+設定の既定公開、一覧操作の固定入口、暗号化情報の取得・変更禁止、設定編集許可の統合は[未実装の設計](mcp-settings-design.md)として分離する。この文書は現行APIの契約を記載する。
+
 MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-design.md)と[保存型コマンド](custom-commands-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 
 接続先管理には`appdock_mcp_get_server_settings`、`appdock_mcp_update_server_settings`、`appdock_mcp_inspect_server_tools`の固定3入口があります。独立した初期OFFの管理許可で、登録・編集・削除と公開前のツール確認を扱います。保存には設定変更・コマンド実行、未公開ツールの確認にはMCP利用・コマンド実行の許可も必要です。[管理APIの契約](mcp-client-design.md#接続先の管理api)を参照してください。

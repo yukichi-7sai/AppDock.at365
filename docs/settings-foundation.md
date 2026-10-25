@@ -2,6 +2,8 @@
 
 本体rendererで全体設定とApplet設定を共用する。画面構成・説明・状態・エラー表示の設計基準は[共通レイアウト指針](settings-ui-guidelines.md)、保存場所とファイル同期は[設定同期](settings-sync.md)、複数項目の一覧編集は[一覧とダイアログ](settings-list-editing.md)を正本とする。
 
+設定のMCP既定公開、暗号化情報の除外、一覧編集と設定変更権限の統合は[未実装の拡張設計](mcp-settings-design.md)を参照する。以下は現行の設定基盤の契約である。
+
 ## 共通レイアウト指針との対応
 
 本体・Applet設定と設定ダイアログは`SettingsSection`/`SettingsField`の`description`と`hint`を共用する。`description`は現在の値・継続的な状態・重要な説明を常時表示し、`hint`は任意の補足だけを表示する。入力欄を個別のラベルとCSSで配置せず、`SettingsField`へタイトル・説明・入力を渡す。共通の選択候補・キー記録・一覧等のウィジェットは、その内部の操作契約を保つ。

@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-25: MCP設定拡張設計のコミット確認
+
+- 専用worktreeの`codex/mcp-settings-design`、開始HEAD `26fdf3e`で設計関連のMarkdown 5ファイルだけを確認。公開既定、設定編集許可の統合、暗号化情報の除外、一覧の行参照、固定MCP入口、既存契約との分離をレビューし、阻害指摘なし。未コミットの設計を保持し、pull・他branchとの統合は行わない。
+- 本文のローカル参照13件、入口3か所、JSON例2件、コードフェンス6個、残す許可8行、会話上の人物名・未置換記号の不在、変更対象5ファイル、`git diff --check`を確認して成功。文書だけのため製品回帰・型検査・GUI試験を対象外とし、製品版0.87.16を維持する。
+- 検査結果、対象ファイルのhash、stage/worktreeの一致、Git tree、commit後のtreeとclean状態は`.artifacts/commit-validation-mcp-settings-design-20261025/`へ記録する。設計は未実装。mainへの統合・push・版更新・publish・Release・deployは行わない。
+
+## 2026-10-25: MCP設定公開・一覧編集・権限統合の設計
+
+- main `26fdf3ebcec05d015743ea5cec4a7bcf7c09e0c0`（0.87.16）のclean状態を確認。制限環境のDNS失敗後、同じ`git pull --ff-only`を通常ユーザー環境で実行し、Already up to dateを確認した。専用worktree `AppDock.at365-mcp-settings-design`、branch `codex/mcp-settings-design`を同じHEADから作成し、既存worktreeを保持した。
+- [設計書](docs/mcp-settings-design.md)を追加し、DEVELOPMENT・設定基盤・外部操作の入口から「未実装」として参照した。通常設定のMCP既定公開、明示非公開・暗号化情報の除外、一覧の行参照と部分編集、固定6入口、既存APIとの互換性、対象別adapter、段階別の実装範囲と検証計画を記載した。
+- 設定編集の許可統合を設計へ反映。16種類から8種類へ整理し、純粋な設定変更はread + write、独立した動作はexecuteと各利用許可で判定する。旧writeの保持、旧個別OFFの廃止、Applet有効/無効と再起動の分類、MCP/Applet列の独立性を明記した。
+- 現コードとの設計レビューで、旧許可キーをUIラベル一覧で検証しているため単純な行削除では旧ファイル読込が失敗する点、秘密付き接続の削除・結び付け変更、IDなし一覧、公開/権限変更後の再送結果を確認し、互換読込・ローカル限定操作・revision付きitemRef・再送前の公開再検査を設計へ反映した。
+- 文書検査は設計書内のローカル参照13件、入口3か所、JSON要求例2件、コードフェンス6個、残す許可8行、会話上の人物名・未置換記号の不在、`git diff --check`が成功。製品コード・依存・設定・版・配布物は変更していない。文書のみのため型検査・製品回帰・GUI/固定EXE/実MCP変更試験は行わず、実装済みとは扱わない。commit・push・publish・Release・deployなし。
+
 ## 2026-10-25: 共通テーブル整備・ヘッダー調整のコミット前検証 0.87.16
 
 - 利用者確認済み0.87.15～0.87.16の13ファイルを対象とし、main b0f5ccc上の差分・未追跡SettingsTable・実効Git名義を確認。GitHubをfetchし、GitHub/AQUAのmainが開始HEADと一致していることを確認した。製品内容・発行物は変更せず0.87.16を維持、再発行なし。
