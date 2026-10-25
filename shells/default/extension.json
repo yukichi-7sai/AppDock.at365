@@ -8,13 +8,12 @@
   "capabilities": ["shell"],
   "shell": {
     "apiVersion": 1,
-    "ribbonSchemaVersion": 2,
+    "ribbonSchemaVersion": 3,
     "ui": "index.html",
     "views": {
       "titlebar": "bars.html",
       "statusbar": "bars.html",
       "overlay.command-palette": "overlay.html",
-      "overlay.ribbon-group": "overlay.html",
       "notification.banner": "notifications.html",
       "notification.desktop": "notifications.html"
     }

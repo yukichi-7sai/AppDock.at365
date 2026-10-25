@@ -10,7 +10,9 @@ export interface ShortcutPageChoice {
 }
 
 export function hostShortcutPage(route: string): string | undefined {
-  return builtinRibbon.some((item) => item.id !== 'theme' && item.id === route)
+  return builtinRibbon.some(
+    (item) => item.id !== 'theme' && item.id !== 'ribbon-display-mode' && item.id === route,
+  )
     ? `host:${route}`
     : undefined;
 }

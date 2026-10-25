@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { RibbonView, ShellApi } from '../../src/shared/shell';
 import './style.css';
+import './ribbon-items.css';
 import './ribbon-badges.css';
 import { RibbonIcon, ribbonLabel } from './RibbonButton';
+import { OverlayApp } from './OverlayApp';
+import './ribbon-group.css';
 declare global {
   interface Window {
     appdockShell: ShellApi;
@@ -121,7 +124,7 @@ function App() {
               }
             }}
           >
-            <RibbonIcon item={item} asset={api.asset} />
+            <RibbonIcon item={item} asset={api.asset} showLabel />
             <span className="ribbon-disclosure" aria-hidden="true">
               {item.expanded ? '−' : '+'}
             </span>
@@ -153,18 +156,22 @@ function App() {
         title={item.disabledReason || (item.badge ? ribbonLabel(item) : item.tooltip)}
         aria-label={ribbonLabel(item)}
         aria-current={item.selected ? 'page' : undefined}
+        aria-expanded={
+          item.id === 'ribbon-display-mode' ? model?.displayMode === 'expanded' : undefined
+        }
         disabled={!item.enabled}
-        className={`${item.selected ? 'active' : ''} ${item.icon.text ? 'avatar' : ''}`}
+        className={`${item.selected ? 'active' : ''}${item.id === 'ribbon-display-mode' ? ' ribbon-mode-toggle' : ''}`}
         onClick={() => invoke(item.actionId!)}
       >
-        <RibbonIcon item={item} asset={api.asset} />
+        <RibbonIcon item={item} asset={api.asset} showLabel />
       </button>
     );
   };
   const renderItem = item;
   return (
     <aside
-      className="activity-rail"
+      className="activity-rail ribbon-surface"
+      data-display-mode={model?.displayMode ?? 'compact'}
       aria-label="リボン"
       data-revision={model?.revision}
       onKeyDown={(e) => {
@@ -182,11 +189,6 @@ function App() {
         if (model && model.contextActionEnabled !== false) invoke(model.contextActionId);
       }}
     >
-      <div className="brand-mark" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
       <div
         className="ribbon-buttons ribbon-top"
         aria-label="上寄せのリボン"
@@ -219,4 +221,6 @@ function App() {
     </aside>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  window.appdockOverlay ? <OverlayApp /> : <App />,
+);

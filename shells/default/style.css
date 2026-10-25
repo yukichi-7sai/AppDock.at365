@@ -1,15 +1,11 @@
 :root {
   color-scheme: dark;
-  --rail: #0c0d11;
   --border: #282b35;
-  --ribbon-text: #b7bfd1;
   font-family: 'Segoe UI', sans-serif;
 }
 :root[data-theme='light'] {
   color-scheme: light;
-  --rail: #edf0f4;
   --border: #e0e4ed;
-  --ribbon-text: #535e73;
 }
 * {
   box-sizing: border-box;
@@ -54,61 +50,6 @@ button:disabled {
   padding: 20px 6px 14px;
   overflow: hidden;
 }
-.brand-mark {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  height: 30px;
-  width: 30px;
-  justify-content: center;
-  transform: rotate(-8deg);
-  flex-shrink: 0;
-  margin-bottom: 18px;
-}
-.brand-mark span {
-  display: block;
-  width: 5px;
-  height: 18px;
-  border-radius: 3px;
-  background: var(--accent);
-}
-.brand-mark span:first-child {
-  height: 12px;
-  transform: translateY(3px);
-  opacity: 0.65;
-}
-.brand-mark span:last-child {
-  height: 23px;
-  transform: translateY(-2px);
-  background: var(--accent);
-  opacity: 0.65;
-}
-.activity-rail button {
-  width: 62px;
-  min-height: 52px;
-  color: var(--ribbon-text);
-  border-radius: 8px;
-  position: relative;
-  flex-direction: column;
-  gap: 5px;
-  flex-shrink: 0;
-}
-.activity-rail button.active {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-.activity-rail button.active:before {
-  content: '';
-  position: absolute;
-  width: 2px;
-  height: 19px;
-  left: -6px;
-  background: var(--accent);
-  border-radius: 2px;
-}
-.rail-label {
-  font-size: 11px;
-}
 .ribbon-buttons {
   display: flex;
   flex-direction: column;
@@ -130,7 +71,6 @@ button:disabled {
   max-width: 100%;
 }
 .ribbon-children {
-  border-left: 2px solid var(--ribbon-group-color, transparent);
   box-sizing: border-box;
   width: 62px;
   padding: 2px 0;
@@ -152,7 +92,7 @@ button:disabled {
 .ribbon-children:before {
   content: '';
   position: absolute;
-  left: -2px;
+  left: 0;
   top: -6px;
   width: 2px;
   height: 6px;
@@ -163,7 +103,7 @@ button:disabled {
 .ribbon-children:after {
   content: '';
   position: absolute;
-  left: -2px;
+  left: 0;
   top: 0;
   bottom: 0;
   width: 2px;
@@ -194,25 +134,6 @@ button:disabled {
   flex: 1;
   min-height: 12px;
 }
-.activity-rail .avatar {
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-img {
-  width: 21px;
-  height: 21px;
-  object-fit: contain;
-}
-.avatar img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-}
 .ribbon-separator {
   height: 1px;
   min-height: 1px;
@@ -225,4 +146,31 @@ img {
   position: absolute !important;
   bottom: 0;
   color: #ff8888 !important;
+}
+
+/* The host owns the matching viewport width for both display modes. */
+.activity-rail {
+  padding: 6px 6px 10px;
+  gap: 6px;
+}
+.ribbon-surface .ribbon-group {
+  width: 100%;
+}
+.ribbon-surface .ribbon-children {
+  width: 100%;
+}
+.ribbon-surface .ribbon-group > button {
+  padding-right: 20px;
+}
+.ribbon-surface .ribbon-group > button .rail-label {
+  max-width: none;
+}
+.ribbon-surface .ribbon-disclosure {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  right: 5px;
+}
+.activity-rail .ribbon-mode-toggle {
+  flex-shrink: 0;
 }

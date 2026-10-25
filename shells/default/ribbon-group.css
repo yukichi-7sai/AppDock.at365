@@ -5,64 +5,39 @@
 }
 .ribbon-flyout {
   position: absolute;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  padding: 6px;
-  width: max-content;
-}
-.ribbon-flyout-controls {
-  display: flex;
-  min-width: 0;
-}
-.ribbon-flyout-controls > button {
-  width: 22px;
-  flex-shrink: 0;
-  font-size: 22px;
-}
-.ribbon-flyout-row {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  min-width: 0;
-  scrollbar-width: thin;
-  gap: 4px;
-  padding: 3px;
-}
-.ribbon-flyout-row button {
-  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  border-right: 1px solid var(--border);
+  padding: 6px 0 6px 6px;
+}
+.ribbon-flyout[data-keyboard-focus='false'] :focus-visible,
+.ribbon-flyout[data-keyboard-focus='false']:focus {
+  outline: none;
+}
+.ribbon-flyout-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
   gap: 6px;
-  width: 76px;
-  min-height: 44px;
-  flex-shrink: 0;
-  border-radius: 8px;
-  padding: 6px;
+  scrollbar-width: auto;
+  scrollbar-gutter: stable;
 }
-.ribbon-flyout-row button.active,
-.ribbon-flyout-row button:hover {
-  background: var(--accent-soft);
-  color: var(--accent);
+.ribbon-flyout-list::-webkit-scrollbar {
+  width: 6px;
 }
-.ribbon-flyout-row img {
-  width: 21px;
-  height: 21px;
-  object-fit: contain;
-}
-.ribbon-flyout-row .rail-label {
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.ribbon-flyout-separator {
-  width: 1px;
+.ribbon-flyout-list::-webkit-scrollbar-thumb {
   background: var(--border);
-  margin: 8px 4px;
-  flex-shrink: 0;
+  border-radius: 3px;
+}
+.ribbon-flyout-list::-webkit-scrollbar-thumb:hover {
+  background: var(--ribbon-text);
+}
+.ribbon-flyout-list::-webkit-scrollbar-button {
+  display: none;
+}
+.ribbon-flyout[data-direction='up'] .ribbon-children::before {
+  top: auto;
+  bottom: -6px;
 }

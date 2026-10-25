@@ -1,5 +1,7 @@
 import { hostText } from './i18n';
 export type RibbonPlacement = 'top' | 'bottom';
+export type RibbonDisplayMode = 'compact' | 'expanded';
+export const ribbonDisplayWidth = (mode?: RibbonDisplayMode) => (mode === 'expanded' ? 200 : 56);
 export interface AppletRibbonItem {
   id: string;
   title: string;

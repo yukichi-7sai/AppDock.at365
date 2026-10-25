@@ -211,7 +211,7 @@ async function colorGeometry() {
       width: rect.width,
       height: rect.height,
       bottom: rect.bottom,
-      line: children && getComputedStyle(children).borderLeftColor,
+      line: children && getComputedStyle(children, ':after').backgroundColor,
       lineLeft: childRect?.left,
       bridge: bridge?.backgroundColor,
       bridgeTop: childRect && childRect.top + parseFloat(bridge.top),
@@ -611,11 +611,10 @@ async function commandChecks() {
     'command provider ready',
   );
   let page = await openRibbonSettings();
-  const cards = page.locator('.ribbon-settings > .settings-section');
-  assert.equal(await cards.count(), 2);
-  assert.equal(await cards.first().evaluate((e) => e.tagName === 'DETAILS' && !e.open), true);
-  assert.equal(await cards.first().locator('h2').textContent(), '動作設定');
-  assert.equal(await cards.nth(1).locator('h2').textContent(), 'リボン編集');
+  const behavior = page.getByTestId('ribbon-behavior-settings'),
+    editor = page.getByTestId('ribbon-editor-settings');
+  assert.equal(await behavior.isVisible(), true);
+  assert.equal(await editor.isVisible(), true);
   const create = async (title, target) => {
     await page
       .getByRole('region', { name: '上寄せのリボン設定', exact: true })
@@ -659,7 +658,7 @@ async function commandChecks() {
     .getByRole('dialog', { name: 'コマンドボタンを編集', exact: true })
     .screenshot({ path: path.join(profile, 'command-button-editor.png') });
   await page.getByLabel('ボタン名', { exact: true }).fill('Renamed action');
-  await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
+  assert.equal(await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(), 0);
   await page.getByRole('button', { name: '適用', exact: true }).click();
   await saved((r) => r.buttons.find((b) => b.id === run)?.title === 'Renamed action');
   await page.getByLabel('Renamed actionの配置', { exact: true }).selectOption('group:colored');
@@ -671,14 +670,11 @@ async function commandChecks() {
   await page.getByRole('button', { name: '適用', exact: true }).click();
   await saved((r) => r.groups[0].expansion === 'temporary');
   await button('group:colored').click();
-  const flyout = await until(
-    () =>
-      app
-        .context()
-        .pages()
-        .find((p) => p.url().endsWith('/overlay.html')),
-    'group popup',
-  );
+  const flyout = await until(async () => {
+    for (const candidate of app.context().pages())
+      if (!candidate.isClosed() && (await candidate.locator('.ribbon-flyout').count()))
+        return candidate;
+  }, 'group popup');
   await flyout.getByRole('button', { name: 'Renamed action', exact: true }).click();
   await until(() => executions() === 3, 'temporary command');
   await until(
@@ -691,12 +687,11 @@ async function commandChecks() {
   checks.push(
     'UI add/edit/icon-only, preserved draft during command picker, builtin/Applet/custom execution and both group modes',
   );
-  await cards.first().locator('summary').click();
-  await page.getByRole('button', { name: '右クリックのコマンドを選択', exact: true }).click();
+  await behavior.getByRole('button', { name: '右クリックのコマンドを選択', exact: true }).click();
   await choose('fixture.ribbon-action.run');
   await saved((r) => r.rightClickCommand === 'fixture.ribbon-action.run');
   await page.screenshot({ path: path.join(profile, 'behavior-settings.png') });
-  await rail.locator('.brand-mark').click({ button: 'right' });
+  await rail.locator('.activity-rail').click({ button: 'right', position: { x: 2, y: 2 } });
   await until(() => executions() === 4, 'background right-click');
   await button('separator:test').click({ button: 'right' });
   await until(() => executions() === 5, 'separator right-click once');
@@ -712,7 +707,7 @@ async function commandChecks() {
     async () => (await rail.evaluate(() => window.appdockShell.get())).contextActionEnabled,
     'restored provider',
   );
-  await rail.locator('.brand-mark').click({ button: 'right' });
+  await rail.locator('.activity-rail').click({ button: 'right', position: { x: 2, y: 2 } });
   await until(() => executions() === 6, 'restored right-click');
   await host.evaluate(async () => {
     const s = await window.dock.snapshot();
@@ -776,7 +771,7 @@ async function commandChecks() {
   );
   await page.getByRole('button', { name: 'フォーム', exact: true }).click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 680));
-  await page.getByRole('heading', { name: '動作設定', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByTestId('ribbon-behavior-settings').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(profile, 'ribbon-settings-narrow.png') });
   checks.push(
     'Right-click assignment survives restart; stopped provider cannot run; page reset restores layout and behavior with empty JSON while preserving command definitions',

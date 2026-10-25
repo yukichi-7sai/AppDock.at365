@@ -1,0 +1,108 @@
+:root {
+  --rail: #0c0d11;
+  --ribbon-text: #b7bfd1;
+}
+:root[data-theme='light'] {
+  --rail: #edf0f4;
+  --ribbon-text: #535e73;
+}
+.ribbon-surface {
+  container: ribbon / inline-size;
+  background: var(--rail);
+  color: var(--ribbon-text);
+}
+.ribbon-surface button {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 40px;
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--ribbon-text);
+}
+.ribbon-surface button.active,
+.ribbon-surface button:hover {
+  background: var(--accent-soft);
+}
+.ribbon-surface button.active {
+  color: var(--accent);
+}
+.ribbon-surface button.active::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  width: 2px;
+  height: 19px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.ribbon-surface .rail-label {
+  font-size: 12px;
+  text-align: left;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* Use the actual ribbon surface width, including when it is an overlay. */
+@container ribbon (max-width: 100px) {
+  .rail-label {
+    display: none;
+  }
+  .ribbon-icon .ribbon-badge:not(.dot) {
+    right: -5px;
+  }
+  .ribbon-icon.avatar .ribbon-badge {
+    right: -1px;
+  }
+}
+.ribbon-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.ribbon-surface .ribbon-icon.avatar {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ribbon-surface img {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+}
+.ribbon-surface .avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.ribbon-icon .ribbon-badge {
+  top: -6px;
+  right: -9px;
+}
+.ribbon-icon .ribbon-badge.dot {
+  top: -2px;
+  right: -3px;
+}
+.ribbon-surface .ribbon-separator {
+  height: 1px;
+  min-height: 1px;
+  width: calc(100% - 12px);
+  margin: 7px auto;
+  background: var(--border);
+  flex-shrink: 0;
+}

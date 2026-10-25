@@ -206,7 +206,7 @@ test('field merge preserves unrelated external updates, detects same-field confl
 test('settings is host owned and retired assignments remain inert compatibility data', () => {
   const { shellRegions, parseShellProviders, isShellRegion } = require('../out/main/shared/shell');
   assert.equal(isShellRegion('page.settings'), false);
-  assert.equal(shellRegions.length, 7);
+  assert.equal(shellRegions.length, 6);
   assert.equal(isShellRegion('page.image-library'), false);
   const { parseDeclaredCommands } = require('../out/main/shared/extension-commands');
   const requirement = { region: 'page.settings', state: 'visible' };

@@ -4,7 +4,7 @@ Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの
 
 ## 担当領域
 
-公開領域は共通カタログの`ribbon`、`overlay.command-palette`、`overlay.ribbon-group`、`notification.banner`・`notification.desktop`です。ページ本文は本体の共通UIで描画します。領域ごとに`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。通常本文はprimaryの本体Window1件、desktopは既存通知専用Windowに限定します。例えばパレットだけを提供するmanifestは以下。
+公開領域は`titlebar`、`ribbon`、`statusbar`、`overlay.command-palette`、`notification.banner`、`notification.desktop`の6領域です。一時グループはリボンの一部として同じ提供元・同じHTMLで描画します。ページ本文は本体の共通UIです。各領域は`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。
 
 ```json
 {
@@ -34,7 +34,9 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 
 ## 本体と描画の分担
 
-`overlay.ribbon-group`は一時グループの横1行パネルを担当する独立領域。`RibbonGroupSession`が内容と寿命を持ち、パレットと同じ1つのモーダル枠を共有する。snapshotの`kind: "ribbon-group"`、`content.groupId/title/anchor/items`を描画し、`ribbonChoose`（id/actionId/requestId）または`dismiss`（id）を送る。`asset(id)`はモデルの画像だけを返す。背景は透明でも全面で入力を受け、外側クリックを消費する。対象設定・route・リボン提供元・Window位置／寸法／フォーカスが変われば閉じる。詳細は[グループ仕様](ribbon-customization-design.md)。
+一時グループの表示は`ribbon`に統合し、独立したShell領域・割り当て・再試行・提供元選択を持ちません。`RibbonGroupSession`は内容と寿命を持ち、OverlayHostの単一モーダル枠を使います。OverlayHostは実際に接続中のリボン提供元と同じ`ribbon` HTMLへ、共通`window.appdockOverlay`を公開します。描画側は`kind: "ribbon-group"`、`content.groupId/title/parent/anchor/viewport/displayMode/items`を使います。親ボタンは`dismiss`、子は`ribbonChoose`で操作します。通常のリボン接続は`window.appdockShell`で、同じHTMLが接続の種類を判別します。描画契約は`shell.ribbonSchemaVersion: 3`、最低ホスト版は0.90.0です。
+
+一時グループの専用設定はありません。保存済みの`overlay.ribbon-group`指定やview宣言は保持しても動作には使わず、単独の実行要件・visible判定・個別切り替えも受け付けません。一時表示が失敗したら要求を閉じ、リボン全体の復旧へ接続します。子の実行要求を再送しません。
 
 | 部分                         | 責務                                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------ |

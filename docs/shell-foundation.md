@@ -1,6 +1,6 @@
 # Shell Hostの構成と拡張方針
 
-画面は原則としてAppDock本体と共通UI部品で実装する。Shellの対象は下記の既存7領域に限定し、新しい領域のShell化は個別に依頼された場合に行う。ポップアップ、ページ内の部品、新しいページという理由だけでShellを追加しない。
+画面は原則としてAppDock本体と共通UI部品で実装する。Shellの対象は下記の既存6領域に限定し、新しい領域のShell化は個別に依頼された場合に行う。ポップアップ、ページ内の部品、新しいページという理由だけでShellを追加しない。
 
 メイン画面の枠組み、画像ライブラリー、通知センター、ログ、設定は本体rendererで描画する。ページ単位のShell描画・差し替え機構は提供しない。本体ページの構成・起動・戻り先は[本体のページ表示](host-pages.md)、通常Appletの独立したページ表示は[Appletページ](applet-pages.md)を参照する。
 
@@ -21,14 +21,13 @@ Default Shellは本体と同時ビルドして単一EXEへ同梱する。追加S
 | 領域ID | 描画内容 | 表示Host・公開契約 |
 | --- | --- | --- |
 | titlebar | タイトルバー | ShellBarHost・[バー](shell-bars.md) |
-| ribbon | リボン、グループ親ボタン、持続的に展開する子ボタン | ShellHost・[Shell API](shell-api.md) |
-| overlay.ribbon-group | 一時展開するリボングループのポップアップ | OverlayHost・[共通オーバーレイ](shell-overlays.md) |
+| ribbon | リボン、グループ親ボタン、持続的・一時的な子表示 | ShellHost/OverlayHost・[Shell API](shell-api.md) |
 | statusbar | ステータスバー | ShellBarHost・[バー](shell-bars.md) |
 | overlay.command-palette | コマンドパレット | OverlayHost・[共通オーバーレイ](shell-overlays.md) |
 | notification.banner | Window内の通知バナー | NotificationSurfaceHost・[通知基盤](notifications.md) |
 | notification.desktop | 独立Window内のデスクトップ通知 | NotificationDesktopHost・[通知基盤](notifications.md) |
 
-型と一覧の正本は[src/shared/shell.ts](../src/shared/shell.ts)。割り当てはhost.shellProvidersの領域IDからApplet IDへのマップで、未指定はDefault Shell。各領域は独立して選択でき、リボングループのポップアップ提供元をリボン提供元から推測しない。
+型と一覧の正本は[src/shared/shell.ts](../src/shared/shell.ts)。割り当てはhost.shellProvidersの領域IDからApplet IDへのマップで、未指定はDefault Shell。一時グループはリボンと同じHTML・提供元で描画し、独立した設定・領域・復旧先を持たない。残る6領域は独立して選択できる。
 
 設定画面と[共通MCP設定API](settings-api.md#shell選択)は同じ領域一覧とshellProviderCandidatesから選択肢を生成する。領域の増減に合わせたMCP専用登録やツールの再定義は不要で、現在のSchemaと候補を取得する。選択はPC専用保存を使い、停止・無効Appletの有効化や再試行を兼ねない。領域や提供元がなくなった場合も保存済みの指定は保持する。
 
@@ -51,9 +50,9 @@ ShellProviderRegistryはmanifest・有効状態・worker世代から領域の提
 - パレットと一時リボングループは開いている要求に提供元を固定する。通常の割り当て変更は次回表示から適用し、故障・停止時は同じ要求をDefault Shellへ引き継ぐ。
 - 通知は同じID・期限・実行状態を保持し、切替のために再発行・期限再開始をしない。デスクトップ通知の可視判定は専用Windowを使う。
 
-Default Shellは復旧依存として無効化・起動遅延を認めず、組み込み出自を検証する。--safe-shellは保存設定を変えず7領域をDefault Shellへ固定する。同じ故障版を無限再生成せず、明示再試行か新版で解除する。リボンの既存shell-failures.jsonと他領域のプロセス内記録を維持し、新しい保存ファイルを増やさない。
+Default Shellは復旧依存として無効化・起動遅延を認めず、組み込み出自を検証する。--safe-shellは保存設定を変えず6領域をDefault Shellへ固定する。同じ故障版を無限再生成せず、明示再試行か新版で解除する。リボンの既存shell-failures.jsonと他領域のプロセス内記録を維持し、新しい保存ファイルを増やさない。
 
-領域別再試行は指定先とDefault Shellだけを対象にし、無効Appletを有効化しない。全体再試行でも現在の7領域の指定先を重複排除し、不活性な旧ページ指定を再起動対象にしない。Default Shell自体の故障は最小ネイティブ通知と更新・復元手段で対処する。
+領域別再試行は指定先とDefault Shellだけを対象にし、無効Appletを有効化しない。全体再試行でも現在の6領域の指定先を重複排除し、不活性な旧ページ指定を再起動対象にしない。Default Shell自体の故障は最小ネイティブ通知と更新・復元手段で対処する。
 
 ## 新しい画面・領域を追加する手順
 

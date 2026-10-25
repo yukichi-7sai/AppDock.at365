@@ -395,14 +395,18 @@ test('temporary group requires local anchor, dismiss executes nothing, selected 
 test('temporary sessions update badges, but invalidate on membership, disabled source and configuration changes', () => {
   const f = presentation('temporary');
   let closed = 0;
+  const viewport = { x: 0, y: 32, width: 200, height: 650 };
   const session = new RibbonGroupSession(
     f.ui,
     'group:one',
     { x: 0, y: 0, width: 20, height: 20 },
     () => {},
+    viewport,
   );
   session.onClosed(() => closed++);
   const first = session.snapshot();
+  assert.deepEqual(first.content.viewport, viewport);
+  assert.deepEqual(first.content.anchor, { x: 0, y: 0, width: 20, height: 20 });
   f.badge({ kind: 'dot' });
   assert(session.snapshot().revision > first.revision);
   assert.equal(closed, 0);

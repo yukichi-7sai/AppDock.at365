@@ -177,7 +177,7 @@ const ribbonManifest = {
   ...manifest,
   id: 'fixture.ribbon',
   name: 'Ribbon only',
-  shell: { apiVersion: 1, ribbonSchemaVersion: 2, views: { ribbon: 'index.html' } },
+  shell: { apiVersion: 1, ribbonSchemaVersion: 3, views: { ribbon: 'index.html' } },
   pages: [],
   commands: [{ id: 'fixture.ribbon.mark', title: 'Mark from Shell' }],
   capabilities: ['shell', 'settings', 'pages'],

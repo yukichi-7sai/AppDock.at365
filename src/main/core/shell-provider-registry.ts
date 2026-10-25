@@ -76,14 +76,17 @@ export class ShellProviderRegistry {
       return hostText('shell.status.missing');
     if (!p.enabled) return hostText('shell.status.disabled');
     if (!shellView(p.shell, region)) return hostText('shell.status.unsupported');
-    if (region === 'ribbon' && p.shell?.ribbonSchemaVersion !== 2)
+    if (region === 'ribbon' && p.shell?.ribbonSchemaVersion !== 3)
       return hostText('shell.status.oldRibbon');
     if (p.state === 'error') return hostText('shell.status.stopped');
     if (p.state !== 'running') return hostText('shell.status.starting');
     if (this.failed(region, p.id, p.version)) return hostText('shell.status.suppressed');
     return null;
   }
-  resolve(region: ShellRegion, fallbackOnly = false) {
+  resolve(
+    region: ShellRegion,
+    fallbackOnly = false,
+  ): { provider: ShellProvider | undefined; reason: string | null } {
     const providers = this.providers();
     const configured = this.configured(region);
     const id = this.options.safeMode || fallbackOnly ? defaultShellId : configured;
@@ -190,6 +193,8 @@ export class ShellProviderRegistry {
   }
   requirement(provider: string, requirement?: ShellRequirement): string | undefined {
     if (!requirement) return;
+    if (requirement.region === 'overlay.ribbon-group')
+      return hostText('shell.status.ribbonGroupIntegrated');
     if (isRetiredShellRegion(requirement.region)) return hostText('shell.status.hostPage');
     const state = this.region(requirement.region);
     if (

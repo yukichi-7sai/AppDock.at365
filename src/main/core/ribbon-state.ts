@@ -2,10 +2,12 @@ import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { atomicWrite } from './settings';
 import { validGroupId } from '../../shared/applet-pages';
+import type { RibbonDisplayMode } from '../../shared/ribbon';
 
 /** PC-local UI state. A failed write never changes the published state. */
 export class RibbonState {
   private expanded: Record<string, boolean> = {};
+  private mode: RibbonDisplayMode = 'compact';
   constructor(
     private file: string,
     private changed: () => void,
@@ -20,18 +22,34 @@ export class RibbonState {
         !value.expanded ||
         Array.isArray(value.expanded) ||
         typeof value.expanded !== 'object' ||
+        (value.displayMode !== undefined &&
+          value.displayMode !== 'compact' &&
+          value.displayMode !== 'expanded') ||
         Object.entries(value.expanded).some(
           ([id, open]) => !validGroupId(id) || typeof open !== 'boolean',
         )
       )
         throw Error(hostText('services.ribbonState.readFailed'));
       this.expanded = value.expanded;
+      this.mode = value.displayMode ?? 'compact';
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') failed(error);
     }
   }
   isExpanded(id: string) {
     return (!this.groupIds || this.groupIds().includes(id)) && this.expanded[id] === true;
+  }
+  get displayMode() {
+    return this.mode;
+  }
+  setDisplayMode(mode: RibbonDisplayMode) {
+    if (mode !== 'compact' && mode !== 'expanded')
+      throw Error(hostText('services.ribbonState.invalidMode'));
+    if (mode === this.mode) return false;
+    this.write(this.expanded, mode);
+    this.mode = mode;
+    this.changed();
+    return true;
   }
   set(id: string, open: boolean) {
     if (!validGroupId(id) || (this.groupIds && !this.groupIds().includes(id)))
@@ -45,14 +63,20 @@ export class RibbonState {
       ),
       [id]: open,
     };
+    this.write(next, this.mode);
+    this.expanded = next;
+    this.changed();
+    return true;
+  }
+  private write(expanded: Record<string, boolean>, displayMode: RibbonDisplayMode) {
     try {
-      atomicWrite(this.file, JSON.stringify({ schemaVersion: 1, expanded: next }, null, 2) + '\n');
+      atomicWrite(
+        this.file,
+        JSON.stringify({ schemaVersion: 1, expanded, displayMode }, null, 2) + '\n',
+      );
     } catch (error) {
       this.failed(error);
       throw Error(hostText('services.ribbonState.saveFailed'));
     }
-    this.expanded = next;
-    this.changed();
-    return true;
   }
 }

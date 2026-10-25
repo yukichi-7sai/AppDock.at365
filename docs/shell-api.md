@@ -19,11 +19,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
   "id": "example.shell",
   "name": "Example Shell",
   "version": "1.0.0",
-  "minimumHostVersion": "0.76.5",
+  "minimumHostVersion": "0.90.0",
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
-  "shell": { "apiVersion": 1, "ribbonSchemaVersion": 2, "views": { "ribbon": "index.html" } }
+  "shell": { "apiVersion": 1, "ribbonSchemaVersion": 3, "views": { "ribbon": "index.html" } }
 }
 ```
 
@@ -51,11 +51,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 0.65.0以降のschema 2のグループは任意の`color: "#RRGGBB" | null`を持ちます。省略／nullは色なしです。Default Shellはこの色をグループボタンの左端の2pxのバーへ使い、持続的に開いた子の縦線・接続部分まで1本の直線につなげます。色なしではバー・縦線・接続部分を表示しません。schema 1へ色は返しません。色を表示する追加Shellはこの任意項目を使い、コマンド実行や選択状態と区別してください。
 
-リボンを提供するShellは`minimumHostVersion: "0.51.0"`と`shell.ribbonSchemaVersion: 2`を宣言する。省略／1の提供元はリボン領域だけDefault Shellへ戻し、他領域の割り当てを維持する。ローカルbridgeは常にschema 2。外部`ui.ribbon.get`は省略時にschema 1へ射影し、グループを通常ボタン、開いた持続型の子を後続の通常項目として返す。
+リボンを提供するShellは`minimumHostVersion: "0.90.0"`と`shell.ribbonSchemaVersion: 3`を宣言する。3は同じ`ribbon` HTMLが通常表示と一時グループの両方を描画する契約で、モデルの`RibbonView.schemaVersion`は2のまま。通常は`window.appdockShell`、一時表示の接続では`window.appdockOverlay`を使い、接続・ready・購読・操作を行う。後者の`kind: "ribbon-group"`の`content.parent/items/anchor/viewport/displayMode`を描画し、親の閉鎖は`dismiss`、子の選択は`ribbonChoose`を送る。省略／1／2の提供元はリボン領域をDefault Shellへ戻し、他領域の指定を維持する。ローカルの通常リボンbridgeはschema 2。外部`ui.ribbon.get`は省略時にschema 1へ射影し、グループを通常ボタン、開いた持続型の子を後続の通常項目として返す。
 
 schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-customization-design.md)。
 
-schema 2の項目は任意の`iconOnly: boolean`を持ち、trueなら表示ラベルを省く。`title`と`tooltip`は本体が解決した表示名で、アイコンのみでもアクセシブル名を保持する。表示名の変更でid/actionIdは変わらない。`iconOnly`を必要とする追加Shellの最低ホスト版は0.53.0とする。schema 1にはこのフィールドを返さない。
+schema 2の項目は任意の`iconOnly: boolean`を持ち、現在のリボン全体の表示モードから導出する。trueなら表示ラベルを省く。`title`と`tooltip`は本体が解決した表示名で、アイコンのみでもアクセシブル名を保持する。表示名の変更でid/actionIdは変わらない。`iconOnly`を必要とする追加Shellの最低ホスト版は0.53.0とする。schema 1にはこのフィールドを返さない。
 
 専用preloadはDefault Shell/Shell Applet共通の`window.appdockShell`を公開する。`window.dock`やNodeの直接アクセスは渡さない。送信元のWebContents・main frame・登録URL・現session・active状態を照合する。Shellのローカル操作権限は従来リボンと同じで、通常Applet/MCPの包括的な操作許可とは分離する。
 
@@ -85,3 +85,7 @@ AppDockを終了してから`--safe-shell`で起動すると、選択とリボ�
 ## 共通ライブラリーの画像
 
 リボンの登録画像も既存assetIdで取得する。プロフィール固有の名前・頭文字・ファイル参照をShellへ投影しない。通常項目、グループ、コマンド、宣言型Appletは同じ画像解決を使い、円形等の加工はホスト側で行う。schema 1/2の描画側に原画像保存や画像ライブラリーの管理APIを追加しない。[共通画像](registered-images.md)を参照。
+
+## リボンの表示モード
+
+schema 2は任意のdisplayMode（compact / expanded）を持つ。0.89.0以降のローカルリボンモデルはdisplayModeToggle（actionId / title / enabled）を追加し、Shellは本体発行のactionIdをinvokeへ渡して切り替える。切替は通常のribbon-display-mode項目として配置し、Default Shellは独立した固定ボタンを重ねない。displayModeToggleは表示中の切替項目に対する互換メタデータとして保持する。通常Applet/MCP向けモデルとschema 1の切替項目は無効でactionIdを渡さず、外部invokeは拒否する。グループpopupでは、実際にそのグループへ配置された切替項目だけを候補検査後に選択できる。モードはPC専用UI状態で、本体の予約幅はcompact 56px / expanded 200px。追加Shellも同じモデルと操作を利用し、Default Shell専用のAPIは設けない。

@@ -21,6 +21,7 @@ export class RibbonGroupSession implements OverlayController {
     private groupId: string,
     private anchor: RibbonAnchor,
     private failed: (error: unknown) => void,
+    private viewport?: RibbonAnchor,
   ) {
     const current = ui.group(groupId);
     if (!current || current.group.expansion !== 'temporary')
@@ -46,7 +47,10 @@ export class RibbonGroupSession implements OverlayController {
       content: {
         groupId: this.groupId,
         title: current.group.title,
+        parent: current.group,
         anchor: this.anchor,
+        ...(this.viewport ? { viewport: this.viewport } : {}),
+        displayMode: current.view.displayMode,
         items: current.items,
       },
     };

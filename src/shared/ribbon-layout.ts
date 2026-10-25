@@ -39,7 +39,9 @@ export const ribbonPlacement = (
     layout.itemOverrides?.[root]?.placement ??
     (layout.bottom.includes(root)
       ? 'bottom'
-      : (items.find((i) => i.id === root)?.contribution?.defaultPlacement ?? 'top'))
+      : (items.find((i) => i.id === root)?.contribution?.defaultPlacement ??
+        items.find((i) => i.id === root)?.defaultPlacement ??
+        'top'))
   );
 };
 export const ribbonVisible = (layout: RibbonLayout, id: string) =>
@@ -136,7 +138,10 @@ export function editRibbon(
     return v as RibbonPlacement;
   };
   const setPlacement = (id: string, p: RibbonPlacement) => {
-    if (items.find((item) => item.id === id)?.contribution) {
+    if (
+      items.find((item) => item.id === id)?.contribution ||
+      items.find((item) => item.id === id)?.defaultPlacement
+    ) {
       next.itemOverrides = {
         ...next.itemOverrides,
         [id]: { ...next.itemOverrides?.[id], placement: p },

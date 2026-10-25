@@ -1474,10 +1474,13 @@ main {
 
 /* One global navigation rail, with a contextual selector only where needed. */
 .shell {
-  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-columns: var(--ribbon-width, 56px) minmax(0, 1fr);
 }
 .shell.with-sidebar {
-  grid-template-columns: 76px min(var(--applet-sidebar-width, 280px), 40vw) minmax(0, 1fr);
+  grid-template-columns: var(--ribbon-width, 56px) min(
+      var(--applet-sidebar-width, 280px),
+      40vw
+    ) minmax(0, 1fr);
 }
 .settings-sidebar-slot {
   grid-column: 2;
@@ -1753,10 +1756,10 @@ summary {
     display: none;
   }
   .shell.with-sidebar {
-    grid-template-columns: 68px minmax(0, 1fr);
+    grid-template-columns: var(--ribbon-width, 56px) minmax(0, 1fr);
   }
   .shell {
-    grid-template-columns: 68px minmax(0, 1fr);
+    grid-template-columns: var(--ribbon-width, 56px) minmax(0, 1fr);
   }
   .shell.with-sidebar .sidebar {
     grid-column: 2;

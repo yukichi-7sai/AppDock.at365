@@ -16,43 +16,60 @@ const settings = require('../out/main/shared/settings-schema').createDefaultSett
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
 settings.globalShortcutCommands = [];
-const fixture = path.join(profile, 'extensions', 'ribbon');
-fs.mkdirSync(fixture, { recursive: true });
-const pages = Array.from({ length: 10 }, (_, i) => ({
+Object.assign(settings.updates, {
+  checkHostOnStartup: false,
+  checkAppletsOnStartup: false,
+  checkHostOnAboutOpen: false,
+});
+const providerId = (index) => 'fixture.ribbon' + (index < 8 ? '' : '-' + Math.floor(index / 8));
+const pages = Array.from({ length: 24 }, (_, i) => ({
   id: i === 0 ? 'main' : 'p' + i,
   title: i === 0 ? 'Badge fixture' : 'Item ' + i,
   source: 'local',
   ui: 'page.html',
-  openCommand: 'fixture.ribbon.open' + i,
+  openCommand: providerId(i) + '.open' + i,
 }));
-fs.writeFileSync(
-  path.join(fixture, 'extension.json'),
-  JSON.stringify({
-    apiVersion: 1,
-    id: 'fixture.ribbon',
-    name: 'Ribbon fixture',
-    version: '1.0.0',
-    runtime: 'node',
-    entry: 'worker.cjs',
-    capabilities: ['pages', 'ribbon-badges'],
-    commands: pages.map((p) => ({ id: p.openCommand, title: p.title, activateOnExecute: true })),
-    pages,
-  }),
-);
-fs.writeFileSync(
-  path.join(fixture, 'page.html'),
-  '<!doctype html><title>Fixture</title><p>Local fixture page</p>',
-);
-fs.writeFileSync(
-  path.join(fixture, 'worker.cjs'),
-  `exports.activate=async c=>{
-  for(let i=0;i<10;i++) c.commands.register('fixture.ribbon.open'+i,'Open '+i,()=>c.pages.open(i===0?'main':'p'+i));
+const pageOwner = (page) => providerId(page.id === 'main' ? 0 : Number(page.id.slice(1)));
+const nodeProviders = [...new Set(pages.map(pageOwner))];
+for (const id of nodeProviders) {
+  const fixture = path.join(profile, 'extensions', id),
+    owned = pages.filter((page) => pageOwner(page) === id);
+  fs.mkdirSync(fixture, { recursive: true });
+  fs.writeFileSync(
+    path.join(fixture, 'extension.json'),
+    JSON.stringify({
+      apiVersion: 1,
+      id,
+      name: 'Ribbon fixture',
+      version: '1.0.0',
+      runtime: 'node',
+      entry: 'worker.cjs',
+      capabilities: ['pages', 'ribbon-badges'],
+      commands: owned.map((p) => ({ id: p.openCommand, title: p.title, activateOnExecute: true })),
+      pages: owned,
+    }),
+  );
+  fs.writeFileSync(
+    path.join(fixture, 'page.html'),
+    '<!doctype html><title>Fixture</title><p>Local fixture page</p>',
+  );
+  fs.writeFileSync(
+    path.join(fixture, 'worker.cjs'),
+    `exports.activate=async c=>{
+  for(const page of ${JSON.stringify(owned)}) c.commands.register(page.openCommand,page.title,()=>c.pages.open(page.id));
+  ${
+    id === 'fixture.ribbon'
+      ? `
   c.commands.register('fixture.ribbon.clear','Clear badge',()=>c.ribbon.setBadge({pageId:'main'},null));
   c.commands.register('fixture.ribbon.dot','Dot badge',()=>c.ribbon.setBadge({pageId:'main'},{kind:'dot'}));
   await c.ribbon.setBadge({pageId:'main'},{kind:'count',count:123,label:'Pending fixture'});
+  `
+      : ''
+  }
 };`,
-);
-settings.extensions['fixture.ribbon'] = { enabled: true, settings: {} };
+  );
+  settings.extensions[id] = { enabled: true, settings: {} };
+}
 const native = path.join(profile, 'extensions', 'native');
 fs.mkdirSync(native, { recursive: true });
 fs.copyFileSync(
@@ -113,7 +130,7 @@ settings.ribbon = {
         'logs',
         'extensions',
         'notifications',
-        ...pages.slice(1).map((p) => 'page:fixture.ribbon:' + p.id),
+        ...pages.slice(1).map((p) => 'page:' + pageOwner(p) + ':' + p.id),
       ],
     },
   ],
@@ -151,13 +168,10 @@ const saved = async (fn, label = 'saved layout') =>
 const button = (id) => rail.locator(`[data-ribbon-id="${id}"]`);
 const overlay = () =>
   until(async () => {
-    const page = app
-      .context()
-      .pages()
-      .find((p) => p.url().endsWith('/overlay.html'));
-    if (!page || !(await page.locator('.ribbon-flyout').count())) return;
-    return page;
-  }, 'group overlay');
+    for (const page of app.context().pages()) {
+      if (!page.isClosed() && (await page.locator('.ribbon-flyout').count())) return page;
+    }
+  }, 'ribbon group');
 async function openTemporary() {
   await button('group:temporary').click();
   return overlay();
@@ -225,12 +239,19 @@ async function launch() {
   host.setDefaultTimeout(15000);
   app.context().on('page', (p) => p.on('pageerror', (e) => errors.push(String(e))));
   rail = await ribbonPage(host);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 820));
-  await until(
-    async () =>
-      (await snapshot()).extensions?.find((e) => e.id === 'fixture.ribbon')?.state === 'running',
-    'Node fixture ready',
-  );
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((candidate) =>
+      candidate.webContents.getURL().startsWith('appdock://host/index.html'),
+    );
+    window.unmaximize();
+    window.setSize(900, 820);
+  });
+  await until(async () => {
+    const state = await snapshot();
+    return nodeProviders.every(
+      (id) => state.extensions?.find((e) => e.id === id)?.state === 'running',
+    );
+  }, 'Node fixture ready');
 }
 (async () => {
   try {
@@ -271,7 +292,7 @@ async function launch() {
       );
     const closedPositions = await positions();
     let flyout = await openTemporary();
-    await flyout.locator('.ribbon-flyout-row button').first().waitFor();
+    await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await until(
       async () => (await button('group:temporary').getAttribute('aria-expanded')) === 'true',
       'temporary expanded accessibility',
@@ -284,37 +305,44 @@ async function launch() {
     assert.equal(await flyout.locator('.ribbon-flyout-heading').count(), 0);
     assert.equal(await flyout.getByRole('button', { name: 'グループを閉じる' }).count(), 0);
     const aligned = async () => {
-      const anchor = (await flyout.evaluate(() => window.appdockOverlay.connect())).snapshot.content
-        .anchor;
-      const child = await flyout
-        .locator('.ribbon-flyout-row [data-ribbon-id]')
-        .first()
-        .boundingBox();
-      return Math.abs(child.y + child.height / 2 - (anchor.y + anchor.height / 2)) < 1;
+      const viewport = (await flyout.evaluate(() => window.appdockOverlay.connect())).snapshot
+        .content.viewport;
+      const panel = await flyout.locator('.ribbon-flyout').boundingBox();
+      return Math.abs(panel.x - viewport.x) < 1 && Math.abs(panel.width - viewport.width) < 1;
     };
-    await until(aligned, 'popup button aligns vertically with source group');
+    await until(aligned, 'popup overlays the source ribbon at the same width');
     const geometry = await flyout
-      .locator('.ribbon-flyout-row button')
+      .locator('.ribbon-flyout-list button')
       .evaluateAll((buttons) => buttons.map((b) => b.getBoundingClientRect().y));
-    assert.equal(new Set(geometry).size, 1);
+    assert(new Set(geometry).size > 1);
     const dimensions = await flyout
-      .locator('.ribbon-flyout-row')
-      .evaluate((el) => ({ width: el.clientWidth, scroll: el.scrollWidth }));
-    assert(dimensions.scroll > dimensions.width);
-    await flyout.getByRole('button', { name: '右へスクロール' }).click();
-    assert(await flyout.locator('.ribbon-flyout-row').evaluate((el) => el.scrollLeft > 0));
-    await flyout.locator('.ribbon-flyout-row button').first().focus();
-    await app.evaluate(({ BrowserWindow, webContents }) => {
-      BrowserWindow.getAllWindows()[0].focus();
-      webContents
-        .getAllWebContents()
-        .find((c) => c.getURL().endsWith('/overlay.html'))
-        .focus();
+      .locator('.ribbon-flyout-list')
+      .evaluate((el) => ({ height: el.clientHeight, scroll: el.scrollHeight }));
+    assert(dimensions.scroll > dimensions.height);
+    await flyout.locator('.ribbon-flyout-list').evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
     });
-    await flyout.locator('.ribbon-flyout-row button').first().press('End');
+    assert(await flyout.locator('.ribbon-flyout-list').evaluate((el) => el.scrollTop > 0));
+    await flyout.locator('.ribbon-flyout-list button').first().focus();
+    await app.evaluate(async ({ BrowserWindow, webContents }) => {
+      BrowserWindow.getAllWindows()
+        .find((candidate) => candidate.webContents.getURL().startsWith('appdock://host/index.html'))
+        .focus();
+      for (const contents of webContents.getAllWebContents()) {
+        if (
+          contents.getURL().endsWith('/shells/default/index.html') &&
+          (await contents.executeJavaScript('Boolean(document.querySelector(".ribbon-flyout"))'))
+        ) {
+          contents.focus();
+          return;
+        }
+      }
+      throw Error('Ribbon group surface missing');
+    });
+    await flyout.locator('.ribbon-flyout-list button').first().press('End');
     assert.equal(
       await flyout.evaluate(() => document.activeElement.dataset.ribbonId),
-      'page:fixture.ribbon:p9',
+      'page:' + pageOwner(pages.at(-1)) + ':' + pages.at(-1).id,
     );
     await flyout.screenshot({ path: path.join(profile, 'temporary.png') });
     await closingAction(flyout.keyboard.press('Escape'));
@@ -355,15 +383,20 @@ async function launch() {
     assert(flyout.isClosed());
     assert.equal(await button('group:persistent').getAttribute('aria-expanded'), 'true');
     checks.push(
-      'Temporary horizontal overflow; keyboard End/Escape and focus return; outside click consumed; selection closes and executes; persistent state retained on navigation',
+      'Temporary vertical overflow; keyboard End/Escape and focus return; outside click consumed; selection closes and executes; persistent state retained on navigation',
     );
 
     flyout = await openTemporary();
-    await app.evaluate(({ BrowserWindow }) => {
-      const window = BrowserWindow.getAllWindows()[0];
+    const resize = await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows().find((candidate) =>
+        candidate.webContents.getURL().startsWith('appdock://host/index.html'),
+      );
       const [w, h] = window.getSize();
-      window.setSize(w + 20, h);
+      window.setSize(w, h - 20);
+      return { before: [w, h], after: window.getSize() };
     });
+    fs.writeFileSync(path.join(profile, 'resize.json'), JSON.stringify(resize, null, 2));
+    assert.notDeepEqual(resize.before, resize.after, 'Resize must change the actual host window');
     await until(() => flyout.isClosed(), 'resize cancels overlay');
     flyout = await openTemporary();
     await rail.evaluate(() => window.appdockShell.invalidateAnchor());
@@ -381,7 +414,7 @@ async function launch() {
       );
     });
     flyout = await openTemporary();
-    await flyout.locator('.ribbon-flyout-row button').first().waitFor();
+    await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await flyout.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
     const box = await flyout.locator('.ribbon-flyout').boundingBox();
     const viewport = await flyout.evaluate(() => ({ width: innerWidth, height: innerHeight }));
@@ -450,27 +483,25 @@ async function launch() {
     );
     await page.getByRole('button', { name: '画像ライブラリーを編集', exact: true }).click();
     await page.getByLabel('ボタン名', { exact: true }).fill('My gallery');
-    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
-    await page.getByRole('button', { name: '適用', exact: true }).click();
-    await saved(
-      (r) =>
-        r.itemOverrides['image-library']?.title === 'My gallery' &&
-        r.itemOverrides['image-library'].iconOnly,
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
     );
+    await page.getByRole('button', { name: '適用', exact: true }).click();
+    await saved((r) => r.itemOverrides['image-library']?.title === 'My gallery');
     await until(
       async () => (await button('image-library').getAttribute('aria-label')) === 'My gallery',
       'custom accessible name',
     );
-    assert.equal(await button('image-library').locator('.rail-label').count(), 0);
+    assert.equal(await button('image-library').locator('.rail-label').isVisible(), false);
     await page.getByRole('button', { name: 'My galleryを編集', exact: true }).click();
     await page.getByLabel('ボタン名', { exact: true }).fill('');
-    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).uncheck();
-    await page.getByRole('button', { name: '適用', exact: true }).click();
-    await saved(
-      (r) =>
-        !r.itemOverrides['image-library']?.title &&
-        r.itemOverrides['image-library']?.iconOnly === false,
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
     );
+    await page.getByRole('button', { name: '適用', exact: true }).click();
+    await saved((r) => !r.itemOverrides['image-library']?.title);
     for (const [id, title] of [
       ['page:missing:root', 'Missing root'],
       ['page:missing:child', 'Missing child'],
@@ -497,16 +528,9 @@ async function launch() {
     );
     assert(fieldLayout.length >= 3, 'group editor uses shared fields');
     assert(fieldLayout.every(({ padding, gap }) => padding >= 14 && gap >= 14));
-    const checkboxGeometry = await page
-      .getByRole('group', { name: 'リボンにアイコンのみを表示する', exact: true })
-      .evaluate((field) => {
-        const checkbox = field.querySelector('input').getBoundingClientRect();
-        const control = field.querySelector('.settings-field-control').getBoundingClientRect();
-        return { width: checkbox.width, left: checkbox.left - control.left };
-      });
-    assert(
-      checkboxGeometry.width < 24 && checkboxGeometry.left < 2,
-      `compact checkbox at start of shared field control: ${JSON.stringify(checkboxGeometry)}`,
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
     );
     await page.screenshot({ path: path.join(profile, 'group-dialog.png') });
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -524,16 +548,19 @@ async function launch() {
       async () => (await button(createdId).getAttribute('aria-label')) === 'グループ',
       'empty group retains accessible fallback',
     );
-    assert.equal(await button(createdId).locator('.rail-label').count(), 0);
+    assert.equal(await button(createdId).locator('.rail-label').isVisible(), false);
     await settingRow(createdId)
       .getByRole('button', { name: 'グループを編集', exact: true })
       .click();
     await page.getByLabel('グループ名', { exact: true }).fill('Renamed group');
-    await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).check();
+    assert.equal(
+      await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
+      0,
+    );
     await page.getByLabel('展開方法', { exact: true }).selectOption('persistent');
     await page.getByRole('button', { name: '適用', exact: true }).click();
     await saved((r) => r.groups.find((g) => g.id === createdId)?.title === 'Renamed group');
-    assert.equal(await button(createdId).locator('.rail-label').count(), 0);
+    assert.equal(await button(createdId).locator('.rail-label').isVisible(), false);
     await page.getByLabel('Renamed groupの配置', { exact: true }).selectOption('bottom');
     await saved((r) => r.bottom.includes(createdId));
     await page.getByRole('button', { name: 'Renamed groupのグループを解除', exact: true }).click();
@@ -550,7 +577,7 @@ async function launch() {
       'Settings dialog add/edit; immediate persisted membership and placement; ungroup returns child with inherited bottom placement',
     );
     checks.push(
-      'Popup alignment and stable rail positions; overflow-only controls; aligned shared action icons; aliases, icon-only, blank group names, missing root/child removal and spacious dialog',
+      'Popup alignment and stable rail positions; vertical keyboard/scroll access; aligned shared action icons; aliases, global label mode, blank group names, missing root/child removal and spacious dialog',
     );
     await app.close();
     app = undefined;

@@ -392,6 +392,13 @@ const presentation = new UiPresentation({
     if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
     ribbonState.set(id, !ribbonState.isExpanded(id));
   },
+  displayMode: () => (safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact')),
+  toggleDisplayMode: safeShell
+    ? undefined
+    : () => {
+        if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
+        ribbonState.setDisplayMode(ribbonState.displayMode === 'compact' ? 'expanded' : 'compact');
+      },
   badge: (id) => ribbonBadges.get(id),
 });
 async function toggleTheme() {
@@ -1592,6 +1599,7 @@ function runTrayCommand(id: string) {
 }
 function snapshot(): HostSnapshot {
   return {
+    ribbonDisplayMode: safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact'),
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
     navigation: navigation.state,
     shellRegions: shellRegistry?.snapshot(),
@@ -2717,7 +2725,7 @@ async function retryShell(region?: ShellRegion) {
   }
   if (!region || region === 'ribbon') shellHost?.retry();
   if (!region || region === 'titlebar' || region === 'statusbar') shellBarHost?.retry(region);
-  if (!region || region === 'overlay.command-palette' || region === 'overlay.ribbon-group')
+  if (!region || region === 'overlay.command-palette' || region === 'ribbon')
     overlayHost?.retry(region);
   if (!region || region === 'notification.banner') notificationBanner?.retry();
   if (!region || region === 'notification.desktop') notificationDesktop?.retry();
@@ -3127,8 +3135,8 @@ async function initialize() {
     changed,
     blocked: (region) =>
       region !== 'overlay.command-palette' &&
-      region !== 'overlay.ribbon-group' &&
       region !== 'notification.desktop' &&
+      !(region === 'ribbon' && overlayHost?.kind === 'ribbon-group') &&
       !!overlayHost?.active,
   });
   manager.shellRequirement = (id, requirement) => shellRegistry!.requirement(id, requirement);
@@ -3772,17 +3780,23 @@ async function initialize() {
     modalLayer: hostModalLayer,
     preload: path.join(__dirname, 'shell-preload.js'),
     ui: presentation,
-    openGroup: (id, anchor) =>
+    openGroup: (id, anchor, viewport) =>
       overlayHost?.open(
-        new RibbonGroupSession(presentation, id, anchor, () => {
-          errors.report({
-            eventId: randomUUID(),
-            source: 'ribbon',
-            title: hostText('services.index.ribbonOperationTitle'),
-            code: 'RIBBON_ACTION_FAILED',
-            message: hostText('services.index.ribbonOperationBody'),
-          });
-        }),
+        new RibbonGroupSession(
+          presentation,
+          id,
+          anchor,
+          () => {
+            errors.report({
+              eventId: randomUUID(),
+              source: 'ribbon',
+              title: hostText('services.index.ribbonOperationTitle'),
+              code: 'RIBBON_ACTION_FAILED',
+              message: hostText('services.index.ribbonOperationBody'),
+            });
+          },
+          viewport,
+        ),
       ),
     invalidateAnchor: () => overlayHost?.cancelRibbon(),
     execute: executeShellCommand,

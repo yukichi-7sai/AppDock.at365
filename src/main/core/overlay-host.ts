@@ -48,7 +48,7 @@ export class OverlayHost {
       asset?(id: unknown): { dataUrl: string };
     },
   ) {
-    for (const region of ['overlay.command-palette', 'overlay.ribbon-group'] as const)
+    for (const region of ['overlay.command-palette'] as const)
       options.registry.observe(region, () => ({
         provider: this.surface?.region === region ? this.surface.provider : null,
         version: this.surface?.version,
@@ -170,14 +170,20 @@ export class OverlayHost {
     if (region) this.options.registry.retry(region);
     else {
       this.options.registry.retry('overlay.command-palette');
-      this.options.registry.retry('overlay.ribbon-group');
+      this.options.registry.retry('ribbon');
     }
   }
   private present() {
     const controller = this.current;
     if (!controller) return;
-    const region = `overlay.${controller.kind}` as ShellRegion;
-    const provider = this.options.registry.resolve(region, this.fallbackOnly).provider;
+    const region: ShellRegion =
+      controller.kind === 'ribbon-group' ? 'ribbon' : 'overlay.command-palette';
+    const provider =
+      controller.kind === 'ribbon-group'
+        ? this.options
+            .providers()
+            .find((p) => p.id === this.options.registry.region('ribbon').boundProvider)
+        : this.options.registry.resolve(region, this.fallbackOnly).provider;
     if (!provider) {
       this.cancel('unavailable');
       this.options.failed(hostText('services.overlayHost.startFailed'));
@@ -186,7 +192,7 @@ export class OverlayHost {
     try {
       const { view, url } = createShellView(
         provider.folder,
-        shellView(provider.shell, `overlay.${controller.kind}`)!,
+        shellView(provider.shell, region)!,
         this.options.preload,
       );
       view.setBackgroundColor('#00000000');
@@ -209,6 +215,13 @@ export class OverlayHost {
       void view.webContents.loadURL(url).catch(() => this.fail(s, 'load failed'));
     } catch {
       this.options.registry.fail(region, provider.id, provider.version);
+      if (controller.kind === 'ribbon-group') {
+        this.cancel('ribbon-unavailable');
+        this.options.failed(
+          hostText('services.overlayHost.loadFailed', { provider: String(provider.id) }),
+        );
+        return;
+      }
       this.fallbackOnly = true;
       this.options.failed(
         hostText('services.overlayHost.loadFailed', { provider: String(provider.id) }),
@@ -219,6 +232,11 @@ export class OverlayHost {
   private fail(s: Surface, reason: string) {
     if (s !== this.surface || !this.current) return;
     this.options.registry.fail(s.region, s.provider, s.version);
+    if (this.current.kind === 'ribbon-group') {
+      this.cancel('ribbon-unavailable');
+      this.options.failed(`${s.provider}: ${reason}`);
+      return;
+    }
     this.fallbackOnly = true;
     this.closeSurface();
     this.options.failed(`${s.provider}: ${reason}`);
@@ -251,6 +269,10 @@ export class OverlayHost {
       return;
     }
     if (!this.options.registry.usable(s.region, s)) {
+      if (this.current.kind === 'ribbon-group') {
+        this.cancel('ribbon-unavailable');
+        return;
+      }
       this.fallbackOnly = true;
       // Intentional disable/restart must not blacklist a healthy provider.
       this.closeSurface();

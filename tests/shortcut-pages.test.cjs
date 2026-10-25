@@ -78,6 +78,7 @@ test('targets preserve legacy assignments and reject unknown host pages and malf
   }
   for (const id of [
     'host:theme',
+    'host:ribbon-display-mode',
     'host:missing',
     'page:test:__proto__',
     'page:test:main:extra',

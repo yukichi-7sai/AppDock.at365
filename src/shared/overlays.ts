@@ -40,6 +40,10 @@ export interface RibbonGroupModel {
     groupId: string;
     title: string;
     anchor: import('./ribbon').RibbonAnchor;
+    parent: import('./shell').RibbonView['items'][number];
+    /** Source ribbon rectangle in the same host CSS coordinates as anchor. */
+    viewport?: import('./ribbon').RibbonAnchor;
+    displayMode?: import('./ribbon').RibbonDisplayMode;
     items: import('./shell').RibbonView['items'];
   };
 }

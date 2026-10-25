@@ -132,7 +132,7 @@ function readManifest(
       !isObject(m.shell) ||
       m.shell.apiVersion !== 1 ||
       (m.shell.ribbonSchemaVersion !== undefined &&
-        ![1, 2].includes(m.shell.ribbonSchemaVersion)) ||
+        ![1, 2, 3].includes(m.shell.ribbonSchemaVersion)) ||
       (m.shell.ui === undefined &&
         (!isObject(m.shell.views) || Object.keys(m.shell.views).length === 0)) ||
       !m.capabilities?.includes('shell')

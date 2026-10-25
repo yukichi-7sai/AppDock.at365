@@ -310,7 +310,7 @@ async function geometry() {
         await geometry();
         await host.screenshot({ path: path.join(profile, `${kind}-${theme}.png`) });
         const state = await host.evaluate(() => window.dock.snapshot());
-        assert.equal(state.shellRegions.regions.length, 7);
+        assert.equal(state.shellRegions.regions.length, 6);
         assert(!state.shellRegions.regions.some((r) => r.region.startsWith('page.')));
         assert(
           !app

@@ -1188,13 +1188,52 @@ const shellApplet = (id, regions = shellRegions.map((r) => r.id), extra = {}) =>
   updateApplet(id, {
     shell: {
       apiVersion: 1,
-      ribbonSchemaVersion: 2,
+      ribbonSchemaVersion: require('../shells/default/extension.json').shell.ribbonSchemaVersion,
       views: Object.fromEntries(regions.map((region) => [region, 'view.html'])),
     },
     ...extra,
   });
 const selectShell = (f, changes, dryRun = false) =>
   f.call('apply', f.request(shellId, [{ kind: 'set', changes }], dryRun));
+
+test('integrated ribbon groups are not separate Shell settings and dormant assignments survive current-region edits', (t) => {
+  const retired = 'overlay.ribbon-group',
+    provider = shellApplet('shell.legacy', [retired]),
+    f = fixture(t, { device: true, updateApplets: [provider] });
+  f.store.save(
+    {
+      ...f.store.value,
+      host: { ...f.store.value.host, shellProviders: { [retired]: provider.id } },
+    },
+    f.store.revision,
+  );
+  const before = fs.readFileSync(f.store.shared.file),
+    schema = f.call('schema.get', { targetId: shellId });
+  assert(!schema.items.some((field) => field.key === retired));
+  assert.throws(() => f.read(shellId, [retired]), { code: 'NOT_FOUND' });
+  assert.throws(() => selectShell(f, { [retired]: provider.id }), { code: 'NOT_FOUND' });
+  for (const { id } of shellRegions)
+    assert.deepEqual(
+      f.call('options.list', { targetId: shellId, key: id }).items.map((option) => option.value),
+      [defaultShellId],
+    );
+  f.store.save(
+    {
+      ...f.store.value,
+      host: {
+        ...f.store.value.host,
+        shellProviders: { ...f.store.value.host.shellProviders, titlebar: defaultShellId },
+      },
+    },
+    f.store.revision,
+  );
+  f.call('apply', f.request(shellId, [{ kind: 'reset', keys: ['titlebar'] }]));
+  assert.deepEqual(f.store.value.host.shellProviders, { [retired]: provider.id });
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)).host.shellProviders, {
+    [retired]: provider.id,
+  });
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+});
 
 test('Shell selection discovers declared regions and per-region providers without starting disabled or stopped Applets', (t) => {
   const a = shellApplet('shell.a'),

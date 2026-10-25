@@ -71,7 +71,6 @@ export function RibbonSettings({
     title: string;
     originalTitle: string;
     image?: RegisteredImageRef | null;
-    iconOnly: boolean;
     before: string;
   }>();
   const [confirmation, setConfirmation] = useState<
@@ -297,7 +296,6 @@ export function RibbonSettings({
                             title: layout.itemOverrides?.[item.id]?.title ?? '',
                             originalTitle: entry.title,
                             image: layout.itemOverrides?.[item.id]?.image,
-                            iconOnly: item.iconOnly,
                             before: JSON.stringify(layout),
                           })
                 }
@@ -554,15 +552,7 @@ export function RibbonSettings({
           onApply={async () => {
             if (dialog.before !== JSON.stringify(layout))
               throw Error(translate('settings.ribbonSettings.editConflict'));
-            const {
-              id,
-              title,
-              icon,
-              expansion,
-              iconOnly = false,
-              color = null,
-              image,
-            } = dialog.group;
+            const { id, title, icon, expansion, color = null, image } = dialog.group;
             await apply(
               dialog.adding
                 ? {
@@ -571,7 +561,6 @@ export function RibbonSettings({
                     title,
                     icon,
                     expansion,
-                    iconOnly,
                     color,
                     ...(image !== undefined ? { image } : {}),
                     placement: dialog.placement,
@@ -583,7 +572,6 @@ export function RibbonSettings({
                       title,
                       icon,
                       expansion,
-                      iconOnly,
                       color,
                       ...(image !== undefined ? { image } : {}),
                     },
@@ -613,16 +601,6 @@ export function RibbonSettings({
               onImage={(image) => setDialog({ ...dialog, group: { ...dialog.group, image } })}
               onChange={(icon) => setDialog({ ...dialog, group: { ...dialog.group, icon } })}
             />
-            <SettingsField title={translate('settings.ribbonSettings.iconOnly')}>
-              <input
-                aria-label={translate('settings.ribbonSettings.iconOnly')}
-                type="checkbox"
-                checked={!!dialog.group.iconOnly}
-                onChange={(e) =>
-                  setDialog({ ...dialog, group: { ...dialog.group, iconOnly: e.target.checked } })
-                }
-              />
-            </SettingsField>
             <SettingsField title={translate('settings.ribbonSettings.expansion')}>
               <select
                 aria-label={translate('settings.ribbonSettings.expansion')}
@@ -672,7 +650,6 @@ export function RibbonSettings({
               id: itemDialog.id,
               changes: {
                 title: itemDialog.title,
-                iconOnly: itemDialog.iconOnly,
                 ...(itemDialog.image !== undefined ? { image: itemDialog.image } : {}),
               },
             });
@@ -697,14 +674,6 @@ export function RibbonSettings({
                 label={translate('settings.ribbonSettings.image')}
                 value={itemDialog.image}
                 onChange={(image) => setItemDialog({ ...itemDialog, image })}
-              />
-            </SettingsField>
-            <SettingsField title={translate('settings.ribbonSettings.iconOnly')}>
-              <input
-                aria-label={translate('settings.ribbonSettings.iconOnly')}
-                type="checkbox"
-                checked={itemDialog.iconOnly}
-                onChange={(e) => setItemDialog({ ...itemDialog, iconOnly: e.target.checked })}
               />
             </SettingsField>
           </div>
@@ -816,19 +785,6 @@ export function RibbonSettings({
                 setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, icon } })
               }
             />
-            <SettingsField title={translate('settings.ribbonSettings.iconOnly')}>
-              <input
-                aria-label={translate('settings.ribbonSettings.iconOnly')}
-                type="checkbox"
-                checked={!!buttonDialog.button.iconOnly}
-                onChange={(e) =>
-                  setButtonDialog({
-                    ...buttonDialog,
-                    button: { ...buttonDialog.button, iconOnly: e.target.checked },
-                  })
-                }
-              />
-            </SettingsField>
           </div>
         </SettingsDialog>
       )}
