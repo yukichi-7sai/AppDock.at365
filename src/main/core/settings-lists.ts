@@ -120,7 +120,8 @@ export function planSettingsList(
       const field = fields.find((field) => field.key === key) ?? fail('NOT_FOUND');
       if (key === target.definition.list?.idKey) fail();
       try {
-        validateMcpSetting(field, value, target.options?.(field) ?? field.options);
+        if (target.validateField) target.validateField(field, value);
+        else validateMcpSetting(field, value, target.options?.(field) ?? field.options);
       } catch {
         fail();
       }

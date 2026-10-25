@@ -45,6 +45,8 @@ import {
 } from './settings-target-types';
 import type { AiSettingsController } from './ai-settings';
 import type { TtsSecrets } from './tts-secrets';
+import type { McpClientSettings } from './mcp-client-settings';
+import { mcpClientSettingsTarget } from './settings-mcp-client-target';
 
 type RecordValue = Record<string, unknown>;
 interface Field extends SettingDefinition {
@@ -123,6 +125,7 @@ export class SettingsServiceTargets {
       notifications(): NotificationTypeEntry[];
       applets?(): ExtensionSnapshot[];
       appletManagement?: AppletManagement;
+      mcpSettings?(): McpClientSettings;
     },
   ) {}
   targets(): SettingsTarget[] {
@@ -148,6 +151,9 @@ export class SettingsServiceTargets {
       this.aiConnections(),
       this.ttsVoices(),
       this.appletOrder(),
+      ...(this.options.mcpSettings
+        ? [mcpClientSettingsTarget(this.options.mcpSettings(), this.options.checkRevision)]
+        : []),
     ];
   }
   private shell(): Target {

@@ -36,6 +36,7 @@ export interface SettingsListTarget extends SettingsTargetBase {
   maxItems?: number;
   createRow?(values: Record<string, unknown>): Record<string, unknown>;
   prepareRow?(row: Record<string, unknown>, keys: string[]): void;
+  validateField?(field: SettingDefinition, value: unknown): void;
   removable?(row: Record<string, unknown>): boolean;
   itemWritable?(row: Record<string, unknown>, field: SettingDefinition): boolean;
   rows(): Record<string, unknown>[];

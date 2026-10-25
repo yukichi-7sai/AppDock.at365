@@ -6,7 +6,7 @@
 
 本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/selectは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listも列の値として編集できる。自由JSON・shortcut-list・画像参照の編集と未対応の専用サービスは、adapterを実装する後続範囲。
 
-通知・AI/TTS・更新の通常設定とShell選択も所有サービスのadapterから公開する。通常値はfields、AI接続とTTS手動ボイスの一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
+通知・AI/TTS・MCP接続・更新の通常設定とShell選択も所有サービスのadapterから公開する。通常値はfields、AI接続・TTS手動ボイス・MCP接続の一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
 
 | 対象 | 公開する設定 |
 | --- | --- |
@@ -15,6 +15,7 @@
 | AI接続一覧 | 登録済み接続の公開列とID、追加・部分編集・削除・並べ替え。暗号化情報を保持する行は削除しない |
 | TTS | URL、モデル、既定ボイス/速度、速度適用先、ボイス候補取得方式/相対パス |
 | TTS手動ボイス一覧 | id/nameの取得・追加・部分編集・削除・並べ替え。既存の上限1,000件と解析規則を使用 |
+| MCP接続一覧 | 共有のID/名前/説明とPC専用の非秘密接続設定。追加・部分編集・削除・並べ替え |
 | 通知の共通音声 | voice/speedの上書きと解除。解除するとTTSの既定値を継承 |
 | 通知種類ごと | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない |
 | 本体の更新設定 | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可 |
@@ -147,6 +148,16 @@ kind=list、category=applet-managementで、現在の管理対象パッケージ
 既存UIと同じmanagedApplets/reorderManagedAppletsを使い、共有appletOrderの管理対象が占める位置だけを入れ替える。未導入ID、子ページIDと組込みの保存位置・相互順序を保ち、未記録の検出済みIDは通常の順で補う。PC専用の有効状態・設定、起動順、入力割当の実行順、リボン配置を変更しない。提供元の増減はschemaRevisionへ反映し、順序・行・保存状態が変われば古いitemRefとrevisionを拒否する。
 
 read + writeで保存でき、appliesはappletDisplayOrderChanged。dryRunは検証だけを行い、保存後は通常の設定通知で管理画面・設定インデックス等へ反映する。無変更・同じ要求の再送では保存やworker再起動を繰り返さない。MCPツール定義は増やさない。
+
+## MCP接続一覧
+
+`category: mcp-client`のlist対象は、既存の共有名簿とPC専用接続を同じ所有サービスから読み書きする。行のidは読取り専用で、追加時にUUIDを生成する。name/descriptionは共有名簿へ、`connection.enabled/transport/command/args/cwd/url/authentication/published/publishedTools`はPC専用のmcp-client.jsonへ保存する。取得したitemRefを使い、部分編集・全行の並べ替え・秘密のない行の削除を行う。最大32行、引数は64件、公開ツール名は重複なしの512件まで。空の引数も既存の接続検証に従って保持する。
+
+新規行の接続は既定で無効・非公開とし、HTTPは有効なURL、stdioは絶対EXEパス等の既存条件を満たす必要がある。token/environment・暗号文・環境変数名はSchema/値/プレビューに公開せず、MCPから指定できない。秘密のない行をBearer認証へ切り替える操作はローカル設定を必要とする。秘密付きの行は接続先・EXE・引数・作業フォルダー・認証方法の変更と削除を拒否し、名前・説明・有効状態・公開設定の編集や順序変更では暗号文をそのまま保持する。現在の制限はitems.listのwritableKeys/removableで確認する。
+
+取得・計画・保存の保護判定は秘密を復号しない。形式不備のある個別行のPCデータは、名前/説明だけの編集や他の行の編集で保持する。PC上で未設定の行は名簿だけを編集でき、必要な非秘密接続情報を指定して設定できる。秘密付きの壊れた接続の修復・削除はローカル操作とする。ファイル全体の不正JSON・未対応版・容量/件数超過ではavailable=falseとなり、原本を保持して保存を拒否する。
+
+read + writeで変更でき、execute/useMcpは保存の追加条件にしない。複数行の編集は既存の共有/PC専用トランザクションで一括保存し、後半の検証やファイル保存が失敗した場合も部分保存しない。無変更・dryRun・同じ要求の再送で保存を繰り返さず、共有名簿だけの変更ではPC接続ファイルを再書込みしない。applies=mcpSettingsChanged、completion=settingsSaved/effectVerified=falseであり、接続・ツール探索・stdio起動は始めない。従来の管理APIも同じ非秘密保存計画を使い、公開する状態は接続設定の状態であり、認証の成否を保証しない。接続試験と実行は[共通MCPクライアント](mcp-client-design.md)の独立した操作を使う。
 
 ## Shell選択
 

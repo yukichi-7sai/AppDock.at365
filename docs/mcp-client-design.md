@@ -38,6 +38,8 @@
 
 管理用の取得・保存は接続・プロセス起動を行わない。inspectToolsは有効な接続先へ接続し、stdioなら指定EXEを起動する。呼出し元・元callerの管理/利用/実行許可を通信後にも再確認する。管理用の閲覧範囲をツール実行へ流用しない。通常のMCP実行には接続先のpublishedとpublishedToolsが必要。
 
+固定6入口の[共通設定API](settings-api.md#mcp接続一覧)にも同じ所有サービスのlist対象を提供する。通常の列を行単位で部分更新し、複数行を原子的に保存できる。ID・保存場所・上限・秘密保護は既存の管理APIと共用する。両入口の公開設定の取得・保存は秘密を復号せず、名前/説明と並べ替えだけの変更ではPC接続ファイルのbytesを保つ。公開状態は接続設定から導くもので、保存済み認証の検証結果ではない。
+
 更新の共通項目は`{op, expectedRevision, dryRun?}`。op別に次を指定する。無関係な項目は拒否する。
 
 - `save`: `item:{id,name,description}`とconnection全項目。新規idは小文字UUID。新規接続先は`enabled:false,published:false,publishedTools:[]`から登録し、利用・公開は明示的に選ぶ。

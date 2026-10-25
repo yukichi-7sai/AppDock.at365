@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-26: MCP接続設定の共通一覧API 0.91.5
+
+- cleanな`codex/mcp-settings-design` / `022b1f1`から同じ専用worktreeで継続した。追跡先なしのためpullや追跡先の新設は行わず、primary mainと他のworktreeは変更しない。既存の名簿・接続項目・保存ファイル・固定MCPツール契約を維持する変更のため、発行済み0.91.4から**0.91.5**へパッチ更新した。push/Release/deployは行わない。
+- McpClientSettingsへ非秘密スナップショットと保存計画を集約し、従来の管理APIと共通設定APIで同じ検証・原子的保存を使う。外部取得・保存の保護判定で暗号化/復号を呼ばず、認証情報を読めない接続でも公開メタデータを編集できる。秘密付きの削除・結び付け先変更・新たなBearer設定を拒否し、従来の秘密保護チェックも保持した。ローカルUIの秘密編集・接続確認は既存経路のまま。
+- `category=mcp-client`のlist対象を固定6入口へ接続。IDは読取り専用で追加時に生成し、名前/説明は共有、非秘密connection列はPC専用へ保存する。追加・部分更新・削除・全行並べ替え、最大32件、空の引数を含む64引数、重複しない公開ツール名512件を既存検証へ渡す。一覧用の任意validator追加はこの所有対象だけに使い、他の一覧は既存の共通検証を維持する。
+- 個別に壊れた行と暗号文・未設定名簿・他の行を保持し、PCファイル全体が不正なら対象をunavailableとして保存しない。名前/説明/順序だけの変更ではPC接続ファイルのbytesを維持する。read + writeで保存し、execute/useMcpを要求しない。applies=mcpSettingsChanged、settingsSaved/effectVerified=falseで、取得/dryRun/保存は接続・stdio起動・ツール探索を始めない。従来入口の公開状態は接続設定の状態を示し、認証の成否を保証しない。
+- 発行前レビューで、未編集の有効URL表記を正規化して秘密の結び付け先へ影響する可能性と、メタデータ専用保存時のPCファイル競合検査を補強した。未編集URLを保持し、PCファイルを再書込みしない検査専用assetも保存直前にrevisionを確認する。回帰を追加し、型検査/build・影響する標準回帰・GUIを再実行。最終の阻害指摘なし。
+- 固定依存install・変更範囲の整形検査・型検査・本体/Default Shell build・publish.batが成功。関連標準**32ファイル354/354件、fail/cancel/skip 0**、うち新規11件（所有adapter10件・従来入口の非復号回帰1件）が成功した。秘密/未設定/壊れた行、複数行の原子的拒否、保存失敗時の共有/PC巻戻し、外部更新、保存直前の再検査、再送、無変更、許可取消、既存上限とID/再読込みを検証した。標準全体は未実行。
+- 隔離source/最終固定EXEで実MCP・設定連動**各40群**と従来MCP設定画面**各10群**、固定EXE smokeが成功した。MCPの追加/dryRun/再送/部分更新/並べ替え/削除、ネイティブ編集からMCPへの即時反映、古い要求と秘密変更の拒否、暗号文保持、execute/useMcp OFFとtools/list不変を確認。ループバックHTTPの要求数は保存後も0。従来ローカルUIの実ハンドシェイク・失敗時OFF復帰・警告・入力保持・再起動も維持した。
+- 最終**760入力**と参照Applet manifestのSHAは、レビュー後回帰前後・発行前後・固定試験後で一致。Node 24.22.1、pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.402、Windows x64、独立node_modulesで実行した。発行後の追記は文書と証跡のみ。
+- EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170693659 bytes / SHA256 `26fb9cb263e373ed366bd5de30edd87e671d5e416561a04749403dbef91f95ac`**。File/ProductVersion、feedの版/size/hash、ASAR内package/同梱Default Shellと全固定試験コピーを照合した。
+- 正本は[設定API](docs/settings-api.md#mcp接続一覧)、[MCP接続管理](docs/mcp-client-design.md)、[設計](docs/mcp-settings-design.md)。証跡は`.artifacts/mcp-settings-client-20261026/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-client-20261026/`。source-profiles.json/fixed-profiles.jsonとsmoke-profile.jsonへ結果/hashを記録した。保存処理の共通化（`542fc4d`）と共通一覧APIへの接続を別コミットに分けた。
+- 中継全体GUIの追加試行は、事前配置するCustomCommands fixture不在でホスト起動前に終了し、成功件数へ含めない。同じ全体スクリプトに今回と無関係なPauseキー送信があるため再試行せず、今回必要なMCP通信/設定回帰は上記の標準と2種類のGUIで検証した。実利用設定/認証、Windows起動登録、Pause/F13～F24のOS送信・登録は変更していない。
+- 専用テストプロセス0。今回の各script/方式の成功は3回以内。過去の参照profile/固定コピー・診断・起動前に止まった中継fixture・状態未確認の過去試験・固定ビルド出力を保持し、削除0件。初期の版更新後依存照合、レビュー前の検証と診断は同じ証跡フォルダーに保持した。
+
 ## 2026-10-26: 共通ブラウザ設定の宣言共有とMCP接続 0.91.4
 
 - main `49d3c0b`の統合commit `a802b73`から、同じ専用worktree/branchで共通ブラウザ設定のMCP対応を実装した。マージと別の実装単位とし、追跡先の追加、primary mainの変更、push/Release/deployは行わない。既存commandTriggerOptionsのbrowsers/requireChromiumWindowClassと共有settings.jsonを使い、製品設定項目/保存ファイルの追加削除はないため、発行済み0.91.3から**0.91.4**へパッチ更新した。

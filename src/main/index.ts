@@ -672,6 +672,7 @@ const serviceSettings = new SettingsServiceTargets({
   notifications: () => notificationCatalog(allApplets()),
   applets: allApplets,
   appletManagement,
+  mcpSettings: () => mcpSettings,
 });
 let aiMcpGeneration = 0;
 const aiOwner = (id?: string) =>
@@ -820,6 +821,7 @@ const mcpSettings = new McpClientSettings(
     mcpClient.reconcile();
     mcpChanged();
   },
+  assertSettingsWritable,
 );
 const mcpClient = new McpClientService({
   settings: mcpSettings,

@@ -453,6 +453,17 @@ async function main() {
   checks.push(
     'local credential dialog encrypts; real MCP hides secrets, rejects secret input/removal/rebinding including dryRun, and preserves cipher on rename',
   );
+  await require('./settings-mcp-client-gateway-checks.cjs')({
+    page,
+    client,
+    profile,
+    local,
+    secretId,
+    checks,
+    tool,
+    value,
+    until,
+  });
   await permissions();
   await toggle('write', 'MCP', false);
   assert.equal(
