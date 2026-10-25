@@ -35,7 +35,7 @@ fs.cpSync(path.join(root, 'out/shells/default'), shellFolder, { recursive: true 
 const shellManifest = JSON.parse(fs.readFileSync(path.join(shellFolder, 'extension.json')));
 shellManifest.id = 'fixture.modal-shell';
 shellManifest.name = 'Modal Shell';
-shellManifest.shell = { apiVersion: 1, ribbonSchemaVersion: 2, views: { ribbon: 'index.html' } };
+shellManifest.shell = { apiVersion: 1, ribbonSchemaVersion: 3, views: { ribbon: 'index.html' } };
 fs.writeFileSync(path.join(shellFolder, 'extension.json'), JSON.stringify(shellManifest));
 settings.extensions[shellManifest.id] = { enabled: true, settings: {} };
 settings.keybindings = [

@@ -347,23 +347,24 @@ export function SettingsForm({
                         aria-label={t('appearance.shell.label', { region: title })}
                         value={configured}
                         disabled={busy}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const shellProviders = { ...settings.host.shellProviders };
+                          if (e.target.value) shellProviders[id] = e.target.value;
+                          else delete shellProviders[id];
                           edit({
                             ...settings,
                             host: {
                               ...settings.host,
-                              shellProviders: {
-                                ...settings.host.shellProviders,
-                                [id]: e.target.value,
-                              },
+                              shellProviders,
                             },
-                          })
-                        }
+                          });
+                        }}
                       >
                         <option value={defaultShellId}>
                           {t('appearance.shell.defaultOption')}
                         </option>
-                        {configured !== defaultShellId &&
+                        {configured &&
+                          configured !== defaultShellId &&
                           !candidates.some((e) => e.id === configured) && (
                             <option value={configured}>
                               {t('appearance.shell.unavailable', { name: configured })}

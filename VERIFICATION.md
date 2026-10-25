@@ -1,5 +1,49 @@
 # 検証記録
 
+## 2026-10-26: 一時リボングループ0.90.2のコミット・プッシュ検証
+
+- main `6a3536c` 上の承認済み35ファイルを対象に、実装時の最終入力779件・証跡のSHA256を照合した。GitHub/AQUAの両mainは親の `cc0a1fe` で競合なし。dirtyのためpull/stashは行わずfetchのみ実施。今回のcommitと、先行する未pushの `6a3536c` を通常pushする。製品の追加変更・版更新・再発行は行わず、確認済み0.90.2を維持する。
+- 標準116ファイルは、統合時11ファイル89件（backend71件と、最終版で確認した表示関連18件）、影響のない基準版76ファイル583件の成功を、対象コード・試験・依存・環境と証跡鎖の一致で再利用。Shell領域一覧/設定カタログ/提供元解決の影響先、manifest/API/設定/モーダルの読取り、最終生成物を使う6試験を含む未確認29ファイルを追加実行し、224/224件成功。合計 **116ファイル・896/896件、fail/skip 0**。基準版895件からは、退役した一時Shell指定/view/要件と旧描画契約のfallbackを確認する1件だけ増えている。再利用・追加実行の一覧と依存関係の判断は `plan.json` に記録した。
+- LUNA/Windows x64/Node24.22.1/pnpm12.10.1・lockfile/toolchainの一致を確認。0.90.0以降の製品差分は一時グループPanel/CSSと版のみで、最終版の上下配置・親寸法・操作順GUI、同一Shell/既存native本文/幅遅延/パレットのGUI、型検査/build/publish/smoke成功を入力・発行物hashと合わせて再利用した。今回は成功済みGUIやbuildを繰り返していない。
+- 発行EXEは **0.90.2 / 170,678,066 bytes / SHA256 `83c8c15a04c05e32b3f627dcdd5c3b3d52dfd751cc84a6b22935801bd25a6a22`** のまま。既存レビューに未解決の阻害指摘なし。最終検証後の追記は本記録だけで、stage内容と作業ファイルの一致、検証済みstage treeとcommit treeの一致を確認する。結果の正本は `.artifacts/commit-validation-ribbon-0902/` の入力一覧・完全log/終了コード・再利用照合・`validation.json` / `stage.json` / `commit.json` / `push.json`。
+- 追加試験は終了済み。今回の追加GUIフォルダーと削除対象はなく、過去の再利用/診断資料を保持する。両remoteのmainとcommit SHAの一致、作業ツリーcleanまで確認して完了とする。Release・実利用deployは行わない。
+
+## 2026-10-25: 上向きの一時グループで親ボタンを末尾へ配置 0.90.2
+
+- 0.90.1の未コミット変更を保持し、上向きに展開する場合は子一覧を上、親ボタンを一番下に配置するよう変更。下向きは親を先頭に維持する。下に収まれば下向き、上に収まれば上向き、どちらにも収まらなければ広い側を選んでスクロールする。制約を受けないグループ内容の実高から方向/最大高/位置を計算し、親の元の位置・幅・高さを保つ。子の保存順は変えず、DOM順・読み上げ順・上下/Home/End/Tabの移動順を見た目と一致させた。
+- 上向きの色バーの接続部は子一覧の下へ移し、親と子の8px間隔と左2pxバーを保持。方向と位置の確定後に表示・初期フォーカスを行い、上向きの長い一覧は末尾へスクロールして親と近い実行可能な子を見せる。下向きは先頭の実行可能な子を使う。初期フォーカス枠は引き続き隠し、キーボード操作後は表示する。設定・保存・Shell契約・コントローラー/実行経路の変更なし。通常修正として0.90.2へパッチ更新。
+- 発行前レビューで配置/計測の依存、親のアンカー寸法、色線、フォーカスと操作順、スクロールと既存保存への影響を確認し阻害指摘なし。固定Node24.22.1/pnpm12.10.1、同一lockfile/供給網検査でfrozen install・整形・型検査・build成功。表示関連3ファイル18/18、fail/skip 0。ソース/最終固定EXEで上/下×compact/expanded×100/125/150%の12条件を確認し、親のy/幅/高さ、DOM順、色バー/8px接続、初期枠なし、親クリック閉鎖が一致した。追加の長い上/下一覧で、初期スクロール・近い子へのフォーカス・無効行スキップ・Home/End/上下/Tab・Escape復帰・末尾コマンド選択を確認した。
+- publish成功。0.90.2のFile/ProductVersion、feed、ASAR本体/Default Shell版・契約3・旧専用view不在、Default Shell同梱内容、size/hashを照合し、最終固定EXEの隔離smoke成功。170,678,066 bytes、SHA256 `83c8c15a04c05e32b3f627dcdd5c3b3d52dfd751cc84a6b22935801bd25a6a22`。発行先 `A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。入力/環境/fixture/完全ログ/レビュー/最終照合は `.artifacts/ribbon-direction-0902/`。実アカウントと物理予約キーは未確認。本件のcommit/push/Release/deployなし。
+- 後片付けは削除0件。今回のGUI/smoke profileを参照するプロセス0件を通常ユーザー権限のCIMで確認。直近成功3件以内・最終証跡・過去の再利用/診断資料を保持し、削除対象はなかった。詳細は `cleanup.json`。
+
+## 2026-10-25: 一時展開時の親ボタン寸法を固定 0.90.1
+
+- 0.90.0の未コミット変更を保持し、一時グループを開くと親ボタンが狭く見える報告に対応。旧固定EXEでcompact/expanded・表示倍率100/125/150%を測定し、親の幅がそれぞれ4px/2px/約0.667px縮むことを再現した。高さとSVGの実寸は同じで、スクロールバーの予約幅が通常リボンの右余白と異なるため、親ボタンとアイコン/開閉記号の間隔が変わっていた。
+- 一時グループの幅と親の高さを、既存の検証済みsource anchorの実寸へ合わせ、パーセントのmax-widthで縮めないようにした。ネイティブの縦スクロールバーは既存右余白内の6pxにし、安定したgutterとスクロール操作を保つ。通常リボン・アイコン部品・描画契約・設定/保存/実行経路は変更しない。通常修正として0.90.1へパッチ更新。発行前レビューで要件・既存操作・可変倍率・アンカー境界・同梱内容を確認し阻害指摘なし。
+- 固定Node24.22.1/pnpm12.10.1と同一lockfile/供給網検査を維持し、frozen install・整形・型検査・build成功。表示関連3ファイル18/18、fail/skip 0。ソースと最終固定EXEでcompact/expanded×100/125/150%の6条件を比較し、親の幅/高さ・SVGの幅/高さの差はすべて0、DPRも一致。さらに一時グループの既存GUI各7群で、色バーと8px接続・初期フォーカス枠なし/キーボード枠・1項目/長い縦リスト・横はみ出しなし・親子操作/閉鎖・本文probeId・Shell統合を確認した。変更のないbackend/描画同期/パレットの成功は繰り返していない。
+- publish成功。最終0.90.1のFile/ProductVersion、feed、ASAR本体/Default Shell版・契約3・旧専用view不在、Default Shell同梱内容・size/hashを照合し、隔離smoke成功。170,670,964 bytes、SHA256 `a5c02f8e95122cfa2e940135e025a6af35c04bfd426a57d15c8e8fe96db1bfe9`。発行先 `A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。旧固定0.90.0のcopy/hash・比較寸法・入力/環境/fixture/ログ/レビュー/最終照合は `.artifacts/ribbon-size-0901/`。実アカウントと物理予約キーは未確認。本件のcommit/push/Release/deployなし。
+- 後片付けは削除0件。今回の比較/GUI/smoke profileを参照するプロセス0件を通常ユーザー権限のCIMで確認。直近成功3件以内・旧版比較・最終証跡・過去の再利用/診断資料を保持し、削除対象はなかった。詳細は `cleanup.json`。
+
+## 2026-10-25: 一時グループの親子表示とリボンShellへの統合 0.90.0
+
+- 0.89.4の未コミット変更を保持し、一時表示も親ボタンの下に子を並べる構造へ変更。親と子を持続的と共通の `.ribbon-group` / `.ribbon-children` で描画し、親と子の8px間隔、左2pxのグループ色バーと接続部、アイコン位置・行高・名前・バッジを統一した。親ボタンを押すと閉じる。初期フォーカスは最初の実行可能な子へ置くが枠は表示せず、上下/Home/End/Tabで操作した時は通常のフォーカス表示を復帰する。外側クリック消費、Escape、本文のWebContents/session保持と実行時の再照合は継続。外周の影も除去した。
+- 独立した `overlay.ribbon-group` Shell領域・設定欄・個別の提供元解決/再試行/visible要件/view選択を廃止し、公開領域を6件へ整理。旧指定・旧view・旧要件は不活性な互換データとして保持し、動作には使用しない。設定カタログ・翻訳・領域状態・own-stateにも専用項目は返さない。リボンの実際の接続中の提供元と同じ `ribbon` HTMLへ、既存の共通overlay APIで一時表示を渡す。独立した復旧先を持たず、失効/故障時は閉じてリボン全体の復旧を使う。表示中のribbon visible要件は有効。一時表示の内容と寿命は既存OverlayHost/RibbonGroupSessionが所有する。
+- 同じHTMLで通常リボンと一時表示を扱う描画契約 `shell.ribbonSchemaVersion: 3` を導入し、Default Shellと追加Shellは同じAPI/起動経路を使用。通常のRibbonViewモデル・外部取得はschema 1/2を維持する。旧描画契約はリボン全体をDefaultへ戻し、他の領域指定を維持する。設定項目・公開領域の削除を含むため0.90.0へマイナー更新。新しい保存キー・ファイルの追加削除なし。repo AGENTSと機能文書の領域数・現行契約を整合させた。A:直下のAGENTSは変更していない。
+- 発行前レビューで要件一致、設定/互換データ、同じ提供元・入口、破棄/再送防止、フォーカスと共有描画への影響を確認し阻害指摘なし。frozen install・整形・型検査・build成功。関連11ファイル89/89、fail/skip 0。退役した指定/view/要件が動作せず、旧契約2はfallbackし3は有効、他領域・設定編集は保つことを検証した。
+- ソース/最終固定EXEのGUI各7群で、明1280/暗900/明720、56/200px、親の下8px・色バー接続・同じアイコン位置、初期枠なし/キーボード移動後の枠、無効行スキップと親/子の移動、1項目102pxの親子パネル・親クリック閉鎖、縦overflow、本文probeId保持、外側クリック消費・選択/resize/scroll取消を確認。追加Shellでも通常リボンと一時表示が同じHTML URL/提供元で動き、旧専用指定/viewを残しても無視されること、設定・状態が6領域で専用欄なしを確認した。ソース/最終固定EXEのnative幅遅延比較はアイコン中心28px・実幅200pxのラベル保持/56pxで非表示を確認。共通OverlayApp切り出しの影響先として最終固定EXEのコマンドパレットを1群追加し、別入口での描画・検索・Escape閉鎖を確認。既存全体GUI runnerのcontract/領域数/検索先も更新したが、本件は必要箇所に絞ったGUIを使用した。
+- publish成功。0.90.0のFile/ProductVersion、feed、ASAR本体/Default Shell版・描画契約3・旧専用view不在、変更main JS/共通型とDefault Shell同梱物・size/hashを照合し、最終固定EXEの隔離smoke成功。170,681,062 bytes、SHA256 `4d23ec157581b4a84ae7b6143b3b4c581574a221528e668346fa05dda3af1719`。発行先 `A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。入力・環境・fixture・完全ログ・コマンド・レビュー・最終照合は `.artifacts/ribbon-integrated-0900/`。実Gmail/Wallpaperアカウントと物理予約キーは未確認。本件のcommit/push/Release/deployなし。
+- 後片付けは削除0件。今回のGUI・幅遅延比較・パレット・smoke profileを参照するプロセス0件を通常ユーザー権限のCIMで確認。直近成功3件以内・最終証跡・過去の再利用資料/診断profileを保持し、削除対象はなかった。結果は `cleanup.json`。変更した既存一時グループGUI runnerの `node --check` も成功した。
+
+## 2026-10-25: 一時リボングループをリボン上の縦表示へ統一 0.89.4
+
+- main `6a3536c` のclean状態から追跡先へ `pull --ff-only`（Already up to date）を確認して実装。一時グループを元のリボン領域へ同じ幅で縦に重ねる表示へ変更。ダイアログ風の外周枠・丸み・大きな影・横並び・左右スクロールボタンを除去し、細い右境界と控えめな影にした。元のグループ位置から開き、上下端に収まるよう補正する。長いリストは縦スクロールする。通常リボンと共通の `ribbon-items.css`・`RibbonIcon` を使い、24pxアイコン枠・40px行・左位置・余白・名前・バッジ・画像を揃えた。表示ラベルは実際のSurface幅に対するcontainer queryで切り替える。
+- 一時表示は既存の `overlay.ribbon-group` とOverlayHost/RibbonGroupSessionを継続使用し、追加のShell領域・専用APIは設けていない。個別指定がなければ解決済みのリボンShellへ継承し、当該viewが未提供/故障ならDefault Shellへ戻す。保存済みの個別指定は保持。「表示」の既存選択欄へ「リボンのShellに従う」を表示し、選択時は当該map entryだけを解除する。新しい設定項目・保存キー・ファイルの追加削除なし。hostが検証したnativeリボン矩形からhost CSS座標の任意 `content.viewport` と `displayMode` を公開モデルへ追加し、従来Shellが追加フィールドを無視できる互換性を保持した。0.89.3から通常修正の0.89.4へパッチ更新。
+- 発行前レビューで操作/描画/寿命・公開境界・設定/保存・影響先を確認。コンパクト幅のスクロールバーでバッジ数字が欠ける箇所は、右余白内の固定gutterとアイコン寄りのバッジ位置で修正した。アイコン位置と通常行のpaddingは維持。継承中に設定欄がDefault表示になる問題は、上記の継承選択と即時解除で修正。修正後に阻害指摘なし。既存のGUI試験は縦配置・矩形幅・24ページの縦overflow・上下移動へ更新し、構文検査成功。旧全体GUI runnerは本件では再実行せず、変更箇所を隔離した専用GUIで確認した。
+- 固定Node24.22.1/pnpm12.10.1・同一lockfile/供給網検査を維持し、frozen install・整形・型検査・build成功。最終ソースで関連10ファイル78/78、fail/skip 0。Shell継承/明示指定/未対応・無効/Default fallback・safe modeとviewport模型を検証。ソース/最終固定EXEのGUI各7群で、明1280/暗900/明720・56/200pxの幅、アイコン/行高/名前/バッジ、28項目の縦overflow、無効行のスキップ・上下/Home/End/Tab・Escape/フォーカス復帰、1項目52pxのパネル、共有設定を書かないこと、外側クリック消費・選択実行・スクロール/resize取消を確認。ローカルApplet本文のWebContents/probeIdを保持し、同じ公開APIを使う追加Shellの継承・明示override・設定UIからの解除も確認した。
+- 折りたたみ回帰はnative setBoundsを遅延させる既存fixtureで確認。ソースと最終固定EXEは、model compactが先着しても実幅200pxの間はアイコン中心28pxとラベルを保持し、実幅56pxでのみラベルを隠す。バッジ位置のみの最終CSS変更はこの同期経路を変えず、最後の固定EXEでも再確認した。失敗した検証fixtureの即時close判定はIPC閉鎖待ちへ修正し、複製Shellのmanifestに最低ホスト版を明記。失敗ログ/診断profileを保持し、最終成功と区別した。
+- publish成功。最終EXEのFile/ProductVersion・feed・ASAR本体/Default Shell版・変更したmain JSとDefault Shell同梱内容・size/SHA256を照合し、最終固定EXEの隔離smoke成功。0.89.4、170,688,474 bytes、SHA256 `be6d79806f01492af4295a6c9b00a0af3f9ad660233ab83c254b3915f0f944d0`。発行先は `A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`。入力/環境/fixture/コマンド/ログ/レビュー/ASAR比較/最終結果は `.artifacts/ribbon-temporary-0894/`。実Gmail/Wallpaperアカウント・物理予約キー・実利用先deployは未確認。本件のcommit/push/Releaseなし。
+- 後片付けは削除0件。今回のsource/fixed GUI・遅延比較・smoke profileを参照するプロセス0件を通常ユーザー権限のCIMで確認した。直近3回の成功・現在の最終証跡・既存commitの再利用資料・失敗診断profileは保持し、削除対象はなかった。詳細は `cleanup.json`。
+
 ## 2026-10-25: リボン変更のコミット前確認・対象ページ候補の修正 0.89.3
 
 - 確認済み0.89.2までの24ファイルをコミットするため、777入力・過去の標準892件・0.89.1関連68件・0.89.2関連18件とGUI/固定EXE証跡をhash照合。既存115試験ファイルは基準版と一致し、表示モードの新規試験3件を含む標準対象は116ファイル895件。依存先を追跡した追加78ファイル691件で690成功・1失敗となり、失敗コマンドの部分成功は再利用しない。証跡: `.artifacts/commit-validation-ribbon-0892/`。

@@ -50,7 +50,11 @@ export class ShellHost {
       shortcut(input: Electron.Input): boolean;
       execute(provider: string, command: string): Promise<unknown>;
       settings(provider: string): Record<string, unknown>;
-      openGroup?(id: string, anchor: import('../../shared/ribbon').RibbonAnchor): void;
+      openGroup?(
+        id: string,
+        anchor: import('../../shared/ribbon').RibbonAnchor,
+        viewport: import('../../shared/ribbon').RibbonAnchor,
+      ): void;
       invalidateAnchor?(): void;
     },
   ) {
@@ -142,12 +146,21 @@ export class ShellHost {
           )
             throw Error(hostText('services.shellHost.groupPosition'));
           const hostZoom = options.window.webContents.getZoomFactor();
-          options.openGroup(id, {
-            x: (bounds.x + anchor.x * zoom) / hostZoom,
-            y: (bounds.y + anchor.y * zoom) / hostZoom,
-            width: (anchor.width * zoom) / hostZoom,
-            height: (anchor.height * zoom) / hostZoom,
-          });
+          options.openGroup(
+            id,
+            {
+              x: (bounds.x + anchor.x * zoom) / hostZoom,
+              y: (bounds.y + anchor.y * zoom) / hostZoom,
+              width: (anchor.width * zoom) / hostZoom,
+              height: (anchor.height * zoom) / hostZoom,
+            },
+            {
+              x: bounds.x / hostZoom,
+              y: bounds.y / hostZoom,
+              width: bounds.width / hostZoom,
+              height: bounds.height / hostZoom,
+            },
+          );
         },
       });
     });

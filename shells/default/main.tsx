@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { RibbonView, ShellApi } from '../../src/shared/shell';
 import './style.css';
+import './ribbon-items.css';
 import './ribbon-badges.css';
 import { RibbonIcon, ribbonLabel } from './RibbonButton';
+import { OverlayApp } from './OverlayApp';
+import './ribbon-group.css';
 declare global {
   interface Window {
     appdockShell: ShellApi;
@@ -167,7 +170,7 @@ function App() {
   const renderItem = item;
   return (
     <aside
-      className="activity-rail"
+      className="activity-rail ribbon-surface"
       data-display-mode={model?.displayMode ?? 'compact'}
       aria-label="リボン"
       data-revision={model?.revision}
@@ -218,4 +221,6 @@ function App() {
     </aside>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  window.appdockOverlay ? <OverlayApp /> : <App />,
+);

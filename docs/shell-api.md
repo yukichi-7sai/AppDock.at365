@@ -19,11 +19,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
   "id": "example.shell",
   "name": "Example Shell",
   "version": "1.0.0",
-  "minimumHostVersion": "0.76.5",
+  "minimumHostVersion": "0.90.0",
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
-  "shell": { "apiVersion": 1, "ribbonSchemaVersion": 2, "views": { "ribbon": "index.html" } }
+  "shell": { "apiVersion": 1, "ribbonSchemaVersion": 3, "views": { "ribbon": "index.html" } }
 }
 ```
 
@@ -51,7 +51,7 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 0.65.0以降のschema 2のグループは任意の`color: "#RRGGBB" | null`を持ちます。省略／nullは色なしです。Default Shellはこの色をグループボタンの左端の2pxのバーへ使い、持続的に開いた子の縦線・接続部分まで1本の直線につなげます。色なしではバー・縦線・接続部分を表示しません。schema 1へ色は返しません。色を表示する追加Shellはこの任意項目を使い、コマンド実行や選択状態と区別してください。
 
-リボンを提供するShellは`minimumHostVersion: "0.51.0"`と`shell.ribbonSchemaVersion: 2`を宣言する。省略／1の提供元はリボン領域だけDefault Shellへ戻し、他領域の割り当てを維持する。ローカルbridgeは常にschema 2。外部`ui.ribbon.get`は省略時にschema 1へ射影し、グループを通常ボタン、開いた持続型の子を後続の通常項目として返す。
+リボンを提供するShellは`minimumHostVersion: "0.90.0"`と`shell.ribbonSchemaVersion: 3`を宣言する。3は同じ`ribbon` HTMLが通常表示と一時グループの両方を描画する契約で、モデルの`RibbonView.schemaVersion`は2のまま。通常は`window.appdockShell`、一時表示の接続では`window.appdockOverlay`を使い、接続・ready・購読・操作を行う。後者の`kind: "ribbon-group"`の`content.parent/items/anchor/viewport/displayMode`を描画し、親の閉鎖は`dismiss`、子の選択は`ribbonChoose`を送る。省略／1／2の提供元はリボン領域をDefault Shellへ戻し、他領域の指定を維持する。ローカルの通常リボンbridgeはschema 2。外部`ui.ribbon.get`は省略時にschema 1へ射影し、グループを通常ボタン、開いた持続型の子を後続の通常項目として返す。
 
 schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-customization-design.md)。
 

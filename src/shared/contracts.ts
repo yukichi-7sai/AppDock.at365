@@ -181,7 +181,7 @@ export interface ExtensionManifest {
   notificationTypes?: import('./notification-types').NotificationTypeDefinition[];
   shell?: {
     apiVersion: 1;
-    ribbonSchemaVersion?: 1 | 2;
+    ribbonSchemaVersion?: 1 | 2 | 3;
     ui?: string;
     views?: Record<string, string>;
   };

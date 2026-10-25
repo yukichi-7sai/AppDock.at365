@@ -18,7 +18,7 @@ settings.host.closeToTray = false;
 settings.globalShortcutCommands = [];
 const fixture = path.join(profile, 'extensions', 'ribbon');
 fs.mkdirSync(fixture, { recursive: true });
-const pages = Array.from({ length: 10 }, (_, i) => ({
+const pages = Array.from({ length: 24 }, (_, i) => ({
   id: i === 0 ? 'main' : 'p' + i,
   title: i === 0 ? 'Badge fixture' : 'Item ' + i,
   source: 'local',
@@ -46,7 +46,7 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(fixture, 'worker.cjs'),
   `exports.activate=async c=>{
-  for(let i=0;i<10;i++) c.commands.register('fixture.ribbon.open'+i,'Open '+i,()=>c.pages.open(i===0?'main':'p'+i));
+  for(let i=0;i<24;i++) c.commands.register('fixture.ribbon.open'+i,'Open '+i,()=>c.pages.open(i===0?'main':'p'+i));
   c.commands.register('fixture.ribbon.clear','Clear badge',()=>c.ribbon.setBadge({pageId:'main'},null));
   c.commands.register('fixture.ribbon.dot','Dot badge',()=>c.ribbon.setBadge({pageId:'main'},{kind:'dot'}));
   await c.ribbon.setBadge({pageId:'main'},{kind:'count',count:123,label:'Pending fixture'});
@@ -151,13 +151,10 @@ const saved = async (fn, label = 'saved layout') =>
 const button = (id) => rail.locator(`[data-ribbon-id="${id}"]`);
 const overlay = () =>
   until(async () => {
-    const page = app
-      .context()
-      .pages()
-      .find((p) => p.url().endsWith('/overlay.html'));
-    if (!page || !(await page.locator('.ribbon-flyout').count())) return;
-    return page;
-  }, 'group overlay');
+    for (const page of app.context().pages()) {
+      if (!page.isClosed() && (await page.locator('.ribbon-flyout').count())) return page;
+    }
+  }, 'ribbon group');
 async function openTemporary() {
   await button('group:temporary').click();
   return overlay();
@@ -271,7 +268,7 @@ async function launch() {
       );
     const closedPositions = await positions();
     let flyout = await openTemporary();
-    await flyout.locator('.ribbon-flyout-row button').first().waitFor();
+    await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await until(
       async () => (await button('group:temporary').getAttribute('aria-expanded')) === 'true',
       'temporary expanded accessibility',
@@ -284,26 +281,25 @@ async function launch() {
     assert.equal(await flyout.locator('.ribbon-flyout-heading').count(), 0);
     assert.equal(await flyout.getByRole('button', { name: 'グループを閉じる' }).count(), 0);
     const aligned = async () => {
-      const anchor = (await flyout.evaluate(() => window.appdockOverlay.connect())).snapshot.content
-        .anchor;
-      const child = await flyout
-        .locator('.ribbon-flyout-row [data-ribbon-id]')
-        .first()
-        .boundingBox();
-      return Math.abs(child.y + child.height / 2 - (anchor.y + anchor.height / 2)) < 1;
+      const viewport = (await flyout.evaluate(() => window.appdockOverlay.connect())).snapshot
+        .content.viewport;
+      const panel = await flyout.locator('.ribbon-flyout').boundingBox();
+      return Math.abs(panel.x - viewport.x) < 1 && Math.abs(panel.width - viewport.width) < 1;
     };
-    await until(aligned, 'popup button aligns vertically with source group');
+    await until(aligned, 'popup overlays the source ribbon at the same width');
     const geometry = await flyout
-      .locator('.ribbon-flyout-row button')
+      .locator('.ribbon-flyout-list button')
       .evaluateAll((buttons) => buttons.map((b) => b.getBoundingClientRect().y));
-    assert.equal(new Set(geometry).size, 1);
+    assert(new Set(geometry).size > 1);
     const dimensions = await flyout
-      .locator('.ribbon-flyout-row')
-      .evaluate((el) => ({ width: el.clientWidth, scroll: el.scrollWidth }));
-    assert(dimensions.scroll > dimensions.width);
-    await flyout.getByRole('button', { name: '右へスクロール' }).click();
-    assert(await flyout.locator('.ribbon-flyout-row').evaluate((el) => el.scrollLeft > 0));
-    await flyout.locator('.ribbon-flyout-row button').first().focus();
+      .locator('.ribbon-flyout-list')
+      .evaluate((el) => ({ height: el.clientHeight, scroll: el.scrollHeight }));
+    assert(dimensions.scroll > dimensions.height);
+    await flyout.locator('.ribbon-flyout-list').evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    assert(await flyout.locator('.ribbon-flyout-list').evaluate((el) => el.scrollTop > 0));
+    await flyout.locator('.ribbon-flyout-list button').first().focus();
     await app.evaluate(({ BrowserWindow, webContents }) => {
       BrowserWindow.getAllWindows()[0].focus();
       webContents
@@ -311,10 +307,10 @@ async function launch() {
         .find((c) => c.getURL().endsWith('/overlay.html'))
         .focus();
     });
-    await flyout.locator('.ribbon-flyout-row button').first().press('End');
+    await flyout.locator('.ribbon-flyout-list button').first().press('End');
     assert.equal(
       await flyout.evaluate(() => document.activeElement.dataset.ribbonId),
-      'page:fixture.ribbon:p9',
+      'page:fixture.ribbon:p23',
     );
     await flyout.screenshot({ path: path.join(profile, 'temporary.png') });
     await closingAction(flyout.keyboard.press('Escape'));
@@ -355,7 +351,7 @@ async function launch() {
     assert(flyout.isClosed());
     assert.equal(await button('group:persistent').getAttribute('aria-expanded'), 'true');
     checks.push(
-      'Temporary horizontal overflow; keyboard End/Escape and focus return; outside click consumed; selection closes and executes; persistent state retained on navigation',
+      'Temporary vertical overflow; keyboard End/Escape and focus return; outside click consumed; selection closes and executes; persistent state retained on navigation',
     );
 
     flyout = await openTemporary();
@@ -381,7 +377,7 @@ async function launch() {
       );
     });
     flyout = await openTemporary();
-    await flyout.locator('.ribbon-flyout-row button').first().waitFor();
+    await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await flyout.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
     const box = await flyout.locator('.ribbon-flyout').boundingBox();
     const viewport = await flyout.evaluate(() => ({ width: innerWidth, height: innerHeight }));
@@ -544,7 +540,7 @@ async function launch() {
       'Settings dialog add/edit; immediate persisted membership and placement; ungroup returns child with inherited bottom placement',
     );
     checks.push(
-      'Popup alignment and stable rail positions; overflow-only controls; aligned shared action icons; aliases, global label mode, blank group names, missing root/child removal and spacious dialog',
+      'Popup alignment and stable rail positions; vertical keyboard/scroll access; aligned shared action icons; aliases, global label mode, blank group names, missing root/child removal and spacious dialog',
     );
     await app.close();
     app = undefined;

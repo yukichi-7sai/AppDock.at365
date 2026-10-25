@@ -32,7 +32,7 @@ function provider(id, extra = {}) {
     minimumHostVersion: '0.34.0',
     shell: {
       apiVersion: 1,
-      ribbonSchemaVersion: 2,
+      ribbonSchemaVersion: 3,
       views: Object.fromEntries(shellRegions.map((r) => [r.id, r.id + '.html'])),
     },
     ...extra,
@@ -62,7 +62,7 @@ test('all retired page assignments remain inert while their saved values and leg
   const assignments = Object.fromEntries(retired.map((region) => [region, 'shell.a']));
   Object.assign(f.assignments, assignments);
   assert.deepEqual(parseShellProviders({ shellProviders: assignments }), assignments);
-  assert.equal(f.registry.snapshot().regions.length, 7);
+  assert.equal(f.registry.snapshot().regions.length, 6);
   for (const region of retired) {
     assert(!f.registry.snapshot().regions.some((state) => state.region === region));
     const requirement = { region, state: 'visible' };
@@ -76,12 +76,10 @@ test('legacy ribbon providers fall back per region while compatible bar and over
   const external = f.providers.find((p) => p.id === 'shell.a');
   delete external.shell.ribbonSchemaVersion;
   f.assignments['titlebar'] = external.id;
-  f.assignments['overlay.ribbon-group'] = external.id;
   assert.equal(f.registry.resolve('ribbon').provider.id, defaultShellId);
   assert.match(f.registry.resolve('ribbon').reason, /対応していない/);
   assert.equal(f.registry.resolve('titlebar').provider.id, external.id);
-  assert.equal(f.registry.resolve('overlay.ribbon-group').provider.id, external.id);
-  external.shell.ribbonSchemaVersion = 2;
+  external.shell.ribbonSchemaVersion = 3;
   assert.equal(f.registry.resolve('ribbon').provider.id, external.id);
 });
 test('legacy scalar migrates eight fixed regions without startup writes, while new empty map takes precedence', (t) => {
@@ -171,6 +169,26 @@ test('all-capability providers mix independently; disable and restoration retain
   assert.equal(assignments.ribbon, 'shell.a');
   providers[1].enabled = true;
   assert.equal(r.resolve('ribbon').provider.id, 'shell.a');
+});
+test('retired temporary-group assignments and views cannot override the ribbon provider', () => {
+  const { registry, assignments, providers } = fixture();
+  assignments['overlay.ribbon-group'] = 'shell.b';
+  providers[1].shell.views['overlay.ribbon-group'] = 'ignored.html';
+  assert.equal(registry.resolve('ribbon').provider.id, 'shell.a');
+  assert(!registry.snapshot().regions.some((r) => r.region === 'overlay.ribbon-group'));
+  assert(!registry.ownState('shell.a').regions.some((r) => r.region === 'overlay.ribbon-group'));
+  assert.equal(
+    require('../out/main/shared/shell').shellView(providers[1].shell, 'overlay.ribbon-group'),
+    undefined,
+  );
+  const requirement = { region: 'overlay.ribbon-group', state: 'resolved' };
+  assert.match(registry.requirement('shell.a', requirement), /リボン/);
+  assert.equal(registry.lease('shell.a', requirement)(), false);
+  assert.equal(assignments['overlay.ribbon-group'], 'shell.b');
+  providers[1].shell.ribbonSchemaVersion = 2;
+  assert.equal(registry.resolve('ribbon').provider.id, defaultShellId);
+  providers[1].shell.ribbonSchemaVersion = 3;
+  assert.equal(registry.resolve('ribbon').provider.id, 'shell.a');
 });
 test('uninstalled, waiting, partial and incompatible providers fall back only in their assigned region', () => {
   const { registry: r, assignments, providers } = fixture();

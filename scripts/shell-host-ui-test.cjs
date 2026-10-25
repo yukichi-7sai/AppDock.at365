@@ -67,7 +67,7 @@ fs.writeFileSync(
     runtime: 'node',
     entry: 'worker.cjs',
     capabilities: ['shell'],
-    shell: { apiVersion: 1, ribbonSchemaVersion: 2, ui: 'index.html' },
+    shell: { apiVersion: 1, ribbonSchemaVersion: 3, ui: 'index.html' },
   }),
 );
 fs.writeFileSync(path.join(stalled, 'worker.cjs'), 'exports.activate=async()=>{};');

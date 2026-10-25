@@ -7,7 +7,6 @@ export type ShellRegion =
   | 'ribbon'
   | 'statusbar'
   | 'overlay.command-palette'
-  | 'overlay.ribbon-group'
   | 'notification.banner'
   | 'notification.desktop';
 
@@ -16,7 +15,6 @@ export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
   { id: 'ribbon', title: hostText('services.sharedShell.ribbon') },
   { id: 'statusbar', title: hostText('services.sharedShell.statusBar') },
   { id: 'overlay.command-palette', title: hostText('services.sharedShell.commandPalette') },
-  { id: 'overlay.ribbon-group', title: hostText('services.sharedShell.ribbonGroup') },
   { id: 'notification.banner', title: hostText('services.sharedShell.banner') },
   { id: 'notification.desktop', title: hostText('services.sharedShell.desktopNotifications') },
 ];
@@ -24,7 +22,12 @@ export function isShellRegion(value: unknown): value is ShellRegion {
   return shellRegions.some((r) => r.id === value);
 }
 export type LegacyShellRegion =
-  'page.settings' | 'page.home' | 'page.logs' | 'page.image-library' | 'page.notifications';
+  | 'page.settings'
+  | 'page.home'
+  | 'page.logs'
+  | 'page.image-library'
+  | 'page.notifications'
+  | 'overlay.ribbon-group';
 export function isRetiredShellRegion(value: unknown): value is LegacyShellRegion {
   return [
     'page.settings',
@@ -32,6 +35,7 @@ export function isRetiredShellRegion(value: unknown): value is LegacyShellRegion
     'page.logs',
     'page.image-library',
     'page.notifications',
+    'overlay.ribbon-group',
   ].includes(value as string);
 }
 export type ShellRequirement = {
@@ -113,6 +117,7 @@ export function shellView(
   shell: { ui?: string; views?: Record<string, string> } | undefined,
   region: ShellRegion | LegacyShellRegion,
 ) {
+  if (isRetiredShellRegion(region)) return undefined;
   return shell?.views?.[region] ?? (region === 'ribbon' ? shell?.ui : undefined);
 }
 export interface RibbonView {
