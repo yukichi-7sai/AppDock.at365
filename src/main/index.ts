@@ -1,3 +1,4 @@
+import { replaceNotificationPreference } from '../shared/notification-preference-edit';
 import { hostText } from '../shared/i18n';
 import { settingListDraftAction } from './core/setting-list-draft';
 import { TouchpadBridgeManager } from './core/touchpad-bridge';
@@ -2359,6 +2360,17 @@ function settingsPageActions(
     };
   }
   if (page.id === 'notifications') {
+    actions.notificationSavePreference = async ([type, original, draft]) => {
+      assertSettingsWritable();
+      const next = replaceNotificationPreference(
+        settings.value,
+        notificationCatalog(allApplets()),
+        type,
+        original,
+        draft,
+      );
+      if (next !== settings.value) commitSettings(prepareSettings(next), settings.revision);
+    };
     actions.notificationVoices = async () => tts.voices('host');
     actions.notificationPreview = async ([requestId]) => {
       if (

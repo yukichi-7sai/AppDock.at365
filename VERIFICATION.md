@@ -1,5 +1,18 @@
 # 検証記録
 
+## 2026-10-25: 通知設定 0.87.14のコミット検証
+
+- 利用者が0.87.14を確認してcommit/pushを依頼。main `ce1c630`上の今回の11対象ファイルだけをレビューし、阻害指摘なし。通知テーブル、共通編集ダイアログ、種類単位の保存/競合検査、追加6試験、翻訳8キー、版と関連文書を対象とした。dirtyのためpull/stash/統合なし。fetchとGitHub/AQUAの読取で両mainが`ce1c630`に一致し、実効author/committerを確認した。
+- 標準回帰は**114ファイル・885/885、fail/skip 0**。既存113試験と既存locale値・設定スキーマ・SDK/native/Shell/runtime・共通UI・依存/固定ツール/ビルド定義は前回と同じ。mainは新しい内部通知actionとimportを除いて既存コードと一致し、新helperはこのactionだけが使用する。影響のない**89ファイル・683件を前回標準から再利用**、今回の実装時に最終入力で成功した**18ファイル・138件を再利用**、最終native/updater生成物を使うall-in-one/applet-defaults/lifecycle/dotnet-pages/applet-packages/portable-updatesとmain静的参照のribbon-commandsの**7ファイル・64件を追加実行して成功**した。型検査/buildの完全logと終了コード、Node/pnpm/.NET/OS、全ソース・試験・依存・fixtureと証跡hashを照合した。
+- 今回の最終固定EXEの通知GUI 2群とsmokeは、入力・試験・実行方式・隔離コピーとEXEのSHA256一致を確認して再利用。確認済みの0.87.14の製品変更・再発行なし。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170,693,021 bytes**、SHA256 `606b48cfe671623b7018264ad4028cc479c014bd04a9416f179f188974ec13a9`。既存feedと版も一致する。検証後の変更はこの記録だけ。stage/worktreeの一致・tree ID・commit/tree・両remote headとclean状態は`.artifacts/commit-validation-notification-table-08714/`へ記録する。今回の追加試験出力と再利用証跡は保護し削除0件。Release/deployは行わない。
+## 2026-10-25: 通知種類のテーブルと編集ダイアログ 0.87.14
+
+- cleanなmain `ce1c630`で`git pull --ff-only`を実行し、Already up to dateを確認して着手。通知種類を共通SettingsContent/SettingsListLayoutの1テーブル（通知名・通知先・表示時間・読み上げ・MCP Events・編集）にし、提供元マークと説明ヒント、必須・固定・停止中・仕様変更・読み上げ前提不足を表示。鉛筆から共通SettingsDialogで編集し、OKで種類単位に保存する。利用できない種類の設定削除、読み上げ共通値、受け取り方の案内は保持した。
+- 内部のsettings-page actionで元の上書き値・提供元/種類ID・通知仕様を照合してから既存の原子的保存へ渡す。他の通知や共通読み上げ設定を保持し、未変更のOKでは既定値を明示化しない。取消では保存せず、失敗・競合では入力とエラーを残す。設定スキーマ・保存ファイル・公開APIの追加削除はなく、発行済み0.87.13からpatchを増加した。
+- 発行前レビューは阻害指摘なし。目視後に一覧の必須・秒数表記を短縮し、未使用importと正本文書を整理。最終差分で型検査・build成功、通知ポリシー/配送/履歴/音声、新しい種類単位保存、設定page/client/host/検索、翻訳・配色・Shell境界・automationの**18ファイル・138/138、fail/skip 0**。追加した恒久試験は保存・競合・制約・同名異提供元の6件で、見た目比較テストは追加していない。
+- ソースと最終固定EXEの隔離GUIで各**2群**成功、pageerrorなし。必須/固定/停止中/仕様変更/TTS不足、取消/Escape/変更なしOK、入力不正時の保持、通知設定の一括確定、別種類・共通音声の外部変更の保持、同一種類競合拒否、停止Applet編集、未知の設定保持、検索anchor、編集ボタンへのfocus復帰を確認。明るい1280px・暗い900px・明るい720pxとヒントOFFの重要状態表示を確認。途中の3失敗はfixtureの最低ホスト版宣言・検索結果の表示前提・非同期focus待ちを修正して解消した。成功profileはソース`notification-table-ui-1792891035029`、固定EXE`notification-table-ui-1792891227202`。
+- `publish.bat`終了0。本体・EXE・ASAR内Default Shell・feedは**0.87.14**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**170693021 bytes**、SHA256 `606b48cfe671623b7018264ad4028cc479c014bd04a9416f179f188974ec13a9`。feedのsize/hash、FileVersion/ProductVersion、隔離コピーを照合し固定smokeも成功。証跡は`.artifacts/notification-table-08714/`のレビュー・完全log/コマンド/終了コード・入力hash・最終照合・証跡hash。発行後の製品変更なし。
+- 整理は削除0件。今回のGUI成功はソース2回・固定EXE1回で方式別3回以内、途中失敗と過去の照合用証跡は保持。今回のfixtureプロセス終了を確認した。実利用設定・物理入力・実TTS/MCP送信・Windows/desktop通知配送・通常終了は今回未確認。commit/push/Release/deployは行っていない。
 ## 2026-10-25: 設定UI 0.87.8～0.87.13のコミット検証
 
 - 利用者が最終0.87.13を確認してcommit/pushを依頼。main `9685a04`上の23対象ファイルをレビューし、阻害指摘なし。索引間隔、Section/一覧/操作列の整理、ジェスチャー有効化・フィルター高さ、MCPクライアント自動取得/Schema、Codex連携/接続設定/トークン・登録操作と関連文書だけを対象とする。dirtyのためpull/stash/統合なし。fetchと両push先の読取でGitHub/AQUAのmainが`9685a04`に一致し、実効author/committerを確認した。

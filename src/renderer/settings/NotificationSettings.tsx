@@ -16,13 +16,16 @@ import {
   resolveNotificationPolicy,
 } from '../../shared/notification-types';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { NotificationTypeDialog } from './NotificationTypeDialog';
+import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
+import { SettingsListLayout, ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { SettingsCombobox } from '../settings-ui/SettingsCombobox';
 import { Toggle } from '../settings-ui/Toggle';
 import {
   SettingsSection,
   SettingsField,
-  SettingsChoice,
+  SettingsContent,
   SettingsActions,
 } from '../settings-ui/SettingsSections';
 const targetTitles = {
@@ -30,8 +33,6 @@ const targetTitles = {
   desktop: hostText('settings.notificationSettings.desktop'),
   windows: hostText('settings.notificationSettings.windows'),
 };
-const ownerGroup = (type: NotificationTypeEntry) =>
-  type.ownerKind === 'host' ? 'host' : JSON.stringify([type.ownerKind, type.ownerId]);
 const reasonTitles: Record<string, string> = {
   'type-definition-changed': hostText('settings.notificationSettings.changed'),
 };
@@ -95,27 +96,10 @@ export function NotificationSettings({
     ['queued', 'generating', 'waitingPlayback', 'playing'].includes(j.state),
   );
   const overrides = settings.notificationPreferences?.overrides ?? [];
-  const change = (type: NotificationTypeEntry, patch: Partial<NotificationPreference>) => {
-    const key = notificationTypeKey(type),
-      current = overrides.find((r) => notificationTypeKey(r) === key);
-    const next = overrides.filter((r) => notificationTypeKey(r) !== key);
-    const updated: NotificationPreference = {
-      ownerKind: type.ownerKind,
-      ownerId: type.ownerId,
-      typeId: type.typeId,
-      ...current,
-      ...patch,
-    };
-    // Keep edits valid when an older saved preference lacks newly required controls.
-    if (updated.targets && type.requiredTargets.length)
-      updated.targets = [...new Set([...updated.targets, ...type.requiredTargets])];
-    next.push(updated);
-    editor.edit({
-      ...settings,
-      notificationPreferences: { ...settings.notificationPreferences, overrides: next },
-    });
-  };
-  const owners = [...new Set(types.map(ownerGroup))];
+  const [editing, setEditing] = useState<{
+    type: NotificationTypeEntry;
+    original: NotificationPreference | null;
+  } | null>(null);
   const unknown = overrides.filter(
     (r) => !types.some((t) => notificationTypeKey(t) === notificationTypeKey(r)),
   );
@@ -134,187 +118,124 @@ export function NotificationSettings({
   useSettingsFeedback({ busy: pending, error });
   return (
     <div className="settings-sections notification-settings">
-      {owners.map((owner) => {
-        const rows = types.filter((t) => ownerGroup(t) === owner);
-        return (
-          <SettingsSection
-            key={owner}
-            variant="card"
-            title={rows[0].ownerTitle}
-            aria-label={translate('settings.notificationSettings.ownerLabel', {
-              owner: rows[0].ownerTitle,
-            })}
-          >
-            {rows.map((type) => {
+      <SettingsContent>
+        <SettingsListLayout title={translate('settings.notificationSettings.list')} toolbar={null}>
+          <thead>
+            <tr>
+              <th scope="col">{translate('settings.notificationSettings.name')}</th>
+              <th scope="col">{translate('settings.notificationSettings.targets')}</th>
+              <th scope="col">{translate('settings.notificationSettings.durationTitle')}</th>
+              <th scope="col">{translate('settings.notificationSettings.speech')}</th>
+              <th scope="col">MCP Events</th>
+              <th scope="col" className="settings-list-actions-heading">
+                {translate('settings.notificationSettings.editColumn')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {types.map((type) => {
               const policy = resolveNotificationPolicy(type, settings);
               const row = overrides.find(
-                (r) => notificationTypeKey(r) === notificationTypeKey(type),
+                (item) => notificationTypeKey(item) === notificationTypeKey(type),
               );
-              const speaking = row?.speak === true;
-              const eventSending = row?.mcpEvents === true;
-              const delivery = policy.selectedTargets.map((target) => targetTitles[target]);
-              const deliverySummary = delivery.length
-                ? delivery.join('・')
-                : eventSending
-                  ? speaking
-                    ? translate('settings.notificationSettings.speechAndEvents')
-                    : translate('settings.notificationSettings.eventsOnly')
-                  : speaking
-                    ? translate('settings.notificationSettings.speechOnly')
-                    : translate('settings.notificationSettings.centerOnly');
               const duration =
                 type.lifetimePolicy === 'condition'
                   ? translate('settings.notificationSettings.untilResolved')
                   : policy.durationSeconds === null
                     ? translate('settings.notificationSettings.untilClosed')
-                    : translate('settings.notificationSettings.duration', {
+                    : translate('settings.notificationSettings.durationValue', {
                         durationSeconds: policy.durationSeconds,
                       });
-              const summary = [
-                deliverySummary,
-                duration,
-                translate('settings.notificationSettings.speechState', {
-                  value: speaking ? 'ON' : 'OFF',
-                }),
-                `MCP Events: ${eventSending ? 'ON' : 'OFF'}`,
-              ].join(' ／ ');
+              const owner =
+                type.ownerKind === 'applet' && type.ownerId.startsWith('at365.')
+                  ? type.ownerTitle
+                      .replace(/^Applet\./, '')
+                      .replace(/\.at365$/, '')
+                      .trim() || type.ownerTitle
+                  : type.ownerTitle;
               return (
-                <SettingsSection
-                  variant="row"
-                  title={type.title}
-                  hint={type.description}
-                  description={[
-                    summary,
-                    type.ownerKind === 'applet' &&
-                    !['starting', 'running'].includes(type.ownerState)
-                      ? translate('settings.notificationSettings.appletStopped')
-                      : '',
-                    policy.reason ? (reasonTitles[policy.reason] ?? policy.reason) : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ／ ')}
-                  collapsible
-                  className="notification-setting-card"
+                <tr
                   key={notificationTypeKey(type)}
                   {...settingAnchor('notifications', notificationSettingKey(type))}
                 >
-                  <SettingsField
-                    title={translate('settings.notificationSettings.targets')}
-                    className="settings-field-wide"
-                  >
-                    <div className="settings-choice-grid">
-                      {type.allowedTargets.map((target) => (
-                        <SettingsChoice
-                          key={target}
-                          label={targetTitles[target]}
-                          ariaLabel={translate('settings.notificationSettings.targetLabel', {
-                            title: type.title,
-                            target: targetTitles[target],
-                          })}
-                          checked={policy.selectedTargets.includes(target)}
-                          disabled={type.requiredTargets.includes(target)}
-                          description={
-                            type.requiredTargets.includes(target)
-                              ? translate('settings.notificationSettings.required')
-                              : undefined
-                          }
-                          onChange={(on) =>
-                            change(type, {
-                              targets: on
-                                ? [...policy.selectedTargets, target]
-                                : policy.selectedTargets.filter((t) => t !== target),
-                            })
-                          }
-                        />
-                      ))}
-                      <SettingsChoice
-                        label={translate('settings.notificationSettings.speech')}
-                        description={translate('settings.notificationSettings.speechDescription')}
-                        ariaLabel={translate('settings.notificationSettings.speechLabel', {
-                          title: type.title,
-                        })}
-                        checked={speaking}
-                        onChange={(speak) => change(type, { speak })}
-                      />
-                      <SettingsChoice
-                        label="MCP Events"
-                        description={translate('settings.notificationSettings.eventDescription')}
-                        ariaLabel={translate('settings.notificationSettings.eventLabel', {
-                          title: type.title,
-                        })}
-                        checked={eventSending}
-                        onChange={(mcpEvents) => change(type, { mcpEvents })}
-                      />
+                  <td className="settings-list-wrap">
+                    <span className="command-provider-badge" title={type.ownerTitle}>
+                      {owner}
+                    </span>
+                    <div className="settings-list-title">
+                      <strong>{type.title}</strong>
+                      <SettingsHintIcon title={type.title} hint={type.description} />
                     </div>
-                    <SettingsChoice
-                      label={translate('settings.notificationSettings.centerOnly')}
-                      ariaLabel={translate('settings.notificationSettings.centerLabel', {
-                        title: type.title,
-                      })}
-                      checked={!policy.selectedTargets.length && !speaking && !eventSending}
-                      disabled={!!type.requiredTargets.length}
-                      onChange={(on) => {
-                        if (on) change(type, { targets: [], speak: false, mcpEvents: false });
-                      }}
-                    />
-                  </SettingsField>
-                  {speaking && (!auxiliary?.configured || !effective.voice) && (
-                    <SettingsField
-                      title={translate('settings.notificationSettings.speechSettings')}
-                      description={translate(
-                        'settings.notificationSettings.speechSettingsRequirements',
+                    {type.ownerKind === 'applet' &&
+                      !['starting', 'running'].includes(type.ownerState) && (
+                        <small>{translate('settings.notificationSettings.appletStopped')}</small>
                       )}
-                    >
-                      <button onClick={() => select('tts')}>
-                        {translate('settings.notificationSettings.openSpeech')}
-                      </button>
-                    </SettingsField>
-                  )}
-                  {type.lifetimePolicy === 'userDuration' ? (
-                    <SettingsField
-                      title={translate('settings.notificationSettings.durationSeconds')}
-                      hint={translate('settings.notificationSettings.durationHint')}
-                    >
-                      <SettingsInput
-                        type="text"
-                        inputMode="numeric"
-                        aria-label={translate('settings.notificationSettings.durationLabel', {
+                    {policy.reason && <small>{reasonTitles[policy.reason] ?? policy.reason}</small>}
+                  </td>
+                  <td className="settings-list-wrap">
+                    {policy.selectedTargets.length
+                      ? policy.selectedTargets.map((target) => (
+                          <div key={target}>
+                            {targetTitles[target]}
+                            {type.requiredTargets.includes(target) &&
+                              `（${translate('settings.notificationSettings.requiredMark')}）`}
+                          </div>
+                        ))
+                      : translate('settings.notificationSettings.center')}
+                  </td>
+                  <td className="settings-list-wrap">
+                    {duration}
+                    {type.lifetimePolicy !== 'userDuration' && (
+                      <small>{translate('settings.notificationSettings.fixed')}</small>
+                    )}
+                  </td>
+                  <td className="settings-list-wrap">
+                    {row?.speak === true ? 'ON' : 'OFF'}
+                    {row?.speak === true && (!auxiliary?.configured || !effective.voice) && (
+                      <small>
+                        {translate('settings.notificationSettings.speechSettingsRequirements')}
+                      </small>
+                    )}
+                  </td>
+                  <td>{row?.mcpEvents === true ? 'ON' : 'OFF'}</td>
+                  <td className="settings-list-actions-cell">
+                    <div className="settings-list-actions">
+                      <button
+                        type="button"
+                        className="settings-list-icon"
+                        disabled={busy}
+                        aria-label={translate('settings.notificationSettings.edit', {
                           title: type.title,
+                          owner: type.ownerTitle,
                         })}
-                        placeholder={translate('settings.notificationSettings.untilClosed')}
-                        value={
-                          row?.durationSeconds === undefined
-                            ? (type.defaultDurationSeconds ?? '')
-                            : (row.durationSeconds ?? '')
+                        onClick={() =>
+                          setEditing({
+                            type: structuredClone(type),
+                            original: row ? structuredClone(row) : null,
+                          })
                         }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          change(type, {
-                            durationSeconds: (value === ''
-                              ? null
-                              : /^\d+$/.test(value)
-                                ? Number(value)
-                                : value) as number | null,
-                          });
-                        }}
-                      />
-                    </SettingsField>
-                  ) : (
-                    <SettingsField
-                      title={translate('settings.notificationSettings.durationTitle')}
-                      description={
-                        type.lifetimePolicy === 'condition'
-                          ? translate('settings.notificationSettings.unresolvedHint')
-                          : translate('settings.notificationSettings.closedHint')
-                      }
-                    />
-                  )}
-                </SettingsSection>
+                      >
+                        <ListIcon kind="pencil" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               );
             })}
-          </SettingsSection>
-        );
-      })}
+          </tbody>
+        </SettingsListLayout>
+      </SettingsContent>
+      {editing && (
+        <NotificationTypeDialog
+          type={editing.type}
+          original={editing.original}
+          settings={settings}
+          speechConfigured={!!auxiliary?.configured && !!effective.voice}
+          invoke={invoke}
+          onClose={() => setEditing(null)}
+          select={select}
+        />
+      )}
       {!!unknown.length && (
         <SettingsSection
           title={translate('settings.notificationSettings.unavailable')}
