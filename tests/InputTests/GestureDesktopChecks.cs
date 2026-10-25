@@ -66,6 +66,33 @@ internal static partial class Program
                 }
         return null;
     }
+    private static bool IsDesktopContextMenu()
+    {
+        var info = new DesktopGuiInfo { Size = (uint)Marshal.SizeOf<DesktopGuiInfo>() };
+        return DesktopGuiThreadInfo(0, ref info) && (info.Flags & 0x1C) != 0 && GestureTarget.IsDesktop(info.MenuOwner);
+    }
+    private static async Task DismissDesktopContextMenu()
+    {
+        if (!IsDesktopContextMenu()) return;
+        Key(0x1B); Key(0x1B, true);
+        var deadline = Environment.TickCount64 + 1000;
+        while (IsDesktopContextMenu() && Environment.TickCount64 < deadline) await Task.Delay(10);
+        if (IsDesktopContextMenu()) throw new Exception("The desktop context menu did not close.");
+    }
+    private static string InputFocusDiagnostic()
+    {
+        var info = new DesktopGuiInfo { Size = (uint)Marshal.SizeOf<DesktopGuiInfo>() };
+        var available = DesktopGuiThreadInfo(0, ref info);
+        return $"foreground={GetForegroundWindow()}, gui={available}, flags={info.Flags}, menuOwner={info.MenuOwner}, capture={info.Capture}";
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DesktopGuiInfo {
+        public uint Size, Flags;
+        public nint Active, Focus, Capture, MenuOwner, MoveSize, Caret;
+        public Rect CaretRect;
+    }
+    [DllImport("user32.dll", EntryPoint = "GetGUIThreadInfo")]
+    private static extern bool DesktopGuiThreadInfo(uint thread, ref DesktopGuiInfo info);
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll", EntryPoint = "PostMessageW")] private static extern bool PostFixtureMessage(nint window, uint message, nuint wParam, nint lParam);
 }

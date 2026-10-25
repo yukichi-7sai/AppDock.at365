@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-25: デスクトップ前面化修正0.88.4のコミット検証
+
+- main `85cc8c3` 上の8ファイルを実装時の最終入力一覧と照合し、無関係な差分・stageなしを確認。dirtyのためpull/stashは行わずfetchだけ実施し、GitHub/AQUAの両mainが `85cc8c3` に一致することとGit名義を確認した。製品修正は追加せず **0.88.4** と発行物を維持し、再発行なし。
+- 全115個のNode試験、main/shared/renderer/SDK/Runtime・依存/固定ツール/ビルド定義を前回892件の封印入力と照合した。差分はnative GestureTargetの前面化、実入力fixture/GUI runner、packageの版、文書だけ。現在の関連7ファイル **93件**と、影響のない前回102ファイル **746件**の成功を証跡鎖と入力hashで再利用した。最終native/updater生成物を使うall-in-one/applet-defaults/lifecycle/dotnet-pages/applet-packages/portable-updatesの6ファイル **53/53件**を追加実行し、標準 **115ファイル・892/892、fail/skip 0** を確認。Node 24.22.1/pnpm 12.10.1/.NET SDK 10.0.402/Runtime 10.0.13とLUNA/OS/lockfile/toolchainの一致も確認した。
+- 変更部分と影響先をレビューし、対象限定・取消・前面確認・入力キューの解放、4検査の保持とメニュー後片付け、専用GUIのデスクトップ/通常操作に阻害指摘なし。実装時の **230/230実入力**、通知13項目・模擬キー状態10項目、型検査/build/publish、固定EXE GUI44コマンドとソース限定12コマンドを、ソース・スクリプト・EXE/コピー/DLL hashの一致で再利用した。今回は物理入力やGUIを再実行していない。
+- 発行EXEは **0.88.4 / 170,673,988 bytes / SHA256 aa50211de386070f24e7becddd999385baa1607b4405eb44c9c44d195cf7d70c** のまま。証跡は `.artifacts/commit-validation-desktop-0884/` のplan/入力一覧・再利用照合、53件完全log/終了コード、環境、stage/commit tree・両remote照合。既存資料を保護し、追加GUIフォルダーと削除対象なし。stage内容と作業ファイルの一致、commit treeと検証済みstage treeの一致を確認してcommit/pushする。結果の正本は同フォルダーの `commit.json` / `push.json`。Release/実利用deployは行わない。
+
+## 2026-10-25: デスクトップ実入力4失敗の調査・修正 0.88.4
+
+- main `85cc8c3` / cleanを確認してpull --ff-only成功（更新なし）。前項までのデスクトップ4失敗を調査した。製品ソースを変更せずInputHostとfixtureの隔離コピーへ診断出力を追加し、入力先・前面対象・選択候補・前面化結果・取消を追跡した。最初のdesktop条件ではProgman/Explorerを正しく選び、候補22件と修飾キー抑止なしを確認したが、通常と入力キュー接続後のSetForegroundWindowがともにfalseで開始を取り消していた。その右クリック復元でExplorerの `#32768` メニューが開き、次のexe条件はデスクトップではなくメニュー上で実行されていた。
+- `GestureTarget.TryActivate` の既存worker内の補助経路へBringWindowToTopを追加し、表示順とアクティブ状態を更新してから前面化を要求する。開始時の対象/source・取消・可視性の検査、実前面対象の待機、入力キューの必ずの解除を維持し、フック内の待機・新たなキー送信・常時最前面化は追加しない。本体を開く既存の前面化経路と同じ活性化手順へ揃えた。仕様参照はMicrosoftの[BringWindowToTop](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-bringwindowtotop)と[GetGUIThreadInfo](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getguithreadinfo)。設定・保存ファイル・公開API・SDK/Runtime契約は不変で、通常修正の **0.88.4** へパッチ更新。
+- テストは4項目とも維持した。各ケースの前後でGetGUIThreadInfoからデスクトップ所有のメニューだけを閉じ、操作開始点がデスクトップであることを2項目追加。座標の位置でメニューを探す中間版ではメニューを見落とし、旧0.88.3の実入力で225成功/5失敗（追加した開始点検査を含む）だった。最終版はメニュー所有元で判定する。試験用Windowを前面化できない場合のGUI状態診断も追加した。
+- 修正版InputHostで実入力 **230/230成功・失敗0**。従来の224成功とデスクトップ4項目、追加した開始点2項目がすべて成功した。1/2段階・取消・first/all/順序/重複除去・クリック/ホイール/キー・通常入力復元・除外・フォーカス変更・前面移動の既存検査を含む。記録は `fixed-full-input-complete.log`。型検査/build/native/helper build成功、関連Node7ファイル **93/93、fail/skip 0**、表示通知13項目と模擬キー状態10項目も成功。Pause/F13〜F24はOSへ送信・登録していない。全標準回帰は今回再実行していない。
+- 実JS表示の試験へdesktop条件/explorer.exe条件を追加。非アクティブなデスクトップからの開始、1→2方向と候補更新、ウィンドウ中央指定での開始モニター中央への配置、元Windowが覆われないこと、解除時の保存順と表示終了を検査する。`--desktop-only` で2条件へ限定可能。通常4種類×明暗と合わせて10組40コマンド、描画終了後4コマンドの合計44件がソース/固定EXEで成功。限定モード12コマンドも成功。初回のfixtureはdesktop条件へprocessesを指定してschemaに拒否され、限定モードの後半はexe条件を残して失敗したため、既存schemaに合わせ、描画終了検査前にglobalへ戻して修正した。
+- 途中の再試験は入力開始前のfixture前面化で停止した。前面Window=NULLを読み取り、入力desktopはDefault/対話セッションActiveであることを確認。画面確認ツールは環境エラーで起動不可だった。試行したcaptionクリックによる回避は撤回し、利用者がデスクトップをクリックした後、同じ前面化処理のまま限定GUIと発行EXE GUIが成功した。これらの開始前停止は製品テストの成功件数へ含めず、失敗log/profileを保持する。
+- 発行前レビューで対象限定・取消・前面確認・入力キュー解放・既存UI/APIの維持を確認し、阻害指摘なし。`publish.bat` 終了0。発行EXEは **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe / 0.88.4 / 170,673,988 bytes / SHA256 aa50211de386070f24e7becddd999385baa1607b4405eb44c9c44d195cf7d70c**。File/ProductVersion、update.jsonのsize/hash/版、ASARのpackage/Default Shell/全rendererと待機表示main/preload、同梱InputHostと開発用DLL、固定GUIコピーを照合した。InputHostは `a5cb18cd46541089dc453dacadd6b288affa708feed4105521eee74e583903ff`、ASARは `b0f96879cdc8779c847bea0336c112769baf0a7e86b162f6e0450924e22dbed9`。配布DLLの通知13項目も成功した。
+- 最終固定EXE profileは `.artifacts/gesture-web-ui-1792920245161/`、ソース通常は `gesture-web-ui-1792918987645/`、限定は `gesture-web-ui-1792919962948/`。Explorerの候補4行と方向表示を目視した。証跡は `.artifacts/desktop-gesture-diagnosis/` の診断ソース/差分・比較/回帰/GUI/publish log、review、入力一覧・発行物/コピーhash・validation。診断プロセス終了を確認し、不要な自己完結runtime・bin/obj等6フォルダーを削除。診断DLLのhashと小さなDLLコピー、診断ソース、失敗資料、旧再利用証跡を保持し、今回の成功GUIは通常/限定/固定各1回で削除対象なし。混在DPI・UAC/ロック画面・性能は今回未検証。今回は未コミット、push/Release/実利用deployなし。
+
 ## 2026-10-25: JS待機表示の採用・ネイティブ画面の撤去 0.88.3
 
 - 利用者が0.88.2の見た目と動作を確認し、JS方式の採用、不要なネイティブ画面の整理、commit/pushを依頼した。main `c7f51db` 上のJS試作を引き継ぎ、dirtyのためpull/stashなし。fetchと両push先の読み取りでGitHub/AQUAのmainが `26fdf3e` に一致すること、実効Git名義を確認した。今回のpushには前回の待機表示コミット `c7f51db` も含む。

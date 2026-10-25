@@ -67,6 +67,8 @@ delete env.ELECTRON_RUN_AS_NODE;
 let app, child;
 const checks = [];
 const portable = process.argv.includes('--portable');
+const desktopOnly = process.argv.includes('--desktop-only');
+const groups = desktopOnly ? 2 : 10;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 let artifactHash;
 (async () => {
@@ -120,7 +122,7 @@ let artifactHash;
     };
   });
   assert.equal(handles.focusable, false);
-  for (const theme of ['dark', 'light']) {
+  for (const theme of desktopOnly ? ['dark'] : ['dark', 'light']) {
     await main.evaluate(async (theme) => {
       const s = await window.dock.snapshot();
       s.settings.value.host.theme = theme;
@@ -130,18 +132,37 @@ let artifactHash;
       () => indicator.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
       'shared appearance updated',
     );
-    for (const style of ['pill', 'compact', 'ring', 'classic']) {
-      await main.evaluate(async (style) => {
-        const s = await window.dock.snapshot();
-        s.settings.value.gestures.indicatorStyle = style;
-        await window.dock.saveSettings(s.settings.value, s.settings.revision);
-      }, style);
+    for (const variant of desktopOnly
+      ? ['desktop', 'exe']
+      : ['pill', 'compact', 'ring', 'classic', ...(theme === 'dark' ? ['desktop', 'exe'] : [])]) {
+      const desktop = variant === 'desktop' || variant === 'exe';
+      const style = desktop ? 'pill' : variant;
+      await main.evaluate(
+        async ({ style, desktop, scope }) => {
+          const s = await window.dock.snapshot();
+          s.settings.value.gestures.indicatorStyle = style;
+          s.settings.value.gestures.activateOnStart = desktop;
+          for (const binding of s.settings.value.gestures.bindings)
+            binding.when = {
+              scope: desktop ? scope : 'global',
+              appletIds: [],
+              processes: scope === 'exe' ? ['explorer'] : [],
+            };
+          await window.dock.saveSettings(s.settings.value, s.settings.revision);
+        },
+        { style, desktop, scope: variant },
+      );
       await wait(180);
-      const exchange = path.join(profile, theme + '-' + style);
+      const exchange = path.join(profile, theme + '-' + variant);
       fs.mkdirSync(exchange);
       child = spawn(
         path.join(root, 'tests/InputTests/bin/Release/net10.0-windows/AppDock.InputTests.exe'),
-        ['--indicator-stages', handles.host, handles.overlay, exchange],
+        [
+          desktop ? '--desktop-indicator-stages' : '--indicator-stages',
+          handles.host,
+          handles.overlay,
+          exchange,
+        ],
         { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
       );
       let childOutput = '';
@@ -163,7 +184,8 @@ let artifactHash;
             style + ' ' + stage + ' mouse stage',
           );
           const state = JSON.parse(fs.readFileSync(path.join(exchange, stage + '.json'), 'utf8'));
-          assert.equal(String(state.foreground), handles.host, 'foreground retained');
+          assert.equal(state.targetMatched, true, 'gesture target retains foreground');
+          if (!desktop) assert.equal(String(state.foreground), handles.host, 'foreground retained');
           assert.equal(
             state.overlayFlags & 0x080000a0,
             0x080000a0,
@@ -191,6 +213,17 @@ let artifactHash;
               .find((win) => win.webContents.getURL().endsWith('/gesture-indicator.html'))
               .getBounds(),
           );
+          if (desktop) {
+            const center = await app.evaluate(
+              ({ screen }, point) => screen.screenToDipPoint(point),
+              { x: state.centerX, y: state.centerY },
+            );
+            assert(
+              Math.abs(current.x + current.width / 2 - center.x) <= 1 &&
+                Math.abs(current.y + current.height / 2 - center.y) <= 1,
+              'desktop window-center resolves to the starting monitor center',
+            );
+          }
           if (style === 'pill') {
             if (stage === 'one') first = current;
             else
@@ -255,7 +288,7 @@ let artifactHash;
             );
           }
           await indicator.screenshot({
-            path: path.join(profile, `${theme}-${style}-${stage}.png`),
+            path: path.join(profile, `${theme}-${variant}-${stage}.png`),
           });
           fs.writeFileSync(path.join(exchange, stage + '.continue'), 'go');
         }
@@ -275,22 +308,34 @@ let artifactHash;
         'overlay hides after release',
       );
       checks.push(
-        `${theme}/${style}: actual mouse input / 1-to-2 direction update / ordered captions / transparent no-focus overlay / release hides`,
+        `${theme}/${variant}: actual mouse input / 1-to-2 direction update / ordered captions / transparent no-focus overlay / release hides`,
       );
     }
   }
   const callsPath = path.join(profile, 'data/storage/test.web-indicator/calls.json');
   await until(
-    () => fs.existsSync(callsPath) && JSON.parse(fs.readFileSync(callsPath, 'utf8')).length === 32,
+    () =>
+      fs.existsSync(callsPath) &&
+      JSON.parse(fs.readFileSync(callsPath, 'utf8')).length === groups * 4,
     'all commands execute on release',
   );
   assert.deepEqual(
     JSON.parse(fs.readFileSync(callsPath, 'utf8')),
-    Array(8).fill(['a', 'b', 'c', 'd']).flat(),
+    Array(groups).fill(['a', 'b', 'c', 'd']).flat(),
   );
   checks.push(
     'pill keeps HWND bounds while 1 caption becomes 4; original command selection and order retained',
   );
+  if (desktopOnly) {
+    await main.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      s.settings.value.gestures.activateOnStart = false;
+      for (const binding of s.settings.value.gestures.bindings)
+        binding.when = { scope: 'global', appletIds: [], processes: [] };
+      await window.dock.saveSettings(s.settings.value, s.settings.revision);
+    });
+    await wait(180);
+  }
   const errors = (await main.evaluate(() => window.dock.snapshot())).logs.filter(
     (entry) => entry.level === 'error',
   );
@@ -338,12 +383,14 @@ let artifactHash;
     });
   });
   await until(
-    () => JSON.parse(fs.readFileSync(callsPath, 'utf8')).length === 36,
+    () => JSON.parse(fs.readFileSync(callsPath, 'utf8')).length === (groups + 1) * 4,
     'input capture still executes gestures without a display',
   );
   assert.deepEqual(
     JSON.parse(fs.readFileSync(callsPath, 'utf8')),
-    Array(9).fill(['a', 'b', 'c', 'd']).flat(),
+    Array(groups + 1)
+      .fill(['a', 'b', 'c', 'd'])
+      .flat(),
   );
   checks.push(
     'renderer crash removes the window, reports the display failure once and preserves gesture execution',

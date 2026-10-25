@@ -16,7 +16,7 @@
 - gestureは1段階移動の`move-up/down/left/right`、2段階移動の`move-<最初の方向>-<次の方向>`（例: `move-right-up`、`move-up-down`）、`click-left/middle`、`wheel-up/down`、`key:<キー>`。2段階は上下左右の異なる2方向の12種類で、逆方向への折り返しも含む。同じ方向の重複や3段階以上のIDは受け付けない。キーは既存ショートカットの正規化（Ctrl/Alt/Shift、英数字、F1〜F24、矢印、対応する記号・特殊キー）を使う。WinやOS専用の保護された入力は対象外。Tabは設定画面の特殊キー選択から登録できる。
 - whenは`global/desktop/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`と任意の`excludeDesktop`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。ページ条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。本体5ページ（設定を含む）・Applet各ページの候補、表示名、対象ID、保存済みApplet指定の保持は[ページ候補と識別](keybindings.md#ページ候補と識別)に従う。
 - `desktop`はWindows Shellが所有するデスクトップの背景・アイコン領域だけに一致する。プロセス名がexplorerであることだけでは一致させず、通常のフォルダー画面とタスクバーを含めない。`excludeDesktop: true`は`global`と`exe`で使用でき、その行だけをデスクトップの候補から除外する。省略はfalse。他にデスクトップで有効な行がなければ右押下を捕捉せず、通常入力を通す。`desktop`条件の別の行は引き続き利用できる。
-- `activateOnStart`は非アクティブなウィンドウ・デスクトップをアクティブにして同じ右押下で開始する設定。
+- `activateOnStart`は非アクティブなウィンドウ・デスクトップをアクティブにして同じ右押下で開始する設定。通常の前面化要求で移動できない場合は、入力フックとは別のworkerで開始元・対象・取消状態を照合し、一時的な入力キュー接続とBringWindowToTopで対象の表示順/アクティブ状態を更新する。実際の前面対象を確認してから開始を確定し、接続は必ず解除する。
 - `excludedProcesses`は全条件より優先。`enabled`は永続設定。トレイの一時停止は稼働中だけで、再起動で解除する。
 - `gestures`がない場合は`defaultGestures()`の空の割り当てを使う。Applet内の旧ジェスチャー設定は読み取らない。保存済みの本体設定と明示的な空配列を保持する。
 - manifestの`defaultGestureBindings`は同じAppletの宣言コマンドのみ・最大100件。新規Appletの初回発見でコピーし、`gestureDefaultsInitialized`で再追加を防ぐ。既存Appletへ更新時の既定値を押し込まない。
@@ -111,7 +111,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - 「いつ・どこで」のデスクトップはグローバルの直下へ置く。グローバル・指定したexeを選んだ場合だけ、その下に「デスクトップを除外」のチェック項目を表示する。初期OFFで、保存・再編集・条件表示・検索に反映する。キーボードのショートカット条件へは追加しない。
 - scripts/gesture-command-checks.cjsをgestures-ui-test.cjsから呼び、一覧/編集/並べ替え/保存再起動/両テーマ3幅を検証する。APPDOCK_GESTURE_UI_ONLY=1は物理入力試験を省略する明示モードで、実入力の成功とは区別する。ショートカット側の共用部品もshortcuts-ui-test.cjsで検証する。
 - `APPDOCK_GESTURE_INDICATOR_ONLY=1`は待機表示だけを検証する明示モード。`scripts/gesture-indicator-checks.cjs`で4種類の選択・透過・表示なしの保持・明暗テーマ・3幅の見本を確認し、既存ハーネスで再起動後の設定保持も確認する。物理入力とコマンド一覧全体の回帰は含まない。
-- `dev.bat exec node scripts/gesture-web-indicator-ui-test.cjs [--portable]`は隔離した本体とマウス専用InputTests helperでJS待機表示を確認する。4種類×明暗で、1/2段階の方向とコマンド更新、サイズ固定、非アクティブ/透過/ツールWindowフラグ、IPCの送信元とsequence検査、右解放後の非表示と実行順を確認する。最後に描画プロセス障害を起こし、表示なしでも実行を続け、共通エラーを一度だけ報告することを確認する。Pause/F13〜F24はOSへ送信・登録しない。
+- `dev.bat exec node scripts/gesture-web-indicator-ui-test.cjs [--portable] [--desktop-only]`は隔離した本体とマウス専用InputTests helperでJS待機表示を確認する。4種類×明暗で、1/2段階の方向とコマンド更新、サイズ固定、非アクティブ/透過/ツールWindowフラグ、IPCの送信元とsequence検査、右解放後の非表示と実行順を確認する。デスクトップ限定/Explorerのexe条件では、非アクティブなデスクトップからの開始、モニター中央への配置、元のウィンドウが覆われないことも確認する。`--desktop-only`はこの2条件だけを検査する。最後に描画プロセス障害を起こし、表示なしでも実行を続け、共通エラーを一度だけ報告することを確認する。Pause/F13〜F24はOSへ送信・登録しない。
 
 一時停止/再開は本体コマンド`appdock.gestures.togglePause`で切り替えます。トレイ内はチェック付き項目で、検索・キーからの実行も同期します。保存されない実行中の状態で、再起動後は解除します。配置の仕様は[タスクトレイ](tray-menu.md)を参照してください。
 

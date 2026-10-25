@@ -15,6 +15,7 @@ internal static partial class Program
         if(args is ["--gesture-key-state",var gestureAssembly]) return RunGestureKeyStateTests(gestureAssembly);
         if(args is ["--indicator-notices",var indicatorAssembly]) return RunIndicatorNoticeTests(indicatorAssembly);
         if(args is ["--indicator-stages",var indicatorTarget,var indicatorHandle,var indicatorExchange]) return RunIndicatorStages(indicatorTarget,indicatorHandle,indicatorExchange);
+        if(args is ["--desktop-indicator-stages",var desktopTarget,var desktopIndicator,var desktopExchange]) return RunIndicatorStages(desktopTarget,desktopIndicator,desktopExchange,true);
         if(args is ["--send" or "--send-inactive",var handle,var action]) {
             var sendCursor=Cursor.Position;
             Action? releaseBlocker=null;
@@ -122,7 +123,7 @@ internal static partial class Program
             await peer.RequestAsync("gestures.sync",configuration,CancellationToken.None);
             await Task.Delay(70);
         }
-        async Task Begin(){var deadline=Environment.TickCount64+2000;do{FocusTarget(form);await Task.Delay(80);}while(GetForegroundWindow()!=form.Handle&&Environment.TickCount64<deadline);if(GetForegroundWindow()!=form.Handle)throw new Exception("Gesture fixture did not become foreground.");Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
+        async Task Begin(){var deadline=Environment.TickCount64+2000;do{FocusTarget(form);await Task.Delay(80);}while(GetForegroundWindow()!=form.Handle&&Environment.TickCount64<deadline);if(GetForegroundWindow()!=form.Handle)throw new Exception("Gesture fixture did not become foreground: "+InputFocusDiagnostic());Cursor.Position=form.PointToScreen(new(330,220));Mouse(8);await Task.Delay(25);}
         async Task End(){Mouse(16);await Task.Delay(150);}
         void Check(bool condition,string name){Console.WriteLine((condition?"PASS ":"FAIL ")+name);if(!condition)failures++;}
         try{
@@ -255,12 +256,15 @@ internal static partial class Program
             var desktopPoint=DesktopPoint();Check(desktopPoint!=null,"a real desktop surface is available for input verification");
             if(desktopPoint is { } desktop){
                 foreach(var scope in new[]{"desktop","exe"}){
+                    await DismissDesktopContextMenu();
                     await Sync(scope:scope,activate:true,position:"window-center",processOverride:"explorer");n=Count();
+                    Check(AppDock.InputHost.GestureTarget.IsDesktop(AppDock.InputHost.GestureTarget.At(new(desktop.X,desktop.Y))),scope+" input starts on the desktop surface");
                     Cursor.Position=desktop;Mouse(8);await Task.Delay(150);Cursor.Position=new(desktop.X-80,desktop.Y);
                     indicatorDeadline=Environment.TickCount64+2000;
                     while(!IndicatorVisible()&&Environment.TickCount64<indicatorDeadline)await Task.Delay(20);
                     Check(IndicatorVisible()&&IndicatorCenteredOnMonitor(desktop),scope+" desktop window-center falls back to the starting monitor center");
                     await End();Check(Count()==n+1,scope+" matches the real desktop");
+                    await DismissDesktopContextMenu();
                 }
                 foreach(var scope in new[]{"global","exe"}){
                     await Sync(scope:scope,activate:true,excludeDesktop:true,processOverride:"explorer");n=Count();var downs=passthrough.Downs;
