@@ -13,6 +13,127 @@ const {
 const { hostCommands } = require('../out/main/shared/commands');
 const { readManifest, ExtensionManager } = require('../out/main/main/core/extensions');
 
+test('MCP defaults expose supported declared settings while other Applets retain opt-in', async (t) => {
+  const f = fixture(t);
+  f.applet.settings.push(
+    ...parseSettingDefinitions([
+      { key: 'newText', title: 'New text', type: 'string', default: 'default' },
+      {
+        key: 'secretText',
+        title: 'Hidden secret',
+        type: 'string',
+        default: 'SECRET_DEFAULT',
+        secret: true,
+        automation: true,
+      },
+      {
+        key: 'localFlag',
+        title: 'Local only',
+        type: 'boolean',
+        default: false,
+        localOnly: true,
+        automation: true,
+        generateCommands: ['toggle'],
+      },
+    ]),
+  );
+  const ops = require('../out/main/shared/appdock-api').operationsFor('mcp');
+  const toolsBefore = JSON.stringify(ops);
+  assert.equal(f.commands.get(f.applet.id).values.newText, 'default');
+  assert.equal(Object.hasOwn(f.commands.get(f.applet.id, 'applet').values, 'newText'), false);
+  assert.equal(
+    f.commands.commands().some((c) => c.id.endsWith('.newText.toggle')),
+    false,
+  );
+  const content = JSON.stringify([
+    f.commands.schema(f.applet.id),
+    f.commands.get(f.applet.id),
+    f.commands.commands(),
+  ]);
+  for (const hidden of ['secretText', 'SECRET_DEFAULT', 'localFlag'])
+    assert.equal(content.includes(hidden), false);
+  f.setExecute(false);
+  await f.run('update', { changes: { newText: 'saved' }, expectedRevision: f.commands.revision() });
+  assert.equal(f.settings.value.extensions[f.applet.id].settings.newText, 'saved');
+  assert.throws(
+    () =>
+      f.commands.execute(
+        f.applet.id + '.settings.update',
+        {
+          changes: { newText: 'other' },
+          expectedRevision: f.commands.revision(),
+          dryRun: true,
+        },
+        true,
+        'applet',
+      ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  await assert.rejects(f.run('localFlag.toggle'), { code: 'NOT_FOUND' });
+  assert.equal(JSON.stringify(ops), toolsBefore);
+  for (const key of ['automation', 'secret', 'localOnly'])
+    assert.throws(() =>
+      parseSettingDefinitions([
+        { key: 'invalid', title: 'Invalid', type: 'boolean', [key]: 'false' },
+      ]),
+    );
+});
+
+test('generated settings publication stays caller-scoped through catalogs and assignment editors', (t) => {
+  const f = fixture(t),
+    field = {
+      key: 'newFlag',
+      title: 'New flag',
+      type: 'boolean',
+      default: false,
+      generateCommands: ['toggle'],
+    };
+  f.applet.settings.push(field);
+  const id = f.applet.id + '.settings.newFlag.toggle';
+  const api = new AutomationApi({
+    ...f.options,
+    settingsCommands: f.commands,
+    ready: () => true,
+    writable: () => true,
+    executable: () => true,
+    version: 'test',
+    instanceId: 'test',
+    appletPermissions: () => ({ read: true, write: true, execute: true }),
+    commands: () => [{ id, appletId: f.applet.id, title: 'Catalog copy', available: true }],
+    execute: async () => {},
+  });
+  assert.equal(
+    api.call('commands.list').commands.some((c) => c.id === id),
+    true,
+  );
+  assert.equal(
+    api.call('commands.list', {}, 'test.caller').commands.some((c) => c.id === id),
+    false,
+  );
+  assert.equal(
+    api.call('shortcuts.get', {}, 'test.caller').assignableCommands.some((c) => c.id === id),
+    false,
+  );
+  assert.equal(
+    api.call('gestures.get', {}, 'test.caller').assignableCommands.some((c) => c.id === id),
+    false,
+  );
+  assert.equal(
+    api.call('tray.get', {}, 'test.caller').assignableCommands.some((c) => c.id === id),
+    false,
+  );
+  assert.equal(
+    api
+      .call('commands.list', {}, 'test.caller', { origin: { kind: 'mcp' } })
+      .commands.some((c) => c.id === id),
+    false,
+  );
+  assert.equal(
+    api.call('commands.list').commands.some((c) => c.id === id),
+    true,
+  );
+});
+
 function fixture(t) {
   const root = path.resolve('.artifacts/settings-command-unit');
   fs.mkdirSync(root, { recursive: true });
@@ -31,6 +152,7 @@ function fixture(t) {
     },
     {
       key: 'privateFeature',
+      automation: false,
       title: 'Private',
       type: 'boolean',
       default: false,
@@ -56,7 +178,7 @@ function fixture(t) {
       ],
       automation: true,
     },
-    { key: 'secret', title: 'Secret', type: 'string', default: 'SECRET_DEFAULT' },
+    { key: 'secret', secret: true, title: 'Secret', type: 'string', default: 'SECRET_DEFAULT' },
   ]);
   const applet = {
     id: 'test.unrelated-provider',
@@ -284,7 +406,11 @@ test('writes and switches require both permissions and current running/public st
   await assert.rejects(f.run('enabledFeature.toggle'), { code: 'WRITE_DISABLED' });
   f.setWrite(true);
   f.setExecute(false);
-  await assert.rejects(f.run('enabledFeature.toggle'), { code: 'EXECUTION_DISABLED' });
+  await f.run('update', {
+    changes: { count: 7 },
+    expectedRevision: f.commands.revision(),
+    dryRun: true,
+  });
   f.setExecute(true);
   for (const state of ['stopped', 'waiting', 'starting', 'stopping', 'error']) {
     f.applet.state = state;

@@ -12,6 +12,7 @@ export interface AutomationCommand {
   available: boolean;
   unavailableReason: string | null;
   completion: 'accepted' | 'handlerReturned' | 'settingsSaved' | 'lifecycleApplied';
+  operation?: import('../../shared/applet-management').AppletOperation;
   permission?:
     | 'customCommands.write'
     | 'settings.write'

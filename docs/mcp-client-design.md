@@ -28,26 +28,26 @@
 
 ## 接続先の管理API
 
-「操作の許可」の「MCP接続先の管理」は、Appletの`manageMcpServers`、MCPの`allowManageMcpServers`に対応する。URL・EXE・引数・公開範囲を閲覧・編集できる許可なので、通常の`useMcp`とは独立させる。MCP自身から操作許可を変更する入口は設けない。
+設定の読取りはread、保存はread + write、未公開ツールの確認はread + execute + useMcpを必要とする。操作許可自体はローカル画面だけで変更する。
 
 | 共通API / MCPツール | 必要許可 | 結果・操作 |
 | --- | --- | --- |
-| `mcp.servers.getSettings` / `appdock_mcp_get_server_settings` | read + manageMcpServers | 引数なしは最大32件の名簿・状態とrevision。serverId指定は1接続先のitem/connection/tokenConfigured/environmentNamesも返す |
-| `mcp.servers.updateSettings` / `appdock_mcp_update_server_settings` | read + execute + write + manageMcpServers | 最新expectedRevisionとopで登録・編集・削除・並替・PC上の有効化。dryRun:trueは検証のみ |
-| `mcp.servers.inspectTools` / `appdock_mcp_inspect_server_tools` | read + execute + useMcp + manageMcpServers | serverIdで未公開を含むツール概要をページ取得。name指定時は1ツールのSchema。refresh:trueで再取得 |
+| `mcp.servers.getSettings` / `appdock_mcp_get_server_settings` | read | 引数なしは最大32件の名簿・状態とrevision。serverId指定は1接続先のitem/connectionを返す。token・環境変数・その名前は返さない |
+| `mcp.servers.updateSettings` / `appdock_mcp_update_server_settings` | read + write | 最新expectedRevisionとopで登録・編集・削除・並替・PC上の有効化。dryRun:trueは検証のみ |
+| `mcp.servers.inspectTools` / `appdock_mcp_inspect_server_tools` | read + execute + useMcp | serverIdで未公開を含むツール概要をページ取得。name指定時は1ツールのSchema。refresh:trueで再取得 |
 
 管理用の取得・保存は接続・プロセス起動を行わない。inspectToolsは有効な接続先へ接続し、stdioなら指定EXEを起動する。呼出し元・元callerの管理/利用/実行許可を通信後にも再確認する。管理用の閲覧範囲をツール実行へ流用しない。通常のMCP実行には接続先のpublishedとpublishedToolsが必要。
 
 更新の共通項目は`{op, expectedRevision, dryRun?}`。op別に次を指定する。無関係な項目は拒否する。
 
 - `save`: `item:{id,name,description}`とconnection全項目。新規idは小文字UUID。新規接続先は`enabled:false,published:false,publishedTools:[]`から登録し、利用・公開は明示的に選ぶ。
-- `remove`: `id`。名簿とこのPCの接続・暗号化済み秘密を削除する。
+- `remove`: `id`。秘密を持たない名簿とこのPCの接続を削除する。暗号化情報がある行の削除はローカル設定で行う。
 - `reorder`: 名簿と同じID集合の`ids`配列。
 - `enabled`: `id`とbooleanの`enabled`。既存のPC設定の有効状態だけを変更する。
 
 connectionは`{enabled,transport,command,args,cwd,url,authentication,published,publishedTools}`。HTTPはcommand/cwdを空文字・argsを空配列とし、stdioはurlを空文字・authenticationをnoneとする。入力Schemaの正本は[操作カタログ](../src/shared/mcp-client.ts)。
 
-`save`のtoken/environmentは書込み専用。省略時は同じ接続先の秘密を保持し、指定時は置換する。環境変数を消すには`environment:{}`、Bearerを解除するにはauthenticationをnoneとする。接続先が変わると旧秘密を転用しない。秘密値をcommand/argsへ埋め込まず、token/environmentを使う。APIの結果・監査・エラーには秘密値を戻さない。
+共通APIの`save`はtoken/environmentを受け付けず、取得・設定・消去を許可しない。既存の暗号化情報がある行は、URL・EXE・引数・作業フォルダー・認証方法の変更を拒否する。名前・説明・有効状態・公開設定の変更と並べ替えでは同じ暗号文を保持する。壊れた秘密付き行の修復・削除もローカル設定で行う。ローカル設定UIの認証情報編集は従来どおり使用でき、保存済みの認証を使った通常のMCP接続・ツール利用も維持する。
 
 共有名簿とPC設定を既存の原子的保存で更新し、他設定を保持する。dryRunは保存上限・秘密の保護も検証し、ファイルとrevisionを変更しない。競合はREVISION_CONFLICT、保存失敗はSAVE_FAILEDと安全な案内を返し、保存失敗を共通エラー通知へつなぐ。暗号化・復号・形式の失敗で元データを上書きしない。
 

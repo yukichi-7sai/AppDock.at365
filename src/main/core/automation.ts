@@ -10,6 +10,7 @@ import type {
   ConnectionScope,
 } from '../../shared/automation';
 import { atomicWrite } from './settings';
+import { retiredMcpPermissionKeys, retiredPermissionActions } from '../../shared/automation';
 import { AutomationApi } from './automation-api';
 import { AutomationMcp } from './automation-mcp';
 import { McpEvents } from './mcp-events';
@@ -31,19 +32,19 @@ interface LocalConfig {
   enabled: boolean;
   allowWrite: boolean;
   allowExecute: boolean;
-  allowManageApplets: boolean;
-  allowEditShortcuts: boolean;
-  allowEditGestures: boolean;
-  allowEditTouchpadGestures: boolean;
-  allowEditRibbon: boolean;
+  allowManageApplets?: boolean;
+  allowEditShortcuts?: boolean;
+  allowEditGestures?: boolean;
+  allowEditTouchpadGestures?: boolean;
+  allowEditRibbon?: boolean;
   allowUseTts: boolean;
   allowUseAi: boolean;
   allowUseMcp: boolean;
   allowSendInput: boolean;
   allowRunProcesses: boolean;
-  allowManageMcpServers: boolean;
-  allowEditTray: boolean;
-  allowManageCustomCommands: boolean;
+  allowManageMcpServers?: boolean;
+  allowEditTray?: boolean;
+  allowManageCustomCommands?: boolean;
   port: number;
   token: string;
   configFile: string;
@@ -112,19 +113,11 @@ export class AutomationService {
       enabled: false,
       allowWrite: false,
       allowExecute: false,
-      allowManageApplets: false,
-      allowEditShortcuts: false,
-      allowEditGestures: false,
-      allowEditTouchpadGestures: false,
-      allowEditRibbon: false,
       allowUseTts: false,
       allowUseAi: false,
       allowUseMcp: false,
       allowSendInput: false,
       allowRunProcesses: false,
-      allowManageMcpServers: false,
-      allowEditTray: false,
-      allowManageCustomCommands: false,
       port: 0,
       token: '',
       serverName: 'AppDock',
@@ -175,19 +168,11 @@ export class AutomationService {
           c.networkHostnames === undefined ? [] : c.networkHostnames,
         );
         c.allowExecute ??= false;
-        c.allowManageApplets ??= false;
-        c.allowEditShortcuts ??= false;
-        c.allowEditGestures ??= false;
-        c.allowEditTouchpadGestures ??= false;
-        c.allowEditRibbon ??= false;
         c.allowUseTts ??= false;
         c.allowUseAi ??= false;
         c.allowUseMcp ??= false;
         c.allowSendInput ??= false;
         c.allowRunProcesses ??= false;
-        c.allowManageMcpServers ??= false;
-        c.allowEditTray ??= false;
-        c.allowManageCustomCommands ??= false;
         c.serverName = codexServerName(c.serverName ?? 'AppDock');
         const token = options.decrypt(c.token);
         if (!/^[a-f0-9]{64}$/.test(token)) throw Error();
@@ -211,8 +196,9 @@ export class AutomationService {
     });
     if (!this.config.enabled) this.events.reconcile(true);
   }
-  private save() {
+  private save(permissionsChanged = false) {
     try {
+      if (permissionsChanged) for (const key of retiredMcpPermissionKeys) delete this.config[key];
       if (!this.token) {
         this.token = randomBytes(32).toString('hex');
         this.config.token = this.options.encrypt(this.token);
@@ -263,12 +249,14 @@ export class AutomationService {
       | 'allowManageCustomCommands'
       | 'allowEditTray',
   ) {
-    if (this.closed || this.loadError || !this.config.enabled || !this.config[key]) return false;
-    if (key === 'allowManageCustomCommands' || key === 'allowManageMcpServers') return true;
-    if (key === 'allowUseTts' || key === 'allowUseAi' || key === 'allowUseMcp') return true;
-    if (key === 'allowSendInput' || key === 'allowRunProcesses') return this.config.allowExecute;
-    if (key === 'allowWrite' || key === 'allowExecute') return true;
-    return this.config.allowExecute && (key === 'allowManageApplets' || this.config.allowWrite);
+    const effectiveKey = (retiredMcpPermissionKeys as readonly string[]).includes(key)
+      ? 'allowWrite'
+      : key;
+    if (this.closed || this.loadError || !this.config.enabled || !this.config[effectiveKey])
+      return false;
+    return key === 'allowSendInput' || key === 'allowRunProcesses'
+      ? this.config.allowExecute
+      : true;
   }
   private block() {
     return registrationBlock(
@@ -293,19 +281,19 @@ export class AutomationService {
       enabled: this.config.enabled,
       allowWrite: this.config.allowWrite,
       allowExecute: this.config.allowExecute,
-      allowManageApplets: this.config.allowManageApplets,
-      allowEditShortcuts: this.config.allowEditShortcuts,
-      allowEditGestures: this.config.allowEditGestures,
-      allowEditTouchpadGestures: this.config.allowEditTouchpadGestures,
-      allowEditRibbon: this.config.allowEditRibbon,
+      allowManageApplets: this.config.allowWrite,
+      allowEditShortcuts: this.config.allowWrite,
+      allowEditGestures: this.config.allowWrite,
+      allowEditTouchpadGestures: this.config.allowWrite,
+      allowEditRibbon: this.config.allowWrite,
       allowUseTts: this.config.allowUseTts,
       allowUseAi: this.config.allowUseAi,
       allowUseMcp: this.config.allowUseMcp,
       allowSendInput: this.config.allowSendInput,
       allowRunProcesses: this.config.allowRunProcesses,
-      allowManageMcpServers: this.config.allowManageMcpServers,
-      allowEditTray: this.config.allowEditTray,
-      allowManageCustomCommands: this.config.allowManageCustomCommands,
+      allowManageMcpServers: this.config.allowWrite,
+      allowEditTray: this.config.allowWrite,
+      allowManageCustomCommands: this.config.allowWrite,
       port: this.config.port,
       running: !!this.server,
       endpoint: this.config.port ? `http://127.0.0.1:${this.config.port}/mcp` : '',
@@ -330,35 +318,11 @@ export class AutomationService {
         () => this.config.enabled && this.config.allowWrite && !this.closed,
         this.id,
         () => this.config.enabled && this.config.allowExecute && !this.closed,
-        () =>
-          this.config.enabled &&
-          this.config.allowExecute &&
-          this.config.allowManageApplets &&
-          !this.closed,
-        () =>
-          this.config.enabled &&
-          this.config.allowExecute &&
-          this.config.allowWrite &&
-          this.config.allowEditShortcuts &&
-          !this.closed,
-        () =>
-          this.config.enabled &&
-          this.config.allowExecute &&
-          this.config.allowWrite &&
-          this.config.allowEditGestures &&
-          !this.closed,
-        () =>
-          this.config.enabled &&
-          this.config.allowExecute &&
-          this.config.allowWrite &&
-          this.config.allowEditRibbon &&
-          !this.closed,
-        () =>
-          this.config.enabled &&
-          this.config.allowExecute &&
-          this.config.allowWrite &&
-          this.config.allowEditTray &&
-          !this.closed,
+        () => this.allowed('allowWrite'),
+        () => this.allowed('allowWrite'),
+        () => this.allowed('allowWrite'),
+        () => this.allowed('allowWrite'),
+        () => this.allowed('allowWrite'),
       )),
       () => this.token,
       (local) => {
@@ -415,6 +379,8 @@ export class AutomationService {
     if (!action || typeof action !== 'object' || typeof action.kind !== 'string')
       throw Error(hostText('services.automation.invalidOperation'));
     if (action.kind === 'status') return { state: this.state() };
+    if ((retiredPermissionActions as readonly string[]).includes(action.kind))
+      throw Error(hostText('services.automation.retiredPermission'));
     if (this.busy || this.closed) throw Error(hostText('services.automation.busy'));
     if (this.loadError) throw Error(this.loadError);
     this.busy = true;
@@ -486,13 +452,14 @@ export class AutomationService {
           if (
             action.enabled === this.config.enabled &&
             action.allowWrite === this.config.allowWrite &&
-            action.port === this.config.port
+            action.port === this.config.port &&
+            !retiredMcpPermissionKeys.some((key) => Object.hasOwn(this.config, key))
           )
             break;
           this.config.enabled = action.enabled;
           this.config.allowWrite = action.allowWrite;
           this.config.port = action.port;
-          this.save();
+          this.save(true);
           if (!action.enabled || action.port !== previous.port) {
             if (!action.enabled) {
               this.events.reconcile(true);
@@ -518,7 +485,7 @@ export class AutomationService {
           if (typeof action.allowed !== 'boolean')
             throw Error(hostText('services.automation.invalidTtsPermission'));
           this.config.allowUseTts = action.allowed;
-          this.save();
+          this.save(true);
           message = hostText('services.automation.ttsPermissionSaved');
           break;
         case 'setInputSending':
@@ -527,7 +494,7 @@ export class AutomationService {
             throw Error(hostText('services.automation.invalidExecutionPermission'));
           this.config[action.kind === 'setInputSending' ? 'allowSendInput' : 'allowRunProcesses'] =
             action.allowed;
-          this.save();
+          this.save(true);
           this.options.authorizationChanged?.();
           message = hostText('services.automation.executionPermissionSaved');
           break;
@@ -535,23 +502,15 @@ export class AutomationService {
           if (typeof action.allowed !== 'boolean')
             throw Error(hostText('services.automation.invalidMcpPermission'));
           this.config.allowUseMcp = action.allowed;
-          this.save();
+          this.save(true);
           this.options.authorizationChanged?.();
           message = hostText('services.automation.mcpPermissionSaved');
-          break;
-        case 'setMcpServerManagement':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidMcpManagementPermission'));
-          this.config.allowManageMcpServers = action.allowed;
-          this.save();
-          this.options.authorizationChanged?.();
-          message = hostText('services.automation.mcpManagementPermissionSaved');
           break;
         case 'setAi':
           if (typeof action.allowed !== 'boolean')
             throw Error(hostText('services.automation.invalidAiPermission'));
           this.config.allowUseAi = action.allowed;
-          this.save();
+          this.save(true);
           if (!action.allowed) this.options.authorizationChanged?.();
           message = hostText('services.automation.aiPermissionSaved');
           break;
@@ -559,59 +518,8 @@ export class AutomationService {
           if (typeof action.allowed !== 'boolean')
             throw Error(hostText('services.automation.invalidCommandPermission'));
           this.config.allowExecute = action.allowed;
-          this.save();
+          this.save(true);
           message = hostText('services.automation.commandPermissionSaved');
-          break;
-        case 'setAppletManagement':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidAppletPermission'));
-          this.config.allowManageApplets = action.allowed;
-          this.save();
-          message = hostText('services.automation.appletPermissionSaved');
-          break;
-        case 'setTrayEditing':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidPermission'));
-          this.config.allowEditTray = action.allowed;
-          this.save();
-          message = hostText('services.automation.trayPermissionSaved');
-          break;
-        case 'setCustomCommandManagement':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidPermission'));
-          this.config.allowManageCustomCommands = action.allowed;
-          this.save();
-          this.options.authorizationChanged?.();
-          message = hostText('services.automation.customCommandPermissionSaved');
-          break;
-        case 'setRibbonEditing':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidPermission'));
-          this.config.allowEditRibbon = action.allowed;
-          this.save();
-          message = hostText('services.automation.ribbonPermissionSaved');
-          break;
-        case 'setTouchpadGestureEditing':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidPermission'));
-          this.config.allowEditTouchpadGestures = action.allowed;
-          this.save();
-          this.options.authorizationChanged?.();
-          message = hostText('services.automation.touchpadPermissionSaved');
-          break;
-        case 'setGestureEditing':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidPermission'));
-          this.config.allowEditGestures = action.allowed;
-          this.save();
-          message = hostText('services.automation.gesturePermissionSaved');
-          break;
-        case 'setShortcutEditing':
-          if (typeof action.allowed !== 'boolean')
-            throw Error(hostText('services.automation.invalidShortcutPermission'));
-          this.config.allowEditShortcuts = action.allowed;
-          this.save();
-          message = hostText('services.automation.shortcutPermissionSaved');
           break;
         case 'register':
           if (!this.server) throw Error(hostText('services.automation.startFirst'));

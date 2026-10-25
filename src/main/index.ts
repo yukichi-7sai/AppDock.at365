@@ -793,21 +793,11 @@ const mcpClient = new McpClientService({
     if (actor.kind === 'host') return startupReady;
     if (actor.owner !== mcpActor(actor.appletId, { origin: actor.origin }).owner) return false;
     const allowed = (id?: string) => {
-      if (!id)
-        return (
-          mcpAllowed('allowUseMcp') &&
-          (!execute || mcpAllowed('allowExecute')) &&
-          (!actor.management || mcpAllowed('allowManageMcpServers'))
-        );
+      if (!id) return mcpAllowed('allowUseMcp') && (!execute || mcpAllowed('allowExecute'));
       const e = manager?.items.get(id);
       const p =
         e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
-      return (
-        p.read === true &&
-        p.useMcp === true &&
-        (!execute || p.execute === true) &&
-        (!actor.management || p.manageMcpServers === true)
-      );
+      return p.read === true && p.useMcp === true && (!execute || p.execute === true);
     };
     return (
       allowed(actor.appletId) &&
@@ -1049,14 +1039,14 @@ function mcpSettingsOperation<T>(operation: () => T): T {
 const operationApi = new AppDockApi({
   handlers: {
     'mcp.servers.getSettings': async (p) =>
-      mcpSettingsOperation(() => mcpSettings.getSettings(p.serverId)),
+      mcpSettingsOperation(() => mcpSettings.publicSettings(p.serverId)),
     'mcp.servers.updateSettings': async (p) => {
       try {
         assertSettingsWritable();
       } catch {
         throw new AutomationError('BUSY', hostText('services.index.settingsRestoring'));
       }
-      return mcpSettingsOperation(() => mcpSettings.update(p));
+      return mcpSettingsOperation(() => mcpSettings.update(p, true));
     },
     'mcp.servers.inspectTools': (p, id, c) => mcpClient.inspectTools(mcpActor(id, c), p),
     'mcp.servers.list': async (p, id, c) => mcpClient.servers(mcpActor(id, c), p),
@@ -1145,8 +1135,6 @@ const operationApi = new AppDockApi({
   mcpClientAllowed: () => mcpAllowed('allowUseMcp'),
   inputAllowed: () => mcpAllowed('allowSendInput'),
   processesAllowed: () => mcpAllowed('allowRunProcesses'),
-  mcpServersManageable: () => mcpAllowed('allowManageMcpServers'),
-  customCommandsManageable: () => mcpAllowed('allowManageCustomCommands'),
   appletPermissions: (id) => {
     const e = manager?.items.get(id);
     return e && ['starting', 'running'].includes(e.state) ? appletApiAccess.get(e.manifest) : {};
@@ -1155,10 +1143,6 @@ const operationApi = new AppDockApi({
   aiAllowed: () => mcpAllowed('allowUseAi'),
   writable: () => mcpAllowed('allowWrite'),
   executable: () => mcpAllowed('allowExecute'),
-  manageable: () => mcpAllowed('allowManageApplets'),
-  shortcutsEditable: () => mcpAllowed('allowEditShortcuts'),
-  gesturesEditable: () => mcpAllowed('allowEditGestures'),
-  touchpadGesturesEditable: () => mcpAllowed('allowEditTouchpadGestures'),
   touchpadBridge: {
     snapshot: () => touchpad?.snapshot(),
     connect: (ids) => {
@@ -1170,8 +1154,6 @@ const operationApi = new AppDockApi({
       return touchpad.afterLocalEdit(before);
     },
   },
-  ribbonEditable: () => mcpAllowed('allowEditRibbon'),
-  trayEditable: () => mcpAllowed('allowEditTray'),
   ribbonApplets: allApplets,
   trayApplets: allApplets,
   shortcutStatus: () => hotKeys?.statuses ?? [],

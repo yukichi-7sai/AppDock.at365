@@ -133,15 +133,16 @@ test('execution mode configuration is atomic, revisioned, private-field preservi
   assert.equal(f.get().options.executionMode, 'first');
 });
 
-test('configuring execution mode requires all shortcut editing grants', async (t) => {
+test('configuring execution mode uses the settings grant independently of execution', async (t) => {
   const f = fixture(t);
-  for (const grant of ['write', 'execute', 'shortcuts']) {
-    f.permissions[grant] = false;
-    await assert.rejects(f.edit([{ kind: 'configure', changes: { executionMode: 'first' } }]));
-    f.permissions[grant] = true;
-  }
-  assert.equal(f.get().options.executionMode, 'all');
+  f.permissions.execute = f.permissions.shortcuts = false;
+  await f.edit([{ kind: 'configure', changes: { executionMode: 'first' } }]);
+  f.permissions.write = false;
+  await assert.rejects(f.edit([{ kind: 'configure', changes: { executionMode: 'all' } }]), {
+    code: 'WRITE_DISABLED',
+  });
 });
+
 test('external shortcut scopes and browser options are atomic, normalized and use the same restricted editor', async (t) => {
   const f = fixture(t),
     revision = f.get().revision;
@@ -390,22 +391,18 @@ test('stale, cross-setting and restart revisions and unobserved disk edits preve
   await assert.rejects(f.edit(op), { code: 'REVISION_CONFLICT' });
   assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.theme, 'system');
 });
-test('command, settings and shortcut grants are all required, including dry run, and revocation is immediate', async (t) => {
+test('settings writes work without execution or retired grants and revoke immediately', async (t) => {
   const f = fixture(t),
     op = [{ kind: 'add', binding: binding('new') }];
-  for (const [flag, code] of [
-    ['execute', 'EXECUTION_DISABLED'],
-    ['write', 'WRITE_DISABLED'],
-    ['shortcuts', 'SHORTCUT_EDITING_DISABLED'],
-  ]) {
-    f.permissions[flag] = false;
-    await assert.rejects(f.edit(op, { dryRun: true }), { code });
-    assert.equal(f.get().bindings.length, 1);
-    f.permissions[flag] = true;
-  }
-  await f.edit(op);
+  f.permissions.execute = false;
   f.permissions.shortcuts = false;
-  await assert.rejects(f.edit([{ kind: 'remove', id: 'new' }]), {
-    code: 'SHORTCUT_EDITING_DISABLED',
-  });
+  f.permissions.write = false;
+  await assert.rejects(f.edit(op, { dryRun: true }), { code: 'WRITE_DISABLED' });
+  assert.equal(f.get().bindings.length, 1);
+  f.permissions.write = true;
+  await f.edit(op, { dryRun: true });
+  assert.equal(f.get().bindings.length, 1);
+  await f.edit(op);
+  f.permissions.write = false;
+  await assert.rejects(f.edit([{ kind: 'remove', id: 'new' }]), { code: 'WRITE_DISABLED' });
 });

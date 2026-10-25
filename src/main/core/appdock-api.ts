@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { touchpadBridgeCommands, executeTouchpadBridgeCommand } from './touchpad-commands';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import type { InputInvocation } from './command-contexts';
@@ -43,6 +44,7 @@ const inputValidators = new Map(
 );
 export class AppDockApi {
   private executing = 0;
+  private callContext = new AsyncLocalStorage<InputInvocation>();
   private settingsCommands: SettingsCommands;
   private shortcuts: ShortcutCommands;
   private gestures: GestureCommands;
@@ -66,17 +68,11 @@ export class AppDockApi {
       save(value: Settings, revision: number): SettingsSnapshot;
       settingsCommands?: SettingsCommands;
       customCommands?: CustomCommandService;
-      customCommandsManageable?(): boolean;
       mcpClientAllowed?(): boolean;
       inputAllowed?(): boolean;
       processesAllowed?(): boolean;
-      mcpServersManageable?(): boolean;
       appletManagement?: AppletManagement;
-      manageable?(): boolean;
-      shortcutsEditable?(): boolean;
       inputPages?(): ShortcutPageChoice[];
-      gesturesEditable?(): boolean;
-      touchpadGesturesEditable?(): boolean;
       touchpadBridge?: {
         snapshot(): unknown;
         connect(
@@ -84,8 +80,6 @@ export class AppDockApi {
         ): Promise<unknown>;
         afterLocalEdit(before: Settings): Promise<unknown>;
       };
-      ribbonEditable?(): boolean;
-      trayEditable?(): boolean;
       trayApplets?(): ExtensionSnapshot[];
       ribbonApplets?(): ExtensionSnapshot[];
       shortcutStatus?(): GlobalHotKeyStatus[];
@@ -135,17 +129,9 @@ export class AppDockApi {
       useMcp: this.options.mcpClientAllowed?.() ?? false,
       sendInput: (this.options.inputAllowed?.() ?? false) && this.options.executable(),
       runProcesses: this.options.processesAllowed?.() ?? false,
-      manageMcpServers: this.options.mcpServersManageable?.() ?? false,
       read: true,
       execute: this.options.executable(),
       write: this.options.writable(),
-      manageApplets: this.options.manageable?.() ?? false,
-      editShortcuts: this.options.shortcutsEditable?.() ?? false,
-      editGestures: this.options.gesturesEditable?.() ?? false,
-      editTouchpadGestures: this.options.touchpadGesturesEditable?.() ?? false,
-      editRibbon: this.options.ribbonEditable?.() ?? false,
-      editTray: this.options.trayEditable?.() ?? false,
-      manageCustomCommands: this.options.customCommandsManageable?.() ?? false,
     };
   }
   private effectivePermissions(appletId: string | undefined, context: InputInvocation) {
@@ -163,18 +149,24 @@ export class AppDockApi {
   publishedCommandIds(): ReadonlySet<string> {
     return new Set(this.commands().map((command) => command.id));
   }
-  private commands(context: InputInvocation = {}) {
+  private commands(context: InputInvocation = this.callContext.getStore() ?? {}) {
     return [
       ...new Map(
         [
-          ...this.options.commands(),
+          ...this.options
+            .commands()
+            .filter((command) => !this.settingsCommands.hasGenerated(command.id)),
           ...(this.options.customCommands
             ? [
                 ...this.options.customCommands.publicCommands(context),
                 this.options.customCommands.managementCommand(),
               ]
             : []),
-          ...this.settingsCommands.commands(),
+          ...this.settingsCommands.commands(
+            context.apiCaller?.kind === 'applet' || context.origin?.kind === 'applet'
+              ? 'applet'
+              : 'mcp',
+          ),
           ...(this.options.appletManagement?.commands() ?? []),
           ...this.shortcuts.commands(),
           ...this.gestures.commands(),
@@ -209,6 +201,21 @@ export class AppDockApi {
     params: unknown = {},
     appletId?: string,
     context: InputInvocation = {},
+  ): Record<string, unknown> | Promise<Record<string, unknown>> {
+    const invocation: InputInvocation = {
+      ...context,
+      apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
+    };
+    // Editors resolve assignable commands lazily; preserve this request's publication scope.
+    return this.callContext.run(invocation, () =>
+      this.dispatch(method, params, appletId, invocation),
+    );
+  }
+  private dispatch(
+    method: string,
+    params: unknown,
+    appletId: string | undefined,
+    context: InputInvocation,
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
     const permissions = this.effectivePermissions(appletId, context);
     const definition = Object.hasOwn(appDockOperations, method)
@@ -261,11 +268,11 @@ export class AppDockApi {
       case 'system.getInfo':
         return {
           apiVersion: 2,
-          trayEditingAllowed: permissions.editTray === true,
-          ribbonEditingAllowed: permissions.editRibbon === true,
-          appletManagementAllowed: permissions.manageApplets === true,
-          gestureEditingAllowed: permissions.editGestures === true,
-          shortcutEditingAllowed: permissions.editShortcuts === true,
+          trayEditingAllowed: permissions.write === true,
+          ribbonEditingAllowed: permissions.write === true,
+          appletManagementAllowed: permissions.write === true,
+          gestureEditingAllowed: permissions.write === true,
+          shortcutEditingAllowed: permissions.write === true,
           version: this.options.version,
           instanceId: this.options.instanceId,
           methods: operationsFor(caller).map(([method]) => method),
@@ -299,11 +306,11 @@ export class AppDockApi {
       }
       case 'commands.list':
         return {
-          trayEditingAllowed: permissions.editTray === true,
-          ribbonEditingAllowed: permissions.editRibbon === true,
-          gestureEditingAllowed: permissions.editGestures === true,
-          shortcutEditingAllowed: permissions.editShortcuts === true,
-          appletManagementAllowed: permissions.manageApplets === true,
+          trayEditingAllowed: permissions.write === true,
+          ribbonEditingAllowed: permissions.write === true,
+          gestureEditingAllowed: permissions.write === true,
+          shortcutEditingAllowed: permissions.write === true,
+          appletManagementAllowed: permissions.write === true,
           commands: this.commands({
             ...context,
             apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
@@ -324,35 +331,35 @@ export class AppDockApi {
           ...this.tray.get(),
           writable: permissions.write === true,
           executable: permissions.execute === true,
-          trayEditingAllowed: permissions.editTray === true,
+          trayEditingAllowed: permissions.write === true,
         };
       case 'ribbon.get':
         return {
           ...this.ribbon.get(this.commands(context)),
           writable: permissions.write === true,
           executable: permissions.execute === true,
-          ribbonEditingAllowed: permissions.editRibbon === true,
+          ribbonEditingAllowed: permissions.write === true,
         };
       case 'touchpadGestures.get':
         return {
           ...this.touchpadGestures.get(),
           state: this.options.touchpadBridge?.snapshot(),
-          editingAllowed: permissions.editTouchpadGestures === true,
+          editingAllowed: permissions.write === true,
         };
       case 'gestures.get':
         return {
           ...this.gestures.get(),
           writable: permissions.write === true,
           executable: permissions.execute === true,
-          gestureEditingAllowed: permissions.editGestures === true,
+          gestureEditingAllowed: permissions.write === true,
         };
       case 'shortcuts.get':
         return {
           ...this.shortcuts.get(),
           writable: permissions.write === true,
           executable: permissions.execute === true,
-          gestureEditingAllowed: permissions.editGestures === true,
-          shortcutEditingAllowed: permissions.editShortcuts === true,
+          gestureEditingAllowed: permissions.write === true,
+          shortcutEditingAllowed: permissions.write === true,
         };
       case 'settings.getSchema':
       case 'settings.get': {
@@ -368,10 +375,15 @@ export class AppDockApi {
             hostText('services.appdockApi.appletSettingsArguments'),
           );
         try {
+          const settingsCaller =
+            appletId === undefined && context.origin?.kind !== 'applet' ? 'mcp' : 'applet';
           return method === 'settings.get'
-            ? this.settingsCommands.get(params.appletId as string | undefined)
+            ? this.settingsCommands.get(params.appletId as string | undefined, settingsCaller)
             : {
-                ...this.settingsCommands.schema(params.appletId as string | undefined),
+                ...this.settingsCommands.schema(
+                  params.appletId as string | undefined,
+                  settingsCaller,
+                ),
                 writable: permissions.write === true,
               };
         } catch (error) {
@@ -403,16 +415,28 @@ export class AppDockApi {
     context: InputInvocation = {},
   ): Promise<Record<string, unknown>> {
     const permissions = this.effectivePermissions(appletId, context);
-    if (!permissions.execute)
-      throw new AutomationError(
-        'EXECUTION_DISABLED',
-        hostText('services.appdockApi.executionPermission'),
-      );
-    const command = this.commands().find((c) => c.id === id);
+    const command = this.commands({
+      ...context,
+      apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
+    }).find((c) => c.id === id);
     if (!command)
       throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.privateCommand'));
     if (!command.available)
       throw new AutomationError('UNAVAILABLE', hostText('services.appdockApi.commandUnavailable'));
+    const settingsEdit =
+      command.permission?.endsWith('.write') ||
+      (command.permission === 'applets.manage' &&
+        (command.operation === 'enable' || command.operation === 'disable'));
+    if (!settingsEdit && !permissions.execute)
+      throw new AutomationError(
+        'EXECUTION_DISABLED',
+        hostText('services.appdockApi.executionPermission'),
+      );
+    if (settingsEdit && (!permissions.read || !permissions.write))
+      throw new AutomationError(
+        'WRITE_DISABLED',
+        hostText('services.appdockApi.settingsPermission'),
+      );
     if (
       !object(args) ||
       (![
@@ -453,43 +477,10 @@ export class AppDockApi {
     // Further asynchronous dispatch is refused, preventing A -> B -> A wait cycles.
     if (this.executing && !(appletId && command.permission?.endsWith('.write')))
       throw new AutomationError('BUSY', hostText('services.appdockApi.busy'));
-    if (command.permission === 'tray.write' && !permissions.editTray)
-      throw new AutomationError(
-        'TRAY_EDITING_DISABLED',
-        hostText('services.appdockApi.trayPermission'),
-      );
-    if (command.permission === 'ribbon.write' && !permissions.editRibbon)
-      throw new AutomationError(
-        'RIBBON_EDITING_DISABLED',
-        hostText('services.appdockApi.ribbonPermission'),
-      );
-    if (
-      command.permission === 'touchpadGestures.write' &&
-      (!permissions.read || !permissions.editTouchpadGestures)
-    )
-      throw new AutomationError(
-        'TOUCHPAD_EDITING_DISABLED',
-        hostText('services.appdockApi.touchpadPermission'),
-      );
-    if (command.permission === 'gestures.write' && !permissions.editGestures)
-      throw new AutomationError(
-        'GESTURE_EDITING_DISABLED',
-        hostText('services.appdockApi.gesturePermission'),
-      );
-    if (command.permission === 'shortcuts.write' && !permissions.editShortcuts)
-      throw new AutomationError(
-        'SHORTCUT_EDITING_DISABLED',
-        hostText('services.appdockApi.shortcutPermission'),
-      );
-    if (command.permission === 'applets.manage' && !permissions.manageApplets)
-      throw new AutomationError(
-        'APPLET_MANAGEMENT_DISABLED',
-        hostText('services.appdockApi.appletPermission'),
-      );
     this.executing++;
     try {
       if (command.permission === 'customCommands.write') {
-        if (!permissions.manageCustomCommands || !this.options.customCommands)
+        if (!this.options.customCommands)
           throw new AutomationError(
             'API_DISABLED',
             hostText('services.appdockApi.customCommandPermission'),
@@ -563,7 +554,9 @@ export class AppDockApi {
         return { id, completion: 'lifecycleApplied', effectVerified: false, ...result };
       }
       if (command.permission === 'settings.write') {
-        const result = this.settingsCommands.execute(id, args);
+        const settingsCaller =
+          appletId === undefined && context.origin?.kind !== 'applet' ? 'mcp' : 'applet';
+        const result = this.settingsCommands.execute(id, args, true, settingsCaller);
         return {
           id,
           completion: result.dryRun ? 'validated' : 'settingsSaved',

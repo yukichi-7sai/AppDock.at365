@@ -31,61 +31,12 @@ const rows: {
     label: hostText('settings.apiPermissionsSettings.settings'),
   },
   {
-    key: 'manageApplets',
-    description: hostSettingItem('permissions', 'manageApplets').description,
-    mcp: 'allowManageApplets',
-    action: 'setAppletManagement',
-    label: hostText('settings.apiPermissionsSettings.applets'),
-  },
-  {
     key: 'execute',
     description: hostSettingItem('permissions', 'execute').description,
     mcp: 'allowExecute',
     action: 'setExecution',
     label: hostText('settings.apiPermissionsSettings.commands'),
     mcpWarning: hostText('settings.apiPermissionsSettings.commandsWarning'),
-  },
-  {
-    key: 'editShortcuts',
-    description: hostSettingItem('permissions', 'editShortcuts').description,
-    mcp: 'allowEditShortcuts',
-    action: 'setShortcutEditing',
-    label: hostText('settings.apiPermissionsSettings.shortcuts'),
-  },
-  {
-    key: 'editGestures',
-    description: hostSettingItem('permissions', 'editGestures').description,
-    mcp: 'allowEditGestures',
-    action: 'setGestureEditing',
-    label: hostText('settings.apiPermissionsSettings.gestures'),
-  },
-  {
-    key: 'editTouchpadGestures',
-    description: hostSettingItem('permissions', 'editTouchpadGestures').description,
-    mcp: 'allowEditTouchpadGestures',
-    action: 'setTouchpadGestureEditing',
-    label: hostText('settings.apiPermissionsSettings.touchpad'),
-  },
-  {
-    key: 'editRibbon',
-    description: hostSettingItem('permissions', 'editRibbon').description,
-    mcp: 'allowEditRibbon',
-    action: 'setRibbonEditing',
-    label: hostText('settings.apiPermissionsSettings.ribbon'),
-  },
-  {
-    key: 'editTray',
-    description: hostSettingItem('permissions', 'editTray').description,
-    mcp: 'allowEditTray',
-    action: 'setTrayEditing',
-    label: hostText('settings.apiPermissionsSettings.tray'),
-  },
-  {
-    key: 'manageCustomCommands',
-    description: hostSettingItem('permissions', 'manageCustomCommands').description,
-    mcp: 'allowManageCustomCommands',
-    action: 'setCustomCommandManagement',
-    label: hostText('settings.apiPermissionsSettings.customCommands'),
   },
   {
     key: 'sendInput',
@@ -102,13 +53,6 @@ const rows: {
     action: 'setProcessLaunching',
     label: hostText('settings.apiPermissionsSettings.process'),
     mcpWarning: hostText('settings.apiPermissionsSettings.processWarning'),
-  },
-  {
-    key: 'manageMcpServers',
-    description: hostSettingItem('permissions', 'manageMcpServers').description,
-    mcp: 'allowManageMcpServers',
-    action: 'setMcpServerManagement',
-    label: hostText('settings.apiPermissionsSettings.mcpManage'),
   },
   {
     key: 'useMcp',
@@ -139,16 +83,7 @@ const rows: {
 function needs(key: AppletApiPermission, permissions: AppletApiPermissions, applet: boolean) {
   if (key === 'read' || (key === 'sendInput' && applet)) return [];
   const required: AppletApiPermission[] = applet ? ['read'] : [];
-  if (
-    key !== 'execute' &&
-    key !== 'useTts' &&
-    key !== 'useAi' &&
-    key !== 'useMcp' &&
-    key !== 'manageCustomCommands' &&
-    key !== 'manageMcpServers'
-  )
-    required.push('execute');
-  if (key.startsWith('edit')) required.push('write');
+  if (key === 'runProcesses' || (key === 'sendInput' && !applet)) required.push('execute');
   return required.filter((k) => !permissions[k]).map((k) => appletApiPermissionLabels[k]);
 }
 
@@ -238,7 +173,11 @@ export function ApiPermissionsSettings({
             const appletOn = grants[row.key] === true;
             const mcpOn = row.mcp && state?.[row.mcp] === true;
             return (
-              <tr key={row.key} {...settingAnchor('permissions', row.key)}>
+              <tr
+                key={row.key}
+                data-testid={`permission-row-${row.key}`}
+                {...settingAnchor('permissions', row.key)}
+              >
                 <th scope="row">
                   <strong>{appletApiPermissionLabels[row.key]}</strong>
                   <p>{row.description}</p>

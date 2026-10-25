@@ -489,22 +489,18 @@ test('stale, cross-setting and restart revisions and unobserved disk edits preve
   await assert.rejects(f.edit(op), { code: 'REVISION_CONFLICT' });
   assert.equal(JSON.parse(fs.readFileSync(f.settings.file)).host.theme, 'system');
 });
-test('command, settings and gesture grants are all required, including dry run, and revocation is immediate', async (t) => {
+test('settings writes work without execution or retired grants and revoke immediately', async (t) => {
   const f = fixture(t),
     op = [{ kind: 'add', binding: binding('new') }];
-  for (const [flag, code] of [
-    ['execute', 'EXECUTION_DISABLED'],
-    ['write', 'WRITE_DISABLED'],
-    ['gestures', 'GESTURE_EDITING_DISABLED'],
-  ]) {
-    f.permissions[flag] = false;
-    await assert.rejects(f.edit(op, { dryRun: true }), { code });
-    assert.equal(f.get().bindings.length, 1);
-    f.permissions[flag] = true;
-  }
-  await f.edit(op);
+  f.permissions.execute = false;
   f.permissions.gestures = false;
-  await assert.rejects(f.edit([{ kind: 'remove', id: 'new' }]), {
-    code: 'GESTURE_EDITING_DISABLED',
-  });
+  f.permissions.write = false;
+  await assert.rejects(f.edit(op, { dryRun: true }), { code: 'WRITE_DISABLED' });
+  assert.equal(f.get().bindings.length, 1);
+  f.permissions.write = true;
+  await f.edit(op, { dryRun: true });
+  assert.equal(f.get().bindings.length, 1);
+  await f.edit(op);
+  f.permissions.write = false;
+  await assert.rejects(f.edit([{ kind: 'remove', id: 'new' }]), { code: 'WRITE_DISABLED' });
 });

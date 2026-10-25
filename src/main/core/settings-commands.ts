@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { isSettingAccessible, type SettingsCaller } from '../../shared/setting-access';
 import { randomUUID } from 'node:crypto';
 import { appletEnabled, defaultAppletEnabled } from '../../shared/applet-state';
 import { readObjectList } from '../../shared/object-list';
@@ -110,9 +111,9 @@ export class SettingsCommands {
   revision() {
     return `${this.epoch}:${this.options.settings.revision}`;
   }
-  private owner(appletId?: string) {
+  private owner(appletId?: string, caller: SettingsCaller = 'mcp') {
     const owner = this.owners().find((o) => o.id === (appletId ?? 'appdock'));
-    if (!owner || !owner.fields.some((f) => f.automation))
+    if (!owner || !owner.fields.some((f) => isSettingAccessible(f, caller)))
       throw new SettingsCommandError(
         'NOT_FOUND',
         hostText('services.settingsCommands.settingMissing'),
@@ -122,7 +123,7 @@ export class SettingsCommands {
   private values(
     owner: Owner,
     settings = this.options.settings.value,
-    fields = owner.fields.filter((f) => f.automation),
+    fields = owner.fields.filter((f) => isSettingAccessible(f, 'mcp')),
   ) {
     const saved: Record<string, unknown> =
       owner.id === 'appdock'
@@ -134,14 +135,14 @@ export class SettingsCommands {
       fields.map((f) => [f.key, Object.hasOwn(saved, f.key) ? saved[f.key] : f.default]),
     );
   }
-  schema(appletId?: string) {
-    const owner = this.owner(appletId);
+  schema(appletId?: string, caller: SettingsCaller = 'mcp') {
+    const owner = this.owner(appletId, caller);
     return {
       scope: owner.id === 'appdock' ? 'host' : 'applet',
       appletId: appletId ?? null,
       fields: Object.fromEntries(
         owner.fields
-          .filter((f) => f.automation)
+          .filter((f) => isSettingAccessible(f, caller))
           .map((f) => [
             f.key,
             {
@@ -153,16 +154,21 @@ export class SettingsCommands {
       ),
     };
   }
-  get(appletId?: string) {
+  get(appletId?: string, caller: SettingsCaller = 'mcp') {
+    const owner = this.owner(appletId, caller);
     return {
-      values: this.values(this.owner(appletId)),
+      values: this.values(
+        owner,
+        this.options.settings.value,
+        owner.fields.filter((f) => isSettingAccessible(f, caller)),
+      ),
       revision: this.revision(),
       warning: this.options.settings.syncError ?? null,
     };
   }
-  commands(): AutomationCommand[] {
+  commands(caller: SettingsCaller = 'mcp'): AutomationCommand[] {
     return this.owners().flatMap((owner) => {
-      const fields = owner.fields.filter((f) => f.automation);
+      const fields = owner.fields.filter((f) => isSettingAccessible(f, caller));
       if (!fields.length) return [];
       const base = {
         appletId: owner.id === 'appdock' ? null : owner.id,
@@ -208,14 +214,16 @@ export class SettingsCommands {
       generatedSettingCommands(o.id, o.fields, o.available).some((c) => c.id === id),
     );
   }
-  execute(id: string, args: unknown = {}, external = true) {
+  execute(id: string, args: unknown = {}, external = true, caller: SettingsCaller = 'mcp') {
     if (!object(args))
       throw new SettingsCommandError(
         'INVALID_ARGUMENT',
         hostText('services.settingsCommands.argumentObject'),
       );
     for (const owner of this.owners()) {
-      const fields = external ? owner.fields.filter((f) => f.automation) : owner.fields;
+      const fields = external
+        ? owner.fields.filter((f) => isSettingAccessible(f, caller))
+        : owner.fields;
       if (id === `${owner.id}.settings.update` && fields.length && external) {
         if (
           Object.keys(args).some((k) => !['changes', 'expectedRevision', 'dryRun'].includes(k)) ||

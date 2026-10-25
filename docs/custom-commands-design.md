@@ -227,12 +227,12 @@ revisionは既存SettingsCommandsと同じepoch付きの不透明な値を使い
 
 ### 許可と所有範囲
 
-操作の許可画面に「カスタムコマンド定義の閲覧・編集」`manageCustomCommands`を追加し、MCP列とApplet列を独立してPC専用保存する。新規・省略時はOFF。設定UIだけが許可自体を変更できる。
+定義の読取りはread、変更はread + writeで判定する。MCP列とApplet列は独立してPC専用保存し、設定UIだけが許可自体を変更できる。独立したカスタムコマンド管理許可は設けない。
 
 | 操作 | 必要条件 |
 | --- | --- |
-| 管理用types/list/get | read + manageCustomCommands。定義のconfigを読める権限であることをUIに示す |
-| 管理更新 | read + execute + write + manageCustomCommands |
+| 管理用types/list/get | read。定義のconfigを読める権限であることをUIに示す |
+| 管理更新 | read + write |
 | 公開コマンド一覧 | 既存read。管理権限なしでも公開された定義の概要は見える |
 | 公開コマンド実行 | 既存read + execute、種類/定義の公開条件、提供元と種類固有サービスの許可 |
 | ローカル設定UI | 本体mainFrameの設定ページsession/route検査。外部API用の許可とは分離 |
@@ -399,7 +399,7 @@ configVersionは1。次の3モードを、1つの「コマンド／プロセス�
 
 ## 実行許可と公開
 
-保存型コマンドのすべての外部実行は、種類のautomation宣言、定義のautomation=true、既存のread／execute、種類固有の許可を満たす。新規定義の外部公開は既定OFF。管理用のread／write／manageCustomCommandsは、実行許可の代わりにはならない。
+保存型コマンドのすべての外部実行は、種類のautomation宣言、定義のautomation=true、既存のread／execute、種類固有の許可を満たす。新規定義の外部公開は既定OFF。管理用のread／writeは、実行許可の代わりにはならない。
 
 | 保存型コマンドの種類 | Appletからの実行 | MCPからの実行 |
 | --- | --- | --- |

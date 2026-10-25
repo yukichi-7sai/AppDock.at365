@@ -97,7 +97,7 @@ test('local and external operations share per-Applet busy guard', async (t) => {
     true,
   );
 });
-test('management has a separate default-deny permission and rejects args without side effects', async (t) => {
+test('enable and disable use write while restart uses execute and rejects args without side effects', async (t) => {
   const f = fixture(t);
   let allowed = false,
     executable = true;
@@ -107,7 +107,7 @@ test('management has a separate default-deny permission and rejects args without
     appletManagement: f.management,
     manageable: () => allowed,
     executable: () => executable,
-    writable: () => false,
+    writable: () => allowed,
     ready: () => true,
     applets: () => [],
     commands: () => [],
@@ -117,7 +117,7 @@ test('management has a separate default-deny permission and rejects args without
   });
   const id = appletManagementId('test.provider', 'disable');
   await assert.rejects(api.call('commands.execute', { id }), {
-    code: 'APPLET_MANAGEMENT_DISABLED',
+    code: 'WRITE_DISABLED',
   });
   allowed = true;
   await assert.rejects(api.call('commands.execute', { id, args: { enabled: true } }), {
@@ -127,10 +127,18 @@ test('management has a separate default-deny permission and rejects args without
   allowed = false;
   await assert.rejects(
     api.call('commands.execute', { id: appletManagementId('test.provider', 'enable') }),
-    { code: 'APPLET_MANAGEMENT_DISABLED' },
+    { code: 'WRITE_DISABLED' },
   );
+  allowed = true;
   executable = false;
-  await assert.rejects(api.call('commands.execute', { id }), { code: 'EXECUTION_DISABLED' });
+  await api.call('commands.execute', { id: appletManagementId('test.provider', 'enable') });
+  await assert.rejects(
+    api.call('commands.execute', { id: appletManagementId('test.provider', 'restart') }),
+    { code: 'EXECUTION_DISABLED' },
+  );
+  allowed = false;
+  executable = true;
+  await api.call('commands.execute', { id: appletManagementId('test.provider', 'restart') });
 });
 test('generated host commands stay discoverable while disabled and work as opt-in tray entries', async (t) => {
   const f = fixture(t),

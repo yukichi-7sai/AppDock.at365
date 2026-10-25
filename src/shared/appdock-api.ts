@@ -343,7 +343,7 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_execute_command',
     description:
-      'commands.listのinputSchemaに従いidとargsで実行します。設定変更は設定変更許可、Appletの有効・無効・再起動はApplet管理許可も必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。別途コマンド実行許可が必要です。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
+      'commands.listのinputSchemaに従いidとargsで実行します。設定変更とAppletの有効・無効は設定変更許可、独立した動作やApplet再起動はコマンド実行許可が必要です。settings.updateのargsにはchangesとexpectedRevision、任意のdryRunを指定します。受付または処理応答を返し、操作先の効果は保証しません。失敗や応答消失時は状態確認前に再実行しないでください。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -371,7 +371,7 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_shortcuts',
     description:
-      'ショートカットキーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktopに対応します。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesはexecutionMode（first/all、既定all）・browsers（exe名の配列）・requireChromiumWindowClass（boolean）です。判定対象は押下時の前面ウィンドウです。設定変更・コマンド実行・ショートカット編集の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。',
+      'ショートカットキーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktopに対応します。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesはexecutionMode（first/all、既定all）・browsers（exe名の配列）・requireChromiumWindowClass（boolean）です。判定対象は押下時の前面ウィンドウです。情報取得と設定変更の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -403,7 +403,7 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_gestures',
     description:
-      'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。設定変更・コマンド実行・ジェスチャー編集の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。',
+      'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。情報取得と設定変更の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -421,7 +421,7 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_ribbon',
     description:
-      'リボンの配置・表示・項目・保持中の未導入ID・revisionを取得します。変更はappdock.ribbon.updateのoperationsとexpectedRevision、任意dryRunを指定します。コマンド実行・設定変更・リボン編集の許可が必要です。項目IDはコマンドIDと異なります。無効Appletの配置を保持し、編集だけで有効化やページ表示はしません。resetは未導入項目の配置も含め初期状態に戻します。',
+      'リボンの配置・表示・項目・保持中の未導入ID・revisionを取得します。変更はappdock.ribbon.updateのoperationsとexpectedRevision、任意dryRunを指定します。情報取得と設定変更の許可が必要です。項目IDはコマンドIDと異なります。無効Appletの配置を保持し、編集だけで有効化やページ表示はしません。resetは未導入項目の配置も含め初期状態に戻します。',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -439,7 +439,7 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_tray',
     description:
-      'タスクトレイのメニュー・シングル/ダブルクリック割当・割当可能コマンド・revisionを取得します。編集はappdock.tray.updateへoperations/expectedRevision/任意dryRunを指定します。実行・設定変更・タスクトレイ編集の許可が必要です。新規割当は公開済み引数なしコマンドだけ。メニューの設定/終了は末尾固定。グループは1段、ungroupで中身を保持して解除できます。doubleClickCommandはnullで解除でき、シングルは1コマンド必須です。編集だけでコマンドを実行しません。',
+      'タスクトレイのメニュー・シングル/ダブルクリック割当・割当可能コマンド・revisionを取得します。編集はappdock.tray.updateへoperations/expectedRevision/任意dryRunを指定します。情報取得と設定変更の許可が必要です。新規割当は公開済み引数なしコマンドだけ。メニューの設定/終了は末尾固定。グループは1段、ungroupで中身を保持して解除できます。doubleClickCommandはnullで解除でき、シングルは1コマンド必須です。編集だけでコマンドを実行しません。',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -463,8 +463,6 @@ export type AppDockMethod = keyof typeof appDockOperations;
 export const appDockMethods = Object.keys(appDockOperations) as AppDockMethod[];
 export const appletApiPermissionLabels = {
   useMcp: hostText('settings.appdock-api.mcpUse'),
-  manageCustomCommands: hostText('settings.appdock-api.customCommands'),
-  manageMcpServers: hostText('settings.appdock-api.mcpManage'),
   useAi: hostText('settings.appdock-api.ai'),
   useTts: hostText('settings.appdock-api.tts'),
   sendInput: hostText('settings.appdock-api.input'),
@@ -472,13 +470,18 @@ export const appletApiPermissionLabels = {
   read: hostText('settings.appdock-api.read'),
   execute: hostText('settings.appdock-api.execute'),
   write: hostText('settings.appdock-api.write'),
-  manageApplets: hostText('settings.appdock-api.applets'),
-  editShortcuts: hostText('settings.appdock-api.shortcuts'),
-  editGestures: hostText('settings.appdock-api.gestures'),
-  editTouchpadGestures: hostText('settings.appdock-api.touchpad'),
-  editRibbon: hostText('settings.appdock-api.ribbon'),
-  editTray: hostText('settings.appdock-api.tray'),
 } as const;
+// Accepted only while reading existing permission files; never independent grants.
+export const retiredAppletApiPermissions = [
+  'manageCustomCommands',
+  'manageMcpServers',
+  'manageApplets',
+  'editShortcuts',
+  'editGestures',
+  'editTouchpadGestures',
+  'editRibbon',
+  'editTray',
+] as const;
 export type AppletApiPermission = keyof typeof appletApiPermissionLabels;
 export type AppletApiPermissions = Partial<Record<AppletApiPermission, boolean>>;
 export type AppDockReply =

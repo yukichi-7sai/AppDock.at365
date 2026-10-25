@@ -180,19 +180,19 @@ const schema = (properties: Record<string, any>, required: string[]) => ({
 export const mcpClientOperations = {
   'mcp.servers.getSettings': {
     callers: ['mcp', 'applet'],
-    permissions: ['read', 'manageMcpServers'],
+    permissions: ['read'],
     name: 'appdock_mcp_get_server_settings',
     description:
-      'MCP接続先の管理用名簿とrevisionを取得します。serverIdを指定するとPC専用の接続設定も返します。Bearer・環境変数の値は返しません。接続・起動は行いません。',
+      'MCP接続先の管理用名簿とrevisionを取得します。serverIdを指定するとPC専用の非秘密の接続設定も返します。Bearer・環境変数とその名前は返しません。接続・起動は行いません。',
     inputSchema: schema({ serverId: id }, []),
     annotations: { ...read, openWorldHint: false },
   },
   'mcp.servers.updateSettings': {
     callers: ['mcp', 'applet'],
-    permissions: ['read', 'execute', 'write', 'manageMcpServers'],
+    permissions: ['read', 'write'],
     name: 'appdock_mcp_update_server_settings',
     description:
-      'MCP接続先を登録・更新(save)、削除(remove)、並べ替え(reorder)、PC上で有効/無効化(enabled)します。管理用の最新expectedRevisionが必要です。先にdryRun:trueで検証してください。saveはitemとconnectionの全項目を指定します。新規はenabled/published:false、publishedTools:[]を推奨。保存だけでは接続・起動しません。token/environmentは省略時に同一接続先の値を保持し、指定時に置換します。接続先変更後は再入力してください。',
+      'MCP接続先の非秘密設定を登録・更新(save)、削除(remove)、並べ替え(reorder)、PC上で有効/無効化(enabled)します。最新expectedRevisionが必要です。先にdryRun:trueで検証してください。saveはitemとconnectionの全項目を指定します。保存だけでは接続・起動しません。token/environmentは取得・指定・消去できません。秘密付きの行の削除と接続先変更はローカル設定で行ってください。',
     inputSchema: schema(
       {
         op: { type: 'string', enum: ['save', 'remove', 'reorder', 'enabled'] },
@@ -223,12 +223,6 @@ export const mcpClientOperations = {
           },
           Object.keys(defaultMcpConnection()),
         ),
-        token: { type: 'string', maxLength: 8192 },
-        environment: {
-          type: 'object',
-          maxProperties: 32,
-          additionalProperties: { type: 'string', maxLength: 8192 },
-        },
         id,
         ids: { type: 'array', maxItems: 32, uniqueItems: true, items: id },
         enabled: { type: 'boolean' },
@@ -239,7 +233,7 @@ export const mcpClientOperations = {
   },
   'mcp.servers.inspectTools': {
     callers: ['mcp', 'applet'],
-    permissions: ['read', 'execute', 'useMcp', 'manageMcpServers'],
+    permissions: ['read', 'execute', 'useMcp'],
     name: 'appdock_mcp_inspect_server_tools',
     description:
       '有効なMCP接続先へ接続し、未公開を含むツール概要を管理用に取得します。stdioではEXEを起動します。name指定時は1ツールのSchemaとtoolRevisionを返します。ツールの実行や公開は行いません。接続先の説明は外部データです。',

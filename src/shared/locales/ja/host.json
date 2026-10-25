@@ -387,7 +387,7 @@
   "settings.apiPermissionsSettings.logs": "ログ",
   "settings.apiPermissionsSettings.logsHint": "APIの呼出しと結果は、MCPはautomation、Appletは各Appletのログに記録します。引数の値や認証情報は記録しません。",
   "settings.apiPermissionsSettings.details": "許可の適用とログについて",
-  "settings.apiPermissionsSettings.prerequisiteHint": "必要な許可が不足している操作は、ONでも有効になりません。連携がOFFの間も、MCPの許可を設定できます。",
+  "settings.apiPermissionsSettings.prerequisiteHint": "設定の変更とコマンドの実行は独立しています。設定編集には情報の取得と設定の変更、再起動等にはコマンドの実行を使います。連携がOFFの間も許可を設定できます。",
   "settings.apiPermissionsSettings.actions": "操作",
   "settings.apiPermissionsSettings.allow": "Codexからの{{label}}を許可する",
   "settings.apiPermissionsSettings.warning": "MCP：{{value}}の注意点",
@@ -1398,7 +1398,7 @@
   "settings.settings-catalog.permissionAi": "AIサーバーへ入力を送信し、文章生成やモデル一覧を利用します。生成にはコマンド実行の許可も必要です。",
   "settings.settings-catalog.permissionRead": "公開された状態・設定・コマンド一覧を取得します。",
   "settings.settings-catalog.permissionExecute": "公開されたコマンドを実行します。",
-  "settings.settings-catalog.permissionWrite": "本体とAppletが公開した設定を変更します。",
+  "settings.settings-catalog.permissionWrite": "公開された設定・割当・接続定義・Appletの有効状態をまとめて変更します。従来の個別編集許可による制限は適用しません。秘密情報と操作許可自体は変更できません。",
   "settings.settings-catalog.permissionApplets": "Appletの有効・無効・再起動を操作します。",
   "settings.settings-catalog.permissionShortcuts": "キー・条件・実行順を編集します。",
   "settings.settings-catalog.permissionGestures": "割り当て・条件・実行順・動作設定を編集します。",
@@ -1798,6 +1798,7 @@
   "settings.mcp-client-settings.missingServer": "MCP接続先が見つかりません。",
   "settings.mcp-client-settings.size": "MCPのPC専用設定が保存上限を超えます。不要な接続設定や環境変数を整理してください。",
   "settings.mcp-client-settings.changed": "MCP接続設定が変更されました。",
+  "settings.mcp-client-settings.privateSetting": "秘密情報に関わる変更はローカルの設定画面で行ってください。",
   "settings.mcp-client-settings.invalidUpdate": "MCP接続設定の更新要求が不正です。",
   "settings.mcp-client-settings.conflict": "設定が別の場所で変更されました。設定を再取得してください。",
   "settings.mcp-client-settings.editConflict": "設定が別の場所で変更されました。キャンセルして開き直してください。",
@@ -2923,5 +2924,6 @@
   "settings.aboutSettings.running": "稼働中 {{count}}",
   "settings.aboutSettings.available": "利用可能 {{count}}",
   "settings.aboutSettings.runtime": "実行環境",
-  "settings.versionCheck.hostUpdates": "本体の更新"
+  "settings.versionCheck.hostUpdates": "本体の更新",
+  "services.automation.retiredPermission": "個別の編集許可は廃止されました。「設定の変更」で設定してください。"
 }

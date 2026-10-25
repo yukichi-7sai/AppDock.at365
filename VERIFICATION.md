@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-10-25: MCP設定の権限・公開・秘密情報の基盤 0.88.0
+
+- 専用worktree `AppDock.at365-mcp-settings-design`、追跡先のないbranch `codex/mcp-settings-design`のcleanな設計commit `bc4954f`から実装。既存mainや他worktreeを統合せず、[拡張設計](docs/mcp-settings-design.md)の先行基盤を対象にした。固定6入口、共通登録、通常一覧と特殊設定のadapterは後続範囲。
+- 操作許可を16種類から8種類へ整理し、設定編集をread + writeへ統合。入力割当・リボン・トレイ・カスタムコマンド定義・MCP接続定義・Applet有効/無効の編集はexecuteから独立し、Applet再起動はread + executeで判定する。旧writeを保持し、旧個別ONでwriteを有効化しない。旧個別OFFによる例外は廃止。旧キーは読込互換だけを残し、ローカルの明示的な許可保存時に整理する。Applet/MCP列、元callerとの許可の積、SELF_CALL/BUSYは維持した。
+- 宣言済みの対応する単純設定をMCPへ既定公開し、automation:false / secret:true / localOnly:trueを除外。他Appletへの公開はautomation:trueを維持し、生成コマンドと割当候補にも同じ公開範囲を適用した。既存の本体定義への登録が必要であり、全本体UI設定の自動登録まで対応したものではない。通常コマンドの公開と生成宣言も維持する。
+- 既存MCP接続管理APIからtoken/environmentの入力・消去、環境変数名の取得、暗号化情報のある行の削除・接続先変更を拒否。壊れた秘密付き行の外部修復も拒否する。非秘密情報の編集・順序変更は暗号文を保持し、ローカルの認証編集と保存済み認証の通常利用を維持した。
+- 発行前レビューで遅延評価される割当カタログのcaller範囲不足を修正し、要求ごとの文脈と関連回帰を追加。最終コードの型検査・本体/Default Shell build、関連標準回帰17ファイル175件と実行経路7ファイル99件、合計**274/274、fail/skip 0**が成功。独立node_modules・固定lockfile・供給網検査を維持した。Node 24.22.1 / pnpm 12.10.1 / Electron 45.0.0、通常ユーザー環境で実行。
+- 専用GUI試験はsource・固定EXEとも4群成功。8行と独立列、write ON/execute OFFでのdryRunと保存、独立動作の拒否、明示非公開と秘密の除外、実MCPでの暗号化情報保護・暗号文保持、許可取消、tools/listの定義不変を確認。既存ローカルMCP設定GUIは固定EXEで10群、スモーク試験も成功した。古い「接続してツールを取得」ボタンを探す試験は、選択時の自動取得へ合わせて試験だけを更新し再検証した。
+- 許可項目の廃止と外部API契約変更のため0.87.16から**0.88.0**へマイナー更新し、publish.batが成功。.NET Host/InputHost/ProcessHostも発行した。出力は `A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/`。EXEは170681482 bytes、SHA256 `fb7ab10478aae6a9afb94f8b0b39ced92e41ea396ab5fa7ff4d00beb2821f62d`。update.jsonの版・size/hashと固定EXEの起動版を照合した。試験だけの後続変更で製品内容は変わらず、再発行・再採番なし。
+- 完全ログ・673入力hash・レビュー・GUI結果は`.artifacts/mcp-settings-foundation/`と各GUI profile、コミット照合は`.artifacts/commit-validation-mcp-settings-foundation-20261025/`へ記録。最終入力差分は上記の既存GUI試験1ファイルだけで、影響するGUIを再実行し、関連標準回帰と型検査・製品buildの成功を再利用した。実利用設定・鍵・Cookie・物理入力は変更せず、実利用先deploy・main統合・push・Releaseなし。
+
 ## 2026-10-25: MCP設定拡張設計のコミット確認
 
 - 専用worktreeの`codex/mcp-settings-design`、開始HEAD `26fdf3e`で設計関連のMarkdown 5ファイルだけを確認。公開既定、設定編集許可の統合、暗号化情報の除外、一覧の行参照、固定MCP入口、既存契約との分離をレビューし、阻害指摘なし。未コミットの設計を保持し、pull・他branchとの統合は行わない。

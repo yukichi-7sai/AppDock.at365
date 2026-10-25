@@ -370,15 +370,13 @@ async function main() {
     'dialog save with ON persists the connection OFF after failure and closes without an inline error',
   );
   await host.getByRole('combobox', { name: '確認するMCP接続先' }).selectOption(ids.offline);
-  await host.getByRole('button', { name: '接続してツールを取得', exact: true }).click();
   await until(
-    async () =>
-      await host.getByRole('button', { name: '接続してツールを取得', exact: true }).isEnabled(),
+    async () => await host.getByRole('combobox', { name: '確認するMCP接続先' }).isEnabled(),
     'inspection finished',
   );
   await noInlineError();
   checks.push(
-    'explicit connection inspection failure also leaves settings editable without reload',
+    'selection-triggered tool inspection failure also leaves settings editable without reload',
   );
   await row('broken').getByRole('button', { name: 'brokenを編集', exact: true }).click();
   await host

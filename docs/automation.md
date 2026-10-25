@@ -1,10 +1,10 @@
 # 共通操作APIとCodex連携
 
-設定の既定公開、一覧操作の固定入口、暗号化情報の取得・変更禁止、設定編集許可の統合は[未実装の設計](mcp-settings-design.md)として分離する。この文書は現行APIの契約を記載する。
+設定編集許可の統合と、宣言済み単純設定のMCP既定公開に対応する。一覧・候補の固定入口、特殊設定の共通登録は[拡張設計](mcp-settings-design.md)の後続範囲。
 
 MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-design.md)と[保存型コマンド](custom-commands-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 
-接続先管理には`appdock_mcp_get_server_settings`、`appdock_mcp_update_server_settings`、`appdock_mcp_inspect_server_tools`の固定3入口があります。独立した初期OFFの管理許可で、登録・編集・削除と公開前のツール確認を扱います。保存には設定変更・コマンド実行、未公開ツールの確認にはMCP利用・コマンド実行の許可も必要です。[管理APIの契約](mcp-client-design.md#接続先の管理api)を参照してください。
+接続先管理には`appdock_mcp_get_server_settings`、`appdock_mcp_update_server_settings`、`appdock_mcp_inspect_server_tools`の固定3入口があります。情報取得・設定変更の許可で、登録・編集・削除と公開前のツール確認を扱います。保存には設定変更、未公開ツールの確認にはMCP利用・コマンド実行の許可も必要です。[管理APIの契約](mcp-client-design.md#接続先の管理api)を参照してください。
 
 保存型カスタムコマンドの管理は固定の4つの読取り入口と`appdock.customCommands.update`を使用します。[カスタムコマンド契約](custom-commands-design.md#共通apiとmcpの固定入口)を参照してください。初回のツール定義反映後、種類や定義の増減でMCPのtools/listは変化しません。管理許可は既存の実行・設定変更許可と独立し、定義のconfigを閲覧できる許可です。保存成功、handlerReturned、effectVerified:falseを区別します。
 
@@ -55,7 +55,7 @@ MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscri
 
 公開範囲の正本は`appDockOperations`のcallersです。入力APIはApplet専用で、MCPには直接公開しません。描画モデルの詳細は[Shell API](shell-api.md)を参照してください。
 
-設定変更はcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象は次の4項目です。
+設定変更はcommands.executeに集約します。本体はappdock.settings.update、各Appletは`<appletId>.settings.update`です。changes/valuesは公開項目の平坦なオブジェクトで、hostやsettingsで囲みません。本体の対象はhostSettingDefinitionsに登録された単純設定です。現在のキー・型はsettings.getSchemaで取得します。主な例を示します。
 
 読取りは共有とこのPCの設定の合成値、書込みは現在の保存先を使用します。本体のテーマ等とAppletの有効状態は常に端末別です。Appletの共有／端末専用はローカルUIで選択し、MCPへ保存先切り替えや他端末の設定を公開しません。公開項目・許可・dryRun・共通revisionの契約は維持します。
 
@@ -65,7 +65,7 @@ MCP 2.0の`server/discover`と`events/list`/`events/subscribe`/`events/unsubscri
 | closeToTray | boolean | nextClose |
 | startMinimized | boolean | nextStart |
 
-`{"id":"appdock.settings.update","args":{"changes":{"theme":"light"},"expectedRevision":"<取得したrevision>","dryRun":true}}`で検証します。dryRunでもコマンド実行・書込の両許可とrevision照合が必要です。未知項目・余分な引数・型不一致・空changesを拒否し、指定外を保持して一括保存します。同じ値だけなら書きません。
+`{"id":"appdock.settings.update","args":{"changes":{"theme":"light"},"expectedRevision":"<取得したrevision>","dryRun":true}}`で検証します。dryRunでも情報取得・設定変更の許可とrevision照合が必要です。未知項目・余分な引数・型不一致・空changesを拒否し、指定外を保持して一括保存します。同じ値だけなら書きません。
 
 revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透明な文字列です。本体再起動前の値は使えません。本体の設定コマンドサービスをローカル操作とMCPで共有するため、MCPの停止・再開だけではrevisionの実行IDは変わりません。保存直前にディスクも確認し、未通知の外部更新・破損を上書きしません。GUIは妥当な変更ごとに即時保存します。操作前の値と現在値を比較し、APIと同じフィールドを変更した古い入力は競合として拒否します。途中入力と失敗値は現在の画面内に保持します。ファイル同期の未到着な変更までmergeする保証はありません。
 
@@ -79,7 +79,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 取得結果のsettingsは保存済みGestureSettings、bindingsはその割当一覧です。gestureTypesは1段階移動4方向・2段階移動12種類・左/中クリック・ホイール上下のIDと表示名、キー操作は`key:Ctrl+A`形式です。2段階移動は`move-right-up`や`move-up-down`など異なる2方向を順番に指定します。同方向の重複と3段階以上は拒否します。scopesはglobal/desktop/app/pages/owner/applets/browser/exeで、desktopはglobalの直下です。assignableCommandsの公開済み引数なしコマンドを新規割当に使用できます。ownerIdと現在のavailableはショートカットと同じ意味です。取得にGUIの未確定入力、他の設定、認証情報、対象アプリの稼働状況は含みません。
 
-編集にはallowExecute・allowWrite・allowEditGesturesの3許可が必要です。操作の許可画面のMCP列で即時変更し、MCPから許可自体を変更する入口はありません。permissionはgestures.write、実効許可はgetInfo/commands.list/gestures.getのgestureEditingAllowedです。ショートカット編集許可とは独立しています。
+編集には情報取得と設定変更（allowWrite）の許可が必要です。コマンド実行許可は不要です。許可自体はローカルの「操作の許可」で変更し、MCPから変更できません。従来の*EditingAllowedはallowWriteから導出します。
 
 ```json
 {
@@ -132,7 +132,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 既存の未公開/未導入コマンドへの割当もbindingsへ返して保持します。それらは無効化・削除できますが、外部からキー/条件を変更したり有効化したりはできません。reorderは既存の同じキーの行だけを並べ替えます。ローカルの編集画面にはこの外部公開制限を加えません。
 
-編集には連携有効に加えallowExecute・allowWrite・allowEditShortcutsの3つが必要です。「操作の許可」のMCP列の「ショートカットの編集」で即時切替、MCP経由で許可を変える操作はありません。permission=shortcuts.write、実効許可はgetInfo/commands.list/shortcuts.getのshortcutEditingAllowedで確認します。既に保存した割当は許可取消後もローカルで使えます。
+編集には情報取得と設定変更（allowWrite）の許可が必要です。コマンド実行許可は不要です。許可自体はローカルの「操作の許可」で変更し、MCPから変更できません。従来の*EditingAllowedはallowWriteから導出します。
 
 ```json
 {
@@ -168,7 +168,7 @@ operationsは1〜100件、全割当は2000件まで。既存parseKeybindings/キ
 
 revisionは本体/各Applet設定と共通です。他の設定編集・再起動・未通知のディスク変更でも古いrevisionを拒否します。保存は既存prepareSettings/commitSettingsを使用し、GUIの未確定入力を消さず、古いGUI版の保存は競合として拒否します。応答はdryRun/changed/bindings/options/revision/warning/appliesを含み、completionはvalidatedまたはsettingsSaved、effectVerified=false。共有フックへの適用は非同期なので、保存成功だけで入力適用の成功と扱わず、shortcuts.getのglobalHotKeysを再取得してください。適用エラーは限定した説明へ置き換えます。
 
-追加エラーはSHORTCUT_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLEです。INVALID_ARGUMENT/NOT_FOUND/REVISION_CONFLICT/SAVE_FAILEDと既存の実行・書込拒否も使用します。変更はautomation監査ログへ結果を記録し、キーやbinding IDなどの引数は記録しません。キー入力の送信、既定テンプレート、Applet初期化状態、ジェスチャー/リボンの編集はこのAPIに含めません。
+追加エラーはWRITE_DISABLED、COMMAND_NOT_ASSIGNABLEです。INVALID_ARGUMENT/NOT_FOUND/REVISION_CONFLICT/SAVE_FAILEDと既存の実行・書込拒否も使用します。変更はautomation監査ログへ結果を記録し、キーやbinding IDなどの引数は記録しません。キー入力の送信、既定テンプレート、Applet初期化状態、ジェスチャー/リボンの編集はこのAPIに含めません。
 
 ## Applet管理
 
@@ -179,19 +179,19 @@ revisionは本体/各Applet設定と共通です。他の設定編集・再起�
 - 開始/停止処理中、同じAppletの管理処理中は拒否します。GUIの有効切替・再起動も同じ処理を使用します。実行前にディスクの設定競合を検査し、未通知の変更はCONFLICTで拒否して現在値を採用します。保存済み設定とGUIの未確定入力を混同しません。
 - 成功応答はcompletion=lifecycleApplied、changed（enabledの保存有無）、applet（id/enabled/state）、effectVerified=falseです。waitingは予約状態で、起動完了を意味しません。起動失敗はLIFECYCLE_FAILEDになり、保存済みenabledは巻き戻しません。失敗/通信切断後は状態とログを確認します。
 
-PC専用automation.jsonの`allowManageApplets`は既定falseです。「操作の許可」のMCP列の「Appletの有効・無効・再起動」で切り替えます。外部実行は連携有効・allowExecute・allowManageAppletsのすべてが必要で、allowWriteとは独立しています。許可設定自体はMCPから変更できません。個別コマンド/個別Appletの許可スイッチはありません。
+Appletの有効・無効はread + write、再起動はread + executeで判定します。旧allowManageAppletsは独立した許可として使いません。操作許可自体はローカル設定でのみ変更します。
 
 カタログのpermission=applets.manageと、system.getInfo/commands.listのappletManagementAllowedで管理権限を確認できます。拒否はAPPLET_MANAGEMENT_DISABLEDです。取消は次の要求から有効で、開始済みの処理を中断しません。ローカル操作に外部操作の許可は不要です。MCPツールは既存の7件を維持し、管理操作もcommands.execute経由で監査ログへ記録します。
 
 ## 公開コマンド
 
-設定変更とは独立したallowExecuteをPC専用設定に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completion/inputSchemaです。設定変更にはpermission=settings.writeが付き、一覧のwritableとexecutableで必要な両許可を確認します。接尾辞・表示名・aliasから許可を推測しません。
+設定変更とは独立したallowExecuteをPC専用設定に保存し、初期値/未保存時はfalse。MCPの一覧には許可前も公開コマンドを載せ、executableで実行権限を示します。commandsの各項目はid/title/appletId（本体はnull）/available/unavailableReason/completion/inputSchemaです。設定変更にはpermission=settings.writeが付き、一覧のwritableで編集可否、executableで独立した動作の実行可否を確認します。接尾辞・表示名・aliasから許可を推測しません。
 
 - 本体: appdock.open、appdock.settings.open、appdock.commands.search、appdock.applets.open、appdock.logs.open、appdock.updates.openと公開設定・Applet管理コマンド。updates.openは画面表示だけで、更新適用は行いません。
 - ファイル型Applet: 各manifestでautomation: trueを宣言した正規コマンド。
 - WebAppletの個別サイト: 提供元AppletのpageCollections宣言からopen/back/forward/reload/homeとname/displayの公開設定を生成し、共通設定コマンドに登録。詳細は[WebApplet公開操作](web-applets.md#公開操作)。
 
-Appletは有効かつrunningかつ現在のcommand.availableがtrueの場合だけ実行します。既存のactivateOnExecuteで停止中Appletを有効化する経路には入りません。実行直前に一覧を再構築し、通常コマンドは既存executeCommandへ、設定コマンドは共通SettingsCommandsへ渡します。通常のApplet RPCコマンドは引き続き引数なしで、argsに値を渡すと拒否します。APIコマンドの同時実行は1件、重複時はBUSY。設定変更許可だけでは実行できず、実行許可だけでは設定変更できません。許可の取消は次の要求から反映し、既に始めた操作の取消は保証しません。
+Appletは有効かつrunningかつ現在のcommand.availableがtrueの場合だけ実行します。既存のactivateOnExecuteで停止中Appletを有効化する経路には入りません。実行直前に一覧を再構築し、通常コマンドは既存executeCommandへ、設定コマンドは共通SettingsCommandsへ渡します。通常のApplet RPCコマンドは引き続き引数なしで、argsに値を渡すと拒否します。APIコマンドの同時実行は1件、重複時はBUSY。純粋な設定編集は設定変更許可で行えます。実行許可だけでは設定変更できません。許可の取消は次の要求から反映し、既に始めた操作の取消は保証しません。
 
 本体の表示要求はcompletion=accepted、Appletの処理応答はhandlerReturned。設定保存はsettingsSaved、dryRunはvalidatedです。いずれも操作先の効果を別途検証していないのでeffectVerified=falseです。settingsSavedは永続化を表し、非同期settings.changedの反映完了は表しません。生のコマンド戻り値/例外は返しません。EXECUTION_DISABLED/UNAVAILABLE/BUSY/COMMAND_FAILEDを追加。応答消失や失敗時は処理済みの可能性があるため、自動再試行せず効果を確認します。MCPの実行ツールはreadOnlyHint=false/idempotentHint=false/destructiveHint=trueです。設定値によって履歴の縮小などを伴うため、実行入口全体を非破壊とは宣言しません。
 
@@ -217,7 +217,9 @@ runtime登録やhost.commands.replaceのautomation値は採用せず、manifest�
 
 ## 設定宣言と自動生成コマンド
 
-この宣言にはminimumHostVersion=0.26.30以上、settings capabilityが必要です。各Applet自身のextension.jsonのsettingsへ、必要な項目だけautomation=trueを付けます。型は最上位のboolean/number/string/静的selectに限定し、既存の型・最小最大・選択肢検証を共有します。入れ子、JSON、動的select、アカウント情報を一括公開する機能はありません。
+MCPの既定公開とsecret/localOnlyの除外を利用するAppletはminimumHostVersionを0.88.0以上にします。これらのフラグは公開範囲を定めるもので、通常の設定値を暗号化する機能ではありません。認証情報の保存には既存Secrets APIを使います。
+
+この宣言にはminimumHostVersion=0.26.30以上、settings capabilityが必要です。各Applet自身のextension.jsonのsettingsにある対応型はMCPへ既定公開します。automation:false、secret:true、localOnly:trueは公開しません。他Appletからの共通APIにはautomation:trueを必要とします。型は最上位のboolean/number/string/静的selectに限定し、既存の型・最小最大・選択肢検証を共有します。入れ子、JSON、動的select、アカウント情報を一括公開する機能はありません。
 
 ```json
 {
@@ -299,7 +301,7 @@ layoutに任意の`separatorTitles`（登録済みセパレーターIDから名�
 
 取得は`ribbon.get`（MCP `appdock_get_ribbon`）、変更は`commands.execute`の`appdock.ribbon.update`です。
 
-編集にはallowExecute・allowWrite・allowEditRibbonの3許可が必要です。操作の許可画面のMCP列で変更し、MCPから許可自体は変更できません。permissionはribbon.write、実効許可はgetInfo/commands.list/ribbon.getのribbonEditingAllowedです。ショートカット/ジェスチャー編集とは独立しています。
+編集には情報取得と設定変更（allowWrite）の許可が必要です。コマンド実行許可は不要です。許可自体はローカルの「操作の許可」で変更し、MCPから変更できません。従来の*EditingAllowedはallowWriteから導出します。
 
 取得結果のlayoutはorder/hidden/bottom/separators/groups/itemOverrides/separatorTitles/buttons/rightClickCommand、itemsはid/title/kind（builtin/page/separator/group/command）/appletId/pageId/parentId/placement/visible/enabled/displayedです。titleはリボンの実効表示名、placementは親からの継承を含みます。無効Appletのページもitemsに含み、displayedはvisibleかつenabledです。開始待ち・エラーでも有効Appletは表示対象です。ページのパス・URL・アイコンデータ・openCommand・非公開設定は返しません。retainedIdsは配置・所属・表示設定に保存中の未導入ページIDで、通常編集では保持します。項目IDはコマンドIDとは異なります。
 
@@ -340,13 +342,13 @@ revisionは全設定で共通です。古いrevision、プロセス再起動前�
 
 結果はdryRun/changed/layout/items/retainedIds/revision/warning/applies=ribbonChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後の画面反映は非同期です。Appletを有効化したりページを開いたりはしません。非表示にした設定ボタンへは既存の設定を開くコマンドやトレイの固定「設定…」から戻れます。
 
-エラーはRIBBON_EDITING_DISABLED、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否を使用します。automation監査ログへAPI名・コマンドID・結果を記録し、操作引数や配置IDは記録しません。
+エラーはWRITE_DISABLED、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否を使用します。automation監査ログへAPI名・コマンドID・結果を記録し、操作引数や配置IDは記録しません。
 
 ## タスクトレイ編集
 
 取得は`tray.get`（MCP `appdock_get_tray`）、変更は`commands.execute`の`appdock.tray.update`です。MCPは11ツール。更新後はCodexを再読み込みしてください。
 
-編集にはallowExecute・allowWrite・allowEditTrayの3許可が必要です。PC専用automation.jsonのallowEditTrayは新規/旧省略ともfalse。操作の許可画面のMCP列で即時変更し、MCPから許可自体は変更できません。permissionはtray.write、実効許可はgetInfo/commands.list/tray.getのtrayEditingAllowed。他の編集許可とは独立しています。
+編集には情報取得と設定変更（allowWrite）の許可が必要です。コマンド実行許可は不要です。許可自体はローカルの「操作の許可」で変更し、MCPから変更できません。従来の*EditingAllowedはallowWriteから導出します。
 
 取得結果はmenu（保存対象ツリー）、clicks（singleClickCommand/doubleClickCommand）、fixedCommands、assignableCommands、revision、warning、各許可。menuはid/typeと、command・groupのtitle/childrenだけを投影し、全設定や認証情報は返しません。固定の設定/終了はmenuの外にあり、末尾へ自動付加します。assignableCommandsは公開済み引数なしコマンドのid/title/available/menuAllowedです。停止中も候補を返しますが、編集で起動・コマンド実行はしません。実表示では空グループや先頭/末尾/連続区切り線を既存ルールで省略します。
 
@@ -383,7 +385,7 @@ parentId=nullはトップレベル、それ以外はグループ項目のID。�
 
 結果はmenu/clicks/dryRun/changed/revision/warning/applies=trayChanged。completionはvalidatedまたはsettingsSaved、effectVerified=false。保存後のトレイ反映は既存applySettingsが行い、保留中のクリックを取消します。編集自体はコマンド実行ではなく、実クリックの成功を保証しません。ダブル未設定ならシングルを即実行、ダブル設定時はWindowsの判定時間を待ち、ダブル成立時に先行シングルを取消す既存仕様を維持します。
 
-エラーはTRAY_EDITING_DISABLED、COMMAND_NOT_ASSIGNABLE、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否です。automationログへAPI名・コマンドID・結果を記録し、グループ名/項目ID/クリック割当などの引数は記録しません。
+エラーはWRITE_DISABLED、COMMAND_NOT_ASSIGNABLE、INVALID_ARGUMENT、NOT_FOUND、REVISION_CONFLICT、SAVE_FAILEDと既存実行/書込拒否です。automationログへAPI名・コマンドID・結果を記録し、グループ名/項目ID/クリック割当などの引数は記録しません。
 
 ## Applet専用操作
 
@@ -500,6 +502,6 @@ networkHostnamesの変更は保存後に検査規則を差し替える。bind変
 
 ## タッチパッドジェスチャー
 
-MCP appdock_get_touchpad_gestures（touchpadGestures.get）でrevision・割り当て・接続状態を取得します。変更はcommands.executeのappdock.touchpadGestures.update / set-enabled / reconnect / clearを使用します。MCP列のallowEditTouchpadGesturesはallowExecute/allowWriteと独立した専用許可で、既定falseです。updateには既存ジェスチャーと同じadd/update/remove/configure/reorder操作、明示接続にはenabledまたはgestureを渡します。Windows反映や入力状態は返却stateと再取得で確認し、effectVerifiedは実機入力を検証していないためfalseです。
+MCP appdock_get_touchpad_gestures（touchpadGestures.get）でrevision・割り当て・接続状態を取得します。変更はcommands.executeのappdock.touchpadGestures.update / set-enabled / reconnect / clearを使用します。変更にはread + writeを必要とし、旧allowEditTouchpadGesturesは使用しません。updateには既存ジェスチャーと同じadd/update/remove/configure/reorder操作、明示接続にはenabledまたはgestureを渡します。Windows反映や入力状態は返却stateと再取得で確認し、effectVerifiedは実機入力を検証していないためfalseです。
 
 詳細は[タッチパッドとWindowsの接続仕様](touchpad-gestures-design.md)を参照してください。

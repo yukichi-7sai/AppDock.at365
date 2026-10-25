@@ -304,7 +304,7 @@ const listInput = {
 };
 const read = {
   callers: ['mcp', 'applet'],
-  permissions: ['read', 'manageCustomCommands'],
+  permissions: ['read'],
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,

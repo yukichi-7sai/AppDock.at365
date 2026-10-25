@@ -534,11 +534,11 @@ test('real SDK HTTP client: auth, tools, writes, revocation, persisted endpoint,
   assert.equal(service.state().allowEditGestures, false);
   assert.equal(service.state().allowEditRibbon, false);
   assert.equal(service.state().allowEditTray, false);
-  await service.action({ kind: 'setTrayEditing', allowed: true });
-  await service.action({ kind: 'setRibbonEditing', allowed: true });
-  await service.action({ kind: 'setGestureEditing', allowed: true });
-  await service.action({ kind: 'setShortcutEditing', allowed: true });
-  await service.action({ kind: 'setAppletManagement', allowed: true });
+  await assert.rejects(service.action({ kind: 'setTrayEditing', allowed: true }), /個別/);
+  await assert.rejects(service.action({ kind: 'setRibbonEditing', allowed: true }), /個別/);
+  await assert.rejects(service.action({ kind: 'setGestureEditing', allowed: true }), /個別/);
+  await assert.rejects(service.action({ kind: 'setShortcutEditing', allowed: true }), /個別/);
+  await assert.rejects(service.action({ kind: 'setAppletManagement', allowed: true }), /個別/);
   const file = path.join(f.base, 'codex', 'config.toml');
   await service.action({ kind: 'selectConfig', file });
   const savedSelection = new AutomationService(options);

@@ -169,6 +169,8 @@ export function parseSettingDefinitions(
       throw Error(hostText('settings.setting-definitions.textLength'));
     if (
       (s.automation !== undefined && typeof s.automation !== 'boolean') ||
+      (s.secret !== undefined && typeof s.secret !== 'boolean') ||
+      (s.localOnly !== undefined && typeof s.localOnly !== 'boolean') ||
       ((s.automation === true || s.generateCommands !== undefined) &&
         (depth !== 0 ||
           !['boolean', 'number', 'string', 'select'].includes(s.type) ||

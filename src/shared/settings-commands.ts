@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { isSettingAccessible } from './setting-access';
 import { defaultHostLanguage, hostLanguages } from './host-language';
 import type { AppletCommand, SettingDefinition } from './contracts';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
@@ -82,7 +83,7 @@ export function generatedSettingCommands(
       id: `${owner}.settings.${field.key}.${action}`,
       title: `${field.title}を${{ on: 'ONにする', off: 'OFFにする', toggle: '切り替える' }[action]}`,
       available,
-      automation: field.automation === true,
+      automation: isSettingAccessible(field, 'mcp'),
     })),
   );
 }
@@ -93,7 +94,7 @@ export function validateSettingCommandIds(
   registered: { id: string; aliases?: string[] }[],
 ) {
   const reserved = new Set([
-    ...(definitions.some((s) => s.automation) ? [`${owner}.settings.update`] : []),
+    ...(definitions.some((s) => isSettingAccessible(s, 'mcp')) ? [`${owner}.settings.update`] : []),
     ...generatedSettingCommands(owner, definitions, false).map((c) => c.id),
   ]);
   if (

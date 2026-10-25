@@ -21,6 +21,124 @@ const host = { owner: 'host', kind: 'host', external: false },
   external = { owner: 'mcp:1', kind: 'mcp', external: true },
   applet = { owner: 'applet:a:1', kind: 'applet', external: false };
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('external configuration excludes encrypted credentials and cannot erase or rebind them', (t) => {
+  const f = fixture(t);
+  const id = f.add(
+    { url: 'http://127.0.0.1:12345/mcp', authentication: 'bearer' },
+    { token: 'PRIVATE_TOKEN' },
+  );
+  const envId = f.add(
+    {
+      transport: 'stdio',
+      command: path.join(f.dir, 'fixture.exe'),
+      cwd: f.dir,
+      args: [],
+      authentication: 'none',
+    },
+    { environment: { PRIVATE_ENVIRONMENT: 'PRIVATE_VALUE' } },
+  );
+  const plainId = f.add({ url: 'http://127.0.0.1:12345/plain' });
+  const file = path.join(f.dir, 'mcp-client.json');
+  const before = fs.readFileSync(file, 'utf8'),
+    settingsBefore = fs.readFileSync(f.store.file, 'utf8');
+  for (const serverId of [undefined, id, envId]) {
+    const publicValue = JSON.stringify(f.settings.publicSettings(serverId));
+    for (const hidden of [
+      'PRIVATE_TOKEN',
+      'PRIVATE_ENVIRONMENT',
+      'PRIVATE_VALUE',
+      'environmentNames',
+      'tokenConfigured',
+      'secret',
+    ])
+      assert.equal(publicValue.includes(hidden), false);
+  }
+  for (const dryRun of [true, false]) {
+    for (const serverId of [id, envId]) {
+      const detail = f.settings.getSettings(serverId);
+      const save = {
+        op: 'save',
+        item: detail.item,
+        connection: detail.connection,
+        expectedRevision: detail.revision,
+        dryRun,
+      };
+      for (const request of [
+        { ...save, token: '' },
+        { ...save, environment: {} },
+        {
+          ...save,
+          connection: {
+            ...save.connection,
+            ...(save.connection.transport === 'stdio'
+              ? { command: path.join(f.dir, 'other.exe') }
+              : { url: 'http://127.0.0.1:12345/other' }),
+          },
+        },
+        { op: 'remove', id: serverId, expectedRevision: detail.revision, dryRun },
+      ])
+        assert.throws(() => f.settings.update(request, true), { code: 'PRIVATE_SETTING' });
+    }
+  }
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(fs.readFileSync(f.store.file, 'utf8'), settingsBefore);
+  const detail = f.settings.getSettings(id);
+  f.settings.update(
+    {
+      op: 'save',
+      item: { ...detail.item, name: 'Renamed' },
+      connection: { ...detail.connection, enabled: false },
+      expectedRevision: detail.revision,
+    },
+    true,
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(file)).entries[id].secret,
+    JSON.parse(before).entries[id].secret,
+  );
+  f.settings.update(
+    { op: 'reorder', ids: [plainId, envId, id], expectedRevision: f.settings.revision() },
+    true,
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(file)).entries[envId].secret,
+    JSON.parse(before).entries[envId].secret,
+  );
+  f.settings.update({ op: 'remove', id: plainId, expectedRevision: f.settings.revision() }, true);
+  assert.equal(f.settings.roster().length, 2);
+  // Local settings retain the existing credential editor and removal path.
+  f.settings.update({ op: 'remove', id, expectedRevision: f.settings.revision() });
+  assert.equal(f.settings.roster().length, 1);
+});
+
+test('external repair cannot discard an unreadable encrypted entry', (t) => {
+  const f = fixture(t),
+    id = f.add({ url: 'http://127.0.0.1:12345/mcp' }),
+    file = path.join(f.dir, 'mcp-client.json');
+  const entries = JSON.parse(fs.readFileSync(file));
+  entries.entries[id] = { connection: { invalid: true }, secret: 'UNREADABLE_CIPHERTEXT' };
+  fs.writeFileSync(file, JSON.stringify(entries));
+  const before = fs.readFileSync(file, 'utf8'),
+    expectedRevision = f.settings.revision();
+  assert.throws(
+    () =>
+      f.settings.update(
+        {
+          op: 'save',
+          item: f.settings.roster()[0],
+          connection: { ...defaultMcpConnection(), url: 'http://127.0.0.1:12345/mcp' },
+          expectedRevision,
+        },
+        true,
+      ),
+    { code: 'PRIVATE_SETTING' },
+  );
+  assert.throws(() => f.settings.update({ op: 'remove', id, expectedRevision }, true), {
+    code: 'PRIVATE_SETTING',
+  });
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+});
 async function until(fn) {
   for (let i = 0; i < 250; i++) {
     const v = await fn();

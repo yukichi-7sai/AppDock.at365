@@ -1,5 +1,26 @@
 export type ConnectionScope = 'local' | 'network';
 
+export const retiredMcpPermissionKeys = [
+  'allowManageApplets',
+  'allowEditShortcuts',
+  'allowEditGestures',
+  'allowEditTouchpadGestures',
+  'allowEditRibbon',
+  'allowManageMcpServers',
+  'allowEditTray',
+  'allowManageCustomCommands',
+] as const;
+export const retiredPermissionActions = [
+  'setAppletManagement',
+  'setShortcutEditing',
+  'setGestureEditing',
+  'setTouchpadGestureEditing',
+  'setRibbonEditing',
+  'setMcpServerManagement',
+  'setTrayEditing',
+  'setCustomCommandManagement',
+] as const;
+
 export interface AutomationState {
   connectionScope: ConnectionScope;
   activeConnectionScope: ConnectionScope | null;

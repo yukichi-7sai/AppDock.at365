@@ -279,27 +279,22 @@ test('catalog changes invalidate incomplete reorder; separator count and duplica
     { code: 'INVALID_ARGUMENT' },
   );
 });
-test('all three write permissions independently gate edits and leave reads available', async (t) => {
+test('settings grant gates ribbon edits independently of retired and execution grants', async (t) => {
   const f = fixture(t);
-  for (const [permission, code] of [
-    ['execute', 'EXECUTION_DISABLED'],
-    ['write', 'WRITE_DISABLED'],
-    ['ribbon', 'RIBBON_EDITING_DISABLED'],
-  ]) {
-    f.permissions[permission] = false;
-    await assert.rejects(f.edit([update('image-library', { visible: false })]), { code });
-    assert.ok(f.get().items.length);
-    f.permissions[permission] = true;
-  }
+  f.permissions.execute = f.permissions.ribbon = false;
+  f.permissions.write = false;
+  await assert.rejects(f.edit([update('image-library', { visible: false })]), {
+    code: 'WRITE_DISABLED',
+  });
+  assert.ok(f.get().items.length);
+  f.permissions.write = true;
   const api = new AutomationApi({ ...f.options, ribbonEditable: undefined });
-  await assert.rejects(
-    api.call('commands.execute', {
-      id,
-      args: { expectedRevision: f.get().revision, operations: [{ kind: 'reset' }] },
-    }),
-    { code: 'RIBBON_EDITING_DISABLED' },
-  );
+  await api.call('commands.execute', {
+    id,
+    args: { expectedRevision: api.call('ribbon.get').revision, operations: [{ kind: 'reset' }] },
+  });
 });
+
 test('shared revision rejects stale edits, restarted API tokens, and disk conflict', async (t) => {
   const f = fixture(t),
     old = f.get().revision;

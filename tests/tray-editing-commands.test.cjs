@@ -183,30 +183,25 @@ test('invalid tree, hierarchy and click inputs reject the whole batch', async (t
     code: 'INVALID_ARGUMENT',
   });
 });
-test('three permissions and old missing permission independently deny writes', async (t) => {
+test('settings grant gates tray edits independently of retired and execution grants', async (t) => {
   const f = fixture(t);
-  for (const [key, code] of [
-    ['execute', 'EXECUTION_DISABLED'],
-    ['write', 'WRITE_DISABLED'],
-    ['tray', 'TRAY_EDITING_DISABLED'],
-  ]) {
-    f.permissions[key] = false;
-    await assert.rejects(f.edit([configure({ doubleClickCommand: null })]), { code });
-    assert.ok(f.get().menu);
-    f.permissions[key] = true;
-  }
+  f.permissions.execute = f.permissions.tray = false;
+  f.permissions.write = false;
+  await assert.rejects(f.edit([configure({ doubleClickCommand: null })]), {
+    code: 'WRITE_DISABLED',
+  });
+  assert.ok(f.get().menu);
+  f.permissions.write = true;
   const api = new AutomationApi({ ...f.options, trayEditable: undefined });
-  await assert.rejects(
-    api.call('commands.execute', {
-      id,
-      args: {
-        expectedRevision: api.call('tray.get').revision,
-        operations: [configure({ doubleClickCommand: null })],
-      },
-    }),
-    { code: 'TRAY_EDITING_DISABLED' },
-  );
+  await api.call('commands.execute', {
+    id,
+    args: {
+      expectedRevision: api.call('tray.get').revision,
+      operations: [configure({ doubleClickCommand: null })],
+    },
+  });
 });
+
 test('shared revision, restart tokens, unobserved disk edits and save failures protect settings', async (t) => {
   const f = fixture(t),
     revision = f.get().revision;

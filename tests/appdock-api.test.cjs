@@ -22,7 +22,7 @@ function setup(t) {
     capabilities: ['appdock-api', 'settings'],
     settings: [
       { key: 'flag', type: 'boolean', default: false, automation: true },
-      { key: 'private', type: 'boolean', default: false },
+      { key: 'private', automation: false, type: 'boolean', default: false },
     ],
   };
   const e = { manifest, state: 'running' };
@@ -97,8 +97,8 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   assert.equal(f.access.get().useTts, false);
   assert.equal(f.access.get().useAi, false);
   assert.equal(f.access.get().useMcp, false);
-  assert.equal(f.access.get().manageCustomCommands, false);
-  assert.equal(f.access.get().manageMcpServers, false);
+  assert.equal(f.access.get().manageCustomCommands, undefined);
+  assert.equal(f.access.get().manageMcpServers, undefined);
   assert.equal(f.access.get().runProcesses, false);
   assert.ok(
     Object.entries(f.access.get())
@@ -149,66 +149,55 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   f.grant({ read: true });
   assert.equal(
     (await f.call('commands.execute', { id: 'appdock.settings.closeToTray.off' })).error.code,
-    'EXECUTION_DISABLED',
+    'WRITE_DISABLED',
   );
   f.grant({});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
 });
-test('MCP server management requires independent caller and origin grants for each operation', async (t) => {
+test('MCP configuration uses read/write while inspection uses execute/useMcp and intersects origin grants', async (t) => {
   const f = setup(t);
   const methods = [
     'mcp.servers.getSettings',
     'mcp.servers.updateSettings',
     'mcp.servers.inspectTools',
   ];
-  let executed = 0;
-  Object.assign(f.options, {
-    executable: () => true,
-    writable: () => true,
-    mcpClientAllowed: () => true,
-    mcpServersManageable: () => false,
-    handlers: Object.fromEntries(methods.map((m) => [m, async () => ({ called: ++executed })])),
-  });
   const params = [
     {},
     { op: 'remove', id: 'server', expectedRevision: 'revision' },
     { serverId: 'server' },
   ];
-  for (const [i, m] of methods.entries())
-    await assert.rejects(async () => f.api.call(m, params[i]), { code: 'API_DISABLED' });
-  assert.equal(executed, 0);
-  f.options.mcpServersManageable = () => true;
-  f.options.mcpClientAllowed = () => false;
-  f.options.executable = () => false;
-  f.options.writable = () => false;
-  assert.equal((await f.api.call(methods[0])).called, 1);
-  for (const i of [1, 2])
-    await assert.rejects(async () => f.api.call(methods[i], params[i]), { code: 'API_DISABLED' });
-  f.options.executable = () => true;
-  await assert.rejects(async () => f.api.call(methods[1], params[1]), { code: 'API_DISABLED' });
-  f.options.writable = () => true;
-  await f.api.call(methods[1], params[1]);
+  Object.assign(f.options, {
+    executable: () => false,
+    writable: () => true,
+    mcpClientAllowed: () => false,
+    handlers: Object.fromEntries(methods.map((m) => [m, async () => ({ called: true })])),
+  });
+  for (const i of [0, 1]) assert.equal((await f.api.call(methods[i], params[i])).called, true);
   await assert.rejects(async () => f.api.call(methods[2], params[2]), { code: 'API_DISABLED' });
+  f.options.writable = () => false;
+  f.grant({ read: true, write: true, execute: true, useMcp: true });
+  assert.equal((await f.call(methods[1], params[1])).ok, true);
+  await assert.rejects(
+    async () => f.api.call(methods[1], params[1], f.manifest.id, { origin: { kind: 'mcp' } }),
+    { code: 'API_DISABLED' },
+  );
+  f.options.writable = () => true;
+  assert.equal(
+    (await f.api.call(methods[1], params[1], f.manifest.id, { origin: { kind: 'mcp' } })).called,
+    true,
+  );
+  f.options.executable = () => true;
   f.options.mcpClientAllowed = () => true;
-  await f.api.call(methods[2], params[2]);
-  const grants = { read: true, execute: true, write: true, useMcp: true, manageMcpServers: true };
-  f.grant(grants);
-  for (const [i, m] of methods.entries()) assert.equal((await f.call(m, params[i])).ok, true);
-  f.options.mcpServersManageable = () => false;
-  for (const [i, m] of methods.entries())
-    await assert.rejects(
-      async () => f.api.call(m, params[i], f.manifest.id, { origin: { kind: 'mcp' } }),
-      { code: 'API_DISABLED' },
-    );
-  f.options.mcpServersManageable = () => true;
-  f.grant({ ...grants, manageMcpServers: false });
-  for (const [i, m] of methods.entries())
-    assert.equal((await f.call(m, params[i])).error.code, 'API_DISABLED');
+  assert.equal((await f.api.call(methods[2], params[2])).called, true);
+  f.grant({ read: true, write: false, execute: true, useMcp: true });
+  assert.equal((await f.call(methods[1], params[1])).error.code, 'API_DISABLED');
+  assert.equal((await f.call(methods[2], params[2])).ok, true);
   await assert.rejects(
     async () => f.api.call(methods[2], { serverId: 'server', management: true }),
     { code: 'INVALID_ARGUMENT' },
   );
 });
+
 test('Caller identity cannot be supplied, capability and lifetime are checked, audit excludes arguments', async (t) => {
   const f = setup(t);
   f.grant({ read: true, execute: true, write: true });
@@ -250,12 +239,12 @@ test('Both transports share revision, dryRun, atomic validation, and settings pe
   assert.equal((await f.call('commands.execute', request)).error.code, 'REVISION_CONFLICT');
   assert.equal(
     (await f.call('commands.execute', { id: 'appdock.tray.update', args: {} })).error.code,
-    'TRAY_EDITING_DISABLED',
+    'INVALID_ARGUMENT',
   );
 });
 test('MCP -> Applet -> synchronous settings works while asynchronous reentry and self lifecycle are rejected', async (t) => {
   const f = setup(t);
-  f.grant({ read: true, execute: true, write: true, manageApplets: true });
+  f.grant({ read: true, execute: true, write: true });
   f.options.executable = () => true;
   f.options.commands = () => [
     {
@@ -455,7 +444,7 @@ test('MCP effective permission reporting retains execution and write prerequisit
   assert.equal(s.allowed('allowEditTray'), false);
   config.allowExecute = true;
   s = service();
-  assert.equal(s.allowed('allowManageApplets'), true);
+  assert.equal(s.allowed('allowManageApplets'), false);
   assert.equal(s.allowed('allowEditTray'), false);
   config.allowWrite = true;
   s = service();
@@ -464,4 +453,84 @@ test('MCP effective permission reporting retains execution and write prerequisit
   s = service();
   assert.equal(s.allowed('allowWrite'), false);
   assert.equal(s.allowed('allowEditTray'), false);
+});
+
+test('legacy Applet grants load without writeback, never enable write, and compact only on explicit save', (t) => {
+  const f = setup(t),
+    file = path.join(f.dir, 'applet-api.json');
+  for (const write of [false, true]) {
+    const saved = JSON.stringify({
+      version: 2,
+      permissions: {
+        read: true,
+        write,
+        execute: false,
+        editShortcuts: !write,
+        manageApplets: true,
+        manageMcpServers: !write,
+        editTray: false,
+      },
+    });
+    fs.writeFileSync(file, saved);
+    const access = new AppletApiAccess(file);
+    assert.deepEqual(access.get(), { read: true, write, execute: false });
+    assert.equal(fs.readFileSync(file, 'utf8'), saved);
+    assert.throws(() => access.set({ write, editTray: false }));
+    assert.equal(fs.readFileSync(file, 'utf8'), saved);
+    access.set(access.get());
+    assert.deepEqual(JSON.parse(fs.readFileSync(file)).permissions, {
+      read: true,
+      write,
+      execute: false,
+    });
+  }
+  for (const permissions of [
+    { read: true, unknown: true },
+    { read: true, editTray: 'false' },
+  ]) {
+    fs.writeFileSync(file, JSON.stringify({ version: 2, permissions }));
+    assert(new AppletApiAccess(file).error);
+  }
+  assert.equal(
+    Object.keys(require('../out/main/shared/appdock-api').appletApiPermissionLabels).length,
+    8,
+  );
+});
+
+test('legacy MCP flags cannot broaden write and are removed only by local permission save', async (t) => {
+  const f = setup(t),
+    file = path.join(f.dir, 'automation.json');
+  const saved = JSON.stringify({
+    version: 1,
+    enabled: true,
+    allowWrite: false,
+    allowExecute: false,
+    allowEditTray: true,
+    allowManageMcpServers: true,
+    port: 0,
+    token: 'a'.repeat(64),
+    configFile: path.join(f.dir, 'config.toml'),
+    serverName: 'Test',
+    owned: {},
+  });
+  fs.writeFileSync(file, saved);
+  const service = new AutomationService({
+    localDirectory: f.dir,
+    baseDirectory: f.dir,
+    version: 'test',
+    encrypt: (v) => v,
+    decrypt: (v) => v,
+    changed: () => {},
+    createApi: () => f.api,
+  });
+  t.after(() => service.close());
+  assert.equal(service.allowed('allowEditTray'), false);
+  assert.equal(fs.readFileSync(file, 'utf8'), saved);
+  await assert.rejects(service.action({ kind: 'setTrayEditing', allowed: true }), /個別/);
+  assert.equal(fs.readFileSync(file, 'utf8'), saved);
+  await service.action({ kind: 'setExecution', allowed: true });
+  const compact = JSON.parse(fs.readFileSync(file));
+  assert.equal(compact.allowWrite, false);
+  assert.equal(Object.hasOwn(compact, 'allowEditTray'), false);
+  assert.equal(Object.hasOwn(compact, 'allowManageMcpServers'), false);
 });

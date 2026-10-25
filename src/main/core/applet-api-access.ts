@@ -7,20 +7,26 @@ import { atomicWrite, isObject } from './settings';
 import { AppDockApi, AutomationError, automationMethods } from './appdock-api';
 import {
   appletApiPermissionLabels,
+  retiredAppletApiPermissions,
   type AppletApiPermissions,
   type AppDockReply,
 } from '../../shared/appdock-api';
 import type { ExtensionInstance } from './extensions';
 
-function permissions(value: unknown): AppletApiPermissions {
+function permissions(value: unknown, legacy = false): AppletApiPermissions {
   if (
     !isObject(value) ||
     Object.entries(value).some(
-      ([k, v]) => !Object.hasOwn(appletApiPermissionLabels, k) || typeof v !== 'boolean',
+      ([k, v]) =>
+        (!Object.hasOwn(appletApiPermissionLabels, k) &&
+          !(legacy && (retiredAppletApiPermissions as readonly string[]).includes(k))) ||
+        typeof v !== 'boolean',
     )
   )
     throw Error(hostText('services.appletApiAccess.invalidPermissions'));
-  return { ...value };
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => Object.hasOwn(appletApiPermissionLabels, key)),
+  );
 }
 export class AppletApiAccess {
   private grants: AppletApiPermissions = {};
@@ -52,7 +58,7 @@ export class AppletApiAccess {
       // Existing per-Applet grants are not broadened to every installed Applet.
       if (saved.version === 1 && isObject(saved.grants)) return;
       if (saved.version !== 2) throw Error();
-      this.grants = permissions(saved.permissions);
+      this.grants = permissions(saved.permissions, true);
     } catch {
       this.error = hostText('services.appletApiAccess.readFailed');
     }

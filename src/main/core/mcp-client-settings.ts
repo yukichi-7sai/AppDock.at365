@@ -26,6 +26,7 @@ interface LocalEntry {
   connection: McpConnection;
   secret?: string;
 }
+const hasSecret = (entry: unknown) => jsonObject(entry) && Object.hasOwn(entry, 'secret');
 export class McpSettingsError extends Error {
   constructor(
     public code: string,
@@ -180,6 +181,14 @@ export class McpClientSettings {
       );
     return { revision, item, ...this.statuses().find((s) => s.id === serverId) };
   }
+  publicSettings(serverId?: unknown) {
+    const {
+      tokenConfigured: _token,
+      environmentNames: _environment,
+      ...value
+    } = this.getSettings(serverId) as Record<string, unknown>;
+    return value;
+  }
   private asset(entries: Record<string, unknown>, expectedRevision: string) {
     const content = JSON.stringify({ version: 1, entries }) + '\n';
     if (Object.keys(entries).length > 64 || Buffer.byteLength(content, 'utf8') > 1024 * 1024)
@@ -205,9 +214,14 @@ export class McpClientSettings {
       },
     };
   }
-  update(request: unknown) {
+  update(request: unknown, external = false) {
     if (!jsonObject(request) || typeof request.expectedRevision !== 'string')
       throw Error(hostText('settings.mcp-client-settings.invalidUpdate'));
+    if (external && (Object.hasOwn(request, 'token') || Object.hasOwn(request, 'environment')))
+      throw new McpSettingsError(
+        'PRIVATE_SETTING',
+        hostText('settings.mcp-client-settings.privateSetting'),
+      );
     const fields: Record<string, string[]> = {
       save: ['item', 'connection', 'token', 'environment'],
       remove: ['id'],
@@ -249,6 +263,15 @@ export class McpClientSettings {
       } catch {
         // Explicitly saving this row repairs it; untouched entries remain verbatim JSON values.
       }
+      if (
+        external &&
+        hasSecret(entries[item.id]) &&
+        (!old || mcpEndpointIdentity(old.connection) !== mcpEndpointIdentity(connection))
+      )
+        throw new McpSettingsError(
+          'PRIVATE_SETTING',
+          hostText('settings.mcp-client-settings.privateSetting'),
+        );
       if (old && mcpEndpointIdentity(old.connection) === mcpEndpointIdentity(connection)) {
         try {
           previous = this.secrets(item.id);
@@ -284,28 +307,36 @@ export class McpClientSettings {
         token: connection.authentication === 'bearer' ? token : undefined,
         env: connection.transport === 'stdio' ? env : {},
       };
-      entries[item.id] = {
-        connection,
-        ...(secretData.token || Object.keys(secretData.env).length
-          ? {
-              secret:
-                old?.secret &&
-                mcpEndpointIdentity(old.connection) === secretData.binding &&
-                isDeepStrictEqual(
-                  { token: previous.token, env: previous.env },
-                  { token: secretData.token, env: secretData.env },
-                )
-                  ? old.secret
-                  : this.encryption.encrypt(JSON.stringify(secretData)),
-            }
-          : {}),
-      };
+      entries[item.id] =
+        external && old && Object.hasOwn(old, 'secret')
+          ? { connection, secret: old.secret }
+          : {
+              connection,
+              ...(secretData.token || Object.keys(secretData.env).length
+                ? {
+                    secret:
+                      old?.secret &&
+                      mcpEndpointIdentity(old.connection) === secretData.binding &&
+                      isDeepStrictEqual(
+                        { token: previous.token, env: previous.env },
+                        { token: secretData.token, env: secretData.env },
+                      )
+                        ? old.secret
+                        : this.encryption.encrypt(JSON.stringify(secretData)),
+                  }
+                : {}),
+            };
       items = items.some((v) => v.id === item.id)
         ? items.map((v) => (v.id === item.id ? item : v))
         : [...items, item];
     } else if (request.op === 'remove') {
       if (!mcpUuid(request.id) || !items.some((v) => v.id === request.id))
         throw Error(hostText('settings.mcp-client-settings.missingConnection'));
+      if (external && hasSecret(entries[request.id]))
+        throw new McpSettingsError(
+          'PRIVATE_SETTING',
+          hostText('settings.mcp-client-settings.privateSetting'),
+        );
       items = items.filter((v) => v.id !== request.id);
       delete entries[request.id];
     } else if (request.op === 'reorder') {

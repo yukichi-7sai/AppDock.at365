@@ -82,6 +82,8 @@ export interface TrayItem {
 }
 export interface SettingDefinition {
   automation?: boolean;
+  secret?: boolean;
+  localOnly?: boolean;
   generateCommands?: ('on' | 'off' | 'toggle')[];
   key: string;
   title: string;

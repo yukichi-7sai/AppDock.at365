@@ -433,10 +433,7 @@ test('API grants separate config management and execution and preserve nested or
     appletPermissions: () => grants,
     handlers: { 'input.sendKeys': async () => ({ completion: 'inputSubmitted' }) },
   });
-  assert.throws(
-    () => api.call('customCommands.get', { id: item.id }),
-    (e) => e.code === 'API_DISABLED',
-  );
+  assert.equal(api.call('customCommands.get', { id: item.id }).item.id, item.id);
   assert.equal((await api.call('commands.execute', { id })).effectVerified, false);
   let invocation;
   f.provider.invoke = async (_definition, context) => {
@@ -449,19 +446,21 @@ test('API grants separate config management and execution and preserve nested or
   });
   assert.deepEqual(invocation.origin, { kind: 'mcp' });
   assert.deepEqual(invocation.apiCaller, { kind: 'applet', appletId: 'different.applet' });
+  api.options.writable = () => false;
   await assert.rejects(
     api.call('commands.execute', {
       id: customUpdateCommand,
       args: { expectedRevision: f.revision(), operations: [{ op: 'remove', id: item.id }] },
     }),
-    (e) => e.code === 'API_DISABLED',
+    (e) => e.code === 'WRITE_DISABLED',
   );
-  grants.manageCustomCommands = true;
+  grants.read = false;
   assert.throws(
     () =>
       api.call('customCommands.get', { id: item.id }, 'test.custom', { origin: { kind: 'mcp' } }),
     (e) => e.code === 'API_DISABLED',
   );
+  grants.read = true;
   assert.equal(api.call('customCommands.get', { id: item.id }, 'test.custom').item.id, item.id);
   assert.equal(
     (await api.call('input.sendKeys', { keys: 'A' }, 'test.custom', { origin: { kind: 'mcp' } }))

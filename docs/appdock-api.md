@@ -4,7 +4,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 ## 保存型カスタムコマンド
 
-`customCommands.types.list/get`と`customCommands.list/get`、`commands.execute`経由の`appdock.customCommands.update`を使用できます。[カスタムコマンド契約](custom-commands-design.md)に保存形式・Schema・上限・CRUD例をまとめています。管理読取りはread + manageCustomCommands、変更はさらにexecute + write、保存済みコマンドの実行はread + executeです。新しい管理許可はMCP・Appletとも初期OFF。Appletは自身の定義だけを管理でき、外部公開を追加できません。実行の元callerはハンドラー内の共通APIにも引き継ぎ、MCPとAppletの必要許可の積を検査します。
+`customCommands.types.list/get`と`customCommands.list/get`、`commands.execute`経由の`appdock.customCommands.update`を使用できます。[カスタムコマンド契約](custom-commands-design.md)に保存形式・Schema・上限・CRUD例をまとめています。定義の読取りはread、変更はread + write、保存済みコマンドの実行はread + executeです。Appletは自身の定義だけを管理でき、外部公開を追加できません。実行の元callerはハンドラー内の共通APIにも引き継ぎ、MCPとAppletの必要許可の積を検査します。
 
 本体提供種類`appdock.mcp.call`は接続先ID・ツール名・toolRevision・固定argumentsを保存します。実行は`handlerReturned`内の`result.completion:'accepted'`とjobIdを返し、完了を待ちません。[保存型MCPコマンド](custom-commands-design.md)を参照してください。
 
@@ -12,11 +12,11 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 `mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`をAppletとMCPへ公開します。発見/状態取得はread + useMcp、実行/取消はさらにexecuteが必要で、useMcpは両入口で初期OFFです。本体のMCPサーバーOFFでもAppletから利用できます。[接続・保存・上限](mcp-client-design.md)と[中継公開](mcp-hub-design.md)を参照してください。
 
-接続先管理には`mcp.servers.getSettings/updateSettings/inspectTools`を使用します。read + manageMcpServersを基本とし、更新にはexecute + write、未公開ツールの確認にはexecute + useMcpも必要です。独立した管理許可は両入口で初期OFF。元callerの必要許可も照合します。[管理API](mcp-client-design.md#接続先の管理api)に、保存・秘密・公開範囲の契約をまとめています。
+接続先管理には`mcp.servers.getSettings/updateSettings/inspectTools`を使用します。設定の読取りはread、保存はread + write、未公開ツールの確認はread + execute + useMcpです。元callerの必要許可も照合します。[管理API](mcp-client-design.md#接続先の管理api)に、保存・秘密・公開範囲の契約をまとめています。
 
 tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返します。tools.callには`{serverId,name,arguments,toolRevision,requestId,timeoutMs?}`を指定し、返されたjobIdでjobs.get/cancelを呼びます。Nodeは`context.appdock.call`、.NETは`context.AppDock.CallAsync`を使用します。結果取得は同じ実行主体に限り、MCP起点を経由したAppletには元のMCP許可と公開リストも適用します。設定UIだけが全ジョブを確認できます。
 
-接続先の追加・秘密・公開許可の変更は本体設定UIで行います。管理APIへ実行ファイルやURLを渡して任意の接続先を作る機能はありません。未対応Schema・変更済みtoolRevision・非公開ツール・上限超過・再起動後のジョブは明確なエラーとして返します。
+非秘密の接続定義は管理APIでも登録・変更できます。秘密の入力・消去と、秘密付きの行の削除・接続先変更は本体設定UIで行います。未対応Schema・変更済みtoolRevision・非公開ツール・上限超過・再起動後のジョブは明確なエラーとして返します。
 
 ## 構造と公開範囲
 
@@ -31,7 +31,7 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.76.5"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/manageCustomCommands/manageMcpServers/runProcessesがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/runProcessesがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 画面ではread／write／executeを「情報の取得」「設定の変更」「コマンドの実行」と表示します。MCP列の情報取得はON固定・操作不可のトグルで、「MCP連携中は常に許可」と補足します。Applet列の情報取得は従来どおり切り替えられます。コマンド実行・Windows入力・プロセス起動・MCP利用・AI送信・TTS送信の6項目は、MCP列のトグル横に注意アイコンを表示します。許可がOFFでも表示し、マウスを重ねるかキーボードでフォーカスすると注意理由を読めます。アイコンは表示上の案内で、許可の判定や保存値を変更しません。
 
@@ -39,9 +39,10 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 | --- | --- |
 | 読取り | 情報の取得（read） |
 | 通常の公開コマンド | read + execute |
-| 公開設定変更・生成ON/OFF/toggle | read + execute + write |
-| Appletの有効・無効・再起動 | read + execute + manageApplets |
-| ショートカット等の編集 | read + execute + write + 対象のeditShortcuts/editGestures/editRibbon/editTray |
+| 公開設定変更・生成ON/OFF/toggle | read + write |
+| Appletの有効・無効 | read + write |
+| Appletの再起動 | read + execute |
+| ショートカット等の編集 | read + write |
 | input.sendKeys / input.appCommand | sendInputのみ（MCPは直接呼出し不可） |
 | processes.start | read + execute + runProcesses（Applet専用） |
 | 保存したキー送信／プロセス起動コマンド | read + execute + sendInput／runProcessesと、定義の外部公開 |
@@ -49,6 +50,8 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 許可を変更できるのはホストの設定画面だけです。MCPやAppletから自分の許可を追加できません。呼び出し元のApplet IDはホストが接続から決定し、リクエストから受け取りません。監査ログは呼び出し元Appletのログへ`[Applet API]`として操作名・リクエストID・成否を記録し、引数や秘密値を含めません。
 
 CodexとAppletの許可設定は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、ホストが発行する元callerを維持し、必要な共通許可はAppletとMCPの両方を満たす必要があります。キー送信にもMCP列のsendInput許可を使い、元MCPのコマンド実行許可だけでは実行しません。プロセス起動も両方のrunProcessesを必要とします。どちらもMCPの生の引数指定APIとして直接公開しません。信頼できるローカルAppletを前提とし、Appletプロセス自体をOSサンドボックスにする機能ではありません。
+
+設定編集の個別許可はwriteへ統合します。旧write/allowWriteの値を維持し、旧個別ONでwriteを有効化しません。writeがONなら旧個別OFFによる編集制限は適用しません。旧キーは読込互換だけを残し、次のローカルな許可保存時に整理します。読取りだけでは保存しません。未知キーや型不正は拒否します。許可画面はread/write/execute/useAi/useTts/useMcp/sendInput/runProcessesの8行です。
 
 ## プロセス起動
 
