@@ -30,6 +30,8 @@ Default Shellは本体と同時ビルドして単一EXEへ同梱する。追加S
 
 型と一覧の正本は[src/shared/shell.ts](../src/shared/shell.ts)。割り当てはhost.shellProvidersの領域IDからApplet IDへのマップで、未指定はDefault Shell。各領域は独立して選択でき、リボングループのポップアップ提供元をリボン提供元から推測しない。
 
+設定画面と[共通MCP設定API](settings-api.md#shell選択)は同じ領域一覧とshellProviderCandidatesから選択肢を生成する。領域の増減に合わせたMCP専用登録やツールの再定義は不要で、現在のSchemaと候補を取得する。選択はPC専用保存を使い、停止・無効Appletの有効化や再試行を兼ねない。領域や提供元がなくなった場合も保存済みの指定は保持する。
+
 旧page.home、page.image-library、page.logs、page.notifications、page.settingsの保存指定は不活性な値として保持し、選択UI・稼働状態・起動・再試行へ含めない。旧指定の削除・変換や保存データの初期化は行わない。旧ページを要求するShell専用コマンドは利用不可とする。通常Appletのpages、コマンド、設定、WebContents/sessionの寿命は変更しない。
 
 ## 状態と操作

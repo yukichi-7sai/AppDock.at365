@@ -9,7 +9,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings } from '../../shared/contracts';
 import type { SettingsPageModel } from '../../shared/settings-page';
-import { defaultShellId, shellRegions, shellView } from '../../shared/shell';
+import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import { useSettingsControls } from '../settings-ui/api';
 import { Toggle } from '../settings-ui/Toggle';
 import { AboutSettings } from './AboutSettings';
@@ -317,9 +317,7 @@ export function SettingsForm({
               {shellRegions.map(({ id }) => {
                 const title = t(`appearance.shell.region.${id}`);
                 const configured = settings.host.shellProviders?.[id] ?? defaultShellId;
-                const candidates = extensions.filter(
-                  (e) => e.id !== defaultShellId && shellView(e.shell, id),
-                );
+                const candidates = shellProviderCandidates(extensions, id);
                 const state = aux.shellRegions?.regions.find((r) => r.region === id);
                 const name = (provider: string | null | undefined) =>
                   provider === defaultShellId
@@ -344,6 +342,7 @@ export function SettingsForm({
                   >
                     <div className="shell-region-controls">
                       <select
+                        data-testid={'shell-provider-' + id}
                         aria-label={t('appearance.shell.label', { region: title })}
                         value={configured}
                         disabled={busy}

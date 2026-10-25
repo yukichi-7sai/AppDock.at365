@@ -135,6 +135,7 @@ fs.writeFileSync(
   path.join(fixture, 'index.cjs'),
   `exports.activate=async context=>{context.commands.register('${fixtureId}.run','Run',async()=>{});await context.settings.setOptions('monitor',[{value:'primary',label:'Primary'},{value:'secondary',label:'Secondary'}]);};`,
 );
+require('./settings-shell-gateway-checks.cjs').install(root, profile);
 let child, browser, page, client;
 async function until(fn, label) {
   const end = Date.now() + 60000;
@@ -308,6 +309,16 @@ async function main() {
     profile,
     local,
     fixtureId,
+    checks,
+    tool,
+    value,
+    until,
+  });
+  await require('./settings-shell-gateway-checks.cjs')({
+    page,
+    client,
+    profile,
+    local,
     checks,
     tool,
     value,

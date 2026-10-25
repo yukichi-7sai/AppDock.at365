@@ -1,17 +1,9 @@
 import { hostText } from './i18n';
+import type { ExtensionManifest } from './contracts';
 /** Public presentation contract. No renderer implementation or host internals. */
 export const defaultShellId = 'appdock.default-shell';
 /** Shell targets are deliberately limited. New targets require an explicit request. */
-export type ShellRegion =
-  | 'titlebar'
-  | 'ribbon'
-  | 'statusbar'
-  | 'overlay.command-palette'
-  | 'overlay.ribbon-group'
-  | 'notification.banner'
-  | 'notification.desktop';
-
-export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
+export const shellRegions = [
   { id: 'titlebar', title: hostText('services.sharedShell.titleBar') },
   { id: 'ribbon', title: hostText('services.sharedShell.ribbon') },
   { id: 'statusbar', title: hostText('services.sharedShell.statusBar') },
@@ -19,7 +11,17 @@ export const shellRegions: readonly { id: ShellRegion; title: string }[] = [
   { id: 'overlay.ribbon-group', title: hostText('services.sharedShell.ribbonGroup') },
   { id: 'notification.banner', title: hostText('services.sharedShell.banner') },
   { id: 'notification.desktop', title: hostText('services.sharedShell.desktopNotifications') },
-];
+] as const;
+export type ShellRegion = (typeof shellRegions)[number]['id'];
+/** Selection candidates follow declared views, independently of worker availability. */
+export function shellProviderCandidates<T extends Pick<ExtensionManifest, 'id' | 'shell'>>(
+  providers: readonly T[],
+  region: ShellRegion,
+): T[] {
+  return providers.filter(
+    (provider) => provider.id !== defaultShellId && shellView(provider.shell, region),
+  );
+}
 export function isShellRegion(value: unknown): value is ShellRegion {
   return shellRegions.some((r) => r.id === value);
 }

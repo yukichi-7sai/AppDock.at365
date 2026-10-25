@@ -6,7 +6,7 @@
 
 本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/selectは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listも列の値として編集できる。自由JSON・shortcut-list・画像参照の編集と未対応の専用サービスは、adapterを実装する後続範囲。
 
-通知・AI/TTS・更新の通常設定も所有サービスのadapterから公開する。通常値はfields、AI接続とTTS手動ボイスの一覧はlist対象として扱う。既存の解析・検証・共有保存と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
+通知・AI/TTS・更新の通常設定とShell選択も所有サービスのadapterから公開する。通常値はfields、AI接続とTTS手動ボイスの一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
 
 | 対象 | 公開する設定 |
 | --- | --- |
@@ -19,6 +19,7 @@
 | 通知種類ごと | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない |
 | 本体の更新設定 | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可 |
 | Appletの更新元 | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外 |
+| Shell選択 | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成 |
 
 起動・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
 
@@ -107,6 +108,16 @@ Appletの更新元はmanifestのupdateRepositoryを既定値とし、上書き�
 適用時点は、更新元/同版許可がnextUpdateCheck、About自動確認がnextAboutOpen、起動時確認の対象/通知がnextStartupCheck、起動時の待ち時間がnextStart。起動時チェックが既に予約されていれば、対象/通知の変更はその確認でも使われるが、待ち時間を保存しても既存タイマーを作り直さない。About表示中の保存やONへの変更で通信せず、次に開いた時に通常の1時間間隔判定を行う。
 
 設定保存はread + write、更新チェック/取得/インストールは既存の独立した更新操作を使う。設定APIの取得・dryRun・保存は更新操作、確認ダイアログ、helper起動や再起動を開始しない。
+
+## Shell選択
+
+Shellのfields対象は[src/shared/shell.ts](../src/shared/shell.ts)のshellRegionsを列挙し、領域IDをそのままkeyにする。`overlay.command-palette`等のドットもIDの一部であり、入れ子のパスとして解釈しない。ShellRegion型も同じ一覧から導出する。本体の領域定義を追加・削除しても、MCP専用の項目一覧や外側のツールSchemaは変更せず、現在のSchemaを再取得して利用する。今回新たなShell領域は追加しない。
+
+select候補はDefault Shellと、現在その領域のviewを宣言するApplet。設定画面と同じshellProviderCandidatesを使用し、名前が重なる場合も提供元IDで区別する。停止・無効の提供元も指定できるが、選択によって有効化・起動しない。候補の追加・削除、名前や有効状態の表示変更はschemaRevisionへ反映し、古いSchemaを使う要求や続きを拒否する。
+
+値は保存された指定を返し、実際に描画している提供元とは区別する。候補や領域がなくなっても保存値を消さず、他の領域の編集では保持する。現行の領域だけを読み書きし、未登録・廃止領域の直接指定はNOT_FOUND。現在の候補にない提供元への新しい指定はINVALID_ARGUMENTとし、既存指定はresetでDefault Shellへ戻せる。resetと既定値のsetは、その領域の保存上書きを除去する。
+
+保存は既存UIと同じPC専用settings-<端末名>.jsonへ行い、共有設定・他の端末の指定・Applet固有設定・暗号化情報を変更しない。read + writeを使い、executeやApplet管理の許可は追加条件にしない。dryRunは保存・切替を行わず、保存完了のeffectVerifiedはfalse。appliesはshellProvidersChangedであり、通常の設定変更通知を既存Shell Hostが適用する。バー/リボンのready待ち、開いているオーバーレイの次回適用、通知の寿命保持、領域別フォールバックとsafe-shellは[Shell基盤](shell-foundation.md)に従う。再試行・再起動・有効化の操作は設定APIへ追加しない。
 
 ## 変更とリセット
 

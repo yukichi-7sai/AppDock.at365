@@ -1,5 +1,18 @@
 # 検証記録
 
+## 2026-10-25: 領域の増減に追従するShell選択の共通MCP操作 0.88.11
+
+- cleanな`fcb6751`から専用worktree `AppDock.at365-mcp-settings-design`の`codex/mcp-settings-design`を継続。Shell選択を既存の固定6入口へ接続した。追跡先は作成せず、mainへの統合・push・Release・実利用先deployは行わない。
+- ShellRegion型と公開フィールドを同じshellRegionsから導出し、UI/MCPの候補判定をshellProviderCandidatesへ共通化。領域の追加/削除、提供元のview変更/消失、同名・停止/無効提供元を扱い、外側のツールSchemaは不変。候補の表示名・有効状態もschemaRevisionへ束縛し、古いSchema/cursor/再送を拒否する。増減はunit fixtureで模擬し、実製品の領域は既存7つを維持した。
+- ドットを含む領域IDを平坦な保存キーとして扱い、指定した項目だけをPC専用settings-<端末名>.jsonへ保存。reset/既定値setで上書きを除去し、共有ファイル・他の端末・Applet設定・資格情報bytesを保持する。廃止/未知領域と消失提供元の保存指定は保持し、直接編集は現行領域/候補だけを許可。read + writeで保存し、execute・有効化・再試行を兼ねない。
+- 発行前に動的投影、選択候補、保存先/既定省略、秘密と権限、Shell寿命と既存UIへの影響をレビュー。既存PC専用の上書き取得/リセット時rewriteへ接続し、試験の保存先前提と失敗注入先も修正した。初回回帰の失敗ログは保持し、全対象を再検証して阻害指摘なし。画面の見た目は保ち、候補判定の共有と検証用属性だけを変更した。
+- 固定依存install・型検査・本体/Default Shell build、関連標準回帰**55ファイル584/584件、fail/skip 0**が成功。所有adapterは48件で、今回のShell7件を含む。追加/削除/再追加時の探索、未知キー/不正候補、dryRun/再送/無変更、外部競合/許可取消、保存失敗/原子性、PC専用/暗号化ファイルの保持、既存Registryのフォールバック/safe-shellを確認した。標準全体は未実行。
+- 隔離sourceと最終固定EXEの実MCP/GUIは各**24群**、固定EXE smokeも成功。現在の7領域すべての指定、バー/リボンのready・bound、MCPと既存UIの相互反映、古い要求の拒否、無効Appletの指定保持と領域別Default Shell復帰、reset/継承、共有bytes/暗号化キー保持、execute OFF、tools/list不変を確認。Shell選択画面のスクリーンショットも確認した。既存の通知/AI/TTS/一覧/更新設定の検証も含む。
+- 型検査/build/584回帰後の変更はGUI helperのスクリーンショット前スクロール1行だけ。標準試験と製品の入力に影響しないことを照合し、成功を再利用してsource/固定GUIを再実行した。最終**740入力**と参照するWebApplet/WallpaperSlideshow manifestのSHAは最終GUIから発行・固定試験まで一致し、詳細はcommit-validationのvalidation.jsonへ記録した。
+- 設定項目/保存ファイルの追加・削除と公開操作契約の破壊を含まないadapter追加につき**0.88.11**へパッチ更新。publish.bat終了0。本体EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170680316 bytes / SHA256 `3066b5cd3a9fc75c0a552724d40ea8e1fd423b2f427c775292004fb637279fae`**。Windows File/ProductVersion、feedの版/size/hash、ASAR内package/同梱Default Shell、隔離コピーと最終EXEを照合した。
+- 正本は[設定API](docs/settings-api.md)、[Shell基盤](docs/shell-foundation.md)、[外部操作](docs/automation.md)、後続範囲は[拡張設計](docs/mcp-settings-design.md)。実利用の設定/認証、実外部Shellパッケージ、新規Shell領域の実装、物理入力/OS効果は今回の検証対象外。起動等の残りの所有adapterは後続範囲。
+- 証跡は`.artifacts/mcp-settings-shell-20261025/`、最終照合は`.artifacts/commit-validation-mcp-settings-shell-20261025/`。source=`mcp-settings-foundation-source-1792937818687`、固定EXE=`mcp-settings-foundation-portable-1792938084928`、smoke=`smoke-1792938109810`。発行後の変更は関連文書と本記録のみ。試験プロセス0、今回の成功は方式ごとの直近3回以内、過去の再利用資料/診断/固定出力は保持し、削除0件。
+
 ## 2026-10-25: 更新設定とApplet更新元の共通MCP操作 0.88.10
 
 - cleanな`010845e`から、追跡先なしの`codex/mcp-settings-design`で本体の更新設定7項目と外部Appletごとの更新元adapterを実装。固定6入口のfields対象として取得・set/resetでき、外側のツール定義と8権限は維持した。mainの変更/統合と追跡先の設定は行わない。

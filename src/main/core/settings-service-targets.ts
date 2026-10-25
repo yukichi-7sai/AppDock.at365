@@ -22,6 +22,7 @@ import { settingInputSchema } from '../../shared/settings-commands';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { createDefaultSettings } from '../../shared/settings-schema';
 import { validateMcpSetting } from '../../shared/mcp-setting-fields';
+import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import type { SettingsStore } from './settings';
 import {
   SettingsTargetError,
@@ -47,6 +48,8 @@ interface Target {
   fields: Field[];
   values(settings: Settings): RecordValue;
   overrides(raw: RecordValue): RecordValue;
+  stored?(): RecordValue;
+  rewriteScope?: 'shared' | 'device';
   replace(settings: Settings, changes: RecordValue, reset: string[]): Settings;
   guard?(next: Settings): void;
   context?: unknown;
@@ -110,6 +113,7 @@ export class SettingsServiceTargets {
   targets(): SettingsTarget[] {
     return [
       ...[
+        this.shell(),
         this.updates(),
         ...(this.options.applets?.() ?? [])
           .filter((applet) => !applet.collection && applet.sourceKind !== 'builtin')
@@ -126,6 +130,54 @@ export class SettingsServiceTargets {
       this.ttsVoices(),
     ];
   }
+  private shell(): Target {
+    const providers = this.options.applets?.() ?? [];
+    const fields: Field[] = shellRegions.map(({ id, title }) => ({
+      key: id,
+      title: hostText('appearance.shell.label', { region: title }),
+      type: 'select',
+      default: defaultShellId,
+      options: [
+        { value: defaultShellId, label: hostText('appearance.shell.defaultOption') },
+        ...shellProviderCandidates(providers, id).map((provider) => ({
+          value: provider.id,
+          label:
+            provider.displayName +
+            (provider.enabled ? '' : hostText('appearance.shell.disabledSuffix')),
+        })),
+      ],
+    }));
+    const projectProviders = (value: unknown) =>
+      Object.fromEntries(
+        fields.flatMap(({ key }) =>
+          Object.hasOwn(object(value), key) ? [[key, object(value)[key]]] : [],
+        ),
+      );
+    return {
+      id: 'service.shell',
+      title: hostText('appearance.shell.section'),
+      category: 'shell',
+      fields,
+      stored: () => this.options.settings.storedSettingOverrides('appdock'),
+      rewriteScope: 'device',
+      context: fields.map(({ key, options }) => ({ key, options })),
+      applies: () => 'shellProvidersChanged',
+      values: (settings) =>
+        Object.fromEntries(
+          fields.map(({ key }) => [key, settings.host.shellProviders?.[key] ?? defaultShellId]),
+        ),
+      overrides: (raw) => projectProviders(raw.shellProviders),
+      replace: (settings, changes, reset) => {
+        const assignments = { ...settings.host.shellProviders, ...changes } as Record<
+          string,
+          string
+        >;
+        for (const key of reset) delete assignments[key];
+        settings.host.shellProviders = assignments;
+        return settings;
+      },
+    };
+  }
   private target(spec: Target): SettingsFieldTarget {
     const applies = (key: string) =>
       spec.applies?.(key) ??
@@ -136,7 +188,9 @@ export class SettingsServiceTargets {
           : 'notificationPreferencesChanged');
     const readOverrides = (): RecordValue | undefined => {
       try {
-        const raw = spec.overrides(this.options.settings.storedValue());
+        const raw = spec.overrides(
+          spec.stored ? spec.stored() : this.options.settings.storedValue(),
+        );
         return { ...raw, ...(spec.guardRevision ? { $guard: spec.guardRevision() } : {}) };
       } catch {
         return undefined;
@@ -219,7 +273,7 @@ export class SettingsServiceTargets {
               next,
               store.revision,
               [...resets].some((key) => original !== undefined && Object.hasOwn(original, key))
-                ? ['shared']
+                ? [spec.rewriteScope ?? 'shared']
                 : [],
             );
           } catch (error) {

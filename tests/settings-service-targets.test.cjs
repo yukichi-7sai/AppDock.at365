@@ -1182,6 +1182,229 @@ const sourceTarget = (f, ownerId) =>
 const setUpdate = (f, changes, dryRun = false) =>
   f.call('apply', f.request(updatesId, [{ kind: 'set', changes }], dryRun));
 
+const { shellRegions, defaultShellId } = require('../out/main/shared/shell');
+const shellId = 'service.shell';
+const shellApplet = (id, regions = shellRegions.map((r) => r.id), extra = {}) =>
+  updateApplet(id, {
+    shell: {
+      apiVersion: 1,
+      ribbonSchemaVersion: 2,
+      views: Object.fromEntries(regions.map((region) => [region, 'view.html'])),
+    },
+    ...extra,
+  });
+const selectShell = (f, changes, dryRun = false) =>
+  f.call('apply', f.request(shellId, [{ kind: 'set', changes }], dryRun));
+
+test('Shell selection discovers declared regions and per-region providers without starting disabled or stopped Applets', (t) => {
+  const a = shellApplet('shell.a'),
+    b = shellApplet('shell.b', ['statusbar']),
+    f = fixture(t, { updateApplets: [a, b, updateApplet('ordinary')] }),
+    schema = f.call('schema.get', { targetId: shellId });
+  assert.deepEqual(
+    schema.items.map((field) => field.key),
+    shellRegions.map((region) => region.id),
+  );
+  for (const { id } of shellRegions) {
+    const options = f.call('options.list', { targetId: shellId, key: id }).items;
+    assert.deepEqual(
+      options.map((option) => option.value),
+      [defaultShellId, a.id, ...(id === 'statusbar' ? [b.id] : [])],
+    );
+    assert.equal(options[1].label, options.at(-1).label);
+    assert.equal(f.values(shellId)[id], defaultShellId);
+    assert.equal(f.read(shellId, [id]).fields[0].inherited, true);
+  }
+  selectShell(f, Object.fromEntries(shellRegions.map(({ id }) => [id, a.id])));
+  assert.equal(a.state, 'stopped');
+  assert.equal(a.enabled, false);
+  assert.equal(f.decrypts(), 0);
+  for (const key of ['page.settings', 'future.private', 'retry', 'enabled'])
+    assert.throws(() => selectShell(f, { [key]: a.id }), { code: 'NOT_FOUND' });
+});
+
+test('Shell selection dryRun, replay, default omission and dotted IDs preserve unrelated and retired values', (t) => {
+  const f = fixture(t, { device: true, updateApplets: [shellApplet('shell.a')] });
+  f.store.save(
+    {
+      ...f.store.value,
+      host: {
+        ...f.store.value.host,
+        shellProviders: {
+          'page.settings': 'old.shell',
+          'future.saved': 'future.shell',
+          ribbon: defaultShellId,
+        },
+      },
+      extensions: { 'shell.a': { enabled: false, settings: { private: 'PRIVATE_SHELL_SETTING' } } },
+    },
+    f.store.revision,
+  );
+  const before = fs.readFileSync(f.store.shared.file),
+    device = fs.readFileSync(f.store.device.file),
+    changes = { 'overlay.command-palette': 'shell.a', 'notification.desktop': 'shell.a' },
+    preview = selectShell(f, changes, true);
+  assert.equal(preview.completion, 'validated');
+  assert.equal(preview.effectVerified, false);
+  assert.equal(preview.applies['overlay.command-palette'], 'shellProvidersChanged');
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  assert.deepEqual(fs.readFileSync(f.store.device.file), device);
+  const request = f.request(shellId, [{ kind: 'set', changes }]),
+    result = f.call('apply', request);
+  assert.deepEqual(f.call('apply', request), result);
+  assert.equal(f.writes(), 1);
+  assert.equal(f.store.value.host.shellProviders['overlay.command-palette'], 'shell.a');
+  assert.equal(f.store.value.host.shellProviders.overlay, undefined);
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  const deviceBefore = JSON.parse(device),
+    deviceAfter = JSON.parse(fs.readFileSync(f.store.device.file));
+  deviceBefore.host.shellProviders = deviceAfter.host.shellProviders;
+  assert.deepEqual(deviceAfter, deviceBefore);
+  assert(f.read(shellId, Object.keys(changes)).fields.every((field) => !field.inherited));
+  f.call('apply', f.request(shellId, [{ kind: 'reset', keys: Object.keys(changes) }]));
+  selectShell(f, { ribbon: defaultShellId });
+  assert.deepEqual(f.store.value.host.shellProviders, {
+    'page.settings': 'old.shell',
+    'future.saved': 'future.shell',
+  });
+  assert.equal(f.read(shellId, ['ribbon']).fields[0].inherited, true);
+  assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
+  assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)).host.shellProviders, {
+    'page.settings': 'old.shell',
+    'future.saved': 'future.shell',
+  });
+  const noOpWrites = f.writes();
+  selectShell(f, { ribbon: defaultShellId });
+  assert.equal(f.writes(), noOpWrites);
+  assert.equal(f.store.value.extensions['shell.a'].enabled, false);
+  assert.deepEqual(f.store.value.extensions['shell.a'].settings, {
+    private: 'PRIVATE_SHELL_SETTING',
+  });
+  assert(!JSON.stringify(f.read(shellId)).includes('PRIVATE_SHELL_SETTING'));
+});
+
+test('Shell region additions and removals change discovery without new tool schemas and retain dormant assignments', (t) => {
+  const original = [...shellRegions];
+  t.after(() => shellRegions.splice(0, shellRegions.length, ...original));
+  const provider = shellApplet('shell.a', ['fixture.future']),
+    f = fixture(t, { updateApplets: [provider] }),
+    before = f.call('schema.get', { targetId: shellId });
+  shellRegions.push({ id: 'fixture.future', title: 'Future fixture' });
+  const added = f.call('schema.get', { targetId: shellId });
+  assert.notEqual(added.schemaRevision, before.schemaRevision);
+  assert(added.items.some((field) => field.key === 'fixture.future'));
+  selectShell(f, { 'fixture.future': provider.id });
+  const cursor = f.call('schema.get', { targetId: shellId, limit: 1 }).nextCursor,
+    stale = f.request(shellId, [{ kind: 'reset', keys: ['fixture.future'] }]);
+  shellRegions.pop();
+  assert.throws(() => f.call('apply', stale), { code: 'SCHEMA_CONFLICT' });
+  assert.throws(() => f.call('schema.get', { targetId: shellId, limit: 1, cursor }), {
+    code: 'REVISION_CONFLICT',
+  });
+  assert.throws(() => f.read(shellId, ['fixture.future']), { code: 'NOT_FOUND' });
+  selectShell(f, { ribbon: defaultShellId });
+  assert.equal(f.store.value.host.shellProviders['fixture.future'], provider.id);
+  shellRegions.push({ id: 'fixture.future', title: 'Future fixture' });
+  assert.equal(f.values(shellId)['fixture.future'], provider.id);
+});
+
+test('Shell candidate changes invalidate schemas, cursors and replay; disappeared selections survive unrelated edits', (t) => {
+  const provider = shellApplet('shell.a'),
+    f = fixture(t, { updateApplets: [provider] }),
+    request = f.request(shellId, [{ kind: 'set', changes: { ribbon: provider.id } }]);
+  f.call('apply', request);
+  const cursor = f.call('options.list', { targetId: shellId, key: 'ribbon', limit: 1 }).nextCursor,
+    oldSchema = f.call('schema.get', { targetId: shellId }).schemaRevision;
+  provider.displayName = 'Renamed';
+  assert.notEqual(f.call('schema.get', { targetId: shellId }).schemaRevision, oldSchema);
+  assert.throws(
+    () => f.call('options.list', { targetId: shellId, key: 'ribbon', limit: 1, cursor }),
+    { code: 'REVISION_CONFLICT' },
+  );
+  assert.throws(() => f.call('apply', request), { code: 'SCHEMA_CONFLICT' });
+  delete provider.shell.views.ribbon;
+  assert.equal(f.values(shellId).ribbon, provider.id);
+  selectShell(f, { statusbar: provider.id });
+  assert.equal(f.values(shellId).ribbon, provider.id);
+  assert.throws(() => selectShell(f, { ribbon: provider.id }), { code: 'INVALID_ARGUMENT' });
+  f.updateApplets.splice(0);
+  assert.equal(f.values(shellId).statusbar, provider.id);
+  f.call('apply', f.request(shellId, [{ kind: 'reset', keys: ['ribbon', 'statusbar'] }]));
+  assert.equal(f.values(shellId).ribbon, defaultShellId);
+});
+
+test('Shell selection rejects invalid batches atomically and checks current write permission and external revisions', (t) => {
+  const f = fixture(t, { updateApplets: [shellApplet('shell.partial', ['ribbon'])] }),
+    before = fs.readFileSync(f.store.file);
+  for (const bad of ['missing.shell', true, null, { id: 'shell.partial' }])
+    assert.throws(() => selectShell(f, { ribbon: 'shell.partial', statusbar: bad }), {
+      code: 'INVALID_ARGUMENT',
+    });
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  const request = f.request(shellId, [{ kind: 'set', changes: { ribbon: 'shell.partial' } }]);
+  f.call('apply', request);
+  f.setWrite(false);
+  assert.throws(() => f.call('apply', request), { code: 'WRITE_DISABLED' });
+  f.setWrite(true);
+  const stale = f.request(shellId, [{ kind: 'reset', keys: ['ribbon'] }]),
+    raw = JSON.parse(fs.readFileSync(f.store.file));
+  raw.host.shellProviders.ribbon = defaultShellId;
+  fs.writeFileSync(f.store.file, JSON.stringify(raw));
+  assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
+  assert.equal(f.writes(), 1);
+});
+
+test('Shell save failure preserves settings, device data and encrypted credentials', (t) => {
+  const f = fixture(t, { device: true, updateApplets: [shellApplet('shell.a')] });
+  f.aiSecrets.setKey(f.store.value.ai.connections[0], 'PRIVATE_AI');
+  f.ttsSecrets.set(f.store.value.tts.baseUrl, 'PRIVATE_TTS');
+  const files = [f.store.shared.file, f.store.device.file, f.aiFile, f.ttsFile],
+    before = files.map((file) => fs.readFileSync(file)),
+    rename = fs.renameSync;
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (to === f.store.device.file) throw Error('Injected write failure');
+    return rename(from, to);
+  });
+  assert.throws(() => selectShell(f, { statusbar: 'shell.a' }), { code: 'SAVE_FAILED' });
+  assert.deepEqual(
+    files.map((file) => fs.readFileSync(file)),
+    before,
+  );
+  assert.equal(f.values(shellId).statusbar, defaultShellId);
+  assert.equal(f.decrypts(), 0);
+});
+
+test('Shell registry consumes saved assignments with its existing per-region fallback and safe-mode rules', (t) => {
+  const provider = shellApplet('shell.a'),
+    fallback = shellApplet(defaultShellId, undefined, {
+      sourceKind: 'builtin',
+      enabled: true,
+      state: 'running',
+    }),
+    f = fixture(t, { updateApplets: [provider, fallback] }),
+    { ShellProviderRegistry } = require('../out/main/main/core/shell-provider-registry'),
+    registry = new ShellProviderRegistry({
+      assignments: () => f.store.value.host.shellProviders,
+      providers: () => f.updateApplets,
+      safeMode: false,
+    });
+  selectShell(f, { ribbon: provider.id });
+  assert.equal(registry.configured('ribbon'), provider.id);
+  assert.equal(registry.resolve('ribbon').provider.id, defaultShellId);
+  provider.enabled = true;
+  provider.state = 'running';
+  assert.equal(registry.resolve('ribbon').provider.id, provider.id);
+  assert.equal(
+    new ShellProviderRegistry({
+      assignments: () => f.store.value.host.shellProviders,
+      providers: () => f.updateApplets,
+      safeMode: true,
+    }).resolve('ribbon').provider.id,
+    defaultShellId,
+  );
+  assert.equal(f.values(shellId).ribbon, provider.id);
+});
+
 test('update fields follow existing defaults and catalog, with explicit application timing and no lifecycle commands', (t) => {
   const f = fixture(t),
     defaults = require('../out/main/shared/settings-schema').createDefaultSettings().updates,
