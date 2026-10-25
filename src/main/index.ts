@@ -467,7 +467,17 @@ const appletManagement = new AppletManagement({
 const settingsCommands = new SettingsCommands({
   settings,
   applets: allApplets,
-  save: (value, revision) => commitSettings(prepareSettings(value), revision),
+  save: (value, revision, reset) => {
+    const rewrite = new Set<'shared' | 'device'>();
+    if (reset) {
+      const owner = reset.collection?.owner ?? reset.ownerId;
+      if (!reset.collection || reset.keys.some((key) => key !== 'enabled'))
+        rewrite.add(owner === 'appdock' || settings.localSettings(owner) ? 'device' : 'shared');
+      if (reset.collection && reset.keys.includes('enabled')) rewrite.add('device');
+    }
+    return commitSettings(prepareSettings(value), revision, undefined, [...rewrite]);
+  },
+  validate: prepareSettings,
 });
 let log: HostLog;
 let hotKeys: GlobalHotKeyManager | undefined;
@@ -1037,6 +1047,7 @@ function mcpSettingsOperation<T>(operation: () => T): T {
   }
 }
 const operationApi = new AppDockApi({
+  settingsPrincipal: () => automation?.principal() ?? '',
   handlers: {
     'mcp.servers.getSettings': async (p) =>
       mcpSettingsOperation(() => mcpSettings.publicSettings(p.serverId)),
@@ -1754,7 +1765,12 @@ function prepareSettings(value: Settings) {
   validateAppletSettings(next, manager.snapshot());
   return initializeCollectionDefaults(next, settings.value, manager.snapshot());
 }
-function commitSettings(value: Settings, revision: number, resetPage?: SettingsPageDefinition) {
+function commitSettings(
+  value: Settings,
+  revision: number,
+  resetPage?: SettingsPageDefinition,
+  rewrite: ('shared' | 'device')[] = [],
+) {
   assertSettingsWritable();
   settings.assertRevision(revision);
   customCommands.validateReplacement(value);
@@ -1775,7 +1791,7 @@ function commitSettings(value: Settings, revision: number, resetPage?: SettingsP
     value,
     revision,
     undefined,
-    resetPage ? settingsPageStorage(resetPage).files.map((file) => file.scope) : [],
+    resetPage ? settingsPageStorage(resetPage).files.map((file) => file.scope) : rewrite,
   );
 }
 function settingsPageStorage(

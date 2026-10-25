@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-25: MCP設定の固定入口と通常設定の共通登録 0.88.1
+
+- 専用worktree `AppDock.at365-mcp-settings-design`、branch `codex/mcp-settings-design`のcleanな`e66a2f4`から、拡張設計の第2単位を実装。追跡先がないためpull・main統合を行わず、独立node_modulesと固定lockfileを維持した。
+- MCP専用の固定6入口で対象・Schema・値・固定選択候補を取得し、単純設定のset/resetを共通SettingsCommandsの検証・保存へ接続。本体の通常設定は共通登録から既定値・検証・設定カタログ・JSON投影・PC専用保存・MCP公開を生成する。既存hardwareAccelerationもnextStartとして公開する。初回の入口反映後、項目・提供元・固定候補を応答データとして追加でき、外側のツールSchemaは変更しない。
+- read + writeだけで変更し、許可・公開定義・可用性を再送時にも検査。値と保存上書きに結び付く不透明revision、schemaRevision、主体と検索条件に結び付くcursor、要求/結果の上限、512件の成功/失敗の重複処理を確認。dryRun・no-op・古いrevision・未宣言/非公開/秘密の拒否、原子的なバッチ検証を確認した。実SDKクライアントで、接続後に設定と提供元を追加してもtools/listが変わらず探索・保存できた。
+- 発行前レビューで、実効値が既定値と同じ上書きの解除不足を修正。物理的な上書きの有無を確認して保存対象scopeを再出力し、表現だけの外部変更も競合検査へ含めた。既存の共有/端末別保存と非公開/未知値を保持する回帰が成功。既存エラーの検証順序、MCP専用の操作列挙とAppletの既存契約も整合させ、阻害指摘なし。
+- 固定依存install、型検査、本体/Default Shell buildに成功。関連27ファイル275件に加え、兄弟manifestの前後SHA付きsettings-editing/web-apiとMCP 2.0の既存mcp-eventsを37件実行。重複11件を除き**29ファイル・301/301件、fail/skip 0**。標準回帰全体は未実行。最初の試験指定に存在しないmcp-modern.test.cjsが含まれたため、実在するmcp-eventsのtransport回帰で補完した。678入力の前後hashは一致。兄弟Appletの宣言は読取りだけで変更しない。
+- 隔離sourceと固定EXEの専用GUI/MCPは各**6群**成功。探索/Schema/候補・dryRun/保存/リセット・旧APIと本体snapshotの一致・再送・秘密保護・8権限・write取消を確認。固定EXEの既存MCP接続管理GUIも**10群**、再起動後の保存とsmokeが成功。各試験コピーと発行EXEのhashを照合した。配布検査helperのShell参照先をASAR内から既存extraResourcesへ修正し、同じEXEで再検査して成功。製品の修正・再発行は不要だった。
+- 設定キー・保存ファイルの増減や既存公開契約の破壊を含まない追加APIのため、0.88.0から**0.88.1**へパッチ更新。publish.bat終了0で.NET各Host/Updaterも発行。出力は `A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170683939 bytes / SHA256 `8851949228f68c1e5925e98c4e5bc2b347082da3b661d607494d0457f648bce4`**。EXEのFile/ProductVersion、update.jsonの版・size/hash、ASAR内packageと同梱Default Shellの版を照合。Node 24.22.1 / pnpm 12.10.1 / Electron 45.0.0 / .NET SDK 10.0.402 / Windows 10.0.26300 x64、通常ユーザー環境で検証した。
+- 現行仕様は[設定API](docs/settings-api.md)、後続範囲は[拡張設計](docs/mcp-settings-design.md)。通常一覧の行操作・動的候補・専用サービスのadapterは未実装で、items.listは対応対象を公開しない。実利用設定・認証・Cookie・外部サービス・物理入力・効果確認は試験対象外。main統合・push・Release・実利用先deployなし。
+- 完全ログ・レビュー・入力hash・成果物照合は`.artifacts/mcp-settings-gateway/`、コミット照合は`.artifacts/commit-validation-mcp-settings-gateway-20261025/`。source=`mcp-settings-foundation-source-1792919388415`、固定EXE=`mcp-settings-foundation-portable-1792919663285`、MCP画面=`mcp-settings-portable-1792919679470`、smoke=`smoke-1792919708977`。今回の成功profileは方式ごとの直近3回以内で削除0、失敗診断と過去の再利用証跡を保持。後続差分は本記録だけで、製品・試験入力は不変。
+
 ## 2026-10-25: MCP設定の権限・公開・秘密情報の基盤 0.88.0
 
 - 専用worktree `AppDock.at365-mcp-settings-design`、追跡先のないbranch `codex/mcp-settings-design`のcleanな設計commit `bc4954f`から実装。既存mainや他worktreeを統合せず、[拡張設計](docs/mcp-settings-design.md)の先行基盤を対象にした。固定6入口、共通登録、通常一覧と特殊設定のadapterは後続範囲。

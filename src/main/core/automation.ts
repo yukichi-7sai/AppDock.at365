@@ -311,6 +311,9 @@ export class AutomationService {
         : { registration: 'absent' as const }),
     };
   }
+  principal() {
+    return createHash('sha256').update(this.token).digest('hex');
+  }
   private async start() {
     if (!this.config.enabled || this.server || this.loadError || this.closed) return;
     const server = new AutomationMcp(

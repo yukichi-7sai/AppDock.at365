@@ -7,8 +7,10 @@ import {
   SettingsConflictError,
   atomicWrite,
   type SettingsRecoveryPlan,
+  storedSettingRecord,
 } from './settings';
 import type { Settings, ExtensionManifest } from '../../shared/contracts';
+import type { CollectionBinding } from '../../shared/page-collections';
 import { parseSettings } from '../../shared/settings-schema';
 import {
   settingsStorageValue,
@@ -23,6 +25,7 @@ import {
   parseDeviceSettings,
   splitSettings,
   deviceSettingsStorageValue,
+  deviceHostKeys,
   type DeviceCollection,
   type DeviceSettings,
 } from './device-settings';
@@ -50,6 +53,31 @@ export class DeviceSettingsStore extends SettingsStore {
   private mutating = false;
   private loaded = false;
   private healthKeys = new Set<string>();
+  override storedSettingOverrides(owner: string, collection?: CollectionBinding) {
+    const shared = this.shared.storedValue(),
+      device = this.device.storedValue();
+    if (owner === 'appdock') {
+      const record = { ...storedSettingRecord(shared, owner) };
+      for (const key of deviceHostKeys) {
+        delete record[key];
+        if (device.host && Object.hasOwn(device.host, key)) record[key] = device.host[key];
+      }
+      return record;
+    }
+    const actualOwner = collection?.owner ?? owner;
+    const local = device.extensions?.[actualOwner];
+    const raw = local?.useLocalSettings
+      ? { extensions: { [actualOwner]: local.configuration } }
+      : shared;
+    const record = { ...storedSettingRecord(raw, owner, collection) };
+    if (collection) {
+      delete record.enabled;
+      const states = device.collectionEnabled?.[collection.owner]?.[collection.key];
+      if (states && Object.hasOwn(states, collection.itemId))
+        record.enabled = states[collection.itemId];
+    }
+    return record;
+  }
   constructor(
     file: string,
     private localRoot: string,

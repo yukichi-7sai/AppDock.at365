@@ -211,6 +211,14 @@ async function main() {
   assert.equal(info.writable, true);
   assert.equal(info.executable, false);
   const toolsBefore = JSON.stringify((await client.listTools()).tools);
+  const gatewayReplay = await require('./settings-gateway-checks.cjs')({
+    client,
+    page,
+    fixtureId,
+    checks,
+    tool,
+    value,
+  });
   const values = await value('appdock_get_settings', { appletId: fixtureId });
   assert.deepEqual(values.values, { flag: false, text: '' });
   const schema = await value('appdock_get_settings_schema', { appletId: fixtureId });
@@ -310,6 +318,10 @@ async function main() {
   );
   await permissions();
   await toggle('write', 'MCP', false);
+  assert.equal(
+    (await tool('appdock_settings_apply', gatewayReplay)).structuredContent.code,
+    'WRITE_DISABLED',
+  );
   const revision = (await value('appdock_get_settings')).revision;
   const refused = await tool('appdock_execute_command', {
     id: 'appdock.settings.update',

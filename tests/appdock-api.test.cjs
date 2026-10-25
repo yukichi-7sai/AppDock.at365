@@ -123,18 +123,21 @@ test('Applet grants are default-on, persisted for all Applets, independent of MC
   assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(), {});
   assert.equal((await f.call('system.getInfo')).error.code, 'API_DISABLED');
   f.grant({ read: true, execute: true, write: true });
-  for (const method of automationMethods.filter(
-    (m) =>
-      !m.startsWith('tts.') &&
-      !m.startsWith('customCommands.') &&
-      !m.startsWith('mcp.') &&
-      !m.startsWith('ai.') &&
-      !m.startsWith('input.') &&
-      !m.startsWith('processes.') &&
-      !m.startsWith('ui.') &&
-      m !== 'commands.execute' &&
-      m !== 'applets.get',
-  ))
+  for (const method of require('../out/main/shared/appdock-api')
+    .operationsFor('applet')
+    .map(([method]) => method)
+    .filter(
+      (m) =>
+        !m.startsWith('tts.') &&
+        !m.startsWith('customCommands.') &&
+        !m.startsWith('mcp.') &&
+        !m.startsWith('ai.') &&
+        !m.startsWith('input.') &&
+        !m.startsWith('processes.') &&
+        !m.startsWith('ui.') &&
+        m !== 'commands.execute' &&
+        m !== 'applets.get',
+    ))
     assert.equal((await f.call(method)).ok, true, method);
   assert.equal(f.api.call('system.getInfo').executable, false);
   assert.deepEqual(new AppletApiAccess(path.join(f.dir, 'applet-api.json')).get(f.manifest), {

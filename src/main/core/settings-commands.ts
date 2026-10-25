@@ -19,15 +19,13 @@ import type { SettingsStore } from './settings';
 import type { AutomationCommand } from './automation-commands';
 import { collectionRecord } from '../../shared/page-collections';
 import { isAccentHex } from '../../shared/appearance';
+import { sameSetting } from '../../shared/settings-defaults';
+import type { SettingsFieldTarget, SettingsFieldPlan } from './settings-targets';
+import { SettingsTargetError } from './settings-targets';
+import type { HostSettingDefinition } from '../../shared/host-settings';
+import { parseSettings } from '../../shared/settings-schema';
 
-export class SettingsCommandError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export class SettingsCommandError extends SettingsTargetError {}
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 interface Owner {
@@ -37,6 +35,11 @@ interface Owner {
   fields: SettingDefinition[];
   available: boolean;
 }
+export interface SettingsResetOwner {
+  ownerId: string;
+  keys: string[];
+  collection?: Owner['collection'];
+}
 
 export class SettingsCommands {
   private epoch = randomUUID();
@@ -44,7 +47,8 @@ export class SettingsCommands {
     private options: {
       settings: SettingsStore;
       applets(): ExtensionSnapshot[];
-      save(value: Settings, revision: number): SettingsSnapshot;
+      save(value: Settings, revision: number, reset?: SettingsResetOwner): SettingsSnapshot;
+      validate?(value: Settings): Settings;
     },
   ) {}
   private owners(): Owner[] {
@@ -111,6 +115,51 @@ export class SettingsCommands {
   revision() {
     return `${this.epoch}:${this.options.settings.revision}`;
   }
+  fieldTargets(): SettingsFieldTarget[] {
+    return this.owners().flatMap((owner) => {
+      const fields = owner.fields.filter((field) => isSettingAccessible(field, 'mcp'));
+      const categories =
+        owner.id === 'appdock'
+          ? [...new Set(fields.map((field) => (field as HostSettingDefinition).pageId))]
+          : ['settings'];
+      return categories.flatMap((category) => {
+        const selected =
+          owner.id === 'appdock'
+            ? fields.filter((field) => (field as HostSettingDefinition).pageId === category)
+            : fields;
+        if (!selected.length) return [];
+        return [
+          {
+            targetId:
+              owner.id === 'appdock'
+                ? `host.${category}`
+                : `applet.${Buffer.from(owner.id).toString('base64url')}`,
+            ownerId: owner.id,
+            title: owner.title,
+            category,
+            available: owner.available,
+            fields: selected,
+            applies: (key: string) => this.applies(owner.id, key),
+            values: () => this.values(owner, this.options.settings.value, selected),
+            overrides: () => this.overrides(owner),
+            plan: (changes: Record<string, unknown>, reset: string[], revision: string) => {
+              const actual = { ...changes },
+                resets = [...reset];
+              for (const field of selected)
+                if (
+                  Object.hasOwn(actual, field.key) &&
+                  sameSetting(actual[field.key], field.default)
+                ) {
+                  delete actual[field.key];
+                  resets.push(field.key);
+                }
+              return this.plan(owner, selected, actual, revision, resets);
+            },
+          },
+        ];
+      });
+    });
+  }
   private owner(appletId?: string, caller: SettingsCaller = 'mcp') {
     const owner = this.owners().find((o) => o.id === (appletId ?? 'appdock'));
     if (!owner || !owner.fields.some((f) => isSettingAccessible(f, caller)))
@@ -134,6 +183,13 @@ export class SettingsCommands {
     return Object.fromEntries(
       fields.map((f) => [f.key, Object.hasOwn(saved, f.key) ? saved[f.key] : f.default]),
     );
+  }
+  private overrides(owner: Owner) {
+    try {
+      return this.options.settings.storedSettingOverrides(owner.id, owner.collection);
+    } catch {
+      return undefined;
+    }
   }
   schema(appletId?: string, caller: SettingsCaller = 'mcp') {
     const owner = this.owner(appletId, caller);
@@ -298,7 +354,7 @@ export class SettingsCommands {
   private applies(owner: string, key: string) {
     if (this.options.applets().some((a) => a.id === owner && a.collection)) return 'immediate';
     return owner === 'appdock'
-      ? ({ closeToTray: 'nextClose', startMinimized: 'nextStart' }[key] ?? 'immediate')
+      ? (hostSettingDefinitions.find((field) => field.key === key)?.applies ?? 'immediate')
       : 'settingsChanged';
   }
   private update(
@@ -308,6 +364,24 @@ export class SettingsCommands {
     revision: string,
     dryRun: boolean,
   ) {
+    const plan = this.plan(owner, fields, changes, revision);
+    if (!dryRun) plan.commit();
+    return {
+      dryRun,
+      changed: plan.changed,
+      values: dryRun ? plan.values : this.values(owner, this.options.settings.value, fields),
+      revision: this.revision(),
+      applies: plan.applies,
+      warning: this.options.settings.syncError ?? null,
+    };
+  }
+  private plan(
+    owner: Owner,
+    fields: SettingDefinition[],
+    changes: Record<string, unknown>,
+    revision: string,
+    reset: string[] = [],
+  ): SettingsFieldPlan {
     if (!owner.available)
       throw new SettingsCommandError(
         'UNAVAILABLE',
@@ -315,6 +389,11 @@ export class SettingsCommands {
       );
     try {
       this.validateChanges(fields, changes, true);
+      if (reset.some((key) => !fields.some((field) => field.key === key)))
+        throw new SettingsCommandError(
+          'INVALID_ARGUMENT',
+          hostText('services.settingsCommands.invalidSetting'),
+        );
     } catch (error) {
       if (error instanceof SettingsCommandError) throw error;
       throw new SettingsCommandError(
@@ -323,9 +402,15 @@ export class SettingsCommands {
       );
     }
     this.checkRevision(revision);
-    const store = this.options.settings,
-      next = structuredClone(store.value);
+    const store = this.options.settings;
+    let next = structuredClone(store.value);
     const before = this.values(owner, store.value, fields);
+    const originalOverrides = this.overrides(owner);
+    const overrides = originalOverrides === undefined ? undefined : { ...originalOverrides };
+    if (overrides) {
+      Object.assign(overrides, changes);
+      for (const key of reset) delete overrides[key];
+    }
     if (owner.id === 'appdock') {
       for (const key of ['customAccentDark', 'customAccentLight'])
         if (Object.hasOwn(changes, key) && !isAccentHex(changes[key]))
@@ -334,6 +419,7 @@ export class SettingsCommands {
             hostText('services.settingsCommands.colorFormat'),
           );
       Object.assign(next.host, changes);
+      for (const key of reset) delete (next.host as unknown as Record<string, unknown>)[key];
     } else if (owner.collection) {
       const item = collectionRecord(next, owner.collection);
       if (!item?.enabled)
@@ -343,6 +429,11 @@ export class SettingsCommands {
         );
       try {
         Object.assign(item, changes);
+        for (const key of reset) {
+          const field = fields.find((field) => field.key === key)!;
+          if (field.default === undefined) delete item[key];
+          else item[key] = structuredClone(field.default);
+        }
         if (typeof item.name === 'string') item.name = item.name.trim();
         if (!item.name || item.name.length > 80 || /[\x00-\x1f\x7f]/.test(item.name))
           throw Error(hostText('services.settingsCommands.pageName'));
@@ -359,26 +450,52 @@ export class SettingsCommands {
           hostText('services.settingsCommands.appletEnabledRequired'),
         );
       this.applyAppletChanges(next, owner.id, changes);
+      for (const key of reset) delete next.extensions[owner.id].settings[key];
+    }
+    try {
+      next = this.options.validate?.(next) ?? parseSettings(next);
+    } catch {
+      throw new SettingsCommandError(
+        'INVALID_ARGUMENT',
+        hostText('services.settingsCommands.valueFormat'),
+      );
     }
     const after = this.values(owner, next, fields);
-    const changed = Object.keys(changes).filter((k) => before[k] !== after[k]);
-    if (!dryRun && changed.length) {
+    const changed = [...Object.keys(changes), ...reset].filter(
+      (key) =>
+        !sameSetting(before[key], after[key]) ||
+        (reset.includes(key) &&
+          originalOverrides !== undefined &&
+          Object.hasOwn(originalOverrides, key)),
+    );
+    const removedOverrides = reset.filter(
+      (key) => originalOverrides !== undefined && Object.hasOwn(originalOverrides, key),
+    );
+    const commit = () => {
+      this.checkRevision(revision);
+      if (!changed.length) return;
       try {
-        this.options.save(next, store.revision);
+        this.options.save(
+          next,
+          store.revision,
+          removedOverrides.length
+            ? { ownerId: owner.id, collection: owner.collection, keys: removedOverrides }
+            : undefined,
+        );
       } catch {
         throw new SettingsCommandError(
           'SAVE_FAILED',
           hostText('services.settingsCommands.saveFailed'),
         );
       }
-    }
+    };
     return {
-      dryRun,
       changed,
-      values: this.values(owner, dryRun ? next : store.value, fields),
-      revision: this.revision(),
+      overrides,
+      before,
+      values: after,
+      commit,
       applies: Object.fromEntries(changed.map((k) => [k, this.applies(owner.id, k)])),
-      warning: store.syncError ?? null,
     };
   }
 }

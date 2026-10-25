@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { hostSettingDefinitions } from './host-settings';
 import { getHostTranslator } from './i18n';
 import { defaultHostLanguage, type HostLanguage } from './host-language';
 import { collectionRecord } from './page-collections';
@@ -391,7 +392,7 @@ function hostRows(
 ): [string, string, string?][] {
   const t = getHostTranslator(language);
   if (pageId !== 'appearance' && pageId !== 'general') return hostItems[pageId] ?? [];
-  return [
+  const rows: [string, string, string?][] = [
     ...localizedHostFields[pageId].map(([key, title, description]): [string, string, string] => [
       key,
       t(title),
@@ -406,6 +407,10 @@ function hostRows(
         ])
       : []),
   ];
+  for (const field of hostSettingDefinitions.filter((field) => field.pageId === pageId))
+    if (!field.catalogKey && !rows.some((row) => row[0] === field.key))
+      rows.push([field.key, field.title, field.description]);
+  return rows;
 }
 export function hostSettingItem(
   pageId: string,
@@ -414,19 +419,22 @@ export function hostSettingItem(
 ): SettingsItem {
   const row = hostRows(pageId, language).find((row) => row[0] === key);
   if (!row) throw Error('Unknown settings item: ' + pageId + '/' + key);
-  return item(pageId, row[0], row[1], row[2]);
+  return item(
+    pageId,
+    row[0],
+    row[1],
+    row[2],
+    hostSettingDefinitions.find((field) => field.pageId === pageId && field.key === key),
+  );
 }
 export const appletCommonDescriptions = {
   display: hostText('settings.settings-catalog.appletDisplay'),
   startupDelaySeconds: hostText('settings.settings-catalog.appletDelay'),
 };
-const generalKeys = [
-  'soundEnabled',
+const generalKeys = () => [
+  ...hostSettingDefinitions.filter((field) => field.pageId === 'general').map((field) => field.key),
   'startAtLogon',
   'runAsAdministrator',
-  'closeToTray',
-  'hardwareAcceleration',
-  'startMinimized',
 ];
 const updateKeys = [
   'hostSource',
@@ -477,7 +485,13 @@ export function settingsCatalog(
       json: !['applets', 'web-accounts', 'permissions', 'codex'].includes(id),
       items: [
         ...hostRows(id, current.host.language).map(([key, title, description]) => ({
-          ...item(id, key, title, description),
+          ...item(
+            id,
+            key,
+            title,
+            description,
+            hostSettingDefinitions.find((field) => field.pageId === id && field.key === key),
+          ),
           keywords:
             id === 'appearance' && key === 'language'
               ? [t('language.ja'), 'ja']
@@ -598,15 +612,11 @@ export function settingsPaths(
       return [['customCommands']];
     case 'appearance':
       return [
-        'language',
-        'theme',
-        'zoomFactor',
-        'accentColor',
-        'customAccentDark',
-        'customAccentLight',
-        'showHints',
+        ...hostSettingDefinitions
+          .filter((field) => field.pageId === 'appearance')
+          .map((field) => field.key),
         'shellProviders',
-      ].map((k) => ['host', k]);
+      ].map((key) => ['host', key]);
     case 'tts':
       return [['tts']];
     case 'ai':
@@ -614,7 +624,7 @@ export function settingsPaths(
     case 'notifications':
       return [['notificationPreferences']];
     case 'general':
-      return generalKeys.map((k) => ['host', k]);
+      return generalKeys().map((k) => ['host', k]);
     case 'tray':
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':

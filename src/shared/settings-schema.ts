@@ -1,3 +1,5 @@
+import { hostSettingsDefaults, hostSettingDefinitions } from './host-settings';
+import { validateSettingValue } from './setting-definitions';
 import { defaultHostLanguage, isHostLanguage } from './host-language';
 import { hostText } from './i18n';
 import { parseMcpRoster } from './mcp-client';
@@ -38,24 +40,7 @@ export const createDefaultSettings = (): Settings => ({
   keybindingOptions: defaultKeybindingOptions(),
   gestureDefaultsInitialized: [],
   schemaVersion: 1,
-  host: {
-    language: defaultHostLanguage,
-    shellProviders: {},
-    theme: 'light',
-    zoomFactor: defaultZoomFactor,
-    accentColor: defaultAccentColor,
-    customAccentDark: defaultCustomAccent.dark,
-    customAccentLight: defaultCustomAccent.light,
-    showHints: true,
-    soundEnabled: true,
-    closeToTray: true,
-    startMinimized: false,
-    startAtLogon: false,
-    runAsAdministrator: false,
-    hardwareAcceleration: false,
-    trayClickCommand: 'appdock.open',
-    trayDoubleClickCommand: null,
-  },
+  host: hostSettingsDefaults(),
   extensions: {},
   updates: {
     hostSource: 'github:yukichi-7sai/AppDock.at365',
@@ -147,6 +132,7 @@ export function parseSettings(value: unknown): Settings {
     value.host.trayDoubleClickCommand === undefined ? null : value.host.trayDoubleClickCommand;
   if (trayDoubleClickCommand !== null && !validCommandId(trayDoubleClickCommand))
     throw new Error(hostText('settings.settings-schema.trayDoubleClick'));
+  for (const field of hostSettingDefinitions) validateSettingValue(field, value.host[field.key]);
   const trayMenu = value.trayMenu === undefined ? undefined : parseTrayMenu(value.trayMenu);
   const trayCommands =
     trayMenu !== undefined

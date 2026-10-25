@@ -8,12 +8,27 @@ import { observeFile } from './file-observer';
 import { SettingsHealth, settingsIssueMessages } from './settings-health';
 import type { Settings, SettingsSnapshot, ExtensionSettings } from '../../shared/contracts';
 import { settingsStorageValue } from '../../shared/settings-storage';
+import type { CollectionBinding } from '../../shared/page-collections';
 import {
   createDefaultSettings as defaults,
   parseSettings as validate,
 } from '../../shared/settings-schema';
 const isObject = (v: unknown): v is Record<string, any> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
+export function storedSettingRecord(
+  raw: Record<string, any>,
+  owner: string,
+  collection?: CollectionBinding,
+): Record<string, unknown> {
+  if (owner === 'appdock') return isObject(raw.host) ? raw.host : {};
+  const settings = raw.extensions?.[collection?.owner ?? owner]?.settings;
+  if (!isObject(settings)) return {};
+  if (!collection) return settings;
+  const rows = settings[collection.key];
+  return (
+    (Array.isArray(rows) && rows.find((row) => isObject(row) && row.id === collection.itemId)) || {}
+  );
+}
 export class SettingsConflictError extends Error {}
 class SettingsReadError extends Error {
   constructor(readonly kind: 'read-invalid' | 'read-unavailable') {
@@ -109,6 +124,18 @@ class SettingsStore<T = Settings> extends EventEmitter {
       ? (this.codec.serialize?.(value) ?? value)
       : settingsStorageValue(value as Settings);
     return JSON.stringify(stored, null, 2) + '\n';
+  }
+  storedValue(): Record<string, any> {
+    const value = JSON.parse(
+      this.readBytes(this.file)
+        .toString('utf8')
+        .replace(/^\uFEFF/, ''),
+    );
+    if (!isObject(value)) throw new SettingsReadError('read-invalid');
+    return value;
+  }
+  storedSettingOverrides(owner: string, collection?: CollectionBinding) {
+    return storedSettingRecord(this.storedValue(), owner, collection);
   }
   private readBytes(file: string): Buffer {
     try {

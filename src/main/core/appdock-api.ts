@@ -21,6 +21,8 @@ import { TrayEditingCommands } from './tray-editing-commands';
 import { RibbonCommands } from './ribbon-commands';
 import { GestureCommands } from './gesture-commands';
 import { ShortcutCommands } from './shortcut-commands';
+import { SettingsTargets, SettingsTargetError } from './settings-targets';
+import { settingsOperations, type SettingsMethod } from '../../shared/settings-operations';
 import type { GlobalHotKeyStatus, ExtensionSnapshot } from '../../shared/contracts';
 import type { ShortcutPageChoice } from '../../shared/shortcut-pages';
 
@@ -46,6 +48,7 @@ export class AppDockApi {
   private executing = 0;
   private callContext = new AsyncLocalStorage<InputInvocation>();
   private settingsCommands: SettingsCommands;
+  private settingsTargets: SettingsTargets;
   private shortcuts: ShortcutCommands;
   private gestures: GestureCommands;
   private touchpadGestures: GestureCommands;
@@ -67,6 +70,7 @@ export class AppDockApi {
       appletPermissions?(id: string): AppletApiPermissions;
       save(value: Settings, revision: number): SettingsSnapshot;
       settingsCommands?: SettingsCommands;
+      settingsPrincipal?(): string;
       customCommands?: CustomCommandService;
       mcpClientAllowed?(): boolean;
       inputAllowed?(): boolean;
@@ -97,6 +101,11 @@ export class AppDockApi {
   ) {
     this.settingsCommands =
       options.settingsCommands ?? new SettingsCommands({ ...options, applets: () => [] });
+    this.settingsTargets = new SettingsTargets({
+      targets: () => this.settingsCommands.fieldTargets(),
+      revision: () => this.settingsCommands.revision(),
+      principal: () => this.options.settingsPrincipal?.() ?? this.options.instanceId,
+    });
     this.tray = new TrayEditingCommands({
       ...options,
       settingsCommands: this.settingsCommands,
@@ -226,11 +235,30 @@ export class AppDockApi {
       throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.unsupported'));
     for (const permission of definition.permissions)
       if (!permissions[permission])
-        throw new AutomationError('API_DISABLED', hostText('services.appdockApi.permission'));
+        throw new AutomationError(
+          permission === 'write' && method === 'settings.apply' ? 'WRITE_DISABLED' : 'API_DISABLED',
+          hostText('services.appdockApi.permission'),
+        );
     if (!this.options.ready())
       throw new AutomationError('NOT_READY', hostText('services.appdockApi.unavailable'));
     if (!object(params))
       throw new AutomationError('INVALID_ARGUMENT', hostText('services.appdockApi.argumentObject'));
+    if (Object.hasOwn(settingsOperations, method)) {
+      if (context.origin?.kind === 'applet')
+        throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.unsupported'));
+      if (!inputValidators.get(method)!(params).valid)
+        throw new AutomationError(
+          'INVALID_ARGUMENT',
+          hostText('services.appdockApi.argumentSchema'),
+        );
+      try {
+        return this.settingsTargets.call(method as SettingsMethod, params);
+      } catch (error) {
+        if (error instanceof SettingsTargetError || error instanceof SettingsCommandError)
+          throw new AutomationError(error.code, error.message);
+        throw error;
+      }
+    }
     if (method.startsWith('customCommands.')) {
       if (!inputValidators.get(method)!(params).valid)
         throw new AutomationError(

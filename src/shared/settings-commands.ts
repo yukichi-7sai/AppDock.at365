@@ -1,77 +1,8 @@
 import { hostText } from './i18n';
 import { isSettingAccessible } from './setting-access';
-import { defaultHostLanguage, hostLanguages } from './host-language';
 import type { AppletCommand, SettingDefinition } from './contracts';
-import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
-import {
-  accentChoices,
-  legacyAccentPalette,
-  defaultAccentColor,
-  defaultCustomAccent,
-} from './appearance';
-
-const switches = ['on', 'off', 'toggle'] as const;
-export const hostSettingDefinitions: SettingDefinition[] = [
-  {
-    key: 'language',
-    title: hostText('language.label'),
-    description: hostText('language.description'),
-    type: 'select',
-    default: defaultHostLanguage,
-    automation: true,
-    options: hostLanguages.map((value) => ({ value, label: hostText(`language.${value}`) })),
-  },
-  {
-    key: 'zoomFactor',
-    title: '表示倍率',
-    description: 'Electronの表示倍率。1が100%、0.5～2（50～200%）。',
-    type: 'number',
-    default: defaultZoomFactor,
-    minimum: minimumZoomFactor,
-    maximum: maximumZoomFactor,
-    automation: true,
-  },
-  {
-    key: 'accentColor',
-    title: 'アクセントカラー',
-    type: 'select',
-    default: defaultAccentColor,
-    automation: true,
-    options: [...accentChoices, legacyAccentPalette].map(({ id, title }) => ({
-      value: id,
-      label: title,
-    })),
-  },
-  ...(['dark', 'light'] as const).map((tone) => ({
-    key: tone === 'dark' ? 'customAccentDark' : 'customAccentLight',
-    title: `カスタムアクセントの${tone === 'dark' ? '濃い色' : '淡い色'}`,
-    description: '#RRGGBB形式の色。表示時はテーマに合わせて明るさを自動調整します。',
-    type: 'string' as const,
-    default: defaultCustomAccent[tone],
-    automation: true,
-  })),
-  {
-    key: 'theme',
-    title: '表示テーマ',
-    type: 'select',
-    default: 'light',
-    automation: true,
-    options: ['dark', 'light', 'system'].map((value) => ({ value, label: value })),
-  },
-  ...[
-    ['showHints', 'ヒントの表示', true],
-    ['soundEnabled', '音の再生', true],
-    ['closeToTray', '閉じるとトレイに格納', true],
-    ['startMinimized', '起動時に最小化', false],
-  ].map(([key, title, value]) => ({
-    key: key as string,
-    title: title as string,
-    type: 'boolean' as const,
-    default: value,
-    automation: true,
-    generateCommands: [...switches],
-  })),
-];
+import { hostSettingDefinitions } from './host-settings';
+export { hostSettingDefinitions } from './host-settings';
 
 export function generatedSettingCommands(
   owner: string,
@@ -118,6 +49,8 @@ export function settingInputSchema(field: SettingDefinition): Record<string, unk
   return {
     type: field.type,
     description,
-    ...(field.type === 'string' ? { maxLength: 10000 } : {}),
+    ...(field.type === 'string'
+      ? { minLength: field.minLength ?? 0, maxLength: field.maxLength ?? 10000 }
+      : {}),
   };
 }

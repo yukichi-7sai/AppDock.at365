@@ -3,12 +3,14 @@ import { mcpClientOperations } from './mcp-client';
 import { aiOperations } from './ai-api';
 import { customCommandOperations } from './custom-commands';
 import { processLaunchOperations } from './process-launch';
+import { settingsOperations } from './settings-operations';
 // One operation catalog drives MCP tools and both Applet SDK entry points.
 export const appDockOperations = {
   ...aiOperations,
   ...mcpClientOperations,
   ...customCommandOperations,
   ...processLaunchOperations,
+  ...settingsOperations,
   'tts.speak': {
     callers: ['mcp', 'applet'],
     permissions: ['read', 'execute', 'useTts'],

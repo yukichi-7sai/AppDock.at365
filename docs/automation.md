@@ -1,6 +1,6 @@
 # 共通操作APIとCodex連携
 
-設定編集許可の統合と、宣言済み単純設定のMCP既定公開に対応する。一覧・候補の固定入口、特殊設定の共通登録は[拡張設計](mcp-settings-design.md)の後続範囲。
+設定編集許可の統合と、宣言済み単純設定のMCP既定公開に対応する。設定の探索・Schema・値・選択候補・変更は[設定APIの固定6入口](settings-api.md)を使用する。通常の一覧編集と特殊設定のadapterは[拡張設計](mcp-settings-design.md)の後続範囲。
 
 MCPハブは`appdock_mcp_list_servers/list_tools/get_tool/call_tool/get_job/cancel_job`の固定6入口を追加します。接続先→そのツール概要→必要なSchemaの順に取得し、call_toolで受付けたjobIdをget_jobで確認します。下流content（画像等）はMCPのcontentへ、ジョブ状態とstructuredContent/isErrorは構造化結果へ返します。[中継契約](mcp-hub-design.md)と[保存型コマンド](custom-commands-design.md)を参照してください。初回の入口反映と、導入後のデータ増減は別です。
 
@@ -23,7 +23,9 @@ LAN・tailnet向けの接続範囲切替、HTTP検査、保存と切替の寿命
 - `tray-editing-commands.ts`: メニューとクリック割当をまとめて検証・保存。既存tray-menu/クリック判定/SettingsCommandsのrevisionを使用。
 - `ribbon-commands.ts`: リボンの公開項目・配置の読取りと原子的編集。共有parseRibbonとSettingsCommandsのrevisionを使用。
 - `gesture-commands.ts`: ジェスチャーの読取り、割当操作・動作設定の一括検証と保存。共有gesturesとSettingsCommandsのrevisionを使用。
-- `src/shared/settings-commands.ts`: 本体の公開設定定義とboolean派生コマンドの生成。
+- `src/shared/host-settings.ts`: 本体の通常設定の共通登録。既定値・検証・設定カタログ・PC専用投影・MCP公開へ接続する。
+- `src/shared/settings-commands.ts`: 設定の公開Schemaとboolean派生コマンドの生成。
+- `settings-targets.ts`と`src/shared/settings-operations.ts`: 固定6入口の探索・ページ分割・公開投影・変更要求の重複処理。検証と保存はSettingsCommandsへ委譲する。
 - `automation-mcp.ts`: 従来方式は公式MCP TypeScript SDKによるstateless Streamable HTTP。`mcp-modern.ts`でMCP 2.0（2026-07-28）も同じendpointへ接続します。JSON応答、GET/DELETEは405。1要求64KiB、同時8要求、要求受信10秒・socket無通信60秒。API呼出しの監査ログを既存HostLogへ渡します。
 - `automation-commands.ts`: 提供元の公開宣言を共通の条件で照合し、Applet情報を限定投影。
 - `automation.ts`: PC専用設定、暗号化、起動/停止、登録状態、接続テスト。

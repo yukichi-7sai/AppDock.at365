@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { hostSettingDefinitions } from '../../shared/host-settings';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ExtensionManifest, ExtensionSettings, Settings } from '../../shared/contracts';
@@ -15,20 +16,10 @@ import {
 } from '../../shared/page-collections';
 
 export const deviceHostKeys = [
-  'language',
-  'theme',
-  'zoomFactor',
-  'accentColor',
-  'customAccentDark',
-  'customAccentLight',
-  'showHints',
+  ...hostSettingDefinitions.map((field) => field.key),
   'shellProviders',
-  'soundEnabled',
-  'closeToTray',
-  'startMinimized',
   'startAtLogon',
   'runAsAdministrator',
-  'hardwareAcceleration',
 ] as const;
 export type DeviceConfiguration = Pick<
   ExtensionSettings,
