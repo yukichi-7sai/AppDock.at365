@@ -1,5 +1,88 @@
 # 検証記録
 
+## 2026-10-25: MCP設定worktreeへmainの最新を統合
+
+- 利用者の指定に従い、cleanな`codex/mcp-settings-design`の`bc9d404`へorigin/main `cc0a1fe`を通常merge。fetch後のlocal mainとorigin/mainは一致し、main checkoutもclean。版は新しい0.88.4を採用し、検証記録は両方を保持。コードの自動統合箇所と関連定義を確認した。
+- 固定lockfileのinstall、型検査、本体/Default Shell build、設定MCP/API/保存/カタログとジェスチャー・待機表示・翻訳の関連12ファイル**140/140件、fail/skip 0**が成功。690入力hashの前後一致を確認。証跡は`.artifacts/mcp-settings-lists-20261025/`のmerge-start/merge、inputs-merge-before/after、各完全ログとmerge-commit。以降の一覧実装前の統合確認であり、この時点の新規発行・main変更・pushは行わない。
+
+## 2026-10-25: デスクトップ前面化修正0.88.4のコミット検証
+
+- main `85cc8c3` 上の8ファイルを実装時の最終入力一覧と照合し、無関係な差分・stageなしを確認。dirtyのためpull/stashは行わずfetchだけ実施し、GitHub/AQUAの両mainが `85cc8c3` に一致することとGit名義を確認した。製品修正は追加せず **0.88.4** と発行物を維持し、再発行なし。
+- 全115個のNode試験、main/shared/renderer/SDK/Runtime・依存/固定ツール/ビルド定義を前回892件の封印入力と照合した。差分はnative GestureTargetの前面化、実入力fixture/GUI runner、packageの版、文書だけ。現在の関連7ファイル **93件**と、影響のない前回102ファイル **746件**の成功を証跡鎖と入力hashで再利用した。最終native/updater生成物を使うall-in-one/applet-defaults/lifecycle/dotnet-pages/applet-packages/portable-updatesの6ファイル **53/53件**を追加実行し、標準 **115ファイル・892/892、fail/skip 0** を確認。Node 24.22.1/pnpm 12.10.1/.NET SDK 10.0.402/Runtime 10.0.13とLUNA/OS/lockfile/toolchainの一致も確認した。
+- 変更部分と影響先をレビューし、対象限定・取消・前面確認・入力キューの解放、4検査の保持とメニュー後片付け、専用GUIのデスクトップ/通常操作に阻害指摘なし。実装時の **230/230実入力**、通知13項目・模擬キー状態10項目、型検査/build/publish、固定EXE GUI44コマンドとソース限定12コマンドを、ソース・スクリプト・EXE/コピー/DLL hashの一致で再利用した。今回は物理入力やGUIを再実行していない。
+- 発行EXEは **0.88.4 / 170,673,988 bytes / SHA256 aa50211de386070f24e7becddd999385baa1607b4405eb44c9c44d195cf7d70c** のまま。証跡は `.artifacts/commit-validation-desktop-0884/` のplan/入力一覧・再利用照合、53件完全log/終了コード、環境、stage/commit tree・両remote照合。既存資料を保護し、追加GUIフォルダーと削除対象なし。stage内容と作業ファイルの一致、commit treeと検証済みstage treeの一致を確認してcommit/pushする。結果の正本は同フォルダーの `commit.json` / `push.json`。Release/実利用deployは行わない。
+
+## 2026-10-25: デスクトップ実入力4失敗の調査・修正 0.88.4
+
+- main `85cc8c3` / cleanを確認してpull --ff-only成功（更新なし）。前項までのデスクトップ4失敗を調査した。製品ソースを変更せずInputHostとfixtureの隔離コピーへ診断出力を追加し、入力先・前面対象・選択候補・前面化結果・取消を追跡した。最初のdesktop条件ではProgman/Explorerを正しく選び、候補22件と修飾キー抑止なしを確認したが、通常と入力キュー接続後のSetForegroundWindowがともにfalseで開始を取り消していた。その右クリック復元でExplorerの `#32768` メニューが開き、次のexe条件はデスクトップではなくメニュー上で実行されていた。
+- `GestureTarget.TryActivate` の既存worker内の補助経路へBringWindowToTopを追加し、表示順とアクティブ状態を更新してから前面化を要求する。開始時の対象/source・取消・可視性の検査、実前面対象の待機、入力キューの必ずの解除を維持し、フック内の待機・新たなキー送信・常時最前面化は追加しない。本体を開く既存の前面化経路と同じ活性化手順へ揃えた。仕様参照はMicrosoftの[BringWindowToTop](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-bringwindowtotop)と[GetGUIThreadInfo](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getguithreadinfo)。設定・保存ファイル・公開API・SDK/Runtime契約は不変で、通常修正の **0.88.4** へパッチ更新。
+- テストは4項目とも維持した。各ケースの前後でGetGUIThreadInfoからデスクトップ所有のメニューだけを閉じ、操作開始点がデスクトップであることを2項目追加。座標の位置でメニューを探す中間版ではメニューを見落とし、旧0.88.3の実入力で225成功/5失敗（追加した開始点検査を含む）だった。最終版はメニュー所有元で判定する。試験用Windowを前面化できない場合のGUI状態診断も追加した。
+- 修正版InputHostで実入力 **230/230成功・失敗0**。従来の224成功とデスクトップ4項目、追加した開始点2項目がすべて成功した。1/2段階・取消・first/all/順序/重複除去・クリック/ホイール/キー・通常入力復元・除外・フォーカス変更・前面移動の既存検査を含む。記録は `fixed-full-input-complete.log`。型検査/build/native/helper build成功、関連Node7ファイル **93/93、fail/skip 0**、表示通知13項目と模擬キー状態10項目も成功。Pause/F13〜F24はOSへ送信・登録していない。全標準回帰は今回再実行していない。
+- 実JS表示の試験へdesktop条件/explorer.exe条件を追加。非アクティブなデスクトップからの開始、1→2方向と候補更新、ウィンドウ中央指定での開始モニター中央への配置、元Windowが覆われないこと、解除時の保存順と表示終了を検査する。`--desktop-only` で2条件へ限定可能。通常4種類×明暗と合わせて10組40コマンド、描画終了後4コマンドの合計44件がソース/固定EXEで成功。限定モード12コマンドも成功。初回のfixtureはdesktop条件へprocessesを指定してschemaに拒否され、限定モードの後半はexe条件を残して失敗したため、既存schemaに合わせ、描画終了検査前にglobalへ戻して修正した。
+- 途中の再試験は入力開始前のfixture前面化で停止した。前面Window=NULLを読み取り、入力desktopはDefault/対話セッションActiveであることを確認。画面確認ツールは環境エラーで起動不可だった。試行したcaptionクリックによる回避は撤回し、利用者がデスクトップをクリックした後、同じ前面化処理のまま限定GUIと発行EXE GUIが成功した。これらの開始前停止は製品テストの成功件数へ含めず、失敗log/profileを保持する。
+- 発行前レビューで対象限定・取消・前面確認・入力キュー解放・既存UI/APIの維持を確認し、阻害指摘なし。`publish.bat` 終了0。発行EXEは **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe / 0.88.4 / 170,673,988 bytes / SHA256 aa50211de386070f24e7becddd999385baa1607b4405eb44c9c44d195cf7d70c**。File/ProductVersion、update.jsonのsize/hash/版、ASARのpackage/Default Shell/全rendererと待機表示main/preload、同梱InputHostと開発用DLL、固定GUIコピーを照合した。InputHostは `a5cb18cd46541089dc453dacadd6b288affa708feed4105521eee74e583903ff`、ASARは `b0f96879cdc8779c847bea0336c112769baf0a7e86b162f6e0450924e22dbed9`。配布DLLの通知13項目も成功した。
+- 最終固定EXE profileは `.artifacts/gesture-web-ui-1792920245161/`、ソース通常は `gesture-web-ui-1792918987645/`、限定は `gesture-web-ui-1792919962948/`。Explorerの候補4行と方向表示を目視した。証跡は `.artifacts/desktop-gesture-diagnosis/` の診断ソース/差分・比較/回帰/GUI/publish log、review、入力一覧・発行物/コピーhash・validation。診断プロセス終了を確認し、不要な自己完結runtime・bin/obj等6フォルダーを削除。診断DLLのhashと小さなDLLコピー、診断ソース、失敗資料、旧再利用証跡を保持し、今回の成功GUIは通常/限定/固定各1回で削除対象なし。混在DPI・UAC/ロック画面・性能は今回未検証。今回は未コミット、push/Release/実利用deployなし。
+
+## 2026-10-25: JS待機表示の採用・ネイティブ画面の撤去 0.88.3
+
+- 利用者が0.88.2の見た目と動作を確認し、JS方式の採用、不要なネイティブ画面の整理、commit/pushを依頼した。main `c7f51db` 上のJS試作を引き継ぎ、dirtyのためpull/stashなし。fetchと両push先の読み取りでGitHub/AQUAのmainが `26fdf3e` に一致すること、実効Git名義を確認した。今回のpushには前回の待機表示コミット `c7f51db` も含む。
+- InputHostのGestureIndicator.xaml/コードビハインド/GestureIndicatorContentとGestureDisplay、WPF専用試験プロジェクトを削除した。GestureIndicatorNotificationsだけで表示モデルを通知し、ネイティブ画面の作成・初期化・配色値・Web/WPF切替を持たない。入力用Dispatcherと.NET/WPFランタイム依存は引き続き必要。プレビューと実表示は共通React/CSS、既存の4種類・サイズ固定・表示候補の選択は維持する。設定/保存ファイル/公開API・SDK/Runtime契約の追加削除はなく、通常修正のため **0.88.3** へパッチ更新。
+- 起動失敗/描画プロセス終了時は表示を破棄し、共通ErrorReporterで `GESTURE_INDICATOR_UNAVAILABLE` と再起動案内を一度報告する。ネイティブ表示へ切り替える処理は撤去し、表示の寿命やテーマ変更で入力構成を再同期しない。描画障害後も入力認識とコマンド実行は続ける。発行前レビューでIPC送信元/main frame/URL、revision/sequenceと寸法境界、終了/接続断、表示通知専用キュー、入力フック/条件/実行順の保持を確認し、阻害指摘なし。
+- 整形・最終型検査・本体/Default Shell/native/helper build・publish成功。最初のpnpm実行は版更新後の依存再照合要求で停止し、固定lockfileのinstallで解消（依存変更なし）。旧配色同期を期待した試験1件と実入力fixtureのWPF/UI Automation探索を通知検査へ移行した。関連5ファイル **41/41**、追加80ファイル **709/709**、前回から同じ入力・到達関係・証跡鎖を確認した30ファイル **142件**を再利用し、標準 **115ファイル・892/892、fail/skip 0**。Node 24.22.1/pnpm 12.10.1/.NET SDK 10.0.402/Runtime 10.0.13、lockfile/toolchainと既存locale値不変を照合した。
+- 表示通知13項目と模擬キー状態10項目が成功。配布DLLを直接読む13項目も成功し、ネイティブWindow派生型・コンパイル済みWPF画面リソースの不在、revision/負座標/方向/候補順/予約行数/非表示/終了を確認。直接InputHostを使う実入力試験は表示通知へ移行し、**224成功・デスクトップ4失敗**。変更前InputHostの既存ログと、方向検査12行の名称変更を正規化した全PASS/FAIL行が完全一致した。4失敗を成功へ含めず、既知の未解消事項として保持する。Pause/F13〜F24はOS送信・登録していない。
+- ソースと固定EXEの実マウスGUIが成功。4種類×明暗、1→2段階、候補1→4行、スリムピルのHWND矩形一致、透明/非アクティブ/クリック透過、古い/不正な寸法IPCの拒否、解放後の非表示、32コマンドの順序を確認。描画を意図的に停止した後も4コマンドを実行し、共通エラーログが1件だけであることを確認（合計36コマンド）。固定EXE profileは `.artifacts/gesture-web-ui-1792916936732/`。設定GUIも明暗×1280/900/700px・SettingsField・非表示時の値保持・保存/再起動後の割り当て/条件/順序保持に成功し、profileは `.artifacts/gestures-ui-1792916962105/`。最終のピルとカラー絵文字/4行の収まりを目視確認した。
+- 発行EXEは **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe / 0.88.3 / 170,683,580 bytes / SHA256 41ddebd3e56d504aff1fefa5c4a560d2799c284222f3518419e2e12861effa64**。File/ProductVersion、update.jsonの版/size/hash、ASAR内package/Default Shell/JS画面・preload・共通配色、全renderer出力と新規main出力、同梱InputHostを照合。InputHost DLLは `10d3da6bcc0db3f72795a34894077dfde5f5b622d562cd11520f4c2b9f4b76f4`、ASARは `50354d370066f1b163cf99fdc1907f75be21ad6f6f4e1a02a52daf738f2528ff`。固定GUIコピーと最終EXEも一致した。
+- 証跡は `.artifacts/commit-validation-js-indicator-0883/`。plan/入力一覧・照合済み再利用鎖、全試験log/終了結果、review、物理入力の変更前比較、発行物hash、stage/commit/push照合を保存する。削除済みWPF試験のbin/objを整理し、終了を確認した今回のGUIと必要な旧証跡を保持する。混在DPI移動、UAC/ロック画面、性能/追加メモリは未検証。Release/実利用deployなし。
+- push成功後に今回の `AppDock.at365-gesture-indicator` worktreeと不要な専用branchを削除する。開始点と23変更ファイルが当時の封印入力に一致し、未知の変更がないことを確認済み。旧入力23ファイルと0.88.0検証資料は `retired-worktree/`（manifest付き67ファイル）へ保管した。実際の削除/残存worktree/両remote先端の結果は同証跡フォルダーの `cleanup.json` / `push.json` を正本とし、MCP設定用worktreeは保持する。
+
+## 2026-10-25: 待機表示のJS描画試作 0.88.2
+
+- 0.88.1までの23ファイルをmainの `c7f51db36146b1d7b8c7d174d66c41f5c6efc9f6` へコミット済み（標準888件の照合は次項）。その後、利用者の指定で同じmain上にJS描画を試作した。今回の試作は未コミットで、push・Release・実利用deployなし。新しい永続設定・保存ファイル・公開APIはなく、パッチ更新 **0.88.2**。
+- 入力フック・認識・表示候補の選択・コマンド実行はInputHostの既存経路を維持。表示モデルだけを容量1の専用通知キューで本体へ送り、透明・非アクティブ・マウス透過・タスクバー非表示の専用BrowserWindowで描画する。実表示とSettingsFieldのプレビューは同じReactコンポーネント/CSSを共用し、クラシックのカラー絵文字もChromiumで揃える。スリムピルの2方向分の幅と最大候補行数の予約を維持した。
+- 発行前レビューで送信元/main frame/正確なURL、revision/sequence、寸法/文字数の境界、設定変更・接続断・終了時の非表示、描画障害からのWPF切替を確認した。sandbox/contextIsolation、隔離した非永続session、navigation/新規Window/permission拒否と共通配色preloadを接続。ロードとreadyの両方を含む3秒の起動上限、テーマ背景より強い透明指定、クラシックの4行収まりを修正して再検証した。入力SDKとAppletの接続契約は変更していない。
+- 最終型検査・build・開発InputHost/helper build・publishが成功。関連12ファイルのNode回帰 **126/126、fail/skip 0**、その後追加した起動失敗/停止の切替試験を含む `gesture-indicator.test.cjs` **4/4** が成功（3件は126件と重複）。WPF表示とWeb通知の試験 **428項目成功**。試験した開発InputHost DLLと最終配布物のSHA256一致を確認した。全標準回帰は今回再実行していない。
+- ソースGUIと固定EXEの隔離コピーで実マウス入力試験が成功。4種類×明暗の8組で1→2段階、候補1→4行、スリムピルのHWND矩形完全一致、透明背景、NOACTIVATE/TRANSPARENT/TOOLWINDOW、前面対象の維持、右解放後の非表示、32コマンドの保存順を確認した。別送信元・不正frame・古いsequence・過大寸法のIPCを拒否。描画プロセスを意図的に停止し、WPF設定の受付完了後にも4コマンドを実行（合計36件）できた。固定EXE profileは `.artifacts/gesture-web-ui-1792914973398/`。クラシックのカラー矢印と4行の収まり、スリムピルを目視確認した。
+- 固定EXEの設定GUIも成功。SettingsFieldのgroup/title、4種類・明暗×1280/900/700px、透過・非表示時の値保持、保存/再起動後の割り当て・条件・順序保持を確認。profileは `.artifacts/gestures-ui-1792915064332/`。最初の固定EXE入力試験は最後の切替後実行だけ32件のままで失敗し、診断が不足して原因の断定はできない。試験側の固定250ms待ちを設定受付完了待ちへ置き換え、診断付き再試験と最終試験は成功した。製品の待機処理は追加せず、失敗log/profileも保持している。
+- 発行先 **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe**、**0.88.2 / 170,696,911 bytes / SHA256 eb2475b6eb092b733ce21d779a3bcab763a651da18ce9a585932e08403034c45**。File/ProductVersion、update.jsonの版/size/hash、ASAR内package/Default Shell/JS画面・専用preload・共通配色、ビルド出力と同梱InputHost、両GUIコピーと最終EXEのhashを照合。InputHost DLLは `45829464ca09bb81994f0cd762c1bd83cb4eca7e156c44742337d7c1916cbfda`、ASARは `18d63e3a02fbf5f791d5bf3d98bf874e21700fb695273b451aec85198dd4e3c8`。
+- 証跡は `.artifacts/web-gesture-indicator-0882/` の型検査/回帰/起動切替/native/ソース・固定GUI/publish log、`artifacts.json`、`validation.json`。今回のJS GUI成功はソース3回・固定2回、設定GUI固定1回で各方式3回以内のため削除0件。今回の隔離プロセス終了を確認し、以前の再利用資料を保持した。Pause/F13〜F24はOS送信・登録していない。入力全回帰、既知のデスクトップ4項目、混在DPI移動、UAC/ロック画面、性能/追加メモリは今回未検証。0.88.0で変更前と一致したデスクトップ4失敗を今回の成功へ含めない。
+
+## 2026-10-25: 待機表示0.88.1のコミット前検証
+
+- main `26fdf3e` 上の今回の23ファイルを対象に、0.88.1の実装時入力SHAと全変更を照合。Git名義を確認し、別作業の差分・stageなしを確認した。製品内容と発行物は変更せず、版更新・再発行なし。JS描画への移行はこのコミットへ含めない。
+- 標準回帰114ファイル・**888件、fail/skip 0**を確認した。今回の最終入力と一致する8ファイル・121件、影響のない30ファイル・142件を前回の検証済み885件の証跡鎖から再利用。設定既定値/カタログ/ジェスチャー管理に到達する依存関係とnative/updater生成物の利用先、renderer静的検査を選び、残り76ファイル・**625/625件**を追加実行した。前回標準からの試験件数増加はジェスチャーの3件だけ。SDK/依存/固定ツール/既存locale値は不変で、旧localeへ追加したキーによる既存文言変更はない。
+- Node 24.22.1、pnpm 12.10.1、.NET SDK 10.0.402、Runtime 10.0.13、LUNA/Windows10.0.26300/x64とlockfileを照合。隔離テスト用Appletをビルドして追加回帰へ使用。最終WPF421項目、固定EXEの4種類・明暗/3幅・SettingsField・保存/再起動GUI、型検査/publishはソース・スクリプト・EXE/コピーhashを照合して再利用した。既存デスクトップ実入力4項目の失敗は0.88.0と変更前で一致する制限として保持し、成功件数へ含めない。
+- EXEは **0.88.1 / 170,678,087 bytes / SHA256 a66a8f60851799f6964e04f468db67a9d5596b0d6d20183d57d2cfa2f09ae4cc** のまま。証跡は `.artifacts/commit-validation-gesture-indicator-0881/` のplan/入力一覧、環境、fixture build、625件完全log、再利用照合、stage/commitのtree。検証後は本記録だけ追記し、再利用資料と失敗診断を保持。push・Release・実利用deployなし。
+
+## 2026-10-25: スリムピルの段階移動サイズ固定・プレビュー欄整備 0.88.1
+
+- main上の未コミット変更を保持したまま追加修正。スリムピルは2方向分の幅と固定の文字行高を確保し、開始対象の移動候補に共通のfirst/all・コマンド重複除去を適用した最大表示行数（1〜4行）を予約する。同じ操作で1方向から2方向へ移るとき、コマンド名や表示件数が変わってもHWNDの大きさと文字領域の位置を変えない。1件だけの操作を一律に4行分の高さにはしない。
+- プレビューは共通SettingsFieldのgroup「待機表示」・title「プレビュー」とし、wide指定を外して他の設定項目と同じ配置へ揃えた。スリムピルの見本も2方向分の幅・固定行高へ合わせた。クラシックの絵文字はChromiumのプレビューとWPFの実表示で色が異なる原因を確認し、依頼どおり今回の見た目変更からは除外した。新規設定・保存ファイル・公開APIの変更なしのためパッチ更新 **0.88.1**。
+- 変更部分と影響先をレビューし、入力フック・認識・実行予約・条件判定を変更せず、表示用の最大行数算定だけを既存の選択処理へ接続していることを確認。指摘なし。既存のmain/shared/設定schema・依存/ビルド定義を変更していないため、前回の関連Node回帰121件と入力状態10項目の成功を再利用。型検査成功、publish.bat終了0（固定lockfile、.NET/renderer/updater/単一EXE/update.json）。commit・push・Release・実利用deployなし。
+- WPF試験 **421項目成功**。1〜4行の予約ごとに1方向/2方向、短い/長い/混在文字列、件数変化と再表示を組み合わせ、ネイティブのウィンドウ矩形が完全一致し、文字の原点も不変であることを確認。共通選択のfirst/allを反映する予約行数も確認した。4種類・明暗・透過・画面端・非アクティブ表示等の既存271項目も含む。開発DLLと配布フォルダーのDLLを直接読み込む試験でそれぞれ成功。実測3840×2160/144 DPI。
+- 発行EXEの隔離GUI試験成功。SettingsFieldのgroup/titleと標準配置、4種類の選択・透過・表示なしの保持、明暗×1280/900/700px、保存・プロセス再起動・エラーログなしを確認した。profileは `.artifacts/gestures-ui-1792911548688/`。Light/1280pxとDark/700pxの描画を目視確認し、欄の対応と枠内への収まりを確認した。
+- 発行先 **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe**、**0.88.1 / 170,678,087 bytes / SHA256 a66a8f60851799f6964e04f468db67a9d5596b0d6d20183d57d2cfa2f09ae4cc**。File/ProductVersion、update.json、ASAR内package/Default Shell/ジェスチャー制御コード、extraResourcesのDefault Shell/InputHost、GUIコピーと前後のEXE hashを照合。InputHost DLL SHA256 `6a8bb704df5826d6757ac41ecfd588fa76bd356a1ac1fd646d40590789258a44`。
+- 証跡は `.artifacts/pill-stable-0881/`（`delta-review.json`、`typecheck.log`、`native-display.log`、`published-native-display.log`、両native-snapshots、`publish.log`、`artifacts.json`、`fixed-exe-ui.log`、`validation.json`）。今回の成功profileは3回以内のため削除なし。実入力の全回帰・混在DPI移動・全標準回帰は今回再実行していない。前回の実入力224成功と、変更前でも同じ4項目が失敗したデスクトップ検査の制限を引き続き保持し、今回の全成功には含めない。
+
+## 2026-10-25: 待機表示をmainへ統合して0.88.0を発行
+
+- 最新取得後のmainはworktreeの開始点 `26fdf3e` と一致し、作業ツリーはclean。前項の検証記録にある23ファイルをmainへ反映し、`inputs.json`の全SHA256と一致することを確認した。変更はmainの未コミット差分として保持し、worktreeの元データも保持した。commit・push・GitHub Release・実利用先deployは行っていない。
+- 表示変更のレビューと関連121件・模擬キー10項目の成功は、同じ開始commit・全変更ソース・lockfile/ツール定義との一致で再利用。発行前の差分確認で追加の対応指摘なし。新しい実装変更はなく、未発行だった設定追加の版 **0.88.0** をそのまま発行した。`publish.bat`は終了0。依存検証、.NET/renderer/Default Shell/updater、単一EXEとupdate.jsonの生成を含む。未変更Appletの再発行・全体ZIP作成なし。
+- 発行先は **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe**、**0.88.0 / 170,685,537 bytes / SHA256 bc5f4a2884609c3f26ee6304b3e62f61bc6dbecc9a63da12d723286900e68353**。File/ProductVersion、update.jsonの版/size/hash、ASAR内package・Default Shell、extraResourcesのDefault Shellを照合した。ASAR内のジェスチャー制御コードとビルド出力、同梱InputHostと.NET出力のSHAも一致。InputHost DLL SHA256は `483d4a82761134c632f61d7d1edc3035f837039e191696d1814e10aee8bbbd71`。
+- 発行フォルダー内のInputHost DLLを直接読み込むWPF試験 **271項目成功**、描画PNG20枚。4種類・明暗・背景透過・再利用時の中央配置・画面端・長い名前/複数コマンドを確認した。試験helperへ任意のDLL指定を追加し、製品コードは変更していない。今回の実測は3840×2160、144 DPI。
+- 固定EXEの隔離コピーで `APPDOCK_GESTURE_INDICATOR_ONLY=1 dev.bat exec node scripts/gestures-ui-test.cjs --portable` 成功。4種類の設定/プレビュー、明暗×3幅、表示なしの値保持、保存・プロセス再起動後の保持を確認し、前後とコピーのEXE SHA一致を確認。profileは `.artifacts/gestures-ui-1792909842119/`。固定EXE smokeも成功し、copy SHA・EXE隣のsettings/data・登録画像・Default Shell起動・トレイ操作を確認。profileは `.artifacts/smoke-1792909896264/`。
+- 前回開始できなかった実入力試験を今回は実行し、**224項目成功、デスクトップの4項目失敗**。1/2段階移動・解除時実行・表示/実行の一致・取消・クリック/ホイール/キー・通常入力復元・除外・前面化等の成功を確認した。失敗はdesktop/exe条件のデスクトップでの実行とwindow-center表示。今回の変更による回帰かを判別するため、HEAD `26fdf3e` の変更前InputHostを隔離ビルドして同じ試験を実行したところ、**224成功/同じ4失敗で、全PASS/FAIL行が完全一致**した。新規失敗は確認されていないが、4項目の実機成功を主張しない。Pause/F13〜F24のOS送信・登録を伴うモードは実行していない。混在DPIの複数モニター移動と全標準回帰は今回未実行。
+- 証跡は `.artifacts/publish-gesture-indicator-0880/` の `integration.json`、`publish.log`、`artifacts.json`、`validation.json`、固定EXE GUI/smoke/native/実入力と変更前比較の各log。ASAR検査の先行失敗は検査スクリプトがWindowsの区切り文字を使っていなかったためで、`path.join`で修正して照合成功。今回の各成功profileは3件以内のため削除なし。失敗診断・変更前比較資料・以前の再利用用証跡を保持。
+
+## 2026-10-25: マウスジェスチャー待機表示の選択実装（worktree・未発行）
+
+- 対象は `A:\30.PROJECT\AppDock.at365-gesture-indicator`、branch `codex/gesture-indicator`、開始点 `26fdf3ebcec05d015743ea5cec4a7bcf7c09e0c0`。最新origin/mainを取得して独立worktreeを作成。元checkoutの変更を移動・破棄していない。設定 `indicatorStyle` 追加のためソース上の次期版は **0.88.0**。依頼によりmainへのマージ・通常publish・commit・push・Release・実利用deployを行わず停止した。配布EXE/update.jsonは今回作成していない。
+- コンパクトカード（未指定時の既定）、スリムピル、リング、クラシックの4種類を実装。新3種は共通アクセントと明暗テーマ、図形の方向表示、背景だけの透過を使用。クラシックは既存の黒パネル・絵文字・全体透過を維持。設定選択・プレビュー・検索・ページJSON・リセット・公開ジェスチャー設定APIへ接続し、位置/表示なし/不透明度/既存割り当てを保持する。複数コマンドは最大3件と残件数、長い名前は省略表示。変更対象と影響先の読み取りレビューを行い、最終差分に対応が必要なP1/P2指摘なし。
+- 固定lockfileの独立node_modulesを準備（既存 `.tools` だけjunction参照）。`dev.bat run typecheck`、`dev.bat run build`、開発用 `.artifacts/dotnet-host/` の.NETビルド成功。型検査は `typecheck-final.log`、最終rendererは `build-preview-final.log`、最終InputHostは `native-build-final.log`。これらは開発用生成物で、40.ARTIFACTへの製品発行ではない。
+- 関連8ファイルのNode回帰 **121/121成功**：`gestures`、`gesture-commands`、`command-execution`、`settings-page`、`settings-defaults-reset`、`settings-commands`、`localization`、`appearance`。旧設定の補完、4種類と不正値、APIのdryRun/原子的保存、表示なしの値保持、native向けスタイル/共通配色/翻訳文言の同期、コマンドタイトル無変換を含む。`regression.log`参照。後続の変更はWPF表示とrenderer見本のみで、この回帰対象のロジックは不変。
+- 入力フックを登録しない `tests/GestureIndicatorTests` の実WPF試験 **271項目成功**。5120×2160、144 DPI、PerMonitorV2で、4種類×明暗、透過0.1/0.45/1、文字不透明、方向図形、複数/長い/改行入りタイトル、非アクティブ/クリック透過フラグ、画面端、再利用時の寸法と中央位置を確認。20枚の描画PNGを保存。試験で再利用時に旧高さを使う位置ずれを発見し、ContentPresenterのレイアウト完了後に寸法を読むよう修正、再検証成功。対象アプリ名を通常文字色へ変更し、明暗背景の描画を確認した。`native-display-6.log`、`native-snapshots/`参照。先行失敗logも保持。
+- `APPDOCK_GESTURE_INDICATOR_ONLY=1 dev.bat exec node scripts/gestures-ui-test.cjs` の隔離開発版GUI成功。4種類のラベル/見本/保存、表示なしの保持、実設定による明暗切替、1280/900/700pxの全24組合せ、プロセス再起動後の保持、エラーログなしを確認。最終profileは `.artifacts/gestures-ui-1792909328516/`、`result.json`とPNG、`settings-indicator-ui-final-2.log`参照。狭幅の見本が縮みすぎる点とリングのラベル幅を実表示に合わせて修正後、全組合せを再実行した。元の総合UI試験は最新mainの有効化欄移動前の配置を要求する既存assertionで停止したため、元assertionを緩めず、今回の表示変更だけを検証する明示モードを追加した。
+- `InputTests --gesture-key-state` はメモリ内の模擬入力 **10項目成功**（`key-state.log`）。実入力の既存InputTestsは試験Windowの前面化失敗、cleanupのSendInputはWindows error 5で停止（`input-regression.log`）。**物理入力の認識・実行回帰は今回未確認**として残す。Pause/F13〜F24のOS送信・登録を行う `--shortcuts` モードは実行していない。混在DPIの複数モニター移動、全標準回帰、固定配布EXEの検証も未実行。main統合後の発行時に現行版を再照合し、固定EXEと実入力の不足を確認する。
+- 証跡の基点は `.artifacts/gesture-indicator-0880/`。`inputs.json`に今回のソース・生成物hashを記録。成功したWPF/GUIの各系列は3回以内で、失敗診断と再利用用記録は保持。隔離テスト用プロセスの残存なしを確認した。
 ## 2026-10-25: MCP設定の固定入口と通常設定の共通登録 0.88.1
 
 - 専用worktree `AppDock.at365-mcp-settings-design`、branch `codex/mcp-settings-design`のcleanな`e66a2f4`から、拡張設計の第2単位を実装。追跡先がないためpull・main統合を行わず、独立node_modulesと固定lockfileを維持した。

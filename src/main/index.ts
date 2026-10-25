@@ -1,5 +1,6 @@
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
 import { hostText } from '../shared/i18n';
+import { GestureIndicatorHost } from './core/gesture-indicator-host';
 import { settingListDraftAction } from './core/setting-list-draft';
 import { TouchpadBridgeManager } from './core/touchpad-bridge';
 import {
@@ -561,6 +562,7 @@ const imageLibraryHost = new ImageLibraryHost(registeredImages, {
     ),
 });
 let updater: PortableUpdates;
+let gestureIndicatorHost: GestureIndicatorHost | undefined;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 let automation: AutomationService | undefined;
 const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
@@ -4106,6 +4108,20 @@ async function initialize() {
     settings.save(migrated, settings.revision);
   await manager.reconcile();
   await syncHotKeys();
+  gestureIndicatorHost = new GestureIndicatorHost({
+    url: pathToFileURL(path.join(app.getAppPath(), 'out/renderer/gesture-indicator.html')).href,
+    preload: path.join(__dirname, 'gesture-indicator-preload.js'),
+    failed: (message) =>
+      errors.report({
+        eventId: 'gesture-indicator-unavailable',
+        source: 'gestures',
+        title: hostText('services.gestures.indicatorTitle'),
+        code: 'GESTURE_INDICATOR_UNAVAILABLE',
+        message,
+      }),
+  });
+  gestures.indicator = gestureIndicatorHost;
+  await gestureIndicatorHost.initialize();
   await gestures.start();
   await touchpad.start();
   startupReady = true;
@@ -4481,6 +4497,7 @@ app.on('before-quit', (event) => {
       () => automation?.close(),
       () => touchpad?.close(),
       () => gestures?.close(),
+      () => gestureIndicatorHost?.dispose(),
       () => nativeInput?.close(),
       () => processLauncher.close(),
       () => hotKeys?.close(),

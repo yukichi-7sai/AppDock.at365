@@ -260,6 +260,11 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.gesturesPositionKeywords'),
     ],
     [
+      'indicatorStyle',
+      hostText('settings.settings-catalog.gesturesStyle'),
+      hostText('settings.settings-catalog.gesturesStyleKeywords'),
+    ],
+    [
       'indicatorOpacity',
       hostText('settings.settings-catalog.gesturesOpacity'),
       hostText('settings.settings-catalog.gesturesIndicatorKeyword'),
@@ -643,6 +648,7 @@ export function settingsPaths(
         'executionMode',
         'indicatorOpacity',
         'indicatorPosition',
+        'indicatorStyle',
         'indicatorShowNoAction',
         'bindings',
       ].map((key) => ['gestures', key]);

@@ -7,6 +7,7 @@ import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections'
 import type { GestureSettings } from '../../shared/gestures';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
 import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
+import { GestureIndicatorPreview } from './GestureIndicatorPreview';
 function Names({
   itemKey,
   values,
@@ -140,7 +141,27 @@ export function GestureOptions({
         </SettingsField>
         <SettingsField
           group={translate('settings.gestureOptions.indicator')}
+          title={hostSettingItem('gestures', 'indicatorStyle').title}
+          {...settingAnchor('gestures', 'indicatorStyle')}
+        >
+          <select
+            aria-label={hostSettingItem('gestures', 'indicatorStyle').title}
+            value={gestures.indicatorStyle}
+            disabled={gestures.indicatorPosition === 'none'}
+            onChange={(e) =>
+              change({ indicatorStyle: e.target.value as GestureSettings['indicatorStyle'] })
+            }
+          >
+            <option value="compact">{translate('settings.gestureOptions.styleCompact')}</option>
+            <option value="pill">{translate('settings.gestureOptions.stylePill')}</option>
+            <option value="ring">{translate('settings.gestureOptions.styleRing')}</option>
+            <option value="classic">{translate('settings.gestureOptions.styleClassic')}</option>
+          </select>
+        </SettingsField>
+        <SettingsField
+          group={translate('settings.gestureOptions.indicator')}
           title={hostSettingItem('gestures', 'indicatorOpacity').title}
+          hint={translate('settings.gestureOptions.opacityHint')}
           {...settingAnchor('gestures', 'indicatorOpacity')}
         >
           <SettingsInput
@@ -152,6 +173,16 @@ export function GestureOptions({
             disabled={gestures.indicatorPosition === 'none'}
             value={gestures.indicatorOpacity}
             onChange={(e) => change({ indicatorOpacity: numberInput(e.target.value) })}
+          />
+        </SettingsField>
+        <SettingsField
+          group={translate('settings.gestureOptions.indicator')}
+          title={translate('settings.gestureOptions.preview')}
+        >
+          <GestureIndicatorPreview
+            style={gestures.indicatorStyle}
+            opacity={gestures.indicatorOpacity}
+            hidden={gestures.indicatorPosition === 'none'}
           />
         </SettingsField>
         <SettingsField

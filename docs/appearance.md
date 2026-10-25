@@ -54,7 +54,7 @@ snapshotは`{revision,palette,dark,colors:{accent,soft,text,hover}}`。revision�
 リボンの通常ボタンは文字と標準SVGアイコンで同じ`--ribbon-text`を参照し、テーマごとの中立色を使う。装飾用の薄い色を通常の文字へ流用しない。選択状態は共通の`--accent`/`--accent-soft`を参照し、通常・hover・focus・選択の各状態でコントラスト4.5以上を確認する。無効ボタンの減光、ユーザーが選んだ画像、グループの色線はこの文字色変更の対象に含めない。
 
 1. ローカル画面は既存の`createShellView`、`AppletSurface`または本体Windowの作成経路を使う。独立経路には配色初期引数・正確なURL登録・共通preloadを接続する。リモート画面へ適用しない。
-2. sandbox付きpreloadはローカルモジュールをruntime requireできないため、`scripts/build-main.cjs`が共通`appearance-preload.ts`のコンパイル結果を8種類のpreloadへIIFEとして同梱する。専用preloadを追加したらこの一覧と検証を更新する。sandbox/contextIsolationは維持する。
+2. sandbox付きpreloadはローカルモジュールをruntime requireできないため、`scripts/build-main.cjs`が共通`appearance-preload.ts`のコンパイル結果を待機表示用を含む9種類のpreloadへIIFEとして同梱する。専用preloadを追加したらこの一覧と検証を更新する。sandbox/contextIsolationは維持する。
 3. 色コードはパレット正本にだけ追加する。選択UI・検索候補は`accentChoices`を参照する。設定検証と外部設定schemaは保存済みIDの互換性も保つ。カスタム色の解決を画面ごとに複製しない。
 4. Light/Dark双方で、通常/hoverボタンの文字と選択背景の強調文字を確認する。各組のコントラスト4.5以上を`tests/appearance.test.cjs`で検査する。
 5. 保存・既定値省略・端末別分離・再起動・表示中/後から開いた画面・再読込・購読解除を確認する。警告/エラーの色の維持と、リモート本文にAPIがないことも確認する。

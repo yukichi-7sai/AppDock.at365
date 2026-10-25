@@ -27,7 +27,7 @@ internal static class Program
         var output = Console.Out; Console.SetOut(Console.Error);
         if (args.SequenceEqual(new[] { "--notification-state" })) return NotificationState(output).GetAwaiter().GetResult();
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-        using var capture = new InputCaptureThread(app.Dispatcher);
+        using var capture = new InputCaptureThread();
         _ = Task.Run(async () => {
             await using var peer = new JsonRpcConnection(Console.In, output);
             using var inputSender = new InputSender();

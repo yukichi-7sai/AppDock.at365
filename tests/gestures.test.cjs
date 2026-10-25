@@ -75,6 +75,32 @@ test('no-action preview defaults on for old settings and preserves an explicit o
     assert.throws(() => parseGestures({ ...old, indicatorShowNoAction }));
 });
 
+test('indicator designs default older settings to compact and retain every explicit design while hidden', () => {
+  const legacy = defaultGestures();
+  assert.equal(legacy.indicatorStyle, 'compact');
+  delete legacy.indicatorStyle;
+  assert.equal(parseGestures(legacy).indicatorStyle, 'compact');
+  assert.equal(Object.hasOwn(legacy, 'indicatorStyle'), false);
+  for (const indicatorStyle of ['compact', 'pill', 'ring', 'classic']) {
+    const input = {
+      ...legacy,
+      indicatorStyle,
+      indicatorPosition: 'none',
+      indicatorOpacity: 0.65,
+      indicatorShowNoAction: false,
+      bindings: [row('retained')],
+    };
+    const parsed = parseSettings({ ...createDefaultSettings(), gestures: input }).gestures;
+    assert.deepEqual(parsed, input);
+    assert.equal(
+      parseGestures({ ...parsed, indicatorPosition: 'gesture-start' }).indicatorStyle,
+      indicatorStyle,
+    );
+  }
+  for (const indicatorStyle of [null, '', 'unknown', 'Compact', 0, false, {}])
+    assert.throws(() => parseGestures({ ...legacy, indicatorStyle }));
+});
+
 test('desktop options preserve old settings and validate scope-specific exclusions', () => {
   const old = defaultGestures();
   delete old.activateOnStart;
@@ -291,6 +317,63 @@ test('activation synchronization uses a bounded key unchanged by focus but chang
   state.settings.gestures.distance++;
   await manager.sync();
   assert.notEqual(payloads[2].gestures.settingsKey, payloads[0].gestures.settingsKey);
+});
+
+test('indicator payload keeps design and localized captions without tracking the renderer palette', async (t) => {
+  const {
+    appearanceSnapshot,
+    configureAppearance,
+  } = require('../out/main/main/core/appearance-host');
+  const { resolveAppearance } = require('../out/main/shared/appearance');
+  const original = appearanceSnapshot();
+  let appearance = resolveAppearance('lavender', false);
+  configureAppearance(() => appearance, { handle() {} });
+  t.after(() => configureAppearance(() => original, { handle() {} }));
+  const state = {
+    settings: createDefaultSettings(),
+    context: { appFocused: false, window: '' },
+    commands: [{ id: 'test.run', title: 'User {{title}}' }],
+    recording: false,
+  };
+  state.settings.gestures.bindings = [row('styled')];
+  const payloads = [];
+  const manager = new InputCaptureManager(
+    'unused',
+    () => state,
+    {},
+    async () => {},
+    () => {},
+    () => {},
+    { ownership: async () => {}, applied() {} },
+  );
+  manager.peer = {
+    closed: false,
+    request: async (method, payload) => {
+      payloads.push(payload);
+      return [];
+    },
+  };
+  for (const indicatorStyle of ['compact', 'pill', 'ring', 'classic']) {
+    state.settings.gestures.indicatorStyle = indicatorStyle;
+    await manager.sync();
+    const payload = payloads.at(-1).gestures;
+    assert.equal(payload.indicatorStyle, indicatorStyle);
+    assert.equal('indicatorDark' in payload, false);
+    assert.equal('indicatorAccent' in payload, false);
+    assert.equal(payload.indicatorNoActionText, 'アクション無し');
+    assert.equal(payload.indicatorMoreText, 'ほか {count} 件');
+    assert.equal(payload.rows[0].title, 'User {{title}}');
+  }
+  const previous = payloads.at(-1).gestures;
+  appearance = resolveAppearance('rose', true);
+  await manager.sync();
+  const changed = payloads.at(-1).gestures;
+  assert.equal(payloads.length, 4, 'appearance change does not interrupt input capture');
+  assert.equal(
+    changed.settingsKey,
+    previous.settingsKey,
+    'appearance does not rewrite binding identity',
+  );
 });
 
 test('gesture editor preserves condition-only order, appends new inputs and rejects stale edits', () => {

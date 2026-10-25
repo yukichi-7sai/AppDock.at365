@@ -98,6 +98,7 @@ const configurationFields = {
   wheelDelayMs: { type: 'integer', minimum: 0, maximum: 5000 },
   executionMode: { type: 'string', enum: ['all', 'first'] },
   indicatorOpacity: { type: 'number', minimum: 0.1, maximum: 1 },
+  indicatorStyle: { type: 'string', enum: ['compact', 'pill', 'ring', 'classic'] },
   indicatorShowNoAction: { type: 'boolean' },
   indicatorPosition: {
     type: 'string',

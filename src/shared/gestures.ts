@@ -62,6 +62,7 @@ export interface GestureSettings {
   wheelDelayMs: number;
   executionMode: 'all' | 'first';
   indicatorOpacity: number;
+  indicatorStyle: 'compact' | 'pill' | 'ring' | 'classic';
   indicatorPosition: 'gesture-start' | 'window-center' | 'monitor-center' | 'none';
   indicatorShowNoAction: boolean;
   bindings: GestureBinding[];
@@ -155,6 +156,7 @@ export function defaultGestures(): GestureSettings {
     wheelDelayMs: 0,
     executionMode: 'all',
     indicatorOpacity: 0.45,
+    indicatorStyle: 'compact',
     indicatorPosition: 'gesture-start',
     indicatorShowNoAction: true,
     bindings: [],
@@ -186,6 +188,8 @@ export function parseGestures(value: unknown): GestureSettings {
     !Number.isFinite(v.indicatorOpacity) ||
     v.indicatorOpacity < 0.1 ||
     v.indicatorOpacity > 1 ||
+    (v.indicatorStyle !== undefined &&
+      !['compact', 'pill', 'ring', 'classic'].includes(v.indicatorStyle)) ||
     (v.executionMode !== undefined && !['all', 'first'].includes(v.executionMode)) ||
     !['gesture-start', 'window-center', 'monitor-center', 'none'].includes(v.indicatorPosition) ||
     (v.indicatorShowNoAction !== undefined && typeof v.indicatorShowNoAction !== 'boolean') ||
@@ -198,6 +202,7 @@ export function parseGestures(value: unknown): GestureSettings {
     ...v,
     activateOnStart: v.activateOnStart ?? false,
     indicatorShowNoAction: v.indicatorShowNoAction ?? true,
+    indicatorStyle: v.indicatorStyle ?? 'compact',
     executionMode: v.executionMode ?? 'all',
     browsers: processNames(v.browsers),
     excludedProcesses: processNames(v.excludedProcesses),

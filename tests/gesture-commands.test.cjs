@@ -177,18 +177,25 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     wheelDelayMs: 120,
     executionMode: 'first',
     indicatorOpacity: 0.6,
+    indicatorStyle: 'ring',
     indicatorPosition: 'monitor-center',
     indicatorShowNoAction: false,
   };
   const operations = [{ kind: 'configure', changes }];
   const dry = await f.edit(operations, { dryRun: true });
   assert.deepEqual(dry.settings.browsers, ['chrome']);
+  assert.equal(dry.settings.indicatorStyle, 'ring');
   assert.equal(fs.readFileSync(f.settings.file, 'utf8'), bytes);
   const result = await f.edit(operations);
   assert.deepEqual(result.bindings, before.bindings);
   assert.equal(result.settings.distance, 75);
   assert.equal(result.settings.executionMode, 'first');
   assert.equal(result.settings.indicatorPosition, 'monitor-center');
+  assert.equal(result.settings.indicatorStyle, 'ring');
+  assert.equal(
+    JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).gestures.indicatorStyle,
+    'ring',
+  );
   assert.equal(result.settings.indicatorShowNoAction, false);
   assert.equal(result.settings.activateOnStart, true);
   const revision = f.settings.revision;
@@ -201,6 +208,9 @@ test('configure validates ranges/processes atomically, preserves bindings and su
     { wheelDelayMs: -1 },
     { indicatorOpacity: 2 },
     { indicatorPosition: 'other' },
+    { indicatorStyle: 'other' },
+    { indicatorStyle: null },
+    { indicatorStyle: 1 },
     { indicatorShowNoAction: 'false' },
     { executionMode: 'other' },
     { enabled: 'true' },
@@ -218,6 +228,17 @@ test('configure validates ranges/processes atomically, preserves bindings and su
       { code: 'INVALID_ARGUMENT' },
     );
     assert.equal(fs.readFileSync(f.settings.file, 'utf8'), saved);
+  }
+});
+
+test('every indicator design round-trips through the public edit API without altering bindings', async (t) => {
+  const f = fixture(t);
+  const before = f.get().bindings;
+  for (const indicatorStyle of ['pill', 'ring', 'classic', 'compact']) {
+    const result = await f.edit([{ kind: 'configure', changes: { indicatorStyle } }]);
+    assert.equal(result.settings.indicatorStyle, indicatorStyle);
+    assert.equal(f.get().settings.indicatorStyle, indicatorStyle);
+    assert.deepEqual(result.bindings, before);
   }
 });
 

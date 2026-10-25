@@ -58,6 +58,8 @@ internal static class GestureTarget
         var attachedTarget = target != current && target != foreground && AttachThreadInput(current, target, true);
         try {
             if (!Valid()) return false;
+            // Complete activation as well as the foreground request for the captured target.
+            BringWindowToTop(destination);
             SetForegroundWindow(destination);
             return WaitForActivation();
         } finally {
@@ -84,6 +86,7 @@ internal static class GestureTarget
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
+    [DllImport("user32.dll")] private static extern bool BringWindowToTop(nint window);
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint source, uint target, bool attach);
     [DllImport("user32.dll")] private static extern bool PeekMessage(out Message message, nint window, uint min, uint max, uint flags);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();

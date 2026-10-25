@@ -6,16 +6,19 @@ namespace AppDock.InputHost;
 internal sealed class InputCaptureThread : IDisposable
 {
     private readonly Thread thread;
-    private readonly GestureDisplay display;
+    private readonly GestureIndicatorNotifications display;
     private readonly Channel<(string Method, object Payload)> notices =
         Channel.CreateBounded<(string, object)>(new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true });
+    // Only the latest display state matters; recognition notices retain their existing queue.
+    private readonly Channel<object> indicatorNotices = Channel.CreateBounded<object>(
+        new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
     private readonly TaskCompletionSource<(Dispatcher Dispatcher, InputCaptureEngine Engine)> ready =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool disposed;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (ShortcutPressNotice Press, long At)> presses = new();
-    internal InputCaptureThread(Dispatcher displayDispatcher)
+    internal InputCaptureThread()
     {
-        display = new GestureDisplay(displayDispatcher);
+        display = new GestureIndicatorNotifications(payload => indicatorNotices.Writer.TryWrite(payload));
         thread = new Thread(() => {
             var dispatcher = Dispatcher.CurrentDispatcher;
             using var engine = new InputCaptureEngine(dispatcher, display,
@@ -28,7 +31,14 @@ internal sealed class InputCaptureThread : IDisposable
     }
     internal async Task PumpAsync(Func<string, object, Task> send, CancellationToken token)
     {
-        await foreach (var notice in notices.Reader.ReadAllAsync(token)) {
+        async Task Indicators()
+        {
+            await foreach (var payload in indicatorNotices.Reader.ReadAllAsync(token))
+                await send("gestures.indicator", payload);
+        }
+        async Task Inputs()
+        {
+          await foreach (var notice in notices.Reader.ReadAllAsync(token)) {
             if (notice.Payload is ShortcutPressNotice press) {
                 var now = Environment.TickCount64;
                 foreach (var entry in presses) if (now - entry.Value.At > 1500) presses.TryRemove(entry.Key, out _);
@@ -36,7 +46,9 @@ internal sealed class InputCaptureThread : IDisposable
                 presses[press.PressId] = (press, press.CapturedAt);
             }
             await send(notice.Method, notice.Payload);
+          }
         }
+        await Task.WhenAll(Inputs(), Indicators());
     }
     internal Task<bool> ActivateAsync(long pressId, string window) => Task.Run(() => {
         if (disposed || !presses.TryRemove(pressId, out var entry) || Environment.TickCount64 - entry.At > 1500 ||
@@ -71,13 +83,11 @@ internal sealed class InputCaptureThread : IDisposable
     });
     internal async Task<ShortcutStatus[]> ConfigureAsync(CaptureConfiguration configuration)
     {
-        if (configuration.Gestures.Enabled && configuration.Gestures.Rows.Length > 0) await display.InitializeAsync();
         var state = await ready.Task;
         return await state.Dispatcher.InvokeAsync(() => state.Engine.Configure(configuration));
     }
     internal async Task ConfigureGesturesAsync(Configuration configuration)
     {
-        if (configuration.Enabled && configuration.Rows.Length > 0) await display.InitializeAsync();
         var state = await ready.Task;
         await state.Dispatcher.InvokeAsync(() => state.Engine.Gestures.Configure(configuration));
     }
@@ -95,7 +105,7 @@ internal sealed class InputCaptureThread : IDisposable
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; notices.Writer.TryComplete();
+        disposed = true; notices.Writer.TryComplete(); indicatorNotices.Writer.TryComplete();
         if (ready.Task.IsCompletedSuccessfully) {
             var state = ready.Task.Result;
             if (!state.Dispatcher.HasShutdownStarted) state.Dispatcher.Invoke(() => {
