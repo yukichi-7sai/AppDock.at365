@@ -33,7 +33,7 @@ internal sealed class InputCaptureEngine : IDisposable
     private long pressId;
     private nint? foregroundWindow;
     internal GestureEngine Gestures { get; }
-    internal InputCaptureEngine(Dispatcher dispatcher, GestureDisplay display, Func<string, object, bool> notify)
+    internal InputCaptureEngine(Dispatcher dispatcher, GestureIndicatorNotifications display, Func<string, object, bool> notify)
     {
         this.dispatcher = dispatcher; this.notify = notify;
         keyboardCallback = Keyboard; mouseCallback = Mouse;

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { GestureSettings } from '../../shared/gestures';
 import { useHostTranslation } from '../HostTranslation';
-import { Icon } from '../Icon';
+import { GestureIndicatorView } from '../gesture-indicator/GestureIndicatorView';
 import './gesture-indicator-preview.css';
 
 const styleKeys = {
@@ -36,21 +36,6 @@ export function GestureIndicatorPreview({
     update();
     return () => observer.disconnect();
   }, [style]);
-  const arrows = (
-    <div
-      className="gesture-preview-arrows"
-      aria-label={t('settings.gestureOptions.previewDirection')}
-    >
-      <Icon name="arrow" size={32} />
-      <span className="gesture-preview-arrow-up">
-        <Icon name="arrow" size={32} />
-      </span>
-    </div>
-  );
-  const caption = (
-    <div className="gesture-preview-caption">{t('settings.gestureOptions.previewCommand')}</div>
-  );
-  const process = <div className="gesture-preview-process">explorer.exe</div>;
   return (
     <div
       ref={stage}
@@ -71,37 +56,18 @@ export function GestureIndicatorPreview({
       {hidden ? (
         <span className="gesture-preview-hidden">{t('settings.gestureOptions.hidden')}</span>
       ) : (
-        <div className={`gesture-preview-indicator gesture-preview-${style}`} aria-hidden="true">
-          {style === 'classic' ? (
-            <>
-              {process}
-              <div className="gesture-preview-emoji">➡️⬆️</div>
-              {caption}
-            </>
-          ) : style === 'ring' ? (
-            <>
-              <div className="gesture-preview-ring-circle">{arrows}</div>
-              <div className="gesture-preview-ring-label">
-                {process}
-                {caption}
-              </div>
-            </>
-          ) : style === 'pill' ? (
-            <>
-              {arrows}
-              <div className="gesture-preview-pill-label">
-                {process}
-                {caption}
-              </div>
-            </>
-          ) : (
-            <>
-              {process}
-              {arrows}
-              {caption}
-            </>
-          )}
-        </div>
+        <GestureIndicatorView
+          model={{
+            x: 0,
+            y: 0,
+            style,
+            opacity,
+            process: 'explorer.exe',
+            directions: ['right', 'up'],
+            captions: [t('settings.gestureOptions.previewCommand')],
+            captionRows: 1,
+          }}
+        />
       )}
     </div>
   );

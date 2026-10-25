@@ -319,7 +319,7 @@ test('activation synchronization uses a bounded key unchanged by focus but chang
   assert.notEqual(payloads[2].gestures.settingsKey, payloads[0].gestures.settingsKey);
 });
 
-test('native indicator payload follows selected design, localized captions and the shared appearance', async (t) => {
+test('indicator payload keeps design and localized captions without tracking the renderer palette', async (t) => {
   const {
     appearanceSnapshot,
     configureAppearance,
@@ -358,8 +358,8 @@ test('native indicator payload follows selected design, localized captions and t
     await manager.sync();
     const payload = payloads.at(-1).gestures;
     assert.equal(payload.indicatorStyle, indicatorStyle);
-    assert.equal(payload.indicatorDark, false);
-    assert.equal(payload.indicatorAccent, appearance.colors.accent);
+    assert.equal('indicatorDark' in payload, false);
+    assert.equal('indicatorAccent' in payload, false);
     assert.equal(payload.indicatorNoActionText, 'アクション無し');
     assert.equal(payload.indicatorMoreText, 'ほか {count} 件');
     assert.equal(payload.rows[0].title, 'User {{title}}');
@@ -368,9 +368,7 @@ test('native indicator payload follows selected design, localized captions and t
   appearance = resolveAppearance('rose', true);
   await manager.sync();
   const changed = payloads.at(-1).gestures;
-  assert.equal(payloads.length, 5, 'appearance change refreshes the native display configuration');
-  assert.equal(changed.indicatorDark, true);
-  assert.equal(changed.indicatorAccent, appearance.colors.accent);
+  assert.equal(payloads.length, 4, 'appearance change does not interrupt input capture');
   assert.equal(
     changed.settingsKey,
     previous.settingsKey,

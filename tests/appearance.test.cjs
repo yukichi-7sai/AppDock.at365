@@ -232,6 +232,7 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
     'notification-surface-preload',
     'applet-page-preload',
     'web-account-preload',
+    'gesture-indicator-preload',
   ])
     assert(
       fs

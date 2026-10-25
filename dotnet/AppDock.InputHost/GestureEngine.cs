@@ -10,11 +10,10 @@ internal sealed record Configuration(bool Enabled, string[] Browsers, string[] E
     bool RequireChromiumWindowClass, int Distance, int WheelDelayMs, double IndicatorOpacity,
     string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all",
     bool ActivateOnStart = false, string SettingsKey = "", uint HostProcessId = 0, bool IndicatorShowNoAction = true,
-    string IndicatorStyle = "compact", string IndicatorAccent = "#7ce1c5", bool IndicatorDark = true,
-    string IndicatorNoActionText = "アクション無し", string IndicatorMoreText = "ほか {count} 件");
+    string IndicatorStyle = "compact", string IndicatorNoActionText = "アクション無し",
+    string IndicatorMoreText = "ほか {count} 件");
 internal enum GestureDirection { Up, Down, Left, Right }
 [StructLayout(LayoutKind.Sequential)] internal readonly record struct GesturePoint(int X, int Y);
-internal static class GestureConfiguration { internal static readonly string[] Marks = ["⬆️","⬇️","⬅️","➡️"]; }
 
 internal sealed class GestureEngine : IDisposable
 {
@@ -26,7 +25,7 @@ internal sealed class GestureEngine : IDisposable
     private Binding[] candidates = [];
     private CommandHostContext hostContext = new();
     private CommandTargetContext? targetContext;
-    private readonly GestureDisplay indicator;
+    private readonly GestureIndicatorNotifications indicator;
     private GesturePoint origin, checkpoint;
     private GesturePoint monitorCenter;
     private PendingStart? starting;
@@ -49,7 +48,7 @@ internal sealed class GestureEngine : IDisposable
     internal bool NeedsKeyboard => ready || keys.Count > 0 || config is {Enabled:true, Rows.Length:>0};
     internal bool NeedsMouse => ready || clicks.Count > 0 || config is {Enabled:true, Rows.Length:>0};
     internal Action? HooksChanged;
-    internal GestureEngine(Dispatcher dispatcher, GestureDisplay display)
+    internal GestureEngine(Dispatcher dispatcher, GestureIndicatorNotifications display)
     {
         this.dispatcher = dispatcher; indicator = display;
         timer = new DispatcherTimer(TimeSpan.FromMilliseconds(10), DispatcherPriority.Normal, (_,_) => Tick(), dispatcher);
@@ -57,6 +56,7 @@ internal sealed class GestureEngine : IDisposable
     }
     internal void Configure(Configuration next)
     {
+        indicator?.Configure(next.Revision);
         hostContext = CommandConditions.HostContext(next.Context);
         // A show command may move focus to the host while its invocation is still completing.
         // Keep only that command alive across focus-only synchronization.
@@ -310,7 +310,7 @@ internal sealed class GestureEngine : IDisposable
         else if (config.IndicatorPosition == "window-center" && GetWindowRect(target,out var rect)) center=new((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2);
         previewGesture = gesture;
         indicator.Display(center, process+".exe", directions.ToArray(), captions, config.IndicatorOpacity,
-            config.IndicatorStyle, config.IndicatorAccent, config.IndicatorDark,
+            config.IndicatorStyle,
             config.IndicatorStyle == "pill" ? PillCaptionRows : 0);
     }
     private void Wheel(int delta)

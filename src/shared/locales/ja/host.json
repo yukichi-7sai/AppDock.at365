@@ -2159,6 +2159,8 @@
   "services.gestureCommands.savedEffect": "保存後に既存の入力処理へ非同期に反映します。実際の入力効果は未確認です。条件に一致したコマンドは実行方法の設定に従って登録順に選びます。",
   "services.gestures.closing": "入力ホストを終了しています。",
   "services.gestures.indicatorNoAction": "アクション無し",
+  "services.gestures.indicatorTitle": "マウスジェスチャーの待機表示",
+  "services.gestures.webIndicatorUnavailable": "待機表示を表示できません。入力操作は続けられます。AppDockを再起動してください。",
   "services.gestures.indicatorMore": "ほか {{count}} 件",
   "services.gestures.inputFailed": "入力処理に失敗しました。",
   "services.gestures.disconnected": "入力プロセスとの接続が終了しました。",

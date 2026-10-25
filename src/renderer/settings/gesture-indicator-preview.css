@@ -15,7 +15,8 @@
   box-sizing: border-box;
   font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif;
   color: var(--text);
-  zoom: var(--gesture-preview-scale);
+  line-height: normal;
+  zoom: var(--gesture-preview-scale, 1);
 }
 .gesture-preview-indicator::before,
 .gesture-preview-ring-circle::before,
@@ -31,6 +32,7 @@
 }
 .gesture-preview-process {
   font-size: 12px;
+  line-height: 16px;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -49,6 +51,9 @@
   gap: 8px;
   color: var(--accent);
 }
+.gesture-preview-arrows > span {
+  display: inline-flex;
+}
 .gesture-preview-arrow-up {
   display: inline-flex;
   transform: rotate(-90deg);
@@ -58,8 +63,15 @@
   padding: 22px;
   border-radius: 18px;
   display: grid;
-  gap: 12px;
+  gap: 0;
+  border: 1px solid transparent;
   isolation: isolate;
+}
+.gesture-preview-compact .gesture-preview-arrows {
+  margin: 12px 0;
+}
+.gesture-preview-caption {
+  line-height: 28px;
 }
 .gesture-preview-pill {
   width: 400px;
@@ -69,10 +81,11 @@
   align-items: center;
   gap: 16px;
   isolation: isolate;
+  border: 1px solid transparent;
 }
 .gesture-preview-pill-label {
   min-width: 0;
-  min-height: 44px;
+  height: calc(20px + 24px * var(--gesture-caption-rows, 1));
 }
 .gesture-preview-pill .gesture-preview-arrows {
   flex: 0 0 60px;
@@ -127,12 +140,15 @@
 }
 .gesture-preview-ring-label .gesture-preview-caption {
   font-size: 18px;
-  margin-top: 4px;
+  line-height: 26px;
+}
+.gesture-preview-ring-label .gesture-preview-process {
+  margin-bottom: 4px;
 }
 .gesture-preview-classic {
   width: 500px;
   height: 300px;
-  padding: 20px;
+  padding: 0;
   border-radius: 20px;
   display: flex;
   flex-direction: column;
@@ -148,12 +164,20 @@
 }
 .gesture-preview-classic .gesture-preview-process {
   font-size: 20px;
+  line-height: 28px;
   color: white;
+  max-width: 460px;
 }
 .gesture-preview-classic .gesture-preview-caption {
   font-size: 22px;
+  line-height: 26px;
   font-weight: 900;
   max-width: 460px;
+}
+.gesture-preview-classic .gesture-indicator-captions {
+  max-width: 460px;
+  max-height: 110px;
+  overflow: hidden;
 }
 .gesture-preview-emoji {
   font-family: 'Segoe UI Emoji', sans-serif;

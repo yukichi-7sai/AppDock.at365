@@ -1,5 +1,28 @@
 # 検証記録
 
+## 2026-10-25: JS待機表示の採用・ネイティブ画面の撤去 0.88.3
+
+- 利用者が0.88.2の見た目と動作を確認し、JS方式の採用、不要なネイティブ画面の整理、commit/pushを依頼した。main `c7f51db` 上のJS試作を引き継ぎ、dirtyのためpull/stashなし。fetchと両push先の読み取りでGitHub/AQUAのmainが `26fdf3e` に一致すること、実効Git名義を確認した。今回のpushには前回の待機表示コミット `c7f51db` も含む。
+- InputHostのGestureIndicator.xaml/コードビハインド/GestureIndicatorContentとGestureDisplay、WPF専用試験プロジェクトを削除した。GestureIndicatorNotificationsだけで表示モデルを通知し、ネイティブ画面の作成・初期化・配色値・Web/WPF切替を持たない。入力用Dispatcherと.NET/WPFランタイム依存は引き続き必要。プレビューと実表示は共通React/CSS、既存の4種類・サイズ固定・表示候補の選択は維持する。設定/保存ファイル/公開API・SDK/Runtime契約の追加削除はなく、通常修正のため **0.88.3** へパッチ更新。
+- 起動失敗/描画プロセス終了時は表示を破棄し、共通ErrorReporterで `GESTURE_INDICATOR_UNAVAILABLE` と再起動案内を一度報告する。ネイティブ表示へ切り替える処理は撤去し、表示の寿命やテーマ変更で入力構成を再同期しない。描画障害後も入力認識とコマンド実行は続ける。発行前レビューでIPC送信元/main frame/URL、revision/sequenceと寸法境界、終了/接続断、表示通知専用キュー、入力フック/条件/実行順の保持を確認し、阻害指摘なし。
+- 整形・最終型検査・本体/Default Shell/native/helper build・publish成功。最初のpnpm実行は版更新後の依存再照合要求で停止し、固定lockfileのinstallで解消（依存変更なし）。旧配色同期を期待した試験1件と実入力fixtureのWPF/UI Automation探索を通知検査へ移行した。関連5ファイル **41/41**、追加80ファイル **709/709**、前回から同じ入力・到達関係・証跡鎖を確認した30ファイル **142件**を再利用し、標準 **115ファイル・892/892、fail/skip 0**。Node 24.22.1/pnpm 12.10.1/.NET SDK 10.0.402/Runtime 10.0.13、lockfile/toolchainと既存locale値不変を照合した。
+- 表示通知13項目と模擬キー状態10項目が成功。配布DLLを直接読む13項目も成功し、ネイティブWindow派生型・コンパイル済みWPF画面リソースの不在、revision/負座標/方向/候補順/予約行数/非表示/終了を確認。直接InputHostを使う実入力試験は表示通知へ移行し、**224成功・デスクトップ4失敗**。変更前InputHostの既存ログと、方向検査12行の名称変更を正規化した全PASS/FAIL行が完全一致した。4失敗を成功へ含めず、既知の未解消事項として保持する。Pause/F13〜F24はOS送信・登録していない。
+- ソースと固定EXEの実マウスGUIが成功。4種類×明暗、1→2段階、候補1→4行、スリムピルのHWND矩形一致、透明/非アクティブ/クリック透過、古い/不正な寸法IPCの拒否、解放後の非表示、32コマンドの順序を確認。描画を意図的に停止した後も4コマンドを実行し、共通エラーログが1件だけであることを確認（合計36コマンド）。固定EXE profileは `.artifacts/gesture-web-ui-1792916936732/`。設定GUIも明暗×1280/900/700px・SettingsField・非表示時の値保持・保存/再起動後の割り当て/条件/順序保持に成功し、profileは `.artifacts/gestures-ui-1792916962105/`。最終のピルとカラー絵文字/4行の収まりを目視確認した。
+- 発行EXEは **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe / 0.88.3 / 170,683,580 bytes / SHA256 41ddebd3e56d504aff1fefa5c4a560d2799c284222f3518419e2e12861effa64**。File/ProductVersion、update.jsonの版/size/hash、ASAR内package/Default Shell/JS画面・preload・共通配色、全renderer出力と新規main出力、同梱InputHostを照合。InputHost DLLは `10d3da6bcc0db3f72795a34894077dfde5f5b622d562cd11520f4c2b9f4b76f4`、ASARは `50354d370066f1b163cf99fdc1907f75be21ad6f6f4e1a02a52daf738f2528ff`。固定GUIコピーと最終EXEも一致した。
+- 証跡は `.artifacts/commit-validation-js-indicator-0883/`。plan/入力一覧・照合済み再利用鎖、全試験log/終了結果、review、物理入力の変更前比較、発行物hash、stage/commit/push照合を保存する。削除済みWPF試験のbin/objを整理し、終了を確認した今回のGUIと必要な旧証跡を保持する。混在DPI移動、UAC/ロック画面、性能/追加メモリは未検証。Release/実利用deployなし。
+- push成功後に今回の `AppDock.at365-gesture-indicator` worktreeと不要な専用branchを削除する。開始点と23変更ファイルが当時の封印入力に一致し、未知の変更がないことを確認済み。旧入力23ファイルと0.88.0検証資料は `retired-worktree/`（manifest付き67ファイル）へ保管した。実際の削除/残存worktree/両remote先端の結果は同証跡フォルダーの `cleanup.json` / `push.json` を正本とし、MCP設定用worktreeは保持する。
+
+## 2026-10-25: 待機表示のJS描画試作 0.88.2
+
+- 0.88.1までの23ファイルをmainの `c7f51db36146b1d7b8c7d174d66c41f5c6efc9f6` へコミット済み（標準888件の照合は次項）。その後、利用者の指定で同じmain上にJS描画を試作した。今回の試作は未コミットで、push・Release・実利用deployなし。新しい永続設定・保存ファイル・公開APIはなく、パッチ更新 **0.88.2**。
+- 入力フック・認識・表示候補の選択・コマンド実行はInputHostの既存経路を維持。表示モデルだけを容量1の専用通知キューで本体へ送り、透明・非アクティブ・マウス透過・タスクバー非表示の専用BrowserWindowで描画する。実表示とSettingsFieldのプレビューは同じReactコンポーネント/CSSを共用し、クラシックのカラー絵文字もChromiumで揃える。スリムピルの2方向分の幅と最大候補行数の予約を維持した。
+- 発行前レビューで送信元/main frame/正確なURL、revision/sequence、寸法/文字数の境界、設定変更・接続断・終了時の非表示、描画障害からのWPF切替を確認した。sandbox/contextIsolation、隔離した非永続session、navigation/新規Window/permission拒否と共通配色preloadを接続。ロードとreadyの両方を含む3秒の起動上限、テーマ背景より強い透明指定、クラシックの4行収まりを修正して再検証した。入力SDKとAppletの接続契約は変更していない。
+- 最終型検査・build・開発InputHost/helper build・publishが成功。関連12ファイルのNode回帰 **126/126、fail/skip 0**、その後追加した起動失敗/停止の切替試験を含む `gesture-indicator.test.cjs` **4/4** が成功（3件は126件と重複）。WPF表示とWeb通知の試験 **428項目成功**。試験した開発InputHost DLLと最終配布物のSHA256一致を確認した。全標準回帰は今回再実行していない。
+- ソースGUIと固定EXEの隔離コピーで実マウス入力試験が成功。4種類×明暗の8組で1→2段階、候補1→4行、スリムピルのHWND矩形完全一致、透明背景、NOACTIVATE/TRANSPARENT/TOOLWINDOW、前面対象の維持、右解放後の非表示、32コマンドの保存順を確認した。別送信元・不正frame・古いsequence・過大寸法のIPCを拒否。描画プロセスを意図的に停止し、WPF設定の受付完了後にも4コマンドを実行（合計36件）できた。固定EXE profileは `.artifacts/gesture-web-ui-1792914973398/`。クラシックのカラー矢印と4行の収まり、スリムピルを目視確認した。
+- 固定EXEの設定GUIも成功。SettingsFieldのgroup/title、4種類・明暗×1280/900/700px、透過・非表示時の値保持、保存/再起動後の割り当て・条件・順序保持を確認。profileは `.artifacts/gestures-ui-1792915064332/`。最初の固定EXE入力試験は最後の切替後実行だけ32件のままで失敗し、診断が不足して原因の断定はできない。試験側の固定250ms待ちを設定受付完了待ちへ置き換え、診断付き再試験と最終試験は成功した。製品の待機処理は追加せず、失敗log/profileも保持している。
+- 発行先 **A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe**、**0.88.2 / 170,696,911 bytes / SHA256 eb2475b6eb092b733ce21d779a3bcab763a651da18ce9a585932e08403034c45**。File/ProductVersion、update.jsonの版/size/hash、ASAR内package/Default Shell/JS画面・専用preload・共通配色、ビルド出力と同梱InputHost、両GUIコピーと最終EXEのhashを照合。InputHost DLLは `45829464ca09bb81994f0cd762c1bd83cb4eca7e156c44742337d7c1916cbfda`、ASARは `18d63e3a02fbf5f791d5bf3d98bf874e21700fb695273b451aec85198dd4e3c8`。
+- 証跡は `.artifacts/web-gesture-indicator-0882/` の型検査/回帰/起動切替/native/ソース・固定GUI/publish log、`artifacts.json`、`validation.json`。今回のJS GUI成功はソース3回・固定2回、設定GUI固定1回で各方式3回以内のため削除0件。今回の隔離プロセス終了を確認し、以前の再利用資料を保持した。Pause/F13〜F24はOS送信・登録していない。入力全回帰、既知のデスクトップ4項目、混在DPI移動、UAC/ロック画面、性能/追加メモリは今回未検証。0.88.0で変更前と一致したデスクトップ4失敗を今回の成功へ含めない。
+
 ## 2026-10-25: 待機表示0.88.1のコミット前検証
 
 - main `26fdf3e` 上の今回の23ファイルを対象に、0.88.1の実装時入力SHAと全変更を照合。Git名義を確認し、別作業の差分・stageなしを確認した。製品内容と発行物は変更せず、版更新・再発行なし。JS描画への移行はこのコミットへ含めない。

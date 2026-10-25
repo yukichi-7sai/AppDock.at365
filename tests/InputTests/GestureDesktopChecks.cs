@@ -66,13 +66,6 @@ internal static partial class Program
                 }
         return null;
     }
-    private static bool CenteredOnMonitor(nint window, System.Drawing.Point origin)
-    {
-        GetWindowRect(window, out var rect);
-        var bounds = Screen.FromPoint(origin).Bounds;
-        return Math.Abs((rect.Left + rect.Right) / 2 - (bounds.Left + bounds.Right) / 2) <= 2 &&
-            Math.Abs((rect.Top + rect.Bottom) / 2 - (bounds.Top + bounds.Bottom) / 2) <= 2;
-    }
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll", EntryPoint = "PostMessageW")] private static extern bool PostFixtureMessage(nint window, uint message, nuint wParam, nint lParam);
 }

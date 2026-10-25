@@ -12,7 +12,7 @@
 - 待機表示と実行は、開始対象と条件に一致した行から同じ登録順・コマンドID重複除去・実行方法で選ぶ。`indicatorPosition`は`gesture-start`・`window-center`・`monitor-center`・`none`（表示なし）。`monitor-center`は右ボタン押下時のカーソルがあるモニター全体の中央。`window-center`も対象がデスクトップなら同じ位置を使う。モニターは開始時に固定し、移動先の画面へ追従しない。`none`でも入力認識・実行・取消を続け、不透明度の保存値を保持する。
 - `indicatorShowNoAction`（「アクションなしを表示する」）は既定true。falseでは、移動方向と開始条件に一致する実行対象がない場合の待機表示を隠す。一致するアクションの表示・入力認識・実行・取消・通常の右クリック復元は従来どおり。`none`ではこの値にかかわらず表示せず、保存値は保持する。未一致の移動を通常の右クリックへ変換する設定ではない。
 - `indicatorStyle`は`compact`（コンパクトカード、既定）・`pill`（スリムピル）・`ring`（リング）・`classic`（クラシック）。未指定の既存設定も`compact`として読み取り、保存済みの位置・不透明度・割り当ては保持する。設定画面の見本は表示だけでコマンドを実行しない。新しい3種類は本体の明暗テーマと共通アクセント色に従い、方向を図形で描画する。不透明度は背景だけへ適用し、文字・方向は薄くしない。クラシックは従来の黒いパネル・絵文字の方向・ウィンドウ全体の不透明度を保つ。表示なしでもスタイルの選択値を保持する。
-- スリムピルは2方向分の表示幅と固定の行高を使用する。操作開始時の対象候補について、実行方法とコマンド重複除去を適用した移動コマンドの最大表示行数（1〜4行）を先に確保する。これにより、同じ操作中は1段階から2段階へ進んだときやコマンド名・件数が変わったときもウィンドウのサイズを変えない。プレビューは共通SettingsFieldのgroup「待機表示」・title「プレビュー」で表示する。クラシックのプレビューはChromium、実画面はWPFの文字描画を使うため、絵文字の色や字形が一致しない場合がある。
+- スリムピルは2方向分の表示幅と固定の行高を使用する。操作開始時の対象候補について、実行方法とコマンド重複除去を適用した移動コマンドの最大表示行数（1〜4行）を先に確保する。これにより、同じ操作中は1段階から2段階へ進んだときやコマンド名・件数が変わったときもウィンドウのサイズを変えない。プレビューは共通SettingsFieldのgroup「待機表示」・title「プレビュー」で表示する。通常の実表示とプレビューは同じGestureIndicatorView/CSSを使い、クラシックのカラー絵文字も同じChromiumで描画する。
 - gestureは1段階移動の`move-up/down/left/right`、2段階移動の`move-<最初の方向>-<次の方向>`（例: `move-right-up`、`move-up-down`）、`click-left/middle`、`wheel-up/down`、`key:<キー>`。2段階は上下左右の異なる2方向の12種類で、逆方向への折り返しも含む。同じ方向の重複や3段階以上のIDは受け付けない。キーは既存ショートカットの正規化（Ctrl/Alt/Shift、英数字、F1〜F24、矢印、対応する記号・特殊キー）を使う。WinやOS専用の保護された入力は対象外。Tabは設定画面の特殊キー選択から登録できる。
 - whenは`global/desktop/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`と任意の`excludeDesktop`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。ページ条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。本体5ページ（設定を含む）・Applet各ページの候補、表示名、対象ID、保存済みApplet指定の保持は[ページ候補と識別](keybindings.md#ページ候補と識別)に従う。
 - `desktop`はWindows Shellが所有するデスクトップの背景・アイコン領域だけに一致する。プロセス名がexplorerであることだけでは一致させず、通常のフォルダー画面とタスクバーを含めない。`excludeDesktop: true`は`global`と`exe`で使用でき、その行だけをデスクトップの候補から除外する。省略はfalse。他にデスクトップで有効な行がなければ右押下を捕捉せず、通常入力を通す。`desktop`条件の別の行は引き続き利用できる。
@@ -24,7 +24,11 @@
 
 ## 入力・実行
 
-`AppDock.InputHost`は本体の子プロセス。自己完結.NET/WPFで配布EXE内に収録し、利用者へDesktop Runtime追加を要求しない。globalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。非アクティブ・クリック透過の待機表示はUI Dispatcherへ分離し、表示の初期化はフック登録前に行う。コールバック内でコマンドやRPCを待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
+`AppDock.InputHost`は本体の子プロセス。自己完結.NET/WPFで配布EXE内に収録し、利用者へDesktop Runtime追加を要求しない。globalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。通常の待機表示は本体専用の透明なElectron Windowへ分離する。Windowは最前面・クリック透過・非アクティブ・タスクバー/Alt+Tab対象外で、初回表示前にページとpreloadを準備する。コールバック内で描画・コマンド・RPC応答を待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
+
+表示は`GestureIndicatorHost`、`gesture-indicator-preload`、`GestureIndicatorView`が担当する。本体は非表示Windowを再利用し、入力側が選んだ方向・コマンド名・スタイル・不透明度・行数・物理座標を通知で渡す。表示用キューは容量1で最新状態だけを保持し、認識/実行通知のキューとは分ける。設定revisionと表示sequenceを照合し、古い更新・非表示後の寸法通知を無視する。DOMの寸法が確定してからDIP座標へ変換し、対象モニター内へ収めて表示する。表示専用IPCは登録したローカルURLのmain frameだけを受け付け、コマンド実行や設定保存のAPIを持たない。配色は共通preloadを使う。表示倍率は通常の設定画面と分離し、OSのDPIを基準にする。このSurfaceは本体専用で、Shell領域を追加しない。
+
+待機表示はJS描画だけを使い、InputHostはGestureIndicatorNotificationsで表示モデルを通知する。ネイティブの待機Window・描画コード・配色/描画方式の切替は持たない。入力用Dispatcherとその.NET/WPFランタイム依存は引き続き必要。ローカル描画ページの起動失敗やrenderer終了時は表示を破棄し、共通のエラー通知とログへGESTURE_INDICATOR_UNAVAILABLEを一度報告して再起動を案内する。表示がなくても入力認識とコマンド実行は続ける。描画プロセスを自動で繰り返し再起動しない。新しい保存設定や素材ファイルは追加しない。
 
 本体は実Windowフォーカスと表示中Appletに対応する行を入力プロセスへ同期する（40ms間隔、内容が変化した時のみ送信）。ネイティブ側は押下時に最前面HWND・exe・カーソル下のWindow・除外・ブラウザクラス条件を確認。ローカル条件は通知済みHWNDにも限定する。状態の同期前に入力した場合に誤ったコマンドを実行しないよう、本体側も受信時と各コマンドの開始前に最新のページ/Window文脈を照合する。
 
@@ -89,7 +93,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 
 - Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、編集中の対象行との競合を検査する。
 - `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、共通予約と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
-- `dotnet run --project tests/GestureIndicatorTests/GestureIndicatorTests.csproj -c Release -- .artifacts/gesture-indicator-native [InputHost DLL]`: 入力フックを登録せず、4種類のWPF待機表示・明暗テーマ・透過・長い名前と複数コマンド・非アクティブ表示・画面端配置を検査し、描画PNGを保存する。DLLを指定するとその発行物を直接読み込む。物理入力や混在DPIの実機確認とは区別する。
+- `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- --indicator-notices [InputHost DLL]`: フックを登録せず、ネイティブWindow/コンパイル済みWPF画面の不在、表示通知のrevision/座標/方向/候補順・行数、非表示・終了の通知を検査する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外、左右の修飾キーと左/中/X1/X2の先行押下・途中解放・捕捉された押下の継続・解除後の再開の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
 - ショートカット/ページの既存GUI回帰も併用し、試験は直列で行う。実測と未確認範囲はVERIFICATION.mdに記録する。
@@ -107,6 +111,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - 「いつ・どこで」のデスクトップはグローバルの直下へ置く。グローバル・指定したexeを選んだ場合だけ、その下に「デスクトップを除外」のチェック項目を表示する。初期OFFで、保存・再編集・条件表示・検索に反映する。キーボードのショートカット条件へは追加しない。
 - scripts/gesture-command-checks.cjsをgestures-ui-test.cjsから呼び、一覧/編集/並べ替え/保存再起動/両テーマ3幅を検証する。APPDOCK_GESTURE_UI_ONLY=1は物理入力試験を省略する明示モードで、実入力の成功とは区別する。ショートカット側の共用部品もshortcuts-ui-test.cjsで検証する。
 - `APPDOCK_GESTURE_INDICATOR_ONLY=1`は待機表示だけを検証する明示モード。`scripts/gesture-indicator-checks.cjs`で4種類の選択・透過・表示なしの保持・明暗テーマ・3幅の見本を確認し、既存ハーネスで再起動後の設定保持も確認する。物理入力とコマンド一覧全体の回帰は含まない。
+- `dev.bat exec node scripts/gesture-web-indicator-ui-test.cjs [--portable]`は隔離した本体とマウス専用InputTests helperでJS待機表示を確認する。4種類×明暗で、1/2段階の方向とコマンド更新、サイズ固定、非アクティブ/透過/ツールWindowフラグ、IPCの送信元とsequence検査、右解放後の非表示と実行順を確認する。最後に描画プロセス障害を起こし、表示なしでも実行を続け、共通エラーを一度だけ報告することを確認する。Pause/F13〜F24はOSへ送信・登録しない。
 
 一時停止/再開は本体コマンド`appdock.gestures.togglePause`で切り替えます。トレイ内はチェック付き項目で、検索・キーからの実行も同期します。保存されない実行中の状態で、再起動後は解除します。配置の仕様は[タスクトレイ](tray-menu.md)を参照してください。
 

@@ -1,5 +1,8 @@
 import { hostText } from '../../shared/i18n';
-import { appearanceSnapshot } from './appearance-host';
+import {
+  readGestureIndicatorNotice,
+  type GestureIndicatorModel,
+} from '../../shared/gesture-indicator';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { JsonLinePeer } from './rpc';
@@ -49,6 +52,7 @@ export interface ShortcutPress {
   target?: CommandTarget;
 }
 export class InputCaptureManager {
+  indicator?: { show(model: GestureIndicatorModel): void; hide(): void };
   private peer?: JsonLinePeer;
   private child?: ChildProcessWithoutNullStreams;
   private fingerprint = '';
@@ -193,6 +197,16 @@ export class InputCaptureManager {
     return !!(await this.peer.request('capture.activateProcess', { pressId, processId }));
   }
   private async event(method: string, p: any) {
+    if (method === 'gestures.indicator') {
+      const notice = readGestureIndicatorNotice(p);
+      if (!notice || notice.revision !== this.revision || this.stopped) return;
+      if (!notice.visible || this.paused || this.state().recording) {
+        this.indicator?.hide();
+        return;
+      }
+      this.indicator?.show(notice);
+      return;
+    }
     if (method === 'touchpad.changed') {
       this.touchpadCallbacks?.changed();
       return;
@@ -364,6 +378,7 @@ export class InputCaptureManager {
     });
     child.on('exit', () => peer.close());
     peer.on('closed', () => {
+      this.indicator?.hide();
       child.kill();
       for (const [session, controller] of this.active) {
         controller.abort();
@@ -389,12 +404,9 @@ export class InputCaptureManager {
       return this.statuses;
     const settings = state.settings.gestures ?? defaultGestures();
     const context = JSON.stringify(state.context);
-    const appearance = appearanceSnapshot();
     const gesture = {
       ...settings,
       indicatorStyle: settings.indicatorStyle ?? 'compact',
-      indicatorAccent: appearance.colors.accent,
-      indicatorDark: appearance.dark,
       indicatorNoActionText: hostText('services.gestures.indicatorNoAction'),
       indicatorMoreText: hostText('services.gestures.indicatorMore', { count: '{count}' }),
       rows: nativeGestureRows(settings, state.context, state.commands, settings.activateOnStart),
@@ -435,6 +447,7 @@ export class InputCaptureManager {
       const peer = this.peer!;
       this.faultSettings = undefined;
       if (this.fingerprint !== fingerprint) {
+        this.indicator?.hide();
         this.revision++;
         for (const [session, controller] of this.active) {
           controller.abort();
@@ -471,6 +484,7 @@ export class InputCaptureManager {
     }
   }
   async close() {
+    this.indicator?.hide();
     this.stopped = true;
     clearInterval(this.timer);
     for (const [session, controller] of this.active) {
