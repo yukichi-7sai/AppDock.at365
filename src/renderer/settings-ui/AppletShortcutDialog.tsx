@@ -2,17 +2,14 @@ import { useHostTranslation } from '../HostTranslation';
 import { useState } from 'react';
 import { SettingsField } from './SettingsSections';
 import { normalizeShortcut } from '../../shared/commands';
-import {
-  protectedShortcut,
-  externalShortcutScope,
-  externalShortcutScopes,
-} from '../../shared/keybindings';
+import { protectedShortcut, externalShortcutScope } from '../../shared/keybindings';
 import type { Keybinding } from '../../shared/keybindings';
-import { ShortcutConditionField } from './ShortcutFields';
 import { Toggle } from './Toggle';
 import { BindingEditDialog } from './BindingEditDialog';
 import { ShortcutCaptureField } from './ShortcutCaptureField';
-import { CommandConditionDetails, useConditionProcesses } from './CommandConditionDetails';
+import { useConditionProcesses } from './CommandConditionDetails';
+import { CommandConditionEditor } from './CommandConditionEditor';
+import { BindingEditorLayout, BindingEnabledControl } from './BindingEditorLayout';
 
 export function AppletShortcutDialog({
   initial,
@@ -43,6 +40,7 @@ export function AppletShortcutDialog({
     (value.when.scope !== 'exe' || (!draft.processError && !!draft.processes.length));
   return (
     <BindingEditDialog
+      className="binding-editor-dialog"
       title={title}
       adding={adding}
       valid={valid}
@@ -59,89 +57,51 @@ export function AppletShortcutDialog({
         })
       }
       onClose={onClose}
+      footerStart={
+        <BindingEnabledControl
+          enabled={value.enabled}
+          onChange={(enabled) => setValue({ ...value, enabled })}
+        />
+      }
     >
       {(ready, setError) => (
-        <>
-          <ShortcutCaptureField
-            value={value.key}
-            onChange={(key) => setValue({ ...value, key })}
-            recordingReady={ready}
-            setError={setError}
-          />
-          <SettingsField
-            title={translate('settings.appletShortcutDialog.scope')}
-            hint={
-              value.when.scope === 'browser'
-                ? translate('settings.appletShortcutDialog.browserHint')
-                : undefined
-            }
-          >
-            <ShortcutConditionField
-              value={{
-                scope: externalShortcutScope(value.when.scope) ? 'global' : value.when.scope,
-                appletIds: value.when.appletIds,
-              }}
-              selectedScope={value.when.scope}
-              extraScopes={externalShortcutScopes.slice()}
-              onExtraScope={(scope) =>
-                setValue({
-                  ...value,
-                  when: {
-                    scope: scope as Keybinding['when']['scope'],
-                    appletIds: [],
-                    processes: [],
-                    ...(scope === 'exe' && value.when.excludeDesktop !== undefined
-                      ? { excludeDesktop: value.when.excludeDesktop }
-                      : {}),
-                  },
-                })
-              }
-              label={translate('settings.appletShortcutDialog.scopeLabel')}
+        <BindingEditorLayout
+          input={
+            <>
+              <ShortcutCaptureField
+                value={value.key}
+                onChange={(key) => setValue({ ...value, key })}
+                recordingReady={ready}
+                setError={setError}
+              />
+              <SettingsField
+                className="binding-inline-toggle"
+                title={translate('settings.appletShortcutDialog.blockOriginal')}
+                hint={
+                  externalShortcutScope(value.when.scope)
+                    ? translate('settings.appletShortcutDialog.blockHint')
+                    : translate('settings.appletShortcutDialog.blockScopes')
+                }
+              >
+                <Toggle
+                  checked={value.blockOriginalInput !== false}
+                  disabled={!externalShortcutScope(value.when.scope)}
+                  label={translate('settings.appletShortcutDialog.blockOriginal')}
+                  onChange={(blockOriginalInput) => setValue({ ...value, blockOriginalInput })}
+                />
+              </SettingsField>
+            </>
+          }
+          conditions={
+            <CommandConditionEditor
+              when={value.when}
+              onChange={(when) => setValue({ ...value, when })}
+              draft={draft}
               ownerTitle={ownerTitle}
               applets={applets}
-              onChange={(when) => {
-                if (when.scope !== 'default')
-                  setValue({
-                    ...value,
-                    when: {
-                      scope: when.scope,
-                      appletIds: when.appletIds,
-                      ...(when.scope === 'global' && value.when.excludeDesktop !== undefined
-                        ? { excludeDesktop: value.when.excludeDesktop }
-                        : {}),
-                    },
-                  });
-              }}
             />
-          </SettingsField>
-          <CommandConditionDetails
-            when={value.when}
-            onChange={(when) => setValue({ ...value, when })}
-            {...draft}
-          />
-          <SettingsField
-            title={translate('settings.appletShortcutDialog.blockOriginal')}
-            hint={
-              externalShortcutScope(value.when.scope)
-                ? translate('settings.appletShortcutDialog.blockHint')
-                : translate('settings.appletShortcutDialog.blockScopes')
-            }
-          >
-            <Toggle
-              checked={value.blockOriginalInput !== false}
-              disabled={!externalShortcutScope(value.when.scope)}
-              label={translate('settings.appletShortcutDialog.blockOriginal')}
-              onChange={(blockOriginalInput) => setValue({ ...value, blockOriginalInput })}
-            />
-          </SettingsField>
-          <SettingsField title={translate('settings.appletShortcutDialog.enabled')}>
-            <Toggle
-              checked={value.enabled}
-              label={translate('settings.appletShortcutDialog.enabled')}
-              onChange={(enabled) => setValue({ ...value, enabled })}
-            />
-          </SettingsField>
-        </>
+          }
+        />
       )}
     </BindingEditDialog>
   );

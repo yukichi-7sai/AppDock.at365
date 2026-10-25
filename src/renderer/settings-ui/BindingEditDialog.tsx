@@ -11,6 +11,7 @@ export function BindingEditDialog({
   className = '',
   error: validationError,
   errorTarget,
+  footerStart,
 }: {
   title: string;
   adding: boolean;
@@ -21,6 +22,7 @@ export function BindingEditDialog({
   className?: string;
   error?: string;
   errorTarget?: string;
+  footerStart?: ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
   const [error, setError] = useState('');
@@ -65,9 +67,17 @@ export function BindingEditDialog({
       }
       footer={
         <footer>
+          {footerStart}
           <div>
-            <button onClick={onClose}>{translate('settings.bindingEditDialog.cancel')}</button>
-            <button className="primary" disabled={!valid || !recordingReady} onClick={apply}>
+            <button data-testid="binding-cancel" onClick={onClose}>
+              {translate('settings.bindingEditDialog.cancel')}
+            </button>
+            <button
+              data-testid="binding-apply"
+              className="primary"
+              disabled={!valid || !recordingReady}
+              onClick={apply}
+            >
               {adding
                 ? translate('settings.bindingEditDialog.addAction')
                 : translate('settings.bindingEditDialog.apply')}

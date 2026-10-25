@@ -245,10 +245,7 @@ module.exports = async ({ host, command, row, checks, profile }) => {
     .click();
   for (const scope of ['pages', 'app']) {
     await condition.click();
-    await host
-      .getByTestId('settings-dialog')
-      .getByLabel('割り当てのいつ・どこで', { exact: true })
-      .selectOption(scope);
+    await host.getByTestId('settings-dialog').getByTestId(`binding-scope:${scope}`).click();
     await host
       .getByTestId('settings-dialog')
       .getByRole('button', { name: '適用', exact: true })

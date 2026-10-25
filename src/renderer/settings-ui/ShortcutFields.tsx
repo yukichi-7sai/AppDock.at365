@@ -84,6 +84,7 @@ export function ShortcutConditionField({
   allowDefault = false,
   extraScopes = [],
   selectedScope,
+  presentation = 'select',
   onExtraScope,
   onChange,
 }: {
@@ -94,6 +95,7 @@ export function ShortcutConditionField({
   allowDefault?: boolean;
   extraScopes?: { id: string; title: string; after?: ShortcutScope }[];
   selectedScope?: string;
+  presentation?: 'select' | 'buttons';
   onExtraScope?(scope: string): void;
   onChange(value: ShortcutCondition): void;
 }) {
@@ -107,6 +109,30 @@ export function ShortcutConditionField({
       .filter((id) => !applets.some((applet) => applet.id === id))
       .map((id) => ({ id, title: shortcutTargetTitle(id, applets) })),
   ];
+  const scopes = [
+    ...(allowDefault
+      ? [{ id: 'default', title: translate('settings.shortcutFields.default') }]
+      : []),
+    ...extraScopes.filter((scope) => !scope.after),
+    ...shortcutScopes
+      .filter((scope) => scope.id !== 'owner' || ownerTitle || value.scope === 'owner')
+      .flatMap((scope) => [scope, ...extraScopes.filter((extra) => extra.after === scope.id)]),
+  ];
+  const changeScope = (id: string) => {
+    if (extraScopes.some((scope) => scope.id === id)) {
+      onExtraScope?.(id);
+      setOpen(false);
+    } else {
+      const scope = id as ShortcutScope | 'default';
+      onChange({ scope, appletIds: scope === 'applets' ? value.appletIds : [] });
+      setOpen(scope === 'applets');
+    }
+    setFilter('');
+  };
+  const scopeTitle = (scope: { id: string; title: string }) =>
+    scope.id === 'owner'
+      ? (ownerTitle ?? translate('settings.shortcutFields.unknownOwner'))
+      : scope.title;
   useSettingsFeedback({
     error: [
       value.scope === 'applets' && !value.appletIds.length
@@ -118,56 +144,50 @@ export function ShortcutConditionField({
   });
   return (
     <div className="shortcut-condition-field">
-      <select
-        aria-label={label}
-        value={selectedScope ?? value.scope}
-        onChange={(event) => {
-          if (extraScopes.some((scope) => scope.id === event.target.value)) {
-            onExtraScope?.(event.target.value);
-            setOpen(false);
-            return;
-          }
-          const scope = event.target.value as ShortcutScope | 'default';
-          onChange({ scope, appletIds: scope === 'applets' ? value.appletIds : [] });
-          setOpen(scope === 'applets');
-          setFilter('');
-        }}
-      >
-        {allowDefault && (
-          <option value="default">{translate('settings.shortcutFields.default')}</option>
-        )}
-        {extraScopes
-          .filter((scope) => !scope.after)
-          .map((scope) => (
-            <option key={scope.id} value={scope.id}>
-              {scope.title}
-            </option>
+      {presentation === 'buttons' ? (
+        <div className="binding-scope-picker" role="group" aria-label={label}>
+          {scopes.map((scope) => (
+            <button
+              key={scope.id}
+              type="button"
+              data-testid={`binding-scope:${scope.id}`}
+              aria-pressed={(selectedScope ?? value.scope) === scope.id}
+              disabled={scope.id === 'owner' && !ownerTitle}
+              onClick={() => changeScope(scope.id)}
+            >
+              {scopeTitle(scope)}
+            </button>
           ))}
-        {shortcutScopes
-          .filter((scope) => scope.id !== 'owner' || ownerTitle || value.scope === 'owner')
-          .flatMap((scope) => [scope, ...extraScopes.filter((extra) => extra.after === scope.id)])
-          .map((scope) => (
+        </div>
+      ) : (
+        <select
+          aria-label={label}
+          value={selectedScope ?? value.scope}
+          onChange={(event) => changeScope(event.target.value)}
+        >
+          {scopes.map((scope) => (
             <option key={scope.id} value={scope.id} disabled={scope.id === 'owner' && !ownerTitle}>
-              {scope.id === 'owner'
-                ? (ownerTitle ?? translate('settings.shortcutFields.unknownOwner'))
-                : scope.title}
+              {scopeTitle(scope)}
             </option>
           ))}
-      </select>
+        </select>
+      )}
       {value.scope === 'applets' && (
         <>
-          <button
-            className="keybinding-targets"
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-          >
-            {value.appletIds.length
-              ? value.appletIds
-                  .map((id) => choices.find((a) => a.id === id)?.title ?? id)
-                  .join(' / ')
-              : translate('settings.shortcutFields.selectPages')}
-          </button>
-          {open && (
+          {presentation === 'select' && (
+            <button
+              className="keybinding-targets"
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
+            >
+              {value.appletIds.length
+                ? value.appletIds
+                    .map((id) => choices.find((a) => a.id === id)?.title ?? id)
+                    .join(' / ')
+                : translate('settings.shortcutFields.selectPages')}
+            </button>
+          )}
+          {(open || presentation === 'buttons') && (
             <div
               className="keybinding-picker"
               role="group"
@@ -185,6 +205,7 @@ export function ShortcutConditionField({
                   <label key={a.id}>
                     <SettingsInput
                       type="checkbox"
+                      data-testid={`binding-page:${a.id}`}
                       checked={value.appletIds.includes(a.id)}
                       onChange={(event) =>
                         onChange({
@@ -199,9 +220,11 @@ export function ShortcutConditionField({
                   </label>
                 ))}
               {!choices.length && <small>{translate('settings.shortcutFields.noPages')}</small>}
-              <button onClick={() => setOpen(false)}>
-                {translate('settings.shortcutFields.close')}
-              </button>
+              {presentation === 'select' && (
+                <button onClick={() => setOpen(false)}>
+                  {translate('settings.shortcutFields.close')}
+                </button>
+              )}
             </div>
           )}
         </>

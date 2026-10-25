@@ -26,7 +26,7 @@ export function useConditionProcesses(when: Keybinding['when']) {
   return { processText, setProcessText, processes, processError };
 }
 
-/** Shared condition controls for mouse gestures and shortcut keys. */
+/** Shared condition controls for all command trigger types. */
 export function CommandConditionDetails({
   when,
   onChange,
@@ -46,7 +46,10 @@ export function CommandConditionDetails({
   return (
     <>
       {['global', 'exe'].includes(when.scope) && (
-        <SettingsField title={translate('settings.commandConditionDetails.excludeDesktop')}>
+        <SettingsField
+          className="binding-inline-toggle"
+          title={translate('settings.commandConditionDetails.excludeDesktop')}
+        >
           <Toggle
             label={translate('settings.commandConditionDetails.excludeDesktop')}
             checked={when.excludeDesktop ?? false}
@@ -69,6 +72,20 @@ export function CommandConditionDetails({
             value={processText}
             placeholder="notepad.exe, explorer.exe"
             onChange={(event) => setProcessText(event.target.value)}
+          />
+        </SettingsField>
+      )}
+      {when.scope === 'global' && (
+        <SettingsField
+          title={translate('settings.commandConditionDetails.excludedProcesses')}
+          description={translate('settings.commandConditionDetails.excludedProcessesPending')}
+        >
+          <SettingsTextarea
+            data-testid="binding-excluded-processes"
+            aria-label={translate('settings.commandConditionDetails.excludedProcesses')}
+            rows={2}
+            value=""
+            disabled
           />
         </SettingsField>
       )}

@@ -34,6 +34,7 @@ fs.writeFileSync(
 );
 const initial = createDefaultSettings();
 const featureSettingsOnly = process.argv.includes('--feature-settings-only');
+const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
 const source = process.argv.slice(2).find((argument) => !argument.startsWith('--'));
 initial.host.hardwareAcceleration = false;
 initial.extensions['fixture.triggers'] = { enabled: true, settings: {} };
@@ -164,6 +165,7 @@ const recordSuccess = () => {
         success: true,
         checks,
         featureSettingsOnly,
+        bindingEditorsOnly,
         source: source ? path.resolve(source) : 'development build',
         sha256: portable ? hash(portable) : null,
         limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
@@ -197,6 +199,24 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (bindingEditorsOnly) {
+      await open();
+      await require('./binding-editor-checks.cjs')({ host, saved, save, checks, profile, row });
+      const durable = await saved();
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      await open();
+      for (const key of ['keybindings', 'gestures', 'touchpadGestures'])
+        assert.deepEqual((await saved())[key], durable[key]);
+      assert.deepEqual(errors, []);
+      checks.push(
+        'all editor changes survive an actual restart without changing connection mappings',
+      );
+      recordSuccess();
+      return;
+    }
     if (featureSettingsOnly) {
       await require('./gesture-settings-checks.cjs')({ host, open, save, saved, checks, profile });
       const durable = (await saved()).commandTriggerOptions;
