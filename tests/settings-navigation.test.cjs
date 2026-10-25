@@ -54,10 +54,7 @@ test('every settings index page has one public command, including new and disabl
   verify();
   applets.push(applet('test.new', 'New Applet'));
   const commands = verify();
-  assert.equal(
-    commands.find((c) => c.pageId === 'shortcuts').title,
-    'ショートカットキー設定を開く',
-  );
+  assert.equal(commands.find((c) => c.pageId === 'shortcuts').title, 'キージェスチャー設定を開く');
   assert.equal(commands.find((c) => c.pageId === 'gestures').title, 'マウスジェスチャー設定を開く');
   assert.equal(commands.find((c) => c.pageId === 'ribbon').id, 'appdock.ribbon.settings.open');
   assert.equal(commands.find((c) => c.pageId === 'about').id, 'appdock.updates.open');

@@ -218,7 +218,12 @@ test('gesture final execution requires exact native selection, target facts and 
   const catalog = ['a', 'b'].map((id) => ({ id, title: id }));
   const settingsKey = () =>
     createHash('sha256')
-      .update(JSON.stringify([settings.gestures, catalog]))
+      .update(
+        JSON.stringify([
+          require('../out/main/shared/gestures').getGestureSettings(settings),
+          catalog,
+        ]),
+      )
       .digest('hex');
   const manager = new InputCaptureManager(
     'unused',
@@ -284,6 +289,16 @@ test('gesture final execution requires exact native selection, target facts and 
   };
   await manager.event('gestures.invoke', { ...payload, settingsKey: settingsKey() });
   assert.deepEqual(calls, ['a', 'b', 'a', 'a']);
+  manager.execute = async (id) => {
+    calls.push(id);
+    settings.commandTriggerOptions.browsers = ['changed-browser'];
+  };
+  await manager.event('gestures.invoke', { ...payload, settingsKey: settingsKey() });
+  assert.deepEqual(
+    calls,
+    ['a', 'b', 'a', 'a', 'a'],
+    'a common browser change cancels the remaining captured batch',
+  );
 });
 
 test('target validation keeps absent facts unknown and rejects malformed native fields', () => {

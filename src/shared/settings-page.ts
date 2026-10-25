@@ -133,7 +133,7 @@ export type SettingsPageOperation =
 /** UI selection state lives for the primary context, independently of a Shell View. */
 export interface SettingsNavigationState {
   query: string;
-  provider?: { id: string; page: 'shortcuts' | 'gestures' | 'touchpad-gestures'; request: number };
+  provider?: { id: string; page: 'command-triggers'; request: number };
   move?: SettingsPageModel['content']['move'];
 }
 export interface SettingsPageAction {

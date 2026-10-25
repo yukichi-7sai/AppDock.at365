@@ -65,10 +65,10 @@ test('shortcut options participate in sparse page JSON and reset independently o
   saved.keybindingOptions = { executionMode: 'first' };
   saved.gestures.executionMode = 'first';
   const shortcutPage = page(saved, 'shortcuts');
-  assert.equal(shortcutPage.title, 'ショートカットキー');
+  assert.equal(shortcutPage.title, 'キージェスチャー');
   assert.equal(
-    shortcutPage.items.find((item) => item.key === 'keybindings').title,
-    'ショートカットキー割り当て',
+    shortcutPage.items.some((item) => item.key === 'keybindings'),
+    false,
   );
   const projected = settingsJsonProjection(saved, shortcutPage, applets);
   assert.deepEqual(projected.keybindingOptions, { executionMode: 'first' });

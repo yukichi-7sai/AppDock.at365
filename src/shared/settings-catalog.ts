@@ -178,11 +178,6 @@ const hostItems: Record<string, [string, string, string?][]> = {
   ],
   shortcuts: [
     [
-      'options',
-      hostText('settings.settings-catalog.inputOptions'),
-      hostText('settings.settings-catalog.inputOptionsKeywords'),
-    ],
-    [
       'executionMode',
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
@@ -190,9 +185,9 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ['browsers', hostText('settings.settings-catalog.browsers')],
     ['requireChromiumWindowClass', hostText('settings.settings-catalog.chromium')],
     [
-      'keybindings',
-      hostText('settings.settings-catalog.shortcuts'),
-      hostText('settings.settings-catalog.shortcutsKeywords'),
+      'commonOptions',
+      hostText('settings.commandTriggerOptions.title'),
+      hostText('settings.settings-catalog.inputOptionsKeywords'),
     ],
   ],
   'touchpad-gestures': [
@@ -201,10 +196,10 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
     ],
-    ['browsers', hostText('settings.settings-catalog.touchpadBrowsers'), 'chrome.exe firefox.exe'],
+    ['browsers', hostText('settings.settings-catalog.browsers'), 'chrome.exe firefox.exe'],
     [
       'requireChromiumWindowClass',
-      hostText('settings.settings-catalog.touchpadChromium'),
+      hostText('settings.settings-catalog.chromium'),
       hostText('settings.settings-catalog.touchpadBrowserKeywords'),
     ],
     [
@@ -213,8 +208,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.touchpadEnabledKeywords'),
     ],
     [
-      'options',
-      hostText('settings.settings-catalog.inputOptions'),
+      'commonOptions',
+      hostText('settings.commandTriggerOptions.title'),
       hostText('settings.settings-catalog.touchpadOptionsKeywords'),
     ],
     [
@@ -227,18 +222,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.touchpadKeyLabel', { title: title }),
       hostText('settings.settings-catalog.touchpadKeyKeywords'),
     ]),
-    [
-      'bindings',
-      hostText('settings.settings-catalog.touchpadBindings'),
-      hostText('settings.settings-catalog.touchpadBindingsKeywords'),
-    ],
   ],
   gestures: [
-    [
-      'gestures',
-      hostText('settings.settings-catalog.gestures'),
-      hostText('settings.settings-catalog.gesturesKeywords'),
-    ],
     ['enabled', hostText('settings.settings-catalog.gesturesEnabled')],
     [
       'activateOnStart',
@@ -246,8 +231,8 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.gesturesInactiveKeywords'),
     ],
     [
-      'options',
-      hostText('settings.settings-catalog.inputOptions'),
+      'commonOptions',
+      hostText('settings.commandTriggerOptions.title'),
       hostText('settings.settings-catalog.gesturesOptionsKeywords'),
     ],
     [
@@ -638,27 +623,32 @@ export function settingsPaths(
     case 'tray':
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
-      return [['keybindings'], ['keybindingOptions']];
+      return [['keybindingOptions'], ['commandTriggerOptions']];
     case 'command-triggers':
       return [['keybindings'], ['gestures', 'bindings'], ['touchpadGestures', 'bindings']];
     case 'touchpad-gestures':
-      return [['touchpadGestures']];
+      return [
+        ['touchpadGestures', 'enabled'],
+        ['touchpadGestures', 'connections'],
+        ['touchpadGestures', 'executionMode'],
+        ['commandTriggerOptions'],
+      ];
     case 'gestures':
       return [
-        'enabled',
-        'activateOnStart',
-        'browsers',
-        'excludedProcesses',
-        'requireChromiumWindowClass',
-        'distance',
-        'wheelDelayMs',
-        'executionMode',
-        'indicatorOpacity',
-        'indicatorPosition',
-        'indicatorStyle',
-        'indicatorShowNoAction',
-        'bindings',
-      ].map((key) => ['gestures', key]);
+        ...[
+          'enabled',
+          'activateOnStart',
+          'excludedProcesses',
+          'distance',
+          'wheelDelayMs',
+          'executionMode',
+          'indicatorOpacity',
+          'indicatorPosition',
+          'indicatorStyle',
+          'indicatorShowNoAction',
+        ].map((key) => ['gestures', key]),
+        ['commandTriggerOptions'],
+      ];
     case 'ribbon':
       return [
         'order',

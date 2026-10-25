@@ -39,7 +39,7 @@ function fixture() {
   ];
   value.gestures.distance = 87;
   value.gestures.executionMode = 'first';
-  value.gestures.browsers = ['custom-browser'];
+  value.commandTriggerOptions.browsers = ['custom-browser'];
   value.touchpadGestures.connections['three.tap'] = { key: 'F13', modifiers: ['Ctrl'] };
   return value;
 }
@@ -134,13 +134,14 @@ test('new page edits only the three binding stores and cannot overwrite trigger 
   assert(page);
   assert(searchSettings(pages, 'コマンドトリガー').some((item) => item.pageId === page.id));
   const projection = settingsProjection(settings, page, []);
+  assert.equal(projection.commandTriggerOptions, undefined);
   assert.deepEqual(Object.keys(projection.gestures), ['bindings']);
   assert.deepEqual(Object.keys(projection.touchpadGestures), ['bindings']);
   projection.gestures.bindings[0].enabled = true;
   const saved = applySettingsJson(settings, page, [], JSON.stringify(projection));
   assert.equal(saved.gestures.bindings[0].enabled, true);
   assert.equal(saved.gestures.distance, 87);
-  assert.deepEqual(saved.gestures.browsers, ['custom-browser']);
+  assert.deepEqual(saved.commandTriggerOptions.browsers, ['custom-browser']);
   assert.deepEqual(saved.touchpadGestures.connections, settings.touchpadGestures.connections);
   assert.equal(saved.gestures.executionMode, 'first');
   assert.throws(() =>

@@ -1,31 +1,37 @@
 import { useHostTranslation } from '../HostTranslation';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { SettingsInput } from './SettingsInput';
-import { SettingsField } from './SettingsSections';
+import { SettingsField, SettingsSection } from './SettingsSections';
+import type { Settings } from '../../shared/contracts';
+import { getCommandTriggerOptions } from '../../shared/command-trigger-options';
 import { Toggle } from './Toggle';
 import { settingAnchor } from './setting-anchor';
 
 export function InputBrowserOptions({
   pageId,
-  value,
+  settings,
   onChange,
 }: {
   pageId: 'shortcuts' | 'gestures' | 'touchpad-gestures';
-  value: { browsers: string[]; requireChromiumWindowClass: boolean };
-  onChange(patch: Partial<typeof value>): void;
+  settings: Settings;
+  onChange(value: Settings): void;
 }) {
   const { t: translate } = useHostTranslation();
+  const value = getCommandTriggerOptions(settings);
+  const change = (patch: Partial<typeof value>) =>
+    onChange({ ...settings, commandTriggerOptions: { ...value, ...patch } });
   const title = hostSettingItem(pageId, 'requireChromiumWindowClass').title;
   return (
-    <>
+    <SettingsSection
+      title={translate('settings.commandTriggerOptions.title')}
+      data-testid="gesture-common-options"
+      {...settingAnchor(pageId, 'commonOptions')}
+    >
       <SettingsField
-        group={translate('settings.inputBrowserOptions.browser')}
         title={hostSettingItem(pageId, 'browsers').title}
         hint={
           translate('settings.inputBrowserOptions.executableHint') +
-          (pageId === 'gestures'
-            ? translate('settings.inputBrowserOptions.webToolsHint')
-            : translate('settings.inputBrowserOptions.conditionHint'))
+          translate('settings.inputBrowserOptions.conditionHint')
         }
         {...settingAnchor(pageId, 'browsers')}
       >
@@ -34,7 +40,7 @@ export function InputBrowserOptions({
           value={value.browsers.join(', ')}
           placeholder="chrome.exe, firefox.exe"
           onChange={(event) =>
-            onChange({
+            change({
               browsers: event.target.value
                 .split(/[\n,]/)
                 .map((s) => s.trim())
@@ -44,7 +50,6 @@ export function InputBrowserOptions({
         />
       </SettingsField>
       <SettingsField
-        group={translate('settings.inputBrowserOptions.browser')}
         title={title}
         description={translate('settings.inputBrowserOptions.chromiumHint')}
         {...settingAnchor(pageId, 'requireChromiumWindowClass')}
@@ -52,9 +57,9 @@ export function InputBrowserOptions({
         <Toggle
           label={title}
           checked={value.requireChromiumWindowClass}
-          onChange={(requireChromiumWindowClass) => onChange({ requireChromiumWindowClass })}
+          onChange={(requireChromiumWindowClass) => change({ requireChromiumWindowClass })}
         />
       </SettingsField>
-    </>
+    </SettingsSection>
   );
 }

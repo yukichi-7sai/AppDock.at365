@@ -241,9 +241,9 @@
   font-size: 12px;
 }
 .settings-file-menu summary {
-  padding: 7px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
   list-style: none;
 }
 .settings-file-menu > div {

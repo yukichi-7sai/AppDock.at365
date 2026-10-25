@@ -4,7 +4,6 @@ import { McpClientSettingsForm } from './McpClientSettings';
 import { displayZoomChoices, displayZoomLabel } from '../../shared/display-zoom';
 import { AccentColorPicker } from './AccentColorPicker';
 import { hostSettingItem } from '../../shared/settings-catalog';
-import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import React from 'react';
 import type { Settings } from '../../shared/contracts';
@@ -191,6 +190,8 @@ export function SettingsForm({
       >
         {category === 'command-triggers' && (
           <CommandTriggersEditor
+            provider={aux.provider}
+            clearProvider={() => void invoke('clearProvider')}
             settings={settings}
             onChange={edit}
             commands={commands}
@@ -204,26 +205,12 @@ export function SettingsForm({
             touchpad={
               category === 'touchpad-gestures' ? { snapshot: aux.touchpad, invoke } : undefined
             }
-            provider={aux.provider}
-            clearProvider={() => void invoke('clearProvider')}
             settings={settings}
             onChange={edit}
-            commands={commands}
-            applets={extensions}
           />
         )}
         {category === 'shortcuts' && (
-          <ShortcutsEditor
-            owned={aux.touchpadShortcuts}
-            provider={aux.provider}
-            clearProvider={() => void invoke('clearProvider')}
-            key={category}
-            commands={commands}
-            settings={settings}
-            onChange={edit}
-            applets={shortcutPageChoices(extensions)}
-            statuses={globalHotKeys}
-          />
+          <ShortcutsEditor key={category} settings={settings} onChange={edit} />
         )}
         {category === 'appearance' && (
           <>

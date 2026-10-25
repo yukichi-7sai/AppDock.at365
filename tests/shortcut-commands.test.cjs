@@ -30,6 +30,8 @@ function fixture(t) {
   );
   const permissions = { write: true, execute: true, shortcuts: true };
   const options = {
+    gesturesEditable: () => true,
+    touchpadGesturesEditable: () => true,
     settings,
     save: (v, r) => settings.save(v, r),
     writable: () => permissions.write,
@@ -83,7 +85,10 @@ function fixture(t) {
 
 test('execution mode configuration is atomic, revisioned, private-field preserving and dry-run aware', async (t) => {
   const f = fixture(t);
-  assert.deepEqual(f.get().options, defaultKeybindingOptions());
+  assert.deepEqual(f.get().options, {
+    ...defaultKeybindingOptions(),
+    ...require('../out/main/shared/command-trigger-options').defaultCommandTriggerOptions(),
+  });
   assert.equal(Object.hasOwn(f.api.call('settings.get').values, 'keybindingOptions'), false);
   assert.equal(Object.hasOwn(f.api.call('settings.getSchema').fields, 'keybindingOptions'), false);
   await assert.rejects(
@@ -165,7 +170,8 @@ test('external shortcut scopes and browser options are atomic, normalized and us
     ...source.when,
     processes: ['notepad'],
   });
-  assert.equal(f.settings.value.gestures.requireChromiumWindowClass, false);
+  assert.equal(f.settings.value.gestures.requireChromiumWindowClass, undefined);
+  assert.equal(f.settings.value.commandTriggerOptions.requireChromiumWindowClass, true);
   const before = fs.readFileSync(f.settings.file, 'utf8');
   await assert.rejects(
     f.edit([

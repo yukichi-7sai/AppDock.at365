@@ -20,6 +20,7 @@ const descriptions: Record<string, HostTextKey> = {
   tray: 'settings.settingsPageLayout.tray',
   shortcuts: 'settings.settingsPageLayout.shortcuts',
   gestures: 'settings.settingsPageLayout.gestures',
+  'touchpad-gestures': 'settings.settingsPageLayout.touchpad',
   'custom-commands': 'settings.settingsPageLayout.customCommands',
   ai: 'settings.settingsPageLayout.ai',
   'mcp-client': 'settings.settingsPageLayout.mcpClient',
@@ -136,7 +137,7 @@ export function SettingsPageLayout({
                 )}
                 {page.json && storage && storage.files.length > 1 ? (
                   <details className="settings-file-menu">
-                    <summary>{t('settings.openFile')}</summary>
+                    <summary className="settings-file-button">{t('settings.openFile')}</summary>
                     <div>
                       {storage.files.map((file) => (
                         <button

@@ -104,16 +104,20 @@ export function CommandTriggersEditor({
   commands,
   applets,
   statuses,
+  provider,
+  clearProvider,
 }: {
   settings: Settings;
   onChange(settings: Settings): void;
   commands: UiCommand[];
   applets: ExtensionSnapshot[];
   statuses: GlobalHotKeyStatus[];
+  provider?: { id: string; title: string; request: number };
+  clearProvider?(): void;
 }) {
   const { t } = useHostTranslation();
   const controls = useSettingsControls();
-  const filters = useBindingCommandFilter();
+  const filters = useBindingCommandFilter(provider, clearProvider);
   const [kinds, setKinds] = useState<readonly CommandTriggerKind[]>(commandTriggerKinds);
   const [error, setError] = useState('');
   const lastStatuses = useRef(statuses);

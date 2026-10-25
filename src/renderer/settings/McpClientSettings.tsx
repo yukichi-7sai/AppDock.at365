@@ -126,6 +126,7 @@ export function McpClientSettingsForm({
         <SettingsListTable
           addInTitle
           orderInTitle
+          actionsAlign="start"
           definition={definition}
           maxItems={32}
           busy={busy || pending || !auxiliary || !!auxiliary.error}

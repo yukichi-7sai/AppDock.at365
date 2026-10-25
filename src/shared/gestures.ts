@@ -5,6 +5,7 @@ import { keybindingConditionLabel } from './keybindings';
 import { matchesWhen, type ShortcutContext, type ShortcutScope } from './keybindings';
 import { validShortcutTarget } from './shortcut-pages';
 import type { Settings } from './contracts';
+import { getCommandTriggerOptions, type CommandTriggerOptions } from './command-trigger-options';
 import {
   commandCondition,
   defaultConditionEnvironment,
@@ -55,9 +56,7 @@ export interface GestureBinding {
 export interface GestureSettings {
   enabled: boolean;
   activateOnStart: boolean;
-  browsers: string[];
   excludedProcesses: string[];
-  requireChromiumWindowClass: boolean;
   distance: number;
   wheelDelayMs: number;
   executionMode: 'all' | 'first';
@@ -150,7 +149,6 @@ export function defaultGestures(): GestureSettings {
   return {
     enabled: true,
     activateOnStart: false,
-    ...defaultConditionEnvironment(),
     excludedProcesses: [],
     distance: 50,
     wheelDelayMs: 0,
@@ -178,7 +176,6 @@ export function parseGestures(value: unknown): GestureSettings {
   if (
     typeof v.enabled !== 'boolean' ||
     (v.activateOnStart !== undefined && typeof v.activateOnStart !== 'boolean') ||
-    typeof v.requireChromiumWindowClass !== 'boolean' ||
     !Number.isInteger(v.distance) ||
     v.distance < 5 ||
     v.distance > 500 ||
@@ -198,16 +195,23 @@ export function parseGestures(value: unknown): GestureSettings {
   )
     throw Error(hostText('settings.gestures.options'));
   const bindings = parseGestureBindings(v.bindings);
+  const {
+    browsers: _browsers,
+    requireChromiumWindowClass: _chromium,
+    ...current
+  } = v as GestureSettings & Partial<CommandTriggerOptions>;
   return {
-    ...v,
+    ...current,
     activateOnStart: v.activateOnStart ?? false,
     indicatorShowNoAction: v.indicatorShowNoAction ?? true,
     indicatorStyle: v.indicatorStyle ?? 'compact',
     executionMode: v.executionMode ?? 'all',
-    browsers: processNames(v.browsers),
     excludedProcesses: processNames(v.excludedProcesses),
     bindings,
   };
+}
+export function getGestureSettings(settings: Pick<Settings, 'gestures' | 'commandTriggerOptions'>) {
+  return { ...(settings.gestures ?? defaultGestures()), ...getCommandTriggerOptions(settings) };
 }
 export interface GestureContext extends ShortcutContext {
   window: string;
@@ -267,7 +271,7 @@ export function nativeGestureRows(
   });
 }
 export function planGestureCommands(
-  settings: GestureSettings,
+  settings: GestureSettings & Partial<CommandTriggerOptions>,
   gesture: string,
   context: GestureContext,
   target: CommandTarget,
@@ -288,8 +292,8 @@ export function planGestureCommands(
     commands,
     settings.executionMode,
     {
-      browsers: settings.browsers,
-      requireChromiumWindowClass: settings.requireChromiumWindowClass,
+      browsers: settings.browsers ?? defaultConditionEnvironment().browsers,
+      requireChromiumWindowClass: settings.requireChromiumWindowClass ?? false,
     },
   );
 }

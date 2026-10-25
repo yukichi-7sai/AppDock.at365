@@ -11,22 +11,6 @@ export const commandSettingsPages = [
     title: hostText('settings.commandTriggers.title'),
     icon: 'bolt',
   },
-  {
-    id: 'shortcuts',
-    title: hostText('settings.commandSettingsNavigation.shortcuts'),
-    icon: 'keyboard',
-  },
-  { id: 'gestures', title: hostText('settings.commandSettingsNavigation.gestures'), icon: 'mouse' },
-  {
-    id: 'touchpad-gestures',
-    title: hostText('settings.commandSettingsNavigation.touchpad'),
-    icon: 'touchpad',
-  },
-  {
-    id: 'custom-commands',
-    title: hostText('settings.commandSettingsNavigation.customCommands'),
-    icon: 'keyboard-command-key',
-  },
 ] as const satisfies { id: string; title: string; icon: IconName }[];
 export type CommandSettingsPage = (typeof commandSettingsPages)[number]['id'];
 export type CommandSettingsTarget = {
@@ -74,16 +58,9 @@ export function CommandSettingsLinks({
       aria-label={translate('settings.commandSettingsNavigation.target', { title: command.title })}
     >
       {commandSettingsPages
-        .filter(
-          (page) =>
-            page.id !== navigation.page &&
-            (page.id !== 'custom-commands' || !!command.customDefinitionId),
-        )
+        .filter((page) => page.id !== navigation.page)
         .map((page) => {
-          const assigned =
-            page.id === 'command-triggers'
-              ? Object.values(navigation.assignments).some((ids) => ids.has(command.id))
-              : page.id !== 'custom-commands' && navigation.assignments[page.id].has(command.id);
+          const assigned = Object.values(navigation.assignments).some((ids) => ids.has(command.id));
           return (
             <button
               key={page.id}

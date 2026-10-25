@@ -2,6 +2,7 @@ import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Settings } from '../../shared/contracts';
+import { getCommandTriggerOptions } from '../../shared/command-trigger-options';
 import {
   connectionKey,
   defaultTouchpadGestures,
@@ -90,7 +91,11 @@ export class TouchpadBridgeManager {
     this.setResting();
   }
   private value() {
-    return this.options.settings().touchpadGestures ?? defaultTouchpadGestures();
+    const settings = this.options.settings();
+    return {
+      ...(settings.touchpadGestures ?? defaultTouchpadGestures()),
+      ...getCommandTriggerOptions(settings),
+    };
   }
   snapshot(): TouchpadSnapshot {
     return {

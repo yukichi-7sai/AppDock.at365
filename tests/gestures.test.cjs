@@ -494,7 +494,6 @@ test('gesture validation rejects right-click, malformed scopes, paths and invali
     { indicatorOpacity: 0 },
     { executionMode: 'unknown' },
     { executionMode: null },
-    { browsers: ['C:\\bad.exe'] },
     { bindings: [row('same'), row('same')] },
     { bindings: [{ ...row('r'), gesture: 'click-right' }] },
     { bindings: [row('r', 'exe')] },

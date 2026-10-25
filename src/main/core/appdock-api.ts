@@ -481,6 +481,29 @@ export class AppDockApi {
         'SHORTCUT_EDITING_DISABLED',
         hostText('services.appdockApi.shortcutPermission'),
       );
+    const editsCommonBrowsers =
+      ['shortcuts.write', 'gestures.write', 'touchpadGestures.write'].includes(
+        command.permission ?? '',
+      ) &&
+      object(args) &&
+      Array.isArray(args.operations) &&
+      args.operations.some(
+        (operation) =>
+          object(operation) &&
+          operation.kind === 'configure' &&
+          object(operation.changes) &&
+          ['browsers', 'requireChromiumWindowClass'].some((key) =>
+            Object.hasOwn(operation.changes as object, key),
+          ),
+      );
+    if (
+      editsCommonBrowsers &&
+      (!permissions.editShortcuts || !permissions.editGestures || !permissions.editTouchpadGestures)
+    )
+      throw new AutomationError(
+        'COMMON_GESTURE_EDITING_DISABLED',
+        hostText('services.appdockApi.commonGesturePermission'),
+      );
     if (command.permission === 'applets.manage' && !permissions.manageApplets)
       throw new AutomationError(
         'APPLET_MANAGEMENT_DISABLED',

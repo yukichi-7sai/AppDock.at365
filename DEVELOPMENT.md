@@ -12,26 +12,26 @@
 
 ## 文書の入口
 
-| 対象 | 正本 |
-| --- | --- |
-| 操作・設定と動作環境 | [機能・操作・設定](docs/usage.md) |
-| 開発・コミット・配布 | [共通手順](docs/development-workflow.md)、[ローカル発行](docs/publishing.md)、[GitHub Release](docs/RELEASING.md)、[全体ZIP](docs/all-in-one.md) |
-| コマンドの入力割り当て | [コマンドトリガー](docs/command-triggers.md) |
-| Appletの開発とAPI | [実装ガイド](docs/applet-development.md)、[Applet API](docs/extensions.md)、[ホスト拡張](docs/host-development.md)、[ページ](docs/applet-pages.md) |
-| 設定・入力・保存 | [共通レイアウト指針](docs/settings-ui-guidelines.md)、[設定UIと既定値・リセット](docs/settings-foundation.md)、[一覧とダイアログ](docs/settings-list-editing.md)、[端末別保存・同期・復旧](docs/settings-sync.md) |
-| 表示言語・翻訳 | [本体の翻訳基盤・文言変更・段階移行](docs/localization.md) |
-| 表示倍率 | [Electron画面の共通倍率・対象・画面追加規則](docs/display-zoom.md) |
-| Appletの導入と管理 | [管理一覧・導入・更新・削除](docs/applet-management-settings-design.md) |
-| Webとアカウント | [WebApplet](docs/web-applets.md)、[Webアカウントとグループ](docs/web-accounts.md) |
-| MCP・外部操作 | [共通操作API](docs/appdock-api.md)、[Codex登録・ネットワーク・許可](docs/automation.md)、[MCPクライアント](docs/mcp-client-design.md)、[MCPハブ](docs/mcp-hub-design.md)、[通知イベント](docs/mcp-events-design.md) |
-| カスタムコマンド | [保存・種類・キー送信・プロセス起動・MCP実行](docs/custom-commands-design.md) |
-| AIと音声 | [AI文章生成](docs/ai.md)、[TTS](docs/tts-design.md)、[共通音声再生](docs/audio-playback.md) |
-| 通知とエラー | [通知基盤](docs/notifications.md)、[通知読み上げ](docs/notification-speech-design.md)、[共通エラー](docs/error-reporting.md)、[共通警告](docs/warning-notifications-design.md) |
-| キー・マウス・タッチパッド・トレイ | [ショートカットと入力フック](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[タッチパッド](docs/touchpad-gestures-design.md)、[トレイ](docs/tray-menu.md) |
-| Shellとリボン | [領域と割り当て](docs/shell-foundation.md)、[リボンの配置とバッジ](docs/ribbon-customization-design.md)、[Shell API](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本体のページ](docs/host-pages.md)、[バー](docs/shell-bars.md) |
-| 画像と配色 | [登録画像](docs/registered-images.md)、[共通ギャラリー](docs/image-gallery.md)、[共通配色](docs/appearance.md) |
-| 起動と更新 | [Windows起動設定](docs/launch-settings.md)、[更新](docs/updates.md)、[配布先の検証](docs/update-checklist.md) |
-| 文書と実測 | [文書方針](docs/documentation.md)、[検証記録](VERIFICATION.md) |
+| 対象                               | 正本                                                                                                                                                                                                                                                |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 操作・設定と動作環境               | [機能・操作・設定](docs/usage.md)                                                                                                                                                                                                                   |
+| 開発・コミット・配布               | [共通手順](docs/development-workflow.md)、[ローカル発行](docs/publishing.md)、[GitHub Release](docs/RELEASING.md)、[全体ZIP](docs/all-in-one.md)                                                                                                    |
+| コマンドの入力割り当て             | [コマンドトリガー](docs/command-triggers.md)                                                                                                                                                                                                        |
+| Appletの開発とAPI                  | [実装ガイド](docs/applet-development.md)、[Applet API](docs/extensions.md)、[ホスト拡張](docs/host-development.md)、[ページ](docs/applet-pages.md)                                                                                                  |
+| 設定・入力・保存                   | [共通レイアウト指針](docs/settings-ui-guidelines.md)、[設定UIと既定値・リセット](docs/settings-foundation.md)、[一覧とダイアログ](docs/settings-list-editing.md)、[端末別保存・同期・復旧](docs/settings-sync.md)                                   |
+| 表示言語・翻訳                     | [本体の翻訳基盤・文言変更・段階移行](docs/localization.md)                                                                                                                                                                                          |
+| 表示倍率                           | [Electron画面の共通倍率・対象・画面追加規則](docs/display-zoom.md)                                                                                                                                                                                  |
+| Appletの導入と管理                 | [管理一覧・導入・更新・削除](docs/applet-management-settings-design.md)                                                                                                                                                                             |
+| Webとアカウント                    | [WebApplet](docs/web-applets.md)、[Webアカウントとグループ](docs/web-accounts.md)                                                                                                                                                                   |
+| MCP・外部操作                      | [共通操作API](docs/appdock-api.md)、[Codex登録・ネットワーク・許可](docs/automation.md)、[MCPクライアント](docs/mcp-client-design.md)、[MCPハブ](docs/mcp-hub-design.md)、[通知イベント](docs/mcp-events-design.md)                                 |
+| カスタムコマンド                   | [保存・種類・キー送信・プロセス起動・MCP実行](docs/custom-commands-design.md)                                                                                                                                                                       |
+| AIと音声                           | [AI文章生成](docs/ai.md)、[TTS](docs/tts-design.md)、[共通音声再生](docs/audio-playback.md)                                                                                                                                                         |
+| 通知とエラー                       | [通知基盤](docs/notifications.md)、[通知読み上げ](docs/notification-speech-design.md)、[共通エラー](docs/error-reporting.md)、[共通警告](docs/warning-notifications-design.md)                                                                      |
+| キー・マウス・タッチパッド・トレイ | [ショートカットと入力フック](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[タッチパッド](docs/touchpad-gestures-design.md)、[トレイ](docs/tray-menu.md)                                                                                  |
+| Shellとリボン                      | [領域と割り当て](docs/shell-foundation.md)、[リボンの配置とバッジ](docs/ribbon-customization-design.md)、[Shell API](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本体のページ](docs/host-pages.md)、[バー](docs/shell-bars.md) |
+| 画像と配色                         | [登録画像](docs/registered-images.md)、[共通ギャラリー](docs/image-gallery.md)、[共通配色](docs/appearance.md)                                                                                                                                      |
+| 起動と更新                         | [Windows起動設定](docs/launch-settings.md)、[更新](docs/updates.md)、[配布先の検証](docs/update-checklist.md)                                                                                                                                       |
+| 文書と実測                         | [文書方針](docs/documentation.md)、[検証記録](VERIFICATION.md)                                                                                                                                                                                      |
 
 本体はTypeScript/Reactで構成し、Nodeと.NET Appletは別プロセスで動作する。画像ライブラリー・通知センター・ログ・設定の描画は本体rendererと共通UI部品、Shell領域の描画は選択したShell、native画面は対象Appletが所有する。起動・復元・戻り先は[本体ページ](docs/host-pages.md#起動と戻り先)を参照する。
 

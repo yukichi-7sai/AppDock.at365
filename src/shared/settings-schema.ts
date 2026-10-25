@@ -16,6 +16,10 @@ import {
 import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
 import { parseGestures, defaultGestures } from './gestures';
 import { defaultTouchpadGestures, parseTouchpadGestures } from './touchpad-gestures';
+import {
+  defaultCommandTriggerOptions,
+  parseCommandTriggerOptions,
+} from './command-trigger-options';
 import type { Settings } from './contracts';
 import { parseImageLibrary } from './registered-images';
 import { validateUpdateSource } from './update-sources';
@@ -36,6 +40,7 @@ export const createDefaultSettings = (): Settings => ({
   touchpadGestures: defaultTouchpadGestures(),
   gestures: defaultGestures(),
   keybindingOptions: defaultKeybindingOptions(),
+  commandTriggerOptions: defaultCommandTriggerOptions(),
   gestureDefaultsInitialized: [],
   schemaVersion: 1,
   host: {
@@ -272,6 +277,7 @@ export function parseSettings(value: unknown): Settings {
     touchpadGestures: parseTouchpadGestures(value.touchpadGestures),
     gestures: value.gestures === undefined ? defaultGestures() : parseGestures(value.gestures),
     keybindingOptions: parseKeybindingOptions(value.keybindingOptions),
+    commandTriggerOptions: parseCommandTriggerOptions(value.commandTriggerOptions),
     gestureDefaultsInitialized: parseGestureInitialized(value.gestureDefaultsInitialized),
     ...(keybindings ? { keybindings } : {}),
     ...(value.keybindingDefaultsInitialized === undefined ? {} : { keybindingDefaultsInitialized }),

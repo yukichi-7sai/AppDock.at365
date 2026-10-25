@@ -371,7 +371,8 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_shortcuts',
     description:
-      'ショートカットキーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktopに対応します。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesはexecutionMode（first/all、既定all）・browsers（exe名の配列）・requireChromiumWindowClass（boolean）です。判定対象は押下時の前面ウィンドウです。設定変更・コマンド実行・ショートカット編集の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。',
+      'キージェスチャーの割当・条件・実行順・動作設定options・revision・割当可能な公開コマンド・入力フックの適用状態を取得します。条件はglobal/desktop/app/pages/owner/applets/browser/exe。exeはwhen.processes、global/exeはwhen.excludeDesktopに対応します。元入力のblockOriginalInputは外部条件に一致した行で適用し、省略時trueです。変更はappdock.shortcuts.updateへoperations/expectedRevision/任意dryRunを渡してください。configureのchangesはexecutionMode（first/all、既定all）・browsers（exe名の配列）・requireChromiumWindowClass（boolean）です。判定対象は押下時の前面ウィンドウです。設定変更・コマンド実行・キージェスチャー編集の許可が必要です。条件を満たすコマンドを動作設定に従って登録順に選びます。入力適用は非同期なので保存後に再取得してください。' +
+      hostText('settings.commandTriggerOptions.apiHint'),
     inputSchema: {
       type: 'object',
       properties: {},
@@ -389,7 +390,8 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_touchpad_gestures',
     description:
-      'タッチパッドの割り当て・接続用キー・Windowsとの接続状態・revisionを取得します。updateはAppDock設定だけを保存します。Windowsの変更にはset-enabledまたはreconnectを明示的に実行します。',
+      'タッチパッドの割り当て・接続用キー・Windowsとの接続状態・revisionを取得します。updateはAppDock設定だけを保存します。Windowsの変更にはset-enabledまたはreconnectを明示的に実行します。' +
+      hostText('settings.commandTriggerOptions.apiHint'),
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: {
       readOnlyHint: true,
@@ -403,7 +405,8 @@ export const appDockOperations = {
     permissions: ['read'],
     name: 'appdock_get_gestures',
     description:
-      'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。設定変更・コマンド実行・ジェスチャー編集の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。',
+      'マウスジェスチャーの割当・条件・実行順・動作設定・revision・割当可能な公開コマンドを取得します。変更はappdock.gestures.updateへoperations/expectedRevision/任意dryRunを渡します。設定変更・コマンド実行・ジェスチャー編集の許可が必要です。右ボタンを押しながら移動/クリック/ホイール/キーで操作します。保存成功は実入力の成功を保証しません。' +
+      hostText('settings.commandTriggerOptions.apiHint'),
     inputSchema: {
       type: 'object',
       properties: {},

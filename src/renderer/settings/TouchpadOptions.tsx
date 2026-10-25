@@ -1,5 +1,6 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   parseTouchpadGestures,
   touchpadGestureTypes,
@@ -15,7 +16,6 @@ import { SettingsButton } from '../settings-ui/SettingsButton';
 import { Toggle } from '../settings-ui/Toggle';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
-import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
 
 export interface TouchpadEditorStatus {
   snapshot?: TouchpadSnapshot;
@@ -26,9 +26,11 @@ export function TouchpadOptions({
   change,
   snapshot,
   invoke,
+  commonSettings,
 }: TouchpadEditorStatus & {
   value: TouchpadGestureSettings;
   change(patch: Partial<TouchpadGestureSettings>): void;
+  commonSettings: ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
   const [errors, setErrors] = useState<Partial<Record<TouchpadGestureId, string>>>({});
@@ -62,24 +64,16 @@ export function TouchpadOptions({
             onChange={(enabled) => change({ enabled })}
           />
         </SettingsField>
-      </SettingsSection>
-      <SettingsSection
-        title={translate('settings.touchpadOptions.behavior')}
-        data-testid="touchpad-options"
-        collapsible
-        {...settingAnchor('touchpad-gestures', 'options')}
-      >
         <CommandExecutionModeField
           pageId="touchpad-gestures"
           value={value.executionMode}
           onChange={(executionMode) => change({ executionMode })}
         />
-        <InputBrowserOptions pageId="touchpad-gestures" value={value} onChange={change} />
       </SettingsSection>
+      {commonSettings}
       <SettingsSection
         title={translate('settings.touchpadOptions.connection')}
         data-testid="touchpad-connection"
-        collapsible
         description={`${translate('settings.touchpadOptions.connectionHint')} ${translate('settings.touchpadOptions.keysHint')}`}
         {...settingAnchor('touchpad-gestures', 'connections')}
       >

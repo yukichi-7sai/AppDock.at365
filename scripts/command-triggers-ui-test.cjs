@@ -33,8 +33,33 @@ fs.writeFileSync(
   "exports.activate = async c => { for (const name of ['one', 'two', 'new', 'long', 'tail']) c.commands.register('fixture.triggers.' + name, 'Trigger ' + name, async () => {}); };",
 );
 const initial = createDefaultSettings();
+const featureSettingsOnly = process.argv.includes('--feature-settings-only');
+const source = process.argv.slice(2).find((argument) => !argument.startsWith('--'));
 initial.host.hardwareAcceleration = false;
 initial.extensions['fixture.triggers'] = { enabled: true, settings: {} };
+if (featureSettingsOnly) {
+  delete initial.commandTriggerOptions;
+  initial.customCommands = {
+    version: 2,
+    items: [
+      {
+        id: '27b98202-1867-4ae4-b6c3-4c310ce05f10',
+        title: 'Trigger custom',
+        description: '',
+        typeId: 'fixture.unavailable',
+        owner: { kind: 'host' },
+        configVersion: 1,
+        config: {},
+        enabled: false,
+        automation: false,
+      },
+    ],
+  };
+  for (const key of ['keybindingOptions', 'gestures', 'touchpadGestures']) {
+    initial[key].browsers = ['legacy-browser'];
+    initial[key].requireChromiumWindowClass = true;
+  }
+}
 const common = {
   id: 'same-id',
   command: 'fixture.triggers.one',
@@ -70,10 +95,10 @@ initial.touchpadGestures.bindings = [
 ];
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : null;
+const portable = source ? path.join(profile, 'AppDock.at365.exe') : null;
 if (portable) {
-  fs.copyFileSync(path.resolve(process.argv[2]), portable);
-  assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
+  fs.copyFileSync(path.resolve(source), portable);
+  assert.equal(hash(portable), hash(path.resolve(source)));
 }
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -131,6 +156,24 @@ async function launch() {
   };
 }
 const checks = [];
+const recordSuccess = () => {
+  fs.writeFileSync(
+    path.join(profile, 'result.json'),
+    JSON.stringify(
+      {
+        success: true,
+        checks,
+        featureSettingsOnly,
+        source: source ? path.resolve(source) : 'development build',
+        sha256: portable ? hash(portable) : null,
+        limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(JSON.stringify({ success: true, checks: checks.length, profile }));
+};
 (async () => {
   let app;
   try {
@@ -154,6 +197,24 @@ const checks = [];
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (featureSettingsOnly) {
+      await require('./gesture-settings-checks.cjs')({ host, open, save, saved, checks, profile });
+      const durable = (await saved()).commandTriggerOptions;
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      await open('shortcuts');
+      assert.deepEqual((await saved()).commandTriggerOptions, durable);
+      assert.equal(
+        await host.getByRole('textbox', { name: 'Webブラウザのexe', exact: true }).inputValue(),
+        durable.browsers.join(', '),
+      );
+      assert.deepEqual(errors, []);
+      checks.push('common browser settings persist after an actual restart');
+      recordSuccess();
+      return;
+    }
     await open();
     assert.equal(await command('fixture.triggers.one').locator('[data-binding-id]').count(), 4);
     assert.equal(
@@ -237,7 +298,7 @@ const checks = [];
       assert.equal(await host.getByTestId('command-trigger-add-kind').count(), 0);
       if (kind === 'shortcuts')
         await dialog()
-          .getByRole('button', { name: 'ショートカットキーを入力', exact: true })
+          .getByRole('button', { name: 'キージェスチャーを入力', exact: true })
           .press('Control+F9');
       await dialog().getByRole('button', { name: '追加', exact: true }).click();
       await save();
@@ -294,24 +355,22 @@ const checks = [];
       ['second-key', 'same-id'],
     );
     checks.push('same-input order dialog includes all commands and saves source order');
-    await open('shortcuts');
-    assert.equal(
-      await host.locator('[data-binding-id="same-id"]').getByText('無効', { exact: true }).count(),
-      1,
-    );
-    await host.locator('[data-binding-id="same-id"]').locator('.applet-shortcut-edit').click();
+    await row('shortcuts', 'same-id').locator('.applet-shortcut-edit').click();
     await dialog().getByRole('switch', { name: 'この割り当てを有効にする' }).click();
     await dialog().getByRole('button', { name: '適用', exact: true }).click();
     await save();
     await open();
     assert.equal(await row('shortcuts', 'same-id').getByText('無効', { exact: true }).count(), 0);
-    checks.push('existing page edits immediately visible in the new page');
+    checks.push('key binding edits remain in the combined list');
     assert.equal(await host.locator('.command-triggers-editor .command-settings-cell').count(), 0);
-    await open('touchpad-gestures');
-    await host.getByTestId('command-settings:fixture.triggers.one:command-triggers').click();
-    await host.getByTestId('settings-page:command-triggers').waitFor();
-    assert.equal(await host.locator('.command-triggers-editor [data-shortcut-command]').count(), 1);
-    checks.push('old list can target a command in the new list / new list omits navigation column');
+    for (const page of ['shortcuts', 'gestures', 'touchpad-gestures']) {
+      await open(page);
+      assert.equal(await host.locator('[data-shortcut-command]').count(), 0);
+    }
+    await open();
+    checks.push(
+      'feature pages contain settings only; combined list omits its own navigation column',
+    );
     const durable = await saved();
     await host.screenshot({ path: path.join(profile, 'command-triggers.png') });
     assert.deepEqual(errors, []);
@@ -324,23 +383,7 @@ const checks = [];
     assert.deepEqual((await saved()).gestures.bindings, durable.gestures.bindings);
     assert.deepEqual((await saved()).touchpadGestures.bindings, durable.touchpadGestures.bindings);
     checks.push('all three stores survive an actual restart');
-    fs.writeFileSync(
-      path.join(profile, 'result.json'),
-      JSON.stringify(
-        {
-          success: true,
-          checks,
-          source: portable ? path.resolve(process.argv[2]) : 'development build',
-          sha256: portable ? hash(portable) : null,
-          limitations: [
-            'UI and durable settings only; no physical input or Windows touchpad writes',
-          ],
-        },
-        null,
-        2,
-      ),
-    );
-    console.log(JSON.stringify({ success: true, checks: checks.length, profile }));
+    recordSuccess();
   } catch (error) {
     fs.writeFileSync(
       path.join(profile, 'result.json'),

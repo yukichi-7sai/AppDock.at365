@@ -283,7 +283,7 @@ export function AppletManagementSettings({
                 />
                 <button
                   type="button"
-                  className="settings-list-icon shortcut-order-open"
+                  className="settings-list-icon"
                   aria-label={translate('settings.appletManagementSettings.order')}
                   title={translate('settings.appletManagementSettings.displayOrder')}
                   disabled={busy || applets.length < 2}
@@ -435,22 +435,15 @@ export function AppletManagementSettings({
                           translate('settings.appletManagementSettings.settings'),
                           'settings',
                         ],
-                        [
-                          'shortcuts',
-                          translate('settings.appletManagementSettings.shortcuts'),
-                          'keyboard',
-                        ],
-                        [
-                          'gestures',
-                          translate('settings.appletManagementSettings.gestures'),
-                          'mouse',
-                        ],
                         ['logs', translate('settings.appletManagementSettings.logs'), 'logs'],
+                        ['command-triggers', translate('settings.commandTriggers.title'), 'bolt'],
                       ] satisfies [string, string, IconName][]
                     ).map(([id, title, icon]) => {
                       const assigned =
-                        (id === 'shortcuts' || id === 'gestures') &&
-                        !!management?.assignments[id].includes(a.id);
+                        id === 'command-triggers' &&
+                        !!Object.values(management?.assignments ?? {}).some((owners) =>
+                          owners.includes(a.id),
+                        );
                       return (
                         <button
                           key={id}

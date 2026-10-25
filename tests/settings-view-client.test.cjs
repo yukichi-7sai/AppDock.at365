@@ -36,13 +36,6 @@ const { mergeSettingsInput } = require(path.join(output, 'compiled/shared/settin
 const { settingsCatalog, settingsProjection } = require(
   path.join(output, 'compiled/shared/settings-catalog.js'),
 );
-const row = {
-  id: 'test-row',
-  command: 'appdock.open',
-  gesture: 'three.tap',
-  enabled: true,
-  when: { scope: 'global', appletIds: [], processes: [] },
-};
 function fixture(pageId = 'touchpad-gestures') {
   const settings = createDefaultSettings();
   const page = settingsCatalog([], settings).find((item) => item.id === pageId);
@@ -140,41 +133,53 @@ function fixture(pageId = 'touchpad-gestures') {
     },
   };
 }
-test('failed touchpad form restores saved values and later key edit does not save rejected row', async () => {
+test('failed touchpad form resets rejected modifiers before a later key edit', async () => {
   const f = fixture();
   f.edit((s) => {
-    s.touchpadGestures.bindings = [row];
+    s.touchpadGestures.connections['three.tap'].modifiers = ['Ctrl'];
   });
   await f.client.flush();
-  assert.deepEqual(f.displayed.content.values.touchpadGestures.bindings, []);
+  assert.deepEqual(
+    f.displayed.content.values.touchpadGestures.connections['three.tap'].modifiers,
+    [],
+  );
   assert.match(f.error, /key conflict/);
   f.behavior(async (op) => f.save(op));
   f.edit((s) => {
     s.touchpadGestures.connections['three.tap'].key = 'F24';
   });
   await f.client.flush();
-  assert.deepEqual(f.displayed.content.values.touchpadGestures.bindings, []);
+  assert.deepEqual(
+    f.displayed.content.values.touchpadGestures.connections['three.tap'].modifiers,
+    [],
+  );
   assert.equal(f.displayed.content.values.touchpadGestures.connections['three.tap'].key, 'F24');
 });
 test('queued forms based on rejected input are discarded; fresh input can save', async () => {
   const f = fixture();
   f.edit((s) => {
-    s.touchpadGestures.bindings = [row];
+    s.touchpadGestures.connections['three.tap'].modifiers = ['Ctrl'];
   });
   f.edit((s) => {
     s.touchpadGestures.connections['three.tap'].key = 'F24';
   });
   await f.client.flush();
   assert.equal(f.calls, 1);
-  assert.deepEqual(f.displayed.content.values.touchpadGestures.bindings, []);
+  assert.deepEqual(
+    f.displayed.content.values.touchpadGestures.connections['three.tap'].modifiers,
+    [],
+  );
   assert.equal(f.displayed.content.values.touchpadGestures.connections['three.tap'].key, 'F13');
   f.behavior(async (op) => f.save(op));
   f.edit((s) => {
-    s.touchpadGestures.bindings = [row];
+    s.touchpadGestures.connections['three.tap'].modifiers = ['Ctrl'];
   });
   await f.client.flush();
   assert.equal(f.calls, 2);
-  assert.deepEqual(f.displayed.content.values.touchpadGestures.bindings, [row]);
+  assert.deepEqual(f.displayed.content.values.touchpadGestures.connections['three.tap'].modifiers, [
+    'Ctrl',
+  ]);
+  assert.equal(f.displayed.content.values.touchpadGestures.connections['three.tap'].key, 'F13');
 });
 test('post-save Windows failure displays actual saved values', async () => {
   const f = fixture();
@@ -183,10 +188,12 @@ test('post-save Windows failure displays actual saved values', async () => {
     throw Error('Windows apply failed');
   });
   f.edit((s) => {
-    s.touchpadGestures.bindings = [row];
+    s.touchpadGestures.connections['three.tap'].modifiers = ['Ctrl'];
   });
   await f.client.flush();
-  assert.deepEqual(f.displayed.content.values.touchpadGestures.bindings, [row]);
+  assert.deepEqual(f.displayed.content.values.touchpadGestures.connections['three.tap'].modifiers, [
+    'Ctrl',
+  ]);
   assert.match(f.error, /Windows apply failed/);
 });
 test('other forms and touchpad JSON retain failed input', async () => {

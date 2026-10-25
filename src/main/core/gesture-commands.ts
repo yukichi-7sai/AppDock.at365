@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { isDeepStrictEqual } from 'node:util';
 import {
   defaultTouchpadGestures,
   parseTouchpadGestures,
@@ -8,6 +9,11 @@ import {
   type TouchpadGestureSettings,
 } from '../../shared/touchpad-gestures';
 import type { Settings, SettingsSnapshot } from '../../shared/contracts';
+import {
+  getCommandTriggerOptions,
+  parseCommandTriggerOptions,
+  type CommandTriggerOptions,
+} from '../../shared/command-trigger-options';
 import { validCommandId } from '../../shared/commands';
 import { shortcutScopes } from '../../shared/keybindings';
 import {
@@ -105,15 +111,18 @@ const configurationFields = {
     enum: ['gesture-start', 'window-center', 'monitor-center', 'none'],
   },
 };
-const gestureSettings = (settings: Settings): GestureSettings => {
-  const source = parseGestures(settings.gestures ?? defaultGestures());
+const gestureSettings = (settings: Settings): GestureSettings & CommandTriggerOptions => {
+  const source = {
+    ...parseGestures(settings.gestures ?? defaultGestures()),
+    ...getCommandTriggerOptions(settings),
+  };
   // Retain extra persisted fields on save, but expose only the documented settings.
   return structuredClone({
     ...Object.fromEntries(
-      Object.keys(configurationFields).map((key) => [key, source[key as keyof GestureSettings]]),
+      Object.keys(configurationFields).map((key) => [key, source[key as keyof typeof source]]),
     ),
     bindings: parseRows(source.bindings),
-  }) as GestureSettings;
+  }) as GestureSettings & CommandTriggerOptions;
 };
 const parseRows = (bindings: unknown) => parseGestures({ ...defaultGestures(), bindings }).bindings;
 
@@ -179,7 +188,10 @@ export class GestureCommands {
   }
   private gestureSettings(settings: Settings) {
     return this.options.touchpad
-      ? parseTouchpadGestures(settings.touchpadGestures)
+      ? {
+          ...parseTouchpadGestures(settings.touchpadGestures),
+          ...getCommandTriggerOptions(settings),
+        }
       : gestureSettings(settings);
   }
   commands(): AutomationCommand[] {
@@ -325,6 +337,7 @@ export class GestureCommands {
     this.options.settingsCommands.checkRevision(args.expectedRevision);
     const store = this.options.settings;
     const before = this.gestureSettings(store.value);
+    let commonOptions = getCommandTriggerOptions(store.value);
     let next = structuredClone(before);
     let rows = next.bindings;
     try {
@@ -367,10 +380,12 @@ export class GestureCommands {
           if (
             !exact(op, ['kind', 'changes']) ||
             !exact(op.changes, Object.keys(this.configurationFields)) ||
-            !Object.keys(op.changes).length
+            !Object.keys(op.changes).length ||
+            Object.values(op.changes).some((value) => value === undefined)
           )
             throw invalid();
-          next = this.parse({ ...next, ...op.changes, bindings: rows });
+          commonOptions = parseCommandTriggerOptions({ ...commonOptions, ...op.changes });
+          next = { ...this.parse({ ...next, ...op.changes, bindings: rows }), ...commonOptions };
         } else if (op.kind === 'reorder') {
           if (
             !exact(op, ['kind', 'gesture', 'ids']) ||
@@ -403,21 +418,22 @@ export class GestureCommands {
       if (error instanceof SettingsCommandError) throw error;
       throw invalid();
     }
-    next = this.parse({ ...next, bindings: rows });
+    next = { ...this.parse({ ...next, bindings: rows }), ...commonOptions };
     if (this.options.touchpad)
       validateTouchpadKeyEdit(
         { ...store.value, touchpadGestures: next as TouchpadGestureSettings },
         store.value,
       );
-    const changed = JSON.stringify(before) !== JSON.stringify(next);
+    const changed = !isDeepStrictEqual(before, next);
     if (changed && args.dryRun !== true) {
       try {
         this.options.save(
           {
             ...structuredClone(store.value),
+            commandTriggerOptions: commonOptions,
             [this.options.touchpad ? 'touchpadGestures' : 'gestures']: this.options.touchpad
-              ? next
-              : { ...structuredClone(store.value.gestures), ...next },
+              ? parseTouchpadGestures(next)
+              : parseGestures({ ...structuredClone(store.value.gestures), ...next }),
           },
           store.revision,
         );
