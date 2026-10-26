@@ -59,6 +59,12 @@ const whenSchema = {
       enum: [...shortcutScopes.map((s) => s.id), 'desktop', 'browser', 'exe'],
     },
     excludeDesktop: { type: 'boolean', description: 'global/exe条件でデスクトップだけを除外する' },
+    excludedProcesses: {
+      type: 'array',
+      items: { type: 'string', minLength: 1, maxLength: 120 },
+      maxItems: 100,
+      description: 'global条件のみ。トリガー全体の除外に追加するexe名。',
+    },
     appletIds: { type: 'array', items: shortcutTargetSchema, maxItems: 500, uniqueItems: true },
     processes: {
       type: 'array',
@@ -150,6 +156,7 @@ export class GestureCommands {
     return this.options.touchpad
       ? {
           executionMode: configurationFields.executionMode,
+          excludedProcesses: processesSchema,
           browsers: processesSchema,
           requireChromiumWindowClass: { type: 'boolean' },
           connections: {

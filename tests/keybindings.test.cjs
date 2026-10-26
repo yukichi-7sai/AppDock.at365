@@ -31,6 +31,7 @@ const { defaultCommandTriggerOptions } = require('../out/main/shared/command-tri
 test('shortcut options default to all, validate explicit values and retain local future fields', () => {
   const defaults = {
     executionMode: 'all',
+    excludedProcesses: [],
   };
   assert.deepEqual(defaultKeybindingOptions(), defaults);
   assert.deepEqual(getKeybindingOptions({}), { ...defaults, ...defaultCommandTriggerOptions() });

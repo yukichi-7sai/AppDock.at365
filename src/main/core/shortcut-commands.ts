@@ -56,6 +56,12 @@ const whenSchema = {
       maxItems: 100,
     },
     excludeDesktop: { type: 'boolean' },
+    excludedProcesses: {
+      type: 'array',
+      items: { type: 'string', minLength: 1, maxLength: 120 },
+      maxItems: 100,
+      description: 'global条件のみ。トリガー全体の除外に追加するexe名。',
+    },
   },
   required: ['scope', 'appletIds'],
   additionalProperties: false,
@@ -133,6 +139,10 @@ export class ShortcutCommands {
                       type: 'object',
                       properties: {
                         executionMode: { type: 'string', enum: ['first', 'all'] },
+                        excludedProcesses: {
+                          ...whenSchema.properties.excludedProcesses,
+                          description: 'このトリガーの全割り当てで除外するexe名。',
+                        },
                         browsers: {
                           type: 'array',
                           items: { type: 'string', minLength: 1, maxLength: 120 },
@@ -278,7 +288,12 @@ export class ShortcutCommands {
         } else if (op.kind === 'configure') {
           if (
             !exact(op, ['kind', 'changes']) ||
-            !exact(op.changes, ['executionMode', 'browsers', 'requireChromiumWindowClass']) ||
+            !exact(op.changes, [
+              'executionMode',
+              'excludedProcesses',
+              'browsers',
+              'requireChromiumWindowClass',
+            ]) ||
             !Object.keys(op.changes).length ||
             Object.values(op.changes).some((v) => v === undefined)
           )
@@ -367,6 +382,7 @@ export class ShortcutCommands {
   private publicOptions(options: ReturnType<typeof getKeybindingOptions>) {
     return {
       executionMode: options.executionMode,
+      excludedProcesses: [...options.excludedProcesses],
       browsers: [...options.browsers],
       requireChromiumWindowClass: options.requireChromiumWindowClass,
     };

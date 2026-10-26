@@ -16,6 +16,7 @@ import { SettingsButton } from '../settings-ui/SettingsButton';
 import { Toggle } from '../settings-ui/Toggle';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
+import { TriggerExcludedProcessesField } from '../settings-ui/TriggerExcludedProcessesField';
 
 export interface TouchpadEditorStatus {
   snapshot?: TouchpadSnapshot;
@@ -68,6 +69,11 @@ export function TouchpadOptions({
           pageId="touchpad-gestures"
           value={value.executionMode}
           onChange={(executionMode) => change({ executionMode })}
+        />
+        <TriggerExcludedProcessesField
+          pageId="touchpad-gestures"
+          values={value.excludedProcesses ?? []}
+          onChange={(excludedProcesses) => change({ excludedProcesses })}
         />
       </SettingsSection>
       {commonSettings}

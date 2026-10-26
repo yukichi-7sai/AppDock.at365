@@ -1,6 +1,49 @@
 {
   "conditions": [
     {
+      "name": "binding process exclusion ignores case and exe suffix",
+      "when": { "scope": "global", "excludedProcesses": ["NOTEpad.EXE"] },
+      "context": { "host": {}, "target": { "window": "1", "processName": "notepad" } },
+      "expected": false
+    },
+    {
+      "name": "trigger exclusions remain active with binding exclusions",
+      "when": { "scope": "global", "excludedProcesses": ["editor"] },
+      "environment": { "excludedProcesses": ["notepad"] },
+      "context": { "host": {}, "target": { "window": "1", "processName": "NOTEPAD.EXE" } },
+      "expected": false
+    },
+    {
+      "name": "binding exclusions add to trigger exclusions",
+      "when": { "scope": "global", "excludedProcesses": ["editor"] },
+      "environment": { "excludedProcesses": ["notepad"] },
+      "context": { "host": {}, "target": { "window": "1", "processName": "editor.exe" } },
+      "expected": false
+    },
+    {
+      "name": "unlisted process allowed with both exclusions",
+      "when": { "scope": "global", "excludedProcesses": ["editor"] },
+      "environment": { "excludedProcesses": ["notepad"] },
+      "context": { "host": {}, "target": { "window": "1", "processName": "browser" } },
+      "expected": true
+    },
+    {
+      "name": "exclusion requires known process",
+      "when": { "scope": "global", "excludedProcesses": ["editor"] },
+      "context": { "host": {}, "target": { "window": "1" } },
+      "expected": false
+    },
+    {
+      "name": "trigger exclusion applies to local bindings too",
+      "when": { "scope": "app" },
+      "environment": { "excludedProcesses": ["appdock.at365"] },
+      "context": {
+        "host": { "focused": true },
+        "target": { "window": "1", "processName": "AppDock.at365.exe" }
+      },
+      "expected": false
+    },
+    {
       "name": "global without target",
       "when": { "scope": "global" },
       "context": { "host": {} },
@@ -205,6 +248,32 @@
     }
   ],
   "selections": [
+    {
+      "name": "first skips process-excluded row without changing saved order",
+      "context": { "host": {}, "target": { "window": "1", "processName": "row.exe" } },
+      "environment": { "excludedProcesses": ["base"] },
+      "mode": "first",
+      "catalog": [{ "id": "a" }, { "id": "b" }],
+      "rows": [
+        { "id": "a", "command": "a", "when": { "scope": "global", "excludedProcesses": ["row"] } },
+        { "id": "b", "command": "b", "when": { "scope": "global" } }
+      ],
+      "expectedRows": ["b"],
+      "expectedCommands": ["b"]
+    },
+    {
+      "name": "trigger exclusion prevents every selected command",
+      "context": { "host": {}, "target": { "window": "1", "processName": "BASE.EXE" } },
+      "environment": { "excludedProcesses": ["base"] },
+      "mode": "all",
+      "catalog": [{ "id": "a" }, { "id": "b" }],
+      "rows": [
+        { "id": "a", "command": "a", "when": { "scope": "global", "excludedProcesses": ["row"] } },
+        { "id": "b", "command": "b", "when": { "scope": "global" } }
+      ],
+      "expectedRows": [],
+      "expectedCommands": []
+    },
     {
       "name": "filter then deduplicate in saved order",
       "context": { "host": { "focused": true } },

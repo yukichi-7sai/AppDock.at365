@@ -52,6 +52,7 @@ export interface Keybinding {
     appletIds: string[];
     processes?: string[];
     excludeDesktop?: boolean;
+    excludedProcesses?: string[];
   };
 }
 export type KeybindingDefault = Omit<Keybinding, 'id'>;
@@ -63,9 +64,11 @@ export interface ShortcutContext {
 }
 export interface KeybindingOptions {
   executionMode: CommandExecutionMode;
+  excludedProcesses: string[];
 }
 export const defaultKeybindingOptions = (): KeybindingOptions => ({
   executionMode: 'all',
+  excludedProcesses: [],
 });
 export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   if (value === undefined) return defaultKeybindingOptions();
@@ -82,6 +85,9 @@ export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   return {
     ...current,
     executionMode: source.executionMode ?? 'all',
+    excludedProcesses: processNames(
+      source.excludedProcesses === undefined ? [] : source.excludedProcesses,
+    ),
   } as KeybindingOptions;
 }
 export function getKeybindingOptions(
@@ -122,12 +128,17 @@ export function parseKeybindings(value: unknown): Keybinding[] {
       (when.excludeDesktop !== undefined && typeof when.excludeDesktop !== 'boolean') ||
       (when.excludeDesktop === true && !['global', 'exe'].includes(String(when.scope))) ||
       Object.keys(when).some(
-        (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
+        (k) =>
+          !['scope', 'appletIds', 'processes', 'excludeDesktop', 'excludedProcesses'].includes(k),
       )
     )
       throw Error(hostText('settings.keybindings.scope'));
     const key = normalizeShortcut(row.key);
     const processes = when.processes === undefined ? [] : processNames(when.processes);
+    const excludedProcesses =
+      when.excludedProcesses === undefined ? [] : processNames(when.excludedProcesses);
+    if (when.scope !== 'global' && excludedProcesses.length)
+      throw Error(hostText('settings.keybindings.scope'));
     if (when.scope === 'exe' ? !processes.length : !!processes.length)
       throw Error(hostText('settings.keybindings.processes'));
     return {
@@ -139,6 +150,7 @@ export function parseKeybindings(value: unknown): Keybinding[] {
         scope: when.scope as KeybindingScope,
         appletIds: [...when.appletIds] as string[],
         ...(when.processes === undefined ? {} : { processes }),
+        ...(when.excludedProcesses === undefined ? {} : { excludedProcesses }),
         ...(when.excludeDesktop === undefined
           ? {}
           : { excludeDesktop: when.excludeDesktop as boolean }),
@@ -326,7 +338,15 @@ export function nativeShortcutInputs(
         available.includes(row.command) &&
         externalShortcutScope(row.when.scope),
     );
-    if (!members.some((row) => row.when.scope !== 'global' || row.when.excludeDesktop))
+    if (
+      !environment.excludedProcesses?.length &&
+      !members.some(
+        (row) =>
+          row.when.scope !== 'global' ||
+          row.when.excludeDesktop ||
+          row.when.excludedProcesses?.length,
+      )
+    )
       return input;
     return {
       ...input,
@@ -336,12 +356,18 @@ export function nativeShortcutInputs(
           appletIds: [],
           processes: row.when.processes ?? [],
           excludeDesktop: row.when.excludeDesktop ?? false,
+          ...(row.when.excludedProcesses?.length
+            ? { excludedProcesses: row.when.excludedProcesses }
+            : {}),
         },
         blockOriginalInput: row.blockOriginalInput !== false,
       })),
       environment: {
         browsers: environment.browsers,
         requireChromiumWindowClass: environment.requireChromiumWindowClass,
+        ...(environment.excludedProcesses?.length
+          ? { excludedProcesses: environment.excludedProcesses }
+          : {}),
       },
     };
   });
@@ -440,8 +466,21 @@ export function keybindingConditionLabel(
       (when.processes ?? []).join(' / ') +
       (when.excludeDesktop ? hostText('settings.keybindings.excludeDesktop') : '')
     );
-  if (when.scope === 'global' && when.excludeDesktop)
-    return hostText('settings.keybindings.globalExcludeDesktop');
+  if (when.scope === 'global') {
+    const title = hostText(
+      when.excludeDesktop
+        ? 'settings.keybindings.globalExcludeDesktop'
+        : 'settings.keybindings.global',
+    );
+    return (
+      title +
+      (when.excludedProcesses?.length
+        ? hostText('settings.keybindings.excludedProcesses', {
+            value: when.excludedProcesses.join(' / '),
+          })
+        : '')
+    );
+  }
   return keybindingScopes.find((scope) => scope.id === when.scope)?.title ?? when.scope;
 }
 /** Legacy fields are derived display/compatibility data once keybindings exists. */

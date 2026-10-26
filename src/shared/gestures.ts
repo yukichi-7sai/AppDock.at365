@@ -51,7 +51,13 @@ export interface GestureBinding {
   command: string;
   gesture: string;
   enabled: boolean;
-  when: { scope: GestureScope; appletIds: string[]; processes: string[]; excludeDesktop?: boolean };
+  when: {
+    scope: GestureScope;
+    appletIds: string[];
+    processes: string[];
+    excludeDesktop?: boolean;
+    excludedProcesses?: string[];
+  };
 }
 export interface GestureSettings {
   enabled: boolean;
@@ -99,13 +105,7 @@ export function gestureConditionLabel(
       when.processes.join(' / ') +
       (when.excludeDesktop ? hostText('settings.gestures.excludeDesktop') : '')
     );
-  if (when.scope === 'global' && when.excludeDesktop)
-    return hostText('settings.gestures.globalExcludeDesktop');
-  return keybindingConditionLabel(
-    { scope: when.scope, appletIds: when.appletIds },
-    ownerTitle,
-    applets,
-  );
+  return keybindingConditionLabel(when, ownerTitle, applets);
 }
 export function applyGestureOrder(
   current: GestureBinding[],
@@ -294,6 +294,7 @@ export function planGestureCommands(
     {
       browsers: settings.browsers ?? defaultConditionEnvironment().browsers,
       requireChromiumWindowClass: settings.requireChromiumWindowClass ?? false,
+      excludedProcesses: settings.excludedProcesses,
     },
   );
 }
@@ -327,11 +328,16 @@ export function parseGestureBindings(
       throw Error(hostText('settings.gestures.binding'));
     ids.add(r.id);
     const processes = processNames(r.when.processes);
+    const excludedProcesses =
+      r.when.excludedProcesses === undefined ? [] : processNames(r.when.excludedProcesses);
+    if (r.when.scope !== 'global' && excludedProcesses.length)
+      throw Error(hostText('settings.gestures.scope'));
     if (r.when.scope === 'exe' ? !processes.length : !!processes.length)
       throw Error(hostText('settings.gestures.processes'));
     if (
       Object.keys(r.when).some(
-        (k) => !['scope', 'appletIds', 'processes', 'excludeDesktop'].includes(k),
+        (k) =>
+          !['scope', 'appletIds', 'processes', 'excludeDesktop', 'excludedProcesses'].includes(k),
       )
     )
       throw Error(hostText('settings.gestures.scope'));
@@ -344,6 +350,7 @@ export function parseGestureBindings(
         scope: r.when.scope,
         appletIds: [...new Set(r.when.appletIds)],
         processes,
+        ...(r.when.excludedProcesses === undefined ? {} : { excludedProcesses }),
         ...(r.when.excludeDesktop === undefined ? {} : { excludeDesktop: r.when.excludeDesktop }),
       },
     };

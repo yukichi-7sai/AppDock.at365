@@ -35,6 +35,11 @@ fs.writeFileSync(
 const initial = createDefaultSettings();
 const featureSettingsOnly = process.argv.includes('--feature-settings-only');
 const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
+if (bindingEditorsOnly) {
+  initial.keybindingOptions.excludedProcesses = ['key-base'];
+  initial.gestures.excludedProcesses = ['mouse-base'];
+  initial.touchpadGestures.excludedProcesses = ['touch-base'];
+}
 const source = process.argv.slice(2).find((argument) => !argument.startsWith('--'));
 initial.host.hardwareAcceleration = false;
 initial.extensions['fixture.triggers'] = { enabled: true, settings: {} };
@@ -219,13 +224,24 @@ const recordSuccess = () => {
     }
     if (featureSettingsOnly) {
       await require('./gesture-settings-checks.cjs')({ host, open, save, saved, checks, profile });
-      const durable = (await saved()).commandTriggerOptions;
+      const beforeRestart = await saved();
+      const durable = beforeRestart.commandTriggerOptions;
+      const exclusions = ['keybindingOptions', 'gestures', 'touchpadGestures'].map(
+        (key) => beforeRestart[key].excludedProcesses,
+      );
       await app.close();
       app = await launch();
       host = await app.firstWindow();
       await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
       await open('shortcuts');
       assert.deepEqual((await saved()).commandTriggerOptions, durable);
+      const restarted = await saved();
+      assert.deepEqual(
+        ['keybindingOptions', 'gestures', 'touchpadGestures'].map(
+          (key) => restarted[key].excludedProcesses,
+        ),
+        exclusions,
+      );
       assert.equal(
         await host.getByRole('textbox', { name: 'Webブラウザのexe', exact: true }).inputValue(),
         durable.browsers.join(', '),

@@ -182,6 +182,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
     ],
+    ['excludedProcesses', hostText('settings.settings-catalog.gesturesExcluded')],
     ['browsers', hostText('settings.settings-catalog.browsers')],
     ['requireChromiumWindowClass', hostText('settings.settings-catalog.chromium')],
     [
@@ -196,6 +197,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
     ],
+    ['excludedProcesses', hostText('settings.settings-catalog.gesturesExcluded')],
     ['browsers', hostText('settings.settings-catalog.browsers'), 'chrome.exe firefox.exe'],
     [
       'requireChromiumWindowClass',
@@ -631,6 +633,7 @@ export function settingsPaths(
         ['touchpadGestures', 'enabled'],
         ['touchpadGestures', 'connections'],
         ['touchpadGestures', 'executionMode'],
+        ['touchpadGestures', 'excludedProcesses'],
         ['commandTriggerOptions'],
       ];
     case 'gestures':

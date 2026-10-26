@@ -9,8 +9,25 @@ import { SettingsTextarea } from './SettingsInput';
 
 export function useConditionProcesses(when: Keybinding['when']) {
   const [processText, setProcessText] = useState((when.processes ?? []).join(', '));
+  const [excludedProcessText, setExcludedProcessText] = useState(
+    (when.excludedProcesses ?? []).join(', '),
+  );
   let processes: string[] = [],
     processError = '';
+  let excludedProcesses: string[] = [],
+    excludedProcessError = '';
+  if (when.scope === 'global') {
+    try {
+      excludedProcesses = processNames(
+        excludedProcessText
+          .split(/[,\n]/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+    } catch {
+      excludedProcessError = hostText('settings.commandConditionDetails.processHint');
+    }
+  }
   if (when.scope === 'exe') {
     try {
       processes = processNames(
@@ -23,7 +40,30 @@ export function useConditionProcesses(when: Keybinding['when']) {
       processError = hostText('settings.commandConditionDetails.processHint');
     }
   }
-  return { processText, setProcessText, processes, processError };
+  return {
+    processText,
+    setProcessText,
+    processes,
+    processError,
+    excludedProcessText,
+    setExcludedProcessText,
+    excludedProcesses,
+    excludedProcessError,
+  };
+}
+
+/** Keep optional fields absent for old bindings and discard exclusions outside global scope. */
+export function conditionExclusions(
+  when: Keybinding['when'],
+  draft: ReturnType<typeof useConditionProcesses>,
+) {
+  const { excludedProcesses: _excluded, ...rest } = when;
+  return {
+    ...rest,
+    ...(when.scope === 'global' && draft.excludedProcesses.length
+      ? { excludedProcesses: draft.excludedProcesses }
+      : {}),
+  };
 }
 
 /** Shared condition controls for all command trigger types. */
@@ -34,14 +74,13 @@ export function CommandConditionDetails({
   setProcessText,
   processes,
   processError,
+  excludedProcessText,
+  setExcludedProcessText,
+  excludedProcessError,
 }: {
   when: Keybinding['when'];
   onChange(when: Keybinding['when']): void;
-  processText: string;
-  setProcessText(text: string): void;
-  processes: string[];
-  processError: string;
-}) {
+} & ReturnType<typeof useConditionProcesses>) {
   const { t: translate } = useHostTranslation();
   return (
     <>
@@ -70,7 +109,7 @@ export function CommandConditionDetails({
             aria-label={translate('settings.commandConditionDetails.processes')}
             rows={2}
             value={processText}
-            placeholder="notepad.exe, explorer.exe"
+            placeholder="notepad, explorer"
             onChange={(event) => setProcessText(event.target.value)}
           />
         </SettingsField>
@@ -78,14 +117,16 @@ export function CommandConditionDetails({
       {when.scope === 'global' && (
         <SettingsField
           title={translate('settings.commandConditionDetails.excludedProcesses')}
-          description={translate('settings.commandConditionDetails.excludedProcessesPending')}
+          description={translate('settings.commandConditionDetails.excludedProcessesHint')}
+          error={excludedProcessError}
         >
           <SettingsTextarea
             data-testid="binding-excluded-processes"
             aria-label={translate('settings.commandConditionDetails.excludedProcesses')}
             rows={2}
-            value=""
-            disabled
+            value={excludedProcessText}
+            placeholder="notepad, explorer"
+            onChange={(event) => setExcludedProcessText(event.target.value)}
           />
         </SettingsField>
       )}

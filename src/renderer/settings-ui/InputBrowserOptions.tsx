@@ -38,7 +38,7 @@ export function InputBrowserOptions({
         <SettingsInput
           aria-label={hostSettingItem(pageId, 'browsers').title}
           value={value.browsers.join(', ')}
-          placeholder="chrome.exe, firefox.exe"
+          placeholder="chrome, firefox"
           onChange={(event) =>
             change({
               browsers: event.target.value

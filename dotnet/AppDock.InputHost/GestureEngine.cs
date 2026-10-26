@@ -105,7 +105,7 @@ internal sealed class GestureEngine : IDisposable
         var classLength = GetClassName(window, className, className.Capacity);
         targetContext = new(window.ToInt64().ToString(), process, classLength > 0 ? className.ToString() : null, desktop);
         var context = new CommandContext(hostContext, targetContext);
-        var environment = new ConditionEnvironment(config!.Browsers, config.RequireChromiumWindowClass);
+        var environment = new ConditionEnvironment(config!.Browsers, config.RequireChromiumWindowClass, config.ExcludedProcesses);
         return config!.Rows.Where(r =>
             (r.Window.Length == 0 || r.Window == window.ToInt64().ToString() || includeInactive && r.Window.Length > 0) &&
             (includeInactive && r.Window == "-1" || CommandConditions.Matches(r.When, context, r.OwnerId, environment))).ToArray();

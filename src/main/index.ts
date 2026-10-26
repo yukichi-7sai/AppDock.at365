@@ -1558,7 +1558,15 @@ function prepareShortcut(
   return planKeybindings(
     rows,
     keys,
-    { ...context, target: press?.target ?? context.target },
+    {
+      ...context,
+      target:
+        press?.target ??
+        context.target ??
+        (!globalEvent && context.appFocused
+          ? { window: '0', processName: path.basename(process.execPath) }
+          : undefined),
+    },
     availableShortcutCommands(),
     globalEvent,
     getKeybindingOptions(settings.value).executionMode,

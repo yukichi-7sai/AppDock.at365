@@ -25,6 +25,21 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
       await common.getByRole('textbox', { name: 'Webブラウザのexe', exact: true }).inputValue(),
       original.commandTriggerOptions.browsers.join(', '),
     );
+    const exclusion = host.getByTestId('trigger-excluded-processes');
+    await exclusion.fill(`${id}.EXE, ${id}.exe`);
+    const setting =
+      id === 'shortcuts'
+        ? 'keybindingOptions'
+        : id === 'gestures'
+          ? 'gestures'
+          : 'touchpadGestures';
+    assert.deepEqual((await saved())[setting].excludedProcesses, []);
+    await exclusion.press('Enter');
+    await save();
+    assert.deepEqual((await saved())[setting].excludedProcesses, [id]);
+    await exclusion.fill('discard.exe');
+    await exclusion.press('Escape');
+    assert.equal(await exclusion.inputValue(), id);
   }
   checks.push(
     'three feature pages omit command lists, combine behavior with enablement in an untitled section and share an ungrouped browser section',
@@ -64,6 +79,12 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
   assert.equal(updated.keybindingOptions.executionMode, 'first');
   assert.equal(updated.gestures.executionMode, 'all');
   assert.equal(updated.touchpadGestures.executionMode, 'first');
+  assert.deepEqual(updated.keybindingOptions.excludedProcesses, ['shortcuts']);
+  assert.deepEqual(updated.gestures.excludedProcesses, ['gestures']);
+  assert.deepEqual(updated.touchpadGestures.excludedProcesses, ['touchpad-gestures']);
+  checks.push(
+    'trigger-wide exclusions normalize and commit independently; Escape cancels and execution mode edits preserve exclusions',
+  );
   for (const key of ['keybindingOptions', 'gestures', 'touchpadGestures'])
     assert.equal(updated[key].browsers, undefined);
   assert.deepEqual(updated.keybindings, original.keybindings);

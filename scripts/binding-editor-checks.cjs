@@ -36,8 +36,25 @@ module.exports = async ({ host, saved, save, checks, profile, row }) => {
       'true',
     );
     await dialog.getByTestId('binding-scope:global').click();
-    assert(await dialog.getByTestId('binding-excluded-processes').isDisabled());
-    assert.match(await dialog.innerText(), /対応予定/);
+    const excluded = dialog.getByTestId('binding-excluded-processes');
+    assert(await excluded.isEnabled());
+    assert.match(await dialog.innerText(), /トリガー全体の除外/);
+    await excluded.fill('C:\\invalid.exe');
+    assert(await dialog.getByTestId('binding-apply').isDisabled());
+    await excluded.fill('NOTEPAD.EXE, notepad, editor.exe');
+    await apply();
+    assert.deepEqual((await binding(kind)).when.excludedProcesses, ['notepad', 'editor']);
+    await edit(kind);
+    assert.equal(await excluded.inputValue(), 'notepad, editor');
+    await excluded.fill('discard.exe');
+    await cancel();
+    assert.deepEqual((await binding(kind)).when.excludedProcesses, ['notepad', 'editor']);
+    await edit(kind);
+    await excluded.fill('');
+    await apply();
+    assert.equal((await binding(kind)).when.excludedProcesses, undefined);
+    await edit(kind);
+    await excluded.fill('extra.exe');
     await dialog.getByRole('switch', { name: 'デスクトップを除外', exact: true }).click();
     await dialog.getByTestId('binding-scope:exe').click();
     const processes = dialog.getByRole('textbox', { name: '対象のexe名', exact: true });
@@ -60,6 +77,13 @@ module.exports = async ({ host, saved, save, checks, profile, row }) => {
       processes: ['notepad', 'explorer'],
       excludeDesktop: true,
     });
+    const current = await saved();
+    assert.deepEqual(current.keybindingOptions, original.keybindingOptions);
+    assert.deepEqual(current.gestures.excludedProcesses, original.gestures.excludedProcesses);
+    assert.deepEqual(
+      current.touchpadGestures.excludedProcesses,
+      original.touchpadGestures.excludedProcesses,
+    );
     await edit(kind);
     assert.equal(
       await dialog.getByTestId('binding-scope:exe').getAttribute('aria-pressed'),
@@ -179,7 +203,7 @@ module.exports = async ({ host, saved, save, checks, profile, row }) => {
   assert.equal(key.enabled, false);
   assert.equal(key.when.excludedProcesses, undefined);
   checks.push(
-    'key capture, original-input blocking and enabled toggle save together; pending global exclusions never enter settings',
+    'key capture, original-input blocking and enabled toggle save together; exclusions outside global scope are omitted',
   );
 
   for (const [theme, width, height] of [

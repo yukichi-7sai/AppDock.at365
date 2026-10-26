@@ -7,7 +7,7 @@ import type { Keybinding } from '../../shared/keybindings';
 import { Toggle } from './Toggle';
 import { BindingEditDialog } from './BindingEditDialog';
 import { ShortcutCaptureField } from './ShortcutCaptureField';
-import { useConditionProcesses } from './CommandConditionDetails';
+import { useConditionProcesses, conditionExclusions } from './CommandConditionDetails';
 import { CommandConditionEditor } from './CommandConditionEditor';
 import { BindingEditorLayout, BindingEnabledControl } from './BindingEditorLayout';
 
@@ -36,6 +36,7 @@ export function AppletShortcutDialog({
   const valid =
     !!value.key &&
     !protectedKey &&
+    !draft.excludedProcessError &&
     (value.when.scope !== 'applets' || !!value.when.appletIds.length) &&
     (value.when.scope !== 'exe' || (!draft.processError && !!draft.processes.length));
   return (
@@ -51,7 +52,7 @@ export function AppletShortcutDialog({
           ...value,
           key: normalizeShortcut(value.key),
           when: {
-            ...value.when,
+            ...conditionExclusions(value.when, draft),
             ...(value.when.scope === 'exe' ? { processes: draft.processes } : {}),
           },
         })

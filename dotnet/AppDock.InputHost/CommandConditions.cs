@@ -2,11 +2,11 @@ using System.Text.Json;
 
 namespace AppDock.InputHost;
 
-internal sealed record Condition(string Scope, string[] AppletIds, string[] Processes, bool ExcludeDesktop = false);
+internal sealed record Condition(string Scope, string[] AppletIds, string[] Processes, bool ExcludeDesktop = false, string[]? ExcludedProcesses = null);
 internal sealed record CommandHostContext(bool? Focused = null, string? PageId = null, string? AppletId = null);
 internal sealed record CommandTargetContext(string Window, string? ProcessName = null, string? WindowClass = null, bool? Desktop = null);
 internal sealed record CommandContext(CommandHostContext Host, CommandTargetContext? Target = null);
-internal sealed record ConditionEnvironment(string[]? Browsers = null, bool RequireChromiumWindowClass = false);
+internal sealed record ConditionEnvironment(string[]? Browsers = null, bool RequireChromiumWindowClass = false, string[]? ExcludedProcesses = null);
 
 /// <summary>Native projection of the shared input condition and selection contract.</summary>
 internal static class CommandConditions
@@ -21,6 +21,8 @@ internal static class CommandConditions
     {
         var host = context.Host;
         var target = context.Target;
+        var excluded = (environment?.ExcludedProcesses ?? []).Concat(when.ExcludedProcesses ?? []).ToArray();
+        if (excluded.Length > 0 && (string.IsNullOrEmpty(target?.ProcessName) || ContainsProcess(excluded, target.ProcessName))) return false;
         if (when.ExcludeDesktop && target?.Desktop != false) return false;
         return when.Scope switch {
             "global" => true,

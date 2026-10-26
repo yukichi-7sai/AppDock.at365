@@ -19,6 +19,10 @@
 
 ## 共通基盤への接続
 
+`ConditionEnvironment.excludedProcesses`は各トリガー全体の除外、`CommandCondition.excludedProcesses`はグローバル行に追加する除外を表す。共通判定は両方の集合のいずれかに一致すればfalseとし、保存データを合成しない。除外があり対象プロセスが不明ならfalse。旧設定の欠落は空として扱う。
+
+キーのnative事前判定も同じ除外と条件を使い、一致行だけから元入力のブロックを合成する。タッチパッドは既存の専用キー規則を保ち、保存行のプロセス除外だけをInputHostへ投影する。全体の除外または同じジェスチャーの全保存行の追加除外に一致すれば元入力を通し、それ以外では条件不一致・利用可能コマンド0件でも専用キーをブロックする。投影が変わったときはshortcutRevisionを更新し、古い通知を採用しない。ローカルrendererのキー入力では本体プロセス名を渡し、外部入力ではnativeが押下時に取得した対象を使う。
+
 [CommandDispatcher](../src/main/core/command-dispatcher.ts)の単一インスタンスがキーとジェスチャーの順次実行・再入防止を担い、最終的な実行は[index.ts](../src/main/index.ts)の`executeCommand`へ集まる。[ShortcutDispatcher](../src/main/core/shortcut-dispatcher.ts)は内部の互換アダプターであり、独立した実行ループを持たない。
 
 | 入口・処理                                                                                 | 共通基盤との関係                                                                                                                                                |

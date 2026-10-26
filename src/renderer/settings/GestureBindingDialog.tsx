@@ -2,7 +2,7 @@ import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { touchpadGestureTypes, touchpadId } from '../../shared/touchpad-gestures';
 import { SettingsField } from '../settings-ui/SettingsSections';
-import { useConditionProcesses } from '../settings-ui/CommandConditionDetails';
+import { useConditionProcesses, conditionExclusions } from '../settings-ui/CommandConditionDetails';
 import { useState } from 'react';
 import {
   gestureTypes,
@@ -102,6 +102,7 @@ export function GestureBindingDialog({
   const valid =
     !!value.gesture &&
     value.gesture !== 'key:' &&
+    !draft.excludedProcessError &&
     (value.when.scope !== 'applets' || !!value.when.appletIds.length) &&
     (value.when.scope !== 'exe' || (!processError && !!processes.length));
   return (
@@ -121,7 +122,7 @@ export function GestureBindingDialog({
         onApply({
           ...value,
           gesture: touchpad ? touchpadId(value.gesture) : normalizeGesture(value.gesture),
-          when: { ...value.when, processes },
+          when: { ...conditionExclusions(value.when, draft), processes },
         })
       }
     >
