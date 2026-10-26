@@ -11,6 +11,9 @@ internal sealed record ConditionEnvironment(string[]? Browsers = null, bool Requ
 /// <summary>Native projection of the shared input condition and selection contract.</summary>
 internal static class CommandConditions
 {
+    internal static string ExecutionMode(string fallback, IReadOnlyDictionary<string, string>? modes, string input) =>
+        modes != null && modes.TryGetValue(input, out var mode) ? mode : fallback;
+
     private static string ProcessName(string name) =>
         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
     private static bool ContainsProcess(string[] names, string process) =>

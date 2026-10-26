@@ -135,8 +135,8 @@ test('new page edits only the three binding stores and cannot overwrite trigger 
   assert(searchSettings(pages, 'コマンドトリガー').some((item) => item.pageId === page.id));
   const projection = settingsProjection(settings, page, []);
   assert.equal(projection.commandTriggerOptions, undefined);
-  assert.deepEqual(Object.keys(projection.gestures), ['bindings']);
-  assert.deepEqual(Object.keys(projection.touchpadGestures), ['bindings']);
+  assert.deepEqual(Object.keys(projection.gestures), ['bindings', 'inputExecutionModes']);
+  assert.deepEqual(Object.keys(projection.touchpadGestures), ['bindings', 'inputExecutionModes']);
   projection.gestures.bindings[0].enabled = true;
   const saved = applySettingsJson(settings, page, [], JSON.stringify(projection));
   assert.equal(saved.gestures.bindings[0].enabled, true);

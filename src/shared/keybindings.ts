@@ -1,6 +1,11 @@
 import { hostText } from './i18n';
 import { applyBindingOrder } from './binding-order';
 import {
+  inputExecutionMode,
+  parseInputExecutionModes,
+  type InputExecutionModes,
+} from './input-execution';
+import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
   normalizeShortcut,
@@ -64,10 +69,12 @@ export interface ShortcutContext {
 }
 export interface KeybindingOptions {
   executionMode: CommandExecutionMode;
+  inputExecutionModes: InputExecutionModes;
   excludedProcesses: string[];
 }
 export const defaultKeybindingOptions = (): KeybindingOptions => ({
   executionMode: 'all',
+  inputExecutionModes: {},
   excludedProcesses: [],
 });
 export function parseKeybindingOptions(value: unknown): KeybindingOptions {
@@ -85,6 +92,7 @@ export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   return {
     ...current,
     executionMode: source.executionMode ?? 'all',
+    inputExecutionModes: parseInputExecutionModes(source.inputExecutionModes, normalizeShortcut),
     excludedProcesses: processNames(
       source.excludedProcesses === undefined ? [] : source.excludedProcesses,
     ),
@@ -525,7 +533,7 @@ export function planKeybindings(
   available: { id: string; extensionId?: string | null }[],
   globalEvent = false,
   mode: CommandExecutionMode = 'all',
-  environment: ConditionEnvironment = {},
+  environment: ConditionEnvironment & { inputExecutionModes?: InputExecutionModes } = {},
 ) {
   const keys = new Set(typeof key === 'string' ? [key] : key);
   return planCommandBatch(
@@ -537,7 +545,7 @@ export function planKeybindings(
       target: context.target,
     },
     available,
-    mode,
+    inputExecutionMode(mode, environment.inputExecutionModes, [...keys]),
     environment,
   );
 }

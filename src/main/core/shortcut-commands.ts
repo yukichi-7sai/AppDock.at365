@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { inputExecutionModesSchema } from '../../shared/input-execution';
 import type { Settings, SettingsSnapshot, GlobalHotKeyStatus } from '../../shared/contracts';
 import { parseCommandTriggerOptions } from '../../shared/command-trigger-options';
 import {
@@ -139,6 +140,7 @@ export class ShortcutCommands {
                       type: 'object',
                       properties: {
                         executionMode: { type: 'string', enum: ['first', 'all'] },
+                        inputExecutionModes: inputExecutionModesSchema,
                         excludedProcesses: {
                           ...whenSchema.properties.excludedProcesses,
                           description: 'このトリガーの全割り当てで除外するexe名。',
@@ -290,6 +292,7 @@ export class ShortcutCommands {
             !exact(op, ['kind', 'changes']) ||
             !exact(op.changes, [
               'executionMode',
+              'inputExecutionModes',
               'excludedProcesses',
               'browsers',
               'requireChromiumWindowClass',
@@ -382,6 +385,7 @@ export class ShortcutCommands {
   private publicOptions(options: ReturnType<typeof getKeybindingOptions>) {
     return {
       executionMode: options.executionMode,
+      inputExecutionModes: { ...options.inputExecutionModes },
       excludedProcesses: [...options.excludedProcesses],
       browsers: [...options.browsers],
       requireChromiumWindowClass: options.requireChromiumWindowClass,

@@ -26,6 +26,7 @@ export function ShortcutsEditor({
               keybindingOptions: {
                 ...settings.keybindingOptions,
                 excludedProcesses: options.excludedProcesses,
+                inputExecutionModes: options.inputExecutionModes,
                 executionMode,
               },
             })
@@ -40,6 +41,7 @@ export function ShortcutsEditor({
               keybindingOptions: {
                 ...settings.keybindingOptions,
                 executionMode: options.executionMode,
+                inputExecutionModes: options.inputExecutionModes,
                 excludedProcesses,
               },
             })

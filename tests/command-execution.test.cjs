@@ -8,6 +8,7 @@ const {
   readCommandTarget,
 } = require('../out/main/shared/command-conditions');
 const { planCommandBatch } = require('../out/main/shared/command-execution');
+const { inputExecutionMode } = require('../out/main/shared/input-execution');
 const { planKeybindings } = require('../out/main/shared/keybindings');
 const { CommandDispatcher } = require('../out/main/main/core/command-dispatcher');
 const { InputCaptureManager } = require('../out/main/main/core/gestures');
@@ -52,6 +53,14 @@ const plan = (commands, mode = 'all') =>
     [...new Set(commands)].map((id) => ({ id })),
     mode,
   );
+
+for (const fixture of fixtures.inputExecutionModes)
+  test('shared native input mode: ' + fixture.name, () => {
+    assert.equal(
+      inputExecutionMode(fixture.fallback, fixture.overrides, fixture.input),
+      fixture.expected,
+    );
+  });
 
 test('first does not fall through busy or failed commands, all reserves the complete batch across triggers', async () => {
   const calls = [],

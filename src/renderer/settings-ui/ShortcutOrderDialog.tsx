@@ -2,7 +2,7 @@ import { useHostTranslation } from '../HostTranslation';
 import type { Settings } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
 import {
-  applyKeybindingOrder,
+  getKeybindingOptions,
   getKeybindings,
   externalShortcutScope,
   keybindingGroups,
@@ -11,6 +11,7 @@ import {
   withKeybindings,
 } from '../../shared/keybindings';
 import { BindingOrderDialog } from './BindingOrderDialog';
+import { applyBindingSettings } from '../../shared/binding-order';
 
 export function ShortcutOrderDialog({
   settings,
@@ -28,9 +29,12 @@ export function ShortcutOrderDialog({
   onClose(): void;
 }) {
   const { t: translate } = useHostTranslation();
+  const options = getKeybindingOptions(settings);
   return (
     <BindingOrderDialog
       bindings={getKeybindings(settings)}
+      executionMode={options.executionMode}
+      inputExecutionModes={options.inputExecutionModes}
       commands={commands}
       initialInput={initialKey}
       title={translate('settings.shortcutOrderDialog.title')}
@@ -50,14 +54,32 @@ export function ShortcutOrderDialog({
       }
       groupRows={keybindingGroups}
       moveRow={moveKeybindingWithinKey}
-      onApply={(ordered, original) =>
+      onApply={(ordered, original, modes, originalModes) => {
+        const next = applyBindingSettings(
+          getKeybindings(settings),
+          original,
+          ordered,
+          options.inputExecutionModes,
+          originalModes,
+          modes,
+          (row) => row.key,
+          (key) => key,
+        );
         onChange(
           withKeybindings(
-            settings,
-            applyKeybindingOrder(getKeybindings(settings), original, ordered),
+            {
+              ...settings,
+              keybindingOptions: {
+                ...settings.keybindingOptions,
+                executionMode: options.executionMode,
+                excludedProcesses: options.excludedProcesses,
+                inputExecutionModes: next.inputExecutionModes,
+              },
+            },
+            next.bindings,
           ),
-        )
-      }
+        );
+      }}
       onClose={onClose}
     />
   );

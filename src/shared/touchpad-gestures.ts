@@ -1,4 +1,9 @@
 import { hostText } from './i18n';
+import {
+  inputExecutionMode,
+  parseInputExecutionModes,
+  type InputExecutionModes,
+} from './input-execution';
 import { normalizeShortcut } from './commands';
 import {
   commandCondition,
@@ -34,6 +39,7 @@ export interface TouchpadGestureSettings {
   enabled: boolean;
   connections: Record<TouchpadGestureId, TouchpadConnection>;
   executionMode: 'first' | 'all';
+  inputExecutionModes: InputExecutionModes;
   excludedProcesses: string[];
   bindings: GestureBinding[];
 }
@@ -75,6 +81,7 @@ export function defaultTouchpadGestures(): TouchpadGestureSettings {
   return {
     enabled: false,
     executionMode: 'all',
+    inputExecutionModes: {},
     excludedProcesses: [],
     bindings: [],
     connections: Object.fromEntries(
@@ -142,6 +149,7 @@ export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
   return {
     enabled: value.enabled ?? false,
     ...options,
+    inputExecutionModes: parseInputExecutionModes(value.inputExecutionModes, touchpadId),
     connections,
     bindings: parseGestureBindings(value.bindings ?? [], touchpadId),
   };
@@ -191,7 +199,7 @@ export function planTouchpadCommands(
       .map((row) => ({ ...row, when: commandCondition(row.when) })),
     context,
     commands,
-    settings.executionMode,
+    inputExecutionMode(settings.executionMode, settings.inputExecutionModes, gesture),
     { ...environment, excludedProcesses: settings.excludedProcesses ?? [] },
   );
 }

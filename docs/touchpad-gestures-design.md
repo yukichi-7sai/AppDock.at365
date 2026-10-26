@@ -128,6 +128,7 @@ interface TouchpadGestureSettings {
     }
   >;
   executionMode: 'first' | 'all';
+  inputExecutionModes: Partial<Record<TouchpadGestureId, 'first' | 'all'>>;
   excludedProcesses: string[];
   bindings: Array<{
     id: string;
@@ -272,7 +273,7 @@ flowchart LR
 1. 専用キーのkeydown時点で、前面HWND・プロセス・デスクトップ判定と、本体の実フォーカス・表示ページ・Appletを取得する。指が触れた時点の情報は取得できる前提にしない。
 2. mainが入力ID、所有元gesture ID、設定revision、接続世代、nativeの生存状態を検証する。入力時の事実を共通`TriggerContext`へ投影する。
 3. 当該gesture IDの保存行を順序付きで渡し、「いつ・どこで」と利用可能性から共通の実行計画を1回だけ作る。未知・停止中コマンドの扱いも共通化する。
-4. `executionMode`に従い、同一コマンド重複除去・全トリガー共通の再入防止・取消・エラー処理を行う。firstの候補がBUSYの場合に後続へすり替えない。
+4. 入力ID別の`inputExecutionModes`、未指定なら全体の`executionMode`に従い、同一コマンド重複除去・全トリガー共通の再入防止・取消・エラー処理を行う。firstの候補がBUSYの場合に後続へすり替えない。編集は[トリガーの設定](command-triggers.md#トリガーの設定)で行い、Windows接続や専用キー所有権は変更しない。
 5. 前面化・キー送信は入力元invocationを伴う既存のキー入力経路へ接続する。本体を開く処理の一度限りの権限・対象検証を守り、旧マウスの接触sessionを偽造しない。
 
 Windows設定変更・機能OFF・行削除・世代失効では未開始の処理を取り消す。すでに実行したコマンドを巻き戻さない。条件判定に入力後の別ウィンドウを代用せず、実行前の対象消失・対象変更と後続実行の取消は共通の入力元検証に従う。

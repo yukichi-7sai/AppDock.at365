@@ -77,7 +77,13 @@ for (const kind of ['gestures', 'touchpadGestures'])
     const f = fixture(t);
     const get = () => f.api.call(kind + '.get');
     const operations = [
-      { kind: 'configure', changes: { excludedProcesses: ['BASE.EXE'] } },
+      {
+        kind: 'configure',
+        changes: {
+          excludedProcesses: ['BASE.EXE'],
+          inputExecutionModes: { [kind === 'gestures' ? 'move-up' : 'three.tap']: 'first' },
+        },
+      },
       {
         kind: 'add',
         binding: {
@@ -96,6 +102,9 @@ for (const kind of ['gestures', 'touchpadGestures'])
     assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
     await edit(false);
     assert.deepEqual(f.settings.value[kind].excludedProcesses, ['base']);
+    assert.deepEqual(f.settings.value[kind].inputExecutionModes, {
+      [kind === 'gestures' ? 'move-up' : 'three.tap']: 'first',
+    });
     assert.deepEqual(get().bindings.find((row) => row.id === 'excluded').when.excludedProcesses, [
       'row',
     ]);

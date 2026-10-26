@@ -326,5 +326,42 @@
       "expectedRows": [],
       "expectedCommands": []
     }
+  ],
+  "inputExecutionModes": [
+    {
+      "name": "missing override inherits first",
+      "fallback": "first",
+      "overrides": {},
+      "input": "move-up",
+      "expected": "first"
+    },
+    {
+      "name": "missing override inherits all",
+      "fallback": "all",
+      "overrides": {},
+      "input": "move-up",
+      "expected": "all"
+    },
+    {
+      "name": "first overrides all",
+      "fallback": "all",
+      "overrides": { "move-up": "first" },
+      "input": "move-up",
+      "expected": "first"
+    },
+    {
+      "name": "all overrides first",
+      "fallback": "first",
+      "overrides": { "move-up": "all" },
+      "input": "move-up",
+      "expected": "all"
+    },
+    {
+      "name": "another input keeps fallback",
+      "fallback": "first",
+      "overrides": { "move-up": "all" },
+      "input": "move-down",
+      "expected": "first"
+    }
   ]
 }

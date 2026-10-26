@@ -12,9 +12,9 @@ import {
   gestureTitle,
   gestureConditionLabel,
   moveGestureBinding,
-  applyGestureOrder,
 } from '../../shared/gestures';
 import { BindingOrderDialog } from '../settings-ui/BindingOrderDialog';
+import { applyBindingSettings } from '../../shared/binding-order';
 export function GestureOrderDialog({
   touchpad = false,
   settings,
@@ -39,6 +39,8 @@ export function GestureOrderDialog({
   return (
     <BindingOrderDialog
       bindings={gestures.bindings}
+      executionMode={gestures.executionMode}
+      inputExecutionModes={gestures.inputExecutionModes ?? {}}
       commands={commands}
       initialInput={initialGesture}
       title={translate('settings.gestureOrderDialog.title')}
@@ -61,12 +63,21 @@ export function GestureOrderDialog({
           : groupGestureBindings(rows).map((group) => [group.gesture, group.bindings])
       }
       moveRow={moveGestureBinding}
-      onApply={(ordered, original) =>
+      onApply={(ordered, original, modes, originalModes) =>
         onChange({
           ...settings,
           [touchpad ? 'touchpadGestures' : 'gestures']: {
             ...gestures,
-            bindings: applyGestureOrder(gestures.bindings, original, ordered),
+            ...applyBindingSettings(
+              gestures.bindings,
+              original,
+              ordered,
+              gestures.inputExecutionModes ?? {},
+              originalModes,
+              modes,
+              (row) => row.gesture,
+              touchpad ? touchpadTitle : gestureTitle,
+            ),
           },
         })
       }

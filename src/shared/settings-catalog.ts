@@ -625,9 +625,20 @@ export function settingsPaths(
     case 'tray':
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
-      return [['keybindingOptions'], ['commandTriggerOptions']];
+      return [
+        ['keybindingOptions', 'executionMode'],
+        ['keybindingOptions', 'excludedProcesses'],
+        ['commandTriggerOptions'],
+      ];
     case 'command-triggers':
-      return [['keybindings'], ['gestures', 'bindings'], ['touchpadGestures', 'bindings']];
+      return [
+        ['keybindings'],
+        ['gestures', 'bindings'],
+        ['touchpadGestures', 'bindings'],
+        ['keybindingOptions', 'inputExecutionModes'],
+        ['gestures', 'inputExecutionModes'],
+        ['touchpadGestures', 'inputExecutionModes'],
+      ];
     case 'touchpad-gestures':
       return [
         ['touchpadGestures', 'enabled'],

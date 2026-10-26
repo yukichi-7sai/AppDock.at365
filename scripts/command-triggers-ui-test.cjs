@@ -35,6 +35,7 @@ fs.writeFileSync(
 const initial = createDefaultSettings();
 const featureSettingsOnly = process.argv.includes('--feature-settings-only');
 const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
+const triggerSettingsOnly = process.argv.includes('--trigger-settings-only');
 if (bindingEditorsOnly) {
   initial.keybindingOptions.excludedProcesses = ['key-base'];
   initial.gestures.excludedProcesses = ['mouse-base'];
@@ -204,6 +205,24 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (triggerSettingsOnly) {
+      await open();
+      await require('./trigger-settings-checks.cjs')({ host, saved, save, checks, profile, row });
+      const durable = await saved();
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      await open();
+      for (const key of ['keybindingOptions', 'keybindings', 'gestures', 'touchpadGestures'])
+        assert.deepEqual((await saved())[key], durable[key]);
+      assert.deepEqual(errors, []);
+      checks.push(
+        'per-input modes and order survive actual restart; connections and defaults stay intact',
+      );
+      recordSuccess();
+      return;
+    }
     if (bindingEditorsOnly) {
       await open();
       await require('./binding-editor-checks.cjs')({ host, saved, save, checks, profile, row });

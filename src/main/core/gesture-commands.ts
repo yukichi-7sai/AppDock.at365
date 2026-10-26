@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { inputExecutionModesSchema } from '../../shared/input-execution';
 import { isDeepStrictEqual } from 'node:util';
 import {
   defaultTouchpadGestures,
@@ -109,6 +110,7 @@ const configurationFields = {
   distance: { type: 'integer', minimum: 5, maximum: 500 },
   wheelDelayMs: { type: 'integer', minimum: 0, maximum: 5000 },
   executionMode: { type: 'string', enum: ['all', 'first'] },
+  inputExecutionModes: inputExecutionModesSchema,
   indicatorOpacity: { type: 'number', minimum: 0.1, maximum: 1 },
   indicatorStyle: { type: 'string', enum: ['compact', 'pill', 'ring', 'classic'] },
   indicatorShowNoAction: { type: 'boolean' },
@@ -156,6 +158,7 @@ export class GestureCommands {
     return this.options.touchpad
       ? {
           executionMode: configurationFields.executionMode,
+          inputExecutionModes: inputExecutionModesSchema,
           excludedProcesses: processesSchema,
           browsers: processesSchema,
           requireChromiumWindowClass: { type: 'boolean' },

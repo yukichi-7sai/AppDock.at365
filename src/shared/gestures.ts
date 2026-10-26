@@ -1,6 +1,11 @@
 import { hostText } from './i18n';
 import { normalizeShortcut, validCommandId } from './commands';
 import { applyBindingOrder } from './binding-order';
+import {
+  inputExecutionMode,
+  parseInputExecutionModes,
+  type InputExecutionModes,
+} from './input-execution';
 import { keybindingConditionLabel } from './keybindings';
 import { matchesWhen, type ShortcutContext, type ShortcutScope } from './keybindings';
 import { validShortcutTarget } from './shortcut-pages';
@@ -66,6 +71,7 @@ export interface GestureSettings {
   distance: number;
   wheelDelayMs: number;
   executionMode: 'all' | 'first';
+  inputExecutionModes: InputExecutionModes;
   indicatorOpacity: number;
   indicatorStyle: 'compact' | 'pill' | 'ring' | 'classic';
   indicatorPosition: 'gesture-start' | 'window-center' | 'monitor-center' | 'none';
@@ -153,6 +159,7 @@ export function defaultGestures(): GestureSettings {
     distance: 50,
     wheelDelayMs: 0,
     executionMode: 'all',
+    inputExecutionModes: {},
     indicatorOpacity: 0.45,
     indicatorStyle: 'compact',
     indicatorPosition: 'gesture-start',
@@ -206,6 +213,7 @@ export function parseGestures(value: unknown): GestureSettings {
     indicatorShowNoAction: v.indicatorShowNoAction ?? true,
     indicatorStyle: v.indicatorStyle ?? 'compact',
     executionMode: v.executionMode ?? 'all',
+    inputExecutionModes: parseInputExecutionModes(v.inputExecutionModes, normalizeGesture),
     excludedProcesses: processNames(v.excludedProcesses),
     bindings,
   };
@@ -290,7 +298,7 @@ export function planGestureCommands(
       target,
     },
     commands,
-    settings.executionMode,
+    inputExecutionMode(settings.executionMode, settings.inputExecutionModes, gesture),
     {
       browsers: settings.browsers ?? defaultConditionEnvironment().browsers,
       requireChromiumWindowClass: settings.requireChromiumWindowClass ?? false,
