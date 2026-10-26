@@ -1,5 +1,19 @@
 # 検証記録
 
+## 2026-10-26: 起動設定のMCP接続と非同期保存 0.94.4
+
+- main `8b271af`の統合commit `6d681fa`から同じ専用worktree/branchで継続した。既存のstartAtLogon/runAsAdministrator・PC専用保存ファイル・固定6入口を維持し、新しい保存項目/ファイルや破壊的な契約変更はないため、発行済み0.94.3から**0.94.4**へパッチ更新した。primary main、追跡先、push/Release/deployは変更しない。
+- 共通設定APIは非同期ownerの完了まで応答を待ち、待機中/完了後のrequestIdを区別する。保存直前のpreflightで元callerの最新許可・主体・対象/Schema・値revisionを再確認し、準備したOS変更の巻戻しは所有サービスへ委譲する。旧主体の遅い成功/失敗が新主体の同名requestIdキャッシュを汚さないよう、要求recordだけを更新する。従来の同期owner・読取り・dryRunは同期応答と既存512件上限を維持し、非同期失敗もAppDockApiの安全なcode/messageへ変換する。
+- `category=launch`のfields対象へ起動登録/管理者起動を公開し、read + writeで変更する。候補EXE・引数・スクリプト・Task XML・管理者再起動/復旧の実行を公開しない。メタデータとdryRunは所有する能力キャッシュを使い、PowerShellを起動しない。開発版/復旧待ちの書込みを拒否し、標準ユーザーの制限も既存所有検証へ渡す。
+- 実保存はWindowsLaunchの同一ユーザー/元EXE/引数/InteractiveToken検査、復旧journal、登録照合とPC専用設定保存を待ってからsettingsSavedを返す。値と上書き状態が同じsetでOS再同期せず、reset/既定値setは現在PCの上書きを除去する。runAsAdministratorは次回起動/ログオンTaskへ適用し、現在のトークンを変更しない。effectVerified=falseとUAC手動承認・取消・復元不能時のローカル復旧を維持する。
+- 発行前に同期互換・認可/主体/Schema/競合・キャッシュ・PC保存/OS巻戻し・秘密非公開・UI互換と必要回帰をレビュー。既存応答用の権限スナップショットを保持して再認可だけを新しく取得し、標準ユーザーでも持込み済みの管理者希望値を解除できるようにした。journal書込み失敗もOS変更前に既存の設定エラーepisodeへ接続する。阻害指摘なし。
+- 固定依存install、整形、型検査、本体/Default Shell buildが成功。関連標準は**84ファイル866/866件、fail/cancel/skip 0**。一次回帰865件のうちownerの12件を、Highest/logonの一括正常保存を追加した13件で置き換えて集計し、他の成功結果を再利用した。差分は当該unitファイルだけで、製品/GUI/依存は不変。新規回帰は非同期基盤8件と起動owner13件で、待機/再送/主体切替/応答上限、取消/登録失敗/保存失敗/復元不能、全般/PC保存、既定値falseの上書き解除、競合・許可取消時の実owner巻戻しを検証した。標準全体は未実行。
+- sourceの実MCP **41群**・既存MCP設定UI **10群**、固定EXEの実MCP **43群**・既存起動設定UI **5群**・MCP設定UI **10群**・smokeが成功。固定MCPはLimited Taskの実登録/照合、同じ要求の再送、ネイティブtoggleとの連動、古い要求拒否、resetによる解除、共有/暗号文bytesと固定tools/listの保持を確認した。既存起動UIは日本語/空白/引用符のある元EXE、Task Schedulerの明示Run/LastTaskResult=0、設定の即時保存と再起動保持、明暗3幅、通常トークンのまま管理者希望値を切り替える動作を確認した。
+- 最終照合で実環境の.NET SDK **10.0.403**を確認したため、先行するnative成功の再利用を取りやめ、条件/選択のnative fixture **46件**を再実行した。.NET通知fixtureを現SDKでRelease buildし、同じ固定EXEのNode/.NET接続・所有アクション・入力失敗/保存/通知ポリシー反映・再起動を **8群**追加確認。製品ソースとEXEの再変更はない。Node 24.22.1、pnpm 12.10.1、Electron 45.0.0、Windows x64を維持した。
+- `publish.bat`終了0。EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170705415 bytes / SHA256 `18f1531d01e7792c45e1eca46983f0597cb5a405d8fb2916d74739d58817e4a7`**。File/ProductVersion、feed版/size/hash、ASAR内package/Default Shellとすべての固定コピーを照合した。最終774入力と参照Applet manifestはレビュー後・発行後・固定/追加native検証後で一致し、後続追記は文書/証跡のみ。
+- テスト用の2つのEXE/profileに対応するTaskを最後に個別読取りし、登録だけでなくXMLも存在しないことを確認した。専用プロセス0、今回の各script/方式の成功は3回以内、削除0件。過去の参照profile/固定コピー・初期の型/監査パス等の診断・ビルド出力を保持する。実UAC承認/Highest実行、実Windowsサインインは未確認。模擬UACでは承認経路/取消を検証し、実プロンプトの自動承認、Pause/F13～F24のOS送信/登録、実利用の設定/認証の変更は行っていない。
+- 正本は[設定API](docs/settings-api.md#windows起動設定)、[起動設定](docs/launch-settings.md)、[設計](docs/mcp-settings-design.md)。証跡は`.artifacts/mcp-settings-launch-20261026/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-launch-20261026/`。source-profiles.json/fixed-profiles.json、task-audit.json、smoke-profile.jsonへ結果/hashを記録する。main統合、非同期保存基盤、起動設定adapterを独立したコミットへ分ける。
+
 ## 2026-10-26: main 8b271afのMCP設定worktree統合 0.94.3
 
 - cleanな`codex/mcp-settings-design` / `15f623c`でorigin/mainをfetchし、ローカルmainと一致する`8b271af`（0.94.2）を統合した。追跡先の新設、primary mainの変更、push/Release/deployは行わない。入力ごとの実行方法/除外設定と通知のセッション寿命/画面/Windows起動経路を取り込み、専用worktreeの確認版を**0.94.3**へ更新した。設定/保存形式の変更はmain側の既存版更新を保持する。

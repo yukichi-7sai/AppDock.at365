@@ -33,6 +33,10 @@ UACヘルパー本体はEncodedCommandを使用し、すでにbase64の本体を
 
 ## 契約・検証
 
+MCPの[共通設定API](settings-api.md#windows起動設定)は保存済みの2つのbooleanを同じWindowsLaunchへ接続し、read + writeでPC専用設定を変更する。読取り/dryRunは能力キャッシュと設定の検証に限定し、OS操作を始めない。実保存はOS登録の照合と設定保存を待ち、待機後の許可取消・主体/Schema/revision変更でも登録を巻き戻す。登録確認用のjournalを保存できない場合も、Windows変更前に既存の設定エラーepisodeへ接続する。
+
+値と保存上書きの状態に変更がないsetはOS登録の再同期を行わない。保存結果のeffectVerified=falseは実サインイン起動や現在の管理者トークンを保証しないことを表す。UAC取消・通常の競合は失敗episodeを増やさず、復元不能時の復旧実行はローカル画面だけに残す。任意のEXE・引数・スクリプト、管理者での再起動、Task Schedulerでの即時実行をMCPの設定対象にしない。
+
 `HostSnapshot.launch`は発行版での対応可否、実トークン、実タスク登録/RunLevel、タスク名、確認エラーを返す。`refreshLaunchState`は読み取りだけ、`restartAsAdministrator`は明示操作だけ。既存のIPC送信元検査を使い、Web/Appletに任意スクリプトや任意EXEの昇格APIを公開しない。開発起動のトグルは無効。
 
 `scripts/launch-settings-ui-test.cjs`は固定した単一EXEのコピーを使い、日本語/空白/引用符付きパス、実タスク登録/実行/解除、即時保存、失敗値の画面内保持、再起動後の保持、両テーマ/3幅を確認する。検証タスクはfinallyで解除する。UAC承認・管理者トークン・実サインインは別に検証結果を記録し、自動承認やユーザーのログオフを行わない。

@@ -47,6 +47,8 @@ import type { AiSettingsController } from './ai-settings';
 import type { TtsSecrets } from './tts-secrets';
 import type { McpClientSettings } from './mcp-client-settings';
 import { mcpClientSettingsTarget } from './settings-mcp-client-target';
+import type { WindowsLaunch } from './windows-launch';
+import { launchSettingsTarget } from './settings-launch-target';
 
 type RecordValue = Record<string, unknown>;
 interface Field extends SettingDefinition {
@@ -126,6 +128,8 @@ export class SettingsServiceTargets {
       applets?(): ExtensionSnapshot[];
       appletManagement?: AppletManagement;
       mcpSettings?(): McpClientSettings;
+      launch?: WindowsLaunch;
+      assertWritable?(): void;
     },
   ) {}
   targets(): SettingsTarget[] {
@@ -153,6 +157,9 @@ export class SettingsServiceTargets {
       this.appletOrder(),
       ...(this.options.mcpSettings
         ? [mcpClientSettingsTarget(this.options.mcpSettings(), this.options.checkRevision)]
+        : []),
+      ...(this.options.launch
+        ? [launchSettingsTarget({ ...this.options, launch: this.options.launch })]
         : []),
     ];
   }

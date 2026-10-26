@@ -2972,6 +2972,8 @@
   "settings.versionCheck.hostUpdates": "本体の更新",
   "services.automation.retiredPermission": "個別の編集許可は廃止されました。「設定の変更」で設定してください。",
   "services.settingsTargets.invalid": "設定操作の引数を確認してください。",
+  "services.settingsTargets.launchFailed": "Windowsの起動設定を変更できませんでした。一般設定で登録状態を確認してください。",
+  "services.settingsTargets.launchCancelled": "Windowsの起動設定の変更をキャンセルしました。設定は保存していません。",
   "services.settingsTargets.notFound": "公開された設定対象または項目が見つかりません。",
   "services.settingsTargets.tooLarge": "設定の応答が上限を超えています。取得する項目を絞ってください。",
   "services.settingsTargets.cursorConflict": "設定の一覧が変わりました。最初から取得してください。",

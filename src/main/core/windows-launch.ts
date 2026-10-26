@@ -79,10 +79,14 @@ interface LaunchRecovery {
 }
 export class WindowsLaunch {
   state: LaunchState;
+  private accountAdministrator?: boolean;
   private busy = false;
   recoveryPending = false;
   get isBusy() {
     return this.busy;
+  }
+  get administratorAccount() {
+    return this.accountAdministrator;
   }
   private readonly prefix: string;
   constructor(
@@ -234,6 +238,7 @@ if ($task) {
       await this.run(`${this.context()}
 @{ administratorAccount=${administratorAccountExpression}; elevated=$admin; sid=$sid; xml=$(if ($task) { $task.Xml } else { $null }); registered=($null -ne $task -and $task.Enabled); taskElevated=($null -ne $task -and $task.Definition.Principal.RunLevel -eq 1) } | ConvertTo-Json -Compress`),
     ) as LaunchTask;
+    this.accountAdministrator = data.administratorAccount;
     this.state = {
       supported: this.state.supported,
       elevated: data.elevated,
@@ -341,8 +346,14 @@ if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $expectedS
         before,
         next: { startAtLogon: next.startAtLogon, runAsAdministrator: next.runAsAdministrator },
       };
-      if (this.recovery)
-        atomicWrite(this.recovery.file, JSON.stringify(recovery), { previous: undefined });
+      if (this.recovery) {
+        try {
+          atomicWrite(this.recovery.file, JSON.stringify(recovery), { previous: undefined });
+        } catch (error) {
+          this.health?.failed();
+          throw error;
+        }
+      }
       try {
         await this.mutate(sameUser + script, elevate);
       } catch (error) {

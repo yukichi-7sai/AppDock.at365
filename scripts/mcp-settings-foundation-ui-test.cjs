@@ -464,6 +464,16 @@ async function main() {
     value,
     until,
   });
+  await require('./settings-launch-gateway-checks.cjs')({
+    page,
+    client,
+    profile,
+    local,
+    checks,
+    tool,
+    value,
+    until,
+  });
   await permissions();
   await toggle('write', 'MCP', false);
   assert.equal(

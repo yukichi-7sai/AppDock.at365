@@ -676,6 +676,8 @@ const serviceSettings = new SettingsServiceTargets({
   applets: allApplets,
   appletManagement,
   mcpSettings: () => mcpSettings,
+  launch,
+  assertWritable: assertSettingsWritable,
 });
 let aiMcpGeneration = 0;
 const aiOwner = (id?: string) =>

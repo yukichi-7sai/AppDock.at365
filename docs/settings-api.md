@@ -21,11 +21,12 @@
 | 本体の更新設定 | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可 |
 | Appletの更新元 | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外 |
 | Shell選択 | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成 |
+| Windows起動設定 | サインイン時の登録と管理者起動。PC専用保存と既存のWindows登録トランザクションを使用 |
 | Applet共通設定 | 有効状態、起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成 |
 | Applet管理順序 | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない |
 | ジェスチャー共通設定 | 3入力方式で共有するブラウザexe名の配列とChromiumウィンドウ条件。通常項目は共通宣言から生成 |
 
-起動・その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
+その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
 
 暗号化情報を持つAI/TTSの接続先や認証方式を変更し、秘密の結び付け先や消去に影響する操作はLOCAL_ACTION_REQUIRED。キーが必要になる新しい認証方式への切替もローカル操作とする。モデル・速度等の非秘密値は暗号化ファイルをそのまま保持する。Schema/値/プレビュー/ログへキー・暗号文・キーrevisionを出さず、設定用の保護判定は秘密を復号しない。破損・読取拒否のメタデータも保護ありとして扱う。Schemaのwritable/resettableで現在の操作範囲を確認する。
 
@@ -158,6 +159,16 @@ read + writeで保存でき、appliesはappletDisplayOrderChanged。dryRunは検
 取得・計画・保存の保護判定は秘密を復号しない。形式不備のある個別行のPCデータは、名前/説明だけの編集や他の行の編集で保持する。PC上で未設定の行は名簿だけを編集でき、必要な非秘密接続情報を指定して設定できる。秘密付きの壊れた接続の修復・削除はローカル操作とする。ファイル全体の不正JSON・未対応版・容量/件数超過ではavailable=falseとなり、原本を保持して保存を拒否する。
 
 read + writeで変更でき、execute/useMcpは保存の追加条件にしない。複数行の編集は既存の共有/PC専用トランザクションで一括保存し、後半の検証やファイル保存が失敗した場合も部分保存しない。無変更・dryRun・同じ要求の再送で保存を繰り返さず、共有名簿だけの変更ではPC接続ファイルを再書込みしない。applies=mcpSettingsChanged、completion=settingsSaved/effectVerified=falseであり、接続・ツール探索・stdio起動は始めない。従来の管理APIも同じ非秘密保存計画を使い、公開する状態は接続設定の状態であり、認証の成否を保証しない。接続試験と実行は[共通MCPクライアント](mcp-client-design.md)の独立した操作を使う。
+
+## Windows起動設定
+
+`category: launch`のfields対象は、保存済みstartAtLogon/runAsAdministratorを公開する。両方boolean、既定falseで、set/resetを既存のWindowsLaunchへ渡す。保存先はこのPCのsettings-<端末名>.jsonで、既定値への復帰は上書きを除去する。値は保存した希望値であり、実Windows登録や現在のトークンを示す値ではない。
+
+read + writeで変更し、execute/sendInput/runProcessesを追加条件にしない。対応可否と管理者アカウントの情報は所有サービスが確認済みのキャッシュを使い、取得・Schema・dryRunのためにPowerShellを起動しない。開発起動と未解決の復旧待ちはavailable=falseとなる。標準ユーザーの管理者起動は入力Schemaと既存所有検証で制限する。実OS状態・権限・所有タスクは保存時に再確認するため、validatedは登録成功やUAC承認の保証ではない。
+
+実保存では、既存の同一ユーザー/元EXE/引数/InteractiveToken検査、復旧journal、登録変更と照合、PC専用設定の原子的保存を完了してからsettingsSavedを返す。Windowsの待機中もrequestIdを実行中として保持し、同じ要求はBUSY、完了後の同じ要求は保存を再実行せず応答する。保存直前に最新の許可・主体・Schema・revisionを再確認し、取消や競合なら所有サービスが準備済みのWindows変更を巻き戻す。古い主体の完了・失敗で新しい主体のキャッシュを上書きしない。非同期処理に起因する失敗も同じ安全なcode/messageへ変換し、引数・パス・Task XML・生の例外を応答へ含めない。
+
+appliesはstartAtLogonがlogonTaskRegistration、runAsAdministratorがnextStartAndLogonTask。effectVerifiedはfalseで、サインインによる実起動や現在のトークン変更を保証しない。値と保存上書きの状態に変更がないsetは保存・OS登録の再同期を行わない。Highest登録の変更等で必要になるUACは既存の同一ユーザー用ヘルパーだけを使い、自動承認しない。取消はCANCELLED、登録等の失敗はAPPLY_FAILED、保存失敗はSAVE_FAILED。復元不能ならLOCAL_ACTION_REQUIREDとなり、以後はローカルの復旧を必要とする。管理者再起動・復旧実行・任意EXE/スクリプトの操作はこの対象へ追加しない。詳細は[Windows起動設定](launch-settings.md)を参照する。
 
 ## Shell選択
 

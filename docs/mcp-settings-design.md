@@ -233,6 +233,8 @@ resetは値へのnull代入と区別する。nullを値として受け付ける�
 
 requestIdはcaller単位で実行中と直近512件を保持し、同じID・同じ要求は二重適用しない。同じIDで異なる内容は拒否する。最新の公開範囲・権限・Schemaを確認してから既知requestIdを解決し、新規要求にだけ現在値のrevision検査を行う。これにより、保存成功後の再送を古いrevisionだけで失敗にせず、許可取消後や非公開化後に過去の応答を返さない。保持はプロセス内だけとし、再起動・保持範囲外・応答不明時の自動再送を保証しない。保存要求にはdryRunと別のIDを使い、最新revisionを再確認する。
 
+非同期の所有サービスも完了まで実行中として保持し、保存直前に同じ許可・主体・Schema・revisionを再検査するpreflightを渡す。所有サービスは検査失敗時に準備したOS変更等を巻き戻す。旧主体の完了・失敗は旧要求のrecordだけを更新し、新主体の同名requestIdへ書き込まない。従来の同期所有サービスとdryRunは同期応答を維持する。
+
 成功結果は`completion: validated | settingsSaved`、`changed`、`revision`、`applies`、`effectVerified: false`を基本とする。所有サービスが提供する適用状態を別に返し、settingsSavedだけで実動作確認済みとしない。
 
 主なエラーは`INVALID_ARGUMENT / NOT_FOUND / NOT_READY / WRITE_DISABLED / UNAVAILABLE / REVISION_CONFLICT / SCHEMA_CONFLICT / LOCAL_ACTION_REQUIRED / SAVE_FAILED / RESULT_TOO_LARGE`。途中の検証失敗で一部だけ保存しない。生の例外や秘密値を返さない。
@@ -292,7 +294,7 @@ requestIdはcaller単位で実行中と直近512件を保持し、同じID・同
 
 | 対象 | 対応範囲・所有処理 |
 | --- | --- |
-| 表示・一般 | 通常フィールドを共通登録。端末別保存を保持。自動起動/管理者起動はLaunchSettings、hardwareAccelerationは再起動時適用 |
+| 表示・一般 | 通常フィールドを共通登録。端末別保存を保持。自動起動/管理者起動はWindowsLaunchへ接続済みで、登録照合/保存/巻戻しを待つ。hardwareAccelerationは再起動時適用 |
 | Shell選択 | 共通領域一覧とview宣言から項目/候補を生成し、領域の増減にもツール定義の変更なしで追従。PC専用保存・指定保持・領域別フォールバックを維持。見た目の実装やShell領域は増やさない |
 | Applet固有設定 | manifestから生成。非公開指定、型、既定値、共有/PC専用の選択を維持 |
 | Applet共通設定 | 起動待ち時間・ページ表示先・更新元・有効状態・管理表示順は接続済み。通常項目は共通宣言からUI/検証/保存/MCPへ反映。有効状態は既存の管理検証、表示順は既存の並べ替えへ委譲。自身の非同期ライフサイクル操作等のSELF_CALLを維持 |
