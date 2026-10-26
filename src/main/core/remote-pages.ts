@@ -42,6 +42,11 @@ export class RemotePageService {
   accounts() {
     return this.profiles.snapshot();
   }
+  settingsProfiles() {
+    if (this.closed || this.clearing.size)
+      throw Error(hostText('services.remotePages.accountBusy'));
+    return this.profiles;
+  }
   validateAccounts(items: RemotePageDefinition[]) {
     for (const item of items) {
       this.profiles.get(item.accountId);

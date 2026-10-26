@@ -140,6 +140,7 @@ require('./settings-shell-gateway-checks.cjs').install(root, profile);
 require('./settings-applet-common-gateway-checks.cjs').install(profile);
 require('./settings-applet-management-gateway-checks.cjs').install(profile);
 require('./settings-image-gateway-checks.cjs').install(profile);
+require('./settings-web-profile-gateway-checks.cjs').install(profile);
 let child, browser, page, client;
 async function until(fn, label) {
   const end = Date.now() + 60000;
@@ -495,6 +496,16 @@ async function main() {
     value,
     until,
     fixtureId,
+  });
+  await require('./settings-web-profile-gateway-checks.cjs').check({
+    page,
+    profile,
+    local,
+    client,
+    checks,
+    tool,
+    value,
+    until,
   });
   await permissions();
   await toggle('write', 'MCP', false);

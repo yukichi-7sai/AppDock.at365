@@ -9,6 +9,8 @@ import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { useSettingsControls } from '../settings-ui/api';
+import { SettingsMcpLock } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 import { useEffect, useRef, useState } from 'react';
 import type { RemotePageDefinition as WebApplet, WebProfile } from '../../shared/web-content';
 
@@ -200,6 +202,11 @@ export function WebAccountSettings({
             <th>
               <span className="settings-list-heading">
                 {translate('settings.webAccountSettings.name')}
+                <SettingsMcpLock
+                  title={translate('settings.webAccountSettings.name')}
+                  itemId={settingsItemId('web-accounts', 'accounts')}
+                  settingKey="name"
+                />
                 <SettingsListAddButton
                   label={translate('settings.webAccountSettings.add')}
                   disabled={busy || accounts.length >= 32}
@@ -217,7 +224,14 @@ export function WebAccountSettings({
             </th>
             <th>{translate('settings.webAccountSettings.usage')}</th>
             <th className="settings-list-actions-heading">
-              {translate('settings.settingsListTable.actions')}
+              <span className="settings-list-heading">
+                {translate('settings.settingsListTable.actions')}
+                <SettingsMcpLock
+                  title={translate('settings.settingsListTable.actions')}
+                  itemId={settingsItemId('web-accounts', 'accounts')}
+                  settingKey="clearWebAccount"
+                />
+              </span>
             </th>
           </tr>
         </thead>

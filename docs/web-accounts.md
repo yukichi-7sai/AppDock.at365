@@ -34,7 +34,11 @@ Windowsでは起動前に`CalculateNativeWinOcclusion`をdisable-featuresへ追�
 {
   "webAccounts": {
     "url": "https://mail.google.com/mail/u/0/#inbox",
-    "origins": ["https://mail.google.com", "https://accounts.google.com", "https://myaccount.google.com"],
+    "origins": [
+      "https://mail.google.com",
+      "https://accounts.google.com",
+      "https://myaccount.google.com"
+    ],
     "observeOrigin": "https://mail.google.com",
     "ui": "web/index.html",
     "observer": "web/observer.js"
@@ -62,14 +66,14 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 任意のmanifest `avatarOrigins:string[]`は最大10個の厳密なHTTPS originです。観測結果のトップレベル`avatar:string`から、そのoriginの画像だけをホストが[ClientRequest](https://www.electronjs.org/docs/latest/api/client-request)で取得します（各アカウント固有のログイン済みセッション・全要求で配信先を再検証・最大3回の転送・合計5秒上限）。PNG/JPEG/WebP/GIFのみ、ストリームを含め64KBまで。デコード後64×64のPNGへ変換し、snapshotの`avatar`へdata URLを返します。失敗・画像未取得は空文字、originを離れたら破棄します。停止・削除時に待機を中断し、保存ファイル/ログ/Node readへ画像バイトを出しません。UIのCSPは外部画像を許可せず、data画像だけで表示できます。Session.fetchのmanual redirectは転送レスポンスを返さず取消エラーとなるため、ClientRequestのredirectイベントから転送先を検証します。取得はDOM読取を待たせず、同じURLは成功後キャッシュ、失敗時は最短60秒で再試行します。この契約を使うAppletの最低ホスト版は0.16.0です。
 
-| Node | RPC | 処理 |
-| --- | --- | --- |
-| `context.webAccounts.start()` | `host.webAccounts.start` | 全枠を非表示で読込開始、UIを開かない |
-| `context.webAccounts.open()` | `host.webAccounts.open` | 操作用ウィンドウを表示・復帰 |
-| `context.webAccounts.cycle(1|-1)` | `host.webAccounts.cycle` | 次/前の枠へ循環して選択。ウィンドウ表示/復元/フォーカス移動なし |
-| `context.webAccounts.navigate(action)` | `host.webAccounts.navigate` | back/forward/reload/inboxだけを受け付け、選択中のViewを操作。停止中は拒否 |
-| `context.webAccounts.read()` | `host.webAccounts.read` | 各枠の観測結果とUIからのクリア要求を返す |
-| `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report` | アカウントの状態表示と一時UIデータを更新 |
+| Node                                                       | RPC                         | 処理                                                                      |
+| ---------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------- |
+| `context.webAccounts.start()`                              | `host.webAccounts.start`    | 全枠を非表示で読込開始、UIを開かない                                      |
+| `context.webAccounts.open()`                               | `host.webAccounts.open`     | 操作用ウィンドウを表示・復帰                                              |
+| `context.webAccounts.cycle(1                               | -1)`                        | `host.webAccounts.cycle`                                                  | 次/前の枠へ循環して選択。ウィンドウ表示/復元/フォーカス移動なし |
+| `context.webAccounts.navigate(action)`                     | `host.webAccounts.navigate` | back/forward/reload/inboxだけを受け付け、選択中のViewを操作。停止中は拒否 |
+| `context.webAccounts.read()`                               | `host.webAccounts.read`     | 各枠の観測結果とUIからのクリア要求を返す                                  |
+| `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report`   | アカウントの状態表示と一時UIデータを更新                                  |
 
 `read`の戻り値は`{ dark, selected, accounts, acknowledged, monitoringResets }`。アカウントは`id/name/monitoring/avatar/url/loading/error/canGoBack/canGoForward/observation/status/attention/data/sound/soundError`を持ちます。型は[src/shared/web-accounts.ts](../src/shared/web-accounts.ts)、Node contextは[src/main/node-worker.ts](../src/main/node-worker.ts)が正本です。dataはJSON化可能な50KB以下の値で、ローカルUIのsnapshotへ渡します。省略時はnull。ホストはファイルやログに保存せず、Applet停止時に破棄します。Nodeへの`read`ではdataをnull、avatarを空文字にし、最大10枠の観測と履歴の二重送信でJSON-RPCの1MB制限を超えないようにします。
 
@@ -128,6 +132,8 @@ Webアカウントのsession/表示WebContentsView/背景Windowは、Chromiumが
 web-profiles capabilityとcontext.webProfiles.list/add/rename/clear/deleteは、Applet自身のログイン保存枠を管理します。任意URLのページ表示にはpageCollectionsのsource:remoteを使います。Cookieやsession、任意保存パスはAppletへ渡しません。上記webAccountsのサービス観測・専用UIとは別契約です。Gmail等の既存APIと保存先を維持します。
 
 新規名簿は共有data/web-profiles/<owner>/accounts.json、sessionと削除待ちはPC専用web-profiles/<owner>です。宣言と操作の詳細は[動的ページ設計](applet-pages.md)を参照してください。
+
+MCPは[共通設定APIの名簿対象](settings-api.md#webアカウント名簿)から、提供元ごとのID/名前を取得し、枠の追加・名前変更を行います。UIと同じ所有サービスで競合を確認して名簿だけを保存し、Cookie/sessionと削除待ち記録を維持します。削除・ログイン情報のクリアはローカル操作です。この入口はサービス観測用webAccounts/accountGroupの名簿を公開しません。
 
 ## 宣言と公開契約
 

@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-27: Webアカウント公開名簿のMCP対応 0.96.4
+
+- main `7531fa445bcfdc5c18cecf756664c208af5386ee`のclean状態を確認し、追跡先から`pull --ff-only`（Already up to date）後に継続した。既存のweb-profiles名簿を固定6入口へ接続する変更で、設定項目・保存形式/ファイル種類・操作許可・MCPツールの追加はないため、パッチを0.96.3から**0.96.4**へ進めた。旧MCP worktreeと無関係な作業は保持し、今回の変更はmainで行った。
+- `web-profiles`を宣言した提供元ごとにlist対象を自動生成し、ID/名前の取得、枠の追加、名前変更を公開。IDは読取り専用で追加時に`account.<UUID>`を生成し、最大32件、名前1～80文字/空白正規化/制御文字拒否を既存parserで検証する。同名行をitemRefで区別し、挿入時も既存行同士の順序を保持する。削除・クリア・並べ替え・認証編集は公開しない。名前列とローカル専用操作列の南京錠は同じownerのメタデータから判定する。
+- UIとMCPの追加/名前変更をWebProfileStoreの変更計画と原子的保存へそろえ、元のファイルbytesによる競合を保存直前にも確認する。未編集の未知属性、既存ID、設定JSONのbytes/revision、削除待ち記録、session、暗号化ファイルを保持した。読取り/dryRunだけでは名簿を作成せず、明示addだけが空の名簿を初期化する。公開読取りからRemotePageServiceの初期化・session整理・ページ表示を行わない。停止中・複数提供元・既存移行先にも対応する。
+- 発行前レビューで公開/権限、提供元の寿命、旧名簿とローカル状態、未知データ、同名/ID/最大件数、競合/再送、エラーの秘匿、UIの確定/取消と削除ガードを確認し、阻害指摘なし。公開IDの表示名を専用の翻訳キーへ修正した。追加/名前変更がローカル削除待ちを書かなくなるため、既存同期試験の競合注入を共有ファイルの一時書込みへ移し、同期中の配信を上書きしない同じ性質を確認した。初期の型診断、fixtureの設定初期化/移行形式/select optionsの不足は修正し、失敗ログも保持した。
+- 固定lockfile install、整形、型検査、本体/Default Shell build、標準**131ファイル1116/1116件（fail/cancel/skip 0）**が成功。新規**11件**は公開範囲、dryRun/保存/再送/無変更、未知属性とローカル状態の保持、追加/候補/再起動、後半の不正変更の原子的拒否、古い要求/cursor、破損/未到着、複数提供元/移行、稼働サービスの再利用とbusy、保存直前の競合、権限取消/件数上限を確認する。標準成功後の4入力差分はfixtureのoptions宣言、GUI helper、公開IDの表示名と翻訳資源に限られ、新規11件を再実行し、最終入力で名簿/同期/MCP可否/翻訳の**41/41件**を再確認した。無関係な成功回帰は再利用し、照合差分と根拠をvalidation.jsonへ記録した。
+- sourceの実MCP **51群**、発行した固定EXEの実MCP **53群**と隔離smokeが成功。MCPと画面の追加/名前変更、動的なアカウント候補、古い要求/cursorの拒否、非公開列と削除/並べ替えの拒否、固定tools/list不変、未知属性・検証用Cookie相当bytes・削除待ち・暗号化3ファイルの保持を確認した。source試験後の製品差分はIDの表示名と翻訳だけで、最終の固定EXEで全群を確認。画面画像も確認し、既存の共通一覧・名前入力・ローカル操作を維持している。
+- 通常発行先`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**0.96.4 / 170,726,144 bytes / SHA256 `dda149cc5080c2c0976839d335fb95ff80765b25be7d03c92218b09962cc47db`**。ASAR SHA256は`c6756659ab863d3f8b58111b5975a9d244778e474e42372f3ad0f8816393c2f6`、feed SHA256は`7f2bc638b45c4778312dcf45fdec167f4382b932e6e6c4df38743c236e9691a6`。梱包した**251出力・621 resource**を生成元と全件照合し、EXE File/ProductVersion・package・Default Shellの版とfeedのsize/hashが一致した。固定試験用EXEコピーも最終EXEと一致する。
+- 最終の型検査/影響回帰・発行・固定試験の前後でソース/テスト/依存/ビルド入力と参照Applet manifestのhash一致を確認。環境はLUNA、Windows 11 x64 10.0.26300、Node 24.22.1、pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.403。完全ログ・入力照合・レビュー・発行物照合は`.artifacts/mcp-settings-web-profiles-20261027/`、stage/tree/commitの根拠は`.artifacts/commit-validation-mcp-settings-web-profiles-20261027/`。
+- 後片付けでは専用GUIプロセス0、検証用Windowsタスクが未登録かつXMLなしを確認した。今回の成功資料・固定コピー、過去のコミット根拠、fixture診断、個別の完了マーカーがない単体出力は保持し、削除0。既存のdeploy設定/スクリプトと発行先の利用者設定を保持した。Pause/F13～F24の送信/登録、実ログイン/実Cookie消去、実UAC同意、Windowsサインインの試験は行っていない。Gmail等のweb-accounts/accountGroup専用名簿は別範囲。push・Release・実利用先deployは行っていない。
+
 ## 2026-10-27: 登録画像参照のMCP設定対応 0.96.3
 
 - cleanなmain `dbd83eb`から開始し、既存追跡先を`pull --ff-only`して最新取得済みを確認した。今回からprimary mainで継続し、旧MCP設定worktreeは変更しない。既存のregistered-image型・保存参照/ID・固定6入口を拡張する通常修正で、新しい保存設定/ファイル・操作許可・MCPツールは追加せず、**0.96.3**へパッチ更新した。push/Release/実利用deployは行わない。

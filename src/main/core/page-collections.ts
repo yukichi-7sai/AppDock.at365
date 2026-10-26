@@ -6,6 +6,7 @@ import { collectionPages, type CollectionPage } from '../../shared/page-collecti
 import type { RemotePageDefinition } from '../../shared/web-content';
 import { RemotePageService } from './remote-pages';
 import { WebProfileStore } from './web-profiles';
+import { webProfileSettingsTarget } from './settings-web-profile-target';
 import { closeAppletPages } from './applet-pages';
 import { parseKeybindingDefaults } from '../../shared/keybindings';
 
@@ -76,6 +77,26 @@ export class PageCollectionManager {
     return this.readProfiles(owner)
       .snapshot()
       .map((account) => ({ value: account.id, label: account.name }));
+  }
+  settingsTargets(checkRevision: (revision: string) => void) {
+    return this.options
+      .parents()
+      .filter((parent) => parent.capabilities?.includes('web-profiles'))
+      .map((parent) => {
+        let store: WebProfileStore | undefined;
+        try {
+          store = this.services.get(parent.id)?.settingsProfiles() ?? this.readProfiles(parent.id);
+        } catch {
+          // Discovery reports an unavailable owner without exposing raw I/O errors.
+        }
+        return webProfileSettingsTarget({
+          ownerId: parent.id,
+          title: parent.displayName,
+          store,
+          checkRevision,
+          changed: this.options.changed,
+        });
+      });
   }
   private readProfiles(owner: string) {
     const store = new WebProfileStore(this.locations(owner).file);

@@ -1093,7 +1093,10 @@ const operationApi = new AppDockApi({
       return false;
     }
   },
-  serviceSettingsTargets: () => serviceSettings.targets(),
+  serviceSettingsTargets: () => [
+    ...serviceSettings.targets(),
+    ...pageCollections.settingsTargets((revision) => settingsCommands.checkRevision(revision)),
+  ],
   settingsPrincipal: () => automation?.principal() ?? '',
   handlers: {
     'mcp.servers.getSettings': async (p) =>

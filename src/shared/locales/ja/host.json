@@ -1044,6 +1044,7 @@
   "settings.updateSettings.defaultSource": "既定: {{defaultSource}}",
   "settings.updateSettings.disableHint": "空欄を保存すると更新確認を無効にします。",
   "settings.updateSettings.reset": "既定に戻す",
+  "settings.webAccountSettings.id": "アカウントID",
   "settings.webAccountSettings.nameLabel": "アカウント名 {{name}}",
   "settings.webAccountSettings.rename": "名前を変更",
   "settings.webAccountSettings.clear": "ログイン情報をクリア",

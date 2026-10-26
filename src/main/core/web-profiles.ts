@@ -1,7 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { atomicWrite } from './settings';
 import { observeFile } from './file-observer';
 import {
@@ -10,6 +10,20 @@ import {
   webProfileName,
   type WebProfile,
 } from '../../shared/web-content';
+
+export class WebProfileSettingsError extends Error {
+  constructor(readonly code: 'INVALID_ARGUMENT' | 'REVISION_CONFLICT' | 'UNAVAILABLE') {
+    super(
+      hostText(
+        code === 'REVISION_CONFLICT'
+          ? 'services.webProfiles.changed'
+          : code === 'INVALID_ARGUMENT'
+            ? 'services.settingsTargets.invalid'
+            : 'services.settingsTargets.unavailable',
+      ),
+    );
+  }
+}
 
 /** Account operations own their file and never change the settings revision. */
 export class WebProfileStore {
@@ -76,6 +90,55 @@ export class WebProfileStore {
   snapshot() {
     return structuredClone(this.value);
   }
+  /** Public roster access never initializes a session or processes pending deletions. */
+  publicConfiguration() {
+    const previous = this.unchanged(true);
+    return {
+      accounts: this.snapshot(),
+      revision: createHash('sha256')
+        .update(JSON.stringify([previous?.toString('base64') ?? null, this.pending]))
+        .digest('hex'),
+    };
+  }
+  planPublicConfiguration(rows: unknown, expectedRevision: string) {
+    const current = this.publicConfiguration();
+    if (current.revision !== expectedRevision)
+      throw new WebProfileSettingsError('REVISION_CONFLICT');
+    const accounts = parseWebProfiles(rows);
+    // Only additions and names are public. Existing identities and their relative order survive.
+    const existing = accounts.filter((a) => current.accounts.some((p) => p.id === a.id));
+    if (
+      existing.length !== current.accounts.length ||
+      existing.some((a, index) => a.id !== current.accounts[index].id)
+    )
+      throw new WebProfileSettingsError('INVALID_ARGUMENT');
+    const changed = JSON.stringify(accounts) !== JSON.stringify(current.accounts);
+    const previous = this.unchanged(accounts.length > current.accounts.length);
+    const raw = previous
+      ? JSON.parse(previous.toString('utf8').replace(/^\uFEFF/, ''))
+      : { schemaVersion: 1, accounts: [] };
+    const saved = {
+      ...raw,
+      accounts: accounts.map((a) => {
+        const before = raw.accounts.find((p: WebProfile) => p.id === a.id);
+        const known = current.accounts.find((p) => p.id === a.id);
+        return before ? { ...before, ...(known?.name === a.name ? {} : { name: a.name }) } : a;
+      }),
+    };
+    const text = JSON.stringify(saved, null, 2) + '\n';
+    if (Buffer.byteLength(text) > 65536) throw new WebProfileSettingsError('INVALID_ARGUMENT');
+    return {
+      changed,
+      commit: () => {
+        if (this.publicConfiguration().revision !== expectedRevision)
+          throw new WebProfileSettingsError('REVISION_CONFLICT');
+        if (!changed) return;
+        // Keep unknown roster data and all local cleanup/session state byte-for-byte.
+        atomicWrite(this.file, text, { previous });
+        this.value = accounts;
+      },
+    };
+  }
   get(id: unknown) {
     const result = profileId(id) ? this.value.find((a) => a.id === id) : undefined;
     if (!result) throw Error(hostText('services.webProfiles.missing'));
@@ -129,13 +192,18 @@ export class WebProfileStore {
     const account = { id: `account.${randomUUID()}`, name: webProfileName(rawName) };
     // A deliberate add can recover an empty roster left behind by old settings.
     // Still re-read any delivered file before saving; never initialize at startup.
-    this.save([...this.value, account], this.pending, this.value.length === 0);
+    const current = this.publicConfiguration();
+    this.planPublicConfiguration([...current.accounts, account], current.revision).commit();
     return { ...account };
   }
   rename(id: unknown, rawName: unknown) {
     const a = this.get(id),
       name = webProfileName(rawName);
-    this.save(this.value.map((p) => (p.id === a.id ? { ...p, name } : p)));
+    const current = this.publicConfiguration();
+    this.planPublicConfiguration(
+      current.accounts.map((p) => (p.id === a.id ? { ...p, name } : p)),
+      current.revision,
+    ).commit();
   }
   remove(id: unknown) {
     const a = this.get(id);

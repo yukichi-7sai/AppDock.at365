@@ -176,19 +176,23 @@ test('a roster delivered during the first local save is not overwritten', (t) =>
     accounts: [{ id: 'account.00000000-0000-0000-0000-000000000001', name: 'delivered' }],
   });
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const rename = fs.renameSync;
+  const write = fs.writeFileSync;
   let delivered = false;
-  fs.renameSync = (source, destination) => {
-    rename(source, destination);
-    if (!delivered && destination === path.join(local, 'pending-deletion.json')) {
+  fs.writeFileSync = (destination, ...args) => {
+    write(destination, ...args);
+    if (
+      !delivered &&
+      String(destination).startsWith(file + '.') &&
+      String(destination).endsWith('.tmp')
+    ) {
       delivered = true;
-      fs.writeFileSync(file, remote);
+      write(file, remote);
     }
   };
   try {
     assert.throws(() => store.add('local addition'), /別の場所/);
   } finally {
-    fs.renameSync = rename;
+    fs.writeFileSync = write;
   }
   assert.equal(delivered, true);
   assert.equal(fs.readFileSync(file, 'utf8'), remote);
