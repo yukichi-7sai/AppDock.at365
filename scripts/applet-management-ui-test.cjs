@@ -523,7 +523,9 @@ async function until(fn, name) {
     await open();
     await page.getByRole('button', { name: 'Appletを並べ替え', exact: true }).click();
     const orderDialog = page.getByRole('dialog');
-    await orderDialog.getByRole('button', { name: 'test.bを上へ', exact: true }).click();
+    await orderDialog
+      .getByRole('button', { name: 'test.bの順番を変更', exact: true })
+      .press('ArrowUp');
     await orderDialog.getByRole('button', { name: 'OK', exact: true }).click();
     await until(async () => (await ids())[0] === 'test.b', 'saved order');
     const order = (await page.evaluate(() => window.dock.snapshot())).settings.value.appletOrder;

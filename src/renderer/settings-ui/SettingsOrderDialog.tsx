@@ -1,5 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { OrderDialogFrame } from './OrderDialogFrame';
 
 export interface SettingsOrderItem {
@@ -32,6 +32,16 @@ export function SettingsOrderDialog({
   const [error, setError] = useState('');
   const dragged = useRef('');
   const saving = useRef(false);
+  const handles = useRef(new Map<string, HTMLButtonElement>());
+  const movedHandle = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const id = movedHandle.current;
+    movedHandle.current = null;
+    if (!id) return;
+    const handle = handles.current.get(id);
+    handle?.focus({ preventScroll: true });
+    handle?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [rows]);
   const move = (from: string, to: string) => {
     if (saving.current) return;
     const next = [...rows];
@@ -104,11 +114,17 @@ export function SettingsOrderDialog({
             <button
               type="button"
               className="shortcut-order-handle"
+              ref={(element) => {
+                if (element) handles.current.set(item.id, element);
+                else handles.current.delete(item.id);
+              }}
               data-testid={`settings-order-handle:${item.id}`}
               draggable={!pending}
               disabled={pending}
               data-initial-focus={index === 0 || undefined}
               aria-label={translate('settings.settingsOrderDialog.drag', { title: item.title })}
+              aria-keyshortcuts="ArrowUp ArrowDown"
+              title={translate('settings.settingsOrderDialog.dragHint')}
               onDragStart={(event) => {
                 if (saving.current) {
                   event.preventDefault();
@@ -123,10 +139,23 @@ export function SettingsOrderDialog({
                 setOver('');
               }}
               onKeyDown={(event) => {
-                if (event.altKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
+                if (
+                  !saving.current &&
+                  !event.nativeEvent.isComposing &&
+                  event.keyCode !== 229 &&
+                  !event.altKey &&
+                  !event.ctrlKey &&
+                  !event.metaKey &&
+                  !event.shiftKey &&
+                  ['ArrowUp', 'ArrowDown'].includes(event.key)
+                ) {
                   event.preventDefault();
+                  event.stopPropagation();
                   const target = rows[index + (event.key === 'ArrowUp' ? -1 : 1)];
-                  if (target) move(item.id, target.id);
+                  if (target) {
+                    movedHandle.current = item.id;
+                    move(item.id, target.id);
+                  }
                 }
               }}
             >
@@ -136,28 +165,6 @@ export function SettingsOrderDialog({
             <div className="shortcut-order-command">
               <strong title={item.title}>{item.title}</strong>
               {item.description && <small title={item.description}>{item.description}</small>}
-            </div>
-            <div className="shortcut-order-moves">
-              <button
-                type="button"
-                aria-label={translate('settings.settingsOrderDialog.up', { title: item.title })}
-                className="secondary"
-                data-testid={`settings-order-up:${item.id}`}
-                disabled={pending || !index}
-                onClick={() => move(item.id, rows[index - 1].id)}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                aria-label={translate('settings.settingsOrderDialog.down', { title: item.title })}
-                data-testid={`settings-order-down:${item.id}`}
-                className="secondary"
-                disabled={pending || index === rows.length - 1}
-                onClick={() => move(item.id, rows[index + 1].id)}
-              >
-                ↓
-              </button>
             </div>
           </li>
         ))}

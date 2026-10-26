@@ -167,7 +167,7 @@ async function closeDialog(page) {
     await until(async () => (await own()).items.length === 2, 'host adds valid site');
     const addedId = (await own()).items.find((entry) => entry.name === '追加サイト').id;
     await field('items', 'list:order').click();
-    await page.getByTestId('settings-order-handle:0').press('Alt+ArrowDown');
+    await page.getByTestId('settings-order-handle:0').press('ArrowDown');
     assert.equal((await own()).items[0].id, 'site.one');
     await dialog.press('Escape');
     assert.equal(
@@ -175,7 +175,7 @@ async function closeDialog(page) {
       true,
     );
     await field('items', 'list:order').click();
-    await page.getByTestId('settings-order-up:1').click();
+    await page.getByTestId('settings-order-handle:1').press('ArrowUp');
     await confirm();
     await until(async () => (await own()).items[0].id === addedId, 'host saves order');
     await field('items', `list:delete:${addedId}`).click();
@@ -211,8 +211,11 @@ async function closeDialog(page) {
 
     const shortcutsBeforeConflict = structuredClone((await own()).shortcutDefaults);
     await field('shortcutDefaults', 'list:order').click();
-    await page.getByTestId('settings-order-handle:0').press('Alt+ArrowDown');
-    assert.equal(await page.getByTestId('settings-order-up:0').isEnabled(), true);
+    await page.getByTestId('settings-order-handle:0').press('ArrowDown');
+    assert.equal(
+      await dialog.locator('.shortcut-order-row').nth(1).getAttribute('data-order-id'),
+      '0',
+    );
     assert.deepEqual((await own()).shortcutDefaults, shortcutsBeforeConflict);
     await host.evaluate(async (owner) => {
       const s = await window.dock.snapshot();
@@ -221,7 +224,11 @@ async function closeDialog(page) {
     }, owner);
     await confirm();
     await dialog.getByRole('alert').waitFor();
-    assert.equal(await page.getByTestId('settings-order-up:0').isEnabled(), true);
+    assert.equal(
+      await dialog.locator('.shortcut-order-row').nth(1).getAttribute('data-order-id'),
+      '0',
+    );
+    assert.equal(await page.getByTestId('settings-order-handle:0').isEnabled(), true);
     assert.deepEqual((await own()).shortcutDefaults, [...shortcutsBeforeConflict].reverse());
     await closeDialog(page);
     checks.push('conflicting order update rejected; local order and cancellation remain available');

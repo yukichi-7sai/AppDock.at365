@@ -147,7 +147,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     await page
       .locator(`[data-binding-id="${b}"] .binding-row-actions button`)
       .evaluateAll((buttons) => buttons.map((button) => button.title)),
-    ['編集', 'このジェスチャーの設定（複数のコマンド）', '削除'],
+    ['割り当てを編集', 'このジェスチャーの設定（複数のコマンド）', '割り当てを削除'],
   );
   await page.locator(`[data-binding-id="${b}"] .binding-order`).click();
   assert.deepEqual(await orderIds(), [b, a], 'full gesture group despite filtered command list');
@@ -160,14 +160,12 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
   assert.equal((await orderIds()).length, 1);
   await orderPanel.getByLabel('設定するジェスチャー').selectOption('move-left');
   assert.deepEqual(await orderIds(), [a, b]);
-  await orderPanel
-    .locator(`[data-order-binding="${a}"] .shortcut-order-handle`)
-    .press('Alt+ArrowDown');
+  await orderPanel.locator(`[data-order-binding="${a}"] .shortcut-order-handle`).press('ArrowDown');
   assert.deepEqual(await orderIds(), [b, a]);
   await orderPanel
     .locator(`[data-order-binding="${a}"]`)
-    .getByRole('button', { name: /を上へ/ })
-    .click();
+    .locator('.shortcut-order-handle')
+    .press('ArrowUp');
   await orderPanel.getByRole('button', { name: '適用', exact: true }).click();
   await save();
   rows = await saved();

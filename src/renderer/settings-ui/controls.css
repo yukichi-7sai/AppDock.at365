@@ -2797,13 +2797,50 @@ summary {
   width: 34%;
 }
 .command-binding-table.binding-conditions-layout .binding-gesture-heading {
-  width: 20%;
+  width: 18%;
+}
+.command-binding-table.binding-conditions-layout :is(th, td) {
+  padding-inline: 12px;
+}
+.command-binding-table.binding-conditions-layout .binding-trigger-actions-heading {
+  width: 32px;
+}
+.command-binding-table.binding-conditions-layout .binding-assignment-actions-heading {
+  width: 70px;
+}
+.command-binding-table.binding-conditions-layout
+  :is(.binding-trigger-actions-heading, .binding-trigger-actions-cell) {
+  padding-inline: 0 12px;
+}
+.shortcut-command-list
+  .binding-conditions-layout
+  :is(.binding-trigger-actions-cell, .binding-assignment-actions-cell) {
+  vertical-align: middle;
+  padding-block: 8px;
+}
+.binding-conditions-layout
+  tbody
+  > tr:not(:last-child)
+  > :is(.binding-trigger-actions-cell, .binding-assignment-actions-cell) {
+  border-bottom: 0;
 }
 .binding-conditions-layout .binding-condition-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
+}
+.binding-disabled-badge {
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 .binding-conditions-layout .binding-row-actions {
   flex: none;
@@ -2914,14 +2951,24 @@ summary {
   .binding-conditions-layout
   tbody
   > tr:not(:first-child)
-  > td:is(.binding-value-cell, .binding-condition-cell) {
+  > td:is(
+    .binding-value-cell,
+    .binding-condition-cell,
+    .binding-trigger-actions-cell,
+    .binding-assignment-actions-cell
+  ) {
   padding-top: 2px;
 }
 .shortcut-command-list
   .binding-conditions-layout
   tbody
   > tr:not(:last-child)
-  > td:is(.binding-value-cell, .binding-condition-cell) {
+  > td:is(
+    .binding-value-cell,
+    .binding-condition-cell,
+    .binding-trigger-actions-cell,
+    .binding-assignment-actions-cell
+  ) {
   padding-bottom: 2px;
 }
 .command-binding-table
@@ -3473,6 +3520,12 @@ summary {
 .order-dialog-frame {
   width: min(760px, calc(100vw - 32px));
 }
+.order-dialog-frame > header .settings-title-with-hint {
+  margin-top: 6px;
+}
+.order-dialog-frame > header h2 {
+  margin: 0;
+}
 .shortcut-order-key {
   display: flex;
   align-items: center;
@@ -3550,6 +3603,7 @@ summary {
 }
 .shortcut-order-handle {
   cursor: grab;
+  scroll-margin-block: 4px;
   padding: 4px;
   background: transparent;
   border: 0;
@@ -3596,17 +3650,6 @@ summary {
 .shortcut-order-command small {
   color: var(--muted);
   font-size: 11px;
-}
-.shortcut-order-moves {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-.shortcut-order-moves button {
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
 }
 .shortcut-order-notice {
   min-height: 32px;

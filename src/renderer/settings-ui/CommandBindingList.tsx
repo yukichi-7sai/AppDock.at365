@@ -164,7 +164,12 @@ export function CommandBindingList<R extends { id: string; command: string; enab
     );
     setEditing(null);
   };
-  const rowActions = (command: UiCommand, row: R | null, multiple: boolean) =>
+  const rowActions = (
+    command: UiCommand,
+    row: R | null,
+    multiple: boolean,
+    part: 'all' | 'trigger' | 'binding' = 'all',
+  ) =>
     row &&
     !readOnly?.(row) && (
       <div
@@ -175,63 +180,69 @@ export function CommandBindingList<R extends { id: string; command: string; enab
           value: inputLabel(row),
         })}
       >
-        <button
-          type="button"
-          className="settings-list-icon applet-shortcut-edit"
-          title={translate('settings.commandBindingList.edit')}
-          aria-label={translate('settings.commandBindingList.editInput', {
-            title: command.title,
-            value: inputLabel(row),
-          })}
-          onClick={() => open(command, row)}
-        >
-          <ListIcon kind="pencil" />
-        </button>
-        <button
-          type="button"
-          className={`settings-list-icon binding-order${multiple ? ' accent-action' : ''}`}
-          title={translate('settings.commandBindingList.inputOrder', {
-            inputName,
-            value: multiple ? translate('settings.commandBindingList.multiple') : '',
-          })}
-          aria-label={translate('settings.commandBindingList.executionOrder', {
-            title: command.title,
-            value: inputLabel(row),
-          })}
-          aria-description={
-            multiple
-              ? translate('settings.commandBindingList.multipleHint', { inputName })
-              : undefined
-          }
-          data-multiple-commands={multiple}
-          onClick={() => {
-            rememberPosition();
-            setOrderKey(row);
-          }}
-        >
-          <ListIcon kind="edit" />
-        </button>
-        <button
-          type="button"
-          className="settings-list-icon settings-list-delete binding-delete"
-          data-testid={`binding-delete:${row.id}`}
-          title={translate('settings.commandBindingList.delete')}
-          aria-label={translate('settings.commandBindingList.deleteBinding', {
-            title: command.title,
-            value: inputLabel(row),
-          })}
-          onClick={() => {
-            rememberPosition();
-            setNotice('');
-            setDeleting({
-              row: structuredClone(row),
+        {part !== 'trigger' && (
+          <button
+            type="button"
+            className="settings-list-icon applet-shortcut-edit"
+            title={translate('settings.commandBindingList.edit')}
+            aria-label={translate('settings.commandBindingList.editInput', {
               title: command.title,
-              description: `${inputLabel(row)} · ${conditionLabel(row, command)}`,
-            });
-          }}
-        >
-          <ListIcon kind="delete" />
-        </button>
+              value: inputLabel(row),
+            })}
+            onClick={() => open(command, row)}
+          >
+            <ListIcon kind="pencil" />
+          </button>
+        )}
+        {part !== 'binding' && (
+          <button
+            type="button"
+            className={`settings-list-icon binding-order${multiple ? ' accent-action' : ''}`}
+            title={translate('settings.commandBindingList.inputOrder', {
+              inputName,
+              value: multiple ? translate('settings.commandBindingList.multiple') : '',
+            })}
+            aria-label={translate('settings.commandBindingList.executionOrder', {
+              title: command.title,
+              value: inputLabel(row),
+            })}
+            aria-description={
+              multiple
+                ? translate('settings.commandBindingList.multipleHint', { inputName })
+                : undefined
+            }
+            data-multiple-commands={multiple}
+            onClick={() => {
+              rememberPosition();
+              setOrderKey(row);
+            }}
+          >
+            <ListIcon kind="edit" />
+          </button>
+        )}
+        {part !== 'trigger' && (
+          <button
+            type="button"
+            className="settings-list-icon settings-list-delete binding-delete"
+            data-testid={`binding-delete:${row.id}`}
+            title={translate('settings.commandBindingList.delete')}
+            aria-label={translate('settings.commandBindingList.deleteBinding', {
+              title: command.title,
+              value: inputLabel(row),
+            })}
+            onClick={() => {
+              rememberPosition();
+              setNotice('');
+              setDeleting({
+                row: structuredClone(row),
+                title: command.title,
+                description: `${inputLabel(row)} · ${conditionLabel(row, command)}`,
+              });
+            }}
+          >
+            <ListIcon kind="delete" />
+          </button>
+        )}
       </div>
     );
   const addButtons = (command: UiCommand) =>
@@ -274,9 +285,23 @@ export function CommandBindingList<R extends { id: string; command: string; enab
             {separateConditions ? inputName : translate('settings.commandBindingList.binding')}
           </th>
           {separateConditions && (
+            <th
+              className="binding-trigger-actions-heading"
+              scope="col"
+              aria-label={translate('settings.commandBindingList.triggerActions')}
+            />
+          )}
+          {separateConditions && (
             <th className="binding-condition-heading">
               {translate('settings.commandBindingList.when')}
             </th>
+          )}
+          {separateConditions && (
+            <th
+              className="binding-assignment-actions-heading"
+              scope="col"
+              aria-label={translate('settings.commandBindingList.bindingActions')}
+            />
           )}
           {!separateConditions && (
             <th className="binding-actions-heading">
@@ -387,7 +412,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                             <kbd>{inputLabel(row)}</kbd>
                           )}
                           {!separateConditions && <span>{conditionLabel(row, command)}</span>}
-                          {!row.enabled && (
+                          {!separateConditions && !row.enabled && (
                             <small>{translate('settings.commandBindingList.disabled')}</small>
                           )}
                           {readOnly?.(row) && <small>{readOnly(row)}</small>}
@@ -400,8 +425,18 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                     </div>
                   </td>
                   {separateConditions && (
+                    <td className="binding-trigger-actions-cell">
+                      {rowActions(command, row, multiple, 'trigger')}
+                    </td>
+                  )}
+                  {separateConditions && (
                     <td className="binding-condition-cell">
                       <div className="binding-condition-content">
+                        {row && !row.enabled && (
+                          <span className="binding-disabled-badge">
+                            {translate('settings.commandBindingList.disabled')}
+                          </span>
+                        )}
                         {row ? (
                           readOnly?.(row) ? (
                             <span>{conditionLabel(row, command)}</span>
@@ -423,8 +458,12 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                         ) : (
                           <span className="muted">—</span>
                         )}
-                        {rowActions(command, row, multiple)}
                       </div>
+                    </td>
+                  )}
+                  {separateConditions && (
+                    <td className="binding-assignment-actions-cell">
+                      {rowActions(command, row, multiple, 'binding')}
                     </td>
                   )}
                   {!separateConditions && (
