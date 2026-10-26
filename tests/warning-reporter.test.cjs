@@ -6,7 +6,6 @@ const { WarningReporter } = require('../out/main/main/core/warning-reporter');
 const { ErrorReporter } = require('../out/main/main/core/error-reporter');
 const { TypedNotifications } = require('../out/main/main/core/typed-notifications');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const {
   notificationCatalog,
@@ -29,12 +28,7 @@ function fixture(t) {
     logs = [],
     publications = [];
   settings.host.notifications = false;
-  const history = new NotificationHistoryStore(
-    path.join(dir, 'history.json'),
-    () => {},
-    () => now,
-  );
-  const service = new NotificationService(history, () => now);
+  const service = new NotificationService(() => now);
   const typed = new TypedNotifications(service, {
     settings: () => settings,
     applets: () => [],
@@ -58,7 +52,6 @@ function fixture(t) {
     reporter,
     typed,
     service,
-    history,
     active: () => service.list().filter((i) => i.status === 'active'),
     advance: (ms) => {
       now += ms;
@@ -92,7 +85,7 @@ test('warnings have independent preferences and safe history; details stay in lo
   assert.equal(f.active()[0].expiresAt, undefined);
   assert.equal(f.logs.length, 2);
   assert.equal(f.publications.length, 1);
-  assert(!JSON.stringify(f.history.list()).includes('C:\\fixture'));
+  assert(!JSON.stringify(f.service.historyEntries()).includes('C:\\fixture'));
   assert(!f.active()[0].body.includes('C:\\fixture'));
   f.prefs({ targets: [], durationSeconds: null });
   assert.deepEqual(f.active()[0].targets, ['banner']);

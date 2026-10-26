@@ -47,7 +47,7 @@ HTTPの2xxはWebhookの受領を表し、dotの仕事の完了を表さない。
 - UIは通知先の選択肢に「MCP Events」を追加する。送信内容がタイトルと本文であることを表示する。
 - 「通知センターのみ」は既存の通知先・読み上げと一緒にMCP EventsもOFFにする。必須バナー等の既存制約は保持する。
 - 通知種類のON/OFFは購読先の選択と別。ONでも購読がなければ送信しない。
-- `TypedNotifications.options.published`から連携する。表示変更、既読、期限変更、同じdedupeKeyの更新だけでは再配信しない。新しい通知episodeは新しいイベントとなる。
+- `TypedNotifications.options.published`から連携する。表示変更、期限変更、同じdedupeKeyの更新だけでは再配信しない。新しい通知episodeは新しいイベントとなる。
 - 過去の通知・履歴をON変更時にまとめて送らない。未宣言の通知種類や停止済みgenerationの発行は既存基盤で拒否される。
 - 既存の読み上げも同じ発行口で呼ぶ。デスクトップ/Windows/バナー表示、通知本文、Applet SDKの呼出し契約は変更しない。
 

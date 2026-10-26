@@ -39,9 +39,9 @@ body {
   overflow: auto;
 }
 .notification-card {
+  position: relative;
   flex-shrink: 0;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--notification-accent);
+  border: 1px solid color-mix(in srgb, var(--notification-accent) 40%, var(--card));
   border-radius: 12px;
   background: var(--card);
   padding: 14px 16px;
@@ -50,11 +50,13 @@ body {
   align-items: center;
   gap: 16px;
 }
-.notification-card.level-warning {
-  --border: #c59744;
+.notification-card.dismissible {
+  padding-right: 52px;
 }
-.notification-card.level-error {
-  --border: #cb646a;
+.notification-card > .notification-dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 .notification-copy {
   flex: 1;
@@ -69,6 +71,7 @@ body {
 .notification-copy strong {
   display: block;
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 .notification-copy p {
   font-size: 12px;

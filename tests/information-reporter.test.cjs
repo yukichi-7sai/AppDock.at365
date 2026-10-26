@@ -5,7 +5,6 @@ const fs = require('node:fs'),
 const { InformationReporter } = require('../out/main/main/core/information-reporter');
 const { TypedNotifications } = require('../out/main/main/core/typed-notifications');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const {
   notificationCatalog,
@@ -20,12 +19,7 @@ function fixture(t) {
     logs = [];
   settings.host.notifications = false;
   let now = 10000;
-  const history = new NotificationHistoryStore(
-    path.join(directory, 'history.json'),
-    () => {},
-    () => now,
-  );
-  const service = new NotificationService(history, () => now);
+  const service = new NotificationService(() => now);
   const typed = new TypedNotifications(service, {
     settings: () => settings,
     applets: () => [],

@@ -98,6 +98,13 @@ initial.notificationPreferences.overrides.push(
     durationSeconds: null,
   },
   { ownerKind: 'host', ownerId: 'updates', typeId: 'applied', durationSeconds: null },
+  {
+    ownerKind: 'host',
+    ownerId: 'errors',
+    typeId: 'operation-failed',
+    targets: [],
+    durationSeconds: null,
+  },
 );
 const notificationDir = path.join(profile, 'data', 'notifications');
 fs.mkdirSync(notificationDir, { recursive: true });
@@ -133,6 +140,7 @@ if (portable) {
   fs.copyFileSync(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
 }
+const originalHistory = fs.readFileSync(path.join(notificationDir, 'history.json'));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 let app, browser, child, host;
@@ -317,72 +325,51 @@ async function close() {
     checks.push(
       'real Node/.NET center-only active notifications retain owned actions and stay out of banner',
     );
-    await card('Node notification')
-      .getByRole('button', { name: '既読にする', exact: true })
-      .click();
-    await until(
-      async () => (await model()).content.items.find((i) => i.title === 'Node notification')?.read,
-      'read marker',
+    const rail = await until(
+      () => pages().find((p) => p.url().endsWith('/shells/default/index.html')),
+      'ribbon',
     );
-    assert.equal(
-      (await model()).content.items.find((i) => i.title === 'Node notification').status,
-      'active',
-    );
-    checks.push(
-      'opening the center does not mark all read; explicit read does not end an active notification',
-    );
+    const badge = rail.locator('[data-ribbon-id="notifications"] .ribbon-badge');
+    const expectBadge = async (count) => {
+      await until(async () => {
+        const item = (await rail.evaluate(() => window.appdockShell.get())).items.find(
+          (i) => i.id === 'notifications',
+        );
+        return count ? item?.badge?.description === 'アクティブな通知: ' + count : !item?.badge;
+      }, 'active count badge ' + count);
+      if (count)
+        await until(async () => (await badge.innerText()) === String(count), 'rendered badge');
+      else assert.equal(await badge.count(), 0);
+    };
+    await expectBadge(3);
+    await command(ids.node + '.publish'); // Same dedupe key updates one notification.
+    await expectBadge(3);
+    const toggleMode = async () =>
+      rail.evaluate(async () => {
+        const m = await window.appdockShell.get();
+        await window.appdockShell.invoke({
+          epoch: m.epoch,
+          requestId: crypto.randomUUID(),
+          actionId: m.items.find((i) => i.id === 'ribbon-display-mode').actionId,
+        });
+      });
+    await toggleMode();
+    await expectBadge(3);
+    await toggleMode();
+    assert.equal(await center.getByTestId('notification-center').getByRole('checkbox').count(), 0);
+    assert.equal(await center.getByRole('button', { name: /既読|履歴.*削除/ }).count(), 0);
+    assert.equal('unreadCount' in (await model()).content, false);
+    assert.ok((await model()).content.items.every((i) => !('read' in i)));
+    assert.equal(await center.getByText(/今回の起動中の通知です/).count(), 1);
     await tab('履歴');
-    assert.equal((await model()).content.items.length, 50);
-    await center.getByRole('button', { name: '次の50件', exact: true }).click();
-    await until(async () => (await model()).content.offset === 50, 'second page');
-    await center.getByRole('button', { name: '最初へ', exact: true }).click();
-    await center.getByLabel('通知を検索', { exact: true }).fill('Seed history 11');
-    await until(async () => (await model()).content.total === 11, 'text filter');
-    await center.getByLabel('通知レベル', { exact: true }).selectOption('warning');
-    await until(async () => (await model()).content.total === 6, 'level filter');
-    await center.getByLabel('通知の発行元', { exact: true }).selectOption('host.seed');
-    await until(
-      async () => (await model()).content.filters.source === 'host.seed',
-      'source filter',
-    );
-    await center.getByRole('button', { name: 'この条件の通知を既読', exact: true }).click();
-    await until(async () => (await model()).content.items.every((i) => i.read), 'filtered read');
-    await center.getByLabel('通知を検索', { exact: true }).fill('');
-    await center.getByLabel('通知レベル', { exact: true }).selectOption('all');
-    await center.getByLabel('通知の発行元', { exact: true }).selectOption('');
-    await until(async () => (await model()).content.total === 121, 'all history');
-    await center.getByLabel('通知の状態', { exact: true }).selectOption('interrupted');
-    await until(async () => (await model()).content.total === 1, 'interrupted filter');
-    assert.equal(await center.getByRole('button', { name: 'Node action', exact: true }).count(), 0);
-    await center.getByLabel('通知の状態', { exact: true }).selectOption('all');
-    await until(async () => (await model()).content.total === 121, 'reset state');
-    const first = (await model()).content.items[0];
-    await card(first.title).getByRole('button', { name: '履歴を削除', exact: true }).click();
-    await until(async () => (await model()).content.total === 120, 'single deleted');
+    assert.equal((await model()).content.historyCount, 0);
+    assert.deepEqual(fs.readFileSync(path.join(notificationDir, 'history.json')), originalHistory);
+    await expectBadge(3);
     checks.push(
-      'bounded history pages, text/level/source/state filters, filtered read and single deletion work; history has no live callbacks',
+      'old disk history is ignored and untouched; no read/delete/selection UI; center navigation and dedupe do not decrement active badge; both ribbon modes use the badge',
     );
-    if (!portable) {
-      await app.evaluate(({ dialog }) => {
-        globalThis.centerDialog = dialog.showMessageBox;
-        dialog.showMessageBox = async () => ({ response: 0, checkboxChecked: false });
-      });
-      await center.getByRole('button', { name: '履歴をすべて削除', exact: true }).click();
-      assert.equal((await model()).content.historyCount, 120);
-      await app.evaluate(({ dialog }) => {
-        dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
-      });
-      await center.getByRole('button', { name: '履歴をすべて削除', exact: true }).click();
-      await until(async () => (await model()).content.historyCount === 0, 'bulk deleted');
-      await app.evaluate(({ dialog }) => {
-        dialog.showMessageBox = globalThis.centerDialog;
-      });
-      checks.push(
-        'bulk deletion confirmation cancel and accept (dialog response fixture); active notifications unaffected',
-      );
-    }
     await tab('アクティブ');
-    await card('Node notification').getByRole('button', { name: '閉じる', exact: true }).click();
+    await center.getByRole('button', { name: 'Node notificationを閉じる', exact: true }).click();
     await until(
       async () => !(await model()).content.items.some((i) => i.title === 'Node notification'),
       'Node closed',
@@ -393,11 +380,14 @@ async function close() {
       'safe ended content',
     );
     assert.equal(await center.getByText('Node body', { exact: true }).count(), 0);
-    await card('Safe node').getByRole('button', { name: '履歴を削除', exact: true }).click();
-    await until(
-      async () => !(await model()).content.items.some((i) => i.title === 'Safe node'),
-      'safe record deleted',
-    );
+    assert.equal(await card('Safe node').getByRole('button').count(), 0);
+    await expectBadge(2);
+    await center.getByTestId('notification-search').fill('Safe node');
+    await until(async () => (await model()).content.total === 1, 'session history search');
+    await center.getByTestId('notification-search').fill('');
+    await center.getByLabel('通知の状態', { exact: true }).selectOption('dismissed');
+    await until(async () => (await model()).content.total === 1, 'dismissed session history');
+    await center.getByLabel('通知の状態', { exact: true }).selectOption('all');
     await tab('アクティブ');
     // New arrivals do not change search focus, and model updates preserve view scroll.
     const list = center.locator('.notification-list');
@@ -417,8 +407,9 @@ async function close() {
       true,
     );
     checks.push(
-      'dismiss resolves only the selected active episode; safe ended history can be deleted; new arrivals preserve search focus',
+      'dismiss removes exactly one active badge count and retains safe session history without actions; search/state filters and new-arrival focus remain usable',
     );
+    await expectBadge(3);
     for (const theme of ['dark', 'light']) {
       await host.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -434,6 +425,34 @@ async function close() {
       await center.screenshot({ path: path.join(profile, 'center-' + theme + '.png') });
     }
     checks.push('host notification center renders both themes in the root renderer');
+    // Invalid gallery size is rejected before saving; its error and the update have distinct host owners.
+    await assert.rejects(host.evaluate(() => window.dock.imageLibrary.saveGalleryWidth(-1)));
+    await until(
+      async () => (await model()).content.items.some((i) => i.ownerId === 'errors'),
+      'host error notification',
+    );
+    const sourceFilter = center.getByLabel('通知の発行元', { exact: true });
+    assert.equal(await sourceFilter.locator('option', { hasText: /^AppDock$/ }).count(), 1);
+    await sourceFilter.selectOption('host');
+    await until(async () => (await model()).content.total === 2, 'grouped host notifications');
+    assert.deepEqual(
+      new Set((await model()).content.items.map((i) => i.ownerId)),
+      new Set(['updates', 'errors']),
+    );
+    await center.screenshot({ path: path.join(profile, 'source-appdock.png') });
+    const error = (await model()).content.items.find((i) => i.ownerId === 'errors');
+    await center.getByRole('button', { name: error.title + 'を閉じる', exact: true }).click();
+    await tab('履歴');
+    await until(async () => (await model()).content.total === 1, 'host history filter');
+    assert.equal((await model()).content.items[0].ownerId, 'errors');
+    await tab('アクティブ');
+    await sourceFilter.selectOption('applet.' + ids.node);
+    await until(async () => (await model()).content.total === 1, 'applet source filter');
+    assert.equal((await model()).content.items[0].ownerId, ids.node);
+    await sourceFilter.selectOption('');
+    checks.push(
+      'one AppDock source includes update/error owners in active and history; Applet filtering stays independent',
+    );
     // A retired page assignment must stay inert and preserve ordinary Shell operation.
     if (!portable) {
       const p = path.join(profile, 'extensions/fixture.center');
@@ -474,19 +493,23 @@ async function close() {
     );
     await tab('履歴');
     await center.getByLabel('通知を検索', { exact: true }).fill('Native');
-    await until(
-      async () =>
-        (await model()).content.items.some(
-          (i) => i.title === 'Safe native' && i.status === 'interrupted',
-        ),
-      'native interrupted',
+    assert.equal((await model()).content.historyCount, 0);
+    assert.equal((await model()).content.activeCount, 0);
+    const restartRail = await until(
+      () => pages().find((p) => p.url().endsWith('/shells/default/index.html')),
+      'restarted ribbon',
     );
+    assert.equal(
+      await restartRail.locator('[data-ribbon-id="notifications"] .ribbon-badge').count(),
+      0,
+    );
+    assert.deepEqual(fs.readFileSync(path.join(notificationDir, 'history.json')), originalHistory);
     assert.equal(
       await center.getByRole('button', { name: 'Native action', exact: true }).count(),
       0,
     );
     checks.push(
-      'restart preserves safe interrupted history and read/deletion; updater receipt prevents replay of the same success',
+      'restart discards active and ended session notifications, badge is absent at zero, old history file stays untouched and update receipt prevents replay',
     );
     if (!portable) {
       assert.equal(center, host);
@@ -503,9 +526,7 @@ async function close() {
         'fixture.center',
       );
       assert.equal((await model()).content.filters.text, 'Native');
-      checks.push(
-        'retired center assignment is preserved without loading a page Shell or losing history',
-      );
+      checks.push('retired center assignment is preserved without loading a page Shell');
     }
     success = true;
   } catch (e) {

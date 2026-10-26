@@ -6,7 +6,6 @@ const {
   desktopNotificationBounds: bounds,
 } = require('../out/main/main/core/notification-desktop-layout');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const {
   NotificationSurfaceController,
 } = require('../out/main/main/core/notification-surface-controller');
@@ -41,14 +40,7 @@ test('negative monitor origins and small work areas clamp dimensions without phy
 test('banner and desktop share IDs, deadlines and action locks while delivery states remain independent', async (t) => {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/notification-delivery-unit-'));
   let now = 1000;
-  const service = new NotificationService(
-    new NotificationHistoryStore(
-      path.join(dir, 'history.json'),
-      () => {},
-      () => now,
-    ),
-    () => now,
-  );
+  const service = new NotificationService(() => now);
   t.after(() => {
     service.dispose();
     fs.rmSync(dir, { recursive: true, force: true });

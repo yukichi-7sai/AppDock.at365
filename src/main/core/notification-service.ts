@@ -7,7 +7,6 @@ import type {
   NotificationLifetime,
   NotificationDeliveryState,
 } from '../../shared/notifications';
-import type { NotificationHistoryStore } from './notification-history';
 export interface NotificationInput {
   dedupeKey?: string;
   level: NotificationItem['level'];
@@ -47,10 +46,11 @@ export class NotificationService {
   private closed = false;
   private version = 0;
   private paused = false;
-  constructor(
-    private history: NotificationHistoryStore,
-    private now = Date.now,
-  ) {}
+  constructor(private now = Date.now) {}
+  get activeCount() {
+    this.expire();
+    return [...this.records.values()].filter((r) => r.item.status === 'active').length;
+  }
   get revision() {
     return this.version;
   }
@@ -71,7 +71,6 @@ export class NotificationService {
         r.remaining = undefined;
       }
       r.item.revision++;
-      this.persist(r);
     }
     this.changed();
   }
@@ -91,15 +90,6 @@ export class NotificationService {
     this.version++;
     for (const callback of this.listeners) callback();
     this.schedule();
-  }
-  private persist(r: Record) {
-    if (r.input.history !== 'persistent') return;
-    const { actions: _actions, busy: _busy, dismissible: _dismissible, ...entry } = r.item;
-    this.history.put({
-      ...entry,
-      title: r.input.historyText!.title,
-      body: r.input.historyText!.body,
-    });
   }
   upsert(source: string, input: NotificationInput, existingId?: string) {
     if (this.closed) throw Error('Notifications are shutting down');
@@ -177,7 +167,6 @@ export class NotificationService {
           busy: false,
           dismissible: false,
           status: 'active',
-          read: false,
           createdAt: this.now(),
           updatedAt: this.now(),
           targets: [],
@@ -228,7 +217,6 @@ export class NotificationService {
     }
     r.item.revision++;
     r.item.updatedAt = this.now();
-    this.persist(r);
     this.changed();
     return r.item.id;
   }
@@ -243,7 +231,6 @@ export class NotificationService {
       return;
     Object.assign(r.item, owner, { typeId });
     r.item.revision++;
-    this.persist(r);
     this.changed();
   }
   list(): NotificationItem[] {
@@ -260,21 +247,18 @@ export class NotificationService {
     );
   }
   historyEntries(): NotificationHistoryEntry[] {
-    return [
-      ...this.history.list(),
-      ...this.list()
-        .filter((i) => this.records.get(i.id)?.input.history === 'session')
-        .map(({ actions: _a, busy: _b, dismissible: _d, ...entry }) => entry),
-    ];
-  }
-  historyStatus() {
-    return this.history.status;
+    return this.list()
+      .filter((i) => this.records.get(i.id)!.input.history !== 'none')
+      .map(({ actions: _a, busy: _b, dismissible: _d, ...entry }) => {
+        const input = this.records.get(entry.id)!.input;
+        return input.history === 'persistent' ? { ...entry, ...input.historyText! } : entry;
+      });
   }
   centerEntries() {
     this.expire();
     const active = [...this.records.values()]
       .filter((r) => r.item.status === 'active')
-      .map((r) => ({ ...structuredClone(r.item), historyPolicy: r.input.history }));
+      .map((r) => structuredClone(r.item));
     const ended = this.historyEntries()
       .filter((i) => i.status !== 'active')
       .map((i) => ({
@@ -282,37 +266,8 @@ export class NotificationService {
         actions: [],
         busy: false,
         dismissible: false,
-        historyPolicy: this.records.get(i.id)?.input.history ?? ('persistent' as const),
       }));
     return [...new Map([...ended, ...active].map((i) => [i.id, i])).values()];
-  }
-  markRead(ids: string[]) {
-    const rows = this.centerEntries();
-    if (ids.some((id) => !rows.some((i) => i.id === id)))
-      throw Error(hostText('services.notificationService.changed'));
-    const persistent = ids.filter(
-      (id) => rows.find((i) => i.id === id)!.historyPolicy === 'persistent',
-    );
-    if (persistent.length) this.history.markRead(persistent);
-    for (const id of ids) {
-      const r = this.records.get(id);
-      if (r && !r.item.read) {
-        r.item.read = true;
-        r.item.revision++;
-      }
-    }
-    this.changed();
-  }
-  deleteHistory(ids: string[]) {
-    const rows = this.centerEntries();
-    if (ids.some((id) => !rows.some((i) => i.id === id && i.status !== 'active')))
-      throw Error(hostText('services.notificationService.endedOnly'));
-    const persistent = ids.filter(
-      (id) => rows.find((i) => i.id === id)!.historyPolicy === 'persistent',
-    );
-    if (persistent.length) this.history.deleteEnded(persistent);
-    for (const id of ids) this.records.delete(id);
-    this.changed();
   }
   end(source: string, id: string, status: 'resolved' | 'withdrawn' = 'resolved', reason?: string) {
     const r = this.records.get(id);
@@ -336,10 +291,14 @@ export class NotificationService {
     r.input.actions = [];
     r.item.busy = false;
     for (const target of r.item.targets) r.item.delivery[target] = 'ended';
-    this.persist(r);
+    // Retain only the safe summary after the actionable notification ends.
+    if (r.input.history === 'persistent') Object.assign(r.item, r.input.historyText);
+    r.input = { ...r.input, title: r.item.title, body: r.item.body };
     // Active records never depend on retention limits; only terminal memory is bounded.
     if (r.input.history === 'none') this.records.delete(r.item.id);
-    const ended = [...this.records.values()].filter((r) => r.item.status !== 'active');
+    const ended = [...this.records.values()]
+      .filter((r) => r.item.status !== 'active')
+      .sort((a, b) => a.item.endedAt! - b.item.endedAt!);
     while (ended.length > 1000) this.records.delete(ended.shift()!.item.id);
     this.changed();
   }
@@ -356,7 +315,6 @@ export class NotificationService {
       if (next === undefined) continue;
       if (r.item.delivery[target] !== next) {
         r.item.delivery[target] = next;
-        this.persist(r);
         changed = true;
       }
     }
@@ -448,7 +406,8 @@ export class NotificationService {
   dispose() {
     this.closed = true;
     clearTimeout(this.timer);
-    this.history.flush();
+    this.records.clear();
+    this.requests.clear();
     this.listeners.clear();
     this.endedListeners.clear();
   }

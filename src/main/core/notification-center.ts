@@ -18,9 +18,13 @@ const defaults = (): NotificationCenterFilters => ({
   level: 'all',
   source: '',
   status: 'all',
-  unread: false,
   text: '',
 });
+// Host modules share one user-facing source; keep the original source on each notification.
+const sourceFilterId = (item: NotificationCenterItem) =>
+  item.ownerKind === 'host' || (!item.ownerKind && item.source.startsWith('host.'))
+    ? 'host'
+    : item.source;
 export class NotificationCenterController implements HostPageController {
   readonly kind = 'notifications';
   readonly route = 'notifications';
@@ -29,7 +33,6 @@ export class NotificationCenterController implements HostPageController {
   private offset = 0;
   private revision = 0;
   private signature = '';
-  private writing = false;
   private unsubscribe: () => void;
   constructor(
     request: NotificationCenterRequest,
@@ -38,7 +41,6 @@ export class NotificationCenterController implements HostPageController {
       applets(): ExtensionSnapshot[];
       dark(): boolean;
       changed(): void;
-      confirmDeletion(count: number): Promise<boolean>;
     },
   ) {
     if (
@@ -90,15 +92,14 @@ export class NotificationCenterController implements HostPageController {
       (i) =>
         (f.tab === 'active' ? i.status === 'active' : i.status !== 'active') &&
         (f.level === 'all' || i.level === f.level) &&
-        (!f.source || i.source === f.source) &&
+        (!f.source || sourceFilterId(i) === f.source || i.source === f.source) &&
         (f.tab === 'active' || f.status === 'all' || i.status === f.status) &&
-        (!f.unread || !i.read) &&
         (i.title + ' ' + i.body + ' ' + i.ownerTitle + ' ' + i.typeTitle)
           .toLowerCase()
           .includes(f.text.toLowerCase()),
     );
     const token = createHash('sha256')
-      .update(JSON.stringify([f, eligible.map((i) => [i.id, i.revision, i.read, i.status])]))
+      .update(JSON.stringify([f, eligible.map((i) => [i.id, i.revision, i.status])]))
       .digest('hex');
     return { rows, eligible, token };
   }
@@ -109,18 +110,20 @@ export class NotificationCenterController implements HostPageController {
       filters: { ...this.filters },
       items: eligible.slice(this.offset, this.offset + pageSize),
       sources: [
-        ...new Map(rows.map((i) => [i.source, { id: i.source, title: i.ownerTitle }])).values(),
+        ...new Map(
+          rows.map((i) => {
+            const id = sourceFilterId(i);
+            return [id, { id, title: id === 'host' ? 'AppDock' : i.ownerTitle }];
+          }),
+        ).values(),
       ],
       total: eligible.length,
       activeCount: rows.filter((i) => i.status === 'active').length,
       historyCount: rows.filter((i) => i.status !== 'active').length,
-      unreadCount: rows.filter((i) => !i.read).length,
       offset: this.offset,
       pageSize,
-      token,
       nextCursor:
         this.offset + pageSize < eligible.length ? token + ':' + (this.offset + pageSize) : null,
-      ...this.options.service.historyStatus(),
     };
     const dark = this.options.dark(),
       signature = JSON.stringify([dark, content]);
@@ -151,15 +154,14 @@ export class NotificationCenterController implements HostPageController {
       const f = a.filters;
       if (
         !exact(a, ['type', 'filters']) ||
-        !exact(f, ['tab', 'level', 'source', 'status', 'unread', 'text']) ||
+        !exact(f, ['tab', 'level', 'source', 'status', 'text']) ||
         !['active', 'history'].includes(f.tab) ||
         !['all', 'info', 'warning', 'error'].includes(f.level) ||
         typeof f.source !== 'string' ||
         f.source.length > 200 ||
         typeof f.text !== 'string' ||
         f.text.length > 1000 ||
-        typeof f.unread !== 'boolean' ||
-        !['all', 'resolved', 'dismissed', 'expired', 'withdrawn', 'interrupted'].includes(f.status)
+        !['all', 'resolved', 'dismissed', 'expired', 'withdrawn'].includes(f.status)
       )
         throw Error(hostText('services.notificationCenter.invalidFilter'));
       this.filters = { ...f };
@@ -202,45 +204,6 @@ export class NotificationCenterController implements HostPageController {
         throw Error(hostText('services.notificationCenter.activeOnly'));
       return this.options.service.invoke(a.request);
     }
-    if (a.type !== 'read' && a.type !== 'delete') throw Error('Unknown center action');
-    if (
-      !exact(a, ['type', 'token', 'ids', 'scope']) ||
-      (a.scope !== undefined && a.token !== query.token) ||
-      typeof a.token !== 'string' ||
-      (a.ids !== undefined && a.scope !== undefined) ||
-      (a.scope !== undefined &&
-        !['filtered', ...(a.type === 'delete' ? ['all'] : [])].includes(a.scope)) ||
-      (a.ids !== undefined &&
-        (!Array.isArray(a.ids) ||
-          a.ids.length > 1000 ||
-          a.ids.some((id) => typeof id !== 'string' || !id || id.length > 100) ||
-          new Set(a.ids).size !== a.ids.length)) ||
-      (a.ids === undefined && a.scope === undefined)
-    )
-      throw Error(hostText('services.notificationCenter.targetChanged'));
-    if (a.type === 'delete' && this.filters.tab !== 'history')
-      throw Error(hostText('services.notificationCenter.endedOnly'));
-    const eligible =
-      a.scope === 'all' ? query.rows.filter((i) => i.status !== 'active') : query.eligible;
-    const ids = a.ids ?? eligible.map((i) => i.id);
-    if (ids.some((id) => !eligible.some((i) => i.id === id)))
-      throw Error(hostText('services.notificationCenter.notDisplayed'));
-    if (!ids.length) return;
-    if (this.writing) throw Error(hostText('services.notificationCenter.busy'));
-    this.writing = true;
-    try {
-      // Capture IDs before the dialog: notifications arriving during confirmation are preserved.
-      if (
-        a.type === 'delete' &&
-        (ids.length > 1 || a.scope !== undefined) &&
-        !(await this.options.confirmDeletion(ids.length))
-      )
-        return;
-      if (a.type === 'delete') this.options.service.deleteHistory(ids);
-      else this.options.service.markRead(ids);
-      this.options.changed();
-    } finally {
-      this.writing = false;
-    }
+    throw Error('Unknown center action');
   }
 }

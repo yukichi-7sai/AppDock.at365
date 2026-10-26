@@ -191,14 +191,20 @@ async function main() {
   assert.deepEqual(await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+F12')), {
     executed: 1,
     failed: 0,
+    busy: 0,
+    cancelled: false,
   });
   assert.deepEqual(await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+F11')), {
     executed: 0,
     failed: 1,
+    busy: 0,
+    cancelled: false,
   });
   assert.deepEqual(await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+F9')), {
     executed: 0,
     failed: 0,
+    busy: 0,
+    cancelled: false,
   });
   assert(
     (await snapshot()).logs.some(
@@ -244,18 +250,26 @@ async function main() {
       'specific operation receipt',
     );
     const historyFile = path.join(profile, 'local-state', 'notifications', 'history.json');
+    await host.evaluate(() => window.dock.executeCommand('appdock.notifications.open'));
     await until(
-      () =>
-        fs.existsSync(historyFile) &&
-        JSON.parse(fs.readFileSync(historyFile)).entries.some(
-          (n) => n.body === '読み上げを停止しました。',
-        ),
-      'specific notification persisted',
+      async () => (await host.evaluate(() => window.dock.pages.get()))?.kind === 'notifications',
+      'notification center ready',
     );
-    const history = JSON.parse(fs.readFileSync(historyFile));
-    assert(!history.entries.some((n) => n.body === 'コマンドを実行しました。'));
+    const entries = await host.evaluate(async () => {
+      const m = await window.dock.pages.get();
+      await window.dock.pages.act({
+        id: m.id,
+        type: 'notifications',
+        action: { type: 'filters', filters: { ...m.content.filters, tab: 'history' } },
+      });
+      const history = await window.dock.pages.get();
+      return [...m.content.items, ...history.content.items];
+    });
+    assert(entries.some((n) => n.body === '読み上げを停止しました。'));
+    assert(!entries.some((n) => n.body === 'コマンドを実行しました。'));
+    assert.equal(fs.existsSync(historyFile), false);
     checks.push(
-      'no generic success log/history; specific TTS stop notification persists even when Windows suppresses banners',
+      'no generic success log/history; specific TTS stop notification stays in-session even when Windows suppresses banners',
     );
     const result = {
       ok: true,

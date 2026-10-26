@@ -3,19 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'),
   path = require('node:path');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 function fixture(t) {
   const base = path.resolve(__dirname, '../.artifacts');
   fs.mkdirSync(base, { recursive: true });
   const dir = fs.mkdtempSync(path.join(base, 'notification-unit-'));
   let clock = 1000000;
   const problems = [];
-  const store = new NotificationHistoryStore(
-    path.join(dir, 'history.json'),
-    (m) => problems.push(m),
-    () => clock,
-  );
-  const service = new NotificationService(store, () => clock);
+  const service = new NotificationService(() => clock);
   t.after(() => {
     service.dispose();
     assert.ok(dir.startsWith(base + path.sep));
@@ -23,7 +17,6 @@ function fixture(t) {
   });
   return {
     service,
-    store,
     dir,
     problems,
     tick: (ms) => {
@@ -232,9 +225,9 @@ test('failure unlocks an action and permits an explicit retry', async (t) => {
   assert.equal(count, 2);
   assert.equal(s.list()[0].status, 'active');
 });
-test('persistent history has safe text and no operations, restart interrupts active records', (t) => {
-  const { service: s, store, dir } = fixture(t);
-  s.upsert(
+test('session history retains safe summaries without operations or disk writes and restart starts empty', (t) => {
+  const { service: s, dir } = fixture(t);
+  const id = s.upsert(
     'host.alpha',
     input({
       title: 'secret value',
@@ -242,76 +235,64 @@ test('persistent history has safe text and no operations, restart interrupts act
       actions: [{ key: 'unsafe', label: 'Run', run: async () => {} }],
     }),
   );
-  store.flush();
-  const bytes = fs.readFileSync(store.file, 'utf8');
+  const bytes = JSON.stringify(s.historyEntries());
   assert.ok(!bytes.includes('secret value') && !bytes.includes('credential material'));
   assert.ok(!bytes.includes('actions') && !bytes.includes('unsafe'));
-  const restored = new NotificationHistoryStore(path.join(dir, 'history.json'), () => {});
-  assert.equal(restored.list()[0].status, 'interrupted');
-  assert.equal(restored.list()[0].actions, undefined);
-  restored.flush();
+  s.end('host.alpha', id);
+  assert.equal(s.centerEntries()[0].body, 'Safe body');
+  assert.equal(s.list()[0].body, 'Safe body');
+  s.dispose();
+  assert.deepEqual(s.list(), []);
+  const restarted = new NotificationService();
+  assert.deepEqual(restarted.centerEntries(), []);
+  restarted.dispose();
+  assert.deepEqual(fs.readdirSync(dir), []);
 });
+
 test('session/none policies, unsupported interfaces and history omission are explicit', (t) => {
-  const { service: s, store } = fixture(t);
+  const { service: s } = fixture(t);
   s.upsert('host.alpha', input({ targets: [], history: 'session' }));
   const id = s.upsert('host.alpha', input({ history: 'none' }));
   assert.equal(s.targetItems('banner').length, 1);
   s.end('host.alpha', id);
   assert.equal(s.list().length, 1);
-  assert.equal(store.list().length, 0);
   assert.equal(s.historyEntries().length, 1);
   assert.throws(() => s.upsert('host.alpha', input({ targets: ['unknown'] })), /Invalid/);
   assert.throws(() => s.upsert('host.alpha', input({ historyText: undefined })), /Invalid/);
 });
-test('history handles malformed, newer schemas and write errors without losing runtime notifications', (t) => {
+test('notification lifetime works without any history filesystem dependency', (t) => {
   const { service: s, dir } = fixture(t);
-  const newer = path.join(dir, 'newer.json');
-  fs.writeFileSync(newer, '{"schemaVersion":99}');
-  const messages = [];
-  const store = new NotificationHistoryStore(newer, (m) => messages.push(m));
-  store.flush();
-  assert.equal(fs.readFileSync(newer, 'utf8'), '{"schemaVersion":99}');
-  const bad = path.join(dir, 'broken.json');
-  fs.writeFileSync(bad, '{broken');
-  const broken = new NotificationHistoryStore(bad, (m) => messages.push(m));
-  assert.ok(fs.readdirSync(dir).some((n) => n.startsWith('broken.json.corrupt-')));
-  broken.flush();
-  const parent = path.join(dir, 'file-parent');
-  fs.writeFileSync(parent, 'not a folder');
-  const unavailable = new NotificationHistoryStore(path.join(parent, 'history.json'), (m) =>
-    messages.push(m),
-  );
-  const runtime = new NotificationService(unavailable);
-  runtime.upsert('host.alpha', input());
-  unavailable.flush();
-  assert.equal(runtime.targetItems('banner').length, 1);
-  runtime.dispose();
-  assert.ok(messages.length >= 3);
-  s.upsert('host.alpha', input());
-  assert.equal(s.targetItems('banner').length, 1);
+  const file = path.join(dir, 'history.json');
+  const bytes = '{broken';
+  fs.writeFileSync(file, bytes);
+  const id = s.upsert('host.alpha', input());
+  s.end('host.alpha', id);
+  s.dispose();
+  assert.equal(fs.readFileSync(file, 'utf8'), bytes);
+  assert.deepEqual(fs.readdirSync(dir), ['history.json']);
 });
-test('history retains active records while pruning old and excessive terminal records', (t) => {
-  const { store } = fixture(t);
-  const base = {
-    revision: 1,
-    source: 'host.alpha',
-    level: 'info',
-    title: 'summary',
-    body: 'body',
-    createdAt: 999999,
-    updatedAt: 999999,
-    read: false,
-    targets: ['banner'],
-    delivery: { banner: 'ended' },
-  };
-  store.put({ ...base, id: 'active', status: 'active' });
-  for (let i = 0; i < 1100; i++)
-    store.put({ ...base, id: 'ended-' + i, status: 'resolved', endedAt: 999999 });
-  assert.equal(store.list().length, 1001);
-  assert.ok(store.list().some((i) => i.id === 'active'));
-  store.put({ ...base, id: 'too-old', status: 'resolved', endedAt: -30 * 86400000 });
-  assert.ok(!store.list().some((i) => i.id === 'too-old'));
+
+test('session retention bounds persistent and session history together by completion time and preserves active records', (t) => {
+  const { service: s, tick } = fixture(t);
+  const long = s.upsert('host.alpha', input());
+  const active = s.upsert('host.alpha', input({ history: 'none' }));
+  let first;
+  for (let i = 0; i < 1001; i++) {
+    const id = s.upsert('host.alpha', input({ history: i % 2 ? 'session' : 'persistent' }));
+    first ??= id;
+    tick(1);
+    s.end('host.alpha', id);
+  }
+  assert.equal(s.centerEntries().length, 1002);
+  assert.ok(!s.centerEntries().some((i) => i.id === first));
+  tick(1);
+  s.end('host.alpha', long);
+  assert.equal(s.centerEntries().length, 1001);
+  assert.ok(s.centerEntries().some((i) => i.id === long));
+  assert.equal(s.activeCount, 1);
+  assert.equal(s.list().find((i) => i.id === active).status, 'active');
 });
+
 test('capacity reserves host slots and permits updates at the owner limit', (t) => {
   const { service: s } = fixture(t);
   for (let i = 0; i < 50; i++)
@@ -322,4 +303,79 @@ test('capacity reserves host slots and permits updates at the owner limit', (t) 
   assert.ok(
     s.upsert('host.settings', input({ lifetime: { type: 'condition' }, dismissible: false })),
   );
+});
+
+test('active count tracks unique lifetimes regardless of center visits, targets, pause and dedupe', async (t) => {
+  const { service: s, tick } = fixture(t);
+  const a = s.upsert(
+    'host.alpha',
+    input({ dedupeKey: 'same', targets: ['banner', 'desktop', 'windows'] }),
+  );
+  const b = s.upsert('host.alpha', input({ targets: [], history: 'session' }));
+  const c = s.upsert('host.alpha', input({ lifetime: { type: 'timed', milliseconds: 100 } }));
+  assert.equal(s.activeCount, 3);
+  assert.equal(s.upsert('host.alpha', input({ dedupeKey: 'same', targets: [] }), a), a);
+  s.centerEntries();
+  assert.equal(s.activeCount, 3);
+  s.setPaused(true);
+  tick(200);
+  assert.equal(s.activeCount, 3);
+  s.setPaused(false);
+  tick(100);
+  assert.equal(s.activeCount, 2);
+  assert.equal(s.list().find((i) => i.id === c).status, 'expired');
+  await s.invoke(request(s, a, { type: 'dismiss' }));
+  assert.equal(s.activeCount, 1);
+  s.end('host.alpha', b);
+  assert.equal(s.activeCount, 0);
+  assert.equal(s.centerEntries().length, 3);
+  const d = s.upsert('host.alpha', input({ dedupeKey: 'same' }));
+  assert.notEqual(d, a);
+  s.withdrawSource('host.alpha');
+  assert.equal(s.activeCount, 0);
+});
+
+test('notification count uses shared ribbon badges, caps display at 99+ and aggregates into groups', (t) => {
+  const { service: s } = fixture(t);
+  const {
+    UiPresentation,
+    NavigationCoordinator,
+  } = require('../out/main/main/core/ui-presentation');
+  const { createDefaultSettings } = require('../out/main/shared/settings-schema');
+  const { ribbonItems } = require('../out/main/shared/applet-pages');
+  const { editRibbon } = require('../out/main/shared/ribbon-layout');
+  const settings = createDefaultSettings();
+  const ui = new UiPresentation({
+    settings: () => settings,
+    applets: () => [],
+    dark: () => false,
+    navigation: new NavigationCoordinator(() => {}),
+    execute: async () => {},
+    theme: async () => {},
+    badge: (id) =>
+      id === 'notifications' && s.activeCount
+        ? { kind: 'count', count: s.activeCount, label: 'アクティブな通知' }
+        : null,
+  });
+  const item = () => ui.get().items.find((i) => i.id === 'notifications');
+  assert.equal(item().badge, undefined);
+  for (let i = 0; i < 101; i++) s.upsert('host.fixture' + Math.floor(i / 40), input());
+  assert.equal(item().badge.text, '99+');
+  assert.equal(item().badge.description, 'アクティブな通知: 101');
+  settings.ribbon = editRibbon(settings.ribbon, ribbonItems([], [], []), {
+    kind: 'addGroup',
+    id: 'group:notifications',
+    title: 'Notifications',
+    icon: 'folder',
+    expansion: 'persistent',
+    placement: 'top',
+  });
+  settings.ribbon = editRibbon(
+    settings.ribbon,
+    ribbonItems([], settings.ribbon.separators, settings.ribbon.groups),
+    { kind: 'moveItem', id: 'notifications', parentId: 'group:notifications', beforeId: null },
+  );
+  assert.equal(ui.get().items.find((i) => i.id === 'group:notifications').badge.kind, 'dot');
+  for (let i = 0; i < 3; i++) s.withdrawSource('host.fixture' + i);
+  assert.equal(ui.get().items.find((i) => i.id === 'group:notifications').badge, undefined);
 });

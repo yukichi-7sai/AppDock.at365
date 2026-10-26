@@ -1,3 +1,5 @@
+import { hostText } from '../../shared/i18n';
+import { NotificationDismissButton } from '../../../ui/notifications/DismissButton';
 import { useEffect, useRef, useState } from 'react';
 import type { HostPageModel } from '../../shared/host-pages';
 import type {
@@ -8,22 +10,25 @@ import type {
 import './notification-center.css';
 const api = window.dock.pages;
 const states = {
-  active: 'アクティブ',
-  resolved: '解消済み',
-  dismissed: '閉じた通知',
-  expired: '期限切れ',
-  withdrawn: '撤回',
-  interrupted: '前回の起動で終了',
+  active: hostText('notifications.active'),
+  resolved: hostText('notifications.resolved'),
+  dismissed: hostText('notifications.dismissed'),
+  expired: hostText('notifications.expired'),
+  withdrawn: hostText('notifications.withdrawn'),
 };
 const reasons: Record<string, string> = {
-  'source-stopped': '発行元が停止しました',
-  'type-disabled': '通知設定でオフにしました',
-  'applet-disabled': 'Applet通知の共通設定でオフにしました',
-  'type-removed': '通知種類の定義がなくなりました',
-  'type-definition-changed': '通知種類の定義が変わりました',
-  'no-available-targets': '選択した通知先を利用できません',
+  'source-stopped': hostText('notifications.sourceStopped'),
+  'type-disabled': hostText('notifications.typeDisabled'),
+  'applet-disabled': hostText('notifications.appletDisabled'),
+  'type-removed': hostText('notifications.typeRemoved'),
+  'type-definition-changed': hostText('notifications.typeChanged'),
+  'no-available-targets': hostText('notifications.noTargets'),
 };
-const levels = { info: '情報', warning: '警告', error: 'エラー' };
+const levels = {
+  info: hostText('notifications.info'),
+  warning: hostText('notifications.warning'),
+  error: hostText('notifications.error'),
+};
 export function NotificationCenterPage({
   initialModel,
 }: {
@@ -31,8 +36,7 @@ export function NotificationCenterPage({
 }) {
   const [model, setModel] = useState<NotificationCenterModel>(initialModel),
     [error, setError] = useState('');
-  const [selected, setSelected] = useState<string[]>([]),
-    [pending, setPending] = useState(false);
+  const [pending, setPending] = useState(false);
   const [filters, setFilters] = useState<NotificationCenterFilters>();
   const acceptModel = useRef<(next: HostPageModel) => void>(() => {});
   const latest = useRef<NotificationCenterModel | undefined>(initialModel),
@@ -49,7 +53,6 @@ export function NotificationCenterPage({
       latest.current = next;
       setModel(next);
       if (!filterRequests.current) setFilters(next.content.filters);
-      setSelected((ids) => ids.filter((id) => next.content.items.some((i) => i.id === id)));
     };
     acceptModel.current = accept;
     accept(initialModel);
@@ -77,7 +80,6 @@ export function NotificationCenterPage({
   };
   const change = (next: NotificationCenterFilters) => {
     setFilters(next);
-    setSelected([]);
     setError('');
     const current = latest.current;
     if (!current) return;
@@ -93,37 +95,35 @@ export function NotificationCenterPage({
   const c = model.content,
     history = filters.tab === 'history';
   const filterPending = JSON.stringify(filters) !== JSON.stringify(c.filters);
-  const selectedPersistent = c.items.some(
-    (i) => selected.includes(i.id) && i.historyPolicy === 'persistent',
-  );
   return (
-    <section className="notification-center">
+    <section className="notification-center" data-testid="notification-center">
       <header>
-        <h1>通知センター</h1>
-        <span className="muted">未読 {c.unreadCount}件</span>
+        <h1>{hostText('notifications.title')}</h1>
+        <span className="muted">{hostText('notifications.sessionHint')}</span>
       </header>
-      <nav aria-label="通知の表示">
+      <nav aria-label={hostText('notifications.display')} data-testid="notification-tabs">
         <button aria-pressed={!history} onClick={() => change({ ...filters, tab: 'active' })}>
-          アクティブ {c.activeCount}
+          {hostText('notifications.active')} {c.activeCount}
         </button>
         <button aria-pressed={history} onClick={() => change({ ...filters, tab: 'history' })}>
-          履歴 {c.historyCount}
+          {hostText('notifications.history')} {c.historyCount}
         </button>
       </nav>
-      <div className="notification-filters">
+      <div className="notification-filters" data-testid="notification-filters">
         <input
-          aria-label="通知を検索"
-          placeholder="通知を検索…"
+          data-testid="notification-search"
+          aria-label={hostText('notifications.search')}
+          placeholder={hostText('notifications.searchPlaceholder')}
           value={filters.text}
           maxLength={1000}
           onChange={(e) => change({ ...filters, text: e.target.value })}
         />
         <select
-          aria-label="通知レベル"
+          aria-label={hostText('notifications.level')}
           value={filters.level}
           onChange={(e) => change({ ...filters, level: e.target.value as any })}
         >
-          <option value="all">すべてのレベル</option>
+          <option value="all">{hostText('notifications.allLevels')}</option>
           {Object.entries(levels).map(([id, title]) => (
             <option key={id} value={id}>
               {title}
@@ -131,11 +131,11 @@ export function NotificationCenterPage({
           ))}
         </select>
         <select
-          aria-label="通知の発行元"
+          aria-label={hostText('notifications.source')}
           value={filters.source}
           onChange={(e) => change({ ...filters, source: e.target.value })}
         >
-          <option value="">すべての発行元</option>
+          <option value="">{hostText('notifications.allSources')}</option>
           {c.sources.map((s) => (
             <option key={s.id} value={s.id}>
               {s.title}
@@ -144,11 +144,11 @@ export function NotificationCenterPage({
         </select>
         {history && (
           <select
-            aria-label="通知の状態"
+            aria-label={hostText('notifications.state')}
             value={filters.status}
             onChange={(e) => change({ ...filters, status: e.target.value as any })}
           >
-            <option value="all">すべての状態</option>
+            <option value="all">{hostText('notifications.allStates')}</option>
             {Object.entries(states)
               .filter(([id]) => id !== 'active')
               .map(([id, title]) => (
@@ -158,115 +158,61 @@ export function NotificationCenterPage({
               ))}
           </select>
         )}
-        <label>
-          <input
-            type="checkbox"
-            checked={filters.unread}
-            onChange={(e) => change({ ...filters, unread: e.target.checked })}
-          />
-          未読のみ
-        </label>
       </div>
-      {(c.saveError || !c.writable) && (
-        <p role="status">
-          {!c.writable
-            ? '通知履歴の保存形式が未対応です。保存が必要な既読・削除は利用できません。'
-            : '通知履歴を保存できませんでした。保存先を確認してから再試行してください。'}
-        </p>
-      )}
       {error && (
         <p className="center-error" role="alert">
           {error}
-          <button onClick={() => void act({ type: 'refresh' })}>再読み込み</button>
+          <button onClick={() => void act({ type: 'refresh' })}>
+            {hostText('notifications.refresh')}
+          </button>
         </p>
       )}
-      <div className="notification-tools">
-        <button
-          disabled={
-            pending || filterPending || !selected.length || (!c.writable && selectedPersistent)
-          }
-          onClick={() => void act({ type: 'read', ids: selected, token: c.token })}
-        >
-          選択した通知を既読
-        </button>
-        <button
-          disabled={
-            pending ||
-            filterPending ||
-            !c.total ||
-            (!c.writable && c.items.some((i) => i.historyPolicy === 'persistent'))
-          }
-          onClick={() => void act({ type: 'read', scope: 'filtered', token: c.token })}
-        >
-          この条件の通知を既読
-        </button>
-        {history && (
-          <>
-            <button
-              disabled={
-                pending || filterPending || !selected.length || (!c.writable && selectedPersistent)
-              }
-              onClick={() => void act({ type: 'delete', ids: selected, token: c.token })}
-            >
-              選択した履歴を削除
-            </button>
-            <button
-              disabled={pending || filterPending || !c.total || !c.writable}
-              onClick={() => void act({ type: 'delete', scope: 'filtered', token: c.token })}
-            >
-              この条件の履歴を削除
-            </button>
-            <button
-              disabled={pending || filterPending || !c.historyCount || !c.writable}
-              onClick={() => void act({ type: 'delete', scope: 'all', token: c.token })}
-            >
-              履歴をすべて削除
-            </button>
-          </>
-        )}
-      </div>
-      <div className="notification-list" aria-label={history ? '通知履歴' : 'アクティブな通知'}>
-        {!c.items.length && <p className="muted">該当する通知はありません。</p>}
+      <div
+        className="notification-list"
+        aria-label={
+          history ? hostText('notifications.historyList') : hostText('notifications.activeList')
+        }
+      >
+        {!c.items.length && <p className="muted">{hostText('notifications.empty')}</p>}
         {c.items.map((i) => (
-          <article
-            key={i.id}
-            className={'center-card level-' + i.level}
-            data-notification-id={i.id}
-          >
-            <div className="center-card-heading">
-              <input
-                type="checkbox"
-                aria-label={i.title + 'を選択'}
-                checked={selected.includes(i.id)}
-                onChange={(e) =>
-                  setSelected((ids) =>
-                    e.target.checked ? [...ids, i.id] : ids.filter((id) => id !== i.id),
-                  )
-                }
-              />
-              <strong>{i.title}</strong>
-              {!i.read && <span className="unread-mark">未読</span>}
-              <span className="center-card-level">{levels[i.level]}</span>
-            </div>
-            <p className="notification-body">{i.body}</p>
-            <p className="muted">
-              {i.ownerTitle} · {i.typeTitle} · {states[i.status]} ·{' '}
-              {new Date(i.endedAt ?? i.createdAt).toLocaleString()}
-              {i.endReason && ' · ' + (reasons[i.endReason] ?? '通知の方針が変わりました')}
-            </p>
-            <div className="center-card-actions">
-              {!i.read && (
-                <button
-                  disabled={
-                    pending || filterPending || (!c.writable && i.historyPolicy === 'persistent')
+          <div key={i.id} className="notification-row" data-testid="notification-row">
+            <div className="notification-row-controls">
+              {i.status === 'active' && i.dismissible && (
+                <NotificationDismissButton
+                  title={i.title}
+                  disabled={i.busy || pending}
+                  onClick={() =>
+                    void act({
+                      type: 'act',
+                      request: {
+                        notificationId: i.id,
+                        revision: i.revision,
+                        requestId: crypto.randomUUID(),
+                        type: 'dismiss',
+                      },
+                    })
                   }
-                  onClick={() => void act({ type: 'read', ids: [i.id], token: c.token })}
-                >
-                  既読にする
-                </button>
+                />
               )}
-              {i.status === 'active' ? (
-                <>
+            </div>
+            <article
+              className={'center-card level-' + i.level}
+              data-testid="notification-card"
+              data-notification-id={i.id}
+            >
+              <div className="center-card-heading">
+                <strong>{i.title}</strong>
+                <span className="center-card-level">{levels[i.level]}</span>
+              </div>
+              <p className="notification-body">{i.body}</p>
+              <p className="muted">
+                {i.ownerTitle} · {i.typeTitle} · {states[i.status]} ·{' '}
+                {new Date(i.endedAt ?? i.createdAt).toLocaleString()}
+                {i.endReason &&
+                  ' · ' + (reasons[i.endReason] ?? hostText('notifications.policyChanged'))}
+              </p>
+              {i.status === 'active' && i.actions.length > 0 && (
+                <div className="center-card-actions">
                   {i.actions.map((a) => (
                     <button
                       key={a.id}
@@ -287,56 +233,32 @@ export function NotificationCenterPage({
                       {a.label}
                     </button>
                   ))}
-                  {i.dismissible && (
-                    <button
-                      disabled={i.busy || pending}
-                      onClick={() =>
-                        void act({
-                          type: 'act',
-                          request: {
-                            notificationId: i.id,
-                            revision: i.revision,
-                            requestId: crypto.randomUUID(),
-                            type: 'dismiss',
-                          },
-                        })
-                      }
-                    >
-                      閉じる
-                    </button>
-                  )}
-                </>
-              ) : (
-                <button
-                  disabled={
-                    pending || filterPending || (!c.writable && i.historyPolicy === 'persistent')
-                  }
-                  onClick={() => void act({ type: 'delete', ids: [i.id], token: c.token })}
-                >
-                  履歴を削除
-                </button>
+                </div>
               )}
-            </div>
-          </article>
+            </article>
+          </div>
         ))}
       </div>
       {history && (
         <footer className="center-pagination">
           <span>
-            {c.total ? c.offset + 1 : 0}〜{Math.min(c.offset + c.items.length, c.total)} / {c.total}
-            件
+            {hostText('notifications.pageRange', {
+              start: c.total ? c.offset + 1 : 0,
+              end: Math.min(c.offset + c.items.length, c.total),
+              count: c.total,
+            })}
           </span>
           <button
             disabled={pending || filterPending || !c.offset}
             onClick={() => void act({ type: 'refresh' })}
           >
-            最初へ
+            {hostText('notifications.first')}
           </button>
           <button
             disabled={pending || filterPending || !c.nextCursor}
             onClick={() => void act({ type: 'page', cursor: c.nextCursor! })}
           >
-            次の50件
+            {hostText('notifications.next')}
           </button>
         </footer>
       )}

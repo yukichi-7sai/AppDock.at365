@@ -2,26 +2,22 @@ const { test } = require('node:test'),
   assert = require('node:assert/strict'),
   fs = require('node:fs'),
   path = require('node:path');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const { NotificationService } = require('../out/main/main/core/notification-service');
 const { NotificationCenterController } = require('../out/main/main/core/notification-center');
 const { publishUpdateResult } = require('../out/main/main/core/update-result-notification');
 const p = require('../out/main/shared/notification-types');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
-function setup(t, { unknown = false, confirm = async () => true } = {}) {
+function setup(t, applets = []) {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/notification-center-unit-')),
     file = path.join(dir, 'history.json');
-  if (unknown) fs.writeFileSync(file, JSON.stringify({ schemaVersion: 99, entries: [] }));
-  const history = new NotificationHistoryStore(file, () => {}),
-    service = new NotificationService(history);
+  const service = new NotificationService();
   const controller = new NotificationCenterController(
     { id: 'center', route: 'notifications', kind: 'notifications' },
     {
       service,
-      applets: () => [],
+      applets: () => applets,
       dark: () => true,
       changed: () => {},
-      confirmDeletion: confirm,
     },
   );
   t.after(() => {
@@ -45,7 +41,7 @@ function setup(t, { unknown = false, confirm = async () => true } = {}) {
   const model = () => controller.snapshot().content;
   const historyTab = () =>
     act({ type: 'filters', filters: { ...model().filters, tab: 'history' } });
-  return { dir, file, history, service, controller, input, publish, act, model, historyTab };
+  return { dir, file, service, controller, input, publish, act, model, historyTab };
 }
 test('center-only policy is accepted; obsolete unsaved warning is absent', () => {
   const s = createDefaultSettings(),
@@ -66,6 +62,56 @@ test('center-only policy is accepted; obsolete unsaved warning is absent', () =>
     false,
   );
 });
+
+test('source filter groups host modules without merging identically named Applets or changing notification ownership', async (t) => {
+  const f = setup(t, [
+    { id: 'same-name', displayName: 'AppDock' },
+    { id: 'other', displayName: 'AppDock' },
+  ]);
+  const publish = (kind, owner, type = 'message') => {
+    const source = `${kind}.${owner}`;
+    const id = f.service.upsert(source, f.input());
+    f.service.identify(id, { ownerKind: kind, ownerId: owner }, type);
+    return id;
+  };
+  const update = publish('host', 'updates', 'applied');
+  const error = publish('host', 'errors', 'operation-failed');
+  const applet = publish('applet', 'same-name');
+  publish('applet', 'other');
+  assert.deepEqual(
+    new Set(f.model().sources.map((s) => s.id)),
+    new Set(['host', 'applet.same-name', 'applet.other']),
+  );
+  assert.equal(f.model().sources.find((s) => s.id === 'host').title, 'AppDock');
+  const filter = (source, tab = 'active') =>
+    f.act({ type: 'filters', filters: { ...f.model().filters, source, tab } });
+  await filter('host');
+  assert.deepEqual(new Set(f.model().items.map((i) => i.id)), new Set([update, error]));
+  assert.deepEqual(
+    new Set(f.model().items.map((i) => i.source)),
+    new Set(['host.updates', 'host.errors']),
+  );
+  const warning = publish('host', 'warnings', 'attention-required');
+  assert.equal(f.model().total, 3);
+  f.service.end('host.errors', error);
+  f.service.end('host.warnings', warning);
+  await filter('host', 'history');
+  assert.deepEqual(new Set(f.model().items.map((i) => i.id)), new Set([error, warning]));
+  assert.equal(f.model().sources.filter((s) => s.id === 'host').length, 1);
+  await filter('applet.same-name');
+  assert.deepEqual(
+    f.model().items.map((i) => i.id),
+    [applet],
+  );
+  await filter('host.updates'); // Existing internal source filters remain accepted.
+  assert.deepEqual(
+    f.model().items.map((i) => i.id),
+    [update],
+  );
+  const untyped = f.publish();
+  await filter('host');
+  assert.deepEqual(new Set(f.model().items.map((i) => i.id)), new Set([update, untyped]));
+});
 test('active/history ID union uses live content and safe ended summaries; none is never retained', async (t) => {
   const f = setup(t);
   const a = f.publish(),
@@ -81,58 +127,8 @@ test('active/history ID union uses live content and safe ended summaries; none i
   assert.equal(f.model().items.find((i) => i.id === a).body, 'Safe summary');
   assert.ok(f.model().items.every((i) => !i.actions.length && !i.dismissible));
 });
-test('read persists without resolving notifications or changing deadlines; restart loads safe interrupted history', async (t) => {
-  const f = setup(t);
-  const id = f.publish({ lifetime: { type: 'timed', milliseconds: 60000 } });
-  const before = f.model().items[0];
-  await f.act({ type: 'read', ids: [id], token: f.model().token });
-  const item = f.model().items[0];
-  assert.equal(item.read, true);
-  assert.equal(item.status, 'active');
-  assert.equal(item.expiresAt, before.expiresAt);
-  const reloaded = new NotificationHistoryStore(f.file, () => {});
-  assert.equal(reloaded.list()[0].read, true);
-  assert.equal(reloaded.list()[0].status, 'interrupted');
-  reloaded.flush();
-});
-test('single ended deletion removes both memory and persistent entry; deleted notification never returns or executes', async (t) => {
-  const f = setup(t),
-    id = f.publish();
-  f.service.end('host.fixture', id);
-  await f.historyTab();
-  await f.act({ type: 'delete', ids: [id], token: f.model().token });
-  assert.equal(f.model().total, 0);
-  assert.equal(
-    f.service.list().some((i) => i.id === id),
-    false,
-  );
-  assert.equal(new NotificationHistoryStore(f.file, () => {}).list().length, 0);
-  await assert.rejects(
-    f.service.invoke({ notificationId: id, revision: 1, requestId: 'gone', type: 'dismiss' }),
-  );
-});
-test('bulk confirmation captures IDs and preserves arrivals; cancel does not delete', async (t) => {
-  let f,
-    cancel = false;
-  f = setup(t, {
-    confirm: async () => {
-      const next = f.publish();
-      f.service.end('host.fixture', next);
-      return !cancel;
-    },
-  });
-  for (let n = 0; n < 3; n++) {
-    const id = f.publish();
-    f.service.end('host.fixture', id);
-  }
-  await f.historyTab();
-  await f.act({ type: 'delete', scope: 'all', token: f.model().token });
-  assert.equal(f.model().total, 1);
-  cancel = true;
-  await f.act({ type: 'delete', scope: 'filtered', token: f.model().token });
-  assert.equal(f.model().total, 2);
-});
-test('history pages are bounded and stale cursors/read scope cannot act on a changed query', async (t) => {
+
+test('history pages are bounded and stale cursors cannot act on a changed query', async (t) => {
   const f = setup(t);
   for (let n = 0; n < 65; n++) {
     const id = f.publish({ level: n % 2 ? 'warning' : 'info' });
@@ -147,49 +143,14 @@ test('history pages are bounded and stale cursors/read scope cannot act on a cha
     id = f.publish();
   f.service.end('host.fixture', id);
   await assert.rejects(f.act({ type: 'page', cursor }), /一覧/);
-  await assert.rejects(f.act({ type: 'read', scope: 'filtered', token }), /一覧/);
   await f.act({
     type: 'filters',
-    filters: { ...f.model().filters, level: 'warning', text: 'Safe', unread: true },
+    filters: { ...f.model().filters, level: 'warning', text: 'Safe' },
   });
   assert.equal(f.model().total, 32);
   assert.equal(f.model().items.length, 32);
 });
-test('unknown schema blocks persistent read/delete but session operations stay usable', async (t) => {
-  const f = setup(t, { unknown: true }),
-    id = f.publish();
-  f.service.end('host.fixture', id);
-  await f.historyTab();
-  await assert.rejects(f.act({ type: 'delete', ids: [id], token: f.model().token }), /未対応/);
-  assert.equal(f.model().total, 1);
-  assert.equal(JSON.parse(fs.readFileSync(f.file)).schemaVersion, 99);
-  const s = f.publish({ history: 'session' });
-  f.service.end('host.fixture', s);
-  await f.act({ type: 'delete', ids: [s], token: f.model().token });
-  assert.equal(f.model().total, 1);
-});
-test('failed persistent write rolls back read and deletion in memory as well as disk', async (t) => {
-  const f = setup(t),
-    id = f.publish();
-  f.service.end('host.fixture', id);
-  f.history.flush();
-  await f.historyTab();
-  const prior = fs.readFileSync(f.file, 'utf8'),
-    rename = fs.renameSync;
-  fs.renameSync = (a, b) => {
-    if (b === f.file) throw Error('locked fixture');
-    return rename(a, b);
-  };
-  try {
-    await assert.rejects(f.act({ type: 'read', ids: [id], token: f.model().token }), /保存/);
-    assert.equal(f.model().items[0].read, false);
-    await assert.rejects(f.act({ type: 'delete', ids: [id], token: f.model().token }), /保存/);
-    assert.equal(f.model().total, 1);
-    assert.equal(fs.readFileSync(f.file, 'utf8'), prior);
-  } finally {
-    fs.renameSync = rename;
-  }
-});
+
 test('center and banner share one action lock; history has no callbacks', async (t) => {
   const f = setup(t);
   let release,
@@ -224,7 +185,7 @@ test('center and banner share one action lock; history has no callbacks', async 
   await f.historyTab();
   await assert.rejects(f.act({ type: 'act', request: { ...request, requestId: 'ended' } }));
 });
-test('update result produces a configurable banner once; receipt survives history deletion and suppressed result does not replay', (t) => {
+test('update result produces a configurable banner once; receipt survives process restarts and suppressed result does not replay', (t) => {
   const f = setup(t);
   const receiptFile = path.join(f.dir, 'receipt.json');
   let calls = 0;
@@ -256,13 +217,20 @@ test('update result produces a configurable banner once; receipt survives histor
   assert.equal(JSON.parse(fs.readFileSync(receiptFile)).schemaVersion, 9);
 });
 
-test('explicit ID read tolerates unrelated content revisions while filtered bulk still requires its snapshot', async (t) => {
-  const f = setup(t),
-    a = f.publish(),
-    b = f.publish(),
-    token = f.model().token;
-  f.service.upsert('host.fixture', f.input({ body: 'changed' }), b);
-  await f.act({ type: 'read', ids: [a], token });
-  assert.equal(f.model().items.find((i) => i.id === a).read, true);
-  await assert.rejects(f.act({ type: 'read', scope: 'filtered', token }), /一覧/);
+test('removed read/delete operations and unread filters are rejected without changing active or ended records', async (t) => {
+  const f = setup(t);
+  const id = f.publish();
+  const before = f.model();
+  for (const type of ['read', 'delete'])
+    await assert.rejects(f.act({ type, ids: [id], token: 'old' }), /Unknown center action/);
+  await assert.rejects(f.act({ type: 'filters', filters: { ...f.model().filters, unread: true } }));
+  assert.deepEqual(f.model(), before);
+  assert.equal('read' in before.items[0], false);
+  assert.equal('unreadCount' in before, false);
+  f.service.end('host.fixture', id);
+  await f.historyTab();
+  await assert.rejects(f.act({ type: 'delete', scope: 'all', token: 'old' }));
+  assert.equal(f.model().historyCount, 1);
+  assert.equal('writable' in f.model(), false);
+  assert.equal(fs.existsSync(f.file), false);
 });

@@ -6,7 +6,6 @@ const p = require('../out/main/shared/notification-types');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { TypedNotifications } = require('../out/main/main/core/typed-notifications');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const definition = (extra) => ({
   typeId: 'message',
   title: 'Message',
@@ -97,12 +96,7 @@ function setup(t, definitions = [definition()]) {
     state: 'running',
     notificationTypes: definitions,
   };
-  const history = new NotificationHistoryStore(
-    path.join(dir, 'history.json'),
-    () => {},
-    () => clock,
-  );
-  const service = new NotificationService(history, () => clock);
+  const service = new NotificationService(() => clock);
   const typed = new TypedNotifications(service, {
     settings: () => settings,
     applets: () => [applet],
@@ -120,7 +114,6 @@ function setup(t, definitions = [definition()]) {
   return {
     typed,
     service,
-    history,
     changes,
     publications,
     applet,
@@ -475,17 +468,17 @@ test('rate limit is separate from suppression and does not prevent withdrawal', 
   assert.throws(() => f.typed.publish(owner, 'message', content(), 'run1'), /頻度/);
   f.typed.end(owner, a.notificationId, 'run1');
 });
-test('safe persisted kind identity survives restart without callbacks or private body', (t) => {
+test('safe in-session kind identity remains without callbacks or private body', (t) => {
   const f = setup(t);
-  f.typed.publish(owner, 'message', content(), 'run1');
-  f.history.flush();
-  const bytes = fs.readFileSync(path.join(f.dir, 'history.json'), 'utf8');
-  assert.equal(bytes.includes('private detail'), false);
-  const read = new NotificationHistoryStore(path.join(f.dir, 'history.json'), () => {});
-  assert.equal(read.list()[0].typeId, 'message');
-  assert.equal(read.list()[0].ownerId, owner.ownerId);
-  assert.equal(read.list()[0].status, 'interrupted');
-  read.flush();
+  const result = f.typed.publish(owner, 'message', content(), 'run1');
+  f.typed.end(owner, result.notificationId, 'run1');
+  const rows = f.service.historyEntries();
+  assert.equal(JSON.stringify(rows).includes('private detail'), false);
+  assert.equal(rows[0].typeId, 'message');
+  assert.equal(rows[0].ownerId, owner.ownerId);
+  assert.equal(rows[0].status, 'resolved');
+  assert.equal(rows[0].actions, undefined);
+  assert.equal(fs.existsSync(path.join(f.dir, 'history.json')), false);
 });
 
 test('reserved desktop defaults from 0.30 manifests remain readable while the new Shell region requires its API version', (t) => {

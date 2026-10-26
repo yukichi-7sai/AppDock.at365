@@ -270,10 +270,7 @@ test('service messages preserve external text and complete lifecycle command lab
     hostText('services.webAccounts.sharedDeleteConfirmation', { name, group: message }),
     `「${name}」を${message}から削除しますか？`,
   );
-  assert.equal(
-    hostText('services.index.historyDeleteConfirmation', { count: 12 }),
-    '通知履歴を12件削除しますか？',
-  );
+  assert.equal(hostText('notifications.dismissTitle', { title: name }), `${name}を閉じる`);
   assert.deepEqual(
     appletManagementCommands([
       { id: 'sample', displayName: name, enabled: true, state: 'running' },

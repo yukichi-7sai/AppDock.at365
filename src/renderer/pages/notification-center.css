@@ -10,7 +10,6 @@
 }
 .notification-center header,
 .notification-center nav,
-.notification-center .notification-tools,
 .notification-center .notification-filters,
 .notification-center .center-card-heading,
 .notification-center .center-card-actions,
@@ -39,13 +38,22 @@
   overflow: auto;
   padding: 2px 8px 8px 2px;
 }
-.notification-center .center-card {
+.notification-center .notification-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
   margin-bottom: 14px;
+}
+.notification-center .notification-row-controls {
+  padding-top: 12px;
+}
+.notification-center .center-card {
+  min-width: 0;
   padding: 20px;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--notification-accent) 40%, var(--panel));
   border-radius: 12px;
   background: var(--panel);
-  border-left: 3px solid var(--notification-accent);
 }
 .notification-center .center-card-level {
   color: var(--notification-accent);
@@ -58,10 +66,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.6;
-}
-.notification-center .unread-mark {
-  color: var(--accent);
-  font-size: 12px;
 }
 .notification-center .center-error {
   color: #e37583;
@@ -79,6 +83,12 @@
   }
   .notification-center .center-card {
     padding: 16px;
+  }
+  .notification-center .notification-row {
+    gap: 8px;
+  }
+  .notification-center .notification-row-controls {
+    padding-top: 8px;
   }
   .notification-center .notification-filters input {
     width: 100%;
