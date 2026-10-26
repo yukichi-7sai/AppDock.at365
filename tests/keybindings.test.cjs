@@ -585,7 +585,25 @@ test('one OS registration per key; common dispatch receives each press only once
 test('page typing policy preserves ordinary text, navigation and IME keys', () => {
   for (const key of ['a', 'Tab', 'Enter', 'Backspace', 'Process'])
     assert.equal(safePageShortcut({ key, control: false, alt: false }), false);
-  for (const key of ['F1', 'F24', 'Pause'])
+  for (const key of [
+    'F1',
+    'F24',
+    'Pause',
+    'CapsLock',
+    'ScrollLock',
+    'Alphanumeric',
+    'KanaMode',
+    'Convert',
+    'NonConvert',
+  ])
     assert.equal(safePageShortcut({ key, control: false, alt: false }), true);
   assert.equal(safePageShortcut({ key: 'r', control: true, alt: false }), true);
+  for (const key of ['Hiragana', 'Katakana', 'HiraganaKatakana', 'Romaji']) {
+    assert.equal(safePageShortcut({ key, code: 'KanaMode', control: false, alt: false }), true);
+    assert.equal(safePageShortcut({ key, code: '', control: false, alt: false }), false);
+  }
+  assert.equal(
+    safePageShortcut({ key: 'Process', code: 'KanaMode', control: false, alt: false }),
+    false,
+  );
 });

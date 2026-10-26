@@ -50,6 +50,118 @@ test('Win aliases and events normalize without changing old key notation', () =>
   );
   assert.throws(() => normalizeShortcut('Win+Meta+W'));
 });
+
+test('lock and Japanese keys record, persist and dispatch with their original-input policy', async () => {
+  const { parseSettings } = require('../out/main/shared/settings-schema');
+  const { settingsStorageValue } = require('../out/main/shared/settings-storage');
+  const source = [
+    'CapsLock',
+    'ScrollLock',
+    'Alphanumeric',
+    'KanaMode',
+    'Convert',
+    'NonConvert',
+  ].flatMap((key, index) =>
+    ['', 'Ctrl+Shift+'].map((prefix, modified) => {
+      const value = prefix + key;
+      assert.equal(normalizeShortcut(value.toLowerCase()), value);
+      assert.equal(
+        shortcutFromEvent({
+          key,
+          code: key,
+          ctrlKey: !!modified,
+          shiftKey: !!modified,
+          altKey: false,
+          metaKey: false,
+        }),
+        value,
+      );
+      assert.equal(normalizeGesture('key:' + value), 'key:' + value);
+      assert.equal(
+        shortcutFromEvent({
+          key,
+          code: key,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: false,
+          metaKey: false,
+          isComposing: true,
+        }),
+        null,
+      );
+      return row(`lock.${index}.${modified}`, !!(index % 2), { key: value });
+    }),
+  );
+  const settings = parseSettings({ ...createDefaultSettings(), keybindings: source });
+  const restored = parseSettings(JSON.parse(JSON.stringify(settingsStorageValue(settings))));
+  assert.deepEqual(restored.keybindings, source);
+  const available = source.map(({ command: id }) => ({ id }));
+  const executed = [],
+    registered = [];
+  const manager = new GlobalHotKeyManager(
+    {
+      async sync(keys, inputs) {
+        registered.push(...inputs);
+        return keys.map((shortcut) => ({ shortcut, registered: true }));
+      },
+      async close() {},
+    },
+    async (key) =>
+      executed.push(
+        ...resolveKeybindings(restored.keybindings, key, { appFocused: false }, available, true),
+      ),
+    () => {},
+    assert.fail,
+  );
+  try {
+    await manager.sync(
+      restored,
+      available.map(({ id }) => id),
+    );
+    assert.deepEqual(
+      registered.map(({ shortcut, blockOriginalInput }) => ({
+        shortcut,
+        blockOriginalInput,
+      })),
+      source.map(({ key, blockOriginalInput }) => ({ shortcut: key, blockOriginalInput })),
+    );
+    for (const { key } of source) await manager.pressed(key);
+    assert.deepEqual(
+      executed,
+      source.map(({ command }) => command),
+    );
+  } finally {
+    await manager.close();
+  }
+});
+test('KanaMode physical key keeps modifiers across IME mode names and preserves composition guards', () => {
+  assert.equal(normalizeShortcut('ctrl+KANA'), 'Ctrl+KanaMode');
+  for (const key of ['KanaMode', 'Hiragana', 'Katakana', 'HiraganaKatakana', 'Romaji']) {
+    const event = {
+      key,
+      code: 'KanaMode',
+      ctrlKey: true,
+      shiftKey: true,
+      altKey: false,
+      metaKey: false,
+    };
+    assert.equal(shortcutFromEvent(event), 'Ctrl+Shift+KanaMode');
+    assert.equal(shortcutFromEvent({ ...event, isComposing: true }), null);
+  }
+  for (const key of ['Process', 'Dead', 'Unidentified', 'Hiragana'])
+    assert.equal(
+      shortcutFromEvent({
+        key,
+        code: key === 'Hiragana' ? '' : 'KanaMode',
+        ctrlKey: false,
+        shiftKey: false,
+        altKey: false,
+        metaKey: false,
+      }),
+      null,
+    );
+  assert.equal(normalizeGesture('key:ctrl+KANA'), 'key:Ctrl+KanaMode');
+});
 test('legacy omission is preserved while explicit passthrough round trips', () => {
   const source = [row('old'), row('pass', false)];
   assert.deepEqual(parseKeybindings(source), source);

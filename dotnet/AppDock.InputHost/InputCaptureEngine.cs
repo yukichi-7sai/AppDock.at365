@@ -132,7 +132,7 @@ internal sealed class InputCaptureEngine : IDisposable
         if (needKeyboard && keyboardHook == 0) {
             pressed.Clear();
             for (uint key = 1; key < 256; key++)
-                if (key != 0x13 && (GetAsyncKeyState((int)key) & 0x8000) != 0) pressed.Add(key);
+                if (!ShortcutCodec.IsPulse(key) && (GetAsyncKeyState((int)key) & 0x8000) != 0) pressed.Add(key);
             keyboardHook = SetWindowsHookEx(13, keyboardCallback, GetModuleHandle(null), 0);
             if (keyboardHook == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
         }
@@ -157,9 +157,11 @@ internal sealed class InputCaptureEngine : IDisposable
         if (code < 0 || disposed) return CallNextHookEx(keyboardHook, code, message, pointer);
         var data = Marshal.PtrToStructure<KeyData>(pointer);
         if (data.Extra == GestureEngine.InputMarker) return CallNextHookEx(keyboardHook, code, message, pointer);
+        data.Key = ShortcutCodec.CaptureKey(data.Key, data.Scan, data.Flags);
         var up = message is 0x101 or 0x105;
-        var repeat = !up && data.Key != 0x13 && !pressed.Add(data.Key);
-        if (up) pressed.Remove(data.Key);
+        var pulse = ShortcutCodec.IsPulse(data.Key);
+        var repeat = !up && !pulse && !pressed.Add(data.Key);
+        if (up || pulse) pressed.Remove(data.Key);
         try {
             if (owned.TryGetValue(data.Key, out var blocked)) {
                 if (up) owned.Remove(data.Key);
@@ -174,7 +176,7 @@ internal sealed class InputCaptureEngine : IDisposable
                     var key = ShortcutCodec.Format(data.Key, modifiers, ForegroundLayout());
                     if (key != null && MaskModifier(modifiers) &&
                         notify("shortcuts.recorded", new { token = recording.Token, key })) {
-                        if (data.Key != 0x13) owned[data.Key] = true;
+                        if (!pulse) owned[data.Key] = true;
                         return 1;
                     }
                 }
@@ -207,7 +209,7 @@ internal sealed class InputCaptureEngine : IDisposable
             if (!notify("shortcuts.pressed", new ShortcutPressNotice(configuration.ShortcutRevision, ++pressId,
                 matched.Select(item => item.Row.Shortcut).Distinct().ToArray(), block, window, configuration.Context,
                 configuration.HostProcessId, target))) return CallNextHookEx(keyboardHook, code, message, pointer);
-            if (data.Key != 0x13) owned[data.Key] = block;
+            if (!pulse) owned[data.Key] = block;
             return block ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
         } catch {
             notify("input.error", new { message = "入力の検出に失敗したため新規入力を通しました。" });

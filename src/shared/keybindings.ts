@@ -9,6 +9,7 @@ import {
   defaultShortcuts,
   defaultGlobalShortcutCommands,
   normalizeShortcut,
+  isKanaModeKey,
   validCommandId,
 } from './commands';
 import type { Settings } from './contracts';
@@ -553,11 +554,17 @@ export function resolveKeybindings(...args: Parameters<typeof planKeybindings>):
   return [...planKeybindings(...args).commands];
 }
 /** No host IPC or text inspection is injected into remote documents. */
-export function safePageShortcut(input: { control: boolean; alt: boolean; key: string }) {
+export function safePageShortcut(input: {
+  control: boolean;
+  alt: boolean;
+  key: string;
+  code?: string;
+}) {
   return (
     input.control ||
     input.alt ||
+    isKanaModeKey(input) ||
     /^F([1-9]|1[0-9]|2[0-4])$/i.test(input.key) ||
-    input.key === 'Pause'
+    ['Pause', 'CapsLock', 'ScrollLock', 'Alphanumeric', 'Convert', 'NonConvert'].includes(input.key)
   );
 }

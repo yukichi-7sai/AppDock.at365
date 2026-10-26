@@ -1,5 +1,116 @@
 # 検証記録
 
+## 2026-10-27: 0.96.7キー対応のmainマージに向けたコミット検証
+
+- 利用者のmainマージ指示を受け、mainのcleanと`pull --ff-only`による最新一致を確認した。対象は準備済み20ファイルだけとし、設定・保存値・製品コードの追加修正は行わない。
+- `.artifacts/merge-main-20261027/final-inputs.json`の856入力、完全ログ22件、試験版EXEのSHA256を照合して一致した。標準回帰1,141件・型検査・native255/マウス＋キー58項目・設定API58群・固定記録42件/保存再起動13群/smokeの成功は、対象コード・試験・依存・環境の一致に基づき再利用する。この追記は検証記録だけの差分として扱う。
+- コミット対象とstage tree、author/committer、main反映結果は、通常版repoの`A:\30.PROJECT\AppDock.at365\.artifacts\commit-validation-lock-keys-20261027/`に記録する。通常版への反映に新しい製品修正は伴わないため0.96.7を維持し、main側の標準publishと新しい固定EXEの確認を行う。push・Release・実利用deployは今回の範囲に含めない。
+
+## 2026-10-27: 最新mainを取り込みキージェスチャーのマージ準備 0.96.7
+
+- 利用者の依頼によりoriginをfetchし、ローカルmainのコミット済み最新を試験用`codex/lock-keys`へ取り込んだ。開始時の`8ae24f2`から`1134e3c`へ進め、確認中に追加された画像グループ対応`e1906cbe324268cf7ab912efd7d2aaf4374eb8a3`も取り込んだ。終了前の再fetchでもHEAD/main/origin/mainが同コミットと一致することを確認した。main本体worktreeの進行中変更には手を加えていない。
+- 未コミットのキー対応19ファイルを先に`.artifacts/merge-main-20261027/backup/`へ保全した。重なったのはpackage.jsonと本記録だけで、main側の既存位置への追記と試験側の記録を両方残し、受け入れ済みのキー対応17ファイルはbyte単位で保持した。Gitのbaseをcheckout-indexで正確に書き出し、対象2ファイルだけを一時的に既知baseへ戻してfast-forward後、準備済みの解決内容を適用した。stash・reset・新規commitは行っていない。再取り込み時の保全20ファイルと処理記録は`refresh-e1906cb/`に保持した。
+- main 0.96.6を基準とする通常の互換対応として、統合版を**0.96.7**へパッチ更新した。キー対応に伴う設定項目・保存ファイル・公開APIの追加はない。MCPのshortcut-listは送信キー用の別文法を維持し、今回追加した捕捉キーがその文法を広げないことを`tests/settings-shortcut-lists.test.cjs`で確認した。トリガー側ではキー名を正規化でき、送信一覧のdryRun/実保存では従来どおり拒否されて保存も実行も起きない。既存ID・名称・入力文字列は書き換えない。
+- 固定依存のfrozen install・型検査・標準`dev.bat test`が成功し、最新mainで**1,141/1,141件**（fail/cancel/skip 0）。開発ホストの設定MCP/GUIは画像グループ対応を含む**58群**が成功した。開発ホストでは起動設定が読み取り専用となる既存の試験経路を使い、実Windows起動登録の再検証は行っていない。前段1134e3cでの1,129件/54群は別ログへ保持し、最新mainの成功件数へ混在させていない。
+- 初回標準試験の2失敗は、追加試験で送信一覧と捕捉キーの文法を混同した期待値、およびframework-dependentな.NET検証ホストの未生成だった。試験の前提を修正し、既存ExtensionHostをRelease buildしてから標準回帰を再実行して成功した。製品の送信文法や検査を緩めていない。統合手順の初回試行で検証記録の追記位置・base復元時の行末差を検出した記録も保持し、保全内容へ戻したことを確認後、正確なbase書き出しで取り込みを完了した。
+- 発行前レビュー1回でmain統合・保存互換・送信/捕捉の境界・入力ブロック/所有状態・未確認範囲を確認し、阻害指摘なし。native関連29入力は旧試験版と一致したが、発行DLLにはmainのコミット情報`0.10.0+e1906cb...`が収録されhashが変わったため、過去DLLの試験をそのまま再利用せず、**発行されたDLLそのもの**でnative状態**255項目**・マウス＋キー状態**58項目**を再実行して成功した。OSへのPause/Break・F13〜F24送信/ホットキー登録は行っていない。
+- 固定EXEでnative記録**42/42件**、特殊キー選択・保存・ブロック設定・取消・実再起動後の登録**13群**、隔離portable smokeが成功した。発行EXE/File/ProductVersion・feedは**0.96.7 / 170,706,835 bytes / SHA256 `9cc07a3334c170e2bfe91552c39f51b5e7dce6b9593f537f306bf68ff0119e58`**。収録/試験InputHost DLLはSHA256`331179bd45552922861b1104bb6cf0edf54ba63a4d1a234367b92490af7126b4`、全試験コピーと最終EXEも照合した。発行・試験前後の856入力が一致し、その後のソース側変更は本記録だけ。既存設定・診断v2 EXE・実機ログ11ファイルは発行前後のhash一致を確認した。
+- 証跡は`.artifacts/merge-main-20261027/validation.json`・入力hash・各完全ログ・integration/review・native-hash-change/native-final。native記録GUIは`.artifacts/shortcut-native-capture-ui-1793044418709/`、設定GUIは`.artifacts/command-triggers-ui-1793044466522/`、smokeは`.artifacts/smoke-1793044503926/`、設定APIは`.artifacts/mcp-settings-foundation-source-1793043968565/`。Node24.22.1/pnpm12.10.1/Electron45.0.0/.NET SDK10.0.403、Windows x64。
+- 成功最新3回を保持し、最古の0.94.10の設定GUI/smoke profile2件だけを終了・範囲・再解析ポイントなしを確認して整理した。結果JSONは元hashのまま`.artifacts/kana-keys-20261027/retired-command-triggers-ui-result.json`・`retired-smoke-result.json`へ保管し、`merge-main-20261027/cleanup.json`に記録した。native固定GUIは最新3回、開発版nativeと設定MCPは各2回、固定出力・保全・調査/失敗証跡は保持した。
+- マージ準備の差分は未コミット。mainへの変更マージ・push・Release・実利用deployは行っていない。0.94.12での利用者確認と、統合版0.96.7の自動検証は分けて扱う。複数AppDock同時起動時のデスクトップ不検出と、Ctrl+Alt+Shift+KANAの本体イベントなしの制約は維持し、今回修正したとは扱わない。実機/IME/LEDや実Windows起動登録の新たな受け入れ確認は行っていない。
+
+## 2026-10-27: 0.94.12の実機成功と複数起動時の発生条件を確認
+
+- 利用者がCtrl+ScrollLock・Ctrl+Alt+NonConvertの動作成功を確認した。デスクトップで入力が拾われず元のキーが素通しになる現象は、別のAppDockを同時に起動していると発生し、その別個体を終了するとデスクトップの入力にも反応することを確認した。
+- 今回の実機条件では、別AppDockとの同時起動が発生条件として切り分けられ、単一起動時のデスクトップでの動作成功を確認済みとする。別個体の版・設定・起動順と、内部のどの経路で干渉したかは未計測であり、フックの優先順位など特定の機構を原因と断定しない。元入力ブロックの全条件にわたる実効果を、この動作成功報告だけで確認済みとはしない。
+- Ctrl+Alt+Shift+KANAは引き続き本体イベントの観測なし。前項の自動試験と今回の利用者確認は対象を分けて保持する。利用者確認の要点は`.artifacts/ime-chords-20261027/physical-acceptance.json`。
+- 記録のみの更新。製品コード・版・発行物・設定・複数起動ポリシーは変更せず、文書差分と既存検証入力との照合を行った。製品回帰の再実行・再publish・commit/pushは行っていない。
+
+## 2026-10-27: Ctrl+ScrollLock・Ctrl+Alt+NonConvertの派生コードに対応 0.94.12試験版
+
+- 利用者が診断v2を実機で試し、診断アプリ前面なら前2組が記録され、デスクトップでは記録なし、Ctrl+Alt+Shift+KANAは反応なしと報告した。`key-probe-KAGUYA-20261027-040116-972.json`は30イベント。Ctrl+ScrollLockはVK03/scan46/非拡張の押下3件、Ctrl+Alt+NonConvertはVKF7/scan7B/非拡張の押下5件で、対応する解放も記録された。3修飾キーを押す区間は修飾キーだけで、KANA本体に相当するイベントなし。全イベントの前面は診断WinFormsであり、このログからデスクトップで届かない原因やCopilot起動経路は確定しない。原本SHA256`363d9c196c67a6850cc36d5f59caefff7dc5caf44a6e629d560ea9411ae222ed`、集計は`.artifacts/ime-chords-20261027/physical-input.json`。
+- 共通`ShortcutCodec.CaptureKey`に、非拡張scan46のVK03をScrollLock、非拡張scan7BのVKF7をNonConvertへ揃える処理を追加した。修飾キー、既存の保存値、通常キーの長押し抑止・押下/解放の所有状態、条件・dispatcher・元入力ブロックを維持し、記録・通常実行・マウス＋キーで共通に使う。異なる位置、拡張されたBreak、通常文字への再割当は変換しない。新しい取得経路や、イベントが来ない組み合わせの代替発火は追加していない。
+- 先にメモリ内回帰を追加して旧0.94.11 DLLの失敗を再現し、修正後に成功した（`native-before.log`・`regression-before.json`）。追加項目は物理位置/拡張の境界、修飾キー付き表示、block ON/OFFの実行・反復抑止・解放・再押下・記録、およびマウス＋キーの解放までの所有状態。OSへのキー送信やフック登録をせず、native状態**255項目**・マウス＋キー状態**58項目**が成功した。Break系入力はこのメモリ内検査だけで扱い、OSへPause/Break・F13〜F24を送信/ホットキー登録していない。
+- 発行前レビュー1回で物理位置の限定・既存キーとの区別・共有捕捉/修飾/所有状態・保存互換・試験の安全性と実機未確認範囲を確認し、阻害指摘なし（`review.json`）。設定項目・保存ファイル・公開APIの追加を伴わない捕捉互換修正として、前回発行0.94.11から**0.94.12**へパッチ更新した。版更新直後のdev実行は依存照合がworkspace変更を検出して停止したため、固定依存のfrozen install後に実行して成功した。型検査、関連Node8ファイル**95/95件**（fail/cancel/skip 0）、書式検査・標準publish成功。
+- 記録の恒久GUI回帰へCtrl+Alt+NonConvertのVK/物理位置送信を追加し、IME切り替え操作の前後・実クリック後の記録を開発版/固定EXEで**各42/42件**成功した。全件でnative通知・正しい表示・エラーなし・前面維持を確認し、42個の異なる記録tokenで再開始された。固定EXEでは特殊キー選択・保存・ブロック設定・取消・実再起動後の登録**13群**、隔離portable smokeも成功。native GUIは`.artifacts/shortcut-native-capture-ui-1793041919520/`、設定GUIは`.artifacts/command-triggers-ui-1793041980634/`、smokeは`.artifacts/smoke-1793042016438/`。
+- 発行EXE/File/ProductVersion・feedは**0.94.12 / 170,704,865 bytes / SHA256 `dba3abb0a3ea2501e2b8a4dca343fb8139887ed5c648599a059aed9293244248`**。試験DLLと発行/収録InputHost DLLのSHA256`048b8a1babd5a6a3e1fc6db378999b8148c1dc43e130b74777f71154bf6f8b80`が一致し、固定試験コピーと最終EXEも照合した。発行/試験前後の803入力が一致し、その後のソース側変更は本記録だけ。設定・診断v2 EXE・既存実機ログの計10ファイルは発行直後にhash一致を確認。最終照合ではsettings.jsonだけ04:14:05に後続更新され、他9件は一致した。現設定に試験fixtureの割り当て/拡張は含まれず、更新元は断定せずに現内容を保持し、上書きしていない（`preserved-final.json`）。証跡は`.artifacts/ime-chords-20261027/validation.json`・各完全ログ・入力hash・review.json。固定ツールはNode24.22.1/pnpm12.10.1/Electron45.0.0/.NET SDK10.0.403、Windows x64。
+- 設定GUI/smokeは成功最新3回を保持し、最古の0.94.9 profile2件だけを終了・範囲・再解析ポイントなしを確認して整理した。結果JSONは元hashのまま`.artifacts/ime-pulse-20261027/retired-command-triggers-ui-result.json`・`retired-smoke-result.json`へ保管し、`ime-chords-20261027/cleanup.json`へ記録した。native記録GUIは各実行方式2回、固定出力・診断・失敗/再現証跡は保持。
+- 0.94.12の両組み合わせの物理的な記録・実行・入力抑止、特にデスクトップでの入力到達は利用者再確認待ち。Ctrl+Alt+Shift+KANAは今回も本体イベントを観測できておらず、現行の入力フックで捕捉できることを示す証拠がない。OSや他入力処理がイベントを出さない場合は、この変換追加では対応できない。IME/LEDへの実効果・無関係な全回帰は未検証、commit・merge・push・Release・実利用deployなし。
+
+## 2026-10-27: 残る3組の見込み調査と複合キー診断v2
+
+- 利用者が0.94.11で動作改善を確認した。残る報告はCtrl+ScrollLock・Ctrl+Alt+NonConvertの記録欄での非対応エラー、およびCtrl+Alt+Shift+KANAでCopilotが開く現象。3組とも旧診断でログが出なかった。新しいKAGUYAログ`key-probe-KAGUYA-20261027-035118-025.json`・`035231-776.json`は、いずれも対象イベント0件、上限未到達。旧診断は対象VK/scanのフィルター付きなので、これだけでフックに入力が届かないと断定しない。
+- 現行の共通正規化と設定parserは`Ctrl+ScrollLock`・`Ctrl+Alt+NonConvert`・`Ctrl+Alt+Shift+KanaMode`の3組を受理する（`.artifacts/key-combinations-20261027/grammar-check.log`、OS送信なしのメモリ内検査）。組み合わせを禁止する設定文法の制限とは確認できなかった。
+- [Microsoft日本語106キーの公式サンプル](https://github.com/microsoft/Windows-driver-samples/blob/main/input/layout/fe_kbds/jpn/106/kbd106.c)では、ScrollLock位置がKBDMULTIVK、Ctrl+Alt+NonConvertは`VK_DBE_ENTERWORDREGISTERMODE`、Ctrl+Alt+Shift+KANAは`KBDNLS_NOEVENT`の定義になっている。[Microsoftのデバッグ資料](https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/debug-universal-drivers---step-by-step-lab--echo-kernel-mode-)にもBreakとScrollLockの関係がある。前2組は変換後コードの追加対応候補、3組目は現行フックへキーイベントが出ない可能性がある。実機の実コードとの一致、Copilotを起動した経路、他フックによる抑止は未確定とし、サンプル定義をそのまま当該PCの実測に読み替えない。
+- 診断のみ更新。旧ソースと固定EXEは保持し、`.artifacts/key-combinations-20261027/probe-source/`から自己完結単一EXEを作成した。従来の対象キー/物理位置に加え、Break系VK03、IME派生F0〜FD、修飾キー、F13〜F24・Apps/起動用キーを受動記録する。文字キーやタイトル・本文は保存せず、入力を遮断しない。高位Fキーを診断に含めるのは観測だけであり、OSへの送信・ホットキー登録はしない。JSONのprobeVersionは2、画面タイトルは「AppDock キー診断 v2（複合キー）」。
+- 診断差分のレビューで対象限定・文字入力の除外・全入力通過・記録上限・手動開始/停止・保存先を確認し、阻害指摘なし。build成功、フック登録/OS送信なしのself-testは48コード＋5位置＋5除外の**58条件成功**。初回の自己試験読取はGUI EXE終了前だったため、Start-ProcessのWaitで終了コード/結果を確認した。文法検査の初回引用符エラーと不完全な試験行のエラーは別ログへ保持し、正しい行による3件成功だけを採用した。
+- `A:\40.ARTIFACT\AppDock.at365-lock-keys\AppDock.KeyProbe.exe`を更新。SHA256`3a78f07dd780fcf8ba24309387550bc301d360e516f8b4e36bb979fc36a6157b`。証跡は`.artifacts/key-combinations-20261027/probe-placement.json`・build/self-test・入力hash・文法確認ログ。本体EXE/feedは0.94.11のまま、本体・設定・既存実機ログの計10ファイルをhashで保持確認した。製品コード・版・キー割り当て・OS/IME/Copilot設定は変更していない。製品回帰の再実行・再publish・commit/pushは不要として行わず、固定出力・既存成功最新3回・調査/失敗証跡を保持し、削除0件。次はv2で3組の派生コードを実測し、捕捉・抑止方法を判断する。
+
+## 2026-10-27: IMEキー記録の再クリックと補助入力を修正 0.94.11試験版
+
+- 利用者が0.94.10でKANAの実行成功を確認した一方、設定画面ではCtrl/Win/Alt付きや単体KANA・Convertが前の表示のまま記録されない場合があり、Win/Alt付きで非対応キーのエラーが一瞬出ると報告した。IMEのON/OFF操作後にも発生するとの観測を受け、設定の記録経路を調査した。
+- 旧固定EXEの実マウス再クリックでは、DOMのフォーカスが同じ記録欄に残っていても、nativeのマウスフックが記録を終了し、再開始されないことを確認した。30入力中native通知は3件、通知なし27件、表示不一致14件（`.artifacts/kana-capture-20261027/native-click-before.json`）。CDPだけのクリックでは30件とも成功しており、マウスフックを通る再クリックを試験へ追加する必要があった。nativeが停止するとDOM側のIME/繰り返し保護に依存するため、IMEキーで記録できたりできなかったりする状態になる。
+- 共有`ShortcutCaptureField`の左pointer downで記録要求を更新し、フォーカスの変化がなくても新しいtokenでnative記録を開始し直す。旧tokenの取消・遅延応答の無効化、記録欄外のクリックによる取消、前面Windowの検査は維持した。再開始だけの中間修正ではnative通知36件が成功したが、18件で一瞬のエラーを再現した（`development-result.json`）。Win/Alt単独動作の抑止用にnativeが送るVK255・extraInfo`0x365B012`がDOMへ`Unidentified/keyCode255`として届き、非対応キー扱いされていたため、この補助入力を除外した。IME変換中/229、実際の非対応キー、保護キーの既存判定は維持する。
+- 恒久回帰として`scripts/shortcut-native-capture-ui-test.cjs`を追加し、既存InputTarget fixtureへ対象Windowの前面確認付きのクリック・限定IMEキー送信を追加した。隔離した設定の記録欄で、IME切り替えキー操作の前後3段階、VK送信と物理位置scan送信の2経路、Ctrl/Win/Alt付きKANA（AltはF5/F6の両方）・単体KANA・Convertの6入力を検査する。実クリック後のnative通知、表示、エラーなし、前面維持と36個の異なる記録tokenを確認する。送信対象は限定したIMEキー/位置と修飾キーだけで、Pause/F13〜F24は送信・登録しない。実行例は`dev.bat exec node scripts/shortcut-native-capture-ui-test.cjs A:/40.ARTIFACT/AppDock.at365-lock-keys/AppDock.at365.exe`。
+- 発行前レビュー1回で共有記録欄の寿命・取消・保存互換・入力保護・試験範囲を確認。試験用送信に前面Window検査を追加する指摘へ対応し、fixtureのbuildと最終固定EXE試験で再確認した。設定項目・保存ファイル・公開APIの追加を伴わないUI修正として、前回発行0.94.10から**0.94.11**へパッチ更新した。型検査・build・標準publish成功、関連Node10ファイル**102/102件**（fail/cancel/skip 0）。変更のないInputHost/Runtime・状態試験29入力と試験/収録DLLをhash照合し、0.94.10のnative状態**229項目**・マウス＋キー状態**50項目**の成功を再利用した（`native-reuse.json`）。
+- 開発版と固定EXEで上記native記録**各36/36件・エラー0件**、固定EXEの特殊キー選択・保存・元入力ブロック設定・取消・実再起動後の登録**12群**と隔離portable smokeが成功した。nativeは`.artifacts/shortcut-native-capture-ui-1793039830133/`、設定GUIは`.artifacts/command-triggers-ui-1793039885444/`、smokeは`.artifacts/smoke-1793039932105/`。検証入力803ファイルは発行/試験前後で一致し、その後のソース側変更は本検証記録だけ。発行先のsettings.json・settings-KAGUYA.json・診断EXE・実機ログ4件の計7ファイルをhashで保持確認した。
+- 発行EXE/File/ProductVersion・feedは**0.94.11 / 170,694,325 bytes / SHA256 `7930bb9443a18ec96cd8857e9679aa40b8f71668fd8224b07738163c8b069788`**。発行/収録InputHost DLLは前版と同じSHA256`d562598c4e58efc38df65e488e2c3afb01f88ca7018e932e6483df5d1a1ff181`。証跡は`.artifacts/kana-capture-20261027/validation.json`・入力hash・review.json・各完全ログ・修正前再現。診断スクリプトの起動待ち/hover/座標取得を修正する途中の失敗ログは保持し、製品の成功結果へ数えていない。Node24.22.1/pnpm12.10.1/Electron45.0.0/.NET SDK10.0.403、Windows x64で検証した。
+- 成功最新3回を保持し、最古の0.94.8の設定GUI/smoke profile2件だけを終了・範囲・再解析ポイントなしを確認して整理した。結果JSONは元hashのまま`.artifacts/ime-keys-20261026/retired-command-triggers-ui-result.json`・`retired-smoke-result.json`へ保管し、`kana-capture-20261027/cleanup.json`へ記録した。診断・失敗証跡と固定出力は保持。制限環境のCIM照合は権限不足で止まったため、同じ処理を通常ユーザー環境で再実行して確認後に整理した。
+- 自動入力は実機のIME状態・キーボード配列すべての受け入れ確認には代えない。0.94.11のKANA/Convertの物理記録、IMEのON/OFF後・Win/Alt/Ctrl付きの記録、長押しやIME/LEDの実効果は利用者の再確認待ち。製品nativeフック、通常キーの状態管理、入力ブロック、保存値は今回変更していない。無関係な全回帰、commit・merge・push・Release・実利用deployは行っていない。
+
+## 2026-10-27: KANAキーに対応 0.94.10試験版
+
+- 利用者が0.94.9の単体CapsLock（英数）の実行と、設定画面での入力記録の成功を確認した。追加対象のKANAは「カタカナ/ひらがな/ローマ字」キーだと確認。旧診断で得た`key-probe-KAGUYA-20261027-013139-851.json`は対象フィルター外の押下を含まず、解放10件だけだったため、かな位置と関連IMEコードを含めて診断EXEを更新した。OS送信/フック登録なしの20条件self-testに成功し、`40.ARTIFACT/AppDock.at365-lock-keys/AppDock.KeyProbe.exe`へ配置した（`.artifacts/kana-keys-20261027/probe-placement.json`）。
+- 更新後の`key-probe-KAGUYA-20261027-013611-573.json`は56イベント。全件JISかな位置のscan`0x70`で、単体/Ctrl/Win付きは主にVKF2、Shift付きはVKF1、Alt付きはVKF5/F6が届いた。押下前に旧モードのupが入り、同じVKの対応するupが来ない連続押下も確認。集計と原本hashは`.artifacts/kana-keys-20261027/physical-input.json`。これは入力コードの実測であり、新版での実行・入力抑止の成功へ読み替えていない。
+- KANAを`KanaMode`として共通正規化・特殊キー選択・native記録/実行・マウス＋キー・ページ入力へ追加し、`KANA`表記も同じ保存値へ正規化する。標準のVK_KANA（0x15）に加え、非拡張scan0x70のIMEコードF0/F1/F2/F5/F6を共通の捕捉変換でKanaModeとして扱い、修飾キーを保持する。英数のscan0x3A、通常文字への再割当、拡張スキャンは変換しない。DOM側も物理codeがKanaModeで既知のIMEキー名のときだけ揃え、IME変換中・Process/Dead/Unidentifiedの保護を維持する。名称と物理codeの確認には[W3C code定義](https://www.w3.org/TR/uievents-code/)・[key定義](https://www.w3.org/TR/uievents-key/)、標準VKには[Microsoft定義](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)を参照した。
+- KanaModeも解放待ちのない押下として扱い、連続押下・モード切り替え前の解放・任意のupで所有状態を残さない。既存Alphanumeric/Pause、通常キーの長押し抑止と押下/解放の対、元入力ブロック、条件と共通dispatcher、保存済み割り当て、別契約の送信キー文法を維持。発行前レビュー1回で要件/互換/影響/検証不足を確認し、阻害指摘なし。新しい設定項目・保存ファイル・公開APIを追加しない通常対応として0.94.9から**0.94.10**へパッチ更新した。
+- frozen install・型検査・標準publish成功。Node関連10ファイル**102/102件**、OSへ送信/フック登録をしないnative状態試験**229項目**、マウス＋キー状態試験**50項目**に成功。固定EXEでは既存キーにKanaMode・Ctrl+KanaMode・Shift+KanaModeを加えた、特殊キー選択・保存・ブロック設定・取消・実再起動後の登録**12群**と隔離portable smokeが成功した。802入力と診断の補助入力hashが一致し、発行前のsettings.json・更新済み診断EXE・実機ログ4件の計6ファイルをhashで保持確認した。
+- 発行EXE/File/ProductVersionとfeedは**0.94.10 / 170,689,402 bytes / SHA256 `1bb5407d201d21bd2062698c2ef3ea8c975b5a35e1c594b411478213c160a3e3`**。試験DLLと発行/収録InputHost DLLのSHA256`d562598c4e58efc38df65e488e2c3afb01f88ca7018e932e6483df5d1a1ff181`が一致。証跡は`.artifacts/kana-keys-20261027/validation.json`と各完全ログ・入力hash・review.json、GUIは`.artifacts/kana-keys-20261027/retired-command-triggers-ui-result.json`、smokeは`.artifacts/kana-keys-20261027/retired-smoke-result.json`。Node24.22.1/pnpm12.10.1/Electron45.0.0/.NET SDK10.0.403、Windows x64で検証した。
+- GUI/smokeの各モードは成功最新3回を保持し、最古の0.94.7 profile2件だけを、成功・終了・対象範囲・再解析ポイントなしを確認して整理した。結果JSONは元hashのまま`.artifacts/lock-keys-20261026/retired-command-triggers-ui-result.json`・`retired-smoke-result.json`へ保管し、詳細を`kana-keys-20261027/cleanup.json`へ記録した。固定出力・調査/失敗証跡は保持。0.94.10のKANAの物理的な記録・実行・入力抑止、長押しやIME/LEDの実効果は実機再確認待ち。Pause/F13〜F24のOS送信/登録、commit・merge・push・Release・実利用deployは行っていない。
+
+## 2026-10-27: 英数の解放なし入力に対応 0.94.9試験版
+
+- AppDock起動中の追加実機ログ`A:\40.ARTIFACT\AppDock.at365-lock-keys\key-probe-KAGUYA-20261027-010509-581.json`を解析（19イベント）。Shift+CapsLock・無変換・変換・ScrollLockはいずれもChrome系Windowとデスクトップ`Progman`から押下後、解放前に同じ表示先Windowへ前面が切り替わった。利用者も単体CapsLock以外でAppDockが開き、元入力もブロックされたように見えたと報告した。入力抑止の実効果は利用者の観測であり、常に入力を通す診断EXE単体では証明しない。今回の0.94.8実機試験で以前のデスクトップ不動作は再現せず、その変化の原因は未確定とする。
+- 単体CapsLock位置はVKF0/scan3Aのdownが2件、対応するupは0件。現行InputCaptureEngineで同じ`F0 down → F2 up → F0 down`をメモリ内で再現すると、VK単位のpressed/ownedが残り、2回目の通知を出さないことを確認（修正前DLL・期待した回帰失敗は`.artifacts/ime-pulse-20261027/native-before.json`・`native-red.log`・`regression.json`）。
+- `Alphanumeric`を解放待ちのない入力として扱い、初期キー状態から除外し、記録・通常実行・マウス＋キーで長押し/所有状態を残さないよう修正した。各downを判定し、任意のupでは実行しない。既存Pauseも共通の分類を使い、通常キーの繰り返し抑止と押下/解放の対を保持。日本語配列の単体CapsLockは引き続き`Alphanumeric`として登録し、`CapsLock`との区別、保存済みキー、IME変換中のローカル入力保護、入力フックの寿命は変更しない。
+- 発行前レビュー1回で修正範囲・保存互換・元入力ブロック・既存キーへの影響を確認し、阻害指摘なし。設定項目・保存ファイル・公開APIの増減を伴わない修正として、前回発行0.94.8から**0.94.9**へパッチ更新。固定依存のfrozen install・型検査・標準publishに成功。Node関連9ファイル**97/97件**、実キー送信/フック登録をしないnative状態試験**179項目**、マウス＋キー状態試験**32項目**に成功した。
+- 発行した固定EXEで特殊キー選択・保存/ブロック設定・取消・実再起動後の登録**9群**、F10/F11だけを使った通常Window/デスクトップの実行・表示と前面化**4群**、隔離portable smokeに成功。EXE/File/ProductVersionとfeedは**0.94.9 / 170,688,798 bytes / SHA256 `8a53b2e2e1dd6c32f4350c8316bae7c129280a673636ca6f0b9abd83c3112599`**。試験DLLと発行/収録InputHost DLLのSHA256`c976a8b9b130baa1d08700ed50b893a0bf6bb2b90107255f4c2407aba43c7eff`が一致した。
+- 試験前後の802入力と補助fixtureのhashが一致。発行先のsettings.json・診断EXE・実機ログ2件の計4ファイルをhashで保持確認した。証跡は`.artifacts/ime-pulse-20261027/validation.json`・各完全ログ・入力hash・review.json・active-log-analysis.json。GUI/smoke結果は同フォルダーの`retired-command-triggers-ui-result.json`・`retired-smoke-result.json`へ保管した。発行当時は各モードの成功最新3回以内と原因再現の失敗証跡を保持し、削除0件。その後0.94.12完了時の整理で旧profile2件を削除し、結果JSONを元hashのまま上記へ保管した。
+- 0.94.9での単体CapsLock/英数の物理的な記録・反復押下・長押し・IME/LED・入力抑止の実効果は利用者の再試験待ち。Pause/F13〜F24をOSへ送信・登録していない。mainの別変更は取り込まず、commit・merge・push・Release・実利用deployは行っていない。
+
+## 2026-10-27: KAGUYA実機ログの解析（AppDock停止中）
+
+- `A:\40.ARTIFACT\AppDock.at365-lock-keys\key-probe-KAGUYA-20261027-005217-389.json`の41イベントを解析。利用者が**AppDockを終了して記録した**と確認したため、Windows側の入力観測として扱い、試験版の捕捉・照合・実行成功へ読み替えていない。集計・元ログのSHA256・未確定事項は`.artifacts/desktop-key-diagnosis-20261027/raw-key-analysis.json`。
+- 診断Window、デスクトップ（`Progman`）、`Chrome_WidgetWin_1`の順で入力が記録され、全41イベントで前面HWNDが非0・配列`0x4110411`・Injected=false。WindowクラスだけではChrome系Windowのアプリ名を確定しない。デスクトップでもScrollLock（VK91/scan46）は3対、変換（VK1C/scan79）と無変換（VK1D/scan7B）は各1対、Shift+CapsLock（VK14/scan3A、修飾4）は2対のdown/upを確認した。
+- 通常のCapsLock位置はVKF0/scan3A（`Alphanumeric`）、Shift付きではVK14/scan3A（`Shift+CapsLock`）。`CapsLock`割当のVK14と通常押しのVKF0は一致しない。一方、既に対応した`Alphanumeric`や`Convert`の記録/実行不可、およびデスクトップ全体の不動作は、この生入力ログだけでは説明できない。
+- VKF0/scan3Aはdown4件・up0件、VKF0/scan70はupのみ2件、VKF2/scan3Aはupのみ1件。英数関連の通常と異なるdown/upの並びを確認した。現InputCaptureEngineのpressed/ownedはVK単位なので、解放されないdownが長押し扱いとして残る可能性がある。ただし異なるscanのupも同じVKなら現実装では状態を消すため、scanの不一致だけを原因と断定しない。AppDock停止中の記録から、実際の捕捉中の状態・IMEの入力抑止時の挙動は確定できない。
+- 次は**試験版0.94.8を起動した後に診断の記録開始**とし、Edgeとデスクトップで対象キーを押して比較する。AppDockの設定画面の記録欄は使用せず、通常実行中の入力を観測する。製品ソース・版・配布EXE・キー設定の変更なし。既存診断EXEは40.ARTIFACTに配置済みのものを使用する。
+
+## 2026-10-27: 別PCでの実入力結果とデスクトップ不反応の切り分け
+
+- 利用者の別PCでの0.94.8実機結果: **NonConvert・Shift+CapsLock・ScrollLockは記録/実行成功、Convert・CapsLock・Alphanumericは記録/実行不可**。成功したキーもEdgeやテキストエディターでは動作するが、デスクトップをクリックすると動作しないとの報告。別PCではPowerToysを無効にして試しており、LUNAもキー制御OFFだったと確認された。PowerToysの競合やIME一般の制約を原因と断定しない。
+- 共有された試験版settings.jsonの該当割り当ては、有効・`scope: global`・`command: appdock.open`で、ScrollLockの`excludeDesktop: false`、キー共通/個別の除外指定なし。単なるアプリ限定条件やデスクトップ除外では説明できない。接続中の通常MCPは0.96.0で試験版のキー割り当てを持たないため、その状態を0.94.8試験版の実行状態へ読み替えていない。
+- LUNAで固定0.94.8を隔離profileと既存InputTargetで起動し、F10による記録だけのコマンドとF11による`appdock.open`を、通常のテストWindow/実Windows Shellのデスクトップ（Progman）の両方で検証。**4段階とも成功**し、非表示だった本体が実際の前面HWNDになった。実利用設定・OSのIME設定を変更せず、Pause/F13〜F24の送信/登録は行っていない。初回Ctrl+Shift+F10の記録件数検査はlocal/storageをdata/storageと誤って参照していたため無効と注記し、正しい記録先と新規profileで再検証した。初回の前面化2ケース自体は成功している。
+- この比較は「デスクトップからの処理が常に無効」という仕様を否定するが、別PCの物理入力・デスクトップクリック後の状態を再現できた証明ではない。nativeの入力取得、コード/修飾キー照合、記録セッション、表示/前面化のどこで止まるかは未確定。前回LUNAで読んだ配列のscan→VK対応も、別PCの実入力コードを確定するものではない。
+- 対象キー/位置だけを観測する自己完結の診断EXE `.artifacts/desktop-key-diagnosis-20261027/probe/AppDock.KeyProbe.exe`を用意。実機試験用に`A:\40.ARTIFACT\AppDock.at365-lock-keys\AppDock.KeyProbe.exe`へコピーし、元の検証済みEXEとSHA256が一致した（`probe-placement.json`）。開始/停止は手動、対象キーのVK/scan/flags/修飾キー・前面HWND/class/PID・そのthreadの配列を最大512件記録し、文字・Windowタイトルを保存しない。入力を抑止せず、停止/終了時に同フォルダーのJSONへ保存する。ビルドと、フック登録/OS送信をしない対象フィルター16条件のself-testが成功。診断用の実キー観測は未実施で、別PCでのログ待ち。これは調査用ツールだけで、製品ソース・版・配布EXE・設定は変更していない。
+- 証跡は`.artifacts/desktop-key-diagnosis-20261027/`のresult-plain.json・run-plain.log・desktop-roots.json・probe-build.log・probe/self-test.jsonと診断ソース。診断中の失敗記録と前回証跡を保持し、削除0件。実機観測後、原因を確定してから修正範囲を判断する。
+
+## 2026-10-26: 日本語配列の英数・変換・無変換に対応 0.94.8試験版
+
+- 0.94.7の実機確認でScrollLockは検出でき、CapsLockは記録とコマンド実行の両方ができなかったとの報告を受けた。同じ専用worktreeでWindowsの配列を読み取り、`0x04110411`における`MapVirtualKeyExW(MAPVK_VSC_TO_VK_EX)`が、CapsLock位置のscan `0x3A`を`0xF0`、変換位置`0x79`を`0x1C`、無変換位置`0x7B`を`0x1D`へ変換することを確認。これは配列情報の読取であり、物理押下のフックイベントを観測したものではない。
+- 英数の`Alphanumeric`、変換の`Convert`、無変換の`NonConvert`を、共通正規化・特殊キー選択・nativeの変換と記録・マウス＋キー・ページ入力に追加。日本語配列の英数キーはAlphanumericとして登録する。既存のCapsLock（`0x14`）と英数（`0xF0`）を分け、保存済み割り当ての自動変更はしない。条件・元入力ブロックとIME変換中のローカル入力保護を保持し、別契約の送信キー文法は広げていない。
+- 発行前レビュー1回で対応範囲・保存互換・名前/キーコードの往復・IME保護・共有記録欄とnativeの整合を確認し、阻害指摘なし。設定項目・保存ファイル・SDK/APIの追加はなく、前回の試験版0.94.7から0.94.8へパッチ更新。frozen install・型検査・build・publish成功。Node関連9ファイル **97/97件**、OSへキー送信・フック登録をしないnative状態試験 **146項目**、マウス＋キーの状態 **30項目**に成功し、試験前後の802入力hashが一致。Pause/F13〜F24の実入力・OS登録は行っていない。
+- 固定EXEでは前回の3入力にAlphanumeric・Convert・NonConvert・Ctrl+NonConvertを加え、特殊キー選択・保存・元入力ブロックON/OFF・再編集/取消・実再起動後の再登録 **9群**と隔離portable smokeに成功。EXE/File/ProductVersionとfeedは **0.94.8 / 170,700,103 bytes / SHA256 `45617c74b8d1989f992d4d225a477b7511a8d3a04525bd6821c0271c6fdb8dad`**。native試験DLLと発行/収録InputHost DLLのSHA256が一致し、発行先の既存settings.json 1件のhashを保持した。
+- 証跡は`.artifacts/ime-keys-20261026/`のlayout-probe・review・入力hash・artifact・完全ログと、同フォルダーの`retired-command-triggers-ui-result.json`・`retired-smoke-result.json`。発行当時は同じ試験/実行方式の成功分が各2回以下で削除0件、固定出力・前回証跡を保持した。その後0.94.11完了時の整理で旧profile2件を削除し、結果JSONを元hashのまま上記へ保管した。新しい3キーの物理押下とIME・LEDへの実効果は再確認待ちであり、CapsLockの実機不検出の解消を確定していない。mainの別変更を保持し、commit・merge・push・Release・実利用deployは行っていない。
+
+## 2026-10-26: CapsLock・ScrollLockのキージェスチャー対応 0.94.7試験版
+
+- `origin/main`をfetchし、コミット済みmain `8ae24f2bb63390159a030950563033d0293a1412`と一致することを確認。専用worktree `AppDock.at365-lock-keys` / `codex/lock-keys`で実装した。本体mainの編集中のリボン変更は取り込んでいない。開始版0.94.6からの通常追加として0.94.7へパッチ更新し、`40.ARTIFACT/AppDock.at365-lock-keys/`へ独立発行。設定項目・保存ファイル・SDK/APIの追加はない。
+- 共通のキー正規化、ネイティブのキー変換・記録、特殊キー選択、Webページ上のローカル条件でCapsLockとScrollLockを受け付ける。既存の修飾キー、条件、コマンド実行基盤と元入力ブロックを共用。共通の記録欄から登録できるマウス＋キーにも同じネイティブ対応をそろえた。送信キーの文法・保護された組み合わせは維持。
+- 発行前レビュー1回で、正規化とnativeの整合、共有記録欄のモード別対応範囲、元入力ブロック・反復・解放、保存互換と必要な回帰を確認し、製品の阻害指摘なし。GUI検査のトグルラベルを現行表示に合わせた。frozen install・型検査・build・通常publish成功。Node関連9ファイル **97/97件**、nativeのメモリ上のキー変換・記録・ブロック・反復・解放 **59項目**、マウス＋キーの状態 **18項目**に成功。native試験はフックを登録せず、OSへキーを送らない。PauseとF13〜F24の実入力・OS登録は行っていない。
+- 発行した固定EXEをコピー前後のSHA256一致で隔離起動し、CapsLock、ScrollLock、Ctrl+ScrollLockの選択・保存・ブロックON/OFF・再編集/取消・実再起動後の再登録 **5群**とportable smokeに成功。EXE/File/ProductVersionとfeedは0.94.7、**170,693,593 bytes / SHA256 `62690fb38f7887ea0ced8701ef8ecea02b8812b5a55323ab8aed7e2f81774182`**。発行に収録したInputHost DLLはnative試験対象とSHA256が一致する。
+- 証跡は`.artifacts/lock-keys-20261026/`の入力hash、review、artifact、完全ログと、同フォルダーの`retired-command-triggers-ui-result.json`、`retired-smoke-result.json`。結果JSONは2026-10-27の最古profile整理時に元hashのまま保管した。発行当時は各試験の直近成功分が3回以下のため削除0件。関連プロセス終了を確認し、証跡・固定ビルド出力を保持。実キーボードの押下、配列/IME/再割当差、ロック状態/LEDと他ソフトの共存は利用者の実機確認待ち。無関係な全回帰・commit・merge・push・Release・実利用先deployは行っていない。
+
 ## 2026-10-27: 画像グループと所属のMCP対応 0.96.6
 
 - main `1134e3c87be5cab69d9fd3851b280cb271388d76`のclean状態から開始し、追跡先への`pull --ff-only`でAlready up to dateを確認した。既存のimageLibrary.groupsを固定6入口へ接続し、設定項目・保存形式/ファイル種類・操作許可・MCPツールは追加しないため、パッチを0.96.5から**0.96.6**へ進めた。旧MCP worktreeと無関係な変更を保持し、共有の分類ownerとMCP接続の2単位でコミットする。

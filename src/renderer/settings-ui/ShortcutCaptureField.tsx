@@ -8,7 +8,23 @@ import { inputKeysFromEvent, normalizeInputKeys } from '../../shared/input-comma
 const specialGroups = [
   [
     hostText('settings.shortcutCaptureField.operation'),
-    ['Tab', 'Enter', 'Escape', 'Space', 'Backspace', 'Delete', 'Insert', 'Pause', 'Plus'],
+    [
+      'Tab',
+      'Enter',
+      'Escape',
+      'Space',
+      'Backspace',
+      'Delete',
+      'Insert',
+      'Pause',
+      'CapsLock',
+      'ScrollLock',
+      'Alphanumeric',
+      'KanaMode',
+      'Convert',
+      'NonConvert',
+      'Plus',
+    ],
   ],
   [
     hostText('settings.shortcutCaptureField.navigation'),
@@ -43,6 +59,7 @@ export function ShortcutCaptureField({
   const recorder = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState(false);
   const [captureReady, setCaptureReady] = useState(false);
+  const [captureRequest, setCaptureRequest] = useState(0);
   const callbacks = useRef({ onChange, setError });
   callbacks.current = { onChange, setError };
   const [special, setSpecial] = useState(false);
@@ -99,7 +116,7 @@ export function ShortcutCaptureField({
       setCaptureReady(false);
       void controls.setShortcutCapture({ token, active: false, allowWin }).catch(() => {});
     };
-  }, [focused, recordingReady, mode, allowWin]);
+  }, [focused, recordingReady, mode, allowWin, captureRequest]);
   const choose = (key: string) => {
     onChange(key);
     setModifiers(key.split('+').slice(0, -1));
@@ -125,6 +142,11 @@ export function ShortcutCaptureField({
         aria-label={translate('settings.shortcutCaptureField.enter', { label: label })}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        onPointerDown={(event) => {
+          // The native mouse hook ends recording before this event. Restart even
+          // when the recorder already has DOM focus and no new focus event fires.
+          if (mode === 'shortcut' && event.button === 0) setCaptureRequest((value) => value + 1);
+        }}
         onKeyDown={(event) => {
           if (
             event.key === 'Escape' ||
@@ -137,7 +159,9 @@ export function ShortcutCaptureField({
             !recordingReady ||
             event.repeat ||
             event.nativeEvent.isComposing ||
-            event.nativeEvent.keyCode === 229
+            event.nativeEvent.keyCode === 229 ||
+            // Ignore the native modifier-mask event, which is not a shortcut key.
+            event.nativeEvent.keyCode === 255
           )
             return;
           const key = (mode === 'send' ? inputKeysFromEvent : shortcutFromEvent)(event.nativeEvent);

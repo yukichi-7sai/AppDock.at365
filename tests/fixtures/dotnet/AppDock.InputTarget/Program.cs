@@ -5,6 +5,8 @@ internal sealed class Target : Form
 {
     private readonly List<string> events = [];
     private readonly nint previous = GetForegroundWindow();
+    private readonly System.Drawing.Point previousCursor = Cursor.Position;
+    private bool movedCursor;
     private object? focusAttempt;
     public Target() { Text = "AppDock isolated input target"; Width = 480; Height = 180; Controls.Add(new Label { Text = "Input verification window", Dock = DockStyle.Fill }); }
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData) { events.Add("key:" + keyData); return true; }
@@ -32,6 +34,40 @@ internal sealed class Target : Form
     }
     private static string Title(nint window) { var text = new System.Text.StringBuilder(512); GetWindowText(window, text, text.Capacity); return text.ToString(); }
     private object Call(string method, JsonElement request) {
+        if (method == "click") {
+            var p = request.GetProperty("params");
+            var window = new nint(long.Parse(p.GetProperty("window").GetString()!));
+            var point = new System.Drawing.Point(p.GetProperty("x").GetInt32(), p.GetProperty("y").GetInt32());
+            var hit = WindowFromPoint(point);
+            if (GetForegroundWindow() != window || hit != window && GetAncestor(hit, 2) != window)
+                throw new Exception("The diagnostic click is outside the foreground target.");
+            movedCursor = true; Cursor.Position = point;
+            mouse_event(2, 0, 0, 0, 0); Thread.Sleep(30); mouse_event(4, 0, 0, 0, 0);
+        }
+        if (method == "imeChord") {
+            var p = request.GetProperty("params");
+            var window = new nint(long.Parse(p.GetProperty("window").GetString()!));
+            var scan = p.GetProperty("scan").GetUInt16();
+            var key = p.GetProperty("key").GetUInt16();
+            var physical = p.GetProperty("physical").GetBoolean();
+            var modifiers = p.GetProperty("modifiers").EnumerateArray().Select(v => v.GetByte()).ToArray();
+            if (scan is not (0x70 or 0x79 or 0x7B or 0x29) || key is not (0x15 or 0x1C or 0x19 or 0xF1 or 0xF2 or 0xF5 or 0xF6 or 0xF7) ||
+                modifiers.Any(v => v is not (0x11 or 0x12 or 0x10 or 0x5B)))
+                throw new Exception("Unsupported diagnostic IME input.");
+            void Stroke(bool up) {
+                if (!up && GetForegroundWindow() != window) throw new Exception("The diagnostic input target is not foreground.");
+                var input = new Input { Type = 1, Data = new InputUnion { Keyboard = new KeyInput {
+                    Key = physical ? (ushort)0 : key, Scan = scan, Flags = (physical ? 8u : 0u) | (up ? 2u : 0u) } } };
+                if (SendInput(1, [input], Marshal.SizeOf<Input>()) != 1) throw new Exception("Diagnostic input failed.");
+            }
+            if (GetForegroundWindow() != window) throw new Exception("The diagnostic input target is not foreground.");
+            try {
+                foreach (var modifier in modifiers) { keybd_event(modifier, 0, modifier == 0x5B ? 1u : 0, 0); Thread.Sleep(40); }
+                Stroke(false); Thread.Sleep(40); Stroke(true);
+            } finally {
+                foreach (var modifier in modifiers.Reverse()) { Thread.Sleep(40); keybd_event(modifier, 0, 2 | (modifier == 0x5B ? 1u : 0), 0); }
+            }
+        }
         if (method == "focus") {
             Show();
             ShowWindow(Handle, 9);
@@ -131,6 +167,7 @@ internal sealed class Target : Form
         });
     }
     protected override void OnFormClosed(FormClosedEventArgs e) {
+        if (movedCursor) Cursor.Position = previousCursor;
         keybd_event(0x11, 0, 2, 0); if (previous != 0) SetForegroundWindow(previous); base.OnFormClosed(e);
         var arguments = Environment.GetCommandLineArgs();
         if (arguments.Length >= 3 && arguments[1] == "--process-target") File.WriteAllText(arguments[2] + ".closed", "closed");
@@ -154,4 +191,12 @@ internal sealed class Target : Form
     [DllImport("user32.dll")] private static extern nint GetThreadDesktop(uint thread);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool GetUserObjectInformation(nint handle, int index, System.Text.StringBuilder name, uint size, out uint needed);
     [DllImport("user32.dll")] private static extern void keybd_event(byte key, byte scan, uint flags, nuint extra);
+    [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, nuint extra);
+    [DllImport("user32.dll")] private static extern nint WindowFromPoint(System.Drawing.Point point);
+    [DllImport("user32.dll")] private static extern nint GetAncestor(nint window, uint flags);
+    [StructLayout(LayoutKind.Sequential)] private struct Input { public uint Type; public InputUnion Data; }
+    [StructLayout(LayoutKind.Explicit)] private struct InputUnion { [FieldOffset(0)] public KeyInput Keyboard; [FieldOffset(0)] public MouseInput Mouse; }
+    [StructLayout(LayoutKind.Sequential)] private struct KeyInput { public ushort Key, Scan; public uint Flags, Time; public nuint Extra; }
+    [StructLayout(LayoutKind.Sequential)] private struct MouseInput { public int X, Y; public uint Data, Flags, Time; public nuint Extra; }
+    [DllImport("user32.dll", SetLastError=true)] private static extern uint SendInput(uint count, Input[] inputs, int size);
 }

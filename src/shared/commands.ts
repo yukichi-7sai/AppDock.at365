@@ -88,6 +88,13 @@ const specialKeys: Record<string, string> = {
   right: 'Right',
   plus: 'Plus',
   pause: 'Pause',
+  capslock: 'CapsLock',
+  scrolllock: 'ScrollLock',
+  alphanumeric: 'Alphanumeric',
+  convert: 'Convert',
+  nonconvert: 'NonConvert',
+  kana: 'KanaMode',
+  kanamode: 'KanaMode',
 };
 export function normalizeShortcut(value: unknown): string {
   if (typeof value !== 'string' || value.length > 80)
@@ -128,6 +135,13 @@ export interface KeyStroke {
   metaKey: boolean;
   isComposing?: boolean;
 }
+export function isKanaModeKey(input: { key: string; code?: string }): boolean {
+  return (
+    input.key === 'KanaMode' ||
+    (input.code === 'KanaMode' &&
+      ['Hiragana', 'Katakana', 'HiraganaKatakana', 'Romaji'].includes(input.key))
+  );
+}
 export function shortcutFromEvent(event: KeyStroke): string | null {
   if (
     event.isComposing ||
@@ -135,6 +149,7 @@ export function shortcutFromEvent(event: KeyStroke): string | null {
   )
     return null;
   let key = event.key;
+  if (isKanaModeKey(event)) key = 'KanaMode';
   if (event.code?.startsWith('Digit') && event.shiftKey) key = event.code.slice(5);
   if (key === ' ') key = 'Space';
   if (key === '+') key = 'Plus';

@@ -229,6 +229,7 @@ internal sealed class GestureEngine : IDisposable
         if (code < 0 || disposed) return 0;
         var input = Marshal.PtrToStructure<KeyData>(data);
         if (input.Extra == InputMarker) return 0;
+        input.Key = ShortcutCodec.CaptureKey(input.Key, input.Scan, input.Flags);
         try {
             var up = message is 0x101 or 0x105;
             if (up && keys.Remove(input.Key)) { ReleaseHooksIfIdle(); return 1; }
@@ -240,9 +241,9 @@ internal sealed class GestureEngine : IDisposable
             }
             var gesture = KeyGesture(input.Key);
             if (gesture != null && candidates.Any(r=>r.Gesture==gesture)) {
-                // Pause is a down-only pulse; waiting for a paired up would capture
-                // every later Pause, including ordinary input outside the gesture.
-                if (input.Key != 0x13) keys.Add(input.Key);
+                // Pulse keys may have no paired up. Do not retain their ownership
+                // after the gesture or suppress later independent presses.
+                if (!ShortcutCodec.IsPulse(input.Key)) keys.Add(input.Key);
                 otherMode=true; lastWheel=0; indicator?.Hide(); Run(gesture); return 1;
             }
             if (input.Key == 0x1B) { keys.Add(input.Key); cancelled=true; CancelPending(); indicator?.Hide(); return 1; }
@@ -257,6 +258,9 @@ internal sealed class GestureEngine : IDisposable
             0x20=>"Space",0x09=>"Tab",0x0D=>"Enter",0x1B=>"Escape",0x08=>"Backspace",0x2E=>"Delete",
             0x2D=>"Insert",0x24=>"Home",0x23=>"End",0x21=>"PageUp",0x22=>"PageDown",
             0x25=>"Left",0x26=>"Up",0x27=>"Right",0x28=>"Down",0x13=>"Pause",
+            0x14=>"CapsLock",0x91=>"ScrollLock",
+            0xF0=>"Alphanumeric",0x1C=>"Convert",0x1D=>"NonConvert",
+            0x15=>"KanaMode",
             >=0x60 and <=0x69 => (key-0x60).ToString(),0x6B=>"Plus",0x6D=>"-",0x6E=>".",0x6F=>"/",
             0xBC=>",",0xBE=>".",0xBF=>"/",0xDC=>"\\",0xBA=>";",0xDB=>"[",0xDD=>"]",0xDE=>"'",0xBD=>"-",0xBB=>Pressed(0x10)||keys.Overlaps([0x10u,0xA0u,0xA1u])?"Plus":"=",_=>null};
         if (name == null || Pressed(0x5B) || Pressed(0x5C)) return null;

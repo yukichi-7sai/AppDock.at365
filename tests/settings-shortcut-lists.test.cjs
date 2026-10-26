@@ -10,6 +10,7 @@ const { AppDockApi } = require('../out/main/main/core/appdock-api');
 const { parseSettingDefinitions } = require('../out/main/shared/setting-definitions');
 const { settingsItemId } = require('../out/main/shared/settings-catalog');
 const { newShortcutListEntry, validShortcutList } = require('../out/main/shared/shortcut-list');
+const { normalizeShortcut } = require('../out/main/shared/commands');
 
 function fixture(t, { rows, defaults = [], device = false } = {}) {
   const directory = path.resolve('.artifacts/settings-shortcut-lists-unit', randomUUID());
@@ -169,6 +170,38 @@ test('dryRun/add/save/replay use native defaults and preserve unrelated/private 
   assert.equal(reply.revision, f.read().revision);
   assert.deepEqual(f.saved().private, privateValue);
   assert.deepEqual(f.saved().retained, { value: 'PRIVATE_RETAINED' });
+});
+
+test('MCP send-shortcut lists keep their grammar separate from gesture-only lock and IME chords', (t) => {
+  const f = fixture(t, { rows: [] });
+  const keys = [
+    'CapsLock',
+    'ScrollLock',
+    'Alphanumeric',
+    'KanaMode',
+    'KANA',
+    'Convert',
+    'NonConvert',
+    'Ctrl+ScrollLock',
+    'Ctrl+Alt+NonConvert',
+    'Ctrl+Alt+Shift+KanaMode',
+  ];
+  const before = fs.readFileSync(f.store.file);
+  for (const key of keys) {
+    assert.equal(normalizeShortcut(key), key === 'KANA' ? 'KanaMode' : key);
+    for (const dryRun of [true, false])
+      refuses(
+        () =>
+          f.call(
+            'apply',
+            f.request([{ kind: 'add', values: { id: 'key', title: key, keys: key } }], { dryRun }),
+          ),
+        'INVALID_ARGUMENT',
+      );
+  }
+  assert.deepEqual(fs.readFileSync(f.store.file), before);
+  assert.equal(f.state.writes, 0);
+  assert.deepEqual(f.saved().shortcuts, []);
 });
 
 test('partial edits allow explicit ID/name/key changes and retain unknown data and other rows', (t) => {

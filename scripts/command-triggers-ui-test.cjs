@@ -36,6 +36,7 @@ const initial = createDefaultSettings();
 const featureSettingsOnly = process.argv.includes('--feature-settings-only');
 const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
 const triggerSettingsOnly = process.argv.includes('--trigger-settings-only');
+const lockKeysOnly = process.argv.includes('--lock-keys-only');
 if (bindingEditorsOnly) {
   initial.keybindingOptions.excludedProcesses = ['key-base'];
   initial.gestures.excludedProcesses = ['mouse-base'];
@@ -109,6 +110,11 @@ if (triggerSettingsOnly) {
     });
   }
 }
+if (lockKeysOnly) {
+  initial.keybindings = [];
+  initial.gestures.bindings = [];
+  initial.touchpadGestures.bindings = [];
+}
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = source ? path.join(profile, 'AppDock.at365.exe') : null;
@@ -181,6 +187,7 @@ const recordSuccess = () => {
         checks,
         featureSettingsOnly,
         bindingEditorsOnly,
+        lockKeysOnly,
         source: source ? path.resolve(source) : 'development build',
         sha256: portable ? hash(portable) : null,
         limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
@@ -214,6 +221,27 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (lockKeysOnly) {
+      await open();
+      await require('./lock-key-ui-checks.cjs')({ host, saved, save, checks, row, until });
+      const durable = (await saved()).keybindings;
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      await open();
+      assert.deepEqual((await saved()).keybindings, durable);
+      await until(async () => {
+        const state = await snapshot();
+        return durable.every(({ key }) =>
+          state.globalHotKeys.some((status) => status.shortcut === key && status.registered),
+        );
+      }, 'lock keys applied after restart');
+      assert.deepEqual(errors, []);
+      checks.push('lock keys and blocking choices persist and register after an actual restart');
+      recordSuccess();
+      return;
+    }
     if (triggerSettingsOnly) {
       for (const [page, description] of [
         [

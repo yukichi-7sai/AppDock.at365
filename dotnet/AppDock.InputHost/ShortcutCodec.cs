@@ -12,6 +12,20 @@ internal sealed record ShortcutStatus(string Shortcut, bool Registered, string[]
 internal readonly record struct ShortcutChord(uint Key, int Modifiers);
 internal static class ShortcutCodec
 {
+    // Japanese IME mode keys may arrive without a matching key-up, like Pause.
+    internal static bool IsPulse(uint key) => key is 0x13 or 0x15 or 0xF0;
+    // Normalize derived codes only at their physical positions. Extended Break
+    // and unrelated remapped keys keep their own identities.
+    internal static uint CaptureKey(uint key, uint scan, uint flags)
+    {
+        if ((flags & 1) != 0) return key;
+        return (scan, key) switch {
+            (0x70, 0xF0 or 0xF1 or 0xF2 or 0xF5 or 0xF6) => 0x15,
+            (0x46, 0x03) => 0x91, // Ctrl+ScrollLock arrives as Cancel/Break.
+            (0x7B, 0xF7) => 0x1D, // Ctrl+Alt+NonConvert arrives as IME word registration.
+            _ => key
+        };
+    }
     internal static bool IsModifier(uint key) => key is 0x10 or 0x11 or 0x12 or 0x5B or 0x5C or >= 0xA0 and <= 0xA5;
     internal static bool Protected(ShortcutChord chord) =>
         ((chord.Modifiers & 8) != 0 && chord.Key == 0x4C) ||
@@ -26,7 +40,10 @@ internal static class ShortcutCodec
         };
         var name = parts[^1];
         uint key = name switch {
-            "Pause" => 0x13, "Space" => 0x20, "Tab" => 9, "Enter" => 13,
+            "Pause" => 0x13, "CapsLock" => 0x14, "ScrollLock" => 0x91,
+            "Alphanumeric" => 0xF0, "Convert" => 0x1C, "NonConvert" => 0x1D,
+            "KanaMode" => 0x15,
+            "Space" => 0x20, "Tab" => 9, "Enter" => 13,
             "Escape" => 27, "Backspace" => 8, "Delete" => 0x2E, "Insert" => 0x2D,
             "Home" => 0x24, "End" => 0x23, "PageUp" => 0x21, "PageDown" => 0x22,
             "Up" => 0x26, "Down" => 0x28, "Left" => 0x25, "Right" => 0x27, _ => 0
@@ -57,6 +74,9 @@ internal static class ShortcutCodec
             0x2E => "Delete", 0x2D => "Insert", 0x24 => "Home", 0x23 => "End",
             0x21 => "PageUp", 0x22 => "PageDown", 0x25 => "Left", 0x26 => "Up",
             0x27 => "Right", 0x28 => "Down", 0x13 => "Pause",
+            0x14 => "CapsLock", 0x91 => "ScrollLock",
+            0xF0 => "Alphanumeric", 0x1C => "Convert", 0x1D => "NonConvert",
+            0x15 => "KanaMode",
             0x6B => "Plus", 0x6D => "-", 0x6E => ".", 0x6F => "/", _ => null
         };
         if (name == null) {
