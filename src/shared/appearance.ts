@@ -29,6 +29,16 @@ export const accentChoices = [
 ] as const;
 export type AccentColor = (typeof accentPalettes)[number]['id'] | 'sky-blue' | 'custom';
 export const defaultAccentColor: AccentColor = 'mint';
+/** Placeholder text remains distinct from entered values on every registered local UI. */
+export const placeholderCss = `
+:root[data-theme='light'] {
+  --appdock-placeholder: #bfc5d0;
+}
+:root[data-theme='light'] :is(input, textarea)::placeholder {
+  color: var(--appdock-placeholder);
+  opacity: 1;
+}
+`;
 /** Shared scrollbars for registered local UI surfaces; neutral colors match the host settings. */
 export const scrollbarCss = `
 :root {

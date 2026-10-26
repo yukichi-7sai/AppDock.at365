@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { NotificationDismissButton } from '../../ui/notifications/DismissButton';
 import type {
   NotificationBannerApi,
   NotificationBannerModel,
@@ -131,7 +132,9 @@ function App() {
       {items.map((item) => (
         <section
           key={item.id}
-          className={'notification-card level-' + item.level}
+          className={
+            'notification-card level-' + item.level + (item.dismissible ? ' dismissible' : '')
+          }
           data-notification-id={item.id}
           role="region"
           aria-label={item.title}
@@ -146,27 +149,27 @@ function App() {
             <strong>{item.title}</strong>
             <p>{item.body}</p>
           </div>
-          <div className="notification-actions">
-            {item.actions.map((action) => (
-              <button
-                key={action.id}
-                className={action.primary ? 'primary' : ''}
-                disabled={item.busy || action.disabled}
-                onClick={() => act(item, 'invoke', action.id)}
-              >
-                {item.busy && action.primary ? '処理中…' : action.label}
-              </button>
-            ))}
-            {item.dismissible && (
-              <button
-                disabled={item.busy}
-                aria-label={item.title + 'を閉じる'}
-                onClick={() => act(item, 'dismiss')}
-              >
-                ×
-              </button>
-            )}
-          </div>
+          {item.actions.length > 0 && (
+            <div className="notification-actions">
+              {item.actions.map((action) => (
+                <button
+                  key={action.id}
+                  className={action.primary ? 'primary' : ''}
+                  disabled={item.busy || action.disabled}
+                  onClick={() => act(item, 'invoke', action.id)}
+                >
+                  {item.busy && action.primary ? '処理中…' : action.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {item.dismissible && (
+            <NotificationDismissButton
+              title={item.title}
+              disabled={item.busy}
+              onClick={() => act(item, 'dismiss')}
+            />
+          )}
         </section>
       ))}
       {all.length > 3 && (

@@ -9,7 +9,6 @@ const {
 const { ErrorReporter } = require('../out/main/main/core/error-reporter');
 const { TypedNotifications } = require('../out/main/main/core/typed-notifications');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const {
   notificationCatalog,
@@ -24,10 +23,7 @@ function fixture(t) {
     logs = [],
     publications = [];
   settings.notificationPreferences = { overrides: [] };
-  const service = new NotificationService(
-    new NotificationHistoryStore(path.join(dir, 'history.json'), () => {}),
-    () => now,
-  );
+  const service = new NotificationService(() => now);
   const typed = new TypedNotifications(service, {
     settings: () => settings,
     applets: () => [],

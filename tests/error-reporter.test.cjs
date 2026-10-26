@@ -4,7 +4,6 @@ const fs = require('node:fs'),
   path = require('node:path');
 const { ErrorReporter } = require('../out/main/main/core/error-reporter');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const { TypedNotifications } = require('../out/main/main/core/typed-notifications');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const {
@@ -23,8 +22,7 @@ function setup(t) {
   const dir = fs.mkdtempSync(path.resolve('.artifacts/error-reporter-unit-'));
   let settings = createDefaultSettings();
   settings.host.notifications = false;
-  const history = new NotificationHistoryStore(path.join(dir, 'history.json'), () => {});
-  const service = new NotificationService(history);
+  const service = new NotificationService();
   const published = [],
     logs = [];
   const typed = new TypedNotifications(service, {

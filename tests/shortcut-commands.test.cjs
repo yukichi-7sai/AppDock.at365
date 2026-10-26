@@ -83,6 +83,45 @@ function fixture(t) {
   return { settings, api, options, permissions, get, edit };
 }
 
+test('key trigger and binding exclusions save through revisioned API without replacing each other', async (t) => {
+  const f = fixture(t);
+  const operations = [
+    {
+      kind: 'configure',
+      changes: { excludedProcesses: ['BASE.EXE'], inputExecutionModes: { 'ctrl+f8': 'first' } },
+    },
+    {
+      kind: 'add',
+      binding: {
+        ...binding('excluded'),
+        when: { scope: 'global', appletIds: [], excludedProcesses: ['ROW.exe'] },
+      },
+    },
+  ];
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  await f.edit(operations, { dryRun: true });
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  await f.edit(operations);
+  assert.deepEqual(f.get().options.excludedProcesses, ['base']);
+  assert.deepEqual(f.get().options.inputExecutionModes, { 'Ctrl+F8': 'first' });
+  assert.deepEqual(f.get().bindings.find((row) => row.id === 'excluded').when.excludedProcesses, [
+    'row',
+  ]);
+  await f.edit([{ kind: 'configure', changes: { executionMode: 'first' } }]);
+  assert.deepEqual(f.get().options.inputExecutionModes, { 'Ctrl+F8': 'first' });
+  await assert.rejects(
+    f.edit([{ kind: 'configure', changes: { inputExecutionModes: { 'Ctrl+F8': 'inherit' } } }]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  await f.edit([{ kind: 'configure', changes: { inputExecutionModes: {} } }]);
+  assert.deepEqual(f.get().options.inputExecutionModes, {});
+  assert.deepEqual(f.get().options.excludedProcesses, ['base']);
+  await assert.rejects(
+    f.edit([{ kind: 'configure', changes: { excludedProcesses: ['C:\\bad.exe'] } }]),
+    { code: 'INVALID_ARGUMENT' },
+  );
+});
+
 test('execution mode configuration is atomic, revisioned, private-field preserving and dry-run aware', async (t) => {
   const f = fixture(t);
   assert.deepEqual(f.get().options, {

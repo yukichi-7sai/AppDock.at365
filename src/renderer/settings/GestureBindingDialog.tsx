@@ -2,23 +2,19 @@ import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { touchpadGestureTypes, touchpadId } from '../../shared/touchpad-gestures';
 import { SettingsField } from '../settings-ui/SettingsSections';
-import {
-  CommandConditionDetails,
-  useConditionProcesses,
-} from '../settings-ui/CommandConditionDetails';
-import { externalShortcutScopes } from '../../shared/keybindings';
+import { useConditionProcesses, conditionExclusions } from '../settings-ui/CommandConditionDetails';
 import { useState } from 'react';
 import {
   gestureTypes,
   moveDirections,
   normalizeGesture,
   type GestureBinding,
-  type GestureScope,
+  gestureTitle,
 } from '../../shared/gestures';
 import { BindingEditDialog } from '../settings-ui/BindingEditDialog';
 import { ShortcutCaptureField } from '../settings-ui/ShortcutCaptureField';
-import { ShortcutConditionField } from '../settings-ui/ShortcutFields';
-import { Toggle } from '../settings-ui/Toggle';
+import { CommandConditionEditor } from '../settings-ui/CommandConditionEditor';
+import { BindingEditorLayout, BindingEnabledControl } from '../settings-ui/BindingEditorLayout';
 
 const families = [
   { id: 'move', title: hostText('settings.gestureBindingDialog.move'), icon: '↗' },
@@ -31,11 +27,13 @@ function MoveDirectionPicker({
   label,
   value,
   disabled,
+  step,
   onChoose,
 }: {
   label: string;
   value: string;
   disabled?: string;
+  step: number;
   onChoose(direction: string): void;
 }) {
   return (
@@ -43,6 +41,7 @@ function MoveDirectionPicker({
       {moveDirections.map(([id, title]) => (
         <button
           key={id}
+          data-testid={`gesture-direction:${step}:${id}`}
           aria-pressed={value === id}
           disabled={disabled === id}
           onClick={() => onChoose(id)}
@@ -92,9 +91,8 @@ export function GestureBindingDialog({
     [initialMove.split('-').length - 1]: initialMove,
   });
   const movement = choices.move.split('-').slice(1);
-  const { processText, setProcessText, processes, processError } = useConditionProcesses(
-    value.when,
-  );
+  const draft = useConditionProcesses(value.when);
+  const { processes, processError } = draft;
   const choose = (gesture: string) => {
     setValue({ ...value, gesture });
     setChoices({ ...choices, [family]: gesture });
@@ -104,236 +102,237 @@ export function GestureBindingDialog({
   const valid =
     !!value.gesture &&
     value.gesture !== 'key:' &&
+    !draft.excludedProcessError &&
     (value.when.scope !== 'applets' || !!value.when.appletIds.length) &&
     (value.when.scope !== 'exe' || (!processError && !!processes.length));
-  const commonScope =
-    value.when.scope === 'exe' || value.when.scope === 'browser' || value.when.scope === 'desktop'
-      ? 'global'
-      : value.when.scope;
   return (
     <BindingEditDialog
-      className="gesture-binding-dialog"
+      className="binding-editor-dialog gesture-binding-dialog"
       title={title}
       adding={adding}
       valid={valid}
       onClose={onClose}
+      footerStart={
+        <BindingEnabledControl
+          enabled={value.enabled}
+          onChange={(enabled) => setValue({ ...value, enabled })}
+        />
+      }
       onApply={() =>
         onApply({
           ...value,
           gesture: touchpad ? touchpadId(value.gesture) : normalizeGesture(value.gesture),
-          when: { ...value.when, processes },
+          when: { ...conditionExclusions(value.when, draft), processes },
         })
       }
     >
       {(ready, setError) => (
-        <>
-          {touchpad ? (
-            <SettingsField title={translate('settings.gestureBindingDialog.action')}>
-              <select
-                aria-label={translate('settings.gestureBindingDialog.action')}
-                data-initial-focus
-                value={value.gesture}
-                onChange={(e) => choose(e.target.value)}
-              >
-                {touchpadGestureTypes.map(([id, title]) => (
-                  <option key={id} value={id}>
-                    {title}
-                  </option>
-                ))}
-              </select>
-            </SettingsField>
-          ) : (
+        <BindingEditorLayout
+          input={
             <>
-              <SettingsField
-                title={translate('settings.gestureBindingDialog.kind')}
-                hint={translate('settings.gestureBindingDialog.hint')}
-              >
-                <div
-                  className="gesture-family-picker"
-                  role="group"
-                  aria-label={translate('settings.gestureBindingDialog.kind')}
-                >
-                  {families.map((item) => (
-                    <button
-                      key={item.id}
-                      data-initial-focus={item.id === family ? '' : undefined}
-                      aria-pressed={family === item.id}
-                      onClick={() => {
-                        setFamily(item.id);
-                        setValue({ ...value, gesture: choices[item.id] });
-                        setError('');
-                      }}
+              {touchpad ? (
+                <div className="touchpad-action-picker">
+                  {(['three', 'four'] as const).map((fingers) => (
+                    <SettingsField
+                      key={fingers}
+                      title={translate(`settings.bindingEditor.${fingers}`)}
                     >
-                      <span aria-hidden="true">{item.icon}</span>
-                      {item.title}
-                    </button>
+                      <div
+                        className="gesture-choice-grid touchpad-choice-grid"
+                        role="group"
+                        aria-label={translate(`settings.bindingEditor.${fingers}`)}
+                      >
+                        {touchpadGestureTypes
+                          .filter(([id]) => id.startsWith(fingers + '.'))
+                          .map(([id, title]) => {
+                            const direction = id.split('.')[1] as
+                              keyof typeof directionIcons | 'tap';
+                            return (
+                              <button
+                                key={id}
+                                data-testid={`touchpad-action:${id}`}
+                                data-initial-focus={value.gesture === id ? '' : undefined}
+                                aria-label={title}
+                                aria-pressed={value.gesture === id}
+                                onClick={() => choose(id)}
+                              >
+                                <span aria-hidden="true">
+                                  {direction === 'tap' ? '●' : directionIcons[direction]}
+                                </span>
+                                {direction === 'tap'
+                                  ? translate('settings.bindingEditor.tap')
+                                  : moveDirections.find(([key]) => key === direction)?.[1]}
+                              </button>
+                            );
+                          })}
+                      </div>
+                    </SettingsField>
                   ))}
                 </div>
-              </SettingsField>
-              {family === 'key' ? (
-                <ShortcutCaptureField
-                  allowWin={false}
-                  label={translate('settings.gestureBindingDialog.key')}
-                  value={value.gesture.slice(4)}
-                  recordingReady={ready}
-                  setError={setError}
-                  onChange={(key) => choose('key:' + key)}
-                />
-              ) : family === 'move' ? (
+              ) : (
                 <>
                   <SettingsField
-                    title={translate('settings.gestureBindingDialog.stages')}
-                    hint={translate('settings.gestureBindingDialog.stagesHint')}
+                    title={translate('settings.gestureBindingDialog.kind')}
+                    hint={translate('settings.gestureBindingDialog.hint')}
                   >
                     <div
-                      className="gesture-choice-grid gesture-step-picker"
+                      className="gesture-family-picker"
                       role="group"
-                      aria-label={translate('settings.gestureBindingDialog.stages')}
+                      aria-label={translate('settings.gestureBindingDialog.kind')}
                     >
-                      {[1, 2].map((steps) => (
+                      {families.map((item) => (
                         <button
-                          key={steps}
-                          aria-pressed={movement.length === steps}
-                          onClick={() => choose(moveChoices[steps])}
+                          key={item.id}
+                          data-testid={`gesture-family:${item.id}`}
+                          data-initial-focus={item.id === family ? '' : undefined}
+                          aria-pressed={family === item.id}
+                          onClick={() => {
+                            setFamily(item.id);
+                            setValue({ ...value, gesture: choices[item.id] });
+                            setError('');
+                          }}
                         >
-                          {translate('settings.gestureBindingDialog.stagesLabel', { count: steps })}
+                          <span aria-hidden="true">{item.icon}</span>
+                          {item.title}
                         </button>
                       ))}
                     </div>
                   </SettingsField>
-                  {movement.length === 1 ? (
-                    <SettingsField title={translate('settings.gestureBindingDialog.action')}>
-                      <MoveDirectionPicker
-                        label={translate('settings.gestureBindingDialog.action')}
-                        value={movement[0]}
-                        onChoose={(direction) => choose('move-' + direction)}
-                      />
-                    </SettingsField>
-                  ) : (
+                  {family === 'key' ? (
+                    <ShortcutCaptureField
+                      allowWin={false}
+                      label={translate('settings.gestureBindingDialog.key')}
+                      value={value.gesture.slice(4)}
+                      recordingReady={ready}
+                      setError={setError}
+                      onChange={(key) => choose('key:' + key)}
+                    />
+                  ) : family === 'move' ? (
                     <>
                       <SettingsField
-                        title={translate('settings.gestureBindingDialog.firstDirection')}
+                        title={translate('settings.gestureBindingDialog.stages')}
+                        hint={translate('settings.gestureBindingDialog.stagesHint')}
                       >
-                        <MoveDirectionPicker
-                          label={translate('settings.gestureBindingDialog.firstDirection')}
-                          value={movement[0]}
-                          onChoose={(direction) =>
-                            choose(
-                              `move-${direction}-${direction === movement[1] ? movement[0] : movement[1]}`,
-                            )
-                          }
-                        />
+                        <div
+                          className="gesture-choice-grid gesture-step-picker"
+                          role="group"
+                          aria-label={translate('settings.gestureBindingDialog.stages')}
+                        >
+                          {[1, 2].map((steps) => (
+                            <button
+                              key={steps}
+                              data-testid={`gesture-steps:${steps}`}
+                              aria-pressed={movement.length === steps}
+                              onClick={() => choose(moveChoices[steps])}
+                            >
+                              {translate('settings.gestureBindingDialog.stagesLabel', {
+                                count: steps,
+                              })}
+                            </button>
+                          ))}
+                        </div>
                       </SettingsField>
-                      <SettingsField
-                        title={translate('settings.gestureBindingDialog.nextDirection')}
-                      >
-                        <MoveDirectionPicker
-                          label={translate('settings.gestureBindingDialog.nextDirection')}
-                          value={movement[1]}
-                          disabled={movement[0]}
-                          onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
-                        />
-                      </SettingsField>
+                      {movement.length === 1 ? (
+                        <SettingsField title={translate('settings.gestureBindingDialog.action')}>
+                          <MoveDirectionPicker
+                            step={1}
+                            label={translate('settings.gestureBindingDialog.action')}
+                            value={movement[0]}
+                            onChoose={(direction) => choose('move-' + direction)}
+                          />
+                        </SettingsField>
+                      ) : (
+                        <div className="gesture-direction-sequence">
+                          <SettingsField
+                            title={translate('settings.gestureBindingDialog.firstDirection')}
+                          >
+                            <MoveDirectionPicker
+                              step={1}
+                              label={translate('settings.gestureBindingDialog.firstDirection')}
+                              value={movement[0]}
+                              onChoose={(direction) =>
+                                choose(
+                                  `move-${direction}-${direction === movement[1] ? movement[0] : movement[1]}`,
+                                )
+                              }
+                            />
+                          </SettingsField>
+                          <SettingsField
+                            title={translate('settings.gestureBindingDialog.nextDirection')}
+                          >
+                            <MoveDirectionPicker
+                              step={2}
+                              label={translate('settings.gestureBindingDialog.nextDirection')}
+                              value={movement[1]}
+                              disabled={movement[0]}
+                              onChoose={(direction) => choose(`move-${movement[0]}-${direction}`)}
+                            />
+                          </SettingsField>
+                        </div>
+                      )}
                     </>
+                  ) : (
+                    <SettingsField
+                      title={translate('settings.gestureBindingDialog.action')}
+                      hint={translate('settings.gestureBindingDialog.actionHint')}
+                    >
+                      <div
+                        className={`gesture-choice-grid gesture-choice-${family}`}
+                        role="group"
+                        aria-label={translate('settings.gestureBindingDialog.action')}
+                      >
+                        {gestureTypes
+                          .filter(([id]) => id.startsWith(family + '-'))
+                          .map(([id, label]) => (
+                            <button
+                              key={id}
+                              data-testid={`gesture-action:${id}`}
+                              aria-pressed={value.gesture === id}
+                              onClick={() => choose(id)}
+                            >
+                              <span aria-hidden="true">
+                                {id === 'wheel-up'
+                                  ? '↑'
+                                  : id === 'wheel-down'
+                                    ? '↓'
+                                    : id === 'click-left'
+                                      ? '◧'
+                                      : '▣'}
+                              </span>
+                              {label.replace(/^[↑↓←→] /, '')}
+                            </button>
+                          ))}
+                      </div>
+                    </SettingsField>
                   )}
                 </>
-              ) : (
-                <SettingsField
-                  title={translate('settings.gestureBindingDialog.action')}
-                  hint={translate('settings.gestureBindingDialog.actionHint')}
-                >
-                  <div
-                    className={`gesture-choice-grid gesture-choice-${family}`}
-                    role="group"
-                    aria-label={translate('settings.gestureBindingDialog.action')}
-                  >
-                    {gestureTypes
-                      .filter(([id]) => id.startsWith(family + '-'))
-                      .map(([id, label]) => (
-                        <button
-                          key={id}
-                          aria-pressed={value.gesture === id}
-                          onClick={() => choose(id)}
-                        >
-                          <span aria-hidden="true">
-                            {id === 'wheel-up'
-                              ? '↑'
-                              : id === 'wheel-down'
-                                ? '↓'
-                                : id === 'click-left'
-                                  ? '◧'
-                                  : '▣'}
-                          </span>
-                          {label.replace(/^[↑↓←→] /, '')}
-                        </button>
-                      ))}
-                  </div>
-                </SettingsField>
               )}
+              <div
+                className="binding-input-summary"
+                data-testid="binding-input-summary"
+                aria-live="polite"
+              >
+                <small>{translate('settings.bindingEditor.selected')}</small>
+                <strong>
+                  {touchpad
+                    ? touchpadGestureTypes.find(([id]) => id === value.gesture)?.[1]
+                    : gestureTitle(value.gesture)}
+                </strong>
+              </div>
             </>
-          )}
-          <SettingsField
-            title={translate('settings.gestureBindingDialog.scope')}
-            hint={
-              value.when.scope === 'browser'
-                ? translate('settings.gestureBindingDialog.browserHint')
-                : undefined
-            }
-          >
-            <ShortcutConditionField
-              value={{ scope: commonScope, appletIds: value.when.appletIds }}
-              selectedScope={value.when.scope}
-              extraScopes={externalShortcutScopes.slice()}
-              onExtraScope={(scope) =>
-                setValue({
-                  ...value,
-                  when: {
-                    scope: scope as GestureScope,
-                    appletIds: [],
-                    processes: [],
-                    ...(scope === 'exe' && value.when.excludeDesktop !== undefined
-                      ? { excludeDesktop: value.when.excludeDesktop }
-                      : {}),
-                  },
-                })
+          }
+          conditions={
+            <CommandConditionEditor
+              when={value.when}
+              onChange={(when) =>
+                setValue({ ...value, when: { ...when, processes: when.processes ?? [] } })
               }
-              label={translate('settings.gestureBindingDialog.scopeLabel')}
+              draft={draft}
               ownerTitle={ownerTitle}
               applets={applets}
-              onChange={(when) => {
-                if (when.scope !== 'default')
-                  setValue({
-                    ...value,
-                    when: {
-                      scope: when.scope,
-                      appletIds: when.appletIds,
-                      processes: [],
-                      ...(when.scope === 'global' && value.when.excludeDesktop !== undefined
-                        ? { excludeDesktop: value.when.excludeDesktop }
-                        : {}),
-                    },
-                  });
-              }}
             />
-          </SettingsField>
-          <CommandConditionDetails
-            when={value.when}
-            onChange={(when) =>
-              setValue({ ...value, when: { ...when, processes: when.processes ?? [] } })
-            }
-            processText={processText}
-            setProcessText={setProcessText}
-            processes={processes}
-            processError={processError}
-          />
-          <SettingsField title={translate('settings.gestureBindingDialog.enabled')}>
-            <Toggle
-              checked={value.enabled}
-              label={translate('settings.gestureBindingDialog.enabled')}
-              onChange={(enabled) => setValue({ ...value, enabled })}
-            />
-          </SettingsField>
-        </>
+          }
+        />
       )}
     </BindingEditDialog>
   );

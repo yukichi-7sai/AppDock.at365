@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { inputExecutionModesSchema } from '../../shared/input-execution';
 import { isDeepStrictEqual } from 'node:util';
 import {
   defaultTouchpadGestures,
@@ -60,6 +61,12 @@ const whenSchema = {
       enum: [...shortcutScopes.map((s) => s.id), 'desktop', 'browser', 'exe'],
     },
     excludeDesktop: { type: 'boolean', description: 'global/exe条件でデスクトップだけを除外する' },
+    excludedProcesses: {
+      type: 'array',
+      items: { type: 'string', minLength: 1, maxLength: 120 },
+      maxItems: 100,
+      description: 'global条件のみ。トリガー全体の除外に追加するexe名。',
+    },
     appletIds: { type: 'array', items: shortcutTargetSchema, maxItems: 500, uniqueItems: true },
     processes: {
       type: 'array',
@@ -104,6 +111,7 @@ const configurationFields = {
   distance: { type: 'integer', minimum: 5, maximum: 500 },
   wheelDelayMs: { type: 'integer', minimum: 0, maximum: 5000 },
   executionMode: { type: 'string', enum: ['all', 'first'] },
+  inputExecutionModes: inputExecutionModesSchema,
   indicatorOpacity: { type: 'number', minimum: 0.1, maximum: 1 },
   indicatorStyle: { type: 'string', enum: ['compact', 'pill', 'ring', 'classic'] },
   indicatorShowNoAction: { type: 'boolean' },
@@ -151,6 +159,8 @@ export class GestureCommands {
     return this.options.touchpad
       ? {
           executionMode: configurationFields.executionMode,
+          inputExecutionModes: inputExecutionModesSchema,
+          excludedProcesses: processesSchema,
           browsers: processesSchema,
           requireChromiumWindowClass: { type: 'boolean' },
           connections: {

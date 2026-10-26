@@ -23,6 +23,7 @@ export class NotificationWindowsAdapter {
     private service: NotificationService,
     private options: {
       openCenter(): Promise<void>;
+      showHost(): Promise<void>;
       failed(): void;
       ready?(): boolean;
       deliver?(input: NativeNotificationInput): NativeNotificationHandle;
@@ -41,12 +42,9 @@ export class NotificationWindowsAdapter {
   }
   private async activate(id: string) {
     const item = this.service.targetItems('windows').find((i) => i.id === id);
-    if (!item) {
-      await this.options.openCenter();
-      return;
-    }
-    const actionId = this.service.windowsOptions(id).actionId;
-    if (actionId)
+    const actionId = item && this.service.windowsOptions(id).actionId;
+    if (item && actionId) {
+      await this.options.showHost();
       await this.service.invoke({
         notificationId: id,
         revision: item.revision,
@@ -54,7 +52,7 @@ export class NotificationWindowsAdapter {
         type: 'invoke',
         actionId,
       });
-    else await this.options.openCenter();
+    } else await this.options.openCenter();
   }
   refresh() {
     if (this.disposed || this.options.ready?.() === false) return;

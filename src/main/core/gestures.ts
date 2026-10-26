@@ -19,6 +19,8 @@ import {
 } from '../../shared/command-conditions';
 import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import type { CommandDispatcher } from './command-dispatcher';
+import { defaultTouchpadGestures, nativeTouchpadConditions } from '../../shared/touchpad-gestures';
+import { getCommandTriggerOptions } from '../../shared/command-trigger-options';
 
 const configurationKey = (settings: Settings['gestures'], commands: unknown) =>
   createHash('sha256')
@@ -37,7 +39,13 @@ export interface ShortcutInput {
   owner?: string;
   touchpadGeneration?: number;
   conditions?: {
-    when: { scope: string; appletIds: string[]; processes: string[]; excludeDesktop: boolean };
+    when: {
+      scope: string;
+      appletIds: string[];
+      processes: string[];
+      excludeDesktop: boolean;
+      excludedProcesses?: string[];
+    };
     blockOriginalInput: boolean;
   }[];
   environment?: ConditionEnvironment;
@@ -62,6 +70,7 @@ export class InputCaptureManager {
   private shortcutRevision = 0;
   private inputs: ShortcutInput[] = [];
   private touchpadInputs: ShortcutInput[] = [];
+  private touchpadProjection = '';
   private touchpadReserved: string[] = [];
   touchpadCallbacks?: { changed(): void; failed(): void };
   private statuses: NativeShortcutStatus[] = [];
@@ -415,11 +424,25 @@ export class InputCaptureManager {
       hostProcessId: process.pid,
       enabled: settings.enabled && !this.paused && !state.recording,
     };
+    const touchpad = state.settings.touchpadGestures ?? defaultTouchpadGestures();
+    const projectedTouchpadInputs = this.touchpadInputs.map((input) => ({
+      ...input,
+      conditions: nativeTouchpadConditions(touchpad, input.owner?.slice('touchpad:'.length) ?? ''),
+      environment: {
+        ...getCommandTriggerOptions(state.settings),
+        excludedProcesses: touchpad.excludedProcesses ?? [],
+      },
+    }));
+    const touchpadProjection = JSON.stringify(projectedTouchpadInputs);
+    if (touchpadProjection !== this.touchpadProjection) {
+      this.touchpadProjection = touchpadProjection;
+      this.shortcutRevision++;
+    }
     const inputs = state.recording
       ? []
       : [
           ...this.inputs.filter((input) => !this.touchpadReserved.includes(input.shortcut)),
-          ...this.touchpadInputs,
+          ...projectedTouchpadInputs,
         ];
     const config = {
       gestures: gesture,

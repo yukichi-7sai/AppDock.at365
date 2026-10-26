@@ -3479,6 +3479,41 @@ summary {
   gap: 16px;
   font-weight: 600;
 }
+.gesture-settings-options {
+  display: grid;
+  gap: 4px;
+}
+.gesture-settings-inherited-mode[data-active='false'] {
+  visibility: hidden;
+}
+.gesture-settings-order-heading {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.gesture-settings-order-heading h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+.gesture-settings-order-heading p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.shortcut-order-dialog .shortcut-order-command {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.shortcut-order-dialog .shortcut-order-command :is(strong, small) {
+  max-width: 100%;
+}
+.shortcut-order-dialog .order-dialog-body {
+  overflow-y: auto;
+}
+.shortcut-order-dialog .shortcut-order-list {
+  flex-shrink: 0;
+  overflow: visible;
+}
 .shortcut-order-key select {
   flex: 1;
   min-width: 0;

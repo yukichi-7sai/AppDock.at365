@@ -41,6 +41,11 @@ const filterKindKeys = {
   gestures: 'settings.commandTriggers.mouseFilter',
   'touchpad-gestures': 'settings.commandTriggers.touchFilter',
 } as const;
+const triggerKindKeys = {
+  shortcuts: 'settings.commandTriggers.keyTrigger',
+  gestures: 'settings.commandTriggers.mouseTrigger',
+  'touchpad-gestures': 'settings.commandTriggers.touchpadTrigger',
+} as const;
 const kindIcons = {
   shortcuts: 'keyboard',
   gestures: 'mouse',
@@ -273,11 +278,11 @@ export function CommandTriggersEditor({
         followCommands
         addOptions={commandTriggerKinds.map((kind) => ({
           id: kind,
-          title: t('settings.commandTriggers.addType', { kind: t(filterKindKeys[kind]) }),
+          title: t('settings.commandTriggers.addType', { kind: t(triggerKindKeys[kind]) }),
           label: (command) =>
             t('settings.commandTriggers.addForCommand', {
               title: command.title,
-              kind: t(kindKeys[kind]),
+              kind: t(triggerKindKeys[kind]),
             }),
           icon: <Icon name={kindIcons[kind]} />,
           create: (command) => newTrigger(kind, command, command.extensionId ? 'owner' : 'app'),

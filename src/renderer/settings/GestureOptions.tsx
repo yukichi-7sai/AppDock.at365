@@ -7,37 +7,7 @@ import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections'
 import type { GestureSettings } from '../../shared/gestures';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
 import { GestureIndicatorPreview } from './GestureIndicatorPreview';
-function Names({
-  itemKey,
-  values,
-  change,
-  hint,
-}: {
-  itemKey: string;
-  values: string[];
-  change: (values: string[]) => void;
-  hint?: string;
-}) {
-  const label = hostSettingItem('gestures', itemKey).title;
-  return (
-    <SettingsField title={label} hint={hint} {...settingAnchor('gestures', itemKey)}>
-      <SettingsInput
-        aria-label={label}
-        value={values.join(', ')}
-        placeholder="chrome.exe, firefox.exe"
-        onChange={(e) =>
-          change(
-            e.target.value
-              .split(/[\n,]/)
-              .map((v) => v.trim())
-              .filter(Boolean),
-          )
-        }
-      />
-    </SettingsField>
-  );
-}
-
+import { TriggerExcludedProcessesField } from '../settings-ui/TriggerExcludedProcessesField';
 export function GestureOptions({
   gestures,
   change,
@@ -75,6 +45,11 @@ export function GestureOptions({
           pageId="gestures"
           value={gestures.executionMode}
           onChange={(executionMode) => change({ executionMode })}
+        />
+        <TriggerExcludedProcessesField
+          pageId="gestures"
+          values={gestures.excludedProcesses}
+          onChange={(excludedProcesses) => change({ excludedProcesses })}
         />
         <SettingsField
           group={translate('settings.gestureOptions.feel')}
@@ -189,12 +164,6 @@ export function GestureOptions({
             onChange={(indicatorShowNoAction) => change({ indicatorShowNoAction })}
           />
         </SettingsField>
-        <Names
-          hint={translate('settings.gestureOptions.excludedHint')}
-          itemKey="excludedProcesses"
-          values={gestures.excludedProcesses}
-          change={(excludedProcesses) => change({ excludedProcesses })}
-        />
       </SettingsSection>
     </>
   );

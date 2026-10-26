@@ -1,4 +1,9 @@
 import { hostText } from './i18n';
+import {
+  inputExecutionMode,
+  parseInputExecutionModes,
+  type InputExecutionModes,
+} from './input-execution';
 import { normalizeShortcut } from './commands';
 import {
   commandCondition,
@@ -34,6 +39,8 @@ export interface TouchpadGestureSettings {
   enabled: boolean;
   connections: Record<TouchpadGestureId, TouchpadConnection>;
   executionMode: 'first' | 'all';
+  inputExecutionModes: InputExecutionModes;
+  excludedProcesses: string[];
   bindings: GestureBinding[];
 }
 export type TouchpadState =
@@ -74,6 +81,8 @@ export function defaultTouchpadGestures(): TouchpadGestureSettings {
   return {
     enabled: false,
     executionMode: 'all',
+    inputExecutionModes: {},
+    excludedProcesses: [],
     bindings: [],
     connections: Object.fromEntries(
       touchpadGestureTypes.map(([id], index) => [
@@ -135,10 +144,12 @@ export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
   ) as TouchpadGestureSettings['connections'];
   const options = parseKeybindingOptions({
     executionMode: value.executionMode ?? 'all',
+    excludedProcesses: value.excludedProcesses,
   });
   return {
     enabled: value.enabled ?? false,
     ...options,
+    inputExecutionModes: parseInputExecutionModes(value.inputExecutionModes, touchpadId),
     connections,
     bindings: parseGestureBindings(value.bindings ?? [], touchpadId),
   };
@@ -188,9 +199,25 @@ export function planTouchpadCommands(
       .map((row) => ({ ...row, when: commandCondition(row.when) })),
     context,
     commands,
-    settings.executionMode,
-    environment,
+    inputExecutionMode(settings.executionMode, settings.inputExecutionModes, gesture),
+    { ...environment, excludedProcesses: settings.excludedProcesses ?? [] },
   );
+}
+
+/** Keep dedicated-key ownership for saved rows; only process exclusions release that ownership. */
+export function nativeTouchpadConditions(settings: TouchpadGestureSettings, gesture: string) {
+  return settings.bindings
+    .filter((row) => row.gesture === gesture)
+    .map((row) => ({
+      when: {
+        scope: 'global' as const,
+        appletIds: [],
+        processes: [],
+        excludeDesktop: false,
+        excludedProcesses: row.when.scope === 'global' ? (row.when.excludedProcesses ?? []) : [],
+      },
+      blockOriginalInput: true,
+    }));
 }
 /** Shared row editor helpers accept the same condition model as mouse gestures. */
 export const touchpadAsGestureSettings = (value: TouchpadGestureSettings) => ({

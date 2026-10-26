@@ -7,6 +7,7 @@ export interface CommandCondition {
   pageOrAppletIds: readonly string[];
   processes: readonly string[];
   excludeDesktop: boolean;
+  excludedProcesses?: readonly string[];
 }
 export interface CommandTarget {
   window: string;
@@ -19,6 +20,7 @@ export interface TriggerContext {
   target?: CommandTarget;
 }
 export interface ConditionEnvironment {
+  excludedProcesses?: readonly string[];
   browsers?: readonly string[];
   requireChromiumWindowClass?: boolean;
 }
@@ -51,12 +53,14 @@ export function commandCondition(when: {
   appletIds: readonly string[];
   processes?: readonly string[];
   excludeDesktop?: boolean;
+  excludedProcesses?: readonly string[];
 }): CommandCondition {
   return {
     scope: when.scope,
     pageOrAppletIds: [...when.appletIds],
     processes: [...(when.processes ?? [])],
     excludeDesktop: when.excludeDesktop ?? false,
+    excludedProcesses: when.excludedProcesses ?? [],
   };
 }
 const processName = (name: string) => name.replace(/\.exe$/i, '').toLowerCase();
@@ -70,6 +74,9 @@ export function matchesCommandCondition(
   environment: ConditionEnvironment = {},
 ): boolean {
   const { host, target } = context;
+  const excluded = [...(environment.excludedProcesses ?? []), ...(when.excludedProcesses ?? [])];
+  if (excluded.length && (!target?.processName || containsProcess(excluded, target.processName)))
+    return false;
   if (when.excludeDesktop && target?.desktop !== false) return false;
   switch (when.scope) {
     case 'global':

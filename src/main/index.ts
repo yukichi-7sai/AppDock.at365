@@ -181,7 +181,6 @@ import {
   validateNotificationPreferenceChanges,
 } from '../shared/notification-types';
 import { NotificationService } from './core/notification-service';
-import { NotificationHistoryStore } from './core/notification-history';
 import { NotificationSurfaceHost } from './core/notification-surface-host';
 import { NotificationDesktopHost } from './core/notification-desktop-host';
 import { NotificationWindowsAdapter } from './core/notification-windows-adapter';
@@ -399,7 +398,11 @@ const presentation = new UiPresentation({
         if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
         ribbonState.setDisplayMode(ribbonState.displayMode === 'compact' ? 'expanded' : 'compact');
       },
-  badge: (id) => ribbonBadges.get(id),
+  badge: (id) => {
+    if (id !== 'notifications') return ribbonBadges.get(id);
+    const count = notificationService?.activeCount ?? 0;
+    return count ? { kind: 'count', count, label: hostText('notifications.activeBadge') } : null;
+  },
 });
 async function toggleTheme() {
   commitSettings(
@@ -1508,6 +1511,10 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
   }
   if (hostCommands.some((command) => command.id === id)) {
     await showWindow(invocation);
+    if (id === 'appdock.notifications.open') {
+      await navigation.navigate('notifications');
+      return;
+    }
     if (id !== 'appdock.open') window?.webContents.send('dock:hostCommand', id);
     return;
   }
@@ -1570,7 +1577,15 @@ function prepareShortcut(
   return planKeybindings(
     rows,
     keys,
-    { ...context, target: press?.target ?? context.target },
+    {
+      ...context,
+      target:
+        press?.target ??
+        context.target ??
+        (!globalEvent && context.appFocused
+          ? { window: '0', processName: path.basename(process.execPath) }
+          : undefined),
+    },
     availableShortcutCommands(),
     globalEvent,
     getKeybindingOptions(settings.value).executionMode,
@@ -3579,12 +3594,15 @@ async function initialize() {
   }
   hostModalLayer = new HostModalLayer(window, () => shellRegistry?.touch());
   windowState.track(window);
-  notificationService = new NotificationService(
-    new NotificationHistoryStore(
-      path.join(dataDirectory, 'notifications', 'history.json'),
-      (message) => log.write('error', 'notifications', message),
-    ),
-  );
+  notificationService = new NotificationService();
+  let notificationCount = 0;
+  notificationService.subscribe(() => {
+    const count = notificationService!.activeCount;
+    if (count !== notificationCount) {
+      notificationCount = count;
+      changed();
+    }
+  });
   const notificationState = new NativeNotificationState(
     path.join(path.dirname(hotKeyHost), 'input', 'AppDock.InputHost.exe'),
   );
@@ -3649,6 +3667,7 @@ async function initialize() {
   });
   notificationWindows = new NotificationWindowsAdapter(notificationService, {
     ready: () => startupReady && !quitting,
+    showHost: () => showWindow(),
     openCenter: () => executeCommand('appdock.notifications.open'),
     failed: () =>
       log.write('error', 'notifications', hostText('services.index.windowsNotificationFailed')),
@@ -3991,17 +4010,6 @@ async function initialize() {
               applets: allApplets,
               dark: () => nativeTheme.shouldUseDarkColors,
               changed,
-              confirmDeletion: async (count) =>
-                (
-                  await dialog.showMessageBox(window!, {
-                    type: 'warning',
-                    message: hostText('services.index.historyDeleteConfirmation', { count }),
-                    detail: hostText('services.index.historyDeleteDetails'),
-                    buttons: [hostText('services.index.cancel'), hostText('services.index.delete')],
-                    defaultId: 0,
-                    cancelId: 0,
-                  })
-                ).response === 1,
             })
           : new LogPageSession(request, {
               entries: () => log.entries,
@@ -4356,8 +4364,9 @@ async function initialize() {
   });
   if (smoke) await runSmoke();
   else if (restoreView || !settings.value.host.startMinimized) showWindow();
-  activateNotification(process.argv, showWindow);
-  if (pendingNotificationArgs) activateNotification(pendingNotificationArgs, showWindow);
+  activateNotification(process.argv, openNotificationCenter);
+  if (pendingNotificationArgs)
+    activateNotification(pendingNotificationArgs, openNotificationCenter);
   pendingNotificationArgs = undefined;
   // Optional startup command only for an explicit isolated test profile.
   const testCommand =
@@ -4490,12 +4499,17 @@ async function runSmoke() {
   quitting = true;
   app.quit();
 }
+function openNotificationCenter() {
+  void executeCommand('appdock.notifications.open').catch(() =>
+    log.write('error', 'notifications', hostText('services.index.windowsNotificationFailed')),
+  );
+}
 app.on('second-instance', (_event, argv) => {
   if (!startupReady) {
     pendingNotificationArgs = argv;
     return;
   }
-  if (!activateNotification(argv, showWindow)) showWindow();
+  if (!activateNotification(argv, openNotificationCenter)) showWindow();
 });
 app.on('before-quit', (event) => {
   clearTimeout(startupUpdateTimer);

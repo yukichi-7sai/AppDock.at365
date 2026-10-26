@@ -147,7 +147,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     await page
       .locator(`[data-binding-id="${b}"] .binding-row-actions button`)
       .evaluateAll((buttons) => buttons.map((button) => button.title)),
-    ['編集', 'このジェスチャーの実行順（複数のコマンド）', '削除'],
+    ['編集', 'このジェスチャーの設定（複数のコマンド）', '削除'],
   );
   await page.locator(`[data-binding-id="${b}"] .binding-order`).click();
   assert.deepEqual(await orderIds(), [b, a], 'full gesture group despite filtered command list');
@@ -156,9 +156,9 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     .dragTo(orderPanel.locator(`[data-order-binding="${b}"]`));
   assert.deepEqual(await orderIds(), [a, b]);
   await orderPanel.screenshot({ path: path.join(profile, 'gesture-order.png') });
-  await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('key:Ctrl+A');
+  await orderPanel.getByLabel('設定するジェスチャー').selectOption('key:Ctrl+A');
   assert.equal((await orderIds()).length, 1);
-  await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('move-left');
+  await orderPanel.getByLabel('設定するジェスチャー').selectOption('move-left');
   assert.deepEqual(await orderIds(), [a, b]);
   await orderPanel
     .locator(`[data-order-binding="${a}"] .shortcut-order-handle`)
@@ -183,7 +183,7 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     .locator('.command-shortcut-summary')
     .screenshot({ path: path.join(profile, 'gesture-order-button.png') });
   await page.getByRole('button', { name: '実行順…', exact: true }).click();
-  await orderPanel.getByRole('heading', { name: 'ジェスチャーの実行順', exact: true }).waitFor();
+  await orderPanel.getByRole('heading', { name: 'トリガーの設定', exact: true }).waitFor();
   await orderPanel.getByRole('button', { name: 'キャンセル', exact: true }).click();
 
   await filter.fill('test.gestures.a');
@@ -310,12 +310,9 @@ module.exports = async ({ page, host, profile, checks, calls, send, until }) => 
     path: path.join(profile, 'movement-label-up-down.png'),
   });
   await page.getByRole('button', { name: '実行順…', exact: true }).click();
-  await orderPanel.getByLabel('実行順を変更するジェスチャー').selectOption('move-up-down');
+  await orderPanel.getByLabel('設定するジェスチャー').selectOption('move-up-down');
   assert.equal(
-    await orderPanel
-      .getByLabel('実行順を変更するジェスチャー')
-      .locator('option:checked')
-      .innerText(),
+    await orderPanel.getByLabel('設定するジェスチャー').locator('option:checked').innerText(),
     '移動: 上, 下 · 1件',
   );
   assert.deepEqual(await orderIds(), [paired.id]);

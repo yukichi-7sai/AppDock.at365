@@ -6,10 +6,29 @@ const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
+const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
+const hostWindow =
+  "electron.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/'))";
+const main = (copy, expression) =>
+  inspect(
+    copy.inspectPort,
+    '(()=>{const electron=' + electronExpression + ';return (' + expression + ');})()',
+  );
+async function centerReady(copy) {
+  return (
+    (await copy.dock.evaluate(
+      async () => (await window.dock.snapshot()).navigation.route === 'notifications',
+    )) &&
+    (await copy.dock.getByTestId('notification-center').isVisible()) &&
+    (await main(copy, hostWindow + '.isVisible() && !' + hostWindow + '.isMinimized()'))
+  );
+}
 const assert = require('node:assert/strict');
 const { notificationProtocol } = require('../out/main/main/core/notification-routing');
 const root = path.resolve(__dirname, '..');
-const source = path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'));
+const source = path.resolve(
+  process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'),
+);
 const profile = path.join(root, '.artifacts', `notification-portable-${Date.now()}`);
 const sha256 = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const powershell = (code) => {
@@ -44,6 +63,7 @@ const copies = ['installed', 'test'].map((name) => {
   settings.host.hardwareAcceleration = false;
   settings.globalShortcutCommands = [];
   settings.extensions['test.notification'] = { enabled: true, settings: {} };
+  settings.extensions['test.notification.legacy'] = { enabled: true, settings: {} };
   settings.extensions['fixture.notifications.native'] = { enabled: true, settings: {} };
   settings.notificationPreferences = {
     overrides: [
@@ -92,8 +112,6 @@ const copies = ['installed', 'test'].map((name) => {
         },
       ],
       commands: [
-        { id: 'test.notification.send', title: 'Send' },
-        { id: 'test.notification.open', title: 'Open' },
         { id: 'test.notification.typed', title: 'Typed' },
         { id: 'test.notification.end', title: 'End' },
       ],
@@ -106,13 +124,37 @@ exports.activate = async context => {
   let id, n=0;
   context.commands.register('test.notification.typed','Typed',async()=>{const result=await context.notifications.publish({typeId:'message',title:'Typed '+(++n),body:'Windows fixture',dedupeKey:'same',historyText:{title:'Safe typed',body:'Safe'}}); id=result.notificationId; await context.storage.set('typed',id);});
   context.commands.register('test.notification.end','End',async()=>context.notifications.end(id));
-  context.commands.register('test.notification.open', 'Open', async () => {
+};`,
+  );
+  const legacy = path.join(folder, 'extensions/legacy');
+  fs.mkdirSync(legacy, { recursive: true });
+  fs.writeFileSync(
+    path.join(legacy, 'extension.json'),
+    JSON.stringify({
+      id: 'test.notification.legacy',
+      name: 'Legacy notification fixture',
+      version: '1.0.0',
+      apiVersion: 1,
+      runtime: 'node',
+      entry: 'index.js',
+      capabilities: ['notifications', 'storage'],
+      commands: [
+        { id: 'test.notification.legacy.send', title: 'Send' },
+        { id: 'test.notification.legacy.open', title: 'Open' },
+      ],
+    }),
+  );
+  fs.writeFileSync(
+    path.join(legacy, 'index.js'),
+    `
+exports.activate = async context => {
+  context.commands.register('test.notification.legacy.open', 'Open', async () => {
     const count = (await context.storage.get('clicks')) || 0;
     await context.storage.set('clicks', count + 1);
   });
-  context.commands.register('test.notification.send', 'Send', () => context.notifications.show(
+  context.commands.register('test.notification.legacy.send', 'Send', () => context.notifications.show(
     'AppDock synthetic ${name}', 'Gmail-style command notification <&>',
-    { silent: true, command: 'test.notification.open' }));
+    { silent: true, command: 'test.notification.legacy.open' }));
 };`,
   );
   const native = path.join(folder, 'extensions/native');
@@ -173,19 +215,26 @@ async function until(fn, label) {
   }
   throw Error(label);
 }
-async function start(copy) {
+async function start(copy, initialUri) {
   const server = net.createServer();
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
   await new Promise((r) => server.close(r));
+  copy.inspectPort = await freePort();
   copy.child = spawn(
     copy.exe,
-    [`--test-profile=${copy.folder}`, `--remote-debugging-port=${port}`],
+    [
+      `--test-profile=${copy.folder}`,
+      `--remote-debugging-port=${port}`,
+      `--inspect=${copy.inspectPort}`,
+      ...(initialUri ? [initialUri] : []),
+    ],
     { cwd: copy.folder, env, windowsHide: true, stdio: 'ignore' },
   );
   // Launch the OS toast URI as soon as the startup update result reaches Windows.
   // This intentionally races initial renderer/Window readiness.
-  const activation = powershell(`$ErrorActionPreference='Stop';
+  if (!initialUri) {
+    const activation = powershell(`$ErrorActionPreference='Stop';
     [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null;
     $deadline=[DateTime]::UtcNow.AddSeconds(25); do {
       foreach($toast in [Windows.UI.Notifications.ToastNotificationManager]::History.GetHistory('at365.appdock')) {
@@ -197,8 +246,9 @@ async function start(copy) {
         }
       }; Start-Sleep -Milliseconds 20
     } while([DateTime]::UtcNow -lt $deadline); throw 'Startup toast missing'`);
-  copy.startupActivation = JSON.parse(activation);
-  if (copy.startupActivation.pid) activationPids.add(copy.startupActivation.pid);
+    copy.startupActivation = JSON.parse(activation);
+    if (copy.startupActivation.pid) activationPids.add(copy.startupActivation.pid);
+  }
   copy.browser = await until(
     () => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 }),
     'portable CDP',
@@ -216,7 +266,9 @@ async function start(copy) {
     'startup ready',
   );
   const snapshot = await copy.dock.evaluate(() => window.dock.snapshot());
-  assert.equal(snapshot.extensions.find((e) => e.id === 'test.notification')?.state, 'running');
+  if (!initialUri)
+    for (const id of ['test.notification', 'test.notification.legacy'])
+      assert.equal(snapshot.extensions.find((e) => e.id === id)?.state, 'running', id);
 }
 async function stop(copy) {
   if (copy.dock && !copy.dock.isClosed())
@@ -228,7 +280,7 @@ async function stop(copy) {
   copy.browser = undefined;
 }
 const count = (copy) => {
-  const file = path.join(copy.folder, 'data/storage/test.notification/clicks.json');
+  const file = path.join(copy.folder, 'data/storage/test.notification.legacy/clicks.json');
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : 0;
 };
 function historyUri(copy) {
@@ -266,14 +318,7 @@ const checks = [];
   for (const copy of copies) {
     assert.equal(sha256(copy.exe), hash);
     await start(copy);
-    await until(
-      () =>
-        copy.browser
-          .contexts()
-          .flatMap((c) => c.pages())
-          .some((p) => p.url().includes('notification-center.html')),
-      'startup update notification opens AppDock',
-    );
+    await until(() => centerReady(copy), 'startup update notification opens AppDock');
   }
   await until(() => {
     const rows = JSON.parse(
@@ -336,15 +381,10 @@ const checks = [];
     'real .NET typed Windows toast',
   );
   const nativeUri = native.xml.match(/launch="([^"]+)"/)[1];
+  await copy.dock.evaluate(() => window.dock.navigate('logs'));
+  await main(copy, hostWindow + '.hide()');
   activate(copy, nativeUri);
-  await until(
-    () =>
-      copy.browser
-        .contexts()
-        .flatMap((c) => c.pages())
-        .some((p) => p.url().includes('notification-center.html')),
-    'typed toast opens notification center',
-  );
+  await until(() => centerReady(copy), 'typed toast opens notification center');
   await copy.dock.evaluate(() =>
     window.dock.toggleExtension('fixture.notifications.native', false),
   );
@@ -356,7 +396,7 @@ const checks = [];
     'real .NET typed Windows delivery and Shell activation open the notification center; stopping the owner retracts its OS entry',
   );
   for (const copy of copies) {
-    await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.send'));
+    await copy.dock.evaluate(() => window.dock.executeCommand('test.notification.legacy.send'));
     copy.uri = await until(() => historyUri(copy), 'native toast in Action Center');
     const command = powershell(
       `$k=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\\Classes\\${copy.protocol}\\shell\\open\\command'); $k.GetValue(''); $k.Close()`,
@@ -368,29 +408,47 @@ const checks = [];
   checks.push(
     'native synthetic toast XML and protocol registrations target each original single EXE/profile',
   );
+  await main(copies[0], hostWindow + '.hide()');
   activate(copies[0], copies[0].uri);
   await until(() => count(copies[0]) === 1, 'installed callback');
+  assert.equal(await main(copies[0], hostWindow + '.isVisible()'), true);
   assert.equal(count(copies[1]), 0);
+  await main(copies[1], hostWindow + '.minimize()');
   activate(copies[1], copies[1].uri);
   await until(() => count(copies[1]) === 1, 'test callback');
+  assert.equal(
+    await main(copies[1], hostWindow + '.isVisible() && !' + hostWindow + '.isMinimized()'),
+    true,
+  );
   assert.equal(count(copies[0]), 1);
   activate(copies[0], copies[0].uri);
-  await wait(1500);
+  await until(() => centerReady(copies[0]), 'old URI opens center');
   assert.equal(count(copies[0]), 1);
   checks.push(
     'Windows Shell activation returns to the matching running copy; command runs once and never in the other copy',
   );
-  await copies[0].dock.evaluate(() => window.dock.executeCommand('test.notification.send'));
+  await copies[0].dock.evaluate(() => window.dock.executeCommand('test.notification.legacy.send'));
   const stale = await until(() => {
     const uri = historyUri(copies[0]);
     return uri && uri !== copies[0].uri && uri;
   }, 'fresh native toast');
-  await copies[0].dock.evaluate(() => window.dock.toggleExtension('test.notification', false));
+  await copies[0].dock.evaluate(() =>
+    window.dock.toggleExtension('test.notification.legacy', false),
+  );
+  await copies[0].dock.evaluate(() => window.dock.navigate('logs'));
+  await main(copies[0], hostWindow + '.hide()');
   activate(copies[0], stale);
-  await wait(1500);
+  await until(() => centerReady(copies[0]), 'stopped notification opens center');
   assert.equal(count(copies[0]), 1);
   checks.push('notification from a stopped Applet cannot execute its old callback');
   for (const copy of copies) await stop(copy);
+  await start(copies[0], copies[0].uri);
+  await until(() => centerReady(copies[0]), 'cold notification arguments open center');
+  assert.equal(count(copies[0]), 1);
+  await stop(copies[0]);
+  checks.push(
+    'cold URI arguments restore the host and open the center without replaying an action',
+  );
   // An old notification after shutdown launches the correct portable host. No
   // previous-process callback is replayed. CDP is deliberately not persisted.
   activate(copies[0], copies[0].uri);

@@ -3,7 +3,6 @@ const { test } = require('node:test'),
   fs = require('node:fs'),
   path = require('node:path');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const {
   NotificationWindowsAdapter,
 } = require('../out/main/main/core/notification-windows-adapter');
@@ -12,16 +11,15 @@ function fixture(t) {
   let clock = 100000,
     ready = true,
     opened = 0,
+    shown = 0,
     failures = 0;
-  const h = new NotificationHistoryStore(
-      path.join(dir, 'history.json'),
-      () => {},
-      () => clock,
-    ),
-    s = new NotificationService(h, () => clock),
+  const s = new NotificationService(() => clock),
     sent = [];
   const a = new NotificationWindowsAdapter(s, {
     ready: () => ready,
+    showHost: async () => {
+      shown++;
+    },
     openCenter: async () => {
       opened++;
     },
@@ -55,6 +53,7 @@ function fixture(t) {
     input,
     ready: (v) => (ready = v),
     open: () => opened,
+    shown: () => shown,
     failures: () => failures,
     tick: (ms) => {
       clock += ms;
@@ -92,7 +91,7 @@ test('Windows per-ID delivery and OS close do not resolve, read or repost the ac
   assert.equal(f.s.list()[0].delivery.windows, 'hidden');
   assert.equal(f.s.list()[1].delivery.windows, 'accepted');
   assert.equal(f.s.list()[0].status, 'active');
-  assert.equal(f.s.list()[0].read, false);
+  assert.equal('read' in f.s.list()[0], false);
   f.a.refresh();
   assert.equal(f.sent.length, 2);
   await f.sent[1].input.clicked();
@@ -125,7 +124,7 @@ test('only content changes replace; stale callbacks are ignored, failures stay f
   assert.equal(f.s.list()[0].id, id);
   assert.equal(f.s.list()[0].status, 'active');
 });
-test('startup gate, hidden timed expiry, safe direct action once, and shutdown callback invalidation', async (t) => {
+test('startup gate, hidden timed expiry, host shown before direct action once and shutdown callback invalidation', async (t) => {
   const f = fixture(t);
   f.ready(false);
   f.s.upsert('host.timer', f.input({ lifetime: { type: 'timed', milliseconds: 100 } }));
@@ -136,7 +135,7 @@ test('startup gate, hidden timed expiry, safe direct action once, and shutdown c
   f.a.refresh();
   assert.equal(f.sent.length, 0);
   let actions = 0;
-  f.s.upsert(
+  const id = f.s.upsert(
     'host.legacy',
     f.input({
       windowsSilent: true,
@@ -146,6 +145,7 @@ test('startup gate, hidden timed expiry, safe direct action once, and shutdown c
           key: 'go',
           label: 'Open',
           run: async () => {
+            assert.equal(f.shown(), 1);
             actions++;
           },
         },
@@ -160,6 +160,8 @@ test('startup gate, hidden timed expiry, safe direct action once, and shutdown c
   await new Promise((r) => setImmediate(r));
   assert.equal(actions, 1);
   assert.equal(f.open(), 0);
+  const item = f.s.list().find((i) => i.id === id);
+  assert.equal(item.status, 'active');
   f.a.dispose();
   assert.equal(f.sent[0].released, 1);
   assert.equal(f.sent[0].closed, 0);

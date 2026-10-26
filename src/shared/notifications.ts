@@ -1,7 +1,6 @@
 import type { ShellAppletApi } from './shell';
 export type NotificationLevel = 'info' | 'warning' | 'error';
-export type NotificationStatus =
-  'active' | 'resolved' | 'dismissed' | 'expired' | 'withdrawn' | 'interrupted';
+export type NotificationStatus = 'active' | 'resolved' | 'dismissed' | 'expired' | 'withdrawn';
 export type NotificationTarget = 'banner' | 'desktop' | 'windows';
 export type NotificationDeliveryState =
   'pending' | 'accepted' | 'showing' | 'hidden' | 'failed' | 'ended';
@@ -26,7 +25,6 @@ export interface NotificationItem {
   updatedAt: number;
   endedAt?: number;
   expiresAt?: number;
-  read: boolean;
   targets: NotificationTarget[];
   delivery: Partial<Record<NotificationTarget, NotificationDeliveryState>>;
 }

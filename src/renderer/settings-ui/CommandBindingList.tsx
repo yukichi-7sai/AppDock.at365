@@ -209,7 +209,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
             setOrderKey(row);
           }}
         >
-          <ListIcon kind="order" />
+          <ListIcon kind="edit" />
         </button>
         <button
           type="button"
@@ -271,11 +271,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
         <tr>
           <th>{translate('settings.commandBindingList.command')}</th>
           <th className={separateConditions ? 'binding-gesture-heading' : undefined}>
-            {translate(
-              separateConditions
-                ? 'settings.commandBindingList.gesture'
-                : 'settings.commandBindingList.binding',
-            )}
+            {separateConditions ? inputName : translate('settings.commandBindingList.binding')}
           </th>
           {separateConditions && (
             <th className="binding-condition-heading">

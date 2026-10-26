@@ -219,7 +219,7 @@ const checks = [];
       await row('a2')
         .locator('.binding-row-actions button')
         .evaluateAll((buttons) => buttons.map((button) => button.title)),
-      ['編集', 'このキーの実行順（複数のコマンド）', '削除'],
+      ['編集', 'このキーの設定（複数のコマンド）', '削除'],
     );
     await row('a2').locator('.binding-delete').click();
     await page.getByTestId('settings-dialog-cancel').click();
@@ -401,7 +401,7 @@ const checks = [];
     await page.locator('[data-binding-id="final-order-fixture"]').waitFor();
     await page.locator('[data-binding-id="final-order-fixture"] .binding-order').click();
     const orderPanel = page.locator('.shortcut-order-dialog');
-    await orderPanel.getByLabel('実行順を変更するキー').selectOption('Ctrl+F8');
+    await orderPanel.getByLabel('設定するキー').selectOption('Ctrl+F8');
     const previousOrder = await orderPanel
       .locator('[data-order-binding]')
       .evaluateAll((items) => items.map((el) => el.dataset.orderBinding));

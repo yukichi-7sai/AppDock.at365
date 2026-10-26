@@ -4,6 +4,7 @@ import {
   defaultAccentColor,
   resolveAppearance,
   scrollbarCss,
+  placeholderCss,
   type AppearanceSnapshot,
 } from '../../shared/appearance';
 
@@ -42,7 +43,7 @@ export function registerAppearance(contents: WebContents, url: string) {
   // Reloads must receive current colors, even if their creation arguments are older.
   contents.on('dom-ready', () => {
     if (!contents.isDestroyed() && contents.getURL() === url) {
-      void contents.insertCSS(scrollbarCss).catch(() => {
+      void contents.insertCSS(`${scrollbarCss}\n${placeholderCss}`).catch(() => {
         // A navigation/destruction race is retried on the next registered local document.
       });
       contents.send('appearance:changed', appearanceSnapshot());

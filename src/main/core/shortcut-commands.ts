@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { inputExecutionModesSchema } from '../../shared/input-execution';
 import type { Settings, SettingsSnapshot, GlobalHotKeyStatus } from '../../shared/contracts';
 import {
   parseCommandTriggerOptions,
@@ -59,6 +60,12 @@ const whenSchema = {
       maxItems: 100,
     },
     excludeDesktop: { type: 'boolean' },
+    excludedProcesses: {
+      type: 'array',
+      items: { type: 'string', minLength: 1, maxLength: 120 },
+      maxItems: 100,
+      description: 'global条件のみ。トリガー全体の除外に追加するexe名。',
+    },
   },
   required: ['scope', 'appletIds'],
   additionalProperties: false,
@@ -136,6 +143,11 @@ export class ShortcutCommands {
                       type: 'object',
                       properties: publicCommandTriggerFields({
                         executionMode: { type: 'string', enum: ['first', 'all'] },
+                        inputExecutionModes: inputExecutionModesSchema,
+                        excludedProcesses: {
+                          ...whenSchema.properties.excludedProcesses,
+                          description: 'このトリガーの全割り当てで除外するexe名。',
+                        },
                         browsers: {
                           type: 'array',
                           items: { type: 'string', minLength: 1, maxLength: 120 },
@@ -281,7 +293,13 @@ export class ShortcutCommands {
         } else if (op.kind === 'configure') {
           if (
             !exact(op, ['kind', 'changes']) ||
-            !exact(op.changes, ['executionMode', 'browsers', 'requireChromiumWindowClass']) ||
+            !exact(op.changes, [
+              'executionMode',
+              'inputExecutionModes',
+              'excludedProcesses',
+              'browsers',
+              'requireChromiumWindowClass',
+            ]) ||
             Object.keys(publicCommandTriggerFields(op.changes)).length !==
               Object.keys(op.changes).length ||
             !Object.keys(op.changes).length ||
@@ -372,6 +390,8 @@ export class ShortcutCommands {
   private publicOptions(options: ReturnType<typeof getKeybindingOptions>) {
     return publicCommandTriggerFields({
       executionMode: options.executionMode,
+      inputExecutionModes: { ...options.inputExecutionModes },
+      excludedProcesses: [...options.excludedProcesses],
       browsers: [...options.browsers],
       requireChromiumWindowClass: options.requireChromiumWindowClass,
     });

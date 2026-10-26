@@ -8,7 +8,6 @@ const {
   resolveNotificationSpeech,
 } = require('../out/main/shared/notification-types');
 const { NotificationService } = require('../out/main/main/core/notification-service');
-const { NotificationHistoryStore } = require('../out/main/main/core/notification-history');
 const { TypedNotifications } = require('../out/main/main/core/typed-notifications');
 const { NotificationSpeechService } = require('../out/main/main/core/notification-speech');
 const { NotificationAvailability } = require('../out/main/main/core/notification-availability');
@@ -71,9 +70,7 @@ function setup(t, extra = {}) {
   const posts = [],
     played = [],
     failed = [];
-  const service = new NotificationService(
-    new NotificationHistoryStore(path.join(dir, 'history.json'), () => {}),
-  );
+  const service = new NotificationService();
   const availability = new NotificationAvailability({
     query: async () => accepts,
     close: () => {},
@@ -200,7 +197,7 @@ test('new notifications speak once across dedupe, timer restart, reads and targe
   const a = f.publish();
   await wait(() => f.posts.length === 1 && f.played.length === 1);
   f.publish('episode', { body: 'changed', restartTimer: true });
-  f.service.markRead([a.notificationId]);
+  f.service.centerEntries();
   f.settings.notificationPreferences.overrides[0].targets = ['banner', 'desktop'];
   f.reconcile();
   await new Promise((r) => setTimeout(r, 20));

@@ -16,7 +16,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   const item = (id) => panel.locator(`[data-order-binding="${id}"]`);
   const cancel = () => panel.getByRole('button', { name: 'キャンセル', exact: true }).click();
   const apply = () => panel.getByRole('button', { name: '適用', exact: true }).click();
-  const choose = (key) => panel.getByLabel('実行順を変更するキー').selectOption(key);
+  const choose = (key) => panel.getByLabel('設定するキー').selectOption(key);
   const write = async (rows) => {
     await page.evaluate(async (rows) => {
       const s = await window.dock.snapshot();
@@ -192,7 +192,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await choose('Ctrl+F8');
   await page.setViewportSize({ width: 700, height: 540 });
   assert(
-    await panel.locator('.shortcut-order-list').evaluate((el) => el.scrollHeight > el.clientHeight),
+    await panel.locator('.order-dialog-body').evaluate((el) => el.scrollHeight > el.clientHeight),
   );
   const footer = await panel.locator('footer').boundingBox();
   assert(footer.y + footer.height <= 540, 'long groups keep apply/cancel visible');

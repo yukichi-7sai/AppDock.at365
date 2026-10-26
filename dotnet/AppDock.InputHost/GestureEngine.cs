@@ -11,7 +11,7 @@ internal sealed record Configuration(bool Enabled, string[] Browsers, string[] E
     string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all",
     bool ActivateOnStart = false, string SettingsKey = "", uint HostProcessId = 0, bool IndicatorShowNoAction = true,
     string IndicatorStyle = "compact", string IndicatorNoActionText = "アクション無し",
-    string IndicatorMoreText = "ほか {count} 件");
+    string IndicatorMoreText = "ほか {count} 件", Dictionary<string, string>? InputExecutionModes = null);
 internal enum GestureDirection { Up, Down, Left, Right }
 [StructLayout(LayoutKind.Sequential)] internal readonly record struct GesturePoint(int X, int Y);
 
@@ -105,7 +105,7 @@ internal sealed class GestureEngine : IDisposable
         var classLength = GetClassName(window, className, className.Capacity);
         targetContext = new(window.ToInt64().ToString(), process, classLength > 0 ? className.ToString() : null, desktop);
         var context = new CommandContext(hostContext, targetContext);
-        var environment = new ConditionEnvironment(config!.Browsers, config.RequireChromiumWindowClass);
+        var environment = new ConditionEnvironment(config!.Browsers, config.RequireChromiumWindowClass, config.ExcludedProcesses);
         return config!.Rows.Where(r =>
             (r.Window.Length == 0 || r.Window == window.ToInt64().ToString() || includeInactive && r.Window.Length > 0) &&
             (includeInactive && r.Window == "-1" || CommandConditions.Matches(r.When, context, r.OwnerId, environment))).ToArray();
@@ -356,7 +356,8 @@ internal sealed class GestureEngine : IDisposable
     {
         // Candidates already passed the start-window, browser/exe and host page conditions.
         // Preview and execution must use the same ordered, command-deduplicated selection.
-        return CommandConditions.Select(candidates.Where(r => r.Gesture == gesture), r => r.Command, config!.ExecutionMode);
+        var mode = CommandConditions.ExecutionMode(config!.ExecutionMode, config.InputExecutionModes, gesture);
+        return CommandConditions.Select(candidates.Where(r => r.Gesture == gesture), r => r.Command, mode);
     }
     // Reserve the largest displayed command batch for this start target before showing its first direction.
     private int PillCaptionRows => Math.Clamp(candidates.Where(row => row.Gesture.StartsWith("move-"))

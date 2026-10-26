@@ -11,7 +11,6 @@ const path = require('path');
 const root = ${JSON.stringify(root)};
 app.setPath('userData', path.join(__dirname,'chromium'));
 const { NotificationService } = require(path.join(root,'out/main/main/core/notification-service'));
-const { NotificationHistoryStore } = require(path.join(root,'out/main/main/core/notification-history'));
 const { ShellProviderRegistry } = require(path.join(root,'out/main/main/core/shell-provider-registry'));
 const { NotificationSurfaceHost } = require(path.join(root,'out/main/main/core/notification-surface-host'));
 const { NotificationSurfaceController } = require(path.join(root,'out/main/main/core/notification-surface-controller'));
@@ -20,8 +19,7 @@ app.whenReady().then(async()=>{
  const window = new BrowserWindow({width:1000,height:800,webPreferences:{sandbox:true}});
  await window.loadURL('data:text/html,<html><body><button id="host">Host focus</button><input id="keep"></body></html>');
  window.webContents.setZoomFactor(1);
- const store=new NotificationHistoryStore(path.join(__dirname,'history.json'),m=>console.error(m));
- const service=new NotificationService(store);
+ const service=new NotificationService();
  let selected='appdock.default-shell', dark=true, executions=0;
  const providers=[
  {id:'appdock.default-shell',sourceKind:'builtin',folder:path.join(root,'out/shells/default'),version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'notifications.html'}}},
@@ -32,7 +30,7 @@ app.whenReady().then(async()=>{
  providers:()=>providers,registry:new ShellProviderRegistry({providers:()=>providers,assignments:()=>({'notification.banner':selected}),safeMode:false}),ready:()=>true,settings:()=>({accent:true}),
  execute:async(id,command)=>{if(command!=='fixture.own')throw Error('Not owned');return id;},
  layer:()=>{},failed:(m)=>console.error(m)});
- fixture={window,service,store,host,providers,
+ fixture={window,service,host,providers,
  publish: (key,extra={})=>service.upsert('host.fixture',{dedupeKey:key,level:'info',title:'Notice '+key,body:'Fixture message',
  lifetime:{type:'manual'},dismissible:true,targets:['banner'],history:'persistent',
  historyText:{title:'Safe fixture '+key,body:'Safe summary'},
@@ -74,7 +72,15 @@ delete env.ELECTRON_RUN_AS_NODE;
         for (const p of all().filter((p) => p.url().endsWith('/notifications.html'))) {
           try {
             const c = await p.evaluate(() => window.appdockNotifications.connect());
-            if (c.providerAppletId === provider) return p;
+            if (
+              c.providerAppletId === provider &&
+              (await app.evaluate(
+                (_, session) =>
+                  fixture.host['active']?.session === session && fixture.host['active']?.ready,
+                c.sessionId,
+              ))
+            )
+              return p;
           } catch {}
         }
         return null;
@@ -220,10 +226,10 @@ delete env.ELECTRON_RUN_AS_NODE;
     );
     await app.evaluate(() => fixture.window.show());
     await p.getByRole('region', { name: 'Notice 0', exact: true }).waitFor();
-    await app.evaluate(() => {
-      fixture.store.flush();
-    });
-    assert.ok(!fs.readFileSync(path.join(profile, 'history.json'), 'utf8').includes('actionId'));
+    const history = await app.evaluate(() => fixture.service.historyEntries());
+    assert.ok(history.length > 0);
+    assert.ok(history.every((item) => !('actions' in item) && !('read' in item)));
+    assert.equal(fs.existsSync(path.join(profile, 'history.json')), false);
     checks.push('light / narrow / 125 percent zoom / hide and restore / safe history');
     fs.writeFileSync(
       path.join(profile, 'result.json'),

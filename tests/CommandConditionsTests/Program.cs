@@ -6,7 +6,7 @@ using var fixtures = JsonDocument.Parse(File.ReadAllText(args[0]));
 string[] Strings(JsonElement value, string key) => value.TryGetProperty(key, out var part)
     ? part.EnumerateArray().Select(item => item.GetString()!).ToArray() : [];
 Condition When(JsonElement value) => new(value.GetProperty("scope").GetString()!, Strings(value, "appletIds"),
-    Strings(value, "processes"), value.TryGetProperty("excludeDesktop", out var exclude) && exclude.GetBoolean());
+    Strings(value, "processes"), value.TryGetProperty("excludeDesktop", out var exclude) && exclude.GetBoolean(), Strings(value, "excludedProcesses"));
 ConditionEnvironment? EnvironmentFor(JsonElement value) => value.TryGetProperty("environment", out var part)
     ? part.Deserialize<ConditionEnvironment>(options) : null;
 var count = 0;
@@ -35,4 +35,10 @@ foreach (var fixture in fixtures.RootElement.GetProperty("selections").Enumerate
     count++;
 }
 if (CommandConditions.HostContext("unknown").Focused != null) throw new Exception("Missing context must fail closed.");
+foreach (var fixture in fixtures.RootElement.GetProperty("inputExecutionModes").EnumerateArray()) {
+    var modes = fixture.GetProperty("overrides").Deserialize<Dictionary<string, string>>(options)!;
+    var actual = CommandConditions.ExecutionMode(fixture.GetProperty("fallback").GetString()!, modes, fixture.GetProperty("input").GetString()!);
+    if (actual != fixture.GetProperty("expected").GetString()) throw new Exception(fixture.GetProperty("name").GetString());
+    count++;
+}
 Console.WriteLine($"Command condition/selection fixtures: {count} passed.");

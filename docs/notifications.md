@@ -67,15 +67,19 @@ TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービス
 
 ## 履歴
 
-PC専用dataDirectory内のnotifications/history.jsonにschemaVersion:1の履歴を保存する。persistentの発行元は保存用の安全なtitle/bodyを指定し、画面用の詳細とは分離する。callback、操作ID、認証、設定draftを保存しない。sessionは起動中だけ保持し、noneはactive終了時に除去する。
+通知は今回のAppDock起動中だけメモリーに保持し、通知履歴のファイル読込・保存は行わない。終了・再起動時にアクティブ通知と終了履歴を破棄する。再起動後は発行元が現在の状態を評価して必要な通知を新規発行する。
 
-終了履歴は30日・1,000件・ファイル5MiBの上限で古い終了記録から整理する。activeを保持期限で解消しない。原子的置換と150msの保存集約を用いる。保存不能時も表示/操作を継続し、失敗をログへ記録する。破損ファイルは同じフォルダーに.corrupt-UUIDを付けて隔離する。未知schemaは上書きせずメモリー内で運用する。
+発行APIのhistoryはpersistent/session/noneを受け付ける。persistentは安全なhistoryTextを必要とする起動中の履歴で、ディスク保存を意味しない。activeの表示は詳細本文、終了後は安全な要約に置き換える。sessionも起動中だけ保持し、noneはactive終了時に除去する。終了時にcallbackと操作IDを回収し、終了した通知から操作を再実行しない。
 
-ownerKind/ownerId/typeId/endReasonを任意保存する。旧記録は種類不明のまま読める。schemaVersion:1を維持する。
+終了履歴は全方針合計で最新1,000件を保持し、終了時刻の古いものから自動整理する。アクティブ通知はこの上限の整理対象にしない。ownerKind/ownerId/typeId/endReasonを保持し、提供元・種類・終了理由を表示する。
 
-再起動で過去のactive履歴をinterruptedへ変換し、操作を復活させない。現在の発行元が条件を評価して新規通知を作る。通知センターで既読・検索・終了履歴削除を提供する。
+未読・既読状態、未読件数、未読のみの検索、既読操作、履歴削除操作と一括選択は提供しない。通知センターはアクティブ/履歴のタブと、本文・レベル・発行元・終了状態の検索、履歴50件ずつのページングを提供する。アクティブ通知の固有操作と「閉じる」は維持し、閉じた記録は履歴へ残す。閉じることと問題の解消は別の状態として扱う。
 
-バナーとデスクトップのShell提供元はhost.shellProvidersのnotification.banner・notification.desktopで指定する。フォールバックと故障抑止は領域ごとに行い、同じworkerの停止では依存する各領域を失効させる。切替で通知を再発行せず、同じID・期限・操作状態を使う。通知センターは本体rendererで共通描画し、Controllerが検索・ページング・選択を保持する。デスクトップの可視判定は専用Windowに従い、本体を隠しても無効にしない。
+発行元フィルターでは、本体の更新・エラー・警告などをひとつの「AppDock」にまとめる。Appletは内部の発行元IDで区別し、表示名が同じでも統合しない。アクティブ/履歴の両タブで同じ単位を使い、通知自身の発行元・所有者・操作権限は変更しない。
+
+リボンの通知センターはNotificationServiceのactive件数を共通バッジへ投影する。通知IDごとに1件とし、複数の表示先、通知センターのみ、ロック中の保留を含める。同じIDの更新・検索・センターを開く操作では増減せず、新規発行で増加、閉じる・解消・期限切れ・撤回・発行元停止で減少する。0件は非表示、1〜99件は数値、100件以上は99+。ツールチップ/支援技術向けの説明には実件数を使う。アイコンのみ/名前付き、配置変更、グループの子と親の点表示は共通リボン契約に従う。
+
+バナーとデスクトップのShell提供元はhost.shellProvidersのnotification.banner・notification.desktopで指定する。フォールバックと故障抑止は領域ごとに行い、同じworkerの停止では依存する各領域を失効させる。切替で通知を再発行せず、同じID・期限・操作状態を使う。通知センターは本体rendererで共通描画し、Controllerが検索・ページングを保持する。デスクトップの可視判定は専用Windowに従い、本体を隠しても無効にしない。
 
 ## Shellの領域とbridge
 
@@ -97,6 +101,8 @@ minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言�
 モデルはschemaVersion:1/contextId:primary/sessionId/revision/dark/items/viewportと任意のsurface:banner/desktop。itemsは発行順。viewportはCSS pxのwidth/maxHeight。古いrevisionを無視する。NotificationSurfaceControllerが表示モデルと操作を持ち、NotificationSurfaceHostはネイティブViewの寿命・ready・位置・復旧だけを管理する。
 
 ## 配置と復旧
+
+通知カードはレベル色の細い均一枠を使用する。バナーとデスクトップ通知の閉じるアイコンはカード右上、通知センターではカード外の左列に置く。閉じる操作のない行も左列を確保し、カードの位置を揃える。終了済みの履歴には閉じる操作を表示しない。
 
 Window上部48 CSS pxへ、幅最大680 CSS px/左右余白16 CSS pxの小さなWebContentsViewを重ねる。幅・高さとzoomをDIPへ変換する。本文レイアウト、Web/AppletのView、入力、sessionを維持する。ページより上、モーダルパレットより下へ置き、ページの追加とバナー更新の後もモーダルを最後に配置する。
 
@@ -126,15 +132,15 @@ Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shel
 
 ## Windows表示の実装
 
-NotificationWindowsAdapterはactiveのwindows対象を1件ずつ投影する。startupReady後に受付を開始し、状態はpending/accepted/hidden/failedとして通知状態・既読から分離する。acceptedはOSへの受付で、ユーザーが見た証明ではない。read/busy/配送報告では再送せず、タイトル/本文/レベル/消音が変わった時だけ同じIDのOS記録を置換する。表示先を外す、終了、無効化、発行元停止では自身のOS記録と起動callbackを回収する。撤去はOSへのbest effortで、別表示先へ無断配送しない。
+NotificationWindowsAdapterはactiveのwindows対象を1件ずつ投影する。startupReady後に受付を開始し、状態はpending/accepted/hidden/failedとして通知の寿命から分離する。acceptedはOSへの受付で、ユーザーが見た証明ではない。busy/配送報告では再送せず、タイトル/本文/レベル/消音が変わった時だけ同じIDのOS記録を置換する。表示先を外す、終了、無効化、発行元停止では自身のOS記録と起動callbackを回収する。撤去はOSへのbest effortで、別表示先へ無断配送しない。
 
-Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protocol末尾16桁。callback URIはランダムtoken、所有者/世代/現行操作を本体で再検査する。通常の種類指定通知のクリックは通知センターへ移動する。複数ボタンはセンターで操作する。旧showのcommandと起動時更新のお知らせは従来どおり直接操作を1回だけ実行する。停止/期限/内容置換後の古いURIは操作できず本体を開く。終了時はcallbackを破棄してOS履歴を残し、再起動で過去の操作を復元しない。
+Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protocol末尾16桁。callback URIはランダムtoken、所有者/世代/現行操作を本体で再検査する。通常の種類指定通知のクリックは通知センターへ移動する。複数ボタンはセンターで操作する。旧showのcommandと起動時更新のお知らせは、本体ウィンドウを表示してから個別操作を1回だけ実行する。個別操作がない通知、および停止/期限/内容置換後や前回起動時の古いURIは、本体を表示して通知センターを開く。古いURIから個別操作を復元しない。終了時はcallbackを破棄してOS履歴を残し、再起動で過去の操作を復元しない。
 
 管理者起動中のAppDockへ通常権限のWindows通知から戻る場合も、portableランチャーは必要最小限の同期権限で既存ホストへ合流する。起動途中の通知引数はstartupReadyまで保留し、準備後に既存の通知操作へ渡す。`scripts/notification-portable-test.cjs`は起動直後の更新完了通知のShell URI起動を含み、`scripts/portable-mutex-access-test.cjs`は専用のGate/Runtimeだけに制限ACLを設定して全権限拒否と実EXEの引き継ぎ・終了・実行領域保持/回収を確認する。試験のACLはfinallyで復元し、UACや実利用のACLは変更しない。
 
 旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出もhost/updates/available (Windows/manual、消音)へ統合し、更新適用成功host/updates/appliedの既定banner/6秒は維持する。
 
-Windowsの集中モード、表示有無、ポップアップ表示時間、manual時の常時表示はOSが管理する。基盤の時限はactive/センターでの操作期限であり、OSのcloseは基盤のresolveや既読にしない。OS表示を閉じても基盤activeならセンターで操作できる。この違いを通知設定に表示する。固定Electronの[Notification](https://www.electronjs.org/docs/latest/api/notification)と実WindowsのTag/Group・履歴・Shell URI起動を検証し、物理クリックと実メール受信は別の未確認事項として記録する。
+Windowsの集中モード、表示有無、ポップアップ表示時間、manual時の常時表示はOSが管理する。基盤の時限はactive/センターでの操作期限であり、OSのcloseは基盤のresolveにしない。OS表示を閉じても基盤activeならセンターで操作できる。この違いを通知設定に表示する。固定Electronの[Notification](https://www.electronjs.org/docs/latest/api/notification)と実WindowsのTag/Group・履歴・Shell URI起動を検証し、物理クリックと実メール受信は別の未確認事項として記録する。
 
 ## 通知音との併用
 

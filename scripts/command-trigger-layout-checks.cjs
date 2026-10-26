@@ -4,7 +4,7 @@ const { settleSettings } = require('./settings-immediate-helper.cjs');
 module.exports = async ({ host, command, row, checks, profile }) => {
   assert.deepEqual(await host.locator('.command-triggers-editor thead th').allTextContents(), [
     'コマンド',
-    'ジェスチャー',
+    'トリガー',
     'いつ・どこで',
   ]);
   const sample = row('shortcuts', 'same-id');
@@ -22,6 +22,16 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   assert.equal(
     await command('fixture.triggers.new').locator('.binding-add-options button').count(),
     3,
+  );
+  assert.deepEqual(
+    await command('fixture.triggers.new')
+      .locator('.binding-add-options button')
+      .evaluateAll((buttons) => buttons.map((button) => button.title)),
+    [
+      'キートリガーの割り当てを追加',
+      'マウストリガーの割り当てを追加',
+      'タッチパッドトリガーの割り当てを追加',
+    ],
   );
   const rail = await command('fixture.triggers.one').evaluate((element) => {
     const summary = element.querySelector('.binding-command-summary');
@@ -68,7 +78,7 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   assert.equal(icons.length, 4);
   assert(icons.every((icon) => icon.width >= 16 && icon.height >= 16 && !!icon.title));
   checks.push(
-    'command / gesture / condition columns with rightmost actions / three right-aligned vertical add buttons beside metadata / private-only lock / SVG kind icons with names and minimum size',
+    'command / trigger / condition columns with rightmost actions / three named trigger add buttons beside metadata / private-only lock / SVG kind icons with names and minimum size',
   );
   const condition = sample.locator('.binding-condition-edit');
   const alignment = await condition.evaluate((button) => {
@@ -245,10 +255,7 @@ module.exports = async ({ host, command, row, checks, profile }) => {
     .click();
   for (const scope of ['pages', 'app']) {
     await condition.click();
-    await host
-      .getByTestId('settings-dialog')
-      .getByLabel('割り当てのいつ・どこで', { exact: true })
-      .selectOption(scope);
+    await host.getByTestId('settings-dialog').getByTestId(`binding-scope:${scope}`).click();
     await host
       .getByTestId('settings-dialog')
       .getByRole('button', { name: '適用', exact: true })

@@ -200,6 +200,7 @@ const storage = (id, key) => {
     let d = await surface('desktop', executable ? 'appdock.default-shell' : customId),
       b = await surface('banner');
     await until(() => main(desktopWindow + '.isVisible()'), 'desktop native visibility');
+    assert.equal(await main(desktopWindow + '.isAlwaysOnTop()'), true);
     assert.equal(await main('electron.BrowserWindow.getFocusedWindow()?.id'), focused);
     const dm = (await d.evaluate(() => window.appdockNotifications.connect())).snapshot;
     const bm = (await b.evaluate(() => window.appdockNotifications.connect())).snapshot;

@@ -185,6 +185,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
     ],
+    ['excludedProcesses', hostText('settings.settings-catalog.gesturesExcluded')],
     [
       'commonOptions',
       hostText('settings.commandTriggerOptions.title'),
@@ -197,6 +198,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
       hostText('settings.settings-catalog.executionMode'),
       hostText('settings.settings-catalog.executionModeKeywords'),
     ],
+    ['excludedProcesses', hostText('settings.settings-catalog.gesturesExcluded')],
     [
       'enabled',
       hostText('settings.settings-catalog.touchpadEnabled'),
@@ -622,14 +624,26 @@ export function settingsPaths(
     case 'tray':
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
-      return [['keybindingOptions'], ['commandTriggerOptions']];
+      return [
+        ['keybindingOptions', 'executionMode'],
+        ['keybindingOptions', 'excludedProcesses'],
+        ['commandTriggerOptions'],
+      ];
     case 'command-triggers':
-      return [['keybindings'], ['gestures', 'bindings'], ['touchpadGestures', 'bindings']];
+      return [
+        ['keybindings'],
+        ['gestures', 'bindings'],
+        ['touchpadGestures', 'bindings'],
+        ['keybindingOptions', 'inputExecutionModes'],
+        ['gestures', 'inputExecutionModes'],
+        ['touchpadGestures', 'inputExecutionModes'],
+      ];
     case 'touchpad-gestures':
       return [
         ['touchpadGestures', 'enabled'],
         ['touchpadGestures', 'connections'],
         ['touchpadGestures', 'executionMode'],
+        ['touchpadGestures', 'excludedProcesses'],
         ['commandTriggerOptions'],
       ];
     case 'gestures':

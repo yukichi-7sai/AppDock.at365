@@ -284,7 +284,7 @@ Shell対象は[Shell基盤](shell-foundation.md)の7領域に限定する。ペ�
 
 登録時の`levels`と`defaultLevel`で通知のレベルを指定する。`info`は緑をポイントにライトで白背景・ダークで暗い背景、`warning`は黄系、`error`は赤系で、Default Shellのバナー・デスクトップと本体の通知センターに共通して適用される。発行元による色の個別指定は不要。複数レベルを宣言する場合は発行時の`level`で選択でき、省略時は`defaultLevel`になる。
 
-最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、種類別の通知先・表示時間を適用します。安全な汎用要約だけを履歴へ保存します。
+最低ホスト版は0.30.0。notifications capabilityと、manifestのnotificationTypesが必要です。旧ShowAsync/notifications.showは、notificationTypesを宣言していないAppletに限り本体生成の予約種類appdock.legacyへ接続します。種類を宣言したAppletはPublishAsync/notifications.publishを使います。従来の署名・null戻り値・silent・所有コマンドのクリック実行を維持し、種類別の通知先・表示時間を適用します。安全な汎用要約だけを起動中の履歴へ保持します。
 
 ```json
 {
@@ -306,7 +306,7 @@ Shell対象は[Shell基盤](shell-foundation.md)の7領域に限定する。ペ�
 }
 ```
 
-定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。通知全体のOFFは設けず、requiredTargets:['banner']はバナーの解除とセンターのみへの変更を拒否します。[通知先の必須指定](notifications.md#通知種類の制約)を参照してください。旧defaultEnabled/canDisable/disabledControlReasonを互換読込で無視し、新規宣言では省略します。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
+定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。通知全体のOFFは設けず、requiredTargets:['banner']はバナーの解除とセンターのみへの変更を拒否します。[通知先の必須指定](notifications.md#通知種類の制約)を参照してください。旧defaultEnabled/canDisable/disabledControlReasonを互換読込で無視し、新規宣言では省略します。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。persistentとsessionはいずれも起動中のメモリーだけに履歴を保持し、persistentは安全なhistoryTextを使う。noneは通知終了時に除去する。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
 
 | 操作 | Node context.notifications | .NET context.Notifications |
 | --- | --- | --- |
@@ -332,13 +332,13 @@ if (result.status === 'accepted') await context.notifications.end(result.notific
 
 発行入力はtypeId/title/bodyと任意のlevel/dedupeKey/historyText/actions/restartTimer/silentです。silentは0.42.0以降の任意booleanで、trueならWindows通知の音だけを抑制します。共通通知の読み上げ設定は変更しません。.NETはNotificationRequestのSilent initプロパティを使います。level省略は種類のdefaultLevel。表示先・寿命・有効状態の上書きは拒否します。persistentでは安全なhistoryTextが必須です。タイトル200文字、本文2,000文字、dedupeKey200文字、操作3件、操作key/label100文字まで。操作のcommandは実行中の自Appletが登録したコマンドに限定し、押下時にも所有者と起動世代を再検査します。
 
-結果はacceptedとnotificationId、またはsuppressedとreasonです。acceptedは登録完了で、表示成功/既読を保証しません。抑制理由はtype-disabled/applet-disabled/type-definition-changed/no-available-targets。不正入力・未知種類・上限/頻度超過はエラーです。endのstatusはresolved/withdrawnのみ、他Appletや古い世代の通知は終了できません。
+結果はacceptedとnotificationId、またはsuppressedとreasonです。acceptedは登録完了で、表示成功や利用者による確認を保証しません。抑制理由はtype-disabled/applet-disabled/type-definition-changed/no-available-targets。不正入力・未知種類・上限/頻度超過はエラーです。endのstatusはresolved/withdrawnのみ、他Appletや古い世代の通知は終了できません。
 
 同じ所有者/typeId/dedupeKeyのactiveを更新します。通常更新は既存の期限を維持し、restartTimer:trueだけが現在の設定で期限を再設定します。所有者50件の上限は全種類で共有、発行頻度はバースト20件/毎秒10件補充です。終了は頻度制限を受けません。方針変更通知は再取得の合図で、通知本文や履歴を含みません。通知方針の購読はNode/.NETともコマンドや他の通知と並行し得るため、再評価処理が必要ならAppletで排他を設けます。
 
 通知先はbanner/desktop/windowsの複数選択に対応します。Windowsへの配送を必要とするAppletはminimumHostVersion:0.32.0以上を指定してください。設定・履歴の保存と寿命は[通知基盤](notifications.md)を参照してください。
 
-本体targets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。Shell領域notification.desktopにはminimumHostVersion:0.31.1以上が必要です。予約済みwindowsにも配送します。Windows側の表示時間・集中モード等はOSが管理し、基盤の寿命や既読と区別します。
+本体targets:[]を通知センターのみとして解決します。発行APIに新しい表示先/寿命指定を渡す必要はありません。notificationTypesのdefaultTargets:[]を宣言するAppletはminimumHostVersion:0.31.0以上にしてください。allowedTargets:[]もセンター専用の種類として宣言できます。本体0.31.1はdesktopにも配送します。desktop配送を必要とするAppletはminimumHostVersion:0.31.1以上を指定してください。Shell領域notification.desktopにはminimumHostVersion:0.31.1以上が必要です。予約済みwindowsにも配送します。Windows側の表示時間・集中モード等はOSが管理し、基盤の寿命と区別します。
 
 ## Shellの採用状態と専用コマンド
 

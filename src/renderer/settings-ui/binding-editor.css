@@ -1,0 +1,157 @@
+.settings-modal.binding-editor-dialog {
+  width: min(960px, calc(100vw - 32px));
+}
+.binding-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.binding-editor-panel {
+  min-width: 0;
+}
+.binding-editor-panel + .binding-editor-panel {
+  border-left: 1px solid var(--border);
+  padding-left: 24px;
+}
+.binding-editor-panel > h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+.binding-editor-dialog .binding-editor-panel .settings-field {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px 0;
+}
+.binding-editor-dialog .binding-editor-panel .binding-inline-toggle {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.binding-editor-dialog .binding-editor-panel .settings-field-label .settings-title-with-hint {
+  min-height: 0;
+}
+.binding-editor-dialog .binding-condition-scope > .settings-field-label:has(p) {
+  order: 1;
+}
+.binding-condition-scope > .settings-field-label .settings-title-with-hint {
+  display: none;
+}
+.binding-condition-scope > .settings-field-label:not(:has(p)) {
+  display: none;
+}
+.binding-scope-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.binding-scope-picker button {
+  min-height: 44px;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.binding-scope-picker button[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.binding-editor-dialog .keybinding-picker {
+  width: auto;
+  min-width: 0;
+  margin-top: 12px;
+}
+.binding-editor-dialog .keybinding-picker label {
+  overflow-wrap: anywhere;
+}
+.binding-editor-dialog .gesture-family-picker,
+.binding-editor-dialog .gesture-choice-grid {
+  margin: 0;
+  gap: 6px;
+}
+.binding-editor-dialog .gesture-family-picker button {
+  padding: 8px 4px;
+  gap: 5px;
+}
+.binding-editor-dialog .gesture-choice-grid button {
+  min-height: 62px;
+  padding: 8px 4px;
+  gap: 6px;
+}
+.binding-editor-dialog .gesture-choice-grid button > span {
+  font-size: 24px;
+}
+.binding-editor-dialog .gesture-step-picker button {
+  min-height: 32px;
+  padding: 5px 8px;
+}
+.gesture-direction-sequence {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.gesture-direction-sequence .gesture-choice-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.binding-editor-dialog .touchpad-choice-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.binding-input-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  overflow-wrap: anywhere;
+}
+.binding-input-summary small {
+  color: var(--muted);
+}
+.binding-input-summary strong {
+  color: var(--accent);
+}
+.binding-editor-enabled {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.binding-editor-dialog > footer .toggle {
+  padding: 0;
+  min-height: 20px;
+  border-radius: 20px;
+}
+.binding-editor-dialog .settings-field-control textarea {
+  min-height: 72px;
+}
+@media (max-width: 800px) {
+  .binding-editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .binding-editor-panel + .binding-editor-panel {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+}
+@media (max-width: 420px) {
+  .settings-modal.binding-editor-dialog {
+    padding: 16px;
+  }
+  .gesture-direction-sequence {
+    gap: 8px;
+  }
+  .binding-editor-dialog .gesture-family-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

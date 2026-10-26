@@ -192,13 +192,30 @@ async function settingsPage() {
     .getByRole('button', { name: '通知', exact: true })
     .click();
   await p.getByRole('heading', { name: '通知', level: 1, exact: true }).waitFor();
-  for (const card of await p.locator('.notification-setting-card').all())
-    if (!(await card.evaluate((e) => e.open))) await card.locator(':scope > summary').click();
   const delivery = p
     .locator('details')
     .filter({ has: p.getByRole('heading', { name: '通知の受け取り方', exact: true }) });
   if (!(await delivery.evaluate((e) => e.open))) await delivery.locator(':scope > summary').click();
   return p;
+}
+async function edit(p, title) {
+  await p.getByRole('button', { name: new RegExp('の' + title + 'を編集$') }).click();
+  const dialog = p.getByRole('dialog', { name: title, exact: true });
+  await dialog.waitFor();
+  await until(
+    () => dialog.locator('[data-testid="settings-dialog-confirm"]').isEnabled(),
+    'dialog ready',
+  );
+  return dialog;
+}
+async function apply(p, dialog) {
+  await dialog.locator('[data-testid="settings-dialog-confirm"]').click();
+  await dialog.waitFor({ state: 'hidden' });
+  await save(p);
+}
+async function cancel(dialog) {
+  await dialog.locator('[data-testid="settings-dialog-cancel"]').click();
+  await dialog.waitFor({ state: 'hidden' });
 }
 async function save(p) {
   await settleSettings(p);
@@ -214,6 +231,7 @@ async function save(p) {
 }
 async function banner() {
   await host.evaluate(() => window.dock.navigate(null));
+  await require('./shell-overlay-helper.cjs').startupPage(host);
   const p = await until(
     () => pages().find((p) => p.url().endsWith('/shells/default/notifications.html')),
     'banner',
@@ -245,18 +263,20 @@ async function close() {
       await p.getByRole('switch', { name: '未保存の変更を通知', exact: true }).count(),
       0,
     );
-    await p.getByRole('heading', { name: 'Stopped notice', exact: true }).waitFor();
+    await p.getByText('Stopped notice', { exact: true }).waitFor();
     assert.equal(await p.getByRole('switch', { name: /noticeを通知$/ }).count(), 0);
     await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
-    await p.getByText('not.installed / retained', { exact: true }).waitFor();
+    await p.locator('strong').filter({ hasText: /^not\.installed \/ retained$/ }).waitFor();
+    let dialog = await edit(p, 'Node notice');
     assert.equal(
-      await p.getByLabel('Node noticeのデスクトップ通知', { exact: true }).isDisabled(),
+      await dialog.getByLabel('Node noticeのデスクトップ通知', { exact: true }).isDisabled(),
       false,
     );
     assert.equal(
-      await p.getByLabel('Node noticeのWindows通知', { exact: true }).isDisabled(),
+      await dialog.getByLabel('Node noticeのWindows通知', { exact: true }).isDisabled(),
       false,
     );
+    await cancel(dialog);
     checks.push(
       'static catalog includes host types without obsolete settings warning, stopped Applet and retained unknown types; desktop and Windows enabled',
     );
@@ -272,8 +292,9 @@ async function close() {
     const nativeId = storage(ids.native, 'result').notificationId;
     checks.push('real Node and .NET API publish accepted banners; owned command actions execute');
     p = await settingsPage();
-    await p.getByLabel('Node noticeの通知センターのみ', { exact: true }).check();
-    await save(p);
+    dialog = await edit(p, 'Node notice');
+    await dialog.getByLabel('Node noticeの通知センターのみ', { exact: true }).check();
+    await apply(p, dialog);
     await command(ids.node + '.publish');
     assert.equal(storage(ids.node, 'result').status, 'accepted');
     b = await banner();
@@ -289,9 +310,10 @@ async function close() {
       'center-only keeps notifications accepted without banners and preserves other owners',
     );
     p = await settingsPage();
-    await p.getByLabel('Node noticeのバナー', { exact: true }).check();
-    await p.getByLabel('Node noticeの表示時間', { exact: true }).fill('5');
-    await save(p);
+    dialog = await edit(p, 'Node notice');
+    await dialog.getByLabel('Node noticeのバナー', { exact: true }).check();
+    await dialog.getByLabel('Node noticeの表示時間', { exact: true }).fill('5');
+    await apply(p, dialog);
     b = await banner();
     await command(ids.node + '.publish');
     await b.getByRole('button', { name: 'Node action', exact: true }).waitFor();
@@ -300,8 +322,9 @@ async function close() {
       'timed expiry',
     );
     p = await settingsPage();
-    await p.getByLabel('Node noticeの表示時間', { exact: true }).fill('');
-    await save(p);
+    dialog = await edit(p, 'Node notice');
+    await dialog.getByLabel('Node noticeの表示時間', { exact: true }).fill('');
+    await apply(p, dialog);
     b = await banner();
     await command(ids.node + '.publish');
     await command(ids.node + '.policy');
@@ -345,16 +368,20 @@ async function close() {
       'undeclared type, caller lifetime/target bypass and foreign actions/end rejected; stopped generation cannot execute',
     );
     p = await settingsPage();
-    await p.getByLabel('Native noticeの表示時間', { exact: true }).fill('0');
-    await settleSettings(p);
-    await p.getByRole('alert').waitFor();
-    assert.equal(await p.getByLabel('Native noticeの表示時間', { exact: true }).inputValue(), '0');
+    dialog = await edit(p, 'Native notice');
+    await dialog.getByLabel('Native noticeの表示時間', { exact: true }).fill('0');
+    await dialog.locator('[data-testid="settings-dialog-confirm"]').click();
+    await dialog.getByRole('alert').waitFor();
+    assert.equal(
+      await dialog.getByLabel('Native noticeの表示時間', { exact: true }).inputValue(),
+      '0',
+    );
     assert.equal(
       saved().notificationPreferences.overrides.some((r) => r.ownerId === ids.native),
       false,
     );
-    await p.getByLabel('Native noticeの表示時間', { exact: true }).fill('');
-    await save(p);
+    await dialog.getByLabel('Native noticeの表示時間', { exact: true }).fill('');
+    await apply(p, dialog);
     assert.equal(
       await p.getByRole('switch', { name: 'Appletからの通知を許可', exact: true }).count(),
       0,
@@ -376,12 +403,10 @@ async function close() {
       'search anchor',
     );
     await p.getByLabel('設定を検索', { exact: true }).fill('');
-    const nodeCard = p
-      .locator('.notification-setting-card')
-      .filter({ has: p.getByRole('heading', { name: 'Node notice', exact: true }) });
     assert.equal(await p.getByRole('button', { name: '既定に戻す', exact: true }).count(), 0);
-    await nodeCard.getByLabel('Node noticeの表示時間', { exact: true }).fill('12');
-    await save(p);
+    dialog = await edit(p, 'Node notice');
+    await dialog.getByLabel('Node noticeの表示時間', { exact: true }).fill('12');
+    await apply(p, dialog);
     assert.equal(
       saved().notificationPreferences.overrides.find((r) => r.ownerId === ids.node).durationSeconds,
       12,
@@ -406,22 +431,35 @@ async function close() {
     await close();
     await launch();
     p = await settingsPage();
-    assert.equal(await p.getByLabel('Native noticeの表示時間', { exact: true }).inputValue(), '');
-    assert.equal(await p.getByLabel('Node noticeの表示時間', { exact: true }).inputValue(), '12');
-    await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
-    await p.getByText('not.installed / retained', { exact: true }).waitFor();
-    const historyFile = path.join(profile, 'data/notifications/history.json');
-    await until(
-      () =>
-        fs.existsSync(historyFile) &&
-        JSON.parse(fs.readFileSync(historyFile, 'utf8')).entries.some(
-          (i) => i.typeId === 'message' && i.status === 'interrupted',
-        ),
-      'typed safe history restart',
+    dialog = await edit(p, 'Native notice');
+    assert.equal(
+      await dialog.getByLabel('Native noticeの表示時間', { exact: true }).inputValue(),
+      '',
     );
-    assert.equal(fs.readFileSync(historyFile, 'utf8').includes('Node body'), false);
+    await cancel(dialog);
+    dialog = await edit(p, 'Node notice');
+    assert.equal(
+      await dialog.getByLabel('Node noticeの表示時間', { exact: true }).inputValue(),
+      '12',
+    );
+    await cancel(dialog);
+    await p.locator('summary').filter({ hasText: '現在利用できない種類' }).click();
+    await p.locator('strong').filter({ hasText: /^not\.installed \/ retained$/ }).waitFor();
+    const historyFile = path.join(profile, 'data/notifications/history.json');
+    assert.equal(fs.existsSync(historyFile), false);
+    await command('appdock.notifications.open');
+    await until(
+      async () => (await host.evaluate(() => window.dock.pages.get()))?.kind === 'notifications',
+      'center ready',
+    );
+    const center = await host.evaluate(() => window.dock.pages.get());
+    assert.equal(center.content.historyCount, 0);
+    assert.equal(
+      center.content.items.some((i) => i.typeId === 'message'),
+      false,
+    );
     checks.push(
-      'shared preferences and safe type history survive restart; old callbacks and inactive events do not replay',
+      'shared preferences survive restart while notification history is discarded; old callbacks and inactive events do not replay',
     );
     success = true;
   } catch (e) {

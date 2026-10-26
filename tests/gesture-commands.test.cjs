@@ -72,6 +72,44 @@ function fixture(t) {
     });
   return { settings, api, options, permissions, get, edit };
 }
+for (const kind of ['gestures', 'touchpadGestures'])
+  test(`${kind} trigger and binding exclusions save independently through API`, async (t) => {
+    const f = fixture(t);
+    const get = () => f.api.call(kind + '.get');
+    const operations = [
+      {
+        kind: 'configure',
+        changes: {
+          excludedProcesses: ['BASE.EXE'],
+          inputExecutionModes: { [kind === 'gestures' ? 'move-up' : 'three.tap']: 'first' },
+        },
+      },
+      {
+        kind: 'add',
+        binding: {
+          ...binding('excluded', 'sample.run', kind === 'gestures' ? 'move-up' : 'three.tap'),
+          when: { scope: 'global', appletIds: [], processes: [], excludedProcesses: ['ROW.exe'] },
+        },
+      },
+    ];
+    const edit = (dryRun) =>
+      f.api.call('commands.execute', {
+        id: 'appdock.' + kind + '.update',
+        args: { expectedRevision: get().revision, operations, dryRun },
+      });
+    const before = fs.readFileSync(f.settings.file, 'utf8');
+    await edit(true);
+    assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+    await edit(false);
+    assert.deepEqual(f.settings.value[kind].excludedProcesses, ['base']);
+    assert.deepEqual(f.settings.value[kind].inputExecutionModes, {
+      [kind === 'gestures' ? 'move-up' : 'three.tap']: 'first',
+    });
+    assert.deepEqual(get().bindings.find((row) => row.id === 'excluded').when.excludedProcesses, [
+      'row',
+    ]);
+  });
+
 test('gesture read is scoped and lists assignable commands while stopped', (t) => {
   const f = fixture(t),
     value = f.get();
