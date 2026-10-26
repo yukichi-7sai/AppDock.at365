@@ -6,7 +6,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import { RegisteredImages } from './registered-images';
 import type { SettingsStore } from './settings';
 import {
-  editImageLibrary,
   imageReference,
   imageKey,
   type ImageLibraryEdit,
@@ -17,6 +16,7 @@ import {
 import type { ExtensionManifest, SettingDefinition } from '../../shared/contracts';
 import { objectFieldValue } from '../../shared/object-list';
 import { imageDirectory } from './panel-images';
+import { ImageLibrarySettings } from './image-library-settings';
 
 import { decodeRegisteredImage } from './registered-image-decoder';
 export { decodeRegisteredImage } from './registered-image-decoder';
@@ -42,6 +42,7 @@ export function ownsImage(
   );
 }
 export class ImageLibraryHost {
+  readonly configuration: ImageLibrarySettings;
   private picking = false;
   private generated = new Map<string, Set<string>>();
   private pickerAlive?: () => boolean;
@@ -61,7 +62,9 @@ export class ImageLibraryHost {
       cover?(): Promise<() => void>;
       referenced?(ref: RegisteredImageRef): boolean;
     },
-  ) {}
+  ) {
+    this.configuration = new ImageLibrarySettings(options.settings, options.writable);
+  }
   async snapshot(): Promise<ImageLibrarySnapshot> {
     await this.images.refresh();
     return {
@@ -95,12 +98,7 @@ export class ImageLibraryHost {
     return this.images.add(await fs.readFile(source), path.basename(source));
   }
   async edit(operation: ImageLibraryEdit) {
-    this.options.writable();
-    const store = this.options.settings;
-    store.save(
-      { ...store.value, imageLibrary: editImageLibrary(store.value.imageLibrary, operation) },
-      store.revision,
-    );
+    this.configuration.edit(operation);
   }
   inUse(ref: RegisteredImageRef) {
     const contains = (value: unknown): boolean => {
