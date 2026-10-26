@@ -239,14 +239,20 @@ export class AppDockApi {
     const caller = appletId === undefined ? 'mcp' : 'applet';
     if (!definition || !(definition.callers as readonly string[]).includes(caller))
       throw new AutomationError('NOT_FOUND', hostText('services.appdockApi.unsupported'));
-    for (const permission of definition.permissions)
-      if (!permissions[permission])
-        throw new AutomationError(
-          permission === 'write' && method === 'settings.apply' ? 'WRITE_DISABLED' : 'API_DISABLED',
-          hostText('services.appdockApi.permission'),
-        );
-    if (!this.options.ready())
-      throw new AutomationError('NOT_READY', hostText('services.appdockApi.unavailable'));
+    const authorize = () => {
+      const currentPermissions = this.effectivePermissions(appletId, context);
+      for (const permission of definition.permissions)
+        if (!currentPermissions[permission])
+          throw new AutomationError(
+            permission === 'write' && method === 'settings.apply'
+              ? 'WRITE_DISABLED'
+              : 'API_DISABLED',
+            hostText('services.appdockApi.permission'),
+          );
+      if (!this.options.ready())
+        throw new AutomationError('NOT_READY', hostText('services.appdockApi.unavailable'));
+    };
+    authorize();
     if (!object(params))
       throw new AutomationError('INVALID_ARGUMENT', hostText('services.appdockApi.argumentObject'));
     if (Object.hasOwn(settingsOperations, method)) {
@@ -257,12 +263,24 @@ export class AppDockApi {
           'INVALID_ARGUMENT',
           hostText('services.appdockApi.argumentSchema'),
         );
-      try {
-        return this.settingsTargets.call(method as SettingsMethod, params);
-      } catch (error) {
+      const failed = (error: unknown): never => {
         if (error instanceof SettingsTargetError || error instanceof SettingsCommandError)
           throw new AutomationError(error.code, error.message);
         throw new AutomationError('INTERNAL_ERROR', hostText('services.settingsTargets.failed'));
+      };
+      try {
+        const result = this.settingsTargets.call(method as SettingsMethod, params, () => {
+          try {
+            authorize();
+          } catch (error) {
+            if (error instanceof AutomationError)
+              throw new SettingsTargetError(error.code, error.message);
+            throw error;
+          }
+        });
+        return result instanceof Promise ? result.catch(failed) : result;
+      } catch (error) {
+        return failed(error);
       }
     }
     if (method.startsWith('customCommands.')) {

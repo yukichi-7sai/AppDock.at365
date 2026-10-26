@@ -6,7 +6,8 @@ export interface SettingsFieldPlan {
   values: Record<string, unknown>;
   applies: Record<string, string>;
   overrides?: Record<string, unknown>;
-  commit(): void;
+  /** Async owners recheck preflight before persistence and roll back prepared effects if it fails. */
+  commit(preflight?: () => void): void | Promise<void>;
 }
 interface SettingsTargetBase {
   targetId: string;

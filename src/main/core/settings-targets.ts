@@ -36,6 +36,12 @@ const digest = (value: unknown) =>
     .update(JSON.stringify(canonical(value)))
     .digest('hex');
 const resultLimit = 256 * 1024;
+interface SettingsRequest {
+  fingerprint: string;
+  pending?: boolean;
+  value?: Record<string, unknown>;
+  error?: { code: string; message: string };
+}
 const operationSchemas = {
   set: {
     type: 'object',
@@ -66,15 +72,7 @@ const operationSchemas = {
 /** Fixed transport entry points discover live metadata from the same owners as legacy settings APIs. */
 export class SettingsTargets {
   private cursorSecret = randomBytes(32);
-  private requests = new Map<
-    string,
-    {
-      fingerprint: string;
-      value?: Record<string, unknown>;
-      error?: { code: string; message: string };
-      pending?: boolean;
-    }
-  >();
+  private requests = new Map<string, SettingsRequest>();
   private lastPrincipal = '';
   constructor(
     private options: {
@@ -261,7 +259,14 @@ export class SettingsTargets {
       applies: target.applies(field.key),
     };
   }
-  call(method: SettingsMethod, params: Record<string, unknown>) {
+  private trimRequests() {
+    while (this.requests.size > 512) {
+      const completed = [...this.requests].find(([, request]) => !request.pending);
+      if (!completed) break;
+      this.requests.delete(completed[0]);
+    }
+  }
+  call(method: SettingsMethod, params: Record<string, unknown>, authorize: () => void = () => {}) {
     try {
       boundedJson(params, 65536, 12, 4096);
     } catch {
@@ -461,6 +466,7 @@ export class SettingsTargets {
         else reset.push(key);
       }
     }
+    authorize();
     const principal = this.options.principal();
     if (principal !== this.lastPrincipal) {
       this.requests.clear();
@@ -475,7 +481,18 @@ export class SettingsTargets {
       if (known.error) throw new SettingsTargetError(known.error.code, known.error.message);
       return structuredClone(known.value!);
     }
-    this.requests.set(params.requestId, { fingerprint, pending: true });
+    const request: SettingsRequest = { fingerprint, pending: true };
+    this.requests.set(params.requestId, request);
+    const rejected = (error: unknown): never => {
+      const safe =
+        error instanceof SettingsTargetError
+          ? error
+          : new SettingsTargetError('INTERNAL_ERROR', hostText('services.settingsTargets.failed'));
+      // Mutate this request record only. A different principal may already own a new cache.
+      request.pending = false;
+      request.error = { code: safe.code, message: safe.message };
+      throw safe;
+    };
     try {
       if (params.expectedRevision !== this.revision(target))
         return this.fail('REVISION_CONFLICT', 'services.settingsCommands.refreshChanges');
@@ -483,7 +500,7 @@ export class SettingsTargets {
         changed: boolean;
         changes: unknown[];
         applies: Record<string, string>;
-        commit(): void;
+        commit(preflight?: () => void): void | Promise<void>;
       };
       if (target.kind === 'list')
         plan = planSettingsList(
@@ -522,38 +539,41 @@ export class SettingsTargets {
       };
       // Reject oversized results before the owner is allowed to persist anything.
       this.bounded({ ...value, revision: 'x'.repeat(256) });
-      const current = this.options
-        .targets()
-        .find((current) => current.targetId === target.targetId);
-      if (!current) return this.fail('NOT_FOUND', 'services.settingsTargets.notFound');
-      if (!current.available)
-        return this.fail('UNAVAILABLE', 'services.settingsTargets.unavailable');
-      if (this.schemaRevision(current) !== schemaRevision)
-        return this.fail('SCHEMA_CONFLICT', 'services.settingsTargets.schemaConflict');
+      const assertCurrent = () => {
+        authorize();
+        if (this.options.principal() !== principal)
+          this.fail('API_DISABLED', 'services.appdockApi.permission');
+        const current = this.options.targets().find((item) => item.targetId === target.targetId);
+        if (!current) this.fail('NOT_FOUND', 'services.settingsTargets.notFound');
+        if (!current.available) this.fail('UNAVAILABLE', 'services.settingsTargets.unavailable');
+        if (this.schemaRevision(current) !== schemaRevision)
+          this.fail('SCHEMA_CONFLICT', 'services.settingsTargets.schemaConflict');
+        if (params.expectedRevision !== this.revision(current))
+          this.fail('REVISION_CONFLICT', 'services.settingsCommands.refreshChanges');
+      };
+      const completed = () => {
+        authorize();
+        if (this.options.principal() !== principal)
+          this.fail('API_DISABLED', 'services.appdockApi.permission');
+        value.revision = this.revision(target);
+        request.value = structuredClone(value);
+        request.pending = false;
+        return value;
+      };
+      assertCurrent();
       if (params.dryRun !== true) {
-        if (params.expectedRevision !== this.revision(target))
-          return this.fail('REVISION_CONFLICT', 'services.settingsCommands.refreshChanges');
-        plan.commit();
+        const pending = plan.commit(assertCurrent);
+        if (pending)
+          return pending
+            .then(completed)
+            .catch(rejected)
+            .finally(() => this.trimRequests());
       }
-      value.revision = this.revision(target);
-      this.requests.set(params.requestId, { fingerprint, value: structuredClone(value) });
-      return value;
+      return completed();
     } catch (error) {
-      const safe =
-        error instanceof SettingsTargetError
-          ? error
-          : new SettingsTargetError('INTERNAL_ERROR', hostText('services.settingsTargets.failed'));
-      this.requests.set(params.requestId, {
-        fingerprint,
-        error: { code: safe.code, message: safe.message },
-      });
-      throw safe;
+      return rejected(error);
     } finally {
-      while (this.requests.size > 512) {
-        const completed = [...this.requests].find(([, request]) => !request.pending);
-        if (!completed) break;
-        this.requests.delete(completed[0]);
-      }
+      this.trimRequests();
     }
   }
 }
