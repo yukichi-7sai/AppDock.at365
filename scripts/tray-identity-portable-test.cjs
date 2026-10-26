@@ -9,12 +9,15 @@ const { buildPortable } = require('./build-portable.cjs');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', 'tray-identity-' + Date.now(), '日本語 profile');
 const executable = path.join(profile, 'AppDock.at365.exe');
-const originalExe = path.join(getPublishDirectory(root), 'AppDock.at365.exe');
+const originalExe = path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe');
 const updatedOutput = path.join(profile, 'update-build');
+const updatedVersion = require('../package.json').version.replace(/\d+$/, (value) =>
+  String(Number(value) + 1),
+);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 fs.mkdirSync(profile, { recursive: true });
-fs.copyFileSync(originalExe, executable);
+require('./copy-host.cjs').copyHost(originalExe, executable);
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
@@ -130,7 +133,7 @@ function registry(exe) {
   );
 }
 async function quit() {
-  const { pid, parent } = await evaluate('({pid:process.pid,parent:process.ppid})');
+  const pid = await evaluate('process.pid');
   await evaluate(`setTimeout(()=>electron.app.quit(),50);true`);
   socket.close();
   await until(() => {
@@ -141,17 +144,6 @@ async function quit() {
       return true;
     }
   }, 'host shutdown');
-  // A command restart creates a new launcher, distinct from the original child handle.
-  await until(() => {
-    try {
-      process.kill(parent, 0);
-      return false;
-    } catch {
-      return true;
-    }
-  }, 'current launcher shutdown');
-  if (child.exitCode === null && child.signalCode === null)
-    await until(() => child.exitCode !== null, 'launcher shutdown');
 }
 function assertIdentity(current, baseline) {
   assert.equal(current.exe, baseline.exe);
@@ -169,11 +161,17 @@ function assertIdentity(current, baseline) {
       await buildPortable({
         compression: 'store',
         directories: { output: updatedOutput },
-        extraMetadata: { version: '0.16.4-tray-update' },
+        extraMetadata: { version: updatedVersion },
       });
+    if (!startStopOnly)
+      execFileSync(
+        path.join(root, '.artifacts/updater/AppDock.Updater.exe'),
+        ['--pack', 'host', path.join(updatedOutput, 'win-unpacked'), updatedVersion, updatedOutput],
+        { windowsHide: true },
+      );
     const first = await launch();
     assert.match(first.guid, /^[a-f0-9-]{36}$/i);
-    assert.ok(path.basename(path.dirname(first.exe)).startsWith('AppDock.at365-'));
+    assert.equal(path.resolve(first.exe).toLowerCase(), path.resolve(executable).toLowerCase());
     await until(() => registry(first.exe).length === 1, 'Windows tray registration');
     fixtureIcon = registry(first.exe)[0];
     // Model "always show" only on the exact new icon created by this fixture.
@@ -183,7 +181,7 @@ function assertIdentity(current, baseline) {
     );
     checkpoints.push({ stage: 'first', ...first, iconKey: fixtureIcon.key });
     await quit();
-    await until(() => !fs.existsSync(path.dirname(first.exe)), 'last lease cleanup');
+    assert.ok(fs.existsSync(first.exe));
     if (startStopOnly) {
       fs.writeFileSync(
         path.join(profile, 'result.json'),
@@ -229,25 +227,21 @@ function assertIdentity(current, baseline) {
     assertIdentity(restarted, first);
     checkpoints.push({ stage: 'command restart', ...restarted });
     await quit();
-    await until(() => !fs.existsSync(path.dirname(first.exe)), 'restart cleanup');
-    fs.copyFileSync(path.join(updatedOutput, 'AppDock.at365.exe'), executable);
+    assert.ok(fs.existsSync(first.exe));
+    require('./copy-host.cjs').copyHost(path.join(updatedOutput, 'AppDock.at365.exe'), executable);
     const updated = await launch();
     assert.notEqual(updated.version, first.version);
     assertIdentity(updated, first);
     checkpoints.push({ stage: 'version update', ...updated });
-    // The host's duplicated kernel lease must survive loss of its own launcher.
+    // A killed host releases the single-instance lock without removing program files.
     child.kill();
-    await until(() => child.signalCode !== null || child.exitCode !== null, 'launcher termination');
-    const afterCrash = run(['--test-profile=' + profile]);
-    await until(() => afterCrash.exitCode !== null, 'join after launcher crash');
-    assert.equal(afterCrash.exitCode, 0);
-    assert.equal(await evaluate('process.pid'), updated.pid);
-    await quit();
+    await until(() => child.signalCode !== null || child.exitCode !== null, 'host termination');
+    socket.close();
     const recovered = await launch();
     assertIdentity(recovered, first);
-    checkpoints.push({ stage: 'launcher crash recovery', ...recovered });
+    checkpoints.push({ stage: 'host crash recovery', ...recovered });
     await quit();
-    await until(() => !fs.existsSync(path.dirname(first.exe)), 'final cleanup');
+    assert.ok(fs.existsSync(first.exe));
     const result = {
       ok: true,
       checkpoints,
@@ -257,8 +251,8 @@ function assertIdentity(current, baseline) {
         'Japanese/spaced profile',
         'simultaneous second launches preserve running files',
         'command restart',
-        'launcher crash lease and recovery',
-        'last runtime cleanup',
+        'host crash recovery',
+        'program files persist after shutdown',
       ],
     };
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));

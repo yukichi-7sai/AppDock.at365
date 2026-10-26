@@ -74,8 +74,8 @@ let artifactHash;
 (async () => {
   const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
   if (portable) {
-    const source = path.join(getPublishDirectory(root), 'AppDock.at365.exe');
-    fs.copyFileSync(source, executable);
+    const source = path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe');
+    require('./copy-host.cjs').copyHost(source, executable);
     artifactHash = hash(source);
     assert.equal(hash(executable), artifactHash);
   }

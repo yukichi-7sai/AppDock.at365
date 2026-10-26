@@ -63,9 +63,9 @@ async function launch(restore) {
   const args = [`--test-profile=${profile}`, ...(restore ? ['--restore-view'] : [])];
   if (!portable)
     return electron.launch({ executablePath: require('electron'), args: [root, ...args], env });
-  const source = path.join(getPublishDirectory(root), 'AppDock.at365.exe');
+  const source = path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe');
   const executable = path.join(profile, 'AppDock.at365.exe');
-  fs.copyFileSync(source, executable);
+  require('./copy-host.cjs').copyHost(source, executable);
   portableHash = hash(source);
   assert.equal(hash(executable), portableHash);
   const listener = net.createServer();

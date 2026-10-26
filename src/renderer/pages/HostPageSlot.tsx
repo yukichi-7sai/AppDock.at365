@@ -10,15 +10,20 @@ export function HostPageSlot({
   scope = { type: 'all' },
   source = '',
   navigationRequest,
+  onReady,
 }: {
   kind?: HostPageRequest['kind'];
   scope?: LogScope;
   source?: string;
   navigationRequest: number;
+  onReady?(): void;
 }) {
   const id = useRef(crypto.randomUUID());
   const [model, setModel] = useState<HostPageModel>();
   const [error, setError] = useState('');
+  useEffect(() => {
+    if (model) onReady?.();
+  }, [model?.id, onReady]);
   const current = useRef<HostPageModel | undefined>(undefined);
   const request: HostPageRequest =
     kind === 'logs'

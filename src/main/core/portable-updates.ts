@@ -1,6 +1,5 @@
 import { hostText } from '../../shared/i18n';
-import fs from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
+import { physicalFs } from './physical-fs';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
@@ -13,6 +12,8 @@ import type { UpdateResult, UpdateState, UpdateSettings } from '../../shared/con
 import type { AppletPackagePlan } from '../../shared/applet-packages';
 
 const execute = promisify(execFile);
+const fs = physicalFs.promises;
+const { createReadStream } = physicalFs;
 const limit = 512 * 1024 * 1024;
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export interface UpdateTarget {
@@ -39,6 +40,16 @@ interface Candidate {
   version: string;
 }
 const json = (bytes: Buffer) => JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/, ''));
+class UpdateHttpError extends Error {
+  constructor(readonly status: number) {
+    super(hostText('services.portableUpdates.httpError', { status: String(status) }));
+  }
+}
+class UnpublishedRelease extends Error {
+  constructor() {
+    super(hostText('services.portableUpdates.releaseUnpublished'));
+  }
+}
 export function safeRelative(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -78,10 +89,7 @@ async function readBounded(
     stream = createReadStream(location, { signal: combined });
   } else {
     const response = await fetcher(location, { signal: combined, redirect: 'follow' });
-    if (!response.ok)
-      throw Error(
-        hostText('services.portableUpdates.httpError', { status: String(response.status) }),
-      );
+    if (!response.ok) throw new UpdateHttpError(response.status);
     if (new URL(response.url || location).protocol !== new URL(location).protocol)
       throw Error(hostText('services.portableUpdates.protocolChanged'));
     if (!response.body) throw Error(hostText('services.portableUpdates.emptyPayload'));
@@ -112,7 +120,7 @@ function validateFeed(value: any, target: Pick<UpdateTarget, 'id' | 'kind'>): Fe
     !Number.isSafeInteger(p.size) ||
     p.size <= 0 ||
     p.size > limit ||
-    p.format !== (target.kind === 'host' ? 'exe' : 'zip')
+    !(target.kind === 'host' ? ['exe', 'zip'] : ['zip']).includes(p.format)
   )
     throw Error(hostText('services.portableUpdates.invalidPayload'));
   return value;
@@ -133,14 +141,20 @@ async function resolveFeedSource(
     );
   if (github) {
     const endpoint = github[2] ? `tags/${encodeURIComponent(github[2])}` : 'latest';
-    const release = json(
-      await readBounded(
+    let metadata: Buffer;
+    try {
+      metadata = await readBounded(
         `https://api.github.com/repos/${github[1]}/releases/${endpoint}`,
         1024 * 1024,
         fetcher,
         signal,
-      ),
-    );
+      );
+    } catch (error) {
+      if (error instanceof UpdateHttpError && error.status === 404 && !github[2])
+        throw new UnpublishedRelease();
+      throw error;
+    }
+    const release = json(metadata);
     if (release.draft || release.prerelease)
       throw Error(hostText('services.portableUpdates.stableReleaseRequired'));
     assets = release.assets;
@@ -388,7 +402,12 @@ export class PortableUpdates {
       return {
         result: {
           ...base,
-          status: /先に本体/.test(String(error)) ? 'incompatible' : 'error',
+          status:
+            error instanceof UnpublishedRelease
+              ? 'unpublished'
+              : /先に本体/.test(String(error))
+                ? 'incompatible'
+                : 'error',
           message: String(error).replace(/^Error: /, ''),
         },
       };
@@ -567,6 +586,8 @@ export class PortableUpdates {
         source: string;
         destination: string;
         sha256?: string;
+        operation?: string;
+        previousSha256?: string;
       }[] = [];
       for (const [index, candidate] of candidates.entries()) {
         signal.throwIfAborted();
@@ -608,15 +629,20 @@ export class PortableUpdates {
                 name: String(candidate.target.name),
               }),
             );
-          if (candidate.target.kind === 'host') await fs.writeFile(staged, data, { flag: 'wx' });
+          if (candidate.feed!.payload.format === 'exe')
+            await fs.writeFile(staged, data, { flag: 'wx' });
           else {
             const archive = `${staged}.zip`;
             await fs.writeFile(archive, data, { flag: 'wx' });
-            await execute(helper, ['--extract', archive, staged], {
-              windowsHide: true,
-              timeout: 120000,
-              signal,
-            });
+            await execute(
+              helper,
+              [candidate.target.kind === 'host' ? '--extract-host' : '--extract', archive, staged],
+              {
+                windowsHide: true,
+                timeout: 120000,
+                signal,
+              },
+            );
           }
         }
         if (candidate.target.kind === 'applet') {
@@ -641,6 +667,19 @@ export class PortableUpdates {
             throw Error(hostText('services.portableUpdates.requiredHostVersion'));
           await fs.access(path.join(staged, m.entry));
           readManifest(staged);
+        } else if (candidate.feed!.payload.format === 'zip') {
+          const plan = await execute(
+            helper,
+            ['--plan-host', staged, this.options.baseDirectory, candidate.version],
+            {
+              windowsHide: true,
+              timeout: 120000,
+              maxBuffer: 1024 * 1024,
+              signal,
+            },
+          );
+          items.push(...JSON.parse(plan.stdout));
+          continue;
         } else {
           const header = await fs.readFile(staged);
           if (header[0] !== 0x4d || header[1] !== 0x5a)
@@ -675,16 +714,20 @@ export class PortableUpdates {
       this.state.phase = hostText('services.portableUpdates.preparingRestart');
       this.options.changed();
       const jobItems = await Promise.all(
-        items.map(async (item) => ({
-          ...item,
-          operation: 'update',
-          previousSha256:
-            item.kind === 'host'
-              ? createHash('sha256')
-                  .update(await fs.readFile(item.destination))
-                  .digest('hex')
-              : await treeHash(item.destination),
-        })),
+        items.map(async (item) =>
+          item.operation
+            ? item
+            : {
+                ...item,
+                operation: 'update',
+                previousSha256:
+                  item.kind === 'host'
+                    ? createHash('sha256')
+                        .update(await fs.readFile(item.destination))
+                        .digest('hex')
+                    : await treeHash(item.destination),
+              },
+        ),
       );
       await this.handoff(temporary, jobItems);
       handedOff = true;

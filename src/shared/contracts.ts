@@ -219,6 +219,7 @@ export interface ExtensionSnapshot extends ExtensionManifest {
   folder: string;
   state: 'stopped' | 'waiting' | 'starting' | 'running' | 'stopping' | 'error';
   scheduledStartAt?: number;
+  startupTiming?: { durationMs: number; outcome: 'success' | 'error' };
   error: string | null;
   enabled: boolean;
   commands: AppletCommand[];
@@ -246,6 +247,7 @@ export interface HostSnapshot {
   webAccounts: import('./web-content').WebProfile[];
   webPages: Record<string, import('./web-content').WebPageState>;
   startupReady: boolean;
+  uiReady: boolean;
   windowVisible: boolean;
   updates: UpdateState;
   globalHotKeys: GlobalHotKeyStatus[];
@@ -328,6 +330,7 @@ export interface DockApi {
   onHostCommand(callback: (id: string) => void): () => void;
   onPaletteExecuted(callback: () => void): () => void;
   snapshot(): Promise<HostSnapshot>;
+  hostUiRendered(): Promise<void>;
   saveSettings(value: Settings, revision: number): Promise<SettingsSnapshot>;
   setPinnedCommands(ids: string[]): Promise<SettingsSnapshot>;
   openCommandPalette(

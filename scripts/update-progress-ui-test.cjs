@@ -102,6 +102,7 @@ const main = (fn) =>
   writeHostFeed('999.0.0');
   settings.updates.hostSource = hostFeed;
   settings.updates.checkHostOnStartup = false;
+  settings.updates.checkHostOnAboutOpen = false;
   settings.updates.checkAppletsOnStartup = false;
   settings.extensions.fixture = {
     enabled: false,
@@ -125,7 +126,7 @@ const main = (fn) =>
   try {
     if (process.argv[2]) {
       const executable = path.join(profile, 'AppDock.at365.exe');
-      fs.copyFileSync(path.resolve(process.argv[2]), executable);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
       const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
       executableSha256 = hash(executable);
       assert.equal(executableSha256, hash(path.resolve(process.argv[2])));
@@ -134,7 +135,7 @@ const main = (fn) =>
       child = spawn(
         executable,
         [`--test-profile=${profile}`, `--remote-debugging-port=${port}`, `--inspect=${mainPort}`],
-        { cwd: profile, env, windowsHide: true, stdio: 'ignore' },
+        { cwd: profile, env, windowsHide: false, stdio: 'ignore' },
       );
       browser = await until(
         () => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 }),
@@ -165,24 +166,11 @@ const main = (fn) =>
       .locator('.settings-categories')
       .getByRole('button', { name: 'AppDockについて', exact: true })
       .click();
-    const update = page
-      .getByRole('article', { name: '更新進捗テスト', exact: true })
-      .getByRole('button', { name: 'このAppletを更新', exact: true });
     const settingsPage = await require('./settings-host-helper.cjs').settingsPage(page);
-    const appletSection = settingsPage.locator('details.settings-section').filter({
-      has: settingsPage.getByRole('heading', { name: 'インストール済みのApplet', exact: true }),
-    });
-    assert.equal(await appletSection.getAttribute('open'), null);
-    assert.equal(await update.isVisible(), false);
-    await appletSection.locator('summary').first().click();
-    const hostVersions = settingsPage.locator('.about-installed-version');
+    const hostVersions = settingsPage.getByTestId('about-version');
     assert.equal(await hostVersions.locator('.version-available').count(), 0);
     await page.evaluate(() => window.dock.checkAllUpdates());
     await hostVersions.getByLabel('更新後のバージョン 999.0.0', { exact: true }).waitFor();
-    await settingsPage
-      .locator('.about-applets')
-      .getByLabel('更新後のバージョン 2.0.0', { exact: true })
-      .waitFor();
     const current = await hostVersions.locator('.version-current').boundingBox();
     const next = await hostVersions.locator('.version-available').boundingBox();
     assert.ok(next.x > current.x + current.width);
@@ -190,20 +178,8 @@ const main = (fn) =>
     const hostColor = await hostVersions
       .locator('.version-current')
       .evaluate((e) => getComputedStyle(e).backgroundColor);
-    const appletColor = await settingsPage
-      .getByRole('article', { name: '更新進捗テスト', exact: true })
-      .locator('.version-current')
-      .evaluate((e) => getComputedStyle(e).backgroundColor);
-    assert.equal(hostColor, appletColor);
     assert.notEqual(hostColor, 'rgba(0, 0, 0, 0)');
     assert.equal(await settingsPage.locator('.update-result-details').count(), 0);
-    assert.equal(
-      await settingsPage
-        .locator('.update-result-inline')
-        .first()
-        .evaluate((e) => getComputedStyle(e).position),
-      'static',
-    );
     writeHostFeed(hostVersion);
     await page.evaluate(() => window.dock.checkUpdates());
     await hostVersions.locator('.version-available').waitFor({ state: 'detached' });
@@ -216,12 +192,21 @@ const main = (fn) =>
     await hostVersions.getByLabel('更新後のバージョン 999.0.0', { exact: true }).waitFor();
     assert.equal(
       await settingsPage.getByRole('button', { name: '更新を確認', exact: true }).count(),
-      0,
+      1,
     );
     assert.equal(
       await settingsPage.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
       0,
     );
+    await page.getByRole('button', { name: 'Appletの管理と更新', exact: true }).click();
+    const row = page.locator('[data-applet-id="fixture"]');
+    const update = row.getByRole('button', { name: '更新', exact: true });
+    await row.getByLabel('更新後のバージョン 2.0.0', { exact: true }).waitFor();
+    const appletColor = await row
+      .locator('.version-current')
+      .evaluate((e) => getComputedStyle(e).backgroundColor);
+    assert.equal(hostColor, appletColor);
+    assert.equal(await update.isEnabled(), true);
     for (const theme of ['dark', 'light']) {
       await page.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -314,10 +299,10 @@ const main = (fn) =>
         'dark/light screenshots',
         'cancel aborts transfer without replacing installed Applet',
         'retry and final confirmation cancellation',
-        'update-only controls on the settings page',
+        'host update controls and separate Applet management',
         'host and Applet current/new versions align inline with matching colored badges',
-        'current/error checks remove the new-version badge; result text is inline, not a popup',
-        'installed Applets start collapsed and remain operable after expanding',
+        'current/error checks remove the new-version badge without a details popup',
+        'Applet updates remain operable in the management row',
         'real download progress and cancellation survive statusbar provider replacement in both themes',
       ],
     };

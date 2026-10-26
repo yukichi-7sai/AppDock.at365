@@ -70,7 +70,7 @@ async function closeDialog(page) {
     if (process.argv[2]) {
       const source = path.resolve(process.argv[2]),
         executable = path.join(profile, 'AppDock.at365.exe');
-      fs.copyFileSync(source, executable);
+      require('./copy-host.cjs').copyHost(source, executable);
       const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
       executableSha256 = hash(source);
       assert.equal(hash(executable), executableSha256);

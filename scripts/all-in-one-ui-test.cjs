@@ -36,7 +36,7 @@ assert.equal(
     .update(fs.readFileSync(path.join(profile, 'AppDock.at365.exe')))
     .digest('hex'),
   createHash('sha256')
-    .update(fs.readFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe')))
+    .update(fs.readFileSync(path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe')))
     .digest('hex'),
 );
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

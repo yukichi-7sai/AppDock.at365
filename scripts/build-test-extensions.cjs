@@ -36,16 +36,16 @@ for (const name of ['AppDock.ShellProbe', 'AppDock.ShellProbe.Native', 'AppDock.
 for (const name of ['welcome', 'dotnet-demo']) {
   const folder = path.join(root, '.artifacts/test-extensions', name);
   fs.mkdirSync(folder, { recursive: true });
-  fs.copyFileSync(
+  require('./copy-host.cjs').copyHost(
     path.join(root, 'tests/fixtures/extensions', name, 'extension.json'),
     path.join(folder, 'extension.json'),
   );
 }
-fs.copyFileSync(
+require('./copy-host.cjs').copyHost(
   path.join(root, '.artifacts/node-extensions/tests/fixtures/extensions/welcome/index.js'),
   path.join(root, '.artifacts/test-extensions/welcome/index.js'),
 );
-fs.copyFileSync(
+require('./copy-host.cjs').copyHost(
   path.join(
     root,
     'tests/fixtures/dotnet/AppDock.Extensions.Demo/bin/Release/net10.0/AppDock.Extensions.Demo.dll',

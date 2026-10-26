@@ -56,10 +56,13 @@ test(
     );
     fs.copyFileSync(path.join(root, 'scripts/publish-paths.ps1'), path.join(host, 'scripts/publish-paths.ps1'));
     fs.writeFileSync(path.join(host, 'package.json'), JSON.stringify({ version: '1.0.0' }));
-    const exe = path.join(getPublishDirectory(host), 'AppDock.at365.exe');
+    const hostFolder = path.join(getPublishDirectory(host), 'win-unpacked');
+    fs.mkdirSync(path.join(hostFolder, 'resources'), { recursive: true });
+    fs.writeFileSync(path.join(hostFolder, 'resources/app.asar'), 'fixture');
+    const exe = path.join(hostFolder, 'AppDock.at365.exe');
     fs.writeFileSync(exe, 'MZ-host-fixture');
     assert.equal(
-      run(helper, ['--pack', 'host', exe, '1.0.0', path.join(getPublishDirectory(host))]).status,
+      run(helper, ['--pack', 'host', hostFolder, '1.0.0', path.join(getPublishDirectory(host))]).status,
       0,
     );
     const manifest = {

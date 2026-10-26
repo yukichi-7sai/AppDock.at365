@@ -17,7 +17,7 @@ async function main() {
       },
     },
   });
-  fs.copyFileSync(
+  require('./copy-host.cjs').copyHost(
     path.join(root, 'ui/image-gallery/gallery.css'),
     path.join(output, 'gallery.css'),
   );

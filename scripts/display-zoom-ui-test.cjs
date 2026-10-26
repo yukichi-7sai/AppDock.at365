@@ -16,7 +16,7 @@ const source = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (source) {
-  fs.copyFileSync(source, exe);
+  require('./copy-host.cjs').copyHost(source, exe);
   assert.equal(hash(exe), hash(source));
 }
 const env = { ...process.env };

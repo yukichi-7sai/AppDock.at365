@@ -77,7 +77,7 @@ function profile(name) {
     JSON.stringify({ version: 1, selected: account.id, accounts: [account] }),
   );
   if (portable) {
-    fs.copyFileSync(portable, path.join(base, 'AppDock.at365.exe'));
+    require('./copy-host.cjs').copyHost(portable, path.join(base, 'AppDock.at365.exe'));
     assert.equal(hash(portable), hash(path.join(base, 'AppDock.at365.exe')));
   }
   return { base, local, localAppData, account, accountFile };
@@ -132,7 +132,7 @@ async function stop(s) {
 }
 function deliverFile(from, to) {
   fs.mkdirSync(path.dirname(to), { recursive: true });
-  fs.copyFileSync(from, to + '.incoming');
+  require('./copy-host.cjs').copyHost(from, to + '.incoming');
   fs.renameSync(to + '.incoming', to);
 }
 function deliverShared(a, b) {
@@ -279,7 +279,7 @@ async function gmail(s) {
   checks.push('registered filenames are listed live and selected independently per Gmail account');
   const imageFile = path.join(pa.base, 'data/assets/images/fixture.png');
   fs.mkdirSync(path.dirname(imageFile), { recursive: true });
-  fs.copyFileSync(path.join(root, 'assets/icon.png'), imageFile);
+  require('./copy-host.cjs').copyHost(path.join(root, 'assets/icon.png'), imageFile);
   await update(a, (v) => {
     v.extensions['fixture.profile'].settings.avatar = { file: 'fixture.png' };
     v.imageLibrary = {

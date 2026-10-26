@@ -44,7 +44,7 @@ Windowsが判定する3本指・4本指の10種類を専用キーで接続する
 
 ## 開発環境・ビルド・テスト
 
-スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行した単一EXEの専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。
+スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行したフォルダー型本体の専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。
 
 Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。
 
@@ -77,7 +77,7 @@ Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして�
 .\dev.bat run test:window-state
 .\dev.bat run smoke
 .\dev.bat run dist
-.\dev.bat exec node scripts/smoke.cjs A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe
+.\dev.bat exec node scripts/smoke.cjs A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe
 ```
 
 Node.jsを含む通常のパッケージ更新は、下記の`.\update-packages.bat`を使います。pnpmの更新や固定版への切り戻しは、`toolchain.json`の完全なバージョン番号を変更してから`.\setup-tools.bat`を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは`.tools/node/<version>`と`.tools/pnpm/<version>`に残します。winget等の更新対象にはなりません。更新後は`.\dev.bat run typecheck`、影響範囲の回帰、`.\publish.bat`で確認してください。
@@ -118,11 +118,11 @@ pnpm本体はnpmで導入するため、workspace設定だけでは保護され�
 
 `.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
 
-`pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 portable EXE作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `.artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
+`pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 フォルダー型本体作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `.artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 
 `build`は`scripts/build-main.cjs`で生成済みの`out/main`を整理してからTypeScriptをコンパイルします。削除したモジュールが次の配布物に残ることを防ぎます。React/Viteも`out/renderer`を再生成します。設定の読み込み・保存は定義済みのトップレベル項目のみを返し、Applet固有の`extensions.<id>.settings`は保持します。
 
-portable発行は`scripts/build-portable.cjs`を経由します。electron-builderのportableテンプレートを適用するため、ビルドプロセス内だけでNsisTarget.computeFinalScriptへ`scripts/portable.nsi`を渡し、終了時に復元します。node_modulesは編集しません。ビルダーの固定版と元テンプレートのライフサイクルを検証し、依存更新時は明示的に見直します。直接electron-builder CLIを使うとこのランチャーを含まないため、発行にはpublish.batまたはdev.bat run distを使ってください。APIからビルドする試験もdev.batのローカルNode/pnpm環境を使います。
+本体は展開済みフォルダーを使用し、起動時に自己展開しません。配布・保存先・更新・検証の正本は[フォルダー型ポータブル配布](docs/portable-distribution.md)を参照してください。
 
 ランチャーはWindows TEMP・外側EXEの正規化パス・test-profileを小文字化してSHA256を取り、`TEMP/AppDock.at365-<hash>`へ展開します。版番号は含めません。起動/展開/最終削除をGlobalの名前付きmutexで直列化し、別の名前付きカーネルオブジェクトの生存を実行領域のleaseとして使用します。leaseは子のElectron本体へDuplicateHandleで渡すため、ランチャーだけの強制終了後も本体を保護します。二重起動は使用中の資産をそのまま使用し、全leaseがなくなった時だけ生成領域を削除します。設定や認証領域は削除対象外です。
 
@@ -167,7 +167,7 @@ scripts/                   ビルドと実機UI/portable検証
 
 ## 配置
 
-共通ログAPIは[Applet API](docs/extensions.md#sdkで使えるサービス)を参照してください。停止処理中のhost.logだけを許可し、クリーンアップエラーをホストファイルへ保存します。tests/logging.test.cjsで開始/稼働/停止中のログ・停止後拒否・他API拒否を確認します。WallpaperSlideshowのscripts/test-host-logging-ui.cjsは発行した単一EXEとnative fixtureで全体/個別ログ画面・終了時ログを確認します。
+共通ログAPIは[Applet API](docs/extensions.md#sdkで使えるサービス)を参照してください。停止処理中のhost.logだけを許可し、クリーンアップエラーをホストファイルへ保存します。tests/logging.test.cjsで開始/稼働/停止中のログ・停止後拒否・他API拒否を確認します。WallpaperSlideshowのscripts/test-host-logging-ui.cjsは発行したフォルダー型本体とnative fixtureで全体/個別ログ画面・終了時ログを確認します。
 
 `deploy.bat` はPowerShell 7（`pwsh.exe`）を使用します。
 
@@ -175,9 +175,9 @@ scripts/                   ビルドと実機UI/portable検証
 
 ### Windows通知の起動先
 
-`src/main/core/notifications.ts`でAppletと更新通知を共用します。Windowsは`toastXml`のprotocol activationを使い、元のportable EXEパス・保存先・packaged状態のSHA256から配置専用URI schemeを生成します。最初の通知時にだけ`app.setAsDefaultProtocolClient`で元の単一EXEを登録し、開発起動にはrepoパス、隔離試験には`--test-profile`を付けます。Electron 44.6.0が共有の製品名ショートカットからCLSIDを読み、LocalServer32を現在の実行EXEへ書き換える自動登録にクリック先を依存させません。
+`src/main/core/notifications.ts`でAppletと更新通知を共用します。Windowsは`toastXml`のprotocol activationを使い、元のフォルダー型本体パス・保存先・packaged状態のSHA256から配置専用URI schemeを生成します。最初の通知時にだけ`app.setAsDefaultProtocolClient`で元のフォルダー型本体を登録し、開発起動にはrepoパス、隔離試験には`--test-profile`を付けます。Electron 44.6.0が共有の製品名ショートカットからCLSIDを読み、LocalServer32を現在の実行EXEへ書き換える自動登録にクリック先を依存させません。
 
-クリックは`second-instance`または初回起動の引数から処理します。URIは配置専用schemeとUUIDトークンだけを受け付け、外部URIから任意コマンドを実行しません。実行中のコールバックは一度だけ消費し、Appletの同じ子プロセスが稼働中であることを再確認します。終了後/古いトークンは本体を開くだけです。履歴用コールバックは最大512件保持します。既存の`at365.appdock`通知設定と単一EXE配布を維持します。
+クリックは`second-instance`または初回起動の引数から処理します。URIは配置専用schemeとUUIDトークンだけを受け付け、外部URIから任意コマンドを実行しません。実行中のコールバックは一度だけ消費し、Appletの同じ子プロセスが稼働中であることを再確認します。終了後/古いトークンは本体を開くだけです。履歴用コールバックは最大512件保持します。既存の`at365.appdock`通知設定とフォルダー型本体配布を維持します。
 
 `dev.bat exec node scripts/notification-portable-test.cjs`は2つの隔離portableで合成通知を表示し、Windows通知履歴のXMLとURI登録を確認して、Windows Shell経由で同じURIを起動します。稼働中/終了後/停止Applet/同じURIの再実行を検証し、試験URIと合成通知を削除、Electronが触る既存のショートカット/COM登録を復元します。物理的な通知クリックと実Gmail受信は別途確認が必要です。
 

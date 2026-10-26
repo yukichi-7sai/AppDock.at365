@@ -94,7 +94,7 @@ const until = async (fn, label) => {
 let portable;
 if (process.argv[2]) {
   portable = path.join(profile, 'AppDock.at365.exe');
-  fs.copyFileSync(path.resolve(process.argv[2]), portable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
 }
 async function launch(extra = []) {

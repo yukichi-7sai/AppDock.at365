@@ -13,7 +13,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 
 - [実装・コミット・リリースの共通手順](docs/development-workflow.md)に従う。実装時は変更に必要な検証・発行前のレビュー1回と必要な修正・再検証・対象モジュールの版更新・各40.ARTIFACT配下への発行まで。破壊的変更、設定項目の追加・削除、保存ファイルの追加・削除はマイナーを1つ増やしてパッチを0にする。通常の実装・修正は発行のたびにパッチを1つ増やし、同じ機能の未コミット・未公開変更への追加修正にも適用する。判定と新たな実装・修正を伴わない再発行の扱いは共通手順に従う。文書のみの変更は製品の版更新・発行を行わない。
 - コミット依頼時は実装時の成功結果を試験ごとに照合して原則再利用する。未実行・失敗・後続変更の影響がある試験、記録不足の試験だけを実行し、必要回帰の成功が揃ってからコミットする。製品修正時はpublishも更新する。push・公開・実利用先deployは各依頼の範囲に従う。
-- 通常publishは本体単一EXEとupdate.json、変更Appletは自身のupdate.zip/update.jsonを生成する。未変更Appletの再発行・全体ZIP作成・旧ZIP整理を通常publishへ含めない。終了コード、版、成果物、固定EXEの隔離起動を確認する。
+- 通常publishは本体の実行用フォルダーとupdate.zip/update.json、変更Appletは自身のupdate.zip/update.jsonを生成する。ビルダーは.artifactsの作業先だけを使い、発行先の利用者データを削除しない。未変更Appletの再発行・全体ZIP作成・旧ZIP整理を通常publishへ含めない。終了コード、版、成果物、固定EXEの隔離起動を確認する。
 - Release依頼では[リリース手順](docs/RELEASING.md)を読み、本体と同梱Appletの未公開版を確認する。公開済み同版は上書き・再作成しない。公開後検証に成功した対象repoごとに最新3件の公開Releaseを保持し、draft・Gitタグ・履歴・無関係repoを保持する。全体ZIPの準備と整理は[オールインワン](docs/all-in-one.md)に従う。
 - deploy先への旧EXEの別フォルダー退避は追加しない。配置hashと利用者データ保持は確認する。この扱いを自己更新helperの復旧用backupへ流用しない。
 - 開発生成物はrepo直下の.artifacts。完了時の整理は[テストフォルダー整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)に従い、終了・成功を確認した種類ごとの直近3回を残す。実行中・状態不明・失敗未解決・固定出力・再利用資料を削除しない。同期・バックアップ・スナップショットの設定は利用者が管理する。
@@ -23,7 +23,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 - Node/pnpmはtoolchain.jsonに従うプロジェクト内の.toolsをdev.bat経由で使用する。グローバル導入はしない。パッケージ更新はupdate-packages.batを使い、Electronは最新安定版・Node.jsは最新LTSを毎回選び完全版で固定する。この2つは7日待機の恒久免除、ほかの依存・pnpmは7日待機と版指定例外を維持する。[依存方針](DEVELOPMENT.md#依存とツールの公開後待機)に従い、pnpmのshim生成とElectron取得を含め、更新時は初回setupと再実行も確認する。
 - node_modulesをjunction共有したworktreeで依存をインストールしない。依存更新用checkoutは独立node_modulesを使い、整理前後は元checkoutへの参照と動作を確認する。
 - GUI試験は直列・隔離profileで行う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。
-- 単一EXEのportable展開mutex・lease・子プロセス寿命・hProc形式のHANDLE変換・安定したTray識別を維持する。electron-builder更新時は独自templateの連携と実EXEの更新・再起動・同時起動・異常終了を確認する。設定・data・認証と展開物の寿命を混ぜない。
+- フォルダー型ポータブルの配布・更新・保存先は[配布仕様](docs/portable-distribution.md)に従う。直接起動、再起動、二重起動、異常終了、Tray識別と本体ファイルの保持を確認する。設定・data・認証と本体ファイルの寿命を混ぜない。
 - .NET SDK/Runtime・接続契約を変えたらnative AppletもRelease buildし、接続・停止・表示・保存を確認する。runtimeconfig欠落は発行元・EXE内・展開先を比較する。
 - PowerShell 5.1用PS1はUTF-8 BOM/CRLF、BATはCP932/CRLFを保つ。File.Replaceへnull backupを渡す場合はNullString.Valueを使う。GitHub CLIのPATH・認証・実行権限はその環境で確認する。
 - 権限不足の切り分けと再実行は[制限付き実行環境](docs/development-workflow.md#制限付き実行環境)に従う。無関係アプリの停止や、検査・セキュリティ機構の無効化で成功扱いにしない。
@@ -36,7 +36,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 - スクロールバーも共通配色の`scrollbarCss`を正本とし、登録したローカル画面へ共通適用する。個別画面で幅・つまみ・トラック・矢印の見た目を追加せず、必要な方向の非表示やスクロール構造だけを指定する。リモート本文・iframeには適用しない。
 
 - [Shell基盤](docs/shell-foundation.md)に従い、本体は状態・操作・表示寿命、Default Shell/Shell AppletはShell対象領域の描画を所有する。メイン画面の枠組み・画像ライブラリー・通知センター・ログ・設定は本体rendererが共通UI部品で描画し、ページ用Shell機構を設けない。Shell対象は既存6領域に限定し、新しい領域のShell化は個別に依頼された場合だけ行う。両Shellは同じ公開API/実行経路を使い、相互の内部import・Default Shell専用API・本体側の復旧用重複描画を作らない。
-- Default Shellは本体repo内で同時ビルドし単一EXEへ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
+- Default Shellは本体repo内で同時ビルドしフォルダー型本体へ同梱する。追加のShell Appletは独立repo。提供領域だけを差し替え、未提供・故障領域はDefault Shellへ戻す。内容ControllerとViewの寿命を分離する。
 - [リボン](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)の公開契約を使う。本体ページは[本体のページ表示](docs/host-pages.md)に従う。Shell領域を追加する個別依頼ではモデルと操作を定義し、Shell Hostへ内容固有の判断を混ぜない。一般Appletの複数Window/同一領域の同時多重表示は未実装。独立デスクトップ通知は通知基盤専用Windowとして共通通知Surface契約を使う。
 - Applet管理は本体の設定一覧へ集約し、説明・詳細タブを再導入しない。設定・ショートカット・ジェスチャー・ログは共通画面へ移動し、入力設定は提供元ID、ログは解除可能なsourceで絞る。WebApplet本体を含め、collectionの子ページをパッケージ一覧へ含めない。[管理仕様](docs/applet-management-settings-design.md)を参照する。
 - 設定は[設定基盤](docs/settings-foundation.md)の確定後の即時保存を正本とする。文字・数値・URL・JSONは共通入力部品でblur/Enter確定・Escape取消、複数行はShift+Enter改行とし、IME操作を優先する。SettingsInputSessionは受付調整のみ。本体の入力キュー、ページ投影/外部競合/原子的保存を維持し、不正入力と失敗値は現在のUIだけに保持する。dirty・共有ドラフト・全体保存/破棄・未保存通知を再導入しない。

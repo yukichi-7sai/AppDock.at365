@@ -4,11 +4,11 @@
 
 ## 1. 発行物を用意する
 
-package.json、各Appletのmanifest、発行物のupdate.jsonから対象版を確認します。本体は単一EXE、Appletは自身のupdate.zipを使用します。
+package.json、各Appletのmanifest、発行物のupdate.jsonから対象版を確認します。本体はフォルダー型本体、Appletは自身のupdate.zipを使用します。
 
 | 対象 | 配布元へ置くファイル | ローカル更新元の指定例 |
 | --- | --- | --- |
-| AppDock | `A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe` と `A:/40.ARTIFACT/AppDock.at365/update.json` | `A:\40.ARTIFACT\AppDock.at365` |
+| AppDock | `A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe` と `A:/40.ARTIFACT/AppDock.at365/update.json` | `A:\40.ARTIFACT\AppDock.at365` |
 | 各Applet | `A:\40.ARTIFACT\<リポジトリ名>`の`update.zip`と`update.json` | `A:\40.ARTIFACT\Applet.Watch.at365` |
 
 Appletの初回追加は、各発行先の`deploy.bat`から配置します。更新ボタンはインストール済みAppletを対象にします。ZIPは各リポジトリで同名なので、別AppletのJSON/ZIPを混ぜないでください。
@@ -38,7 +38,7 @@ Appletの初回追加は、各発行先の`deploy.bat`から配置します。�
 - [ ] AppDockの更新を開始すると進捗が表示され、取得が長ければ容量と割合が増える。
 - [ ] 取得中の「キャンセル」で通常操作へ戻り、現在の版を保持する。再試行できる。
 - [ ] 最終確認の対象・版が正しく、そこでキャンセルした場合も現在の版を保持する。
-- [ ] 「更新して再起動」の後、同じ配置先の単一EXEから起動し、版が想定どおりになる。
+- [ ] 「更新して再起動」の後、同じ配置先のフォルダー型本体から起動し、版が想定どおりになる。
 - [ ] トレイ開始の設定がONでも、更新後は更新前のページを表示する。
 - [ ] 保存済み設定・Applet有効状態・既存ログインが保持される。
 - [ ] Applet一括更新では対象が正しく、再起動が1回で済む。必要な本体版が不足する候補は案内される。

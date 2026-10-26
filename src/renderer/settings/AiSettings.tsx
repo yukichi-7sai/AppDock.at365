@@ -21,6 +21,7 @@ import {
   SettingsListLayout,
 } from '../settings-ui/SettingsListTable';
 import { CommandListSummary } from '../settings-ui/CommandListScroll';
+import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
 import {
   AiConnectionDialog,
   AiConnectionOrderDialog,
@@ -190,14 +191,11 @@ export function AiSettingsForm({
               </tr>
             ))}
             {!value.connections.length && (
-              <tr>
-                <td colSpan={3}>
-                  <div className="ai-empty">
-                    <strong>{translate('settings.aiSettings.empty')}</strong>
-                    <p>{translate('settings.aiSettings.emptyHint')}</p>
-                  </div>
-                </td>
-              </tr>
+              <SettingsTableEmptyRow
+                colSpan={3}
+                title={translate('settings.aiSettings.empty')}
+                description={translate('settings.aiSettings.emptyHint')}
+              />
             )}
           </tbody>
         </SettingsListLayout>

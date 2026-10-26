@@ -163,7 +163,7 @@ const executable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : u
 const managementOnly = process.argv.includes('--management-only');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (executable) {
-  fs.copyFileSync(path.resolve(process.argv[2]), executable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
   assert.equal(hash(executable), hash(process.argv[2]));
 }
 async function until(fn, name) {

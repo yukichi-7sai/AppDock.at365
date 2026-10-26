@@ -11,10 +11,15 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `portable-updates-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const executable = path.join(profile, 'AppDock.at365.exe');
-fs.copyFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe'), executable);
+require('./copy-host.cjs').copyHost(
+  path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'),
+  executable,
+);
+fs.writeFileSync(path.join(profile, 'resources/obsolete-host.dll'), 'obsolete host fixture');
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 settings.updates.checkHostOnAboutOpen = false;
 settings.host.hardwareAcceleration = false;
+settings.host.theme = 'dark';
 settings.host.notifications = false;
 settings.host.startMinimized = true;
 settings.host.soundEnabled = false;
@@ -197,6 +202,7 @@ const renderer = (inspectPort, expression) =>
     inspectPort,
     `${electronExpression}.webContents.getAllWebContents().find(w => w.getURL().startsWith('appdock://host/')).executeJavaScript(${JSON.stringify(expression)})`,
   );
+const mainWindow = `${electronExpression}.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/'))`;
 async function verifyRestartGesture(inspectPort, label) {
   const exchange = path.join(profile, 'gesture-probe-' + Date.now());
   fs.mkdirSync(exchange);
@@ -304,7 +310,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       '--enable-logging=file',
       `--log-file=${path.join(profile, 'electron.log')}`,
     ],
-    { env, cwd: profile, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+    { env, cwd: profile, windowsHide: false, stdio: ['ignore', 'pipe', 'pipe'] },
   );
   child.stdout.on('data', (data) =>
     fs.appendFileSync(path.join(profile, 'startup.stdout.log'), data),
@@ -313,6 +319,19 @@ async function restarted(inspectPort, predicate, previousPid) {
     fs.appendFileSync(path.join(profile, 'startup.stderr.log'), data),
   );
   let connected;
+  const capture = async (name) => {
+    const file = path.join(profile, name);
+    await inspect(
+      inspectPort,
+      `${mainWindow}.webContents.capturePage().then(image => { process.getBuiltinModule('fs').writeFileSync(${JSON.stringify(file)}, image.toPNG()); return true; })`,
+    );
+    const bytes = fs.readFileSync(file);
+    assert.equal(bytes.subarray(1, 4).toString(), 'PNG');
+    assert(
+      bytes.readUInt32BE(16) >= 640 && bytes.readUInt32BE(20) >= 480,
+      'capture must contain the host window',
+    );
+  };
   const keepAlive = setInterval(() => {}, 1000);
   try {
     connected = await connect(port);
@@ -333,18 +352,8 @@ async function restarted(inspectPort, predicate, previousPid) {
     assert.equal(initial.updates.results.filter((r) => r.status === 'available').length, 2);
     assert.equal(fs.existsSync(path.join(profile, 'data/update-result.json')), false);
     checks.push('startup checks metadata only, includes disabled Applet, and never installs');
-    assert.equal(
-      await inspect(
-        inspectPort,
-        `${electronExpression}.BrowserWindow.getAllWindows()[0].isVisible()`,
-      ),
-      false,
-    );
-    await inspect(
-      inspectPort,
-      `${electronExpression}.BrowserWindow.getAllWindows()[0].show()`,
-      false,
-    );
+    assert.equal(await inspect(inspectPort, `${mainWindow}.isVisible()`), false);
+    await inspect(inspectPort, `${mainWindow}.show()`, false);
     await about(page);
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
     assert.equal(await page.locator('.about-page > .settings-section').count(), 1);
@@ -370,15 +379,16 @@ async function restarted(inspectPort, predicate, previousPid) {
     checks.push(
       'welcome panel and initially open update settings, per-target last-check times beside update buttons',
     );
-    await page.screenshot({ path: path.join(profile, 'updates-collapsed-dark.png') });
+    await capture('updates-collapsed-dark.png');
     // Both source resets save immediately and preserve unrelated settings.
     await page.getByRole('button', { name: 'Appletの管理と更新', exact: true }).click();
     await page
       .locator('[data-applet-id="test.disabled"]')
       .getByRole('button', { name: 'test.disabled', exact: true })
       .click();
-    const appletCard = page.locator('.applet-update-source');
-    await appletCard.locator('summary').click();
+    const common = page.getByTestId('applet-common-settings');
+    if ((await common.getAttribute('open')) === null) await common.locator('summary').click();
+    const appletCard = page.getByTestId('applet-update-source-test.disabled');
     await appletCard.getByRole('button', { name: '既定に戻す', exact: true }).click();
     assert.equal(
       await appletCard.getByLabel('test.disabledの更新元', { exact: true }).inputValue(),
@@ -412,7 +422,7 @@ async function restarted(inspectPort, predicate, previousPid) {
 
     await settleSettings(page);
     await waitSnapshot(page, (s) => s.settings.value.updates.startupDelaySeconds === 1);
-    await page.screenshot({ path: path.join(profile, 'updates-settings.png') });
+    await capture('updates-settings.png');
     await page.getByText('更新の設定', { exact: true }).click();
     await page.evaluate(async () => {
       const s = await window.dock.snapshot();
@@ -420,18 +430,14 @@ async function restarted(inspectPort, predicate, previousPid) {
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
-    await page.screenshot({ path: path.join(profile, 'updates-collapsed-light.png') });
-    await inspect(
-      inspectPort,
-      `${electronExpression}.BrowserWindow.getAllWindows()[0].setSize(900, 720)`,
-      false,
-    );
+    await capture('updates-collapsed-light.png');
+    await inspect(inspectPort, `${mainWindow}.setSize(900, 720)`, false);
     await wait(300);
     assert.equal(
       await page.locator('.settings-body').evaluate((el) => el.scrollWidth <= el.clientWidth),
       true,
     );
-    await page.screenshot({ path: path.join(profile, 'updates-compact.png') });
+    await capture('updates-compact.png');
     await page.evaluate(() => window.dock.checkAllUpdates());
     await waitSnapshot(page, (s) => !s.updates.busy && s.updates.results.length === 3);
     checks.push(
@@ -469,9 +475,14 @@ async function restarted(inspectPort, predicate, previousPid) {
       'test.disabled',
     ]);
     assert.notEqual(await inspect(inspectPort, 'process.pid'), combinedPid);
+    assert.equal(fs.existsSync(path.join(profile, 'resources/obsolete-host.dll')), false);
+    assert.deepEqual(
+      fs.readFileSync(path.join(profile, 'resources/app.asar')),
+      fs.readFileSync(path.join(getPublishDirectory(root), 'win-unpacked/resources/app.asar')),
+    );
     assert.deepEqual(
       fs.readFileSync(executable),
-      fs.readFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe')),
+      fs.readFileSync(path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe')),
     );
     assert.equal(
       fs.existsSync(path.join(profile, 'extensions/appdock.dotnet-demo/obsolete.dll')),
@@ -485,13 +496,7 @@ async function restarted(inspectPort, predicate, previousPid) {
       updated.settings.value.extensions['appdock.dotnet-demo'].settings.preserved,
       'user-data',
     );
-    assert.equal(
-      await inspect(
-        inspectPort,
-        `${electronExpression}.BrowserWindow.getAllWindows()[0].isVisible()`,
-      ),
-      true,
-    );
+    assert.equal(await inspect(inspectPort, `${mainWindow}.isVisible()`), true);
     assert.equal(
       await settingsRenderer(inspectPort, "!!document.querySelector('.about-page')", '.about-page'),
       true,
@@ -524,7 +529,24 @@ async function restarted(inspectPort, predicate, previousPid) {
       fs.readFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'utf8'),
       'login-fixture',
     );
-    checks.push('real single-EXE host replacement and restart through the same helper');
+    checks.push('real folder host replacement and restart through the same helper');
+    assert.equal(typeof result.temporaryDirectory, 'string');
+    const cleanupDeadline = Date.now() + 15000;
+    while (fs.existsSync(result.temporaryDirectory) && Date.now() < cleanupDeadline)
+      await wait(100);
+    assert.equal(
+      fs.existsSync(result.temporaryDirectory),
+      false,
+      'Host payload including app.asar must be removed',
+    );
+    assert.equal(
+      await renderer(
+        inspectPort,
+        "window.dock.snapshot().then(s=>s.logs.some(l=>l.source==='updates'&&l.message.includes('更新用一時ファイルを削除できませんでした')))",
+      ),
+      false,
+    );
+    checks.push('restarted host removes the ASAR payload without a cleanup warning');
     await verifyRestartGesture(inspectPort, 'real host update restart');
     await ribbonRenderer(
       inspectPort,
@@ -570,13 +592,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     await wait(2000);
     await restarted(inspectPort, (s) => s.version === hostVersion && s.startupReady, oldPid);
     assert.notEqual(await inspect(inspectPort, 'process.pid'), oldPid);
-    assert.equal(
-      await inspect(
-        inspectPort,
-        `${electronExpression}.BrowserWindow.getAllWindows()[0].isVisible()`,
-      ),
-      true,
-    );
+    assert.equal(await inspect(inspectPort, `${mainWindow}.isVisible()`), true);
     assert.equal(
       await settingsRenderer(
         inspectPort,

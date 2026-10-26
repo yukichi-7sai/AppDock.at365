@@ -50,7 +50,7 @@ const source =
 const scrollbarsOnly = process.argv.includes('--scrollbars-only');
 const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (source) {
-  fs.copyFileSync(source, exe);
+  require('./copy-host.cjs').copyHost(source, exe);
   assert.equal(hash(exe), hash(source));
 }
 const env = { ...process.env };

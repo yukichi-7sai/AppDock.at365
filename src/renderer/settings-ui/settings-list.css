@@ -120,6 +120,19 @@ button.settings-list-add.applet-shortcut-add:is(:hover, :focus-visible):enabled 
 .settings-list-state {
   white-space: nowrap;
 }
+.settings-data-table td.settings-table-empty-cell {
+  width: auto;
+  white-space: normal;
+}
+.settings-table-empty {
+  text-align: center;
+  padding: 28px 0;
+}
+.settings-table-empty p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
 .settings-list-icon {
   display: inline-flex;
   justify-content: center;

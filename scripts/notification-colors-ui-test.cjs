@@ -85,7 +85,7 @@ settings.notificationPreferences = {
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
-  fs.copyFileSync(portable, exe);
+  require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));

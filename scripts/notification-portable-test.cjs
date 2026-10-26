@@ -27,7 +27,7 @@ const assert = require('node:assert/strict');
 const { notificationProtocol } = require('../out/main/main/core/notification-routing');
 const root = path.resolve(__dirname, '..');
 const source = path.resolve(
-  process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'),
+  process.argv[2] || path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'),
 );
 const profile = path.join(root, '.artifacts', `notification-portable-${Date.now()}`);
 const sha256 = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -58,7 +58,7 @@ const copies = ['installed', 'test'].map((name) => {
   const folder = path.join(profile, name),
     exe = path.join(folder, 'AppDock.at365.exe');
   fs.mkdirSync(path.join(folder, 'extensions/notification'), { recursive: true });
-  fs.copyFileSync(source, exe);
+  require('./copy-host.cjs').copyHost(source, exe);
   const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
   settings.host.hardwareAcceleration = false;
   settings.globalShortcutCommands = [];

@@ -34,7 +34,7 @@ let executable = require('electron'),
   packedHash;
 if (process.argv[2]) {
   executable = path.join(profile, 'AppDock.at365.exe');
-  fs.copyFileSync(path.resolve(process.argv[2]), executable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
   const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   packedHash = hash(executable);
   assert.equal(packedHash, hash(path.resolve(process.argv[2])));

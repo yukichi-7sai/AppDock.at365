@@ -10,7 +10,7 @@
 
 | 対象 | 判定と操作 | 添付する配布物 |
 | --- | --- | --- |
-| AppDock | 現行版が未公開ならPrepareから公開・検証。本体版が公開済みなら再作成・上書き・版更新をしない | 単一EXE、update.json、全体ZIP |
+| AppDock | 現行版が未公開ならPrepareから公開・検証。本体版が公開済みなら再作成・上書き・版更新をしない | フォルダー型本体、update.json、全体ZIP |
 | 全体ZIPの各Applet | 同梱した版が自身のrepoで未公開なら、その同梱版を個別公開・検証。公開済み同版はskip | update.zip、update.json |
 | 本機能公開した全repo | 各repoの公開後検証が成功してから、公開日時順で最新3件を保持して古いRelease/assetを削除 | draft・Gitタグ/履歴は保持 |
 
@@ -28,7 +28,7 @@
 
 | ファイル | 用途 |
 | --- | --- |
-| `AppDock.at365.exe` | 通常の単一EXE版・本体自己更新 |
+| `update.zip` | フォルダー型本体・本体自己更新 |
 | `update.json` | 通常EXEの版・サイズ・SHA256を示す更新情報 |
 | `AppDock.at365-all-in-one-<version>.zip` | 同じEXE + 全ローカルAppletを`extensions`へ配置 + `bundle.json` |
 

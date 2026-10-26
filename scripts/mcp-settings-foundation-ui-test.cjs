@@ -187,7 +187,7 @@ async function main() {
   await new Promise((resolve) => listener.close(resolve));
   const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
   if (portable) {
-    fs.copyFileSync(portable, executable);
+    require('./copy-host.cjs').copyHost(portable, executable);
     assert.equal(hash(executable), hash(portable));
   }
   const env = { ...process.env };

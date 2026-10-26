@@ -64,7 +64,7 @@ const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest
 const source = process.argv[2] && path.resolve(process.argv[2]);
 const portable = source && path.join(profile, 'AppDock.at365.exe');
 if (portable) {
-  fs.copyFileSync(source, portable);
+  require('./copy-host.cjs').copyHost(source, portable);
   assert.equal(hash(portable), hash(source));
 }
 const checks = [],

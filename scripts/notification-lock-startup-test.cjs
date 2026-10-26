@@ -197,7 +197,7 @@ const checks = [];
     const portable = process.argv[2],
       exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (portable) {
-      fs.copyFileSync(path.resolve(portable), exe);
+      require('./copy-host.cjs').copyHost(path.resolve(portable), exe);
       assert.equal(hash(exe), hash(path.resolve(portable)));
     }
     port = await freePort();

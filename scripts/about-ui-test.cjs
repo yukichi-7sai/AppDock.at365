@@ -87,7 +87,7 @@ async function until(fn, label) {
     const portable = !!process.argv[2],
       executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (portable) {
-      fs.copyFileSync(path.resolve(process.argv[2]), executablePath);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executablePath);
       assert.equal(hash(executablePath), hash(process.argv[2]));
     }
     const env = { ...process.env };

@@ -10,7 +10,7 @@ const profile = path.join(root, '.artifacts', `hotkeys-${Date.now()}`);
 const clockFolder = path.join(profile, 'extensions', 'Applet.Watch.at365');
 fs.mkdirSync(clockFolder, { recursive: true });
 for (const name of ['extension.json', 'Applet.Watch.at365.exe'])
-  fs.copyFileSync(
+  require('./copy-host.cjs').copyHost(
     path.join(root, '../../40.ARTIFACT/Applet.Watch.at365/Applet.Watch.at365', name),
     path.join(clockFolder, name),
   );

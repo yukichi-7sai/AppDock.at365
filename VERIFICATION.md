@@ -1,5 +1,85 @@
 # 検証記録
 
+## 2026-10-27: フォルダー型0.97.5をmainへ反映するコミット検証
+
+- 利用者のmain反映指示を受け、primary mainのcleanと`pull --ff-only`による最新一致を確認した。対象は準備済み138項目のみ。製品コード・版・依存の追加変更は行わず0.97.5を維持する。
+- `.artifacts/main-merge-prep-0975-20261027/validation.json`・865入力・完全ログ・review・試験EXE/ZIPのSHA256を再照合した。標準1,166件、native状態313項目、固定GUI101群、smoke/実ASAR/APPDOCK見出しの成功を再利用する。起動順変更後の不足範囲として、更新進捗の開発GUI9群・固定版トレイ7群・Windows自動起動5群を追加し成功した。検証専用Taskの登録/実行/解除、同時起動・再起動・異常終了、設定保持を確認した。
+- 単一EXE版の本体更新は`payload.format=exe`を要求するため、新しい`format=zip`は適用できず、初回は終了後に同じ配置先へ本体一式を手動配置する。配置ルートとsettings/data/extensionsを維持し、切り替え後はフォルダー型の自己更新を使う。通常の発行先の既存deployスクリプトは単一EXE配置の旧内容で、運用者所有として保持されることも確認し、配布仕様へ追記した。
+- コミット対象/検証再利用の正本は試験用worktree `.artifacts/commit-validation-folder-portable-0975-20261027/`。stage tree・commit・main反映・通常発行先での検証はprimaryの同名フォルダーへ記録する。保存設定や実利用先の変更・push・Releaseは今回の範囲に含めない。
+
+## 2026-10-27: 最新mainを取り込みマージ準備・見出しを修正 0.97.5
+
+- 利用者が0.97.4で更新エラーが出なくなったことを確認した。最新mainの取り込みとmainへマージする準備、`settings.index.hostHeading`の`APPPDOCK`→`APPDOCK`修正を行った。保存設定・保存ファイル・公開プロトコルを変えない通常修正として、確認用を**0.97.4→0.97.5**へパッチ更新した。
+- `codex/folder-portable`の未commit差分137項目を、rawファイル・hash・binary patch付きで`.artifacts/main-merge-prep-0975-20261027/`へ保存した。originをfetchし、MCP名簿/shortcut-list/画像グループとロックキー対応の6コミット・46ファイルを含むローカルmain `86acd2714d9776bc9d479cd782506eca6e34e688`へfast-forwardした。一時stashを再適用し、競合したpackage.jsonはフォルダー配布設定、本記録は双方の履歴を保持した。重なった残り4ファイルのMCP接続・試験・翻訳も照合し、重なりのない移行131項目はbyte単位で保持、行末だけ変わった15ファイルも元のbytesへ戻した。検証後に所有する一時stashだけを整理し、backupを保持した。
+- 確認中にmainへ追加された検証記録だけの`e976d2beae0a743201febdd6732f19d2a693eaca`も取り込んだ。この再取り込みは既知baseのVERIFICATIONだけを一時復元してfast-forwardし、準備済みの結合内容を戻した。ほか864入力はhash一致、stash/reset/新規commitなし。終了前の再fetchでもHEAD/mainはe976d2b、origin/mainはe1906cbで、mainのローカル2コミットを保持している。発行時HEADは86acd27、後続の製品コード変更はない。
+- 見出しは既存キーの値だけを変更し、残る辞書は双方の変更を結合した期待値と全項目一致した。mainで増えたnative記録GUIの固定版コピーを共通`copyHost`へ接続し、フォルダー一式で検証できるようにした。発行前レビュー1回で両方の実装・保存互換・起動順・更新・共通設定の維持を確認し、阻害指摘なし。発行後はASAR試験の標準出力/エラーを専用ログへ採取する変更だけを加え、判定条件・製品コード・配布物を変えずに再確認した。
+- 固定Node24.22.1/pnpm12.10.1、独立node_modulesでfrozen install・型検査・本体/Default Shell/.NET/helper build・全CJS構文検査・差分検査が成功。lockfile・依存・供給網ポリシーは変更しない。標準回帰は**1,166/1,166件（fail/cancel/skip 0）**、発行InputHost DLLそのものでOSへキーを送らないnative状態**255項目**・マウス＋キー状態**58項目**が成功した。Pause/F13〜F24のOS送信・登録は行わない。
+- 固定配布EXEでMCP設定**60群**、Shell先行/トレイ/復元の起動順**19群**、起動計測/空一覧**8群**、更新/再起動/ASAR後片付け**14群**の計**101群**と、隔離smoke・実ASARのステージング/取消/削除・未公開404のinfoを確認した。見出しは`settings-host-heading`の実画面で`APPDOCK`を確認し、`settings-index.png`を保存・目視確認した。全固定試験のEXEを発行元とhash照合した。
+- 初回標準試験の.NETページ1件はframework-dependent ExtensionHostの生成不足を補って再実行した。入力試験の初回はモード指定不足でhelper接続前に停止し、明示的な`--lock-keys`/`--gesture-key-state`へ直して成功した。更新GUIの外部マウスジェスチャー待ち1回は、同じソース/EXEで再実行して14群成功。ASAR補助試験はstdio破棄時の接続/終了待ち2回を保持し、診断採取を追加した専用コピーと本来の試験で各1回成功した。これらの待機の根本原因は断定せず、初期ログと失敗profileを保持する。製品の検査・期待値は緩めていない。
+- `publish.bat`成功（exit 0）。発行先`A:\40.ARTIFACT\AppDock.at365-folder-portable\win-unpacked\AppDock.at365.exe`、EXE size **249797632**、SHA256 **09e4ea01b9f04941bdfeeb4b744b30c85c42f2ce5b3bb5cddcd1f3196190baa8**。`update.zip` size **270659973**、SHA256 **56e90435db7fdad18fcdcd5f9bc71235ccff63acaa3b650f1b2b6f29e6125d6a**。EXE/File/ProductVersion・manifest/feedは0.97.5で整合し、ビルド元・発行先・更新ZIPの管理**694ファイル**がすべてSHA256一致。試験InputHost DLLはSHA256 **325177e1288992db0a5a825a187ea0160323a6335676e6f9d7cced9f7d1cc6b5**。
+- 完全ログ・初期/検証時/最終入力・review・統合/再取り込み・配布hash・最終結果は`.artifacts/main-merge-prep-0975-20261027/`。固定MCPは`mcp-settings-foundation-portable-1793046758437/`、起動順は`startup-order-ui-1793046839917/`、計測は`applet-startup-ui-1793046867823/`、更新成功は`portable-updates-1793047038419/`、ASAR成功は`update-filesystem-1793047426246/`、smokeは`smoke-1793047431324/`。配布後のソース差分は本記録と製品へ同梱しない試験の診断採取だけ。
+- 終了・成功・結果の保存hash・絶対パス・再解析ポイントなしを確認し、古い成功smoke/更新の各1フォルダーだけを整理した。各方式の最新3成功、初期失敗・移行/同期の証跡・固定出力・backupを保持する。準備した差分は未commitで、index/unmergedは空。main本体worktreeと他worktreeは変更せず、この差分のcommit/main反映・push・Release・実利用deployは未実施。実利用Applet全件の再計測・実Windowsサインイン/UACも今回の対象外。
+
+## 2026-10-27: 未公開Releaseの404とASAR一時領域削除を修正 0.97.4
+
+- 利用者が0.97.3で本体ウィンドウがすぐ表示されることを確認した。続いて、同版再適用OFFで`UPDATE_OPERATION_FAILED`、Watchの更新元はReleaseがまだなくHTTP 404、再起動後に`payload-0/resources/app.asar`のEBUSY警告が出るとの報告を受けて調査した。404の全体エラーと、前の更新後の一時領域削除警告は別の経路だった。
+- GitHubの最新公開Releaseを読み取り確認した。以前の利用者の一覧と比較すると、Gmailは導入/公開とも0.12.1、WallpaperSlideshowは導入0.7.3/公開0.7.2、WebAppletは0.4.1/0.3.1、WebBrowserToolsは0.3.5/0.3.4、WindowsToolsは0.2.7/0.2.2。Gmailだけが同版再適用対象になる状況と整合する。古い版へ戻さない既存仕様は維持する。公開情報は`.artifacts/update-recovery-validation/public-releases.json`。WatchのRelease未公開は利用者申告。新しいReleaseの公開やAppletの更新元設定変更は行わない。
+- GitHub `releases/latest`の404だけを`unpublished`へ分類した。未公開は確認時にエラー通知せず、適用時はスキップし、同版OFFで残りがすべて現行版なら更新なしの情報通知で終える。403/503、明示タグの404、配布済みfeed/assetの404、不正な内容等は従来どおりエラーとする。未公開対象を更新済みとして数えない。
+- Electron 45.0.0で実ASARの専用コピーを削除して再現した。通常fsはASARを仮想ディレクトリと扱い、事前に開かない条件でもrmがEBUSY/rmdirになる。`original-fs`だけを使う新規コピーは物理ファイルとして削除できた。通常fsで開いた後はキャッシュが解放されるまでrawのunlinkもロックされるため、更新パッケージのコピー・読み取り・ハッシュ・削除を一貫して物理fsへ接続した。再起動後の削除も同じAPIにし、既存のTEMP名/親パス/symlink/journal確認を保持し、有限の3回/100msの再試行後も失敗なら警告を残す。通常のASAR読取やグローバル設定を変更しない。
+- 発行前レビュー1回で404の判定範囲、真正エラー・取消・同版/旧版判定の保持、fsの適用範囲、パス/リンク/容量/hash/transactionの既存検証と一時領域の寿命を確認し、未解決指摘なし。変更前850入力のうち今回の9項目以外の843ファイルがhash一致し、既存のフォルダー配布・Shell先行・起動計測・空一覧を保持した。保存設定・保存ファイル・Applet実行RPCの変更がない修正としてパッチ**0.97.3→0.97.4**に更新した。発行後は本記録だけを変更した。
+- 固定Node 24.22.1/pnpm 12.10.1と独立node_modulesで`install --frozen-lockfile`を再照合し、依存/lockfile/toolchainを変更しない。型検査、本体/Default Shell build、差分検査、共通更新・フォルダー本体・結果通知・起動時更新の関連**4ファイル45/45件（fail/cancel/skip 0）**が成功した。未公開+現行版の同版OFF、ON時の同版だけの確認、通常の新版と未公開の混在、実際の失敗を維持するケースを含む。
+- ソース版と固定配布版の実Electronで、実ASARを含むAppletのステージング・物理ファイル/hash・確認取消・一時領域削除・既存配置保持と、未公開404の`unpublished`/infoを確認した。固定版はapp.asar内の実製品moduleを呼び、実行コピーと発行EXEのhash一致を確認した。ASAR入力のsource/fixed用SHA256は各`update-filesystem-*/result.json`へ記録した。
+- 固定EXEの更新/再起動GUI **14群**（従来13群+再起動後のASARを含む一時領域の消去/警告なし）とsmokeが成功した。同版再適用、まとめて/個別/本体更新、設定・認証・有効状態保持、リソース交換、startMinimized時の更新/通常再起動、設定カテゴリ/Appletページ復元、外部マウスジェスチャーを再確認した。Pause/F13〜F24は送信・登録しない。
+- `publish.bat`成功（exit 0）。発行先`A:\40.ARTIFACT\AppDock.at365-folder-portable\win-unpacked\AppDock.at365.exe`。EXE size **249797632**、SHA256 **38bf7bcb543943ec0b8c27a6b956b5dbe75a9be8af8f4683ca343f6bdc8543b7**。`update.zip` size **270653231**、SHA256 **d256af653c1c4e2e3fe6e3104e1a5a7a126592dd7756ff15c74355236070baea**。manifest/feedの0.97.4とZIPのsize/hash、ビルド元・発行先・更新ZIPの管理694ファイルのSHA256一致を確認した。
+- 旧ASAR再現、完全ログ、review、変更前/検証時/最終入力、成果物hash、最終結果は`.artifacts/update-investigation/`と`.artifacts/update-recovery-validation/`。実Electronのソース/固定試験は`update-filesystem-1793044409674/`と`update-filesystem-1793044654294/`、固定更新GUIは`portable-updates-1793044658979/`、smokeは`smoke-1793044736162/`。
+- 古い成功smoke/更新の各1世代と、今回の不要なASAR再現コピー2フォルダーだけを、絶対パス・リンクなし・プロセス終了を確認して整理した。smoke旧結果は保護済み移行ログとの全項目一致を確認し、旧更新のresultを保存した。smoke/固定更新は直近3成功を保持し、診断JSON・既存の移行/同期/起動証跡・固定出力は保持する。全リポジトリ回帰、別worktree統合、commit/push/Release/実利用先deployは行わない。0.97.2の利用者一覧のWatch最大523msは過去の実測として保持し、今回の実利用版の再計測・再確認は未実施。
+
+## 2026-10-27: 選択Shellを先行し本体表示後に通常Appletを起動 0.97.3
+
+- `codex/folder-portable`（HEAD/main取込元`7531fa4`）の移行・起動計測・空一覧を保持して実装した。既存の`capabilities: ["shell"]`・`shell`宣言と領域別の選択設定を使用し、Default Shellと選択中の有効な提供元を先行する。本体の標準本文とタイトルバー・リボン・ステータスバーのreadyを確認してから本体を表示し、残りのAppletを従来の順で起動する。未選択Shellは後続、safe-shellではDefault Shellだけを先行し、保存順・並列化・Applet固有処理は変更しない。
+- `uiReady`を本文/Shellの準備に使用し、既存の`startupReady`は通常Appletの初期起動・開始予約後まで維持する。初期設定の補完・Applet自己設定の保存・再起動・activate-on-executeも同じ起動許可で制御し、別経路から通常Appletが表示前に開始されないことを確認した。Aboutの自動確認等は準備完了まで待つ。起動中に終了した場合は後続workerを開始しない。
+- トレイ起動の非表示、起動中に隠した本体を完了時に再表示しない挙動、設定カテゴリとAppletページの復元を保持した。Applet復元は待機表示の後、startupReadyと提供元runningを待って開く。選択Shellの失敗時はDefault Shellへ戻り、起動遅延5秒のShellは待機中にDefault Shellで表示してから切り替わる。準備確認は最大30秒で打ち切るが、GUI試験では打切りログがないことを確認した。
+- 発行前レビュー1回で、選別・設定保存からの再入・frame/URL限定IPC・renderer再読込・終了・遅延/故障・復元・後続表示の抑止を確認した。完了後もShell状態を照会し続ける点を修正し、追加単体試験とGUIで再確認、未解決指摘なし。変更前847入力のうち今回の16項目以外の834ファイルはhash一致。発行後は本文の準備完了の定義、Shell文書のフォルダー同梱表記と本記録だけを変更した。
+- 固定Node 24.22.1/pnpm 12.10.1を`dev.bat`経由で使用し、独立node_modulesへ`install --frozen-lockfile`を再照合した。lockfile・依存・toolchainを変更しない。型検査、本体/Default Shell build、差分検査、起動順・計測・世代・既定有効・Shell/境界・本体ページ・設定ページ/移動・遅延/更新の関連**11ファイル59/59件（fail/cancel/skip 0）**が成功。保存項目/保存ファイル/実行プロトコルを追加・変更しない内部の起動制御なので、通常パッチ**0.97.2→0.97.3**とした。
+- ソース版は起動順19群と計測/空一覧8群が成功。固定配布EXEは、同じ起動順19群・計測/空一覧8群・更新/再起動13群の計**40群**とsmokeに成功した。選択Shellのactivate中に設定保存を発生させた段階では本体非表示かつ通常workerなし、本体表示時には通常Appletがまだactivate待機中であることを確認した。全体完了後の再表示抑止、トレイ起動、safe-shell、失敗復旧、遅延切替、更新後/通常再起動後のカテゴリ・Appletページ復元、同版再適用、外部マウスジェスチャーを確認した。Pause/F13〜F24は送信・登録しない。
+- 初期本文のDOMと領域のboundProvider/readyに加え、固定EXEの別隔離profileで選択Shellのタイトルバー・リボン・ステータスバーそれぞれのDOM、正の寸法、ready/visible、各WebContentsからの直接PNGを確認した。親WindowのcapturePageだけではShell領域を確認したことにしない。直接PNGは`.artifacts/startup-order-validation/{titlebar,statusbar,ribbon}.png`、結果は`native-surfaces.json`。
+- `publish.bat`成功（exit 0）。発行先`A:\40.ARTIFACT\AppDock.at365-folder-portable\win-unpacked\AppDock.at365.exe`。EXE size **249797632**、SHA256 **460f0e8ef1f016a0622c1607026ca15e4241a50de19bd085918b85f01187c40c**。`update.zip` size **270652988**、SHA256 **5a86fb7673349b81bd48db344ec8f7d6e3da0181b238936894362191ed248b68**。manifest/feedの0.97.3とZIPのsize/hashを確認し、ビルド元・発行先・更新ZIP内の管理694ファイルがすべてSHA256一致した。固定GUI2系統の実行コピーも発行EXEとhash一致。
+- 完全ログ・review・変更前/検証時/最終入力hash・全配布ファイルhash・最終結果は`.artifacts/startup-order-validation/`。起動順のソース/固定出力は`.artifacts/startup-order-ui-1793041549546/`と`startup-order-ui-1793041802250/`、計測は`applet-startup-ui-1793041434357/`と`applet-startup-ui-1793041830942/`、更新は`portable-updates-1793042069386/`。GUI初期のfixture宣言不足・renderer復元先の保存待ち不足・safe-shellの表示直後の早過ぎる判定はfixtureを整えて解決し、診断結果を保持した。
+- 古い成功smoke `smoke-1793033997069`だけを、絶対パス・成功結果・プロセス終了・再解析ポイントなしを確認して整理し、直近3世代を保持した。ほかの試験は実行方式ごとの成功3世代以内、現行証跡・旧移行/同期証跡・固定出力を保持する。実利用Watch/全Appletでの新しい表示順と体感、実Windowsサインインは利用者確認待ち。全リポジトリ回帰・別worktreeの統合・commit/push/Release/実利用先deployは行わない。
+
+## 2026-10-27: Appletの起動時間と空一覧の表示 0.97.2
+
+- `codex/folder-portable`（main `7531fa4`取込済み）の既存移行内容を保持して実装した。Applet管理に「起動時間」を追加し、Node/.NET/native共通の起動準備からactivate応答・登録検証までを単調時計で計測する。設定した起動遅延・キュー待ち・停止時間は除外する。起動中は計測中、未計測は「—」、失敗は失敗までの時間と起動失敗を表示する。再起動で直近値へ置き換え、停止後は保持し、本体終了時に破棄する。設定・履歴ファイル・起動順は変更しない。
+- 管理対象0件と検索結果0件を、見出しと外枠が残る表内の全7列にまたがる案内へ変更した。AI一覧の空表示を`SettingsTableEmptyRow`へ共通化し、同じ余白と中央配置を使用する。設定ページへ渡す要約にも起動計測を含め、実画面の更新を確認した。
+- 発行前レビュー1回で計測開始/終了、初回失敗・再試行、停止/後続クラッシュ、snapshot・設定ページ連携、保存非干渉、空表示の列数・折り返し・既存操作を確認し、未解決指摘なし。変更前の845入力と照合し、今回の13項目以外の834ファイルはhash一致。レビュー後は本文の「起動処理中」の表現と本記録のみを修正した。通常の診断表示と既存UIの修正で保存仕様の追加・削除がないためパッチを0.97.1→**0.97.2**へ更新した。
+- 固定Node 24.22.1/pnpm 12.10.1を`dev.bat`経由で使用した。版更新に必要な`install --frozen-lockfile`再照合を独立node_modulesで行い、lockfile・toolchain・依存設定を変更しない。型検査、本体/Default Shell build、差分検査、関連**9ファイル48/48件（fail/cancel/skip 0）**に成功した。計測の成功・失敗・RPC完了前のプロセス障害・再試行・遅延除外・保存不変と、世代ガード/既定有効/Applet管理/AI/設定ページ/動的ページを確認した。
+- GUIはソース版8群、発行済み固定EXEの隔離コピー8群を直列実行し、初回の秒表示・無効/開始待ちの未計測・失敗表示・再起動中と直近値・今すぐ開始・検索0件/解除・未導入0件・AI空表示・明暗/狭幅・保存に計測値が入らないことを確認した。固定版fixtureの計測は約1269 ms→再起動約2080 ms、遅延60秒の今すぐ開始は約180 ms。これは検証用Appletの測定であり、実利用Appletの速度評価ではない。固定EXEのsmokeも成功した。
+- `publish.bat`成功（exit 0）。発行先は`A:\40.ARTIFACT\AppDock.at365-folder-portable\win-unpacked\AppDock.at365.exe`。EXE size **249797632**、SHA256 **605bacf99f150fc8af99b63744ac83a5fec0c8d90ab1204e9eda2a5341f3a3d3**。`update.zip` size **270652196**、SHA256 **fd2c4223f47962ad3b9347e89c71910c1a81007c85c1c580cc974c4b5498a8fb**。manifest/feedの0.97.2、ZIPのsize/hash、ビルド元・発行先・更新ZIP内の管理694ファイルのSHA256一致を確認した。
+- 完全ログ、レビュー、変更前/検証時/最終入力hash、配布ファイルhash、結果JSONは`.artifacts/applet-startup-validation/`。GUIの結果とPNGは`.artifacts/applet-startup-ui-1793038322937/`（ソース）と`.artifacts/applet-startup-ui-1793038555406/`（固定版）。GUI初回の要約連携不足は修正後に成功し、再現資料を保持した。今回の試験フォルダーは実行方式ごとに成功分3件以下のため削除0件、過去の移行証跡も保持する。
+- 起動/トレイ/更新方式は今回変更していない。0.97.1での利用者による1秒以内表示・トレイ再起動・同版更新の申告と前回の検証は前項を参照する。今回の全リポジトリ回帰、トレイ識別、Windowsサインイン実動作、実利用Applet全部の計測は実施していない。commit/push/Release/実利用先deployは行わない。
+
+## 2026-10-27: フォルダー型worktreeへ最新mainを取り込み（ソース同期）
+
+- 利用者の取り込み依頼に合わせて、cleanなprimary mainを`pull --ff-only`で確認し、最新`7531fa445bcfdc5c18cecf756664c208af5386ee`（登録画像のMCP設定対応、0.96.3）を`codex/folder-portable`へfast-forwardした。移行作業を新たにcommitすることなく、HEADを`dbd83eb`から更新した。
+- 未commitの移行内容は差分・全対象ファイルのhash付きバックアップを作り、一時stash後に再適用。競合したpackage.jsonは移行版の0.97.1とフォルダー配布設定を保持し、VERIFICATIONは双方の履歴を保持した。自動統合された本体indexとMCP GUI fixtureは、mainの画像連携と移行版の起動先/コピー方法の両立を確認した。mainとの重複を除く移行110項目は元の内容と照合し、2ファイルの改行bytesも復元した。
+- 型検査、本体/Default Shell build、登録画像・MCP設定/一覧/対象/ダイアログ・画像基盤・フォルダー本体更新・従来更新の関連**9ファイル105/105件、fail/cancel/skip 0**が成功。未追跡の移行4ファイルと削除2ファイルも保持し、unmerged/staged項目は残さない。
+- 今回はソース同期のみで、版更新・再発行・push・Release・実利用deployは行わない。40.ARTIFACTの0.97.1は前項の移行時に検証した配布物のままで、今回のmain追加分を含む配布物ではない。次の実装/発行時に所定の版更新と発行物検証を行う。
+- バックアップ・競合解消/保持照合・型検査/build/105件の完全ログ・最終状態は`.artifacts/main-sync-20261027-024603/`。一時stashは再適用と検証後に所有hashを確認して整理し、差分とファイルバックアップは保持する。
+
+## 2026-10-27: フォルダー型ポータブルへの移行 0.97.1
+
+- `dbd83eb`から専用worktree `AppDock.at365-folder-portable` / `codex/folder-portable`を作成。起動時に展開するランチャーを外し、配置先のElectron EXEを直接起動する方式へ移行した。設定・端末別設定・data・extensionsと、配置パスから決まるPC専用rootは維持する。Appletの起動順序・計測機能は今回変更しない。
+- 本体一覧`appdock-host.json`とUpdaterの許可一覧で所有する本体項目を限定。EXE、resources/locales、DLL等の追加・交換・削除を既存のパッケージトランザクションへ接続し、終了確認・ハッシュ・リンク/範囲検証・中断復旧を保持した。更新結果には本体/Appletだけを数え、内部の本体資産をAppletとして数えない。
+- 配布/更新契約の変更で0.97.0へマイナー更新し、発行・検証した。その後、実行用の発行フォルダーへビルダーを直接出力すると再発行で利用者データを消し得る点を修正し、規則に従って0.97.1へ更新。ビルドは`.artifacts/host-build`、発行は本体所有ファイルだけの配置とし、ZIPをクリーンな作業先から生成する。0.97.0→0.97.1の実再発行で確認ファイルの保持を検証し、確認ファイルだけを削除した。
+- 発行前レビューと追加修正レビューは`.artifacts/folder-portable-validation/review.json`へ記録。本体一式が約630MBのため、展開済み本体の上限を1GiBへ分離。配布ZIPとAppletの上限は512MiB、ファイル数・SHA256・パス等の検査は維持する。通常publishは全体ZIP生成・未変更Appletの再発行を行わない。
+- 型検査、本体/Default Shell/.NET/helperビルド成功。関連回帰は**94件（更新・パッケージ・配布62件、Windows起動・トレイ32件）、fail/skip 0**。32件は0.97.1の発行先分離に影響されないソース・試験・依存を照合して再利用。標準全回帰は今回一律には再実行していない。固定Node 24.22.1、pnpm 12.10.1、Electron 45.0.0、builder 26.15.3を使用し、lockfile・依存検査を維持した。worktreeは独立node_modules、固定ツールだけjunctionで再利用した。
+- 最終0.97.1の固定フォルダーでGUI **34群**成功。更新/再起動/復元13群、進捗・取消・再試行/ステータスバー9群、トレイ識別・同時起動・版変更・異常終了7群、自動起動の登録/実Task実行/再起動/解除5群。専用Windows Taskは解除済み。smokeも成功し、既存の設定・保存場所・fixtureのログイン情報の保持を確認した。
+- 更新後のresourcesの完全交換と不要資産の除去もGUIで確認。GUI fixtureは本体一式を共通helperでコピーする。旧試験に残っていた補助Windowの配列番号参照、廃止されたApplet欄、共通設定の折りたたみ・既定のAbout自動確認を現UIへ合わせた。撮影は本体URLで対象を特定し、PNG寸法も検査。製品の画面・保存動作を試験のために変更していない。
+- 最終helperで**8箇所の中断・復旧試験**成功。停止点は試験用コピーだけに追加した。独立した日本語/空白入りの配置fixtureで、旧EXEのみの配置からの移行、再配置、全694ファイルの照合、既存データ保持を確認。発行ZIPからの独立配置試験も、明示引数/UTF-8設定/引数優先/不正な配置先の4ケースで成功した。
+- 発行先は`A:/40.ARTIFACT/AppDock.at365-folder-portable`。本体EXEは**249797632 bytes / SHA256 `9ce9f9047aea76350ba8a4773b167e8aae6e502c6a7601fc7d195f98caba2aca`**、update.zipは**270650767 bytes / SHA256 `8ec7c39b570979a696092df0c6121b8a6eed7b3e58e057489530dc4d42bd8a1f`**。feed・本体一覧・UIの版は0.97.1で整合。exe単体の配布は行わず、初回の旧形式からの切り替えは同じ既存配置先への手動配置とする。
+- 利用者から、ウィンドウ表示が1秒以内、トレイ起動/トレイ再起動/同版更新が成功したとの報告を受けた。これは利用者の実環境での確認として記録し、自動計測の値と混同しない。実UAC承認・実Windowsサインイン・実アカウント/NAS・全Applet入り実ZIPは今回の試験対象外（全体ZIPはfixtureで検証）。起動時間の内訳と遅いAppletの特定は次の工程。
+- 正本仕様は[フォルダー型配布](docs/portable-distribution.md)。完全ログ、成果物のhash、入力manifest、再利用判定、レビューと後片付けは`.artifacts/folder-portable-validation/`を参照する。commit・push・GitHub Release・実利用先deployは未実施。
+
 ## 2026-10-27: キー対応をmainへマージし通常版0.96.7を確認
 
 - 利用者の指示により、準備済み20ファイルを`86acd2714d9776bc9d479cd782506eca6e34e688`（tree `30d4aeae7e1f88cc0b0882d97c2a5e78c130c573`）へコミットし、cleanなmainへfast-forwardで反映した。stage treeとcommit tree、author/committerと有効なGit設定の一致を確認した。対象外の変更・push・Release・実利用deployは含めていない。

@@ -28,7 +28,7 @@ const portable = process.argv[2] && path.resolve(process.argv[2]);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
-  fs.copyFileSync(portable, exe);
+  require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
 let child, browser, host;

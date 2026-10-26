@@ -14,7 +14,7 @@ fs.mkdirSync(profile, { recursive: true });
 const sourceExe = path.resolve(process.argv[2]);
 const executable = path.join(profile, 'AppDock.at365.exe');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-fs.copyFileSync(sourceExe, executable);
+require('./copy-host.cjs').copyHost(sourceExe, executable);
 assert.equal(hash(executable), hash(sourceExe));
 const caller = 'test.command-api';
 const stopped = 'test.stopped-settings';
@@ -60,7 +60,7 @@ const manifest = JSON.parse(
 );
 manifest.version = '2.0.0';
 fs.writeFileSync(path.join(updateSource, 'extension.json'), JSON.stringify(manifest));
-fs.copyFileSync(
+require('./copy-host.cjs').copyHost(
   path.join(profile, 'extensions', stopped, 'index.cjs'),
   path.join(updateSource, 'index.cjs'),
 );

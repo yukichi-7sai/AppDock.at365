@@ -87,6 +87,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
 const portable = process.argv.includes('--portable');
 const source = path.join(
   require('./publish-paths.cjs').getPublishDirectory(root),
+  'win-unpacked',
   'AppDock.at365.exe',
 );
 const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
@@ -94,7 +95,7 @@ let sha256, app, probe;
 const checks = [];
 (async () => {
   if (portable) {
-    fs.copyFileSync(source, executablePath);
+    require('./copy-host.cjs').copyHost(source, executablePath);
     sha256 = hash(source);
     assert.equal(hash(executablePath), sha256);
   }

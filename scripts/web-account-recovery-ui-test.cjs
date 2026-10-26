@@ -53,7 +53,7 @@ settings.webApplets.items = [
 const originalSettings = JSON.stringify(settings);
 fs.writeFileSync(settingsFile, originalSettings);
 const executable = portable ? path.join(base, 'AppDock.at365.exe') : require('electron');
-if (portable) fs.copyFileSync(portable, executable);
+if (portable) require('./copy-host.cjs').copyHost(portable, executable);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {

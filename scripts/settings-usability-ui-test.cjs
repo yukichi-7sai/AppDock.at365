@@ -76,7 +76,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     delete env.ELECTRON_RUN_AS_NODE;
     const exe = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (process.argv[2]) {
-      fs.copyFileSync(path.resolve(process.argv[2]), exe);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);
       assert.equal(hash(exe), hash(path.resolve(process.argv[2])));
     }
     child = spawn(

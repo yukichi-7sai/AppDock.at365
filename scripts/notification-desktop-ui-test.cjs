@@ -90,7 +90,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const executable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
 if (executable) {
-  fs.copyFileSync(path.resolve(process.argv[2]), executable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
   assert.equal(hash(executable), hash(path.resolve(process.argv[2])));
 }
 const env = { ...process.env };

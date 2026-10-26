@@ -600,15 +600,6 @@ pre.ai-preview-result {
 .ai-model-name {
   font-size: 12px;
 }
-.ai-empty {
-  text-align: center;
-  padding: 28px 0;
-}
-.ai-empty p {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 8px;
-}
 .ai-model-picker {
   display: flex;
   align-items: center;
@@ -627,7 +618,7 @@ pre.ai-preview-result {
 .ai-connection-dialog .settings-dialog-body {
   flex: 1;
 }
-.applet-management-table td:first-child {
+.applet-management-table td:first-child:not([colspan]) {
   width: 30%;
   min-width: 150px;
   white-space: normal;

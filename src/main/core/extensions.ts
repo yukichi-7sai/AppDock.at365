@@ -319,6 +319,8 @@ export interface ExtensionInstance {
   panel: Panel | null;
   settingOptions: Record<string, SettingOption[]>;
   error: string | null;
+  startupStartedAt?: number;
+  startupTiming?: ExtensionSnapshot['startupTiming'];
   scheduledStartAt?: number;
   scheduledDelay?: number;
   startTimer?: ReturnType<typeof setTimeout>;
@@ -326,6 +328,7 @@ export interface ExtensionInstance {
   peer?: JsonLinePeer | null;
 }
 interface ManagerOptions {
+  startAllowed?(id: string): boolean;
   reservedCustomTypeIds?(): string[];
   builtinRoots?: string[];
   hostVersion?: string;
@@ -370,6 +373,7 @@ class ExtensionManager extends EventEmitter {
   hostVersion: string;
   reservedCustomTypeIds: () => string[];
   discoveryIssueCount = 0;
+  startAllowed: (id: string) => boolean;
   constructor({
     roots,
     builtinRoots = [],
@@ -381,6 +385,7 @@ class ExtensionManager extends EventEmitter {
     log,
     hostVersion = '0.0.0',
     reservedCustomTypeIds = () => [],
+    startAllowed = () => true,
   }: ManagerOptions) {
     super();
     this.builtinRoots = builtinRoots;
@@ -396,6 +401,7 @@ class ExtensionManager extends EventEmitter {
     this.shuttingDown = false;
     this.hostVersion = hostVersion;
     this.reservedCustomTypeIds = reservedCustomTypeIds;
+    this.startAllowed = startAllowed;
   }
   validateInstall(folder: string) {
     const manifest = readManifest(folder);
@@ -475,6 +481,7 @@ class ExtensionManager extends EventEmitter {
       displayName: appletDisplayName(e.manifest),
       state: e.state,
       scheduledStartAt: e.scheduledStartAt,
+      startupTiming: e.startupTiming && { ...e.startupTiming },
       error: e.error,
       enabled:
         e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, e.manifest.id),
@@ -487,6 +494,7 @@ class ExtensionManager extends EventEmitter {
   canActivateForCommand(e: ExtensionInstance, id: string) {
     if (
       this.shuttingDown ||
+      !this.startAllowed(e.manifest.id) ||
       !['stopped', 'waiting'].includes(e.state) ||
       !e.manifest.commands?.some((command) => command.id === id && command.activateOnExecute)
     )
@@ -559,6 +567,7 @@ class ExtensionManager extends EventEmitter {
       .then(async () => {
         if (this.shuttingDown) return;
         for (const e of this.items.values()) {
+          if (this.shuttingDown) return;
           const enabled =
             e.manifest.sourceKind === 'builtin' ||
             appletEnabled(this.settings.value, e.manifest.id);
@@ -607,7 +616,9 @@ class ExtensionManager extends EventEmitter {
       );
   }
   async schedule(e: ExtensionInstance) {
+    if (this.shuttingDown || !this.startAllowed(e.manifest.id)) return;
     this.cancelStart(e);
+    e.startupTiming = undefined;
     try {
       this.checkCompatibility(e);
     } catch (err) {
@@ -651,6 +662,9 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   async start(e: ExtensionInstance) {
+    if (this.shuttingDown || !this.startAllowed(e.manifest.id)) return;
+    e.startupTiming = undefined;
+    e.startupStartedAt = performance.now();
     e.runtimeSession = randomUUID();
     e.dynamicPages = [];
     e.pageRevision = (e.pageRevision ?? 0) + 1;
@@ -752,6 +766,7 @@ class ExtensionManager extends EventEmitter {
               ),
           )
         : [];
+      this.finishStartup(e, 'success');
       e.state = 'running';
       this.log(
         'info',
@@ -764,9 +779,18 @@ class ExtensionManager extends EventEmitter {
     }
     this.emit('changed');
   }
+  finishStartup(e: ExtensionInstance, outcome: 'success' | 'error') {
+    if (e.startupStartedAt === undefined) return;
+    e.startupTiming = {
+      durationMs: Math.max(0, performance.now() - e.startupStartedAt),
+      outcome,
+    };
+    e.startupStartedAt = undefined;
+  }
   crashed(e: ExtensionInstance, message: string) {
     this.executions.stop(e.manifest.id);
     if (e.state === 'stopping') return;
+    this.finishStartup(e, 'error');
     void closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
     e.dynamicPages = [];
@@ -783,6 +807,7 @@ class ExtensionManager extends EventEmitter {
   async stop(e: ExtensionInstance) {
     this.executions.stop(e.manifest.id);
     this.cancelStart(e);
+    e.startupStartedAt = undefined;
     e.state = 'stopping';
     await closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);

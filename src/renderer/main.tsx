@@ -1,4 +1,5 @@
 import { SettingsControlsProvider } from './settings-ui/api';
+import { hostText } from '../shared/i18n';
 import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/RegisteredImagePicker';
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { HostPageSlot } from './pages/HostPageSlot';
@@ -92,6 +93,12 @@ function App() {
   const [restoringPage, setRestoringPage] = useState(page.startsWith('page:'));
   const openingRestoredPage = useRef(false);
   const [error, setError] = useState('');
+  const hostUiRendered = React.useCallback(() => {
+    void window.dock.hostUiRendered().catch((e) => setError(String(e)));
+  }, []);
+  useEffect(() => {
+    if (snapshot?.uiReady && (page.startsWith('page:') || page === 'extensions')) hostUiRendered();
+  }, [snapshot?.uiReady, page, hostUiRendered]);
   const [busy, setBusy] = useState(false);
   const [ribbonRequest, setRibbonRequest] = useState(0);
   const [generalRequest, setGeneralRequest] = useState(0);
@@ -122,11 +129,11 @@ function App() {
     };
     // Native Applet views can cover this renderer; mode changes must not wait for an observer frame.
   }, [!!snapshot, snapshot?.ribbonDisplayMode]);
-  const settingsPageReady = snapshot?.startupReady === true && snapshot.navigation.route === page;
+  const settingsPageReady = snapshot?.uiReady === true && snapshot.navigation.route === page;
   const editor = useSettingsEditor(snapshot?.settings);
   const settingsViewRestored = useRef(false);
   useEffect(() => {
-    if (!snapshot?.startupReady || !editor.sessionId) return;
+    if (!snapshot?.uiReady || !editor.sessionId) return;
     const key = 'appdock.restart-view.category';
     if (!settingsViewRestored.current) {
       settingsViewRestored.current = true;
@@ -143,7 +150,7 @@ function App() {
     try {
       localStorage.setItem(key, JSON.stringify(editor.pageId));
     } catch {}
-  }, [snapshot?.startupReady, editor.sessionId, editor.pageId]);
+  }, [snapshot?.uiReady, editor.sessionId, editor.pageId]);
   useEffect(() => {
     if (ribbonRequest) editor.selectPage('ribbon');
   }, [ribbonRequest]);
@@ -401,6 +408,9 @@ function App() {
           <div className="page-content">
             {page.startsWith('page:') && (
               <div className="applet-page-body">
+                {restoringPage && (
+                  <div className="loading">{hostText('renderer.startup.restoringApplet')}</div>
+                )}
                 {snapshot.extensions
                   .filter((a) => !!snapshot.webPages[a.id] && `page:${a.id}:main` === page)
                   .map((a) => (
@@ -444,17 +454,26 @@ function App() {
             )}
             <div className="settings-page" hidden={page !== 'settings'}>
               {page === 'settings' && (
-                <SettingsPage ready={settingsPageReady} sidebarWidth={appletSidebar.width} />
+                <SettingsPage
+                  ready={settingsPageReady}
+                  sidebarWidth={appletSidebar.width}
+                  onReady={hostUiRendered}
+                />
               )}
             </div>
             {page === 'notifications' && (
-              <HostPageSlot kind="notifications" navigationRequest={snapshot.navigation.request} />
+              <HostPageSlot
+                kind="notifications"
+                navigationRequest={snapshot.navigation.request}
+                onReady={hostUiRendered}
+              />
             )}
             {page === 'image-library' && (
               <HostPageSlot
                 key="image-library"
                 kind="image-library"
                 navigationRequest={snapshot.navigation.request}
+                onReady={hostUiRendered}
               />
             )}
             {page === 'logs' && (
@@ -462,6 +481,7 @@ function App() {
                 scope={{ type: 'all' }}
                 source={logSource}
                 navigationRequest={snapshot.navigation.request}
+                onReady={hostUiRendered}
               />
             )}
           </div>

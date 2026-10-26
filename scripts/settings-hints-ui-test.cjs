@@ -667,7 +667,7 @@ async function checkSectionTitles() {
     require('../out/main/shared/settings-schema').parseSettings(initial);
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
     if (source) {
-      fs.copyFileSync(source, path.join(profile, 'AppDock.at365.exe'));
+      require('./copy-host.cjs').copyHost(source, path.join(profile, 'AppDock.at365.exe'));
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
     }
     await launch();

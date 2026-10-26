@@ -21,6 +21,8 @@ import { Toggle } from '../settings-ui/Toggle';
 import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { CommandListSummary } from '../settings-ui/CommandListScroll';
+import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
+import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
 
 const states = {
   running: hostText('settings.appletManagementSettings.running'),
@@ -312,6 +314,15 @@ export function AppletManagementSettings({
             </th>
             <th>{translate('settings.appletManagementSettings.enabled')}</th>
             <th>{translate('settings.appletManagementSettings.state')}</th>
+            <th>
+              <span className="settings-list-heading">
+                {translate('settings.appletManagementSettings.startupTime')}
+                <SettingsHintIcon
+                  title={translate('settings.appletManagementSettings.startupTime')}
+                  hint={translate('settings.appletManagementSettings.startupTimeHint')}
+                />
+              </span>
+            </th>
             <th className="settings-list-actions-heading">
               {translate('settings.appletManagementSettings.actions')}
             </th>
@@ -389,6 +400,26 @@ export function AppletManagementSettings({
                         {translate('settings.appletManagementSettings.start')}
                       </button>
                     </>
+                  )}
+                </td>
+                <td data-testid="applet-startup-time">
+                  {a.state === 'starting'
+                    ? translate('settings.appletManagementSettings.measuring')
+                    : a.startupTiming
+                      ? translate(
+                          a.startupTiming.durationMs < 1000
+                            ? 'settings.appletManagementSettings.startupMilliseconds'
+                            : 'settings.appletManagementSettings.startupSeconds',
+                          {
+                            duration:
+                              a.startupTiming.durationMs < 1000
+                                ? Math.round(a.startupTiming.durationMs)
+                                : (a.startupTiming.durationMs / 1000).toFixed(2),
+                          },
+                        )
+                      : '—'}
+                  {a.startupTiming?.outcome === 'error' && (
+                    <small>{translate('settings.appletManagementSettings.startupFailed')}</small>
                   )}
                 </td>
                 <td className="settings-list-actions-cell">
@@ -481,15 +512,24 @@ export function AppletManagementSettings({
               </tr>
             );
           })}
+          {!visible.length && (
+            <SettingsTableEmptyRow
+              colSpan={7}
+              testId="applet-management-empty"
+              title={translate(
+                applets.length
+                  ? 'settings.appletManagementSettings.noMatches'
+                  : 'settings.appletManagementSettings.empty',
+              )}
+              description={translate(
+                applets.length
+                  ? 'settings.appletManagementSettings.noMatchesHint'
+                  : 'settings.appletManagementSettings.emptyHint',
+              )}
+            />
+          )}
         </tbody>
       </SettingsListLayout>
-      {!visible.length && (
-        <p>
-          {applets.length
-            ? translate('settings.appletManagementSettings.noMatches')
-            : translate('settings.appletManagementSettings.empty')}
-        </p>
-      )}
       {install && <InstallDialog invoke={invoke} close={() => setInstall(false)} />}
       {order && (
         <SettingsOrderDialog

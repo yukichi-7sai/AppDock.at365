@@ -27,7 +27,7 @@ for (const name of ['Gmail', 'Watch', 'WallpaperSlideshow', 'WebBrowserTools', '
   const mf = path.join(repo, 'extension.json'),
     m = JSON.parse(fs.readFileSync(mf));
   // Before publishing, test current declarations against the existing disabled payloads.
-  if (!process.argv[2]) fs.copyFileSync(mf, path.join(folder, 'extension.json'));
+  if (!process.argv[2]) require('./copy-host.cjs').copyHost(mf, path.join(folder, 'extension.json'));
   else assert.equal(hash(mf), hash(path.join(folder, 'extension.json')));
   manifests.push(m);
   inputs.push({ repo, manifest: hash(mf), payload: hash(path.join(source, m.entry)) });
@@ -125,7 +125,7 @@ async function until(fn, label) {
     delete env.ELECTRON_RUN_AS_NODE;
     const exe = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (process.argv[2]) {
-      fs.copyFileSync(path.resolve(process.argv[2]), exe);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);
       assert.equal(hash(exe), hash(path.resolve(process.argv[2])));
     }
     child = spawn(

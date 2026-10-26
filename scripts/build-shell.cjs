@@ -10,7 +10,7 @@ fs.writeFileSync(
   path.join(root, 'out/shells/default/extension.json'),
   JSON.stringify(manifest, null, 2),
 );
-fs.copyFileSync(
+require('./copy-host.cjs').copyHost(
   path.join(root, 'shells/default/worker.cjs'),
   path.join(root, 'out/shells/default/worker.cjs'),
 );

@@ -13,11 +13,11 @@ const root = path.resolve(__dirname, '..'),
 const development = process.argv.includes('--development');
 const source = development
   ? require('electron')
-  : path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'));
+  : path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'));
 const executable = development ? source : path.join(profile, 'AppDock.at365.exe');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 fs.mkdirSync(profile, { recursive: true });
-if (!development) fs.copyFileSync(source, executable);
+if (!development) require('./copy-host.cjs').copyHost(source, executable);
 const sha256 = hash(source);
 assert.equal(hash(executable), sha256);
 fs.cpSync(

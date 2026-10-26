@@ -72,7 +72,7 @@ for (let index = 0; index < 2; index++) {
 }
 const native = path.join(profile, 'extensions', 'native');
 fs.mkdirSync(native, { recursive: true });
-fs.copyFileSync(
+require('./copy-host.cjs').copyHost(
   path.join(
     root,
     'tests/fixtures/dotnet/AppDock.RibbonBadge/bin/Release/net10.0/AppDock.RibbonBadge.dll',
@@ -143,7 +143,7 @@ settings.ribbon = {
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
-  fs.copyFileSync(portable, exe);
+  require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
 const checks = [],

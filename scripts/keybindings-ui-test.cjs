@@ -215,7 +215,7 @@ const expectCalls = async (before, expected) => {
     fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     const portable = !!process.argv[2];
     const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
-    if (portable) fs.copyFileSync(path.resolve(process.argv[2]), executablePath);
+    if (portable) require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executablePath);
     const portableHash = portable
       ? createHash('sha256').update(fs.readFileSync(executablePath)).digest('hex')
       : undefined;

@@ -107,7 +107,7 @@ fs.mkdirSync(path.dirname(configFile), { recursive: true });
 const original = '# Existing configuration must survive\npersonality = "friendly"\n';
 fs.writeFileSync(configFile, original);
 const portableHash = portable ? hash(portable) : undefined;
-if (portable) fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'));
+if (portable) require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
   const start = Date.now();

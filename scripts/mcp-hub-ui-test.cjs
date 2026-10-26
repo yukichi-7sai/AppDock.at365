@@ -49,7 +49,7 @@ for (const [index, id] of providerIds.entries()) {
   const folder = path.join(profile, 'extensions', id);
   fs.mkdirSync(folder, { recursive: true });
   if (index === 0)
-    fs.copyFileSync(
+    require('./copy-host.cjs').copyHost(
       path.join(root, 'tests/fixtures/extensions/custom-commands/index.cjs'),
       path.join(folder, 'index.cjs'),
     );
@@ -103,14 +103,14 @@ const watchFolder = path.join(profile, 'extensions', 'at365.watch');
 fs.cpSync(path.join(watchRoot, 'Applet.Watch/bin/Release/net10.0-windows/win-x64'), watchFolder, {
   recursive: true,
 });
-fs.copyFileSync(path.join(watchRoot, 'extension.json'), path.join(watchFolder, 'extension.json'));
+require('./copy-host.cjs').copyHost(path.join(watchRoot, 'extension.json'), path.join(watchFolder, 'extension.json'));
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
 fs.writeFileSync(configFile, '# isolated test\n');
 const portableHash = portable ? hash(portable) : undefined;
-if (portable) fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'));
+if (portable) require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
 function fixtureHashes(folder) {
   return Object.fromEntries(
     fs.readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {

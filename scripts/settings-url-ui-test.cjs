@@ -79,7 +79,7 @@ const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex'
     let exe = require('electron');
     if (process.argv[2]) {
       exe = path.join(profile, 'AppDock.at365.exe');
-      fs.copyFileSync(path.resolve(process.argv[2]), exe);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);
       assert.equal(hash(exe), hash(process.argv[2]));
     }
     child = spawn(

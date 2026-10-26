@@ -48,7 +48,7 @@ const settingsFile = path.join(profile, 'settings.json');
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
 const portable = !!process.argv[2];
 const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
-if (portable) fs.copyFileSync(path.resolve(process.argv[2]), executable);
+if (portable) require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const events = () => (fs.existsSync(eventsFile) ? JSON.parse(fs.readFileSync(eventsFile)) : []);

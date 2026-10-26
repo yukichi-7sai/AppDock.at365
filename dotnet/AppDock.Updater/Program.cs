@@ -48,15 +48,15 @@ internal static partial class Program
         using var stream = File.OpenRead(file);
         return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
     }
-    private static string TreeHash(string directory)
+    private static string TreeHash(string directory, long max = Limit)
     {
         NoLinks(directory);
-        var files = Files(directory).OrderBy(p => Path.GetRelativePath(directory, p).Replace('\\', '/'), StringComparer.Ordinal);
+        var files = Files(directory, max).OrderBy(p => Path.GetRelativePath(directory, p).Replace('\\', '/'), StringComparer.Ordinal);
         var text = new StringBuilder();
         foreach (var file in files) text.Append(Path.GetRelativePath(directory, file).Replace('\\', '/')).Append('\0').Append(Hash(file)).Append('\n');
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()))).ToLowerInvariant();
     }
-    private static List<string> Files(string directory)
+    private static List<string> Files(string directory, long max = Limit)
     {
         var files = new List<string>(); long size = 0;
         void Walk(string current)
@@ -69,14 +69,14 @@ internal static partial class Program
                 else
                 {
                     size += new FileInfo(file).Length;
-                    if (size > Limit || files.Count >= 10000) throw new IOException("更新ファイルのサイズ・個数が上限を超えました。");
+                    if (size > max || files.Count >= 10000) throw new IOException("更新ファイルのサイズ・個数が上限を超えました。");
                     files.Add(file);
                 }
             }
         }
         Walk(directory); return files;
     }
-    private static void Extract(string archive, string directory)
+    private static void Extract(string archive, string directory, long max = Limit)
     {
         if (Directory.Exists(directory)) throw new IOException("展開先は空の新規フォルダーにしてください。");
         Directory.CreateDirectory(directory); NoLinks(directory);
@@ -89,7 +89,7 @@ internal static partial class Program
             if (((entry.ExternalAttributes >> 16) & 0xf000) == 0xa000) throw new IOException("ZIPにリンクを含めることはできません。");
             if (!paths.Add(name)) throw new IOException("ZIPに重複したパスがあります。");
             var destination = Full(Path.Combine(directory, name));
-            if (!Within(directory, destination) || (size += entry.Length) > Limit) throw new IOException("ZIPの展開範囲・サイズが上限を超えました。");
+            if (!Within(directory, destination) || (size += entry.Length) > max) throw new IOException("ZIPの展開範囲・サイズが上限を超えました。");
             if (entry.FullName.EndsWith('/')) Directory.CreateDirectory(destination);
             else { Directory.CreateDirectory(Path.GetDirectoryName(destination)!); entry.ExtractToFile(destination, false); }
         }
@@ -105,10 +105,10 @@ internal static partial class Program
         }
         File.Move(next, file, true);
     }
-    private static void CopyDirectory(string source, string destination)
+    private static void CopyDirectory(string source, string destination, long max = Limit)
     {
         Directory.CreateDirectory(destination);
-        foreach (var file in Files(source))
+        foreach (var file in Files(source, max))
         {
             var target = Path.Combine(destination, Path.GetRelativePath(source, file));
             Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target, false);
@@ -117,19 +117,19 @@ internal static partial class Program
     private static void Move(string source, string destination, string kind)
     {
         NoLinks(source); NoLinks(destination);
-        if (kind == "host") File.Move(source, destination); else Directory.Move(source, destination);
+        if (FileItem(kind)) File.Move(source, destination); else Directory.Move(source, destination);
     }
     private static void Delete(string location, string kind)
     {
         NoLinks(location);
-        if (kind == "host") { if (File.Exists(location)) File.Delete(location); }
+        if (FileItem(kind)) { if (File.Exists(location)) File.Delete(location); }
         else if (Directory.Exists(location)) Directory.Delete(location, true);
     }
-    private static bool Exists(string location, string kind) => kind == "host" ? File.Exists(location) : Directory.Exists(location);
+    private static bool Exists(string location, string kind) => FileItem(kind) ? File.Exists(location) : Directory.Exists(location);
     private static void Verify(Item item)
     {
         NoLinks(item.Source); NoLinks(item.Destination);
-        var digest = item.Kind == "host" ? Hash(item.Source) : TreeHash(item.Source);
+        var digest = FileItem(item.Kind) ? Hash(item.Source) : TreeHash(item.Source, item.Kind == "host-directory" ? HostLimit : Limit);
         if (!string.Equals(digest, item.Sha256, StringComparison.OrdinalIgnoreCase)) throw new IOException("準備済み更新ファイルのハッシュが一致しません。");
         if (item.Kind == "applet")
         {
@@ -327,7 +327,14 @@ internal static partial class Program
         source = Full(source); output = Full(output); NoLinks(source); NoLinks(output);
         string id; string? minimumHostVersion = null; string payload;
         List<string>? files = null;
-        if (kind == "host") { id = "host"; payload = "AppDock.at365.exe"; }
+        if (kind == "host")
+        {
+            id = "host"; payload = "AppDock.at365.exe";
+            if (Directory.Exists(source))
+            {
+                WriteHostPackage(source, version); files = Files(source, HostLimit); payload = "update.zip";
+            }
+        }
         else if (kind == "applet")
         {
             using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(source, "extension.json")));
@@ -350,7 +357,7 @@ internal static partial class Program
         var temporary = Path.Combine(output, ".update-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
-            if (kind == "applet")
+            if (files is not null)
             {
                 using (var archive = ZipFile.Open(temporary, ZipArchiveMode.Create))
                     foreach (var file in files!)
@@ -360,7 +367,7 @@ internal static partial class Program
             }
             else if (!Same(source, filePath)) { File.Copy(source, temporary); File.Move(temporary, filePath, true); }
             Write(Path.Combine(output, "update.json"), new { schemaVersion = 1, kind, id, version, minimumHostVersion,
-                payload = new { file = payload, sha256 = Hash(filePath), size = new FileInfo(filePath).Length, format = kind == "host" ? "exe" : "zip" } });
+                payload = new { file = payload, sha256 = Hash(filePath), size = new FileInfo(filePath).Length, format = files is null ? "exe" : "zip" } });
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
@@ -369,10 +376,15 @@ internal static partial class Program
         try
         {
             if (args.Length == 3 && args[0] == "--extract") Extract(args[1], args[2]);
+            else if (args.Length == 3 && args[0] == "--extract-host") Extract(args[1], args[2], HostLimit);
             else if (args.Length == 2 && args[0] == "--apply") Apply(args[1]);
             else if (args.Length == 2 && args[0] == "--recover") Recover(args[1]);
             else if (args.Length == 3 && args[0] == "--recover") Recover(args[1], args[2]);
             else if (args.Length == 5 && args[0] == "--pack") Pack(args[1], args[2], args[3], args[4]);
+            else if (args.Length == 4 && args[0] == "--plan-host")
+                Console.WriteLine(JsonSerializer.Serialize(PlanHost(args[1], args[2], args[3]), JsonOptions));
+            else if (args.Length == 3 && args[0] == "--deploy-host") DeployHost(args[1], args[2]);
+            else if (args.Length == 3 && args[0] == "--seal-host") WriteHostPackage(Full(args[1]), args[2]);
             else throw new ArgumentException("AppDock.Updater: --apply job.json / --extract zip directory / --recover base / --pack host|applet source version output");
             return 0;
         }

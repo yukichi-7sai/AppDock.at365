@@ -72,7 +72,7 @@ for (const [key, id] of Object.entries(ids)) {
     m.runtime = 'dotnet';
     m.entry = 'AppDock.ShellProbe.dll';
     m.type = 'AppDock.ShellProbe.ShellProbe';
-    fs.copyFileSync(
+    require('./copy-host.cjs').copyHost(
       path.join(
         root,
         'tests/fixtures/dotnet/AppDock.ShellProbe/bin/Release/net10.0/AppDock.ShellProbe.dll',
@@ -113,7 +113,7 @@ const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex'
 let executable, app, browser, host, child;
 if (process.argv[2]) {
   executable = path.join(profile, 'AppDock.at365.exe');
-  fs.copyFileSync(path.resolve(process.argv[2]), executable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
   assert.equal(hash(executable), hash(path.resolve(process.argv[2])));
 }
 const pages = () => (app ? app.context().pages() : browser.contexts().flatMap((c) => c.pages()));

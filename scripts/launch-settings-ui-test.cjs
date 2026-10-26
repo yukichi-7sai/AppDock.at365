@@ -15,9 +15,9 @@ const folder = path.join(profile, '日本語 folder');
 fs.mkdirSync(folder, { recursive: true });
 const executable = path.join(folder, "AppDock's.at365.exe");
 const source = path.resolve(
-  process.argv[2] || path.join(getPublishDirectory(root), 'AppDock.at365.exe'),
+  process.argv[2] || path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'),
 );
-fs.copyFileSync(source, executable);
+require('./copy-host.cjs').copyHost(source, executable);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 assert.equal(hash(source), hash(executable));
 const settings = createDefaultSettings();
@@ -45,7 +45,7 @@ async function launch() {
   await new Promise((resolve) => probe.close(resolve));
   child = spawn(executable, [`--test-profile=${profile}`, `--remote-debugging-port=${port}`], {
     cwd: folder,
-    windowsHide: true,
+    windowsHide: false,
     env,
     stdio: 'ignore',
   });

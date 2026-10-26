@@ -18,13 +18,17 @@
 
 statusがcurrentの場合は結果本文を表示せず、現在のバージョンと最終確認日時だけを残す。「最新版です。」の表示は行わない。
 
+GitHubの最新Release取得（`releases/latest`）がHTTP 404の場合は、取得可能な公開Releaseがない`unpublished`として扱う。確認だけならエラー通知を出さず、更新実行ではその対象をスキップする。同版再適用OFFでほかがすべて現行版なら、更新なしの情報通知で終了する。明示したタグ、配布済みのupdate.json/ZIPの404、403/503、破損・不一致等は引き続きエラーとする。未公開を「更新できた」とは扱わない。
+
+更新パッケージの読み取り・コピー・ハッシュ・一時領域の削除は、Electronでは`original-fs`を使用して物理ファイルとして処理する。`app.asar`を仮想ディレクトリとして開かない。本体が通常動作でASARを読む仕組みは変更しない。再起動後の一時領域整理も同じAPIを使い、既存のTEMP直下・名前・symlink・journal確認を保つ。実ファイルの一時的なロックには短い有限の再試行を行い、削除できなければ警告を残す。
+
 `settings.updates`はhostSource、checkHostOnAboutOpen、checkHostOnStartup、checkAppletsOnStartup、startupDelaySeconds（0～3600）、notifyOnStartup、allowSameVersion。本体のhostSourceの既定は`github:yukichi-7sai/AppDock.at365`。保存済みの更新元は保持し、「AppDockの更新元を既定に戻す」で現在の既定値へ戻す。Appletは`extensions.<id>.updateSource`を使い、未指定ならmanifest.updateRepositoryを継承、空文字は無効。
 
 ローカル/UNCはupdate.jsonまたは発行フォルダー。Appletフォルダーにupdate.jsonがなければextension.jsonを読む。HTTP(S)はfeed URLまたは末尾/の配布ベースURL。GitHubはリポジトリ/Release URLからAPIとRelease assetsを使い、Source code ZIPは使わない。IDと正式版SemVer、最低本体版を照合する。非公開の認証トークンとプレリリースは扱わない。
 
 ## 発行
 
-本体のpublish.bat/dev.bat run distはhelperをビルドし、portable EXEの発行後にA:/40.ARTIFACT/AppDock.at365/update.jsonを生成する。外部公開はしない。
+本体のpublish.bat/dev.bat run distはhelperをビルドし、フォルダー型本体の発行後にA:/40.ARTIFACT/AppDock.at365/update.jsonを生成する。外部公開はしない。
 
 共通`scripts/pack-applet-update.ps1`は.NET 10 SDKでパッカーを増分ビルドして実行する。全6Appletのpublish.batは発行後にこれを呼び、`A:\40.ARTIFACT\<リポジトリ名>`へupdate.jsonとupdate.zipを生成する。その下の各Appletの配布フォルダーは配置用として保持する。Applet側でOutputDirectoryを指定した場合も、その内容をパッケージ化してJSON/ZIPは標準発行先へ出力する。.NET AppletではNode.js不要。配置スクリプトの保存・保持は[発行手順](publishing.md)を参照する。
 
@@ -35,7 +39,7 @@ ZIPは一時ファイルへ完成させてから置換し、feedを最後に保�
 .\dev.bat run pack:update applet ..\..\40.ARTIFACT\Applet.Watch.at365\Applet.Watch.at365 .artifacts\watch-update
 ```
 
-生成したupdate.jsonとupdate.zipを同じWeb配布場所/GitHub Releaseに置く。本体はupdate.jsonとAppDock.at365.exe。JSONはschemaVersion=1、kind=host/applet、id=host/実Applet ID、version、任意minimumHostVersion、payload={file,sha256,size,format=exe/zip}。ZIP直下にextension.jsonと実行ファイル一式を置く。情報JSONを配布物の最後に公開する。
+生成したupdate.jsonとupdate.zipを同じWeb配布場所/GitHub Releaseに置く。JSONはschemaVersion=1、kind=host/applet、id=host/実Applet ID、version、任意minimumHostVersion、payload={file,sha256,size,format=zip}。本体ZIPはEXE・resources・DLL・本体一覧、Applet ZIPはextension.jsonと実行ファイル一式を直下へ置く。新しい更新処理は従来の本体format=exeも読めるが、発行は本体ZIPを標準にする。所有範囲と初回切り替えは[フォルダー型配布](portable-distribution.md)を参照する。情報JSONを配布物の最後に公開する。
 
 ## 交換と復元
 
@@ -75,7 +79,7 @@ IPCのcancelUpdatesは取得/検証中のAbortControllerだけを停止する。
 
 `scripts/update-progress-ui-test.cjs`は専用profileとループバックHTTPを使い、dark/lightの実progress/容量表示、キャンセル、再試行、最終確認での取消と元ファイル保持を確認する。
 
-`scripts/update-recovery-test.cjs`はhelperソースを.artifactsへコピーし、そのコピーだけに停止点を挿入して試験用EXEをビルドする。準備前、2対象の準備後、各退避/移動後、commit後の8箇所で実プロセスを停止し、製品helperで復旧する。交換対象は隔離した検査用ファイルで、実portable EXE交換は既存portable-updates-ui-testが担当する。製品helperに故障注入機能は含めない。
+`scripts/update-recovery-test.cjs`はhelperソースを.artifactsへコピーし、そのコピーだけに停止点を挿入して試験用EXEをビルドする。準備前、2対象の準備後、各退避/移動後、commit後の8箇所で実プロセスを停止し、製品helperで復旧する。交換対象は隔離した検査用ファイルで、実フォルダー型本体交換は既存portable-updates-ui-testが担当する。製品helperに故障注入機能は含めない。
 
 ```powershell
 .\dev.bat exec node scripts/update-progress-ui-test.cjs

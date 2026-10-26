@@ -32,7 +32,7 @@ function metrics(pid) {
     const profile = path.join(output, String(index));
     fs.mkdirSync(profile, { recursive: true });
     const exe = path.join(profile, 'AppDock.at365.exe');
-    fs.copyFileSync(path.resolve(input), exe);
+    require('./copy-host.cjs').copyHost(path.resolve(input), exe);
     const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
     settings.profile = { name: 'Legacy fixture', avatar: null };
     settings.profile.name = 'Test profile';

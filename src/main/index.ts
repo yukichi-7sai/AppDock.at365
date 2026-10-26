@@ -2,6 +2,8 @@ import { replaceNotificationPreference } from '../shared/notification-preference
 import { SettingsServiceTargets } from './core/settings-service-targets';
 import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
+import { startupShellIds, StartupUiBarrier } from './core/startup';
+import { physicalFs } from './core/physical-fs';
 import { GestureIndicatorHost } from './core/gesture-indicator-host';
 import { settingListDraftAction } from './core/setting-list-draft';
 import { TouchpadBridgeManager } from './core/touchpad-bridge';
@@ -220,6 +222,12 @@ protocol.registerSchemesAsPrivileged([
 const restoreView = process.argv.includes('--restore-view');
 const hostDocumentUrl = `appdock://host/index.html${restoreView ? '?restoreView=1' : ''}`;
 let startupReady = false;
+let uiReady = false;
+let startupAppletsReleased = false;
+let completeStartup: () => void;
+const startupCompleted = new Promise<void>((resolve) => {
+  completeStartup = resolve;
+});
 let pendingNotificationArgs: string[] | undefined;
 const smoke = process.argv.includes('--smoke-test');
 const smokeDirectory = process.argv
@@ -327,6 +335,11 @@ applyAudioPlaybackSettings();
 let window: BrowserWindow | null = null;
 let primaryWindowCreated = false;
 let shellRegistry: ShellProviderRegistry | undefined;
+const startupUi = new StartupUiBarrier(() =>
+  ['titlebar', 'ribbon', 'statusbar'].every((region) =>
+    shellRegistry?.snapshot().regions.some((r) => r.region === region && r.ready),
+  ),
+);
 const shellStateSent = new Map<string, string>();
 let lastShellRevision = -1;
 let notificationBanner: NotificationSurfaceHost | undefined;
@@ -1277,6 +1290,7 @@ const changed = () => {
       trayMenu();
     }
     if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
+    startupUi.check();
   }, 60);
 };
 const shortcutInvocation = new AsyncLocalStorage<ShortcutPress>();
@@ -1658,6 +1672,7 @@ function snapshot(): HostSnapshot {
     },
     launch: launch.state,
     startupReady,
+    uiReady,
     windowVisible: !!window && !window.isDestroyed() && window.isVisible() && !window.isMinimized(),
     updates: updater?.state ?? { busy: false, phase: '', results: [] },
     globalHotKeys: hotKeys?.statuses ?? [],
@@ -1945,6 +1960,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     state: a.state,
     error: id === 'applets' && a.error ? hostText('settings.index.appletLifecycle') : null,
     scheduledStartAt: a.scheduledStartAt,
+    startupTiming: id === 'applets' ? a.startupTiming : undefined,
     enabled: a.enabled,
     commands: page.kind === 'applet' || id === 'tray' ? a.commands : [],
     tray: id === 'tray' ? a.tray : [],
@@ -2745,6 +2761,7 @@ function settingsPageActions(
     Object.entries(actions).map(([key, run]) => [
       key,
       async (args: unknown[]) => {
+        if (uiReady && !startupReady && !quitting) await startupCompleted;
         if (!startupReady || quitting) throw Error(hostText('settings.index.preparing'));
         const result = await run(args);
         const accountMessages: Record<string, string> = {
@@ -2884,6 +2901,9 @@ function registerIpc() {
     settingsPageHost?.close(id);
   });
   handle('dock:focusShell', (edge) => shellHost?.focus(edge));
+  handle('dock:hostUiRendered', () => {
+    if (uiReady && !quitting) startupUi.rendererReady();
+  });
   handle('dock:barViewport', (region, bounds) => shellBarHost?.viewport(region, bounds));
   handle('dock:focusBar', (region, edge) => shellBarHost?.focus(region, edge));
   handle('dock:navigate', (route: string | null, restore?: true) =>
@@ -3135,6 +3155,13 @@ async function initialize() {
   const external = path.join(baseDirectory, 'extensions');
   fs.mkdirSync(external, { recursive: true });
   manager = new ExtensionManager({
+    startAllowed: (id) =>
+      startupAppletsReleased ||
+      startupShellIds(
+        manager.shellProviders(),
+        settings.value.host.shellProviders ?? {},
+        safeShell,
+      ).has(id),
     reservedCustomTypeIds: () => customCommands.hostTypeIds(),
     hostVersion: app.getVersion(),
     roots: [external],
@@ -3208,7 +3235,9 @@ async function initialize() {
         kind: 'host',
         version: app.getVersion(),
         source: settings.value.updates.hostSource,
-        destination: process.env.PORTABLE_EXECUTABLE_FILE || '',
+        destination: app.isPackaged
+          ? process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe')
+          : '',
       },
       ...manager
         .snapshot()
@@ -3756,7 +3785,7 @@ async function initialize() {
     preload: path.join(__dirname, 'shell-bar-preload.js'),
     registry: shellRegistry!,
     modalLayer: hostModalLayer,
-    ready: () => startupReady && !quitting,
+    ready: () => uiReady && !quitting,
     blocked: () => !!overlayHost?.active,
     content: new WindowBars({
       state: () => {
@@ -3869,7 +3898,7 @@ async function initialize() {
     selected: () => shellRegistry!.configured('ribbon'),
     registry: shellRegistry!,
     safeMode: safeShell,
-    ready: () => startupReady && !quitting,
+    ready: () => uiReady && !quitting,
     failureFile: path.join(dataDirectory, 'shell-failures.json'),
     changed,
     log: (message) => log.write('error', 'shell', message),
@@ -3947,7 +3976,7 @@ async function initialize() {
   });
   settingsPageHost = new SettingsPageHost({
     allowed: (request) =>
-      startupReady &&
+      uiReady &&
       !quitting &&
       request.kind === 'settings' &&
       request.route === navigation.state.route &&
@@ -4032,7 +4061,7 @@ async function initialize() {
     changed: (model) => {
       if (window && !window.isDestroyed()) window.webContents.send('dock:pages:changed', model);
     },
-    ready: () => startupReady && !quitting,
+    ready: () => uiReady && !quitting,
     create: (request) =>
       request.kind === 'image-library'
         ? new ImageLibraryPageSession(request, {
@@ -4145,6 +4174,7 @@ async function initialize() {
   window.on('restore', changed);
   window.webContents.on('render-process-gone', resumeHotKeys);
   window.webContents.on('did-start-loading', resumeHotKeys);
+  window.webContents.on('did-start-loading', () => startupUi.resetRenderer());
   window.webContents.on('did-start-loading', () => updatePageViewport(null, null));
   registerIpc();
   const icon = nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png'));
@@ -4208,7 +4238,19 @@ async function initialize() {
   await gestureIndicatorHost.initialize();
   await gestures.start();
   await touchpad.start();
+  if (quitting) return;
+  uiReady = true;
+  changed();
+  const rendered = await startupUi.wait();
+  if (quitting || window.isDestroyed()) return;
+  if (!rendered) log.write('warn', 'host', hostText('services.index.initialUiTimeout'));
+  if (!smoke && (restoreView || !settings.value.host.startMinimized)) await showWindow();
+  // Settings changes during discovery use the same gate, so no ordinary worker can bypass it.
+  startupAppletsReleased = true;
+  await manager.reconcile();
+  if (quitting) return;
   startupReady = true;
+  completeStartup!();
   customCommands.reconcile();
   mcpClient.reconcile();
   mcpChanged();
@@ -4355,8 +4397,8 @@ async function initialize() {
         setTimeout(() => {
           if (fs.existsSync(path.join(dataDirectory, 'update-transaction.json'))) return;
           if (fs.existsSync(temporary) && !fs.lstatSync(temporary).isSymbolicLink())
-            void fs.promises
-              .rm(temporary, { recursive: true, force: true })
+            void physicalFs.promises
+              .rm(temporary, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
               .catch((error) =>
                 log.write(
                   'warn',
@@ -4404,7 +4446,6 @@ async function initialize() {
     }
   });
   if (smoke) await runSmoke();
-  else if (restoreView || !settings.value.host.startMinimized) showWindow();
   activateNotification(process.argv, openNotificationCenter);
   if (pendingNotificationArgs)
     activateNotification(pendingNotificationArgs, openNotificationCenter);
@@ -4555,6 +4596,8 @@ app.on('second-instance', (_event, argv) => {
 app.on('before-quit', (event) => {
   clearTimeout(startupUpdateTimer);
   quitting = true;
+  startupUi.cancel();
+  completeStartup!();
   trayClicks?.close();
   windowState?.flush();
   if (shutdownFinished || !manager) return;

@@ -92,7 +92,7 @@ function fixture(t) {
   };
   const release = createRelease(root, run);
   release.preflight(planPath, notes);
-  const exe = path.join(getPublishDirectory(root), 'AppDock.at365.exe');
+  const exe = path.join(getPublishDirectory(root), 'update.zip');
   const archive = path.join(getPublishDirectory(root), 'AppDock.at365-all-in-one-1.2.3.zip');
   fs.writeFileSync(exe, 'host fixture');
   fs.writeFileSync(archive, 'archive fixture');
@@ -102,7 +102,7 @@ function fixture(t) {
     kind: 'host',
     id: 'host',
     version: '1.2.3',
-    payload: { file: host.name, size: host.size, sha256: host.sha256, format: 'exe' },
+    payload: { file: host.name, size: host.size, sha256: host.sha256, format: 'zip' },
   });
   save(path.join(root, '.artifacts/checks.json'), CHECKS);
   for (const name of CHECKS) fs.writeFileSync(path.join(root, `.artifacts/${name}.log`), 'passed');
@@ -112,6 +112,7 @@ function fixture(t) {
     archiveSha256: asset(archive).sha256,
     bundle: {
       hostVersion: '1.2.3',
+      hostPayloadSha256: host.sha256,
       hostCommit: commit,
       hostDirty: false,
       applets: [
@@ -124,7 +125,7 @@ function fixture(t) {
           updateZipSha256: asset(path.join(getPublishDirectory(applet), 'update.zip')).sha256,
         },
       ],
-      files: [{ path: host.name, size: host.size, sha256: host.sha256 }],
+      files: [{ path: 'AppDock.at365.exe', size: host.size, sha256: host.sha256 }],
     },
   });
   return { root, state, release, planPath, archive };
@@ -221,7 +222,6 @@ test('successful release preparation removes only older stable bundles in publis
     'AppDock.at365-all-in-one-1.0.0-beta.1.zip',
     'AppDock.at365-all-in-one-01.0.0.zip',
     'other-1.0.0.zip',
-    'update.zip',
   ];
   for (const name of [...old, ...keep]) fs.writeFileSync(path.join(publish, name), name);
   const nested = path.join(publish, 'nested/AppDock.at365-all-in-one-1.0.0.zip');
@@ -232,11 +232,13 @@ test('successful release preparation removes only older stable bundles in publis
   const backup = path.join(root, '.artifacts/previous-all-in-one.zip');
   fs.writeFileSync(backup, 'backup');
   const current = asset(archive);
+  const hostPackage = asset(path.join(publish, 'update.zip'));
   release.seal(planPath);
   assert.deepEqual(read(planPath).removedOldBundles.sort(), old.sort());
   for (const name of old) assert.equal(fs.existsSync(path.join(publish, name)), false);
   for (const name of keep) assert.equal(fs.readFileSync(path.join(publish, name), 'utf8'), name);
   assert.deepEqual(asset(archive), current);
+  assert.deepEqual(asset(path.join(publish, 'update.zip')), hostPackage);
   assert.equal(fs.readFileSync(nested, 'utf8'), 'nested');
   assert.equal(fs.statSync(directory).isDirectory(), true);
   assert.equal(fs.readFileSync(backup, 'utf8'), 'backup');

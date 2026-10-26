@@ -112,7 +112,7 @@ const capture = async (name) => {
 async function launch(extra = []) {
   if (process.argv[2]) {
     const executable = path.join(profile, 'AppDock.at365.exe');
-    if (!fs.existsSync(executable)) fs.copyFileSync(path.resolve(process.argv[2]), executable);
+    if (!fs.existsSync(executable)) require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
     result.executableSha256 = hash(executable);
     assert.equal(result.executableSha256, hash(path.resolve(process.argv[2])));
     const port = await freePort();

@@ -99,7 +99,7 @@ const portable = !!process.argv[2];
 const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (portable) {
-  fs.copyFileSync(path.resolve(process.argv[2]), executablePath);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executablePath);
   assert.equal(hash(executablePath), hash(path.resolve(process.argv[2])));
 }
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

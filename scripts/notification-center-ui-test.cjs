@@ -137,7 +137,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
 if (portable) {
-  fs.copyFileSync(path.resolve(process.argv[2]), portable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
 }
 const originalHistory = fs.readFileSync(path.join(notificationDir, 'history.json'));

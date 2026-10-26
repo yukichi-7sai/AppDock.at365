@@ -115,7 +115,7 @@ function createRelease(
         assert.deepEqual(asset(expected.path), expected, `Prepared file changed: ${expected.name}`);
       assert.deepEqual(
         plan.assets.map((a) => a.name),
-        ['AppDock.at365.exe', 'update.json', `AppDock.at365-all-in-one-${version()}.zip`],
+        ['update.zip', 'update.json', `AppDock.at365-all-in-one-${version()}.zip`],
       );
     }
   }
@@ -147,14 +147,14 @@ function createRelease(
       );
     }
     plan.assets = [
-      'AppDock.at365.exe',
+      'update.zip',
       'update.json',
       `AppDock.at365-all-in-one-${version()}.zip`,
     ].map((name) => asset(path.join(getPublishDirectory(root), name)));
     assert.equal(report.archiveSha256, plan.assets[2].sha256, 'Bundle changed after UI check');
     const hostFile = bundle.files.find((file) => file.path === 'AppDock.at365.exe');
-    assert.equal(hostFile.sha256, plan.assets[0].sha256);
-    assert.equal(hostFile.size, plan.assets[0].size);
+    assert.ok(hostFile, 'Bundle must contain the host executable');
+    assert.equal(bundle.hostPayloadSha256, plan.assets[0].sha256, 'Bundle host package differs');
     const feed = read(plan.assets[1].path);
     assert.equal(feed.schemaVersion, 1);
     assert.equal(feed.kind, 'host');
@@ -162,7 +162,7 @@ function createRelease(
     assert.equal(feed.version, version());
     assert.deepEqual(feed.payload, {
       file: plan.assets[0].name,
-      format: 'exe',
+      format: 'zip',
       size: plan.assets[0].size,
       sha256: plan.assets[0].sha256,
     });

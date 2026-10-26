@@ -56,7 +56,7 @@ for (const id of ids) {
     }),
   );
   if (dotnet)
-    fs.copyFileSync(
+    require('./copy-host.cjs').copyHost(
       path.join(
         root,
         'tests/fixtures/dotnet/AppDock.Extensions.ApiProbe/bin/Release/net10.0/AppDock.Extensions.ApiProbe.dll',
@@ -89,16 +89,16 @@ const legacyDll = process.env.APPDOCK_TEST_LEGACY_DEMO_DLL;
 if (legacyDll) {
   const dir = path.join(profile, 'extensions', 'legacy-dotnet');
   fs.mkdirSync(dir, { recursive: true });
-  fs.copyFileSync(
+  require('./copy-host.cjs').copyHost(
     path.join(root, 'tests/fixtures/extensions/dotnet-demo/extension.json'),
     path.join(dir, 'extension.json'),
   );
-  fs.copyFileSync(legacyDll, path.join(dir, 'AppDock.Extensions.Demo.dll'));
+  require('./copy-host.cjs').copyHost(legacyDll, path.join(dir, 'AppDock.Extensions.Demo.dll'));
   settings.extensions['appdock.dotnet-demo'] = { enabled: true, settings: {} };
 }
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 if (portable) {
-  fs.copyFileSync(portable, path.join(profile, 'AppDock.at365.exe'));
+  require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
   assert.equal(hash(path.join(profile, 'AppDock.at365.exe')), hash(portable));
 }
 const states = [],

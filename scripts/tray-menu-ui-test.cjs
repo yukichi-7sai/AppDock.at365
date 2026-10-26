@@ -54,7 +54,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : null;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (portable) {
-  fs.copyFileSync(path.resolve(process.argv[2]), portable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
 }
 async function until(fn, label) {

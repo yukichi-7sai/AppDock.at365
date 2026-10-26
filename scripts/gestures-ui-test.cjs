@@ -138,9 +138,9 @@ const uiOnly = process.env.APPDOCK_GESTURE_UI_ONLY === '1' || indicatorOnly;
   const launch = async () =>
     portable
       ? await (async () => {
-          const source = path.join(getPublishDirectory(root), 'AppDock.at365.exe'),
+          const source = path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'),
             executable = path.join(profile, 'AppDock.at365.exe');
-          fs.copyFileSync(source, executable);
+          require('./copy-host.cjs').copyHost(source, executable);
           const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
           portableHash = hash(source);
           assert.equal(hash(executable), portableHash);

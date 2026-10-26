@@ -1,9 +1,13 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param([switch]$HostOnly)
+$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'publish-paths.ps1')
 $taskHost = Split-Path $PSScriptRoot -Parent
 $taskRun = Join-Path $taskHost ('.artifacts\published-deployment-' + [DateTime]::Now.ToString('yyyyMMdd-HHmmss'))
 $taskResults = @()
-foreach ($taskRepo in Get-ChildItem -LiteralPath (Split-Path $taskHost -Parent) -Directory) {
+$taskRepositories = @(Get-ChildItem -LiteralPath (Split-Path $taskHost -Parent) -Directory | Where-Object {
+    $_.FullName -eq $taskHost -or (-not $HostOnly -and (Test-Path -LiteralPath (Join-Path $_.FullName 'extension.json')))
+})
+foreach ($taskRepo in $taskRepositories) {
     if (-not (Test-Path -LiteralPath (Join-Path $taskRepo.FullName 'deployment\deploy.bat'))) { continue }
     $taskPublished = Get-PublishDirectory $taskRepo.FullName
     $taskFixture = Join-Path $taskRun ($taskRepo.Name + '\発行済み with spaces')
@@ -11,9 +15,9 @@ foreach ($taskRepo in Get-ChildItem -LiteralPath (Split-Path $taskHost -Parent) 
     New-Item -ItemType Directory -Path $taskFixture, $taskTarget -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $taskPublished 'deploy.bat') -Destination $taskFixture
     Copy-Item -LiteralPath (Join-Path $taskPublished 'scripts') -Destination $taskFixture -Recurse
-    if ($taskRepo.Name -eq 'AppDock.at365') {
-        $taskPayload = 'AppDock.at365.exe'
-        $taskInstalled = 'AppDock.at365.exe'
+    if ($taskRepo.FullName -eq $taskHost) {
+        $taskPayload = 'win-unpacked'
+        $taskInstalled = '.'
     } else {
         $taskManifest = Get-Content -LiteralPath (Join-Path $taskRepo.FullName 'extension.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $taskPayload = if ($taskRepo.Name -eq 'Applet.WebApplet.at365') { 'extensions\at365.web-applet' } else { $taskRepo.Name }
@@ -21,7 +25,12 @@ foreach ($taskRepo in Get-ChildItem -LiteralPath (Split-Path $taskHost -Parent) 
     }
     $taskSource = Join-Path $taskFixture $taskPayload
     New-Item -ItemType Directory -Path (Split-Path $taskSource -Parent) -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $taskPublished $taskPayload) -Destination $taskSource -Recurse
+    if ($taskRepo.FullName -eq $taskHost) {
+        & (Join-Path $taskHost '.artifacts\updater\AppDock.Updater.exe') --extract-host (Join-Path $taskPublished 'update.zip') $taskSource
+        if ($LASTEXITCODE -ne 0) { throw 'Host package extraction failed.' }
+    } else {
+        Copy-Item -LiteralPath (Join-Path $taskPublished $taskPayload) -Destination $taskSource -Recurse
+    }
     [IO.File]::WriteAllText((Join-Path $taskTarget 'AppDock.at365.exe'), 'fixture')
     foreach ($taskRelative in @('settings.json', 'data\keep.txt', 'extensions\unrelated\keep.txt')) {
         $taskFile = Join-Path $taskTarget $taskRelative
@@ -37,8 +46,13 @@ foreach ($taskRepo in Get-ChildItem -LiteralPath (Split-Path $taskHost -Parent) 
     [IO.File]::WriteAllText((Join-Path $taskFixture 'deploy.local.txt'), (Join-Path $taskRun 'missing'))
     & $taskBatch $taskTarget *> (Join-Path $taskFixture 'precedence.log')
     if ($LASTEXITCODE -ne 0) { throw "Argument precedence failed: $($taskRepo.Name)" }
-    & $taskBatch *> (Join-Path $taskFixture 'invalid.log')
-    if ($LASTEXITCODE -eq 0) { throw "Invalid destination was accepted: $($taskRepo.Name)" }
+    $taskPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & $taskBatch *> (Join-Path $taskFixture 'invalid.log')
+        $taskInvalidExit = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $taskPreference }
+    if ($taskInvalidExit -eq 0) { throw "Invalid destination was accepted: $($taskRepo.Name)" }
     $taskFiles = if (Test-Path -LiteralPath $taskSource -PathType Leaf) { @(Get-Item -LiteralPath $taskSource) } else { @(Get-ChildItem -LiteralPath $taskSource -Recurse -File) }
     foreach ($taskFile in $taskFiles) {
         $taskRelative = if ($taskFile.FullName -eq $taskSource) { '' } else { $taskFile.FullName.Substring($taskSource.Length + 1) }
@@ -52,6 +66,6 @@ foreach ($taskRepo in Get-ChildItem -LiteralPath (Split-Path $taskHost -Parent) 
     $taskResults += [ordered]@{ repository = $taskRepo.Name; passed = 4; hashesMatch = $true; dataPreserved = $true; detachedFromRepository = $true }
     Write-Output "PASS $($taskRepo.Name): detached deploy, UTF-8 config, argument precedence, invalid destination, hashes, data preservation"
 }
-if ($taskResults.Count -ne 7) { throw "Expected 7 repositories, found $($taskResults.Count)." }
+if ($taskResults.Count -ne $taskRepositories.Count -or $taskResults.Count -eq 0) { throw 'Deployment verification did not cover every selected repository.' }
 $taskResults | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $taskRun 'result.json') -Encoding UTF8
 Write-Output "Results: $taskRun"

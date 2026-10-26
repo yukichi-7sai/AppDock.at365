@@ -40,7 +40,7 @@ const profileSource = path.resolve(root, '../Applet.Profile.at365');
 const profileDirectory = path.join(profile, 'extensions', 'at365.profile');
 fs.mkdirSync(profileDirectory, { recursive: true });
 for (const file of ['extension.json', 'index.cjs'])
-  fs.copyFileSync(path.join(profileSource, file), path.join(profileDirectory, file));
+  require('./copy-host.cjs').copyHost(path.join(profileSource, file), path.join(profileDirectory, file));
 fs.cpSync(
   path.resolve(root, '../../40.ARTIFACT/Applet.WebApplet.at365/extensions/at365.web-applet'),
   path.join(profile, 'extensions', 'at365.web-applet'),
@@ -81,7 +81,7 @@ assert.equal(settings.extensions['at365.profile'], undefined);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
-  fs.copyFileSync(portable, exe);
+  require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
 let app, host, rail, child, browser;

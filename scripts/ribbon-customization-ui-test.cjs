@@ -150,7 +150,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 let exe = require('electron');
 if (portable) {
   exe = path.join(profile, 'AppDock.at365.exe');
-  fs.copyFileSync(portable, exe);
+  require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
 const checks = [],

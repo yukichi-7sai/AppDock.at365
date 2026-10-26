@@ -49,4 +49,4 @@ MCPからメニューとシングル/ダブルクリック割当をまとめて�
 - scripts/tray-menu-ui-test.cjs（test:trayからも実行）: 保存済み設定、配置/追加/改名/並べ替え、パレット、固定末尾、実Tray callback/単・ダブルクリック、一時停止チェック、即時保存/再起動、停止中の保持、両テーマ/3幅。
 portableモードはrendererのCDP接続のため、mainのTrayイベント検査はソース版で別に実施します。
 
-Applet API/SDKと単一EXE配布は変更しません。実測結果は[VERIFICATION.md](../VERIFICATION.md)へ記録します。
+Applet API/SDKとフォルダー型本体配布は変更しません。実測結果は[VERIFICATION.md](../VERIFICATION.md)へ記録します。

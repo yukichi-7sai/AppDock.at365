@@ -54,6 +54,8 @@ source = source.replace(
 );
 assert.ok(source.includes('args[0] == "--hold"'));
 fs.writeFileSync(path.join(output, 'Program.cs'), source);
+for (const name of ['PackageTransactions.cs', 'HostPackage.cs'])
+  require('./copy-host.cjs').copyHost(path.join(root, 'dotnet/AppDock.Updater', name), path.join(output, name));
 fs.writeFileSync(
   path.join(output, 'Probe.csproj'),
   `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>RecoveryProbe</AssemblyName></PropertyGroup></Project>`,

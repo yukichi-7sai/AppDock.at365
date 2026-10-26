@@ -9,7 +9,7 @@ internal static partial class Program
     {
         NoLinks(location);
         if (!Exists(location, item.Kind) || !Regex.IsMatch(item.PreviousSha256 ?? "", "^[a-f0-9]{64}$", RegexOptions.IgnoreCase) ||
-            !string.Equals(item.Kind == "host" ? Hash(location) : TreeHash(location), item.PreviousSha256, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(FileItem(item.Kind) ? Hash(location) : TreeHash(location, item.Kind == "host-directory" ? HostLimit : Limit), item.PreviousSha256, StringComparison.OrdinalIgnoreCase))
             throw new IOException("変更前の配置が計画と一致しません。");
         if (item.Kind == "applet")
         {
@@ -24,7 +24,7 @@ internal static partial class Program
     }
     private static void ValidatePackageSwaps(string baseDirectory, string executable, string operationId, List<Swap> swaps)
     {
-        if (!Same(executable, Path.Combine(baseDirectory, "AppDock.at365.exe")) || swaps.Count is 0 or > 501)
+        if (!Same(executable, Path.Combine(baseDirectory, "AppDock.at365.exe")) || swaps.Count is 0 or > 550)
             throw new IOException("パッケージ処理の本体・対象数が正しくありません。");
         NoLinks(baseDirectory); NoLinks(executable);
         var transactionRoot = TransactionRoot(baseDirectory, operationId); NoLinks(transactionRoot);
@@ -40,15 +40,20 @@ internal static partial class Program
             {
                 if (operation != "update" || item.Id != "host" || !Same(item.Destination, executable)) throw new IOException("本体の操作が不正です。");
             }
+            else if (item.Kind is "host-file" or "host-directory")
+            {
+                if (!IsHostEntry(item.Id) || HostKind(item.Id) != item.Kind ||
+                    !Same(item.Destination, Path.Combine(baseDirectory, item.Id))) throw new IOException("本体ファイルの配置先が不正です。");
+            }
             else if (item.Kind != "applet" || item.Id == "appdock.default-shell" ||
                 !Regex.IsMatch(item.Id, "^[a-z0-9][a-z0-9.-]{0,100}$") ||
                 !Same(Path.GetDirectoryName(item.Destination)!, Path.Combine(baseDirectory, "extensions")))
                 throw new IOException("Appletの配置先が正しくありません。");
             else SafeName(Path.GetFileName(item.Destination));
-            if (item.Kind == "applet" ? File.Exists(item.Destination) || File.Exists(swap.Next) || File.Exists(swap.Backup)
+            if (!FileItem(item.Kind) ? File.Exists(item.Destination) || File.Exists(swap.Next) || File.Exists(swap.Backup)
                 : Directory.Exists(item.Destination) || Directory.Exists(swap.Next) || Directory.Exists(swap.Backup))
                 throw new IOException("配置・復旧先のファイル形式が不正です。");
-            if (operation == "install" && (item.PreviousSha256 is not null || !Same(item.Destination, Path.Combine(baseDirectory, "extensions", item.Id))))
+            if (operation == "install" && (item.PreviousSha256 is not null || (item.Kind == "applet" && !Same(item.Destination, Path.Combine(baseDirectory, "extensions", item.Id)))))
                 throw new IOException("新規導入の配置条件が正しくありません。");
             if (operation == "uninstall" && (!string.IsNullOrEmpty(item.Source) || item.Sha256 is not null))
                 throw new IOException("削除に配布物は指定できません。");
@@ -70,7 +75,7 @@ internal static partial class Program
             {
                 if (operation == "uninstall") throw new IOException("削除計画に不明な配布物があります。");
                 if (committed) Verify(item with { Source = swap.Next });
-                else if (item.Kind == "applet") _ = TreeHash(swap.Next);
+                else if (!FileItem(item.Kind)) _ = TreeHash(swap.Next, item.Kind == "host-directory" ? HostLimit : Limit);
                 else NoLinks(swap.Next);
             }
             if (committed)
@@ -188,8 +193,8 @@ internal static partial class Program
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(swap.Next)!); NoLinks(swap.Next);
                 if (Operation(swap.Item) == "uninstall") continue;
-                if (swap.Item.Kind == "host") File.Copy(swap.Item.Source, swap.Next);
-                else CopyDirectory(swap.Item.Source, swap.Next);
+                if (FileItem(swap.Item.Kind)) File.Copy(swap.Item.Source, swap.Next);
+                else CopyDirectory(swap.Item.Source, swap.Next, swap.Item.Kind == "host-directory" ? HostLimit : Limit);
                 Verify(swap.Item with { Source = swap.Next });
             }
             foreach (var swap in swaps)
@@ -200,7 +205,7 @@ internal static partial class Program
             Write(journal, new { schemaVersion = 2, operationId, executable, helper = Path.Combine(stage, "AppDock.Updater.exe"), swaps, committed = true });
             committed = true;
             Write(result, new { ok = true, operationId, time = DateTimeOffset.Now, message = "Applet・更新の操作を適用しました。", temporaryDirectory = stage,
-                updated = swaps.Select(s => new { s.Item.Id, s.Item.Version, operation = Operation(s.Item) }) });
+                updated = swaps.Where(s => s.Item.Kind is "host" or "applet").Select(s => new { s.Item.Id, s.Item.Version, operation = Operation(s.Item) }) });
             FinishPackageSwaps(baseDirectory, operationId, swaps, true); File.Delete(journal);
         }
         catch (Exception error)

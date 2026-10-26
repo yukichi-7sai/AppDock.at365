@@ -12,7 +12,7 @@ fs.writeFileSync(
 );
 const portable = !!process.argv[2];
 const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
-if (portable) fs.copyFileSync(path.resolve(process.argv[2]), executable);
+if (portable) require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
 const args = portable ? ['--smoke-test'] : [root, '--smoke-test', `--smoke-dir=${profile}`];
 const childEnvironment = { ...process.env };
 delete childEnvironment.ELECTRON_RUN_AS_NODE;

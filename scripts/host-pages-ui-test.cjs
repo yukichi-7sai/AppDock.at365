@@ -128,7 +128,7 @@ async function launch(restore = false) {
     });
   else {
     const exe = path.join(profile, 'AppDock.at365.exe');
-    if (!fs.existsSync(exe)) fs.copyFileSync(portable, exe);
+    if (!fs.existsSync(exe)) require('./copy-host.cjs').copyHost(portable, exe);
     assert.equal(hash(exe), hash(portable));
     const debug = await freePort(),
       inspector = await freePort();

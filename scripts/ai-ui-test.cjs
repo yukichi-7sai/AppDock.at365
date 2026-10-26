@@ -164,7 +164,7 @@ async function errorNoticeFor(caller) {
       );
       settings.extensions[id] = { enabled: true, settings: {} };
       if (dotnet)
-        fs.copyFileSync(
+        require('./copy-host.cjs').copyHost(
           path.join(
             root,
             'tests/fixtures/dotnet/AppDock.Extensions.AiProbe/bin/Release/net10.0/AppDock.Extensions.AiProbe.dll',
@@ -189,7 +189,7 @@ async function errorNoticeFor(caller) {
       args = [root];
     if (process.argv[2]) {
       executable = path.join(profile, 'AppDock.at365.exe');
-      fs.copyFileSync(path.resolve(process.argv[2]), executable);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
       assert.equal(
         createHash('sha256').update(fs.readFileSync(executable)).digest('hex'),
         createHash('sha256').update(fs.readFileSync(process.argv[2])).digest('hex'),

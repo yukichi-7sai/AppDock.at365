@@ -45,7 +45,7 @@ const portable = !!process.argv[2],
   hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 let expectedHash;
 if (portable) {
-  fs.copyFileSync(path.resolve(process.argv[2]), executable);
+  require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
   expectedHash = hash(executable);
   assert.equal(expectedHash, hash(path.resolve(process.argv[2])));
 }

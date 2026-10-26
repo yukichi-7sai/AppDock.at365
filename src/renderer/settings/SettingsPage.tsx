@@ -25,11 +25,13 @@ export function SettingsPage({
   context = 'full',
   pageId,
   sidebarWidth = 280,
+  onReady,
 }: {
   ready: boolean;
   context?: 'full' | 'applet';
   pageId?: string;
   sidebarWidth?: number;
+  onReady?(): void;
 }) {
   const [model, setModel] = useState<SettingsPageModel>();
   const t = getHostTranslator(model?.content.language);
@@ -46,6 +48,9 @@ export function SettingsPage({
   const drag = useRef<{ x: number; width: number } | null>(null);
   const surface = useRef<HTMLDivElement>(null);
   const [controls, setControls] = useState<ReturnType<SettingsViewClient['controls']>>();
+  useEffect(() => {
+    if (ready && model && controls) onReady?.();
+  }, [ready, model?.id, controls, onReady]);
   useEffect(() => {
     // Restored local navigation can render before startup and main-side routing are ready.
     if (!ready) return;

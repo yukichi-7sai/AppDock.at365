@@ -27,7 +27,7 @@ const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest
 fs.mkdirSync(local, { recursive: true });
 const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
-  fs.copyFileSync(portable, executable);
+  require('./copy-host.cjs').copyHost(portable, executable);
   assert.equal(hash(executable), hash(portable));
 }
 let application,

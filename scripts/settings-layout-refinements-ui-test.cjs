@@ -213,7 +213,7 @@ async function tableAppearance(table) {
     delete env.ELECTRON_RUN_AS_NODE;
     const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (portable) {
-      fs.copyFileSync(path.resolve(process.argv[2]), executablePath);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executablePath);
       assert.equal(hash(executablePath), hash(path.resolve(process.argv[2])));
     }
     app = await launchTestHost({

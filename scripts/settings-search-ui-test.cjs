@@ -90,7 +90,7 @@ async function until(fn, label) {
   async function launch(extra = []) {
     if (process.argv[2]) {
       portable = path.join(profile, 'AppDock.at365.exe');
-      fs.copyFileSync(path.resolve(process.argv[2]), portable);
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
       assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
       const probe = net.createServer();
       await new Promise((r) => probe.listen(0, '127.0.0.1', r));

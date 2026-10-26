@@ -1,6 +1,6 @@
 {
   "name": "appdock-at365",
-  "version": "0.96.7",
+  "version": "0.97.5",
   "private": true,
   "description": "AppDock.at365",
   "author": "at365",
@@ -50,7 +50,7 @@
     "productName": "AppDock.at365",
     "executableName": "AppDock.at365",
     "directories": {
-      "output": "../../40.ARTIFACT/AppDock.at365",
+      "output": ".artifacts/host-build",
       "buildResources": "assets"
     },
     "files": [
@@ -79,15 +79,10 @@
     ],
     "win": {
       "target": [
-        "portable"
+        "dir"
       ],
       "icon": "assets/icon.ico",
       "signExecutable": false
-    },
-    "portable": {
-      "artifactName": "AppDock.at365.exe",
-      "requestExecutionLevel": "user",
-      "unpackDirName": "AppDock.at365"
     }
   },
   "dependencies": {

@@ -11,7 +11,7 @@
 .\dev.bat run pack:all-in-one
 ```
 
-通常の`publish.bat → dev.bat run dist → dist:host`は本体単一EXEと更新JSONだけを生成します。変更したAppletは各repoの40.ARTIFACT配下へ配置し、個別更新用update.zip/update.jsonも生成します。実装完了時に変更モジュールを版更新して発行し、未変更モジュールを通常publishで再発行しません。
+通常の`publish.bat → dev.bat run dist → dist:host`は本体の実行用フォルダーとupdate.zip/update.jsonを生成します。変更したAppletは各repoの40.ARTIFACT配下へ配置し、個別更新用update.zip/update.jsonも生成します。実装完了時に変更モジュールを版更新して発行し、未変更モジュールを通常publishで再発行しません。
 
 [RELEASING.md](RELEASING.md)の`release.ps1 -Mode Prepare`が本体publishの後に`pack:all-in-one`を実行します。組み立ては`scripts/build-all-in-one.ps1`です。上記のpack単独コマンドはリリース準備の切り分け用で、正式なPrepareの全検証・sealを省略する用途には使いません。
 
@@ -35,14 +35,14 @@ AppDock.at365-all-in-one-<version>.zip
 - ID重複、正式版のバージョン、最低本体版、発行スクリプトを先に検査します。
 - 各Appletのpublish.batを直列実行し、終了コードを確認します。生成した更新JSONとZIPのID・版・サイズ・SHA256を照合します。
 - ZIPは共通helperでリンク/パストラバーサル/サイズ等を検査して、専用stageの`extensions/<repo名>`へ展開します。展開後のmanifest・entry・最低本体版も元ソースと照合します。
-- 本体EXEだけをコピーし、各Appletは検証した更新ZIPの内容だけを収録します。AppDockの設定・認証領域・ログ・実利用先の拡張は取り込みません。Appletのpublishフォルダーは生成物専用とし、個人データを置かないでください。
+- 検証した本体更新ZIPの全内容と、各Appletの検証した更新ZIPの内容だけを収録します。AppDockの設定・認証領域・ログ・実利用先の拡張は取り込みません。Appletのpublishフォルダーは生成物専用とし、個人データを置かないでください。
 - `bundle.json`に本体/各Appletの版・commit・dirty状態・Applet ZIPハッシュと収録ファイルのサイズ/SHA256を記録します。初期設定は同梱せず、初回起動時の通常動作ですべてのAppletが無効になります。
 
 出力は`A:/40.ARTIFACT/AppDock.at365/AppDock.at365-all-in-one-<version>.zip`。専用stageは`.artifacts/all-in-one-<ID>/package`に残します。完成後だけ同じ版の出力ZIPを置換します。途中で失敗した場合、以前の完成済みZIPは残るため、終了コードが失敗の発行物を新しいものとして公開しないでください。Appletが0件でも失敗します。
 
 ## publishの旧版ZIP整理
 
-AppDockのリリース準備で新しいオールインワンZIPを`A:\40.ARTIFACT\AppDock.at365`へ配置した後、版・全収録ファイルのサイズ/SHA256・同梱本体と`A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe`の一致・隔離起動を検証します。2026-10-09のユーザーの追加指定により、通常publishではZIPの生成も整理も行いません。
+AppDockのリリース準備で新しいオールインワンZIPを`A:\40.ARTIFACT\AppDock.at365`へ配置した後、版・全収録ファイルのサイズ/SHA256・同梱本体と`A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe`の一致・隔離起動を検証します。2026-10-09のユーザーの追加指定により、通常publishではZIPの生成も整理も行いません。
 
 削除対象は`A:\40.ARTIFACT\AppDock.at365`直下の`AppDock.at365-all-in-one-<version>.zip`という通常ファイルだけです。正式版x.y.zを数値で比較し、検証済みの新版より古い版だけを削除します。新版、同じ版、より新しい版、別名のZIP、ディレクトリ/リンク、`.artifacts`のstage/backup、GitHub Releaseは対象外です。削除した名前はplan.jsonの`removedOldBundles`へ保存します。削除時のエラーはPrepareの失敗として報告されるため、ログと残存ZIPを確認してください。
 
@@ -50,7 +50,7 @@ AppDockのリリース準備で新しいオールインワンZIPを`A:\40.ARTIFA
 
 バージョン更新からGitHub公開までの正本は[RELEASING.md](RELEASING.md)です。`scripts/release.ps1 -Mode Prepare`は通常版と全体ZIPの作成・検証をまとめて行い、リリース時には全repoがcleanであることを要求します。
 
-通常の`AppDock.at365.exe`と`update.json`に加え、オールインワンZIPを同じAppDock Releaseへ添付します。`update.json`のpayloadは通常EXEのままとし、オールインワンZIPへ向けません。Applet個別のリリース・更新処理も従来どおりです。publish.bat自体はGitHubへの公開や実利用先deployを行いません。
+本体用`update.zip`と`update.json`に加え、オールインワンZIPを同じAppDock Releaseへ添付します。`update.json`のpayloadは本体用ZIPとし、オールインワンZIPへ向けません。Applet個別のリリース・更新処理も従来どおりです。publish.bat自体はGitHubへの公開や実利用先deployを行いません。
 
 ## 検証
 

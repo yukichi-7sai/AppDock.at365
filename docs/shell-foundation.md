@@ -14,7 +14,7 @@ Shell全領域の配色は[共通配色](appearance.md)を参照する。共通p
 | Shell Applet | 通常AppletにShell描画能力を追加した拡張。担当する対象領域だけを差し替える |
 | Shell Host | 本体側のView起動・配置・切替・公開API・復旧を担当 |
 
-Default Shellは本体と同時ビルドして単一EXEへ同梱する。追加Shell Appletは独立repoとし、両者は同じ公開モデル・操作・起動経路を使う。Default Shell専用APIや本体rendererの復旧用重複描画を作らない。本体とShellのReact実装を相互importせず、再利用する表示部品は共通UIへ置く。
+Default Shellは本体と同時ビルドして本体の実行用フォルダーへ同梱する。追加Shell Appletは独立repoとし、両者は同じ公開モデル・操作・起動経路を使う。Default Shell専用APIや本体rendererの復旧用重複描画を作らない。本体とShellのReact実装を相互importせず、再利用する表示部品は共通UIへ置く。
 
 ## 領域と割り当ての単位
 
@@ -51,6 +51,8 @@ ShellProviderRegistryはmanifest・有効状態・worker世代から領域の提
 - 通知は同じID・期限・実行状態を保持し、切替のために再発行・期限再開始をしない。デスクトップ通知の可視判定は専用Windowを使う。
 
 Default Shellは復旧依存として無効化・起動遅延を認めず、組み込み出自を検証する。--safe-shellは保存設定を変えず6領域をDefault Shellへ固定する。同じ故障版を無限再生成せず、明示再試行か新版で解除する。リボンの既存shell-failures.jsonと他領域のプロセス内記録を維持し、新しい保存ファイルを増やさない。
+
+本体の初回表示では、Default Shellと選択中の有効な提供元を先行して起動する。宣言だけがあり未選択のShell Appletは通常Appletと同じ後続段階へ回す。表示と残りAppletの起動・準備完了の区分は[本体ページの起動](host-pages.md#起動と戻り先)を参照する。
 
 領域別再試行は指定先とDefault Shellだけを対象にし、無効Appletを有効化しない。全体再試行でも現在の6領域の指定先を重複排除し、不活性な旧ページ指定を再起動対象にしない。Default Shell自体の故障は最小ネイティブ通知と更新・復元手段で対処する。
 

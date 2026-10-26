@@ -86,7 +86,7 @@ const terminalTitle = 'AppDock shortcut test ' + randomUUID();
 let terminalWindow, widgetsBaseline;
 const executable = portableSource ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portableSource) {
-  fs.copyFileSync(portableSource, executable);
+  require('./copy-host.cjs').copyHost(portableSource, executable);
   assert.equal(hash(executable), hash(portableSource));
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

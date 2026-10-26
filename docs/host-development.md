@@ -154,7 +154,7 @@ Windows SDKへのアクセス制限がある環境はビルド未確認として
 
 Webアカウントの仮名とtemporaryNameフラグを保存し、観測accountNameで仮名だけを一度変更します。cycleはアクティブな操作Windowの選択中WebContentsに入力フォーカスがある場合だけ、新しいViewへ引き継ぎます。別Window・ローカル入力欄・非表示/最小化にはフォーカスを移しません。
 
-portableランチャーは更新間で実行パスを固定し、tray-identity.tsのUUID v5と併せてWindowsの通知領域の識別を維持します。ビルドはbuild-portable.cjsを経由し、使用中の資産を削除しないkernel lease/gateをportable.nsiで扱います。内部のビルダー連携と再起動/二重起動/設定保持試験は[開発ガイド](../DEVELOPMENT.md)を参照してください。タスクバーのAppUserModelId/元EXEの再起動先とは別の仕組みです。
+フォルダー型本体は配置先のEXEを直接起動し、tray-identity.tsのUUID v5と固定した配置パスで通知領域の識別を維持します。自己展開や終了時の本体削除は行いません。詳細は[フォルダー型配布](portable-distribution.md)を参照してください。
 
 名前付きmutexは[CreateMutexExW](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-createmutexexw)で必要な権限だけ要求します。GateはSYNCHRONIZE | MUTEX_MODIFY_STATE、Runtime leaseはSYNCHRONIZEです。CreateMutexWの暗黙のMUTEX_ALL_ACCESSは管理者起動済みホストへ通常権限の通知起動が合流すると拒否されるため使いません。既定DACL、mutex名、待機/解放、DuplicateHandle、最終lease回収は変更しません。ACL緩和や通知クリックによる追加のUAC昇格を行いません。
 

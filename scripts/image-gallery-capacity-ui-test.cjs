@@ -95,7 +95,7 @@ const originals = Object.fromEntries(
 const measurements = [];
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
-  fs.copyFileSync(portable, exe);
+  require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
 let app, host, page, child;

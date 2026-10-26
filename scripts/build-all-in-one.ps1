@@ -25,8 +25,8 @@ function Git-Value([string]$Repository, [string[]]$Arguments) {
     return $taskValue
 }
 function Assert-Payload($Feed, [string]$Directory, [string]$Kind, [string]$Id, [string]$Version) {
-    $taskExpectedFile = if ($Kind -eq 'host') { 'AppDock.at365.exe' } else { 'update.zip' }
-    $taskExpectedFormat = if ($Kind -eq 'host') { 'exe' } else { 'zip' }
+    $taskExpectedFile = 'update.zip'
+    $taskExpectedFormat = 'zip'
     if ($Feed.schemaVersion -ne 1 -or $Feed.kind -ne $Kind -or $Feed.id -cne $Id -or $Feed.version -cne $Version -or
         $Feed.payload.file -cne $taskExpectedFile -or $Feed.payload.format -ne $taskExpectedFormat) { throw "Invalid update feed: $Directory" }
     $taskPayload = Join-Path $Directory $taskExpectedFile
@@ -39,7 +39,7 @@ function Assert-Payload($Feed, [string]$Directory, [string]$Kind, [string]$Id, [
 # nested inside repositories and the user's installed extensions are never scanned.
 $taskHostVersion = Stable-Version $taskVersion
 $taskHostFeed = Read-Json (Join-Path $taskPublish 'update.json')
-$taskHostExe = Assert-Payload $taskHostFeed $taskPublish 'host' 'host' $taskVersion
+$taskHostArchive = Assert-Payload $taskHostFeed $taskPublish 'host' 'host' $taskVersion
 $taskIds = @{}
 $taskApplets = @(foreach ($taskDirectory in (Get-ChildItem -LiteralPath $AppletRoot -Directory | Sort-Object Name)) {
     $taskManifestPath = Join-Path $taskDirectory.FullName 'extension.json'
@@ -63,8 +63,9 @@ if ($taskApplets.Count -eq 0) { throw "No Applet repositories found in $AppletRo
 
 $taskStage = Join-Path $taskRoot ('.artifacts\all-in-one-' + [guid]::NewGuid().ToString('N'))
 $taskPackage = Join-Path $taskStage 'package'
+& $taskHelper --extract-host $taskHostArchive $taskPackage
+if ($LASTEXITCODE -ne 0) { throw 'Host folder extraction failed.' }
 New-Item -ItemType Directory -Path (Join-Path $taskPackage 'extensions') -Force | Out-Null
-Copy-Item -LiteralPath $taskHostExe -Destination (Join-Path $taskPackage 'AppDock.at365.exe')
 $taskInventory = @()
 foreach ($taskApplet in $taskApplets) {
     $taskRepository = $taskApplet.directory.FullName
@@ -100,6 +101,7 @@ $taskFiles = @(Get-ChildItem -LiteralPath $taskPackage -Recurse -File | Sort-Obj
 $taskBundle = [ordered]@{
     schemaVersion = 1
     hostVersion = $taskVersion
+    hostPayloadSha256 = File-Hash $taskHostArchive
     hostCommit = (Git-Value $taskRoot @('rev-parse', 'HEAD'))
     hostDirty = [bool](Git-Value $taskRoot @('status', '--porcelain', '--untracked-files=normal'))
     createdAt = [DateTimeOffset]::UtcNow.ToString('o')

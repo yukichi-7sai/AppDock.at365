@@ -85,7 +85,7 @@ function install(id, source) {
 const pdir = path.join(profile, 'extensions', 'at365.profile');
 fs.mkdirSync(pdir, { recursive: true });
 for (const file of ['extension.json', 'index.cjs'])
-  fs.copyFileSync(path.join(profileSource, file), path.join(pdir, file));
+  require('./copy-host.cjs').copyHost(path.join(profileSource, file), path.join(pdir, file));
 settings.extensions['at365.profile'] = { enabled: true, settings: { name: 'Profile fixture' } };
 install(
   'at365.web-applet',
@@ -177,7 +177,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
-  fs.copyFileSync(portable, exe);
+  require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));
 }
 let app, host, rail, libraryPage, libraryNavigation;

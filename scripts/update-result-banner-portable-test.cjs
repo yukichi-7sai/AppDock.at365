@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'update-result-banner-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const executable = path.join(profile, 'AppDock.at365.exe');
-fs.copyFileSync(path.join(getPublishDirectory(root), 'AppDock.at365.exe'), executable);
+require('./copy-host.cjs').copyHost(path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'), executable);
 const initialHash = createHash('sha256').update(fs.readFileSync(executable)).digest('hex');
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;

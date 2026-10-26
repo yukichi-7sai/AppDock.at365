@@ -49,7 +49,7 @@ const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest
 let executable = require('electron');
 if (portable) {
   executable = path.join(base, 'AppDock.at365.exe');
-  fs.copyFileSync(portable, executable);
+  require('./copy-host.cjs').copyHost(portable, executable);
   assert.equal(hash(executable), hash(portable));
 }
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));

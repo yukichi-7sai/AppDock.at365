@@ -229,6 +229,94 @@ test('HTTP feeds and GitHub release assets share identity/hash validation; check
   await updater.check();
   assert.match(updater.state.results[0].message, /配布ファイル/);
 });
+test('a GitHub source without a public Release is skipped without an update failure', async (t) => {
+  const f = fixture(t);
+  f.target.version = f.manifest.version;
+  const watch = {
+    ...f.target,
+    id: 'watch',
+    name: 'Watch',
+    source: 'github:owner/watch',
+    destination: path.join(f.directory, 'extensions/watch'),
+  };
+  const approvals = [],
+    calls = [];
+  const updater = new PortableUpdates({
+    ...f.updater.options,
+    executable: path.join(f.directory, 'AppDock.exe'),
+    targets: () => [f.target, watch],
+    fetcher: async (url) => {
+      calls.push(url);
+      return new Response('{}', { status: 404 });
+    },
+    confirm: async (names) => {
+      approvals.push(names);
+      return false;
+    },
+    shutdown: () =>
+      assert.fail('An unpublished source or a cancelled update cannot restart the host'),
+  });
+  await updater.check();
+  assert.equal(updater.state.results.find((r) => r.id === 'watch').status, 'unpublished');
+  assert.equal(updater.state.results.find((r) => r.id === 'fixture').installable, false);
+  assert.equal(f.notices.length, 0);
+  await updater.install('all');
+  assert.equal(updater.state.notice.kind, 'info');
+  assert.deepEqual(approvals, []);
+  f.settings.allowSameVersion = true;
+  await updater.install('all');
+  assert.deepEqual(approvals, [['Fixture 2.0.0 → 2.0.0']]);
+  assert.equal(updater.state.results.find((r) => r.id === 'watch').status, 'unpublished');
+  f.settings.allowSameVersion = false;
+  f.target.version = '1.0.0';
+  await updater.install('all');
+  assert.deepEqual(approvals, [['Fixture 2.0.0 → 2.0.0'], ['Fixture 1.0.0 → 2.0.0']]);
+  assert(!f.notices.some((n) => n.notice.kind === 'error'));
+  assert(calls.every((url) => url === 'https://api.github.com/repos/owner/watch/releases/latest'));
+});
+
+test('HTTP failures for permissions, service errors, feeds and explicit tags remain errors', async (t) => {
+  for (const [source, status] of [
+    ['github:owner/repo', 403],
+    ['github:owner/repo', 503],
+    ['https://example.org/update.json', 404],
+    ['https://github.com/owner/repo/releases/tag/v9.0.0', 404],
+  ])
+    await t.test(`${source} HTTP ${status}`, async (t) => {
+      const f = fixture(t);
+      f.target.source = source;
+      const updater = new PortableUpdates({
+        ...f.updater.options,
+        fetcher: async () => new Response('{}', { status }),
+      });
+      await updater.check();
+      assert.equal(updater.state.results[0].status, 'error');
+      assert.match(updater.state.results[0].message, new RegExp(`HTTP ${status}`));
+      assert.equal(updater.state.notice.kind, 'error');
+    });
+});
+
+test('a broken published update.json asset is not classified as an unpublished Release', async (t) => {
+  const f = fixture(t);
+  f.target.source = 'github:owner/repo';
+  const updater = new PortableUpdates({
+    ...f.updater.options,
+    fetcher: async (url) =>
+      url.endsWith('/releases/latest')
+        ? new Response(
+            JSON.stringify({
+              assets: [
+                { name: 'update.json', browser_download_url: 'https://example.org/missing.json' },
+              ],
+            }),
+          )
+        : new Response('{}', { status: 404 }),
+  });
+  await updater.check();
+  assert.equal(updater.state.results[0].status, 'error');
+  assert.equal(updater.state.notice.kind, 'error');
+});
+
 test('turning startup checks off during the delay prevents access to update origins', async (t) => {
   const f = fixture(t);
   f.settings.checkAppletsOnStartup = true;
