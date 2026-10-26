@@ -1,6 +1,6 @@
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { OrderDialogFrame } from './OrderDialogFrame';
 import type { UiCommand } from '../../shared/commands';
 import type { CommandExecutionMode } from '../../shared/command-execution';
@@ -62,6 +62,16 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   const [over, setOver] = useState<string | null>(null);
   const dragged = useRef<string | null>(null);
   const selector = useRef<HTMLSelectElement>(null);
+  const handles = useRef(new Map<string, HTMLButtonElement>());
+  const movedHandle = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const id = movedHandle.current;
+    movedHandle.current = null;
+    if (!id) return;
+    const handle = handles.current.get(id);
+    handle?.focus({ preventScroll: true });
+    handle?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [ordered]);
   const originalGroups = new Map(groupRows(original));
   const changed = groups.filter(
     ([name, group]) =>
@@ -94,12 +104,13 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
       onError={setError}
       initialFocus="select"
       error={error}
-      description={
-        changed
-          ? translate('settings.bindingOrderDialog.changedCount', { changed })
-          : translate('settings.inputExecution.description')
-      }
-      message={notice}
+      description={translate('settings.inputExecution.description')}
+      message={[
+        notice,
+        changed ? translate('settings.bindingOrderDialog.changedCount', { changed }) : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       hint={translate('settings.bindingOrderDialog.hint')}
       applyLabel={translate('settings.bindingOrderDialog.apply')}
       applyDisabled={!changed || !ready}
@@ -224,9 +235,15 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
               }}
             >
               <button
+                type="button"
                 className="shortcut-order-handle"
+                ref={(element) => {
+                  if (element) handles.current.set(row.id, element);
+                  else handles.current.delete(row.id);
+                }}
                 draggable
                 aria-label={translate('settings.bindingOrderDialog.drag', { title: title })}
+                aria-keyshortcuts="ArrowUp ArrowDown"
                 title={translate('settings.bindingOrderDialog.dragHint')}
                 onDragStart={(event) => {
                   dragged.current = row.id;
@@ -238,10 +255,22 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
                   setOver(null);
                 }}
                 onKeyDown={(event) => {
-                  if (event.altKey && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
+                  if (
+                    !event.nativeEvent.isComposing &&
+                    event.keyCode !== 229 &&
+                    !event.altKey &&
+                    !event.ctrlKey &&
+                    !event.metaKey &&
+                    !event.shiftKey &&
+                    ['ArrowUp', 'ArrowDown'].includes(event.key)
+                  ) {
                     event.preventDefault();
+                    event.stopPropagation();
                     const target = rows[index + (event.key === 'ArrowUp' ? -1 : 1)];
-                    if (target) move(row.id, target.id);
+                    if (target) {
+                      movedHandle.current = row.id;
+                      move(row.id, target.id);
+                    }
                   }
                 }}
               >
@@ -263,26 +292,6 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
                       : translate('settings.bindingOrderDialog.unavailable')}
                   </small>
                 )}
-              </div>
-              <div className="shortcut-order-moves">
-                <button
-                  aria-label={translate('settings.bindingOrderDialog.up', { title: title })}
-                  className="secondary"
-                  data-testid={`binding-order-up:${row.id}`}
-                  disabled={index === 0}
-                  onClick={() => move(row.id, rows[index - 1].id)}
-                >
-                  ↑
-                </button>
-                <button
-                  aria-label={translate('settings.bindingOrderDialog.down', { title: title })}
-                  className="secondary"
-                  data-testid={`binding-order-down:${row.id}`}
-                  disabled={index === rows.length - 1}
-                  onClick={() => move(row.id, rows[index + 1].id)}
-                >
-                  ↓
-                </button>
               </div>
             </li>
           );

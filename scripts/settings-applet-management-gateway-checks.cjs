@@ -161,7 +161,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   ]);
   await page.getByRole('button', { name: 'Appletを並べ替え', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Common fixtureを上へ', exact: true }).first().click();
+  await dialog.locator(`[data-testid="settings-order-handle:${active}"]`).press('ArrowUp');
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(async () => {
     const current = (await items()).items.map((item) => item.values.id);

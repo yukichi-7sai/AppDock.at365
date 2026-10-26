@@ -4,6 +4,17 @@ const path = require('node:path');
 module.exports = async ({ host, saved, save, checks, profile, row }) => {
   const panel = host.getByTestId('settings-dialog');
   const mode = panel.getByTestId('binding-execution-mode');
+  const item = (id) => panel.locator(`[data-order-binding="${id}"]`);
+  const handle = (id) => item(id).locator('.shortcut-order-handle');
+  const order = () =>
+    panel
+      .locator('[data-order-binding]')
+      .evaluateAll((elements) => elements.map((element) => element.dataset.orderBinding));
+  const alignedHint = async () => {
+    const heading = await panel.locator('header h2').boundingBox();
+    const hint = await panel.locator('header .settings-hint-trigger svg').boundingBox();
+    assert(Math.abs(heading.y + heading.height / 2 - hint.y - hint.height / 2) < 1);
+  };
   const stableModeHeight = async () => {
     const initial = await mode.inputValue();
     await mode.selectOption('inherit');
@@ -44,14 +55,43 @@ module.exports = async ({ host, saved, save, checks, profile, row }) => {
       'すべて',
     ]);
     assert.match(await panel.innerText(), /ジェスチャーの現在の設定: すべて/);
+    assert.match(
+      await panel.innerText(),
+      /このトリガーに割り当てられたコマンドの実行方法と順番を設定します。/,
+    );
+    assert.equal(await panel.locator('.shortcut-order-moves').count(), 0);
+    await alignedHint();
     await stableModeHeight();
+    const originalOrder = await order();
+    await handle('same-id').press('ArrowUp');
+    assert.deepEqual(await order(), originalOrder, 'first item cannot move above the boundary');
+    for (const modifier of ['altKey', 'ctrlKey', 'shiftKey', 'metaKey']) {
+      await handle('same-id').dispatchEvent('keydown', { key: 'ArrowDown', [modifier]: true });
+      assert.deepEqual(await order(), originalOrder, 'only plain arrows reorder');
+    }
+    await handle('same-id').dispatchEvent('keydown', { key: 'ArrowDown', isComposing: true });
+    assert.deepEqual(await order(), originalOrder, 'composition does not reorder');
+    await handle('same-id').press('ArrowDown');
+    assert.deepEqual(await order(), [...originalOrder].reverse());
+    assert(await handle('same-id').evaluate((element) => element === document.activeElement));
+    await host.keyboard.press('ArrowDown');
+    assert.deepEqual(
+      await order(),
+      [...originalOrder].reverse(),
+      'last item stays at the boundary',
+    );
+    await host.keyboard.press('ArrowUp');
+    assert.deepEqual(await order(), originalOrder, 'focus follows the moved item for the next key');
+    await handle('same-id').dragTo(item(originalOrder[1]));
+    assert.deepEqual(await order(), [...originalOrder].reverse(), 'drag still reorders');
     await mode.selectOption('first');
     assert.deepEqual((await saved())[store].inputExecutionModes, {});
     await cancel();
     await open(kind);
+    assert.deepEqual(await order(), originalOrder, 'cancel restores the original order');
     assert.equal(await mode.inputValue(), 'inherit');
     await mode.selectOption('first');
-    if (kind === 'shortcuts') await panel.getByTestId('binding-order-down:same-id').click();
+    await handle('same-id').press('ArrowDown');
     await apply();
     assert.deepEqual((await saved())[store].inputExecutionModes, { [input]: 'first' });
     await open(kind);
@@ -67,13 +107,20 @@ module.exports = async ({ host, saved, save, checks, profile, row }) => {
     await mode.selectOption('first');
     await apply();
     checks.push(
-      `${kind}: inherit/first/all, cancel, mode-only apply, clear override, and reopening`,
+      `${kind}: plain arrows/drag, focus and boundaries, modifier/IME guard, cancel, inherit/first/all and reopening`,
     );
   }
   assert.deepEqual(
     (await saved()).keybindings.filter((row) => row.key === 'Ctrl+F8').map((row) => row.id),
     ['second-key', 'same-id'],
   );
+  for (const store of ['gestures', 'touchpadGestures'])
+    assert.deepEqual(
+      (await saved())[store].bindings
+        .filter((row) => ['same-id', 'second-input'].includes(row.id))
+        .map((row) => row.id),
+      ['second-input', 'same-id'],
+    );
   assert.deepEqual(
     (await saved()).touchpadGestures.connections,
     original.touchpadGestures.connections,
@@ -112,6 +159,7 @@ module.exports = async ({ host, saved, save, checks, profile, row }) => {
     await host.setViewportSize({ width, height: 800 });
     await open('shortcuts');
     await stableModeHeight();
+    await alignedHint();
     await panel.screenshot({ path: path.join(profile, `trigger-settings-${theme}-${width}.png`) });
     await mode.selectOption('all');
     await panel.getByTestId('settings-dialog-confirm').scrollIntoViewIfNeeded();
@@ -128,7 +176,13 @@ module.exports = async ({ host, saved, save, checks, profile, row }) => {
   );
   const footer = await panel.getByTestId('settings-dialog-confirm').boundingBox();
   assert(footer && footer.y + footer.height <= 540);
-  await panel.getByTestId('binding-order-down:long-0').click();
+  await handle('long-0').focus();
+  for (let index = 0; index < 14; index++) await host.keyboard.press('ArrowDown');
+  assert.equal((await order()).indexOf('long-0'), 14);
+  assert(await handle('long-0').evaluate((element) => element === document.activeElement));
+  const moved = await handle('long-0').boundingBox();
+  const body = await panel.locator('.order-dialog-body').boundingBox();
+  assert(moved.y >= body.y && moved.y + moved.height <= body.y + body.height + 1);
   await cancel();
   assert.deepEqual(
     (await saved()).keybindings.filter((row) => row.key === 'Ctrl+Shift+F8'),

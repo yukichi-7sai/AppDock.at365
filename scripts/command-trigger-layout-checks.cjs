@@ -5,7 +5,9 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   assert.deepEqual(await host.locator('.command-triggers-editor thead th').allTextContents(), [
     'コマンド',
     'トリガー',
+    '',
     'いつ・どこで',
+    '',
   ]);
   const sample = row('shortcuts', 'same-id');
   assert.match(await sample.locator('.binding-condition-cell').innerText(), /AppDock全体/);
@@ -16,9 +18,22 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   assert.equal(await sample.locator('.binding-value-cell .binding-row-actions button').count(), 0);
   assert.equal(
     await sample.locator('.binding-condition-cell .binding-row-actions button').count(),
-    3,
+    0,
   );
-  assert.equal(await sample.locator('td').last().getAttribute('class'), 'binding-condition-cell');
+  assert.equal(await sample.locator('.binding-trigger-actions-cell .binding-order').count(), 1);
+  assert.equal(await sample.locator('.binding-assignment-actions-cell button').count(), 2);
+  assert.equal(
+    await sample.locator('td').last().getAttribute('class'),
+    'binding-assignment-actions-cell',
+  );
+  assert.equal(
+    await host.getByRole('columnheader', { name: 'トリガーの設定', exact: true }).count(),
+    1,
+  );
+  assert.equal(
+    await host.getByRole('columnheader', { name: '割り当ての操作', exact: true }).count(),
+    1,
+  );
   assert.equal(
     await command('fixture.triggers.new').locator('.binding-add-options button').count(),
     3,
@@ -78,7 +93,7 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   assert.equal(icons.length, 4);
   assert(icons.every((icon) => icon.width >= 16 && icon.height >= 16 && !!icon.title));
   checks.push(
-    'command / trigger / condition columns with rightmost actions / three named trigger add buttons beside metadata / private-only lock / SVG kind icons with names and minimum size',
+    'five columns separate trigger settings and binding actions; blank action headers retain accessible names / named add buttons / private-only lock / kind icons',
   );
   const condition = sample.locator('.binding-condition-edit');
   const alignment = await condition.evaluate((button) => {
@@ -95,18 +110,20 @@ module.exports = async ({ host, command, row, checks, profile }) => {
     };
   });
   assert(Math.abs(alignment.textLeft - alignment.buttonLeft) < 1, JSON.stringify(alignment));
-  assert(alignment.conditionWidth > alignment.gestureWidth);
+  assert(alignment.conditionWidth > alignment.gestureWidth, JSON.stringify(alignment));
   const spacing = await command('fixture.triggers.long')
     .locator('tr')
     .evaluateAll((rows) =>
       rows.map((row) => ({
         height: row.getBoundingClientRect().height,
-        cells: [...row.querySelectorAll('.binding-value-cell, .binding-condition-cell')].map(
-          (cell) => ({
-            top: parseFloat(getComputedStyle(cell).paddingTop),
-            bottom: parseFloat(getComputedStyle(cell).paddingBottom),
-          }),
-        ),
+        cells: [
+          ...row.querySelectorAll(
+            '.binding-value-cell, .binding-condition-cell, .binding-trigger-actions-cell, .binding-assignment-actions-cell',
+          ),
+        ].map((cell) => ({
+          top: parseFloat(getComputedStyle(cell).paddingTop),
+          bottom: parseFloat(getComputedStyle(cell).paddingBottom),
+        })),
       })),
     );
   assert.equal(spacing.length, 24);
@@ -197,7 +214,7 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   checks.push(
     'add icons hidden while idle / command-wide hover reveals transparent buttons without layout movement / another command hides them / keyboard Tab and Enter work and cancel restores focus in both themes',
   );
-  const actions = sample.locator('.binding-row-actions');
+  const actions = sample.locator('.binding-assignment-actions-cell .binding-row-actions');
   const appearance = () =>
     actions.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -225,6 +242,18 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   assert.equal(hovered.left, idle.left);
   assert.equal(hovered.top, idle.top);
   assert(Math.abs(hovered.cellRight - hovered.paddingRight - hovered.right) < 2);
+  const gear = sample.locator('.binding-order');
+  const gearBounds = await gear.boundingBox();
+  const conditionBounds = await condition.boundingBox();
+  assert(
+    conditionBounds.x - gearBounds.x - gearBounds.width >= 16,
+    'trigger gear is separated from the condition',
+  );
+  await condition.focus();
+  await host.keyboard.press('Shift+Tab');
+  assert(await gear.evaluate((element) => element === document.activeElement));
+  await host.keyboard.press('Tab');
+  assert(await condition.evaluate((element) => element === document.activeElement));
   await condition.click();
   await host
     .getByTestId('settings-dialog')

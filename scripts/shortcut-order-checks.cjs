@@ -48,11 +48,8 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await fromRow('a2');
   assert.deepEqual(await order(), ['b1', 'a2']);
   assert.match(await item('b1').innerText(), /UI B/);
-  assert(
-    await item('b1')
-      .getByRole('button', { name: /を上へ/ })
-      .isDisabled(),
-  );
+  await item('b1').locator('.shortcut-order-handle').press('ArrowUp');
+  assert.deepEqual(await order(), ['b1', 'a2']);
   await item('a2').locator('.shortcut-order-handle').dragTo(item('b1'));
   assert.deepEqual(await order(), ['a2', 'b1']);
   await panel.press('Escape');
@@ -69,16 +66,11 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     0,
   );
   await openFromVisibleRow();
-  await item('a2')
-    .getByRole('button', { name: /を上へ/ })
-    .click();
+  await item('a2').locator('.shortcut-order-handle').press('ArrowUp');
   await choose('Ctrl+Alt+F10');
   assert.deepEqual(await order(), ['a1']);
-  assert(
-    await item('a1')
-      .getByRole('button', { name: /を下へ/ })
-      .isDisabled(),
-  );
+  await item('a1').locator('.shortcut-order-handle').press('ArrowDown');
+  assert.deepEqual(await order(), ['a1']);
   await choose('Ctrl+F8');
   assert.deepEqual(await order(), ['a2', 'b1']);
   await apply();
@@ -96,7 +88,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
     .click();
   await fromRow('a2');
   assert.match(await item('b1').innerText(), /B first[\s\S]*UI B/);
-  await item('a2').locator('.shortcut-order-handle').press('Alt+ArrowDown');
+  await item('a2').locator('.shortcut-order-handle').press('ArrowDown');
   await apply();
   await save();
   assert.deepEqual((await snapshot()).settings.value.keybindings, original);
@@ -118,13 +110,9 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   await openFromVisibleRow();
   await choose('Ctrl+F8');
   assert.match(await item('order.disabled').innerText(), /未確認のコマンド[\s\S]*無効/);
-  await item('a2')
-    .getByRole('button', { name: /を上へ/ })
-    .click();
+  await item('a2').locator('.shortcut-order-handle').press('ArrowUp');
   await choose('F2');
-  await item('order.other2')
-    .getByRole('button', { name: /を上へ/ })
-    .click();
+  await item('order.other2').locator('.shortcut-order-handle').press('ArrowUp');
   await choose('Ctrl+F8');
   const external = structuredClone(extra);
   external.find((r) => r.id === 'a1').enabled = false;
@@ -139,9 +127,7 @@ module.exports = async ({ page, snapshot, save, profile, checks }) => {
   assert.equal(merged[0].enabled, false);
   await openFromVisibleRow();
   await choose('Ctrl+F8');
-  await item('b1')
-    .getByRole('button', { name: /を上へ/ })
-    .click();
+  await item('b1').locator('.shortcut-order-handle').press('ArrowUp');
   const conflict = structuredClone(merged);
   conflict.find((r) => r.id === 'b1').enabled = false;
   await write(conflict);

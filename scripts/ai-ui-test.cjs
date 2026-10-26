@@ -412,9 +412,7 @@ async function errorNoticeFor(caller) {
 
     await page.getByRole('button', { name: 'AIサーバーを並べ替え', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog
-      .getByLabel('mcpの順番をドラッグで変更')
-      .dragTo(dialog.locator('[data-order-id="preview"]'));
+    await dialog.getByLabel('mcpの順番を変更').dragTo(dialog.locator('[data-order-id="preview"]'));
     assert.deepEqual(
       (await snapshot()).settings.value.ai.connections.map((c) => c.id),
       ['preview', 'sdk', 'mcp'],
@@ -426,7 +424,7 @@ async function errorNoticeFor(caller) {
     );
     await page.getByRole('button', { name: 'AIサーバーを並べ替え', exact: true }).click();
     dialog = page.getByRole('dialog');
-    await dialog.getByLabel('mcpの順番をドラッグで変更').press('Alt+ArrowDown');
+    await dialog.getByLabel('mcpの順番を変更').press('ArrowDown');
     await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.deepEqual(
       (await snapshot()).settings.value.ai.connections.map((c) => c.id),

@@ -100,6 +100,15 @@ initial.touchpadGestures.bindings = [
     when: { ...common.when, processes: [] },
   },
 ];
+if (triggerSettingsOnly) {
+  for (const key of ['gestures', 'touchpadGestures']) {
+    initial[key].bindings.push({
+      ...initial[key].bindings[0],
+      id: 'second-input',
+      command: 'fixture.triggers.two',
+    });
+  }
+}
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = source ? path.join(profile, 'AppDock.at365.exe') : null;
@@ -206,6 +215,26 @@ const recordSuccess = () => {
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
     if (triggerSettingsOnly) {
+      for (const [page, description] of [
+        [
+          'command-triggers',
+          '操作（トリガー）にコマンドを割り当て、いつ・どこで実行するかを設定します。',
+        ],
+        ['shortcuts', 'キー操作をトリガーとして使うための、共通の動作を設定します。'],
+        ['gestures', 'マウス操作をトリガーとして使うための、認識方法や共通の動作を設定します。'],
+        [
+          'touchpad-gestures',
+          'タッチパッド操作をトリガーとして使うための、共通の動作やWindowsとの接続を設定します。',
+        ],
+      ]) {
+        await open(page);
+        const heading = host.getByTestId(`settings-page:${page}`).locator('.settings-page-heading');
+        assert.equal(await heading.locator('p').innerText(), description);
+        await heading.screenshot({ path: path.join(profile, `description-${page}.png`) });
+      }
+      checks.push(
+        'four settings pages explain the roles of gestures, triggers and command bindings',
+      );
       await open();
       await require('./trigger-settings-checks.cjs')({ host, saved, save, checks, profile, row });
       const durable = await saved();
@@ -365,13 +394,53 @@ const recordSuccess = () => {
     checks.push(
       'one-click typed addition for all three trigger types / no kind-selection step / cancel restores the same add button',
     );
+    assert.equal(await host.locator('.binding-disabled-badge').count(), 0);
     for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
       await row(kind, 'same-id').locator('.binding-condition-cell').hover();
       await row(kind, 'same-id').locator('.applet-shortcut-edit').click();
       await dialog().getByRole('switch', { name: 'この割り当てを有効にする' }).click();
       await dialog().getByRole('button', { name: '適用', exact: true }).click();
       await save();
+      assert.equal(
+        await row(kind, 'same-id')
+          .locator('.binding-value-cell')
+          .getByText('無効', { exact: true })
+          .count(),
+        0,
+      );
+      assert.equal(
+        await row(kind, 'same-id')
+          .locator('.binding-condition-cell .binding-disabled-badge')
+          .innerText(),
+        '無効',
+      );
     }
+    for (const theme of ['light', 'dark']) {
+      await host.evaluate(async (theme) => {
+        const snapshot = await window.dock.snapshot();
+        await window.dock.saveSettings(
+          { ...snapshot.settings.value, host: { ...snapshot.settings.value.host, theme } },
+          snapshot.settings.revision,
+        );
+      }, theme);
+      await save();
+      for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
+        const badge = row(kind, 'same-id').locator('.binding-disabled-badge');
+        assert(await badge.isVisible());
+        assert(
+          await badge.evaluate((element) => {
+            const style = getComputedStyle(element);
+            return parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle === 'solid';
+          }),
+        );
+      }
+      await command('fixture.triggers.one').screenshot({
+        path: path.join(profile, `disabled-assignments-${theme}.png`),
+      });
+    }
+    checks.push(
+      'disabled assignment badges appear only in the condition column for all three kinds, with visible borders in both themes',
+    );
     const edited = await saved();
     assert.equal(edited.keybindings.find((row) => row.id === 'same-id').enabled, false);
     assert.equal(edited.gestures.bindings.find((row) => row.id === 'same-id').enabled, false);
@@ -402,7 +471,9 @@ const recordSuccess = () => {
     await row('shortcuts', 'same-id').locator('.binding-condition-cell').hover();
     await row('shortcuts', 'same-id').locator('.binding-order').click();
     assert.equal(await host.locator('.shortcut-order-row').count(), 2);
-    await host.getByTestId('binding-order-down:same-id').click();
+    await dialog()
+      .locator('[data-order-binding="same-id"] .shortcut-order-handle')
+      .press('ArrowDown');
     await dialog().getByRole('button', { name: '適用', exact: true }).click();
     await save();
     assert.deepEqual(
