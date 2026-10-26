@@ -142,6 +142,7 @@ require('./settings-applet-management-gateway-checks.cjs').install(profile);
 require('./settings-image-gateway-checks.cjs').install(profile);
 require('./settings-web-profile-gateway-checks.cjs').install(profile);
 require('./settings-shortcut-list-gateway-checks.cjs').install(profile);
+require('./settings-image-group-gateway-checks.cjs').install(profile);
 let child, browser, page, client;
 async function until(fn, label) {
   const end = Date.now() + 60000;
@@ -509,6 +510,16 @@ async function main() {
     until,
   });
   await require('./settings-shortcut-list-gateway-checks.cjs').check({
+    page,
+    profile,
+    local,
+    client,
+    checks,
+    tool,
+    value,
+    until,
+  });
+  await require('./settings-image-group-gateway-checks.cjs').check({
     page,
     profile,
     local,

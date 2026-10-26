@@ -1,5 +1,6 @@
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
 import { SettingsServiceTargets } from './core/settings-service-targets';
+import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
 import { GestureIndicatorHost } from './core/gesture-indicator-host';
 import { settingListDraftAction } from './core/setting-list-draft';
@@ -1096,6 +1097,11 @@ const operationApi = new AppDockApi({
   serviceSettingsTargets: () => [
     ...serviceSettings.targets(),
     ...pageCollections.settingsTargets((revision) => settingsCommands.checkRevision(revision)),
+    ...imageLibrarySettingsTargets({
+      owner: imageLibraryHost.configuration,
+      references: () => registeredImages.availableReferences(),
+      checkRevision: (revision) => settingsCommands.checkRevision(revision),
+    }),
   ],
   settingsPrincipal: () => automation?.principal() ?? '',
   handlers: {
