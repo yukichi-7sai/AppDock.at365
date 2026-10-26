@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-27: MCP設定統合後のmain発行検証 0.96.2
+
+- 統合commit `f341e13`（parents `c5ba87f` / `fa5ce41`）を保存し、cleanなprimary mainを`fa5ce41`からfast-forwardした。MCP設定一式・南京錠と最新リボンを同じtreeへ統合し、worktreeとmainの一致を確認。追跡先の変更、push/Release/実利用deployは行わない。
+- primary mainから固定lockfileで通常の`publish.bat`を実行し、終了0。`A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe`は**0.96.2 / 170702713 bytes / SHA256 `7d03ab3f54270eee03d4570a54bc8b3c84c4939bf7f3878936adda597262d6bc`**。File/ProductVersion、feedの版/size/hash、ASAR内package/Default Shell、全250ビルド出力・621追加resourceを発行元と照合した。既存の配置スクリプト/ローカル設定を保持した。
+- 同一Git treeでもWindowsのcheckoutごとの改行によって生成物のbytesが異なったため、単純な全ファイルhash一致だけでは再利用しなかった。238出力はbytes一致、残り12出力は改行（生成HTMLのCR重複を含む）とギャラリーの入力hash記録だけの差であることを各入力まで照合。native等のresourceはそれぞれの発行元と照合する。比較helperの初期停止はこの差の診断として保持し、製品ソースを変更していない。
+- main上でも標準**129ファイル1093/1093件（fail/cancel/skip 0）**を追加実行して成功し、再ビルド後も発行物と全出力が一致した。通常発行の固定EXEで実MCP **47群**・リボンの画像/40種アイコン/復元/モード別 **10群**・個別ラベル **4群**、計**61群**と隔離smokeが成功。先行するworktree版の74群と区別して、今回の最終EXE/copyのhashを記録した。
+- mainの**782入力**と参照Applet manifestは発行前後・追加標準後・最終固定検証後で一致。ツール/SDKは前項と同一。専用Taskは登録/Task XMLとも不在、専用プロセス0、削除0件。現在/再利用の証跡・固定コピー・診断を保持した。物理入力・実UAC承認・実Windowsサインインや、実利用設定の変更は検証対象外のまま。
+- 後続追記は本記録だけで、製品の変更・版更新・再発行は不要。記録commit後もmainと既存worktreeを同じ先端へそろえて保持する。通常発行ログ/782入力/hashはprimaryの`.artifacts/mcp-settings-main-merge-20261027/`、固定GUI/比較/後片付けとstage/commit照合はworktreeの同名証跡フォルダーおよび`.artifacts/commit-validation-mcp-settings-main-merge-20261027/main-publication.json`・`final-state.json`を参照する。
+
 ## 2026-10-27: 最新mainとMCP設定worktreeの統合 0.96.2
 
 - cleanな専用worktree `codex/mcp-settings-design` / `c5ba87f`とprimary mainを確認。mainの既存追跡先を`pull --ff-only`し、origin/mainと一致する`fa5ce41`（0.96.1）をworktreeへ統合した。追跡先の新設、別worktreeの変更、push/Release/実利用deployは行わない。
