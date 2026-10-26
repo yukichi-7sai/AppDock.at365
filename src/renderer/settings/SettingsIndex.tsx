@@ -13,7 +13,6 @@ const indexIcons: Partial<Record<string, IconName>> = {
   shortcuts: 'keyboard',
   gestures: 'mouse',
   'touchpad-gestures': 'touchpad',
-  'custom-commands': 'keyboard-command-key',
 };
 
 export function SettingsIndex({
