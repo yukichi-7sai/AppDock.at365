@@ -480,7 +480,11 @@ const settingsCommands = new SettingsCommands({
   settings,
   applets: allApplets,
   settingOptions: (owner, field) =>
-    field.optionSource === 'web-profiles' ? pageCollections.settingOptions(owner) : [],
+    field.type === 'registered-image'
+      ? registeredImages.availableReferences().map(({ file }) => ({ value: file, label: file }))
+      : field.optionSource === 'web-profiles'
+        ? pageCollections.settingOptions(owner)
+        : [],
   save: (value, revision, reset) => {
     const rewrite = new Set<'shared' | 'device'>();
     if (reset) {

@@ -30,6 +30,7 @@ import { SettingsTargetError } from './settings-target-types';
 import {
   mcpSettingPublished,
   mcpSettingSupported,
+  mcpSettingValue,
   publicListFields,
   validateMcpSetting,
 } from '../../shared/mcp-setting-fields';
@@ -165,6 +166,7 @@ export class SettingsCommands {
             available: owner.available,
             fields: selected,
             options: (field: SettingDefinition) => this.fieldOptions(owner, field),
+            schemaContext: () => this.imageContext(owner, selected),
             applies: (key: string) => this.applies(owner.id, key),
             values: () => this.values(owner, this.options.settings.value, selected),
             overrides: () => this.overrides(owner),
@@ -203,7 +205,7 @@ export class SettingsCommands {
     });
   }
   private fieldOptions(owner: Owner, field: SettingDefinition): SettingOption[] {
-    if (field.optionSource) {
+    if (field.type === 'registered-image' || field.optionSource) {
       try {
         return this.options.settingOptions?.(owner.collection?.owner ?? owner.id, field) ?? [];
       } catch {
@@ -211,6 +213,12 @@ export class SettingsCommands {
       }
     }
     return (field.dynamic ? owner.options?.[field.key] : undefined) ?? field.options ?? [];
+  }
+  private imageContext(owner: Owner, fields: SettingDefinition[]) {
+    const images = fields.filter((field) => field.type === 'registered-image');
+    return images.length
+      ? images.map((field) => [field.key, this.fieldOptions(owner, field)])
+      : undefined;
   }
   listTargets(): SettingsListTarget[] {
     return this.owners().flatMap((owner) =>
@@ -232,6 +240,7 @@ export class SettingsCommands {
             fields,
             definition,
             options: (field: SettingDefinition) => this.fieldOptions(owner, field),
+            schemaContext: () => this.imageContext(owner, fields),
             applies: (key: string) => this.applies(owner.id, key),
             overrides: () => this.overrides(owner),
             rows: () =>
@@ -266,7 +275,10 @@ export class SettingsCommands {
           ? { ...collectionRecord(settings, owner.collection) }
           : (settings.extensions[owner.id]?.settings ?? {});
     return Object.fromEntries(
-      fields.map((f) => [f.key, Object.hasOwn(saved, f.key) ? saved[f.key] : f.default]),
+      fields.map((f) => {
+        const value = Object.hasOwn(saved, f.key) ? saved[f.key] : f.default;
+        return [f.key, mcpSettingValue(f, value)];
+      }),
     );
   }
   private overrides(owner: Owner) {

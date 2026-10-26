@@ -233,6 +233,14 @@ export class RegisteredImages {
       .map((v) => structuredClone(v.entry))
       .sort((a, b) => a.ref.file.localeCompare(b.ref.file, 'ja'));
   }
+  /** Cached selection candidates only; never reads, decodes or returns image content. */
+  availableReferences(): RegisteredImageRef[] {
+    if (this.error) return [];
+    return [...this.entries.values()]
+      .filter(({ entry }) => entry.available)
+      .map(({ entry }) => ({ file: entry.ref.file }))
+      .sort((a, b) => a.file.localeCompare(b.file, 'ja'));
+  }
   entry(ref: unknown) {
     if (!imageReference(ref)) return undefined;
     const value = this.entries.get(imageKey(ref));

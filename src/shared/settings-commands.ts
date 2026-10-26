@@ -37,6 +37,19 @@ export function validateSettingCommandIds(
 
 export function settingInputSchema(field: SettingDefinition): Record<string, unknown> {
   const description = field.description || field.title;
+  if (field.type === 'registered-image')
+    return {
+      description,
+      anyOf: [
+        { type: 'null' },
+        {
+          type: 'object',
+          properties: { file: { type: 'string', minLength: 1, maxLength: 180 } },
+          required: ['file'],
+          additionalProperties: false,
+        },
+      ],
+    };
   if (field.type === 'select')
     return { type: 'string', enum: field.options?.map((o) => o.value), description };
   if (field.type === 'number')

@@ -20,7 +20,9 @@ export function objectFieldValue(item: Record<string, unknown>, field: SettingDe
     item,
   );
   const value = field.propertyPath
-    ? (stored ?? field.default)
+    ? field.type === 'registered-image' && stored === null
+      ? null
+      : (stored ?? field.default)
     : Object.hasOwn(item, field.key)
       ? item[field.key]
       : field.default;
@@ -40,7 +42,7 @@ export function objectFieldValue(item: Record<string, unknown>, field: SettingDe
     }
     return strings;
   }
-  if (value === null) return field.default;
+  if (value === null && field.type !== 'registered-image') return field.default;
   if (field.type === 'select' && field.numericOptions && typeof value === 'number')
     return field.options?.[value]?.value ?? value;
   return value;

@@ -136,7 +136,9 @@ export function AppletSettingsForm({
     );
   };
   const field = (item: SettingDefinition) => {
-    const value = current.settings[item.key] ?? item.default;
+    const stored = current.settings[item.key];
+    const value =
+      item.type === 'registered-image' && stored === null ? null : (stored ?? item.default);
     const set = (next: unknown) =>
       update({ ...current, settings: { ...current.settings, [item.key]: next } });
     const options = applet.settingOptions[item.key] ?? item.options ?? [];

@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-27: 登録画像参照のMCP設定対応 0.96.3
+
+- cleanなmain `dbd83eb`から開始し、既存追跡先を`pull --ff-only`して最新取得済みを確認した。今回からprimary mainで継続し、旧MCP設定worktreeは変更しない。既存のregistered-image型・保存参照/ID・固定6入口を拡張する通常修正で、新しい保存設定/ファイル・操作許可・MCPツールは追加せず、**0.96.3**へパッチ更新した。push/Release/実利用deployは行わない。
+- 通常フィールドと宣言型一覧の登録画像列を同じ公開判定へ接続。入力は既存のfile参照またはnullで、登録済み候補は画像サービスのキャッシュからファイル名だけをページ分割して返す。候補の増減でSchema/cursorを更新し、古い要求・未登録画像・URL/パス・余分な属性を拒否する。読取り/dryRunによる走査・decode・画像取込みはなく、既存の秘密/非公開/PC専用保存と従来の単純設定・他Applet向け公開範囲を保持した。画像欄の南京錠は同じownerから自動判定する。
+- 明示的なnullを通常設定/入れ子の画像列/ネイティブフォームで保持し、既定画像の継承と区別した。画像を参照する行のremoveは保護し、画像列を明示的に解除すると他の保護値がない行を削除できる。原画像のbytes・グループ・未編集列/未知データは保持し、画像の取込み/削除は今回の設定操作へ含めない。
+- 発行前レビューで公開/候補の範囲、Schema/変更競合、共有/PC保存、既定値とnull、画像行の削除、原画像/暗号文の保持とUI互換を確認。形式不正の古い画像オブジェクトが一覧dryRunのbeforeへ残る問題を、期待した失敗1件で再現し、読取りと変更前後プレビューを同じ公開値投影へそろえた。登録画像だけにnull保持を適用し、他の列の既存既定値処理は維持した。修正後の必要回帰に成功し、阻害指摘なし。
+- 固定lockfile install、整形、型検査、本体/Default Shell build、標準**130ファイル1105/1105件（fail/cancel/skip 0）**が成功。新規**12件**は公開判定/旧API維持、512候補のページ分割、dryRun/保存/再送/解除/reset、候補変更・権限取消・原子的拒否、未到着参照の保持、不正値の読取り/プレビュー非転送、一覧の入れ子/null/行保護、キャッシュ取得の無副作用を確認する。初期3件の期待値/fixture、GUIの対象数（共通/更新対象も含まれる）の診断を修正し、初期失敗と期待したレビュー再現ログを保持した。
+- sourceの実MCP **48群**、発行した固定EXEの実MCP **50群**・既存リボン画像/復元/モード別 **10群**、計**60群**と隔離smokeが成功。通常画像と入れ子列のMCP/ネイティブ選択・解除、nonnull既定画像からの解除、暗号化済み3ファイル/元画像のbytes保持、候補追加と古いSchema拒否、固定tools/list不変、南京錠を確認した。設定本文と一覧ダイアログの画像も確認し、共通部品の配置/外観を維持している。
+- `publish.bat`終了0。`A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe`は**170715492 bytes / SHA256 `186dda5d95e46c8a954542ab44037dcd3c0b8e1c566e11604949d1ed659c782b`**。File/ProductVersion、feedの版/size/hash、ASAR内package/Default Shell、全**250ビルド出力**・**621追加resource**、固定試験コピーを照合。既存の配置スクリプト/ローカル設定を保持した。
+- レビュー後の**784入力**と参照Applet manifestは標準/source検証前後・発行後・固定検証後で一致し、以後の追記は本記録と無視対象の証跡のみ。Node **24.22.1**、pnpm **12.10.1**、Electron **45.0.0**、.NET SDK **10.0.403**、Windows x64を維持した。専用Limited Taskは登録/Task XMLとも不在、専用プロセス0、削除0件。現行/再利用の成功、固定コピー、診断と独立した成功判定のないunitフォルダーを保持した。Pause/F13〜F24のOS送信/登録、実UAC承認/Windowsサインイン、物理入力、実利用設定の変更は行っていない。
+- 正本は[設定API](docs/settings-api.md#登録画像の参照)・[画像基盤](docs/registered-images.md#共通設定と選択画面)。実行コマンド/完全ログ・入力/出力hash・レビュー・環境・profile・後片付けは`.artifacts/mcp-settings-registered-images-20261027/`、stage/commit照合は`.artifacts/commit-validation-mcp-settings-registered-images-20261027/`へ記録する。公開型・保存・UI解除を1つの機能コミットにまとめる。
+
 ## 2026-10-27: MCP設定統合後のmain発行検証 0.96.2
 
 - 統合commit `f341e13`（parents `c5ba87f` / `fa5ce41`）を保存し、cleanなprimary mainを`fa5ce41`からfast-forwardした。MCP設定一式・南京錠と最新リボンを同じtreeへ統合し、worktreeとmainの一致を確認。追跡先の変更、push/Release/実利用deployは行わない。

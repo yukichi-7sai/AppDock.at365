@@ -1,14 +1,24 @@
 import type { SettingDefinition, SettingOption } from './contracts';
 import { validateSettingValue } from './setting-definitions';
 import { webUrl } from './web-content';
+import { imageKey, imageReference } from './registered-images';
+import { sameSetting } from './settings-defaults';
 
 export const mcpSettingPublished = (field: SettingDefinition) =>
   !field.secret && !field.localOnly && field.automation !== false;
 export const mcpSettingSupported = (field: SettingDefinition, nested = false) =>
-  ['boolean', 'number', 'string', 'select', ...(nested ? ['string-list'] : [])].includes(
-    field.type,
-  ) &&
+  [
+    'boolean',
+    'number',
+    'string',
+    'select',
+    'registered-image',
+    ...(nested ? ['string-list'] : []),
+  ].includes(field.type) &&
   (!nested || !field.dynamic || !!field.optionSource);
+/** Invalid stored image objects must not leave the owner, including change previews. */
+export const mcpSettingValue = (field: SettingDefinition, value: unknown) =>
+  field.type === 'registered-image' && value !== null && !imageReference(value) ? undefined : value;
 const paths = (field: SettingDefinition) => [
   field.propertyPath ?? [field.key],
   ...(field.aliases ?? []).map((key) => [key]),
@@ -40,4 +50,12 @@ export function validateMcpSetting(
   if (field.type === 'string' && field.format === 'url') webUrl(value);
   if (field.type === 'select' && !options?.some((option) => option.value === value))
     throw Error('Unavailable setting option');
+  if (
+    field.type === 'registered-image' &&
+    value !== null &&
+    !sameSetting(value, field.default) &&
+    (!imageReference(value) ||
+      !options?.some((option) => option.value.toLowerCase() === imageKey(value)))
+  )
+    throw Error('Unavailable registered image');
 }

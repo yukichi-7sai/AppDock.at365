@@ -19,7 +19,10 @@ Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作API
 `minimumHostVersion: "0.51.0"`と`ribbon-badges` capabilityを宣言する。Nodeは`context.ribbon.setBadge(target, badge)`、RPCは`host.ribbon.setBadge`へ`{ target, badge }`、.NETは`context.Ribbon.SetBadgeAsync(RibbonBadgeTarget, RibbonBadge?, token)`を使う。
 
 ```typescript
-await context.ribbon.setBadge({ pageId: 'main' }, { kind: 'count', count: 12, label: '未読の新着' });
+await context.ribbon.setBadge(
+  { pageId: 'main' },
+  { kind: 'count', count: 12, label: '未読の新着' },
+);
 await context.ribbon.setBadge({ collectionKey: 'items', itemId: 'saved-item-id' }, { kind: 'dot' });
 await context.ribbon.setBadge({ pageId: 'main' }, null);
 ```
@@ -62,12 +65,8 @@ await context.Ribbon.SetBadgeAsync(
       "id": "monitoring",
       "title": "監視",
       "description": "自動確認の間隔を設定します。",
-      "settings": [
-        "intervalSeconds"
-      ],
-      "actions": [
-        "at365.my-tool.check"
-      ]
+      "settings": ["intervalSeconds"],
+      "actions": ["at365.my-tool.check"]
     }
   ]
 }
@@ -179,7 +178,9 @@ export async function activate(context: NodeExtensionContext) {
   context.tray.add('今すぐ確認', 'at365.my-tool.check');
   await context.ui.showPanel({ title: 'My Tool', description: '準備ができました。' });
 }
-export async function deactivate() { /* 独自のリソースを解放 */ }
+export async function deactivate() {
+  /* 独自のリソースを解放 */
+}
 ```
 
 `tray.add` / `Tray.Add`はメニューの表示名を提案します。利用者が本体の「設定 → タスクトレイ」でコマンドを配置し、Appletは表示を強制しません。提案のない登録コマンドも選択できます。クリック時のコマンドは`host.trayClickCommand`で選び、既定は`appdock.open`です。メニューとダブルクリックの契約は[トレイ仕様](tray-menu.md)を参照してください。
@@ -190,18 +191,18 @@ Node拡張はElectron同梱Nodeを子プロセスで利用します。ホスト�
 
 Webサービスのアカウント別ページには[WebアカウントAPI](web-accounts.md)（Nodeのみ）を使用できます。一時UIデータと、ローカルUIによる表示領域・非表示の切替にも対応します。
 
-| API | 用途 | capabilities |
-| --- | --- | --- |
-| Commands | パレットとボタンから呼ぶ処理の登録 | 常時 |
-| Tray | ホストトレイのサブメニューにコマンドを追加 | 常時 |
-| Settings | 自分の拡張設定の読み取り・保存 | 書き込みに `settings` |
-| Notifications | ホストの通知設定に従うデスクトップ通知 | `notifications` |
-| UI | テキスト、説明、label/value、コマンドボタンのパネル | `ui` |
-| Browser | 資格情報を含まないHTTPS URLを既定ブラウザで開く | `browser` |
-| Logging | 拡張ID付きホストログ | 常時 |
-| Scheduler | 定期実行、停止時のタイマー解除 | 拡張ランナー内 |
-| Storage | 拡張ID・キー別のJSON永続データ（1件1MBまで） | `storage` |
-| Secrets | 拡張ID・キー別の暗号化文字列 | `secrets` |
+| API           | 用途                                                | capabilities          |
+| ------------- | --------------------------------------------------- | --------------------- |
+| Commands      | パレットとボタンから呼ぶ処理の登録                  | 常時                  |
+| Tray          | ホストトレイのサブメニューにコマンドを追加          | 常時                  |
+| Settings      | 自分の拡張設定の読み取り・保存                      | 書き込みに `settings` |
+| Notifications | ホストの通知設定に従うデスクトップ通知              | `notifications`       |
+| UI            | テキスト、説明、label/value、コマンドボタンのパネル | `ui`                  |
+| Browser       | 資格情報を含まないHTTPS URLを既定ブラウザで開く     | `browser`             |
+| Logging       | 拡張ID付きホストログ                                | 常時                  |
+| Scheduler     | 定期実行、停止時のタイマー解除                      | 拡張ランナー内        |
+| Storage       | 拡張ID・キー別のJSON永続データ（1件1MBまで）        | `storage`             |
+| Secrets       | 拡張ID・キー別の暗号化文字列                        | `secrets`             |
 
 ログは.NETの`context.Log.InfoAsync/ErrorAsync`、Nodeの`context.log.info/error`を使い、独自ファイルへの出力を避けてください。ホストがApplet IDを付けて全体ログ・Applet詳細ログとホストログファイルへ記録します。deactivate中の`host.log`も受け付け、クリーンアップのエラーを元のレベルで保存します。停止完了/異常終了後の呼び出しと、停止中のログ以外のAPIは拒否します。終了前に必要なログをawaitし、同期のバックグラウンド処理から接続する場合は上限付きの待ち行列と短い排出待ちを使ってください。
 
@@ -235,6 +236,7 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 パネルの`images`は4件まで。各項目は`title`、任意の`description`、`image`（JPEG/PNG/WebPのbase64 data URL、200000文字以内）、名前空間内の`actions`（4件まで）。ホストは外部URL・SVG・HTMLを受け付けない。.NETの既存`Panel`コンストラクターは維持し、任意の`Images`プロパティと`PanelImage`を追加。Nodeの`ui.showPanel`でも同じJSON型を使用できる。
 
 これらはホスト内部と既存パネルAPIの追加で、`.NET`/Nodeに新しいRPCメソッドは追加していない。外部native Appletは独自のSDKコピーを含むため、追加プロパティを使うAppletは再publishすること。
+
 ## 宣言コマンド・構造化一覧・パネル操作
 
 この節の機能を使うAppletは`minimumHostVersion: "0.6.0"`を指定してください。
@@ -246,16 +248,17 @@ manifestの`commands: [{ id, title, activateOnExecute?, aliases? }]`は、ロー
 `Panel.Images`は最大1000件、`Tabs`は最大100件です。`PanelAction`は従来の`Command`、または`Command: ""`と`ActionId`のどちらかを指定します。`Selected`はタブの選択状態。`ActionId`はAppletの名前空間内のIDとし、.NETの`IPanelActionHandler.HandlePanelActionAsync` / Nodeの`onPanelAction`で処理します。ホストは現在表示中のパネルに存在するIDだけを`panel.action`で送ります。可変数の履歴ボタンを一般コマンドへ登録する必要はありません。ページ世代IDと表示対象の検証はApplet側でも行ってください。
 
 `local-images` capabilityで`.NET: Ui.GetImageDirectoryAsync` / Nodeの`ui.getImageDirectory` / RPC `host.ui.imageDirectory`が専用キャッシュを作成します。そこにPNG/JPEG/WebPを作り、`PanelImage.ImageFile`へ絶対パスを指定します。ホストは実パスでキャッシュ内に含まれるファイルだけを登録し、同一オリジンの画像URLとして表示します。画像データはJSON-RPCへ載せず、画像バイト数による画質・解像度の制限はありません。従来のbase64 `Image`は200000文字上限のまま使用可能です。`Tooltip`で元ファイルパスを表示できます。キャッシュファイルの寿命と削除はAppletが管理します。
+
 ## Node Appletの通知・ファイル選択
 
 既存API v1と従来の通知呼出しを維持した追加です。利用するAppletは`minimumHostVersion: "0.11.0"`を指定します。
 
-| Node API | capability | 動作 |
-| --- | --- | --- |
-| `ui.pickFile('json' \| 'wav')` | `file-dialog` | ホストのファイル選択。絶対パスまたはキャンセル時null。RPC待機は5分 |
-| `audio.play(file?)` | `audio` | ローカルWAVを共通キューで再生。空文字/省略が無音。キュー受付時に戻る |
-| `tray.attention(boolean)` | `tray-attention` | 稼働中Appletの通知要求を集約し、共通トレイに橙色の印を表示 |
-| `notifications.show(title, body, { silent?, command? })` | `notifications` | 音の抑制とクリック時の自Appletコマンドを任意指定 |
+| Node API                                                 | capability       | 動作                                                                 |
+| -------------------------------------------------------- | ---------------- | -------------------------------------------------------------------- |
+| `ui.pickFile('json' \| 'wav')`                           | `file-dialog`    | ホストのファイル選択。絶対パスまたはキャンセル時null。RPC待機は5分   |
+| `audio.play(file?)`                                      | `audio`          | ローカルWAVを共通キューで再生。空文字/省略が無音。キュー受付時に戻る |
+| `tray.attention(boolean)`                                | `tray-attention` | 稼働中Appletの通知要求を集約し、共通トレイに橙色の印を表示           |
+| `notifications.show(title, body, { silent?, command? })` | `notifications`  | 音の抑制とクリック時の自Appletコマンドを任意指定                     |
 
 WAVは絶対パス、16 MiB以下のRIFF/WAVE。待機は32件まで、1回の再生は30秒で打ち切ります。再生時だけsandbox/contextIsolation有効の非表示Electronウィンドウを作り、終了時に破棄します。停止・再起動したAppletの音は中止し、待機分は破棄します。再生失敗はホストログに記録します。外部URLやシェルによる再生は行いません。
 
@@ -268,11 +271,14 @@ WAVは絶対パス、16 MiB以下のRIFF/WAVE。待機は32件まで、1回の�
 manifestのdefaultGestureBindingsに、自身のcommandsに宣言したコマンドの割り当て（id/command/gesture/enabled/when、最大100行）を宣言できる。初回だけ設定へコピーする。詳細は[マウスジェスチャー](gestures.md)。
 
 command.executeは任意のinvocation（session/window/process/source）を受け取る。.NETハンドラーはCommandExecution.Currentから読み取れる。source=gestureの場合のwindowは開始対象HWNDの10進文字列。command.cancelのsessionが一致すればハンドラーのCancellationTokenを取り消す。引数なしの既存ハンドラーは変更不要。対象固定や取消を実操作まで反映するかはAppletの実装による。
+
 ## 外部コマンド公開
 
 manifestの`commands[].automation: true`で共通操作API/MCPへの公開を宣言できます。省略/falseは非公開、runtime登録や別名だけでは公開しません。形式・動的コマンドとの照合・権限は[共通操作API](automation.md#appletによる公開宣言)を参照してください。利用するAppletは`minimumHostVersion: "0.26.29"`以上を指定します。
 
 設定を外部公開し、booleanのON/OFF/切り替えを通常コマンドとして生成する場合は、[設定宣言と自動生成コマンド](automation.md#設定宣言と自動生成コマンド)を参照してください。settings capabilityが必要です。対応する単純設定はMCPへ既定公開し、automation:false・secret:true・localOnly:trueは除外します。他Applet向けの公開とON/OFF/toggle生成は明示宣言を維持します。
+
+registered-imageの通常設定と一覧列も、同じ公開判定で[MCPの登録画像参照](settings-api.md#登録画像の参照)から選択・解除できます。候補は登録済み画像から取得し、参照は`{ file: "画像.png" }`、解除はnullです。automation:trueも宣言できます。画像の取込みや原画像の削除は、この設定変更には含めません。
 
 MCPの[固定設定API](settings-api.md)は宣言済みobject-listの行操作と既存providerの動的selectにも対応します。一覧の親・子の非公開指定、ID列の読取り専用、非公開の保存先と重なる別名の除外を適用します。通常一覧をMCPへ公開するための個別ツール登録は不要です。
 
@@ -290,30 +296,32 @@ Shell対象は[Shell基盤](shell-foundation.md)の7領域に限定する。ペ�
 {
   "minimumHostVersion": "0.76.5",
   "capabilities": ["notifications"],
-  "notificationTypes": [{
-    "typeId": "new-message",
-    "title": "新着メッセージ",
-    "description": "新しいメッセージを受信したときに通知します。",
-    "levels": ["info", "warning"],
-    "defaultLevel": "info",
-    "allowedTargets": ["banner", "desktop", "windows"],
-    "defaultTargets": ["banner"],
-    "requiredTargets": [],
-    "lifetimePolicy": "userDuration",
-    "defaultDurationSeconds": 10,
-    "history": "persistent"
-  }]
+  "notificationTypes": [
+    {
+      "typeId": "new-message",
+      "title": "新着メッセージ",
+      "description": "新しいメッセージを受信したときに通知します。",
+      "levels": ["info", "warning"],
+      "defaultLevel": "info",
+      "allowedTargets": ["banner", "desktop", "windows"],
+      "defaultTargets": ["banner"],
+      "requiredTargets": [],
+      "lifetimePolicy": "userDuration",
+      "defaultDurationSeconds": 10,
+      "history": "persistent"
+    }
+  ]
 }
 ```
 
 定義は1Applet64件まででtypeIdは所有者内で一意です。重複、未知フィールド、範囲外秒数、既定/必須先が許可先にない定義を拒否します。通知全体のOFFは設けず、requiredTargets:['banner']はバナーの解除とセンターのみへの変更を拒否します。[通知先の必須指定](notifications.md#通知種類の制約)を参照してください。旧defaultEnabled/canDisable/disabledControlReasonを互換読込で無視し、新規宣言では省略します。lifetimePolicyはuserDuration/fixedManual/condition、historyはpersistent/session/none。persistentとsessionはいずれも起動中のメモリーだけに履歴を保持し、persistentは安全なhistoryTextを使う。noneは通知終了時に除去する。userDurationの既定秒数を省略/nullにするとmanualです。conditionは発行元の終了まで持続し、閉じるボタンを持ちません。
 
-| 操作 | Node context.notifications | .NET context.Notifications |
-| --- | --- | --- |
-| 発行・同じキーの更新 | publish(request) | PublishAsync(NotificationRequest, token) |
-| 保存済みの実効方針取得 | getPolicy(typeId) | GetPolicyAsync(typeId, token) |
-| 所有通知の終了 | end(notificationId, status?) | EndAsync(notificationId, status, token) |
-| 方針変更購読 | onChanged(handler)、解除関数を返す | OnPolicyChanged(handler)、IDisposableを返す |
+| 操作                   | Node context.notifications         | .NET context.Notifications                  |
+| ---------------------- | ---------------------------------- | ------------------------------------------- |
+| 発行・同じキーの更新   | publish(request)                   | PublishAsync(NotificationRequest, token)    |
+| 保存済みの実効方針取得 | getPolicy(typeId)                  | GetPolicyAsync(typeId, token)               |
+| 所有通知の終了         | end(notificationId, status?)       | EndAsync(notificationId, status, token)     |
+| 方針変更購読           | onChanged(handler)、解除関数を返す | OnPolicyChanged(handler)、IDisposableを返す |
 
 ```javascript
 const unsubscribe = context.notifications.onChanged(async () => {
@@ -321,11 +329,15 @@ const unsubscribe = context.notifications.onChanged(async () => {
   // 必要なら現在の条件を再評価する。過去のイベントは再送しない。
 });
 const result = await context.notifications.publish({
-  typeId: 'new-message', title: 'メッセージを受信しました', body: '内容を確認できます。',
-  dedupeKey: 'inbox', historyText: { title: '新着メッセージ', body: 'メッセージを受信しました。' },
-  actions: [{ key: 'open', label: '確認', command: 'example.mail.open' }]
+  typeId: 'new-message',
+  title: 'メッセージを受信しました',
+  body: '内容を確認できます。',
+  dedupeKey: 'inbox',
+  historyText: { title: '新着メッセージ', body: 'メッセージを受信しました。' },
+  actions: [{ key: 'open', label: '確認', command: 'example.mail.open' }],
 });
-if (result.status === 'accepted') await context.notifications.end(result.notificationId, 'resolved');
+if (result.status === 'accepted')
+  await context.notifications.end(result.notificationId, 'resolved');
 ```
 
 .NETはNotificationRequest/NotificationHistoryText/NotificationAction/NotificationPublishResult/NotificationPolicyをSDKで提供します。新SDK/Runtimeを使ってビルドし、最低ホスト版を宣言してください。SDKの共有AssemblyVersion 0.10.0と旧ShowAsyncの署名を維持します。古いサービス実装の新メソッドはNotSupportedExceptionとなります。

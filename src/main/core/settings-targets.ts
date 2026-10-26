@@ -361,7 +361,7 @@ export class SettingsTargets {
     if (method === 'settings.options.list') {
       const field = target.fields.find((field) => field.key === params.key);
       if (!field) return this.fail('NOT_FOUND', 'services.settingsTargets.notFound');
-      if (field.type !== 'select')
+      if (field.type !== 'select' && field.type !== 'registered-image')
         return this.fail('INVALID_ARGUMENT', 'services.settingsTargets.notOptions');
       if (
         params.itemRef !== undefined &&

@@ -3,7 +3,11 @@ import type { SettingDefinition } from '../../shared/contracts';
 import { jsonObject } from '../../shared/custom-commands';
 import { objectFieldValue, setObjectField } from '../../shared/object-list';
 import { sameSetting } from '../../shared/settings-defaults';
-import { validateMcpSetting, settingFieldsOverlap } from '../../shared/mcp-setting-fields';
+import {
+  validateMcpSetting,
+  settingFieldsOverlap,
+  mcpSettingValue,
+} from '../../shared/mcp-setting-fields';
 import { SettingsTargetError, type SettingsListTarget } from './settings-target-types';
 import { hostText } from '../../shared/i18n';
 
@@ -77,7 +81,7 @@ export const settingsListOperationSchemas = (target: SettingsListTarget) => {
 export function listValues(target: SettingsListTarget, row: Record<string, unknown>) {
   return Object.fromEntries(
     target.fields.flatMap((field) => {
-      const value = objectFieldValue(row, field);
+      const value = mcpSettingValue(field, objectFieldValue(row, field));
       return value === undefined ? [] : [[field.key, structuredClone(value)]];
     }),
   );
@@ -88,7 +92,8 @@ export function listRemovable(target: SettingsListTarget, row: Record<string, un
     target.removable?.(row) !== false &&
     !(target.definition.fields ?? []).some(
       (field) =>
-        !target.fields.some((publicField) => publicField.key === field.key) &&
+        (field.type === 'registered-image' ||
+          !target.fields.some((publicField) => publicField.key === field.key)) &&
         objectFieldValue(row, field) != null,
     )
   );
@@ -134,8 +139,8 @@ export function planSettingsList(
     target.prepareRow?.(row, Object.keys(raw));
     for (const key of Object.keys(raw)) {
       const field = fields.find((field) => field.key === key)!;
-      const previous = objectFieldValue(previousRow, field),
-        value = objectFieldValue(row, field);
+      const previous = mcpSettingValue(field, objectFieldValue(previousRow, field)),
+        value = mcpSettingValue(field, objectFieldValue(row, field));
       if (!sameSetting(previous, value))
         result[key] = {
           ...(previous === undefined ? {} : { before: structuredClone(previous) }),

@@ -172,9 +172,15 @@ export function parseSettingDefinitions(
       (s.secret !== undefined && typeof s.secret !== 'boolean') ||
       (s.localOnly !== undefined && typeof s.localOnly !== 'boolean') ||
       (s.automation === true &&
-        !['boolean', 'number', 'string', 'select', 'object-list', 'string-list'].includes(
-          s.type,
-        )) ||
+        ![
+          'boolean',
+          'number',
+          'string',
+          'select',
+          'registered-image',
+          'object-list',
+          'string-list',
+        ].includes(s.type)) ||
       (s.generateCommands !== undefined && (depth !== 0 || s.dynamic === true)) ||
       (s.generateCommands !== undefined &&
         (s.type !== 'boolean' ||

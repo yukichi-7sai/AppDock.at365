@@ -14,7 +14,7 @@ UIとの対応はownerの`ui`で安定したページID・設定キーを結び�
 
 このメタデータは信頼された本体設定rendererだけへ渡す。値・既定値・認証情報やTask XMLを含めず、公開対象/Schemaの外側へUI専用情報を追加しない。実際の保存可否は従来どおり各APIが再検証し、表示によって権限を付与しない。
 
-本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/selectは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listも列の値として編集できる。自由JSON・shortcut-list・画像参照の編集と未対応の専用サービスは、adapterを実装する後続範囲。
+本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/select/registered-imageは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listやregistered-imageも列の値として編集できる。自由JSON・shortcut-listと未対応の専用サービスは、adapterを実装する後続範囲。
 
 通知・AI/TTS・MCP接続・更新の通常設定とShell選択も所有サービスのadapterから公開する。通常値はfields、AI接続・TTS手動ボイス・MCP接続の一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
 
@@ -36,7 +36,7 @@ UIとの対応はownerの`ui`で安定したページID・設定キーを結び�
 | Applet管理順序       | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない                |
 | ジェスチャー共通設定 | 3入力方式で共有するブラウザexe名の配列とChromiumウィンドウ条件。通常項目は共通宣言から生成               |
 
-その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
+その他の専用サービスと画像/アカウントの寿命操作は後続範囲。登録済み画像の参照は下記の共通設定から選択・解除する。未宣言JSON全体の変更入口へ置き換えない。
 
 暗号化情報を持つAI/TTSの接続先や認証方式を変更し、秘密の結び付け先や消去に影響する操作はLOCAL_ACTION_REQUIRED。キーが必要になる新しい認証方式への切替もローカル操作とする。モデル・速度等の非秘密値は暗号化ファイルをそのまま保持する。Schema/値/プレビュー/ログへキー・暗号文・キーrevisionを出さず、設定用の保護判定は秘密を復号しない。破損・読取拒否のメタデータも保護ありとして扱う。Schemaのwritable/resettableで現在の操作範囲を確認する。
 
@@ -101,6 +101,16 @@ itemRefは主体・target・Schema・値のrevision・行の識別に結び付�
 addは宣言済みの既定値とID生成を使い、非公開列を要求から設定させない。汎用の全体置換・一覧resetは提供しない。removeは非公開列や未対応列に値があればローカル操作とし、画像参照等の寿命管理が必要なデータを汎用削除で消さない。dryRunは公開列だけの変更計画を返す。保存結果のchangesは操作種別と公開された変更内容で、行参照は取得時のもの。保存後の参照はitems.listで再取得する。
 
 所有サービスの一覧は、targets.listのoperationsとschema.getのoperationSchemasに対応操作だけを返す。未対応操作は計画・保存前に拒否する。Applet管理順序はreorderだけを公開し、既存のappletOrderと同じ最大500件を使う。
+
+### 登録画像の参照
+
+公開された`registered-image`は`{ "file": "登録済みのファイル名.png" }`または`null`を受け付ける。`null`は画像を外し、fieldsのresetは保存上書きを解除して宣言の既定値を継承する。一覧の列も同じ形式を使い、propertyPathにある明示的なnullを既定画像へ戻さない。通常設定と同じautomation/secret/localOnlyの判定を使い、対応欄の南京錠も同じownerから自動で更新する。
+
+候補は`settings.options.list`で取得し、itemsのvalueを参照のfileへ指定する。返す情報は登録済みファイル名のvalue/labelだけ。所有する画像サービスの現在のキャッシュから選べる画像を取得し、この要求やdryRunを理由にディスク走査・decode・取込みを始めない。画像の未到着・読取不能時は候補へ含めず、保存済みの参照は未編集なら保持する。候補がなくてもnullへの解除と宣言の既定値への復帰は行える。
+
+候補の追加/消失でschemaRevisionと候補cursorを更新し、古いSchemaでの保存を拒否する。512画像も既存のページ分割で取得し、ファイル名をツールの引数定義へ列挙しない。パス/URL・余分な属性・未登録画像への変更は拒否する。形が不正な保存値は読取り・変更前プレビューとも名前以外の属性や任意パスを応答へ投影せず、未編集データは保持する。
+
+画像を参照する行はremovable=falseとし、removeで暗黙に参照を消さない。公開列の画像を明示的に解除し、他の保護値がなければ行を削除できる。操作は設定参照だけを保存し、原画像のbytes・グループ・秘密情報を変更しない。画像の取込み/削除などの寿命操作は所有する画像サービスの範囲とする。登録画像の操作入口は固定6入口であり、既存の単純設定コマンドや他Applet向け設定APIの対応範囲は維持する。
 
 ### AI接続一覧
 
