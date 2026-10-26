@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-27: キー対応をmainへマージし通常版0.96.7を確認
+
+- 利用者の指示により、準備済み20ファイルを`86acd2714d9776bc9d479cd782506eca6e34e688`（tree `30d4aeae7e1f88cc0b0882d97c2a5e78c130c573`）へコミットし、cleanなmainへfast-forwardで反映した。stage treeとcommit tree、author/committerと有効なGit設定の一致を確認した。対象外の変更・push・Release・実利用deployは含めていない。
+- 準備時の856入力・完全ログ22件・試験版EXEをhash照合し、標準回帰1,141件・型検査・開発ホスト設定API58群の成功を再利用した。mainのcheckoutでは510入力がbyte一致、346入力はCRLF/LFだけの差で内容一致した。再生成した226ファイルも221件がbyte一致、残る5件は改行だけで正規化後のJavaScriptが一致し、製品の意味的な変更はない（`merge.json`・`compiled-runtime-reuse.json`）。
+- 製品修正を伴わない通常版の再発行として**0.96.7**を維持し、mainの標準publishを実行した。通常版EXE/File/ProductVersion・feedは**0.96.7 / 170,718,857 bytes / SHA256 `566bf6107540f8f8fca97a67e54ce14001a36a950c0cf84fda273990c16f5adf`**。試験用worktreeのEXEとはビルド位置・コミット情報が異なるためhashを区別する。既存の設定・配置ファイル4件のhashを保持した。
+- 通常版に収録したInputHost DLL（SHA256`c3fdca3d17c270c5f6993b2f5c4443313c36a1ee66cc031a12ac9fe2dae8beac`）そのものでnative状態**255項目**・マウス＋キー状態**58項目**を再実行して成功。OSへのキー送信・フック登録をしないメモリ試験を使用した。新しい通常版EXEでは隔離したnative記録**42/42件**、特殊キー選択・保存/ブロック設定・取消・実再起動後の登録**13群**、portable smokeが成功した。Pause/Break・F13〜F24をOSへ送信/ホットキー登録していない。
+- 通常版の記録GUIは`.artifacts/shortcut-native-capture-ui-1793046335990/`、設定GUIは`.artifacts/command-triggers-ui-1793046384600/`、smokeは`.artifacts/smoke-1793046420051/`。各新規モードは今回1回、既存の別作業のsmokeは再利用・保護状態を断定できないため保持し、削除0件。検証専用プロセスは終了確認済み。Node24.22.1/pnpm12.10.1/Electron45.0.0/.NET SDK10.0.403、Windows x64。
+- 証跡の正本はmain側`.artifacts/commit-validation-lock-keys-20261027/`のreuse/stage/commit/merge・artifact・各完全ログ・validation。今回の追記は検証記録だけの差分としてコミットし、製品を再build・版更新しない。旧試験worktreeと実機ログを保持する。0.94.12での利用者確認と通常版の自動検証を区別し、複数起動時のデスクトップ不検出および3修飾KANAの未観測という既知の制約は変えていない。
+
 ## 2026-10-27: 0.96.7キー対応のmainマージに向けたコミット検証
 
 - 利用者のmainマージ指示を受け、mainのcleanと`pull --ff-only`による最新一致を確認した。対象は準備済み20ファイルだけとし、設定・保存値・製品コードの追加修正は行わない。
