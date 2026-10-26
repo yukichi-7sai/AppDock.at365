@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { imageReference } from './registered-images';
 export type RibbonPlacement = 'top' | 'bottom';
 export type RibbonDisplayMode = 'compact' | 'expanded';
 export const ribbonDisplayWidth = (mode?: RibbonDisplayMode) => (mode === 'expanded' ? 200 : 56);
@@ -21,6 +22,38 @@ export const ribbonGroupIcons = [
   'settings',
   'bell',
   'user',
+  'home',
+  'globe',
+  'logs',
+  'terminal',
+  'command',
+  'keyboard',
+  'mouse',
+  'touchpad',
+  'bolt',
+  'lock',
+  'search',
+  'play',
+  'refresh',
+  'power',
+  'sun',
+  'moon',
+  'chevron',
+  'chevron-left',
+  'calendar',
+  'star',
+  'heart',
+  'file',
+  'link',
+  'download',
+  'upload',
+  'music',
+  'volume',
+  'video',
+  'edit',
+  'trash',
+  'info',
+  'help',
 ] as const;
 export type RibbonBuiltinIcon = (typeof ribbonGroupIcons)[number];
 export const defaultRibbonRightClickCommand = 'appdock.ribbon.settings.open';
@@ -42,8 +75,12 @@ export interface RibbonGroup {
   color?: string | null;
   children: string[];
 }
-export interface RibbonItemOverride {
+export interface RibbonIconOverride {
+  icon?: RibbonBuiltinIcon | null;
   image?: import('./registered-images').RegisteredImageRef | null;
+}
+export interface RibbonItemOverride extends RibbonIconOverride {
+  displayModeIcons?: Partial<Record<RibbonDisplayMode, RibbonIconOverride>> | null;
   placement?: RibbonPlacement;
   title?: string;
   iconOnly?: boolean;
@@ -60,6 +97,36 @@ export interface RibbonLayout {
   separatorTitles?: Record<string, string>;
   buttons?: RibbonCommandButton[];
   rightClickCommand?: string;
+}
+export function parseRibbonDisplayModeIcons(
+  value: unknown,
+): RibbonItemOverride['displayModeIcons'] {
+  if (value === null) return null;
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    Object.keys(value).some((key) => key !== 'compact' && key !== 'expanded')
+  )
+    throw Error(hostText('settings.applet-pages.displayName'));
+  const result: Partial<Record<RibbonDisplayMode, RibbonIconOverride>> = {};
+  for (const [mode, icon] of Object.entries(value)) {
+    if (
+      !icon ||
+      typeof icon !== 'object' ||
+      Array.isArray(icon) ||
+      Object.keys(icon).some((key) => key !== 'icon' && key !== 'image')
+    )
+      throw Error(hostText('settings.applet-pages.displayName'));
+    const entry = icon as RibbonIconOverride;
+    if (
+      (entry.icon != null && !ribbonGroupIcons.includes(entry.icon)) ||
+      (entry.image != null && !imageReference(entry.image))
+    )
+      throw Error(hostText('settings.applet-pages.displayName'));
+    result[mode as RibbonDisplayMode] = { ...entry };
+  }
+  return result;
 }
 export function parseRibbonColor(value: unknown): string | null {
   if (value === null || value === undefined) return null;

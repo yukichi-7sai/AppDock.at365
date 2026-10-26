@@ -181,7 +181,7 @@ export function editRibbon(
   } else if (op.kind === 'updateItem') {
     if (
       !exact(op, ['kind', 'id', 'changes']) ||
-      !exact(op.changes, ['title', 'iconOnly', 'image']) ||
+      !exact(op.changes, ['title', 'icon', 'iconOnly', 'image', 'displayModeIcons']) ||
       !Object.keys(op.changes).length ||
       validGroupId(op.id) ||
       validRibbonButtonId(op.id) ||

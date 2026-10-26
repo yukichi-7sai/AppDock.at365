@@ -81,16 +81,16 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 
 `minimumHostVersion: "0.69.0"`と`registered-images` capabilityを宣言する。原画像の列挙と選択は信頼されたローカルUIだけが利用でき、リモートサイトへbridgeを渡さない。
 
-| 呼出元 | 操作 | 契約 |
-| --- | --- | --- |
-| Node | `context.registeredImages.import({ filename?, base64 })` | 元bytesを登録して参照を返す。512KiB以下。名前省略時は内容hash名 |
-| Node | `context.registeredImages.copyToCache(image, variant?)` | `original`（既定）または`thumbnail`を自己のPC専用imageDirectoryへコピーし、絶対パスを返す |
-| .NET | `context.RegisteredImages.ImportAsync(bytes, filename?, token)` | Nodeと同じ。SDK 0.27.0 |
-| .NET | `context.RegisteredImages.CopyToCacheAsync(image, thumbnail?, token)` | `RegisteredImageRef`を使い、既定は原画像 |
-| local UI | `appletPage.call('registeredImages.snapshot')` | メタデータ・参照・グループ。サムネイル本体は別取得 |
-| local UI | `appletPage.call('registeredImages.preview', { image })` | 縮小プレビューを返す |
-| local UI | `appletPage.call('registeredImages.pick', { current })` | `{cancelled:true}`または`{cancelled:false,image:ref|null}`。現在の選択UIは参照を返し、nullable型は互換用に保持。解除は呼出元の画像入力で行う |
-| local UI | `appletPage.call('registeredImages.import', { filename?, base64 })` | プログラム登録と同じ上限 |
+| 呼出元   | 操作                                                                  | 契約                                                                                      |
+| -------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Node     | `context.registeredImages.import({ filename?, base64 })`              | 元bytesを登録して参照を返す。512KiB以下。名前省略時は内容hash名                           |
+| Node     | `context.registeredImages.copyToCache(image, variant?)`               | `original`（既定）または`thumbnail`を自己のPC専用imageDirectoryへコピーし、絶対パスを返す |
+| .NET     | `context.RegisteredImages.ImportAsync(bytes, filename?, token)`       | Nodeと同じ。SDK 0.27.0                                                                    |
+| .NET     | `context.RegisteredImages.CopyToCacheAsync(image, thumbnail?, token)` | `RegisteredImageRef`を使い、既定は原画像                                                  |
+| local UI | `appletPage.call('registeredImages.snapshot')`                        | メタデータ・参照・グループ。サムネイル本体は別取得                                        |
+| local UI | `appletPage.call('registeredImages.preview', { image })`              | 縮小プレビューを返す                                                                      |
+| local UI | `appletPage.call('registeredImages.pick', { current })`               | `{cancelled:true}`または`{cancelled:false,image:ref                                       | null}`。現在の選択UIは参照を返し、nullable型は互換用に保持。解除は呼出元の画像入力で行う |
+| local UI | `appletPage.call('registeredImages.import', { filename?, base64 })`   | プログラム登録と同じ上限                                                                  |
 
 `copyToCache`は自己manifestのregistered-image設定、またはobject-list内の同型フィールドが現在参照している画像だけを受け付ける。登録しただけでは読取対象にならず、まず自己設定へ保存する。生成コピーはruntime世代別とし、停止・異常終了・世代変更で回収する。共有原画像は回収しない。古い処理の完了で新世代のコピーを消さない。ページで表示するときは既存の`pages.registerImages`へコピーを渡し、その画像IDの寿命も守る。
 
@@ -102,8 +102,13 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 
 ```json
 {
-  "id": "main", "title": "プロフィール", "action": "settings", "icon": "user",
-  "imageSetting": "avatar", "imageShape": "circle", "iconOnly": true,
+  "id": "main",
+  "title": "プロフィール",
+  "action": "settings",
+  "icon": "user",
+  "imageSetting": "avatar",
+  "imageShape": "circle",
+  "iconOnly": true,
   "defaultPlacement": "bottom"
 }
 ```
@@ -112,7 +117,7 @@ IDはApplet内で安定させる。リボンIDは`applet:<Applet ID>:<id>`。act
 
 宣言の初期値より保存した親グループと配置・表示設定を優先する。宣言のbottomを利用者がtopへ変えた場合は明示overrideを保存する。無効Appletは実リボンから外し、設定と配置は保持する。設定への入口はruntimeの開始失敗時にも使用できる。名前・tooltip・アクセシブル名は宣言値と利用者のリボン表示名から作り、プロフィールのユーザー名・頭文字を投影しない。
 
-グループ・コマンドボタンの`image`、通常／動的ページの`image`、`ribbon.itemOverrides[id].image`も同じ参照を使う。画像が使えない場合は宣言・設定した固定アイコン、WebAppletでは旧inline iconへ戻る。外部リボン編集のadd/updateButton、add/updateGroup、updateItemも参照またはnullを受け付ける。
+グループ・コマンドボタンの`image`、通常／動的ページの`image`、`ribbon.itemOverrides[id].image`も同じ参照を使う。画像が使えない場合は宣言・設定した固定アイコン、WebAppletでは旧inline iconへ戻る。通常項目の固定アイコンを明示した場合の登録元画像との優先順位は[リボンのアイコン](ribbon-customization-design.md#固定アイコンと登録画像)に従う。外部リボン編集のadd/updateButton、add/updateGroup、updateItemも参照またはnullを受け付ける。
 
 ## プロフィール
 

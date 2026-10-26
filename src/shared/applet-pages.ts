@@ -5,6 +5,7 @@ import { imageReference, type RegisteredImageRef } from './registered-images';
 import {
   ribbonGroupIcons,
   parseRibbonColor,
+  parseRibbonDisplayModeIcons,
   type RibbonGroup,
   type RibbonItemOverride,
   type RibbonCommandButton,
@@ -361,8 +362,21 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       (value.image != null && !imageReference(value.image)) ||
       (value.placement !== undefined && !['top', 'bottom'].includes(value.placement as string)) ||
       Object.keys(value).some(
-        (key) => !['title', 'iconOnly', 'lastKnownTitle', 'image', 'placement'].includes(key),
+        (key) =>
+          ![
+            'title',
+            'icon',
+            'iconOnly',
+            'lastKnownTitle',
+            'image',
+            'placement',
+            'displayModeIcons',
+          ].includes(key),
       ) ||
+      (value.displayModeIcons !== undefined && id !== 'ribbon-display-mode') ||
+      (value.icon !== undefined &&
+        value.icon !== null &&
+        !ribbonGroupIcons.includes(value.icon as any)) ||
       ['title', 'lastKnownTitle'].some(
         (key) =>
           value[key] !== undefined &&
@@ -379,10 +393,16 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       title ||
       lastKnownTitle ||
       value.iconOnly !== undefined ||
+      value.icon !== undefined ||
+      value.displayModeIcons !== undefined ||
       value.image !== undefined ||
       value.placement !== undefined
     )
       overrides[id] = {
+        ...(value.displayModeIcons !== undefined
+          ? { displayModeIcons: parseRibbonDisplayModeIcons(value.displayModeIcons) }
+          : {}),
+        ...(value.icon !== undefined ? { icon: value.icon as RibbonItemOverride['icon'] } : {}),
         ...(title ? { title } : {}),
         ...(value.image !== undefined ? { image: value.image as RegisteredImageRef | null } : {}),
         ...(value.placement !== undefined

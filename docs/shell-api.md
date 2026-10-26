@@ -31,11 +31,11 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 ## 描画モデルと共通操作
 
-| 操作                | 引数と戻り値                                                                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ui.ribbon.get`     | 任意`contextId: "primary"`と`schemaVersion: 1 | 2`（省略は1）。要求した版の`schemaVersion`、`epoch`、表示用`revision`、`contextId`、`dark`、`route`、`contextActionId`、`items[]`を返す |
-| `ui.assets.get`     | `id`にモデル内のassetId。PNG/WebPの`dataUrl`を返す。ファイルパス・任意URLは受け付けない                                                     |
-| `ui.actions.invoke` | `epoch`、任意`contextId: "primary"`、`actionId`、一意の`requestId`。結果は`result`に入る。受付や保存と外部アプリ側の効果確認は区別する      |
+| 操作                | 引数と戻り値                                                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `ui.ribbon.get`     | 任意`contextId: "primary"`と`schemaVersion: 1                                                                                          | 2`（省略は1）。要求した版の`schemaVersion`、`epoch`、表示用`revision`、`contextId`、`dark`、`route`、`contextActionId`、`items[]`を返す |
+| `ui.assets.get`     | `id`にモデル内のassetId。PNG/WebPの`dataUrl`を返す。ファイルパス・任意URLは受け付けない                                                |
+| `ui.actions.invoke` | `epoch`、任意`contextId: "primary"`、`actionId`、一意の`requestId`。結果は`result`に入る。受付や保存と外部アプリ側の効果確認は区別する |
 
 各項目は`id/kind/title/tooltip/placement/selected/enabled/disabledReason/actionId/icon`を持つ。schema 1の`kind`はbutton/separator、schema 2はgroupも含み、`placement`はtop/bottom。iconは名前、任意のopaque assetId、文字代替。画像1件はdata URLで1 MiB以下。構造化モデルにローカルパス・openCommand・認証情報を含めない。
 
@@ -55,7 +55,9 @@ Default Shellは通常Appletと同じmanifest検証・ExtensionManager・Node wo
 
 schema 2のgroupは`expansion/expanded/childCount/children/badge`を持つ。持続型の開いている子だけ`children`へ入る。個別バッジは`kind/text/description`、グループは対象の子から導出する点。持続型の開閉はPC専用のUI状態で、外部操作にはexecuteだけが必要。一時型は外部モデルで無効にし、選択されたローカルShellの`invoke`にだけ`anchor: {x,y,width,height}`を渡せる。座標はShellのCSS座標とし、本体がView位置とzoomを変換する。スクロール・寸法変更では`invalidateAnchor()`を呼び、パネルを閉じる。詳細は[グループとバッジ](ribbon-customization-design.md)。
 
-schema 2の項目は任意の`iconOnly: boolean`を持ち、現在のリボン全体の表示モードから導出する。trueなら表示ラベルを省く。`title`と`tooltip`は本体が解決した表示名で、アイコンのみでもアクセシブル名を保持する。表示名の変更でid/actionIdは変わらない。`iconOnly`を必要とする追加Shellの最低ホスト版は0.53.0とする。schema 1にはこのフィールドを返さない。
+schema 2の項目は任意の`iconOnly: boolean`を持つ。全体がcompactの場合、または項目ごとのアイコンのみ表示が有効な場合はtrueとなり、表示ラベルを省く。expandedでは項目ごとの指定を反映する。`title`と`tooltip`は本体が解決した表示名で、アイコンのみでもアクセシブル名を保持する。表示名の変更でid/actionIdは変わらない。`iconOnly`を必要とする追加Shellの最低ホスト版は0.53.0とする。schema 1にはこのフィールドを返さない。
+
+0.96.1以降は任意の`hideLabel: boolean`も返す。これは個別のアイコンのみ指定や空グループ名により、モードにかかわらずラベルを省くかを示す。Default Shellはtrueのラベルを描画せず、falseのラベルは実際の領域幅で表示を切り替える。折りたたみモデルが幅変更より先に届いても、個別指定のラベルを一時的に再生成しない。既存のiconOnlyの実効値とschema 1は変更しない。
 
 専用preloadはDefault Shell/Shell Applet共通の`window.appdockShell`を公開する。`window.dock`やNodeの直接アクセスは渡さない。送信元のWebContents・main frame・登録URL・現session・active状態を照合する。Shellのローカル操作権限は従来リボンと同じで、通常Applet/MCPの包括的な操作許可とは分離する。
 
@@ -84,8 +86,10 @@ AppDockを終了してから`--safe-shell`で起動すると、選択とリボ�
 
 ## 共通ライブラリーの画像
 
-リボンの登録画像も既存assetIdで取得する。プロフィール固有の名前・頭文字・ファイル参照をShellへ投影しない。通常項目、グループ、コマンド、宣言型Appletは同じ画像解決を使い、円形等の加工はホスト側で行う。schema 1/2の描画側に原画像保存や画像ライブラリーの管理APIを追加しない。[共通画像](registered-images.md)を参照。
+リボンの登録画像も既存assetIdで取得する。プロフィール固有の名前・頭文字・ファイル参照をShellへ投影しない。通常項目、グループ、コマンド、宣言型Appletは同じ画像解決を使い、円形等の加工はホスト側で行う。通常項目の明示icon指定がある場合は、登録元の画像や動的アイコンを使わず、利用者の画像指定があれば画像を、そのほかは指定した固定アイコンを投影する。優先順位と選択UIは[リボンのアイコン](ribbon-customization-design.md#固定アイコンと登録画像)を正本とする。schema 1/2の描画側に原画像保存や画像ライブラリーの管理APIを追加しない。[共通画像](registered-images.md)を参照。
 
 ## リボンの表示モード
+
+切替項目の画像/アイコンは、現在のdisplayModeに対応した共有設定のdisplayModeIconsを本体で解決し、既存のicon.name/assetIdへ投影する。Shell側で状態ごとの設定を解釈したり、新しい描画用操作を設けたりしない。未指定時の共通値引き継ぎと復元は[リボンの表示モード](ribbon-customization-design.md#リボンの表示モード)に従う。
 
 schema 2は任意のdisplayMode（compact / expanded）を持つ。0.89.0以降のローカルリボンモデルはdisplayModeToggle（actionId / title / enabled）を追加し、Shellは本体発行のactionIdをinvokeへ渡して切り替える。切替は通常のribbon-display-mode項目として配置し、Default Shellは独立した固定ボタンを重ねない。displayModeToggleは表示中の切替項目に対する互換メタデータとして保持する。通常Applet/MCP向けモデルとschema 1の切替項目は無効でactionIdを渡さず、外部invokeは拒否する。グループpopupでは、実際にそのグループへ配置された切替項目だけを候補検査後に選択できる。モードはPC専用UI状態で、本体の予約幅はcompact 56px / expanded 200px。追加Shellも同じモデルと操作を利用し、Default Shell専用のAPIは設けない。

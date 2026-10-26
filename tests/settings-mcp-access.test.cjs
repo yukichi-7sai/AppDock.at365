@@ -273,7 +273,7 @@ test('reorder-only lists stay editable as a list while their columns stay read-o
   );
 });
 
-test('legacy input configure and binding schemas also describe MCP-editable native controls', (t) => {
+test('dedicated input and ribbon schemas describe MCP-editable native controls', (t) => {
   const f = fixture(t);
   for (const [page, keys] of [
     ['shortcuts', ['executionMode', 'excludedProcesses']],
@@ -292,6 +292,9 @@ test('legacy input configure and binding schemas also describe MCP-editable nati
   const binding = access.items[settingsItemId('command-triggers', 'bindings')];
   for (const key of ['key', 'gesture', 'when', 'enabled'])
     assert.equal(binding.fields[key].reason, null);
+  const ribbon = f.api.settingsAccess(f.page('ribbon')).items[settingsItemId('ribbon', 'ribbon')];
+  for (const key of ['title', 'icon', 'image', 'iconOnly', 'displayModeIcons'])
+    assert.equal(ribbon.fields[key].reason, null, key);
   assert.equal(f.saves(), 0);
 });
 

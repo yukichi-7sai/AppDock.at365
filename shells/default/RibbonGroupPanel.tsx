@@ -87,7 +87,7 @@ export function RibbonGroupPanel({
       className={parent.selected ? 'active' : ''}
       onClick={close}
     >
-      <RibbonIcon item={parent} asset={asset} showLabel />
+      <RibbonIcon item={parent} asset={asset} />
       <span className="ribbon-disclosure" aria-hidden="true">
         −
       </span>
@@ -211,7 +211,7 @@ export function RibbonGroupPanel({
                       })
                     }
                   >
-                    <RibbonIcon item={item} asset={asset} showLabel />
+                    <RibbonIcon item={item} asset={asset} />
                   </button>
                 ),
               )}

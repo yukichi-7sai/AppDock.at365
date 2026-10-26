@@ -185,6 +185,7 @@ export function SettingsDialog({
   message,
   errorAction,
   cancelWhilePending = false,
+  resetAction,
 }: {
   title: string;
   description?: ReactNode;
@@ -206,6 +207,7 @@ export function SettingsDialog({
   message?: string;
   errorAction?: ReactNode;
   cancelWhilePending?: boolean;
+  resetAction?: { label: string; onClick(): void };
 }) {
   const { t } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -263,6 +265,15 @@ export function SettingsDialog({
       }
       footer={
         <footer>
+          {resetAction && (
+            <SettingsButton
+              data-testid="settings-dialog-reset"
+              disabled={!ready || pending}
+              onClick={resetAction.onClick}
+            >
+              {resetAction.label}
+            </SettingsButton>
+          )}
           <div>
             <button
               data-testid="settings-dialog-cancel"

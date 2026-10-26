@@ -1940,6 +1940,21 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     pages:
       page.kind === 'applet' || ['ribbon', 'command-triggers'].includes(id) ? a.pages : undefined,
     ribbonItems: id === 'ribbon' ? a.ribbonItems : undefined,
+    settings:
+      id === 'ribbon'
+        ? a.settings
+            ?.filter(
+              (setting) =>
+                setting.type === 'registered-image' &&
+                a.ribbonItems?.some((item) => item.imageSetting === setting.key),
+            )
+            .map((setting) => ({
+              key: setting.key,
+              title: setting.title,
+              type: 'registered-image' as const,
+              default: setting.default,
+            }))
+        : undefined,
     shell: id === 'appearance' ? a.shell : undefined,
     updateRepository: id === 'about' || page.kind === 'applet' ? a.updateRepository : undefined,
   });

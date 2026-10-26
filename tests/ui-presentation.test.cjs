@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { UiPresentation, NavigationCoordinator } = require('../out/main/main/core/ui-presentation');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
-function fixture() {
+function fixture(overrides = {}) {
   const settings = createDefaultSettings();
   let changes = 0,
     executions = [],
@@ -32,6 +32,7 @@ function fixture() {
     navigation: nav,
     execute: async (c) => executions.push(c),
     theme: async () => toggles++,
+    ...overrides,
   });
   return {
     ui,
@@ -65,6 +66,74 @@ test('full presentation preserves order, placement, selected route and opaque as
   f.nav.navigate('logs');
   assert.ok(f.ui.get().revision > a.revision);
   assert.equal(f.settings.schemaVersion, 1);
+});
+
+test('ribbon icon overrides replace provider images, preserve actions and allow restoring inherited icons', () => {
+  const f = fixture({ image: (ref) => (ref?.file ? 'data:image/png;base64,QkI=' : undefined) });
+  const id = 'page:test.page:main';
+  const get = (key = id) => f.ui.get().items.find((item) => item.id === key);
+  const original = get();
+  assert(original.icon.assetId);
+  f.settings.ribbon.itemOverrides[id] = { icon: 'star' };
+  assert.equal(get().icon.name, 'star');
+  assert.equal(get().icon.assetId, undefined);
+  assert.equal(get().actionId, original.actionId);
+  assert.equal(get().title, original.title);
+  f.settings.ribbon.itemOverrides[id].image = { file: 'custom.png' };
+  assert.equal(f.ui.getAsset(get().icon.assetId).dataUrl, 'data:image/png;base64,QkI=');
+  f.settings.ribbon.itemOverrides[id] = { icon: null, image: null };
+  assert.equal(get().icon.assetId, original.icon.assetId);
+  for (const key of ['ribbon-display-mode', 'theme']) {
+    f.settings.ribbon.itemOverrides[key] = { icon: 'heart' };
+    assert.equal(get(key).icon.name, 'heart');
+    f.settings.ribbon.itemOverrides[key].icon = null;
+    assert.notEqual(get(key).icon.name, 'heart');
+  }
+});
+
+test('mode-specific icons inherit legacy values, switch atomically and restore factory icons independently', async () => {
+  let mode = 'compact';
+  const f = fixture({
+    displayMode: () => mode,
+    toggleDisplayMode: () => {
+      mode = mode === 'compact' ? 'expanded' : 'compact';
+    },
+    image: (ref) => (ref?.file ? 'data:image/png;base64,QkI=' : undefined),
+  });
+  const id = 'ribbon-display-mode';
+  const get = () => f.ui.get().items.find((item) => item.id === id);
+  f.settings.ribbon.itemOverrides[id] = { icon: 'star', image: { file: 'legacy.png' } };
+  for (mode of ['compact', 'expanded']) {
+    assert.equal(get().icon.name, 'star');
+    assert(get().icon.assetId);
+  }
+  mode = 'compact';
+  const override = f.settings.ribbon.itemOverrides[id];
+  override.displayModeIcons = {
+    compact: { icon: 'music', image: null },
+    expanded: { icon: 'calendar', image: { file: 'expanded.png' } },
+  };
+  const first = get();
+  assert.equal(first.icon.name, 'music');
+  assert.equal(first.icon.assetId, undefined);
+  await f.ui.invoke(
+    { epoch: f.ui.get().epoch, requestId: 'mode-icons', actionId: first.actionId },
+    'local',
+  );
+  const next = get();
+  assert.equal(next.icon.name, 'calendar');
+  assert(next.icon.assetId);
+  assert.equal(next.actionId, first.actionId);
+  assert.equal(next.title, first.title);
+  override.displayModeIcons.expanded = { icon: null, image: null };
+  assert.equal(get().icon.name, 'chevron-left');
+  assert.equal(get().icon.assetId, undefined);
+  mode = 'compact';
+  assert.equal(get().icon.name, 'music');
+  override.icon = null;
+  override.image = null;
+  override.displayModeIcons = null;
+  assert.equal(get().icon.name, 'chevron');
 });
 
 test('ribbon aliases and icon-only are presentation settings, preserving actions and accessible fallback names', async () => {

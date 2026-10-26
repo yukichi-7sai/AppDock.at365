@@ -107,6 +107,19 @@ test('saved ribbon and inactive or unknown Applet references block deletion, mem
     ),
   );
 });
+test('both mode image references block deletion even when only the other mode is displayed', async () => {
+  const f = await fixture();
+  f.store.value.ribbon.itemOverrides['ribbon-display-mode'] = {
+    displayModeIcons: { compact: { icon: 'star' }, expanded: { image: f.ref } },
+  };
+  assert.equal(f.host.inUse(f.ref), true);
+  await assert.rejects(f.host.remove(f.entry), /使用中/);
+  assert.equal(f.calls(), 0);
+  f.store.value.ribbon.itemOverrides['ribbon-display-mode'].displayModeIcons = null;
+  assert.equal(f.host.inUse(f.ref), false);
+  assert.deepEqual(await fs.readFile(f.file), bytes);
+});
+
 test('changed bytes and invalid paths never reach the recycle adapter', async () => {
   const f = await fixture();
   await fs.writeFile(f.file, Buffer.concat([bytes, Buffer.from('changed')]));

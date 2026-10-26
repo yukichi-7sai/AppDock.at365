@@ -13,6 +13,11 @@ import {
 } from '../../shared/ribbon-layout';
 import {
   defaultRibbonRightClickCommand,
+  ribbonGroupIcons,
+  type RibbonBuiltinIcon,
+  type RibbonItemOverride,
+  type RibbonIconOverride,
+  type RibbonDisplayMode,
   type RibbonCommandButton,
   type RibbonGroup,
   type RibbonPlacement,
@@ -24,9 +29,9 @@ import { ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsColorPicker } from '../settings-ui/SettingsColorPicker';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections';
+import { Toggle } from '../settings-ui/Toggle';
 import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
-import { RegisteredImageInput } from '../settings-ui/RegisteredImagePicker';
-import type { RegisteredImageRef } from '../../shared/registered-images';
+import { imageReference, type RegisteredImageRef } from '../../shared/registered-images';
 import { CommandPicker } from '../settings-ui/CommandPicker';
 
 export function RibbonSettings({
@@ -52,6 +57,7 @@ export function RibbonSettings({
     placement: RibbonPlacement;
     before: string;
     nameEdited: boolean;
+    iconRevision?: number;
   }>();
   const [separatorDialog, setSeparatorDialog] = useState<{
     id: string;
@@ -65,11 +71,18 @@ export function RibbonSettings({
     adding: boolean;
     placement: RibbonPlacement;
     before: string;
+    iconRevision?: number;
   }>();
   const [itemDialog, setItemDialog] = useState<{
     id: string;
     title: string;
     originalTitle: string;
+    iconOnly: boolean;
+    icon?: RibbonBuiltinIcon | null;
+    originalIcon: RibbonBuiltinIcon;
+    originalImage?: RegisteredImageRef;
+    displayModeIcons?: RibbonItemOverride['displayModeIcons'];
+    iconRevision?: number;
     image?: RegisteredImageRef | null;
     before: string;
   }>();
@@ -81,6 +94,21 @@ export function RibbonSettings({
     )
   >();
   const catalog = ribbonItems(extensions, layout.separators, groups, layout.buttons);
+  const changeModeIcon = (mode: RibbonDisplayMode, changes: RibbonIconOverride) => {
+    setItemDialog(
+      (current) =>
+        current && {
+          ...current,
+          displayModeIcons: {
+            ...current.displayModeIcons,
+            [mode]: {
+              ...(current.displayModeIcons?.[mode] ?? { icon: current.icon, image: current.image }),
+              ...changes,
+            },
+          },
+        },
+    );
+  };
   const commandTitle = (id: string) => commands.find((c) => c.id === id)?.title ?? id;
   const rightClickCommand = layout.rightClickCommand ?? defaultRibbonRightClickCommand;
   const items = [
@@ -172,6 +200,14 @@ export function RibbonSettings({
     const { command, group } = item;
     const parent = ribbonParent(layout, item.id);
     const missing = !catalog.some((value) => value.id === item.id);
+    const sourceImage =
+      entry.image ??
+      (entry.contribution?.imageSetting
+        ? (settings.extensions[entry.extensionId!]?.settings[entry.contribution.imageSetting] ??
+          extensions
+            .find((value) => value.id === entry.extensionId)
+            ?.settings?.find((value) => value.key === entry.contribution!.imageSetting)?.default)
+        : undefined);
     const detail = missing
       ? translate('settings.ribbonSettings.missing')
       : item.group
@@ -295,6 +331,15 @@ export function RibbonSettings({
                             id: item.id,
                             title: layout.itemOverrides?.[item.id]?.title ?? '',
                             originalTitle: entry.title,
+                            iconOnly: item.iconOnly,
+                            icon: layout.itemOverrides?.[item.id]?.icon,
+                            originalImage: imageReference(sourceImage) ? sourceImage : undefined,
+                            displayModeIcons: structuredClone(
+                              layout.itemOverrides?.[item.id]?.displayModeIcons,
+                            ),
+                            originalIcon: ribbonGroupIcons.includes(entry.icon as RibbonBuiltinIcon)
+                              ? (entry.icon as RibbonBuiltinIcon)
+                              : 'extensions',
                             image: layout.itemOverrides?.[item.id]?.image,
                             before: JSON.stringify(layout),
                           })
@@ -537,6 +582,18 @@ export function RibbonSettings({
       )}
       {dialog && (
         <SettingsDialog
+          resetAction={{
+            label: translate('settings.ribbonSettings.resetIcon'),
+            onClick: () =>
+              setDialog(
+                (current) =>
+                  current && {
+                    ...current,
+                    iconRevision: (current.iconRevision ?? 0) + 1,
+                    group: { ...current.group, icon: 'folder', image: null },
+                  },
+              ),
+          }}
           title={
             dialog.adding
               ? translate('settings.ribbonSettings.newGroup')
@@ -552,7 +609,15 @@ export function RibbonSettings({
           onApply={async () => {
             if (dialog.before !== JSON.stringify(layout))
               throw Error(translate('settings.ribbonSettings.editConflict'));
-            const { id, title, icon, expansion, color = null, image } = dialog.group;
+            const {
+              id,
+              title,
+              icon,
+              expansion,
+              color = null,
+              image,
+              iconOnly = false,
+            } = dialog.group;
             await apply(
               dialog.adding
                 ? {
@@ -561,6 +626,7 @@ export function RibbonSettings({
                     title,
                     icon,
                     expansion,
+                    iconOnly,
                     color,
                     ...(image !== undefined ? { image } : {}),
                     placement: dialog.placement,
@@ -572,6 +638,7 @@ export function RibbonSettings({
                       title,
                       icon,
                       expansion,
+                      iconOnly,
                       color,
                       ...(image !== undefined ? { image } : {}),
                     },
@@ -596,14 +663,33 @@ export function RibbonSettings({
               />
             </SettingsField>
             <RibbonIconPicker
-              key={dialog.group.id}
+              key={`${dialog.group.id}:${dialog.iconRevision ?? 0}`}
               label={translate('settings.ribbonSettings.groupIcon')}
-              preferImage={dialog.adding}
+              preferImage={dialog.adding && !dialog.iconRevision}
               value={dialog.group.icon}
               image={dialog.group.image}
-              onImage={(image) => setDialog({ ...dialog, group: { ...dialog.group, image } })}
-              onChange={(icon) => setDialog({ ...dialog, group: { ...dialog.group, icon } })}
+              onImage={(image) =>
+                setDialog(
+                  (current) => current && { ...current, group: { ...current.group, image } },
+                )
+              }
+              onChange={(icon) =>
+                setDialog((current) => current && { ...current, group: { ...current.group, icon } })
+              }
             />
+            <SettingsField
+              settingKey="iconOnly"
+              title={translate('settings.ribbonSettings.iconOnly')}
+              data-testid="ribbon-icon-only"
+            >
+              <Toggle
+                label={translate('settings.ribbonSettings.iconOnly')}
+                checked={!!dialog.group.iconOnly}
+                onChange={(iconOnly) =>
+                  setDialog({ ...dialog, group: { ...dialog.group, iconOnly } })
+                }
+              />
+            </SettingsField>
             <SettingsField
               settingKey="expansion"
               title={translate('settings.ribbonSettings.expansion')}
@@ -644,6 +730,20 @@ export function RibbonSettings({
       )}
       {itemDialog && (
         <SettingsDialog
+          resetAction={{
+            label: translate('settings.ribbonSettings.resetIcon'),
+            onClick: () =>
+              setItemDialog(
+                (current) =>
+                  current && {
+                    ...current,
+                    iconRevision: (current.iconRevision ?? 0) + 1,
+                    icon: null,
+                    image: null,
+                    ...(current.id === 'ribbon-display-mode' ? { displayModeIcons: null } : {}),
+                  },
+              ),
+          }}
           title={translate('settings.ribbonSettings.editButton')}
           applyLabel={translate('settings.ribbonSettings.apply')}
           valid={itemDialog.title.trim().length <= 80}
@@ -656,7 +756,12 @@ export function RibbonSettings({
               id: itemDialog.id,
               changes: {
                 title: itemDialog.title,
+                iconOnly: itemDialog.iconOnly,
+                ...(itemDialog.icon !== undefined ? { icon: itemDialog.icon } : {}),
                 ...(itemDialog.image !== undefined ? { image: itemDialog.image } : {}),
+                ...(itemDialog.displayModeIcons !== undefined
+                  ? { displayModeIcons: itemDialog.displayModeIcons }
+                  : {}),
               },
             });
           }}
@@ -676,13 +781,51 @@ export function RibbonSettings({
                 onChange={(e) => setItemDialog({ ...itemDialog, title: e.target.value })}
               />
             </SettingsField>
-            <SettingsField settingKey="image" title={translate('settings.ribbonSettings.image')}>
-              <RegisteredImageInput
-                label={translate('settings.ribbonSettings.image')}
-                value={itemDialog.image}
-                onChange={(image) => setItemDialog({ ...itemDialog, image })}
+            <SettingsField
+              settingKey="iconOnly"
+              title={translate('settings.ribbonSettings.iconOnly')}
+              data-testid="ribbon-icon-only"
+            >
+              <Toggle
+                label={translate('settings.ribbonSettings.iconOnly')}
+                checked={itemDialog.iconOnly}
+                onChange={(iconOnly) => setItemDialog({ ...itemDialog, iconOnly })}
               />
             </SettingsField>
+            {itemDialog.id === 'ribbon-display-mode' ? (
+              (['compact', 'expanded'] as const).map((mode) => {
+                const appearance = itemDialog.displayModeIcons?.[mode] ?? {
+                  icon: itemDialog.icon,
+                  image: itemDialog.image,
+                };
+                return (
+                  <div key={mode} data-testid={`ribbon-mode-icon-${mode}`}>
+                    <RibbonIconPicker
+                      settingKey="displayModeIcons"
+                      key={`${mode}:${itemDialog.iconRevision ?? 0}`}
+                      label={translate(
+                        mode === 'compact'
+                          ? 'settings.ribbonSettings.compactIcon'
+                          : 'settings.ribbonSettings.expandedIcon',
+                      )}
+                      value={appearance.icon ?? (mode === 'compact' ? 'chevron' : 'chevron-left')}
+                      image={appearance.image}
+                      onChange={(icon) => changeModeIcon(mode, { icon })}
+                      onImage={(image) => changeModeIcon(mode, { image })}
+                    />
+                  </div>
+                );
+              })
+            ) : (
+              <RibbonIconPicker
+                key={`${itemDialog.id}:${itemDialog.iconRevision ?? 0}`}
+                label={translate('settings.ribbonSettings.buttonIcon')}
+                value={itemDialog.icon ?? itemDialog.originalIcon}
+                image={itemDialog.image ?? (itemDialog.icon ? null : itemDialog.originalImage)}
+                onChange={(icon) => setItemDialog((current) => current && { ...current, icon })}
+                onImage={(image) => setItemDialog((current) => current && { ...current, image })}
+              />
+            )}
           </div>
         </SettingsDialog>
       )}
@@ -716,6 +859,18 @@ export function RibbonSettings({
       )}
       {buttonDialog && !picker && (
         <SettingsDialog
+          resetAction={{
+            label: translate('settings.ribbonSettings.resetIcon'),
+            onClick: () =>
+              setButtonDialog(
+                (current) =>
+                  current && {
+                    ...current,
+                    iconRevision: (current.iconRevision ?? 0) + 1,
+                    button: { ...current.button, icon: 'extensions', image: null },
+                  },
+              ),
+          }}
           title={
             buttonDialog.adding
               ? translate('settings.ribbonSettings.newCommand')
@@ -784,18 +939,35 @@ export function RibbonSettings({
               />
             </SettingsField>
             <RibbonIconPicker
-              key={buttonDialog.button.id}
+              key={`${buttonDialog.button.id}:${buttonDialog.iconRevision ?? 0}`}
               label={translate('settings.ribbonSettings.buttonIcon')}
-              preferImage={buttonDialog.adding}
+              preferImage={buttonDialog.adding && !buttonDialog.iconRevision}
               value={buttonDialog.button.icon}
               image={buttonDialog.button.image}
               onImage={(image) =>
-                setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, image } })
+                setButtonDialog(
+                  (current) => current && { ...current, button: { ...current.button, image } },
+                )
               }
               onChange={(icon) =>
-                setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, icon } })
+                setButtonDialog(
+                  (current) => current && { ...current, button: { ...current.button, icon } },
+                )
               }
             />
+            <SettingsField
+              settingKey="iconOnly"
+              title={translate('settings.ribbonSettings.iconOnly')}
+              data-testid="ribbon-icon-only"
+            >
+              <Toggle
+                label={translate('settings.ribbonSettings.iconOnly')}
+                checked={!!buttonDialog.button.iconOnly}
+                onChange={(iconOnly) =>
+                  setButtonDialog({ ...buttonDialog, button: { ...buttonDialog.button, iconOnly } })
+                }
+              />
+            </SettingsField>
           </div>
         </SettingsDialog>
       )}
