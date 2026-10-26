@@ -124,7 +124,7 @@ function App() {
               }
             }}
           >
-            <RibbonIcon item={item} asset={api.asset} showLabel />
+            <RibbonIcon item={item} asset={api.asset} />
             <span className="ribbon-disclosure" aria-hidden="true">
               {item.expanded ? '−' : '+'}
             </span>
@@ -163,7 +163,7 @@ function App() {
         className={`${item.selected ? 'active' : ''}${item.id === 'ribbon-display-mode' ? ' ribbon-mode-toggle' : ''}`}
         onClick={() => invoke(item.actionId!)}
       >
-        <RibbonIcon item={item} asset={api.asset} showLabel />
+        <RibbonIcon item={item} asset={api.asset} />
       </button>
     );
   };

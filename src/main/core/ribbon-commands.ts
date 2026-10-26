@@ -184,6 +184,31 @@ export class RibbonCommands {
                       additionalProperties: false,
                       properties: {
                         title: { type: 'string', maxLength: 80 },
+                        icon: { anyOf: [{ enum: ribbonGroupIcons }, { type: 'null' }] },
+                        displayModeIcons: {
+                          anyOf: [
+                            { type: 'null' },
+                            {
+                              type: 'object',
+                              additionalProperties: false,
+                              properties: Object.fromEntries(
+                                ['compact', 'expanded'].map((mode) => [
+                                  mode,
+                                  {
+                                    type: 'object',
+                                    additionalProperties: false,
+                                    properties: {
+                                      icon: {
+                                        anyOf: [{ enum: ribbonGroupIcons }, { type: 'null' }],
+                                      },
+                                      image: registeredImageSchema,
+                                    },
+                                  },
+                                ]),
+                              ),
+                            },
+                          ],
+                        },
                         iconOnly: { type: 'boolean' },
                         image: registeredImageSchema,
                       },

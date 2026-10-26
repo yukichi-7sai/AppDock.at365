@@ -150,6 +150,7 @@ export interface RibbonView {
     children?: RibbonView['items'];
     childCount?: number;
     iconOnly?: boolean;
+    hideLabel?: boolean;
   }[];
 }
 export interface UiActionRequest {

@@ -210,6 +210,8 @@ export function ItemNameDialog({
 
 `SettingsDialog`はnative dialogの開始、見出し、本文とフッター、保存中の二重送信・閉鎖防止を扱う。`applyLabel`で「追加」「削除」等を指定できる。`children`に`(ready, setError) => ...`を渡すと入力受付の準備状態とエラー表示口を利用できる。この`ready`はショートカット等の入力停止の準備であり、背景画像の描画準備とは別の状態である。
 
+`resetAction={{ label, onClick }}`を渡すと、左下に共通の復元ボタンを配置できる。受付準備前と保存中は共通部品で無効にする。onClickは対象機能のダイアログ内の一時入力だけを更新し、適用時の既存保存へ接続する。復元対象を明示したラベルを使い、他の項目や保存データを直接変更しない。
+
 `SettingsModal`を直接使う場合は、見出しIDを`labelledBy`へ渡し、見出し・操作は`header`/`footer`スロットへ渡す。本文のスクロール領域と常設エラー領域は共通部品が配置する。エラーは`error`と`errorTarget`、処理中は`busy`へ渡す。`SettingsDialog`も同じエラーの受け渡し口を持ち、項目固有のエラーは`SettingsField.error`で関連付ける。初期フォーカスは`data-initial-focus`または`initialFocus`で指定し、`onReady`で入力受付を制御し、準備失敗は`onError`へ接続する。非同期処理中は`closeDisabled`と`SettingsButton.pending`・処理側の重複防止を揃える。同じ本体documentの開く前の要素へフォーカスを戻し、その要素が削除された場合は`data-dialog-focus-fallback`を付けた安定した操作へ戻す。
 
 ### 描画順と背景の管理

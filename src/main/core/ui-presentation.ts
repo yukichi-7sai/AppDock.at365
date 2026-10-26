@@ -139,13 +139,16 @@ export class UiPresentation {
     const project = (item: RibbonItem): RibbonView['items'][number] => {
       const appearance = ribbonPresentation(settings.ribbon, item);
       const modeItem = item.id === 'ribbon-display-mode';
+      const baseIcon = settings.ribbon.itemOverrides?.[item.id];
+      const modeIcon = modeItem ? baseIcon?.displayModeIcons?.[displayMode] : undefined;
+      const iconAppearance = modeIcon ?? baseIcon;
+      const iconOverride = iconAppearance?.icon;
       const modeTitle = hostText(
         displayMode === 'compact'
           ? 'services.uiPresentation.expandRibbon'
           : 'services.uiPresentation.collapseRibbon',
       );
-      const title =
-        modeItem && !settings.ribbon.itemOverrides?.[item.id]?.title ? modeTitle : appearance.title;
+      const title = appearance.title;
       const actionId = modeItem ? 'ribbon.display-mode' : `ribbon.${item.id}`;
       const provider = applets.find((e) => e.id === item.extensionId);
       const page = provider?.pages?.find((p) => p.id === item.pageId);
@@ -199,36 +202,42 @@ export class UiPresentation {
         ...(schemaVersion === 2
           ? {
               badge: ribbonBadgeView(this.options.badge?.(item.id) ?? null),
-              iconOnly: displayMode === 'compact',
+              iconOnly: displayMode === 'compact' || appearance.iconOnly,
+              hideLabel: appearance.iconOnly,
             }
           : {}),
         icon: {
           assetId: this.asset(
-            [
-              settings.ribbon.itemOverrides?.[item.id]?.image,
-              item.group?.image,
-              item.command?.image,
-              item.image,
-              item.contribution?.imageSetting
-                ? (settings.extensions[item.extensionId!]?.settings[
-                    item.contribution.imageSetting
-                  ] ??
-                  provider?.settings?.find((s) => s.key === item.contribution!.imageSetting)
-                    ?.default)
-                : undefined,
-            ]
+            (iconOverride || modeIcon
+              ? [iconAppearance?.image]
+              : [
+                  iconAppearance?.image,
+                  item.group?.image,
+                  item.command?.image,
+                  item.image,
+                  item.contribution?.imageSetting
+                    ? (settings.extensions[item.extensionId!]?.settings[
+                        item.contribution.imageSetting
+                      ] ??
+                      provider?.settings?.find((s) => s.key === item.contribution!.imageSetting)
+                        ?.default)
+                    : undefined,
+                ]
+            )
               .map((ref) => this.options.image?.(ref, item.contribution?.imageShape))
-              .find(Boolean) ?? item.iconImage,
+              .find(Boolean) ?? (iconOverride || modeIcon ? undefined : item.iconImage),
           ),
-          name: modeItem
-            ? displayMode === 'expanded'
-              ? 'chevron-left'
-              : 'chevron'
-            : item.id === 'theme'
-              ? dark
-                ? 'sun'
-                : 'moon'
-              : item.icon,
+          name:
+            iconOverride ??
+            (modeItem
+              ? displayMode === 'expanded'
+                ? 'chevron-left'
+                : 'chevron'
+              : item.id === 'theme'
+                ? dark
+                  ? 'sun'
+                  : 'moon'
+                : item.icon),
         },
       };
     };

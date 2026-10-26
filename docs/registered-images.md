@@ -112,7 +112,7 @@ IDはApplet内で安定させる。リボンIDは`applet:<Applet ID>:<id>`。act
 
 宣言の初期値より保存した親グループと配置・表示設定を優先する。宣言のbottomを利用者がtopへ変えた場合は明示overrideを保存する。無効Appletは実リボンから外し、設定と配置は保持する。設定への入口はruntimeの開始失敗時にも使用できる。名前・tooltip・アクセシブル名は宣言値と利用者のリボン表示名から作り、プロフィールのユーザー名・頭文字を投影しない。
 
-グループ・コマンドボタンの`image`、通常／動的ページの`image`、`ribbon.itemOverrides[id].image`も同じ参照を使う。画像が使えない場合は宣言・設定した固定アイコン、WebAppletでは旧inline iconへ戻る。外部リボン編集のadd/updateButton、add/updateGroup、updateItemも参照またはnullを受け付ける。
+グループ・コマンドボタンの`image`、通常／動的ページの`image`、`ribbon.itemOverrides[id].image`も同じ参照を使う。画像が使えない場合は宣言・設定した固定アイコン、WebAppletでは旧inline iconへ戻る。通常項目の固定アイコンを明示した場合の登録元画像との優先順位は[リボンのアイコン](ribbon-customization-design.md#固定アイコンと登録画像)に従う。外部リボン編集のadd/updateButton、add/updateGroup、updateItemも参照またはnullを受け付ける。
 
 ## プロフィール
 

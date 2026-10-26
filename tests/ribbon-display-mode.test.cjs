@@ -51,7 +51,7 @@ test('display mode shares PC-local state with groups, accepts old state and comm
   assert.equal(failed, 1);
   assert.equal(changed, 2);
 });
-test('global display mode overrides legacy item flags without changing settings or command identity', async () => {
+test('expanded display respects individual icon flags without changing settings or command identity', async () => {
   const settings = createDefaultSettings();
   settings.ribbon.groups = [
     {
@@ -85,6 +85,10 @@ test('global display mode overrides legacy item flags without changing settings 
     action = first.displayModeToggle.actionId,
     request = { epoch: first.epoch, requestId: 'toggle-once', actionId: action };
   assert(first.items.filter((x) => x.kind !== 'separator').every((x) => x.iconOnly === true));
+  assert.equal(first.items.find((x) => x.id === 'settings').hideLabel, true);
+  assert.equal(first.items.find((x) => x.id === 'logs').hideLabel, false);
+  assert.equal(first.items.find((x) => x.id === 'group:one').hideLabel, true);
+  assert.equal(ui.get(() => true, 1).items.find((x) => x.id === 'settings').hideLabel, undefined);
   assert.equal(ui.get(() => true, 1).displayMode, undefined);
   assert.equal(ui.get(() => true, 2, false).displayModeToggle, undefined);
   await Promise.all([ui.invoke(request, 'local'), ui.invoke(request, 'local')]);
@@ -92,7 +96,16 @@ test('global display mode overrides legacy item flags without changing settings 
   const next = ui.get();
   assert.equal(next.displayMode, 'expanded');
   assert(next.revision > first.revision);
-  assert(next.items.filter((x) => x.kind !== 'separator').every((x) => x.iconOnly === false));
+  assert.equal(next.items.find((x) => x.id === 'settings').iconOnly, true);
+  assert.equal(next.items.find((x) => x.id === 'settings').hideLabel, true);
+  assert.equal(next.items.find((x) => x.id === 'logs').hideLabel, false);
+  assert.equal(next.items.find((x) => x.id === 'logs').iconOnly, false);
+  assert.equal(next.items.find((x) => x.id === 'group:one').iconOnly, true);
+  assert.equal(next.items.find((x) => x.id === 'ribbon-display-mode').iconOnly, false);
+  assert.equal(
+    next.items.find((x) => x.id === 'ribbon-display-mode').title,
+    ribbonItems([]).find((x) => x.id === 'ribbon-display-mode').title,
+  );
   assert.equal(next.items.find((x) => x.id === 'group:one').title, 'グループ');
   assert.equal(JSON.stringify(settings), before);
   assert.equal(nav.state.request, 0);

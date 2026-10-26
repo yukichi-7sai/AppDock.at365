@@ -411,11 +411,23 @@ async function launch() {
 
     if (!scrollbarsOnly) {
       flyout = await openTemporary();
-      await app.evaluate(({ BrowserWindow }) => {
-        const window = BrowserWindow.getAllWindows()[0];
+      const resizeProbe = await app.evaluate(({ BrowserWindow }, hostUrl) => {
+        const windows = BrowserWindow.getAllWindows();
+        const window = windows.find((candidate) => candidate.webContents.getURL() === hostUrl);
+        if (!window) throw Error('Host window not found');
         const [w, h] = window.getSize();
+        const before = windows.map((candidate) => ({
+          id: candidate.id,
+          host: candidate === window,
+          size: candidate.getSize(),
+        }));
         window.setSize(w + 20, h);
-      });
+        return { before, hostId: window.id, requested: [w + 20, h], actual: window.getSize() };
+      }, host.url());
+      fs.writeFileSync(path.join(profile, 'resize-probe.json'), JSON.stringify(resizeProbe, null, 2));
+      const hostBefore = resizeProbe.before.find((window) => window.host).size;
+      assert(resizeProbe.actual[0] > hostBefore[0]);
+      assert(resizeProbe.actual.every((size, index) => Math.abs(size - resizeProbe.requested[index]) <= 2));
       await until(() => flyout.isClosed(), 'resize cancels overlay');
       flyout = await openTemporary();
       await rail.evaluate(() => window.appdockShell.invalidateAnchor());
@@ -515,7 +527,7 @@ async function launch() {
     await page.getByLabel('ボタン名', { exact: true }).fill('My gallery');
     assert.equal(
       await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
-      0,
+      1,
     );
     await page.getByRole('button', { name: '適用', exact: true }).click();
     await saved((r) => r.itemOverrides['image-library']?.title === 'My gallery');
@@ -528,7 +540,7 @@ async function launch() {
     await page.getByLabel('ボタン名', { exact: true }).fill('');
     assert.equal(
       await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
-      0,
+      1,
     );
     await page.getByRole('button', { name: '適用', exact: true }).click();
     await saved((r) => !r.itemOverrides['image-library']?.title);
@@ -560,7 +572,7 @@ async function launch() {
     assert(fieldLayout.every(({ padding, gap }) => padding >= 14 && gap >= 14));
     assert.equal(
       await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
-      0,
+      1,
     );
     await page.screenshot({ path: path.join(profile, 'group-dialog.png') });
     await page.getByRole('button', { name: '追加', exact: true }).click();
@@ -585,7 +597,7 @@ async function launch() {
     await page.getByLabel('グループ名', { exact: true }).fill('Renamed group');
     assert.equal(
       await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(),
-      0,
+      1,
     );
     await page.getByLabel('展開方法', { exact: true }).selectOption('persistent');
     await page.getByRole('button', { name: '適用', exact: true }).click();

@@ -46,6 +46,18 @@
 .ribbon-icon-picker {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+.ribbon-icon-content {
+  display: flex;
+  align-items: center;
+  height: 80px;
+  min-width: 0;
+  overflow: hidden;
+}
+.ribbon-icon-content > .registered-image-input {
+  flex-wrap: nowrap;
 }
 .ribbon-icon-modes {
   display: inline-flex;
@@ -91,10 +103,18 @@
 }
 .ribbon-builtin-icons {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 80px;
+  padding: 6px 5px 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
   gap: 8px;
 }
 .ribbon-builtin-icons > button {
+  flex: none;
   position: relative;
   display: grid;
   place-items: center;

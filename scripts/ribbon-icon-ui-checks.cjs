@@ -40,7 +40,11 @@ module.exports = async function iconChecks(context) {
     await dialog.getByRole('button', { name: label, exact: true }).click();
     const picker = host.getByRole('dialog', { name: '画像を選択', exact: true });
     assert.equal(await picker.getByRole('button', { name: '画像を外す', exact: true }).count(), 0);
-    await picker.locator('.image-library-card').filter({ hasText: filename }).click();
+    await picker
+      .locator('.ad-gallery-card')
+      .filter({ hasText: filename })
+      .locator('.ad-gallery-image')
+      .click();
     await picker
       .getByRole('button', { name: confirm ? '画像を使う' : 'キャンセル', exact: true })
       .click();
@@ -49,7 +53,7 @@ module.exports = async function iconChecks(context) {
   let dialog = await edit();
   assert(await dialog.getByRole('radio', { name: '既定のアイコン', exact: true }).isChecked());
   assert.equal(await dialog.locator('.registered-image-input').count(), 0);
-  assert.equal(await dialog.locator('.ribbon-builtin-icons button').count(), 8);
+  assert.equal(await dialog.locator('.ribbon-builtin-icons button').count(), 40);
   assert.equal(
     await dialog
       .getByRole('button', { name: 'フォルダー', exact: true })
@@ -150,6 +154,7 @@ module.exports = async function iconChecks(context) {
         'theme',
       );
       assert(await dialog.getByRole('radio', { name: '画像', exact: true }).isChecked());
+      let panelHeight, dialogHeight;
       for (const source of ['画像', '既定のアイコン']) {
         await mode(dialog, source);
         if (source === '画像') {
@@ -160,18 +165,29 @@ module.exports = async function iconChecks(context) {
             'preview image decoded',
           );
         }
-        const layout = await dialog.locator('.ribbon-icon-picker').evaluate((element) => {
-          const bounds = element.getBoundingClientRect();
-          return {
-            overflow: element.scrollWidth > element.clientWidth,
-            fits: [...element.querySelectorAll('button')].every((button) => {
-              const r = button.getBoundingClientRect();
-              return r.left >= bounds.left && r.right <= bounds.right + 1;
-            }),
-          };
-        });
+        const layout = await dialog.getByTestId('ribbon-icon-picker').evaluate((element) => ({
+          overflow: element.scrollWidth > element.clientWidth,
+          height: element.querySelector('.ribbon-icon-content').getBoundingClientRect().height,
+        }));
         assert.equal(layout.overflow, false);
-        assert.equal(layout.fits, true);
+        panelHeight ??= layout.height;
+        dialogHeight ??= (await dialog.boundingBox()).height;
+        assert.equal(layout.height, panelHeight);
+        assert.equal((await dialog.boundingBox()).height, dialogHeight);
+        if (source === '既定のアイコン') {
+          const strip = dialog.getByTestId('ribbon-builtin-icons');
+          const row = await strip.evaluate((element) => ({
+            scrolls: element.scrollWidth > element.clientWidth,
+            rows: new Set([...element.children].map((button) => button.getBoundingClientRect().top))
+              .size,
+            overflowY: getComputedStyle(element).overflowY,
+          }));
+          assert.equal(row.rows, 1);
+          assert(row.scrolls);
+          assert.equal(row.overflowY, 'hidden');
+          await dialog.getByRole('button', { name: 'ヘルプ', exact: true }).focus();
+          assert(await strip.evaluate((element) => element.scrollLeft > 0));
+        }
         await dialog.screenshot({
           path: path.join(
             profile,
@@ -182,7 +198,9 @@ module.exports = async function iconChecks(context) {
       await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     }
   }
-  checks.push('light/dark and 1120/760 widths keep both source panels within dialog');
+  checks.push(
+    'light/dark and 1120/760 widths keep one scrolling row, keyboard focus visible and equal panel/dialog heights across image/builtin sources',
+  );
 
   dialog = await edit();
   await dialog.getByRole('button', { name: 'グループのアイコンの画像を外す', exact: true }).click();
@@ -217,8 +235,9 @@ module.exports = async function iconChecks(context) {
     .click();
   dialog = host.getByRole('dialog', { name: 'リボンボタンを編集', exact: true });
   await dialog.waitFor();
-  assert.equal(await dialog.locator('.ribbon-icon-modes').count(), 0);
-  await selectImage(dialog, 'リボンの画像を選択');
+  assert.equal(await dialog.locator('.ribbon-icon-modes').count(), 1);
+  await mode(dialog, '画像');
+  await selectImage(dialog, 'ボタンのアイコンの画像を選択');
   await dialog.getByRole('button', { name: '適用', exact: true }).click();
   await saved((r) => r.itemOverrides?.['image-library']?.image?.file === filename);
   await page
@@ -226,21 +245,116 @@ module.exports = async function iconChecks(context) {
     .getByRole('button', { name: /を編集$/ })
     .click();
   dialog = host.getByRole('dialog', { name: 'リボンボタンを編集', exact: true });
-  await dialog.getByRole('button', { name: 'リボンの画像を外す', exact: true }).click();
+  await dialog.getByRole('button', { name: 'ボタンのアイコンの画像を外す', exact: true }).click();
   await dialog.getByRole('button', { name: '適用', exact: true }).click();
   await saved((r) => !r.itemOverrides?.['image-library']?.image);
   checks.push(
     'command editor shares source controls; ordinary ribbon item shares image input and persists removal',
   );
 
-  await page
-    .getByRole('button', { name: /にグループを追加$/ })
-    .first()
-    .click();
+  const overrides = [
+    ['ribbon-display-mode', 'star', '星'],
+    ['page:fixture.ribbon-icons:main', 'calendar', 'カレンダー'],
+    ['applet:fixture.ribbon-icons:main', 'music', '音楽'],
+  ];
+  await rail.locator('[data-ribbon-id="applet:fixture.ribbon-icons:main"] img').waitFor();
+  const getItem = async (id) =>
+    (await rail.evaluate(() => window.appdockShell.get())).items.find((item) => item.id === id);
+  const actions = new Map();
+  for (const [id, icon, name] of overrides) {
+    const editors = () =>
+      id === 'ribbon-display-mode'
+        ? ['compact', 'expanded'].map((mode) => dialog.getByTestId(`ribbon-mode-icon-${mode}`))
+        : [dialog];
+    const savedIcon = (r) =>
+      id === 'ribbon-display-mode'
+        ? ['compact', 'expanded'].every(
+            (mode) => r.itemOverrides?.[id]?.displayModeIcons?.[mode]?.icon === icon,
+          )
+        : r.itemOverrides?.[id]?.icon === icon;
+    actions.set(id, (await getItem(id)).actionId);
+    await page
+      .locator(`[data-ribbon-setting="${id}"]`)
+      .getByRole('button', { name: /を編集$/ })
+      .click();
+    dialog = host.getByRole('dialog', { name: 'リボンボタンを編集', exact: true });
+    if (id.startsWith('applet:')) {
+      if (!(await dialog.getByRole('radio', { name: '画像', exact: true }).isChecked())) {
+        fs.writeFileSync(
+          path.join(profile, 'inherited-image-diagnostic.json'),
+          JSON.stringify(
+            await host.evaluate(async () => {
+              const s = await window.dock.snapshot();
+              const a = s.extensions.find((a) => a.id === 'fixture.ribbon-icons');
+              return {
+                definitions: a?.settings,
+                contribution: a?.ribbonItems,
+                values: s.settings.value.extensions['fixture.ribbon-icons'],
+              };
+            }),
+            null,
+            2,
+          ),
+        );
+      }
+      assert(await dialog.getByRole('radio', { name: '画像', exact: true }).isChecked());
+      await dialog.getByRole('button', { name: '適用', exact: true }).click();
+      assert.equal((await saved((r) => r.itemOverrides[id])).image, undefined);
+      await page
+        .locator(`[data-ribbon-setting="${id}"]`)
+        .getByRole('button', { name: /を編集$/ })
+        .click();
+      dialog = host.getByRole('dialog', { name: 'リボンボタンを編集', exact: true });
+    }
+    assert.equal(await dialog.getByText('リボンの画像', { exact: true }).count(), 0);
+    for (const editor of editors()) {
+      await mode(editor, '既定のアイコン');
+      await editor.getByRole('button', { name, exact: true }).click();
+    }
+    await dialog.getByRole('button', { name: '適用', exact: true }).click();
+    await saved(savedIcon);
+    await until(async () => (await getItem(id)).icon.name === icon, 'override rendered');
+    assert.equal((await getItem(id)).icon.assetId, undefined);
+    assert.equal((await getItem(id)).actionId, actions.get(id));
+    await page
+      .locator(`[data-ribbon-setting="${id}"]`)
+      .getByRole('button', { name: /を編集$/ })
+      .click();
+    dialog = host.getByRole('dialog', { name: 'リボンボタンを編集', exact: true });
+    for (const editor of editors()) {
+      assert.equal(
+        await editor.getByRole('button', { name, exact: true }).getAttribute('aria-pressed'),
+        'true',
+      );
+      await editor.getByRole('button', { name: 'ハート', exact: true }).click();
+    }
+    await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await saved(savedIcon);
+  }
+  const beforeMode = await rail
+    .evaluate(() => window.appdockShell.get())
+    .then((model) => model.displayMode);
+  await rail.locator('[data-ribbon-id="ribbon-display-mode"]').click();
+  await until(
+    async () => (await rail.evaluate(() => window.appdockShell.get())).displayMode !== beforeMode,
+    'mode toggled',
+  );
+  await until(
+    async () => (await getItem('ribbon-display-mode')).icon.name === 'star',
+    'custom icon survives mode switch',
+  );
+  checks.push(
+    'mode button, Applet page and declared Applet button share builtin picker; custom icons override inherited images, preserve action ids and support cancel/reopen',
+  );
+
+  await page.getByRole('button', { name: '＋ グループ', exact: true }).first().click();
   dialog = host.getByRole('dialog', { name: 'リボングループを追加', exact: true });
   assert(await dialog.getByRole('radio', { name: '画像', exact: true }).isChecked());
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
   ({ app, host, rail } = await restart());
+  for (const [id, icon] of overrides) {
+    await until(async () => (await getItem(id))?.icon.name === icon, 'override restored');
+  }
   assert.equal((await saved((r) => r.groups[0])).icon, 'mail');
   assert.equal((await saved((r) => r.groups[0])).image, null);
   await rail.locator('[data-ribbon-id="button:icon"] img').waitFor();
@@ -252,4 +366,6 @@ module.exports = async function iconChecks(context) {
   checks.push(
     'new group starts with image; real restart preserves sources; all operations preserve original image bytes',
   );
+  await require('./ribbon-reset-mode-ui-checks.cjs')({ ...context, app, host, rail });
+  assert.equal(createHash('sha256').update(fs.readFileSync(file)).digest('hex'), originalHash);
 };

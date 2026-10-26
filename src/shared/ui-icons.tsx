@@ -31,8 +31,85 @@ export type IconName =
   | 'clock'
   | 'image'
   | 'sun'
-  | 'moon';
+  | 'moon'
+  | 'calendar'
+  | 'star'
+  | 'heart'
+  | 'file'
+  | 'link'
+  | 'download'
+  | 'upload'
+  | 'music'
+  | 'volume'
+  | 'video'
+  | 'edit'
+  | 'trash'
+  | 'info'
+  | 'help';
 const paths: Record<IconName, React.ReactNode> = {
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M7 3v4m10-4v4M3 11h18M7 15h2m3 0h2m3 0h1M7 18h2m3 0h2" />
+    </>
+  ),
+  star: <path d="m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" />,
+  heart: (
+    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />
+  ),
+  file: (
+    <>
+      <path d="M14 2H5v20h14V7Z" />
+      <path d="M14 2v5h5M8 12h8m-8 4h8" />
+    </>
+  ),
+  link: (
+    <>
+      <path d="m10 13 4-4m-5 7-2 2a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 0 2-2a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" />
+    </>
+  ),
+  download: <path d="M12 3v12m-5-5 5 5 5-5M4 15v6h16v-6" />,
+  upload: <path d="M12 15V3m-5 5 5-5 5 5M4 15v6h16v-6" />,
+  music: (
+    <>
+      <path d="M9 18V5l12-3v13M9 9l12-3" />
+      <ellipse cx="6" cy="18" rx="3" ry="3" />
+      <ellipse cx="18" cy="15" rx="3" ry="3" />
+    </>
+  ),
+  volume: (
+    <>
+      <path d="m11 3-6 5H2v8h3l6 5Zm4 5a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" />
+    </>
+  ),
+  video: (
+    <>
+      <rect x="2" y="5" width="14" height="14" rx="2" />
+      <path d="m16 10 6-4v12l-6-4" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="m16 3 5 5-12 12-6 1 1-6ZM13 6l5 5" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6m0-10v.1" />
+    </>
+  ),
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9 8a3 3 0 0 1 6 0c0 3-3 2-3 5m0 4v.1" />
+    </>
+  ),
   user: (
     <>
       <circle cx="12" cy="8" r="4" />

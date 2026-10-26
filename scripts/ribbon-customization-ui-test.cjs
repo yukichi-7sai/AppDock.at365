@@ -6,7 +6,7 @@ const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
 const { inspect, electronExpression } = require('./electron-main-helper.cjs');
-const { ribbonPage, overlayPage } = require('./shell-overlay-helper.cjs');
+const { ribbonPage, overlayPage, closingAction } = require('./shell-overlay-helper.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `ribbon-customization-ui-${Date.now()}`);
@@ -14,6 +14,7 @@ const portable =
   process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
 const appearanceOnly = process.argv.includes('--appearance-only');
 const iconsOnly = process.argv.includes('--icons-only');
+const labelsOnly = process.argv.includes('--labels-only');
 const marker = path.join(profile, 'command-executions.txt');
 const customMarker = path.join(profile, 'custom-executions.txt');
 const customId = randomUUID();
@@ -37,13 +38,69 @@ settings.ribbon.groups = [
   },
 ];
 fs.mkdirSync(profile, { recursive: true });
-if (iconsOnly) {
+if (iconsOnly || labelsOnly) {
   settings.ribbon.buttons = [
     { id: 'button:icon', title: 'Icon command', icon: 'clock', commandId: 'appdock.logs.open' },
   ];
   settings.ribbon.order.push('button:icon');
 }
-if (!appearanceOnly && !iconsOnly) {
+if (iconsOnly) {
+  const fixture = path.join(profile, 'extensions', 'ribbon-icons');
+  fs.mkdirSync(fixture, { recursive: true });
+  fs.writeFileSync(
+    path.join(fixture, 'extension.json'),
+    JSON.stringify({
+      apiVersion: 1,
+      id: 'fixture.ribbon-icons',
+      minimumHostVersion: '0.69.0',
+      name: 'Icon fixture',
+      version: '1.0.0',
+      runtime: 'node',
+      entry: 'worker.cjs',
+      capabilities: ['settings', 'ribbon-items', 'pages'],
+      settings: [
+        {
+          key: 'avatar',
+          title: 'Avatar',
+          type: 'registered-image',
+          default: { file: 'fixture-image-with-a-long-name.png' },
+        },
+      ],
+      ribbonItems: [
+        {
+          id: 'main',
+          title: 'Applet contribution',
+          action: 'settings',
+          icon: 'user',
+          imageSetting: 'avatar',
+        },
+      ],
+      commands: [
+        { id: 'fixture.ribbon-icons.open', title: 'Applet page', activateOnExecute: true },
+      ],
+      pages: [
+        {
+          id: 'main',
+          title: 'Applet page',
+          icon: 'mail',
+          source: 'local',
+          ui: 'page.html',
+          openCommand: 'fixture.ribbon-icons.open',
+        },
+      ],
+    }),
+  );
+  fs.writeFileSync(
+    path.join(fixture, 'worker.cjs'),
+    "exports.activate=async c=>c.commands.register('fixture.ribbon-icons.open','Applet page',()=>c.pages.open('main'));",
+  );
+  fs.writeFileSync(
+    path.join(fixture, 'page.html'),
+    '<!doctype html><title>Applet page</title><p>Icon fixture</p>',
+  );
+  settings.extensions['fixture.ribbon-icons'] = { enabled: true, settings: {} };
+}
+if (!appearanceOnly && !iconsOnly && !labelsOnly) {
   const fixture = path.join(profile, 'extensions', 'ribbon-action');
   fs.mkdirSync(fixture, { recursive: true });
   fs.writeFileSync(
@@ -223,8 +280,8 @@ async function colorGeometry() {
 (async () => {
   try {
     await launch();
-    if (iconsOnly) {
-      await require('./ribbon-icon-ui-checks.cjs')({
+    if (iconsOnly || labelsOnly) {
+      await require(labelsOnly ? './ribbon-label-ui-checks.cjs' : './ribbon-icon-ui-checks.cjs')({
         app,
         host,
         rail,
@@ -260,6 +317,7 @@ async function colorGeometry() {
       const result = {
         ok: true,
         iconsOnly,
+        labelsOnly,
         profile,
         portable,
         checks,
@@ -611,11 +669,9 @@ async function commandChecks() {
     'command provider ready',
   );
   let page = await openRibbonSettings();
-  const cards = page.locator('.ribbon-settings > .settings-section');
-  assert.equal(await cards.count(), 2);
-  assert.equal(await cards.first().evaluate((e) => e.tagName === 'DETAILS' && !e.open), true);
-  assert.equal(await cards.first().locator('h2').textContent(), '動作設定');
-  assert.equal(await cards.nth(1).locator('h2').textContent(), 'リボン編集');
+  assert.equal(await page.getByTestId('ribbon-behavior-settings').count(), 1);
+  assert.equal(await page.getByTestId('ribbon-editor-settings').count(), 1);
+  assert(await page.getByRole('button', { name: '右クリックのコマンドを選択', exact: true }).isVisible());
   const create = async (title, target) => {
     await page
       .getByRole('region', { name: '上寄せのリボン設定', exact: true })
@@ -659,9 +715,11 @@ async function commandChecks() {
     .getByRole('dialog', { name: 'コマンドボタンを編集', exact: true })
     .screenshot({ path: path.join(profile, 'command-button-editor.png') });
   await page.getByLabel('ボタン名', { exact: true }).fill('Renamed action');
-  assert.equal(await page.getByLabel('リボンにアイコンのみを表示する', { exact: true }).count(), 0);
+  const iconOnly = page.getByTestId('ribbon-icon-only').getByRole('switch');
+  assert.equal(await iconOnly.getAttribute('aria-checked'), 'false');
+  await iconOnly.click();
   await page.getByRole('button', { name: '適用', exact: true }).click();
-  await saved((r) => r.buttons.find((b) => b.id === run)?.title === 'Renamed action');
+  await saved((r) => r.buttons.some((b) => b.id === run && b.title === 'Renamed action' && b.iconOnly));
   await page.getByLabel('Renamed actionの配置', { exact: true }).selectOption('group:colored');
   await saved((r) => r.groups[0].children.includes(run));
   await button(run).click();
@@ -672,14 +730,14 @@ async function commandChecks() {
   await saved((r) => r.groups[0].expansion === 'temporary');
   await button('group:colored').click();
   const flyout = await until(
-    () =>
-      app
-        .context()
-        .pages()
-        .find((p) => p.url().endsWith('/overlay.html')),
+    async () => {
+      for (const candidate of app.context().pages())
+        if (!candidate.isClosed() && (await candidate.locator('.ribbon-flyout').count()))
+          return candidate;
+    },
     'group popup',
   );
-  await flyout.getByRole('button', { name: 'Renamed action', exact: true }).click();
+  await closingAction(flyout.getByRole('button', { name: 'Renamed action', exact: true }).click());
   await until(() => executions() === 3, 'temporary command');
   await until(
     async () =>
@@ -691,12 +749,11 @@ async function commandChecks() {
   checks.push(
     'UI add/edit/icon-only, preserved draft during command picker, builtin/Applet/custom execution and both group modes',
   );
-  await cards.first().locator('summary').click();
   await page.getByRole('button', { name: '右クリックのコマンドを選択', exact: true }).click();
   await choose('fixture.ribbon-action.run');
   await saved((r) => r.rightClickCommand === 'fixture.ribbon-action.run');
   await page.screenshot({ path: path.join(profile, 'behavior-settings.png') });
-  await rail.locator('.brand-mark').click({ button: 'right' });
+  await rail.locator('.activity-rail').click({ button: 'right', position: { x: 2, y: 2 } });
   await until(() => executions() === 4, 'background right-click');
   await button('separator:test').click({ button: 'right' });
   await until(() => executions() === 5, 'separator right-click once');
@@ -712,7 +769,7 @@ async function commandChecks() {
     async () => (await rail.evaluate(() => window.appdockShell.get())).contextActionEnabled,
     'restored provider',
   );
-  await rail.locator('.brand-mark').click({ button: 'right' });
+  await rail.locator('.activity-rail').click({ button: 'right', position: { x: 2, y: 2 } });
   await until(() => executions() === 6, 'restored right-click');
   await host.evaluate(async () => {
     const s = await window.dock.snapshot();
@@ -776,7 +833,7 @@ async function commandChecks() {
   );
   await page.getByRole('button', { name: 'フォーム', exact: true }).click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 680));
-  await page.getByRole('heading', { name: '動作設定', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByTestId('ribbon-behavior-settings').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(profile, 'ribbon-settings-narrow.png') });
   checks.push(
     'Right-click assignment survives restart; stopped provider cannot run; page reset restores layout and behavior with empty JSON while preserving command definitions',

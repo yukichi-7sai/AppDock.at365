@@ -5,11 +5,9 @@ import { Icon, type IconName } from '../../src/shared/ui-icons';
 export function RibbonIcon({
   item,
   asset,
-  showLabel,
 }: {
   item: RibbonView['items'][number];
   asset(id: string): Promise<{ dataUrl: string }>;
-  showLabel?: boolean;
 }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
@@ -39,7 +37,7 @@ export function RibbonIcon({
           </span>
         )}
       </span>
-      {(showLabel ?? !item.iconOnly) && <span className="rail-label">{item.title}</span>}
+      {!(item.hideLabel ?? item.iconOnly) && <span className="rail-label">{item.title}</span>}
     </>
   );
 }

@@ -57,6 +57,71 @@ function fixture(t) {
 }
 const update = (id, changes) => ({ kind: 'update', id, changes });
 
+test('ordinary item icons accept the expanded catalog through the public atomic edit API', async (t) => {
+  const f = fixture(t);
+  const icons = require('../out/main/shared/ribbon').ribbonGroupIcons;
+  assert.equal(icons.length, 40);
+  assert.equal(new Set(icons).size, icons.length);
+  for (const icon of icons) {
+    await f.edit([{ kind: 'updateItem', id: 'page:sample:main', changes: { icon } }]);
+    assert.equal(f.get().layout.itemOverrides['page:sample:main'].icon, icon);
+  }
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  const operations = [
+    { kind: 'updateItem', id: 'ribbon-display-mode', changes: { icon: 'calendar' } },
+  ];
+  await f.edit(operations, { dryRun: true });
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  for (const icon of ['unknown-icon', {}, 1]) {
+    await assert.rejects(
+      f.edit([{ kind: 'updateItem', id: 'ribbon-display-mode', changes: { icon } }]),
+    );
+    assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  }
+  await f.edit(operations);
+  await f.edit([{ kind: 'updateItem', id: 'page:sample:main', changes: { icon: null } }]);
+  assert.equal(f.get().layout.itemOverrides['page:sample:main'].icon, null);
+  assert.equal(f.get().layout.itemOverrides['ribbon-display-mode'].icon, 'calendar');
+});
+
+test('mode icon edits validate both states, support dry-run and reject invalid or misplaced data atomically', async (t) => {
+  const f = fixture(t),
+    item = 'ribbon-display-mode';
+  await f.edit([{ kind: 'updateItem', id: item, changes: { icon: 'star' } }]);
+  const modes = {
+    compact: { icon: 'music', image: null },
+    expanded: { icon: null, image: { file: 'expanded.png' } },
+  };
+  const operations = [{ kind: 'updateItem', id: item, changes: { displayModeIcons: modes } }];
+  const before = fs.readFileSync(f.settings.file, 'utf8');
+  await f.edit(operations, { dryRun: true });
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), before);
+  await f.edit(operations);
+  assert.deepEqual(f.get().layout.itemOverrides[item].displayModeIcons, modes);
+  assert.equal(f.get().layout.itemOverrides[item].icon, 'star');
+  const saved = fs.readFileSync(f.settings.file, 'utf8');
+  for (const value of [
+    { other: {} },
+    { compact: null },
+    { compact: { icon: 'invalid' } },
+    { expanded: { image: { file: '../outside.png' } } },
+    { compact: { title: 'extra' } },
+  ]) {
+    await assert.rejects(
+      f.edit([{ kind: 'updateItem', id: item, changes: { displayModeIcons: value } }]),
+    );
+    assert.equal(fs.readFileSync(f.settings.file, 'utf8'), saved);
+  }
+  await assert.rejects(
+    f.edit([{ kind: 'updateItem', id: 'logs', changes: { displayModeIcons: modes } }]),
+  );
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), saved);
+  await f.edit([
+    { kind: 'updateItem', id: item, changes: { displayModeIcons: null, icon: null, image: null } },
+  ]);
+  assert.equal(f.get().layout.itemOverrides[item].displayModeIcons, null);
+});
+
 test('appearance edits preserve source identity and missing removal rechecks the current catalog', async (t) => {
   const f = fixture(t);
   await f.edit([
