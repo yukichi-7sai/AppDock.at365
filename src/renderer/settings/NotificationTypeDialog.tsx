@@ -67,6 +67,7 @@ export function NotificationTypeDialog({
       onApply={() => invoke('notificationSavePreference', [type, original, row])}
     >
       <SettingsField
+        settingKey="targets"
         title={translate('settings.notificationSettings.targets')}
         className="settings-field-wide"
       >
@@ -128,6 +129,7 @@ export function NotificationTypeDialog({
       </SettingsField>
       {speaking && !speechConfigured && (
         <SettingsField
+          settingKey="speak"
           title={translate('settings.notificationSettings.speechSettings')}
           description={translate('settings.notificationSettings.speechSettingsRequirements')}
         >
@@ -143,6 +145,7 @@ export function NotificationTypeDialog({
       )}
       {type.lifetimePolicy === 'userDuration' ? (
         <SettingsField
+          settingKey="durationSeconds"
           title={translate('settings.notificationSettings.durationSeconds')}
           hint={translate('settings.notificationSettings.durationHint')}
         >
@@ -172,6 +175,7 @@ export function NotificationTypeDialog({
         </SettingsField>
       ) : (
         <SettingsField
+          settingKey="durationSeconds"
           title={translate('settings.notificationSettings.durationTitle')}
           description={
             type.lifetimePolicy === 'condition'

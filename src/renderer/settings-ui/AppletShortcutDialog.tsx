@@ -67,6 +67,7 @@ export function AppletShortcutDialog({
     >
       {(ready, setError) => (
         <BindingEditorLayout
+          inputKey="key"
           input={
             <>
               <ShortcutCaptureField

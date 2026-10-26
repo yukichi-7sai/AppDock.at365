@@ -252,17 +252,18 @@ async function checkSectionTitles() {
           );
         }
         const read = async (state) => {
-          const rows = await host
-            .locator('.settings-section > :is(header,summary) h2')
-            .evaluateAll((elements) =>
-              elements.map((el) => ({
-                title: el.textContent,
-                color: getComputedStyle(el).color,
-                opacity: getComputedStyle(el).opacity,
-                collapsible: !!el.closest('summary'),
-              })),
-            );
-          assert(rows.length > 0, title + ' section titles');
+          const headings = host.locator('.settings-section > :is(header,summary) h2');
+          const rows = await (
+            (await headings.count()) ? headings : host.locator('.settings-field-label strong')
+          ).evaluateAll((elements) =>
+            elements.map((el) => ({
+              title: el.textContent,
+              color: getComputedStyle(el).color,
+              opacity: getComputedStyle(el).opacity,
+              collapsible: !!el.closest('summary'),
+            })),
+          );
+          assert(rows.length > 0, title + ' settings titles');
           for (const row of rows) {
             titleSamples.push({ theme, width, page: title, state, ...row });
             assert.equal(row.color, reference, `${theme}/${width}/${title}/${row.title}/${state}`);

@@ -16,6 +16,8 @@ import {
   resolveNotificationPolicy,
 } from '../../shared/notification-types';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { SettingsMcpScope, SettingsMcpLock } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 import { NotificationTypeDialog } from './NotificationTypeDialog';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
 import { SettingsListLayout, ListIcon } from '../settings-ui/SettingsListTable';
@@ -165,6 +167,10 @@ export function NotificationSettings({
                     <div className="settings-list-title">
                       <strong>{type.title}</strong>
                       <SettingsHintIcon title={type.title} hint={type.description} />
+                      <SettingsMcpLock
+                        title={type.title}
+                        itemId={settingsItemId('notifications', notificationSettingKey(type))}
+                      />
                     </div>
                     {type.ownerKind === 'applet' &&
                       !['starting', 'running'].includes(type.ownerState) && (
@@ -226,15 +232,19 @@ export function NotificationSettings({
         </SettingsListLayout>
       </SettingsContent>
       {editing && (
-        <NotificationTypeDialog
-          type={editing.type}
-          original={editing.original}
-          settings={settings}
-          speechConfigured={!!auxiliary?.configured && !!effective.voice}
-          invoke={invoke}
-          onClose={() => setEditing(null)}
-          select={select}
-        />
+        <SettingsMcpScope
+          itemId={settingsItemId('notifications', notificationSettingKey(editing.type))}
+        >
+          <NotificationTypeDialog
+            type={editing.type}
+            original={editing.original}
+            settings={settings}
+            speechConfigured={!!auxiliary?.configured && !!effective.voice}
+            invoke={invoke}
+            onClose={() => setEditing(null)}
+            select={select}
+          />
+        </SettingsMcpScope>
       )}
       {!!unknown.length && (
         <SettingsSection

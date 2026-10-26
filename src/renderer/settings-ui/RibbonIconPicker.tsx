@@ -44,7 +44,7 @@ export function RibbonIconPicker({
     onImage?.(next === 'image' ? draftImage : null);
   };
   return (
-    <SettingsField title={label}>
+    <SettingsField title={label} settingKey="icon">
       {onImage && (
         <div
           className="ribbon-icon-modes"

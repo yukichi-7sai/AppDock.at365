@@ -128,6 +128,7 @@ export function GestureBindingDialog({
     >
       {(ready, setError) => (
         <BindingEditorLayout
+          inputKey="gesture"
           input={
             <>
               {touchpad ? (

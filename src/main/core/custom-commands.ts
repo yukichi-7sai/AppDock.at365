@@ -7,6 +7,7 @@ import {
   customCommandVersion,
   customDescription,
   customItems,
+  customEditableKeys,
   customUpdateCommand,
   customUpdateSchema,
   jsonObject,
@@ -454,17 +455,7 @@ export class CustomCommandService {
             if (
               !jsonObject(changes) ||
               !Object.keys(changes).length ||
-              Object.keys(changes).some(
-                (k) =>
-                  ![
-                    'title',
-                    'description',
-                    'enabled',
-                    'automation',
-                    'config',
-                    'configVersion',
-                  ].includes(k),
-              )
+              Object.keys(changes).some((k) => !customEditableKeys.includes(k))
             )
               return failure('INVALID_ARGUMENT', hostText('services.customCommands.patchFields'));
             if (caller && Object.hasOwn(changes, 'automation'))
@@ -545,7 +536,7 @@ export class CustomCommandService {
         if (old.typeId !== item.typeId || !sameCustomOwner(old.owner, item.owner))
           return failure('INVALID_ARGUMENT', hostText('services.customCommands.fixedProvider'));
         const changes = Object.fromEntries(
-          ['title', 'description', 'configVersion', 'config', 'enabled', 'automation']
+          customEditableKeys
             .filter(
               (k) =>
                 JSON.stringify(old[k as keyof typeof old]) !==

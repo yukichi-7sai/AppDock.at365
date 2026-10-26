@@ -1,4 +1,6 @@
 import { hostText } from '../../shared/i18n';
+import { SettingsMcpLock } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -349,18 +351,26 @@ export function AppletManagementSettings({
                   {result?.message && <small>{result.message}</small>}
                 </td>
                 <td>
-                  <Toggle
-                    label={translate('settings.appletManagementSettings.enable', {
-                      displayName: a.displayName,
-                    })}
-                    checked={a.enabled}
-                    disabled={changing}
-                    onChange={(value) =>
-                      void run(a.id, () =>
-                        invoke('manageApplet', [a.id, value ? 'enable' : 'disable']),
-                      )
-                    }
-                  />
+                  <span className="settings-title-with-hint">
+                    <Toggle
+                      label={translate('settings.appletManagementSettings.enable', {
+                        displayName: a.displayName,
+                      })}
+                      checked={a.enabled}
+                      disabled={changing}
+                      onChange={(value) =>
+                        void run(a.id, () =>
+                          invoke('manageApplet', [a.id, value ? 'enable' : 'disable']),
+                        )
+                      }
+                    />
+                    <SettingsMcpLock
+                      title={translate('settings.appletManagementSettings.enable', {
+                        displayName: a.displayName,
+                      })}
+                      itemId={settingsItemId('applets', 'enabled:' + a.id)}
+                    />
+                  </span>
                 </td>
                 <td>
                   <span className={`state ${a.state}`}>{states[a.state]}</span>

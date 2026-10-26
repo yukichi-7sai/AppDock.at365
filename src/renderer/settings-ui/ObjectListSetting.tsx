@@ -99,7 +99,12 @@ export function ObjectListSetting({
             const current = objectFieldValue(entry, field);
             const name = `${label}${index + 1} ${field.title}`;
             return (
-              <SettingsField title={field.title} description={field.description} key={field.key}>
+              <SettingsField
+                title={field.title}
+                description={field.description}
+                key={field.key}
+                settingKey={field.key}
+              >
                 {field.type === 'registered-image' ? (
                   <RegisteredImageInput
                     value={current}

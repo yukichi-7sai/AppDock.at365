@@ -24,6 +24,8 @@ import {
   SettingsContent,
 } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 
 type Invoke = (name: string, args?: unknown[]) => Promise<any>;
 const definition: SettingDefinition = {
@@ -326,12 +328,17 @@ export function McpClientSettingsForm({
         )}
       </SettingsSection>
       {dialog?.kind === 'edit' && (
-        <McpConnectionDialog
-          original={dialog.item}
-          status={dialog.status}
-          onClose={() => setDialog(null)}
-          onApply={(value) => update({ op: 'save', ...value }, dialog.revision)}
-        />
+        <SettingsMcpScope
+          itemId={settingsItemId('mcp-client', 'connections')}
+          rowId={dialog.item?.id}
+        >
+          <McpConnectionDialog
+            original={dialog.item}
+            status={dialog.status}
+            onClose={() => setDialog(null)}
+            onApply={(value) => update({ op: 'save', ...value }, dialog.revision)}
+          />
+        </SettingsMcpScope>
       )}
       {dialog?.kind === 'delete' && (
         <SettingsDialog
@@ -402,7 +409,7 @@ function McpConnectionDialog({
         })
       }
     >
-      <SettingsField title={translate('settings.mcpClientSettings.name')}>
+      <SettingsField settingKey="name" title={translate('settings.mcpClientSettings.name')}>
         <SettingsInput
           aria-label={translate('settings.mcpClientSettings.name')}
           data-initial-focus
@@ -411,7 +418,10 @@ function McpConnectionDialog({
           onChange={(e) => setName(e.target.value)}
         />
       </SettingsField>
-      <SettingsField title={translate('settings.mcpClientSettings.description')}>
+      <SettingsField
+        settingKey="description"
+        title={translate('settings.mcpClientSettings.description')}
+      >
         <SettingsTextarea
           aria-label={translate('settings.mcpClientSettings.description')}
           value={description}
@@ -424,7 +434,10 @@ function McpConnectionDialog({
         checked={connection.enabled}
         onChange={(enabled) => set({ enabled })}
       />
-      <SettingsField title={translate('settings.mcpClientSettings.transport')}>
+      <SettingsField
+        settingKey="connection.transport"
+        title={translate('settings.mcpClientSettings.transport')}
+      >
         <select
           aria-label={translate('settings.mcpClientSettings.transport')}
           value={connection.transport}
@@ -445,7 +458,10 @@ function McpConnectionDialog({
       </SettingsField>
       {connection.transport === 'http' ? (
         <>
-          <SettingsField title={translate('settings.mcpClientSettings.url')}>
+          <SettingsField
+            settingKey="connection.url"
+            title={translate('settings.mcpClientSettings.url')}
+          >
             <SettingsInput
               aria-label={translate('settings.mcpClientSettings.url')}
               value={connection.url}
@@ -453,7 +469,10 @@ function McpConnectionDialog({
               onChange={(e) => set({ url: e.target.value })}
             />
           </SettingsField>
-          <SettingsField title={translate('settings.mcpClientSettings.auth')}>
+          <SettingsField
+            settingKey="connection.authentication"
+            title={translate('settings.mcpClientSettings.auth')}
+          >
             <select
               aria-label={translate('settings.mcpClientSettings.auth')}
               value={connection.authentication}
@@ -487,7 +506,10 @@ function McpConnectionDialog({
         </>
       ) : (
         <>
-          <SettingsField title={translate('settings.mcpClientSettings.executable')}>
+          <SettingsField
+            settingKey="connection.command"
+            title={translate('settings.mcpClientSettings.executable')}
+          >
             <SettingsInput
               aria-label={translate('settings.mcpClientSettings.executable')}
               value={connection.command}
@@ -495,7 +517,10 @@ function McpConnectionDialog({
               onChange={(e) => set({ command: e.target.value })}
             />
           </SettingsField>
-          <SettingsField title={translate('settings.mcpClientSettings.argsArray')}>
+          <SettingsField
+            settingKey="connection.args"
+            title={translate('settings.mcpClientSettings.argsArray')}
+          >
             <SettingsTextarea
               aria-label={translate('settings.mcpClientSettings.argsArray')}
               value={args}
@@ -503,7 +528,10 @@ function McpConnectionDialog({
               onChange={(e) => setArgs(e.target.value)}
             />
           </SettingsField>
-          <SettingsField title={translate('settings.mcpClientSettings.workingDirectory')}>
+          <SettingsField
+            settingKey="connection.cwd"
+            title={translate('settings.mcpClientSettings.workingDirectory')}
+          >
             <SettingsInput
               aria-label={translate('settings.mcpClientSettings.workingDirectory')}
               value={connection.cwd}
@@ -539,7 +567,10 @@ function McpConnectionDialog({
         checked={connection.published}
         onChange={(published) => set({ published })}
       />
-      <SettingsField title={translate('settings.mcpClientSettings.publishedTools')}>
+      <SettingsField
+        settingKey="connection.publishedTools"
+        title={translate('settings.mcpClientSettings.publishedTools')}
+      >
         <SettingsTextarea
           aria-label={translate('settings.mcpClientSettings.publishedTools')}
           rows={4}

@@ -580,7 +580,10 @@ export function RibbonSettings({
           }}
         >
           <div>
-            <SettingsField title={translate('settings.ribbonSettings.groupName')}>
+            <SettingsField
+              settingKey="title"
+              title={translate('settings.ribbonSettings.groupName')}
+            >
               <SettingsInput
                 aria-label={translate('settings.ribbonSettings.groupName')}
                 data-initial-focus
@@ -601,7 +604,10 @@ export function RibbonSettings({
               onImage={(image) => setDialog({ ...dialog, group: { ...dialog.group, image } })}
               onChange={(icon) => setDialog({ ...dialog, group: { ...dialog.group, icon } })}
             />
-            <SettingsField title={translate('settings.ribbonSettings.expansion')}>
+            <SettingsField
+              settingKey="expansion"
+              title={translate('settings.ribbonSettings.expansion')}
+            >
               <select
                 aria-label={translate('settings.ribbonSettings.expansion')}
                 value={dialog.group.expansion}
@@ -621,7 +627,7 @@ export function RibbonSettings({
                 <option value="temporary">{translate('settings.ribbonSettings.temporary')}</option>
               </select>
             </SettingsField>
-            <SettingsField title={translate('settings.ribbonSettings.color')}>
+            <SettingsField settingKey="color" title={translate('settings.ribbonSettings.color')}>
               <SettingsColorPicker
                 value={dialog.group.color ?? null}
                 allowNone
@@ -657,6 +663,7 @@ export function RibbonSettings({
         >
           <div>
             <SettingsField
+              settingKey="title"
               title={translate('settings.ribbonSettings.buttonName')}
               hint={translate('settings.ribbonSettings.buttonNameHint')}
             >
@@ -669,7 +676,7 @@ export function RibbonSettings({
                 onChange={(e) => setItemDialog({ ...itemDialog, title: e.target.value })}
               />
             </SettingsField>
-            <SettingsField title={translate('settings.ribbonSettings.image')}>
+            <SettingsField settingKey="image" title={translate('settings.ribbonSettings.image')}>
               <RegisteredImageInput
                 label={translate('settings.ribbonSettings.image')}
                 value={itemDialog.image}
@@ -695,7 +702,7 @@ export function RibbonSettings({
             });
           }}
         >
-          <SettingsField title={translate('settings.ribbonSettings.name')}>
+          <SettingsField settingKey="title" title={translate('settings.ribbonSettings.name')}>
             <SettingsInput
               aria-label={translate('settings.ribbonSettings.name')}
               data-initial-focus
@@ -738,6 +745,7 @@ export function RibbonSettings({
         >
           <div>
             <SettingsField
+              settingKey="commandId"
               title={translate('settings.ribbonSettings.command')}
               description={
                 buttonDialog.button.commandId &&
@@ -757,7 +765,10 @@ export function RibbonSettings({
                   : translate('settings.ribbonSettings.selectCommand')}
               </button>
             </SettingsField>
-            <SettingsField title={translate('settings.ribbonSettings.buttonName')}>
+            <SettingsField
+              settingKey="title"
+              title={translate('settings.ribbonSettings.buttonName')}
+            >
               <SettingsInput
                 aria-label={translate('settings.ribbonSettings.buttonName')}
                 data-initial-focus

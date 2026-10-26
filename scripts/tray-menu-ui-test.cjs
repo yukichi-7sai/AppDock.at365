@@ -154,9 +154,14 @@ const checks = [];
     const button = (name) => page.getByRole('button', { name, exact: true });
     const nav = (name) => ({
       click: async () => {
-        const id = { 一般: 'general', ショートカットキー: 'shortcuts', タスクトレイ: 'tray' }[name];
+        const id = {
+          一般: 'general',
+          ショートカットキー: 'shortcuts',
+          コマンドトリガー: 'command-triggers',
+          タスクトレイ: 'tray',
+        }[name];
         await page.getByTestId('settings-nav:' + id).click();
-        await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
+        await page.getByTestId('settings-page:' + id).waitFor();
       },
     });
     const save = async () => {
@@ -338,8 +343,9 @@ const checks = [];
       );
     }
     // The registered host command must be selectable in keyboard bindings too.
-    await nav('ショートカットキー').click();
-    assert.equal(await page.locator(`[data-shortcut-command="${pause}"]`).count(), 1);
+    await nav('コマンドトリガー').click();
+    assert.equal(await page.getByTestId(`binding-command-summary:${pause}`).count(), 1);
+    assert.equal(await page.getByTestId(`binding-add:${pause}:shortcuts`).count(), 1);
     await nav('タスクトレイ').click();
     await choose('トレイクリックのコマンドを選択', 'appdock.open');
     await button('未設定に戻す').click();
@@ -456,13 +462,14 @@ const checks = [];
       await choose('トレイクリックのコマンドを選択', 'a.run');
       await save();
       await app.evaluate(({ BrowserWindow }) => {
-        BrowserWindow.getAllWindows()[0].hide();
+        const main = BrowserWindow.getAllWindows().find((window) =>
+          window.webContents.getURL().startsWith('appdock://host/'),
+        );
+        if (!main) throw Error('Host window not found');
+        main.hide();
         globalThis.testTray.emit('click');
       });
-      await until(
-        () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()),
-        'unavailable click opens host',
-      );
+      await until(async () => (await snapshot()).windowVisible, 'unavailable click opens host');
       assert(
         (await snapshot()).logs.some((entry) => entry.source === 'tray' && entry.level === 'error'),
       );

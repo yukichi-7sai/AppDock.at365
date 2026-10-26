@@ -1079,6 +1079,16 @@ function mcpSettingsOperation<T>(operation: () => T): T {
   }
 }
 const operationApi = new AppDockApi({
+  mcpEnabled: () => automation?.state().enabled ?? false,
+  mcpAvailable: () => {
+    if (!automation?.state().running) return false;
+    try {
+      assertSettingsWritable();
+      return true;
+    } catch {
+      return false;
+    }
+  },
   serviceSettingsTargets: () => serviceSettings.targets(),
   settingsPrincipal: () => automation?.principal() ?? '',
   handlers: {
@@ -3940,6 +3950,7 @@ async function initialize() {
         changed,
         auxiliary: (page) => ({
           ...settingsPageAuxiliary(page),
+          mcpAccess: operationApi.settingsAccess(page),
           shortcutCapture: settingsRecording ? shortcutCaptured : undefined,
           storage: settingsPageStorage(page),
           settingsFiles: page.id === 'general' ? settings.diagnostics() : undefined,

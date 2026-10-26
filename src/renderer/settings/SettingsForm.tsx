@@ -29,6 +29,8 @@ import { CodexSettings } from './CodexSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { AppletSettingsForm } from '../settings-ui/AppletSettingsForm';
 import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
+import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 export interface FormEditor {
   value: Settings;
   edit(value: Settings): void;
@@ -116,12 +118,14 @@ export function SettingsForm({
     );
   if (category === 'tray')
     return (
-      <TraySettings
-        settings={settings}
-        extensions={extensions}
-        commands={commands}
-        onChange={edit}
-      />
+      <SettingsMcpScope itemId={settingsItemId('tray', 'trayMenu')}>
+        <TraySettings
+          settings={settings}
+          extensions={extensions}
+          commands={commands}
+          onChange={edit}
+        />
+      </SettingsMcpScope>
     );
   if (category === 'tts')
     return <TtsSettingsForm editor={editor} auxiliary={aux.tts} invoke={invoke} busy={busy} />;
@@ -138,22 +142,26 @@ export function SettingsForm({
     );
   if (category === 'custom-commands')
     return (
-      <CustomCommandsSettings
-        commands={commands}
-        settings={settings}
-        auxiliary={aux.customCommands}
-        invoke={invoke}
-        busy={busy}
-      />
+      <SettingsMcpScope itemId={settingsItemId('custom-commands', 'definitions')}>
+        <CustomCommandsSettings
+          commands={commands}
+          settings={settings}
+          auxiliary={aux.customCommands}
+          invoke={invoke}
+          busy={busy}
+        />
+      </SettingsMcpScope>
     );
   if (category === 'ribbon')
     return (
-      <RibbonSettings
-        settings={settings}
-        extensions={extensions}
-        commands={commands}
-        onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
-      />
+      <SettingsMcpScope itemId={settingsItemId('ribbon', 'ribbon')}>
+        <RibbonSettings
+          settings={settings}
+          extensions={extensions}
+          commands={commands}
+          onEdit={(operation, before) => invoke('editRibbon', [operation, before])}
+        />
+      </SettingsMcpScope>
     );
   if (category === 'notifications')
     return (

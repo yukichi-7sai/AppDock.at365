@@ -10,6 +10,7 @@ export interface SettingsFieldPlan {
   commit(preflight?: () => void): void | Promise<void>;
 }
 interface SettingsTargetBase {
+  ui?: import('../../shared/settings-mcp-access').SettingsUiBinding;
   targetId: string;
   ownerId: string;
   title: string;

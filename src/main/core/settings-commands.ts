@@ -35,6 +35,8 @@ import {
 } from '../../shared/mcp-setting-fields';
 import type { HostSettingDefinition } from '../../shared/host-settings';
 import { parseSettings } from '../../shared/settings-schema';
+import { settingsUiFields, settingsUiGroup } from '../../shared/settings-mcp-access';
+import { appletSettingsPageId } from '../../shared/settings-navigation';
 
 export class SettingsCommandError extends SettingsTargetError {}
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -151,6 +153,13 @@ export class SettingsCommands {
                 ? `host.${category}`
                 : `applet.${Buffer.from(owner.id).toString('base64url')}`,
             ownerId: owner.id,
+            ui: settingsUiFields(
+              owner.id === 'appdock' ? category : appletSettingsPageId(owner.id),
+              (field) =>
+                owner.id === 'appdock'
+                  ? ((field as HostSettingDefinition).catalogKey ?? field.key)
+                  : `setting:${field.key}`,
+            ),
             title: owner.title,
             category,
             available: owner.available,
@@ -218,6 +227,7 @@ export class SettingsCommands {
             ownerId: owner.id,
             title: owner.title + ' / ' + definition.title,
             category: 'settings',
+            ui: settingsUiGroup(appletSettingsPageId(owner.id), `setting:${definition.key}`),
             available: owner.available,
             fields,
             definition,

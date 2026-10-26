@@ -4,27 +4,37 @@
 
 ## 対象と公開判定
 
+### 設定画面の南京錠
+
+本体の共通設定画面は、MCPから変更できない設定だけに南京錠を表示する。変更できる項目には表示しない。項目ごとのアイコン表示フラグや保存設定は持たず、同じ設定ownerの公開フィールド、available/writable、一覧のitemWritableと対応操作から内部メタデータを生成する。MCPの無効化、設定変更許可、起動・保存の準備状態も現在値に追従する。南京錠は画面からの直接編集を禁止しない。
+
+UIとの対応はownerの`ui`で安定したページID・設定キーを結びつける。通常の本体/Applet設定、Applet共通設定、Shell領域、ジェスチャー共通設定は既存の宣言から生成するため、同じ宣言に追加した項目へ自動で追従する。専用の編集画面は、その保存ownerと既存APIの入力定義へ設定IDを接続する。画面の見出し文字列やDOMの入力形式から公開可否を推測しない。従来の入力・トレイ・リボン・カスタムコマンド編集も、対応する既存APIの定義を使用する。
+
+一覧は全体の操作可否と列・行の制限を分ける。公開された編集可能列がある一覧全体へ、秘密列や読取り専用IDを理由に南京錠を付けない。行ごとの認証情報の保護などは、同じ所有サービスの制限をダイアログへ渡す。説明は共通ポップオーバーで表示し、ヒントOFFでもキーボードから確認できる。新しいMCPツール、操作許可、保存キー/ファイルは追加しない。
+
+このメタデータは信頼された本体設定rendererだけへ渡す。値・既定値・認証情報やTask XMLを含めず、公開対象/Schemaの外側へUI専用情報を追加しない。実際の保存可否は従来どおり各APIが再検証し、表示によって権限を付与しない。
+
 本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/selectは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listも列の値として編集できる。自由JSON・shortcut-list・画像参照の編集と未対応の専用サービスは、adapterを実装する後続範囲。
 
 通知・AI/TTS・MCP接続・更新の通常設定とShell選択も所有サービスのadapterから公開する。通常値はfields、AI接続・TTS手動ボイス・MCP接続の一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
 
-| 対象 | 公開する設定 |
-| --- | --- |
-| AI共通 | 共通プロンプト、既定の接続ID。候補は現在の登録接続 |
-| 既存AI接続 | 名前、preset、URL、認証方式、モデル、出力上限、待ち時間、compatibilityの通常値。IDとprotocolは変更対象外 |
-| AI接続一覧 | 登録済み接続の公開列とID、追加・部分編集・削除・並べ替え。暗号化情報を保持する行は削除しない |
-| TTS | URL、モデル、既定ボイス/速度、速度適用先、ボイス候補取得方式/相対パス |
-| TTS手動ボイス一覧 | id/nameの取得・追加・部分編集・削除・並べ替え。既存の上限1,000件と解析規則を使用 |
-| MCP接続一覧 | 共有のID/名前/説明とPC専用の非秘密接続設定。追加・部分編集・削除・並べ替え |
-| 通知の共通音声 | voice/speedの上書きと解除。解除するとTTSの既定値を継承 |
-| 通知種類ごと | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない |
-| 本体の更新設定 | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可 |
-| Appletの更新元 | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外 |
-| Shell選択 | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成 |
-| Windows起動設定 | サインイン時の登録と管理者起動。PC専用保存と既存のWindows登録トランザクションを使用 |
-| Applet共通設定 | 有効状態、起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成 |
-| Applet管理順序 | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない |
-| ジェスチャー共通設定 | 3入力方式で共有するブラウザexe名の配列とChromiumウィンドウ条件。通常項目は共通宣言から生成 |
+| 対象                 | 公開する設定                                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------------------- |
+| AI共通               | 共通プロンプト、既定の接続ID。候補は現在の登録接続                                                       |
+| 既存AI接続           | 名前、preset、URL、認証方式、モデル、出力上限、待ち時間、compatibilityの通常値。IDとprotocolは変更対象外 |
+| AI接続一覧           | 登録済み接続の公開列とID、追加・部分編集・削除・並べ替え。暗号化情報を保持する行は削除しない             |
+| TTS                  | URL、モデル、既定ボイス/速度、速度適用先、ボイス候補取得方式/相対パス                                    |
+| TTS手動ボイス一覧    | id/nameの取得・追加・部分編集・削除・並べ替え。既存の上限1,000件と解析規則を使用                         |
+| MCP接続一覧          | 共有のID/名前/説明とPC専用の非秘密接続設定。追加・部分編集・削除・並べ替え                               |
+| 通知の共通音声       | voice/speedの上書きと解除。解除するとTTSの既定値を継承                                                   |
+| 通知種類ごと         | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない               |
+| 本体の更新設定       | 更新元、About表示時/起動時の自動確認、起動時の待ち時間と通知、同版更新の許可                             |
+| Appletの更新元       | ファイル型の外部AppletごとのupdateSource上書きと解除。組込みとcollectionの子ページは対象外               |
+| Shell選択            | 現在の領域ごとの提供元指定とDefault Shellへの復帰。領域と候補は共通の定義から生成                        |
+| Windows起動設定      | サインイン時の登録と管理者起動。PC専用保存と既存のWindows登録トランザクションを使用                      |
+| Applet共通設定       | 有効状態、起動待ち時間と、宣言/登録されたページごとの表示先。通常項目は共通定義から生成                  |
+| Applet管理順序       | 管理対象パッケージのID/名前と表示順。並べ替えだけに対応し、導入・削除・名前変更は行わない                |
+| ジェスチャー共通設定 | 3入力方式で共有するブラウザexe名の配列とChromiumウィンドウ条件。通常項目は共通宣言から生成               |
 
 その他の専用サービスと画像/アカウントの寿命操作は後続範囲。未宣言JSON全体の変更入口へ置き換えない。
 
@@ -42,14 +52,14 @@ Appletのホスト管理共通項目は[src/shared/applet-common-settings.ts](..
 
 ## 固定入口
 
-| 内部メソッド | MCPツール | 用途 |
-| --- | --- | --- |
-| settings.targets.list | appdock_settings_list_targets | ownerId/queryで公開対象を探す |
-| settings.schema.get | appdock_settings_get_schema | targetIdのフィールド・入力制約・対応操作とschemaRevision |
-| settings.values.get | appdock_settings_get_values | 実効値・既定値・上書き状態とrevision。keysで絞込み |
-| settings.items.list | appdock_settings_list_items | 一覧の公開列・itemRef・削除可否とrevision。fields対象への要求はINVALID_ARGUMENT |
-| settings.options.list | appdock_settings_list_options | targetId/keyの現在のselect候補。必要に応じitemRef/draftValues |
-| settings.apply | appdock_settings_apply | 1対象の対応操作をまとめて検証・保存 |
+| 内部メソッド          | MCPツール                     | 用途                                                                            |
+| --------------------- | ----------------------------- | ------------------------------------------------------------------------------- |
+| settings.targets.list | appdock_settings_list_targets | ownerId/queryで公開対象を探す                                                   |
+| settings.schema.get   | appdock_settings_get_schema   | targetIdのフィールド・入力制約・対応操作とschemaRevision                        |
+| settings.values.get   | appdock_settings_get_values   | 実効値・既定値・上書き状態とrevision。keysで絞込み                              |
+| settings.items.list   | appdock_settings_list_items   | 一覧の公開列・itemRef・削除可否とrevision。fields対象への要求はINVALID_ARGUMENT |
+| settings.options.list | appdock_settings_list_options | targetId/keyの現在のselect候補。必要に応じitemRef/draftValues                   |
+| settings.apply        | appdock_settings_apply        | 1対象の対応操作をまとめて検証・保存                                             |
 
 MCP専用の入口。読取りは「情報の取得」、applyは「情報の取得」と「設定の変更」を必要とし、コマンド実行許可は不要。dryRunと保存済み要求の再送にも最新の許可を検査する。許可自体はこのAPIから変更できない。
 
@@ -65,12 +75,12 @@ schemaのitemsはkey/title/type/inputSchema/default/writable/applies、operation
 
 items.listの行は`itemRef`・`values`・`removable`を返す。行ごとの操作制約を持つ所有サービスは`writableKeys`も返し、その時点で変更できる列を示す。valuesは公開された対応列だけで、一覧全体のdefault・未宣言データ・非公開列をSchemaやプレビューへ含めない。親のautomation:falseを子のtrueで解除しない。非公開列やIDと保存先が重なるpropertyPath/aliasesも公開しない。
 
-| 操作 | 入力 |
-| --- | --- |
-| add | values。任意beforeItemRef。省略時は末尾 |
-| update | itemRefとchanges。指定した公開列だけを更新 |
-| remove | itemRef。保護列に値がある行はLOCAL_ACTION_REQUIRED |
-| reorder | 全行のitemRefs。欠落・重複・他の一覧の参照を拒否 |
+| 操作    | 入力                                               |
+| ------- | -------------------------------------------------- |
+| add     | values。任意beforeItemRef。省略時は末尾            |
+| update  | itemRefとchanges。指定した公開列だけを更新         |
+| remove  | itemRef。保護列に値がある行はLOCAL_ACTION_REQUIRED |
+| reorder | 全行のitemRefs。欠落・重複・他の一覧の参照を拒否   |
 
 ```json
 {

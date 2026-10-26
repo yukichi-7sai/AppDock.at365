@@ -1,6 +1,8 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useId, useState, type ReactNode } from 'react';
 import { SettingsModal } from './SettingsModal';
+import { SettingsMcpScope } from './SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 export function BindingEditDialog({
   title,
   adding,
@@ -38,55 +40,57 @@ export function BindingEditDialog({
     }
   };
   return (
-    <SettingsModal
-      className={className}
-      labelledBy={`${id}-title`}
-      onClose={onClose}
-      onReady={setRecordingReady}
-      onError={setError}
-      error={[error, validationError].filter(Boolean).join('\n')}
-      errorTarget={errorTarget}
-      header={
-        <header>
-          <div>
-            <small>
-              {adding
-                ? translate('settings.bindingEditDialog.add')
-                : translate('settings.bindingEditDialog.edit')}
-            </small>
-            <h2 id={`${id}-title`}>{title}</h2>
-          </div>
-          <button
-            className="shortcut-dialog-close"
-            aria-label={translate('settings.bindingEditDialog.cancelEdit')}
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </header>
-      }
-      footer={
-        <footer>
-          {footerStart}
-          <div>
-            <button data-testid="binding-cancel" onClick={onClose}>
-              {translate('settings.bindingEditDialog.cancel')}
-            </button>
+    <SettingsMcpScope itemId={settingsItemId('command-triggers', 'bindings')}>
+      <SettingsModal
+        className={className}
+        labelledBy={`${id}-title`}
+        onClose={onClose}
+        onReady={setRecordingReady}
+        onError={setError}
+        error={[error, validationError].filter(Boolean).join('\n')}
+        errorTarget={errorTarget}
+        header={
+          <header>
+            <div>
+              <small>
+                {adding
+                  ? translate('settings.bindingEditDialog.add')
+                  : translate('settings.bindingEditDialog.edit')}
+              </small>
+              <h2 id={`${id}-title`}>{title}</h2>
+            </div>
             <button
-              data-testid="binding-apply"
-              className="primary"
-              disabled={!valid || !recordingReady}
-              onClick={apply}
+              className="shortcut-dialog-close"
+              aria-label={translate('settings.bindingEditDialog.cancelEdit')}
+              onClick={onClose}
             >
-              {adding
-                ? translate('settings.bindingEditDialog.addAction')
-                : translate('settings.bindingEditDialog.apply')}
+              ×
             </button>
-          </div>
-        </footer>
-      }
-    >
-      {children(recordingReady, setError)}
-    </SettingsModal>
+          </header>
+        }
+        footer={
+          <footer>
+            {footerStart}
+            <div>
+              <button data-testid="binding-cancel" onClick={onClose}>
+                {translate('settings.bindingEditDialog.cancel')}
+              </button>
+              <button
+                data-testid="binding-apply"
+                className="primary"
+                disabled={!valid || !recordingReady}
+                onClick={apply}
+              >
+                {adding
+                  ? translate('settings.bindingEditDialog.addAction')
+                  : translate('settings.bindingEditDialog.apply')}
+              </button>
+            </div>
+          </footer>
+        }
+      >
+        {children(recordingReady, setError)}
+      </SettingsModal>
+    </SettingsMcpScope>
   );
 }

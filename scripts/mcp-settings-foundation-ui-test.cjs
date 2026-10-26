@@ -71,6 +71,7 @@ fs.writeFileSync(
     settings: [
       { key: 'flag', title: 'Flag', type: 'boolean', default: false, generateCommands: ['toggle'] },
       { key: 'text', title: 'Text', type: 'string', default: '' },
+      { key: 'opaque', title: 'Opaque config', type: 'json', default: '{"native":true}' },
       {
         key: 'monitor',
         title: 'Monitor',
@@ -473,6 +474,16 @@ async function main() {
     tool,
     value,
     until,
+  });
+  await require('./settings-mcp-lock-checks.cjs')({
+    page,
+    profile,
+    local,
+    checks,
+    tool,
+    value,
+    until,
+    fixtureId,
   });
   await permissions();
   await toggle('write', 'MCP', false);

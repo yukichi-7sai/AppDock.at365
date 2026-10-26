@@ -8,6 +8,7 @@ import { BindingEditorPanel } from './BindingEditorLayout';
 import { CommandConditionDetails, useConditionProcesses } from './CommandConditionDetails';
 import { SettingsField } from './SettingsSections';
 import { ShortcutConditionField } from './ShortcutFields';
+import { SettingsMcpScope } from './SettingsMcpAccess';
 
 /** One condition editor and scope-transition policy for keys, mouse and touchpad. */
 export function CommandConditionEditor({
@@ -34,32 +35,34 @@ export function CommandConditionEditor({
         : {}),
     });
   return (
-    <BindingEditorPanel title={t('settings.gestureBindingDialog.scope')}>
-      <SettingsField
-        className="binding-condition-scope"
-        title={t('settings.gestureBindingDialog.scopeLabel')}
-        description={
-          when.scope === 'browser' ? t('settings.gestureBindingDialog.browserHint') : undefined
-        }
-      >
-        <ShortcutConditionField
-          presentation="buttons"
-          value={{
-            scope: externalShortcutScope(when.scope) ? 'global' : when.scope,
-            appletIds: when.appletIds,
-          }}
-          selectedScope={when.scope}
-          extraScopes={externalShortcutScopes.slice()}
-          onExtraScope={(scope) => selectScope(scope as Keybinding['when']['scope'])}
-          label={t('settings.gestureBindingDialog.scopeLabel')}
-          ownerTitle={ownerTitle}
-          applets={applets}
-          onChange={(next) => {
-            if (next.scope !== 'default') selectScope(next.scope, next.appletIds);
-          }}
-        />
-      </SettingsField>
-      <CommandConditionDetails when={when} onChange={onChange} {...draft} />
-    </BindingEditorPanel>
+    <SettingsMcpScope fieldKey="when">
+      <BindingEditorPanel title={t('settings.gestureBindingDialog.scope')}>
+        <SettingsField
+          className="binding-condition-scope"
+          title={t('settings.gestureBindingDialog.scopeLabel')}
+          description={
+            when.scope === 'browser' ? t('settings.gestureBindingDialog.browserHint') : undefined
+          }
+        >
+          <ShortcutConditionField
+            presentation="buttons"
+            value={{
+              scope: externalShortcutScope(when.scope) ? 'global' : when.scope,
+              appletIds: when.appletIds,
+            }}
+            selectedScope={when.scope}
+            extraScopes={externalShortcutScopes.slice()}
+            onExtraScope={(scope) => selectScope(scope as Keybinding['when']['scope'])}
+            label={t('settings.gestureBindingDialog.scopeLabel')}
+            ownerTitle={ownerTitle}
+            applets={applets}
+            onChange={(next) => {
+              if (next.scope !== 'default') selectScope(next.scope, next.appletIds);
+            }}
+          />
+        </SettingsField>
+        <CommandConditionDetails when={when} onChange={onChange} {...draft} />
+      </BindingEditorPanel>
+    </SettingsMcpScope>
   );
 }

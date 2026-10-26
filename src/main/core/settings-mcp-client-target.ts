@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { settingsUiGroup } from '../../shared/settings-mcp-access';
 import type { SettingDefinition } from '../../shared/contracts';
 import { hostText } from '../../shared/i18n';
 import { defaultMcpConnection, mcpText, parseMcpConnection } from '../../shared/mcp-client';
@@ -95,6 +96,7 @@ export function mcpClientSettingsTarget(
   return {
     kind: 'list',
     targetId: 'service.mcp.servers',
+    ui: settingsUiGroup('mcp-client', 'connections'),
     ownerId: 'appdock',
     title: definition.title,
     category: 'mcp-client',

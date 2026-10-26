@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
+import { SettingsMcpAccessProvider } from './SettingsMcpAccess';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   imageKey,
@@ -298,96 +299,98 @@ export function RegisteredImagePicker({
       });
   };
   return (
-    <SettingsDialog
-      title={translate('settings.registeredImagePicker.select')}
-      description={translate('settings.registeredImagePicker.keepOriginal')}
-      error={[library.error, sizeError].filter(Boolean).join('\n')}
-      errorTarget={translate('settings.registeredImagePicker.selection')}
-      errorAction={
-        sizeError ? (
-          <button type="button" onClick={() => saveWidth(cardWidth)}>
-            {translate('settings.registeredImagePicker.retry')}
-          </button>
-        ) : undefined
-      }
-      className="image-library-dialog"
-      applyLabel={translate('settings.registeredImagePicker.use')}
-      valid={!!library.api && !!selected && !registering}
-      onClose={() => {
-        if (!applied.current) onClose();
-      }}
-      onApply={async () => {
-        if (!selected) return;
-        await onSelect(selected);
-        applied.current = true;
-      }}
-    >
-      <div className="image-library-actions">
-        <button
-          type="button"
-          className="secondary"
-          disabled={!library.api || registering}
-          onClick={async () => {
-            setRegistering(true);
-            library.setError('');
-            try {
-              const ref = await library.api!.register();
-              if (ref) {
-                setSelected(ref);
-                setGroup('all');
-                setQuery('');
-                await library.reload();
-              }
-            } catch (e) {
-              library.setError(String(e instanceof Error ? e.message : e));
-            } finally {
-              setRegistering(false);
-            }
-          }}
-        >
-          {translate('settings.registeredImagePicker.register')}
-        </button>
-        <span>{selected?.file ?? translate('settings.registeredImagePicker.none')}</span>
-      </div>
-      <GallerySizeControl
-        value={cardWidth}
-        onChange={(value) => {
-          sizeTouched.current = true;
-          setCardWidth(value);
+    <SettingsMcpAccessProvider value={undefined}>
+      <SettingsDialog
+        title={translate('settings.registeredImagePicker.select')}
+        description={translate('settings.registeredImagePicker.keepOriginal')}
+        error={[library.error, sizeError].filter(Boolean).join('\n')}
+        errorTarget={translate('settings.registeredImagePicker.selection')}
+        errorAction={
+          sizeError ? (
+            <button type="button" onClick={() => saveWidth(cardWidth)}>
+              {translate('settings.registeredImagePicker.retry')}
+            </button>
+          ) : undefined
+        }
+        className="image-library-dialog"
+        applyLabel={translate('settings.registeredImagePicker.use')}
+        valid={!!library.api && !!selected && !registering}
+        onClose={() => {
+          if (!applied.current) onClose();
         }}
-        onCommit={saveWidth}
-      />
-      <ImageLibraryBrowser
-        snapshot={library.snapshot}
-        selected={selected}
-        onSelect={setSelected}
-        group={group}
-        onGroup={setGroup}
-        query={query}
-        onQuery={setQuery}
-        cardWidth={cardWidth}
-        disabled={registering}
-        onPreview={setPreview}
-      />
-      {preview && (
-        <SettingsModal
-          labelledBy="picker-preview-title"
-          className="image-library-preview-modal"
-          closeOnBackdrop
-          onClose={() => setPreview(null)}
-          header={
-            <header className="image-library-preview-heading">
-              <h2 id="picker-preview-title">{preview.ref.file}</h2>
-              <button type="button" data-initial-focus onClick={() => setPreview(null)}>
-                {translate('settings.registeredImagePicker.close')}
-              </button>
-            </header>
-          }
-        >
-          <RegisteredGalleryPreview entry={preview} groups={library.snapshot.groups} />
-        </SettingsModal>
-      )}
-    </SettingsDialog>
+        onApply={async () => {
+          if (!selected) return;
+          await onSelect(selected);
+          applied.current = true;
+        }}
+      >
+        <div className="image-library-actions">
+          <button
+            type="button"
+            className="secondary"
+            disabled={!library.api || registering}
+            onClick={async () => {
+              setRegistering(true);
+              library.setError('');
+              try {
+                const ref = await library.api!.register();
+                if (ref) {
+                  setSelected(ref);
+                  setGroup('all');
+                  setQuery('');
+                  await library.reload();
+                }
+              } catch (e) {
+                library.setError(String(e instanceof Error ? e.message : e));
+              } finally {
+                setRegistering(false);
+              }
+            }}
+          >
+            {translate('settings.registeredImagePicker.register')}
+          </button>
+          <span>{selected?.file ?? translate('settings.registeredImagePicker.none')}</span>
+        </div>
+        <GallerySizeControl
+          value={cardWidth}
+          onChange={(value) => {
+            sizeTouched.current = true;
+            setCardWidth(value);
+          }}
+          onCommit={saveWidth}
+        />
+        <ImageLibraryBrowser
+          snapshot={library.snapshot}
+          selected={selected}
+          onSelect={setSelected}
+          group={group}
+          onGroup={setGroup}
+          query={query}
+          onQuery={setQuery}
+          cardWidth={cardWidth}
+          disabled={registering}
+          onPreview={setPreview}
+        />
+        {preview && (
+          <SettingsModal
+            labelledBy="picker-preview-title"
+            className="image-library-preview-modal"
+            closeOnBackdrop
+            onClose={() => setPreview(null)}
+            header={
+              <header className="image-library-preview-heading">
+                <h2 id="picker-preview-title">{preview.ref.file}</h2>
+                <button type="button" data-initial-focus onClick={() => setPreview(null)}>
+                  {translate('settings.registeredImagePicker.close')}
+                </button>
+              </header>
+            }
+          >
+            <RegisteredGalleryPreview entry={preview} groups={library.snapshot.groups} />
+          </SettingsModal>
+        )}
+      </SettingsDialog>
+    </SettingsMcpAccessProvider>
   );
 }
 export function RegisteredGalleryPreview({

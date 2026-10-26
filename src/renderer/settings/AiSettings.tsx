@@ -13,6 +13,8 @@ import {
 } from '../settings-ui/SettingsSections';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 import {
   ListIcon,
   SettingsListAddButton,
@@ -242,12 +244,14 @@ export function AiSettingsForm({
         </SettingsField>
       </SettingsSection>
       {dialog?.kind === 'edit' && (
-        <AiConnectionDialog
-          original={dialog.original}
-          status={dialog.status}
-          invoke={invoke}
-          onClose={() => setDialog(null)}
-        />
+        <SettingsMcpScope itemId={settingsItemId('ai', 'connections')} rowId={dialog.original?.id}>
+          <AiConnectionDialog
+            original={dialog.original}
+            status={dialog.status}
+            invoke={invoke}
+            onClose={() => setDialog(null)}
+          />
+        </SettingsMcpScope>
       )}
       {dialog?.kind === 'order' && (
         <AiConnectionOrderDialog

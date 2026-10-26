@@ -44,6 +44,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  mcpAccess?: import('./settings-mcp-access').SettingsMcpAccess;
   commandAssignments?: { shortcuts: string[]; gestures: string[]; 'touchpad-gestures': string[] };
   touchpad?: import('./touchpad-gestures').TouchpadSnapshot;
   touchpadShortcuts?: import('./keybindings').Keybinding[];

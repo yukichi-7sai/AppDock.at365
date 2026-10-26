@@ -26,6 +26,15 @@ import { settingsOperations, type SettingsMethod } from '../../shared/settings-o
 import type { SettingsTarget } from './settings-target-types';
 import type { GlobalHotKeyStatus, ExtensionSnapshot } from '../../shared/contracts';
 import type { ShortcutPageChoice } from '../../shared/shortcut-pages';
+import type { SettingsPageDefinition } from '../../shared/settings-catalog';
+import {
+  settingsMcpAccess,
+  addConfigurationAccess,
+  addBindingAccess,
+  addOperationAccess,
+} from './settings-mcp-access';
+import { settingsItemId } from '../../shared/settings-catalog';
+import { customEditableKeys, customItems } from '../../shared/custom-commands';
 
 export class AutomationError extends Error {
   constructor(
@@ -73,6 +82,8 @@ export class AppDockApi {
       settingsCommands?: SettingsCommands;
       settingsPrincipal?(): string;
       serviceSettingsTargets?(): SettingsTarget[];
+      mcpEnabled?(): boolean;
+      mcpAvailable?(): boolean;
       customCommands?: CustomCommandService;
       mcpClientAllowed?(): boolean;
       inputAllowed?(): boolean;
@@ -104,11 +115,7 @@ export class AppDockApi {
     this.settingsCommands =
       options.settingsCommands ?? new SettingsCommands({ ...options, applets: () => [] });
     this.settingsTargets = new SettingsTargets({
-      targets: () => [
-        ...this.settingsCommands.fieldTargets(),
-        ...this.settingsCommands.listTargets(),
-        ...(this.options.serviceSettingsTargets?.() ?? []),
-      ],
+      targets: () => this.allSettingsTargets(),
       revision: () => this.settingsCommands.revision(),
       principal: () => this.options.settingsPrincipal?.() ?? this.options.instanceId,
     });
@@ -135,6 +142,83 @@ export class AppDockApi {
       commands: () => this.commands(),
       status: options.shortcutStatus,
     });
+  }
+  private allSettingsTargets() {
+    return [
+      ...this.settingsCommands.fieldTargets(),
+      ...this.settingsCommands.listTargets(),
+      ...(this.options.serviceSettingsTargets?.() ?? []),
+    ];
+  }
+  /** Internal trusted renderer projection; does not call MCP or expose a new operation. */
+  settingsAccess(page: SettingsPageDefinition) {
+    const access = settingsMcpAccess(
+      page,
+      this.allSettingsTargets(),
+      this.options.mcpEnabled?.() === false
+        ? 'disabled'
+        : !this.options.writable()
+          ? 'permission'
+          : !this.options.ready() || this.options.mcpAvailable?.() === false
+            ? 'unavailable'
+            : null,
+    );
+    for (const [pageId, owner] of [
+      ['shortcuts', this.shortcuts],
+      ['gestures', this.gestures],
+      ['touchpad-gestures', this.touchpadGestures],
+    ] as const) {
+      if (page.id === pageId)
+        addConfigurationAccess(access, page.id, owner.commands()[0]?.inputSchema);
+      if (page.id === 'command-triggers')
+        addBindingAccess(access, page.id, owner.commands()[0]?.inputSchema);
+    }
+    if (page.id === 'touchpad-gestures')
+      access.items[settingsItemId(page.id, 'enabled')] = {
+        reason: !this.options.touchpadBridge ? 'unavailable' : null,
+      };
+    for (const [pageId, key, owner] of [
+      ['ribbon', 'ribbon', this.ribbon],
+      ['tray', 'trayMenu', this.tray],
+    ] as const) {
+      if (page.id !== pageId) continue;
+      const schema = owner.commands()[0]?.inputSchema;
+      addOperationAccess(access, page.id, key, schema);
+      if (pageId === 'tray') {
+        addConfigurationAccess(access, page.id, schema);
+        for (const [native, remote] of [
+          ['trayClickCommand', 'singleClickCommand'],
+          ['trayDoubleClickCommand', 'doubleClickCommand'],
+        ]) {
+          const field = access.items[settingsItemId(page.id, remote)];
+          if (field) access.items[settingsItemId(page.id, native)] = field;
+        }
+      } else if (access.items[settingsItemId(page.id, key)]?.fields?.commandId)
+        access.items[settingsItemId(page.id, 'rightClickCommand')] = { reason: null };
+    }
+    if (page.id === 'custom-commands' && this.options.customCommands) {
+      const fields = Object.fromEntries(
+        [...customEditableKeys, 'typeId'].map((key) => [key, { reason: null }]),
+      );
+      access.items[settingsItemId(page.id, 'definitions')] = {
+        reason: null,
+        fields,
+        rows: Object.fromEntries(
+          customItems(this.options.settings.value.customCommands).map((item) => [
+            item.id,
+            { ...fields, typeId: { reason: 'readOnly' as const } },
+          ]),
+        ),
+      };
+      for (const type of this.options.customCommands.descriptors())
+        access.items[settingsItemId(page.id, 'config:' + type.id)] = {
+          reason: type.available ? null : 'unavailable',
+          fields: {
+            config: { reason: type.available ? null : 'unavailable' },
+          },
+        };
+    }
+    return access;
   }
   private permissions(appletId?: string) {
     if (appletId !== undefined) return this.options.appletPermissions?.(appletId) ?? {};

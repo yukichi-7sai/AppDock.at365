@@ -317,6 +317,7 @@ export function ObjectListDialogSetting({
                 return (
                   <SettingsField
                     key={field.key}
+                    settingKey={field.key}
                     title={field.title}
                     description={field.description}
                     onInputCapture={

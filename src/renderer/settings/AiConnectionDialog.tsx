@@ -165,7 +165,7 @@ export function AiConnectionDialog({
         await invoke('aiSaveConnection', [next, original, apiKey, status?.keyRevision]);
       }}
     >
-      <SettingsField title={translate('settings.aiConnectionDialog.kind')}>
+      <SettingsField settingKey="preset" title={translate('settings.aiConnectionDialog.kind')}>
         <select
           data-initial-focus
           aria-label={translate('settings.aiConnectionDialog.kindLabel')}
@@ -192,6 +192,7 @@ export function AiConnectionDialog({
         </select>
       </SettingsField>
       <SettingsField
+        settingKey="baseUrl"
         title={translate('settings.aiConnectionDialog.url')}
         hint={translate('settings.aiConnectionDialog.urlHint')}
       >
@@ -223,7 +224,7 @@ export function AiConnectionDialog({
           }}
         />
       </SettingsField>
-      <SettingsField title={translate('settings.aiConnectionDialog.name')}>
+      <SettingsField settingKey="name" title={translate('settings.aiConnectionDialog.name')}>
         <SettingsInput
           aria-label={translate('settings.aiConnectionDialog.nameLabel')}
           maxLength={160}
@@ -231,7 +232,10 @@ export function AiConnectionDialog({
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
       </SettingsField>
-      <SettingsField title={translate('settings.aiConnectionDialog.auth')}>
+      <SettingsField
+        settingKey="authentication"
+        title={translate('settings.aiConnectionDialog.auth')}
+      >
         <select
           aria-label={translate('settings.aiConnectionDialog.authLabel')}
           value={draft.authentication}
@@ -264,6 +268,7 @@ export function AiConnectionDialog({
         )}
       </SettingsField>
       <SettingsField
+        settingKey="defaultModel"
         title={translate('settings.aiConnectionDialog.model')}
         hint={translate('settings.aiConnectionDialog.modelHint')}
       >
@@ -297,6 +302,7 @@ export function AiConnectionDialog({
         </datalist>
       </SettingsField>
       <SettingsField
+        settingKey="defaultMaxOutputTokens"
         title={translate('settings.aiConnectionDialog.maxTokens')}
         hint={translate('settings.aiConnectionDialog.maxTokensHint')}
         description={translate('settings.aiConnectionDialog.maxTokensWarning')}
@@ -312,6 +318,7 @@ export function AiConnectionDialog({
         />
       </SettingsField>
       <SettingsField
+        settingKey="defaultTimeoutSeconds"
         title={translate('settings.aiConnectionDialog.timeout')}
         hint={translate('settings.aiConnectionDialog.timeoutHint')}
       >
@@ -325,7 +332,10 @@ export function AiConnectionDialog({
           onChange={(e) => setTimeoutSeconds(e.target.value)}
         />
       </SettingsField>
-      <SettingsField title={translate('settings.aiConnectionDialog.tokenFormat')}>
+      <SettingsField
+        settingKey="compatibility.tokenLimitField"
+        title={translate('settings.aiConnectionDialog.tokenFormat')}
+      >
         <select
           aria-label={translate('settings.aiConnectionDialog.tokenFormatLabel')}
           value={draft.compatibility.tokenLimitField}
@@ -347,6 +357,7 @@ export function AiConnectionDialog({
       </SettingsField>
       <SettingsField
         title="Temperature"
+        settingKey="compatibility.temperature"
         hint={translate('settings.aiConnectionDialog.temperatureHint')}
       >
         <SettingsInput
@@ -357,6 +368,7 @@ export function AiConnectionDialog({
         />
       </SettingsField>
       <SettingsField
+        settingKey="compatibility.reasoningEffort"
         title={translate('settings.aiConnectionDialog.reasoning')}
         hint={translate('settings.aiConnectionDialog.reasoningHint')}
       >
@@ -374,7 +386,10 @@ export function AiConnectionDialog({
           }
         />
       </SettingsField>
-      <SettingsField title={translate('settings.aiConnectionDialog.store')}>
+      <SettingsField
+        settingKey="compatibility.store"
+        title={translate('settings.aiConnectionDialog.store')}
+      >
         <select
           aria-label={translate('settings.aiConnectionDialog.storeLabel')}
           value={draft.compatibility.store}

@@ -3,6 +3,8 @@ import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { SettingsMcpLock } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
@@ -179,7 +181,13 @@ export function ApiPermissionsSettings({
                 {...settingAnchor('permissions', row.key)}
               >
                 <th scope="row">
-                  <strong>{appletApiPermissionLabels[row.key]}</strong>
+                  <div className="settings-title-with-hint">
+                    <strong>{appletApiPermissionLabels[row.key]}</strong>
+                    <SettingsMcpLock
+                      title={appletApiPermissionLabels[row.key]}
+                      itemId={settingsItemId('permissions', row.key)}
+                    />
+                  </div>
                   <p>{row.description}</p>
                 </th>
                 <td data-caller="Applet">

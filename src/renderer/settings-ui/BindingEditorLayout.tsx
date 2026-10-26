@@ -2,19 +2,24 @@ import { useId, type ReactNode } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import { Toggle } from './Toggle';
 import './binding-editor.css';
+import { SettingsMcpScope, SettingsMcpLock } from './SettingsMcpAccess';
 
 /** Shared input/condition layout for all three command trigger editors. */
 export function BindingEditorLayout({
   input,
   conditions,
+  inputKey,
 }: {
   input: ReactNode;
   conditions: ReactNode;
+  inputKey: 'key' | 'gesture';
 }) {
   const { t } = useHostTranslation();
   return (
     <div className="binding-editor-layout">
-      <BindingEditorPanel title={t('settings.bindingEditor.input')}>{input}</BindingEditorPanel>
+      <BindingEditorPanel title={t('settings.bindingEditor.input')}>
+        <SettingsMcpScope fieldKey={inputKey}>{input}</SettingsMcpScope>
+      </BindingEditorPanel>
       {conditions}
     </div>
   );
@@ -43,6 +48,7 @@ export function BindingEnabledControl({
     <label className="binding-editor-enabled">
       <Toggle checked={enabled} label={label} onChange={onChange} />
       <span>{label}</span>
+      <SettingsMcpLock title={label} settingKey="enabled" />
     </label>
   );
 }

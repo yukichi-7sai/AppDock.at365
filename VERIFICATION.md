@@ -1,5 +1,18 @@
 # 検証記録
 
+## 2026-10-27: MCP変更不可設定の南京錠自動表示 0.94.7
+
+- main `8ae24f2`を統合した`86382ee`から専用worktree/branchで実装。設定追加、保存ファイル追加、公開MCPツールや操作許可の追加はなく、0.94.6から**0.94.7**へパッチ更新した。primary checkoutの作業、追跡先、push/Release/実利用deployは変更しない。
+- 本体設定rendererへ、既存ownerの公開フィールド・available/writable・一覧の操作/列/行制限から生成する変更可否だけを渡す。通常設定・Applet共通・Shell領域は宣言と安定した設定IDへ接続し、項目別のアイコンフラグを保存しない。従来の入力・トレイ・リボン等は既存操作Schemaを参照する。値/既定値/秘密/Task XMLやUI専用情報を公開MCPのSchemaへ追加しない。
+- MCPから変更できない項目だけに共通の南京錠と理由を表示。MCP停止、read/write許可、準備状態の変化に追従し、設定用コマンドにexecute許可を追加要求しない。秘密/非公開/未対応/読取り専用・認証に結び付いた行の保護を共有し、編集可能列を持つ一覧全体は秘密列の存在だけで施錠しない。画面の直接編集は従来どおり行える。ヒントOFFでも共通ポップオーバーをキーボードで確認でき、画像選択内の検索等の一時入力は対象外とする。
+- 発行前に公開判定の単一性、秘密値の非転送、即時保存/一覧/入力の互換、設定追加時の追従、権限と無効/準備状態、共通部品とポータルをレビューした。read/writeだけで実touchpad設定APIのdryRunが成功し、write取消時に拒否される試験を追加。操作許可表とApplet一覧の有効スイッチにもownerのIDを接続し、レイアウト用見出しと保存項目を区別した。阻害指摘なし。
+- 固定lockfileのinstall、型検査、本体/Default Shell build、標準**129ファイル1088/1088件（fail/cancel/skip 0）**が成功。新規9件は通常/動的宣言、非公開と秘密、owner/行/列の能力と秘密を含まない投影、既存Schema、権限/停止状態、設定コマンドの実認可を確認する。最終調整後も全1088件を再実行した。.NETページ試験の初期失敗はframework-dependentホストDLLの不足だったため、既存プロジェクトをRelease buildし、試験/製品を弱めずに標準全体を成功させた。
+- sourceの実MCP **45群**、タイトル/レイアウト **8群**、リボン **6群**、トレイ **5群**が成功。固定EXEでは実MCP **47群**、タイトル/レイアウト **8群**、リボン **6群**、トレイ **4群**、入力編集ダイアログ **8群**、共通並べ替え **5群**（計**78群**）とsmokeが成功。明暗/700〜1280幅、ヒントOFF、説明のfocus/Escape、画面からの編集と再起動保持、権限切替による即時反映、暗号化済み3ファイルのbytes保持、固定tools/list不変を確認した。古い試験の見出し/トリガー操作とWindow配列順への依存を現在のページID/host URLへ更新した。初期失敗と診断ログは保持する。
+- `publish.bat`終了0。EXEは`A:/40.ARTIFACT/AppDock.at365-mcp-settings-design/AppDock.at365.exe`、**170712527 bytes / SHA256 `bc0b56974adcfc4109d7d45ec466de61ce011276717c327923bec744aaeab6aa`**。File/ProductVersion、feedの版/size/hash、ASAR内package/Default Shell、全ビルド出力**250ファイル**と追加resource **621ファイル**、固定コピーのhashが一致した。照合helperの初回はWindows上のASARパス区切りが誤っていたため、製品を変更せずnativeパスへ修正して成功した。既存deploy.local.txtの不在も保持する。
+- 最終**780入力**と参照Applet manifestは、最終調整後の標準/source検証前後・発行後・固定EXE検証後で一致。Node **24.22.1**、pnpm **12.10.1**、Electron **45.0.0**、.NET SDK **10.0.403**、Windows 11 x64を確認。後続変更は本記録と無視対象の証跡だけで、製品再変更/再発行はない。
+- 固定MCP試験の専用Limited Taskは登録もXMLも残らず、専用GUIプロセス0を確認した。参照中の成功・固定コピー・初期診断・過去機能の証跡を保持し、削除0件。Pause/F13〜F24のOS送信/登録、実UAC承認、Windowsサインイン、物理入力・touchpadの実設定書込みは行っていない。確認用隔離profile以外の設定/認証は変更しない。
+- 正本は[設定API](docs/settings-api.md#設定画面の南京錠)と[設定基盤](docs/settings-foundation.md)。コマンド/完全ログ/入力・出力hash・profile・レビュー・環境・後片付けは`.artifacts/mcp-settings-locks-20261026/`、最終stage/commit照合は`.artifacts/commit-validation-mcp-settings-locks-20261026/`へ記録。main統合と、owner投影/UI/試験を一体にした機能変更の2コミットに分ける。
+
 ## 2026-10-26: main 8ae24f2のMCP設定worktree統合
 
 - cleanな`codex/mcp-settings-design` / `6b15760`からorigin/mainをfetchし、ローカルmainと一致する`8ae24f2`（0.94.6）を統合。5ファイルの競合は両検証履歴、mainの5列トリガー/並べ替えUIと役割の説明、worktreeの統合済み設定変更許可・共通宣言を残して解消した。primary checkout、追跡先、push/Release/deployは変更しない。
@@ -149,6 +162,7 @@
 - 固定EXEで編集専用 **8群**、統合一覧 **18群**、隔離smoke成功。全方式のscope切替、exe不正入力/正規化、ページ検索/選択、取消とフォーカス復帰、マウスの種類/段数ごとの入力保持、2段階の方向交換、タッチ全10IDの保存とキーボード操作、キー記録/元入力ブロック、有効切替、追加/編集/削除/実行順、実再起動後の保存維持を確認。実テーマAPIで明暗を切り替え、1280/760/480pxの操作と画像を確認した。予約キーPause/F13～F24のOS送信/登録・Windowsタッチパッド設定変更なし。物理入力と将来のexe除外機能は確認対象外。
 - **0.91.3 / 170,691,969 bytes / SHA256 `fbd8d6aefdc6588519088b246f514dcbe79cf06b2409bd430fdef01c9057d2d9`**。`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`へ発行。EXEのFile/ProductVersion、feedの版/size/hash、同梱本体/Default Shell版、out全237ファイル、固定GUI/smokeコピー3本を照合した。最終GUI前後705入力一致。回帰後の入力差分はGUIのテーマ設定を実APIへ変更した検証スクリプトだけで、製品/単体試験への影響なし。
 - 正本: [割り当てダイアログ](docs/command-triggers.md#割り当てダイアログ)、[UI指針](docs/settings-ui-guidelines.md)。証跡: `.artifacts/binding-dialogs-20261026/`のreview/validation/bundle/environment・入力hash・各ログ。固定GUIは`command-triggers-ui-1792971771827`と`command-triggers-ui-1792971825963`、smokeは`smoke-1792971874323`。開発GUI初回は既存一覧のhover手順不足でタイムアウトし、手順修正後に成功。失敗ログは診断資料として保持した。検証プロセス終了確認、現在の証跡/過去の再利用資料/用途不明分を保持して削除0件。commit/push/Release/実利用deployなし。
+
 ## 2026-10-26: MCP接続設定の共通一覧API 0.91.5
 
 - cleanな`codex/mcp-settings-design` / `022b1f1`から同じ専用worktreeで継続した。追跡先なしのためpullや追跡先の新設は行わず、primary mainと他のworktreeは変更しない。既存の名簿・接続項目・保存ファイル・固定MCPツール契約を維持する変更のため、発行済み0.91.4から**0.91.5**へパッチ更新した。push/Release/deployは行わない。
@@ -310,7 +324,6 @@
 - 正本は[コマンドトリガー](docs/command-triggers.md)。証跡は`.artifacts/command-triggers-20261026/`の`review.json`・単体/発行/smokeログ・`bundle.json`・`validation.json`・入力hash。最終GUIは`.artifacts/command-triggers-ui-1792945290541/result.json`と`.artifacts/shortcuts-ui-1792945622278/result.json`。新設GUIの成功は直近3回以内で、解決済み失敗の診断資料と既存再利用資料も保持し削除0件。今回のテストプロファイルを参照するAppDock/Electron/Nodeプロセスの終了を確認した。
 - 入力の物理操作、実利用の割り当て、Windowsタッチパッド設定の書き込みは未検証。ブラウザ判定共有化、入力単位の実行方式、割り当て別exe除外、旧一覧撤去と旧ページの改名は次の段階。本件のcommit/push/Release/実利用deployは行っていない。
 
-
 ## 2026-10-26: Applet有効状態と管理表示順のMCP接続 0.90.5
 
 - 専用worktree `AppDock.at365-mcp-settings-design`、追跡先のない`codex/mcp-settings-design`のcleanな`0627d35`から継続。現在のbranchを保ち、pull先の追加、main統合、push/Release/deployは行わない。既存のenabled/appletOrderへMCP adapterを追加する変更で、設定項目・保存ファイルの追加削除と破壊的変更を含まないため、発行済み0.90.4から**0.90.5**へパッチ更新した。
@@ -433,6 +446,7 @@
 
 - 利用者の指定に従い、cleanな`codex/mcp-settings-design`の`bc9d404`へorigin/main `cc0a1fe`を通常merge。fetch後のlocal mainとorigin/mainは一致し、main checkoutもclean。版は新しい0.88.4を採用し、検証記録は両方を保持。コードの自動統合箇所と関連定義を確認した。
 - 固定lockfileのinstall、型検査、本体/Default Shell build、設定MCP/API/保存/カタログとジェスチャー・待機表示・翻訳の関連12ファイル**140/140件、fail/skip 0**が成功。690入力hashの前後一致を確認。証跡は`.artifacts/mcp-settings-lists-20261025/`のmerge-start/merge、inputs-merge-before/after、各完全ログとmerge-commit。以降の一覧実装前の統合確認であり、この時点の新規発行・main変更・pushは行わない。
+
 ## 2026-10-26: 一時リボングループ0.90.2のコミット・プッシュ検証
 
 - main `6a3536c` 上の承認済み35ファイルを対象に、実装時の最終入力779件・証跡のSHA256を照合した。GitHub/AQUAの両mainは親の `cc0a1fe` で競合なし。dirtyのためpull/stashは行わずfetchのみ実施。今回のcommitと、先行する未pushの `6a3536c` を通常pushする。製品の追加変更・版更新・再発行は行わず、確認済み0.90.2を維持する。
@@ -594,6 +608,7 @@
 - `APPDOCK_GESTURE_INDICATOR_ONLY=1 dev.bat exec node scripts/gestures-ui-test.cjs` の隔離開発版GUI成功。4種類のラベル/見本/保存、表示なしの保持、実設定による明暗切替、1280/900/700pxの全24組合せ、プロセス再起動後の保持、エラーログなしを確認。最終profileは `.artifacts/gestures-ui-1792909328516/`、`result.json`とPNG、`settings-indicator-ui-final-2.log`参照。狭幅の見本が縮みすぎる点とリングのラベル幅を実表示に合わせて修正後、全組合せを再実行した。元の総合UI試験は最新mainの有効化欄移動前の配置を要求する既存assertionで停止したため、元assertionを緩めず、今回の表示変更だけを検証する明示モードを追加した。
 - `InputTests --gesture-key-state` はメモリ内の模擬入力 **10項目成功**（`key-state.log`）。実入力の既存InputTestsは試験Windowの前面化失敗、cleanupのSendInputはWindows error 5で停止（`input-regression.log`）。**物理入力の認識・実行回帰は今回未確認**として残す。Pause/F13〜F24のOS送信・登録を行う `--shortcuts` モードは実行していない。混在DPIの複数モニター移動、全標準回帰、固定配布EXEの検証も未実行。main統合後の発行時に現行版を再照合し、固定EXEと実入力の不足を確認する。
 - 証跡の基点は `.artifacts/gesture-indicator-0880/`。`inputs.json`に今回のソース・生成物hashを記録。成功したWPF/GUIの各系列は3回以内で、失敗診断と再利用用記録は保持。隔離テスト用プロセスの残存なしを確認した。
+
 ## 2026-10-25: MCP設定の固定入口と通常設定の共通登録 0.88.1
 
 - 専用worktree `AppDock.at365-mcp-settings-design`、branch `codex/mcp-settings-design`のcleanな`e66a2f4`から、拡張設計の第2単位を実装。追跡先がないためpull・main統合を行わず、独立node_modulesと固定lockfileを維持した。

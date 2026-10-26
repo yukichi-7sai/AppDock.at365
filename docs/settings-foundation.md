@@ -4,6 +4,8 @@
 
 通常設定の共通登録、MCP公開、変更とリセットは[設定API](settings-api.md)を参照する。一覧編集と特殊設定の拡張は[一部実装済みの設計](mcp-settings-design.md)にまとめる。以下は現行の設定基盤の契約である。
 
+設定項目の南京錠は「MCPから変更できない」ことを表し、画面からの直接編集とは独立する。[MCP変更可否](settings-api.md#設定画面の南京錠)のメタデータを`SettingsField`/`SettingsSection`とダイアログで共有し、対応項目にはアイコンを出さない。公開判定と表示指定を二重管理せず、項目追加時は既存の設定IDと宣言を使用する。
+
 ## 共通レイアウト指針との対応
 
 本体・Applet設定と設定ダイアログは`SettingsSection`/`SettingsField`の`description`と`hint`を共用する。`description`は現在の値・継続的な状態・重要な説明を常時表示し、`hint`は任意の補足だけを表示する。入力欄を個別のラベルとCSSで配置せず、`SettingsField`へタイトル・説明・入力を渡す。共通の選択候補・キー記録・一覧等のウィジェットは、その内部の操作契約を保つ。
@@ -218,17 +220,17 @@ main      ▼
 
 ### ファイル配置
 
-| 現在 | 統合後 | 方針 |
-| --- | --- | --- |
-| `src/shared/settings-ui/*` | `src/renderer/settings-ui/*` | 全ファイルを移動。相対importとCSS参照も更新 |
-| `shells/default/settings/*.tsx` | `src/renderer/settings/*.tsx` | SettingsForm、SettingsIndex、SettingsPageLayout、各ページ・編集ダイアログを移動 |
-| `shells/default/settings/runtime.ts` | `src/renderer/settings/runtime.ts` | 入力キュー等を再利用し、transportを本体用へ変更 |
-| `shells/default/settings.tsx` | `src/renderer/settings/SettingsPage.tsx` | Reactコンポーネントへ変換。createRoot、window宣言、Shell接続・ready・境界フォーカス処理を除く |
-| `shells/default/settings.css` | `src/renderer/settings/settings.css` | 本体へ取り込み。設定画面のルート内へスタイルを限定 |
-| `shells/default/settings.html` | 削除 | 独立HTMLのビルド・配布を終了 |
-| `src/shared/settings-page.ts` | 同じ場所 | mainと本体preload/renderer間の型として再利用。Shell公開型との接続を外す |
-| `src/shared/settings-editing.ts`・`settings-catalog.ts`等 | 同じ場所 | Reactに依存しない型、定義、検索・投影処理は共通側に保持 |
-| `src/main/core/settings-page.ts` | 同じ場所 | 本体設定ページのセッション |
+| 現在                                                      | 統合後                                   | 方針                                                                                          |
+| --------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `src/shared/settings-ui/*`                                | `src/renderer/settings-ui/*`             | 全ファイルを移動。相対importとCSS参照も更新                                                   |
+| `shells/default/settings/*.tsx`                           | `src/renderer/settings/*.tsx`            | SettingsForm、SettingsIndex、SettingsPageLayout、各ページ・編集ダイアログを移動               |
+| `shells/default/settings/runtime.ts`                      | `src/renderer/settings/runtime.ts`       | 入力キュー等を再利用し、transportを本体用へ変更                                               |
+| `shells/default/settings.tsx`                             | `src/renderer/settings/SettingsPage.tsx` | Reactコンポーネントへ変換。createRoot、window宣言、Shell接続・ready・境界フォーカス処理を除く |
+| `shells/default/settings.css`                             | `src/renderer/settings/settings.css`     | 本体へ取り込み。設定画面のルート内へスタイルを限定                                            |
+| `shells/default/settings.html`                            | 削除                                     | 独立HTMLのビルド・配布を終了                                                                  |
+| `src/shared/settings-page.ts`                             | 同じ場所                                 | mainと本体preload/renderer間の型として再利用。Shell公開型との接続を外す                       |
+| `src/shared/settings-editing.ts`・`settings-catalog.ts`等 | 同じ場所                                 | Reactに依存しない型、定義、検索・投影処理は共通側に保持                                       |
+| `src/main/core/settings-page.ts`                          | 同じ場所                                 | 本体設定ページのセッション                                                                    |
 
 settings-uiのapi.tsxは本体内部の制御依存として扱う。現在は別documentにある2つの`configureSettingsControls`が、統合後に同じグローバルを書き換える構造を残さない。`SettingsControlsProvider`と`useSettingsControls`によるReact Contextへ変更し、本体ルートでは既存DockApi、SettingsPage配下ではそのSettingsViewClientのcontrolsを渡す。部品の利用側はContextから取得する。設定フォームの操作は発行済み操作IDを通し、本体の他画面は設定画面の表示有無に依存させない。
 
@@ -238,13 +240,13 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 
 本体preloadのDockApiへ`settingsPage`を追加する。以下は本体の内部APIで、Applet/MCPには公開しない。
 
-| 操作 | 役割 |
-| --- | --- |
-| `open(request)` | fullまたはappletの表示を登録し、接続IDと初回モデルを返す |
-| `get(connectionId)` | 現在の接続に対する最新SettingsPageModelを取得 |
-| `act(connectionId, action)` | 既存SettingsPageActionを検証し、モデルと結果を返す |
-| `close(connectionId)` | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放 |
-| `onChanged(callback)` | 接続ID付きでモデルの更新を受け取る |
+| 操作                        | 役割                                                     |
+| --------------------------- | -------------------------------------------------------- |
+| `open(request)`             | fullまたはappletの表示を登録し、接続IDと初回モデルを返す |
+| `get(connectionId)`         | 現在の接続に対する最新SettingsPageModelを取得            |
+| `act(connectionId, action)` | 既存SettingsPageActionを検証し、モデルと結果を返す       |
+| `close(connectionId)`       | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放   |
+| `onChanged(callback)`       | 接続ID付きでモデルの更新を受け取る                       |
 
 接続IDはmainが発行し、開き直した画面へ使い回さない。これはShellの接続ID・提供元IDとは独立する。mainは1つのアクティブな設定ページを管理し、全体設定とApplet詳細を同時にmountしない。新しいopenは既存の入力受付を待った後に古い接続を失効させる。SettingsPageSessionは既存の`settingsNavigation`、`settingsEditing`、補助情報生成と操作関数を再利用する。rendererは購読を登録してからopenし、接続IDとrevisionで初回snapshotと更新通知の順序を判定する。
 

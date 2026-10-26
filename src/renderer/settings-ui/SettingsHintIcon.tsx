@@ -25,16 +25,23 @@ export function SettingsDescriptionIcon({
   ) : null;
 }
 
+/** MCP restrictions remain visible even when optional hints are hidden. */
+export function SettingsLockIcon({ title, description }: { title: string; description: string }) {
+  return <HintPopover title={title} hint={description} description lock />;
+}
+
 function HintPopover({
   title,
   hint,
   description = false,
   testId,
+  lock = false,
 }: {
   title: string;
   hint: string;
   description?: boolean;
   testId?: string;
+  lock?: boolean;
 }) {
   const { t } = useHostTranslation();
   const id = useId();
@@ -105,7 +112,10 @@ function HintPopover({
         type="button"
         className={description ? 'settings-description-trigger' : 'settings-hint-trigger'}
         data-testid={testId}
-        aria-label={t(description ? 'common.description' : 'common.hint', { title })}
+        aria-label={t(
+          lock ? 'settings.mcpAccess.label' : description ? 'common.description' : 'common.hint',
+          { title },
+        )}
         aria-describedby={id}
         onFocus={show}
         onBlur={() => setOpen(false)}
@@ -119,8 +129,22 @@ function HintPopover({
         }}
       >
         <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />
-          {description ? (
+          {!lock && <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />}
+          {lock ? (
+            <>
+              <rect
+                x="4.5"
+                y="8.5"
+                width="11"
+                height="8"
+                rx="1.5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+              />
+              <path d="M7 8.5V6a3 3 0 0 1 6 0v2.5" stroke="currentColor" strokeWidth="1.6" />
+              <circle cx="10" cy="12.5" r="1" fill="currentColor" />
+            </>
+          ) : description ? (
             <>
               <path d="M10 9v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               <circle cx="10" cy="6" r=".9" fill="currentColor" />

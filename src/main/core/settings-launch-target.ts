@@ -1,5 +1,6 @@
 import type { Settings } from '../../shared/contracts';
 import { hostText } from '../../shared/i18n';
+import { settingsUiFields } from '../../shared/settings-mcp-access';
 import { hostSettingItem } from '../../shared/settings-catalog';
 import { sameSetting } from '../../shared/settings-defaults';
 import { createDefaultSettings } from '../../shared/settings-schema';
@@ -59,6 +60,7 @@ export function launchSettingsTarget(options: {
   };
   return {
     targetId: 'service.launch',
+    ui: settingsUiFields('general'),
     ownerId: 'appdock',
     title: hostText('general.startup.section'),
     category: 'launch',

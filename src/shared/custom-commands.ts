@@ -348,6 +348,14 @@ export const customCommandOperations = {
     },
   },
 } as const;
+export const customEditableKeys: readonly string[] = [
+  'title',
+  'description',
+  'configVersion',
+  'config',
+  'enabled',
+  'automation',
+];
 export const customUpdateSchema = {
   type: 'object',
   properties: {

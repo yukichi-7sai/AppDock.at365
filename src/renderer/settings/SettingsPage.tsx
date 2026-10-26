@@ -12,6 +12,7 @@ import { SettingsPageLayout } from './SettingsPageLayout';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsMcpAccessProvider } from '../settings-ui/SettingsMcpAccess';
 import { SettingsStatusProvider, SettingsStatusArea } from '../settings-ui/SettingsStatus';
 import {
   CommandSettingsNavigation,
@@ -192,259 +193,268 @@ export function SettingsPage({
   return (
     <HostTranslationProvider language={model.content.language}>
       <SettingsControlsProvider api={controls}>
-        <SettingsHintsContext.Provider value={model.content.showHints}>
-          <div
-            ref={surface}
-            data-settings-connection={model.id}
-            className={`settings-surface ${context}`}
-            data-compact={model.content.hostWidth <= 760}
-          >
-            {context === 'full' && (
-              <aside
-                className="sidebar settings-categories"
-                data-testid="settings-index"
-                style={{
-                  width: Math.min(model.content.sidebarWidth, model.content.hostWidth * 0.4),
-                }}
-                aria-label={t('settings.index')}
-              >
-                <SettingsIndex content={model.content} act={act} />
-                <div
-                  className="sidebar-resizer"
-                  role="separator"
-                  tabIndex={0}
-                  aria-label={t('settings.resizeIndex')}
-                  aria-orientation="vertical"
-                  aria-valuemin={220}
-                  aria-valuemax={480}
-                  aria-valuenow={model.content.sidebarWidth}
-                  onPointerDown={(e) => {
-                    if (e.button !== 0) return;
-                    e.preventDefault();
-                    drag.current = {
-                      x: e.clientX,
-                      width: e.currentTarget.parentElement!.getBoundingClientRect().width,
-                    };
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  }}
-                  onPointerMove={(e) => {
-                    if (drag.current) resize(drag.current.width + e.clientX - drag.current.x);
-                  }}
-                  onPointerUp={(e) => {
-                    drag.current = null;
-                    if (e.currentTarget.hasPointerCapture(e.pointerId))
-                      e.currentTarget.releasePointerCapture(e.pointerId);
-                  }}
-                  onLostPointerCapture={() => (drag.current = null)}
-                  onKeyDown={(e) => {
-                    const width = {
-                      ArrowLeft: model.content.sidebarWidth - 10,
-                      ArrowRight: model.content.sidebarWidth + 10,
-                      Home: 220,
-                      End: 480,
-                    }[e.key];
-                    if (width !== undefined) {
-                      e.preventDefault();
-                      resize(width);
-                    }
-                  }}
-                />
-              </aside>
-            )}
-            <SettingsPageLayout
-              page={page}
-              mode={editing.mode}
-              pending={editing.pending}
-              error={error || editing.error || ''}
-              onMode={(mode) => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
-              storage={model.content.auxiliary.storage}
-              onLocalSettings={(enabled) => {
-                if (!enabled) void confirm('storage');
-                else
-                  void c
-                    .invoke('set-local-settings', [true])
-                    .catch((error) => setError(String(error)));
-              }}
-              onReset={() => void confirm('reset')}
-              onOpenFile={(scope) =>
-                void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
-              }
-              onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
-              announcement={
-                <span key={movement.id} className="settings-live" role="status" aria-live="polite">
-                  {movement.text}
-                </span>
-              }
+        <SettingsMcpAccessProvider value={model.content.auxiliary.mcpAccess}>
+          <SettingsHintsContext.Provider value={model.content.showHints}>
+            <div
+              ref={surface}
+              data-settings-connection={model.id}
+              className={`settings-surface ${context}`}
+              data-compact={model.content.hostWidth <= 760}
             >
-              {page.unavailableReason ? (
-                <SettingsField
-                  title={t('settings.availability')}
-                  description={page.unavailableReason}
-                />
-              ) : editing.mode === 'json' ? (
-                <SettingsTextarea
-                  aria-label={t('settings.jsonInput')}
-                  value={c.text(model)}
-                  spellCheck={false}
-                  onChange={(e) => {
-                    c.setText(e.target.value);
+              {context === 'full' && (
+                <aside
+                  className="sidebar settings-categories"
+                  data-testid="settings-index"
+                  style={{
+                    width: Math.min(model.content.sidebarWidth, model.content.hostWidth * 0.4),
                   }}
-                />
-              ) : (
-                <CommandSettingsNavigation.Provider
-                  value={
-                    context === 'full'
-                      ? {
-                          page: page.id,
-                          assignments: {
-                            'touchpad-gestures': new Set(
-                              model.content.auxiliary.commandAssignments?.['touchpad-gestures'] ??
-                                [],
-                            ),
-                            shortcuts: new Set(
-                              model.content.auxiliary.commandAssignments?.shortcuts ?? [],
-                            ),
-                            gestures: new Set(
-                              model.content.auxiliary.commandAssignments?.gestures ?? [],
-                            ),
-                          },
-                          target: commandTarget?.page === page.id ? commandTarget : undefined,
-                          clear: () => setCommandTarget(undefined),
-                          open: (pageId, command) => {
-                            const request = ++commandNavigationRequest.current;
-                            void c
-                              .act({ kind: 'select', pageId })
-                              .then(() => {
-                                if (
-                                  request !== commandNavigationRequest.current ||
-                                  c.model?.content.page.id !== pageId
-                                )
-                                  return;
-                                setCommandTarget({
-                                  page: pageId,
-                                  id: command.id,
-                                  title: command.title,
-                                  request,
-                                });
-                              })
-                              .catch(() => {});
-                          },
-                        }
-                      : null
-                  }
+                  aria-label={t('settings.index')}
                 >
-                  <SettingsForm
-                    model={model}
-                    editor={editor}
-                    select={(pageId) => act({ kind: 'select', pageId })}
-                    invoke={c.invoke}
+                  <SettingsIndex content={model.content} act={act} />
+                  <div
+                    className="sidebar-resizer"
+                    role="separator"
+                    tabIndex={0}
+                    aria-label={t('settings.resizeIndex')}
+                    aria-orientation="vertical"
+                    aria-valuemin={220}
+                    aria-valuemax={480}
+                    aria-valuenow={model.content.sidebarWidth}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.preventDefault();
+                      drag.current = {
+                        x: e.clientX,
+                        width: e.currentTarget.parentElement!.getBoundingClientRect().width,
+                      };
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                    }}
+                    onPointerMove={(e) => {
+                      if (drag.current) resize(drag.current.width + e.clientX - drag.current.x);
+                    }}
+                    onPointerUp={(e) => {
+                      drag.current = null;
+                      if (e.currentTarget.hasPointerCapture(e.pointerId))
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                    }}
+                    onLostPointerCapture={() => (drag.current = null)}
+                    onKeyDown={(e) => {
+                      const width = {
+                        ArrowLeft: model.content.sidebarWidth - 10,
+                        ArrowRight: model.content.sidebarWidth + 10,
+                        Home: 220,
+                        End: 480,
+                      }[e.key];
+                      if (width !== undefined) {
+                        e.preventDefault();
+                        resize(width);
+                      }
+                    }}
                   />
-                </CommandSettingsNavigation.Provider>
+                </aside>
               )}
-            </SettingsPageLayout>
-            {confirmation && (
-              <SettingsDialog
-                className="settings-reset-dialog"
-                title={
-                  confirmation.kind === 'reset' ? t('settings.reset') : t('settings.switchShared')
-                }
-                onClose={() => setConfirmation(undefined)}
-                applyLabel={
-                  confirmation.kind === 'reset'
-                    ? t('settings.resetApply')
-                    : t('settings.switchApply')
-                }
-                onApply={async () => {
-                  const expected = confirmation.model;
-                  if (confirmation.kind === 'storage')
-                    await c.invoke('set-local-settings', [
-                      false,
-                      expected.content.auxiliary.storage?.revision,
-                      disposition,
-                      expected.content.auxiliary.storage?.signature,
-                    ]);
+              <SettingsPageLayout
+                page={page}
+                mode={editing.mode}
+                pending={editing.pending}
+                error={error || editing.error || ''}
+                onMode={(mode) => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
+                storage={model.content.auxiliary.storage}
+                onLocalSettings={(enabled) => {
+                  if (!enabled) void confirm('storage');
                   else
-                    await c.act({
-                      kind: 'edit',
-                      action: {
-                        type: 'reset-page',
-                        pageId: expected.content.page.id,
-                        revision: expected.content.auxiliary.storage?.revision ?? -1,
-                        storageScope: expected.content.auxiliary.storage?.signature,
-                        before: expected.content.jsonValues ?? expected.content.values,
-                      },
-                    });
+                    void c
+                      .invoke('set-local-settings', [true])
+                      .catch((error) => setError(String(error)));
                 }}
+                onReset={() => void confirm('reset')}
+                onOpenFile={(scope) =>
+                  void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
+                }
+                onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
+                announcement={
+                  <span
+                    key={movement.id}
+                    className="settings-live"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {movement.text}
+                  </span>
+                }
               >
-                <SettingsField
-                  title={t('settings.target')}
-                  description={confirmation.model.content.page.title}
-                />
-                {confirmation.kind === 'reset' ? (
-                  <>
-                    <SettingsField
-                      title={t('settings.resetContents')}
-                      description={t('settings.resetDescription')}
-                    />
-                    <SettingsField
-                      title={t('settings.storage.title')}
-                      description={confirmation.model.content.auxiliary.storage?.files
-                        .map(
-                          (file) =>
-                            `${file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
-                        )
-                        .join('、')}
-                    />
-                    {confirmation.model.content.auxiliary.storage?.files.some(
-                      (file) => file.scope === 'shared',
-                    ) && (
-                      <SettingsField
-                        title={t('settings.shared.effect')}
-                        description={t('settings.shared.effectDescription')}
-                      />
-                    )}
-                  </>
-                ) : (
+                {page.unavailableReason ? (
                   <SettingsField
-                    title={t('general.files.device')}
-                    className="settings-field-wide"
-                    description={
-                      disposition === 'share' ? t('settings.shared.replaceDescription') : undefined
+                    title={t('settings.availability')}
+                    description={page.unavailableReason}
+                  />
+                ) : editing.mode === 'json' ? (
+                  <SettingsTextarea
+                    aria-label={t('settings.jsonInput')}
+                    value={c.text(model)}
+                    spellCheck={false}
+                    onChange={(e) => {
+                      c.setText(e.target.value);
+                    }}
+                  />
+                ) : (
+                  <CommandSettingsNavigation.Provider
+                    value={
+                      context === 'full'
+                        ? {
+                            page: page.id,
+                            assignments: {
+                              'touchpad-gestures': new Set(
+                                model.content.auxiliary.commandAssignments?.['touchpad-gestures'] ??
+                                  [],
+                              ),
+                              shortcuts: new Set(
+                                model.content.auxiliary.commandAssignments?.shortcuts ?? [],
+                              ),
+                              gestures: new Set(
+                                model.content.auxiliary.commandAssignments?.gestures ?? [],
+                              ),
+                            },
+                            target: commandTarget?.page === page.id ? commandTarget : undefined,
+                            clear: () => setCommandTarget(undefined),
+                            open: (pageId, command) => {
+                              const request = ++commandNavigationRequest.current;
+                              void c
+                                .act({ kind: 'select', pageId })
+                                .then(() => {
+                                  if (
+                                    request !== commandNavigationRequest.current ||
+                                    c.model?.content.page.id !== pageId
+                                  )
+                                    return;
+                                  setCommandTarget({
+                                    page: pageId,
+                                    id: command.id,
+                                    title: command.title,
+                                    request,
+                                  });
+                                })
+                                .catch(() => {});
+                            },
+                          }
+                        : null
                     }
                   >
-                    <label>
-                      <input
-                        type="radio"
-                        name="settings-disposition"
-                        checked={disposition === 'share'}
-                        onChange={() => setDisposition('share')}
-                      />
-                      {t('settings.shared.copy')}
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="settings-disposition"
-                        checked={disposition === 'clear'}
-                        onChange={() => setDisposition('clear')}
-                      />
-                      {t('settings.shared.clear')}
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name="settings-disposition"
-                        checked={disposition === 'keep'}
-                        onChange={() => setDisposition('keep')}
-                      />
-                      {t('settings.shared.keep')}
-                    </label>
-                  </SettingsField>
+                    <SettingsForm
+                      model={model}
+                      editor={editor}
+                      select={(pageId) => act({ kind: 'select', pageId })}
+                      invoke={c.invoke}
+                    />
+                  </CommandSettingsNavigation.Provider>
                 )}
-              </SettingsDialog>
-            )}
-          </div>
-        </SettingsHintsContext.Provider>
+              </SettingsPageLayout>
+              {confirmation && (
+                <SettingsDialog
+                  className="settings-reset-dialog"
+                  title={
+                    confirmation.kind === 'reset' ? t('settings.reset') : t('settings.switchShared')
+                  }
+                  onClose={() => setConfirmation(undefined)}
+                  applyLabel={
+                    confirmation.kind === 'reset'
+                      ? t('settings.resetApply')
+                      : t('settings.switchApply')
+                  }
+                  onApply={async () => {
+                    const expected = confirmation.model;
+                    if (confirmation.kind === 'storage')
+                      await c.invoke('set-local-settings', [
+                        false,
+                        expected.content.auxiliary.storage?.revision,
+                        disposition,
+                        expected.content.auxiliary.storage?.signature,
+                      ]);
+                    else
+                      await c.act({
+                        kind: 'edit',
+                        action: {
+                          type: 'reset-page',
+                          pageId: expected.content.page.id,
+                          revision: expected.content.auxiliary.storage?.revision ?? -1,
+                          storageScope: expected.content.auxiliary.storage?.signature,
+                          before: expected.content.jsonValues ?? expected.content.values,
+                        },
+                      });
+                  }}
+                >
+                  <SettingsField
+                    title={t('settings.target')}
+                    description={confirmation.model.content.page.title}
+                  />
+                  {confirmation.kind === 'reset' ? (
+                    <>
+                      <SettingsField
+                        title={t('settings.resetContents')}
+                        description={t('settings.resetDescription')}
+                      />
+                      <SettingsField
+                        title={t('settings.storage.title')}
+                        description={confirmation.model.content.auxiliary.storage?.files
+                          .map(
+                            (file) =>
+                              `${file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
+                          )
+                          .join('、')}
+                      />
+                      {confirmation.model.content.auxiliary.storage?.files.some(
+                        (file) => file.scope === 'shared',
+                      ) && (
+                        <SettingsField
+                          title={t('settings.shared.effect')}
+                          description={t('settings.shared.effectDescription')}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <SettingsField
+                      title={t('general.files.device')}
+                      className="settings-field-wide"
+                      description={
+                        disposition === 'share'
+                          ? t('settings.shared.replaceDescription')
+                          : undefined
+                      }
+                    >
+                      <label>
+                        <input
+                          type="radio"
+                          name="settings-disposition"
+                          checked={disposition === 'share'}
+                          onChange={() => setDisposition('share')}
+                        />
+                        {t('settings.shared.copy')}
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="settings-disposition"
+                          checked={disposition === 'clear'}
+                          onChange={() => setDisposition('clear')}
+                        />
+                        {t('settings.shared.clear')}
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name="settings-disposition"
+                          checked={disposition === 'keep'}
+                          onChange={() => setDisposition('keep')}
+                        />
+                        {t('settings.shared.keep')}
+                      </label>
+                    </SettingsField>
+                  )}
+                </SettingsDialog>
+              )}
+            </div>
+          </SettingsHintsContext.Provider>
+        </SettingsMcpAccessProvider>
       </SettingsControlsProvider>
     </HostTranslationProvider>
   );

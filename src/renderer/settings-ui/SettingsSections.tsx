@@ -3,6 +3,7 @@ import { SettingsInput } from './SettingsInput';
 import { SettingsHintIcon } from './SettingsHintIcon';
 import { useSettingsFeedback, SettingsFieldTarget } from './SettingsStatus';
 import './settings-sections.css';
+import { SettingsMcpScope, SettingsMcpLock } from './SettingsMcpAccess';
 export function SettingsInputActions({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div {...props} className={`settings-input-actions ${className}`} />;
 }
@@ -45,6 +46,13 @@ export function SettingsSection({
       <div className="settings-title-with-hint">
         <h2 id={id}>{title}</h2>
         {title && <SettingsHintIcon title={title} hint={hint} />}
+        {title && props['data-setting-item' as keyof typeof props] && (
+          <SettingsMcpLock
+            title={title}
+            level="group"
+            itemId={String(props['data-setting-item' as keyof typeof props])}
+          />
+        )}
       </div>
       {description && <p>{description}</p>}
     </>
@@ -63,7 +71,13 @@ export function SettingsSection({
           </svg>
         </span>
       </summary>
-      <div className="settings-section-content">{children}</div>
+      <div className="settings-section-content">
+        <SettingsMcpScope
+          itemId={props['data-setting-item' as keyof typeof props] as string | undefined}
+        >
+          {children}
+        </SettingsMcpScope>
+      </div>
     </details>
   ) : (
     <section
@@ -72,7 +86,13 @@ export function SettingsSection({
       aria-labelledby={title ? id : undefined}
     >
       {title && <header>{heading}</header>}
-      <div className="settings-section-content">{children}</div>
+      <div className="settings-section-content">
+        <SettingsMcpScope
+          itemId={props['data-setting-item' as keyof typeof props] as string | undefined}
+        >
+          {children}
+        </SettingsMcpScope>
+      </div>
     </section>
   );
 }
@@ -84,6 +104,7 @@ export function SettingsField({
   hint,
   error,
   children,
+  settingKey,
   ...props
 }: {
   title: string;
@@ -92,6 +113,7 @@ export function SettingsField({
   hint?: string;
   error?: string;
   children?: ReactNode;
+  settingKey?: string;
 } & Omit<HTMLAttributes<HTMLFieldSetElement>, 'title'>) {
   const errorId = useSettingsFeedback({ error, target: title });
   return (
@@ -108,12 +130,24 @@ export function SettingsField({
           {group && <small className="settings-field-group">{group}</small>}
           <strong>{title}</strong>
           <SettingsHintIcon title={title} hint={hint} />
+          <SettingsMcpLock
+            title={title}
+            itemId={props['data-setting-item' as keyof typeof props] as string | undefined}
+            settingKey={settingKey}
+          />
         </div>
         {description && <p>{description}</p>}
       </div>
       {children != null && children !== false && (
         <SettingsFieldTarget.Provider value={title}>
-          <div className="settings-field-control">{children}</div>
+          <div className="settings-field-control">
+            <SettingsMcpScope
+              itemId={props['data-setting-item' as keyof typeof props] as string | undefined}
+              fieldKey={settingKey}
+            >
+              {children}
+            </SettingsMcpScope>
+          </div>
         </SettingsFieldTarget.Provider>
       )}
     </fieldset>
@@ -127,6 +161,7 @@ export function SettingsChoice({
   disabled,
   onChange,
   ariaLabel,
+  settingKey,
 }: {
   label: string;
   description?: string;
@@ -134,6 +169,7 @@ export function SettingsChoice({
   disabled?: boolean;
   onChange(checked: boolean): void;
   ariaLabel?: string;
+  settingKey?: string;
 }) {
   return (
     <label
@@ -149,7 +185,14 @@ export function SettingsChoice({
         onChange={(e) => onChange(e.target.checked)}
       />
       <span>
-        <strong>{label}</strong>
+        {settingKey ? (
+          <span className="settings-title-with-hint">
+            <strong>{label}</strong>
+            <SettingsMcpLock title={label} settingKey={settingKey} />
+          </span>
+        ) : (
+          <strong>{label}</strong>
+        )}
         {description && <small>{description}</small>}
       </span>
     </label>

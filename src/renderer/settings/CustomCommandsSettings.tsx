@@ -16,6 +16,8 @@ import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
+import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
+import { settingsItemId } from '../../shared/settings-catalog';
 import { McpCommandFields } from './McpCommandFields';
 import { ProcessCommandFields } from './ProcessCommandFields';
 import { defaultProcessLaunch } from '../../shared/process-launch';
@@ -213,256 +215,277 @@ function CustomCommandDialog({
   const editableConfig = !!type && (!oldVersion || migrate);
   const jsonOnly = !type?.fields?.length && typeId !== 'appdock.process.start';
   return (
-    <SettingsDialog
-      title={
-        original
-          ? translate('settings.customCommandsSettings.edit')
-          : translate('settings.customCommandsSettings.add')
-      }
-      onClose={onClose}
-      valid={
-        !!title.trim() &&
-        (!!original || !!type) &&
-        (jsonMode || !Object.values(invalidFields).some(Boolean))
-      }
-      onApply={async () => {
-        const nextConfig = editableConfig
-          ? jsonMode || jsonOnly
-            ? JSON.parse(json)
-            : config
-          : original!.config;
-        const value = {
-          title: title.trim(),
-          description,
-          configVersion: migrate || !original ? type!.configVersion : original.configVersion,
-          config: nextConfig,
-          enabled,
-          automation,
-        };
-        if (!original) {
-          if (typeId === 'appdock.mcp.call')
-            await invoke('mcpTool', [nextConfig.serverId, nextConfig.toolName]);
-          return onApply({
-            op: 'add',
-            expectedTypeRevision: type!.typeRevision,
-            item: { id, typeId, ...value },
-          });
+    <SettingsMcpScope rowId={original?.id}>
+      <SettingsDialog
+        title={
+          original
+            ? translate('settings.customCommandsSettings.edit')
+            : translate('settings.customCommandsSettings.add')
         }
-        const changes = Object.fromEntries(
-          Object.entries(value).filter(
-            ([key, v]) =>
-              JSON.stringify(v) !== JSON.stringify(original[key as keyof typeof original]),
-          ),
-        );
-        if ('configVersion' in changes) changes.config = nextConfig;
-        if (!Object.keys(changes).length) return;
-        if (
-          typeId === 'appdock.mcp.call' &&
-          ('config' in changes || changes.enabled === true || changes.automation === true)
-        )
-          await invoke('mcpTool', [nextConfig.serverId, nextConfig.toolName]);
-        return onApply({ op: 'update', id, changes, expectedTypeRevision: type?.typeRevision });
-      }}
-    >
-      {(ready, setError) => (
-        <>
-          <SettingsField
-            title={translate('settings.customCommandsSettings.kind')}
-            description={type?.description}
-          >
-            <select
-              aria-label={translate('settings.customCommandsSettings.kind')}
-              value={typeId}
-              disabled={!!original}
-              onChange={(e) => {
-                const value = e.target.value;
-                setTypeId(value);
-                const next = defaults(value);
-                setConfig(next);
-                setJson(JSON.stringify(next, null, 2));
-                setAutomation(false);
-                setInvalidFields({});
-              }}
+        onClose={onClose}
+        valid={
+          !!title.trim() &&
+          (!!original || !!type) &&
+          (jsonMode || !Object.values(invalidFields).some(Boolean))
+        }
+        onApply={async () => {
+          const nextConfig = editableConfig
+            ? jsonMode || jsonOnly
+              ? JSON.parse(json)
+              : config
+            : original!.config;
+          const value = {
+            title: title.trim(),
+            description,
+            configVersion: migrate || !original ? type!.configVersion : original.configVersion,
+            config: nextConfig,
+            enabled,
+            automation,
+          };
+          if (!original) {
+            if (typeId === 'appdock.mcp.call')
+              await invoke('mcpTool', [nextConfig.serverId, nextConfig.toolName]);
+            return onApply({
+              op: 'add',
+              expectedTypeRevision: type!.typeRevision,
+              item: { id, typeId, ...value },
+            });
+          }
+          const changes = Object.fromEntries(
+            Object.entries(value).filter(
+              ([key, v]) =>
+                JSON.stringify(v) !== JSON.stringify(original[key as keyof typeof original]),
+            ),
+          );
+          if ('configVersion' in changes) changes.config = nextConfig;
+          if (!Object.keys(changes).length) return;
+          if (
+            typeId === 'appdock.mcp.call' &&
+            ('config' in changes || changes.enabled === true || changes.automation === true)
+          )
+            await invoke('mcpTool', [nextConfig.serverId, nextConfig.toolName]);
+          return onApply({ op: 'update', id, changes, expectedTypeRevision: type?.typeRevision });
+        }}
+      >
+        {(ready, setError) => (
+          <>
+            <SettingsField
+              settingKey="typeId"
+              title={translate('settings.customCommandsSettings.kind')}
+              description={type?.description}
             >
-              {!type && (
-                <option value={typeId}>
-                  {typeId || translate('settings.customCommandsSettings.noType')}
-                </option>
-              )}
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          </SettingsField>
-          <SettingsField title={translate('settings.customCommandsSettings.name')}>
-            <SettingsInput
-              aria-label={translate('settings.customCommandsSettings.name')}
-              data-initial-focus
-              value={title}
-              maxLength={100}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </SettingsField>
-          <SettingsField
-            title={translate('settings.customCommandsSettings.description')}
-            hint={translate('settings.customCommandsSettings.publicHint')}
-          >
-            <SettingsTextarea
-              aria-label={translate('settings.customCommandsSettings.description')}
-              value={description}
-              maxLength={1000}
-              rows={3}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </SettingsField>
-          <SettingsChoice
-            label={translate('settings.customCommandsSettings.enabled')}
-            checked={enabled}
-            disabled={!type && !enabled}
-            onChange={setEnabled}
-          />
-          <SettingsChoice
-            label={translate('settings.customCommandsSettings.public')}
-            checked={automation}
-            disabled={!type?.automation && !automation}
-            onChange={setAutomation}
-          />
-          {!type?.automation && (
-            <p className="muted">{translate('settings.customCommandsSettings.publicForbidden')}</p>
-          )}
-          {oldVersion && type && (
-            <SettingsChoice
-              label={translate('settings.customCommandsSettings.upgradeConfig', {
-                configVersion: type.configVersion,
-              })}
-              checked={migrate}
-              onChange={(checked) => {
-                setMigrate(checked);
-                const next = checked ? defaults(typeId) : original!.config;
-                setConfig(next);
-                setJson(JSON.stringify(next, null, 2));
-                setInvalidFields({});
-              }}
-            />
-          )}
-          {!jsonOnly && editableConfig && (
-            <SettingsChoice
-              label={translate('settings.customCommandsSettings.editJson')}
-              checked={jsonMode}
-              onChange={(checked) => {
-                if (checked) setJson(JSON.stringify(config, null, 2));
-                else {
-                  try {
-                    const parsed = JSON.parse(json);
-                    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
-                    setConfig(parsed);
-                  } catch {
-                    return;
-                  }
-                }
-                setInvalidFields({});
-                setJsonMode(checked);
-              }}
-            />
-          )}
-          {!editableConfig || jsonMode || jsonOnly ? (
-            <SettingsField title={translate('settings.customCommandsSettings.configJson')}>
-              <SettingsTextarea
-                aria-label={translate('settings.customCommandsSettings.configJson')}
-                value={json}
-                readOnly={!editableConfig}
-                rows={10}
-                onChange={(e) => setJson(e.target.value)}
+              <select
+                aria-label={translate('settings.customCommandsSettings.kind')}
+                value={typeId}
+                disabled={!!original}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setTypeId(value);
+                  const next = defaults(value);
+                  setConfig(next);
+                  setJson(JSON.stringify(next, null, 2));
+                  setAutomation(false);
+                  setInvalidFields({});
+                }}
+              >
+                {!type && (
+                  <option value={typeId}>
+                    {typeId || translate('settings.customCommandsSettings.noType')}
+                  </option>
+                )}
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            </SettingsField>
+            <SettingsField
+              settingKey="title"
+              title={translate('settings.customCommandsSettings.name')}
+            >
+              <SettingsInput
+                aria-label={translate('settings.customCommandsSettings.name')}
+                data-initial-focus
+                value={title}
+                maxLength={100}
+                onChange={(e) => setTitle(e.target.value)}
               />
             </SettingsField>
-          ) : typeId === 'appdock.input.sendKeys' ? (
-            <ShortcutCaptureField
-              mode="send"
-              label={translate('settings.customCommandsSettings.inputKeys')}
-              value={typeof config.keys === 'string' ? config.keys : ''}
-              onChange={(keys) => setConfig({ ...config, keys })}
-              recordingReady={ready}
-              setError={setError}
+            <SettingsField
+              settingKey="description"
+              title={translate('settings.customCommandsSettings.description')}
+              hint={translate('settings.customCommandsSettings.publicHint')}
+            >
+              <SettingsTextarea
+                aria-label={translate('settings.customCommandsSettings.description')}
+                value={description}
+                maxLength={1000}
+                rows={3}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </SettingsField>
+            <SettingsChoice
+              label={translate('settings.customCommandsSettings.enabled')}
+              settingKey="enabled"
+              checked={enabled}
+              disabled={!type && !enabled}
+              onChange={setEnabled}
             />
-          ) : typeId === 'appdock.process.start' ? (
-            <ProcessCommandFields
-              config={config}
-              onChange={setConfig}
-              onValidity={(valid) =>
-                setInvalidFields((previous) => ({ ...previous, process: !valid }))
-              }
+            <SettingsChoice
+              label={translate('settings.customCommandsSettings.public')}
+              settingKey="automation"
+              checked={automation}
+              disabled={!type?.automation && !automation}
+              onChange={setAutomation}
             />
-          ) : typeId === 'appdock.mcp.call' ? (
-            <McpCommandFields
-              config={config}
-              onChange={setConfig}
-              invoke={invoke}
-              onValidity={(valid) =>
-                setInvalidFields((previous) => ({ ...previous, mcpArguments: !valid }))
-              }
-            />
-          ) : (
-            type!.fields!.map((field) => (
-              <SettingsField key={field.key} title={field.title}>
-                {field.type === 'boolean' ? (
-                  <input
-                    aria-label={field.title}
-                    type="checkbox"
-                    checked={config[field.key] === true}
-                    onChange={(e) => setConfig({ ...config, [field.key]: e.target.checked })}
-                  />
-                ) : field.type === 'select' ? (
-                  <select
-                    aria-label={field.title}
-                    value={String(config[field.key] ?? '')}
-                    onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}
-                  >
-                    <option value="">{translate('settings.customCommandsSettings.select')}</option>
-                    {field.options?.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                ) : field.type === 'json' ? (
-                  <JsonField
-                    label={field.title}
-                    value={config[field.key]}
-                    onValidity={(valid) =>
-                      setInvalidFields((previous) => ({ ...previous, [field.key]: !valid }))
+            {!type?.automation && (
+              <p className="muted">
+                {translate('settings.customCommandsSettings.publicForbidden')}
+              </p>
+            )}
+            {oldVersion && type && (
+              <SettingsChoice
+                label={translate('settings.customCommandsSettings.upgradeConfig', {
+                  configVersion: type.configVersion,
+                })}
+                checked={migrate}
+                onChange={(checked) => {
+                  setMigrate(checked);
+                  const next = checked ? defaults(typeId) : original!.config;
+                  setConfig(next);
+                  setJson(JSON.stringify(next, null, 2));
+                  setInvalidFields({});
+                }}
+              />
+            )}
+            {!jsonOnly && editableConfig && (
+              <SettingsChoice
+                label={translate('settings.customCommandsSettings.editJson')}
+                checked={jsonMode}
+                onChange={(checked) => {
+                  if (checked) setJson(JSON.stringify(config, null, 2));
+                  else {
+                    try {
+                      const parsed = JSON.parse(json);
+                      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+                      setConfig(parsed);
+                    } catch {
+                      return;
                     }
-                    onChange={(value) => setConfig({ ...config, [field.key]: value })}
+                  }
+                  setInvalidFields({});
+                  setJsonMode(checked);
+                }}
+              />
+            )}
+            <SettingsMcpScope
+              itemId={settingsItemId('custom-commands', 'config:' + typeId)}
+              fieldKey="config"
+            >
+              {!editableConfig || jsonMode || jsonOnly ? (
+                <SettingsField
+                  settingKey="config"
+                  title={translate('settings.customCommandsSettings.configJson')}
+                >
+                  <SettingsTextarea
+                    aria-label={translate('settings.customCommandsSettings.configJson')}
+                    value={json}
+                    readOnly={!editableConfig}
+                    rows={10}
+                    onChange={(e) => setJson(e.target.value)}
                   />
-                ) : (
-                  <SettingsInput
-                    aria-label={field.title}
-                    type={field.type === 'number' ? 'number' : 'text'}
-                    value={String(config[field.key] ?? '')}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        [field.key]:
-                          field.type === 'number' && e.target.value.trim()
-                            ? Number(e.target.value)
-                            : e.target.value,
-                      })
-                    }
-                  />
-                )}
-              </SettingsField>
-            ))
-          )}
-          {type && (
-            <details>
-              <summary>{translate('settings.customCommandsSettings.schema')}</summary>
-              <pre>{JSON.stringify(type.configSchema, null, 2)}</pre>
-            </details>
-          )}
-        </>
-      )}
-    </SettingsDialog>
+                </SettingsField>
+              ) : typeId === 'appdock.input.sendKeys' ? (
+                <ShortcutCaptureField
+                  mode="send"
+                  label={translate('settings.customCommandsSettings.inputKeys')}
+                  value={typeof config.keys === 'string' ? config.keys : ''}
+                  onChange={(keys) => setConfig({ ...config, keys })}
+                  recordingReady={ready}
+                  setError={setError}
+                />
+              ) : typeId === 'appdock.process.start' ? (
+                <ProcessCommandFields
+                  config={config}
+                  onChange={setConfig}
+                  onValidity={(valid) =>
+                    setInvalidFields((previous) => ({ ...previous, process: !valid }))
+                  }
+                />
+              ) : typeId === 'appdock.mcp.call' ? (
+                <McpCommandFields
+                  config={config}
+                  onChange={setConfig}
+                  invoke={invoke}
+                  onValidity={(valid) =>
+                    setInvalidFields((previous) => ({ ...previous, mcpArguments: !valid }))
+                  }
+                />
+              ) : (
+                type!.fields!.map((field) => (
+                  <SettingsField key={field.key} title={field.title}>
+                    {field.type === 'boolean' ? (
+                      <input
+                        aria-label={field.title}
+                        type="checkbox"
+                        checked={config[field.key] === true}
+                        onChange={(e) => setConfig({ ...config, [field.key]: e.target.checked })}
+                      />
+                    ) : field.type === 'select' ? (
+                      <select
+                        aria-label={field.title}
+                        value={String(config[field.key] ?? '')}
+                        onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}
+                      >
+                        <option value="">
+                          {translate('settings.customCommandsSettings.select')}
+                        </option>
+                        {field.options?.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : field.type === 'json' ? (
+                      <JsonField
+                        label={field.title}
+                        value={config[field.key]}
+                        onValidity={(valid) =>
+                          setInvalidFields((previous) => ({ ...previous, [field.key]: !valid }))
+                        }
+                        onChange={(value) => setConfig({ ...config, [field.key]: value })}
+                      />
+                    ) : (
+                      <SettingsInput
+                        aria-label={field.title}
+                        type={field.type === 'number' ? 'number' : 'text'}
+                        value={String(config[field.key] ?? '')}
+                        onChange={(e) =>
+                          setConfig({
+                            ...config,
+                            [field.key]:
+                              field.type === 'number' && e.target.value.trim()
+                                ? Number(e.target.value)
+                                : e.target.value,
+                          })
+                        }
+                      />
+                    )}
+                  </SettingsField>
+                ))
+              )}
+            </SettingsMcpScope>
+            {type && (
+              <details>
+                <summary>{translate('settings.customCommandsSettings.schema')}</summary>
+                <pre>{JSON.stringify(type.configSchema, null, 2)}</pre>
+              </details>
+            )}
+          </>
+        )}
+      </SettingsDialog>
+    </SettingsMcpScope>
   );
 }
 function JsonField({

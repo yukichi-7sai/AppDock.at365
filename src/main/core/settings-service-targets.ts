@@ -12,6 +12,7 @@ import { defaultTtsSettings, parseTtsSettings } from '../../shared/tts';
 import { replaceNotificationPreference } from '../../shared/notification-preference-edit';
 import {
   notificationTypeKey,
+  notificationSettingKey,
   resolveNotificationPolicy,
   resolveNotificationSpeech,
   type NotificationTypeEntry,
@@ -49,6 +50,11 @@ import type { McpClientSettings } from './mcp-client-settings';
 import { mcpClientSettingsTarget } from './settings-mcp-client-target';
 import type { WindowsLaunch } from './windows-launch';
 import { launchSettingsTarget } from './settings-launch-target';
+import {
+  settingsUiFields,
+  settingsUiGroup,
+  type SettingsUiBinding,
+} from '../../shared/settings-mcp-access';
 
 type RecordValue = Record<string, unknown>;
 interface Field extends SettingDefinition {
@@ -58,6 +64,7 @@ interface Field extends SettingDefinition {
   inherit?: boolean;
 }
 interface Target {
+  ui?: SettingsUiBinding;
   id: string;
   title: string;
   category: string;
@@ -188,6 +195,7 @@ export class SettingsServiceTargets {
       );
     return {
       id: 'service.shell',
+      ui: settingsUiFields('appearance', (field) => 'shellProviders.' + field.key),
       title: hostText('appearance.shell.section'),
       category: 'shell',
       fields,
@@ -231,6 +239,7 @@ export class SettingsServiceTargets {
     };
     return {
       targetId: spec.id,
+      ui: spec.ui,
       ownerId: spec.ownerId ?? 'appdock',
       title: spec.title,
       category: spec.category,
@@ -350,6 +359,7 @@ export class SettingsServiceTargets {
       }));
     return {
       id: 'service.updates',
+      ui: settingsUiFields('about'),
       title: hostSettingItem('about', 'updates').title,
       category: 'updates',
       fields,
@@ -395,6 +405,7 @@ export class SettingsServiceTargets {
       }));
     return {
       id: 'service.command-triggers',
+      ui: settingsUiFields(['shortcuts', 'gestures', 'touchpad-gestures']),
       title: hostText('settings.commandTriggerOptions.title'),
       category: 'command-triggers',
       fields,
@@ -431,6 +442,7 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.updates.applet.' + Buffer.from(applet.id).toString('base64url'),
+      ui: settingsUiFields('applet:' + applet.id),
       ownerId: applet.id,
       title: applet.displayName,
       category: 'updates',
@@ -501,6 +513,10 @@ export class SettingsServiceTargets {
       );
     return {
       id: 'service.applets.common.' + Buffer.from(applet.id).toString('base64url'),
+      ui: (field) => [
+        ...settingsUiFields('applet:' + applet.id)(field),
+        ...(field?.key === 'enabled' ? [{ pageId: 'applets', key: 'enabled:' + applet.id }] : []),
+      ],
       ownerId: applet.id,
       title: applet.displayName,
       category: 'applet-common',
@@ -577,6 +593,7 @@ export class SettingsServiceTargets {
     return {
       kind: 'list',
       targetId: 'service.applets.order',
+      ui: settingsUiGroup('applets', 'order'),
       ownerId: 'appdock',
       title: definition.title,
       category: 'applet-management',
@@ -667,6 +684,7 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.ai',
+      ui: settingsUiFields('ai'),
       title: hostText('settings.aiSettings.common'),
       category: 'ai',
       fields,
@@ -845,6 +863,7 @@ export class SettingsServiceTargets {
     return {
       kind: 'list',
       targetId: 'service.ai.connections',
+      ui: settingsUiGroup('ai', 'connections'),
       ownerId: 'appdock',
       title: definition.title,
       category: 'ai',
@@ -991,6 +1010,7 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.tts',
+      ui: settingsUiFields('tts'),
       title: hostText('settings.ttsSettings.title'),
       category: 'tts',
       fields,
@@ -1055,6 +1075,7 @@ export class SettingsServiceTargets {
     return {
       kind: 'list',
       targetId: owner.targetId,
+      ui: settingsUiGroup('tts', 'manualVoices'),
       ownerId: owner.ownerId,
       title: owner.title,
       category: owner.category,
@@ -1096,6 +1117,7 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.notifications.speech',
+      ui: settingsUiFields('notifications', (field) => 'speech.' + field.key),
       title: hostText('settings.notificationSettings.speechSettings'),
       category: 'notifications',
       fields,
@@ -1154,6 +1176,7 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.notification.' + Buffer.from(key).toString('base64url'),
+      ui: settingsUiGroup('notifications', notificationSettingKey(type)),
       ownerId: type.ownerKind === 'host' ? 'appdock' : type.ownerId,
       title: type.ownerTitle + ' / ' + type.title,
       category: 'notifications',

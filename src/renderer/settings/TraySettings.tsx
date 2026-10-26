@@ -345,7 +345,10 @@ export function TraySettings({
                 aria-label={translate('settings.traySettings.selected')}
               >
                 {active.item.type === 'group' ? (
-                  <SettingsField title={translate('settings.traySettings.groupName')}>
+                  <SettingsField
+                    settingKey="title"
+                    title={translate('settings.traySettings.groupName')}
+                  >
                     <SettingsInput
                       aria-label={translate('settings.traySettings.groupName')}
                       maxLength={80}
@@ -359,7 +362,10 @@ export function TraySettings({
                     />
                   </SettingsField>
                 ) : (
-                  <SettingsField title={translate('settings.traySettings.location')}>
+                  <SettingsField
+                    settingKey="parentId"
+                    title={translate('settings.traySettings.location')}
+                  >
                     <select
                       aria-label={translate('settings.traySettings.locationLabel')}
                       value={active.parent ?? ''}
