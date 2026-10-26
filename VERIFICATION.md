@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-10-27: フォルダー型をmainへ反映し通常版0.97.5を確認
+
+- 利用者のmain反映指示により、準備済み138項目を`ff286da52a2c5c2921334f41eb8f0a5529f29d3c`（tree `6c69c92b25cde38861e9f4ec5b02e9fa5992e0de`）へコミットし、cleanなprimary mainへfast-forwardした。stage tree/commit tree、Git設定のauthor/committerとの一致を確認した。元の`codex/folder-portable`も同commitでcleanな状態を保持する。
+- 試験版の865入力・完全ログ・配布EXE/ZIP・reviewを再照合し、標準**1,166/1,166件**と試験版固定GUI101群等の成功を再利用した。不足分として試験用worktreeで開発版の更新進捗9群、固定版トレイ7群・Windows自動起動5群を追加して成功した。専用Taskは解除済み。mainへのcheckoutは525入力がbyte一致、340入力が改行だけの差だった。生成済みmainコード228ファイルも224件がbyte一致、残る4件は改行だけで内容一致した。rendererのhash付きasset名を含む全outの初回照合は非同一となったため、コンパイル照合をmainコードに限定し、rendererは新しい固定EXEのGUIで再確認した。
+- 製品の追加修正を伴わない通常発行として**0.97.5**を維持し、primaryの`publish.bat`を実行した。発行先は`A:\40.ARTIFACT\AppDock.at365\win-unpacked\AppDock.at365.exe`。EXE/File/ProductVersion・manifest/feedは0.97.5で整合し、EXE size **249797632**、SHA256 **23092070f3db415f9780fa122c550eebf247f2092a4a3c51955ef8081aed92ac**。`update.zip` size **270659690**、SHA256 **d3b62b8cdaf6e1ce093dc3d5c23adc9217819c5804c05882461a702f967f5797**。ビルド元・通常発行先・更新ZIPの本体管理**694ファイル**はすべてSHA256一致した。試験用発行先のEXEとは生成場所/コミット情報が異なるためhashを区別する。
+- 通常版に収録したInputHost DLL（SHA256 **d6c93dfbaf16d70e3f74bd517f0cb1767c5666ee76258567db58a98d865d0eda**）そのもので、OSへキー送信・登録をしないnative状態**255項目**・マウス＋キー状態**58項目**を再実行した。固定EXEではMCP設定60群、起動順/トレイ/復元19群、更新/再起動/ASAR後片付け14群、更新進捗9群、計測/空一覧8群の計**110群**と、`APPDOCK`見出し・smokeが成功した。Pause/F13〜F24はOSへ送信・登録しない。
+- 初回の旧単一EXE版からは、旧更新器が本体に`format=exe`を要求するためフォルダー型の`format=zip`へ自動更新できない。完全終了後、同じ配置先へ新しい本体一式を手動配置し、settings/data/extensionsと配置パスを維持する。その後はフォルダー型の通常更新を使う。発行先に残る旧単一EXE、既存deploy.bat/scripts/deploy.ps1/deploy.local.txt、旧全体ZIPの計5ファイルはhashを保持した。既存deployは旧EXEだけを配置する内容なので、初回には新しい`win-unpacked`の中身一式を使う。実利用先への配置は行っていない。
+- 証跡の正本はprimary `.artifacts/commit-validation-folder-portable-0975-20261027/`のstage/merge/reuse・compiled-runtime-reuse・artifact・各完全ログ・validation。試験用worktreeの同名フォルダーとmain-merge-prepにも元ログ・入力を保持する。mainで追加した各方式は今回1回、ほかの作業の旧profileは再利用/保護状態を断定せず保持して削除0件。試験用worktreeの追加3方式も成功3回以内で削除0件。検証専用プロセスは終了済み。
+- この追記は検証記録だけとして別commitにし、製品を再build/版更新しない。通常版と試験版の両worktreeを保持する。push・Release・実利用deploy、新しい実アカウント/実Windowsサインイン/UACの確認は未実施。
+
 ## 2026-10-27: フォルダー型0.97.5をmainへ反映するコミット検証
 
 - 利用者のmain反映指示を受け、primary mainのcleanと`pull --ff-only`による最新一致を確認した。対象は準備済み138項目のみ。製品コード・版・依存の追加変更は行わず0.97.5を維持する。
