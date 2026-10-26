@@ -45,6 +45,8 @@ await context.Ribbon.SetBadgeAsync(
 
 設定定義の `type: "shortcut-list"` は `{ id, title, keys }` の配列を扱い、追加・削除UIを提供します。IDは小文字英数字とハイフン（先頭英数字、40文字以内）、名前は100文字以内、最大32件。既定値は `[]` です。キーは `Ctrl+Shift+T` や `Win+E` などの1組の組み合わせで、フォーム保存／Host API保存時に検証します。設定型はキーを送信せず、実行はApplet側の責任です。
 
+MCPは宣言から[共通設定APIの一覧対象](settings-api.md#ショートカット一覧設定)を生成し、追加・部分編集・削除・並べ替えを提供します。automation省略/trueを公開、false/secret/localOnlyを非公開とし、設定が増えてもMCPツールの定義を変更しません。IDも画面と同じく編集できます。検証、追加時の既定値、上限は共通定義から使い、未知属性を保持します。
+
 実装例: [WindowsToolsの開発ガイド](../../Applet.WindowsTools.at365/DEVELOPMENT.md)。この型と動的APIを使用するAppletにはAppDock 0.4.0以上が必要です。
 
 画面上では拡張機能をAppletと呼びます。`extension.json`、`extensions`、`IAppDockExtension` などの既存API名は互換性を維持します。

@@ -38,6 +38,13 @@ import type { HostSettingDefinition } from '../../shared/host-settings';
 import { parseSettings } from '../../shared/settings-schema';
 import { settingsUiFields, settingsUiGroup } from '../../shared/settings-mcp-access';
 import { appletSettingsPageId } from '../../shared/settings-navigation';
+import {
+  newShortcutListEntry,
+  shortcutListDefinition,
+  shortcutListIdPattern,
+  shortcutListLimit,
+  validShortcutList,
+} from '../../shared/shortcut-list';
 
 export class SettingsCommandError extends SettingsTargetError {}
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -223,9 +230,22 @@ export class SettingsCommands {
   listTargets(): SettingsListTarget[] {
     return this.owners().flatMap((owner) =>
       owner.fields.flatMap((definition) => {
-        if (definition.type !== 'object-list' || !mcpSettingPublished(definition)) return [];
-        const fields = publicListFields(definition);
+        const shortcut = definition.type === 'shortcut-list';
+        if ((!shortcut && definition.type !== 'object-list') || !mcpSettingPublished(definition))
+          return [];
+        const projected = shortcut ? shortcutListDefinition(definition) : definition;
+        const fields = publicListFields(projected);
         if (!fields.length) return [];
+        const value = () => {
+          const current = this.values(owner, this.options.settings.value, [definition])[
+            definition.key
+          ];
+          return current === undefined || (!shortcut && current === null) ? [] : current;
+        };
+        const rows = () => {
+          const current = value();
+          return shortcut && !validShortcutList(current) ? [] : readObjectList(current);
+        };
         return [
           {
             kind: 'list' as const,
@@ -236,17 +256,34 @@ export class SettingsCommands {
             title: owner.title + ' / ' + definition.title,
             category: 'settings',
             ui: settingsUiGroup(appletSettingsPageId(owner.id), `setting:${definition.key}`),
-            available: owner.available,
+            available: owner.available && (!shortcut || validShortcutList(value())),
             fields,
-            definition,
+            definition: projected,
+            maxItems: shortcut ? shortcutListLimit : undefined,
+            createRow: shortcut ? () => ({ ...newShortcutListEntry(rows()) }) : undefined,
+            validateField: shortcut
+              ? (field: SettingDefinition, next: unknown) =>
+                  validateSettingValue(definition, [
+                    { ...newShortcutListEntry([]), [field.key]: next },
+                  ])
+              : undefined,
+            inputSchema: shortcut
+              ? (field: SettingDefinition) => ({
+                  ...settingInputSchema(field),
+                  ...(field.key === 'id' ? { pattern: shortcutListIdPattern } : {}),
+                })
+              : undefined,
+            removable: shortcut
+              ? (row: Record<string, unknown>) =>
+                  Object.keys(row).every(
+                    (key) => fields.some((field) => field.key === key) || row[key] == null,
+                  )
+              : undefined,
             options: (field: SettingDefinition) => this.fieldOptions(owner, field),
             schemaContext: () => this.imageContext(owner, fields),
             applies: (key: string) => this.applies(owner.id, key),
             overrides: () => this.overrides(owner),
-            rows: () =>
-              readObjectList(
-                this.values(owner, this.options.settings.value, [definition])[definition.key] ?? [],
-              ),
+            rows,
             plan: (rows: Record<string, unknown>[], revision: string) =>
               this.plan(owner, [definition], { [definition.key]: rows }, revision),
           },

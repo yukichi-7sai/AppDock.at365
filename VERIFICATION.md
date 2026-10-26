@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-10-27: ショートカット一覧設定のMCP対応 0.96.5
+
+- main `13d048dff824dec061efa63658b03f961c5dd689`のclean状態を確認し、追跡先から`pull --ff-only`（Already up to date）後に継続。既存のshortcut-list型を固定6入口へ接続する変更で、設定項目・保存形式/ファイル種類・操作許可・MCPツールの追加はないため、パッチを0.96.4から**0.96.5**へ進めた。旧MCP worktreeと無関係な作業を保持してmainで実装し、共通定義/検証/初期値とMCP接続の2単位でコミットする。
+- Appletの宣言からID/名前/送信するキーの3列を持つlist対象を生成し、追加・部分編集・削除・並べ替えに対応。automation省略/trueは公開、false/secret/localOnlyは非公開。IDも既存UIと同様に編集でき、読取revisionに束縛したitemRefを使う。32件上限、ID形式/重複、名前/キーの長さとキー検証はUI/自己設定APIと同じ規則を使う。初期ID・初期名・Ctrl+TはUIと同じ関数から生成し、保存キー・配列順・共有/PC専用分類を維持する。
+- 通常フィールドの全体置換やresetを追加せず、既存SettingsCommandsの計画/検証/保存へ委譲。未知属性はMCPの列/プレビューへ返さず、MCPとネイティブ編集で未編集行も含め保持する。未知属性にnull以外の値を持つ行のMCP removeはLOCAL_ACTION_REQUIRED。不正な保存値や停止中のAppletはavailable=false。設定欄と3列の南京錠は同じownerから判定する。従来の単純設定API/他Applet向けの対応型とvalidSendKeysの既存exportを保持した。
+- 発行前レビューで公開/権限、共通検証と追加時の既定値、編集可能ID、無変更/再送/競合、部分失敗の原子性、未知属性と行削除、共有/端末保存、入力確定と南京錠、翻訳を確認。明示nullが未保存の空配列と同じ扱いになる問題を期待した失敗1件で再現し、shortcut-listはundefinedだけを未設定と扱うよう修正した。object-listの従来のnull処理は維持し、修正後の標準/GUIを再検証して阻害指摘なし。再現ログも保持した。
+- 固定lockfile install、整形、型検査、本体/Default Shell build、最終入力の標準**132ファイル1126/1126件（fail/cancel/skip 0）**が成功。新規**10件**は公開/旧API範囲、dryRun/保存/再送/追加既定値、ID/名前/キーの部分変更、非公開列/未知属性保持、重複/不正キーと後半失敗の原子的拒否、行保護、挿入/並べ替え/空配列、32件/ページ分割/無変更、古いitemRef/cursorと権限取消、破損値/null/停止、後から増えた宣言とPC専用保存を確認する。
+- 最終sourceの実MCP **54群**、発行した固定EXEの実MCP **56群**と隔離smokeが成功。MCPとネイティブのID/名前/キー編集・追加/削除、MCP挿入/並べ替え、未知属性の保持と行保護、重複ID/不正キーの原子的拒否、古い要求/cursor、固定tools/list不変、暗号化3ファイルのbytes保持、公開欄は南京錠なし/非公開欄は南京錠ありを確認した。fixtureは実行ハンドラー/入力フックを持たず、キーは文字列入力だけを行った。画面画像も確認し、既存の共通入力/レイアウトを維持している。
+- 通常発行先`A:\40.ARTIFACT\AppDock.at365\AppDock.at365.exe`は**0.96.5 / 170,714,891 bytes / SHA256 `ce36d5e5a0ab976759d3afb3396cec76e55d60cee659c8fa57cea69592c41dfd`**。ASAR SHA256は`40996c81aabf71185b3c4131f7230336d32c3a65f16ff2f28d3a15f54ee2795b`、feed SHA256は`1e0568ba99a9db6b0769812ff2ebef7e23241bd99a449a3ff61e19f54c0c5fd5`。**252出力・621 resource**を生成元と全件照合し、File/ProductVersion・package・Default Shellの版とfeedのsize/hashが一致。固定試験用EXEコピーも最終EXEと一致した。
+- 最終の型検査/標準/source試験・発行・固定試験の前後でソース/テスト/依存/ビルド入力と参照Applet manifestのhash一致を確認。環境はLUNA、Windows 11 x64 10.0.26300、Node 24.22.1、pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.403。完全ログ・入力/発行物照合・レビューは`.artifacts/mcp-settings-shortcut-lists-20261027/`、コミット単位ごとのstage/tree/commit根拠は`.artifacts/commit-validation-mcp-settings-shortcut-lists-20261027/`へ記録する。
+- 後片付けでは専用GUIプロセス0、検証用Windowsタスクが未登録かつXMLなしを確認。今回の成功資料・固定コピー、過去のコミット根拠、nullのレビュー再現、個別の完了マーカーがない単体出力を保持し、削除0。既存deploy設定/スクリプトと発行先の利用者設定を保持した。Pause/F13～F24のOS送信/登録、実キー送信/コマンド実行、実UAC同意、Windowsサインインの試験は行っていない。自由JSONや残る専用サービスは別範囲。push・Release・実利用先deployは行っていない。
+
 ## 2026-10-27: Webアカウント公開名簿のMCP対応 0.96.4
 
 - main `7531fa445bcfdc5c18cecf756664c208af5386ee`のclean状態を確認し、追跡先から`pull --ff-only`（Already up to date）後に継続した。既存のweb-profiles名簿を固定6入口へ接続する変更で、設定項目・保存形式/ファイル種類・操作許可・MCPツールの追加はないため、パッチを0.96.3から**0.96.4**へ進めた。旧MCP worktreeと無関係な作業は保持し、今回の変更はmainで行った。

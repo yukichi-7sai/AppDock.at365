@@ -14,7 +14,7 @@ UIとの対応はownerの`ui`で安定したページID・設定キーを結び�
 
 このメタデータは信頼された本体設定rendererだけへ渡す。値・既定値・認証情報やTask XMLを含めず、公開対象/Schemaの外側へUI専用情報を追加しない。実際の保存可否は従来どおり各APIが再検証し、表示によって権限を付与しない。
 
-本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/select/registered-imageは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listやregistered-imageも列の値として編集できる。自由JSON・shortcut-listと未対応の専用サービスは、adapterを実装する後続範囲。
+本体の外観・全般の通常設定と、Appletが宣言するboolean/number/string/select/registered-imageは`kind: fields`で、`set`/`reset`に対応する。Appletのobject-listとshortcut-listは`kind: list`で、`add`/`update`/`remove`/`reorder`に対応する。子のstring-listやregistered-imageも列の値として編集できる。自由JSONと未対応の専用サービスは、adapterを実装する後続範囲。
 
 通知・AI/TTS・MCP接続・更新の通常設定とShell選択も所有サービスのadapterから公開する。通常値はfields、AI接続・TTS手動ボイス・MCP接続の一覧はlist対象として扱う。既存の解析・検証・保存分類と再適用を使い、生成・読み上げ・接続試験を実行しない。対応範囲は下表のとおり。
 
@@ -112,6 +112,16 @@ addは宣言済みの既定値とID生成を使い、非公開列を要求から
 候補の追加/消失でschemaRevisionと候補cursorを更新し、古いSchemaでの保存を拒否する。512画像も既存のページ分割で取得し、ファイル名をツールの引数定義へ列挙しない。パス/URL・余分な属性・未登録画像への変更は拒否する。形が不正な保存値は読取り・変更前プレビューとも名前以外の属性や任意パスを応答へ投影せず、未編集データは保持する。
 
 画像を参照する行はremovable=falseとし、removeで暗黙に参照を消さない。公開列の画像を明示的に解除し、他の保護値がなければ行を削除できる。操作は設定参照だけを保存し、原画像のbytes・グループ・秘密情報を変更しない。画像の取込み/削除などの寿命操作は所有する画像サービスの範囲とする。登録画像の操作入口は固定6入口であり、既存の単純設定コマンドや他Applet向け設定APIの対応範囲は維持する。
+
+### ショートカット一覧設定
+
+Appletの`type: shortcut-list`は、既存の宣言からid/title/keysの3列と最大32行のlist対象を生成する。automation省略/trueを公開、false/secret/localOnlyを非公開とし、新しい宣言も固定6入口から探索する。保存型・設定キー・保存分類は元のshortcut-listのまま。一般フィールドのsetや一覧全体のresetは公開しない。
+
+3列とも編集可能で、IDの変更はUIと同じく別のコマンドを表し得る。IDは小文字英数字/ハイフン、先頭英数字、1～40文字で重複不可。titleは空白のみの値を許さない1～100文字、keysは100文字以内の既存キー検証を使う。itemRefを読取revisionに束縛し、同名行やIDの変更後は再取得する。addは空いている最小の`shortcut-N`、既存の初期名、`Ctrl+T`をUIと同じ共通関数から生成し、指定された公開列で上書きする。beforeItemRefによる挿入と全行のreorderも対応する。
+
+MCPの列検証と保存時の一覧検証はUI/自己設定APIと同じ規則を使い、不正なキー、重複ID、後半の不正操作は一部保存しない。未知属性は読取り/変更プレビューへ投影せず、MCPとネイティブ編集は未編集行も含め保持する。未知属性にnull以外の値を持つ行のremoveはLOCAL_ACTION_REQUIRED。保存済み一覧が不正な場合はavailable=falseとし、不正な値を列へ返さない。停止中Applet、共有/PC専用、競合、権限取消、dryRunと再送の契約は共通一覧と同じ。
+
+この設定型は送信するキーの定義を保存し、MCPの設定操作はキー送信やコマンド実行を行わない。Applet固有の設定変更後の処理は従来の設定反映経路を使う。設定欄と3列の南京錠も同じ生成ownerから判定する。従来の単純設定コマンドと他Applet向けAPIの対応型は拡張しない。
 
 ### AI接続一覧
 
