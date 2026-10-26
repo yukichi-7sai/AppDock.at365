@@ -1355,6 +1355,7 @@
   "settings.shortcutFields.targetPages": "{{label}}の対象ページ",
   "settings.shortcutListSetting.empty": "「コマンドを追加」から、名前と送信するキーを登録できます。",
   "settings.shortcutListSetting.id": "ID（例: new-tab）",
+  "settings.shortcutListSetting.identifier": "ID",
   "settings.shortcutListSetting.nameLabel": "{{title}} {{value}} 名前",
   "settings.shortcutListSetting.namePlaceholder": "名前（例: 新しいタブ）",
   "settings.shortcutListSetting.name": "名前",

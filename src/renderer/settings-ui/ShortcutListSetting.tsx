@@ -1,7 +1,7 @@
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
 import { SettingsInput } from './SettingsInput';
-import { validSendKeys } from '../../shared/setting-definitions';
+import { newShortcutListEntry, shortcutListLimit, validSendKeys } from '../../shared/shortcut-list';
 
 type Entry = { id: string; title: string; keys: string };
 export function ShortcutListSetting({
@@ -16,6 +16,7 @@ export function ShortcutListSetting({
   const { t: translate } = useHostTranslation();
   const entries: Entry[] = Array.isArray(value)
     ? value.map((entry) => ({
+        ...(entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {}),
         id: typeof entry?.id === 'string' ? entry.id : '',
         title: typeof entry?.title === 'string' ? entry.title : '',
         keys: typeof entry?.keys === 'string' ? entry.keys : '',
@@ -31,7 +32,10 @@ export function ShortcutListSetting({
       {!entries.length && <p>{translate('settings.shortcutListSetting.empty')}</p>}
       {entries.map((entry, index) => (
         <div className="send-key-entry" key={index}>
-          <SettingsField title="ID">
+          <SettingsField
+            title={translate('settings.shortcutListSetting.identifier')}
+            settingKey="id"
+          >
             <SettingsInput
               aria-label={`${title} ${index + 1} ID`}
               placeholder={translate('settings.shortcutListSetting.id')}
@@ -39,7 +43,7 @@ export function ShortcutListSetting({
               onChange={(event) => update(index, 'id', event.target.value)}
             />
           </SettingsField>
-          <SettingsField title={translate('settings.shortcutListSetting.name')}>
+          <SettingsField title={translate('settings.shortcutListSetting.name')} settingKey="title">
             <SettingsInput
               aria-label={translate('settings.shortcutListSetting.nameLabel', {
                 title: title,
@@ -50,7 +54,7 @@ export function ShortcutListSetting({
               onChange={(event) => update(index, 'title', event.target.value)}
             />
           </SettingsField>
-          <SettingsField title={translate('settings.shortcutListSetting.keys')}>
+          <SettingsField title={translate('settings.shortcutListSetting.keys')} settingKey="keys">
             <SettingsInput
               aria-label={translate('settings.shortcutListSetting.keysLabel', {
                 title: title,
@@ -76,17 +80,11 @@ export function ShortcutListSetting({
       ))}
       <button
         type="button"
-        disabled={entries.length >= 32}
+        disabled={entries.length >= shortcutListLimit}
         onClick={() => {
-          let n = 1;
-          while (entries.some((entry) => entry.id === `shortcut-${n}`)) n++;
           onChange([
             ...entries,
-            {
-              id: `shortcut-${n}`,
-              title: translate('settings.shortcutListSetting.new'),
-              keys: 'Ctrl+T',
-            },
+            newShortcutListEntry(entries, translate('settings.shortcutListSetting.new')),
           ]);
         }}
       >

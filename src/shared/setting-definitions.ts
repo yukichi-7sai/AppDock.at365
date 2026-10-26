@@ -2,6 +2,8 @@ import { hostText } from './i18n';
 import type { ExtensionManifest, Settings, SettingDefinition, SettingOption } from './contracts';
 import { readObjectList, objectFieldValue } from './object-list';
 import { imageReference } from './registered-images';
+import { validShortcutList } from './shortcut-list';
+export { validSendKeys } from './shortcut-list';
 const object = (value: unknown): value is Record<string, any> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 export function parseSettingOptions(value: unknown): SettingOption[] {
@@ -90,30 +92,7 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
       fail();
     }
   }
-  if (definition.type === 'shortcut-list') {
-    if (!Array.isArray(value) || value.length > 32) {
-      fail();
-      return;
-    }
-    const ids = new Set<string>();
-    for (const entry of value) {
-      if (
-        !object(entry) ||
-        typeof entry.id !== 'string' ||
-        !/^[a-z0-9][a-z0-9-]{0,39}$/.test(entry.id) ||
-        ids.has(entry.id) ||
-        typeof entry.title !== 'string' ||
-        !entry.title.trim() ||
-        entry.title.length > 100 ||
-        typeof entry.keys !== 'string' ||
-        !validSendKeys(entry.keys)
-      ) {
-        fail();
-        return;
-      }
-      ids.add(entry.id);
-    }
-  }
+  if (definition.type === 'shortcut-list' && !validShortcutList(value)) fail();
   if (
     definition.type === 'select' &&
     (typeof value !== 'string' ||
@@ -180,6 +159,7 @@ export function parseSettingDefinitions(
           'registered-image',
           'object-list',
           'string-list',
+          'shortcut-list',
         ].includes(s.type)) ||
       (s.generateCommands !== undefined && (depth !== 0 || s.dynamic === true)) ||
       (s.generateCommands !== undefined &&
@@ -298,21 +278,6 @@ export function parseSettingDefinitions(
   });
 }
 
-export function validSendKeys(value: string): boolean {
-  const parts = value.split('+').map((part) => part.trim().toUpperCase());
-  const key = parts.pop() ?? '';
-  const modifiers = parts.map(
-    (part) => ({ CONTROL: 'CTRL', WINDOWS: 'WIN', META: 'WIN' })[part] ?? part,
-  );
-  return (
-    value.length <= 100 &&
-    modifiers.every((part) => ['CTRL', 'ALT', 'SHIFT', 'WIN'].includes(part)) &&
-    new Set(modifiers).size === modifiers.length &&
-    /^(?:[A-Z0-9]|F(?:[1-9]|1[0-9]|2[0-4])|ENTER|TAB|ESC|ESCAPE|SPACE|BACKSPACE|DELETE|INSERT|HOME|END|PAGEUP|PAGEDOWN|LEFT|RIGHT|UP|DOWN)$/.test(
-      key,
-    )
-  );
-}
 export function validateAppletSettings(value: Settings, applets: ExtensionManifest[]) {
   for (const applet of applets)
     for (const definition of applet.settings ?? []) {
