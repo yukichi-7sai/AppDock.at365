@@ -84,6 +84,7 @@ let browser,
   helper,
   peer,
   success = false;
+const layouts = [];
 const errors = [],
   checks = [];
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -209,7 +210,7 @@ async function close() {
   try {
     await launch();
     await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
-    const dialog = page.getByTestId('settings-dialog');
+    let dialog = page.getByTestId('settings-dialog');
     const save = async () => {
       await until(() => dialog.getByTestId('settings-dialog-confirm').isEnabled(), 'save ready');
       await dialog.getByTestId('settings-dialog-confirm').click();
@@ -223,6 +224,61 @@ async function close() {
       await closingAction(palette.getByRole('combobox').press('Enter'));
       await until(() => palette.isClosed(), 'picker closed');
       await dialog.getByTestId('command-stack-editor').waitFor();
+    };
+    const checkTriggerLayout = async (kind, suffix = '') => {
+      assert.equal(
+        await dialog
+          .locator('.stack-trigger-header .settings-field-label')
+          .getByText('トリガー', { exact: true })
+          .count(),
+        1,
+      );
+      for (const viewport of [
+        { width: 1320, height: 1050 },
+        { width: 900, height: 640 },
+        { width: 560, height: 640 },
+      ]) {
+        await page.setViewportSize(viewport);
+        const layout = await dialog.evaluate((element) => {
+          const body = element.querySelector('.settings-dialog-body');
+          const conditions = element.querySelector('.stack-condition-panel');
+          const list = element.querySelector('.stack-entry-list');
+          const box = element.getBoundingClientRect();
+          const footer = element
+            .querySelector('[data-testid=settings-dialog-confirm]')
+            .getBoundingClientRect();
+          return {
+            height: box.height,
+            bottom: box.bottom,
+            top: box.top,
+            footerBottom: footer.bottom,
+            bodyHeight: body.clientHeight,
+            bodyScroll: body.scrollHeight,
+            outerOverflow: getComputedStyle(body).overflowY,
+            headerBorder: getComputedStyle(element.querySelector('.stack-trigger-header'))
+              .borderBottomWidth,
+            divider:
+              getComputedStyle(conditions)[innerWidth < 620 ? 'borderTopWidth' : 'borderLeftWidth'],
+            conditionsHeight: conditions.clientHeight,
+            listHeight: list.clientHeight,
+            conditionsOverflow: getComputedStyle(conditions).overflowY,
+          };
+        });
+        layouts.push({ kind, suffix, viewport, ...layout });
+        assert.equal(layout.outerOverflow, 'hidden');
+        assert(layout.bodyScroll <= layout.bodyHeight + 1, JSON.stringify(layout));
+        assert(parseFloat(layout.headerBorder) > 0);
+        assert(parseFloat(layout.divider) > 0);
+        assert.equal(layout.conditionsOverflow, 'auto');
+        assert(layout.conditionsHeight > 60 && layout.listHeight > 30, JSON.stringify(layout));
+        assert(layout.top >= 0 && layout.bottom <= viewport.height + 1);
+        assert(layout.footerBottom <= viewport.height - 8);
+        if (viewport.height > 900) assert(layout.height > 850 && layout.height <= 900);
+        await dialog.screenshot({
+          path: path.join(profile, `trigger-${kind}-${viewport.width}${suffix}.png`),
+        });
+      }
+      await page.setViewportSize({ width: 1320, height: 900 });
     };
     await page.getByRole('button', { name: 'コマンドを追加', exact: true }).click();
     await dialog.getByTestId('custom-command-kind').selectOption('appdock.commands.stack');
@@ -318,6 +374,25 @@ async function close() {
       }
       assert.equal(await table.locator('tbody tr').count(), 1);
       await table.getByRole('button', { name: /を編集$/ }).click();
+      await dialog.getByTestId('binding-scope:exe').filter({ visible: true }).click();
+      await checkTriggerLayout(kind);
+      await dialog.getByTestId('binding-scope:app').filter({ visible: true }).click();
+      if (kind === 'shortcuts') {
+        await dialog.locator('.shortcut-special-trigger').click();
+        await checkTriggerLayout(kind, '-keys');
+        await dialog
+          .locator('.shortcut-special-picker')
+          .getByRole('button', { name: 'F12', exact: true })
+          .scrollIntoViewIfNeeded();
+        assert(await dialog.locator('.stack-trigger-header').evaluate((el) => el.scrollTop > 0));
+        assert.equal(
+          await dialog
+            .locator('.shortcut-special-picker')
+            .evaluate((el) => getComputedStyle(el).overflowY),
+          'visible',
+        );
+        await dialog.locator('.shortcut-special-trigger').click();
+      }
       await dialog.getByTestId('stack-execution-mode').selectOption('first');
       await save();
       assert.equal(
@@ -375,6 +450,84 @@ async function close() {
     assert.equal(state.settings.value.touchpadGestures.bindings.length, 1);
     assert.deepEqual(errors, []);
     checks.push('restart retains named and dedicated stacks');
+    dialog = page.getByTestId('settings-dialog');
+    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+    for (const [kind, inputs, expected] of [
+      [
+        'shortcuts',
+        ['Ctrl+Shift+F10', 'Ctrl+Shift+F2'],
+        ['Ctrl+Shift+9', 'Ctrl+Shift+F2', 'Ctrl+Shift+F10'],
+      ],
+      ['gestures', ['wheel-down', 'move-down'], ['move-up', 'move-down', 'wheel-down']],
+      [
+        'touchpad-gestures',
+        ['four.right', 'three.left'],
+        ['three.tap', 'three.left', 'four.right'],
+      ],
+    ]) {
+      await page.getByTestId('command-stack-tab:' + kind).click();
+      const table = page.getByTestId('trigger-stack-table');
+      const titles = new Map();
+      titles.set(
+        expected[0],
+        await table.locator('tbody tr').first().locator('td').first().innerText(),
+      );
+      for (const input of inputs) {
+        await table.getByRole('button', { name: /追加/ }).click();
+        if (kind === 'shortcuts') {
+          const key = input.split('+').at(-1);
+          await dialog
+            .locator('.shortcut-capture')
+            .dispatchEvent('keydown', { key, code: key, ctrlKey: true, shiftKey: true });
+          titles.set(input, input);
+        } else {
+          await dialog.getByTestId('stack-trigger-input').selectOption(input);
+          titles.set(
+            input,
+            await dialog.getByTestId('stack-trigger-input').locator('option:checked').innerText(),
+          );
+        }
+        await choose('fixture.stacks.a');
+        await dialog.getByTestId('binding-scope:app').click();
+        await save();
+      }
+      const expectedTitles = expected.map((input) => titles.get(input));
+      const displayed = () =>
+        table
+          .locator('tbody tr')
+          .evaluateAll((rows) => rows.map((tr) => tr.querySelector('td').innerText));
+      assert.deepEqual(await displayed(), expectedTitles);
+      await page.getByTestId('settings-nav:' + kind).click();
+      assert.deepEqual(await displayed(), expectedTitles);
+      await table
+        .getByRole('button', { name: titles.get(inputs[1]) + 'を編集', exact: true })
+        .click();
+      await dialog.getByTestId('stack-execution-mode').selectOption('all');
+      if (kind === 'shortcuts') {
+        for (let index = 0; index < 9; index++) await choose('fixture.stacks.b');
+        await checkTriggerLayout(kind, '-many');
+        const list = dialog.locator('.stack-entry-list');
+        await list.evaluate((el) => {
+          el.scrollTop = el.scrollHeight;
+        });
+        assert(await list.evaluate((el) => el.scrollTop > 0));
+      }
+      await save();
+      const stored = require('../out/main/shared/trigger-stacks').triggerStacks(
+        (await snapshot()).settings.value,
+        kind,
+      );
+      assert.equal(stored.find((stack) => stack.input === inputs[1]).executionMode, 'all');
+      assert.equal(stored.find((stack) => stack.input === inputs[0]).executionMode, 'inherit');
+      await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+    }
+    checks.push(
+      'trigger dialogs retain separators, one trigger label and reachable footer at tall, compact and narrow sizes',
+    );
+    checks.push(
+      'all trigger tables follow picker order and sorted edits update the correct saved stack',
+    );
+    assert.deepEqual(errors, []);
     success = true;
   } catch (error) {
     console.error(error);
@@ -391,6 +544,7 @@ async function close() {
         {
           success,
           checks,
+          layouts,
           errors,
           portable,
           sha256: portable ? hash(portable) : null,

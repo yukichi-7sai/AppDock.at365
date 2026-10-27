@@ -7,7 +7,11 @@ const {
   expandStackCommand,
   stackConditionPaths,
 } = require('../out/main/shared/command-stacks');
-const { triggerStacks, applyTriggerStack } = require('../out/main/shared/trigger-stacks');
+const {
+  triggerStacks,
+  applyTriggerStack,
+  sortTriggerStacksForDisplay,
+} = require('../out/main/shared/trigger-stacks');
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
 const { getKeybindings, nativeShortcutInputs } = require('../out/main/shared/keybindings');
@@ -174,6 +178,45 @@ test('trigger stacks are the single persisted assignment source and share confli
     0,
   );
   assert.deepEqual(triggerStacks(parseSettings(settingsStorageValue(next))), triggerStacks(next));
+});
+
+test('trigger list order follows picker catalogs without changing command execution order', () => {
+  for (const [kind, inputs, expected] of [
+    [
+      'shortcuts',
+      ['Ctrl+F10', 'Down', 'Alt+A', 'Ctrl+A', 'A', '9', 'Up', 'Ctrl+F2', 'Tab'],
+      ['A', 'Ctrl+A', 'Alt+A', '9', 'Tab', 'Up', 'Down', 'Ctrl+F2', 'Ctrl+F10'],
+    ],
+    [
+      'gestures',
+      ['key:Down', 'wheel-down', 'move-down', 'move-up-right', 'click-left', 'key:Up', 'move-up'],
+      ['move-up', 'move-down', 'move-up-right', 'click-left', 'wheel-down', 'key:Up', 'key:Down'],
+    ],
+    [
+      'touchpad-gestures',
+      ['four.right', 'three.down', 'four.tap', 'three.tap', 'three.up'],
+      ['three.tap', 'three.up', 'three.down', 'four.tap', 'four.right'],
+    ],
+  ]) {
+    const original = inputs.map((input, index) => ({
+      kind,
+      input,
+      executionMode: 'first',
+      entries: index ? [row(input + '-b', 'b'), row(input + '-a', 'a')] : [],
+    }));
+    const before = structuredClone(original);
+    const sorted = sortTriggerStacksForDisplay(original);
+    assert.deepEqual(
+      sorted.map((value) => value.input),
+      expected,
+    );
+    assert.deepEqual(original, before);
+    for (const value of sorted)
+      assert.equal(
+        value,
+        original.find((item) => item.input === value.input),
+      );
+  }
 });
 
 test('native preflight receives nested owner conditions, including branches that cannot run', () => {

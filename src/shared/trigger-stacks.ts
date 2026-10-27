@@ -7,9 +7,10 @@ import {
   withKeybindings,
   type Keybinding,
 } from './keybindings';
-import { defaultGestures, normalizeGesture, type GestureBinding } from './gestures';
-import { defaultTouchpadGestures, touchpadId } from './touchpad-gestures';
+import { defaultGestures, gestureTypes, normalizeGesture, type GestureBinding } from './gestures';
+import { defaultTouchpadGestures, touchpadGestureTypes, touchpadId } from './touchpad-gestures';
 import { parseCommandStack, type CommandStackEntry } from './command-stacks';
+import { compareShortcutDisplayOrder } from './shortcut-key-catalog';
 
 export type TriggerStackKind = 'shortcuts' | 'gestures' | 'touchpad-gestures';
 export interface TriggerStack {
@@ -20,6 +21,21 @@ export interface TriggerStack {
 }
 export function triggerStackKey(stack: Pick<TriggerStack, 'kind' | 'input'>) {
   return JSON.stringify([stack.kind, stack.input]);
+}
+/** Presentation order only; keep each stack's execution order and stored rows intact. */
+export function sortTriggerStacksForDisplay(stacks: readonly TriggerStack[]): TriggerStack[] {
+  const kinds = ['shortcuts', 'gestures', 'touchpad-gestures'];
+  const mouse = new Map<string, number>(gestureTypes.map(([id], index) => [id, index]));
+  const touchpad = new Map<string, number>(touchpadGestureTypes.map(([id], index) => [id, index]));
+  return [...stacks].sort((a, b) => {
+    if (a.kind !== b.kind) return kinds.indexOf(a.kind) - kinds.indexOf(b.kind);
+    if (a.kind === 'shortcuts') return compareShortcutDisplayOrder(a.input, b.input);
+    const catalog = a.kind === 'gestures' ? mouse : touchpad;
+    const order = (catalog.get(a.input) ?? catalog.size) - (catalog.get(b.input) ?? catalog.size);
+    if (!order && a.input.startsWith('key:') && b.input.startsWith('key:'))
+      return compareShortcutDisplayOrder(a.input.slice(4), b.input.slice(4));
+    return order || (a.input < b.input ? -1 : a.input > b.input ? 1 : 0);
+  });
 }
 export function normalizeStackInput(kind: TriggerStackKind, input: string) {
   return kind === 'shortcuts'

@@ -5,36 +5,11 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useSettingsControls } from './api';
 import { normalizeShortcut, shortcutFromEvent } from '../../shared/commands';
 import { inputKeysFromEvent, normalizeInputKeys } from '../../shared/input-command';
-const specialGroups = [
-  [
-    hostText('settings.shortcutCaptureField.operation'),
-    [
-      'Tab',
-      'Enter',
-      'Escape',
-      'Space',
-      'Backspace',
-      'Delete',
-      'Insert',
-      'Pause',
-      'CapsLock',
-      'ScrollLock',
-      'Alphanumeric',
-      'KanaMode',
-      'Convert',
-      'NonConvert',
-      'Plus',
-    ],
-  ],
-  [
-    hostText('settings.shortcutCaptureField.navigation'),
-    ['Up', 'Down', 'Left', 'Right', 'Home', 'End', 'PageUp', 'PageDown'],
-  ],
-  [
-    hostText('settings.shortcutCaptureField.function'),
-    Array.from({ length: 24 }, (_, i) => `F${i + 1}`),
-  ],
-] as const;
+import {
+  shortcutAlphanumericKeys,
+  shortcutModifierKeys,
+  shortcutSpecialKeyGroups,
+} from '../../shared/shortcut-key-catalog';
 
 export function ShortcutCaptureField({
   value,
@@ -207,21 +182,23 @@ export function ShortcutCaptureField({
             role="group"
             aria-label={translate('settings.shortcutCaptureField.modifiers')}
           >
-            {['Ctrl', 'Alt', 'Shift', ...(allowWin ? ['Win'] : [])].map((modifier) => (
-              <button
-                key={modifier}
-                aria-pressed={modifiers.includes(modifier)}
-                onClick={() =>
-                  setModifiers(
-                    modifiers.includes(modifier)
-                      ? modifiers.filter((m) => m !== modifier)
-                      : [...modifiers, modifier],
-                  )
-                }
-              >
-                {modifier}
-              </button>
-            ))}
+            {shortcutModifierKeys
+              .filter((modifier) => allowWin || modifier !== 'Win')
+              .map((modifier) => (
+                <button
+                  key={modifier}
+                  aria-pressed={modifiers.includes(modifier)}
+                  onClick={() =>
+                    setModifiers(
+                      modifiers.includes(modifier)
+                        ? modifiers.filter((m) => m !== modifier)
+                        : [...modifiers, modifier],
+                    )
+                  }
+                >
+                  {modifier}
+                </button>
+              ))}
             <small>{translate('settings.shortcutCaptureField.combine')}</small>
           </div>
           <SettingsField title={translate('settings.shortcutCaptureField.alphanumeric')}>
@@ -236,14 +213,14 @@ export function ShortcutCaptureField({
               }}
             >
               <option value="">{translate('settings.shortcutCaptureField.select')}</option>
-              {Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789').map((key) => (
+              {shortcutAlphanumericKeys.map((key) => (
                 <option key={key}>{key}</option>
               ))}
             </select>
           </SettingsField>
-          {specialGroups.map(([name, keys]) => (
+          {shortcutSpecialKeyGroups.map(([name, keys]) => (
             <div className="shortcut-special-group" key={name}>
-              <small>{name}</small>
+              <small>{translate(`settings.shortcutCaptureField.${name}`)}</small>
               <div>
                 {keys.filter(supported).map((key) => (
                   <button

@@ -1,7 +1,85 @@
-.settings-modal.settings-group-dialog.command-stack-dialog[open],
 .settings-modal.settings-group-dialog.custom-command-dialog.stack-command-dialog[open] {
   width: min(1180px, calc(100vw - 32px));
   max-height: min(700px, calc(100dvh - 32px));
+}
+.settings-modal.settings-group-dialog.command-stack-dialog[open] {
+  width: min(1180px, calc(100vw - 32px));
+  height: min(900px, calc(100dvh - 32px));
+  max-height: min(900px, calc(100dvh - 32px));
+}
+.command-stack-dialog > .settings-dialog-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.command-stack-dialog .settings-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.command-stack-dialog .stack-trigger-header .settings-field,
+.command-stack-dialog .stack-condition-panel .settings-field {
+  padding: 0;
+}
+.command-stack-dialog .stack-trigger-header select {
+  width: 100%;
+}
+.command-stack-dialog .stack-trigger-header {
+  flex: none;
+  max-height: 45%;
+  overflow: auto;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.stack-trigger-input {
+  min-width: 0;
+}
+.command-stack-dialog .command-stack-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.command-stack-dialog .stack-list-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.command-stack-dialog .stack-list-heading {
+  flex: none;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.command-stack-dialog .stack-entry-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+.command-stack-dialog .stack-condition-panel {
+  min-height: 0;
+  max-height: none;
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+}
+.command-stack-dialog .stack-selected-title {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.command-stack-dialog .shortcut-special-picker {
+  max-height: none;
+  overflow: visible;
+}
+.command-stack-dialog .shortcut-capture {
+  min-height: 64px;
+  padding: 8px;
+}
+.command-stack-dialog .shortcut-capture kbd {
+  padding: 5px 8px;
+  font-size: 16px;
 }
 .stack-command-dialog .custom-command-editor {
   grid-template-columns: minmax(190px, 0.65fr) minmax(0, 2.35fr);
@@ -157,5 +235,24 @@
   }
   .stack-condition-panel {
     max-height: none;
+  }
+  .command-stack-dialog .command-stack-editor {
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+  }
+  .command-stack-dialog .stack-trigger-header {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+  .command-stack-dialog .shortcut-capture-status {
+    flex-basis: 100%;
+  }
+  .command-stack-dialog .stack-condition-panel {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 12px;
   }
 }

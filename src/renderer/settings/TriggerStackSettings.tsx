@@ -3,6 +3,7 @@ import type { Settings, ExtensionSnapshot, SettingDefinition } from '../../share
 import type { UiCommand } from '../../shared/commands';
 import {
   triggerStacks,
+  sortTriggerStacksForDisplay,
   applyTriggerStack,
   normalizeStackInput,
   type TriggerStack,
@@ -74,29 +75,31 @@ export function TriggerStackDialog({
       {(ready, setError) => (
         <>
           <div className="stack-trigger-header">
-            <SettingsField title={t('settings.commandStacks.input')}>
+            <div className="stack-trigger-input">
               {value.kind !== 'shortcuts' && (
-                <select
-                  data-testid="stack-trigger-input"
-                  aria-label={t('settings.commandStacks.input')}
-                  value={keyGesture ? 'key:' : value.input}
-                  onChange={(event) => setValue({ ...value, input: event.target.value })}
-                >
-                  {(value.kind === 'gestures' ? gestureTypes : touchpadGestureTypes).map(
-                    ([id, title]) => (
-                      <option key={id} value={id}>
-                        {title}
-                      </option>
-                    ),
-                  )}
-                  {value.kind === 'gestures' && (
-                    <option value="key:">{t('settings.gestureBindingDialog.keyboard')}</option>
-                  )}
-                </select>
+                <SettingsField title={t('settings.commandStacks.input')}>
+                  <select
+                    data-testid="stack-trigger-input"
+                    aria-label={t('settings.commandStacks.input')}
+                    value={keyGesture ? 'key:' : value.input}
+                    onChange={(event) => setValue({ ...value, input: event.target.value })}
+                  >
+                    {(value.kind === 'gestures' ? gestureTypes : touchpadGestureTypes).map(
+                      ([id, title]) => (
+                        <option key={id} value={id}>
+                          {title}
+                        </option>
+                      ),
+                    )}
+                    {value.kind === 'gestures' && (
+                      <option value="key:">{t('settings.gestureBindingDialog.keyboard')}</option>
+                    )}
+                  </select>
+                </SettingsField>
               )}
               {(value.kind === 'shortcuts' || keyGesture) && (
                 <ShortcutCaptureField
-                  label={t('settings.commandStacks.input')}
+                  label={value.kind === 'shortcuts' ? t('settings.commandStacks.input') : undefined}
                   showDescription={false}
                   allowWin={value.kind === 'shortcuts'}
                   value={keyGesture ? value.input.slice(4) : value.input}
@@ -107,7 +110,7 @@ export function TriggerStackDialog({
                   setError={setError}
                 />
               )}
-            </SettingsField>
+            </div>
             <StackExecutionMode
               value={value.executionMode}
               inherited={inherited}
@@ -151,7 +154,7 @@ export function TriggerStackSettings({
     stack: TriggerStack;
     adding?: boolean;
   } | null>(null);
-  const stacks = triggerStacks(settings, kind);
+  const stacks = sortTriggerStacksForDisplay(triggerStacks(settings, kind));
   const list: SettingDefinition = {
     key: 'stacks',
     title: t('settings.commandStacks.triggers'),
