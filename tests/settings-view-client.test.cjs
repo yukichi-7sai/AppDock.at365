@@ -57,12 +57,14 @@ function fixture(pageId = 'touchpad-gestures') {
     behavior = async () => {
       throw Error('key conflict');
     };
+  const failures = [];
   const client = new SettingsViewClient(
     (m) => {
       displayed = m;
     },
     (e) => {
       error = e;
+      if (e) failures.push(e);
     },
     {
       get: async () => structuredClone(model),
@@ -83,6 +85,7 @@ function fixture(pageId = 'touchpad-gestures') {
     get error() {
       return error;
     },
+    failures,
     get calls() {
       return calls;
     },
@@ -407,4 +410,73 @@ test('presentation-only model copies retain the saved basis of rejected input', 
   await f.client.flush();
   assert.equal(f.error, '');
   assert.equal(f.client.model.content.values.ai.commonPrompt, 'corrected after resize');
+});
+
+test('an optimistic form handler still accepts the next color after its preceding save drains the queue', async () => {
+  const f = fixture('appearance');
+  f.behavior(async (op) => f.save(op));
+  f.edit((settings) => {
+    settings.host.accentColor = 'rose';
+  });
+  // React can retain the handler for this optimistic frame until its next commit.
+  const editor = f.client.editor(f.displayed);
+  await f.client.flush();
+  editor.value.host.accentColor = 'lavender';
+  editor.edit(editor.value);
+  await f.client.flush();
+  assert.equal(f.error, '');
+  assert.equal(f.client.model.content.values.host.accentColor, 'lavender');
+});
+
+test('an older optimistic form still rejects a subsequent external color change', async () => {
+  const f = fixture('appearance');
+  f.behavior(async (op) => f.save(op));
+  f.edit((settings) => {
+    settings.host.accentColor = 'rose';
+  });
+  const editor = f.client.editor(f.displayed);
+  await f.client.flush();
+  f.external((values) => {
+    values.host.accentColor = 'amber';
+  });
+  editor.value.host.accentColor = 'lavender';
+  editor.edit(editor.value);
+  await f.client.flush();
+  assert(f.error);
+  assert.equal(f.client.model.content.values.host.accentColor, 'amber');
+});
+
+test('repeated color edits stay ordered across queue drains without transient conflicts', async () => {
+  const f = fixture('appearance');
+  f.behavior(async (op) => f.save(op));
+  const colors = ['rose', 'lavender', 'amber', 'mint'];
+  let editor = f.client.editor(f.displayed);
+  for (let i = 0; i < 60; i++) {
+    editor.value.host.accentColor = colors[i % colors.length];
+    editor.edit(editor.value);
+    editor = f.client.editor(f.displayed);
+    await f.client.flush();
+    assert.equal(f.client.model.content.values.host.accentColor, colors[i % colors.length]);
+  }
+  assert.equal(f.calls, 60);
+  assert.deepEqual(f.failures, []);
+});
+
+test('confirming an optimistic color keeps an unrelated external change out of its basis', async () => {
+  const f = fixture('appearance');
+  f.behavior(async (op) => f.save(op));
+  f.edit((settings) => {
+    settings.host.accentColor = 'rose';
+  });
+  const editor = f.client.editor(f.displayed);
+  await f.client.flush();
+  f.external((values) => {
+    values.host.zoomFactor = 1.25;
+  });
+  editor.value.host.accentColor = 'lavender';
+  editor.edit(editor.value);
+  await f.client.flush();
+  assert.deepEqual(f.failures, []);
+  assert.equal(f.client.model.content.values.host.accentColor, 'lavender');
+  assert.equal(f.client.model.content.values.host.zoomFactor, 1.25);
 });

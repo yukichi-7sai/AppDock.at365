@@ -29,7 +29,7 @@ export class SettingsPageSession {
     private options: {
       editor: SettingsInputSession;
       navigation?: SettingsNavigationState;
-      host(): HostSnapshot;
+      host(): Pick<HostSnapshot, 'settings' | 'dark'>;
       auxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary;
       actions(page: SettingsPageDefinition): Record<string, (args: unknown[]) => Promise<unknown>>;
       changed(): void;
@@ -49,8 +49,8 @@ export class SettingsPageSession {
     this.id = request.id;
     this.route = request.route;
     this.navigation = options.navigation ?? { query: '' };
-    if (request.pageId && request.pageId !== options.editor.snapshot().pageId) {
-      const state = options.editor.snapshot();
+    if (request.pageId && request.pageId !== options.editor.metadata().pageId) {
+      const state = options.editor.metadata();
       // The host's selected detail supplies the scope; a rejected transition keeps the original JSON.
       void options.editor
         .act({
@@ -70,11 +70,11 @@ export class SettingsPageSession {
       !this.disposed &&
       (this.request.context !== 'applet' ||
         !this.request.pageId ||
-        this.options.editor.snapshot().pageId === this.request.pageId)
+        this.options.editor.metadata().pageId === this.request.pageId)
     );
   }
   snapshot(): SettingsPageModel {
-    const state = this.options.editor.snapshot();
+    const state = this.options.editor.metadata();
     if (
       this.request.context === 'applet' &&
       this.request.pageId &&
@@ -176,7 +176,7 @@ export class SettingsPageSession {
     return work;
   }
   private async perform(action: SettingsPageAction) {
-    const state = this.options.editor.snapshot();
+    const state = this.options.editor.metadata();
     if (
       this.request.context === 'applet' &&
       this.request.pageId &&
@@ -209,7 +209,7 @@ export class SettingsPageSession {
           action: { type: 'select-page', pageId: item.pageId },
         });
         this.navigation.provider = undefined;
-        const selected = this.options.editor.snapshot();
+        const selected = this.options.editor.metadata();
         if (selected.mode !== 'form')
           await this.options.editor.act({
             sessionId: selected.sessionId,

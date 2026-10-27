@@ -32,7 +32,8 @@ export class SettingsViewClient {
   private queued = 0;
   private chain = Promise.resolve();
   private listeners = new Set<() => void>();
-  private input?: InputBasis & {
+  private input?: {
+    basis: InputBasis;
     pageId: string;
     values?: Record<string, unknown>;
     text?: string;
@@ -45,10 +46,7 @@ export class SettingsViewClient {
   private displayedBases = new WeakMap<Record<string, unknown>, InputBasis>();
   private display(m: SettingsPageModel) {
     if (this.input?.pageId === m.content.page.id && this.input.values) {
-      this.displayedBases.set(this.input.values, {
-        before: this.input.before,
-        revision: this.input.revision,
-      });
+      this.displayedBases.set(this.input.values, this.input.basis);
       return { ...m, content: { ...m.content, values: this.input.values } };
     }
     return m;
@@ -62,12 +60,12 @@ export class SettingsViewClient {
     const m = this.model!;
     const basis =
       this.input?.pageId === m.content.page.id
-        ? { before: this.input.before, revision: this.input.revision }
+        ? this.input.basis
         : {
             before: m.content.jsonValues ?? m.content.values,
             revision: m.content.editing.editRevision,
           };
-    this.input = { pageId: m.content.page.id, text: value, ...basis };
+    this.input = { pageId: m.content.page.id, text: value, basis };
     this.inputVersion++;
     this.render(this.display(m));
     void this.act(
@@ -76,6 +74,7 @@ export class SettingsViewClient {
         action: { type: 'partial-text', pageId: m.content.page.id, before: basis.before, value },
       },
       basis.revision,
+      basis,
     ).catch(() => {});
   }
   constructor(
@@ -105,6 +104,7 @@ export class SettingsViewClient {
   act(
     operation: SettingsPageOperation,
     inputRevision = this.model?.content.editing.editRevision ?? -1,
+    inputBasis?: InputBasis,
   ): Promise<any> {
     if (
       operation.kind === 'edit' &&
@@ -181,13 +181,17 @@ export class SettingsViewClient {
             savedRevision: response.model.content.editing.editRevision,
           };
           this.savedInputs.push(saved);
-          if (this.input?.pageId === saved.pageId && this.input.revision < saved.savedRevision) {
+          const bases = new Set([
+            inputBasis,
+            this.input?.pageId === saved.pageId ? this.input.basis : undefined,
+          ]);
+          for (const basis of bases) {
+            if (!basis || basis.revision >= saved.savedRevision) continue;
             try {
-              this.input = {
-                ...this.input,
-                before: mergeSettingsInput(saved.before, saved.value, this.input.before),
-                revision: saved.savedRevision,
-              };
+              // Optimistic frames share this basis with their rendered handlers.
+              // Confirm only our submitted changes, even after the queue drains.
+              basis.before = mergeSettingsInput(saved.before, saved.value, basis.before);
+              basis.revision = saved.savedRevision;
             } catch {
               // A separately started input retains its basis and conflict check.
             }
@@ -257,12 +261,13 @@ export class SettingsViewClient {
   };
   editor(model: SettingsPageModel) {
     const ignore = (p: Promise<unknown>) => void p.catch(() => {});
-    const basis = this.displayedBases.get(model.content.values) ?? {
-      before: model.content.values,
+    const displayed = this.display(model);
+    const basis = this.displayedBases.get(displayed.content.values) ?? {
+      before: displayed.content.values,
       revision: model.content.editing.editRevision,
     };
     return {
-      value: materialize(this.display(model)),
+      value: materialize(displayed),
       edit: (value: Settings) => {
         const values = settingsProjection(
           value,
@@ -272,7 +277,7 @@ export class SettingsViewClient {
         // Async controls can finish after an external update. Compare against the
         // values that produced this editor, not the newly accepted server values.
         const before = basis.before;
-        this.input = { pageId: model.content.page.id, values, ...basis };
+        this.input = { pageId: model.content.page.id, values, basis };
         this.inputVersion++;
         this.render(this.display(model));
         ignore(
@@ -282,6 +287,7 @@ export class SettingsViewClient {
               action: { type: 'page-values', pageId: model.content.page.id, before, value: values },
             },
             basis.revision,
+            basis,
           ),
         );
       },

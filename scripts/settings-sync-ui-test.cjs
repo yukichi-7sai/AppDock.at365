@@ -193,8 +193,8 @@ async function gmail(s) {
   checks.push('rename-delivered settings apply while running');
   await b.dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   await b.dock.getByRole('button', { name: 'プロフィール', exact: true }).click();
-  await b.dock.getByLabel('ユーザー名').fill('即時保存');
-  await b.dock.getByLabel('ユーザー名').press('Enter');
+  await b.dock.getByLabel('ユーザー名', { exact: true }).fill('即時保存');
+  await b.dock.getByLabel('ユーザー名', { exact: true }).press('Enter');
   await settleSettings(b.dock);
   assert.equal(
     (await b.snapshot()).settings.value.extensions['fixture.profile'].settings.name,
@@ -209,7 +209,8 @@ async function gmail(s) {
     'remote name',
   );
   await until(
-    async () => (await b.dock.getByLabel('ユーザー名').inputValue()) === '相手の名前',
+    async () =>
+      (await b.dock.getByLabel('ユーザー名', { exact: true }).inputValue()) === '相手の名前',
     'external value shown',
   );
   checks.push(
@@ -265,13 +266,13 @@ async function gmail(s) {
       (await accountSnapshot(uiB)).registeredSounds.includes('ベル.wav'),
     'registered list',
   );
-  await uiA.getByLabel('登録済みの通知音').selectOption('ベル.wav');
+  await uiA.getByLabel('登録済みの通知音', { exact: true }).selectOption('ベル.wav');
   await until(
     async () => (await accountSnapshot(uiA)).accounts[0].sound.file === 'ベル.wav',
     'select existing',
   );
   assert.equal((await accountSnapshot(uiB)).accounts[0].sound.file, '');
-  await uiB.getByLabel('登録済みの通知音').selectOption('ベル.wav');
+  await uiB.getByLabel('登録済みの通知音', { exact: true }).selectOption('ベル.wav');
   await until(
     async () => (await accountSnapshot(uiB)).accounts[0].sound.file === 'ベル.wav',
     'select other PC',
@@ -302,7 +303,14 @@ async function gmail(s) {
   const before = (await imageSnapshot()).images.find((i) => i.ref.file === 'fixture.png').thumbnail;
   // A second valid PNG changes pixels without changing the logical reference.
   const pixel = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1cAAAAASUVORK5CYII=',
+    await b.dock.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 2;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#123456';
+      context.fillRect(0, 0, 2, 2);
+      return canvas.toDataURL('image/png').split(',')[1];
+    }),
     'base64',
   );
   fs.writeFileSync(imageFile, pixel);

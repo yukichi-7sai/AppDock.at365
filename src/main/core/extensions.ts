@@ -319,7 +319,12 @@ export interface ExtensionInstance {
   panel: Panel | null;
   settingOptions: Record<string, SettingOption[]>;
   error: string | null;
-  startupStartedAt?: number;
+  startupMeasurement?: {
+    startedAt: number;
+    phaseStartedAt: number;
+    phase: import('../../shared/contracts').AppletStartupPhase;
+    phases: import('../../shared/contracts').AppletStartupPhaseTiming[];
+  };
   startupTiming?: ExtensionSnapshot['startupTiming'];
   scheduledStartAt?: number;
   scheduledDelay?: number;
@@ -481,7 +486,10 @@ class ExtensionManager extends EventEmitter {
       displayName: appletDisplayName(e.manifest),
       state: e.state,
       scheduledStartAt: e.scheduledStartAt,
-      startupTiming: e.startupTiming && { ...e.startupTiming },
+      startupTiming: e.startupTiming && {
+        ...e.startupTiming,
+        phases: e.startupTiming.phases?.map((phase) => ({ ...phase })),
+      },
       error: e.error,
       enabled:
         e.manifest.sourceKind === 'builtin' || appletEnabled(this.settings.value, e.manifest.id),
@@ -664,7 +672,8 @@ class ExtensionManager extends EventEmitter {
   async start(e: ExtensionInstance) {
     if (this.shuttingDown || !this.startAllowed(e.manifest.id)) return;
     e.startupTiming = undefined;
-    e.startupStartedAt = performance.now();
+    const startedAt = performance.now();
+    e.startupMeasurement = { startedAt, phaseStartedAt: startedAt, phase: 'prepare', phases: [] };
     e.runtimeSession = randomUUID();
     e.dynamicPages = [];
     e.pageRevision = (e.pageRevision ?? 0) + 1;
@@ -677,6 +686,7 @@ class ExtensionManager extends EventEmitter {
       this.checkCompatibility(e);
       // Revalidate paths on each activation, including after an external extension update.
       m.entryPath = contained(m.folder, m.entry);
+      this.advanceStartup(e, 'process');
       let child: ChildProcessWithoutNullStreams;
       if (m.runtime === 'node')
         child = spawn(this.nodeExecutable, [this.nodeWorker, m.entryPath], {
@@ -736,11 +746,13 @@ class ExtensionManager extends EventEmitter {
           this.crashed(e, err.message);
         }
       });
+      this.advanceStartup(e, 'activate');
       const result = await peer.request('activate', {
         id: m.id,
         settings: this.settings.value.extensions[m.id]?.settings ?? {},
       });
       if (e.error) throw new Error(e.error);
+      this.advanceStartup(e, 'validate');
       if (
         !isObject(result) ||
         !Array.isArray(result.commands) ||
@@ -779,13 +791,30 @@ class ExtensionManager extends EventEmitter {
     }
     this.emit('changed');
   }
+  advanceStartup(e: ExtensionInstance, phase: import('../../shared/contracts').AppletStartupPhase) {
+    const measurement = e.startupMeasurement;
+    if (!measurement) return;
+    const now = performance.now();
+    measurement.phases.push({
+      phase: measurement.phase,
+      durationMs: Math.max(0, now - measurement.phaseStartedAt),
+    });
+    measurement.phase = phase;
+    measurement.phaseStartedAt = now;
+  }
   finishStartup(e: ExtensionInstance, outcome: 'success' | 'error') {
-    if (e.startupStartedAt === undefined) return;
+    const measurement = e.startupMeasurement;
+    if (!measurement) return;
+    const now = performance.now();
     e.startupTiming = {
-      durationMs: Math.max(0, performance.now() - e.startupStartedAt),
+      durationMs: Math.max(0, now - measurement.startedAt),
       outcome,
+      phases: [
+        ...measurement.phases,
+        { phase: measurement.phase, durationMs: Math.max(0, now - measurement.phaseStartedAt) },
+      ],
     };
-    e.startupStartedAt = undefined;
+    e.startupMeasurement = undefined;
   }
   crashed(e: ExtensionInstance, message: string) {
     this.executions.stop(e.manifest.id);
@@ -807,7 +836,7 @@ class ExtensionManager extends EventEmitter {
   async stop(e: ExtensionInstance) {
     this.executions.stop(e.manifest.id);
     this.cancelStart(e);
-    e.startupStartedAt = undefined;
+    e.startupMeasurement = undefined;
     e.state = 'stopping';
     await closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);

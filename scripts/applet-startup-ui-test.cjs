@@ -10,6 +10,7 @@ const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const root = path.resolve(__dirname, '..');
 const output = path.join(root, '.artifacts', `applet-startup-ui-${Date.now()}`);
 const source = process.argv[2] && path.resolve(process.argv[2]);
+const saveStress = process.argv.includes('--save-stress');
 const checks = [],
   errors = [],
   measurements = {};
@@ -117,6 +118,23 @@ async function phase(name) {
     const text =
       duration < 1000 ? `${Math.round(duration)} ms` : `${(duration / 1000).toFixed(2)} 秒`;
     assert((await row(id).getByTestId('applet-startup-time').innerText()).startsWith(text));
+    assert(Array.isArray(a.startupTiming.phases));
+    const sum = a.startupTiming.phases.reduce((sum, phase) => sum + phase.durationMs, 0);
+    assert(Math.abs(sum - duration) < 0.001);
+    const title = await row(id).getByTestId('applet-startup-time').getAttribute('title');
+    assert(title.startsWith('合計：'));
+    for (const [phase, label] of Object.entries({
+      prepare: 'ホストの開始準備',
+      process: 'プロセスの起動要求',
+      activate: '接続・初期化の応答待ち',
+      validate: '登録内容の確認',
+    })) {
+      if (a.startupTiming.phases.some((item) => item.phase === phase))
+        assert(title.includes(label));
+    }
+    assert(title.includes('ホスト処理の待ち時間'));
+    if (a.startupTiming.outcome === 'error') assert(title.includes('失敗した区間まで'));
+    await row(id).getByTestId('applet-startup-time').hover();
     return a.startupTiming;
   };
   const empty = async (title) => {
@@ -176,6 +194,50 @@ async function phase(name) {
         ),
       );
       checks.push('actual-activation-duration-disabled-and-waiting-unmeasured-failure-labelled');
+      checks.push('startup-tooltip-phase-sum-localized-labels-and-partial-failure');
+      if (saveStress) {
+        await page.evaluate(() => {
+          window.__saveStressErrors = [];
+          window.__saveStressOff = window.dock.onChanged(async () => {
+            const state = await window.dock.snapshot();
+            if (state.settings.syncError) window.__saveStressErrors.push(state.settings.syncError);
+          });
+        });
+        for (let i = 0; i < 60; i++) {
+          const enabled = i % 2 === 0;
+          await row('test.disabled').getByRole('switch').click();
+          await waitForHost(
+            page,
+            async ({ id, enabled }) => {
+              const state = await window.dock.snapshot();
+              const applet = state.extensions.find((a) => a.id === id);
+              return (
+                applet.enabled === enabled && applet.state === (enabled ? 'running' : 'stopped')
+              );
+            },
+            { id: 'test.disabled', enabled },
+          );
+          const state = await snapshot();
+          assert.equal(state.settings.syncError, undefined);
+          const saved = JSON.parse(
+            fs.readFileSync(
+              path.join(profile, `settings-${require('node:os').hostname()}.json`),
+              'utf8',
+            ),
+          );
+          assert.equal(saved.extensions['test.disabled'].enabled, enabled);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const failures = await page.evaluate(() => {
+          window.__saveStressOff();
+          return window.__saveStressErrors;
+        });
+        assert.deepEqual(failures, []);
+        const saveLog = fs.readFileSync(path.join(profile, 'local', 'logs', 'host.log'), 'utf8');
+        assert(!/save-failed|EPERM[^\n]*rename/.test(saveLog));
+        measurements.saveStress = { toggles: 60, failures };
+        checks.push('rapid-applet-toggles-persist-without-transient-save-errors');
+      }
       fs.writeFileSync(path.join(profile, 'extensions/test.slow/wait.txt'), '2000');
       await row('test.slow')
         .getByRole('button', { name: 'test.slowを再起動', exact: true })

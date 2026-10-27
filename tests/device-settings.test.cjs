@@ -36,6 +36,29 @@ function fixture(t, name = 'PC-A', collections = []) {
   return { store, base, file, shared };
 }
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+
+test('rapid Applet toggles preserve PC settings while both settings observers are reading', async (t) => {
+  const { store, file, base } = fixture(t);
+  const readErrors = [];
+  store.watch((error) => readErrors.push(error.message));
+  for (let i = 0; i < 100; i++) {
+    const pending = Promise.all([store.shared.observer.check(), store.device.observer.check()]);
+    await new Promise(setImmediate);
+    const next = structuredClone(store.value);
+    next.extensions['example.wallpaper'].enabled = i % 2 === 0;
+    store.save(next, store.revision);
+    await pending;
+    assert.equal(store.value.extensions['example.wallpaper'].enabled, i % 2 === 0);
+    assert.equal(store.syncError, undefined);
+    assert.equal(
+      disk(path.join(base, 'settings-PC-A.json')).extensions['example.wallpaper'].enabled,
+      i % 2 === 0,
+    );
+  }
+  assert.deepEqual(readErrors, []);
+  assert.equal(disk(file).extensions['example.wallpaper'].enabled, true);
+  assert(!fs.readdirSync(base).some((name) => name.endsWith('.tmp')));
+});
 test('hint visibility accepts old device files and remains independent per PC without changing shared bytes', (t) => {
   const old = initialDeviceSettings('PC-A');
   delete old.host.showHints;

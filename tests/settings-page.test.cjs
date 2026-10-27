@@ -101,6 +101,22 @@ function fixture(actions = {}) {
     },
   };
 }
+test('settings page refreshes never clone unrelated saved values', (t) => {
+  const f = fixture();
+  const clone = structuredClone;
+  let unrelatedCopies = 0;
+  t.mock.method(global, 'structuredClone', (value, ...args) => {
+    if (value?.extensions?.['private.other']) unrelatedCopies++;
+    return clone(value, ...args);
+  });
+  f.page.snapshot();
+  f.page.isCurrent();
+  f.navigation.query = 'theme';
+  const model = f.page.snapshot();
+  assert.equal(unrelatedCopies, 0);
+  assert.equal(JSON.stringify(model).includes('private-value'), false);
+});
+
 test('all settings pages receive live hint visibility without exposing other page values', async () => {
   const f = fixture();
   await f.act({ kind: 'select', pageId: 'tts' });

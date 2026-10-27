@@ -19,7 +19,7 @@ export class SettingsInputSession {
   private operations = new Map<string, Promise<SettingsInputState>>();
   constructor(
     private options: {
-      current(): SettingsSnapshot;
+      current(): Pick<SettingsSnapshot, 'value' | 'revision'>;
       initialPageId?: string;
       scope?(page: import('../../shared/settings-catalog').SettingsPageDefinition): string;
       applets(): ExtensionSnapshot[];
@@ -52,15 +52,18 @@ export class SettingsInputSession {
       this.notify();
     }
   }
-  snapshot(): SettingsInputState {
+  metadata(): Omit<SettingsInputState, 'value'> {
     this.synchronize();
-    return { ...this.state, value: this.value };
+    return { ...this.state };
+  }
+  snapshot(): SettingsInputState {
+    return { ...this.metadata(), value: this.value };
   }
   get value() {
     return structuredClone(this.options.current().value);
   }
   catalog() {
-    return settingsCatalog(this.options.applets(), this.value);
+    return settingsCatalog(this.options.applets(), this.options.current().value);
   }
   page(id = this.state.pageId) {
     const page = this.catalog().find((p) => p.id === id);
@@ -68,10 +71,14 @@ export class SettingsInputSession {
     return page;
   }
   projection(id = this.state.pageId) {
-    return settingsProjection(this.value, this.page(id), this.options.applets());
+    return structuredClone(
+      settingsProjection(this.options.current().value, this.page(id), this.options.applets()),
+    );
   }
   jsonProjection(id = this.state.pageId) {
-    return settingsJsonProjection(this.value, this.page(id), this.options.applets());
+    return structuredClone(
+      settingsJsonProjection(this.options.current().value, this.page(id), this.options.applets()),
+    );
   }
   async act(request: SettingsEditRequest): Promise<SettingsInputState> {
     if (

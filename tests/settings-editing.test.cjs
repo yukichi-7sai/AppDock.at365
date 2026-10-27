@@ -21,6 +21,37 @@ const applets = [
     settingActions: [],
   },
 ];
+test('metadata and scoped projections avoid copying unrelated settings and remain isolated', (t) => {
+  const value = createDefaultSettings();
+  value.extensions.unrelated = { enabled: true, settings: { rows: [{ text: 'large data' }] } };
+  value.extensions['test.a.b'] = { enabled: true, settings: { 'x.y': 4 } };
+  const saved = { value, revision: 1 };
+  const session = new SettingsInputSession({
+    current: () => saved,
+    applets: () => applets,
+    save() {
+      throw Error('Read only fixture');
+    },
+    changed() {},
+  });
+  const clone = structuredClone;
+  let fullCopies = 0;
+  t.mock.method(global, 'structuredClone', (input, ...args) => {
+    if (input?.extensions?.unrelated) fullCopies++;
+    return clone(input, ...args);
+  });
+  assert.equal(Object.hasOwn(session.metadata(), 'value'), false);
+  session.catalog();
+  const projected = session.projection('applet:test.a.b');
+  projected.extensions['test.a.b'].settings['x.y'] = 9;
+  session.jsonProjection('applet:test.a.b');
+  assert.equal(value.extensions['test.a.b'].settings['x.y'], 4);
+  assert.equal(fullCopies, 0);
+  const snapshot = session.snapshot();
+  snapshot.value.extensions.unrelated.settings.rows[0].text = 'changed by caller';
+  assert.equal(value.extensions.unrelated.settings.rows[0].text, 'large data');
+  assert.equal(fullCopies, 1);
+});
 function fixture() {
   let saved = { value: createDefaultSettings(), revision: 1, path: 'test' };
   let fail = false,

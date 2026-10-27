@@ -176,6 +176,50 @@ test('atomic replacement checks expected bytes before the first rename and remov
   assert.equal(fs.readFileSync(f.file, 'utf8'), 'incoming');
   assert.deepEqual(fs.readdirSync(f.root), ['settings.json']);
 });
+test(
+  'a genuine Windows file lock still reports save failure and preserves the last saved settings',
+  { skip: process.platform !== 'win32' },
+  (t) => {
+    const f = fixture(t);
+    f.store.load();
+    const before = fs.readFileSync(f.file);
+    const next = structuredClone(f.store.value);
+    next.profile = { ...next.profile, name: 'after lock release' };
+    const fd = fs.openSync(f.file, 'r');
+    try {
+      assert.throws(() => f.store.save(next, f.store.revision), { code: 'EPERM' });
+      assert(f.store.health.has('save'));
+      assert(fs.readFileSync(f.file).equals(before));
+      assert.notEqual(f.store.value.profile?.name, next.profile.name);
+    } finally {
+      fs.closeSync(fd);
+    }
+    f.store.save(next, f.store.revision);
+    assert.equal(f.store.syncError, undefined);
+    assert.equal(JSON.parse(fs.readFileSync(f.file)).profile.name, next.profile.name);
+    assert(!fs.readdirSync(f.root).some((name) => name.endsWith('.tmp')));
+  },
+);
+test(
+  'a concurrent external edit during a Windows retry is preserved instead of repeating a toggle',
+  { skip: process.platform !== 'win32' },
+  (t) => {
+    const f = fixture(t);
+    fs.writeFileSync(f.file, 'original');
+    const rename = fs.renameSync;
+    let attempts = 0;
+    t.mock.method(fs, 'renameSync', (from, to) => {
+      if (to !== f.file) return rename(from, to);
+      attempts++;
+      fs.writeFileSync(f.file, 'external edit');
+      throw Object.assign(Error('temporary lock'), { code: 'EPERM' });
+    });
+    assert.throws(() => atomicWrite(f.file, 'replacement'), SettingsConflictError);
+    assert.equal(attempts, 1);
+    assert.equal(fs.readFileSync(f.file, 'utf8'), 'external edit');
+    assert.deepEqual(fs.readdirSync(f.root), ['settings.json']);
+  },
+);
 test('startup fallback never overwrites corrupt input and still finds a generation if last-good is invalid', (t) => {
   const f = fixture(t);
   f.store.load();

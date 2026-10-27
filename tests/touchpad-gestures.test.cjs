@@ -119,6 +119,7 @@ function fixture(t) {
     settings = createDefaultSettings(),
     calls = [],
     events = [],
+    publications = [],
     errors = [],
     windows = touchpadGestureTypes.map(([gesture]) => ({
       gesture,
@@ -163,7 +164,9 @@ function fixture(t) {
     stateFile: path.join(directory, 'state.json'),
     settings: () => settings,
     input,
-    changed() {},
+    changed() {
+      publications.push(manager.snapshot());
+    },
     warnings: {
       episode: () => ({
         update: () => events.push('warning'),
@@ -183,6 +186,7 @@ function fixture(t) {
     windows,
     calls,
     events,
+    publications,
     errors,
     directory,
     get inputs() {
@@ -201,6 +205,33 @@ function fixture(t) {
     },
   };
 }
+test('unchanged periodic checks still inspect Windows but do not republish UI or warnings', async (t) => {
+  const f = fixture(t);
+  await f.edit((v) => {
+    v.bindings = [row('a')];
+    v.enabled = true;
+  });
+  const count = f.publications.length;
+  const reads = () => f.calls.filter((c) => c.method === 'touchpad.read').length;
+  const initialReads = reads();
+  await f.manager.reconcile();
+  await f.manager.reconcile();
+  assert.equal(reads(), initialReads + 2);
+  assert.equal(f.publications.length, count);
+  f.windows[0].key = 'Ctrl+F24';
+  await f.manager.reconcile();
+  assert.equal(f.manager.snapshot().statuses[0].state, 'conflict');
+  assert.equal(f.publications.length, count + 1);
+  const warnings = f.events.filter((event) => event === 'warning').length;
+  await f.manager.reconcile();
+  assert.equal(f.publications.length, count + 1);
+  assert.equal(f.events.filter((event) => event === 'warning').length, warnings);
+  f.windows[0].key = 'F13';
+  await f.manager.reconcile();
+  assert.equal(f.manager.snapshot().statuses[0].state, 'connected');
+  assert.equal(f.publications.length, count + 2);
+});
+
 test('explicit ON connects assigned inputs, conflict is per gesture, OFF and delete leave Windows', async (t) => {
   const f = fixture(t),
     count = () => f.calls.filter((c) => c.method === 'touchpad.apply').length;

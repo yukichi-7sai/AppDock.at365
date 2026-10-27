@@ -80,6 +80,10 @@ Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして�
 .\dev.bat exec node scripts/smoke.cjs A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe
 ```
 
+設定サイズとApplet起動の比較は`dev.bat exec node scripts/settings-startup-performance-test.cjs <発行EXE>`で行います。同じ8個の模擬Node Appletを2KiB/34KiBの隔離設定で起動・再起動し、起動時間と本体の全設定コピー・同期ファイル操作を記録します。実Appletの処理や実利用設定の性能保証とは区別します。
+
+同じスクリプトの`--idle`は2秒ごとの同一トレイ状態送信を模擬し、設定画面の自動スクロール中に全体更新回数を数えます。修正後は`--idle --expect-quiet`で同一状態による更新が0回であることを検査します。タッチパッドの定期確認は`tests/touchpad-gestures.test.cjs`の模擬APIで、読取継続・同一状態の通知抑制・競合と復旧の通知を確認します。実入力やWindows設定の変更は行いません。
+
 Node.jsを含む通常のパッケージ更新は、下記の`.\update-packages.bat`を使います。pnpmの更新や固定版への切り戻しは、`toolchain.json`の完全なバージョン番号を変更してから`.\setup-tools.bat`を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは`.tools/node/<version>`と`.tools/pnpm/<version>`に残します。winget等の更新対象にはなりません。更新後は`.\dev.bat run typecheck`、影響範囲の回帰、`.\publish.bat`で確認してください。
 
 現在の固定ツールはNode.js 24.22.1（24 LTS）とpnpm 12.10.1です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。

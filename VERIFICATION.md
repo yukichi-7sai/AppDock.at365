@@ -1,5 +1,45 @@
 # 検証記録
 
+## 2026-10-27: 0.97.11までの改善・修正の一括コミット検証
+
+- 利用者の依頼により、設定監視の非同期化/60秒補助と読取worker、設定コピーと同一周期通知の削減、Applet起動4区間の表示、連続保存EPERMと入力基準の競合修正、それらの文書/試験を36ファイルの1コミットへまとめた。基点はmainの293c134。既存変更を保持し、pull/stash/reset・他repoの変更は行っていない。
+- 最終0.97.11の検証入力871ファイルと現在のbytes、lockfile/toolchain/build定義、未追跡の試験/workerを照合して一致した。必要な関連回帰26ファイルは、0.97.9の182件、0.97.10の91件、0.97.11の78件の既存成功から、試験/対象コード/後続差分の影響を個別判定して再利用した。重複するケース数を合計せず、最終版の型検査と色変更120回/入力9群/同期11群/smokeも再利用した。根拠と入力差分は`.artifacts/commit-validation-settings-performance-09711-20261027/{reuse,input-comparison,prior-log-checks}.json`。
+- 最終EXEで未実施だった起動内訳/連続切替60回を含む10群、復旧7群、idleを追加し、すべて成功した。idleは同じ2秒周期の通知3回で全体更新0、391フレーム/最大16.8ms。古い版のGUI成功を今回実行したものへ読み替えていない。実KAGUYA/Google認証/物理入力の未確認範囲は各実装記録のとおり。
+- 発行先/staging/ZIPの管理694ファイルとfeedの0.97.11/size/SHA256を再照合して一致した。EXE SHA256は`a7195e1b26c7d1b47c85a49b309d34c962a055ffcf333ce6a3bfc37ae8990aca`、ZIPは`57d6d9735bf7b9b61b55e626f5d4e9ca2e900531de03efe6017d794b9efd2efd`。製品の追加修正がないため版更新/再発行は行わない。
+- 差分レビューに未解決指摘なし。stage対象一覧、`git write-tree`、commit/tree、Git設定とauthor/committerの一致、終了状態は同証跡のstage/commit/validationに記録する。直近試験と比較基準・参照済みの旧試験を保護し、追加削除なし。コミット工程のみとし、push/Release/deployは実施していない。
+
+## 2026-10-27: 連続入力で自分の保存を外部変更と誤判定する競合を修正 0.97.11
+
+- 利用者が0.97.10でAppletの連続切替と設定連続変更の保存エラー解消を確認した。一方、アクセントカラーを続けて変えると、設定画面の赤いエラーと`dock:settingsPage:act: 同じ設定が別の場所で変わりました`が時々発生した。
+- 修正前のSettingsViewClientで、先行入力を表示した画面の操作ハンドラーを保持し、その保存でキューが空になった後に同じ項目を変更すると、報告と同じ競合を再現した。キューの成功履歴は完了時に解放する一方、画面の比較基準は直前の保存前のまま残っていた。`.artifacts/settings-input-race-09711-20261027/baseline-unit.log`へ失敗を記録した。実画面の120回の混合間隔クリックだけでは、修正前0.97.10でも再現しなかったため、遅延条件を固定した単体の再現と区別する。
+- 先行入力と画面ハンドラーで比較基準の参照を共有し、自分の保存成功時に送信した変更だけを反映するよう修正した。画面の再描画前に次の操作が届いても、直前の自分の保存とは競合しない。表示値と比較基準は分け、保存で統合した外部の未編集値は取り込まない。同一項目への外部更新、失敗入力、古いsession/保存先の検査、配列比較、設定の原子的保存は維持する。成功履歴をキュー完了後も蓄積する方式にはせず、設定項目・保存ファイル・公開API/transport契約は変更していない。
+- 型検査と関連8ファイル78/78件（fail/cancel/skip 0）が成功した。遅延した画面ハンドラーによる60回の色変更、保存後の同一項目外部変更の拒否、別項目の外部変更保持、JSONの連続/交互入力、失敗値の修正、タッチパッドの拒否入力回収を含む。発行前に入力基準の寿命、成功/失敗/外部更新との境界、追加コピー/長期履歴の有無、既存画面と保存契約をレビューし、未解決指摘なし。0.97.10の監視worker/保存処理と0.97.9の周期通知抑制は変更していない。
+- `publish.bat`終了0、`A:/40.ARTIFACT/AppDock.at365/win-unpacked`へ0.97.11を発行した。固定EXEの隔離GUIではアクセント120回の変更で一時画面エラー/設定actionエラー0、最後の色の実プロセス再起動後の保持が成功した。文字/JSON/数値/IME/ダイアログ入力9群、共有設定/名簿/素材同期11群、smokeも成功した。実KAGUYAの連続操作と物理IME/入力は今回実測していない。
+- EXE SHA256=`a7195e1b26c7d1b47c85a49b309d34c962a055ffcf333ce6a3bfc37ae8990aca`、app.asar=`be4940d0b1dc873b50df20aa8ede025cff191e6e2842c8bc3a1216218ee54977`、update.zip=270663856 bytes/SHA256 `57d6d9735bf7b9b61b55e626f5d4e9ca2e900531de03efe6017d794b9efd2efd`。管理694ファイルのstaging/発行先/ZIP、feedの版/size/hash、固定試験コピー、ASAR内renderer8ファイルと監視workerのビルド一致を確認した。検証前後の871入力も一致した（本記録の追記を除く）。
+- 証跡は`.artifacts/settings-input-race-09711-20261027/`のbefore/after入力一覧、baseline、runtime-review.diff/review.json、regression/typecheck/publish、GUI結果参照、artifacts/package-check/validation。固定Node 24.22.1/pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.403で検証した。直近GUIと比較基準、過去の検証から参照する出力を保護し、今回の追加削除なし。実利用先deploy、commit/push/Releaseは実施していない。
+
+## 2026-10-27: Appletの連続切り替え時に発生する設定保存EPERMを修正 0.97.10
+
+- 利用者が0.97.9でプチフリーズとCPU使用率の大幅な改善を確認した。その後、Appletの有効/無効を続けて切り替えると、端末設定の一時ファイルから`settings-KAGUYA.json`へのrenameがEPERMになり、save-failed通知が一時的に出ると報告した。
+- LUNA上の隔離ファイルで、Node 24.22.1の非同期readFileと同期atomicWriteの重なりを再現した。ファイルを閉じた状態の置換は成功し、読取handleを保持した状態と、100回の非同期readFileとの重なりはすべてEPERMになった。同期保存の再試行がメインループを止める間、同じループに依存する非同期読取のcloseも進まなかった。空き容量や権限不足だけを原因とするログではなかった。再現元は`.artifacts/settings-save-race-09710-20261027/probe-result.json`。
+- 監視の内容読取を、全監視で共有する遅延起動のworkerへ委譲した。worker内でopen/read/closeを完結させ、保存中もhandleを解放する。開いたファイルと読取中の増大へ4MiB上限を適用し、エラーとworker終了は未完了要求へ返し、次回確認で再作成する。待機workerは終了を妨げない。60秒のメタデータ確認、5分の内容照合、安定bytes/古い結果の破棄、150ms以内の既存置換再試行、revision/期待bytes/ジャーナルの保護、実際の保存失敗通知は維持した。設定項目・保存ファイル・Applet契約の追加/削除はない。
+- 型検査と関連10ファイル91/91件（fail/cancel/skip 0）が成功した。実ファイルのworker読取/保存100回、両監視中の端末設定切替100回、UTF-8/空/4MiB上限、worker異常/再作成、本当のWindows読取lockでの失敗保持と解放後の回復、再試行中の外部編集保護を含む。固定EXEでは実設定画面の切替60回の全保存と一時エラー0を確認し、起動内訳等と合わせ10群、同期11群、復旧7群、smokeが成功した。idleは2秒周期の同値通知3回に対して全体更新0/全設定コピー0、391フレーム・最大間隔16.8msだった。0.97.9の通知/タッチパッド/startup計測の製品コードは変更していない。
+- 発行前レビューで、同期保存と監視handleの寿命、共有workerの終了/要求対応、サイズ上限、変更競合と既存保存形式、必要試験を確認し、未解決指摘なし。`publish.bat`終了0、`A:/40.ARTIFACT/AppDock.at365/win-unpacked`へ0.97.10を発行した。EXE SHA256=`264638ec937f42128999357548ddab0df87b02c396fba4aa93edd438ed9497f8`、app.asar=`31bb58b41920c06a3c5ef6cbfb30bc3fbf7e3152a1b88e85b5f3d43abae397ef`、update.zip=270663079 bytes/SHA256 `ecaabd6b3ab95390bf9b82b9c8555f68b1ac9bd18b3f939facf5abeb0cc36709`。管理694ファイルをstaging/発行先/ZIPで一致確認し、feedの版/size/hashと固定試験コピーのhashを照合した。検証前後の870入力は一致した（本記録の追記を除く）。
+- 証跡は`.artifacts/settings-save-race-09710-20261027/`の入力一覧・review・regression/typecheck/publish・gui-status・artifactsと各GUI結果。固定Node 24.22.1/pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.403を使用した。今回作成したGUI5種は各直近3回が残り、比較基準・固定出力・既存証跡も保持するため追加削除なし。実KAGUYA上の連打、同期サービスや他プロセスの長時間lockは未確認。実設定の書き換えや実利用先deploy、commit/push/Releaseは実施していない。
+
+## 2026-10-27: 設定サイズによる負荷と周期的な全体更新を削減し、起動区間を表示 0.97.9
+
+- 提供画像ではsettings.jsonが34KBの構成で、多くのAppletの起動時間が2KBの構成より約100ms長かった。起動のactivateへはメモリー上の当該Applet設定だけを渡しており、Appletごとの全ファイル読取ではなかった。設定画面の全設定コピーと、周期処理からの全体更新を調査した。画像の数値は`.artifacts/settings-startup-0978-20261027/reported-observation.json`へ利用者の観測値として記録し、合成データの測定と区別した。
+- 設定・共有名簿の監視はfs.watchを主経路にし、読取とstatを非同期化した。補助は指定された60秒ごとの識別情報/サイズ/更新日時/変更日時の確認とし、同じなら内容を読まない。通知とメタデータの両方で検出できない更新に備え5分ごとの内容照合を残す。イベント時の読取、180ms以上離した同一bytesの確認、4MiB上限、終了/更新中の古い読取の破棄を維持した。保存直前のファイル/revision再照合は監視間隔と独立して残した。未作成の親は既存祖先を監視し、監視APIが使えない場合も安定候補をリセットし続けず補助確認で動作する。
+- SettingsInputSessionのmetadata、カタログとページ投影、設定ページの補助情報を全体snapshotから分離した。全体snapshotと公開するページ値の変更分離は維持した。同じ8個の模擬Node Appletを各3回再起動した診断では、全設定コピーは各サイズとも534回から156回へ減った。0.97.5と0.97.8の固定配布物で2KiB/34KiBの内容をpaddingだけ変えた場合、約100msの差は再現せず、実設定の内容差と実Appletの性能は未確認とした。
+- 起動時間セルのnative tooltipに、開始準備/プロセス起動要求/接続・初期化の応答待ち/登録内容確認を表示した。区間は単調時計で連続して測り、合計を従来の全体時間へ一致させる。失敗は到達区間まで、再起動は新しい計測へ置換し、停止後も直近結果を保持する。snapshotの区間配列も変更分離した。応答待ちにはOS/runtimeの立上がり、Applet初期化、通信、本体処理待ちが含まれ、Applet内部の実行時間だけとは扱わない。区間情報は保存せず、Applet側のRPC/SDKは変更しない。利用者は0.97.8で応答待ちが大半であることを確認した。
+- 続いて、0.97.8でも自動スクロールが約2秒周期で止まり、Gmailを無効にしても同周期が残るとの報告を受けた。Gmailの2秒tickが同じtray.attention値を送っても本体が毎回manager変更を通知し、有効なTouchpadBridgeも同じ状態を2秒ごとにpublishしていた。attentionはbooleanが変わる場合だけコマンド/全体更新へ進め、TouchpadBridgeは有効状態・接続状態・busy・操作IDが同じなら警告と画面通知を省く。タッチパッドの読取と実際の競合/復旧の通知は維持した。実利用のGmail有効状態やWindows設定は操作していない。
+- 固定0.97.8の隔離再現では、同一attention要求3回で全体更新3回・全設定コピー9回だった。固定0.97.9では同じ3回を処理しても全体更新0回・全設定コピー0回となった。34KiB設定で自動スクロールし、各6.5秒/391フレームを記録した。両方の最大フレーム間隔は16.8msであり、この軽いfixtureで実環境のフリーズ自体を再現したという意味ではない。タッチパッドは模擬APIで同一状態でもWindows読取が続き、通知が増えず、競合/復旧で通知することを確認した。Pause/F13〜F24の実送信・実登録は行わない。
+- 発行前の差分/影響レビューで、保存・権限・世代・警告・区間合計と変更分離を確認し、発行阻害の指摘なし。監視API未対応時の候補リセットを修正して回帰を追加した。同期GUIの旧label参照がMCP説明ボタンにも一致する問題と、静的PNGのIDAT CRC不正は試験側を修正し、正常なCanvas PNGで検査条件を維持して再検証した。保存設定/保存ファイルの追加削除・破壊的変更はなく、各ローカル発行でパッチを進め、最終版を0.97.9とした。
+- 固定Node 24.22.1/pnpm 12.10.1、Electron 45.0.0、.NET SDK 10.0.403を使用し、固定lockfileと供給網検査を維持した。最終版の型検査、本体/Default Shell build、関連23ファイルの単体182/182件（fail/cancel/skip 0）、固定配布物の起動/tooltip9群・共有設定/名簿/素材同期11群・入力9群・復旧/再起動7群、idle重複通知抑制とsmokeが成功した。実Google認証/受信、実同期サービス、実タッチパッド操作、実環境の全Applet起動時間とフリーズ解消は今回の試験では確認していない。
+- publish.bat exit 0。標準発行先は`A:\40.ARTIFACT\AppDock.at365\win-unpacked\AppDock.at365.exe`。EXE SHA256は`36f680b7661912933b71a19dfd3614394166f246c2a8f6d26ce43bcdeb28d813`、update.zip sizeは270662028、SHA256は`17e468f3406462ba213bef243f2c28729657372ecbd61fe39ffeabfd2d337ad4`。manifest/feedの0.97.9、staging/配布フォルダー/ZIPの管理694ファイルのSHA256一致と、検証前後866入力の一致を確認した。Appletsの再発行・全体ZIP作成・commit/push/Release・実利用先deployは行わない。
+- 最終記録は`.artifacts/settings-startup-0979-20261027/{validation,review,artifacts,environment,cleanup,inputs-before,inputs-after}.json`と完全ログ。旧/新idleは`settings-idle-update-1793053063141/`・`settings-idle-update-1793053388147/`、起動サイズ比較は`settings-startup-performance-1793050736281/`・`settings-startup-performance-1793052184529/`、固定GUIは同validationから参照する。今回の解決済みfixture準備失敗7フォルダーだけ、結果JSON保管・プロセス終了・絶対パス/再解析ポイントなしを確認して整理した。最新成功分、比較基準、固定出力、既存の検証/再利用資料と他作業は保持した。
+
 ## 2026-10-27: フォルダー型をmainへ反映し通常版0.97.5を確認
 
 - 利用者のmain反映指示により、準備済み138項目を`ff286da52a2c5c2921334f41eb8f0a5529f29d3c`（tree `6c69c92b25cde38861e9f4ec5b02e9fa5992e0de`）へコミットし、cleanなprimary mainへfast-forwardした。stage tree/commit tree、Git設定のauthor/committerとの一致を確認した。元の`codex/folder-portable`も同commitでcleanな状態を保持する。

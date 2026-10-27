@@ -1,4 +1,4 @@
-import { hostText } from '../../shared/i18n';
+import { hostText, type HostTranslator } from '../../shared/i18n';
 import { SettingsMcpLock } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
 import { useHostTranslation } from '../HostTranslation';
@@ -32,6 +32,32 @@ const states = {
   stopping: hostText('settings.appletManagementSettings.stopping'),
   error: hostText('settings.appletManagementSettings.error'),
 };
+const startupPhaseLabels = {
+  prepare: 'settings.appletManagementSettings.startupPrepare',
+  process: 'settings.appletManagementSettings.startupProcess',
+  activate: 'settings.appletManagementSettings.startupActivate',
+  validate: 'settings.appletManagementSettings.startupValidate',
+} as const;
+function startupTooltip(applet: ExtensionSnapshot, t: HostTranslator) {
+  const timing = applet.startupTiming;
+  if (applet.state === 'starting') return t('settings.appletManagementSettings.measuring');
+  if (!timing) return undefined;
+  const duration = (ms: number) =>
+    t(
+      ms < 1000
+        ? 'settings.appletManagementSettings.startupMilliseconds'
+        : 'settings.appletManagementSettings.startupSeconds',
+      { duration: ms < 1000 ? ms.toFixed(1) : (ms / 1000).toFixed(2) },
+    );
+  return [
+    t('settings.appletManagementSettings.startupTotal', { duration: duration(timing.durationMs) }),
+    ...(timing.phases ?? []).map(
+      ({ phase, durationMs }) => `${t(startupPhaseLabels[phase])}：${duration(durationMs)}`,
+    ),
+    ...(timing.phases?.length ? [t('settings.appletManagementSettings.startupActivateHint')] : []),
+    ...(timing.outcome === 'error' ? [t('settings.appletManagementSettings.startupPartial')] : []),
+  ].join('\n');
+}
 type Invoke = (name: string, args?: unknown[]) => Promise<any>;
 async function applyPackage(invoke: Invoke, id: string) {
   try {
@@ -402,7 +428,7 @@ export function AppletManagementSettings({
                     </>
                   )}
                 </td>
-                <td data-testid="applet-startup-time">
+                <td data-testid="applet-startup-time" title={startupTooltip(a, translate)}>
                   {a.state === 'starting'
                     ? translate('settings.appletManagementSettings.measuring')
                     : a.startupTiming

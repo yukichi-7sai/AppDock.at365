@@ -70,6 +70,7 @@ export class TouchpadBridgeManager {
   private epoch = 0;
   private lease = false;
   private requestedSettings = '';
+  private publishedState = '';
   constructor(
     private options: {
       stateFile: string;
@@ -183,6 +184,8 @@ export class TouchpadBridgeManager {
     }));
   }
   private publish() {
+    const state = JSON.stringify([this.value().enabled, this.snapshot()]);
+    if (state === this.publishedState) return;
     for (const status of this.statuses) {
       const needsAttention = ['conflict', 'error', 'unavailable'].includes(status.state);
       if (needsAttention && this.value().enabled) {
@@ -217,6 +220,7 @@ export class TouchpadBridgeManager {
         this.episodes.delete(status.gesture);
       }
     }
+    this.publishedState = state;
     this.options.changed();
   }
   async start() {

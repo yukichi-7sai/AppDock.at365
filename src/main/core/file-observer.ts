@@ -1,8 +1,18 @@
 import { hostText } from '../../shared/i18n';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readObservedFile } from './file-reader';
 
-/** Read twice before applying a sync write; polling also covers missed events and resume. */
+const pollInterval = 60000;
+const fullCheckInterval = 5 * pollInterval;
+const stableInterval = 180;
+const maximumBytes = 4 * 1024 * 1024;
+const signature = (stat: fs.BigIntStats) =>
+  [stat.dev, stat.ino, stat.mode, stat.size, stat.mtimeNs, stat.ctimeNs, stat.birthtimeNs].join(
+    ':',
+  );
+
+/** Watch for updates; asynchronous metadata polling covers missed events and resume. */
 export function observeFile(
   file: string,
   accept: (text: string) => void,
@@ -11,46 +21,149 @@ export function observeFile(
   let closed = false,
     candidate: string | undefined,
     applied: string | undefined;
-  let lastError = '',
+  let candidateSince = 0,
+    lastFullCheck = 0,
+    acceptedSignature: string | undefined,
+    generation = 0,
+    pending = false;
+  let checking: Promise<void> | undefined;
+  let watcher: fs.FSWatcher | undefined, watchedDirectory: string | undefined;
+  let lastWatchError = '',
+    lastError = '',
     timer: ReturnType<typeof setTimeout> | undefined;
-  const check = () => {
+  const schedule = (delay: number) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => void check(), delay);
+  };
+  const report = (error: unknown) => {
+    applied = undefined;
+    candidate = undefined;
+    acceptedSignature = undefined;
+    const e = error instanceof Error ? error : new Error(String(error));
+    if (lastError !== e.message) failed(e);
+    lastError = e.message;
+  };
+  const reportWatchError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === lastWatchError) return;
+    lastWatchError = message;
+    report(error);
+  };
+  const read = async (force: boolean) => {
     if (closed) return;
+    const currentGeneration = generation;
     try {
-      const stat = fs.statSync(file);
-      if (!stat.isFile() || stat.size > 4 * 1024 * 1024)
+      if (watchedDirectory !== path.dirname(file)) watchDirectory(path.dirname(file));
+      const stat = await fs.promises.stat(file, { bigint: true });
+      if (closed) return;
+      if (!stat.isFile() || stat.size > maximumBytes)
         throw Error(hostText('services.fileObserver.invalidFile'));
-      const text = fs.readFileSync(file, 'utf8');
+      const metadata = signature(stat);
+      // Events always read bytes, even when a synchronizer preserves size and timestamps.
+      // A slower full check also covers filesystems with unreliable metadata and notifications.
+      if (
+        !force &&
+        !lastError &&
+        metadata === acceptedSignature &&
+        Date.now() - lastFullCheck < fullCheckInterval
+      )
+        return;
+      const text = await readObservedFile(file);
+      if (closed) return;
+      if (Buffer.byteLength(text, 'utf8') > maximumBytes)
+        throw Error(hostText('services.fileObserver.invalidFile'));
+      const after = await fs.promises.stat(file, { bigint: true });
+      if (closed) return;
+      if (currentGeneration !== generation || signature(after) !== metadata) {
+        candidate = undefined;
+        schedule(stableInterval);
+        return;
+      }
       if (text !== candidate) {
         candidate = text;
-        clearTimeout(timer);
-        timer = setTimeout(check, 180);
+        candidateSince = performance.now();
+        schedule(stableInterval);
+        return;
+      }
+      const remaining = stableInterval - (performance.now() - candidateSince);
+      if (remaining > 0) {
+        schedule(Math.ceil(remaining));
         return;
       }
       if (text !== applied) {
         accept(text);
         applied = text;
       }
+      acceptedSignature = metadata;
+      lastFullCheck = Date.now();
       lastError = '';
     } catch (error) {
-      applied = undefined;
-      const e = error instanceof Error ? error : new Error(String(error));
-      if (lastError !== e.message) failed(e);
-      lastError = e.message;
+      if (!closed && currentGeneration === generation)
+        report(
+          (error as NodeJS.ErrnoException).code === 'EFBIG'
+            ? Error(hostText('services.fileObserver.invalidFile'))
+            : error,
+        );
     }
   };
-  const poll = setInterval(check, 2000);
-  let watcher: fs.FSWatcher | undefined;
-  try {
-    watcher = fs.watch(path.dirname(file), (_, name) => {
-      if (name && name.toString() !== path.basename(file)) return;
-      clearTimeout(timer);
-      timer = setTimeout(check, 100);
+  const check = (force = true): Promise<void> => {
+    if (closed) return Promise.resolve();
+    if (checking) {
+      pending ||= force;
+      return checking;
+    }
+    checking = (async () => {
+      do {
+        pending = false;
+        await read(force);
+        force = true;
+      } while (pending && !closed);
+    })().finally(() => {
+      checking = undefined;
     });
-    watcher.on('error', failed);
-  } catch (error) {
-    failed(error instanceof Error ? error : new Error(String(error)));
+    return checking;
+  };
+  const poll = setInterval(() => void check(false), pollInterval);
+  function watchDirectory(directory: string): void {
+    try {
+      const next = fs.watch(directory, (_, name) => {
+        if (closed) return;
+        if (directory === path.dirname(file) && name) {
+          const changed = name.toString();
+          const expected = path.basename(file);
+          if (
+            process.platform === 'win32'
+              ? changed.toLowerCase() !== expected.toLowerCase()
+              : changed !== expected
+          )
+            return;
+        }
+        generation++;
+        schedule(100);
+      });
+      next.on('error', (error) => {
+        if (closed || watcher !== next) return;
+        next.close();
+        watcher = undefined;
+        watchedDirectory = undefined;
+        reportWatchError(error);
+        schedule(100);
+      });
+      watcher?.close();
+      watcher = next;
+      watchedDirectory = directory;
+      lastWatchError = '';
+    } catch (error) {
+      const parent = path.dirname(directory);
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT' && parent !== directory) {
+        // Shared rosters may not exist at startup. Watch their nearest existing ancestor
+        // until the real parent arrives, so the first file does not wait for a poll.
+        if (watchedDirectory !== parent) watchDirectory(parent);
+      } else reportWatchError(error);
+    }
   }
-  timer = setTimeout(check, 100);
+  watchDirectory(path.dirname(file));
+  schedule(100);
   return {
     check,
     // A caller can validate a file directly before the observer sees the healthy interval.

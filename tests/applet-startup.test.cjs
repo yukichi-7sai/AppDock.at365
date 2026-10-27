@@ -80,6 +80,61 @@ function fixture(t, delay = 0) {
   });
 }
 
+function expectedTiming(durationMs, outcome, validated = outcome === 'success') {
+  return {
+    durationMs,
+    outcome,
+    phases: [
+      { phase: 'prepare', durationMs: 0 },
+      { phase: 'process', durationMs: 0 },
+      { phase: 'activate', durationMs },
+      ...(validated ? [{ phase: 'validate', durationMs: 0 }] : []),
+    ],
+  };
+}
+
+test('phase boundaries account for host preparation, launch request, response wait and validation', async (t) => {
+  const f = fixture(t);
+  f.manager.on('changed', () => {
+    if (f.item.state === 'starting' && f.item.startupMeasurement?.phase === 'prepare')
+      f.clock += 15;
+  });
+  const spawn = childProcess.spawn;
+  t.mock.method(childProcess, 'spawn', (...args) => {
+    f.clock += 20;
+    return spawn(...args);
+  });
+  f.activate = async () => {
+    f.clock += 50;
+    return { commands: [] };
+  };
+  Object.defineProperty(f.item.manifest, 'settings', {
+    configurable: true,
+    get() {
+      f.clock += 5;
+      return [];
+    },
+  });
+  await f.manager.reconcile();
+  const timing = f.snapshot().startupTiming;
+  assert.deepEqual(timing, {
+    durationMs: 90,
+    outcome: 'success',
+    phases: [
+      { phase: 'prepare', durationMs: 15 },
+      { phase: 'process', durationMs: 20 },
+      { phase: 'activate', durationMs: 50 },
+      { phase: 'validate', durationMs: 5 },
+    ],
+  });
+  assert.equal(
+    timing.phases.reduce((sum, phase) => sum + phase.durationMs, 0),
+    timing.durationMs,
+  );
+  timing.phases[0].durationMs = 999;
+  assert.equal(f.snapshot().startupTiming.phases[0].durationMs, 15);
+});
+
 test('delay and stopped time are excluded; restart replaces the memory-only measurement', async (t) => {
   const f = fixture(t, 60);
   const settingsBefore = fs.readFileSync(f.settings.file, 'utf8');
@@ -94,7 +149,7 @@ test('delay and stopped time are excluded; restart replaces the memory-only meas
     return { commands: [] };
   };
   await f.manager.restart('test.timing', true);
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 325, outcome: 'success' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(325, 'success'));
   const copy = f.snapshot().startupTiming;
   copy.durationMs = 99;
   assert.equal(f.snapshot().startupTiming.durationMs, 325);
@@ -107,7 +162,7 @@ test('delay and stopped time are excluded; restart replaces the memory-only meas
     return { commands: [] };
   };
   await f.manager.restart('test.timing', true);
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 80, outcome: 'success' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(80, 'success'));
   assert.equal(fs.readFileSync(f.settings.file, 'utf8'), settingsBefore);
 });
 
@@ -119,7 +174,7 @@ test('failed activation has its own duration; retry and a later runtime crash pr
   };
   await f.manager.reconcile();
   assert.equal(f.snapshot().state, 'error');
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 1200, outcome: 'error' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(1200, 'error'));
   f.activate = async () => {
     assert.equal(f.snapshot().startupTiming, undefined);
     f.clock += 50;
@@ -129,7 +184,7 @@ test('failed activation has its own duration; retry and a later runtime crash pr
   f.clock += 50000;
   f.item.child.emit('error', Error('later runtime failure'));
   assert.equal(f.snapshot().state, 'error');
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 50, outcome: 'success' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(50, 'success'));
 });
 
 test('process failure finishes measurement before the activation RPC settles', async (t) => {
@@ -144,11 +199,11 @@ test('process failure finishes measurement before the activation RPC settles', a
   await ready;
   f.clock = 25;
   f.item.child.emit('error', Error('process failure'));
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 25, outcome: 'error' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(25, 'error'));
   f.clock = 9000;
   release({ commands: [] });
   await pending;
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 25, outcome: 'error' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(25, 'error'));
 });
 
 test('activation registration must validate before a startup is successful', async (t) => {
@@ -159,7 +214,7 @@ test('activation registration must validate before a startup is successful', asy
   };
   await f.manager.reconcile();
   assert.equal(f.snapshot().state, 'error');
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 10, outcome: 'error' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(10, 'error', true));
 });
 
 test('startup gate covers reconciliation, direct restart, delayed scheduling and command activation', async (t) => {
@@ -182,7 +237,7 @@ test('startup gate covers reconciliation, direct restart, delayed scheduling and
     return { commands: [] };
   };
   await f.manager.restart('test.timing', true);
-  assert.deepEqual(f.snapshot().startupTiming, { durationMs: 40, outcome: 'success' });
+  assert.deepEqual(f.snapshot().startupTiming, expectedTiming(40, 'success'));
 });
 
 test('quitting during one activation prevents the next queued worker from starting', async (t) => {

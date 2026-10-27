@@ -576,13 +576,15 @@ export function createHostApi(
         );
         return null;
       }
-      case 'host.tray.attention':
+      case 'host.tray.attention': {
         requireCapability('tray-attention');
         if (typeof p.active !== 'boolean')
           throw new Error(hostText('services.hostApi.invalidActive'));
+        const attentionChanged = !!e.attention !== p.active;
         e.attention = p.active;
-        commandsChanged();
+        if (attentionChanged) commandsChanged();
         return null;
+      }
       case 'host.commands.replace': {
         requireCapability('dynamic-commands');
         const commands = parseExtensionCommands(id, p.commands);

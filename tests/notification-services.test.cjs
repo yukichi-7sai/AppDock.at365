@@ -20,6 +20,8 @@ test('attention and file/audio APIs require capability and validate parameters',
   ])
     await assert.rejects(api(e, method, args), /capabilities/);
   e.manifest.capabilities = ['tray-attention', 'file-dialog', 'audio'];
+  await api(e, 'host.tray.attention', { active: false });
+  assert.equal(changes, 0);
   await assert.rejects(api(e, 'host.tray.attention', { active: 'true' }), /boolean/);
   await assert.rejects(api(e, 'host.ui.pickFile', { kind: 'exe' }), /JSON/);
   await assert.rejects(
@@ -29,8 +31,13 @@ test('attention and file/audio APIs require capability and validate parameters',
   await api(e, 'host.tray.attention', { active: true });
   assert.equal(e.attention, true);
   assert.equal(changes, 1);
+  await api(e, 'host.tray.attention', { active: true });
+  assert.equal(changes, 1);
   await api(e, 'host.tray.attention', { active: false });
   assert.equal(e.attention, false);
+  assert.equal(changes, 2);
+  await api(e, 'host.tray.attention', { active: false });
+  assert.equal(changes, 2);
 });
 test('stopped and crashed extensions cannot leave attention active', async () => {
   const manager = new ExtensionManager({

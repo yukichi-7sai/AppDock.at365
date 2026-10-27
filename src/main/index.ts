@@ -457,7 +457,7 @@ const ribbonBadges = new RibbonBadges(
 const settingsNavigation: import('../shared/settings-page').SettingsNavigationState = { query: '' };
 const settingsEditing = new SettingsInputSession({
   initialPageId: defaultNavigation.section,
-  current: () => settings.snapshot(),
+  current: () => ({ value: settings.value, revision: settings.revision }),
   scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
   save: async (value, revision, resetPage, source) => {
@@ -1925,8 +1925,6 @@ function settingsPageStorage(
   };
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
-  const host = snapshot();
-  const state = settingsEditing.snapshot();
   const id = page.id;
   if (id === 'mcp-client')
     return {
@@ -1991,7 +1989,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (id === 'applets')
     return {
       applets: managedApplets(applets, settings.value.appletOrder).map(summary),
-      updates: host.updates,
+      updates: updater.state,
       appletManagement: {
         assignments: settingsAppletAssignments(),
         packagesAvailable: updater.packagesAvailable,
@@ -2030,7 +2028,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     };
   if (id === 'general')
     return {
-      launch: host.launch,
+      launch: launch.state,
       legacyLocalData: legacyLocalData?.snapshot(),
       settingsHealth: {
         restartRequired: settingsRestartRequired(),
@@ -2044,7 +2042,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     };
   if (id === 'notifications')
     return {
-      notificationTypes: notificationCatalog(orderApplets(applets, state.value.appletOrder)),
+      notificationTypes: notificationCatalog(orderApplets(applets, settings.value.appletOrder)),
       notificationSpeech: {
         defaults: {
           defaultVoice: settings.value.tts?.defaultVoice ?? '',
@@ -2079,14 +2077,20 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
           : undefined,
       applets: applets.map(summary),
       commands: settingsUiCommands(),
-      statuses: id === 'command-triggers' ? host.globalHotKeys : undefined,
+      statuses: id === 'command-triggers' ? (hotKeys?.statuses ?? []) : undefined,
     };
   if (id === 'about') {
     const commands = settingsUiCommands();
     return {
-      version: host.version,
-      runtime: host.runtime,
-      updates: host.updates,
+      version: app.getVersion(),
+      runtime: {
+        electron: process.versions.electron,
+        chrome: process.versions.chrome,
+        node: process.versions.node,
+        platform: process.platform,
+        arch: process.arch,
+      },
+      updates: updater.state,
       applets: applets.filter((a) => a.sourceKind !== 'builtin').map(summary),
       aboutStats: {
         commandCount: new Set(commands.map((command) => command.id)).size,
@@ -2098,7 +2102,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   }
   if (id === 'web-accounts')
     return {
-      accounts: host.webAccounts,
+      accounts: pageCollections.accounts(),
       accountReferences: {
         saved: pageCollections.entries().map(({ id, item: { name, accountId } }) => ({
           id,
@@ -2135,7 +2139,8 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
         }),
       },
     };
-  if (id === 'permissions') return { permissions: host.appletApi };
+  if (id === 'permissions')
+    return { permissions: { permissions: appletApiAccess.get(), error: appletApiAccess.error } };
   return {};
 }
 let settingsRecording = false;
@@ -4003,7 +4008,10 @@ async function initialize() {
       return new SettingsPageSession(request, {
         navigation: settingsNavigation,
         editor: settingsEditing,
-        host: snapshot,
+        host: () => ({
+          settings: { value: settings.value, revision: settings.revision, path: settings.file },
+          dark: nativeTheme.shouldUseDarkColors,
+        }),
         changed,
         auxiliary: (page) => ({
           ...settingsPageAuxiliary(page),

@@ -212,6 +212,11 @@ export interface ExtensionManifest extends Partial<
   webAccounts?: import('./web-accounts').WebAccountDefinition;
   pages?: import('./applet-pages').AppletPageDefinition[];
 }
+export type AppletStartupPhase = 'prepare' | 'process' | 'activate' | 'validate';
+export interface AppletStartupPhaseTiming {
+  phase: AppletStartupPhase;
+  durationMs: number;
+}
 export interface ExtensionSnapshot extends ExtensionManifest {
   collection?: import('./page-collections').CollectionBinding;
   sourceKind?: 'builtin' | 'external';
@@ -219,7 +224,11 @@ export interface ExtensionSnapshot extends ExtensionManifest {
   folder: string;
   state: 'stopped' | 'waiting' | 'starting' | 'running' | 'stopping' | 'error';
   scheduledStartAt?: number;
-  startupTiming?: { durationMs: number; outcome: 'success' | 'error' };
+  startupTiming?: {
+    durationMs: number;
+    outcome: 'success' | 'error';
+    phases?: AppletStartupPhaseTiming[];
+  };
   error: string | null;
   enabled: boolean;
   commands: AppletCommand[];
