@@ -1,4 +1,6 @@
 {
+  "commands.noop.title": "何もしない",
+  "commands.noop.description": "何も実行しません。元の入力をブロックするトリガーに割り当てて使います。",
   "settings.commandStacks.type": "コマンドスタック",
   "settings.commandStacks.description": "条件に一致するコマンドを、指定した順番で呼び出します。各コマンドの受付・応答後に次へ進みます。",
   "settings.commandStacks.invalid": "コマンドスタックの設定を確認してください。",

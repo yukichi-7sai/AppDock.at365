@@ -2,7 +2,15 @@ import type { Command } from './contracts';
 import { generatedSettingCommands, hostSettingDefinitions } from './settings-commands';
 import { hostSettingsPageCommands, appletSettingsPageCommands } from './settings-navigation';
 import { updateCommands } from './update-commands';
+import { hostText } from './i18n';
 export const hostCommands = [
+  {
+    id: 'appdock.noop',
+    title: hostText('commands.noop.title'),
+    description: hostText('commands.noop.description'),
+    extension: 'AppDock',
+    available: true,
+  },
   { id: 'appdock.open', title: 'AppDockを開く', extension: 'AppDock', available: true },
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
   { id: 'appdock.settings.open', title: '設定を開く', extension: 'AppDock', available: true },

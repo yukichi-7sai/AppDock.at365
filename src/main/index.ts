@@ -1583,6 +1583,7 @@ function openCommandPalette(
 }
 async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
+  if (id === 'appdock.noop') return { accepted: true };
   const settingsPage = settingsPageCommands(allApplets()).find((command) => command.id === id);
   if (settingsPage) {
     await showWindow(invocation);

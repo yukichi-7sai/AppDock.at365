@@ -36,6 +36,7 @@ export interface AutomationApplet {
 }
 // Deliberate product policy: never infer permission from a suffix, alias, or title.
 const hostIds = new Set([
+  'appdock.noop',
   'appdock.open',
   'appdock.settings.open',
   'appdock.commands.search',
