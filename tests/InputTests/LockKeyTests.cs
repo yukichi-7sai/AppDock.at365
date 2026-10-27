@@ -57,6 +57,8 @@ internal static partial class Program
             }));
             var owned = (Dictionary<uint, bool>)type.GetField("owned", members)!.GetValue(engine)!;
             var pressed = (HashSet<uint>)type.GetField("pressed", members)!.GetValue(engine)!;
+            var pending = type.GetField("pendingPresses", members)!.GetValue(engine)!;
+            void ClearPending() => pending.GetType().GetMethod("Clear")!.Invoke(pending, null);
             var keyboard = type.GetMethod("Keyboard", members)!;
             nint Feed(uint key, bool up = false, uint scan = 0, uint flags = 0) {
                 var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<GestureTestKeyData>());
@@ -68,7 +70,7 @@ internal static partial class Program
             foreach (var (key, name) in keys) {
                 var pulse = key is 0x13 or 0x15 or 0xF0;
                 foreach (var block in new[] { true, false }) {
-                    owned.Clear(); pressed.Clear(); notices.Clear();
+                    owned.Clear(); pressed.Clear(); notices.Clear(); ClearPending();
                     Set("inputs", Decode("ShortcutInput[]", new[] { new { shortcut = name, blockOriginalInput = block } }));
                     var statuses = (Array)type.GetMethod("Compile", members)!.Invoke(engine, null)!;
                     Check((bool)statuses.GetValue(0)!.GetType().GetProperty("Registered")!.GetValue(statuses.GetValue(0))!, name + " compiles");
@@ -84,10 +86,10 @@ internal static partial class Program
                     var released = Feed(key, true);
                     Check((pulse || !block || released == 1) && !owned.ContainsKey(key) && !pressed.Contains(key), name + " release completes while capture is suspended");
                     Feed(key);
-                    Check(notices.Count == (pulse ? 2 : 1), name + " suspended input does not dispatch");
+                    Check(notices.Count == (pulse ? 2 : 1), name + " synchronization defers immediate dispatch");
                     Feed(key, true);
                 }
-                notices.Clear(); pressed.Clear();
+                notices.Clear(); pressed.Clear(); ClearPending();
                 Set("recording", Decode("RecordingInput", new { token = "lock-record", window = GetForegroundWindow().ToString(), allowWin = false }));
                 Check(Feed(key) == 1 && (pulse ? !owned.ContainsKey(key) && !pressed.Contains(key) : owned.GetValueOrDefault(key)), name + " recording captures down");
                 var recorded = notices.Single(n => n.Method == "shortcuts.recorded").Payload;
@@ -97,7 +99,7 @@ internal static partial class Program
                     name + (pulse ? " records independent pulses without executing" : " recording consumes repeat and paired release without executing"));
                 Set("recording", null);
             }
-            owned.Clear(); pressed.Clear(); notices.Clear();
+            owned.Clear(); pressed.Clear(); notices.Clear(); ClearPending();
             Set("inputs", Decode("ShortcutInput[]", new[] { new { shortcut = "Alphanumeric", blockOriginalInput = true } }));
             type.GetMethod("Compile", members)!.Invoke(engine, null);
             Set("accepting", true);
@@ -116,7 +118,7 @@ internal static partial class Program
             Feed(0xF0, scan: 0x3A);
             Check(notices.Count(n => n.Method == "shortcuts.pressed") == 4 && !pressed.Contains(0xF0),
                 "IME mode state does not suppress a new Alphanumeric pulse");
-            owned.Clear(); pressed.Clear(); notices.Clear();
+            owned.Clear(); pressed.Clear(); notices.Clear(); ClearPending();
             Set("inputs", Decode("ShortcutInput[]", new[] { new { shortcut = "KanaMode", blockOriginalInput = true } }));
             type.GetMethod("Compile", members)!.Invoke(engine, null);
             Set("accepting", true);
@@ -160,7 +162,7 @@ internal static partial class Program
                 Check((string?)format.Invoke(null, [canonical, modifiers, nint.Zero]) == shortcut,
                     name + " derived code retains shortcut modifiers");
                 foreach (var block in new[] { true, false }) {
-                    owned.Clear(); pressed.Clear(); notices.Clear();
+                    owned.Clear(); pressed.Clear(); notices.Clear(); ClearPending();
                     Set("inputs", Decode("ShortcutInput[]", new[] { new { shortcut = name, blockOriginalInput = block } }));
                     type.GetMethod("Compile", members)!.Invoke(engine, null);
                     var captured = Feed(raw, scan: scan);
@@ -178,7 +180,7 @@ internal static partial class Program
                     Check(notices.Count(n => n.Method == "shortcuts.pressed") == 2,
                         name + " derived next press remains usable");
                 }
-                owned.Clear(); pressed.Clear(); notices.Clear();
+                owned.Clear(); pressed.Clear(); notices.Clear(); ClearPending();
                 Set("recording", Decode("RecordingInput", new { token = "derived-record", window = GetForegroundWindow().ToString(), allowWin = false }));
                 Check(Feed(raw, scan: scan) == 1 && notices.Single(n => n.Method == "shortcuts.recorded").Payload.GetProperty("key").GetString() == name,
                     name + " derived code records the canonical key");

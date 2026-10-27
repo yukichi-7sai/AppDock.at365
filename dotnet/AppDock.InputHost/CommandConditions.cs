@@ -50,7 +50,7 @@ internal static class CommandConditions
     internal static T[] Select<T>(IEnumerable<T> rows, Func<T, string> command, string mode)
     {
         if (mode is not ("all" or "first")) throw new ArgumentException("Unknown command execution mode.");
-        var selected = rows.DistinctBy(command);
+        var selected = rows;
         return (mode == "first" ? selected.Take(1) : selected).ToArray();
     }
 

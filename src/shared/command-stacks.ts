@@ -214,7 +214,7 @@ export function validateStackGraph(
   }
 }
 
-/** Resolve a bounded, immutable invocation plan before reserving any command. */
+/** Resolve a bounded invocation plan while preserving every selected entry. */
 export function expandStackCommand(
   id: string,
   catalog: ReadonlyMap<string, StackCatalogEntry>,
@@ -231,14 +231,12 @@ export function expandStackCommand(
     return { commands: [], stackIds: [] };
   const commands: string[] = [],
     stackIds: string[] = [id];
-  const seen = new Set<string>();
   for (const row of command.stack.entries) {
     const child = catalog.get(row.command);
     if (
       !row.enabled ||
       !child ||
       child.available === false ||
-      seen.has(row.command) ||
       !matchesCommandCondition(commandCondition(row.when), context, child.extensionId, environment)
     )
       continue;
@@ -252,13 +250,12 @@ export function expandStackCommand(
     );
     if (budget.remaining < 0) return { commands: [], stackIds: [] };
     if (!plan.commands.length) continue;
-    seen.add(row.command);
     commands.push(...plan.commands);
     stackIds.push(...plan.stackIds);
     if (commands.length > maximumExpandedCommands) return { commands: [], stackIds: [] };
     if (command.stack.executionMode === 'first') break;
   }
-  return { commands: [...new Set(commands)], stackIds: [...new Set(stackIds)] };
+  return { commands, stackIds: [...new Set(stackIds)] };
 }
 
 export interface StackConditionTerm {

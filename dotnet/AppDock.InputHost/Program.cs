@@ -52,7 +52,6 @@ internal static class Program
                         return await capture.ConfigureAsync(configuration);
                     }
                     if (method == "capture.activate") return await capture.ActivateAsync(p.GetProperty("pressId").GetInt64(), p.GetProperty("window").GetString()!);
-                    if (method == "capture.activateProcess") return await capture.ActivateProcessAsync(p.GetProperty("pressId").GetInt64(), p.GetProperty("processId").GetUInt32());
                     if (method != "gestures.sync") throw new ArgumentException("Unknown input method.");
                     var config = p.Deserialize<Configuration>(JsonRpcConnection.Json) ?? throw new ArgumentException("Missing configuration.");
                     await capture.ConfigureGesturesAsync(config);

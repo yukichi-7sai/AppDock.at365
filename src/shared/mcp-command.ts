@@ -23,6 +23,6 @@ export const mcpCommandType: CustomCommandType = {
     { key: 'toolName', title: 'ツール名', type: 'string' },
     { key: 'toolRevision', title: '確認したツールの識別情報', type: 'string' },
     { key: 'arguments', title: '固定引数', type: 'json', default: {} },
-    { key: 'timeoutMs', title: '待ち時間（ミリ秒）', type: 'number', default: 60000 },
+    { key: 'timeoutMs', title: '応答の制限時間（ミリ秒）', type: 'number', default: 60000 },
   ],
 };

@@ -801,6 +801,20 @@ async function assertMcpWriteDenied() {
       async () => (await inputPeer.request('snapshot')).events.includes('key:T, Shift, Control'),
       'host key delivery',
     );
+    const consecutiveKeys = await Promise.all(
+      Array.from({ length: 4 }, () => call('appdock_execute_command', { id: keyItem.commandId })),
+    );
+    assert(consecutiveKeys.every((result) => result.result.completion === 'inputSubmitted'));
+    await until(
+      async () =>
+        (await inputPeer.request('snapshot')).events.filter(
+          (event) => event === 'key:T, Shift, Control',
+        ).length === 5,
+      'independent consecutive key deliveries',
+    );
+    checks.push(
+      'four concurrent calls of the same saved key command all reach the isolated native target without a fixed post-send wait',
+    );
     await setCapability('Windowsへのキー・操作メッセージ送信', false);
     assert.equal(
       (await call('appdock_list_commands')).commands.find((c) => c.id === keyItem.commandId)
@@ -1101,6 +1115,11 @@ async function assertMcpWriteDenied() {
     await dialog.getByLabel('固定引数（JSON）', { exact: true }).fill('{bad');
     assert.equal(await dialog.getByRole('button', { name: 'OK', exact: true }).isEnabled(), false);
     await dialog.getByLabel('固定引数（JSON）', { exact: true }).fill('{"seconds":600}');
+    await dialog.getByTestId('custom-command-options').locator(':scope > summary').click();
+    const responseDeadline = dialog.getByLabel('応答の制限時間（ミリ秒）', { exact: true });
+    assert.equal(await responseDeadline.inputValue(), '60000');
+    await responseDeadline.fill('120000');
+    await responseDeadline.press('Tab');
     await dialog.getByLabel('MCP・Appletの共通APIへ公開').check();
     await checkDialogLayout(dialog);
     await page.setViewportSize({ width: 740, height: 760 });
@@ -1116,6 +1135,10 @@ async function assertMcpWriteDenied() {
     );
     assert(savedMcp);
     assert.equal(savedMcp.description, 'MCPツールを実行する試験');
+    assert.equal(
+      (await call('appdock_get_custom_command', { id: savedMcp.id })).item.config.timeoutMs,
+      120000,
+    );
     const savedJob = async () => {
       const accepted = await call('appdock_execute_command', { id: savedMcp.commandId });
       assert.equal(accepted.completion, 'handlerReturned');

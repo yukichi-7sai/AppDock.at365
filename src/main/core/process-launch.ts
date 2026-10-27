@@ -70,7 +70,6 @@ export class ProcessLaunchService {
   constructor(
     private appDirectory: string,
     private executable = path.resolve('.artifacts/dotnet-host/process/AppDock.ProcessHost.exe'),
-    private started?: (processId: number) => Promise<void>,
   ) {}
   private async worker() {
     if (!this.peer) {
@@ -138,8 +137,6 @@ export class ProcessLaunchService {
     }
     if (!result?.ok)
       return fail('PROCESS_START_FAILED', hostText('services.processLaunch.launchFailed'));
-    if (Number.isSafeInteger(result.processId) && result.processId! > 0)
-      await this.started?.(result.processId!);
     return { completion: 'processStarted' as const, effectVerified: false as const };
   }
   close() {

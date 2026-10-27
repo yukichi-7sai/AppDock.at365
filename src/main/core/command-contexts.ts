@@ -4,6 +4,10 @@ import { randomUUID } from 'node:crypto';
 export interface InputInvocation {
   /** Captured by trusted host entry points, never accepted as an API argument. */
   triggerContext?: import('../../shared/command-conditions').TriggerContext;
+  /** Host-only ancestry, restored through the execution identity across Applet RPC. */
+  commandChain?: readonly string[];
+  /** Applet handlers in this call path; returning to one can deadlock its command queue. */
+  commandApplets?: readonly string[];
   session?: string;
   process?: string;
   origin?: { kind: 'local' | 'mcp' } | { kind: 'applet'; appletId: string };
@@ -12,6 +16,27 @@ export interface InputInvocation {
   signal?: AbortSignal;
   window?: string;
   source?: string;
+}
+export class CommandCycleError extends Error {
+  readonly code = 'SELF_CALL';
+  constructor() {
+    super(hostText('services.appdockApi.selfCall'));
+  }
+}
+export function enterCommand(
+  id: string,
+  context: InputInvocation = {},
+  appletId?: string,
+): InputInvocation {
+  const ancestors = context.commandChain ?? [];
+  const applets = context.commandApplets ?? [];
+  if (ancestors.includes(id) || (appletId && applets.includes(appletId)))
+    throw new CommandCycleError();
+  return {
+    ...context,
+    commandChain: Object.freeze([...ancestors, id]),
+    commandApplets: appletId ? Object.freeze([...applets, appletId]) : applets,
+  };
 }
 /** Host-issued call identities bind input to the actual command and its lifetime. */
 export class CommandContexts {
@@ -26,6 +51,8 @@ export class CommandContexts {
       valid?: () => boolean;
       origin?: InputInvocation['origin'];
       triggerContext?: InputInvocation['triggerContext'];
+      commandChain?: InputInvocation['commandChain'];
+      commandApplets?: InputInvocation['commandApplets'];
     }
   >();
   async run<T>(
@@ -72,6 +99,8 @@ export class CommandContexts {
       session: entry.session,
       origin: entry.origin,
       triggerContext: entry.triggerContext,
+      commandChain: entry.commandChain,
+      commandApplets: entry.commandApplets,
     };
   }
   cancel(session: string) {

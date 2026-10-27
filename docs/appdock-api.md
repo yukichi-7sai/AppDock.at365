@@ -123,7 +123,7 @@ await context.AppDock.CallAsync("commands.execute", new {
 ## 再入・起動と互換性
 
 - 共通APIはAppDockの起動完了後に利用できます。activate時点ではNOT_READYとなる場合があるため、起動時の必須処理に依存させず、起動後のコマンド等から呼びます。
-- MCP→Appletハンドラー→共通APIの読取り・同期的な設定変更は利用できます。別のAPIコマンドが処理中の追加の非同期コマンド実行・Applet管理はBUSYで拒否し、待ち合う循環を作りません。自分の通常コマンドや自分の有効・無効・再起動はSELF_CALLで拒否します。自分の公開設定変更は可能です。
+- MCP→Appletハンドラー→共通APIの読取り・設定変更・別コマンドの実行を利用できます。独立した要求は同じIDでも並行して受け付けます。ホストが発行する実行IDに呼び出し経路を保持し、同じ経路内で同じコマンドや実行中Appletへ戻る循環をSELF_CALLで拒否します。自分の通常コマンドや自分の有効・無効・再起動もSELF_CALLです。自分の公開設定変更は可能です。Appletの開始・停止など、同一資源の変更に必要な排他は保持します。
 - 既存の`context.settings.set`/`Settings.SetAsync`/`host.settings.set`は互換入口を維持します。settings capabilityと自分自身の設定範囲を保ち、非公開/従来の未宣言キーやactivate中の更新に新しい許可を要求しません。
 - 互換入口の設定値検証・Applet設定への変更適用をSettingsCommandsへ集約しました。公開設定更新も同じ処理を使用し、同じSettingsStoreのrevisionを進めます。公開APIには引き続き公開フィールド制限・expectedRevision・dryRun・通常の設定保存検証を適用し、互換入口には従来の保存契約を残します。
 

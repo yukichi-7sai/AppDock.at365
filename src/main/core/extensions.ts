@@ -3,7 +3,7 @@ import { validateAppletCommonValues } from '../../shared/applet-common-settings'
 import { shellView, type ShellRequirement } from '../../shared/shell';
 import type { ShellProvider } from './shell-provider-registry';
 import { parseNotificationTypes } from '../../shared/notification-types';
-import { CommandContexts } from './command-contexts';
+import { CommandContexts, enterCommand } from './command-contexts';
 import type { InputInvocation } from './command-contexts';
 import { parseCustomTypes } from '../../shared/custom-commands';
 import { compileCustomType, type CustomCommandProvider } from './custom-commands';
@@ -886,6 +886,7 @@ class ExtensionManager extends EventEmitter {
       (x) => x.state === 'running' && x.commands.some((c) => c.id === id),
     );
     if (running) {
+      invocation = enterCommand(id, invocation, running.manifest.id);
       const reason = this.shellRequirement(
         running.manifest.id,
         running.manifest.commands?.find((c) => c.id === id)?.shellRequirement,
@@ -920,6 +921,7 @@ class ExtensionManager extends EventEmitter {
     }
     const e = [...this.items.values()].find((item) => this.canActivateForCommand(item, id));
     if (!e) throw new Error(hostText('services.extensions.commandUnavailable'));
+    invocation = enterCommand(id, invocation, e.manifest.id);
     const execution = this.queue
       .catch((err) => this.log('error', 'host', err.message))
       .then(async () => {

@@ -465,7 +465,7 @@ test('invalid and unknown conditions fail closed; unknown applet and command IDs
     1,
   );
 });
-test('scopes, multi-applet OR, ordering, disabled/unavailable commands and deduplication', () => {
+test('scopes, multi-applet OR, ordering, disabled/unavailable commands and repeated rows', () => {
   const rows = [
     row('a', 'test.a', 'global'),
     row('b', 'test.b'),
@@ -479,19 +479,25 @@ test('scopes, multi-applet OR, ordering, disabled/unavailable commands and dedup
   const resolve = (context, global = false) =>
     resolveKeybindings(rows, 'Ctrl+F12', context, available, global);
   assert.deepEqual(resolve({ appFocused: false }, true), ['test.a']);
-  assert.deepEqual(resolve({ appFocused: true }), ['test.b']);
+  assert.deepEqual(resolve({ appFocused: true }), ['test.b', 'test.b']);
   assert.deepEqual(resolve({ appFocused: true, appletId: 'gmail' }), [
     'test.b',
     'test.c',
     'test.d',
+    'test.b',
   ]);
   assert.deepEqual(resolve({ appFocused: true, appletId: 'web.1' }, true), [
     'test.a',
     'test.b',
     'test.c',
     'test.d',
+    'test.b',
   ]);
-  assert.deepEqual(resolve({ appFocused: true, appletId: 'other' }), ['test.b', 'test.c']);
+  assert.deepEqual(resolve({ appFocused: true, appletId: 'other' }), [
+    'test.b',
+    'test.c',
+    'test.b',
+  ]);
   assert.deepEqual(resolve({ appFocused: false, appletId: 'gmail' }), []);
 });
 test('owner scope uses registered ownership, follows current catalog and fails closed without an owner', () => {
@@ -525,7 +531,7 @@ test('owner scope uses registered ownership, follows current catalog and fails c
   );
   assert.throws(() => parseKeybindings([row('a', 'unrelated.command', 'owner', ['gmail'])]));
 });
-test('batch captures commands, reserves against re-entry, continues after failure and stops at shutdown', async () => {
+test('batch captures every row, accepts independent input, continues after failure and stops at shutdown', async () => {
   const calls = [],
     errors = [];
   let finish,
@@ -533,7 +539,7 @@ test('batch captures commands, reserves against re-entry, continues after failur
   const dispatcher = new ShortcutDispatcher(
     async (id) => {
       calls.push(id);
-      if (id === 'a') await new Promise((r) => (finish = r));
+      if (id === 'a' && calls.length === 1) await new Promise((r) => (finish = r));
       if (id === 'b') throw Error('test');
       if (id === 'quit') stopped = true;
     },
@@ -543,11 +549,11 @@ test('batch captures commands, reserves against re-entry, continues after failur
   const first = dispatcher.dispatch('F1', ['a', 'b', 'c', 'b']);
   await dispatcher.dispatch('F1', ['a', 'b']);
   await dispatcher.dispatch('F2', ['b']);
-  assert.deepEqual(calls, ['a']);
+  assert.deepEqual(calls, ['a', 'a', 'b', 'b']);
   finish();
   await first;
-  assert.deepEqual(calls, ['a', 'b', 'c']);
-  assert.equal(errors.length, 1);
+  assert.deepEqual(calls, ['a', 'a', 'b', 'b', 'b', 'c', 'b']);
+  assert.equal(errors.length, 4);
   await dispatcher.dispatch('F1', ['quit', 'c']);
   assert.equal(calls.at(-1), 'quit');
 });

@@ -31,11 +31,8 @@ export function selectCommandBindings<T extends { command: string }>(
   mode: CommandExecutionMode,
 ): T[] {
   if (mode !== 'all' && mode !== 'first') throw Error('Unknown command execution mode.');
-  const seen = new Set<string>();
   const selected: T[] = [];
   for (const row of rows) {
-    if (seen.has(row.command)) continue;
-    seen.add(row.command);
     selected.push(row);
     if (mode === 'first') break;
   }
@@ -76,9 +73,7 @@ export function planCommandBatch(
   const stackIds = [
     ...new Set(selected.flatMap((row) => expanded.get(row.command)?.stackIds ?? [])),
   ];
-  const commands = [
-    ...new Set(selected.flatMap((row) => expanded.get(row.command)?.commands ?? [])),
-  ];
+  const commands = selected.flatMap((row) => expanded.get(row.command)?.commands ?? []);
   if (commands.length > maximumExpandedCommands)
     return Object.freeze({ commands: Object.freeze([]), rowIds: Object.freeze([]) });
   return Object.freeze({

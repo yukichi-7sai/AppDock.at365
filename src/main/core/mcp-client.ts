@@ -364,8 +364,6 @@ export class McpClientService {
       record = undefined;
     }
     if (!record) {
-      if (this.sessions.size >= 32)
-        return fail('BUSY', hostText('services.mcpClient.connectionLimit'));
       const secret = this.options.settings.secrets(id);
       if (c.authentication === 'bearer' && !secret.token)
         return fail('AUTH_REQUIRED', hostText('services.mcpClient.bearerRequired'));
@@ -664,10 +662,6 @@ export class McpClientService {
               hostText('services.mcpClient.requestIdConflict'),
             ),
           );
-    if (this.starts.size >= 8)
-      return Promise.reject(
-        new AutomationError('BUSY', hostText('services.mcpClient.admissionLimit')),
-      );
     const promise = this.createJob(actor, params, signature, signal, detachAfterAcceptance).finally(
       () => this.starts.delete(key),
     );
@@ -693,16 +687,6 @@ export class McpClientService {
       return fail('SCHEMA_CHANGED', hostText('services.mcpClient.toolChanged'));
     if (!safeSchema(tool.inputSchema)(p.arguments).valid)
       return fail('INVALID_ARGUMENT', hostText('services.mcpClient.argumentSchema'));
-    const running = [...this.jobs.values()].filter((r) => r.job.state === 'running');
-    if (
-      running.length >= 4 ||
-      running.some((r) => r.job.serverId === serverId) ||
-      this.jobs.size >= 64 ||
-      [...this.jobs.values()].filter(
-        (r) => r.actor.owner === actor.owner && r.job.state === 'running',
-      ).length >= 4
-    )
-      return fail('BUSY', hostText('services.mcpClient.busy'));
     const session = this.sessions.get(serverId)!;
     const job: McpJob = {
       jobId: randomUUID(),

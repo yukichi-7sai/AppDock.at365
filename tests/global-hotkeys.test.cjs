@@ -90,16 +90,16 @@ test('registration follows availability, rebinding, recording suspension and shu
   assert.equal(registrations.at(-1), 'closed');
 });
 
-test('registration conflicts and host failure are visible; duplicate callbacks cannot overlap', async () => {
+test('registration conflicts and host failure are visible; distinct accepted callbacks can overlap', async () => {
   let conflict = true;
   const reports = [];
   let calls = 0;
-  let finish;
+  const finishes = [];
   const dispatcher = new CommandDispatcher(
     async () => {
       calls++;
       await new Promise((resolve) => {
-        finish = resolve;
+        finishes.push(resolve);
       });
     },
     (error) => reports.push(error),
@@ -139,14 +139,14 @@ test('registration conflicts and host failure are visible; duplicate callbacks c
   conflict = false;
   await manager.sync(settings, ['at365.watch.toggle'], false, true);
   const first = manager.pressed('Pause');
-  await manager.pressed('Pause');
-  assert.equal(calls, 1);
-  finish();
-  await first;
+  const second = manager.pressed('Pause');
+  assert.equal(calls, 2);
+  finishes.forEach((finish) => finish());
+  await Promise.all([first, second]);
   manager.failed(new Error('host crashed'));
   assert.equal(manager.statuses[0].registered, false);
   assert.equal(manager.statuses[0].error, 'host crashed');
   await manager.pressed('Pause');
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
   await manager.close();
 });

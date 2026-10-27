@@ -9,6 +9,7 @@ internal static class CommandTargetCapture
 {
     internal static CommandTargetContext Capture(nint window)
     {
+        if (window == 0) return new("0");
         var name = new StringBuilder(256);
         var length = GetClassName(window, name, name.Capacity);
         string? process = null;

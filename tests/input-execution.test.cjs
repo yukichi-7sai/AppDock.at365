@@ -61,12 +61,12 @@ for (const [store, input] of stores) {
     value.executionMode = 'first';
     assert.deepEqual(plans[store](s).commands, ['a']);
     value.inputExecutionModes[input] = 'all';
-    assert.deepEqual(plans[store](s).commands, ['a', 'b']);
+    assert.deepEqual(plans[store](s).commands, ['a', 'a', 'b']);
     value.executionMode = 'all';
     value.inputExecutionModes[input] = 'first';
     assert.deepEqual(plans[store](s).commands, ['a']);
     delete value.inputExecutionModes[input];
-    assert.deepEqual(plans[store](s).commands, ['a', 'b']);
+    assert.deepEqual(plans[store](s).commands, ['a', 'a', 'b']);
     value.inputExecutionModes[input] = 'all';
     value.excludedProcesses = ['editor'];
     assert.deepEqual(plans[store](s).commands, []);

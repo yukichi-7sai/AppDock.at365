@@ -14,6 +14,8 @@ internal static partial class Program
         if(args is ["--shortcuts",var shortcutHelper]) return RunShortcutTests(shortcutHelper);
         if(args is ["--gesture-key-state",var gestureAssembly]) return RunGestureKeyStateTests(gestureAssembly);
         if(args is ["--lock-keys",var lockKeyAssembly]) return RunLockKeyTests(lockKeyAssembly);
+        if(args is ["--input-queue",var inputQueueAssembly]) return RunInputQueueTests(inputQueueAssembly);
+        if(args is ["--input-blocking",var inputBlockingAssembly]) return RunInputBlockingTests(inputBlockingAssembly);
         if(args is ["--indicator-notices",var indicatorAssembly]) return RunIndicatorNoticeTests(indicatorAssembly);
         if(args is ["--indicator-stages",var indicatorTarget,var indicatorHandle,var indicatorExchange]) return RunIndicatorStages(indicatorTarget,indicatorHandle,indicatorExchange);
         if(args is ["--desktop-indicator-stages",var desktopTarget,var desktopIndicator,var desktopExchange]) return RunIndicatorStages(desktopTarget,desktopIndicator,desktopExchange,true);

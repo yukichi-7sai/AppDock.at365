@@ -496,6 +496,53 @@ test('MCP roster, local binding, encryption and atomic revisions do not share en
   });
   assert.notEqual(f.settings.identity(id), identity);
 });
+test('MCP admits independent concurrent calls on one connection and retained results do not block later calls', async (t) => {
+  const server = await httpFixture(t),
+    f = fixture(t),
+    id = f.add({ enabled: true, url: server.url });
+  const { tool } = await f.service.tool(applet, { serverId: id, name: 'delay' });
+  const request = {
+    serverId: id,
+    name: 'delay',
+    arguments: { delay: 400 },
+    toolRevision: tool.toolRevision,
+  };
+  const params = Array.from({ length: 12 }, () => ({ ...request, requestId: randomUUID() }));
+  const jobs = await Promise.all(params.map((p) => f.service.start(applet, p)));
+  assert.equal(new Set(jobs.map((j) => j.jobId)).size, 12);
+  assert.equal((await f.service.start(applet, params[0])).jobId, jobs[0].jobId);
+  f.service.cancel(applet, jobs[0].jobId);
+  const results = await Promise.all(
+    jobs.slice(1).map((job) =>
+      until(() => {
+        const result = f.service.get(applet, job.jobId);
+        return result.state !== 'running' && result;
+      }),
+    ),
+  );
+  assert(results.every((r) => r.state === 'succeeded'));
+  assert.equal(f.service.get(applet, jobs[0].jobId).state, 'cancelled');
+  const echo = (await f.service.tool(applet, { serverId: id, name: 'echo' })).tool;
+  const more = await Promise.all(
+    Array.from({ length: 66 }, () =>
+      f.service.start(applet, {
+        serverId: id,
+        name: 'echo',
+        arguments: { message: 'parallel' },
+        toolRevision: echo.toolRevision,
+        requestId: randomUUID(),
+      }),
+    ),
+  );
+  await Promise.all(
+    more.map((job) => until(() => f.service.get(applet, job.jobId).state === 'succeeded')),
+  );
+  assert.equal(
+    (await call(f, applet, id, 'echo', { message: 'after retained jobs' })).state,
+    'succeeded',
+  );
+});
+
 test('stdio uses a real process, paginated tools and encrypted environment; errors and cancellation are distinct', async (t) => {
   const f = fixture(t),
     cancelFile = path.join(f.dir, 'cancelled'),

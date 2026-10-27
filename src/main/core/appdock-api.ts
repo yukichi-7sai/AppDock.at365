@@ -2,7 +2,7 @@ import { hostText } from '../../shared/i18n';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { touchpadBridgeCommands, executeTouchpadBridgeCommand } from './touchpad-commands';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
-import type { InputInvocation } from './command-contexts';
+import { CommandCycleError, type InputInvocation } from './command-contexts';
 import type { CustomCommandService } from './custom-commands';
 import { customUpdateCommand } from '../../shared/custom-commands';
 import type { AppletApiPermissions } from '../../shared/appdock-api';
@@ -55,7 +55,6 @@ const inputValidators = new Map(
   ]),
 );
 export class AppDockApi {
-  private executing = 0;
   private callContext = new AsyncLocalStorage<InputInvocation>();
   private settingsCommands: SettingsCommands;
   private settingsTargets: SettingsTargets;
@@ -303,6 +302,8 @@ export class AppDockApi {
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
     const invocation: InputInvocation = {
       ...context,
+      commandChain: context.commandChain ?? this.callContext.getStore()?.commandChain,
+      commandApplets: context.commandApplets ?? this.callContext.getStore()?.commandApplets,
       apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
     };
     // Editors resolve assignable commands lazily; preserve this request's publication scope.
@@ -544,16 +545,10 @@ export class AppDockApi {
       );
     return params.id;
   }
-  /** Only the host stack runner calls this; external dispatch retains the re-entry guard. */
+  /** The host stack runner preserves the caller's authority and execution ancestry. */
   executeStackEntry(id: string, context: InputInvocation) {
     const caller = context.apiCaller ?? context.origin;
-    return this.execute(
-      id,
-      {},
-      caller?.kind === 'applet' ? caller.appletId : undefined,
-      context,
-      true,
-    );
+    return this.execute(id, {}, caller?.kind === 'applet' ? caller.appletId : undefined, context);
   }
   canExecuteStack(id: string, context: InputInvocation) {
     const caller = context.apiCaller ?? context.origin;
@@ -567,7 +562,6 @@ export class AppDockApi {
     args: unknown,
     appletId?: string,
     context: InputInvocation = {},
-    stackEntry = false,
   ): Promise<Record<string, unknown>> {
     const permissions = this.effectivePermissions(appletId, context);
     const command = this.commands({
@@ -623,125 +617,130 @@ export class AppDockApi {
         hostText('services.appdockApi.settingsPermission'),
       );
     if (
-      appletId &&
-      command.appletId === appletId &&
+      command.appletId &&
+      (command.appletId === appletId || context.commandApplets?.includes(command.appletId)) &&
       (command.permission === 'applets.manage' || !command.permission)
     )
       throw new AutomationError('SELF_CALL', hostText('services.appdockApi.selfCall'));
-    // Synchronous settings edits can complete while an Applet handler awaits this API.
-    // Further asynchronous dispatch is refused, preventing A -> B -> A wait cycles.
-    if (!stackEntry && this.executing && !(appletId && command.permission?.endsWith('.write')))
-      throw new AutomationError('BUSY', hostText('services.appdockApi.busy'));
-    this.executing++;
-    try {
-      if (command.permission === 'customCommands.write') {
-        if (!this.options.customCommands)
-          throw new AutomationError(
-            'API_DISABLED',
-            hostText('services.appdockApi.customCommandPermission'),
-          );
-        const result = this.options.customCommands.update(args, appletId);
-        return {
-          id: customUpdateCommand,
-          completion: result.dryRun ? 'validated' : 'settingsSaved',
-          effectVerified: false,
-          ...result,
-        };
-      }
-      if (this.options.customCommands?.has(id))
-        return await this.options.customCommands.execute(id, {
-          ...context,
-          apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
-          origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
-        });
-      if (command.permission === 'tray.write') {
-        const result = this.tray.execute(args);
-        return {
-          id,
-          completion: result.dryRun ? 'validated' : 'settingsSaved',
-          effectVerified: false,
-          ...result,
-        };
-      }
-      if (command.permission === 'ribbon.write') {
-        const result = this.ribbon.execute(args, this.commands(context));
-        return {
-          id,
-          completion: result.dryRun ? 'validated' : 'settingsSaved',
-          effectVerified: false,
-          ...result,
-        };
-      }
-      if (command.permission === 'touchpadGestures.write') {
-        if (id === 'appdock.touchpadGestures.update') {
-          const result = this.touchpadGestures.execute(args);
+    const ancestors = context.commandChain ?? [];
+    if (ancestors.includes(id))
+      throw new AutomationError('SELF_CALL', hostText('services.appdockApi.selfCall'));
+    return this.callContext.run(
+      { ...context, commandChain: Object.freeze([...ancestors, id]) },
+      async () => {
+        try {
+          if (command.permission === 'customCommands.write') {
+            if (!this.options.customCommands)
+              throw new AutomationError(
+                'API_DISABLED',
+                hostText('services.appdockApi.customCommandPermission'),
+              );
+            const result = this.options.customCommands.update(args, appletId);
+            return {
+              id: customUpdateCommand,
+              completion: result.dryRun ? 'validated' : 'settingsSaved',
+              effectVerified: false,
+              ...result,
+            };
+          }
+          if (this.options.customCommands?.has(id))
+            return await this.options.customCommands.execute(id, {
+              ...context,
+              apiCaller: appletId ? { kind: 'applet', appletId } : { kind: 'mcp' },
+              origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
+            });
+          if (command.permission === 'tray.write') {
+            const result = this.tray.execute(args);
+            return {
+              id,
+              completion: result.dryRun ? 'validated' : 'settingsSaved',
+              effectVerified: false,
+              ...result,
+            };
+          }
+          if (command.permission === 'ribbon.write') {
+            const result = this.ribbon.execute(args, this.commands(context));
+            return {
+              id,
+              completion: result.dryRun ? 'validated' : 'settingsSaved',
+              effectVerified: false,
+              ...result,
+            };
+          }
+          if (command.permission === 'touchpadGestures.write') {
+            if (id === 'appdock.touchpadGestures.update') {
+              const result = this.touchpadGestures.execute(args);
+              return {
+                id,
+                completion: result.dryRun ? 'validated' : 'settingsSaved',
+                effectVerified: false,
+                ...result,
+              };
+            }
+            const result = await executeTouchpadBridgeCommand(id, args, {
+              ...this.options,
+              settingsCommands: this.settingsCommands,
+            });
+            return { id, ...result };
+          }
+          if (command.permission === 'shortcuts.write' || command.permission === 'gestures.write') {
+            const result = (
+              command.permission === 'shortcuts.write' ? this.shortcuts : this.gestures
+            ).execute(args);
+            return {
+              id,
+              completion: result.dryRun ? 'validated' : 'settingsSaved',
+              effectVerified: false,
+              ...result,
+            };
+          }
+          if (command.permission === 'applets.manage') {
+            if (!this.options.appletManagement)
+              throw new AppletManagementError(
+                'NOT_FOUND',
+                hostText('services.appdockApi.appletManagementUnavailable'),
+              );
+            const result = await this.options.appletManagement.execute(id);
+            return { id, completion: 'lifecycleApplied', effectVerified: false, ...result };
+          }
+          if (command.permission === 'settings.write') {
+            const settingsCaller =
+              appletId === undefined && context.origin?.kind !== 'applet' ? 'mcp' : 'applet';
+            const result = this.settingsCommands.execute(id, args, true, settingsCaller);
+            return {
+              id,
+              completion: result.dryRun ? 'validated' : 'settingsSaved',
+              effectVerified: false,
+              ...result,
+            };
+          }
+          await this.options.execute(id, {
+            ...context,
+            origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
+          });
           return {
             id,
-            completion: result.dryRun ? 'validated' : 'settingsSaved',
+            completion: command.completion,
             effectVerified: false,
-            ...result,
+            message:
+              command.completion === 'accepted'
+                ? hostText('services.appdockApi.displayAccepted')
+                : hostText('services.appdockApi.commandResponded'),
           };
-        }
-        const result = await executeTouchpadBridgeCommand(id, args, {
-          ...this.options,
-          settingsCommands: this.settingsCommands,
-        });
-        return { id, ...result };
-      }
-      if (command.permission === 'shortcuts.write' || command.permission === 'gestures.write') {
-        const result = (
-          command.permission === 'shortcuts.write' ? this.shortcuts : this.gestures
-        ).execute(args);
-        return {
-          id,
-          completion: result.dryRun ? 'validated' : 'settingsSaved',
-          effectVerified: false,
-          ...result,
-        };
-      }
-      if (command.permission === 'applets.manage') {
-        if (!this.options.appletManagement)
-          throw new AppletManagementError(
-            'NOT_FOUND',
-            hostText('services.appdockApi.appletManagementUnavailable'),
+        } catch (error) {
+          if (error instanceof AutomationError) throw error;
+          if (
+            error instanceof SettingsCommandError ||
+            error instanceof AppletManagementError ||
+            error instanceof CommandCycleError
+          )
+            throw new AutomationError(error.code, error.message);
+          throw new AutomationError(
+            'COMMAND_FAILED',
+            hostText('services.appdockApi.executionUnconfirmed'),
           );
-        const result = await this.options.appletManagement.execute(id);
-        return { id, completion: 'lifecycleApplied', effectVerified: false, ...result };
-      }
-      if (command.permission === 'settings.write') {
-        const settingsCaller =
-          appletId === undefined && context.origin?.kind !== 'applet' ? 'mcp' : 'applet';
-        const result = this.settingsCommands.execute(id, args, true, settingsCaller);
-        return {
-          id,
-          completion: result.dryRun ? 'validated' : 'settingsSaved',
-          effectVerified: false,
-          ...result,
-        };
-      }
-      await this.options.execute(id, {
-        ...context,
-        origin: context.origin ?? (appletId ? { kind: 'applet', appletId } : { kind: 'mcp' }),
-      });
-      return {
-        id,
-        completion: command.completion,
-        effectVerified: false,
-        message:
-          command.completion === 'accepted'
-            ? hostText('services.appdockApi.displayAccepted')
-            : hostText('services.appdockApi.commandResponded'),
-      };
-    } catch (error) {
-      if (error instanceof AutomationError) throw error;
-      if (error instanceof SettingsCommandError || error instanceof AppletManagementError)
-        throw new AutomationError(error.code, error.message);
-      throw new AutomationError(
-        'COMMAND_FAILED',
-        hostText('services.appdockApi.executionUnconfirmed'),
-      );
-    } finally {
-      this.executing--;
-    }
+        }
+      },
+    );
   }
 }

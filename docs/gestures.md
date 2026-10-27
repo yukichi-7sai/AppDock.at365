@@ -2,7 +2,7 @@
 
 入力基盤は本体が所有する。操作コマンドとその設定は提供元のAppletが所有する。本体はApplet IDによる専用処理を持たない。設定は`Settings.gestures`、画面は`GesturesEditor`、保存は既存SettingsEditorの即時保存/revision/atomic writeを共用する。
 
-キー入力と[共通コマンド実行基盤](command-execution-foundation-design.md)を使う。「いつ・どこで」の評価、保存順とfirst/allの選択、重複除去、実行予約と順次実行を共用し、入力認識とsessionの生存確認はジェスチャー側が担う。
+キー入力と[共通コマンド実行基盤](command-execution-foundation-design.md)を使う。「いつ・どこで」の評価、各行の保存順とfirst/allの選択、計画内の順次実行を共用し、入力認識とsessionの生存確認はジェスチャー側が担う。
 
 ## 保存と初期値
 
@@ -11,10 +11,10 @@
 割り当てマークからジェスチャーIDの完全一致でコマンド一覧を絞り込める。対象の切り替え、解除、複数コマンドの色とキーボード操作は[入力マークによる絞り込み](settings-list-editing.md#入力マークによる絞り込み)に従う。
 
 - `bindings`は最大2000行。各行は安定した`id`、`command`、`gesture`、`enabled`、`when`。配列順が実行順。`executionMode`は`all`（条件に一致したすべて、既定値）または`first`（最初の1つ）。入力ID別の`inputExecutionModes`で上書きでき、未指定なら全体値を使う。同一コマンドIDは1回だけ。移動・クリック・ホイール・キーに共通して適用し、native待機表示と実行も同じ実効値を使用する。編集は[トリガーの設定](command-triggers.md#トリガーの設定)に従う。
-- 待機表示と実行は、開始対象と条件に一致した行から同じ登録順・コマンドID重複除去・実行方法で選ぶ。`indicatorPosition`は`gesture-start`・`window-center`・`monitor-center`・`none`（表示なし）。`monitor-center`は右ボタン押下時のカーソルがあるモニター全体の中央。`window-center`も対象がデスクトップなら同じ位置を使う。モニターは開始時に固定し、移動先の画面へ追従しない。`none`でも入力認識・実行・取消を続け、不透明度の保存値を保持する。
+- 待機表示と実行は、開始対象と条件に一致した行から同じ行の登録順・実行方法で選ぶ。`indicatorPosition`は`gesture-start`・`window-center`・`monitor-center`・`none`（表示なし）。`monitor-center`は右ボタン押下時のカーソルがあるモニター全体の中央。`window-center`も対象がデスクトップなら同じ位置を使う。モニターは開始時に固定し、移動先の画面へ追従しない。`none`でも入力認識・実行・取消を続け、不透明度の保存値を保持する。
 - `indicatorShowNoAction`（「アクションなしを表示する」）は既定true。falseでは、移動方向と開始条件に一致する実行対象がない場合の待機表示を隠す。一致するアクションの表示・入力認識・実行・取消・通常の右クリック復元は従来どおり。`none`ではこの値にかかわらず表示せず、保存値は保持する。未一致の移動を通常の右クリックへ変換する設定ではない。
 - `indicatorStyle`は`compact`（コンパクトカード、既定）・`pill`（スリムピル）・`ring`（リング）・`classic`（クラシック）。未指定の既存設定も`compact`として読み取り、保存済みの位置・不透明度・割り当ては保持する。設定画面の見本は表示だけでコマンドを実行しない。新しい3種類は本体の明暗テーマと共通アクセント色に従い、方向を図形で描画する。不透明度は背景だけへ適用し、文字・方向は薄くしない。クラシックは従来の黒いパネル・絵文字の方向・ウィンドウ全体の不透明度を保つ。表示なしでもスタイルの選択値を保持する。
-- スリムピルは2方向分の表示幅と固定の行高を使用する。操作開始時の対象候補について、実行方法とコマンド重複除去を適用した移動コマンドの最大表示行数（1〜4行）を先に確保する。これにより、同じ操作中は1段階から2段階へ進んだときやコマンド名・件数が変わったときもウィンドウのサイズを変えない。プレビューは共通SettingsFieldのgroup「待機表示」・title「プレビュー」で表示する。通常の実表示とプレビューは同じGestureIndicatorView/CSSを使い、クラシックのカラー絵文字も同じChromiumで描画する。
+- スリムピルは2方向分の表示幅と固定の行高を使用する。操作開始時の対象候補について、実行方法を適用した移動コマンドの最大表示行数（1〜4行）を先に確保する。これにより、同じ操作中は1段階から2段階へ進んだときやコマンド名・件数が変わったときもウィンドウのサイズを変えない。プレビューは共通SettingsFieldのgroup「待機表示」・title「プレビュー」で表示する。通常の実表示とプレビューは同じGestureIndicatorView/CSSを使い、クラシックのカラー絵文字も同じChromiumで描画する。
 - gestureは1段階移動の`move-up/down/left/right`、2段階移動の`move-<最初の方向>-<次の方向>`（例: `move-right-up`、`move-up-down`）、`click-left/middle`、`wheel-up/down`、`key:<キー>`。2段階は上下左右の異なる2方向の12種類で、逆方向への折り返しも含む。同じ方向の重複や3段階以上のIDは受け付けない。キーは既存ショートカットの正規化（Ctrl/Alt/Shift、英数字、F1〜F24、矢印、対応する記号・特殊キー）を使い、CapsLock・ScrollLock・Alphanumeric（英数）・KanaMode（かな）・Convert（変換）・NonConvert（無変換）にも対応する。WinやOS専用の保護された入力は対象外。Tabは設定画面の特殊キー選択から登録できる。
 - whenは`global/desktop/browser/exe/app/pages/owner/applets`、`appletIds`、`processes`と任意の`excludeDesktop`。exe名はパスなし、`.exe`省略可、大文字小文字を区別せず、一覧内はOR。browserは共通`browsers`を使用。ページ条件はキーバインドの`matchesWhen`を共用し、非アクティブなページでは一致しない。本体5ページ（設定を含む）・Applet各ページの候補、表示名、対象ID、保存済みApplet指定の保持は[ページ候補と識別](keybindings.md#ページ候補と識別)に従う。
 - `desktop`はWindows Shellが所有するデスクトップの背景・アイコン領域だけに一致する。プロセス名がexplorerであることだけでは一致させず、通常のフォルダー画面とタスクバーを含めない。`excludeDesktop: true`は`global`と`exe`で使用でき、その行だけをデスクトップの候補から除外する。省略はfalse。他にデスクトップで有効な行がなければ右押下を捕捉せず、通常入力を通す。`desktop`条件の別の行は引き続き利用できる。
@@ -56,7 +56,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 
 実行中/予約中の追加操作は溜めない。ホイール間隔0〜5000msは上下共通で、間隔内の入力を捨てる。ホイールの未送信処理は最後の入力から100ms、右の解放、対象変更、設定変更、停止で取り消す。移動で確定した処理は右解放後に開始できるが、対象変更時には中止する。OSへ送信済みの操作は取り消せない。
 
-キーとジェスチャーは同じShortcutDispatcherのコマンド予約を使う。`command.execute`の任意`invocation`（session/window/process/source、processは拡張子なしのプロセス名）と`command.cancel`を追加し、.NETでは`CommandExecution.Current`とハンドラーのCancellationTokenに伝える。登録前に届いた取消も保持する。WebBrowserToolsは開始対象HWNDを実送信直前まで照合し、ジェスチャーに通常キー送信経路の150ms待機を加えない。再入経路のみ150msガードを維持する。任意のApplet内部の操作先や取消対応を自動変更する契約ではない。
+キーとジェスチャーは同じShortcutDispatcherで計画内を順次実行し、独立した入力の同一コマンドを予約で抑止しない。`command.execute`の任意`invocation`（session/window/process/source、processは拡張子なしのプロセス名）と`command.cancel`を追加し、.NETでは`CommandExecution.Current`とハンドラーのCancellationTokenに伝える。登録前に届いた取消も保持する。WebBrowserToolsは開始対象HWNDを実送信直前まで照合する。キー送信後の固定150ms待機・150msガードは設けず、押下と解放の組を保つ実送信の直列化と、捕捉側のOSリピート破棄を使う。任意のApplet内部の操作先や取消対応を自動変更する契約ではない。
 
 入力プロセスの停止はログに報告し、設定変更/再起動で再接続可能。終了・接続断で入力フックと表示を解放する。別のジェスチャーソフトとの同時利用、管理者権限のアプリ、UAC/ロック画面は通常デスクトップと同一に保証しない。
 
@@ -87,14 +87,14 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 
 たとえば右と右→上の両方を登録しても、右→上の途中で右のコマンドを実行しない。右→上が未割り当てなら右へ戻して実行せず、通常右クリックも再送しない。1段階目が未割り当てでも、2段階目の割り当ては認識できる。
 
-待機表示は段階が増えるたびに方向の矢印列と完全一致するアクションへ更新する。未一致表示OFFなら前段の表示を隠し、後段で一致すれば再表示する。開始対象・条件・保存順・同一コマンドの重複除去・first/allは、完成した方向列に対して既存の選択と実行経路を使う。対象変更・設定変更・Escape等による取消と、クリック・ホイール・キーへ切り替えた場合の扱いは共通入力基盤に従う。
+待機表示は段階が増えるたびに方向の矢印列と完全一致するアクションへ更新する。未一致表示OFFなら前段の表示を隠し、後段で一致すれば再表示する。開始対象・条件・各行の保存順・first/allは、完成した方向列に対して既存の選択と実行経路を使う。対象変更・設定変更・Escape等による取消と、クリック・ホイール・キーへ切り替えた場合の扱いは共通入力基盤に従う。
 
 保存済みの1段階ID・安定行ID・条件・順序はそのまま使い、設定項目・保存ファイル・自動移行は追加しない。新しい移動を追加するときは`moveDirections`/`gestureTypes`、設定編集・公開API・並べ替え、InputHostの認識・待機表示・解放時のID生成をそろえ、保存と実OS入力の両方を検証する。
 
 ## 検証
 
 - Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、編集中の対象行との競合を検査する。
-- `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、共通予約と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
+- `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、独立した入力の順次実行と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- --indicator-notices [InputHost DLL]`: フックを登録せず、ネイティブWindow/コンパイル済みWPF画面の不在、表示通知のrevision/座標/方向/候補順・行数、非表示・終了の通知を検査する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外、左右の修飾キーと左/中/X1/X2の先行押下・途中解放・捕捉された押下の継続・解除後の再開の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。

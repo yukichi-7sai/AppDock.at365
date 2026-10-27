@@ -782,7 +782,7 @@
   "settings.mcpCommandFields.schema": "ツールの引数Schema",
   "settings.mcpCommandFields.args": "固定引数（JSON）",
   "settings.mcpCommandFields.argsObject": "引数はJSONオブジェクトで入力してください。",
-  "settings.mcpCommandFields.timeout": "待ち時間（ミリ秒）",
+  "settings.mcpCommandFields.timeout": "応答の制限時間（ミリ秒）",
   "settings.notificationSettings.list": "通知ごとの設定",
   "settings.notificationSettings.editColumn": "編集",
   "settings.notificationSettings.name": "通知名",

@@ -275,7 +275,7 @@
       "expectedCommands": []
     },
     {
-      "name": "filter then deduplicate in saved order",
+      "name": "filter then preserve every matching row in saved order",
       "context": { "host": { "focused": true } },
       "mode": "all",
       "catalog": [
@@ -294,8 +294,8 @@
         { "id": "b-duplicate", "command": "b", "when": { "scope": "global" } },
         { "id": "c", "command": "c", "when": { "scope": "app" } }
       ],
-      "expectedRows": ["b-first", "c"],
-      "expectedCommands": ["b", "c"]
+      "expectedRows": ["b-first", "b-duplicate", "c"],
+      "expectedCommands": ["b", "b", "c"]
     },
     {
       "name": "first matching command after conditions",
@@ -365,126 +365,124 @@
     }
   ],
   "stackConditions": [
-  {
-    "name": "empty stack is ineligible",
-    "paths": [],
-    "expected": false,
-    "context": {
-      "host": {
-        "focused": false
+    {
+      "name": "empty stack is ineligible",
+      "paths": [],
+      "expected": false,
+      "context": {
+        "host": {
+          "focused": false
+        }
       }
-    }
-  },
-  {
-    "name": "primitive has no additional conditions",
-    "paths": null,
-    "expected": true,
-    "context": {
-      "host": {}
-    }
-  },
-  {
-    "name": "nested owner requires both ancestor and registered child owner",
-    "paths": [
-      [
-        {
-          "when": {
-            "scope": "app"
-          }
-        },
-        {
-          "when": {
-            "scope": "owner"
+    },
+    {
+      "name": "primitive has no additional conditions",
+      "paths": null,
+      "expected": true,
+      "context": {
+        "host": {}
+      }
+    },
+    {
+      "name": "nested owner requires both ancestor and registered child owner",
+      "paths": [
+        [
+          {
+            "when": {
+              "scope": "app"
+            }
           },
-          "ownerId": "demo"
-        }
-      ]
-    ],
-    "expected": true,
-    "context": {
-      "host": {
-        "appletId": "demo",
-        "focused": true
-      }
-    }
-  },
-  {
-    "name": "nested owner mismatch does not consume input",
-    "paths": [
-      [
-        {
-          "when": {
-            "scope": "global"
+          {
+            "when": {
+              "scope": "owner"
+            },
+            "ownerId": "demo"
           }
-        },
-        {
-          "when": {
-            "scope": "owner"
-          },
-          "ownerId": "other"
-        }
-      ]
-    ],
-    "expected": false,
-    "context": {
-      "host": {
-        "appletId": "demo",
-        "focused": true
-      }
-    }
-  },
-  {
-    "name": "any complete path permits a stack",
-    "paths": [
-      [
-        {
-          "when": {
-            "scope": "app"
-          }
-        }
+        ]
       ],
-      [
-        {
-          "when": {
-            "scope": "global"
-          }
-        },
-        {
-          "when": {
-            "processes": [
-              "notepad"
-            ],
-            "scope": "exe"
-          }
+      "expected": true,
+      "context": {
+        "host": {
+          "appletId": "demo",
+          "focused": true
         }
-      ]
-    ],
-    "expected": true,
-    "context": {
-      "host": {
-        "focused": false
-      },
-      "target": {
-        "window": "1",
-        "processName": "notepad"
+      }
+    },
+    {
+      "name": "nested owner mismatch does not consume input",
+      "paths": [
+        [
+          {
+            "when": {
+              "scope": "global"
+            }
+          },
+          {
+            "when": {
+              "scope": "owner"
+            },
+            "ownerId": "other"
+          }
+        ]
+      ],
+      "expected": false,
+      "context": {
+        "host": {
+          "appletId": "demo",
+          "focused": true
+        }
+      }
+    },
+    {
+      "name": "any complete path permits a stack",
+      "paths": [
+        [
+          {
+            "when": {
+              "scope": "app"
+            }
+          }
+        ],
+        [
+          {
+            "when": {
+              "scope": "global"
+            }
+          },
+          {
+            "when": {
+              "processes": ["notepad"],
+              "scope": "exe"
+            }
+          }
+        ]
+      ],
+      "expected": true,
+      "context": {
+        "host": {
+          "focused": false
+        },
+        "target": {
+          "window": "1",
+          "processName": "notepad"
+        }
+      }
+    },
+    {
+      "name": "unknown host state fails closed",
+      "paths": [
+        [
+          {
+            "when": {
+              "scope": "app"
+            }
+          }
+        ]
+      ],
+      "expected": false,
+      "context": {
+        "host": {}
       }
     }
-  },
-  {
-    "name": "unknown host state fails closed",
-    "paths": [
-      [
-        {
-          "when": {
-            "scope": "app"
-          }
-        }
-      ]
-    ],
-    "expected": false,
-    "context": {
-      "host": {}
-    }
-  }
-]
+  ]
 }

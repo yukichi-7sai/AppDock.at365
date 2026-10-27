@@ -11,7 +11,6 @@ internal sealed class InputSender : IDisposable
     private readonly HashSet<string> cancelled = [];
     private readonly Queue<string> cancellationOrder = [];
     private readonly SemaphoreSlim gate = new(1, 1);
-    private long guardUntil;
     private bool disposed;
     private static readonly int[] HeldModifiers = [0x10, 0x11, 0x12, 0x5B, 0x5C];
 
@@ -35,11 +34,8 @@ internal sealed class InputSender : IDisposable
         try {
             var token = cts.Token;
             token.ThrowIfCancellationRequested();
-            var gesture = p.GetProperty("gesture").GetBoolean();
-            if (!gesture && Environment.TickCount64 < Interlocked.Read(ref guardUntil))
-                return new { ok = false, code = "INPUT_BUSY", message = "キー送信の再入を抑止しました。" };
-            entered = await gate.WaitAsync(0, token);
-            if (!entered) return new { ok = false, code = "INPUT_BUSY", message = "別の入力操作を処理中です。" };
+            await gate.WaitAsync(token);
+            entered = true;
             var target = GetForegroundWindow();
             // System key chords (for example Win+E) also work with the desktop focused.
             // Window-directed app commands retain their ordinary-window restriction.
@@ -71,7 +67,6 @@ internal sealed class InputSender : IDisposable
                 events.Add(KeyEvent(chord.Key, false, chord.Extended));
                 events.Add(KeyEvent(chord.Key, true, chord.Extended));
                 foreach (var modifier in chord.Modifiers.Reverse()) events.Add(KeyEvent(modifier, true, modifier == 0x5B));
-                Interlocked.Exchange(ref guardUntil, Environment.TickCount64 + 150);
                 var sent = SendInput((uint)events.Count, events.ToArray(), Marshal.SizeOf<Input>());
                 if (sent != events.Count) {
                     var releases = events.Take((int)sent).Where(e => (e.Data.Keyboard.Flags & 2) == 0).Reverse()
@@ -79,8 +74,6 @@ internal sealed class InputSender : IDisposable
                     if (releases.Length > 0) SendInput((uint)releases.Length, releases, Marshal.SizeOf<Input>());
                     throw new InvalidOperationException("キーの一部を送信できませんでした。操作先を確認してください。");
                 }
-                // Preserve ordinary hotkey loop protection without delaying gesture repeats.
-                if (!gesture) await Task.Delay(150, token);
             } else if (SendMessageTimeout(target, 0x0319, target, new nint(appCommand << 16), 0x22, 1000, out var handled) == 0 || handled == 0)
                 throw new InvalidOperationException("操作メッセージが処理されませんでした。");
             return new { ok = true };

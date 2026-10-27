@@ -85,7 +85,7 @@ test('strict ten gesture/chord model and reserved read-only projection', () => {
   );
   assert.doesNotThrow(() => validateTouchpadKeyEdit(c, c));
 });
-test('shared planner applies availability, conditions, registration order, dedup and first/all', () => {
+test('shared planner applies availability, conditions, each saved row and first/all', () => {
   const v = defaultTouchpadGestures();
   v.bindings = [
     row('a', 'three.tap', 'missing'),
@@ -96,7 +96,7 @@ test('shared planner applies availability, conditions, registration order, dedup
   const commands = [{ id: 'test.run' }, { id: 'test.other' }];
   assert.deepEqual(
     planTouchpadCommands(v, 'three.tap', { host: { focused: true } }, commands).commands,
-    ['test.run', 'test.other'],
+    ['test.run', 'test.run', 'test.other'],
   );
   v.executionMode = 'first';
   assert.deepEqual(

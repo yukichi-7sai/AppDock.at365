@@ -187,7 +187,7 @@ test('protected global combinations are rejected and gesture Win exclusion remai
   assert.throws(() => normalizeGesture('key:Win+W'));
   assert.equal(normalizeGesture('key:Ctrl+A'), 'key:Ctrl+A');
 });
-test('blocking is aggregated only over available enabled globals before command deduplication', () => {
+test('blocking is aggregated over available enabled globals independently of execution selection', () => {
   const rows = [
     row('pass', false),
     row('stop', true),
@@ -209,7 +209,7 @@ test('blocking is aggregated only over available enabled globals before command 
   assert.equal(globalShortcutInputs(duplicates, ['test.one'])[0].blockOriginalInput, true);
   assert.deepEqual(
     resolveKeybindings(duplicates, 'Win+W', { appFocused: false }, [{ id: 'test.one' }], true),
-    ['test.one'],
+    ['test.one', 'test.one'],
   );
 });
 test('key changes and order edits retain explicit passthrough settings', () => {

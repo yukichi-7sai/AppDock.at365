@@ -929,13 +929,6 @@ const processLauncher = new ProcessLaunchService(
     'process',
     'AppDock.ProcessHost.exe',
   ),
-  async (processId) => {
-    const press = shortcutInvocation.getStore();
-    if (press)
-      await gestures
-        ?.activateProcess(press.pressId, processId)
-        .catch((error) => log.write('error', 'hotkeys', String(error)));
-  },
 );
 const customCommands = new CustomCommandService({
   settings,

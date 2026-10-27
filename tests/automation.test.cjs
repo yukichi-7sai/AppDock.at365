@@ -414,13 +414,13 @@ test('command policy uses provider declarations, projects details and never acti
   f.options.applets = () => automationApplets(input);
   f.options.commands = () => automationCommands(input);
   let allowed = false,
-    calls = 0,
-    finish;
+    calls = 0;
+  const finishes = [];
   f.options.executable = () => allowed;
   f.options.execute = () => {
     calls++;
     return new Promise((r) => {
-      finish = r;
+      finishes.push(r);
     });
   };
   const before = structuredClone(f.settings.value);
@@ -454,12 +454,14 @@ test('command policy uses provider declarations, projects details and never acti
   await assert.rejects(f.api.call('commands.execute', { id }), { code: 'UNAVAILABLE' });
   native.commands[0].available = true;
   const pending = f.api.call('commands.execute', { id });
-  await assert.rejects(f.api.call('commands.execute', { id }), { code: 'BUSY' });
-  finish({ secret: 'SECRET_RESULT' });
+  const parallel = f.api.call('commands.execute', { id });
+  assert.equal(calls, 2);
+  finishes.forEach((finish) => finish({ secret: 'SECRET_RESULT' }));
+  await parallel;
   const result = await pending;
   assert.equal(result.completion, 'handlerReturned');
   assert.equal(result.effectVerified, false);
-  assert.equal(calls, 1);
+  assert.equal(calls, 2);
   assert.ok(!JSON.stringify(result).includes('SECRET_RESULT'));
   f.options.execute = async () => {
     throw Error('SECRET_FAILURE');

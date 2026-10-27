@@ -562,7 +562,7 @@ test('manifest gesture defaults apply once and preserve existing users and delet
   assert.equal(new Set(sharedIds.gestures.bindings.map((row) => row.id)).size, 2);
   assert.doesNotThrow(() => parseGestures(sharedIds.gestures));
 });
-test('gesture and keyboard dispatch share reservations, order, cancellation and deduplication', async () => {
+test('gesture and keyboard dispatch preserve independent inputs, order and cancellation', async () => {
   const called = [];
   let valid = true;
   const dispatcher = new ShortcutDispatcher(
@@ -577,5 +577,5 @@ test('gesture and keyboard dispatch share reservations, order, cancellation and 
       valid = false;
     },
   });
-  assert.deepEqual(called, ['test.a']);
+  assert.deepEqual(called, ['test.a', 'test.a', 'test.b']);
 });

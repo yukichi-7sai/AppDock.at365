@@ -8,6 +8,9 @@ module.exports = async ({ page, item, call, profile, until }) => {
   const keys = () => capture().locator('kbd').allTextContents();
   const edit = async () => {
     await editButton.click();
+    await dialog.waitFor();
+    const actionSection = dialog.getByTestId('custom-command-section:action');
+    if (await actionSection.isVisible()) await actionSection.click();
     await capture().waitFor();
     await dialog.getByTestId('custom-command-options').locator(':scope > summary').click();
   };

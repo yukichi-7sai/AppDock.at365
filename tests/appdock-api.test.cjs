@@ -231,7 +231,7 @@ test('Both transports share revision, dryRun, atomic validation, and settings pe
     'INVALID_ARGUMENT',
   );
 });
-test('MCP -> Applet -> synchronous settings works while asynchronous reentry and self lifecycle are rejected', async (t) => {
+test('MCP -> Applet can call settings and another command while cycles and self lifecycle are rejected', async (t) => {
   const f = setup(t);
   f.grant({ read: true, execute: true, write: true });
   f.options.executable = () => true;
@@ -258,12 +258,18 @@ test('MCP -> Applet -> synchronous settings works while asynchronous reentry and
       available: true,
     },
   ];
-  f.options.execute = async () => {
+  f.options.execute = async (id) => {
+    if (id === 'other.run') {
+      await assert.rejects(f.api.call('commands.execute', { id: 'test.caller.run' }), {
+        code: 'SELF_CALL',
+      });
+      return;
+    }
     assert.equal(
       (await f.call('commands.execute', { id: 'appdock.settings.closeToTray.off' })).ok,
       true,
     );
-    assert.equal((await f.call('commands.execute', { id: 'other.run' })).error.code, 'BUSY');
+    assert.equal((await f.call('commands.execute', { id: 'other.run' })).ok, true);
     assert.equal(
       (await f.call('commands.execute', { id: 'test.caller.run' })).error.code,
       'SELF_CALL',
@@ -276,7 +282,7 @@ test('MCP -> Applet -> synchronous settings works while asynchronous reentry and
   await f.api.call('commands.execute', { id: 'test.caller.run' });
   assert.equal(f.store.value.host.closeToTray, false);
 });
-test('host stack children retain publication, caller authority, self-call and external reentry guards', async (t) => {
+test('host stack children retain publication, caller authority and cycle guards without refusing other calls', async (t) => {
   const f = setup(t),
     calls = [];
   f.options.commands = () =>
@@ -301,7 +307,8 @@ test('host stack children retain publication, caller authority, self-call and ex
         f.api.executeStackEntry('test.caller.self', context),
         (error) => error.code === 'SELF_CALL',
       );
-      assert.equal((await f.call('commands.execute', { id: 'leaf' })).error.code, 'BUSY');
+      assert.equal((await f.call('commands.execute', { id: 'leaf' })).ok, true);
+      assert.equal((await f.call('commands.execute', { id: 'stack' })).error.code, 'SELF_CALL');
       f.grant({ read: true, execute: false });
       assert.equal(f.api.canExecuteStack('stack', context), false);
       await assert.rejects(
@@ -311,7 +318,33 @@ test('host stack children retain publication, caller authority, self-call and ex
     } else assert.equal(context.origin.appletId, 'test.caller');
   };
   assert.equal((await f.call('commands.execute', { id: 'stack' })).ok, true);
-  assert.deepEqual(calls, ['stack', 'leaf']);
+  assert.deepEqual(calls, ['stack', 'leaf', 'leaf']);
+});
+
+test('API command calls isolate simultaneous roots and restore Applet queue ancestry', async (t) => {
+  const f = setup(t),
+    releases = [];
+  f.options.commands = () =>
+    ['one', 'two'].map((id) => ({
+      id,
+      title: id,
+      appletId: 'other',
+      available: true,
+      completion: 'handlerReturned',
+    }));
+  f.options.executable = () => true;
+  f.options.execute = async () => new Promise((release) => releases.push(release));
+  const runs = ['one', 'one', 'two'].map((id) => f.api.call('commands.execute', { id }));
+  assert.equal(releases.length, 3);
+  releases.forEach((release) => release());
+  await Promise.all(runs);
+  await assert.rejects(
+    f.api.call('commands.execute', { id: 'two' }, undefined, {
+      commandChain: ['one'],
+      commandApplets: ['other'],
+    }),
+    { code: 'SELF_CALL' },
+  );
 });
 
 test('Legacy self-setting uses shared validation and revision while keeping private keys and startup behavior', (t) => {

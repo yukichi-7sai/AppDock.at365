@@ -82,7 +82,7 @@ test('stack validation enforces conditions, bounded graph, cycles and future fie
   assert.throws(() => validateStackGraph(huge));
 });
 
-test('nested first/all resolves a fixed context, skips empty candidates and deduplicates leaf commands', () => {
+test('nested first/all resolves a fixed context, skips empty candidates and preserves repeated leaf entries', () => {
   const catalog = [
     { id: 'a' },
     { id: 'b' },
@@ -98,27 +98,27 @@ test('nested first/all resolves a fixed context, skips empty candidates and dedu
   }));
   const plan = planCommandBatch(rows, context, catalog, 'first');
   assert.deepEqual(plan, {
-    commands: ['a', 'b'],
+    commands: ['a', 'a', 'b'],
     rowIds: ['trigger'],
     stackIds: ['outer', 'inner'],
   });
   catalog[0].available = false;
-  assert.deepEqual(plan.commands, ['a', 'b']);
-  assert.deepEqual(planCommandBatch(rows, context, catalog, 'all').commands, ['b', 'c']);
+  assert.deepEqual(plan.commands, ['a', 'a', 'b']);
+  assert.deepEqual(planCommandBatch(rows, context, catalog, 'all').commands, ['b', 'b', 'c']);
   const cyclic = new Map(
     [{ id: 'loop', stack: stack([row('self', 'loop')]) }].map((c) => [c.id, c]),
   );
   assert.deepEqual(expandStackCommand('loop', cyclic, context).commands, []);
 });
 
-test('stack reservations prevent overlap and stop on revocation without reselecting first', async () => {
+test('independent stacks overlap and each stops on revocation without reselecting first', async () => {
   const calls = [];
-  let release,
-    available = true;
+  const releases = [];
+  let available = true;
   const dispatcher = new CommandDispatcher(
     async (id) => {
       calls.push(id);
-      if (id === 'a') await new Promise((resolve) => (release = resolve));
+      if (id === 'a') await new Promise((resolve) => releases.push(resolve));
     },
     () => {},
     () => false,
@@ -126,11 +126,13 @@ test('stack reservations prevent overlap and stop on revocation without reselect
   );
   const plan = { commands: ['a', 'b'], rowIds: ['one'], stackIds: ['stack'] };
   const run = dispatcher.dispatch('key', plan);
-  assert.equal((await dispatcher.dispatch('mouse', plan)).busy, 2);
+  const parallel = dispatcher.dispatch('mouse', plan);
+  assert.deepEqual(calls, ['a', 'a']);
   available = false;
-  release();
+  releases.forEach((release) => release());
   assert.equal((await run).cancelled, true);
-  assert.deepEqual(calls, ['a']);
+  assert.equal((await parallel).cancelled, true);
+  assert.deepEqual(calls, ['a', 'a']);
   available = true;
   assert.equal(
     (await dispatcher.dispatch('mouse', { commands: ['b'], rowIds: ['one'], stackIds: ['stack'] }))

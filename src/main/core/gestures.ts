@@ -211,10 +211,6 @@ export class InputCaptureManager {
     }
     return !!prepared && !!(await peer.request('gestures.activate', request));
   }
-  async activateProcess(pressId: number, processId: number) {
-    if (!this.peer || this.peer.closed || this.stopped) return false;
-    return !!(await this.peer.request('capture.activateProcess', { pressId, processId }));
-  }
   private async event(method: string, p: any) {
     if (method === 'gestures.indicator') {
       const notice = readGestureIndicatorNotice(p);

@@ -25,7 +25,7 @@ import type { UiCommand } from '../../shared/commands';
 import type { AutomationCommand } from './automation-commands';
 import type { SettingsStore } from './settings';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
-import type { InputInvocation } from './command-contexts';
+import { enterCommand, type InputInvocation } from './command-contexts';
 import {
   commandStackTypeId,
   parseCommandStack,
@@ -595,9 +595,9 @@ export class CustomCommandService {
     for (const [id, generation] of this.bindings)
       if (!records.some((r) => r.type.id === id && r.provider.generation === generation))
         this.bindings.delete(id);
-    for (const [id, active] of this.active) {
+    for (const active of this.active.values()) {
       const item = customItems(this.options.settings.value.customCommands).find(
-        (i) => customCommandId(i.id) === id,
+        (i) => i.id === active.definition.id,
       );
       const state = item ? this.state(item) : undefined;
       if (
@@ -654,13 +654,25 @@ export class CustomCommandService {
       return failure('PERMISSION_DENIED', hostText('services.customCommands.executionForbidden'));
     if (context.signal?.aborted)
       return failure('CANCELLED', hostText('services.customCommands.cancelled'));
-    if (this.active.has(id)) return failure('BUSY', hostText('services.customCommands.busy'));
+    const appletId = item.owner.kind === 'applet' ? item.owner.id : undefined;
+    if (
+      context.commandChain?.includes(id) ||
+      (appletId && context.commandApplets?.includes(appletId))
+    )
+      return failure('SELF_CALL', hostText('services.appdockApi.selfCall'));
+    context = enterCommand(id, context, appletId);
+    const executionId = randomUUID();
     const controller = new AbortController(),
       definition = structuredClone(item),
       provider = state.record.provider;
     const cancel = () => controller.abort();
     context.signal?.addEventListener('abort', cancel, { once: true });
-    this.active.set(id, { definition, generation: provider.generation, controller, context });
+    this.active.set(executionId, {
+      definition,
+      generation: provider.generation,
+      controller,
+      context,
+    });
     let timeout = false;
     const timer = setTimeout(() => {
       timeout = true;
@@ -710,7 +722,7 @@ export class CustomCommandService {
       controller.signal.removeEventListener('abort', aborted);
       context.signal?.removeEventListener('abort', cancel);
       controller.abort();
-      this.active.delete(id);
+      this.active.delete(executionId);
     }
   }
 }

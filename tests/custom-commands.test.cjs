@@ -346,7 +346,10 @@ test('execution is snapshot-based, bounded, cancellable and never automatically 
     return { ok: true };
   };
   const pending = f.service.execute(id, { origin: { kind: 'mcp' } });
-  await assert.rejects(f.service.execute(id), (e) => e.code === 'BUSY');
+  await assert.rejects(
+    f.service.execute(id, { commandChain: [id] }),
+    (e) => e.code === 'SELF_CALL',
+  );
   f.update([
     {
       op: 'update',
@@ -367,6 +370,42 @@ test('execution is snapshot-based, bounded, cancellable and never automatically 
   f.provider.invoke = async () => ({ large: 'x'.repeat(65536) });
   await assert.rejects(f.service.execute(id), (e) => e.code === 'OUTCOME_UNKNOWN');
 });
+test('same-command executions keep independent completion, cancellation and revocation lifetimes', async (t) => {
+  const f = fixture(t),
+    item = f.add({ automation: true }),
+    id = customCommandId(item.id);
+  const invocations = [],
+    controllers = [new AbortController(), new AbortController()];
+  f.provider.invoke = async (definition, context) => {
+    await new Promise((release) => invocations.push({ definition, context, release }));
+    return { ok: true };
+  };
+  const runs = [0, 1, 2].map((i) =>
+    f.service.execute(id, {
+      origin: { kind: 'mcp' },
+      signal: controllers[i]?.signal,
+    }),
+  );
+  assert.equal(invocations.length, 3);
+  assert.equal(new Set(invocations.map((i) => i.context.signal)).size, 3);
+  assert.deepEqual(invocations[0].context.commandChain, [id]);
+  assert.deepEqual(invocations[0].context.commandApplets, ['test.custom']);
+  invocations[0].release();
+  await runs[0];
+  assert.equal(invocations[1].context.signal.aborted, false);
+  controllers[1].abort();
+  await assert.rejects(runs[1], { code: 'CANCELLED' });
+  assert.equal(invocations[2].context.signal.aborted, false);
+  f.update([{ op: 'update', id: item.id, changes: { automation: false } }]);
+  await assert.rejects(runs[2], { code: 'CANCELLED' });
+  assert.equal(invocations[2].context.signal.aborted, true);
+  invocations.slice(1).forEach((i) => i.release());
+  const other = customCommandId(f.add().id);
+  await assert.rejects(f.service.execute(other, { commandApplets: ['test.custom'] }), {
+    code: 'SELF_CALL',
+  });
+});
+
 test('host and Applet providers use the same saved command service', async (t) => {
   const f = fixture(t);
   f.service.registerHost({ ...type, id: 'appdock.test' }, async (config) => ({
@@ -540,10 +579,22 @@ test('host-issued execution identity preserves cancellation and cannot be omitte
   let identity;
   await contexts.run(
     'test.custom',
-    { origin: { kind: 'mcp' }, signal: controller.signal, window: '123', session: 'gesture' },
+    {
+      origin: { kind: 'mcp' },
+      signal: controller.signal,
+      window: '123',
+      session: 'gesture',
+      commandChain: ['first', 'second'],
+      commandApplets: ['first.applet', 'test.custom'],
+    },
     async (id) => {
       identity = id;
       assert.equal(contexts.get('test.custom', id).origin.kind, 'mcp');
+      assert.deepEqual(contexts.get('test.custom', id).commandChain, ['first', 'second']);
+      assert.deepEqual(contexts.get('test.custom', id).commandApplets, [
+        'first.applet',
+        'test.custom',
+      ]);
       assert.throws(() => contexts.get('other', id));
       assert.throws(() => contexts.get('test.custom'));
       controller.abort();

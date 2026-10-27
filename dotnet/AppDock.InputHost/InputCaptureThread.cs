@@ -8,8 +8,8 @@ internal sealed class InputCaptureThread : IDisposable
     private readonly Thread thread;
     private readonly GestureIndicatorNotifications display;
     private readonly Channel<(string Method, object Payload)> notices =
-        Channel.CreateBounded<(string, object)>(new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true });
-    // Only the latest display state matters; recognition notices retain their existing queue.
+        Channel.CreateUnbounded<(string, object)>(new UnboundedChannelOptions { SingleReader = true, AllowSynchronousContinuations = false });
+    // Recognition notices retain every accepted press; only display state may be replaced.
     private readonly Channel<object> indicatorNotices = Channel.CreateBounded<object>(
         new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
     private readonly TaskCompletionSource<(Dispatcher Dispatcher, InputCaptureEngine Engine)> ready =
@@ -69,18 +69,6 @@ internal sealed class InputCaptureThread : IDisposable
         return permission is { } grant && await Task.Run(() =>
             ForegroundPermission.Activate(new nint(destination),grant.Source,grant.Process));
     }
-    internal Task<bool> ActivateProcessAsync(long pressId, uint process) => Task.Run(async () => {
-        if (disposed || process == 0 || process == uint.MaxValue || !presses.TryRemove(pressId, out var entry) ||
-            !long.TryParse(entry.Press.Window, out var source)) return false;
-        var descendants = new HashSet<uint> { process };
-        while (!disposed && Environment.TickCount64 - entry.At <= 1500) {
-            ForegroundPermission.AddDescendants(descendants);
-            var window = ForegroundPermission.ProcessWindow(descendants, out var owner);
-            if (window != 0) return ForegroundPermission.Activate(window, new nint(source), owner);
-            await Task.Delay(20);
-        }
-        return false;
-    });
     internal async Task<ShortcutStatus[]> ConfigureAsync(CaptureConfiguration configuration)
     {
         var state = await ready.Task;

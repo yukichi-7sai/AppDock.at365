@@ -62,14 +62,14 @@ for (const fixture of fixtures.inputExecutionModes)
     );
   });
 
-test('first does not fall through busy or failed commands, all reserves the complete batch across triggers', async () => {
+test('independent presses overlap while each batch preserves every entry and first never falls through failure', async () => {
   const calls = [],
     errors = [];
   let finish;
   const dispatcher = new CommandDispatcher(
     async (id) => {
       calls.push(id);
-      if (id === 'a')
+      if (id === 'a' && calls.length === 1)
         await new Promise((resolve) => {
           finish = resolve;
         });
@@ -78,14 +78,14 @@ test('first does not fall through busy or failed commands, all reserves the comp
     (error) => errors.push(error),
   );
   const batch = dispatcher.dispatch('keyboard:F1', plan(['a', 'b', 'a']));
-  assert.equal((await dispatcher.dispatch('gesture:left', plan(['a', 'c'], 'first'))).busy, 1);
-  assert.equal((await dispatcher.dispatch('keyboard:F2', plan(['b']))).busy, 1);
-  const busy = await dispatcher.dispatch('gesture:right', plan(['b', 'c']));
-  assert.deepEqual(busy, { executed: 1, failed: 0, busy: 1, cancelled: false });
-  assert.deepEqual(calls, ['a', 'c']);
+  assert.equal((await dispatcher.dispatch('keyboard:F1', plan(['a', 'c'], 'first'))).executed, 1);
+  assert.equal((await dispatcher.dispatch('keyboard:F2', plan(['b']))).executed, 1);
+  const parallel = await dispatcher.dispatch('gesture:right', plan(['b', 'c']));
+  assert.deepEqual(parallel, { executed: 2, failed: 0, busy: 0, cancelled: false });
+  assert.deepEqual(calls, ['a', 'a', 'b', 'b', 'c']);
   finish();
   await batch;
-  assert.deepEqual(calls, ['a', 'c', 'b']);
+  assert.deepEqual(calls, ['a', 'a', 'b', 'b', 'c', 'b', 'a']);
   const firstFailure = await dispatcher.dispatch('keyboard:F3', plan(['fail', 'tail'], 'first'));
   assert.equal(firstFailure.failed, 1);
   assert.equal(calls.includes('tail'), false);
@@ -94,7 +94,7 @@ test('first does not fall through busy or failed commands, all reserves the comp
   assert.equal(errors.length, 2);
 });
 
-test('a fixed plan survives page changes and reserves before asynchronous validity or SendInput re-entry', async () => {
+test('a fixed plan survives page changes and allows independent input during asynchronous validity', async () => {
   const context = { host: { focused: true, pageId: 'host.settings' } };
   const rows = normalizeRows(
     ['a', 'b'].map((command) => ({
@@ -112,7 +112,7 @@ test('a fixed plan survives page changes and reserves before asynchronous validi
       if (!reentered) {
         reentered = true;
         const nested = await dispatcher.dispatch('gesture:left', plan(['a', 'b']));
-        assert.equal(nested.busy, 2);
+        assert.equal(nested.executed, 2);
       }
       return true;
     },
@@ -122,11 +122,11 @@ test('a fixed plan survives page changes and reserves before asynchronous validi
       rows.splice(0);
     },
   });
-  assert.deepEqual(calls, ['a', 'b']);
+  assert.deepEqual(calls, ['a', 'b', 'a', 'b']);
   assert.equal(Object.isFrozen(captured.commands), true);
 });
 
-test('lifetime cancellation and failures release reservations; shutdown stops the remaining batch', async () => {
+test('lifetime cancellation and failures leave other inputs usable; shutdown stops the remaining batch', async () => {
   let valid = true,
     stopped = false;
   const calls = [];

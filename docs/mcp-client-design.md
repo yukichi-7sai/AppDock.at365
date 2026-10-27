@@ -65,9 +65,9 @@ connectionは`{enabled,transport,command,args,cwd,url,authentication,published,p
 
 FastMCPの`x-fastmcp-wrap-result`はboolean型の注釈として明示対応し、Schema位置から検証時だけ除外する。包まれた`result`プロパティの型・必須条件はそのまま検証する。Schema原文は詳細とtoolRevisionに残す。任意の未知keywordを許可する変更ではない。
 
-呼出しは検証後にjobIdを返し、状態はrunning/succeeded/tool-error/failed/cancelled/outcome-unknown。`succeeded`はMCP応答の受領で、外部効果の確認ではない。`isError`、content、structuredContentを保持し、リンクの自動取得やHTML実行はしない。1サーバー1件、全体4件まで実行し、待ち行列は作らずBUSYを返す。受付前の発見も時間制限内に収める。
+呼出しは検証後にjobIdを返し、状態はrunning/succeeded/tool-error/failed/cancelled/outcome-unknown。`succeeded`はMCP応答の受領で、外部効果の確認ではない。`isError`、content、structuredContentを保持し、リンクの自動取得やHTML実行はしない。同じ接続先・呼出し元への独立した要求も並行して受け付ける。開始準備中・実行中・結果保持中の件数による受付制限を設けない。受付前の発見も時間制限内に収める。
 
-requestIdはcaller・接続・引数・toolRevisionに結び付け、同じ入力だけ保持期間中の重複送信を抑止する。別入力で同じIDは拒否する。待ち時間は1〜600秒（既定60秒）。取消・タイムアウト・通信切断は自動再送せず、結果不明と効果が戻らないことを区別する。送信後のタイムアウト/切断はoutcome-unknown。ジョブはメモリーのみ、完了10分後に結果を廃棄し、最大64件。再起動後はNOT_FOUNDで、再開/再送しない。
+requestIdはcaller・接続・引数・toolRevisionに結び付け、同じ入力だけ保持期間中の重複送信を抑止する。別入力で同じIDは拒否する。応答の制限時間は1〜600秒（既定60秒）で、操作後の待機や操作間隔ではない。取消・タイムアウト・通信切断は自動再送せず、結果不明と効果が戻らないことを区別する。送信後のタイムアウト/切断はoutcome-unknown。ジョブはメモリーのみ、完了10分後に結果を廃棄する。再起動後はNOT_FOUNDで、再開/再送しない。
 
 呼出し元はホストが発行する実行文脈とプロセス世代から決定し、引数から受け取らない。結果取得・取消も同じcallerに限定する。本体UIだけが全体のジョブを管理する。許可取消、Applet停止、MCP認証世代変更、接続無効化、設定変更で実行を取り消し、既存の結果へのアクセスも止める。
 
