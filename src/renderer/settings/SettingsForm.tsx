@@ -212,7 +212,7 @@ export function SettingsForm({
         )}
         {(category === 'gestures' || category === 'touchpad-gestures') && (
           <GesturesEditor
-            key={category}
+            key={`gesture-options:${category}`}
             touchpad={
               category === 'touchpad-gestures' ? { snapshot: aux.touchpad, invoke } : undefined
             }
@@ -221,13 +221,13 @@ export function SettingsForm({
           />
         )}
         {category === 'shortcuts' && (
-          <ShortcutsEditor key={category} settings={settings} onChange={edit} />
+          <ShortcutsEditor key="shortcut-options" settings={settings} onChange={edit} />
         )}
         {(category === 'shortcuts' ||
           category === 'gestures' ||
           category === 'touchpad-gestures') && (
           <TriggerStackSettings
-            key={category}
+            key={`trigger-stacks:${category}`}
             kind={category}
             settings={settings}
             commands={commands}

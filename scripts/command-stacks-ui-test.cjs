@@ -286,11 +286,49 @@ async function close() {
       await page.getByTestId('settings-nav:' + kind).click();
       const table = page.getByTestId('trigger-stack-table');
       await table.waitFor();
+      const optionsId = {
+        shortcuts: 'key-gesture-options',
+        gestures: 'mouse-gesture-enablement',
+        'touchpad-gestures': 'touchpad-gesture-enablement',
+      }[kind];
+      const settingsKey = {
+        shortcuts: 'keybindingOptions',
+        gestures: 'gestures',
+        'touchpad-gestures': 'touchpadGestures',
+      }[kind];
+      for (const mode of ['first', 'all', 'first', 'all']) {
+        await page.getByTestId(optionsId).first().getByRole('combobox').first().selectOption(mode);
+        await until(
+          async () => (await snapshot()).settings.value[settingsKey].executionMode === mode,
+          'feature option saved',
+        );
+        assert.equal(
+          await page.getByTestId(optionsId).count(),
+          1,
+          kind + ' options must not multiply',
+        );
+        assert.equal(
+          await page.getByTestId('gesture-common-options').count(),
+          1,
+          kind + ' common options must not multiply',
+        );
+        assert.equal(await table.count(), 1, kind + ' stack table must not multiply');
+        if (kind === 'touchpad-gestures')
+          assert.equal(await page.getByTestId('touchpad-connection').count(), 1);
+      }
       assert.equal(await table.locator('tbody tr').count(), 1);
       await table.getByRole('button', { name: /を編集$/ }).click();
       await dialog.getByTestId('stack-execution-mode').selectOption('first');
       await save();
+      assert.equal(
+        await page.getByTestId(optionsId).count(),
+        1,
+        kind + ' options remain unique after stack edit',
+      );
     }
+    checks.push(
+      'repeated feature-option and stack edits retain one options section and table for each gesture kind',
+    );
     await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
     await page.getByTestId('command-stack-tab:gestures').click();
     assert.match(await page.getByTestId('trigger-stack-table').innerText(), /最初/);
