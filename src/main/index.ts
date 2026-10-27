@@ -101,7 +101,7 @@ import { mcpCommandType } from '../shared/mcp-command';
 import type { InputInvocation } from './core/command-contexts';
 import { commandStackType, parseCommandStack, validateStackGraph } from '../shared/command-stacks';
 import { customItems } from '../shared/custom-commands';
-import { triggerStacks } from '../shared/trigger-stacks';
+import { triggerStacks, inheritedTriggerExecutionMode } from '../shared/trigger-stacks';
 import { planCommandBatch } from '../shared/command-execution';
 import { commandCondition } from '../shared/command-conditions';
 import { SettingsPageSession } from './core/settings-page';
@@ -2162,7 +2162,19 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     };
   if (['tray', 'command-triggers'].includes(id))
     return {
-      ...(id === 'command-triggers' ? { commandAssignments: settingsCommandAssignments() } : {}),
+      ...(id === 'command-triggers'
+        ? {
+            commandAssignments: settingsCommandAssignments(),
+            triggerExecutionModes: {
+              shortcuts: inheritedTriggerExecutionMode(settings.value, 'shortcuts'),
+              gestures: inheritedTriggerExecutionMode(settings.value, 'gestures'),
+              'touchpad-gestures': inheritedTriggerExecutionMode(
+                settings.value,
+                'touchpad-gestures',
+              ),
+            },
+          }
+        : {}),
       provider:
         settingsNavigation.provider?.page === id
           ? {

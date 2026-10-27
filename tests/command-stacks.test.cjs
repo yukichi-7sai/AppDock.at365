@@ -11,6 +11,7 @@ const {
   triggerStacks,
   applyTriggerStack,
   sortTriggerStacksForDisplay,
+  inheritedTriggerExecutionMode,
 } = require('../out/main/shared/trigger-stacks');
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema');
@@ -139,6 +140,26 @@ test('independent stacks overlap and each stops on revocation without reselectin
       .executed,
     1,
   );
+});
+
+test('inherited trigger modes follow each gesture default independently of input overrides', () => {
+  const settings = createDefaultSettings();
+  for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures'])
+    assert.equal(inheritedTriggerExecutionMode(settings, kind), 'all');
+  settings.keybindingOptions.executionMode = 'first';
+  settings.gestures.executionMode = 'first';
+  settings.touchpadGestures.executionMode = 'first';
+  settings.keybindingOptions.inputExecutionModes = { 'Ctrl+F8': 'all' };
+  settings.gestures.inputExecutionModes = { 'move-up': 'all' };
+  settings.touchpadGestures.inputExecutionModes = { 'three.tap': 'all' };
+  const before = structuredClone(settings);
+  for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures'])
+    assert.equal(inheritedTriggerExecutionMode(settings, kind), 'first');
+  assert.deepEqual(settings, before);
+  settings.gestures.executionMode = 'all';
+  assert.equal(inheritedTriggerExecutionMode(settings, 'gestures'), 'all');
+  assert.equal(inheritedTriggerExecutionMode(settings, 'shortcuts'), 'first');
+  assert.equal(inheritedTriggerExecutionMode(settings, 'touchpad-gestures'), 'first');
 });
 
 test('trigger stacks are the single persisted assignment source and share conflict checked edits', () => {

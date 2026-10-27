@@ -30,6 +30,7 @@ import { AppletShortcutDialog } from '../settings-ui/AppletShortcutDialog';
 import { GestureBindingDialog } from './GestureBindingDialog';
 import { TriggerStackDialog, TriggerStackSettings } from './TriggerStackSettings';
 import { triggerStacks } from '../../shared/trigger-stacks';
+import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 
 const kindKeys = {
   shortcuts: 'settings.commandTriggers.keys',
@@ -115,6 +116,7 @@ export function CommandTriggersEditor({
   provider,
   clearProvider,
   busy = false,
+  inheritedModes,
 }: {
   settings: Settings;
   onChange(settings: Settings): void;
@@ -124,6 +126,7 @@ export function CommandTriggersEditor({
   provider?: { id: string; title: string; request: number };
   clearProvider?(): void;
   busy?: boolean;
+  inheritedModes?: SettingsPageAuxiliary['triggerExecutionModes'];
 }) {
   const { t } = useHostTranslation();
   const controls = useSettingsControls();
@@ -351,6 +354,7 @@ export function CommandTriggersEditor({
           ) : (
             <TriggerStackDialog
               settings={settings}
+              inheritedMode={inheritedModes?.[edit.row.kind]}
               initial={triggerStacks(settings, edit.row.kind).find(
                 (stack) =>
                   stack.input ===
@@ -367,6 +371,7 @@ export function CommandTriggersEditor({
         renderOrder={(row, close) => (
           <TriggerStackDialog
             settings={settings}
+            inheritedMode={inheritedModes?.[row.kind]}
             initial={triggerStacks(settings, row.kind).find(
               (stack) =>
                 stack.input === ('key' in row.binding ? row.binding.key : row.binding.gesture),
@@ -408,6 +413,7 @@ export function CommandTriggersEditor({
         <TriggerStackSettings
           key={tab}
           kind={tab}
+          inheritedMode={inheritedModes?.[tab]}
           settings={settings}
           commands={commands}
           applets={applets}

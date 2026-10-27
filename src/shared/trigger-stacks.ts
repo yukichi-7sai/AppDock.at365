@@ -22,6 +22,14 @@ export interface TriggerStack {
 export function triggerStackKey(stack: Pick<TriggerStack, 'kind' | 'input'>) {
   return JSON.stringify([stack.kind, stack.input]);
 }
+/** The gesture-wide default, independently of any per-input override. */
+export function inheritedTriggerExecutionMode(settings: Settings, kind: TriggerStackKind) {
+  return kind === 'shortcuts'
+    ? getKeybindingOptions(settings).executionMode
+    : kind === 'gestures'
+      ? (settings.gestures ?? defaultGestures()).executionMode
+      : (settings.touchpadGestures ?? defaultTouchpadGestures()).executionMode;
+}
 /** Presentation order only; keep each stack's execution order and stored rows intact. */
 export function sortTriggerStacksForDisplay(stacks: readonly TriggerStack[]): TriggerStack[] {
   const kinds = ['shortcuts', 'gestures', 'touchpad-gestures'];

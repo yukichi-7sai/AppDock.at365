@@ -35,6 +35,7 @@ fs.writeFileSync(
 const initial = createDefaultSettings();
 const featureSettingsOnly = process.argv.includes('--feature-settings-only');
 const triggerTabsOnly = process.argv.includes('--trigger-tabs-only');
+const inheritanceOnly = process.argv.includes('--inheritance-only');
 const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
 const triggerSettingsOnly = process.argv.includes('--trigger-settings-only');
 const lockKeysOnly = process.argv.includes('--lock-keys-only');
@@ -116,6 +117,11 @@ if (lockKeysOnly) {
   initial.gestures.bindings = [];
   initial.touchpadGestures.bindings = [];
 }
+if (inheritanceOnly) {
+  initial.keybindingOptions.executionMode = 'first';
+  initial.gestures.executionMode = 'first';
+  initial.touchpadGestures.executionMode = 'first';
+}
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = source ? path.join(profile, 'AppDock.at365.exe') : null;
@@ -188,6 +194,7 @@ const recordSuccess = () => {
         checks,
         featureSettingsOnly,
         triggerTabsOnly,
+        inheritanceOnly,
         bindingEditorsOnly,
         lockKeysOnly,
         source: source ? path.resolve(source) : 'development build',
@@ -223,6 +230,23 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (inheritanceOnly) {
+      await open();
+      const inheritance = require('./trigger-inheritance-checks.cjs');
+      await inheritance.check({ host, saved, save, open, row, checks });
+      const durable = await saved();
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      await open();
+      await inheritance.verify({ host, checks });
+      assert.deepEqual(await saved(), durable);
+      assert.deepEqual(errors, []);
+      checks.push('actual restart retains global modes and inherited trigger selections');
+      recordSuccess();
+      return;
+    }
     if (lockKeysOnly) {
       await open();
       await require('./lock-key-ui-checks.cjs')({ host, saved, save, checks, row, until });

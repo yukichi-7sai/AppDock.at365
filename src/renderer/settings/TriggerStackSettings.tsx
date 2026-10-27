@@ -6,12 +6,12 @@ import {
   sortTriggerStacksForDisplay,
   applyTriggerStack,
   normalizeStackInput,
+  inheritedTriggerExecutionMode,
   type TriggerStack,
   type TriggerStackKind,
 } from '../../shared/trigger-stacks';
 import { gestureTitle } from '../../shared/gestures';
 import { touchpadTitle } from '../../shared/touchpad-gestures';
-import { getKeybindingOptions } from '../../shared/keybindings';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
@@ -40,6 +40,7 @@ export function TriggerStackDialog({
   onChange,
   onClose,
   initialEntryId,
+  inheritedMode,
 }: {
   settings: Settings;
   initial: TriggerStack;
@@ -49,6 +50,7 @@ export function TriggerStackDialog({
   onChange(settings: Settings): void;
   onClose(): void;
   initialEntryId?: string;
+  inheritedMode?: 'first' | 'all';
 }) {
   const { t } = useHostTranslation();
   const [value, setValue] = useState(() => structuredClone(initial));
@@ -66,12 +68,7 @@ export function TriggerStackDialog({
     });
     return () => cancelAnimationFrame(frame);
   }, [selecting]);
-  const inherited =
-    value.kind === 'shortcuts'
-      ? getKeybindingOptions(settings).executionMode
-      : value.kind === 'gestures'
-        ? (settings.gestures?.executionMode ?? 'all')
-        : (settings.touchpadGestures?.executionMode ?? 'all');
+  const inherited = inheritedMode ?? inheritedTriggerExecutionMode(settings, value.kind);
   let validInput = true;
   try {
     normalizeStackInput(value.kind, value.input);
@@ -211,6 +208,7 @@ export function TriggerStackSettings({
   applets,
   onChange,
   busy = false,
+  inheritedMode,
 }: {
   settings: Settings;
   kind: TriggerStackKind;
@@ -218,6 +216,7 @@ export function TriggerStackSettings({
   applets: ExtensionSnapshot[];
   onChange(settings: Settings): void;
   busy?: boolean;
+  inheritedMode?: 'first' | 'all';
 }) {
   const { t } = useHostTranslation();
   const [dialog, setDialog] = useState<{
@@ -282,6 +281,7 @@ export function TriggerStackSettings({
       {dialog?.kind === 'edit' && (
         <TriggerStackDialog
           settings={settings}
+          inheritedMode={inheritedMode}
           initial={dialog.stack}
           original={dialog.adding ? null : dialog.stack}
           commands={commands}

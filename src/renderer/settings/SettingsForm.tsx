@@ -201,6 +201,7 @@ export function SettingsForm({
         {category === 'command-triggers' && (
           <CommandTriggersEditor
             busy={busy}
+            inheritedModes={aux.triggerExecutionModes}
             provider={aux.provider}
             clearProvider={() => void invoke('clearProvider')}
             settings={settings}
