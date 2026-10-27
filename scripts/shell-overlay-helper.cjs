@@ -21,6 +21,12 @@ exports.closingAction = async (action) => {
     if (!/Target page, context or browser has been closed/.test(String(e))) throw e;
   }
 };
+exports.overlayClosed = async (page) =>
+  page.isClosed() ||
+  !(await page
+    .locator('.command-palette')
+    .count()
+    .catch(() => (page.isClosed() ? 0 : 1)));
 exports.overlayPage = async (host) => {
   const end = Date.now() + 15000;
   while (Date.now() < end) {

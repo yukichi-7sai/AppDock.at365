@@ -9,6 +9,7 @@ export interface HostSettings {
   customAccentDark: string;
   customAccentLight: string;
   showHints: boolean;
+  overlayBackground: 'blur' | 'transparent';
   soundEnabled: boolean;
   closeToTray: boolean;
   startMinimized: boolean;
@@ -280,6 +281,7 @@ export interface GlobalHotKeyStatus {
   effectiveBlockOriginalInput?: boolean;
 }
 export interface DockApi {
+  onOverlayState(callback: (state: HostSnapshot['overlay']) => void): () => void;
   imageLibrary: import('./registered-images').ImageLibraryApi;
   imageLibraryDialog: import('./image-library-page').ImageLibraryDialogApi;
   settingsPage: import('./settings-page').SettingsPageApi;

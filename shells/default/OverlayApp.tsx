@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { OverlayAction, OverlayModel, ShellOverlayApi } from '../../src/shared/overlays';
 import { CommandPalette } from './CommandPalette';
 import { RibbonGroupPanel } from './RibbonGroupPanel';
@@ -9,39 +9,71 @@ declare global {
 }
 const api = window.appdockOverlay;
 export function OverlayApp() {
-  const [model, setModel] = useState<OverlayModel>();
-  const [session, setSession] = useState('');
+  const [binding, setBinding] = useState<{ model: OverlayModel; session: string }>();
+  const model = binding?.model;
+  const activeModelId = useRef<string | undefined>(undefined);
+  activeModelId.current = model?.id;
   const [error, setError] = useState('');
   useEffect(() => {
     let live = true;
+    let currentId = '';
+    let sequence = 0;
+    const connect = async () => {
+      const request = ++sequence;
+      try {
+        const c = await api.connect();
+        if (!live || request !== sequence) return;
+        currentId = c.snapshot.id;
+        setError('');
+        setBinding({ model: c.snapshot, session: c.sessionId });
+      } catch (e) {
+        if (live && request === sequence) setError(String(e));
+      }
+    };
     const accept = (next: OverlayModel) => {
-      if (live)
-        setModel((old) => (old && old.id === next.id && old.revision > next.revision ? old : next));
+      if (!live) return;
+      if (next.id !== currentId) {
+        void connect();
+        return;
+      }
+      setBinding((old) =>
+        old && old.model.id === next.id && old.model.revision > next.revision
+          ? old
+          : old && { ...old, model: next },
+      );
     };
     const unsubscribe = api.onChanged(accept);
-    void api
-      .connect()
-      .then((c) => {
-        if (live) {
-          accept(c.snapshot);
-          setSession(c.sessionId);
-        }
-      })
-      .catch((e) => setError(String(e)));
+    const unsuspend = api.onSuspended?.(() => {
+      sequence++;
+      currentId = '';
+      setBinding(undefined);
+      setError('');
+    });
+    void connect();
     return () => {
       live = false;
       unsubscribe();
+      unsuspend?.();
     };
   }, []);
   useEffect(() => {
-    if (session && model) void api.ready(session).catch((e) => setError(String(e)));
-  }, [session, !!model]);
+    let live = true;
+    if (binding)
+      void api.ready(binding.session, { reusable: true, modelId: binding.model.id }).catch((e) => {
+        if (live) setError(String(e));
+      });
+    return () => {
+      live = false;
+    };
+  }, [binding?.session, model?.id]);
   useEffect(() => {
     document.documentElement.dataset.theme = model?.dark ? 'dark' : 'light';
   }, [model?.dark]);
   const act = (action: OverlayAction) => {
     setError('');
-    void api.act(action).catch((e) => setError(String(e)));
+    void api.act(action).catch((e) => {
+      if (activeModelId.current === action.id) setError(String(e));
+    });
   };
   if (!model) return null;
   if (model.kind === 'ribbon-group')

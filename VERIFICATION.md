@@ -1,5 +1,26 @@
 # 検証記録
 
+## 2026-10-27: 0.99.1のコミット確認と試行worktreeの整理
+
+- 利用者がmain版の動作を確認し、mainの変更のコミットと`AppDock.at365-dialog-performance`のworktree/専用発行先だけの削除を依頼した。製品差分は0.99.1の検証入力と一致。新しい製品修正は行わず、既存の配布物を維持して再発行・版更新はしない。
+- 実装時の関連205件・固定EXE GUI32群/smokeを入力/完全ログ/発行694ファイルのhash一致で再利用した。標準回帰の残り121ファイル1,009件を追加実行し、1,008件成功。失敗1件は`preferences.test.cjs`の旧設定期待値に新規項目`overlayBackground: transparent`が不足していたため、テストだけを修正し同ファイル7件が成功。重複を除き標準142ファイル1,214件の必要成功が揃い、fail/skip 0。修正したテスト以外の入力・製品・配布物は不変。
+- 公開SDK/native本体は変更していない。追加のnativeキー状態試験の前面Window制約と、実OS入力全般の未確認範囲は前項のとおり保持する。今回のコミットで同試験の成功を主張しない。証跡の入口は`.artifacts/commit-validation-dialog-performance-20261027/`。stage treeと作業ファイル、commit treeの一致を記録し、push/Release/deployは行わない。
+- worktreeの変更38ファイルを統合先と照合した。本文は一致し、例外はmain 0.98.8のGUI検査を保持したスタック試験と、保存する試行履歴のVERIFICATIONのみ。削除前にソース・試行履歴・計測スクリプト・完全ログ・結果・画像を`.artifacts/retained-dialog-performance-trial-20261027/`へhash照合して保存する。
+- コミット後の整理記録は`.artifacts/dialog-performance-worktree-cleanup-20261027/{before,cleanup,final-verification}.json`を正本とする。対象は`A:\30.PROJECT\AppDock.at365-dialog-performance`と`A:\40.ARTIFACT\AppDock.at365-dialog-performance`。実行中プロセスと絶対パスを確認し、再解析ポイントをリンクとして解除してから削除する。main、標準発行物、共有ツール、MCP設計worktreeを保持する。
+
+## 2026-10-27: パレット再利用・背景選択のmain統合と透明既定 0.99.1
+
+- 利用者が専用worktreeの0.99.0を確認し、透明ではダイアログも速くなることを確認した。依頼に従い背景の既定値を`transparent`へ変更し、選択肢を「透明」「ブラー」とした。省略設定・新規設定・appearanceの初期値未提供・CSS変数未配布もfilterなし。保存IDの`blur`と明示的に保存された選択は保持する。体感改善は利用者確認として記録し、定量値に置き換えない。
+- cleanなmain/b9184edに`pull --ff-only`を実行、Already up to date。c1c8215基点の`AppDock.at365-dialog-performance`から3方向で適用、競合0。mainのカスタム編集・スクロール・狭幅レイアウトと対応GUIはHEADとの一致を確認した。package/検証記録は個別に扱い、発行済み試行版から0.99.1へ更新した。
+- 設定ページの入力停止・再開で全モデルの再取得・再構築・返却を省く。既存入力確定キュー、送信元/接続/session/ページ/発行済み操作ID/最新利用可否の検査、ショートカット・ジェスチャーの保護を維持した。パレットは対応Viewを最大1件再利用し、閉鎖時にsession・検索・選択を初期化、再表示時に新しいreadyを待つ。旧Shellの破棄方式・故障時の復旧も維持する。
+- 発行前レビューは`.artifacts/dialog-performance-main-20261027/review.md`。worktreeの関連44件、統合mainの型検査/build・関連21ファイル205件（pass205/fail0/skip0）が成功。依存検査メタデータは固定lockfileのオフラインinstallで更新した。パッチ出力の改行/引数エラーはmainを変更しておらず、git自身が出力したraw patchで適用を完了した。
+- `publish.bat`で標準の`A:\40.ARTIFACT\AppDock.at365`へ発行、exit0。Node24.22.1/pnpm12.10.1/Electron45.0.0。staging/発行/ZIPの管理対象694ファイル、ASAR内out261ファイル、版・Default Shell・feed・deploy用ファイルを照合した。利用者データは管理対象へ含めていない。
+- 固定EXEでダイアログ9群、画像ライブラリー8群、Shell/パレット7群、カスタム編集8群（計32群）とsmokeが成功。透明既定、選択肢/切替、画像プレビュー・Applet/nested本文、編集40回とパレット反復、背景クリックの制御、検索初期化/session更新、未対応Shell・故障・timeout・再試行、既存レイアウトを確認。5つの隔離コピーも管理対象694ファイルずつ最終発行物と一致した。
+- 追加のInputHost模擬キー状態試験は未完了。初回`GetForegroundWindow`が0・不可視の環境で、最初のPause模擬入力の前面Window前提を満たせずexit1。一時的な試験用Windowでも先頭検査で停止した。OSへPause/F13〜F24を送信・登録しておらず、native/試験ソースは試行基点から不変。今回の発行DLLで58件成功したとは扱わない。今回の必要範囲は上記の設定・入力保護・パレットの単体/固定GUIで確認し、実OSの全入力効果は未確認とする。
+- 最終EXE SHA256 `778d39641cdcb5f115c0a5a664750626a3e2850df10483b9f8a22d17709b93e4`、ASAR `dd816afbfbc66a51d996604535c653339a3630b6bd64a8583287cdbc657bd532`、更新ZIP `8d6dcf3311d50f864e1fff063c5b60df1741c356f7f9eea93c96071162996738`（270,681,738 bytes）。検証前後と最終入力のhash一致。完全ログ・コマンド・入力/配布hashの入口は`.artifacts/dialog-performance-main-20261027/validation.json`、段階別は`check.json`・`publish.json`・`gui.json`・`package-validation.json`・`asar-validation.json`。
+- 試行版の計測正本は`.artifacts/retained-dialog-performance-trial-20261027/source/VERIFICATION.md`と同保持先の`artifacts/dialog-performance-validation-20261027/`・`dialog-performance-latency-20261027/`。再表示中央値136→10msは当時の隔離fixtureによる計測で、今回の統合版では再計測していない。
+- 今回の試験プロセス0、indexの変更0、diff検査成功。固定EXE profile5件は証跡として保持し、既存の検証参照・状態未確定の生成物は削除していない。専用worktree/旧専用発行先と他worktreeも保持した。main統合・ローカル発行までで、commit・push・Release・実利用先deployは行っていない。
+
 ## 2026-10-27: カスタムコマンドダイアログの区切りとスクロール整理 0.98.8
 
 - 開始時に履歴・作業ツリー・インデックス・未追跡・worktreeを確認。`main`はクリーンで、明示依頼後の`pull --ff-only`はAlready up to date。`origin/main`と`c1c8215f954012a5ef65679686b24a2af35c37aa`で一致し、ahead/behindは0/0。他のworktreeを保持して着手した。

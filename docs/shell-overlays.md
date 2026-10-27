@@ -44,11 +44,11 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 | `OverlayController`          | 内容別のモデル・操作・完了・取消。表示先を所有しない                                             |
 | `CommandPaletteSession`      | コマンド列挙・利用可否、現在のピン保存、選択だけの結果、共通コマンド実行、実行中の重複防止       |
 | Default Shell / Shell Applet | 公開snapshotの描画、検索文字列・選択位置・キーボード移動。設定や業務状態を複製しない             |
-| 本体の`CommandPicker`        | トレイ編集から選択を要求し、返されたIDを設定入力へ反映し、即時保存する。描画実装を持たない              |
+| 本体の`CommandPicker`        | トレイ編集から選択を要求し、返されたIDを設定入力へ反映し、即時保存する。描画実装を持たない       |
 
-下のApplet WebContentsや入力・sessionを破棄/再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループは従来のクライアント領域を使う。設定通知もその下へ置く。パレットの背景は透明で、本文だけを2pxぼかす。本体本文はCSS filter、別WebContentsのApplet本文は一時CSSを使い、撮影せず同じrendererと入力を保持する。リボン・タイトルバー・ステータスバーは操作できる。本文の背景クリックで閉じ、リボン等のroute変更でも閉じる。グローバルキー・ジェスチャーによる共通コマンド割り当ての停止は維持する。パレット自身の入力・IME・Tab循環・上下/Enter/Escapeは描画が扱う。
+下のApplet WebContentsや入力・sessionを破棄/再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループは従来のクライアント領域を使う。設定通知もその下へ置く。背景は[表示設定](appearance.md#ダイアログパレットの背景)に従い、本文だけを薄くぼかすか透明にする。本体本文はCSS filter、別WebContentsのApplet本文は一時CSSを使い、撮影せず同じrendererと入力を保持する。リボン・タイトルバー・ステータスバーは操作できる。本文の背景クリックで閉じ、リボン等のroute変更でも閉じる。グローバルキー・ジェスチャーによる共通コマンド割り当ての停止は維持する。パレット自身の入力・IME・Tab循環・上下/Enter/Escapeは描画が扱う。
 
-閉じるとView・readyタイマーを破棄し、元のrouteが変わらず本体Windowにフォーカスがある場合だけ元のWebContentsへ戻す。新しい要求は旧要求を取消。所有Windowの非表示・最小化・再読込・終了、本文のroute変更でも取消する。実行開始済みコマンドの副作用を取消で巻き戻すことはしない。
+閉じるとreadyタイマーを解除し、元のrouteが変わらず本体Windowにフォーカスがある場合だけ元のWebContentsへ戻す。再利用に対応したパレットViewは非表示で1件保持し、未対応のViewと一時リボングループは破棄する。初回は遅延生成し、2回目以降は同じ提供元・版・起動世代・正規化URLのViewを再利用する。提供元の停止・更新・故障、Shell再試行、ホスト終了では保持Viewを破棄する。新しい要求は旧要求を取消。所有Windowの非表示・最小化・再読込・終了、本文のroute変更でも取消する。実行開始済みコマンドの副作用を取消で巻き戻すことはしない。
 
 ## 公開bridge
 
@@ -59,6 +59,8 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 3. `act({id,type,...})`で操作する。`id`はホスト発行のオーバーレイID。取消`dismiss`、選択/実行`choose`（`commandId`）、`togglePin`（`commandId`）、`movePin`（`commandId/direction: -1|1/visibleIds`）を提供する。
 4. `executeCommand(id)`で自Appletの登録コマンドを実行できる。任意コマンド実行の入口にはしない。選択中コマンドの実行は`choose`でホストに判断させる。
 5. `onChanged`の戻り値で購読を解除する。View終了時はホストが回収する。
+
+再利用に対応する描画は`onSuspended(callback)`を購読し、`ready(sessionId, { reusable: true, modelId: snapshot.id })`で明示する。非表示通知で検索文字列・選択・旧モデルを破棄する。次の`onChanged`で別のモデルIDを受けたら`connect()`し直し、新しいsessionとモデルを描画してから再度readyする。それまではViewを表示しない。閉鎖時にもsessionを失効させ、非表示中の接続・操作や旧IDの要求を拒否する。Default Shellはこの契約に対応する。従来の`ready(sessionId)`を使うShell Appletは破棄・再生成の動作を維持する。
 
 モデルは`schemaVersion:1/id/contextId:primary/kind:command-palette/revision/dark/modal:true/content`。contentは`mode/commands/pins/shortcuts/busy/error`。リボンとは独立した接続・モデル・readyを持つ。WebContents、main frame、登録URL、現session、ready状態を検査し、古いオーバーレイIDの操作は拒否する。
 

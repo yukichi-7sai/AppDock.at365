@@ -3198,7 +3198,7 @@ summary {
 }
 .applet-shortcut-dialog::backdrop {
   background: transparent;
-  backdrop-filter: blur(2px);
+  backdrop-filter: var(--appdock-overlay-filter, none);
   inset: var(--dialog-page-top, 0px) var(--dialog-page-right, 0px) var(--dialog-page-bottom, 0px)
     var(--dialog-page-left, 0px);
 }

@@ -17,6 +17,7 @@ function paint() {
     '--accent-text': text,
     '--accent-hover': hover,
     '--accent-focus': accent,
+    '--appdock-overlay-filter': current.overlayBackground === 'blur' ? 'blur(2px)' : 'none',
   }))
     for (const element of [root, document.body]) element?.style.setProperty(name, value);
 }

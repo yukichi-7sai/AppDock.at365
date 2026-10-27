@@ -98,6 +98,18 @@ const definitions = {
     automation: true,
     generateCommands: [...switches],
   },
+  overlayBackground: {
+    pageId: 'appearance',
+    title: hostText('appearance.overlayBackground.label'),
+    description: hostText('appearance.overlayBackground.description'),
+    type: 'select',
+    default: 'transparent',
+    automation: true,
+    options: (['transparent', 'blur'] as const).map((value) => ({
+      value,
+      label: hostText(`appearance.overlayBackground.${value}`),
+    })),
+  },
   soundEnabled: {
     pageId: 'general',
     title: hostText('general.sound.label'),

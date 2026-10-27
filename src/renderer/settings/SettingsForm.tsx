@@ -333,6 +333,26 @@ export function SettingsForm({
                   }
                 />
               </SettingRow>
+              <SettingRow pageId={category} itemKey="overlayBackground">
+                <select
+                  aria-label={t('appearance.overlayBackground.label')}
+                  value={settings.host.overlayBackground}
+                  onChange={(event) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        overlayBackground: event.target.value as 'blur' | 'transparent',
+                      },
+                    })
+                  }
+                >
+                  <option value="transparent">
+                    {t('appearance.overlayBackground.transparent')}
+                  </option>
+                  <option value="blur">{t('appearance.overlayBackground.blur')}</option>
+                </select>
+              </SettingRow>
             </SettingsSection>
             <SettingsSection title={t('appearance.shell.section')}>
               {shellRegions.map(({ id }) => {

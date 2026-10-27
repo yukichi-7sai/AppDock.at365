@@ -325,11 +325,13 @@ if (locked) {
 const startupHardwareAcceleration = settings.value.host.hardwareAcceleration;
 configureDisplayZoom(() => settings.value.host.zoomFactor);
 configureAppearance(
-  () =>
-    resolveAppearance(settings.value.host.accentColor, nativeTheme.shouldUseDarkColors, 0, {
+  () => ({
+    ...resolveAppearance(settings.value.host.accentColor, nativeTheme.shouldUseDarkColors, 0, {
       dark: settings.value.host.customAccentDark,
       light: settings.value.host.customAccentLight,
     }),
+    overlayBackground: settings.value.host.overlayBackground,
+  }),
   ipcMain,
 );
 function applyAudioPlaybackSettings() {
@@ -1312,6 +1314,9 @@ const operationApi = new AppDockApi({
 });
 const changed = () => {
   refreshAppearance();
+  setAppletPageBlur(
+    overlayHost?.kind === 'command-palette' && settings.value.host.overlayBackground === 'blur',
+  );
   touchpad?.setSettingsVisible(
     !quitting &&
       !!window &&
@@ -3015,6 +3020,7 @@ function registerIpc() {
   handle('dock:settingsPage:open', (request) => settingsPageHost!.open(request));
   handle('dock:settingsPage:get', (id) => settingsPageHost!.get(id));
   handle('dock:settingsPage:act', (id, action) => settingsPageHost!.act(id, action));
+  handle('dock:settingsPage:input', (id, request) => settingsPageHost!.input(id, request));
   handle('dock:settingsPage:close', (id) => {
     if (typeof id !== 'string') throw Error('Invalid settings connection');
     settingsPageHost?.close(id);
@@ -4081,7 +4087,14 @@ async function initialize() {
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     changed: () => {
-      setAppletPageBlur(overlayHost?.kind === 'command-palette');
+      if (window && !window.isDestroyed())
+        window.webContents.send('dock:overlayState', {
+          active: !!overlayHost?.active,
+          kind: overlayHost?.kind ?? null,
+        });
+      setAppletPageBlur(
+        overlayHost?.kind === 'command-palette' && settings.value.host.overlayBackground === 'blur',
+      );
       void syncHotKeys();
       changed();
     },

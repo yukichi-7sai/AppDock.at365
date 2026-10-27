@@ -36,7 +36,7 @@ SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/
 
 ## 本体の設定ページ契約
 
-SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使用する。DockApi.settingsPageのopen/get/act/close/onChangedを本体のmainFrameだけに提供し、SettingsPageHostが接続ID・route・対象を検査する。Shell Appletへ設定描画bridgeは公開しない。
+SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使用する。DockApi.settingsPageのopen/get/act/input/close/onChangedを本体のmainFrameだけに提供し、SettingsPageHostが接続ID・route・対象を検査する。Shell Appletへ設定描画bridgeは公開しない。
 
 更新・再起動で画面を復元するときは、保存された表示先だけで接続を開始しない。本体のstartupReadyとnavigation.routeが実際の表示先にそろってから設定を接続する。準備中は読み込み表示とし、対象が変われば接続と検索移動の監視を解放する。全体設定とApplet詳細の両入口で同じ条件を使う。
 
@@ -251,10 +251,13 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 | `open(request)`             | fullまたはappletの表示を登録し、接続IDと初回モデルを返す |
 | `get(connectionId)`         | 現在の接続に対する最新SettingsPageModelを取得            |
 | `act(connectionId, action)` | 既存SettingsPageActionを検証し、モデルと結果を返す       |
+| `input(connectionId, request)` | 現ページの発行済み入力制御IDを検査し、一時停止・再開だけを実行する。モデルは返さない |
 | `close(connectionId)`       | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放   |
 | `onChanged(callback)`       | 接続ID付きでモデルの更新を受け取る                       |
 
 接続IDはmainが発行し、開き直した画面へ使い回さない。これはShellの接続ID・提供元IDとは独立する。mainは1つのアクティブな設定ページを管理し、全体設定とApplet詳細を同時にmountしない。新しいopenは既存の入力受付を待った後に古い接続を失効させる。SettingsPageSessionは既存の`settingsNavigation`、`settingsEditing`、補助情報生成と操作関数を再利用する。rendererは購読を登録してからopenし、接続IDとrevisionで初回snapshotと更新通知の順序を判定する。
+
+`input`は設定ダイアログの入力保護専用で、`sessionId/pageId/actionId/recording:boolean`を送る。最新のページの利用可否と発行済みの`setShortcutRecording`だけを検査し、設定値の変更・任意アクション・モデル全体の取得は行わない。入力確定キューと停止・復帰の既存サービスを使う。詳細は[ダイアログの入力準備](settings-list-editing.md)を参照する。
 
 - 送信元は既存の`dock:*`ハンドラーと同じ本体webContents・mainFrame・hostDocumentUrl検査で限定する。
 - open時に本体の現在routeと表示対象を検査する。Applet詳細は選択中のAppletとpageIdの所有者を照合し、full用の検索・ページ選択を許可しない。

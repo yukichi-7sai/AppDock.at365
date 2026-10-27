@@ -27,6 +27,14 @@ ipcRenderer.on(
   },
 );
 const api: DockApi = {
+  onOverlayState: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      state: import('../shared/contracts').HostSnapshot['overlay'],
+    ) => callback(state);
+    ipcRenderer.on('dock:overlayState', listener);
+    return () => ipcRenderer.removeListener('dock:overlayState', listener);
+  },
   overlayViewport: (bounds) => ipcRenderer.invoke('dock:overlayViewport', bounds),
   imageLibraryDialog: {
     onRequest: (callback) => {
@@ -92,6 +100,7 @@ const api: DockApi = {
     open: (request) => ipcRenderer.invoke('dock:settingsPage:open', request),
     get: (id) => ipcRenderer.invoke('dock:settingsPage:get', id),
     act: (id, action) => ipcRenderer.invoke('dock:settingsPage:act', id, action),
+    input: (id, request) => ipcRenderer.invoke('dock:settingsPage:input', id, request),
     close: (id) => ipcRenderer.invoke('dock:settingsPage:close', id),
     onChanged: (callback) => {
       const listener = (

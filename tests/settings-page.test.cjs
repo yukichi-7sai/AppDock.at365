@@ -101,6 +101,37 @@ function fixture(actions = {}) {
     },
   };
 }
+test('transient input mode validates the issued scope without creating a page model', async (t) => {
+  const calls = [];
+  const actions = { setShortcutRecording: async ([value]) => calls.push(value) };
+  const f = fixture(actions);
+  const model = f.page.snapshot();
+  const request = {
+    sessionId: model.content.editing.sessionId,
+    pageId: model.content.page.id,
+    actionId: model.content.actions.setShortcutRecording,
+    recording: true,
+  };
+  t.mock.method(f.page, 'snapshot', () => {
+    throw Error('full page model must not be rebuilt');
+  });
+  await f.page.input(request);
+  await f.page.input({ ...request, recording: false });
+  assert.deepEqual(calls, [true, false]);
+  for (const change of [
+    { sessionId: 'other' },
+    { pageId: 'other' },
+    { actionId: 'other' },
+    { recording: 'true' },
+  ])
+    await assert.rejects(f.page.input({ ...request, ...change }));
+  delete actions.setShortcutRecording;
+  await assert.rejects(f.page.input(request));
+  f.page.dispose();
+  await assert.rejects(f.page.input(request));
+  assert.deepEqual(calls, [true, false]);
+});
+
 test('settings page refreshes never clone unrelated saved values', (t) => {
   const f = fixture();
   const clone = structuredClone;

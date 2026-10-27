@@ -6,16 +6,20 @@ import { pathToFileURL } from 'node:url';
 import { appearanceArguments, registerAppearance } from './appearance-host';
 
 /** Same local-file boundary for built-in and external presentation surfaces. */
+export function shellViewUrl(folder: string, entry: string) {
+  const file = fs.realpathSync(path.resolve(folder, entry));
+  const relative = path.relative(fs.realpathSync(folder), file);
+  if (relative.startsWith('..') || path.isAbsolute(relative))
+    throw Error('Shell UI is outside provider');
+  return pathToFileURL(file).href;
+}
 export function createShellView(
   folder: string,
   entry: string,
   preload: string,
   additionalArguments: string[] = [],
 ) {
-  const file = fs.realpathSync(path.resolve(folder, entry));
-  const relative = path.relative(fs.realpathSync(folder), file);
-  if (relative.startsWith('..') || path.isAbsolute(relative))
-    throw Error('Shell UI is outside provider');
+  const url = shellViewUrl(folder, entry);
   const view = new WebContentsView({
     webPreferences: {
       preload,
@@ -31,7 +35,6 @@ export function createShellView(
   view.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   view.webContents.on('will-navigate', (event) => event.preventDefault());
   view.webContents.on('will-redirect', (event) => event.preventDefault());
-  const url = pathToFileURL(file).href;
   registerAppearance(view.webContents, url);
   return { view, url };
 }

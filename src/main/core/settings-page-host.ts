@@ -4,6 +4,7 @@ import type {
   SettingsPageAction,
   SettingsPageConnection,
   SettingsPageRequest,
+  SettingsInputModeRequest,
 } from '../../shared/settings-page';
 import type { SettingsPageSession } from './settings-page';
 
@@ -63,6 +64,10 @@ export class SettingsPageHost {
     const response = await current.page.act(action);
     this.bound(id);
     return response;
+  }
+  async input(id: string, request: SettingsInputModeRequest) {
+    await this.bound(id).page.input(request);
+    this.bound(id);
   }
   close(id?: string) {
     if (id && this.current?.id !== id) return;

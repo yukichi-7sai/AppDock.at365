@@ -149,6 +149,12 @@ export interface SettingsPageConnection {
   connectionId: string;
   snapshot: SettingsPageModel;
 }
+export interface SettingsInputModeRequest {
+  sessionId: string;
+  pageId: string;
+  actionId: string;
+  recording: boolean;
+}
 /** Trusted host renderer only; never exposed in an Applet preload. */
 export interface SettingsPageApi {
   open(request: SettingsPageRequest): Promise<SettingsPageConnection>;
@@ -157,6 +163,7 @@ export interface SettingsPageApi {
     connectionId: string,
     action: SettingsPageAction,
   ): Promise<{ model: SettingsPageModel; result: unknown }>;
+  input?(connectionId: string, request: SettingsInputModeRequest): Promise<void>;
   close(connectionId: string): Promise<void>;
   onChanged(callback: (connection: SettingsPageConnection) => void): () => void;
 }

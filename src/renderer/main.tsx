@@ -31,6 +31,8 @@ function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
+  const [overlayState, setOverlayState] = useState<HostSnapshot['overlay']>();
+  useEffect(() => window.dock.onOverlayState(setOverlayState), []);
   const mainRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const page = mainRef.current;
@@ -378,7 +380,9 @@ function App() {
   return (
     <div
       className="shell"
-      data-palette-open={snapshot?.overlay.kind === 'command-palette' || undefined}
+      data-palette-open={
+        (overlayState ?? snapshot?.overlay)?.kind === 'command-palette' || undefined
+      }
       data-route={page}
       style={
         {

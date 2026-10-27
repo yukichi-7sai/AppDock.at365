@@ -30,6 +30,29 @@ const contrast = (a, b) => {
   const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (values[0] + 0.05) / (values[1] + 0.05);
 };
+
+test('overlay background defaults to transparent, preserves explicit blur and rejects unknown choices', () => {
+  const settings = createDefaultSettings();
+  assert.equal(settings.host.overlayBackground, 'transparent');
+  assert.equal(settingsStorageValue(settings).host?.overlayBackground, undefined);
+  delete settings.host.overlayBackground;
+  assert.equal(parseSettings(settings).host.overlayBackground, 'transparent');
+  settings.host.overlayBackground = 'blur';
+  assert.equal(parseSettings(settingsStorageValue(settings)).host.overlayBackground, 'blur');
+  const item = settingsCatalog([], settings)
+    .find((page) => page.id === 'appearance')
+    .items.find((item) => item.key === 'overlayBackground');
+  assert(item);
+  assert.deepEqual(
+    item.definition.options.map(({ value, label }) => [value, label]),
+    [
+      ['transparent', '透明'],
+      ['blur', 'ブラー'],
+    ],
+  );
+  settings.host.overlayBackground = 'gray';
+  assert.throws(() => parseSettings(settings));
+});
 test('all palettes provide readable accent text, soft selections and filled/hovered controls in both themes', () => {
   assert.deepEqual(
     accentChoices.map((palette) => palette.title),
@@ -225,6 +248,8 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
     document: { documentElement: root, body },
   });
   assert.equal(root['--accent'], '#245f9e');
+  assert.equal(root['--appdock-overlay-filter'], 'none');
+  assert.equal(body['--appdock-overlay-filter'], 'none');
   assert.equal(body['--accent'], '#245f9e');
   await api.snapshot();
   assert.equal(root.dataset.accent, 'alice-blue');
@@ -236,7 +261,13 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
   assert.equal(root.dataset.theme, 'dark');
   assert.equal(root['--accent'], '#f2a6c6');
   stop();
-  ipc.emit('appearance:changed', {}, resolveAppearance('mint', false, 4));
+  ipc.emit(
+    'appearance:changed',
+    {},
+    { ...resolveAppearance('mint', false, 4), overlayBackground: 'blur' },
+  );
+  assert.equal(root['--appdock-overlay-filter'], 'blur(2px)');
+  assert.equal(body['--appdock-overlay-filter'], 'blur(2px)');
   assert.equal(calls, 1);
   for (const name of [
     'preload',

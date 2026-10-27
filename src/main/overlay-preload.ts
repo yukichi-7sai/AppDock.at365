@@ -10,12 +10,17 @@ const api: ShellOverlayApi = {
   },
   executeCommand: (id) => ipcRenderer.invoke('overlay:executeCommand', id),
   connect: () => ipcRenderer.invoke('overlay:connect'),
-  ready: (session) => ipcRenderer.invoke('overlay:ready', session),
+  ready: (session, options) => ipcRenderer.invoke('overlay:ready', session, options),
   act: (action) => ipcRenderer.invoke('overlay:act', action),
   onChanged: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, model: OverlayModel) => callback(model);
     ipcRenderer.on('overlay:changed', handler);
     return () => ipcRenderer.removeListener('overlay:changed', handler);
+  },
+  onSuspended: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('overlay:suspended', handler);
+    return () => ipcRenderer.removeListener('overlay:suspended', handler);
   },
 };
 contextBridge.exposeInMainWorld('appdockOverlay', api);

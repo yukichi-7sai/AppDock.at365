@@ -222,7 +222,10 @@ async function close() {
       await palette.getByRole('combobox').fill(id);
       await until(async () => !!(await palette.locator('[role=option]').count()), 'command result');
       await closingAction(palette.getByRole('combobox').press('Enter'));
-      await until(() => palette.isClosed(), 'picker closed');
+      await until(
+        () => require('./shell-overlay-helper.cjs').overlayClosed(palette),
+        'picker closed',
+      );
       await dialog.getByTestId('command-stack-editor').waitFor();
     };
     const next = async () => {
@@ -338,7 +341,10 @@ async function close() {
     await dialog.getByTestId('stack-add-command').click();
     const cancelledPicker = await overlayPage(host);
     await closingAction(cancelledPicker.mouse.click(5, 5));
-    await until(() => cancelledPicker.isClosed(), 'background closes only the command picker');
+    await until(
+      () => require('./shell-overlay-helper.cjs').overlayClosed(cancelledPicker),
+      'background closes only the command picker',
+    );
     assert(await dialog.isVisible(), 'parent editor survives command picker cancellation');
     assert.equal(await dialog.getByLabel('名前', { exact: true }).inputValue(), 'Ordered stack');
     checks.push(

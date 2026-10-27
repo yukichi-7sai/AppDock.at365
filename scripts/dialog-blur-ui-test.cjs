@@ -124,7 +124,7 @@ async function closePalette(p, background = false) {
   await p.waitForFunction(() => document.activeElement === document.querySelector('input'));
   if (background) await p.mouse.click(5, 5);
   else await p.keyboard.press('Escape').catch(() => {});
-  await until(() => !context.pages().includes(p), 'palette closed');
+  await until(() => require('./shell-overlay-helper.cjs').overlayClosed(p), 'palette closed');
   await host.waitForFunction(() => !document.querySelector('.shell[data-palette-open="true"]'));
 }
 (async () => {
@@ -195,6 +195,38 @@ async function closePalette(p, background = false) {
       }
     });
     const cdp = await context.newCDPSession(host);
+    assert.equal(
+      (await host.evaluate(() => window.dock.snapshot())).settings.value.host.overlayBackground,
+      'transparent',
+    );
+    await openEditor();
+    assert.equal(
+      await host
+        .locator('dialog:modal')
+        .evaluate((el) => getComputedStyle(el, '::backdrop').backdropFilter),
+      'none',
+    );
+    await host.keyboard.press('Escape');
+    await host.locator('dialog.settings-modal').waitFor({ state: 'detached' });
+    const defaultPalette = await palette();
+    assert.equal(await host.locator('main').evaluate((el) => getComputedStyle(el).filter), 'none');
+    await closePalette(defaultPalette);
+    await host.evaluate(async () => {
+      const s = await window.dock.snapshot();
+      await window.dock.saveSettings(
+        { ...s.settings.value, host: { ...s.settings.value.host, overlayBackground: 'blur' } },
+        s.settings.revision,
+      );
+    });
+    await host.waitForFunction(
+      () =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue('--appdock-overlay-filter')
+          .trim() === 'blur(2px)',
+    );
+    result.checks.push(
+      'fresh settings default to transparent for dialogs and palette before explicitly enabling blur',
+    );
     // The first portal installs React's shared event delegation on document.body.
     for (let i = 0; i < 3; i++) {
       await openEditor();
@@ -309,6 +341,8 @@ async function closePalette(p, background = false) {
     await host.keyboard.press('Escape');
     await host.locator('dialog.settings-modal').waitFor({ state: 'detached' });
     let p = await palette();
+    const reusedPalette = p;
+    const initialSession = await p.evaluate(() => window.appdockOverlay.connect());
     assert.equal(
       await host.locator('main').evaluate((el) => getComputedStyle(el).filter),
       'blur(2px)',
@@ -317,21 +351,37 @@ async function closePalette(p, background = false) {
       await p.locator('.modal-backdrop').evaluate((el) => getComputedStyle(el).backgroundColor),
       'rgba(0, 0, 0, 0)',
     );
-    const area = await host.locator('main').boundingBox();
-    const paletteBounds = await main(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()
-        .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
-        .contentView.children.find((v) => v.webContents?.getURL().endsWith('/overlay.html'))
-        .getBounds(),
-    );
-    assert(
-      Math.abs(area.x - paletteBounds.x) < 2 && Math.abs(area.width - paletteBounds.width) < 2,
-    );
+    await until(async () => {
+      const area = await host.locator('main').boundingBox();
+      const paletteBounds = await main(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
+          .contentView.children.find((v) => v.webContents?.getURL().endsWith('/overlay.html'))
+          .getBounds(),
+      );
+      result.paletteGeometry = { area, paletteBounds };
+      return (
+        Math.abs(area.x - paletteBounds.x) < 2 && Math.abs(area.width - paletteBounds.width) < 2
+      );
+    }, 'palette follows the completed native maximize/restore layout');
     await closePalette(p, true);
     for (let i = 0; i < 15; i++) {
       p = await palette();
+      assert.equal(p, reusedPalette, 'palette reuses its renderer after closing');
+      assert.equal(
+        await p.getByRole('combobox').inputValue(),
+        '',
+        'search resets for each session',
+      );
+      const session = await p.evaluate(() => window.appdockOverlay.connect());
+      assert.notEqual(session.sessionId, initialSession.sessionId);
+      await p.getByRole('combobox').fill('temporary search');
       await closePalette(p);
     }
+    assert(!p.isClosed(), 'reusable renderer remains alive while hidden');
+    result.checks.push(
+      'palette retains one renderer while clearing search and rotating its connection',
+    );
     assert.deepEqual(
       (await native()).map((v) => [v.id, v.visible]),
       before.map((v) => [v.id, v.visible]),
@@ -461,6 +511,35 @@ async function closePalette(p, background = false) {
         () => getComputedStyle(document.documentElement).filter === 'none',
       );
     }
+    const background = async (value) => {
+      await host.evaluate(async (overlayBackground) => {
+        const s = await window.dock.snapshot();
+        await window.dock.saveSettings(
+          { ...s.settings.value, host: { ...s.settings.value.host, overlayBackground } },
+          s.settings.revision,
+        );
+      }, value);
+    };
+    p = await palette();
+    await background('transparent');
+    await body.waitForFunction(() => getComputedStyle(document.documentElement).filter === 'none');
+    await nested.waitForFunction(
+      () => getComputedStyle(document.documentElement).filter === 'none',
+    );
+    await host.waitForFunction(
+      () => getComputedStyle(document.querySelector('main')).filter === 'none',
+    );
+    await background('blur');
+    await body.waitForFunction(
+      () => getComputedStyle(document.documentElement).filter === 'blur(2px)',
+    );
+    await nested.waitForFunction(
+      () => getComputedStyle(document.documentElement).filter === 'blur(2px)',
+    );
+    await closePalette(p);
+    result.checks.push(
+      'background choice applies live to host, Applet and nested body without replacing input',
+    );
     assert.equal(await body.getByLabel('Retained input').inputValue(), 'retained');
     assert.equal(await nested.getByLabel('Nested input').inputValue(), 'nested retained');
     await main(() => {
@@ -473,6 +552,35 @@ async function closePalette(p, background = false) {
     result.checks.push(
       'both themes blur without dimming; native Applet body is blurred with temporary CSS, retaining input and renderer across 10 palette cycles',
     );
+    await host.evaluate(() => window.dock.navigate('settings'));
+    await host.getByTestId('settings-nav:appearance').click();
+    const backgroundChoice = host.getByRole('combobox', {
+      name: 'ダイアログ・パレットの背景',
+      exact: true,
+    });
+    await backgroundChoice.selectOption('transparent');
+    assert.deepEqual(await backgroundChoice.locator('option').allTextContents(), [
+      '透明',
+      'ブラー',
+    ]);
+    await until(
+      async () =>
+        (await host.evaluate(() => window.dock.snapshot())).settings.value.host
+          .overlayBackground === 'transparent',
+      'background preference saved',
+    );
+    await host.getByTestId('settings-nav:custom-commands').click();
+    await openEditor();
+    await host.waitForFunction(
+      () =>
+        getComputedStyle(document.querySelector('dialog:modal'), '::backdrop').backdropFilter ===
+        'none',
+    );
+    await host.keyboard.press('Escape');
+    await host.locator('dialog.settings-modal').waitFor({ state: 'detached' });
+    await host.getByTestId('settings-nav:appearance').click();
+    await backgroundChoice.selectOption('blur');
+    result.checks.push('appearance UI saves transparent background and common dialogs honor it');
     result.audit = await main(() => globalThis.__dialogAudit);
     assert.equal(result.audit.captures, 0);
     result.success = true;

@@ -136,6 +136,42 @@ function fixture(pageId = 'touchpad-gestures') {
     },
   };
 }
+
+test('transient recording uses no page get, action model or render and rejects a changed page', async () => {
+  const f = fixture();
+  f.client.model.content.actions.setShortcutRecording = 'input-mode';
+  const displayed = f.displayed,
+    requests = [];
+  f.client.transport.get = async () => {
+    throw Error('unexpected full page read');
+  };
+  f.client.transport.input = async (id, request) => requests.push({ id, ...request });
+  await f.client.controls().setShortcutRecording(true);
+  await f.client.controls().setShortcutRecording(false);
+  assert.equal(f.calls, 0);
+  assert.equal(f.displayed, displayed);
+  assert.deepEqual(
+    requests.map((row) => row.recording),
+    [true, false],
+  );
+  assert(
+    requests.every(
+      (row) => row.id === 'connection' && row.actionId === 'input-mode' && row.sessionId === 'edit',
+    ),
+  );
+  let resume;
+  f.client.chain = new Promise((resolve) => {
+    resume = resolve;
+  });
+  const stale = f.client.controls().setShortcutRecording(true);
+  f.client.model = {
+    ...f.client.model,
+    content: { ...f.client.model.content, page: { id: 'other' } },
+  };
+  resume();
+  await assert.rejects(stale);
+  assert.equal(requests.length, 2);
+});
 test('failed touchpad form resets rejected modifiers before a later key edit', async () => {
   const f = fixture();
   f.edit((s) => {

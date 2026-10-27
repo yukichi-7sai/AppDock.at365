@@ -201,7 +201,7 @@ async function open() {
 }
 async function dismiss(p) {
   await closingAction(p.keyboard.press('Escape'));
-  await until(() => p.isClosed(), 'overlay disposed');
+  await until(() => require('./shell-overlay-helper.cjs').overlayClosed(p), 'overlay closed');
   await until(
     async () => !(await dock.evaluate(() => window.dock.snapshot())).overlay.active,
     'modal released',
@@ -234,7 +234,10 @@ async function dismiss(p) {
       async () => (await dock.evaluate(() => window.dock.snapshot())).navigation.route === 'logs',
       'palette execution',
     );
-    await until(() => p.isClosed(), 'executed palette destroyed');
+    await until(
+      () => require('./shell-overlay-helper.cjs').overlayClosed(p),
+      'executed palette closed',
+    );
     checks.push(
       'lazy independent Default Shell palette; host has no duplicate; IME, Tab, shortcut suppression and execution',
     );

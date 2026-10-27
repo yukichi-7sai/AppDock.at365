@@ -80,7 +80,7 @@ export class SettingsViewClient {
   constructor(
     private render: (model: SettingsPageModel) => void,
     private failed: (text: string) => void,
-    private transport: Pick<SettingsPageApi, 'get' | 'act'>,
+    private transport: Pick<SettingsPageApi, 'get' | 'act'> & Pick<SettingsPageApi, 'input'>,
     private connectionId: string,
   ) {}
   flush = () => this.chain;
@@ -259,6 +259,22 @@ export class SettingsViewClient {
       return response.result;
     });
   };
+  private setShortcutRecording(recording: boolean): Promise<void> {
+    if (!this.transport.input) return this.invoke('setShortcutRecording', [recording]);
+    const pageId = this.model?.content.page.id;
+    return this.chain.then(async () => {
+      const model = this.model;
+      const actionId = model?.content.actions.setShortcutRecording;
+      if (!model || model.content.page.id !== pageId || !actionId)
+        throw Error(hostText('settings.runtime.unavailable'));
+      await this.transport.input!(this.connectionId, {
+        sessionId: model.content.editing.sessionId,
+        pageId: model.content.page.id,
+        actionId,
+        recording,
+      });
+    });
+  }
   editor(model: SettingsPageModel) {
     const ignore = (p: Promise<unknown>) => void p.catch(() => {});
     const displayed = this.display(model);
@@ -311,7 +327,7 @@ export class SettingsViewClient {
       installUpdates: (id) => invoke('installUpdates', [id]),
       cancelUpdates: () => invoke('cancelUpdates'),
       openReleases: (id) => invoke('openReleases', [id]),
-      setShortcutRecording: (value) => invoke('setShortcutRecording', [value]),
+      setShortcutRecording: (value) => this.setShortcutRecording(value),
       setShortcutCapture: (value) => invoke('setShortcutCapture', [value]),
       onShortcutCaptured: (callback) => {
         let sequence = 0;

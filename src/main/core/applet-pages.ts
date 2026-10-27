@@ -23,6 +23,7 @@ const surfaces = new Map<string, AppletSurface>();
 const allSurfaces = new Set<AppletSurface>();
 let paletteBlur = false;
 export function setAppletPageBlur(active: boolean) {
+  if (active === paletteBlur) return;
   paletteBlur = active;
   for (const surface of allSurfaces) surface.updatePaletteBlur();
 }

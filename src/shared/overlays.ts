@@ -56,8 +56,9 @@ export type OverlayAction =
   | { id: string; type: 'movePin'; commandId: string; direction: -1 | 1; visibleIds: string[] };
 export interface ShellOverlayApi extends ShellAppletApi {
   connect(): Promise<{ sessionId: string; providerAppletId: string; snapshot: OverlayModel }>;
-  ready(sessionId: string): Promise<void>;
+  ready(sessionId: string, options?: { reusable?: boolean; modelId?: string }): Promise<void>;
   act(action: OverlayAction): Promise<void>;
   asset(id: string): Promise<{ dataUrl: string }>;
   onChanged(callback: (model: OverlayModel) => void): () => void;
+  onSuspended?(callback: () => void): () => void;
 }

@@ -1,7 +1,7 @@
 @import './settings-ui/controls.css';
 
 .shell[data-palette-open='true'] > main {
-  filter: blur(2px);
+  filter: var(--appdock-overlay-filter, none);
 }
 
 /* Host pages share layout, focus and modal handling in the root renderer. */

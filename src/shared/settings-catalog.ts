@@ -357,6 +357,11 @@ const localizedHostFields = {
     ['zoomFactor', 'appearance.zoom.label', 'appearance.zoom.description'],
     ['accentColor', 'appearance.accent.label', 'appearance.accent.description'],
     ['showHints', 'appearance.hints.label', 'appearance.hints.description'],
+    [
+      'overlayBackground',
+      'appearance.overlayBackground.label',
+      'appearance.overlayBackground.description',
+    ],
   ],
   general: [
     ['soundEnabled', 'general.sound.label', 'general.sound.description'],

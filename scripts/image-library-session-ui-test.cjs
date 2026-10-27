@@ -61,6 +61,7 @@ for (let i = 0; i < 75; i++)
 const longName = '長いファイル名と透過画像の表示を確認するためのサンプル画像です.png';
 fs.writeFileSync(path.join(images, longName), png(600, 600, 4, 150));
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
+settings.host.overlayBackground = 'blur';
 settings.host.closeToTray = false;
 settings.host.soundEnabled = false;
 settings.globalShortcutCommands = [];
@@ -293,6 +294,23 @@ const observations = [];
       .getByRole('button', { name: 'image-000.pngを拡大', exact: true })
       .click();
     const framePreview = host.getByRole('dialog', { name: 'image-000.png', exact: true });
+    for (const overlayBackground of ['transparent', 'blur']) {
+      await host.evaluate(async (overlayBackground) => {
+        const s = await window.dock.snapshot();
+        await window.dock.saveSettings(
+          { ...s.settings.value, host: { ...s.settings.value.host, overlayBackground } },
+          s.settings.revision,
+        );
+      }, overlayBackground);
+      await until(
+        () =>
+          framePreview.evaluate(
+            (el, expected) => getComputedStyle(el, '::backdrop').backdropFilter === expected,
+            overlayBackground === 'blur' ? 'blur(2px)' : 'none',
+          ),
+        'preview background preference',
+      );
+    }
     await until(
       () => framePreview.evaluate((el) => getComputedStyle(el).opacity === '1'),
       'preview with paused host animation frames',

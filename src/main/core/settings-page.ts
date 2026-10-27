@@ -7,6 +7,7 @@ import type {
   SettingsPageRequest,
   SettingsNavigationState,
   SettingsPageAction,
+  SettingsInputModeRequest,
 } from '../../shared/settings-page';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import { searchSettings } from '../../shared/settings-catalog';
@@ -174,6 +175,26 @@ export class SettingsPageSession {
     this.requests.set(action.operationId, work);
     while (this.requests.size > 512) this.requests.delete(this.requests.keys().next().value!);
     return work;
+  }
+  async input(request: SettingsInputModeRequest) {
+    const state = this.options.editor.metadata();
+    const issued = this.actions.get('setShortcutRecording');
+    if (
+      !this.isCurrent() ||
+      !request ||
+      typeof request.recording !== 'boolean' ||
+      request.sessionId !== state.sessionId ||
+      request.pageId !== state.pageId ||
+      this.actionPage !== state.pageId ||
+      !issued ||
+      request.actionId !== issued.id
+    )
+      throw Error(hostText('settings.pageError.operationDenied'));
+    // Recheck availability without constructing/returning the settings page model.
+    const page = this.options.editor.page(state.pageId);
+    const run = !page.unavailableReason && this.options.actions(page).setShortcutRecording;
+    if (!run) throw Error(hostText('settings.pageError.operationDenied'));
+    await run([request.recording]);
   }
   private async perform(action: SettingsPageAction) {
     const state = this.options.editor.metadata();

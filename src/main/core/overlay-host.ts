@@ -11,7 +11,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { shellView, type ShellRegion } from '../../shared/shell';
 import type { OverlayController } from './overlay-controller';
-import { createShellView } from './shell-view';
+import { createShellView, shellViewUrl } from './shell-view';
 
 type Surface = {
   region: ShellRegion;
@@ -22,6 +22,7 @@ type Surface = {
   version: string;
   generation?: string;
   ready: boolean;
+  reusable: boolean;
   revision: number;
   settingsSignature?: string;
   timer: ReturnType<typeof setTimeout>;
@@ -31,6 +32,7 @@ export class OverlayHost {
   private fallbackOnly = false;
   private current?: OverlayController;
   private surface?: Surface;
+  private cached?: Surface;
   private previousFocus?: WebContents;
   private previousRoute = '';
   private bounds?: Electron.Rectangle;
@@ -87,16 +89,28 @@ export class OverlayHost {
         snapshot: this.current!.snapshot(),
       };
     });
-    ipcMain.handle('overlay:ready', (event, session) => {
-      const s = bound(event);
-      if (session !== s.session) throw Error('Stale overlay session');
-      clearTimeout(s.timer);
-      if (s.ready) return;
-      s.ready = true;
-      this.layout();
-      if (options.window.isFocused()) s.view.webContents.focus();
-      this.refresh();
-    });
+    ipcMain.handle(
+      'overlay:ready',
+      (event, session, readiness?: { reusable?: boolean; modelId?: string }) => {
+        const s = bound(event);
+        if (session !== s.session) throw Error('Stale overlay session');
+        if (
+          readiness !== undefined &&
+          (!readiness ||
+            typeof readiness !== 'object' ||
+            typeof readiness.reusable !== 'boolean' ||
+            readiness.modelId !== this.current!.snapshot().id)
+        )
+          throw Error('Stale overlay model');
+        clearTimeout(s.timer);
+        if (s.ready) return;
+        s.reusable = readiness?.reusable === true && s.region === 'overlay.command-palette';
+        s.ready = true;
+        this.layout();
+        if (options.window.isFocused()) s.view.webContents.focus();
+        this.refresh();
+      },
+    );
     ipcMain.handle('overlay:act', (event, action) => {
       const s = bound(event);
       if (!s.ready) throw Error('Overlay is not ready');
@@ -169,7 +183,7 @@ export class OverlayHost {
         !this.options.window.isDestroyed() &&
         this.options.window.isFocused() &&
         this.previousRoute === this.options.route();
-      this.closeSurface();
+      this.closeSurface(true);
       if (restore && this.previousFocus && !this.previousFocus.isDestroyed())
         this.previousFocus.focus();
       this.previousFocus = undefined;
@@ -185,6 +199,10 @@ export class OverlayHost {
     if (this.kind === 'ribbon-group') this.cancel(reason);
   }
   retry(region?: ShellRegion) {
+    if ((!region || region === 'overlay.command-palette') && this.cached) {
+      this.destroySurface(this.cached);
+      this.cached = undefined;
+    }
     if (region) this.options.registry.retry(region);
     else {
       this.options.registry.retry('overlay.command-palette');
@@ -207,6 +225,33 @@ export class OverlayHost {
       this.options.failed(hostText('services.overlayHost.startFailed'));
       return;
     }
+    const cached = this.cached;
+    this.cached = undefined;
+    let sameView = false;
+    try {
+      sameView = cached?.url === shellViewUrl(provider.folder, shellView(provider.shell, region)!);
+    } catch {
+      /* The normal creation path reports unavailable provider files. */
+    }
+    if (
+      cached &&
+      controller.kind === 'command-palette' &&
+      !cached.view.webContents.isDestroyed() &&
+      cached.provider === provider.id &&
+      cached.version === provider.version &&
+      cached.generation === provider.generation &&
+      sameView
+    ) {
+      cached.session = randomUUID();
+      cached.ready = false;
+      cached.revision = 0;
+      cached.settingsSignature = undefined;
+      cached.timer = setTimeout(() => this.fail(cached, 'ready timeout'), 10000);
+      this.surface = cached;
+      cached.view.webContents.send('overlay:changed', controller.snapshot());
+      return;
+    }
+    if (cached) this.destroySurface(cached);
     try {
       const { view, url } = createShellView(
         provider.folder,
@@ -223,10 +268,12 @@ export class OverlayHost {
         version: provider.version,
         generation: provider.generation,
         ready: false,
+        reusable: false,
         revision: 0,
         timer: setTimeout(() => this.fail(s, 'ready timeout'), 10000),
       };
       this.surface = s;
+      view.setVisible(false);
       this.options.window.contentView.addChildView(view);
       view.webContents.on('render-process-gone', () => this.fail(s, 'renderer exited'));
       view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
@@ -248,6 +295,13 @@ export class OverlayHost {
     }
   }
   private fail(s: Surface, reason: string) {
+    if (s === this.cached) {
+      this.cached = undefined;
+      this.options.registry.fail(s.region, s.provider, s.version);
+      this.destroySurface(s);
+      this.options.changed();
+      return;
+    }
     if (s !== this.surface || !this.current) return;
     this.options.registry.fail(s.region, s.provider, s.version);
     if (this.current.kind === 'ribbon-group') {
@@ -260,11 +314,30 @@ export class OverlayHost {
     this.options.failed(`${s.provider}: ${reason}`);
     this.present();
   }
-  private closeSurface() {
+  private closeSurface(reuse = false) {
     const s = this.surface;
     this.surface = undefined;
     this.options.registry.touch();
     if (!s) return;
+    clearTimeout(s.timer);
+    if (
+      reuse &&
+      !this.disposed &&
+      s.reusable &&
+      !s.view.webContents.isDestroyed() &&
+      !this.options.window.isDestroyed()
+    ) {
+      if (this.cached) this.destroySurface(this.cached);
+      s.ready = false;
+      s.session = randomUUID();
+      s.view.setVisible(false);
+      s.view.webContents.send('overlay:suspended');
+      this.cached = s;
+      return;
+    }
+    this.destroySurface(s);
+  }
+  private destroySurface(s: Surface) {
     clearTimeout(s.timer);
     if (!this.options.window.isDestroyed()) this.options.window.contentView.removeChildView(s.view);
     if (!s.view.webContents.isDestroyed()) s.view.webContents.close();
@@ -294,6 +367,10 @@ export class OverlayHost {
     this.options.window.contentView.addChildView(s.view);
   }
   refresh() {
+    if (this.cached && !this.options.registry.usable(this.cached.region, this.cached)) {
+      this.destroySurface(this.cached);
+      this.cached = undefined;
+    }
     const s = this.surface;
     if (!this.current || !s) return;
     if (this.previousRoute !== this.options.route()) {
@@ -328,6 +405,8 @@ export class OverlayHost {
     this.disposed = true;
     this.cancel('shutdown');
     this.closeSurface();
+    if (this.cached) this.destroySurface(this.cached);
+    this.cached = undefined;
     for (const name of ['connect', 'ready', 'act', 'executeCommand', 'getSettings', 'asset'])
       ipcMain.removeHandler(`overlay:${name}`);
   }
