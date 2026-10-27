@@ -275,6 +275,7 @@ export function CommandTriggersEditor({
         showProvider
         showNavigation={false}
         separateConditions
+        triggerStackActions
         followCommands
         addOptions={commandTriggerKinds.map((kind) => ({
           id: kind,

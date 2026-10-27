@@ -678,6 +678,96 @@ async function close() {
     checks.push(
       'assignment addition and stack creation share identical gesture pickers and persist selected actions',
     );
+    const triggerTable = page.locator('.command-triggers-editor .command-binding-table');
+    assert.deepEqual(await triggerTable.locator('thead th').allTextContents(), [
+      'コマンド',
+      'トリガー',
+      'いつ・どこで',
+      '',
+    ]);
+    assert.equal(await triggerTable.locator('.applet-shortcut-edit').count(), 0);
+    assert.equal(await triggerTable.locator('.binding-trigger-actions-cell').count(), 0);
+    const { triggerStacks } = require('../out/main/shared/trigger-stacks');
+    const stacks = (await snapshot()).settings.value;
+    const bindingRow = (kind, id) =>
+      triggerTable.locator('[data-binding-id]').filter({
+        has: page.getByTestId('binding-delete:' + JSON.stringify([kind, id])),
+      });
+    for (const [kind, input, multiple] of [
+      ['shortcuts', 'Ctrl+Shift+F2', true],
+      ['gestures', 'move-down', false],
+      ['touchpad-gestures', 'three.left', false],
+    ]) {
+      const stack = triggerStacks(stacks, kind).find((item) => item.input === input);
+      const selected = stack.entries.at(-1);
+      const binding = bindingRow(kind, selected.id);
+      const gear = binding.locator('.binding-order');
+      await binding.locator('.binding-condition-cell').hover();
+      assert.deepEqual(
+        await binding
+          .locator('.binding-assignment-actions-cell button')
+          .evaluateAll((buttons) =>
+            buttons.map((button) =>
+              button.classList.contains('binding-order')
+                ? 'gear'
+                : button.classList.contains('binding-delete')
+                  ? 'delete'
+                  : 'unexpected',
+            ),
+          ),
+        ['gear', 'delete'],
+      );
+      assert.equal(await gear.getAttribute('data-multiple-commands'), String(multiple));
+      assert.equal(
+        await gear.evaluate((button) => button.classList.contains('accent-action')),
+        multiple,
+      );
+      if (multiple) assert.match(await gear.getAttribute('aria-description'), /複数のコマンド/);
+      await binding.locator('.binding-condition-edit').focus();
+      await page.keyboard.press('Tab');
+      assert(await gear.evaluate((button) => button === document.activeElement));
+      await gear.press('Enter');
+      await dialog.getByRole('heading', { name: 'トリガーの編集', exact: true }).waitFor();
+      assert.equal(
+        await dialog
+          .locator('[data-stack-entry][data-selected=true]')
+          .getAttribute('data-stack-entry'),
+        selected.id,
+      );
+      assert.equal(await dialog.getByTestId('stack-entry').count(), stack.entries.length);
+      await dialog.getByTestId('settings-dialog-cancel').click();
+      await dialog.waitFor({ state: 'hidden' });
+      assert(await gear.evaluate((button) => button === document.activeElement));
+    }
+    const multiStack = triggerStacks(stacks, 'shortcuts').find(
+      (item) => item.input === 'Ctrl+Shift+F2',
+    );
+    const repeated = multiStack.entries.find((entry) => entry.command === 'fixture.stacks.b');
+    const multiRow = bindingRow('shortcuts', repeated.id);
+    const multiGear = multiRow.locator('.binding-order');
+    const search = page.locator('.command-triggers-editor input[type=search]');
+    await search.fill('fixture.stacks.b');
+    assert.equal(
+      await triggerTable.locator('[data-shortcut-command="fixture.stacks.a"]').count(),
+      0,
+    );
+    assert(await multiGear.evaluate((button) => button.classList.contains('accent-action')));
+    await multiRow.locator('.binding-condition-cell').hover();
+    await page.screenshot({ path: path.join(profile, 'trigger-row-actions.png') });
+    await multiGear.click();
+    const unique = multiStack.entries.find((entry) => entry.command === 'fixture.stacks.a');
+    await dialog.locator(`[data-stack-entry="${unique.id}"] .settings-list-icon`).click();
+    await save();
+    await until(
+      async () => (await multiGear.getAttribute('data-multiple-commands')) === 'false',
+      'only repeated instances of the same command do not accent the gear',
+    );
+    assert(!(await multiGear.evaluate((button) => button.classList.contains('accent-action'))));
+    assert(await multiGear.evaluate((button) => button === document.activeElement));
+    await search.fill('');
+    checks.push(
+      'trigger rows use one gear beside delete; all three kinds open the selected entry and restore focus; accent counts distinct commands across filters and updates after save',
+    );
     assert.deepEqual(errors, []);
     success = true;
   } catch (error) {

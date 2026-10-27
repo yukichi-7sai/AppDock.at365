@@ -22,6 +22,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   showProvider = false,
   showNavigation = true,
   separateConditions = false,
+  triggerStackActions = false,
   followCommands = false,
   addOptions,
   statusError,
@@ -47,6 +48,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
   showProvider?: boolean;
   showNavigation?: boolean;
   separateConditions?: boolean;
+  triggerStackActions?: boolean;
   followCommands?: boolean;
   addOptions?: {
     id: string;
@@ -180,7 +182,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
           value: inputLabel(row),
         })}
       >
-        {part !== 'trigger' && (
+        {!triggerStackActions && part !== 'trigger' && (
           <button
             type="button"
             className="settings-list-icon applet-shortcut-edit"
@@ -194,7 +196,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
             <ListIcon kind="pencil" />
           </button>
         )}
-        {part !== 'binding' && (
+        {(part !== 'binding' || triggerStackActions) && (
           <button
             type="button"
             className={`settings-list-icon binding-order${multiple ? ' accent-action' : ''}`}
@@ -284,7 +286,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
           <th className={separateConditions ? 'binding-gesture-heading' : undefined}>
             {separateConditions ? inputName : translate('settings.commandBindingList.binding')}
           </th>
-          {separateConditions && (
+          {separateConditions && !triggerStackActions && (
             <th
               className="binding-trigger-actions-heading"
               scope="col"
@@ -424,7 +426,7 @@ export function CommandBindingList<R extends { id: string; command: string; enab
                       )}
                     </div>
                   </td>
-                  {separateConditions && (
+                  {separateConditions && !triggerStackActions && (
                     <td className="binding-trigger-actions-cell">
                       {rowActions(command, row, multiple, 'trigger')}
                     </td>

@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-27: コマンドトリガー一覧の編集ボタン整理 0.98.5
+
+- コマンドトリガーの逆引き一覧で、同じ編集画面を開く鉛筆を省き、既存の歯車を条件の右・削除の左へ移した。入力の隣の空く操作列をなくして4列にした。共通CommandBindingListのtriggerStackActionsをこの画面だけで有効にし、従来のショートカット一覧の編集／実行順は保持する。歯車の複数コマンド判定・アクセント色・tooltip／読み上げ説明・選択行・フォーカス復帰を再利用した。条件文字からの編集も保持する。
+- 発行前レビューで使用箇所、readOnly、列幅、保存／競合検査への影響を確認し、阻害事項なし。設定項目・保存形式・公開API・native入力処理は未変更のためパッチ更新。型検査／build／関連68件が成功。GUI初回は選択行とチェックボックスのdata-selectedを同時に拾う検査が失敗したため、スタック行に限定し、全体を再実行して成功した。版変更後の依存照合エラーはfrozen installで解消し、依存・lockfile・toolchain・供給網検査は変更していない。
+- ソースと最終固定EXEの隔離GUI各13群が成功。3方式の追加・編集・保存・再起動と既存レイアウトに加え、鉛筆と旧操作列がないこと、右端の歯車／削除の順、Tab／Enter操作、対象行を選んだ編集と取消／保存後のフォーカス復帰、検索で他コマンドを隠しても複数色を保つこと、異なるコマンド削除後に同一コマンドの複数条件だけなら通常色へ戻ることを確認した。画面を目視し、固定EXEの起動／保存／トレイ／終了smokeも成功した。
+- 初回publishはRuntimeの中間ref DLLに管理メタデータがなく失敗した。refint／binは正常だったことを記録し、ソースを変えずRuntimeを再ビルドして参照DLLを修復し、同じ0.98.5のpublish再試行が終了0。再生成を受け最終配布InputHost DLLそのもののメモリ内状態58項目も成功。物理入力試験・Windows設定変更は行わず、Pause/F13〜F24をOSへ送信・登録していない。
+- 発行先は `A:/40.ARTIFACT/AppDock.at365/win-unpacked`。EXE SHA256=`ddb8df3b7f441cee0c1e642b973b568d4ad18b80a8af3d8346aee26d9856f278`、app.asar=`a5ed6c5014f898f945646f4fa72bfa533456d7ae6bd797d879f4dbe0e32d4764`。update.zipは270679260 bytes／SHA256 `2764e5c92d8f7e050df233193cf6fb7a6d3a90e52b352d9d470b02d58c264344`。staging／発行先／ZIPの管理694ファイル、feedの版／size／hash、ASAR内main233・renderer8ファイル、発行前後829入力、固定GUI／smokeのEXE・ASARコピー一致を照合した。
+- 証跡は `.artifacts/trigger-row-actions-0985-20261027/` のbaseline／review／各log／reference-diagnostics／inputs-before・after／artifacts／package-check／validation／commit-result。ソースGUIは `.artifacts/command-stacks-ui-1793099569281/`、固定GUIは `.artifacts/command-stacks-ui-1793099745775/`、smokeは `.artifacts/smoke-1793099790999/`。直近成功・初回診断・参照中の旧版・他作業資料を保持し、削除なし。通常ユーザーのCIM照会で今回の試験プロセス残存0。今回の変更のみをコミットし、既存の別作業は未stageで保持する。発行物は現在の作業ツリーから作成した。push／Release／実利用先deployは行っていない。
+
 ## 2026-10-27: トリガー選択部品の共通化と追加手順の分離 0.98.4
 
 - マウス／タッチパッドの既存割り当て追加UIを`GestureInputPicker`へ抽出し、トリガー専用スタックの追加でも共用した。移動・クリック・ホイール・キー、1／2段階の移動方向、3／4本指のマークを同じ部品と配列で表示する。種類を行き来したときの選択保持、同方向の2連続防止、キーの記録・正規化も維持した。
