@@ -69,24 +69,32 @@
 .binding-editor-dialog .keybinding-picker label {
   overflow-wrap: anywhere;
 }
-.binding-editor-dialog .gesture-family-picker,
-.binding-editor-dialog .gesture-choice-grid {
+.settings-modal .gesture-input-picker .settings-field {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px 0;
+}
+.settings-modal .gesture-input-picker .settings-field-label .settings-title-with-hint {
+  min-height: 0;
+}
+.gesture-input-picker .gesture-family-picker,
+.gesture-input-picker .gesture-choice-grid {
   margin: 0;
   gap: 6px;
 }
-.binding-editor-dialog .gesture-family-picker button {
+.gesture-input-picker .gesture-family-picker button {
   padding: 8px 4px;
   gap: 5px;
 }
-.binding-editor-dialog .gesture-choice-grid button {
+.gesture-input-picker .gesture-choice-grid button {
   min-height: 62px;
   padding: 8px 4px;
   gap: 6px;
 }
-.binding-editor-dialog .gesture-choice-grid button > span {
+.gesture-input-picker .gesture-choice-grid button > span {
   font-size: 24px;
 }
-.binding-editor-dialog .gesture-step-picker button {
+.gesture-input-picker .gesture-step-picker button {
   min-height: 32px;
   padding: 5px 8px;
 }
@@ -98,7 +106,7 @@
 .gesture-direction-sequence .gesture-choice-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.binding-editor-dialog .touchpad-choice-grid {
+.gesture-input-picker .touchpad-choice-grid {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 .binding-input-summary {
@@ -151,7 +159,7 @@
   .gesture-direction-sequence {
     gap: 8px;
   }
-  .binding-editor-dialog .gesture-family-picker {
+  .gesture-input-picker .gesture-family-picker {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -21,6 +21,50 @@
   min-height: 0;
   overflow: hidden;
 }
+.stack-creation-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.stack-creation-steps [aria-current='step'] {
+  color: var(--accent);
+  font-weight: 600;
+}
+.stack-trigger-selection {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 680px;
+  align-self: center;
+  overflow: auto;
+  padding: 4px 8px;
+  box-sizing: border-box;
+}
+.command-stack-dialog .stack-trigger-selection > .settings-field {
+  display: block;
+  padding: 0;
+}
+.command-stack-dialog .stack-trigger-selection > .settings-field > .settings-field-control {
+  margin-top: 6px;
+}
+.stack-command-step {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.stack-command-step[hidden] {
+  display: none;
+}
+.stack-trigger-summary {
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 .command-stack-dialog .stack-trigger-header .settings-field,
 .command-stack-dialog .stack-condition-panel .settings-field {
   padding: 0;

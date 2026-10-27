@@ -185,6 +185,7 @@ export function SettingsDialog({
   message,
   errorAction,
   cancelWhilePending = false,
+  closeAfterApply = true,
   resetAction,
 }: {
   title: string;
@@ -207,6 +208,7 @@ export function SettingsDialog({
   message?: string;
   errorAction?: ReactNode;
   cancelWhilePending?: boolean;
+  closeAfterApply?: boolean;
   resetAction?: { label: string; onClick(): void };
 }) {
   const { t } = useHostTranslation();
@@ -223,7 +225,7 @@ export function SettingsDialog({
     setError('');
     try {
       await onApply();
-      onClose();
+      if (closeAfterApply) onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('common.saveFailed'));
     } finally {

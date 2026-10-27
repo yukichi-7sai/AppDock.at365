@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { Settings, ExtensionSnapshot, SettingDefinition } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
 import {
@@ -9,8 +9,8 @@ import {
   type TriggerStack,
   type TriggerStackKind,
 } from '../../shared/trigger-stacks';
-import { gestureTypes, gestureTitle } from '../../shared/gestures';
-import { touchpadGestureTypes, touchpadTitle } from '../../shared/touchpad-gestures';
+import { gestureTitle } from '../../shared/gestures';
+import { touchpadTitle } from '../../shared/touchpad-gestures';
 import { getKeybindingOptions } from '../../shared/keybindings';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { useHostTranslation } from '../HostTranslation';
@@ -19,6 +19,7 @@ import { SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsListTable } from '../settings-ui/SettingsListTable';
 import { CommandListSection } from '../settings-ui/CommandListScroll';
 import { ShortcutCaptureField } from '../settings-ui/ShortcutCaptureField';
+import { GestureInputPicker } from '../settings-ui/GestureInputPicker';
 import { CommandStackEditor, StackExecutionMode } from './CommandStackEditor';
 
 export const triggerStackTitle = (stack: Pick<TriggerStack, 'kind' | 'input'>) =>
@@ -51,7 +52,18 @@ export function TriggerStackDialog({
   const [value, setValue] = useState(() => structuredClone(initial));
   const [before] = useState(() => (original ? structuredClone(original) : undefined));
   const [valid, setValid] = useState(true);
-  const keyGesture = value.kind === 'gestures' && value.input.startsWith('key:');
+  const [selecting, setSelecting] = useState(!before);
+  const selection = useRef<HTMLDivElement>(null);
+  const editor = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const target = selecting
+        ? selection.current?.querySelector<HTMLElement>('[data-initial-focus], .shortcut-capture')
+        : editor.current?.querySelector<HTMLElement>('[data-testid="stack-add-command"]');
+      target?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selecting]);
   const inherited =
     value.kind === 'shortcuts'
       ? getKeybindingOptions(settings).executionMode
@@ -64,69 +76,114 @@ export function TriggerStackDialog({
   } catch {
     validInput = false;
   }
+  const duplicate =
+    !before && triggerStacks(settings, value.kind).some((stack) => stack.input === value.input);
   return (
     <SettingsDialog
       className="command-stack-dialog"
       title={t(before ? 'settings.commandStacks.editTrigger' : 'settings.commandStacks.addTrigger')}
+      description={
+        !before && (
+          <span className="stack-creation-steps">
+            <span aria-current={selecting ? 'step' : undefined}>
+              {t('settings.commandStacks.chooseTriggerStep')}
+            </span>
+            <span aria-current={!selecting ? 'step' : undefined}>
+              {t('settings.commandStacks.editStackStep')}
+            </span>
+          </span>
+        )
+      }
       onClose={onClose}
-      valid={valid && validInput && value.entries.length > 0}
-      onApply={async () => onChange(applyTriggerStack(settings, value, before))}
+      valid={validInput && !duplicate && (selecting || (valid && value.entries.length > 0))}
+      error={duplicate ? t('settings.commandStacks.triggerExists') : undefined}
+      applyLabel={
+        selecting
+          ? t('settings.commandStacks.next')
+          : before
+            ? 'OK'
+            : t('settings.bindingEditDialog.addAction')
+      }
+      closeAfterApply={!selecting}
+      resetAction={
+        !before && !selecting
+          ? { label: t('settings.commandStacks.backToTrigger'), onClick: () => setSelecting(true) }
+          : undefined
+      }
+      onApply={async () => {
+        if (selecting) {
+          setSelecting(false);
+          return;
+        }
+        onChange(
+          applyTriggerStack(
+            settings,
+            before ? { ...value, kind: before.kind, input: before.input } : value,
+            before,
+          ),
+        );
+      }}
     >
       {(ready, setError) => (
         <>
-          <div className="stack-trigger-header">
-            <div className="stack-trigger-input">
-              {value.kind !== 'shortcuts' && (
-                <SettingsField title={t('settings.commandStacks.input')}>
-                  <select
-                    data-testid="stack-trigger-input"
-                    aria-label={t('settings.commandStacks.input')}
-                    value={keyGesture ? 'key:' : value.input}
-                    onChange={(event) => setValue({ ...value, input: event.target.value })}
-                  >
-                    {(value.kind === 'gestures' ? gestureTypes : touchpadGestureTypes).map(
-                      ([id, title]) => (
-                        <option key={id} value={id}>
-                          {title}
-                        </option>
-                      ),
-                    )}
-                    {value.kind === 'gestures' && (
-                      <option value="key:">{t('settings.gestureBindingDialog.keyboard')}</option>
-                    )}
-                  </select>
-                </SettingsField>
-              )}
-              {(value.kind === 'shortcuts' || keyGesture) && (
+          {!before && (
+            <div
+              ref={selection}
+              className="stack-trigger-selection"
+              hidden={!selecting}
+              data-testid="stack-trigger-selection"
+            >
+              {value.kind === 'shortcuts' ? (
                 <ShortcutCaptureField
-                  label={value.kind === 'shortcuts' ? t('settings.commandStacks.input') : undefined}
+                  label={t('settings.commandStacks.input')}
                   showDescription={false}
-                  allowWin={value.kind === 'shortcuts'}
-                  value={keyGesture ? value.input.slice(4) : value.input}
-                  onChange={(input) =>
-                    setValue({ ...value, input: keyGesture ? 'key:' + input : input })
-                  }
+                  value={value.input}
+                  onChange={(input) => setValue({ ...value, input })}
+                  recordingReady={ready}
+                  setError={setError}
+                />
+              ) : (
+                <GestureInputPicker
+                  touchpad={value.kind === 'touchpad-gestures'}
+                  value={value.input}
+                  onChange={(input) => setValue({ ...value, input })}
                   recordingReady={ready}
                   setError={setError}
                 />
               )}
             </div>
-            <StackExecutionMode
-              value={value.executionMode}
-              inherited={inherited}
-              onChange={(executionMode) => setValue({ ...value, executionMode })}
+          )}
+          <div
+            ref={editor}
+            className="stack-command-step"
+            hidden={selecting}
+            data-testid="stack-command-step"
+          >
+            <div className="stack-trigger-header">
+              <div className="stack-trigger-input">
+                <SettingsField title={t('settings.commandStacks.input')}>
+                  <div className="stack-trigger-summary" data-testid="stack-trigger-readonly">
+                    {triggerStackTitle(before ?? value)}
+                  </div>
+                </SettingsField>
+              </div>
+              <StackExecutionMode
+                value={value.executionMode}
+                inherited={inherited}
+                onChange={(executionMode) => setValue({ ...value, executionMode })}
+              />
+            </div>
+            <CommandStackEditor
+              entries={value.entries}
+              onChange={(entries) => setValue({ ...value, entries })}
+              commands={commands}
+              applets={applets}
+              keyboard={value.kind === 'shortcuts'}
+              onValidity={setValid}
+              initialEntryId={initialEntryId}
+              maxEntries={2000}
             />
           </div>
-          <CommandStackEditor
-            entries={value.entries}
-            onChange={(entries) => setValue({ ...value, entries })}
-            commands={commands}
-            applets={applets}
-            keyboard={value.kind === 'shortcuts'}
-            onValidity={setValid}
-            initialEntryId={initialEntryId}
-            maxEntries={2000}
-          />
         </>
       )}
     </SettingsDialog>

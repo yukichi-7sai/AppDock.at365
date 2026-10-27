@@ -225,6 +225,54 @@ async function close() {
       await until(() => palette.isClosed(), 'picker closed');
       await dialog.getByTestId('command-stack-editor').waitFor();
     };
+    const next = async () => {
+      const action = dialog.getByTestId('settings-dialog-confirm');
+      assert.equal(await action.innerText(), '次へ');
+      await until(() => action.isEnabled(), 'valid trigger selection');
+      await action.click();
+      await dialog.getByTestId('stack-command-step').waitFor();
+      assert(await dialog.getByTestId('stack-trigger-selection').isHidden());
+    };
+    const pickerSignatures = {};
+    const pickerSignature = () =>
+      dialog
+        .getByTestId('gesture-input-picker')
+        .locator('button[data-testid]')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => ({ id: button.dataset.testid, text: button.textContent.trim() })),
+        );
+    const checkSelectionLayout = async (kind) => {
+      for (const viewport of [
+        { width: 1320, height: 1050 },
+        { width: 900, height: 640 },
+        { width: 560, height: 640 },
+      ]) {
+        await page.setViewportSize(viewport);
+        assert(await dialog.getByTestId('stack-command-step').isHidden());
+        const dimensions = await dialog.evaluate((element) => {
+          const body = element.querySelector('.settings-dialog-body');
+          const selection = element.querySelector('.stack-trigger-selection');
+          const footer = element
+            .querySelector('[data-testid=settings-dialog-confirm]')
+            .getBoundingClientRect();
+          return {
+            height: selection.clientHeight,
+            bodyHeight: body.clientHeight,
+            bodyScroll: body.scrollHeight,
+            overflow: getComputedStyle(body).overflowY,
+            footer: footer.bottom,
+          };
+        });
+        assert(dimensions.height > 200, JSON.stringify(dimensions));
+        assert.equal(dimensions.overflow, 'hidden');
+        assert(dimensions.bodyScroll <= dimensions.bodyHeight + 1);
+        assert(dimensions.footer <= viewport.height - 8);
+        await dialog.screenshot({
+          path: path.join(profile, `trigger-select-${kind}-${viewport.width}.png`),
+        });
+      }
+      await page.setViewportSize({ width: 1320, height: 900 });
+    };
     const checkTriggerLayout = async (kind, suffix = '') => {
       assert.equal(
         await dialog
@@ -322,8 +370,61 @@ async function close() {
           ctrlKey: true,
           shiftKey: true,
         });
+        await page.setViewportSize({ width: 900, height: 640 });
+        await dialog.locator('.shortcut-special-trigger').click();
+        await dialog
+          .locator('.shortcut-special-picker')
+          .getByRole('button', { name: 'F12', exact: true })
+          .scrollIntoViewIfNeeded();
+        assert(
+          await dialog.getByTestId('stack-trigger-selection').evaluate((el) => el.scrollTop > 0),
+        );
+        await dialog.locator('.shortcut-special-trigger').click();
+      } else {
+        pickerSignatures[kind] = await pickerSignature();
+        if (kind === 'gestures') {
+          await dialog.getByTestId('gesture-family:key').click();
+          assert(await dialog.getByTestId('settings-dialog-confirm').isDisabled());
+          await dialog.getByTestId('gesture-family:move').click();
+          await dialog.getByTestId('gesture-steps:2').click();
+          await dialog.getByTestId('gesture-direction:1:right').click();
+          await dialog.getByTestId('gesture-direction:2:up').click();
+          assert(await dialog.getByTestId('gesture-direction:2:right').isDisabled());
+          await dialog.getByTestId('gesture-family:click').click();
+          await dialog.getByTestId('gesture-action:click-middle').click();
+          await dialog.getByTestId('gesture-family:move').click();
+          assert.equal(
+            await dialog.getByTestId('gesture-direction:1:right').getAttribute('aria-pressed'),
+            'true',
+          );
+          await dialog.getByTestId('gesture-steps:1').click();
+          await dialog.getByTestId('gesture-direction:1:up').click();
+        } else {
+          await dialog.getByTestId('touchpad-action:four.right').click();
+          await dialog.getByTestId('touchpad-action:three.tap').click();
+        }
       }
+      await checkSelectionLayout(kind);
+      const beforeSteps = (await snapshot()).settings.value;
+      await next();
       await choose('appdock.custom.' + item.id);
+      await dialog.getByTestId('binding-scope:exe').click();
+      await until(
+        () => dialog.getByTestId('settings-dialog-confirm').isDisabled(),
+        'condition validation applied',
+      );
+      await dialog.getByTestId('settings-dialog-reset').click();
+      await next();
+      assert.equal(await dialog.getByTestId('stack-entry').count(), 1);
+      await until(
+        () => dialog.getByTestId('settings-dialog-confirm').isDisabled(),
+        'condition draft retained',
+      );
+      assert.deepEqual(
+        (await snapshot()).settings.value,
+        beforeSteps,
+        'wizard steps must not persist drafts',
+      );
       await dialog.getByTestId('binding-scope:app').click();
       await dialog.getByTestId('stack-execution-mode').selectOption('all');
       await save();
@@ -374,26 +475,20 @@ async function close() {
       }
       assert.equal(await table.locator('tbody tr').count(), 1);
       await table.getByRole('button', { name: /を編集$/ }).click();
+      assert.equal(await dialog.locator('h2').innerText(), 'トリガーの編集');
+      assert.equal(
+        await dialog
+          .locator('.shortcut-capture, .gesture-input-picker, [data-testid=stack-trigger-input]')
+          .count(),
+        0,
+      );
+      assert.equal(await dialog.getByTestId('settings-dialog-reset').count(), 0);
+      const fixedInput = await dialog.getByTestId('stack-trigger-readonly').innerText();
       await dialog.getByTestId('binding-scope:exe').filter({ visible: true }).click();
       await checkTriggerLayout(kind);
       await dialog.getByTestId('binding-scope:app').filter({ visible: true }).click();
-      if (kind === 'shortcuts') {
-        await dialog.locator('.shortcut-special-trigger').click();
-        await checkTriggerLayout(kind, '-keys');
-        await dialog
-          .locator('.shortcut-special-picker')
-          .getByRole('button', { name: 'F12', exact: true })
-          .scrollIntoViewIfNeeded();
-        assert(await dialog.locator('.stack-trigger-header').evaluate((el) => el.scrollTop > 0));
-        assert.equal(
-          await dialog
-            .locator('.shortcut-special-picker')
-            .evaluate((el) => getComputedStyle(el).overflowY),
-          'visible',
-        );
-        await dialog.locator('.shortcut-special-trigger').click();
-      }
       await dialog.getByTestId('stack-execution-mode').selectOption('first');
+      assert.equal(await dialog.getByTestId('stack-trigger-readonly').innerText(), fixedInput);
       await save();
       assert.equal(
         await page.getByTestId(optionsId).count(),
@@ -481,12 +576,18 @@ async function close() {
             .dispatchEvent('keydown', { key, code: key, ctrlKey: true, shiftKey: true });
           titles.set(input, input);
         } else {
-          await dialog.getByTestId('stack-trigger-input').selectOption(input);
+          if (kind === 'touchpad-gestures')
+            await dialog.getByTestId('touchpad-action:' + input).click();
+          else if (input.startsWith('wheel-')) {
+            await dialog.getByTestId('gesture-family:wheel').click();
+            await dialog.getByTestId('gesture-action:' + input).click();
+          } else await dialog.getByTestId('gesture-direction:1:' + input.slice(5)).click();
           titles.set(
             input,
-            await dialog.getByTestId('stack-trigger-input').locator('option:checked').innerText(),
+            await dialog.getByTestId('binding-input-summary').locator('strong').innerText(),
           );
         }
+        await next();
         await choose('fixture.stacks.a');
         await dialog.getByTestId('binding-scope:app').click();
         await save();
@@ -526,6 +627,56 @@ async function close() {
     );
     checks.push(
       'all trigger tables follow picker order and sorted edits update the correct saved stack',
+    );
+    const beforeCancel = (await snapshot()).settings.value;
+    await page.getByTestId('command-stack-tab:gestures').click();
+    await page.getByTestId('trigger-stack-table').getByRole('button', { name: /追加/ }).click();
+    assert(
+      await dialog.getByTestId('settings-dialog-confirm').isDisabled(),
+      'duplicate trigger blocks next',
+    );
+    await dialog.getByTestId('settings-dialog-cancel').click();
+    await page.getByTestId('command-stack-tab:touchpad-gestures').click();
+    await page.getByTestId('trigger-stack-table').getByRole('button', { name: /追加/ }).click();
+    await dialog.getByTestId('touchpad-action:four.down').click();
+    await next();
+    await choose('fixture.stacks.a');
+    await dialog.getByTestId('settings-dialog-cancel').click();
+    await dialog.waitFor({ state: 'hidden' });
+    assert.deepEqual(
+      (await snapshot()).settings.value,
+      beforeCancel,
+      'cancellation on either step discards the draft',
+    );
+    await page.getByRole('button', { name: 'コマンドトリガー', exact: true }).click();
+    for (const kind of ['gestures', 'touchpad-gestures']) {
+      await page.locator('[data-shortcut-command="fixture.stacks.host"] .command-title').hover();
+      await page.getByTestId('binding-add:fixture.stacks.host:' + kind).click();
+      assert.deepEqual(
+        await pickerSignature(),
+        pickerSignatures[kind],
+        'assignment and stack creation must share the same picker',
+      );
+      if (kind === 'gestures') {
+        await dialog.getByTestId('gesture-family:wheel').click();
+        await dialog.getByTestId('gesture-action:wheel-up').click();
+      } else await dialog.getByTestId('touchpad-action:four.up').click();
+      await dialog.getByTestId('binding-apply').click();
+      await dialog.waitFor({ state: 'hidden' });
+      await until(async () => {
+        const value = (await snapshot()).settings.value;
+        return (kind === 'gestures' ? value.gestures : value.touchpadGestures).bindings.some(
+          (entry) =>
+            entry.command === 'fixture.stacks.host' &&
+            entry.gesture === (kind === 'gestures' ? 'wheel-up' : 'four.up'),
+        );
+      }, 'shared picker assignment persisted');
+    }
+    checks.push(
+      'two-step creation retains invalid condition drafts without persisting; editing locks trigger identity',
+    );
+    checks.push(
+      'assignment addition and stack creation share identical gesture pickers and persist selected actions',
     );
     assert.deepEqual(errors, []);
     success = true;
