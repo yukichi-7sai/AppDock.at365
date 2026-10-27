@@ -46,7 +46,7 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 | Default Shell / Shell Applet | 公開snapshotの描画、検索文字列・選択位置・キーボード移動。設定や業務状態を複製しない             |
 | 本体の`CommandPicker`        | トレイ編集から選択を要求し、返されたIDを設定入力へ反映し、即時保存する。描画実装を持たない              |
 
-下のApplet WebContentsや入力・sessionを破棄/再生成しない。オーバーレイは本体クライアント領域全体に重なる独立WebContentsView。設定通知もその下へ置く。モーダル中は本体の画面・グローバルキー・ジェスチャーによる共通コマンド割り当てを停止する。パレット自身の入力・IME・Tab循環・上下/Enter/Escapeは描画が扱う。
+下のApplet WebContentsや入力・sessionを破棄/再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループは従来のクライアント領域を使う。設定通知もその下へ置く。パレットの背景は透明で、本文だけを2pxぼかす。本体本文はCSS filter、別WebContentsのApplet本文は一時CSSを使い、撮影せず同じrendererと入力を保持する。リボン・タイトルバー・ステータスバーは操作できる。本文の背景クリックで閉じ、リボン等のroute変更でも閉じる。グローバルキー・ジェスチャーによる共通コマンド割り当ての停止は維持する。パレット自身の入力・IME・Tab循環・上下/Enter/Escapeは描画が扱う。
 
 閉じるとView・readyタイマーを破棄し、元のrouteが変わらず本体Windowにフォーカスがある場合だけ元のWebContentsへ戻す。新しい要求は旧要求を取消。所有Windowの非表示・最小化・再読込・終了、本文のroute変更でも取消する。実行開始済みコマンドの副作用を取消で巻き戻すことはしない。
 

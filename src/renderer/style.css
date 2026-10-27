@@ -1,5 +1,9 @@
 @import './settings-ui/controls.css';
 
+.shell[data-palette-open='true'] > main {
+  filter: blur(2px);
+}
+
 /* Host pages share layout, focus and modal handling in the root renderer. */
 .host-page-main {
   display: flex;
@@ -52,11 +56,4 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-/* Preserve native focus containment while Shell surfaces are prepared before painting. */
-html[data-host-modal-pending] dialog:modal,
-html[data-host-modal-pending] dialog:modal::backdrop {
-  opacity: 0 !important;
-  transition: none !important;
-  animation: none !important;
 }

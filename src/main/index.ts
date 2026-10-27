@@ -170,6 +170,7 @@ import { trayIdentity } from './core/tray-identity';
 import { configureNotifications, activateNotification } from './core/notifications';
 import {
   activeShortcutPage,
+  setAppletPageBlur,
   configurePageHost,
   updatePageViewport,
   refreshPageDisplays,
@@ -3028,6 +3029,7 @@ function registerIpc() {
     restore === true && route !== null ? navigation.restore(route) : navigation.navigate(route),
   );
   handle('dock:shellViewport', (bounds) => shellHost?.viewport(bounds));
+  handle('dock:overlayViewport', (bounds) => overlayHost?.viewport(bounds));
   handle('dock:pages:open', (request) => hostPages!.open(request));
   handle('dock:pages:get', (id) => hostPages!.get(id));
   handle('dock:pages:act', (action) => hostPages!.act(action));
@@ -3141,11 +3143,7 @@ function registerIpc() {
     if (typeof active !== 'boolean') throw Error('Invalid modal state');
     hostModalLayer?.setActive(active);
   });
-  handle('dock:hostModalReady', (revision: number, rendered = true) => {
-    if (!Number.isSafeInteger(revision)) throw Error('Invalid modal revision');
-    if (typeof rendered !== 'boolean') throw Error('Invalid modal background state');
-    return hostModalLayer?.ready(revision, rendered) ?? false;
-  });
+
   handle('dock:setShortcutRecording', async (recording: boolean) => {
     if (typeof recording !== 'boolean') throw new Error(hostText('services.index.invalidKeyState'));
     shortcutRecording = recording && !!window?.isFocused();
@@ -3339,6 +3337,10 @@ async function initialize() {
     changed,
     blocked: (region) =>
       region !== 'overlay.command-palette' &&
+      !(
+        overlayHost?.kind === 'command-palette' &&
+        ['ribbon', 'titlebar', 'statusbar'].includes(region)
+      ) &&
       region !== 'notification.desktop' &&
       !(region === 'ribbon' && overlayHost?.kind === 'ribbon-group') &&
       !!overlayHost?.active,
@@ -3902,9 +3904,9 @@ async function initialize() {
     window,
     preload: path.join(__dirname, 'shell-bar-preload.js'),
     registry: shellRegistry!,
-    modalLayer: hostModalLayer,
+
     ready: () => uiReady && !quitting,
-    blocked: () => !!overlayHost?.active,
+    blocked: () => overlayHost?.kind === 'ribbon-group',
     content: new WindowBars({
       state: () => {
         const update = updater.state;
@@ -3988,7 +3990,7 @@ async function initialize() {
     layer: () => {
       overlayHost?.layout();
     },
-    modalLayer: hostModalLayer,
+
     preload: path.join(__dirname, 'shell-preload.js'),
     ui: presentation,
     openGroup: (id, anchor, viewport) =>
@@ -4079,6 +4081,7 @@ async function initialize() {
     execute: executeShellCommand,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     changed: () => {
+      setAppletPageBlur(overlayHost?.kind === 'command-palette');
       void syncHotKeys();
       changed();
     },

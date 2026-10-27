@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { rankCommands, type UiCommand } from '../../src/shared/commands';
 import { Icon } from '../../src/shared/ui-icons';
@@ -47,7 +47,7 @@ export function CommandPalette({
   const selected = Math.min(index, Math.max(0, filtered.length - 1));
   const visiblePins = filtered.filter((c) => pins.includes(c.id)).map((c) => c.id);
   const canChoose = (c: UiCommand) => !busy && (mode === 'select' || c.available);
-  useEffect(() => {
+  useLayoutEffect(() => {
     ref.current?.querySelector('input')?.focus();
   }, [mode]);
   useEffect(() => {

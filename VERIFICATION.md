@@ -1,5 +1,43 @@
 # 検証記録
 
+## 2026-10-27: ぼかしworktreeのmain統合と発行 0.98.7
+
+- 利用者が確認した専用worktreeの0.98.5を、クリーンなmain/0389f78へ取り込んだ。開始時に`pull --ff-only`で最新取得済みを確認。試験基点はf8d1954で、30ファイルの3方向照合は競合なし。main側の`closeAfterApply`・2段階追加・最新トリガーUIと既定設定を保持し、スタックGUI回帰1本を追加改修した計31ファイルを対象とする。
+- ダイアログとパレットの背景を本文範囲だけの2pxぼかしへ統合し、Shellの撮影・画像転送・非表示待ちを除いた。OK／キャンセルのあるダイアログは背景クリックで入力を保持し、閉じるだけのプレビューとパレットは背景で閉じる。mainの新しい900pxスタックダイアログにも共通の高さ上限変数を接続した。
+- 発行前レビューと統合確認で、パレット開始時の一括閉鎖がスタック編集のコマンド選択を巻き込む問題を発見した。0.98.6の固定GUI失敗を保持し、表示先の変更時だけ元のダイアログを閉じるよう修正。パレットの背景取消で親と未保存名が残り、選択結果を編集へ戻せる回帰を追加した。修正後のソースGUI13群・最終固定GUI14群が成功し、未解決指摘なし。発行済み0.98.6から通常修正のパッチ更新として0.98.7とした。設定項目・保存ファイル・公開APIの追加削除なし。
+- 統合版の型検査・build、関連40ファイル365/365件が成功（fail/cancel/skip 0）。標準1210件のうち非影響分は、0.98.5の既存照合チェーン・888入力と完全ログのSHA256から再利用した。365件後の差分は版・rendererの閉鎖条件・GUI試験だけで、対象main/native/単体試験と固定文言は不変のため365件の成功も最終版へ再利用。最後の829入力の前後一致を確認した。最終InputHost DLLそのもののメモリ内状態58項目も成功し、0.98.7との同一hashを確認した。OSへPause/F13〜F24を送信・登録していない。
+- `publish.bat`終了0。通常発行先は `A:/40.ARTIFACT/AppDock.at365/win-unpacked`。管理694ファイルのstaging／発行先／ZIP、ASAR内261生成物と最終out、manifest／Default Shell／feedの版・サイズ・hashを照合。EXE SHA256=`aa821bcf8d335a64e4331e0d494fbf980dc4a25f097954117859680838001485`、ASAR=`10c3299457921fecb92e6a8362b0a6d958eba9440131327e0ab2af09f72de35b`、update.zip=270679272 bytes／SHA256=`42fd93bdf219384812a016e2782519e2f3279c939ad1e92352ebcf109a96f3ba`。
+- 最終固定EXEは共通ダイアログ5群・画像ライブラリー8群・Shell overlay7群・スタック編集14群、smokeがすべて成功。背景クリック40回の入力保持、パレット26回、親付きパレット取消／選択、3方式の追加・編集・保存・再起動、本文内の高さ制限、両テーマ、狭幅、Applet／入れ子Viewと入力、IME／Tab／ピン／Shell復旧を確認した。5試験コピーの管理694ファイルをすべて最終配布物と照合。実リモートアカウント・物理入力・長時間GPU／プロセス全体メモリは未確認。
+- 証跡: `.artifacts/commit-validation-dialog-blur-main-20261027/` のbaseline／integration／review-reuse／inputs-before・after／各完全log／package・asar・fixed-copy-validation／native-result／cleanup／validation／stage・commit-result。最終GUI profileはdialog `1793105199798`、gallery `1793105217042`、overlay `1793105228189`、stacks `1793105143792`、smoke `1793105246531`。今回の試験プロセス残存0。直近成功と失敗診断・再利用資料を保持し、追加削除なし。今回の変更だけをコミットし、push・Release・実利用先deployは行わない。元の専用worktreeと発行先を保持する。
+
+以下の専用worktreeに関する3節は試験時の履歴であり、証跡の相対`.artifacts/`は `A:/30.PROJECT/AppDock.at365-dialog-blur/` を基準とする。
+
+## 2026-10-27: ダイアログの背景クリック制御 0.98.5（専用worktree）
+
+- `SettingsModal.closeOnBackdrop`の既定値をfalseにした。OK／キャンセル等の確定操作がある編集・確認・並べ替えダイアログは背景クリックで閉じず、一時入力を保持する。閉じる操作だけの画像プレビュー2経路は明示的なtrueを維持し、独立したコマンドパレットも従来どおり背景クリックで閉じる。画像プレビューのぼかしは既存実装を維持した。
+- 発行前に全SettingsModal呼出元と影響先をレビューし、ボタンの文言・DOMによる推測を使わず共通既定値と明示指定で制御できること、保存・API・IME・busy・Escape・フォーカスへの変更がないことを確認した。未解決指摘なし。型検査成功。804入力の照合で製品差分は共通部品の既定値とpackage.jsonの版だけ、試験差分は関連GUI2本だけで、main/native/依存と関連63件の成功を再利用した。設定項目・保存ファイル・公開APIの追加削除はなく、既発行0.98.4から通常修正のパッチ更新とした。
+- `publish.bat`終了0。発行先は `A:/40.ARTIFACT/AppDock.at365-dialog-blur/win-unpacked`。管理694ファイルをstaging／発行先／ZIPで照合し、ASAR内260生成物と最終out、feed／manifest／Default Shellの0.98.5を確認。EXE SHA256=`c3add4bbb2908129eb883aa96b0d3194177956c95488c427acac623233bff2d4`、ASAR=`239d722db7a20506d1e49b08252af7dc912a4305f58517963eaaf779900389a0`、update.zip=270676776 bytes／SHA256=`54bb9cadc65c4d1fcf8451c247bb64f5ee912b8e0456179e45bf4a851624a763`。照合スクリプトは発行先の利用者ファイルを全件比較する旧前提を修正し、manifest所有分だけを検査した。製品の発行手順は変更していない。
+- 固定EXEの共通GUI5群、画像GUI8群、smokeが成功。背景クリック40回で未保存の名前を保持し、キャンセル／Escapeで閉じること、パレット26回の表示寿命、画像グループ編集の入力保持、画像プレビューの背景閉鎖と内側クリック／ドラッグの非閉鎖を確認。従来の本文内2pxぼかし、バー操作、両テーマ、狭幅、入れ子Viewと入力保持も成功。3試験コピーの全694ファイルを最終配布物と照合した。実リモートアカウント・物理IME／機器・長時間GPU／全体メモリは未確認。
+- 証跡: `.artifacts/dialog-backdrop-0985-20261027/` のreview-reuse、inputs-before/after、各完全log、package/asar/fixed-copy-validation、cleanup、validation。固定GUIは `dialog-blur-ui-1793100012929`、画像は `image-library-session-ui-1793100066111`、smokeは `smoke-1793100099601`。テストプロセス残存0。同じscript／実行方式の直近成功と参照証跡を保持し、今回の追加削除なし。main統合・commit・push・Release・実利用先deployは行っていない。
+
+## 2026-10-27: ぼかしworktree専用フォルダーへの0.98.4発行
+
+- 依頼に従い `A:/40.ARTIFACT/AppDock.at365-dialog-blur` を新規の専用発行先として、既存publish.batで0.98.4を発行した（終了0）。通常版0.98.3を参照して新しいパッチ番号を選択。対象ソースは前項の専用worktree、mainへの統合・commit・push・Release・実利用先deployは行っていない。発行先は既存publish-pathsのworktreeフォルダー名による解決を使用し、発行スクリプトは変更していない。
+- 804入力を前項の最終manifestと照合し、製品側の差分はpackage.jsonの版のみ。実装時の関連63件とレビュー結果を再利用した。frozen-lockfileの同期・供給網検査を維持。発行前にpnpm実行すると版変更に伴うworkspace構造照合で止まったため、publish.bat内の正規のinstallから実行し成功した。固定配布物の試験ではWindow表示をfixtureで明示し、製品コードを追加変更せず検証した。
+- 配布フォルダー・staging・update.zipの全694ファイルのSHA256を照合し、feedの版・サイズ・hash・format、Default Shell版、配置用スクリプトを確認した。ASAR内の生成物260ファイルも最終outと完全一致。EXE SHA256=`e1f27b17689788a0cb4db12e842d5eca979a081c01bf4a06591aee7b0cd60aeb`、ASAR=`f28ddbc768076dd20aaa1810ff83c1d949069d419944e5ab58b38419ea84eb26`。update.zipは270676807 bytes/SHA256=`b1393e0101084a4b69e418e2187eb16d9ef7ba8142b19c5fa14a18825f44230b`。
+- 発行物を隔離profileへコピーして共通GUI5群（ダイアログ40回・パレット26回・入れ子の描画面・入力保持・両テーマ・狭幅・背景取消・バー操作）、画像ライブラリーGUI8群、smokeが成功。各コピーの管理対象694ファイルを発行元と照合した。GUIのcapture/hideは各0、GC後DOM nodesは510→509。通常のぼかし・取消・再選択・起動保存を固定EXEで確認し、長時間GPU/全体メモリ・実リモートアカウント・物理入力は追加確認していない。
+- 証跡: `.artifacts/dialog-blur-publish-20261027/` のreuse/publish.log/package-validation/asar-validation/fixed-copy-validationと固定GUI・gallery・smokeの完全ログ。GUIは `.artifacts/dialog-blur-ui-1793098067594/result.json`、画像は `.artifacts/image-library-session-ui-1793097917985/result.json`、smokeは `.artifacts/smoke-1793097929875/smoke-result.json`。未解決指摘なし。発行物を使う成功分は各方式で直近3回以内のため削除なし。失敗fixtureと検証資料、元のworktreeも保持する。
+
+## 2026-10-27: 本文内の薄いぼかしとダイアログ背景処理（専用worktree・未発行）
+
+- `AppDock.at365-dialog-blur`を確定済みmain `f8d1954c87cd2ae4c50ac78e6bd192e019786a6c`からdetachedで作成。元checkoutの別作業は保持した。依頼に従い発行の直前で停止し、版更新・publish・main統合・commit・push・Release・deployは行っていない。検証は固定配布物ではなく専用worktreeの開発ビルド。
+- 共通SettingsModalは本文矩形だけに収め、透明な背景へ2pxのCSSぼかしを適用。背景クリックで取消し、保存中の閉鎖抑止、IME、Tab、フォーカス復帰と一時入力・保存処理を維持。Shellの撮影・画像転送・decode・非表示と準備完了待ちを廃止し、リボン・タイトルバー・ステータスバーの表示と操作を保持した。リボンでの表示先変更とパレット開始で元のダイアログを閉じる。
+- パレットも本文矩形だけに配置し、背景クリックで閉じる。本体本文はCSS filter、別WebContentsのApplet本文とその内部の子Viewも追加・削除する一時CSSでぼかし、renderer・session・入力を保持する。Webアカウントの選択中本文の載せ替えも同じ管理へ接続し、nested View fixtureで入力保持と10回の適用・解除を確認した。グローバルキーとジェスチャーの停止、選択と実行の分離、ピン保存、Shellの復旧、独立Windowから本体へ画像選択を委譲する既存契約は維持した。
+- 型検査・本体/Default Shell開発ビルド・ネイティブ補助ビルドが成功。関連63件はfail/cancel/skip 0。共通GUI5群（通常ダイアログ40回、パレット26回、両テーマ、狭幅、背景クリック、バー操作、ページ移動、Applet入力とCSS解除）成功。40回の開閉でShell capture/hide各0、GC後DOM nodesは510→509。開閉全体の自動操作時間に回数に比例する悪化は見られなかったが、旧版との速度比較・長時間のGPU/プロセス全体メモリ計測は行っていない。
+- 画像ライブラリーGUI8群とShell overlay GUI7群も成功。画像プレビュー・グループ編集、rAF停止、capture/decode使用不能、スクロール/再選択、IME/Tab、選択/実行/ピン、Appletの入力とフォーカス、外部Shell/復旧/ready期限を確認。古い試験の撮影待ちと非表示期待を新契約に更新し、native Windowの特定とready待ちを明示した。
+- レビューでは、狭幅で個別max-heightが共通制限を上書きする問題を共有CSS変数へ変更した。Electron 45.0.0のuser-origin CSSはremoveInsertedCSS成功後もfilterが残ることを最小probeで再現し、解除できるauthor-originへ修正した。パレットの初期フォーカスは描画前に準備し、Appletの上へ配置する既存native処理を維持。パレット閉鎖で別のダイアログを巻き込まないよう、取消通知はページ変更とオーバーレイ開始だけに制限した。最終の関連GUIは成功、発行を妨げる未解決指摘なし。設定項目・保存形式・外部公開APIの変更なし。発行時の版は、その時点のmainと発行済み版を確認して決定する。
+- 完全ログと最終入力・生成物hash: `.artifacts/dialog-blur-validation/`。最終GUI: `.artifacts/dialog-blur-ui-1793095123503/result.json`、画像: `.artifacts/image-library-session-ui-1793094322163/result.json`、overlay: `.artifacts/shell-overlay-1793094492434/checks.json`。終了・成功・対象パス・実行プロセスなし・再解析ポイントなしを確認し、古い成功profile `dialog-blur-ui-1793094207076`と`dialog-blur-ui-1793094309554`の2件だけ削除。同種の成功は直近3回を保持し、失敗/probeと固定出力も保持。結果は同証跡のcleanup.json。`.tools`は元checkoutへのjunction、node_modulesは専用展開で、元の依存へinstallしていない。
+
 ## 2026-10-27: 既定設定とタッチパッド予備照合のコミット前再確認 0.98.5
 
 - 0.97.12/.13の未コミット変更を、後続のコマンドスタック・編集UIを含むmain/473a2ed（本体0.98.5）で再確認した。対象は可視設定画面に限定した60秒予備照合、本体の提供設定に沿う既定値、自動更新確認OFF、Applet操作許可の新規全ON、保存互換性と関連仕様・試験の40ファイル。別作業の`scripts/mcp-hub-ui-test.cjs`はコミット対象から外し、作業ツリーに保持する。別worktreeは変更していない。

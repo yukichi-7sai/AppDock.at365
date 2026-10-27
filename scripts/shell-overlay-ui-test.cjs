@@ -258,9 +258,14 @@ async function dismiss(p) {
     await retained.getByLabel('Retained input').focus();
     p = await open();
     if (app) {
-      const order = await app.evaluate(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()[0].contentView.children.map((v) => v.webContents?.getURL()),
-      );
+      const order = await until(async () => {
+        const urls = await app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()
+            .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
+            .contentView.children.map((v) => v.webContents?.getURL()),
+        );
+        return urls.at(-1)?.endsWith('/overlay.html') && urls;
+      }, 'native overlay ready above the Applet body');
       assert.ok(order.at(-1).endsWith('/overlay.html'));
     }
     await dismiss(p);

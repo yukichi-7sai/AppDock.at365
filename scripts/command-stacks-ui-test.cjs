@@ -292,6 +292,7 @@ async function close() {
           const conditions = element.querySelector('.stack-condition-panel');
           const list = element.querySelector('.stack-entry-list');
           const box = element.getBoundingClientRect();
+          const page = document.querySelector('.shell > main').getBoundingClientRect();
           const footer = element
             .querySelector('[data-testid=settings-dialog-confirm]')
             .getBoundingClientRect();
@@ -299,6 +300,8 @@ async function close() {
             height: box.height,
             bottom: box.bottom,
             top: box.top,
+            pageTop: page.top,
+            pageBottom: page.bottom,
             footerBottom: footer.bottom,
             bodyHeight: body.clientHeight,
             bodyScroll: body.scrollHeight,
@@ -320,6 +323,7 @@ async function close() {
         assert.equal(layout.conditionsOverflow, 'auto');
         assert(layout.conditionsHeight > 60 && layout.listHeight > 30, JSON.stringify(layout));
         assert(layout.top >= 0 && layout.bottom <= viewport.height + 1);
+        assert(layout.top >= layout.pageTop && layout.bottom <= layout.pageBottom + 1);
         assert(layout.footerBottom <= viewport.height - 8);
         if (viewport.height > 900) assert(layout.height > 850 && layout.height <= 900);
         await dialog.screenshot({
@@ -331,6 +335,13 @@ async function close() {
     await page.getByRole('button', { name: 'コマンドを追加', exact: true }).click();
     await dialog.getByTestId('custom-command-kind').selectOption('appdock.commands.stack');
     await dialog.getByLabel('名前', { exact: true }).fill('Ordered stack');
+    await dialog.getByTestId('stack-add-command').click();
+    const cancelledPicker = await overlayPage(host);
+    await closingAction(cancelledPicker.mouse.click(5, 5));
+    await until(() => cancelledPicker.isClosed(), 'background closes only the command picker');
+    assert(await dialog.isVisible(), 'parent editor survives command picker cancellation');
+    assert.equal(await dialog.getByLabel('名前', { exact: true }).inputValue(), 'Ordered stack');
+    checks.push('command picker background cancellation preserves the parent dialog and unsaved input');
     await choose('fixture.stacks.a');
     await choose('fixture.stacks.b');
     await dialog.getByTestId('stack-entry').nth(1).locator('.stack-drag').focus();

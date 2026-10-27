@@ -1,6 +1,6 @@
 .settings-modal.settings-group-dialog.custom-command-dialog[open] {
   width: min(900px, calc(100vw - 32px));
-  max-height: min(760px, calc(100dvh - 32px));
+  --dialog-max-height: 760px;
 }
 .custom-command-editor {
   display: grid;

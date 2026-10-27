@@ -65,14 +65,35 @@ export function SettingsModal({
       event.clientY >= bounds.bottom
     );
   };
-  const callbacks = useRef({ onReady, onError });
-  callbacks.current = { onReady, onError };
+  const callbacks = useRef({ onReady, onError, onClose });
+  callbacks.current = { onReady, onError, onClose };
   const [returnFocus] = useState(() =>
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
   useLayoutEffect(() => {
-    dialog.current?.showModal();
-    dialog.current?.querySelector<HTMLElement>(initialFocus)?.focus({ preventScroll: true });
+    const element = dialog.current!;
+    const page = document.querySelector('.shell > main');
+    const layout = () => {
+      const rect = page?.getBoundingClientRect();
+      const insets = rect
+        ? [rect.top, window.innerWidth - rect.right, window.innerHeight - rect.bottom, rect.left]
+        : [0, 0, 0, 0];
+      for (const [i, side] of ['top', 'right', 'bottom', 'left'].entries())
+        element.style.setProperty(`--dialog-page-${side}`, `${Math.max(0, insets[i])}px`);
+    };
+    layout();
+    const observer = new ResizeObserver(layout);
+    if (page) observer.observe(page);
+    window.addEventListener('resize', layout);
+    const dismiss = () => callbacks.current.onClose();
+    document.addEventListener('appdock:dialog-dismiss', dismiss);
+    element.showModal();
+    element.querySelector<HTMLElement>(initialFocus)?.focus({ preventScroll: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', layout);
+      document.removeEventListener('appdock:dialog-dismiss', dismiss);
+    };
   }, []);
   useEffect(() => {
     activeSettingsModals++;

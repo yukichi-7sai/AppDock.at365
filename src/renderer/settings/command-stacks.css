@@ -1,11 +1,11 @@
 .settings-modal.settings-group-dialog.custom-command-dialog.stack-command-dialog[open] {
   width: min(1180px, calc(100vw - 32px));
-  max-height: min(700px, calc(100dvh - 32px));
+  --dialog-max-height: 700px;
 }
 .settings-modal.settings-group-dialog.command-stack-dialog[open] {
   width: min(1180px, calc(100vw - 32px));
   height: min(900px, calc(100dvh - 32px));
-  max-height: min(900px, calc(100dvh - 32px));
+  --dialog-max-height: 900px;
 }
 .command-stack-dialog > .settings-dialog-body {
   display: flex;

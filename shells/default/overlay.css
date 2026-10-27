@@ -66,7 +66,7 @@ kbd {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: #080c1480;
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: flex-start;

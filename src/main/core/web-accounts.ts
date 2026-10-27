@@ -960,6 +960,7 @@ export class WebAccountController {
       width: Math.max(1, Math.min(area.width, w - area.x)),
       height: Math.max(1, Math.min(area.height, h - area.y)),
     });
+    this.surface?.updatePaletteBlur();
   }
   private show(id: string) {
     if (!this.window) return;

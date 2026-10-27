@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { shellView } from '../../shared/shell';
 import type { ShellBarRegion } from '../../shared/shell-bars';
 import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
-import type { HostModalLayer, HostModalRegistration } from './host-modal-layer';
+
 import type { WindowBars } from './window-bars';
 import { createShellView } from './shell-view';
 
@@ -20,7 +20,7 @@ type Binding = {
   session: string;
   view: WebContentsView;
   url: string;
-  modal: HostModalRegistration;
+
   ready: boolean;
   revision: number;
   settingsSignature?: string;
@@ -45,7 +45,7 @@ export class ShellBarHost {
       window: BrowserWindow;
       preload: string;
       registry: ShellProviderRegistry;
-      modalLayer: HostModalLayer;
+
       content: WindowBars;
       ready(): boolean;
       blocked(): boolean;
@@ -63,7 +63,7 @@ export class ShellBarHost {
         generation: bar.active?.generation,
         session: bar.active?.session,
         ready: !!bar.active?.ready,
-        visible: this.visible(bar) && !bar.active?.modal.blocked && !options.blocked(),
+        visible: this.visible(bar) && !options.blocked(),
         pending: bar.pending?.provider ?? null,
       }));
     const bound = (event: IpcMainInvokeEvent, active = false) => {
@@ -78,11 +78,7 @@ export class ShellBarHost {
         !options.registry.usable(bar.region, binding) ||
         event.senderFrame !== event.sender.mainFrame ||
         event.sender.getURL() !== binding.url ||
-        (active &&
-          (binding !== bar.active ||
-            !this.visible(bar) ||
-            binding.modal.blocked ||
-            options.blocked()))
+        (active && (binding !== bar.active || !this.visible(bar) || options.blocked()))
       )
         throw Error('Window bar session is not bound');
       return { bar, binding };
@@ -172,13 +168,7 @@ export class ShellBarHost {
   }
   focus(region: ShellBarRegion, edge: 'first' | 'last') {
     const bar = this.bars.find((bar) => bar.region === region);
-    if (
-      !bar ||
-      !['first', 'last'].includes(edge) ||
-      !this.visible(bar) ||
-      bar.active!.modal.blocked ||
-      this.options.blocked()
-    )
+    if (!bar || !['first', 'last'].includes(edge) || !this.visible(bar) || this.options.blocked())
       return;
     bar.active!.view.webContents.focus();
     bar.active!.view.webContents.send('shell-bar:focus', edge);
@@ -200,7 +190,7 @@ export class ShellBarHost {
       });
       b.view.webContents.setZoomFactor(zoom);
     }
-    b.modal.setVisible(this.visible(bar));
+    b.view.setVisible(this.visible(bar));
     this.options.registry.touch();
     this.options.layer();
   }
@@ -263,7 +253,7 @@ export class ShellBarHost {
         session: randomUUID(),
         view,
         url,
-        modal: this.options.modalLayer.register(view),
+
         ready: false,
         revision: 0,
         timer: setTimeout(() => this.fail(bar, b, 'ready timeout'), 10000),
@@ -292,7 +282,7 @@ export class ShellBarHost {
   private close(b: Binding) {
     clearTimeout(b.timer);
     this.options.content.disconnect(b.session);
-    b.modal.dispose();
+
     if (!this.options.window.isDestroyed()) this.options.window.contentView.removeChildView(b.view);
     if (!b.view.webContents.isDestroyed()) b.view.webContents.close();
   }

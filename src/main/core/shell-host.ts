@@ -7,7 +7,6 @@ import path from 'node:path';
 import { createShellView } from './shell-view';
 import { defaultShellId, shellView, type ShellStatus } from '../../shared/shell';
 import type { UiPresentation } from './ui-presentation';
-import type { HostModalLayer, HostModalRegistration } from './host-modal-layer';
 
 type Binding = {
   id: string;
@@ -15,7 +14,7 @@ type Binding = {
   generation?: string;
   session: string;
   view: WebContentsView;
-  modal?: HostModalRegistration;
+
   url: string;
   ready: boolean;
   revision: number;
@@ -35,7 +34,7 @@ export class ShellHost {
     private options: {
       window: BrowserWindow;
       layer?(): void;
-      modalLayer?: HostModalLayer;
+
       preload: string;
       ui: UiPresentation;
       providers(): ShellProvider[];
@@ -70,7 +69,6 @@ export class ShellHost {
       ready: !!this.active?.ready,
       visible:
         !!this.active?.ready &&
-        !this.active?.modal?.blocked &&
         !!this.bounds &&
         !options.window.isDestroyed() &&
         options.window.isVisible() &&
@@ -125,7 +123,7 @@ export class ShellHost {
     });
     ipcMain.handle('shell:invoke', (event, request) => {
       const b = binding(event);
-      if (b !== this.active || !b.ready || b.modal?.blocked) throw Error('Shell is not active');
+      if (b !== this.active || !b.ready) throw Error('Shell is not active');
       return options.ui.invoke(request, b.session, undefined, {
         openGroup: (id, anchor) => {
           const bounds = this.bounds;
@@ -170,7 +168,7 @@ export class ShellHost {
     });
     ipcMain.handle('shell:executeCommand', (event, command) => {
       const b = binding(event);
-      if (b !== this.active || !b.ready || b.modal?.blocked) throw Error('Shell is not active');
+      if (b !== this.active || !b.ready) throw Error('Shell is not active');
       return options.execute(b.id, command);
     });
     ipcMain.handle('shell:getSettings', (event) => options.settings(binding(event).id));
@@ -205,13 +203,7 @@ export class ShellHost {
     };
   }
   focus(edge: 'first' | 'last') {
-    if (
-      !['first', 'last'].includes(edge) ||
-      !this.active ||
-      !this.bounds ||
-      this.active.modal?.blocked
-    )
-      return;
+    if (!['first', 'last'].includes(edge) || !this.active || !this.bounds) return;
     this.active.view.webContents.focus();
     this.active.view.webContents.send('shell:focus', edge);
   }
@@ -241,8 +233,7 @@ export class ShellHost {
     this.options.registry.touch();
     if (!this.active) return;
     if (this.bounds) this.active.view.setBounds(this.bounds);
-    if (this.active.modal) this.active.modal.setVisible(!!this.bounds);
-    else this.active.view.setVisible(!!this.bounds);
+    this.active.view.setVisible(!!this.bounds);
     this.options.layer?.();
   }
   refresh() {
@@ -376,7 +367,7 @@ export class ShellHost {
       generation: provider.generation,
       session: randomUUID(),
       view,
-      modal: this.options.modalLayer?.register(view),
+
       url,
       ready: false,
       revision: 0,
@@ -396,7 +387,7 @@ export class ShellHost {
     this.options.invalidateAnchor?.();
     clearTimeout(b.timer);
     this.options.ui.disconnect(b.session);
-    b.modal?.dispose();
+
     if (!this.options.window.isDestroyed()) this.options.window.contentView.removeChildView(b.view);
     if (!b.view.webContents.isDestroyed()) b.view.webContents.close();
   }

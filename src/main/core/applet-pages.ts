@@ -6,6 +6,7 @@ import type { PageDisplay } from '../../shared/applet-pages';
 import { PageImageRegistry } from './page-images';
 import { appearanceArguments, registerAppearance } from './appearance-host';
 import { registerDisplayZoom } from './display-zoom-host';
+import { SurfaceBlur } from './surface-blur';
 
 interface PageHost {
   window(): BrowserWindow | null;
@@ -20,6 +21,11 @@ let selected: string | null = null;
 let bounds: Rectangle | null = null;
 const surfaces = new Map<string, AppletSurface>();
 const allSurfaces = new Set<AppletSurface>();
+let paletteBlur = false;
+export function setAppletPageBlur(active: boolean) {
+  paletteBlur = active;
+  for (const surface of allSurfaces) surface.updatePaletteBlur();
+}
 export async function coverAppletPagesForImagePicker() {
   const visible = [...allSurfaces].filter((surface) => surface.visible);
   const frozen: { image: string; bounds: Rectangle }[] = [];
@@ -170,6 +176,7 @@ export class AppletSurface {
   readonly images?: PageImageRegistry;
   private changePending = false;
   readonly ui: WebContentsView;
+  private blurs = new Map<Electron.WebContents, SurfaceBlur>();
   readonly contentView = new View();
   private standalone?: BrowserWindow;
   private parent?: BrowserWindow;
@@ -262,6 +269,23 @@ export class AppletSurface {
   }
   get display() {
     return this.mode;
+  }
+  updatePaletteBlur() {
+    const active = paletteBlur && this.mode === 'page' && this.visible;
+    const current = new Set<Electron.WebContents>();
+    const visit = (view: View) => {
+      if (view instanceof WebContentsView && !view.webContents.isDestroyed())
+        current.add(view.webContents);
+      for (const child of view.children) visit(child);
+    };
+    visit(this.contentView);
+    if (active)
+      for (const contents of current)
+        if (!this.blurs.has(contents)) {
+          this.blurs.set(contents, new SurfaceBlur(contents));
+          contents.once('destroyed', () => this.blurs.delete(contents));
+        }
+    for (const [contents, blur] of this.blurs) blur.setActive(active && current.has(contents));
   }
   get window() {
     return this.mode === 'page' ? (host?.window() ?? undefined) : this.standalone;
@@ -405,6 +429,7 @@ export class AppletSurface {
   }
   layout() {
     if (this.closed) return;
+    this.updatePaletteBlur();
     const window = this.window;
     if (!window || !this.opened || (!this.visible && this.mode === 'page')) {
       this.detach();
@@ -442,6 +467,8 @@ export class AppletSurface {
   close() {
     if (this.closed) return;
     this.closed = true;
+    for (const blur of this.blurs.values()) blur.setActive(false);
+    this.blurs.clear();
     this.releaseImages();
     allSurfaces.delete(this);
     this.detach();

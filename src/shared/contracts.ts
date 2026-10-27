@@ -298,6 +298,9 @@ export interface DockApi {
   shellViewport(
     bounds: { x: number; y: number; width: number; height: number } | null,
   ): Promise<void>;
+  overlayViewport(
+    bounds: { x: number; y: number; width: number; height: number } | null,
+  ): Promise<void>;
   retryShell(): Promise<void>;
   setAppletApiPermissions(permissions: import('./appdock-api').AppletApiPermissions): Promise<void>;
   automation(

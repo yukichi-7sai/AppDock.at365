@@ -40,11 +40,11 @@ Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewか�
 
 ## 背景・配置・復旧
 
-両バーとリボンを同じ`HostModalLayer`へ登録します。本体の編集ダイアログでは[共通背景管理](settings-list-editing.md)を使い、画像の準備完了後に元のViewを一時非表示にします。ダイアログを閉じると最新の表示希望へ戻します。狭い窓でバーとダイアログが重なっても、バーの画像はnative dialogの背後です。
+本体の編集ダイアログとパレットは本文内に収め、本文だけを薄くぼかします。両バーとリボンは表示・操作を維持します。Shellの撮影・背景画像への変換・一時非表示は行いません。
 
 バーのボタンから本体内の新しいダイアログを開く場合は、[ダイアログの追加手順](settings-list-editing.md#shellからダイアログを開く)に従います。表示は本体に依頼し、開閉時のWebContents間のフォーカス移動と、同じボタンへ戻す接続を追加します。現行の操作ID一覧に汎用ダイアログ開始操作はありません。新しい操作は公開モデルと本体の機能側へ定義し、Default Shell・追加Shellとも同じ経路を使用します。
 
-パレットは従来のnative OverlayHostを最前面に置きます。本文・Applet・通知のViewを作り直さず、各バーの位置とzoomを本体枠に合わせます。本体rendererの再読込中は古い配置を非表示にし、新しい枠の報告後に再表示します。
+パレットはnative OverlayHostで本文の矩形だけに置きます。本文・Applet・通知のViewを作り直さず、各バーの位置とzoomを本体枠に合わせます。本体rendererの再読込中は古い配置を非表示にし、新しい枠の報告後に再表示します。
 
 提供元交換は領域ごとにready後に行います。renderer異常終了・応答停止・ロード失敗・ready期限超過では対象領域の故障を記録し、Default Shellへ戻します。設定指定は保持します。故障抑止は既存のプロセス内Registryを使い、新しい保存ファイルは追加しません。提供元の無効化・意図的再起動では故障を作らず、再開後に選択を再適用します。領域別再試行、版更新、`--safe-shell`の共通契約は[領域別割り当て](shell-foundation.md)を参照してください。
 
@@ -52,6 +52,6 @@ Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewか�
 
 `tests/window-bars.test.cjs`は公開状態・操作可否・session・重複受付を検査します。`tests/shell-region.test.cjs`と`tests/shell-boundaries.test.cjs`は共通選択・描画境界を検査します。
 
-`scripts/shell-bars-ui-test.cjs [固定EXE]`は実ウィンドウ操作、Windowsのマウス入力によるドラッグ、両テーマ、サイズとzoom、Tab、パレット、別々の提供元、故障・無効化・再試行・safe起動を検査します。`scripts/host-modal-ui-test.cjs [固定EXE]`は実際の3領域とダイアログのWindows合成画像を確認します。更新のHTTP取得・進捗・取消は既存の`update-progress-ui-test.cjs [固定EXE]`で検証します。実測と未確認事項は[VERIFICATION](../VERIFICATION.md)に記録します。
+`scripts/shell-bars-ui-test.cjs [固定EXE]`は実ウィンドウ操作、Windowsのマウス入力によるドラッグ、両テーマ、サイズとzoom、Tab、パレット、別々の提供元、故障・無効化・再試行・safe起動を検査します。`scripts/host-modal-ui-test.cjs [固定EXE]`はダイアログ・パレットの本文範囲、ぼかし、連続開閉と3領域の操作維持を確認します。更新のHTTP取得・進捗・取消は既存の`update-progress-ui-test.cjs [固定EXE]`で検証します。実測と未確認事項は[VERIFICATION](../VERIFICATION.md)に記録します。
 
 ドラッグ領域の指定は[Electronの公式仕様](https://www.electronjs.org/docs/latest/tutorial/custom-window-interactions#custom-draggable-regions)に従います。

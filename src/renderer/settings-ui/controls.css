@@ -3197,7 +3197,10 @@ summary {
   overscroll-behavior: contain;
 }
 .applet-shortcut-dialog::backdrop {
-  background: #080b1266;
+  background: transparent;
+  backdrop-filter: blur(2px);
+  inset: var(--dialog-page-top, 0px) var(--dialog-page-right, 0px) var(--dialog-page-bottom, 0px)
+    var(--dialog-page-left, 0px);
 }
 .gesture-settings-card {
   border: 1px solid var(--border);
@@ -3927,6 +3930,15 @@ summary {
 
 /* Common grouped settings dialogs keep actions visible while their content scrolls. */
 .settings-modal[open] {
+  position: fixed;
+  inset: var(--dialog-page-top, 0px) var(--dialog-page-right, 0px) var(--dialog-page-bottom, 0px)
+    var(--dialog-page-left, 0px);
+  margin: auto;
+  max-width: calc(100vw - var(--dialog-page-left, 0px) - var(--dialog-page-right, 0px) - 32px);
+  max-height: min(
+    var(--dialog-max-height, 100dvh),
+    calc(100dvh - var(--dialog-page-top, 0px) - var(--dialog-page-bottom, 0px) - 32px)
+  );
   display: flex;
   flex-direction: column;
   overflow: hidden;

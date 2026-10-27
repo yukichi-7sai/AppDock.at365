@@ -1,81 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
-import type { HostModalBackdrop } from '../shared/host-modal';
-
-// Native dialog backdrops cover all registered Shell surfaces in this document.
+// Track host dialogs without capturing or hiding the independent Shell views.
 window.addEventListener('DOMContentLoaded', () => {
   let active = false;
-  let generation = 0;
-  let backdrop: HTMLDivElement | undefined;
-  const root = document.documentElement;
-  const finish = async (revision: number, current: number, rendered: boolean) => {
-    if (!active || current !== generation) return;
-    try {
-      if (!(await ipcRenderer.invoke('dock:hostModalReady', revision, rendered))) return;
-    } catch {
-      // Keep the dialog usable when preparation fails.
-    }
-    if (active && current === generation) root.removeAttribute('data-host-modal-pending');
-  };
-  ipcRenderer.on('dock:hostModalBackdrop', async (_event, model: HostModalBackdrop) => {
-    if (!active) return;
-    const current = ++generation;
-    if (model.failed) {
-      void finish(model.revision, current, false);
-      return;
-    }
-    const next = document.createElement('div');
-    next.dataset.hostModalBackdrop = 'true';
-    next.setAttribute('aria-hidden', 'true');
-    Object.assign(next.style, {
-      position: 'fixed',
-      inset: '0',
-      pointerEvents: 'none',
-      zIndex: '2147483647',
-    });
-    const images = model.surfaces.map((surface) => {
-      const image = new Image();
-      image.alt = '';
-      image.dataset.hostModalSurface = String(surface.id);
-      image.src = surface.image;
-      Object.assign(image.style, {
-        position: 'absolute',
-        left: `${surface.bounds.x}px`,
-        top: `${surface.bounds.y}px`,
-        width: `${surface.bounds.width}px`,
-        height: `${surface.bounds.height}px`,
-      });
-      next.append(image);
-      return image;
-    });
-    try {
-      await Promise.all(images.map((image) => image.decode()));
-    } catch {
-      void finish(model.revision, current, false);
-      return;
-    }
-    if (!active || current !== generation) return;
-    backdrop?.remove();
-    backdrop = next;
-    document.body.append(next);
-    // A native body can occlude this renderer and suspend its animation frames.
-    // The decoded DOM is ready; cover native views before waiting for any paint.
-    void finish(model.revision, current, true);
-  });
   const update = () => {
     const next = !!document.querySelector('dialog:modal');
     if (next === active) return;
     active = next;
-    const current = ++generation;
-    if (active) root.setAttribute('data-host-modal-pending', '');
-    else {
-      root.removeAttribute('data-host-modal-pending');
-      backdrop?.remove();
-      backdrop = undefined;
-    }
-    void ipcRenderer.invoke('dock:hostModal', active).catch(() => {
-      if (current === generation) root.removeAttribute('data-host-modal-pending');
-    });
+    void ipcRenderer.invoke('dock:hostModal', active).catch(() => {});
   };
   new MutationObserver(update).observe(document.documentElement, {
     childList: true,
@@ -95,6 +27,7 @@ ipcRenderer.on(
   },
 );
 const api: DockApi = {
+  overlayViewport: (bounds) => ipcRenderer.invoke('dock:overlayViewport', bounds),
   imageLibraryDialog: {
     onRequest: (callback) => {
       let live = true;

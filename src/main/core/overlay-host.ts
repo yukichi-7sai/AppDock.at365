@@ -33,6 +33,7 @@ export class OverlayHost {
   private surface?: Surface;
   private previousFocus?: WebContents;
   private previousRoute = '';
+  private bounds?: Electron.Rectangle;
   private disposed = false;
   constructor(
     private options: {
@@ -131,6 +132,23 @@ export class OverlayHost {
   }
   get sourceId() {
     return this.current?.sourceId;
+  }
+  viewport(bounds: Electron.Rectangle | null) {
+    if (
+      bounds !== null &&
+      (!bounds ||
+        ['x', 'y', 'width', 'height'].some((key) => {
+          const value = bounds[key as keyof Electron.Rectangle];
+          return (
+            !Number.isFinite(value) ||
+            value < (key === 'x' || key === 'y' ? 0 : 1) ||
+            value > 100000
+          );
+        }))
+    )
+      throw Error('Invalid overlay viewport');
+    this.bounds = bounds ?? undefined;
+    this.layout();
   }
   open(controller: OverlayController) {
     if (this.disposed) {
@@ -256,8 +274,22 @@ export class OverlayHost {
     const s = this.surface;
     if (!s?.ready || this.options.window.isDestroyed()) return;
     const [width, height] = this.options.window.getContentSize();
-    s.view.setBounds({ x: 0, y: 0, width: Math.max(1, width), height: Math.max(1, height) });
-    s.view.webContents.setZoomFactor(this.options.window.webContents.getZoomFactor());
+    const zoom = this.options.window.webContents.getZoomFactor();
+    if (this.current?.kind === 'command-palette') {
+      if (!this.bounds) {
+        s.view.setVisible(false);
+        return;
+      }
+      const x = Math.min(width - 1, Math.round(this.bounds.x * zoom));
+      const y = Math.min(height - 1, Math.round(this.bounds.y * zoom));
+      s.view.setBounds({
+        x,
+        y,
+        width: Math.max(1, Math.min(width - x, Math.round(this.bounds.width * zoom))),
+        height: Math.max(1, Math.min(height - y, Math.round(this.bounds.height * zoom))),
+      });
+    } else s.view.setBounds({ x: 0, y: 0, width: Math.max(1, width), height: Math.max(1, height) });
+    s.view.webContents.setZoomFactor(zoom);
     s.view.setVisible(true);
     this.options.window.contentView.addChildView(s.view);
   }

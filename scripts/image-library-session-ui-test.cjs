@@ -226,6 +226,12 @@ const observations = [];
       () => ordinaryDialog.evaluate((el) => getComputedStyle(el).opacity === '1'),
       'dialog without host focus emulation',
     );
+    const groupName = ordinaryDialog.getByRole('textbox').first();
+    await groupName.fill('Unsaved image group');
+    const backdrop = await host.locator('.shell > main').boundingBox();
+    await host.mouse.click(backdrop.x + 3, backdrop.y + 3);
+    assert(await ordinaryDialog.isVisible(), 'background click keeps the group editor open');
+    assert.equal(await groupName.inputValue(), 'Unsaved image group');
     await ordinaryDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(
       async () =>
@@ -235,7 +241,9 @@ const observations = [];
         ),
       'ordinary dialog restores page',
     );
-    checks.push('host dialog opens with browser automation focus emulation disabled');
+    checks.push(
+      'host dialog opens without focus emulation; background click preserves the editor and unsaved group name',
+    );
     await app.evaluate(async ({ BrowserWindow }) => {
       const wc = BrowserWindow.getAllWindows().find((w) =>
         w.webContents.getURL().startsWith('appdock:'),
@@ -254,7 +262,10 @@ const observations = [];
     await frameDialog.waitFor();
     // A covered host renderer may not receive animation frames. Preparing its
     // modal must not wait for a frame before hiding the native page that covers it.
-    await host.locator('[data-host-modal-backdrop]').waitFor({ state: 'attached' });
+    assert.equal(
+      await frameDialog.evaluate((el) => getComputedStyle(el, '::backdrop').backdropFilter),
+      'blur(2px)',
+    );
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const frameState = await host.evaluate(() => ({
       pending: document.documentElement.hasAttribute('data-host-modal-pending'),
@@ -296,7 +307,15 @@ const observations = [];
       'frame-independent preview covers page',
     );
     await host.screenshot({ path: path.join(profile, 'host-frames-paused-preview.png') });
-    await framePreview.getByRole('button', { name: '閉じる', exact: true }).click();
+    await framePreview.locator('h2').click();
+    assert(await framePreview.isVisible(), 'inner click keeps the preview open');
+    const previewBounds = await framePreview.boundingBox();
+    await host.mouse.move(previewBounds.x + 10, previewBounds.y + 10);
+    await host.mouse.down();
+    await host.mouse.move(backdrop.x + 3, backdrop.y + 3);
+    await host.mouse.up();
+    assert(await framePreview.isVisible(), 'drag from the preview to the background keeps it open');
+    await host.mouse.click(backdrop.x + 3, backdrop.y + 3);
     await until(
       async () =>
         host.evaluate(
@@ -319,7 +338,9 @@ const observations = [];
       ]);
     });
     await hostCdp.detach();
-    checks.push('paused host animation frames do not hide dialogs or trap page input');
+    checks.push(
+      'paused host animation frames do not hide dialogs or trap page input; close-only preview dismisses on background click but not an inner click or drag',
+    );
     for (const mode of ['capture', 'decode']) {
       await app.evaluate(({ BrowserWindow }, mode) => {
         for (const w of BrowserWindow.getAllWindows())
@@ -344,8 +365,8 @@ const observations = [];
       const failureSurfaces = await modalState();
       observations.push({ phase: `${mode}-failed`, surfaces: failureSurfaces });
       assert(
-        failureSurfaces.filter((v) => /\/(index|bars)\.html/.test(v.url)).every((v) => !v.visible),
-        'capture failure must hide native surfaces so the host dialog can receive input',
+        failureSurfaces.filter((v) => /\/(index|bars)\.html/.test(v.url)).every((v) => v.visible),
+        'host dialogs must remain usable without captures while native Shell surfaces stay visible',
       );
       await host.screenshot({ path: path.join(profile, `${mode}-failure-dialog.png`) });
       await fallbackDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -367,7 +388,7 @@ const observations = [];
           }
       });
       checks.push(
-        `${mode} failure still exposes the host dialog and restores native surfaces on close`,
+        `${mode} unavailable capture does not affect the body dialog or native Shell visibility`,
       );
     }
     // A native modal can become active before the scroll handler's rAF reaches main.

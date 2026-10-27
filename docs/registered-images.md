@@ -69,7 +69,7 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 
 文字列には任意の`minLength`と`maxLength`も指定できる。最小長を指定した場合は空白だけの値を拒否する。共通フォームのblur/Enter確定、Escape取消、ダイアログOKによる登録単位の保存を使う。
 
-本体内の選択は共通SettingsDialogを使い、親ダイアログの一時入力だけを変更する。重なったモーダルがある間はショートカット記録の抑止を維持する。ローカルAppletページからの選択は本体へ委譲し、表示中Viewをcapture・hide、独立Windowを操作不可にして本体の選択画面を表示する。完了・取消・提供元停止で同じViewとフォーカスを復元し、WebContents/sessionを再生成しない。共有preloadのHostModalLayerがShellの背景を覆う。
+本体内の選択は共通SettingsDialogを使い、親ダイアログの一時入力だけを変更する。重なったモーダルがある間はショートカット記録の抑止を維持する。ローカルAppletページからの選択は本体へ委譲し、表示中Viewをcapture・hide、独立Windowを操作不可にして本体の選択画面を表示する。完了・取消・提供元停止で同じViewとフォーカスを復元し、WebContents/sessionを再生成しない。本体のダイアログは本文だけを薄くぼかし、Shellの表示・操作を維持する。
 
 ### 画像入力部品とアイコンの選択
 

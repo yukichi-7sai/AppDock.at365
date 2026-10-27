@@ -31,6 +31,34 @@ function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
+  const mainRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const page = mainRef.current;
+    const update = () => {
+      const rect = page?.getBoundingClientRect();
+      void window.dock
+        .overlayViewport(
+          rect && rect.width > 0 && rect.height > 0
+            ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+            : null,
+        )
+        .catch((error) => setError(String(error)));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    if (page) observer.observe(page);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [snapshot?.ribbonDisplayMode]);
+  const dialogNavigation = useRef(snapshot?.navigation.request);
+  useLayoutEffect(() => {
+    const changed = dialogNavigation.current !== snapshot?.navigation.request;
+    dialogNavigation.current = snapshot?.navigation.request;
+    if (changed) document.dispatchEvent(new Event('appdock:dialog-dismiss'));
+  }, [snapshot?.navigation.request]);
   const [pagePlacementRevision, setPagePlacementRevision] = useState(0);
   // Capture this before useRestartView replaces a retired/invalid saved route.
   const [restoreSettingsCategory] = useState(() => {
@@ -350,6 +378,7 @@ function App() {
   return (
     <div
       className="shell"
+      data-palette-open={snapshot?.overlay.kind === 'command-palette' || undefined}
       data-route={page}
       style={
         {
@@ -375,6 +404,7 @@ function App() {
         }}
       />
       <main
+        ref={mainRef}
         className={
           page === 'settings' ||
           page === 'logs' ||
