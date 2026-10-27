@@ -8,7 +8,8 @@ module.exports = async ({ page, item, call, profile, until }) => {
   const keys = () => capture().locator('kbd').allTextContents();
   const edit = async () => {
     await editButton.click();
-    await dialog.getByText('押して入力', { exact: true }).waitFor();
+    await capture().waitFor();
+    await dialog.getByTestId('custom-command-options').locator(':scope > summary').click();
   };
   const saved = async () =>
     (await page.evaluate(() => window.dock.snapshot())).settings.value.customCommands.items.find(
@@ -33,7 +34,7 @@ module.exports = async ({ page, item, call, profile, until }) => {
   await capture().dispatchEvent('keydown', { key: 'x', code: 'KeyX', isComposing: true });
   await capture().dispatchEvent('keydown', { key: 'a', code: 'KeyA', keyCode: 229 });
   assert.deepEqual(await keys(), ['Enter'], 'repeat/composition do not change the recorded key');
-  await capture().press('Pause');
+  await capture().dispatchEvent('keydown', { key: 'F25', code: 'F25' });
   await dialog.getByRole('alert').waitFor();
   assert.deepEqual(await keys(), ['Enter'], 'unsupported input retains the previous value');
   await capture().press('Alt+ArrowLeft');
@@ -58,7 +59,7 @@ module.exports = async ({ page, item, call, profile, until }) => {
   assert.equal(
     await dialog
       .locator('.shortcut-special-group')
-      .getByRole('button', { name: 'Pause', exact: true })
+      .getByRole('button', { name: 'F25', exact: true })
       .count(),
     0,
   );
@@ -67,7 +68,7 @@ module.exports = async ({ page, item, call, profile, until }) => {
       .locator('.shortcut-special-group')
       .getByRole('button', { name: 'Plus', exact: true })
       .count(),
-    0,
+    1,
   );
   await dialog
     .locator('.shortcut-special-group')

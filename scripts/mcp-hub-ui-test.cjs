@@ -11,6 +11,7 @@ const {
 } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
 const { parse } = require('smol-toml');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
+const { retiredMcpPermissionKeys } = require('../out/main/shared/automation');
 const root = path.resolve(__dirname, '..'),
   portable = process.argv[2] && path.resolve(process.argv[2]);
 const profile = path.join(
@@ -98,19 +99,32 @@ for (const [index, id] of providerIds.entries()) {
   );
   settings.extensions[id] = { enabled: true, settings: {} };
 }
-const watchRoot = path.resolve(root, '../Applet.Watch.at365');
+const publishedWatch = process.env.APPDOCK_MCP_WATCH_FIXTURE;
+const watchRoot = publishedWatch
+  ? path.resolve(publishedWatch)
+  : path.resolve(root, '../Applet.Watch.at365');
 const watchFolder = path.join(profile, 'extensions', 'at365.watch');
-fs.cpSync(path.join(watchRoot, 'Applet.Watch/bin/Release/net10.0-windows/win-x64'), watchFolder, {
-  recursive: true,
-});
-require('./copy-host.cjs').copyHost(path.join(watchRoot, 'extension.json'), path.join(watchFolder, 'extension.json'));
+fs.cpSync(
+  publishedWatch
+    ? watchRoot
+    : path.join(watchRoot, 'Applet.Watch/bin/Release/net10.0-windows/win-x64'),
+  watchFolder,
+  { recursive: true },
+);
+const watchManifest = JSON.parse(fs.readFileSync(path.join(watchRoot, 'extension.json'), 'utf8'));
+assert.equal(watchManifest.id, 'at365.watch');
+// This fixture tests the native lifecycle without registering its default input bindings.
+delete watchManifest.defaultKeybindings;
+delete watchManifest.defaultGestures;
+fs.writeFileSync(path.join(watchFolder, 'extension.json'), JSON.stringify(watchManifest));
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
 fs.writeFileSync(configFile, '# isolated test\n');
 const portableHash = portable ? hash(portable) : undefined;
-if (portable) require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
+if (portable)
+  require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
 function fixtureHashes(folder) {
   return Object.fromEntries(
     fs.readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
@@ -123,11 +137,16 @@ function fixtureHashes(folder) {
 }
 const fixtureInputs = fixtureHashes(path.join(profile, 'extensions'));
 const fixtureMetadata = {
-  watchHead: execFileSync('git', ['rev-parse', 'HEAD'], {
-    cwd: watchRoot,
-    encoding: 'utf8',
-    windowsHide: true,
-  }).trim(),
+  watchHead: publishedWatch
+    ? null
+    : execFileSync('git', ['rev-parse', 'HEAD'], {
+        cwd: watchRoot,
+        encoding: 'utf8',
+        windowsHide: true,
+      }).trim(),
+  watchFixtureSource: publishedWatch ? 'published' : 'release-build',
+  watchVersion: watchManifest.version,
+  watchManifestSha256: hash(path.join(watchRoot, 'extension.json')),
   node: process.version,
   nodeSha256: hash(process.execPath),
   settingsSchemaSha256: hash(path.join(root, 'out/main/shared/settings-schema.js')),
@@ -278,19 +297,16 @@ async function checkDialogLayout(dialog) {
 async function mcpPermissionControl(page, management = false) {
   await page.getByRole('button', { name: '操作の許可', exact: true }).click();
   const panel = page.getByRole('region', { name: '操作の許可', exact: true });
-  const control = panel.getByRole('switch', {
-    name: management
-      ? 'CodexからのMCP接続先の管理を許可する'
-      : 'CodexからのMCP接続先の利用を許可する',
-    exact: true,
-  });
+  const control = panel
+    .getByTestId(`permission-row-${management ? 'write' : 'useMcp'}`)
+    .getByRole('switch', { name: /^Codex/ });
   await control.waitFor();
   await until(() => control.isEnabled(), 'MCP permission control ready');
   return { panel, control };
 }
 async function setMcpPermission(page, allowed, management = false) {
   const { panel, control } = await mcpPermissionControl(page, management);
-  const permission = management ? 'allowManageMcpServers' : 'allowUseMcp';
+  const permission = management ? 'allowWrite' : 'allowUseMcp';
   const file = path.join(local, 'automation.json');
   const before = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
   const stateBefore = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
@@ -311,10 +327,22 @@ async function setMcpPermission(page, allowed, management = false) {
   const stateAfter = (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state;
   assert.equal(stateAfter[permission], allowed);
   for (const key of Object.keys(stateBefore).filter(
-    (key) => key.startsWith('allow') && key !== permission,
+    (key) =>
+      key.startsWith('allow') && key !== permission && !retiredMcpPermissionKeys.includes(key),
   ))
     assert.equal(stateAfter[key], stateBefore[key], key);
+  for (const key of retiredMcpPermissionKeys)
+    assert.equal(stateAfter[key], stateAfter.allowWrite, key);
   assert.equal(stateAfter.enabled, stateBefore.enabled);
+}
+async function assertMcpWriteDenied() {
+  const current = await call('appdock_mcp_get_server_settings');
+  const rejected = await client.callTool({
+    name: 'appdock_mcp_update_server_settings',
+    arguments: { op: 'remove', id: randomUUID(), expectedRevision: current.revision, dryRun: true },
+  });
+  assert.equal(rejected.structuredContent.code, 'API_DISABLED');
+  assert.equal((await call('appdock_mcp_get_server_settings')).revision, current.revision);
 }
 (async () => {
   try {
@@ -342,12 +370,12 @@ async function setMcpPermission(page, allowed, management = false) {
     resetValue.customCommands = { version: 2, items: [] };
     await resetJson.fill(JSON.stringify(resetValue, null, 2));
     await resetJson.press('Tab');
-    await until(
-      () =>
-        JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).customCommands
-          .version === 2,
-      'explicit v2 JSON replacement',
-    );
+    await until(() => {
+      const saved = JSON.parse(
+        fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'),
+      ).customCommands;
+      return saved === undefined || (saved.version === 2 && saved.items.length === 0);
+    }, 'explicit v2 JSON replacement');
     await page.getByRole('button', { name: 'フォーム', exact: true }).click();
     checks.push(
       'unsupported version 1 stays inert and unchanged until explicit JSON replacement with an empty version 2 list; no migration',
@@ -372,7 +400,10 @@ async function setMcpPermission(page, allowed, management = false) {
     const mcpServerId = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'))
       .mcpServers.items[0].id;
     await page.getByLabel('確認するMCP接続先').selectOption(mcpServerId);
-    await page.getByRole('button', { name: '接続してツールを取得', exact: true }).click();
+    await until(
+      () => page.getByLabel('MCPツール', { exact: true }).isEnabled(),
+      'automatic client tools',
+    );
     await page.getByLabel('MCPツール', { exact: true }).selectOption('echo');
     await page
       .getByLabel('MCPツールの引数', { exact: true })
@@ -392,10 +423,13 @@ async function setMcpPermission(page, allowed, management = false) {
     );
     await page.evaluate(async (configFile) => {
       await window.dock.automation({ kind: 'selectConfig', file: configFile });
-      await window.dock.automation({ kind: 'configure', enabled: true, allowWrite: true, port: 0 });
+      await window.dock.automation({
+        kind: 'configure',
+        enabled: true,
+        allowWrite: false,
+        port: 0,
+      });
       await window.dock.automation({ kind: 'setExecution', allowed: true });
-      await window.dock.automation({ kind: 'setCustomCommandManagement', allowed: true });
-      await window.dock.automation({ kind: 'setShortcutEditing', allowed: true });
       await window.dock.automation({ kind: 'register' });
     }, configFile);
     await connect(state);
@@ -406,11 +440,7 @@ async function setMcpPermission(page, allowed, management = false) {
     );
     await setMcpPermission(page, true);
     await page.screenshot({ path: path.join(profile, 'mcp-permission-on.png') });
-    assert.equal(
-      (await client.callTool({ name: 'appdock_mcp_get_server_settings', arguments: {} }))
-        .structuredContent.code,
-      'API_DISABLED',
-    );
+    await assertMcpWriteDenied();
     await setMcpPermission(page, true, true);
     await page.screenshot({ path: path.join(profile, 'mcp-management-permission-on.png') });
     const managedId = randomUUID();
@@ -439,21 +469,44 @@ async function setMcpPermission(page, allowed, management = false) {
       op: 'save',
       item: managedItem,
       connection: managedConnection,
-      environment: { MCP_FIXTURE_SECRET: 'fixture-management-secret' },
     };
     const beforePreview = [
       hash(path.join(profile, 'settings.json')),
       hash(path.join(local, 'mcp-client.json')),
     ];
+    const secretWrite = await client.callTool({
+      name: 'appdock_mcp_update_server_settings',
+      arguments: {
+        ...request,
+        expectedRevision: (await call('appdock_mcp_get_server_settings')).revision,
+        environment: { MCP_FIXTURE_SECRET: 'fixture-management-secret' },
+      },
+    });
+    assert.equal(secretWrite.structuredContent.code, 'INVALID_ARGUMENT');
     assert.equal((await managedUpdate({ ...request, dryRun: true })).saved, false);
     assert.deepEqual(
       [hash(path.join(profile, 'settings.json')), hash(path.join(local, 'mcp-client.json'))],
       beforePreview,
     );
     await managedUpdate(request);
+    await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
+    await page.getByRole('button', { name: managedItem.name + 'を編集', exact: true }).click();
+    const secretDialog = page.getByRole('dialog');
+    await secretDialog.getByLabel('環境変数を入力・置換する', { exact: true }).check();
+    await secretDialog
+      .getByLabel('環境変数（JSON）', { exact: true })
+      .fill(JSON.stringify({ MCP_FIXTURE_SECRET: 'fixture-management-secret' }));
+    await secretDialog.getByRole('button', { name: 'OK', exact: true }).click();
+    await secretDialog.waitFor({ state: 'hidden' });
+    const secretFile = path.join(local, 'mcp-client.json');
+    const secretBytes = () =>
+      JSON.parse(fs.readFileSync(secretFile, 'utf8')).entries[managedId].secret;
+    const retainedSecret = secretBytes();
+    assert.equal(typeof retainedSecret, 'string');
     let managedDetails = await call('appdock_mcp_get_server_settings', { serverId: managedId });
     assert.deepEqual(managedDetails.connection, managedConnection);
-    assert.deepEqual(managedDetails.environmentNames, ['MCP_FIXTURE_SECRET']);
+    assert.equal(Object.hasOwn(managedDetails, 'environmentNames'), false);
+    assert(!JSON.stringify(managedDetails).includes('MCP_FIXTURE_SECRET'));
     assert(!JSON.stringify(managedDetails).includes('fixture-management-secret'));
     assert.equal(
       (
@@ -518,11 +571,24 @@ async function setMcpPermission(page, allowed, management = false) {
       ).structuredContent.code,
       'NOT_FOUND',
     );
-    await managedUpdate({ op: 'remove', id: managedId });
+    const protectedRemoval = await client.callTool({
+      name: 'appdock_mcp_update_server_settings',
+      arguments: {
+        op: 'remove',
+        id: managedId,
+        expectedRevision: (await call('appdock_mcp_get_server_settings')).revision,
+      },
+    });
+    assert.equal(protectedRemoval.structuredContent.code, 'PRIVATE_SETTING');
+    assert.equal(secretBytes(), retainedSecret, 'MCP edits retain the locally encrypted secret');
+    await page.getByRole('button', { name: managedItem.name + 'を削除', exact: true }).click();
+    const removeDialog = page.getByRole('dialog');
+    await removeDialog.getByRole('button', { name: '削除', exact: true }).click();
+    await removeDialog.waitFor({ state: 'hidden' });
     assert.equal((await call('appdock_mcp_get_server_settings')).items.length, 1);
     assert.equal(JSON.stringify((await client.listTools()).tools), outer);
     checks.push(
-      'MCP registration: separate default-OFF UI grant, dry-run, credential redaction, enable, private catalog inspection, explicit publication, execution, revision conflict and deletion on one connection',
+      'MCP registration: unified write grant, dry-run, refused external secret input, local encrypted setup, secret/name redaction, enable, private inspection, publication, execution, revision conflict, protected removal and local deletion',
     );
     await page.getByRole('button', { name: 'MCPクライアント', exact: true }).click();
     assert.equal((await call('appdock_mcp_list_servers')).items.length, 0);
@@ -870,10 +936,12 @@ async function setMcpPermission(page, allowed, management = false) {
         changes: { config: { message: 'process-fixture' } },
       },
     ]);
-    await assert.rejects(page.evaluate((id) => window.dock.executeCommand(id), node.commandId));
-    assert.equal(probeCount(), 0);
     const originalGrants = (await page.evaluate(() => window.dock.snapshot())).appletApi
       .permissions;
+    const deniedGrants = { ...originalGrants, runProcesses: false };
+    await page.evaluate((grants) => window.dock.setAppletApiPermissions(grants), deniedGrants);
+    await assert.rejects(page.evaluate((id) => window.dock.executeCommand(id), node.commandId));
+    assert.equal(probeCount(), 0);
     await page.evaluate(
       (grants) => window.dock.setAppletApiPermissions({ ...grants, runProcesses: true }),
       originalGrants,
@@ -893,7 +961,7 @@ async function setMcpPermission(page, allowed, management = false) {
     await setCapability('コマンド・プロセスの起動', true);
     await call('appdock_execute_command', { id: node.commandId });
     await until(() => probeCount() === 2, 'MCP origin with Applet process API');
-    await page.evaluate((grants) => window.dock.setAppletApiPermissions(grants), originalGrants);
+    await page.evaluate((grants) => window.dock.setAppletApiPermissions(grants), deniedGrants);
     assert.equal(
       (
         await client.callTool({
@@ -915,8 +983,9 @@ async function setMcpPermission(page, allowed, management = false) {
     ]);
     await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
     checks.push(
-      'real Node Applet processes.start: direct default-OFF grant, local launch, MCP root grant intersection and immediate Applet revocation without duplicate launches',
+      'real Node Applet processes.start: explicit OFF baseline, local launch, MCP root grant intersection and immediate Applet revocation without duplicate launches',
     );
+    await page.evaluate((grants) => window.dock.setAppletApiPermissions(grants), originalGrants);
     await page.getByRole('button', { name: 'Saved Nodeを編集', exact: true }).click();
     dialog = page.getByRole('dialog');
     await dialog.getByLabel('名前', { exact: true }).fill('Keep my input');
@@ -1023,10 +1092,10 @@ async function setMcpPermission(page, allowed, management = false) {
     await dialog.getByLabel('名前', { exact: true }).fill('Saved MCP');
     await dialog.getByLabel('説明', { exact: true }).fill('MCPツールを実行する試験');
     await dialog.getByLabel('MCP接続先', { exact: true }).selectOption(mcpServerId);
-    await dialog.getByRole('button', { name: 'ツールを取得', exact: true }).click();
+    await until(() => dialog.getByTestId('custom-command-mcp-tool').isEnabled(), 'automatic tools');
     await dialog.getByLabel('MCPツール', { exact: true }).selectOption('schedule_off');
     await until(
-      () => dialog.getByText('ツールの引数Schema', { exact: true }).isVisible(),
+      () => dialog.getByTestId('custom-command-tool-description').isVisible(),
       'saved command tool detail',
     );
     await dialog.getByLabel('固定引数（JSON）', { exact: true }).fill('{bad');
@@ -1243,13 +1312,9 @@ async function setMcpPermission(page, allowed, management = false) {
     checks.push('permissions UI: ON and OFF survive process restart; OFF revokes MCP hub access');
     assert.equal((await call('appdock_mcp_get_server_settings')).items.length, 1);
     await setMcpPermission(page, false, true);
-    assert.equal(
-      (await client.callTool({ name: 'appdock_mcp_get_server_settings', arguments: {} }))
-        .structuredContent.code,
-      'API_DISABLED',
-    );
+    await assertMcpWriteDenied();
     checks.push(
-      'management grant survives restart, reads settings independently of useMcp and revokes immediately through UI',
+      'unified write grant survives restart and revokes edits immediately while read remains independent of write and useMcp',
     );
     await client.close();
     client = null;
