@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { hostStartupTiming } from './host-startup-timing';
 import { createHash, randomUUID } from 'node:crypto';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import {
@@ -176,6 +177,9 @@ export class CustomCommandService {
     }));
   }
   private state(item: CustomCommandDefinition) {
+    return hostStartupTiming.measure('commandState', () => this.stateCore(item));
+  }
+  private stateCore(item: CustomCommandDefinition) {
     const record = this.records().find(
       (r) => r.type.id === item.typeId && sameCustomOwner(r.provider.owner, item.owner),
     );
@@ -210,6 +214,9 @@ export class CustomCommandService {
     }));
   }
   uiCommands(): UiCommand[] {
+    return hostStartupTiming.measure('commandCatalog', () => this.uiCommandsCore());
+  }
+  private uiCommandsCore(): UiCommand[] {
     const stacks = new Map(
       customItems(this.options.settings.value.customCommands)
         .filter((item) => item.typeId === commandStackTypeId)
@@ -591,6 +598,9 @@ export class CustomCommandService {
     );
   }
   reconcile() {
+    return hostStartupTiming.measure('commandReconcile', () => this.reconcileCore());
+  }
+  private reconcileCore() {
     const records = this.records();
     for (const [id, generation] of this.bindings)
       if (!records.some((r) => r.type.id === id && r.provider.generation === generation))

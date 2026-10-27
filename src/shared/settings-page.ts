@@ -2,6 +2,7 @@ import type { ExtensionSnapshot, GlobalHotKeyStatus, HostSnapshot } from './cont
 import type { UiCommand } from './commands';
 import type { SettingsPageDefinition, SettingsItem } from './settings-catalog';
 import type { SettingsEdit } from './settings-editing';
+import type { CommandPaletteRequest, CommandPaletteResult } from './overlays';
 export interface SettingsPageRequest {
   id: string;
   route: 'settings' | 'extensions';
@@ -112,6 +113,7 @@ export interface SettingsPageAuxiliary {
   launch?: HostSnapshot['launch'];
   runtime?: HostSnapshot['runtime'];
   aboutStats?: { commandCount: number; availableCommandCount: number };
+  hostStartupTiming?: import('./host-startup-timing').HostStartupTiming;
   version?: string;
   updates?: HostSnapshot['updates'];
   accounts?: HostSnapshot['webAccounts'];
@@ -156,6 +158,11 @@ export interface SettingsInputModeRequest {
   actionId: string;
   recording: boolean;
 }
+export type SettingsPaletteRequest = Pick<
+  SettingsInputModeRequest,
+  'sessionId' | 'pageId' | 'actionId'
+> &
+  ({ kind: 'open'; request: CommandPaletteRequest } | { kind: 'cancel'; requestId: string });
 /** Trusted host renderer only; never exposed in an Applet preload. */
 export interface SettingsPageApi {
   open(request: SettingsPageRequest): Promise<SettingsPageConnection>;
@@ -165,6 +172,10 @@ export interface SettingsPageApi {
     action: SettingsPageAction,
   ): Promise<{ model: SettingsPageModel; result: unknown }>;
   input?(connectionId: string, request: SettingsInputModeRequest): Promise<void>;
+  palette?(
+    connectionId: string,
+    request: SettingsPaletteRequest,
+  ): Promise<CommandPaletteResult | void>;
   close(connectionId: string): Promise<void>;
   onChanged(callback: (connection: SettingsPageConnection) => void): () => void;
 }

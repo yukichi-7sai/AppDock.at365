@@ -1,5 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import type { Settings } from '../../shared/contracts';
+import type { CommandPaletteRequest, CommandPaletteResult } from '../../shared/overlays';
 import type {
   SettingsPageModel,
   SettingsPageOperation,
@@ -80,7 +81,7 @@ export class SettingsViewClient {
   constructor(
     private render: (model: SettingsPageModel) => void,
     private failed: (text: string) => void,
-    private transport: Pick<SettingsPageApi, 'get' | 'act'> & Pick<SettingsPageApi, 'input'>,
+    private transport: Pick<SettingsPageApi, 'get' | 'act' | 'input' | 'palette'>,
     private connectionId: string,
   ) {}
   flush = () => this.chain;
@@ -275,6 +276,31 @@ export class SettingsViewClient {
       });
     });
   }
+  private invokePalette(kind: 'open', value: CommandPaletteRequest): Promise<CommandPaletteResult>;
+  private invokePalette(kind: 'cancel', value: string): Promise<void>;
+  private invokePalette(
+    kind: 'open' | 'cancel',
+    value: CommandPaletteRequest | string,
+  ): Promise<CommandPaletteResult | void> {
+    const name = kind === 'open' ? 'openCommandPalette' : 'cancelCommandPalette';
+    if (!this.transport.palette) return this.invoke(name, [value]);
+    const pageId = this.model?.content.page.id;
+    // Wait for saved inputs, without holding the queue while selection is pending.
+    return this.chain.then(() => {
+      const model = this.model;
+      const actionId = model?.content.actions[name];
+      if (!model || model.content.page.id !== pageId || !actionId)
+        throw Error(hostText('settings.runtime.unavailable'));
+      return this.transport.palette!(this.connectionId, {
+        sessionId: model.content.editing.sessionId,
+        pageId: model.content.page.id,
+        actionId,
+        ...(kind === 'open'
+          ? { kind, request: value as CommandPaletteRequest }
+          : { kind, requestId: value as string }),
+      });
+    });
+  }
   editor(model: SettingsPageModel) {
     const ignore = (p: Promise<unknown>) => void p.catch(() => {});
     const displayed = this.display(model);
@@ -344,8 +370,8 @@ export class SettingsViewClient {
         };
       },
       retryGlobalHotKeys: () => invoke('retryGlobalHotKeys'),
-      openCommandPalette: (request) => invoke('openCommandPalette', [request]),
-      cancelCommandPalette: (id) => invoke('cancelCommandPalette', [id]),
+      openCommandPalette: (request) => this.invokePalette('open', request),
+      cancelCommandPalette: (id) => this.invokePalette('cancel', id),
       createWebAccount: (name) => invoke('createWebAccount', [name]),
       renameWebAccount: (id, name) => invoke('renameWebAccount', [id, name]),
       deleteWebAccount: (id) => invoke('deleteWebAccount', [id]),

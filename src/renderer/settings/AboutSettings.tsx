@@ -17,6 +17,7 @@ import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { UpdateActions, UpdateSettings } from './UpdateSettings';
 import { Icon } from '../../shared/ui-icons';
 import './about.css';
+import { HostStartupTimingPanel } from './HostStartupTimingPanel';
 
 export function AboutSettings({
   settings,
@@ -24,6 +25,7 @@ export function AboutSettings({
   extensions,
   runtime,
   stats,
+  startupTiming,
   version,
   busy,
   openApplets,
@@ -33,6 +35,7 @@ export function AboutSettings({
   extensions: ExtensionSnapshot[];
   runtime: NonNullable<SettingsPageAuxiliary['runtime']>;
   stats?: SettingsPageAuxiliary['aboutStats'];
+  startupTiming?: SettingsPageAuxiliary['hostStartupTiming'];
   version: string;
   busy: boolean;
   openApplets(): void;
@@ -155,6 +158,7 @@ export function AboutSettings({
           <VersionCheck disabled={busy || checking} embedded />
         </div>
       </article>
+      <HostStartupTimingPanel timing={startupTiming} />
       <UpdateSettings settings={settings} edit={edit} />
     </section>
   );

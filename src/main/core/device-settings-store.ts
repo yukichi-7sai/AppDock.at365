@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { hostStartupTiming } from './host-startup-timing';
 import fs from 'node:fs';
 import { appletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
@@ -165,7 +166,9 @@ export class DeviceSettingsStore extends SettingsStore {
     this.recovered = this.shared.recovered || this.device.recovered;
   }
   private refreshCombined(notify: boolean) {
-    const value = combineSettings(this.shared.value, this.device.value, this.collections());
+    const value = hostStartupTiming.measure('settingsCombine', () =>
+      combineSettings(this.shared.value, this.device.value, this.collections()),
+    );
     this.value = value;
     this.syncHealth();
     this.revision++;

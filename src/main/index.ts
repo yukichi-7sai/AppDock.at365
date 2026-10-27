@@ -1,4 +1,5 @@
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
+import { hostStartupTiming } from './core/host-startup-timing';
 import { SettingsServiceTargets } from './core/settings-service-targets';
 import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
@@ -314,7 +315,7 @@ const launch = new WindowsLaunch(
 let settingsLoadError: Error | undefined;
 if (locked) {
   try {
-    settings.load();
+    hostStartupTiming.phase('settings', () => settings.load());
     // Electron requires this before app.ready and before the renderer/GPU starts.
     if (!settings.value.host.hardwareAcceleration) app.disableHardwareAcceleration();
   } catch (error) {
@@ -1482,6 +1483,7 @@ function uiCommands(): import('../shared/commands').UiCommand[] {
     ),
   ];
   for (const command of commands) knownSettingsCommands.set(command.id, command);
+  hostStartupTiming.count('commandCount', commands.length);
   return commands;
 }
 function settingsUiCommands() {
@@ -1730,6 +1732,9 @@ function runTrayCommand(id: string) {
   });
 }
 function snapshot(): HostSnapshot {
+  return hostStartupTiming.measure('hostSnapshot', () => snapshotCore());
+}
+function snapshotCore(): HostSnapshot {
   return {
     ribbonDisplayMode: safeShell ? 'compact' : (ribbonState?.displayMode ?? 'compact'),
     overlay: { active: !!overlayHost?.active, kind: overlayHost?.kind ?? null },
@@ -2207,6 +2212,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
           commands.filter((command) => command.available).map((command) => command.id),
         ).size,
       },
+      hostStartupTiming: hostStartupTiming.snapshot(),
     };
   }
   if (id === 'web-accounts')
@@ -3017,13 +3023,17 @@ function registerIpc() {
   handle('dock:settingsPage:get', (id) => settingsPageHost!.get(id));
   handle('dock:settingsPage:act', (id, action) => settingsPageHost!.act(id, action));
   handle('dock:settingsPage:input', (id, request) => settingsPageHost!.input(id, request));
+  handle('dock:settingsPage:palette', (id, request) => settingsPageHost!.palette(id, request));
   handle('dock:settingsPage:close', (id) => {
     if (typeof id !== 'string') throw Error('Invalid settings connection');
     settingsPageHost?.close(id);
   });
   handle('dock:focusShell', (edge) => shellHost?.focus(edge));
   handle('dock:hostUiRendered', () => {
-    if (uiReady && !quitting) startupUi.rendererReady();
+    if (uiReady && !quitting) {
+      hostStartupTiming.mark('renderer');
+      startupUi.rendererReady();
+    }
   });
   handle('dock:barViewport', (region, bounds) => shellBarHost?.viewport(region, bounds));
   handle('dock:focusBar', (region, edge) => shellBarHost?.focus(region, edge));
@@ -3233,10 +3243,13 @@ function applyWindowAction(action: string) {
 }
 async function initialize() {
   if (settingsLoadError) {
-    const recovered = await recoverSettingsAtStartup(settings, settingsRecoveryUi);
+    const recovered = await hostStartupTiming.phaseAsync('recovery', () =>
+      recoverSettingsAtStartup(settings, settingsRecoveryUi),
+    );
     quitHost(recovered);
     return;
   }
+  const endServices = hostStartupTiming.begin('services');
   log = new HostLog(path.join(dataDirectory, 'logs'), changed);
   ribbonState = new RibbonState(
     path.join(dataDirectory, 'ribbon-state.json'),
@@ -3685,8 +3698,10 @@ async function initialize() {
   settings.watch(() => {
     /* The health source reports stable failures through ErrorReporter. */
   });
-  applySettings();
-  await registeredImages.refresh();
+  endServices();
+  hostStartupTiming.phase('apply', () => applySettings());
+  await hostStartupTiming.phaseAsync('images', () => registeredImages.refresh());
+  hostStartupTiming.count('imageCount', registeredImages.list().length);
   registeredImages.watch();
   nativeTheme.on('updated', () => {
     refreshWindowTheme();
@@ -3747,6 +3762,7 @@ async function initialize() {
   const windowIcon = app.isPackaged
     ? path.join(process.resourcesPath, 'icon.ico')
     : path.join(app.getAppPath(), 'assets', 'icon.ico');
+  const endWindow = hostStartupTiming.begin('window');
   window = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -3768,6 +3784,8 @@ async function initialize() {
       spellcheck: false,
     },
   });
+  endWindow();
+  window.once('show', () => hostStartupTiming.mark('shown'));
   primaryWindowCreated = true;
   registerDisplayZoom(window.webContents);
   registerAppearance(window.webContents, hostDocumentUrl);
@@ -4336,26 +4354,29 @@ async function initialize() {
   tray.on('click', () => trayClicks?.click());
   tray.on('double-click', () => trayClicks?.doubleClick());
   trayMenu();
-  await window.loadURL(hostDocumentUrl);
+  await hostStartupTiming.phaseAsync('document', () => window!.loadURL(hostDocumentUrl));
   // Reapply after native initialization, which can adjust frameless bounds for DPI.
   if (savedWindow) restoreWindowBounds(window, savedWindow.bounds);
-  manager.discover();
-  const migrated = initializeGestureDefaults(
-    initializeExtensionDefaults(
-      withoutMissingSamples(settings.value, manager.items.keys()),
+  hostStartupTiming.phase('discovery', () => manager.discover());
+  hostStartupTiming.count('appletCount', manager.items.size);
+  hostStartupTiming.phase('defaults', () => {
+    const migrated = initializeGestureDefaults(
+      initializeExtensionDefaults(
+        withoutMissingSamples(settings.value, manager.items.keys()),
+        [...manager.items.values()].map((item) => item.manifest),
+      ),
       [...manager.items.values()].map((item) => item.manifest),
-    ),
-    [...manager.items.values()].map((item) => item.manifest),
-  );
-  migrated.trayMenu = getTrayMenu(migrated, allApplets());
-  if (
-    !settings.recovered &&
-    !launch.recoveryPending &&
-    JSON.stringify(migrated) !== JSON.stringify(settings.value)
-  )
-    settings.save(migrated, settings.revision);
-  await manager.reconcile();
-  await syncHotKeys();
+    );
+    migrated.trayMenu = getTrayMenu(migrated, allApplets());
+    if (
+      !settings.recovered &&
+      !launch.recoveryPending &&
+      JSON.stringify(migrated) !== JSON.stringify(settings.value)
+    )
+      settings.save(migrated, settings.revision);
+  });
+  await hostStartupTiming.phaseAsync('shells', () => manager.reconcile());
+  await hostStartupTiming.phaseAsync('hotkeys', () => syncHotKeys());
   gestureIndicatorHost = new GestureIndicatorHost({
     url: pathToFileURL(path.join(app.getAppPath(), 'out/renderer/gesture-indicator.html')).href,
     preload: path.join(__dirname, 'gesture-indicator-preload.js'),
@@ -4369,21 +4390,25 @@ async function initialize() {
       }),
   });
   gestures.indicator = gestureIndicatorHost;
-  await gestureIndicatorHost.initialize();
-  await gestures.start();
-  await touchpad.start();
+  await hostStartupTiming.phaseAsync('indicator', () => gestureIndicatorHost!.initialize());
+  await hostStartupTiming.phaseAsync('gestures', () => gestures!.start());
+  await hostStartupTiming.phaseAsync('touchpad', () => touchpad!.start());
   if (quitting) return;
   uiReady = true;
   changed();
+  const endUi = hostStartupTiming.begin('ui');
   const rendered = await startupUi.wait();
+  endUi(rendered ? 'ended' : 'timeout');
   if (quitting || window.isDestroyed()) return;
   if (!rendered) log.write('warn', 'host', hostText('services.index.initialUiTimeout'));
   if (!smoke && (restoreView || !settings.value.host.startMinimized)) await showWindow();
   // Settings changes during discovery use the same gate, so no ordinary worker can bypass it.
   startupAppletsReleased = true;
-  await manager.reconcile();
+  await hostStartupTiming.phaseAsync('applets', () => manager.reconcile());
   if (quitting) return;
   startupReady = true;
+  hostStartupTiming.mark('ready');
+  const endIntegration = hostStartupTiming.begin('integration');
   completeStartup!();
   customCommands.reconcile();
   mcpClient.reconcile();
@@ -4579,6 +4604,9 @@ async function initialize() {
       log.write('error', 'updates', String(error));
     }
   });
+  endIntegration();
+  hostStartupTiming.finish();
+  changed();
   if (smoke) await runSmoke();
   activateNotification(process.argv, openNotificationCenter);
   if (pendingNotificationArgs)
@@ -4793,13 +4821,16 @@ app.on('window-all-closed', () => {
   if (!primaryWindowCreated && !quitting) return;
   if (!tray || quitting) app.quit();
 });
+const endElectron = hostStartupTiming.begin('electron');
 if (!locked) app.quit();
 else
   void app
     .whenReady()
     .then(async () => {
-      await launch.refresh();
-      if (!settingsLoadError) await launch.checkRecovery();
+      endElectron();
+      await hostStartupTiming.phaseAsync('launch', () => launch.refresh());
+      if (!settingsLoadError)
+        await hostStartupTiming.phaseAsync('recovery', () => launch.checkRecovery());
       settings.writesBlocked = launch.recoveryPending;
       if (
         !settingsLoadError &&

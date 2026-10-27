@@ -36,7 +36,7 @@ SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/
 
 ## 本体の設定ページ契約
 
-SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使用する。DockApi.settingsPageのopen/get/act/input/close/onChangedを本体のmainFrameだけに提供し、SettingsPageHostが接続ID・route・対象を検査する。Shell Appletへ設定描画bridgeは公開しない。
+SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使用する。DockApi.settingsPageのopen/get/act/input/palette/close/onChangedを本体のmainFrameだけに提供し、SettingsPageHostが接続ID・route・対象を検査する。Shell Appletへ設定描画bridgeは公開しない。
 
 更新・再起動で画面を復元するときは、保存された表示先だけで接続を開始しない。本体のstartupReadyとnavigation.routeが実際の表示先にそろってから設定を接続する。準備中は読み込み表示とし、対象が変われば接続と検索移動の監視を解放する。全体設定とApplet詳細の両入口で同じ条件を使う。
 
@@ -252,6 +252,7 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 | `get(connectionId)`            | 現在の接続に対する最新SettingsPageModelを取得                                        |
 | `act(connectionId, action)`    | 既存SettingsPageActionを検証し、モデルと結果を返す                                   |
 | `input(connectionId, request)` | 現ページの発行済み入力制御IDを検査し、一時停止・再開だけを実行する。モデルは返さない |
+| `palette(connectionId, request)` | 現ページの発行済み操作IDを検査し、選択パレットの開始・取消と結果だけを受け渡す |
 | `close(connectionId)`          | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放                               |
 | `onChanged(callback)`          | 接続ID付きでモデルの更新を受け取る                                                   |
 
@@ -259,9 +260,11 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 
 `input`は設定ダイアログの入力保護専用で、`sessionId/pageId/actionId/recording:boolean`を送る。最新のページの利用可否と発行済みの`setShortcutRecording`だけを検査し、設定値の変更・任意アクション・モデル全体の取得は行わない。入力確定キューと停止・復帰の既存サービスを使う。詳細は[ダイアログの入力準備](settings-list-editing.md)を参照する。
 
+`palette`も同じ一時操作の照合を共用する。`sessionId/pageId/actionId`と、`kind: open`の選択要求または`kind: cancel`のrequestIdを送る。選択用だけを許可し、要求のサイズ・現在ページの利用可否・発行済み操作IDを検査する。開始前のモデル再取得、操作時のモデル再構築、結果返却時のモデル同梱は行わない。結果は選択IDまたは取消で、設定の保存を兼ねない。入力確定キューは待つが選択待ちの間は占有せず、取消を受け付ける。接続終了後の応答を拒否し、未対応transportは従来のアクション経路へ戻る。
+
 - 送信元は既存の`dock:*`ハンドラーと同じ本体webContents・mainFrame・hostDocumentUrl検査で限定する。
 - open時に本体の現在routeと表示対象を検査する。Applet詳細は選択中のAppletとpageIdの所有者を照合し、full用の検索・ページ選択を許可しない。
-- get/actは接続IDと現在の表示文脈を照合する。closeは画面遷移後もその接続IDの解放だけを許し、新しい接続へ作用させない。古い画面の操作・応答は新しい画面へ適用しない。
+- get/act/input/paletteは接続IDと現在の表示文脈を照合する。closeは画面遷移後もその接続IDの解放だけを許し、新しい接続へ作用させない。古い画面の操作・応答は新しい画面へ適用しない。
 - sessionId/editRevision、操作ID、ページの許可範囲、発行済みactionId、入力サイズの既存検査を維持する。
 - アカウント認証、APIキー、任意のURL実行等を別の汎用口として追加しない。既存の機能サービスを通す。
 - Shell側のpreloadへこのbridgeを追加しない。エラー記録には入力値・認証値を含めない。

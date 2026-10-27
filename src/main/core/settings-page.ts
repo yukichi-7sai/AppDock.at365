@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { hostStartupTiming } from './host-startup-timing';
 import { randomUUID } from 'node:crypto';
 import type { HostSnapshot } from '../../shared/contracts';
 import type {
@@ -8,7 +9,9 @@ import type {
   SettingsNavigationState,
   SettingsPageAction,
   SettingsInputModeRequest,
+  SettingsPaletteRequest,
 } from '../../shared/settings-page';
+import type { CommandPaletteResult } from '../../shared/overlays';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import { searchSettings } from '../../shared/settings-catalog';
 import type { SettingsInputSession } from './settings-input-session';
@@ -75,6 +78,9 @@ export class SettingsPageSession {
     );
   }
   snapshot(): SettingsPageModel {
+    return hostStartupTiming.measure('settingsPage', () => this.snapshotCore());
+  }
+  private snapshotCore(): SettingsPageModel {
     const state = this.options.editor.metadata();
     if (
       this.request.context === 'applet' &&
@@ -177,12 +183,38 @@ export class SettingsPageSession {
     return work;
   }
   async input(request: SettingsInputModeRequest) {
+    if (!request || typeof request.recording !== 'boolean')
+      throw Error(hostText('settings.pageError.operationDenied'));
+    await this.transientAction(request, 'setShortcutRecording')([request.recording]);
+  }
+  async palette(request: SettingsPaletteRequest): Promise<CommandPaletteResult | void> {
+    if (!request || !['open', 'cancel'].includes(request.kind))
+      throw Error(hostText('settings.pageError.operationDenied'));
+    if (request.kind === 'open') {
+      if (
+        !request.request ||
+        request.request.mode !== 'select' ||
+        JSON.stringify([request.request]).length > 1024 * 1024
+      )
+        throw Error(hostText('settings.pageError.operationDenied'));
+      return (await this.transientAction(
+        request,
+        'openCommandPalette',
+      )([request.request])) as CommandPaletteResult;
+    }
+    if (typeof request.requestId !== 'string' || !/^[a-zA-Z0-9-]{1,100}$/.test(request.requestId))
+      throw Error(hostText('settings.pageError.operationDenied'));
+    await this.transientAction(request, 'cancelCommandPalette')([request.requestId]);
+  }
+  private transientAction(
+    request: Pick<SettingsInputModeRequest, 'sessionId' | 'pageId' | 'actionId'>,
+    name: 'setShortcutRecording' | 'openCommandPalette' | 'cancelCommandPalette',
+  ) {
     const state = this.options.editor.metadata();
-    const issued = this.actions.get('setShortcutRecording');
+    const issued = this.actions.get(name);
     if (
       !this.isCurrent() ||
       !request ||
-      typeof request.recording !== 'boolean' ||
       request.sessionId !== state.sessionId ||
       request.pageId !== state.pageId ||
       this.actionPage !== state.pageId ||
@@ -192,9 +224,9 @@ export class SettingsPageSession {
       throw Error(hostText('settings.pageError.operationDenied'));
     // Recheck availability without constructing/returning the settings page model.
     const page = this.options.editor.page(state.pageId);
-    const run = !page.unavailableReason && this.options.actions(page).setShortcutRecording;
+    const run = !page.unavailableReason && this.options.actions(page)[name];
     if (!run) throw Error(hostText('settings.pageError.operationDenied'));
-    await run([request.recording]);
+    return run;
   }
   private async perform(action: SettingsPageAction) {
     const state = this.options.editor.metadata();

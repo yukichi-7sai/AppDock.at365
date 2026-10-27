@@ -101,6 +101,7 @@ const api: DockApi = {
     get: (id) => ipcRenderer.invoke('dock:settingsPage:get', id),
     act: (id, action) => ipcRenderer.invoke('dock:settingsPage:act', id, action),
     input: (id, request) => ipcRenderer.invoke('dock:settingsPage:input', id, request),
+    palette: (id, request) => ipcRenderer.invoke('dock:settingsPage:palette', id, request),
     close: (id) => ipcRenderer.invoke('dock:settingsPage:close', id),
     onChanged: (callback) => {
       const listener = (

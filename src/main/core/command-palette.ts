@@ -65,10 +65,15 @@ export class CommandPaletteSession implements OverlayController {
   }
   private commands() {
     const catalog = this.options.commands();
+    const allowed =
+      this.request.mode === 'select' && this.request.commandIds
+        ? new Set(this.request.commandIds)
+        : undefined;
+    const known = allowed ? new Set(catalog.map((command) => command.id)) : undefined;
     const missing =
       this.request.mode === 'select'
         ? (this.request.commandIds ?? [])
-            .filter((id) => !catalog.some((c) => c.id === id))
+            .filter((id) => !known?.has(id))
             .map((id) => ({
               id,
               title: id,
@@ -77,11 +82,7 @@ export class CommandPaletteSession implements OverlayController {
             }))
         : [];
     return [...catalog, ...missing].filter(
-      (c) =>
-        !('hidden' in c && c.hidden) &&
-        (this.request.mode === 'execute' ||
-          !this.request.commandIds ||
-          this.request.commandIds.includes(c.id)),
+      (c) => !('hidden' in c && c.hidden) && (!allowed || allowed.has(c.id)),
     );
   }
   snapshot(): import('../../shared/overlays').CommandPaletteModel {

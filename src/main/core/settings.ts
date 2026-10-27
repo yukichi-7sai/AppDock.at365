@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { hostStartupTiming } from './host-startup-timing';
 import fs from 'node:fs';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
@@ -145,12 +146,22 @@ class SettingsStore<T = Settings> extends EventEmitter {
     return isObject(entry) ? entry : {};
   }
   private readBytes(file: string): Buffer {
+    return hostStartupTiming.measure('settingsRead', () => this.readBytesCore(file));
+  }
+  private readBytesCore(file: string): Buffer {
     try {
       const stat = fs.statSync(file);
       if (!stat.isFile() || stat.size > 4 * 1024 * 1024)
         throw new SettingsReadError('read-unavailable');
       const bytes = fs.readFileSync(file);
       if (bytes.length > 4 * 1024 * 1024) throw new SettingsReadError('read-unavailable');
+      hostStartupTiming.count('readBytes', bytes.length, true);
+      if (file === this.file) {
+        const name = path.basename(file);
+        if (name === 'settings.json') hostStartupTiming.countOnce('sharedBytes', bytes.length);
+        else if (/^settings-.+\.json$/.test(name))
+          hostStartupTiming.countOnce('deviceBytes', bytes.length);
+      }
       return bytes;
     } catch {
       throw new SettingsReadError('read-unavailable');
@@ -158,8 +169,12 @@ class SettingsStore<T = Settings> extends EventEmitter {
   }
   private parse(bytes: Buffer | string) {
     try {
-      const raw = JSON.parse(bytes.toString().replace(/^\uFEFF/, ''));
-      const value = this.codec ? this.codec.parse(raw) : (validate(raw) as T);
+      const raw = hostStartupTiming.measure('settingsJson', () =>
+        JSON.parse(bytes.toString().replace(/^\uFEFF/, '')),
+      );
+      const value = hostStartupTiming.measure('settingsValidate', () =>
+        this.codec ? this.codec.parse(raw) : (validate(raw) as T),
+      );
       return value;
     } catch {
       throw new SettingsReadError('read-invalid');
@@ -204,7 +219,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
   }
   private tryBackup(value: T) {
     try {
-      this.backup(value);
+      hostStartupTiming.measure('settingsBackup', () => this.backup(value));
       this.health.clear('backup');
     } catch {
       this.health.set('backup', 'backup-failed');
@@ -244,6 +259,9 @@ class SettingsStore<T = Settings> extends EventEmitter {
     return this.snapshot();
   }
   snapshot(): SettingsSnapshot<T> {
+    return hostStartupTiming.measure('settingsSnapshot', () => this.snapshotCore());
+  }
+  private snapshotCore(): SettingsSnapshot<T> {
     return {
       value: structuredClone(this.value),
       revision: this.revision,

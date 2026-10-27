@@ -5,6 +5,7 @@ import type {
   SettingsPageConnection,
   SettingsPageRequest,
   SettingsInputModeRequest,
+  SettingsPaletteRequest,
 } from '../../shared/settings-page';
 import type { SettingsPageSession } from './settings-page';
 
@@ -68,6 +69,11 @@ export class SettingsPageHost {
   async input(id: string, request: SettingsInputModeRequest) {
     await this.bound(id).page.input(request);
     this.bound(id);
+  }
+  async palette(id: string, request: SettingsPaletteRequest) {
+    const result = await this.bound(id).page.palette(request);
+    this.bound(id);
+    return result;
   }
   close(id?: string) {
     if (id && this.current?.id !== id) return;
