@@ -1,5 +1,6 @@
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
 import { hostStartupTiming } from './core/host-startup-timing';
+import { SettingsReadScope } from './core/settings-read-scope';
 import { SettingsServiceTargets } from './core/settings-service-targets';
 import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
@@ -488,7 +489,10 @@ const settingsEditing = new SettingsInputSession({
   },
 });
 let pageCollections: PageCollectionManager;
-const allApplets = () => [...manager.snapshot(), ...(pageCollections?.snapshot() ?? [])];
+const settingsReads = new SettingsReadScope();
+const parentApplets = () => settingsReads.once('parents', () => manager.snapshot());
+const allApplets = () =>
+  settingsReads.once('applets', () => [...parentApplets(), ...(pageCollections?.snapshot() ?? [])]);
 const appletManagement = new AppletManagement({
   settings,
   applets: allApplets,
@@ -1152,6 +1156,14 @@ function mcpSettingsOperation<T>(operation: () => T): T {
   }
 }
 const operationApi = new AppDockApi({
+  settingsAccessRevision: (page) =>
+    JSON.stringify([
+      settings.revision,
+      settingsEditing.definitionsKey(),
+      page.id === 'custom-commands'
+        ? customCommands.descriptors().map((type) => [type.id, type.typeRevision])
+        : undefined,
+    ]),
   serviceSettingsTargets: () => [
     ...serviceSettings.targets(),
     ...pageCollections.settingsTargets((revision) => settingsCommands.checkRevision(revision)),
@@ -3478,7 +3490,7 @@ async function initialize() {
   );
   pageCollections = new PageCollectionManager({
     settings: () => settings.value,
-    parents: () => manager.snapshot(),
+    parents: parentApplets,
     localRoot: dataDirectory,
     sharedRoot: sharedDirectory,
     changed,
@@ -4150,6 +4162,7 @@ async function initialize() {
         });
       }
       return new SettingsPageSession(request, {
+        read: (action) => settingsReads.run(action),
         navigation: settingsNavigation,
         editor: settingsEditing,
         host: () => ({

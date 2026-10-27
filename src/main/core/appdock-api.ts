@@ -27,6 +27,7 @@ import type { SettingsTarget } from './settings-target-types';
 import type { GlobalHotKeyStatus, ExtensionSnapshot } from '../../shared/contracts';
 import type { ShortcutPageChoice } from '../../shared/shortcut-pages';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
+import type { SettingsMcpAccess } from '../../shared/settings-mcp-access';
 import {
   settingsMcpAccess,
   addConfigurationAccess,
@@ -63,6 +64,7 @@ export class AppDockApi {
   private touchpadGestures: GestureCommands;
   private tray: TrayEditingCommands;
   private ribbon: RibbonCommands;
+  private settingsAccessCache?: { key: string; value: SettingsMcpAccess };
   constructor(
     private options: {
       handlers?: Partial<
@@ -81,6 +83,7 @@ export class AppDockApi {
       settingsCommands?: SettingsCommands;
       settingsPrincipal?(): string;
       serviceSettingsTargets?(): SettingsTarget[];
+      settingsAccessRevision?(page: SettingsPageDefinition): string;
       customCommands?: CustomCommandService;
       mcpClientAllowed?(): boolean;
       inputAllowed?(): boolean;
@@ -149,6 +152,14 @@ export class AppDockApi {
   }
   /** Internal trusted renderer projection; does not call MCP or expose a new operation. */
   settingsAccess(page: SettingsPageDefinition) {
+    const revision = this.options.settingsAccessRevision?.(page);
+    if (revision === undefined) return this.createSettingsAccess(page);
+    const key = JSON.stringify([revision, page]);
+    if (key !== this.settingsAccessCache?.key)
+      this.settingsAccessCache = { key, value: this.createSettingsAccess(page) };
+    return structuredClone(this.settingsAccessCache!.value);
+  }
+  private createSettingsAccess(page: SettingsPageDefinition) {
     const access = settingsMcpAccess(page, this.allSettingsTargets());
     for (const [pageId, owner] of [
       ['shortcuts', this.shortcuts],

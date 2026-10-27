@@ -9,6 +9,7 @@ import {
   settingsProjection,
   settingsJsonProjection,
   applySettingsJson,
+  type SettingsPageDefinition,
 } from '../../shared/settings-catalog';
 import { mergeSettingsInput } from '../../shared/settings-input';
 import { sameSetting } from '../../shared/settings-defaults';
@@ -17,6 +18,20 @@ import { restoreSettingsCollections } from '../../shared/settings-storage';
 export class SettingsInputSession {
   private state: Omit<SettingsInputState, 'value'>;
   private operations = new Map<string, Promise<SettingsInputState>>();
+  private reading?: {
+    current: Pick<SettingsSnapshot, 'value' | 'revision'>;
+    applets: ExtensionSnapshot[];
+    definitions?: string;
+    catalog?: SettingsPageDefinition[];
+  };
+  private catalogCache?: { key: string; pages: SettingsPageDefinition[] };
+  private projectionCache?: {
+    key: string;
+    current: Settings;
+    revision: number;
+    values?: Record<string, unknown>;
+    json?: Record<string, unknown>;
+  };
   constructor(
     private options: {
       current(): Pick<SettingsSnapshot, 'value' | 'revision'>;
@@ -62,8 +77,51 @@ export class SettingsInputSession {
   get value() {
     return structuredClone(this.options.current().value);
   }
+  /** The caller must finish this read synchronously; writes retain the normal live path. */
+  read<T>(action: () => T): T {
+    if (this.reading) return action();
+    this.reading = { current: this.options.current(), applets: this.options.applets() };
+    try {
+      return action();
+    } finally {
+      this.reading = undefined;
+    }
+  }
+  definitionsKey(): string {
+    return this.read(() => {
+      const source = this.reading!;
+      return (source.definitions ??= JSON.stringify([
+        source.current.value.host.language,
+        source.current.value.appletOrder,
+        source.applets.map(
+          ({
+            commands,
+            tray,
+            panel,
+            settingOptions,
+            startupTiming,
+            error,
+            state,
+            enabled,
+            scheduledStartAt,
+            ...definition
+          }) => definition,
+        ),
+      ]));
+    });
+  }
   catalog() {
-    return settingsCatalog(this.options.applets(), this.options.current().value);
+    return this.read(() => {
+      const source = this.reading!;
+      if (source.catalog) return source.catalog;
+      const key = JSON.stringify([
+        this.definitionsKey(),
+        source.applets.map((applet) => [applet.enabled, applet.state]),
+      ]);
+      if (key !== this.catalogCache?.key)
+        this.catalogCache = { key, pages: settingsCatalog(source.applets, source.current.value) };
+      return (source.catalog = this.catalogCache!.pages);
+    });
   }
   page(id = this.state.pageId) {
     const page = this.catalog().find((p) => p.id === id);
@@ -71,14 +129,34 @@ export class SettingsInputSession {
     return page;
   }
   projection(id = this.state.pageId) {
-    return structuredClone(
-      settingsProjection(this.options.current().value, this.page(id), this.options.applets()),
-    );
+    return this.project(id, 'values');
   }
   jsonProjection(id = this.state.pageId) {
-    return structuredClone(
-      settingsJsonProjection(this.options.current().value, this.page(id), this.options.applets()),
-    );
+    return this.project(id, 'json');
+  }
+  private project(id: string, kind: 'values' | 'json') {
+    return this.read(() => {
+      const source = this.reading!,
+        page = this.page(id);
+      const key = JSON.stringify([id, this.definitionsKey()]);
+      if (
+        key !== this.projectionCache?.key ||
+        source.current.value !== this.projectionCache.current ||
+        source.current.revision !== this.projectionCache.revision
+      )
+        this.projectionCache = {
+          key,
+          current: source.current.value,
+          revision: source.current.revision,
+        };
+      const cache = this.projectionCache!;
+      cache[kind] ??= (kind === 'values' ? settingsProjection : settingsJsonProjection)(
+        source.current.value,
+        page,
+        source.applets,
+      );
+      return structuredClone(cache[kind]!);
+    });
   }
   async act(request: SettingsEditRequest): Promise<SettingsInputState> {
     if (

@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-28: 設定表示データ再利用 0.99.10のコミット
+
+- 利用者から、普段の設定でウィンドウ表示まで約1.5秒へ大幅に改善し、各Appletの起動時間も短縮したとの確認を受けた。利用者の実環境での報告であり、この作業で新たに実測した値や、全設定での改善保証ではない。
+- main `32f7483`上の対象8ファイルをレビューし、発行時の全入力・型検査/ビルドの完全ログ・終了コード・0.99.10の発行済みEXE/ASAR/ZIPのSHA256を照合する。表示専用データの再利用、同期範囲の終了/例外時解放、設定/定義/状態変更時の無効化と、実要求の権限/保存経路の分離を再確認。追加の製品修正はない。
+- 前回の指定を維持し、追加テスト・アプリ起動確認を行わず、実装時の型検査/ビルド/発行記録を再利用してコミットする。版更新・再発行・push・Release・実利用先deployは行わない。既存worktree・専用発行先・検証証跡を保持し、新しいprofileや整理候補はない。
+- 入力/ログ/成果物の照合、レビュー、stage/作業ファイル一致、stage treeとcommit treeの一致の正本は`.artifacts/commit-validation-settings-page-cache-20261028/validation.json`・`stage.json`・`commit.json`。
+
+## 2026-10-28: 設定ページ表示データの再利用 0.99.10
+
+- main `32f7483`/0.99.9のclean状態から開始し、`pull --ff-only`は変更なし。設定ページ生成の重複取得と、変更のない定義・投影・MCP公開表示の再構築を抑制した。既存worktreeと専用発行先を保持し、commit・push・Release・deployは行っていない。
+- 同期的な設定ページ生成の間だけ、親Applet/collectionを含む一覧とStore/カタログを共有する。読取り範囲はfinallyで解放し、非同期の保存や実行には持ち越さない。範囲外のApplet取得は現在値を毎回取得する。
+- 設定カタログは言語・並び順・Applet定義・enabled/state、選択ページのフォーム/JSON投影はStore参照/revision・ページID・定義を比較して再利用する。投影の呼出元には複製を返し、保存用ドラフトを作らず、before/revision/原子的保存の検査を保持する。
+- trusted UIのMCP公開表示だけを設定revision・定義・対象ページ・custom type revisionで再利用し、最終の1ページ分を保持する。追加のrevision供給がない利用先は都度構築する。MCP要求時の全target生成・権限検査・保存・実行の経路はキャッシュせず、公開表示と実行可否を分離する。
+- 発行前レビューで同期範囲、例外時解放、状態/定義/保存値変更時の無効化、複製、メモリー保持範囲、既存入力/保存と公開APIを確認。既知の発行阻害事項なし。書式整形・型検査・publish内の本体/Default Shell/native/updaterビルド成功。前回の指定に合わせてテストとアプリ起動確認は省略し、従来の成功を今回の動作証明へ転用していない。
+- 実行時設定項目・保存ファイル・公開Schema・依存の追加/変更がない通常patchとして0.99.10へ更新。`publish.bat`終了0、版/Default Shell/feed、ZIP SHA256/size、管理外設定2ファイルの不変を照合。速度改善幅、実設定での表示・保存・動的定義変更後の動作は利用者確認待ち。起動計測の生成回数自体は残り、累計/最長時間の比較で効果を評価する。
+- 発行先`A:/40.ARTIFACT/AppDock.at365/win-unpacked`。EXE SHA256=`0ae9c8e9a0fbefc74eedcfd209468ff27a4c5ac0f1e070ef06fd812c43d5c9e3`、ASAR=`d5dd9b7b77f4977e6dbccf7bc60f5fddab0b26298ddfc30e7ecdae2d2f465227`、update.zip=`6ec7ddf7f6aa6a8781f1d6857ab2e929c3060774a7a769a883dca70f58ee9f9f`（270,688,340 bytes）。入力一覧・完全publishログhash・終了コードは`.artifacts/settings-page-cache-20261028/validation.json`、レビューは同`review.md`。
+- アプリ/試験プロセスを起動せず、新しいテストprofileや整理候補はない。利用者設定・認証・既存証跡を保持した。
+
 ## 2026-10-28: 起動計測Sectionの折りたたみとコミット 0.99.9
 
 - 0.99.8の選択パレット高速化統合/本体起動計測を保ち、共通SettingsSectionへ`collapsible`を指定した。既定の`defaultOpen=false`により、AppDockについてを開いたときは「本体の起動計測」を折りたたみ、見出しから展開できる。計測処理とデータ保持、設定・保存ファイル・公開APIは変更していない。

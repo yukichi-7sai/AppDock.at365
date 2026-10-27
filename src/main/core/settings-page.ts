@@ -36,6 +36,7 @@ export class SettingsPageSession {
       host(): Pick<HostSnapshot, 'settings' | 'dark'>;
       auxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary;
       actions(page: SettingsPageDefinition): Record<string, (args: unknown[]) => Promise<unknown>>;
+      read?<T>(action: () => T): T;
       changed(): void;
       release?(): void;
       resize?(width: number): void;
@@ -78,7 +79,10 @@ export class SettingsPageSession {
     );
   }
   snapshot(): SettingsPageModel {
-    return hostStartupTiming.measure('settingsPage', () => this.snapshotCore());
+    const read = () => this.options.editor.read(() => this.snapshotCore());
+    return hostStartupTiming.measure('settingsPage', () =>
+      this.options.read ? this.options.read(read) : read(),
+    );
   }
   private snapshotCore(): SettingsPageModel {
     const state = this.options.editor.metadata();
