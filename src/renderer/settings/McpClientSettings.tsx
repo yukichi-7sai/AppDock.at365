@@ -328,10 +328,7 @@ export function McpClientSettingsForm({
         )}
       </SettingsSection>
       {dialog?.kind === 'edit' && (
-        <SettingsMcpScope
-          itemId={settingsItemId('mcp-client', 'connections')}
-          rowId={dialog.item?.id}
-        >
+        <SettingsMcpScope itemId={settingsItemId('mcp-client', 'connections')}>
           <McpConnectionDialog
             original={dialog.item}
             status={dialog.status}

@@ -1,17 +1,14 @@
 import type { SettingDefinition } from './contracts';
 
-export type SettingsMcpLockReason =
-  'disabled' | 'permission' | 'unavailable' | 'readOnly' | 'private' | 'unsupported';
+export type SettingsMcpLockReason = 'private' | 'unsupported';
 export interface SettingsMcpFieldAccess {
   reason: SettingsMcpLockReason | null;
 }
 export interface SettingsMcpItemAccess extends SettingsMcpFieldAccess {
   fields?: Record<string, SettingsMcpFieldAccess>;
-  rows?: Record<string, Record<string, SettingsMcpFieldAccess>>;
 }
 /** Trusted settings UI metadata only; no setting values, defaults or credentials. */
 export interface SettingsMcpAccess {
-  reason: SettingsMcpLockReason | null;
   items: Record<string, SettingsMcpItemAccess>;
 }
 export interface SettingsUiReference {

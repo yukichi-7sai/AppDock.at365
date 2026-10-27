@@ -15,22 +15,20 @@ export const SettingsMcpAccessProvider = Access.Provider;
 const own = <T,>(record: Record<string, T> | undefined, key: string) =>
   record && Object.hasOwn(record, key) ? record[key] : undefined;
 
-/** Row/dialog contexts carry identities through React portals; they do not control visibility. */
+/** Dialog contexts carry publication identities through React portals. */
 export function SettingsMcpScope({
   itemId,
-  rowId,
   fieldKey,
   children,
 }: {
   itemId?: string;
-  rowId?: string;
   fieldKey?: string;
   children: ReactNode;
 }) {
   const access = useContext(Access),
     inherited = useContext(Scope);
   const item = itemId ? own(access?.items, itemId) : inherited;
-  const fields = rowId !== undefined && item?.rows ? (own(item.rows, rowId) ?? {}) : item?.fields;
+  const fields = item?.fields;
   const field = fieldKey
     ? (own(item?.fields, fieldKey) ?? inherited?.field ?? { reason: 'unsupported' as const })
     : itemId
@@ -67,7 +65,7 @@ export function SettingsMcpLock({
     : itemId
       ? item
       : inherited?.field;
-  const reason = field ? (field.reason ?? access.reason) : 'unsupported';
+  const reason = field ? field.reason : 'unsupported';
   if (!reason) return null;
   const textKey = `settings.mcpAccess.${reason}` as const;
   return (

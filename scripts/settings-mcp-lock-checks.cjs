@@ -48,13 +48,13 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
   await field(appletPage, 'setting:records').getByRole('button', { name: /編集/ }).first().click();
   const dialog = page.getByRole('dialog');
   const id = dialog.locator('fieldset:has(input[aria-label="ID"])').last();
-  if (await id.count()) assert.equal(await id.locator('[data-mcp-lock="readOnly"]').count(), 1);
+  if (await id.count()) assert.equal(await count(id), 0);
   const name = dialog.locator('fieldset:has(input[aria-label="Record name"])').last();
   assert.equal(await name.count(), 1);
   assert.equal(await count(name), 0);
   await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
   checks.push(
-    'Shared list dialog inherits actual MCP column metadata: native immutable IDs stay hidden or locked while editable columns remain unlocked',
+    'Public list columns stay unlocked, including immutable IDs; publication markers do not represent write restrictions',
   );
 
   const appearance = (
@@ -79,7 +79,7 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
   };
   await editAppearance({ showHints: false, theme: 'dark' });
   await nav(appletPage);
-  const lock = locked.getByRole('button', { name: /MCPから変更できない設定/ });
+  const lock = locked.getByRole('button', { name: /MCPに公開していない設定/ });
   await lock.focus();
   const tooltipId = await lock.getAttribute('aria-describedby');
   await until(
@@ -100,7 +100,7 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
 
   await nav('tts');
   assert.equal(await field('tts', 'apiKey').locator('[data-mcp-lock]').count(), 1);
-  assert.equal(await field('tts', 'baseUrl').locator('[data-mcp-lock="readOnly"]').count(), 1);
+  assert.equal(await count(field('tts', 'baseUrl')), 0);
   assert.equal(await count(field('tts', 'model')), 0);
   await nav('applets');
   const enabledRow = page.locator('[data-applet-id="fixture.common-active"]');
@@ -115,14 +115,13 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
   await until(async () => !(await write.isChecked()), 'MCP write revoked');
   await nav('applets');
   await until(
-    async () => (await enabledRow.locator('[data-mcp-lock="permission"]').count()) === 1,
-    'Applet enable switch follows MCP write permission',
+    async () => (await enabledRow.locator('[data-mcp-lock]').count()) === 0,
+    'public Applet enable switch stays unlocked after MCP write revocation',
   );
   await nav('appearance');
   await until(
-    async () =>
-      (await field('appearance', 'theme').locator('[data-mcp-lock="permission"]').count()) === 1,
-    'permission change updates locks',
+    async () => (await count(field('appearance', 'theme'))) === 0,
+    'permission change does not alter public field markers',
   );
   await nav('permissions');
   await write.click();
@@ -136,6 +135,6 @@ module.exports = async ({ page, profile, local, checks, value, until, fixtureId 
     assert.deepEqual(fs.readFileSync(file), credentials[index]),
   );
   checks.push(
-    'Native encrypted-key fields and protected endpoints are locked; toggling MCP settings permission updates icons immediately without changing credential bytes',
+    'Secret fields stay locked while public protected endpoints and fields remain unlocked across write-permission changes; credential bytes are preserved',
   );
 };

@@ -52,7 +52,17 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   ]) {
     const state = await value(name),
       options = state.options ?? state.settings;
-    assert.deepEqual(options.browsers, ['edge']);
+    if (JSON.stringify(options.browsers) !== JSON.stringify(['edge']))
+      fs.writeFileSync(
+        path.join(profile, 'browser-reader-divergence.json'),
+        JSON.stringify({
+          method: name,
+          legacy: options,
+          common: (await read()).fields,
+          stored: JSON.parse(fs.readFileSync(sharedFile, 'utf8')).commandTriggerOptions,
+        }, null, 2),
+      );
+    assert.deepEqual(options.browsers, ['edge'], name);
     assert.equal(options.requireChromiumWindowClass, true);
   }
   assert.deepEqual(fs.readFileSync(deviceFile), device);

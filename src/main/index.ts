@@ -1151,16 +1151,6 @@ function mcpSettingsOperation<T>(operation: () => T): T {
   }
 }
 const operationApi = new AppDockApi({
-  mcpEnabled: () => automation?.state().enabled ?? false,
-  mcpAvailable: () => {
-    if (!automation?.state().running) return false;
-    try {
-      assertSettingsWritable();
-      return true;
-    } catch {
-      return false;
-    }
-  },
   serviceSettingsTargets: () => [
     ...serviceSettings.targets(),
     ...pageCollections.settingsTargets((revision) => settingsCommands.checkRevision(revision)),

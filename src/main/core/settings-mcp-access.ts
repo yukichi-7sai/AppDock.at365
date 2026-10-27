@@ -5,15 +5,13 @@ import type {
   SettingsMcpAccess,
   SettingsMcpFieldAccess,
   SettingsMcpItemAccess,
-  SettingsMcpLockReason,
 } from '../../shared/settings-mcp-access';
 import type { SettingsTarget } from './settings-target-types';
 
-/** Project the same owners as MCP without returning values or running an operation. */
+/** Project publication declarations without runtime access, row values or credentials. */
 export function settingsMcpAccess(
   page: SettingsPageDefinition,
   targets: SettingsTarget[],
-  reason: SettingsMcpLockReason | null = null,
 ): SettingsMcpAccess {
   const items: SettingsMcpAccess['items'] = Object.create(null);
   const merge = (id: string, access: SettingsMcpItemAccess) => {
@@ -25,86 +23,30 @@ export function settingsMcpAccess(
   for (const target of targets) {
     const roots = target.ui?.().filter((ref) => ref.pageId === page.id) ?? [];
     const fields = target.fields.flatMap((field) =>
-      (target.ui?.(field) ?? [])
-        .filter((ref) => ref.pageId === page.id)
-        .map((ref) => ({ field, ref })),
+      (target.ui?.(field) ?? []).filter((ref) => ref.pageId === page.id),
     );
     if (!roots.length && !fields.length) continue;
-    const fieldAccess = (field: (typeof target.fields)[number]): SettingsMcpFieldAccess => ({
-      reason: !target.available
-        ? 'unavailable'
-        : !(
-              target.writable?.(field) ??
-              (target.kind !== 'list' || field.key !== target.definition.list?.idKey)
-            )
-          ? 'readOnly'
-          : null,
-    });
-    const columns = Object.fromEntries(
-      target.fields.map((field) => [field.key, fieldAccess(field)]),
-    );
-    const operations =
-      target.kind === 'list' ? (target.operations ?? ['add', 'update', 'remove', 'reorder']) : [];
-    const mutable =
-      target.kind === 'list'
-        ? operations.some(
-            (operation) =>
-              operation !== 'update' || target.fields.some((field) => !fieldAccess(field).reason),
-          )
-        : target.fields.some((field) => !fieldAccess(field).reason);
+    const fieldAccess = (): SettingsMcpFieldAccess => ({ reason: null });
+    const columns = Object.fromEntries(target.fields.map((field) => [field.key, fieldAccess()]));
     const rootAccess: SettingsMcpItemAccess = {
-      reason: !target.available ? 'unavailable' : mutable ? null : 'readOnly',
+      reason: null,
       fields: columns,
     };
-    if (
-      roots.length &&
-      target.kind === 'list' &&
-      target.itemWritable &&
-      target.definition.list?.idKey
-    ) {
-      const idKey = target.definition.list.idKey;
-      // Only public, declared row identities leave the owner; values and hidden columns never do.
-      if (target.fields.some((field) => field.key === idKey))
-        rootAccess.rows = Object.fromEntries(
-          target.rows().flatMap((row) => {
-            const id = row[idKey];
-            return typeof id !== 'string'
-              ? []
-              : [
-                  [
-                    id,
-                    Object.fromEntries(
-                      target.fields.map((field) => [
-                        field.key,
-                        {
-                          reason:
-                            fieldAccess(field).reason ??
-                            (!operations.includes('update') || !target.itemWritable!(row, field)
-                              ? 'readOnly'
-                              : null),
-                        },
-                      ]),
-                    ),
-                  ],
-                ];
-          }),
-        );
-    }
     for (const ref of roots) merge(settingsItemId(ref.pageId, ref.key), rootAccess);
-    for (const { field, ref } of fields) {
+    for (const ref of fields) {
       const id = settingsItemId(ref.pageId, ref.key);
       if (ref.fieldKey) {
         const current = items[id] ?? { reason: rootAccess.reason };
-        current.fields = { ...current.fields, [ref.fieldKey]: fieldAccess(field) };
+        current.fields = { ...current.fields, [ref.fieldKey]: fieldAccess() };
         merge(id, current);
-      } else merge(id, fieldAccess(field));
+      } else merge(id, fieldAccess());
     }
   }
   for (const item of page.items) {
     if (item.definition && !mcpSettingPublished(item.definition))
       items[item.id] = { reason: 'private' };
   }
-  return { reason, items };
+  return { items };
 }
 
 /** Legacy input APIs retain their existing configure schema as the source of supported keys. */
@@ -149,7 +91,13 @@ export function addBindingAccess(
   const update = alternatives.find(
     (entry) => object(object(object(entry).properties).kind).const === 'update',
   );
-  const properties = object(object(object(object(update).properties).changes).properties);
+  const configure = alternatives.find(
+    (entry) => object(object(object(entry).properties).kind).const === 'configure',
+  );
+  const properties = {
+    ...object(object(object(object(update).properties).changes).properties),
+    ...object(object(object(object(configure).properties).changes).properties),
+  };
   if (!Object.keys(properties).length) return;
   const id = settingsItemId(pageId, 'bindings');
   access.items[id] = {
@@ -177,8 +125,7 @@ export function addOperationAccess(
     }
     const record = node as Record<string, unknown>;
     if (record.properties && typeof record.properties === 'object')
-      for (const name of Object.keys(record.properties))
-        fields[name] = { reason: name === 'id' ? 'readOnly' : null };
+      for (const name of Object.keys(record.properties)) fields[name] = { reason: null };
     Object.values(record).forEach(visit);
   };
   visit(schema);

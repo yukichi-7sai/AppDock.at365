@@ -54,6 +54,7 @@ Object.assign(settings.tts, {
   voicesSource: 'manual',
   manualVoices: [{ id: 'fixture-voice', name: 'Fixture voice' }],
 });
+require('./settings-stack-mcp-lock-checks.cjs').install(settings);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
@@ -219,6 +220,26 @@ async function main() {
   await until(
     () => page.evaluate(async () => (await window.dock.snapshot()).startupReady),
     'startup',
+  );
+  assert.equal(
+    (await page.evaluate(() => window.dock.automation({ kind: 'status' }))).state.enabled,
+    false,
+  );
+  await page.evaluate(() => window.dock.navigate('settings'));
+  await page.getByTestId('settings-nav:appearance').click();
+  assert.equal(
+    await page.locator('fieldset[data-setting-item="appearance/theme"] [data-mcp-lock]').count(),
+    0,
+  );
+  await page.getByTestId('settings-nav:applet:' + fixtureId).click();
+  assert.equal(
+    await page
+      .locator('[data-setting-item$="setting%3Aprivate"] [data-mcp-lock="private"]')
+      .count(),
+    1,
+  );
+  checks.push(
+    'Disabled MCP integration leaves public fields unlocked and private fields marked without a client connection',
   );
   await permissions();
   assert.equal(await page.locator('[data-testid^="permission-row-"]').count(), 8);
@@ -499,6 +520,7 @@ async function main() {
     until,
     fixtureId,
   });
+  await require('./settings-stack-mcp-lock-checks.cjs').check({ page, profile, checks });
   await require('./settings-web-profile-gateway-checks.cjs').check({
     page,
     profile,

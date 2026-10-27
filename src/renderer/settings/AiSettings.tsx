@@ -242,7 +242,7 @@ export function AiSettingsForm({
         </SettingsField>
       </SettingsSection>
       {dialog?.kind === 'edit' && (
-        <SettingsMcpScope itemId={settingsItemId('ai', 'connections')} rowId={dialog.original?.id}>
+        <SettingsMcpScope itemId={settingsItemId('ai', 'connections')}>
           <AiConnectionDialog
             original={dialog.original}
             status={dialog.status}

@@ -34,7 +34,7 @@ import {
   addOperationAccess,
 } from './settings-mcp-access';
 import { settingsItemId } from '../../shared/settings-catalog';
-import { customEditableKeys, customItems } from '../../shared/custom-commands';
+import { customEditableKeys } from '../../shared/custom-commands';
 
 export class AutomationError extends Error {
   constructor(
@@ -81,8 +81,6 @@ export class AppDockApi {
       settingsCommands?: SettingsCommands;
       settingsPrincipal?(): string;
       serviceSettingsTargets?(): SettingsTarget[];
-      mcpEnabled?(): boolean;
-      mcpAvailable?(): boolean;
       customCommands?: CustomCommandService;
       mcpClientAllowed?(): boolean;
       inputAllowed?(): boolean;
@@ -151,17 +149,7 @@ export class AppDockApi {
   }
   /** Internal trusted renderer projection; does not call MCP or expose a new operation. */
   settingsAccess(page: SettingsPageDefinition) {
-    const access = settingsMcpAccess(
-      page,
-      this.allSettingsTargets(),
-      this.options.mcpEnabled?.() === false
-        ? 'disabled'
-        : !this.options.writable()
-          ? 'permission'
-          : !this.options.ready() || this.options.mcpAvailable?.() === false
-            ? 'unavailable'
-            : null,
-    );
+    const access = settingsMcpAccess(page, this.allSettingsTargets());
     for (const [pageId, owner] of [
       ['shortcuts', this.shortcuts],
       ['gestures', this.gestures],
@@ -169,12 +157,14 @@ export class AppDockApi {
     ] as const) {
       if (page.id === pageId)
         addConfigurationAccess(access, page.id, owner.commands()[0]?.inputSchema);
+      if ([pageId, 'command-triggers', 'custom-commands'].includes(page.id))
+        addBindingAccess(access, pageId, owner.commands()[0]?.inputSchema);
       if (page.id === 'command-triggers')
         addBindingAccess(access, page.id, owner.commands()[0]?.inputSchema);
     }
     if (page.id === 'touchpad-gestures')
       access.items[settingsItemId(page.id, 'enabled')] = {
-        reason: !this.options.touchpadBridge ? 'unavailable' : null,
+        reason: null,
       };
     for (const [pageId, key, owner] of [
       ['ribbon', 'ribbon', this.ribbon],
@@ -202,18 +192,12 @@ export class AppDockApi {
       access.items[settingsItemId(page.id, 'definitions')] = {
         reason: null,
         fields,
-        rows: Object.fromEntries(
-          customItems(this.options.settings.value.customCommands).map((item) => [
-            item.id,
-            { ...fields, typeId: { reason: 'readOnly' as const } },
-          ]),
-        ),
       };
       for (const type of this.options.customCommands.descriptors())
         access.items[settingsItemId(page.id, 'config:' + type.id)] = {
-          reason: type.available ? null : 'unavailable',
+          reason: null,
           fields: {
-            config: { reason: type.available ? null : 'unavailable' },
+            config: { reason: null },
           },
         };
     }

@@ -44,8 +44,6 @@ function fixture(t, definitions = [], { bridge = false } = {}) {
   const api = new AppDockApi({
     ...options,
     settingsCommands: new SettingsCommands(options),
-    mcpEnabled: () => state.enabled,
-    mcpAvailable: () => state.available,
     writable: () => state.write,
     ready: () => state.ready,
     serviceSettingsTargets: () => state.services,
@@ -124,38 +122,39 @@ test('Applet additions are automatically discovered; private, secret, local and 
   access = f.api.settingsAccess(f.page(id));
   assert.equal(access.items[settingsItemId(id, 'setting:later')].reason, null);
   f.owner.state = 'stopped';
-  assert.equal(reason(f.api.settingsAccess(f.page(id)), id, 'setting:text'), 'unavailable');
+  assert.equal(reason(f.api.settingsAccess(f.page(id)), id, 'setting:text'), null);
   assert.doesNotMatch(JSON.stringify(access), /PRIVATE_DEFAULT|Later|default|inputSchema/);
   assert.equal(f.saves(), 0);
 });
 
-test('permission, connection and startup state update without changing definitions or granting permissions', (t) => {
+test('runtime permission and startup state do not change publication metadata or grant permissions', (t) => {
   const f = fixture(t),
     page = f.page('general');
   const original = JSON.stringify(f.store.value);
-  assert.equal(f.api.settingsAccess(page).reason, null);
+  const originalAccess = f.api.settingsAccess(page);
   f.state.write = false;
-  assert.equal(f.api.settingsAccess(page).reason, 'permission');
+  assert.deepEqual(f.api.settingsAccess(page), originalAccess);
   f.state.enabled = false;
-  assert.equal(f.api.settingsAccess(page).reason, 'disabled');
+  assert.deepEqual(f.api.settingsAccess(page), originalAccess);
   f.state.enabled = true;
   f.state.write = true;
   f.state.ready = false;
-  assert.equal(f.api.settingsAccess(page).reason, 'unavailable');
+  assert.deepEqual(f.api.settingsAccess(page), originalAccess);
   f.state.ready = true;
   f.state.available = false;
-  assert.equal(f.api.settingsAccess(page).reason, 'unavailable');
+  assert.deepEqual(f.api.settingsAccess(page), originalAccess);
   assert.equal(JSON.stringify(f.store.value), original);
   assert.equal(f.saves(), 0);
 });
 
-test('metadata does not invoke values, persistence, overrides or unrelated list owners', () => {
+test('publication metadata never reads runtime restrictions, rows, values or persistence', () => {
   const forbidden = () => {
     throw Error('Forbidden side effect');
   };
   const target = {
     ui: settingsUiFields('general'),
     available: true,
+    writable: forbidden,
     fields: [{ key: 'flag', title: 'Flag', type: 'boolean', default: 'DO_NOT_RETURN_DEFAULT' }],
     values: forbidden,
     overrides: forbidden,
@@ -164,17 +163,19 @@ test('metadata does not invoke values, persistence, overrides or unrelated list 
   const unrelated = {
     ...target,
     kind: 'list',
-    ui: settingsUiGroup('elsewhere', 'rows'),
+    ui: settingsUiGroup('general', 'rows'),
     definition: { list: { idKey: 'id' } },
     itemWritable: forbidden,
     rows: forbidden,
   };
+  Object.defineProperty(target, 'available', { get: forbidden });
+  Object.defineProperty(unrelated, 'available', { get: forbidden });
   const access = settingsMcpAccess({ id: 'general', items: [] }, [target, unrelated]);
   assert.equal(reason(access, 'general', 'flag'), null);
   assert.doesNotMatch(JSON.stringify(access), /DO_NOT_RETURN_DEFAULT/);
 });
 
-test('read-only and unavailable services use the same owner restrictions as settings.apply', (t) => {
+test('published read-only and unavailable fields stay unlocked while API restrictions remain', (t) => {
   const f = fixture(t);
   const fields = ['editable', 'bound'].map((key) => ({ key, title: key, type: 'string' }));
   f.state.services = [
@@ -196,15 +197,16 @@ test('read-only and unavailable services use the same owner restrictions as sett
   ];
   let access = f.api.settingsAccess(f.page('general'));
   assert.equal(reason(access, 'general', 'editable'), null);
-  assert.equal(reason(access, 'general', 'bound'), 'readOnly');
+  assert.equal(reason(access, 'general', 'bound'), null);
   const schema = f.api.call('settings.schema.get', { targetId: 'service.fixture' });
   assert.equal(schema.items.find((field) => field.key === 'bound').writable, false);
   f.state.services[0].available = false;
   access = f.api.settingsAccess(f.page('general'));
-  assert.equal(reason(access, 'general', 'editable'), 'unavailable');
+  assert.equal(reason(access, 'general', 'editable'), null);
+  assert.equal(f.api.call('settings.schema.get', { targetId: 'service.fixture' }).available, false);
 });
 
-test('list identities and per-row restrictions are projected without values or hidden columns', (t) => {
+test('public list columns are projected without row restrictions, identities, values or hidden columns', (t) => {
   const f = fixture(t, [
     {
       key: 'rows',
@@ -222,7 +224,7 @@ test('list identities and per-row restrictions are projected without values or h
   const id = 'applet:' + f.owner.id;
   const access = f.api.settingsAccess(f.page(id)).items[settingsItemId(id, 'setting:rows')];
   assert.equal(access.reason, null);
-  assert.equal(access.fields.id.reason, 'readOnly');
+  assert.equal(access.fields.id.reason, null);
   assert.equal(access.fields.name.reason, null);
   assert.equal(Object.hasOwn(access.fields, 'secret'), false);
   const group = {
@@ -244,12 +246,13 @@ test('list identities and per-row restrictions are projected without values or h
   const projected = settingsMcpAccess({ id: 'ai', items: [] }, [group]).items[
     settingsItemId('ai', 'connections')
   ];
-  assert.equal(projected.rows.one.baseUrl.reason, 'readOnly');
-  assert.equal(projected.rows.two.baseUrl.reason, null);
-  assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_URL|OTHER_URL|protected/);
+  assert.equal(projected.fields.id.reason, null);
+  assert.equal(projected.fields.baseUrl.reason, null);
+  assert.equal(Object.hasOwn(projected, 'rows'), false);
+  assert.doesNotMatch(JSON.stringify(projected), /PRIVATE_URL|OTHER_URL|protected|one|two/);
 });
 
-test('reorder-only lists stay editable as a list while their columns stay read-only', () => {
+test('public list declarations stay unlocked independently of supported operations', () => {
   const target = {
     kind: 'list',
     available: true,
@@ -263,13 +266,13 @@ test('reorder-only lists stay editable as a list while their columns stay read-o
     settingsItemId('applets', 'order')
   ];
   assert.equal(item.reason, null);
-  assert.equal(item.fields.id.reason, 'readOnly');
+  assert.equal(item.fields.id.reason, null);
   target.operations = [];
   assert.equal(
     settingsMcpAccess({ id: 'applets', items: [] }, [target]).items[
       settingsItemId('applets', 'order')
     ].reason,
-    'readOnly',
+    null,
   );
 });
 
@@ -286,12 +289,28 @@ test('dedicated input and ribbon schemas describe MCP-editable native controls',
   }
   assert.equal(
     reason(f.api.settingsAccess(f.page('touchpad-gestures')), 'touchpad-gestures', 'enabled'),
-    'unavailable',
+    null,
   );
   const access = f.api.settingsAccess(f.page('command-triggers'));
   const binding = access.items[settingsItemId('command-triggers', 'bindings')];
   for (const key of ['key', 'gesture', 'when', 'enabled'])
     assert.equal(binding.fields[key].reason, null);
+  for (const pageId of [
+    'shortcuts',
+    'gestures',
+    'touchpad-gestures',
+    'custom-commands',
+    'command-triggers',
+  ]) {
+    const stackAccess = f.api.settingsAccess(f.page(pageId));
+    for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
+      if (![kind, 'custom-commands', 'command-triggers'].includes(pageId)) continue;
+      const fields = stackAccess.items[settingsItemId(kind, 'bindings')].fields;
+      for (const key of ['when', 'enabled', 'inputExecutionModes'])
+        assert.equal(fields[key].reason, null);
+      assert.equal(fields[kind === 'shortcuts' ? 'key' : 'gesture'].reason, null);
+    }
+  }
   const ribbon = f.api.settingsAccess(f.page('ribbon')).items[settingsItemId('ribbon', 'ribbon')];
   for (const key of ['title', 'icon', 'image', 'iconOnly', 'displayModeIcons'])
     assert.equal(ribbon.fields[key].reason, null, key);
@@ -312,7 +331,7 @@ test('touchpad setting commands share the consolidated write permission even whe
   };
   assert.equal((await f.api.call('commands.execute', request)).completion, 'validated');
   f.state.write = false;
-  assert.equal(access().reason, 'permission');
+  assert.equal(reason(access(), 'touchpad-gestures', 'enabled'), null);
   await assert.rejects(
     f.api.call('commands.execute', request),
     (error) => error.code === 'WRITE_DISABLED',

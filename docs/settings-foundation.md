@@ -4,7 +4,7 @@
 
 通常設定の共通登録、MCP公開、変更とリセットは[設定API](settings-api.md)を参照する。一覧編集と特殊設定の拡張は[一部実装済みの設計](mcp-settings-design.md)にまとめる。以下は現行の設定基盤の契約である。
 
-設定項目の南京錠は「MCPから変更できない」ことを表し、画面からの直接編集とは独立する。[MCP変更可否](settings-api.md#設定画面の南京錠)のメタデータを`SettingsField`/`SettingsSection`とダイアログで共有し、対応項目にはアイコンを出さない。公開判定と表示指定を二重管理せず、項目追加時は既存の設定IDと宣言を使用する。
+設定項目の南京錠は「MCPへ公開していない」ことを表し、画面からの直接編集とは独立する。[MCP公開判定](settings-api.md#設定画面の南京錠)のメタデータを`SettingsField`/`SettingsSection`とダイアログで共有する。接続ON/OFF・許可・稼働状態や公開済み項目の書込み制限では表示を変えない。公開判定と表示指定を二重管理せず、項目追加時は既存の設定IDと宣言を使用する。
 
 ## 共通レイアウト指針との対応
 
@@ -246,14 +246,14 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 
 本体preloadのDockApiへ`settingsPage`を追加する。以下は本体の内部APIで、Applet/MCPには公開しない。
 
-| 操作                        | 役割                                                     |
-| --------------------------- | -------------------------------------------------------- |
-| `open(request)`             | fullまたはappletの表示を登録し、接続IDと初回モデルを返す |
-| `get(connectionId)`         | 現在の接続に対する最新SettingsPageModelを取得            |
-| `act(connectionId, action)` | 既存SettingsPageActionを検証し、モデルと結果を返す       |
+| 操作                           | 役割                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| `open(request)`                | fullまたはappletの表示を登録し、接続IDと初回モデルを返す                             |
+| `get(connectionId)`            | 現在の接続に対する最新SettingsPageModelを取得                                        |
+| `act(connectionId, action)`    | 既存SettingsPageActionを検証し、モデルと結果を返す                                   |
 | `input(connectionId, request)` | 現ページの発行済み入力制御IDを検査し、一時停止・再開だけを実行する。モデルは返さない |
-| `close(connectionId)`       | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放   |
-| `onChanged(callback)`       | 接続ID付きでモデルの更新を受け取る                       |
+| `close(connectionId)`          | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放                               |
+| `onChanged(callback)`          | 接続ID付きでモデルの更新を受け取る                                                   |
 
 接続IDはmainが発行し、開き直した画面へ使い回さない。これはShellの接続ID・提供元IDとは独立する。mainは1つのアクティブな設定ページを管理し、全体設定とApplet詳細を同時にmountしない。新しいopenは既存の入力受付を待った後に古い接続を失効させる。SettingsPageSessionは既存の`settingsNavigation`、`settingsEditing`、補助情報生成と操作関数を再利用する。rendererは購読を登録してからopenし、接続IDとrevisionで初回snapshotと更新通知の順序を判定する。
 

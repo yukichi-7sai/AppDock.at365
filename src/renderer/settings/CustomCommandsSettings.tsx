@@ -331,7 +331,7 @@ function CustomCommandDialog({
     }
   };
   return (
-    <SettingsMcpScope rowId={original?.id}>
+    <SettingsMcpScope>
       <SettingsDialog
         className={
           'custom-command-dialog' +
