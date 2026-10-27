@@ -4601,7 +4601,9 @@ async function runSmoke() {
       settings.revision,
     );
     tray!.emit('click');
-    await new Promise((r) => setTimeout(r, 150));
+    const paletteDeadline = Date.now() + 5000;
+    while (!overlayHost?.active && Date.now() < paletteDeadline)
+      await new Promise((r) => setTimeout(r, 25));
     if (!overlayHost?.active) throw new Error('Selected tray click did not open command palette');
     window!.hide();
     settings.save(

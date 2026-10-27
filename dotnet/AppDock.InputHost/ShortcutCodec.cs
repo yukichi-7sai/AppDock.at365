@@ -3,7 +3,7 @@ using System.Text;
 
 namespace AppDock.InputHost;
 
-internal sealed record ShortcutCondition(Condition When, bool BlockOriginalInput = true);
+internal sealed record ShortcutCondition(Condition When, bool BlockOriginalInput = true, StackConditionTerm[][]? StackConditions = null);
 internal sealed record ShortcutInput(string Shortcut, bool BlockOriginalInput = true,
     ShortcutCondition[]? Conditions = null, ConditionEnvironment? Environment = null,
     string? Owner = null, long TouchpadGeneration = 0);
