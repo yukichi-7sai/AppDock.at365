@@ -47,7 +47,13 @@ export class GlobalHotKeyManager {
     private changed: () => void,
     private report: (message: string) => void,
   ) {}
-  sync(settings: Settings, available: string[], suspended = false, retry = false): Promise<void> {
+  sync(
+    settings: Settings,
+    available: string[],
+    suspended = false,
+    retry = false,
+    catalog: readonly import('../../shared/command-stacks').StackCatalogEntry[] = [],
+  ): Promise<void> {
     const desired = suspended
       ? []
       : getKeybindings(settings)
@@ -60,7 +66,12 @@ export class GlobalHotKeyManager {
           .map((row) => ({ commandId: row.command, shortcut: row.key }));
     const inputs = suspended
       ? []
-      : nativeShortcutInputs(getKeybindings(settings), available, getKeybindingOptions(settings));
+      : nativeShortcutInputs(
+          getKeybindings(settings),
+          available,
+          getKeybindingOptions(settings),
+          catalog,
+        );
     this.queue = this.queue.then(async () => {
       if (this.stopped) return;
       const signature = JSON.stringify([desired, inputs]);

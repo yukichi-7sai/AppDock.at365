@@ -21,6 +21,7 @@ import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import type { CommandDispatcher } from './command-dispatcher';
 import { defaultTouchpadGestures, nativeTouchpadConditions } from '../../shared/touchpad-gestures';
 import { getCommandTriggerOptions } from '../../shared/command-trigger-options';
+import type { StackCatalogEntry } from '../../shared/command-stacks';
 
 const configurationKey = (settings: Settings['gestures'], commands: unknown) =>
   createHash('sha256')
@@ -88,7 +89,7 @@ export class InputCaptureManager {
     private readState: (foregroundWindow?: string) => {
       settings: Settings;
       context: GestureContext;
-      commands: { id: string; title: string; extensionId?: string | null }[];
+      commands: (StackCatalogEntry & { title: string })[];
       recording: boolean;
     },
     private dispatcher: CommandDispatcher,
@@ -105,6 +106,15 @@ export class InputCaptureManager {
   ) {}
   private state() {
     return this.readState(this.foregroundWindow);
+  }
+  async captureTarget() {
+    if (this.stopped) return undefined;
+    try {
+      if (!this.peer || this.peer.closed) this.connect();
+      return readCommandTarget(await this.peer!.request('capture.target', {}));
+    } catch {
+      return undefined;
+    }
   }
   async start() {
     await this.refresh();

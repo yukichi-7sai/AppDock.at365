@@ -2,6 +2,8 @@ import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 
 export interface InputInvocation {
+  /** Captured by trusted host entry points, never accepted as an API argument. */
+  triggerContext?: import('../../shared/command-conditions').TriggerContext;
   session?: string;
   process?: string;
   origin?: { kind: 'local' | 'mcp' } | { kind: 'applet'; appletId: string };
@@ -23,6 +25,7 @@ export class CommandContexts {
       source?: string;
       valid?: () => boolean;
       origin?: InputInvocation['origin'];
+      triggerContext?: InputInvocation['triggerContext'];
     }
   >();
   async run<T>(
@@ -68,6 +71,7 @@ export class CommandContexts {
       source: entry.source,
       session: entry.session,
       origin: entry.origin,
+      triggerContext: entry.triggerContext,
     };
   }
   cancel(session: string) {

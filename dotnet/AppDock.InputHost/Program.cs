@@ -38,6 +38,7 @@ internal static class Program
             var pumping = capture.PumpAsync((method, p) => peer.NotifyAsync(method, p), peer.Lifetime);
             try {
                 await peer.ReadAsync(async (method, p) => {
+                    if (method == "capture.target") return CommandTargetCapture.Capture(GetForegroundWindow());
                     if (method.StartsWith("touchpad.", StringComparison.Ordinal))
                         return await app.Dispatcher.InvokeAsync(() => touchpad.Handle(method, p));
                     if (method == "capture.validTarget") return long.TryParse(p.GetProperty("window").GetString(), out var target) && target != 0 && GetForegroundWindow().ToInt64() == target;

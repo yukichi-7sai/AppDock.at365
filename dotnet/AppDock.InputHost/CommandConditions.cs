@@ -7,10 +7,13 @@ internal sealed record CommandHostContext(bool? Focused = null, string? PageId =
 internal sealed record CommandTargetContext(string Window, string? ProcessName = null, string? WindowClass = null, bool? Desktop = null);
 internal sealed record CommandContext(CommandHostContext Host, CommandTargetContext? Target = null);
 internal sealed record ConditionEnvironment(string[]? Browsers = null, bool RequireChromiumWindowClass = false, string[]? ExcludedProcesses = null);
+internal sealed record StackConditionTerm(Condition When, string? OwnerId = null);
 
 /// <summary>Native projection of the shared input condition and selection contract.</summary>
 internal static class CommandConditions
 {
+    internal static bool MatchesStack(StackConditionTerm[][]? paths, CommandContext context, ConditionEnvironment? environment = null) =>
+        paths == null || paths.Any(path => path.All(term => Matches(term.When, context, term.OwnerId, environment)));
     internal static string ExecutionMode(string fallback, IReadOnlyDictionary<string, string>? modes, string input) =>
         modes != null && modes.TryGetValue(input, out var mode) ? mode : fallback;
 
@@ -61,6 +64,14 @@ internal static class CommandConditions
                 ? value.GetBoolean() : null;
             string? Read(string name) => root.TryGetProperty(name, out var part) && part.ValueKind == JsonValueKind.String ? part.GetString() : null;
             return new(focused, Read("pageId"), Read("appletId"));
+        } catch (JsonException) { return new(); }
+    }
+    internal static CommandHostContext HostContextForWindow(string json, string window)
+    {
+        try {
+            using var document = JsonDocument.Parse(json);
+            return document.RootElement.TryGetProperty("window", out var known) && known.GetString() == window
+                ? HostContext(json) : new(false);
         } catch (JsonException) { return new(); }
     }
 }

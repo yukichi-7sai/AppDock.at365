@@ -390,6 +390,59 @@ test('host and Applet providers use the same saved command service', async (t) =
   assert.equal(f.service.uiCommands().find((c) => c.id === customCommandId(id)).extensionId, null);
   assert.equal((await f.service.execute(customCommandId(id))).result.message, 'host');
 });
+test('host stacks reject graph cycles atomically and expose executable metadata only in local catalog', (t) => {
+  const f = fixture(t),
+    { commandStackType, parseCommandStack } = require('../out/main/shared/command-stacks');
+  f.service.registerHost(commandStackType(), async () => ({}), {
+    validateConfig: (config) => {
+      parseCommandStack(config);
+      return null;
+    },
+  });
+  const type = f.service.descriptors().find((item) => item.id === 'appdock.commands.stack');
+  const config = { executionMode: 'all', entries: [] };
+  const id = randomUUID();
+  f.update([
+    {
+      op: 'add',
+      expectedTypeRevision: type.typeRevision,
+      item: { id, typeId: type.id, title: 'Stack', configVersion: 1, config, automation: true },
+    },
+  ]);
+  assert.deepEqual(
+    f.service.uiCommands().find((item) => item.id === customCommandId(id)).stack,
+    config,
+  );
+  assert.equal(
+    f.service.publicCommands().find((item) => item.id === customCommandId(id)).stack,
+    undefined,
+  );
+  const revision = f.revision();
+  assert.throws(() =>
+    f.update([
+      {
+        op: 'update',
+        id,
+        expectedTypeRevision: type.typeRevision,
+        changes: {
+          config: {
+            ...config,
+            entries: [
+              {
+                id: 'self',
+                command: customCommandId(id),
+                enabled: true,
+                when: { scope: 'global', appletIds: [] },
+              },
+            ],
+          },
+        },
+      },
+    ]),
+  );
+  assert.equal(f.revision(), revision);
+});
+
 test('fixed MCP catalog remains unchanged as definitions change; stale cursor rejected', (t) => {
   const f = fixture(t),
     outer = JSON.stringify(operationsFor('mcp'));

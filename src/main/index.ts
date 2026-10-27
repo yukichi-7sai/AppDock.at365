@@ -99,6 +99,11 @@ import { SettingsInputSession } from './core/settings-input-session';
 import { CustomCommandService, CustomCommandError } from './core/custom-commands';
 import { mcpCommandType } from '../shared/mcp-command';
 import type { InputInvocation } from './core/command-contexts';
+import { commandStackType, parseCommandStack, validateStackGraph } from '../shared/command-stacks';
+import { customItems } from '../shared/custom-commands';
+import { triggerStacks } from '../shared/trigger-stacks';
+import { planCommandBatch } from '../shared/command-execution';
+import { commandCondition } from '../shared/command-conditions';
 import { SettingsPageSession } from './core/settings-page';
 import { SettingsPageHost } from './core/settings-page-host';
 import { dataPaths } from './core/data-paths';
@@ -1076,6 +1081,59 @@ customCommands.registerHost(
     unavailableReason: (config) => mcpClient.commandUnavailable(config),
   },
 );
+customCommands.registerHost(
+  commandStackType(),
+  async (_config, context, definition) => {
+    const id = 'appdock.custom.' + definition.id;
+    const captured = context.triggerContext ?? (await captureCommandContext());
+    const catalog = availableShortcutCommands();
+    // Use the root definition snapshot supplied by CustomCommandService.
+    const root = catalog.find((command) => command.id === id);
+    if (root) root.stack = parseCommandStack(definition.config);
+    const plan = planCommandBatch(
+      [
+        {
+          id,
+          command: id,
+          enabled: true,
+          when: commandCondition({ scope: 'global', appletIds: [] }),
+        },
+      ],
+      captured,
+      catalog,
+      'all',
+      getCommandTriggerOptions(settings.value),
+    );
+    const external = context.origin && context.origin.kind !== 'local';
+    const allowed = () =>
+      !external ||
+      (plan.stackIds ?? []).every((stackId) => operationApi.canExecuteStack(stackId, context));
+    if (!allowed())
+      throw new CustomCommandError(
+        'PERMISSION_DENIED',
+        hostText('services.customCommands.executionForbidden'),
+      );
+    const invocation = { ...context, triggerContext: captured };
+    const result = await commandDispatcher.dispatch('stack:' + id, plan, {
+      valid: async () => !context.signal?.aborted && allowed(),
+      execute: (child) =>
+        external
+          ? operationApi.executeStackEntry(child, invocation)
+          : executeCommand(child, invocation),
+    });
+    return { completion: 'commandsDispatched', ...result };
+  },
+  {
+    validateConfig: (config) => {
+      try {
+        parseCommandStack(config);
+        return null;
+      } catch (error) {
+        return String(error instanceof Error ? error.message : error);
+      }
+    },
+  },
+);
 function mcpSettingsOperation<T>(operation: () => T): T {
   try {
     return operation();
@@ -1479,8 +1537,12 @@ function ribbonUiCommands() {
         applets.some((a) => a.id === command.extensionId && a.enabled && a.state === 'running')),
   }));
 }
-function openCommandPalette(request: CommandPaletteRequest) {
+function openCommandPalette(
+  request: CommandPaletteRequest,
+  captured?: import('../shared/command-conditions').TriggerContext,
+) {
   if (!startupReady || quitting || !overlayHost) throw Error(hostText('services.index.notReady'));
+  const context = captured ? Promise.resolve(captured) : captureCommandContext();
   const session = new CommandPaletteSession(request, {
     commands: uiCommands,
     pins: () => settings.value.pinnedCommands,
@@ -1489,7 +1551,7 @@ function openCommandPalette(request: CommandPaletteRequest) {
     savePins: (ids) => {
       settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision);
     },
-    execute: executeCommand,
+    execute: async (id) => executeCommand(id, { triggerContext: await context }),
     changed,
   });
   paletteSession = session;
@@ -1531,9 +1593,10 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
   }
   if (customCommands.has(id)) return customCommands.execute(id, invocation);
   if (id === 'appdock.commands.search') {
+    const context = invocation?.triggerContext ?? (await captureCommandContext());
     await showWindow(invocation);
     if (overlayHost?.active) overlayHost.cancel('toggle');
-    else void openCommandPalette({ requestId: randomUUID(), mode: 'execute' });
+    else void openCommandPalette({ requestId: randomUUID(), mode: 'execute' }, context);
     return;
   }
   if (appletManagement.has(id)) return appletManagement.execute(id);
@@ -1569,7 +1632,19 @@ const commandDispatcher = new CommandDispatcher(
   executeCommand,
   (message) => log.write('error', 'shortcuts', message),
   () => quitting || shortcutRecording || !!overlayHost?.active,
+  (id) => customCommands.uiCommands().some((command) => command.id === id && command.available),
 );
+async function captureCommandContext(): Promise<
+  import('../shared/command-conditions').TriggerContext
+> {
+  const press = shortcutInvocation.getStore();
+  const target = press?.target ?? (await gestures?.captureTarget());
+  const current = shortcutContext(target?.window);
+  return {
+    host: { focused: current.appFocused, pageId: current.pageId, appletId: current.appletId },
+    target,
+  };
+}
 function shortcutContext(foregroundWindow?: string) {
   const { appletId, pageId } = activeShortcutPage(foregroundWindow);
   const hostFocused =
@@ -1582,7 +1657,9 @@ function shortcutContext(foregroundWindow?: string) {
     pageId: pageId ?? (hostFocused ? hostShortcutPage(navigation.state.route) : undefined),
   };
 }
-function availableShortcutCommands() {
+function availableShortcutCommands(): (import('../shared/command-execution').CommandCatalogEntry & {
+  title: string;
+})[] {
   return [
     ...hostCommandsForApplets(allApplets()).map((c) => ({
       id: c.id,
@@ -1735,7 +1812,7 @@ function syncHotKeys(retry = false) {
   const generation = ++hotKeyApplyGeneration;
   const suspended = shortcutRecording || !!overlayHost?.active;
   return hotKeys
-    .sync(settings.value, available, suspended, retry)
+    .sync(settings.value, available, suspended, retry, availableShortcutCommands())
     .then(() => {
       if (
         quitting ||
@@ -1858,6 +1935,11 @@ function commitSettings(
   assertSettingsWritable();
   settings.assertRevision(revision);
   customCommands.validateReplacement(value);
+  if (
+    JSON.stringify([value.customCommands, triggerStacks(value)]) !==
+    JSON.stringify([settings.value.customCommands, triggerStacks(settings.value)])
+  )
+    validateStackGraph(customItems(value.customCommands), triggerStacks(value));
   try {
     validateTouchpadKeyEdit(value, settings.value);
   } catch (error) {
@@ -1934,16 +2016,6 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
         jobs: mcpClient.summaries(),
       },
     };
-  if (id === 'custom-commands')
-    return {
-      commands: settingsUiCommands(),
-      commandAssignments: settingsCommandAssignments(),
-      customCommands: {
-        types: customCommands.descriptors(),
-        summaries: customCommands.summaries(),
-        revision: settingsCommands.revision(),
-      },
-    };
   const summary = (a: ExtensionSnapshot): ExtensionSnapshot => ({
     apiVersion: 1,
     id: a.id,
@@ -1965,7 +2037,17 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     panel: null,
     settingOptions: {},
     pages:
-      page.kind === 'applet' || ['ribbon', 'command-triggers'].includes(id) ? a.pages : undefined,
+      page.kind === 'applet' ||
+      [
+        'ribbon',
+        'command-triggers',
+        'custom-commands',
+        'shortcuts',
+        'gestures',
+        'touchpad-gestures',
+      ].includes(id)
+        ? a.pages
+        : undefined,
     ribbonItems: id === 'ribbon' ? a.ribbonItems : undefined,
     settings:
       id === 'ribbon'
@@ -1986,6 +2068,17 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     updateRepository: id === 'about' || page.kind === 'applet' ? a.updateRepository : undefined,
   });
   const applets = allApplets();
+  if (id === 'custom-commands')
+    return {
+      commands: settingsUiCommands(),
+      applets: applets.map(summary),
+      commandAssignments: settingsCommandAssignments(),
+      customCommands: {
+        types: customCommands.descriptors(),
+        summaries: customCommands.summaries(),
+        revision: settingsCommands.revision(),
+      },
+    };
   if (id === 'applets')
     return {
       applets: managedApplets(applets, settings.value.appletOrder).map(summary),
@@ -2061,8 +2154,14 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       },
     };
   if (id === 'ribbon') return { applets: applets.map(summary), commands: ribbonUiCommands() };
-  if (id === 'shortcuts' || id === 'gestures') return {};
-  if (id === 'touchpad-gestures') return { touchpad: touchpad?.snapshot() };
+  if (id === 'shortcuts' || id === 'gestures')
+    return { commands: settingsUiCommands(), applets: applets.map(summary) };
+  if (id === 'touchpad-gestures')
+    return {
+      touchpad: touchpad?.snapshot(),
+      commands: settingsUiCommands(),
+      applets: applets.map(summary),
+    };
   if (['tray', 'command-triggers'].includes(id))
     return {
       ...(id === 'command-triggers' ? { commandAssignments: settingsCommandAssignments() } : {}),
@@ -2577,9 +2676,15 @@ function settingsPageActions(
       actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
   if (
-    ['shortcuts', 'gestures', 'tray', 'ribbon', 'touchpad-gestures', 'command-triggers'].includes(
-      page.id,
-    )
+    [
+      'shortcuts',
+      'gestures',
+      'tray',
+      'ribbon',
+      'touchpad-gestures',
+      'command-triggers',
+      'custom-commands',
+    ].includes(page.id)
   ) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;

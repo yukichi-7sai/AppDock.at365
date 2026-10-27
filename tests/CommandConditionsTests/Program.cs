@@ -35,10 +35,23 @@ foreach (var fixture in fixtures.RootElement.GetProperty("selections").Enumerate
     count++;
 }
 if (CommandConditions.HostContext("unknown").Focused != null) throw new Exception("Missing context must fail closed.");
+if (CommandConditions.HostContextForWindow("{\"window\":\"1\",\"appFocused\":true}", "2").Focused != false)
+    throw new Exception("A previous host window must not authorize stack input in another window.");
+if (CommandConditions.HostContextForWindow("{\"window\":\"1\",\"appFocused\":true,\"appletId\":\"demo\"}", "1").AppletId != "demo")
+    throw new Exception("Current window context must retain child command ownership.");
 foreach (var fixture in fixtures.RootElement.GetProperty("inputExecutionModes").EnumerateArray()) {
     var modes = fixture.GetProperty("overrides").Deserialize<Dictionary<string, string>>(options)!;
     var actual = CommandConditions.ExecutionMode(fixture.GetProperty("fallback").GetString()!, modes, fixture.GetProperty("input").GetString()!);
     if (actual != fixture.GetProperty("expected").GetString()) throw new Exception(fixture.GetProperty("name").GetString());
+    count++;
+}
+foreach (var fixture in fixtures.RootElement.GetProperty("stackConditions").EnumerateArray()) {
+    var context = fixture.GetProperty("context").Deserialize<CommandContext>(options)!;
+    var value = fixture.GetProperty("paths");
+    var paths = value.ValueKind == JsonValueKind.Null ? null : value.EnumerateArray().Select(path => path.EnumerateArray().Select(term =>
+        new StackConditionTerm(When(term.GetProperty("when")), term.TryGetProperty("ownerId", out var owner) ? owner.GetString() : null)).ToArray()).ToArray();
+    if (CommandConditions.MatchesStack(paths, context, EnvironmentFor(fixture)) != fixture.GetProperty("expected").GetBoolean())
+        throw new Exception(fixture.GetProperty("name").GetString());
     count++;
 }
 Console.WriteLine($"Command condition/selection fixtures: {count} passed.");

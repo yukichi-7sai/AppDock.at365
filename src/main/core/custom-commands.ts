@@ -26,6 +26,11 @@ import type { AutomationCommand } from './automation-commands';
 import type { SettingsStore } from './settings';
 import { SettingsCommands, SettingsCommandError } from './settings-commands';
 import type { InputInvocation } from './command-contexts';
+import {
+  commandStackTypeId,
+  parseCommandStack,
+  validateStackGraph,
+} from '../../shared/command-stacks';
 
 export class CustomCommandError extends SettingsCommandError {}
 export interface CustomCommandProvider {
@@ -106,7 +111,11 @@ export class CustomCommandService {
   }
   registerHost(
     type: CustomCommandType,
-    handler: (config: JsonObject, context: InputInvocation) => Promise<unknown>,
+    handler: (
+      config: JsonObject,
+      context: InputInvocation,
+      definition: CustomCommandDefinition,
+    ) => Promise<unknown>,
     checks: Pick<CustomCommandProvider, 'validateConfig' | 'unavailableReason' | 'authorized'> = {},
   ) {
     const [parsed] = parseCustomTypes(null, [type]);
@@ -119,7 +128,7 @@ export class CustomCommandService {
       types: [parsed],
       available: true,
       generation: randomUUID(),
-      invoke: (definition, context) => handler(definition.config, context),
+      invoke: (definition, context) => handler(definition.config, context, definition),
       ...checks,
     });
     this.options.changed?.();
@@ -201,6 +210,17 @@ export class CustomCommandService {
     }));
   }
   uiCommands(): UiCommand[] {
+    const stacks = new Map(
+      customItems(this.options.settings.value.customCommands)
+        .filter((item) => item.typeId === commandStackTypeId)
+        .flatMap((item) => {
+          try {
+            return [[item.id, parseCommandStack(item.config)] as const];
+          } catch {
+            return [];
+          }
+        }),
+    );
     return this.summaries().map((item) => ({
       id: item.commandId,
       customDefinitionId: item.id,
@@ -210,6 +230,7 @@ export class CustomCommandService {
       extensionId: item.owner.kind === 'host' ? null : item.owner.id,
       available: item.available,
       disabledReason: item.unavailableReason ?? undefined,
+      ...(stacks.has(item.id) ? { stack: stacks.get(item.id) } : {}),
     }));
   }
   publicCommands(context: InputInvocation = {}): AutomationCommand[] {
@@ -482,6 +503,14 @@ export class CustomCommandService {
         }
       }
       const block = parseCustomCommands({ version: customCommandVersion, items });
+      try {
+        validateStackGraph(customItems(block));
+      } catch (error) {
+        return failure(
+          'INVALID_ARGUMENT',
+          error instanceof Error ? error.message : hostText('settings.commandStacks.invalid'),
+        );
+      }
       if (!raw.dryRun) {
         this.options.settingsCommands.checkRevision(raw.expectedRevision);
         try {

@@ -544,11 +544,30 @@ export class AppDockApi {
       );
     return params.id;
   }
+  /** Only the host stack runner calls this; external dispatch retains the re-entry guard. */
+  executeStackEntry(id: string, context: InputInvocation) {
+    const caller = context.apiCaller ?? context.origin;
+    return this.execute(
+      id,
+      {},
+      caller?.kind === 'applet' ? caller.appletId : undefined,
+      context,
+      true,
+    );
+  }
+  canExecuteStack(id: string, context: InputInvocation) {
+    const caller = context.apiCaller ?? context.origin;
+    return (
+      this.effectivePermissions(caller?.kind === 'applet' ? caller.appletId : undefined, context)
+        .execute && this.commands(context).some((command) => command.id === id && command.available)
+    );
+  }
   private async execute(
     id: string,
     args: unknown,
     appletId?: string,
     context: InputInvocation = {},
+    stackEntry = false,
   ): Promise<Record<string, unknown>> {
     const permissions = this.effectivePermissions(appletId, context);
     const command = this.commands({
@@ -611,7 +630,7 @@ export class AppDockApi {
       throw new AutomationError('SELF_CALL', hostText('services.appdockApi.selfCall'));
     // Synchronous settings edits can complete while an Applet handler awaits this API.
     // Further asynchronous dispatch is refused, preventing A -> B -> A wait cycles.
-    if (this.executing && !(appletId && command.permission?.endsWith('.write')))
+    if (!stackEntry && this.executing && !(appletId && command.permission?.endsWith('.write')))
       throw new AutomationError('BUSY', hostText('services.appdockApi.busy'));
     this.executing++;
     try {

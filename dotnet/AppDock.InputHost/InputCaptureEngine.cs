@@ -194,10 +194,10 @@ internal sealed class InputCaptureEngine : IDisposable
             // A local binding sharing this key still dispatches through the native owner, without blocking ordinary input.
             GetWindowThreadProcessId(capturedWindow, out var foregroundProcess);
             var local = foregroundProcess == configuration.HostProcessId;
-            var context = new CommandContext(new(), target);
+            var context = new CommandContext(CommandConditions.HostContextForWindow(configuration.Context, capturedWindow.ToInt64().ToString()), target);
             var matched = rows.Select(row => new {
                 Row = row,
-                Conditions = row.Conditions?.Where(c => CommandConditions.Matches(c.When, context, environment: row.Environment)).ToArray()
+                Conditions = row.Conditions?.Where(c => CommandConditions.Matches(c.When, context, environment: row.Environment) && CommandConditions.MatchesStack(c.StackConditions, context, row.Environment)).ToArray()
             }).Where(item => item.Conditions == null || item.Conditions.Length > 0 || local).ToArray();
             if (matched.Length == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
             var block = matched.Any(item => item.Conditions == null ? item.Row.BlockOriginalInput : item.Conditions.Any(c => c.BlockOriginalInput));

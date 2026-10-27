@@ -5,7 +5,7 @@ using System.Text;
 using System.Windows.Threading;
 
 namespace AppDock.InputHost;
-internal sealed record Binding(string Id, string Command, string Gesture, string Title, string Window, Condition When, string? OwnerId = null);
+internal sealed record Binding(string Id, string Command, string Gesture, string Title, string Window, Condition When, string? OwnerId = null, StackConditionTerm[][]? StackConditions = null);
 internal sealed record Configuration(bool Enabled, string[] Browsers, string[] ExcludedProcesses,
     bool RequireChromiumWindowClass, int Distance, int WheelDelayMs, double IndicatorOpacity,
     string IndicatorPosition, Binding[] Rows, string Context, int Revision, string ExecutionMode = "all",
@@ -104,11 +104,11 @@ internal sealed class GestureEngine : IDisposable
         var className = new StringBuilder(256);
         var classLength = GetClassName(window, className, className.Capacity);
         targetContext = new(window.ToInt64().ToString(), process, classLength > 0 ? className.ToString() : null, desktop);
-        var context = new CommandContext(hostContext, targetContext);
+        var context = new CommandContext(CommandConditions.HostContextForWindow(config!.Context, window.ToInt64().ToString()), targetContext);
         var environment = new ConditionEnvironment(config!.Browsers, config.RequireChromiumWindowClass, config.ExcludedProcesses);
         return config!.Rows.Where(r =>
             (r.Window.Length == 0 || r.Window == window.ToInt64().ToString() || includeInactive && r.Window.Length > 0) &&
-            (includeInactive && r.Window == "-1" || CommandConditions.Matches(r.When, context, r.OwnerId, environment))).ToArray();
+            (includeInactive && r.Window == "-1" || CommandConditions.Matches(r.When, context, r.OwnerId, environment) && (includeInactive || CommandConditions.MatchesStack(r.StackConditions, context, environment)))).ToArray();
     }
     private void Begin(GesturePoint p)
     {

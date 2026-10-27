@@ -290,6 +290,44 @@ test('MCP -> Applet -> synchronous settings works while asynchronous reentry and
   await f.api.call('commands.execute', { id: 'test.caller.run' });
   assert.equal(f.store.value.host.closeToTray, false);
 });
+test('host stack children retain publication, caller authority, self-call and external reentry guards', async (t) => {
+  const f = setup(t),
+    calls = [];
+  f.options.commands = () =>
+    ['stack', 'leaf', 'test.caller.self'].map((id) => ({
+      id,
+      title: id,
+      appletId: id === 'test.caller.self' ? 'test.caller' : null,
+      available: true,
+      completion: 'handlerReturned',
+    }));
+  f.options.executable = () => true;
+  f.options.execute = async (id, context) => {
+    calls.push(id);
+    if (id === 'stack') {
+      assert.equal(f.api.canExecuteStack('stack', context), true);
+      await f.api.executeStackEntry('leaf', context);
+      await assert.rejects(
+        f.api.executeStackEntry('private', context),
+        (error) => error.code === 'NOT_FOUND',
+      );
+      await assert.rejects(
+        f.api.executeStackEntry('test.caller.self', context),
+        (error) => error.code === 'SELF_CALL',
+      );
+      assert.equal((await f.call('commands.execute', { id: 'leaf' })).error.code, 'BUSY');
+      f.grant({ read: true, execute: false });
+      assert.equal(f.api.canExecuteStack('stack', context), false);
+      await assert.rejects(
+        f.api.executeStackEntry('leaf', context),
+        (error) => error.code === 'EXECUTION_DISABLED',
+      );
+    } else assert.equal(context.origin.appletId, 'test.caller');
+  };
+  assert.equal((await f.call('commands.execute', { id: 'stack' })).ok, true);
+  assert.deepEqual(calls, ['stack', 'leaf']);
+});
+
 test('Legacy self-setting uses shared validation and revision while keeping private keys and startup behavior', (t) => {
   const f = setup(t);
   const before = f.settingsCommands.revision();
