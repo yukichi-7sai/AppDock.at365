@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import type { ExtensionSnapshot, GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import type { UiCommand } from '../../shared/commands';
@@ -28,7 +28,7 @@ import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { AppletShortcutDialog } from '../settings-ui/AppletShortcutDialog';
 import { GestureBindingDialog } from './GestureBindingDialog';
-import { TriggerStackDialog } from './TriggerStackSettings';
+import { TriggerStackDialog, TriggerStackSettings } from './TriggerStackSettings';
 import { triggerStacks } from '../../shared/trigger-stacks';
 
 const kindKeys = {
@@ -102,7 +102,10 @@ function TriggerBindingDialog({
   );
 }
 
-/** Reverse lookup over the three trigger-stack projections. */
+type TriggerTab = 'commands' | CommandTriggerKind;
+const triggerTabs: readonly TriggerTab[] = ['commands', ...commandTriggerKinds];
+
+/** Command reverse lookup and the three dedicated trigger-stack lists share one settings page. */
 export function CommandTriggersEditor({
   settings,
   onChange,
@@ -111,6 +114,7 @@ export function CommandTriggersEditor({
   statuses,
   provider,
   clearProvider,
+  busy = false,
 }: {
   settings: Settings;
   onChange(settings: Settings): void;
@@ -119,10 +123,34 @@ export function CommandTriggersEditor({
   statuses: GlobalHotKeyStatus[];
   provider?: { id: string; title: string; request: number };
   clearProvider?(): void;
+  busy?: boolean;
 }) {
   const { t } = useHostTranslation();
   const controls = useSettingsControls();
   const filters = useBindingCommandFilter(provider, clearProvider);
+  const [tab, setTab] = useState<TriggerTab>('commands');
+  const root = useRef<HTMLDivElement>(null);
+  const positions = useRef<Partial<Record<TriggerTab, { left: number; top: number }>>>({});
+  const selectTab = (value: TriggerTab) => {
+    if (value === tab) return;
+    const body = root.current?.closest<HTMLElement>('.settings-body');
+    if (body) positions.current[tab] = { left: body.scrollLeft, top: body.scrollTop };
+    setTab(value);
+  };
+  useLayoutEffect(() => {
+    if (provider?.request !== undefined || filters.target?.request !== undefined) {
+      delete positions.current.commands;
+      selectTab('commands');
+    }
+  }, [provider?.request, filters.target?.request]);
+  useLayoutEffect(() => {
+    const body = root.current?.closest<HTMLElement>('.settings-body');
+    const position = positions.current[tab];
+    if (body) {
+      body.scrollLeft = position?.left ?? 0;
+      body.scrollTop = position?.top ?? 0;
+    }
+  }, [tab]);
   const [kinds, setKinds] = useState<readonly CommandTriggerKind[]>(commandTriggerKinds);
   const [error, setError] = useState('');
   const lastStatuses = useRef(statuses);
@@ -210,8 +238,8 @@ export function CommandTriggersEditor({
         (filters.statusFilter === 'conflict' && assigned.some(statusError)))
     );
   });
-  useSettingsFeedback({ error });
-  return (
+  useSettingsFeedback({ error: tab === 'commands' ? error : '' });
+  const commandList = (
     <CommandListSection
       title={t('settings.commandTriggers.title')}
       className="command-triggers-editor command-shortcuts"
@@ -352,5 +380,41 @@ export function CommandTriggersEditor({
         )}
       />
     </CommandListSection>
+  );
+  return (
+    <>
+      <div
+        ref={root}
+        className="command-trigger-tabs"
+        role="group"
+        aria-label={t('settings.commandTriggers.view')}
+        data-testid="command-trigger-tabs"
+      >
+        {triggerTabs.map((value) => (
+          <button
+            key={value}
+            type="button"
+            data-testid={'command-trigger-tab:' + value}
+            aria-pressed={tab === value}
+            onClick={() => selectTab(value)}
+          >
+            {t(value === 'commands' ? 'settings.commandTriggers.commands' : kindKeys[value])}
+          </button>
+        ))}
+      </div>
+      {tab === 'commands' ? (
+        commandList
+      ) : (
+        <TriggerStackSettings
+          key={tab}
+          kind={tab}
+          settings={settings}
+          commands={commands}
+          applets={applets}
+          onChange={onChange}
+          busy={busy}
+        />
+      )}
+    </>
   );
 }

@@ -245,13 +245,13 @@
 .command-stack-dialog .stack-condition-panel .binding-inline-toggle {
   border: 0;
 }
-.custom-command-tabs {
+.command-trigger-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
 }
-.custom-command-tabs button[aria-pressed='true'] {
+.command-trigger-tabs button[aria-pressed='true'] {
   color: var(--accent);
   background: var(--accent-soft);
 }

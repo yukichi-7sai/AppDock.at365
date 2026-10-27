@@ -295,22 +295,19 @@ test('dedicated input and ribbon schemas describe MCP-editable native controls',
   const binding = access.items[settingsItemId('command-triggers', 'bindings')];
   for (const key of ['key', 'gesture', 'when', 'enabled'])
     assert.equal(binding.fields[key].reason, null);
-  for (const pageId of [
-    'shortcuts',
-    'gestures',
-    'touchpad-gestures',
-    'custom-commands',
-    'command-triggers',
-  ]) {
+  for (const pageId of ['shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers']) {
     const stackAccess = f.api.settingsAccess(f.page(pageId));
     for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
-      if (![kind, 'custom-commands', 'command-triggers'].includes(pageId)) continue;
+      if (![kind, 'command-triggers'].includes(pageId)) continue;
       const fields = stackAccess.items[settingsItemId(kind, 'bindings')].fields;
       for (const key of ['when', 'enabled', 'inputExecutionModes'])
         assert.equal(fields[key].reason, null);
       assert.equal(fields[kind === 'shortcuts' ? 'key' : 'gesture'].reason, null);
     }
   }
+  const customAccess = f.api.settingsAccess(f.page('custom-commands'));
+  for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures'])
+    assert.equal(customAccess.items[settingsItemId(kind, 'bindings')], undefined);
   const ribbon = f.api.settingsAccess(f.page('ribbon')).items[settingsItemId('ribbon', 'ribbon')];
   for (const key of ['title', 'icon', 'image', 'iconOnly', 'displayModeIcons'])
     assert.equal(ribbon.fields[key].reason, null, key);

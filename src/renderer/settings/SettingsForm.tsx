@@ -149,7 +149,6 @@ export function SettingsForm({
           settings={settings}
           auxiliary={aux.customCommands}
           applets={extensions}
-          onChange={edit}
           invoke={invoke}
           busy={busy}
         />
@@ -201,6 +200,7 @@ export function SettingsForm({
       >
         {category === 'command-triggers' && (
           <CommandTriggersEditor
+            busy={busy}
             provider={aux.provider}
             clearProvider={() => void invoke('clearProvider')}
             settings={settings}

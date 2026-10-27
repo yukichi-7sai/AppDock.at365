@@ -610,15 +610,7 @@ export function settingsPaths(
     case 'mcp-client':
       return [['mcpServers']];
     case 'custom-commands':
-      return [
-        ['customCommands'],
-        ['keybindings'],
-        ['gestures', 'bindings'],
-        ['touchpadGestures', 'bindings'],
-        ['keybindingOptions', 'inputExecutionModes'],
-        ['gestures', 'inputExecutionModes'],
-        ['touchpadGestures', 'inputExecutionModes'],
-      ];
+      return [['customCommands']];
     case 'appearance':
       return [
         ...hostSettingDefinitions

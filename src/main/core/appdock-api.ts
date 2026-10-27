@@ -157,7 +157,7 @@ export class AppDockApi {
     ] as const) {
       if (page.id === pageId)
         addConfigurationAccess(access, page.id, owner.commands()[0]?.inputSchema);
-      if ([pageId, 'command-triggers', 'custom-commands'].includes(page.id))
+      if ([pageId, 'command-triggers'].includes(page.id))
         addBindingAccess(access, pageId, owner.commands()[0]?.inputSchema);
       if (page.id === 'command-triggers')
         addBindingAccess(access, page.id, owner.commands()[0]?.inputSchema);

@@ -129,7 +129,8 @@
 }
 .command-list-page-canvas
   > :is(.settings-page-heading, .settings-page-toolbar, .settings-status-area),
-.command-list-page-canvas .command-list-toolbar {
+.command-list-page-canvas .command-list-toolbar,
+.command-list-page-canvas .command-trigger-tabs {
   position: sticky;
   left: 0;
   width: 100cqw;

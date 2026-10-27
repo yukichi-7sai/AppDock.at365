@@ -34,6 +34,7 @@ fs.writeFileSync(
 );
 const initial = createDefaultSettings();
 const featureSettingsOnly = process.argv.includes('--feature-settings-only');
+const triggerTabsOnly = process.argv.includes('--trigger-tabs-only');
 const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
 const triggerSettingsOnly = process.argv.includes('--trigger-settings-only');
 const lockKeysOnly = process.argv.includes('--lock-keys-only');
@@ -186,6 +187,7 @@ const recordSuccess = () => {
         success: true,
         checks,
         featureSettingsOnly,
+        triggerTabsOnly,
         bindingEditorsOnly,
         lockKeysOnly,
         source: source ? path.resolve(source) : 'development build',
@@ -328,6 +330,96 @@ const recordSuccess = () => {
       return;
     }
     await open();
+    const tabs = host.getByTestId('command-trigger-tabs');
+    assert.deepEqual(await tabs.getByRole('button').allTextContents(), [
+      'コマンド一覧',
+      'キージェスチャー',
+      'マウスジェスチャー',
+      'タッチパッドジェスチャー',
+    ]);
+    assert.equal(
+      await host.getByTestId('command-trigger-tab:commands').getAttribute('aria-pressed'),
+      'true',
+    );
+    const beforeTabs = await saved();
+    const commandList = host.getByTestId('command-triggers-list');
+    await commandList.locator('input[type=search]').fill('fixture.triggers');
+    await commandList.locator('select').selectOption('assigned');
+    await host.getByTestId('command-trigger-filter:touchpad-gestures').click();
+    const body = host.locator('.settings-body');
+    const position = await body.evaluate((element) => {
+      const tabs = element.querySelector('[data-testid="command-trigger-tabs"]');
+      const visibleTabTop =
+        tabs.getBoundingClientRect().top - element.getBoundingClientRect().top - 8;
+      element.scrollTop = Math.min(120, Math.max(0, visibleTabTop));
+      element.scrollLeft = 40;
+      return { top: element.scrollTop, left: element.scrollLeft };
+    });
+    // Click visible tabs directly so automation does not scroll them past the toolbar's scroll padding.
+    const clickTab = async (kind) => {
+      const bounds = await host.getByTestId('command-trigger-tab:' + kind).boundingBox();
+      assert(bounds);
+      await host.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    };
+    for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
+      await clickTab(kind);
+      assert.equal(await host.getByTestId('trigger-stack-table').count(), 1);
+      assert.equal(await host.getByTestId('command-triggers-list').count(), 0);
+    }
+    await clickTab('commands');
+    assert.equal(await commandList.locator('input[type=search]').inputValue(), 'fixture.triggers');
+    assert.equal(await commandList.locator('select').inputValue(), 'assigned');
+    assert.equal(
+      await host
+        .getByTestId('command-trigger-filter:touchpad-gestures')
+        .getAttribute('aria-pressed'),
+      'false',
+    );
+    assert.deepEqual(
+      await body.evaluate((element) => ({ top: element.scrollTop, left: element.scrollLeft })),
+      position,
+    );
+    assert.deepEqual(await saved(), beforeTabs);
+    checks.push(
+      'four command-trigger tabs share saved stacks and preserve command filters and scroll without saving',
+    );
+    if (triggerTabsOnly) {
+      await open('custom-commands');
+      assert.equal(await host.getByTestId('command-trigger-tabs').count(), 0);
+      assert.equal(await host.getByTestId('trigger-stack-table').count(), 0);
+      assert.equal(await host.locator('.custom-commands-settings table').count(), 1);
+      assert.deepEqual(await saved(), beforeTabs);
+      checks.push(
+        'custom commands retain only their command list without trigger tabs or stack tables',
+      );
+      await open();
+      assert.equal(
+        await host.getByTestId('command-trigger-tab:commands').getAttribute('aria-pressed'),
+        'true',
+      );
+      await host.screenshot({ path: path.join(profile, 'command-trigger-tabs.png') });
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      await open();
+      assert.equal(
+        await host.getByTestId('command-trigger-tab:commands').getAttribute('aria-pressed'),
+        'true',
+      );
+      assert.deepEqual(await saved(), beforeTabs);
+      assert.deepEqual(errors, []);
+      checks.push(
+        'reopening and actual restart select the command list and preserve all saved commands and triggers',
+      );
+      recordSuccess();
+      return;
+    }
+    await commandList.getByRole('button', { name: '絞り込みを解除', exact: true }).click();
+    await body.evaluate((element) => {
+      element.scrollTop = 0;
+      element.scrollLeft = 0;
+    });
     assert.equal(await command('fixture.triggers.one').locator('[data-binding-id]').count(), 4);
     assert.equal(
       await command('fixture.triggers.new').getByText('未割り当て', { exact: true }).count(),

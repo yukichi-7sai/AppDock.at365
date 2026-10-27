@@ -11,8 +11,6 @@ import {
 } from '../../shared/command-stacks';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { CommandStackEditor, StackExecutionMode } from './CommandStackEditor';
-import { TriggerStackSettings } from './TriggerStackSettings';
-import type { TriggerStackKind } from '../../shared/trigger-stacks';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import {
   customItems,
@@ -79,7 +77,6 @@ export function CustomCommandsSettings({
   busy,
   commands,
   applets,
-  onChange,
 }: {
   settings: Settings;
   auxiliary?: SettingsPageAuxiliary['customCommands'];
@@ -87,10 +84,8 @@ export function CustomCommandsSettings({
   busy: boolean;
   commands: UiCommand[];
   applets: ExtensionSnapshot[];
-  onChange(settings: Settings): void;
 }) {
   const { t: translate } = useHostTranslation();
-  const [tab, setTab] = useState<'created' | TriggerStackKind>('created');
   const items = customItems(settings.customCommands),
     types = auxiliary?.types ?? [];
   const target = useCommandSettingsTarget();
@@ -126,98 +121,60 @@ export function CustomCommandsSettings({
   useSettingsFeedback({ error });
   return (
     <div className="settings-sections custom-commands-settings">
-      <div
-        className="custom-command-tabs"
-        role="group"
-        aria-label={translate('settings.commandStacks.type')}
+      <CommandListSection
+        title={translate('settings.customCommandsSettings.registered')}
+        description={[
+          !supported ? translate('settings.customCommandsSettings.unsupportedVersion') : '',
+          !types.length ? translate('settings.customCommandsSettings.noTypes') : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        {...settingAnchor('custom-commands', 'definitions')}
       >
-        {(['created', 'shortcuts', 'gestures', 'touchpad-gestures'] as const).map((value) => (
-          <button
-            key={value}
-            data-testid={'command-stack-tab:' + value}
-            aria-pressed={tab === value}
-            onClick={() => setTab(value)}
-          >
-            {translate(
-              value === 'created'
-                ? 'settings.commandStacks.created'
-                : value === 'shortcuts'
-                  ? 'settings.commandTriggers.keys'
-                  : value === 'gestures'
-                    ? 'settings.commandTriggers.mouse'
-                    : 'settings.commandTriggers.touchpad',
-            )}
-          </button>
-        ))}
-      </div>
-      {tab !== 'created' ? (
-        <TriggerStackSettings
-          key={tab}
-          kind={tab}
-          settings={settings}
-          commands={commands}
-          applets={applets}
-          onChange={onChange}
-          busy={busy}
+        <SettingsListTable
+          toolbarFilter={<CommandTargetFilter />}
+          titleExtra={(entry) => <CommandPrivacy published={command(entry).automation} />}
+          navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
+          addInTitle
+          commandListScroll
+          definition={list}
+          maxItems={256}
+          canAdd={types.length > 0 && items.length < 256}
+          entries={visibleItems.map((item) => ({
+            ...item,
+            typeTitle: types.find((t) => t.id === item.typeId)?.title ?? item.typeId,
+            providerTitle: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
+            unavailableReason:
+              auxiliary?.summaries.find((s) => s.id === item.id)?.unavailableReason ?? '',
+          }))}
+          busy={busy || !supported || !auxiliary}
+          onAdd={() => open('edit', null)}
+          onEdit={(i) => open('edit', visibleItems[i])}
+          onDelete={(i) => open('delete', visibleItems[i])}
+          onToggle={(i) => {
+            setError('');
+            void update([
+              {
+                op: 'update',
+                id: visibleItems[i].id,
+                changes: { enabled: !visibleItems[i].enabled },
+                expectedTypeRevision: types.find((t) => t.id === visibleItems[i].typeId)
+                  ?.typeRevision,
+              },
+            ]).catch((e) => setError(String(e)));
+          }}
         />
-      ) : (
-        <>
-          <CommandListSection
-            title={translate('settings.customCommandsSettings.registered')}
-            description={[
-              !supported ? translate('settings.customCommandsSettings.unsupportedVersion') : '',
-              !types.length ? translate('settings.customCommandsSettings.noTypes') : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            {...settingAnchor('custom-commands', 'definitions')}
-          >
-            <SettingsListTable
-              toolbarFilter={<CommandTargetFilter />}
-              titleExtra={(entry) => <CommandPrivacy published={command(entry).automation} />}
-              navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
-              addInTitle
-              commandListScroll
-              definition={list}
-              maxItems={256}
-              canAdd={types.length > 0 && items.length < 256}
-              entries={visibleItems.map((item) => ({
-                ...item,
-                typeTitle: types.find((t) => t.id === item.typeId)?.title ?? item.typeId,
-                providerTitle: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
-                unavailableReason:
-                  auxiliary?.summaries.find((s) => s.id === item.id)?.unavailableReason ?? '',
-              }))}
-              busy={busy || !supported || !auxiliary}
-              onAdd={() => open('edit', null)}
-              onEdit={(i) => open('edit', visibleItems[i])}
-              onDelete={(i) => open('delete', visibleItems[i])}
-              onToggle={(i) => {
-                setError('');
-                void update([
-                  {
-                    op: 'update',
-                    id: visibleItems[i].id,
-                    changes: { enabled: !visibleItems[i].enabled },
-                    expectedTypeRevision: types.find((t) => t.id === visibleItems[i].typeId)
-                      ?.typeRevision,
-                  },
-                ]).catch((e) => setError(String(e)));
-              }}
-            />
-          </CommandListSection>
-          {dialog?.kind === 'edit' && (
-            <CustomCommandDialog
-              original={dialog.item}
-              types={dialog.types}
-              invoke={invoke}
-              commands={commands}
-              applets={shortcutPageChoices(applets)}
-              onClose={() => setDialog(null)}
-              onApply={(operation) => update([operation], dialog.revision)}
-            />
-          )}
-        </>
+      </CommandListSection>
+      {dialog?.kind === 'edit' && (
+        <CustomCommandDialog
+          original={dialog.item}
+          types={dialog.types}
+          invoke={invoke}
+          commands={commands}
+          applets={shortcutPageChoices(applets)}
+          onClose={() => setDialog(null)}
+          onApply={(operation) => update([operation], dialog.revision)}
+        />
       )}
       {dialog?.kind === 'delete' && (
         <SettingsDialog

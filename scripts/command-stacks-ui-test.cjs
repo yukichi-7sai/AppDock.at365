@@ -385,11 +385,20 @@ async function close() {
     await until(() => calls().length === 3, 'direct stack execution');
     assert.deepEqual(calls(), ['b', 'a', 'host']);
     checks.push('direct nested stack executes ordered leaves with captured host condition');
+    assert.equal(await page.getByTestId('command-trigger-tabs').count(), 0);
+    assert.equal(await page.getByTestId('trigger-stack-table').count(), 0);
+    checks.push('custom commands show only their command list without trigger tabs');
+    await page.getByTestId('settings-nav:command-triggers').click();
     for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
-      await page.getByTestId('command-stack-tab:' + kind).click();
+      await page.getByTestId('command-trigger-tab:' + kind).click();
       await page.getByTestId('trigger-stack-table').getByRole('button', { name: /追加/ }).click();
       if (kind === 'shortcuts') {
         const capture = dialog.locator('.shortcut-capture');
+        await until(
+          async () =>
+            !(await capture.locator('.shortcut-capture-status').innerText()).includes('準備'),
+          'shortcut recording session ready',
+        );
         await capture.dispatchEvent('keydown', {
           key: '9',
           code: 'Digit9',
@@ -460,7 +469,7 @@ async function close() {
     assert.equal(state.settings.value.keybindings.length, 1);
     assert.equal(state.settings.value.gestures.bindings.length, 1);
     assert.equal(state.settings.value.touchpadGestures.bindings.length, 1);
-    checks.push('three trigger kinds create dedicated stacks from custom-command tabs');
+    checks.push('three trigger kinds create dedicated stacks from command-trigger tabs');
     for (const [kind, title] of [
       ['shortcuts', 'キージェスチャー'],
       ['gestures', 'マウスジェスチャー'],
@@ -525,10 +534,10 @@ async function close() {
     checks.push(
       'repeated feature-option and stack edits retain one options section and table for each gesture kind',
     );
-    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
-    await page.getByTestId('command-stack-tab:gestures').click();
+    await page.getByTestId('settings-nav:command-triggers').click();
+    await page.getByTestId('command-trigger-tab:gestures').click();
     assert.match(await page.getByTestId('trigger-stack-table').innerText(), /最初/);
-    checks.push('feature pages and custom tabs edit the same saved stacks');
+    checks.push('feature pages and command-trigger tabs edit the same saved stacks');
     await focusHost();
     const dispatched = await host.evaluate(() => window.dock.dispatchShortcut('Ctrl+Shift+9'));
     assert.equal(dispatched.executed, 3);
@@ -536,7 +545,7 @@ async function close() {
     checks.push(
       'local key trigger invokes its dedicated stack and nested named stack through the dispatcher',
     );
-    await page.getByTestId('command-stack-tab:created').click();
+    await page.getByTestId('settings-nav:custom-commands').click();
     await page.getByRole('button', { name: 'Ordered stackを編集', exact: true }).click();
     await dialog.getByTestId('stack-entry').first().locator('.stack-entry-select').click();
     await dialog.getByTestId('binding-scope:exe').filter({ visible: true }).click();
@@ -572,7 +581,7 @@ async function close() {
     assert.deepEqual(errors, []);
     checks.push('restart retains named and dedicated stacks');
     dialog = page.getByTestId('settings-dialog');
-    await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+    await page.getByTestId('settings-nav:command-triggers').click();
     for (const [kind, inputs, expected] of [
       [
         'shortcuts',
@@ -586,7 +595,7 @@ async function close() {
         ['three.tap', 'three.left', 'four.right'],
       ],
     ]) {
-      await page.getByTestId('command-stack-tab:' + kind).click();
+      await page.getByTestId('command-trigger-tab:' + kind).click();
       const table = page.getByTestId('trigger-stack-table');
       const titles = new Map();
       titles.set(
@@ -597,6 +606,11 @@ async function close() {
         await table.getByRole('button', { name: /追加/ }).click();
         if (kind === 'shortcuts') {
           const key = input.split('+').at(-1);
+          await until(
+            async () =>
+              !(await dialog.locator('.shortcut-capture-status').innerText()).includes('準備'),
+            'shortcut recording session ready',
+          );
           await dialog
             .locator('.shortcut-capture')
             .dispatchEvent('keydown', { key, code: key, ctrlKey: true, shiftKey: true });
@@ -646,7 +660,7 @@ async function close() {
       );
       assert.equal(stored.find((stack) => stack.input === inputs[1]).executionMode, 'all');
       assert.equal(stored.find((stack) => stack.input === inputs[0]).executionMode, 'inherit');
-      await page.getByRole('button', { name: 'カスタムコマンド', exact: true }).click();
+      await page.getByTestId('settings-nav:command-triggers').click();
     }
     checks.push(
       'trigger dialogs retain separators, one trigger label and reachable footer at tall, compact and narrow sizes',
@@ -655,14 +669,14 @@ async function close() {
       'all trigger tables follow picker order and sorted edits update the correct saved stack',
     );
     const beforeCancel = (await snapshot()).settings.value;
-    await page.getByTestId('command-stack-tab:gestures').click();
+    await page.getByTestId('command-trigger-tab:gestures').click();
     await page.getByTestId('trigger-stack-table').getByRole('button', { name: /追加/ }).click();
     assert(
       await dialog.getByTestId('settings-dialog-confirm').isDisabled(),
       'duplicate trigger blocks next',
     );
     await dialog.getByTestId('settings-dialog-cancel').click();
-    await page.getByTestId('command-stack-tab:touchpad-gestures').click();
+    await page.getByTestId('command-trigger-tab:touchpad-gestures').click();
     await page.getByTestId('trigger-stack-table').getByRole('button', { name: /追加/ }).click();
     await dialog.getByTestId('touchpad-action:four.down').click();
     await next();
@@ -674,7 +688,7 @@ async function close() {
       beforeCancel,
       'cancellation on either step discards the draft',
     );
-    await page.getByRole('button', { name: 'コマンドトリガー', exact: true }).click();
+    await page.getByTestId('command-trigger-tab:commands').click();
     for (const kind of ['gestures', 'touchpad-gestures']) {
       await page.locator('[data-shortcut-command="fixture.stacks.host"] .command-title').hover();
       await page.getByTestId('binding-add:fixture.stacks.host:' + kind).click();
@@ -778,9 +792,11 @@ async function close() {
       0,
     );
     assert(await multiGear.evaluate((button) => button.classList.contains('accent-action')));
+    await page.mouse.move(0, 0);
     await multiRow.locator('.binding-condition-cell').hover();
+    await multiGear.focus();
     await page.screenshot({ path: path.join(profile, 'trigger-row-actions.png') });
-    await multiGear.click();
+    await multiGear.press('Enter');
     const unique = multiStack.entries.find((entry) => entry.command === 'fixture.stacks.a');
     await dialog.locator(`[data-stack-entry="${unique.id}"] .settings-list-icon`).click();
     await save();

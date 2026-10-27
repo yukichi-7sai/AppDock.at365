@@ -56,7 +56,8 @@ exports.check = async ({ page, profile, checks }) => {
   checks.push(
     'Named-stack configuration uses its public custom-command owner independently of command execution publication',
   );
-  await page.getByTestId('command-stack-tab:gestures').click();
+  await page.getByTestId('settings-nav:command-triggers').click();
+  await page.getByTestId('command-trigger-tab:gestures').click();
   await page
     .getByTestId('trigger-stack-table')
     .getByRole('button', { name: /を編集$/ })
@@ -68,7 +69,7 @@ exports.check = async ({ page, profile, checks }) => {
   await dialog.screenshot({ path: path.join(profile, 'mcp-trigger-stack.png') });
   await cancel(dialog);
   checks.push(
-    'Trigger-stack identity, execution mode and conditions inherit the existing public input API in custom-command tabs',
+    'Trigger-stack identity, execution mode and conditions inherit the existing public input API in command-trigger tabs',
   );
   await page.getByTestId('settings-nav:gestures').click();
   await page
@@ -81,6 +82,6 @@ exports.check = async ({ page, profile, checks }) => {
   assert.equal(await dialog.locator('[data-mcp-lock]').count(), 0);
   await cancel(dialog);
   checks.push(
-    'The input settings page uses the same trigger-stack publication metadata as the custom-command editor',
+    'The input settings page uses the same trigger-stack publication metadata as the command-trigger tabs',
   );
 };

@@ -39,6 +39,8 @@
   "settings.commandTriggerOptions.title": "ジェスチャー共通の設定",
   "settings.commandTriggerOptions.invalid": "ジェスチャー共通の設定を確認してください。",
   "settings.commandTriggers.title": "コマンドトリガー",
+  "settings.commandTriggers.commands": "コマンド一覧",
+  "settings.commandTriggers.view": "表示する一覧",
   "settings.commandTriggers.description": "操作（トリガー）にコマンドを割り当て、いつ・どこで実行するかを設定します。",
   "settings.commandTriggers.keywords": "トリガー キージェスチャー ショートカットキー マウスジェスチャー タッチパッドジェスチャー 割り当て 実行順",
   "settings.commandTriggers.trigger": "トリガー",

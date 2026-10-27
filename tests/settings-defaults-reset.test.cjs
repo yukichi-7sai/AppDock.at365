@@ -87,6 +87,59 @@ test('shortcut options participate in sparse page JSON and reset independently o
   );
 });
 
+test('custom-command JSON and reset leave trigger stacks to the command-trigger page', () => {
+  const { commandTriggerBindings } = require('../out/main/shared/command-triggers');
+  const value = createDefaultSettings();
+  const entry = {
+    id: 'trigger-entry',
+    command: 'appdock.noop',
+    enabled: true,
+    when: { scope: 'app', appletIds: [], processes: [] },
+  };
+  value.customCommands = {
+    version: 2,
+    items: [
+      {
+        id: '382d402d-0b17-4868-b505-2f8228aa4c58',
+        typeId: 'appdock.commands.stack',
+        owner: { kind: 'host' },
+        title: 'Named stack',
+        description: '',
+        configVersion: 1,
+        config: { executionMode: 'all', entries: [entry] },
+        enabled: true,
+        automation: false,
+      },
+    ],
+  };
+  value.keybindings = [{ ...entry, key: 'Ctrl+F8' }];
+  value.keybindingOptions.inputExecutionModes = { 'Ctrl+F8': 'first' };
+  value.gestures.bindings = [{ ...entry, gesture: 'move-up' }];
+  value.gestures.inputExecutionModes = { 'move-up': 'first' };
+  value.touchpadGestures.bindings = [{ ...entry, gesture: 'three.tap' }];
+  value.touchpadGestures.inputExecutionModes = { 'three.tap': 'all' };
+  const current = parseSettings(value);
+  const customPage = page(current, 'custom-commands');
+  assert.deepEqual(Object.keys(settingsProjection(current, customPage, applets)), [
+    'customCommands',
+  ]);
+  assert.deepEqual(Object.keys(settingsJsonProjection(current, customPage, applets)), [
+    'customCommands',
+  ]);
+  const reset = applySettingsJson(current, customPage, applets, '{}');
+  assert.equal(reset.customCommands.items.length, 0);
+  assert.deepEqual(commandTriggerBindings(reset), commandTriggerBindings(current));
+  for (const key of ['keybindingOptions', 'gestures', 'touchpadGestures'])
+    assert.deepEqual(reset[key].inputExecutionModes, current[key].inputExecutionModes);
+  assert.throws(() => applySettingsJson(current, customPage, applets, '{"keybindings":[]}'));
+  const triggerReset = applySettingsJson(current, page(current, 'command-triggers'), applets, '{}');
+  assert.deepEqual(triggerReset.customCommands, current.customCommands);
+  assert.deepEqual(
+    commandTriggerBindings(triggerReset),
+    commandTriggerBindings(createDefaultSettings()),
+  );
+});
+
 test('sparse JSON round trips host settings; false, zero, empty arrays and unknown leaves remain meaningful', () => {
   const value = createDefaultSettings();
   value.host.soundEnabled = false;
