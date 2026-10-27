@@ -25,6 +25,7 @@
 | MCP・外部操作 | [共通操作API](docs/appdock-api.md)、[Codex登録・ネットワーク・許可](docs/automation.md)、[MCPクライアント](docs/mcp-client-design.md)、[MCPハブ](docs/mcp-hub-design.md)、[通知イベント](docs/mcp-events-design.md) |
 | MCP設定 | [固定6入口と通常設定の共通登録](docs/settings-api.md)、[一覧編集・特殊設定の拡張設計（一部実装）](docs/mcp-settings-design.md) |
 | コマンドの入力割り当て | [コマンドトリガー](docs/command-triggers.md) |
+| コマンドの連続実行・トリガー専用設定 | [コマンドスタック](docs/command-stacks.md) |
 | カスタムコマンド | [保存・種類・キー送信・プロセス起動・MCP実行](docs/custom-commands-design.md) |
 | AIと音声 | [AI文章生成](docs/ai.md)、[TTS](docs/tts-design.md)、[共通音声再生](docs/audio-playback.md) |
 | 通知とエラー | [通知基盤](docs/notifications.md)、[通知読み上げ](docs/notification-speech-design.md)、[共通エラー](docs/error-reporting.md)、[共通警告](docs/warning-notifications-design.md) |

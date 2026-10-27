@@ -1,201 +1,249 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { McpServerEntry, McpToolDescriptor } from '../../shared/mcp-client';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsDescriptionButton } from '../settings-ui/SettingsHintIcon';
+import { CustomCommandOptions } from './CustomCommandOptions';
 
 export function McpCommandFields({
   config,
   onChange,
   onValidity,
   invoke,
+  advancedOptions,
+  refreshKey = 0,
 }: {
   config: Record<string, unknown>;
   onChange(config: Record<string, unknown>): void;
   onValidity(valid: boolean): void;
   invoke(name: string, args?: unknown[]): Promise<any>;
+  advancedOptions?: ReactNode;
+  refreshKey?: number;
 }) {
   const { t: translate } = useHostTranslation();
   const [servers, setServers] = useState<McpServerEntry[]>([]);
   const [tools, setTools] = useState<Partial<McpToolDescriptor>[]>([]);
-  const [cursor, setCursor] = useState<string>();
   const [tool, setTool] = useState<McpToolDescriptor>();
   const [args, setArgs] = useState(() => JSON.stringify(config.arguments ?? {}, null, 2));
   const [error, setError] = useState('');
+  const [serversError, setServersError] = useState('');
   const [argsError, setArgsError] = useState('');
   const [pending, setPending] = useState(false);
+  const [retry, setRetry] = useState(0);
   const generation = useRef(0);
+  const current = useRef({ config, onChange, onValidity, invoke });
+  current.current = { config, onChange, onValidity, invoke };
+  const serverId = String(config.serverId ?? '');
+  const name = String(config.toolName ?? '');
+  const needsReview = !!tool && tool.toolRevision !== config.toolRevision;
+
   useEffect(() => {
     let active = true;
-    void invoke('mcpServers')
-      .then((v) => {
-        if (active) setServers(v.items);
+    setServersError('');
+    void current.current
+      .invoke('mcpServers')
+      .then((reply) => {
+        if (active) setServers(reply.items);
       })
-      .catch((e) => {
-        if (active) setError(String(e));
+      .catch((reason) => {
+        if (active) setServersError(String(reason));
       });
     return () => {
       active = false;
+    };
+  }, [retry]);
+
+  useEffect(() => {
+    const epoch = ++generation.current;
+    setTools([]);
+    setTool(undefined);
+    setError('');
+    setPending(!!serverId);
+    if (serverId)
+      void (async () => {
+        try {
+          const items: Partial<McpToolDescriptor>[] = [];
+          let cursor: string | undefined;
+          do {
+            const reply = await current.current.invoke('mcpTools', [serverId, cursor]);
+            if (epoch !== generation.current) return;
+            items.push(...reply.items);
+            cursor = reply.nextCursor;
+          } while (cursor);
+          setTools(items);
+          const savedName = String(current.current.config.toolName ?? '');
+          if (savedName) {
+            const reply = await current.current.invoke('mcpTool', [serverId, savedName]);
+            if (epoch !== generation.current) return;
+            // Opening an existing command never adopts a different tool revision.
+            setTool(reply.tool);
+          }
+        } catch (reason) {
+          if (epoch === generation.current)
+            setError(reason instanceof Error ? reason.message : String(reason));
+        } finally {
+          if (epoch === generation.current) setPending(false);
+        }
+      })();
+    return () => {
       generation.current++;
     };
-  }, []);
-  const run = async (work: () => Promise<void>) => {
-    if (pending) return;
-    setPending(true);
+  }, [serverId, refreshKey, retry]);
+
+  const selectTool = async (nextName: string) => {
+    const epoch = ++generation.current;
+    setTool(undefined);
     setError('');
-    try {
-      await work();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
+    onChange({ ...current.current.config, toolName: nextName, toolRevision: '' });
+    if (!nextName) {
       setPending(false);
+      return;
     }
-  };
-  const serverId = String(config.serverId ?? ''),
-    name = String(config.toolName ?? '');
-  const fetchTools = (next?: string) =>
-    run(async () => {
-      const epoch = generation.current;
-      const reply = await invoke('mcpTools', [serverId, next]);
-      if (epoch !== generation.current) return;
-      setTools(next ? [...tools, ...reply.items] : reply.items);
-      setCursor(reply.nextCursor);
-    });
-  const selectTool = (name: string) =>
-    run(async () => {
-      const epoch = generation.current;
-      const reply = await invoke('mcpTool', [serverId, name]);
+    setPending(true);
+    try {
+      const reply = await current.current.invoke('mcpTool', [serverId, nextName]);
       if (epoch !== generation.current) return;
       setTool(reply.tool);
-      onChange({ ...config, toolName: name, toolRevision: reply.tool.toolRevision });
-    });
+      // Retain argument and timeout edits made while discovery was in progress.
+      current.current.onChange({
+        ...current.current.config,
+        toolName: nextName,
+        toolRevision: reply.tool.toolRevision,
+      });
+    } catch (reason) {
+      if (epoch === generation.current)
+        setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      if (epoch === generation.current) setPending(false);
+    }
+  };
+  useEffect(() => {
+    current.current.onValidity(!argsError && !pending && !needsReview);
+  }, [argsError, pending, needsReview]);
   useSettingsFeedback({
     busy: pending,
     message: pending ? translate('settings.mcpCommandFields.loading') : '',
-    error: [tool && tool.unsupportedReason ? tool.unsupportedReason : '', error ? error : '']
-      .filter(Boolean)
-      .join('\n'),
+    error: [tool?.unsupportedReason, serversError, error].filter(Boolean).join('\n'),
+    onRetry: serversError || error ? () => setRetry((value) => value + 1) : undefined,
   });
   return (
     <>
       <SettingsField title={translate('settings.mcpCommandFields.server')}>
         <select
+          data-testid="custom-command-mcp-server"
           aria-label={translate('settings.mcpCommandFields.server')}
           value={serverId}
-          disabled={pending}
-          onChange={(e) => {
+          onChange={(event) => {
             generation.current++;
             setTools([]);
-            setCursor(undefined);
             setTool(undefined);
             setError('');
-            onChange({ ...config, serverId: e.target.value, toolName: '', toolRevision: '' });
+            onChange({ ...config, serverId: event.target.value, toolName: '', toolRevision: '' });
           }}
         >
           <option value="">{translate('settings.mcpCommandFields.select')}</option>
-          {serverId && !servers.some((s) => s.id === serverId) && (
+          {serverId && !servers.some((server) => server.id === serverId) && (
             <option value={serverId}>
               {serverId}
               {translate('settings.mcpCommandFields.unregistered')}
             </option>
           )}
-          {servers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
+          {servers.map((server) => (
+            <option key={server.id} value={server.id}>
+              {server.name}
             </option>
           ))}
         </select>
-        <button type="button" disabled={!serverId || pending} onClick={() => void fetchTools()}>
-          {translate('settings.mcpCommandFields.fetch')}
-        </button>
-        {cursor && (
-          <button type="button" disabled={pending} onClick={() => void fetchTools(cursor)}>
-            {translate('settings.mcpCommandFields.more')}
-          </button>
-        )}
       </SettingsField>
-      <SettingsField
-        title={translate('settings.mcpCommandFields.tool')}
-        description={tool?.description}
-        hint={translate('settings.mcpCommandFields.schemaHint')}
-      >
+      <SettingsField title={translate('settings.mcpCommandFields.tool')}>
         <select
+          data-testid="custom-command-mcp-tool"
           aria-label={translate('settings.mcpCommandFields.tool')}
           value={name}
           disabled={!tools.length || pending}
-          onChange={(e) => {
-            if (e.target.value) void selectTool(e.target.value);
-          }}
+          onChange={(event) => void selectTool(event.target.value)}
         >
           <option value="">{translate('settings.mcpCommandFields.select')}</option>
-          {name && !tools.some((t) => t.name === name) && (
+          {name && !tools.some((entry) => entry.name === name) && (
             <option value={name}>
               {name}
               {translate('settings.mcpCommandFields.saved')}
             </option>
           )}
-          {tools.map((t) => (
-            <option key={t.name} value={t.name}>
-              {t.title ?? t.name}
-              {t.unsupportedReason ? translate('settings.mcpCommandFields.unsupported') : ''}
+          {tools.map((entry) => (
+            <option key={entry.name} value={entry.name}>
+              {entry.title ?? entry.name}
+              {entry.unsupportedReason ? translate('settings.mcpCommandFields.unsupported') : ''}
             </option>
           ))}
         </select>
-        {name && (
-          <button
-            type="button"
-            disabled={pending || !serverId}
-            onClick={() => void selectTool(name)}
+        {tool?.description && (
+          <div
+            className="custom-command-tool-description"
+            data-testid="custom-command-tool-description"
           >
-            {translate('settings.mcpCommandFields.refresh')}
-          </button>
+            <span aria-hidden="true">{tool.description}</span>
+            <SettingsDescriptionButton
+              title={tool.title ?? tool.name}
+              description={tool.description}
+              label={translate('settings.mcpCommandFields.readDescription')}
+            />
+          </div>
         )}
       </SettingsField>
-      {tool && (
-        <>
-          <details>
-            <summary>{translate('settings.mcpCommandFields.schema')}</summary>
-            <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
-          </details>
-        </>
+      {needsReview && (
+        <div className="custom-command-tool-review" data-testid="custom-command-tool-review">
+          <p role="status">{translate('settings.mcpCommandFields.changed')}</p>
+          <button
+            type="button"
+            data-testid="custom-command-accept-tool"
+            onClick={() => onChange({ ...config, toolRevision: tool!.toolRevision })}
+          >
+            {translate('settings.mcpCommandFields.accept')}
+          </button>
+        </div>
       )}
-      <SettingsField
-        error={argsError ? argsError : ''}
-        title={translate('settings.mcpCommandFields.args')}
-      >
+      <SettingsField error={argsError} title={translate('settings.mcpCommandFields.args')}>
         <SettingsTextarea
+          data-testid="custom-command-mcp-arguments"
           aria-label={translate('settings.mcpCommandFields.args')}
-          disabled={pending}
-          rows={7}
+          rows={5}
           value={args}
-          onChange={(e) => {
-            setArgs(e.target.value);
+          onChange={(event) => {
+            setArgs(event.target.value);
             try {
-              const value = JSON.parse(e.target.value);
+              const value = JSON.parse(event.target.value);
               if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error();
               onChange({ ...config, arguments: value });
               setArgsError('');
-              onValidity(true);
             } catch {
               setArgsError(translate('settings.mcpCommandFields.argsObject'));
-              onValidity(false);
             }
           }}
         />
       </SettingsField>
-      <SettingsField title={translate('settings.mcpCommandFields.timeout')}>
-        <SettingsInput
-          aria-label={translate('settings.mcpCommandFields.timeout')}
-          disabled={pending}
-          type="number"
-          min={1000}
-          max={600000}
-          step={1000}
-          value={String(config.timeoutMs ?? 60000)}
-          onChange={(e) => onChange({ ...config, timeoutMs: Number(e.target.value) })}
-        />
-      </SettingsField>
+      <CustomCommandOptions>
+        <SettingsField title={translate('settings.mcpCommandFields.timeout')}>
+          <SettingsInput
+            aria-label={translate('settings.mcpCommandFields.timeout')}
+            type="number"
+            min={1000}
+            max={600000}
+            step={1000}
+            value={String(config.timeoutMs ?? 60000)}
+            onChange={(event) => onChange({ ...config, timeoutMs: Number(event.target.value) })}
+          />
+        </SettingsField>
+        {tool && (
+          <details className="custom-command-schema">
+            <summary>{translate('settings.mcpCommandFields.schema')}</summary>
+            <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
+          </details>
+        )}
+        {advancedOptions}
+      </CustomCommandOptions>
     </>
   );
 }

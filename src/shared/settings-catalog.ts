@@ -605,7 +605,15 @@ export function settingsPaths(
     case 'mcp-client':
       return [['mcpServers']];
     case 'custom-commands':
-      return [['customCommands']];
+      return [
+        ['customCommands'],
+        ['keybindings'],
+        ['gestures', 'bindings'],
+        ['touchpadGestures', 'bindings'],
+        ['keybindingOptions', 'inputExecutionModes'],
+        ['gestures', 'inputExecutionModes'],
+        ['touchpadGestures', 'inputExecutionModes'],
+      ];
     case 'appearance':
       return [
         ...hostSettingDefinitions
@@ -625,6 +633,8 @@ export function settingsPaths(
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
       return [
+        ['keybindings'],
+        ['keybindingOptions', 'inputExecutionModes'],
         ['keybindingOptions', 'executionMode'],
         ['keybindingOptions', 'excludedProcesses'],
         ['commandTriggerOptions'],
@@ -640,6 +650,8 @@ export function settingsPaths(
       ];
     case 'touchpad-gestures':
       return [
+        ['touchpadGestures', 'bindings'],
+        ['touchpadGestures', 'inputExecutionModes'],
         ['touchpadGestures', 'enabled'],
         ['touchpadGestures', 'connections'],
         ['touchpadGestures', 'executionMode'],
@@ -648,6 +660,8 @@ export function settingsPaths(
       ];
     case 'gestures':
       return [
+        ['gestures', 'bindings'],
+        ['gestures', 'inputExecutionModes'],
         ...[
           'enabled',
           'activateOnStart',

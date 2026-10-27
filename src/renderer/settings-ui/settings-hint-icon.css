@@ -67,3 +67,24 @@
   background: transparent;
   pointer-events: none;
 }
+.settings-description-button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  padding: 2px 0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.settings-description-popover {
+  max-width: min(560px, calc(100vw - 16px));
+  padding-right: 38px;
+}
+.settings-description-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 2px 8px;
+}

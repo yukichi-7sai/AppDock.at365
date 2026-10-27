@@ -124,7 +124,7 @@ test('keyboard, mouse, touchpad and native keyboard gates use the same browser e
   }
 });
 
-test('three feature pages share browser JSON/reset while bindings belong to command triggers', () => {
+test('feature pages share browser options and expose only their own trigger stacks', () => {
   const settings = createDefaultSettings();
   settings.commandTriggerOptions = { browsers: ['firefox'], requireChromiumWindowClass: true };
   settings.gestures.executionMode = 'first';
@@ -141,9 +141,9 @@ test('three feature pages share browser JSON/reset while bindings belong to comm
     const page = settingsCatalog([], settings).find((page) => page.id === id);
     const projection = settingsProjection(settings, page, []);
     assert.deepEqual(projection.commandTriggerOptions, settings.commandTriggerOptions);
-    assert.equal(projection.keybindings, undefined);
-    assert.equal(projection.gestures?.bindings, undefined);
-    assert.equal(projection.touchpadGestures?.bindings, undefined);
+    assert.equal(Array.isArray(projection.keybindings), id === 'shortcuts');
+    assert.equal(Array.isArray(projection.gestures?.bindings), id === 'gestures');
+    assert.equal(Array.isArray(projection.touchpadGestures?.bindings), id === 'touchpad-gestures');
     assert.equal(
       page.items.some((item) =>
         ['bindings', 'keybindings', 'gestures', 'options'].includes(item.key),
@@ -163,7 +163,7 @@ test('three feature pages share browser JSON/reset while bindings belong to comm
     assert.deepEqual(edited.gestures.bindings, settings.gestures.bindings);
     const reset = applySettingsJson(settings, page, [], '{}');
     assert.deepEqual(reset.commandTriggerOptions, defaultCommandTriggerOptions());
-    assert.deepEqual(reset.gestures.bindings, settings.gestures.bindings);
+    assert.deepEqual(reset.gestures.bindings, id === 'gestures' ? [] : settings.gestures.bindings);
   }
 });
 

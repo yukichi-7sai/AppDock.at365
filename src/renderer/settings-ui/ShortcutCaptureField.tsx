@@ -44,6 +44,7 @@ export function ShortcutCaptureField({
   label = hostText('settings.shortcutCaptureField.key'),
   mode = 'shortcut',
   allowWin = true,
+  showDescription = true,
 }: {
   value: string;
   onChange(value: string): void;
@@ -52,6 +53,7 @@ export function ShortcutCaptureField({
   label?: string;
   mode?: 'shortcut' | 'send';
   allowWin?: boolean;
+  showDescription?: boolean;
 }) {
   const { t: translate } = useHostTranslation();
   const controls = useSettingsControls();
@@ -127,13 +129,15 @@ export function ShortcutCaptureField({
       title={label}
       hint={translate('settings.shortcutCaptureField.keyboardHint')}
       description={
-        !recordingReady
-          ? translate('settings.shortcutCaptureField.preparing')
-          : !focused
-            ? translate('settings.shortcutCaptureField.click')
-            : mode === 'send' || captureReady
-              ? translate('settings.shortcutCaptureField.press')
-              : translate('settings.shortcutCaptureField.preparing')
+        !showDescription
+          ? undefined
+          : !recordingReady
+            ? translate('settings.shortcutCaptureField.preparing')
+            : !focused
+              ? translate('settings.shortcutCaptureField.click')
+              : mode === 'send' || captureReady
+                ? translate('settings.shortcutCaptureField.press')
+                : translate('settings.shortcutCaptureField.preparing')
       }
     >
       <button
@@ -170,6 +174,17 @@ export function ShortcutCaptureField({
             setError(translate('settings.shortcutCaptureField.invalid'));
         }}
       >
+        {!showDescription && (
+          <small className="shortcut-capture-status">
+            {translate(
+              !recordingReady
+                ? 'settings.shortcutCaptureField.preparing'
+                : focused
+                  ? 'settings.shortcutCaptureField.press'
+                  : 'settings.shortcutCaptureField.click',
+            )}
+          </small>
+        )}
         {value ? (
           value.split('+').map((part, index) => <kbd key={index}>{part}</kbd>)
         ) : (

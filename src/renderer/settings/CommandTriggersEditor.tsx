@@ -27,9 +27,9 @@ import { useSettingsControls } from '../settings-ui/api';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { AppletShortcutDialog } from '../settings-ui/AppletShortcutDialog';
-import { ShortcutOrderDialog } from '../settings-ui/ShortcutOrderDialog';
 import { GestureBindingDialog } from './GestureBindingDialog';
-import { GestureOrderDialog } from './GestureOrderDialog';
+import { TriggerStackDialog } from './TriggerStackSettings';
+import { triggerStacks } from '../../shared/trigger-stacks';
 
 const kindKeys = {
   shortcuts: 'settings.commandTriggers.keys',
@@ -102,7 +102,7 @@ function TriggerBindingDialog({
   );
 }
 
-/** A combined view over the existing three binding stores. */
+/** Reverse lookup over the three trigger-stack projections. */
 export function CommandTriggersEditor({
   settings,
   onChange,
@@ -316,31 +316,39 @@ export function CommandTriggersEditor({
         onRetry={() =>
           void controls.retryGlobalHotKeys().catch((reason) => setError(String(reason)))
         }
-        renderEditor={(edit, apply, close) => (
-          <TriggerBindingDialog edit={edit} applets={targets} apply={apply} close={close} />
-        )}
-        renderOrder={(row, close) =>
-          row.kind === 'shortcuts' ? (
-            <ShortcutOrderDialog
-              settings={settings}
-              commands={catalog}
-              applets={targets}
-              initialKey={row.binding.key}
-              onChange={onChange}
-              onClose={close}
-            />
+        renderEditor={(edit, apply, close) =>
+          edit.adding ? (
+            <TriggerBindingDialog edit={edit} applets={targets} apply={apply} close={close} />
           ) : (
-            <GestureOrderDialog
-              touchpad={row.kind === 'touchpad-gestures'}
+            <TriggerStackDialog
               settings={settings}
+              initial={triggerStacks(settings, edit.row.kind).find(
+                (stack) =>
+                  stack.input ===
+                  ('key' in edit.row.binding ? edit.row.binding.key : edit.row.binding.gesture),
+              )!}
               commands={catalog}
               applets={targets}
-              initialGesture={row.binding.gesture}
+              initialEntryId={edit.row.binding.id}
               onChange={onChange}
               onClose={close}
             />
           )
         }
+        renderOrder={(row, close) => (
+          <TriggerStackDialog
+            settings={settings}
+            initial={triggerStacks(settings, row.kind).find(
+              (stack) =>
+                stack.input === ('key' in row.binding ? row.binding.key : row.binding.gesture),
+            )!}
+            commands={catalog}
+            applets={targets}
+            initialEntryId={row.binding.id}
+            onChange={onChange}
+            onClose={close}
+          />
+        )}
       />
     </CommandListSection>
   );

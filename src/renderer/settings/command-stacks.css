@@ -1,0 +1,161 @@
+.settings-modal.settings-group-dialog.command-stack-dialog[open],
+.settings-modal.settings-group-dialog.custom-command-dialog.stack-command-dialog[open] {
+  width: min(1180px, calc(100vw - 32px));
+  max-height: min(700px, calc(100dvh - 32px));
+}
+.stack-command-dialog .custom-command-editor {
+  grid-template-columns: minmax(190px, 0.65fr) minmax(0, 2.35fr);
+  gap: 24px;
+}
+.stack-trigger-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  margin-bottom: 18px;
+}
+.command-stack-editor {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.9fr) minmax(0, 1.1fr);
+  gap: 20px;
+  min-width: 0;
+}
+.stack-list-panel,
+.stack-condition-panel {
+  min-width: 0;
+}
+.stack-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.stack-list-heading button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.stack-entry-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  max-height: 420px;
+  min-height: 180px;
+}
+.stack-entry-list > li {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  gap: 4px;
+  padding: 4px 0;
+}
+.stack-entry-list > li[data-selected='true'] {
+  background: var(--accent-soft);
+  border-radius: 6px;
+}
+.stack-entry-select {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  justify-content: stretch;
+  justify-items: start;
+  background: transparent;
+  border: 0;
+  padding: 8px 4px;
+}
+.stack-entry-select strong,
+.stack-entry-select small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.stack-entry-select small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.stack-drag {
+  cursor: grab;
+  padding: 6px;
+  border: 0;
+  background: transparent;
+}
+.stack-selected-title {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-bottom: 10px;
+}
+.stack-condition-panel {
+  max-height: min(350px, calc(100dvh - 300px));
+  overflow: auto;
+  padding-right: 4px;
+}
+.stack-condition-panel .binding-editor-panel {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.stack-condition-panel .settings-field,
+.stack-trigger-header .settings-field {
+  display: block;
+  border: 0;
+  padding: 0;
+  margin-bottom: 12px;
+}
+.stack-condition-panel .settings-field-control,
+.stack-trigger-header .settings-field-control {
+  margin-top: 6px;
+}
+.stack-trigger-header select {
+  width: 100%;
+}
+.custom-command-dialog .settings-choice,
+.command-stack-dialog .settings-choice {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin: 10px 0;
+}
+.command-stack-dialog .stack-condition-panel .binding-inline-toggle {
+  border: 0;
+}
+.custom-command-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.custom-command-tabs button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.stack-empty {
+  color: var(--muted);
+  padding: 20px 8px !important;
+}
+@container settings-dialog (max-width:780px) {
+  .stack-command-dialog .custom-command-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stack-command-dialog .custom-command-common {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+}
+@container settings-dialog (max-width:560px) {
+  .command-stack-editor,
+  .stack-trigger-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stack-entry-list {
+    max-height: 200px;
+  }
+  .stack-condition-panel {
+    max-height: none;
+  }
+}

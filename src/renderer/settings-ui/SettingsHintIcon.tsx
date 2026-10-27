@@ -30,18 +30,33 @@ export function SettingsLockIcon({ title, description }: { title: string; descri
   return <HintPopover title={title} hint={description} description lock />;
 }
 
+/** Long explanations open on request and stay available while their text is read. */
+export function SettingsDescriptionButton({
+  title,
+  description,
+  label,
+}: {
+  title: string;
+  description: string;
+  label: string;
+}) {
+  return <HintPopover title={title} hint={description} description buttonLabel={label} />;
+}
+
 function HintPopover({
   title,
   hint,
   description = false,
   testId,
   lock = false,
+  buttonLabel,
 }: {
   title: string;
   hint: string;
   description?: boolean;
   testId?: string;
   lock?: boolean;
+  buttonLabel?: string;
 }) {
   const { t } = useHostTranslation();
   const id = useId();
@@ -86,6 +101,7 @@ function HintPopover({
       event.preventDefault();
       event.stopPropagation();
       setOpen(false);
+      if (buttonLabel && tooltip.contains(document.activeElement)) button.focus();
     };
     const scroll = settingsPopoverScroll(button, tooltip, () => setOpen(false));
     const resize = () => setOpen(false);
@@ -100,25 +116,33 @@ function HintPopover({
       window.removeEventListener('scroll', scroll, true);
       window.removeEventListener('resize', resize);
     };
-  }, [open, hint]);
+  }, [open, hint, buttonLabel]);
   return (
     <span
       className={description ? 'settings-description-icon' : 'settings-hint-icon'}
-      onPointerEnter={show}
-      onPointerLeave={leave}
+      onPointerEnter={buttonLabel ? undefined : show}
+      onPointerLeave={buttonLabel ? undefined : leave}
     >
       <button
         ref={trigger}
         type="button"
-        className={description ? 'settings-description-trigger' : 'settings-hint-trigger'}
+        className={
+          buttonLabel
+            ? 'settings-description-button'
+            : description
+              ? 'settings-description-trigger'
+              : 'settings-hint-trigger'
+        }
         data-testid={testId}
         aria-label={t(
           lock ? 'settings.mcpAccess.label' : description ? 'common.description' : 'common.hint',
           { title },
         )}
-        aria-describedby={id}
-        onFocus={show}
-        onBlur={() => setOpen(false)}
+        aria-describedby={buttonLabel ? undefined : id}
+        aria-expanded={buttonLabel ? open : undefined}
+        aria-controls={buttonLabel ? id : undefined}
+        onFocus={buttonLabel ? undefined : show}
+        onBlur={buttonLabel ? undefined : () => setOpen(false)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
         }}
@@ -128,49 +152,65 @@ function HintPopover({
           show();
         }}
       >
-        <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          {!lock && <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />}
-          {lock ? (
-            <>
-              <rect
-                x="4.5"
-                y="8.5"
-                width="11"
-                height="8"
-                rx="1.5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-              />
-              <path d="M7 8.5V6a3 3 0 0 1 6 0v2.5" stroke="currentColor" strokeWidth="1.6" />
-              <circle cx="10" cy="12.5" r="1" fill="currentColor" />
-            </>
-          ) : description ? (
-            <>
-              <path d="M10 9v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              <circle cx="10" cy="6" r=".9" fill="currentColor" />
-            </>
-          ) : (
-            <>
-              <path
-                d="M7.8 7.5a2.2 2.2 0 0 1 4.4 0c0 1.6-2.2 1.8-2.2 3.5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-              <circle cx="10" cy="14" r=".9" fill="currentColor" />
-            </>
-          )}
-        </svg>
+        {buttonLabel ?? (
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            {!lock && <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.6" />}
+            {lock ? (
+              <>
+                <rect
+                  x="4.5"
+                  y="8.5"
+                  width="11"
+                  height="8"
+                  rx="1.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                />
+                <path d="M7 8.5V6a3 3 0 0 1 6 0v2.5" stroke="currentColor" strokeWidth="1.6" />
+                <circle cx="10" cy="12.5" r="1" fill="currentColor" />
+              </>
+            ) : description ? (
+              <>
+                <path d="M10 9v5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                <circle cx="10" cy="6" r=".9" fill="currentColor" />
+              </>
+            ) : (
+              <>
+                <path
+                  d="M7.8 7.5a2.2 2.2 0 0 1 4.4 0c0 1.6-2.2 1.8-2.2 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <circle cx="10" cy="14" r=".9" fill="currentColor" />
+              </>
+            )}
+          </svg>
+        )}
       </button>
       <span
         ref={popup}
         id={id}
-        className="settings-hint-tooltip"
-        role="tooltip"
+        className={`settings-hint-tooltip${buttonLabel ? ' settings-description-popover' : ''}`}
+        role={buttonLabel ? 'region' : 'tooltip'}
+        aria-label={buttonLabel ? title : undefined}
         popover="manual"
-        onPointerEnter={show}
-        onPointerLeave={leave}
+        onPointerEnter={buttonLabel ? undefined : show}
+        onPointerLeave={buttonLabel ? undefined : leave}
       >
+        {buttonLabel && (
+          <button
+            type="button"
+            className="settings-description-close"
+            aria-label={t('common.closeDialog')}
+            onClick={() => {
+              setOpen(false);
+              trigger.current?.focus();
+            }}
+          >
+            ×
+          </button>
+        )}
         {hint}
       </span>
     </span>

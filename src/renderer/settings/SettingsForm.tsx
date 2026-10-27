@@ -23,6 +23,7 @@ import { TraySettings } from './TraySettings';
 import { TtsSettingsForm } from './TtsSettings';
 import { AiSettingsForm } from './AiSettings';
 import { CustomCommandsSettings } from './CustomCommandsSettings';
+import { TriggerStackSettings } from './TriggerStackSettings';
 import { WebAccountSettings } from './WebAccountSettings';
 import { ApiPermissionsSettings } from './ApiPermissionsSettings';
 import { CodexSettings } from './CodexSettings';
@@ -147,6 +148,8 @@ export function SettingsForm({
           commands={commands}
           settings={settings}
           auxiliary={aux.customCommands}
+          applets={extensions}
+          onChange={edit}
           invoke={invoke}
           busy={busy}
         />
@@ -219,6 +222,19 @@ export function SettingsForm({
         )}
         {category === 'shortcuts' && (
           <ShortcutsEditor key={category} settings={settings} onChange={edit} />
+        )}
+        {(category === 'shortcuts' ||
+          category === 'gestures' ||
+          category === 'touchpad-gestures') && (
+          <TriggerStackSettings
+            key={category}
+            kind={category}
+            settings={settings}
+            commands={commands}
+            applets={extensions}
+            onChange={edit}
+            busy={busy}
+          />
         )}
         {category === 'appearance' && (
           <>
