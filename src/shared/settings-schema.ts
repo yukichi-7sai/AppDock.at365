@@ -27,6 +27,7 @@ import { parseImageLibrary } from './registered-images';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
 import { fillSettingDefaults } from './settings-defaults';
+import { restoreTriggerStackStorage } from './trigger-stacks';
 import { validateAppletCommonValues } from './applet-common-settings';
 import {
   defaultShortcuts,
@@ -64,6 +65,7 @@ export const createDefaultSettings = (): Settings => ({
   ribbon: defaultRibbon(),
 });
 export function parseSettings(value: unknown): Settings {
+  if (object(value)) value = restoreTriggerStackStorage(value);
   // Files may omit default-valued fields. Explicit invalid values still reach validation.
   if (object(value) && value.schemaVersion === 1) {
     const raw = value;

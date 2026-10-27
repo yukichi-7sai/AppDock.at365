@@ -4,6 +4,7 @@ import {
   type ConditionEnvironment,
   type TriggerContext,
 } from './command-conditions';
+import { expandStackCommand, maximumExpandedCommands, type CommandStack } from './command-stacks';
 
 export type CommandExecutionMode = 'first' | 'all';
 export interface TriggerBinding {
@@ -16,10 +17,12 @@ export interface CommandCatalogEntry {
   id: string;
   extensionId?: string | null;
   available?: boolean;
+  stack?: CommandStack;
 }
 export interface CommandBatchPlan {
   readonly commands: readonly string[];
   readonly rowIds: readonly string[];
+  readonly stackIds?: readonly string[];
 }
 
 /** Shared by planning and compatibility adapters; busy state never changes selection. */
@@ -47,20 +50,41 @@ export function planCommandBatch(
   environment: ConditionEnvironment = {},
 ): CommandBatchPlan {
   const available = new Map(catalog.filter((c) => c.available !== false).map((c) => [c.id, c]));
+  const expanded = new Map<string, ReturnType<typeof expandStackCommand>>();
   const selected = selectCommandBindings(
     rows.filter((row) => {
       const command = available.get(row.command);
+      if (
+        !row.enabled ||
+        !command ||
+        !matchesCommandCondition(row.when, context, command.extensionId, environment)
+      )
+        return false;
+      const plan =
+        expanded.get(row.command) ??
+        expandStackCommand(row.command, available, context, environment);
+      expanded.set(row.command, plan);
       return (
         row.enabled &&
         !!command &&
+        !!plan?.commands.length &&
         matchesCommandCondition(row.when, context, command.extensionId, environment)
       );
     }),
     mode,
   );
+  const stackIds = [
+    ...new Set(selected.flatMap((row) => expanded.get(row.command)?.stackIds ?? [])),
+  ];
+  const commands = [
+    ...new Set(selected.flatMap((row) => expanded.get(row.command)?.commands ?? [])),
+  ];
+  if (commands.length > maximumExpandedCommands)
+    return Object.freeze({ commands: Object.freeze([]), rowIds: Object.freeze([]) });
   return Object.freeze({
-    commands: Object.freeze(selected.map((row) => row.command)),
+    commands: Object.freeze(commands),
     rowIds: Object.freeze(selected.map((row) => row.id)),
+    ...(stackIds.length ? { stackIds: Object.freeze(stackIds) } : {}),
   });
 }
 

@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { stackConditionPaths, type StackCatalogEntry } from './command-stacks';
 import { applyBindingOrder } from './binding-order';
 import {
   inputExecutionMode,
@@ -338,7 +339,9 @@ export function nativeShortcutInputs(
   rows: Keybinding[],
   available: string[],
   environment: ConditionEnvironment,
+  catalog: readonly StackCatalogEntry[] = [],
 ) {
+  const known = new Map(catalog.map((command) => [command.id, command]));
   return globalShortcutInputs(rows, available).map((input) => {
     const members = rows.filter(
       (row) =>
@@ -351,6 +354,7 @@ export function nativeShortcutInputs(
       !environment.excludedProcesses?.length &&
       !members.some(
         (row) =>
+          known.get(row.command)?.stack ||
           row.when.scope !== 'global' ||
           row.when.excludeDesktop ||
           row.when.excludedProcesses?.length,
@@ -370,6 +374,9 @@ export function nativeShortcutInputs(
             : {}),
         },
         blockOriginalInput: row.blockOriginalInput !== false,
+        ...(known.get(row.command)?.stack
+          ? { stackConditions: stackConditionPaths(row.command, known) }
+          : {}),
       })),
       environment: {
         browsers: environment.browsers,

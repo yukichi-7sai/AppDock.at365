@@ -3,6 +3,7 @@ import { createDefaultSettings } from './settings-schema';
 import { defaultKeybindings } from './keybindings';
 import { fillSettingDefaults, omitSettingDefaults, settingsObject } from './settings-defaults';
 import { customCommandVersion } from './custom-commands';
+import { triggerStacks } from './trigger-stacks';
 import { appletCommonDefinitions, type AppletCommonKey } from './applet-common-settings';
 
 export function appletConfigurationDefaults(applet?: ExtensionManifest) {
@@ -110,6 +111,19 @@ export function settingsStorageValue(
 ): Record<string, unknown> {
   const defaults = settingsStorageDefaults();
   const result = omitSettingDefaults(value, defaults) ?? {};
+  // Input modules consume projections; the file contains one stack for each trigger.
+  const stacks = triggerStacks(value);
+  if (JSON.stringify(stacks) !== JSON.stringify(triggerStacks(defaults)))
+    result.triggerStacks = { version: 1, items: stacks };
+  delete result.keybindings;
+  delete result.shortcuts;
+  delete result.globalShortcutCommands;
+  for (const key of ['keybindingOptions', 'gestures', 'touchpadGestures']) {
+    if (!result[key]) continue;
+    delete result[key].inputExecutionModes;
+    if (key !== 'keybindingOptions') delete result[key].bindings;
+    if (!Object.keys(result[key]).length) delete result[key];
+  }
   for (const key of ['customCommands', 'mcpServers'] as const)
     if (result[key]) result[key].version = value[key]!.version;
   result.schemaVersion = 1;

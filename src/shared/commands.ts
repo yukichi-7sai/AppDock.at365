@@ -43,6 +43,8 @@ export function hostCommandsForApplets(applets: import('./contracts').ExtensionS
   return [...hostCommands, ...appletSettingsPageCommands(applets)];
 }
 export interface UiCommand extends Command {
+  /** Local-only execution metadata; never projected into the external command catalog. */
+  stack?: import('./command-stacks').CommandStack;
   /** Effective publication from the shared external command catalog, not execution permission. */
   automation?: boolean;
   customDefinitionId?: string;

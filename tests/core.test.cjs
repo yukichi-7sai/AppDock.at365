@@ -6,6 +6,7 @@ const path = require('node:path');
 const { PassThrough } = require('node:stream');
 const { SettingsStore, defaults, validate } = require('../out/main/main/core/settings.js');
 const { JsonLinePeer } = require('../out/main/main/core/rpc.js');
+const { getKeybindings, withKeybindings } = require('../out/main/shared/keybindings');
 const { readManifest } = require('../out/main/main/core/extensions.js');
 function temporary(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-test-'));
@@ -97,7 +98,10 @@ test('settings retain supported preferences and Applet data while dropping obsol
   const loaded = store.load();
   assert.deepEqual(loaded.value, value);
   store.save(loaded.value, loaded.revision);
-  assert.deepEqual(validate(JSON.parse(fs.readFileSync(file, 'utf8'))), value);
+  assert.deepEqual(
+    validate(JSON.parse(fs.readFileSync(file, 'utf8'))),
+    withKeybindings(value, getKeybindings(value)),
+  );
 });
 test('invalid settings do not overwrite valid settings', (t) => {
   const file = path.join(temporary(t), 'settings.json');

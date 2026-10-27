@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { stackConditionPaths, type StackCatalogEntry } from './command-stacks';
 import { normalizeShortcut, validCommandId } from './commands';
 import { applyBindingOrder } from './binding-order';
 import {
@@ -251,7 +252,7 @@ export function initializeGestureDefaults(
 export function nativeGestureRows(
   settings: GestureSettings,
   context: GestureContext,
-  commands: { id: string; title: string; extensionId?: string | null }[],
+  commands: (StackCatalogEntry & { title: string })[],
   includeInactive = false,
 ) {
   const available = new Map(commands.map((c) => [c.id, c]));
@@ -273,6 +274,7 @@ export function nativeGestureRows(
         ...row,
         title: command.title,
         ownerId: command.extensionId ?? null,
+        ...(command.stack ? { stackConditions: stackConditionPaths(command.id, available) } : {}),
         window: !matches ? '-1' : external ? '' : context.window,
       },
     ];

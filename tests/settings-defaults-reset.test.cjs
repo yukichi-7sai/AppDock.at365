@@ -10,6 +10,7 @@ const {
   applySettingsJson,
 } = require('../out/main/shared/settings-catalog');
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
+const { getKeybindings } = require('../out/main/shared/keybindings');
 const {
   fillSettingDefaults,
   omitSettingDefaults,
@@ -418,13 +419,17 @@ test('restoring an old full configuration accepts the canonical sparse state on 
   assert.equal(store.value.host.theme, 'dark');
 });
 
-test('legacy command maps keep explicit empty assignments while omitted maps follow current defaults', () => {
+test('legacy empty assignments serialize as trigger stacks without restoring removed defaults', () => {
   const value = createDefaultSettings();
   const command = Object.keys(value.shortcuts)[0];
   value.shortcuts[command] = [];
   const raw = settingsStorageValue(value);
-  assert.deepEqual(parseSettings(raw).shortcuts, value.shortcuts);
-  assert.deepEqual(parseSettings(raw).shortcuts[command], []);
+  assert.equal(raw.shortcuts, undefined);
+  assert.deepEqual(getKeybindings(parseSettings(raw)), getKeybindings(value));
+  assert.equal(
+    getKeybindings(parseSettings(raw)).some((row) => row.command === command),
+    false,
+  );
   assert.deepEqual(
     parseSettings({ schemaVersion: 1 }).shortcuts,
     createDefaultSettings().shortcuts,
