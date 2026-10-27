@@ -3063,7 +3063,7 @@
   "settings.touchpadOptions.windowsSettings": "Windowsのタッチパッド設定",
   "settings.aboutSettings.checkUpdates": "更新を確認",
   "settings.updateSettings.autoCheckHost": "AppDockの更新を自動で確認",
-  "settings.updateSettings.autoCheckHostHint": "AppDockについてを開いたとき、前回の確認から1時間以上経過していれば本体の更新を確認します。更新の適用は行いません。",
+  "settings.updateSettings.autoCheckHostHint": "既定はOFFです。ONにすると、AppDockについてを開いたとき、前回の確認から1時間以上経過していれば本体のバージョン情報を確認します。更新パッケージのダウンロード・適用は行いません。",
   "settings.aboutSettings.intro": "アプリ・コマンド・毎日の操作を、ひとつの場所に。",
   "settings.aboutSettings.commands": "コマンド",
   "settings.aboutSettings.running": "稼働中 {{count}}",

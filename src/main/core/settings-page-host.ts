@@ -17,6 +17,7 @@ export class SettingsPageHost {
       create(request: SettingsPageRequest): SettingsPageSession | Promise<SettingsPageSession>;
       flush(): Promise<void>;
       changed(connection: SettingsPageConnection): void;
+      activeChanged?(): void;
     },
   ) {}
   async open(request: SettingsPageRequest): Promise<SettingsPageConnection> {
@@ -36,7 +37,12 @@ export class SettingsPageHost {
       throw Error(hostText('services.settingsPageHost.targetChanged'));
     }
     this.current = { id, request: bound, page };
+    this.options.activeChanged?.();
     return { connectionId: id, snapshot: this.current.page.snapshot() };
+  }
+  isOpen() {
+    const current = this.current;
+    return !!current && this.options.allowed(current.request) && current.page.isCurrent();
   }
   private bound(id: string) {
     const current = this.current;
@@ -60,8 +66,10 @@ export class SettingsPageHost {
   }
   close(id?: string) {
     if (id && this.current?.id !== id) return;
-    this.current?.page.dispose();
+    const current = this.current;
     this.current = undefined;
+    current?.page.dispose();
+    if (current) this.options.activeChanged?.();
   }
   refresh() {
     const current = this.current;

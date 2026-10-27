@@ -142,7 +142,7 @@ test('mode item uses normal placement, name, visibility and group editing withou
       operation,
     );
   };
-  assert.equal(ribbonPlacement(settings.ribbon, id, items), 'bottom');
+  assert.equal(ribbonPlacement(settings.ribbon, id, items), 'top');
   edit({ kind: 'updateItem', id, changes: { title: '切り替え' } });
   edit({ kind: 'update', id, changes: { placement: 'top' } });
   assert.equal(ribbonPlacement(settings.ribbon, id, items), 'top');

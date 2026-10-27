@@ -134,7 +134,7 @@ await context.AppDock.CallAsync("tts.stop", new { jobId = id }, token);
 
 ## 許可と所有者
 
-読み上げ専用useTtsをApplet/MCPそれぞれに追加する。生成はread+execute+useTts、一覧はread+useTts。新規環境・既存保存形式の省略項目ともuseTtsは初期OFF。他の許可から推定して有効化しない。
+読み上げ専用useTtsをApplet/MCPそれぞれに設ける。生成はread+execute+useTts、一覧はread+useTts。新規環境はApplet側がON、MCP側がOFF。既存保存形式の省略項目は拒否を維持し、他の許可から推定して有効化しない。
 
 状態取得はread、停止はread+executeを必要とする。useTts取消後も他の必要許可が残っていれば状態確認・停止ができる。useTts取消時にはホストが該当する稼働中ジョブを自動取消する。MCP連携OFF、Applet停止・異常終了、ホスト終了でも対象ジョブを取り消す。
 

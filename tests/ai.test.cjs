@@ -603,10 +603,10 @@ test('keys are endpoint-bound encrypted and carry an opaque revision', () => {
   fs.writeFileSync(path.join(dir, 'keys.json'), '{broken');
   assert(store.status(c).error);
 });
-test('Applet AI defaults OFF and existing grants do not gain AI permission', () => {
+test('Applet AI defaults ON and existing grants retain their explicit permissions', () => {
   const dir = temp(),
     file = path.join(dir, 'access.json');
-  assert.equal(new AppletApiAccess(file).get().useAi, false);
+  assert.equal(new AppletApiAccess(file).get().useAi, true);
   fs.writeFileSync(
     file,
     JSON.stringify({ version: 2, permissions: { read: true, execute: true, useTts: true } }),

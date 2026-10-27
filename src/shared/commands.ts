@@ -56,7 +56,7 @@ export interface UiCommand extends Command {
   hidden?: boolean;
 }
 export const defaultShortcuts: Record<string, string[]> = {
-  'appdock.commands.search': ['Ctrl+P', 'Ctrl+Shift+P'],
+  'appdock.commands.search': ['Ctrl+P'],
   'appdock.settings.open': ['Ctrl+,'],
 };
 export const defaultGlobalShortcutCommands: string[] = [];

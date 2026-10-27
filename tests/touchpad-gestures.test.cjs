@@ -232,6 +232,121 @@ test('unchanged periodic checks still inspect Windows but do not republish UI or
   assert.equal(f.publications.length, count + 2);
 });
 
+test('one-minute supplementary checks run only while settings are visible; Windows events still work while hidden', async (t) => {
+  const f = fixture(t);
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const tick = async (ms) => {
+    t.mock.timers.tick(ms);
+    await new Promise(setImmediate);
+  };
+  await f.edit((v) => {
+    v.bindings = [row('a')];
+    v.enabled = true;
+  });
+  await f.manager.start();
+  const reads = () => f.calls.filter((c) => c.method === 'touchpad.read').length;
+  let count = reads();
+  await tick(10 * 60000);
+  assert.equal(reads(), count);
+  f.manager.setSettingsVisible(true);
+  await tick(0);
+  assert.equal(reads(), ++count, 'opening settings checks immediately');
+  const publications = f.publications.length;
+  await tick(59999);
+  assert.equal(reads(), count);
+  await tick(1);
+  assert.equal(reads(), ++count);
+  assert.equal(f.publications.length, publications, 'unchanged state does not republish');
+  f.manager.setSettingsVisible(false);
+  await tick(10 * 60000);
+  assert.equal(reads(), count);
+  f.windows[0].key = 'Ctrl+F24';
+  f.manager.windowsChanged();
+  await tick(0);
+  assert.equal(reads(), ++count);
+  assert.equal(f.manager.snapshot().statuses[0].state, 'conflict');
+  f.windows[0].key = 'F13';
+  f.manager.windowsChanged();
+  await tick(0);
+  assert.equal(reads(), ++count);
+  assert.equal(f.manager.snapshot().statuses[0].state, 'connected');
+  await f.manager.pressed({ shortcuts: ['F13'], window: '7', target: { window: '7' } });
+  assert(f.events.includes('three.tap'), 'hidden settings do not disable gesture dispatch');
+});
+
+test('polling starts after startup with an already visible surface and stops when disabled or unassigned', async (t) => {
+  const f = fixture(t);
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const tick = async (ms) => {
+    t.mock.timers.tick(ms);
+    await new Promise(setImmediate);
+  };
+  await f.edit((v) => {
+    v.bindings = [row('a')];
+    v.enabled = true;
+  });
+  const reads = () => f.calls.filter((c) => c.method === 'touchpad.read').length;
+  const before = reads();
+  f.manager.setSettingsVisible(true);
+  assert.equal(reads(), before);
+  await f.manager.start();
+  await tick(60000);
+  assert.equal(reads(), before + 2);
+  await f.edit((v) => {
+    v.enabled = false;
+  });
+  const disabled = reads();
+  await tick(600000);
+  assert.equal(reads(), disabled);
+  await f.edit((v) => {
+    v.enabled = true;
+  });
+  const enabled = reads();
+  await tick(60000);
+  assert.equal(reads(), enabled + 1);
+  await f.edit((v) => {
+    v.bindings = [];
+  });
+  const empty = reads();
+  await tick(600000);
+  assert.equal(reads(), empty);
+});
+
+test('hiding settings cancels a queued periodic read and closing prevents polling from restarting', async (t) => {
+  const f = fixture(t);
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const tick = async (ms) => {
+    t.mock.timers.tick(ms);
+    await new Promise(setImmediate);
+  };
+  await f.edit((v) => {
+    v.bindings = [row('a')];
+    v.enabled = true;
+  });
+  await f.manager.start();
+  f.manager.setSettingsVisible(true);
+  await tick(0);
+  const reads = () => f.calls.filter((c) => c.method === 'touchpad.read').length;
+  const count = reads();
+  let release;
+  const blocked = f.manager.serial(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  await tick(60000);
+  f.manager.setSettingsVisible(false);
+  release();
+  await blocked;
+  await tick(0);
+  assert.equal(reads(), count);
+  await f.manager.close();
+  f.manager.setSettingsVisible(true);
+  await tick(60000);
+  assert.equal(reads(), count);
+});
+
 test('explicit ON connects assigned inputs, conflict is per gesture, OFF and delete leave Windows', async (t) => {
   const f = fixture(t),
     count = () => f.calls.filter((c) => c.method === 'touchpad.apply').length;

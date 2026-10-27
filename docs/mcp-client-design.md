@@ -24,7 +24,7 @@
 
 ## 共通サービスと発見
 
-本体のMcpClientServiceを単一実体とし、Appletは`context.appdock.call`/`.NET AppDock.CallAsync`を使う。MCPサーバー機能OFFでも本体とAppletの利用は可能。操作は`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`。Appletの`useMcp`は初期OFF。読取りはread + useMcp、実行/取消はさらにexecute。接続先の管理は本体設定UIと、独立した管理許可を持つ共通APIから同じ保存処理を使う。
+本体のMcpClientServiceを単一実体とし、Appletは`context.appdock.call`/`.NET AppDock.CallAsync`を使う。MCPサーバー機能OFFでも本体とAppletの利用は可能。操作は`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`。Appletの`useMcp`は新規環境でON、保存済みの拒否・省略は維持する。読取りはread + useMcp、実行/取消はさらにexecute。接続先の管理は本体設定UIと、独立した管理許可を持つ共通APIから同じ保存処理を使う。
 
 ## 接続先の管理API
 

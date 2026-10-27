@@ -5,11 +5,13 @@ function fixture() {
   let route = 'settings',
     flush = async () => {},
     disposed = [],
-    changes = [];
+    changes = [],
+    activity = [];
   const host = new SettingsPageHost({
     allowed: (r) => r.route === route,
     flush: () => flush(),
     changed: (c) => changes.push(c),
+    activeChanged: () => activity.push(host.isOpen()),
     create: (r) => ({
       isCurrent: () => true,
       snapshot: () => ({ id: r.id, revision: 1 }),
@@ -17,9 +19,34 @@ function fixture() {
       dispose: () => disposed.push(r.id),
     }),
   });
-  return { host, disposed, changes, route: (r) => (route = r), flush: (f) => (flush = f) };
+  return {
+    host,
+    disposed,
+    changes,
+    activity,
+    route: (r) => (route = r),
+    flush: (f) => (flush = f),
+  };
 }
 const request = { id: 'untrusted-id', route: 'settings', kind: 'settings', context: 'full' };
+
+test('active settings surface tracks opening, replacement, stale cleanup and navigation', async () => {
+  const f = fixture();
+  assert.equal(f.host.isOpen(), false);
+  const first = await f.host.open(request);
+  assert.equal(f.host.isOpen(), true);
+  assert.deepEqual(f.activity, [true]);
+  const second = await f.host.open(request);
+  assert.deepEqual(f.activity, [true, false, true]);
+  f.host.close(first.connectionId);
+  assert.equal(f.host.isOpen(), true);
+  assert.deepEqual(f.activity, [true, false, true]);
+  f.route('home');
+  assert.equal(f.host.isOpen(), false);
+  f.host.close(second.connectionId);
+  assert.equal(f.host.isOpen(), false);
+  assert.deepEqual(f.activity, [true, false, true, false]);
+});
 test('replacement invalidates stale calls and stale cleanup cannot close the new settings page', async () => {
   const f = fixture();
   const old = await f.host.open(request);

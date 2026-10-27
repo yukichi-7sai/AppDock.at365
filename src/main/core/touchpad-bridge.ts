@@ -64,6 +64,8 @@ export class TouchpadBridgeManager {
   private episodes = new Map<TouchpadGestureId, WarningEpisode>();
   private queue: Promise<unknown> = Promise.resolve();
   private timer?: ReturnType<typeof setInterval>;
+  private started = false;
+  private settingsVisible = false;
   private running = false;
   private stopped = false;
   private busy = false;
@@ -224,17 +226,44 @@ export class TouchpadBridgeManager {
     this.options.changed();
   }
   async start() {
+    this.started = true;
     await this.reconcile();
-    this.timer = setInterval(() => {
-      if (this.running || this.busy || this.stopped || !this.value().enabled) return;
-      this.running = true;
-      void this.reconcile().finally(() => {
-        this.running = false;
-      });
-    }, 2000);
+    this.updatePolling();
+  }
+  /** Periodic inspection is UI support; Windows notifications remain active. */
+  setSettingsVisible(visible: boolean) {
+    if (this.stopped || visible === this.settingsVisible) return;
+    this.settingsVisible = visible;
+    this.updatePolling();
+    if (visible && this.started) this.checkVisible();
+  }
+  private updatePolling() {
+    const value = this.value();
+    if (
+      !this.started ||
+      !this.settingsVisible ||
+      this.stopped ||
+      !value.enabled ||
+      !value.bindings.length
+    ) {
+      clearInterval(this.timer);
+      this.timer = undefined;
+    } else if (!this.timer) this.timer = setInterval(() => this.checkVisible(), 60000);
+  }
+  private checkVisible() {
+    if (this.running || this.busy || this.stopped || !this.settingsVisible || !this.value().enabled)
+      return;
+    this.running = true;
+    void this.serial(async () => {
+      // A queued periodic check may outlive the visible settings surface.
+      if (!this.stopped && this.settingsVisible && this.value().enabled) await this.inspect();
+    }).finally(() => {
+      this.running = false;
+    });
   }
   /** The changed event never grants permission to write Windows settings. */
   settingsChanged() {
+    this.updatePolling();
     const next = fingerprint(this.value());
     if (next === this.requestedSettings) return;
     this.requestedSettings = next;
@@ -272,6 +301,7 @@ export class TouchpadBridgeManager {
   }
   private async inspect() {
     if (this.stopped) return;
+    this.updatePolling();
     const value = this.value();
     const expectedSettings = fingerprint(value);
     this.requestedSettings = expectedSettings;

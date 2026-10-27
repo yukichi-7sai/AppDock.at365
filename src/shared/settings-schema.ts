@@ -15,7 +15,7 @@ import {
   defaultKeybindingOptions,
   parseKeybindingOptions,
 } from './keybindings';
-import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems } from './tray-menu';
+import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems, defaultTrayMenu } from './tray-menu';
 import { parseGestures, defaultGestures } from './gestures';
 import { defaultTouchpadGestures, parseTouchpadGestures } from './touchpad-gestures';
 import {
@@ -51,7 +51,7 @@ export const createDefaultSettings = (): Settings => ({
   extensions: {},
   updates: {
     hostSource: 'github:yukichi-7sai/AppDock.at365',
-    checkHostOnAboutOpen: true,
+    checkHostOnAboutOpen: false,
     checkHostOnStartup: false,
     checkAppletsOnStartup: false,
     startupDelaySeconds: 10,
@@ -60,7 +60,8 @@ export const createDefaultSettings = (): Settings => ({
   },
   shortcuts: structuredClone(defaultShortcuts),
   globalShortcutCommands: [...defaultGlobalShortcutCommands],
-  trayCommands: [],
+  trayCommands: ['appdock.open'],
+  trayMenu: defaultTrayMenu(),
   pinnedCommands: [],
   ribbon: defaultRibbon(),
 });
@@ -75,8 +76,23 @@ export function parseSettings(value: unknown): Settings {
       Object.hasOwn(raw.host, 'shellProvider')
     )
       value = { ...raw, host: { ...raw.host, shellProviders: parseShellProviders(raw.host) } };
+    const defaults = createDefaultSettings();
+    if (object(raw.ribbon) && Array.isArray(raw.ribbon.groups)) {
+      const children = new Set(
+        raw.ribbon.groups.flatMap((group) =>
+          object(group) && Array.isArray(group.children) ? group.children : [],
+        ),
+      );
+      // New root defaults must not pull an existing child out of its saved group.
+      defaults.ribbon.order = defaults.ribbon.order.filter((id) => !children.has(id));
+      defaults.ribbon.bottom = defaults.ribbon.bottom.filter((id) => !children.has(id));
+    }
     value = fillSettingDefaults(value, {
-      ...createDefaultSettings(),
+      ...defaults,
+      // An explicit legacy command list owns its layout until its usual migration.
+      ...(raw.trayMenu === undefined && raw.trayCommands !== undefined
+        ? { trayMenu: undefined }
+        : {}),
       ...(raw.notificationPreferences === undefined
         ? {}
         : { notificationPreferences: { overrides: [] } }),

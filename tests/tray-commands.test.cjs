@@ -13,22 +13,25 @@ const applet = (commands) => ({
   tray: [{ title: 'Suggested label', command: 'test.applet.run' }],
 });
 
-test('legacy profiles default to no optional tray entries and the open command without mutation', () => {
+test('missing tray choices default to the open command without mutating saved input', () => {
   const original = createDefaultSettings();
   delete original.trayCommands;
   delete original.host.trayClickCommand;
   const parsed = parseSettings(original);
-  assert.deepEqual(parsed.trayCommands, []);
+  assert.deepEqual(parsed.trayCommands, ['appdock.open']);
   assert.equal(parsed.host.trayClickCommand, 'appdock.open');
   assert.equal(original.host.trayClickCommand, undefined);
   assert.deepEqual(
-    trayCommandGroups(parsed, [applet([{ id: 'test.applet.run', title: 'Run', available: true }])]),
-    [],
+    trayCommandGroups(parsed, [
+      applet([{ id: 'test.applet.run', title: 'Run', available: true }]),
+    ]).flatMap((group) => group.commands.map((command) => command.id)),
+    ['appdock.open'],
   );
 });
 
 test('tray settings validate types, duplicates and IDs, while retaining missing command choices', () => {
   const settings = createDefaultSettings();
+  delete settings.trayMenu;
   settings.trayCommands = ['missing.command'];
   settings.host.trayClickCommand = 'missing.command';
   assert.deepEqual(parseSettings(settings).trayCommands, settings.trayCommands);

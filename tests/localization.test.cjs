@@ -121,6 +121,7 @@ test('saving Japanese remains PC-local and preserves user commands, groups and s
     },
   ];
   value.ribbon.order = ['group:custom', 'settings'];
+  value.ribbon.bottom = ['theme'];
   value.customCommands = {
     version: 2,
     items: [

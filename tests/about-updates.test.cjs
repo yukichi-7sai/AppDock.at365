@@ -6,8 +6,9 @@ const { PortableUpdates } = require('../out/main/main/core/portable-updates.js')
 const { createDefaultSettings, parseSettings } = require('../out/main/shared/settings-schema.js');
 const { settingsProjection, applySettingsJson } = require('../out/main/shared/settings-catalog.js');
 
-function fixture() {
+function fixture(automatic = true) {
   const settings = createDefaultSettings().updates;
+  settings.checkHostOnAboutOpen = automatic;
   const requests = [],
     notices = [];
   let latest = '1.0.0',
@@ -49,10 +50,10 @@ function fixture() {
       return new Response(
         JSON.stringify({
           schemaVersion: 1,
-          kind: 'host',
-          id: 'host',
+          kind: url.endsWith('/applet.json') ? 'applet' : 'host',
+          id: url.endsWith('/applet.json') ? 'applet' : 'host',
           version: latest,
-          payload: { file: 'AppDock.exe', format: 'exe', sha256: 'a'.repeat(64), size: 20 },
+          payload: { file: 'update.zip', format: 'zip', sha256: 'a'.repeat(64), size: 20 },
         }),
         { status: 200 },
       );
@@ -70,8 +71,22 @@ function fixture() {
   };
 }
 
-test('About auto-check defaults on, preserves explicit false and validates its saved setting', () => {
-  assert.equal(createDefaultSettings().updates.checkHostOnAboutOpen, true);
+test('fresh startup and About do not request updates; an explicit check reads only version metadata', async () => {
+  const f = fixture(false);
+  await f.updater.checkHostOnAboutOpen();
+  assert.equal(
+    f.updater.scheduleStartup(false, () => assert.fail('unexpected startup notification')),
+    undefined,
+  );
+  assert.deepEqual(f.requests, []);
+  f.setLatest('2.0.0');
+  await f.updater.check();
+  assert.deepEqual(f.requests, ['http://localhost/host.json', 'http://localhost/applet.json']);
+  assert(f.updater.state.results.every((result) => result.status === 'available'));
+});
+
+test('About auto-check defaults off, preserves explicit values and validates its saved setting', () => {
+  assert.equal(createDefaultSettings().updates.checkHostOnAboutOpen, false);
   const saved = createDefaultSettings();
   saved.updates.checkHostOnAboutOpen = false;
   assert.equal(parseSettings(saved).updates.checkHostOnAboutOpen, false);

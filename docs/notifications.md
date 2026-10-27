@@ -34,9 +34,9 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 種類別の「既定に戻す」ボタンは設けない。通知先・表示時間・読み上げは個別に即時保存する。未指定項目の既定値継承と、既存の保存値は維持する。
 
-本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。ログも残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
+本体の処理失敗は、機能ごとの種類を増やさず「エラー通知」へ接続する。初期状態はバナー、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。ログも残す。共通入口と接続済み範囲は[共通のエラー通知とログ](error-reporting.md)を正本とする。「設定 → 通知」は内部のownerIdによらず本体の種類を一つのAppDock欄へまとめる。
 
-確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナーとデスクトップ通知、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。同じ状態の間は閉じる・期限切れ後に再表示せず、本体ログで確認できる。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
+確認・対処が必要な状態は本体の「警告通知」へ接続する。既定はバナー、閉じるまで表示、読み上げOFF。バナーは必須で、通知全体のOFFは設けない。同じ状態の間は閉じる・期限切れ後に再表示せず、本体ログで確認できる。共通入口・状態寿命・整理導線は[警告通知の設計](warning-notifications-design.md)を参照する。
 
 notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、表示先・時間指定が可能。
 
@@ -138,7 +138,7 @@ Windows Tagは通知IDのSHA256先頭16桁、Groupは配置/profile固有protoco
 
 通知の起動先には配置先の本体EXEを使い、Electronのsingle-instance経路で実行中の本体へ通知引数を渡す。起動途中の引数はstartupReadyまで保留し、準備後に既存の通知操作へ渡す。`scripts/notification-portable-test.cjs`でShell URIの隔離起動と引き継ぎを確認する。実管理者環境のUAC承認後の動作は別途確認する。
 
-旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出もhost/updates/available (Windows/manual、消音)へ統合し、更新適用成功host/updates/appliedの既定banner/6秒は維持する。
+旧showは本体生成appdock.legacyへ統合。署名・null・100/500文字制限・silent・登録済み所有コマンド検査を保持する。既定はWindows/manual。履歴は固定の汎用要約だけを保存し、旧本文に安全な要約があると推測しない。Appletが予約IDを宣言することを拒否する。起動時更新検出はhost/updates/available (banner/6秒、消音)へ統合する。更新適用成功host/updates/appliedも既定banner/6秒とする。
 
 Windowsの集中モード、表示有無、ポップアップ表示時間、manual時の常時表示はOSが管理する。基盤の時限はactive/センターでの操作期限であり、OSのcloseは基盤のresolveにしない。OS表示を閉じても基盤activeならセンターで操作できる。この違いを通知設定に表示する。固定Electronの[Notification](https://www.electronjs.org/docs/latest/api/notification)と実WindowsのTag/Group・履歴・Shell URI起動を検証し、物理クリックと実メール受信は別の未確認事項として記録する。
 

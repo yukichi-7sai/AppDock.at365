@@ -91,6 +91,7 @@ test('settings retain supported preferences and Applet data while dropping obsol
   value.shortcuts['test.applet.run'] = ['Ctrl+Alt+9'];
   value.pinnedCommands = ['test.applet.run'];
   value.trayCommands = ['test.applet.run'];
+  delete value.trayMenu;
   value.globalShortcutCommands = ['test.applet.run'];
   value.profile = { ...value.profile, name: 'Test profile' };
   fs.writeFileSync(file, JSON.stringify({ ...value, widgets: { obsolete: 'unused' } }));

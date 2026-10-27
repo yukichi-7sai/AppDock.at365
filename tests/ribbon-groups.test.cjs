@@ -183,6 +183,7 @@ test('move and ungroup preserve missing children, exact root position, bottom an
 test('child placement changes require moving out; group nesting and partial reorder cannot corrupt layout', () => {
   const layout = {
     ...defaultRibbon(),
+    bottom: ['theme'],
     order: ['group:one', 'group:two'],
     groups: [group('group:one', ['home', 'logs']), group('group:two')],
   };

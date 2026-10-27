@@ -1311,6 +1311,14 @@ const operationApi = new AppDockApi({
 });
 const changed = () => {
   refreshAppearance();
+  touchpad?.setSettingsVisible(
+    !quitting &&
+      !!window &&
+      !window.isDestroyed() &&
+      window.isVisible() &&
+      !window.isMinimized() &&
+      !!settingsPageHost?.isOpen(),
+  );
   if (quitting || notifyTimer) return;
   notifyTimer = setTimeout(() => {
     notifyTimer = undefined;
@@ -4085,6 +4093,7 @@ async function initialize() {
     },
   });
   settingsPageHost = new SettingsPageHost({
+    activeChanged: changed,
     allowed: (request) =>
       uiReady &&
       !quitting &&

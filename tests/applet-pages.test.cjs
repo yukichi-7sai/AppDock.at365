@@ -38,9 +38,9 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
   const settings = createDefaultSettings();
   delete settings.ribbon;
   assert.deepEqual(parseSettings(settings).ribbon, {
-    order: [],
+    order: ['ribbon-display-mode', 'settings', 'image-library', 'notifications', 'logs', 'theme'],
     hidden: [],
-    bottom: ['theme'],
+    bottom: ['theme', 'logs', 'notifications'],
     separators: [],
     groups: [],
     itemOverrides: {},
@@ -54,7 +54,7 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
     pages: { main: { display: 'window' } },
   };
   const next = parseSettings(settings);
-  assert.deepEqual(next.ribbon.bottom, ['theme']);
+  assert.deepEqual(next.ribbon.bottom, ['theme', 'logs', 'notifications']);
   assert.deepEqual(next.ribbon.separators, []);
   assert.equal(pageDisplay(next, 'test.pages', manifest.pages[0]), 'window');
   assert.equal(next.extensions['test.pages'].settings.unrelated, 3);

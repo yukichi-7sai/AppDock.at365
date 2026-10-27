@@ -12,6 +12,7 @@ const command = (id, cmd = id) => ({ id, type: 'command', command: cmd });
 const group = (children) => ({ id: 'group', type: 'group', title: '好きな名前', children });
 test('tray layout migration preserves displayed order, unknown commands and opt-ins once', () => {
   const settings = createDefaultSettings();
+  delete settings.trayMenu;
   settings.trayCommands = ['appdock.quit', 'missing.run', 'a.second', 'appdock.open', 'a.first'];
   const original = structuredClone(settings);
   const items = getTrayMenu(settings, [
@@ -52,6 +53,7 @@ test('tray schema rejects invalid structure, fixed commands, duplicate ids, nest
 
 test('maximum legacy opt-ins migrate without exceeding the new layout or derived ID limits', () => {
   const settings = createDefaultSettings();
+  delete settings.trayMenu;
   const applets = Array.from({ length: 500 }, (_, i) => ({
     id: `applet${i}`,
     name: `Applet ${i}`,

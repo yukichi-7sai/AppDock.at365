@@ -13,6 +13,10 @@ export type TrayMenuLeaf =
 export type TrayMenuItem =
   TrayMenuLeaf | { id: string; type: 'group'; title: string; children: TrayMenuLeaf[] };
 
+export const defaultTrayMenu = (): TrayMenuItem[] => [
+  { id: 'tray.default.open', type: 'command', command: 'appdock.open' },
+];
+
 export function parseTrayMenu(value: unknown): TrayMenuItem[] {
   const ids = new Set<string>();
   function parse(items: unknown, nested = false): TrayMenuItem[] {

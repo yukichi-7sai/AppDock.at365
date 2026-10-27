@@ -48,7 +48,7 @@ export const builtinRibbon: RibbonItem[] = [
     id: 'ribbon-display-mode',
     title: hostText('settings.applet-pages.ribbonDisplayMode'),
     icon: 'chevron',
-    defaultPlacement: 'bottom',
+    defaultPlacement: 'top',
   },
 ];
 export const pageKey = (extensionId: string, pageId: string) => `page:${extensionId}:${pageId}`;
@@ -73,9 +73,16 @@ export const validGroupId = (id: unknown): id is string =>
 export const validSeparatorId = (id: unknown): id is string =>
   typeof id === 'string' && /^separator:[a-z0-9][a-z0-9-]{0,79}$/.test(id);
 export const defaultRibbon = () => ({
-  order: [] as string[],
+  order: [
+    'ribbon-display-mode',
+    'settings',
+    'image-library',
+    'notifications',
+    'logs',
+    'theme',
+  ] as string[],
   hidden: [] as string[],
-  bottom: ['theme'],
+  bottom: ['theme', 'logs', 'notifications'],
   separators: [] as string[],
   groups: [] as RibbonGroup[],
   itemOverrides: {} as Record<string, RibbonItemOverride>,

@@ -74,7 +74,7 @@ test('warnings have independent preferences and safe history; details stay in lo
     ['errors', 'warnings'],
   );
   assert.equal(type.defaultDurationSeconds, null);
-  assert.deepEqual(type.defaultTargets, ['banner', 'desktop']);
+  assert.deepEqual(type.defaultTargets, ['banner']);
   assert.deepEqual(type.requiredTargets, ['banner']);
   assert.equal(notificationSpeechEnabled(type, f.settings), false);
   const episode = f.reporter.episode();

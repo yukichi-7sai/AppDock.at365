@@ -59,7 +59,7 @@ test('shared error type uses AppDock preferences and ignores obsolete OFF values
     type = notificationCatalog([]).find((n) => n.ownerId === 'errors');
   assert.equal(type.title, 'エラー通知');
   assert.equal(type.defaultDurationSeconds, null);
-  assert.deepEqual(type.defaultTargets, ['banner', 'desktop']);
+  assert.deepEqual(type.defaultTargets, ['banner']);
   assert.deepEqual(type.requiredTargets, ['banner']);
   assert.equal('canDisable' in type, false);
   assert.equal(notificationSpeechEnabled(type, f.settings()), false);
@@ -70,7 +70,7 @@ test('shared error type uses AppDock preferences and ignores obsolete OFF values
   const first = f.service.list().find((n) => n.typeId === owner.typeId);
   assert.equal(first.level, 'error');
   assert.equal(first.expiresAt, undefined);
-  assert.deepEqual(first.targets, ['banner', 'desktop']);
+  assert.deepEqual(first.targets, ['banner']);
   assert.match(first.body, /AI_OUTPUT_LIMIT/);
   f.prefs({ targets: ['banner'], durationSeconds: 20 });
   assert.deepEqual(f.service.list().find((n) => n.id === first.id).targets, ['banner']);

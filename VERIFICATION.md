@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-27: 既定設定とタッチパッド予備照合のコミット前再確認 0.98.5
+
+- 0.97.12/.13の未コミット変更を、後続のコマンドスタック・編集UIを含むmain/473a2ed（本体0.98.5）で再確認した。対象は可視設定画面に限定した60秒予備照合、本体の提供設定に沿う既定値、自動更新確認OFF、Applet操作許可の新規全ON、保存互換性と関連仕様・試験の40ファイル。別作業の`scripts/mcp-hub-ui-test.cjs`はコミット対象から外し、作業ツリーに保持する。別worktreeは変更していない。
+- 最新0.98.5の829検証入力と現在を比較し、差があった本体11ファイルはすべてLF/CRLFだけの違いだった。元のSHA256を改行の正規化後に再現して確認した。依存・lockfile・toolchain・既存試験・実装内容は一致する。発行物に今回の変更がすでに含まれているため、製品修正なしのコミットでは版を増やさない共通手順に従い、0.98.5を維持し、再発行していない。
+- 0.98.1時点の標準1210/1210件と、後続0.98.5の関連68/68件を、元ログのSHA256、入力比較、差分の影響で照合して再利用した。標準回帰には今回の初期値・更新確認・許可・60秒/非表示/破棄待ち照合の試験も含まれる。後続の非表示関連以外の変更は、設定UI・トリガー表示順とその試験、版・smoke準備待ちであり、関連回帰と最新の固定GUI/native/smokeが成功している。追加で、変更されたrendererを走査する翻訳・設定ビュー・共通配色34/34件を実行し、fail/cancel/skip 0。最新の型検査/build、InputHost状態58項目、起動/保存/トレイ/終了smokeの成功も入力・成果物一致を確認して再利用した。
+- 最新固定EXEで初回設定GUI4群と可視状態GUI8群を新たに実行し、すべて成功した。初回起動/About表示と11秒待機中の自動HTTP(S)/待受作成0、Applet許可8項目ON/MCPサーバーOFF、手動更新確認のrelease/update.json取得のみ・ZIP取得0を確認した。設定以外/トレイ/最小化での予備照合停止、設定表示/復帰での再開、非表示でもWindows変更通知の処理を確認した。予備照合は模擬Bridgeと加速した時計を使い、実キー登録・送信やWindows設定への書込はしていない。今回の試験プロセス残存0を通常ユーザーのCIM照会で確認した。
+- 発行先の0.98.5 EXE SHA256=`ddb8df3b7f441cee0c1e642b973b568d4ad18b80a8af3d8346aee26d9856f278`、app.asar=`a5ed6c5014f898f945646f4fa72bfa533456d7ae6bd797d879f4dbe0e32d4764`、update.zip=270679260 bytes/SHA256 `2764e5c92d8f7e050df233193cf6fb7a6d3a90e52b352d9d470b02d58c264344`を再照合した。staging/発行先/ZIPの管理694ファイル、feed、ASAR内main233/renderer8ファイルとビルド結果、検証前後888入力の一致を確認した（本記録追記を除く）。
+- 証跡は`.artifacts/commit-validation-defaults-touchpad-0985-20261027/`のreview、compare/line-ending-comparison、standard-regression-input-comparison/reused-log-checks/reuse、各status/log、inputs-before/after、package-check/artifacts、staged-tree/commit-result/validation。今回の成功出力と既存の参照証跡を保持し、追加削除なし。発行前後の製品修正・push/Release/実利用先deployは行っていない。
+
 ## 2026-10-27: コマンドトリガー一覧の編集ボタン整理 0.98.5
 
 - コマンドトリガーの逆引き一覧で、同じ編集画面を開く鉛筆を省き、既存の歯車を条件の右・削除の左へ移した。入力の隣の空く操作列をなくして4列にした。共通CommandBindingListのtriggerStackActionsをこの画面だけで有効にし、従来のショートカット一覧の編集／実行順は保持する。歯車の複数コマンド判定・アクセント色・tooltip／読み上げ説明・選択行・フォーカス復帰を再利用した。条件文字からの編集も保持する。
@@ -56,6 +65,27 @@
 - publish.bat終了0。固定EXEの隔離GUI7群で、自動全55ツール取得、失敗・再試行、遅い応答の破棄、取得中の引数保持、仕様変更の採用と取消、JSON編集、入力不正、プロセス設定、送信キー記録、保存・取消を確認した。説明アイコンのhover/focus、説明ポップオーバーの閉じる／Escapeとフォーカス、ヒント非表示時の説明、幅360/520/1200での操作到達性、明暗テーマを確認した。幅広／狭幅／プロセスの画像も確認した。キーはDOMイベント、MCPはローカル模擬サーバーのみで、実際のキー送信・プロセス起動・下流ツール実行は行っていない。固定EXEのsmokeも成功した。
 - 発行先は`A:/40.ARTIFACT/AppDock.at365/win-unpacked`。EXE SHA256=`1ed20fbfeb5080eda03a99ea3d5278f154e8858ba4d1a27aefc9a34b2b49469b`、app.asar=`329103e048476e68d5c61de60f0362bc7196f36cc90bd13ac3b741aea9b48687`、update.zip=270665581 bytes/SHA256 `662db3c22392100304127b692856d05ff2abdff69d04817d1ab998242313d1de`。管理694ファイルのstaging／発行先／ZIPと隔離コピー2組、feedの版/size/hash、ASAR内main230／renderer8ファイルと最終ビルドの一致、877入力の検証前後一致を確認した（本記録追記を除く）。
 - 証跡は`.artifacts/custom-command-layout-20261027/`のbaseline、review、inputs-before/after、各status/log、artifacts/package-check/validation、prior-changes-preserved、cleanup-inventory/status。固定GUIは`.artifacts/custom-command-editor-portable-1793084313767/`、smokeは`.artifacts/smoke-1793084339736/`。直近成功・失敗診断・既存の参照証跡を保持し、追加削除なし。CIM照会は制限環境で拒否されたため通常ユーザーで再確認し、試験プロセス残存なし。既存0.97.12/.13の未コミット変更を保持し、重複編集したpackage.json・locale・本記録以外の35変更ファイルは開始時差分と一致した。commit/push/Release/実利用先deployは実施していない。
+
+## 2026-10-27: 本体の既定設定と初回起動時の更新通信 0.97.13
+
+- 提供されたsettings.json（SHA256 `eb8cdf3c23252f5c61916504a19e59b228e29204d03c0b887b11a59a11705f6b`）の実効設定を本体の既定値へ反映した。ホイール遅延20ms、待機表示の不透明度90%、コマンド検索Ctrl+P、トレイの「本体を開く」、リボンの順序と下部配置、エラー/警告のバナー、更新検出のバナー6秒を統一した。インストール済みAppletの初期化履歴や利用者生成のトレイUUIDは共通の既定値へ固定していない。
+- About表示時・本体起動時・Applet起動時の自動更新確認はすべて既定OFF。AI/TTS接続先未設定、MCPサーバー既定OFFは維持する。更新確認の既存経路はrelease/update.json等のバージョン情報だけを取得し、パッケージの取得・適用はinstall経路で行うことを確認した。自動・手動の確認経路にダウンロード処理を追加していない。
+- applet-api.jsonがない新規環境では、現在のApplet操作許可8項目をすべてONにした。保存済みversion 2の明示値・省略時拒否、version 1の個別許可を共通許可へ拡大しない移行、不正/読取不能時の拒否、MCP列の独立した許可は維持する。既存の設定ファイルや明示したON/OFFを上書きしない。
+- 発行前レビューで、旧trayCommandsだけの保存値を新しい既定trayMenuで置き換えないことと、保存済みリボングループの子を省略された既定root/bottomへ追加しないことを確認・修正した。明示した無効な子/root重複は従来どおり拒否する。画面の説明・関連仕様・旧既定値を前提にしたfixtureを更新した。型検査と標準回帰1197/1197件が成功（fail/cancel/skip 0）。初回の回帰失敗、fixture修正後の成功ログを保持する。保存項目/保存ファイル/公開APIの追加削除はなく、既存既定値と互換読込の調整としてパッチ版0.97.13とした。
+- publish.bat終了0。固定EXEを設定ファイルのない隔離profileで起動し、本体入口で事前設置したfetch/Electron net.fetch・HTTP(S)・Node listenの記録で、起動時の設定待機時間を超える11秒とAbout表示中の自動通信/待受作成0件を確認した。Appletの8項目ONとMCPサーバーOFF、実際の許可スイッチ全ONも確認した。手動の更新チェックは模擬リリース情報とupdate.jsonの2件だけで更新候補を表示し、ZIP取得/適用0件だった。実サービスへの接続や実FWダイアログの操作は行っていない。別途設定したAppletの通信はこの本体初期設定の確認対象に含めない。
+- GUIプローブの初期試行は、Electron初期化前のresourcesPath、停止中評価方式、カテゴリ名、Electron net.fetchへのfixture接続を試験側だけで修正した。製品は発行後変更していない。設定入力9群とsmokeも固定EXEで成功した。About/許可画面の画像を確認した。全体回帰の入力から変わったのは新設GUIプローブのみで、製品・単体試験・ビルド入力の不変を照合した。
+- 発行先は`A:/40.ARTIFACT/AppDock.at365/win-unpacked`。EXE SHA256=`5d9e502641f9f6b92794b73ab5459ff903bfe415ce560656b952d385294a5d98`、app.asar=`44a3f2171352b44f661305e60c3b4509d197e1fb230000f2c3eb394e20f2a43b`、update.zip=270663951 bytes/SHA256 `c55c60bf7ccbf3d9f4ea4d6b0455fba21d69f2568b363c5bf7ba5ef75fed3092`。管理694ファイルのstaging/発行先/ZIP、feedの版/size/hash、固定試験コピー、ASAR内main230ファイル/renderer8ファイルとビルド結果を照合した。最終874入力は検証前後で一致した（本記録の追記を除く）。
+- 証跡は`.artifacts/defaults-network-09713-20261027/`のattachment-diff、inputs-pre-publish/before/after、input-adjustments、review、typecheck/regression、publish、defaults-ui/gui-status、artifacts/package-check/validation、cleanup-inventory/status。既存の参照証跡・比較基準、今回の失敗プローブ診断と成功結果を保持し、追加削除なし。0.97.12のタッチパッド確認抑制を含む未コミット変更を保持した。commit/push/Release/実利用先deployは実施していない。
+
+## 2026-10-27: タッチパッドの予備確認を表示中の設定画面へ限定 0.97.12
+
+- 利用者の希望により、タッチパッド接続の予備照合を常時2秒から60秒へ広げ、本体の設定画面（Applet設定を含む）が表示されている間だけ実行するよう変更した。別画面、トレイ収納、最小化、設定接続の破棄ではタイマーを解除する。設定画面を開く/再表示するときは一度照合し、待機中の周期処理も実行直前に表示状態を再確認する。機能OFF/割り当て0件では周期確認しない。
+- SettingsPageHostの現在の設定接続と、main Windowの可視/最小化状態から表示状態を通知する。画面ハンドラーや公開APIへ独立した保存値を追加していない。Windows変更通知による世代無効化・即時照合、起動/明示操作、ジェスチャー受付/実行、Windows設定の書込条件と競合停止は維持した。通知漏れや一時障害の解消確認は、表示中の次の確認か設定画面を開くまで遅れる場合がある。
+- 開始時はmain/8d74924でclean、共通手順のpull --ff-onlyはAlready up to dateだった。直前の配色名変更は保持した。型検査と関連6ファイル44/44件（fail/cancel/skip 0）が成功した。模擬時計で非表示中10分の周期確認0、表示直後と60秒時の確認、非表示後の通知による競合/回復、非表示中のジェスチャー実行、OFF/未割り当て、待機中の周期処理取消とclose後の再開禁止を確認した。発行前レビューに未解決指摘なし。設定項目/保存ファイル/公開契約の追加削除はないためパッチ版0.97.12とした。
+- 最初の発行は、生成済みRuntime参照DLL（20992 bytes、先頭16 bytesが全て00）を.NETコンパイラーが読めずCS0009で停止した。同時ビルドは検出されなかった。失敗ログを保持し、ExtensionHostと参照プロジェクトの標準Rebuildを通常ユーザーで実行して成功（警告/エラー0）。MZヘッダーを確認し、固定設定を維持したpublish.bat再実行は終了0で完了した。製品ソースや検査の回避変更は行っていない。
+- 固定0.97.12のGUI8群で、設定以外では周期確認0、表示中の周期確認、トレイ収納/最小化での停止、再表示での再開、非表示中のWindows変更通知を確認した。ここでは隔離プロセスのBridgeを模擬化し、対象タイマーだけ60秒を100msへ加速した。実際の60秒境界は単体で検査し、Windows設定への書込・Pause/F13～F24の実登録/実送信は行っていない。従来の設定入力/JSON/IME等9群とsmokeも成功した。物理入力・実タッチパッドの再確認は未実施。
+- 標準発行先は`A:/40.ARTIFACT/AppDock.at365/win-unpacked`。EXE SHA256=`92bdd57be66b9591bd7749f5a20e8890dc311ae8e1b1fcc6a2812798d70e5bfe`、app.asar=`372a2392dfcf38f26ce7dcb6b4d4357dec32827ddd473026baa1ec22472ae1ae`、update.zip=270664203 bytes/SHA256 `3bdc279891f7e5d032fc73e0fa4dc2faad9034a3e0a8fca26dcfa653ca8c0245`。管理694ファイルのstaging/発行先/ZIP、feedの版/size/hash、固定試験コピー、ASARコードのビルド一致を照合した。検証前後の872入力は一致した（本記録追記を除く）。
+- 証跡は`.artifacts/touchpad-polling-09712-20261027/`の入力一覧、review、regression/typecheck、publish-failed/native-reference-failure/native-rebuild/publish、gui-status、artifacts/package-check/validation。直近成功分と既存の参照証跡を保持し追加削除なし。commit/push/Release/実利用先deployは行っていない。
 
 ## 2026-10-27: 0.97.11までの改善・修正の一括コミット検証
 

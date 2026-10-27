@@ -94,27 +94,13 @@ test('internal publication IDs share the external catalog without granting execu
 test('Applet grants are default-on, persisted for all Applets, independent of MCP, and revoked immediately', async (t) => {
   const f = setup(t);
   assert.equal((await f.call('system.getInfo')).ok, true);
-  assert.equal(f.access.get().useTts, false);
-  assert.equal(f.access.get().useAi, false);
-  assert.equal(f.access.get().useMcp, false);
+  assert.equal(f.access.get().useTts, true);
+  assert.equal(f.access.get().useAi, true);
+  assert.equal(f.access.get().useMcp, true);
   assert.equal(f.access.get().manageCustomCommands, undefined);
   assert.equal(f.access.get().manageMcpServers, undefined);
-  assert.equal(f.access.get().runProcesses, false);
-  assert.ok(
-    Object.entries(f.access.get())
-      .filter(
-        ([k]) =>
-          ![
-            'useTts',
-            'useAi',
-            'useMcp',
-            'manageCustomCommands',
-            'manageMcpServers',
-            'runProcesses',
-          ].includes(k),
-      )
-      .every(([, v]) => v === true),
-  );
+  assert.equal(f.access.get().runProcesses, true);
+  assert.ok(Object.values(f.access.get()).every((value) => value === true));
   assert.equal(
     Object.keys(f.access.get()).length,
     Object.keys(require('../out/main/shared/appdock-api').appletApiPermissionLabels).length,

@@ -10,7 +10,7 @@ MCPとAppletは同じ操作名・引数・結果・設定revision・dryRun・保
 
 ## MCPクライアントとハブ
 
-`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`をAppletとMCPへ公開します。発見/状態取得はread + useMcp、実行/取消はさらにexecuteが必要で、useMcpは両入口で初期OFFです。本体のMCPサーバーOFFでもAppletから利用できます。[接続・保存・上限](mcp-client-design.md)と[中継公開](mcp-hub-design.md)を参照してください。
+`mcp.servers.list`、`mcp.tools.list/get/call`、`mcp.jobs.get/cancel`をAppletとMCPへ公開します。発見/状態取得はread + useMcp、実行/取消はさらにexecuteが必要です。新規環境のuseMcpはApplet側がON、MCP側がOFFです。本体のMCPサーバーOFFでもAppletから利用できます。[接続・保存・上限](mcp-client-design.md)と[中継公開](mcp-hub-design.md)を参照してください。
 
 接続先管理には`mcp.servers.getSettings/updateSettings/inspectTools`を使用します。設定の読取りはread、保存はread + write、未公開ツールの確認はread + execute + useMcpです。元callerの必要許可も照合します。[管理API](mcp-client-design.md#接続先の管理api)に、保存・秘密・公開範囲の契約をまとめています。
 
@@ -31,7 +31,7 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 
 新しいAPIを使うAppletのmanifestに`"capabilities": ["appdock-api"]`と`"minimumHostVersion": "0.76.5"`を指定します。従来のsettings/UI等も使う場合は、そのcapabilityも残します。
 
-本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。共通許可は変更せず引き継ぎます。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境ではuseTts/useAi/useMcp/runProcessesがOFF、その他はONです。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
+本体の「設定 → 操作の許可」のApplet列で変更します。MCP列と並べて表示しますが、保存先・許可判定は独立したままです。操作カテゴリごとに全Applet共通の許可を使い、Applet別の許可は設けません。applet-api.jsonが存在しない新規環境では、Applet列の全項目をONにします。既存version 2の保存値はそのまま使用し、省略項目も拒否を維持します。MCPは接続・操作許可が初期OFFで、情報取得は連携ON時に許可する既存契約を保ちます。変更はその場でPC専用の`applet-api.json`（version 2、permissions）へ保存され、共有settings.jsonの保存とは独立しています。旧version 1の個別許可を全Appletへ拡大せず、初回は共通許可をOFFとして扱います。設定を読み取れない場合は拒否し、画面へエラーを表示します。Codex側の許可・登録とは独立しています。
 
 画面ではread／write／executeを「情報の取得」「設定の変更」「コマンドの実行」と表示します。MCP列の情報取得はON固定・操作不可のトグルで、「MCP連携中は常に許可」と補足します。Applet列の情報取得は従来どおり切り替えられます。コマンド実行・Windows入力・プロセス起動・MCP利用・AI送信・TTS送信の6項目は、MCP列のトグル横に注意アイコンを表示します。許可がOFFでも表示し、マウスを重ねるかキーボードでフォーカスすると注意理由を読めます。アイコンは表示上の案内で、許可の判定や保存値を変更しません。
 
@@ -153,7 +153,7 @@ ApiPermissionsSettingsで操作行とApplet/MCPの列を並べ、狭幅では操
 
 ## AI文章生成
 
-最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。本体の共通プロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、どちらも初期OFFです。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
+最低ホスト版0.37.0。ai.text.generate / ai.jobs.get / ai.jobs.cancel / ai.models.listをAppletとMCPへ公開します。本体の共通プロンプトと接続設定を使い、呼出しでモデル・追加プロンプト・入力を指定できます。Applet/MCPのuseAiは独立したPC専用許可で、新規環境はApplet側がON、MCP側がOFFです。入力と結果・保存・期限・例は[AI共通API](ai.md)を参照してください。
 
 ## タッチパッドジェスチャー
 

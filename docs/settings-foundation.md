@@ -14,6 +14,8 @@
 
 ## 保存と入力
 
+本体の新規既定値は、マウスのホイール間隔20ms・待機表示の不透明度90%、コマンドパレットCtrl+P、トレイの追加項目「AppDockを開く」です。リボンは表示方式/設定/画像/通知/ログ/テーマの順を基本に、テーマ/ログ/通知を下側へ置きます。エラーと警告はバナー、更新のお知らせはバナー6秒を既定とします。更新の自動確認はすべてOFFで、[更新設定](updates.md)から有効化できます。個別の保存済み値・IDは保持し、Appletの初期化済み履歴を本体の既定値へ固定しません。
+
 SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/editRevision・pending・512操作の再送結果だけを持つ。snapshot.valueはStoreから取得し、別の値を保持しない。SettingsPageSessionは選択ページだけを投影する。useSettingsEditorとSettingsViewClientは入力キューと購読を担う。
 
 選択ページと編集状態だけを必要とする処理は`metadata()`を使い、全設定を複製しない。カタログ作成は現在の保存値を読み取り、フォーム/JSONへの投影では対象ページだけを分離する。全体snapshotは呼出元の変更からStoreを保護する複製を維持する。本体の設定ページ更新は必要な表示情報を直接参照し、補助情報の取得だけのために全体HostSnapshotや設定snapshotを作らない。
