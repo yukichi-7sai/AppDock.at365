@@ -341,13 +341,22 @@ async function close() {
     await until(() => cancelledPicker.isClosed(), 'background closes only the command picker');
     assert(await dialog.isVisible(), 'parent editor survives command picker cancellation');
     assert.equal(await dialog.getByLabel('名前', { exact: true }).inputValue(), 'Ordered stack');
-    checks.push('command picker background cancellation preserves the parent dialog and unsaved input');
+    checks.push(
+      'command picker background cancellation preserves the parent dialog and unsaved input',
+    );
     await choose('fixture.stacks.a');
     await choose('fixture.stacks.b');
     await dialog.getByTestId('stack-entry').nth(1).locator('.stack-drag').focus();
     await page.keyboard.press('ArrowUp');
     assert.match(await dialog.getByTestId('stack-entry').first().innerText(), /fixture b/);
     await choose('appdock.custom.' + nestedId);
+    await require('./custom-command-layout-checks.cjs')({
+      page,
+      dialog,
+      profile,
+      name: 'named-stack-layout',
+      stack: true,
+    });
     await dialog.screenshot({ path: path.join(profile, 'named-stack.png') });
     assert.equal(
       await dialog

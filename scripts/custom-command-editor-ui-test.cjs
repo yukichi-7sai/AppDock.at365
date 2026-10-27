@@ -378,6 +378,12 @@ const diskDefinitions = () =>
     config.arguments.message = 'JSON edit';
     config.toolRevision = 'stale';
     await json.fill(JSON.stringify(config));
+    await require('./custom-command-layout-checks.cjs')({
+      page,
+      dialog,
+      profile,
+      name: 'json-layout',
+    });
     await dialog.getByTestId('settings-dialog-confirm').click();
     await dialog.getByTestId('custom-command-accept-tool').waitFor();
     assert.equal(
@@ -393,6 +399,16 @@ const diskDefinitions = () =>
       'layout ready',
     );
     await page.screenshot({ path: path.join(profile, 'editor-wide.png') });
+    await options();
+    for (const summary of await dialog.locator('.custom-command-schema > summary').all()) {
+      await summary.click();
+    }
+    await require('./custom-command-layout-checks.cjs')({
+      page,
+      dialog,
+      profile,
+      name: 'mcp-layout',
+    });
     for (const width of [520, 360]) {
       await page.setViewportSize({ width, height: 650 });
       const bounds = await dialog.evaluate((el) => ({
@@ -432,6 +448,21 @@ const diskDefinitions = () =>
     await dialog.getByLabel('作業フォルダー', { exact: true }).fill(profile);
     await dialog.getByLabel('コンソールを表示する', { exact: true }).check();
     await page.screenshot({ path: path.join(profile, 'process-dark.png') });
+    await require('./custom-command-layout-checks.cjs')({
+      page,
+      dialog,
+      profile,
+      name: 'process-layout',
+    });
+    await page.setViewportSize({ width: 520, height: 640 });
+    await dialog.getByTestId('custom-command-section:action').click();
+    await dialog.getByLabel('引数', { exact: true }).fill('{unfinished');
+    await dialog.getByTestId('custom-command-section:common').click();
+    await dialog.getByTestId('custom-command-section:action').click();
+    assert.equal(await dialog.getByLabel('引数', { exact: true }).inputValue(), '{unfinished');
+    assert(await dialog.getByTestId('settings-dialog-confirm').isDisabled());
+    await dialog.getByLabel('引数', { exact: true }).fill('["example.txt"]');
+    await page.setViewportSize({ width: 1200, height: 850 });
     await save();
     const processItem = (await definitions()).find((item) => item.title === 'Saved process');
     assert.equal(processItem.config.workingDirectory, profile);
@@ -443,6 +474,9 @@ const diskDefinitions = () =>
     assert.equal(processUpdated.config.mode, 'powershell');
     assert.equal(processUpdated.config.workingDirectory, profile);
     assert.equal(processUpdated.config.showConsole, true);
+    checks.push(
+      'custom editors keep a single scroll owner per pane, visible divided footer, and invalid drafts across narrow section switching',
+    );
     checks.push(
       'wide/narrow reachable actions, process modes and optional fields saved, dark theme',
     );
@@ -460,6 +494,13 @@ const diskDefinitions = () =>
       await capture.locator('..').locator('..').locator('.settings-field-label > p').count(),
       0,
     );
+    await dialog.locator('.shortcut-special-trigger').click();
+    await require('./custom-command-layout-checks.cjs')({
+      page,
+      dialog,
+      profile,
+      name: 'keys-layout',
+    });
     await save();
     assert.equal(
       (await definitions()).find((item) => item.title === 'Saved keys').config.keys,

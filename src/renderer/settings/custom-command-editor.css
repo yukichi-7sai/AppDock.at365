@@ -1,19 +1,71 @@
 .settings-modal.settings-group-dialog.custom-command-dialog[open] {
   width: min(900px, calc(100vw - 32px));
-  --dialog-max-height: 760px;
+  height: min(900px, calc(100dvh - 32px));
+  --dialog-max-height: 900px;
+}
+.custom-command-dialog > header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 14px;
+  margin-bottom: 12px;
+}
+.custom-command-dialog > footer {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 12px;
+}
+.custom-command-dialog > .settings-dialog-body,
+.custom-command-dialog .settings-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+.custom-command-section-switch {
+  display: none;
+  flex: none;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.custom-command-section-switch button {
+  flex: 1;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.custom-command-section-switch button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 .custom-command-editor {
   display: grid;
   grid-template-columns: minmax(210px, 0.8fr) minmax(0, 1.6fr);
   gap: 28px;
-  align-items: start;
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 .custom-command-editor > section {
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 6px;
+}
+.custom-command-editor > .custom-command-common {
+  border-right: 1px solid var(--border);
+  padding-right: 20px;
 }
 .custom-command-editor h3 {
   margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-size: 13px;
   font-weight: 500;
@@ -77,8 +129,8 @@
 .custom-command-dialog pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: 220px;
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 .custom-command-tool-description {
   display: flex;
@@ -114,13 +166,84 @@
   font-weight: 400;
   color: var(--muted);
 }
+.custom-command-dialog .shortcut-special-picker {
+  max-height: none;
+  overflow: visible;
+}
+.stack-command-form .custom-command-action {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.stack-command-form .custom-command-action > h3,
+.stack-command-form .custom-command-action > .settings-field {
+  flex: none;
+}
+.stack-command-form .custom-command-action > .custom-command-options {
+  flex: none;
+  max-height: 35%;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
 @container settings-dialog (max-width: 640px) {
+  .custom-command-section-switch {
+    display: flex;
+  }
   .custom-command-editor {
     grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
+    gap: 0;
   }
-  .custom-command-common {
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 12px;
+  .custom-command-editor[data-active-section='common'] > .custom-command-action,
+  .custom-command-editor[data-active-section='action'] > .custom-command-common {
+    display: none;
+  }
+  .custom-command-editor > .custom-command-common {
+    border: 0;
+    padding: 4px 6px;
+  }
+  .custom-command-editor > section > h3 {
+    display: none;
+  }
+}
+@container settings-dialog (max-width: 780px) {
+  .stack-command-dialog .custom-command-section-switch {
+    display: flex;
+  }
+  .stack-command-dialog .custom-command-editor {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .stack-command-dialog
+    .custom-command-editor[data-active-section='common']
+    > .custom-command-action,
+  .stack-command-dialog
+    .custom-command-editor[data-active-section='action']
+    > .custom-command-common {
+    display: none;
+  }
+  .stack-command-dialog .custom-command-editor > .custom-command-common {
+    border: 0;
+    padding: 4px 6px;
+  }
+  .stack-command-dialog .custom-command-editor > section > h3 {
+    display: none;
+  }
+}
+@container settings-dialog (max-width: 560px) {
+  .stack-command-form .custom-command-action {
+    display: block;
+    overflow: auto;
+  }
+  .stack-command-form .command-stack-editor {
+    grid-template-rows: auto auto;
+    overflow: visible;
+  }
+  .stack-command-form .stack-list-panel,
+  .stack-command-form .stack-entry-list,
+  .stack-command-form .stack-condition-panel,
+  .stack-command-form .custom-command-action > .custom-command-options {
+    overflow: visible;
+    max-height: none;
   }
 }

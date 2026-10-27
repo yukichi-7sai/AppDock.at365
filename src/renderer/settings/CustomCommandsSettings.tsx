@@ -284,6 +284,7 @@ function CustomCommandDialog({
   const [migrate, setMigrate] = useState(false);
   const [invalidFields, setInvalidFields] = useState<Record<string, boolean>>({});
   const [mcpRefresh, setMcpRefresh] = useState(0);
+  const [section, setSection] = useState<'common' | 'action'>('common');
   const type = types.find((t) => t.id === typeId);
   const oldVersion = !!original && original.configVersion !== type?.configVersion;
   const editableConfig = !!type && (!oldVersion || migrate);
@@ -333,7 +334,11 @@ function CustomCommandDialog({
     <SettingsMcpScope rowId={original?.id}>
       <SettingsDialog
         className={
-          'custom-command-dialog' + (typeId === commandStackTypeId ? ' stack-command-dialog' : '')
+          'custom-command-dialog' +
+          (typeId === commandStackTypeId ? ' stack-command-dialog' : '') +
+          (typeId === commandStackTypeId && editableConfig && !jsonMode
+            ? ' stack-command-form'
+            : '')
         }
         title={
           original
@@ -385,243 +390,270 @@ function CustomCommandDialog({
         }}
       >
         {(ready, setError) => (
-          <div className="custom-command-editor" data-testid="custom-command-editor">
-            <section
-              className="custom-command-common"
-              aria-label={translate('settings.customCommandsSettings.common')}
+          <>
+            <div
+              className="custom-command-section-switch"
+              role="group"
+              aria-label={translate('settings.customCommandsSettings.edit')}
             >
-              <h3>{translate('settings.customCommandsSettings.common')}</h3>
-              <SettingsField
-                settingKey="typeId"
-                title={translate('settings.customCommandsSettings.kind')}
+              {(['common', 'action'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-testid={'custom-command-section:' + value}
+                  aria-pressed={section === value}
+                  onClick={() => setSection(value)}
+                >
+                  {translate(`settings.customCommandsSettings.${value}`)}
+                </button>
+              ))}
+            </div>
+            <div
+              className="custom-command-editor"
+              data-testid="custom-command-editor"
+              data-active-section={section}
+            >
+              <section
+                className="custom-command-common"
+                aria-label={translate('settings.customCommandsSettings.common')}
+                onFocusCapture={() => setSection('common')}
               >
-                <div className="custom-command-select">
-                  <select
-                    data-testid="custom-command-kind"
-                    aria-label={translate('settings.customCommandsSettings.kind')}
-                    value={typeId}
-                    disabled={!!original}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setTypeId(value);
-                      const next = defaults(value);
+                <h3>{translate('settings.customCommandsSettings.common')}</h3>
+                <SettingsField
+                  settingKey="typeId"
+                  title={translate('settings.customCommandsSettings.kind')}
+                >
+                  <div className="custom-command-select">
+                    <select
+                      data-testid="custom-command-kind"
+                      aria-label={translate('settings.customCommandsSettings.kind')}
+                      value={typeId}
+                      disabled={!!original}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setTypeId(value);
+                        const next = defaults(value);
+                        setConfig(next);
+                        setJson(JSON.stringify(next, null, 2));
+                        setAutomation(false);
+                        setInvalidFields({});
+                      }}
+                    >
+                      {!type && (
+                        <option value={typeId}>
+                          {typeId || translate('settings.customCommandsSettings.noType')}
+                        </option>
+                      )}
+                      {types.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                        </option>
+                      ))}
+                    </select>
+                    <SettingsDescriptionIcon
+                      title={translate('settings.customCommandsSettings.kind')}
+                      description={type?.description}
+                      testId="custom-command-kind-info"
+                    />
+                  </div>
+                </SettingsField>
+                <SettingsField
+                  settingKey="title"
+                  title={translate('settings.customCommandsSettings.name')}
+                >
+                  <SettingsInput
+                    aria-label={translate('settings.customCommandsSettings.name')}
+                    data-initial-focus
+                    value={title}
+                    maxLength={100}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </SettingsField>
+                <SettingsField
+                  settingKey="description"
+                  title={translate('settings.customCommandsSettings.description')}
+                  hint={translate('settings.customCommandsSettings.publicHint')}
+                >
+                  <SettingsTextarea
+                    aria-label={translate('settings.customCommandsSettings.description')}
+                    value={description}
+                    maxLength={1000}
+                    rows={3}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </SettingsField>
+                <SettingsChoice
+                  label={translate('settings.customCommandsSettings.enabled')}
+                  settingKey="enabled"
+                  checked={enabled}
+                  disabled={!type && !enabled}
+                  onChange={setEnabled}
+                />
+                <SettingsChoice
+                  label={translate('settings.customCommandsSettings.public')}
+                  settingKey="automation"
+                  checked={automation}
+                  disabled={!type?.automation && !automation}
+                  onChange={setAutomation}
+                />
+                {!type?.automation && (
+                  <p className="muted">
+                    {translate('settings.customCommandsSettings.publicForbidden')}
+                  </p>
+                )}
+              </section>
+              <section
+                className="custom-command-action"
+                aria-label={translate('settings.customCommandsSettings.action')}
+                onFocusCapture={() => setSection('action')}
+              >
+                <h3>{translate('settings.customCommandsSettings.action')}</h3>
+                {oldVersion && type && (
+                  <SettingsChoice
+                    label={translate('settings.customCommandsSettings.upgradeConfig', {
+                      configVersion: type.configVersion,
+                    })}
+                    checked={migrate}
+                    onChange={(checked) => {
+                      setMigrate(checked);
+                      const next = checked ? defaults(typeId) : original!.config;
                       setConfig(next);
                       setJson(JSON.stringify(next, null, 2));
-                      setAutomation(false);
                       setInvalidFields({});
                     }}
-                  >
-                    {!type && (
-                      <option value={typeId}>
-                        {typeId || translate('settings.customCommandsSettings.noType')}
-                      </option>
-                    )}
-                    {types.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title}
-                      </option>
-                    ))}
-                  </select>
-                  <SettingsDescriptionIcon
-                    title={translate('settings.customCommandsSettings.kind')}
-                    description={type?.description}
-                    testId="custom-command-kind-info"
                   />
-                </div>
-              </SettingsField>
-              <SettingsField
-                settingKey="title"
-                title={translate('settings.customCommandsSettings.name')}
-              >
-                <SettingsInput
-                  aria-label={translate('settings.customCommandsSettings.name')}
-                  data-initial-focus
-                  value={title}
-                  maxLength={100}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </SettingsField>
-              <SettingsField
-                settingKey="description"
-                title={translate('settings.customCommandsSettings.description')}
-                hint={translate('settings.customCommandsSettings.publicHint')}
-              >
-                <SettingsTextarea
-                  aria-label={translate('settings.customCommandsSettings.description')}
-                  value={description}
-                  maxLength={1000}
-                  rows={3}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </SettingsField>
-              <SettingsChoice
-                label={translate('settings.customCommandsSettings.enabled')}
-                settingKey="enabled"
-                checked={enabled}
-                disabled={!type && !enabled}
-                onChange={setEnabled}
-              />
-              <SettingsChoice
-                label={translate('settings.customCommandsSettings.public')}
-                settingKey="automation"
-                checked={automation}
-                disabled={!type?.automation && !automation}
-                onChange={setAutomation}
-              />
-              {!type?.automation && (
-                <p className="muted">
-                  {translate('settings.customCommandsSettings.publicForbidden')}
-                </p>
-              )}
-            </section>
-            <section
-              className="custom-command-action"
-              aria-label={translate('settings.customCommandsSettings.action')}
-            >
-              <h3>{translate('settings.customCommandsSettings.action')}</h3>
-              {oldVersion && type && (
-                <SettingsChoice
-                  label={translate('settings.customCommandsSettings.upgradeConfig', {
-                    configVersion: type.configVersion,
-                  })}
-                  checked={migrate}
-                  onChange={(checked) => {
-                    setMigrate(checked);
-                    const next = checked ? defaults(typeId) : original!.config;
-                    setConfig(next);
-                    setJson(JSON.stringify(next, null, 2));
-                    setInvalidFields({});
-                  }}
-                />
-              )}
-              <SettingsMcpScope
-                itemId={settingsItemId('custom-commands', 'config:' + typeId)}
-                fieldKey="config"
-              >
-                {!editableConfig || jsonMode || jsonOnly ? (
-                  <SettingsField
-                    settingKey="config"
-                    title={translate('settings.customCommandsSettings.configJson')}
-                  >
-                    <SettingsTextarea
-                      aria-label={translate('settings.customCommandsSettings.configJson')}
-                      value={json}
-                      readOnly={!editableConfig}
-                      rows={8}
-                      onChange={(e) => setJson(e.target.value)}
+                )}
+                <SettingsMcpScope
+                  itemId={settingsItemId('custom-commands', 'config:' + typeId)}
+                  fieldKey="config"
+                >
+                  {!editableConfig || jsonMode || jsonOnly ? (
+                    <SettingsField
+                      settingKey="config"
+                      title={translate('settings.customCommandsSettings.configJson')}
+                    >
+                      <SettingsTextarea
+                        aria-label={translate('settings.customCommandsSettings.configJson')}
+                        value={json}
+                        readOnly={!editableConfig}
+                        rows={8}
+                        onChange={(e) => setJson(e.target.value)}
+                      />
+                    </SettingsField>
+                  ) : typeId === commandStackTypeId ? (
+                    <>
+                      <StackExecutionMode
+                        value={(config as unknown as CommandStack).executionMode}
+                        onChange={(executionMode) => setConfig({ ...config, executionMode })}
+                      />
+                      <CommandStackEditor
+                        entries={(config as unknown as CommandStack).entries}
+                        onChange={(entries) => setConfig({ ...config, entries })}
+                        commands={commands}
+                        applets={applets}
+                        excludeId={customCommandId(id)}
+                        onValidity={(valid) =>
+                          setInvalidFields((previous) =>
+                            previous.stack === !valid ? previous : { ...previous, stack: !valid },
+                          )
+                        }
+                      />
+                    </>
+                  ) : typeId === 'appdock.input.sendKeys' ? (
+                    <ShortcutCaptureField
+                      mode="send"
+                      showDescription={false}
+                      label={translate('settings.customCommandsSettings.inputKeys')}
+                      value={typeof config.keys === 'string' ? config.keys : ''}
+                      onChange={(keys) => setConfig({ ...config, keys })}
+                      recordingReady={ready}
+                      setError={setError}
                     />
-                  </SettingsField>
-                ) : typeId === commandStackTypeId ? (
-                  <>
-                    <StackExecutionMode
-                      value={(config as unknown as CommandStack).executionMode}
-                      onChange={(executionMode) => setConfig({ ...config, executionMode })}
-                    />
-                    <CommandStackEditor
-                      entries={(config as unknown as CommandStack).entries}
-                      onChange={(entries) => setConfig({ ...config, entries })}
-                      commands={commands}
-                      applets={applets}
-                      excludeId={customCommandId(id)}
+                  ) : typeId === 'appdock.process.start' ? (
+                    <ProcessCommandFields
+                      advancedOptions={advancedOptions}
+                      config={config}
+                      onChange={setConfig}
                       onValidity={(valid) =>
-                        setInvalidFields((previous) =>
-                          previous.stack === !valid ? previous : { ...previous, stack: !valid },
-                        )
+                        setInvalidFields((previous) => ({ ...previous, process: !valid }))
                       }
                     />
-                  </>
-                ) : typeId === 'appdock.input.sendKeys' ? (
-                  <ShortcutCaptureField
-                    mode="send"
-                    showDescription={false}
-                    label={translate('settings.customCommandsSettings.inputKeys')}
-                    value={typeof config.keys === 'string' ? config.keys : ''}
-                    onChange={(keys) => setConfig({ ...config, keys })}
-                    recordingReady={ready}
-                    setError={setError}
-                  />
-                ) : typeId === 'appdock.process.start' ? (
-                  <ProcessCommandFields
-                    advancedOptions={advancedOptions}
-                    config={config}
-                    onChange={setConfig}
-                    onValidity={(valid) =>
-                      setInvalidFields((previous) => ({ ...previous, process: !valid }))
-                    }
-                  />
-                ) : typeId === 'appdock.mcp.call' ? (
-                  <McpCommandFields
-                    advancedOptions={advancedOptions}
-                    refreshKey={mcpRefresh}
-                    config={config}
-                    onChange={setConfig}
-                    invoke={invoke}
-                    onValidity={(valid) =>
-                      setInvalidFields((previous) => ({ ...previous, mcpArguments: !valid }))
-                    }
-                  />
-                ) : (
-                  type!.fields!.map((field) => (
-                    <SettingsField key={field.key} title={field.title}>
-                      {field.type === 'boolean' ? (
-                        <input
-                          aria-label={field.title}
-                          type="checkbox"
-                          checked={config[field.key] === true}
-                          onChange={(e) => setConfig({ ...config, [field.key]: e.target.checked })}
-                        />
-                      ) : field.type === 'select' ? (
-                        <select
-                          aria-label={field.title}
-                          value={String(config[field.key] ?? '')}
-                          onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}
-                        >
-                          <option value="">
-                            {translate('settings.customCommandsSettings.select')}
-                          </option>
-                          {field.options?.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
+                  ) : typeId === 'appdock.mcp.call' ? (
+                    <McpCommandFields
+                      advancedOptions={advancedOptions}
+                      refreshKey={mcpRefresh}
+                      config={config}
+                      onChange={setConfig}
+                      invoke={invoke}
+                      onValidity={(valid) =>
+                        setInvalidFields((previous) => ({ ...previous, mcpArguments: !valid }))
+                      }
+                    />
+                  ) : (
+                    type!.fields!.map((field) => (
+                      <SettingsField key={field.key} title={field.title}>
+                        {field.type === 'boolean' ? (
+                          <input
+                            aria-label={field.title}
+                            type="checkbox"
+                            checked={config[field.key] === true}
+                            onChange={(e) =>
+                              setConfig({ ...config, [field.key]: e.target.checked })
+                            }
+                          />
+                        ) : field.type === 'select' ? (
+                          <select
+                            aria-label={field.title}
+                            value={String(config[field.key] ?? '')}
+                            onChange={(e) => setConfig({ ...config, [field.key]: e.target.value })}
+                          >
+                            <option value="">
+                              {translate('settings.customCommandsSettings.select')}
                             </option>
-                          ))}
-                        </select>
-                      ) : field.type === 'json' ? (
-                        <JsonField
-                          label={field.title}
-                          value={config[field.key]}
-                          onValidity={(valid) =>
-                            setInvalidFields((previous) => ({ ...previous, [field.key]: !valid }))
-                          }
-                          onChange={(value) => setConfig({ ...config, [field.key]: value })}
-                        />
-                      ) : (
-                        <SettingsInput
-                          aria-label={field.title}
-                          type={field.type === 'number' ? 'number' : 'text'}
-                          value={String(config[field.key] ?? '')}
-                          onChange={(e) =>
-                            setConfig({
-                              ...config,
-                              [field.key]:
-                                field.type === 'number' && e.target.value.trim()
-                                  ? Number(e.target.value)
-                                  : e.target.value,
-                            })
-                          }
-                        />
-                      )}
-                    </SettingsField>
-                  ))
+                            {field.options?.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : field.type === 'json' ? (
+                          <JsonField
+                            label={field.title}
+                            value={config[field.key]}
+                            onValidity={(valid) =>
+                              setInvalidFields((previous) => ({ ...previous, [field.key]: !valid }))
+                            }
+                            onChange={(value) => setConfig({ ...config, [field.key]: value })}
+                          />
+                        ) : (
+                          <SettingsInput
+                            aria-label={field.title}
+                            type={field.type === 'number' ? 'number' : 'text'}
+                            value={String(config[field.key] ?? '')}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                [field.key]:
+                                  field.type === 'number' && e.target.value.trim()
+                                    ? Number(e.target.value)
+                                    : e.target.value,
+                              })
+                            }
+                          />
+                        )}
+                      </SettingsField>
+                    ))
+                  )}
+                </SettingsMcpScope>
+                {(!editableConfig ||
+                  jsonMode ||
+                  jsonOnly ||
+                  !['appdock.process.start', 'appdock.mcp.call'].includes(typeId)) && (
+                  <CustomCommandOptions>{advancedOptions}</CustomCommandOptions>
                 )}
-              </SettingsMcpScope>
-              {(!editableConfig ||
-                jsonMode ||
-                jsonOnly ||
-                !['appdock.process.start', 'appdock.mcp.call'].includes(typeId)) && (
-                <CustomCommandOptions>{advancedOptions}</CustomCommandOptions>
-              )}
-            </section>
-          </div>
+              </section>
+            </div>
+          </>
         )}
       </SettingsDialog>
     </SettingsMcpScope>

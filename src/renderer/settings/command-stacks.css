@@ -1,6 +1,6 @@
 .settings-modal.settings-group-dialog.custom-command-dialog.stack-command-dialog[open] {
   width: min(1180px, calc(100vw - 32px));
-  --dialog-max-height: 700px;
+  --dialog-max-height: 900px;
 }
 .settings-modal.settings-group-dialog.command-stack-dialog[open] {
   width: min(1180px, calc(100vw - 32px));
@@ -82,34 +82,34 @@
 .stack-trigger-input {
   min-width: 0;
 }
-.command-stack-dialog .command-stack-editor {
+:is(.command-stack-dialog, .stack-command-form) .command-stack-editor {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
-.command-stack-dialog .stack-list-panel {
+:is(.command-stack-dialog, .stack-command-form) .stack-list-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
-.command-stack-dialog .stack-list-heading {
+:is(.command-stack-dialog, .stack-command-form) .stack-list-heading {
   flex: none;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
-.command-stack-dialog .stack-entry-list {
+:is(.command-stack-dialog, .stack-command-form) .stack-entry-list {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
 }
-.command-stack-dialog .stack-condition-panel {
+:is(.command-stack-dialog, .stack-command-form) .stack-condition-panel {
   min-height: 0;
   max-height: none;
   border-left: 1px solid var(--border);
   padding-left: 20px;
 }
-.command-stack-dialog .stack-selected-title {
+:is(.command-stack-dialog, .stack-command-form) .stack-selected-title {
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
@@ -259,16 +259,6 @@
   color: var(--muted);
   padding: 20px 8px !important;
 }
-@container settings-dialog (max-width:780px) {
-  .stack-command-dialog .custom-command-editor {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .stack-command-dialog .custom-command-common {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 16px;
-  }
-}
 @container settings-dialog (max-width:560px) {
   .command-stack-editor,
   .stack-trigger-header {
@@ -280,7 +270,7 @@
   .stack-condition-panel {
     max-height: none;
   }
-  .command-stack-dialog .command-stack-editor {
+  :is(.command-stack-dialog, .stack-command-form) .command-stack-editor {
     grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
     gap: 12px;
   }
@@ -293,7 +283,7 @@
   .command-stack-dialog .shortcut-capture-status {
     flex-basis: 100%;
   }
-  .command-stack-dialog .stack-condition-panel {
+  :is(.command-stack-dialog, .stack-command-form) .stack-condition-panel {
     border-left: 0;
     border-top: 1px solid var(--border);
     padding-left: 0;
