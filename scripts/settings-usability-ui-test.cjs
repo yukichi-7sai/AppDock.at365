@@ -57,7 +57,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
     initial.updates.checkHostOnAboutOpen = false;
+    initial.updates.checkHostOnStartup = false;
+    initial.updates.checkAppletsOnStartup = false;
     initial.host.hardwareAcceleration = false;
+    initial.host.soundEnabled = false;
     initial.keybindings = [];
     initial.gestures.enabled = false;
     initial.tts = {
@@ -172,14 +175,24 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     );
     const type = model.content.auxiliary.notificationTypes.find((t) => !t.requiredTargets.length);
     assert(type);
-    await page
-      .locator('.notification-setting-card')
-      .filter({ has: page.getByRole('heading', { name: type.title, exact: true }) })
-      .locator(':scope > summary')
-      .click();
+    const editNotification = () =>
+      page
+        .getByRole('button', {
+          name: `${type.ownerTitle}の${type.title}を編集`,
+          exact: true,
+        })
+        .click();
+    const applyNotification = async () => {
+      await page.getByRole('dialog').getByTestId('settings-dialog-confirm').click();
+      await page.getByRole('dialog').waitFor({ state: 'hidden' });
+      await settleSettings(page);
+    };
+    await editNotification();
+    const notificationBefore = (await snapshot()).settings.value.notificationPreferences;
     const speak = page.getByLabel(type.title + 'を読み上げる', { exact: true });
     await speak.check();
-    await settleSettings(page);
+    assert.deepEqual((await snapshot()).settings.value.notificationPreferences, notificationBefore);
+    await applyNotification();
     const row = () =>
       snapshot().then((s) =>
         s.settings.value.notificationPreferences.overrides.find(
@@ -187,12 +200,13 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         ),
       );
     assert.equal((await row()).speak, true);
+    await editNotification();
     assert.equal(
       await page.getByLabel(type.title + 'の通知センターのみ', { exact: true }).isChecked(),
       false,
     );
     await page.getByLabel(type.title + 'の通知センターのみ', { exact: true }).check();
-    await settleSettings(page);
+    await applyNotification();
     assert.deepEqual((await row()).targets, []);
     assert.equal((await row()).speak, false);
     checks.push('speech is a destination; center-only clears visual and speech targets atomically');
@@ -248,7 +262,6 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     checks.push(
       'notification links open TTS/MCP settings and permissions remain in connection status',
     );
-    await page.locator('summary').filter({ hasText: '登録先や接続の詳細' }).click();
     await page.getByLabel('Codexの設定ファイル', { exact: true }).fill(config);
     await page.getByRole('button', { name: '設定先を変更', exact: true }).click();
     const automation = () =>
@@ -274,85 +287,6 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByRole('switch', { name: 'Codex連携を有効にする' }).click();
     await until(async () => !(await automation()).enabled, 'automation disabled');
     checks.push('isolated Codex enable/register/test/unregister preserves unrelated TOML');
-    for (const theme of ['light', 'dark']) {
-      await host.evaluate(async (theme) => {
-        const s = await window.dock.snapshot();
-        await window.dock.saveSettings(
-          { ...s.settings.value, host: { ...s.settings.value.host, theme } },
-          s.settings.revision,
-        );
-      }, theme);
-      await until(
-        () => page.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
-        'theme',
-      );
-      for (const width of [1280, 760]) {
-        await inspect(
-          mainPort,
-          electronExpression +
-            `.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/')).setSize(${width}, 850)`,
-        );
-        await page.waitForTimeout(200);
-        for (const name of [
-          'TTS',
-          '通知',
-          'MCPサーバー',
-          '一般',
-          '表示',
-          'Applet管理',
-          'タスクトレイ',
-          'AppDockについて',
-        ]) {
-          await select(name);
-          const result = await page.evaluate(() => {
-            const m = document.querySelector('.settings-page-layout'),
-              b = document.querySelector('.settings-body'),
-              h = document.querySelector('.settings-page-heading'),
-              t = document.querySelector('.settings-page-toolbar'),
-              c = document.querySelector('.settings-page-content');
-            return {
-              overflow: b.scrollWidth > b.clientWidth + 2,
-              order:
-                b.contains(h) &&
-                b.contains(t) &&
-                b.contains(c) &&
-                h.getBoundingClientRect().bottom <= t.getBoundingClientRect().top + 1 &&
-                t.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1,
-              mainScroll: m.scrollTop,
-            };
-          });
-          assert.equal(result.overflow, false, name + ' horizontal overflow ' + width);
-          assert(result.order, name + ' common frame order');
-          await page.screenshot({ path: path.join(profile, `${theme}-${width}-${name}.png`) });
-        }
-      }
-    }
-    await select('タスクトレイ');
-    assert.equal(await page.getByRole('region', { name: '動作設定', exact: true }).count(), 1);
-    assert.equal(
-      await page.getByRole('region', { name: 'コンテキストメニュー', exact: true }).count(),
-      1,
-    );
-    await select('AppDockについて');
-    assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 1);
-    assert.equal(
-      await page.getByRole('button', { name: 'すべての更新を確認', exact: true }).count(),
-      0,
-    );
-    assert.equal(
-      await page
-        .locator('.settings-surface')
-        .getByRole('button', { name: 'AppDockを更新', exact: true })
-        .count(),
-      1,
-    );
-    assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
-    assert.equal(await page.locator('.about-applets').isVisible(), false);
-    assert.equal(await page.getByTestId('about-version').locator('.settings-badge').count(), 1);
-    assert.equal(await page.locator('.update-result-details').count(), 0);
-    checks.push(
-      'eight pages fit light/dark at 1280 and 760; tray cards are separated and about offers version check and update actions',
-    );
     assert.deepEqual(failures, []);
     fs.writeFileSync(path.join(profile, 'process.log'), output);
     success = true;

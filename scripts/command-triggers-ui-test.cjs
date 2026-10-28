@@ -458,7 +458,7 @@ const recordSuccess = () => {
     checks.push(
       'single mixed catalog / unassigned commands / overlapping IDs / original pages retained / display does not rewrite storage',
     );
-    await require('./command-trigger-layout-checks.cjs')({ host, command, row, checks, profile });
+    await require('./command-trigger-usability-checks.cjs')({ host, command, row, checks });
     const search = host.getByRole('searchbox', { name: 'トリガーのコマンドを検索', exact: true });
     const assignmentFilter = host.getByLabel('トリガーの絞り込み', { exact: true });
     await assignmentFilter.selectOption('unassigned');
@@ -542,9 +542,9 @@ const recordSuccess = () => {
     assert.equal(await host.locator('.binding-disabled-badge').count(), 0);
     for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
       await row(kind, 'same-id').locator('.binding-condition-cell').hover();
-      await row(kind, 'same-id').locator('.applet-shortcut-edit').click();
-      await dialog().getByRole('switch', { name: 'この割り当てを有効にする' }).click();
-      await dialog().getByRole('button', { name: '適用', exact: true }).click();
+      await row(kind, 'same-id').locator('.binding-condition-edit').click();
+      await dialog().getByRole('checkbox', { name: '有効', exact: true }).uncheck();
+      await dialog().getByTestId('settings-dialog-confirm').click();
       await save();
       assert.equal(
         await row(kind, 'same-id')
@@ -560,32 +560,9 @@ const recordSuccess = () => {
         '無効',
       );
     }
-    for (const theme of ['light', 'dark']) {
-      await host.evaluate(async (theme) => {
-        const snapshot = await window.dock.snapshot();
-        await window.dock.saveSettings(
-          { ...snapshot.settings.value, host: { ...snapshot.settings.value.host, theme } },
-          snapshot.settings.revision,
-        );
-      }, theme);
-      await save();
-      for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
-        const badge = row(kind, 'same-id').locator('.binding-disabled-badge');
-        assert(await badge.isVisible());
-        assert(
-          await badge.evaluate((element) => {
-            const style = getComputedStyle(element);
-            return parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle === 'solid';
-          }),
-        );
-      }
-      await command('fixture.triggers.one').screenshot({
-        path: path.join(profile, `disabled-assignments-${theme}.png`),
-      });
-    }
-    checks.push(
-      'disabled assignment badges appear only in the condition column for all three kinds, with visible borders in both themes',
-    );
+    for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures'])
+      assert(await row(kind, 'same-id').getByText('無効', { exact: true }).isVisible());
+    checks.push('disabled state stays visible for all three trigger kinds');
     const edited = await saved();
     assert.equal(edited.keybindings.find((row) => row.id === 'same-id').enabled, false);
     assert.equal(edited.gestures.bindings.find((row) => row.id === 'same-id').enabled, false);
@@ -615,20 +592,18 @@ const recordSuccess = () => {
     checks.push('delete confirmation / cancellation / equal IDs in other trigger types remain');
     await row('shortcuts', 'same-id').locator('.binding-condition-cell').hover();
     await row('shortcuts', 'same-id').locator('.binding-order').click();
-    assert.equal(await host.locator('.shortcut-order-row').count(), 2);
-    await dialog()
-      .locator('[data-order-binding="same-id"] .shortcut-order-handle')
-      .press('ArrowDown');
-    await dialog().getByRole('button', { name: '適用', exact: true }).click();
+    assert.equal(await dialog().getByTestId('stack-entry').count(), 2);
+    await dialog().locator('[data-stack-entry="same-id"] .stack-drag').press('ArrowDown');
+    await dialog().getByTestId('settings-dialog-confirm').click();
     await save();
     assert.deepEqual(
       (await saved()).keybindings.filter((row) => row.key === 'Ctrl+F8').map((row) => row.id),
       ['second-key', 'same-id'],
     );
     checks.push('same-input order dialog includes all commands and saves source order');
-    await row('shortcuts', 'same-id').locator('.applet-shortcut-edit').click();
-    await dialog().getByRole('switch', { name: 'この割り当てを有効にする' }).click();
-    await dialog().getByRole('button', { name: '適用', exact: true }).click();
+    await row('shortcuts', 'same-id').locator('.binding-condition-edit').click();
+    await dialog().getByRole('checkbox', { name: '有効', exact: true }).check();
+    await dialog().getByTestId('settings-dialog-confirm').click();
     await save();
     await open();
     assert.equal(await row('shortcuts', 'same-id').getByText('無効', { exact: true }).count(), 0);

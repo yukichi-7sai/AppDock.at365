@@ -22,6 +22,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 
 ## ツールとWindows検証
 
+- テストの追加・修正・整理では[テストの作成と整理](docs/testing.md)を参照する。利用者の操作・保存・拒否・復旧を守り、細かな意匠やCSS/DOMの実装方法だけを固定する検査を増やさない。共通部品は代表例へ集約し、検査削除時は残る契約と担当試験を記録する。
 - Node/pnpmはtoolchain.jsonに従うプロジェクト内の.toolsをdev.bat経由で使用する。グローバル導入はしない。パッケージ更新はupdate-packages.batを使い、Electronは最新安定版・Node.jsは最新LTSを毎回選び完全版で固定する。この2つは7日待機の恒久免除、ほかの依存・pnpmは7日待機と版指定例外を維持する。[依存方針](DEVELOPMENT.md#依存とツールの公開後待機)に従い、pnpmのshim生成とElectron取得を含め、更新時は初回setupと再実行も確認する。
 - node_modulesをjunction共有したworktreeで依存をインストールしない。依存更新用checkoutは独立node_modulesを使い、整理前後は元checkoutへの参照と動作を確認する。
 - GUI試験は直列・隔離profileで行う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。

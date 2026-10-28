@@ -17,6 +17,7 @@
 | 設定一覧の件数と索引 | [設定一覧の容量と検索](docs/settings-capacity.md) |
 | 操作・設定と動作環境 | [機能・操作・設定](docs/usage.md) |
 | 開発・コミット・配布 | [共通手順](docs/development-workflow.md)、[ローカル発行](docs/publishing.md)、[GitHub Release](docs/RELEASING.md)、[全体ZIP](docs/all-in-one.md) |
+| テストの作成・整理 | [検査の価値、層の選択、共通化と削除の判断](docs/testing.md) |
 | Appletの開発とAPI | [実装ガイド](docs/applet-development.md)、[Applet API](docs/extensions.md)、[ホスト拡張](docs/host-development.md)、[ページ](docs/applet-pages.md) |
 | 設定・入力・保存 | [共通レイアウト指針](docs/settings-ui-guidelines.md)、[設定UIと既定値・リセット](docs/settings-foundation.md)、[一覧とダイアログ](docs/settings-list-editing.md)、[端末別保存・同期・復旧](docs/settings-sync.md) |
 | 表示言語・翻訳 | [本体の翻訳基盤・文言変更・段階移行](docs/localization.md) |
@@ -45,6 +46,8 @@
 Windowsが判定する3本指・4本指の10種類を専用キーで接続する[タッチパッドジェスチャー](docs/touchpad-gestures-design.md)を実装。端末別の既定OFF、明示操作でのWindows設定、ジェスチャーごとの競合停止、専用キーの所有権と共通実行基盤への接続を提供する。
 
 ## 開発環境・ビルド・テスト
+
+テストを追加・修正するときは[テストの作成と整理](docs/testing.md)を参照してください。必要回帰と結果の再利用は[共通手順](docs/development-workflow.md)に従います。
 
 スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行したフォルダー型本体の専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。
 

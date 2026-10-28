@@ -116,7 +116,7 @@ Applet数は組み込みとcollectionの子ページを除くインストール�
 
 `scripts/about-ui-test.cjs [固定EXE]`で、件数と登録後の更新、枠なしの確認アイコンと更新版/日時、明暗/狭幅のボタン寸法と標準面の共通hover、折りたたみ/保存/自動確認のON・OFF/リセットアイコン/件数タイルの移動を確認する。固定EXEでは2種類の更新対象と更新なしの通知も隔離feedで確認する。1時間境界・重複防止・通知の出し分けとJSON投影は`tests/about-updates.test.cjs`を使う。
 
-`scripts/settings-usability-ui-test.cjs [固定EXE]`は共通構成、8ページの明暗テーマと狭い幅、モデル候補・直接入力、通知先と声/速度の継承、隔離したCodex登録/解除を確認する。`scripts/settings-layout-refinements-ui-test.cjs [固定EXE]`はgroupとタイトルの高さ、入力列・全幅区切り線、通知カード・暗色の枠、許可一覧の背景、導入description、AIの同一階層と保存/取消、操作文字の中心を確認する。保存と公開範囲の契約は上記を維持する。
+`scripts/settings-controls-ui-test.cjs [固定EXE]`は即時保存とコマンドの反映、代表的な明暗・狭幅でのキーボード開閉とフォーカス、通知の必須宛先、検索による移動、AIダイアログの保存/取消を確認する。`scripts/settings-usability-ui-test.cjs <固定EXE>`はモデル候補・直接入力、通知先と声/速度の継承、隔離したCodex登録/解除を確認する。細かな余白や装飾の固定検査を追加せず、共通部品の確認は[テストの作成と整理](testing.md)に従って集約する。保存と公開範囲の契約は上記を維持する。
 
 Applet本文は`src/renderer/settings-ui/AppletSettingsForm.tsx`を共通テンプレートとする。manifestの`settingSections`を検証し、設定ページのauxiliaryへ投影する。セクションへ配置されなかった設定・操作も表示し、設定保存/JSONの投影に表示メタデータを混ぜない。設定アンカーは既存のキーのままで、セクションの再配置や折りたたみに依存しない。WebAppletもSettingsSection/SettingsFieldでサイト・表示とページ遷移・アカウント・管理を描画する。
 
