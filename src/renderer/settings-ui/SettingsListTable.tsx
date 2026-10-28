@@ -138,6 +138,9 @@ export function SettingsListTable({
   totalCount,
   emptyMessage,
   actionsAlign = 'end',
+  tableClassName,
+  hideActionsHeading = false,
+  renderCell,
 }: {
   testId?: string;
   definition: SettingDefinition;
@@ -164,6 +167,9 @@ export function SettingsListTable({
   totalCount?: number;
   emptyMessage?: ReactNode;
   actionsAlign?: 'start' | 'end';
+  tableClassName?: string;
+  hideActionsHeading?: boolean;
+  renderCell?(entry: Record<string, unknown>, key: string, index: number): ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
   const view = definition.list!;
@@ -225,6 +231,7 @@ export function SettingsListTable({
       title={definition.title}
       commandListScroll={commandListScroll}
       actionsAlign={actionsAlign}
+      tableClassName={tableClassName}
       toolbar={
         <>
           {toolbarControls}
@@ -269,8 +276,13 @@ export function SettingsListTable({
               {translate('settings.settingsListTable.enabled')}
             </th>
           )}
-          <th className="settings-list-actions-heading">
-            {translate('settings.settingsListTable.actions')}
+          <th
+            className="settings-list-actions-heading"
+            aria-label={
+              hideActionsHeading ? translate('settings.settingsListTable.actions') : undefined
+            }
+          >
+            {!hideActionsHeading && translate('settings.settingsListTable.actions')}
           </th>
           {navigation && (
             <th className="command-settings-heading">
@@ -323,7 +335,7 @@ export function SettingsListTable({
                       </div>
                     </div>
                   ) : (
-                    display(entry, key)
+                    (renderCell?.(entry, key, index) ?? display(entry, key))
                   )}
                 </td>
               ))}

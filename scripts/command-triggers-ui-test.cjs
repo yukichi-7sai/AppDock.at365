@@ -114,6 +114,18 @@ if (triggerSettingsOnly) {
     });
   }
 }
+if (triggerTabsOnly) {
+  for (const rows of [
+    initial.keybindings,
+    initial.gestures.bindings,
+    initial.touchpadGestures.bindings,
+  ]) {
+    rows.push(
+      { ...rows[0], id: 'summary-disabled', command: 'fixture.triggers.new', enabled: false },
+      { ...rows[0], id: 'summary-unavailable', command: 'fixture.triggers.missing' },
+    );
+  }
+}
 if (lockKeysOnly) {
   initial.keybindings = [];
   initial.gestures.bindings = [];
@@ -481,10 +493,15 @@ const recordSuccess = () => {
       'four command-trigger views share the toolbar with JSON and preserve command filters and scroll without saving',
     );
     if (triggerTabsOnly) {
+      await require('./trigger-summary-checks.cjs')({ host, open, saved, checks });
       await open('custom-commands');
       assert.equal(await host.getByTestId('command-trigger-tabs').count(), 0);
       assert.equal(await host.getByTestId('trigger-stack-table').count(), 0);
       assert.equal(await host.locator('.custom-commands-settings table').count(), 1);
+      assert.equal(
+        await host.getByRole('columnheader', { name: '操作', exact: true }).innerText(),
+        '操作',
+      );
       assert.deepEqual(await saved(), beforeTabs);
       checks.push(
         'custom commands retain only their command list without trigger tabs or stack tables',

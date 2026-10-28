@@ -1,3 +1,59 @@
+.command-list-page-canvas .trigger-stack-section {
+  width: 100cqw;
+  min-width: 0;
+}
+.trigger-stack-list {
+  table-layout: fixed;
+}
+.settings-list .trigger-stack-list :is(th, td) {
+  box-sizing: border-box;
+  padding-inline: 12px;
+}
+.settings-list .trigger-stack-list :is(th:first-child, td.settings-list-primary) {
+  width: 140px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-list .trigger-stack-list :is(th:nth-child(3), td:nth-child(3)) {
+  width: 230px;
+  white-space: nowrap;
+}
+.trigger-stack-list :is(.settings-list-actions-heading, .settings-list-actions-cell) {
+  width: 98px;
+}
+.trigger-stack-list tbody td:nth-child(2) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.trigger-stack-command[data-state] {
+  color: var(--muted);
+}
+.trigger-stack-command[data-state] .trigger-stack-command-name {
+  text-decoration: line-through;
+}
+.trigger-stack-command-state {
+  font-size: 12px;
+}
+@container settings-page (max-width: 600px) {
+  .settings-list .trigger-stack-list :is(th, td) {
+    padding-inline: 8px;
+  }
+  .settings-list .trigger-stack-list :is(th:first-child, td.settings-list-primary) {
+    width: 100px;
+  }
+  .settings-list .trigger-stack-list :is(th:nth-child(3), td:nth-child(3)) {
+    width: 80px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .trigger-stack-list :is(.settings-list-actions-heading, .settings-list-actions-cell) {
+    width: 86px;
+  }
+  .trigger-stack-list .settings-list-actions {
+    gap: 6px;
+  }
+}
+
 .settings-modal.settings-group-dialog.custom-command-dialog.stack-command-dialog[open] {
   width: min(1180px, calc(100vw - 32px));
   --dialog-max-height: 900px;

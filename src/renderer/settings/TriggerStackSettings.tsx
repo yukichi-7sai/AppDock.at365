@@ -260,9 +260,46 @@ export function TriggerStackSettings({
     <CommandListSection
       title={t('settings.commandStacks.triggers')}
       data-testid="trigger-stack-table"
+      className="trigger-stack-section"
     >
       <SettingsListTable
         testId={`trigger-stacks:${kind}`}
+        tableClassName="trigger-stack-list"
+        hideActionsHeading
+        renderCell={(_entry, key, index) =>
+          key === 'commands' ? (
+            <span className="trigger-stack-commands">
+              {visible[index].entries.map((row, rowIndex) => {
+                const command = commandsById.get(row.command);
+                const state = !row.enabled
+                  ? 'disabled'
+                  : !command?.available
+                    ? 'unavailable'
+                    : undefined;
+                return (
+                  <span key={row.id}>
+                    {rowIndex > 0 && <span aria-hidden="true"> → </span>}
+                    <span
+                      className="trigger-stack-command"
+                      data-state={state}
+                      title={command?.disabledReason}
+                    >
+                      <span className="trigger-stack-command-name">
+                        {command?.title ?? row.command}
+                      </span>
+                      {state && (
+                        <span className="trigger-stack-command-state">
+                          {' '}
+                          ({t(`settings.bindingOrderDialog.${state}`)})
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                );
+              })}
+            </span>
+          ) : undefined
+        }
         definition={list}
         totalCount={stacks.length}
         toolbarControls={
