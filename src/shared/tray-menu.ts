@@ -132,7 +132,7 @@ export function resolveTrayMenu(
 
 export function trayCommandCatalog(
   extensions: ExtensionSnapshot[],
-  additional: import('./commands').UiCommand[] = [],
+  additional: readonly import('./commands').UiCommand[] = [],
 ) {
   const base = [
     ...hostCommandsForApplets(extensions),

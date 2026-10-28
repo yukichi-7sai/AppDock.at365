@@ -269,7 +269,7 @@ const diskDefinitions = () =>
     );
     await dialog.getByTestId('custom-command-mcp-arguments').fill('{"message":"original"}');
     await options();
-    await dialog.getByLabel('待ち時間（ミリ秒）', { exact: true }).fill('90000');
+    await dialog.getByLabel('応答の制限時間（ミリ秒）', { exact: true }).fill('90000');
     await save();
     const original = structuredClone(
       (await definitions()).find((item) => item.title === 'Saved MCP'),

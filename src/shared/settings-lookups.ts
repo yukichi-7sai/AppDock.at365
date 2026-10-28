@@ -10,6 +10,12 @@ type Lookups = {
 };
 const lookups = new WeakMap<Settings, Lookups>();
 
+function freezeValues(value: unknown): void {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return;
+  for (const child of Object.values(value)) freezeValues(child);
+  Object.freeze(value);
+}
+
 function prepareCondition(when: {
   appletIds: readonly string[];
   processes?: readonly string[];
@@ -41,12 +47,15 @@ export function prepareSettingsLookups(settings: Settings): void {
     if (names) prepareProcessNames(names);
   }
   const items = customItems(settings.customCommands);
+  // Accepted definitions and their config share the lifetime of these indexes.
+  freezeValues(items);
   const stacks = new Map<string, CommandStack>();
   for (const item of items) {
     if (item.typeId !== commandStackTypeId) continue;
     try {
       const stack = parseCommandStack(item.config);
       for (const row of stack.entries) prepareCondition(row.when);
+      freezeValues(stack);
       stacks.set(item.id, stack);
     } catch {
       // Unknown/invalid stored definitions remain visible as unavailable commands.

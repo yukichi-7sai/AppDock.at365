@@ -795,6 +795,7 @@ test('saved MCP commands validate without execution, retain identity, and detach
     {
       validateConfig: (c) => f.service.commandValidation(c),
       unavailableReason: (c) => f.service.commandUnavailable(c),
+      stateVersion: () => f.service.commandStateVersion(),
     },
   );
   const tool = (await f.service.tool(host, { serverId, name: 'delay' })).tool;
@@ -827,6 +828,18 @@ test('saved MCP commands validate without execution, retain identity, and detach
   assert.equal(remote.state.count, 0);
   service.update({ expectedRevision: settingsCommands.revision(), operations });
   assert.equal(remote.state.count, 0);
+  const catalog = service.uiCommands();
+  assert.equal(service.uiCommands(), catalog);
+  const session = f.service.sessions.get(serverId),
+    fetchedAt = session.fetchedAt;
+  session.fetchedAt = Date.now() - 30000;
+  assert.notEqual(
+    service.uiCommands(),
+    catalog,
+    'tool expiry invalidates presentation without a notification',
+  );
+  session.fetchedAt = fetchedAt;
+  assert.equal(service.uiCommands()[0].available, true);
   const accepted = await service.execute('appdock.custom.' + id, { origin: { kind: 'mcp' } });
   assert.equal(accepted.result.completion, 'accepted');
   const completed = await until(() => {
@@ -842,6 +855,19 @@ test('saved MCP commands validate without execution, retain identity, and detach
   assert.equal(service.summaries()[0].commandId, 'appdock.custom.' + id);
   assert.match(f.service.commandValidation({ ...config, arguments: { delay: 'bad' } }), /Schema/);
   assert.match(f.service.commandValidation({ ...config, toolRevision: '0'.repeat(64) }), /再取得/);
+  const localFile = path.join(f.dir, 'mcp-client.json');
+  const localBytes = fs.readFileSync(localFile);
+  const local = JSON.parse(localBytes);
+  local.entries[serverId].connection.enabled = false;
+  fs.writeFileSync(localFile, JSON.stringify(local));
+  assert.equal(
+    service.uiCommands()[0].available,
+    false,
+    'external connection edits invalidate the cached UI',
+  );
+  await assert.rejects(service.execute('appdock.custom.' + id), { code: 'TYPE_UNAVAILABLE' });
+  fs.writeFileSync(localFile, localBytes);
+  assert.equal(service.uiCommands()[0].available, true);
   f.settings.update({
     op: 'enabled',
     id: serverId,
@@ -849,6 +875,7 @@ test('saved MCP commands validate without execution, retain identity, and detach
     expectedRevision: f.settings.revision(),
   });
   assert.match(f.service.commandUnavailable(config), /OFF/);
+  assert.equal(service.uiCommands()[0].available, false);
   await assert.rejects(
     service.execute('appdock.custom.' + id),
     (e) => e.code === 'TYPE_UNAVAILABLE',

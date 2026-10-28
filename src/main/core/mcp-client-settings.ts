@@ -82,6 +82,17 @@ export class McpClientSettings {
   revision() {
     return mcpDigest([this.settings.revision, this.read()]);
   }
+  /** Presentation invalidation only; permissions, secrets and execution still use current reads. */
+  stateVersion() {
+    try {
+      const stat = fs.statSync(this.file, { bigint: true, throwIfNoEntry: false });
+      return [this.settings.revision, stat?.ino, stat?.size, stat?.mtimeNs, stat?.ctimeNs].join(
+        ':',
+      );
+    } catch {
+      return 'unreadable';
+    }
+  }
   health(): { revision: string; error?: string } {
     try {
       return { revision: this.revision() };

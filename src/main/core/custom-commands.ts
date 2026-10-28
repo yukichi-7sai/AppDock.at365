@@ -44,6 +44,8 @@ export interface CustomCommandProvider {
   invoke(definition: CustomCommandDefinition, context: InputInvocation): Promise<unknown>;
   validateConfig?(config: JsonObject): string | null;
   unavailableReason?(config: JsonObject): string | null;
+  /** Presentation dependency token. Omit for an uncached dynamic unavailableReason. */
+  stateVersion?(): unknown;
   authorized?(context: InputInvocation): boolean;
 }
 const failure = (code: string, message: string): never => {
@@ -84,6 +86,16 @@ export class CustomCommandService {
   private hosts = new Map<string, CustomCommandProvider>();
   private bindings = new Map<string, string>();
   private compiled = new Map<string, ReturnType<typeof compileCustomType>>();
+  private validated = new WeakMap<
+    CustomCommandDefinition,
+    { revision: string; reason: string | null }
+  >();
+  private catalog?: {
+    settings: Settings;
+    types: Set<string>;
+    signature: string;
+    commands: readonly UiCommand[];
+  };
   private active = new Map<
     string,
     {
@@ -118,7 +130,10 @@ export class CustomCommandService {
       context: InputInvocation,
       definition: CustomCommandDefinition,
     ) => Promise<unknown>,
-    checks: Pick<CustomCommandProvider, 'validateConfig' | 'unavailableReason' | 'authorized'> = {},
+    checks: Pick<
+      CustomCommandProvider,
+      'validateConfig' | 'unavailableReason' | 'stateVersion' | 'authorized'
+    > = {},
   ) {
     const [parsed] = parseCustomTypes(null, [type]);
     if (this.hosts.has(parsed.id)) throw Error(hostText('services.customCommands.duplicateType'));
@@ -156,8 +171,7 @@ export class CustomCommandService {
       return failure('TYPE_UNAVAILABLE', hostText('services.customCommands.invalidDeclarations'));
     return result;
   }
-  private validator(type: CustomCommandType) {
-    const key = digest(type);
+  private validator(type: CustomCommandType, key = digest(type)) {
     let validator = this.compiled.get(key);
     if (!validator) {
       validator = compileCustomType(type);
@@ -183,7 +197,26 @@ export class CustomCommandService {
     return hostStartupTiming.measure('commandState', () => this.stateCore(item, records));
   }
   private recordIndex() {
-    return new Map(this.records().map((record) => [record.type.id, record]));
+    return new Map(
+      this.records().map((record) => [
+        record.type.id,
+        { ...record, revision: digest(record.type) },
+      ]),
+    );
+  }
+  private schemaReason(item: CustomCommandDefinition, type: CustomCommandType, revision: string) {
+    const cached = this.validated.get(item);
+    if (cached?.revision === revision) return cached.reason;
+    let reason: string | null = null;
+    try {
+      if (!this.validator(type, revision)(item.config).valid)
+        reason = hostText('settings.customCommandState.schemaMismatch');
+    } catch {
+      reason = hostText('settings.customCommandState.schemaUnavailable');
+    }
+    if (Object.isFrozen(item) && Object.isFrozen(item.config))
+      this.validated.set(item, { revision, reason });
+    return reason;
   }
   private stateCore(item: CustomCommandDefinition, records = this.recordIndex()) {
     const found = records.get(item.typeId);
@@ -200,20 +233,15 @@ export class CustomCommandService {
     else if (item.configVersion !== record.type.configVersion)
       reason = hostText('settings.customCommandState.configVersion');
     else {
-      try {
-        if (!this.validator(record.type)(item.config).valid)
-          reason = hostText('settings.customCommandState.schemaMismatch');
-      } catch {
-        reason = hostText('settings.customCommandState.schemaUnavailable');
-      }
+      reason = this.schemaReason(item, record.type, record.revision);
       if (!reason) reason = record.provider.unavailableReason?.(item.config) ?? null;
     }
     return { record, reason, published: !!record?.type.automation && item.automation };
   }
-  summaries() {
-    const records = this.recordIndex();
-    return customItems(this.options.settings.value.customCommands).map(({ config, ...item }) => {
-      const state = this.state({ ...item, config }, records);
+  summaries(records = this.recordIndex()) {
+    return customItems(this.options.settings.value.customCommands).map((definition) => {
+      const { config, ...item } = definition;
+      const state = this.state(definition, records);
       return {
         ...item,
         commandId: customCommandId(item.id),
@@ -222,22 +250,57 @@ export class CustomCommandService {
       };
     });
   }
-  uiCommands(): UiCommand[] {
-    return hostStartupTiming.measure('commandCatalog', () => this.uiCommandsCore());
+  uiCommands(): readonly UiCommand[] {
+    const settings = this.options.settings.value;
+    const types =
+      this.catalog?.settings === settings
+        ? this.catalog.types
+        : new Set(customItems(settings.customCommands).map((item) => item.typeId));
+    const records = this.recordIndex();
+    let cacheable = true;
+    const signature = JSON.stringify(
+      [...records.values()]
+        .filter(({ type }) => types.has(type.id))
+        .map(({ type, provider, revision }) => {
+          if (provider.unavailableReason && !provider.stateVersion) cacheable = false;
+          return [
+            type.id,
+            revision,
+            provider.owner,
+            provider.generation,
+            provider.available,
+            this.bindings.get(type.id),
+            provider.stateVersion?.(),
+          ];
+        }),
+    );
+    if (cacheable && this.catalog?.settings === settings && this.catalog.signature === signature)
+      return this.catalog.commands;
+    const commands = hostStartupTiming.measure('commandCatalog', () =>
+      this.uiCommandsCore(records),
+    );
+    this.catalog = cacheable ? { settings, types, signature, commands } : undefined;
+    return commands;
   }
-  private uiCommandsCore(): UiCommand[] {
+  private uiCommandsCore(
+    records: ReturnType<CustomCommandService['recordIndex']>,
+  ): readonly UiCommand[] {
     const stacks = settingsLookups(this.options.settings.value).stacks;
-    return this.summaries().map((item) => ({
-      id: item.commandId,
-      customDefinitionId: item.id,
-      title: item.title,
-      description: item.description,
-      extension: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
-      extensionId: item.owner.kind === 'host' ? null : item.owner.id,
-      available: item.available,
-      disabledReason: item.unavailableReason ?? undefined,
-      ...(stacks.has(item.id) ? { stack: stacks.get(item.id) } : {}),
-    }));
+    return Object.freeze(
+      this.summaries(records).map((item) =>
+        Object.freeze({
+          id: item.commandId,
+          customDefinitionId: item.id,
+          title: item.title,
+          description: item.description,
+          extension: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
+          extensionId: item.owner.kind === 'host' ? null : item.owner.id,
+          available: item.available,
+          disabledReason: item.unavailableReason ?? undefined,
+          ...(stacks.has(item.id) ? { stack: stacks.get(item.id) } : {}),
+        }),
+      ),
+    );
   }
   publicCommands(context: InputInvocation = {}): AutomationCommand[] {
     const records = this.recordIndex();
@@ -541,9 +604,11 @@ export class CustomCommandService {
     }
   }
   has(id: string) {
-    return customItems(this.options.settings.value.customCommands).some(
-      (i) => customCommandId(i.id) === id,
-    );
+    return settingsLookups(this.options.settings.value).customByCommandId.has(id);
+  }
+  isAvailable(id: string) {
+    const item = settingsLookups(this.options.settings.value).customByCommandId.get(id);
+    return !!item && this.state(item).reason === null;
   }
   validateReplacement(next: Settings) {
     const current = this.options.settings.value.customCommands;
@@ -636,7 +701,7 @@ export class CustomCommandService {
           if (!record || item.configVersion !== record.type.configVersion) return true;
           try {
             return (
-              !this.validator(record.type)(item.config).valid ||
+              this.schemaReason(item, record.type, record.revision) !== null ||
               !!record.provider.unavailableReason?.(item.config)
             );
           } catch {

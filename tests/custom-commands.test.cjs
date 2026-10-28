@@ -20,6 +20,7 @@ const {
 } = require('../out/main/shared/custom-commands');
 const { parseSettings, createDefaultSettings } = require('../out/main/shared/settings-schema');
 const { operationsFor } = require('../out/main/shared/appdock-api');
+const { hostStartupTiming } = require('../out/main/main/core/host-startup-timing');
 const type = {
   id: 'test.custom.echo',
   title: 'Echo',
@@ -90,6 +91,72 @@ function fixture(t, extra = {}) {
     add,
   };
 }
+
+test('repeated catalog readers share thousands of accepted definitions and one-ID checks stay current', async (t) => {
+  const f = fixture(t);
+  f.add();
+  const template = f.store.value.customCommands.items[0];
+  const items = Array.from({ length: 1000 }, (_, i) => ({
+    ...template,
+    id: randomUUID(),
+    title: `Command ${i}`,
+  }));
+  f.store.save({ ...f.store.value, customCommands: { version: 2, items } }, f.store.revision);
+  const calls = (id) => hostStartupTiming.snapshot().work.find((row) => row.id === id)?.calls ?? 0;
+  const catalogs = calls('commandCatalog'),
+    states = calls('commandState');
+  const first = f.service.uiCommands();
+  for (let i = 0; i < 158; i++) assert.equal(f.service.uiCommands(), first);
+  assert.equal(first.length, 1000);
+  assert.equal(calls('commandCatalog') - catalogs, 1);
+  assert.equal(calls('commandState') - states, 1000);
+  assert.equal(Reflect.set(first[0], 'available', false), false);
+  const beforeOne = calls('commandState');
+  assert.equal(f.service.isAvailable(first[0].id), true);
+  assert.equal(f.service.isAvailable('unknown.command'), false);
+  assert.equal(calls('commandState') - beforeOne, 1);
+  f.provider.available = false;
+  await assert.rejects(f.service.execute(first[0].id), { code: 'TYPE_UNAVAILABLE' });
+  assert.equal(f.service.uiCommands()[0].available, false);
+  f.provider.available = true;
+  assert.equal(f.service.uiCommands()[0].available, true);
+  f.update([{ op: 'update', id: items[0].id, changes: { title: 'Renamed' } }]);
+  assert.equal(f.service.uiCommands()[0].title, 'Renamed');
+  f.provider.types[0].configSchema.properties.message.type = 'number';
+  assert.equal(f.service.uiCommands()[0].available, false);
+  assert.equal(f.service.isAvailable(first[0].id), false);
+});
+
+test('dynamic provider versions refresh presentation while public and execution checks always use current state', async (t) => {
+  const f = fixture(t),
+    item = f.add({ automation: true });
+  let reason = null,
+    version = 0;
+  f.provider.unavailableReason = () => reason;
+  const initial = f.service.uiCommands();
+  reason = 'Unavailable';
+  assert.equal(
+    f.service.uiCommands()[0].available,
+    false,
+    'unversioned callbacks are never cached',
+  );
+  f.provider.stateVersion = () => version;
+  reason = null;
+  const cached = f.service.uiCommands();
+  assert.equal(f.service.uiCommands(), cached);
+  reason = 'Permission changed';
+  assert.equal(f.service.publicCommands()[0].available, false);
+  await assert.rejects(f.service.execute(customCommandId(item.id)), { code: 'TYPE_UNAVAILABLE' });
+  version++;
+  assert.equal(f.service.uiCommands()[0].disabledReason, reason);
+  assert.notEqual(f.service.uiCommands(), initial);
+  reason = null;
+  version++;
+  f.provider.authorized = () => false;
+  assert.equal(f.service.uiCommands()[0].available, true);
+  assert.equal(f.service.publicCommands()[0].available, false);
+  await assert.rejects(f.service.execute(customCommandId(item.id)), { code: 'PERMISSION_DENIED' });
+});
 test('codec preserves unknown blocks and rejects unsafe known definitions', () => {
   const old = createDefaultSettings();
   assert.equal(parseSettings(old).customCommands, undefined);

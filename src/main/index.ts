@@ -1053,6 +1053,7 @@ customCommands.registerHost(
     authorized: (context) => customExecutionAllowed('runProcesses', context),
     validateConfig: validateProcessConfig,
     unavailableReason: validateProcessConfig,
+    stateVersion: () => 0,
   },
 );
 customCommands.registerHost(
@@ -1078,6 +1079,7 @@ customCommands.registerHost(
     authorized: (context) => customExecutionAllowed('sendInput', context),
     validateConfig: validateInputConfig,
     unavailableReason: validateInputConfig,
+    stateVersion: () => 0,
   },
 );
 customCommands.registerHost(
@@ -1113,6 +1115,7 @@ customCommands.registerHost(
   {
     validateConfig: (config) => mcpClient.commandValidation(config),
     unavailableReason: (config) => mcpClient.commandUnavailable(config),
+    stateVersion: () => mcpClient.commandStateVersion(),
   },
 );
 customCommands.registerHost(
@@ -1120,10 +1123,10 @@ customCommands.registerHost(
   async (_config, context, definition) => {
     const id = 'appdock.custom.' + definition.id;
     const captured = context.triggerContext ?? (await captureCommandContext());
-    const catalog = availableShortcutCommands();
     // Use the root definition snapshot supplied by CustomCommandService.
-    const root = catalog.find((command) => command.id === id);
-    if (root) root.stack = parseCommandStack(definition.config);
+    const catalog = availableShortcutCommands().map((command) =>
+      command.id === id ? { ...command, stack: parseCommandStack(definition.config) } : command,
+    );
     const plan = planCommandBatch(
       [
         {
@@ -1676,7 +1679,7 @@ const commandDispatcher = new CommandDispatcher(
   executeCommand,
   (message) => log.write('error', 'shortcuts', message),
   () => quitting || shortcutRecording || !!overlayHost?.active,
-  (id) => customCommands.uiCommands().some((command) => command.id === id && command.available),
+  (id) => customCommands.isAvailable(id),
 );
 async function captureCommandContext(): Promise<
   import('../shared/command-conditions').TriggerContext
@@ -1701,18 +1704,20 @@ function shortcutContext(foregroundWindow?: string) {
     pageId: pageId ?? (hostFocused ? hostShortcutPage(navigation.state.route) : undefined),
   };
 }
-function availableShortcutCommands(): (import('../shared/command-execution').CommandCatalogEntry & {
+function availableShortcutCommands(
+  applets = allApplets(),
+): (import('../shared/command-execution').CommandCatalogEntry & {
   title: string;
 })[] {
   return [
-    ...hostCommandsForApplets(allApplets()).map((c) => ({
+    ...hostCommandsForApplets(applets).map((c) => ({
       id: c.id,
       title: c.title,
       extensionId: null,
     })),
     ...customCommands.uiCommands().filter((c) => c.available),
-    ...appletManagementCommands(allApplets()).filter((c) => c.available),
-    ...allApplets().flatMap((e) =>
+    ...appletManagementCommands(applets).filter((c) => c.available),
+    ...applets.flatMap((e) =>
       e.commands
         .filter((c) => c.available)
         .map((c) => ({ id: c.id, title: c.title, extensionId: e.id })),
@@ -1842,24 +1847,13 @@ let hotKeyApplyGeneration = 0;
 let appletApplyGeneration = 0;
 function syncHotKeys(retry = false) {
   if (quitting || !hotKeys) return Promise.resolve();
-  const available = [
-    ...hostCommandsForApplets(allApplets()).map((command) => command.id),
-    ...customCommands
-      .uiCommands()
-      .filter((c) => c.available)
-      .map((c) => c.id),
-    ...appletManagementCommands(allApplets())
-      .filter((c) => c.available)
-      .map((c) => c.id),
-    ...allApplets().flatMap((extension) =>
-      extension.commands.filter((command) => command.available).map((command) => command.id),
-    ),
-  ];
+  const catalog = availableShortcutCommands();
+  const available = catalog.map((command) => command.id);
   const revision = settings.revision;
   const generation = ++hotKeyApplyGeneration;
   const suspended = shortcutRecording || !!overlayHost?.active;
   return hotKeys
-    .sync(settings.value, available, suspended, retry, availableShortcutCommands())
+    .sync(settings.value, available, suspended, retry, catalog)
     .then(() => {
       if (
         quitting ||

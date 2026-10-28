@@ -132,6 +132,7 @@ function safeError(error: unknown, sent = false): { code: string; message: strin
       };
 }
 export class McpClientService {
+  private commandRevision = 0;
   private sessions = new Map<string, Session>();
   private connectionErrors = new Map<string, string>();
   private connectionChecks = new Set<string>();
@@ -155,6 +156,18 @@ export class McpClientService {
   private allow(actor: McpActor, execute = false) {
     if (!this.options.authorized(actor, execute || actor.management === true))
       fail('API_DISABLED', hostText('services.mcpClient.permission'));
+  }
+  private commandsChanged() {
+    this.commandRevision++;
+    this.options.changed?.();
+  }
+  commandStateVersion() {
+    const now = Date.now();
+    return [
+      this.commandRevision,
+      this.options.settings.stateVersion(),
+      [...this.sessions.values()].map((record) => [record.id, now - record.fetchedAt < 30000]),
+    ];
   }
   private configuration(actor: McpActor, id: unknown, tool?: string) {
     this.allow(actor);
@@ -313,7 +326,7 @@ export class McpClientService {
     try {
       await record.transport.close();
     } catch {}
-    this.options.changed?.();
+    this.commandsChanged();
   }
   private fetcher(url: string, token?: string): typeof fetch {
     const fetcher = this.options.fetcher ?? fetch;
@@ -406,14 +419,14 @@ export class McpClientService {
       client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
         current.fetchedAt = 0;
         current.toolsEpoch++;
-        this.options.changed?.();
+        this.commandsChanged();
       });
       client.onerror = () => {}; // Raw protocol errors can contain credentials or tool arguments.
       client.onclose = () => {
         if (!current.closed) {
           current.error = hostText('services.mcpClient.connectionClosed');
           current.fetchedAt = 0;
-          this.options.changed?.();
+          this.commandsChanged();
         }
       };
       this.sessions.set(id, current);
@@ -446,7 +459,7 @@ export class McpClientService {
           throw new AutomationError(safe.code, safe.message);
         } finally {
           clearTimeout(timer);
-          this.options.changed?.();
+          this.commandsChanged();
         }
       })();
     }
@@ -518,7 +531,7 @@ export class McpClientService {
         this.connectionErrors.delete(id);
         record.fetchedAt = Date.now();
         record.error = undefined;
-        this.options.changed?.();
+        this.commandsChanged();
         return tools;
       } catch (error) {
         if (record.closed)
@@ -528,7 +541,7 @@ export class McpClientService {
         this.connectionErrors.set(id, safe.message);
         if (!record.closed && safe.code !== 'STALE_CATALOG' && !this.connectionChecks.has(id))
           this.options.failed?.(randomUUID(), safe);
-        this.options.changed?.();
+        this.commandsChanged();
         throw new AutomationError(safe.code, safe.message);
       } finally {
         record.loading = undefined;
