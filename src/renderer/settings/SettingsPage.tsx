@@ -10,6 +10,7 @@ import type {
 import { SettingsControlsProvider } from '../settings-ui/api';
 import { SettingsHintsContext } from '../settings-ui/SettingsHints';
 import { SettingsViewClient } from './runtime';
+import type { SettingsResetScope } from '../../shared/settings-catalog';
 import { SettingsForm } from './SettingsForm';
 import {
   triggerTabTitles,
@@ -29,6 +30,12 @@ import {
 } from '../settings-ui/CommandSettingsNavigation';
 import '../settings-ui/controls.css';
 import './settings.css';
+const resetTabTitles = {
+  ...triggerTabTitles,
+  form: 'settings.form',
+  triggers: 'settings.triggerList',
+  json: 'settings.json',
+} as const;
 export function SettingsPage({
   ready,
   index,
@@ -62,6 +69,8 @@ export function SettingsPage({
   const [confirmation, setConfirmation] = useState<{
     kind: 'reset' | 'storage';
     model: SettingsPageModel;
+    scope: SettingsResetScope;
+    target: string;
   }>();
   const [disposition, setDisposition] = useState<'keep' | 'share' | 'clear'>('keep');
   const client = useRef<SettingsViewClient | null>(null);
@@ -228,8 +237,28 @@ export function SettingsPage({
     try {
       const current = await c?.preparePageChange();
       if (current) {
+        const { page, editing } = current.content;
+        const gesturePage = ['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id);
+        const tab =
+          editing.mode === 'json'
+            ? 'json'
+            : page.id === 'command-triggers'
+              ? triggerTab
+              : gesturePage
+                ? gestureView
+                : undefined;
+        const scope: SettingsResetScope =
+          tab === undefined || tab === 'json' || tab === 'commands' ? 'page' : tab;
+        const tabTitle = tab ? t(resetTabTitles[tab]) : undefined;
         setDisposition('keep');
-        setConfirmation({ kind, model: current });
+        setConfirmation({
+          kind,
+          model: current,
+          scope,
+          target: tabTitle
+            ? t('settings.resetTarget', { page: page.title, tab: tabTitle })
+            : page.title,
+        });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -352,6 +381,11 @@ export function SettingsPage({
             void c.invoke('set-local-settings', [true]).catch((error) => setError(String(error)));
         }}
         onReset={() => void confirm('reset')}
+        resetLabel={
+          editing.mode === 'form' && (gesturePage || page.id === 'command-triggers')
+            ? t('settings.resetTab')
+            : undefined
+        }
         onOpenFile={(scope) =>
           void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
         }
@@ -429,7 +463,17 @@ export function SettingsPage({
       {confirmation && (
         <SettingsDialog
           className="settings-reset-dialog"
-          title={confirmation.kind === 'reset' ? t('settings.reset') : t('settings.switchShared')}
+          title={
+            confirmation.kind === 'reset'
+              ? t(
+                  confirmation.scope !== 'page' ||
+                    (confirmation.model.content.page.id === 'command-triggers' &&
+                      confirmation.model.content.editing.mode === 'form')
+                    ? 'settings.resetTab'
+                    : 'settings.reset',
+                )
+              : t('settings.switchShared')
+          }
           onClose={() => setConfirmation(undefined)}
           applyLabel={
             confirmation.kind === 'reset' ? t('settings.resetApply') : t('settings.switchApply')
@@ -449,6 +493,7 @@ export function SettingsPage({
                 action: {
                   type: 'reset-page',
                   pageId: expected.content.page.id,
+                  scope: confirmation.scope,
                   revision: expected.content.auxiliary.storage?.revision ?? -1,
                   storageScope: expected.content.auxiliary.storage?.signature,
                   before: expected.content.jsonValues ?? expected.content.values,
@@ -458,17 +503,35 @@ export function SettingsPage({
         >
           <SettingsField
             title={t('settings.target')}
-            description={confirmation.model.content.page.title}
+            description={
+              confirmation.kind === 'reset'
+                ? confirmation.target
+                : confirmation.model.content.page.title
+            }
           />
           {confirmation.kind === 'reset' ? (
             <>
               <SettingsField
                 title={t('settings.resetContents')}
-                description={t('settings.resetDescription')}
+                description={t(
+                  confirmation.scope === 'form'
+                    ? 'settings.resetFormDescription'
+                    : confirmation.scope !== 'page' ||
+                        (confirmation.model.content.page.id === 'command-triggers' &&
+                          confirmation.model.content.editing.mode === 'form')
+                      ? 'settings.resetTriggersDescription'
+                      : 'settings.resetDescription',
+                )}
               />
               <SettingsField
                 title={t('settings.storage.title')}
                 description={confirmation.model.content.auxiliary.storage?.files
+                  .filter(
+                    (file) =>
+                      confirmation.scope !== 'triggers' ||
+                      confirmation.model.content.page.id !== 'touchpad-gestures' ||
+                      file.scope === 'shared',
+                  )
                   .map(
                     (file) =>
                       `${file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,

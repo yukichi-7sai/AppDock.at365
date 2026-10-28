@@ -9,7 +9,9 @@ import {
   settingsProjection,
   settingsJsonProjection,
   applySettingsJson,
+  resetSettingsPage,
   type SettingsPageDefinition,
+  type SettingsResetScope,
 } from '../../shared/settings-catalog';
 import { mergeSettingsInput } from '../../shared/settings-input';
 import { sameSetting } from '../../shared/settings-defaults';
@@ -43,6 +45,7 @@ export class SettingsInputSession {
         revision: number,
         resetPage?: import('../../shared/settings-catalog').SettingsPageDefinition,
         source?: 'form' | 'json',
+        resetScope?: SettingsResetScope,
       ): Promise<SettingsSnapshot>;
       changed(): void;
     },
@@ -178,15 +181,21 @@ export class SettingsInputSession {
     while (this.operations.size > 512) this.operations.delete(this.operations.keys().next().value!);
     return result;
   }
-  private async save(value: Settings, force = false) {
+  private async save(value: Settings, resetScope?: SettingsResetScope) {
     const parsed = restoreSettingsCollections(parseSettings(value), this.options.applets());
     validateAppletSettings(parsed, this.options.applets());
-    if (!force && JSON.stringify(parsed) === JSON.stringify(this.value)) return;
+    if (!resetScope && JSON.stringify(parsed) === JSON.stringify(this.value)) return;
     const revision = this.options.current().revision;
     this.state.pending = true;
     this.notify();
     try {
-      await this.options.save(parsed, revision, force ? this.page() : undefined, this.state.mode);
+      await this.options.save(
+        parsed,
+        revision,
+        resetScope ? this.page() : undefined,
+        this.state.mode,
+        resetScope,
+      );
     } finally {
       this.state.pending = false;
       this.state.revision = this.options.current().revision;
@@ -217,9 +226,10 @@ export class SettingsInputSession {
           !sameSetting(action.before, this.jsonProjection())
         )
           throw Error(hostText('settings.inputError.confirmationChanged'));
+        const scope = action.scope === undefined ? 'page' : action.scope;
         await this.save(
-          applySettingsJson(this.value, this.page(), this.options.applets(), '{}'),
-          true,
+          resetSettingsPage(this.value, this.page(), this.options.applets(), scope),
+          scope,
         );
         break;
       }

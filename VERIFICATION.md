@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-29: タブ単位の設定リセット 0.100.3 のコミット照合
+
+- 利用者が0.100.3の動作を確認した後、main=`7eeb601`上の今回の14ファイルをレビュー。名前付きscopeの検証、タブ/ページの対象、revision/signature、設定省略、共有/端末の境界、Windows接続と既存確認ダイアログへの影響を確認し、コミット阻害事項なし。
+- 実装時の776入力・完全ログ22件、発行先/最終GUI/最終smokeコピーの本体所有694ファイルとZIP/feedのSHA256を照合して一致。型検査/build、関連91件、最終発行EXE GUI15群・smokeを再利用し、版更新・再発行は行わない。
+- 共有型・既存ページ・共通ブラウザ設定を確認する未実施の`command-trigger-options/settings-view-client/settings-navigation/appearance/shell-boundaries` 5ファイル39件を追加し成功。先行コミットの922入力と成功ログ、変更のない試験・依存/実行条件を照合し、他の134ファイル1,143件を再利用。今回の13ファイル130件と合わせ、標準147ファイル1,273件の必要範囲を確認した。同じGUIやbuildをコミット依頼だけで繰り返していない。
+- 照合証跡は`.artifacts/commit-validation-tab-reset-01003-20261029/`の`reuse.json`・`stage.json`・`commit.json`。今回の14ファイルだけをstageし、作業ファイル/stageとstage tree/commit treeを照合する。既存の失敗診断・固定出力・再利用資料を保持し、ローカルcommitだけを行う。push・Release・実利用deployは行わない。
+
+## 2026-10-29: 表示中のタブ単位の設定リセット 0.100.3
+
+- main=`7eeb6013d74b78f6fb956115b6ada2acc22e1bd6`、開始時clean・追跡先と一致。`pull --ff-only`は制限環境のDNS失敗後、通常ユーザー環境で最新を確認。main上で実装し、commit/push/Release/実利用deployは行っていない。
+- コマンドトリガーの種類別タブは、その方式の割り当てと入力別の実行方法だけを戻す。コマンド一覧は3方式すべて、各機能ページはフォームの動作設定・共通ブラウザ設定とトリガー一覧を分離。検索・絞り込みに連動せずタブ全体を対象にし、JSONはページ全体を対象にする。確認画面にページ/タブ名・保存先・共有設定への影響を表示する。
+- ホストが名前付きscopeを既存の設定カタログの範囲へ解決し、任意のパス・不正scope・他ページのscopeを拒否。従来のrevision/signature/確認時の値の照合、入力確定、原子的保存と既定値省略を維持する。タッチパッド一覧のリセットは共有保存だけを対象にし、端末の有効状態・接続用キーを保持。フォームのリセットもWindows設定・接続試行履歴を変更しない。
+- 発行前レビューで要件、タブ/ページの所有範囲、カスタムコマンドの定義・条件・順序、既存の保存先と競合・Windows接続への影響を確認。初回GUIの一括リセット比較は、既定のkeybindingsを省略する既存の保存仕様との表現差で失敗したため、保存形式を正規化して比較し、割り当て・動作設定・他の値の検査を維持して14群成功。失敗診断も保持する。
+- 0.100.2発行後、既存リボンGUIの参照確認で共通ダイアログの見出し変更を発見。通常ページ/JSONの従来の見出しを保持する修正と代表ページの取消検査を追加し、再レビュー・型検査・翻訳8件・固定EXE GUI15群・smokeに成功。設定項目・保存形式・公開API・保存ファイルの追加削除はなく通常パッチ更新。発行済み0.100.2への追加修正のため、最終版を0.100.3に進めて再発行した。
+- 固定Node 24.22.1/pnpm 12.10.1/Electron 45.0.0、Windows x64。固定lockfile/供給網検査を維持したinstall、変更ファイル整形、型検査/build成功。`settings-defaults-reset/settings-editing/settings-page/settings-page-host/command-triggers/command-stacks/touchpad-gestures/localization`の8ファイル91件成功。最終の見出し修正はrenderer・版・GUI検査だけでmain/sharedと8試験ソースは不変のため91件を再利用し、rendererを直接読むlocalizationは8件を再確認した。無関係な全回帰は実施していない。
+- `command-triggers-ui-test.cjs --tab-reset-only`はソース14群、最終発行EXE15群で成功。3方式×種類別タブ/トリガー一覧/フォーム、コマンド一覧、JSON、取消、外部変更後の確定拒否、既存ページの確認見出し、実再起動後の保存を確認した。GUIの設定は隔離profileとfixtureコマンドを使用。物理入力、Windowsのタッチパッド設定書込、実利用先での操作は未確認。
+- `A:\40.ARTIFACT\AppDock.at365`へ通常発行。生成元/発行先/最終GUIコピー/最終smokeコピーの本体所有694ファイルのSHA256が一致。manifest/feed/ZIP内manifestの0.100.3、ZIPのsize/SHA256、776入力が最終発行・検証中に不変であることを確認。最終EXE SHA256=`decaddd1045ee1fd2f9d6a1ab7f16f16a6cc9c052465135c8735cb365dd60c90`。兄弟Applet再発行・全体ZIPは行っていない。
+- 証跡は`.artifacts/settings-tab-reset-20261029/`の完全ログ・`inputs-01003.json`・`artifact-validation.json`・`validation.json`。最終GUIは`.artifacts/command-triggers-ui-1793219168991/`、smokeは`.artifacts/smoke-1793219213948/`。今回のタブリセット専用GUIの成功は方式別で直近3回以下。既存smoke等は参照/使用状態の確認が不十分なため保持し、失敗診断・固定出力・再利用資料も削除していない。
+
 ## 2026-10-29: 設定ページ遷移 0.100.1 のコミット照合
 
 - 利用者が0.100.1の改善を確認した後、main=`4bca7de`上の今回の15ファイルをレビュー。インデックスの先行表示、1秒の遅延案内、先行選択/離脱/失敗、既存検索・即時保存とIPC/session境界への影響を再確認し、コミット阻害事項なし。

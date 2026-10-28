@@ -39,7 +39,7 @@ import { ShellProviderRegistry } from './core/shell-provider-registry';
 import { isDeepStrictEqual } from 'node:util';
 import { shellRegions, isShellRegion, type ShellRegion } from '../shared/shell';
 import type { ExtensionSnapshot } from '../shared/contracts';
-import type { SettingsPageDefinition } from '../shared/settings-catalog';
+import type { SettingsPageDefinition, SettingsResetScope } from '../shared/settings-catalog';
 import type { SettingsPageAuxiliary } from '../shared/settings-page';
 import type { AppletPackagePreviewResult } from '../shared/applet-packages';
 import { ShellHost } from './core/shell-host';
@@ -91,7 +91,7 @@ import { SettingsConflictError } from './core/settings';
 import { DeviceSettingsStore } from './core/device-settings-store';
 import { deviceHostKeys, readDeviceCollections, readDeviceManifests } from './core/device-settings';
 import { restoreSettingsCollections } from '../shared/settings-storage';
-import { settingsPaths, appletSettingsPageId } from '../shared/settings-catalog';
+import { settingsResetPaths, appletSettingsPageId } from '../shared/settings-catalog';
 import { recoverSettingsAtStartup, type SettingsRecoveryUi } from './core/settings-recovery';
 import {
   SettingsHealthNotifications,
@@ -499,7 +499,7 @@ const settingsEditing = new SettingsInputSession({
   current: () => ({ value: settings.value, revision: settings.revision }),
   scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
-  save: async (value, revision, resetPage, source) => {
+  save: async (value, revision, resetPage, source, resetScope) => {
     const before = settings.value;
     assertSettingsWritable();
     const next = prepareSettings(value);
@@ -507,7 +507,7 @@ const settingsEditing = new SettingsInputSession({
       next.host,
       settings.value.host,
       () => settings.assertRevision(revision),
-      () => commitSettings(next, revision, resetPage),
+      () => commitSettings(next, revision, resetPage, [], resetScope),
     );
     if (!resetPage && source === 'form') await touchpad?.afterLocalEdit(before);
     return saved;
@@ -1972,6 +1972,7 @@ function commitSettings(
   revision: number,
   resetPage?: SettingsPageDefinition,
   rewrite: ('shared' | 'device')[] = [],
+  resetScope: SettingsResetScope = 'page',
 ) {
   assertSettingsWritable();
   settings.assertRevision(revision);
@@ -1998,11 +1999,14 @@ function commitSettings(
     value,
     revision,
     undefined,
-    resetPage ? settingsPageStorage(resetPage).files.map((file) => file.scope) : rewrite,
+    resetPage
+      ? settingsPageStorage(resetPage, resetScope).files.map((file) => file.scope)
+      : rewrite,
   );
 }
 function settingsPageStorage(
   page: SettingsPageDefinition,
+  resetScope: SettingsResetScope = 'page',
 ): NonNullable<SettingsPageAuxiliary['storage']> {
   const owner = page.collection?.owner ?? page.owner;
   const local =
@@ -2010,8 +2014,8 @@ function settingsPageStorage(
       ? settings.localSettings(owner!)
       : ['appearance', 'general'].includes(page.id);
   const scopes = new Set<'shared' | 'device'>();
-  if (page.id === 'touchpad-gestures') scopes.add('device');
-  for (const p of settingsPaths(page, allApplets())) {
+  if (page.id === 'touchpad-gestures' && resetScope !== 'triggers') scopes.add('device');
+  for (const p of settingsResetPaths(page, allApplets(), resetScope)) {
     scopes.add(
       p[0] === 'host' && (deviceHostKeys as readonly string[]).includes(p[1])
         ? 'device'

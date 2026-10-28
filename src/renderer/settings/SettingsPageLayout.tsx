@@ -44,6 +44,7 @@ export function SettingsPageLayout({
   onLocalSettings,
   onReload,
   onReset,
+  resetLabel,
   children,
   announcement,
 }: {
@@ -59,6 +60,7 @@ export function SettingsPageLayout({
   onLocalSettings?(enabled: boolean): void;
   onReload(): void;
   onReset?(): void;
+  resetLabel?: string;
   children: ReactNode;
   announcement: ReactNode;
 }) {
@@ -209,7 +211,7 @@ export function SettingsPageLayout({
                       disabled={pending}
                       onClick={onReset}
                     >
-                      {t('settings.reset')}
+                      {resetLabel ?? t('settings.reset')}
                     </button>
                   )}
                 </div>

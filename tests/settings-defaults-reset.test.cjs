@@ -8,6 +8,7 @@ const {
   settingsProjection,
   settingsJsonProjection,
   applySettingsJson,
+  resetSettingsPage,
 } = require('../out/main/shared/settings-catalog');
 const { settingsStorageValue } = require('../out/main/shared/settings-storage');
 const { getKeybindings } = require('../out/main/shared/keybindings');
@@ -60,6 +61,122 @@ function fixture(t) {
 }
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const page = (value, id) => settingsCatalog(applets, value).find((p) => p.id === id);
+
+function triggerFixture() {
+  const value = createDefaultSettings();
+  const entry = {
+    id: 'keep-order',
+    command: 'appdock.noop',
+    enabled: false,
+    when: { scope: 'app', appletIds: [] },
+  };
+  value.keybindings = [{ ...entry, key: 'Ctrl+F8' }];
+  value.keybindingOptions = {
+    executionMode: 'first',
+    excludedProcesses: ['key-excluded'],
+    inputExecutionModes: { 'Ctrl+F8': 'all' },
+  };
+  for (const [key, input] of [
+    ['gestures', 'move-up'],
+    ['touchpadGestures', 'four.right'],
+  ]) {
+    value[key].bindings = [{ ...entry, gesture: input, when: { ...entry.when, processes: [] } }];
+    value[key].inputExecutionModes = { [input]: 'all' };
+    value[key].executionMode = 'first';
+    value[key].excludedProcesses = [key.toLowerCase()];
+  }
+  value.gestures.distance = 91;
+  value.touchpadGestures.enabled = true;
+  value.touchpadGestures.connections['three.tap'].modifiers = ['Ctrl'];
+  value.commandTriggerOptions.browsers = ['custom-browser'];
+  value.host.theme = 'dark';
+  return parseSettings(value);
+}
+
+for (const [kind, key] of [
+  ['shortcuts', 'keybindingOptions'],
+  ['gestures', 'gestures'],
+  ['touchpad-gestures', 'touchpadGestures'],
+]) {
+  for (const view of ['command-tab', 'triggers', 'form'])
+    test(`${kind} ${view} reset preserves other tabs, conditions and device connection settings`, () => {
+      const current = triggerFixture();
+      const id = view === 'command-tab' ? 'command-triggers' : kind;
+      const scope = view === 'command-tab' ? kind : view;
+      const actual = parseSettings(resetSettingsPage(current, page(current, id), applets, scope));
+      const expected = structuredClone(current);
+      const defaults = createDefaultSettings();
+      if (view === 'form') {
+        for (const field of Object.keys(defaults[key])) {
+          if (!['bindings', 'inputExecutionModes'].includes(field))
+            expected[key][field] = defaults[key][field];
+        }
+        expected.commandTriggerOptions = defaults.commandTriggerOptions;
+      } else {
+        if (kind === 'shortcuts') expected.keybindings = getKeybindings(defaults);
+        else expected[key].bindings = defaults[key].bindings;
+        expected[key].inputExecutionModes = {};
+      }
+      assert.deepEqual(actual, parseSettings(expected));
+      assert.deepEqual(current, triggerFixture(), 'reset cannot mutate the confirmed input');
+      const roundTrip = parseSettings(settingsStorageValue(actual));
+      assert.deepEqual(roundTrip, actual, 'scoped defaults survive sparse durable storage');
+    });
+}
+
+test('unknown reset scopes and scopes from other pages are rejected before saving', async () => {
+  let snapshot = { value: triggerFixture(), revision: 7 };
+  let saves = 0;
+  const session = new SettingsInputSession({
+    initialPageId: 'command-triggers',
+    current: () => snapshot,
+    scope: () => 'shared',
+    applets: () => applets,
+    changed() {},
+    save: async (value, revision, resetPage, source, scope) => {
+      saves++;
+      assert.equal(resetPage.id, 'command-triggers');
+      assert.equal(scope, 'gestures');
+      return (snapshot = { value, revision: revision + 1 });
+    },
+  });
+  const act = (scope, revision = snapshot.revision) => {
+    const state = session.snapshot();
+    return session.act({
+      sessionId: state.sessionId,
+      editRevision: state.editRevision,
+      operationId: crypto.randomUUID(),
+      action: {
+        type: 'reset-page',
+        pageId: 'command-triggers',
+        scope,
+        revision,
+        storageScope: 'shared',
+        before: session.jsonProjection(),
+      },
+    });
+  };
+  for (const scope of ['form', 'triggers', 'unknown', 'toString', null])
+    await assert.rejects(act(scope), /初期化/);
+  await assert.rejects(act('gestures', 6), /変更/);
+  assert.equal(saves, 0);
+  const expected = parseSettings(
+    resetSettingsPage(
+      snapshot.value,
+      page(snapshot.value, 'command-triggers'),
+      applets,
+      'gestures',
+    ),
+  );
+  await act('gestures');
+  assert.equal(saves, 1);
+  assert.deepEqual(snapshot.value, expected);
+  assert.throws(
+    () =>
+      resetSettingsPage(snapshot.value, page(snapshot.value, 'appearance'), applets, 'gestures'),
+    /初期化/,
+  );
+});
 
 test('shortcut options participate in sparse page JSON and reset independently of gestures', () => {
   const saved = createDefaultSettings();

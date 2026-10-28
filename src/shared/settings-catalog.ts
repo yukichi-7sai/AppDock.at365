@@ -26,6 +26,8 @@ import {
 } from './settings-storage';
 
 export type SettingsPath = string[];
+export type SettingsResetScope =
+  'page' | 'form' | 'triggers' | 'shortcuts' | 'gestures' | 'touchpad-gestures';
 export interface SettingsItem {
   id: string;
   pageId: string;
@@ -692,6 +694,50 @@ export function settingsPaths(
 }
 export const readSettingsPath = (value: unknown, path: SettingsPath): any =>
   path.reduce((v: any, key) => (v != null && Object.hasOwn(v, key) ? v[key] : undefined), value);
+
+/** Resolve a named view on the host; callers cannot supply arbitrary reset paths. */
+export function settingsResetPaths(
+  page: SettingsPageDefinition,
+  applets: ExtensionSnapshot[],
+  scope: SettingsResetScope = 'page',
+): SettingsPath[] {
+  const paths = settingsPaths(page, applets);
+  if (scope === 'page') return paths;
+  const triggerPath = (path: SettingsPath) =>
+    path[0] === 'keybindings' || path[1] === 'bindings' || path[1] === 'inputExecutionModes';
+  if (page.id === 'command-triggers') {
+    const key =
+      scope === 'shortcuts'
+        ? 'keybindingOptions'
+        : scope === 'gestures'
+          ? 'gestures'
+          : scope === 'touchpad-gestures'
+            ? 'touchpadGestures'
+            : undefined;
+    if (key)
+      return paths.filter(
+        (path) => path[0] === key || (scope === 'shortcuts' && path[0] === 'keybindings'),
+      );
+  } else if (['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id)) {
+    if (scope === 'form' || scope === 'triggers')
+      return paths.filter((path) => triggerPath(path) === (scope === 'triggers'));
+  }
+  throw Error(hostText('settings.inputError.resetScope'));
+}
+
+export function resetSettingsPage(
+  current: Settings,
+  page: SettingsPageDefinition,
+  applets: ExtensionSnapshot[],
+  scope: SettingsResetScope = 'page',
+): Settings {
+  const paths = settingsResetPaths(page, applets, scope);
+  if (scope === 'page') return applySettingsJson(current, page, applets, '{}');
+  const defaults = settingsPageDefaults(page, applets);
+  const next = structuredClone(current);
+  for (const path of paths) writePath(next, path, readSettingsPath(defaults, path));
+  return next;
+}
 function writePath(value: any, path: SettingsPath, next: unknown) {
   let parent = value;
   const ancestors: { parent: any; key: string }[] = [];

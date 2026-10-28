@@ -1,4 +1,5 @@
 import type { Settings } from './contracts';
+import type { SettingsResetScope } from './settings-catalog';
 /** Host input coordinator metadata. Values always come from the persisted store. */
 export interface SettingsInputState {
   sessionId: string;
@@ -30,6 +31,7 @@ export type SettingsEdit =
   | {
       type: 'reset-page';
       pageId: string;
+      scope?: SettingsResetScope;
       revision: number;
       storageScope?: string;
       before: Record<string, unknown>;
