@@ -7,6 +7,11 @@ import { SettingsControlsProvider } from '../settings-ui/api';
 import { SettingsHintsContext } from '../settings-ui/SettingsHints';
 import { SettingsViewClient } from './runtime';
 import { SettingsForm } from './SettingsForm';
+import {
+  triggerTabTitles,
+  type TriggerTab,
+  type TriggerScrollPositions,
+} from './CommandTriggersEditor';
 import { SettingsIndex } from './SettingsIndex';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
@@ -37,6 +42,13 @@ export function SettingsPage({
   const t = getHostTranslator(model?.content.language);
   const [error, setError] = useState('');
   const [commandTarget, setCommandTarget] = useState<CommandSettingsTarget>();
+  const [triggerTab, setTriggerTab] = useState<TriggerTab>('commands');
+  const triggerScrollPositions = useRef<TriggerScrollPositions>({});
+  useEffect(() => {
+    setTriggerTab('commands');
+    for (const tab of Object.keys(triggerScrollPositions.current) as TriggerTab[])
+      delete triggerScrollPositions.current[tab];
+  }, [model?.content.page.id]);
   const commandNavigationRequest = useRef(0);
   const [movement, setMovement] = useState({ id: '', text: '' });
   const [confirmation, setConfirmation] = useState<{
@@ -47,6 +59,20 @@ export function SettingsPage({
   const client = useRef<SettingsViewClient | null>(null);
   const drag = useRef<{ x: number; width: number } | null>(null);
   const surface = useRef<HTMLDivElement>(null);
+  const rememberTriggerScroll = () => {
+    const body = surface.current?.querySelector<HTMLElement>('.settings-body');
+    if (
+      body &&
+      model?.content.page.id === 'command-triggers' &&
+      model.content.editing.mode === 'form'
+    )
+      triggerScrollPositions.current[triggerTab] = { left: body.scrollLeft, top: body.scrollTop };
+  };
+  const selectTriggerTab = (tab: TriggerTab) => {
+    if (tab === triggerTab) return;
+    rememberTriggerScroll();
+    setTriggerTab(tab);
+  };
   const [controls, setControls] = useState<ReturnType<SettingsViewClient['controls']>>();
   useEffect(() => {
     if (ready && model && controls) onReady?.();
@@ -263,7 +289,33 @@ export function SettingsPage({
                 mode={editing.mode}
                 pending={editing.pending}
                 error={error || editing.error || ''}
-                onMode={(mode) => act({ kind: 'edit', action: { type: 'mode', value: mode } })}
+                onMode={(mode) => {
+                  rememberTriggerScroll();
+                  act({ kind: 'edit', action: { type: 'mode', value: mode } });
+                }}
+                formTabs={
+                  page.id === 'command-triggers'
+                    ? (Object.keys(triggerTabTitles) as TriggerTab[]).map((tab) => ({
+                        id: tab,
+                        title: t(triggerTabTitles[tab]),
+                        selected: triggerTab === tab,
+                        select: () => {
+                          if (editing.mode === 'form') selectTriggerTab(tab);
+                          else
+                            void c
+                              .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
+                              .then(() => {
+                                if (
+                                  c.model?.content.page.id === page.id &&
+                                  c.model.content.editing.mode === 'form'
+                                )
+                                  setTriggerTab(tab);
+                              })
+                              .catch(() => {});
+                        },
+                      }))
+                    : undefined
+                }
                 storage={model.content.auxiliary.storage}
                 onLocalSettings={(enabled) => {
                   if (!enabled) void confirm('storage');
@@ -346,6 +398,9 @@ export function SettingsPage({
                     }
                   >
                     <SettingsForm
+                      triggerTab={triggerTab}
+                      onTriggerTab={selectTriggerTab}
+                      triggerScrollPositions={triggerScrollPositions.current}
                       model={model}
                       editor={editor}
                       select={(pageId) => act({ kind: 'select', pageId })}

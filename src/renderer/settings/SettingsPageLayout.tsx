@@ -1,6 +1,6 @@
 import type { HostTextKey } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
 import { SettingsStatusProvider, SettingsStatusArea } from '../settings-ui/SettingsStatus';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
@@ -37,6 +37,7 @@ export function SettingsPageLayout({
   pending,
   error,
   onMode,
+  formTabs,
   onOpenFile,
   storage,
   onLocalSettings,
@@ -50,6 +51,7 @@ export function SettingsPageLayout({
   pending: boolean;
   error: string;
   onMode(mode: 'form' | 'json'): void;
+  formTabs?: { id: string; title: string; selected: boolean; select(): void }[];
   onOpenFile(scope?: 'shared' | 'device'): void;
   storage?: SettingsPageAuxiliary['storage'];
   onLocalSettings?(enabled: boolean): void;
@@ -59,8 +61,22 @@ export function SettingsPageLayout({
   announcement: ReactNode;
 }) {
   const { t } = useHostTranslation();
+  const toolsRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const element = toolsRef.current;
+    const body = element?.closest<HTMLElement>('.settings-body');
+    if (!element || !body) return;
+    const measure = () =>
+      body.style.setProperty('--settings-toolbar-height', `${element.offsetHeight}px`);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => {
+      observer.disconnect();
+      body.style.removeProperty('--settings-toolbar-height');
+    };
+  }, [page.id, mode]);
   const pageScroll = page.id === 'command-triggers' && mode === 'form';
-  const modes: ('form' | 'json')[] = page.json ? ['form', 'json'] : ['form'];
   const description =
     page.kind === 'host'
       ? page.id === 'appearance' || page.id === 'general'
@@ -80,104 +96,132 @@ export function SettingsPageLayout({
           aria-label={t('settings.body')}
         >
           <div
-            className={`settings-body settings-page-scroll${pageScroll ? ' settings-page-shared-scroll' : ''}`}
+            className={`settings-body settings-page-scroll${pageScroll ? ' settings-page-shared-scroll' : ''}${mode === 'json' ? ' settings-page-json' : ''}`}
           >
             <CommandListPageCanvas>
               <header className="settings-page-heading">
                 <h1>{page.title}</h1>
                 <p>{description ?? t('settings.defaultDescription')}</p>
               </header>
-              <div className="settings-page-toolbar">
-                <div className="tabs" role="group" aria-label={t('settings.mode')}>
-                  {modes.map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={value === mode ? 'selected' : ''}
-                      aria-pressed={value === mode}
-                      onClick={() => onMode(value)}
+              <div className="settings-page-tools" ref={toolsRef} data-testid="settings-page-tools">
+                <div className="settings-page-toolbar">
+                  <div className="settings-page-view-tools">
+                    <div
+                      className="tabs"
+                      role="group"
+                      aria-label={t('settings.mode')}
+                      data-testid={formTabs ? 'command-trigger-tabs' : 'settings-view-tabs'}
                     >
-                      {value === 'form' ? t('settings.form') : t('settings.json')}
-                    </button>
-                  ))}
-                </div>
-                {storage && (storage.canSwitch || ['appearance', 'general'].includes(page.id)) ? (
-                  <label className="settings-storage-toggle">
-                    <input
-                      data-testid="settings-storage-local"
-                      type="checkbox"
-                      checked={storage.local}
-                      disabled={!storage.canSwitch || pending}
-                      onChange={(event) => onLocalSettings?.(event.target.checked)}
-                    />
-                    {t('settings.local.label')}
-                    <SettingsHintIcon
-                      title={t('settings.local.label')}
-                      hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
-                    />
-                  </label>
-                ) : null}
-                <p className="settings-save-status" role="status">
-                  {storage && page.json && (
-                    <span className="settings-storage-status">
-                      {t('settings.storage.json')}{' '}
-                      {storage.files.length > 1
-                        ? t('settings.storage.both')
-                        : storage.local
-                          ? t('settings.storage.deviceOnly')
-                          : t('settings.storage.shared')}
-                      　
-                    </span>
-                  )}
-                  <span className="sr-only">{pending ? t('settings.saving') : ''}</span>
-                </p>
-                {page.json && !page.unavailableReason && (
-                  <button type="button" disabled={pending} onClick={onReset}>
-                    {t('settings.reset')}
-                  </button>
-                )}
-                {page.json && storage && storage.files.length > 1 ? (
-                  <details className="settings-file-menu">
-                    <summary className="settings-file-button">{t('settings.openFile')}</summary>
-                    <div>
-                      {storage.files.map((file) => (
+                      {formTabs ? (
+                        formTabs.map((tab) => (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            data-testid={`command-trigger-tab:${tab.id}`}
+                            className={mode === 'form' && tab.selected ? 'selected' : ''}
+                            aria-pressed={mode === 'form' && tab.selected}
+                            onClick={tab.select}
+                          >
+                            {tab.title}
+                          </button>
+                        ))
+                      ) : (
                         <button
                           type="button"
-                          key={file.scope}
-                          onClick={(event) => {
-                            event.currentTarget.closest('details')!.open = false;
-                            onOpenFile(file.scope);
-                          }}
+                          className={mode === 'form' ? 'selected' : ''}
+                          aria-pressed={mode === 'form'}
+                          onClick={() => onMode('form')}
                         >
-                          {file.scope === 'device'
-                            ? t('settings.storage.device')
-                            : t('settings.storage.shared')}
-                          : {file.name}
+                          {t('settings.form')}
+                        </button>
+                      )}
+                      {page.json && (
+                        <button
+                          type="button"
+                          className={mode === 'json' ? 'selected' : ''}
+                          aria-pressed={mode === 'json'}
+                          onClick={() => onMode('json')}
+                        >
+                          {t('settings.json')}
+                        </button>
+                      )}
+                    </div>
+                    {mode === 'json' &&
+                      page.json &&
+                      (storage && storage.files.length > 1 ? (
+                        <details className="settings-file-menu">
+                          <summary className="settings-file-button">
+                            {t('settings.openFile')}
+                          </summary>
+                          <div>
+                            {storage.files.map((file) => (
+                              <button
+                                type="button"
+                                key={file.scope}
+                                onClick={(event) => {
+                                  event.currentTarget.closest('details')!.open = false;
+                                  onOpenFile(file.scope);
+                                }}
+                              >
+                                {file.scope === 'device'
+                                  ? t('settings.storage.device')
+                                  : t('settings.storage.shared')}
+                                : {file.name}
+                              </button>
+                            ))}
+                          </div>
+                        </details>
+                      ) : (
+                        <button
+                          type="button"
+                          className="settings-file-button"
+                          onClick={() => onOpenFile(storage?.files[0]?.scope)}
+                        >
+                          {t('settings.openFile')}
                         </button>
                       ))}
-                    </div>
-                  </details>
-                ) : (
-                  page.json && (
+                  </div>
+                  {storage && (storage.canSwitch || ['appearance', 'general'].includes(page.id)) ? (
+                    <label className="settings-storage-toggle">
+                      <input
+                        data-testid="settings-storage-local"
+                        type="checkbox"
+                        checked={storage.local}
+                        disabled={!storage.canSwitch || pending}
+                        onChange={(event) => onLocalSettings?.(event.target.checked)}
+                      />
+                      {t('settings.local.label')}
+                      <SettingsHintIcon
+                        title={t('settings.local.label')}
+                        hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
+                      />
+                    </label>
+                  ) : null}
+                  <span className="sr-only" role="status">
+                    {pending ? t('settings.saving') : ''}
+                  </span>
+                  {page.json && !page.unavailableReason && (
                     <button
                       type="button"
-                      className="settings-file-button"
-                      onClick={() => onOpenFile(storage?.files[0]?.scope)}
+                      className="settings-page-reset"
+                      disabled={pending}
+                      onClick={onReset}
                     >
-                      {t('settings.openFile')}
+                      {t('settings.reset')}
                     </button>
-                  )
-                )}
+                  )}
+                </div>
+                <SettingsStatusArea
+                  collapseWhenEmpty
+                  action={
+                    error ? (
+                      <button type="button" className="secondary" onClick={onReload}>
+                        {t('settings.reload')}
+                      </button>
+                    ) : undefined
+                  }
+                />
               </div>
-              <SettingsStatusArea
-                action={
-                  error ? (
-                    <button type="button" className="secondary" onClick={onReload}>
-                      {t('settings.reload')}
-                    </button>
-                  ) : undefined
-                }
-              />
               <div
                 className={`settings-page-content settings-panel settings-panel-${mode}${mode === 'form' ? ' settings-panel-flat' : ''}`}
                 key={page.id + mode}

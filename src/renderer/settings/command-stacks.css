@@ -245,16 +245,6 @@
 .command-stack-dialog .stack-condition-panel .binding-inline-toggle {
   border: 0;
 }
-.command-trigger-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.command-trigger-tabs button[aria-pressed='true'] {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
 .stack-empty {
   color: var(--muted);
   padding: 20px 8px !important;

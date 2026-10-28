@@ -360,6 +360,7 @@ const recordSuccess = () => {
       'キージェスチャー',
       'マウスジェスチャー',
       'タッチパッドジェスチャー',
+      'JSON',
     ]);
     assert.equal(
       await host.getByTestId('command-trigger-tab:commands').getAttribute('aria-pressed'),
@@ -405,7 +406,7 @@ const recordSuccess = () => {
     );
     assert.deepEqual(await saved(), beforeTabs);
     checks.push(
-      'four command-trigger tabs share saved stacks and preserve command filters and scroll without saving',
+      'four command-trigger views share the toolbar with JSON and preserve command filters and scroll without saving',
     );
     if (triggerTabsOnly) {
       await open('custom-commands');

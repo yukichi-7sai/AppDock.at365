@@ -103,8 +103,12 @@ function TriggerBindingDialog({
   );
 }
 
-type TriggerTab = 'commands' | CommandTriggerKind;
-const triggerTabs: readonly TriggerTab[] = ['commands', ...commandTriggerKinds];
+export type TriggerTab = 'commands' | CommandTriggerKind;
+export type TriggerScrollPositions = Partial<Record<TriggerTab, { left: number; top: number }>>;
+export const triggerTabTitles = {
+  commands: 'settings.commandTriggers.commands',
+  ...kindKeys,
+} as const;
 
 /** Command reverse lookup and the three dedicated trigger-stack lists share one settings page. */
 export function CommandTriggersEditor({
@@ -117,6 +121,9 @@ export function CommandTriggersEditor({
   clearProvider,
   busy = false,
   inheritedModes,
+  tab,
+  onTabChange,
+  scrollPositions,
 }: {
   settings: Settings;
   onChange(settings: Settings): void;
@@ -127,28 +134,23 @@ export function CommandTriggersEditor({
   clearProvider?(): void;
   busy?: boolean;
   inheritedModes?: SettingsPageAuxiliary['triggerExecutionModes'];
+  tab: TriggerTab;
+  onTabChange(tab: TriggerTab): void;
+  scrollPositions: TriggerScrollPositions;
 }) {
   const { t } = useHostTranslation();
   const controls = useSettingsControls();
   const filters = useBindingCommandFilter(provider, clearProvider);
-  const [tab, setTab] = useState<TriggerTab>('commands');
   const root = useRef<HTMLDivElement>(null);
-  const positions = useRef<Partial<Record<TriggerTab, { left: number; top: number }>>>({});
-  const selectTab = (value: TriggerTab) => {
-    if (value === tab) return;
-    const body = root.current?.closest<HTMLElement>('.settings-body');
-    if (body) positions.current[tab] = { left: body.scrollLeft, top: body.scrollTop };
-    setTab(value);
-  };
   useLayoutEffect(() => {
     if (provider?.request !== undefined || filters.target?.request !== undefined) {
-      delete positions.current.commands;
-      selectTab('commands');
+      delete scrollPositions.commands;
+      onTabChange('commands');
     }
   }, [provider?.request, filters.target?.request]);
   useLayoutEffect(() => {
     const body = root.current?.closest<HTMLElement>('.settings-body');
-    const position = positions.current[tab];
+    const position = scrollPositions[tab];
     if (body) {
       body.scrollLeft = position?.left ?? 0;
       body.scrollTop = position?.top ?? 0;
@@ -387,26 +389,7 @@ export function CommandTriggersEditor({
     </CommandListSection>
   );
   return (
-    <>
-      <div
-        ref={root}
-        className="command-trigger-tabs"
-        role="group"
-        aria-label={t('settings.commandTriggers.view')}
-        data-testid="command-trigger-tabs"
-      >
-        {triggerTabs.map((value) => (
-          <button
-            key={value}
-            type="button"
-            data-testid={'command-trigger-tab:' + value}
-            aria-pressed={tab === value}
-            onClick={() => selectTab(value)}
-          >
-            {t(value === 'commands' ? 'settings.commandTriggers.commands' : kindKeys[value])}
-          </button>
-        ))}
-      </div>
+    <div ref={root} className="command-trigger-view">
       {tab === 'commands' ? (
         commandList
       ) : (
@@ -421,6 +404,6 @@ export function CommandTriggersEditor({
           busy={busy}
         />
       )}
-    </>
+    </div>
   );
 }

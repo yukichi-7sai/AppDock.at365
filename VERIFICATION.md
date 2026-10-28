@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-28: 設定UI 0.99.14のコミット検証
+
+- 実装時の入力808件と完全ログ、発行済みEXE/ZIPのSHA256が一致。型検査、source/固定EXEのscroll 9群・tabs 3群とsmokeを再利用し、未実行だった標準`dev.bat test`を通常環境で追加実行して1235/1235件成功。製品の追加変更と再発行はない。
+- 現行4列と異なる古い5列期待値を持つ広域GUIは、この変更の必要回帰から分離する。対象の共通レイアウト・JSON・タブ切替は専用の固定EXE試験で成功済み。再レビューと`git diff --check`に問題なし。証跡は`.artifacts/commit-validation-settings-ui-20261028/validation.json`、標準回帰の完全ログ、stage/commit tree照合。push・Release・deployは行わない。
+
+## 2026-10-28: 設定ツールバー・JSONスクロール・トリガータブ 0.99.14
+
+- 指定されたcleanなmain `b1f30b92832e03f096495da09ec49f028cc71328`/0.99.13から開始。追跡先origin/mainへの`pull --ff-only`は通常環境で変更なし。制限環境でのDNS失敗は同じコマンドの通常環境で解消した。commit・push・Release・実利用先deployは行っていない。
+- 全体設定とApplet設定の共通レイアウトへ右端8pxの余白を追加。JSONのSection相当の囲いを外し、残り高さを編集欄へ割り当て、縦スクロールを編集欄だけにした。保存先の重複ラベルを除去し、ファイルを開く操作はJSON選択中だけタブ列の直後へ表示する。複数ファイルの選択、即時保存、失敗入力の保持、ページ全体のJSON/初期化範囲は維持する。
+- ツールバーと表示中のエラーを一つの縦sticky領域にし、フィルターをその前面へ重ねる。エラーがないときはページのエラー行と余白を確保せず、進行・正常結果の支援技術向け通知は維持する。ダイアログ内のエラー固定高は変更しない。コマンドトリガーは4種類の一覧とJSONを設定ツールバーへ統合し、狭幅で折り返す。
+- 発行前レビューで保存/API境界、狭幅、縦横sticky、JSONエラー時の高さ、タブ選択/提供元ナビゲーションを確認。非同期scrollイベントだけでは一覧切替時の位置を失う問題を修正し、タブ切替前に同期記録する形で再確認した。通常patchとして0.99.14へ更新し、設定項目・保存ファイル・公開API・条件判定の変更はない。
+- 固定lockfileのinstall、型検査/build成功。設定編集・ページ・view client・既定値リセット・トリガー・ナビゲーションの既存6ファイル65/65件成功。後続のrenderer内スクロール保持修正はこれらが対象とするshared/runtimeのコードに影響せず、修正後は型検査/buildと専用GUIを再実行した。
+- 最終sourceと発行した固定EXEで、共通UI9群とトリガータブ3群が成功。実本体ウィンドウの1280/900/760px・明暗、長いJSONの単一スクロール、不正JSON保持/修正時のエラー出現/消滅、ファイル操作の表示条件、フィルターの前面重なり、横scroll中の操作位置、停止中Applet設定への共通適用、一覧の検索/種類/状態フィルター・scroll保持、実再起動での設定保持を確認。固定EXEの通常smokeも成功。
+- 初期fixtureはexe名300件で既存の100件上限に抵触して復旧待ちとなったため、40件へ訂正し、起動前のparseSettings検査を追加した。件数上限が適切であることの検証ではない。100件はAppDockの共通processNamesの入力制限であり、対象exe名・除外exe名・ブラウザー名に適用される。上限の根拠と判定負荷の見直しは相談事項として未変更。画面幅の初期検証は補助Windowを参照していたため、本体URLでWindowを特定し、検証環境だけ最小幅を下げ、innerWidthも照合して全サイズを再確認した。
+- 広い既存`command-triggers-ui-test.cjs`の全モードは`command-trigger-layout-checks.cjs`の古い5列期待値で停止。現在の実装/既存AGENTSは4列であり、本変更に起因する列変更はない。この全モードの成功や、その先の編集機能を今回検証済みとは扱わない。変更範囲は専用のscroll試験と`--trigger-tabs-only`で確認した。物理入力、実アカウント、複数DPI環境、実利用先への配置は未確認。
+- `publish.bat`終了0、標準`A:/40.ARTIFACT/AppDock.at365/win-unpacked`へ発行。版/所有manifest/feed/ZIPサイズとSHA256、stage・配布・GUI2件/smokeコピー・更新ZIPの所有694ファイルを全件照合。EXE SHA256=`9679cf3df77c9e1363f60a38cf4ecf00069e9e321b442e464880e1ea11ab81ef`、ZIP=`f2ef9cd89e47e3c1e29d5587c8d89005f178f6ec6ce890bc1fc9ca77a0d6ee4f`。
+- 正本は`.artifacts/settings-toolbar-ui-20261028/validation.json`、`inputs-before.json`（入力808件・発行後変更なし）、`owned-files.json`、完全ログ。固定GUI結果は`.artifacts/settings-scroll-1793175637858/result.json`と`.artifacts/command-triggers-ui-1793175646185/result.json`、smokeは`.artifacts/smoke-1793175654244/smoke-result.json`。入力と結果が最終変更へ適用できることを記録し、失敗ログも保持した。
+- プロセス終了・絶対パス・再解析ポイントを確認し、今回の解決済み上限超過fixture6フォルダーだけ削除。診断ログ、最終成功証跡、現用/再利用状態の不明な過去215フォルダーを保持した。削除/保持判断は同証跡内`cleanup.json`。既存worktreeと他作業のファイルは保持する。
+
 ## 2026-10-28: 登録画像の必要時読込・デコード 0.99.13
 
 - 指定どおりcleanなmain `3210be2`/0.99.11から開始。`pull --ff-only`は変更なし。既存worktree・専用発行先・利用者の設定/認証/原画像を保持して実装し、追加依頼に従い発行後のコミットまで行う。push・Release・実利用先deployは含めない。

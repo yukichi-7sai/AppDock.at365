@@ -16,7 +16,11 @@ import { AppletManagementSettings } from './AppletManagementSettings';
 import { AppletUpdateSource } from './UpdateSettings';
 
 import { ShortcutsEditor } from './ShortcutsEditor';
-import { CommandTriggersEditor } from './CommandTriggersEditor';
+import {
+  CommandTriggersEditor,
+  type TriggerTab,
+  type TriggerScrollPositions,
+} from './CommandTriggersEditor';
 import { GesturesEditor } from './GesturesEditor';
 import { RibbonSettings } from './RibbonSettings';
 import { TraySettings } from './TraySettings';
@@ -41,11 +45,17 @@ export function SettingsForm({
   editor,
   select,
   invoke,
+  triggerTab,
+  onTriggerTab,
+  triggerScrollPositions,
 }: {
   model: SettingsPageModel;
   editor: FormEditor;
   select(id: string): void;
   invoke(name: string, args?: unknown[]): Promise<any>;
+  triggerTab: TriggerTab;
+  onTriggerTab(tab: TriggerTab): void;
+  triggerScrollPositions: TriggerScrollPositions;
 }) {
   const { t, language } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -201,6 +211,9 @@ export function SettingsForm({
       >
         {category === 'command-triggers' && (
           <CommandTriggersEditor
+            tab={triggerTab}
+            onTabChange={onTriggerTab}
+            scrollPositions={triggerScrollPositions}
             busy={busy}
             inheritedModes={aux.triggerExecutionModes}
             provider={aux.provider}

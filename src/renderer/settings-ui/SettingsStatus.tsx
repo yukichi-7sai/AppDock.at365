@@ -90,8 +90,14 @@ export function useSettingsFeedback({
   return scope?.errorId;
 }
 
-/** Only common layouts place this reserved area. */
-export function SettingsStatusArea({ action }: { action?: ReactNode }) {
+/** Common page layouts can collapse the visual row while keeping live announcements. */
+export function SettingsStatusArea({
+  action,
+  collapseWhenEmpty = false,
+}: {
+  action?: ReactNode;
+  collapseWhenEmpty?: boolean;
+}) {
   const { t } = useHostTranslation();
   const scope = useContext(SettingsStatusContext);
   const entries = useContext(SettingsStatusEntries);
@@ -110,19 +116,23 @@ export function SettingsStatusArea({ action }: { action?: ReactNode }) {
     ),
   ];
   return (
-    <div className="settings-status-area">
-      <SettingsError id={scope?.errorId ?? 'settings-error'} error={errors.join('\n')} />
-      {entries
-        .filter((entry) => entry.error && entry.retry)
-        .map((entry, index) => (
-          <button key={index} type="button" disabled={entry.busy} onClick={entry.retry!.run}>
-            {entry.retry!.label}
-          </button>
-        ))}
-      {action}
+    <>
+      {(!collapseWhenEmpty || errors.length > 0 || action) && (
+        <div className="settings-status-area">
+          <SettingsError id={scope?.errorId ?? 'settings-error'} error={errors.join('\n')} />
+          {entries
+            .filter((entry) => entry.error && entry.retry)
+            .map((entry, index) => (
+              <button key={index} type="button" disabled={entry.busy} onClick={entry.retry!.run}>
+                {entry.retry!.label}
+              </button>
+            ))}
+          {action}
+        </div>
+      )}
       <span className="sr-only" role="status" aria-atomic="true">
         {messages.join('、')}
       </span>
-    </div>
+    </>
   );
 }

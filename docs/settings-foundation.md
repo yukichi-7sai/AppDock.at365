@@ -10,7 +10,7 @@
 
 本体・Applet設定と設定ダイアログは`SettingsSection`/`SettingsField`の`description`と`hint`を共用する。`description`は現在の値・継続的な状態・重要な説明を常時表示し、`hint`は任意の補足だけを表示する。入力欄を個別のラベルとCSSで配置せず、`SettingsField`へタイトル・説明・入力を渡す。共通の選択候補・キー記録・一覧等のウィジェットは、その内部の操作契約を保つ。
 
-ページと[SettingsModal/SettingsDialog](../src/renderer/settings-ui/SettingsModal.tsx)は、常設の[SettingsStatusArea](../src/renderer/settings-ui/SettingsStatus.tsx)と[SettingsError](../src/renderer/settings-ui/SettingsError.tsx)を持つ。エラーの有無・長さによらず40pxの表示領域を確保し、要約と「詳細」から全文を確認できる。個別配置の`SettingsHint`・`SettingsFeedback`と`errorLayout`は使用しない。
+ページと[SettingsModal/SettingsDialog](../src/renderer/settings-ui/SettingsModal.tsx)は、共通の[SettingsStatusArea](../src/renderer/settings-ui/SettingsStatus.tsx)と[SettingsError](../src/renderer/settings-ui/SettingsError.tsx)を持つ。ページはエラーがあるときだけ40pxの要約行と上下の余白を表示し、ツールバーと一緒に縦stickyにする。「詳細」から全文を確認できる。ダイアログ内は従来の固定高を保つ。進行・正常結果のスクリーンリーダー通知は、エラー欄がないときも維持する。個別配置の`SettingsHint`・`SettingsFeedback`と`errorLayout`は使用しない。
 
 ## 保存と入力
 
@@ -80,11 +80,11 @@ settings-catalog.tsがページ/項目ID・JSON許可範囲・静的検索メタ
 
 全体設定の割り当て一覧は「ショートカットキー割り当て」「マウスジェスチャー割り当て」を共通の`SettingsSection`で表示し、hintは「＋で割り当てを追加します。」とする。本文とヘッダーの余白は共通規則を使い、ジェスチャーだけの上余白を追加しない。Applet詳細の共用一覧内へ見出しを重ねない。
 
-ショートカットキー・マウスジェスチャーの「動作設定」Sectionの見出しにはhintを付けない。各Fieldのヒントは維持する。ショートカットキーのフォームでは本文の外枠と余白を重ねず、初期状態で閉じた「動作設定」と、枠なしのコマンド一覧を本文のトップレベルに配置する。実行方法のフィールドはジェスチャーと`CommandExecutionModeField`を共有する。JSON編集の枠は維持する。一般の設定ファイルカードはファイル別の状態の下へ共通のボタン列を置き、Windows起動設定の復旧も同じ列へ含める。操作の許可への案内カードは設けない。並べ替えを開くボタンと順序ダイアログの上下移動は、[共通配色](appearance.md)の`accent-action`へ統一する。
+ショートカットキー・マウスジェスチャーの「動作設定」Sectionの見出しにはhintを付けない。各Fieldのヒントは維持する。ショートカットキーのフォームでは本文の外枠と余白を重ねず、初期状態で閉じた「動作設定」と、枠なしのコマンド一覧を本文のトップレベルに配置する。実行方法のフィールドはジェスチャーと`CommandExecutionModeField`を共有する。JSON編集は共通レイアウトで入力欄を直接配置する。一般の設定ファイルカードはファイル別の状態の下へ共通のボタン列を置き、Windows起動設定の復旧も同じ列へ含める。操作の許可への案内カードは設けない。並べ替えを開くボタンと順序ダイアログの上下移動は、[共通配色](appearance.md)の`accent-action`へ統一する。
 
 通知の「読み上げ」カードの設定項目名は「TTS設定」とする。声・速度の現在値は各項目の`description`へ表示し、共通設定/個別設定とヒントON/OFFによらず有効値を示す。「MCP連携設定」は「通知の受け取り方」内へ配置し、イベント用途とMCPサーバー・ChatGPTとの接続条件をdescriptionへまとめる。Windows通知の表示時間と通知センターの操作期限は同じFieldで説明し、表示時間の変更が次の通知から反映される案内も同Sectionへ配置する。
 
-本体とAppletの全設定ページは`SettingsPageLayout`（`src/renderer/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。ページ側で同じ見出しを重ねない。フォーム/JSONの切替を含む上部操作・タイトル・本文を同じ外側の表示枠で縦スクロールする。一覧フィルターだけを共通の固定ツールバーへ接続する。JSON入力欄の編集領域は読み書きできる高さを保つ。Applet詳細でも同じ本文部品を使い、ショートカット一覧の内部にタイトル・説明を追加しない。
+本体とAppletの全設定ページは`SettingsPageLayout`（`src/renderer/settings/SettingsPageLayout.tsx`）へタイトル・説明・ツールバー・本文を渡す。フォームではタイトル・説明・本文を同じ外側の表示枠で縦スクロールし、ツールバーと表示中のエラーを一緒に上端へ固定する。一覧フィルターはその前面に重なる。右端はスクロールバーとの間に8pxの余白を置く。JSON入力欄はSection相当の囲いを付けず、残りの高さを使い、縦スクロールを入力欄だけにする。「ファイルを開く」はJSON選択中だけタブ列の直後へ表示し、複数ファイルの選択は維持する。保存先はチェックボックスとヒントで示し、設定JSONの保存先ラベルを重ねない。Applet詳細でも同じ本文部品を使う。
 
 本文は`src/renderer/settings-ui/SettingsSections.tsx`の`SettingsSection`（カード/詳細折りたたみ、`variant="group"`で枠のない見出しグループ）、`SettingsField`（項目名・説明と入力、入力なしの状態表示）、`SettingsChoice`（選択カード）、`SettingsActions`（余白と折り返しを持つボタン列）、`SettingsContent`（構造を持つウィジェットの外枠）を再利用する。説明・状態・エラーの表示は共通レイアウト指針に従って共通部品側へ集約する。新しいページでは既存の余白・境界・テーマ変数・幅に応じた縦配置を継承し、ページ専用CSSは固有の一覧構造に限定する。カード内のグループ背景には`--settings-group-background`を使い、ボタンの`--raised`や選択状態の色と分離する。入力には`SettingsInput`/`SettingsTextarea`を使い、アクセシブルなラベルを指定する。共通部品は保存や通信を所有しない。
 

@@ -650,7 +650,7 @@ module.exports = async ({ host, command, row, checks, profile }) => {
   assert.equal(await host.locator('.settings-page-shared-scroll').count(), 0);
   assert.equal(await host.locator('.command-list-page-canvas').count(), 0);
   assert.equal(await bar.isVisible(), false);
-  await host.getByRole('button', { name: 'フォーム', exact: true }).click();
+  await host.getByTestId('command-trigger-tab:commands').click();
   await host.locator('.command-triggers-editor').waitFor();
   assert.equal(await host.locator('.settings-page-shared-scroll').count(), 1);
   assert.equal(await host.locator('.command-list-page-canvas').count(), 1);
