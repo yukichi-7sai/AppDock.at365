@@ -148,7 +148,46 @@ if (portable) {
 }
 const checks = [],
   errors = [];
+const cacheChecks = [];
 let app, host, rail;
+async function resetCacheProbe() {
+  await rail.evaluate(() => window.appdockShell.get());
+  await app.evaluate(({ app }) => {
+    const load = process
+      .getBuiltinModule('module')
+      .createRequire(app.getAppPath() + '/package.json');
+    const { UiPresentation } = load('./out/main/main/core/ui-presentation');
+    const { RibbonCatalogCache } = load('./out/main/main/core/ribbon-catalog-cache');
+    if (!globalThis.ribbonCacheProbeInstalled) {
+      globalThis.ribbonCacheProbeInstalled = true;
+      const get = UiPresentation.prototype.get;
+      UiPresentation.prototype.get = function (...args) {
+        if (!this.ribbonCacheProbeInstalled) {
+          this.ribbonCacheProbeInstalled = true;
+          const read = this.options.applets;
+          this.options.applets = () => {
+            globalThis.ribbonCacheProbe.projections++;
+            return read();
+          };
+        }
+        return get.apply(this, args);
+      };
+      const inputs = RibbonCatalogCache.prototype.get;
+      RibbonCatalogCache.prototype.get = function (...args) {
+        const before = this.cached;
+        const value = inputs.apply(this, args);
+        if (this.cached !== before) globalThis.ribbonCacheProbe.catalogBuilds++;
+        return value;
+      };
+    }
+    globalThis.ribbonCacheProbe = { projections: 0, catalogBuilds: 0 };
+  });
+}
+async function checkCacheProbe(operation) {
+  const counts = await app.evaluate(() => globalThis.ribbonCacheProbe);
+  assert.deepEqual(counts, { projections: 1, catalogBuilds: 0 }, operation);
+  cacheChecks.push({ operation, ...counts });
+}
 const until = async (fn, label) => {
   const deadline = Date.now() + 20000;
   let last;
@@ -177,6 +216,7 @@ const recordSuccess = () => {
   const result = {
     ok: true,
     checks,
+    cacheChecks,
     profile,
     errors,
     scrollbarsOnly,
@@ -295,6 +335,14 @@ async function launch() {
     assert.equal(await button('group:persistent').getAttribute('aria-expanded'), 'false');
     assert.equal(await button('page:fixture.ribbon:main').count(), 0);
     assert.equal(await button('group:persistent').locator('.ribbon-badge.dot').count(), 1);
+    await resetCacheProbe();
+    await button('group:persistent').click();
+    await button('page:fixture.ribbon:main').waitFor();
+    await checkCacheProbe('persistent expand');
+    await resetCacheProbe();
+    await button('group:persistent').click();
+    await button('page:fixture.ribbon:main').waitFor({ state: 'detached' });
+    await checkCacheProbe('persistent collapse');
     await button('group:persistent').click();
     await button('page:fixture.ribbon:main').waitFor();
     assert.equal(
@@ -321,7 +369,9 @@ async function launch() {
         })),
       );
     const closedPositions = await positions();
+    await resetCacheProbe();
     let flyout = await openTemporary();
+    await checkCacheProbe('temporary expand');
     await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await until(
       async () => (await button('group:temporary').getAttribute('aria-expanded')) === 'true',

@@ -2,6 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { UiPresentation, NavigationCoordinator } = require('../out/main/main/core/ui-presentation');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
+const { RibbonCatalogCache } = require('../out/main/main/core/ribbon-catalog-cache');
+const { RibbonGroupSession } = require('../out/main/main/core/ribbon-group-session');
 function fixture(overrides = {}) {
   const settings = createDefaultSettings();
   let changes = 0,
@@ -48,6 +50,187 @@ function fixture(overrides = {}) {
     },
   };
 }
+
+function cachedFixture(expansion = 'persistent') {
+  let settings = createDefaultSettings(),
+    shell = '',
+    source = [],
+    images = 0;
+  let commandBuilds = 0,
+    projections = 0,
+    open = false,
+    badge = null,
+    mode = 'compact';
+  settings.ribbon.groups = [
+    {
+      id: 'group:cached',
+      title: 'Cached',
+      children: ['image-library'],
+      expansion,
+    },
+  ];
+  settings.ribbon.order = ['group:cached'];
+  const catalog = new RibbonCatalogCache(
+    () => source,
+    () => {
+      commandBuilds++;
+      return [{ id: 'ribbon.configure', available: true }, ...source.flatMap((a) => a.commands)];
+    },
+  );
+  const inputs = () => catalog.get(settings, shell);
+  const nav = new NavigationCoordinator(() => {});
+  const ui = new UiPresentation({
+    settings: () => settings,
+    version: () => `${inputs().revision}:${images}`,
+    applets: () => {
+      projections++;
+      return inputs().applets;
+    },
+    commands: () => inputs().commands,
+    dark: () => false,
+    navigation: nav,
+    execute: async () => {},
+    theme: async () => {},
+    expanded: () => open,
+    temporaryExpanded: () => expansion === 'temporary' && open,
+    toggleGroup: () => {
+      open = !open;
+    },
+    displayMode: () => mode,
+    toggleDisplayMode: () => {
+      mode = mode === 'compact' ? 'expanded' : 'compact';
+    },
+    badge: (id) => (id === 'image-library' ? badge : null),
+  });
+  return {
+    ui,
+    nav,
+    catalog,
+    get counts() {
+      return { commandBuilds, projections };
+    },
+    set open(value) {
+      open = value;
+    },
+    set badge(value) {
+      badge = value;
+    },
+    set shell(value) {
+      shell = value;
+    },
+    set source(value) {
+      source = value;
+      catalog.invalidate();
+    },
+    changeSettings(update) {
+      settings = structuredClone(settings);
+      update(settings);
+    },
+    changeImages() {
+      images++;
+    },
+  };
+}
+
+test('cached persistent expansion rebuilds once after each click without regenerating commands', async () => {
+  const f = cachedFixture();
+  const first = f.ui.get();
+  assert.deepEqual(f.counts, { commandBuilds: 1, projections: 1 });
+  for (const [i, expanded] of [true, false, true].entries()) {
+    await f.ui.invoke(
+      { epoch: first.epoch, requestId: `click-${i}`, actionId: 'ribbon.group:cached' },
+      'local',
+    );
+    const next = f.ui.get();
+    assert.equal(next.items.find((item) => item.id === 'group:cached').expanded, expanded);
+    assert.equal(f.ui.group('group:cached').view, next);
+    assert.equal(f.ui.get(), next);
+    assert.deepEqual(f.counts, { commandBuilds: 1, projections: i + 2 });
+  }
+});
+
+test('temporary group snapshots share the ribbon projection; transient changes keep the catalog', () => {
+  const f = cachedFixture('temporary');
+  f.ui.get();
+  const session = new RibbonGroupSession(
+    f.ui,
+    'group:cached',
+    { x: 0, y: 0, width: 40, height: 40 },
+    assert.fail,
+  );
+  f.open = true;
+  const expanded = f.ui.get();
+  for (let i = 0; i < 4; i++) {
+    assert.equal(session.snapshot().revision, expanded.revision);
+    assert.equal(f.ui.get(), expanded);
+  }
+  assert.deepEqual(f.counts, { commandBuilds: 1, projections: 2 });
+  session.cancel('dismissed');
+  f.open = false;
+  assert.equal(f.ui.get().items.find((item) => item.id === 'group:cached').expanded, false);
+  f.badge = { kind: 'count', count: 3, label: 'Pending' };
+  assert.equal(f.ui.group('group:cached').items[0].badge.text, '3');
+  f.nav.navigate('logs');
+  assert.equal(f.ui.get().route, 'logs');
+  f.changeImages();
+  const changed = f.ui.get();
+  assert.equal(f.ui.get(), changed);
+  assert.deepEqual(f.counts, { commandBuilds: 1, projections: 6 });
+});
+
+test('catalog invalidation refreshes settings, Applet availability and Shell requirements before invocation', async () => {
+  const f = cachedFixture();
+  const first = f.ui.get();
+  f.shell = 'provider-visible';
+  f.ui.get();
+  assert.equal(f.counts.commandBuilds, 2);
+  f.source = [];
+  f.ui.get();
+  assert.equal(f.counts.commandBuilds, 3);
+  const pending = f.ui.invoke(
+    { epoch: first.epoch, requestId: 'hidden', actionId: 'ribbon.group:cached' },
+    'local',
+  );
+  f.changeSettings((settings) => settings.ribbon.hidden.push('group:cached'));
+  await assert.rejects(
+    pending,
+    /Unknown or hidden action|Action target changed|no longer available/,
+  );
+  assert.equal(f.counts.commandBuilds, 4);
+  assert.equal(f.ui.group('group:cached'), undefined);
+});
+
+test('cached projections keep permissions, schema and local-only controls separate', () => {
+  const f = cachedFixture();
+  const local = f.ui.get();
+  const denied = () => false;
+  assert.equal(f.ui.get(denied).items.find((item) => item.id === 'group:cached').enabled, false);
+  assert.equal(f.ui.get(denied).items.find((item) => item.id === 'group:cached').enabled, false);
+  assert.equal(f.ui.get().items.find((item) => item.id === 'group:cached').enabled, true);
+  assert.ok(f.ui.get(undefined, 1).items.every((item) => item.kind !== 'group'));
+  assert.equal(f.ui.get(undefined, 2, false).displayModeToggle, undefined);
+  assert.equal(f.ui.get().revision, local.revision);
+  assert.equal(f.counts.commandBuilds, 1);
+});
+
+test('cached Applet pages track registration, availability and removal', () => {
+  const f = cachedFixture();
+  const source = {
+    id: 'cached.page',
+    enabled: true,
+    state: 'running',
+    commands: [{ id: 'cached.page.open', available: true }],
+    pages: [{ id: 'main', title: 'Live page', openCommand: 'cached.page.open', source: 'local' }],
+  };
+  const page = () => f.ui.get().items.find((item) => item.id === 'page:cached.page:main');
+  assert.equal(page(), undefined);
+  f.source = [source];
+  assert.equal(page().enabled, true);
+  f.source = [{ ...source, commands: [{ id: 'cached.page.open', available: false }] }];
+  assert.equal(page().enabled, false);
+  f.source = [];
+  assert.equal(page(), undefined);
+});
 test('full presentation preserves order, placement, selected route and opaque assets without local paths', () => {
   const f = fixture();
   f.settings.ribbon.order = ['page:test.page:main', 'image-library'];

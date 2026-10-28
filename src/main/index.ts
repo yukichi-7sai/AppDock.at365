@@ -59,6 +59,7 @@ import { LogPageSession } from './core/log-page';
 import { CommandPaletteSession } from './core/command-palette';
 import type { CommandPaletteRequest } from '../shared/overlays';
 import { NavigationCoordinator, UiPresentation } from './core/ui-presentation';
+import { RibbonCatalogCache } from './core/ribbon-catalog-cache';
 import { defaultShellId } from '../shared/shell';
 import { NativeInput } from './core/native-input';
 import {
@@ -400,10 +401,32 @@ const navigation = new NavigationCoordinator(
   },
   (error) => log.write('error', 'navigation', String(error)),
 );
+const ribbonCatalog = new RibbonCatalogCache(
+  () => (manager ? allApplets() : []),
+  (applets) => (manager ? ribbonUiCommands(applets) : hostCommands),
+);
+let ribbonImageRevision = 0;
+function ribbonInputs() {
+  // Only state used by command Shell requirements belongs to the catalog key.
+  const shell =
+    JSON.stringify(
+      shellRegistry
+        ?.snapshot()
+        .regions.map((region) => [
+          region.region,
+          region.resolvedProvider,
+          region.boundProvider,
+          region.ready,
+          region.visible,
+        ]),
+    ) ?? '';
+  return ribbonCatalog.get(settings.value, shell);
+}
 const presentation = new UiPresentation({
   settings: () => (safeShell ? { ...settings.value, ribbon: defaultRibbon() } : settings.value),
-  applets: () => (manager ? allApplets() : []),
-  commands: () => (manager ? ribbonUiCommands() : hostCommands),
+  applets: () => ribbonInputs().applets,
+  commands: () => ribbonInputs().commands,
+  version: () => `${ribbonInputs().revision}:${ribbonImageRevision}`,
   dark: () => nativeTheme.shouldUseDarkColors,
   image: (ref, shape) => registeredImages.icon(ref, shape),
   navigation,
@@ -592,7 +615,10 @@ let notifyTimer: ReturnType<typeof setTimeout> | undefined;
 const registeredImages = new RegisteredImages(
   path.join(paths.assets, 'images'),
   decodeRegisteredImage,
-  () => changed(),
+  () => {
+    ribbonImageRevision++;
+    changed();
+  },
 );
 const imageLibraryHost = new ImageLibraryHost(registeredImages, {
   settings,
@@ -958,6 +984,7 @@ const customCommands = new CustomCommandService({
     return true;
   },
   changed: () => {
+    ribbonCatalog.invalidate();
     if (startupReady) changed();
   },
   unavailable: (ids) => {
@@ -1485,12 +1512,12 @@ function executeShellCommand(provider: string, command: string) {
   return executeCommand(command);
 }
 const knownSettingsCommands = new Map<string, ReturnType<typeof uiCommands>[number]>();
-function uiCommands(): import('../shared/commands').UiCommand[] {
+function uiCommands(applets = allApplets()): import('../shared/commands').UiCommand[] {
   const commands = [
-    ...hostCommandsForApplets(allApplets()).map((c) => ({ ...c, extensionId: null })),
+    ...hostCommandsForApplets(applets).map((c) => ({ ...c, extensionId: null })),
     ...customCommands.uiCommands(),
-    ...appletManagementCommands(allApplets()),
-    ...allApplets().flatMap((e) =>
+    ...appletManagementCommands(applets),
+    ...applets.flatMap((e) =>
       e.commands.map((c) => ({ ...c, extension: e.displayName, extensionId: e.id })),
     ),
   ];
@@ -1538,9 +1565,8 @@ function settingsAppletAssignments() {
     gestures: owners([...assignments.gestures, ...assignments['touchpad-gestures']]),
   };
 }
-function ribbonUiCommands() {
-  const applets = allApplets();
-  return settingsUiCommands().map((command) => ({
+function ribbonUiCommands(applets = allApplets()) {
+  return uiCommands(applets).map((command) => ({
     ...command,
     available:
       command.available &&
@@ -3493,7 +3519,10 @@ async function initialize() {
     parents: parentApplets,
     localRoot: dataDirectory,
     sharedRoot: sharedDirectory,
-    changed,
+    changed: () => {
+      ribbonCatalog.invalidate();
+      changed();
+    },
     failed: (error) => log.write('error', 'web-profiles', error.message),
     openLocal: async (page) => {
       const parent = manager.items.get(page.binding.owner);
@@ -3660,6 +3689,7 @@ async function initialize() {
     },
   });
   manager.on('changed', () => {
+    ribbonCatalog.invalidate();
     imageLibraryHost.reconcile(
       new Set(
         [...manager.items.values()]

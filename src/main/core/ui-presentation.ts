@@ -68,12 +68,23 @@ type Action = {
   group?: string;
   displayMode?: true;
 };
+const allowAll = () => true;
 export class UiPresentation {
   readonly epoch = randomUUID();
   private revision = 0;
   private signature = '';
   private assets = new Map<string, string>();
   private actions = new Map<string, Action>();
+  private badgeIds: string[] = [];
+  private cached?: {
+    version: unknown;
+    settings: Settings;
+    state: string;
+    allowed: (action: Action) => boolean;
+    schemaVersion: 1 | 2;
+    local: boolean;
+    view: RibbonView;
+  };
   private requests = new Map<
     string,
     { action: string; promise: Promise<unknown>; completed: boolean; expires: number }
@@ -83,6 +94,8 @@ export class UiPresentation {
       settings(): Settings;
       applets(): ExtensionSnapshot[];
       commands?(): UiCommand[];
+      /** Changes when catalog inputs or registered images change. Omit for uncached sources. */
+      version?(): unknown;
       dark(): boolean;
       image?(ref: unknown, shape?: string): string | undefined;
       navigation: NavigationCoordinator;
@@ -108,15 +121,40 @@ export class UiPresentation {
     return id;
   }
   get(
-    allowed: (action: Action) => boolean = () => true,
+    allowed: (action: Action) => boolean = allowAll,
     schemaVersion: 1 | 2 = 2,
     local = true,
   ): RibbonView {
     const settings = this.options.settings();
     const displayMode = this.options.displayMode?.() ?? 'compact';
-    const applets = this.options.applets();
     const dark = this.options.dark();
     const route = this.options.navigation.state.route;
+    const version = this.options.version?.();
+    const state = () =>
+      JSON.stringify([
+        this.options.navigation.state,
+        dark,
+        displayMode,
+        (settings.ribbon.groups ?? []).map(({ id }) => [
+          id,
+          this.options.expanded?.(id),
+          this.options.temporaryExpanded?.(id),
+        ]),
+        this.badgeIds.map((id) => [id, this.options.badge?.(id)]),
+      ]);
+    if (
+      this.options.version &&
+      this.cached &&
+      this.cached.version === version &&
+      this.cached.settings === settings &&
+      this.cached.allowed === allowed &&
+      this.cached.schemaVersion === schemaVersion &&
+      this.cached.local === local &&
+      this.cached.state === state()
+    )
+      return this.cached.view;
+    this.cached = undefined;
+    const applets = this.options.applets();
     this.assets.clear();
     this.actions.clear();
     const contextAction: Action = settings.ribbon.rightClickCommand
@@ -136,6 +174,7 @@ export class UiPresentation {
       settings.ribbon.groups,
       settings.ribbon.buttons,
     );
+    this.badgeIds = catalog.map((item) => item.id);
     const project = (item: RibbonItem): RibbonView['items'][number] => {
       const appearance = ribbonPresentation(settings.ribbon, item);
       const modeItem = item.id === 'ribbon-display-mode';
@@ -345,7 +384,10 @@ export class UiPresentation {
       this.signature = signature;
       this.revision++;
     }
-    return { ...body, revision: this.revision };
+    const view = { ...body, revision: this.revision };
+    if (this.options.version)
+      this.cached = { version, settings, state: state(), allowed, schemaVersion, local, view };
+    return view;
   }
   private children = new Map<string, RibbonView['items']>();
   private runningCommands = new Set<string>();
