@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-29: 設定ページ遷移 0.100.1 のコミット照合
+
+- 利用者が0.100.1の改善を確認した後、main=`4bca7de`上の今回の15ファイルをレビュー。インデックスの先行表示、1秒の遅延案内、先行選択/離脱/失敗、既存検索・即時保存とIPC/session境界への影響を再確認し、コミット阻害事項なし。
+- 実装時の841入力と成功ログのSHA256、発行物/固定GUI・smokeの隔離コピーの本体所有694ファイルとZIP/feedを照合して一致。型検査/build・関連62件・ソース遷移GUI5群/検索8群・最終発行EXE遷移5群/smokeの成功を再利用し、版更新・再発行は行わない。
+- 未実施だったrenderer/配色/パッケージの構造検査5ファイル25件を追加し成功。今回の12ファイル87件と、先行mainの完全ログ/試験ソース/未変更の実行依存を照合した135ファイル1,176件を合わせ、標準147ファイル1,263件の必要範囲を確認した。コミットだけを理由とする同一GUI/buildの再実行は行わない。
+- 照合証跡は`.artifacts/commit-validation-settings-transition-01001-20261029/`の`reuse.json`・`inputs-final.json`・`stage.json`・`commit.json`。今回の15ファイルだけをstageし、作業ファイルとstage、stage treeとcommit treeを照合する。追加検査のログと既存の失敗診断・再利用資料を保持。ローカルcommitのみを行い、push・Release・実利用deployは行わない。
+
+## 2026-10-29: 設定ページへの遷移と読み込み案内 0.100.1
+
+- main=`4bca7de9a05cde1f7cf87408a72b268f70d600ef`、開始時clean・未push1件。`pull --ff-only`は制限環境のDNS失敗後、通常ユーザー権限で実行して最新を確認した。main上で実装し、commit/push/Release/実利用deployは行っていない。
+- 設定値・編集session・操作IDを含まないインデックスを本体専用IPCで別途取得し、他ページの表示中もsnapshot変更で更新。通常と読み込み中の共通frameでインデックスDOM・幅・スクロール・フォーカスを保ち、本文は新しい接続から取得する。1秒未満では案内を出さず、超過時だけ右本文中央へ表示する。最低表示時間は設けず、失敗/詳細は即時表示する。
+- 読み込み中の項目選択/結果への移動は新接続のキューへ順番どおり反映。検索入力・幅変更は接続完了後に有効化し、離脱時に旧キュー/タイマー/接続を破棄する。設定保存・権限・MCP/Applet公開API・保存ファイルは不変のため通常パッチ版`0.100.1`とした。
+- 発行前レビューはframe継続、インデックスの情報範囲、既存IPC送信元検査、session/revision、先行操作、タイマー/失敗/離脱、幅変更と検索/即時保存への影響を確認し、製品の指摘なし。検索GUIの廃止済みApplet一覧/詳細タブの期待値だけを現在の管理一覧から設定へ移る入口に修正し、8群すべて成功。初回遷移GUIの失敗は詳細ボタンの古いアクセシブル名で、現行名へ修正後に全群成功。失敗診断も保持する。
+- 固定Node `24.22.1`/pnpm `12.10.1`/Electron `45.0.0`、Windows x64。固定lockfile・供給網検査を維持して`install --frozen-lockfile`、変更ファイルの書式、型検査、buildが成功。`settings-page/settings-page-host/settings-editing` 27件、`settings-view-client/settings-navigation/host-pages/localization` 35件、合計62件成功。無関係な標準全回帰・兄弟Appletの再発行は実施していない。
+- `settings-transition-ui-test.cjs`はソースと最終発行EXEの両方で5群成功。短時間/長時間、インデックス先行と同一DOM/幅、先行選択の反映、即時エラー/詳細、読み込み途中離脱と再接続、狭幅/暗色の本文内表示を確認。既存検索GUIはNFKC/IME・項目移動・即時保存・JSON・動的追加/削除・検索保持・狭幅を含む8群成功。発行EXEの隔離smokeも成功。
+- 既存`publish.bat`で`A:\40.ARTIFACT\AppDock.at365`へ発行。ステージと発行先の本体所有694ファイルがSHA256一致。EXE=`97e2159a80a1c3dedc2864e8ea81cae1ae8185985bd85a5681561224414bcb4a`、update.zip=`c77e1d81bcd170f7464ffa61fce26b821bb1876b6263198758bc25eeb567b80c`、270,706,369 bytes。manifest/feed/ZIP内manifestは0.100.1で、ZIPのSHA256/sizeと利用者データを含まないことを確認した。
+- 証跡は`.artifacts/settings-transition-20261029/`の完全ログ、841入力のSHA256、レビュー、成果物照合、最終結果。GUI詳細は`.artifacts/settings-transition-ui-1793217673175/`（source）、`settings-transition-ui-1793217762805/`（portable）、検索は`settings-search-1793217605588/`、smokeは`smoke-1793217768783/`。renderer画像だけでnative Shell全体の合成を確認したとは扱わず、本文/インデックスの領域内配置と実接続を動的検査した。実利用環境での体感、物理入力・実メール/Windows通知は未確認。
+- 今回のテストアプリは終了を確認。種類/実行方式別の新しい成功分は直近3件以内、失敗診断/再利用資料は保持した。旧smokeの既存参照・他作業利用が未確定の資料も保護し、削除は行わない。詳細は`cleanup.json`。
+
 ## 2026-10-29: タイトルバーの通知ベルと通知センター表示 0.100.0
 
 - main=`b7df63d`のクリーン状態から`pull --ff-only`し、最新一致を確認して着手。タイトルバーの「通知」をベルへ変更し、クリックは既存の`appdock.notifications.open`へ接続した。センターを開いた後は本体本文へnativeフォーカスを渡す。通知サービスのアクティブ件数をバーの公開モデルへ投影し、0件は通常色、1件以上は共通アクセント色にする。センターを開くだけでは件数・色を変えない。

@@ -14,7 +14,27 @@ import type {
 import type { CommandPaletteResult } from '../../shared/overlays';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import { searchSettings } from '../../shared/settings-catalog';
+import type { SettingsIndexModel } from '../../shared/settings-page';
 import type { SettingsInputSession } from './settings-input-session';
+
+export function projectSettingsIndex(
+  catalog: SettingsPageDefinition[],
+  pageId: string,
+  query: string,
+  language: SettingsIndexModel['language'],
+): SettingsIndexModel {
+  const titles = new Map(catalog.map((page) => [page.id, page.title]));
+  return {
+    language,
+    page: { id: pageId },
+    navigation: catalog.map(({ id, title, owner }) => ({ id, title, owner })),
+    query,
+    results: searchSettings(catalog, query).map(({ definition, keywords, ...item }) => ({
+      ...item,
+      pageTitle: titles.get(item.pageId)!,
+    })),
+  };
+}
 
 export class SettingsPageSession {
   readonly kind = 'settings';
@@ -119,27 +139,17 @@ export class SettingsPageSession {
       hostWidth: this.request.hostWidth ?? 1024,
       showHints: host.settings.value.host.showHints,
       language: host.settings.value.host.language,
-      page,
       values: page.json ? this.options.editor.projection() : {},
       jsonValues: page.json ? this.options.editor.jsonProjection() : {},
-      navigation:
-        this.request.context === 'full'
-          ? catalog.map((p) => ({
-              id: p.id,
-              title: p.title,
-              owner: p.owner,
-            }))
-          : [],
-      query: this.request.context === 'full' ? this.navigation.query : '',
-      results:
-        this.request.context === 'full'
-          ? searchSettings(catalog, this.navigation.query).map(
-              ({ definition, keywords, ...item }) => ({
-                ...item,
-                pageTitle: catalog.find((p) => p.id === item.pageId)!.title,
-              }),
-            )
-          : [],
+      ...(this.request.context === 'full'
+        ? projectSettingsIndex(
+            catalog,
+            page.id,
+            this.navigation.query,
+            host.settings.value.host.language,
+          )
+        : { navigation: [], query: '', results: [] }),
+      page,
       move:
         this.request.context === 'full' && this.navigation.move?.pageId === page.id
           ? this.navigation.move

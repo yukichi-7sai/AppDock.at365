@@ -287,18 +287,14 @@ async function until(fn, label) {
     await host.evaluate(() => window.dock.navigate('settings'));
     shell = await settingsPage();
     assert.equal(await search().inputValue(), 'Fixture field 47');
-    await host.evaluate(() => window.dock.navigate('extensions'));
-    await host
-      .getByRole('complementary', { name: 'Applet一覧' })
-      .getByRole('button', { name: /^Settings fixture/ })
-      .click();
-    await host.getByRole('tab', { name: '設定', exact: true }).click();
+    await op(shell, { kind: 'select', pageId: 'applets' });
+    await host.getByRole('button', { name: 'Settings fixtureの設定を開く', exact: true }).click();
     shell = await settingsPage();
     assert.equal(
       await shell.getByLabel('Fixture field 47', { exact: true }).inputValue(),
       'Last field saved',
     );
-    assert.equal(await shell.getByRole('combobox', { name: '設定を検索' }).count(), 0);
+    assert.equal(await search().inputValue(), 'Fixture field 47');
     await shell.getByLabel('Fixture text', { exact: true }).fill('Edited in detail');
     await shell.getByLabel('Fixture text', { exact: true }).press('Enter');
     await host.evaluate(() => window.dock.navigate('settings'));
@@ -325,7 +321,7 @@ async function until(fn, label) {
       'whole save',
     );
     checks.push(
-      'index and detail reuse complete body and edit state; query survives routes; save includes other pages',
+      'index and management reuse complete body and edit state; query survives routes; save includes other pages',
     );
     await shell.getByRole('button', { name: 'JSON', exact: true }).click();
     const json = await shell.getByLabel('設定JSON').inputValue();

@@ -122,6 +122,11 @@ export interface SettingsPageAuxiliary {
   };
   permissions?: HostSnapshot['appletApi'];
 }
+/** Display-only index; contains no setting values, edit session or action handles. */
+export type SettingsIndexModel = Pick<
+  SettingsPageModel['content'],
+  'navigation' | 'query' | 'results' | 'language'
+> & { page: { id: string } };
 export type SettingsPageOperation =
   | {
       kind: 'edit';
@@ -165,6 +170,7 @@ export type SettingsPaletteRequest = Pick<
   ({ kind: 'open'; request: CommandPaletteRequest } | { kind: 'cancel'; requestId: string });
 /** Trusted host renderer only; never exposed in an Applet preload. */
 export interface SettingsPageApi {
+  index(): Promise<SettingsIndexModel>;
   open(request: SettingsPageRequest): Promise<SettingsPageConnection>;
   get(connectionId: string): Promise<SettingsPageModel>;
   act(

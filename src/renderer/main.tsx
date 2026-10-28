@@ -6,6 +6,7 @@ import { HostPageSlot } from './pages/HostPageSlot';
 import { ImageLibraryDialogHost } from './ImageLibraryDialogHost';
 import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
+import type { SettingsIndexModel } from '../shared/settings-page';
 import { Icon } from './Icon';
 import { getKeybindings, resolveKeybindings } from '../shared/keybindings';
 import { hostShortcutPage } from '../shared/shortcut-pages';
@@ -31,6 +32,20 @@ function App() {
   const appletSidebar = useAppletSidebar();
   useEffect(() => window.dock.onSettingsSidebarWidth(appletSidebar.resize), []);
   const [snapshot, setSnapshot] = useState<HostSnapshot>();
+  const [settingsIndex, setSettingsIndex] = useState<SettingsIndexModel>();
+  useEffect(() => {
+    if (!snapshot?.uiReady) return;
+    let live = true;
+    void window.dock.settingsPage
+      .index()
+      .then((index) => {
+        if (live) setSettingsIndex(index);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [snapshot]);
   const [overlayState, setOverlayState] = useState<HostSnapshot['overlay']>();
   useEffect(() => window.dock.onOverlayState(setOverlayState), []);
   const mainRef = useRef<HTMLElement>(null);
@@ -490,6 +505,7 @@ function App() {
               {page === 'settings' && (
                 <SettingsPage
                   ready={settingsPageReady}
+                  index={settingsIndex}
                   sidebarWidth={appletSidebar.width}
                   onReady={hostUiRendered}
                 />

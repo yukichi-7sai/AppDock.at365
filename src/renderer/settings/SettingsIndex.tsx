@@ -1,6 +1,6 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useState } from 'react';
-import type { SettingsPageModel, SettingsPageOperation } from '../../shared/settings-page';
+import type { SettingsIndexModel, SettingsPageOperation } from '../../shared/settings-page';
 import { SettingsInput } from '../settings-ui/SettingsInput';
 import { Icon, type IconName } from '../../shared/ui-icons';
 import { defaultShellId } from '../../shared/shell';
@@ -18,9 +18,11 @@ const indexIcons: Partial<Record<string, IconName>> = {
 export function SettingsIndex({
   content,
   act,
+  pending = false,
 }: {
-  content: SettingsPageModel['content'];
+  content: SettingsIndexModel;
   act(op: SettingsPageOperation): void;
+  pending?: boolean;
 }) {
   const { t } = useHostTranslation();
   const [query, setQuery] = useState(content.query),
@@ -40,7 +42,7 @@ export function SettingsIndex({
   };
   const choose = (id: string) => act({ kind: 'move', itemId: id });
   const searching = !!query.trim();
-  const row = (p: SettingsPageModel['content']['navigation'][number]) => (
+  const row = (p: SettingsIndexModel['navigation'][number]) => (
     <button
       key={p.id}
       data-testid={`settings-nav:${p.id}`}
@@ -71,6 +73,7 @@ export function SettingsIndex({
         aria-label={t('settings.search')}
         placeholder={t('settings.searchPlaceholder')}
         maxLength={512}
+        disabled={pending}
         value={query}
         aria-expanded={searching}
         aria-controls="settings-results"

@@ -107,7 +107,7 @@ import { customItems } from '../shared/custom-commands';
 import { triggerStacks, inheritedTriggerExecutionMode } from '../shared/trigger-stacks';
 import { planCommandBatch } from '../shared/command-execution';
 import { commandCondition } from '../shared/command-conditions';
-import { SettingsPageSession } from './core/settings-page';
+import { projectSettingsIndex, SettingsPageSession } from './core/settings-page';
 import { SettingsPageHost } from './core/settings-page-host';
 import { dataPaths } from './core/data-paths';
 import { RegisteredImages } from './core/registered-images';
@@ -3078,6 +3078,18 @@ function registerIpc() {
     }
     return settingsEditing.act(request);
   });
+  handle('dock:settingsPage:index', () =>
+    settingsReads.run(() =>
+      settingsEditing.read(() =>
+        projectSettingsIndex(
+          settingsEditing.catalog(),
+          settingsEditing.metadata().pageId,
+          settingsNavigation.query,
+          settings.value.host.language,
+        ),
+      ),
+    ),
+  );
   handle('dock:settingsPage:open', (request) => settingsPageHost!.open(request));
   handle('dock:settingsPage:get', (id) => settingsPageHost!.get(id));
   handle('dock:settingsPage:act', (id, action) => settingsPageHost!.act(id, action));

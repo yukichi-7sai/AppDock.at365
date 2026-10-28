@@ -101,6 +101,7 @@ const api: DockApi = {
     },
   },
   settingsPage: {
+    index: () => ipcRenderer.invoke('dock:settingsPage:index'),
     open: (request) => ipcRenderer.invoke('dock:settingsPage:open', request),
     get: (id) => ipcRenderer.invoke('dock:settingsPage:get', id),
     act: (id, action) => ipcRenderer.invoke('dock:settingsPage:act', id, action),

@@ -2,7 +2,10 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema');
 const { SettingsInputSession } = require('../out/main/main/core/settings-input-session');
-const { SettingsPageSession } = require('../out/main/main/core/settings-page');
+const {
+  SettingsPageSession,
+  projectSettingsIndex,
+} = require('../out/main/main/core/settings-page');
 const { settingsProjection, applySettingsJson } = require('../out/main/shared/settings-catalog');
 
 test('Applet page edits allow absent display overrides and reset them without empty page objects', () => {
@@ -146,6 +149,44 @@ test('settings page refreshes never clone unrelated saved values', (t) => {
   const model = f.page.snapshot();
   assert.equal(unrelatedCopies, 0);
   assert.equal(JSON.stringify(model).includes('private-value'), false);
+});
+
+test('the settings index is available without loading page values or actions', (t) => {
+  const f = fixture();
+  const expected = f.page.snapshot().content;
+  t.mock.method(f.editor, 'projection', () => {
+    throw Error('page values must not be loaded');
+  });
+  t.mock.method(f.editor, 'jsonProjection', () => {
+    throw Error('JSON must not be loaded');
+  });
+  const index = () =>
+    f.editor.read(() =>
+      projectSettingsIndex(
+        f.editor.catalog(),
+        f.editor.metadata().pageId,
+        f.navigation.query,
+        f.saved.value.host.language,
+      ),
+    );
+  const first = index();
+  assert.deepEqual(first.navigation, expected.navigation);
+  assert.equal(first.page.id, expected.page.id);
+  assert.deepEqual(Object.keys(first).sort(), [
+    'language',
+    'navigation',
+    'page',
+    'query',
+    'results',
+  ]);
+  assert.equal(JSON.stringify(first).includes('private-value'), false);
+  first.navigation.length = 0;
+  assert.ok(index().navigation.length);
+  f.applets[0].displayName = 'Renamed fixture';
+  assert.ok(index().navigation.some((page) => page.title === 'Renamed fixture'));
+  f.navigation.query = 'Number';
+  assert.ok(index().results.some((item) => item.title === 'Number'));
+  assert.equal(JSON.stringify(index()).includes('"definition"'), false);
 });
 
 test('all settings pages receive live hint visibility without exposing other page values', async () => {

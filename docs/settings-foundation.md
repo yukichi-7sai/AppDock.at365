@@ -40,6 +40,10 @@ SettingsInputSessionは選択ページ・フォーム/JSONモード・sessionId/
 
 ## 本体の設定ページ契約
 
+設定ページを開くときは、読み込み中も通常と同じインデックス・本文の枠を使う。本体rendererは`settingsPage.index()`で設定値・編集session・操作IDを含まない軽量インデックスを別途取得し、本体snapshotの変更時に更新する。他ページから戻るときはこの一覧を先に表示し、本文は現在の接続から取得する。インデックスと本文の投影は同じカタログ・検索処理を使う。読み込み中の項目選択・検索結果への移動は接続後に順番どおり反映し、検索入力と幅変更は接続の準備完了後に有効にする。ページ離脱時は待機中の操作を破棄し、旧接続の結果を受け付けない。
+
+本文の読み込み案内は1秒を超えた場合だけ右本文の中央へ表示し、完了後の最低表示時間は設けない。失敗の案内と詳細はこの待機時間に関係なく即時表示する。インデックスのDOM・幅・スクロール・フォーカスは本文の準備前後で保持する。`scripts/settings-transition-ui-test.cjs [固定EXE]`で、短い読み込み・長い読み込み・途中の項目選択・失敗・離脱・明暗と狭幅の代表例を隔離profileで確認する。
+
 SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使用する。DockApi.settingsPageのopen/get/act/input/palette/close/onChangedを本体のmainFrameだけに提供し、SettingsPageHostが接続ID・route・対象を検査する。Shell Appletへ設定描画bridgeは公開しない。
 
 更新・再起動で画面を復元するときは、保存された表示先だけで接続を開始しない。本体のstartupReadyとnavigation.routeが実際の表示先にそろってから設定を接続する。準備中は読み込み表示とし、対象が変われば接続と検索移動の監視を解放する。全体設定とApplet詳細の両入口で同じ条件を使う。

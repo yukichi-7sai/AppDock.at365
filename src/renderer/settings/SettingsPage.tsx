@@ -1,8 +1,12 @@
 import { getHostTranslator } from '../../shared/i18n';
 import { HostTranslationProvider } from '../HostTranslation';
 import { registerSettingsInputs } from '../settings-input-flush';
-import { useEffect, useRef, useState } from 'react';
-import type { SettingsPageModel, SettingsPageOperation } from '../../shared/settings-page';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type {
+  SettingsIndexModel,
+  SettingsPageModel,
+  SettingsPageOperation,
+} from '../../shared/settings-page';
 import { SettingsControlsProvider } from '../settings-ui/api';
 import { SettingsHintsContext } from '../settings-ui/SettingsHints';
 import { SettingsViewClient } from './runtime';
@@ -12,7 +16,7 @@ import {
   type TriggerTab,
   type TriggerScrollPositions,
 } from './CommandTriggersEditor';
-import { SettingsIndex } from './SettingsIndex';
+import { SettingsPageFrame } from './SettingsPageFrame';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
@@ -27,19 +31,21 @@ import '../settings-ui/controls.css';
 import './settings.css';
 export function SettingsPage({
   ready,
+  index,
   context = 'full',
   pageId,
   sidebarWidth = 280,
   onReady,
 }: {
   ready: boolean;
+  index?: SettingsIndexModel;
   context?: 'full' | 'applet';
   pageId?: string;
   sidebarWidth?: number;
   onReady?(): void;
 }) {
   const [model, setModel] = useState<SettingsPageModel>();
-  const t = getHostTranslator(model?.content.language);
+  const t = getHostTranslator(model?.content.language ?? index?.language);
   const [error, setError] = useState('');
   const [commandTarget, setCommandTarget] = useState<CommandSettingsTarget>();
   const [triggerTab, setTriggerTab] = useState<TriggerTab>('commands');
@@ -59,7 +65,8 @@ export function SettingsPage({
   }>();
   const [disposition, setDisposition] = useState<'keep' | 'share' | 'clear'>('keep');
   const client = useRef<SettingsViewClient | null>(null);
-  const drag = useRef<{ x: number; width: number } | null>(null);
+  const pendingNavigation = useRef<SettingsPageOperation[]>([]);
+  const [pendingPage, setPendingPage] = useState<string>();
   const surface = useRef<HTMLDivElement>(null);
   const rememberTriggerScroll = () => {
     const body = surface.current?.querySelector<HTMLElement>('.settings-body');
@@ -76,6 +83,14 @@ export function SettingsPage({
     setTriggerTab(tab);
   };
   const [controls, setControls] = useState<ReturnType<SettingsViewClient['controls']>>();
+  const loaded = !!(ready && model && client.current && controls);
+  const [showLoading, setShowLoading] = useState(false);
+  useEffect(() => {
+    setShowLoading(false);
+    if (loaded) return;
+    const timer = setTimeout(() => setShowLoading(true), 1000);
+    return () => clearTimeout(timer);
+  }, [loaded]);
   useEffect(() => {
     if (ready && model && controls) onReady?.();
   }, [ready, model?.id, controls, onReady]);
@@ -100,7 +115,7 @@ export function SettingsPage({
         sidebarWidth,
         hostWidth: window.innerWidth,
       })
-      .then((connection) => {
+      .then(async (connection) => {
         connectionId = connection.connectionId;
         if (!live) {
           void transport.close(connectionId);
@@ -109,6 +124,11 @@ export function SettingsPage({
         const c = new SettingsViewClient(setModel, setError, transport, connectionId);
         client.current = c;
         c.accept(connection.snapshot);
+        while (live && pendingNavigation.current.length) {
+          await c.act(pendingNavigation.current.shift()!).catch(() => {});
+        }
+        if (!live) return;
+        setPendingPage(undefined);
         setControls(c.controls());
         // Refresh after binding to cover changes arriving during open.
         void transport
@@ -131,6 +151,10 @@ export function SettingsPage({
     window.addEventListener('resize', resize);
     return () => {
       live = false;
+      pendingNavigation.current = [];
+      setModel(undefined);
+      setControls(undefined);
+      setPendingPage(undefined);
       unsubscribe();
       flush();
       window.removeEventListener('resize', resize);
@@ -191,6 +215,13 @@ export function SettingsPage({
       setCommandTarget(undefined);
       setGestureView('form');
     }
+    if (!loaded) {
+      if (operation.kind === 'select' || operation.kind === 'move') {
+        pendingNavigation.current.push(operation);
+        if (operation.kind === 'select') setPendingPage(operation.pageId);
+      }
+      return;
+    }
     void c?.act(operation).catch(() => {});
   };
   const confirm = async (kind: 'reset' | 'storage') => {
@@ -204,344 +235,294 @@ export function SettingsPage({
       setError(e instanceof Error ? e.message : String(e));
     }
   };
-  if (!ready || !model || !c || !controls)
-    return (
-      <SettingsStatusProvider
-        error={ready ? error : undefined}
-        target={t('settings.loadingTarget')}
-      >
-        <SettingsField
-          title={t('settings.title')}
-          description={error ? t('settings.loadFailed') : t('settings.loading')}
-        />
-        <SettingsStatusArea />
-      </SettingsStatusProvider>
-    );
-  const { page, navigation, editing } = model.content;
-  const gesturePage = ['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id);
-  const editor = c.editor(model);
   const resize = (width: number) => {
+    if (!model || !loaded) return;
     const value = Math.round(Math.max(220, Math.min(480, width)));
     setModel({ ...model, content: { ...model.content, sidebarWidth: value } });
     act({ kind: 'sidebar-width', width: value });
   };
-  return (
-    <HostTranslationProvider language={model.content.language}>
-      <SettingsControlsProvider api={controls}>
-        <SettingsMcpAccessProvider value={model.content.auxiliary.mcpAccess}>
-          <SettingsHintsContext.Provider value={model.content.showHints}>
-            <div
-              ref={surface}
-              data-settings-connection={model.id}
-              className={`settings-surface ${context}`}
-              data-compact={model.content.hostWidth <= 760}
+  const indexContent = loaded ? model!.content : index;
+  const frame = (body: ReactNode) => (
+    <HostTranslationProvider language={model?.content.language ?? index?.language}>
+      <SettingsControlsProvider api={controls ?? window.dock}>
+        <SettingsMcpAccessProvider value={loaded ? model?.content.auxiliary.mcpAccess : undefined}>
+          <SettingsHintsContext.Provider value={model?.content.showHints ?? true}>
+            <SettingsPageFrame
+              surface={surface}
+              context={context}
+              connectionId={loaded ? model?.id : undefined}
+              index={
+                indexContent && pendingPage
+                  ? { ...indexContent, page: { id: pendingPage } }
+                  : indexContent
+              }
+              sidebarWidth={loaded ? model!.content.sidebarWidth : sidebarWidth}
+              hostWidth={loaded ? model!.content.hostWidth : window.innerWidth}
+              pending={!loaded}
+              act={act}
+              resize={resize}
             >
-              {context === 'full' && (
-                <aside
-                  className="sidebar settings-categories"
-                  data-testid="settings-index"
-                  style={{
-                    width: Math.min(model.content.sidebarWidth, model.content.hostWidth * 0.4),
-                  }}
-                  aria-label={t('settings.index')}
-                >
-                  <SettingsIndex content={model.content} act={act} />
-                  <div
-                    className="sidebar-resizer"
-                    role="separator"
-                    tabIndex={0}
-                    aria-label={t('settings.resizeIndex')}
-                    aria-orientation="vertical"
-                    aria-valuemin={220}
-                    aria-valuemax={480}
-                    aria-valuenow={model.content.sidebarWidth}
-                    onPointerDown={(e) => {
-                      if (e.button !== 0) return;
-                      e.preventDefault();
-                      drag.current = {
-                        x: e.clientX,
-                        width: e.currentTarget.parentElement!.getBoundingClientRect().width,
-                      };
-                      e.currentTarget.setPointerCapture(e.pointerId);
-                    }}
-                    onPointerMove={(e) => {
-                      if (drag.current) resize(drag.current.width + e.clientX - drag.current.x);
-                    }}
-                    onPointerUp={(e) => {
-                      drag.current = null;
-                      if (e.currentTarget.hasPointerCapture(e.pointerId))
-                        e.currentTarget.releasePointerCapture(e.pointerId);
-                    }}
-                    onLostPointerCapture={() => (drag.current = null)}
-                    onKeyDown={(e) => {
-                      const width = {
-                        ArrowLeft: model.content.sidebarWidth - 10,
-                        ArrowRight: model.content.sidebarWidth + 10,
-                        Home: 220,
-                        End: 480,
-                      }[e.key];
-                      if (width !== undefined) {
-                        e.preventDefault();
-                        resize(width);
-                      }
-                    }}
-                  />
-                </aside>
-              )}
-              <SettingsPageLayout
-                page={page}
-                mode={editing.mode}
-                pending={editing.pending}
-                error={error || editing.error || ''}
-                onMode={(mode) => {
-                  rememberTriggerScroll();
-                  act({ kind: 'edit', action: { type: 'mode', value: mode } });
-                }}
-                formTabs={
-                  page.id === 'command-triggers'
-                    ? (Object.keys(triggerTabTitles) as TriggerTab[]).map((tab) => ({
-                        id: tab,
-                        title: t(triggerTabTitles[tab]),
-                        selected: triggerTab === tab,
-                        select: () => {
-                          if (editing.mode === 'form') selectTriggerTab(tab);
-                          else
-                            void c
-                              .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
-                              .then(() => {
-                                if (
-                                  c.model?.content.page.id === page.id &&
-                                  c.model.content.editing.mode === 'form'
-                                )
-                                  setTriggerTab(tab);
-                              })
-                              .catch(() => {});
-                        },
-                      }))
-                    : gesturePage
-                      ? (['form', 'triggers'] as const).map((view) => ({
-                          id: view,
-                          title: t(view === 'form' ? 'settings.form' : 'settings.triggerList'),
-                          selected: gestureView === view,
-                          select: () => {
-                            if (editing.mode === 'form') setGestureView(view);
-                            else
-                              void c
-                                .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
-                                .then(() => {
-                                  if (
-                                    c.model?.content.page.id === page.id &&
-                                    c.model.content.editing.mode === 'form'
-                                  )
-                                    setGestureView(view);
-                                })
-                                .catch(() => {});
-                          },
-                        }))
-                      : undefined
-                }
-                formTabsId={gesturePage ? 'gesture-settings' : 'command-trigger'}
-                storage={model.content.auxiliary.storage}
-                onLocalSettings={(enabled) => {
-                  if (!enabled) void confirm('storage');
-                  else
-                    void c
-                      .invoke('set-local-settings', [true])
-                      .catch((error) => setError(String(error)));
-                }}
-                onReset={() => void confirm('reset')}
-                onOpenFile={(scope) =>
-                  void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
-                }
-                onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
-                announcement={
-                  <span
-                    key={movement.id}
-                    className="settings-live"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {movement.text}
-                  </span>
-                }
-              >
-                {page.unavailableReason ? (
-                  <SettingsField
-                    title={t('settings.availability')}
-                    description={page.unavailableReason}
-                  />
-                ) : editing.mode === 'json' ? (
-                  <SettingsTextarea
-                    aria-label={t('settings.jsonInput')}
-                    value={c.text(model)}
-                    spellCheck={false}
-                    onChange={(e) => {
-                      c.setText(e.target.value);
-                    }}
-                  />
-                ) : (
-                  <CommandSettingsNavigation.Provider
-                    value={
-                      context === 'full'
-                        ? {
-                            page: page.id,
-                            assignments: {
-                              'touchpad-gestures': new Set(
-                                model.content.auxiliary.commandAssignments?.['touchpad-gestures'] ??
-                                  [],
-                              ),
-                              shortcuts: new Set(
-                                model.content.auxiliary.commandAssignments?.shortcuts ?? [],
-                              ),
-                              gestures: new Set(
-                                model.content.auxiliary.commandAssignments?.gestures ?? [],
-                              ),
-                            },
-                            target: commandTarget?.page === page.id ? commandTarget : undefined,
-                            clear: () => setCommandTarget(undefined),
-                            open: (pageId, command) => {
-                              const request = ++commandNavigationRequest.current;
-                              void c
-                                .act({ kind: 'select', pageId })
-                                .then(() => {
-                                  if (
-                                    request !== commandNavigationRequest.current ||
-                                    c.model?.content.page.id !== pageId
-                                  )
-                                    return;
-                                  setCommandTarget({
-                                    page: pageId,
-                                    id: command.id,
-                                    title: command.title,
-                                    request,
-                                  });
-                                })
-                                .catch(() => {});
-                            },
-                          }
-                        : null
-                    }
-                  >
-                    <SettingsForm
-                      triggerTab={triggerTab}
-                      gestureView={gestureView}
-                      onTriggerTab={selectTriggerTab}
-                      triggerScrollPositions={triggerScrollPositions.current}
-                      model={model}
-                      editor={editor}
-                      select={(pageId) => act({ kind: 'select', pageId })}
-                      invoke={c.invoke}
-                    />
-                  </CommandSettingsNavigation.Provider>
-                )}
-              </SettingsPageLayout>
-              {confirmation && (
-                <SettingsDialog
-                  className="settings-reset-dialog"
-                  title={
-                    confirmation.kind === 'reset' ? t('settings.reset') : t('settings.switchShared')
-                  }
-                  onClose={() => setConfirmation(undefined)}
-                  applyLabel={
-                    confirmation.kind === 'reset'
-                      ? t('settings.resetApply')
-                      : t('settings.switchApply')
-                  }
-                  onApply={async () => {
-                    const expected = confirmation.model;
-                    if (confirmation.kind === 'storage')
-                      await c.invoke('set-local-settings', [
-                        false,
-                        expected.content.auxiliary.storage?.revision,
-                        disposition,
-                        expected.content.auxiliary.storage?.signature,
-                      ]);
-                    else
-                      await c.act({
-                        kind: 'edit',
-                        action: {
-                          type: 'reset-page',
-                          pageId: expected.content.page.id,
-                          revision: expected.content.auxiliary.storage?.revision ?? -1,
-                          storageScope: expected.content.auxiliary.storage?.signature,
-                          before: expected.content.jsonValues ?? expected.content.values,
-                        },
-                      });
-                  }}
-                >
-                  <SettingsField
-                    title={t('settings.target')}
-                    description={confirmation.model.content.page.title}
-                  />
-                  {confirmation.kind === 'reset' ? (
-                    <>
-                      <SettingsField
-                        title={t('settings.resetContents')}
-                        description={t('settings.resetDescription')}
-                      />
-                      <SettingsField
-                        title={t('settings.storage.title')}
-                        description={confirmation.model.content.auxiliary.storage?.files
-                          .map(
-                            (file) =>
-                              `${file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
-                          )
-                          .join('、')}
-                      />
-                      {confirmation.model.content.auxiliary.storage?.files.some(
-                        (file) => file.scope === 'shared',
-                      ) && (
-                        <SettingsField
-                          title={t('settings.shared.effect')}
-                          description={t('settings.shared.effectDescription')}
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <SettingsField
-                      title={t('general.files.device')}
-                      className="settings-field-wide"
-                      description={
-                        disposition === 'share'
-                          ? t('settings.shared.replaceDescription')
-                          : undefined
-                      }
-                    >
-                      <label>
-                        <input
-                          type="radio"
-                          name="settings-disposition"
-                          checked={disposition === 'share'}
-                          onChange={() => setDisposition('share')}
-                        />
-                        {t('settings.shared.copy')}
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="settings-disposition"
-                          checked={disposition === 'clear'}
-                          onChange={() => setDisposition('clear')}
-                        />
-                        {t('settings.shared.clear')}
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="settings-disposition"
-                          checked={disposition === 'keep'}
-                          onChange={() => setDisposition('keep')}
-                        />
-                        {t('settings.shared.keep')}
-                      </label>
-                    </SettingsField>
-                  )}
-                </SettingsDialog>
-              )}
-            </div>
+              {body}
+            </SettingsPageFrame>
           </SettingsHintsContext.Provider>
         </SettingsMcpAccessProvider>
       </SettingsControlsProvider>
     </HostTranslationProvider>
+  );
+  if (!ready || !model || !c || !controls)
+    return frame(
+      <div className="settings-page-layout settings-page-loading" aria-busy={!error}>
+        <SettingsStatusProvider
+          error={ready ? error : undefined}
+          target={t('settings.loadingTarget')}
+        >
+          <div className="settings-loading-body">
+            {error ? (
+              <p>{t('settings.loadFailed')}</p>
+            ) : (
+              showLoading && <p role="status">{t('settings.loading')}</p>
+            )}
+          </div>
+          <SettingsStatusArea />
+        </SettingsStatusProvider>
+      </div>,
+    );
+  const { page, navigation, editing } = model.content;
+  const gesturePage = ['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id);
+  const editor = c.editor(model);
+  return frame(
+    <>
+      <SettingsPageLayout
+        page={page}
+        mode={editing.mode}
+        pending={editing.pending}
+        error={error || editing.error || ''}
+        onMode={(mode) => {
+          rememberTriggerScroll();
+          act({ kind: 'edit', action: { type: 'mode', value: mode } });
+        }}
+        formTabs={
+          page.id === 'command-triggers'
+            ? (Object.keys(triggerTabTitles) as TriggerTab[]).map((tab) => ({
+                id: tab,
+                title: t(triggerTabTitles[tab]),
+                selected: triggerTab === tab,
+                select: () => {
+                  if (editing.mode === 'form') selectTriggerTab(tab);
+                  else
+                    void c
+                      .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
+                      .then(() => {
+                        if (
+                          c.model?.content.page.id === page.id &&
+                          c.model.content.editing.mode === 'form'
+                        )
+                          setTriggerTab(tab);
+                      })
+                      .catch(() => {});
+                },
+              }))
+            : gesturePage
+              ? (['form', 'triggers'] as const).map((view) => ({
+                  id: view,
+                  title: t(view === 'form' ? 'settings.form' : 'settings.triggerList'),
+                  selected: gestureView === view,
+                  select: () => {
+                    if (editing.mode === 'form') setGestureView(view);
+                    else
+                      void c
+                        .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
+                        .then(() => {
+                          if (
+                            c.model?.content.page.id === page.id &&
+                            c.model.content.editing.mode === 'form'
+                          )
+                            setGestureView(view);
+                        })
+                        .catch(() => {});
+                  },
+                }))
+              : undefined
+        }
+        formTabsId={gesturePage ? 'gesture-settings' : 'command-trigger'}
+        storage={model.content.auxiliary.storage}
+        onLocalSettings={(enabled) => {
+          if (!enabled) void confirm('storage');
+          else
+            void c.invoke('set-local-settings', [true]).catch((error) => setError(String(error)));
+        }}
+        onReset={() => void confirm('reset')}
+        onOpenFile={(scope) =>
+          void c.invoke('open-settings', [scope]).catch((error) => setError(String(error)))
+        }
+        onReload={() => act({ kind: 'edit', action: { type: 'reload' } })}
+        announcement={
+          <span key={movement.id} className="settings-live" role="status" aria-live="polite">
+            {movement.text}
+          </span>
+        }
+      >
+        {page.unavailableReason ? (
+          <SettingsField title={t('settings.availability')} description={page.unavailableReason} />
+        ) : editing.mode === 'json' ? (
+          <SettingsTextarea
+            aria-label={t('settings.jsonInput')}
+            value={c.text(model)}
+            spellCheck={false}
+            onChange={(e) => {
+              c.setText(e.target.value);
+            }}
+          />
+        ) : (
+          <CommandSettingsNavigation.Provider
+            value={
+              context === 'full'
+                ? {
+                    page: page.id,
+                    assignments: {
+                      'touchpad-gestures': new Set(
+                        model.content.auxiliary.commandAssignments?.['touchpad-gestures'] ?? [],
+                      ),
+                      shortcuts: new Set(
+                        model.content.auxiliary.commandAssignments?.shortcuts ?? [],
+                      ),
+                      gestures: new Set(model.content.auxiliary.commandAssignments?.gestures ?? []),
+                    },
+                    target: commandTarget?.page === page.id ? commandTarget : undefined,
+                    clear: () => setCommandTarget(undefined),
+                    open: (pageId, command) => {
+                      const request = ++commandNavigationRequest.current;
+                      void c
+                        .act({ kind: 'select', pageId })
+                        .then(() => {
+                          if (
+                            request !== commandNavigationRequest.current ||
+                            c.model?.content.page.id !== pageId
+                          )
+                            return;
+                          setCommandTarget({
+                            page: pageId,
+                            id: command.id,
+                            title: command.title,
+                            request,
+                          });
+                        })
+                        .catch(() => {});
+                    },
+                  }
+                : null
+            }
+          >
+            <SettingsForm
+              triggerTab={triggerTab}
+              gestureView={gestureView}
+              onTriggerTab={selectTriggerTab}
+              triggerScrollPositions={triggerScrollPositions.current}
+              model={model}
+              editor={editor}
+              select={(pageId) => act({ kind: 'select', pageId })}
+              invoke={c.invoke}
+            />
+          </CommandSettingsNavigation.Provider>
+        )}
+      </SettingsPageLayout>
+      {confirmation && (
+        <SettingsDialog
+          className="settings-reset-dialog"
+          title={confirmation.kind === 'reset' ? t('settings.reset') : t('settings.switchShared')}
+          onClose={() => setConfirmation(undefined)}
+          applyLabel={
+            confirmation.kind === 'reset' ? t('settings.resetApply') : t('settings.switchApply')
+          }
+          onApply={async () => {
+            const expected = confirmation.model;
+            if (confirmation.kind === 'storage')
+              await c.invoke('set-local-settings', [
+                false,
+                expected.content.auxiliary.storage?.revision,
+                disposition,
+                expected.content.auxiliary.storage?.signature,
+              ]);
+            else
+              await c.act({
+                kind: 'edit',
+                action: {
+                  type: 'reset-page',
+                  pageId: expected.content.page.id,
+                  revision: expected.content.auxiliary.storage?.revision ?? -1,
+                  storageScope: expected.content.auxiliary.storage?.signature,
+                  before: expected.content.jsonValues ?? expected.content.values,
+                },
+              });
+          }}
+        >
+          <SettingsField
+            title={t('settings.target')}
+            description={confirmation.model.content.page.title}
+          />
+          {confirmation.kind === 'reset' ? (
+            <>
+              <SettingsField
+                title={t('settings.resetContents')}
+                description={t('settings.resetDescription')}
+              />
+              <SettingsField
+                title={t('settings.storage.title')}
+                description={confirmation.model.content.auxiliary.storage?.files
+                  .map(
+                    (file) =>
+                      `${file.scope === 'device' ? t('settings.storage.device') : t('settings.storage.shared')} (${file.name})`,
+                  )
+                  .join('、')}
+              />
+              {confirmation.model.content.auxiliary.storage?.files.some(
+                (file) => file.scope === 'shared',
+              ) && (
+                <SettingsField
+                  title={t('settings.shared.effect')}
+                  description={t('settings.shared.effectDescription')}
+                />
+              )}
+            </>
+          ) : (
+            <SettingsField
+              title={t('general.files.device')}
+              className="settings-field-wide"
+              description={
+                disposition === 'share' ? t('settings.shared.replaceDescription') : undefined
+              }
+            >
+              <label>
+                <input
+                  type="radio"
+                  name="settings-disposition"
+                  checked={disposition === 'share'}
+                  onChange={() => setDisposition('share')}
+                />
+                {t('settings.shared.copy')}
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="settings-disposition"
+                  checked={disposition === 'clear'}
+                  onChange={() => setDisposition('clear')}
+                />
+                {t('settings.shared.clear')}
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="settings-disposition"
+                  checked={disposition === 'keep'}
+                  onChange={() => setDisposition('keep')}
+                />
+                {t('settings.shared.keep')}
+              </label>
+            </SettingsField>
+          )}
+        </SettingsDialog>
+      )}
+    </>,
   );
 }
