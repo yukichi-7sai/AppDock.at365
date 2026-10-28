@@ -10,9 +10,9 @@ const { settingsAwarePage } = require('./settings-aware-page.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const root = path.resolve(__dirname, '..'),
-  portable =
-    process.argv[2] && process.argv[2] !== '--commands-only' && path.resolve(process.argv[2]);
+  portable = process.argv[2] && !process.argv[2].startsWith('--') && path.resolve(process.argv[2]);
 const commandsOnly = process.argv.includes('--commands-only');
+const updatesOnly = process.argv.includes('--updates-only');
 const profile = path.join(root, '.artifacts', `information-notifications-ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const accountFixture = path.join(profile, 'extensions', 'fixture.accounts');
@@ -103,15 +103,15 @@ async function port() {
 let application, browser, child, host, ui;
 const checks = [];
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
-async function statusbar() {
+async function titlebar() {
   return until(async () => {
     for (const page of host
       .context()
       .pages()
       .filter((p) => p.url().endsWith('/bars.html')))
-      if (await page.locator('footer.statusbar').count()) return page;
+      if (await page.locator('header.titlebar').count()) return page;
     return null;
-  }, 'Default Shell statusbar');
+  }, 'Default Shell titlebar');
 }
 async function banner() {
   for (const page of host
@@ -129,7 +129,13 @@ async function info() {
 const automation = (action) => host.evaluate((a) => window.dock.automation(a), action);
 async function dismissAll() {
   const b = await banner();
-  if (!b.page) return;
+  if (!b.page || !b.model.items.length) return;
+  await until(async () => {
+    const state = (await snapshot()).shellRegions.regions.find(
+      (r) => r.region === 'notification.banner',
+    );
+    return state?.ready && state.visible;
+  }, 'notification banner ready for dismissal');
   await b.page.evaluate(async () => {
     const c = await window.appdockNotifications.connect();
     for (const n of c.snapshot.items)
@@ -140,6 +146,84 @@ async function dismissAll() {
         type: 'dismiss',
       });
   });
+}
+async function checkUpdateNotifications() {
+  await host.evaluate(() => window.dock.checkUpdates());
+  assert.equal((await snapshot()).updates.results.find((r) => r.id === 'host').status, 'current');
+  assert.equal((await info()).length, 0);
+  await host.evaluate(() => window.dock.installUpdates('host'));
+  await until(
+    async () => (await info()).some((i) => i.body.includes('更新はありません')),
+    'no updates',
+  );
+  await until(
+    async () => (await (await titlebar()).locator('.update-operation').count()) === 0,
+    'titlebar progress ends',
+  );
+  await dismissAll();
+  feed.version = '99.0.0';
+  saveFeed();
+  await host.evaluate(() => window.dock.checkUpdates());
+  await until(
+    async () =>
+      (await banner()).model.items.some(
+        (i) => i.ownerId === 'updates' && i.body.includes('1件の更新があります'),
+      ),
+    'available',
+  );
+  await (await banner()).page.getByRole('button', { name: '更新画面を開く', exact: true }).click();
+  await (
+    await settingsPage(host)
+  )
+    .getByRole('region', { name: 'AppDockについて', exact: true })
+    .waitFor();
+  checks.push('manual current/available results and details navigation; no footer result');
+  await dismissAll();
+  fs.writeFileSync(path.join(settings.updates.hostSource, 'update.json'), 'PRIVATE_BAD_JSON');
+  await host.evaluate(() => window.dock.checkUpdates());
+  const updateError = await until(
+    async () =>
+      (await banner()).model.items.find((i) => i.body.includes('UPDATE_OPERATION_FAILED')),
+    'update error',
+  );
+  assert(!updateError.body.includes('PRIVATE'));
+  assert(!updateError.body.includes(profile));
+  checks.push('update failure moves to errors without raw paths or payload');
+  const slowServer = require('node:http').createServer(() => {});
+  await new Promise((resolve) => slowServer.listen(0, '127.0.0.1', resolve));
+  try {
+    const url = `http://127.0.0.1:${slowServer.address().port}/update.json`;
+    const next = JSON.parse(fs.readFileSync(settingsFile));
+    next.updates.hostSource = url;
+    fs.writeFileSync(settingsFile, JSON.stringify(next));
+    await until(
+      async () => (await snapshot()).settings.value.updates.hostSource === url,
+      'fixture source applied',
+    );
+    await dismissAll();
+    await host.evaluate(() => {
+      window.fixtureCheck = window.dock.checkUpdates();
+    });
+    const title = await titlebar();
+    await title.getByRole('region', { name: '更新の進捗', exact: true }).waitFor();
+    await title.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await host.evaluate(() => window.fixtureCheck);
+    await until(
+      async () => (await info()).some((i) => i.body === '更新確認を取り消しました。'),
+      'cancel receipt',
+    );
+    await until(
+      async () => (await (await titlebar()).locator('.update-operation').count()) === 0,
+      'cancel ends progress',
+    );
+    checks.push(
+      'slow local update keeps progress and cancel; cancellation is information, not failure',
+    );
+  } finally {
+    slowServer.closeAllConnections();
+    await new Promise((resolve) => slowServer.close(resolve));
+  }
+  await dismissAll();
 }
 async function main() {
   const debug = await port(),
@@ -152,7 +236,7 @@ async function main() {
     `--remote-debugging-port=${debug}`,
   ];
   if (portable) {
-    child = spawn(exe, args, { cwd: profile, env, windowsHide: true, stdio: 'ignore' });
+    child = spawn(exe, args, { cwd: profile, env, windowsHide: false, stdio: 'ignore' });
     browser = await until(
       () => chromium.connectOverCDP(`http://127.0.0.1:${debug}`, { timeout: 1000 }),
       'CDP',
@@ -175,6 +259,21 @@ async function main() {
   host.setDefaultTimeout(15000);
   await until(async () => (await snapshot()).startupReady, 'ready');
   ui = settingsAwarePage(host);
+  if (updatesOnly) {
+    await checkUpdateNotifications();
+    const result = {
+      ok: true,
+      profile,
+      mode: portable ? 'portable' : 'source',
+      scope: 'updates',
+      version: (await snapshot()).version,
+      exeHash: portable ? hash(exe) : undefined,
+      checks,
+    };
+    fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result));
+    return;
+  }
   await until(
     async () =>
       (await snapshot()).extensions.some(
@@ -361,76 +460,7 @@ async function main() {
   assert(!failure.body.includes(profile));
   checks.push('failed test uses common error notification and safe matching result');
   await dismissAll();
-  await host.evaluate(() => window.dock.checkUpdates());
-  await until(
-    async () => (await info()).some((i) => i.body.includes('更新はありません')),
-    'no updates',
-  );
-  await until(
-    async () => (await (await statusbar()).locator('.update-operation').count()) === 0,
-    'footer progress ends',
-  );
-  await dismissAll();
-  feed.version = '99.0.0';
-  saveFeed();
-  await host.evaluate(() => window.dock.checkUpdates());
-  await until(
-    async () => (await info()).some((i) => i.body.includes('1件の更新があります')),
-    'available',
-  );
-  await (await banner()).page.getByRole('button', { name: '更新画面を開く', exact: true }).click();
-  await (
-    await settingsPage(host)
-  )
-    .getByRole('region', { name: 'AppDockについて', exact: true })
-    .waitFor();
-  checks.push('manual current/available results and details navigation; no footer result');
-  await dismissAll();
-  fs.writeFileSync(path.join(settings.updates.hostSource, 'update.json'), 'PRIVATE_BAD_JSON');
-  await host.evaluate(() => window.dock.checkUpdates());
-  const updateError = await until(
-    async () =>
-      (await banner()).model.items.find((i) => i.body.includes('UPDATE_OPERATION_FAILED')),
-    'update error',
-  );
-  assert(!updateError.body.includes('PRIVATE'));
-  assert(!updateError.body.includes(profile));
-  checks.push('update failure moves to errors without raw paths or payload');
-  const slowServer = require('node:http').createServer(() => {});
-  await new Promise((resolve) => slowServer.listen(0, '127.0.0.1', resolve));
-  try {
-    const url = `http://127.0.0.1:${slowServer.address().port}/update.json`;
-    const next = JSON.parse(fs.readFileSync(settingsFile));
-    next.updates.hostSource = url;
-    fs.writeFileSync(settingsFile, JSON.stringify(next));
-    await until(
-      async () => (await snapshot()).settings.value.updates.hostSource === url,
-      'fixture source applied',
-    );
-    await dismissAll();
-    await host.evaluate(() => {
-      window.fixtureCheck = window.dock.checkUpdates();
-    });
-    const footer = await statusbar();
-    await footer.getByRole('region', { name: '更新の進捗', exact: true }).waitFor();
-    await footer.getByRole('button', { name: 'キャンセル', exact: true }).click();
-    await host.evaluate(() => window.fixtureCheck);
-    await until(
-      async () => (await info()).some((i) => i.body === '更新確認を取り消しました。'),
-      'cancel receipt',
-    );
-    await until(
-      async () => (await (await statusbar()).locator('.update-operation').count()) === 0,
-      'cancel ends progress',
-    );
-    checks.push(
-      'slow local update keeps progress and cancel; cancellation is information, not failure',
-    );
-  } finally {
-    slowServer.closeAllConnections();
-    await new Promise((resolve) => slowServer.close(resolve));
-  }
-  await dismissAll();
+  await checkUpdateNotifications();
   await ui.getByRole('button', { name: 'Webアカウント', exact: true }).click();
   await ui.getByRole('button', { name: 'アカウント枠を追加', exact: true }).click();
   await until(

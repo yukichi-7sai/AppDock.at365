@@ -78,12 +78,21 @@ test('update and cancellation follow current service availability rather than ol
   assert.throws(() => f.bars.invoke('statusbar', 'current', update), /unavailable/);
   f.state.update.blocked = false;
   await f.bars.invoke('statusbar', 'current', update);
+  assert.equal(f.bars.snapshot('titlebar').actions.cancel, undefined);
   f.state.update.busy = true;
   f.state.update.cancellable = true;
-  const cancel = f.action('statusbar', 'cancel', 'cancel');
+  const cancel = f.action('titlebar', 'cancel', 'cancel');
   f.state.update.cancellable = false;
-  assert.throws(() => f.bars.invoke('statusbar', 'current', cancel), /unavailable/);
-  assert.deepEqual(f.calls, ['update']);
+  assert.throws(() => f.bars.invoke('titlebar', 'current', cancel), /unavailable/);
+  f.state.update.cancellable = true;
+  await f.bars.invoke('titlebar', 'current', cancel);
+  await f.bars.invoke('statusbar', 'current', f.action('statusbar', 'cancel', 'legacy-cancel'));
+  f.state.update.busy = false;
+  assert.throws(
+    () => f.bars.invoke('titlebar', 'current', { ...cancel, requestId: 'finished' }),
+    /unavailable/,
+  );
+  assert.deepEqual(f.calls, ['update', 'cancel', 'cancel']);
 });
 test('a failed request is not rerun and a replacement View gets an independent session', async () => {
   const f = fixture();

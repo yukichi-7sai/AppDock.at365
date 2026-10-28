@@ -576,6 +576,21 @@ export class PortableUpdates {
         this.checkedNotice(results, true);
         return { ...structuredClone(this.state), busy: false, cancellable: false };
       }
+      signal.throwIfAborted();
+      this.state.cancellable = false;
+      this.state.phase = hostText('services.portableUpdates.awaitingConfirmation');
+      this.options.changed();
+      if (
+        !(await this.options.confirm(
+          candidates.map((c) => `${c.target.name} ${c.target.version} → ${c.version}`),
+        ))
+      ) {
+        this.state.phase = hostText('services.portableUpdates.cancelled');
+        this.notice('info', this.state.phase);
+        return { ...structuredClone(this.state), busy: false, cancellable: false };
+      }
+      signal.throwIfAborted();
+      this.state.cancellable = true;
       temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'AppDock-update-'));
       const helper = path.join(temporary, 'AppDock.Updater.exe');
       await fs.copyFile(this.options.helper, helper);
@@ -700,17 +715,6 @@ export class PortableUpdates {
       signal.throwIfAborted();
       this.state.cancellable = false;
       this.state.progress = undefined;
-      this.state.phase = hostText('services.portableUpdates.awaitingConfirmation');
-      this.options.changed();
-      if (
-        !(await this.options.confirm(
-          candidates.map((c) => `${c.target.name} ${c.target.version} → ${c.version}`),
-        ))
-      ) {
-        this.state.phase = hostText('services.portableUpdates.cancelled');
-        this.notice('info', this.state.phase);
-        return { ...structuredClone(this.state), busy: false, cancellable: false };
-      }
       this.state.phase = hostText('services.portableUpdates.preparingRestart');
       this.options.changed();
       const jobItems = await Promise.all(

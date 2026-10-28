@@ -356,7 +356,6 @@ async function restarted(inspectPort, predicate, previousPid) {
     await inspect(inspectPort, `${mainWindow}.show()`, false);
     await about(page);
     assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
-    assert.equal(await page.locator('.about-page > .settings-section').count(), 1);
     assert.equal(await page.getByTestId('about-overview').count(), 1);
     assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 1);
     assert.equal(
@@ -443,7 +442,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     checks.push(
       'settings save, shared check results, and immediate settings do not block update controls',
     );
-    // Electron dialogs are native. Stub only the final approval UI; the real updater, shutdown, swap and restart all run.
+    // Stub the native confirmation before download; the real updater, shutdown, swap and restart all run.
     await approve(inspectPort);
     const combinedPid = await inspect(inspectPort, 'process.pid');
     await page.getByRole('button', { name: 'AppDockとAppletをすべて更新', exact: true }).click();

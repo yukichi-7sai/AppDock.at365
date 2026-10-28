@@ -112,7 +112,8 @@ const capture = async (name) => {
 async function launch(extra = []) {
   if (process.argv[2]) {
     const executable = path.join(profile, 'AppDock.at365.exe');
-    if (!fs.existsSync(executable)) require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
+    if (!fs.existsSync(executable))
+      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
     result.executableSha256 = hash(executable);
     assert.equal(result.executableSha256, hash(path.resolve(process.argv[2])));
     const port = await freePort();
@@ -125,7 +126,7 @@ async function launch(extra = []) {
         `--inspect=${mainPort}`,
         ...extra,
       ],
-      { cwd: profile, env, windowsHide: true, stdio: 'ignore' },
+      { cwd: profile, env, windowsHide: false, stdio: 'ignore' },
     );
     browser = await until(
       () => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 1000 }),
@@ -233,15 +234,12 @@ async function close() {
         .click();
       const palette = await overlayPage(host);
       await closingAction(palette.keyboard.press('Escape'));
-      await until(
-        () => !context.pages().some((p) => p.url().endsWith('/overlay.html')),
-        'palette closed',
-      );
+      await until(async () => !(await state('overlay.command-palette')).visible, 'palette closed');
       await page.waitForFunction(() => document.hasFocus());
       await page.keyboard.press('Control+p');
       await closingAction((await overlayPage(host)).keyboard.press('Escape'));
       await until(
-        () => !context.pages().some((p) => p.url().endsWith('/overlay.html')),
+        async () => !(await state('overlay.command-palette')).visible,
         'keyboard palette closed',
       );
     }
@@ -315,6 +313,14 @@ async function close() {
     result.checks.push(
       'native minimize/maximize/restore and real Windows mouse dragging through the Shell titlebar',
     );
+    if (process.argv.includes('--controls-only')) {
+      await closingAction(title.getByRole('button', { name: '閉じる', exact: true }).click());
+      await until(() => host.isClosed(), 'close button closes the host window');
+      result.checks.push('close button closes the host window');
+      result.scope = 'controls';
+      result.success = true;
+      return;
+    }
     await host.evaluate(() => {
       const modal = document.createElement('dialog');
       modal.id = 'bar-modal-fixture';

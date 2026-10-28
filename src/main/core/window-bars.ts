@@ -22,7 +22,14 @@ export class WindowBars {
     const state = this.options.state();
     const operations: Operation[] =
       region === 'titlebar'
-        ? ['palette', 'notifications', 'minimize', 'maximize', 'close']
+        ? [
+            'palette',
+            'notifications',
+            'minimize',
+            'maximize',
+            'close',
+            ...(state.update.busy && state.update.cancellable ? ['cancel' as const] : []),
+          ]
         : [
             'palette',
             ...(!state.update.busy && !state.update.blocked ? ['update' as const] : []),

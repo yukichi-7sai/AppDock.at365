@@ -40,12 +40,14 @@ assert.equal(
 const zip = fs.readFileSync(path.join(feedDir, 'update.zip'));
 const feed = fs.readFileSync(path.join(feedDir, 'update.json'));
 let slow = true,
-  disconnected = 0;
+  disconnected = 0,
+  payloadRequests = 0;
 const server = http.createServer((request, response) => {
   if (request.url === '/update.json') {
     response.end(feed);
     return;
   }
+  payloadRequests++;
   response.setHeader('Content-Length', zip.length);
   if (!slow) {
     response.end(zip);
@@ -116,7 +118,7 @@ const main = (fn) =>
     id: 'fixture.progress-bar',
     name: 'Progress Shell',
     minimumHostVersion: '0.64.0',
-    shell: { apiVersion: 1, views: { statusbar: 'bars.html' } },
+    shell: { apiVersion: 1, views: { titlebar: 'bars.html' } },
   });
   fs.writeFileSync(path.join(barFolder, 'extension.json'), JSON.stringify(barManifest));
   settings.extensions[barManifest.id] = { enabled: true, settings: {} };
@@ -158,7 +160,8 @@ const main = (fn) =>
       host = await app.firstWindow();
     }
     const page = require('./settings-aware-page.cjs').settingsAwarePage(host);
-    let statusbar = await require('./shell-bars-helper.cjs').barPage(page, 'statusbar');
+    let titlebar = await require('./shell-bars-helper.cjs').barPage(page, 'titlebar');
+    const statusbar = await require('./shell-bars-helper.cjs').barPage(page, 'statusbar');
     page.setDefaultTimeout(15000);
     await require('./shell-overlay-helper.cjs').startupPage(page);
     await page.getByRole('button', { name: '設定', exact: true }).click();
@@ -207,6 +210,34 @@ const main = (fn) =>
       .evaluate((e) => getComputedStyle(e).backgroundColor);
     assert.equal(hostColor, appletColor);
     assert.equal(await update.isEnabled(), true);
+    await main(({ dialog }) => {
+      globalThis.updateConfirmations = [];
+      dialog.showMessageBox = async (...args) => {
+        globalThis.updateConfirmations.push(args.at(-1));
+        return new Promise((resolve) => {
+          globalThis.answerUpdateConfirmation = resolve;
+        });
+      };
+    });
+    await update.click();
+    await until(
+      () => main(() => globalThis.updateConfirmations.length === 1),
+      'confirmation before download',
+    );
+    assert.equal(payloadRequests, 0);
+    const confirmation = await main(() => globalThis.updateConfirmations[0]);
+    assert.equal(confirmation.title, '更新して再起動');
+    assert.match(confirmation.message, /ダウンロード・検証/);
+    assert.match(confirmation.detail, /1\.0\.0 → 2\.0\.0/);
+    await main(() => globalThis.answerUpdateConfirmation({ response: 1 }));
+    await page.waitForFunction(() => window.dock.snapshot().then((s) => !s.updates.busy));
+    assert.equal(payloadRequests, 0);
+    await main(({ dialog }) => {
+      dialog.showMessageBox = async (...args) => {
+        globalThis.updateConfirmations.push(args.at(-1));
+        return { response: 0 };
+      };
+    });
     for (const theme of ['dark', 'light']) {
       await page.evaluate(async (theme) => {
         const s = await window.dock.snapshot();
@@ -217,21 +248,48 @@ const main = (fn) =>
         (theme) => document.documentElement.dataset.theme === theme,
         theme,
       );
+      const titleBounds = await page
+        .locator('.shell-bar-slot[data-region="titlebar"]')
+        .boundingBox();
+      const bodyBounds = await page.locator('main').boundingBox();
       await update.click();
       await page.waitForFunction(() =>
         window.dock.snapshot().then((s) => s.updates.progress?.receivedBytes > 131072),
       );
-      await statusbar.waitForFunction(
+      await titlebar.waitForFunction(
         () => document.querySelector('.update-operation progress')?.value > 131072,
         undefined,
         { polling: 100 },
       );
       const progress = await page.getByRole('progressbar').getAttribute('value');
       assert.ok(Number(progress) > 0 && Number(progress) < zip.length);
+      await page.evaluate(() => window.dock.focusBar('titlebar', 'first'));
+      await titlebar.waitForFunction(
+        () => document.activeElement?.textContent.trim() === 'キャンセル',
+        undefined,
+        { timeout: 3000 },
+      );
+      assert.equal(
+        await titlebar.getByRole('button', { name: '閉じる', exact: true }).isVisible(),
+        false,
+      );
+      assert.equal(await statusbar.getByRole('region', { name: '更新の進捗' }).count(), 0);
+      assert.equal(await statusbar.getByText(/実行中.*Applet/).isVisible(), true);
+      assert.deepEqual(
+        await page.locator('.shell-bar-slot[data-region="titlebar"]').boundingBox(),
+        titleBounds,
+      );
+      assert.deepEqual(await page.locator('main').boundingBox(), bodyBounds);
+      assert.equal(
+        await titlebar
+          .locator('.update-operation')
+          .evaluate((e) => getComputedStyle(e).getPropertyValue('-webkit-app-region')),
+        'no-drag',
+      );
       await page.evaluate(
         async (provider) => {
           const s = await window.dock.snapshot();
-          s.settings.value.host.shellProviders.statusbar = provider;
+          s.settings.value.host.shellProviders.titlebar = provider;
           await window.dock.saveSettings(s.settings.value, s.settings.revision);
         },
         theme === 'dark' ? 'fixture.progress-bar' : 'appdock.default-shell',
@@ -241,22 +299,22 @@ const main = (fn) =>
           page.evaluate(
             async (provider) => {
               const s = await window.dock.snapshot();
-              const bar = s.shellRegions.regions.find((r) => r.region === 'statusbar');
+              const bar = s.shellRegions.regions.find((r) => r.region === 'titlebar');
               return bar.boundProvider === provider && bar.ready;
             },
             theme === 'dark' ? 'fixture.progress-bar' : 'appdock.default-shell',
           ),
-        'statusbar changes during download',
+        'titlebar changes during download',
       );
-      statusbar = await require('./shell-bars-helper.cjs').barPage(page, 'statusbar');
-      await statusbar.waitForFunction(
+      titlebar = await require('./shell-bars-helper.cjs').barPage(page, 'titlebar');
+      await titlebar.waitForFunction(
         (value) => document.querySelector('.update-operation progress')?.value >= value,
         Number(progress),
       );
-      await statusbar.screenshot({ path: path.join(profile, `statusbar-${theme}.png`) });
+      await titlebar.screenshot({ path: path.join(profile, `titlebar-${theme}.png`) });
       await page.screenshot({ path: path.join(profile, `progress-${theme}.png`) });
       await settingsPage.screenshot({ path: path.join(profile, `settings-${theme}.png`) });
-      await page.getByRole('button', { name: 'キャンセル', exact: true }).click();
+      await titlebar.getByRole('button', { name: 'キャンセル', exact: true }).click();
       await page.waitForFunction(() => window.dock.snapshot().then((s) => !s.updates.busy));
       await until(
         () =>
@@ -268,6 +326,8 @@ const main = (fn) =>
         'cancellation result with notifications disabled',
       );
       assert.equal(await update.isEnabled(), true);
+      await titlebar.getByRole('button', { name: '閉じる', exact: true }).waitFor();
+      assert.equal(await titlebar.getByRole('region', { name: '更新の進捗' }).count(), 0);
       assert.equal(
         JSON.parse(fs.readFileSync(path.join(installed, 'extension.json'))).version,
         '1.0.0',
@@ -275,6 +335,7 @@ const main = (fn) =>
       assert.equal(fs.existsSync(path.join(profile, 'data/update-transaction.json')), false);
     }
     slow = false;
+    const requestsBeforeCancel = payloadRequests;
     await main(({ dialog }) => {
       dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false });
     });
@@ -288,6 +349,8 @@ const main = (fn) =>
       'confirmation cancellation result',
     );
     assert.equal(await update.isEnabled(), true);
+    assert.equal(payloadRequests, requestsBeforeCancel);
+    assert.equal(await main(() => globalThis.updateConfirmations.length), 3);
     assert.ok(disconnected >= 2);
     assert.equal(fs.existsSync(path.join(installed, 'asset.bin')), false);
     const result = {
@@ -298,12 +361,16 @@ const main = (fn) =>
         'real IPC and local HTTP streaming progress',
         'dark/light screenshots',
         'cancel aborts transfer without replacing installed Applet',
-        'retry and final confirmation cancellation',
+        'confirmation precedes payload requests; cancellation does not download',
+        'approved transfers remain cancellable in both themes',
         'host update controls and separate Applet management',
         'host and Applet current/new versions align inline with matching colored badges',
         'current/error checks remove the new-version badge without a details popup',
         'Applet updates remain operable in the management row',
-        'real download progress and cancellation survive statusbar provider replacement in both themes',
+        'titlebar progress covers window controls, preserves body bounds and restores controls after cancellation',
+        'keyboard entry into the titlebar focuses the visible cancel button during download',
+        'statusbar retains its normal activity display throughout download',
+        'real download progress and cancellation survive titlebar provider replacement in both themes',
       ],
     };
     fs.writeFileSync(path.join(profile, 'result.json'), JSON.stringify(result, null, 2));

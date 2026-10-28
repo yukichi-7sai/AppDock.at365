@@ -21,10 +21,10 @@ Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewか�
 
 | 領域 | 操作 |
 | --- | --- |
-| titlebar | パレット、通知バナーへフォーカス、最小化、最大化／元に戻す、閉じる |
+| titlebar | パレット、通知バナーへフォーカス、最小化、最大化／元に戻す、閉じる、更新を取り消せる間だけキャンセル |
 | statusbar | パレット、本体更新、更新を取り消せる間だけキャンセル |
 
-操作IDは本体発行の不透明な値です。ShellはIDからコマンド・パスを組み立てません。タイトルバーのドラッグ領域は描画側が`-webkit-app-region: drag`で指定し、操作部品は`no-drag`にします。Default Shellは従来の色・配置・検索・通知・ウィンドウボタン、下部の稼働数・版・更新・進捗を維持します。
+操作IDは本体発行の不透明な値です。ShellはIDからコマンド・パスを組み立てません。タイトルバーのドラッグ領域は描画側が`-webkit-app-region: drag`で指定し、操作部品は`no-drag`にします。Default Shellは通常時の検索・通知・ウィンドウボタンを、更新処理中だけ進捗・取得量・キャンセルで覆います。進捗全体を`no-drag`にし、終了後は通常表示へ戻します。キーボードの入口・Tab境界は表示中の有効なボタンだけを対象にし、進捗表示中はキャンセルへ移動します。下部の稼働数・版・更新は常時維持します。既存の追加Shellとの互換性のため、statusbarのキャンセル操作IDも提供を続けます。
 
 ## 公開bridge
 
@@ -53,5 +53,7 @@ Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewか�
 `tests/window-bars.test.cjs`は公開状態・操作可否・session・重複受付を検査します。`tests/shell-region.test.cjs`と`tests/shell-boundaries.test.cjs`は共通選択・描画境界を検査します。
 
 `scripts/shell-bars-ui-test.cjs [固定EXE]`は実ウィンドウ操作、Windowsのマウス入力によるドラッグ、両テーマ、サイズとzoom、Tab、パレット、別々の提供元、故障・無効化・再試行・safe起動を検査します。`scripts/host-modal-ui-test.cjs [固定EXE]`はダイアログ・パレットの本文範囲、ぼかし、連続開閉と3領域の操作維持を確認します。更新のHTTP取得・進捗・取消は既存の`update-progress-ui-test.cjs [固定EXE]`で検証します。実測と未確認事項は[VERIFICATION](../VERIFICATION.md)に記録します。
+
+`shell-bars-ui-test.cjs [固定EXE] --controls-only`は通常バーの操作・パレット・Tab移動・最小化/最大化/復元・実ドラッグ・閉じるに対象を絞ります。modal被覆・提供元の故障/復旧等を含む全体試験とは結果を区別します。
 
 ドラッグ領域の指定は[Electronの公式仕様](https://www.electronjs.org/docs/latest/tutorial/custom-window-interactions#custom-draggable-regions)に従います。

@@ -330,7 +330,55 @@ test('turning startup checks off during the delay prevents access to update orig
   });
   assert.deepEqual(f.updater.state.results, []);
 });
-test('a corrupt downloaded payload never reaches approval or shutdown', async (t) => {
+test('confirmation precedes download and cancellation never retrieves a payload', async (t) => {
+  const f = fixture(t);
+  f.target.source = 'https://example.org/update.json';
+  const feed = {
+    schemaVersion: 1,
+    kind: 'applet',
+    id: 'fixture',
+    version: '2.0.0',
+    payload: { file: 'update.zip', sha256: 'a'.repeat(64), size: 9, format: 'zip' },
+  };
+  const requests = [];
+  let answer, shown;
+  const confirmation = new Promise((resolve) => {
+    shown = resolve;
+  });
+  const updater = new PortableUpdates({
+    ...f.updater.options,
+    executable: process.execPath,
+    helper: path.join(f.directory, 'missing-helper.exe'),
+    fetcher: async (url) => {
+      requests.push(url);
+      assert.ok(url.endsWith('update.json'), 'No payload request before approval');
+      return new Response(JSON.stringify(feed));
+    },
+    confirm: (names) => {
+      assert.deepEqual(names, ['Fixture 1.0.0 → 2.0.0']);
+      shown();
+      return new Promise((resolve) => {
+        answer = resolve;
+      });
+    },
+    shutdown: () => assert.fail('Cancellation cannot restart the host'),
+  });
+  const installing = updater.install('fixture');
+  await confirmation;
+  assert.deepEqual(requests, [f.target.source]);
+  assert.equal(updater.state.busy, true);
+  assert.equal(updater.state.progress, undefined);
+  assert.equal(updater.cancel(), false);
+  await assert.rejects(updater.install('fixture'), /進行中/);
+  answer(false);
+  const cancelled = await installing;
+  assert.equal(cancelled.busy, false);
+  assert.equal(updater.state.busy, false);
+  assert.equal(updater.state.notice.kind, 'info');
+  assert.deepEqual(requests, [f.target.source]);
+});
+
+test('an approved corrupt payload is verified before handoff or shutdown', async (t) => {
   const f = fixture(t);
   f.target.source = 'https://example.org/update.json';
   const feed = {
@@ -345,8 +393,10 @@ test('a corrupt downloaded payload never reaches approval or shutdown', async (t
   const updater = new PortableUpdates({
     ...f.updater.options,
     executable: process.execPath,
-    fetcher: async (url) =>
-      new Response(url.endsWith('update.json') ? JSON.stringify(feed) : 'bad bytes'),
+    fetcher: async (url) => {
+      if (!url.endsWith('update.json')) assert.equal(approvals, 1);
+      return new Response(url.endsWith('update.json') ? JSON.stringify(feed) : 'bad bytes');
+    },
     confirm: async () => {
       approvals++;
       return true;
@@ -356,7 +406,7 @@ test('a corrupt downloaded payload never reaches approval or shutdown', async (t
     },
   });
   await assert.rejects(updater.install('fixture'), /ハッシュ/);
-  assert.equal(approvals, 0);
+  assert.equal(approvals, 1);
   assert.equal(shutdowns, 0);
   assert.equal(updater.state.busy, false);
 });
@@ -424,7 +474,7 @@ function combinedFixture(t, minimumHostVersion, packaged = false) {
   };
   return { ...f, updater, host, feed, hostSource, saveFeed, approvals, preserved };
 }
-test('combined update prepares host and Applet against the new host version in one approval', async (t) => {
+test('combined update confirms host and Applet against the new host version before preparation', async (t) => {
   for (const packaged of [false, true]) {
     await t.test(packaged ? 'feed and extracted manifest' : 'local manifest', async (t) => {
       const f = combinedFixture(t, '0.23.0', packaged);
@@ -465,8 +515,12 @@ test('combined preparation failure leaves both host and Applet installed files i
         ),
         'corrupt',
       );
+      f.updater.options.confirm = async (names) => {
+        f.approvals.push(names);
+        return true;
+      };
       await assert.rejects(f.updater.install('all'), /ハッシュ/);
-      assert.deepEqual(f.approvals, []);
+      assert.deepEqual(f.approvals, [['AppDock 0.22.0 → 0.23.0', 'Fixture 1.0.0 → 2.0.0']]);
       f.preserved();
     });
   }
@@ -678,12 +732,23 @@ test('streaming download reports bytes, cancels without applying, and can be ret
     confirm: async () => {
       approvals++;
       assert.equal(updater.cancel(), false);
-      return false;
+      return true;
     },
     shutdown() {
       shutdowns++;
     },
   });
+  let handoffs = 0;
+  updater.handoff = async (temporary, items) => {
+    t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+    handoffs++;
+    assert.equal(updater.cancel(), false);
+    assert.equal(items.length, 1);
+    assert.equal(
+      fs.readFileSync(path.join(items[0].source, 'index.js'), 'utf8'),
+      'module.exports = {};',
+    );
+  };
   const installing = updater.install('fixture');
   await ready;
   assert.equal(updater.cancel(), true);
@@ -692,7 +757,8 @@ test('streaming download reports bytes, cancels without applying, and can be ret
   assert.equal(cancelled.busy, false);
   assert.equal(cancelled.progress, undefined);
   assert.match(cancelled.phase, /取り消しました/);
-  assert.equal(approvals, 0);
+  assert.equal(approvals, 1);
+  assert.equal(handoffs, 0);
   assert.equal(shutdowns, 0);
   assert.equal(seen[0].receivedBytes, 20);
   assert.equal(seen[0].totalBytes, zip.length);
@@ -703,9 +769,10 @@ test('streaming download reports bytes, cancels without applying, and can be ret
     'installed',
   );
   slow = false;
-  assert.equal((await updater.install('fixture')).busy, false);
-  assert.equal(approvals, 1);
-  assert.equal(shutdowns, 0);
+  assert.equal((await updater.install('fixture')).busy, true);
+  assert.equal(approvals, 2);
+  assert.equal(handoffs, 1);
+  assert.equal(shutdowns, 1);
   assert.ok(seen.some((p) => p.receivedBytes === zip.length));
 });
 

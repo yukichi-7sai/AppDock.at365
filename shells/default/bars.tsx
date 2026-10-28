@@ -16,7 +16,7 @@ document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark
   : 'light';
 const controls = () =>
   [...document.querySelectorAll<HTMLButtonElement>('button')].filter(
-    (e) => e.getClientRects().length && !e.disabled,
+    (e) => e.getClientRects().length && getComputedStyle(e).visibility === 'visible' && !e.disabled,
   );
 const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 function App() {
@@ -96,6 +96,48 @@ function App() {
   };
   if (!model) return null;
   const progress = model.update.progress;
+  const updateOperation = model.update.busy && (
+    <section className={`update-operation${error ? ' has-error' : ''}`} aria-label="更新の進捗">
+      <Icon name="refresh" size={14} />
+      <span
+        className="update-operation-message"
+        role={error ? 'alert' : 'status'}
+        title={error || model.update.phase}
+      >
+        {error || model.update.phase}
+      </span>
+      {progress && (
+        <>
+          <progress
+            aria-label={`${progress.name}の取得状況`}
+            max={progress.totalBytes ?? 1}
+            value={
+              progress.totalBytes
+                ? Math.min(progress.receivedBytes, progress.totalBytes)
+                : undefined
+            }
+          />
+          <small>
+            {progress.index}/{progress.count} · {megabytes(progress.receivedBytes)}
+            {progress.totalBytes ? ` / ${megabytes(progress.totalBytes)}` : ''}
+          </small>
+        </>
+      )}
+      <button
+        className="text-button"
+        disabled={!model.actions.cancel}
+        onClick={() => {
+          const actionId = model.actions.cancel;
+          if (actionId)
+            void api
+              .invoke({ sessionId: session, actionId, requestId: crypto.randomUUID() })
+              .catch(() => setError('更新をキャンセルできませんでした。'));
+        }}
+      >
+        キャンセル
+      </button>
+    </section>
+  );
   if (model.region === 'titlebar')
     return (
       <header className="titlebar">
@@ -132,11 +174,12 @@ function App() {
             </button>
           ))}
         </div>
-        {error && (
+        {error && !model.update.busy && (
           <span className="bar-error" role="alert" title={error}>
             {error}
           </span>
         )}
+        {updateOperation}
       </header>
     );
   return (
@@ -168,48 +211,6 @@ function App() {
         コマンドパレット
         {model.paletteKey && <kbd>{model.paletteKey}</kbd>}
       </button>
-      {model.update.busy && (
-        <section className={`update-operation${error ? ' has-error' : ''}`} aria-label="更新の進捗">
-          <Icon name="refresh" size={14} />
-          <span
-            className="update-operation-message"
-            role={error ? 'alert' : 'status'}
-            title={error || model.update.phase}
-          >
-            {error || model.update.phase}
-          </span>
-          {progress && (
-            <>
-              <progress
-                aria-label={`${progress.name}の取得状況`}
-                max={progress.totalBytes ?? 1}
-                value={
-                  progress.totalBytes
-                    ? Math.min(progress.receivedBytes, progress.totalBytes)
-                    : undefined
-                }
-              />
-              <small>
-                {progress.index}/{progress.count} · {megabytes(progress.receivedBytes)}
-                {progress.totalBytes ? ` / ${megabytes(progress.totalBytes)}` : ''}
-              </small>
-            </>
-          )}
-          <button
-            className="text-button"
-            disabled={!model.actions.cancel}
-            onClick={() => {
-              const actionId = model.actions.cancel;
-              if (actionId)
-                void api
-                  .invoke({ sessionId: session, actionId, requestId: crypto.randomUUID() })
-                  .catch(() => setError('更新をキャンセルできませんでした。'));
-            }}
-          >
-            キャンセル
-          </button>
-        </section>
-      )}
     </footer>
   );
 }

@@ -3023,7 +3023,7 @@
   "services.index.updateAvailable": "更新があります",
   "services.index.openUpdates": "更新画面を開く",
   "services.index.updateRestartTitle": "更新して再起動",
-  "services.index.updateRestartMessage": "AppDockとすべてのAppletを終了し、更新して再起動します。",
+  "services.index.updateRestartMessage": "更新ファイルをダウンロード・検証した後、AppDockとすべてのAppletを終了し、更新して再起動します。",
   "services.index.cancel": "キャンセル",
   "services.index.pageProviderStopped": "ページの提供元が停止しています。",
   "services.index.ownCommandOnly": "自身のコマンドだけを実行できます。",
