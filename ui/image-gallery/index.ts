@@ -6,8 +6,10 @@ import {
   type GalleryModel,
 } from '../../src/shared/image-gallery';
 export * from '../../src/shared/image-gallery';
+import { mountGalleryInteractions, type GalleryInteractions } from './interactions';
 
 export interface GalleryOptions {
+  interactions?: GalleryInteractions;
   scrollElement: HTMLElement;
   image(assetId: string, edge: number): Promise<string>;
   select(id: string, selected: boolean): void;
@@ -25,6 +27,7 @@ type Card = {
   button: HTMLButtonElement;
   image: HTMLImageElement;
   check: HTMLInputElement;
+  checkArea: HTMLLabelElement;
   title: HTMLElement;
   detail: HTMLElement;
   labels: HTMLElement;
@@ -53,6 +56,9 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
   let disposed = false,
     active = 0,
     frame = 0;
+  const interactions = options.interactions
+    ? mountGalleryInteractions(container, options.scrollElement, () => model, options.interactions)
+    : undefined;
   const empty = element('p', 'ad-gallery-empty');
   const wantedEdge = (card: Card) => {
     const width = card.button.getBoundingClientRect().width || model.cardWidth;
@@ -129,7 +135,8 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
   });
   resize.observe(container);
   const anchor = (): GalleryAnchor | undefined => {
-    const top = options.scrollElement.getBoundingClientRect().top;
+    const top =
+      options.interactions?.viewport().top ?? options.scrollElement.getBoundingClientRect().top;
     for (const child of container.children) {
       const card = cards.get((child as HTMLElement).dataset.imageId!);
       if (!card) continue;
@@ -143,7 +150,8 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
     if (card)
       options.scrollElement.scrollTop +=
         card.node.getBoundingClientRect().top -
-        options.scrollElement.getBoundingClientRect().top -
+        (options.interactions?.viewport().top ??
+          options.scrollElement.getBoundingClientRect().top) -
         value.offset;
   };
   const create = (item: GalleryItem) => {
@@ -152,25 +160,29 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
     const button = element('button', 'ad-gallery-image');
     button.type = 'button';
     const image = element('img', '');
+    image.draggable = false;
     image.alt = '';
     image.decoding = 'async';
     const status = element('span', 'ad-gallery-status');
     button.append(image, status);
     const check = element('input', 'ad-gallery-check');
     check.type = 'checkbox';
+    const checkArea = element('label', 'ad-gallery-check-area');
+    checkArea.append(check);
     const body = element('div', 'ad-gallery-body');
     const title = element('h3', 'ad-gallery-title'),
       detail = element('p', 'ad-gallery-detail');
     const labels = element('div', 'ad-gallery-labels'),
       actions = element('div', 'ad-gallery-actions');
     body.append(title, detail, labels);
-    node.append(button, check, body, actions);
+    node.append(button, checkArea, body, actions);
     const card: Card = {
       node,
       button,
       image,
       status,
       check,
+      checkArea,
       title,
       detail,
       labels,
@@ -193,6 +205,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
   return {
     anchor,
     restore,
+    cancelInteraction: () => interactions?.cancel(),
     setModel(next: GalleryModel) {
       if (disposed) return;
       const saved = anchor();
@@ -205,6 +218,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         `${validGalleryWidth(next.cardWidth) ? next.cardWidth : gallerySize.initial}px`,
       );
       container.dataset.fit = next.fit;
+      container.dataset.compact = String(next.cardWidth < 180);
       const ids = new Set(next.items.map((i) => i.id));
       for (const [id, card] of cards)
         if (!ids.has(id)) {
@@ -224,6 +238,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         card.item = item;
         card.node.classList.toggle('ad-gallery-selected', !!item.selected);
         card.check.hidden = next.selection !== 'multiple';
+        card.checkArea.hidden = next.selection !== 'multiple';
         card.check.checked = !!item.selected;
         card.check.disabled = item.selectable === false;
         card.check.setAttribute('aria-label', `${item.title}を選択`);
@@ -287,10 +302,12 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         if (replacement) saved.id = replacement;
       }
       restore(saved);
+      interactions?.update();
       pump();
     },
     dispose() {
       disposed = true;
+      interactions?.dispose();
       cancelAnimationFrame(frame);
       observer.disconnect();
       resize.disconnect();

@@ -2478,6 +2478,8 @@
   "services.imageLibraryPage.unreadable": "画像を読み取れません。同期の完了を待つか再取得してください。",
   "services.imageLibraryPage.currentGroup": "現在表示しているグループを指定してください。",
   "services.imageLibraryPage.importSummary": "追加 {{added}}枚・再利用 {{reused}}枚・失敗 {{failed}}枚",
+  "services.imageLibraryPage.orderSaved": "画像の順番を保存しました。",
+  "services.imageLibraryPage.dropSummary": "グループに{{added}}枚を追加しました",
   "services.imageLibraryPage.groupAddFailure": "画像は登録済みですが、グループへの追加を保存できませんでした。",
   "services.imageLibraryPage.addFailed": "画像を追加できませんでした。",
   "services.imageLibraryPage.addFailedHint": "画像を追加できませんでした。画面の結果を確認してください。",

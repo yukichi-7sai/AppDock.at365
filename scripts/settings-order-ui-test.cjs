@@ -223,11 +223,24 @@ async function open(target) {
       assert.deepEqual(await order(), moved);
       await handle(first).dragTo(dialog.locator(`[data-order-id="${target.ids[1]}"]`));
       assert.deepEqual(await order(), target.ids, 'dragging still works');
+      await dialog
+        .locator(`[data-order-id="${first}"] .shortcut-order-command strong`)
+        .dragTo(dialog.locator(`[data-order-id="${target.ids[2]}"]`));
+      assert.deepEqual(
+        await order(),
+        [target.ids[1], target.ids[2], first, ...target.ids.slice(3)],
+        'row text can start dragging',
+      );
+      assert(
+        await handle(first).evaluate((el) => el === document.activeElement),
+        'text drag preserves handle focus',
+      );
+      assert.deepEqual(target.values(await saved()), moved, 'text drag remains a draft');
       await dialog.screenshot({ path: path.join(profile, `${target.page}-light.png`) });
       await dialog.getByTestId('settings-dialog-cancel').click();
       assert.deepEqual(target.values(await saved()), moved);
       checks.push(
-        `${target.page}: button removal, plain arrows, retained focus, bounds/modifier/IME guards, drag, cancel, save and reopen`,
+        `${target.page}: plain arrows, retained focus, bounds/modifier/IME guards, handle/text drag, cancel, save and reopen`,
       );
     }
     await host.setViewportSize({ width: 480, height: 540 });

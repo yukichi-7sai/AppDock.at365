@@ -11,25 +11,25 @@ exports.galleryComponentPage = async (app, host, profile) => {
     fixture,
     `<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="${stylesheet}"><body></body>`,
   );
-  await app.evaluate(async ({ BrowserWindow }, fixture) => {
-    const window = new BrowserWindow({
-      show: false,
-      width: 1100,
-      height: 850,
-      webPreferences: {
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-        backgroundThrottling: false,
-      },
-    });
-    await window.loadFile(fixture);
-  }, fixture);
+  const opened = host.context().waitForEvent('page');
+  const [page] = await Promise.all([
+    opened,
+    app.evaluate(async ({ BrowserWindow }, fixture) => {
+      const window = new BrowserWindow({
+        show: false,
+        width: 1100,
+        height: 850,
+        webPreferences: {
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false,
+          backgroundThrottling: false,
+        },
+      });
+      await window.loadFile(fixture);
+    }, fixture),
+  ]);
   const url = pathToFileURL(fixture).href;
-  const page = host
-    .context()
-    .pages()
-    .find((page) => page.url() === url);
-  if (!page) throw Error('Gallery component fixture did not open');
+  await page.waitForURL(url);
   return page;
 };

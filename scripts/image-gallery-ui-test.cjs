@@ -287,7 +287,7 @@ async function selectedBorder(label) {
     assert.equal((await model()).content.selected, 1);
     assert.equal(await slider.evaluate((e) => document.activeElement === e), true);
     await slider.press('Home');
-    await until(async () => (await model()).content.cardWidth === 180, 'min saved');
+    await until(async () => (await model()).content.cardWidth === 120, 'min saved');
     assert.equal(hash(path.join(profile, 'settings.json')), settingsHash);
     assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
     await page.getByRole('button', { name: /すべて選択/ }).click();
@@ -297,13 +297,35 @@ async function selectedBorder(label) {
     await page.locator('.library-scroll').evaluate((e) => {
       e.scrollTop = 1300;
     });
-    await until(async () => !!(await model()).content.anchor, 'anchor saved');
+    await until(async () => {
+      const saved = (await model()).content.anchor;
+      if (!saved) return false;
+      return page.evaluate((saved) => {
+        const top = document.querySelector('.library-filter-panel').getBoundingClientRect().bottom;
+        const first = [...document.querySelectorAll('[data-image-id]')].find(
+          (node) => node.getBoundingClientRect().bottom > top,
+        );
+        return (
+          first?.dataset.imageId === saved.id &&
+          Math.abs(first.getBoundingClientRect().top - top - saved.offset) < 2
+        );
+      }, saved);
+    }, 'current scroll anchor saved');
     const anchor = (await model()).content.anchor;
     await slider.focus();
     await slider.press('ArrowRight');
-    await until(async () => (await model()).content.cardWidth === 200, 'resize');
-    const afterAnchor = (await model()).content.anchor;
-    assert.equal(afterAnchor.id, anchor.id);
+    await until(async () => (await model()).content.cardWidth === 140, 'resize');
+    const anchorOffset = await page
+      .locator(`[data-image-id="${anchor.id}"]`)
+      .evaluate(
+        (el) =>
+          el.getBoundingClientRect().top -
+          document.querySelector('.library-filter-panel').getBoundingClientRect().bottom,
+      );
+    assert(
+      Math.abs(anchorOffset - anchor.offset) < 2,
+      `resizing preserves the original image offset even when columns change: ${JSON.stringify({ anchor, anchorOffset, after: (await model()).content.anchor })}`,
+    );
     checks.push(
       'slider keyboard, stable DOM/focus, all-match selection, anchor and unchanged shared data',
     );
@@ -318,13 +340,14 @@ async function selectedBorder(label) {
       async () =>
         (await modalState())
           .filter((v) => /\/(index|bars)\.html/.test(v.url))
-          .every((v) => !v.visible),
-      'native surfaces hidden',
+          .every((v) => v.visible),
+      'independent Shell surfaces remain visible during body dialog',
     );
     await assert.rejects(action('select-all'), /dialog/);
     await host.screenshot({ path: path.join(profile, 'modal.png') });
     await d.getByLabel('画像グループ名').fill('新しいグループ');
-    await host.mouse.click(4, 4);
+    const backdrop = await host.locator('.shell > main').boundingBox();
+    await host.mouse.click(backdrop.x + 4, backdrop.y + 4);
     assert(await d.isVisible(), 'editing dialogs keep their draft after a backdrop click');
     assert.equal(await d.getByLabel('画像グループ名').inputValue(), '新しいグループ');
     await d.getByRole('button', { name: '追加', exact: true }).click();
@@ -361,10 +384,10 @@ async function selectedBorder(label) {
     const previewBounds = await d.boundingBox();
     await host.mouse.move(previewBounds.x + 12, previewBounds.y + 12);
     await host.mouse.down();
-    await host.mouse.move(4, 4);
+    await host.mouse.move(backdrop.x + 4, backdrop.y + 4);
     await host.mouse.up();
     assert(await d.isVisible(), 'dragging from the preview to its backdrop does not dismiss it');
-    await host.mouse.click(4, 4);
+    await host.mouse.click(backdrop.x + 4, backdrop.y + 4);
     await until(
       async () =>
         host.evaluate(
@@ -374,7 +397,7 @@ async function selectedBorder(label) {
       'preview closed',
     );
     checks.push(
-      'shared host dialogs, host page and native bar backdrop, blocked background actions and preview',
+      'shared body dialogs, independent native bars, blocked background actions and preview backdrop',
     );
     await app.evaluate(
       ({ dialog }, files) => {
@@ -606,6 +629,33 @@ async function selectedBorder(label) {
     checks.push(
       'settings no longer contains a library category or link; the independent page remains available',
     );
+    checks.push(
+      await require('./image-gallery-interactions-check.cjs').checkGalleryInteractions({
+        page,
+        model,
+        action,
+        imageSnapshot,
+        until,
+        profile,
+        theme,
+      }),
+    );
+    const orderedGroups = (await imageSnapshot()).groups;
+    await app.close();
+    app = null;
+    await launch(true);
+    await open();
+    assert.deepEqual((await imageSnapshot()).groups, orderedGroups);
+    const orderedGroup = (await model()).content.groups.find((g) => g.title === 'ドラッグ検証');
+    await action('group', { groupId: orderedGroup.id });
+    assert.deepEqual(
+      (await model()).content.items.map((i) => i.title),
+      orderedGroups
+        .find((g) => g.name === 'ドラッグ検証')
+        .images.slice(0, 64)
+        .map((i) => i.file),
+    );
+    checks.push('saved group image order survives process restart and renders in that order');
     const appPath = await app.evaluate(({ app }) => app.getAppPath());
     const bundleUrl = require('node:url').pathToFileURL(
       path.join(appPath, 'out/ui/image-gallery/image-gallery.js'),

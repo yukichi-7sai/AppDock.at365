@@ -27,6 +27,7 @@ async function main() {
   );
   const sourceFiles = [
     'ui/image-gallery/index.ts',
+    'ui/image-gallery/interactions.ts',
     'ui/image-gallery/gallery.css',
     'src/shared/image-gallery.ts',
   ];

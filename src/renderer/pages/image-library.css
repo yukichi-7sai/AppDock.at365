@@ -153,11 +153,22 @@
 .library-page .library-group-menu {
   display: flex;
   flex-direction: column;
-  width: 100%;
+  position: fixed;
+  inset: auto;
+  width: max-content;
+  min-width: 180px;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
-  margin: 4px 0;
+  color: var(--text);
+  box-shadow: var(--shadow);
+  margin: 0;
+}
+.library-page .library-group-menu:not(:popover-open) {
+  display: none;
 }
 .library-page .library-group-menu button {
   font-size: 12px;
@@ -183,6 +194,20 @@
   gap: 16px;
   flex-wrap: wrap;
 }
+.library-page .library-filter-panel {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding-bottom: 2px;
+}
+.library-page .library-search:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.library-page .library-search input:focus-visible {
+  outline: none;
+}
 .library-page .library-search {
   display: flex;
   align-items: center;
@@ -191,7 +216,8 @@
   flex: 1;
   border: 1px solid var(--border);
   border-radius: 9px;
-  padding: 8px 12px;
+  min-height: 32px;
+  padding: 0 10px;
   background: var(--surface);
   color: var(--muted);
 }
@@ -200,8 +226,10 @@
   border: 0;
   min-width: 0;
   width: 100%;
-  outline-offset: 4px;
   font-size: 13px;
+  height: 30px;
+  padding: 0;
+  margin: 0;
 }
 .library-page .library-summary {
   display: flex;
@@ -255,13 +283,28 @@
   text-decoration: underline;
 }
 .library-page .library-scroll {
+  background: transparent;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  padding: 2px 5px 20px 2px;
+  padding: 0 5px 20px 2px;
   overflow-anchor: none;
+}
+.library-page .library-content {
+  background: transparent;
+}
+.library-page .ad-gallery-card {
+  box-shadow: none;
+}
+.library-page .ad-gallery {
+  isolation: isolate;
+}
+.library-page [data-gallery-drop='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-soft);
 }
 .library-page .library-more {
   display: block;

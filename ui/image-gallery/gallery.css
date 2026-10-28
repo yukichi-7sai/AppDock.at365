@@ -65,8 +65,8 @@
   box-shadow: var(--shadow, 0 4px 16px #192b4d06);
   color: var(--text, #202534);
 }
-.ad-gallery-card:hover {
-  border-color: color-mix(in srgb, var(--accent, #5664d9) 28%, var(--border, #e5e8ef));
+.ad-gallery .ad-gallery-image:hover:not(:disabled) {
+  filter: none;
 }
 .ad-gallery-card.ad-gallery-selected {
   border-color: var(--accent, #5664d9);
@@ -144,13 +144,26 @@
 .ad-gallery-status:empty {
   display: none;
 }
-.ad-gallery-check {
+.ad-gallery-check-area {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 1px;
+  left: 1px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 2;
+}
+.ad-gallery-check-area[hidden] {
+  display: none;
+}
+.ad-gallery-check {
   width: 18px;
   height: 18px;
   margin: 0;
+  padding: 0;
+  flex: none;
   accent-color: var(--accent, #5664d9);
   cursor: pointer;
 }
@@ -239,5 +252,74 @@
 .ad-gallery-size input {
   width: 120px;
   min-width: 50px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   accent-color: var(--accent, #5664d9);
+}
+.ad-gallery[data-compact='true'] {
+  gap: 12px;
+}
+.ad-gallery[data-compact='true'] .ad-gallery-body {
+  padding: 8px;
+}
+.ad-gallery[data-compact='true'] .ad-gallery-actions {
+  gap: 2px;
+  padding: 4px;
+}
+.ad-gallery[data-compact='true'] .ad-gallery-action {
+  padding: 4px 2px;
+}
+.ad-gallery-gesturing {
+  user-select: none;
+}
+.ad-gallery-marquee,
+.ad-gallery-drag-badge,
+.ad-gallery-insertion {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+}
+.ad-gallery-marquee {
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  opacity: 0.65;
+}
+.ad-gallery-drag-badge {
+  width: 180px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+}
+.ad-gallery-drag-badge img {
+  display: block;
+  width: 164px;
+  height: 132px;
+  object-fit: contain;
+}
+.ad-gallery-drag-badge span {
+  display: block;
+  text-align: center;
+  font-weight: 600;
+}
+.ad-gallery-drag-badge[data-multiple='true'] {
+  box-shadow:
+    4px 4px 0 var(--panel),
+    5px 5px 0 var(--border),
+    8px 8px 0 var(--panel),
+    9px 9px 0 var(--border);
+}
+.ad-gallery-insertion {
+  width: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.ad-gallery-drag-badge[data-valid='true'] {
+  border-color: var(--accent);
 }

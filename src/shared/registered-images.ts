@@ -166,8 +166,9 @@ export function editImageLibrary(
     if (!equal(memberships, [...op.before].sort())) conflict();
     const destinations = new Set(op.ids);
     for (const g of next.groups) {
-      g.images = g.images.filter((i) => imageKey(i) !== imageKey(op.image));
-      if (destinations.has(g.id)) g.images.push(op.image);
+      if (!destinations.has(g.id))
+        g.images = g.images.filter((i) => imageKey(i) !== imageKey(op.image));
+      else if (!g.images.some((i) => imageKey(i) === imageKey(op.image))) g.images.push(op.image);
     }
   } else if (op.kind === 'membership-batch') {
     if (
@@ -200,8 +201,13 @@ export function editImageLibrary(
     }
     const group = groupsById.get(op.groupId)!;
     const selected = new Set(op.images.map(({ image }) => imageKey(image)));
-    group.images = group.images.filter((image) => !selected.has(imageKey(image)));
-    if (op.mode === 'add') for (const { image } of op.images) group.images.push(image);
+    if (op.mode === 'remove')
+      group.images = group.images.filter((image) => !selected.has(imageKey(image)));
+    else {
+      const existing = new Set(group.images.map(imageKey));
+      for (const { image } of op.images)
+        if (!existing.has(imageKey(image))) group.images.push(image);
+    }
   } else throw Error(hostText('services.sharedRegisteredImages.unsupportedOperation'));
   return parseImageLibrary(next);
 }

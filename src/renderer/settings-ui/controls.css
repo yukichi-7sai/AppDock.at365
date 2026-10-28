@@ -3604,6 +3604,10 @@ summary {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+.settings-order-dialog .shortcut-order-row[draggable='true'] {
+  cursor: grab;
+  user-select: none;
+}
 .shortcut-order-handle {
   cursor: grab;
   scroll-margin-block: 4px;

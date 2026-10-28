@@ -98,6 +98,21 @@ export function SettingsOrderDialog({
             key={item.id}
             data-order-id={item.id}
             className={`shortcut-order-row${over === item.id ? ' drop-target' : ''}`}
+            draggable={!pending}
+            onDragStart={(event) => {
+              if (saving.current) {
+                event.preventDefault();
+                return;
+              }
+              dragged.current = item.id;
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', item.id);
+              handles.current.get(item.id)?.focus({ preventScroll: true });
+            }}
+            onDragEnd={() => {
+              dragged.current = '';
+              setOver('');
+            }}
             onDragOver={(event) => {
               if (!saving.current && dragged.current && dragged.current !== item.id) {
                 event.preventDefault();
@@ -106,6 +121,7 @@ export function SettingsOrderDialog({
             }}
             onDrop={(event) => {
               event.preventDefault();
+              movedHandle.current = dragged.current;
               move(dragged.current, item.id);
               dragged.current = '';
               setOver('');
@@ -125,19 +141,6 @@ export function SettingsOrderDialog({
               aria-label={translate('settings.settingsOrderDialog.drag', { title: item.title })}
               aria-keyshortcuts="ArrowUp ArrowDown"
               title={translate('settings.settingsOrderDialog.dragHint')}
-              onDragStart={(event) => {
-                if (saving.current) {
-                  event.preventDefault();
-                  return;
-                }
-                dragged.current = item.id;
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', item.id);
-              }}
-              onDragEnd={() => {
-                dragged.current = '';
-                setOver('');
-              }}
               onKeyDown={(event) => {
                 if (
                   !saving.current &&

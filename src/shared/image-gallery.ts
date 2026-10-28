@@ -1,5 +1,5 @@
 /** Public, framework-neutral gallery presentation. No file-system or host operations. */
-export const gallerySize = { min: 180, max: 360, step: 20, initial: 260 } as const;
+export const gallerySize = { min: 120, max: 360, step: 20, initial: 260 } as const;
 export function validGalleryWidth(value: unknown): value is number {
   return (
     typeof value === 'number' &&

@@ -34,6 +34,24 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   };
   const save = (operation: ImageLibraryDialogOperation) =>
     window.dock.imageLibraryDialog.complete(r.id, operation);
+  if (r.kind === 'order-images')
+    return (
+      <SettingsOrderDialog
+        title="画像を並べ替え"
+        listLabel={`${current?.name ?? ''}の画像の表示順`}
+        items={(current?.images ?? []).map((image) => ({ id: imageKey(image), title: image.file }))}
+        onClose={close}
+        onApply={(ids) => {
+          if (!current) throw Error('グループが見つかりません。');
+          const images = new Map(current.images.map((image) => [imageKey(image), image]));
+          return save({
+            kind: 'update',
+            before: current,
+            group: { ...current, images: ids.map((id) => images.get(id)!) },
+          });
+        }}
+      />
+    );
   if (r.kind === 'order')
     return (
       <SettingsOrderDialog

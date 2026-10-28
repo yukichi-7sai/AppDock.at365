@@ -109,6 +109,8 @@ test('view state creates no file until a valid edit; surfaces remain independent
   const restored = new GalleryViewStateStore(file);
   assert.equal(restored.get('library'), 180);
   assert.equal(restored.get('picker'), 360);
+  restored.save('library', 120);
+  assert.equal(new GalleryViewStateStore(file).get('library'), 120);
   for (const value of [0, 181, 400, '260', NaN])
     assert.throws(() => restored.save('library', value));
   for (const invalid of [
@@ -126,6 +128,63 @@ test('view state creates no file until a valid edit; surfaces remain independent
   fs.writeFileSync(file, '{"schemaVersion":99}');
   assert.throws(() => external.save('library', 280));
   assert.equal(fs.readFileSync(file, 'utf8'), '{"schemaVersion":99}');
+});
+test('range selection replaces or adds displayed images atomically and rejects stale IDs', async () => {
+  const f = fixture(),
+    items = f.session.snapshot().content.items;
+  await f.act('select-range', { imageIds: [items[0].id, items[1].id], additive: false });
+  assert.equal(f.state.selected.size, 2);
+  await f.act('select-range', { imageIds: [items[2].id], additive: true });
+  assert.equal(f.state.selected.size, 3);
+  await assert.rejects(
+    f.act('select-range', { imageIds: [items[3].id, 'stale'], additive: false }),
+  );
+  assert.equal(f.state.selected.size, 3);
+  await f.act('select-range', { imageIds: [items[3].id], additive: false });
+  assert.equal(f.state.selected.size, 1);
+});
+test('dragging a selected card includes unrendered selections, preserves memberships and skips duplicates', async () => {
+  const f = fixture(),
+    c = f.session.snapshot().content;
+  await f.act('select-all');
+  const drag = await f.act('drag-start', { imageId: c.items[0].id });
+  assert.equal(drag.count, 130);
+  await f.act('drop', { token: drag.token, groupId: c.groups[3].id });
+  assert.equal(f.value.groups[1].images.length, 130);
+  assert.equal(f.value.groups[0].images.length, 1);
+  assert.match(f.state.message, /129枚/);
+  await assert.rejects(f.act('drop', { token: drag.token, groupId: c.groups[3].id }));
+  const repeated = await f.act('drag-start', { imageId: c.items[0].id });
+  await f.act('drop', { token: repeated.token, groupId: c.groups[3].id });
+  assert.match(f.state.message, /0枚/);
+  assert.equal(f.value.groups[1].images.length, 130);
+});
+test('unselected drags use one image; virtual targets, changed view and concurrent membership edits are rejected', async () => {
+  const f = fixture(),
+    c = f.session.snapshot().content;
+  await f.act('select', { imageId: c.items[0].id, selected: true });
+  let drag = await f.act('drag-start', { imageId: c.items[2].id });
+  assert.equal(drag.count, 1);
+  await assert.rejects(f.act('drop', { token: drag.token, groupId: 'unfiled' }));
+  drag = await f.act('drag-start', { imageId: c.items[2].id });
+  await f.act('query', { value: 'image' });
+  await assert.rejects(f.act('drop', { token: drag.token, groupId: c.groups[3].id }));
+  drag = await f.act('drag-start', { imageId: c.items[2].id });
+  f.value.groups[0].images.push(f.entries[2].ref);
+  const before = structuredClone(f.value);
+  await assert.rejects(f.act('drop', { token: drag.token, groupId: c.groups[3].id }), /別の場所/);
+  assert.deepEqual(f.value, before);
+  drag = await f.act('drag-start', { imageId: c.items[2].id });
+  await f.act('drop', { token: drag.token, groupId: c.groups[3].id });
+  assert.equal(f.value.groups[1].images.length, 2);
+});
+test('a removed source image cannot be restored to a group by a pending drop', async () => {
+  const f = fixture(),
+    c = f.session.snapshot().content;
+  const drag = await f.act('drag-start', { imageId: c.items[2].id });
+  f.setEntries(f.entries.filter((entry) => entry.ref.file !== 'image-002.png'));
+  await assert.rejects(f.act('drop', { token: drag.token, groupId: c.groups[3].id }));
+  assert.equal(f.value.groups[1].images.length, 1);
 });
 test('batch membership is atomic on conflict and permits larger groups, preserves unrelated membership and originals', () => {
   const image = { file: 'a.png' },
@@ -290,6 +349,10 @@ test('modal bookkeeping accepts validated anchors while edits remain active oper
   assert(f.session.passive(request('anchor')));
   for (const command of [
     'select',
+    'select-range',
+    'drag-start',
+    'drop',
+    'reorder',
     'select-all',
     'clear',
     'query',
@@ -318,4 +381,150 @@ test('modal bookkeeping accepts validated anchors while edits remain active oper
   assert(!fs.existsSync(f.file));
   f.session.dispose();
   await assert.rejects(f.act('anchor', { anchor: { id: item.id, offset: 0 } }));
+});
+
+test('group ordering moves selected images in visual order, survives reopening and leaves other groups unchanged', async () => {
+  const f = fixture();
+  const refs = f.entries.slice(0, 6).map((e) => e.ref);
+  f.value.groups[1].images = refs;
+  const other = structuredClone(f.value.groups[0]);
+  await f.act('group', { groupId: f.session.snapshot().content.groups[3].id });
+  const items = f.session.snapshot().content.items;
+  // Reverse click order must not reverse the moved block.
+  for (const index of [2, 0]) await f.act('select', { imageId: items[index].id, selected: true });
+  const drag = await f.act('drag-start', { imageId: items[0].id });
+  await f.act('reorder', { token: drag.token, imageId: items[4].id, after: true });
+  const expected = [1, 3, 4, 0, 2, 5].map((i) => refs[i].file);
+  assert.deepEqual(
+    f.value.groups[1].images.map((r) => r.file),
+    expected,
+  );
+  f.reopen();
+  assert.deepEqual(
+    f.session.snapshot().content.items.map((i) => i.title),
+    expected,
+  );
+  assert.deepEqual(f.value.groups[0], other);
+  await f.act('group', { groupId: 'all' });
+  assert.deepEqual(
+    f.session
+      .snapshot()
+      .content.items.slice(0, 6)
+      .map((i) => i.title),
+    refs.map((r) => r.file),
+  );
+  const virtualDrag = await f.act('drag-start', {
+    imageId: f.session.snapshot().content.items[0].id,
+  });
+  await assert.rejects(
+    f.act('reorder', {
+      token: virtualDrag.token,
+      imageId: f.session.snapshot().content.items[2].id,
+      after: false,
+    }),
+  );
+});
+
+test('filtered reorder keeps hidden images in relative order and refuses concurrent group edits', async () => {
+  const f = fixture();
+  const refs = [0, 10, 1, 11, 2].map((i) => f.entries[i].ref);
+  f.value.groups[1].images = refs;
+  await f.act('group', { groupId: f.session.snapshot().content.groups[3].id });
+  await f.act('query', { value: 'image-00' });
+  const items = f.session.snapshot().content.items;
+  let drag = await f.act('drag-start', { imageId: items[2].id });
+  await f.act('reorder', { token: drag.token, imageId: items[0].id, after: false });
+  assert.deepEqual(
+    f.value.groups[1].images.map((r) => r.file),
+    [2, 0, 10, 1, 11].map((i) => f.entries[i].ref.file),
+  );
+  drag = await f.act('drag-start', { imageId: items[0].id });
+  f.value.groups[1].images.reverse();
+  const changed = structuredClone(f.value);
+  await assert.rejects(f.act('reorder', { token: drag.token, imageId: items[1].id, after: true }));
+  assert.deepEqual(f.value, changed);
+  await assert.rejects(f.act('reorder', { token: drag.token, imageId: items[1].id, after: true }));
+});
+
+test('membership changes retain existing order and append only new images', async () => {
+  const f = fixture();
+  const refs = f.entries.slice(0, 4).map((e) => e.ref);
+  f.value.groups[1].images = [refs[2], refs[0], refs[1]];
+  const before = structuredClone(f.value);
+  await f.host.edit({
+    kind: 'membership',
+    image: refs[0],
+    ids: ['all', 'b'],
+    before: ['all', 'b'],
+  });
+  assert.deepEqual(f.value, before);
+  await f.host.edit({
+    kind: 'membership-batch',
+    mode: 'add',
+    groupId: 'b',
+    images: [
+      { image: refs[0], before: ['all', 'b'] },
+      { image: refs[3], before: [] },
+    ],
+  });
+  assert.deepEqual(f.value.groups[1].images, [refs[2], refs[0], refs[1], refs[3]]);
+});
+
+test('selection and view changes dismiss success feedback while retaining errors', async () => {
+  for (const command of ['select', 'select-range', 'select-all', 'clear', 'group', 'query']) {
+    const f = fixture();
+    const model = f.session.snapshot().content;
+    const drag = await f.act('drag-start', { imageId: model.items[0].id });
+    await f.act('drop', { token: drag.token, groupId: model.groups[3].id });
+    assert.match(f.session.snapshot().content.message, /1枚/);
+    f.state.error = 'Save error remains actionable';
+    await f.act(command, {
+      imageId: model.items[1].id,
+      selected: true,
+      imageIds: [model.items[1].id],
+      additive: false,
+      groupId: model.groups[3].id,
+      value: 'image-00',
+    });
+    assert.equal(f.session.snapshot().content.message, '', command);
+    assert.equal(f.session.snapshot().content.error, 'Save error remains actionable', command);
+  }
+});
+
+test('late drop and reorder results do not restore feedback after the selection context changes', async () => {
+  for (const command of ['drop', 'reorder']) {
+    const f = fixture();
+    f.value.groups[1].images = f.entries.slice(0, 4).map((e) => e.ref);
+    const group = f.session.snapshot().content.groups[3].id;
+    await f.act('group', { groupId: group });
+    const items = f.session.snapshot().content.items;
+    const drag = await f.act('drag-start', { imageId: items[0].id });
+    let finish;
+    const gate = new Promise((resolve) => {
+      finish = resolve;
+    });
+    const edit = f.host.edit;
+    f.host.edit = async (op) => {
+      await gate;
+      await edit(op);
+    };
+    const operation = f.act(command, {
+      token: drag.token,
+      groupId: group,
+      imageId: items[2].id,
+      after: true,
+    });
+    await f.act('clear');
+    finish();
+    await operation;
+    assert.equal(f.session.snapshot().content.message, '', command);
+    if (command === 'reorder') {
+      assert.equal(f.value.groups[1].images[2].file, 'image-000.png');
+      const next = await f.act('drag-start', { imageId: items[0].id });
+      await f.act('reorder', { token: next.token, imageId: items[1].id, after: false });
+      assert.match(f.session.snapshot().content.message, /順番を保存/);
+      await f.act('group', { groupId: 'all' });
+      assert.equal(f.session.snapshot().content.message, '');
+    }
+  }
 });

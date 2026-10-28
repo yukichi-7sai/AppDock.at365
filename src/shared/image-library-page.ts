@@ -15,6 +15,7 @@ export type ImageLibraryDialogKind =
   | 'rename'
   | 'delete'
   | 'order'
+  | 'order-images'
   | 'membership'
   | 'batch-add'
   | 'batch-remove'
@@ -68,6 +69,10 @@ export type ImageLibraryPageAction = {
   | { command: 'query'; value: string }
   | { command: 'group'; groupId: string }
   | { command: 'select'; imageId: string; selected: boolean }
+  | { command: 'select-range'; imageIds: string[]; additive: boolean }
+  | { command: 'drag-start'; imageId: string }
+  | { command: 'drop'; token: string; groupId: string }
+  | { command: 'reorder'; token: string; imageId: string; after: boolean }
   | { command: 'select-all' | 'clear' | 'more' | 'reload' | 'add' | 'retry-membership' }
   | { command: 'width'; value: number; commit: boolean }
   | { command: 'anchor'; anchor?: GalleryAnchor }
