@@ -201,9 +201,10 @@ export function visibleRibbonItems(
 }
 export function orderRibbon(items: RibbonItem[], order: string[]): RibbonItem[] {
   const byId = new Map(items.map((item) => [item.id, item]));
+  const ordered = new Set(order);
   return [
     ...order.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
-    ...items.filter((item) => !order.includes(item.id)),
+    ...items.filter((item) => !ordered.has(item.id)),
   ];
 }
 export function pageDisplay(
@@ -237,7 +238,6 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       const ids = ribbon[key];
       return (
         !Array.isArray(ids) ||
-        ids.length > (key === 'separators' ? 50 : 550) ||
         ids.some((id) => !validRibbonId(id)) ||
         (key === 'separators' && ids.some((id) => !validSeparatorId(id))) ||
         new Set(ids).size !== ids.length
@@ -245,18 +245,13 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
     })
   )
     throw Error(hostText('settings.applet-pages.ribbonIds'));
+  const separators = new Set(ribbon.separators as string[]);
   for (const key of ['order', 'hidden', 'bottom'])
-    if (
-      (ribbon[key] as string[]).some(
-        (id) => validSeparatorId(id) && !(ribbon.separators as string[]).includes(id),
-      )
-    )
+    if ((ribbon[key] as string[]).some((id) => validSeparatorId(id) && !separators.has(id)))
       throw Error(hostText('settings.applet-pages.separatorRequired'));
-  if (!Array.isArray(ribbon.groups) || ribbon.groups.length > 50)
-    throw Error(hostText('settings.applet-pages.groupLimit'));
+  if (!Array.isArray(ribbon.groups)) throw Error(hostText('settings.applet-pages.groupLimit'));
   const groups = ribbon.groups as RibbonGroup[];
-  if (!Array.isArray(ribbon.buttons) || ribbon.buttons.length > 100)
-    throw Error(hostText('settings.applet-pages.buttonLimit'));
+  if (!Array.isArray(ribbon.buttons)) throw Error(hostText('settings.applet-pages.buttonLimit'));
   const buttonIds = new Set<string>();
   ribbon.buttons = (ribbon.buttons as RibbonCommandButton[]).map((button) => {
     if (
@@ -308,13 +303,12 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
       (g.iconOnly !== undefined && typeof g.iconOnly !== 'boolean') ||
       !['persistent', 'temporary'].includes(g.expansion) ||
       !Array.isArray(g.children) ||
-      g.children.length > 500 ||
       g.children.some(
         (id) =>
           !validRibbonId(id) ||
           validGroupId(id) ||
           children.has(id) ||
-          (validSeparatorId(id) && !(ribbon.separators as string[]).includes(id)),
+          (validSeparatorId(id) && !separators.has(id)),
       ) ||
       new Set(g.children).size !== g.children.length
     )
@@ -324,14 +318,14 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
   }
   const order = ribbon.order as string[],
     bottom = ribbon.bottom as string[];
+  const ordered = new Set(order);
   if (
     order.some((id) => children.has(id)) ||
     bottom.some((id) => children.has(id)) ||
-    groups.some((g) => !order.includes(g.id)) ||
+    groups.some((g) => !ordered.has(g.id)) ||
     ['order', 'hidden', 'bottom'].some((k) =>
       (ribbon[k] as string[]).some((id) => validGroupId(id) && !groupIds.has(id)),
-    ) ||
-    order.filter((id) => !validGroupId(id)).length + children.size > 500
+    )
   )
     throw Error(hostText('settings.applet-pages.groupChildren'));
   ribbon.groups = groups.map((g) => ({
@@ -341,12 +335,12 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
     ...(g.color !== undefined ? { color: parseRibbonColor(g.color) } : {}),
   }));
   if (ribbon.separatorTitles !== undefined) {
-    if (!object(ribbon.separatorTitles) || Object.keys(ribbon.separatorTitles).length > 50)
+    if (!object(ribbon.separatorTitles))
       throw Error(hostText('settings.applet-pages.separatorLimit'));
     const titles: Record<string, string> = {};
     for (const [id, title] of Object.entries(ribbon.separatorTitles)) {
       if (
-        !(ribbon.separators as string[]).includes(id) ||
+        !separators.has(id) ||
         typeof title !== 'string' ||
         title.trim().length > 80 ||
         /[\x00-\x1f\x7f]/.test(title)
@@ -356,8 +350,7 @@ export function parseRibbon(value: unknown): Settings['ribbon'] {
     }
     ribbon.separatorTitles = titles;
   }
-  if (!object(ribbon.itemOverrides) || Object.keys(ribbon.itemOverrides).length > 500)
-    throw Error(hostText('settings.applet-pages.displayLimit'));
+  if (!object(ribbon.itemOverrides)) throw Error(hostText('settings.applet-pages.displayLimit'));
   const overrides: Record<string, RibbonItemOverride> = {};
   for (const [id, value] of Object.entries(ribbon.itemOverrides)) {
     if (

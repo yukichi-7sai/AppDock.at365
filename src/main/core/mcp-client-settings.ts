@@ -50,10 +50,8 @@ export class McpClientSettings {
   private read(): Record<string, unknown> {
     if (!fs.existsSync(this.file)) return {};
     try {
-      if (fs.statSync(this.file).size > 1024 * 1024) throw Error();
       const data = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      if (data.version !== 1 || !jsonObject(data.entries) || Object.keys(data.entries).length > 64)
-        throw Error();
+      if (data.version !== 1 || !jsonObject(data.entries)) throw Error();
       return data.entries;
     } catch {
       throw new McpSettingsError(
@@ -69,8 +67,7 @@ export class McpClientSettings {
       !mcpUuid(id) ||
       !jsonObject(value) ||
       Object.keys(value).some((key) => !['connection', 'secret'].includes(key)) ||
-      (value.secret !== undefined &&
-        (typeof value.secret !== 'string' || value.secret.length > 131072))
+      (value.secret !== undefined && typeof value.secret !== 'string')
     )
       throw new McpSettingsError(
         'CONFIGURATION_REQUIRED',
@@ -106,11 +103,10 @@ export class McpClientSettings {
     if (!entry?.secret) return { env: {} };
     try {
       const data = JSON.parse(this.encryption.decrypt(entry.secret));
-      boundedJson(data, 65536, 4, 256);
+      boundedJson(data, Infinity, 4, Infinity);
       if (
         data.binding !== mcpEndpointIdentity(entry.connection) ||
         !jsonObject(data.env) ||
-        Object.keys(data.env).length > 32 ||
         Object.entries(data.env).some(
           ([k, v]) =>
             !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) ||
@@ -275,8 +271,10 @@ export class McpClientSettings {
         version: 1,
         items: rows.map(({ id, name, description }) => ({ id, name, description })),
       }).items;
+      const itemIds = new Set(items.map((item) => item.id));
+      const beforeIds = new Set(before.map((item) => item.id));
       for (const item of before) {
-        if (items.some((row) => row.id === item.id)) continue;
+        if (itemIds.has(item.id)) continue;
         if (hasSecret(entries[item.id]))
           throw new McpSettingsError(
             'PRIVATE_SETTING',
@@ -292,7 +290,7 @@ export class McpClientSettings {
           /* Explicit connection edits may repair a non-secret row. */
         }
         if (row.connection === undefined) {
-          if (!before.some((item) => item.id === row.id) || old) throw Error();
+          if (!beforeIds.has(row.id) || old) throw Error();
           continue;
         }
         if (old && isDeepStrictEqual(old.connection, row.connection)) continue;
@@ -325,14 +323,9 @@ export class McpClientSettings {
       );
     }
     const next = { ...this.settings.value, mcpServers: { version: 1 as const, items } };
-    if (Buffer.byteLength(JSON.stringify(next, null, 2) + '\n', 'utf8') > 4 * 1024 * 1024)
-      throw new McpSettingsError(
-        'INVALID_ARGUMENT',
-        hostText('settings.mcp-client-settings.fileSize'),
-      );
     const localChanged = !isDeepStrictEqual(entries, previousEntries);
     const changed = localChanged || !isDeepStrictEqual(before, items);
-    // Constructing the asset validates its size without writing or decrypting anything.
+    // Prepare the asset without writing or decrypting anything.
     const asset = localChanged
       ? this.asset(entries, expectedRevision)
       : {
@@ -389,17 +382,18 @@ export class McpClientSettings {
         );
       row.connection.enabled = request.enabled;
     } else {
+      const rowsById = new Map(rows.map((row) => [row.id, row]));
       if (
         !Array.isArray(request.ids) ||
         request.ids.length !== rows.length ||
         new Set(request.ids).size !== rows.length ||
-        request.ids.some((id) => !rows.some((row) => row.id === id))
+        request.ids.some((id) => !rowsById.has(id))
       )
         throw new McpSettingsError(
           'INVALID_ARGUMENT',
           hostText('settings.mcp-client-settings.order'),
         );
-      rows = request.ids.map((id) => rows.find((row) => row.id === id)!);
+      rows = request.ids.map((id) => rowsById.get(id)!);
     }
     const plan = this.planPublicConfiguration(rows, request.expectedRevision as string);
     if (request.dryRun === true)
@@ -409,8 +403,6 @@ export class McpClientSettings {
   }
   private asset(entries: Record<string, unknown>, expectedRevision: string) {
     const content = JSON.stringify({ version: 1, entries }) + '\n';
-    if (Object.keys(entries).length > 64 || Buffer.byteLength(content, 'utf8') > 1024 * 1024)
-      throw Error(hostText('settings.mcp-client-settings.size'));
     const previous = fs.existsSync(this.file) ? fs.readFileSync(this.file) : undefined;
     let committed = false;
     return {
@@ -455,7 +447,7 @@ export class McpClientSettings {
       (request.dryRun !== undefined && typeof request.dryRun !== 'boolean')
     )
       throw Error(hostText('settings.mcp-client-settings.invalidUpdate'));
-    boundedJson(request, 262144, 8, 4096);
+    boundedJson(request, Infinity, 8, Infinity);
     if (external) return this.updatePublic(request);
     try {
       this.settings.assertRevision(this.settings.revision);
@@ -508,7 +500,6 @@ export class McpClientSettings {
       const env = request.environment === undefined ? previous.env : request.environment;
       if (
         !jsonObject(env) ||
-        Object.keys(env).length > 32 ||
         Object.entries(env).some(
           ([k, v]) =>
             !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(k) ||
@@ -518,7 +509,7 @@ export class McpClientSettings {
         )
       )
         throw Error(hostText('settings.mcp-client-settings.invalidEnvironment'));
-      boundedJson(env, 32768, 2, 100);
+      boundedJson(env, Infinity, 2, Infinity);
       if (connection.authentication === 'bearer' && !token)
         throw Error(hostText('settings.mcp-client-settings.bearerRequired'));
       const secretData = {
@@ -559,14 +550,15 @@ export class McpClientSettings {
       items = items.filter((v) => v.id !== request.id);
       delete entries[request.id];
     } else if (request.op === 'reorder') {
+      const itemsById = new Map(items.map((item) => [item.id, item]));
       if (
         !Array.isArray(request.ids) ||
         request.ids.length !== items.length ||
         new Set(request.ids).size !== items.length ||
-        request.ids.some((id) => !items.some((v) => v.id === id))
+        request.ids.some((id) => !itemsById.has(id))
       )
         throw Error(hostText('settings.mcp-client-settings.order'));
-      items = request.ids.map((id) => items.find((v) => v.id === id)!);
+      items = request.ids.map((id) => itemsById.get(id)!);
     } else if (request.op === 'enabled') {
       if (
         !mcpUuid(request.id) ||
@@ -581,8 +573,6 @@ export class McpClientSettings {
     } else throw Error(hostText('settings.mcp-client-settings.unsupported'));
     const mcpServers = parseMcpRoster({ version: 1, items });
     const next = { ...this.settings.value, mcpServers };
-    if (Buffer.byteLength(JSON.stringify(next, null, 2) + '\n', 'utf8') > 4 * 1024 * 1024)
-      throw Error(hostText('settings.mcp-client-settings.fileSize'));
     if (request.expectedRevision !== this.revision())
       throw new McpSettingsError(
         'REVISION_CONFLICT',

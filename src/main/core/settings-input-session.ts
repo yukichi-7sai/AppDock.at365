@@ -237,10 +237,7 @@ export class SettingsInputSession {
           throw Error(hostText('settings.inputError.pageChanged'));
         let value: Record<string, unknown>;
         if (action.type === 'partial-text') {
-          if (
-            typeof action.value !== 'string' ||
-            new TextEncoder().encode(action.value).length > 1024 * 1024
-          )
+          if (typeof action.value !== 'string')
             throw Error(hostText('settings.inputError.jsonSize'));
           try {
             value = JSON.parse(action.value);

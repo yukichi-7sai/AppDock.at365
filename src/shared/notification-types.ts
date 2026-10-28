@@ -162,8 +162,7 @@ export function parseNotificationPreferences(value: unknown): NotificationPrefer
   if (
     !object(value) ||
     Object.keys(value).some((k) => !['overrides', 'speech'].includes(k)) ||
-    !Array.isArray(value.overrides) ||
-    value.overrides.length > 1024
+    !Array.isArray(value.overrides)
   )
     throw Error(hostText('settings.notification-types.format'));
   const rows = value.overrides.map((v: unknown) => {

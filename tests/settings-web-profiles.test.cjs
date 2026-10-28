@@ -141,7 +141,7 @@ test('declared profile owners expose names and readonly IDs while stopped withou
   assert.deepEqual(f.target().operations, ['add', 'update']);
   const schema = f.call('schema.get', { targetId: f.target().targetId });
   assert.equal(schema.available, true);
-  assert.equal(schema.maxItems, 32);
+  assert.equal(schema.maxItems, undefined);
   assert.deepEqual(
     schema.items.map((item) => [item.key, item.writable]),
     [
@@ -380,7 +380,7 @@ test('store plan rechecks file bytes immediately before commit and refuses impli
   );
 });
 
-test('write revocation applies to new changes and replay; full rosters reject further adds', (t) => {
+test('write revocation applies to new changes and replay; larger rosters permit further adds', (t) => {
   const f = fixture(t);
   const request = f.request([{ kind: 'add', values: { name: 'Added' } }]);
   f.call('apply', request);
@@ -396,9 +396,6 @@ test('write revocation applies to new changes and replay; full rosters reject fu
       accounts: Array.from({ length: 32 }, () => ({ id: `account.${randomUUID()}`, name: 'Full' })),
     }),
   );
-  refuses(
-    () => f.call('apply', f.request([{ kind: 'add', values: { name: 'Overflow' } }])),
-    'INVALID_ARGUMENT',
-  );
-  assert.equal(f.read().items.length, 32);
+  f.call('apply', f.request([{ kind: 'add', values: { name: 'Overflow' } }]));
+  assert.equal(f.read().items.length, 33);
 });

@@ -213,7 +213,7 @@ export class ImageLibraryPageSession implements HostPageController {
           ? { id: this.items.get(s.anchor.key)!.id, offset: s.anchor.offset }
           : undefined,
       viewRevision: s.viewRevision,
-      canAddGroup: groups.length < 64,
+      canAddGroup: true,
       canOrder: groups.length > 1,
       canRetryMembership: !!s.retry,
     };

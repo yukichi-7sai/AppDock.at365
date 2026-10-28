@@ -148,7 +148,7 @@ test('ordering validates membership and current order, while preserving later na
   assert.equal(f.settings.value.ai.defaultConnectionId, undefined);
   assert.equal(f.secrets.key(f.c), undefined);
 });
-test('limits and invalid values fail without writing keys; discovery cancellation releases transport', async () => {
+test('connections beyond the former limit retain encrypted keys; discovery cancellation releases transport', async () => {
   const f = fixture({
     models: async (_c, _key, signal) =>
       new Promise((_resolve, reject) =>
@@ -158,8 +158,9 @@ test('limits and invalid values fail without writing keys; discovery cancellatio
   for (let i = 0; i < 8; i++)
     f.controller.save({ ...f.c, id: 'c' + i, authentication: 'none' }, null);
   const before = fs.readFileSync(f.keys, 'utf8');
-  assert.throws(() => f.controller.save(f.c, null, 'overflow-key'), /8件/);
-  assert.equal(fs.readFileSync(f.keys, 'utf8'), before);
+  f.controller.save(f.c, null, 'ninth-key');
+  assert.equal(f.settings.value.ai.connections.length, 9);
+  assert.notEqual(fs.readFileSync(f.keys, 'utf8'), before);
   const request = f.controller.models(f.c, 'transient-key');
   const check = assert.rejects(request, /aborted/);
   f.controller.cancelModels();

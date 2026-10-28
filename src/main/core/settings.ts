@@ -151,10 +151,8 @@ class SettingsStore<T = Settings> extends EventEmitter {
   private readBytesCore(file: string): Buffer {
     try {
       const stat = fs.statSync(file);
-      if (!stat.isFile() || stat.size > 4 * 1024 * 1024)
-        throw new SettingsReadError('read-unavailable');
+      if (!stat.isFile()) throw new SettingsReadError('read-unavailable');
       const bytes = fs.readFileSync(file);
-      if (bytes.length > 4 * 1024 * 1024) throw new SettingsReadError('read-unavailable');
       hostStartupTiming.count('readBytes', bytes.length, true);
       if (file === this.file) {
         const name = path.basename(file);
@@ -330,8 +328,6 @@ class SettingsStore<T = Settings> extends EventEmitter {
     const parsed = this.codec ? this.codec.parse(value) : (validate(value) as T);
     const serialized = this.serialize(parsed);
     const next = this.parse(serialized);
-    if (Buffer.byteLength(serialized, 'utf8') > 4 * 1024 * 1024)
-      throw Error(hostText('services.settings.sizeLimit'));
     this.tryBackup(this.value);
     const previous = this.readBytes(this.file);
     if (JSON.stringify(this.parse(previous)) !== JSON.stringify(this.value)) {

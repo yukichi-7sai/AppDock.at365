@@ -32,7 +32,7 @@ Ctrl+ScrollLockがScrollLock位置からBreak系コード、Ctrl+Alt+NonConvert�
 
 「いつ・どこで」はジェスチャーと同じ8種類に対応する。`desktop`はWindows Shellのデスクトップ面、`browser`は共通のブラウザ一覧、`exe`は`when.processes`のexe名のいずれかへの一致。`global`と`exe`の任意boolean `when.excludeDesktop`でデスクトップを除外する。対象はキーを押した瞬間の前面Windowであり、カーソル下のWindowへは切り替えない。exe名はパスを受け付けず、大文字小文字と`.exe`の有無を正規化する。processesはexe条件で1件以上、他の条件では空または省略とする。古い行に空配列やfalseを書き足す自動移行は行わない。
 
-`Settings.keybindings`は最大2000件の配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。
+`Settings.keybindings`は件数上限のない配列。配列順が実行順で、各行に安定IDを持つ。フォーム/JSON/各Appletの入口は既存SettingsEditorを共用する。
 Appletの`extension.json`には`defaultKeybindings`で、自身の`commands`に宣言したコマンドの初期割り当てを指定できる。ID以外の`command`/`key`/`enabled`/`when`を各行へ書き、未宣言のコマンドはmanifest読込時に拒否する。初回発見時だけsettings.jsonにコピーし、適用済みIDは`keybindingDefaultsInitialized`へ記録する。行を消した後の再起動やApplet更新でも再追加しない。
 新しいWebAppletは`webApplets.shortcutDefaults`から追加時の保存トランザクションでコピーする。このテンプレートのコマンドは`open`/`reload`/`back`/`forward`/`home`に限定し、コマンドIDの`web.<UUID>.`を追加時に補う。既存WebAppletの行は変更しない。Applet詳細は割り当てごとの追加・編集・削除に対応し、一括初期化の操作は置かない。WebApplet管理項目の新規サイト用テンプレート編集は維持する。
 新規割り当ては、対象コマンドに登録元extensionIdがあればowner、なければappを既定にする。既存行のキー変更は条件を保持する。コマンドIDはショートカット表・パレット・トレイ動作選択で完全な文字列を表示し、表示名による検索も維持する。

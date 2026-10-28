@@ -45,9 +45,9 @@ test('network names, addresses and strict authority/origin validation', () => {
     ['-abc'],
     ['abc-'],
     ['a'.repeat(64)],
-    Array(17).fill('dock'),
   ])
     assert.throws(() => networkHostnames(value));
+  assert.deepEqual(networkHostnames(Array(1000).fill('dock')), ['dock']);
   const addresses = ['192.168.1.2', '100.100.1.2'];
   const check = (req, scope = 'network', names = ['dock.example']) =>
     validMcpHeaders(req, 34567, scope, names, addresses, 'DOCK');

@@ -96,7 +96,6 @@ export function imageLibrarySettingsTargets(options: {
       fields,
       list: { idKey: 'id', titleKey: 'name', columns: ['name'] },
     },
-    maxItems: 64,
     rows: () => library().groups.map((group) => ({ ...group })),
     overrides: guard,
     writable: (field) => available && field.key === 'name',
@@ -135,7 +134,6 @@ export function imageLibrarySettingsTargets(options: {
           list: { columns: ['file'], titleKey: 'file' },
         },
         operations: ['add', 'remove', 'reorder'],
-        maxItems: 512,
         rows: () =>
           (library().groups.find((current) => current.id === group.id)?.images ?? []).map(
             ({ file }) => ({ file }),

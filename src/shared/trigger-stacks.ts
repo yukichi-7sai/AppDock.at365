@@ -113,7 +113,7 @@ export function applyTriggerStack(
   const normalized = value && {
     ...value,
     input: normalizeStackInput(value.kind, value.input),
-    entries: parseCommandStack({ executionMode: 'all', entries: value.entries }, 2000).entries,
+    entries: parseCommandStack({ executionMode: 'all', entries: value.entries }).entries,
   };
   if (
     normalized &&
@@ -170,13 +170,11 @@ export function parseStoredTriggerStacks(value: unknown): TriggerStack[] {
   if (
     block.version !== 1 ||
     !Array.isArray(block.items) ||
-    block.items.length > 2000 ||
     Object.keys(block).some((key) => !['version', 'items'].includes(key))
   )
     throw Error(hostText('settings.commandStacks.invalid'));
   const keys = new Set<string>(),
     rowIds = new Set<string>();
-  let total = 0;
   return block.items.map((raw) => {
     if (
       !raw ||
@@ -188,7 +186,7 @@ export function parseStoredTriggerStacks(value: unknown): TriggerStack[] {
       Object.keys(raw).some((key) => !['kind', 'input', 'executionMode', 'entries'].includes(key))
     )
       throw Error(hostText('settings.commandStacks.invalid'));
-    const entries = parseCommandStack({ executionMode: 'all', entries: raw.entries }, 2000).entries;
+    const entries = parseCommandStack({ executionMode: 'all', entries: raw.entries }).entries;
     const stack: TriggerStack = {
       kind: raw.kind,
       input: normalizeStackInput(raw.kind, raw.input),
@@ -196,8 +194,7 @@ export function parseStoredTriggerStacks(value: unknown): TriggerStack[] {
       entries,
     };
     const key = triggerStackKey(stack);
-    if (keys.has(key) || (total += entries.length) > 6000)
-      throw Error(hostText('settings.commandStacks.invalid'));
+    if (keys.has(key)) throw Error(hostText('settings.commandStacks.invalid'));
     keys.add(key);
     for (const row of entries) {
       const rowKey = stack.kind + ':' + row.id;

@@ -22,6 +22,18 @@ const host = { owner: 'host', kind: 'host', external: false },
   applet = { owner: 'applet:a:1', kind: 'applet', external: false };
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+test('large environment settings survive encrypted storage without an aggregate count or size cap', (t) => {
+  const f = fixture(t);
+  const environment = Object.fromEntries(
+    Array.from({ length: 1000 }, (_, i) => [`VALUE_${i}`, 'x'.repeat(200)]),
+  );
+  const id = f.add({ transport: 'stdio', command: process.execPath }, { environment });
+  assert.deepEqual(f.settings.secrets(id).env, environment);
+  const file = JSON.parse(fs.readFileSync(path.join(f.dir, 'mcp-client.json')));
+  assert(file.entries[id].secret.length > 131072);
+  assert.equal(f.settings.publicSettings(id).connection.command, process.execPath);
+});
+
 test('public settings and external metadata edits never decrypt a damaged cipher and keep its exact bytes', (t) => {
   const f = fixture(t),
     id = f.add(

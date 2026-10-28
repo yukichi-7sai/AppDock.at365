@@ -90,7 +90,7 @@ function fixture(t, extra = {}) {
     add,
   };
 }
-test('codec preserves unknown blocks and rejects unsafe or oversized known definitions', () => {
+test('codec preserves unknown blocks and rejects unsafe known definitions', () => {
   const old = createDefaultSettings();
   assert.equal(parseSettings(old).customCommands, undefined);
   const future = { version: 9, unknown: { data: [1, 2] } };
@@ -113,7 +113,6 @@ test('codec preserves unknown blocks and rejects unsafe or oversized known defin
   });
   for (const items of [
     [item, item],
-    [{ ...item, config: { x: 'x'.repeat(16384) } }],
     [{ ...item, owner: { kind: 'host', id: 'spoof' } }],
     [{ ...item, config: JSON.parse('{"__proto__":1}') }],
   ])

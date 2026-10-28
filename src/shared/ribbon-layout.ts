@@ -213,7 +213,6 @@ export function editRibbon(
     if (
       !exact(op, child ? ['kind', 'id', 'ids'] : ['kind', 'placement', 'ids']) ||
       !Array.isArray(op.ids) ||
-      op.ids.length > 550 ||
       op.ids.some((id: unknown) => !validRibbonId(id)) ||
       new Set(op.ids).size !== op.ids.length
     )
@@ -414,7 +413,6 @@ export function editRibbon(
         .slice(0, 80);
       if (!lastKnownTitle) continue;
       next.itemOverrides ??= {};
-      if (!next.itemOverrides[item.id] && Object.keys(next.itemOverrides).length >= 500) continue;
       next.itemOverrides[item.id] = { ...next.itemOverrides[item.id], lastKnownTitle };
     }
   }

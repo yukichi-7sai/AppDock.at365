@@ -6,7 +6,6 @@ import {
   parseTrayMenu,
   trayMenuCommandIds,
   fixedTrayCommands,
-  maximumTrayItems,
   type TrayMenuItem,
 } from '../../shared/tray-menu';
 import type { SettingsStore } from './settings';
@@ -116,7 +115,6 @@ export class TrayEditingCommands {
                     ids: {
                       type: 'array',
                       items: idSchema,
-                      maxItems: maximumTrayItems,
                       uniqueItems: true,
                       description: '指定階層の全項目IDを希望順で指定',
                     },

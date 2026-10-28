@@ -209,11 +209,11 @@ export class McpClientService {
   }
   servers(actor: McpActor, params: Record<string, unknown> = {}) {
     this.allow(actor);
-    const statuses = this.statuses();
+    const statuses = new Map(this.statuses().map((status) => [status.id, status]));
     const items = this.options.settings
       .roster()
-      .filter((v) => !actor.external || statuses.find((s) => s.id === v.id)?.connection?.published)
-      .map((v) => ({ ...v, state: statuses.find((s) => s.id === v.id)?.state ?? 'unconfigured' }));
+      .filter((v) => !actor.external || statuses.get(v.id)?.connection?.published)
+      .map((v) => ({ ...v, state: statuses.get(v.id)?.state ?? 'unconfigured' }));
     return this.page(items, params, actor.owner + ':' + actor.external);
   }
   statuses() {
@@ -476,7 +476,7 @@ export class McpClientService {
           this.configuration(actor, id);
           boundedJson(reply, 1024 * 1024, 48, 65536);
           for (const raw of reply.tools) {
-            if (tools.length >= 512 || names.has(raw.name) || !/^[\w.-]{1,128}$/.test(raw.name))
+            if (names.has(raw.name) || !/^[\w.-]{1,128}$/.test(raw.name))
               return fail('INVALID_CATALOG', hostText('services.mcpClient.invalidToolList'));
             boundedJson(raw, 65536, 40, 8192);
             names.add(raw.name);

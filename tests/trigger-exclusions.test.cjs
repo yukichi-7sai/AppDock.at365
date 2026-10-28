@@ -107,7 +107,7 @@ test('exclusions normalize, validate, persist independently and default to empty
       ])[0].when.excludedProcesses,
       ['notepad', 'editor'],
     );
-    for (const bad of [null, 'notepad', ['C:\\Apps\\note.exe'], Array(101).fill('a')])
+    for (const bad of [null, 'notepad', ['C:\\Apps\\note.exe']])
       assert.throws(() =>
         parse([{ ...binding('x'), when: { ...binding('x').when, excludedProcesses: bad } }]),
       );

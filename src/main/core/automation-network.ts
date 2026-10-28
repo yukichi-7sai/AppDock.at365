@@ -19,8 +19,7 @@ function hostname(value: string): string | undefined {
 }
 
 export function networkHostnames(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length > 16)
-    throw Error(hostText('services.automationNetwork.hostnameLimit'));
+  if (!Array.isArray(value)) throw Error(hostText('services.automationNetwork.hostnameLimit'));
   const names = value.map((entry) => (typeof entry === 'string' ? hostname(entry) : undefined));
   if (names.some((name) => !name))
     throw Error(hostText('services.automationNetwork.hostnameFormat'));

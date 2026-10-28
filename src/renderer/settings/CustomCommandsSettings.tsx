@@ -92,10 +92,15 @@ export function CustomCommandsSettings({
   const visibleItems = target
     ? items.filter((item) => customCommandId(item.id) === target.id)
     : items;
+  const commandsById = new Map(commands.map((command) => [command.id, command]));
+  const typesById = new Map(types.map((type) => [type.id, type]));
+  const summariesById = new Map(
+    (auxiliary?.summaries ?? []).map((summary) => [summary.id, summary]),
+  );
   const command = (
     entry: Record<string, unknown>,
   ): Pick<UiCommand, 'id' | 'title' | 'customDefinitionId' | 'automation'> =>
-    commands.find((c) => c.id === customCommandId(String(entry.id))) ?? {
+    commandsById.get(customCommandId(String(entry.id))) ?? {
       id: customCommandId(String(entry.id)),
       title: String(entry.title),
       customDefinitionId: String(entry.id),
@@ -138,14 +143,12 @@ export function CustomCommandsSettings({
           addInTitle
           commandListScroll
           definition={list}
-          maxItems={256}
-          canAdd={types.length > 0 && items.length < 256}
+          canAdd={types.length > 0}
           entries={visibleItems.map((item) => ({
             ...item,
-            typeTitle: types.find((t) => t.id === item.typeId)?.title ?? item.typeId,
+            typeTitle: typesById.get(item.typeId)?.title ?? item.typeId,
             providerTitle: item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
-            unavailableReason:
-              auxiliary?.summaries.find((s) => s.id === item.id)?.unavailableReason ?? '',
+            unavailableReason: summariesById.get(item.id)?.unavailableReason ?? '',
           }))}
           busy={busy || !supported || !auxiliary}
           onAdd={() => open('edit', null)}

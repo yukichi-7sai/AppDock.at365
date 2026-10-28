@@ -13,8 +13,6 @@ import type { Keybinding } from './keybindings';
 
 export const commandStackTypeId = 'appdock.commands.stack';
 export const maximumStackDepth = 8;
-export const maximumStackEntries = 256;
-export const maximumExpandedCommands = 2000;
 export interface CommandStackEntry {
   id: string;
   command: string;
@@ -38,13 +36,12 @@ const object = (value: unknown): value is Record<string, unknown> =>
 function invalid(): never {
   throw Error(hostText('settings.commandStacks.invalid'));
 }
-export function parseCommandStack(value: unknown, limit = maximumStackEntries): CommandStack {
+export function parseCommandStack(value: unknown): CommandStack {
   if (
     !object(value) ||
     Object.keys(value).some((key) => !['executionMode', 'entries'].includes(key)) ||
     !['first', 'all'].includes(String(value.executionMode)) ||
-    !Array.isArray(value.entries) ||
-    value.entries.length > limit
+    !Array.isArray(value.entries)
   )
     invalid();
   const seen = new Set<string>();
@@ -69,7 +66,6 @@ export function parseCommandStack(value: unknown, limit = maximumStackEntries): 
         String(when.scope),
       ) ||
       !Array.isArray(when.appletIds) ||
-      when.appletIds.length > 500 ||
       when.appletIds.some((id) => !validShortcutTarget(id)) ||
       new Set(when.appletIds).size !== when.appletIds.length ||
       (when.scope === 'applets' ? !when.appletIds.length : !!when.appletIds.length) ||
@@ -124,7 +120,6 @@ export const commandStackType = (): CustomCommandType => ({
       executionMode: { type: 'string', enum: ['first', 'all'] },
       entries: {
         type: 'array',
-        maxItems: maximumStackEntries,
         items: {
           type: 'object',
           additionalProperties: false,
@@ -145,17 +140,14 @@ export const commandStackType = (): CustomCommandType => ({
                 },
                 appletIds: {
                   type: 'array',
-                  maxItems: 500,
                   items: { type: 'string', maxLength: 200 },
                 },
                 processes: {
                   type: 'array',
-                  maxItems: 100,
                   items: { type: 'string', maxLength: 120 },
                 },
                 excludedProcesses: {
                   type: 'array',
-                  maxItems: 100,
                   items: { type: 'string', maxLength: 120 },
                 },
                 excludeDesktop: { type: 'boolean' },
@@ -196,8 +188,6 @@ export function validateStackGraph(
       const child = visit(entry.command, [...ancestors, id]);
       count += Math.max(1, child.count);
       depth = Math.max(depth, child.depth + 1);
-      if (count > maximumExpandedCommands)
-        throw Error(hostText('settings.commandStacks.expandedLimit'));
     }
     const result = { count, depth };
     memo.set(id, result);
@@ -208,22 +198,18 @@ export function validateStackGraph(
     let count = 0;
     for (const entry of root.entries) {
       count += Math.max(1, visit(entry.command, []).count);
-      if (count > maximumExpandedCommands)
-        throw Error(hostText('settings.commandStacks.expandedLimit'));
     }
   }
 }
 
-/** Resolve a bounded invocation plan while preserving every selected entry. */
+/** Resolve an invocation plan while preserving every selected entry. */
 export function expandStackCommand(
   id: string,
   catalog: ReadonlyMap<string, StackCatalogEntry>,
   context: TriggerContext,
   environment: ConditionEnvironment = {},
   ancestors: readonly string[] = [],
-  budget = { remaining: maximumExpandedCommands * maximumStackDepth },
 ): { commands: string[]; stackIds: string[] } {
-  if (--budget.remaining < 0) return { commands: [], stackIds: [] };
   const command = catalog.get(id);
   if (!command || command.available === false) return { commands: [], stackIds: [] };
   if (!command.stack) return { commands: [id], stackIds: [] };
@@ -240,19 +226,10 @@ export function expandStackCommand(
       !matchesCommandCondition(commandCondition(row.when), context, child.extensionId, environment)
     )
       continue;
-    const plan = expandStackCommand(
-      row.command,
-      catalog,
-      context,
-      environment,
-      [...ancestors, id],
-      budget,
-    );
-    if (budget.remaining < 0) return { commands: [], stackIds: [] };
+    const plan = expandStackCommand(row.command, catalog, context, environment, [...ancestors, id]);
     if (!plan.commands.length) continue;
-    commands.push(...plan.commands);
-    stackIds.push(...plan.stackIds);
-    if (commands.length > maximumExpandedCommands) return { commands: [], stackIds: [] };
+    for (const selected of plan.commands) commands.push(selected);
+    for (const stackId of plan.stackIds) stackIds.push(stackId);
     if (command.stack.executionMode === 'first') break;
   }
   return { commands, stackIds: [...new Set(stackIds)] };
@@ -267,9 +244,7 @@ export function stackConditionPaths(
   id: string,
   catalog: ReadonlyMap<string, StackCatalogEntry>,
   ancestors: readonly string[] = [],
-  budget = { remaining: maximumExpandedCommands * maximumStackDepth },
 ): StackConditionTerm[][] | undefined {
-  if (--budget.remaining < 0) return [];
   const command = catalog.get(id);
   if (!command || command.available === false) return [];
   if (!command.stack) return undefined;
@@ -278,11 +253,9 @@ export function stackConditionPaths(
   for (const row of command.stack.entries) {
     const child = catalog.get(row.command);
     if (!row.enabled || !child || child.available === false) continue;
-    const suffixes = stackConditionPaths(row.command, catalog, [...ancestors, id], budget) ?? [[]];
-    if (budget.remaining < 0) return [];
+    const suffixes = stackConditionPaths(row.command, catalog, [...ancestors, id]) ?? [[]];
     for (const suffix of suffixes) {
       paths.push([{ when: row.when, ownerId: child.extensionId }, ...suffix]);
-      if (paths.length > maximumExpandedCommands) return [];
     }
   }
   return paths;

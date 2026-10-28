@@ -254,7 +254,6 @@ export class InputCaptureManager {
         p.revision !== this.shortcutRevision ||
         !Array.isArray(p.shortcuts) ||
         !p.shortcuts.length ||
-        p.shortcuts.length > 2000 ||
         p.shortcuts.some((key: unknown) => typeof key !== 'string') ||
         typeof p.window !== 'string' ||
         typeof p.context !== 'string'
@@ -325,7 +324,6 @@ export class InputCaptureManager {
       this.active.has(p.session) ||
       !Array.isArray(p.rowIds) ||
       !p.rowIds.length ||
-      p.rowIds.length > 2000 ||
       p.rowIds.some((id: unknown) => typeof id !== 'string' || id.length > 180) ||
       new Set(p.rowIds).size !== p.rowIds.length
     )

@@ -189,9 +189,8 @@ export function WebAccountSettings({
         toolbar={
           <CommandListSummary className="settings-list-toolbar" actions={null}>
             <span role="status">
-              {translate('settings.settingsListTable.entryCount', {
+              {translate('settings.settingsListTable.unlimitedCount', {
                 count: accounts.length,
-                limit: 32,
               })}
             </span>
           </CommandListSummary>
@@ -209,7 +208,7 @@ export function WebAccountSettings({
                 />
                 <SettingsListAddButton
                   label={translate('settings.webAccountSettings.add')}
-                  disabled={busy || accounts.length >= 32}
+                  disabled={busy}
                   onClick={() =>
                     void run(() =>
                       settingsControls.createWebAccount(

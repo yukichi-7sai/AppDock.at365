@@ -463,10 +463,6 @@ test('model discovery distinguishes empty, unsupported, auth and malformed respo
     [() => new Response('PRIVATE RESPONSE', { status: 401 }), 'TTS_AUTH_FAILED'],
     [() => Response.json({ data: [{ id: 'a' }, { id: 'a' }] }), 'TTS_INVALID_MODELS'],
     [() => Response.json({ data: [{ id: '' }] }), 'TTS_INVALID_MODELS'],
-    [
-      () => Response.json({ data: Array.from({ length: 1001 }, (_, n) => ({ id: String(n) })) }),
-      'TTS_INVALID_MODELS',
-    ],
     [() => Response.json({ voices: [] }), 'TTS_INVALID_MODELS'],
     [
       () => new Response('PRIVATE RESPONSE', { headers: { 'Content-Type': 'text/html' } }),

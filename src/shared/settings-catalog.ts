@@ -25,7 +25,6 @@ import {
   settingsStorageDefaults,
 } from './settings-storage';
 
-export const settingsTextLimit = 1024 * 1024;
 export type SettingsPath = string[];
 export interface SettingsItem {
   id: string;
@@ -803,8 +802,6 @@ export function applySettingsJson(
   applets: ExtensionSnapshot[],
   text: string,
 ): Settings {
-  if (new TextEncoder().encode(text).length > settingsTextLimit)
-    throw Error(hostText('settings.settings-catalog.jsonSize'));
   const value = JSON.parse(text);
   if (!object(value) || !page.json) throw Error(hostText('settings.settings-catalog.jsonObject'));
   const next = structuredClone(current);

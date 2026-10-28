@@ -126,7 +126,7 @@ export function SettingsListTable({
   extra,
   titleExtra,
   navigation,
-  maxItems = 64,
+  maxItems,
   canAdd = true,
   addInTitle = false,
   orderInTitle = false,
@@ -163,10 +163,15 @@ export function SettingsListTable({
     settingsListText(definition, entry, key, options);
   const count = (
     <span>
-      {translate('settings.settingsListTable.entryCount', {
-        count: entries.length,
-        limit: maxItems,
-      })}
+      {translate(
+        maxItems === undefined
+          ? 'settings.settingsListTable.unlimitedCount'
+          : 'settings.settingsListTable.entryCount',
+        {
+          count: entries.length,
+          ...(maxItems === undefined ? {} : { limit: maxItems }),
+        },
+      )}
     </span>
   );
   const orderInHeading = !!onOrder && addInTitle && orderInTitle;
@@ -192,7 +197,7 @@ export function SettingsListTable({
           className="primary"
           data-testid={testId ? `${testId}:add` : undefined}
           data-dialog-focus-fallback
-          disabled={busy || !canAdd || entries.length >= maxItems}
+          disabled={busy || !canAdd || (maxItems !== undefined && entries.length >= maxItems)}
           onClick={onAdd}
         >
           {translate('settings.settingsListTable.add', {
@@ -231,7 +236,9 @@ export function SettingsListTable({
                     label={translate('settings.settingsListTable.add', {
                       value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
                     })}
-                    disabled={busy || !canAdd || entries.length >= maxItems}
+                    disabled={
+                      busy || !canAdd || (maxItems !== undefined && entries.length >= maxItems)
+                    }
                     onClick={onAdd}
                   />
                   {orderInHeading && orderButton}

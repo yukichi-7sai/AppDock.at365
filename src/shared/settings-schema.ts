@@ -2,6 +2,7 @@ import { hostSettingsDefaults, hostSettingDefinitions } from './host-settings';
 import { validateSettingValue } from './setting-definitions';
 import { defaultHostLanguage, isHostLanguage } from './host-language';
 import { hostText } from './i18n';
+import { prepareSettingsLookups } from './settings-lookups';
 import { parseMcpRoster } from './mcp-client';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import { defaultAccentColor, defaultCustomAccent, isAccentColor, isAccentHex } from './appearance';
@@ -15,7 +16,7 @@ import {
   defaultKeybindingOptions,
   parseKeybindingOptions,
 } from './keybindings';
-import { parseTrayMenu, trayMenuCommandIds, maximumTrayItems, defaultTrayMenu } from './tray-menu';
+import { parseTrayMenu, trayMenuCommandIds, defaultTrayMenu } from './tray-menu';
 import { parseGestures, defaultGestures } from './gestures';
 import { defaultTouchpadGestures, parseTouchpadGestures } from './touchpad-gestures';
 import {
@@ -166,7 +167,6 @@ export function parseSettings(value: unknown): Settings {
         : value.trayCommands;
   if (
     !Array.isArray(trayCommands) ||
-    trayCommands.length > (trayMenu === undefined ? 500 : maximumTrayItems) ||
     trayCommands.some((id) => !validCommandId(id)) ||
     new Set(trayCommands).size !== trayCommands.length
   )
@@ -197,7 +197,6 @@ export function parseSettings(value: unknown): Settings {
   const appletOrder = value.appletOrder === undefined ? [] : value.appletOrder;
   if (
     !Array.isArray(appletOrder) ||
-    appletOrder.length > 500 ||
     appletOrder.some(
       (id) =>
         typeof id !== 'string' ||
@@ -214,7 +213,6 @@ export function parseSettings(value: unknown): Settings {
     value.keybindingDefaultsInitialized === undefined ? [] : value.keybindingDefaultsInitialized;
   if (
     !Array.isArray(keybindingDefaultsInitialized) ||
-    keybindingDefaultsInitialized.length > 500 ||
     keybindingDefaultsInitialized.some(
       (id) => typeof id !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,100}$/.test(id),
     ) ||
@@ -231,7 +229,6 @@ export function parseSettings(value: unknown): Settings {
       : value.globalShortcutCommands;
   if (
     !Array.isArray(globalShortcutCommands) ||
-    globalShortcutCommands.length > 500 ||
     globalShortcutCommands.some((id) => !validCommandId(id)) ||
     new Set(globalShortcutCommands).size !== globalShortcutCommands.length
   )
@@ -239,7 +236,6 @@ export function parseSettings(value: unknown): Settings {
   const pinnedCommands = value.pinnedCommands === undefined ? [] : value.pinnedCommands;
   if (
     !Array.isArray(pinnedCommands) ||
-    pinnedCommands.length > 500 ||
     pinnedCommands.some((id) => !validCommandId(id)) ||
     new Set(pinnedCommands).size !== pinnedCommands.length
   )
@@ -320,7 +316,6 @@ export function parseSettings(value: unknown): Settings {
       web.version !== 1 ||
       web.owner !== 'at365.web-applet' ||
       !Array.isArray(web.ids) ||
-      web.ids.length > 64 ||
       web.ids.some((id) => typeof id !== 'string' || !/^web\.[a-f0-9-]{36}$/.test(id)) ||
       new Set(web.ids).size !== web.ids.length
     )
@@ -328,13 +323,12 @@ export function parseSettings(value: unknown): Settings {
     parsed.migrations = structuredClone(marker);
   }
   const result = keybindings ? withKeybindings(parsed, keybindings) : parsed;
-  if (new TextEncoder().encode(JSON.stringify(result)).length > 1024 * 1024)
-    throw new Error(hostText('settings.settings-schema.size'));
+  prepareSettingsLookups(result);
   return result;
 }
 function parseGestureInitialized(value: unknown): string[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 500 || value.some((v) => !validCommandId(v)))
+  if (!Array.isArray(value) || value.some((v) => !validCommandId(v)))
     throw Error(hostText('settings.settings-schema.gesturesApplied'));
   return [...new Set(value)] as string[];
 }

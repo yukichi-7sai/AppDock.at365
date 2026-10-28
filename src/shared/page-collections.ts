@@ -105,8 +105,7 @@ export function validateCollectionRecords(
   definition: PageCollectionDefinition,
   value: unknown,
 ): CollectionRecord[] {
-  if (!Array.isArray(value) || value.length > 64)
-    throw Error(hostText('services.sharedPageCollections.countLimit'));
+  if (!Array.isArray(value)) throw Error(hostText('services.sharedPageCollections.countLimit'));
   const ids = new Set<string>();
   return value.map((item) => {
     if (
@@ -127,8 +126,7 @@ export function validateCollectionRecords(
       if (
         !profileId(item.accountId) ||
         !['none', 'same-origin', 'any'].includes(item.navigation) ||
-        !Array.isArray(item.allowedOrigins) ||
-        item.allowedOrigins.length > 32
+        !Array.isArray(item.allowedOrigins)
       )
         throw Error(hostText('services.sharedPageCollections.invalidNavigation'));
       for (const origin of item.allowedOrigins)
@@ -156,12 +154,11 @@ export function collectionPages(
 ): CollectionPage[] {
   const ids = new Set(parents.map((parent) => parent.id));
   return parents.flatMap((parent) => {
-    let count = 0;
     return (parent.pageCollections ?? []).flatMap((definition) => {
       const rows = settings.extensions[parent.id]?.settings[definition.key] ?? [];
       return validateCollectionRecords(definition, rows).map((item) => {
         const id = collectionIdentity(settings, parent.id, definition.key, item.id);
-        if (id.length > 100 || ids.has(id) || ++count > 64)
+        if (id.length > 100 || ids.has(id))
           throw Error(hostText('services.sharedPageCollections.invalidIds'));
         ids.add(id);
         return {

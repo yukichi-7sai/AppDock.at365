@@ -53,17 +53,15 @@ const whenSchema = {
   type: 'object',
   properties: {
     scope: { type: 'string', enum: keybindingScopes.map((s) => s.id) },
-    appletIds: { type: 'array', items: shortcutTargetSchema, maxItems: 500, uniqueItems: true },
+    appletIds: { type: 'array', items: shortcutTargetSchema, uniqueItems: true },
     processes: {
       type: 'array',
       items: { type: 'string', minLength: 1, maxLength: 120 },
-      maxItems: 100,
     },
     excludeDesktop: { type: 'boolean' },
     excludedProcesses: {
       type: 'array',
       items: { type: 'string', minLength: 1, maxLength: 120 },
-      maxItems: 100,
       description: 'global条件のみ。トリガー全体の除外に追加するexe名。',
     },
   },
@@ -151,7 +149,6 @@ export class ShortcutCommands {
                         browsers: {
                           type: 'array',
                           items: { type: 'string', minLength: 1, maxLength: 120 },
-                          maxItems: 100,
                         },
                         requireChromiumWindowClass: { type: 'boolean' },
                       }),
@@ -165,7 +162,6 @@ export class ShortcutCommands {
                       type: 'array',
                       items: idSchema,
                       minItems: 1,
-                      maxItems: 2000,
                       uniqueItems: true,
                       description: '同じキーの全行IDを実行順に指定',
                     },
@@ -315,7 +311,6 @@ export class ShortcutCommands {
             !exact(op, ['kind', 'key', 'ids']) ||
             !Array.isArray(op.ids) ||
             !op.ids.length ||
-            op.ids.length > 2000 ||
             op.ids.some((id) => !validCommandId(id))
           )
             throw invalid();

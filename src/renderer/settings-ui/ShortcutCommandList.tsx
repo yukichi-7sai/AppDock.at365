@@ -87,7 +87,6 @@ export function ShortcutCommandList({
       applyBinding={(row, original) => {
         let next: Keybinding[];
         if (!original) {
-          if (bindings.length >= 2000) throw Error(translate('settings.shortcutCommandList.limit'));
           next = appendKeybinding(bindings, row);
         } else {
           if (

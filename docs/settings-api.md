@@ -26,7 +26,7 @@ UIとの対応はownerの`ui`で安定したページID・設定キーを結び�
 | 既存AI接続           | 名前、preset、URL、認証方式、モデル、出力上限、待ち時間、compatibilityの通常値。IDとprotocolは変更対象外 |
 | AI接続一覧           | 登録済み接続の公開列とID、追加・部分編集・削除・並べ替え。暗号化情報を保持する行は削除しない             |
 | TTS                  | URL、モデル、既定ボイス/速度、速度適用先、ボイス候補取得方式/相対パス                                    |
-| TTS手動ボイス一覧    | id/nameの取得・追加・部分編集・削除・並べ替え。既存の上限1,000件と解析規則を使用                         |
+| TTS手動ボイス一覧    | id/nameの取得・追加・部分編集・削除・並べ替え。固定件数上限なし。既存の解析規則を使用                         |
 | MCP接続一覧          | 共有のID/名前/説明とPC専用の非秘密接続設定。追加・部分編集・削除・並べ替え                               |
 | 通知の共通音声       | voice/speedの上書きと解除。解除するとTTSの既定値を継承                                                   |
 | 通知種類ごと         | 通知先、表示時間、読み上げ、MCP Eventsの上書きと解除。種類の追加/削除/並べ替えは提供しない               |
@@ -100,11 +100,11 @@ items.listの行は`itemRef`・`values`・`removable`を返す。行ごとの操
 
 itemRefは主体・target・Schema・値のrevision・行の識別に結び付いた不透明な参照。同名行を名前で識別しない。list.idKeyがあれば内部で保存IDに対応し、ID列が公開されていれば読取り専用にする。追加時だけ既存UIと同じUUIDを生成する。IDなしの一覧には保存IDを追加せず、取得したスナップショット内の位置を使用する。保存後・Schema変更後・再起動後は行を再取得する。
 
-宣言型一覧は最大64行。所有サービスの一覧は既存の上限に従い、SchemaのmaxItemsとreorder.itemRefsのmaxItemsで返す。AI接続は8行、TTS手動ボイスは1,000行まで扱える。要求64KiB・応答256KiBの制限は維持する。add/remove/reorderは1要求につき1件とし、他の操作と混在させない。updateは1～32件で、同じ行の同じ保存フィールドの重複を拒否する。最新行を複製して部分変更し、非公開列・未知キー・未編集の入れ子・互換形式を保持する。propertyPath・別名・数値の旧select表現は共通object-list部品で解釈し、指定された列だけを正規化する。JSON文字列で保存された旧一覧も、無変更なら書き直さない。
+宣言型・所有サービスの保存一覧に固定件数上限は設けず、Schemaとreorder.itemRefsのmaxItemsは省略する。内部設定APIの要求に合計サイズ上限は設けない。MCP通信の要求64KiB・設定APIの応答256KiBは維持する。add/remove/reorderは1要求につき1件とし、他の操作と混在させない。updateは1～32件で、同じ行の同じ保存フィールドの重複を拒否する。最新行を複製して部分変更し、非公開列・未知キー・未編集の入れ子・互換形式を保持する。propertyPath・別名・数値の旧select表現は共通object-list部品で解釈し、指定された列だけを正規化する。JSON文字列で保存された旧一覧も、無変更なら書き直さない。
 
 addは宣言済みの既定値とID生成を使い、非公開列を要求から設定させない。汎用の全体置換・一覧resetは提供しない。removeは非公開列や未対応列に値があればローカル操作とし、画像参照等の寿命管理が必要なデータを汎用削除で消さない。dryRunは公開列だけの変更計画を返す。保存結果のchangesは操作種別と公開された変更内容で、行参照は取得時のもの。保存後の参照はitems.listで再取得する。
 
-所有サービスの一覧は、targets.listのoperationsとschema.getのoperationSchemasに対応操作だけを返す。未対応操作は計画・保存前に拒否する。Applet管理順序はreorderだけを公開し、既存のappletOrderと同じ最大500件を使う。
+所有サービスの一覧は、targets.listのoperationsとschema.getのoperationSchemasに対応操作だけを返す。未対応操作は計画・保存前に拒否する。Applet管理順序はreorderだけを公開し、既存のappletOrderと同じく件数上限を設けない。
 
 ### 登録画像の参照
 
@@ -120,7 +120,7 @@ addは宣言済みの既定値とID生成を使い、非公開列を要求から
 
 `category: image-library`のlist対象は、共有imageLibrary.groupsのID/名前を公開する。IDは読取り専用で、追加時にUUIDを生成する。add/update/remove/reorderに対応し、最大64グループ、名前は前後の空白を除いて1～80文字、制御文字と大文字小文字を無視した重複を拒否する。グループの削除は分類だけを外し、原画像とリボン/各Appletの使用先は変更しない。
 
-各グループには`category: image-library-members`のlist対象を生成し、file列で所属する登録画像のファイル名を取得する。操作はadd/remove/reorderで、既存行のupdateは提供しない。追加するfileはsettings.options.listから取得し、現在の画像サービスのキャッシュにある候補と大文字小文字を無視して照合する。パス・URL・任意ファイル、同じグループ内の重複は拒否する。各グループ512参照、全体4096所属の既存上限を使う。
+各グループには`category: image-library-members`のlist対象を生成し、file列で所属する登録画像のファイル名を取得する。操作はadd/remove/reorderで、既存行のupdateは提供しない。追加するfileはsettings.options.listから取得し、現在の画像サービスのキャッシュにある候補と大文字小文字を無視して照合する。パス・URL・任意ファイル、同じグループ内の重複は拒否する。各グループの参照数・全体の所属数に固定上限は設けない。
 
 グループ名簿と所属は、画像管理画面と同じImageLibrarySettingsの変更計画、既存parserと保存処理へ渡す。未編集グループ、他の所属、設定、認証情報と原画像を保持する。画像の未到着や候補取得失敗でも既存の所属を取得・解除・並べ替えできるが、未知候補の追加は拒否する。名称・所属の候補/Schema/値/プレビューに画像bytes、サムネイル、内容世代や実保存パスを含めない。
 
@@ -166,7 +166,7 @@ Appletの更新元はmanifestのupdateRepositoryを既定値とし、上書き�
 
 ## ジェスチャー共通のブラウザ設定
 
-category=command-triggersのfields対象から、共有commandTriggerOptionsをset/resetできる。browsersは最大100件の文字列配列で、空配列も明示値として保持する。既存processNamesと同じ、前後空白の除去・末尾.exeの除去・小文字化・重複除去を行い、trim後1～120文字のexe名として検証する。パスや不正文字列は保存しない。requireChromiumWindowClassはboolean。Schemaはstring-listに対してtype=arrayと所有サービスのmaxItemsを返す。
+category=command-triggersのfields対象から、共有commandTriggerOptionsをset/resetできる。browsersは件数上限のない文字列配列で、空配列も明示値として保持する。既存processNamesと同じ、前後空白の除去・末尾.exeの除去・小文字化・重複除去を行い、trim後1～120文字のexe名として検証する。パスや不正文字列は保存しない。requireChromiumWindowClassはboolean。Schemaはstring-listに対してtype=arrayを返し、maxItemsは省略する。
 
 [共通宣言](../src/shared/command-trigger-options.ts)から型、既定値、検証、既存3画面の通常入力、検索/JSON、差分保存、MCPの項目を生成する。通常のトグル・文字・数値・固定選択は同じ宣言に追加する。独自の正規化関数は内部だけに保持し、画面/MCPへ渡す定義は構造化複製できるデータにする。方式別の動作・割当・接続に属するキーは共通宣言へ混ぜない。
 
@@ -198,11 +198,11 @@ read + writeで保存でき、appliesはappletDisplayOrderChanged。dryRunは検
 
 ## MCP接続一覧
 
-`category: mcp-client`のlist対象は、既存の共有名簿とPC専用接続を同じ所有サービスから読み書きする。行のidは読取り専用で、追加時にUUIDを生成する。name/descriptionは共有名簿へ、`connection.enabled/transport/command/args/cwd/url/authentication/published/publishedTools`はPC専用のmcp-client.jsonへ保存する。取得したitemRefを使い、部分編集・全行の並べ替え・秘密のない行の削除を行う。最大32行、引数は64件、公開ツール名は重複なしの512件まで。空の引数も既存の接続検証に従って保持する。
+`category: mcp-client`のlist対象は、既存の共有名簿とPC専用接続を同じ所有サービスから読み書きする。行のidは読取り専用で、追加時にUUIDを生成する。name/descriptionは共有名簿へ、`connection.enabled/transport/command/args/cwd/url/authentication/published/publishedTools`はPC専用のmcp-client.jsonへ保存する。取得したitemRefを使い、部分編集・全行の並べ替え・秘密のない行の削除を行う。行数・引数・公開ツール名に固定件数上限は設けず、公開ツール名の重複を拒否する。空の引数も既存の接続検証に従って保持する。
 
 新規行の接続は既定で無効・非公開とし、HTTPは有効なURL、stdioは絶対EXEパス等の既存条件を満たす必要がある。token/environment・暗号文・環境変数名はSchema/値/プレビューに公開せず、MCPから指定できない。秘密のない行をBearer認証へ切り替える操作はローカル設定を必要とする。秘密付きの行は接続先・EXE・引数・作業フォルダー・認証方法の変更と削除を拒否し、名前・説明・有効状態・公開設定の編集や順序変更では暗号文をそのまま保持する。現在の制限はitems.listのwritableKeys/removableで確認する。
 
-取得・計画・保存の保護判定は秘密を復号しない。形式不備のある個別行のPCデータは、名前/説明だけの編集や他の行の編集で保持する。PC上で未設定の行は名簿だけを編集でき、必要な非秘密接続情報を指定して設定できる。秘密付きの壊れた接続の修復・削除はローカル操作とする。ファイル全体の不正JSON・未対応版・容量/件数超過ではavailable=falseとなり、原本を保持して保存を拒否する。
+取得・計画・保存の保護判定は秘密を復号しない。形式不備のある個別行のPCデータは、名前/説明だけの編集や他の行の編集で保持する。PC上で未設定の行は名簿だけを編集でき、必要な非秘密接続情報を指定して設定できる。秘密付きの壊れた接続の修復・削除はローカル操作とする。ファイル全体の不正JSON・未対応版ではavailable=falseとなり、原本を保持して保存を拒否する。
 
 read + writeで変更でき、execute/useMcpは保存の追加条件にしない。複数行の編集は既存の共有/PC専用トランザクションで一括保存し、後半の検証やファイル保存が失敗した場合も部分保存しない。無変更・dryRun・同じ要求の再送で保存を繰り返さず、共有名簿だけの変更ではPC接続ファイルを再書込みしない。applies=mcpSettingsChanged、completion=settingsSaved/effectVerified=falseであり、接続・ツール探索・stdio起動は始めない。従来の管理APIも同じ非秘密保存計画を使い、公開する状態は接続設定の状態であり、認証の成否を保証しない。接続試験と実行は[共通MCPクライアント](mcp-client-design.md)の独立した操作を使う。
 
@@ -210,7 +210,7 @@ read + writeで変更でき、execute/useMcpは保存の追加条件にしない
 
 `web-profiles` capabilityを宣言したAppletごとに、`category: web-accounts`のlist対象を自動生成する。無効・停止中の提供元も名簿を編集でき、操作のために有効化・Applet起動・RemotePageService初期化・ページ表示を行わない。提供元が増減しても固定6入口と外側のツールSchemaを変更しない。対象IDは探索結果を使い、`ownerId`で提供元を区別する。
 
-公開する列は読取り専用のidと編集可能なnameだけ。対応操作は`add`と`update`で、枠の追加時は`account.<UUID>`を生成する。addのbeforeItemRefで既存行の前へ挿入できるが、既存IDと既存行同士の順序は保持する。上限32件、名前は制御文字なしの1～80文字で、前後の空白を除く。同名の枠はitemRefで区別する。行削除、並べ替え、reset、ログイン情報のクリア、Cookieやsessionの取得・編集は提供しない。
+公開する列は読取り専用のidと編集可能なnameだけ。対応操作は`add`と`update`で、枠の追加時は`account.<UUID>`を生成する。addのbeforeItemRefで既存行の前へ挿入できるが、既存IDと既存行同士の順序は保持する。件数上限はなく、名前は制御文字なしの1～80文字で、前後の空白を除く。同名の枠はitemRefで区別する。行削除、並べ替え、reset、ログイン情報のクリア、Cookieやsessionの取得・編集は提供しない。
 
 保存はUIの追加・名前変更と同じWebProfileStoreの変更計画・parser・atomicWriteを使う。共有名簿の既存の未知属性と未編集値を保持し、設定JSONのbytes/revision、PC専用の削除待ち記録、session、暗号化情報を変更しない。既存の移行マーカーが指定する保存先もそのまま使う。候補のid/名前は既存のweb-profiles providerから取得し、名簿変更はそのselectのschemaRevisionへ反映する。
 
@@ -259,7 +259,7 @@ select候補はDefault Shellと、現在その領域のviewを宣言するApplet
 }
 ```
 
-例のキーは本体の外観対象に対するもの。外側のツールSchemaにはtargetId・キー・kindの列挙を固定しないが、実行時は最新の対象定義と操作Schemaへ厳密に照合する。未対応操作、余分なプロパティ、同一キーへの複数操作、範囲・型違反は保存前に拒否する。操作は1～32件、set/resetそれぞれ1～128キー、要求本文は64KiBまで。1要求を複数対象へ分割保存しない。
+例のキーは本体の外観対象に対するもの。外側のツールSchemaにはtargetId・キー・kindの列挙を固定しないが、実行時は最新の対象定義と操作Schemaへ厳密に照合する。未対応操作、余分なプロパティ、同一キーへの複数操作、範囲・型違反は保存前に拒否する。操作は1～32件、set/resetそれぞれ1～128キー、MCP通信の要求本文は64KiBまで。1要求を複数対象へ分割保存しない。
 
 resetは指定された保存上書きを解除して現在の既定値へ戻す。setで既定値を指定した場合も同じ扱いにする。既定値と等しい値が保存されている場合も上書きを解除する。変更がなければ書き込まず、revisionを変えない。共有設定とPC専用設定、Appletのローカル設定、未宣言・非公開の値は既存の保存経路と分類を使う。
 

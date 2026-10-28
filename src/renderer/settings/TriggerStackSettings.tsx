@@ -191,7 +191,6 @@ export function TriggerStackDialog({
                 keyboard={value.kind === 'shortcuts'}
                 onValidity={setValid}
                 initialEntryId={initialEntryId}
-                maxEntries={2000}
               />
             </div>
           </>
@@ -261,8 +260,6 @@ export function TriggerStackSettings({
         busy={busy}
         addInTitle
         commandListScroll
-        maxItems={2000}
-        canAdd={stacks.length < 2000}
         onAdd={() =>
           setDialog({
             kind: 'edit',

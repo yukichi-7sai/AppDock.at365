@@ -145,8 +145,8 @@ test('classification discovery exposes only group identities/names and filenames
       ['name', true],
     ],
   );
-  assert.equal(schema.maxItems, 64);
-  assert.equal(f.call('schema.get', { targetId: f.target('one').targetId }).maxItems, 512);
+  assert.equal(schema.maxItems, undefined);
+  assert.equal(f.call('schema.get', { targetId: f.target('one').targetId }).maxItems, undefined);
   assert.deepEqual(
     f.read('two').items.map((row) => row.values),
     [{ file: 'first.png' }, { file: 'missing.png' }],
@@ -438,7 +438,7 @@ test('malformed classification stays unavailable without exposing unknown data o
   }
 });
 
-test('64 groups/512 references/4096 memberships retain the existing capacity limits and pagination', (t) => {
+test('groups and memberships exceed former capacities while retaining pagination and duplicate checks', (t) => {
   const files = Array.from({ length: 512 }, (_, i) => `image-${i}.png`);
   const f = fixture(t, { groups: Array.from({ length: 8 }, (_, i) => group('group-' + i, files)) });
   f.state.candidates = files;
@@ -456,16 +456,12 @@ test('64 groups/512 references/4096 memberships retain the existing capacity lim
   );
   f.call('apply', f.request([{ kind: 'add', values: { name: 'Ninth' } }]));
   const ninth = f.owner.snapshot().groups.at(-1).id;
-  refuses(
-    () => f.call('apply', f.request([{ kind: 'add', values: { file: files[0] } }], ninth)),
-    'INVALID_ARGUMENT',
-  );
+  f.call('apply', f.request([{ kind: 'add', values: { file: files[0] } }], ninth));
+  assert.equal(f.owner.snapshot().groups.at(-1).images.length, 1);
   const capped = fixture(t, { groups: Array.from({ length: 64 }, (_, i) => group('group-' + i)) });
   assert.equal(capped.read(undefined, { limit: 100 }).items.length, 64);
-  refuses(
-    () => capped.call('apply', capped.request([{ kind: 'add', values: { name: 'Overflow' } }])),
-    'INVALID_ARGUMENT',
-  );
+  capped.call('apply', capped.request([{ kind: 'add', values: { name: 'Additional' } }]));
+  assert.equal(capped.read(undefined, { limit: 100 }).items.length, 65);
 });
 
 test('owner plans recheck preflight/revision and do not write on no-change or failed commit', (t) => {

@@ -63,7 +63,6 @@ export function webProfileSettingsTarget(options: {
     ui: settingsUiGroup('web-accounts', 'accounts'),
     fields,
     definition,
-    maxItems: 32,
     operations: ['add', 'update'],
     rows: () => store?.snapshot().map(({ id, name }) => ({ id, name })) ?? [],
     overrides: () => {

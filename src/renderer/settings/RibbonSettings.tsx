@@ -508,14 +508,14 @@ export function RibbonSettings({
                   </button>
                   <button
                     className="secondary accent-action"
-                    disabled={pending || groups.length >= 50}
+                    disabled={pending}
                     onClick={() => open(undefined, position)}
                   >
                     {translate('settings.ribbonSettings.addGroup')}
                   </button>
                   <button
                     className="secondary accent-action"
-                    disabled={pending || layout.separators.length >= 50}
+                    disabled={pending}
                     onClick={() =>
                       run({
                         kind: 'addSeparator',

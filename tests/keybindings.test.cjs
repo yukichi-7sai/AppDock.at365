@@ -281,22 +281,20 @@ test('order panel refuses changed, removed, added or reordered members of an edi
     /変更されました/,
   );
 });
-test('new settings round-trip beyond legacy limits and include bindings in the size limit', () => {
+test('new settings round-trip beyond legacy limits and preserve large binding settings', () => {
   const keybindings = Array.from({ length: 501 }, (_, i) =>
     row(`r.${i}`, `test.command.${i}`, 'global'),
   );
   const parsed = parseSettings({ ...createDefaultSettings(), keybindings });
   assert.deepEqual(parseSettings(parsed), parsed);
   const appletIds = Array.from({ length: 100 }, (_, i) => `applet.${i}.${'x'.repeat(160)}`);
-  assert.throws(
-    () =>
-      parseSettings({
-        ...createDefaultSettings(),
-        keybindings: Array.from({ length: 100 }, (_, i) =>
-          row(`r.${i}`, 'test.command', 'applets', appletIds),
-        ),
-      }),
-    /1MB/,
+  assert.doesNotThrow(() =>
+    parseSettings({
+      ...createDefaultSettings(),
+      keybindings: Array.from({ length: 100 }, (_, i) =>
+        row(`r.${i}`, 'test.command', 'applets', appletIds),
+      ),
+    }),
   );
 });
 test('legacy settings remain readable; new bindings are authoritative and allow shared keys', () => {

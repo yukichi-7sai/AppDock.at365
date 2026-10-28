@@ -14,6 +14,7 @@
 
 | 対象 | 正本 |
 | --- | --- |
+| 設定一覧の件数と索引 | [設定一覧の容量と検索](docs/settings-capacity.md) |
 | 操作・設定と動作環境 | [機能・操作・設定](docs/usage.md) |
 | 開発・コミット・配布 | [共通手順](docs/development-workflow.md)、[ローカル発行](docs/publishing.md)、[GitHub Release](docs/RELEASING.md)、[全体ZIP](docs/all-in-one.md) |
 | Appletの開発とAPI | [実装ガイド](docs/applet-development.md)、[Applet API](docs/extensions.md)、[ホスト拡張](docs/host-development.md)、[ページ](docs/applet-pages.md) |

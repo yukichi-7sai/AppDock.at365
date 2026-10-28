@@ -27,7 +27,15 @@ export class WebProfileSettingsError extends Error {
 
 /** Account operations own their file and never change the settings revision. */
 export class WebProfileStore {
-  private value: WebProfile[] = [];
+  private accounts: WebProfile[] = [];
+  private byId = new Map<string, WebProfile>();
+  private get value() {
+    return this.accounts;
+  }
+  private set value(accounts: WebProfile[]) {
+    this.accounts = accounts;
+    this.byId = new Map(accounts.map((account) => [account.id, account]));
+  }
   private pending: string[] = [];
   private observer?: ReturnType<typeof observeFile>;
   private referenced?: () => boolean;
@@ -42,10 +50,10 @@ export class WebProfileStore {
     if (received === undefined && !fs.existsSync(this.file) && this.value.length === 0)
       return { accounts: [], pendingDeletion: [...this.pending] };
     const text = (received ?? fs.readFileSync(this.file, 'utf8')).replace(/^\uFEFF/, '');
-    if (Buffer.byteLength(text) > 65536) throw Error(hostText('services.webProfiles.sizeLimit'));
     const raw = JSON.parse(text);
     if (raw?.schemaVersion !== 1) throw Error(hostText('services.webProfiles.unsupportedFormat'));
     const accounts = parseWebProfiles(raw.accounts);
+    const accountIds = new Set(accounts.map((account) => account.id));
     const pending = this.pendingFile
       ? fs.existsSync(this.pendingFile)
         ? JSON.parse(fs.readFileSync(this.pendingFile, 'utf8'))
@@ -53,9 +61,7 @@ export class WebProfileStore {
       : (raw.pendingDeletion ?? []);
     if (
       !Array.isArray(pending) ||
-      pending.some(
-        (id) => !profileId(id) || (!this.pendingFile && accounts.some((a) => a.id === id)),
-      ) ||
+      pending.some((id) => !profileId(id) || (!this.pendingFile && accountIds.has(id))) ||
       new Set(pending).size !== pending.length
     )
       throw Error(hostText('services.webProfiles.invalidDeletion'));
@@ -106,7 +112,8 @@ export class WebProfileStore {
       throw new WebProfileSettingsError('REVISION_CONFLICT');
     const accounts = parseWebProfiles(rows);
     // Only additions and names are public. Existing identities and their relative order survive.
-    const existing = accounts.filter((a) => current.accounts.some((p) => p.id === a.id));
+    const currentById = new Map(current.accounts.map((account) => [account.id, account]));
+    const existing = accounts.filter((a) => currentById.has(a.id));
     if (
       existing.length !== current.accounts.length ||
       existing.some((a, index) => a.id !== current.accounts[index].id)
@@ -117,16 +124,18 @@ export class WebProfileStore {
     const raw = previous
       ? JSON.parse(previous.toString('utf8').replace(/^\uFEFF/, ''))
       : { schemaVersion: 1, accounts: [] };
+    const previousById = new Map<string, WebProfile>(
+      raw.accounts.map((account: WebProfile) => [account.id, account]),
+    );
     const saved = {
       ...raw,
       accounts: accounts.map((a) => {
-        const before = raw.accounts.find((p: WebProfile) => p.id === a.id);
-        const known = current.accounts.find((p) => p.id === a.id);
+        const before = previousById.get(a.id);
+        const known = currentById.get(a.id);
         return before ? { ...before, ...(known?.name === a.name ? {} : { name: a.name }) } : a;
       }),
     };
     const text = JSON.stringify(saved, null, 2) + '\n';
-    if (Buffer.byteLength(text) > 65536) throw new WebProfileSettingsError('INVALID_ARGUMENT');
     return {
       changed,
       commit: () => {
@@ -140,7 +149,7 @@ export class WebProfileStore {
     };
   }
   get(id: unknown) {
-    const result = profileId(id) ? this.value.find((a) => a.id === id) : undefined;
+    const result = profileId(id) ? this.byId.get(id) : undefined;
     if (!result) throw Error(hostText('services.webProfiles.missing'));
     return { ...result };
   }
@@ -177,7 +186,6 @@ export class WebProfileStore {
         null,
         2,
       ) + '\n';
-    if (Buffer.byteLength(text) > 65536) throw Error(hostText('services.webProfiles.sizeLimit'));
     if (this.pendingFile) atomicWrite(this.pendingFile, JSON.stringify(pending));
     try {
       atomicWrite(this.file, text, { previous });
@@ -214,7 +222,7 @@ export class WebProfileStore {
     );
   }
   pendingDeletion() {
-    return this.pending.filter((id) => !this.value.some((a) => a.id === id));
+    return this.pending.filter((id) => !this.byId.has(id));
   }
   cleanupSessions(referenced: Iterable<string>, live: Iterable<string> = []) {
     const blocked = new Set([...referenced, ...live, ...this.value.map((a) => a.id)]);

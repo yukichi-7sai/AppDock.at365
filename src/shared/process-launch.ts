@@ -25,7 +25,7 @@ const absolute = (value: string) =>
   !/[\x00-\x1f]/.test(value);
 export function parseProcessLaunch(value: unknown): ProcessLaunchConfig {
   if (!jsonObject(value)) throw Error(hostText('settings.process-launch.settings'));
-  boundedJson(value, 16 * 1024);
+  boundedJson(value, Infinity, 16, Infinity);
   const mode = value.mode;
   const fields =
     mode === 'executable'
@@ -56,7 +56,6 @@ export function parseProcessLaunch(value: unknown): ProcessLaunchConfig {
       !absolute(value.executable) ||
       !value.executable.toLowerCase().endsWith('.exe') ||
       !Array.isArray(value.arguments) ||
-      value.arguments.length > 64 ||
       value.arguments.some((arg) => !string(arg, 4096))
     )
       throw Error(hostText('settings.process-launch.executable'));
@@ -84,7 +83,7 @@ export const processLaunchSchema = {
       'executable',
       {
         executable: { type: 'string', minLength: 1, maxLength: 4096 },
-        arguments: { type: 'array', maxItems: 64, items: { type: 'string', maxLength: 4096 } },
+        arguments: { type: 'array', items: { type: 'string', maxLength: 4096 } },
       },
       ['executable', 'arguments'],
     ),

@@ -297,7 +297,6 @@ export class WebAccountController {
         s.version !== 1 ||
         !Array.isArray(s.accounts) ||
         !s.accounts.length ||
-        s.accounts.length > 10 ||
         s.accounts.some(
           (a) =>
             !a ||
@@ -1024,8 +1023,6 @@ export class WebAccountController {
         this.services.setSetting(args[0], args[1]);
         return;
       case 'add': {
-        if (this.state.accounts.length >= 10)
-          throw Error(hostText('services.webAccounts.accountLimit'));
         const id = randomUUID();
         this.save({
           ...this.state,

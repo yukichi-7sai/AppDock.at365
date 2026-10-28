@@ -42,7 +42,6 @@ import {
   newShortcutListEntry,
   shortcutListDefinition,
   shortcutListIdPattern,
-  shortcutListLimit,
   validShortcutList,
 } from '../../shared/shortcut-list';
 
@@ -259,7 +258,6 @@ export class SettingsCommands {
             available: owner.available && (!shortcut || validShortcutList(value())),
             fields,
             definition: projected,
-            maxItems: shortcut ? shortcutListLimit : undefined,
             createRow: shortcut ? () => ({ ...newShortcutListEntry(rows()) }) : undefined,
             validateField: shortcut
               ? (field: SettingDefinition, next: unknown) =>

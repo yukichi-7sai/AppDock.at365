@@ -54,4 +54,19 @@ foreach (var fixture in fixtures.RootElement.GetProperty("stackConditions").Enum
         throw new Exception(fixture.GetProperty("name").GetString());
     count++;
 }
-Console.WriteLine($"Command condition/selection fixtures: {count} passed.");
+var names = Enumerable.Range(0, 10000).Select(i => $"Process{i}.EXE").ToArray();
+var pool = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+var large = new Condition("exe", [], names);
+CommandConditions.Prepare(large, pool);
+CommandConditions.Prepare(new ConditionEnvironment(names.ToArray()), pool);
+if (pool.Count != 1) throw new Exception("Equivalent process lists must share the prepared index.");
+var last = new CommandContext(new(), new("1", "process9999.exe"));
+if (!CommandConditions.Matches(large, last)) throw new Exception("Large process list must match its last entry.");
+if (CommandConditions.Matches(large, new(new(), new("1", "absent")))) throw new Exception("Unknown process matched.");
+if (CommandConditions.Matches(large, last, environment: new(ExcludedProcesses: names)))
+    throw new Exception("Exclusions must use the same normalized membership rules.");
+var changed = new Condition("exe", [], ["replacement"]);
+CommandConditions.Prepare(changed, new(StringComparer.Ordinal));
+if (CommandConditions.Matches(changed, last) || !CommandConditions.Matches(large, last))
+    throw new Exception("A new configuration must not reuse a stale index or mutate the old one.");
+Console.WriteLine($"Command condition/selection fixtures: {count} passed; large shared indexes passed.");

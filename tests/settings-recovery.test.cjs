@@ -123,7 +123,7 @@ test('changed recovery candidate and unpreservable targets are never overwritten
   assert.throws(() => f.store.restoreRecovery(plan), SettingsConflictError);
   assert.equal(fs.readFileSync(f.file, 'utf8'), '{bad');
   fs.writeFileSync(f.file, Buffer.alloc(4 * 1024 * 1024 + 1));
-  assert.throws(() => f.store.prepareRecovery());
+  assert.doesNotThrow(() => f.store.prepareRecovery());
   assert.equal(fs.statSync(f.file).size, 4 * 1024 * 1024 + 1);
   fs.unlinkSync(f.file);
   fs.mkdirSync(f.file);

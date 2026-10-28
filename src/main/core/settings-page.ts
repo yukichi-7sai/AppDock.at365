@@ -195,11 +195,7 @@ export class SettingsPageSession {
     if (!request || !['open', 'cancel'].includes(request.kind))
       throw Error(hostText('settings.pageError.operationDenied'));
     if (request.kind === 'open') {
-      if (
-        !request.request ||
-        request.request.mode !== 'select' ||
-        JSON.stringify([request.request]).length > 1024 * 1024
-      )
+      if (!request.request || request.request.mode !== 'select')
         throw Error(hostText('settings.pageError.operationDenied'));
       return (await this.transientAction(
         request,
@@ -321,11 +317,7 @@ export class SettingsPageSession {
         // Rebuild against current page and availability before resolving the issued ID.
         this.snapshot();
         const issued = [...this.actions.values()].find((a) => a.id === op.actionId);
-        if (
-          !issued ||
-          !Array.isArray(op.args ?? []) ||
-          JSON.stringify(op.args ?? []).length > 1024 * 1024
-        )
+        if (!issued || !Array.isArray(op.args ?? []))
           throw Error(hostText('settings.pageError.operationDenied'));
         // The invoking control (for example SettingsDialog) owns action error feedback.
         actionOwnsError = true;

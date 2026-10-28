@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { settingsLookups } from '../../shared/settings-lookups';
 import { hostStartupTiming } from './host-startup-timing';
 import { createHash, randomUUID } from 'node:crypto';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
@@ -122,7 +123,6 @@ export class CustomCommandService {
     const [parsed] = parseCustomTypes(null, [type]);
     if (this.hosts.has(parsed.id)) throw Error(hostText('services.customCommands.duplicateType'));
     compileCustomType(parsed);
-    if (this.records().length >= 256) throw Error(hostText('services.customCommands.typeLimit'));
     this.hosts.set(parsed.id, {
       owner: { kind: 'host' },
       title: 'AppDock',
@@ -152,7 +152,7 @@ export class CustomCommandService {
     const result = providers.flatMap((provider) =>
       provider.types.map((type) => ({ provider, type })),
     );
-    if (result.length > 256 || new Set(result.map((r) => r.type.id)).size !== result.length)
+    if (new Set(result.map((r) => r.type.id)).size !== result.length)
       return failure('TYPE_UNAVAILABLE', hostText('services.customCommands.invalidDeclarations'));
     return result;
   }
@@ -176,13 +176,18 @@ export class CustomCommandService {
         (provider.owner.kind === 'host' || this.bindings.get(type.id) === provider.generation),
     }));
   }
-  private state(item: CustomCommandDefinition) {
-    return hostStartupTiming.measure('commandState', () => this.stateCore(item));
+  private state(
+    item: CustomCommandDefinition,
+    records?: ReturnType<CustomCommandService['recordIndex']>,
+  ) {
+    return hostStartupTiming.measure('commandState', () => this.stateCore(item, records));
   }
-  private stateCore(item: CustomCommandDefinition) {
-    const record = this.records().find(
-      (r) => r.type.id === item.typeId && sameCustomOwner(r.provider.owner, item.owner),
-    );
+  private recordIndex() {
+    return new Map(this.records().map((record) => [record.type.id, record]));
+  }
+  private stateCore(item: CustomCommandDefinition, records = this.recordIndex()) {
+    const found = records.get(item.typeId);
+    const record = found && sameCustomOwner(found.provider.owner, item.owner) ? found : undefined;
     let reason: string | null = null;
     if (!item.enabled) reason = hostText('settings.customCommandState.disabled');
     else if (!record) reason = hostText('settings.customCommandState.missingType');
@@ -206,28 +211,22 @@ export class CustomCommandService {
     return { record, reason, published: !!record?.type.automation && item.automation };
   }
   summaries() {
-    return customItems(this.options.settings.value.customCommands).map(({ config, ...item }) => ({
-      ...item,
-      commandId: customCommandId(item.id),
-      available: this.state({ ...item, config }).reason === null,
-      unavailableReason: this.state({ ...item, config }).reason,
-    }));
+    const records = this.recordIndex();
+    return customItems(this.options.settings.value.customCommands).map(({ config, ...item }) => {
+      const state = this.state({ ...item, config }, records);
+      return {
+        ...item,
+        commandId: customCommandId(item.id),
+        available: state.reason === null,
+        unavailableReason: state.reason,
+      };
+    });
   }
   uiCommands(): UiCommand[] {
     return hostStartupTiming.measure('commandCatalog', () => this.uiCommandsCore());
   }
   private uiCommandsCore(): UiCommand[] {
-    const stacks = new Map(
-      customItems(this.options.settings.value.customCommands)
-        .filter((item) => item.typeId === commandStackTypeId)
-        .flatMap((item) => {
-          try {
-            return [[item.id, parseCommandStack(item.config)] as const];
-          } catch {
-            return [];
-          }
-        }),
-    );
+    const stacks = settingsLookups(this.options.settings.value).stacks;
     return this.summaries().map((item) => ({
       id: item.commandId,
       customDefinitionId: item.id,
@@ -241,8 +240,9 @@ export class CustomCommandService {
     }));
   }
   publicCommands(context: InputInvocation = {}): AutomationCommand[] {
+    const records = this.recordIndex();
     return customItems(this.options.settings.value.customCommands).flatMap((item) => {
-      const state = this.state(item);
+      const state = this.state(item, records);
       const reason =
         state.reason ??
         (state.record?.provider.authorized?.(context) === false
@@ -377,7 +377,7 @@ export class CustomCommandService {
         );
       if (!jsonObject(item.config))
         return failure('INVALID_ARGUMENT', hostText('services.customCommands.configObject'));
-      boundedJson(item.config, 16 * 1024);
+      boundedJson(item.config, Infinity, 40, Infinity);
       if (!this.validator(type)(item.config).valid)
         return failure('INVALID_ARGUMENT', hostText('services.customCommands.configSchema'));
       const provider = this.records().find((r) => r.type.id === item.typeId)?.provider;
@@ -459,15 +459,17 @@ export class CustomCommandService {
           items.push(item);
         } else if (operation.op === 'reorder') {
           const owned = items.filter((i) => this.owned(i.owner, caller));
+          const ownedById = new Map(owned.map((item) => [item.id, item]));
           if (
             !Array.isArray(operation.ids) ||
             operation.ids.length !== owned.length ||
             new Set(operation.ids).size !== owned.length ||
-            operation.ids.some((id) => !owned.some((i) => i.id === id))
+            operation.ids.some((id) => !ownedById.has(id))
           )
             return failure('INVALID_ARGUMENT', hostText('services.customCommands.orderIds'));
-          const ordered = operation.ids.map((id) => owned.find((i) => i.id === id)!);
-          items = items.map((i) => (this.owned(i.owner, caller) ? ordered.shift()! : i));
+          const ordered = operation.ids.map((id) => ownedById.get(id)!);
+          let position = 0;
+          items = items.map((i) => (this.owned(i.owner, caller) ? ordered[position++] : i));
         } else {
           const index = items.findIndex(
             (i) => i.id === operation.id && this.owned(i.owner, caller),
@@ -554,12 +556,16 @@ export class CustomCommandService {
     const before = customItems(current),
       after = customItems(parseCustomCommands(next.customCommands));
     const types = this.descriptors();
+    const beforeById = new Map(before.map((item) => [item.id, item]));
+    const afterIds = new Set(after.map((item) => item.id));
+    const typesById = new Map(types.map((type) => [type.id, type]));
     const operations: JsonObject[] = [];
     for (const item of before)
-      if (!after.some((i) => i.id === item.id)) operations.push({ op: 'remove', id: item.id });
+      if (!afterIds.has(item.id)) operations.push({ op: 'remove', id: item.id });
     for (const item of after) {
-      const old = before.find((i) => i.id === item.id);
-      const type = types.find((t) => t.id === item.typeId && sameCustomOwner(t.owner, item.owner));
+      const old = beforeById.get(item.id);
+      const found = typesById.get(item.typeId);
+      const type = found && sameCustomOwner(found.owner, item.owner) ? found : undefined;
       if (!old) {
         if (!type)
           return failure(
@@ -601,15 +607,14 @@ export class CustomCommandService {
     return hostStartupTiming.measure('commandReconcile', () => this.reconcileCore());
   }
   private reconcileCore() {
-    const records = this.records();
+    const records = this.recordIndex();
     for (const [id, generation] of this.bindings)
-      if (!records.some((r) => r.type.id === id && r.provider.generation === generation))
-        this.bindings.delete(id);
+      if (records.get(id)?.provider.generation !== generation) this.bindings.delete(id);
     for (const active of this.active.values()) {
-      const item = customItems(this.options.settings.value.customCommands).find(
-        (i) => i.id === active.definition.id,
+      const item = settingsLookups(this.options.settings.value).customById.get(
+        active.definition.id,
       );
-      const state = item ? this.state(item) : undefined;
+      const state = item ? this.state(item, records) : undefined;
       if (
         !item?.enabled ||
         !state?.record ||
@@ -625,9 +630,9 @@ export class CustomCommandService {
       customItems(this.options.settings.value.customCommands)
         .filter((item) => {
           if (!item.enabled) return false;
-          const record = records.find(
-            (r) => r.type.id === item.typeId && sameCustomOwner(r.provider.owner, item.owner),
-          );
+          const found = records.get(item.typeId);
+          const record =
+            found && sameCustomOwner(found.provider.owner, item.owner) ? found : undefined;
           if (!record || item.configVersion !== record.type.configVersion) return true;
           try {
             return (
@@ -645,9 +650,7 @@ export class CustomCommandService {
     for (const active of this.active.values()) active.controller.abort();
   }
   async execute(id: string, context: InputInvocation = {}): Promise<JsonObject> {
-    const item = customItems(this.options.settings.value.customCommands).find(
-      (i) => customCommandId(i.id) === id,
-    );
+    const item = settingsLookups(this.options.settings.value).customByCommandId.get(id);
     if (!item) return failure('NOT_FOUND', hostText('services.customCommands.missing'));
     const state = this.state(item),
       external = context.origin && context.origin.kind !== 'local';

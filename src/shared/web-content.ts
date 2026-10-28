@@ -44,8 +44,7 @@ export function webProfileName(value: unknown): string {
   return value.trim();
 }
 export function parseWebProfiles(raw: unknown): WebProfile[] {
-  if (!Array.isArray(raw) || raw.length > 32)
-    throw Error(hostText('services.sharedWebContent.accountLimit'));
+  if (!Array.isArray(raw)) throw Error(hostText('services.sharedWebContent.accountLimit'));
   const ids = new Set<string>();
   return raw.map((account) => {
     if (!account || typeof account !== 'object' || !profileId(account.id) || ids.has(account.id))

@@ -44,7 +44,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影モデルとして使�
 
 更新・再起動で画面を復元するときは、保存された表示先だけで接続を開始しない。本体のstartupReadyとnavigation.routeが実際の表示先にそろってから設定を接続する。準備中は読み込み表示とし、対象が変われば接続と検索移動の監視を解放する。全体設定とApplet詳細の両入口で同じ条件を使う。
 
-本体内部モデルは選択ページのvalues/定義/表示用補助情報/不透明な操作IDとsessionId/editRevision/pending/mode/errorだけ。選択ページ以外のSettings/HostSnapshot・他Appletの値を投影しない。dirty/conflict/text/avatarChanged/avatarLoadingを削除した。page-values/partial-textは同ページのbefore投影を必須とし、対象外キーを拒否する。save/discard/avatar-loadingを削除。JSONはUTF-8 1MiB、画像5MiB、検索語512文字。
+本体内部モデルは選択ページのvalues/定義/表示用補助情報/不透明な操作IDとsessionId/editRevision/pending/mode/errorだけ。選択ページ以外のSettings/HostSnapshot・他Appletの値を投影しない。dirty/conflict/text/avatarChanged/avatarLoadingを削除した。page-values/partial-textは同ページのbefore投影を必須とし、対象外キーを拒否する。save/discard/avatar-loadingを削除。設定JSONに固定の合計サイズ上限は設けない。画像5MiB、検索語512文字。件数と派生索引の方針は[設定一覧の容量と検索](settings-capacity.md)を参照する。
 
 Applet管理と左インデックスは本体の共通設定ページを開く。個別設定・入力設定・ログの移動先と表示用フィルターは[Applet管理](applet-management-settings-design.md)を参照する。停止・無効でも編集でき、移動だけで起動しない。入力キューと3秒のflush、競合と不正入力の契約を維持する。
 

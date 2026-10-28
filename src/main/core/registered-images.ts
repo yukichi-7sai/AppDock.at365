@@ -295,7 +295,6 @@ export class RegisteredImages {
         return { ref: saved.ref, reused: true };
       };
       if (existing) return duplicate();
-      if (files.length >= 512) throw Error(hostText('services.registeredImages.countLimit'));
       const temp = path.join(this.directory, `.${randomUUID()}.tmp`);
       const handle = await fs.open(temp, 'wx');
       try {

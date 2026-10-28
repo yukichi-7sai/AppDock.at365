@@ -35,13 +35,7 @@ test('tray settings validate types, duplicates and IDs, while retaining missing 
   settings.trayCommands = ['missing.command'];
   settings.host.trayClickCommand = 'missing.command';
   assert.deepEqual(parseSettings(settings).trayCommands, settings.trayCommands);
-  for (const invalid of [
-    null,
-    {},
-    ['bad id'],
-    ['a', 'a'],
-    Array.from({ length: 501 }, (_, i) => `c${i}`),
-  ])
+  for (const invalid of [null, {}, ['bad id'], ['a', 'a']])
     assert.throws(() => parseSettings({ ...settings, trayCommands: invalid }), /trayCommands/);
   for (const invalid of [null, '', {}, 'bad id', '__proto__'])
     assert.throws(

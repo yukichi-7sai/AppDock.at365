@@ -411,16 +411,13 @@ class ExtensionManager extends EventEmitter {
   validateInstall(folder: string) {
     const manifest = readManifest(folder);
     if (this.items.has(manifest.id)) throw Error(hostText('services.extensions.duplicateApplet'));
-    const existingTypes = [
+    const existingTypes = new Set([
       ...this.reservedCustomTypeIds(),
       ...[...this.items.values()].flatMap((e) =>
         (e.manifest.customCommandTypes ?? []).map((t) => t.id),
       ),
-    ];
-    if (
-      existingTypes.length + (manifest.customCommandTypes?.length ?? 0) > 256 ||
-      manifest.customCommandTypes?.some((t) => existingTypes.includes(t.id))
-    )
+    ]);
+    if (manifest.customCommandTypes?.some((t) => existingTypes.has(t.id)))
       throw Error(hostText('services.extensions.customTypeLimit'));
   }
   discover() {
@@ -451,16 +448,13 @@ class ExtensionManager extends EventEmitter {
             this.log('warn', manifest.id, hostText('services.extensions.duplicateExtension'));
             continue;
           }
-          const existingTypes = [
+          const existingTypes = new Set([
             ...this.reservedCustomTypeIds(),
             ...[...this.items.values()].flatMap((e) =>
               (e.manifest.customCommandTypes ?? []).map((t) => t.id),
             ),
-          ];
-          if (
-            existingTypes.length + (manifest.customCommandTypes?.length ?? 0) > 256 ||
-            manifest.customCommandTypes?.some((t) => existingTypes.includes(t.id))
-          )
+          ]);
+          if (manifest.customCommandTypes?.some((t) => existingTypes.has(t.id)))
             throw Error(hostText('services.extensions.globalTypeLimit'));
           this.items.set(manifest.id, {
             manifest,

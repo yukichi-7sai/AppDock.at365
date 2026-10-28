@@ -1,7 +1,6 @@
 import type { SettingDefinition } from './contracts';
 import { hostText } from './i18n';
 
-export const shortcutListLimit = 32;
 export const shortcutListIdPattern = '^[a-z0-9][a-z0-9-]{0,39}$';
 export interface ShortcutListEntry {
   id: string;
@@ -24,7 +23,7 @@ export function validSendKeys(value: string): boolean {
   );
 }
 export function validShortcutList(value: unknown): value is ShortcutListEntry[] {
-  if (!Array.isArray(value) || value.length > shortcutListLimit) return false;
+  if (!Array.isArray(value)) return false;
   const ids = new Set<string>();
   for (const entry of value) {
     if (
@@ -49,8 +48,9 @@ export function newShortcutListEntry(
   entries: readonly { id?: unknown }[],
   title = hostText('settings.shortcutListSetting.new'),
 ): ShortcutListEntry {
+  const ids = new Set(entries.map((entry) => entry.id));
   let n = 1;
-  while (entries.some((entry) => entry.id === `shortcut-${n}`)) n++;
+  while (ids.has(`shortcut-${n}`)) n++;
   return { id: `shortcut-${n}`, title, keys: 'Ctrl+T' };
 }
 /** Projection only: the saved setting remains a shortcut-list with its existing validator. */

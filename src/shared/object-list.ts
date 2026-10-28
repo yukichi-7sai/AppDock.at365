@@ -5,7 +5,6 @@ export function readObjectList(value: unknown): Record<string, unknown>[] {
   const list = typeof value === 'string' ? JSON.parse(value) : value;
   if (
     !Array.isArray(list) ||
-    list.length > 64 ||
     list.some((item) => !item || typeof item !== 'object' || Array.isArray(item))
   )
     throw new Error(hostText('services.sharedObjectList.itemLimit'));

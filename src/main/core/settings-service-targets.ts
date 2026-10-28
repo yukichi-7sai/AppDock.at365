@@ -397,7 +397,6 @@ export class SettingsServiceTargets {
           ? {
               schema: {
                 type: 'array',
-                maxItems: field.maxItems ?? 64,
                 items: { type: 'string', minLength: 1 },
               },
             }
@@ -597,11 +596,10 @@ export class SettingsServiceTargets {
       ownerId: 'appdock',
       title: definition.title,
       category: 'applet-management',
-      available: rows().length <= 500,
+      available: true,
       operations: ['reorder'],
       definition,
       fields,
-      maxItems: 500,
       rows,
       applies: () => 'appletDisplayOrderChanged',
       schemaContext: () =>
@@ -870,7 +868,6 @@ export class SettingsServiceTargets {
       available: true,
       definition,
       fields,
-      maxItems: 8,
       rows,
       applies: () => 'aiSettingsChanged',
       inputSchema: (field) => (field as Field).schema ?? settingInputSchema(field),
@@ -1082,7 +1079,6 @@ export class SettingsServiceTargets {
       available: true,
       fields,
       definition,
-      maxItems: 1000,
       rows: () =>
         parseTtsSettings(this.options.settings.value.tts).manualVoices as unknown as RecordValue[],
       // Voice IDs identify the server's voices and are edited explicitly, never generated.

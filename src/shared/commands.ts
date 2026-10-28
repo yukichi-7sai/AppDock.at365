@@ -182,7 +182,7 @@ export function parseShortcuts(value: unknown): Record<string, string[]> {
     throw new Error('shortcuts はコマンドIDとキー配列のオブジェクトです。');
   const result = structuredClone(defaultShortcuts);
   for (const [id, bindings] of Object.entries(value)) {
-    if (!validCommandId(id) || !Array.isArray(bindings) || bindings.length > 5)
+    if (!validCommandId(id) || !Array.isArray(bindings))
       throw new Error(`ショートカット ${id} の形式が正しくありません。`);
     result[id] = bindings.map(normalizeShortcut);
   }

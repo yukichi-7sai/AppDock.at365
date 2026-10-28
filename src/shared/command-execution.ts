@@ -4,7 +4,7 @@ import {
   type ConditionEnvironment,
   type TriggerContext,
 } from './command-conditions';
-import { expandStackCommand, maximumExpandedCommands, type CommandStack } from './command-stacks';
+import { expandStackCommand, type CommandStack } from './command-stacks';
 
 export type CommandExecutionMode = 'first' | 'all';
 export interface TriggerBinding {
@@ -48,34 +48,27 @@ export function planCommandBatch(
 ): CommandBatchPlan {
   const available = new Map(catalog.filter((c) => c.available !== false).map((c) => [c.id, c]));
   const expanded = new Map<string, ReturnType<typeof expandStackCommand>>();
-  const selected = selectCommandBindings(
-    rows.filter((row) => {
-      const command = available.get(row.command);
-      if (
-        !row.enabled ||
-        !command ||
-        !matchesCommandCondition(row.when, context, command.extensionId, environment)
-      )
-        return false;
-      const plan =
-        expanded.get(row.command) ??
-        expandStackCommand(row.command, available, context, environment);
-      expanded.set(row.command, plan);
-      return (
-        row.enabled &&
-        !!command &&
-        !!plan?.commands.length &&
-        matchesCommandCondition(row.when, context, command.extensionId, environment)
-      );
-    }),
-    mode,
-  );
+  if (mode !== 'all' && mode !== 'first') throw Error('Unknown command execution mode.');
+  const selected: TriggerBinding[] = [];
+  for (const row of rows) {
+    const command = available.get(row.command);
+    if (
+      !row.enabled ||
+      !command ||
+      !matchesCommandCondition(row.when, context, command.extensionId, environment)
+    )
+      continue;
+    const plan =
+      expanded.get(row.command) ?? expandStackCommand(row.command, available, context, environment);
+    expanded.set(row.command, plan);
+    if (!plan.commands.length) continue;
+    selected.push(row);
+    if (mode === 'first') break;
+  }
   const stackIds = [
     ...new Set(selected.flatMap((row) => expanded.get(row.command)?.stackIds ?? [])),
   ];
   const commands = selected.flatMap((row) => expanded.get(row.command)?.commands ?? []);
-  if (commands.length > maximumExpandedCommands)
-    return Object.freeze({ commands: Object.freeze([]), rowIds: Object.freeze([]) });
   return Object.freeze({
     commands: Object.freeze(commands),
     rowIds: Object.freeze(selected.map((row) => row.id)),

@@ -116,9 +116,9 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 
 desktop条件はデスクトップの背景・アイコン領域だけに一致し、フォルダー画面やタスクバーを含みません。whenの任意のboolean `excludeDesktop`はglobal/exeでtrueを指定でき、省略はfalseです。その行だけをデスクトップの開始候補から除外します。別のdesktop条件の行は維持し、候補がなければ通常の右クリックを通します。例: `{"scope":"exe","appletIds":[],"processes":["explorer"],"excludeDesktop":true}`。他のscopeでtrueを指定するとINVALID_ARGUMENTです。monitor-centerは開始時のカーソルがあるモニター全体の中央へ表示し、window-centerも対象がデスクトップなら同じ表示位置になります。
 
-exe条件のprocessesはパスを含まない実行ファイル名を1件以上指定し、その他の条件では空配列です。browsers/excludedProcessesも同じ形式で各100件まで。末尾.exeと大文字小文字を正規化します。applets条件だけappletIdsへ登録済みIDを1件以上指定し、その他では空配列です。本体コマンドにownerは使えません。旧未公開/未導入の割当は保持・無効化・削除でき、既存の同じ入力内で並べ替えられます。新規追加・再有効化・その他の更新は公開済み引数なしコマンドに限ります。
+exe条件のprocessesはパスを含まない実行ファイル名を1件以上指定し、その他の条件では空配列です。browsers/excludedProcessesも同じ形式で件数上限なし。末尾.exeと大文字小文字を正規化します。applets条件だけappletIdsへ登録済みIDを1件以上指定し、その他では空配列です。本体コマンドにownerは使えません。旧未公開/未導入の割当は保持・無効化・削除でき、既存の同じ入力内で並べ替えられます。新規追加・再有効化・その他の更新は公開済み引数なしコマンドに限ります。
 
-operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正規化/実行順処理を共用し、一括検証後に1回だけ保存します。dryRun/無変更は保存せず、途中エラーも全体を保存しません。他の本体/Applet設定・ショートカットとrevisionを共用し、未通知のディスク更新・再起動・GUIの未確定入力に対する競合保護を維持します。エラーはINVALID_ARGUMENT/NOT_FOUND/COMMAND_NOT_ASSIGNABLE/REVISION_CONFLICT/SAVE_FAILED、および実行/書込/編集の許可不足です。
+operationsは1〜100件、割当の件数上限なし。既存parseGestures/入力正規化/実行順処理を共用し、一括検証後に1回だけ保存します。dryRun/無変更は保存せず、途中エラーも全体を保存しません。他の本体/Applet設定・ショートカットとrevisionを共用し、未通知のディスク更新・再起動・GUIの未確定入力に対する競合保護を維持します。エラーはINVALID_ARGUMENT/NOT_FOUND/COMMAND_NOT_ASSIGNABLE/REVISION_CONFLICT/SAVE_FAILED、および実行/書込/編集の許可不足です。
 
 結果はdryRun/changed/settings/bindings/revision/warning/applies=gesturesChanged、completionはvalidatedまたはsettingsSaved、effectVerified=false。入力処理への反映は非同期であり、保存完了は物理ジェスチャーの成功や現在の一時停止解除を示しません。全API呼出しを既存automationログへ記録し、操作引数やexe名はログに残しません。
 
@@ -168,7 +168,7 @@ operationsは1〜100件、割当は2000件まで。既存parseGestures/入力正
 
 scopeはglobal/desktop/app/pages/owner/applets/browser/exeです。appletsだけはページIDまたは既存のApplet IDを1件以上指定し、他はappletIdsを空配列にします。既存の未導入対象は変更しない限り保持します。同じキーの複数割当を一律に競合扱いせず、既存の条件・実行順を使用します。同じコマンドが複数の条件で一致しても1回の押下では1回だけ実行します。
 
-operationsは1〜100件、全割当は2000件まで。既存parseKeybindings/キー正規化/条件検査/同じキー内の順序検査を共有します。全操作をメモリ上で検証し、1件でも不正なら保存しません。指定外の割当/設定を保持し、withKeybindingsでshortcuts/globalShortcutCommandsの互換フィールドも揃えます。dryRunは保存せず結果を返し、同じ許可とrevisionが必要です。同じ結果なら保存しません。
+operationsは1〜100件、全割当の件数上限なし。既存parseKeybindings/キー正規化/条件検査/同じキー内の順序検査を共有します。全操作をメモリ上で検証し、1件でも不正なら保存しません。指定外の割当/設定を保持し、withKeybindingsでshortcuts/globalShortcutCommandsの互換フィールドも揃えます。dryRunは保存せず結果を返し、同じ許可とrevisionが必要です。同じ結果なら保存しません。
 
 revisionは本体/各Applet設定と共通です。他の設定編集・再起動・未通知のディスク変更でも古いrevisionを拒否します。保存は既存prepareSettings/commitSettingsを使用し、GUIの未確定入力を消さず、古いGUI版の保存は競合として拒否します。応答はdryRun/changed/bindings/options/revision/warning/appliesを含み、completionはvalidatedまたはsettingsSaved、effectVerified=false。共有フックへの適用は非同期なので、保存成功だけで入力適用の成功と扱わず、shortcuts.getのglobalHotKeysを再取得してください。適用エラーは限定した説明へ置き換えます。
 
@@ -299,7 +299,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 
 ## リボン編集
 
-layoutには`buttons`（最大100件のコマンドボタン定義）と任意の`rightClickCommand`も含みます。操作は`addButton { id, title, icon, commandId, iconOnly?, placement }`、`updateButton { id, changes }`、`removeButton { id }`、`setRightClickCommand { commandId }`を追加しました。button IDは`button:<stable-id>`で、表示用items.kindはcommandです。保存済みの未登録コマンドも保持し、通常のretainedIdsへは分類しません。外部の取得・変更結果では公開されていないcommandId／rightClickCommandを省略するため、読取結果を保存型として丸ごと送り返さず、操作と変更対象だけを指定してください。編集はコマンドの実行許可を追加せず、実行時にも元callerと公開宣言・個別許可を検査します。
+layoutには`buttons`（件数上限のないコマンドボタン定義）と任意の`rightClickCommand`も含みます。操作は`addButton { id, title, icon, commandId, iconOnly?, placement }`、`updateButton { id, changes }`、`removeButton { id }`、`setRightClickCommand { commandId }`を追加しました。button IDは`button:<stable-id>`で、表示用items.kindはcommandです。保存済みの未登録コマンドも保持し、通常のretainedIdsへは分類しません。外部の取得・変更結果では公開されていないcommandId／rightClickCommandを省略するため、読取結果を保存型として丸ごと送り返さず、操作と変更対象だけを指定してください。編集はコマンドの実行許可を追加せず、実行時にも元callerと公開宣言・個別許可を検査します。
 
 layoutに任意の`separatorTitles`（登録済みセパレーターIDから名前へのマップ）を含みます。`updateSeparator { id, changes: { title } }`で80文字以内の名前を変更し、空欄で自動生成名へ戻します。`addGroup`の任意`color`、`updateGroup.changes.color`は`#RRGGBB`またはnullです。色なしのnull、欠落、色の正規化、名前、削除・初期化はGUIと同じ共有検証を使います。グループ削除で色、セパレーター削除で名前も削除されます。保存・dryRunだけではコマンドを実行しません。
 
@@ -338,9 +338,9 @@ layoutに任意の`separatorTitles`（登録済みセパレーターIDから名�
 | ungroup | id | 子を元の親位置へ戻し、配置と実効非表示を継承。Appletは削除しない |
 | reset | なし | グループと色・セパレーターと名前・コマンドボタン・未導入項目の保存配置と表示設定を初期化。bottomはtheme/profile。別の動作設定rightClickCommandは保持 |
 
-operationsは1〜100件。全操作を順にメモリ上で検証し、一つでも失敗すれば保存しません。GUIと同じparseRibbonを使い、ID配列550件、グループ50件・区切り線50件、明示配置全体の葉500件まで。reorderの不足・重複・別グループ混入、未登録区切り線参照、不明フィールドは拒否します。空グループのreorderは空idsだけを許可します。現在登録されていないページはupdate不可で、再導入後に編集できます。新たなApplet追加などで項目一覧が変わった場合は再取得してください。
+operationsは1〜100件。全操作を順にメモリ上で検証し、一つでも失敗すれば保存しません。GUIと同じparseRibbonを使い、ID配列・グループ・区切り線・明示配置の件数上限は設けません。reorderの不足・重複・別グループ混入、未登録区切り線参照、不明フィールドは拒否します。空グループのreorderは空idsだけを許可します。現在登録されていないページはupdate不可で、再導入後に編集できます。新たなApplet追加などで項目一覧が変わった場合は再取得してください。
 
-表示名は前後空白除去後0〜80文字で制御文字不可、iconOnlyはbooleanです。itemOverridesは通常ボタンIDごとの`{title?, iconOnly?, lastKnownTitle?}`を最大500件保持します。lastKnownTitleは編集保存時の登録名で、未導入項目の名前表示に使い、updateItemの指定対象にはしません。読取り・同値編集で名前記録を更新せず、枠が埋まっている場合は新規の名前記録を省略します。空の別名は保存せず登録元名を使用し、グループ名が空の場合は実リボンのラベルを省いてアクセシブル名に「グループ」を使用します。ID・登録元の名前・実行先は変更しません。
+表示名は前後空白除去後0〜80文字で制御文字不可、iconOnlyはbooleanです。itemOverridesは通常ボタンIDごとの`{title?, iconOnly?, lastKnownTitle?}`を件数上限なしで保持します。lastKnownTitleは編集保存時の登録名で、未導入項目の名前表示に使い、updateItemの指定対象にはしません。読取り・同値編集で名前記録を更新しません。空の別名は保存せず登録元名を使用し、グループ名が空の場合は実リボンのラベルを省いてアクセシブル名に「グループ」を使用します。ID・登録元の名前・実行先は変更しません。
 
 revisionは全設定で共通です。古いrevision、プロセス再起動前のrevision、同期競合を拒否し、GUIの未確定入力は上書きしません。dryRunは保存せず変更後のlayout/itemsを返します。同値更新は保存せずrevisionも変えません。リボン以外の設定と、ローカルribbonの未知フィールドは保持します。
 
@@ -381,7 +381,7 @@ revisionは全設定で共通です。古いrevision、プロセス再起動前�
 | move | id, parentId, beforeId | 指定階層のbeforeIdの直前へ移動。beforeId=nullは末尾。グループを別グループに入れる操作は不可 |
 | reorder | parentId, ids | 指定階層の全項目IDを希望順に指定。他階層の順序を維持 |
 
-parentId=nullはトップレベル、それ以外はグループ項目のID。項目IDとコマンドIDは別です。同じコマンドは異なる項目IDで複数箇所へ置けます。グループは1段、名前は前後空白除去後1〜80文字で制御文字不可、全項目1500件以下、IDは全体で一意。operationsは1〜100件、全操作を順に検証後1回だけ保存します。reorderは対象階層の未知/非公開コマンドの項目も含め、欠落・重複・別階層混入を拒否します。不明フィールド・ネストしたグループ・固定メニュー項目の追加も拒否します。
+parentId=nullはトップレベル、それ以外はグループ項目のID。項目IDとコマンドIDは別です。同じコマンドは異なる項目IDで複数箇所へ置けます。グループは1段、名前は前後空白除去後1〜80文字で制御文字不可、項目数の固定上限はなく、IDは全体で一意。operationsは1〜100件、全操作を順に検証後1回だけ保存します。reorderは対象階層の未知/非公開コマンドの項目も含め、欠落・重複・別階層混入を拒否します。不明フィールド・ネストしたグループ・固定メニュー項目の追加も拒否します。
 
 新規/変更先のコマンドはassignableCommandsから指定します。メニューではmenuAllowed=trueだけを使用し、固定「設定」「終了」の重複を防ぎます。クリック割当はmenuAllowedに制約されません。既存の未知/非公開コマンドは保持・移動・並べ替え・削除が可能で、同じ値の再指定は許可しますが、別の項目やクリック先への新規コピーは許可しません。groupのremoveは拒否し、中身を消したい場合も項目ごとに明示削除します。
 

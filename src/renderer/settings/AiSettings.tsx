@@ -110,7 +110,7 @@ export function AiSettingsForm({
                   {translate('settings.aiSettings.server')}
                   <SettingsListAddButton
                     label={translate('settings.aiSettings.add')}
-                    disabled={busy || value.connections.length >= 8}
+                    disabled={busy}
                     onClick={() => open('edit', null)}
                   />
                   <button

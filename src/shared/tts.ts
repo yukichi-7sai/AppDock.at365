@@ -53,8 +53,7 @@ export function ttsVoicesPath(value: string): string {
   return value;
 }
 export function parseTtsVoices(value: unknown): TtsVoice[] {
-  if (!Array.isArray(value) || value.length > 1000)
-    throw Error(hostText('settings.tts.voiceLimit'));
+  if (!Array.isArray(value)) throw Error(hostText('settings.tts.voiceLimit'));
   const ids = new Set<string>();
   return value.map((v) => {
     if (
@@ -74,8 +73,7 @@ export function parseTtsVoices(value: unknown): TtsVoice[] {
 export function parseTtsModels(value: unknown): TtsVoice[] {
   if (!object(value)) throw Error(hostText('settings.tts.modelObject'));
   if (Object.hasOwn(value, 'data')) return parseTtsVoices(value.data);
-  if (!Array.isArray(value.models) || value.models.length > 1000)
-    throw Error(hostText('settings.tts.modelLimit'));
+  if (!Array.isArray(value.models)) throw Error(hostText('settings.tts.modelLimit'));
   const rows = value.models.map((model) => {
     if (!object(model) || (model.downloaded !== undefined && typeof model.downloaded !== 'boolean'))
       throw Error(hostText('settings.tts.modelItem'));

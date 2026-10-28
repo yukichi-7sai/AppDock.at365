@@ -246,7 +246,7 @@ test('shared revision, restart tokens, unobserved disk edits and save failures p
   await assert.rejects(f.edit([configure({ singleClickCommand: 'sample.run' })]));
   assert.equal(JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).host.theme, 'light');
 });
-test('legacy layout is projected without saving and menu item count is bounded', async (t) => {
+test('legacy layout is projected without saving and larger menus remain editable', async (t) => {
   const f = fixture(t),
     value = structuredClone(f.settings.value);
   delete value.trayMenu;
@@ -264,6 +264,6 @@ test('legacy layout is projected without saving and menu item count is bounded',
     },
     f.settings.revision,
   );
-  await assert.rejects(f.edit([add(command('overflow'))]), { code: 'INVALID_ARGUMENT' });
-  assert.equal(f.get().menu.length, 1500);
+  await f.edit([add(command('overflow'))]);
+  assert.equal(f.get().menu.length, 1501);
 });

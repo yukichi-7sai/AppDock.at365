@@ -9,12 +9,7 @@ export function parseInputExecutionModes(
   normalize: (input: unknown) => string,
 ): InputExecutionModes {
   if (value === undefined) return {};
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    Array.isArray(value) ||
-    Object.keys(value).length > 2000
-  )
+  if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error(hostText('settings.inputExecution.invalid'));
   const entries = Object.entries(value).map(([input, mode]) => {
     if (mode !== 'first' && mode !== 'all')

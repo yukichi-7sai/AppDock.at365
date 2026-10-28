@@ -21,7 +21,6 @@ export const commandTriggerOptionDeclarations = {
       hostText('settings.inputBrowserOptions.executableHint') +
       hostText('settings.inputBrowserOptions.conditionHint'),
     default: defaultConditionEnvironment().browsers,
-    maxItems: 100,
     hint: true,
     placeholder: 'chrome.exe, firefox.exe',
     normalize: processNames,
@@ -95,7 +94,6 @@ export function parseCommandTriggerOptions(value: unknown): CommandTriggerOption
       if (field.type === 'string-list') {
         if (
           !Array.isArray(next) ||
-          next.length > (field.maxItems ?? 64) ||
           next.some((item) => typeof item !== 'string' || !item.trim() || item.length > 32767)
         )
           throw Error(hostText('settings.commandTriggerOptions.invalid'));

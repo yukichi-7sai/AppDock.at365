@@ -1,4 +1,10 @@
 import { hostText } from './i18n';
+import {
+  normalizeProcessName,
+  prepareProcessNames,
+  processNameIndex,
+  stringNameIndex,
+} from './settings-indexes';
 export type CommandScope =
   'global' | 'app' | 'pages' | 'owner' | 'applets' | 'desktop' | 'browser' | 'exe';
 
@@ -31,11 +37,10 @@ export const defaultConditionEnvironment = () => ({
 export function processNames(value: unknown): string[] {
   if (
     !Array.isArray(value) ||
-    value.length > 100 ||
     value.some((v) => typeof v !== 'string' || !/^[\p{L}\p{N}_. -]{1,120}$/u.test(v.trim()))
   )
     throw Error(hostText('settings.command-conditions.processes'));
-  return [
+  const names = [
     ...new Set(
       value.map((v) =>
         v
@@ -45,6 +50,8 @@ export function processNames(value: unknown): string[] {
       ),
     ),
   ];
+  prepareProcessNames(names);
+  return names;
 }
 
 /** Normalize binding formats without changing their persisted representation. */
@@ -57,15 +64,12 @@ export function commandCondition(when: {
 }): CommandCondition {
   return {
     scope: when.scope,
-    pageOrAppletIds: [...when.appletIds],
-    processes: [...(when.processes ?? [])],
+    pageOrAppletIds: when.appletIds,
+    processes: when.processes ?? [],
     excludeDesktop: when.excludeDesktop ?? false,
     excludedProcesses: when.excludedProcesses ?? [],
   };
 }
-const processName = (name: string) => name.replace(/\.exe$/i, '').toLowerCase();
-const containsProcess = (names: readonly string[], name: string) =>
-  names.some((entry) => processName(entry) === processName(name));
 
 export function matchesCommandCondition(
   when: CommandCondition,
@@ -74,8 +78,14 @@ export function matchesCommandCondition(
   environment: ConditionEnvironment = {},
 ): boolean {
   const { host, target } = context;
-  const excluded = [...(environment.excludedProcesses ?? []), ...(when.excludedProcesses ?? [])];
-  if (excluded.length && (!target?.processName || containsProcess(excluded, target.processName)))
+  const process = target?.processName ? normalizeProcessName(target.processName) : undefined;
+  if (
+    (environment.excludedProcesses?.length || when.excludedProcesses?.length) &&
+    (!process ||
+      (environment.excludedProcesses &&
+        processNameIndex(environment.excludedProcesses).has(process)) ||
+      (when.excludedProcesses && processNameIndex(when.excludedProcesses).has(process)))
+  )
     return false;
   if (when.excludeDesktop && target?.desktop !== false) return false;
   switch (when.scope) {
@@ -90,21 +100,21 @@ export function matchesCommandCondition(
     case 'applets':
       return (
         host.focused === true &&
-        ((!!host.pageId && when.pageOrAppletIds.includes(host.pageId)) ||
-          (!!host.appletId && when.pageOrAppletIds.includes(host.appletId)))
+        ((!!host.pageId && stringNameIndex(when.pageOrAppletIds).has(host.pageId)) ||
+          (!!host.appletId && stringNameIndex(when.pageOrAppletIds).has(host.appletId)))
       );
     case 'desktop':
       return target?.desktop === true;
     case 'browser':
       return (
-        !!target?.processName &&
+        !!process &&
         !!environment.browsers &&
-        containsProcess(environment.browsers, target.processName) &&
+        processNameIndex(environment.browsers).has(process) &&
         (!environment.requireChromiumWindowClass ||
-          target.windowClass?.startsWith('Chrome_WidgetWin_') === true)
+          target?.windowClass?.startsWith('Chrome_WidgetWin_') === true)
       );
     case 'exe':
-      return !!target?.processName && containsProcess(when.processes, target.processName);
+      return !!process && processNameIndex(when.processes).has(process);
     default:
       return false;
   }

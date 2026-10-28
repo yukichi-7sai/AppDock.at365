@@ -196,7 +196,7 @@ test('common enabled is explicit and host-owned; package order advertises only r
   assert.deepEqual(target.operations, ['reorder']);
   const schema = f.call('schema.get', { targetId: orderId });
   assert.deepEqual(Object.keys(schema.operationSchemas), ['reorder']);
-  assert.equal(schema.maxItems, 500);
+  assert.equal(schema.maxItems, undefined);
   assert(schema.items.every((field) => !field.writable));
   const rows = f.items().items;
   assert.deepEqual(

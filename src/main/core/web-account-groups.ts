@@ -56,8 +56,7 @@ const identity = (a: unknown): a is Identity =>
 function readText(file: string): string | null {
   try {
     const stat = fs.statSync(file);
-    if (!stat.isFile() || stat.size > 1024 * 1024)
-      throw Error(hostText('services.webAccountGroups.invalidFile'));
+    if (!stat.isFile()) throw Error(hostText('services.webAccountGroups.invalidFile'));
     return fs.readFileSync(file, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -70,7 +69,6 @@ function roster(text: string): Identity[] {
     !object(raw) ||
     raw.version !== 1 ||
     !Array.isArray(raw.accounts) ||
-    raw.accounts.length > 10 ||
     raw.accounts.some((a: unknown) => !identity(a)) ||
     new Set(raw.accounts.map((a: Identity) => a.id)).size !== raw.accounts.length
   )
@@ -170,7 +168,6 @@ export class WebAccountGroup {
         typeof m.selected !== 'string' ||
         (m.selected !== '' && !accountId(m.selected)) ||
         !Array.isArray(m.preferences) ||
-        m.preferences.length > 10 ||
         new Set(m.preferences.map((p: any) => p?.id)).size !== m.preferences.length
       )
         throw Error(hostText('services.webAccountGroups.invalidApplet'));
@@ -273,7 +270,6 @@ export class WebAccountGroup {
           throw Error(hostText('services.webAccountGroups.sessionConflict'));
         local.legacySessions[a.id] = owner;
       }
-      if (accounts.length > 10) throw Error(hostText('services.webAccountGroups.accountLimit'));
       local.members[owner] = memberOf(legacy);
     } else local.members[owner] = { selected: '', preferences: [] };
     if (legacy) this.commit(accounts, local);

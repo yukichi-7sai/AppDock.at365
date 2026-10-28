@@ -6,8 +6,6 @@ import { appletDisplayName } from './applet-display-name';
 
 export const gesturePauseCommand = 'appdock.gestures.togglePause';
 export const fixedTrayCommands = ['appdock.settings.open', 'appdock.quit'];
-// The legacy maximum is 500 commands; migration can also add 500 groups and the pause item.
-export const maximumTrayItems = 1500;
 export type TrayMenuLeaf =
   { id: string; type: 'command'; command: string } | { id: string; type: 'separator' };
 export type TrayMenuItem =
@@ -25,8 +23,6 @@ export function parseTrayMenu(value: unknown): TrayMenuItem[] {
       if (!item || typeof item !== 'object' || !validCommandId(item.id) || ids.has(item.id))
         throw Error(hostText('settings.tray-menu.id'));
       ids.add(item.id);
-      if (ids.size > maximumTrayItems)
-        throw Error(hostText('settings.tray-menu.limit', { maximumTrayItems: maximumTrayItems }));
       const id = item.id as string;
       if (item.type === 'separator') return { id, type: 'separator' };
       if (

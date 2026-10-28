@@ -80,7 +80,7 @@ export function DirectoryListInput({
         type="button"
         className="secondary"
         aria-label={translate('settings.directoryListInput.add', { label: label })}
-        disabled={choosing || value.length >= 64}
+        disabled={choosing}
         onClick={() => onChange([...value, ''])}
       >
         {translate('settings.directoryListInput.addDirectory')}

@@ -103,7 +103,6 @@ export class SettingsTargets {
         (field.type === 'string-list'
           ? {
               type: 'array',
-              maxItems: 64,
               items: { type: 'string', minLength: 1, maxLength: 32767 },
             }
           : settingInputSchema({ ...field, options: target.options?.(field) ?? field.options })),
@@ -124,7 +123,9 @@ export class SettingsTargets {
       fields: target.fields.map((field) => this.field(field, target)),
       kind: target.kind ?? 'fields',
       context: target.schemaContext?.(),
-      ...(target.kind === 'list' ? { maxItems: target.maxItems ?? 64 } : {}),
+      ...(target.kind === 'list' && target.maxItems !== undefined
+        ? { maxItems: target.maxItems }
+        : {}),
       operationSchemas:
         target.kind === 'list' ? settingsListOperationSchemas(target) : operationSchemas,
     });
@@ -268,7 +269,7 @@ export class SettingsTargets {
   }
   call(method: SettingsMethod, params: Record<string, unknown>, authorize: () => void = () => {}) {
     try {
-      boundedJson(params, 65536, 12, 4096);
+      boundedJson(params, Infinity, 12, Infinity);
     } catch {
       return this.invalid();
     }
@@ -326,7 +327,9 @@ export class SettingsTargets {
           kind: target.kind ?? 'fields',
           operationSchemas:
             target.kind === 'list' ? settingsListOperationSchemas(target) : operationSchemas,
-          ...(target.kind === 'list' ? { maxItems: target.maxItems ?? 64 } : {}),
+          ...(target.kind === 'list' && target.maxItems !== undefined
+            ? { maxItems: target.maxItems }
+            : {}),
         },
       );
     if (method === 'settings.items.list') {

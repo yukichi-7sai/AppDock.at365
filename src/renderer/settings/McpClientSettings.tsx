@@ -130,7 +130,6 @@ export function McpClientSettingsForm({
           orderInTitle
           actionsAlign="start"
           definition={definition}
-          maxItems={32}
           busy={busy || pending || !auxiliary || !!auxiliary.error}
           entries={items.map((item) => {
             const s = auxiliary?.connections.find((c) => c.id === item.id);

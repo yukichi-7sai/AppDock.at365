@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { inputRows } from './settings-indexes';
 import {
   inputExecutionMode,
   parseInputExecutionModes,
@@ -194,9 +195,10 @@ export function planTouchpadCommands(
   environment: ConditionEnvironment = defaultConditionEnvironment(),
 ) {
   return planCommandBatch(
-    settings.bindings
-      .filter((row) => row.gesture === gesture)
-      .map((row) => ({ ...row, when: commandCondition(row.when) })),
+    inputRows(settings.bindings, [gesture], 'gesture').map((row) => ({
+      ...row,
+      when: commandCondition(row.when),
+    })),
     context,
     commands,
     inputExecutionMode(settings.executionMode, settings.inputExecutionModes, gesture),
@@ -206,18 +208,16 @@ export function planTouchpadCommands(
 
 /** Keep dedicated-key ownership for saved rows; only process exclusions release that ownership. */
 export function nativeTouchpadConditions(settings: TouchpadGestureSettings, gesture: string) {
-  return settings.bindings
-    .filter((row) => row.gesture === gesture)
-    .map((row) => ({
-      when: {
-        scope: 'global' as const,
-        appletIds: [],
-        processes: [],
-        excludeDesktop: false,
-        excludedProcesses: row.when.scope === 'global' ? (row.when.excludedProcesses ?? []) : [],
-      },
-      blockOriginalInput: true,
-    }));
+  return inputRows(settings.bindings, [gesture], 'gesture').map((row) => ({
+    when: {
+      scope: 'global' as const,
+      appletIds: [],
+      processes: [],
+      excludeDesktop: false,
+      excludedProcesses: row.when.scope === 'global' ? (row.when.excludedProcesses ?? []) : [],
+    },
+    blockOriginalInput: true,
+  }));
 }
 /** Shared row editor helpers accept the same condition model as mouse gestures. */
 export const touchpadAsGestureSettings = (value: TouchpadGestureSettings) => ({

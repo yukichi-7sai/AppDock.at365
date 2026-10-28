@@ -87,8 +87,6 @@ export function applyCommandTrigger(
   }
   if (row.kind === 'shortcuts') {
     const bindings = getKeybindings(settings);
-    if (!original && bindings.length >= 2000)
-      throw Error(hostText('settings.shortcutCommandList.limit'));
     const next = original
       ? changeKeybindingKey(bindings, row.binding.id, row.binding.key).map((item) =>
           item.id === row.binding.id ? row.binding : item,

@@ -127,7 +127,7 @@ test('view state creates no file until a valid edit; surfaces remain independent
   assert.throws(() => external.save('library', 280));
   assert.equal(fs.readFileSync(file, 'utf8'), '{"schemaVersion":99}');
 });
-test('batch membership is atomic on conflict and capacity, preserves unrelated membership and originals', () => {
+test('batch membership is atomic on conflict and permits larger groups, preserves unrelated membership and originals', () => {
   const image = { file: 'a.png' },
     other = { file: 'b.png' };
   const value = {
@@ -154,7 +154,10 @@ test('batch membership is atomic on conflict and capacity, preserves unrelated m
   assert.throws(() => editImageLibrary(value, conflict), /別の場所/);
   const full = structuredClone(value);
   full.groups[1].images = Array.from({ length: 512 }, (_, i) => ({ file: `n${i}.png` }));
-  assert.throws(() => editImageLibrary(full, { ...op, images: [op.images[0]] }));
+  assert.equal(
+    editImageLibrary(full, { ...op, images: [op.images[0]] }).groups[1].images.length,
+    513,
+  );
   assert.equal(full.groups[1].images.length, 512);
 });
 test('pagination selects all matches, resize keeps selections and anchor, navigation retains state with fresh IDs', async () => {

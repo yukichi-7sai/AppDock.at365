@@ -81,13 +81,11 @@ export function parseImageLibrary(value: unknown): ImageLibrary {
   if (
     !object(value) ||
     Object.keys(value).some((k) => k !== 'groups') ||
-    !Array.isArray(value.groups) ||
-    value.groups.length > 64
+    !Array.isArray(value.groups)
   )
     throw Error(hostText('services.sharedRegisteredImages.groupLimit'));
   const ids = new Set<string>(),
     names = new Set<string>();
-  let count = 0;
   const groups = value.groups.map((g: unknown): ImageGroup => {
     if (
       !object(g) ||
@@ -101,14 +99,10 @@ export function parseImageLibrary(value: unknown): ImageLibrary {
       /[\x00-\x1f\x7f]/.test(g.name) ||
       names.has(g.name.trim().toLowerCase()) ||
       !Array.isArray(g.images) ||
-      g.images.length > 512 ||
       !g.images.every(imageReference)
     )
       throw Error(hostText('services.sharedRegisteredImages.invalidGroup'));
-    if (
-      new Set(g.images.map(imageKey)).size !== g.images.length ||
-      (count += g.images.length) > 4096
-    )
+    if (new Set(g.images.map(imageKey)).size !== g.images.length)
       throw Error(hostText('services.sharedRegisteredImages.membershipLimit'));
     ids.add(g.id);
     names.add(g.name.trim().toLowerCase());
@@ -122,12 +116,13 @@ export function editImageLibrary(
   op: ImageLibraryEdit,
 ): ImageLibrary {
   const next = parseImageLibrary(current);
+  const groupsById = new Map(next.groups.map((group) => [group.id, group]));
   const conflict = () => {
     throw Error(hostText('services.sharedRegisteredImages.changed'));
   };
   if (!object(op)) throw Error(hostText('services.sharedRegisteredImages.invalidOperation'));
   if (op.kind === 'add') {
-    if (next.groups.some((g) => g.id === op.group?.id)) conflict();
+    if (groupsById.has(op.group?.id)) conflict();
     next.groups.push(op.group);
   } else if (op.kind === 'update' || op.kind === 'delete') {
     const id = op.kind === 'update' ? op.group?.id : op.id;
@@ -144,17 +139,17 @@ export function editImageLibrary(
       !Array.isArray(op.ids) ||
       op.ids.length !== next.groups.length ||
       new Set(op.ids).size !== op.ids.length ||
-      op.ids.some((id) => !next.groups.some((g) => g.id === id))
+      op.ids.some((id) => !groupsById.has(id))
     )
       conflict();
-    next.groups = op.ids.map((id) => next.groups.find((g) => g.id === id)!);
+    next.groups = op.ids.map((id) => groupsById.get(id)!);
   } else if (op.kind === 'membership') {
     if (
       !imageReference(op.image) ||
       !Array.isArray(op.ids) ||
       !Array.isArray(op.before) ||
       new Set(op.ids).size !== op.ids.length ||
-      op.ids.some((id) => !next.groups.some((g) => g.id === id))
+      op.ids.some((id) => !groupsById.has(id))
     )
       throw Error(hostText('services.sharedRegisteredImages.invalidDestination'));
     const memberships = next.groups
@@ -162,17 +157,17 @@ export function editImageLibrary(
       .map((g) => g.id)
       .sort();
     if (!equal(memberships, [...op.before].sort())) conflict();
+    const destinations = new Set(op.ids);
     for (const g of next.groups) {
       g.images = g.images.filter((i) => imageKey(i) !== imageKey(op.image));
-      if (op.ids.includes(g.id)) g.images.push(op.image);
+      if (destinations.has(g.id)) g.images.push(op.image);
     }
   } else if (op.kind === 'membership-batch') {
     if (
       !['add', 'remove'].includes(op.mode) ||
-      !next.groups.some((g) => g.id === op.groupId) ||
+      !groupsById.has(op.groupId) ||
       !Array.isArray(op.images) ||
       !op.images.length ||
-      op.images.length > 4096 ||
       op.images.some(
         (v) =>
           !object(v) ||
@@ -184,18 +179,22 @@ export function editImageLibrary(
     )
       throw Error(hostText('services.sharedRegisteredImages.invalidSelection'));
     // Validate every prior membership before applying anything. Save the whole result once.
+    const memberships = new Map<string, string[]>();
+    for (const group of next.groups)
+      for (const image of group.images) {
+        const key = imageKey(image);
+        const ids = memberships.get(key) ?? [];
+        ids.push(group.id);
+        memberships.set(key, ids);
+      }
     for (const item of op.images) {
-      const before = next.groups
-        .filter((g) => g.images.some((i) => imageKey(i) === imageKey(item.image)))
-        .map((g) => g.id)
-        .sort();
+      const before = (memberships.get(imageKey(item.image)) ?? []).sort();
       if (!equal(before, [...item.before].sort())) conflict();
     }
-    const group = next.groups.find((g) => g.id === op.groupId)!;
-    for (const { image } of op.images) {
-      group.images = group.images.filter((i) => imageKey(i) !== imageKey(image));
-      if (op.mode === 'add') group.images.push(image);
-    }
+    const group = groupsById.get(op.groupId)!;
+    const selected = new Set(op.images.map(({ image }) => imageKey(image)));
+    group.images = group.images.filter((image) => !selected.has(imageKey(image)));
+    if (op.mode === 'add') for (const { image } of op.images) group.images.push(image);
   } else throw Error(hostText('services.sharedRegisteredImages.unsupportedOperation'));
   return parseImageLibrary(next);
 }

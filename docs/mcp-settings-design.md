@@ -215,7 +215,7 @@ flowchart LR
 - 応答は`schemaVersion: 1`の固定envelopeとし、通常フィールドは`key/value/default/inherited/writable/applies`等のデータへ格納する。秘密のdefaultや保存パスを含めない。
 - cursorは対象・フィルター・revision・callerに束縛する。ページ途中の変更は`REVISION_CONFLICT`として最初から再取得させ、異なる版の一覧を混ぜない。
 - 1ページ既定50件・最大100件、1応答の構造化JSONは256KiB以下とする。値を途中で切って成功扱いにしない。単一要素も上限超過なら`RESULT_TOO_LARGE`とする。
-- 既存のMCP本文64KiB制限と設定・一覧ごとの上限を維持する。values.getは必要なkeysを絞れるようにする。
+- 既存のMCP本文64KiB制限は維持し、保存一覧の固定件数上限は設けない。values.getは必要なkeysを絞れるようにする。
 
 ## 7. 通常項目と一覧の変更契約
 

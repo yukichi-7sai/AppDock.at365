@@ -188,7 +188,7 @@ test('shared browser discovery uses declared defaults, a bounded array and exist
     ['browsers', 'requireChromiumWindowClass'],
   );
   assert.equal(schema.items[0].inputSchema.type, 'array');
-  assert.equal(schema.items[0].inputSchema.maxItems, 100);
+  assert.equal(schema.items[0].inputSchema.maxItems, undefined);
   assert.deepEqual(f.values(id), defaultCommandTriggerOptions());
   assert(f.read(id).fields.every((field) => field.inherited && field.writable));
   assert.doesNotThrow(() => structuredClone(commandTriggerSettingDefinitions()));
@@ -268,16 +268,8 @@ test('shared browser changes retain PC settings, assignments, other preferences 
     files.map((file) => fs.readFileSync(file)),
     bytes,
   );
-  const stored = fs.readFileSync(f.store.file);
-  assert.throws(
-    () =>
-      f.call(
-        'apply',
-        f.request(id, [{ kind: 'set', changes: { browsers: [...browsers, 'extra'] } }]),
-      ),
-    { code: 'INVALID_ARGUMENT' },
-  );
-  assert.deepEqual(fs.readFileSync(f.store.file), stored);
+  f.call('apply', f.request(id, [{ kind: 'set', changes: { browsers: [...browsers, 'extra'] } }]));
+  assert.equal(f.values(id).browsers.length, 101);
   f.call('apply', f.request(id, [{ kind: 'set', changes: { browsers: [] } }]));
   assert.deepEqual(f.values(id).browsers, []);
   assert.equal(f.read(id, ['browsers']).fields[0].inherited, false);
@@ -908,7 +900,7 @@ test('AI list add shares owner defaults and normalization, dryRun and replay nev
   const f = fixture(t),
     schema = f.call('schema.get', { targetId: aiList });
   assert.equal(schema.kind, 'list');
-  assert.equal(schema.maxItems, 8);
+  assert.equal(schema.maxItems, undefined);
   assert.equal(schema.items.find((field) => field.key === 'id').writable, false);
   assert.equal(
     schema.items.find((field) => field.key === 'defaultTimeoutSeconds').inputSchema.type,
@@ -1136,8 +1128,8 @@ test('AI list validates limits, identity sets and complete batches before one at
   assert.equal(f.writes(), writes);
   assert.deepEqual(fs.readFileSync(f.store.file), before);
   while (f.store.value.ai.connections.length < 8) listApply(f, [addConnection('Same')]);
-  assert.throws(() => listApply(f, [addConnection('Ninth')]), { code: 'INVALID_ARGUMENT' });
-  assert.equal(new Set(f.store.value.ai.connections.map((c) => c.id)).size, 8);
+  listApply(f, [addConnection('Ninth')]);
+  assert.equal(new Set(f.store.value.ai.connections.map((c) => c.id)).size, 9);
 });
 
 test('AI list stale references, credential revisions, external edits and revocation cannot overwrite newer state', (t) => {
@@ -1238,8 +1230,8 @@ const voiceApply = (f, operations, dryRun = false) =>
 test('TTS manual voices use explicit server IDs, owner defaults and independent shared storage', (t) => {
   const f = fixture(t, { device: true }),
     schema = f.call('schema.get', { targetId: ttsList });
-  assert.equal(schema.maxItems, 1000);
-  assert.equal(schema.operationSchemas.reorder.properties.itemRefs.maxItems, 1000);
+  assert.equal(schema.maxItems, undefined);
+  assert.equal(schema.operationSchemas.reorder.properties.itemRefs.maxItems, undefined);
   assert.equal(schema.items.find((field) => field.key === 'id').writable, true);
   const before = fs.readFileSync(f.store.shared.file),
     device = fs.readFileSync(f.store.device.file),
@@ -1368,13 +1360,12 @@ test('TTS list paginates 1000 rows and reorders all references within the unchan
     () => f.call('items.list', { targetId: ttsList, limit: 100, cursor: firstCursor }),
     { code: 'REVISION_CONFLICT' },
   );
-  assert.throws(() => voiceApply(f, [{ kind: 'add', values: { id: 'v1000' } }]), {
-    code: 'INVALID_ARGUMENT',
-  });
+  voiceApply(f, [{ kind: 'add', values: { id: 'v1000' } }]);
+  assert.equal(f.store.value.tts.manualVoices.length, 1001);
   assert.equal(
     f.call('schema.get', { targetId: aiList }).operationSchemas.reorder.properties.itemRefs
       .maxItems,
-    8,
+    undefined,
   );
 });
 

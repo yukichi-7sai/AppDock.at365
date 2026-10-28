@@ -325,17 +325,14 @@ test('catalog changes invalidate incomplete reorder; separator count and duplica
   await assert.rejects(f.edit([{ kind: 'reorder', placement: 'top', ids: top }]), {
     code: 'INVALID_ARGUMENT',
   });
-  await assert.rejects(
-    f.edit(
-      Array.from({ length: 51 }, (_, i) => ({
-        kind: 'addSeparator',
-        id: `separator:s${i}`,
-        placement: 'top',
-      })),
-    ),
-    { code: 'INVALID_ARGUMENT' },
+  await f.edit(
+    Array.from({ length: 51 }, (_, i) => ({
+      kind: 'addSeparator',
+      id: `separator:s${i}`,
+      placement: 'top',
+    })),
   );
-  assert.deepEqual(f.get().layout, defaultRibbon());
+  assert.equal(f.get().layout.separators.length, 51);
   await assert.rejects(
     f.edit([
       { kind: 'addSeparator', id: 'separator:dup', placement: 'top' },

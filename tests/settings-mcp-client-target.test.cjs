@@ -114,15 +114,15 @@ test('MCP roster list uses fixed settings entries and preserves shared/device st
   assert.equal(discovery.category, 'mcp-client');
   assert.deepEqual(discovery.operations, ['add', 'update', 'remove', 'reorder']);
   const schema = f.schema();
-  assert.equal(schema.maxItems, 32);
+  assert.equal(schema.maxItems, undefined);
   assert.equal(schema.items.find((field) => field.key === 'id').writable, false);
   assert.equal(
     schema.items.find((field) => field.key === 'connection.args').inputSchema.maxItems,
-    64,
+    undefined,
   );
   assert.equal(
     schema.items.find((field) => field.key === 'connection.publishedTools').inputSchema.maxItems,
-    512,
+    undefined,
   );
   const before = f.bytes();
   assert.equal(
@@ -314,8 +314,6 @@ test('secret input and new bearer bindings are rejected; both endpoint kinds pre
   ]);
   assert.equal(f.row(id).values['connection.publishedTools'].length, 512);
   for (const changes of [
-    { 'connection.args': Array(65).fill('a') },
-    { 'connection.publishedTools': [...toolNames, 'extra'] },
     { 'connection.publishedTools': ['same', 'same'] },
     { 'connection.command': 'relative.exe' },
     { 'connection.args': ['bad\0arg'] },
@@ -431,14 +429,7 @@ test('whole-file corruption is discoverable but unavailable, while unconfigured 
     },
   ]);
   assert.equal(f.row(id).values['connection.url'], 'http://configured.test/mcp');
-  for (const text of [
-    '{invalid',
-    '{"version":2,"entries":{}}',
-    JSON.stringify({
-      version: 1,
-      entries: Object.fromEntries(Array.from({ length: 65 }, (_, i) => [String(i), {}])),
-    }),
-  ]) {
+  for (const text of ['{invalid', '{"version":2,"entries":{}}']) {
     fs.writeFileSync(f.localFile, text);
     const target = f.call('targets.list').items.find((item) => item.targetId === targetId);
     assert.equal(target.available, false);
@@ -485,15 +476,10 @@ test('the existing roster limit and restart-loaded IDs and device values remain 
     f.store.revision,
   );
   assert.equal(f.read().items.length, 32);
-  const before = f.bytes();
-  assert.throws(
-    () =>
-      f.apply([
-        { kind: 'add', values: { name: 'Overflow', 'connection.url': 'http://example.test/mcp' } },
-      ]),
-    { code: 'INVALID_ARGUMENT' },
-  );
-  assert.deepEqual(f.bytes(), before);
+  f.apply([
+    { kind: 'add', values: { name: 'Additional', 'connection.url': 'http://example.test/mcp' } },
+  ]);
+  assert.equal(f.read().items.length, 33);
   const ref = f.row(ids[0]).itemRef;
   f.apply([
     { kind: 'update', itemRef: ref, changes: { 'connection.url': 'http://device.test/mcp' } },
@@ -514,7 +500,7 @@ test('the existing roster limit and restart-loaded IDs and device values remain 
   );
   assert.deepEqual(
     reloaded.roster().map((item) => item.id),
-    ids,
+    f.store.value.mcpServers.items.map((item) => item.id),
   );
   assert.equal(reloaded.publicSettings(ids[0]).connection.url, 'http://device.test/mcp');
   assert.equal(f.crypts(), 0);

@@ -60,14 +60,13 @@ export function deviceName(name: string) {
     throw Error(hostText('services.deviceSettings.invalidComputerName'));
   return name;
 }
-function safeJson(value: unknown, depth = 0, budget = { count: 0 }) {
-  if (++budget.count > 100000 || depth > 40)
-    throw Error(hostText('services.deviceSettings.structureLimit'));
+function safeJson(value: unknown, depth = 0) {
+  if (depth > 40) throw Error(hostText('services.deviceSettings.structureLimit'));
   if (value && typeof value === 'object')
     for (const [key, child] of Object.entries(value)) {
       if (['__proto__', 'constructor', 'prototype'].includes(key))
         throw Error(hostText('services.deviceSettings.invalidKey'));
-      safeJson(child, depth + 1, budget);
+      safeJson(child, depth + 1);
     }
 }
 export function configuration(settings: Settings, owner: string): DeviceConfiguration {

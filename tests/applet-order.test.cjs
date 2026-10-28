@@ -31,14 +31,7 @@ test('order persists through schema parsing, upgrades old settings, and never ch
   assert.deepEqual(getKeybindings(parsed), bindings);
   delete settings.appletOrder;
   assert.deepEqual(parseSettings(settings).appletOrder, []);
-  for (const invalid of [
-    null,
-    'file.a',
-    ['file.a', 'file.a'],
-    ['../escape'],
-    ['constructor'],
-    Array.from({ length: 501 }, (_, i) => `file.${i}`),
-  ]) {
+  for (const invalid of [null, 'file.a', ['file.a', 'file.a'], ['../escape'], ['constructor']]) {
     assert.throws(() => parseSettings({ ...settings, appletOrder: invalid }), /appletOrder/);
   }
 });

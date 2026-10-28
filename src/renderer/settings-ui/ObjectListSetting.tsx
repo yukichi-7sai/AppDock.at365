@@ -167,7 +167,6 @@ export function ObjectListSetting({
                     ))}
                     <button
                       className="secondary"
-                      disabled={(current as string[]).length >= 64}
                       aria-label={translate('settings.objectListSetting.addItem', { name: name })}
                       onClick={() => update(index, field.key, [...(current as string[]), ''])}
                     >
@@ -221,7 +220,6 @@ export function ObjectListSetting({
       ))}
       <button
         className="secondary"
-        disabled={entries.length >= 64}
         onClick={() => onChange([...entries, normalizeObject({}, fields)])}
       >
         {translate('settings.objectListSetting.add', { label })}

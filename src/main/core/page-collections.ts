@@ -220,7 +220,6 @@ export class PageCollectionManager {
                   (setting) => setting.key === page.definition.shortcutDefaultsKey,
                 )?.default,
               actions,
-              20,
             ).map((binding) => ({ ...binding, command: `${page.id}.${binding.command}` }))
           : [],
         commands: actions.map((action) => ({

@@ -114,8 +114,7 @@ export function parseAiSettings(value: unknown): AiSettings {
   if (
     !aiString(value.commonPrompt ?? '', 2048) ||
     (value.defaultConnectionId !== undefined && !aiId(value.defaultConnectionId)) ||
-    !Array.isArray(value.connections) ||
-    value.connections.length > 8
+    !Array.isArray(value.connections)
   )
     throw Error(hostText('settings.ai.limit'));
   const ids = new Set<string>();

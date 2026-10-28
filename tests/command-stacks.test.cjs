@@ -45,7 +45,7 @@ const context = {
   target: { window: '1', processName: 'notepad', desktop: false, browser: false },
 };
 
-test('stack validation enforces conditions, bounded graph, cycles and future fields', () => {
+test('stack validation enforces conditions, graph depth, cycles and future fields', () => {
   assert.deepEqual(
     parseCommandStack(
       stack([row('one', 'x', 'applets', { appletIds: ['host:settings', 'page:test:main'] })]),
@@ -80,7 +80,7 @@ test('stack validation enforces conditions, bounded graph, cycles and future fie
       stack(Array.from({ length: 8 }, (_, i) => row('r' + i, 'appdock.custom.inner'))),
     ),
   ];
-  assert.throws(() => validateStackGraph(huge));
+  assert.doesNotThrow(() => validateStackGraph(huge));
 });
 
 test('nested first/all resolves a fixed context, skips empty candidates and preserves repeated leaf entries', () => {

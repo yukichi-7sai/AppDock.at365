@@ -32,7 +32,7 @@ test('tray layout migration preserves displayed order, unknown commands and opt-
   assert.deepEqual(getTrayMenu({ ...settings, trayMenu: [] }, []), []);
   assert.deepEqual(parseSettings({ ...settings, trayMenu: [] }).trayCommands, []);
 });
-test('tray schema rejects invalid structure, fixed commands, duplicate ids, nesting and excessive size', () => {
+test('tray schema rejects invalid structure, fixed commands, duplicate ids, nesting', () => {
   for (const invalid of [
     null,
     {},
@@ -43,7 +43,6 @@ test('tray schema rejects invalid structure, fixed commands, duplicate ids, nest
     [group([group([])])],
     [{ ...group([]), title: ' ' }],
     [{ ...group([]), title: 'x'.repeat(81) }],
-    Array.from({ length: 1501 }, (_, i) => command('c' + i)),
   ])
     assert.throws(() => parseTrayMenu(invalid));
   const duplicateCommand = [command('a', 'some.command'), group([command('b', 'some.command')])];

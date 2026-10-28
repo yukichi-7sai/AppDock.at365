@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Runtime.CompilerServices;
 
 namespace AppDock.InputHost;
 
@@ -12,6 +13,36 @@ internal sealed record StackConditionTerm(Condition When, string? OwnerId = null
 /// <summary>Native projection of the shared input condition and selection contract.</summary>
 internal static class CommandConditions
 {
+    private static readonly ConditionalWeakTable<string[], HashSet<string>> processIndexes = new();
+    private static readonly ConditionalWeakTable<string[], HashSet<string>> appletIndexes = new();
+    private static HashSet<string> Processes(string[] names) => processIndexes.GetValue(names,
+        values => values.Select(ProcessName).ToHashSet(StringComparer.OrdinalIgnoreCase));
+    private static void Prepare(string[]? names, Dictionary<string, HashSet<string>> pool)
+    {
+        if (names == null || processIndexes.TryGetValue(names, out _)) return;
+        var key = string.Join('\0', names.Select(name => ProcessName(name).ToUpperInvariant()));
+        if (!pool.TryGetValue(key, out var index)) {
+            index = names.Select(ProcessName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            pool.Add(key, index);
+        }
+        processIndexes.GetValue(names, _ => index);
+    }
+    internal static void Prepare(Condition when, Dictionary<string, HashSet<string>> pool)
+    {
+        Prepare(when.Processes, pool);
+        Prepare(when.ExcludedProcesses, pool);
+        appletIndexes.GetValue(when.AppletIds, ids => ids.ToHashSet(StringComparer.Ordinal));
+    }
+    internal static void Prepare(ConditionEnvironment? environment, Dictionary<string, HashSet<string>> pool)
+    {
+        Prepare(environment?.Browsers, pool);
+        Prepare(environment?.ExcludedProcesses, pool);
+    }
+    internal static void Prepare(StackConditionTerm[][]? paths, Dictionary<string, HashSet<string>> pool)
+    {
+        if (paths != null) foreach (var path in paths) foreach (var term in path) Prepare(term.When, pool);
+    }
+    internal static bool Excluded(string[] names, string process) => Processes(names).Contains(ProcessName(process));
     internal static bool MatchesStack(StackConditionTerm[][]? paths, CommandContext context, ConditionEnvironment? environment = null) =>
         paths == null || paths.Any(path => path.All(term => Matches(term.When, context, term.OwnerId, environment)));
     internal static string ExecutionMode(string fallback, IReadOnlyDictionary<string, string>? modes, string input) =>
@@ -20,15 +51,17 @@ internal static class CommandConditions
     private static string ProcessName(string name) =>
         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
     private static bool ContainsProcess(string[] names, string process) =>
-        names.Any(name => ProcessName(name).Equals(ProcessName(process), StringComparison.OrdinalIgnoreCase));
+        Processes(names).Contains(ProcessName(process));
 
     internal static bool Matches(Condition when, CommandContext context, string? ownerId = null,
         ConditionEnvironment? environment = null)
     {
         var host = context.Host;
         var target = context.Target;
-        var excluded = (environment?.ExcludedProcesses ?? []).Concat(when.ExcludedProcesses ?? []).ToArray();
-        if (excluded.Length > 0 && (string.IsNullOrEmpty(target?.ProcessName) || ContainsProcess(excluded, target.ProcessName))) return false;
+        if ((environment?.ExcludedProcesses?.Length > 0 || when.ExcludedProcesses?.Length > 0) &&
+            (string.IsNullOrEmpty(target?.ProcessName) ||
+             environment?.ExcludedProcesses is { } global && ContainsProcess(global, target.ProcessName) ||
+             when.ExcludedProcesses is { } local && ContainsProcess(local, target.ProcessName))) return false;
         if (when.ExcludeDesktop && target?.Desktop != false) return false;
         return when.Scope switch {
             "global" => true,
@@ -36,8 +69,8 @@ internal static class CommandConditions
             "pages" => host.Focused == true && (!string.IsNullOrEmpty(host.PageId) || !string.IsNullOrEmpty(host.AppletId)),
             "owner" => host.Focused == true && !string.IsNullOrEmpty(ownerId) && host.AppletId == ownerId,
             "applets" => host.Focused == true &&
-                (!string.IsNullOrEmpty(host.PageId) && when.AppletIds.Contains(host.PageId) ||
-                 !string.IsNullOrEmpty(host.AppletId) && when.AppletIds.Contains(host.AppletId)),
+                (!string.IsNullOrEmpty(host.PageId) && appletIndexes.GetValue(when.AppletIds, ids => ids.ToHashSet(StringComparer.Ordinal)).Contains(host.PageId) ||
+                 !string.IsNullOrEmpty(host.AppletId) && appletIndexes.GetValue(when.AppletIds, ids => ids.ToHashSet(StringComparer.Ordinal)).Contains(host.AppletId)),
             "desktop" => target?.Desktop == true,
             "browser" => !string.IsNullOrEmpty(target?.ProcessName) && environment?.Browsers != null &&
                 ContainsProcess(environment.Browsers, target.ProcessName) &&

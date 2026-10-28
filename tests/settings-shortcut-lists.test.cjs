@@ -123,7 +123,7 @@ test('shortcut declarations auto-publish all three editable columns without wide
   const f = fixture(t, { rows: [row('one')] });
   assert.deepEqual(f.target().operations, ['add', 'update', 'remove', 'reorder']);
   const schema = f.schema();
-  assert.equal(schema.maxItems, 32);
+  assert.equal(schema.maxItems, undefined);
   assert.deepEqual(
     schema.items.map((field) => [field.key, field.writable]),
     [
@@ -339,12 +339,11 @@ test('reorder and insertion preserve IDs and unknown values; empty lists do not 
   assert.deepEqual(plain.read().items, []);
 });
 
-test('32-row limit, pagination and no-change detection share existing validation', (t) => {
+test('large list pagination and no-change detection share existing validation', (t) => {
   const f = fixture(t, { rows: Array.from({ length: 32 }, (_, i) => row('item-' + i)) });
   const first = f.read({ limit: 20 }),
     second = f.read({ limit: 20, cursor: first.nextCursor });
   assert.equal(first.items.length + second.items.length, 32);
-  refuses(() => f.call('apply', f.request([{ kind: 'add', values: {} }])), 'INVALID_ARGUMENT');
   const before = fs.readFileSync(f.store.file);
   assert.equal(
     f.call(
@@ -384,7 +383,6 @@ test('stopped owners and malformed stored shortcut values are unavailable withou
     null,
     [row('one', { keys: { token: 'PRIVATE_BAD_KEY' } })],
     '[{"id":"one"}]',
-    Array.from({ length: 33 }, (_, i) => row('row-' + i)),
   ]) {
     const f = fixture(t, { rows });
     assert.equal(f.target().available, false);

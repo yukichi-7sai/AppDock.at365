@@ -10,9 +10,9 @@
 
 ## 保存と設定UI
 
-- 共有settings.jsonの`mcpServers: {version:1, items:[{id,name,description}]}`は最大32件。IDはUUIDで、名前変更後も一定。共有JSONに接続先のパス、URL、秘密、許可を入れない。
+- 共有settings.jsonの`mcpServers: {version:1, items:[{id,name,description}]}`に固定件数上限は設けない。IDはUUIDで、名前変更後も一定。共有JSONに接続先のパス、URL、秘密、許可を入れない。
 - PC専用`mcp-client.json`にID別のtransport、絶対EXEパス/引数配列/cwd、HTTP URL、認証方式、enabledと公開許可を保存する。Bearerと環境変数値はsafeStorageで暗号化し、設定UIにも既存値を戻さない。秘密の更新は明示入力、未指定は保持、空文字は解除。接続先を変更した場合Bearerの再入力が必要。
-- PCファイルは64エントリ/1MiB以内。保存前にも同じ上限を検証する。名前だけの変更では同じ暗号文を保持し、実行中接続や保存済みtoolRevisionを失効させない。各エントリは利用時に独立して検証し、1件の形式不備・復号不能で他の接続先の編集を止めない。他の接続先を保存するときも、不備のあるエントリと暗号文はJSON値をそのまま保持する。対象行の明示的な編集・削除では修復・削除できる。ファイル全体のJSON不正・未対応版・上限超過は元ファイルを保持して読み取り専用にする。
+- PCファイルにエントリ件数・合計サイズの固定上限は設けない。保存前にも形式を検証する。名前だけの変更では同じ暗号文を保持し、実行中接続や保存済みtoolRevisionを失効させない。各エントリは利用時に独立して検証し、1件の形式不備・復号不能で他の接続先の編集を止めない。他の接続先を保存するときも、不備のあるエントリと暗号文はJSON値をそのまま保持する。対象行の明示的な編集・削除では修復・削除できる。ファイル全体のJSON不正・未対応版は元ファイルを保持して読み取り専用にする。
 - 同期で名簿が届いてもPC設定がなければ未設定となる。自動接続・他のIDへの代替はしない。名前/PC設定/秘密の編集は共通ダイアログのOKで原子的に保存し、expectedRevision競合では入力を保持する。名簿だけのJSON編集は許可し、接続許可を変更できない。
 - 設定の一覧に状態を表示し、追加/編集/削除/並替、接続確認、ツール探索、ジョブ表示・取消を提供する。全体の未保存状態は作らない。
 - 接続一覧は外側のSectionを設けずページのトップレベルへ配置し、名前と端末専用情報の保存範囲はページ説明に残す。ツール確認用の接続先を選ぶと既存の取得経路で自動接続/ツール取得し、独立した取得ボタンは置かない。未選択は取得せず、接続先を切り替えるとツール・ページcursor・結果を解除する。処理中の操作ガードと既存の警告/エラー経路を維持する。追加読込・実行は共通SettingsActions、引数Schemaは読み取り専用のSettingsTextareaをSettingsField内へ置く。ジョブ操作、接続一覧とダイアログは既存の共通部品を使用する。
@@ -32,7 +32,7 @@
 
 | 共通API / MCPツール | 必要許可 | 結果・操作 |
 | --- | --- | --- |
-| `mcp.servers.getSettings` / `appdock_mcp_get_server_settings` | read | 引数なしは最大32件の名簿・状態とrevision。serverId指定は1接続先のitem/connectionを返す。token・環境変数・その名前は返さない |
+| `mcp.servers.getSettings` / `appdock_mcp_get_server_settings` | read | 引数なしは名簿・状態とrevision。serverId指定は1接続先のitem/connectionを返す。token・環境変数・その名前は返さない |
 | `mcp.servers.updateSettings` / `appdock_mcp_update_server_settings` | read + write | 最新expectedRevisionとopで登録・編集・削除・並替・PC上の有効化。dryRun:trueは検証のみ |
 | `mcp.servers.inspectTools` / `appdock_mcp_inspect_server_tools` | read + execute + useMcp | serverIdで未公開を含むツール概要をページ取得。name指定時は1ツールのSchema。refresh:trueで再取得 |
 
@@ -57,7 +57,7 @@ connectionは`{enabled,transport,command,args,cwd,url,authentication,published,p
 
 ## 接続とカタログ
 
-接続は発見/実行時に遅延開始する。1接続先の準備は共有し、設定世代が変われば途中の応答を採用しない。交渉15秒、一覧最大16ページ/512ツール、ツール定義1件64KiB、全体1MiB、結果1MiB、引数64KiBで制限する。一覧キャッシュは30秒と変更通知で失効し、実行前に定義を再取得する。外向け一覧は1ページ最大50件の概要だけを返し、詳細でSchemaを返す。cursorは一覧/公開範囲の識別情報へ結び付ける。
+接続は発見/実行時に遅延開始する。1接続先の準備は共有し、設定世代が変われば途中の応答を採用しない。交渉15秒、一覧最大16ページ（ツール件数の固定上限なし）、ツール定義1件64KiB、全体1MiB、結果1MiB、引数64KiBで制限する。一覧キャッシュは30秒と変更通知で失効し、実行前に定義を再取得する。外向け一覧は1ページ最大50件の概要だけを返し、詳細でSchemaを返す。cursorは一覧/公開範囲の識別情報へ結び付ける。
 
 入力・出力Schemaはカスタムコマンドと同じ有界な共通部分を検証する。未対応keywordや循環参照があるツールは一覧に理由を示して実行を拒否する。Schemaを無視して実行しない。定義全体の`toolRevision`をハッシュし、呼出しに期待値を必須とする。接続先のPC設定も識別情報へ含めるので、同じIDを別URLへ変更して保存済み操作がそのまま実行されることはない。
 

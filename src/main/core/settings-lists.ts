@@ -52,7 +52,7 @@ export const listOperationSchemas = {
     type: 'object',
     properties: {
       kind: { const: 'reorder' },
-      itemRefs: { type: 'array', maxItems: 64, uniqueItems: true, items: { type: 'string' } },
+      itemRefs: { type: 'array', uniqueItems: true, items: { type: 'string' } },
     },
     required: ['kind', 'itemRefs'],
     additionalProperties: false,
@@ -67,7 +67,7 @@ export const settingsListOperationSchemas = (target: SettingsListTarget) => {
         ...listOperationSchemas.reorder.properties,
         itemRefs: {
           ...listOperationSchemas.reorder.properties.itemRefs,
-          maxItems: target.maxItems ?? 64,
+          ...(target.maxItems === undefined ? {} : { maxItems: target.maxItems }),
         },
       },
     },
@@ -110,19 +110,21 @@ export function planSettingsList(
     rows = structuredClone(before),
     changes: Record<string, unknown>[] = [];
   const used: { index: number; field: SettingDefinition }[] = [];
+  const refIndexes = new Map(refs.map((ref, index) => [ref, index]));
   const resolve = (ref: unknown) => {
     if (typeof ref !== 'string') return fail();
-    const index = refs.indexOf(ref);
-    if (index < 0) return fail('REVISION_CONFLICT');
+    const index = refIndexes.get(ref);
+    if (index === undefined) return fail('REVISION_CONFLICT');
     return index;
   };
   const fields = target.fields;
+  const fieldsByKey = new Map(fields.map((field) => [field.key, field]));
   const update = (row: Record<string, unknown>, raw: unknown) => {
     if (!jsonObject(raw) || Object.keys(raw).length > 128) return fail();
     const result: Record<string, unknown> = {};
     const previousRow = structuredClone(row);
     for (const [key, value] of Object.entries(raw)) {
-      const field = fields.find((field) => field.key === key) ?? fail('NOT_FOUND');
+      const field = fieldsByKey.get(key) ?? fail('NOT_FOUND');
       if (key === target.definition.list?.idKey) fail();
       try {
         if (target.validateField) target.validateField(field, value);
@@ -138,7 +140,7 @@ export function planSettingsList(
     }
     target.prepareRow?.(row, Object.keys(raw));
     for (const key of Object.keys(raw)) {
-      const field = fields.find((field) => field.key === key)!;
+      const field = fieldsByKey.get(key)!;
       const previous = mcpSettingValue(field, objectFieldValue(previousRow, field)),
         value = mcpSettingValue(field, objectFieldValue(row, field));
       if (!sameSetting(previous, value))
@@ -163,7 +165,11 @@ export function planSettingsList(
       fail();
     if (kind !== 'update' && operations.length !== 1) fail();
     if (kind === 'add') {
-      if (rows.length >= (target.maxItems ?? 64) || !jsonObject(operation.values)) fail();
+      if (
+        (target.maxItems !== undefined && rows.length >= target.maxItems) ||
+        !jsonObject(operation.values)
+      )
+        fail();
       const row: Record<string, unknown> =
         target.createRow?.(operation.values as Record<string, unknown>) ?? {};
       if (!target.createRow) {
@@ -182,7 +188,7 @@ export function planSettingsList(
       if (!jsonObject(operation.changes) || !Object.keys(operation.changes).length) fail();
       const index = resolve(operation.itemRef);
       for (const key of Object.keys(operation.changes as object)) {
-        const field = fields.find((field) => field.key === key) ?? fail('NOT_FOUND');
+        const field = fieldsByKey.get(key) ?? fail('NOT_FOUND');
         if (
           used.some(
             (previous) => previous.index === index && settingFieldsOverlap(previous.field, field),
@@ -202,13 +208,14 @@ export function planSettingsList(
     } else {
       if (
         !Array.isArray(operation.itemRefs) ||
-        operation.itemRefs.length > (target.maxItems ?? 64) ||
+        (target.maxItems !== undefined && operation.itemRefs.length > target.maxItems) ||
         operation.itemRefs.length !== rows.length ||
         new Set(operation.itemRefs).size !== rows.length
       )
         fail();
       const reordered = (operation.itemRefs as unknown[]).map((ref) => rows[resolve(ref)]);
-      rows.splice(0, rows.length, ...reordered);
+      rows.length = 0;
+      for (const row of reordered) rows.push(row);
       if (!sameSetting(before, rows)) changes.push({ kind });
     }
   }

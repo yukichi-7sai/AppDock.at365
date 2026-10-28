@@ -103,7 +103,6 @@ export function mcpClientSettingsTarget(
     available,
     fields,
     definition,
-    maxItems: 32,
     rows: () => snapshot.rows as unknown as Row[],
     overrides: () => {
       try {
@@ -119,27 +118,20 @@ export function mcpClientSettingsTarget(
     removable: (row) => available && !protectedRow(row),
     inputSchema: (field) =>
       field.key === 'connection.args'
-        ? { type: 'array', maxItems: 64, items: { type: 'string', maxLength: 4096 } }
+        ? { type: 'array', items: { type: 'string', maxLength: 4096 } }
         : field.key === 'connection.publishedTools'
           ? {
               type: 'array',
-              maxItems: 512,
               uniqueItems: true,
               items: { type: 'string', pattern: '^[\\w.-]{1,128}$' },
             }
           : settingInputSchema(field),
     validateField: (field, value) => {
       if (field.key === 'connection.args') {
-        if (
-          !Array.isArray(value) ||
-          value.length > 64 ||
-          !value.every((item) => mcpText(item, 4096))
-        )
-          throw Error();
+        if (!Array.isArray(value) || !value.every((item) => mcpText(item, 4096))) throw Error();
       } else if (field.key === 'connection.publishedTools') {
         if (
           !Array.isArray(value) ||
-          value.length > 512 ||
           new Set(value).size !== value.length ||
           !value.every((item) => typeof item === 'string' && /^[\w.-]{1,128}$/.test(item))
         )

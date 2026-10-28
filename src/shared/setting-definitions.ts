@@ -9,7 +9,6 @@ const object = (value: unknown): value is Record<string, any> =>
 export function parseSettingOptions(value: unknown): SettingOption[] {
   if (
     !Array.isArray(value) ||
-    value.length > 128 ||
     value.some(
       (o) =>
         !object(o) ||
@@ -49,7 +48,6 @@ export function validateSettingValue(definition: SettingDefinition, value: unkno
   if (
     definition.type === 'string-list' &&
     (!Array.isArray(value) ||
-      value.length > 64 ||
       value.some((item) => typeof item !== 'string' || !item.trim() || item.length > 32767))
   )
     fail();

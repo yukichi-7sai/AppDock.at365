@@ -58,8 +58,6 @@ export class RegisteredSounds {
       return name;
     };
     if (existing) return duplicate();
-    if ((await this.list()).length >= 512)
-      throw Error(hostText('services.registeredSounds.countLimit'));
     let handle;
     try {
       handle = await fs.open(file, 'wx');

@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { inputRows } from './settings-indexes';
 import { stackConditionPaths, type StackCatalogEntry } from './command-stacks';
 import { normalizeShortcut, validCommandId } from './commands';
 import { applyBindingOrder } from './binding-order';
@@ -132,7 +133,6 @@ export function applyGestureBinding(
     JSON.stringify(rows.find((item) => item.id === original.id)) !== JSON.stringify(original)
   )
     throw Error(hostText('settings.gestures.conflict'));
-  if (!original && rows.length >= 2000) throw Error(hostText('settings.gestures.limit'));
   if (original?.gesture === row.gesture)
     return rows.map((item) => (item.id === row.id ? row : item));
   const next = rows.filter((item) => item.id !== row.id);
@@ -198,8 +198,7 @@ export function parseGestures(value: unknown): GestureSettings {
     (v.executionMode !== undefined && !['all', 'first'].includes(v.executionMode)) ||
     !['gesture-start', 'window-center', 'monitor-center', 'none'].includes(v.indicatorPosition) ||
     (v.indicatorShowNoAction !== undefined && typeof v.indicatorShowNoAction !== 'boolean') ||
-    !Array.isArray(v.bindings) ||
-    v.bindings.length > 2000
+    !Array.isArray(v.bindings)
   )
     throw Error(hostText('settings.gestures.options'));
   const bindings = parseGestureBindings(v.bindings);
@@ -288,9 +287,10 @@ export function planGestureCommands(
   commands: { id: string; extensionId?: string | null }[],
 ) {
   return planCommandBatch(
-    settings.bindings
-      .filter((row) => row.gesture === gesture)
-      .map((row) => ({ ...row, when: commandCondition(row.when) })),
+    inputRows(settings.bindings, [gesture], 'gesture').map((row) => ({
+      ...row,
+      when: commandCondition(row.when),
+    })),
     {
       host: {
         focused: context.appFocused && context.window === target.window,
@@ -313,8 +313,7 @@ export function parseGestureBindings(
   value: unknown,
   normalize: (value: unknown) => string = normalizeGesture,
 ): GestureBinding[] {
-  if (!Array.isArray(value) || value.length > 2000)
-    throw Error(hostText('settings.gestures.limit'));
+  if (!Array.isArray(value)) throw Error(hostText('settings.gestures.limit'));
   const rows = value as GestureBinding[];
   const ids = new Set<string>();
   return rows.map((r) => {
@@ -331,7 +330,6 @@ export function parseGestureBindings(
       (r.when.excludeDesktop !== undefined && typeof r.when.excludeDesktop !== 'boolean') ||
       (r.when.excludeDesktop === true && !['global', 'exe'].includes(r.when.scope)) ||
       !Array.isArray(r.when.appletIds) ||
-      r.when.appletIds.length > 500 ||
       r.when.appletIds.some((id) => !validShortcutTarget(id)) ||
       (r.when.scope === 'applets' ? !r.when.appletIds.length : !!r.when.appletIds.length)
     )

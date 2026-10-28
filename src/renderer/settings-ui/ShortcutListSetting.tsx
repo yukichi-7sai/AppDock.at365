@@ -1,7 +1,7 @@
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
 import { SettingsInput } from './SettingsInput';
-import { newShortcutListEntry, shortcutListLimit, validSendKeys } from '../../shared/shortcut-list';
+import { newShortcutListEntry, validSendKeys } from '../../shared/shortcut-list';
 
 type Entry = { id: string; title: string; keys: string };
 export function ShortcutListSetting({
@@ -80,7 +80,6 @@ export function ShortcutListSetting({
       ))}
       <button
         type="button"
-        disabled={entries.length >= shortcutListLimit}
         onClick={() => {
           onChange([
             ...entries,

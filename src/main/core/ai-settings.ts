@@ -69,8 +69,11 @@ export class AiSettingsController {
   preparePublicConnections(rows: Record<string, unknown>[]) {
     const current = this.current();
     const parsed = parseAiSettings({ ...current, connections: rows });
+    const currentById = new Map(
+      current.connections.map((connection) => [connection.id, connection]),
+    );
     const connections = parsed.connections.map((value) => {
-      const before = current.connections.find((c) => c.id === value.id);
+      const before = currentById.get(value.id);
       return JSON.stringify(before) === JSON.stringify(value)
         ? value
         : this.preparePublicConnection(value, !before || before.name !== value.name);
@@ -81,11 +84,13 @@ export class AiSettingsController {
   }
   validatePublic(next: AiSettings) {
     const current = this.current();
+    const nextIds = new Set(next.connections.map((connection) => connection.id));
+    const currentById = new Map(
+      current.connections.map((connection) => [connection.id, connection]),
+    );
     if (
       current.connections.some(
-        (c) =>
-          !next.connections.some((value) => value.id === c.id) &&
-          this.secrets.configurationState(c.id).protected,
+        (c) => !nextIds.has(c.id) && this.secrets.configurationState(c.id).protected,
       )
     )
       throw new SettingsTargetError(
@@ -93,7 +98,7 @@ export class AiSettingsController {
         hostText('services.settingsTargets.localAction'),
       );
     for (const connection of next.connections) {
-      const before = current.connections.find((c) => c.id === connection.id);
+      const before = currentById.get(connection.id);
       if (JSON.stringify(before) === JSON.stringify(connection)) continue;
       this.connection(connection);
       if (!before) {
@@ -162,17 +167,18 @@ export class AiSettingsController {
   reorder(original: unknown, ordered: unknown) {
     const current = this.current(),
       ids = current.connections.map((c) => c.id);
+    const byId = new Map(current.connections.map((connection) => [connection.id, connection]));
     if (
       JSON.stringify(original) !== JSON.stringify(ids) ||
       !Array.isArray(ordered) ||
       ordered.length !== ids.length ||
       new Set(ordered).size !== ids.length ||
-      ordered.some((id) => !ids.includes(id))
+      ordered.some((id) => !byId.has(id))
     )
       throw Error(hostText('settings.ai-settings.orderConflict'));
     const ai = {
       ...current,
-      connections: ordered.map((id) => current.connections.find((c) => c.id === id)!),
+      connections: ordered.map((id) => byId.get(id)!),
     };
     this.settings.save({ ...this.settings.value, ai }, this.settings.revision);
     this.changed();

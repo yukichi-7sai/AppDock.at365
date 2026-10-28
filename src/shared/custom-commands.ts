@@ -84,7 +84,7 @@ export function boundedJson(value: unknown, bytes: number, depth = 16, count = 2
     seen.delete(v);
   };
   visit(value, 0);
-  if (new TextEncoder().encode(JSON.stringify(value)).length > bytes)
+  if (Number.isFinite(bytes) && new TextEncoder().encode(JSON.stringify(value)).length > bytes)
     throw Error(hostText('settings.custom-commands.jsonSize'));
 }
 export function customItems(block: CustomCommandBlock | undefined): CustomCommandDefinition[] {
@@ -93,16 +93,14 @@ export function customItems(block: CustomCommandBlock | undefined): CustomComman
 export function parseCustomCommands(value: unknown): CustomCommandBlock {
   if (!jsonObject(value) || !version(value.version))
     throw Error(hostText('settings.custom-commands.format'));
-  boundedJson(value, 1024 * 1024, 40, 100000);
+  boundedJson(value, Infinity, 40, Infinity);
   if (value.version !== customCommandVersion) return structuredClone(value) as CustomCommandBlock;
   if (
     Object.keys(value).some((k) => !['version', 'items'].includes(k)) ||
-    !Array.isArray(value.items) ||
-    value.items.length > 256
+    !Array.isArray(value.items)
   )
     throw Error(hostText('settings.custom-commands.limit'));
-  const ids = new Set<string>(),
-    counts = new Map<string, number>();
+  const ids = new Set<string>();
   const items = value.items.map((item: unknown) => {
     if (
       !jsonObject(item) ||
@@ -135,11 +133,8 @@ export function parseCustomCommands(value: unknown): CustomCommandBlock {
         : Object.keys(item.owner).length !== 2 || !identifier(item.owner.id))
     )
       throw Error(hostText('settings.custom-commands.command'));
-    boundedJson(item.config, 16 * 1024);
+    boundedJson(item.config, Infinity, 40, Infinity);
     ids.add(item.id);
-    const owner = item.owner.kind === 'host' ? 'host' : `applet:${item.owner.id}`;
-    counts.set(owner, (counts.get(owner) ?? 0) + 1);
-    if (counts.get(owner)! > 100) throw Error(hostText('settings.custom-commands.ownerLimit'));
     return {
       ...item,
       title: item.title.trim(),
@@ -373,7 +368,7 @@ export const customUpdateSchema = {
           expectedTypeRevision: { type: 'string' },
           item: { type: 'object' },
           changes: { type: 'object' },
-          ids: { type: 'array', items: { type: 'string' }, maxItems: 256 },
+          ids: { type: 'array', items: { type: 'string' } },
         },
         required: ['op'],
         additionalProperties: false,

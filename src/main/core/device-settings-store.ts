@@ -41,8 +41,6 @@ interface Journal {
 }
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const read = (file: string) => {
-  if (fs.statSync(file).size > 4 * 1024 * 1024)
-    throw Error(hostText('services.deviceSettingsStore.sizeLimit'));
   return fs.readFileSync(file);
 };
 
@@ -228,7 +226,6 @@ export class DeviceSettingsStore extends SettingsStore {
   private recoverTransaction() {
     if (!fs.existsSync(this.journal)) return;
     try {
-      if (fs.statSync(this.journal).size > 32 * 1024 * 1024) throw Error('journal size');
       const journal = JSON.parse(fs.readFileSync(this.journal, 'utf8')) as Journal;
       if (
         journal.version !== 1 ||
@@ -300,9 +297,6 @@ export class DeviceSettingsStore extends SettingsStore {
         before: read(this.device.file).toString('base64'),
         after: Buffer.from(this.device.serialize(device)).toString('base64'),
       });
-    for (const item of files)
-      if (Buffer.from(item.after, 'base64').length > 4 * 1024 * 1024)
-        throw Error(hostText('services.deviceSettingsStore.fileSizeLimit'));
     for (const item of files)
       if ((item.scope === 'shared' ? this.shared : this.device).recovered)
         throw Error(hostText('services.deviceSettingsStore.targetRecoveryRequired'));

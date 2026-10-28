@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { inputRows } from './settings-indexes';
 import { stackConditionPaths, type StackCatalogEntry } from './command-stacks';
 import { applyBindingOrder } from './binding-order';
 import {
@@ -112,8 +113,7 @@ export function getKeybindingOptions(
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 export function parseKeybindings(value: unknown): Keybinding[] {
-  if (!Array.isArray(value) || value.length > 2000)
-    throw Error(hostText('settings.keybindings.list'));
+  if (!Array.isArray(value)) throw Error(hostText('settings.keybindings.list'));
   const ids = new Set<string>();
   return value.map((row) => {
     if (
@@ -131,7 +131,6 @@ export function parseKeybindings(value: unknown): Keybinding[] {
     if (
       !keybindingScopes.some((s) => s.id === when.scope) ||
       !Array.isArray(when.appletIds) ||
-      when.appletIds.length > 500 ||
       when.appletIds.some((id) => !validShortcutTarget(id)) ||
       new Set(when.appletIds).size !== when.appletIds.length ||
       (when.scope === 'applets' ? !when.appletIds.length : !!when.appletIds.length) ||
@@ -172,14 +171,9 @@ export function parseKeybindings(value: unknown): Keybinding[] {
   });
 }
 /** Manifest defaults may only name commands declared by the same Applet. */
-export function parseKeybindingDefaults(
-  value: unknown,
-  commands: string[],
-  limit = 100,
-): KeybindingDefault[] {
+export function parseKeybindingDefaults(value: unknown, commands: string[]): KeybindingDefault[] {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > limit)
-    throw Error(hostText('settings.keybindings.defaultLimit', { limit: limit }));
+  if (!Array.isArray(value)) throw Error(hostText('settings.keybindings.list'));
   const allowed = new Set(commands);
   return parseKeybindings(
     value.map((row, index) => {
@@ -263,7 +257,6 @@ export function initializeCollectionDefaults(
       page.definition.source === 'remote'
         ? ['open', 'back', 'forward', 'reload', 'home']
         : ['open'],
-      20,
     );
     if (!prior.has(page.id))
       rows = addDefaultBindings(
@@ -342,14 +335,17 @@ export function nativeShortcutInputs(
   catalog: readonly StackCatalogEntry[] = [],
 ) {
   const known = new Map(catalog.map((command) => [command.id, command]));
+  const availableIds = new Set(available);
+  const membersByKey = new Map<string, Keybinding[]>();
+  for (const row of rows) {
+    if (!row.enabled || !availableIds.has(row.command) || !externalShortcutScope(row.when.scope))
+      continue;
+    const members = membersByKey.get(row.key) ?? [];
+    members.push(row);
+    membersByKey.set(row.key, members);
+  }
   return globalShortcutInputs(rows, available).map((input) => {
-    const members = rows.filter(
-      (row) =>
-        row.key === input.shortcut &&
-        row.enabled &&
-        available.includes(row.command) &&
-        externalShortcutScope(row.when.scope),
-    );
+    const members = membersByKey.get(input.shortcut)!;
     if (
       !environment.excludedProcesses?.length &&
       !members.some(
@@ -545,8 +541,8 @@ export function planKeybindings(
 ) {
   const keys = new Set(typeof key === 'string' ? [key] : key);
   return planCommandBatch(
-    rows
-      .filter((row) => keys.has(row.key) && (globalEvent || !externalShortcutScope(row.when.scope)))
+    inputRows(rows, [...keys])
+      .filter((row) => globalEvent || !externalShortcutScope(row.when.scope))
       .map((row) => ({ ...row, when: commandCondition(row.when) })),
     {
       host: { focused: context.appFocused, appletId: context.appletId, pageId: context.pageId },

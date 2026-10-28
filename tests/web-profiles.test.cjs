@@ -82,7 +82,7 @@ test('Invalid or externally changed roster is preserved instead of overwritten',
     assert.equal(fs.readFileSync(f.file, 'utf8'), 'invalid account file');
     assert.deepEqual(fs.readFileSync(f.settings.file), settingsBytes);
     assert.throws(() => parseWebProfiles([f.account, f.account]));
-    assert.throws(() =>
+    assert.doesNotThrow(() =>
       parseWebProfiles(
         Array.from({ length: 33 }, () => ({ id: `account.${randomUUID()}`, name: '枠' })),
       ),

@@ -10,21 +10,16 @@ export class AiSecrets {
     private encryption: { encrypt(value: string): string; decrypt(value: string): string },
   ) {}
   private read(file: string): Record<string, { fingerprint: string; key?: string }> {
+    let text: string;
     try {
-      if (fs.statSync(file).size > 262144) throw Error();
+      text = fs.readFileSync(file, 'utf8');
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {};
       throw Error(hostText('services.aiSecrets.readFailed'));
     }
     try {
-      const v = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (
-        !aiObject(v) ||
-        v.version !== 1 ||
-        !aiObject(v.entries) ||
-        Object.keys(v.entries).length > 128
-      )
-        throw Error();
+      const v = JSON.parse(text);
+      if (!aiObject(v) || v.version !== 1 || !aiObject(v.entries)) throw Error();
       for (const [id, item] of Object.entries(v.entries)) {
         if (
           !aiId(id) ||
@@ -71,7 +66,6 @@ export class AiSecrets {
       if (!c.baseUrl) throw Error(hostText('services.aiSecrets.configureFirst'));
       entries[c.id] = { fingerprint: hash(c.baseUrl), key: this.encryption.encrypt(value) };
     } else delete entries[c.id];
-    if (Object.keys(entries).length > 128) throw Error(hostText('services.aiSecrets.keyLimit'));
     return {
       commit: () => atomicWrite(this.keysFile, JSON.stringify({ version: 1, entries }) + '\n'),
       rollback: () => {

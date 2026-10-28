@@ -119,7 +119,6 @@ export class RibbonCommands {
                     ids: {
                       type: 'array',
                       items: idSchema,
-                      maxItems: 550,
                       uniqueItems: true,
                       description:
                         '指定配置の全itemsのID。非表示/無効Appletも含む。retainedIdsは含めない。',
@@ -254,7 +253,7 @@ export class RibbonCommands {
                   operation('ungroup', { id: idSchema }),
                   operation('reorderChildren', {
                     id: idSchema,
-                    ids: { type: 'array', maxItems: 500, uniqueItems: true, items: idSchema },
+                    ids: { type: 'array', uniqueItems: true, items: idSchema },
                   }),
                   {
                     type: 'object',

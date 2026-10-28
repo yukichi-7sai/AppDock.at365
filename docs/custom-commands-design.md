@@ -70,16 +70,16 @@ itemsの配列順は管理一覧の順序だけを表す。ショートカット
 
 | 対象 | 初期上限 |
 | --- | --- |
-| 保存定義 | 全体256件、1提供元100件 |
-| 種類宣言 | 1Applet16件、全提供元合計256件 |
+| 保存定義 | 固定件数上限なし |
+| 種類宣言 | 1Applet16件。全提供元合計の固定上限なし |
 | typeId | 既存の公開IDに使える文字で200文字以内。本体はappdock名前空間、Appletは自身のID配下 |
-| config | UTF-8 JSONで16KiB、入れ子16段、JSON値2,048個以内 |
+| config | 固定の合計サイズ・要素数上限なし。保存ブロックの入れ子40段と型検証を適用 |
 | configSchema | UTF-8 JSONで32KiB、入れ子32段。外部参照、非同期検証、コード評価を禁止 |
 | 1回の管理更新 | 32操作以内。MCPでは既存の要求本文64KiB制限も適用 |
 | 一覧 | 1ページ最大50件。config/Schema全文を含めない |
 | 実行結果 | JSONオブジェクト64KiB以内。画像・音声bytes・任意ファイル参照は結果に含めない |
 
-settings.json全体と設定ページJSONは既存codecの1MiB制限も受ける。個別上限内でも保存全体の上限を超える場合は保存前に拒否する。prototype系キー、重複ID、他提供元へのなりすまし、予約済みcommandIdとの衝突を拒否する。
+settings.json全体と設定ページJSONに固定の合計サイズ上限は設けない。prototype系キー、重複ID、他提供元へのなりすまし、予約済みcommandIdとの衝突を拒否する。
 
 ## 種類の宣言とハンドラー登録
 
@@ -351,7 +351,7 @@ version 1の専用reader、説明の自動補完保存、旧定義の変換、�
 
 MCPの仕様にはツールの機能を説明するdescriptionがあるが、上記の個別説明は固定ツールの**応答データ**として公開するAppDock側の設計である。AIが必ず読むことや正しく選択することは保証しない。説明文を実行コード、許可の根拠、上位の指示として解釈しない。[MCP Tools仕様](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 
-説明文を追加した一覧のUTF-8サイズも確認する。既存の定義256件・提供元100件・ブロック1MiB・MCP要求64KiB等の上限を維持し、超過時に本文を黙って切り捨てたり、保存／要求の上限を迂回したりしない。
+説明文を含む大量の一覧も切り捨てず保存する。保存一覧の件数・合計サイズは制限しない。MCPの要求本文64KiBなど通信境界は維持する。
 
 ## キー送信種類
 
@@ -384,7 +384,7 @@ configVersionは1。次の3モードを、1つの「コマンド／プロセス�
 
 モードの値、`workingDirectory`、`showConsole`を共通項目とし、モード別の入力名は`executable`＋`arguments`、`command`、`script`とする。選択していないモードの項目は保存せず、未知項目も拒否する。
 
-実行ファイル／作業フォルダーは4,096文字以内、引数は64件以内・各4,096文字以内、シェル本文は8,192文字以内、config全体は既存16KiB以内とする。cmdはさらに、組み立てた実行文字列を8,191文字以内に制限する。NULを拒否し、構築したWindowsのコマンドライン長も起動前に検査する。保存時の形式検証と起動直前の実在・アクセス確認を分ける。[cmdの上限](https://learn.microsoft.com/en-au/troubleshoot/windows-client/shell-experience/command-line-string-limitation)、[EncodedCommandの符号化](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe?view=powershell-5.1)
+実行ファイル／作業フォルダーは4,096文字以内、引数の件数上限はなく、各4,096文字以内、シェル本文は8,192文字以内、config全体に固定サイズ上限は設けない。cmdはさらに、組み立てた実行文字列を8,191文字以内に制限する。NULを拒否し、構築したWindowsのコマンドライン長も起動前に検査する。保存時の形式検証と起動直前の実在・アクセス確認を分ける。[cmdの上限](https://learn.microsoft.com/en-au/troubleshoot/windows-client/shell-experience/command-line-string-limitation)、[EncodedCommandの符号化](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_powershell_exe?view=powershell-5.1)
 
 ### 共通APIと寿命
 
@@ -425,7 +425,7 @@ configVersionは1。次の3モードを、1つの「コマンド／プロセス�
 
 ## 保存契約とUI
 
-configVersion 1。configは`serverId`、`toolName`、`toolRevision`、固定`arguments`、任意`timeoutMs`（1〜600秒、既定60秒）。commandIdはUUIDのまま、名前/引数/接続先を編集しても入力割当を保持する。種類のconfig全体は16KiB以内。引数に秘密値を保存するための機能は設けず、接続のBearer/暗号化環境変数を使用する。ツール独自の秘密引数参照は初期対象外。
+configVersion 1。configは`serverId`、`toolName`、`toolRevision`、固定`arguments`、任意`timeoutMs`（1〜600秒、既定60秒）。commandIdはUUIDのまま、名前/引数/接続先を編集しても入力割当を保持する。種類のconfig全体に固定サイズ上限は設けない。引数に秘密値を保存するための機能は設けず、接続のBearer/暗号化環境変数を使用する。ツール独自の秘密引数参照は初期対象外。
 
 共通のカスタムコマンド画面でこの種類を選ぶと、接続先、ツール、引数JSONを表示する。接続先変更と既存コマンドの編集開始時にツール一覧を全ページ自動取得し、選択したツールの詳細も自動取得する。接続先を素早く切り替えた場合は古い応答を破棄し、取得中の引数編集を上書きしない。取得失敗時だけ共通エラー欄から再試行でき、常設の「ツールを取得」「詳細を再取得」ボタンは置かない。接続できなくても保存済みconfigを変えない名前・説明の編集はできる。
 

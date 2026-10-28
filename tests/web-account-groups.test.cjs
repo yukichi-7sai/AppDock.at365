@@ -281,18 +281,24 @@ test('failed final journal write recovers committed roster and member settings o
   assert.equal(f.create().snapshot('fixture.gmail').accounts[0].name, 'After failure');
 });
 
-test('legacy binding prevents implicit reuse by another group and limits migration to ten identities', (t) => {
+test('legacy binding prevents implicit reuse by another group and preserves migration beyond ten identities', (t) => {
   const f = fixture(t),
     g = f.create();
   g.connect('fixture.gmail', f.legacy);
   const other = f.create('fixture.other');
   assert.throws(() => other.connect('fixture.gmail', f.legacy), /グループ変更/);
-  const tooMany = structuredClone(f.legacy);
-  tooMany.accounts = Array.from({ length: 10 }, (_, n) => ({
+  const additional = structuredClone(f.legacy);
+  additional.accounts = Array.from({ length: 100 }, (_, n) => ({
     id: randomUUID(),
     name: `Other ${n}`,
   }));
-  tooMany.selected = tooMany.accounts[0].id;
-  assert.throws(() => g.connect('fixture.other', tooMany), /10件/);
-  assert.equal(g.snapshot('fixture.gmail').accounts.length, 2);
+  additional.selected = additional.accounts[0].id;
+  g.connect('fixture.other', additional);
+  const accounts = g.snapshot('fixture.gmail').accounts;
+  assert.equal(accounts.length, 102);
+  assert.deepEqual(
+    accounts.slice(-100).map((item) => item.id),
+    additional.accounts.map((item) => item.id),
+  );
+  assert.equal(f.create().snapshot('fixture.gmail').accounts.length, 102);
 });

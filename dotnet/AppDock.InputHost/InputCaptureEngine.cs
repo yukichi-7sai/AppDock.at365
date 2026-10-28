@@ -28,6 +28,7 @@ internal sealed class InputCaptureEngine : IDisposable
     private readonly Dictionary<ShortcutChord, List<ShortcutInput>> chords = [];
     private ShortcutInput[] inputs = [];
     private CaptureConfiguration? configuration;
+    private Dictionary<string, HashSet<string>> processPool = new(StringComparer.Ordinal);
     private RecordingInput? recording;
     private nint keyboardHook, mouseHook, layout, preparedLayout;
     private bool disposed, accepting;
@@ -47,12 +48,22 @@ internal sealed class InputCaptureEngine : IDisposable
     internal ShortcutStatus[] Configure(CaptureConfiguration next)
     {
         accepting = false;
+        if (configuration?.ShortcutRevision != next.ShortcutRevision ||
+            configuration?.Gestures.SettingsKey != next.Gestures.SettingsKey)
+            processPool = new(StringComparer.Ordinal);
         if (configuration?.ShortcutRevision != next.ShortcutRevision || next.Recording != null || next.Shortcuts.Length == 0)
             pendingPresses.Clear();
         configuration = next;
         inputs = next.Shortcuts;
         recording = next.Recording;
-        Gestures.Configure(next.Gestures);
+        foreach (var input in inputs) {
+            CommandConditions.Prepare(input.Environment, processPool);
+            foreach (var condition in input.Conditions ?? []) {
+                CommandConditions.Prepare(condition.When, processPool);
+                CommandConditions.Prepare(condition.StackConditions, processPool);
+            }
+        }
+        Gestures.Configure(next.Gestures, processPool);
         var statuses = Compile();
         if (!next.ShortcutsActive) preparedLayout = layout;
         try {

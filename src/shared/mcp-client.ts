@@ -62,12 +62,11 @@ export const mcpText = (v: unknown, max: number): v is string =>
   typeof v === 'string' && v.length <= max && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
 export function parseMcpRoster(value: unknown): McpServerRoster {
   if (value === undefined) return { version: 1, items: [] };
-  boundedJson(value, 65536, 4, 512);
+  boundedJson(value, Infinity, 4, Infinity);
   if (
     !jsonObject(value) ||
     value.version !== 1 ||
     !Array.isArray(value.items) ||
-    value.items.length > 32 ||
     Object.keys(value).some((k) => !['version', 'items'].includes(k))
   )
     throw Error(hostText('settings.mcp-client.directory'));
@@ -102,7 +101,7 @@ export const defaultMcpConnection = (): McpConnection => ({
   publishedTools: [],
 });
 export function parseMcpConnection(value: unknown): McpConnection {
-  boundedJson(value, 65536, 6, 1024);
+  boundedJson(value, Infinity, 6, Infinity);
   if (
     !jsonObject(value) ||
     Object.keys(value).some((k) => !Object.hasOwn(defaultMcpConnection(), k)) ||
@@ -114,10 +113,8 @@ export function parseMcpConnection(value: unknown): McpConnection {
     !mcpText(value.cwd, 4096) ||
     !mcpText(value.url, 4096) ||
     !Array.isArray(value.args) ||
-    value.args.length > 64 ||
     !value.args.every((v) => mcpText(v, 4096)) ||
     !Array.isArray(value.publishedTools) ||
-    value.publishedTools.length > 512 ||
     !value.publishedTools.every((v) => typeof v === 'string' && /^[\w.-]{1,128}$/.test(v)) ||
     new Set(value.publishedTools).size !== value.publishedTools.length
   )
@@ -214,17 +211,17 @@ export const mcpClientOperations = {
             enabled: { type: 'boolean' },
             transport: { type: 'string', enum: ['stdio', 'http'] },
             command: { type: 'string', maxLength: 4096 },
-            args: { type: 'array', maxItems: 64, items: { type: 'string', maxLength: 4096 } },
+            args: { type: 'array', items: { type: 'string', maxLength: 4096 } },
             cwd: { type: 'string', maxLength: 4096 },
             url: { type: 'string', maxLength: 4096 },
             authentication: { type: 'string', enum: ['none', 'bearer'] },
             published: { type: 'boolean' },
-            publishedTools: { type: 'array', maxItems: 512, uniqueItems: true, items: toolName },
+            publishedTools: { type: 'array', uniqueItems: true, items: toolName },
           },
           Object.keys(defaultMcpConnection()),
         ),
         id,
-        ids: { type: 'array', maxItems: 32, uniqueItems: true, items: id },
+        ids: { type: 'array', uniqueItems: true, items: id },
         enabled: { type: 'boolean' },
       },
       ['op', 'expectedRevision'],

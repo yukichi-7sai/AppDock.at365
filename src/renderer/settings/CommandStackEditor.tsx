@@ -112,7 +112,7 @@ export function CommandStackEditor({
   keyboard = false,
   excludeId,
   initialEntryId,
-  maxEntries = 256,
+  maxEntries,
 }: {
   entries: CommandStackEntry[];
   onChange(entries: CommandStackEntry[]): void;
@@ -160,7 +160,7 @@ export function CommandStackEditor({
           <button
             type="button"
             data-testid="stack-add-command"
-            disabled={entries.length >= maxEntries}
+            disabled={maxEntries !== undefined && entries.length >= maxEntries}
             onClick={() => setPicking(true)}
           >
             ＋ {t('settings.commandStacks.add')}

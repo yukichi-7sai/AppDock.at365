@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { launchTestHost } = require('./electron-test-launcher.cjs');
 const { waitForHost } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
@@ -13,7 +13,21 @@ initial.updates.checkHostOnAboutOpen = false;
 initial.host.hardwareAcceleration = false;
 initial.keybindings = [];
 initial.gestures.enabled = false;
-initial.keybindingOptions.excludedProcesses = Array.from({ length: 40 }, (_, i) => 'fixture-' + i);
+initial.keybindingOptions.excludedProcesses = Array.from({ length: 300 }, (_, i) => 'fixture-' + i);
+initial.customCommands = {
+  version: 2,
+  items: Array.from({ length: 300 }, (_, i) => ({
+    id: randomUUID(),
+    title: 'Capacity command ' + i,
+    description: '',
+    typeId: 'appdock.commands.stack',
+    owner: { kind: 'host' },
+    configVersion: 1,
+    config: { executionMode: 'all', entries: [] },
+    enabled: false,
+    automation: false,
+  })),
+};
 const fixture = path.join(profile, 'extensions', 'fixture.layout');
 fs.mkdirSync(fixture, { recursive: true });
 fs.writeFileSync(
@@ -99,7 +113,7 @@ const frame = () =>
             window.webContents.getURL().startsWith('appdock://host/'),
           );
           window.unmaximize();
-            window.setMinimumSize(600, 320);
+          window.setMinimumSize(600, 320);
           window.setSize(width, 650);
         }, width);
         await waitForHost(
@@ -227,6 +241,17 @@ const frame = () =>
     assert.equal(await host.getByTestId('trigger-stack-table').count(), 1);
     checks.push('integrated trigger tabs remain available in JSON and return to the selected list');
     await host.screenshot({ path: path.join(profile, 'trigger-toolbar.png') });
+    await open('custom-commands');
+    assert.equal(await host.locator('.custom-commands-settings tbody tr').count(), 300);
+    const addCustom = host
+      .locator('.custom-commands-settings')
+      .getByRole('button', { name: /追加/ })
+      .first();
+    assert.equal(await addCustom.isEnabled(), true);
+    assert(!/300\s*\/\s*256/.test(await host.locator('.custom-commands-settings').innerText()));
+    checks.push(
+      '300 custom commands remain visible and the add action stays enabled beyond the former limit',
+    );
     await host
       .locator('.settings-categories')
       .getByRole('button', { name: 'Layout fixture', exact: true })

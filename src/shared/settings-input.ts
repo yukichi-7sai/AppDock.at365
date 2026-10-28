@@ -15,8 +15,7 @@ export function mergeSettingsInput<T>(before: T, next: T, current: T): T {
         throw Error(hostText('services.sharedSettingsInput.invalidValue'));
       return p;
     });
-    if (!text || new TextEncoder().encode(text).length > 1024 * 1024)
-      throw Error(hostText('services.sharedSettingsInput.sizeLimit'));
+    if (!text) throw Error(hostText('services.sharedSettingsInput.sizeLimit'));
   };
   check(before);
   check(next);

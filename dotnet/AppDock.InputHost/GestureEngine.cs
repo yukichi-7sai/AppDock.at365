@@ -22,7 +22,15 @@ internal sealed class GestureEngine : IDisposable
     private readonly DispatcherTimer timer;
     private nint target;
     private Configuration? config;
+    private ConditionEnvironment environment = new();
     private Binding[] candidates = [];
+    private Dictionary<string, Binding[]> candidatesByGesture = new(StringComparer.Ordinal);
+    private void SetCandidates(Binding[] rows)
+    {
+        candidates = rows;
+        candidatesByGesture = rows.GroupBy(row => row.Gesture, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+    }
     private CommandHostContext hostContext = new();
     private CommandTargetContext? targetContext;
     private readonly GestureIndicatorNotifications indicator;
@@ -54,8 +62,15 @@ internal sealed class GestureEngine : IDisposable
         timer = new DispatcherTimer(TimeSpan.FromMilliseconds(10), DispatcherPriority.Normal, (_,_) => Tick(), dispatcher);
         timer.Stop();
     }
-    internal void Configure(Configuration next)
+    internal void Configure(Configuration next, Dictionary<string, HashSet<string>>? processPool = null)
     {
+        processPool ??= new(StringComparer.Ordinal);
+        environment = new(next.Browsers, next.RequireChromiumWindowClass, next.ExcludedProcesses);
+        CommandConditions.Prepare(environment, processPool);
+        foreach (var row in next.Rows) {
+            CommandConditions.Prepare(row.When, processPool);
+            CommandConditions.Prepare(row.StackConditions, processPool);
+        }
         indicator?.Configure(next.Revision);
         hostContext = CommandConditions.HostContext(next.Context);
         // A show command may move focus to the host while its invocation is still completing.
@@ -105,7 +120,6 @@ internal sealed class GestureEngine : IDisposable
         var classLength = GetClassName(window, className, className.Capacity);
         targetContext = new(window.ToInt64().ToString(), process, classLength > 0 ? className.ToString() : null, desktop);
         var context = new CommandContext(CommandConditions.HostContextForWindow(config!.Context, window.ToInt64().ToString()), targetContext);
-        var environment = new ConditionEnvironment(config!.Browsers, config.RequireChromiumWindowClass, config.ExcludedProcesses);
         return config!.Rows.Where(r =>
             (r.Window.Length == 0 || r.Window == window.ToInt64().ToString() || includeInactive && r.Window.Length > 0) &&
             (includeInactive && r.Window == "-1" || CommandConditions.Matches(r.When, context, r.OwnerId, environment) && (includeInactive || CommandConditions.MatchesStack(r.StackConditions, context, environment)))).ToArray();
@@ -121,7 +135,7 @@ internal sealed class GestureEngine : IDisposable
         GetWindowThreadProcessId(hit, out var pid);
         using var instance = Process.GetProcessById((int)pid);
         process = instance.ProcessName.ToLowerInvariant();
-        if (config.ExcludedProcesses.Contains(process,StringComparer.OrdinalIgnoreCase)) return;
+        if (CommandConditions.Excluded(config.ExcludedProcesses, process)) return;
         var hostWindow = pid == config.HostProcessId;
         var needsContext = false;
         if (config.ActivateOnStart && config.SettingsKey.Length > 0) {
@@ -131,7 +145,7 @@ internal sealed class GestureEngine : IDisposable
         }
         target = same ? foreground : hit;
         var preparing = !same || needsContext;
-        candidates = MatchingRows(target, preparing && config.ActivateOnStart && hostWindow);
+        SetCandidates(MatchingRows(target, preparing && config.ActivateOnStart && hostWindow));
         if (candidates.Length == 0) return;
         CancelPending(); lifetime = new(); session = Guid.NewGuid().ToString("N");
         origin = checkpoint = p; directions.Clear(); previewGesture=""; activationTarget=0; cancelled=false; otherMode=false;
@@ -170,7 +184,7 @@ internal sealed class GestureEngine : IDisposable
                 if (starting != pending || pending.Cancellation.IsCancellationRequested) return;
                 if (!prepared || !GestureTarget.Matches(pending.Hit, GetForegroundWindow())) { StopStart(true); return; }
                 target = GetForegroundWindow();
-                candidates = MatchingRows(target);
+                SetCandidates(MatchingRows(target));
                 if (candidates.Length == 0) { StopStart(true); return; }
                 starting = null;
                 if (!cancelled && pending.Gesture != null) Run(pending.Gesture, pending.Repeats, pending.Released);
@@ -240,7 +254,7 @@ internal sealed class GestureEngine : IDisposable
                 keys.Add(input.Key); return 1;
             }
             var gesture = KeyGesture(input.Key);
-            if (gesture != null && candidates.Any(r=>r.Gesture==gesture)) {
+            if (gesture != null && candidatesByGesture.ContainsKey(gesture)) {
                 // Pulse keys may have no paired up. Do not retain their ownership
                 // after the gesture or suppress later independent presses.
                 if (!ShortcutCodec.IsPulse(input.Key)) keys.Add(input.Key);
@@ -359,13 +373,13 @@ internal sealed class GestureEngine : IDisposable
     private Binding[] SelectedRows(string gesture)
     {
         // Candidates already passed the start-window, browser/exe and host page conditions.
-        // Preview and execution must use the same ordered, command-deduplicated selection.
+        // Preview and execution must use the same saved row order, including duplicate commands.
         var mode = CommandConditions.ExecutionMode(config!.ExecutionMode, config.InputExecutionModes, gesture);
-        return CommandConditions.Select(candidates.Where(r => r.Gesture == gesture), r => r.Command, mode);
+        return CommandConditions.Select(candidatesByGesture.GetValueOrDefault(gesture) ?? [], r => r.Command, mode);
     }
     // Reserve the largest displayed command batch for this start target before showing its first direction.
-    private int PillCaptionRows => Math.Clamp(candidates.Where(row => row.Gesture.StartsWith("move-"))
-        .Select(row => row.Gesture).Distinct().Select(gesture => SelectedRows(gesture).Length).DefaultIfEmpty(0).Max(), 1, 4);
+    private int PillCaptionRows => Math.Clamp(candidatesByGesture.Keys.Where(gesture => gesture.StartsWith("move-"))
+        .Select(gesture => SelectedRows(gesture).Length).DefaultIfEmpty(0).Max(), 1, 4);
     private void Release(GesturePoint point)
     {
         var replay=!otherMode && !cancelled && directions.Count==0;
