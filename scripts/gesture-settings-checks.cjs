@@ -12,6 +12,24 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
   for (const [id, title] of pages) {
     await open(id);
     await host.getByRole('heading', { name: title, level: 1, exact: true }).waitFor();
+    const tabs = host.getByTestId('gesture-settings-tabs');
+    assert.deepEqual(await tabs.getByRole('button').allTextContents(), [
+      'フォーム',
+      'トリガー一覧',
+      'JSONの構成',
+    ]);
+    assert.equal(await host.getByTestId('trigger-stack-table').count(), 0);
+    const beforeTabs = await saved();
+    await host.getByTestId('gesture-settings-tab:triggers').click();
+    await host.getByTestId('trigger-stack-table').waitFor();
+    assert.equal(await host.getByTestId('gesture-common-options').count(), 0);
+    await tabs.getByRole('button', { name: 'JSONの構成', exact: true }).click();
+    await host.getByRole('textbox', { name: '設定JSON', exact: true }).waitFor();
+    await host.getByTestId('gesture-settings-tab:triggers').click();
+    await host.getByTestId('trigger-stack-table').waitFor();
+    await host.getByTestId('gesture-settings-tab:form').click();
+    await host.getByTestId('gesture-common-options').waitFor();
+    assert.deepEqual(await saved(), beforeTabs);
     assert.equal(await host.locator('[data-shortcut-command], .command-binding-table').count(), 0);
     const first = host.locator('.settings-section').first();
     assert.equal(await first.locator('h2').count(), 0);
@@ -42,7 +60,7 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
     assert.equal(await exclusion.inputValue(), id);
   }
   checks.push(
-    'three feature pages omit command lists, combine behavior with enablement in an untitled section and share an ungrouped browser section',
+    'three feature pages switch between behavior, shared trigger stacks and JSON without saving; form retains behavior and common browser settings',
   );
 
   await open('shortcuts');
@@ -121,12 +139,15 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     );
   };
+  await host.getByRole('button', { name: 'JSONの構成', exact: true }).click();
+  await menu.waitFor();
   await idlePointer();
   const touchpadStyle = await style(menu);
   await menu.click();
   assert.equal(await host.locator('.settings-file-menu[open] button').count(), 2);
   await menu.click();
   await open('shortcuts');
+  await host.getByRole('button', { name: 'JSONの構成', exact: true }).click();
   await idlePointer();
   const keyStyle = await style(host.locator('.settings-file-button'));
   assert.deepEqual(touchpadStyle, keyStyle);

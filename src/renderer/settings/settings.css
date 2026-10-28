@@ -35,6 +35,10 @@
 .settings-categories .sidebar-extensions button:focus-visible {
   outline-offset: -3px;
 }
+.settings-categories .sidebar-extensions button:is(.selected, :hover) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
 .settings-categories .sidebar-extensions button:has(.settings-index-icon) {
   display: flex;
   align-items: center;
@@ -53,7 +57,7 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 24px;
+  padding: 4px;
   overflow: hidden;
   container: settings-page / inline-size;
 }
@@ -94,7 +98,7 @@
   background: transparent;
 }
 .settings-surface .settings-body.settings-page-scroll {
-  padding: 0 8px 4px 0;
+  padding: 20px;
   border: 0;
   border-radius: 0;
   background: transparent;

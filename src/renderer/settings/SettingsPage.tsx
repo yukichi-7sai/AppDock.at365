@@ -43,9 +43,11 @@ export function SettingsPage({
   const [error, setError] = useState('');
   const [commandTarget, setCommandTarget] = useState<CommandSettingsTarget>();
   const [triggerTab, setTriggerTab] = useState<TriggerTab>('commands');
+  const [gestureView, setGestureView] = useState<'form' | 'triggers'>('form');
   const triggerScrollPositions = useRef<TriggerScrollPositions>({});
   useEffect(() => {
     setTriggerTab('commands');
+    setGestureView('form');
     for (const tab of Object.keys(triggerScrollPositions.current) as TriggerTab[])
       delete triggerScrollPositions.current[tab];
   }, [model?.content.page.id]);
@@ -187,6 +189,7 @@ export function SettingsPage({
     if (operation.kind === 'select' || operation.kind === 'move') {
       commandNavigationRequest.current++;
       setCommandTarget(undefined);
+      setGestureView('form');
     }
     void c?.act(operation).catch(() => {});
   };
@@ -215,6 +218,7 @@ export function SettingsPage({
       </SettingsStatusProvider>
     );
   const { page, navigation, editing } = model.content;
+  const gesturePage = ['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id);
   const editor = c.editor(model);
   const resize = (width: number) => {
     const value = Math.round(Math.max(220, Math.min(480, width)));
@@ -314,8 +318,30 @@ export function SettingsPage({
                               .catch(() => {});
                         },
                       }))
-                    : undefined
+                    : gesturePage
+                      ? (['form', 'triggers'] as const).map((view) => ({
+                          id: view,
+                          title: t(view === 'form' ? 'settings.form' : 'settings.triggerList'),
+                          selected: gestureView === view,
+                          select: () => {
+                            if (editing.mode === 'form') setGestureView(view);
+                            else
+                              void c
+                                .act({ kind: 'edit', action: { type: 'mode', value: 'form' } })
+                                .then(() => {
+                                  if (
+                                    c.model?.content.page.id === page.id &&
+                                    c.model.content.editing.mode === 'form'
+                                  )
+                                    setGestureView(view);
+                                })
+                                .catch(() => {});
+                          },
+                        }))
+                      : undefined
                 }
+                formTabsId={gesturePage ? 'gesture-settings' : 'command-trigger'}
+                jsonLabel={gesturePage ? t('settings.jsonConfiguration') : undefined}
                 storage={model.content.auxiliary.storage}
                 onLocalSettings={(enabled) => {
                   if (!enabled) void confirm('storage');
@@ -399,6 +425,7 @@ export function SettingsPage({
                   >
                     <SettingsForm
                       triggerTab={triggerTab}
+                      gestureView={gestureView}
                       onTriggerTab={selectTriggerTab}
                       triggerScrollPositions={triggerScrollPositions.current}
                       model={model}

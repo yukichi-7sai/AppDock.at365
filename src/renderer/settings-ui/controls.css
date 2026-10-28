@@ -133,6 +133,7 @@
   border: 0;
 }
 .tray-select {
+  cursor: grab;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -2077,7 +2078,7 @@ summary {
 }
 .ribbon-row-controls {
   display: grid;
-  grid-template-columns: 100px repeat(4, 32px);
+  grid-template-columns: 100px repeat(2, 32px);
   gap: 8px;
   align-items: center;
   flex: none;
@@ -2120,6 +2121,9 @@ summary {
 .drag-handle {
   cursor: grab;
   opacity: 0.6;
+}
+.ribbon-setting-summary[draggable='true'] {
+  cursor: grab;
 }
 .ribbon-placement {
   margin: 22px 0;

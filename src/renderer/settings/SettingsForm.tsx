@@ -46,6 +46,7 @@ export function SettingsForm({
   select,
   invoke,
   triggerTab,
+  gestureView,
   onTriggerTab,
   triggerScrollPositions,
 }: {
@@ -54,6 +55,7 @@ export function SettingsForm({
   select(id: string): void;
   invoke(name: string, args?: unknown[]): Promise<any>;
   triggerTab: TriggerTab;
+  gestureView: 'form' | 'triggers';
   onTriggerTab(tab: TriggerTab): void;
   triggerScrollPositions: TriggerScrollPositions;
 }) {
@@ -225,32 +227,34 @@ export function SettingsForm({
             statuses={globalHotKeys}
           />
         )}
-        {(category === 'gestures' || category === 'touchpad-gestures') && (
-          <GesturesEditor
-            key={`gesture-options:${category}`}
-            touchpad={
-              category === 'touchpad-gestures' ? { snapshot: aux.touchpad, invoke } : undefined
-            }
-            settings={settings}
-            onChange={edit}
-          />
-        )}
-        {category === 'shortcuts' && (
+        {gestureView === 'form' &&
+          (category === 'gestures' || category === 'touchpad-gestures') && (
+            <GesturesEditor
+              key={`gesture-options:${category}`}
+              touchpad={
+                category === 'touchpad-gestures' ? { snapshot: aux.touchpad, invoke } : undefined
+              }
+              settings={settings}
+              onChange={edit}
+            />
+          )}
+        {gestureView === 'form' && category === 'shortcuts' && (
           <ShortcutsEditor key="shortcut-options" settings={settings} onChange={edit} />
         )}
-        {(category === 'shortcuts' ||
-          category === 'gestures' ||
-          category === 'touchpad-gestures') && (
-          <TriggerStackSettings
-            key={`trigger-stacks:${category}`}
-            kind={category}
-            settings={settings}
-            commands={commands}
-            applets={extensions}
-            onChange={edit}
-            busy={busy}
-          />
-        )}
+        {gestureView === 'triggers' &&
+          (category === 'shortcuts' ||
+            category === 'gestures' ||
+            category === 'touchpad-gestures') && (
+            <TriggerStackSettings
+              key={`trigger-stacks:${category}`}
+              kind={category}
+              settings={settings}
+              commands={commands}
+              applets={extensions}
+              onChange={edit}
+              busy={busy}
+            />
+          )}
         {category === 'appearance' && (
           <>
             <SettingsSection data-testid="appearance-common-settings">

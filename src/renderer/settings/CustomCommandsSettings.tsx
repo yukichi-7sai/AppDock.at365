@@ -21,6 +21,7 @@ import {
 } from '../../shared/custom-commands';
 import { SettingsListTable } from '../settings-ui/SettingsListTable';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
+import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsField, SettingsChoice } from '../settings-ui/SettingsSections';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -108,6 +109,10 @@ export function CustomCommandsSettings({
   const supported =
     !settings.customCommands || settings.customCommands.version === customCommandVersion;
   const [error, setError] = useState('');
+  const [order, setOrder] = useState<{
+    items: CustomCommandDefinition[];
+    revision: string;
+  } | null>(null);
   const [dialog, setDialog] = useState<null | {
     kind: 'edit' | 'delete';
     item: CustomCommandDefinition | null;
@@ -141,6 +146,7 @@ export function CustomCommandsSettings({
           titleExtra={(entry) => <CommandPrivacy published={command(entry).automation} />}
           navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
           addInTitle
+          orderInTitle
           commandListScroll
           definition={list}
           canAdd={types.length > 0}
@@ -154,6 +160,7 @@ export function CustomCommandsSettings({
           onAdd={() => open('edit', null)}
           onEdit={(i) => open('edit', visibleItems[i])}
           onDelete={(i) => open('delete', visibleItems[i])}
+          onOrder={() => setOrder({ items: structuredClone(items), revision: auxiliary!.revision })}
           onToggle={(i) => {
             setError('');
             void update([
@@ -168,6 +175,15 @@ export function CustomCommandsSettings({
           }}
         />
       </CommandListSection>
+      {order && (
+        <SettingsOrderDialog
+          title={translate('settings.customCommandsSettings.order')}
+          listLabel={translate('settings.customCommandsSettings.title')}
+          items={order.items}
+          onClose={() => setOrder(null)}
+          onApply={(ids) => update([{ op: 'reorder', ids }], order.revision)}
+        />
+      )}
       {dialog?.kind === 'edit' && (
         <CustomCommandDialog
           original={dialog.item}

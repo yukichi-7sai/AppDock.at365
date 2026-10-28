@@ -15,6 +15,7 @@ const portable =
 const appearanceOnly = process.argv.includes('--appearance-only');
 const iconsOnly = process.argv.includes('--icons-only');
 const labelsOnly = process.argv.includes('--labels-only');
+const orderOnly = process.argv.includes('--order-only');
 const marker = path.join(profile, 'command-executions.txt');
 const customMarker = path.join(profile, 'custom-executions.txt');
 const customId = randomUUID();
@@ -280,23 +281,25 @@ async function colorGeometry() {
 (async () => {
   try {
     await launch();
-    if (iconsOnly || labelsOnly) {
-      await require(labelsOnly ? './ribbon-label-ui-checks.cjs' : './ribbon-icon-ui-checks.cjs')({
-        app,
-        host,
-        rail,
-        profile,
-        checks,
-        until,
-        saved,
-        openRibbonSettings,
-        restart: async () => {
-          await app.close();
-          app = undefined;
-          await launch();
-          return { app, host, rail };
-        },
-      });
+    if (iconsOnly || labelsOnly || orderOnly) {
+      if (orderOnly) await orderChecks();
+      else
+        await require(labelsOnly ? './ribbon-label-ui-checks.cjs' : './ribbon-icon-ui-checks.cjs')({
+          app,
+          host,
+          rail,
+          profile,
+          checks,
+          until,
+          saved,
+          openRibbonSettings,
+          restart: async () => {
+            await app.close();
+            app = undefined;
+            await launch();
+            return { app, host, rail };
+          },
+        });
       assert.deepEqual(errors, []);
       const runtime = await app.evaluate(({ app }) => {
         const read = process
@@ -318,6 +321,7 @@ async function colorGeometry() {
         ok: true,
         iconsOnly,
         labelsOnly,
+        orderOnly,
         profile,
         portable,
         checks,
@@ -653,6 +657,24 @@ async function colorGeometry() {
   }
 })();
 
+async function orderChecks() {
+  const page = await openRibbonSettings();
+  const orderRow = (id) => page.locator(`[data-ribbon-setting="${id}"]`);
+  await orderRow('separator:test')
+    .locator('.ribbon-setting-summary')
+    .dragTo(orderRow('settings').locator('.ribbon-setting-summary'));
+  await saved((r) => r.order.indexOf('separator:test') > r.order.indexOf('settings'));
+  await orderRow('separator:test').locator('.drag-handle').press('ArrowUp');
+  await saved((r) => r.order.indexOf('separator:test') < r.order.indexOf('settings'));
+  assert.equal(
+    await orderRow('separator:test')
+      .locator('.drag-handle')
+      .evaluate((element) => element === document.activeElement),
+    true,
+  );
+  checks.push('ribbon item names drag to reorder; handle arrows save and retain focus');
+  await host.screenshot({ path: path.join(profile, 'ribbon-order.png') });
+}
 async function commandChecks() {
   const executions = () =>
     fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8').split('run').length - 1 : 0;

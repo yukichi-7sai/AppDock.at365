@@ -123,9 +123,7 @@ async function launch() {
     await separatorRow(separatorIds[0])
       .getByLabel('区切り線の配置', { exact: true })
       .selectOption('top');
-    await separatorRow(separatorIds[0])
-      .getByRole('button', { name: '区切り線を上へ', exact: true })
-      .click();
+    await separatorRow(separatorIds[0]).locator('.drag-handle').press('ArrowUp');
     await separatorRow(separatorIds[1])
       .getByRole('button', { name: '区切り線を削除', exact: true })
       .click();
@@ -136,7 +134,7 @@ async function launch() {
     );
     const gmailRow = dock.locator('[data-ribbon-setting="page:at365.gmail:gmail"]');
     await gmailRow
-      .locator('.drag-handle')
+      .locator('.ribbon-setting-summary')
       .dragTo(dock.locator('[data-ribbon-setting="image-library"] .drag-handle'));
     assert.equal(await dock.getByLabel('Gmailの配置', { exact: true }).inputValue(), 'top');
     await app.evaluate(({ BrowserWindow }) =>

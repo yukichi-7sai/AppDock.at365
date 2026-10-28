@@ -25,6 +25,7 @@ settings.keybindings = [
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
 settings.trayCommands = ['a.run', 'b.run', 'missing.run', 'appdock.quit'];
+delete settings.trayMenu;
 for (const owner of ['a', 'b']) {
   const dir = path.join(profile, 'extensions', owner);
   fs.mkdirSync(dir, { recursive: true });
@@ -112,7 +113,10 @@ async function launch() {
   }
   const page = await app.firstWindow();
   page.setDefaultTimeout(12000);
-  await page.waitForFunction(async () => (await window.dock?.snapshot())?.startupReady);
+  await require('./settings-host-helper.cjs').waitForHost(
+    page,
+    async () => (await window.dock?.snapshot())?.startupReady,
+  );
   if (!portable) {
     const launched = app;
     const close = launched.close.bind(launched);
@@ -211,7 +215,7 @@ const checks = [];
     await page.getByLabel('メニュー項目の配置先').selectOption(groupId);
     await commandRow('b.run').locator('.tray-select').click();
     await page.getByLabel('メニュー項目の配置先').selectOption(groupId);
-    await commandRow('b.run').getByTitle('上へ移動', { exact: true }).click();
+    await commandRow('b.run').locator('.tray-drag').press('ArrowUp');
     await select(groupId);
     await button('＋ 区切り線').click();
     await page.getByLabel('メニュー項目の配置先').selectOption('');
@@ -221,10 +225,10 @@ const checks = [];
     const before = await ids();
     // CDP mouse dragging in an embedded WebContentsView may emit no HTML5 drag events.
     // Exercise the browser's drag handlers with one shared DataTransfer; keyboard and
-    // reorder buttons above still use normal UI input.
+    // handle ordering above still uses normal UI input.
     const dragPage = await require('./settings-host-helper.cjs').settingsPage(page);
     const dataTransfer = await dragPage.evaluateHandle(() => new DataTransfer());
-    const sourceRow = dragPage.locator(`[data-tray-item="${openId}"] .tray-drag`);
+    const sourceRow = dragPage.locator(`[data-tray-item="${openId}"] .tray-select`);
     const targetRow = dragPage.locator('[data-tray-item]').first();
     await sourceRow.dispatchEvent('dragstart', { dataTransfer });
     await targetRow.dispatchEvent('dragover', { dataTransfer });

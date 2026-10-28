@@ -5,7 +5,6 @@ import type { ExtensionSnapshot } from './contracts';
 export const hostSettingsPages = [
   ['appearance', hostText('pages.appearance.title')],
   ['general', hostText('pages.general.title')],
-  ['applets', hostText('settings.settings-navigation.applets')],
   ['notifications', hostText('settings.settings-navigation.notifications')],
   ['ribbon', hostText('settings.settings-navigation.ribbon')],
   ['tray', hostText('settings.settings-navigation.tray')],
@@ -21,6 +20,7 @@ export const hostSettingsPages = [
   ['codex', hostText('settings.settings-navigation.codex')],
   ['mcp-client', hostText('settings.settings-navigation.mcpClient')],
   ['about', hostText('settings.settings-navigation.about')],
+  ['applets', hostText('settings.settings-navigation.applets')],
 ] as const;
 
 export const appletSettingsPageId = (id: string) => `applet:${id}`;

@@ -26,6 +26,20 @@ initial.keybindings = [];
 initial.globalShortcutCommands = [];
 initial.gestures.enabled = false;
 initial.touchpadGestures.enabled = false;
+initial.customCommands = {
+  version: 2,
+  items: Array.from({ length: 3 }, (_, index) => ({
+    id: randomUUID(),
+    title: `Order command ${index + 1}`,
+    description: '',
+    typeId: 'appdock.commands.stack',
+    owner: { kind: 'host' },
+    configVersion: 1,
+    config: { executionMode: 'all', entries: [] },
+    enabled: false,
+    automation: false,
+  })),
+};
 const appletIds = ['fixture.order.a', 'fixture.order.b', 'fixture.order.c'];
 for (const id of appletIds) {
   const folder = path.join(profile, 'extensions', id);
@@ -154,6 +168,12 @@ const cases = [
     ids: initial.mcpServers.items.map((c) => c.id),
     values: (s) => s.mcpServers.items.map((c) => c.id),
   },
+  {
+    page: 'custom-commands',
+    button: 'カスタムコマンドを並べ替え',
+    ids: initial.customCommands.items.map((c) => c.id),
+    values: (s) => s.customCommands.items.map((c) => c.id),
+  },
 ];
 async function open(target) {
   await host.evaluate(
@@ -243,6 +263,25 @@ async function open(target) {
         `${target.page}: plain arrows, retained focus, bounds/modifier/IME guards, handle/text drag, cancel, save and reopen`,
       );
     }
+    const custom = cases.find((target) => target.page === 'custom-commands');
+    await open(custom);
+    const conflictDialog = host.locator('.settings-order-dialog');
+    const beforeConflict = custom.values(await saved());
+    await conflictDialog
+      .getByTestId(`settings-order-handle:${beforeConflict[0]}`)
+      .press('ArrowDown');
+    await host.evaluate(async () => {
+      const snapshot = await window.dock.snapshot();
+      snapshot.settings.value.customCommands.items[0].title = 'Updated while ordering';
+      await window.dock.saveSettings(snapshot.settings.value, snapshot.settings.revision);
+    });
+    await settleSettings(host);
+    await conflictDialog.getByTestId('settings-dialog-confirm').click();
+    await conflictDialog.locator('.settings-status-area').waitFor();
+    assert.deepEqual(custom.values(await saved()), beforeConflict);
+    assert.equal((await saved()).customCommands.items[0].title, 'Updated while ordering');
+    await conflictDialog.getByTestId('settings-dialog-cancel').click();
+    checks.push('custom command order conflicts remain open and preserve concurrent edits');
     await host.setViewportSize({ width: 480, height: 540 });
     await host.evaluate(async () => {
       const s = await window.dock.snapshot();
@@ -296,7 +335,7 @@ async function open(target) {
       );
       await host.getByTestId('settings-dialog-cancel').click();
     }
-    checks.push('all three saved orders survive a real restart; AI default selection preserved');
+    checks.push('all saved orders survive a real restart; AI default selection preserved');
     assert.deepEqual(errors, []);
     await stop();
     fs.writeFileSync(

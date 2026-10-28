@@ -1,6 +1,6 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { ribbonItems, type RibbonItem } from '../../shared/applet-pages';
 import {
@@ -66,6 +66,15 @@ export function RibbonSettings({
   }>();
   const [error, setError] = useState(''),
     [pending, setPending] = useState(false);
+  const orderHandles = useRef(new Map<string, HTMLButtonElement>());
+  const movedHandle = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (pending || !movedHandle.current) return;
+    const handle = orderHandles.current.get(movedHandle.current);
+    movedHandle.current = null;
+    handle?.focus({ preventScroll: true });
+    handle?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [pending]);
   const [dialog, setDialog] = useState<{
     group: RibbonGroup;
     adding: boolean;
@@ -175,7 +184,7 @@ export function RibbonSettings({
     event.preventDefault();
     event.stopPropagation();
     const id = event.dataTransfer.getData('text/plain') || dragged;
-    if (id && items.some((item) => item.id === id)) work(id);
+    if (!pending && id && items.some((item) => item.id === id)) work(id);
     setDragged(null);
   };
   const open = (group: RibbonGroup | undefined, placement: RibbonPlacement) => {
@@ -228,8 +237,11 @@ export function RibbonSettings({
         <div
           className={`ribbon-setting-row ${item.kind === 'separator' ? 'separator-setting-row' : ''}`}
           data-ribbon-setting={item.id}
-          draggable={!pending}
           onDragStart={(event) => {
+            if (pending) {
+              event.preventDefault();
+              return;
+            }
             setDragged(item.id);
             event.dataTransfer.setData('text/plain', item.id);
             event.dataTransfer.effectAllowed = 'move';
@@ -246,9 +258,40 @@ export function RibbonSettings({
           }
           onDragEnd={() => setDragged(null)}
         >
-          <span className="drag-handle" aria-hidden="true">
+          <button
+            type="button"
+            className="drag-handle settings-list-icon"
+            ref={(element) => {
+              if (element) orderHandles.current.set(item.id, element);
+              else orderHandles.current.delete(item.id);
+            }}
+            draggable={!pending}
+            disabled={pending}
+            aria-label={translate('settings.settingsOrderDialog.drag', { title: item.title })}
+            title={translate('settings.settingsOrderDialog.dragHint')}
+            aria-keyshortcuts="ArrowUp ArrowDown"
+            onKeyDown={(event) => {
+              if (
+                pending ||
+                event.nativeEvent.isComposing ||
+                event.keyCode === 229 ||
+                event.altKey ||
+                event.ctrlKey ||
+                event.metaKey ||
+                event.shiftKey ||
+                !['ArrowUp', 'ArrowDown'].includes(event.key)
+              )
+                return;
+              event.preventDefault();
+              const target = siblings[index + (event.key === 'ArrowUp' ? -1 : 1)];
+              if (target) {
+                movedHandle.current = item.id;
+                move(item.id, target.id);
+              }
+            }}
+          >
             ⠿
-          </span>
+          </button>
           <label>
             <input
               type="checkbox"
@@ -259,7 +302,7 @@ export function RibbonSettings({
                 run({ kind: 'update', id: item.id, changes: { visible: e.target.checked } })
               }
             />
-            <span className="ribbon-setting-summary">
+            <span className="ribbon-setting-summary" draggable={!pending}>
               <span className="ribbon-setting-name" title={item.title}>
                 {item.title}
               </span>
@@ -286,24 +329,6 @@ export function RibbonSettings({
                   </option>
                 ))}
             </select>
-            <button
-              aria-label={translate('settings.ribbonSettings.up', { title: item.title })}
-              className="settings-list-icon"
-              title={translate('settings.ribbonSettings.upAction')}
-              disabled={pending || index === 0}
-              onClick={() => move(item.id, siblings[index - 1].id)}
-            >
-              ↑
-            </button>
-            <button
-              aria-label={translate('settings.ribbonSettings.down', { title: item.title })}
-              className="settings-list-icon"
-              title={translate('settings.ribbonSettings.downAction')}
-              disabled={pending || index === siblings.length - 1}
-              onClick={() => move(item.id, siblings[index + 1].id)}
-            >
-              ↓
-            </button>
             {
               <button
                 className="settings-list-icon"

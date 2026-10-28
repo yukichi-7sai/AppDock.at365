@@ -142,11 +142,18 @@ export function TraySettings({
     drag(null);
   };
   const rows = (list: TrayMenuItem[], nested = false) =>
-    list.map((item, index) => (
+    list.map((item) => (
       <div key={item.id}>
         <div
           className={`tray-editor-row ${nested ? 'tray-child' : ''} ${selected === item.id ? 'selected' : ''}`}
           data-tray-item={item.id}
+          onDragStart={(e) => {
+            drag(item.id);
+            select(item.id);
+            e.dataTransfer.setData('text/plain', item.id);
+            e.dataTransfer.effectAllowed = 'move';
+          }}
+          onDragEnd={() => drag(null)}
           onDragOver={(e) => {
             if (dragged) e.preventDefault();
           }}
@@ -160,14 +167,17 @@ export function TraySettings({
             draggable
             aria-label={translate('settings.traySettings.drag', { value: title(item) })}
             onClick={() => select(item.id)}
-            onDragStart={(e) => {
-              drag(item.id);
-              select(item.id);
-              e.dataTransfer.setData('text/plain', item.id);
-            }}
-            onDragEnd={() => drag(null)}
+            aria-keyshortcuts="ArrowUp ArrowDown"
             onKeyDown={(e) => {
-              if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+              if (
+                !e.nativeEvent.isComposing &&
+                e.keyCode !== 229 &&
+                !e.altKey &&
+                !e.ctrlKey &&
+                !e.metaKey &&
+                !e.shiftKey &&
+                (e.key === 'ArrowUp' || e.key === 'ArrowDown')
+              ) {
                 e.preventDefault();
                 select(item.id);
                 move(e.key === 'ArrowUp' ? -1 : 1, item.id);
@@ -178,6 +188,7 @@ export function TraySettings({
           </button>
           <button
             className="tray-select"
+            draggable
             aria-pressed={selected === item.id}
             onClick={() => select(item.id)}
           >
@@ -199,26 +210,6 @@ export function TraySettings({
             )}
           </button>
           <div className="tray-row-controls">
-            <button
-              type="button"
-              className="settings-list-icon"
-              aria-label={translate('settings.traySettings.up', { value: title(item) })}
-              title={translate('settings.traySettings.upAction')}
-              disabled={index === 0}
-              onClick={() => move(-1, item.id)}
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              className="settings-list-icon"
-              aria-label={translate('settings.traySettings.down', { value: title(item) })}
-              title={translate('settings.traySettings.downAction')}
-              disabled={index === list.length - 1}
-              onClick={() => move(1, item.id)}
-            >
-              ↓
-            </button>
             <button
               type="button"
               className="settings-list-icon settings-list-delete"
@@ -392,7 +383,6 @@ export function TraySettings({
             className="tray-preview"
             aria-label={translate('settings.traySettings.previewLabel')}
           >
-            <h4>{translate('settings.traySettings.preview')}</h4>
             <div className="tray-preview-menu">
               {preview(resolveTrayMenu(items, catalog))}
               {resolveTrayMenu(items, catalog).length > 0 && <hr />}

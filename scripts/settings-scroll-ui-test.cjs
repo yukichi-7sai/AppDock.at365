@@ -92,7 +92,10 @@ const frame = () =>
     host.setDefaultTimeout(15000);
     const open = async (id) => {
       await host.evaluate(
-        (id) => window.dock.executeCommand('appdock.settings.' + id + '.open'),
+        (id) =>
+          window.dock.executeCommand(
+            id === 'about' ? 'appdock.updates.open' : 'appdock.settings.' + id + '.open',
+          ),
         id,
       );
       await host.getByTestId('settings-page:' + id).waitFor();
@@ -123,7 +126,20 @@ const frame = () =>
         );
         await open('general');
         await frame();
-        assert.equal(await body.evaluate((e) => getComputedStyle(e).paddingRight), '8px');
+        const leftEdge = await body.boundingBox();
+        await host.mouse.move(leftEdge.x + 2, leftEdge.y + leftEdge.height / 2);
+        await host.mouse.wheel(0, 400);
+        await waitForHost(host, () => document.querySelector('.settings-body').scrollTop > 0);
+        await body.evaluate((e) => {
+          e.scrollTop = 0;
+        });
+        const clientWidth = await body.evaluate((e) => e.clientWidth);
+        await host.mouse.move(leftEdge.x + clientWidth - 2, leftEdge.y + leftEdge.height / 2);
+        await host.mouse.wheel(0, 400);
+        await waitForHost(host, () => document.querySelector('.settings-body').scrollTop > 0);
+        await body.evaluate((e) => {
+          e.scrollTop = 0;
+        });
         assert.equal(await toolbar.locator('.settings-status-area').count(), 0);
         assert.equal(
           await toolbar.locator('.settings-storage-status, .settings-file-button').count(),
@@ -135,11 +151,14 @@ const frame = () =>
         await frame();
         const position = await toolbar.boundingBox(),
           viewport = await body.boundingBox();
-        assert(Math.abs(position.y - viewport.y) <= 1, 'toolbar sticks to the body top');
+        assert(
+          position.y >= viewport.y && position.y + position.height <= viewport.y + viewport.height,
+          'sticky toolbar remains reachable inside the padded scroll viewport',
+        );
         assert(await body.evaluate((e) => e.scrollTop > 0));
         assert(await body.evaluate((e) => e.scrollWidth <= e.clientWidth + 1));
         await open('shortcuts');
-        await host.getByRole('button', { name: 'JSON', exact: true }).click();
+        await host.getByRole('button', { name: 'JSONの構成', exact: true }).click();
         const input = host.locator('.settings-panel-json > textarea');
         await input.waitFor();
         await frame();
@@ -248,6 +267,11 @@ const frame = () =>
       .getByRole('button', { name: /追加/ })
       .first();
     assert.equal(await addCustom.isEnabled(), true);
+    await addCustom.focus();
+    await addCustom.press('Shift+Tab');
+    await host.keyboard.press('Tab');
+    assert(await addCustom.evaluate((element) => element === document.activeElement));
+    await host.screenshot({ path: path.join(profile, 'left-button-focus.png') });
     assert(!/300\s*\/\s*256/.test(await host.locator('.custom-commands-settings').innerText()));
     checks.push(
       '300 custom commands remain visible and the add action stays enabled beyond the former limit',
@@ -257,7 +281,6 @@ const frame = () =>
       .getByRole('button', { name: 'Layout fixture', exact: true })
       .click();
     await host.getByLabel('Layout note', { exact: true }).waitFor();
-    assert.equal(await body.evaluate((e) => getComputedStyle(e).paddingRight), '8px');
     assert.equal(await toolbar.locator('.settings-status-area, .settings-file-button').count(), 0);
     await host.getByRole('button', { name: 'JSON', exact: true }).click();
     await host.locator('.settings-panel-json > textarea').waitFor();
@@ -266,6 +289,22 @@ const frame = () =>
     await host.screenshot({ path: path.join(profile, 'applet-json.png') });
     checks.push(
       'disabled Applet settings share the toolbar, padding and single JSON scroll layout',
+    );
+    const navigation = await host
+      .locator('[data-testid^="settings-nav:"]')
+      .evaluateAll((buttons) => buttons.map((button) => button.dataset.testid));
+    assert.equal(navigation[navigation.indexOf('settings-nav:about') + 1], 'settings-nav:applets');
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows().find((window) =>
+        window.webContents.getURL().startsWith('appdock://host/'),
+      );
+      window.setSize(1280, 820);
+    });
+    await open('about');
+    await host.getByTestId('about-overview').waitFor();
+    await host.screenshot({ path: path.join(profile, 'about-overview.png') });
+    checks.push(
+      'Applet management follows About in the index; About captured for alignment review',
     );
     assert.deepEqual(errors, []);
     fs.writeFileSync(
