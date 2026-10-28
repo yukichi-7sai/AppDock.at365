@@ -374,8 +374,8 @@ export class SettingsViewClient {
       cancelCommandPalette: (id) => this.invokePalette('cancel', id),
       createWebAccount: (name) => invoke('createWebAccount', [name]),
       renameWebAccount: (id, name) => invoke('renameWebAccount', [id, name]),
-      deleteWebAccount: (id) => invoke('deleteWebAccount', [id]),
-      clearWebAccount: (id) => invoke('clearWebAccount', [id]),
+      deleteWebAccount: (id, confirmed) => invoke('deleteWebAccount', [id, confirmed]),
+      clearWebAccount: (id, confirmed) => invoke('clearWebAccount', [id, confirmed]),
 
       chooseDirectory: () => invoke('chooseDirectory'),
       setAppletApiPermissions: (value) => invoke('setAppletApiPermissions', [value]),

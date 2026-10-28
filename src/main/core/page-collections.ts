@@ -3,7 +3,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import type { ExtensionSnapshot, Settings } from '../../shared/contracts';
 import { collectionPages, type CollectionPage } from '../../shared/page-collections';
-import type { RemotePageDefinition } from '../../shared/web-content';
+import type { RemotePageDefinition, WebProfile } from '../../shared/web-content';
 import { RemotePageService } from './remote-pages';
 import { WebProfileStore } from './web-profiles';
 import { webProfileSettingsTarget } from './settings-web-profile-target';
@@ -103,7 +103,7 @@ export class PageCollectionManager {
     store.loadStandalone(() => false);
     return store;
   }
-  private accountService(id?: string) {
+  private accountService(id?: string, confirmed?: WebProfile) {
     const owners = id
       ? this.accounts()
           .filter((account) => account.id === id)
@@ -114,6 +114,8 @@ export class PageCollectionManager {
           .map((parent) => parent.id);
     if (owners.length !== 1)
       throw Error(hostText('services.pageCollections.manageAccountsAtProvider'));
+    if (confirmed !== undefined && confirmed?.owner !== owners[0])
+      throw Error(hostText('services.webProfiles.changed'));
     return this.profiles(owners[0]);
   }
   addAccount(name: unknown) {
@@ -122,11 +124,11 @@ export class PageCollectionManager {
   renameAccount(id: string, name: unknown) {
     return this.accountService(id).renameAccount(id, name);
   }
-  deleteAccount(id: string) {
-    return this.accountService(id).deleteAccount(id);
+  deleteAccount(id: string, confirmed?: WebProfile) {
+    return this.accountService(id, confirmed).deleteAccount(id, confirmed);
   }
-  clearAccount(id: string) {
-    return this.accountService(id).clearAccount(id);
+  clearAccount(id: string, confirmed?: WebProfile) {
+    return this.accountService(id, confirmed).clearAccount(id, confirmed);
   }
   private locations(owner: string) {
     const legacy = this.options.settings().migrations?.webApplet;

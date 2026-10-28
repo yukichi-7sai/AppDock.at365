@@ -317,10 +317,13 @@ export interface DockApi {
   dispatchShortcut(key: string): Promise<{ executed: number; failed: number } | undefined>;
 
   webNavigate(id: string, action: 'back' | 'forward' | 'reload' | 'home'): Promise<void>;
-  clearWebAccount(id: string): Promise<boolean>;
+  clearWebAccount(id: string, confirmed?: import('./web-content').WebProfile): Promise<boolean>;
   createWebAccount(name: string): Promise<import('./web-content').WebProfile>;
   renameWebAccount(id: string, name: string): Promise<void>;
-  deleteWebAccount(id: string): Promise<false | 'deleted' | 'deferred'>;
+  deleteWebAccount(
+    id: string,
+    confirmed?: import('./web-content').WebProfile,
+  ): Promise<false | 'deleted' | 'deferred'>;
   cancelUpdates(): Promise<boolean>;
   checkAllUpdates(): Promise<UpdateState>;
   installUpdates(target: 'all' | 'host' | 'applets' | string): Promise<UpdateState>;

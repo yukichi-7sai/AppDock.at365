@@ -640,6 +640,7 @@ async function checkSectionTitles() {
         },
       ];
       initial.ribbon.order = ['group:localization', 'settings'];
+      initial.ribbon.bottom = initial.ribbon.bottom.filter((id) => id !== 'logs');
       initial.customCommands = {
         version: 2,
         items: [

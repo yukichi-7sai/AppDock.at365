@@ -183,6 +183,7 @@ import { pageDisplay, pageKey, defaultRibbon } from '../shared/applet-pages';
 import { hostShortcutPage, shortcutPageChoices } from '../shared/shortcut-pages';
 import { PageCollectionManager } from './core/page-collections';
 import { WebProfileStore } from './core/web-profiles';
+import type { WebProfile } from '../shared/web-content';
 import { contained } from './core/extensions';
 import { openLocalPage, pageHostShortcut } from './core/applet-pages';
 
@@ -2714,6 +2715,7 @@ function settingsPageActions(
       'mcp-client',
       'image-library',
       'applets',
+      'web-accounts',
     ].includes(page.id) ||
     page.json ||
     page.kind === 'applet'
@@ -2825,13 +2827,14 @@ function settingsPageActions(
     actions.createWebAccount = async ([name]) => pageCollections.addAccount(name);
     actions.renameWebAccount = async ([id, name]) =>
       pageCollections.renameAccount(string(id), name);
-    actions.deleteWebAccount = async ([id]) => {
+    actions.deleteWebAccount = async ([id, confirmed]) => {
       const target = string(id);
       if (pageCollections.entries().some((a) => a.item.accountId === target))
         throw Error(hostText('settings.index.accountInUse'));
-      return pageCollections.deleteAccount(target);
+      return pageCollections.deleteAccount(target, confirmed as WebProfile | undefined);
     };
-    actions.clearWebAccount = async ([id]) => pageCollections.clearAccount(string(id));
+    actions.clearWebAccount = async ([id, confirmed]) =>
+      pageCollections.clearAccount(string(id), confirmed as WebProfile | undefined);
   }
   if (['permissions', 'codex'].includes(page.id)) {
     actions.automation = async ([action]) => {
@@ -3152,12 +3155,16 @@ function registerIpc() {
   handle('dock:pageViewport', updatePageViewport);
 
   handle('dock:webNavigate', (id: string, action: string) => pageCollections.navigate(id, action));
-  handle('dock:clearWebAccount', (id: string) => pageCollections.clearAccount(id));
+  handle('dock:clearWebAccount', (id: string, confirmed?: WebProfile) =>
+    pageCollections.clearAccount(id, confirmed),
+  );
   handle('dock:createWebAccount', (name: unknown) => pageCollections.addAccount(name));
   handle('dock:renameWebAccount', (id: string, name: unknown) =>
     pageCollections.renameAccount(id, name),
   );
-  handle('dock:deleteWebAccount', (id: string) => pageCollections.deleteAccount(id));
+  handle('dock:deleteWebAccount', (id: string, confirmed?: WebProfile) =>
+    pageCollections.deleteAccount(id, confirmed),
+  );
   ipcMain.handle('applet-page:snapshot', (event) => localPageSource(event).snapshot());
   ipcMain.handle('applet-page:execute', (event, id: unknown) => localPageSource(event).execute(id));
   ipcMain.handle('applet-page:call', (event, operation: unknown, input: unknown) => {

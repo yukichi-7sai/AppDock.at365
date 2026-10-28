@@ -176,10 +176,10 @@ const api: DockApi = {
   },
 
   webNavigate: (id, action) => ipcRenderer.invoke('dock:webNavigate', id, action),
-  clearWebAccount: (id) => ipcRenderer.invoke('dock:clearWebAccount', id),
+  clearWebAccount: (id, confirmed) => ipcRenderer.invoke('dock:clearWebAccount', id, confirmed),
   createWebAccount: (name) => ipcRenderer.invoke('dock:createWebAccount', name),
   renameWebAccount: (id, name) => ipcRenderer.invoke('dock:renameWebAccount', id, name),
-  deleteWebAccount: (id) => ipcRenderer.invoke('dock:deleteWebAccount', id),
+  deleteWebAccount: (id, confirmed) => ipcRenderer.invoke('dock:deleteWebAccount', id, confirmed),
   cancelUpdates: () => ipcRenderer.invoke('dock:cancelUpdates'),
   onAppletPage: (callback) => {
     const handler = (_: Electron.IpcRendererEvent, key: string | null) => callback(key);

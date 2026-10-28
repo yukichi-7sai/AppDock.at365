@@ -9,6 +9,7 @@ import {
   allowedWebNavigation,
   type RemotePageDefinition,
   type WebPageState,
+  type WebProfile,
 } from '../../shared/web-content';
 
 export class RemotePageService {
@@ -66,7 +67,14 @@ export class RemotePageService {
     this.profiles.rename(id, name);
     this.changed();
   }
-  async deleteAccount(id: string) {
+  private checkConfirmation(id: string, confirmed: WebProfile) {
+    // Re-read the roster before any destructive work, including before its watcher fires.
+    this.profiles.publicConfiguration();
+    const current = this.profiles.get(id);
+    if (!confirmed || confirmed.id !== id || confirmed.name !== current.name)
+      throw Error(hostText('services.webProfiles.changed'));
+  }
+  async deleteAccount(id: string, confirmed?: WebProfile) {
     const account = this.profiles.get(id);
     const used = () => this.items().some((a) => a.accountId === id);
     if (this.closed || this.clearing.has(id))
@@ -74,15 +82,22 @@ export class RemotePageService {
     if (used()) throw Error(hostText('services.remotePages.accountInUse'));
     this.clearing.add(id);
     try {
-      const answer = await dialog.showMessageBox({
-        type: 'warning',
-        message: hostText('services.remotePages.deleteAccount', { name: String(account.name) }),
-        detail: hostText('services.remotePages.deleteDetails'),
-        buttons: [hostText('services.remotePages.cancel'), hostText('services.remotePages.delete')],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (answer.response !== 1 || this.closed) return false;
+      if (confirmed === undefined) {
+        const answer = await dialog.showMessageBox({
+          type: 'warning',
+          message: hostText('services.remotePages.deleteAccount', { name: String(account.name) }),
+          detail: hostText('services.remotePages.deleteDetails'),
+          buttons: [
+            hostText('services.remotePages.cancel'),
+            hostText('services.remotePages.delete'),
+          ],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        if (answer.response !== 1) return false;
+      }
+      if (this.closed) return false;
+      this.checkConfirmation(id, confirmed ?? account);
       if (used()) throw Error(hostText('services.remotePages.accountAssigned'));
       const ses = this.sessions.get(id);
       if (ses) await this.eraseSession(ses);
@@ -264,21 +279,29 @@ export class RemotePageService {
     this.views.delete(id);
     return this.open(id);
   }
-  async clearAccount(id: string) {
+  async clearAccount(id: string, confirmed?: WebProfile) {
+    if (this.closed) throw Error(hostText('services.remotePages.closed'));
     const account = this.profiles.get(id);
-    const ses = this.account(id);
     if (this.clearing.has(id)) throw Error(hostText('services.remotePages.processing'));
     this.clearing.add(id);
     try {
-      const answer = await dialog.showMessageBox({
-        type: 'warning',
-        message: hostText('services.remotePages.clearAccount', { name: String(account.name) }),
-        detail: hostText('services.remotePages.clearDetails'),
-        buttons: [hostText('services.remotePages.cancel'), hostText('services.remotePages.clear')],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (answer.response !== 1 || this.closed) return false;
+      if (confirmed === undefined) {
+        const answer = await dialog.showMessageBox({
+          type: 'warning',
+          message: hostText('services.remotePages.clearAccount', { name: String(account.name) }),
+          detail: hostText('services.remotePages.clearDetails'),
+          buttons: [
+            hostText('services.remotePages.cancel'),
+            hostText('services.remotePages.clear'),
+          ],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        if (answer.response !== 1) return false;
+      }
+      if (this.closed) return false;
+      this.checkConfirmation(id, confirmed ?? account);
+      const ses = this.account(id);
       for (const [key, v] of this.views)
         if (v.item.accountId === id) {
           v.surface.close();
