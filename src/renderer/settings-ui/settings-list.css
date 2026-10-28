@@ -2,6 +2,17 @@
   width: 100%;
   min-width: 0;
 }
+.settings-list-filters {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.settings-list-filters > .command-shortcut-search {
+  flex: 1 1 240px;
+}
+.settings-list-filters > select {
+  width: fit-content;
+  max-width: 100%;
+}
 .settings-list-heading {
   display: flex;
   align-items: center;

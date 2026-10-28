@@ -17,6 +17,7 @@ import { useHostTranslation } from '../HostTranslation';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsListTable } from '../settings-ui/SettingsListTable';
+import { SettingsListFilters } from '../settings-ui/SettingsListFilters';
 import { CommandListSection } from '../settings-ui/CommandListScroll';
 import { ShortcutCaptureField } from '../settings-ui/ShortcutCaptureField';
 import { GestureInputPicker } from '../settings-ui/GestureInputPicker';
@@ -223,7 +224,26 @@ export function TriggerStackSettings({
     stack: TriggerStack;
     adding?: boolean;
   } | null>(null);
+  const [search, setSearch] = useState('');
+  const [modeFilter, setModeFilter] = useState('');
   const stacks = sortTriggerStacksForDisplay(triggerStacks(settings, kind));
+  const commandsById = new Map(commands.map((command) => [command.id, command]));
+  const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const visible = stacks.filter((stack) => {
+    if (modeFilter && stack.executionMode !== modeFilter) return false;
+    const text = [
+      triggerStackTitle(stack),
+      stack.input,
+      ...stack.entries.flatMap((entry) => {
+        const command = commandsById.get(entry.command);
+        return [entry.command, command?.title, command?.description, command?.extensionId];
+      }),
+    ]
+      .join('\n')
+      .toLocaleLowerCase();
+    return terms.every((term) => text.includes(term));
+  });
+  const filtered = !!search || !!modeFilter;
   const list: SettingDefinition = {
     key: 'stacks',
     title: t('settings.commandStacks.triggers'),
@@ -242,14 +262,48 @@ export function TriggerStackSettings({
       data-testid="trigger-stack-table"
     >
       <SettingsListTable
+        testId={`trigger-stacks:${kind}`}
         definition={list}
-        entries={stacks.map((stack) => ({
+        totalCount={stacks.length}
+        toolbarControls={
+          <SettingsListFilters
+            search={search}
+            onSearch={setSearch}
+            searchLabel={t('settings.commandStacks.search')}
+            searchPlaceholder={t('settings.commandStacks.searchPlaceholder')}
+          >
+            <select
+              aria-label={t('settings.commandStacks.modeFilter')}
+              value={modeFilter}
+              onChange={(event) => setModeFilter(event.target.value)}
+            >
+              <option value="">{t('settings.commandStacks.allModes')}</option>
+              <option value="inherit">{t('settings.inputExecution.inherit')}</option>
+              <option value="first">{t('settings.commandExecutionModeField.first')}</option>
+              <option value="all">{t('settings.commandExecutionModeField.all')}</option>
+            </select>
+          </SettingsListFilters>
+        }
+        toolbarActions={
+          filtered ? (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                setSearch('');
+                setModeFilter('');
+              }}
+            >
+              {t('settings.commandBindingToolbar.clear')}
+            </button>
+          ) : undefined
+        }
+        emptyMessage={filtered ? t('settings.commandStacks.noMatches') : undefined}
+        entries={visible.map((stack) => ({
           ...stack,
           title: triggerStackTitle(stack),
           commands: stack.entries
-            .map(
-              (row) => commands.find((command) => command.id === row.command)?.title ?? row.command,
-            )
+            .map((row) => commandsById.get(row.command)?.title ?? row.command)
             .join(' → '),
           mode: t(
             stack.executionMode === 'inherit'
@@ -272,8 +326,8 @@ export function TriggerStackSettings({
             },
           })
         }
-        onEdit={(index) => setDialog({ kind: 'edit', stack: structuredClone(stacks[index]) })}
-        onDelete={(index) => setDialog({ kind: 'delete', stack: structuredClone(stacks[index]) })}
+        onEdit={(index) => setDialog({ kind: 'edit', stack: structuredClone(visible[index]) })}
+        onDelete={(index) => setDialog({ kind: 'delete', stack: structuredClone(visible[index]) })}
       />
       {dialog?.kind === 'edit' && (
         <TriggerStackDialog

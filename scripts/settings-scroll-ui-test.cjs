@@ -11,7 +11,15 @@ fs.mkdirSync(profile, { recursive: true });
 const initial = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 initial.updates.checkHostOnAboutOpen = false;
 initial.host.hardwareAcceleration = false;
-initial.keybindings = [];
+initial.keybindings = Array.from({ length: 60 }, (_, index) => ({
+  id: 'scroll-key-' + index,
+  command: 'appdock.open',
+  key:
+    ['Ctrl+Alt+', 'Ctrl+Shift+', 'Alt+Shift+'][Math.floor(index / 26)] +
+    String.fromCharCode(65 + (index % 26)),
+  enabled: false,
+  when: { scope: 'app', appletIds: [] },
+}));
 initial.gestures.enabled = false;
 initial.keybindingOptions.excludedProcesses = Array.from({ length: 300 }, (_, i) => 'fixture-' + i);
 initial.customCommands = {
@@ -102,6 +110,19 @@ const frame = () =>
     };
     const body = host.locator('.settings-body');
     const toolbar = host.getByTestId('settings-page-tools');
+    const coveredTop = async (selector) => {
+      await frame();
+      const covered = await host.locator(selector).evaluate((element) => {
+        const body = element.closest('.settings-body');
+        const viewport = body.getBoundingClientRect();
+        return [
+          viewport.left + 1,
+          viewport.left + body.clientWidth / 2,
+          viewport.left + body.clientWidth - 1,
+        ].every((x) => element.contains(document.elementFromPoint(x, viewport.top + 1)));
+      });
+      assert(covered, 'the sticky panel covers the viewport top without exposing table text');
+    };
     for (const theme of ['dark', 'light']) {
       await host.evaluate(async (theme) => {
         const snapshot = await window.dock.snapshot();
@@ -156,9 +177,10 @@ const frame = () =>
           'sticky toolbar remains reachable inside the padded scroll viewport',
         );
         assert(await body.evaluate((e) => e.scrollTop > 0));
+        await coveredTop('.settings-page-tools');
         assert(await body.evaluate((e) => e.scrollWidth <= e.clientWidth + 1));
         await open('shortcuts');
-        await host.getByRole('button', { name: 'JSONの構成', exact: true }).click();
+        await host.getByRole('button', { name: 'JSON', exact: true }).click();
         const input = host.locator('.settings-panel-json > textarea');
         await input.waitFor();
         await frame();
@@ -214,6 +236,7 @@ const frame = () =>
       e.scrollTop = 500;
     });
     await frame();
+    await coveredTop('.command-list-toolbar');
     assert(
       await host.locator('.command-list-toolbar').evaluate((filter) => {
         const bounds = filter.getBoundingClientRect();
@@ -258,6 +281,13 @@ const frame = () =>
       'true',
     );
     assert.equal(await host.getByTestId('trigger-stack-table').count(), 1);
+    await host.getByTestId('command-trigger-tab:shortcuts').click();
+    await host.getByTestId('trigger-stack-table').waitFor();
+    await body.evaluate((element) => {
+      element.scrollTop = element.scrollHeight / 2;
+    });
+    await coveredTop('.command-list-toolbar');
+    checks.push('settings toolbar and both command/trigger list filters cover the scrollport top');
     checks.push('integrated trigger tabs remain available in JSON and return to the selected list');
     await host.screenshot({ path: path.join(profile, 'trigger-toolbar.png') });
     await open('custom-commands');
@@ -290,10 +320,16 @@ const frame = () =>
     checks.push(
       'disabled Applet settings share the toolbar, padding and single JSON scroll layout',
     );
+    assert.equal(
+      await host.getByTestId('settings-host-pages').getByTestId('settings-nav:applets').count(),
+      0,
+    );
     const navigation = await host
+      .getByTestId('settings-applet-pages')
       .locator('[data-testid^="settings-nav:"]')
       .evaluateAll((buttons) => buttons.map((button) => button.dataset.testid));
-    assert.equal(navigation[navigation.indexOf('settings-nav:about') + 1], 'settings-nav:applets');
+    assert.equal(navigation[0], 'settings-nav:applets');
+    assert(navigation.length > 1);
     await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows().find((window) =>
         window.webContents.getURL().startsWith('appdock://host/'),
@@ -302,10 +338,60 @@ const frame = () =>
     });
     await open('about');
     await host.getByTestId('about-overview').waitFor();
+    for (const theme of ['dark', 'light']) {
+      await host.evaluate(async (theme) => {
+        const snapshot = await window.dock.snapshot();
+        await window.dock.saveSettings(
+          { ...snapshot.settings.value, host: { ...snapshot.settings.value.host, theme } },
+          snapshot.settings.revision,
+        );
+      }, theme);
+      await host.waitForFunction(
+        (theme) => document.documentElement.dataset.theme === theme,
+        theme,
+      );
+      const mark = host.getByTestId('settings-nav:about').locator('.brand-mark');
+      assert.equal(await mark.locator('span').count(), 3);
+      assert(
+        await mark.evaluate((element) => {
+          const style = getComputedStyle(element);
+          const bar = getComputedStyle(element.children[1]);
+          const expected = document.createElement('span');
+          expected.style.color = 'var(--accent)';
+          element.append(expected);
+          const accent = getComputedStyle(expected).color;
+          expected.remove();
+          return style.backgroundColor === 'rgba(0, 0, 0, 0)' && bar.backgroundColor === accent;
+        }),
+      );
+      await host.screenshot({ path: path.join(profile, `about-overview-${theme}.png`) });
+    }
     await host.screenshot({ path: path.join(profile, 'about-overview.png') });
     checks.push(
-      'Applet management follows About in the index; About captured for alignment review',
+      'Applet management leads the APPLET group; About uses transparent accent bars in both themes',
     );
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows().find((window) =>
+        window.webContents.getURL().startsWith('appdock://host/'),
+      );
+      window.setMinimumSize(600, 200);
+      window.setSize(760, 320);
+    });
+    await open('general');
+    await host.locator('.settings-page-layout').evaluate((element) => {
+      element.scrollTop = element.scrollHeight / 2;
+    });
+    await frame();
+    assert(
+      await toolbar.evaluate((element) => {
+        const viewport = element.closest('.settings-page-layout').getBoundingClientRect();
+        const button = element.querySelector('button').getBoundingClientRect();
+        return button.top >= viewport.top && button.bottom <= viewport.bottom;
+      }),
+      'short window layout keeps sticky toolbar buttons fully reachable',
+    );
+    await host.screenshot({ path: path.join(profile, 'short-settings-toolbar.png') });
+    checks.push('short window scroll owner keeps the settings toolbar buttons fully reachable');
     assert.deepEqual(errors, []);
     fs.writeFileSync(
       path.join(profile, 'result.json'),

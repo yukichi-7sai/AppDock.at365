@@ -23,6 +23,7 @@ import { settingAnchor } from '../settings-ui/setting-anchor';
 import { CommandListSummary } from '../settings-ui/CommandListScroll';
 import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
+import { SettingsListCount } from '../settings-ui/SettingsListCount';
 
 const states = {
   running: hostText('settings.appletManagementSettings.running'),
@@ -291,12 +292,7 @@ export function AppletManagementSettings({
               </div>
             </div>
             <CommandListSummary className="command-shortcut-summary" actions={null}>
-              <span role="status">
-                {translate('settings.appletManagementSettings.visibleCount', {
-                  visible: visible.length,
-                  total: applets.length,
-                })}
-              </span>
+              <SettingsListCount visible={visible.length} total={applets.length} />
             </CommandListSummary>
           </>
         }

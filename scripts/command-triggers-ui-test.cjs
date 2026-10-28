@@ -39,6 +39,7 @@ const inheritanceOnly = process.argv.includes('--inheritance-only');
 const bindingEditorsOnly = process.argv.includes('--binding-editors-only');
 const triggerSettingsOnly = process.argv.includes('--trigger-settings-only');
 const lockKeysOnly = process.argv.includes('--lock-keys-only');
+const filterConsistencyOnly = process.argv.includes('--filter-consistency-only');
 if (bindingEditorsOnly) {
   initial.keybindingOptions.excludedProcesses = ['key-base'];
   initial.gestures.excludedProcesses = ['mouse-base'];
@@ -122,6 +123,37 @@ if (inheritanceOnly) {
   initial.gestures.executionMode = 'first';
   initial.touchpadGestures.executionMode = 'first';
 }
+if (filterConsistencyOnly) {
+  const gestureWhen = { ...common.when, processes: [] };
+  initial.keybindings = [
+    { ...common, id: 'filter-key-one', key: 'Ctrl+F8' },
+    { ...common, id: 'filter-key-two', command: 'fixture.triggers.two', key: 'Ctrl+F9' },
+  ];
+  initial.gestures.bindings = [
+    { ...common, when: gestureWhen, id: 'filter-mouse-one', gesture: 'move-up' },
+    {
+      ...common,
+      when: gestureWhen,
+      id: 'filter-mouse-two',
+      command: 'fixture.triggers.two',
+      gesture: 'move-right',
+    },
+  ];
+  initial.touchpadGestures.bindings = [
+    { ...common, when: gestureWhen, id: 'filter-touch-one', gesture: 'four.right' },
+    {
+      ...common,
+      when: gestureWhen,
+      id: 'filter-touch-two',
+      command: 'fixture.triggers.two',
+      gesture: 'three.tap',
+    },
+  ];
+  initial.keybindingOptions.inputExecutionModes = { 'Ctrl+F8': 'first' };
+  initial.gestures.inputExecutionModes = { 'move-up': 'first' };
+  initial.touchpadGestures.inputExecutionModes = { 'four.right': 'first' };
+  require('../out/main/shared/settings-schema').parseSettings(initial);
+}
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = source ? path.join(profile, 'AppDock.at365.exe') : null;
@@ -143,12 +175,16 @@ const until = async (predicate, title) => {
   throw Error(title);
 };
 async function launch() {
-  if (!portable)
-    return electron.launch({
+  if (!portable) {
+    const launched = await electron.launch({
       executablePath: require('electron'),
       args: [root, `--test-profile=${profile}`],
       env,
     });
+    for (const stream of [launched.process().stdout, launched.process().stderr])
+      stream?.on('data', (data) => fs.appendFileSync(path.join(profile, 'process.log'), data));
+    return launched;
+  }
   const server = net.createServer();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
@@ -197,6 +233,7 @@ const recordSuccess = () => {
         inheritanceOnly,
         bindingEditorsOnly,
         lockKeysOnly,
+        filterConsistencyOnly,
         source: source ? path.resolve(source) : 'development build',
         sha256: portable ? hash(portable) : null,
         limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
@@ -230,6 +267,19 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (filterConsistencyOnly) {
+      await require('./trigger-list-filter-checks.cjs')({
+        host,
+        open,
+        save,
+        saved,
+        checks,
+        profile,
+      });
+      assert.deepEqual(errors, []);
+      recordSuccess();
+      return;
+    }
     if (inheritanceOnly) {
       await open();
       const inheritance = require('./trigger-inheritance-checks.cjs');

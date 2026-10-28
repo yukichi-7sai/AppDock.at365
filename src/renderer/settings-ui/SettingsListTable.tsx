@@ -6,6 +6,7 @@ import { objectFieldValue } from '../../shared/object-list';
 import './settings-list.css';
 import { RegisteredImagePreview } from './RegisteredImagePicker';
 import { SettingsTable } from './SettingsTable';
+import { SettingsListCount } from './SettingsListCount';
 
 export function settingsListText(
   definition: SettingDefinition,
@@ -132,6 +133,10 @@ export function SettingsListTable({
   orderInTitle = false,
   commandListScroll = false,
   toolbarFilter,
+  toolbarControls,
+  toolbarActions,
+  totalCount,
+  emptyMessage,
   actionsAlign = 'end',
 }: {
   testId?: string;
@@ -154,6 +159,10 @@ export function SettingsListTable({
   orderInTitle?: boolean;
   commandListScroll?: boolean;
   toolbarFilter?: ReactNode;
+  toolbarControls?: ReactNode;
+  toolbarActions?: ReactNode;
+  totalCount?: number;
+  emptyMessage?: ReactNode;
   actionsAlign?: 'start' | 'end';
 }) {
   const { t: translate } = useHostTranslation();
@@ -161,19 +170,22 @@ export function SettingsListTable({
   const fields = definition.fields ?? [];
   const display = (entry: Record<string, unknown>, key: string) =>
     settingsListText(definition, entry, key, options);
-  const count = (
-    <span>
-      {translate(
-        maxItems === undefined
-          ? 'settings.settingsListTable.unlimitedCount'
-          : 'settings.settingsListTable.entryCount',
-        {
-          count: entries.length,
-          ...(maxItems === undefined ? {} : { limit: maxItems }),
-        },
-      )}
-    </span>
-  );
+  const count =
+    totalCount !== undefined ? (
+      <SettingsListCount visible={entries.length} total={totalCount} />
+    ) : (
+      <span role="status">
+        {translate(
+          maxItems === undefined
+            ? 'settings.settingsListTable.unlimitedCount'
+            : 'settings.settingsListTable.entryCount',
+          {
+            count: entries.length,
+            ...(maxItems === undefined ? {} : { limit: maxItems }),
+          },
+        )}
+      </span>
+    );
   const orderInHeading = !!onOrder && addInTitle && orderInTitle;
   const orderButton = (
     <button
@@ -190,6 +202,7 @@ export function SettingsListTable({
   );
   const actions = (
     <>
+      {toolbarActions}
       {!!onOrder && !orderInHeading && orderButton}
       {!addInTitle && (
         <button
@@ -213,13 +226,16 @@ export function SettingsListTable({
       commandListScroll={commandListScroll}
       actionsAlign={actionsAlign}
       toolbar={
-        <CommandListSummary
-          className="settings-list-toolbar"
-          filter={toolbarFilter}
-          actions={actions}
-        >
-          {count}
-        </CommandListSummary>
+        <>
+          {toolbarControls}
+          <CommandListSummary
+            className="settings-list-toolbar"
+            filter={toolbarFilter}
+            actions={actions}
+          >
+            {count}
+          </CommandListSummary>
+        </>
       }
     >
       <thead>
@@ -385,13 +401,14 @@ export function SettingsListTable({
               }
               className="settings-list-empty"
             >
-              {addInTitle
-                ? translate('settings.settingsListTable.emptyHeader', {
-                    title: fields.find((field) => field.key === view.titleKey)!.title,
-                  })
-                : translate('settings.settingsListTable.emptyButton', {
-                    value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
-                  })}
+              {emptyMessage ??
+                (addInTitle
+                  ? translate('settings.settingsListTable.emptyHeader', {
+                      title: fields.find((field) => field.key === view.titleKey)!.title,
+                    })
+                  : translate('settings.settingsListTable.emptyButton', {
+                      value: definition.itemTitle ?? translate('settings.settingsListTable.item'),
+                    }))}
             </td>
           </tr>
         )}

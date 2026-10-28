@@ -20,6 +20,7 @@ import {
   type CustomCommandDescriptor,
 } from '../../shared/custom-commands';
 import { SettingsListTable } from '../settings-ui/SettingsListTable';
+import { SettingsListFilters } from '../settings-ui/SettingsListFilters';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
@@ -90,14 +91,49 @@ export function CustomCommandsSettings({
   const items = customItems(settings.customCommands),
     types = auxiliary?.types ?? [];
   const target = useCommandSettingsTarget();
-  const visibleItems = target
-    ? items.filter((item) => customCommandId(item.id) === target.id)
-    : items;
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('all');
+  const [publicationFilter, setPublicationFilter] = useState('all');
   const commandsById = new Map(commands.map((command) => [command.id, command]));
   const typesById = new Map(types.map((type) => [type.id, type]));
   const summariesById = new Map(
     (auxiliary?.summaries ?? []).map((summary) => [summary.id, summary]),
   );
+  const typeChoices = new Map(types.map((type) => [type.id, type.title]));
+  for (const item of items)
+    if (!typeChoices.has(item.typeId)) typeChoices.set(item.typeId, item.typeId);
+  if (typeFilter && !typeChoices.has(typeFilter)) typeChoices.set(typeFilter, typeFilter);
+  const providerNames = new Map(applets.map((applet) => [applet.id, applet.displayName]));
+  const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const visibleItems = items.filter((item) => {
+    if (target && customCommandId(item.id) !== target.id) return false;
+    if (typeFilter && item.typeId !== typeFilter) return false;
+    if (
+      (stateFilter === 'enabled' && !item.enabled) ||
+      (stateFilter === 'disabled' && item.enabled)
+    )
+      return false;
+    const summary = summariesById.get(item.id);
+    if (stateFilter === 'unavailable' && summary?.available !== false) return false;
+    if (publicationFilter !== 'all' && item.automation !== (publicationFilter === 'public'))
+      return false;
+    const text = [
+      item.title,
+      item.description,
+      item.id,
+      customCommandId(item.id),
+      item.typeId,
+      typesById.get(item.typeId)?.title,
+      item.owner.kind === 'host' ? 'AppDock' : item.owner.id,
+      item.owner.kind === 'host' ? '' : providerNames.get(item.owner.id),
+      summary?.unavailableReason,
+    ]
+      .join('\n')
+      .toLocaleLowerCase();
+    return terms.every((term) => text.includes(term));
+  });
+  const filtered = !!search || !!typeFilter || stateFilter !== 'all' || publicationFilter !== 'all';
   const command = (
     entry: Record<string, unknown>,
   ): Pick<UiCommand, 'id' | 'title' | 'customDefinitionId' | 'automation'> =>
@@ -111,6 +147,7 @@ export function CustomCommandsSettings({
   const [error, setError] = useState('');
   const [order, setOrder] = useState<{
     items: CustomCommandDefinition[];
+    allIds: string[];
     revision: string;
   } | null>(null);
   const [dialog, setDialog] = useState<null | {
@@ -142,7 +179,82 @@ export function CustomCommandsSettings({
         {...settingAnchor('custom-commands', 'definitions')}
       >
         <SettingsListTable
+          testId="custom-commands"
+          toolbarControls={
+            <SettingsListFilters
+              search={search}
+              onSearch={setSearch}
+              searchLabel={translate('settings.customCommandsSettings.search')}
+              searchPlaceholder={translate('settings.customCommandsSettings.searchPlaceholder')}
+            >
+              <select
+                aria-label={translate('settings.customCommandsSettings.typeFilter')}
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value)}
+              >
+                <option value="">{translate('settings.customCommandsSettings.allTypes')}</option>
+                {[...typeChoices].map(([id, title]) => (
+                  <option key={id} value={id}>
+                    {title}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label={translate('settings.customCommandsSettings.stateFilter')}
+                value={stateFilter}
+                onChange={(event) => setStateFilter(event.target.value)}
+              >
+                <option value="all">
+                  {translate('settings.customCommandsSettings.allStates')}
+                </option>
+                <option value="enabled">
+                  {translate('settings.customCommandsSettings.enabled')}
+                </option>
+                <option value="disabled">
+                  {translate('settings.customCommandsSettings.disabledFilter')}
+                </option>
+                <option value="unavailable">
+                  {translate('settings.customCommandsSettings.unavailableFilter')}
+                </option>
+              </select>
+              <select
+                aria-label={translate('settings.customCommandsSettings.publicationFilter')}
+                value={publicationFilter}
+                onChange={(event) => setPublicationFilter(event.target.value)}
+              >
+                <option value="all">
+                  {translate('settings.customCommandsSettings.allPublications')}
+                </option>
+                <option value="public">
+                  {translate('settings.customCommandsSettings.publicFilter')}
+                </option>
+                <option value="private">
+                  {translate('settings.customCommandsSettings.privateFilter')}
+                </option>
+              </select>
+            </SettingsListFilters>
+          }
+          toolbarActions={
+            filtered ? (
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setSearch('');
+                  setTypeFilter('');
+                  setStateFilter('all');
+                  setPublicationFilter('all');
+                }}
+              >
+                {translate('settings.commandBindingToolbar.clear')}
+              </button>
+            ) : undefined
+          }
           toolbarFilter={<CommandTargetFilter />}
+          totalCount={items.length}
+          emptyMessage={
+            filtered || target ? translate('settings.customCommandsSettings.noMatches') : undefined
+          }
           titleExtra={(entry) => <CommandPrivacy published={command(entry).automation} />}
           navigation={(entry) => <CommandSettingsLinks command={command(entry)} />}
           addInTitle
@@ -160,7 +272,13 @@ export function CustomCommandsSettings({
           onAdd={() => open('edit', null)}
           onEdit={(i) => open('edit', visibleItems[i])}
           onDelete={(i) => open('delete', visibleItems[i])}
-          onOrder={() => setOrder({ items: structuredClone(items), revision: auxiliary!.revision })}
+          onOrder={() =>
+            setOrder({
+              items: structuredClone(visibleItems),
+              allIds: items.map((item) => item.id),
+              revision: auxiliary!.revision,
+            })
+          }
           onToggle={(i) => {
             setError('');
             void update([
@@ -181,7 +299,12 @@ export function CustomCommandsSettings({
           listLabel={translate('settings.customCommandsSettings.title')}
           items={order.items}
           onClose={() => setOrder(null)}
-          onApply={(ids) => update([{ op: 'reorder', ids }], order.revision)}
+          onApply={(ids) => {
+            const selected = new Set(ids);
+            let position = 0;
+            const merged = order.allIds.map((id) => (selected.has(id) ? ids[position++] : id));
+            return update([{ op: 'reorder', ids: merged }], order.revision);
+          }}
         />
       )}
       {dialog?.kind === 'edit' && (

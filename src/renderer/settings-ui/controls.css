@@ -259,7 +259,8 @@ button:hover:not(:disabled) {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+.command-shortcut-search:has(input:focus-visible) {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -2886,7 +2887,7 @@ summary {
 }
 .binding-command-follow .binding-command-summary {
   position: sticky;
-  top: calc(var(--command-list-toolbar-height, 0px) + 8px);
+  top: calc(var(--command-list-toolbar-height, 0px) + 8px + var(--settings-sticky-top, 0px));
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 32px;
@@ -3062,7 +3063,16 @@ summary {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.command-list-summary > .command-list-summary-actions {
+.command-list-summary-trailing {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  margin-left: auto;
+}
+.command-list-summary-trailing > .command-list-summary-actions {
   display: flex;
   flex: none;
   align-items: center;
@@ -3070,7 +3080,6 @@ summary {
 }
 .command-list-summary-count {
   flex: none;
-  margin-left: auto;
   white-space: nowrap;
 }
 .command-list-toolbar > .settings-list-toolbar {
@@ -3086,9 +3095,6 @@ summary {
   padding: 0 14px;
   background: var(--panel);
   gap: 10px;
-}
-.command-shortcut-search:focus-within {
-  border-color: var(--accent);
 }
 .command-shortcut-search > span {
   color: var(--muted);

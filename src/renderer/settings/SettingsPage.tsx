@@ -341,7 +341,6 @@ export function SettingsPage({
                       : undefined
                 }
                 formTabsId={gesturePage ? 'gesture-settings' : 'command-trigger'}
-                jsonLabel={gesturePage ? t('settings.jsonConfiguration') : undefined}
                 storage={model.content.auxiliary.storage}
                 onLocalSettings={(enabled) => {
                   if (!enabled) void confirm('storage');

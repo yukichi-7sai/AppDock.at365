@@ -5,6 +5,7 @@ import { CommandProviderFilter } from './CommandProviderFilter';
 import type { BindingInputFilter } from './useBindingCommandFilter';
 import { CommandListSummary, CommandListToolbar } from './CommandListScroll';
 import { Icon } from '../../shared/ui-icons';
+import { SettingsListCount } from './SettingsListCount';
 export function CommandBindingToolbar({
   inputName,
   inputKind,
@@ -116,12 +117,7 @@ export function CommandBindingToolbar({
           </>
         }
       >
-        <span role="status">
-          {translate('settings.commandBindingToolbar.visibleCount', {
-            visible: visibleCount,
-            total: count,
-          })}
-        </span>
+        <SettingsListCount visible={visibleCount} total={count} />
       </CommandListSummary>
     </CommandListToolbar>
   );

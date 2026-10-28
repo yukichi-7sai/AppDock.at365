@@ -122,8 +122,10 @@ export function CommandListSummary({
     <div className={`command-list-summary ${className}`}>
       {leading && <div className="command-list-summary-leading">{leading}</div>}
       {filter && <div className="command-list-summary-main">{filter}</div>}
-      {actions && <div className="command-list-summary-actions">{actions}</div>}
-      <div className="command-list-summary-count">{children}</div>
+      <div className="command-list-summary-trailing">
+        {actions && <div className="command-list-summary-actions">{actions}</div>}
+        <div className="command-list-summary-count">{children}</div>
+      </div>
     </div>
   );
 }

@@ -49,7 +49,15 @@ export function SettingsIndex({
       onClick={() => act({ kind: 'select', pageId: p.id })}
     >
       <span className="settings-index-icon" aria-hidden="true">
-        {indexIcons[p.id] && <Icon name={indexIcons[p.id]!} />}
+        {p.id === 'about' ? (
+          <span className="brand-mark small">
+            <span />
+            <span />
+            <span />
+          </span>
+        ) : (
+          indexIcons[p.id] && <Icon name={indexIcons[p.id]!} />
+        )}
       </span>
       <span title={p.title}>{p.title}</span>
     </button>
@@ -120,11 +128,12 @@ export function SettingsIndex({
             <h3 className="settings-applet-heading" data-testid="settings-host-heading">
               {t('settings.index.hostHeading')}
             </h3>
-            <div aria-label={t('settings.host')}>
-              {content.navigation.filter((p) => !p.owner).map(row)}
+            <div aria-label={t('settings.host')} data-testid="settings-host-pages">
+              {content.navigation.filter((p) => !p.owner && p.id !== 'applets').map(row)}
             </div>
             <h3 className="settings-applet-heading">Applet</h3>
-            <div aria-label={t('settings.applets')}>
+            <div aria-label={t('settings.applets')} data-testid="settings-applet-pages">
+              {content.navigation.filter((p) => p.id === 'applets').map(row)}
               {content.navigation.filter((p) => p.owner && p.owner !== defaultShellId).map(row)}
             </div>
           </>

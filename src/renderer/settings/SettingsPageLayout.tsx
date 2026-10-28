@@ -39,7 +39,6 @@ export function SettingsPageLayout({
   onMode,
   formTabs,
   formTabsId = 'command-trigger',
-  jsonLabel,
   onOpenFile,
   storage,
   onLocalSettings,
@@ -55,7 +54,6 @@ export function SettingsPageLayout({
   onMode(mode: 'form' | 'json'): void;
   formTabs?: { id: string; title: string; selected: boolean; select(): void }[];
   formTabsId?: string;
-  jsonLabel?: string;
   onOpenFile(scope?: 'shared' | 'device'): void;
   storage?: SettingsPageAuxiliary['storage'];
   onLocalSettings?(enabled: boolean): void;
@@ -146,7 +144,7 @@ export function SettingsPageLayout({
                           aria-pressed={mode === 'json'}
                           onClick={() => onMode('json')}
                         >
-                          {jsonLabel ?? t('settings.json')}
+                          {t('settings.json')}
                         </button>
                       )}
                     </div>

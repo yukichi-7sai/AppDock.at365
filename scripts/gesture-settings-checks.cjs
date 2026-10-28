@@ -16,14 +16,14 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
     assert.deepEqual(await tabs.getByRole('button').allTextContents(), [
       'フォーム',
       'トリガー一覧',
-      'JSONの構成',
+      'JSON',
     ]);
     assert.equal(await host.getByTestId('trigger-stack-table').count(), 0);
     const beforeTabs = await saved();
     await host.getByTestId('gesture-settings-tab:triggers').click();
     await host.getByTestId('trigger-stack-table').waitFor();
     assert.equal(await host.getByTestId('gesture-common-options').count(), 0);
-    await tabs.getByRole('button', { name: 'JSONの構成', exact: true }).click();
+    await tabs.getByRole('button', { name: 'JSON', exact: true }).click();
     await host.getByRole('textbox', { name: '設定JSON', exact: true }).waitFor();
     await host.getByTestId('gesture-settings-tab:triggers').click();
     await host.getByTestId('trigger-stack-table').waitFor();
@@ -139,7 +139,7 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     );
   };
-  await host.getByRole('button', { name: 'JSONの構成', exact: true }).click();
+  await host.getByRole('button', { name: 'JSON', exact: true }).click();
   await menu.waitFor();
   await idlePointer();
   const touchpadStyle = await style(menu);
@@ -147,7 +147,7 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
   assert.equal(await host.locator('.settings-file-menu[open] button').count(), 2);
   await menu.click();
   await open('shortcuts');
-  await host.getByRole('button', { name: 'JSONの構成', exact: true }).click();
+  await host.getByRole('button', { name: 'JSON', exact: true }).click();
   await idlePointer();
   const keyStyle = await style(host.locator('.settings-file-button'));
   assert.deepEqual(touchpadStyle, keyStyle);

@@ -98,6 +98,8 @@
   background: transparent;
 }
 .settings-surface .settings-body.settings-page-scroll {
+  --settings-scroll-padding: 20px;
+  --settings-sticky-top: calc(-1 * var(--settings-scroll-padding));
   padding: 20px;
   border: 0;
   border-radius: 0;
@@ -141,12 +143,22 @@
   .settings-page-content.settings-panel.settings-panel-flat {
   padding-inline-end: 0;
 }
-.command-list-page-canvas > :is(.settings-page-heading, .settings-page-tools),
-.command-list-page-canvas .command-list-toolbar {
+.command-list-page-canvas > .settings-page-heading {
   position: sticky;
   left: 0;
   width: 100cqw;
   box-sizing: border-box;
+}
+.command-list-page-canvas > .settings-page-tools,
+.command-list-page-canvas .command-list-toolbar {
+  left: calc(-1 * var(--settings-scroll-padding, 0px));
+  width: calc(100cqw + 2 * var(--settings-scroll-padding, 0px));
+  box-sizing: border-box;
+}
+.settings-page-tools,
+.command-list-toolbar {
+  margin-inline: calc(-1 * var(--settings-scroll-padding, 0px));
+  padding-inline: var(--settings-scroll-padding, 0px);
 }
 .command-list-page-canvas > :is(.settings-page-heading, .settings-page-tools) {
   z-index: 2;
@@ -200,7 +212,7 @@
 }
 .settings-page-tools {
   position: sticky;
-  top: 0;
+  top: var(--settings-sticky-top, 0px);
   z-index: 2;
   background: var(--bg);
   margin-bottom: 18px;
@@ -340,7 +352,7 @@
 }
 .command-list-toolbar {
   position: sticky;
-  top: 0;
+  top: var(--settings-sticky-top, 0px);
   z-index: 3;
   padding-block: 8px;
   background: var(--bg);
@@ -445,6 +457,7 @@
     overflow: auto;
   }
   .settings-surface .settings-body:not(.settings-page-json) {
+    --settings-sticky-top: -4px;
     flex: none;
     overflow: visible;
   }
