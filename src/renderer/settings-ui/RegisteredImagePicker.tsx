@@ -200,6 +200,7 @@ export function ImageLibraryBrowser({
       <div className="image-library-toolbar">
         <SettingsField title={translate('settings.registeredImagePicker.group')}>
           <select
+            data-testid="image-picker-group"
             aria-label={translate('settings.registeredImagePicker.groupLabel')}
             value={group}
             onChange={(e) => onGroup(e.target.value)}
@@ -215,6 +216,7 @@ export function ImageLibraryBrowser({
         </SettingsField>
         <SettingsField title={translate('settings.registeredImagePicker.search')}>
           <SettingsInput
+            data-testid="image-picker-search"
             type="search"
             aria-label={translate('settings.registeredImagePicker.searchPlaceholder')}
             value={query}
@@ -268,12 +270,13 @@ export function ImageLibraryBrowser({
             if (!disabled && images.has(id)) onPreview(images.get(id)!);
           },
         }}
-      />
-      {filtered.length > limit && (
-        <button type="button" className="secondary" onClick={() => setLimit(limit + 64)}>
-          {translate('settings.registeredImagePicker.more', { count: filtered.length - limit })}
-        </button>
-      )}
+      >
+        {filtered.length > limit && (
+          <button type="button" className="secondary" onClick={() => setLimit(limit + 64)}>
+            {translate('settings.registeredImagePicker.more', { count: filtered.length - limit })}
+          </button>
+        )}
+      </ImageGallery>
     </>
   );
 }
@@ -327,6 +330,23 @@ export function RegisteredImagePicker({
         }
       });
   };
+  const register = async () => {
+    setRegistering(true);
+    library.setError('');
+    try {
+      const ref = await library.api!.register();
+      if (ref) {
+        setSelected(ref);
+        setGroup('all');
+        setQuery('');
+        await library.reload();
+      }
+    } catch (e) {
+      library.setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setRegistering(false);
+    }
+  };
   return (
     <SettingsMcpAccessProvider value={undefined}>
       <SettingsDialog
@@ -342,6 +362,12 @@ export function RegisteredImagePicker({
           ) : undefined
         }
         className="image-library-dialog"
+        secondaryAction={{
+          label: translate('settings.registeredImagePicker.register'),
+          disabled: !library.api,
+          pending: registering,
+          onClick: () => void register(),
+        }}
         applyLabel={translate('settings.registeredImagePicker.use')}
         valid={!!library.api && !!selected && !registering}
         onClose={() => {
@@ -353,41 +379,23 @@ export function RegisteredImagePicker({
           applied.current = true;
         }}
       >
-        <div className="image-library-actions">
-          <button
-            type="button"
-            className="secondary"
-            disabled={!library.api || registering}
-            onClick={async () => {
-              setRegistering(true);
-              library.setError('');
-              try {
-                const ref = await library.api!.register();
-                if (ref) {
-                  setSelected(ref);
-                  setGroup('all');
-                  setQuery('');
-                  await library.reload();
-                }
-              } catch (e) {
-                library.setError(String(e instanceof Error ? e.message : e));
-              } finally {
-                setRegistering(false);
-              }
-            }}
+        <div className="image-picker-summary">
+          <span
+            className="image-picker-filename"
+            data-testid="image-picker-filename"
+            title={selected?.file}
           >
-            {translate('settings.registeredImagePicker.register')}
-          </button>
-          <span>{selected?.file ?? translate('settings.registeredImagePicker.none')}</span>
+            {selected?.file ?? translate('settings.registeredImagePicker.none')}
+          </span>
+          <GallerySizeControl
+            value={cardWidth}
+            onChange={(value) => {
+              sizeTouched.current = true;
+              setCardWidth(value);
+            }}
+            onCommit={saveWidth}
+          />
         </div>
-        <GallerySizeControl
-          value={cardWidth}
-          onChange={(value) => {
-            sizeTouched.current = true;
-            setCardWidth(value);
-          }}
-          onCommit={saveWidth}
-        />
         <ImageLibraryBrowser
           snapshot={library.snapshot}
           selected={selected}

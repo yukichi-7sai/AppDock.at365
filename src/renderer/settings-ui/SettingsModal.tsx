@@ -208,6 +208,7 @@ export function SettingsDialog({
   cancelWhilePending = false,
   closeAfterApply = true,
   resetAction,
+  secondaryAction,
 }: {
   title: string;
   description?: ReactNode;
@@ -231,6 +232,12 @@ export function SettingsDialog({
   cancelWhilePending?: boolean;
   closeAfterApply?: boolean;
   resetAction?: { label: string; onClick(): void };
+  secondaryAction?: {
+    label: string;
+    onClick(): void;
+    disabled?: boolean;
+    pending?: boolean;
+  };
 }) {
   const { t } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -288,6 +295,16 @@ export function SettingsDialog({
       }
       footer={
         <footer>
+          {secondaryAction && (
+            <SettingsButton
+              data-testid="settings-dialog-secondary"
+              disabled={!ready || pending || secondaryAction.disabled}
+              pending={secondaryAction.pending}
+              onClick={secondaryAction.onClick}
+            >
+              {secondaryAction.label}
+            </SettingsButton>
+          )}
           {resetAction && (
             <SettingsButton
               data-testid="settings-dialog-reset"

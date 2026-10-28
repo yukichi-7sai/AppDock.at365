@@ -1,6 +1,4 @@
-.registered-image-input,
-.image-library-actions,
-.image-library-toolbar {
+.registered-image-input {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -154,14 +152,48 @@
   overflow-wrap: anywhere;
 }
 .image-library-toolbar {
-  margin: 12px 0;
-  align-items: end;
-}
-.image-library-toolbar > label {
   display: grid;
-  gap: 6px;
-  flex: 1;
-  min-width: 150px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px 20px;
+  margin: 12px 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.image-library-dialog .image-library-toolbar > .settings-field {
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+}
+.image-library-dialog .image-library-toolbar select {
+  width: 100%;
+}
+.image-picker-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.image-picker-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.image-picker-summary .image-picker-size {
+  margin: 0;
+}
+.image-library-dialog .image-picker-scroll {
+  height: min(46vh, 520px);
+  background: var(--panel);
+  --shadow: none;
+}
+@container settings-dialog (max-width: 520px) {
+  .image-library-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .image-picker-scroll {
   max-height: min(46vh, 520px);

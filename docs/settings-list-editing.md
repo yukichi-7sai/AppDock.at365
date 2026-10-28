@@ -170,6 +170,8 @@ Webアカウント設定の枠削除とログイン情報のクリアも共通`S
 
 ### SettingsDialogの使用例
 
+確定・取消とは別の補助操作を左フッターへ置く場合は`secondaryAction`へ`label`・`onClick`・任意の`disabled`/`pending`を渡す。共通ボタンが準備前・確定中・補助操作中の実行を抑止する。補助操作自体の保存・失敗・取消は呼出側が扱い、既定値復元は従来の`resetAction`を使う。
+
 以下は`src/renderer/settings/`に置く部品の例。親は開く間だけmountし、`onClose`でunmountする。別の登録へ切り替えるときは対象IDで`key`を分け、一時入力を取り違えないようにする。
 
 ```tsx

@@ -1,5 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   mountImageGallery,
   mountGallerySizeControl,
@@ -14,10 +14,12 @@ export function ImageGallery({
   model,
   options,
   resetKey,
+  children,
 }: {
   model: GalleryModel;
   options: Omit<GalleryOptions, 'scrollElement'>;
   resetKey?: string;
+  children?: ReactNode;
 }) {
   const { t: translate } = useHostTranslation();
   const container = useRef<HTMLDivElement>(null);
@@ -53,6 +55,7 @@ export function ImageGallery({
         role="group"
         aria-label={translate('settings.imageGallery.registeredImages')}
       />
+      {children}
     </div>
   );
 }
