@@ -2,10 +2,8 @@ import { hostText } from '../../shared/i18n';
 import type { ShellProviderRegistry, ShellProvider } from './shell-provider-registry';
 import {
   ipcMain,
-  webContents,
   type BrowserWindow,
   type WebContentsView,
-  type WebContents,
   type IpcMainInvokeEvent,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
@@ -35,7 +33,6 @@ export class NotificationSurfaceHost {
   private refreshing = false;
   private queued = false;
   private stop: () => void;
-  private previousFocus?: WebContents;
   constructor(
     private options: {
       window: BrowserWindow;
@@ -118,9 +115,7 @@ export class NotificationSurfaceHost {
         options.focusHost();
         return;
       }
-      if (this.previousFocus && !this.previousFocus.isDestroyed()) this.previousFocus.focus();
-      else options.window.webContents.focus();
-      this.previousFocus = undefined;
+      options.window.webContents.focus();
     });
     ipcMain.handle(this.channel('getSettings'), (e) => options.settings(bound(e).provider));
     ipcMain.handle(this.channel('executeCommand'), (e, id) =>
@@ -320,12 +315,6 @@ export class NotificationSurfaceHost {
     }
     const ids = this.options.controller.items().map((i) => i.id);
     this.options.controller.delivery(ids, visible ? 'showing' : 'hidden');
-  }
-  focus() {
-    if (!this.active?.ready || !this.visible()) return;
-    this.previousFocus = webContents.getFocusedWebContents() ?? undefined;
-    this.active.view.webContents.focus();
-    this.active.view.webContents.send(this.channel('focus'));
   }
   retry() {
     this.options.registry.retry(this.region());

@@ -311,7 +311,6 @@ export interface DockApi {
   restoreSettingsBackup(revision: number): Promise<SettingsSnapshot | null>;
   refreshLaunchState(): Promise<LaunchState>;
   restartAsAdministrator(): Promise<void>;
-  focusNotifications(): Promise<void>;
   onFlushSettingsInputs(callback: (id: string) => void): () => void;
   settingsInputsFlushed(id: string): Promise<void>;
   dispatchShortcut(key: string): Promise<{ executed: number; failed: number } | undefined>;

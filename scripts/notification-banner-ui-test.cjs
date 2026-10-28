@@ -118,15 +118,15 @@ delete env.ELECTRON_RUN_AS_NODE;
     );
     checks.push('limited bridge / foreign operation rejected / no Node or general host bridge');
     await base.locator('#host').focus();
-    await app.evaluate(() => fixture.host.focus());
+    assert.equal(await p.evaluate(() => typeof window.appdockNotifications.onFocus), 'undefined');
     await p.getByRole('button', { name: 'Run 0', exact: true }).waitFor();
-    await until(
-      () => p.evaluate(() => document.activeElement?.textContent === 'Run 0'),
-      'banner focus',
-    );
+    assert(await base.evaluate(() => document.hasFocus()));
+    await p.getByRole('button', { name: 'Run 0', exact: true }).focus();
     await p.keyboard.press('Escape');
     await until(() => base.evaluate(() => document.hasFocus()), 'focus returned');
-    checks.push('explicit focus / Escape returns to host / no automatic focus on publish');
+    checks.push(
+      'banner focus request removed / Escape returns to host / no automatic focus on publish',
+    );
     await p.getByRole('button', { name: 'Run 1', exact: true }).click();
     await until(() => app.evaluate(() => fixture.count() === 1), 'operation once');
     await p.getByRole('button', { name: 'Notice 2を閉じる', exact: true }).click();

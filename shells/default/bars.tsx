@@ -157,10 +157,13 @@ function App() {
         </button>
         <button
           className="titlebar-notifications"
-          aria-label="通知へ移動"
+          data-testid="notification-center"
+          data-active={model.activeNotificationCount > 0 || undefined}
+          aria-label={`通知センターを開く（アクティブ ${model.activeNotificationCount}件）`}
+          title={`通知センター（アクティブ ${model.activeNotificationCount}件）`}
           onClick={() => act('notifications')}
         >
-          通知
+          <Icon name="bell" size={17} />
         </button>
         <div className="window-controls">
           {(['minimize', 'maximize', 'close'] as const).map((operation, i) => (

@@ -167,7 +167,6 @@ const api: DockApi = {
   automation: (action) => ipcRenderer.invoke('dock:automation', action),
   refreshLaunchState: () => ipcRenderer.invoke('dock:refreshLaunchState'),
   restartAsAdministrator: () => ipcRenderer.invoke('dock:restartAsAdministrator'),
-  focusNotifications: () => ipcRenderer.invoke('dock:focusNotifications'),
   settingsInputsFlushed: (id) => ipcRenderer.invoke('dock:settingsInputsFlushed', id),
   onFlushSettingsInputs: (callback) => {
     const listener = (_: Electron.IpcRendererEvent, id: string) => callback(id);

@@ -9,6 +9,8 @@ const { freePort, inspect, electronExpression } = require('./electron-main-helpe
 const { barPage } = require('./shell-bars-helper.cjs');
 const { closingAction, overlayPage } = require('./shell-overlay-helper.cjs');
 const root = path.resolve(__dirname, '..');
+const notificationsOnly = process.argv.includes('--notifications-only');
+const portable = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
 const profile = path.join(root, '.artifacts', `shell-bars-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -16,6 +18,54 @@ settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
 settings.globalShortcutCommands = [];
 settings.updates.checkHostOnStartup = settings.updates.checkAppletsOnStartup = false;
+settings.updates.checkHostOnAboutOpen = false;
+if (notificationsOnly) {
+  const id = 'fixture.bell';
+  const folder = path.join(profile, 'extensions', id);
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(
+    path.join(folder, 'extension.json'),
+    JSON.stringify({
+      apiVersion: 1,
+      id,
+      name: 'Notification bell fixture',
+      version: '1.0.0',
+      minimumHostVersion: '0.100.0',
+      runtime: 'node',
+      entry: 'index.cjs',
+      capabilities: ['notifications'],
+      commands: ['publish', 'end', 'timed'].map((key) => ({ id: id + '.' + key, title: key })),
+      notificationTypes: ['message', 'timed'].map((typeId) => ({
+        typeId,
+        title: typeId,
+        description: 'Notification bell fixture',
+        levels: ['info'],
+        defaultLevel: 'info',
+        allowedTargets: ['banner'],
+        defaultTargets: [],
+        requiredTargets: [],
+        lifetimePolicy: 'userDuration',
+        defaultDurationSeconds: typeId === 'timed' ? 3 : null,
+        history: 'session',
+      })),
+    }),
+  );
+  fs.writeFileSync(
+    path.join(folder, 'index.cjs'),
+    `exports.activate = async c => {
+      let current;
+      const publish = typeId => c.notifications.publish({
+        typeId, title: 'Bell notification', body: 'Notification bell fixture', dedupeKey: typeId,
+      });
+      c.commands.register('fixture.bell.publish', 'Publish', async () => {
+        current = (await publish('message')).notificationId;
+      });
+      c.commands.register('fixture.bell.end', 'End', async () => c.notifications.end(current));
+      c.commands.register('fixture.bell.timed', 'Timed', async () => publish('timed'));
+    };`,
+  );
+  settings.extensions[id] = { enabled: true, settings: {} };
+}
 const hostFeed = path.join(profile, 'host-feed.json');
 fs.writeFileSync(
   hostFeed,
@@ -50,7 +100,7 @@ for (const [id, views] of [
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-const result = { profile, success: false, checks: [] };
+const result = { profile, notificationsOnly, success: false, checks: [] };
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 let app, browser, context, host, child, mainPort, title, status;
 const until = async (fn, label, timeout = 30000) => {
@@ -110,12 +160,12 @@ const capture = async (name) => {
   fs.writeFileSync(path.join(profile, name + '.png'), Buffer.from(image, 'base64'));
 };
 async function launch(extra = []) {
-  if (process.argv[2]) {
+  if (portable) {
     const executable = path.join(profile, 'AppDock.at365.exe');
     if (!fs.existsSync(executable))
-      require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
+      require('./copy-host.cjs').copyHost(path.resolve(portable), executable);
     result.executableSha256 = hash(executable);
-    assert.equal(result.executableSha256, hash(path.resolve(process.argv[2])));
+    assert.equal(result.executableSha256, hash(path.resolve(portable)));
     const port = await freePort();
     mainPort = await freePort();
     child = spawn(
@@ -168,6 +218,136 @@ async function close() {
 (async () => {
   try {
     await launch();
+    if (notificationsOnly) {
+      await until(
+        async () =>
+          (await host.evaluate(() => window.dock.snapshot())).extensions.some(
+            (e) => e.id === 'fixture.bell' && e.state === 'running',
+          ),
+        'notification fixture ready',
+      );
+      const command = (id) => host.evaluate((id) => window.dock.executeCommand(id), id);
+      await command('appdock.notifications.open');
+      await until(
+        async () => (await host.evaluate(() => window.dock.pages.get()))?.kind === 'notifications',
+        'center ready',
+      );
+      // Remove startup warnings in this isolated profile before checking exact notification counts.
+      await host.evaluate(async () => {
+        const model = await window.dock.pages.get();
+        for (const item of model.content.items.filter(
+          (item) => item.status === 'active' && item.dismissible,
+        ))
+          await window.dock.pages.action({
+            id: model.id,
+            type: 'notifications',
+            action: {
+              type: 'act',
+              request: {
+                notificationId: item.id,
+                revision: item.revision,
+                requestId: crypto.randomUUID(),
+                type: 'dismiss',
+              },
+            },
+          });
+      });
+      const bell = title.getByTestId('notification-center');
+      const count = async (expected) => {
+        await until(
+          async () => (await bell.getAttribute('aria-label'))?.includes(`アクティブ ${expected}件`),
+          'bell explanation',
+        );
+        assert.equal(await bell.getAttribute('data-active'), expected ? 'true' : null);
+      };
+      await count(0);
+      assert.equal(await host.evaluate(() => typeof window.dock.focusNotifications), 'undefined');
+      await command('appdock.logs.open');
+      await bell.click();
+      await until(
+        async () => (await host.evaluate(() => window.dock.pages.get()))?.kind === 'notifications',
+        'empty bell opens center',
+      );
+      result.checks.push('empty bell opens the center and removed banner focus entry is absent');
+      for (const theme of ['light', 'dark']) {
+        await save({ theme });
+        await title.waitForFunction(
+          (theme) => document.documentElement.dataset.theme === theme,
+          theme,
+        );
+        const normalColor = await bell.evaluate((button) => getComputedStyle(button).color);
+        await command('fixture.bell.publish');
+        await count(1);
+        const activeColor = await bell.evaluate((button) => getComputedStyle(button).color);
+        assert.notEqual(activeColor, normalColor);
+        await command('fixture.bell.publish');
+        await count(1);
+        await command('appdock.logs.open');
+        await bell.click();
+        await host
+          .getByRole('button', { name: 'Bell notificationを閉じる', exact: true })
+          .waitFor();
+        await count(1);
+        await capture('bell-active-' + theme);
+        await host.getByRole('button', { name: 'Bell notificationを閉じる', exact: true }).click();
+        await count(0);
+        assert.equal(await bell.evaluate((button) => getComputedStyle(button).color), normalColor);
+        await command('fixture.bell.publish');
+        await count(1);
+        await command('fixture.bell.end');
+        await count(0);
+        result.checks.push(
+          theme +
+            ': center-only notification colors the bell; dedupe/open retain count; dismiss/resolve restore normal color',
+        );
+      }
+      await command('fixture.bell.timed');
+      await count(1);
+      await count(0);
+      result.checks.push('timed notification expiry restores the normal bell');
+      await host.evaluate(async () => {
+        const s = await window.dock.snapshot();
+        s.settings.value.notificationPreferences ??= { overrides: [] };
+        s.settings.value.notificationPreferences.overrides.push({
+          ownerKind: 'applet',
+          ownerId: 'fixture.bell',
+          typeId: 'message',
+          targets: ['banner'],
+        });
+        await window.dock.saveSettings(s.settings.value, s.settings.revision);
+      });
+      await command('fixture.bell.publish');
+      await count(1);
+      const banner = await until(
+        () => context.pages().find((page) => page.url().endsWith('/notifications.html')),
+        'banner',
+      );
+      await banner.getByRole('region', { name: 'Bell notification', exact: true }).waitFor();
+      assert.equal(
+        await banner.evaluate(() => typeof window.appdockNotifications.onFocus),
+        'undefined',
+      );
+      await command('appdock.logs.open');
+      await bell.click();
+      await until(
+        async () => (await host.evaluate(() => window.dock.pages.get()))?.kind === 'notifications',
+        'bell opens center with banner',
+      );
+      await until(
+        async () =>
+          (await main(({ webContents }) => webContents.getFocusedWebContents()?.getURL())) ===
+          host.url(),
+        'center receives native focus',
+      );
+      await count(1);
+      await host.evaluate(() => window.dock.toggleExtension('fixture.bell', false));
+      await count(0);
+      result.checks.push(
+        'visible banner does not receive bell focus; removed notification focus event is absent; owner stop clears count',
+      );
+      result.success = true;
+      return;
+    }
     const defaultId = 'appdock.default-shell';
     assert.equal(await host.locator('header.titlebar, footer.statusbar').count(), 0);
     assert.equal(await title.evaluate(() => typeof window.dock), 'undefined');
@@ -175,7 +355,7 @@ async function close() {
     const initialStatus = await status.evaluate(() => window.appdockBar.connect());
     assert(initialStatus.snapshot.runningApplets >= 3);
     await status.getByRole('button', { name: 'AppDockを更新', exact: true }).click();
-    if (!process.argv[2]) {
+    if (!portable) {
       await status.getByRole('alert').waitFor();
       await host.evaluate(() => window.dock.checkUpdates());
     }
@@ -222,12 +402,11 @@ async function close() {
     result.checks.push(
       'independent public-only bar renderers, current state, host update action, stale-session and foreign-command rejection',
     );
-    await title.getByRole('button', { name: '通知へ移動', exact: true }).click();
-    await until(async () => {
-      for (const page of context.pages().filter((p) => p.url().endsWith('/notifications.html')))
-        if (await page.evaluate(() => document.hasFocus())) return true;
-      return false;
-    }, 'notification button focuses the notification surface');
+    await title.getByTestId('notification-center').click();
+    await until(
+      async () => (await host.evaluate(() => window.dock.pages.get()))?.kind === 'notifications',
+      'notification button opens the notification center',
+    );
     for (const page of [title, status]) {
       await page
         .getByRole('button', { name: page === title ? 'コマンドを検索' : 'コマンドパレット' })
@@ -259,7 +438,7 @@ async function close() {
     await status.keyboard.press('Tab');
     await title.waitForFunction(() => document.hasFocus());
     result.checks.push(
-      'notification button transfers focus; palette buttons and shortcuts work from both bars and restore focus; Tab crosses title/ribbon/body/status boundaries',
+      'notification button opens the center; palette buttons and shortcuts work from both bars and restore focus; Tab crosses title/ribbon/body/status boundaries',
     );
     await title.getByRole('button', { name: '最大化', exact: true }).click();
     await title.getByRole('button', { name: '元に戻す', exact: true }).waitFor();

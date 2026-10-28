@@ -8,6 +8,7 @@ function fixture() {
     paletteKey: 'Ctrl+K',
     maximized: false,
     runningApplets: 2,
+    activeNotificationCount: 0,
     update: { busy: false, blocked: false, phase: '', cancellable: false },
   };
   const calls = [];
@@ -30,6 +31,14 @@ test('bar snapshots advance only with state changes, preserve opaque actions, an
   assert.deepEqual(next.actions, first.actions);
   assert(!next.actions.update);
   assert(!f.bars.snapshot('statusbar').actions.close);
+  f.state.activeNotificationCount = 2;
+  const notifications = f.bars.snapshot('titlebar');
+  assert.equal(notifications.activeNotificationCount, 2);
+  assert(notifications.revision > next.revision);
+  assert.equal(notifications.actions.notifications, first.actions.notifications);
+  assert.equal(f.bars.snapshot('titlebar').revision, notifications.revision);
+  f.state.activeNotificationCount = 0;
+  assert.equal(f.bars.snapshot('titlebar').activeNotificationCount, 0);
   next.update.busy = true;
   assert.equal(f.state.update.busy, false);
 });

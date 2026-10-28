@@ -3127,9 +3127,6 @@ function registerIpc() {
     if (typeof id !== 'string') throw Error('Invalid input flush');
     settingsInputFlushes.get(id)?.();
   });
-  handle('dock:focusNotifications', () => {
-    if (!overlayHost?.active) notificationBanner?.focus();
-  });
   handle('dock:openCommandPalette', (request: CommandPaletteRequest) =>
     openCommandPalette(request),
   );
@@ -4002,6 +3999,7 @@ async function initialize() {
           version: app.getVersion(),
           paletteKey: settings.value.shortcuts['appdock.commands.search']?.[0] ?? '',
           maximized: window?.isMaximized() ?? false,
+          activeNotificationCount: notificationService?.activeCount ?? 0,
           runningApplets: allApplets().filter(
             (e) => e.sourceKind !== 'builtin' && e.state === 'running',
           ).length,
@@ -4027,7 +4025,11 @@ async function initialize() {
       run: async (operation) => {
         if (operation === 'palette')
           return openCommandPalette({ requestId: randomUUID(), mode: 'execute' });
-        if (operation === 'notifications') return notificationBanner?.focus();
+        if (operation === 'notifications') {
+          await executeCommand('appdock.notifications.open');
+          window?.webContents.focus();
+          return;
+        }
         if (operation === 'update') {
           await flushSettingsInputs();
           await updater.install('host');

@@ -60,6 +60,5 @@ export interface NotificationBannerApi extends ShellAppletApi {
   resize(height: number): Promise<void>;
   focusHost(): Promise<void>;
   openCenter(): Promise<void>;
-  onFocus(callback: () => void): () => void;
   onChanged(callback: (model: NotificationBannerModel) => void): () => void;
 }

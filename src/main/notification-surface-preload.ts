@@ -18,11 +18,6 @@ const api: NotificationBannerApi = {
   resize: (height) => ipcRenderer.invoke(channel('resize'), height),
   focusHost: () => ipcRenderer.invoke(channel('focusHost')),
   openCenter: () => ipcRenderer.invoke(channel('openCenter')),
-  onFocus: (callback) => {
-    const listener = () => callback();
-    ipcRenderer.on(channel('focus'), listener);
-    return () => ipcRenderer.removeListener(channel('focus'), listener);
-  },
   onChanged: (callback) => {
     const listener = (_: Electron.IpcRendererEvent, model: NotificationBannerModel) =>
       callback(model);

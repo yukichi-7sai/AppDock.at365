@@ -17,6 +17,7 @@ export interface ShellBarModel {
   paletteKey: string;
   maximized: boolean;
   runningApplets: number;
+  activeNotificationCount: number;
   update: {
     busy: boolean;
     blocked: boolean;

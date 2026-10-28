@@ -261,6 +261,7 @@ const main = (fn) =>
         undefined,
         { polling: 100 },
       );
+      assert.equal(await titlebar.getByTestId('notification-center').isVisible(), false);
       const progress = await page.getByRole('progressbar').getAttribute('value');
       assert.ok(Number(progress) > 0 && Number(progress) < zip.length);
       await page.evaluate(() => window.dock.focusBar('titlebar', 'first'));
@@ -327,6 +328,7 @@ const main = (fn) =>
       );
       assert.equal(await update.isEnabled(), true);
       await titlebar.getByRole('button', { name: '閉じる', exact: true }).waitFor();
+      assert.equal(await titlebar.getByTestId('notification-center').isVisible(), true);
       assert.equal(await titlebar.getByRole('region', { name: '更新の進捗' }).count(), 0);
       assert.equal(
         JSON.parse(fs.readFileSync(path.join(installed, 'extension.json'))).version,
@@ -363,6 +365,7 @@ const main = (fn) =>
         'cancel aborts transfer without replacing installed Applet',
         'confirmation precedes payload requests; cancellation does not download',
         'approved transfers remain cancellable in both themes',
+        'update progress covers the notification bell while the transfer is active',
         'host update controls and separate Applet management',
         'host and Applet current/new versions align inline with matching colored badges',
         'current/error checks remove the new-version badge without a details popup',

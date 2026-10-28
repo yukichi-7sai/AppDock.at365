@@ -55,11 +55,6 @@ function App() {
   useLayoutEffect(() => {
     if (session && model) void api.ready(session).catch((e) => setError(String(e)));
   }, [session, !!model]);
-  useEffect(
-    () =>
-      api.onFocus(() => lane.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus()),
-    [],
-  );
   useLayoutEffect(() => {
     const element = lane.current;
     if (!element) return;

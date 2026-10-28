@@ -137,9 +137,13 @@ kbd {
 }
 .titlebar-notifications {
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
   margin-right: 12px;
-  font-size: 12px;
   color: var(--muted);
+}
+.titlebar-notifications[data-active='true'] {
+  color: var(--accent);
 }
 .window-controls {
   display: flex;

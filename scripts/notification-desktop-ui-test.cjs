@@ -180,17 +180,19 @@ const storage = (id, key) => {
     host.setDefaultTimeout(12000);
     for (const p of pages())
       p.on('pageerror', (e) => console.error('RENDERER', p.url(), String(e)));
-    await host.waitForFunction(async () => {
-      const s = await window.dock.snapshot();
-      return (
-        s.startupReady &&
-        Object.values(
-          s.extensions.filter((e) =>
+    await until(
+      () =>
+        host.evaluate(async () => {
+          const s = await window.dock.snapshot();
+          const fixtures = s.extensions.filter((e) =>
             ['fixture.notifications.node', 'fixture.notifications.native'].includes(e.id),
-          ),
-        ).every((e) => e.state === 'running')
-      );
-    });
+          );
+          return (
+            s.startupReady && fixtures.length === 2 && fixtures.every((e) => e.state === 'running')
+          );
+        }),
+      'notification fixture commands ready',
+    );
     await require('./shell-overlay-helper.cjs').startupPage(host);
     assert.equal(await main(desktopWindow + '?.isVisible() ?? false'), false);
     await main(parentWindow + '.focus()');

@@ -50,10 +50,10 @@ TypedNotificationsは呼出元/宣言/現在世代を検証してrawサービス
 
 登録側は許可先・既定先・必須先を指定する。必須の表示先は`allowedTargets`と`defaultTargets`にも含める。
 
-| 登録定義 | 動作 |
-| --- | --- |
+| 登録定義                     | 動作                                                             |
+| ---------------------------- | ---------------------------------------------------------------- |
 | `requiredTargets:['banner']` | バナーを必ず含める。バナーの解除とセンターのみへの変更を拒否する |
-| `requiredTargets:[]` | 許可された表示先をすべて外してセンターのみへ変更できる |
+| `requiredTargets:[]`         | 許可された表示先をすべて外してセンターのみへ変更できる           |
 
 エラー・警告・インフォメーション通知は`requiredTargets:['banner']`を使う。Appletにも必須先を宣言できる。通知の寿命や閉じる操作は`lifetimePolicy`の別の契約で、バナー必須だけでは常時表示を意味しない。
 
@@ -95,7 +95,7 @@ minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言�
 2. themeを適用してsnapshotを描画後、ready(sessionId)を送る。
 3. actへnotificationId/revision/requestId/type:invoke/actionId、またはtype:dismissを渡す。表示中のactive通知だけ操作できる。
 4. resizeで描画した高さをCSS pxで報告する。ホストが最大高さを制限する。
-5. onFocusに応じて先頭操作へ移動し、focusHostで元のWebContentsへ戻す。
+5. focusHostで本体本文へ戻す。デスクトップ通知では通知Windowのフォーカスを解放する。
 6. getSettings/onSettingsChanged/executeCommandは他のShellと同じ自Applet用契約を使う。executeCommandは自身の登録済みコマンドに限定する。
 
 モデルはschemaVersion:1/contextId:primary/sessionId/revision/dark/items/viewportと任意のsurface:banner/desktop。itemsは発行順。viewportはCSS pxのwidth/maxHeight。古いrevisionを無視する。NotificationSurfaceControllerが表示モデルと操作を持ち、NotificationSurfaceHostはネイティブViewの寿命・ready・位置・復旧だけを管理する。
@@ -106,7 +106,7 @@ minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言�
 
 Window上部48 CSS pxへ、幅最大680 CSS px/左右余白16 CSS pxの小さなWebContentsViewを重ねる。幅・高さとzoomをDIPへ変換する。本文レイアウト、Web/AppletのView、入力、sessionを維持する。ページより上、モーダルパレットより下へ置き、ページの追加とバナー更新の後もモーダルを最後に配置する。
 
-Default Shellは最大3カードを通常表示し、超過分を「ほかN件を表示」で展開する。利用可能高さ40%を目安に領域内をスクロールする。新規通知でfocusを奪わず、タイトルバーの「通知」から操作へ移れる。EscapeとTab境界で元の画面へ戻る。色・アイコン・レベル名を使い、新規通知の読み上げを行う。
+Default Shellは最大3カードを通常表示し、超過分を「ほかN件を表示」で展開する。利用可能高さ40%を目安に領域内をスクロールする。新規通知でfocusを奪わず、タイトルバーのベルは通知センターを開く。バナーへフォーカスを移す専用操作は提供しない。バナーを直接操作した後はEscapeとTab境界で本体本文へ戻る。色・アイコン・レベル名を使い、新規通知の読み上げを行う。
 
 ready期限は10秒。Shell切替先のreadyまでは旧Viewを保持し、同じ通知ID・期限・操作ロックを引き継ぐ。未提供/無効/停止/故障領域はDefault Shellへ戻す。通知領域の同じ提供元・版の故障はプロセス内で記憶し、「Shellを再試行」または新版で再試行する。safe起動はDefault Shellへ固定する。Default Shellも利用不能な場合は最小ネイティブdialogとログを使い、通知を再帰的に発行しない。
 
