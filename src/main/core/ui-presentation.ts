@@ -69,11 +69,12 @@ type Action = {
   displayMode?: true;
 };
 const allowAll = () => true;
+type PresentationImage = string | { key: string; load(): Promise<string | undefined> };
 export class UiPresentation {
   readonly epoch = randomUUID();
   private revision = 0;
   private signature = '';
-  private assets = new Map<string, string>();
+  private assets = new Map<string, PresentationImage>();
   private actions = new Map<string, Action>();
   private badgeIds: string[] = [];
   private cached?: {
@@ -97,7 +98,7 @@ export class UiPresentation {
       /** Changes when catalog inputs or registered images change. Omit for uncached sources. */
       version?(): unknown;
       dark(): boolean;
-      image?(ref: unknown, shape?: string): string | undefined;
+      image?(ref: unknown, shape?: string): PresentationImage | undefined;
       navigation: NavigationCoordinator;
       execute(command: string): Promise<unknown>;
       theme(): Promise<unknown>;
@@ -109,7 +110,16 @@ export class UiPresentation {
       badge?(id: string): RibbonBadge;
     },
   ) {}
-  private asset(data: string | undefined) {
+  private asset(data: PresentationImage | undefined) {
+    if (data && typeof data === 'object') {
+      if (typeof data.key !== 'string' || data.key.length > 2048 || typeof data.load !== 'function')
+        return;
+      const id = createHash('sha256')
+        .update(this.epoch + ':' + data.key)
+        .digest('hex');
+      this.assets.set(id, data);
+      return id;
+    }
     if (
       !data ||
       data.length > 1024 * 1024 ||
@@ -413,7 +423,19 @@ export class UiPresentation {
   getAsset(id: unknown) {
     this.get();
     if (typeof id !== 'string' || !this.assets.has(id)) throw Error('Unknown presentation asset');
-    return { dataUrl: this.assets.get(id)! };
+    const source = this.assets.get(id)!;
+    if (typeof source === 'string') return { dataUrl: source };
+    return source.load().then((dataUrl) => {
+      this.get();
+      if (
+        !this.assets.has(id) ||
+        !dataUrl ||
+        dataUrl.length > 1024 * 1024 ||
+        !/^data:image\/(png|webp);base64,[A-Za-z0-9+/=]+$/.test(dataUrl)
+      )
+        throw Error('Unknown presentation asset');
+      return { dataUrl };
+    });
   }
   invoke(
     request: UiActionRequest,

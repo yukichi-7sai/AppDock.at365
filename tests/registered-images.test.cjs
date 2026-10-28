@@ -41,7 +41,7 @@ const groups = {
     { id: 'backgrounds', name: '背景', images: [ref] },
   ],
 };
-test('addition waits for a pre-existing scan then refreshes the new file before returning', async () => {
+test('addition remains indexed while another requested image is decoding', async () => {
   let release, scanned;
   const entered = new Promise((resolve) => {
     scanned = resolve;
@@ -63,7 +63,7 @@ test('addition waits for a pre-existing scan then refreshes the new file before 
     Buffer.concat([bytes, Buffer.from([1])]),
   );
   pause = true;
-  const scanning = library.refresh();
+  const scanning = library.preview({ file: 'old.png' });
   await entered;
   const addition = library.addWithResult(Buffer.concat([bytes, Buffer.from([2])]), 'new.png');
   for (let i = 0; i < 100; i++) {
@@ -211,10 +211,139 @@ test('missing or incomplete images preserve references and recover without setti
   assert.equal(images.icon(ref), decoded().thumbnail);
   await fs.writeFile(path.join(images.directory, ref.file), Buffer.from('partial'));
   await images.refresh();
+  assert.equal(images.list()[0].available, true, 'metadata alone cannot validate image bytes');
+  await assert.rejects(images.read(ref));
   assert.equal(images.list()[0].available, false);
   await fs.writeFile(path.join(images.directory, ref.file), bytes);
   await images.refresh();
   assert.equal(images.list()[0].available, true);
+});
+
+test('metadata scans and presentation models do not read or decode unused images', async () => {
+  let decodes = 0,
+    reads = 0;
+  const images = await fixture(() => {
+    decodes++;
+    return decoded();
+  });
+  await fs.mkdir(images.directory, { recursive: true });
+  for (const name of ['used.png', 'unused.png'])
+    await fs.writeFile(path.join(images.directory, name), bytes);
+  const original = fs.readFile;
+  fs.readFile = async (file, ...args) => {
+    if (String(file).startsWith(images.directory)) reads++;
+    return original.call(fs, file, ...args);
+  };
+  try {
+    await images.refresh();
+    await images.refresh();
+    assert.equal(reads, 0);
+    assert.equal(decodes, 0);
+    assert.equal(images.availableReferences().length, 2);
+    assert.equal(images.entry({ file: 'used.png' }).width, 0);
+    const asset = images.asset({ file: 'used.png' });
+    assert.equal(decodes, 0, 'creating an opaque asset is passive');
+    await Promise.all([asset.load(), asset.load()]);
+    assert.equal(reads, 1);
+    assert.equal(decodes, 1);
+    await asset.load();
+    await images.refresh();
+    assert.equal(reads, 1);
+    assert.equal(decodes, 1);
+    assert.equal(images.entry({ file: 'unused.png' }).width, 0);
+  } finally {
+    fs.readFile = original;
+  }
+});
+
+test('replacement during decode cannot publish the obsolete image or invalidate its successor', async () => {
+  let release,
+    entered,
+    pause = true;
+  const gate = new Promise((r) => {
+    release = r;
+  });
+  const start = new Promise((r) => {
+    entered = r;
+  });
+  const images = await fixture(async () => {
+    if (pause) {
+      entered();
+      await gate;
+    }
+    return decoded();
+  });
+  await fs.mkdir(images.directory, { recursive: true });
+  await fs.writeFile(path.join(images.directory, ref.file), bytes);
+  await images.refresh();
+  const generation = images.entry(ref).generation;
+  const pending = images.asset(ref).load();
+  await start;
+  await fs.writeFile(
+    path.join(images.directory, ref.file),
+    Buffer.concat([bytes, Buffer.from('new')]),
+  );
+  await images.refresh();
+  const replacement = images.entry(ref).generation;
+  assert.notEqual(replacement, generation);
+  pause = false;
+  release();
+  await assert.rejects(pending, /変更/);
+  assert.equal(images.entry(ref).generation, replacement);
+  assert.equal(images.icon(ref), '');
+  assert.equal(await images.asset(ref).load(), decoded().thumbnail);
+});
+
+test('deletion or shutdown while decoding never publishes a late result', async () => {
+  for (const mode of ['delete', 'stop']) {
+    let release, entered;
+    const gate = new Promise((r) => {
+      release = r;
+    });
+    const start = new Promise((r) => {
+      entered = r;
+    });
+    const images = await fixture(async () => {
+      entered();
+      await gate;
+      return decoded();
+    });
+    await fs.mkdir(images.directory, { recursive: true });
+    await fs.writeFile(path.join(images.directory, ref.file), bytes);
+    await images.refresh();
+    const pending = images.asset(ref).load();
+    await start;
+    if (mode === 'delete') {
+      await fs.unlink(path.join(images.directory, ref.file));
+      await images.refresh();
+    } else images.stop();
+    release();
+    await assert.rejects(pending);
+    assert.equal(images.icon(ref), '');
+  }
+});
+
+test('failed decoding is not repeated by polling; explicit reload enables only a future demand', async () => {
+  let failures = true,
+    decodes = 0;
+  const images = await fixture(() => {
+    decodes++;
+    if (failures) throw Error('fixture decoder failure');
+    return decoded();
+  });
+  await fs.mkdir(images.directory, { recursive: true });
+  await fs.writeFile(path.join(images.directory, ref.file), bytes);
+  await images.refresh();
+  await assert.rejects(images.asset(ref).load());
+  await images.refresh();
+  await images.refresh();
+  assert.equal(decodes, 1);
+  assert.equal(images.entry(ref).available, false);
+  failures = false;
+  await images.refresh(true);
+  assert.equal(decodes, 1);
+  assert.equal(await images.asset(ref).load(), decoded().thumbnail);
+  assert.equal(decodes, 2);
 });
 test('transferred image roots are rejected without writing originals into the target', async () => {
   const directory = path.join(runRoot, String(++serial)),

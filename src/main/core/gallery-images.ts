@@ -1,5 +1,4 @@
 import { hostText } from '../../shared/i18n';
-import { createHash } from 'node:crypto';
 import type { RegisteredImages } from './registered-images';
 import type { RegisteredImageRef } from '../../shared/registered-images';
 import { decodeRegisteredImage } from './registered-image-decoder';
@@ -15,20 +14,32 @@ export class GalleryImages {
     if (![512, 1024, 2048].includes(edge))
       return Promise.reject(Error(hostText('services.galleryImages.invalidSize')));
     const key = `${generation}:${edge}`;
-    const cached = this.cache.get(key);
+    const hash = this.images.contentHash(ref, generation);
+    const contentKey = hash ? `${hash}:${edge}` : undefined;
+    const cached = contentKey ? this.cache.get(contentKey) : undefined;
     if (cached) {
-      this.cache.delete(key);
-      this.cache.set(key, cached);
+      this.cache.delete(contentKey!);
+      this.cache.set(contentKey!, cached);
       return Promise.resolve(cached.source);
     }
     const pending = this.pending.get(key);
     if (pending) return pending;
     const task = this.queue
       .then(async () => {
-        const { bytes } = await this.images.read(ref);
-        if (createHash('sha256').update(bytes).digest('hex') !== generation)
+        const {
+          bytes,
+          hash,
+          generation: currentGeneration,
+        } = await this.images.read(ref, generation);
+        if (currentGeneration !== generation)
           throw Error(hostText('services.galleryImages.changed'));
+        const contentKey = `${hash}:${edge}`;
+        const existing = this.cache.get(contentKey);
+        if (existing) return existing.source;
         const image = await decodeRegisteredImage(bytes, edge);
+        const current = this.images.entry(ref);
+        if (!current?.available || current.generation !== generation)
+          throw Error(hostText('services.galleryImages.changed'));
         const scale = Math.min(1, edge / Math.max(image.width, image.height));
         const cost =
           image.thumbnail.length * 2 +
@@ -39,7 +50,7 @@ export class GalleryImages {
           this.cache.delete(oldest);
         }
         if (cost <= 64 * 1024 * 1024) {
-          this.cache.set(key, { source: image.thumbnail, cost });
+          this.cache.set(contentKey, { source: image.thumbnail, cost });
           this.bytes += cost;
         }
         return image.thumbnail;

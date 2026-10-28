@@ -170,8 +170,7 @@ export function createHostApi(
           };
         }
         if (method === 'host.registeredImages.preview') {
-          await imageLibrary.images.refresh();
-          return imageLibrary.images.icon(p.image) ?? null;
+          return (await imageLibrary.images.preview(p.image)) ?? null;
         }
         if (method === 'host.registeredImages.pick') {
           const generation = e.runtimeSession;

@@ -18,6 +18,20 @@ export interface DecodedImage {
   circle: string;
 }
 export type ImageDecoder = (bytes: Buffer) => DecodedImage | Promise<DecodedImage>;
+interface ImageRecord {
+  entry: RegisteredImageEntry;
+  signature: string;
+  hash: string;
+  circle: string;
+  decoded: boolean;
+  pending?: Promise<ReadImage>;
+}
+interface ReadImage {
+  ref: RegisteredImageRef;
+  bytes: Buffer;
+  hash: string;
+  generation: string;
+}
 const maxBytes = 5 * 1024 * 1024;
 export function imageFormat(bytes: Buffer) {
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'png';
@@ -27,11 +41,10 @@ export function imageFormat(bytes: Buffer) {
   throw Error(hostText('services.registeredImages.selectFormat'));
 }
 export class RegisteredImages {
-  private entries = new Map<
-    string,
-    { entry: RegisteredImageEntry; signature: string; hash: string; circle: string }
-  >();
+  private entries = new Map<string, ImageRecord>();
   private queue: Promise<unknown> = Promise.resolve();
+  private reads: Promise<unknown> = Promise.resolve();
+  private stopped = false;
   private refreshing?: Promise<void>;
   private timer?: ReturnType<typeof setInterval>;
   private watcher?: FSWatcher;
@@ -90,16 +103,113 @@ export class RegisteredImages {
       throw Error(hostText('services.registeredImages.decodeFailed'));
     return image;
   }
-  async read(ref: unknown) {
+  private notify() {
+    if (this.stopped) return;
+    this.changed();
+    for (const callback of this.listeners) callback();
+  }
+  private current(record: ImageRecord) {
+    return (
+      !this.stopped &&
+      this.entries.get(imageKey(record.entry.ref)) === record &&
+      record.entry.available
+    );
+  }
+  private publish(record: ImageRecord, image: DecodedImage, hash: string) {
+    if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
+    const changed = !record.decoded || record.hash !== hash;
+    record.hash = hash;
+    record.circle = image.circle;
+    record.decoded = true;
+    Object.assign(record.entry, {
+      width: image.width,
+      height: image.height,
+      thumbnail: image.thumbnail,
+      available: true,
+      state: 'ready',
+    });
+    if (changed) this.notify();
+  }
+  private async fileSignature(name: string) {
+    const file = path.join(this.directory, name),
+      stat = await fs.lstat(file);
+    if (
+      stat.isSymbolicLink() ||
+      !stat.isFile() ||
+      !stat.size ||
+      stat.size > maxBytes ||
+      (await fs.realpath(file)).toLowerCase() !== file.toLowerCase()
+    )
+      throw Error(hostText('services.registeredImages.unsafeFile'));
+    return { signature: `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`, bytes: stat.size };
+  }
+  async read(ref: unknown, generation?: string): Promise<ReadImage> {
     if (!imageReference(ref)) throw Error(hostText('services.registeredImages.invalidReference'));
-    await this.root();
-    const files = await fs.readdir(this.directory, { withFileTypes: true });
-    const found = files.find((f) => f.name.toLowerCase() === imageKey(ref));
-    if (!found?.isFile() || !imageFilename(found.name))
+    await this.refresh();
+    const record = this.entries.get(imageKey(ref));
+    if (!record || !this.current(record))
       throw Error(hostText('services.registeredImages.missing'));
-    const bytes = await this.fileBytes(found.name);
-    await this.validate(bytes, found.name);
-    return { ref: { file: found.name }, bytes };
+    if (generation !== undefined && generation !== record.entry.generation)
+      throw Error(hostText('services.registeredImages.changed'));
+    if (record.pending) return record.pending;
+    const run = async (): Promise<ReadImage> => {
+      if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
+      // Let the requesting surface paint its normal fallback before doing pixel work.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
+      let decoding = false;
+      try {
+        await this.root();
+        if ((await this.fileSignature(record.entry.ref.file)).signature !== record.signature) {
+          await this.refresh();
+          throw Error(hostText('services.registeredImages.changed'));
+        }
+        const bytes = await this.fileBytes(record.entry.ref.file);
+        const hash = createHash('sha256').update(bytes).digest('hex');
+        if (record.hash && record.hash !== hash) {
+          // Detect replacement even if a writer managed to preserve the stat signature.
+          this.replace(record.entry.ref.file, record.signature, bytes.length, record);
+          this.notify();
+          throw Error(hostText('services.registeredImages.changed'));
+        }
+        let image: DecodedImage;
+        if (record.decoded)
+          image = {
+            width: record.entry.width,
+            height: record.entry.height,
+            thumbnail: record.entry.thumbnail,
+            circle: record.circle,
+          };
+        else {
+          decoding = true;
+          image = await this.validate(bytes, record.entry.ref.file);
+          decoding = false;
+        }
+        if ((await this.fileSignature(record.entry.ref.file)).signature !== record.signature) {
+          await this.refresh();
+          throw Error(hostText('services.registeredImages.changed'));
+        }
+        this.publish(record, image, hash);
+        return { ref: { ...record.entry.ref }, bytes, hash, generation: record.entry.generation! };
+      } catch (error) {
+        if (this.current(record)) {
+          record.entry.available = false;
+          record.entry.state = 'error';
+          if (!decoding) record.signature = '';
+          this.notify();
+        }
+        throw error;
+      }
+    };
+    const task = this.reads.then(run, run).finally(() => {
+      record.pending = undefined;
+    });
+    record.pending = task;
+    this.reads = task.then(
+      () => {},
+      () => {},
+    );
+    return task;
   }
   private async fileBytes(name: string) {
     if (!imageFilename(name)) throw Error(hostText('services.registeredImages.invalidFilename'));
@@ -126,8 +236,10 @@ export class RegisteredImages {
     options: { trash(file: string): Promise<void>; prepare(): () => void },
   ): Promise<void> {
     const run = async () => {
-      const original = await this.read(ref);
-      if (!generation || createHash('sha256').update(original.bytes).digest('hex') !== generation)
+      if (!imageReference(ref)) throw Error(hostText('services.registeredImages.invalidReference'));
+      const expectedHash = this.entries.get(imageKey(ref))?.hash;
+      const original = await this.read(ref, generation);
+      if (!generation || (expectedHash && expectedHash !== original.hash))
         throw Error(hostText('services.registeredImages.changed'));
       const commit = options.prepare();
       const file = path.join(this.directory, original.ref.file);
@@ -159,8 +271,7 @@ export class RegisteredImages {
       this.entries.delete(imageKey(original.ref));
       // A concurrent file-system writer may have restored this filename.
       await this.refresh();
-      this.changed();
-      for (const callback of this.listeners) callback();
+      this.notify();
     };
     const task = this.queue.then(run, run);
     this.queue = task.catch(() => {});
@@ -171,7 +282,7 @@ export class RegisteredImages {
     filename: string,
   ): Promise<{ ref: RegisteredImageRef; reused: boolean }> {
     const run = async () => {
-      await this.validate(bytes, filename);
+      const decoded = await this.validate(bytes, filename);
       await this.root(true);
       const files = (await fs.readdir(this.directory)).filter(imageFilename);
       const existing = files.find((n) => n.toLowerCase() === filename.toLowerCase());
@@ -204,6 +315,14 @@ export class RegisteredImages {
       // A scan already in progress may have enumerated the directory before this addition.
       if (this.refreshing) await this.refreshing;
       await this.refresh();
+      const record = this.entries.get(imageKey(ref));
+      if (
+        !record ||
+        !(await this.fileBytes(name)).equals(bytes) ||
+        (await this.fileSignature(name)).signature !== record.signature
+      )
+        throw Error(hostText('services.registeredImages.changed'));
+      this.publish(record, decoded, createHash('sha256').update(bytes).digest('hex'));
       return { ref, reused: false };
     };
     const task = this.queue.then(run, run);
@@ -251,7 +370,59 @@ export class RegisteredImages {
     const entry = this.entries.get(imageKey(ref));
     return shape === 'circle' ? entry?.circle : entry?.entry.thumbnail;
   }
-  refresh(): Promise<void> {
+  /** Only the consumer of this opaque asset starts a read, not model construction. */
+  asset(ref: unknown, shape = 'square') {
+    if (!imageReference(ref)) return undefined;
+    const record = this.entries.get(imageKey(ref));
+    if (!record) return undefined;
+    if (!record.entry.available) return this.icon(ref, shape) || undefined;
+    return {
+      key: `${imageKey(record.entry.ref)}:${record.entry.generation}:${shape}`,
+      load: async () => {
+        if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
+        if (!record.decoded) await this.read(record.entry.ref, record.entry.generation);
+        if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
+        return this.icon(record.entry.ref, shape) || undefined;
+      },
+    };
+  }
+  async preview(ref: unknown) {
+    await this.refresh();
+    const asset = this.asset(ref);
+    return typeof asset === 'string' ? asset : asset ? asset.load() : undefined;
+  }
+  contentHash(ref: RegisteredImageRef, generation: string) {
+    const record = this.entries.get(imageKey(ref));
+    return record && this.current(record) && record.entry.generation === generation && record.hash
+      ? record.hash
+      : undefined;
+  }
+  private replace(name: string, signature: string, bytes: number, old?: ImageRecord) {
+    const record: ImageRecord = {
+      signature,
+      hash: '',
+      circle: old?.circle ?? '',
+      decoded: false,
+      entry: {
+        ref: { file: name },
+        bytes,
+        width: old?.entry.width ?? 0,
+        height: old?.entry.height ?? 0,
+        thumbnail: old?.entry.thumbnail ?? '',
+        available: true,
+        state: 'ready',
+        generation: randomUUID(),
+      },
+    };
+    this.entries.set(name.toLowerCase(), record);
+    return record;
+  }
+  refresh(retry = false): Promise<void> {
+    if (this.stopped) return Promise.resolve();
+    if (retry && this.refreshing) return this.refreshing.then(() => this.refresh(true));
+    if (retry)
+      for (const record of this.entries.values())
+        if (record.entry.state === 'error') record.signature = '';
     if (this.refreshing) return this.refreshing;
     this.refreshing = this.scan().finally(() => {
       this.refreshing = undefined;
@@ -276,31 +447,15 @@ export class RegisteredImages {
         const key = f.name.toLowerCase();
         seen.add(key);
         try {
-          const stat = await fs.lstat(path.join(this.directory, f.name));
-          const signature = `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+          const { signature, bytes } = await this.fileSignature(f.name);
           const old = this.entries.get(key);
-          if (old?.signature === signature && old.entry.available) continue;
-          const bytes = await this.fileBytes(f.name),
-            ref = { file: f.name };
-          const decoded = await this.validate(bytes, f.name);
-          this.entries.set(key, {
-            signature,
-            hash: createHash('sha256').update(bytes).digest('hex'),
-            circle: decoded.circle,
-            entry: {
-              ref,
-              bytes: bytes.length,
-              width: decoded.width,
-              height: decoded.height,
-              thumbnail: decoded.thumbnail,
-              available: true,
-              state: 'ready',
-              generation: createHash('sha256').update(bytes).digest('hex'),
-            },
-          });
+          if (old?.signature === signature && (old.entry.available || old.entry.state === 'error'))
+            continue;
+          this.replace(f.name, signature, bytes, old);
         } catch {
           const old = this.entries.get(key);
           if (old) {
+            old.signature = '';
             old.entry.available = false;
             old.entry.state = 'error';
           } else
@@ -308,6 +463,7 @@ export class RegisteredImages {
               signature: '',
               hash: '',
               circle: '',
+              decoded: false,
               entry: {
                 ref: { file: f.name },
                 width: 0,
@@ -341,21 +497,20 @@ export class RegisteredImages {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         this.error = hostText('services.registeredImages.readFailed');
       for (const value of this.entries.values()) {
+        value.signature = '';
         value.entry.available = false;
         value.entry.state =
           (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'error';
       }
     }
-    if (previous !== signature()) {
-      this.changed();
-      for (const callback of this.listeners) callback();
-    }
+    if (previous !== signature()) this.notify();
   }
   watch() {
     this.timer ??= setInterval(() => void this.refresh(), 2000);
     this.timer.unref();
   }
   stop() {
+    this.stopped = true;
     clearInterval(this.timer);
     this.timer = undefined;
     this.watcher?.close();

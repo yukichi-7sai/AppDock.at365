@@ -18,9 +18,11 @@ export interface RegisteredImageEntry {
   height: number;
   bytes: number;
   thumbnail: string;
+  /** A safe, present file that can be requested; pixels are validated on first use. */
   available: boolean;
-  /** Optional richer status for gallery adapters; available retains its existing meaning. */
+  /** Optional richer status for gallery adapters. Unknown dimensions are zero until first use. */
   state?: 'ready' | 'missing' | 'error';
+  /** Opaque file-version token, not an image-content hash. */
   generation?: string;
 }
 export interface ImageLibrarySnapshot {

@@ -51,6 +51,26 @@ function fixture(overrides = {}) {
   };
 }
 
+test('deferred ribbon assets start loading only when their opaque asset is requested', async () => {
+  let loads = 0;
+  const f = fixture({
+    image: () => ({
+      key: 'deferred-image',
+      load: async () => {
+        loads++;
+        return 'data:image/png;base64,AA==';
+      },
+    }),
+  });
+  const view = f.ui.get();
+  assert.equal(loads, 0);
+  const id = view.items.find((item) => item.icon.assetId)?.icon.assetId;
+  assert(id);
+  assert(!JSON.stringify(view).includes('deferred-image'));
+  assert.deepEqual(await f.ui.getAsset(id), { dataUrl: 'data:image/png;base64,AA==' });
+  assert.equal(loads, 1);
+});
+
 function cachedFixture(expansion = 'persistent') {
   let settings = createDefaultSettings(),
     shell = '',

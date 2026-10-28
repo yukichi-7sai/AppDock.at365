@@ -428,7 +428,7 @@ const presentation = new UiPresentation({
   commands: () => ribbonInputs().commands,
   version: () => `${ribbonInputs().revision}:${ribbonImageRevision}`,
   dark: () => nativeTheme.shouldUseDarkColors,
-  image: (ref, shape) => registeredImages.icon(ref, shape),
+  image: (ref, shape) => registeredImages.asset(ref, shape),
   navigation,
   execute: executeCommand,
   theme: toggleTheme,
@@ -3032,7 +3032,8 @@ function registerIpc() {
     if (!entry?.available || !entry.generation || generation !== entry.generation)
       throw Error(hostText('services.index.imageChanged'));
     const source = await galleryImages.get(entry.ref, generation, edge);
-    if (registeredImages.entry(ref)?.generation !== generation)
+    const current = registeredImages.entry(ref);
+    if (!current?.available || current.generation !== generation)
       throw Error(hostText('services.index.imageChanged'));
     return source;
   });
@@ -3043,8 +3044,7 @@ function registerIpc() {
       const extension = path.extname(saved.ref.file).slice(1).toLowerCase();
       return `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${saved.bytes.toString('base64')}`;
     }
-    await registeredImages.refresh();
-    return registeredImages.icon(ref) ?? null;
+    return (await registeredImages.preview(ref)) ?? null;
   });
   handle('dock:imageLibrary:pick', (current) => imageLibraryHost.pick(current));
   handle('dock:imagePick:pending', () => imageLibraryHost.pendingRequest());

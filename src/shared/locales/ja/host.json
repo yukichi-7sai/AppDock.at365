@@ -360,7 +360,7 @@
   "settings.startup.phase.recovery": "起動状態の復旧確認",
   "settings.startup.phase.services": "本体サービスの構築",
   "settings.startup.phase.apply": "初期設定の反映",
-  "settings.startup.phase.images": "登録画像の読み込み・デコード",
+  "settings.startup.phase.images": "登録画像の一覧取得",
   "settings.startup.phase.window": "本体ウィンドウの作成",
   "settings.startup.phase.document": "本体ページの読み込み",
   "settings.startup.phase.discovery": "Appletの検出・manifest確認",

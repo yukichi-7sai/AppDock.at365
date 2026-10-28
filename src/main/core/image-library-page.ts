@@ -297,7 +297,7 @@ export class ImageLibraryPageSession implements HostPageController {
       s.resetView();
     } else if (action.command === 'more') s.count += 64;
     else if (action.command === 'reload') {
-      await this.options.host.images.refresh();
+      await this.options.host.images.refresh(true);
       s.error = '';
       for (const item of this.items.values()) item.assetId = randomUUID();
     } else {

@@ -205,9 +205,10 @@ export function ImageLibraryBrowser({
             id: imageKey(image.ref),
             assetId: `${imageKey(image.ref)}:${image.generation ?? ''}`,
             title: image.ref.file,
-            detail: image.available
-              ? `${image.width} × ${image.height}`
-              : translate('settings.registeredImagePicker.pending'),
+            detail:
+              image.width > 0
+                ? `${image.width} × ${image.height}`
+                : translate('services.imageLibraryPage.dimensionsUnavailable'),
             labels: snapshot.groups
               .filter((g) => g.images.some((ref) => imageKey(ref) === imageKey(image.ref)))
               .map((g) => g.name),
@@ -394,14 +395,21 @@ export function RegisteredImagePicker({
   );
 }
 export function RegisteredGalleryPreview({
-  entry,
+  entry: initialEntry,
   groups,
 }: {
   entry: RegisteredImageEntry;
   groups: ImageLibrarySnapshot['groups'];
 }) {
   const { t: translate } = useHostTranslation();
-  const api = useRegisteredImages();
+  const library = useImageLibrary();
+  const api = library.api;
+  const entry =
+    library.snapshot.images.find(
+      (image) =>
+        imageKey(image.ref) === imageKey(initialEntry.ref) &&
+        image.generation === initialEntry.generation,
+    ) ?? initialEntry;
   const labels = groups
     .filter((g) => g.images.some((ref) => imageKey(ref) === imageKey(entry.ref)))
     .map((g) => g.name);
@@ -411,7 +419,7 @@ export function RegisteredGalleryPreview({
         assetId: `${imageKey(entry.ref)}:${entry.generation ?? ''}`,
         title: entry.ref.file,
         state: entry.available ? 'ready' : (entry.state ?? 'missing'),
-        detail: `${entry.width} × ${entry.height} · ${entry.ref.file.split('.').at(-1)?.toUpperCase()} · ${(entry.bytes / 1024).toFixed(1)} KiB`,
+        detail: `${entry.width > 0 ? `${entry.width} × ${entry.height}` : translate('services.imageLibraryPage.dimensionsUnavailable')} · ${entry.ref.file.split('.').at(-1)?.toUpperCase()} · ${(entry.bytes / 1024).toFixed(1)} KiB`,
         labels: labels.length ? labels : [translate('settings.registeredImagePicker.ungrouped')],
       }}
       image={async () => {

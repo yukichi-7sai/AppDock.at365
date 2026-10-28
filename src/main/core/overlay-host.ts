@@ -48,7 +48,7 @@ export class OverlayHost {
       settings(provider: string): Record<string, unknown>;
       changed(): void;
       failed(message: string): void;
-      asset?(id: unknown): { dataUrl: string };
+      asset?(id: unknown): { dataUrl: string } | Promise<{ dataUrl: string }>;
     },
   ) {
     for (const region of ['overlay.command-palette'] as const)
