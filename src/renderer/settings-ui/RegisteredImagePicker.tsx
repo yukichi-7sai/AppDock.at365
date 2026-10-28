@@ -29,6 +29,32 @@ export function RegisteredImagesProvider({
   return <ImagesContext.Provider value={api}>{children}</ImagesContext.Provider>;
 }
 export const useRegisteredImages = () => useContext(ImagesContext);
+/** Each mounted image surface releases only its own host cache ownership. */
+function useImageSession(api: ImageLibraryApi | undefined) {
+  const owner = useRef<{ live: boolean; pending?: Promise<string> }>({ live: true });
+  useEffect(() => {
+    if (!owner.current.live) owner.current = { live: true };
+    return () => {
+      const closed = owner.current;
+      closed.live = false;
+      void closed.pending?.then((id) => api?.releaseImageSession(id)).catch(() => {});
+    };
+  }, [api]);
+  const session = async () => {
+    const current = owner.current;
+    if (!api || !current.live) throw Error(hostText('settings.registeredImagePicker.updated'));
+    current.pending ??= api.createImageSession();
+    const id = await current.pending;
+    if (!current.live) throw Error(hostText('settings.registeredImagePicker.updated'));
+    return id;
+  };
+  return {
+    preview: async (ref: RegisteredImageRef, original = false) =>
+      api!.preview(ref, original, await session()),
+    image: async (ref: RegisteredImageRef, generation: string, edge: number) =>
+      api!.galleryImage(ref, generation, edge, await session()),
+  };
+}
 export function useImageLibrary() {
   const api = useRegisteredImages();
   const [snapshot, setSnapshot] = useState<ImageLibrarySnapshot>({
@@ -76,6 +102,7 @@ export function RegisteredImagePreview({
 }) {
   const { t: translate } = useHostTranslation();
   const api = useRegisteredImages();
+  const images = useImageSession(api);
   const [url, setUrl] = useState<string | null>(null);
   const file = imageReference(value) ? value.file : '';
   useEffect(() => {
@@ -84,7 +111,7 @@ export function RegisteredImagePreview({
     const update = async () => {
       const current = ++generation;
       try {
-        const next = file ? await api?.preview({ file }, original) : null;
+        const next = file && api ? await images.preview({ file }, original) : null;
         if (live && current === generation) setUrl(next ?? null);
       } catch {
         if (live && current === generation) setUrl(null);
@@ -133,6 +160,7 @@ export function ImageLibraryBrowser({
 }) {
   const { t: translate } = useHostTranslation();
   const api = useRegisteredImages();
+  const imageSession = useImageSession(api);
   const [limit, setLimit] = useState(64);
   useEffect(() => setLimit(64), [group, query]);
   const images = new Map(snapshot.images.map((image) => [imageKey(image.ref), image]));
@@ -230,7 +258,7 @@ export function ImageLibraryBrowser({
               (image) => `${imageKey(image.ref)}:${image.generation ?? ''}` === assetId,
             );
             if (!item || !api) throw Error(translate('settings.registeredImagePicker.updated'));
-            return api.galleryImage(item.ref, item.generation ?? '', edge);
+            return imageSession.image(item.ref, item.generation ?? '', edge);
           },
           select: (id) => {
             if (!disabled && images.has(id)) onSelect(images.get(id)!.ref);
@@ -404,6 +432,7 @@ export function RegisteredGalleryPreview({
   const { t: translate } = useHostTranslation();
   const library = useImageLibrary();
   const api = library.api;
+  const imageSession = useImageSession(api);
   const entry =
     library.snapshot.images.find(
       (image) =>
@@ -423,7 +452,7 @@ export function RegisteredGalleryPreview({
         labels: labels.length ? labels : [translate('settings.registeredImagePicker.ungrouped')],
       }}
       image={async () => {
-        const source = await api?.preview(entry.ref, true);
+        const source = api ? await imageSession.preview(entry.ref, true) : null;
         if (!source) throw Error(translate('settings.registeredImagePicker.unreadable'));
         return source;
       }}

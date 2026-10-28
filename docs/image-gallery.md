@@ -23,6 +23,8 @@ CSSは`gallery.css`を読み込む。`.ad-gallery`配下と専用クラスへ限
 
 画像は可視領域と前後300pxで最大3要求を行い、元の正常画像を保持して次のdecode完了後に差し替える。画面外ではsrcと取得中の応答を失効させ、遅い応答で画像を再保持しない。再び表示範囲へ戻ったときに再取得する。512/1024/2048pxの選択は実カード幅とdevicePixelRatioによる。部品内で原画像の読み込み、保存、外部サービス呼出しを行わない。
 
+本体側の画像キャッシュの寿命も呼出元の画面へ結び付ける。管理ページのControllerは破棄時、画像選択・プレビュー・設定欄のReact adapterはunmount時に自己の画像sessionを解放する。最後の利用元がなくなった縮小画像、待機要求、遅れて完了した応答の扱いは[登録画像の寿命](registered-images.md#保存と参照)を正本とする。このsessionは信頼された本体renderer内部だけで使い、Applet/MCP APIへ公開しない。
+
 ## ビルドと配布
 
 `dev.bat pnpm run build:image-gallery`は`out/ui/image-gallery/`にES module、CSS、manifestを作る。通常のbuildにも含む。manifestは`apiVersion: 1`、本体版、出力ファイルと3つのソースのSHA256を持つ。

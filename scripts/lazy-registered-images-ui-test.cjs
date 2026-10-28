@@ -4,7 +4,7 @@ const fs = require('node:fs'),
   assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
-const { freePort } = require('./electron-main-helper.cjs');
+const { freePort, inspect } = require('./electron-main-helper.cjs');
 const { waitForHost } = require('./settings-host-helper.cjs');
 const { ribbonPage } = require('./shell-overlay-helper.cjs');
 const { copyHost } = require('./copy-host.cjs');
@@ -118,12 +118,13 @@ const until = async (fn, label) => {
   }
   throw Error(label + (last ? ': ' + last : ''));
 };
-let child, browser, host;
+let child, browser, host, inspector;
 const result = { success: false, profile, mode: source ? 'fixed' : 'source', checks: [] };
 (async () => {
   try {
     const port = await freePort(),
       env = { ...process.env };
+    inspector = await freePort();
     delete env.ELECTRON_RUN_AS_NODE;
     child = spawn(
       exe,
@@ -132,6 +133,7 @@ const result = { success: false, profile, mode: source ? 'fixed' : 'source', che
         `--test-profile=${profile}`,
         `--test-local-state=${path.join(profile, 'local')}`,
         `--remote-debugging-port=${port}`,
+        `--inspect=127.0.0.1:${inspector}`,
       ],
       { cwd: root, env, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] },
     );
@@ -151,6 +153,25 @@ const result = { success: false, profile, mode: source ? 'fixed' : 'source', che
     await waitForHost(
       host,
       async () => !!window.dock && (await window.dock.snapshot()).startupReady,
+    );
+    await inspect(
+      inspector,
+      `(() => {
+      const base = ${JSON.stringify(source ? null : root)} || process.resourcesPath + '/app.asar';
+      const require = process.getBuiltinModule('module').createRequire(base + '/package.json');
+      const type = require(base + '/out/main/main/core/gallery-images.js').GalleryImages;
+      const original = type.prototype.session;
+      globalThis.__imageCacheOwners = 0;
+      type.prototype.session = function () {
+        globalThis.__imageCacheUnderTest = this;
+        const session = original.call(this); let live = true;
+        globalThis.__imageCacheOwners++;
+        return { ...session, dispose() {
+          if (live) { live = false; globalThis.__imageCacheOwners--; }
+          session.dispose();
+        }};
+      };
+    })()`,
     );
     const snapshot = () => host.evaluate(() => window.dock.imageLibrary.snapshot());
     await until(
@@ -199,6 +220,123 @@ const result = { success: false, profile, mode: source ? 'fixed' : 'source', che
     assert.equal((await snapshot()).images.find((e) => e.ref.file === target.ref.file).width, 32);
     result.checks.push(
       'gallery loads visible cards and requested derivatives while unrequested files stay undecoded',
+    );
+    assert(
+      gallery.images
+        .filter((entry) => entry.ref.file.startsWith('z-unused'))
+        .every((entry) => !entry.thumbnail),
+    );
+    const retained = await host.evaluate(async () => {
+      const api = window.dock.imageLibrary;
+      const session = await api.createImageSession();
+      const item = (await api.snapshot()).images.find(
+        (entry) => entry.ref.file === 'z-unused-099.png',
+      );
+      await api.galleryImage(item.ref, item.generation, 512, session);
+      await api.releaseImageSession(session);
+      let rejected = false;
+      try {
+        await api.galleryImage(item.ref, item.generation, 512, session);
+      } catch {
+        rejected = true;
+      }
+      return rejected;
+    });
+    assert(retained, 'closed image sessions must reject late requests');
+    const current = await host.evaluate(() => window.dock.pages.get());
+    const oldAsset = current.content.items.find((item) => item.state === 'ready');
+    const cacheState = () =>
+      inspect(
+        inspector,
+        `({
+      cached: globalThis.__imageCacheUnderTest.cache.size,
+      bytes: globalThis.__imageCacheUnderTest.bytes,
+      pending: globalThis.__imageCacheUnderTest.pending.size,
+      owners: globalThis.__imageCacheOwners
+    })`,
+      );
+    assert((await cacheState()).cached > 0);
+    await host.locator('.ad-gallery-card').first().locator('.ad-gallery-image').click();
+    await host.getByRole('dialog').waitFor();
+    await until(async () => (await cacheState()).owners === 2, 'preview owner');
+    await host.getByRole('dialog').getByRole('button', { name: '閉じる', exact: true }).click();
+    await until(async () => (await cacheState()).owners === 1, 'preview owner released');
+    assert((await cacheState()).cached > 0, 'closing preview preserves the underlying gallery');
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
+    await until(
+      async () =>
+        !(await host.evaluate(() => window.dock.pages.get())) ||
+        (await host.evaluate(() => window.dock.pages.get())).id !== current.id,
+      'library closed',
+    );
+    await until(async () => {
+      const state = await cacheState();
+      return state.cached === 0 && state.bytes === 0 && state.pending === 0;
+    }, 'library host cache released');
+    const stale = await host.evaluate(
+      async ({ id, assetId }) => {
+        try {
+          await window.dock.pages.act({
+            id,
+            type: 'gallery',
+            command: 'image',
+            assetId,
+            edge: 512,
+          });
+          return false;
+        } catch {
+          return true;
+        }
+      },
+      { id: current.id, assetId: oldAsset.assetId },
+    );
+    assert(stale);
+    const baselineOwners = (await cacheState()).owners;
+    await host.evaluate(() => {
+      window.__cachePickResult = window.dock.imageLibrary.pick(null);
+    });
+    const picker = host.getByRole('dialog', { name: '画像を選択', exact: true });
+    await picker.waitFor();
+    await until(
+      async () =>
+        (await cacheState()).cached > 0 && (await cacheState()).owners === baselineOwners + 1,
+      'picker cache',
+    );
+    await picker.getByRole('button', { name: '拡大', exact: true }).first().click();
+    await until(
+      async () => (await cacheState()).owners === baselineOwners + 2,
+      'picker preview owner',
+    );
+    await host
+      .getByRole('dialog')
+      .last()
+      .getByRole('button', { name: '閉じる', exact: true })
+      .click();
+    await until(
+      async () => (await cacheState()).owners === baselineOwners + 1,
+      'picker preview released',
+    );
+    assert((await cacheState()).cached > 0);
+    await picker.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    assert.deepEqual(await host.evaluate(() => window.__cachePickResult), { cancelled: true });
+    await until(async () => {
+      const state = await cacheState();
+      return state.cached === 0 && state.bytes === 0 && state.owners === baselineOwners;
+    }, 'picker cache released');
+    result.checks.push(
+      'picker preview releases its owner while the picker remains open; cancelling the picker releases its cache and preserves the selection',
+    );
+    await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
+    await until(() => host.locator('.ad-gallery-card img[src]').count(), 'reopened gallery');
+    const reopened = await snapshot();
+    assert(
+      reopened.images
+        .filter((entry) => entry.ref.file.startsWith('z-unused'))
+        .every((entry) => !entry.thumbnail),
+    );
+    assert(reopened.images.find((entry) => entry.ref.file === 'a-visible.png').thumbnail);
+    result.checks.push(
+      'temporary thumbnails are not retained; released sessions and closed library reject late requests; reopening reloads images and preserves ribbon icons',
     );
     const webp = await host.evaluate(() => {
       const canvas = document.createElement('canvas');

@@ -49,8 +49,15 @@ export interface ImageLibraryApi {
   snapshot(): Promise<ImageLibrarySnapshot>;
   register(): Promise<RegisteredImageRef | null>;
   edit(operation: ImageLibraryEdit): Promise<void>;
-  preview(image: RegisteredImageRef, original?: boolean): Promise<string | null>;
-  galleryImage(image: RegisteredImageRef, generation: string, edge: number): Promise<string>;
+  createImageSession(): Promise<string>;
+  releaseImageSession(session: string): Promise<void>;
+  preview(image: RegisteredImageRef, original?: boolean, session?: string): Promise<string | null>;
+  galleryImage(
+    image: RegisteredImageRef,
+    generation: string,
+    edge: number,
+    session?: string,
+  ): Promise<string>;
   galleryView(): Promise<{ cardWidth: number; error: string }>;
   saveGalleryWidth(value: number): Promise<void>;
   pick(current?: RegisteredImageRef | null): Promise<ImagePickResult>;

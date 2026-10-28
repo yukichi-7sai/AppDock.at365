@@ -390,6 +390,11 @@ let hostPages: HostPages | undefined;
 let imageLibraryDialogs: ImageLibraryDialogs | undefined;
 let galleryViewState: GalleryViewStateStore;
 let galleryImages: GalleryImages;
+const rendererImageSessions = new Map<string, ReturnType<GalleryImages['session']>>();
+const releaseRendererImages = () => {
+  for (const session of rendererImageSessions.values()) session.dispose();
+  rendererImageSessions.clear();
+};
 let settingsPageHost: SettingsPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
 let ribbonState: RibbonState | undefined;
@@ -3027,18 +3032,37 @@ function registerIpc() {
       throw error;
     }
   });
-  handle('dock:imageLibrary:galleryImage', async (ref, generation, edge) => {
+  handle('dock:imageLibrary:createImageSession', () => {
+    const id = randomUUID();
+    rendererImageSessions.set(id, galleryImages.session());
+    return id;
+  });
+  handle('dock:imageLibrary:releaseImageSession', (id) => {
+    rendererImageSessions.get(id)?.dispose();
+    rendererImageSessions.delete(id);
+  });
+  const imageSession = (id: unknown) => {
+    const session = typeof id === 'string' ? rendererImageSessions.get(id) : undefined;
+    if (!session) throw Error(hostText('services.index.imageChanged'));
+    return session;
+  };
+  handle('dock:imageLibrary:galleryImage', async (ref, generation, edge, sessionId) => {
     const entry = registeredImages.entry(ref);
     if (!entry?.available || !entry.generation || generation !== entry.generation)
       throw Error(hostText('services.index.imageChanged'));
-    const source = await galleryImages.get(entry.ref, generation, edge);
+    const source = await (sessionId === undefined ? galleryImages : imageSession(sessionId)).get(
+      entry.ref,
+      generation,
+      edge,
+    );
     const current = registeredImages.entry(ref);
     if (!current?.available || current.generation !== generation)
       throw Error(hostText('services.index.imageChanged'));
     return source;
   });
-  handle('dock:imageLibrary:preview', async (ref, original = false) => {
+  handle('dock:imageLibrary:preview', async (ref, original = false, sessionId) => {
     if (!imageReference(ref)) throw Error(hostText('services.index.imageReference'));
+    if (sessionId !== undefined) return imageSession(sessionId).preview(ref, original === true);
     if (original === true) {
       const saved = await registeredImages.read(ref);
       const extension = path.extname(saved.ref.file).slice(1).toLowerCase();
@@ -4215,6 +4239,9 @@ async function initialize() {
   });
   window.webContents.on('did-start-loading', () => settingsPageHost?.dispose());
   window.webContents.on('render-process-gone', () => settingsPageHost?.dispose());
+  window.webContents.on('did-start-loading', releaseRendererImages);
+  window.webContents.on('render-process-gone', releaseRendererImages);
+  window.webContents.on('destroyed', releaseRendererImages);
   galleryViewState = new GalleryViewStateStore(
     path.join(dataDirectory, 'image-gallery-state.json'),
   );
@@ -4719,7 +4746,7 @@ async function runSmoke() {
       nativeImage.createFromPath(path.join(app.getAppPath(), 'assets', 'icon.png')).toPNG(),
       'smoke-image.png',
     );
-    const libraryUrl = registeredImages.icon(libraryImage);
+    const libraryUrl = await registeredImages.preview(libraryImage);
     const result = await window!.webContents.executeJavaScript(`(async () => {
       const s = await window.dock.snapshot();
       await window.dock.saveSettings({...s.settings.value, host: {...s.settings.value.host, theme: 'light'}}, s.settings.revision);
@@ -4827,6 +4854,7 @@ app.on('before-quit', (event) => {
   shellBarHost?.dispose();
   overlayHost?.dispose();
   hostPages?.dispose();
+  releaseRendererImages();
   settingsPageHost?.dispose();
   void (async () => {
     for (const stop of [

@@ -35,6 +35,49 @@ async function fixture(decoder = decoded) {
   return new RegisteredImages(path.join(directory, 'images'), decoder);
 }
 const ref = { file: 'flower.png' };
+test('temporary gallery reads keep metadata but release small pixels, while ribbon demand retains them', async () => {
+  const library = await fixture();
+  await fs.mkdir(library.directory, { recursive: true });
+  await fs.writeFile(path.join(library.directory, ref.file), bytes);
+  const read = await library.read(ref, undefined, { cachePreview: false });
+  assert.equal(read.thumbnail, decoded().thumbnail);
+  assert.equal(library.entry(ref).width, 320);
+  assert.equal(library.icon(ref), '');
+  assert.equal(library.icon(ref, 'circle'), '');
+  await library.asset(ref).load();
+  assert.equal(library.icon(ref), decoded().thumbnail);
+  await library.read(ref, undefined, { cachePreview: false });
+  assert.equal(library.icon(ref), decoded().thumbnail);
+});
+
+test('closing during original decode rejects late pixels without making the image unavailable', async () => {
+  let enter,
+    release,
+    live = true;
+  const started = new Promise((resolve) => {
+    enter = resolve;
+  });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const library = await fixture(async () => {
+    enter();
+    await gate;
+    return decoded();
+  });
+  await fs.mkdir(library.directory, { recursive: true });
+  await fs.writeFile(path.join(library.directory, ref.file), bytes);
+  const pending = assert.rejects(
+    library.read(ref, undefined, { cachePreview: false, active: () => live }),
+  );
+  await started;
+  live = false;
+  release();
+  await pending;
+  assert.equal(library.entry(ref).available, true);
+  assert.equal(library.icon(ref), '');
+  assert.equal((await library.read(ref)).thumbnail, decoded().thumbnail);
+});
 const groups = {
   groups: [
     { id: 'icons', name: 'アイコン', images: [ref] },
@@ -205,6 +248,7 @@ test('size, dimensions, extension mismatch, invalid bytes and RPC import limits 
 test('missing or incomplete images preserve references and recover without settings changes', async () => {
   const images = await fixture();
   await images.add(bytes, ref.file);
+  await images.preview(ref);
   await fs.unlink(path.join(images.directory, ref.file));
   await images.refresh();
   assert.equal(images.list()[0].available, false);

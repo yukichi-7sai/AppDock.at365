@@ -48,6 +48,7 @@ export class ImageLibraryPageSession implements HostPageController {
   readonly route = 'image-library';
   readonly id: string;
   private closed = false;
+  private imageSession: ReturnType<GalleryImages['session']>;
   private revision = 0;
   private signature = '';
   private items = new Map<
@@ -78,6 +79,7 @@ export class ImageLibraryPageSession implements HostPageController {
     )
       throw Error('Invalid image library page request');
     this.id = request.id;
+    this.imageSession = options.images.session();
     void options.host.images.refresh().catch(() => {});
   }
   private catalogue() {
@@ -252,7 +254,7 @@ export class ImageLibraryPageSession implements HostPageController {
       const value = [...this.items.values()].find((v) => v.assetId === action.assetId);
       if (!value?.entry.available || !value.entry.generation)
         throw Error(hostText('services.imageLibraryPage.missing'));
-      const result = await this.options.images.get(
+      const result = await this.imageSession.get(
         value.entry.ref,
         value.entry.generation,
         action.edge,
@@ -440,6 +442,8 @@ export class ImageLibraryPageSession implements HostPageController {
   }
   dispose() {
     this.closed = true;
+    this.imageSession.dispose();
+    this.items.clear();
     this.options.dialogs.cancel();
   }
 }

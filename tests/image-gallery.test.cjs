@@ -51,7 +51,7 @@ function fixture() {
   });
   const options = {
     host,
-    images: { get: async () => 'image-data' },
+    images: { session: () => ({ get: async () => 'image-data', dispose() {} }) },
     state,
     groups: () => value.groups,
     dialogs,

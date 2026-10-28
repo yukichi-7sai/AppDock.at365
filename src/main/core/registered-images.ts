@@ -24,13 +24,17 @@ interface ImageRecord {
   hash: string;
   circle: string;
   decoded: boolean;
-  pending?: Promise<ReadImage>;
+  pending?: {
+    task: Promise<ReadImage>;
+    interests: Set<{ active(): boolean; cachePreview: boolean }>;
+  };
 }
 interface ReadImage {
   ref: RegisteredImageRef;
   bytes: Buffer;
   hash: string;
   generation: string;
+  thumbnail: string;
 }
 const maxBytes = 5 * 1024 * 1024;
 export function imageFormat(bytes: Buffer) {
@@ -115,16 +119,22 @@ export class RegisteredImages {
       record.entry.available
     );
   }
-  private publish(record: ImageRecord, image: DecodedImage, hash: string) {
+  private publish(record: ImageRecord, image: DecodedImage, hash: string, cachePreview = true) {
     if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
-    const changed = !record.decoded || record.hash !== hash;
+    const changed =
+      record.hash !== hash ||
+      record.entry.width !== image.width ||
+      record.entry.height !== image.height ||
+      (cachePreview && !record.decoded);
     record.hash = hash;
-    record.circle = image.circle;
-    record.decoded = true;
+    if (cachePreview) {
+      record.circle = image.circle;
+      record.entry.thumbnail = image.thumbnail;
+      record.decoded = true;
+    }
     Object.assign(record.entry, {
       width: image.width,
       height: image.height,
-      thumbnail: image.thumbnail,
       available: true,
       state: 'ready',
     });
@@ -143,20 +153,47 @@ export class RegisteredImages {
       throw Error(hostText('services.registeredImages.unsafeFile'));
     return { signature: `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`, bytes: stat.size };
   }
-  async read(ref: unknown, generation?: string): Promise<ReadImage> {
+  async read(
+    ref: unknown,
+    generation?: string,
+    options: { active?(): boolean; cachePreview?: boolean } = {},
+  ): Promise<ReadImage> {
     if (!imageReference(ref)) throw Error(hostText('services.registeredImages.invalidReference'));
+    const interest = {
+      active: options.active ?? (() => true),
+      cachePreview: options.cachePreview !== false,
+    };
+    const checkInterest = () => {
+      if (!interest.active()) throw Error(hostText('services.registeredImages.changed'));
+    };
+    checkInterest();
     await this.refresh();
+    checkInterest();
     const record = this.entries.get(imageKey(ref));
     if (!record || !this.current(record))
       throw Error(hostText('services.registeredImages.missing'));
     if (generation !== undefined && generation !== record.entry.generation)
       throw Error(hostText('services.registeredImages.changed'));
-    if (record.pending) return record.pending;
+    const reply = (task: Promise<ReadImage>) =>
+      task.then((result) => {
+        checkInterest();
+        return result;
+      });
+    if (record.pending && [...record.pending.interests].some((value) => value.active())) {
+      record.pending.interests.add(interest);
+      return reply(record.pending.task);
+    }
+    const interests = new Set([interest]);
+    const active = () => [...interests].some((value) => value.active());
+    const check = () => {
+      if (!active() || !this.current(record))
+        throw Error(hostText('services.registeredImages.changed'));
+    };
     const run = async (): Promise<ReadImage> => {
-      if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
+      check();
       // Let the requesting surface paint its normal fallback before doing pixel work.
       await new Promise<void>((resolve) => setImmediate(resolve));
-      if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
+      check();
       let decoding = false;
       try {
         await this.root();
@@ -164,7 +201,9 @@ export class RegisteredImages {
           await this.refresh();
           throw Error(hostText('services.registeredImages.changed'));
         }
+        check();
         const bytes = await this.fileBytes(record.entry.ref.file);
+        check();
         const hash = createHash('sha256').update(bytes).digest('hex');
         if (record.hash && record.hash !== hash) {
           // Detect replacement even if a writer managed to preserve the stat signature.
@@ -189,10 +228,22 @@ export class RegisteredImages {
           await this.refresh();
           throw Error(hostText('services.registeredImages.changed'));
         }
-        this.publish(record, image, hash);
-        return { ref: { ...record.entry.ref }, bytes, hash, generation: record.entry.generation! };
+        check();
+        this.publish(
+          record,
+          image,
+          hash,
+          [...interests].some((value) => value.active() && value.cachePreview),
+        );
+        return {
+          ref: { ...record.entry.ref },
+          bytes,
+          hash,
+          generation: record.entry.generation!,
+          thumbnail: image.thumbnail,
+        };
       } catch (error) {
-        if (this.current(record)) {
+        if (active() && this.current(record)) {
           record.entry.available = false;
           record.entry.state = 'error';
           if (!decoding) record.signature = '';
@@ -202,14 +253,14 @@ export class RegisteredImages {
       }
     };
     const task = this.reads.then(run, run).finally(() => {
-      record.pending = undefined;
+      if (record.pending?.task === task) record.pending = undefined;
     });
-    record.pending = task;
+    record.pending = { task, interests };
     this.reads = task.then(
       () => {},
       () => {},
     );
-    return task;
+    return reply(task);
   }
   private async fileBytes(name: string) {
     if (!imageFilename(name)) throw Error(hostText('services.registeredImages.invalidFilename'));
@@ -321,7 +372,7 @@ export class RegisteredImages {
         (await this.fileSignature(name)).signature !== record.signature
       )
         throw Error(hostText('services.registeredImages.changed'));
-      this.publish(record, decoded, createHash('sha256').update(bytes).digest('hex'));
+      this.publish(record, decoded, createHash('sha256').update(bytes).digest('hex'), false);
       return { ref, reused: false };
     };
     const task = this.queue.then(run, run);
