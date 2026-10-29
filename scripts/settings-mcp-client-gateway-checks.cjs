@@ -32,10 +32,10 @@ module.exports = async ({ page, client, profile, local, secretId, checks, tool, 
     cipher = JSON.parse(secretBytes).entries[secretId].secret;
   const schema = await value('appdock_settings_get_schema', { targetId });
   assert.equal(schema.kind, 'list');
-  assert.equal(schema.maxItems, 32);
+  assert.equal(schema.maxItems, undefined);
   assert.equal(
     schema.items.find((field) => field.key === 'connection.publishedTools').inputSchema.maxItems,
-    512,
+    undefined,
   );
   const protectedRow = await row(secretId);
   assert.equal(protectedRow.removable, false);

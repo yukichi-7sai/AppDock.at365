@@ -124,8 +124,8 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     'TTS UI saved 1000 manual voices',
   );
   const schema = await value('appdock_settings_get_schema', { targetId });
-  assert.equal(schema.maxItems, 1000);
-  assert.equal(schema.operationSchemas.reorder.properties.itemRefs.maxItems, 1000);
+  assert.equal(schema.maxItems, undefined);
+  assert.equal(schema.operationSchemas.reorder.properties.itemRefs.maxItems, undefined);
   rows = [];
   let cursor, firstCursor;
   do {
@@ -155,15 +155,8 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
       .structuredContent.code,
     'REVISION_CONFLICT',
   );
-  assert.equal(
-    (
-      await tool(
-        'appdock_settings_apply',
-        await request([{ kind: 'add', values: { id: 'v1000' } }]),
-      )
-    ).structuredContent.code,
-    'INVALID_ARGUMENT',
-  );
+  assert.equal((await apply([{ kind: 'add', values: { id: 'v1000' } }])).changed, true);
+  assert.equal(JSON.parse(fs.readFileSync(sharedFile)).tts.manualVoices.length, 1001);
   await manual.fill('[]');
   await manual.press('Tab');
   await until(async () => (await items()).items.length === 0, 'TTS JSON UI cleared candidates');
@@ -176,6 +169,6 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   assert.deepEqual(fs.readFileSync(keyFile), cipher);
   assert.equal(JSON.stringify((await client.listTools()).tools), tools);
   checks.push(
-    'TTS manual list 1000-row pagination and real MCP full reorder fit the fixed transport; upper bound, empty-default compaction and tool definitions stay consistent',
+    'TTS manual list pagination and real MCP full reorder fit the fixed transport; adding beyond the former 1000-row limit, empty-default compaction and tool definitions stay consistent',
   );
 };

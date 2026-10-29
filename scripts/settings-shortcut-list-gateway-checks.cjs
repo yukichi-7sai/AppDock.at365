@@ -76,7 +76,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   });
   assert.deepEqual(target.operations, ['add', 'update', 'remove', 'reorder']);
   const definition = await schema();
-  assert.equal(definition.maxItems, 32);
+  assert.equal(definition.maxItems, undefined);
   assert.deepEqual(
     definition.items.map((field) => [field.key, field.writable]),
     [

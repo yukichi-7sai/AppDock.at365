@@ -163,14 +163,10 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
   ]);
   assert.equal((await vals(notification.targetId)).durationSeconds, 7);
   assert.equal(
-    (
-      await tool(
-        'appdock_settings_apply',
-        await request(notification.targetId, [{ kind: 'set', changes: { targets: [] } }]),
-      )
-    ).structuredContent.code,
-    'INVALID_ARGUMENT',
+    (await apply(notification.targetId, [{ kind: 'set', changes: { targets: [] } }])).completion,
+    'settingsSaved',
   );
+  assert.deepEqual((await vals(notification.targetId)).targets, []);
   await apply(notification.targetId, [
     { kind: 'reset', keys: ['targets', 'durationSeconds', 'mcpEvents'] },
   ]);

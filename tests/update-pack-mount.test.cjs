@@ -156,10 +156,8 @@ test(
     }
     fs.writeFileSync(job + '.commit', 'apply');
     assert.equal(await exited, 0, output);
-    assert.equal(
-      JSON.parse(fs.readFileSync(path.join(installed, 'data', 'update-result.json'))).ok,
-      true,
-    );
+    const result = JSON.parse(fs.readFileSync(path.join(installed, 'data', 'update-result.json')));
+    assert.equal(result.ok, true, JSON.stringify(result));
     assert.equal(invoke('--recover', installed).status, 0);
   },
 );

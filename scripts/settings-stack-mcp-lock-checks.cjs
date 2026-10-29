@@ -58,11 +58,7 @@ exports.check = async ({ page, profile, checks }) => {
   );
   await page.getByTestId('settings-nav:command-triggers').click();
   await page.getByTestId('command-trigger-tab:gestures').click();
-  await page
-    .getByTestId('trigger-stack-table')
-    .getByRole('button', { name: /を編集$/ })
-    .first()
-    .click();
+  await page.getByTestId('trigger-stacks:gestures:list:edit:move-up').click();
   dialog = page.getByTestId('settings-dialog');
   await dialog.getByTestId('stack-execution-mode').waitFor();
   assert.equal(await dialog.locator('[data-mcp-lock]').count(), 0);
@@ -72,11 +68,8 @@ exports.check = async ({ page, profile, checks }) => {
     'Trigger-stack identity, execution mode and conditions inherit the existing public input API in command-trigger tabs',
   );
   await page.getByTestId('settings-nav:gestures').click();
-  await page
-    .getByTestId('trigger-stack-table')
-    .getByRole('button', { name: /を編集$/ })
-    .first()
-    .click();
+  await page.getByTestId('gesture-settings-tab:triggers').click();
+  await page.getByTestId('trigger-stacks:gestures:list:edit:move-up').click();
   dialog = page.getByTestId('settings-dialog');
   await dialog.getByTestId('stack-execution-mode').waitFor();
   assert.equal(await dialog.locator('[data-mcp-lock]').count(), 0);

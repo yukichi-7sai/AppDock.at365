@@ -22,8 +22,10 @@ internal static partial class Program
                 new[] { "", "Ctrl+", "Alt+", "Shift+", "Ctrl+Alt+", "Ctrl+Shift+", "Alt+Shift+", "Ctrl+Alt+Shift+" }
                     .Select(prefix => new { id = key + prefix, command = "fixture", gesture = "key:" + prefix + key,
                         title = "fixture", window = "", when = new { scope = "global", appletIds = Array.Empty<string>(), processes = Array.Empty<string>() } }));
-            Set("candidates", JsonSerializer.Deserialize(JsonSerializer.Serialize(rows), binding.MakeArrayType(),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!);
+            type.GetMethod("SetCandidates", members)!.Invoke(engine, [
+                JsonSerializer.Deserialize(JsonSerializer.Serialize(rows), binding.MakeArrayType(),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!
+            ]);
             Set("busy", true); // Prevent command execution; exercise capture/release state only.
             Set("ready", true);
             var keyboard = type.GetMethod("Keyboard", members)!;

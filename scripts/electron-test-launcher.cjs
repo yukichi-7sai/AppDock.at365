@@ -2,8 +2,8 @@
 const { spawn } = require('node:child_process');
 const { _electron: electron, chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
-async function launchTestHost({ executablePath, portable, args, env }) {
-  if (!portable) return electron.launch({ executablePath, args, env });
+async function launchTestHost({ executablePath, portable, mainInspector = false, args, env }) {
+  if (!portable && !mainInspector) return electron.launch({ executablePath, args, env });
   const port = await freePort(),
     mainPort = await freePort();
   const child = spawn(

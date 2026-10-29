@@ -75,7 +75,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   await page.getByRole('button', { name: 'MCP gallery groupの操作', exact: true }).click();
   await page
     .locator('.library-group-menu')
-    .getByRole('button', { name: '名前を変更', exact: true })
+    .getByRole('menuitem', { name: '名前を変更', exact: true })
     .click();
   let dialog = page.getByRole('dialog', { name: '画像グループの名前を変更', exact: true });
   await dialog.waitFor();
@@ -214,7 +214,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
   await page.getByRole('button', { name: 'MCP added groupの操作', exact: true }).click();
   await page
     .locator('.library-group-menu')
-    .getByRole('button', { name: 'グループを削除', exact: true })
+    .getByRole('menuitem', { name: 'グループを削除', exact: true })
     .click();
   dialog = page.getByRole('dialog', { name: '画像グループを削除', exact: true });
   await dialog.getByRole('button', { name: '削除', exact: true }).click();

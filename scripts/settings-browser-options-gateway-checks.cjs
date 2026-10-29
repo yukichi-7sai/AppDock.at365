@@ -34,7 +34,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     ai = fs.readFileSync(path.join(local, 'ai-keys.json')),
     tts = fs.readFileSync(path.join(local, 'tts-key.json'));
   assert.equal(browser.inputSchema.type, 'array');
-  assert.equal(browser.inputSchema.maxItems, 100);
+  assert.equal(browser.inputSchema.maxItems, undefined);
   const changes = { browsers: [' EDGE.EXE ', 'edge'], requireChromiumWindowClass: true };
   const preview = await set(changes, true);
   assert.equal(preview.completion, 'validated');
@@ -55,12 +55,16 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     if (JSON.stringify(options.browsers) !== JSON.stringify(['edge']))
       fs.writeFileSync(
         path.join(profile, 'browser-reader-divergence.json'),
-        JSON.stringify({
-          method: name,
-          legacy: options,
-          common: (await read()).fields,
-          stored: JSON.parse(fs.readFileSync(sharedFile, 'utf8')).commandTriggerOptions,
-        }, null, 2),
+        JSON.stringify(
+          {
+            method: name,
+            legacy: options,
+            common: (await read()).fields,
+            stored: JSON.parse(fs.readFileSync(sharedFile, 'utf8')).commandTriggerOptions,
+          },
+          null,
+          2,
+        ),
       );
     assert.deepEqual(options.browsers, ['edge'], name);
     assert.equal(options.requireChromiumWindowClass, true);
@@ -117,14 +121,11 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     'All three native feature pages render the same declarations and values; native input/toggle saves reach MCP, stale requests fail and bindings and other settings remain unchanged',
   );
 
-  const names = Array.from({ length: 100 }, (_, index) => `browser${index}.EXE`);
+  const names = Array.from({ length: 101 }, (_, index) => `browser${index}.EXE`);
   await set({ browsers: names });
-  assert.equal(field(await read(), 'browsers').value.length, 100);
+  assert.equal(field(await read(), 'browsers').value.length, 101);
   const beforeInvalid = fs.readFileSync(sharedFile);
-  for (const invalid of [
-    { browsers: [...names, 'extra'] },
-    { browsers: ['C:/browser.exe'], requireChromiumWindowClass: true },
-  ])
+  for (const invalid of [{ browsers: ['C:/browser.exe'], requireChromiumWindowClass: true }])
     assert.equal(
       (await tool('appdock_settings_apply', await request([{ kind: 'set', changes: invalid }])))
         .structuredContent.code,
@@ -139,7 +140,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   assert.equal(field(await read(), 'browsers').inherited, true);
   assert.equal(JSON.parse(fs.readFileSync(sharedFile)).commandTriggerOptions, undefined);
   checks.push(
-    'Shared browser arrays preserve the existing 100-name limit and explicit empty value; invalid late fields are atomic and normalized defaults remove the saved override',
+    'Shared browser arrays accept names beyond the former 100-name limit and preserve explicit empty values; invalid late fields are atomic and normalized defaults remove the saved override',
   );
 
   await set(changes);
@@ -157,7 +158,8 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     path.join(profile, 'browser-options-mcp.json'),
     JSON.stringify(
       {
-        maxItems: 100,
+        fixedItemLimit: false,
+        testedItems: names.length,
         pages: 3,
         resetInherited: true,
         executeAllowed: false,
