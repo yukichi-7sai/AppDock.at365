@@ -91,9 +91,9 @@ Git worktreeでは`node_modules`を元の作業ツリーへのjunctionとして�
 
 Node.jsを含む通常のパッケージ更新は、下記の`.\update-packages.bat`を使います。pnpmの更新や固定版への切り戻しは、`toolchain.json`の完全なバージョン番号を変更してから`.\setup-tools.bat`を再実行します。両ツールの取得・動作確認が成功した後にだけ利用バージョンを切り替えます。以前のバージョンは`.tools/node/<version>`と`.tools/pnpm/<version>`に残します。winget等の更新対象にはなりません。更新後は`.\dev.bat run typecheck`、影響範囲の回帰、`.\publish.bat`で確認してください。
 
-現在の固定ツールはNode.js 24.22.1（24 LTS）とpnpm 12.10.1です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。
+現在の固定ツールはNode.js 26.13.0（26 LTS）とpnpm 12.15.0です。pnpm 12はネイティブEXEになったため、setupはnpmで依存のスクリプトを無効にして取得した後、pnpm自身の公式`install.js`だけを実行し、Windowsの起動用shimを再生成します。初回取得・再実行・古いpnpmへの切り戻しもプロジェクト内で完結します。グローバルのツールやPATHは変更しません。
 
-Electron 45.0.0はバイナリを初回実行時に取得するため、[公式手順](https://www.electronjs.org/docs/latest/tutorial/installation)の`install-electron`をプロジェクトの`postinstall`で明示実行します。pnpmが変更なしのインストールを省略する場合、バイナリが必要なら次を実行してください。
+Electron 45.1.0はバイナリを初回実行時に取得するため、[公式手順](https://www.electronjs.org/docs/latest/tutorial/installation)の`install-electron`をプロジェクトの`postinstall`で明示実行します。pnpmが変更なしのインストールを省略する場合、バイナリが必要なら次を実行してください。
 
 ```powershell
 .\dev.bat run postinstall
@@ -115,7 +115,7 @@ ElectronとNode.jsは公開後7日の待機対象から恒久的に除外しま�
 
 ElectronとNode以外の公開後待機の例外は完全版指定とし、依存更新時に必要性を確認します。`minimumReleaseAgeExcludePrune: true`でlockfileから消えた版の例外を整理します。Electronのパッケージ全体の免除は恒久設定として残します。導入済みの固定pnpmは再利用し、新規取得には待機条件を適用します。
 
-Node.jsは`toolchain.json`で完全な版を固定し、`nodeChannel: "lts"`を維持します。現在の24.22.1はKrypton LTSです。更新時は公式の`dist/index.json`から最新LTSを数値で比較して選び、新規取得前にも対象版のLTS表示と公開日を確認します。待機日数だけを免除し、公式SHA256照合と実行ファイルのLTS表示・版の確認は維持します。通常setupは指定された固定版を再利用します。
+Node.jsは`toolchain.json`で完全な版を固定し、`nodeChannel: "lts"`を維持します。現在の26.13.0はLithium LTSです。更新時は公式の`dist/index.json`から最新LTSを数値で比較して選び、新規取得前にも対象版のLTS表示と公開日を確認します。待機日数だけを免除し、公式SHA256照合と実行ファイルのLTS表示・版の確認は維持します。通常setupは指定された固定版を再利用します。
 
 pnpm本体はnpmで導入するため、workspace設定だけでは保護されません。setupは公式npmレジストリで固定版のpnpmとWindows x64ネイティブパッケージの公開日時を確認し、npmにも`--min-release-age=7`を渡します。新規取得でメタデータの取得・検証に失敗したら停止します。導入済みの固定ツールは再利用し、通常ビルドのたびにツール公開情報を取得しません。
 

@@ -8,7 +8,12 @@ minimumReleaseAgeExcludePrune: true
 # Runtime updates use the latest stable Electron without a release-age delay.
 minimumReleaseAgeExclude:
   - 'electron'
+  # CVE-2026-111181: fixed 2.4.0 only; eligible without this exception after 2026-10-29 11:39:38.614 UTC.
+  - 'body-parser@2.4.0'
 verifyDepsBeforeRun: error
 allowBuilds:
   electron: true
   electron-winstaller: false
+# CVE-2026-111181: replace the retained vulnerable transitive version with the compatible fixed release.
+overrides:
+  'body-parser@2.3.0': '2.4.0'
