@@ -76,7 +76,10 @@ export class GestureIndicatorHost {
     const next = { x, y, width, height };
     if (JSON.stringify(this.window!.getBounds()) !== JSON.stringify(next))
       this.window!.setBounds(next, false);
-    if (!this.window!.isVisible()) this.window!.showInactive();
+    if (!this.window!.isVisible()) {
+      this.window!.showInactive();
+      this.window!.setAlwaysOnTop(true, 'pop-up-menu');
+    }
   };
   async initialize() {
     let timer: ReturnType<typeof setTimeout> | undefined;

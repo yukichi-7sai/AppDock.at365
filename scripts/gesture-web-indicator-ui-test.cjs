@@ -68,7 +68,8 @@ let app, child;
 const checks = [];
 const portable = process.argv.includes('--portable');
 const desktopOnly = process.argv.includes('--desktop-only');
-const groups = desktopOnly ? 2 : 10;
+const topmostOnly = process.argv.includes('--topmost-only');
+const groups = desktopOnly ? 2 : topmostOnly ? 9 : 11;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 let artifactHash;
 (async () => {
@@ -134,9 +135,16 @@ let artifactHash;
     );
     for (const variant of desktopOnly
       ? ['desktop', 'exe']
-      : ['pill', 'compact', 'ring', 'classic', ...(theme === 'dark' ? ['desktop', 'exe'] : [])]) {
+      : [
+          'pill',
+          'compact',
+          'ring',
+          'classic',
+          ...(theme === 'dark' ? [...(topmostOnly ? [] : ['desktop', 'exe']), 'external'] : []),
+        ]) {
       const desktop = variant === 'desktop' || variant === 'exe';
-      const style = desktop ? 'pill' : variant;
+      const external = variant === 'external';
+      const style = desktop || external ? 'pill' : variant;
       await main.evaluate(
         async ({ style, desktop, scope }) => {
           const s = await window.dock.snapshot();
@@ -158,7 +166,11 @@ let artifactHash;
       child = spawn(
         path.join(root, 'tests/InputTests/bin/Release/net10.0-windows/AppDock.InputTests.exe'),
         [
-          desktop ? '--desktop-indicator-stages' : '--indicator-stages',
+          desktop
+            ? '--desktop-indicator-stages'
+            : external
+              ? '--external-indicator-stages'
+              : '--indicator-stages',
           handles.host,
           handles.overlay,
           exchange,
@@ -176,6 +188,7 @@ let artifactHash;
             : reject(Error(childOutput || 'mouse stage helper failed ' + code)),
         );
       });
+      void completion.catch(() => {});
       let first;
       try {
         for (const stage of ['one', 'two']) {
@@ -185,11 +198,25 @@ let artifactHash;
           );
           const state = JSON.parse(fs.readFileSync(path.join(exchange, stage + '.json'), 'utf8'));
           assert.equal(state.targetMatched, true, 'gesture target retains foreground');
-          if (!desktop) assert.equal(String(state.foreground), handles.host, 'foreground retained');
+          if (!desktop) {
+            assert.equal(String(state.foreground), String(state.target), 'foreground retained');
+            assert.equal(state.external, external);
+            assert.equal(state.targetTopmost, true, 'isolated target is topmost');
+            assert.equal(state.overlayAboveTarget, true, 'overlay is above the topmost target');
+            if (external) {
+              assert.equal(state.externalTopmost, true, 'competing native window is topmost');
+              assert.equal(
+                state.overlayAboveExternal,
+                true,
+                'overlay is above the other process window',
+              );
+            }
+          }
+          assert.equal(state.overlayDemotedBeforeStart, true);
           assert.equal(
-            state.overlayFlags & 0x080000a0,
-            0x080000a0,
-            'transparent, no-activate and tool-window flags',
+            state.overlayFlags & 0x080000a8,
+            0x080000a8,
+            'topmost is restored with transparent, no-activate and tool-window flags',
           );
           await until(
             () =>
@@ -308,7 +335,7 @@ let artifactHash;
         'overlay hides after release',
       );
       checks.push(
-        `${theme}/${variant}: actual mouse input / 1-to-2 direction update / ordered captions / transparent no-focus overlay / release hides`,
+        `${theme}/${variant}: actual mouse input / topmost recovery and native z-order / 1-to-2 direction update / ordered captions / transparent no-focus overlay / release hides`,
       );
     }
   }

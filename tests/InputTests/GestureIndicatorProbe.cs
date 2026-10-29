@@ -6,27 +6,57 @@ using System.Windows.Forms;
 internal static partial class Program
 {
     // Mouse-only handshake lets the browser test inspect a live gesture before release.
-    private static int RunIndicatorStages(string targetText, string overlayText, string exchange, bool desktop = false)
+    private static int RunIndicatorStages(string targetText, string overlayText, string exchange, bool desktop = false, bool external = false)
     {
         var original=Cursor.Position;
+        using var externalWindow=external?new Probe { Text="AppDock isolated topmost competitor",Inactive=true,StartPosition=FormStartPosition.Manual,Size=new(160,100) }:null;
+        var source=new nint(long.Parse(targetText));
+        var sourceWasTopmost=false;
+        var promoted=false;
+        void Pause(int milliseconds) {
+            var until=Environment.TickCount64+milliseconds;
+            do {Application.DoEvents();Thread.Sleep(5);}while(Environment.TickCount64<until);
+        }
         try
         {
-            var target=new nint(long.Parse(targetText));
-            var source=target;
+            var target=source;
             var overlay=new nint(long.Parse(overlayText));
+            if(IsWindowVisible(overlay))throw new Exception("Indicator must be hidden before its topmost state is removed.");
+            if(!SetIndicatorWindowPos(overlay,new nint(-2),0,0,0,0,0x13) || (GetIndicatorWindowLong(overlay,-20)&8)!=0)
+                throw new Exception("Could not remove the hidden indicator's topmost state.");
+            if(!desktop){
+                sourceWasTopmost=(GetIndicatorWindowLong(source,-20)&8)!=0;
+                if(!SetIndicatorWindowPos(source,new nint(-1),0,0,0,0,0x13))throw new Exception("Could not promote the isolated gesture target.");
+                promoted=true;
+            }
             var deadline=Environment.TickCount64+2000;
-            do {FocusWindow(target);Thread.Sleep(40);} while(GetForegroundWindow()!=target && Environment.TickCount64<deadline);
+            do {FocusWindow(target);Pause(40);} while(GetForegroundWindow()!=target && Environment.TickCount64<deadline);
             if(GetForegroundWindow()!=target)throw new Exception("Indicator target did not become foreground.");
             GetWindowRect(target,out var bounds);
             var sourcePoint=new System.Drawing.Point(bounds.Left+80,bounds.Top+200);
             Cursor.Position=new((bounds.Left+bounds.Right)/2,(bounds.Top+bounds.Bottom)/2);
+            if(externalWindow!=null){
+                externalWindow.Location=new(Cursor.Position.X+50,Cursor.Position.Y+10);
+                externalWindow.Show();
+                if(!SetIndicatorWindowPos(externalWindow.Handle,new nint(-1),0,0,0,0,0x13))throw new Exception("Could not promote the isolated competing window.");
+                Application.DoEvents();
+            }
             if(desktop){
                 var point=DesktopIndicatorPoint()??throw new Exception("No desktop surface is available for the two-stage gesture.");
                 Cursor.Position=point;target=AppDock.InputHost.GestureTarget.At(new(point.X,point.Y));
             }
-            Thread.Sleep(80);
+            Pause(80);
+            bool Above(nint other) {
+                for(var window=GetIndicatorWindow(other,3);window!=0;window=GetIndicatorWindow(window,3))
+                    if(window==overlay)return true;
+                return false;
+            }
             void Stage(string name)
             {
+                var visibleUntil=Environment.TickCount64+2000;
+                while((!IsWindowVisible(overlay) || (GetIndicatorWindowLong(overlay,-20)&8)==0 || !Above(target) || externalWindow!=null && !Above(externalWindow.Handle))
+                    && Environment.TickCount64<visibleUntil)Pause(10);
+                if(!IsWindowVisible(overlay))throw new Exception("Indicator did not appear: "+InputFocusDiagnostic());
                 var sourceUncovered=GetAncestor(WindowFromPoint(sourcePoint),2)==source;
                 if(desktop&&!sourceUncovered)throw new Exception("Desktop activation covered the source window.");
                 File.WriteAllText(Path.Combine(exchange,name+".json"),JsonSerializer.Serialize(new {
@@ -35,26 +65,36 @@ internal static partial class Program
                     sourceUncovered,
                     desktop,centerX=(Screen.FromPoint(Cursor.Position).Bounds.Left+Screen.FromPoint(Cursor.Position).Bounds.Right)/2,
                     centerY=(Screen.FromPoint(Cursor.Position).Bounds.Top+Screen.FromPoint(Cursor.Position).Bounds.Bottom)/2,
-                    overlayFlags=overlay==0?0:GetIndicatorWindowLong(overlay,-20)
+                    overlayFlags=overlay==0?0:GetIndicatorWindowLong(overlay,-20),
+                    overlayAboveTarget=Above(target),
+                    overlayAboveExternal=externalWindow==null || Above(externalWindow.Handle),
+                    externalTopmost=externalWindow!=null && (GetIndicatorWindowLong(externalWindow.Handle,-20)&8)!=0,
+                    targetTopmost=(GetIndicatorWindowLong(source,-20)&8)!=0,
+                    overlayDemotedBeforeStart=true,external
                 }));
                 var until=Environment.TickCount64+15000;
-                while(!File.Exists(Path.Combine(exchange,name+".continue")) && Environment.TickCount64<until)Thread.Sleep(10);
+                while(!File.Exists(Path.Combine(exchange,name+".continue")) && Environment.TickCount64<until)Pause(10);
                 if(Environment.TickCount64>=until)throw new Exception("Indicator stage timed out: "+name);
                 if(!AppDock.InputHost.GestureTarget.Matches(target,GetForegroundWindow()))throw new Exception("Indicator stole or lost the gesture target focus.");
             }
-            Mouse(8);Thread.Sleep(80);
+            if(desktop)DismissDesktopContextMenu().GetAwaiter().GetResult();
+            Mouse(8);Pause(80);
             if(desktop){
                 deadline=Environment.TickCount64+2000;
-                while(!AppDock.InputHost.GestureTarget.Matches(target,GetForegroundWindow())&&Environment.TickCount64<deadline)Thread.Sleep(10);
+                while(!AppDock.InputHost.GestureTarget.Matches(target,GetForegroundWindow())&&Environment.TickCount64<deadline)Pause(10);
             }
-            Cursor.Position=new(Cursor.Position.X+85,Cursor.Position.Y);Thread.Sleep(120);Stage("one");
-            Cursor.Position=new(Cursor.Position.X,Cursor.Position.Y-85);Thread.Sleep(120);Stage("two");
-            Mouse(16);Thread.Sleep(120);
+            Cursor.Position=new(Cursor.Position.X+85,Cursor.Position.Y);Pause(120);Stage("one");
+            Cursor.Position=new(Cursor.Position.X,Cursor.Position.Y-85);Pause(120);Stage("two");
+            Mouse(16);Pause(120);
             File.WriteAllText(Path.Combine(exchange,"released"),"ok");
             return 0;
         }
-        catch(Exception error){Console.Error.WriteLine(error);return 1;}
-        finally {Mouse(16);Cursor.Position=original;}
+        catch(Exception error){File.WriteAllText(Path.Combine(exchange,"helper-failure.txt"),error.ToString());Console.Error.WriteLine(error);return 1;}
+        finally {
+            Mouse(16);Cursor.Position=original;
+            if(promoted)SetIndicatorWindowPos(source,new nint(sourceWasTopmost?-1:-2),0,0,0,0,0x13);
+            if(desktop)DismissDesktopContextMenu().GetAwaiter().GetResult();
+        }
     }
     private static System.Drawing.Point? DesktopIndicatorPoint()
     {
@@ -66,4 +106,6 @@ internal static partial class Program
         return null;
     }
     [DllImport("user32.dll",EntryPoint="GetWindowLongW")]private static extern int GetIndicatorWindowLong(nint window,int index);
+    [DllImport("user32.dll",EntryPoint="GetWindow")]private static extern nint GetIndicatorWindow(nint window,uint command);
+    [DllImport("user32.dll",EntryPoint="SetWindowPos")]private static extern bool SetIndicatorWindowPos(nint window,nint after,int x,int y,int width,int height,uint flags);
 }

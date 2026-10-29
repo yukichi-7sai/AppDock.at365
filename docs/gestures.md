@@ -32,6 +32,8 @@
 
 表示は`GestureIndicatorHost`、`gesture-indicator-preload`、`GestureIndicatorView`が担当する。本体は非表示Windowを再利用し、入力側が選んだ方向・コマンド名・スタイル・不透明度・行数・物理座標を通知で渡す。表示用キューは容量1で最新状態だけを保持し、認識/実行通知のキューとは分ける。設定revisionと表示sequenceを照合し、古い更新・非表示後の寸法通知を無視する。DOMの寸法が確定してからDIP座標へ変換し、対象モニター内へ収めて表示する。表示専用IPCは登録したローカルURLのmain frameだけを受け付け、コマンド実行や設定保存のAPIを持たない。配色は共通preloadを使う。表示倍率は通常の設定画面と分離し、OSのDPIを基準にする。このSurfaceは本体専用で、Shell領域を追加しない。
 
+非表示から表示するたびに、位置・寸法の確定と`showInactive()`の後で`setAlwaysOnTop(true, 'pop-up-menu')`を再適用する。Windows側の最前面属性が外れた場合や、他の最前面Windowの背後へ回った場合も、操作先のフォーカスを移さずに表示順を戻す。`pop-up-menu`はタスクバー背面への配置を避けるために使う。表示中の内容更新では最前面設定を繰り返さず、古い寸法通知や非表示後の通知によってWindowを再表示しない。
+
 待機表示はJS描画だけを使い、InputHostはGestureIndicatorNotificationsで表示モデルを通知する。ネイティブの待機Window・描画コード・配色/描画方式の切替は持たない。入力用Dispatcherとその.NET/WPFランタイム依存は引き続き必要。ローカル描画ページの起動失敗やrenderer終了時は表示を破棄し、共通のエラー通知とログへGESTURE_INDICATOR_UNAVAILABLEを一度報告して再起動を案内する。表示がなくても入力認識とコマンド実行は続ける。描画プロセスを自動で繰り返し再起動しない。新しい保存設定や素材ファイルは追加しない。
 
 本体は実Windowフォーカスと表示中Appletに対応する行を入力プロセスへ同期する（40ms間隔、内容が変化した時のみ送信）。ネイティブ側は押下時に最前面HWND・exe・カーソル下のWindow・除外・ブラウザクラス条件を確認。ローカル条件は通知済みHWNDにも限定する。状態の同期前に入力した場合に誤ったコマンドを実行しないよう、本体側も受信時と各コマンドの開始前に最新のページ/Window文脈を照合する。
@@ -116,7 +118,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - 「いつ・どこで」のデスクトップはグローバルの直下へ置く。グローバル・指定したexeを選んだ場合だけ、その下に「デスクトップを除外」のチェック項目を表示する。初期OFFで、保存・再編集・条件表示・検索に反映する。キーボードのショートカット条件へは追加しない。
 - scripts/gesture-command-checks.cjsをgestures-ui-test.cjsから呼び、一覧/編集/並べ替え/保存再起動/両テーマ3幅を検証する。APPDOCK_GESTURE_UI_ONLY=1は物理入力試験を省略する明示モードで、実入力の成功とは区別する。ショートカット側の共用部品もshortcuts-ui-test.cjsで検証する。
 - `APPDOCK_GESTURE_INDICATOR_ONLY=1`は待機表示だけを検証する明示モード。`scripts/gesture-indicator-checks.cjs`で4種類の選択・透過・表示なしの保持・明暗テーマ・3幅の見本を確認し、既存ハーネスで再起動後の設定保持も確認する。物理入力とコマンド一覧全体の回帰は含まない。
-- `dev.bat exec node scripts/gesture-web-indicator-ui-test.cjs [--portable] [--desktop-only]`は隔離した本体とマウス専用InputTests helperでJS待機表示を確認する。4種類×明暗で、1/2段階の方向とコマンド更新、サイズ固定、非アクティブ/透過/ツールWindowフラグ、IPCの送信元とsequence検査、右解放後の非表示と実行順を確認する。デスクトップ限定/Explorerのexe条件では、非アクティブなデスクトップからの開始、モニター中央への配置、元のウィンドウが覆われないことも確認する。`--desktop-only`はこの2条件だけを検査する。最後に描画プロセス障害を起こし、表示なしでも実行を続け、共通エラーを一度だけ報告することを確認する。Pause/F13〜F24はOSへ送信・登録しない。
+- `dev.bat exec node scripts/gesture-web-indicator-ui-test.cjs [--portable] [--desktop-only | --topmost-only]`は隔離した本体とマウス専用InputTests helperでJS待機表示を確認する。4種類×明暗で、1/2段階の方向とコマンド更新、サイズ固定、非アクティブ/透過/ツールWindowフラグ、IPCの送信元とsequence検査、右解放後の非表示と実行順を確認する。表示前に待機Windowの最前面属性を外し、再表示時の復旧を実HWNDで確認する。本体と別プロセスの専用Windowを最前面にした条件で、待機表示がその上に重なる実際のZ順序と操作先のフォーカス維持も確認する。デスクトップ限定/Explorerのexe条件では、非アクティブなデスクトップからの開始、モニター中央への配置、元のウィンドウが覆われないことも確認する。`--desktop-only`はこの2条件だけ、`--topmost-only`は4種類×明暗と別プロセスの表示順復旧を検査し、デスクトップからの開始を含めない。最後に描画プロセス障害を起こし、表示なしでも実行を続け、共通エラーを一度だけ報告することを確認する。Pause/F13〜F24はOSへ送信・登録しない。
 
 一時停止/再開は本体コマンド`appdock.gestures.togglePause`で切り替えます。トレイ内はチェック付き項目で、検索・キーからの実行も同期します。保存されない実行中の状態で、再起動後は解除します。配置の仕様は[タスクトレイ](tray-menu.md)を参照してください。
 
