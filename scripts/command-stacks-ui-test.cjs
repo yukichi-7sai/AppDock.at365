@@ -530,6 +530,7 @@ async function close() {
       ['touchpad-gestures', 'タッチパッドジェスチャー'],
     ]) {
       await page.getByTestId('settings-nav:' + kind).click();
+      await page.getByTestId('gesture-settings-tab:triggers').click();
       const table = page.getByTestId('trigger-stack-table');
       await table.waitFor();
       const optionsId = {
@@ -543,6 +544,7 @@ async function close() {
         'touchpad-gestures': 'touchpadGestures',
       }[kind];
       for (const mode of ['first', 'all', 'first', 'all']) {
+        await page.getByTestId('gesture-settings-tab:form').click();
         await page.getByTestId(optionsId).first().getByRole('combobox').first().selectOption(mode);
         await until(
           async () => (await snapshot()).settings.value[settingsKey].executionMode === mode,
@@ -558,9 +560,11 @@ async function close() {
           1,
           kind + ' common options must not multiply',
         );
-        assert.equal(await table.count(), 1, kind + ' stack table must not multiply');
         if (kind === 'touchpad-gestures')
           assert.equal(await page.getByTestId('touchpad-connection').count(), 1);
+        await page.getByTestId('gesture-settings-tab:triggers').click();
+        await table.waitFor();
+        assert.equal(await table.count(), 1, kind + ' stack table must not multiply');
       }
       assert.equal(await table.locator('tbody tr').count(), 1);
       await table.getByRole('button', { name: /を編集$/ }).click();
@@ -579,11 +583,13 @@ async function close() {
       await dialog.getByTestId('stack-execution-mode').selectOption('first');
       assert.equal(await dialog.getByTestId('stack-trigger-readonly').innerText(), fixedInput);
       await save();
+      await page.getByTestId('gesture-settings-tab:form').click();
       assert.equal(
         await page.getByTestId(optionsId).count(),
         1,
         kind + ' options remain unique after stack edit',
       );
+      await page.getByTestId('gesture-settings-tab:triggers').click();
     }
     checks.push(
       'repeated feature-option and stack edits retain one options section and table for each gesture kind',
@@ -693,6 +699,7 @@ async function close() {
           .evaluateAll((rows) => rows.map((tr) => tr.querySelector('td').innerText));
       assert.deepEqual(await displayed(), expectedTitles);
       await page.getByTestId('settings-nav:' + kind).click();
+      await page.getByTestId('gesture-settings-tab:triggers').click();
       assert.deepEqual(await displayed(), expectedTitles);
       await table
         .getByRole('button', { name: titles.get(inputs[1]) + 'を編集', exact: true })

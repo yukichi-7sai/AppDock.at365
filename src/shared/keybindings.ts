@@ -37,17 +37,16 @@ export const shortcutScopes = [
 ] as const;
 export type ShortcutScope = (typeof shortcutScopes)[number]['id'];
 export const externalShortcutScopes = [
-  { id: 'browser', title: hostText('settings.keybindings.browser') },
-  { id: 'exe', title: hostText('settings.keybindings.exe') },
   { id: 'desktop', title: hostText('settings.keybindings.desktop'), after: 'global' },
+  { id: 'exe', title: hostText('settings.keybindings.exe'), after: 'global' },
+  { id: 'browser', title: hostText('settings.keybindings.browser'), after: 'global' },
 ] as const;
 export type KeybindingScope = ShortcutScope | (typeof externalShortcutScopes)[number]['id'];
-export const keybindingScopes: readonly { id: KeybindingScope; title: string }[] = [
-  shortcutScopes[0],
-  externalShortcutScopes[2],
-  ...shortcutScopes.slice(1),
-  ...externalShortcutScopes.slice(0, 2),
-];
+export const keybindingScopes: readonly { id: KeybindingScope; title: string }[] =
+  shortcutScopes.flatMap((scope) => [
+    scope,
+    ...externalShortcutScopes.filter((extra) => extra.after === scope.id),
+  ]);
 export const externalShortcutScope = (scope: string) =>
   ['global', 'desktop', 'browser', 'exe'].includes(scope);
 export interface Keybinding {

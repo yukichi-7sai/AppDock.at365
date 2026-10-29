@@ -128,7 +128,7 @@ test('desktop options preserve old settings and validate scope-specific exclusio
   assert.equal(parsed.indicatorPosition, 'monitor-center');
   assert.deepEqual(parsed.bindings[2].when.processes, ['explorer']);
   assert.equal(gestureConditionLabel(desktop.when), 'デスクトップ');
-  assert.equal(gestureConditionLabel(global.when), 'グローバル（デスクトップを除外）');
+  assert.equal(gestureConditionLabel(global.when), 'Windows全体（デスクトップを除外）');
   assert.equal(gestureConditionLabel(exe.when), 'Explorer.exe（デスクトップを除外）');
   for (const when of [
     { ...desktop.when, excludeDesktop: true },

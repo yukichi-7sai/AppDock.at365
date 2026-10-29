@@ -130,12 +130,19 @@
   display: none;
 }
 .stack-trigger-summary {
-  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: var(--settings-control-height, 32px);
+  padding: var(--settings-control-padding-y, 5px) 12px;
   border-radius: 6px;
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
   overflow-wrap: anywhere;
+}
+.stack-trigger-header .stack-execution-controls {
+  padding: 0;
 }
 .command-stack-dialog .stack-trigger-header .settings-field,
 .command-stack-dialog .stack-condition-panel .settings-field {

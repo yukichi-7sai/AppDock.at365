@@ -234,7 +234,7 @@ test('external shortcut scopes and browser options are atomic, normalized and us
     revision = f.get().revision;
   assert.deepEqual(
     f.get().scopes.map((s) => s.id),
-    ['global', 'desktop', 'app', 'pages', 'owner', 'applets', 'browser', 'exe'],
+    ['global', 'desktop', 'exe', 'browser', 'app', 'pages', 'owner', 'applets'],
   );
   const source = {
     ...binding('external'),
