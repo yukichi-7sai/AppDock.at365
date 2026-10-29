@@ -45,6 +45,7 @@ export function SettingsPageLayout({
   onReload,
   onReset,
   resetLabel,
+  heading,
   children,
   announcement,
 }: {
@@ -61,6 +62,7 @@ export function SettingsPageLayout({
   onReload(): void;
   onReset?(): void;
   resetLabel?: string;
+  heading?: ReactNode;
   children: ReactNode;
   announcement: ReactNode;
 }) {
@@ -103,9 +105,16 @@ export function SettingsPageLayout({
             className={`settings-body settings-page-scroll${pageScroll ? ' settings-page-shared-scroll' : ''}${mode === 'json' ? ' settings-page-json' : ''}`}
           >
             <CommandListPageCanvas>
-              <header className="settings-page-heading">
-                <h1>{page.title}</h1>
-                <p>{description ?? t('settings.defaultDescription')}</p>
+              <header
+                className={heading ? 'settings-page-overview' : 'settings-page-heading'}
+                data-testid={heading ? 'settings-page-overview' : undefined}
+              >
+                {heading ?? (
+                  <>
+                    <h1>{page.title}</h1>
+                    <p>{description ?? t('settings.defaultDescription')}</p>
+                  </>
+                )}
               </header>
               <div className="settings-page-tools" ref={toolsRef} data-testid="settings-page-tools">
                 <div className="settings-page-toolbar">

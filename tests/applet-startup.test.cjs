@@ -93,6 +93,60 @@ function expectedTiming(durationMs, outcome, validated = outcome === 'success') 
   };
 }
 
+test('manifest descriptions remain optional plain text and reject non-text values', (t) => {
+  const f = fixture(t);
+  const file = path.join(f.item.manifest.folder, 'extension.json');
+  const manifest = JSON.parse(fs.readFileSync(file));
+  for (const description of [undefined, '', '時計の概要\n<説明>']) {
+    fs.writeFileSync(file, JSON.stringify({ ...manifest, description }));
+    f.manager.items.clear();
+    f.manager.discover();
+    assert.equal(f.manager.snapshot().length, 1);
+    assert.equal(f.snapshot().description, description);
+  }
+  for (const description of [null, 3, {}, []]) {
+    fs.writeFileSync(file, JSON.stringify({ ...manifest, description }));
+    f.manager.items.clear();
+    f.manager.discover();
+    assert.equal(f.manager.snapshot().length, 0);
+  }
+});
+
+test('Applet identity metadata accepts shared icons and optional single-line plain text', (t) => {
+  const f = fixture(t);
+  const file = path.join(f.item.manifest.folder, 'extension.json');
+  const manifest = JSON.parse(fs.readFileSync(file));
+  const read = (metadata) => {
+    fs.writeFileSync(file, JSON.stringify({ ...manifest, ...metadata }));
+    f.manager.items.clear();
+    f.manager.discover();
+    return f.snapshot();
+  };
+  for (const icon of [
+    undefined,
+    'clock',
+    'mail',
+    'terminal',
+    'user',
+    'image',
+    'globe',
+    'mouse',
+    'settings',
+  ])
+    assert.equal(read({ icon }).icon, icon);
+  for (const tagline of [
+    undefined,
+    '',
+    'いつもの画面に、見やすい時計を。',
+    '<b>language.ja</b>',
+    '長'.repeat(3000),
+  ])
+    assert.equal(read({ tagline }).tagline, tagline);
+  for (const icon of [null, '', 1, 'unknown', '../clock']) assert.equal(read({ icon }), undefined);
+  for (const tagline of [null, 1, {}, [], 'first\nsecond', 'first\rsecond', 'first\u2028second'])
+    assert.equal(read({ tagline }), undefined);
+});
+
 test('phase boundaries account for host preparation, launch request, response wait and validation', async (t) => {
   const f = fixture(t);
   f.manager.on('changed', () => {

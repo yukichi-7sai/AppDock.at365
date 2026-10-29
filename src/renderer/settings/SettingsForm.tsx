@@ -69,9 +69,7 @@ export function SettingsForm({
   const extensions = aux.applets ?? [],
     commands = aux.commands ?? [],
     globalHotKeys = aux.statuses ?? [];
-  const launch = aux.launch!,
-    runtime = aux.runtime!,
-    version = aux.version ?? '';
+  const launch = aux.launch!;
   const run = async (work: () => Promise<unknown>) => {
     try {
       await work();
@@ -117,19 +115,7 @@ export function SettingsForm({
       />
     );
   if (category === 'about')
-    return (
-      <AboutSettings
-        settings={settings}
-        edit={edit}
-        extensions={extensions}
-        runtime={runtime}
-        stats={aux.aboutStats}
-        startupTiming={aux.hostStartupTiming}
-        version={version}
-        busy={busy}
-        openApplets={() => select('applets')}
-      />
-    );
+    return <AboutSettings settings={settings} edit={edit} startupTiming={aux.hostStartupTiming} />;
   if (category === 'tray')
     return (
       <SettingsMcpScope itemId={settingsItemId('tray', 'trayMenu')}>

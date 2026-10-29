@@ -202,6 +202,8 @@ export interface ExtensionManifest extends Partial<
   updateRepository?: string;
   description?: string;
   runtime: 'node' | 'dotnet' | 'native' | 'web';
+  icon?: import('./ribbon').RibbonBuiltinIcon;
+  tagline?: string;
   entry: string;
   type?: string;
   capabilities?: string[];

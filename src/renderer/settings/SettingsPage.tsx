@@ -22,6 +22,8 @@ import { SettingsPageLayout } from './SettingsPageLayout';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsField } from '../settings-ui/SettingsSections';
+import { AppletInformationPanel } from '../settings-ui/AppletInformationPanel';
+import { AboutInformationPanel } from './AboutSettings';
 import { SettingsMcpAccessProvider } from '../settings-ui/SettingsMcpAccess';
 import { SettingsStatusProvider, SettingsStatusArea } from '../settings-ui/SettingsStatus';
 import {
@@ -319,6 +321,10 @@ export function SettingsPage({
   const { page, navigation, editing } = model.content;
   const gesturePage = ['shortcuts', 'gestures', 'touchpad-gestures'].includes(page.id);
   const editor = c.editor(model);
+  const headingApplet =
+    editing.mode === 'form' && page.kind === 'applet' && !page.collection && !page.unavailableReason
+      ? model.content.auxiliary.applets?.find((applet) => applet.id === page.owner)
+      : undefined;
   return frame(
     <>
       <SettingsPageLayout
@@ -326,6 +332,26 @@ export function SettingsPage({
         mode={editing.mode}
         pending={editing.pending}
         error={error || editing.error || ''}
+        heading={
+          editing.mode === 'form' && page.id === 'about' && !page.unavailableReason ? (
+            <AboutInformationPanel
+              settings={editor.value}
+              extensions={model.content.auxiliary.applets ?? []}
+              runtime={model.content.auxiliary.runtime!}
+              stats={model.content.auxiliary.aboutStats}
+              version={model.content.auxiliary.version ?? ''}
+              busy={editing.pending}
+              openApplets={() => act({ kind: 'select', pageId: 'applets' })}
+            />
+          ) : headingApplet ? (
+            <AppletInformationPanel
+              applet={headingApplet}
+              updateSource={editor.value.extensions[headingApplet.id]?.updateSource}
+              busy={editing.pending}
+              headingLevel={1}
+            />
+          ) : undefined
+        }
         onMode={(mode) => {
           rememberTriggerScroll();
           act({ kind: 'edit', action: { type: 'mode', value: mode } });

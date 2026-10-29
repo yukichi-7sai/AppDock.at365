@@ -21,6 +21,22 @@ const applets = [
     settingActions: [],
   },
 ];
+test('Applet overview and startup measurements are searchable without becoming saved settings', () => {
+  const value = createDefaultSettings();
+  const applet = {
+    ...applets[0],
+    description: '半透明の時計を表示します。',
+    tagline: 'いつもの画面に、見やすい時計を。',
+  };
+  const pages = settingsCatalog([applet], value);
+  const page = pages.find((row) => row.owner === applet.id);
+  assert.equal(searchSettings(pages, '半透明 時計')[0].key, 'information');
+  assert.equal(searchSettings(pages, 'いつもの画面')[0].key, 'information');
+  assert.equal(searchSettings(pages, '起動時間の計測')[0].key, 'startupTiming');
+  const projection = settingsProjection(value, page, [applet]);
+  assert.equal(Object.hasOwn(projection, 'information'), false);
+  assert.equal(Object.hasOwn(projection, 'startupTiming'), false);
+});
 test('metadata and scoped projections avoid copying unrelated settings and remain isolated', (t) => {
   const value = createDefaultSettings();
   value.extensions.unrelated = { enabled: true, settings: { rows: [{ text: 'large data' }] } };

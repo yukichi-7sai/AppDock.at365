@@ -227,7 +227,9 @@ export function AppletManagementSettings({
   };
   const busy = !!pending || !!management?.busy || !!updates?.busy;
   const visible = applets.filter((a) =>
-    `${a.displayName} ${a.name} ${a.id}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+    `${a.displayName} ${a.name} ${a.id} ${a.tagline ?? ''} ${a.description ?? ''}`
+      .toLocaleLowerCase()
+      .includes(query.toLocaleLowerCase()),
   );
   const move = (id: string, destination: string) =>
     run(id, () => invoke('openAppletDestination', [id, destination]));

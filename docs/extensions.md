@@ -228,6 +228,9 @@ UTF-8のJSON-RPC 2.0をstdin/stdoutに1行1メッセージで送ります（上�
 
 ## manifestとホスト共通設定
 
+- `icon`: Applet全体を代表する共通アイコン名。任意で、リボンと同じ`RibbonBuiltinIcon`（`clock`、`mail`、`image`など）を使う。省略時は`extensions`。ページ・リボン個別のアイコンや利用者の画像設定を変更しない。
+- `tagline`: Applet名の上に表示する短いキャッチコピー。任意の改行を含まないプレーンテキスト文字列。省略・空欄なら行を表示しない。概要とは分けて、設定インデックスとApplet管理の検索にも使う。
+- `description`: Applet全体の概要。任意のプレーンテキスト文字列。省略・空欄なら概要を表示しない。設定画面の先頭に改行を保って表示し、設定インデックスとApplet管理の検索にも使用する。HTML/Markdownとして解釈しない。
 - `minimumHostVersion`: 必要なホストの安定版SemVer (`0.5.0`など)。省略時は従来どおりAPI v1として起動。
 - `startupDelaySeconds`: 既定の遅延秒数、0～86400の整数。省略は0。
 - `updateRepository`: GitHubの`owner/repository`。省略時は更新確認非対応。更新比較には`major.minor.patch`の正式版タグ（先頭`v`も可）が必要。

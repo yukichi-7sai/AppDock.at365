@@ -549,6 +549,22 @@ export function settingsCatalog(
                 ),
               ]
             : []),
+          ...(!a.collection
+            ? [
+                item(
+                  id,
+                  'information',
+                  hostText('settings.appletInformation.title'),
+                  [a.tagline, a.description].filter(Boolean).join(' '),
+                ),
+                item(
+                  id,
+                  'startupTiming',
+                  hostText('settings.appletStartup.title'),
+                  hostText('settings.appletManagementSettings.startupTimeHint'),
+                ),
+              ]
+            : []),
           ...(!a.collection ? (a.pages ?? []) : []).map((p) =>
             item(
               id,

@@ -1,7 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsButton } from './SettingsButton';
-import { SettingsField } from './SettingsSections';
+import { SettingsActions, SettingsField } from './SettingsSections';
 import { useSettingsFeedback } from './SettingsStatus';
 import { useSettingsControls } from './api';
 import { useEffect, useState } from 'react';
@@ -76,12 +76,16 @@ export function VersionCheck({
   disabled = false,
   compact = false,
   embedded = false,
+  standalone = false,
+  disabledReason,
 }: {
   id?: string;
   details?: boolean;
   disabled?: boolean;
   compact?: boolean;
   embedded?: boolean;
+  standalone?: boolean;
+  disabledReason?: string;
 }) {
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -111,7 +115,9 @@ export function VersionCheck({
           icon={embedded}
           className={embedded ? 'about-host-update' : compact ? 'text-button' : 'update-primary'}
           disabled={busy || state.busy || disabled}
-          title={disabled ? translate('settings.versionCheck.pending') : undefined}
+          title={
+            disabled ? (disabledReason ?? translate('settings.versionCheck.pending')) : undefined
+          }
           onClick={() => {
             setError('');
             setBusy(true);
@@ -150,6 +156,8 @@ export function VersionCheck({
   );
   return embedded ? (
     <div className="about-update-group">{content}</div>
+  ) : standalone ? (
+    <SettingsActions>{content}</SettingsActions>
   ) : (
     <SettingsField
       title={translate('settings.versionCheck.update')}

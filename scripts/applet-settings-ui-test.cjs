@@ -169,7 +169,7 @@ async function until(fn, label) {
       assert.equal(await page.locator('.applet-settings .setting-row').count(), 0);
       assert.equal(
         await page.locator('.applet-settings [data-setting-item]').count(),
-        (m.settings?.length ?? 0) + (m.settingActions?.length ?? 0) + (m.pages?.length ?? 0) + 1,
+        (m.settings?.length ?? 0) + (m.settingActions?.length ?? 0) + (m.pages?.length ?? 0) + 2,
       );
       for (const s of m.settingSections ?? [])
         assert.equal(await page.getByRole('heading', { name: s.title, exact: true }).count(), 1);

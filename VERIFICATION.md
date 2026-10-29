@@ -1,5 +1,71 @@
 # 検証記録
 
+## 2026-10-29: 更新設定の初期表示レビューと本体・全Appletのコミット照合 0.101.9
+
+- 先行0.101.8の1,115実装入力と照合し、追加の製品変更は`UpdateSettings.tsx`だけだった。「更新の設定」を既定で開く指定と、`allowSameVersion`を最初のboolean行へ移す変更を確認。設定値・保存・更新処理・確認前のダウンロードを変えず、共通Sectionの折りたたみも維持するため、問題なしと判断した。既存About GUIの初期状態・順序・再表示の期待値と現行文書を合わせた。
+- 本体・8Appletの変更全体、先行レビュー、manifest/版、単独更新の対象境界、情報/計測/検索/フォームとJSON、壁紙の標準発行による共通ギャラリー生成差分を確認した。全repoはmainのdirtyを保持してpull/stash/branch切替を行わず、GitHub originのfetch後、開始HEADと各origin/mainが全て一致した。コミット対象に別作業の実装変更なし。
+- 単体の設定/更新71件、先行101件ログ内のApplet起動/manifest9件、共通ギャラリー21件、壁紙のnative fake履歴GUI9群を、関連入力と完全ログSHA256の一致に基づき再利用。101件全体を現在の同一試験として扱わず、検索文字列の変更を含む試験は新しい71件の結果を採用した。8Appletの実装入力、配置manifest/entry、ZIP/feedと既存の版は一致し、再ビルド・再発行しなかった。
+- 変更後の本体は0.101.9へパッチ更新し、frozen-lockfile install、型検査/build、ソースAbout GUI6群を実行して成功。標準publish後、最終固定EXEのAbout6群・Applet7群（既存8Applet表示を含む）・本体計測2条件・smokeも成功。初期展開と行順、利用者の折りたたみ、即時保存、自動確認の抑制、明暗/狭幅、対象限定の更新確認/取消、読み取り専用計測を確認した。
+- 本体所有694ファイルは発行物・ビルド出力・5隔離コピーで一致。EXE SHA256は`4833b7d7bcbc31912f7d3b892f0ce962d416076e0bde6835d275676ad1ff4503`、update.zipは270,725,688 bytes・SHA256 `d45d08504b667017a778905140fb9e6b0180a96ad858940130c29648be181d45`でfeedと一致。9repo/1,115実装入力は検証前後で一致した。
+- 照合の正本は`.artifacts/commit-validation-applet-information-20261029/{initial,review,reuse,validation,artifacts,stage,commits,push}.json`と各ログ。stageのtree/作業ファイル一致、commitのtree一致、GitHub main先端とcommitの一致を同ディレクトリへ記録する。今回の5成功profileは各方式の直近3回以内で保持し、先行の再利用資料も保持した。実サービス・実利用Applet起動・実更新適用・他PC/DPIと無関係な全回帰は今回実施せず、GitHub Releaseと実利用deployは依頼範囲に含めない。
+
+## 2026-10-29: About見出しの統一と起動時間欄の末尾移動 0.101.8
+
+- 先行する本体0.101.7と8Appletの未コミット変更を保持。本体だけを0.101.8へパッチ更新し、通常publishで40.ARTIFACTへ発行した。設定・保存ファイル・公開APIの追加/削除はなく、各Appletの再発行・commit・push・Release・実利用先deployは行っていない。
+- 「AppDockについて」のフォームは、タイトルと定型説明を既存情報パネルへ置き換えた。アプリ名を唯一のh1とし、共通ツールバーより上へ配置。情報パネルの自動更新確認・版表示・件数・管理画面への移動・更新操作は既存経路を維持し、JSONではコンパクトな見出しを保つ。本体とAppletの共通パネルから外枠の影を除いた。
+- 本体とAppletの計測欄をどちらも「起動時間の計測」へ変更し、Aboutは更新設定の後、Appletは設定・表示先・共通設定の後の最下部へ配置。既定の折りたたみ、直近計測の表示、再起動時の更新、読み取り専用JSONを維持した。設定検索の期待値と現行仕様文書を整合させた。
+- 発行前に差分と影響を1回レビューし、未解決の発行阻害なし。型検査/buildと関連6ファイル71件が成功。ソースGUIはAbout6群・Applet5群、発行した固定EXEはAbout6群・Applet7群・本体計測2条件・smokeが成功した。Aboutのフォーム/JSON切替後の自動確認抑制、保存、両ページの計測欄の名前と末尾配置、明暗/狭幅、既存8Appletの情報表示、単独更新確認の取消も確認。実際の公開更新の適用、実利用設定でのApplet起動、他PC/DPI、無関係な全標準回帰は今回の対象外。
+- About GUIの初回は、幅変更後もポインターが更新ボタンへ重なり通常色の検査が失敗。検査前にポインターを外し、ソースと固定EXEで成功した。smokeの初回は余分な引数区切りを実行パスと解釈して起動前に失敗し、呼出しを訂正して成功。製品側の検査緩和や権限変更は行っていない。
+- 発行物・ビルド出力・5隔離コピーの本体所有694ファイルが全てSHA256一致。EXEは`943b3bab53038ca486d55d1b4253281802bd0ff9324e0b13525d9ebaf8cec2a1`。update.zipは270,725,693 bytes、SHA256 `be94ca747112ce83dab81709cdeddc512e87cebe87cf3bd54efd801862f39ab9`でfeedと一致。9repo/1,115実装入力も最終検証前後で一致した。
+- 証跡は`.artifacts/about-heading-20261029/{review,validation,artifacts,cleanup}.json`と各ログ、About画像は`.artifacts/about-ui-1793253477535/`、Applet画像は`.artifacts/applet-information-ui-1793253497509/`。今回の成功6フォルダーは各方式の直近3回以内として保持し、過去の検証資料・他作業も保持。起動前失敗で生じたsettings.jsonだけの一時profile1件を、絶対パス・内容・再解析ポイント・プロセス終了を確認して削除した。今回の試験プロセス残存0。
+
+## 2026-10-29: Appletフォームの見出し差し替えと単独更新 0.101.7
+
+- 先行0.101.6と8Appletの未コミット変更を保持して継続。本体はdirtyのためpull/stash/branch切替を行わず、今回の製品変更は本体UIだけとした。通常の表示変更で設定・保存ファイル・公開APIの追加/削除を含まないため、0.101.6→0.101.7のパッチ更新。各Appletは先行発行版を維持し、再発行していない。
+- `SettingsPageLayout`に任意の見出し内容を渡し、Applet設定フォームのタイトル・定型説明を共通情報パネルへ置き換えた。パネルを共通ツールバーの上に置き、Applet名を唯一のh1として表示する。JSON/collection/他の本体設定の見出しは従来の構成を保つ。起動計測と設定本文はツールバーの下に残し、情報の検索アンカー・入力確定・保存・モード切替と共通のエラー/操作Contextを維持した。
+- 稼働状態を名前の横へ移し、従来の状態表示位置には「このAppletを更新」を常設。既存`VersionCheck`をラベルなしの共通操作列へ配置し、対象ownerだけの`installUpdates(id)`と既存の確認→ダウンロード/検証→AppDock再起動の経路を使用する。更新元なしでは確認と更新の両ボタンを無効にし、理由を既存文言で示す。新しい更新方式や設定値は追加していない。
+- 発行前に見出しの重複/階層、表示順、明暗/狭幅、共通Provider、JSON/リセット、対象ID制約、確認前の取得禁止、既存Aboutへの影響をレビューし、阻害事項なし（`.artifacts/applet-heading-20261029/review.json`）。既存Applet設定GUIのアンカー件数は本文から情報アンカーが移動した分だけ更新したが、その旧スクリプト全体は今回実行していない。
+- frozen-lockfile install、型検査/buildと関連6ファイル96件（設定ページ/編集/リセット/About更新/portable更新）が成功。専用GUIはソース5群、発行した固定EXE7群が成功。先頭の唯一のh1と情報パネル/ツールバーの順序、JSON編集からフォーム復帰後の保存値、状態/計測/検索、更新元なし、対象外12通りの拒否、先行発行8Appletすべてのアイコン/キャッチコピー/概要と常設更新ボタンの表示を確認した。Pause/F13〜F24の割り当てを生成せず、無いことも検査した。
+- 固定EXEの単独更新ではローカル模擬feedを使用し、Electronの確認ダイアログAPIを試験側でキャンセル応答に置き換え、確認要求が`fixture.info 1.0.0 → 1.1.0`だけであることと、キャンセル後の要求がmetadataだけでpayload取得0であることを確認。実更新や実再起動を実行した試験とは扱わない。既存Aboutも固定EXEで6群（更新・即時保存・明暗×4幅）成功、smoke成功。
+- 本体の通常publishが成功し、発行先は`A:/40.ARTIFACT/AppDock.at365/win-unpacked`。所有694ファイルをstage/最終専用GUI/About/smokeの4コピーとSHA256照合して一致。EXE=`c160a90f7d79af0828ee713fae8734f1c5909aa9b0f97540626604ba504cc3a7`、update.zip=`a622f9d453124bcdb94fed364683b98119fa46068786483550b7b154447f8461`（270,725,649 bytes）。版/feed/manifestが一致。9repoの1115入力は最終GUI前後で不変であり、途中の追加は実Appletでボタン表示を待ってから採取する試験上の確認だけで製品差分はない。
+- 入力/完全ログ/成果物照合/レビューの正本は`.artifacts/applet-heading-20261029/`。最終GUIは`.artifacts/applet-information-ui-1793251445155/result.json`、Aboutは`.artifacts/about-ui-1793251303437/result.json`、smokeは`.artifacts/smoke-1793251311688/smoke-result.json`。今回の成功分は方式別の直近3回以内で、既存の再利用資料・診断・固定出力を保持し、試験フォルダー削除0件。標準全回帰、実公開先更新、実利用Applet起動、別PC/DPI、commit/push/Release/全体ZIP/実利用deployは行っていない。
+
+## 2026-10-29: Appletのアイコン・キャッチコピーとAbout共通表示 0.101.6
+
+- 本体は先行の情報/起動計測0.101.5の未コミット変更を保持して継続。8つの独立Appletはmain/追跡先とcleanを確認し、通常環境の`pull --ff-only`で最新化してから変更した。開始時の状態と全manifestは`.artifacts/applet-branding-20261029/baseline.json`へ保存した。
+- manifestに任意の`icon`（共通`RibbonBuiltinIcon`）と`tagline`（改行なしのプレーンテキスト）を追加。アイコン名・型・改行を読込時に検証し、人為的な文字数上限は設けない。省略時は`extensions`、キャッチコピー省略/空欄時は行を表示しない。キャッチコピーを設定インデックスとApplet管理の検索にも含めた。設定・コマンド・保存形式や既存のページ/リボンアイコンは変更していない。表示用の任意情報なので、Appletの最低本体版は既存の使用APIに対応した値を維持する。
+- `SettingsAppIdentity`と共通CSSへ「AppDockについて」のアイコン/キャッチコピー/名前/バージョンの配置を抽出し、Applet情報にも使用。80px（狭幅60px）アイコンの右に同じアクセント色/文字サイズ/余白でキャッチコピーを表示する。概要はその下に残す。明暗・狭幅と省略時の表示、既存更新操作/起動計測/確定保存を維持した。公開前レビューは`review.json`。通常の表示追加であり、設定・保存ファイルや破壊的変更を伴わないため本体0.101.5→0.101.6と各Appletのパッチを更新した。
+
+| Applet | 版 | icon | tagline |
+| --- | --- | --- | --- |
+| ChatCodex | 0.6.7 | terminal | 会話から、作業のその先へ。 |
+| Gmail | 0.12.2 | mail | メールの確認を、もっと身近に。 |
+| Profile | 0.1.1 | user | 名前とアバターで、自分らしく。 |
+| WallpaperSlideshow | 0.7.6 | image | お気に入りの景色を、デスクトップに。 |
+| Watch | 0.4.1 | clock | いつもの画面に、見やすい時計を。 |
+| WebApplet | 0.4.2 | globe | いつものサイトを、すぐそばに。 |
+| WebBrowserTools | 0.3.6 | mouse | ブラウザー操作を、指先ひとつで。 |
+| WindowsTools | 0.2.8 | settings | 毎日のWindows操作を、もっと軽やかに。 |
+
+- frozen-lockfile install、型検査/build、関連10ファイル101件と共通ギャラリー2ファイル21件のNode回帰が成功。WebBrowserToolsは標準publish内の2件も成功。専用GUIはソース4群・発行EXE5群が成功し、後者は実発行した8Appletすべてのicon/tagline/description/版を停止状態のまま検証した。省略時の共通アイコン、キャッチコピー検索、選択対象以外12通りの更新操作拒否、既存の計測/更新/Enter保存も成功。
+- Aboutの固定EXE GUIは6群成功し、更新確認/対象/通知、即時保存/再入時抑制、管理画面への移動、明暗×1280/900/760/600pxの表示を確認した。既存試験の旧前提は、更新設定を専用testidで識別、自動確認ONのfixtureを明示、移動先名を現在のカタログから取得するよう修正。存在しない別機能のファイルボタンに対する重複hover検査を除き、About内の共通標準ボタンのhover/フォーカス・更新操作の確認を維持した。初期の失敗ログを成功扱いせず保持する。smokeも成功。
+- WallpaperSlideshowの標準publishは本体の共通ギャラリーを0.101.6へ同期するため、`web/vendor/image-gallery/`の生成JS/CSS/manifestも更新された。v1契約と元ソース/生成物hashの一致を確認し、発行済みWeb資産と専用native fixtureを使う履歴ページGUI9群が成功。デスクトップ描画・壁紙設定を変更しないfixtureであり、実利用の壁紙や画像は操作していない。生成物の追加差分もレビューし、阻害事項なし。
+- 本体と全8Appletの通常publishが成功。各feed/ZIP内manifest/配置manifestのID・版・icon/tagline、ZIPサイズ/SHA256、native/.NETのProductVersionを照合した。本体所有694ファイルはstage/専用GUI/About/smokeの4コピーと一致し、EXE=`ec90cdf32840df6e7e66e7d28a9699735f720ddf3a0c9223487906d1c2f4b936`、ZIP=`5c301b44c3bd4f25ae71474be52815b4227e606b1bf4c3b52f98e7094e8a052d`（270,723,897 bytes）。9repoの1115入力は最終GUI前後で不変。先行の専用GUIからの製品ソース変更はなく、後続差分はAbout試験の前提修正だけである。
+- 完全ログ/入力/hash/レビュー/各配布物の正本は`.artifacts/applet-branding-20261029/`。固定専用GUIは`.artifacts/applet-information-ui-1793249075900/result.json`、Aboutは`.artifacts/about-ui-1793249424439/result.json`、壁紙は兄弟repoの`.artifacts/history-page-ui-1793249137971/result.json`。実利用Appletの通常起動、実Google/Codex接続、実Windows入力、別PC/DPI、標準全回帰は今回の実施範囲に含めない。
+- 試験フォルダーは今回の成功が方式別の直近3回以内であり削除0件。先行作業の再利用資料・失敗診断・固定出力は保持。コミット/プッシュ/Release/全体ZIP/実利用先deployは行わず、既存変更を保持した未コミット状態で引き渡す。
+
+最終の専用GUIでは実Appletの初期キー/ジェスチャー割り当ての取り込みを明示的に抑止し、Pause/F13〜F24の割り当てがないことも検査して5群を再確認した（`.artifacts/applet-information-ui-1793249820682/`）。先行GUI後の後続変更は、About試験の旧前提修正に加え、この試験用の初期化と検査だけで、製品ソース/配布物は不変。任意の初期化済み一覧を試験側で作る修正後に成功し、初回の試験準備失敗はログへ保持した。
+
+## 2026-10-29: Applet設定の共通情報パネルと起動計測 0.101.5
+
+- mainの作業ツリー/インデックス/未追跡がcleanであることと追跡先を確認し、通常ユーザー環境の`pull --ff-only`で最新を確認して着手。各Appletの定義や配布物は変更せず、本体の共通`AppletInformationPanel`に名前・版・対象Appletの更新確認/最終確認・概要・状態を表示し、詳細にID/最低本体版/宣言配布元をまとめた。既存の任意`description`をプレーンテキストとして使い、非文字列はmanifest検証で拒否する。概要はヒントOFFでも表示し、設定インデックスとApplet管理から検索できる。
+- 「Appletの起動計測」は情報パネルの直後に既定で閉じて配置。既存の直近の`startupTiming`の合計/4区間/成功・途中失敗を表示し、未起動と開始待ちは未計測、再起動中は旧値を消して計測中、完了後は新しい値へ更新する。読み取り専用の計測JSONをコピーできる。本体の起動計測と表示CSSを共用し、collectionの子ページにはパッケージ情報/計測を置かない。新たな設定・保存ファイル・計測処理・ポーリングは追加していない。
+- 発行前レビューで、共通レイアウト/配色、概要の未指定/文字列検証とHTML非解釈、状態と計測の寿命、設定JSON/リセット、表示用投影の範囲、既存の更新確認/確認ダイアログへの接続を確認。GUI確認で判明した概要/最低版/計測の投影不足とAppletページの更新操作未接続を修正し、更新操作は選択owner以外のID・host/all・未指定を拒否し、全体更新/全体取消の操作を公開しない構成とした。再確認後の発行阻害事項なし。保存仕様/APIの破壊的変更を含まない表示追加・修正として0.101.4→0.101.5のパッチ更新。
+- frozen-lockfile install、型検査、ビルド、関連10ファイル100件のNode回帰（Applet起動/manifest、検索/設定投影、設定ページ/寿命、既定値リセット、About更新、本体起動計測、翻訳、MCP表示、Applet管理）が成功。初回の追加試験の引数順/入力確定の誤りも修正し、失敗ログは成功として扱わず保持。既存Applet設定GUIのアンカー件数期待は情報/計測の2件分を更新したが、同スクリプト全体は今回実行していない。
+- 専用GUIはソース版と発行した固定EXEで各4検査群成功。概要の改行/HTML非解釈/ヒントOFF、キーボード詳細と計測開閉、実Node Appletの各区間/再起動中から完了への更新、停止・開始待ち・失敗、Enter確定による即時保存、概要検索、明暗/狭幅、模擬feedのmetadataのみの取得と共通エラーを確認。固定EXEでは追加した12通りの対象拒否も確認した。本体起動計測GUIは明暗2条件（共有設定2,606/37,871 bytes）成功し、固定EXEのsmokeも成功。実利用Appletの実起動・公開先での更新/ブラウザーリンク・別PC/DPIの確認とは区別する。
+- 通常publishは成功し、`A:/40.ARTIFACT/AppDock.at365/win-unpacked`の0.101.5を検証。本体所有694ファイルをstage/専用GUI/本体計測GUI2環境/smokeの計5コピーとSHA256照合し全件一致。EXE=`bbc1bbc13f38ad6d8e8f48ca2124136951efd107dc04dfb3ffa60629ce9a6c50`、update.zip=`ca42c797f88bc15a3b066d2dccdc0246826fdf2aa8cdadf3efb6411823f934b7`（270,723,605 bytes）。feed/manifest/本体版が一致し、829入力も固定GUI前後で不変。入力/完全ログ/成果物照合の正本は`.artifacts/applet-information-20261029/`の`inputs-before.json`・`inputs-after.json`・`artifacts.json`、専用固定GUIは`.artifacts/applet-information-ui-1793247792794/result.json`。
+- テスト整理は、新しい専用GUIの成功分がソース/固定とも3回以内、本体起動計測も方式別で各2回のため削除対象なし。失敗診断・先行検証の再利用資料・固定出力は保持。今回の試験プロセス終了を確認し、その他の古いsmoke等は既存記録の再利用資料として保持する。全標準回帰、未変更Appletの再発行、全体ZIP、コミット/プッシュ/Release/実利用deployは行っていない。
+
 ## 2026-10-29: 依存パッケージ・ツール更新と脆弱性確認 0.101.4
 
 - main=`c5abad4`、作業ツリー/インデックス/未追跡はclean。通常ユーザー環境で追跡先へ`pull --ff-only`し最新を確認した。公式メタデータと公開日時を照合し、`update-packages.bat`でNode.js 24.22.1→26.13.0 Lithium LTS、Electron 45.0.0→45.1.0を完全版固定。pnpmは7日経過済みの12.10.1→12.15.0へ更新した。製品コード・設定・保存形式・公開APIの変更はなく、通常の依存更新として0.101.3→0.101.4へパッチ更新。

@@ -2066,6 +2066,10 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     id: a.id,
     name: a.name,
     displayName: a.displayName,
+    description: id === 'applets' || page.kind === 'applet' ? a.description : undefined,
+    icon: page.kind === 'applet' ? a.icon : undefined,
+    tagline: id === 'applets' || page.kind === 'applet' ? a.tagline : undefined,
+    minimumHostVersion: page.kind === 'applet' ? a.minimumHostVersion : undefined,
     version: id === 'about' || id === 'applets' || page.kind === 'applet' ? a.version : '',
     runtime: a.runtime,
     collection: a.collection,
@@ -2075,7 +2079,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
     state: a.state,
     error: id === 'applets' && a.error ? hostText('settings.index.appletLifecycle') : null,
     scheduledStartAt: a.scheduledStartAt,
-    startupTiming: id === 'applets' ? a.startupTiming : undefined,
+    startupTiming: id === 'applets' || page.kind === 'applet' ? a.startupTiming : undefined,
     enabled: a.enabled,
     commands: page.kind === 'applet' || id === 'tray' ? a.commands : [],
     tray: id === 'tray' ? a.tray : [],
@@ -2141,6 +2145,9 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
   if (page.kind === 'applet') {
     const a = applets.find((a) => a.id === page.owner)!;
     return {
+      updates: !page.collection
+        ? { ...updater.state, results: updater.state.results.filter((row) => row.id === a.id) }
+        : undefined,
       applets: [
         {
           ...summary(a),
@@ -2779,8 +2786,16 @@ function settingsPageActions(
       );
     };
   }
-  if (page.id === 'about' || page.id === 'applets') {
+  if (
+    page.id === 'about' ||
+    page.id === 'applets' ||
+    (page.kind === 'applet' && !page.collection)
+  ) {
     const target = (value: unknown, groups = false) => {
+      if (page.kind === 'applet') {
+        if (value !== page.owner) throw Error(hostText('settings.index.invalidUpdateTarget'));
+        return page.owner;
+      }
       if (value === undefined) return undefined;
       const id = string(value);
       if (
@@ -2795,7 +2810,8 @@ function settingsPageActions(
       await updater.check([selected ?? 'host']);
       return updater.state.results.find((r) => r.id === (selected ?? 'host'));
     };
-    actions.checkAllUpdates = async () => executeCommand('appdock.updates.check');
+    if (page.kind !== 'applet')
+      actions.checkAllUpdates = async () => executeCommand('appdock.updates.check');
     if (page.id === 'about')
       actions.checkHostOnAboutOpen = async () => updater.checkHostOnAboutOpen();
     if (page.id === 'about')
@@ -2804,7 +2820,7 @@ function settingsPageActions(
     if (page.id === 'applets')
       actions.checkAppletUpdates = async () =>
         updater.check(managedApplets(allApplets()).map((a) => a.id));
-    actions.cancelUpdates = async () => updater.cancel();
+    if (page.kind !== 'applet') actions.cancelUpdates = async () => updater.cancel();
     actions.installUpdates = async ([id]) => {
       const scope = target(id, true)!;
       return scope === 'all' || scope === 'host'

@@ -6,6 +6,9 @@ const { createHash } = require('node:crypto');
 const { launchTestHost } = require('./electron-test-launcher.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
+const shortcutTitle = require('../out/main/shared/settings-navigation').hostSettingsPages.find(
+  ([id]) => id === 'shortcuts',
+)[1];
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', 'about-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
@@ -57,6 +60,7 @@ async function until(fn, label) {
     initial.gestures.enabled = false;
     initial.touchpadGestures.enabled = false;
     initial.updates.checkHostOnStartup = false;
+    initial.updates.checkHostOnAboutOpen = true;
     initial.updates.checkAppletsOnStartup = false;
     initial.updates.allowSameVersion = false;
     const base = 'http://127.0.0.1:' + server.address().port;
@@ -125,9 +129,20 @@ async function until(fn, label) {
     await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await settingsPage(page);
     await page.getByTestId('settings-nav:about').click();
-    await page.getByRole('heading', { name: 'AppDockについて', exact: true, level: 1 }).waitFor();
+    await page.getByRole('heading', { name: 'AppDock.at365', exact: true, level: 1 }).waitFor();
     const overview = page.getByTestId('about-overview');
-    assert.equal(await overview.evaluate((e) => e === e.parentElement.firstElementChild), true);
+    assert.equal(await page.locator('h1').count(), 1);
+    assert(
+      await overview.evaluate(
+        (element) =>
+          !!(
+            element.compareDocumentPosition(
+              document.querySelector('[data-testid="settings-page-tools"]'),
+            ) & Node.DOCUMENT_POSITION_FOLLOWING
+          ),
+      ),
+      'About information replaces the generic heading above the shared toolbar',
+    );
     await until(
       () => overview.locator('img').evaluate((e) => e.complete && e.naturalWidth > 0),
       'icon loaded',
@@ -160,15 +175,32 @@ async function until(fn, label) {
       1,
     );
     assert.equal(
-      await overview.getByRole('button', { name: 'AppDockとAppletをすべて更新', exact: true }).count(),
+      await overview
+        .getByRole('button', { name: 'AppDockとAppletをすべて更新', exact: true })
+        .count(),
       1,
     );
     assert.equal(
       await overview.getByRole('button', { name: 'AppDockを更新', exact: true }).count(),
       1,
     );
-    const options = page.locator('.about-page > details.settings-section');
-    assert.equal(await options.evaluate((e) => e.open), false);
+    const options = page.getByTestId('update-settings');
+    const setOptionsOpen = async (open) => {
+      if ((await options.evaluate((element) => element.open)) !== open)
+        await options.locator(':scope > summary').click();
+    };
+    const timing = page.getByTestId('host-startup-timing');
+    assert(await timing.getByText('起動時間の計測', { exact: true }).isVisible());
+    assert(
+      await timing.evaluate((element) => element === element.parentElement.lastElementChild),
+      'startup timing is the last section after update settings',
+    );
+    assert.equal(await options.evaluate((e) => e.open), true);
+    assert.equal(
+      await options.getByRole('switch').first().getAttribute('aria-label'),
+      require('../out/main/shared/settings-catalog').hostSettingItem('about', 'allowSameVersion')
+        .title,
+    );
     await until(
       async () =>
         !(await snapshot()).updates.busy &&
@@ -177,6 +209,16 @@ async function until(fn, label) {
     );
     assert.deepEqual(requests, ['host']);
     assert.equal((await snapshot()).updates.notice, undefined);
+    await page.getByRole('button', { name: 'JSON', exact: true }).click();
+    await page.getByRole('heading', { name: 'AppDockについて', exact: true, level: 1 }).waitFor();
+    assert.equal(await overview.count(), 0);
+    await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+    await page.getByRole('heading', { name: 'AppDock.at365', exact: true, level: 1 }).waitFor();
+    assert.deepEqual(
+      requests,
+      ['host'],
+      'returning to the form preserves automatic check throttle',
+    );
     assert.equal(
       await checkBorder(overview.getByRole('button', { name: '更新を確認', exact: true })),
       '0px',
@@ -186,7 +228,7 @@ async function until(fn, label) {
       return button.evaluate((e) => getComputedStyle(e).borderTopWidth);
     }
     checks.push(
-      'information panel, frameless check icon, initially collapsed settings and one quiet automatic host check',
+      'information panel, frameless check icon, initially expanded update settings with allow-same-version first and one quiet automatic host check',
     );
     const oldCount = (await model()).content.auxiliary.aboutStats.commandCount;
     await page.evaluate(async () => {
@@ -233,12 +275,12 @@ async function until(fn, label) {
       String(oldCount + 1),
     );
     await page.getByTestId('settings-nav:shortcuts').click();
-    await page
-      .getByRole('heading', { name: 'ショートカットキー', exact: true, level: 1 })
-      .waitFor();
+    await page.getByRole('heading', { name: shortcutTitle, exact: true, level: 1 }).waitFor();
     const catalog = (await model()).content.auxiliary.commands;
     await page.getByTestId('settings-nav:about').click();
     await overview.waitFor();
+    assert.equal(await options.evaluate((e) => e.open), true);
+    await setOptionsOpen(false);
     assert.equal(
       (await model()).content.auxiliary.aboutStats.commandCount,
       new Set(catalog.map((c) => c.id)).size,
@@ -313,7 +355,7 @@ async function until(fn, label) {
         ? 'all/host update targets match same-version local feeds; closed settings stay closed'
         : 'development update execution is deferred to the fixed EXE',
     );
-    await options.locator(':scope > summary').click();
+    await setOptionsOpen(true);
     assert.equal(
       await page
         .getByText(
@@ -330,12 +372,10 @@ async function until(fn, label) {
     assert.equal((await snapshot()).settings.value.updates.checkHostOnAboutOpen, false);
     const beforeReopen = requests.length;
     await page.getByTestId('settings-nav:shortcuts').click();
-    await page
-      .getByRole('heading', { name: 'ショートカットキー', level: 1, exact: true })
-      .waitFor();
+    await page.getByRole('heading', { name: shortcutTitle, level: 1, exact: true }).waitFor();
     await page.getByTestId('settings-nav:about').click();
     await overview.waitFor();
-    await options.locator(':scope > summary').click();
+    await setOptionsOpen(true);
     await page.getByRole('switch', { name: 'AppDockの更新を自動で確認', exact: true }).click();
     await settleSettings(page);
     await page.waitForTimeout(150);
@@ -373,7 +413,7 @@ async function until(fn, label) {
       .click();
     await settleSettings(page);
     checks.push(
-      'collapsed update settings preserve save behavior, automatic check opt-out/throttle and adjacent icon reset',
+      'collapsible update settings preserve save behavior, automatic check opt-out/throttle and adjacent icon reset',
     );
     const appletTile = overview.getByRole('button', { name: 'Appletの管理と更新', exact: true });
     await appletTile.focus();
@@ -409,6 +449,7 @@ async function until(fn, label) {
           .locator('.settings-body')
           .evaluate((e) => ({ clientWidth: e.clientWidth, scrollWidth: e.scrollWidth }));
         assert(size.scrollWidth <= size.clientWidth + 2, JSON.stringify(size));
+        await page.mouse.move(0, 0);
         const actions = await overview
           .locator('.about-update-buttons button')
           .evaluateAll((elements) =>
@@ -440,13 +481,6 @@ async function until(fn, label) {
         await hostButton.hover();
         assert.equal(await hostButton.evaluate((e) => getComputedStyle(e).borderTopColor), accent);
         assert.equal(await hostButton.evaluate((e) => getComputedStyle(e).filter), 'none');
-        await page.getByRole('button', { name: 'ファイルを開く', exact: true }).hover();
-        assert.equal(
-          await page
-            .getByRole('button', { name: 'ファイルを開く', exact: true })
-            .evaluate((e) => getComputedStyle(e).borderTopColor),
-          accent,
-        );
         if (width === 1280) {
           const boxes = await versionRow
             .locator('.version-display, button, time')

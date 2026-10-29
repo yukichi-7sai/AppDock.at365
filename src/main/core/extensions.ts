@@ -34,6 +34,7 @@ import { closeWebAccounts, validateWebAccounts } from './web-accounts';
 import { closeAppletPages } from './applet-pages';
 import { parseAppletPages } from '../../shared/applet-pages';
 import { parseRibbonItems } from '../../shared/ribbon-items';
+import { ribbonGroupIcons } from '../../shared/ribbon';
 import { appletEnabled } from '../../shared/applet-state';
 import { parsePageCollections } from '../../shared/page-collections';
 import type {
@@ -78,6 +79,14 @@ function readManifest(
     (typeof m.displayName !== 'string' || !m.displayName.trim() || m.displayName.length > 100)
   )
     throw new Error(hostText('services.extensions.displayName'));
+  if (m.description !== undefined && typeof m.description !== 'string')
+    throw new Error(hostText('services.extensions.manifestFormat'));
+  if (
+    (m.icon !== undefined && !ribbonGroupIcons.includes(m.icon)) ||
+    (m.tagline !== undefined &&
+      (typeof m.tagline !== 'string' || /[\r\n\u2028\u2029]/.test(m.tagline)))
+  )
+    throw new Error(hostText('services.extensions.manifestFormat'));
   if (m.minimumHostVersion !== undefined) parseVersion(m.minimumHostVersion);
   if (m.updateRepository !== undefined && !validRepository(m.updateRepository))
     throw new Error(hostText('services.extensions.updateRepository'));

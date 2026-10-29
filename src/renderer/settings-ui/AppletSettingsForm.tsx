@@ -25,6 +25,7 @@ import { ObjectListSetting } from './ObjectListSetting';
 import { ObjectListDialogSetting } from './ObjectListDialogSetting';
 import { useSettingsControls } from './api';
 import { RegisteredImageInput } from './RegisteredImagePicker';
+import { AppletStartupTimingPanel } from './AppletStartupTimingPanel';
 
 /** Shared manifest-driven body for the settings index and Applet detail tab. */
 export function AppletSettingsForm({
@@ -373,6 +374,7 @@ export function AppletSettingsForm({
           {commonFields}
         </SettingsSection>
       )}
+      {!applet.collection && <AppletStartupTimingPanel applet={applet} />}
     </div>
   );
 }

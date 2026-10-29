@@ -119,6 +119,7 @@ export function UpdateSettings({
       title={translate('settings.updateSettings.settings')}
       hint={translate('settings.updateSettings.settingsHint')}
       collapsible
+      defaultOpen
       {...settingAnchor('about', 'updates')}
       data-testid="update-settings"
     >
@@ -157,11 +158,11 @@ export function UpdateSettings({
       </SettingsField>
       {(
         [
+          'allowSameVersion',
           'checkHostOnAboutOpen',
           'checkHostOnStartup',
           'checkAppletsOnStartup',
           'notifyOnStartup',
-          'allowSameVersion',
         ] as const
       ).map((key) => (
         <SettingsField

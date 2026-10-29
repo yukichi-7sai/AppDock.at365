@@ -4,6 +4,7 @@ import { hostStartupCounts } from '../../shared/host-startup-timing';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsContent, SettingsSection } from '../settings-ui/SettingsSections';
 import { SettingsTextarea } from '../settings-ui/SettingsInput';
+import '../settings-ui/startup-timing.css';
 
 export function HostStartupTimingPanel({ timing }: { timing?: HostStartupTiming }) {
   const { t, language } = useHostTranslation();

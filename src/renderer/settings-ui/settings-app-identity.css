@@ -1,0 +1,109 @@
+.about-overview,
+.applet-information {
+  min-width: 0;
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-soft) 60%, var(--panel)),
+    var(--panel) 65%
+  );
+}
+.about-identity {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-width: 0;
+}
+.about-app-icon {
+  flex: none;
+  width: 80px;
+  height: 80px;
+  border-radius: 19px;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--text) 12%, transparent);
+}
+.about-identity-copy {
+  min-width: 0;
+  flex: 1;
+}
+.about-welcome {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.about-identity :is(h1, h2) {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+.about-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+.about-version {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-block: 3px;
+}
+.about-version > * {
+  flex: none;
+}
+.about-version .about-update-check {
+  min-height: 30px;
+  width: 30px;
+  padding: 4px;
+  background: transparent;
+  border: 0;
+}
+.about-version time {
+  font-size: 11px;
+}
+@container settings-page (max-width: 540px) {
+  .about-overview,
+  .applet-information {
+    padding: 22px;
+    border-radius: 20px;
+  }
+  .about-identity {
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .about-app-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+  }
+  .about-identity :is(h1, h2) {
+    font-size: 24px;
+  }
+}
+@container settings-page (max-width: 360px) {
+  .about-overview,
+  .applet-information {
+    padding: 18px;
+  }
+  .about-identity {
+    flex-direction: column;
+  }
+  .about-identity-copy {
+    width: 100%;
+  }
+}

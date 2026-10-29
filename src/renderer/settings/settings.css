@@ -212,6 +212,10 @@
   gap: 8px;
   margin-bottom: 20px;
 }
+.settings-page-overview {
+  min-width: 0;
+  margin-bottom: 20px;
+}
 .settings-page-heading h1 {
   font-size: 24px;
   font-weight: 600;
