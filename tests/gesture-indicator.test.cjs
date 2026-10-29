@@ -56,7 +56,7 @@ test('indicator notices accept bounded presentation data and reject malformed in
     );
 });
 test('web indicator ignores stale revisions and hides when paused or recording', async () => {
-  const state = { recording: false },
+  const state = { recording: false, settings: createDefaultSettings() },
     shown = [],
     hidden = [];
   const manager = new InputCaptureManager(
@@ -70,11 +70,12 @@ test('web indicator ignores stale revisions and hides when paused or recording',
   );
   manager.revision = 7;
   manager.indicator = {
-    show: (m) => shown.push(m),
+    show: (m, followCursor) => shown.push({ model: m, followCursor }),
     hide: () => hidden.push(true),
   };
   await manager.event('gestures.indicator', notice());
   assert.equal(shown.length, 1);
+  assert.equal(shown[0].followCursor, false);
   await manager.event('gestures.indicator', { ...notice(), revision: 6 });
   assert.equal(shown.length, 1);
   await manager.event('gestures.indicator', { ...notice(), captions: [3] });
@@ -92,6 +93,11 @@ test('web indicator ignores stale revisions and hides when paused or recording',
   manager.stopped = true;
   await manager.event('gestures.indicator', notice());
   assert.equal(shown.length, 1);
+  manager.stopped = false;
+  state.settings.gestures.indicatorPosition = 'cursor-follow';
+  await manager.event('gestures.indicator', notice());
+  assert.equal(shown[1].followCursor, true);
+  assert.deepEqual(shown[1].model, readGestureIndicatorNotice(notice()));
 });
 test('display lifetime does not reconfigure or cancel input capture', async () => {
   const settings = createDefaultSettings();
@@ -143,6 +149,198 @@ test('display lifetime does not reconfigure or cancel input capture', async () =
   assert.equal(hidden.length, 1);
   await manager.close();
   assert.equal(hidden.length, 2);
+});
+async function indicatorHostFixture(t) {
+  const handlers = new Map(),
+    listeners = new Map(),
+    sent = [];
+  let window,
+    cursor = { x: 100, y: 100 },
+    conversions = 0;
+  class FakeWindow extends EventEmitter {
+    constructor() {
+      super();
+      window = this;
+      this.bounds = { x: 0, y: 0, width: 1, height: 1 };
+      this.moves = [];
+      this.visible = false;
+      this.destroyed = false;
+      this.promotions = 0;
+      this.webContents = new EventEmitter();
+      Object.assign(this.webContents, {
+        mainFrame: {},
+        setZoomMode() {},
+        setZoomFactor() {},
+        setWindowOpenHandler() {},
+        session: { setPermissionRequestHandler() {} },
+        getURL: () => 'file:///indicator.html',
+        send: (...args) => sent.push(args),
+      });
+    }
+    setIgnoreMouseEvents() {}
+    async loadURL() {
+      handlers.get('gesture-indicator:connect')(event());
+    }
+    isDestroyed() {
+      return this.destroyed;
+    }
+    isVisible() {
+      return this.visible;
+    }
+    getBounds() {
+      return this.bounds;
+    }
+    setBounds(bounds) {
+      this.bounds = bounds;
+      this.moves.push(bounds);
+    }
+    showInactive() {
+      this.visible = true;
+    }
+    setAlwaysOnTop() {
+      this.promotions++;
+    }
+    hide() {
+      this.visible = false;
+    }
+    destroy() {
+      this.destroyed = true;
+      this.emit('closed');
+    }
+  }
+  const event = () => ({ sender: window.webContents, senderFrame: window.webContents.mainFrame });
+  const exports = {};
+  vm.runInNewContext(
+    fs.readFileSync(path.resolve('out/main/main/core/gesture-indicator-host.js'), 'utf8'),
+    {
+      exports,
+      require: (name) =>
+        name === 'electron'
+          ? {
+              BrowserWindow: FakeWindow,
+              ipcMain: {
+                handle: (name, fn) => handlers.set(name, fn),
+                on: (name, fn) => listeners.set(name, fn),
+                removeHandler: (name) => handlers.delete(name),
+                removeListener: (name) => listeners.delete(name),
+              },
+              screen: {
+                getCursorScreenPoint: () => cursor,
+                screenToDipPoint: ({ x, y }) => {
+                  conversions++;
+                  return { x: x / 2, y: y / 2 };
+                },
+                getDisplayNearestPoint: ({ x }) => ({
+                  id: x < 0 ? 2 : 1,
+                  scaleFactor: x < 0 ? 2 : 1,
+                  bounds:
+                    x < 0
+                      ? { x: -800, y: 0, width: 800, height: 600 }
+                      : { x: 0, y: 0, width: 1920, height: 1080 },
+                }),
+              },
+            }
+          : name === './appearance-host'
+            ? { appearanceArguments: () => [], registerAppearance() {} }
+            : { hostText: (key) => key },
+      setTimeout,
+      clearTimeout,
+    },
+  );
+  const host = new exports.GestureIndicatorHost({
+    url: 'file:///indicator.html',
+    preload: 'fixture',
+    failed() {},
+  });
+  await host.initialize();
+  t.after(() => host.dispose());
+  return {
+    host,
+    window,
+    sent,
+    handlers,
+    conversions: () => conversions,
+    cursor: (point) => {
+      cursor = point;
+    },
+    tick: (sequence = host.sequence, changes = {}) =>
+      listeners.get('gesture-indicator:follow')?.({ ...event(), ...changes }, sequence),
+    measured: (sequence, width = 200, height = 100) =>
+      listeners.get('gesture-indicator:measured')(event(), { sequence, width, height }),
+    frame: () => handlers.get('gesture-indicator:connect')(event()),
+  };
+}
+test('cursor following starts after measurement and moves without content updates or repeated promotion', async (t) => {
+  const f = await indicatorHostFixture(t);
+  f.host.show(notice(), true);
+  assert.equal(f.frame().followCursor, true);
+  f.tick();
+  assert.equal(f.window.moves.length, 0, 'frame before measurement cannot show or move the window');
+  f.measured(f.frame().sequence - 1);
+  assert.equal(f.window.visible, false);
+  f.measured(f.frame().sequence);
+  assert.deepEqual({ ...f.window.bounds }, { x: 116, y: 116, width: 200, height: 100 });
+  const sent = f.sent.length;
+  f.tick();
+  assert.equal(f.window.moves.length, 1, 'stationary cursor does not move the window');
+  f.cursor({ x: 200, y: 150 });
+  f.tick(f.frame().sequence - 1);
+  f.tick(String(f.frame().sequence));
+  f.tick(f.frame().sequence, { sender: {} });
+  f.tick(f.frame().sequence, { senderFrame: null });
+  assert.equal(
+    f.window.moves.length,
+    1,
+    'stale or unauthorized frame requests do not move the window',
+  );
+  f.tick();
+  assert.deepEqual({ ...f.window.bounds }, { x: 216, y: 166, width: 200, height: 100 });
+  assert.equal(f.sent.length, sent, 'no rendering IPC for position-only updates');
+  assert.equal(f.window.promotions, 1);
+  assert.equal(f.conversions(), 0, 'cursor DIP coordinates are not converted twice');
+});
+test('following stays inside the current display, including negative coordinates and a larger panel', async (t) => {
+  const f = await indicatorHostFixture(t);
+  f.host.show(notice(), true);
+  f.measured(f.frame().sequence);
+  f.cursor({ x: 1919, y: 1079 });
+  f.tick();
+  assert.deepEqual({ ...f.window.bounds }, { x: 1720, y: 980, width: 200, height: 100 });
+  f.cursor({ x: -780, y: 590 });
+  f.tick();
+  assert.deepEqual({ ...f.window.bounds }, { x: -764, y: 500, width: 200, height: 100 });
+  f.measured(f.frame().sequence, 1000, 700);
+  assert.deepEqual({ ...f.window.bounds }, { x: -800, y: 0, width: 800, height: 600 });
+  f.cursor({ x: 100, y: 100 });
+  f.tick();
+  assert.deepEqual({ ...f.window.bounds }, { x: 116, y: 116, width: 1000, height: 700 });
+});
+test('hide, fixed placement, renderer failure and close stop cursor tracking and reject stale sizing', async (t) => {
+  const f = await indicatorHostFixture(t);
+  f.host.show(notice(), true);
+  f.measured(f.frame().sequence);
+  const oldSequence = f.frame().sequence;
+  f.host.hide();
+  f.measured(oldSequence);
+  f.tick();
+  assert.equal(f.frame().followCursor, false);
+  assert.equal(f.window.visible, false);
+  f.host.show(notice());
+  f.measured(f.frame().sequence);
+  f.cursor({ x: 600, y: 600 });
+  f.tick();
+  assert.deepEqual({ ...f.window.bounds }, { x: -800, y: 150, width: 200, height: 100 });
+  f.host.show(notice(), true);
+  f.measured(f.frame().sequence);
+  f.window.webContents.emit('render-process-gone');
+  f.tick();
+  assert.equal(f.host.available(), false);
+  const g = await indicatorHostFixture(t);
+  g.host.show(notice(), true);
+  g.measured(g.frame().sequence);
+  g.window.destroy();
+  g.tick();
+  assert.equal(g.host.available(), false);
 });
 test('failed or stalled display initialization reports once without blocking host startup', async () => {
   for (const mode of ['failed', 'stalled']) {

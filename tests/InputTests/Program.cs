@@ -19,6 +19,7 @@ internal static partial class Program
         if(args is ["--input-blocking",var inputBlockingAssembly]) return RunInputBlockingTests(inputBlockingAssembly);
         if(args is ["--indicator-notices",var indicatorAssembly]) return RunIndicatorNoticeTests(indicatorAssembly);
         if(args is ["--indicator-stages",var indicatorTarget,var indicatorHandle,var indicatorExchange]) return RunIndicatorStages(indicatorTarget,indicatorHandle,indicatorExchange);
+        if(args is ["--follow-indicator-stages",var followTarget,var followIndicator,var followExchange]) return RunIndicatorStages(followTarget,followIndicator,followExchange,follow:true);
         if(args is ["--external-indicator-stages",var externalTarget,var externalIndicator,var externalExchange]) return RunIndicatorStages(externalTarget,externalIndicator,externalExchange,external:true);
         if(args is ["--desktop-indicator-stages",var desktopTarget,var desktopIndicator,var desktopExchange]) return RunIndicatorStages(desktopTarget,desktopIndicator,desktopExchange,true);
         if(args is ["--send" or "--send-inactive",var handle,var action]) {

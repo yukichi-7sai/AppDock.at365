@@ -65,7 +65,13 @@ test('no-action preview defaults on for old settings and preserves an explicit o
   assert.equal(old.indicatorShowNoAction, true);
   delete old.indicatorShowNoAction;
   assert.equal(parseGestures(old).indicatorShowNoAction, true);
-  for (const indicatorPosition of ['gesture-start', 'window-center', 'monitor-center', 'none']) {
+  for (const indicatorPosition of [
+    'gesture-start',
+    'cursor-follow',
+    'window-center',
+    'monitor-center',
+    'none',
+  ]) {
     const parsed = parseGestures({ ...old, indicatorPosition, indicatorShowNoAction: false });
     assert.equal(parsed.indicatorShowNoAction, false);
     assert.equal(parsed.indicatorPosition, indicatorPosition);

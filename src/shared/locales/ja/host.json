@@ -773,6 +773,7 @@
   "settings.gestureOptions.activateHint": "右ボタンを押した場所をアクティブにして、その対象でジェスチャーを開始します。",
   "settings.gestureOptions.feel": "操作感",
   "settings.gestureOptions.startPosition": "ジェスチャー開始地点",
+  "settings.gestureOptions.cursorFollow": "カーソルに追従",
   "settings.gestureOptions.windowCenter": "対象ウィンドウの中央",
   "settings.gestureOptions.monitorCenter": "カーソルのあるモニターの中央",
   "settings.gestureOptions.hidden": "表示なし",

@@ -17,11 +17,13 @@ export type GestureIndicatorNotice =
 export interface GestureIndicatorFrame {
   sequence: number;
   model: GestureIndicatorModel | null;
+  followCursor: boolean;
 }
 export interface GestureIndicatorApi {
   connect(): Promise<GestureIndicatorFrame>;
   onChanged(callback: (frame: GestureIndicatorFrame) => void): () => void;
   measured(sequence: number, width: number, height: number): void;
+  follow(sequence: number): void;
 }
 export function readGestureIndicatorNotice(value: unknown): GestureIndicatorNotice | undefined {
   if (!value || typeof value !== 'object') return;

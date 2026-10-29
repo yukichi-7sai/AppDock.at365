@@ -6,8 +6,7 @@ module.exports = async ({ page, host, profile, checks }) => {
   const snapshot = () => host.evaluate(() => window.dock.snapshot());
   const save = () => settleSettings(page);
   const before = structuredClone((await snapshot()).settings.value.gestures);
-  const options = page.locator('.gesture-settings-section');
-  if ((await options.getAttribute('open')) === null) await options.locator('summary').click();
+  const options = page.getByTestId('mouse-gesture-enablement');
   const position = options.getByLabel('表示位置', { exact: true });
   const design = options.getByLabel('デザイン', { exact: true });
   const opacity = options.getByLabel('不透明度', { exact: true });
@@ -45,6 +44,21 @@ module.exports = async ({ page, host, profile, checks }) => {
     designs,
   );
   assert.equal(await design.inputValue(), 'compact');
+  await position.selectOption({ label: 'カーソルに追従' });
+  await save();
+  assert.equal((await snapshot()).settings.value.gestures.indicatorPosition, 'cursor-follow');
+  assert.equal(
+    JSON.parse(require('node:fs').readFileSync(path.join(profile, 'settings.json'), 'utf8'))
+      .gestures.indicatorPosition,
+    'cursor-follow',
+  );
+  assert.deepEqual((await snapshot()).settings.value.gestures, {
+    ...before,
+    indicatorPosition: 'cursor-follow',
+  });
+  checks.push(
+    'cursor-follow selection saves immediately while retaining all other gesture settings',
+  );
   await position.selectOption('gesture-start');
   await opacity.fill('0.65');
   await opacity.press('Enter');
@@ -132,13 +146,13 @@ module.exports = async ({ page, host, profile, checks }) => {
     'actual host theme settings propagate to the preview / all four designs fit dark and light at 1280, 900 and 700 pixels',
   );
   await design.selectOption('ring');
-  await position.selectOption('none');
+  await position.selectOption('cursor-follow');
   await save();
   const saved = (await snapshot()).settings.value.gestures;
   assert.deepEqual(saved, {
     ...before,
     indicatorStyle: 'ring',
-    indicatorPosition: 'none',
+    indicatorPosition: 'cursor-follow',
     indicatorOpacity: 0.65,
   });
   checks.push(

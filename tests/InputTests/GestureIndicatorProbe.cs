@@ -6,7 +6,7 @@ using System.Windows.Forms;
 internal static partial class Program
 {
     // Mouse-only handshake lets the browser test inspect a live gesture before release.
-    private static int RunIndicatorStages(string targetText, string overlayText, string exchange, bool desktop = false, bool external = false)
+    private static int RunIndicatorStages(string targetText, string overlayText, string exchange, bool desktop = false, bool external = false, bool follow = false)
     {
         var original=Cursor.Position;
         using var externalWindow=external?new Probe { Text="AppDock isolated topmost competitor",Inactive=true,StartPosition=FormStartPosition.Manual,Size=new(160,100) }:null;
@@ -35,7 +35,19 @@ internal static partial class Program
             if(GetForegroundWindow()!=target)throw new Exception("Indicator target did not become foreground.");
             GetWindowRect(target,out var bounds);
             var sourcePoint=new System.Drawing.Point(bounds.Left+80,bounds.Top+200);
-            Cursor.Position=new((bounds.Left+bounds.Right)/2,(bounds.Top+bounds.Bottom)/2);
+            var startPoint=new System.Drawing.Point((bounds.Left+bounds.Right)/2,(bounds.Top+bounds.Bottom)/2);
+            bool CanStart(System.Drawing.Point point) => new[]{point,new(point.X+85,point.Y),new(point.X+85,point.Y-85)}
+                .All(p=>AppDock.InputHost.GestureTarget.Matches(source,AppDock.InputHost.GestureTarget.At(new(p.X,p.Y))));
+            if(!desktop&&!CanStart(startPoint)){
+                var found=false;
+                for(var y=bounds.Top+180;y<bounds.Bottom-100&&!found;y+=100)
+                    for(var x=bounds.Left+100;x<bounds.Right-180;x+=100){
+                        var point=new System.Drawing.Point(x,y);
+                        if(CanStart(point)){startPoint=point;found=true;break;}
+                    }
+                if(!found)throw new Exception($"No uncovered input surface is available in the isolated gesture target: source={source}, bounds={bounds.Left},{bounds.Top},{bounds.Right},{bounds.Bottom}, centerHit={AppDock.InputHost.GestureTarget.At(new(startPoint.X,startPoint.Y))}.");
+            }
+            Cursor.Position=startPoint;
             if(externalWindow!=null){
                 externalWindow.Location=new(Cursor.Position.X+50,Cursor.Position.Y+10);
                 externalWindow.Show();
@@ -59,6 +71,7 @@ internal static partial class Program
                     && Environment.TickCount64<visibleUntil)Pause(10);
                 if(!IsWindowVisible(overlay))throw new Exception("Indicator did not appear: "+InputFocusDiagnostic());
                 var sourceUncovered=GetAncestor(WindowFromPoint(sourcePoint),2)==source;
+                GetWindowRect(overlay,out var overlayBounds);
                 if(desktop&&!sourceUncovered)throw new Exception("Desktop activation covered the source window.");
                 File.WriteAllText(Path.Combine(exchange,name+".json"),JsonSerializer.Serialize(new {
                     foreground=GetForegroundWindow().ToInt64(),target=target.ToInt64(),
@@ -72,19 +85,53 @@ internal static partial class Program
                     externalTopmost=externalWindow!=null && (GetIndicatorWindowLong(externalWindow.Handle,-20)&8)!=0,
                     targetTopmost=(GetIndicatorWindowLong(source,-20)&8)!=0,
                     overlayDemotedBeforeStart=true,external
+                    ,overlayWidth=overlayBounds.Right-overlayBounds.Left,overlayHeight=overlayBounds.Bottom-overlayBounds.Top
                 }));
                 var until=Environment.TickCount64+15000;
-                while(!File.Exists(Path.Combine(exchange,name+".continue")) && Environment.TickCount64<until)Pause(10);
+                var motionRun=false;
+                while(!File.Exists(Path.Combine(exchange,name+".continue")) && Environment.TickCount64<until){
+                    if(!motionRun&&File.Exists(Path.Combine(exchange,name+".motion"))){
+                        motionRun=true;
+                        var began=System.Diagnostics.Stopwatch.GetTimestamp();
+                        var duration=System.Diagnostics.Stopwatch.Frequency*3;
+                        var point=Cursor.Position;
+                        var samples=new List<object>();
+                        var lastX=int.MinValue;
+                        var moves=0;
+                        while(System.Diagnostics.Stopwatch.GetTimestamp()-began<duration){
+                            var elapsed=(System.Diagnostics.Stopwatch.GetTimestamp()-began)/(double)System.Diagnostics.Stopwatch.Frequency;
+                            Cursor.Position=new(point.X+(int)(elapsed*180),point.Y);moves++;
+                            GetWindowRect(overlay,out var current);
+                            if(current.Left!=lastX){samples.Add(new {at=elapsed*1000,x=current.Left,y=current.Top,width=current.Right-current.Left,height=current.Bottom-current.Top});lastX=current.Left;}
+                            Application.DoEvents();Thread.Sleep(1);
+                        }
+                        File.WriteAllText(Path.Combine(exchange,name+".motion.json"),JsonSerializer.Serialize(new {seconds=3,inputUpdates=moves,samples}));
+                    }
+                    Pause(5);
+                }
                 if(Environment.TickCount64>=until)throw new Exception("Indicator stage timed out: "+name);
                 if(!AppDock.InputHost.GestureTarget.Matches(target,GetForegroundWindow()))throw new Exception("Indicator stole or lost the gesture target focus.");
             }
             if(desktop)DismissDesktopContextMenu().GetAwaiter().GetResult();
+            File.WriteAllText(Path.Combine(exchange,"preflight.json"),JsonSerializer.Serialize(new {
+                source=source.ToInt64(),target=target.ToInt64(),foreground=GetForegroundWindow().ToInt64(),
+                hit=AppDock.InputHost.GestureTarget.At(new(Cursor.Position.X,Cursor.Position.Y)).ToInt64(),
+                blocked=AppDock.InputHost.GestureTarget.BlocksGestureStart(target,GetForegroundWindow()),
+                held=new[]{0x10,0x11,0x12,0x5B,0x5C,0x01,0x02,0x04,0x05,0x06}.Where(k=>(GetAsyncKeyState(k)&0x8000)!=0).ToArray(),
+                cursor=Cursor.Position.ToString(),bounds=new {bounds.Left,bounds.Top,bounds.Right,bounds.Bottom}
+            }));
+            if(!desktop&&!AppDock.InputHost.GestureTarget.Matches(target,AppDock.InputHost.GestureTarget.At(new(Cursor.Position.X,Cursor.Position.Y))))
+                throw new Exception("Input pointer did not reach the isolated gesture target.");
             Mouse(8);rightHeld=true;Pause(80);
             if(desktop){
                 deadline=Environment.TickCount64+2000;
                 while(!AppDock.InputHost.GestureTarget.Matches(target,GetForegroundWindow())&&Environment.TickCount64<deadline)Pause(10);
             }
             Cursor.Position=new(Cursor.Position.X+85,Cursor.Position.Y);Pause(120);Stage("one");
+            if(follow){
+                Cursor.Position=new(Cursor.Position.X+85,Cursor.Position.Y);Pause(120);Stage("follow");
+                Cursor.Position=new(Screen.FromPoint(Cursor.Position).Bounds.Right-1,Cursor.Position.Y);Pause(120);Stage("edge");
+            }
             Cursor.Position=new(Cursor.Position.X,Cursor.Position.Y-85);Pause(120);Stage("two");
             Mouse(16);rightHeld=false;Pause(120);
             File.WriteAllText(Path.Combine(exchange,"released"),"ok");

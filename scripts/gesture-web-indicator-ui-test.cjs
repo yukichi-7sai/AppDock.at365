@@ -69,7 +69,9 @@ const checks = [];
 const portable = process.argv.includes('--portable');
 const desktopOnly = process.argv.includes('--desktop-only');
 const topmostOnly = process.argv.includes('--topmost-only');
-const groups = desktopOnly ? 2 : topmostOnly ? 9 : 11;
+const followOnly = process.argv.includes('--follow-only');
+const styles = ['pill', 'compact', 'ring', 'classic'];
+const groups = followOnly ? 8 : desktopOnly ? 2 : topmostOnly ? 9 : 19;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 let artifactHash;
 (async () => {
@@ -91,7 +93,7 @@ let artifactHash;
     main = app
       .context()
       .pages()
-      .find((page) => page.url().endsWith('/index.html'));
+      .find((page) => page.url().startsWith('appdock://host/'));
     return !!main;
   }, 'main renderer exists');
   await until(
@@ -113,8 +115,8 @@ let artifactHash;
     const overlay = BrowserWindow.getAllWindows().find((win) =>
       win.webContents.getURL().endsWith('/gesture-indicator.html'),
     );
-    const host = BrowserWindow.getAllWindows().find(
-      (win) => win !== overlay && !!win.webContents.getURL().endsWith('/index.html'),
+    const host = BrowserWindow.getAllWindows().find((win) =>
+      win.webContents.getURL().startsWith('appdock://host/'),
     );
     return {
       host: host.getNativeWindowHandle().readBigUInt64LE().toString(),
@@ -123,6 +125,10 @@ let artifactHash;
     };
   });
   assert.equal(handles.focusable, false);
+  await app.evaluate(({ ipcMain }) => {
+    globalThis.__indicatorFollowRequests = 0;
+    ipcMain.on('gesture-indicator:follow', () => globalThis.__indicatorFollowRequests++);
+  });
   for (const theme of desktopOnly ? ['dark'] : ['dark', 'light']) {
     await main.evaluate(async (theme) => {
       const s = await window.dock.snapshot();
@@ -133,23 +139,25 @@ let artifactHash;
       () => indicator.evaluate((theme) => document.documentElement.dataset.theme === theme, theme),
       'shared appearance updated',
     );
-    for (const variant of desktopOnly
-      ? ['desktop', 'exe']
-      : [
-          'pill',
-          'compact',
-          'ring',
-          'classic',
-          ...(theme === 'dark' ? [...(topmostOnly ? [] : ['desktop', 'exe']), 'external'] : []),
-        ]) {
+    for (const variant of followOnly
+      ? styles.map((style) => 'follow-' + style)
+      : desktopOnly
+        ? ['desktop', 'exe']
+        : [
+            ...styles,
+            ...(topmostOnly ? [] : styles.map((style) => 'follow-' + style)),
+            ...(theme === 'dark' ? [...(topmostOnly ? [] : ['desktop', 'exe']), 'external'] : []),
+          ]) {
       const desktop = variant === 'desktop' || variant === 'exe';
       const external = variant === 'external';
-      const style = desktop || external ? 'pill' : variant;
+      const follow = variant.startsWith('follow-');
+      const style = desktop || external ? 'pill' : follow ? variant.slice(7) : variant;
       await main.evaluate(
-        async ({ style, desktop, scope }) => {
+        async ({ style, desktop, scope, follow }) => {
           const s = await window.dock.snapshot();
           s.settings.value.gestures.indicatorStyle = style;
           s.settings.value.gestures.activateOnStart = desktop;
+          s.settings.value.gestures.indicatorPosition = follow ? 'cursor-follow' : 'window-center';
           for (const binding of s.settings.value.gestures.bindings)
             binding.when = {
               scope: desktop ? scope : 'global',
@@ -158,7 +166,7 @@ let artifactHash;
             };
           await window.dock.saveSettings(s.settings.value, s.settings.revision);
         },
-        { style, desktop, scope: variant },
+        { style, desktop, scope: variant, follow },
       );
       await wait(180);
       const exchange = path.join(profile, theme + '-' + variant);
@@ -166,11 +174,13 @@ let artifactHash;
       child = spawn(
         path.join(root, 'tests/InputTests/bin/Release/net10.0-windows/AppDock.InputTests.exe'),
         [
-          desktop
-            ? '--desktop-indicator-stages'
-            : external
-              ? '--external-indicator-stages'
-              : '--indicator-stages',
+          follow
+            ? '--follow-indicator-stages'
+            : desktop
+              ? '--desktop-indicator-stages'
+              : external
+                ? '--external-indicator-stages'
+                : '--indicator-stages',
           handles.host,
           handles.overlay,
           exchange,
@@ -189,11 +199,16 @@ let artifactHash;
         );
       });
       void completion.catch(() => {});
-      let first;
+      let first, firstNativeSize, previewSequence;
+      const stages = follow ? ['one', 'follow', 'edge', 'two'] : ['one', 'two'];
       try {
-        for (const stage of ['one', 'two']) {
+        for (const stage of stages) {
           await until(
-            () => fs.existsSync(path.join(exchange, stage + '.json')),
+            () => {
+              const failure = path.join(exchange, 'helper-failure.txt');
+              if (fs.existsSync(failure)) throw Error(fs.readFileSync(failure, 'utf8'));
+              return fs.existsSync(path.join(exchange, stage + '.json'));
+            },
             style + ' ' + stage + ' mouse stage',
           );
           const state = JSON.parse(fs.readFileSync(path.join(exchange, stage + '.json'), 'utf8'));
@@ -232,9 +247,33 @@ let artifactHash;
               indicator
                 .locator('.gesture-preview-caption')
                 .count()
-                .then((count) => count === (stage === 'one' ? 1 : 4)),
+                .then((count) => count === (stage === 'two' ? 4 : 1)),
             'caption count',
           );
+          if (follow)
+            await until(
+              () =>
+                app.evaluate(({ BrowserWindow, screen }) => {
+                  const bounds = BrowserWindow.getAllWindows()
+                    .find((win) => win.webContents.getURL().endsWith('/gesture-indicator.html'))
+                    .getBounds();
+                  const cursor = screen.getCursorScreenPoint();
+                  const display = screen.getDisplayNearestPoint(cursor).bounds;
+                  return (
+                    bounds.x ===
+                      Math.max(
+                        display.x,
+                        Math.min(display.x + display.width - bounds.width, cursor.x + 16),
+                      ) &&
+                    bounds.y ===
+                      Math.max(
+                        display.y,
+                        Math.min(display.y + display.height - bounds.height, cursor.y + 16),
+                      )
+                  );
+                }),
+              'cursor-follow reaches the cursor with screen-edge clipping',
+            );
           const current = await app.evaluate(({ BrowserWindow }) =>
             BrowserWindow.getAllWindows()
               .find((win) => win.webContents.getURL().endsWith('/gesture-indicator.html'))
@@ -251,8 +290,32 @@ let artifactHash;
               'desktop window-center resolves to the starting monitor center',
             );
           }
+          if (follow) {
+            const frame = await indicator.evaluate(() => window.appdockGestureIndicator.connect());
+            if (stage === 'one') {
+              first = current;
+              firstNativeSize = [state.overlayWidth, state.overlayHeight];
+              previewSequence = frame.sequence;
+            } else if (stage !== 'two') {
+              assert.equal(
+                frame.sequence,
+                previewSequence,
+                'position-only motion does not redraw content',
+              );
+              assert.deepEqual(frame.model.directions, ['right']);
+              assert.deepEqual(frame.model.captions, ['Command a']);
+              if (stage === 'follow')
+                assert(current.x > first.x, 'same-direction movement follows the cursor');
+            }
+          }
           if (style === 'pill') {
             if (stage === 'one') first = current;
+            else if (follow)
+              assert.deepEqual(
+                [state.overlayWidth, state.overlayHeight],
+                firstNativeSize,
+                'pill size remains stable while following',
+              );
             else
               assert.deepEqual(
                 current,
@@ -262,7 +325,7 @@ let artifactHash;
           }
           assert.equal(
             await indicator.locator('.gesture-preview-arrows svg').count(),
-            style === 'classic' ? 0 : stage === 'one' ? 1 : 2,
+            style === 'classic' ? 0 : stage === 'two' ? 2 : 1,
           );
           assert.equal(
             await indicator.evaluate(
@@ -283,8 +346,8 @@ let artifactHash;
               const overlay = BrowserWindow.getAllWindows().find((win) =>
                 win.webContents.getURL().endsWith('/gesture-indicator.html'),
               );
-              const host = BrowserWindow.getAllWindows().find(
-                (win) => win !== overlay && win.webContents.getURL().endsWith('/index.html'),
+              const host = BrowserWindow.getAllWindows().find((win) =>
+                win.webContents.getURL().startsWith('appdock://host/'),
               );
               ipcMain.emit(
                 'gesture-indicator:measured',
@@ -321,7 +384,7 @@ let artifactHash;
         }
         await completion;
       } finally {
-        for (const stage of ['one', 'two'])
+        for (const stage of stages)
           fs.writeFileSync(path.join(exchange, stage + '.continue'), 'go');
       }
       await until(
@@ -335,11 +398,26 @@ let artifactHash;
         'overlay hides after release',
       );
       checks.push(
-        `${theme}/${variant}: actual mouse input / topmost recovery and native z-order / 1-to-2 direction update / ordered captions / transparent no-focus overlay / release hides`,
+        `${theme}/${variant}: actual mouse input / topmost recovery and native z-order / 1-to-2 direction update / ordered captions / transparent no-focus overlay / release hides${follow ? ' / same-direction cursor following without content updates / screen-edge clipping' : ''}`,
       );
     }
   }
   const callsPath = path.join(profile, 'data/storage/test.web-indicator/calls.json');
+  await until(
+    () =>
+      indicator
+        .locator('.gesture-preview-indicator')
+        .count()
+        .then((count) => count === 0),
+    'hidden indicator content removed',
+  );
+  const hiddenRequests = await app.evaluate(() => globalThis.__indicatorFollowRequests);
+  await wait(250);
+  assert.equal(
+    await app.evaluate(() => globalThis.__indicatorFollowRequests),
+    hiddenRequests,
+    'hidden indicator stops frame requests',
+  );
   await until(
     () =>
       fs.existsSync(callsPath) &&

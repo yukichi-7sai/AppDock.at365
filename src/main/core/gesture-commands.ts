@@ -114,7 +114,7 @@ const configurationFields = {
   indicatorShowNoAction: { type: 'boolean' },
   indicatorPosition: {
     type: 'string',
-    enum: ['gesture-start', 'window-center', 'monitor-center', 'none'],
+    enum: ['gesture-start', 'cursor-follow', 'window-center', 'monitor-center', 'none'],
   },
 };
 const gestureSettings = (settings: Settings): GestureSettings & CommandTriggerOptions => {

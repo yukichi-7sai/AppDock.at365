@@ -4,6 +4,7 @@ const api: GestureIndicatorApi = {
   connect: () => ipcRenderer.invoke('gesture-indicator:connect'),
   measured: (sequence, width, height) =>
     ipcRenderer.send('gesture-indicator:measured', { sequence, width, height }),
+  follow: (sequence) => ipcRenderer.send('gesture-indicator:follow', sequence),
   onChanged: (callback) => {
     const listener = (_: Electron.IpcRendererEvent, frame: GestureIndicatorFrame) =>
       callback(frame);

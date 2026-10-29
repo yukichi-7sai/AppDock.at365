@@ -97,6 +97,9 @@ export function GestureOptions({
             <option value="gesture-start">
               {translate('settings.gestureOptions.startPosition')}
             </option>
+            <option value="cursor-follow">
+              {translate('settings.gestureOptions.cursorFollow')}
+            </option>
             <option value="window-center">
               {translate('settings.gestureOptions.windowCenter')}
             </option>

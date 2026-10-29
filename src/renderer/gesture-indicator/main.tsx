@@ -5,7 +5,11 @@ import { GestureIndicatorView } from './GestureIndicatorView';
 import '../settings-ui/controls.css';
 import './window.css';
 function Indicator() {
-  const [frame, setFrame] = useState<GestureIndicatorFrame>({ sequence: 0, model: null });
+  const [frame, setFrame] = useState<GestureIndicatorFrame>({
+    sequence: 0,
+    model: null,
+    followCursor: false,
+  });
   useEffect(() => {
     const receive = (next: GestureIndicatorFrame) =>
       setFrame((current) => (next.sequence >= current.sequence ? next : current));
@@ -26,6 +30,16 @@ function Indicator() {
       Math.ceil(bounds.height),
     );
   }, [frame]);
+  useEffect(() => {
+    if (!frame.model || !frame.followCursor) return;
+    let request: number;
+    const follow = () => {
+      window.appdockGestureIndicator.follow(frame.sequence);
+      request = requestAnimationFrame(follow);
+    };
+    request = requestAnimationFrame(follow);
+    return () => cancelAnimationFrame(request);
+  }, [frame.sequence, frame.model, frame.followCursor]);
   return frame.model ? <GestureIndicatorView model={frame.model} /> : null;
 }
 createRoot(document.getElementById('root')!).render(<Indicator />);

@@ -274,6 +274,16 @@ test('configure validates ranges/processes atomically, preserves bindings and su
   const revision = f.settings.revision;
   await f.edit(operations);
   assert.equal(f.settings.revision, revision);
+  const following = await f.edit([
+    { kind: 'configure', changes: { indicatorPosition: 'cursor-follow' } },
+  ]);
+  assert.equal(following.settings.indicatorPosition, 'cursor-follow');
+  assert.deepEqual(following.bindings, before.bindings);
+  assert.equal(
+    JSON.parse(fs.readFileSync(f.settings.file, 'utf8')).gestures.indicatorPosition,
+    'cursor-follow',
+  );
+  await f.edit(operations);
   const saved = fs.readFileSync(f.settings.file, 'utf8');
   for (const changes of [
     { distance: 4 },

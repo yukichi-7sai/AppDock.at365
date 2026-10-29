@@ -61,7 +61,7 @@ export interface ShortcutPress {
   target?: CommandTarget;
 }
 export class InputCaptureManager {
-  indicator?: { show(model: GestureIndicatorModel): void; hide(): void };
+  indicator?: { show(model: GestureIndicatorModel, followCursor?: boolean): void; hide(): void };
   private peer?: JsonLinePeer;
   private child?: ChildProcessWithoutNullStreams;
   private fingerprint = '';
@@ -219,7 +219,10 @@ export class InputCaptureManager {
         this.indicator?.hide();
         return;
       }
-      this.indicator?.show(notice);
+      this.indicator?.show(
+        notice,
+        this.state().settings?.gestures?.indicatorPosition === 'cursor-follow',
+      );
       return;
     }
     if (method === 'touchpad.changed') {

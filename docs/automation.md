@@ -112,7 +112,7 @@ revisionは実行ごとのUUIDとSettingsStoreの変更番号からなる不透�
 - update: idとchanges（command/gesture/enabled/whenの部分更新）。whenを指定するときはscope/appletIds/processes全体が必要です。入力変更は移動先の末尾、条件だけの変更は現在位置を保ちます。
 - remove: 削除するidを指定します。存在しないIDはNOT_FOUNDです。
 - reorder: gestureとidsを指定。同じ入力の無効行も含む全IDが必要で、別入力の順序は維持します。
-- configure: changesでenabled、activateOnStart、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、executionMode（all/first）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/window-center/monitor-center/none）、indicatorShowNoAction（boolean）を部分更新します。falseの場合は実行対象のない移動の待機表示を隠し、ジェスチャーの認識・実行・取消は維持します。executionModeは条件一致のすべて／最初の1つ、noneは待機表示なしです。省略された旧executionModeはallになります。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
+- configure: changesでenabled、activateOnStart、browsers、excludedProcesses、requireChromiumWindowClass、distance（5〜500）、wheelDelayMs（0〜5000）、executionMode（all/first）、indicatorOpacity（0.1〜1）、indicatorPosition（gesture-start/cursor-follow/window-center/monitor-center/none）、indicatorShowNoAction（boolean）を部分更新します。indicatorShowNoActionがfalseの場合は実行対象のない移動の待機表示を隠し、ジェスチャーの認識・実行・取消は維持します。cursor-followはカーソルの少し右下へ待機表示だけを追従させ、画面端で現在のモニター内へ収めます。executionModeは条件一致のすべて／最初の1つ、noneは待機表示なしです。省略された旧executionModeはallになります。bindingsの直接置換は受け付けません。トレイの一時停止は保存設定と異なり、この操作では変更しません。
 
 desktop条件はデスクトップの背景・アイコン領域だけに一致し、フォルダー画面やタスクバーを含みません。whenの任意のboolean `excludeDesktop`はglobal/exeでtrueを指定でき、省略はfalseです。その行だけをデスクトップの開始候補から除外します。別のdesktop条件の行は維持し、候補がなければ通常の右クリックを通します。例: `{"scope":"exe","appletIds":[],"processes":["explorer"],"excludeDesktop":true}`。他のscopeでtrueを指定するとINVALID_ARGUMENTです。monitor-centerは開始時のカーソルがあるモニター全体の中央へ表示し、window-centerも対象がデスクトップなら同じ表示位置になります。
 

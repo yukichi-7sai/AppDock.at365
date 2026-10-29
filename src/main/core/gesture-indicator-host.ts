@@ -14,6 +14,16 @@ export class GestureIndicatorHost {
   private ready = false;
   private sequence = 0;
   private model: GestureIndicatorModel | null = null;
+  private size?: { width: number; height: number };
+  private placement?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    display: number;
+    scale: number;
+  };
+  private followCursor = false;
   private releaseReady?: () => void;
   constructor(
     private options: {
@@ -24,6 +34,7 @@ export class GestureIndicatorHost {
   ) {
     ipcMain.handle('gesture-indicator:connect', this.connect);
     ipcMain.on('gesture-indicator:measured', this.measured);
+    ipcMain.on('gesture-indicator:follow', this.follow);
   }
   available = () => this.ready && !!this.window && !this.window.isDestroyed();
   private authorized(event: IpcMainEvent | IpcMainInvokeEvent) {
@@ -35,7 +46,11 @@ export class GestureIndicatorHost {
       event.sender.getURL() === this.options.url
     );
   }
-  private frame = (): GestureIndicatorFrame => ({ sequence: this.sequence, model: this.model });
+  private frame = (): GestureIndicatorFrame => ({
+    sequence: this.sequence,
+    model: this.model,
+    followCursor: !!this.model && this.followCursor,
+  });
   private connect = (event: IpcMainInvokeEvent) => {
     if (!this.authorized(event))
       throw Error(hostText('services.appearanceHost.unauthorizedSurface'));
@@ -61,26 +76,62 @@ export class GestureIndicatorHost {
       value.height > 1024
     )
       return;
-    const center = screen.screenToDipPoint({ x: this.model.x, y: this.model.y });
-    const bounds = screen.getDisplayNearestPoint(center).bounds;
-    const width = Math.min(value.width, bounds.width),
-      height = Math.min(value.height, bounds.height);
-    const x = Math.max(
-      bounds.x,
-      Math.min(bounds.x + bounds.width - width, Math.round(center.x - width / 2)),
-    );
-    const y = Math.max(
-      bounds.y,
-      Math.min(bounds.y + bounds.height - height, Math.round(center.y - height / 2)),
-    );
-    const next = { x, y, width, height };
-    if (JSON.stringify(this.window!.getBounds()) !== JSON.stringify(next))
-      this.window!.setBounds(next, false);
+    this.size = { width: value.width, height: value.height };
+    this.position();
     if (!this.window!.isVisible()) {
       this.window!.showInactive();
       this.window!.setAlwaysOnTop(true, 'pop-up-menu');
     }
   };
+  private follow = (event: IpcMainEvent, sequence: number) => {
+    if (
+      this.authorized(event) &&
+      this.available() &&
+      this.followCursor &&
+      this.model &&
+      this.size &&
+      sequence === this.sequence &&
+      this.window!.isVisible()
+    )
+      this.position();
+  };
+  private position() {
+    if (!this.available() || !this.model || !this.size) return;
+    // Cursor coordinates already use DIP, including across displays with different scales.
+    const anchor = this.followCursor
+      ? screen.getCursorScreenPoint()
+      : screen.screenToDipPoint({ x: this.model.x, y: this.model.y });
+    const display = screen.getDisplayNearestPoint(anchor);
+    const bounds = display.bounds;
+    const width = Math.min(this.size.width, bounds.width),
+      height = Math.min(this.size.height, bounds.height);
+    const x = Math.max(
+      bounds.x,
+      Math.min(
+        bounds.x + bounds.width - width,
+        Math.round(anchor.x + (this.followCursor ? 16 : -width / 2)),
+      ),
+    );
+    const y = Math.max(
+      bounds.y,
+      Math.min(
+        bounds.y + bounds.height - height,
+        Math.round(anchor.y + (this.followCursor ? 16 : -height / 2)),
+      ),
+    );
+    const previous = this.placement;
+    const changed =
+      !previous ||
+      previous.x !== x ||
+      previous.y !== y ||
+      previous.width !== width ||
+      previous.height !== height ||
+      previous.display !== display.id ||
+      previous.scale !== display.scaleFactor;
+    // Keep the measured DIP size rather than round-tripping Windows' rounded bounds.
+    if (changed) this.window!.setBounds({ x, y, width, height }, false);
+    this.placement = { x, y, width, height, display: display.id, scale: display.scaleFactor };
+  }
   async initialize() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -126,6 +177,8 @@ export class GestureIndicatorHost {
       );
       window.webContents.on('render-process-gone', () => this.fail());
       window.on('closed', () => {
+        this.size = undefined;
+        this.placement = undefined;
         this.ready = false;
         this.window = undefined;
       });
@@ -146,13 +199,16 @@ export class GestureIndicatorHost {
       this.releaseReady = undefined;
     }
   }
-  show = (model: GestureIndicatorModel) => {
+  show = (model: GestureIndicatorModel, followCursor = false) => {
     if (!this.available()) return;
+    this.followCursor = followCursor;
     this.model = model;
     this.sequence++;
     this.window!.webContents.send('gesture-indicator:changed', this.frame());
   };
   hide = () => {
+    this.size = undefined;
+    this.placement = undefined;
     this.model = null;
     this.sequence++;
     if (!this.window || this.window.isDestroyed()) return;
@@ -160,6 +216,8 @@ export class GestureIndicatorHost {
     if (this.ready) this.window.webContents.send('gesture-indicator:changed', this.frame());
   };
   private fail() {
+    this.size = undefined;
+    this.placement = undefined;
     const active = !!this.window;
     this.ready = false;
     this.model = null;
@@ -176,5 +234,6 @@ export class GestureIndicatorHost {
     this.window = undefined;
     ipcMain.removeHandler('gesture-indicator:connect');
     ipcMain.removeListener('gesture-indicator:measured', this.measured);
+    ipcMain.removeListener('gesture-indicator:follow', this.follow);
   }
 }

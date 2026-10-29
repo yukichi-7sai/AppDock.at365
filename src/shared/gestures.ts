@@ -76,7 +76,8 @@ export interface GestureSettings {
   inputExecutionModes: InputExecutionModes;
   indicatorOpacity: number;
   indicatorStyle: 'compact' | 'pill' | 'ring' | 'classic';
-  indicatorPosition: 'gesture-start' | 'window-center' | 'monitor-center' | 'none';
+  indicatorPosition:
+    'gesture-start' | 'cursor-follow' | 'window-center' | 'monitor-center' | 'none';
   indicatorShowNoAction: boolean;
   bindings: GestureBinding[];
 }
@@ -196,7 +197,9 @@ export function parseGestures(value: unknown): GestureSettings {
     (v.indicatorStyle !== undefined &&
       !['compact', 'pill', 'ring', 'classic'].includes(v.indicatorStyle)) ||
     (v.executionMode !== undefined && !['all', 'first'].includes(v.executionMode)) ||
-    !['gesture-start', 'window-center', 'monitor-center', 'none'].includes(v.indicatorPosition) ||
+    !['gesture-start', 'cursor-follow', 'window-center', 'monitor-center', 'none'].includes(
+      v.indicatorPosition,
+    ) ||
     (v.indicatorShowNoAction !== undefined && typeof v.indicatorShowNoAction !== 'boolean') ||
     !Array.isArray(v.bindings)
   )
