@@ -30,6 +30,7 @@ const { defaultCommandTriggerOptions } = require('../out/main/shared/command-tri
 
 test('shortcut options default to all, validate explicit values and retain local future fields', () => {
   const defaults = {
+    enabled: true,
     executionMode: 'all',
     inputExecutionModes: {},
     excludedProcesses: [],
@@ -46,6 +47,8 @@ test('shortcut options default to all, validate explicit values and retain local
     null,
     [],
     false,
+    { enabled: null },
+    { enabled: 'false' },
     { executionMode: null },
     { executionMode: 'unknown' },
     { executionMode: 0 },
@@ -165,6 +168,54 @@ const row = (id, command, scope = 'app', appletIds = []) => ({
   key: 'Ctrl+F12',
   enabled: true,
   when: { scope, appletIds },
+});
+
+test('whole-key disable keeps bindings, omits its default and prevents local/global plans and native blocking', () => {
+  const { planKeybindings, nativeShortcutInputs } = require('../out/main/shared/keybindings');
+  const settings = createDefaultSettings();
+  settings.keybindings = [row('local', 'test.local'), row('global', 'test.global', 'global')];
+  const original = structuredClone(settings.keybindings);
+  settings.keybindingOptions.enabled = false;
+  const parsed = parseSettings(settingsStorageValue(settings));
+  assert.equal(parsed.keybindingOptions.enabled, false);
+  assert.deepEqual(parsed.keybindings, original);
+  const available = original.map(({ command: id }) => ({ id }));
+  for (const globalEvent of [false, true])
+    assert.deepEqual(
+      planKeybindings(
+        original,
+        'Ctrl+F12',
+        { appFocused: true },
+        available,
+        globalEvent,
+        'all',
+        getKeybindingOptions(parsed),
+      ).commands,
+      [],
+    );
+  assert.deepEqual(
+    nativeShortcutInputs(
+      original,
+      available.map(({ id }) => id),
+      getKeybindingOptions(parsed),
+    ),
+    [],
+  );
+  parsed.keybindingOptions.enabled = true;
+  assert.deepEqual(
+    planKeybindings(
+      original,
+      'Ctrl+F12',
+      { appFocused: true },
+      available,
+      false,
+      'all',
+      getKeybindingOptions(parsed),
+    ).commands,
+    ['test.local'],
+  );
+  assert.equal(settingsStorageValue(parsed).keybindingOptions, undefined);
+  assert.deepEqual(parsed.keybindings, original);
 });
 
 test('same-key moves cross providers, retain other-key slots and control dispatch order', () => {

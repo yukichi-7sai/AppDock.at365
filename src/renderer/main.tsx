@@ -306,6 +306,7 @@ function App() {
     const handler = (e: KeyboardEvent) => {
       if (
         e.defaultPrevented ||
+        snapshot?.settings.value.keybindingOptions?.enabled === false ||
         e.isComposing ||
         e.repeat ||
         (e.target instanceof Element && e.target.closest('[data-shortcut-recorder]'))

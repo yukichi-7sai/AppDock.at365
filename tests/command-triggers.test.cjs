@@ -9,11 +9,44 @@ const {
 } = require('../out/main/shared/settings-catalog');
 const {
   commandTriggerBindings,
+  commandTriggerEnablement,
   commandTriggerBinding,
   commandTriggerInput,
   applyCommandTrigger,
   deleteCommandTrigger,
 } = require('../out/main/shared/command-triggers');
+
+test('whole-method display states stay independent and never change saved binding flags', () => {
+  const value = createDefaultSettings();
+  assert.equal(commandTriggerEnablement(value).shortcuts, true);
+  value.keybindingOptions.enabled = false;
+  value.gestures.enabled = false;
+  value.touchpadGestures.enabled = true;
+  const before = commandTriggerBindings(value);
+  assert.deepEqual(commandTriggerEnablement(value), {
+    shortcuts: false,
+    gestures: false,
+    'touchpad-gestures': true,
+  });
+  assert.deepEqual(commandTriggerBindings(value), before);
+});
+
+test('key switch JSON and form reset preserve assignments and other method settings', () => {
+  const { resetSettingsPage } = require('../out/main/shared/settings-catalog');
+  const value = createDefaultSettings();
+  value.keybindingOptions.enabled = false;
+  value.gestures.enabled = false;
+  const page = settingsCatalog([], value).find((page) => page.id === 'shortcuts');
+  const projected = settingsProjection(value, page, []);
+  assert.equal(projected.keybindingOptions.enabled, false);
+  const reset = resetSettingsPage(value, page, [], 'form');
+  assert.equal(reset.keybindingOptions.enabled, true);
+  assert.deepEqual(commandTriggerBindings(reset), commandTriggerBindings(value));
+  assert.equal(reset.gestures.enabled, false);
+  const commandPage = settingsCatalog([], value).find((page) => page.id === 'command-triggers');
+  const triggerReset = resetSettingsPage(value, commandPage, [], 'shortcuts');
+  assert.equal(triggerReset.keybindingOptions.enabled, false);
+});
 
 function fixture() {
   const value = createDefaultSettings();

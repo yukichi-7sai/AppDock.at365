@@ -121,6 +121,7 @@ export function CommandTriggersEditor({
   clearProvider,
   busy = false,
   inheritedModes,
+  triggerEnablement,
   tab,
   onTabChange,
   scrollPositions,
@@ -134,6 +135,7 @@ export function CommandTriggersEditor({
   clearProvider?(): void;
   busy?: boolean;
   inheritedModes?: SettingsPageAuxiliary['triggerExecutionModes'];
+  triggerEnablement?: SettingsPageAuxiliary['triggerEnablement'];
   tab: TriggerTab;
   onTabChange(tab: TriggerTab): void;
   scrollPositions: TriggerScrollPositions;
@@ -188,6 +190,35 @@ export function CommandTriggersEditor({
       kind: t(kindKeys[row.kind]),
       input: inputText(row),
     });
+  const renderInput = (row: CommandTriggerBinding, showState = true) => {
+    const disabledReason =
+      triggerEnablement?.[row.kind] === false
+        ? t('settings.commandTriggers.gestureDisabled', { kind: t(kindKeys[row.kind]) })
+        : undefined;
+    return (
+      <span className="binding-trigger-display">
+        {showState && disabledReason && (
+          <span
+            className="binding-disabled-badge"
+            role="img"
+            aria-label={disabledReason}
+            title={disabledReason}
+          >
+            OFF
+          </span>
+        )}
+        <kbd className="binding-trigger-mark" data-trigger-kind={row.kind}>
+          <span className="binding-trigger-icon" title={t(kindKeys[row.kind])} aria-hidden="true">
+            <Icon name={kindIcons[row.kind]} />
+          </span>
+          <span>{inputText(row)}</span>
+        </kbd>
+      </span>
+    );
+  };
+  const filteredInputRow = filters.inputFilter
+    ? allRows.find((row) => commandTriggerInput(row) === filters.inputFilter!.key)
+    : undefined;
   const conditionLabel = (row: CommandTriggerBinding, command: UiCommand) =>
     row.kind === 'shortcuts'
       ? keybindingConditionLabel(
@@ -207,6 +238,7 @@ export function CommandTriggersEditor({
         );
   const statusError = (row: CommandTriggerBinding) =>
     row.kind === 'shortcuts' &&
+    triggerEnablement?.shortcuts !== false &&
     row.enabled &&
     externalShortcutScope(row.binding.when.scope) &&
     known.get(row.command)?.available
@@ -261,7 +293,12 @@ export function CommandTriggersEditor({
         setFilter={filters.setFilter}
         setStatusFilter={filters.setStatusFilter}
         showRegistrationErrors
-        inputFilter={filters.inputFilter}
+        inputFilter={
+          filters.inputFilter && {
+            ...filters.inputFilter,
+            content: filteredInputRow ? renderInput(filteredInputRow, false) : undefined,
+          }
+        }
         clearInputFilter={filters.clearInput}
         hasAdditionalFilters={kinds.length !== commandTriggerKinds.length}
         clearAdditionalFilters={() => setKinds(commandTriggerKinds)}
@@ -324,14 +361,7 @@ export function CommandTriggersEditor({
         inputName={t('settings.commandTriggers.trigger')}
         inputKey={commandTriggerInput}
         inputLabel={inputLabel}
-        renderInput={(row) => (
-          <kbd className="binding-trigger-mark" data-trigger-kind={row.kind}>
-            <span className="binding-trigger-icon" title={t(kindKeys[row.kind])} aria-hidden="true">
-              <Icon name={kindIcons[row.kind]} />
-            </span>
-            <span>{inputText(row)}</span>
-          </kbd>
-        )}
+        renderInput={renderInput}
         conditionLabel={conditionLabel}
         selectedInput={filters.inputFilter?.key}
         onInputFilter={filters.selectInput}

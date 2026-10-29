@@ -128,6 +128,8 @@ operationsは1〜100件、割当の件数上限なし。既存parseGestures/入�
 
 取得は`shortcuts.get`（MCP `appdock_get_shortcuts`）、変更は既存のcommands.executeへ`id=appdock.shortcuts.update`を渡します。
 
+`options.enabled`はキージェスチャー全体の有効値です。既定・欠落時はtrue、configureのchangesへbooleanを指定して切り替えます。OFFはキーの実行と元入力のブロックを止め、割り当てを保持します。expectedRevision・dryRun・キー編集の許可境界は従来どおりです。動作範囲と保存は[キージェスチャーの設定](keybindings.md#設定)を参照してください。
+
 `options.executionMode`に有効な実行方法を返します。`first`は条件に一致した先頭1件、`all`は全件を登録順に選び、同一コマンドの重複を除きます。省略時はallです。firstで選んだコマンドが実行中・失敗になっても次へ繰り下げません。ジェスチャーとは独立した設定です。
 
 `options.browsers`と`options.requireChromiumWindowClass`はキー用のブラウザ判定設定です。configureのchangesへこれらを部分指定できます。exe名はパスを含めずに指定し、大小文字と`.exe`を正規化します。ジェスチャー側の設定は変更しません。whenのscopeはglobal/desktop/app/pages/owner/applets/browser/exe、exeだけはprocessesを1件以上指定します。global/exeではexcludeDesktopも使用できます。条件に一致しない場所では元のキー入力を通します。globalHotKeysのeffectiveBlockOriginalInputは設定上の合成値であり、現在の前面アプリで入力を止めた証拠ではありません。

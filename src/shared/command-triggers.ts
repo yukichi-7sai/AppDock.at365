@@ -5,6 +5,7 @@ import {
   appendKeybinding,
   changeKeybindingKey,
   getKeybindings,
+  getKeybindingOptions,
   withKeybindings,
   type Keybinding,
 } from './keybindings';
@@ -18,6 +19,15 @@ import { defaultTouchpadGestures, touchpadGestureTypes } from './touchpad-gestur
 
 export const commandTriggerKinds = ['shortcuts', 'gestures', 'touchpad-gestures'] as const;
 export type CommandTriggerKind = (typeof commandTriggerKinds)[number];
+
+/** Display-only method state; never rewrite the saved enabled flags of individual bindings. */
+export function commandTriggerEnablement(settings: Settings): Record<CommandTriggerKind, boolean> {
+  return {
+    shortcuts: getKeybindingOptions(settings).enabled,
+    gestures: (settings.gestures ?? defaultGestures()).enabled,
+    'touchpad-gestures': (settings.touchpadGestures ?? defaultTouchpadGestures()).enabled,
+  };
+}
 type TriggerRow = { id: string; command: string; enabled: boolean };
 export type CommandTriggerBinding = TriggerRow &
   (

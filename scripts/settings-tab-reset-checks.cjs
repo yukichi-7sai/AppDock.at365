@@ -7,6 +7,7 @@ const durable = (value) => parseSettings(settingsStorageValue(value));
 
 module.exports = async ({ host, open, save, saved, checks, profile }) => {
   const baseline = await saved();
+  baseline.keybindingOptions.enabled = false;
   baseline.keybindingOptions.executionMode = 'first';
   baseline.keybindingOptions.inputExecutionModes = { 'Ctrl+F8': 'all' };
   baseline.gestures.executionMode = 'first';

@@ -72,11 +72,13 @@ export interface ShortcutContext {
   target?: CommandTarget;
 }
 export interface KeybindingOptions {
+  enabled: boolean;
   executionMode: GestureExecutionMode;
   inputExecutionModes: InputExecutionModes;
   excludedProcesses: string[];
 }
 export const defaultKeybindingOptions = (): KeybindingOptions => ({
+  enabled: true,
   executionMode: 'all',
   inputExecutionModes: {},
   excludedProcesses: [],
@@ -86,6 +88,8 @@ export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error(hostText('settings.keybindings.options'));
   const source = value as Record<string, unknown>;
+  if (source.enabled !== undefined && typeof source.enabled !== 'boolean')
+    throw Error(hostText('settings.keybindings.enabled'));
   if (
     source.executionMode !== undefined &&
     source.executionMode !== 'first' &&
@@ -95,6 +99,7 @@ export function parseKeybindingOptions(value: unknown): KeybindingOptions {
   const { browsers: _browsers, requireChromiumWindowClass: _chromium, ...current } = source;
   return {
     ...current,
+    enabled: source.enabled ?? true,
     executionMode: source.executionMode ?? 'all',
     inputExecutionModes: parseInputExecutionModes(source.inputExecutionModes, normalizeShortcut),
     excludedProcesses: processNames(
@@ -332,9 +337,10 @@ export function globalShortcutInputs(rows: Keybinding[], available: string[]) {
 export function nativeShortcutInputs(
   rows: Keybinding[],
   available: string[],
-  environment: ConditionEnvironment,
+  environment: ConditionEnvironment & { enabled?: boolean },
   catalog: readonly StackCatalogEntry[] = [],
 ) {
+  if (environment.enabled === false) return [];
   const known = new Map(catalog.map((command) => [command.id, command]));
   const availableIds = new Set(available);
   const membersByKey = new Map<string, Keybinding[]>();
@@ -538,8 +544,12 @@ export function planKeybindings(
   available: { id: string; extensionId?: string | null }[],
   globalEvent = false,
   mode: GestureExecutionMode = 'all',
-  environment: ConditionEnvironment & { inputExecutionModes?: InputExecutionModes } = {},
+  environment: ConditionEnvironment & {
+    enabled?: boolean;
+    inputExecutionModes?: InputExecutionModes;
+  } = {},
 ) {
+  if (environment.enabled === false) return { commands: [], rowIds: [] };
   const keys = new Set(typeof key === 'string' ? [key] : key);
   return planCommandBatch(
     inputRows(rows, [...keys])

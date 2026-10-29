@@ -204,6 +204,7 @@ export function SettingsForm({
             scrollPositions={triggerScrollPositions}
             busy={busy}
             inheritedModes={aux.triggerExecutionModes}
+            triggerEnablement={aux.triggerEnablement}
             provider={aux.provider}
             clearProvider={() => void invoke('clearProvider')}
             settings={settings}

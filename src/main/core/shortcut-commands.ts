@@ -140,6 +140,7 @@ export class ShortcutCommands {
                     changes: {
                       type: 'object',
                       properties: publicCommandTriggerFields({
+                        enabled: { type: 'boolean' },
                         executionMode: { type: 'string', enum: ['first', 'all'] },
                         inputExecutionModes: inputExecutionModesSchema,
                         excludedProcesses: {
@@ -290,6 +291,7 @@ export class ShortcutCommands {
           if (
             !exact(op, ['kind', 'changes']) ||
             !exact(op.changes, [
+              'enabled',
               'executionMode',
               'inputExecutionModes',
               'excludedProcesses',
@@ -384,6 +386,7 @@ export class ShortcutCommands {
   }
   private publicOptions(options: ReturnType<typeof getKeybindingOptions>) {
     return publicCommandTriggerFields({
+      enabled: options.enabled,
       executionMode: options.executionMode,
       inputExecutionModes: { ...options.inputExecutionModes },
       excludedProcesses: [...options.excludedProcesses],

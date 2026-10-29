@@ -113,6 +113,18 @@ module.exports = async ({ host, open, save, saved, checks, profile }) => {
   );
 
   const connection = host.getByTestId('touchpad-connection');
+  const commonOptions = host.getByTestId('gesture-common-options');
+  assert(
+    await connection.evaluate((element) => {
+      const common = document.querySelector('[data-testid="gesture-common-options"]');
+      return (
+        !!common && !!(element.compareDocumentPosition(common) & Node.DOCUMENT_POSITION_FOLLOWING)
+      );
+    }),
+    'common gesture settings follow Windows connection',
+  );
+  await commonOptions.scrollIntoViewIfNeeded();
+  await host.screenshot({ path: path.join(profile, 'touchpad-common-after-windows.png') });
   assert.equal(await connection.evaluate((element) => element.tagName), 'SECTION');
   assert.equal(await connection.locator('select').count(), 10);
   assert.equal(await host.getByTestId('touchpad-windows-settings').getByRole('button').count(), 1);

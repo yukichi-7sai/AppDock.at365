@@ -41,6 +41,7 @@ const triggerSettingsOnly = process.argv.includes('--trigger-settings-only');
 const lockKeysOnly = process.argv.includes('--lock-keys-only');
 const filterConsistencyOnly = process.argv.includes('--filter-consistency-only');
 const tabResetOnly = process.argv.includes('--tab-reset-only');
+const enablementOnly = process.argv.includes('--enablement-only');
 if (bindingEditorsOnly) {
   initial.keybindingOptions.excludedProcesses = ['key-base'];
   initial.gestures.excludedProcesses = ['mouse-base'];
@@ -90,6 +91,13 @@ initial.keybindings = [
     })),
   ),
 ];
+if (enablementOnly)
+  initial.keybindings.push({
+    ...common,
+    id: 'global-switch',
+    key: 'Ctrl+Alt+F10',
+    when: { scope: 'global', appletIds: [] },
+  });
 initial.gestures.enabled = false;
 initial.gestures.distance = 87;
 initial.gestures.bindings = [
@@ -248,6 +256,7 @@ const recordSuccess = () => {
         lockKeysOnly,
         filterConsistencyOnly,
         tabResetOnly,
+        enablementOnly,
         source: source ? path.resolve(source) : 'development build',
         sha256: portable ? hash(portable) : null,
         limitations: ['UI and durable settings only; no physical input or Windows touchpad writes'],
@@ -281,6 +290,32 @@ const recordSuccess = () => {
       host.locator(`[data-binding-id=${JSON.stringify(JSON.stringify([kind, id]))}]`);
     const dialog = () => host.getByTestId('settings-dialog');
     const save = async () => settleSettings(host);
+    if (enablementOnly) {
+      await require('./gesture-enablement-checks.cjs')({
+        host,
+        open,
+        saved,
+        save,
+        checks,
+        profile,
+        row,
+        until,
+      });
+      const durable = await saved();
+      await app.close();
+      app = await launch();
+      host = await app.firstWindow();
+      await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+      assert.deepEqual(await saved(), durable);
+      await open();
+      await row('shortcuts', 'same-id')
+        .getByRole('img', { name: 'キージェスチャーが無効です' })
+        .waitFor();
+      checks.push('whole-key OFF and trigger markers survive an actual restart');
+      assert.deepEqual(errors, []);
+      recordSuccess();
+      return;
+    }
     if (tabResetOnly) {
       await require('./settings-tab-reset-checks.cjs')({
         host,
@@ -493,7 +528,7 @@ const recordSuccess = () => {
       'four command-trigger views share the toolbar with JSON and preserve command filters and scroll without saving',
     );
     if (triggerTabsOnly) {
-      await require('./trigger-summary-checks.cjs')({ host, open, saved, checks });
+      await require('./trigger-summary-checks.cjs')({ host, open, saved, checks, profile });
       await open('custom-commands');
       assert.equal(await host.getByTestId('command-trigger-tabs').count(), 0);
       assert.equal(await host.getByTestId('trigger-stack-table').count(), 0);

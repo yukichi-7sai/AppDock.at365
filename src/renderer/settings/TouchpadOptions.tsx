@@ -76,7 +76,6 @@ export function TouchpadOptions({
           onChange={(excludedProcesses) => change({ excludedProcesses })}
         />
       </SettingsSection>
-      {commonSettings}
       <SettingsSection
         title={translate('settings.touchpadOptions.connection')}
         data-testid="touchpad-connection"
@@ -171,6 +170,7 @@ export function TouchpadOptions({
           );
         })}
       </SettingsSection>
+      {commonSettings}
     </>
   );
 }

@@ -181,6 +181,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
     ],
   ],
   shortcuts: [
+    ['enabled', hostText('settings.settings-catalog.keysEnabled')],
     [
       'executionMode',
       hostText('settings.settings-catalog.executionMode'),
@@ -648,6 +649,7 @@ export function settingsPaths(
     case 'shortcuts':
       return [
         ['keybindings'],
+        ['keybindingOptions', 'enabled'],
         ['keybindingOptions', 'inputExecutionModes'],
         ['keybindingOptions', 'executionMode'],
         ['keybindingOptions', 'excludedProcesses'],

@@ -1,6 +1,9 @@
 import type { Settings } from '../../shared/contracts';
 import { getKeybindingOptions } from '../../shared/keybindings';
-import { SettingsSection } from '../settings-ui/SettingsSections';
+import { SettingsField, SettingsSection } from '../settings-ui/SettingsSections';
+import { Toggle } from '../settings-ui/Toggle';
+import { hostSettingItem } from '../../shared/settings-catalog';
+import { useHostTranslation } from '../HostTranslation';
 import { CommandExecutionModeField } from '../settings-ui/CommandExecutionModeField';
 import { InputBrowserOptions } from '../settings-ui/InputBrowserOptions';
 import { settingAnchor } from '../settings-ui/setting-anchor';
@@ -14,9 +17,24 @@ export function ShortcutsEditor({
   onChange(value: Settings): void;
 }) {
   const options = getKeybindingOptions(settings);
+  const { t } = useHostTranslation();
+  const enabledTitle = hostSettingItem('shortcuts', 'enabled').title;
   return (
     <>
       <SettingsSection data-testid="key-gesture-options" {...settingAnchor('shortcuts', 'options')}>
+        <SettingsField
+          title={enabledTitle}
+          hint={t('settings.shortcutsEditor.enabledHint')}
+          {...settingAnchor('shortcuts', 'enabled')}
+        >
+          <Toggle
+            label={enabledTitle}
+            checked={options.enabled}
+            onChange={(enabled) =>
+              onChange({ ...settings, keybindingOptions: { ...options, enabled } })
+            }
+          />
+        </SettingsField>
         <CommandExecutionModeField
           pageId="shortcuts"
           value={getKeybindingOptions(settings).executionMode}
@@ -25,6 +43,7 @@ export function ShortcutsEditor({
               ...settings,
               keybindingOptions: {
                 ...settings.keybindingOptions,
+                enabled: options.enabled,
                 excludedProcesses: options.excludedProcesses,
                 inputExecutionModes: options.inputExecutionModes,
                 executionMode,
@@ -40,6 +59,7 @@ export function ShortcutsEditor({
               ...settings,
               keybindingOptions: {
                 ...settings.keybindingOptions,
+                enabled: options.enabled,
                 executionMode: options.executionMode,
                 inputExecutionModes: options.inputExecutionModes,
                 excludedProcesses,

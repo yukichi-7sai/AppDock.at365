@@ -145,6 +145,7 @@ import { initializeGestureDefaults } from '../shared/gestures';
 import { getCommandTriggerOptions } from '../shared/command-trigger-options';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, hostCommandsForApplets, shortcutFromEvent } from '../shared/commands';
+import { commandTriggerEnablement } from '../shared/command-triggers';
 import { settingsPageCommands } from '../shared/settings-navigation';
 import { updateCommands } from '../shared/update-commands';
 import { AppletManagement } from './core/applet-management';
@@ -1759,9 +1760,12 @@ function prepareShortcut(
 }
 function dispatchShortcutPlan(key: string, plan: CommandBatchPlan, press?: ShortcutPress) {
   const input = 'keyboard:' + [...new Set(press?.shortcuts ?? [key])].sort().join('|');
-  return press
-    ? shortcutInvocation.run(press, () => commandDispatcher.dispatch(input, plan))
-    : commandDispatcher.dispatch(input, plan);
+  const run = () =>
+    commandDispatcher.dispatch(input, plan, {
+      valid: async () => getKeybindingOptions(settings.value).enabled,
+      execute: executeCommand,
+    });
+  return press ? shortcutInvocation.run(press, run) : run();
 }
 function dispatchShortcut(key: string, globalEvent = false, press?: ShortcutPress) {
   if (
@@ -2219,6 +2223,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       ...(id === 'command-triggers'
         ? {
             commandAssignments: settingsCommandAssignments(),
+            triggerEnablement: commandTriggerEnablement(settings.value),
             triggerExecutionModes: {
               shortcuts: inheritedTriggerExecutionMode(settings.value, 'shortcuts'),
               gestures: inheritedTriggerExecutionMode(settings.value, 'gestures'),

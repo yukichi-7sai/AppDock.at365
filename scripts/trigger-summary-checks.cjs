@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
+const path = require('node:path');
 
-module.exports = async ({ host, open, saved, checks }) => {
+module.exports = async ({ host, open, saved, checks, profile }) => {
   const baseline = await saved();
   for (const context of ['command-triggers', 'feature']) {
     for (const [kind, input] of [
@@ -34,6 +35,20 @@ module.exports = async ({ host, open, saved, checks }) => {
       assert.match(await row.getByRole('cell').nth(1).innerText(), /Trigger new\s*\(無効\)/);
       await table.getByTestId(`trigger-stacks:${kind}:list:delete:${input}`).focus();
       assert.deepEqual(await saved(), baseline);
+      if (context === 'feature' && kind === 'shortcuts') {
+        const viewport = host.viewportSize();
+        for (const [size, width] of [
+          ['wide', 1100],
+          ['narrow', 820],
+        ]) {
+          await host.setViewportSize({ width, height: 820 });
+          await table
+            .getByTestId(`trigger-stacks:${kind}:list:edit:${input}`)
+            .scrollIntoViewIfNeeded();
+          await host.screenshot({ path: path.join(profile, `trigger-column-${size}.png`) });
+        }
+        if (viewport) await host.setViewportSize(viewport);
+      }
     }
     checks.push(
       `${context}: ordered command summaries expose disabled and unavailable entries; edit cancellation and actions preserve settings`,

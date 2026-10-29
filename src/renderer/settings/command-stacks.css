@@ -26,7 +26,7 @@
   padding-inline: 12px;
 }
 .settings-list .trigger-stack-list :is(th:first-child, td.settings-list-primary) {
-  width: 140px;
+  width: 180px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -55,7 +55,7 @@
     padding-inline: 8px;
   }
   .settings-list .trigger-stack-list :is(th:first-child, td.settings-list-primary) {
-    width: 100px;
+    width: 140px;
   }
   .settings-list .trigger-stack-list :is(th:nth-child(3), td:nth-child(3)) {
     width: 80px;

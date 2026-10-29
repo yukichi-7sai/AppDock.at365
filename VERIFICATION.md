@@ -1,5 +1,34 @@
 # 検証記録
 
+## 2026-10-30: キージェスチャー有効設定と表示調整 0.102.1 のコミット照合
+
+- 利用者が発行済み0.102.1を確認し、コミットを依頼した。対象は0.102.0のキー全体有効設定と0.102.1のOFF表示・列幅・タッチパッド設定順を含む今回の32ファイル。main `56e10a1`からの差分をレビューし、入力停止/元入力ブロック、既定ONと登録保持、保存/JSON/API/初期化、表示専用auxiliary、個別無効の条件列表示、共通部品と狭幅を確認。阻害事項なし。
+- 0.102.1の935入力と完全ログ12件のSHA256を照合し、後続差分はVERIFICATIONのみ。型検査/build・ソースGUI18群・固定EXE GUI18群・smokeを再利用した。0.102.0の関連単体試験13ファイル197件も、試験ソース・入力実行/設定parser/API/初期化の製品コード・固定依存/ビルド条件の一致を照合して再利用。後続差分はUI配置・版・文書と未使用翻訳キーの削除であり、対象13ファイルの単体試験へ影響しないことを確認した。
+- 新しいキー有効値/既定値/設定投影で未確認だった残り134ファイル1,109件を追加実行し、fail/skip 0。再利用と合わせて本体標準147ファイル1,306/1,306件が成功。成功済み197件や同じGUIの再実行、無関係な兄弟Appletの再発行は行っていない。
+- 発行先0.102.1の所有694ファイルと更新ZIP/feedが実装時のhash/版と一致し、検証に使った固定EXEとも一致。製品内容の変更がないため版更新・再発行なし。新たなGUI/profileの生成・削除なし。証跡は`.artifacts/commit-validation-key-gesture-01021-20261030/`の`evidence-reuse-check.json`、`standard-plan.json`、`supplemental-tests.log`、`distribution-reuse.json`、`validation.json`。対象ファイルのstage blobと作業ファイル、stage treeとcommit tree、コミット後のcleanは同フォルダーの`stage.json`/`commit.json`へ記録する。commitのみでpush・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-30: OFF表示の整理とジェスチャー設定のレイアウト 0.102.1
+
+- 発行済み0.102.0の利用者確認後の追加調整。main `56e10a1`/origin/main、前段0.102.0の未コミット変更を保持して着手したためpull/stash/resetは実施していない。前段との変更ファイルは`.artifacts/gesture-layout-01021-20261030/changed-from-01020.txt`。設定・保存形式・公開APIの追加削除はなく、本体のみパッチ更新0.102.0→0.102.1。
+- コマンド一覧のOFFマークは入力方式全体のOFFだけに限定し、トリガーのkbd枠の左外へ配置。個別の割り当てが無効の場合は「いつ・どこで」列の従来の無効表示だけを使用する。OFFの理由・入力による絞り込み・歯車の編集・アクセント表示を維持した。
+- キー・マウス・タッチパッドで共用するトリガー一覧の先頭列を通常140→180px、本文幅600px以下では100→140pxへ拡幅。実行方法列の通常230px/狭幅80pxと折り返し、コマンド列の折り返し・無効/利用不可表示、既存の操作列を保持した。機能ページとコマンドトリガーの種類別タブへ同時適用。タッチパッドのフォームは動作設定→「Windows」との接続→「ジェスチャー共通の設定」の順に変更し、共有設定の実体や接続用キーの操作は変更していない。
+- 発行前レビューで表示判定・クリック/フィルター領域・個別無効表示・共通部品・広幅/狭幅・保存境界を確認し、阻害事項なし。型検査/build成功。ソースGUIはenablement4群・feature-settings9群・trigger-tabs5群、計18群成功。発行した固定EXEの隔離コピーでも同じ18群とsmokeが成功し、明暗のOFF枠外配置、個別無効だけではOFFを出さないこと、接続後の共通設定、設定保持、編集取消、実再起動を確認した。1100px/820pxの代表画面を目視し、トリガー・登録コマンド・実行方法・操作が読めることを確認した。検査は寸法の完全一致を固定せず、左外配置と表示順の要件を確認している。
+- 入力実行・設定parser・API・初期化の製品コードと関連単体試験は前段から不変。表示変更に必要なビルド/型検査/GUIを今回実行し、成功済み197件や無関係な全回帰を再実行していない。タッチパッド全体OFFを維持し、Pause/F13〜F24をOSへ送信・登録せず、実Windows接続の書換えも行っていない。
+- 通常publish成功。staging・発行先・更新ZIPの所有694ファイルのSHA256一致、manifest/feed/EXEは0.102.1。更新ZIPサイズ270,726,754 bytesとfeed一致、EXE SHA256=`3f82c9cb300a7e8417ec2e886ac85d6661c0eb53dc2a4fa588bc3c52bbdf228d`、ZIP SHA256=`58dfb0e1332bfc9c4147c1cde9b8f141b5bd1a7cbc79faeb1d0ccd05c59ec602`。検証前935入力のhashは発行/固定GUI後も差分0で、後続の変更は本検証記録のみ。
+- 証跡は`.artifacts/gesture-layout-01021-20261030/`の完全ログ・入力hash・各summary/validationと配布物照合。ソースGUIは`command-triggers-ui-1793287540786`/`1793287545984`/`1793287552843`、固定GUIは`1793287676757`/`1793287686706`/`1793287698553`、smokeは`smoke-1793287708339`。今回の成功資料と再利用資料は保持し、削除0件。終了済みの検証プロセスを確認し、他作業の資料・固定出力へ変更なし。commit・push・GitHub Release・実利用先deployなし。
+
+## 2026-10-30: キージェスチャーの全体有効設定とトリガーのOFF表示 0.102.0
+
+- main `56e10a1` の作業ツリー・index・未追跡がcleanであることを確認し、現在の追跡先origin/mainへ`pull --ff-only`を実施。制限内のDNS失敗は通常Windowsユーザー環境で同じコマンドを実行して解消し、Already up to dateを確認した。本体のみ0.101.12→0.102.0。設定項目`keybindingOptions.enabled`の追加のためマイナー更新。
+- キージェスチャーのフォーム先頭へ「キージェスチャーを有効にする」を追加。既定・欠落時ON、OFFは本体renderer・ローカル/Web/Applet入力の共通計画を空にし、Windows側のキー登録と元入力ブロックを解除する。割り当て・順序・条件・入力別実行方法は保持し、OFF中も編集・記録の経路を維持。共通CommandDispatcherのキー用lifetimeで次のコマンド実行前にも有効値を確認し、マウス/タッチパッドのlifetimeへ混ぜない。既存nativeの押下/解放所有権は変更していない。
+- 保存・差分JSON・フォーム初期化・公開`shortcuts.get`と`appdock.shortcuts.update` configureを同じ有効値へ接続。trueは保存から省略し、トリガー一覧だけの初期化は有効値を保つ。コマンド一覧のトリガー列は3方式の全体OFFと個別無効にOFFマークを表示し、tooltip/アクセシブルな名前で理由を区別する。全体状態は表示専用auxiliaryとして投影し、割り当ての保存やJSONへ戻さない。入力絞り込みの表示には行の一時状態を固定して残さない。
+- 発行前レビューで入力全経路・登録解除・実行途中の停止・保存/API/初期化境界・他方式への影響を確認。共用parserからタッチパッドのenabledを上書きしないよう、タッチパッド側で実行方法/除外だけを取り出す形へ修正。既存の順序編集と他のキー設定変更でもenabledを保持する。発行を阻害する未解決指摘なし。
+- 型検査/build成功。キー・global hotkey・公開編集API・command triggers・共通browser条件・touchpad・除外・settings page/editingの9ファイル98件と、command execution/input execution/settings targetsの4ファイル99件が成功、計197件、fail/skip 0。主な新規確認は欠落時ON・OFF永続化・不正値拒否・ローカル/グローバル計画とnative入力投影の停止・登録解除/再開・API dryRun/再読込・初期化範囲。物理Pause/F13〜F24の送信・登録は行わず、該当する既存単体試験は模擬backendだけを使用した。
+- ソースGUIの専用4群に続き、発行済み固定EXEの隔離コピーで`command-triggers-ui-test.cjs --enablement-only`4群、`--feature-settings-only`9群、`--tab-reset-only`15群（キー全体OFFを初期化の基準へ追加）、計28群成功。OFFでnative登録が空になりローカルDOM入力のdefaultPreventedがfalse、ONで登録と抑止が戻ること、割り当て保持、OFF中の編集取消、3方式OFFマークと個別無効の理由、明暗・狭幅・Space操作、実再起動後の保持を確認。先行GUI失敗は表示反映待ちと無関係な画像を含むselectorの問題で、保存値を変えずに条件待ちと名前による特定へ修正して成功した。
+- 通常publish成功、manifest/feed/EXEは0.102.0。staging・発行先・更新ZIPの所有694ファイルすべてのSHA256一致、ZIPサイズ270,725,592 bytesとfeedのhash/size一致。EXE SHA256=`7b0273b4a2d2bcb3e71fd4dd2cdccb1a7eaef468d13ed7d302979c03db56b64e`、ZIP SHA256=`fbd9dc4ab7d929b68bee90697a66e7f30ca256b809bb7bd4ca076699f6c4a3d0`。固定EXE smokeも成功し、設定と画像の保存先を隔離profile内で確認した。Node26.13.0/pnpm12.15.0/.NET SDK10.0.403、固定lockfileと供給網検査を維持。
+- 証跡は`.artifacts/key-gesture-enablement-20261030/`の各完全ログ、入力hash、`runtime.json`、`gui-summary.json`、`distribution-files.json`/`distribution-verification.json`。GUI正本は`command-triggers-ui-1793286651199`（ソース）、`1793286777299`（固定専用）、`1793286787088`（固定機能設定）、`1793286798511`（固定初期化）、smokeは`smoke-1793286809946`。今回のプロセス終了をCIMで確認。再利用証跡と診断用profileを保持し削除0件、既存の別作業/使用状態不明の古いprofileは削除していない。
+- 実物理キーでのdown/up中の切り替え・外部アプリへの入力通過・物理タッチパッド/Windows接続変更は未確認。タッチパッドはGUI中OFFのままとし、全体ON状態の表示判定はフックを持たない単体入力で確認。無関係な全回帰・兄弟Appletの再発行は実施していない。実利用先deploy・commit・push・GitHub Releaseなし。
+
 ## 2026-10-29: 設定インデックス余白 0.101.12 のコミット照合
 
 - 利用者が発行済み0.101.12を確認し、コミットを依頼した。対象は設定インデックスのCSS、版、UI指針、検証記録の4ファイルのみ。余白の移動と検索欄の整列を再レビューし、検索・選択・保存・フォーカス・幅変更の処理に変更がないことを確認、阻害事項なし。

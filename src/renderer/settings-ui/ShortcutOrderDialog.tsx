@@ -71,6 +71,7 @@ export function ShortcutOrderDialog({
               ...settings,
               keybindingOptions: {
                 ...settings.keybindingOptions,
+                enabled: options.enabled,
                 executionMode: options.executionMode,
                 excludedProcesses: options.excludedProcesses,
                 inputExecutionModes: next.inputExecutionModes,

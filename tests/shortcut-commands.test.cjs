@@ -177,6 +177,26 @@ test('execution mode configuration is atomic, revisioned, private-field preservi
   assert.equal(f.get().options.executionMode, 'first');
 });
 
+test('whole-key switch supports API dry-run, validation and reload without changing bindings', async (t) => {
+  const f = fixture(t);
+  const rows = f.get().bindings;
+  const revision = f.get().revision;
+  const operation = { kind: 'configure', changes: { enabled: false } };
+  await f.edit([operation], { dryRun: true });
+  assert.equal(f.get().revision, revision);
+  assert.equal(f.get().options.enabled, true);
+  await f.edit([operation]);
+  assert.equal(f.get().options.enabled, false);
+  assert.deepEqual(f.get().bindings, rows);
+  f.settings.reload();
+  assert.equal(f.get().options.enabled, false);
+  for (const enabled of [null, 'false', 0])
+    await assert.rejects(f.edit([{ kind: 'configure', changes: { enabled } }]));
+  await f.edit([{ kind: 'configure', changes: { enabled: true } }]);
+  assert.equal(f.get().options.enabled, true);
+  assert.deepEqual(f.get().bindings, rows);
+});
+
 test('per-key count survives API storage while global mode remains first/all', async (t) => {
   const f = fixture(t);
   const mode = { mode: 'count', count: 3 };

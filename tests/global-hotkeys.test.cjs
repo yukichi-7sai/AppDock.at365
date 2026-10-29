@@ -31,7 +31,7 @@ test('legacy Watch global Pause and explicit opt-out survive migration', () => {
   );
 });
 
-test('registration follows availability, rebinding, recording suspension and shutdown', async () => {
+test('registration follows availability, whole-key disable, rebinding, recording suspension and shutdown', async () => {
   const registrations = [];
   const executed = [];
   const dispatcher = new CommandDispatcher(async (id) => executed.push(id), assert.fail);
@@ -72,6 +72,15 @@ test('registration follows availability, rebinding, recording suspension and shu
   assert.deepEqual(registrations, [[], ['Pause']]);
   await manager.pressed('Pause');
   assert.deepEqual(executed, available);
+  const saved = structuredClone(settings);
+  settings.keybindingOptions.enabled = false;
+  await manager.sync(settings, available);
+  assert.deepEqual(registrations.at(-1), []);
+  await manager.pressed('Pause');
+  assert.equal(executed.length, 1);
+  settings.keybindingOptions.enabled = true;
+  await manager.sync(settings, available);
+  assert.deepEqual(settings, saved);
   await manager.sync(settings, available, true);
   await manager.pressed('Pause');
   assert.equal(executed.length, 1);

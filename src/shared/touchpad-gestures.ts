@@ -149,7 +149,8 @@ export function parseTouchpadGestures(raw: unknown): TouchpadGestureSettings {
   });
   return {
     enabled: value.enabled ?? false,
-    ...options,
+    executionMode: options.executionMode,
+    excludedProcesses: options.excludedProcesses,
     inputExecutionModes: parseInputExecutionModes(value.inputExecutionModes, touchpadId),
     connections,
     bindings: parseGestureBindings(value.bindings ?? [], touchpadId),

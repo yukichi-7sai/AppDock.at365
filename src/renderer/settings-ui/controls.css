@@ -2921,6 +2921,7 @@ summary {
   align-items: flex-start;
   gap: 6px;
 }
+.binding-trigger-display,
 .binding-trigger-mark {
   display: inline-flex;
   align-items: center;

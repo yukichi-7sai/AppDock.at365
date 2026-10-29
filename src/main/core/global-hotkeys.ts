@@ -54,7 +54,8 @@ export class GlobalHotKeyManager {
     retry = false,
     catalog: readonly import('../../shared/command-stacks').StackCatalogEntry[] = [],
   ): Promise<void> {
-    const desired = suspended
+    const inactive = suspended || !getKeybindingOptions(settings).enabled;
+    const desired = inactive
       ? []
       : getKeybindings(settings)
           .filter(
@@ -64,7 +65,7 @@ export class GlobalHotKeyManager {
               available.includes(row.command),
           )
           .map((row) => ({ commandId: row.command, shortcut: row.key }));
-    const inputs = suspended
+    const inputs = inactive
       ? []
       : nativeShortcutInputs(
           getKeybindings(settings),
