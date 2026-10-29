@@ -11,6 +11,20 @@ export interface WebAccountDefinition {
   externalLinkSetting?: string;
   returnToStartOnHideSetting?: string;
 }
+export const webAccountId = (id: unknown): id is string =>
+  typeof id === 'string' &&
+  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
+
+export function webAccountName(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    value.length > 60 ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  )
+    throw Error('Invalid Web account name');
+  return value.trim();
+}
 export interface WebAccount {
   id: string;
   name: string;

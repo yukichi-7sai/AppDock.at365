@@ -4,6 +4,8 @@ import path from 'node:path';
 import { atomicWrite } from './settings';
 import { observeFile } from './file-observer';
 import type { WebAccountSound } from '../../shared/web-accounts';
+import { webAccountId } from '../../shared/web-accounts';
+import { WebAccountRoster, WebAccountRosterError } from './web-account-roster';
 
 export type AccountState = {
   version: 1;
@@ -30,9 +32,7 @@ type LocalState = {
 type Journal = { before: string | null; after: string; state: LocalState };
 type Listener = { changed(): void; removing(id: string): void; failed(): void };
 
-export const accountId = (id: unknown): id is string =>
-  typeof id === 'string' &&
-  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id);
+export const accountId = webAccountId;
 export const groupId = (id: unknown): id is string =>
   typeof id === 'string' &&
   /^[a-z][a-z0-9-]{0,39}(\.[a-z][a-z0-9-]{0,39}){1,4}$/.test(id) &&
@@ -278,6 +278,27 @@ export class WebAccountGroup {
   hasMember(owner: string) {
     return Object.hasOwn(this.local.members, owner);
   }
+  settingsRoster(owner: string, legacyFile: string) {
+    return new WebAccountRoster(this.file, {
+      bindingFile: path.join(path.dirname(legacyFile), 'group-binding.json'),
+      group: { id: this.id, owner, stateFile: this.localFile, legacyFile },
+      check: () => {
+        if (this.busy || this.broken) throw new WebAccountRosterError('UNAVAILABLE');
+        this.unchanged();
+        const localText = readText(this.localFile);
+        if (
+          localText &&
+          JSON.stringify(this.validateLocal(JSON.parse(localText))) !== JSON.stringify(this.local)
+        )
+          throw new WebAccountRosterError('REVISION_CONFLICT');
+      },
+      applied: (raw, text) => {
+        this.text = text;
+        this.accounts = raw.accounts.map((row) => identityOf(row as Identity));
+        this.notify();
+      },
+    });
+  }
   snapshot(owner: string): AccountState {
     const member = this.hasMember(owner) ? this.local.members[owner] : undefined;
     if (!member) throw Error(hostText('services.webAccountGroups.notConnected'));
@@ -374,6 +395,10 @@ export class WebAccountGroup {
 }
 
 const groups = new Map<string, WebAccountGroup>();
+export function findWebAccountGroup(id: string, sharedRoot: string, localRoot: string) {
+  const group = groups.get(JSON.stringify([path.resolve(sharedRoot), path.resolve(localRoot), id]));
+  return group?.active ? group : undefined;
+}
 export function getWebAccountGroup(
   id: string,
   sharedRoot: string,

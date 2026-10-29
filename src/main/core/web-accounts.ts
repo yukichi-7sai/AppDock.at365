@@ -30,7 +30,14 @@ import { queueSound } from './sounds';
 import { RegisteredSounds, soundFilename } from './registered-sounds';
 import { keepWebPageActive } from './web-page-activity';
 import { webAvatarURL, fetchWebAvatar, webAvatarResponse } from './web-account-avatar';
-import { getWebAccountGroup, groupId, type WebAccountGroup } from './web-account-groups';
+import {
+  getWebAccountGroup,
+  findWebAccountGroup,
+  groupId,
+  type WebAccountGroup,
+} from './web-account-groups';
+import { WebAccountRoster, WebAccountRosterError } from './web-account-roster';
+import { webAccountName } from '../../shared/web-accounts';
 
 type Saved = {
   version: 1;
@@ -365,6 +372,27 @@ export class WebAccountController {
     atomicWrite(this.file, JSON.stringify(next, null, 2));
     this.state = next;
     this.changed();
+  }
+  settingsRoster(expected?: { root: string; groupId?: string }) {
+    if (
+      expected &&
+      (path.resolve(expected.root) !== path.resolve(this.root) ||
+        expected.groupId !== this.definition.accountGroup?.id)
+    )
+      throw new WebAccountRosterError('UNAVAILABLE');
+    if (this.group) return this.group.settingsRoster(this.id, this.file);
+    return new WebAccountRoster(this.file, {
+      bindingFile: path.join(this.root, 'group-binding.json'),
+      check: (raw) => {
+        if (this.disposed || this.deleting.size) throw new WebAccountRosterError('UNAVAILABLE');
+        if (JSON.stringify(raw) !== JSON.stringify(this.state))
+          throw new WebAccountRosterError('REVISION_CONFLICT');
+      },
+      applied: (raw) => {
+        this.state = raw as Saved;
+        this.changed();
+      },
+    });
   }
   private syncGroup() {
     if (this.disposed || !this.group) return;
@@ -1081,16 +1109,21 @@ export class WebAccountController {
         return;
       }
       case 'rename': {
-        const a = this.account(args[0]),
-          name = args[1];
-        if (typeof name !== 'string' || !name.trim() || name.length > 60)
+        const a = this.account(args[0]);
+        let name: string;
+        try {
+          name = webAccountName(args[1]);
+        } catch {
           throw Error(hostText('services.webAccounts.invalidName'));
-        this.save({
-          ...this.state,
-          accounts: this.state.accounts.map((item) =>
-            item.id === a.id ? { ...a, name: name.trim(), temporaryName: false } : item,
-          ),
-        });
+        }
+        const roster = this.settingsRoster(),
+          current = roster.publicConfiguration();
+        roster
+          .planPublicConfiguration(
+            current.accounts.map((item) => (item.id === a.id ? { ...item, name } : item)),
+            current.revision,
+          )
+          .commit();
         return;
       }
       case 'acknowledge':
@@ -1400,4 +1433,39 @@ export async function closeWebAccounts(id: string) {
   const c = controllers.get(id);
   controllers.delete(id);
   await c?.close();
+}
+
+/** Resolve a declared roster without constructing a controller, migrating or opening a page. */
+export function webAccountSettingsRoster(
+  id: string,
+  definition: WebAccountDefinition,
+  localRoot: string,
+  sharedRoot: string,
+) {
+  const directory = path.join(localRoot, 'web-accounts', id);
+  const controller = controllers.get(id);
+  if (controller)
+    return controller.settingsRoster({ root: directory, groupId: definition.accountGroup?.id });
+  const file = path.join(directory, 'accounts.json');
+  const group = definition.accountGroup;
+  if (group) {
+    const active = findWebAccountGroup(group.id, sharedRoot, localRoot);
+    if (active) return active.settingsRoster(id, file);
+  }
+  return new WebAccountRoster(
+    group ? path.join(sharedRoot, 'web-account-groups', group.id, 'accounts.json') : file,
+    {
+      bindingFile: path.join(directory, 'group-binding.json'),
+      ...(group
+        ? {
+            group: {
+              id: group.id,
+              owner: id,
+              legacyFile: file,
+              stateFile: path.join(localRoot, 'web-account-groups', group.id, 'state.json'),
+            },
+          }
+        : {}),
+    },
+  );
 }

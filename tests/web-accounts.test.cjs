@@ -229,22 +229,34 @@ test('Cycle transfers focused Gmail input but preserves local UI and other windo
 
 test('Only temporary account names are replaced and explicit renames win', async () => {
   const { WebAccountController: Controller } = require('../out/main/main/core/web-accounts');
+  const { randomUUID } = require('node:crypto');
+  const root = path.resolve('.artifacts/web-account-name-unit', randomUUID());
+  fs.mkdirSync(root, { recursive: true });
+  const ids = { new: randomUUID(), legacy: randomUUID(), custom: randomUUID() };
   const fake = {
+    root,
+    file: path.join(root, 'accounts.json'),
+    definition: {},
+    settingsRoster: Controller.prototype.settingsRoster,
+    changed() {},
     state: {
+      version: 1,
       accounts: [
-        { id: 'new', name: '新しいアカウント', temporaryName: true, monitoring: false },
-        { id: 'legacy', name: 'アカウント 2' },
-        { id: 'custom', name: '仕事用' },
+        { id: ids.new, name: '新しいアカウント', temporaryName: true, monitoring: false },
+        { id: ids.legacy, name: 'アカウント 2' },
+        { id: ids.custom, name: '仕事用' },
       ],
-      selected: 'new',
+      selected: ids.new,
     },
     deleting: new Set(),
     account: Controller.prototype.account,
     save(next) {
       this.state = next;
+      fs.writeFileSync(this.file, JSON.stringify(next));
     },
   };
-  const update = (id, value) => Controller.prototype.updateAccountName.call(fake, id, value);
+  fake.save(fake.state);
+  const update = (id, value) => Controller.prototype.updateAccountName.call(fake, ids[id], value);
   for (const raw of [null, {}, '', 'x'.repeat(61), 'bad\nname']) update('new', raw);
   assert.equal(fake.state.accounts[0].name, '新しいアカウント');
   update('new', 'Gmail Name');
@@ -256,7 +268,7 @@ test('Only temporary account names are replaced and explicit renames win', async
   assert.equal(fake.state.accounts[1].name, 'account@example.test');
   update('custom', 'Ignored');
   assert.equal(fake.state.accounts[2].name, '仕事用');
-  await Controller.prototype.invoke.call(fake, 'rename', ['new', '新しいアカウント']);
+  await Controller.prototype.invoke.call(fake, 'rename', [ids.new, '新しいアカウント']);
   update('new', 'Ignored after explicit rename');
   assert.equal(fake.state.accounts[0].name, '新しいアカウント');
 });
