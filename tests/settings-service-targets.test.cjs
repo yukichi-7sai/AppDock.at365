@@ -2018,6 +2018,7 @@ test('Shell selection dryRun, replay, default omission and dotted IDs preserve u
         ...f.store.value.host,
         shellProviders: {
           'page.settings': 'old.shell',
+          'overlay.command-palette': 'retired.palette',
           'future.saved': 'future.shell',
           ribbon: defaultShellId,
         },
@@ -2028,18 +2029,21 @@ test('Shell selection dryRun, replay, default omission and dotted IDs preserve u
   );
   const before = fs.readFileSync(f.store.shared.file),
     device = fs.readFileSync(f.store.device.file),
-    changes = { 'overlay.command-palette': 'shell.a', 'notification.desktop': 'shell.a' },
+    changes = { 'notification.banner': 'shell.a', 'notification.desktop': 'shell.a' },
     preview = selectShell(f, changes, true);
   assert.equal(preview.completion, 'validated');
   assert.equal(preview.effectVerified, false);
-  assert.equal(preview.applies['overlay.command-palette'], 'shellProvidersChanged');
+  assert.equal(preview.applies['notification.banner'], 'shellProvidersChanged');
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
   assert.deepEqual(fs.readFileSync(f.store.device.file), device);
   const request = f.request(shellId, [{ kind: 'set', changes }]),
     result = f.call('apply', request);
   assert.deepEqual(f.call('apply', request), result);
   assert.equal(f.writes(), 1);
-  assert.equal(f.store.value.host.shellProviders['overlay.command-palette'], 'shell.a');
+  assert.equal(f.store.value.host.shellProviders['notification.banner'], 'shell.a');
+  assert.throws(() => selectShell(f, { 'overlay.command-palette': 'shell.a' }), {
+    code: 'NOT_FOUND',
+  });
   assert.equal(f.store.value.host.shellProviders.overlay, undefined);
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
   const deviceBefore = JSON.parse(device),
@@ -2051,12 +2055,14 @@ test('Shell selection dryRun, replay, default omission and dotted IDs preserve u
   selectShell(f, { ribbon: defaultShellId });
   assert.deepEqual(f.store.value.host.shellProviders, {
     'page.settings': 'old.shell',
+    'overlay.command-palette': 'retired.palette',
     'future.saved': 'future.shell',
   });
   assert.equal(f.read(shellId, ['ribbon']).fields[0].inherited, true);
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
   assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)).host.shellProviders, {
     'page.settings': 'old.shell',
+    'overlay.command-palette': 'retired.palette',
     'future.saved': 'future.shell',
   });
   const noOpWrites = f.writes();

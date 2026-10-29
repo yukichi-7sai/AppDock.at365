@@ -29,6 +29,7 @@
 .palette-input input {
   border: 0;
   background: none;
+  color: var(--text);
   padding: 0;
   flex: 1;
   outline: 0 !important;

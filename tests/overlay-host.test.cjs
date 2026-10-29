@@ -21,9 +21,10 @@ function fixture(t) {
     generation: 'first',
     folder: 'fixture',
     enabled: true,
-    shell: { views: { 'overlay.command-palette': 'overlay.html' } },
+    shell: { views: { ribbon: 'index.html' } },
   };
-  const failed = [];
+  const failed = [],
+    errors = [];
   const registry = {
     observe() {},
     touch() {},
@@ -62,8 +63,8 @@ function fixture(t) {
   const createShellView = () => {
     const wc = Object.assign(new EventEmitter(), {
       closed: false,
-      url: 'file:///fixture/overlay.html',
-      mainFrame: { url: 'file:///fixture/overlay.html' },
+      url: 'file:///host/command-palette/index.html',
+      mainFrame: { url: 'file:///host/command-palette/index.html' },
       isDestroyed() {
         return this.closed;
       },
@@ -110,7 +111,7 @@ function fixture(t) {
               webContents: { getFocusedWebContents: () => window.webContents },
             }
           : id === './shell-view'
-            ? { createShellView, shellViewUrl: () => 'file:///fixture/overlay.html' }
+            ? { createShellView, createLocalView: createShellView }
             : actualRequire(id),
       setTimeout: (fn) => {
         const id = ++timerId;
@@ -124,13 +125,16 @@ function fixture(t) {
   const host = new module.exports.OverlayHost({
     window,
     preload: 'preload',
+    palette: { folder: 'host', entry: 'command-palette/index.html', preload: 'palette-preload' },
     registry,
     providers: () => [provider],
     route: () => 'settings',
     execute: async () => {},
     settings: () => ({}),
     changed() {},
-    failed() {},
+    failed(message) {
+      errors.push(message);
+    },
   });
   t.after(() => host.dispose());
   host.viewport({ x: 0, y: 40, width: 1000, height: 720 });
@@ -148,21 +152,28 @@ function fixture(t) {
       },
     );
   const invoke = (name, view, ...args) =>
-    handlers.get('overlay:' + name)(
+    handlers.get('palette:' + name)(
       { sender: view.webContents, senderFrame: view.webContents.mainFrame },
       ...args,
     );
-  const ready = (view, reusable = true) => {
+  const ready = (view) => {
     const connection = invoke('connect', view);
-    invoke(
-      'ready',
-      view,
-      connection.sessionId,
-      reusable ? { reusable: true, modelId: connection.snapshot.id } : undefined,
-    );
+    invoke('ready', view, connection.sessionId, { modelId: connection.snapshot.id });
     return connection;
   };
-  return { host, views, provider, failed, session, invoke, ready };
+  return {
+    host,
+    views,
+    provider,
+    failed,
+    errors,
+    window,
+    timers,
+    handlers,
+    session,
+    invoke,
+    ready,
+  };
 }
 
 test('reusable palettes keep one hidden renderer, rotate sessions and reject old callbacks', async (t) => {
@@ -174,7 +185,7 @@ test('reusable palettes keep one hidden renderer, rotate sessions and reject old
   first.cancel('dismissed');
   assert.equal(view.visible, false);
   assert.equal(view.webContents.closed, false);
-  assert.equal(view.webContents.messages.at(-1)[0], 'overlay:suspended');
+  assert.equal(view.webContents.messages.at(-1)[0], 'palette:suspended');
   assert.throws(() => f.invoke('connect', view));
   for (let i = 0; i < 15; i++) {
     const session = f.session();
@@ -196,27 +207,29 @@ test('reusable palettes keep one hidden renderer, rotate sessions and reject old
   assert(view.webContents.closed);
 });
 
-test('legacy renderers are destroyed and changed or disabled providers retire cached renderers', (t) => {
+test('Shell changes, disable and retry do not replace the fixed palette or its cached view', (t) => {
   const f = fixture(t);
   let session = f.session();
   f.host.open(session);
-  f.ready(f.views[0], false);
+  f.ready(f.views[0]);
   session.cancel('done');
-  assert(f.views[0].webContents.closed);
+  assert.equal(f.views[0].webContents.closed, false);
   session = f.session();
   f.host.open(session);
-  f.ready(f.views[1]);
+  f.ready(f.views[0]);
   session.cancel('done');
   f.provider.generation = 'second';
   f.host.refresh();
-  assert(f.views[1].webContents.closed);
+  assert.equal(f.views[0].webContents.closed, false);
   session = f.session();
   f.host.open(session);
-  f.ready(f.views[2]);
+  f.ready(f.views[0]);
   session.cancel('done');
   f.provider.enabled = false;
   f.host.refresh();
-  assert(f.views[2].webContents.closed);
+  f.host.retry();
+  assert.equal(f.views.length, 1);
+  assert.equal(f.views[0].webContents.closed, false);
 });
 
 test('a hidden renderer crash is retired without opening an overlay', (t) => {
@@ -229,5 +242,52 @@ test('a hidden renderer crash is retired without opening an overlay', (t) => {
   view.webContents.emit('render-process-gone');
   assert(view.webContents.closed);
   assert.equal(f.host.active, false);
-  assert.equal(f.failed.length, 1);
+  assert.equal(f.failed.length, 0);
+  assert.equal(f.errors.length, 0);
+  f.host.open(f.session());
+  assert.equal(f.views.length, 2);
+});
+
+test('palette failure recovers once and repeated failure cancels and reports without a Shell failure', async (t) => {
+  const f = fixture(t),
+    session = f.session();
+  f.host.open(session);
+  f.views[0].webContents.emit('render-process-gone');
+  assert.equal(f.views.length, 2);
+  assert.equal(f.host.active, true);
+  const stale = f.views[0];
+  stale.webContents.emit('render-process-gone');
+  assert.equal(f.views.length, 2);
+  [...f.timers.values()][0]();
+  assert.deepEqual(await session.result, { status: 'cancelled', reason: 'palette-unavailable' });
+  assert.equal(f.host.active, false);
+  assert.equal(f.errors.length, 1);
+  assert.equal(f.failed.length, 0);
+  f.host.open(f.session());
+  assert.equal(f.views.length, 3);
+});
+
+test('owner reload destroys cached palette and palette bridge denies foreign Shell frames', (t) => {
+  const f = fixture(t),
+    session = f.session();
+  f.host.open(session);
+  const view = f.views[0];
+  f.ready(view);
+  assert.throws(() =>
+    f.handlers.get('overlay:connect')({
+      sender: view.webContents,
+      senderFrame: view.webContents.mainFrame,
+    }),
+  );
+  assert.throws(() =>
+    f.handlers.get('palette:connect')({ sender: view.webContents, senderFrame: {} }),
+  );
+  view.webContents.url = 'file:///foreign.html';
+  assert.throws(() => f.invoke('connect', view));
+  view.webContents.url = 'file:///host/command-palette/index.html';
+  session.cancel('done');
+  f.window.webContents.emit('did-start-loading');
+  assert.equal(view.webContents.closed, true);
+  f.host.open(f.session());
+  assert.equal(f.views.length, 2);
 });

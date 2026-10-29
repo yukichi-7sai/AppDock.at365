@@ -53,6 +53,7 @@ function fixture(extra = {}) {
 test('all retired page assignments remain inert while their saved values and legacy requirements survive', () => {
   const f = fixture();
   const retired = [
+    'overlay.command-palette',
     'page.home',
     'page.logs',
     'page.image-library',
@@ -62,7 +63,7 @@ test('all retired page assignments remain inert while their saved values and leg
   const assignments = Object.fromEntries(retired.map((region) => [region, 'shell.a']));
   Object.assign(f.assignments, assignments);
   assert.deepEqual(parseShellProviders({ shellProviders: assignments }), assignments);
-  assert.equal(f.registry.snapshot().regions.length, 6);
+  assert.equal(f.registry.snapshot().regions.length, 5);
   for (const region of retired) {
     assert(!f.registry.snapshot().regions.some((state) => state.region === region));
     const requirement = { region, state: 'visible' };

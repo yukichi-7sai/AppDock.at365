@@ -10,6 +10,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'src/renderer/index.html',
+        commandPalette: 'src/renderer/command-palette/index.html',
         gestureIndicator: 'src/renderer/gesture-indicator.html',
       },
     },

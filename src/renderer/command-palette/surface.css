@@ -1,0 +1,69 @@
+:root {
+  font-family: 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: transparent;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+button {
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+input {
+  min-width: 0;
+}
+kbd {
+  border: 1px solid var(--border);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(20px, 14vh, 110px) 12px 20px;
+}
+.command-palette {
+  max-height: calc(100vh - 45px);
+}
+.empty {
+  color: var(--muted);
+  padding: 16px;
+}
+[role='alert'] {
+  color: #ff9ca5;
+  overflow-wrap: anywhere;
+  padding: 8px 20px;
+}

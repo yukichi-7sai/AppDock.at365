@@ -7,7 +7,6 @@ export const shellRegions = [
   { id: 'titlebar', title: hostText('services.sharedShell.titleBar') },
   { id: 'ribbon', title: hostText('services.sharedShell.ribbon') },
   { id: 'statusbar', title: hostText('services.sharedShell.statusBar') },
-  { id: 'overlay.command-palette', title: hostText('services.sharedShell.commandPalette') },
   { id: 'notification.banner', title: hostText('services.sharedShell.banner') },
   { id: 'notification.desktop', title: hostText('services.sharedShell.desktopNotifications') },
 ] as const;
@@ -25,6 +24,7 @@ export function isShellRegion(value: unknown): value is ShellRegion {
   return shellRegions.some((r) => r.id === value);
 }
 export type LegacyShellRegion =
+  | 'overlay.command-palette'
   | 'page.settings'
   | 'page.home'
   | 'page.logs'
@@ -33,6 +33,7 @@ export type LegacyShellRegion =
   | 'overlay.ribbon-group';
 export function isRetiredShellRegion(value: unknown): value is LegacyShellRegion {
   return [
+    'overlay.command-palette',
     'page.settings',
     'page.home',
     'page.logs',

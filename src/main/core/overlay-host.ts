@@ -11,25 +11,29 @@ import {
 import { randomUUID } from 'node:crypto';
 import { shellView, type ShellRegion } from '../../shared/shell';
 import type { OverlayController } from './overlay-controller';
-import { createShellView, shellViewUrl } from './shell-view';
+import { createLocalView, createShellView } from './shell-view';
 
 type Surface = {
-  region: ShellRegion;
   view: WebContentsView;
   url: string;
   session: string;
-  provider: string;
-  version: string;
-  generation?: string;
   ready: boolean;
-  reusable: boolean;
   revision: number;
-  settingsSignature?: string;
   timer: ReturnType<typeof setTimeout>;
-};
-/** One modal lane per context. Controllers and providers do not own native layering. */
+  settingsSignature?: string;
+} & (
+  | { kind: 'command-palette' }
+  | {
+      kind: 'ribbon-group';
+      region: 'ribbon';
+      provider: string;
+      version: string;
+      generation?: string;
+    }
+);
+
+/** One modal lane; the fixed palette and Shell-owned ribbon groups share native layering. */
 export class OverlayHost {
-  private fallbackOnly = false;
   private current?: OverlayController;
   private surface?: Surface;
   private cached?: Surface;
@@ -37,10 +41,12 @@ export class OverlayHost {
   private previousRoute = '';
   private bounds?: Electron.Rectangle;
   private disposed = false;
+  private paletteRecoveries = 0;
   constructor(
     private options: {
       window: BrowserWindow;
       preload: string;
+      palette: { folder: string; entry: string; preload: string };
       providers(): ShellProvider[];
       registry: ShellProviderRegistry;
       route(): string;
@@ -51,79 +57,52 @@ export class OverlayHost {
       asset?(id: unknown): { dataUrl: string } | Promise<{ dataUrl: string }>;
     },
   ) {
-    for (const region of ['overlay.command-palette'] as const)
-      options.registry.observe(region, () => ({
-        provider: this.surface?.region === region ? this.surface.provider : null,
-        version: this.surface?.version,
-        generation: this.surface?.generation,
-        session: this.surface?.session,
-        ready: this.surface?.region === region && !!this.surface?.ready,
-        visible:
-          !!this.current &&
-          this.surface?.region === region &&
-          this.previousRoute === options.route() &&
-          !!this.surface?.ready &&
-          !options.window.isDestroyed() &&
-          options.window.isVisible() &&
-          !options.window.isMinimized(),
-      }));
-    const bound = (event: IpcMainInvokeEvent) => {
-      const s = this.surface;
-      if (
-        !s ||
-        !options.registry.usable(s.region, s) ||
-        !this.current ||
-        this.previousRoute !== options.route() ||
-        event.sender !== s.view.webContents ||
-        event.senderFrame !== event.sender.mainFrame ||
-        event.sender.getURL() !== s.url
-      )
-        throw Error('Overlay session is not bound');
-      return s;
-    };
-    ipcMain.handle('overlay:connect', (event) => {
-      const s = bound(event);
-      return {
-        sessionId: s.session,
-        providerAppletId: s.provider,
-        snapshot: this.current!.snapshot(),
-      };
-    });
-    ipcMain.handle(
-      'overlay:ready',
-      (event, session, readiness?: { reusable?: boolean; modelId?: string }) => {
-        const s = bound(event);
-        if (session !== s.session) throw Error('Stale overlay session');
+    for (const [prefix, kind] of [
+      ['palette', 'command-palette'],
+      ['overlay', 'ribbon-group'],
+    ] as const) {
+      ipcMain.handle(`${prefix}:connect`, (event) => {
+        const s = this.bound(event, kind);
+        return {
+          sessionId: s.session,
+          ...(s.kind === 'ribbon-group' ? { providerAppletId: s.provider } : {}),
+          snapshot: this.current!.snapshot(),
+        };
+      });
+      ipcMain.handle(`${prefix}:ready`, (event, session, readiness?: { modelId?: string }) => {
+        const s = this.bound(event, kind);
         if (
-          readiness !== undefined &&
-          (!readiness ||
-            typeof readiness !== 'object' ||
-            typeof readiness.reusable !== 'boolean' ||
-            readiness.modelId !== this.current!.snapshot().id)
+          session !== s.session ||
+          (s.kind === 'command-palette' && readiness?.modelId !== this.current!.id)
         )
+          throw Error('Stale overlay session');
+        if (readiness?.modelId !== undefined && readiness.modelId !== this.current!.id)
           throw Error('Stale overlay model');
         clearTimeout(s.timer);
         if (s.ready) return;
-        s.reusable = readiness?.reusable === true && s.region === 'overlay.command-palette';
         s.ready = true;
         this.layout();
         if (options.window.isFocused()) s.view.webContents.focus();
         this.refresh();
-      },
-    );
-    ipcMain.handle('overlay:act', (event, action) => {
-      const s = bound(event);
-      if (!s.ready) throw Error('Overlay is not ready');
-      return this.current!.act(action);
-    });
+      });
+      ipcMain.handle(`${prefix}:act`, (event, action) => {
+        const s = this.bound(event, kind);
+        if (!s.ready) throw Error('Overlay is not ready');
+        return this.current!.act(action);
+      });
+    }
     ipcMain.handle('overlay:executeCommand', (event, command) => {
-      const s = bound(event);
-      if (!s.ready) throw Error('Overlay is not ready');
+      const s = this.bound(event, 'ribbon-group');
+      if (!s.ready || s.kind !== 'ribbon-group') throw Error('Overlay is not ready');
       return options.execute(s.provider, command);
     });
-    ipcMain.handle('overlay:getSettings', (event) => options.settings(bound(event).provider));
+    ipcMain.handle('overlay:getSettings', (event) => {
+      const s = this.bound(event, 'ribbon-group');
+      if (s.kind !== 'ribbon-group') throw Error('Invalid overlay');
+      return options.settings(s.provider);
+    });
     ipcMain.handle('overlay:asset', (event, id) => {
-      bound(event);
+      this.bound(event, 'ribbon-group');
       return options.asset?.(id);
     });
     options.window.on('resize', () => {
@@ -134,9 +113,28 @@ export class OverlayHost {
     options.window.on('blur', () => this.cancelRibbon('window-blurred'));
     options.window.on('hide', () => this.cancel('window-hidden'));
     options.window.on('minimize', () => this.cancel('window-minimized'));
-    options.window.webContents.on('did-start-loading', () => this.cancel('owner-reloaded'));
-    options.window.webContents.on('render-process-gone', () => this.cancel('owner-exited'));
+    options.window.webContents.on('did-start-loading', () => this.cancelOwner('owner-reloaded'));
+    options.window.webContents.on('render-process-gone', () => this.cancelOwner('owner-exited'));
     options.window.once('closed', () => this.dispose());
+  }
+  private usable(s: Surface) {
+    return s.kind === 'command-palette' || this.options.registry.usable('ribbon', s);
+  }
+  private bound(event: IpcMainInvokeEvent, kind: Surface['kind']) {
+    const s = this.surface;
+    if (
+      !s ||
+      s.kind !== kind ||
+      !this.usable(s) ||
+      !this.current ||
+      this.current.kind !== kind ||
+      this.previousRoute !== this.options.route() ||
+      event.sender !== s.view.webContents ||
+      event.senderFrame !== event.sender.mainFrame ||
+      event.sender.getURL() !== s.url
+    )
+      throw Error('Overlay session is not bound');
+    return s;
   }
   get active() {
     return !!this.current;
@@ -170,7 +168,7 @@ export class OverlayHost {
       return;
     }
     this.cancel('replaced');
-    this.fallbackOnly = false;
+    this.paletteRecoveries = 0;
     this.previousFocus = this.options.window.isFocused()
       ? (webContents.getFocusedWebContents() ?? this.options.window.webContents)
       : undefined;
@@ -195,135 +193,116 @@ export class OverlayHost {
   cancel(reason = 'dismissed') {
     this.current?.cancel(reason);
   }
+  private cancelOwner(reason: string) {
+    this.cancel(reason);
+    if (this.cached) this.destroySurface(this.cached);
+    this.cached = undefined;
+  }
   cancelRibbon(reason = 'source-changed') {
     if (this.kind === 'ribbon-group') this.cancel(reason);
   }
   retry(region?: ShellRegion) {
-    if ((!region || region === 'overlay.command-palette') && this.cached) {
-      this.destroySurface(this.cached);
-      this.cached = undefined;
-    }
-    if (region) this.options.registry.retry(region);
-    else {
-      this.options.registry.retry('overlay.command-palette');
-      this.options.registry.retry('ribbon');
-    }
+    this.options.registry.retry(region ?? 'ribbon');
   }
   private present() {
     const controller = this.current;
     if (!controller) return;
-    const region: ShellRegion =
-      controller.kind === 'ribbon-group' ? 'ribbon' : 'overlay.command-palette';
-    const provider =
-      controller.kind === 'ribbon-group'
-        ? this.options
-            .providers()
-            .find((p) => p.id === this.options.registry.region('ribbon').boundProvider)
-        : this.options.registry.resolve(region, this.fallbackOnly).provider;
-    if (!provider) {
-      this.cancel('unavailable');
-      this.options.failed(hostText('services.overlayHost.startFailed'));
-      return;
-    }
-    const cached = this.cached;
-    this.cached = undefined;
-    let sameView = false;
-    try {
-      sameView = cached?.url === shellViewUrl(provider.folder, shellView(provider.shell, region)!);
-    } catch {
-      /* The normal creation path reports unavailable provider files. */
-    }
     if (
-      cached &&
       controller.kind === 'command-palette' &&
-      !cached.view.webContents.isDestroyed() &&
-      cached.provider === provider.id &&
-      cached.version === provider.version &&
-      cached.generation === provider.generation &&
-      sameView
+      this.cached &&
+      !this.cached.view.webContents.isDestroyed()
     ) {
-      cached.session = randomUUID();
-      cached.ready = false;
-      cached.revision = 0;
-      cached.settingsSignature = undefined;
-      cached.timer = setTimeout(() => this.fail(cached, 'ready timeout'), 10000);
-      this.surface = cached;
-      cached.view.webContents.send('overlay:changed', controller.snapshot());
+      const s = this.cached;
+      this.cached = undefined;
+      s.session = randomUUID();
+      s.ready = false;
+      s.revision = 0;
+      s.timer = setTimeout(() => this.fail(s, 'ready timeout'), 10000);
+      this.surface = s;
+      s.view.webContents.send('palette:changed', controller.snapshot());
       return;
     }
-    if (cached) this.destroySurface(cached);
     try {
-      const { view, url } = createShellView(
-        provider.folder,
-        shellView(provider.shell, region)!,
-        this.options.preload,
-      );
-      view.setBackgroundColor('#00000000');
-      const s: Surface = {
-        region,
-        view,
-        url,
-        session: randomUUID(),
-        provider: provider.id,
-        version: provider.version,
-        generation: provider.generation,
-        ready: false,
-        reusable: false,
-        revision: 0,
-        timer: setTimeout(() => this.fail(s, 'ready timeout'), 10000),
-      };
-      this.surface = s;
-      view.setVisible(false);
-      this.options.window.contentView.addChildView(view);
-      view.webContents.on('render-process-gone', () => this.fail(s, 'renderer exited'));
-      view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
-      void view.webContents.loadURL(url).catch(() => this.fail(s, 'load failed'));
-    } catch {
-      this.options.registry.fail(region, provider.id, provider.version);
-      if (controller.kind === 'ribbon-group') {
-        this.cancel('ribbon-unavailable');
-        this.options.failed(
-          hostText('services.overlayHost.loadFailed', { provider: String(provider.id) }),
+      let s: Surface;
+      if (controller.kind === 'command-palette') {
+        const p = this.options.palette;
+        const { view, url } = createLocalView(p.folder, p.entry, p.preload);
+        s = {
+          kind: 'command-palette',
+          view,
+          url,
+          session: randomUUID(),
+          ready: false,
+          revision: 0,
+          timer: undefined!,
+        };
+      } else {
+        const provider = this.options
+          .providers()
+          .find((p) => p.id === this.options.registry.region('ribbon').boundProvider);
+        if (!provider) {
+          this.cancel('ribbon-unavailable');
+          return;
+        }
+        const { view, url } = createShellView(
+          provider.folder,
+          shellView(provider.shell, 'ribbon')!,
+          this.options.preload,
         );
-        return;
+        s = {
+          kind: 'ribbon-group',
+          region: 'ribbon',
+          provider: provider.id,
+          version: provider.version,
+          generation: provider.generation,
+          view,
+          url,
+          session: randomUUID(),
+          ready: false,
+          revision: 0,
+          timer: undefined!,
+        };
       }
-      this.fallbackOnly = true;
-      this.options.failed(
-        hostText('services.overlayHost.loadFailed', { provider: String(provider.id) }),
-      );
-      this.present();
+      this.surface = s;
+      s.timer = setTimeout(() => this.fail(s, 'ready timeout'), 10000);
+      s.view.setBackgroundColor('#00000000');
+      s.view.setVisible(false);
+      this.options.window.contentView.addChildView(s.view);
+      s.view.webContents.on('render-process-gone', () => this.fail(s, 'renderer exited'));
+      s.view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
+      void s.view.webContents.loadURL(s.url).catch(() => this.fail(s, 'load failed'));
+    } catch {
+      this.fail(this.surface, 'load failed');
     }
   }
-  private fail(s: Surface, reason: string) {
-    if (s === this.cached) {
+  private fail(s: Surface | undefined, reason: string) {
+    if (s && s === this.cached) {
       this.cached = undefined;
-      this.options.registry.fail(s.region, s.provider, s.version);
       this.destroySurface(s);
-      this.options.changed();
       return;
     }
-    if (s !== this.surface || !this.current) return;
-    this.options.registry.fail(s.region, s.provider, s.version);
-    if (this.current.kind === 'ribbon-group') {
-      this.cancel('ribbon-unavailable');
-      this.options.failed(`${s.provider}: ${reason}`);
-      return;
-    }
-    this.fallbackOnly = true;
+    if ((s && s !== this.surface) || !this.current) return;
+    const palette = this.current.kind === 'command-palette';
+    if (!palette && s?.kind === 'ribbon-group')
+      this.options.registry.fail('ribbon', s.provider, s.version);
     this.closeSurface();
-    this.options.failed(`${s.provider}: ${reason}`);
-    this.present();
+    if (palette && this.paletteRecoveries++ === 0) {
+      this.present();
+      return;
+    }
+    this.cancel(palette ? 'palette-unavailable' : 'ribbon-unavailable');
+    this.options.failed(hostText('services.overlayHost.startFailed') + ': ' + reason);
   }
   private closeSurface(reuse = false) {
     const s = this.surface;
     this.surface = undefined;
-    this.options.registry.touch();
     if (!s) return;
     clearTimeout(s.timer);
+    if (s.kind === 'ribbon-group') this.options.registry.touch();
     if (
       reuse &&
+      s.kind === 'command-palette' &&
       !this.disposed &&
-      s.reusable &&
       !s.view.webContents.isDestroyed() &&
       !this.options.window.isDestroyed()
     ) {
@@ -331,7 +310,7 @@ export class OverlayHost {
       s.ready = false;
       s.session = randomUUID();
       s.view.setVisible(false);
-      s.view.webContents.send('overlay:suspended');
+      s.view.webContents.send('palette:suspended');
       this.cached = s;
       return;
     }
@@ -343,61 +322,57 @@ export class OverlayHost {
     if (!s.view.webContents.isDestroyed()) s.view.webContents.close();
   }
   layout() {
-    this.options.registry.touch();
     const s = this.surface;
     if (!s?.ready || this.options.window.isDestroyed()) return;
-    const [width, height] = this.options.window.getContentSize();
-    const zoom = this.options.window.webContents.getZoomFactor();
-    if (this.current?.kind === 'command-palette') {
+    const [width, height] = this.options.window.getContentSize(),
+      zoom = this.options.window.webContents.getZoomFactor();
+    if (s.kind === 'command-palette') {
       if (!this.bounds) {
         s.view.setVisible(false);
         return;
       }
-      const x = Math.min(width - 1, Math.round(this.bounds.x * zoom));
-      const y = Math.min(height - 1, Math.round(this.bounds.y * zoom));
+      const x = Math.min(width - 1, Math.round(this.bounds.x * zoom)),
+        y = Math.min(height - 1, Math.round(this.bounds.y * zoom));
       s.view.setBounds({
         x,
         y,
         width: Math.max(1, Math.min(width - x, Math.round(this.bounds.width * zoom))),
         height: Math.max(1, Math.min(height - y, Math.round(this.bounds.height * zoom))),
       });
-    } else s.view.setBounds({ x: 0, y: 0, width: Math.max(1, width), height: Math.max(1, height) });
+    } else {
+      s.view.setBounds({ x: 0, y: 0, width: Math.max(1, width), height: Math.max(1, height) });
+      this.options.registry.touch();
+    }
     s.view.webContents.setZoomFactor(zoom);
     s.view.setVisible(true);
     this.options.window.contentView.addChildView(s.view);
   }
   refresh() {
-    if (this.cached && !this.options.registry.usable(this.cached.region, this.cached)) {
-      this.destroySurface(this.cached);
-      this.cached = undefined;
-    }
     const s = this.surface;
     if (!this.current || !s) return;
     if (this.previousRoute !== this.options.route()) {
       this.cancel('owner-navigation');
       return;
     }
-    if (!this.options.registry.usable(s.region, s)) {
-      if (this.current.kind === 'ribbon-group') {
-        this.cancel('ribbon-unavailable');
-        return;
-      }
-      this.fallbackOnly = true;
-      // Intentional disable/restart must not blacklist a healthy provider.
-      this.closeSurface();
-      this.present();
+    if (!this.usable(s)) {
+      this.cancel('ribbon-unavailable');
       return;
     }
     const model = this.current.snapshot();
     if (!this.current || this.surface !== s) return;
-    const signature = JSON.stringify(this.options.settings(s.provider));
-    if (s.ready && s.settingsSignature !== signature) {
-      s.settingsSignature = signature;
-      s.view.webContents.send('overlay:settingsChanged');
+    if (s.kind === 'ribbon-group') {
+      const signature = JSON.stringify(this.options.settings(s.provider));
+      if (s.ready && s.settingsSignature !== signature) {
+        s.settingsSignature = signature;
+        s.view.webContents.send('overlay:settingsChanged');
+      }
     }
     if (s.ready && s.revision !== model.revision) {
       s.revision = model.revision;
-      s.view.webContents.send('overlay:changed', model);
+      s.view.webContents.send(
+        s.kind === 'command-palette' ? 'palette:changed' : 'overlay:changed',
+        model,
+      );
     }
     this.layout();
   }
@@ -407,7 +382,9 @@ export class OverlayHost {
     this.closeSurface();
     if (this.cached) this.destroySurface(this.cached);
     this.cached = undefined;
-    for (const name of ['connect', 'ready', 'act', 'executeCommand', 'getSettings', 'asset'])
+    for (const prefix of ['palette', 'overlay'])
+      for (const name of ['connect', 'ready', 'act']) ipcMain.removeHandler(`${prefix}:${name}`);
+    for (const name of ['executeCommand', 'getSettings', 'asset'])
       ipcMain.removeHandler(`overlay:${name}`);
   }
 }

@@ -17,6 +17,7 @@ import { mergeSettingsInput } from '../../shared/settings-input';
 import { sameSetting } from '../../shared/settings-defaults';
 import { restoreSettingsCollections } from '../../shared/settings-storage';
 /** Coordinates scoped immediate writes; incomplete inputs belong to the rendering UI. */
+const emptyCommandReferences: import('../../shared/command-text').CommandReference[] = [];
 export class SettingsInputSession {
   private state: Omit<SettingsInputState, 'value'>;
   private operations = new Map<string, Promise<SettingsInputState>>();
@@ -26,7 +27,11 @@ export class SettingsInputSession {
     definitions?: string;
     catalog?: SettingsPageDefinition[];
   };
-  private catalogCache?: { key: string; pages: SettingsPageDefinition[] };
+  private catalogCache?: {
+    key: string;
+    references: import('../../shared/command-text').CommandReference[];
+    pages: SettingsPageDefinition[];
+  };
   private projectionCache?: {
     key: string;
     current: Settings;
@@ -40,6 +45,7 @@ export class SettingsInputSession {
       initialPageId?: string;
       scope?(page: import('../../shared/settings-catalog').SettingsPageDefinition): string;
       applets(): ExtensionSnapshot[];
+      commands?(): import('../../shared/command-text').CommandReference[];
       save(
         value: Settings,
         revision: number,
@@ -117,12 +123,19 @@ export class SettingsInputSession {
     return this.read(() => {
       const source = this.reading!;
       if (source.catalog) return source.catalog;
+      const references = this.definitionsKey().includes('[command:')
+        ? (this.options.commands?.() ?? emptyCommandReferences)
+        : emptyCommandReferences;
       const key = JSON.stringify([
         this.definitionsKey(),
         source.applets.map((applet) => [applet.enabled, applet.state]),
       ]);
-      if (key !== this.catalogCache?.key)
-        this.catalogCache = { key, pages: settingsCatalog(source.applets, source.current.value) };
+      if (key !== this.catalogCache?.key || references !== this.catalogCache.references)
+        this.catalogCache = {
+          key,
+          references,
+          pages: settingsCatalog(source.applets, source.current.value, references),
+        };
       return (source.catalog = this.catalogCache!.pages);
     });
   }

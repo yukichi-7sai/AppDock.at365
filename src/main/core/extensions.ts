@@ -1,6 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import { validateAppletCommonValues } from '../../shared/applet-common-settings';
-import { shellView, type ShellRequirement } from '../../shared/shell';
+import { shellView, isRetiredShellRegion, type ShellRequirement } from '../../shared/shell';
 import type { ShellProvider } from './shell-provider-registry';
 import { parseNotificationTypes } from '../../shared/notification-types';
 import { CommandContexts, enterCommand } from './command-contexts';
@@ -215,7 +215,7 @@ function readManifest(
     if (
       requirement &&
       (!m.capabilities?.includes('shell') ||
-        !shellView(m.shell, requirement.region) ||
+        (!isRetiredShellRegion(requirement.region) && !shellView(m.shell, requirement.region)) ||
         command.activateOnExecute ||
         !m.minimumHostVersion ||
         compareVersions(m.minimumHostVersion, '0.34.0') < 0)

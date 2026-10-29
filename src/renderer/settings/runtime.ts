@@ -289,7 +289,12 @@ export class SettingsViewClient {
     return this.chain.then(() => {
       const model = this.model;
       const actionId = model?.content.actions[name];
-      if (!model || model.content.page.id !== pageId || !actionId)
+      if (
+        !model ||
+        model.content.page.id !== pageId ||
+        !actionId ||
+        (kind === 'open' && !!model.content.editing.error)
+      )
         throw Error(hostText('settings.runtime.unavailable'));
       return this.transport.palette!(this.connectionId, {
         sessionId: model.content.editing.sessionId,

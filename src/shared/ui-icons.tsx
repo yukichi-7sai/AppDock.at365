@@ -46,6 +46,7 @@ export type IconName =
   | 'trash'
   | 'info'
   | 'help';
+const playIcon = <path d="m7 4 13 8-13 8Z" />;
 const paths: Record<IconName, React.ReactNode> = {
   calendar: (
     <>
@@ -159,7 +160,7 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M5 12h14m-5-5 5 5-5 5" />
     </>
   ),
-  play: <path d="m7 4 13 8-13 8Z" />,
+  play: playIcon,
   refresh: (
     <>
       <path d="M20 8a8 8 0 1 0 .3 7M20 3v5h-5" />
@@ -173,12 +174,7 @@ const paths: Record<IconName, React.ReactNode> = {
   close: <path d="m6 6 12 12M18 6 6 18" />,
   minus: <path d="M5 12h14" />,
   square: <rect x="6" y="6" width="12" height="12" rx="1" />,
-  command: (
-    <>
-      <path d="M8 8h8v8H8Z" />
-      <path d="M8 8H5a3 3 0 1 1 3-3v14a3 3 0 1 1-3-3h14a3 3 0 1 1-3 3V5a3 3 0 1 1 3 3Z" />
-    </>
-  ),
+  command: playIcon,
   touchpad: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2" />

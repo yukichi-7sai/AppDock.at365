@@ -238,9 +238,7 @@ async function dismiss(p) {
       () => require('./shell-overlay-helper.cjs').overlayClosed(p),
       'executed palette closed',
     );
-    checks.push(
-      'lazy independent Default Shell palette; host has no duplicate; IME, Tab, shortcut suppression and execution',
-    );
+    checks.push('lazy independent host palette; IME, Tab, shortcut suppression and execution');
     p = await open();
     await p.getByRole('combobox').fill('appdock.logs.open');
     await p.getByRole('button', { name: 'ログを開くをピン留め', exact: true }).click();
@@ -267,9 +265,9 @@ async function dismiss(p) {
             .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
             .contentView.children.map((v) => v.webContents?.getURL()),
         );
-        return urls.at(-1)?.endsWith('/overlay.html') && urls;
+        return urls.at(-1)?.endsWith('/command-palette/index.html') && urls;
       }, 'native overlay ready above the Applet body');
-      assert.ok(order.at(-1).endsWith('/overlay.html'));
+      assert.ok(order.at(-1).endsWith('/command-palette/index.html'));
     }
     await dismiss(p);
     assert.equal(
@@ -335,12 +333,12 @@ async function dismiss(p) {
       true,
     );
     p = await open();
-    assert.ok(p.url().includes('/shells/default/'));
+    assert.ok(p.url().endsWith('/command-palette/index.html'));
     await p.getByRole('combobox').fill('fixture.ribbon.mark');
     await p.locator('.palette-execute').waitFor();
     await dismiss(p);
     checks.push(
-      'ribbon-only Shell provides and invokes its ordinary commands; other owner denied; default palette fallback',
+      'ribbon Shell settings and ordinary commands work; other owner denied; host palette is independent',
     );
     await save({ shellProvider: 'fixture.shell' });
     await until(
@@ -351,33 +349,41 @@ async function dismiss(p) {
     );
     assert.equal((await dock.evaluate(() => window.dock.snapshot())).shell.error, null);
     p = await open();
-    assert.ok(p.url().endsWith('/fixture-shell/overlay.html'));
-    await p.evaluate(() => window.appdockOverlay.executeCommand('fixture.shell.probe'));
-    assert.equal(JSON.parse(fs.readFileSync(path.join(external, 'probe.json'))).schemaVersion, 1);
+    assert.ok(p.url().endsWith('/command-palette/index.html'));
+    assert.deepEqual(
+      await p.evaluate(() => Object.keys(window.appdockPalette).sort()),
+      ['act', 'connect', 'onChanged', 'onSuspended', 'ready'].sort(),
+    );
+    assert.equal(await p.evaluate(() => typeof window.appdockOverlay), 'undefined');
+    assert.equal(
+      browser.pages().some((v) => v.url().endsWith('/fixture-shell/overlay.html')),
+      false,
+    );
     const cdp = await browser.newCDPSession(p);
-    await cdp.send('Page.crash').catch(() => {});
+    void cdp.send('Page.crash').catch(() => {});
     const fallback = await until(
-      () =>
-        browser.pages().find((v) => v !== p && v.url().includes('/shells/default/overlay.html')),
-      'overlay crash fallback',
+      () => browser.pages().find((v) => v !== p && v.url().endsWith('/command-palette/index.html')),
+      'host palette crash recovery',
     );
     await fallback.locator('.command-palette').waitFor();
     assert.equal(
       (await dock.evaluate(() => window.dock.snapshot())).shell.active,
       'appdock.default-shell',
     );
-    await dismiss(fallback);
+    const recovered = await browser.newCDPSession(fallback);
+    void recovered.send('Page.crash').catch(() => {});
+    await until(
+      async () => !(await dock.evaluate(() => window.dock.snapshot())).overlay.active,
+      'second palette crash cancels rather than retrying forever',
+    );
+    assert.equal(fs.existsSync(path.join(external, 'probe.json')), false);
     await dock.evaluate(() => window.dock.retryShell());
     p = await open();
-    assert.ok(p.url().endsWith('/fixture-shell/overlay.html'));
+    assert.ok(p.url().endsWith('/command-palette/index.html'));
     await dock.evaluate(() => window.dock.toggleExtension('fixture.shell', false));
-    const disabled = await until(
-      () =>
-        browser.pages().find((v) => v !== p && v.url().includes('/shells/default/overlay.html')),
-      'disable fallback',
-    );
-    await disabled.locator('.command-palette').waitFor();
-    await dismiss(disabled);
+    await p.getByRole('combobox').fill('fixture.shell.probe');
+    await p.locator('.palette-execute:disabled').waitFor();
+    await dismiss(p);
     await dock.evaluate(() => window.dock.toggleExtension('fixture.shell', true));
     await until(
       async () =>
@@ -387,26 +393,20 @@ async function dismiss(p) {
       're-enabled',
     );
     p = await open();
-    assert.ok(p.url().endsWith('/fixture-shell/overlay.html'));
+    assert.ok(p.url().endsWith('/command-palette/index.html'));
     await dismiss(p);
     checks.push(
-      'palette-only and normal pages/commands coexist; renderer failure recovers only overlay; retry and intentional disable/re-enable',
+      'retired palette assignment is inert; palette crash recovers once; Shell retry and disable/re-enable leave palette independent',
     );
     await save({ shellProvider: 'fixture.stalled' });
-    await dock.evaluate(() => window.dock.executeCommand('appdock.commands.search'));
-    await until(
-      () => browser.pages().some((v) => v.url().endsWith('/stalled/index.html')),
-      'pending overlay',
-    );
-    await dock.evaluate(() => window.dock.executeCommand('appdock.commands.search'));
-    await until(
-      () => !browser.pages().some((v) => v.url().endsWith('/stalled/index.html')),
-      'cancel pending overlay',
-    );
     p = await open();
-    assert.ok(p.url().includes('/shells/default/'));
+    assert.ok(p.url().endsWith('/command-palette/index.html'));
+    assert.equal(
+      browser.pages().some((v) => v.url().endsWith('/stalled/index.html')),
+      false,
+    );
     await dismiss(p);
-    checks.push('pending overlay cancels; readiness timeout falls back without damaging ribbon');
+    checks.push('retired unready Shell view is never loaded and cannot delay the host palette');
     await save({ shellProvider: 'appdock.default-shell' });
     if (app)
       await app.evaluate(({ BrowserWindow }) => {

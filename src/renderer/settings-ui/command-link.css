@@ -1,0 +1,36 @@
+.command-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+.command-link > svg {
+  flex: 0 0 auto;
+  align-self: center;
+}
+.command-link > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.command-link:hover > span {
+  text-decoration: underline;
+}
+.command-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.command-link:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.command-reference-missing {
+  overflow-wrap: anywhere;
+}

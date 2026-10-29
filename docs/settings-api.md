@@ -242,7 +242,7 @@ appliesはstartAtLogonがlogonTaskRegistration、runAsAdministratorがnextStartA
 
 ## Shell選択
 
-Shellのfields対象は[src/shared/shell.ts](../src/shared/shell.ts)のshellRegionsを列挙し、領域IDをそのままkeyにする。`overlay.command-palette`等のドットもIDの一部であり、入れ子のパスとして解釈しない。ShellRegion型も同じ一覧から導出する。本体の領域定義を追加・削除しても、MCP専用の項目一覧や外側のツールSchemaは変更せず、現在のSchemaを再取得して利用する。今回新たなShell領域は追加しない。
+Shellのfields対象は[src/shared/shell.ts](../src/shared/shell.ts)のshellRegionsを列挙し、領域IDをそのままkeyにする。`notification.banner`等のドットもIDの一部であり、入れ子のパスとして解釈しない。ShellRegion型も同じ一覧から導出する。本体の領域定義を追加・削除しても、MCP専用の項目一覧や外側のツールSchemaは変更せず、現在のSchemaを再取得して利用する。今回新たなShell領域は追加しない。
 
 select候補はDefault Shellと、現在その領域のviewを宣言するApplet。設定画面と同じshellProviderCandidatesを使用し、名前が重なる場合も提供元IDで区別する。停止・無効の提供元も指定できるが、選択によって有効化・起動しない。候補の追加・削除、名前や有効状態の表示変更はschemaRevisionへ反映し、古いSchemaを使う要求や続きを拒否する。
 

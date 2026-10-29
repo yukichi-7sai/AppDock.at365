@@ -107,4 +107,21 @@ test('partial Shell view lookup preserves legacy ribbon and does not require oth
     undefined,
   );
   assert.equal(shellView({ ui: 'old.html' }, 'overlay.command-palette'), undefined);
+  assert.equal(
+    shellView({ views: { 'overlay.command-palette': 'old.html' } }, 'overlay.command-palette'),
+    undefined,
+  );
+});
+
+test('initial command selection is exact, does not execute and permits known unavailable commands', async () => {
+  const f = fixture({ initialCommandId: 'b' });
+  assert.equal(f.session.snapshot().content.initialCommandId, 'b');
+  assert.deepEqual(f.state.executed, []);
+  f.state.commands[1].available = false;
+  await assert.rejects(f.act({ type: 'choose', commandId: 'b' }), /unavailable/);
+  for (const id of ['missing', '__proto__', ' a'])
+    assert.throws(() => fixture({ initialCommandId: id }));
+  f.state.commands[1].hidden = true;
+  await assert.rejects(f.act({ type: 'choose', commandId: 'b' }), /no longer/);
+  assert.deepEqual(f.state.executed, []);
 });

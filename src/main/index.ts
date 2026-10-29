@@ -59,6 +59,13 @@ import { publishUpdateResult } from './core/update-result-notification';
 import { LogPageSession } from './core/log-page';
 import { CommandPaletteSession } from './core/command-palette';
 import type { CommandPaletteRequest } from '../shared/overlays';
+import { validSettingsPaletteRequest } from '../shared/overlays';
+import {
+  commandReferences,
+  commandTextIds,
+  commandTextPlain,
+  definitionCommandTexts,
+} from '../shared/command-text';
 import { NavigationCoordinator, UiPresentation } from './core/ui-presentation';
 import { RibbonCatalogCache } from './core/ribbon-catalog-cache';
 import { defaultShellId } from '../shared/shell';
@@ -501,6 +508,7 @@ const settingsEditing = new SettingsInputSession({
   current: () => ({ value: settings.value, revision: settings.revision }),
   scope: (page) => settingsPageStorage(page).signature,
   applets: () => (manager ? allApplets() : []),
+  commands: () => commandReferenceCatalog(),
   save: async (value, revision, resetPage, source, resetScope) => {
     const before = settings.value;
     assertSettingsWritable();
@@ -1530,6 +1538,33 @@ function executeShellCommand(provider: string, command: string) {
   return executeCommand(command);
 }
 const knownSettingsCommands = new Map<string, ReturnType<typeof uiCommands>[number]>();
+let commandReferenceCache:
+  | {
+      key: string;
+      custom: readonly import('../shared/commands').UiCommand[];
+      references: import('../shared/command-text').CommandReference[];
+    }
+  | undefined;
+function commandReferenceCatalog() {
+  const applets = allApplets(),
+    custom = customCommands.uiCommands();
+  const key = JSON.stringify([
+    settings.value.host.language,
+    applets.map((applet) => [
+      applet.id,
+      applet.displayName,
+      applet.commands.map((command) => [command.id, command.title, command.hidden]),
+    ]),
+  ]);
+  if (commandReferenceCache?.key === key && commandReferenceCache.custom === custom)
+    return commandReferenceCache.references;
+  const commands = uiCommands(applets);
+  const references = commands
+    .filter((command) => !command.hidden)
+    .map(({ id, title, available }) => ({ id, title, available }));
+  commandReferenceCache = { key, custom, references };
+  return references;
+}
 function uiCommands(applets = allApplets()): import('../shared/commands').UiCommand[] {
   const commands = [
     ...hostCommandsForApplets(applets).map((c) => ({ ...c, extensionId: null })),
@@ -1603,6 +1638,7 @@ function openCommandPalette(
     pins: () => settings.value.pinnedCommands,
     shortcuts: () => settings.value.shortcuts,
     dark: () => nativeTheme.shouldUseDarkColors,
+    language: () => settings.value.host.language,
     savePins: (ids) => {
       settings.save({ ...settings.value, pinnedCommands: ids }, settings.revision);
     },
@@ -2064,6 +2100,31 @@ function settingsPageStorage(
   };
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
+  const auxiliary = settingsPageAuxiliaryContent(page);
+  const texts = page.items.flatMap((item) => [
+    item.description,
+    ...(item.keywords ?? []),
+    ...(item.definition ? definitionCommandTexts(item.definition) : []),
+  ]);
+  for (const applet of auxiliary.applets ?? [])
+    texts.push(
+      applet.description ?? '',
+      ...(applet.settings ?? []).flatMap(definitionCommandTexts),
+      ...(applet.settingActions ?? []).map((action) => action.description ?? ''),
+      ...(applet.settingSections ?? []).map((section) => section.description ?? ''),
+    );
+  const ids = commandTextIds(texts);
+  if (ids.size) auxiliary.commandReferences = commandReferences(ids, uiCommands());
+  if (page.id === 'applets' && auxiliary.commandReferences) {
+    const references = new Map(auxiliary.commandReferences.map((command) => [command.id, command]));
+    auxiliary.applets = auxiliary.applets?.map((applet) => ({
+      ...applet,
+      description: commandTextPlain(applet.description ?? '', references),
+    }));
+  }
+  return auxiliary;
+}
+function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPageAuxiliary {
   const id = page.id;
   if (id === 'mcp-client')
     return {
@@ -2763,11 +2824,17 @@ function settingsPageActions(
       'touchpad-gestures',
       'command-triggers',
       'custom-commands',
-    ].includes(page.id)
+    ].includes(page.id) ||
+    page.kind === 'applet' ||
+    page.items.some(
+      (item) =>
+        item.description.includes('[command:') ||
+        item.definition?.description?.includes('[command:'),
+    )
   ) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;
-      if (!value || value.mode !== 'select') throw Error(hostText('settings.index.selectOnly'));
+      if (!validSettingsPaletteRequest(value)) throw Error(hostText('settings.index.selectOnly'));
       settingsPalette = value.requestId;
       return openCommandPalette(value);
     };
@@ -3000,8 +3067,7 @@ async function retryShell(region?: ShellRegion) {
   }
   if (!region || region === 'ribbon') shellHost?.retry();
   if (!region || region === 'titlebar' || region === 'statusbar') shellBarHost?.retry(region);
-  if (!region || region === 'overlay.command-palette' || region === 'ribbon')
-    overlayHost?.retry(region);
+  if (!region || region === 'ribbon') overlayHost?.retry(region);
   if (!region || region === 'notification.banner') notificationBanner?.retry();
   if (!region || region === 'notification.desktop') notificationDesktop?.retry();
   changed();
@@ -3456,7 +3522,6 @@ async function initialize() {
     safeMode: safeShell,
     changed,
     blocked: (region) =>
-      region !== 'overlay.command-palette' &&
       !(
         overlayHost?.kind === 'command-palette' &&
         ['ribbon', 'titlebar', 'statusbar'].includes(region)
@@ -4211,6 +4276,11 @@ async function initialize() {
     asset: (id) => presentation.getAsset(id),
     window,
     preload: path.join(__dirname, 'overlay-preload.js'),
+    palette: {
+      folder: path.join(__dirname, '../../renderer'),
+      entry: 'command-palette/index.html',
+      preload: path.join(__dirname, 'command-palette-preload.js'),
+    },
     providers: () => manager.shellProviders(),
     registry: shellRegistry!,
     route: () => navigation.state.route,
@@ -4229,13 +4299,13 @@ async function initialize() {
       changed();
     },
     failed: (message) => {
-      log.write('error', 'overlay', message);
-      if (!overlayHost?.active)
-        void dialog.showMessageBox(window!, {
-          type: 'error',
-          message,
-          buttons: [hostText('common.ok')],
-        });
+      errors.report({
+        eventId: randomUUID(),
+        source: 'overlay',
+        title: hostText('services.overlayHost.startFailed'),
+        code: 'OVERLAY_UNAVAILABLE',
+        message,
+      });
     },
   });
   settingsPageHost = new SettingsPageHost({

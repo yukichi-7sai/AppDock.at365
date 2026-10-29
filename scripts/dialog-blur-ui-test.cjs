@@ -102,6 +102,7 @@ const native = () =>
         (v) =>
           v.webContents &&
           /\/(index|bars)\.html$/.test(v.webContents.getURL()) &&
+          !v.webContents.getURL().endsWith('/command-palette/index.html') &&
           !v.webContents.getURL().startsWith('appdock://host/'),
       )
       .map((v) => ({ id: v.webContents.id, visible: v.getVisible(), bounds: v.getBounds() }));
@@ -116,7 +117,7 @@ async function palette() {
     void window.dock.openCommandPalette({ requestId: crypto.randomUUID(), mode: 'execute' });
   });
   return until(async () => {
-    const p = context.pages().find((p) => p.url().endsWith('/overlay.html'));
+    const p = context.pages().find((p) => p.url().endsWith('/command-palette/index.html'));
     return p && (await p.locator('.command-palette').isVisible()) && p;
   }, 'palette ready');
 }
@@ -342,7 +343,7 @@ async function closePalette(p, background = false) {
     await host.locator('dialog.settings-modal').waitFor({ state: 'detached' });
     let p = await palette();
     const reusedPalette = p;
-    const initialSession = await p.evaluate(() => window.appdockOverlay.connect());
+    const initialSession = await p.evaluate(() => window.appdockPalette.connect());
     assert.equal(
       await host.locator('main').evaluate((el) => getComputedStyle(el).filter),
       'blur(2px)',
@@ -356,7 +357,9 @@ async function closePalette(p, background = false) {
       const paletteBounds = await main(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()
           .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
-          .contentView.children.find((v) => v.webContents?.getURL().endsWith('/overlay.html'))
+          .contentView.children.find((v) =>
+            v.webContents?.getURL().endsWith('/command-palette/index.html'),
+          )
           .getBounds(),
       );
       result.paletteGeometry = { area, paletteBounds };
@@ -373,7 +376,7 @@ async function closePalette(p, background = false) {
         '',
         'search resets for each session',
       );
-      const session = await p.evaluate(() => window.appdockOverlay.connect());
+      const session = await p.evaluate(() => window.appdockPalette.connect());
       assert.notEqual(session.sessionId, initialSession.sessionId);
       await p.getByRole('combobox').fill('temporary search');
       await closePalette(p);

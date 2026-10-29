@@ -33,14 +33,14 @@ exports.overlayPage = async (host) => {
     const page = host
       .context()
       .pages()
-      .find((p) => p.url().endsWith('/overlay.html'));
+      .find((p) => p.url().endsWith('/command-palette/index.html'));
     if (page) {
       await page.locator('.command-palette').waitFor();
       return page;
     }
     await new Promise((r) => setTimeout(r, 50));
   }
-  throw Error('Shell overlay did not become ready');
+  throw Error('Host command palette did not become ready');
 };
 exports.logsPage = async (host, scope) => {
   const end = Date.now() + 20000;

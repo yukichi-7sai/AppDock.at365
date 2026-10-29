@@ -42,6 +42,9 @@ export function useSettingsControls() {
   if (!api) throw Error('Settings controls are not connected');
   return api;
 }
+export function useOptionalSettingsControls() {
+  return useContext(ControlsContext);
+}
 export interface SettingsControlEditor {
   value: Settings;
   edit(value: Settings): void;

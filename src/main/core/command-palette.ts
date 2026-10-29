@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { randomUUID } from 'node:crypto';
 import { movePinnedCommand, validCommandId, type UiCommand } from '../../shared/commands';
+import { commandTextPlain } from '../../shared/command-text';
 import type {
   CommandPaletteRequest,
   CommandPaletteResult,
@@ -27,6 +28,7 @@ export class CommandPaletteSession implements OverlayController {
       pins(): string[];
       shortcuts(): Record<string, string[]>;
       dark(): boolean;
+      language?(): import('../../shared/host-language').HostLanguage;
       savePins(ids: string[]): void;
       execute(id: string): Promise<unknown>;
       changed(): void;
@@ -62,8 +64,14 @@ export class CommandPaletteSession implements OverlayController {
     this.result = new Promise((resolve) => {
       this.resolve = resolve;
     });
+    if (
+      request.initialCommandId !== undefined &&
+      (!validCommandId(request.initialCommandId) ||
+        !this.commands().some((c) => c.id === request.initialCommandId))
+    )
+      throw Error(hostText('commands.link.missing'));
   }
-  private commands() {
+  private commands(): UiCommand[] {
     const catalog = this.options.commands();
     const allowed =
       this.request.mode === 'select' && this.request.commandIds
@@ -86,11 +94,19 @@ export class CommandPaletteSession implements OverlayController {
     );
   }
   snapshot(): import('../../shared/overlays').CommandPaletteModel {
+    const commands = this.commands();
+    const references = new Map(commands.map((c) => [c.id, c]));
     const body = {
       dark: this.options.dark(),
+      language: this.options.language?.(),
       content: {
         mode: this.request.mode,
-        commands: this.commands(),
+        commands: commands.map((c) =>
+          c.description?.includes('[command:')
+            ? { ...c, description: commandTextPlain(c.description, references) }
+            : c,
+        ),
+        initialCommandId: this.request.initialCommandId,
         pins:
           this.request.mode === 'select'
             ? (this.request.pins ?? this.options.pins())

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { OverlayAction, OverlayModel, ShellOverlayApi } from '../../src/shared/overlays';
-import { CommandPalette } from './CommandPalette';
+
 import { RibbonGroupPanel } from './RibbonGroupPanel';
 declare global {
   interface Window {
@@ -78,34 +78,5 @@ export function OverlayApp() {
   if (!model) return null;
   if (model.kind === 'ribbon-group')
     return <RibbonGroupPanel model={model} act={act} asset={api.asset} />;
-  const content = model.content;
-  return (
-    <CommandPalette
-      key={model.id}
-      commands={content.commands}
-      pins={content.pins}
-      shortcuts={content.shortcuts}
-      mode={content.mode}
-      busy={content.busy}
-      error={error || content.error}
-      onChoose={(c) => act({ id: model.id, type: 'choose', commandId: c.id })}
-      onClose={() => act({ id: model.id, type: 'dismiss' })}
-      onPinAction={
-        content.mode === 'execute'
-          ? (type, commandId, direction, visibleIds) =>
-              act(
-                type === 'togglePin'
-                  ? { id: model.id, type, commandId }
-                  : {
-                      id: model.id,
-                      type,
-                      commandId,
-                      direction: direction!,
-                      visibleIds: visibleIds!,
-                    },
-              )
-          : undefined
-      }
-    />
-  );
+  return null;
 }

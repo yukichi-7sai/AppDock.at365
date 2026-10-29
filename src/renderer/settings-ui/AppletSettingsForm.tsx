@@ -1,4 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
+import { CommandText } from './CommandText';
 import { useRef, useState, type ReactNode } from 'react';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import { appletCommonDefinitions } from '../../shared/applet-common-settings';
@@ -110,12 +111,8 @@ export function AppletSettingsForm({
         title={item.title}
         description={
           <span id={help}>
-            {[
-              item.description,
-              !available ? translate('settings.appletSettingsForm.startRequired') : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
+            {item.description && <CommandText text={item.description} />}
+            {!available && ` ${translate('settings.appletSettingsForm.startRequired')}`}
           </span>
         }
         error={result?.command === item.command && result.error ? result.message : undefined}
@@ -149,7 +146,13 @@ export function AppletSettingsForm({
       <SettingsField
         key={item.key}
         title={item.title}
-        description={item.description && <span id={help}>{item.description}</span>}
+        description={
+          item.description && (
+            <span id={help}>
+              <CommandText text={item.description} />
+            </span>
+          )
+        }
         className={wide ? 'settings-field-wide' : ''}
         {...settingAnchor(pageId, `setting:${item.key}`)}
       >
@@ -265,7 +268,7 @@ export function AppletSettingsForm({
         <SettingsSection
           key={section.id}
           title={section.title}
-          description={section.description}
+          description={section.description && <CommandText text={section.description} />}
           collapsible={section.collapsible}
         >
           {section.settings.map(field)}

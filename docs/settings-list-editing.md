@@ -164,7 +164,7 @@ Webアカウント設定の枠削除とログイン情報のクリアも共通`S
 | 通常の追加・編集・削除確認              | `SettingsDialog`                              | タイトル、一時入力、検証、保存処理、閉じる処理                   |
 | キー記録など独自の本文・フッターが必要  | `SettingsModal`                               | 見出しと`labelledBy`、本文・ボタン、初期フォーカス、処理中の制御 |
 | 設定以外の本体内プレビュー等            | 本体documentの`<dialog>`を`showModal()`で開く | ラベル、初期フォーカス、Escape・取消・復帰、必要な入力停止       |
-| パレットのように描画をShellへ差し替える | `OverlayController`と`OverlayHost`            | 内容別モデル・操作・取消。新しい種類は公開契約と描画側も追加     |
+| 一時リボングループをShellで描画する | `OverlayController`と`OverlayHost`            | 内容別モデル・操作・取消。新しい種類は公開契約と描画側も追加     |
 
 `SettingsDialog`と`SettingsModal`は[SettingsControlsProvider](../src/renderer/settings-ui/api.tsx)の配下で使用する。本体のルートと設定ページは既に接続している。別のSurfaceや試験へ持ち出す場合は、そのSurfaceで許可された`SettingsControlsApi`を注入する。ShellのHTMLへ本体用部品や`window.dock`を持ち込まない。
 

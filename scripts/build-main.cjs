@@ -23,13 +23,14 @@ const result = spawnSync(
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status || 1);
 // Sandboxed Electron preloads support require('electron'), but no local runtime imports.
-// Share one self-contained appearance bridge without duplicating it in eight sources.
+// Share one self-contained appearance bridge across local surface preloads.
 const appearance = fs.readFileSync(path.join(output, 'main/appearance-preload.js'), 'utf8');
 for (const name of [
   'preload',
   'shell-preload',
   'shell-bar-preload',
   'overlay-preload',
+  'command-palette-preload',
   'notification-surface-preload',
   'applet-page-preload',
   'web-account-preload',

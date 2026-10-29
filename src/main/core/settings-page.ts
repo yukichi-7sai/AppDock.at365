@@ -12,6 +12,7 @@ import type {
   SettingsPaletteRequest,
 } from '../../shared/settings-page';
 import type { CommandPaletteResult } from '../../shared/overlays';
+import { validSettingsPaletteRequest } from '../../shared/overlays';
 import type { SettingsPageDefinition } from '../../shared/settings-catalog';
 import { searchSettings } from '../../shared/settings-catalog';
 import type { SettingsIndexModel } from '../../shared/settings-page';
@@ -205,7 +206,7 @@ export class SettingsPageSession {
     if (!request || !['open', 'cancel'].includes(request.kind))
       throw Error(hostText('settings.pageError.operationDenied'));
     if (request.kind === 'open') {
-      if (!request.request || request.request.mode !== 'select')
+      if (!validSettingsPaletteRequest(request.request))
         throw Error(hostText('settings.pageError.operationDenied'));
       return (await this.transientAction(
         request,

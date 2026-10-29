@@ -13,7 +13,7 @@ export function shellViewUrl(folder: string, entry: string) {
     throw Error('Shell UI is outside provider');
   return pathToFileURL(file).href;
 }
-export function createShellView(
+export function createLocalView(
   folder: string,
   entry: string,
   preload: string,
@@ -38,3 +38,4 @@ export function createShellView(
   registerAppearance(view.webContents, url);
   return { view, url };
 }
+export const createShellView = createLocalView;

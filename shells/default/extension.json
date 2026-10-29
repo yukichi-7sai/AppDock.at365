@@ -13,7 +13,6 @@
     "views": {
       "titlebar": "bars.html",
       "statusbar": "bars.html",
-      "overlay.command-palette": "overlay.html",
       "notification.banner": "notifications.html",
       "notification.desktop": "notifications.html"
     }

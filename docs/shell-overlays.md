@@ -1,87 +1,79 @@
 # 部分Shellと共通オーバーレイ
 
-Shell Appletは通常Appletに描画提供能力を加えたもの。全Shellの実装を要求しない。本体が状態と操作を管理し、選択されたAppletが宣言した領域だけを描画する。未宣言・利用不可・描画失敗の領域にはDefault Shellを使用する。Default Shell専用のAPIや本体側の第二のパレットは作らない。
+Shell Appletは通常Appletに描画提供能力を加えたもの。本体が状態と操作を管理し、選択されたAppletが宣言した領域だけを描画する。未宣言・利用不可・描画失敗の領域にはDefault Shellを使用する。コマンドパレットは本体固定UIとし、Shellの差し替え対象に含めない。
 
 ## 担当領域
 
-公開領域は`titlebar`、`ribbon`、`statusbar`、`overlay.command-palette`、`notification.banner`、`notification.desktop`の6領域です。一時グループはリボンの一部として同じ提供元・同じHTMLで描画します。ページ本文は本体の共通UIです。各領域は`host.shellProviders`で指定し、利用できない領域だけDefault Shellへ戻します。
+公開領域は`titlebar`、`ribbon`、`statusbar`、`notification.banner`、`notification.desktop`の5領域。各領域は`host.shellProviders`で指定する。一時グループはリボンの一部として同じ提供元・同じHTMLで描画し、独立した設定・領域・復旧先を持たない。
 
 ```json
 {
   "apiVersion": 1,
-  "id": "example.palette",
-  "name": "Example Palette",
+  "id": "example.ribbon",
+  "name": "Example Ribbon",
   "version": "1.0.0",
-  "minimumHostVersion": "0.76.5",
+  "minimumHostVersion": "0.90.0",
   "runtime": "node",
   "entry": "worker.cjs",
   "capabilities": ["shell"],
   "shell": {
     "apiVersion": 1,
-    "views": { "overlay.command-palette": "palette.html" }
+    "ribbonSchemaVersion": 3,
+    "views": { "ribbon": "index.html" }
   },
-  "commands": [{ "id": "example.palette.compact", "title": "表示を切り替える" }]
+  "commands": [{ "id": "example.ribbon.compact", "title": "表示を切り替える" }]
 }
 ```
 
-workerでは通常の`context.commands.register`で宣言コマンドを実装する。コマンドはパレット・ショートカット・トレイから利用でき、描画側の`executeCommand`でも自分のAppletのものを呼べる。設定・ページを持つ場合も既存のcapabilityとAPIを使う。Shellとして未選択でもApplet自体の有効状態・コマンド登録は維持される。
+workerでは通常の`context.commands.register`で宣言コマンドを実装する。設定・ページを持つ場合も既存のcapabilityとAPIを使う。Shellとして未選択でもApplet自体の有効状態・コマンド登録は維持する。
 
-描画側は`getSettings()`と`onSettingsChanged(callback)`で自Appletの設定を取得・購読できる。例えば`compact`設定をコマンドから通常のsettings APIで変更すれば、リボンとオーバーレイはその設定に応じて描画を更新できる。両bridgeに同じ`ShellAppletApi`を適用する。
+描画側は`getSettings()`と`onSettingsChanged(callback)`で自Appletの設定を取得・購読し、`executeCommand(id)`で自Appletの通常コマンドを実行できる。任意の他Appletコマンドの入口にはしない。リボンと一時グループのbridgeには同じ`ShellAppletApi`を適用する。
 
-`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用のキーは検証して保持するが、未対応の領域は描画しない。
+`views`は最大32件。キーは英小文字から始まる英小文字・数字・ピリオド・ハイフン、最大64文字。HTMLはAppletフォルダー内の相対パス。`ui`も`views`もない宣言は拒否する。将来用・廃止済みキーは検証して保持するが、未対応の領域は描画しない。従来の`shell.ui`は`ribbon`の別名で、`views.ribbon`を優先する。
 
-従来の`shell.ui`は`ribbon`の別名。`views.ribbon`を優先する。リボンだけを提供すればパレットはDefault Shell、パレットだけならリボンはDefault Shell。これは正常な組合せであり、故障表示にしない。
+旧`overlay.command-palette`の保存指定・view宣言は不活性な互換データとして保持する。旧viewを読み込まず、選択・状態・起動・再試行の対象にしない。この領域の`shellRequirement`を持つコマンドだけ利用不可とし、通常のコマンド・設定・ページとApplet自体は維持する。旧`overlay.ribbon-group`も同様に独立した領域としては使わない。
 
 ## 本体と描画の分担
 
-一時グループの表示は`ribbon`に統合し、独立したShell領域・割り当て・再試行・提供元選択を持ちません。`RibbonGroupSession`は内容と寿命を持ち、OverlayHostの単一モーダル枠を使います。OverlayHostは実際に接続中のリボン提供元と同じ`ribbon` HTMLへ、共通`window.appdockOverlay`を公開します。描画側は`kind: "ribbon-group"`、`content.groupId/title/parent/anchor/viewport/displayMode/items`を使います。親ボタンは`dismiss`、子は`ribbonChoose`で操作します。通常のリボン接続は`window.appdockShell`で、同じHTMLが接続の種類を判別します。描画契約は`shell.ribbonSchemaVersion: 3`、最低ホスト版は0.90.0です。
+| 部分 | 責務 |
+| --- | --- |
+| `OverlayHost` | primaryのモーダル枠1件、遅延生成、表示順序、寸法・zoom、IPC送信元、ready、復旧、フォーカス、破棄 |
+| `OverlayController` | 内容別のモデル・操作・完了・取消。表示先を所有しない |
+| `CommandPaletteSession` | 最新コマンド列挙・利用可否、ピン保存、選択だけの結果、共通実行、実行中の重複防止 |
+| 本体`command-palette` renderer | パレットの検索・選択位置・キーボード移動・描画 |
+| Default Shell / Shell Applet | リボンと一時グループの公開snapshotを描画する |
+| 本体`CommandPicker` / `CommandLink` | 選択結果を設定へ反映する、または対象コマンドを初期選択して開く |
 
-一時グループの専用設定はありません。保存済みの`overlay.ribbon-group`指定やview宣言は保持しても動作には使わず、単独の実行要件・visible判定・個別切り替えも受け付けません。一時表示が失敗したら要求を閉じ、リボン全体の復旧へ接続します。子の実行要求を再送しません。
+下のApplet WebContentsや入力・sessionを再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループはクライアント領域を使う。背景は[表示設定](appearance.md#ダイアログパレットの背景)に従う。リボン・タイトルバー・ステータスバーは操作でき、本文の背景クリック・route変更で閉じる。共通コマンドのグローバルキー・ジェスチャー割り当てはモーダル中停止する。
 
-| 部分                         | 責務                                                                                             |
-| ---------------------------- | ------------------------------------------------------------------------------------------------ |
-| `OverlayHost`                | primaryのモーダル枠1件、遅延生成、表示順序、寸法・zoom、IPC送信元、ready、復旧、フォーカス、破棄 |
-| `OverlayController`          | 内容別のモデル・操作・完了・取消。表示先を所有しない                                             |
-| `CommandPaletteSession`      | コマンド列挙・利用可否、現在のピン保存、選択だけの結果、共通コマンド実行、実行中の重複防止       |
-| Default Shell / Shell Applet | 公開snapshotの描画、検索文字列・選択位置・キーボード移動。設定や業務状態を複製しない             |
-| 本体の`CommandPicker`        | トレイ編集から選択を要求し、返されたIDを設定入力へ反映し、即時保存する。描画実装を持たない       |
+所有Windowの非表示・最小化・再読込・終了、本文のroute変更、新要求への置換で取消する。元routeとWindowのフォーカスが保たれている場合だけ元のWebContentsへ戻す。開始済みコマンドの副作用は取消で巻き戻さない。要求ごとの`requestId`照合により、旧呼出側の取消が後から開いた要求を閉じない。
 
-下のApplet WebContentsや入力・sessionを破棄/再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループは従来のクライアント領域を使う。設定通知もその下へ置く。背景は[表示設定](appearance.md#ダイアログパレットの背景)に従い、本文だけを薄くぼかすか透明にする。本体本文はCSS filter、別WebContentsのApplet本文は一時CSSを使い、撮影せず同じrendererと入力を保持する。リボン・タイトルバー・ステータスバーは操作できる。本文の背景クリックで閉じ、リボン等のroute変更でも閉じる。グローバルキー・ジェスチャーによる共通コマンド割り当ての停止は維持する。パレット自身の入力・IME・Tab循環・上下/Enter/Escapeは描画が扱う。
+## リボングループの公開bridge
 
-閉じるとreadyタイマーを解除し、元のrouteが変わらず本体Windowにフォーカスがある場合だけ元のWebContentsへ戻す。再利用に対応したパレットViewは非表示で1件保持し、未対応のViewと一時リボングループは破棄する。初回は遅延生成し、2回目以降は同じ提供元・版・起動世代・正規化URLのViewを再利用する。提供元の停止・更新・故障、Shell再試行、ホスト終了では保持Viewを破棄する。新しい要求は旧要求を取消。所有Windowの非表示・最小化・再読込・終了、本文のroute変更でも取消する。実行開始済みコマンドの副作用を取消で巻き戻すことはしない。
+`RibbonGroupSession`が内容と寿命を持ち、接続中リボンと同じHTMLへ`window.appdockOverlay`を公開する。通常リボンは`window.appdockShell`を使用し、同じHTMLが接続の種類を判別する。契約は`src/shared/overlays.ts`と`shell.ribbonSchemaVersion:3`。
 
-## 公開bridge
+1. `onChanged(callback)`を登録し、`connect()`で`sessionId/providerAppletId/snapshot`を受け取る。
+2. `kind:ribbon-group`の`content.groupId/title/parent/anchor/viewport/displayMode/items`を描画して`ready(sessionId)`する。
+3. `act({id,type: "dismiss"})`または`ribbonChoose`（`actionId/requestId`）を送る。
+4. 終了時は購読を解除する。ready期限・送信元・登録URL・現session・操作IDを本体が検査する。
 
-契約の正本は`src/shared/overlays.ts`。パレットHTMLにはDefault Shell/Shell Applet共通の`window.appdockOverlay`だけを公開し、`window.dock`やNodeアクセスを渡さない。
+一時グループのViewは閉鎖時に破棄する。表示失敗は要求を閉じてリボン全体の復旧へ接続し、子の実行要求を再送しない。提供元の変更は次の表示から適用し、停止・無効化で操作権限を失効させる。
 
-1. `onChanged(callback)`を登録して`connect()`する。`sessionId/providerAppletId/snapshot`を受け取る。
-2. snapshotを描画後に`ready(sessionId)`する。同じIDの古いrevisionを無視する。
-3. `act({id,type,...})`で操作する。`id`はホスト発行のオーバーレイID。取消`dismiss`、選択/実行`choose`（`commandId`）、`togglePin`（`commandId`）、`movePin`（`commandId/direction: -1|1/visibleIds`）を提供する。
-4. `executeCommand(id)`で自Appletの登録コマンドを実行できる。任意コマンド実行の入口にはしない。選択中コマンドの実行は`choose`でホストに判断させる。
-5. `onChanged`の戻り値で購読を解除する。View終了時はホストが回収する。
+## 本体固定パレット
 
-再利用に対応する描画は`onSuspended(callback)`を購読し、`ready(sessionId, { reusable: true, modelId: snapshot.id })`で明示する。非表示通知で検索文字列・選択・旧モデルを破棄する。次の`onChanged`で別のモデルIDを受けたら`connect()`し直し、新しいsessionとモデルを描画してから再度readyする。それまではViewを表示しない。閉鎖時にもsessionを失効させ、非表示中の接続・操作や旧IDの要求を拒否する。Default Shellはこの契約に対応する。従来の`ready(sessionId)`を使うShell Appletは破棄・再生成の動作を維持する。
+本体の`command-palette/index.html`と専用preloadを使う。`window.appdockPalette`の`connect/ready/act/onChanged/onSuspended`だけを公開し、Node、`window.dock`、Shell bridge、設定取得、任意コマンド実行を公開しない。WebContents・main frame・登録URL・route・現session・ready・モデルIDを検査する。
 
-モデルは`schemaVersion:1/id/contextId:primary/kind:command-palette/revision/dark/modal:true/content`。contentは`mode/commands/pins/shortcuts/busy/error`。リボンとは独立した接続・モデル・readyを持つ。WebContents、main frame、登録URL、現session、ready状態を検査し、古いオーバーレイIDの操作は拒否する。
+モデルは`schemaVersion:1/id/contextId:primary/kind:command-palette/revision/dark/language/modal:true/content`。contentは`mode/commands/pins/shortcuts/busy/error/initialCommandId`。操作は`dismiss/choose/togglePin/movePin`で、実行直前にも最新の権限・可否を照合する。busy中の重複選択を拒否し、エラー時はパレットを残す。
 
-`mode:execute`はクリック時にも利用可否を照合して実行する。実行中の二重選択を拒否し、エラー時はパレットを残す。ピン操作は本体の最新設定を取得して対象だけを更新し、他の設定と検索外のピンを保つ。
+- `mode:execute`は共通実行経路を使う。ピン操作は最新の本体設定から対象だけ更新し、検索外のピン・他設定を保つ。
+- `initialCommandId`は対象を初期選択・可視位置へ移動し、フィルターへIDを入力して文字列を全選択する。入力の置換・クリア後は通常検索へ戻り、snapshot更新で入力を初期化しない。通常起動は空検索とする。開くだけでは実行せず、対象消失時に別コマンドを代わりに実行しない。
+- `mode:select`は指定集合からIDを返すだけで、実行・ピン保存を行わない。停止中・保存済み未知コマンドも選べる。
+- 結果は`{status:selected|executed,commandId}`または`{status:cancelled,reason}`。
 
-`mode:select`は呼出側が指定したID集合から結果を返すだけで、実行・ピン保存を行わない。停止中・保存済みの未知コマンドも選択できる。トレイ編集は保存済み値を基準に選択結果を即時保存し、変更ごとの検証と保存は本体が所有する。
+初回は遅延生成し、閉じると非表示Viewを1件保持する。sessionを失効させ`onSuspended`で旧モデル・検索・選択を捨てる。次要求は新sessionとモデルを描画し、`ready(sessionId,modelId)`後に表示する。Shellの変更・停止・再試行はパレットの寿命へ影響しない。
 
-候補の照合はsnapshotごとに現在のカタログIDと要求されたIDを集合化し、候補ごとの配列の総当たりを避ける。カタログの順序、未知IDの補完、非表示コマンドの除外、選択時のID検査は維持する。候補の内容を要求間で固定せず、実行用パレットと画面再利用の仕組みは共用する。設定ページからの選択要求は、本体内部の`settingsPage.palette`でモデル再構築を省いて受け渡す。
+候補IDと要求IDを集合化し、説明のタグ名解決は共有索引を使う。同じカタログでの無変更監視はキャッシュを共用する。実行時の最新照合は省かない。設定ページからは本体内部の`settingsPage.palette`で受け渡し、保存キューの完了・入力エラー・page/session/actionを確認する。[コマンドリンク](command-links-design.md)も参照。
 
-要求の結果は`{status:selected|executed,commandId}`または`{status:cancelled,reason}`。画面を閉じることと、開始済みコマンドの取消は別。呼出側の破棄による取消はrequestIdを照合し、後から開いた別要求を閉じない。
+ready期限は10秒。読込失敗・renderer終了/応答不能では新しい本体Viewで同じ要求を1回だけ復旧する。続けて失敗したら要求を取り消し、共通エラー報告へ接続して操作停止を解除する。実行済みの操作を再送しない。正常に閉じた次の要求では復旧回数をリセットする。
 
-## 復旧・後続の拡張
-
-ready期限は10秒。読込失敗・renderer終了/応答不能で同じ要求をDefault Shellへつなぎ直す。パレットの故障で稼働中のリボンを切り替えない。故障したパレット提供元の同版は当該プロセス中再利用せず、「Shellを再試行」または提供元の新版で再試行できる。意図的な停止/無効化は故障記録に含めない。オーバーレイは開いた時点の提供元に結び、設定のShell選択変更は次回表示から適用する。リボンの再起動をまたぐ故障記録は既存[Shell API](shell-api.md)に従う。
-
-Default Shellも利用できない場合は要求を取消して最小ネイティブ通知を出し、本体の操作停止を解除する。`--safe-shell`では各領域をDefault Shellへ固定する。
-
-新しいUIは原則として本体と共通部品で実装する。Shell化の個別依頼がある場合だけ、機能サービス→型付き表示モデル/操作→内容Controller→Default Shellの描画の順に追加する。別モーダルは共有契約のkindと領域を追加し、OverlayHostへ内容固有の判断を入れない。本体のページは[本体のページ表示](host-pages.md)を参照する。一般Appletの同一領域の多重表示とオーバーレイモデルのMCP公開は未実装。
-
-関連検証: `tests/command-palette.test.cjs`、manifest/boundary/presentation回帰、`scripts/shell-overlay-ui-test.cjs [EXE]`、既存Shell/トレイ/ページ/設定通知/ホストコマンド試験。実測は[VERIFICATION](../VERIFICATION.md)。
-
-## 領域別指定とパレットの寿命
-
-開いた要求の提供元は固定し、割り当て変更は次回表示から適用します。停止・無効化・故障では現在の要求をDefault Shellへ引き継ぎ、別の外部Shellへ自動転送しません。選択結果・実行中状態・取消・フォーカス復帰は既存Controllerが維持します。設定と解決先、現在のViewが異なる間は領域状態に適用待ちを表示します。
+一般Appletの同一領域の多重表示とオーバーレイモデルのMCP公開は未実装。新しいUIは原則として本体と共通部品で実装する。関連検証は`tests/command-palette.test.cjs`、Shell境界・領域回帰、`scripts/shell-overlay-ui-test.cjs [EXE]`、`scripts/command-links-ui-test.cjs [EXE]`。実測は[VERIFICATION](../VERIFICATION.md)。

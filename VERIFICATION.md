@@ -1,5 +1,38 @@
 # 検証記録
 
+## 2026-10-30: コマンドリンクのID絞り込み 0.105.1 とコミット照合
+
+- コマンドリンクの`initialCommandId`をフィルターの初期値にも使い、入力欄のIDを全選択する。直接入力で検索語を置き換え、クリアで全件表示へ戻る。snapshot/ピン変更では入力を初期化せず、リンクの再表示時は対象IDへ戻す。通常起動・選択用パレットは従来の空検索を維持し、明示操作まで実行しない。
+- 前回完了時の73ファイルと今回開始時のSHA256がすべて一致し、別作業の差分がないことを確認した（`.artifacts/command-link-filter-20261030/baseline.json`）。本体固定化・タグ・Shell5領域・権限/取消/保存/復旧の実装とレビュー、標準1,344件および今回影響しない固定GUIの成功結果を、前項と`.artifacts/command-links-20261030/final.json`から再利用する。履歴はmain 15fb24fのまま、既存変更を保持して作業した。
+- 発行前に初期検索・フォーカス効果・モデルIDごとの再利用・消失した対象・通常検索への復帰・IME/実行抑止への影響をレビューし、阻害事項なし。変更はrendererの初期値と初期フォーカス、関連GUIと文書。API/保存形式・依存の追加変更はない。発行済み0.105.0への通常の追加修正として0.105.1へパッチ更新した。
+- `install --frozen-lockfile`、整形、型検査、buildと関連26件成功。ソースと固定EXEでcommand-links GUI4群成功：IDフィルター・全選択・打ち替え・クリア・ピン更新時の検索保持・リンク再表示・通常起動空検索・明示Enter1回実行・Escapeフォーカス・無効JSON保持・一覧ダイアログ・停止中WindowsToolsの2リンク・明暗900×640を確認した。固定EXEでは通常/選択モード・IME・ピン・クラッシュ復旧等のshell-overlay7群、モーダル/入力保持/再利用のhost-modal9群とsmokeも成功。
+- `publish.bat`成功。0.105.1の管理693ファイルがstagingと一致し、ASARの新renderer/専用preload/共通配色、Default Shellの旧パレット除去、ZIP/feedを確認した。固定EXEと隔離コピーSHA256は`6788af258fbd1e4ba128e6b7ecaaf9d79f68ba8f7108a62e11f74773c961e316`。ZIPは270,736,769 bytes、SHA256 `6b791a4f341787b8ba159a49e34f5ebd326e30a6921d57c4377a425bca99d5dc`。証跡は`.artifacts/command-link-filter-20261030/{published.json,package.json,*ui*.log,regression.log,smoke.log}`。
+- 現行の説明をIDによる初期絞り込みへ更新し、ローカル文書参照398件/JSON例2件と差分検査が成功。前回のworktree取り込み・削除、本体固定化・タグ対応と今回の追加修正をまとめてmainでコミットする。push・Release・実利用先deployは含めない。実消灯・実ロックは実行していない。
+
+## 2026-10-30: コマンドリンク・タグと本体固定パレット 0.105.0
+
+- 設計worktreeの未コミット文書を、mainの既存履歴を保って取り込み後、`A:\30.PROJECT\AppDock.at365-command-links-design`をGitで削除し、以後mainで実装した。稼働プロセス・reparse point・対象パス・差分を確認し、設計原本とignored証跡をmainの`.artifacts/command-links-20261030/retained-design`と`.artifacts/command-links-design-20261030`へ保全。`integration.json`と最後のworktree一覧を参照。ブランチ`codex/command-links-design`は保持する。
+- 共通`CommandLink`・`CommandText`と`[command:ID]`を実装。再生アイコンは既存の`command` IDで共用し、`bolt`はトリガー、Commandキー用アイコンは維持。Applet概要・セクション・設定・設定アクション・一覧内フィールド/編集ダイアログのdescriptionへ適用する。未知参照は非操作表示、エスケープは文字表示、HTML/Markdown・コマンド名の再解析を行わない。検索/管理一覧/パレット内の説明は現在名のプレーンテキストへ投影し、ID検索と原文・保存値を保持する。
+- リンクは対象IDを初期選択してスクロールするだけで、明示操作まで実行しない。全候補・空検索・ピン順、選択モード、IME・Tab・上下/Enter/Escape、保存キュー、入力エラー、要求ごとの取消、ページとフォーカスの復帰を維持した。初回のnative寸法確定後の可視位置と、Reactがボタンを再有効化する前のフォーカス競合をレビュー/GUIで修正した。
+- パレットを本体の専用renderer/preload/WebContentsViewへ移設。APIはパレット操作に限定し、送信元/main frame/固定URL/route/session/model ID/readyを検査する。非表示Viewは1件保持し、再利用時に検索・選択・sessionを更新。読込/ready/renderer障害は1回だけ再生成し、再失敗は取消と共通エラー報告。古い要求や障害通知による別要求への干渉と、実行の再送を防ぐ。所有rendererの再読込・障害時は保持Viewも破棄する。
+- Shellの有効領域を5つへ整理。旧`overlay.command-palette`の保存値・manifestは互換データとして保持し、起動・描画・再試行・設定/MCP選択へ含めない。旧領域を条件とするコマンドだけ利用不可にし、通常コマンド・設定・ページは維持する。パレットはShell停止・変更・retryから独立。一時リボングループは同じOverlayHost枠を共用して継続する。
+- 発行前レビュー1回と修正・再確認を実施。専用preloadの共通配色同梱、権限境界、旧指定、描画寿命・復旧、参照投影とキャッシュ、ビルド/配布を確認した。画面レビューで基本色の未定義を修正し、本体とパレットの基本色を`theme.css`で共用。検索文字は本文色へ合わせ、明暗の読みやすさを確認。新しい依存・設定キー・保存ファイル・外部実行APIは追加していない。Shell差し替え契約の廃止により0.104.2→0.105.0とした。
+- `install --frozen-lockfile`、型検査、build成功。標準回帰は最終1,344件を照合し、1,344件すべての成功を確認した。最初の旧Shell前提4件は契約変更に合わせて更新し、関連70件成功。最終全体で既存の更新試験1件に一時的なAccess deniedがあり、同じ通常Windows環境で当該2件を単独実行して成功（`test-final.log`、`regression-3.log`、`update-mount-recheck.log`）。配色preloadの対象追加後は関連8件成功。失敗ログも残す。
+- 固定EXEで7本のGUI成功：`command-links-ui-test`（4群）、`shell-overlay-ui-test`（7群）、`ribbon-groups-ui-test`（7群）、`shell-region-ui-test`（7群）、`host-modal-ui-test`（9群）、`shell-bars-ui-test`（8群）、`appearance-ui-test`。発行済みWindowsTools0.2.10の2タグ・停止中の対象選択/実行不可/非起動、一覧ダイアログ、無効JSON保持、明暗900×640、下のApplet入力保持、再利用/古いsession拒否、2回の障害による打切り、40回の編集取消、本文内背景、バーのnativeドラッグ・125%zoom・Shell復旧、プリセット/カスタム色・再起動を確認した。代表画像は各profileに保存し目視確認した。`fixed-*.log`の成功結果を正本とし、最終GUIのEXE SHA256は`9195d90e76f0ad2d1cea90107a5158ad0fc52eb2c370952e14f1a1522047df81`。
+- 試験の整理：旧Shellパレット提供元へのfallbackは、本体Viewの1回復旧/再失敗取消と旧view非起動へ置換。全Windowを覆う旧modal fixtureは現行の本文内modalと合わないため、パレット中の両バー可視・操作を確認するケースへ置換し、編集保持/取消/背景/フォーカスはhost-modal試験が担当する。実際のバーのドラッグは維持。旧独立ページURL・装飾brand-mark・翻訳前の色名・設定ページの入口も現在の契約へ更新した。製品を古い試験へ戻す変更はしていない。
+- 性能測定は1万コマンド/千件のタグ説明。初回検索カタログ28.56ms、無変更100回の中央値0.80ms/p95 1.83ms（同じオブジェクトを再利用）、参照投影4.97ms。改名時の索引更新も成功。人工的な件数上限を追加せず、実行時の最新照合は維持する（`performance.json`）。
+- `publish.bat`成功。`A:\40.ARTIFACT\AppDock.at365`へ0.105.0を発行し、管理693ファイルがstagingと一致。ASAR内の新renderer/preloadと共通配色、Default Shellの旧パレット宣言除去、ZIP内ASAR/manifestの一致、ZIP/feedを確認した。ZIP SHA256は`8428371830b0f2ab86b2846c2e998c5f8bfe20af94863b3560003346d04b4453`、270,736,763 bytes。固定EXE smoke成功。
+- 文書の現行仕様・AGENTSの5領域を整合。変更文書15ファイルのローカル参照398件とJSON例2件、`git diff --check`成功。詳細は`.artifacts/command-links-20261030/{docs.json,package.json,published.json,zip-entries.json}`。WindowsToolsの設定/処理は今回変更せず、実消灯・実ロックは自動実行していない。今回のAppDock変更はmainで未コミット。push・Release・実利用先deployは行っていない。
+
+## 2026-10-30: コマンドリンク・説明文タグ・本体固定パレットの設計
+
+- 基点は本体 `bc5431b38aa30106359b3e0d806a819d4ac37b58` / 0.104.1。元のmainには別作業の `VERIFICATION.md` / `docs/mcp-settings-design.md` の変更があったため保持し、`fetch origin` でローカル5件先行・リモート側の追加0件を確認した。Gitで `A:\30.PROJECT\AppDock.at365-command-links-design` / `codex/command-links-design` を新規作成し、確定済みのコミットから文書だけを作成した。
+- 設計の正本は [コマンドリンク・説明文タグと本体固定パレット](docs/command-links-design.md)。再生アイコン、`[command:ID]`、共通描画とプレーンテキスト/検索投影、設定の入力確定・取消・フォーカス、対象IDの初期選択と参照切れ、本体固定UIへの移設、旧Shell指定の不活性保持を定義した。開発ガイドの入口を追加した。製品への適用は未実装。
+- 設計レビューでは、設定ページの既存パレット経路が選択専用である点、リンクを実行ボタンへ入れ子にしない点、折りたたみ見出しのイベント、初期対象消失時に別コマンドを実行しない点を確認し、必要な接続・検証を明記した。Shell廃止の影響を宣言・条件・設定/MCP・preload・ビルド/配布まで洗い出し、既存の廃止領域の仕組みへ合わせる方針にした。
+- 文書2ファイルのローカル参照98件、JSON例2件、コードフェンスの対応、末尾空白、`git diff --check` は成功。結果と文書SHA256は `.artifacts/command-links-design-20261030/docs-check.json`。本項の追記後にも差分・参照と文書のみの変更範囲を確認する。
+- 設計のみのため、製品の型検査・回帰・GUI・実消灯/実ロックは実行していない。製品コード・設定・依存・版・発行物は変更せず、コミット・push・Release・deployも行っていない。設計用worktreeと検証JSONを次工程用に保持する。
+
+
 ## 2026-10-30: 監視競合修正 0.104.2 のコミット照合
 
 - 発行済み0.104.2の保存/直接再読込み/revision検査/復旧と監視世代の照合、正常復帰時のエラー解除、外部設定受信・秘密保護を、調査記録と合わせた8ファイルでレビューし、阻害事項なし。製品・テスト・依存・ビルド/発行手順は実装時から不変。変更はこの検証追記だけで、版更新・再発行は行わない。

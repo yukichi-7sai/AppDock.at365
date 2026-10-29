@@ -1,4 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
+import { CommandText } from './CommandText';
 import { SettingsInput, numberInput } from './SettingsInput';
 import { useSettingsControls } from './api';
 import { useState } from 'react';
@@ -101,7 +102,7 @@ export function ObjectListSetting({
             return (
               <SettingsField
                 title={field.title}
-                description={field.description}
+                description={field.description && <CommandText text={field.description} />}
                 key={field.key}
                 settingKey={field.key}
               >

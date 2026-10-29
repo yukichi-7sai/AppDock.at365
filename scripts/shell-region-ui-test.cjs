@@ -208,10 +208,7 @@ async function execute(id) {
 }
 async function openPalette() {
   await execute('appdock.commands.search');
-  return until(async () => {
-    const s = await state('overlay.command-palette');
-    return s.ready && page('overlay.command-palette', s.boundProvider);
-  }, 'palette');
+  return require('./shell-overlay-helper.cjs').overlayPage(host);
 }
 async function closePalette(p) {
   await p.keyboard.press('Escape').catch(() => {});
@@ -219,20 +216,12 @@ async function closePalette(p) {
 }
 async function launch(args = []) {
   if (executable) {
-    const server = net.createServer();
-    await new Promise((r) => server.listen(0, '127.0.0.1', r));
-    const port = server.address().port;
-    await new Promise((r) => server.close(r));
-    child = spawn(
-      executable,
-      [`--test-profile=${profile}`, `--remote-debugging-port=${port}`, ...args],
-      { env, windowsHide: true, stdio: 'ignore' },
-    );
-    browser = await until(async () => {
-      try {
-        return await chromium.connectOverCDP('http://127.0.0.1:' + port);
-      } catch {}
-    }, 'CDP');
+    app = await require('./electron-test-launcher.cjs').launchTestHost({
+      executablePath: executable,
+      portable: true,
+      args: [`--test-profile=${profile}`, ...args],
+      env,
+    });
   } else
     app = await electron.launch({
       executablePath: require('electron'),
@@ -245,6 +234,13 @@ async function launch(args = []) {
   );
   host.setDefaultTimeout(10000);
   await until(async () => (await snap()).startupReady, 'startup');
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find(
+      (w) => w.webContents.getURL() === 'appdock://host/index.html',
+    );
+    w.show();
+    w.focus();
+  });
 }
 async function close() {
   if (app) {
@@ -289,31 +285,33 @@ async function close() {
     await assign({ statusbar: ids.b });
     await bound('statusbar', ids.b);
     let palette = await openPalette();
-    await assert.rejects(() => execute(ids.a + '.visible'));
+    await execute(ids.a + '.visible');
+    assert((await snap()).overlay.active);
     await assign({ 'overlay.command-palette': ids.b });
-    assert.equal((await state('overlay.command-palette')).boundProvider, ids.a);
-    assert.equal((await state('overlay.command-palette')).resolvedProvider, ids.b);
+    assert.equal(
+      (await snap()).shellRegions.regions.some((r) => r.region === 'overlay.command-palette'),
+      false,
+    );
     await closePalette(palette);
     palette = await openPalette();
-    await bound('overlay.command-palette', ids.b);
+    assert(palette.url().endsWith('/command-palette/index.html'));
     await closePalette(palette);
     await assign({ 'overlay.command-palette': ids.a });
     palette = await openPalette();
     await assign({ 'overlay.command-palette': ids.b });
     await enabled(ids.a, false);
-    await bound('overlay.command-palette', defaultShellId);
     assert((await snap()).overlay.active);
-    await closePalette(await page('overlay.command-palette', defaultShellId));
+    await closePalette(palette);
     await bound('ribbon', defaultShellId);
     await bound('statusbar', ids.b);
     assert.equal((await snap()).settings.value.host.shellProviders.ribbon, ids.a);
     await enabled(ids.a, true);
     await bound('ribbon', ids.a);
     palette = await openPalette();
-    await bound('overlay.command-palette', ids.b);
+    assert(palette.url().endsWith('/command-palette/index.html'));
     await closePalette(palette);
     checks.push(
-      'independent assignment preserves other Views; palette freezes current provider, modal blocks visible commands, disable recovers the same request only to Default, re-enable restores configured ribbon',
+      'independent assignment preserves other Views; retired palette assignment is inert; body palette keeps ribbon commands operable; Shell disable leaves host palette active and re-enable restores configured ribbon',
     );
     await assign({ statusbar: ids.partial });
     await bound('statusbar', defaultShellId);

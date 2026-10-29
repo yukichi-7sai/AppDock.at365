@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { rankCommands, type UiCommand } from '../../src/shared/commands';
-import { Icon } from '../../src/shared/ui-icons';
+import { rankCommands, type UiCommand } from '../../shared/commands';
+import { Icon } from '../../shared/ui-icons';
+import { useHostTranslation } from '../HostTranslation';
 
 /** Execution and selection share navigation and favorites; only the caller decides the action. */
 export function CommandPalette({
@@ -14,6 +15,7 @@ export function CommandPalette({
   onChoose,
   onClose,
   error = '',
+  initialCommandId,
 }: {
   commands: UiCommand[];
   pins?: string[];
@@ -29,9 +31,18 @@ export function CommandPalette({
   onChoose(command: UiCommand): void;
   onClose(): void;
   error?: string;
+  initialCommandId?: string;
 }) {
-  const [query, setQuery] = useState(''),
-    [index, setIndex] = useState(0);
+  const { t } = useHostTranslation();
+  const [query, setQuery] = useState(() => initialCommandId ?? ''),
+    [selectedId, setSelectedId] = useState<string | undefined>(
+      () =>
+        initialCommandId ??
+        rankCommands(
+          commands.filter((c) => !c.hidden),
+          pins,
+        )[0]?.id,
+    );
   const ref = useRef<HTMLDivElement>(null),
     prefix = useId();
   const filtered = rankCommands(
@@ -44,14 +55,27 @@ export function CommandPalette({
     ),
     pins,
   );
-  const selected = Math.min(index, Math.max(0, filtered.length - 1));
+  const selected =
+    selectedId === undefined
+      ? filtered.length
+        ? 0
+        : -1
+      : filtered.findIndex((c) => c.id === selectedId);
   const visiblePins = filtered.filter((c) => pins.includes(c.id)).map((c) => c.id);
   const canChoose = (c: UiCommand) => !busy && (mode === 'select' || c.available);
   useLayoutEffect(() => {
-    ref.current?.querySelector('input')?.focus();
-  }, [mode]);
-  useEffect(() => {
-    ref.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    const input = ref.current?.querySelector('input');
+    input?.focus();
+    if (initialCommandId) input?.select();
+  }, [mode, initialCommandId]);
+  useLayoutEffect(() => {
+    const reveal = () =>
+      ref.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+    reveal();
+    // Native surface bounds arrive after ready and may change with the host window.
+    const observer = new ResizeObserver(reveal);
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
   }, [selected, query]);
   return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
@@ -60,7 +84,7 @@ export function CommandPalette({
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-label={mode === 'select' ? 'コマンドを選択' : 'コマンドパレット'}
+        aria-label={t(mode === 'select' ? 'commands.palette.select' : 'commands.palette.title')}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           e.stopPropagation();
@@ -88,28 +112,34 @@ export function CommandPalette({
         <div className="palette-input">
           <Icon name="search" />
           <input
-            aria-label="コマンドを検索"
+            aria-label={t('commands.palette.search')}
             role="combobox"
             aria-expanded="true"
             aria-autocomplete="list"
             aria-controls={`${prefix}-results`}
             aria-activedescendant={filtered[selected] ? `${prefix}-option-${selected}` : undefined}
-            placeholder={mode === 'select' ? '割り当てるコマンドを検索…' : 'コマンドを入力…'}
+            placeholder={t(
+              mode === 'select'
+                ? 'commands.palette.selectPlaceholder'
+                : 'commands.palette.executePlaceholder',
+            )}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              setIndex(0);
+              setSelectedId(undefined);
             }}
             onKeyDown={(e) => {
               if (e.nativeEvent.isComposing) return;
               if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                setIndex(
-                  filtered.length
-                    ? (selected + (e.key === 'ArrowDown' ? 1 : -1) + filtered.length) %
-                        filtered.length
-                    : 0,
-                );
+                const next =
+                  selected < 0
+                    ? e.key === 'ArrowDown'
+                      ? 0
+                      : filtered.length - 1
+                    : (selected + (e.key === 'ArrowDown' ? 1 : -1) + filtered.length) %
+                      filtered.length;
+                setSelectedId(filtered[next]?.id);
               }
               if (
                 e.key === 'Enter' &&
@@ -122,16 +152,18 @@ export function CommandPalette({
               }
             }}
           />
-          <button aria-label="パレットを閉じる" onClick={onClose}>
+          <button aria-label={t('commands.palette.close')} onClick={onClose}>
             <kbd>Esc</kbd>
           </button>
         </div>
-        <div className="palette-label">{mode === 'select' ? 'コマンドを選択' : 'COMMANDS'}</div>
+        <div className="palette-label">
+          {t(mode === 'select' ? 'commands.palette.select' : 'commands.palette.label')}
+        </div>
         <div
           id={`${prefix}-results`}
           className="palette-results"
           role="listbox"
-          aria-label="コマンド検索結果"
+          aria-label={t('commands.palette.results')}
         >
           {filtered.map((c, i) => {
             const pinned = pins.includes(c.id),
@@ -157,9 +189,9 @@ export function CommandPalette({
                     <small title={c.extension}>
                       <span className="command-id">{c.id}</span>
                       {!c.available && (
-                        <span> · {c.disabledReason ?? 'Applet起動後に利用できます'}</span>
+                        <span> · {c.disabledReason ?? t('commands.palette.startRequired')}</span>
                       )}
-                      {pinned && <span className="pin-badge">PINNED</span>}
+                      {pinned && <span className="pin-badge">{t('commands.palette.pinned')}</span>}
                     </small>
                   </div>
                   {shortcuts[c.id]?.[0] && <kbd>{shortcuts[c.id][0]}</kbd>}
@@ -169,14 +201,14 @@ export function CommandPalette({
                     {pinned && (
                       <>
                         <button
-                          aria-label={`${c.title}を上に移動`}
+                          aria-label={t('commands.palette.moveUp', { title: c.title })}
                           disabled={busy || pinIndex <= 0}
                           onClick={() => onPinAction('movePin', c.id, -1, visiblePins)}
                         >
                           ↑
                         </button>
                         <button
-                          aria-label={`${c.title}を下に移動`}
+                          aria-label={t('commands.palette.moveDown', { title: c.title })}
                           disabled={busy || pinIndex === visiblePins.length - 1}
                           onClick={() => onPinAction('movePin', c.id, 1, visiblePins)}
                         >
@@ -186,7 +218,9 @@ export function CommandPalette({
                     )}
                     <button
                       className="pin-toggle"
-                      aria-label={`${c.title}を${pinned ? 'ピン留め解除' : 'ピン留め'}`}
+                      aria-label={t(pinned ? 'commands.palette.unpin' : 'commands.palette.pin', {
+                        title: c.title,
+                      })}
                       aria-pressed={pinned}
                       disabled={busy}
                       onClick={() => onPinAction('togglePin', c.id)}
@@ -198,12 +232,15 @@ export function CommandPalette({
               </div>
             );
           })}
-          {!filtered.length && <p className="empty">該当するコマンドはありません。</p>}
+          {!filtered.length && <p className="empty">{t('commands.palette.empty')}</p>}
         </div>
         {error && <p role="alert">{error}</p>}
+        {!error && initialCommandId === selectedId && selected < 0 && (
+          <p role="alert">{t('commands.link.missing')}</p>
+        )}
         <div className="palette-footer">
-          ↑↓キーで選択・Enterで{mode === 'select' ? '選択（実行しません）' : '実行'}・Escで閉じる。
-          {onPinAction && '☆でピン留め、矢印ボタンで並べ替え。'}
+          {t(mode === 'select' ? 'commands.palette.selectHint' : 'commands.palette.executeHint')}
+          {onPinAction && t('commands.palette.pinHint')}
         </div>
       </div>
     </div>,

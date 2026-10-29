@@ -68,13 +68,8 @@ export const defaultShortcuts: Record<string, string[]> = {
   'appdock.settings.open': ['Ctrl+,'],
 };
 export const defaultGlobalShortcutCommands: string[] = [];
-export function validCommandId(id: unknown): id is string {
-  return (
-    typeof id === 'string' &&
-    /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,179}$/.test(id) &&
-    !['constructor', 'prototype', '__proto__'].includes(id)
-  );
-}
+export { validCommandId } from './command-id';
+import { validCommandId } from './command-id';
 const specialKeys: Record<string, string> = {
   space: 'Space',
   tab: 'Tab',

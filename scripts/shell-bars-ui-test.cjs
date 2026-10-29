@@ -450,12 +450,15 @@ async function close() {
       }
       const palette = await overlayPage(host);
       await closingAction(palette.keyboard.press('Escape'));
-      await until(async () => !(await state('overlay.command-palette')).visible, 'palette closed');
+      await until(
+        async () => !(await host.evaluate(() => window.dock.snapshot())).overlay.active,
+        'palette closed',
+      );
       await page.waitForFunction(() => document.hasFocus());
       await page.keyboard.press('Control+p');
       await closingAction((await overlayPage(host)).keyboard.press('Escape'));
       await until(
-        async () => !(await state('overlay.command-palette')).visible,
+        async () => !(await host.evaluate(() => window.dock.snapshot())).overlay.active,
         'keyboard palette closed',
       );
     }
@@ -537,71 +540,38 @@ async function close() {
       result.success = true;
       return;
     }
-    await host.evaluate(() => {
-      const modal = document.createElement('dialog');
-      modal.id = 'bar-modal-fixture';
-      modal.style.cssText =
-        'position:fixed;inset:0;margin:0;width:100vw;max-width:none;height:100vh;max-height:none;border:0;padding:0';
-      const button = document.createElement('button');
-      button.textContent = 'Modal native click';
-      button.style.cssText = 'position:absolute;left:240px;top:5px;width:180px;height:30px';
-      button.onclick = () => {
-        document.body.dataset.barModalClicked = 'true';
-        modal.close();
-        modal.remove();
-      };
-      modal.append(button);
-      document.body.append(modal);
-      modal.showModal();
+    await title.getByRole('button', { name: 'コマンドを検索' }).click();
+    const barPalette = await overlayPage(host);
+    const priorPalette = await barPalette.evaluate(() => window.appdockPalette.connect());
+    await until(
+      async () => (await state('titlebar')).visible && (await state('statusbar')).visible,
+      'body palette keeps bars visible',
+    );
+    await status.evaluate(async () => {
+      const c = await window.appdockBar.connect();
+      window.barPaletteCompleted = false;
+      void window.appdockBar
+        .invoke({
+          sessionId: c.sessionId,
+          requestId: crypto.randomUUID(),
+          actionId: c.snapshot.actions.palette,
+        })
+        .then(() => (window.barPaletteCompleted = true));
     });
     await until(
       async () =>
-        !(await state('titlebar')).visible &&
-        (await host.locator('[data-host-modal-surface]').count()) === 3,
-      'all bar surfaces covered',
+        (await barPalette.evaluate(() => window.appdockPalette.connect())).snapshot.id !==
+        priorPalette.snapshot.id,
+      'bar requests a fresh palette session',
     );
-    for (const page of [title, status])
-      assert.equal(
-        await page.evaluate(async () => {
-          const c = await window.appdockBar.connect();
-          try {
-            await window.appdockBar.invoke({
-              sessionId: c.sessionId,
-              requestId: crypto.randomUUID(),
-              actionId: c.snapshot.actions.palette,
-            });
-            return false;
-          } catch {
-            return true;
-          }
-        }),
-        true,
-      );
-    const covered = await main(({ BrowserWindow, screen }) => {
-      const w = BrowserWindow.getAllWindows().find((w) =>
-        w.webContents.getURL().startsWith('appdock://host/'),
-      );
-      const before = w.getBounds();
-      return {
-        before,
-        from: screen.dipToScreenPoint({ x: before.x + 180, y: before.y + 20 }),
-        to: screen.dipToScreenPoint({ x: before.x + 260, y: before.y + 60 }),
-        click: screen.dipToScreenPoint({ x: before.x + 300, y: before.y + 20 }),
-      };
-    });
-    leftDrag(covered.from, covered.to);
-    assert.deepEqual(
-      await main(({ BrowserWindow }) =>
-        BrowserWindow.getAllWindows()
-          .find((w) => w.webContents.getURL().startsWith('appdock://host/'))
-          .getBounds(),
-      ),
-      covered.before,
+    await closingAction((await overlayPage(host)).keyboard.press('Escape'));
+    await until(
+      async () => !(await host.evaluate(() => window.dock.snapshot())).overlay.active,
+      'status bar remains operable during the palette',
     );
-    leftDrag(covered.click);
-    await host.waitForFunction(() => document.body.dataset.barModalClicked === 'true');
+    await status.waitForFunction(() => window.barPaletteCompleted === true);
     result.checks.push(
-      'hidden titlebar has no native drag hit area; a real mouse click reaches the modal over the titlebar',
+      'body palette leaves both bars visible and permits the status bar palette action',
     );
     for (const theme of ['light', 'dark']) {
       await save({ theme });
@@ -654,6 +624,7 @@ async function close() {
       'light/dark and 900/1280px plus 125% zoom preserve bar bounds and window controls',
     );
     await host.evaluate(() => window.dock.navigate('settings'));
+    await host.getByTestId('settings-nav:appearance').click();
     await host.getByLabel('タイトルバーのShell', { exact: true }).selectOption('fixture.bars-a');
     await assigned('titlebar', 'fixture.bars-a');
     await assigned('statusbar', defaultId);

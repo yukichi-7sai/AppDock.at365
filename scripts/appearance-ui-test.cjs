@@ -7,7 +7,10 @@ const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
+const { waitForHost } = require('./settings-host-helper.cjs');
 const { accentPalettes, resolveAppearance } = require('../out/main/shared/appearance');
+const { getHostTranslator } = require('../out/main/shared/i18n');
+const translate = getHostTranslator('ja');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', 'appearance-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
@@ -145,11 +148,11 @@ async function assertRibbonReadability(rail, id, dark) {
         `${id}/${dark}/${state}/${item.element}: ${item.color} on ${sample.background} = ${contrast(item.color, sample.background).toFixed(2)}`,
       );
   };
-  await rail.locator('.brand-mark').hover();
+  await rail.mouse.move(0, 0);
   await read(normal, 'normal');
   await normal.hover();
   await read(normal, 'hover');
-  await rail.locator('.brand-mark').hover();
+  await rail.mouse.move(0, 0);
   await normal.focus();
   await read(normal, 'focus');
   const selected = rail.locator('.activity-rail button.active:not(:disabled)').first();
@@ -265,7 +268,7 @@ async function assertRibbonReadability(rail, id, dark) {
         void window.dock.openCommandPalette({ requestId: 'scrollbar-preview', mode: 'execute' });
       });
       await until(
-        () => context.pages().find((page) => page.url().endsWith('/overlay.html')),
+        () => context.pages().find((page) => page.url().endsWith('/command-palette/index.html')),
         'overlay',
       );
       for (const theme of ['light', 'dark'])
@@ -334,8 +337,8 @@ async function assertRibbonReadability(rail, id, dark) {
     assert.deepEqual(await host.locator('.accent-palettes button').allTextContents(), [
       'ミント',
       'アリス',
-      'ラベンダー',
-      'マジカル',
+      'ワンダーランド',
+      'マジカント',
       'クッキー',
       'カスタム',
     ]);
@@ -365,7 +368,12 @@ async function assertRibbonReadability(rail, id, dark) {
       await host.getByLabel('テーマ', { exact: true }).selectOption(dark ? 'dark' : 'light');
       await settleSettings(host);
       for (const palette of accentPalettes) {
-        await host.getByRole('button', { name: palette.title, exact: true }).click();
+        await host
+          .getByRole('button', {
+            name: translate('appearance.accent.palette.' + palette.id),
+            exact: true,
+          })
+          .click();
         await settleSettings(host);
         await assertColors(host, palette.id, dark);
         assert.equal(await host.locator('.accent-palettes [aria-pressed="true"]').count(), 1);
@@ -484,19 +492,12 @@ async function assertRibbonReadability(rail, id, dark) {
     checks.push('local Applet root/body overrides and remote isolation');
     for (const route of ['logs', 'image-library', 'notifications']) {
       await host.evaluate((route) => window.dock.navigate(route), route);
-      const page = await until(
-        () =>
-          context
-            .pages()
-            .find((p) =>
-              p
-                .url()
-                .endsWith(
-                  '/' + (route === 'notifications' ? 'notification-center' : route) + '.html',
-                ),
-            ),
-        'page ' + route,
+      await waitForHost(
+        host,
+        async (route) => (await window.dock.pages.get())?.kind === route,
+        route,
       );
+      const page = host;
       await assertColors(page, 'alice-blue', true);
       checks.push(route + ' late-open colors');
       if (route === 'notifications') {
@@ -518,7 +519,7 @@ async function assertRibbonReadability(rail, id, dark) {
       void window.dock.openCommandPalette({ requestId: 'accent-preview', mode: 'execute' });
     });
     const overlay = await until(
-      () => context.pages().find((p) => p.url().endsWith('/overlay.html')),
+      () => context.pages().find((p) => p.url().endsWith('/command-palette/index.html')),
       'overlay',
     );
     await assertColors(overlay, 'alice-blue', true);

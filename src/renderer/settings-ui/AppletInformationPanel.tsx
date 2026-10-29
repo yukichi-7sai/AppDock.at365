@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import type { ExtensionSnapshot } from '../../shared/contracts';
 import { Icon } from '../../shared/ui-icons';
+import { CommandText } from './CommandText';
 import { appletSettingsPageId } from '../../shared/settings-catalog';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsButton } from './SettingsButton';
@@ -104,7 +105,7 @@ export function AppletInformationPanel({
       </SettingsAppIdentity>
       {description && (
         <p className="applet-information-description" data-testid="applet-description">
-          {description}
+          <CommandText text={description} />
         </p>
       )}
       <VersionCheck

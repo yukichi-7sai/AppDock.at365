@@ -1,4 +1,5 @@
 import { useHostTranslation } from '../HostTranslation';
+import { CommandText } from './CommandText';
 import { useEffect, useRef, useState } from 'react';
 import type { SettingDefinition, SettingOption } from '../../shared/contracts';
 import {
@@ -319,7 +320,7 @@ export function ObjectListDialogSetting({
                     key={field.key}
                     settingKey={field.key}
                     title={field.title}
-                    description={field.description}
+                    description={field.description && <CommandText text={field.description} />}
                     onInputCapture={
                       field.type === 'registered-image' ? undefined : () => changed(field.key)
                     }

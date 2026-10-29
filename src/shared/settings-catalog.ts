@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { commandTextPlain, type CommandReference } from './command-text';
 import { hostSettingDefinitions } from './host-settings';
 import { appletCommonDefinitions, appletCommonKeys } from './applet-common-settings';
 import { commandTriggerSettingDefinitions } from './command-trigger-options';
@@ -487,9 +488,10 @@ function definitionTerms(definition: SettingDefinition): string[] {
 export function settingsCatalog(
   applets: ExtensionSnapshot[],
   current: Settings,
+  references: readonly CommandReference[] = [],
 ): SettingsPageDefinition[] {
   const t = getHostTranslator(current.host.language);
-  return [
+  const pages: SettingsPageDefinition[] = [
     ...hostSettingsPages.map(([id, title]) => ({
       id,
       title: id === 'appearance' || id === 'general' ? t(`pages.${id}.title`) : title,
@@ -606,6 +608,23 @@ export function settingsCatalog(
       };
     }),
   ];
+  const byId = new Map(references.map((c) => [c.id, c]));
+  return pages.map((page) => ({
+    ...page,
+    items: page.items.map((field) =>
+      !field.description.includes('[command:') &&
+      !field.keywords?.some((text) => text.includes('[command:'))
+        ? field
+        : {
+            ...field,
+            description: commandTextPlain(field.description, byId),
+            keywords: [
+              ...(field.keywords ?? []).map((text) => commandTextPlain(text, byId)),
+              field.description,
+            ],
+          },
+    ),
+  }));
 }
 export function settingsPaths(
   page: SettingsPageDefinition,

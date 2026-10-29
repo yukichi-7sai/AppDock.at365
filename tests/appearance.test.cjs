@@ -274,6 +274,7 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
     'shell-preload',
     'shell-bar-preload',
     'overlay-preload',
+    'command-palette-preload',
     'notification-surface-preload',
     'applet-page-preload',
     'web-account-preload',

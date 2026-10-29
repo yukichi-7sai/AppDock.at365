@@ -191,7 +191,7 @@ SettingsPageModel schemaVersion:2は本体内部の投影契約とし、DockApi.
 
 ## コマンドパレットの共用
 
-コマンド検索とトレイの選択パレットは本体のCommandPaletteSessionとDefault Shellの描画を共用します。表示・取消・フォーカス・復旧は[共通オーバーレイ](shell-overlays.md)に従い、本体rendererへパレットを追加しません。
+コマンド検索・トレイの選択・説明文のコマンドリンクは、本体のCommandPaletteSessionと固定パレットrendererを共用します。表示・取消・フォーカス・復旧は[共通オーバーレイ](shell-overlays.md)に従い、Shellの提供元から独立した専用WebContentsViewを使います。
 
 ## 割り当て操作UIの共用
 
