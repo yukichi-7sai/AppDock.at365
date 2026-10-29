@@ -190,18 +190,6 @@ kbd {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.statusbar > button {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--faint);
-  gap: 6px;
-}
-.statusbar kbd {
-  border: 0;
-  padding: 0;
-  margin-left: 5px;
-  font-size: 8px;
-}
 .version-check {
   margin-left: 8px;
 }

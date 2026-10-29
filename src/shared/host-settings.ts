@@ -23,7 +23,7 @@ type OrdinaryHostKey = Exclude<
 >;
 export type HostSettingDefinition = SettingDefinition & {
   key: OrdinaryHostKey;
-  pageId: 'appearance' | 'general';
+  pageId: 'appearance' | 'general' | 'statusbar';
   catalogKey?: string;
   applies?: string;
 };
@@ -114,6 +114,15 @@ const definitions = {
     pageId: 'general',
     title: hostText('general.sound.label'),
     description: hostText('general.sound.description'),
+    type: 'boolean',
+    default: true,
+    automation: true,
+    generateCommands: [...switches],
+  },
+  showStatusBar: {
+    pageId: 'statusbar',
+    title: hostText('statusbar.visible.label'),
+    description: hostText('statusbar.visible.description'),
     type: 'boolean',
     default: true,
     automation: true,

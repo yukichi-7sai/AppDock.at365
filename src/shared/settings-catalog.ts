@@ -353,6 +353,7 @@ const hostItems: Record<string, [string, string, string?][]> = {
   ]),
 };
 const localizedHostFields = {
+  statusbar: [['showStatusBar', 'statusbar.visible.label', 'statusbar.visible.description']],
   appearance: [
     ['language', 'language.label', 'language.description'],
     ['theme', 'appearance.theme.label', 'appearance.theme.description'],
@@ -389,7 +390,7 @@ function hostRows(
   language: HostLanguage = defaultHostLanguage,
 ): [string, string, string?][] {
   const t = getHostTranslator(language);
-  if (pageId !== 'appearance' && pageId !== 'general')
+  if (pageId !== 'appearance' && pageId !== 'general' && pageId !== 'statusbar')
     return [
       ...(hostItems[pageId] ?? []),
       ...(['shortcuts', 'gestures', 'touchpad-gestures'].includes(pageId)
@@ -644,6 +645,10 @@ export function settingsPaths(
       return [['notificationPreferences']];
     case 'general':
       return generalKeys().map((k) => ['host', k]);
+    case 'statusbar':
+      return hostSettingDefinitions
+        .filter((field) => field.pageId === page.id)
+        .map((field) => ['host', field.key]);
     case 'tray':
       return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':

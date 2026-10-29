@@ -209,11 +209,6 @@ function App() {
           {error}
         </span>
       )}
-      <button onClick={() => act('palette')}>
-        <Icon name="command" size={12} />
-        コマンドパレット
-        {model.paletteKey && <kbd>{model.paletteKey}</kbd>}
-      </button>
     </footer>
   );
 }

@@ -14,6 +14,7 @@ test('fresh host defaults match the supplied behavior without installation histo
   const settings = parseSettings(createDefaultSettings());
   assert.equal(settings.gestures.wheelDelayMs, 20);
   assert.equal(settings.gestures.indicatorOpacity, 0.9);
+  assert.equal(settings.host.showStatusBar, true);
   assert.deepEqual(
     getKeybindings(settings).map(({ command, key }) => ({ command, key })),
     [
@@ -47,6 +48,18 @@ test('fresh host defaults match the supplied behavior without installation histo
   assert.deepEqual(settings.extensions, {});
   assert.deepEqual(settings.gestureDefaultsInitialized, []);
   assert.deepEqual(settings.keybindingDefaultsInitialized ?? [], []);
+});
+
+test('status bar visibility defaults on, persists explicit off and rejects nonboolean values', () => {
+  assert.equal(parseSettings({ schemaVersion: 1 }).host.showStatusBar, true);
+  const value = parseSettings({ schemaVersion: 1, host: { showStatusBar: false } });
+  const sparse = omitSettingDefaults(value, createDefaultSettings());
+  assert.equal(sparse.host.showStatusBar, false);
+  assert.equal(parseSettings({ schemaVersion: 1, ...sparse }).host.showStatusBar, false);
+  value.host.showStatusBar = true;
+  assert.equal(omitSettingDefaults(value, createDefaultSettings())?.host?.showStatusBar, undefined);
+  for (const showStatusBar of ['false', 0, null])
+    assert.throws(() => parseSettings({ schemaVersion: 1, host: { showStatusBar } }));
 });
 
 test('all automatic update entry points default off and AI/TTS have no configured endpoint', () => {

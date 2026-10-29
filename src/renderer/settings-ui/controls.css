@@ -325,7 +325,7 @@ code {
 .shell {
   display: grid;
   grid-template-columns: 58px 228px minmax(0, 1fr);
-  grid-template-rows: 43px minmax(0, 1fr) 28px;
+  grid-template-rows: 43px minmax(0, 1fr) var(--statusbar-height, 28px);
   height: 100vh;
   overflow: hidden;
 }

@@ -48,6 +48,7 @@ export class ShellBarHost {
 
       content: WindowBars;
       ready(): boolean;
+      enabled(region: ShellBarRegion): boolean;
       blocked(): boolean;
       settings(provider: string): Record<string, unknown>;
       execute(provider: string, command: string): Promise<unknown>;
@@ -144,7 +145,12 @@ export class ShellBarHost {
   private visible(bar: Bar) {
     const w = this.options.window;
     return (
-      !!bar.active?.ready && !!bar.bounds && !w.isDestroyed() && w.isVisible() && !w.isMinimized()
+      this.options.enabled(bar.region) &&
+      !!bar.active?.ready &&
+      !!bar.bounds &&
+      !w.isDestroyed() &&
+      w.isVisible() &&
+      !w.isMinimized()
     );
   }
   viewport(region: ShellBarRegion, bounds: Electron.Rectangle | null) {
@@ -190,7 +196,9 @@ export class ShellBarHost {
       });
       b.view.webContents.setZoomFactor(zoom);
     }
-    b.view.setVisible(this.visible(bar));
+    const visible = this.visible(bar);
+    if (!visible && b.view.webContents.isFocused()) w.webContents.focus();
+    b.view.setVisible(visible);
     this.options.registry.touch();
     this.options.layer();
   }

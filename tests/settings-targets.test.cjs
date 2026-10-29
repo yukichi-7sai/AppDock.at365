@@ -486,6 +486,23 @@ test('field registration drives host defaults, validation, UI metadata, storage 
   );
 });
 
+test('status bar setting is discoverable, immediate and device-owned through the common MCP path', (t) => {
+  const f = fixture(t, { device: true });
+  const targetId = f
+    .call('targets.list', { ownerId: 'appdock' })
+    .items.find((target) => target.category === 'statusbar').targetId;
+  const sharedBefore = fs.readFileSync(f.store.shared.file, 'utf8');
+  assert.deepEqual(values(f.read(targetId)), { showStatusBar: true });
+  const off = f.request([{ kind: 'set', changes: { showStatusBar: false } }], { targetId });
+  f.call('apply', { ...off, dryRun: true });
+  assert.equal(f.store.value.host.showStatusBar, true);
+  f.call('apply', { ...off, requestId: randomUUID() });
+  assert.equal(f.store.value.host.showStatusBar, false);
+  assert.equal(fs.readFileSync(f.store.shared.file, 'utf8'), sharedBefore);
+  f.call('apply', f.request([{ kind: 'reset', keys: ['showStatusBar'] }], { targetId }));
+  assert.equal(f.store.value.host.showStatusBar, true);
+});
+
 test('device-backed resets preserve per-PC ownership and shared bytes', (t) => {
   const f = fixture(t, { device: true }),
     targetId = f

@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-30: ステータスバー 0.103.0 のコミット照合
+
+- 利用者が発行済み0.103.0を確認し、コミットを依頼した。main `c9093c8`からの今回の21ファイルを対象に、既定ON・即時保存/PC専用所有・検索/JSON/API/初期化・native Viewの表示と操作拒否・フォーカス復帰・追加Shellの提供元/session保持・右下ボタン削除をレビューし、阻害事項なし。
+- 実装時の936入力と完全ログ10件、固定EXE GUI8+4群・smokeの成功結果、発行済み所有694ファイル・ZIP/feedの版/hashを照合。対象製品コード・依存/lockfile・ビルド条件は不変のため、関連12ファイル134件・型検査/build・GUI・smokeを再利用した。再発行や版更新はしていない。
+- 本体標準147ファイルを依存先で分類し、設定登録・設定カタログ/ページコマンドまたは翻訳資源の追加による影響がある未確認101ファイル1,028件を追加実行してfail/skip 0。`preferences.test.cjs`の旧設定読込後の期待値へ`showStatusBar:true`を追加した。変更はテストの期待値だけで、確認済み製品とGUIに影響しない。残る34ファイル147件は0.102.1コミット時の完全ログと当該試験/依存ソース・固定ツールの一致、既存翻訳値が不変であることを照合して再利用。実装時134件と合わせて標準1,309/1,309件が成功した。
+- 再利用元・147ファイルの判定・実行ログ/hash・成果物照合は`.artifacts/commit-validation-statusbar-01030-20261030/`の`evidence-reuse-check.json`、`standard-plan.json`、`supplemental-tests.log`、`supplemental-summary.json`、`validation.json`。今回のstage blobと作業ファイル、stage treeとcommit tree、コミット後のcleanは同フォルダーの`stage.json`/`commit.json`へ記録する。
+- 新しいGUI/profile生成はなく、既存の実装/GUI/smoke・コミット検証資料を再利用のため保護して削除0件。commitのみでpush・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-30: ステータスバーの表示設定と右下ボタン整理 0.103.0
+
+- main `c9093c8` / origin/main追跡、開始時clean・ahead 1を確認し、`pull --ff-only`はAlready up to date。本体のみ0.102.1→0.103.0。任意の設定項目追加のためマイナー更新とした。
+- 設定インデックスのリボン直下にステータスバーを追加し、`host.showStatusBar`を既定ONで登録。共通の型・既定値・検証・ページ投影・検索/JSON・PC専用保存・初期化・MCPと生成ON/OFF/toggleコマンドへ接続した。切替は即時反映・保存、OFF時は28px予約枠とTab入口を取り除く。native Viewと非表示中の操作も無効にし、表示中のフォーカスを本体へ戻す。同じ提供元/sessionを保った再表示と、非表示中の提供元無効化によるfallbackを維持する。
+- Default Shellの右下コマンドパレットボタンと専用CSSを削除。タイトルバーの検索、共通ショートカット、公開コマンドを維持し、追加Shellの公開`palette`操作は変更していない。
+- 発行前レビューは今回の製品差分と設定・保存/API・フォーカス・native領域・オーバーレイ/本文領域への影響を確認し、阻害事項なし。明るい通常幅と暗い狭幅の実ウィンドウ画像も確認。型検査/build成功。関連12ファイル134/134件、fail/skip 0。初回単体の失敗は「すべて既定値なら省略結果全体がundefined」のテスト側参照を修正、初回GUIの失敗は既存リセットボタンの現行ラベルへ修正した。同じ必要範囲を再実行して成功し、失敗ログも保持。
+- 通常publish成功。発行済み固定EXEを隔離コピーしてvisibility専用8群・通常バー操作4群が成功。設定の切替/検索/初期化、再起動後OFF保持、native Viewの実非表示と操作拒否、sessionと提供元保持、フォーカス復帰、追加Shell/fallback、パレット/Tab/最小化/最大化/復元/実ドラッグ/終了を確認。固定EXEのsmokeもbridge・保存・登録画像・トレイ・終了が成功。開発版visibility専用8群も成功したが固定EXEの結果と区別する。
+- 発行先`A:\40.ARTIFACT\AppDock.at365\win-unpacked`、EXE SHA256 `301d24b5cf50e01e5c5f8d38f832d9451c53e8b987c244c1f1421f7d24b9435f`。package/所有manifest/Default Shell/feedの版0.103.0、所有694ファイルとstagingのhash一致、ASAR内の対象14ファイルと現在の生成物一致。更新ZIPは270,728,088 bytes、SHA256 `4a4ae98030149fb08622592b885a884414fdaec4c7e76030bed976fe94c16544`でfeedと一致。Node v26.13.0 / pnpm 12.15.0 / Windows x64、固定lockfileと供給網検査を維持。版更新後の依存状態不一致は`install --frozen-lockfile`で再照合し、依存版/lockfileは変更していない。
+- 証跡は`.artifacts/statusbar-visibility-20261030/`の完全ログ・inputs.json・validation.json。GUIは`.artifacts/statusbar-visibility-1793288784316/`（開発）、`.artifacts/statusbar-visibility-1793288891288/`（固定EXE）、`.artifacts/shell-bars-1793288922881/`（固定EXE通常操作）、smokeは`.artifacts/smoke-1793288943448/`。現在の成功分は方式ごとに直近3回以内のため保持、初回失敗と既存の再利用参照/所有確認が未完了の旧結果も保護し、削除0件。
+- 別PC/混在DPI・第三者Shell固有のUI・無関係な全回帰は未実施。未変更Appletの再発行・全体ZIP作成、コミット・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-30: キージェスチャー有効設定と表示調整 0.102.1 のコミット照合
 
 - 利用者が発行済み0.102.1を確認し、コミットを依頼した。対象は0.102.0のキー全体有効設定と0.102.1のOFF表示・列幅・タッチパッド設定順を含む今回の32ファイル。main `56e10a1`からの差分をレビューし、入力停止/元入力ブロック、既定ONと登録保持、保存/JSON/API/初期化、表示専用auxiliary、個別無効の条件列表示、共通部品と狭幅を確認。阻害事項なし。

@@ -4025,6 +4025,7 @@ async function initialize() {
     window,
     preload: path.join(__dirname, 'shell-bar-preload.js'),
     registry: shellRegistry!,
+    enabled: (region) => region !== 'statusbar' || settings.value.host.showStatusBar,
 
     ready: () => uiReady && !quitting,
     blocked: () => overlayHost?.kind === 'ribbon-group',

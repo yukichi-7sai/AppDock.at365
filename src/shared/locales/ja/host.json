@@ -1,4 +1,7 @@
 {
+  "settings.settings-navigation.statusbar": "ステータスバー",
+  "statusbar.visible.label": "ステータスバーの表示",
+  "statusbar.visible.description": "画面下部に、実行中のApplet数やバージョン、更新ボタンを表示します。",
   "commands.noop.title": "何もしない",
   "commands.noop.description": "何も実行しません。元の入力をブロックするトリガーに割り当てて使います。",
   "settings.commandStacks.type": "コマンドスタック",

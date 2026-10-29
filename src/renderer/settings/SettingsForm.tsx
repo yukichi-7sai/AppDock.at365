@@ -195,8 +195,22 @@ export function SettingsForm({
   return (
     <div className="settings-layout">
       <div
-        className={`settings-form${['general', 'appearance', 'shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(category) ? ' settings-sections' : ''}`}
+        className={`settings-form${['general', 'appearance', 'statusbar', 'shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(category) ? ' settings-sections' : ''}`}
       >
+        {category === 'statusbar' && (
+          <SettingsSection>
+            <SettingRow pageId={category} itemKey="showStatusBar">
+              <Toggle
+                label={t('statusbar.visible.label')}
+                checked={settings.host.showStatusBar}
+                disabled={busy}
+                onChange={(showStatusBar) =>
+                  edit({ ...settings, host: { ...settings.host, showStatusBar } })
+                }
+              />
+            </SettingRow>
+          </SettingsSection>
+        )}
         {category === 'command-triggers' && (
           <CommandTriggersEditor
             tab={triggerTab}

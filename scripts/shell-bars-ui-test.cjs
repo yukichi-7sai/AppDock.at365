@@ -10,12 +10,22 @@ const { barPage } = require('./shell-bars-helper.cjs');
 const { closingAction, overlayPage } = require('./shell-overlay-helper.cjs');
 const root = path.resolve(__dirname, '..');
 const notificationsOnly = process.argv.includes('--notifications-only');
+const visibilityOnly = process.argv.includes('--visibility-only');
 const portable = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
-const profile = path.join(root, '.artifacts', `shell-bars-${Date.now()}`);
+const profile = path.join(
+  root,
+  '.artifacts',
+  `${visibilityOnly ? 'statusbar-visibility' : 'shell-bars'}-${Date.now()}`,
+);
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
+if (visibilityOnly) {
+  settings.host.soundEnabled = false;
+  settings.gestures.enabled = false;
+  settings.touchpadGestures.enabled = false;
+}
 settings.globalShortcutCommands = [];
 settings.updates.checkHostOnStartup = settings.updates.checkAppletsOnStartup = false;
 settings.updates.checkHostOnAboutOpen = false;
@@ -100,7 +110,7 @@ for (const [id, views] of [
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-const result = { profile, notificationsOnly, success: false, checks: [] };
+const result = { profile, notificationsOnly, visibilityOnly, success: false, checks: [] };
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 let app, browser, context, host, child, mainPort, title, status;
 const until = async (fn, label, timeout = 30000) => {
@@ -172,6 +182,7 @@ async function launch(extra = []) {
       executable,
       [
         `--test-profile=${profile}`,
+        `--test-local-state=${path.join(profile, 'local')}`,
         `--remote-debugging-port=${port}`,
         `--inspect=${mainPort}`,
         ...extra,
@@ -186,7 +197,12 @@ async function launch(extra = []) {
   } else {
     app = await _electron.launch({
       executablePath: require('electron'),
-      args: [root, `--test-profile=${profile}`, ...extra],
+      args: [
+        root,
+        `--test-profile=${profile}`,
+        `--test-local-state=${path.join(profile, 'local')}`,
+        ...extra,
+      ],
       env,
     });
     context = app.context();
@@ -218,6 +234,23 @@ async function close() {
 (async () => {
   try {
     await launch();
+    if (visibilityOnly) {
+      await require('./statusbar-visibility-checks.cjs')({
+        host: () => host,
+        state,
+        save,
+        assign,
+        launch,
+        close,
+        main,
+        capture,
+        barPage,
+        profile,
+        checks: result.checks,
+      });
+      result.success = true;
+      return;
+    }
     if (notificationsOnly) {
       await until(
         async () =>
@@ -408,9 +441,13 @@ async function close() {
       'notification button opens the notification center',
     );
     for (const page of [title, status]) {
-      await page
-        .getByRole('button', { name: page === title ? 'コマンドを検索' : 'コマンドパレット' })
-        .click();
+      if (page === title) await page.getByRole('button', { name: 'コマンドを検索' }).click();
+      else {
+        assert.equal(await page.getByRole('button', { name: 'コマンドパレット' }).count(), 0);
+        await host.locator('[data-region="statusbar"]').focus();
+        await page.waitForFunction(() => document.hasFocus());
+        await page.keyboard.press('Control+p');
+      }
       const palette = await overlayPage(host);
       await closingAction(palette.keyboard.press('Escape'));
       await until(async () => !(await state('overlay.command-palette')).visible, 'palette closed');
@@ -434,11 +471,11 @@ async function close() {
     );
     await host.locator('[data-region="statusbar"]').focus();
     await status.waitForFunction(() => document.hasFocus());
-    await status.getByRole('button', { name: 'コマンドパレット' }).focus();
+    await status.getByRole('button', { name: 'AppDockを更新', exact: true }).focus();
     await status.keyboard.press('Tab');
     await title.waitForFunction(() => document.hasFocus());
     result.checks.push(
-      'notification button opens the center; palette buttons and shortcuts work from both bars and restore focus; Tab crosses title/ribbon/body/status boundaries',
+      'notification button opens the center; title palette button and shortcuts from both bars restore focus; Tab crosses title/ribbon/body/status boundaries',
     );
     await title.getByRole('button', { name: '最大化', exact: true }).click();
     await title.getByRole('button', { name: '元に戻す', exact: true }).waitFor();

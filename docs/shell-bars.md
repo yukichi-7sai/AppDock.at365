@@ -13,6 +13,10 @@
 
 Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewから同じ公開bridgeで接続します。本体rendererは43pxと28pxの枠・フォーカス移動だけを管理し、復旧用のバーを重複描画しません。外部Shellも同じ予約寸法を使い、自由な高さ指定は提供しません。
 
+「設定 → ステータスバー」の「ステータスバーの表示」で下部全体を切り替えます。`host.showStatusBar`は既定ONで、変更は即時反映・保存されます。OFFでは28pxの予約枠とTabの入口を取り除き、本文とオーバーレイの表示範囲を広げます。Default Shell・追加Shellともnative Viewを非表示にして操作を受け付けず、選択した提供元とViewの状態は保持します。再表示時は同じViewを利用します。
+
+Default Shellの下部には稼働数・版・更新ボタンを表示し、コマンドパレットボタンは置きません。パレットはタイトルバーの検索ボタン、共通ショートカット、公開コマンドから開けます。追加Shell向けの既存`palette`操作は互換性のため維持します。
+
 ## 内容と操作
 
 [公開型](../src/shared/shell-bars.ts)を正本とします。`ShellBarModel`はschemaVersion 1、primary context、領域、表示revision、テーマ、本体版、パレットのキー表示、最大化状態、実行中Applet数、アクティブ通知件数`activeNotificationCount`、更新進捗、利用可能な操作IDを持ちます。完全設定・更新元・保存パス・認証情報は投影しません。
@@ -24,7 +28,7 @@ Default Shellは両領域で`bars.html`を使い、別々のWebContentsViewか�
 | titlebar  | パレット、通知センター表示、最小化、最大化／元に戻す、閉じる、更新を取り消せる間だけキャンセル |
 | statusbar | パレット、本体更新、更新を取り消せる間だけキャンセル                                           |
 
-操作IDは本体発行の不透明な値です。ShellはIDからコマンド・パスを組み立てません。タイトルバーのドラッグ領域は描画側が`-webkit-app-region: drag`で指定し、操作部品は`no-drag`にします。Default Shellは通常時の検索・通知・ウィンドウボタンを、更新処理中だけ進捗・取得量・キャンセルで覆います。進捗全体を`no-drag`にし、終了後は通常表示へ戻します。キーボードの入口・Tab境界は表示中の有効なボタンだけを対象にし、進捗表示中はキャンセルへ移動します。下部の稼働数・版・更新は常時維持します。既存の追加Shellとの互換性のため、statusbarのキャンセル操作IDも提供を続けます。
+操作IDは本体発行の不透明な値です。ShellはIDからコマンド・パスを組み立てません。タイトルバーのドラッグ領域は描画側が`-webkit-app-region: drag`で指定し、操作部品は`no-drag`にします。Default Shellは通常時の検索・通知・ウィンドウボタンを、更新処理中だけ進捗・取得量・キャンセルで覆います。進捗全体を`no-drag`にし、終了後は通常表示へ戻します。キーボードの入口・Tab境界は表示中の有効なボタンだけを対象にし、進捗表示中はキャンセルへ移動します。ステータスバーを表示している間は下部の稼働数・版・更新を維持します。既存の追加Shellとの互換性のため、statusbarのキャンセル操作IDも提供を続けます。
 
 ## 公開bridge
 
@@ -57,5 +61,7 @@ Default Shellの通知ボタンはベルだけを表示し、`notifications`操�
 `scripts/shell-bars-ui-test.cjs [固定EXE]`は実ウィンドウ操作、Windowsのマウス入力によるドラッグ、両テーマ、サイズとzoom、Tab、パレット、別々の提供元、故障・無効化・再試行・safe起動を検査します。`scripts/host-modal-ui-test.cjs [固定EXE]`はダイアログ・パレットの本文範囲、ぼかし、連続開閉と3領域の操作維持を確認します。更新のHTTP取得・進捗・取消は既存の`update-progress-ui-test.cjs [固定EXE]`で検証します。実測と未確認事項は[VERIFICATION](../VERIFICATION.md)に記録します。
 
 `shell-bars-ui-test.cjs [固定EXE] --controls-only`は通常バーの操作・パレット・Tab移動・最小化/最大化/復元・実ドラッグ・閉じるに対象を絞ります。modal被覆・提供元の故障/復旧等を含む全体試験とは結果を区別します。
+
+`shell-bars-ui-test.cjs [固定EXE] --visibility-only`は設定インデックス・検索・既定ON・即時切替と保存・再起動後のOFF保持・ページの初期化・非表示Viewの操作拒否とフォーカス復帰・追加Shellのsession保持とfallbackを確認します。明るい通常幅と暗い狭幅を代表画面として確認します。
 
 ドラッグ領域の指定は[Electronの公式仕様](https://www.electronjs.org/docs/latest/tutorial/custom-window-interactions#custom-draggable-regions)に従います。

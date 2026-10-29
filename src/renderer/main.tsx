@@ -404,6 +404,8 @@ function App() {
         {
           '--applet-sidebar-width': `${appletSidebar.width}px`,
           '--ribbon-width': `${ribbonDisplayWidth(snapshot?.ribbonDisplayMode)}px`,
+          '--statusbar-height':
+            snapshot?.settings.value.host.showStatusBar === false ? '0px' : '28px',
         } as React.CSSProperties
       }
     >
@@ -538,7 +540,7 @@ function App() {
           </div>
         )}
       </main>
-      <ShellBarSlot region="statusbar" />
+      {snapshot?.settings.value.host.showStatusBar !== false && <ShellBarSlot region="statusbar" />}
     </div>
   );
 }

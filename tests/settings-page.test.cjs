@@ -8,6 +8,29 @@ const {
 } = require('../out/main/main/core/settings-page');
 const { settingsProjection, applySettingsJson } = require('../out/main/shared/settings-catalog');
 
+test('status bar search and page edits own only visibility and reset without touching other settings', () => {
+  const {
+    settingsCatalog,
+    resetSettingsPage,
+    searchSettings,
+  } = require('../out/main/shared/settings-catalog');
+  const value = createDefaultSettings();
+  value.host.soundEnabled = false;
+  value.host.shellProviders = { statusbar: 'fixture.custom' };
+  const catalog = settingsCatalog([], value);
+  const page = catalog.find((page) => page.id === 'statusbar');
+  assert.equal(catalog[catalog.findIndex((page) => page.id === 'ribbon') + 1], page);
+  assert.equal(page.items[0].title, 'ステータスバーの表示');
+  assert.deepEqual(settingsProjection(value, page, []), { host: { showStatusBar: true } });
+  const changed = applySettingsJson(value, page, [], '{"host":{"showStatusBar":false}}');
+  assert.equal(changed.host.showStatusBar, false);
+  assert.deepEqual(resetSettingsPage(changed, page, []), value);
+  assert.deepEqual(changed.host.shellProviders, value.host.shellProviders);
+  assert.equal(changed.host.soundEnabled, false);
+  const results = searchSettings(catalog, 'ステータスバー');
+  assert(results.some((result) => result.pageId === 'statusbar' && result.key === 'showStatusBar'));
+});
+
 test('Applet page edits allow absent display overrides and reset them without empty page objects', () => {
   const current = createDefaultSettings();
   const id = 'fixture.pages';

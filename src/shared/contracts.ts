@@ -9,6 +9,7 @@ export interface HostSettings {
   customAccentDark: string;
   customAccentLight: string;
   showHints: boolean;
+  showStatusBar: boolean;
   overlayBackground: 'blur' | 'transparent';
   soundEnabled: boolean;
   closeToTray: boolean;

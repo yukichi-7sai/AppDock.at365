@@ -7,6 +7,7 @@ export const hostSettingsPages = [
   ['general', hostText('pages.general.title')],
   ['notifications', hostText('settings.settings-navigation.notifications')],
   ['ribbon', hostText('settings.settings-navigation.ribbon')],
+  ['statusbar', hostText('settings.settings-navigation.statusbar')],
   ['tray', hostText('settings.settings-navigation.tray')],
   ['command-triggers', hostText('settings.commandTriggers.title')],
   ['shortcuts', hostText('settings.settings-navigation.shortcuts')],
