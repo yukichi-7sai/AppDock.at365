@@ -218,7 +218,17 @@ read + writeで変更でき、execute/useMcpは保存の追加条件にしない
 
 名簿の元bytesを内部の競合判定に含め、未知属性だけが外部で変わった場合も古い要求・itemRef・cursorを拒否する。名簿の破損・形式不備・読取り拒否、稼働中サービスの終了・クリア処理中はavailable=false。生のI/O例外や保存パスを返さない。読取りとdryRunでは名簿を新規作成せず、空の名簿への明示的なaddだけが初期化する。保存後のappliesはwebProfilesChanged、effectVerifiedはfalse。
 
-設定画面は名前列のMCP公開を同じownerから判定し、非公開の削除・クリアの操作列は南京錠を表示する。ローカルUIの入力確定・取消・参照中の削除ガードは維持する。Gmail等の`web-accounts`とaccountGroupが持つサービス専用の名簿は、このweb-profiles対象へ統合しない。
+設定画面は名前列のMCP公開を同じownerから判定し、非公開の削除・クリアの操作列は南京錠を表示する。ローカルUIの入力確定・取消・参照中の削除ガードは維持する。
+
+### サービス専用Webアカウント名簿
+
+`web-accounts` capabilityと`webAccounts`を宣言したAppletにも、同じ固定6入口で`category: web-accounts`のlist対象を提供する。`web-profiles`の名簿とは別の対象であり、提供元ごとのPC専用名簿、または明示した`accountGroup`の共有名簿を既存の保存先から扱う。同じグループの変更は、そのグループを宣言した他の提供元の対象にも反映される。
+
+公開列は読取り専用の`id`と編集可能な`name`、操作は`add`と`update`だけ。既存と同じUUIDを新しい枠へ生成し、名前は制御文字なしの1～60文字で前後の空白を除く。固定件数上限は設けない。`beforeItemRef`で新しい枠を挿入できるが、既存IDと既存行同士の順序を維持する。監視・音声・選択・一時名の内部フラグ・観測データ・URL・Cookie/sessionは公開せず、削除・並べ替え・reset・認証消去も受け付けない。
+
+所有サービスの`WebAccountRoster`で変更を計画し、元の名簿bytesと保存先、グループのローカル状態・移行マーカーをrevisionへ結び付ける。名前変更はローカルUIと同じ計画・検証・原子的保存を使い、既存行と名簿の未知属性、選択・監視・音声、ローカル状態・認証を保持する。明示的な名前変更では一時名の自動更新を解除する。稼働中のcontroller/groupへ保存結果を反映し、停止中はAppletの有効化・起動・前面表示を行わない。設定JSONとそのrevisionは変更しない。
+
+探索・読取り・dryRunではファイルの作成、既存データの移行、journalの復旧を行わない。空の未初期化名簿への明示的なaddだけが名簿を作成する。破損・読取り失敗、同期で消えた共有名簿、未完了の移行/復旧、認証消去中、稼働中の所有先と最新宣言が異なる場合はavailable=false。保存パスや生のI/O例外を返さない。実行直前にも権限・Schema・名簿revisionと所有サービスの生存を確認し、保存後のappliesは`webAccountsChanged`、effectVerifiedはfalseとする。
 
 ## Windows起動設定
 

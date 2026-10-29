@@ -133,7 +133,9 @@ web-profiles capabilityとcontext.webProfiles.list/add/rename/clear/deleteは、
 
 新規名簿は共有data/web-profiles/<owner>/accounts.json、sessionと削除待ちはPC専用web-profiles/<owner>です。宣言と操作の詳細は[動的ページ設計](applet-pages.md)を参照してください。
 
-MCPは[共通設定APIの名簿対象](settings-api.md#webアカウント名簿)から、提供元ごとのID/名前を取得し、枠の追加・名前変更を行います。UIと同じ所有サービスで競合を確認して名簿だけを保存し、Cookie/sessionと削除待ち記録を維持します。削除・ログイン情報のクリアはローカル操作です。この入口はサービス観測用webAccounts/accountGroupの名簿を公開しません。
+MCPは[共通設定APIの名簿対象](settings-api.md#webアカウント名簿)から、提供元ごとのID/名前を取得し、枠の追加・名前変更を行います。UIと同じ所有サービスで競合を確認して名簿だけを保存し、Cookie/sessionと削除待ち記録を維持します。削除・ログイン情報のクリアはローカル操作です。
+
+サービス観測用の`webAccounts/accountGroup`にも[専用の名簿対象](settings-api.md#サービス専用webアカウント名簿)を提供します。`web-profiles`へ移し替えず、既存のUUID・保存先と専用/共有の区分を維持します。公開はID/名前と追加・名前変更に限り、ローカルUIの名前変更も同じ変更計画を使います。選択、監視、音声、観測データ、認証にはこのAPIから触れません。無効・停止中でも名簿を編集できますが、読取りやdryRunによる初期化・移行・復旧は行いません。
 
 ## 宣言と公開契約
 

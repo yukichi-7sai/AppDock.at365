@@ -4,6 +4,7 @@ import { SettingsReadScope } from './core/settings-read-scope';
 import { SettingsServiceTargets } from './core/settings-service-targets';
 import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
+import { webAccountSettingsTargets } from './core/settings-web-account-target';
 import { startupShellIds, StartupUiBarrier } from './core/startup';
 import { physicalFs } from './core/physical-fs';
 import { GestureIndicatorHost } from './core/gesture-indicator-host';
@@ -1204,6 +1205,13 @@ const operationApi = new AppDockApi({
   serviceSettingsTargets: () => [
     ...serviceSettings.targets(),
     ...pageCollections.settingsTargets((revision) => settingsCommands.checkRevision(revision)),
+    ...webAccountSettingsTargets({
+      applets: parentApplets(),
+      localRoot: dataDirectory,
+      sharedRoot: sharedDirectory,
+      checkRevision: (revision) => settingsCommands.checkRevision(revision),
+      changed,
+    }),
     ...imageLibrarySettingsTargets({
       owner: imageLibraryHost.configuration,
       references: () => registeredImages.availableReferences(),

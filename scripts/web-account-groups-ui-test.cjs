@@ -43,6 +43,7 @@ let app;
 async function launch(seed) {
   app = await launchTestHost({
     portable: !!process.argv[2],
+    mainInspector: true,
     executablePath: executable,
     args: [...(process.argv[2] ? [] : [root]), '--test-profile=' + profile],
     env,
@@ -184,6 +185,13 @@ async function shutdown() {
     checks.push(
       'legacy session reuse, same-account sharing, cross-account isolation, independent monitoring',
     );
+    await require('./settings-web-account-live-checks.cjs').check({
+      app,
+      local,
+      shared,
+      assets,
+      checks,
+    });
     await app.evaluate(async () => {
       await groupFixture.mail.open();
     });

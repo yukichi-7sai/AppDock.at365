@@ -142,6 +142,7 @@ require('./settings-applet-common-gateway-checks.cjs').install(profile);
 require('./settings-applet-management-gateway-checks.cjs').install(profile);
 require('./settings-image-gateway-checks.cjs').install(profile);
 require('./settings-web-profile-gateway-checks.cjs').install(profile);
+require('./settings-web-account-gateway-checks.cjs').install(profile, local);
 require('./settings-shortcut-list-gateway-checks.cjs').install(profile);
 require('./settings-image-group-gateway-checks.cjs').install(profile);
 let child, browser, page, client;
@@ -522,6 +523,16 @@ async function main() {
   });
   await require('./settings-stack-mcp-lock-checks.cjs').check({ page, profile, checks });
   await require('./settings-web-profile-gateway-checks.cjs').check({
+    page,
+    profile,
+    local,
+    client,
+    checks,
+    tool,
+    value,
+    until,
+  });
+  await require('./settings-web-account-gateway-checks.cjs').check({
     page,
     profile,
     local,
