@@ -28,7 +28,7 @@ foreach (var fixture in fixtures.RootElement.GetProperty("selections").Enumerate
         var owner = command.TryGetProperty("extensionId", out var id) ? id.GetString() : null;
         return CommandConditions.Matches(When(row.GetProperty("when")), context, owner, EnvironmentFor(fixture));
     });
-    var selected = CommandConditions.Select(rows, row => row.GetProperty("command").GetString()!, fixture.GetProperty("mode").GetString()!);
+    var selected = CommandConditions.Select(rows, row => row.GetProperty("command").GetString()!, CommandConditions.SelectionLimit(fixture.GetProperty("mode")));
     foreach (var (field, expected) in new[] { ("id", "expectedRows"), ("command", "expectedCommands") })
         if (!selected.Select(row => row.GetProperty(field).GetString()!).SequenceEqual(Strings(fixture, expected)))
             throw new Exception(fixture.GetProperty("name").GetString() + ": " + field);
@@ -40,10 +40,16 @@ if (CommandConditions.HostContextForWindow("{\"window\":\"1\",\"appFocused\":tru
 if (CommandConditions.HostContextForWindow("{\"window\":\"1\",\"appFocused\":true,\"appletId\":\"demo\"}", "1").AppletId != "demo")
     throw new Exception("Current window context must retain child command ownership.");
 foreach (var fixture in fixtures.RootElement.GetProperty("inputExecutionModes").EnumerateArray()) {
-    var modes = fixture.GetProperty("overrides").Deserialize<Dictionary<string, string>>(options)!;
-    var actual = CommandConditions.ExecutionMode(fixture.GetProperty("fallback").GetString()!, modes, fixture.GetProperty("input").GetString()!);
-    if (actual != fixture.GetProperty("expected").GetString()) throw new Exception(fixture.GetProperty("name").GetString());
+    var modes = fixture.GetProperty("overrides").Deserialize<Dictionary<string, JsonElement>>(options)!;
+    var actual = CommandConditions.ExecutionLimit(fixture.GetProperty("fallback").GetString()!, modes, fixture.GetProperty("input").GetString()!);
+    if (actual != CommandConditions.SelectionLimit(fixture.GetProperty("expected"))) throw new Exception(fixture.GetProperty("name").GetString());
     count++;
+}
+foreach (var mode in fixtures.RootElement.GetProperty("invalidExecutionModes").EnumerateArray()) {
+    try {
+        CommandConditions.SelectionLimit(mode);
+        throw new Exception("Invalid execution mode was accepted: " + mode);
+    } catch (ArgumentException) { count++; }
 }
 foreach (var fixture in fixtures.RootElement.GetProperty("stackConditions").EnumerateArray()) {
     var context = fixture.GetProperty("context").Deserialize<CommandContext>(options)!;

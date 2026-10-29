@@ -249,6 +249,33 @@
   ],
   "selections": [
     {
+      "name": "count selects three eligible rows including duplicates after filtering",
+      "context": { "host": { "focused": false } },
+      "mode": { "mode": "count", "count": 3 },
+      "catalog": [{ "id": "a" }, { "id": "b" }, { "id": "off", "available": false }],
+      "rows": [
+        { "id": "condition", "command": "a", "when": { "scope": "app" } },
+        { "id": "disabled", "command": "a", "enabled": false, "when": { "scope": "global" } },
+        { "id": "missing", "command": "missing", "when": { "scope": "global" } },
+        { "id": "off", "command": "off", "when": { "scope": "global" } },
+        { "id": "first", "command": "b", "when": { "scope": "global" } },
+        { "id": "repeat", "command": "b", "when": { "scope": "global" } },
+        { "id": "third", "command": "a", "when": { "scope": "global" } },
+        { "id": "tail", "command": "a", "when": { "scope": "global" } }
+      ],
+      "expectedRows": ["first", "repeat", "third"],
+      "expectedCommands": ["b", "b", "a"]
+    },
+    {
+      "name": "count above available rows has no additional fixed ceiling",
+      "context": { "host": {} },
+      "mode": { "mode": "count", "count": 9007199254740991 },
+      "catalog": [{ "id": "a" }],
+      "rows": [{ "id": "only", "command": "a", "when": { "scope": "global" } }],
+      "expectedRows": ["only"],
+      "expectedCommands": ["a"]
+    },
+    {
       "name": "first skips process-excluded row without changing saved order",
       "context": { "host": {}, "target": { "window": "1", "processName": "row.exe" } },
       "environment": { "excludedProcesses": ["base"] },
@@ -329,6 +356,13 @@
   ],
   "inputExecutionModes": [
     {
+      "name": "count overrides first for one input",
+      "fallback": "first",
+      "overrides": { "move-up": { "mode": "count", "count": 3 } },
+      "input": "move-up",
+      "expected": { "mode": "count", "count": 3 }
+    },
+    {
       "name": "missing override inherits first",
       "fallback": "first",
       "overrides": {},
@@ -363,6 +397,22 @@
       "input": "move-down",
       "expected": "first"
     }
+  ],
+  "invalidExecutionModes": [
+    null,
+    "count",
+    3,
+    {},
+    [],
+    { "mode": "count" },
+    { "mode": "count", "count": 0 },
+    { "mode": "count", "count": -1 },
+    { "mode": "count", "count": 1.5 },
+    { "mode": "count", "count": "3" },
+    { "mode": "count", "count": "" },
+    { "mode": "count", "count": 9007199254740992 },
+    { "mode": "all", "count": 3 },
+    { "mode": "count", "count": 3, "extra": true }
   ],
   "stackConditions": [
     {

@@ -177,6 +177,28 @@ test('execution mode configuration is atomic, revisioned, private-field preservi
   assert.equal(f.get().options.executionMode, 'first');
 });
 
+test('per-key count survives API storage while global mode remains first/all', async (t) => {
+  const f = fixture(t);
+  const mode = { mode: 'count', count: 3 };
+  const op = { kind: 'configure', changes: { inputExecutionModes: { 'ctrl+f8': mode } } };
+  const before = f.get().revision;
+  await f.edit([op], { dryRun: true });
+  assert.equal(f.get().revision, before);
+  await f.edit([op]);
+  assert.deepEqual(f.get().options.inputExecutionModes, { 'Ctrl+F8': mode });
+  f.settings.reload();
+  assert.deepEqual(f.get().options.inputExecutionModes, { 'Ctrl+F8': mode });
+  const persisted = fs.readFileSync(f.settings.file, 'utf8');
+  for (const changes of [
+    { executionMode: mode },
+    { inputExecutionModes: { 'Ctrl+F8': { mode: 'count', count: 0 } } },
+  ])
+    await assert.rejects(f.edit([{ kind: 'configure', changes }]), { code: 'INVALID_ARGUMENT' });
+  assert.equal(fs.readFileSync(f.settings.file, 'utf8'), persisted);
+  await f.edit([{ kind: 'configure', changes: { inputExecutionModes: {} } }]);
+  assert.deepEqual(f.get().options.inputExecutionModes, {});
+});
+
 test('configuring execution mode uses the settings grant independently of execution', async (t) => {
   const f = fixture(t);
   f.permissions.execute = f.permissions.shortcuts = false;

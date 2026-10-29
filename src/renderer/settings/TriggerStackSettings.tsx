@@ -24,6 +24,7 @@ import { GestureInputPicker } from '../settings-ui/GestureInputPicker';
 import { CommandStackEditor, StackExecutionMode } from './CommandStackEditor';
 import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
 import { settingsItemId } from '../../shared/settings-catalog';
+import { parseCommandExecutionMode } from '../../shared/command-execution-mode';
 
 export const triggerStackTitle = (stack: Pick<TriggerStack, 'kind' | 'input'>) =>
   stack.kind === 'shortcuts'
@@ -71,6 +72,12 @@ export function TriggerStackDialog({
   }, [selecting]);
   const inherited = inheritedMode ?? inheritedTriggerExecutionMode(settings, value.kind);
   let validInput = true;
+  let validMode = true;
+  try {
+    if (value.executionMode !== 'inherit') parseCommandExecutionMode(value.executionMode);
+  } catch {
+    validMode = false;
+  }
   try {
     normalizeStackInput(value.kind, value.input);
   } catch {
@@ -98,8 +105,18 @@ export function TriggerStackDialog({
           )
         }
         onClose={onClose}
-        valid={validInput && !duplicate && (selecting || (valid && value.entries.length > 0))}
-        error={duplicate ? t('settings.commandStacks.triggerExists') : undefined}
+        valid={
+          validInput &&
+          !duplicate &&
+          (selecting || (valid && validMode && value.entries.length > 0))
+        }
+        error={
+          duplicate
+            ? t('settings.commandStacks.triggerExists')
+            : !validMode
+              ? t('settings.commandStacks.invalidCount')
+              : undefined
+        }
         applyLabel={
           selecting
             ? t('settings.commandStacks.next')
@@ -230,7 +247,11 @@ export function TriggerStackSettings({
   const commandsById = new Map(commands.map((command) => [command.id, command]));
   const terms = search.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const visible = stacks.filter((stack) => {
-    if (modeFilter && stack.executionMode !== modeFilter) return false;
+    if (
+      modeFilter &&
+      (typeof stack.executionMode === 'object' ? 'count' : stack.executionMode) !== modeFilter
+    )
+      return false;
     const text = [
       triggerStackTitle(stack),
       stack.input,
@@ -317,6 +338,7 @@ export function TriggerStackSettings({
               <option value="">{t('settings.commandStacks.allModes')}</option>
               <option value="inherit">{t('settings.inputExecution.inherit')}</option>
               <option value="first">{t('settings.commandExecutionModeField.first')}</option>
+              <option value="count">{t('settings.commandExecutionModeField.count')}</option>
               <option value="all">{t('settings.commandExecutionModeField.all')}</option>
             </select>
           </SettingsListFilters>
@@ -342,11 +364,14 @@ export function TriggerStackSettings({
           commands: stack.entries
             .map((row) => commandsById.get(row.command)?.title ?? row.command)
             .join(' → '),
-          mode: t(
-            stack.executionMode === 'inherit'
-              ? 'settings.inputExecution.inherit'
-              : `settings.commandExecutionModeField.${stack.executionMode}`,
-          ),
+          mode:
+            typeof stack.executionMode === 'object'
+              ? t('settings.commandStacks.firstCount', { count: stack.executionMode.count })
+              : t(
+                  stack.executionMode === 'inherit'
+                    ? 'settings.inputExecution.inherit'
+                    : `settings.commandExecutionModeField.${stack.executionMode}`,
+                ),
         }))}
         busy={busy}
         addInTitle

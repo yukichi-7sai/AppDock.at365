@@ -45,8 +45,24 @@ internal static class CommandConditions
     internal static bool Excluded(string[] names, string process) => Processes(names).Contains(ProcessName(process));
     internal static bool MatchesStack(StackConditionTerm[][]? paths, CommandContext context, ConditionEnvironment? environment = null) =>
         paths == null || paths.Any(path => path.All(term => Matches(term.When, context, term.OwnerId, environment)));
-    internal static string ExecutionMode(string fallback, IReadOnlyDictionary<string, string>? modes, string input) =>
-        modes != null && modes.TryGetValue(input, out var mode) ? mode : fallback;
+    internal static long ExecutionLimit(string fallback, IReadOnlyDictionary<string, JsonElement>? modes, string input) =>
+        modes != null && modes.TryGetValue(input, out var mode) ? SelectionLimit(mode) : SelectionLimit(fallback);
+
+    private static long SelectionLimit(string mode) => mode switch {
+        "first" => 1,
+        "all" => long.MaxValue,
+        _ => throw new ArgumentException("Unknown command execution mode.")
+    };
+    internal static long SelectionLimit(JsonElement mode)
+    {
+        if (mode.ValueKind == JsonValueKind.String) return SelectionLimit(mode.GetString()!);
+        if (mode.ValueKind == JsonValueKind.Object && mode.EnumerateObject().Count() == 2 &&
+            mode.TryGetProperty("mode", out var kind) && kind.ValueKind == JsonValueKind.String && kind.GetString() == "count" &&
+            mode.TryGetProperty("count", out var count) && count.ValueKind == JsonValueKind.Number &&
+            count.TryGetDouble(out var value) && value >= 1 && value <= 9007199254740991 && Math.Truncate(value) == value)
+            return (long)value;
+        throw new ArgumentException("Invalid command execution count.");
+    }
 
     private static string ProcessName(string name) =>
         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
@@ -80,11 +96,10 @@ internal static class CommandConditions
         };
     }
 
-    internal static T[] Select<T>(IEnumerable<T> rows, Func<T, string> command, string mode)
+    internal static T[] Select<T>(IEnumerable<T> rows, Func<T, string> command, long limit)
     {
-        if (mode is not ("all" or "first")) throw new ArgumentException("Unknown command execution mode.");
-        var selected = rows;
-        return (mode == "first" ? selected.Take(1) : selected).ToArray();
+        if (limit < 1) throw new ArgumentException("Invalid command execution count.");
+        return (limit >= int.MaxValue ? rows : rows.Take((int)limit)).ToArray();
     }
 
     internal static CommandHostContext HostContext(string json)

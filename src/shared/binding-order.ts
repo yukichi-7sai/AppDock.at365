@@ -20,13 +20,13 @@ export function applyBindingSettings<R extends { id: string }>(
   ])) {
     const before = original.filter((row) => input(row) === key);
     const after = ordered.filter((row) => input(row) === key);
-    const modeChanged = originalModes[key] !== modes[key];
+    const modeChanged = JSON.stringify(originalModes[key]) !== JSON.stringify(modes[key]);
     const orderChanged =
       before.map((row) => row.id).join('\n') !== after.map((row) => row.id).join('\n');
     if (!modeChanged && !orderChanged) continue;
     if (
       JSON.stringify(current.filter((row) => input(row) === key)) !== JSON.stringify(before) ||
-      currentModes[key] !== originalModes[key]
+      JSON.stringify(currentModes[key]) !== JSON.stringify(originalModes[key])
     )
       throw Error(hostText('services.sharedBindingOrder.changed', { name: label(key) }));
     if (modeChanged) {

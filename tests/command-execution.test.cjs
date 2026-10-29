@@ -56,11 +56,45 @@ const plan = (commands, mode = 'all') =>
 
 for (const fixture of fixtures.inputExecutionModes)
   test('shared native input mode: ' + fixture.name, () => {
-    assert.equal(
+    assert.deepEqual(
       inputExecutionMode(fixture.fallback, fixture.overrides, fixture.input),
       fixture.expected,
     );
   });
+
+for (const mode of fixtures.invalidExecutionModes)
+  test('invalid execution selection is rejected: ' + JSON.stringify(mode), () => {
+    const { parseCommandExecutionMode } = require('../out/main/shared/command-execution-mode');
+    assert.throws(() => parseCommandExecutionMode(mode));
+    assert.throws(() => plan(['a'], mode));
+  });
+
+test('count fixes the selected batch before failures and cancellation without replacement', async () => {
+  const calls = [];
+  const dispatcher = new CommandDispatcher(
+    async (id) => {
+      calls.push(id);
+      if (id === 'fail') throw Error('fixture');
+    },
+    () => {},
+  );
+  const result = await dispatcher.dispatch(
+    'count',
+    plan(['fail', 'a', 'tail'], { mode: 'count', count: 2 }),
+  );
+  assert.equal(result.failed, 1);
+  assert.deepEqual(calls, ['fail', 'a']);
+  calls.length = 0;
+  const cancelled = await dispatcher.dispatch(
+    'count',
+    plan(['a', 'b', 'tail'], { mode: 'count', count: 2 }),
+    {
+      valid: () => !calls.length,
+    },
+  );
+  assert.equal(cancelled.cancelled, true);
+  assert.deepEqual(calls, ['a']);
+});
 
 test('independent presses overlap while each batch preserves every entry and first never falls through failure', async () => {
   const calls = [],

@@ -11,6 +11,7 @@ import {
 } from '../../shared/command-stacks';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { CommandStackEditor, StackExecutionMode } from './CommandStackEditor';
+import { parseCommandExecutionMode } from '../../shared/command-execution-mode';
 import type { SettingsPageAuxiliary } from '../../shared/settings-page';
 import {
   customItems,
@@ -429,6 +430,14 @@ function CustomCommandDialog({
       throw new Error(translate('settings.mcpCommandFields.changed'));
     }
   };
+  let validStackMode = true;
+  if (typeId === commandStackTypeId && editableConfig && !jsonMode) {
+    try {
+      parseCommandExecutionMode(config.executionMode);
+    } catch {
+      validStackMode = false;
+    }
+  }
   return (
     <SettingsMcpScope>
       <SettingsDialog
@@ -448,8 +457,10 @@ function CustomCommandDialog({
         valid={
           !!title.trim() &&
           (!!original || !!type) &&
+          validStackMode &&
           (jsonMode || !Object.values(invalidFields).some(Boolean))
         }
+        error={!validStackMode ? translate('settings.commandStacks.invalidCount') : undefined}
         onApply={async () => {
           const nextConfig = editableConfig
             ? jsonMode || jsonOnly

@@ -11,12 +11,13 @@ import { defaultGestures, gestureTypes, normalizeGesture, type GestureBinding } 
 import { defaultTouchpadGestures, touchpadGestureTypes, touchpadId } from './touchpad-gestures';
 import { parseCommandStack, type CommandStackEntry } from './command-stacks';
 import { compareShortcutDisplayOrder } from './shortcut-key-catalog';
+import { parseCommandExecutionMode, type CommandExecutionMode } from './command-execution-mode';
 
 export type TriggerStackKind = 'shortcuts' | 'gestures' | 'touchpad-gestures';
 export interface TriggerStack {
   kind: TriggerStackKind;
   input: string;
-  executionMode: 'inherit' | 'first' | 'all';
+  executionMode: 'inherit' | CommandExecutionMode;
   entries: CommandStackEntry[];
 }
 export function triggerStackKey(stack: Pick<TriggerStack, 'kind' | 'input'>) {
@@ -112,6 +113,10 @@ export function applyTriggerStack(
   if (!value && !original) return settings;
   const normalized = value && {
     ...value,
+    executionMode:
+      value.executionMode === 'inherit'
+        ? ('inherit' as const)
+        : parseCommandExecutionMode(value.executionMode),
     input: normalizeStackInput(value.kind, value.input),
     entries: parseCommandStack({ executionMode: 'all', entries: value.entries }).entries,
   };
@@ -133,7 +138,7 @@ export function applyTriggerStack(
     const modes = Object.fromEntries(
       own
         .filter((stack) => stack.executionMode !== 'inherit')
-        .map((stack) => [stack.input, stack.executionMode as 'first' | 'all']),
+        .map((stack) => [stack.input, stack.executionMode as CommandExecutionMode]),
     );
     if (kind === 'shortcuts') {
       const rows: Keybinding[] = own.flatMap((stack) =>
@@ -181,7 +186,6 @@ export function parseStoredTriggerStacks(value: unknown): TriggerStack[] {
       typeof raw !== 'object' ||
       Array.isArray(raw) ||
       !['shortcuts', 'gestures', 'touchpad-gestures'].includes(raw.kind) ||
-      !['inherit', 'first', 'all'].includes(raw.executionMode) ||
       typeof raw.input !== 'string' ||
       Object.keys(raw).some((key) => !['kind', 'input', 'executionMode', 'entries'].includes(key))
     )
@@ -190,7 +194,8 @@ export function parseStoredTriggerStacks(value: unknown): TriggerStack[] {
     const stack: TriggerStack = {
       kind: raw.kind,
       input: normalizeStackInput(raw.kind, raw.input),
-      executionMode: raw.executionMode,
+      executionMode:
+        raw.executionMode === 'inherit' ? 'inherit' : parseCommandExecutionMode(raw.executionMode),
       entries,
     };
     const key = triggerStackKey(stack);

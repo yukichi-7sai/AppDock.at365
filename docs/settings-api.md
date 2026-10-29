@@ -164,6 +164,8 @@ Appletの更新元はmanifestのupdateRepositoryを既定値とし、上書き�
 
 設定保存はread + write、更新チェック/取得/インストールは既存の独立した更新操作を使う。設定APIの取得・dryRun・保存は更新操作、確認ダイアログ、helper起動や再起動を開始しない。
 
+個別トリガーの公開編集APIでは、inputExecutionModesの値にfirst、all、または`{ "mode": "count", "count": 3 }`を指定できる。指定のない入力は全体のexecutionModeを継承する。全体のexecutionModeはfirst/allのまま。正の安全な整数の検証・数え方・失敗時の非補充は[コマンドスタック](command-stacks.md#指定の数)と共通で、expectedRevision・dryRun・設定変更許可の契約を維持する。
+
 ## ジェスチャー共通のブラウザ設定
 
 category=command-triggersのfields対象から、共有commandTriggerOptionsをset/resetできる。browsersは件数上限のない文字列配列で、空配列も明示値として保持する。既存processNamesと同じ、前後空白の除去・末尾.exeの除去・小文字化・重複除去を行い、trim後1～120文字のexe名として検証する。パスや不正文字列は保存しない。requireChromiumWindowClassはboolean。Schemaはstring-listに対してtype=arrayを返し、maxItemsは省略する。

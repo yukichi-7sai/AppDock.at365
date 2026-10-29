@@ -25,7 +25,8 @@ import {
   type CommandTarget,
   type ConditionEnvironment,
 } from './command-conditions';
-import { planCommandBatch, type CommandExecutionMode } from './command-execution';
+import { planCommandBatch } from './command-execution';
+import type { GestureExecutionMode } from './command-execution-mode';
 
 export const shortcutScopes = [
   { id: 'global', title: hostText('settings.keybindings.global') },
@@ -71,7 +72,7 @@ export interface ShortcutContext {
   target?: CommandTarget;
 }
 export interface KeybindingOptions {
-  executionMode: CommandExecutionMode;
+  executionMode: GestureExecutionMode;
   inputExecutionModes: InputExecutionModes;
   excludedProcesses: string[];
 }
@@ -536,7 +537,7 @@ export function planKeybindings(
   context: ShortcutContext,
   available: { id: string; extensionId?: string | null }[],
   globalEvent = false,
-  mode: CommandExecutionMode = 'all',
+  mode: GestureExecutionMode = 'all',
   environment: ConditionEnvironment & { inputExecutionModes?: InputExecutionModes } = {},
 ) {
   const keys = new Set(typeof key === 'string' ? [key] : key);

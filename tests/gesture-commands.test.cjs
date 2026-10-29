@@ -123,6 +123,39 @@ test('gesture read is scoped and lists assignable commands while stopped', (t) =
   assert.throws(() => f.api.call('gestures.get', { unknown: true }), { code: 'INVALID_ARGUMENT' });
 });
 
+for (const kind of ['gestures', 'touchpadGestures'])
+  test(kind + ' count overrides are public, atomic and independently inherited', async (t) => {
+    const f = fixture(t);
+    const input = kind === 'gestures' ? 'move-up' : 'three.tap';
+    const get = () => f.api.call(kind + '.get');
+    const edit = (changes, dryRun = false) =>
+      f.api.call('commands.execute', {
+        id: 'appdock.' + kind + '.update',
+        args: {
+          expectedRevision: get().revision,
+          operations: [{ kind: 'configure', changes }],
+          dryRun,
+        },
+      });
+    const changes = { inputExecutionModes: { [input]: { mode: 'count', count: 3 } } };
+    const before = f.settings.revision;
+    await edit(changes, true);
+    assert.equal(f.settings.revision, before);
+    await edit(changes);
+    assert.deepEqual(f.settings.value[kind].inputExecutionModes, changes.inputExecutionModes);
+    f.settings.reload();
+    assert.deepEqual(f.settings.value[kind].inputExecutionModes, changes.inputExecutionModes);
+    await assert.rejects(edit({ executionMode: { mode: 'count', count: 3 } }), {
+      code: 'INVALID_ARGUMENT',
+    });
+    await assert.rejects(
+      edit({ inputExecutionModes: { [input]: { mode: 'count', count: 1.5 } } }),
+      { code: 'INVALID_ARGUMENT' },
+    );
+    await edit({ inputExecutionModes: {} });
+    assert.deepEqual(f.settings.value[kind].inputExecutionModes, {});
+  });
+
 test('two-step movements are discoverable, save atomically and survive reload without changing existing bindings', async (t) => {
   const f = fixture(t);
   const old = structuredClone(f.get().bindings);

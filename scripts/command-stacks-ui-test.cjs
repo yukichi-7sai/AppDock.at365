@@ -37,7 +37,7 @@ fs.writeFileSync(
   path.join(extension, 'index.js'),
   `exports.activate=async c=>{for(const id of ${JSON.stringify(names)})c.commands.register('fixture.stacks.'+id,'Stack fixture '+id,async()=>{require('node:fs').appendFileSync(process.env.APPDOCK_STACK_TRACE,JSON.stringify({id})+'\\n');if(id==='fail')throw Error('Expected stack fixture failure');});};`,
 );
-const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
+let initial = require('../out/main/shared/settings-schema').createDefaultSettings();
 initial.host.closeToTray = false;
 initial.host.hardwareAcceleration = false;
 initial.host.soundEnabled = false;
@@ -75,6 +75,36 @@ initial.customCommands = {
     },
   ],
 };
+if (process.argv.includes('--count-only')) {
+  const countId = randomUUID();
+  const entries = [
+    row('skip', 'fixture.stacks.a', 'desktop'),
+    { ...row('disabled', 'fixture.stacks.a'), enabled: false },
+    row('missing', 'fixture.missing'),
+    row('a', 'fixture.stacks.a', 'app'),
+    row('again', 'fixture.stacks.a', 'app'),
+    row('nested', 'appdock.custom.' + nestedId, 'app'),
+    row('b', 'fixture.stacks.b', 'app'),
+    row('host', 'fixture.stacks.host', 'app'),
+  ];
+  initial.customCommands.items.push({
+    ...initial.customCommands.items[0],
+    id: countId,
+    title: 'Count stack',
+    config: { executionMode: 'all', entries },
+  });
+  for (const [kind, input] of [
+    ['shortcuts', 'Ctrl+Shift+9'],
+    ['gestures', 'move-up'],
+    ['touchpad-gestures', 'three.tap'],
+  ])
+    initial = require('../out/main/shared/trigger-stacks').applyTriggerStack(initial, {
+      kind,
+      input,
+      executionMode: 'inherit',
+      entries: entries.map((entry) => ({ ...entry, id: kind + '-' + entry.id })),
+    });
+}
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 let browser,
   host,
@@ -236,6 +266,30 @@ async function close() {
       await dialog.getByTestId('stack-command-step').waitFor();
       assert(await dialog.getByTestId('stack-trigger-selection').isHidden());
     };
+    if (process.argv.includes('--count-only')) {
+      await require('./command-count-checks.cjs').check({
+        host,
+        page,
+        dialog,
+        save,
+        snapshot,
+        calls,
+        checks,
+        focusHost,
+        sendKey: () => peer.request('hotkey', { key: 0x39 }),
+        profile,
+      });
+      const beforeRestart = (await snapshot()).settings.value;
+      await close();
+      await launch();
+      const afterRestart = (await snapshot()).settings.value;
+      for (const key of ['customCommands', 'keybindingOptions', 'gestures', 'touchpadGestures'])
+        assert.deepEqual(afterRestart[key], beforeRestart[key]);
+      checks.push('restart preserves named and all three dedicated count selections');
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     const pickerSignatures = {};
     const pickerSignature = () =>
       dialog

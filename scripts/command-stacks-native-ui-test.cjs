@@ -67,17 +67,28 @@ const nested = stack(
   [row('fixture.stack-native.host', 'app'), row('fixture.stack-native.external', 'exe')],
   'first',
 );
-const ordered = stack('Native ordered', [
-  row('appdock.custom.' + nested.id),
-  row('fixture.stack-native.tail', 'exe'),
-]);
+const ordered = stack(
+  'Native ordered',
+  [
+    row('appdock.custom.' + nested.id),
+    row('fixture.stack-native.tail', 'exe'),
+    row('fixture.stack-native.tail', 'exe'),
+  ],
+  { mode: 'count', count: 2 },
+);
 const hostOnly = stack('Native host only', [row('fixture.stack-native.host', 'app')]);
 settings.customCommands = { version: 2, items: [nested, ordered, hostOnly] };
 settings.keybindings = [
   { ...row('appdock.custom.' + ordered.id), key: 'Ctrl+Shift+9', blockOriginalInput: true },
   { ...row('appdock.custom.' + hostOnly.id), key: 'Ctrl+Shift+8', blockOriginalInput: true },
 ];
-settings.gestures.bindings = [{ ...row('appdock.custom.' + ordered.id), gesture: 'move-left' }];
+settings.keybindingOptions.inputExecutionModes = { 'Ctrl+Shift+9': { mode: 'count', count: 1 } };
+settings.gestures.bindings = [
+  { ...row('appdock.custom.' + ordered.id), gesture: 'move-left' },
+  { ...row('fixture.stack-native.tail'), gesture: 'move-left' },
+  { ...row('fixture.stack-native.tail'), gesture: 'move-left' },
+];
+settings.gestures.inputExecutionModes = { 'move-left': { mode: 'count', count: 2 } };
 require('../out/main/shared/settings-schema').parseSettings(settings);
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -228,9 +239,11 @@ const checks = [];
       String(sent.stdout ?? '') + String(sent.stderr ?? ''),
     );
     assert.equal(sent.status, 0, 'mouse input probe');
-    await until(() => calls().length === 4, 'mouse stack execution');
-    assert.deepEqual(calls(), ['host', 'external', 'tail', 'host']);
-    checks.push('actual mouse gesture invokes dedicated stack with nested host condition');
+    await until(() => calls().length === 5, 'mouse stack execution');
+    assert.deepEqual(calls(), ['host', 'external', 'tail', 'host', 'tail']);
+    checks.push(
+      'actual mouse gesture count selects two rows including a nested stack and excludes the third',
+    );
     assert.equal(hash(source), hash(executable));
     success = true;
   } catch (error) {

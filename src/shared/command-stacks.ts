@@ -10,6 +10,12 @@ import {
 } from './command-conditions';
 import type { CustomCommandDefinition, CustomCommandType } from './custom-commands';
 import type { Keybinding } from './keybindings';
+import {
+  commandExecutionLimit,
+  commandExecutionModeSchema,
+  parseCommandExecutionMode,
+  type CommandExecutionMode,
+} from './command-execution-mode';
 
 export const commandStackTypeId = 'appdock.commands.stack';
 export const maximumStackDepth = 8;
@@ -21,7 +27,7 @@ export interface CommandStackEntry {
   blockOriginalInput?: boolean;
 }
 export interface CommandStack {
-  executionMode: 'first' | 'all';
+  executionMode: CommandExecutionMode;
   entries: CommandStackEntry[];
 }
 export interface StackCatalogEntry {
@@ -40,7 +46,6 @@ export function parseCommandStack(value: unknown): CommandStack {
   if (
     !object(value) ||
     Object.keys(value).some((key) => !['executionMode', 'entries'].includes(key)) ||
-    !['first', 'all'].includes(String(value.executionMode)) ||
     !Array.isArray(value.entries)
   )
     invalid();
@@ -102,7 +107,7 @@ export function parseCommandStack(value: unknown): CommandStack {
         : { blockOriginalInput: raw.blockOriginalInput as boolean }),
     };
   });
-  return { executionMode: value.executionMode as CommandStack['executionMode'], entries };
+  return { executionMode: parseCommandExecutionMode(value.executionMode), entries };
 }
 
 /** A stack is a host-owned command type; it never grants authority to its children. */
@@ -117,7 +122,7 @@ export const commandStackType = (): CustomCommandType => ({
     additionalProperties: false,
     required: ['executionMode', 'entries'],
     properties: {
-      executionMode: { type: 'string', enum: ['first', 'all'] },
+      executionMode: commandExecutionModeSchema,
       entries: {
         type: 'array',
         items: {
@@ -217,6 +222,8 @@ export function expandStackCommand(
     return { commands: [], stackIds: [] };
   const commands: string[] = [],
     stackIds: string[] = [id];
+  const limit = commandExecutionLimit(command.stack.executionMode);
+  let selectedRows = 0;
   for (const row of command.stack.entries) {
     const child = catalog.get(row.command);
     if (
@@ -230,7 +237,7 @@ export function expandStackCommand(
     if (!plan.commands.length) continue;
     for (const selected of plan.commands) commands.push(selected);
     for (const stackId of plan.stackIds) stackIds.push(stackId);
-    if (command.stack.executionMode === 'first') break;
+    if (++selectedRows >= limit) break;
   }
   return { commands, stackIds: [...new Set(stackIds)] };
 }

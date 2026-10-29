@@ -142,6 +142,94 @@ test('independent stacks overlap and each stops on revocation without reselectin
   );
 });
 
+test('count applies independently to eligible rows at each nested level', () => {
+  const catalog = [
+    { id: 'a' },
+    { id: 'b' },
+    { id: 'tail' },
+    { id: 'empty', stack: stack([]) },
+    {
+      id: 'inner',
+      stack: stack([row('a'), row('again', 'a'), row('b'), row('tail')], {
+        mode: 'count',
+        count: 3,
+      }),
+    },
+    {
+      id: 'outer',
+      stack: stack([row('empty'), row('off', 'a', 'app'), row('inner'), row('b'), row('tail')], {
+        mode: 'count',
+        count: 2,
+      }),
+    },
+  ];
+  const rows = [row('empty'), row('outer'), row('tail')];
+  const plan = planCommandBatch(rows, context, catalog, { mode: 'count', count: 1 });
+  assert.deepEqual(plan.rowIds, ['outer']);
+  assert.deepEqual(plan.commands, ['a', 'a', 'b', 'b']);
+  assert.deepEqual(plan.stackIds, ['outer', 'inner']);
+  assert.deepEqual(planCommandBatch(rows, context, catalog, { mode: 'count', count: 8 }).commands, [
+    'a',
+    'a',
+    'b',
+    'b',
+    'tail',
+  ]);
+});
+
+test('count modes round trip across every trigger, reject invalid edits and preserve semantic conflicts', () => {
+  for (const [kind, input] of [
+    ['shortcuts', 'Ctrl+F8'],
+    ['gestures', 'move-up'],
+    ['touchpad-gestures', 'three.tap'],
+  ]) {
+    let settings = createDefaultSettings();
+    settings.keybindings = [];
+    settings = applyTriggerStack(settings, {
+      kind,
+      input,
+      executionMode: { mode: 'count', count: 3 },
+      entries: [row('a'), row('b')],
+    });
+    const restored = parseSettings(settingsStorageValue(settings));
+    const original = triggerStacks(restored, kind)[0];
+    assert.deepEqual(original.executionMode, { mode: 'count', count: 3 });
+    assert.equal(inheritedTriggerExecutionMode(restored, kind), 'all');
+    const changed = applyTriggerStack(
+      restored,
+      { ...original, executionMode: { mode: 'count', count: 2 } },
+      original,
+    );
+    assert.throws(() =>
+      applyTriggerStack(changed, { ...original, executionMode: 'all' }, original),
+    );
+    const { applyBindingSettings } = require('../out/main/shared/binding-order');
+    const rows = original.entries.map((entry) => ({ ...entry, input }));
+    const modes = { [input]: original.executionMode };
+    assert.doesNotThrow(() =>
+      applyBindingSettings(
+        rows,
+        rows,
+        rows.toReversed(),
+        structuredClone(modes),
+        modes,
+        structuredClone(modes),
+        (r) => r.input,
+        (x) => x,
+      ),
+    );
+    for (const invalid of require('./fixtures/command-conditions.json').invalidExecutionModes) {
+      assert.throws(() =>
+        applyTriggerStack(restored, { ...original, executionMode: invalid }, original),
+      );
+      assert.throws(() => parseCommandStack(stack([], invalid)));
+      const raw = settingsStorageValue(settings);
+      raw.triggerStacks.items[0].executionMode = invalid;
+      assert.throws(() => parseSettings(raw));
+    }
+  }
+});
+
 test('inherited trigger modes follow each gesture default independently of input overrides', () => {
   const settings = createDefaultSettings();
   for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures'])

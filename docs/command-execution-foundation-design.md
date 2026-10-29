@@ -66,7 +66,7 @@ flowchart TD
 以下は内部契約を簡略化した型であり、外部APIや保存JSONの追加ではない。
 
 ```ts
-type CommandExecutionMode = 'first' | 'all';
+type CommandExecutionMode = 'first' | 'all' | { mode: 'count'; count: number };
 type CommandScope =
   'global' | 'app' | 'pages' | 'owner' | 'applets' | 'desktop' | 'browser' | 'exe';
 
@@ -130,7 +130,7 @@ interface TriggerBinding {
 2. 同じイベントの設定・コマンド一覧・contextをスナップショットとして確保する。
 3. 共通計画で、無効行、利用不能コマンド、条件不一致を除く。ownerの判定にはそのコマンドの登録元情報を使う。
 4. 同じコマンドIDでも、条件に一致した各行を保存順で保つ。
-5. `first`なら先頭1件、`all`なら全件を選ぶ。ここで計画を固定する。
+5. `first`なら先頭1件、`{ mode: "count", count: N }`なら先頭から最大N件、`all`なら全件を選ぶ。ここで計画を固定する。
 6. 共通Dispatcherが入力ごとに独立した計画を受け付ける。ほかの入力で同じコマンドが実行中でも省略しない。
 7. 各コマンドの直前に停止・取消を確認し、既存の`executeCommand`で計画内を順番に実行する。
 

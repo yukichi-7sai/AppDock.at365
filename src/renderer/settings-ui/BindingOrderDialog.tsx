@@ -4,6 +4,11 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { OrderDialogFrame } from './OrderDialogFrame';
 import type { UiCommand } from '../../shared/commands';
 import type { CommandExecutionMode } from '../../shared/command-execution';
+import {
+  parseCommandExecutionMode,
+  type GestureExecutionMode,
+} from '../../shared/command-execution-mode';
+import { StackExecutionMode } from '../settings/CommandStackEditor';
 import type { InputExecutionModes } from '../../shared/input-execution';
 export function BindingOrderDialog<R extends { id: string; command: string; enabled: boolean }>({
   bindings,
@@ -21,7 +26,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   onClose,
 }: {
   bindings: R[];
-  executionMode: CommandExecutionMode;
+  executionMode: GestureExecutionMode;
   inputExecutionModes: InputExecutionModes;
   commands: UiCommand[];
   initialInput?: string;
@@ -75,12 +80,18 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
   const originalGroups = new Map(groupRows(original));
   const changed = groups.filter(
     ([name, group]) =>
-      modes[name] !== originalModes[name] ||
+      JSON.stringify(modes[name]) !== JSON.stringify(originalModes[name]) ||
       group.map((row) => row.id).join('\n') !==
         (originalGroups.get(name) ?? []).map((row) => row.id).join('\n'),
   ).length;
   const mode: CommandExecutionMode | 'inherit' = Object.hasOwn(modes, key) ? modes[key] : 'inherit';
   const effectiveMode = mode === 'inherit' ? executionMode : mode;
+  let validModes = true;
+  try {
+    Object.values(modes).forEach(parseCommandExecutionMode);
+  } catch {
+    validModes = false;
+  }
 
   const move = (from: string, to: string) => {
     setOrdered((value) => moveRow(value, from, to));
@@ -103,7 +114,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
       onReady={setReady}
       onError={setError}
       initialFocus="select"
-      error={error}
+      error={error || (!validModes ? translate('settings.commandStacks.invalidCount') : '')}
       description={translate('settings.inputExecution.description')}
       message={[
         notice,
@@ -113,7 +124,7 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
         .join(' · ')}
       hint={translate('settings.bindingOrderDialog.hint')}
       applyLabel={translate('settings.bindingOrderDialog.apply')}
-      applyDisabled={!changed || !ready}
+      applyDisabled={!changed || !ready || !validModes}
       onApply={() => {
         try {
           onApply(ordered, original, modes, originalModes);
@@ -159,28 +170,13 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
             ))}
           </select>
         </SettingsField>
-        <SettingsField
-          title={translate('settings.settings-catalog.executionMode')}
-          data-testid="binding-execution-field"
-          description={
-            <span
-              className="gesture-settings-inherited-mode"
-              data-active={mode === 'inherit'}
-              aria-hidden={mode !== 'inherit'}
-            >
-              {translate('settings.inputExecution.current', {
-                value: translate(`settings.commandExecutionModeField.${executionMode}`),
-              })}
-            </span>
-          }
-        >
-          <select
-            data-testid="binding-execution-mode"
-            aria-label={translate('settings.settings-catalog.executionMode')}
+        <div data-testid="binding-execution-field">
+          <StackExecutionMode
+            testId="binding-execution-mode"
             value={mode}
+            inherited={executionMode}
             disabled={!rows.length}
-            onChange={(event) => {
-              const value = event.target.value as CommandExecutionMode | 'inherit';
+            onChange={(value) => {
               setModes((current) => {
                 const next = { ...current };
                 if (value === 'inherit') delete next[key];
@@ -189,16 +185,16 @@ export function BindingOrderDialog<R extends { id: string; command: string; enab
               });
               setError('');
             }}
-          >
-            <option value="inherit">{translate('settings.inputExecution.inherit')}</option>
-            <option value="first">{translate('settings.commandExecutionModeField.first')}</option>
-            <option value="all">{translate('settings.commandExecutionModeField.all')}</option>
-          </select>
-        </SettingsField>
+          />
+        </div>
       </div>
       <div className="gesture-settings-order-heading">
         <h3>{translate('settings.inputExecution.order')}</h3>
-        <p>{translate(`settings.inputExecution.${effectiveMode}Hint`)}</p>
+        <p>
+          {typeof effectiveMode === 'object'
+            ? translate('settings.commandStacks.firstCount', { count: effectiveMode.count })
+            : translate(`settings.inputExecution.${effectiveMode}Hint`)}
+        </p>
       </div>
       <ol
         className="shortcut-order-list"

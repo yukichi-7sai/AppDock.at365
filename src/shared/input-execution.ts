@@ -1,5 +1,10 @@
 import { hostText } from './i18n';
-import type { CommandExecutionMode } from './command-execution';
+import {
+  commandExecutionModeSchema,
+  parseCommandExecutionMode,
+  type CommandExecutionMode,
+  type GestureExecutionMode,
+} from './command-execution-mode';
 
 /** Missing entries inherit the trigger's current execution mode. */
 export type InputExecutionModes = Record<string, CommandExecutionMode>;
@@ -12,9 +17,7 @@ export function parseInputExecutionModes(
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw Error(hostText('settings.inputExecution.invalid'));
   const entries = Object.entries(value).map(([input, mode]) => {
-    if (mode !== 'first' && mode !== 'all')
-      throw Error(hostText('settings.inputExecution.invalid'));
-    return [normalize(input), mode] as const;
+    return [normalize(input), parseCommandExecutionMode(mode)] as const;
   });
   if (new Set(entries.map(([input]) => input)).size !== entries.length)
     throw Error(hostText('settings.inputExecution.invalid'));
@@ -23,7 +26,7 @@ export function parseInputExecutionModes(
 
 /** Native aliases describe one key press; the first explicit entry in notification order wins. */
 export function inputExecutionMode(
-  fallback: CommandExecutionMode,
+  fallback: GestureExecutionMode,
   modes: InputExecutionModes | undefined,
   input: string | readonly string[],
 ): CommandExecutionMode {
@@ -36,7 +39,7 @@ export function inputExecutionMode(
 export const inputExecutionModesSchema = {
   type: 'object',
   maxProperties: 2000,
-  additionalProperties: { type: 'string', enum: ['first', 'all'] },
+  additionalProperties: commandExecutionModeSchema,
   description:
-    '入力IDごとの実行方法。指定のない入力はジェスチャー全体のexecutionModeを使用します。',
+    '入力IDごとの実行方法。first、all、または{mode:"count",count:正の整数}。条件に一致する行を登録順に最大count件選び、入れ子は親で1件として数えます。未指定の入力は全体のexecutionModeを使用します。',
 } as const;

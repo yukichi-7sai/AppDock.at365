@@ -3,7 +3,9 @@ import type { UiCommand } from '../../shared/commands';
 import type { CommandStackEntry } from '../../shared/command-stacks';
 import { keybindingConditionLabel, externalShortcutScope } from '../../shared/keybindings';
 import { useHostTranslation } from '../HostTranslation';
-import { SettingsChoice, SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsActions, SettingsChoice, SettingsField } from '../settings-ui/SettingsSections';
+import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
+import type { CommandExecutionMode } from '../../shared/command-execution-mode';
 import { CommandPicker } from '../settings-ui/CommandPicker';
 import { CommandConditionEditor } from '../settings-ui/CommandConditionEditor';
 import { conditionExclusions, useConditionProcesses } from '../settings-ui/CommandConditionDetails';
@@ -14,29 +16,62 @@ export function StackExecutionMode({
   value,
   onChange,
   inherited,
+  disabled,
+  testId = 'stack-execution-mode',
 }: {
-  value: 'inherit' | 'first' | 'all';
-  onChange(value: 'inherit' | 'first' | 'all'): void;
+  value: 'inherit' | CommandExecutionMode;
+  onChange(value: 'inherit' | CommandExecutionMode): void;
   inherited?: 'first' | 'all';
+  disabled?: boolean;
+  testId?: string;
 }) {
   const { t } = useHostTranslation();
+  const count = useRef(typeof value === 'object' ? value.count : 3);
+  if (typeof value === 'object') count.current = value.count;
   return (
     <SettingsField title={t('settings.commandStacks.mode')}>
-      <select
-        aria-label={t('settings.commandStacks.mode')}
-        data-testid="stack-execution-mode"
-        value={value}
-        onChange={(event) => onChange(event.target.value as typeof value)}
-      >
-        {inherited && (
-          <option value="inherit">
-            {t('settings.inputExecution.inherit')} (
-            {t(`settings.commandExecutionModeField.${inherited}`)})
-          </option>
+      <SettingsActions className="stack-execution-controls">
+        <select
+          aria-label={t('settings.commandStacks.mode')}
+          data-testid={testId}
+          disabled={disabled}
+          value={typeof value === 'object' ? 'count' : value}
+          onChange={(event) =>
+            onChange(
+              event.target.value === 'count'
+                ? { mode: 'count', count: count.current }
+                : (event.target.value as 'inherit' | 'first' | 'all'),
+            )
+          }
+        >
+          {inherited && (
+            <option value="inherit">
+              {t('settings.inputExecution.inherit')} (
+              {t(`settings.commandExecutionModeField.${inherited}`)})
+            </option>
+          )}
+          <option value="first">{t('settings.commandExecutionModeField.first')}</option>
+          <option value="count">{t('settings.commandExecutionModeField.count')}</option>
+          <option value="all">{t('settings.commandExecutionModeField.all')}</option>
+        </select>
+        {typeof value === 'object' && (
+          <label className="stack-execution-count">
+            <span>{t('settings.commandStacks.executionCount')}</span>
+            <SettingsInput
+              type="number"
+              min={1}
+              step={1}
+              data-testid="stack-execution-count"
+              value={value.count}
+              disabled={disabled}
+              aria-invalid={!Number.isSafeInteger(value.count) || value.count < 1}
+              onChange={(event) =>
+                onChange({ mode: 'count', count: numberInput(event.target.value) })
+              }
+            />
+          </label>
         )}
-        <option value="first">{t('settings.commandExecutionModeField.first')}</option>
-        <option value="all">{t('settings.commandExecutionModeField.all')}</option>
-      </select>
+      </SettingsActions>
     </SettingsField>
   );
 }

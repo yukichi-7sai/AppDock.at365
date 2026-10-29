@@ -5,8 +5,9 @@ import {
   type TriggerContext,
 } from './command-conditions';
 import { expandStackCommand, type CommandStack } from './command-stacks';
+import { commandExecutionLimit, type CommandExecutionMode } from './command-execution-mode';
 
-export type CommandExecutionMode = 'first' | 'all';
+export type { CommandExecutionMode } from './command-execution-mode';
 export interface TriggerBinding {
   id: string;
   command: string;
@@ -30,11 +31,11 @@ export function selectCommandBindings<T extends { command: string }>(
   rows: readonly T[],
   mode: CommandExecutionMode,
 ): T[] {
-  if (mode !== 'all' && mode !== 'first') throw Error('Unknown command execution mode.');
+  const limit = commandExecutionLimit(mode);
   const selected: T[] = [];
   for (const row of rows) {
     selected.push(row);
-    if (mode === 'first') break;
+    if (selected.length >= limit) break;
   }
   return selected;
 }
@@ -48,7 +49,7 @@ export function planCommandBatch(
 ): CommandBatchPlan {
   const available = new Map(catalog.filter((c) => c.available !== false).map((c) => [c.id, c]));
   const expanded = new Map<string, ReturnType<typeof expandStackCommand>>();
-  if (mode !== 'all' && mode !== 'first') throw Error('Unknown command execution mode.');
+  const limit = commandExecutionLimit(mode);
   const selected: TriggerBinding[] = [];
   for (const row of rows) {
     const command = available.get(row.command);
@@ -63,7 +64,7 @@ export function planCommandBatch(
     expanded.set(row.command, plan);
     if (!plan.commands.length) continue;
     selected.push(row);
-    if (mode === 'first') break;
+    if (selected.length >= limit) break;
   }
   const stackIds = [
     ...new Set(selected.flatMap((row) => expanded.get(row.command)?.stackIds ?? [])),
