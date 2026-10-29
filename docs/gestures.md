@@ -10,7 +10,7 @@
 
 割り当てマークからジェスチャーIDの完全一致でコマンド一覧を絞り込める。対象の切り替え、解除、複数コマンドの色とキーボード操作は[入力マークによる絞り込み](settings-list-editing.md#入力マークによる絞り込み)に従う。
 
-- `bindings`に行数の固定上限は設けない。各行は安定した`id`、`command`、`gesture`、`enabled`、`when`。配列順が実行順。`executionMode`は`all`（条件に一致したすべて、既定値）または`first`（最初の1つ）。入力ID別の`inputExecutionModes`で上書きでき、未指定なら全体値を使う。同一コマンドIDは1回だけ。移動・クリック・ホイール・キーに共通して適用し、native待機表示と実行も同じ実効値を使用する。編集は[トリガーの設定](command-triggers.md#トリガーの設定)に従う。
+- `bindings`に行数の固定上限は設けない。各行は安定した`id`、`command`、`gesture`、`enabled`、`when`。配列順が実行順。`executionMode`は`all`（条件に一致したすべて、既定値）または`first`（最初の1つ）。入力ID別の`inputExecutionModes`で上書きでき、未指定なら全体値を使う。同じコマンドIDでも選択された各行を保存順で実行する。移動・クリック・ホイール・キーに共通して適用し、native待機表示と実行も同じ実効値を使用する。編集は[トリガーの設定](command-triggers.md#トリガーの設定)に従う。
 - 待機表示と実行は、開始対象と条件に一致した行から同じ行の登録順・実行方法で選ぶ。`indicatorPosition`は`gesture-start`・`window-center`・`monitor-center`・`none`（表示なし）。`monitor-center`は右ボタン押下時のカーソルがあるモニター全体の中央。`window-center`も対象がデスクトップなら同じ位置を使う。モニターは開始時に固定し、移動先の画面へ追従しない。`none`でも入力認識・実行・取消を続け、不透明度の保存値を保持する。
 - `indicatorShowNoAction`（「アクションなしを表示する」）は既定true。falseでは、移動方向と開始条件に一致する実行対象がない場合の待機表示を隠す。一致するアクションの表示・入力認識・実行・取消・通常の右クリック復元は従来どおり。`none`ではこの値にかかわらず表示せず、保存値は保持する。未一致の移動を通常の右クリックへ変換する設定ではない。
 - `indicatorStyle`は`compact`（コンパクトカード、既定）・`pill`（スリムピル）・`ring`（リング）・`classic`（クラシック）。未指定の既存設定も`compact`として読み取り、保存済みの位置・不透明度・割り当ては保持する。設定画面の見本は表示だけでコマンドを実行しない。新しい3種類は本体の明暗テーマと共通アクセント色に従い、方向を図形で描画する。不透明度は背景だけへ適用し、文字・方向は薄くしない。クラシックは従来の黒いパネル・絵文字の方向・ウィンドウ全体の不透明度を保つ。表示なしでもスタイルの選択値を保持する。
@@ -27,6 +27,8 @@
 ## 入力・実行
 
 `AppDock.InputHost`は本体の子プロセス。自己完結.NET/WPFで配布EXE内に収録し、利用者へDesktop Runtime追加を要求しない。globalショートカット・入力記録と同じInputCaptureManager／入力プロセスを使い、専用Dispatcherの単一マウス／キーボードフックを共有する。通常の待機表示は本体専用の透明なElectron Windowへ分離する。Windowは最前面・クリック透過・非アクティブ・タスクバー/Alt+Tab対象外で、初回表示前にページとpreloadを準備する。コールバック内で描画・コマンド・RPC応答を待たない。送信専用NativeInputのworkerは引き続きフックを登録しない。
+
+メニュー操作中と、一時的なポップアップ上の右押下ではジェスチャーを開始しない。押下・解放を捕捉せず元の入力を通し、前面化や右クリックの再送を行わない。`activateOnStart`のON/OFFにかかわらず適用する。対象/前面スレッドのメニューモード、標準メニュー・コンボ一覧のWindowクラス、タイトルバー/サイズ変更枠を持たない`WS_POPUP`の所有元または非アクティブ属性を使って判定する。前面化workerも同じ判定を再確認する。通常の所有付きダイアログと、独立したアプリの枠なしWindowは引き続き開始対象にできる。属性の根拠はMicrosoftの[メニュー状態](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-guithreadinfo)、[Windowスタイル](https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles)、[拡張スタイル](https://learn.microsoft.com/en-us/windows/win32/winmsg/extended-window-styles)を参照する。同じWindow内に独自描画され、これらの情報で区別できないポップアップは判定対象に含まれない。
 
 表示は`GestureIndicatorHost`、`gesture-indicator-preload`、`GestureIndicatorView`が担当する。本体は非表示Windowを再利用し、入力側が選んだ方向・コマンド名・スタイル・不透明度・行数・物理座標を通知で渡す。表示用キューは容量1で最新状態だけを保持し、認識/実行通知のキューとは分ける。設定revisionと表示sequenceを照合し、古い更新・非表示後の寸法通知を無視する。DOMの寸法が確定してからDIP座標へ変換し、対象モニター内へ収めて表示する。表示専用IPCは登録したローカルURLのmain frameだけを受け付け、コマンド実行や設定保存のAPIを持たない。配色は共通preloadを使う。表示倍率は通常の設定画面と分離し、OSのDPIを基準にする。このSurfaceは本体専用で、Shell領域を追加しない。
 
@@ -96,6 +98,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - Codex/MCPからの取得・編集は[共通操作API](automation.md#ジェスチャー編集)。割当・順序・動作設定を同じ保存経路で更新し、編集中の対象行との競合を検査する。
 - `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、独立した入力の順次実行と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- --indicator-notices [InputHost DLL]`: フックを登録せず、ネイティブWindow/コンパイル済みWPF画面の不在、表示通知のrevision/座標/方向/候補順・行数、非表示・終了の通知を検査する。
+- `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- --gesture-popups [InputHost DLL]`: 専用Window・標準メニュー/WinFormsポップアップの実表示中に、コンパイル済みInputHostのマウス処理へメモリ内の押下/解放を渡す。通常入力の通過、前面/メニュー状態/マウス捕捉の維持、通常ダイアログ/枠なしアプリでの開始とメニュー終了後の復帰を確認する。フック登録やOSへの入力送信は行わず、任意の実アプリでの物理操作を確認した結果とは区別する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外、左右の修飾キーと左/中/X1/X2の先行押下・途中解放・捕捉された押下の継続・解除後の再開の試験。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
 - ショートカット/ページの既存GUI回帰も併用し、試験は直列で行う。実測と未確認範囲はVERIFICATION.mdに記録する。

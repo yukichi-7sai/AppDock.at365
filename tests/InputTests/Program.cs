@@ -13,6 +13,7 @@ internal static partial class Program
         if(args is ["--external-gesture",var exchange]) return RunExternalGesture(exchange);
         if(args is ["--shortcuts",var shortcutHelper]) return RunShortcutTests(shortcutHelper);
         if(args is ["--gesture-key-state",var gestureAssembly]) return RunGestureKeyStateTests(gestureAssembly);
+        if(args is ["--gesture-popups",var popupAssembly]) return RunGesturePopupTests(popupAssembly);
         if(args is ["--lock-keys",var lockKeyAssembly]) return RunLockKeyTests(lockKeyAssembly);
         if(args is ["--input-queue",var inputQueueAssembly]) return RunInputQueueTests(inputQueueAssembly);
         if(args is ["--input-blocking",var inputBlockingAssembly]) return RunInputBlockingTests(inputBlockingAssembly);
@@ -203,13 +204,13 @@ internal static partial class Program
                 var showDeadline=Environment.TickCount64+2000;
                 while(!IndicatorVisible()&&Environment.TickCount64<showDeadline)await Task.Delay(20);
                 var overlay=IndicatorVisible();Check(overlay,mode+" preview is visible");
-                if(overlay){var caption=IndicatorCaption();Check(caption.Contains("First")&&!caption.Contains("Wrong")&&!caption.Contains("Duplicate")&&caption.Contains("Second")== (mode=="all"),mode+" preview contains exactly selected commands");}
+                if(overlay){var caption=IndicatorCaption();Check(caption.Contains("First")&&!caption.Contains("Wrong")&&caption.Contains("Duplicate")== (mode=="all")&&caption.Contains("Second")== (mode=="all"),mode+" preview contains exactly selected rows");}
                 await End();
-                var expected=mode=="first"?new[]{"first-move-left"}:new[]{"first-move-left","second-move-left"};
-                Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" stroke uses conditions, saved order and command deduplication");
+                var expected=mode=="first"?new[]{"first-move-left"}:new[]{"first-move-left","second-move-left","duplicate-move-left"};
+                Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" stroke preserves conditions and each saved row");
                 n=Count();await Begin();await Step("right");await Step("up");await End();
-                expected=mode=="first"?new[]{"first-move-right-up"}:new[]{"first-move-right-up","second-move-right-up"};
-                Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" two-step uses conditions, saved order and command deduplication");
+                expected=mode=="first"?new[]{"first-move-right-up"}:new[]{"first-move-right-up","second-move-right-up","duplicate-move-right-up"};
+                Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" two-step preserves conditions and each saved row");
                 foreach(var gesture in new[]{"click-left","click-middle","wheel-up","key:A"}){
                     n=Count();await Begin();
                     if(gesture=="click-left"){Mouse(2);await Task.Delay(60);Mouse(4);}
@@ -217,7 +218,7 @@ internal static partial class Program
                     else if(gesture=="wheel-up")Mouse(0x800,120);
                     else{Key(0x41);Key(0x41,true);}
                     await Task.Delay(60);await End();
-                    expected=mode=="first"?new[]{"first-"+gesture}:new[]{"first-"+gesture,"second-"+gesture};
+                    expected=mode=="first"?new[]{"first-"+gesture}:new[]{"first-"+gesture,"second-"+gesture,"duplicate-"+gesture};
                     Check(Count()==n+1&&LastRows().SequenceEqual(expected),mode+" selection for "+gesture);
                 }
             }

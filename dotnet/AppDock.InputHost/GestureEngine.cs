@@ -130,6 +130,7 @@ internal sealed class GestureEngine : IDisposable
         var hit = GestureTarget.At(p);
         var foreground = GetForegroundWindow();
         if (hit == 0 || !IsWindowVisible(hit)) return;
+        if (GestureTarget.BlocksGestureStart(hit, foreground)) return;
         var same = GestureTarget.Matches(hit, foreground);
         if (!same && !config.ActivateOnStart) return;
         GetWindowThreadProcessId(hit, out var pid);

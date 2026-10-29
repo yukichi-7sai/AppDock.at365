@@ -21,6 +21,29 @@ internal static class GestureTarget
     }
     internal static bool Matches(nint expected, nint actual) => expected != 0 && actual != 0 &&
         (expected == actual || IsDesktop(expected) && IsDesktop(actual));
+    internal static bool BlocksGestureStart(nint window, nint foreground)
+    {
+        // Menu loops own mouse capture even when their owner remains foreground.
+        // Leave their original button down/up untouched, including clicks that dismiss a menu.
+        var thread = GetWindowThreadProcessId(window, out _);
+        var foregroundThread = GetWindowThreadProcessId(foreground, out _);
+        if (IsMenuActive(thread) || thread != foregroundThread && IsMenuActive(foregroundThread)) return true;
+        var name = new StringBuilder(256);
+        GetClassName(window, name, name.Capacity);
+        if (name.ToString() is "#32768" or "ComboLBox" or "tooltips_class32") return true;
+        if (IsDesktop(window)) return false;
+        var style = GetWindowLongPtr(window, -16).ToInt64(); // GWL_STYLE
+        if ((style & 0x80000000L) == 0 || (style & 0x00C00000L) == 0x00C00000L ||
+            (style & 0x00040000L) != 0) return false; // Keep titled/resizable windows and dialogs eligible.
+        return GetWindow(window, 4) != 0 || // GW_OWNER: an owned, unframed WS_POPUP.
+            (GetWindowLongPtr(window, -20).ToInt64() & 0x08000000L) != 0; // WS_EX_NOACTIVATE
+    }
+    private static bool IsMenuActive(uint thread)
+    {
+        if (thread == 0) return false;
+        var info = new GuiThreadInfo { Size = (uint)Marshal.SizeOf<GuiThreadInfo>() };
+        return GetGUIThreadInfo(thread, ref info) && (info.Flags & 0x1C) != 0;
+    }
     internal static bool TryActivate(nint window, nint source, CancellationToken token)
     {
         // Only called on a worker for the target captured by a live physical right-button press.
@@ -28,7 +51,7 @@ internal static class GestureTarget
         var requested = false;
         bool Valid() {
             var foreground = GetForegroundWindow();
-            return !token.IsCancellationRequested && IsWindowVisible(window) &&
+            return !token.IsCancellationRequested && IsWindowVisible(window) && !BlocksGestureStart(window, foreground) &&
                 (foreground == source || Matches(window, foreground) || requested && foreground == 0);
         }
         bool WaitForActivation() {
@@ -78,6 +101,11 @@ internal static class GestureTarget
     [StructLayout(LayoutKind.Sequential)] private struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] private struct MonitorInfo { public uint Size; public Rect Monitor, Work; public uint Flags; }
     [StructLayout(LayoutKind.Sequential)] private struct Message { public nint Window; public uint Id; public nuint WParam; public nint LParam; public uint Time; public int X, Y; public uint Private; }
+    [StructLayout(LayoutKind.Sequential)] private struct GuiThreadInfo {
+        public uint Size, Flags;
+        public nint Active, Focus, Capture, MenuOwner, MoveSize, Caret;
+        public Rect CaretRect;
+    }
     [DllImport("user32.dll")] private static extern nint GetShellWindow();
     [DllImport("user32.dll")] private static extern nint GetAncestor(nint window, uint flags);
     [DllImport("user32.dll")] private static extern nint WindowFromPoint(GesturePoint point);
@@ -85,6 +113,9 @@ internal static class GestureTarget
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(nint window, StringBuilder name, int size);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern nint GetWindow(nint window, uint command);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern nint GetWindowLongPtr(nint window, int index);
+    [DllImport("user32.dll")] private static extern bool GetGUIThreadInfo(uint thread, ref GuiThreadInfo info);
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint window);
     [DllImport("user32.dll")] private static extern bool BringWindowToTop(nint window);
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint source, uint target, bool attach);
