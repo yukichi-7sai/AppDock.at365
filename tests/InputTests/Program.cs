@@ -25,6 +25,7 @@ internal static partial class Program
             var sendCursor=Cursor.Position;
             Action? releaseBlocker=null;
             Probe? inactiveProbe=null;
+            var sendRightHeld=false;
             void Pause(int milliseconds) {
                 var deadline=Environment.TickCount64+milliseconds;
                 do {if(inactiveProbe!=null)Application.DoEvents();Thread.Sleep(5);}while(Environment.TickCount64<deadline);
@@ -54,7 +55,7 @@ internal static partial class Program
                 else if(action=="blocked:left"){releaseBlocker=()=>Mouse(4);Mouse(2);}
                 else if(action=="blocked:middle"){releaseBlocker=()=>Mouse(0x40);Mouse(0x20);}
                 else if(action is "blocked:x1" or "blocked:x2"){var button=action=="blocked:x1"?1:2;releaseBlocker=()=>Mouse(0x100,button);Mouse(0x80,button);}
-                Pause(60);Mouse(8);Pause(50);
+                Pause(60);Mouse(8);sendRightHeld=true;Pause(50);
                 if(releaseBlocker!=null){
                     releaseBlocker();Thread.Sleep(40);
                     Cursor.Position=new(Cursor.Position.X-85,Cursor.Position.Y);Thread.Sleep(60);Mouse(0x800,120);
@@ -69,8 +70,8 @@ internal static partial class Program
                 else if(action=="key:Ctrl+A"){Key(0x11);Thread.Sleep(20);Key(0x41);Thread.Sleep(80);Key(0x41,true);Key(0x11,true);}
                 else if(action=="click-left"){Mouse(2);Thread.Sleep(80);Mouse(4);}
                 else if(action=="wheel-up")Mouse(0x800,120);
-                Pause(100);Mouse(16);Pause(150);return 0;
-            }finally{Mouse(16);releaseBlocker?.Invoke();inactiveProbe?.Dispose();Cursor.Position=sendCursor;}
+                Pause(100);Mouse(16);sendRightHeld=false;Pause(150);return 0;
+            }finally{if(sendRightHeld)Mouse(16);releaseBlocker?.Invoke();inactiveProbe?.Dispose();Cursor.Position=sendCursor;}
         }
         using var form=new Probe(); form.Text="AppDock isolated gesture test";form.StartPosition=FormStartPosition.CenterScreen;form.Size=new(720,500);
         var original=Cursor.Position;
@@ -257,6 +258,8 @@ internal static partial class Program
                 right=form.RightUps;Mouse(8);await Task.Delay(150);await End();
                 Check(form.RightUps==right+1,"activation followed by no gesture restores one ordinary right click");
             }
+            await Sync(enabled:false);
+            await CheckDesktopMenuCleanup(form,Check);
             form.Hide();await Task.Delay(100);
             var desktopPoint=DesktopPoint();Check(desktopPoint!=null,"a real desktop surface is available for input verification");
             if(desktopPoint is { } desktop){

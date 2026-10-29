@@ -66,18 +66,49 @@ internal static partial class Program
                 }
         return null;
     }
-    private static bool IsDesktopContextMenu()
+    private static nint DesktopContextMenuOwner()
     {
+        var shell = GetShellWindow();
+        if (shell == 0) return 0;
+        var thread = GetWindowThreadProcessId(shell, out _);
         var info = new DesktopGuiInfo { Size = (uint)Marshal.SizeOf<DesktopGuiInfo>() };
-        return DesktopGuiThreadInfo(0, ref info) && (info.Flags & 0x1C) != 0 && GestureTarget.IsDesktop(info.MenuOwner);
+        return thread != 0 && DesktopGuiThreadInfo(thread, ref info) && (info.Flags & 0x1C) != 0 &&
+            GestureTarget.IsDesktop(GetAncestor(info.MenuOwner, 2)) ? info.MenuOwner : 0;
     }
+    private static bool IsDesktopContextMenu() => DesktopContextMenuOwner() != 0;
     private static async Task DismissDesktopContextMenu()
     {
-        if (!IsDesktopContextMenu()) return;
-        Key(0x1B); Key(0x1B, true);
+        var owner = DesktopContextMenuOwner();
+        if (owner == 0) return;
+        if (!PostFixtureMessage(owner, 0x1F, 0, 0)) throw new Exception("The desktop menu cancellation was rejected.");
         var deadline = Environment.TickCount64 + 1000;
         while (IsDesktopContextMenu() && Environment.TickCount64 < deadline) await Task.Delay(10);
         if (IsDesktopContextMenu()) throw new Exception("The desktop context menu did not close.");
+    }
+    private static async Task CheckDesktopMenuCleanup(Probe form, Action<bool,string> check)
+    {
+        var original = Cursor.Position;
+        try {
+            await DismissDesktopContextMenu();
+            if (DesktopPoint() is not { } point) return;
+            var desktop = GestureTarget.At(new(point.X,point.Y));
+            FocusWindow(desktop); Cursor.Position = point;
+            // Reproduce the old helper's extra up without starting a gesture.
+            Mouse(16);
+            var deadline = Environment.TickCount64 + 1500;
+            while (!IsDesktopContextMenu() && Environment.TickCount64 < deadline) await Task.Delay(10);
+            var owner = DesktopContextMenuOwner();
+            check(owner != 0 && GestureTarget.IsDesktop(GetAncestor(owner,2)), "desktop child menu ownership is recognized");
+            FocusTarget(form);
+            deadline = Environment.TickCount64 + 1500;
+            while (GetForegroundWindow() != form.Handle && Environment.TickCount64 < deadline) await Task.Delay(10);
+            await DismissDesktopContextMenu();
+            check(!IsDesktopContextMenu() && GetForegroundWindow() == form.Handle, "background desktop cleanup retains the foreground fixture");
+            using var foreign = new ContextMenuStrip();
+            foreign.Items.Add("Fixture menu"); foreign.Show(form,new System.Drawing.Point(40,80));
+            await DismissDesktopContextMenu();
+            check(foreign.Visible, "desktop cleanup preserves another window's menu");
+        } finally { await DismissDesktopContextMenu(); Cursor.Position = original; }
     }
     private static string InputFocusDiagnostic()
     {

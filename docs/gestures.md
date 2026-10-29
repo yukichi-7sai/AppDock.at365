@@ -101,7 +101,7 @@ Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLに�
 - `tests/gestures.test.cjs`: 旧Applet設定から独立した初期値、明示的な空配列、検証、条件、初期割り当て、独立した入力の順次実行と取消。`tests/lifecycle.test.cjs`では実Nodeプロセスへの起動・設定通知でApplet設定をそのまま渡すことも確認する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- --indicator-notices [InputHost DLL]`: フックを登録せず、ネイティブWindow/コンパイル済みWPF画面の不在、表示通知のrevision/座標/方向/候補順・行数、非表示・終了の通知を検査する。
 - `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- --gesture-popups [InputHost DLL]`: 専用Window・標準メニュー/WinFormsポップアップの実表示中に、コンパイル済みInputHostのマウス処理へメモリ内の押下/解放を渡す。通常入力の通過、前面/メニュー状態/マウス捕捉の維持、通常ダイアログ/枠なしアプリでの開始とメニュー終了後の復帰を確認する。フック登録やOSへの入力送信は行わず、任意の実アプリでの物理操作を確認した結果とは区別する。
-- `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外、左右の修飾キーと左/中/X1/X2の先行押下・途中解放・捕捉された押下の継続・解除後の再開の試験。カーソルを終了時に戻す。
+- `dotnet run --project tests/InputTests/InputTests.csproj -c Release -- .artifacts/dotnet-host/input/AppDock.InputHost.exe`: 専用Windowで実OS入力を使った移動・クリック・キー・ホイール・通常入力復元・取消・除外、左右の修飾キーと左/中/X1/X2の先行押下・途中解放・捕捉された押下の継続・解除後の再開の試験。デスクトップの子Windowが所有するメニューを背景状態でも検出/取消し、操作先のフォーカスと他Windowのメニューを保つことも確認する。カーソルを終了時に戻す。
 - `dev.bat exec node scripts/gestures-ui-test.cjs [win-unpacked EXE]`: 隔離AppDock、試験Applet、実入力と設定画面。先にInputTestsをビルドする。`--portable`を指定するとpublishの単一EXEを隔離コピーして同じ試験を行い、前後のSHA256を照合する。
 - ショートカット/ページの既存GUI回帰も併用し、試験は直列で行う。実測と未確認範囲はVERIFICATION.mdに記録する。
 - `dev.bat exec node scripts/gesture-startup-ui-test.cjs [--portable]`: トレイ起動・`--restore-view`付き起動で、外部の専用Windowを実際にアクティブにして、AppDockを手動でアクティブにする前のジェスチャーを検証する。Electronのフォーカス情報が残る状態も含め、実入力とコマンド記録を照合する。

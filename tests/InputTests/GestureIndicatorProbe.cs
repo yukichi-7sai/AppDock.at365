@@ -13,6 +13,7 @@ internal static partial class Program
         var source=new nint(long.Parse(targetText));
         var sourceWasTopmost=false;
         var promoted=false;
+        var rightHeld=false;
         void Pause(int milliseconds) {
             var until=Environment.TickCount64+milliseconds;
             do {Application.DoEvents();Thread.Sleep(5);}while(Environment.TickCount64<until);
@@ -78,20 +79,20 @@ internal static partial class Program
                 if(!AppDock.InputHost.GestureTarget.Matches(target,GetForegroundWindow()))throw new Exception("Indicator stole or lost the gesture target focus.");
             }
             if(desktop)DismissDesktopContextMenu().GetAwaiter().GetResult();
-            Mouse(8);Pause(80);
+            Mouse(8);rightHeld=true;Pause(80);
             if(desktop){
                 deadline=Environment.TickCount64+2000;
                 while(!AppDock.InputHost.GestureTarget.Matches(target,GetForegroundWindow())&&Environment.TickCount64<deadline)Pause(10);
             }
             Cursor.Position=new(Cursor.Position.X+85,Cursor.Position.Y);Pause(120);Stage("one");
             Cursor.Position=new(Cursor.Position.X,Cursor.Position.Y-85);Pause(120);Stage("two");
-            Mouse(16);Pause(120);
+            Mouse(16);rightHeld=false;Pause(120);
             File.WriteAllText(Path.Combine(exchange,"released"),"ok");
             return 0;
         }
         catch(Exception error){File.WriteAllText(Path.Combine(exchange,"helper-failure.txt"),error.ToString());Console.Error.WriteLine(error);return 1;}
         finally {
-            Mouse(16);Cursor.Position=original;
+            if(rightHeld)Mouse(16);Cursor.Position=original;
             if(promoted)SetIndicatorWindowPos(source,new nint(sourceWasTopmost?-1:-2),0,0,0,0,0x13);
             if(desktop)DismissDesktopContextMenu().GetAwaiter().GetResult();
         }
