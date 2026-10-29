@@ -147,6 +147,8 @@ export interface SettingOption {
 export interface SettingAction {
   title: string;
   command: string;
+  /** Place this action inside an existing top-level setting field. Presentation only. */
+  settingKey?: string;
   description?: string;
   successMessage?: string;
 }

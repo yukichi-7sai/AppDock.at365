@@ -1,5 +1,20 @@
 # 検証記録
 
+## 2026-10-30: 設定項目内操作0.105.2のコミット前照合
+
+- 利用者の動作確認後、mainの対象差分をレビュー。実装時の本体845入力とWatch22入力、完全ログ8件、両発行物695ファイル/ZIPのSHA256一致を確認し、型検査/build・関連35件・本体の固定GUI5群・Watchの固定GUI14群とMCP検証を再利用した。WatchのC#/SDK依存29入力も不変で、標準回帰21件を再利用する。
+- 変更したmanifest読み込み・設定カタログを直接/間接参照する標準試験から、成功済み5ファイルを除いた65ファイルを抽出。build:test-extensions後に731/731成功、失敗/skip 0。対象外の保存/実行経路等を全件再実行することはせず、依存関係と選定理由を記録した。製品の変更・版更新・再発行なし。
+- 証跡は`.artifacts/commit-validation-inline-settings-20261030/`の`reuse.json`・`regression-plan.json`・`regression.log`・`stage.json`・`commits.json`・`push.json`。stage treeと作業ファイル、commit tree、各GitHub origin/mainを照合する。既存GUI成功分と再利用証跡を保持し、今回の新規GUI試行/削除は0。GitHub Releaseと実利用deployは対象外。
+
+## 2026-10-30: 設定項目内の操作ボタン 0.105.2
+
+- mainのclean/追跡先を確認しpull --ff-onlyで最新を取得。既存の未pushコミット7f2eaa4を保持して実装した。`settingActions.settingKey`を任意の表示metadataとして追加し、自身のトップレベル設定を参照する操作を同じFieldへ配置する。共通`SettingsInputActions`のopt-in折り返しを使い、独立操作の配置は維持。設定キー/値/既定値/保存形式、MCP公開スキーマ・読み書き・実行許可は変更しない。設定/操作それぞれの検索アンカーとMCP対応表示を保つ。
+- 発行前に宣言検証・参照/重複拒否・最低版・共通フォーム・保存/実行経路・検索・MCP表示・既存Appletへの影響をレビューし、阻害事項なし。設定/保存ファイル追加と破壊的変更を含まないため0.105.1→0.105.2。新指定にはminimumHostVersion:0.105.2以上を要求する。
+- 固定ツールでinstall --frozen-lockfile・型検査・build成功。関連5ファイル35件成功（setting-actions、setting-sections、settings-editing、settings-mcp-access、localization）。開発/発行固定EXEの専用GUI5群成功。同じFieldと旧独立配置、MCP対応表示の区別、blur確定後実行、二重実行防止、Escape取消、キーボード実行失敗と値保持、検索アンカー、1200/760px・停止時無効化を確認した。初回GUIは停止後のmain状態からrenderer反映までを待たず失敗し、試験の条件待ちだけを修正して再成功。製品の追加修正なし。
+- Watch 0.5.3との発行物GUI14群も成功。標準フォント選択のOK/取消・保存・同じ枠・狭幅折り返し、時計/日付descriptionの個別リンク・未実行・Escapeフォーカス復帰、MCP公開15項目のschema/読取/更新・不正値/書込拒否・dryRun/revision競合、従来の個別表示・再起動保持を確認。広幅/狭幅PNGを目視確認した。
+- publish.bat終了コード0。seal/feed/EXE版、update.zipのサイズ/SHA256と全693ファイルの発行先一致、deploy.batの保持を確認。配布先は`A:\40.ARTIFACT\AppDock.at365`。Watchもソース/配布/ZIP manifest、最低ホスト版、EXE/feed、全2ファイルを照合した。検証入力は前後で一致。既存のVite大チャンク注意は出るがbuild成功。全回帰や旧パレット専用試験は変更箇所ではないため再実行せず、今回のGUIでリンクを確認した。
+- 証跡は`.artifacts/inline-setting-actions-20261030/`の`review.json`、`inputs-build.json`、`inputs-after.json`、`typecheck.log`、`build.log`、`tests.log`、`publish.log`、`ui-dev-retry.log`、`ui-published.log`、`packages.json`、`validation.json`。固定GUIは`.artifacts/setting-actions-ui-1793308035010/`。試験方式別の成功分は3回以下で削除0、初回失敗証跡も保持。実利用設定/他Appletの発行、commit/push、GitHub Release、実利用deployは行わない。
+
 ## 2026-10-30: コマンドリンクのID絞り込み 0.105.1 とコミット照合
 
 - コマンドリンクの`initialCommandId`をフィルターの初期値にも使い、入力欄のIDを全選択する。直接入力で検索語を置き換え、クリアで全件表示へ戻る。snapshot/ピン変更では入力を初期化せず、リンクの再表示時は対象IDへ戻す。通常起動・選択用パレットは従来の空検索を維持し、明示操作まで実行しない。

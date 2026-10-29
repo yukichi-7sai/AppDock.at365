@@ -25,3 +25,13 @@ test('settings actions only reference declared commands and keep action data out
   ])
     assert.throws(() => parseSettingActions(value, commands));
 });
+test('attached actions only reference a top-level setting without changing its schema', () => {
+  const settings = [{ key: 'font', title: 'Font', type: 'string', default: '' }];
+  const before = JSON.stringify(settings);
+  const attached = { ...action, settingKey: 'font' };
+  assert.deepEqual(parseSettingActions([attached], commands, settings), [attached]);
+  assert.equal(JSON.stringify(settings), before);
+  for (const settingKey of ['', null, 3, 'missing', 'font.family', '__proto__'])
+    assert.throws(() => parseSettingActions([{ ...action, settingKey }], commands, settings));
+  assert.throws(() => parseSettingActions([attached], commands));
+});

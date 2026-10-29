@@ -4,8 +4,18 @@ import { SettingsHintIcon } from './SettingsHintIcon';
 import { useSettingsFeedback, SettingsFieldTarget } from './SettingsStatus';
 import './settings-sections.css';
 import { SettingsMcpScope, SettingsMcpLock } from './SettingsMcpAccess';
-export function SettingsInputActions({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div {...props} className={`settings-input-actions ${className}`} />;
+export function SettingsInputActions({
+  className = '',
+  wrap = false,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { wrap?: boolean }) {
+  return (
+    <div
+      {...props}
+      className={`settings-input-actions ${className}`}
+      data-wrap={wrap || undefined}
+    />
+  );
 }
 
 /** A shared, wrapping action row for section bodies and field controls. */

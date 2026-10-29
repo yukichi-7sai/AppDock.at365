@@ -136,6 +136,10 @@ Applet数は組み込みとcollectionの子ページを除くインストール�
 
 Applet本文は`src/renderer/settings-ui/AppletSettingsForm.tsx`を共通テンプレートとする。manifestの`settingSections`を検証し、設定ページのauxiliaryへ投影する。セクションへ配置されなかった設定・操作も表示し、設定保存/JSONの投影に表示メタデータを混ぜない。設定アンカーは既存のキーのままで、セクションの再配置や折りたたみに依存しない。WebAppletもSettingsSection/SettingsFieldでサイト・表示とページ遷移・アカウント・管理を描画する。
 
+`settingActions.settingKey`の操作は対象設定のField内へまとめ、入力とボタンは`SettingsInputActions wrap`で配置する。操作の説明/開始待ちとエラーは親Fieldへ渡す。操作の検索アンカーとMCP対応表示は設定のものへ統合せず、従来の操作IDを維持する。未指定の操作は独立Fieldを保つ。保存・実行API・MCP公開範囲を表示配置から変更しない。
+
+`scripts/setting-actions-ui-test.cjs [固定EXE]`は隔離Node fixtureで、同じFieldへの配置、独立操作との併用、入力確定/取消、二重実行防止、操作失敗時の入力保持、設定検索、停止時の無効化、MCP対応表示の独立性を確認する。Watchの標準フォント選択と説明リンクはWatch側の`test-fonts-ui.cjs`で確認する。
+
 `scripts/applet-settings-ui-test.cjs [固定EXE]`は兄弟Appletの宣言と配布物を隔離配置し、停止したまま全項目の描画・保存・検索・両入口の一致・明暗/狭幅を確認する。コマンドの実行中表示は専用Node fixtureを使い、実壁紙やロック・キー送信は実行しない。最低ホスト版と宣言形式は[Applet API](extensions.md#共通の設定ページ)を正本とする。
 
 URL欄は共通の`SettingsUrlInput`を使い、入力途中のコロン・スラッシュ・不完全なURLを入力欄内に保持する。補正・検証・保存はEnterまたはフォーカスが外れた時だけ行い、Enter後のblurで同じ入力を二重送信しない。IME変換確定のEnterは設定確定として扱わない。AI/TTSのベースURL、WebAppletのURL、本体/各Appletの更新元に同じ動作を適用する。WebAppletの追加許可先は`SettingsUrlTextarea`を使い、Enterで確定、Shift+Enterで改行する。Web側の初期設定取得もURL確定後に行う。AI接続ダイアログではURLの確定はローカル入力だけを更新し、Enterでは未保存値でモデル一覧を取得する。blurでは通信・保存をしない。その他のモデル一覧・更新等の通信は既存の明示操作を維持する。

@@ -82,12 +82,16 @@ MCPは宣言から[共通設定APIの一覧対象](settings-api.md#ショート�
 
 ### 設定ページの操作ボタン
 
-`settingActions` は最大16件の `{ title, command, description?, successMessage? }` を宣言します。
+`settingActions` は最大16件の `{ title, command, settingKey?, description?, successMessage? }` を宣言します。
 `command` は同じマニフェストの `commands` に宣言した正規IDに限定し、重複・別Applet・ホストのコマンドを拒否します。
 ボタンは既存のコマンド実行経路を使い、実行中は同じ設定パネルの操作ボタンを無効化します。
 成功・失敗をその場へ表示し、設定変更とは独立して実行します。操作内容はsettings.jsonへ保存しません。
 実行可否はコマンドの現在のavailabilityに従います。Windows等への実際の操作と結果確認はAppletの責任です。
 `activateOnExecute` のないコマンドはApplet開始後に利用できます。この機能を使うAppletはminimumHostVersionを0.21.0以上にしてください。
+
+AppDock **0.105.2以上**では、任意の`settingKey`に自身のトップレベル設定キーを指定すると、その入力欄と同じField内へボタンを配置します。例えばフォント選択操作に`"settingKey": "fontFamily"`を指定します。入力欄と操作は横並びになり、狭い幅では折り返します。操作の説明・開始待ち・エラーも同じFieldへ関連付けます。
+
+この操作は対象設定のセクションへ追従するため、`settingSections.actions`には重ねて指定しません。存在しないキーや重複配置は拒否します。省略した操作は従来どおり独立したFieldです。設定値・既定値・JSON保存・MCPの公開キー/スキーマ/読み書き/実行許可は変更しません。検索アンカーとMCP対応表示も、設定と操作それぞれの識別子を維持します。
 
 ```json
 {

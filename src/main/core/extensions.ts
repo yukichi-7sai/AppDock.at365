@@ -285,7 +285,16 @@ function readManifest(
     defaultGestureBindings.some((r) => !bindingCommands.some((c) => c.id === r.command))
   )
     throw Error(hostText('services.extensions.gestureOwnership'));
-  const settingActions = parseSettingActions(m.settingActions, bindingCommands);
+  const settingActions = parseSettingActions(
+    m.settingActions,
+    bindingCommands,
+    settingDefinitions ?? [],
+  );
+  if (
+    settingActions?.some((action) => action.settingKey !== undefined) &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.105.2') < 0)
+  )
+    throw Error(hostText('services.extensions.settingActionFieldVersion'));
   const settingSections = parseSettingSections(
     m.settingSections,
     settingDefinitions ?? [],

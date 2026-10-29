@@ -270,6 +270,18 @@
 .settings-input-actions > button {
   flex: none;
 }
+.settings-input-actions[data-wrap] {
+  flex-wrap: wrap;
+}
+.settings-input-actions[data-wrap] > :first-child {
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 100%;
+}
+.settings-input-actions[data-wrap] > :first-child > :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+}
 .settings-field-control > :is(input, select, textarea) {
   width: 100%;
   min-width: 0;

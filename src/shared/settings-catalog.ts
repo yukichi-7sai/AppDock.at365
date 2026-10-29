@@ -588,7 +588,11 @@ export function settingsCatalog(
           ...(a.settingActions ?? []).map((s) => ({
             ...item(id, `action:${s.command}`, s.title, s.description),
             keywords: (a.settingSections ?? [])
-              .filter((section) => section.actions?.includes(s.command))
+              .filter((section) =>
+                s.settingKey !== undefined
+                  ? section.settings?.includes(s.settingKey)
+                  : section.actions?.includes(s.command),
+              )
               .flatMap((section) => [section.title, section.description ?? '']),
             unavailableReason:
               !a.enabled || a.state !== 'running'

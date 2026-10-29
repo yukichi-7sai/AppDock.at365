@@ -1,6 +1,6 @@
 import { useHostTranslation } from '../HostTranslation';
 import { CommandText } from './CommandText';
-import { useRef, useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import { appletCommonDefinitions } from '../../shared/applet-common-settings';
 import { Toggle } from './Toggle';
@@ -18,7 +18,13 @@ import {
 import { resolveSettingSections } from '../../shared/setting-sections';
 import { settingAnchor } from './setting-anchor';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
-import { SettingsSection, SettingsField, SettingsActions } from './SettingsSections';
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsActions,
+  SettingsInputActions,
+} from './SettingsSections';
+import { SettingsMcpLock } from './SettingsMcpAccess';
 import { SettingsButton } from './SettingsButton';
 import { useSettingsFeedback } from './SettingsStatus';
 import { ShortcutListSetting } from './ShortcutListSetting';
@@ -99,37 +105,38 @@ export function AppletSettingsForm({
     message: result && !result.error ? result.message : undefined,
     busy: runningAction !== null,
   });
+  const actionAvailable = (item: SettingAction) =>
+    applet.enabled &&
+    applet.state === 'running' &&
+    applet.commands.some((c) => c.id === item.command && c.available);
+  const actionDescription = (item: SettingAction) => (
+    <span id={`setting-action-help-${item.command}`}>
+      {item.description && <CommandText text={item.description} />}
+      {!actionAvailable(item) && ` ${translate('settings.appletSettingsForm.startRequired')}`}
+    </span>
+  );
+  const actionButton = (item: SettingAction) => (
+    <SettingsButton
+      type="button"
+      className="secondary"
+      aria-describedby={`setting-action-help-${item.command}`}
+      disabled={!actionAvailable(item) || runningAction !== null}
+      pending={runningAction === item.command}
+      onClick={() => void executeAction(item)}
+    >
+      {item.title}
+    </SettingsButton>
+  );
   const action = (item: SettingAction) => {
-    const available =
-      applet.enabled &&
-      applet.state === 'running' &&
-      applet.commands.some((c) => c.id === item.command && c.available);
-    const help = `setting-action-help-${item.command}`;
     return (
       <SettingsField
         key={item.command}
         title={item.title}
-        description={
-          <span id={help}>
-            {item.description && <CommandText text={item.description} />}
-            {!available && ` ${translate('settings.appletSettingsForm.startRequired')}`}
-          </span>
-        }
+        description={actionDescription(item)}
         error={result?.command === item.command && result.error ? result.message : undefined}
         {...settingAnchor(pageId, `action:${item.command}`)}
       >
-        <SettingsActions>
-          <SettingsButton
-            type="button"
-            className="secondary"
-            aria-describedby={help}
-            disabled={!available || runningAction !== null}
-            pending={runningAction === item.command}
-            onClick={() => void executeAction(item)}
-          >
-            {item.title}
-          </SettingsButton>
-        </SettingsActions>
+        <SettingsActions>{actionButton(item)}</SettingsActions>
       </SettingsField>
     );
   };
@@ -142,122 +149,160 @@ export function AppletSettingsForm({
     const options = applet.settingOptions[item.key] ?? item.options ?? [];
     const help = `setting-help-${applet.id}-${item.key}`;
     const wide = ['object-list', 'shortcut-list', 'json'].includes(item.type);
+    const attached = (applet.settingActions ?? []).filter(
+      (action) => action.settingKey === item.key,
+    );
+    const control =
+      item.type === 'object-list' && item.list && onListCommit ? (
+        <ObjectListDialogSetting
+          testId={`setting:${settingsItemId(pageId, `setting:${item.key}`)}`}
+          definition={item}
+          value={value}
+          onOpen={
+            applet.pageCollections?.some((c) => c.key === item.key) && onListOpen
+              ? (entry) => onListOpen(item.key, entry.id)
+              : undefined
+          }
+          options={Object.fromEntries(
+            (item.fields ?? [])
+              .filter((field) => field.optionSource === 'web-profiles')
+              .map((field) => [
+                field.key,
+                accounts.map((account) => ({ value: account.id, label: account.name })),
+              ]),
+          )}
+          onCommit={(next, before) => onListCommit(item.key, next, before)}
+          onDraftAction={
+            item.list.draftAction && onListDraftAction
+              ? (input) => onListDraftAction(item.key, input)
+              : undefined
+          }
+          onDraftImage={
+            item.list.draftAction && onListDraftImage
+              ? (base64) => onListDraftImage(item.key, base64)
+              : undefined
+          }
+        />
+      ) : item.type === 'object-list' ? (
+        <ObjectListSetting definition={item} value={value} onChange={set} />
+      ) : item.type === 'shortcut-list' ? (
+        <ShortcutListSetting title={item.title} value={value} onChange={set} />
+      ) : item.type === 'registered-image' ? (
+        <RegisteredImageInput value={value} onChange={set} label={item.title} />
+      ) : item.type === 'json' ? (
+        <SettingsTextarea
+          aria-label={item.title}
+          aria-describedby={item.description ? help : undefined}
+          rows={10}
+          value={String(value ?? '')}
+          onChange={(e) => set(e.target.value)}
+        />
+      ) : item.type === 'string' && item.format === 'url' ? (
+        <SettingsUrlInput
+          aria-label={item.title}
+          aria-describedby={item.description ? help : undefined}
+          value={String(value ?? '')}
+          onChange={(e) => set(e.target.value)}
+        />
+      ) : item.type === 'boolean' ? (
+        <button
+          type="button"
+          className="toggle"
+          role="switch"
+          aria-label={item.title}
+          aria-describedby={item.description ? help : undefined}
+          aria-checked={Boolean(value)}
+          onClick={() => set(!value)}
+        >
+          <span />
+        </button>
+      ) : item.type === 'select' ? (
+        <select
+          aria-label={item.title}
+          aria-describedby={item.description ? help : undefined}
+          value={String(value ?? '')}
+          onChange={(e) => set(e.target.value)}
+        >
+          {!options.some((o) => o.value === value) && value !== undefined && (
+            <option value={String(value)}>
+              {translate('settings.appletSettingsForm.savedUnavailable')}
+              {String(value)}
+            </option>
+          )}
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <SettingsInput
+          aria-label={item.title}
+          aria-describedby={item.description ? help : undefined}
+          type={item.type === 'number' ? 'number' : 'text'}
+          min={item.minimum}
+          maxLength={item.maxLength}
+          max={item.maximum}
+          step={item.step ?? 'any'}
+          value={String(value ?? '')}
+          onChange={(e) =>
+            set(
+              item.type === 'number'
+                ? e.target.value === ''
+                  ? ''
+                  : numberInput(e.target.value)
+                : e.target.value,
+            )
+          }
+        />
+      );
     return (
       <SettingsField
         key={item.key}
         title={item.title}
         description={
-          item.description && (
-            <span id={help}>
-              <CommandText text={item.description} />
-            </span>
+          (item.description || attached.length > 0) && (
+            <>
+              {item.description && (
+                <span id={help}>
+                  <CommandText text={item.description} />
+                </span>
+              )}
+              {attached.map((action, index) => (
+                <Fragment key={action.command}>
+                  {(item.description || index > 0) && <br />}
+                  {actionDescription(action)}
+                </Fragment>
+              ))}
+            </>
           )
+        }
+        error={
+          result?.error && attached.some((a) => a.command === result.command)
+            ? result.message
+            : undefined
         }
         className={wide ? 'settings-field-wide' : ''}
         {...settingAnchor(pageId, `setting:${item.key}`)}
       >
-        {item.type === 'object-list' && item.list && onListCommit ? (
-          <ObjectListDialogSetting
-            testId={`setting:${settingsItemId(pageId, `setting:${item.key}`)}`}
-            definition={item}
-            value={value}
-            onOpen={
-              applet.pageCollections?.some((c) => c.key === item.key) && onListOpen
-                ? (entry) => onListOpen(item.key, entry.id)
-                : undefined
-            }
-            options={Object.fromEntries(
-              (item.fields ?? [])
-                .filter((field) => field.optionSource === 'web-profiles')
-                .map((field) => [
-                  field.key,
-                  accounts.map((account) => ({ value: account.id, label: account.name })),
-                ]),
-            )}
-            onCommit={(next, before) => onListCommit(item.key, next, before)}
-            onDraftAction={
-              item.list.draftAction && onListDraftAction
-                ? (input) => onListDraftAction(item.key, input)
-                : undefined
-            }
-            onDraftImage={
-              item.list.draftAction && onListDraftImage
-                ? (base64) => onListDraftImage(item.key, base64)
-                : undefined
-            }
-          />
-        ) : item.type === 'object-list' ? (
-          <ObjectListSetting definition={item} value={value} onChange={set} />
-        ) : item.type === 'shortcut-list' ? (
-          <ShortcutListSetting title={item.title} value={value} onChange={set} />
-        ) : item.type === 'registered-image' ? (
-          <RegisteredImageInput value={value} onChange={set} label={item.title} />
-        ) : item.type === 'json' ? (
-          <SettingsTextarea
-            aria-label={item.title}
-            aria-describedby={item.description ? help : undefined}
-            rows={10}
-            value={String(value ?? '')}
-            onChange={(e) => set(e.target.value)}
-          />
-        ) : item.type === 'string' && item.format === 'url' ? (
-          <SettingsUrlInput
-            aria-label={item.title}
-            aria-describedby={item.description ? help : undefined}
-            value={String(value ?? '')}
-            onChange={(e) => set(e.target.value)}
-          />
-        ) : item.type === 'boolean' ? (
-          <button
-            type="button"
-            className="toggle"
-            role="switch"
-            aria-label={item.title}
-            aria-describedby={item.description ? help : undefined}
-            aria-checked={Boolean(value)}
-            onClick={() => set(!value)}
-          >
-            <span />
-          </button>
-        ) : item.type === 'select' ? (
-          <select
-            aria-label={item.title}
-            aria-describedby={item.description ? help : undefined}
-            value={String(value ?? '')}
-            onChange={(e) => set(e.target.value)}
-          >
-            {!options.some((o) => o.value === value) && value !== undefined && (
-              <option value={String(value)}>
-                {translate('settings.appletSettingsForm.savedUnavailable')}
-                {String(value)}
-              </option>
-            )}
-            {options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+        {attached.length ? (
+          <SettingsInputActions wrap>
+            <div>{control}</div>
+            {attached.map((action) => (
+              <SettingsActions
+                key={action.command}
+                {...settingAnchor(pageId, `action:${action.command}`)}
+              >
+                {actionButton(action)}
+                <SettingsMcpLock
+                  title={action.title}
+                  itemId={settingsItemId(pageId, `action:${action.command}`)}
+                />
+              </SettingsActions>
             ))}
-          </select>
+          </SettingsInputActions>
         ) : (
-          <SettingsInput
-            aria-label={item.title}
-            aria-describedby={item.description ? help : undefined}
-            type={item.type === 'number' ? 'number' : 'text'}
-            min={item.minimum}
-            maxLength={item.maxLength}
-            max={item.maximum}
-            step={item.step ?? 'any'}
-            value={String(value ?? '')}
-            onChange={(e) =>
-              set(
-                item.type === 'number'
-                  ? e.target.value === ''
-                    ? ''
-                    : numberInput(e.target.value)
-                  : e.target.value,
-              )
-            }
-          />
+          control
         )}
       </SettingsField>
     );

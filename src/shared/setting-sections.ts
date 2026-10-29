@@ -48,7 +48,7 @@ export function parseSettingSections(
     );
     const buttons = references(
       section.actions,
-      actions.map((a) => a.command),
+      actions.filter((a) => a.settingKey === undefined).map((a) => a.command),
       usedActions,
     );
     if (!fields?.length && !buttons?.length)
@@ -70,15 +70,16 @@ export function resolveSettingSections(
   actions: SettingAction[],
   sections: SettingSection[] = [],
 ) {
+  const standalone = actions.filter((a) => a.settingKey === undefined);
   const usedSettings = new Set(sections.flatMap((s) => s.settings ?? []));
   const usedActions = new Set(sections.flatMap((s) => s.actions ?? []));
   const result = sections.map((section) => ({
     ...section,
     settings: (section.settings ?? []).flatMap((key) => definitions.filter((s) => s.key === key)),
-    actions: (section.actions ?? []).flatMap((key) => actions.filter((a) => a.command === key)),
+    actions: (section.actions ?? []).flatMap((key) => standalone.filter((a) => a.command === key)),
   }));
   const rest = definitions.filter((s) => !usedSettings.has(s.key));
-  const remainingActions = actions.filter((a) => !usedActions.has(a.command));
+  const remainingActions = standalone.filter((a) => !usedActions.has(a.command));
   if (rest.length)
     result.push({
       id: '$settings',

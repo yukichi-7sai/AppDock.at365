@@ -1,10 +1,11 @@
 import { hostText } from './i18n';
-import type { DeclaredCommand, SettingAction } from './contracts';
+import type { DeclaredCommand, SettingAction, SettingDefinition } from './contracts';
 
 /** Actions invoke declared commands; they never create persisted settings. */
 export function parseSettingActions(
   value: unknown,
   commands: DeclaredCommand[],
+  settings: SettingDefinition[] = [],
 ): SettingAction[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > 16)
@@ -21,6 +22,9 @@ export function parseSettingActions(
       typeof action.command !== 'string' ||
       seen.has(action.command) ||
       !commands.some((command) => command.id === action.command) ||
+      (action.settingKey !== undefined &&
+        (typeof action.settingKey !== 'string' ||
+          !settings.some((setting) => setting.key === action.settingKey))) ||
       (action.description !== undefined &&
         (typeof action.description !== 'string' || action.description.length > 1000)) ||
       (action.successMessage !== undefined &&
@@ -33,6 +37,7 @@ export function parseSettingActions(
     return {
       title: action.title,
       command: action.command,
+      ...(action.settingKey !== undefined ? { settingKey: action.settingKey } : {}),
       ...(action.description !== undefined ? { description: action.description } : {}),
       ...(action.successMessage !== undefined ? { successMessage: action.successMessage } : {}),
     };

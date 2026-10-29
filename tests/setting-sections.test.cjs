@@ -9,6 +9,30 @@ const fields = [
   { key: 'seconds', title: 'Seconds', type: 'number', default: 10 },
 ];
 const actions = [{ command: 'fixture.refresh', title: 'Refresh' }];
+test('attached actions follow their setting and never duplicate in standalone sections', () => {
+  const attached = { command: 'fixture.pick', title: 'Pick', settingKey: 'seconds' };
+  const all = [...actions, attached];
+  const sections = parseSettingSections(
+    [{ id: 'timing', title: 'Timing', settings: ['seconds'] }],
+    fields,
+    all,
+  );
+  assert.deepEqual(
+    resolveSettingSections(fields, all, sections).flatMap((s) => s.actions),
+    actions,
+  );
+  assert.deepEqual(
+    resolveSettingSections(fields, [attached]).flatMap((s) => s.actions),
+    [],
+  );
+  assert.throws(() =>
+    parseSettingSections(
+      [{ id: 'timing', title: 'Timing', settings: ['seconds'], actions: [attached.command] }],
+      fields,
+      all,
+    ),
+  );
+});
 test('section order and references are presentation only; undeclared fields and actions stay visible', () => {
   const before = JSON.stringify({ fields, actions });
   const sections = parseSettingSections(
