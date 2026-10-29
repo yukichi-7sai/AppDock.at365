@@ -179,6 +179,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
     }
   }
   private readDisk() {
+    this.observer?.invalidate();
     return this.parse(this.readBytes(this.file));
   }
   private readFailure(error: unknown, immediate = true) {
@@ -348,6 +349,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
       throw error;
     }
     this.value = next;
+    this.observer?.invalidate(serialized);
     this.observer?.resetError();
     this.health.clear('save');
     this.health.clear('read');
@@ -449,6 +451,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
       throw error;
     }
     this.value = next;
+    this.observer?.invalidate(serialized);
     this.observer?.resetError();
     this.recovered = false;
     this.health.clear('read');

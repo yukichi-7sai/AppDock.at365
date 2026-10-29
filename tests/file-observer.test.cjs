@@ -50,6 +50,7 @@ function fixture(t, { watchUnavailable = false } = {}) {
     (text) => {
       JSON.parse(text);
       f.accepted.push(text);
+      f.onAccept?.(text);
     },
     (error) => f.errors.push(error.message),
   );
@@ -198,4 +199,60 @@ test('close ignores outstanding reads and oversize files are rejected', async (t
   await pending;
   assert.equal(f.accepted.length, 1);
   assert.equal(f.errors.length, 1);
+});
+
+test('acknowledged owner content is not reapplied and a later external revert is still delivered', async (t) => {
+  const f = fixture(t);
+  await f.start();
+  const original = f.text;
+  f.text = '{"value":2}';
+  f.observer.invalidate(f.text);
+  await f.tick(100);
+  assert.deepEqual(f.accepted, [original]);
+  f.text = original;
+  f.event('change', 'settings.json');
+  await f.tick(100);
+  await f.tick(180);
+  assert.deepEqual(f.accepted, [original, original]);
+});
+
+test('a save performed by an acceptance callback supersedes that callback result', async (t) => {
+  const f = fixture(t);
+  await f.start();
+  f.onAccept = () => {
+    f.onAccept = undefined;
+    f.text = '{"value":3}';
+    f.stat.ctimeNs++;
+    f.observer.invalidate(f.text);
+  };
+  f.text = '{"value":2}';
+  f.event('change', 'settings.json');
+  await f.tick(100);
+  await f.tick(180);
+  assert.deepEqual(f.accepted, ['{"value":1}', '{"value":2}']);
+  f.text = '{"value":2}';
+  f.event('change', 'settings.json');
+  await f.tick(100);
+  await f.tick(180);
+  assert.deepEqual(f.accepted, ['{"value":1}', '{"value":2}', '{"value":2}']);
+});
+
+test('a superseded read error cannot report a failure after an owner save', async (t) => {
+  const f = fixture(t);
+  await f.start();
+  let reject;
+  f.read = () =>
+    new Promise((_resolve, fail) => {
+      reject = fail;
+    });
+  f.event('change', 'settings.json');
+  await f.tick(100);
+  f.text = '{"value":2}';
+  f.observer.invalidate(f.text);
+  f.read = undefined;
+  reject(Error('Obsolete file lock'));
+  await f.tick(0);
+  await f.tick(100);
+  assert.deepEqual(f.errors, []);
+  assert.deepEqual(f.accepted, ['{"value":1}']);
 });

@@ -55,7 +55,7 @@ export function observeFile(
     try {
       if (watchedDirectory !== path.dirname(file)) watchDirectory(path.dirname(file));
       const stat = await fs.promises.stat(file, { bigint: true });
-      if (closed) return;
+      if (closed || currentGeneration !== generation) return;
       if (!stat.isFile() || stat.size > maximumBytes)
         throw Error(hostText('services.fileObserver.invalidFile'));
       const metadata = signature(stat);
@@ -69,12 +69,12 @@ export function observeFile(
       )
         return;
       const text = await readObservedFile(file);
-      if (closed) return;
+      if (closed || currentGeneration !== generation) return;
       if (Buffer.byteLength(text, 'utf8') > maximumBytes)
         throw Error(hostText('services.fileObserver.invalidFile'));
       const after = await fs.promises.stat(file, { bigint: true });
-      if (closed) return;
-      if (currentGeneration !== generation || signature(after) !== metadata) {
+      if (closed || currentGeneration !== generation) return;
+      if (signature(after) !== metadata) {
         candidate = undefined;
         schedule(stableInterval);
         return;
@@ -92,6 +92,7 @@ export function observeFile(
       }
       if (text !== applied) {
         accept(text);
+        if (closed || currentGeneration !== generation) return;
         applied = text;
       }
       acceptedSignature = metadata;
@@ -166,6 +167,15 @@ export function observeFile(
   schedule(100);
   return {
     check,
+    // A synchronous owner read/save supersedes work started against the previous file.
+    invalidate(currentText?: string) {
+      if (closed) return;
+      generation++;
+      candidate = applied = currentText;
+      candidateSince = performance.now() - stableInterval;
+      acceptedSignature = undefined;
+      schedule(100);
+    },
     // A caller can validate a file directly before the observer sees the healthy interval.
     resetError() {
       lastError = '';
