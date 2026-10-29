@@ -24,7 +24,7 @@
   overflow: hidden;
 }
 .settings-surface .settings-categories {
-  padding-block: 16px;
+  padding: 4px;
   gap: 0;
 }
 .settings-surface .sidebar-resizer {
@@ -38,6 +38,7 @@
   min-height: 0;
   flex: 1;
   display: block;
+  padding: 0 12px 12px;
 }
 .settings-categories .sidebar-extensions button {
   width: 100%;
@@ -480,8 +481,8 @@
   }
 }
 .settings-categories .settings-search {
-  width: 100%;
-  margin: 0 0 16px;
+  width: calc(100% - 24px);
+  margin: 12px 12px 16px;
 }
 .settings-applet-heading {
   font-size: 12px;
