@@ -1,5 +1,6 @@
 import type { HostSettings, SettingDefinition } from './contracts';
 import { hostText } from './i18n';
+import { notificationBannerPositions } from './notifications';
 import { defaultHostLanguage, hostLanguages } from './host-language';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import {
@@ -23,7 +24,7 @@ type OrdinaryHostKey = Exclude<
 >;
 export type HostSettingDefinition = SettingDefinition & {
   key: OrdinaryHostKey;
-  pageId: 'appearance' | 'general' | 'statusbar';
+  pageId: 'appearance' | 'general' | 'statusbar' | 'notifications';
   catalogKey?: string;
   applies?: string;
 };
@@ -118,6 +119,18 @@ const definitions = {
     default: true,
     automation: true,
     generateCommands: [...switches],
+  },
+  notificationBannerPosition: {
+    pageId: 'notifications',
+    title: hostText('settings.notificationSettings.bannerPosition'),
+    description: hostText('settings.notificationSettings.bannerPositionHint'),
+    type: 'select',
+    default: 'top-center',
+    automation: true,
+    options: notificationBannerPositions.map((value) => ({
+      value,
+      label: hostText(`settings.notificationSettings.position.${value}`),
+    })),
   },
   showStatusBar: {
     pageId: 'statusbar',

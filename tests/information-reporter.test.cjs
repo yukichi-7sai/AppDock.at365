@@ -48,25 +48,28 @@ function fixture(t) {
     },
   };
 }
-test('catalog order, mandatory banners, six second lifetime, speech off and legacy preference repair', () => {
+test('host notification destinations are optional while default banners, lifetime and speech remain unchanged', () => {
   const types = notificationCatalog([]),
     settings = createDefaultSettings();
   assert.deepEqual(
     types.slice(0, 3).map((t) => t.title),
     ['エラー通知', '警告通知', 'インフォメーション通知'],
   );
-  for (const type of types.filter((t) => ['warnings', 'information'].includes(t.ownerId))) {
-    assert.deepEqual(type.requiredTargets, ['banner']);
-    settings.notificationPreferences = {
-      overrides: [{ ownerKind: 'host', ownerId: type.ownerId, typeId: type.typeId, targets: [] }],
-    };
-    const before = JSON.stringify(settings);
-    assert(resolveNotificationPolicy(type, settings).targets.includes('banner'));
-    assert.equal(JSON.stringify(settings), before);
-    assert.equal(notificationSpeechEnabled(type, settings), false);
-    assert.throws(() =>
-      validateNotificationPreferenceChanges(settings, createDefaultSettings(), types),
-    );
+  for (const type of types.slice(0, 3)) {
+    assert.deepEqual(type.requiredTargets, []);
+    assert.deepEqual(type.defaultTargets, ['banner']);
+    for (const targets of [[], ['desktop'], ['windows'], ['banner', 'desktop', 'windows']]) {
+      settings.notificationPreferences = {
+        overrides: [{ ownerKind: 'host', ownerId: type.ownerId, typeId: type.typeId, targets }],
+      };
+      const before = JSON.stringify(settings);
+      assert.deepEqual(resolveNotificationPolicy(type, settings).targets, targets);
+      assert.equal(JSON.stringify(settings), before);
+      assert.equal(notificationSpeechEnabled(type, settings), false);
+      assert.doesNotThrow(() =>
+        validateNotificationPreferenceChanges(settings, createDefaultSettings(), types),
+      );
+    }
   }
   const info = types[2];
   assert.deepEqual(info.defaultTargets, ['banner']);

@@ -3984,6 +3984,7 @@ async function initialize() {
   });
   notificationBanner = new NotificationSurfaceHost({
     window,
+    position: () => settings.value.host.notificationBannerPosition,
     preload: path.join(__dirname, 'notification-surface-preload.js'),
     controller: new NotificationSurfaceController(
       notificationService,

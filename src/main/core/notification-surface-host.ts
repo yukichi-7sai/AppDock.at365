@@ -8,7 +8,11 @@ import {
 } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { shellView } from '../../shared/shell';
-import type { NotificationBannerModel } from '../../shared/notifications';
+import type {
+  NotificationBannerModel,
+  NotificationBannerPosition,
+} from '../../shared/notifications';
+import { bannerNotificationBounds } from './notification-banner-layout';
 import type { NotificationSurfaceController } from './notification-surface-controller';
 import { createShellView } from './shell-view';
 type Surface = {
@@ -46,6 +50,7 @@ export class NotificationSurfaceHost {
       layer(): void;
       visible?(): boolean;
       viewport?(): NotificationBannerModel['viewport'];
+      position?(): NotificationBannerPosition;
       arrange?(view: WebContentsView | undefined, height: number, visible: boolean): void;
       focusHost?(): void;
       openCenter?(): Promise<void>;
@@ -302,14 +307,17 @@ export class NotificationSurfaceHost {
     else if (s && visible) {
       const viewport = this.viewport(),
         zoom = this.options.window.webContents.getZoomFactor();
-      const [width] = this.options.window.getContentSize();
+      const [width, height] = this.options.window.getContentSize();
       s.view.webContents.setZoomFactor(zoom);
-      s.view.setBounds({
-        x: Math.max(0, Math.round((width - viewport.width * zoom) / 2)),
-        y: Math.round(48 * zoom),
-        width: Math.max(1, Math.round(viewport.width * zoom)),
-        height: Math.max(1, Math.round(Math.min(s.height, viewport.maxHeight) * zoom)),
-      });
+      s.view.setBounds(
+        bannerNotificationBounds(
+          { width, height },
+          viewport,
+          s.height,
+          zoom,
+          this.options.position?.() ?? 'top-center',
+        ),
+      );
       this.options.window.contentView.addChildView(s.view);
       this.options.layer();
     }

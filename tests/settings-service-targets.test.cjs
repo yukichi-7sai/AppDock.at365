@@ -693,8 +693,9 @@ test('AI authenticated endpoint/authentication edits require local actions and d
   assert.equal(fs.readFileSync(f.aiFile, 'utf8'), bytes);
 });
 test('notification updates enforce required targets and lifetime rules, preserve missing providers and clear overrides', (t) => {
-  const f = fixture(t),
-    type = f.types[0],
+  const f = fixture(t);
+  f.types[0] = { ...f.types[0], requiredTargets: ['banner'] };
+  const type = f.types[0],
     id = f.notification(type),
     before = structuredClone(f.store.value.notificationPreferences.overrides);
   const request = f.request(id, [
@@ -755,7 +756,7 @@ test('notification speech inherits TTS values; schema changes and missing/stoppe
   const type = f.types[0],
     id = f.notification(type),
     request = f.request(id, [{ kind: 'set', changes: { speak: true } }]);
-  f.types[0] = { ...type, requiredTargets: [] };
+  f.types[0] = { ...type, requiredTargets: ['banner'] };
   assert.throws(() => f.call('apply', request), { code: 'SCHEMA_CONFLICT' });
   f.types.splice(0, 1);
   assert.throws(() => f.read(id), { code: 'NOT_FOUND' });

@@ -20,7 +20,7 @@ app.whenReady().then(async()=>{
  await window.loadURL('data:text/html,<html><body><button id="host">Host focus</button><input id="keep"></body></html>');
  window.webContents.setZoomFactor(1);
  const service=new NotificationService();
- let selected='appdock.default-shell', dark=true, executions=0;
+ let selected='appdock.default-shell', dark=true, executions=0, position='top-center';
  const providers=[
  {id:'appdock.default-shell',sourceKind:'builtin',folder:path.join(root,'out/shells/default'),version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'notifications.html'}}},
  {id:'fixture.partial',folder:path.join(root,'out/shells/default'),version:'1',enabled:true,state:'running',shell:{views:{'notification.banner':'notifications.html'}}},
@@ -29,7 +29,7 @@ app.whenReady().then(async()=>{
  const host=new NotificationSurfaceHost({window,controller:new NotificationSurfaceController(service,()=>dark),preload:path.join(root,'out/main/main/notification-surface-preload.js'),
  providers:()=>providers,registry:new ShellProviderRegistry({providers:()=>providers,assignments:()=>({'notification.banner':selected}),safeMode:false}),ready:()=>true,settings:()=>({accent:true}),
  execute:async(id,command)=>{if(command!=='fixture.own')throw Error('Not owned');return id;},
- layer:()=>{},failed:(m)=>console.error(m)});
+ position:()=>position,layer:()=>{},failed:(m)=>console.error(m)});
  fixture={window,service,host,providers,
  publish: (key,extra={})=>service.upsert('host.fixture',{dedupeKey:key,level:'info',title:'Notice '+key,body:'Fixture message',
  lifetime:{type:'manual'},dismissible:true,targets:['banner'],history:'persistent',
@@ -37,6 +37,7 @@ app.whenReady().then(async()=>{
  actions:[{key:'run',label:'Run '+key,run:async()=>{executions++;await new Promise(r=>setTimeout(r,80));}}],
  ...extra}),
  select:id=>{selected=id;host.refresh();}, theme:value=>{dark=value;host.refresh();},
+ position:value=>{position=value;host.refresh();},
  count:()=>executions };
  globalThis.fixture=fixture;
  window.on('closed',()=>{host.dispose();service.dispose();app.quit();});
@@ -219,6 +220,14 @@ delete env.ELECTRON_RUN_AS_NODE;
       fixture.window.contentView.children.at(-1).getBounds(),
     );
     assert.ok(zoomBounds.width <= 720 && zoomBounds.height <= 232);
+    await app.evaluate(() => fixture.position('bottom-right'));
+    const bottomBounds = await app.evaluate(() => ({
+      rect: fixture.window.contentView.children.at(-1).getBounds(),
+      content: fixture.window.getContentSize(),
+    }));
+    assert.equal(bottomBounds.content[0] - bottomBounds.rect.x - bottomBounds.rect.width, 20);
+    assert.equal(bottomBounds.content[1] - bottomBounds.rect.y - bottomBounds.rect.height, 60);
+    await p.screenshot({ path: path.join(profile, 'bottom-right-light-zoom.png') });
     await app.evaluate(() => fixture.window.hide());
     assert.equal(
       await app.evaluate(() => fixture.window.contentView.children.at(-1).getVisible()),
@@ -230,7 +239,9 @@ delete env.ELECTRON_RUN_AS_NODE;
     assert.ok(history.length > 0);
     assert.ok(history.every((item) => !('actions' in item) && !('read' in item)));
     assert.equal(fs.existsSync(path.join(profile, 'history.json')), false);
-    checks.push('light / narrow / 125 percent zoom / hide and restore / safe history');
+    checks.push(
+      'light / narrow / 125 percent zoom / bottom-right anchoring / hide and restore / safe history',
+    );
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify({ ok: true, checks, profile }, null, 2),

@@ -60,7 +60,7 @@ test('shared error type uses AppDock preferences and ignores obsolete OFF values
   assert.equal(type.title, 'エラー通知');
   assert.equal(type.defaultDurationSeconds, null);
   assert.deepEqual(type.defaultTargets, ['banner']);
-  assert.deepEqual(type.requiredTargets, ['banner']);
+  assert.deepEqual(type.requiredTargets, []);
   assert.equal('canDisable' in type, false);
   assert.equal(notificationSpeechEnabled(type, f.settings()), false);
   f.reporter.report(failure);
@@ -85,7 +85,7 @@ test('shared error type uses AppDock preferences and ignores obsolete OFF values
   f.reporter.report({ ...failure, eventId: 'job-four' });
   const active = f.service.list().filter((n) => n.status === 'active');
   assert.equal(active.length, 4);
-  assert.deepEqual(active[0].targets, ['banner']);
+  assert.deepEqual(active[0].targets, []);
   assert.equal(f.logs.length, 4);
 });
 test('reporting faults never recurse, retry, or replace the operation result', () => {

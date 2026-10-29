@@ -22,6 +22,8 @@ import { NotificationTypeDialog } from './NotificationTypeDialog';
 import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
 import { SettingsListLayout, ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsInput } from '../settings-ui/SettingsInput';
+import { hostSettingDefinitions } from '../../shared/host-settings';
+import type { NotificationBannerPosition } from '../../shared/notifications';
 import { SettingsCombobox } from '../settings-ui/SettingsCombobox';
 import { Toggle } from '../settings-ui/Toggle';
 import {
@@ -38,6 +40,9 @@ const targetTitles = {
 const reasonTitles: Record<string, string> = {
   'type-definition-changed': hostText('settings.notificationSettings.changed'),
 };
+const bannerPositionSetting = hostSettingDefinitions.find(
+  (field) => field.key === 'notificationBannerPosition',
+)!;
 export function NotificationSettings({
   editor,
   types,
@@ -120,6 +125,35 @@ export function NotificationSettings({
   useSettingsFeedback({ busy: pending, error });
   return (
     <div className="settings-sections notification-settings">
+      <SettingsSection title={translate('settings.notificationSettings.banner')}>
+        <SettingsField
+          title={bannerPositionSetting.title}
+          description={bannerPositionSetting.description}
+          {...settingAnchor('notifications', 'notificationBannerPosition')}
+        >
+          <select
+            aria-label={bannerPositionSetting.title}
+            data-testid="notification-banner-position"
+            disabled={busy}
+            value={settings.host.notificationBannerPosition}
+            onChange={(event) =>
+              editor.edit({
+                ...settings,
+                host: {
+                  ...settings.host,
+                  notificationBannerPosition: event.target.value as NotificationBannerPosition,
+                },
+              })
+            }
+          >
+            {bannerPositionSetting.options?.map((option) => (
+              <option key={String(option.value)} value={String(option.value)}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </SettingsField>
+      </SettingsSection>
       <SettingsContent>
         <SettingsListLayout title={translate('settings.notificationSettings.list')} toolbar={null}>
           <thead>

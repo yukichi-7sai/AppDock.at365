@@ -18,6 +18,49 @@ initial.gestures.enabled = false;
 initial.touchpadGestures.enabled = false;
 initial.updates.checkHostOnStartup = false;
 initial.updates.checkAppletsOnStartup = false;
+const fixtureId = 'fixture.banner-position';
+const fixtureFolder = path.join(profile, 'extensions', fixtureId);
+fs.mkdirSync(fixtureFolder, { recursive: true });
+fs.writeFileSync(
+  path.join(fixtureFolder, 'extension.json'),
+  JSON.stringify({
+    apiVersion: 1,
+    id: fixtureId,
+    name: 'Banner position fixture',
+    version: '1.0.0',
+    minimumHostVersion: '0.31.1',
+    runtime: 'node',
+    entry: 'index.cjs',
+    capabilities: ['notifications'],
+    commands: ['publish', 'end'].map((key) => ({ id: fixtureId + '.' + key, title: key })),
+    notificationTypes: [
+      {
+        typeId: 'probe',
+        title: 'Position probe',
+        description: 'Isolated notification',
+        levels: ['info'],
+        defaultLevel: 'info',
+        allowedTargets: ['banner'],
+        defaultTargets: ['banner'],
+        requiredTargets: [],
+        lifetimePolicy: 'userDuration',
+        history: 'session',
+      },
+    ],
+  }),
+);
+fs.writeFileSync(
+  path.join(fixtureFolder, 'index.cjs'),
+  `exports.activate=async c=>{
+  const ids=[];
+  c.commands.register('${fixtureId}.publish','Publish',async()=>{
+    const result=await c.notifications.publish({typeId:'probe',title:'Position probe '+(ids.length+1),body:'Banner position and measured height'});
+    if(result.status==='accepted')ids.push(result.notificationId);
+  });
+  c.commands.register('${fixtureId}.end','End',async()=>{for(const id of ids)await c.notifications.end(id,'resolved');});
+};`,
+);
+initial.extensions[fixtureId] = { enabled: true, settings: {} };
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
 
 const source = process.argv[2] && path.resolve(process.argv[2]);
@@ -86,6 +129,116 @@ let app,
     assert.equal((await saved()).host.soundEnabled, false);
     checks.push('sound edits save immediately and generated commands update the same control');
 
+    await open('notifications');
+    await waitForHost(host, async () =>
+      (await window.dock.snapshot()).extensions.some(
+        (entry) => entry.id === 'fixture.banner-position' && entry.state === 'running',
+      ),
+    );
+    await host.evaluate(() => window.dock.executeCommand('fixture.banner-position.publish'));
+    const banner = await (async () => {
+      const end = Date.now() + 15000;
+      while (Date.now() < end) {
+        const page = app
+          .context()
+          .pages()
+          .find((page) => page.url().endsWith('/notifications.html'));
+        if (page) return page;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      throw Error('banner ready');
+    })();
+    await banner.getByRole('region', { name: 'Position probe 1', exact: true }).waitFor();
+    const session = (await banner.evaluate(() => window.appdockNotifications.connect())).sessionId;
+    const nativeBounds = () =>
+      app.evaluate(({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows().find((w) =>
+          w.webContents.getURL().startsWith('appdock://host/'),
+        );
+        const view = window.contentView.children.find((v) =>
+          v.webContents?.getURL().endsWith('/notifications.html'),
+        );
+        return {
+          ...view.getBounds(),
+          content: window.getContentSize(),
+          zoom: window.webContents.getZoomFactor(),
+        };
+      });
+    for (const position of [
+      'top-center',
+      'bottom-center',
+      'top-right',
+      'bottom-right',
+      'top-left',
+      'bottom-left',
+    ]) {
+      await host.getByTestId('notification-banner-position').selectOption(position);
+      await settleSettings(host);
+      assert.equal((await saved()).host.notificationBannerPosition, position);
+      await waitForHost(
+        host,
+        async () =>
+          (await window.dock.snapshot()).settings.value.host.notificationBannerPosition !==
+          undefined,
+      );
+      const deadline = Date.now() + 10000;
+      let rect;
+      while (Date.now() < deadline) {
+        rect = await nativeBounds();
+        const expectedX = position.endsWith('-left')
+          ? 16 * rect.zoom
+          : position.endsWith('-right')
+            ? rect.content[0] - rect.width - 16 * rect.zoom
+            : (rect.content[0] - rect.width) / 2;
+        const expectedY = position.startsWith('bottom-')
+          ? rect.content[1] - rect.height - 48 * rect.zoom
+          : 48 * rect.zoom;
+        if (Math.abs(rect.x - expectedX) <= 1 && Math.abs(rect.y - expectedY) <= 1) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      const bottom = position.startsWith('bottom-');
+      assert(
+        Math.abs((bottom ? rect.content[1] - rect.y - rect.height : rect.y) - 48 * rect.zoom) <= 1,
+      );
+      if (position.endsWith('-left')) assert(Math.abs(rect.x - 16 * rect.zoom) <= 1);
+      if (position.endsWith('-right'))
+        assert(Math.abs(rect.content[0] - rect.x - rect.width - 16 * rect.zoom) <= 1);
+      if (position.endsWith('-center'))
+        assert(Math.abs(rect.x + rect.width / 2 - rect.content[0] / 2) <= 1);
+      assert.equal(
+        (await banner.evaluate(() => window.appdockNotifications.connect())).sessionId,
+        session,
+      );
+    }
+    const beforeGrowth = await nativeBounds();
+    await host.evaluate(() => window.dock.executeCommand('fixture.banner-position.publish'));
+    await banner.getByRole('region', { name: 'Position probe 2', exact: true }).waitFor();
+    let afterGrowth;
+    const growDeadline = Date.now() + 10000;
+    do {
+      afterGrowth = await nativeBounds();
+      if (afterGrowth.height > beforeGrowth.height) break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } while (Date.now() < growDeadline);
+    assert(afterGrowth.height > beforeGrowth.height);
+    assert.equal(afterGrowth.y + afterGrowth.height, beforeGrowth.y + beforeGrowth.height);
+    await host.screenshot({ path: path.join(profile, 'banner-bottom-left.png') });
+    await host.evaluate(() => window.dock.executeCommand('fixture.banner-position.end'));
+    const raw = JSON.parse(
+      fs.readFileSync(path.join(profile, `settings-${require('node:os').hostname()}.json`)),
+    );
+    assert.equal(raw.host.notificationBannerPosition, 'bottom-left');
+    await host.reload();
+    await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+    await open('notifications');
+    assert.equal(
+      await host.getByTestId('notification-banner-position').inputValue(),
+      'bottom-left',
+    );
+    checks.push(
+      'six banner positions save and move the existing native surface; bottom growth stays anchored; page reload restores selection',
+    );
+
     for (const { theme, width } of [
       { theme: 'light', width: 1280 },
       { theme: 'dark', width: 760 },
@@ -129,10 +282,16 @@ let app,
       const notificationDialog = host.getByRole('dialog');
       await notificationDialog.waitFor();
       assert(
-        await notificationDialog.getByLabel('エラー通知のバナー', { exact: true }).isDisabled(),
+        await notificationDialog.getByLabel('エラー通知のバナー', { exact: true }).isEnabled(),
       );
       assert(
         await notificationDialog.getByLabel('エラー通知のバナー', { exact: true }).isChecked(),
+      );
+      await notificationDialog.getByLabel('エラー通知のバナー', { exact: true }).uncheck();
+      assert(
+        await notificationDialog
+          .getByLabel('エラー通知の通知センターのみ', { exact: true })
+          .isChecked(),
       );
       await host.screenshot({ path: path.join(profile, `${theme}-${width}-controls.png`) });
       await notificationDialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -140,7 +299,7 @@ let app,
       assert(await edit.evaluate((element) => element === document.activeElement));
       assert.deepEqual((await saved()).notificationPreferences, before);
       checks.push(
-        `${theme}/${width}: keyboard expansion, focus, row click and required notification destination`,
+        `${theme}/${width}: keyboard expansion, focus, row click and optional notification destination cancel`,
       );
     }
     await host.getByRole('button', { name: 'AppDockのエラー通知を編集', exact: true }).click();
@@ -164,6 +323,28 @@ let app,
       .filter({ has: host.getByText('エラー通知', { exact: true }) });
     assert.match(await notificationRow.innerText(), /12秒/);
     checks.push('notification draft saves only on OK and the list reflects its saved value');
+    for (const title of ['エラー通知', '警告通知', 'インフォメーション通知']) {
+      await host.getByRole('button', { name: `AppDockの${title}を編集`, exact: true }).click();
+      const dialog = host.getByRole('dialog');
+      await dialog.getByLabel(`${title}の通知センターのみ`, { exact: true }).check();
+      await dialog.getByTestId('settings-dialog-confirm').click();
+      await dialog.waitFor({ state: 'hidden' });
+      await settleSettings(host);
+      await host.getByRole('button', { name: `AppDockの${title}を編集`, exact: true }).click();
+      assert(await dialog.getByLabel(`${title}の通知センターのみ`, { exact: true }).isChecked());
+      await dialog.getByLabel(`${title}のデスクトップ通知`, { exact: true }).check();
+      await dialog.getByTestId('settings-dialog-confirm').click();
+      await dialog.waitFor({ state: 'hidden' });
+      await settleSettings(host);
+    }
+    const storedTypes = (await saved()).notificationPreferences.overrides.filter((row) =>
+      ['errors', 'warnings', 'information'].includes(row.ownerId),
+    );
+    assert.equal(storedTypes.length, 3);
+    assert(storedTypes.every((row) => JSON.stringify(row.targets) === '["desktop"]'));
+    checks.push(
+      'all three host notification types persist center-only and desktop-only destinations without adding banners',
+    );
 
     await open('general');
     const search = host.getByRole('combobox', { name: '設定を検索', exact: true });
@@ -203,6 +384,46 @@ let app,
     assert.deepEqual((await saved()).ai, persisted, 'cancel discards local edits');
     checks.push(
       'AI dialog keeps drafts local, saves on OK, restores values and discards on cancel',
+    );
+    await app.close();
+    app = await launchTestHost({
+      executablePath,
+      portable: !!source,
+      env,
+      args: [
+        ...(source ? [] : [root]),
+        '--test-profile=' + profile,
+        '--test-local-state=' + path.join(profile, 'local'),
+      ],
+    });
+    const restartDeadline = Date.now() + 30000;
+    host = undefined;
+    while (!host && Date.now() < restartDeadline) {
+      host = app
+        .context()
+        .pages()
+        .find((page) => page.url().startsWith('appdock://host/'));
+      if (!host) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert(host);
+    await waitForHost(host, async () => (await window.dock?.snapshot())?.startupReady);
+    await open('notifications');
+    assert.equal(
+      await host.getByTestId('notification-banner-position').inputValue(),
+      'bottom-left',
+    );
+    assert.deepEqual(
+      (await saved()).notificationPreferences.overrides,
+      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
+        .overrides,
+    );
+    assert(
+      (await saved()).notificationPreferences.overrides
+        .filter((row) => ['errors', 'warnings', 'information'].includes(row.ownerId))
+        .every((row) => JSON.stringify(row.targets) === '["desktop"]'),
+    );
+    checks.push(
+      'process restart restores the saved banner position and all three optional destinations',
     );
     assert.deepEqual(errors, []);
     success = true;

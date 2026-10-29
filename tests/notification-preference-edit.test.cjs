@@ -76,7 +76,7 @@ test('catalog removal and changed delivery rules reject stale dialog; availabili
   const { settings, catalog, type, row } = setup();
   assert.throws(() => save(settings, [], type, null, { ...row, speak: true }));
   const changed = catalog.map((entry, index) =>
-    index ? entry : { ...entry, requiredTargets: [] },
+    index ? entry : { ...entry, requiredTargets: ['banner'] },
   );
   assert.throws(() => save(settings, changed, type, null, { ...row, speak: true }));
   const stopped = catalog.map((entry) => ({
@@ -94,7 +94,6 @@ test('catalog removal and changed delivery rules reject stale dialog; availabili
 test('host validates required targets, permitted targets, duration and row identity before saving', () => {
   const { settings, catalog, type, row } = setup();
   for (const patch of [
-    { targets: [] },
     { targets: ['banner', 'unknown'] },
     { durationSeconds: 0 },
     { durationSeconds: 86401 },
@@ -103,6 +102,13 @@ test('host validates required targets, permitted targets, duration and row ident
     { typeId: 'different' },
   ])
     assert.throws(() => save(settings, catalog, type, null, { ...row, ...patch }));
+  const required = { ...type, requiredTargets: ['banner'] };
+  assert.throws(() => save(settings, [required], required, null, { ...row, targets: [] }));
+  assert.deepEqual(
+    save(settings, catalog, type, null, { ...row, targets: [] }).notificationPreferences
+      .overrides[0].targets,
+    [],
+  );
   const fixed = { ...type, lifetimePolicy: 'condition', defaultDurationSeconds: undefined };
   assert.throws(() => save(settings, [fixed], fixed, null, { ...row, durationSeconds: 5 }));
   assert.deepEqual(settings.notificationPreferences.overrides, []);

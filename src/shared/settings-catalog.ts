@@ -393,6 +393,9 @@ function hostRows(
   if (pageId !== 'appearance' && pageId !== 'general' && pageId !== 'statusbar')
     return [
       ...(hostItems[pageId] ?? []),
+      ...hostSettingDefinitions
+        .filter((field) => field.pageId === pageId && !field.catalogKey)
+        .map((field): [string, string, string?] => [field.key, field.title, field.description]),
       ...(['shortcuts', 'gestures', 'touchpad-gestures'].includes(pageId)
         ? commandTriggerSettingDefinitions().map((field): [string, string, string?] => [
             field.key,
@@ -642,7 +645,7 @@ export function settingsPaths(
     case 'ai':
       return [['ai']];
     case 'notifications':
-      return [['notificationPreferences']];
+      return [['notificationPreferences'], ['host', 'notificationBannerPosition']];
     case 'general':
       return generalKeys().map((k) => ['host', k]);
     case 'statusbar':

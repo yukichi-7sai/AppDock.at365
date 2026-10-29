@@ -1,4 +1,13 @@
 import type { ShellAppletApi } from './shell';
+export const notificationBannerPositions = [
+  'top-center',
+  'bottom-center',
+  'top-right',
+  'bottom-right',
+  'top-left',
+  'bottom-left',
+] as const;
+export type NotificationBannerPosition = (typeof notificationBannerPositions)[number];
 export type NotificationLevel = 'info' | 'warning' | 'error';
 export type NotificationStatus = 'active' | 'resolved' | 'dismissed' | 'expired' | 'withdrawn';
 export type NotificationTarget = 'banner' | 'desktop' | 'windows';

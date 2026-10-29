@@ -284,7 +284,7 @@ test('obsolete disabling declarations and preferences cannot bypass required ban
   assert.equal(p.parseNotificationTypes([definition({ requiredTargets: ['banner'] })]).length, 1);
 });
 
-test('error banner is required even for older center-only preferences; explicit removal is rejected', () => {
+test('error preferences can omit banners and obsolete OFF does not suppress notification history', () => {
   const type = p.notificationCatalog([]).find((t) => t.ownerId === 'errors');
   const original = createDefaultSettings();
   for (const targets of [[], ['desktop'], ['windows']]) {
@@ -292,8 +292,8 @@ test('error banner is required even for older center-only preferences; explicit 
     next.notificationPreferences = {
       overrides: [{ ownerKind: 'host', ownerId: 'errors', typeId: type.typeId, targets }],
     };
-    assert.throws(() => p.validateNotificationPreferenceChanges(next, original, [type]));
-    assert(p.resolveNotificationPolicy(type, next).targets.includes('banner'));
+    assert.doesNotThrow(() => p.validateNotificationPreferenceChanges(next, original, [type]));
+    assert.deepEqual(p.resolveNotificationPolicy(type, next).targets, targets);
   }
   const disabled = structuredClone(original);
   disabled.notificationPreferences = {
