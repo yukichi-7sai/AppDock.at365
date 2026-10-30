@@ -10,12 +10,23 @@ import type { UiCommand } from '../../shared/commands';
 
 export class NavigationCoordinator {
   private requestSequence = 0;
+  private appliedSequence = 0;
   state: NavigationState = { ...defaultNavigation, request: 0 };
   constructor(
     private changed: () => void,
     private beforeNavigate?: () => Promise<void>,
     private failed?: (error: unknown) => void,
-  ) {}
+    initialRoute?: string,
+  ) {
+    if (initialRoute && isPageRoute(initialRoute)) this.state = { route: initialRoute, request: 0 };
+  }
+  lease(route: string) {
+    const sequence = this.requestSequence;
+    return () =>
+      sequence === this.requestSequence &&
+      sequence === this.appliedSequence &&
+      this.state.route === route;
+  }
   restore(route: string) {
     // Startup restoration has lower priority than any explicit or pending navigation.
     if (this.requestSequence !== 0) return;
@@ -37,9 +48,13 @@ export class NavigationCoordinator {
     }
     if (!isPageRoute(route)) throw Error('Unknown route');
     const sequence = ++this.requestSequence;
-    if (route === this.state.route && !section && !appletId) return;
+    if (route === this.state.route && !section && !appletId) {
+      this.appliedSequence = sequence;
+      return;
+    }
     const apply = () => {
       if (sequence !== this.requestSequence) return;
+      this.appliedSequence = sequence;
       this.state = {
         route,
         section,

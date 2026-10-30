@@ -1000,19 +1000,19 @@ export class WebAccountController {
     this.layout();
     this.changed();
   }
-  async open() {
+  async open(presentation?: import('./applet-pages').PageOpenOptions) {
     if (this.disposed) throw Error('Web accounts are closed');
     if (this.opening) return this.opening;
     if (this.surface) {
-      await this.surface.open();
+      await this.surface.open(presentation);
       return;
     }
-    this.opening = this.openWindow().finally(() => {
+    this.opening = this.openWindow(presentation).finally(() => {
       this.opening = undefined;
     });
     return this.opening;
   }
-  private async openWindow() {
+  private async openWindow(presentation?: import('./applet-pages').PageOpenOptions) {
     await this.start();
     if (this.disposed) return;
     const page = this.services.page;
@@ -1029,7 +1029,7 @@ export class WebAccountController {
       onCreated: (contents) => this.bindShortcuts(contents),
     });
     try {
-      await this.surface.open();
+      await this.surface.open(presentation);
       if (!this.disposed && this.state.selected) this.show(this.state.selected);
     } catch {
       this.surface?.close();

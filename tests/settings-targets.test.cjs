@@ -181,6 +181,44 @@ const values = (result) =>
     result.fields.filter((field) => field.hasValue).map((field) => [field.key, field.value]),
   );
 
+test('start page publication uses live page candidates, next-start application and atomic validation', (t) => {
+  const f = fixture(t);
+  f.owner.pages = [
+    { id: 'main', title: 'Main' },
+    { id: 'window', title: 'Window', defaultDisplay: 'window' },
+  ];
+  const targetId = 'host.general';
+  const schema = f.call('schema.get', { targetId });
+  const field = schema.items.find((field) => field.key === 'startPage');
+  assert.deepEqual(field.inputSchema.enum, ['about', 'page:test.target-provider:main']);
+  assert.equal(field.applies, 'nextStart');
+  assert.equal(f.settingsCommands.schema().fields.startPage, undefined);
+  const operations = [{ kind: 'set', changes: { startPage: 'page:test.target-provider:main' } }];
+  f.call('apply', f.request(operations, { targetId, dryRun: true }));
+  assert.equal(f.store.value.host.startPage, 'about');
+  f.call('apply', f.request(operations, { targetId }));
+  assert.equal(f.store.value.host.startPage, 'page:test.target-provider:main');
+  const writes = f.writes();
+  assert.throws(
+    () =>
+      f.call(
+        'apply',
+        f.request([{ kind: 'set', changes: { startPage: 'page:test.target-provider:window' } }], {
+          targetId,
+        }),
+      ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.equal(f.writes(), writes);
+  f.owner.enabled = false;
+  assert.deepEqual(
+    f.call('schema.get', { targetId }).items.find((field) => field.key === 'startPage').inputSchema
+      .enum,
+    ['about'],
+  );
+  assert.equal(values(f.read(targetId, ['startPage'])).startPage, 'page:test.target-provider:main');
+});
+
 test('fixed MCP entries discover registered fields without exposing private/default/unsupported data', (t) => {
   const f = fixture(t),
     id = f.target();

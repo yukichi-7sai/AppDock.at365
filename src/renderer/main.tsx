@@ -19,6 +19,7 @@ import { appletManagementCommands } from '../shared/applet-management';
 import { useSettingsEditor } from './useSettingsEditor';
 import { useRestartView } from './useRestartView';
 import { defaultNavigation, isPageRoute, type PageRoute } from '../shared/navigation';
+import { startPageState } from '../shared/start-page';
 import { useAppletSidebar } from './useAppletSidebar';
 import { ribbonDisplayWidth } from '../shared/ribbon';
 
@@ -88,9 +89,11 @@ function App() {
   });
   const [page, setLocalPage] = useRestartView<Page>('page', defaultNavigation.route, isPageRoute);
   const setPage = (next: Page) => {
+    setPendingPage(null);
     void window.dock.navigate(next).catch((e) => setError(String(e)));
   };
   const openDefaultPage = () => {
+    setPendingPage(null);
     void window.dock.navigate(null).catch((e) => setError(String(e)));
   };
   const ribbonSlot = useRef<HTMLDivElement>(null);
@@ -117,16 +120,20 @@ function App() {
     [],
   );
   const navigationSeen = useRef(-1);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const nav = snapshot?.navigation;
     if (!nav || nav.request === navigationSeen.current) return;
     navigationSeen.current = nav.request;
     if (nav.request === 0) {
-      if (page !== nav.route)
+      if (new URLSearchParams(location.search).get('restoreView') !== '1') {
+        setLocalPage(nav.route as Page);
+        if (nav.route.startsWith('page:')) setPendingPage(nav.route);
+      } else if (page !== nav.route)
         void window.dock.navigate(page, true).catch((error) => setError(String(error)));
       return;
     }
     setLocalPage(nav.route as Page);
+    if (nav.route !== pendingPage) setPendingPage(null);
     if (nav.route === 'logs' && typeof nav.appletId === 'string') setLogSource(nav.appletId);
     if (nav.section === defaultNavigation.section) editor.selectPage(defaultNavigation.section);
     else if (nav.section === 'applets') editor.selectPage('applets');
@@ -135,7 +142,10 @@ function App() {
     if (nav.section === 'ribbon') setRibbonRequest((v) => v + 1);
     if (nav.section === 'general') setGeneralRequest((v) => v + 1);
   }, [snapshot?.navigation]);
-  const [restoringPage, setRestoringPage] = useState(page.startsWith('page:'));
+  const [pendingPage, setPendingPage] = useState<string | null>(
+    page.startsWith('page:') ? page : null,
+  );
+  const restoringPage = pendingPage === page;
   const openingRestoredPage = useRef(false);
   const [error, setError] = useState('');
   const hostUiRendered = React.useCallback(() => {
@@ -241,29 +251,23 @@ function App() {
   useEffect(() => {
     if (!restoringPage || !snapshot?.startupReady || openingRestoredPage.current) return;
     if (!page.startsWith('page:')) {
-      setRestoringPage(false);
+      setPendingPage(null);
       return;
     }
     const [, id, pageId] = page.split(':');
-    const extension = snapshot.extensions.find((e) => e.id === id);
-    if (
-      !extension?.enabled ||
-      extension.state === 'error' ||
-      !extension.pages?.some((p) => p.id === pageId)
-    ) {
+    const state = startPageState(page, snapshot.settings.value, snapshot.extensions);
+    if (state === 'fallback') {
       openDefaultPage();
-      setRestoringPage(false);
       return;
     }
-    if (extension.state !== 'running') return;
+    if (state === 'wait') return;
     openingRestoredPage.current = true;
     void window.dock
-      .openAppletPage(id, pageId)
+      .openAppletPage(id, pageId, snapshot.navigation.request)
       .catch((error) => {
         setError(String(error));
-        openDefaultPage();
       })
-      .finally(() => setRestoringPage(false));
+      .finally(() => setPendingPage((current) => (current === page ? null : current)));
   }, [snapshot, page, restoringPage]);
   useLayoutEffect(() => {
     const update = () => {

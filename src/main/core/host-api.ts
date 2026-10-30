@@ -55,6 +55,7 @@ export function createHostApi(
     method: string,
     params: unknown,
     localPage = false,
+    presentation?: import('./applet-pages').PageOpenOptions,
   ): Promise<unknown> => {
     if (!isObject(params)) throw new Error(hostText('services.hostApi.argumentObject'));
     const p = params;
@@ -464,6 +465,7 @@ export function createHostApi(
               };
             },
           },
+          presentation,
         );
       }
       case 'host.webAccounts.start':
@@ -531,7 +533,7 @@ export function createHostApi(
           return null;
         }
         if (method.endsWith('.open')) {
-          await web.open();
+          await web.open(presentation);
           return null;
         }
         if (method.endsWith('.cycle')) {

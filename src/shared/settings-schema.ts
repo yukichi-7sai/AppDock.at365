@@ -1,4 +1,5 @@
 import { hostSettingsDefaults, hostSettingDefinitions } from './host-settings';
+import { isStartPage } from './start-page';
 import { validateSettingValue } from './setting-definitions';
 import { defaultHostLanguage, isHostLanguage } from './host-language';
 import { hostText } from './i18n';
@@ -158,6 +159,7 @@ export function parseSettings(value: unknown): Settings {
   if (trayDoubleClickCommand !== null && !validCommandId(trayDoubleClickCommand))
     throw new Error(hostText('settings.settings-schema.trayDoubleClick'));
   for (const field of hostSettingDefinitions) validateSettingValue(field, value.host[field.key]);
+  if (!isStartPage(value.host.startPage)) throw Error(hostText('general.startPage.invalid'));
   const trayMenu = value.trayMenu === undefined ? undefined : parseTrayMenu(value.trayMenu);
   const trayCommands =
     trayMenu !== undefined

@@ -188,6 +188,17 @@ const definitions = {
     generateCommands: [...switches],
     applies: 'nextStart',
   },
+  startPage: {
+    pageId: 'general',
+    title: hostText('general.startPage.label'),
+    description: hostText('general.startPage.description'),
+    type: 'select',
+    dynamic: true,
+    default: 'about',
+    automation: true,
+    options: [{ value: 'about', label: hostText('settings.aboutSettings.title') }],
+    applies: 'nextStart',
+  },
   hardwareAcceleration: {
     pageId: 'general',
     title: hostText('general.hardwareAcceleration.label'),

@@ -45,6 +45,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  startPages?: import('./contracts').SettingOption[];
   commandReferences?: import('./command-text').CommandReference[];
   mcpAccess?: import('./settings-mcp-access').SettingsMcpAccess;
   commandAssignments?: { shortcuts: string[]; gestures: string[]; 'touchpad-gestures': string[] };

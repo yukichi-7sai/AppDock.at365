@@ -52,6 +52,7 @@ import { OverlayHost } from './core/overlay-host';
 import { HostModalLayer } from './core/host-modal-layer';
 import { HostPages } from './core/host-pages';
 import { defaultNavigation } from '../shared/navigation';
+import { startPageOptions, startPageState } from '../shared/start-page';
 import { ImageLibraryPageSession, ImageLibraryPageState } from './core/image-library-page';
 import { ImageLibraryDialogs } from './core/image-library-dialogs';
 import { GalleryViewStateStore } from './core/gallery-view-state';
@@ -420,6 +421,9 @@ const navigation = new NavigationCoordinator(
     await flushSettingsInputs();
   },
   (error) => log.write('error', 'navigation', String(error)),
+  !restoreView && settings.value.host.startPage !== 'about'
+    ? settings.value.host.startPage
+    : undefined,
 );
 const ribbonCatalog = new RibbonCatalogCache(
   () => (manager ? allApplets() : []),
@@ -2342,6 +2346,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
     };
   if (id === 'general')
     return {
+      startPages: startPageOptions(settings.value, applets),
       launch: launch.state,
       legacyLocalData: legacyLocalData?.snapshot(),
       settingsHealth: {
@@ -3370,16 +3375,58 @@ function registerIpc() {
   handle('dock:cancelCommandPalette', (requestId: string) => {
     if (paletteSession?.request.requestId === requestId) paletteSession.cancel('owner-disposed');
   });
-  handle('dock:openAppletPage', async (extensionId: string, pageId: string) => {
-    if (pageCollections.find(extensionId) && pageId === 'main')
-      return pageCollections.open(extensionId);
-    const extension = manager.items.get(extensionId);
-    const page = [...(extension?.manifest.pages ?? []), ...(extension?.dynamicPages ?? [])].find(
-      (page) => page.id === pageId,
-    );
-    if (!page) throw Error(hostText('services.index.appletPageMissing'));
-    await executeCommand(page.openCommand);
-  });
+  handle(
+    'dock:openAppletPage',
+    async (extensionId: string, pageId: string, navigationRequest?: number) => {
+      if (navigationRequest !== undefined) {
+        const key = pageKey(extensionId, pageId);
+        if (navigation.state.request !== navigationRequest) return;
+        const current = navigation.lease(key);
+        const valid = () =>
+          current() && !quitting && startPageState(key, settings.value, allApplets()) === 'open';
+        if (!valid()) return;
+        const presentation = { valid, background: true };
+        try {
+          if (pageCollections.find(extensionId) && pageId === 'main')
+            await pageCollections.open(extensionId, presentation);
+          else {
+            const extension = manager.items.get(extensionId)!;
+            const page = [
+              ...(extension.manifest.pages ?? []),
+              ...(extension.dynamicPages ?? []),
+            ].find((page) => page.id === pageId)!;
+            await manager.api(
+              extension,
+              page.source === 'web-accounts' ? 'host.webAccounts.open' : 'host.pages.open',
+              { id: pageId },
+              false,
+              presentation,
+            );
+          }
+          if (
+            current() &&
+            !quitting &&
+            startPageState(key, settings.value, allApplets()) !== 'open'
+          )
+            await navigation.navigate(null);
+        } catch (error) {
+          if (current() && !quitting) {
+            await navigation.navigate(null);
+            throw error;
+          }
+        }
+        return;
+      }
+      if (pageCollections.find(extensionId) && pageId === 'main')
+        return pageCollections.open(extensionId);
+      const extension = manager.items.get(extensionId);
+      const page = [...(extension?.manifest.pages ?? []), ...(extension?.dynamicPages ?? [])].find(
+        (page) => page.id === pageId,
+      );
+      if (!page) throw Error(hostText('services.index.appletPageMissing'));
+      await executeCommand(page.openCommand);
+    },
+  );
   handle('dock:pageViewport', updatePageViewport);
 
   handle('dock:webNavigate', (id: string, action: string) => pageCollections.navigate(id, action));
@@ -3782,7 +3829,7 @@ async function initialize() {
       changed();
     },
     failed: (error) => log.write('error', 'web-profiles', error.message),
-    openLocal: async (page) => {
+    openLocal: async (page, presentation) => {
       const parent = manager.items.get(page.binding.owner);
       if (!parent || parent.state !== 'running')
         throw Error(hostText('services.index.pageProviderStopped'));
@@ -3833,6 +3880,7 @@ async function initialize() {
             };
           },
         },
+        presentation,
       );
     },
   });

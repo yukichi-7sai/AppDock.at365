@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { startPageOptions } from '../../shared/start-page';
 import { isSettingAccessible, type SettingsCaller } from '../../shared/setting-access';
 import { randomUUID } from 'node:crypto';
 import { appletEnabled, defaultAppletEnabled } from '../../shared/applet-state';
@@ -211,6 +212,8 @@ export class SettingsCommands {
     });
   }
   private fieldOptions(owner: Owner, field: SettingDefinition): SettingOption[] {
+    if (owner.id === 'appdock' && field.key === 'startPage')
+      return startPageOptions(this.options.settings.value, this.options.applets());
     if (field.type === 'registered-image' || field.optionSource) {
       try {
         return this.options.settingOptions?.(owner.collection?.owner ?? owner.id, field) ?? [];
@@ -521,6 +524,15 @@ export class SettingsCommands {
       );
     try {
       this.validateChanges(fields, changes, true);
+      if (
+        owner.id === 'appdock' &&
+        Object.hasOwn(changes, 'startPage') &&
+        !this.fieldOptions(
+          owner,
+          fields.find((field) => field.key === 'startPage')!,
+        ).some((option) => option.value === changes.startPage)
+      )
+        throw new SettingsCommandError('INVALID_ARGUMENT', hostText('general.startPage.invalid'));
       if (reset.some((key) => !fields.some((field) => field.key === key)))
         throw new SettingsCommandError(
           'INVALID_ARGUMENT',

@@ -149,7 +149,7 @@ export class RemotePageService {
       }
     }
   }
-  async open(id: string) {
+  async open(id: string, presentation?: import('./applet-pages').PageOpenOptions) {
     if (this.closed) throw Error(hostText('services.remotePages.pageMissing'));
     const a = this.items().find((a) => a.id === id);
     if (!a?.enabled || this.clearing.has(a.accountId))
@@ -250,7 +250,7 @@ export class RemotePageService {
       this.views.set(id, v);
     }
     try {
-      await v.surface.open();
+      await v.surface.open(presentation);
     } catch {
       v.state.error = hostText('services.remotePages.loadFailed');
       this.changed();

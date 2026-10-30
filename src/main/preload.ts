@@ -186,8 +186,8 @@ const api: DockApi = {
     ipcRenderer.on('dock:appletPage', handler);
     return () => ipcRenderer.removeListener('dock:appletPage', handler);
   },
-  openAppletPage: (extensionId, pageId) =>
-    ipcRenderer.invoke('dock:openAppletPage', extensionId, pageId),
+  openAppletPage: (extensionId, pageId, navigationRequest) =>
+    ipcRenderer.invoke('dock:openAppletPage', extensionId, pageId, navigationRequest),
   pageViewport: (key, bounds) => ipcRenderer.invoke('dock:pageViewport', key, bounds),
   chooseDirectory: () => ipcRenderer.invoke('dock:chooseDirectory'),
   checkUpdates: (id) => ipcRenderer.invoke('dock:checkUpdates', id),

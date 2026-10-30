@@ -32,6 +32,7 @@ test('legacy settings gain Ctrl+P and pins without creating a host profile', () 
     notificationDesktopShadow: true,
     closeToTray: false,
     startMinimized: true,
+    startPage: 'about',
     trayClickCommand: 'appdock.open',
     trayDoubleClickCommand: null,
     hardwareAcceleration: false,

@@ -481,6 +481,41 @@ export function SettingsForm({
               </SettingRow>
             </SettingsSection>
             <SettingsSection title={t('general.window.section')}>
+              <SettingRow
+                pageId={category}
+                itemKey="startPage"
+                description={
+                  aux.startPages?.some((option) => option.value === settings.host.startPage)
+                    ? undefined
+                    : t('general.startPage.unavailableDescription')
+                }
+              >
+                <select
+                  aria-label={t('general.startPage.label')}
+                  value={settings.host.startPage}
+                  disabled={busy}
+                  onChange={(event) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        startPage: event.target.value as Settings['host']['startPage'],
+                      },
+                    })
+                  }
+                >
+                  {!aux.startPages?.some((option) => option.value === settings.host.startPage) && (
+                    <option value={settings.host.startPage} disabled>
+                      {t('general.startPage.unavailable', { page: settings.host.startPage })}
+                    </option>
+                  )}
+                  {(aux.startPages ?? []).map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </SettingRow>
               {(['closeToTray', 'startMinimized', 'hardwareAcceleration'] as const).map((key) => (
                 <SettingRow key={key} pageId={category} itemKey={key}>
                   <Toggle

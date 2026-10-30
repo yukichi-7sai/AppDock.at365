@@ -370,6 +370,7 @@ const localizedHostFields = {
   ],
   general: [
     ['soundEnabled', 'general.sound.label', 'general.sound.description'],
+    ['startPage', 'general.startPage.label', 'general.startPage.description'],
     ['startAtLogon', 'general.startAtLogon.label', 'general.startAtLogon.description'],
     [
       'runAsAdministrator',

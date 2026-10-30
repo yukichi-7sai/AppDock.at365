@@ -1,4 +1,4 @@
-/** The host's startup and recovery destination. No configurable startup setting yet. */
+/** The built-in destination used when no startup page is selected or a page is unavailable. */
 export const defaultNavigation = { route: 'settings', section: 'about' } as const;
 
 export type PageRoute =

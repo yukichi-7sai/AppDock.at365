@@ -369,7 +369,13 @@ interface ManagerOptions {
   nodeExecutable: string;
   nodeWorker: string;
   dotnetHost: string;
-  api: (e: ExtensionInstance, method: string, params: any) => Promise<unknown>;
+  api: (
+    e: ExtensionInstance,
+    method: string,
+    params: any,
+    localPage?: boolean,
+    presentation?: import('./applet-pages').PageOpenOptions,
+  ) => Promise<unknown>;
   log: (level: string, source: string, message: string) => void;
 }
 class ExtensionManager extends EventEmitter {

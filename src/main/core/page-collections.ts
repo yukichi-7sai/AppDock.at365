@@ -23,7 +23,10 @@ export class PageCollectionManager {
       sharedRoot: string;
       changed(): void;
       failed(error: Error): void;
-      openLocal(page: CollectionPage): Promise<unknown>;
+      openLocal(
+        page: CollectionPage,
+        presentation?: import('./applet-pages').PageOpenOptions,
+      ): Promise<unknown>;
     },
   ) {}
   entries(settings = this.options.settings()): CollectionPage[] {
@@ -305,13 +308,13 @@ export class PageCollectionManager {
     this.previous = current;
     for (const [owner, service] of this.services) if (!this.invalid.has(owner)) service.reconcile();
   }
-  async open(id: string) {
+  async open(id: string, presentation?: import('./applet-pages').PageOpenOptions) {
     const page = this.find(id);
     if (!page || !page.item.enabled || !page.parent.enabled || page.parent.state !== 'running')
       throw Error(hostText('services.pageCollections.stopped'));
     return page.definition.source === 'remote'
-      ? this.profiles(page.binding.owner).open(id)
-      : this.options.openLocal(page);
+      ? this.profiles(page.binding.owner).open(id, presentation)
+      : this.options.openLocal(page, presentation);
   }
   async navigate(id: string, action: unknown) {
     const page = this.find(id);

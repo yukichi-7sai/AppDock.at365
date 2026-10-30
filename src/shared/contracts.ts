@@ -18,6 +18,7 @@ export interface HostSettings {
   notificationDesktopShadow: boolean;
   closeToTray: boolean;
   startMinimized: boolean;
+  startPage: import('./start-page').StartPage;
   startAtLogon: boolean;
   runAsAdministrator: boolean;
   hardwareAcceleration: boolean;
@@ -342,7 +343,7 @@ export interface DockApi {
   checkAllUpdates(): Promise<UpdateState>;
   installUpdates(target: 'all' | 'host' | 'applets' | string): Promise<UpdateState>;
   onAppletPage(callback: (key: string | null) => void): () => void;
-  openAppletPage(extensionId: string, pageId: string): Promise<void>;
+  openAppletPage(extensionId: string, pageId: string, navigationRequest?: number): Promise<void>;
   pageViewport(
     key: string | null,
     bounds: { x: number; y: number; width: number; height: number } | null,

@@ -171,6 +171,11 @@ export interface SurfaceOptions {
   onCreated?(contents: Electron.WebContents): void;
   pageImages?: { dataRoot: string; active(): boolean };
 }
+/** Trusted startup/restoration requests may attach a page without revealing its host window. */
+export interface PageOpenOptions {
+  valid(): boolean;
+  background: boolean;
+}
 /** Owns the UI, independently of the window in which it is currently presented. */
 export class AppletSurface {
   covered = false;
@@ -371,10 +376,11 @@ export class AppletSurface {
     if (saved?.maximized) window.maximize();
     return window;
   }
-  async open() {
+  async open(presentation?: PageOpenOptions) {
     if (this.closed) throw Error(hostText('services.appletPages.stopped'));
     await this.ready;
     if (this.closed) throw Error(hostText('services.appletPages.stopped'));
+    if (presentation && (!presentation.valid() || this.requestedDisplay() !== 'page')) return;
     this.opened = true;
     this.refreshDisplay();
     if (this.mode === 'page') {
@@ -384,9 +390,11 @@ export class AppletSurface {
       if (!alreadySelected) bounds = null;
       host?.selected(selected);
       const window = this.window;
-      if (window?.isMinimized()) window.restore();
-      window?.show();
-      window?.focus();
+      if (!presentation?.background) {
+        if (window?.isMinimized()) window.restore();
+        window?.show();
+        window?.focus();
+      }
     } else {
       const window = this.createWindow();
       if (window.isMinimized()) window.restore();
@@ -498,9 +506,13 @@ const localPages = new Map<
   Electron.WebContents,
   { url: string; services: LocalPageServices; surface: AppletSurface; unsubscribe(): void }
 >();
-export function openLocalPage(options: SurfaceOptions, services: LocalPageServices) {
+export function openLocalPage(
+  options: SurfaceOptions,
+  services: LocalPageServices,
+  presentation?: PageOpenOptions,
+) {
   const existing = options.key && surfaces.get(options.key);
-  if (existing) return existing.open();
+  if (existing) return existing.open(presentation);
   const surface = new AppletSurface(options);
   const contents = surface.ui.webContents;
   const unsubscribe = services.changed(() => {
@@ -511,7 +523,7 @@ export function openLocalPage(options: SurfaceOptions, services: LocalPageServic
     unsubscribe();
     localPages.delete(contents);
   });
-  return surface.open().catch((error) => {
+  return surface.open(presentation).catch((error) => {
     surface.close();
     throw error;
   });
