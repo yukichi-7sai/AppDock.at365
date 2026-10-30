@@ -166,6 +166,7 @@ internal static partial class Program
             }
         }
         var arguments = root.GetProperty("args").EnumerateArray().Select(v => v.GetString()!).ToArray();
+        using var progress = UpdateProgressWindow.Open(root, executable);
         var processes = new List<Process>();
         bool exited = false, committed = false, recovered = true;
         try
@@ -181,6 +182,7 @@ internal static partial class Program
             while (!File.Exists(jobPath + ".commit")) { if (deadline.ElapsedMilliseconds > 30000) throw new IOException("処理が取り消されました。"); Thread.Sleep(100); }
             foreach (var process in processes) if (!process.WaitForExit(Math.Max(1, 60000 - (int)deadline.ElapsedMilliseconds))) throw new IOException("AppDockとAppletの終了を確認できませんでした。");
             exited = true;
+            progress?.Phase("applying");
             // Revalidate after all writers stopped, before creating the journal or moving a file.
             foreach (var swap in swaps)
             {
@@ -210,6 +212,7 @@ internal static partial class Program
         }
         catch (Exception error)
         {
+            progress?.Phase("restoring");
             try
             {
                 if (!committed && File.Exists(journal)) { FinishPackageSwaps(baseDirectory, operationId, swaps, false); File.Delete(journal); }
@@ -220,6 +223,7 @@ internal static partial class Program
                 message = error.Message, temporaryDirectory = recovered ? stage : null });
         }
         finally { foreach (var process in processes) process.Dispose(); }
-        if (exited && recovered) Restart(executable, arguments);
+        if (exited && recovered) Restart(executable, arguments, progress);
+        else progress?.Outcome("updateFailed");
     }
 }

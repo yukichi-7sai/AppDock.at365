@@ -5,5 +5,9 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../src/shared/locales/ja/host.json" LogicalName="AppDock.Updater.Messages.json" />
+  </ItemGroup>
 </Project>

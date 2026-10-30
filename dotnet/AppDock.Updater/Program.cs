@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.IO.Pipes;
 
 internal static partial class Program
 {
@@ -138,12 +139,24 @@ internal static partial class Program
                 throw new IOException("準備済みAppletのID・版が一致しません。");
         }
     }
-    private static void Restart(string executable, string[] arguments)
+    private static void Restart(string executable, string[] arguments, UpdateProgressWindow? progress = null)
     {
+        progress?.Phase("starting");
+        var pipeName = "AppDock.UpdateReady." + Guid.NewGuid().ToString("N");
+        using var pipe = progress is null ? null : new NamedPipeServerStream(pipeName, PipeDirection.In, 1,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(executable)!, CreateNoWindow = true };
         start.Environment.Remove("ELECTRON_RUN_AS_NODE");
+        start.Environment.Remove("APPDOCK_UPDATE_READY_PIPE");
+        if (pipe is not null) start.Environment["APPDOCK_UPDATE_READY_PIPE"] = pipeName;
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        Process.Start(start)?.Dispose();
+        try
+        {
+            using var process = Process.Start(start) ?? throw new IOException("AppDockを起動できませんでした。");
+            if (pipe is not null && !WaitForUpdatedWindow(pipe, process).GetAwaiter().GetResult())
+                progress?.Outcome("startupUnconfirmed");
+        }
+        catch when (progress is not null) { progress.Outcome("restartFailed"); }
     }
     private static string StateDirectory(string baseDirectory, string? requested)
     {
@@ -214,6 +227,7 @@ internal static partial class Program
         var journal = Path.Combine(stateDirectory, "update-transaction.json");
         NoLinks(result); NoLinks(journal);
         if (File.Exists(journal)) throw new IOException("前回の更新復元が必要です。AppDockを起動し直してください。");
+        using var progress = UpdateProgressWindow.Open(root, executable);
         File.WriteAllText(jobPath + ".ready", "ready");
         var deadline = Stopwatch.StartNew();
         while (!File.Exists(jobPath + ".commit"))
@@ -230,6 +244,7 @@ internal static partial class Program
                 process.Dispose();
             }
             allExited = true;
+            progress?.Phase("applying");
             Write(journal, new { executable, helper = Path.Combine(stage, "AppDock.Updater.exe"), swaps });
             foreach (var swap in swaps)
             {
@@ -251,7 +266,8 @@ internal static partial class Program
         catch (Exception error)
         {
             // After commit, leave the journal for recovery instead of rolling back a completed update.
-            if (committed) { restored = false; throw; }
+            if (committed) { restored = false; progress?.Outcome("updateFailed"); throw; }
+            progress?.Phase("restoring");
             foreach (var swap in swaps.AsEnumerable().Reverse())
             {
                 try
@@ -276,7 +292,8 @@ internal static partial class Program
             }
         }
         // If a process failed to exit, avoid starting a second instance. Nothing was exchanged in that case.
-        if (restored && (changed || allExited)) Restart(executable, arguments);
+        if (restored && (changed || allExited)) Restart(executable, arguments, progress);
+        else progress?.Outcome("updateFailed");
     }
     private static void Recover(string baseDirectory, string? requestedState = null)
     {

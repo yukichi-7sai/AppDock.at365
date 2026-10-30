@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-10-30: アップデーター進行表示0.107.4の受入・コミット照合
+
+- 実利用で意図した動作を確認したとの受入後、コミット依頼を受けた。main `ca305edeae70502fc01cb91c71179e28101f3b99`上の今回の21ファイルをレビューし、未解決指摘なし。受入後の製品修正はなく、0.107.4と発行物を維持する。画像取得ツールの不調、個別のAlt+F4/失敗画面の実操作、管理者更新等の未実施範囲は実装時の記録を保持する。
+- 実装時の979入力・16ログ、発行EXE/asar/helper/ZIP、固定GUI・smokeコピーのSHA256を照合した。型検査/build/書式・関連7ファイル84件、実helper新旧job2群、更新中断復旧8箇所、固定GUI15群・smokeの成功を再利用した。新しいGUI実行や再発行は行っていない。
+- 直前の標準153ファイル1360件の成功と、元の完全ログ32件のSHA256を照合した。従来の標準試験ファイルはすべて一致し、新しい表示完了通知の4件だけが標準へ追加されている。変更対象は更新helper・更新引き渡し・更新時だけの起動通知・準備判定の公開・専用文言・パッチ版で、その他の実処理・依存・ツールは一致する。実装時に未実行だったフォルダー型配布、梱包、マウント対応、Shell境界の4ファイル10件を追加してすべて成功、fail/cancel/skip 0。実装時84件・追加10件・影響のない既存1270件を合わせ、標準154ファイル1364件の必要範囲が揃った。
+- 証跡は`.artifacts/commit-validation-updater-window-20261030/`のaudit.cjs・reuse.json・追加回帰の完全ログ、stage.json・commit.json。今回の21ファイルだけをstageし、作業ファイルとstage、最終commit treeの一致を記録する。新しい配布物の実行用コピーは作らず、実装時の整理結果と記録を保持した。push・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-30: 本体終了中のアップデーター進行表示 0.107.4
+
+- main `ca305edeae70502fc01cb91c71179e28101f3b99`のclean状態で`pull --ff-only`を行い、Already up to dateを確認して開始した。更新helperに独立したWin32ウィンドウを追加し、本体の終了待ち・ファイル適用・本体起動を表示する。本体は初期本文とShellの描画準備が揃い、実ウィンドウを表示できたときだけ一度通知し、helperが画面を閉じて終了する。設定・保存ファイル・追加ランタイム要件は増やさず、0.107.3→0.107.4のパッチ更新とした。古いhelperから新版を導入する最初の更新には表示を後付けできず、新helperを含む版を導入した後の更新から有効になる。
+- 通知はランダム名・同一ユーザー限定のnamed pipeを使い、接続元PIDをhelperが起動した本体へ限定する。本体は環境変数を子プロセスの起動前に消費する。通常起動では通信も追加のShell準備照会も行わない。表示待ちの120秒経過・起動プロセス終了・起動失敗は、確認できなかった状態を示す閉じられる画面へ切り替え、適用済みファイルの巻き戻しや本体の強制終了を行わない。更新の検証・commit・rollback・復旧契約は保持した。
+- 発行前に実装と影響先をレビューした。通常起動での不要な準備照会をpending判定で避け、復旧後にも正確になるよう起動確認失敗の文言を調整した。未解決の指摘なし。更新ウィンドウの文言は日本語JSONを.NETにも埋め込み、WindowsDesktop Runtimeは不要。新しい.NET SDK/公開SDK契約・Applet APIは導入していない。
+- 固定lockfileのinstall、型検査、本体build、helper Release publish、書式・差分確認が成功。版更新後の`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`は既存の`install --frozen-lockfile`で再同期し、依存・lockfile・検査を変更していない。関連7ファイル84件はfail/cancel/skip 0。中断復旧試験は8箇所すべて成功し、commit前の復元・commit後の保持・ロック解除後の再試行を確認した。標準全体回帰は今回実行していない。
+- `updater-window-test.cjs`を開発helperと発行済みhelperで実行し、新旧jobの2群ずつが成功。終了待ち中に旧配置を保持すること、更新適用、別PIDからの偽の合図の拒否、再起動したプロセスの合図までhelperが終了しないことを確認した。最初の観察付き試験はlegacy fixtureの一時ディレクトリ移動でAccess deniedとなり失敗し、旧版へ復元された。同じ処理の自動試験と最終発行物での再試験は成功した。初回の失敗記録・コピーは保持し、成功へ数えていない。
+- 固定配布物の`portable-updates-ui-test.cjs`は15群成功。本体/一括/個別Applet更新、再起動時の画面・設定カテゴリ・Appletページ復元、無効状態・設定/認証fixture保持、実外部ジェスチャー、起動通知用環境変数の除去、helper終了後の一時ファイル整理を確認した。初回は更新設定を閉じて表示する古い試験前提で失敗したため、現在の初期展開状態へ試験だけを合わせ、同じ0.107.4で再成功した。発行後の製品修正はない。発行済みコピーのsmokeもok:true。
+- ネイティブ画面の画像確認とAlt+F4/失敗画面の閉じる操作の実操作は未確認。Computer Use/node_replとcuaの起動が`failed to prepare MXC sandbox: permission path cannot be represented losslessly`で失敗し、reset後も復旧しなかった。実プロセス・通信・更新/復旧試験の成功と、目視/実操作の未確認を区別する。実配布サービスからの取得・管理者更新も今回の確認範囲外。
+- `publish.bat`終了0。発行先`A:\40.ARTIFACT\AppDock.at365\win-unpacked`、feed・ZIP内manifestは0.107.4。ZIP270,817,600バイト、SHA256 `e91b72bbcb3184836417cf96047206b3a2b5cf5fefbe6161772a499f7f2ebbd6`がfeedと一致。EXE `4b78abbdf2a2e366eb4d2cab9c4b6687191c7f2989de0152963bb6941ea52ba5`、asar `43dabc4172b49404d1d8aaa0173950ee2586eb19cd807bf2b213472209a43c2c`、helper `ee821879b52149d8b5312b9531a737ee3da0fbc8cb7d8b2cc2c77f85b5a97ae0`はZIP内と一致。693項目にsettings/data/extensionsは含まれない。
+- 証跡は`.artifacts/updater-window-20261030/`の979入力SHA一覧・比較、完全ログ、review.json、publication.json、validation.json、cleanup.json。最終入力差分はGUI試験の現行UI対応だけで、固定EXE再試験で確認済み。プロセス試験は`.artifacts/updater-window-1793363915211/`、復旧は`.artifacts/update-recovery-1793363818563/`、固定GUIは`.artifacts/portable-updates-1793363983028/`、smokeは`.artifacts/smoke-1793364117982/`。今回の試験プロセス不在を確認済み。終了・成功・絶対パス・再解析ポイント不在を確認した前回更新GUI/smokeコピーから本体管理1,385ファイルを整理し、残した記録・画像・設定・manifest計217件のSHA一致と最新コピー保持を確認した。失敗記録は保持。commit・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-30: フィルターSelect 0.107.3の受入・コミット照合
 
 - 実利用で意図した動作を確認後、コミット依頼を受けた。main `5d2c9e2`上の今回の22ファイルをレビューし、未解決指摘なし。受入後の製品修正はなく、0.107.3と発行物を維持する。

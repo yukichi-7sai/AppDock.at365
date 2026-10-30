@@ -8,6 +8,7 @@ import { validRepository } from '../shared/versions';
 import { isDialogNavigationShortcut } from '../shared/commands';
 import { webAccountSettingsTargets } from './core/settings-web-account-target';
 import { startupShellIds, StartupUiBarrier } from './core/startup';
+import { takeUpdateStartupSignal } from './core/update-startup-signal';
 import { physicalFs } from './core/physical-fs';
 import { GestureIndicatorHost } from './core/gesture-indicator-host';
 import { settingListDraftAction } from './core/setting-list-draft';
@@ -367,6 +368,13 @@ const startupUi = new StartupUiBarrier(() =>
     shellRegistry?.snapshot().regions.some((r) => r.region === region && r.ready),
   ),
 );
+const updateStartupSignal = takeUpdateStartupSignal();
+function notifyUpdatedWindowShown() {
+  if (!updateStartupSignal.pending) return;
+  updateStartupSignal.notify(
+    !quitting && !!window && !window.isDestroyed() && window.isVisible() && startupUi.ready,
+  );
+}
 const shellStateSent = new Map<string, string>();
 let lastShellRevision = -1;
 let notificationBanner: NotificationSurfaceHost | undefined;
@@ -1468,6 +1476,7 @@ const changed = () => {
     }
     if (window && !window.isDestroyed()) window.webContents.send('dock:changed');
     startupUi.check();
+    notifyUpdatedWindowShown();
   }, 60);
 };
 const shortcutInvocation = new AsyncLocalStorage<ShortcutPress>();
@@ -1497,6 +1506,7 @@ async function showWindow(invocation?: InputInvocation) {
     }
     if (window.isMinimized()) window.restore();
     window.show();
+    notifyUpdatedWindowShown();
     window.focus();
     const press = shortcutInvocation.getStore();
     if (press)
@@ -3334,6 +3344,7 @@ function registerIpc() {
     if (uiReady && !quitting) {
       hostStartupTiming.mark('renderer');
       startupUi.rendererReady();
+      notifyUpdatedWindowShown();
     }
   });
   handle('dock:barViewport', (region, bounds) => shellBarHost?.viewport(region, bounds));

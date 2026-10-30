@@ -355,7 +355,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     assert.equal(await inspect(inspectPort, `${mainWindow}.isVisible()`), false);
     await inspect(inspectPort, `${mainWindow}.show()`, false);
     await about(page);
-    assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), false);
+    assert.equal(await page.getByLabel('AppDockの更新元', { exact: true }).isVisible(), true);
     assert.equal(await page.getByTestId('about-overview').count(), 1);
     assert.equal(await page.getByRole('button', { name: '更新を確認', exact: true }).count(), 1);
     assert.equal(
@@ -378,7 +378,7 @@ async function restarted(inspectPort, predicate, previousPid) {
     checks.push(
       'welcome panel and initially open update settings, per-target last-check times beside update buttons',
     );
-    await capture('updates-collapsed-dark.png');
+    await capture('updates-settings-dark.png');
     // Both source resets save immediately and preserve unrelated settings.
     await page.getByRole('button', { name: 'Appletの管理と更新', exact: true }).click();
     await page
@@ -403,7 +403,9 @@ async function restarted(inspectPort, predicate, previousPid) {
       .fill(path.join(profile, 'sources/test.disabled'));
     await settleSettings(page);
     await about(page);
-    await page.getByText('更新の設定', { exact: true }).click();
+    const updateSettings = page.getByTestId('update-settings');
+    if ((await updateSettings.getAttribute('open')) === null)
+      await updateSettings.locator('summary').click();
     await page.getByRole('button', { name: 'AppDockの更新元を既定に戻す', exact: true }).click();
     assert.equal(
       await page.getByLabel('AppDockの更新元', { exact: true }).inputValue(),
@@ -474,6 +476,11 @@ async function restarted(inspectPort, predicate, previousPid) {
       'test.disabled',
     ]);
     assert.notEqual(await inspect(inspectPort, 'process.pid'), combinedPid);
+    assert.equal(
+      await inspect(inspectPort, 'process.env.APPDOCK_UPDATE_READY_PIPE ?? null'),
+      null,
+      'update display capability must not remain in the restarted host environment',
+    );
     assert.equal(fs.existsSync(path.join(profile, 'resources/obsolete-host.dll')), false);
     assert.deepEqual(
       fs.readFileSync(path.join(profile, 'resources/app.asar')),
@@ -546,6 +553,9 @@ async function restarted(inspectPort, predicate, previousPid) {
       false,
     );
     checks.push('restarted host removes the ASAR payload without a cleanup warning');
+    checks.push(
+      'updated window acknowledges its presentation and releases the updater before temporary cleanup',
+    );
     await verifyRestartGesture(inspectPort, 'real host update restart');
     await ribbonRenderer(
       inspectPort,

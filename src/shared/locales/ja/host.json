@@ -3283,5 +3283,17 @@
   "commands.palette.empty": "該当するコマンドはありません。",
   "commands.palette.selectHint": "↑↓キーで選択・Enterで選択（実行しません）・Escで閉じる。",
   "commands.palette.executeHint": "↑↓キーで選択・Enterで実行・Escで閉じる。",
-  "commands.palette.pinHint": "☆でピン留め、上下ボタンで並べ替え。"
+  "commands.palette.pinHint": "☆でピン留め、上下ボタンで並べ替え。",
+  "services.updaterWindow.title": "AppDock 更新",
+  "services.updaterWindow.heading": "AppDockを更新しています",
+  "services.updaterWindow.detail": "更新が終わると自動的に起動します。",
+  "services.updaterWindow.waiting": "AppDockの終了を待っています…",
+  "services.updaterWindow.applying": "更新ファイルを適用しています…",
+  "services.updaterWindow.starting": "AppDockを起動しています…",
+  "services.updaterWindow.restoring": "更新を完了できなかったため、復旧しています…",
+  "services.updaterWindow.attention": "AppDockの状態を確認してください",
+  "services.updaterWindow.startupUnconfirmed": "AppDockの画面の表示を確認できませんでした。\nAppDockの状態を確認してください。",
+  "services.updaterWindow.restartFailed": "AppDockを起動できませんでした。\n更新結果を確認してから、AppDockを起動してください。",
+  "services.updaterWindow.updateFailed": "更新を完了できませんでした。\n更新結果を確認してください。",
+  "services.updaterWindow.close": "閉じる"
 }

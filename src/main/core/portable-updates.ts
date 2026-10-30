@@ -1009,6 +1009,7 @@ export class PortableUpdates {
     const job = {
       schemaVersion,
       operationId,
+      showProgress: true,
       baseDirectory: this.options.baseDirectory,
       executable: this.options.executable,
       args: this.options.restartArgs,
