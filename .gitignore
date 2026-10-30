@@ -1,10 +1,10 @@
-node_modules/
 .pnpm_store/
 .tools/
-publish/
 .artifacts/
-out/
 .appdock/
+node_modules/
+out/
+publish/
 settings.json
 settings.json.*
 avatar.png
