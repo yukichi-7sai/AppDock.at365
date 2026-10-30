@@ -955,12 +955,11 @@ async function checkSectionTitles() {
     checks.push(
       'notification type explanations use title hints; OFF removes explanations while current summaries and required targets remain',
     );
-    const speechState = host
-      .locator('.notification-settings > .settings-section')
-      .filter({ has: host.getByRole('heading', { name: '読み上げ', exact: true }) })
-      .locator('summary > p');
-    await speechState.waitFor();
-    assert.match(await speechState.innerText(), /現在の声:.*速度:/);
+    await host.getByTestId('notification-delivery').locator(':scope > summary').click();
+    const speech = host.getByTestId('notification-speech');
+    await speech.locator(':scope > summary').click();
+    await speech.getByText(/^現在の声:/).waitFor();
+    await speech.getByText(/^現在の速度:/).waitFor();
     await select('タスクトレイ');
     await host
       .locator('.tray-click-id.command-id')

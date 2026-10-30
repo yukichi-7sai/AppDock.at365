@@ -108,6 +108,11 @@ let app,
       await settingsPage(host);
       await host.getByTestId('settings-page:' + id).waitFor();
       await settleSettings(host);
+      if (id === 'notifications') {
+        const delivery = host.getByTestId('notification-delivery');
+        if (!(await delivery.evaluate((element) => element.open)))
+          await delivery.locator(':scope > summary').click();
+      }
     };
     const section = (title) =>
       host.locator('.settings-section').filter({
@@ -238,6 +243,155 @@ let app,
     checks.push(
       'six banner positions save and move the existing native surface; bottom growth stays anchored; page reload restores selection',
     );
+
+    const preferencesBeforeCenter = (await saved()).notificationPreferences;
+    await host.evaluate(() => {
+      window.notificationCenterTransitionAlerts = [];
+      window.notificationCenterTransitionObserver = new MutationObserver(() => {
+        for (const element of document.querySelectorAll('.settings-status-area [role="alert"]')) {
+          const text = element.textContent.trim();
+          if (text) window.notificationCenterTransitionAlerts.push(text);
+        }
+      });
+      window.notificationCenterTransitionObserver.observe(document.documentElement, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    });
+    await host.getByRole('button', { name: '通知センターを開く', exact: true }).click();
+    await host.getByRole('heading', { name: '通知センター', exact: true }).waitFor();
+    assert.deepEqual(
+      await host.evaluate(() => {
+        window.notificationCenterTransitionObserver.disconnect();
+        return window.notificationCenterTransitionAlerts;
+      }),
+      [],
+      'opening the notification center never flashes a settings error',
+    );
+    assert.deepEqual((await saved()).notificationPreferences, preferencesBeforeCenter);
+    await open('notifications');
+    checks.push('notification center navigation preserves preferences without a transient error');
+
+    const holdMcpStatus = (failure = false) =>
+      app.evaluate(({ app }, fail) => {
+        const require = process
+          .getBuiltinModule('module')
+          .createRequire(app.getAppPath() + '/package.json');
+        const { AutomationService } = require(
+          app.getAppPath() + '/out/main/main/core/automation.js',
+        );
+        const original = AutomationService.prototype.action;
+        globalThis.mcpLoadingOriginal = original;
+        globalThis.mcpLoadingReleases = [];
+        AutomationService.prototype.action = async function (action) {
+          if (action?.kind === 'status') {
+            await new Promise((resolve) => globalThis.mcpLoadingReleases.push(resolve));
+            if (fail) throw Error('Fixture MCP status failure');
+          }
+          return original.call(this, action);
+        };
+      }, failure);
+    const releaseMcpStatus = () =>
+      app.evaluate(({ app }) => {
+        if (!globalThis.mcpLoadingOriginal) return;
+        const require = process
+          .getBuiltinModule('module')
+          .createRequire(app.getAppPath() + '/package.json');
+        const { AutomationService } = require(
+          app.getAppPath() + '/out/main/main/core/automation.js',
+        );
+        AutomationService.prototype.action = globalThis.mcpLoadingOriginal;
+        for (const release of globalThis.mcpLoadingReleases.splice(0)) release();
+      });
+    const openMcp = async () => {
+      await open('notifications');
+      await host
+        .getByRole('group', { name: 'MCP連携設定', exact: true })
+        .getByRole('button', { name: '設定を開く', exact: true })
+        .click();
+      await host.getByTestId('settings-page:codex').waitFor();
+    };
+    const reloadMcp = host.getByRole('button', { name: '連携状態を再読み込み', exact: true });
+    const mcpReady = () => host.getByLabel('Codexの設定ファイル', { exact: true }).waitFor();
+    try {
+      await holdMcpStatus();
+      await host.evaluate(() => {
+        window.mcpLoadingTimes = { mounted: 0, shown: [] };
+        window.mcpLoadingObserver = new MutationObserver(() => {
+          if (!document.querySelector('[data-testid="settings-page:codex"]')) return;
+          const times = window.mcpLoadingTimes;
+          if (!times.mounted) times.mounted = performance.now();
+          if (
+            Array.from(document.querySelectorAll('button')).some(
+              (button) => button.textContent.trim() === '連携状態を再読み込み',
+            )
+          )
+            times.shown.push(performance.now());
+        });
+        window.mcpLoadingObserver.observe(document.documentElement, {
+          childList: true,
+          subtree: true,
+        });
+      });
+      await openMcp();
+      await releaseMcpStatus();
+      await mcpReady();
+      assert.deepEqual(
+        await host.evaluate(() => window.mcpLoadingTimes.shown),
+        [],
+        'fast MCP status never inserts a transient reload button',
+      );
+      await open('notifications');
+      await holdMcpStatus();
+      await host.evaluate(() => {
+        window.mcpLoadingTimes = { mounted: 0, shown: [] };
+      });
+      await openMcp();
+      await reloadMcp.waitFor();
+      const times = await host.evaluate(() => window.mcpLoadingTimes);
+      assert(times.shown[0] - times.mounted >= 950, 'MCP reload waits one second while loading');
+      fs.writeFileSync(
+        path.join(profile, 'mcp-loading-timing.json'),
+        JSON.stringify({ delayMs: times.shown[0] - times.mounted }, null, 2),
+      );
+      await host.screenshot({ path: path.join(profile, 'mcp-status-loading.png') });
+      await releaseMcpStatus();
+      await mcpReady();
+      assert.equal(await reloadMcp.count(), 0, 'completed MCP status removes the loading button');
+      await open('notifications');
+      await holdMcpStatus(true);
+      await openMcp();
+      await releaseMcpStatus();
+      await host.getByRole('alert').filter({ hasText: 'Fixture MCP status failure' }).waitFor();
+      assert(
+        await reloadMcp.isVisible(),
+        'failed status offers retry without waiting for the timer',
+      );
+      await reloadMcp.click();
+      await mcpReady();
+      await host
+        .getByRole('alert')
+        .filter({ hasText: 'Fixture MCP status failure' })
+        .waitFor({ state: 'hidden' });
+      await open('notifications');
+      await holdMcpStatus();
+      await openMcp();
+      await open('notifications');
+      await releaseMcpStatus();
+      assert.equal(
+        await reloadMcp.count(),
+        0,
+        'leaving pending MCP status keeps the selected page',
+      );
+      await host.getByTestId('settings-page:notifications').waitFor();
+      checks.push(
+        'MCP status avoids fast-load flicker, delays reload, preserves failure retry and allows leaving',
+      );
+    } finally {
+      await releaseMcpStatus();
+      await host.evaluate(() => window.mcpLoadingObserver?.disconnect());
+    }
 
     for (const { theme, width } of [
       { theme: 'light', width: 1280 },

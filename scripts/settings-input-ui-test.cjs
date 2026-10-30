@@ -344,11 +344,8 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
     );
 
     await select('通知');
-    await page
-      .locator('.settings-section')
-      .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
-      .locator(':scope > summary')
-      .click();
+    await page.getByTestId('notification-delivery').locator(':scope > summary').click();
+    await page.getByTestId('notification-speech').locator(':scope > summary').click();
     await page.getByRole('switch', { name: '通知の声に共通設定を使う', exact: true }).click();
     await settleSettings(page);
     const voice = page.getByLabel('通知用のボイスID', { exact: true });

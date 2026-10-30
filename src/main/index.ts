@@ -2748,6 +2748,7 @@ function settingsPageActions(
     };
   }
   if (page.id === 'notifications') {
+    actions.notificationOpenWindows = async () => shell.openExternal('ms-settings:notifications');
     actions.notificationSavePreference = async ([type, original, draft]) => {
       assertSettingsWritable();
       const next = replaceNotificationPreference(

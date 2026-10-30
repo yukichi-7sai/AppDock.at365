@@ -12,6 +12,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
   const [state, setState] = useState<AutomationState>();
+  const [showReload, setShowReload] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [file, setFile] = useState('');
@@ -19,6 +20,12 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   const [name, setName] = useState('AppDock');
   const [hostnames, setHostnames] = useState('');
   const operation = useRef(false);
+  useEffect(() => {
+    setShowReload(false);
+    if (state) return;
+    const timer = window.setTimeout(() => setShowReload(true), 1000);
+    return () => window.clearTimeout(timer);
+  }, [state]);
   useEffect(() => {
     let active = true;
     const refresh = () =>
@@ -81,13 +88,13 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
     message: !state && !error ? translate('settings.codexSettings.loading') : '',
   });
   if (!state)
-    return (
+    return showReload || error || busy ? (
       <div className="settings-sections">
         <button disabled={busy} onClick={() => void run({ kind: 'status' })}>
           {translate('settings.codexSettings.reload')}
         </button>
       </div>
-    );
+    ) : null;
   const configure = (
     enabled = state.enabled,
     allowWrite = state.allowWrite,

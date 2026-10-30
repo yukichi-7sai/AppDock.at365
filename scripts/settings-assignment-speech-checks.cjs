@@ -106,7 +106,8 @@ module.exports = async function ({
         );
       }
       await select('通知');
-      const speech = card('読み上げ');
+      await host.getByTestId('notification-delivery').locator(':scope > summary').click();
+      const speech = host.getByTestId('notification-speech');
       await speech.locator(':scope > summary').click();
       assert.equal(await field('TTS設定').count(), 1);
       assert.equal(await field('読み上げ設定').count(), 0);
@@ -114,7 +115,6 @@ module.exports = async function ({
       assert.equal(await description('速度').innerText(), '現在の速度: 1.25');
       for (const title of ['声', '速度'])
         assert.equal(await field(title).locator('.settings-field-control > p').count(), 0);
-      await card('通知の受け取り方').locator(':scope > summary').click();
       assert.equal(await description('MCP連携設定').innerText(), mcpDescription);
       await hints(false);
       assert.equal(await description('声').isVisible(), true);

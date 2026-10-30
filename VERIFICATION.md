@@ -1,5 +1,67 @@
 # 検証記録
 
+## 2026-10-30: 通知設定・移動時のちらつき修正 0.105.7 のコミット照合
+
+- 利用者が確認した通知設定の並べ替え・重複説明の除去・読み上げの現在値・通知センター/Windows設定へのボタン・入れ子Fieldのインデントと、通知センター移動/MCP読み込みのちらつき対策を19ファイルでレビューした。main `e120441`上の対象差分を保持し、無関係な変更は追加しない。設定ページの接続検査・入力確定・保存・取消を維持し、製品の追加修正は不要と判断した。
+- 実装時0.105.7の型検査/build、ソース/固定EXEの設定コントロール各11群、固定EXEの設定操作8群とsmokeを、入力959ファイル・完全ログ・EXE/ZIPのSHA256へ照合して再利用した。差分は独立した読み上げGUI試験と本項の検証追記だけで、製品・依存・ビルド/発行手順は不変。確認済みの0.105.7を維持し、再発行は行わない。
+- 標準回帰152ファイルを試験ごとに分類した。実装時の関連10ファイルと、0.104.2の標準成功記録に対して試験・依存closureのソースとコンパイル結果が一致し、追加ファイル読取・プロセス起動がない10ファイルを再利用した。残る132ファイルは今回追加実行し、並列131ファイル1,207件と単独の更新試験2件、計1,209件がfail/skip 0で成功。再利用20ファイルと合わせて必要な標準152ファイルの成功が揃った。ビルド手順の差はパレットpreloadへの配色bridge追加だけで、再利用した純粋module試験の入力は不変であることも確認した。
+- 移動した読み上げ設定のGUI試験には、旧カード形式と文字入力だけで保存される前提が残っていた。現在の一覧→編集ダイアログとEnterでの入力確定へ試験だけを合わせ、確認前の通知設定が保存されない検査を追加した。初回2件の失敗記録を保持し、同じ固定EXEで12群成功。声の手入力/候補選択・明暗/狭幅・速度・通知の読み上げ・試聴・独立した継承復帰・ロック中の音声待機をloopbackの模擬TTSで確認した。実TTSサーバー・実通知受信の検証とは区別する。
+- 読み上げ試験の解決済み初回2件は、終了・パス・再解析ポイント・追加指示・内容不変を照合して実行用コピーだけを整理した。161ファイルの失敗結果・ログ・設定等と配布manifestのSHA256を維持し、最新成功の固定コピーを保持した。ほかの失敗・状態不明・過去の再利用証跡は保持する。
+- 証跡は`.artifacts/commit-validation-notification-settings-01057-20261030/`の`standard-plan.json`・入力SHA一覧・`concurrent/serial-result.json`と完全ログ・`speech-fixed-v3-result.json`・`cleanup.json`・`validation.json`。差分/構文/文書参照と発行物の再照合を行い、stageと作業ファイルの一致、stage/commit tree、最終commitは同ディレクトリの`stage.json`・`commit.json`へ記録する。push・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-30: MCP読み込み中の再読み込みボタンを1秒後に表示 0.105.7
+
+- main `aa56664`上の既存18ファイルの未コミット変更を保持し、利用者が指定した読み込み中の表示遅延を実装した。MCP情報の取得はすぐ開始し、状態未取得が1秒以上続いた場合だけ「連携状態を再読み込み」ボタンを表示する。短い取得ではボタンを挟まず本文へ切り替える。
+- 取得失敗ではエラーと再試行ボタンをすぐ表示し、手動の再試行中はボタンを表示したまま無効にする。成功後に最低表示時間を設けず、取得完了・ページ離脱では表示待ちのタイマーを解放する。取得処理、設定値、MCP接続・許可・認証、公開APIは変更していない。
+- 発行前に差分と影響先をレビューした。製品の変更は`CodexSettings.tsx`の表示制御だけで、設定ページ・入力クライアント・接続寿命の検査は0.105.6の検証入力とSHA256が一致した。設定項目・保存ファイルの追加/削除なし。通常のUI修正として0.105.6→0.105.7へ更新した。
+- 既存`settings-controls-ui-test.cjs`へ、短い読み込み中のボタン非表示、1秒の遅延、完了後の除去、取得失敗時の即時再試行、待機中のページ離脱を追加した。APIの応答ゲートとDOMの表示を使い、固定sleepで成功させない。0.105.6では短時間読み込みのボタン出現を検出して失敗し、修正後のソース/固定EXEで成功することを確認した。
+- 固定lockfileのinstall、整形、型検査、build、既定`publish.bat`は終了コード0。翻訳・設定ページ接続・入力クライアントの関連3ファイル（`localization`・`settings-page-host`・`settings-view-client`）32/32件が成功。ソースと発行済み固定EXEの`settings-controls-ui-test`各11群、固定EXEの`settings-usability-ui-test`8群、smokeも成功した。ボタンの表示はソース1001.6ms・固定EXE1004.7msで、短時間取得では一度も表示されなかった。取得失敗と再試行、離脱、既存の通知先・表示位置・入力保存・取消・再起動後の保持も確認した。
+- feed・フォルダー/ZIPのmanifestは0.105.7で一致。update.zipは270,737,363バイト、SHA256 `2f635e381f74a4c35c6f451ddb5f5913d16198723c6e83f9dcaf57d0f4adef7b`がfeedと一致し、EXE/asarを収録、設定・data・extensionsの混入なし。EXE SHA256 `4a9ab60d84f67079914d865d05afe08b9727255459469549b55babc0fa708a2f`は各固定試験コピーと一致。検証記録を除く追跡入力959ファイルの検証前後SHA256も一致した。証跡は`.artifacts/mcp-loading-delay-20261030/`の各log・`regression-before.json`・`review.json`・`publication.json`・入力SHA一覧・`validation.json`と、各GUI profileの結果・計測JSON・画像。
+- 後片付けでは、直前の成功3件と解決した旧版回帰1件の実行用コピーだけを整理し、379ファイルの記録・画像・設定等のSHA256維持を確認した。最新成功の固定コピー3件とソース試験記録は保持。詳細は同証跡の`cleanup.json`。全標準回帰、実アカウント/実受信は今回未実行。コミット・push・GitHub Release・実利用先deployは行っていない。
+
+## 2026-10-30: MCP連携設定への移動時に見える領域変化を調査（0.105.6）
+
+- 通知センター移動時のエラー消失は利用者確認済み。続いて、通知の「MCP連携設定 → 設定を開く」で一瞬エラー領域が広がるように見えるとの申告を調査した。表示が短いため、利用者もエラー文・詳細ボタンの有無は判断できていない。実接続の`system.getInfo`で稼働版0.105.6を確認した。
+- 同じ発行EXEの隔離profileで、MCP有効/無効、1280/760幅、MCPリンク/TTSリンク/左インデックスのMCP選択を各2回、計24回比較した。DOMのエラー文・エラー枠の出現は0件で、ツールバーの高さも変わらなかった。実利用の設定・認証・接続先は変更せず、MCP有効条件は隔離設定と専用のconfig.tomlだけを使った。
+- MCP情報の応答を明示的なゲートで保留し、読み込み途中と完了後の画面も確認した。途中では「連携状態を再読み込み」ボタンだけが表示され、その後に設定本文へ切り替わる。両状態ともエラー文・エラー枠は0件。読み込み中の案内はスクリーンリーダー向けのstatusだけだった。この本文の切り替えが申告された見え方に関係する可能性はあるが、実利用で見えた一瞬と同じ現象だとは断定していない。
+- `NotificationSettings`のMCPボタンは同じ設定画面内で`select('codex')`する経路で、通知センターで修正した別routeへの移動とは異なる。通常の設定本文では`SettingsStatusArea`へ`collapseWhenEmpty`を指定し、エラーや操作がある場合だけエラー枠を描画する。今回の確認で、エラー扱いと断定して表示処理を変更する根拠は得られていない。
+- 証跡は`.artifacts/notification-mcp-link-investigation-20261030/`の`check.log`・`check-enabled.log`と各profileの`result.json`。読み込み前後の画像は成功した有効条件の`profile-1793334374229/status-loading.png`・`status-loaded.png`。初回の有効条件は試験側の非同期トグルに`check`を使って止まったため、`click`と状態確認へ修正し、同じEXEの別profileで成功した。失敗記録は保持した。
+- 製品変更なし。検証記録を除く追跡入力959ファイルは0.105.6検証時とSHA256が一致し、版更新・build・publish・commit・push・Release・実利用先deployは行っていない。解決済みの試験側失敗1件の実行用コピーだけを整理し、75ファイルの記録・設定等のSHA256維持を確認した。成功した有効/無効の各コピーを保持。詳細は同証跡の`cleanup.json`。
+
+## 2026-10-30: 通知センターへの移動で一瞬出る接続エラーを修正 0.105.6
+
+- main `aa56664`上の0.105.5までの未コミット16ファイルを保持して着手。修正前の固定EXEを隔離し、4回すべての移動で「設定画面の接続が古くなっています。」を記録した。通知センターへの移動成功後、元の設定ページへの操作応答で`SettingsPageHost.act`の接続再検査が拒否し、画面が切り替わる前にエラーが表示されていた。
+- 通知センターへの移動を本体rendererのページControllerへ移し、`preparePageChange`で入力・保存キューと現在のページを確認してから既存の`appdock.notifications.open`を実行する。通知設定の共通処理はコールバックも受け取れるようにし、処理中の操作抑止と実際の失敗表示を維持した。設定ページ内の`notificationOpenCenter`操作は不要になったため取り除いた。
+- 発行前に差分と影響先をレビューし、設定ページ接続の検査を削除・緩和せず、エラー文言による抑止や待機時間の追加もしていないことを確認。`settings-page-host.ts`・`settings-page.ts`・`runtime.ts`は0.105.5の検証入力とSHA256が一致した。設定項目・保存ファイル・公開APIの変更なし。通常の移動処理の修正として0.105.5→0.105.6へ更新した。
+- `settings-controls-ui-test.cjs`へ、移動完了までDOMのエラー表示を監視する継続回帰を追加。修正前の0.105.5で同じ検査が目的の条件で失敗し、修正後で成功することを確認した。最終画面だけの確認から、一瞬表示されるエラーも検出する確認へ補強した。
+- 固定lockfileのinstall、整形、型検査、build、既定`publish.bat`は終了コード0。接続・操作・クライアント・編集・設定ナビゲーション・画面移動の関連6ファイル（`settings-page-host`・`settings-page`・`settings-view-client`・`settings-editing`・`settings-navigation`・`ui-presentation`）67/67件が成功。発行済み固定EXEで`settings-controls-ui-test`10群、`settings-usability-ui-test`8群、smokeも成功した。
+- 固定0.105.6で4回連続の往復を行い、DOMのエラー表示とmainの接続エラーがともに0件、通知設定値の維持を確認した。さらに入力途中のボイスIDが確定・保存されてから移動すること、意図的に移動を失敗させた場合は設定画面に原因を表示して留まり、再試行で正常に移動することを確認した。声・速度の継承、通知先・表示位置・取消・再起動後の保存の既存確認も今回成功した。Windows設定を開く操作は変更なしで、前版の検証を参照する。
+- feed・フォルダー/ZIPのmanifestは0.105.6で一致。update.zipは270,738,625バイト、SHA256 `dceb3804405b3fe84fd50679df0bd3773d9ba3f3632801ad12b38fe6792a6493`がfeedと一致し、EXE/asarを収録、設定・data・extensionsの混入なし。EXE SHA256 `4643f5e3b13f8d678b83baea3f5ccf33b9740f846e0f99c6833e29c897e447a2`は各試験コピーと一致。検証記録を除く追跡入力959ファイルの検証前後SHA256も一致した。証跡は`.artifacts/notification-center-transition-20261030/`の各log・profile別`result.json`・`regression-before.json`・`review.json`・`publication.json`・入力SHA一覧・`validation.json`。
+- 後片付けでは直前の成功3件と、原因を解決した再現・旧版回帰2件のEXE/同梱ランタイムだけを整理し、452ファイルの記録・画像・設定等のSHA256維持を確認した。最新成功の4コピーは保持。詳細は同証跡の`cleanup.json`。全標準回帰・実TTS/実受信は今回未実行。コミット・push・GitHub Release・実利用先deployは行っていない。
+
+## 2026-10-30: 通知の現在値・移動ボタンと入れ子Fieldのインデント 0.105.5
+
+- main `aa56664`上の直前の0.105.4改修を保持して追加実装した。開始時のブランチ・追跡先・既存13ファイルの未コミット状態を確認し、pull・stash・resetは行っていない。「読み上げ」行のdescriptionへ元と同じ「現在の声: … ／ 速度: …倍」を戻し、共通値の継承と通知用の上書きに追従させた。
+- 「通知センターを開く」は既存の`appdock.notifications.open`へ、「Windowsの通知設定を開く」は定数`ms-settings:notifications`へ接続するページ限定の操作とした。後者のURIは[Microsoftの起動先仕様](https://learn.microsoft.com/en-us/windows/apps/develop/launch/launch-settings#system)に従う。任意のURLをrendererから渡さず、公開コマンド・MCP操作・設定項目・保存ファイルを追加しない。処理中の二重操作抑止と、失敗表示・再操作は通知ページの既存の共通処理を使う。
+- 発行前に差分と影響先をレビューした。入れ子にした`SettingsSection variant="row"`の直下のFieldへ、共通CSSで左16pxのインデントを付ける。見出し・開閉操作の位置は維持し、他のrow利用箇所である起動計測のJSON枠はFieldではないため対象外。声・速度の保存、試聴、通知種類の一覧と検索anchor、即時保存・取消・競合の契約を保持した。通常の追加UI修正として0.105.4→0.105.5へ更新した。
+- 固定lockfileのinstall、整形、型検査、build、既定`publish.bat`の終了コード0。`localization`・`notification-preference-edit`・`notification-policy`・`settings-editing`・`notification-banner-layout`・`settings-page`・`settings-page-host`の7ファイル63/63件が成功。発行済み固定EXEで`settings-controls-ui-test`9群、`settings-usability-ui-test`8群、smokeも成功した。
+- 隔離した固定EXEで、折りたたみ時の現在値、声/速度の上書きと継承復帰、ヒントOFFでの現在値表示、検索での二重展開、通知センターへの実画面移動と通知設定値の維持を確認した。light/1280・dark/760の画面を確認し、読み上げ内の4つのFieldが各16px内側で、入力・ボタンのはみ出しがないことを記録した。WindowsボタンはElectronの模擬受け口で正しいURI、失敗表示、再試行成功と設定値の保持を確認した。
+- Windows設定の実画面確認は、Computer Useと別の画面確認ツールの両方が`failed to prepare MXC sandbox: permission path cannot be represented losslessly`で起動できず未確認。実OS設定の変更・強制的な回避は行っていない。`native-verification.json`に環境上の制約を記録した。全標準回帰、物理入力、実TTSサーバー・実通知受信は今回未実行。
+- 初回の個別GUI確認は、無効の試聴ボタンも含めて有効化を待つ試験側の条件でタイムアウトした。待機対象をWindows設定ボタンへ絞り、同じ発行EXE・別の隔離profileで成功した。製品の追加修正・追加発行は不要で、初期ログとprofileを保持した。
+- feed・フォルダー/ZIPのmanifestは0.105.5で一致。update.zipは270,737,278バイト、SHA256 `8e6ff22ada62c400ee0898bbee0dea2ca5c7456eb750eced77465f97b029b770`がfeedと一致し、EXE/asarを収録、設定・data・extensionsの混入なし。EXE SHA256 `869441d5e7161277916e050c55983ba381f6e1c04d37c8c042ddadecfa2ac3a4`は各試験コピーと一致。検証記録を除く追跡入力959ファイルの検証前後SHA256も一致した。証跡は`.artifacts/notification-settings-actions-20261030/`の各log・画像・`review.json`・`publication.json`・`inspection.json`・入力SHA一覧・`validation.json`。
+- 後片付けでは直前の成功4件と解決済みの試験待機失敗1件の、EXE/同梱ランタイムだけを整理し、442ファイルの記録・画像・設定等のSHA256維持を確認した。最新成功コピーと未解決の旧GUI失敗profileを保持。詳細は同証跡の`cleanup.json`。コミット・push・GitHub Release・実利用先deployは行っていない。
+
+## 2026-10-30: 通知の受け取り方へ表示位置・読み上げを集約 0.105.4
+
+- main `aa56664`の作業ツリー・インデックス・未追跡が空であることと`origin/main`を確認し、`pull --ff-only`で最新取得済みから着手。「通知の受け取り方」を通知ページの先頭へ移し、「バナーの表示位置」と「読み上げ」を内部へ配置した。読み上げは共通の折りたたみ行を使用する。
+- バナーと読み上げの説明専用Field、重複する声・速度のサマリー、「変更の反映」Field、「変更はすぐに反映されます。」を削除。上部固定を示していた古いバナー説明を除き、通知センターは現在の通知と起動中の履歴を確認する説明へ修正した。設定基盤・利用ガイド・通知仕様の案内も現構成へ整合させた。
+- 発行前に差分と影響先をレビューし、状態・ハンドラー、バナー選択、読み上げの入力・継承・一覧取得・試聴、通知種類の一覧が移動前と同じ内容であることを照合した。既存の検索anchor・設定ID・保存・取消・競合・公開APIを保持し、設定項目や保存ファイルの追加・削除なし。通常のUI修正として0.105.3→0.105.4へパッチ更新した。
+- 固定lockfileのinstall、整形、型検査、build、既定`publish.bat`の終了コード0。版更新後の初回型検査は`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`で止まったため、指示どおり`install --frozen-lockfile`で照合してから成功を確認した。`localization`・`notification-preference-edit`・`notification-policy`・`settings-editing`・`notification-banner-layout`の関連5ファイル47/47件が成功した。
+- 発行済み固定EXEを隔離して`settings-controls-ui-test`9群、`settings-usability-ui-test`8群、smokeが成功。バナー6位置と下側の伸長、開閉とフォーカス、保存・取消、再起動後の復元、声・速度の独立した継承、ボイス候補とTTS/MCPへの移動を確認した。1280/760幅の実画面を確認し、受け取り方が先頭で、内部の表示位置と読み上げが各1つ、削除した説明がないことを記録した。表示位置の検索で親、声の検索で親と読み上げの両方が開くことも確認した。
+- `settings-hints-ui-test --assignment-speech-only`は通知検査に入る前に、既存の「ショートカットキー」という旧ナビゲーション名を探して停止した。現在の画面名は「キージェスチャー」で、旧割り当てカードも前提にしていたため、今回のUI変更の成功結果へ含めない。失敗ログ・画像・profileを保持し、通知部分は上記の固定EXE試験と画面・検索の個別確認で検証した。全標準回帰、旧GUI全体の改修、実TTSサーバー・実通知受信は今回未実行。
+- 発行物のfeed・フォルダー/ZIPのmanifestは0.105.4で一致。update.zipは270,737,063バイト、SHA256 `c3d1ff4cd23ac827cb7ae906542828712662e3a9069dc6c891cc7c526c826b93`がfeedと一致し、EXE/asarを収録、設定・data・extensionsの混入なし。EXE SHA256 `b14dc9fe3db7bf45940d48b9d28880dd3c25f3f1185ec175f4c28dbe50299caa`は試験コピーと一致。検証記録を除く追跡入力959ファイルの検証前後SHA256も一致した。証跡は`.artifacts/notification-settings-layout-20261030/`の各log・`review.json`・`publication.json`・`inspection.json`・画像・入力SHA一覧・`validation.json`へ記録した。
+- 後片付けは成功済みの古い固定コピー3件のEXE/同梱ランタイムだけを削除し、318ファイルの記録・画像・設定等のSHA256維持を確認。過去の検証から参照される77フォルダー、最新成功コピー、未解決の旧GUI失敗profileは保持した。詳細は同証跡の`cleanup-plan.json`・`cleanup.json`。コミット・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-30: pnpmストアをプロジェクト内へ移動
 
 - main `5bfa4e3`のcleanと追跡先を確認し、`pull --ff-only`成功後に着手。`A:\30.PROJECT\.pnpm_store`を`A:\30.PROJECT\AppDock.at365\.pnpm_store`へ同一ドライブ内で移動した。移動直後に19,407ファイル・364,214,580バイトの全SHA256と12個のjunctionの参照先が移動前と一致し、旧フォルダーの不在を確認した。junctionの先へ進まず、既存の登録先を保持した。

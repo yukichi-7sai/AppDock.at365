@@ -104,7 +104,7 @@ minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言�
 
 通知カードはレベル色の細い均一枠を使用する。バナーとデスクトップ通知の閉じるアイコンはカード右上、通知センターではカード外の左列に置く。閉じる操作のない行も左列を確保し、カードの位置を揃える。終了済みの履歴には閉じる操作を表示しない。
 
-「設定 → 通知 → バナーの表示位置」で中央上・中央下・右上・右下・左上・左下を選ぶ。`host.notificationBannerPosition`に`top-center`（既定）・`bottom-center`・`top-right`・`bottom-right`・`top-left`・`bottom-left`を保存し、確定後すぐ反映する。既定値は保存から省略し、通知ページのJSON編集と既定へのリセットにも含める。ほかのhost設定と同じPC専用保存の切り替えと公開設定APIへ接続する。
+「設定 → 通知 → 通知の受け取り方 → バナーの表示位置」で中央上・中央下・右上・右下・左上・左下を選ぶ。`host.notificationBannerPosition`に`top-center`（既定）・`bottom-center`・`top-right`・`bottom-right`・`top-left`・`bottom-left`を保存し、確定後すぐ反映する。既定値は保存から省略し、通知ページのJSON編集と既定へのリセットにも含める。ほかのhost設定と同じPC専用保存の切り替えと公開設定APIへ接続する。
 
 上側はWindow上端、下側は下端から48 CSS px、左右配置は対応する端から16 CSS pxへ、幅最大680 CSS pxの小さなWebContentsViewを重ねる。中央配置は水平中央にそろえる。下側は描画された高さに合わせて上方向へ伸び、通知の発行順は維持する。幅・高さとzoomをDIPへ変換し、ウィンドウを縮めても範囲内へ収める。本文レイアウト、Web/AppletのView、入力、sessionを維持する。ページより上、モーダルパレットより下へ置き、ページの追加とバナー更新の後もモーダルを最後に配置する。独立デスクトップ通知とWindows通知の位置はこの設定に含めない。
 

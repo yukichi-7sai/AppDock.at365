@@ -50,6 +50,7 @@ export function NotificationSettings({
   invoke,
   busy,
   select,
+  onOpenCenter,
 }: {
   editor: FormEditor;
   types: NotificationTypeEntry[];
@@ -57,6 +58,7 @@ export function NotificationSettings({
   invoke(name: string, args?: unknown[]): Promise<any>;
   busy: boolean;
   select(id: string): void;
+  onOpenCenter(): Promise<unknown>;
 }) {
   const { t: translate } = useHostTranslation();
   const settings = editor.value;
@@ -87,12 +89,12 @@ export function NotificationSettings({
       },
     });
   };
-  const run = async (name: string, args?: unknown[]) => {
+  const run = async (work: string | (() => Promise<unknown>), args?: unknown[]) => {
     if (pending) return;
     setPending(true);
     setError('');
     try {
-      return await invoke(name, args);
+      return await (typeof work === 'string' ? invoke(work, args) : work());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -125,7 +127,22 @@ export function NotificationSettings({
   useSettingsFeedback({ busy: pending, error });
   return (
     <div className="settings-sections notification-settings">
-      <SettingsSection title={translate('settings.notificationSettings.banner')}>
+      <SettingsSection
+        title={translate('settings.notificationSettings.delivery')}
+        data-testid="notification-delivery"
+        hint={translate('settings.notificationSettings.deliveryHint')}
+        collapsible
+      >
+        <SettingsField
+          title={translate('settings.notificationSettings.center')}
+          description={translate('settings.notificationSettings.centerHint')}
+        >
+          <SettingsActions>
+            <button disabled={busy || pending} onClick={() => void run(onOpenCenter)}>
+              {translate('settings.notificationSettings.openCenter')}
+            </button>
+          </SettingsActions>
+        </SettingsField>
         <SettingsField
           title={bannerPositionSetting.title}
           description={bannerPositionSetting.description}
@@ -152,6 +169,152 @@ export function NotificationSettings({
               </option>
             ))}
           </select>
+        </SettingsField>
+        <SettingsField
+          title={translate('settings.notificationSettings.desktop')}
+          description={translate('settings.notificationSettings.desktopHint')}
+        />
+        <SettingsField
+          title={translate('settings.notificationSettings.windows')}
+          description={translate('settings.notificationSettings.windowsDurationHint')}
+        >
+          <SettingsActions>
+            <button disabled={busy || pending} onClick={() => void run('notificationOpenWindows')}>
+              {translate('settings.notificationSettings.openWindowsSettings')}
+            </button>
+          </SettingsActions>
+        </SettingsField>
+        <SettingsSection
+          title={translate('settings.notificationSettings.speech')}
+          data-testid="notification-speech"
+          description={translate('settings.notificationSettings.currentVoiceAndSpeed', {
+            value: effective.voice || translate('settings.notificationSettings.unset'),
+            speed: effective.speed,
+          })}
+          variant="row"
+          collapsible
+        >
+          <SettingsField
+            title={translate('settings.notificationSettings.ttsSettings')}
+            description={translate('settings.notificationSettings.ttsHint')}
+          >
+            <SettingsActions>
+              <button onClick={() => select('tts')}>
+                {translate('settings.notificationSettings.openSettings')}
+              </button>
+            </SettingsActions>
+          </SettingsField>
+          <SettingsField
+            title={translate('settings.notificationSettings.voice')}
+            description={translate('settings.notificationSettings.currentVoice', {
+              value: effective.voice || translate('settings.notificationSettings.unset'),
+            })}
+            hint={translate('settings.notificationSettings.voiceHint')}
+            {...settingAnchor('notifications', 'speech.voice')}
+          >
+            <SettingsActions>
+              <Toggle
+                label={translate('settings.notificationSettings.inheritVoice')}
+                checked={speech.voice === undefined && !voiceOverride}
+                onChange={(inherit) => {
+                  setVoiceOverride(!inherit);
+                  if (inherit) changeSpeech('voice');
+                  else if (effective.voice) changeSpeech('voice', effective.voice);
+                }}
+              />
+              <span>{translate('settings.notificationSettings.inherit')}</span>
+            </SettingsActions>
+            {(speech.voice !== undefined || voiceOverride) && (
+              <>
+                <SettingsCombobox
+                  label={translate('settings.notificationSettings.voiceId')}
+                  value={speech.voice ?? ''}
+                  onChange={(value) => changeSpeech('voice', value)}
+                  options={voices}
+                />
+                <SettingsActions>
+                  <button
+                    disabled={busy || pending}
+                    onClick={() => {
+                      const revision = auxiliary?.voiceListRevision;
+                      void run('notificationVoices').then((v) => {
+                        if (v && revision === voiceListRevision.current) setVoices(v.voices);
+                      });
+                    }}
+                  >
+                    {translate('settings.notificationSettings.refreshVoices')}
+                  </button>
+                </SettingsActions>
+              </>
+            )}
+          </SettingsField>
+          <SettingsField
+            title={translate('settings.notificationSettings.speed')}
+            description={translate('settings.notificationSettings.currentSpeed', {
+              speed: effective.speed,
+            })}
+            hint={translate('settings.notificationSettings.speedHint')}
+            {...settingAnchor('notifications', 'speech.speed')}
+          >
+            <SettingsActions>
+              <Toggle
+                label={translate('settings.notificationSettings.inheritSpeed')}
+                checked={speech.speed === undefined}
+                onChange={(inherit) => changeSpeech('speed', inherit ? undefined : effective.speed)}
+              />
+              <span>{translate('settings.notificationSettings.inherit')}</span>
+            </SettingsActions>
+            {speech.speed !== undefined && (
+              <SettingsInput
+                type="number"
+                min={0.25}
+                max={4}
+                step={0.05}
+                aria-label={translate('settings.notificationSettings.speechSpeed')}
+                value={speech.speed}
+                onChange={(e) =>
+                  changeSpeech('speed', e.target.value.trim() ? Number(e.target.value) : NaN)
+                }
+              />
+            )}
+          </SettingsField>
+          <SettingsField
+            title={translate('settings.notificationSettings.preview')}
+            description={
+              !auxiliary?.configured || !effective.voice
+                ? translate('settings.notificationSettings.previewRequirements')
+                : (previewState ?? translate('settings.notificationSettings.previewHint'))
+            }
+            error={previewJob?.error?.message}
+          >
+            <SettingsActions {...settingAnchor('notifications', 'speech.preview')}>
+              <button
+                className="primary"
+                disabled={
+                  busy || pending || previewActive || !auxiliary?.configured || !effective.voice
+                }
+                onClick={() => void run('notificationPreview', [crypto.randomUUID()])}
+              >
+                {translate('settings.notificationSettings.previewAction')}
+              </button>
+              <button
+                disabled={pending || !previewActive}
+                onClick={() => void run('notificationPreviewStop')}
+              >
+                {translate('settings.notificationSettings.stopPreview')}
+              </button>
+            </SettingsActions>
+          </SettingsField>
+        </SettingsSection>
+        <SettingsField
+          title={translate('settings.notificationSettings.mcpSettings')}
+          description={translate('settings.notificationSettings.mcpHint')}
+        >
+          <SettingsActions>
+            <button onClick={() => select('codex')}>
+              {translate('settings.notificationSettings.openSettings')}
+            </button>
+          </SettingsActions>
         </SettingsField>
       </SettingsSection>
       <SettingsContent>
@@ -310,168 +473,6 @@ export function NotificationSettings({
           ))}
         </SettingsSection>
       )}
-      <SettingsSection
-        title={translate('settings.notificationSettings.speech')}
-        data-testid="notification-speech"
-        description={translate('settings.notificationSettings.currentVoiceAndSpeed', {
-          value: effective.voice || translate('settings.notificationSettings.unset'),
-          speed: effective.speed,
-        })}
-        collapsible
-      >
-        <SettingsField
-          title={translate('settings.notificationSettings.ttsSettings')}
-          description={translate('settings.notificationSettings.ttsHint')}
-        >
-          <SettingsActions>
-            <button onClick={() => select('tts')}>
-              {translate('settings.notificationSettings.openSettings')}
-            </button>
-          </SettingsActions>
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.notificationSettings.voice')}
-          description={translate('settings.notificationSettings.currentVoice', {
-            value: effective.voice || translate('settings.notificationSettings.unset'),
-          })}
-          hint={translate('settings.notificationSettings.voiceHint')}
-          {...settingAnchor('notifications', 'speech.voice')}
-        >
-          <SettingsActions>
-            <Toggle
-              label={translate('settings.notificationSettings.inheritVoice')}
-              checked={speech.voice === undefined && !voiceOverride}
-              onChange={(inherit) => {
-                setVoiceOverride(!inherit);
-                if (inherit) changeSpeech('voice');
-                else if (effective.voice) changeSpeech('voice', effective.voice);
-              }}
-            />
-            <span>{translate('settings.notificationSettings.inherit')}</span>
-          </SettingsActions>
-          {(speech.voice !== undefined || voiceOverride) && (
-            <>
-              <SettingsCombobox
-                label={translate('settings.notificationSettings.voiceId')}
-                value={speech.voice ?? ''}
-                onChange={(value) => changeSpeech('voice', value)}
-                options={voices}
-              />
-              <SettingsActions>
-                <button
-                  disabled={busy || pending}
-                  onClick={() => {
-                    const revision = auxiliary?.voiceListRevision;
-                    void run('notificationVoices').then((v) => {
-                      if (v && revision === voiceListRevision.current) setVoices(v.voices);
-                    });
-                  }}
-                >
-                  {translate('settings.notificationSettings.refreshVoices')}
-                </button>
-              </SettingsActions>
-            </>
-          )}
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.notificationSettings.speed')}
-          description={translate('settings.notificationSettings.currentSpeed', {
-            speed: effective.speed,
-          })}
-          hint={translate('settings.notificationSettings.speedHint')}
-          {...settingAnchor('notifications', 'speech.speed')}
-        >
-          <SettingsActions>
-            <Toggle
-              label={translate('settings.notificationSettings.inheritSpeed')}
-              checked={speech.speed === undefined}
-              onChange={(inherit) => changeSpeech('speed', inherit ? undefined : effective.speed)}
-            />
-            <span>{translate('settings.notificationSettings.inherit')}</span>
-          </SettingsActions>
-          {speech.speed !== undefined && (
-            <SettingsInput
-              type="number"
-              min={0.25}
-              max={4}
-              step={0.05}
-              aria-label={translate('settings.notificationSettings.speechSpeed')}
-              value={speech.speed}
-              onChange={(e) =>
-                changeSpeech('speed', e.target.value.trim() ? Number(e.target.value) : NaN)
-              }
-            />
-          )}
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.notificationSettings.preview')}
-          description={
-            !auxiliary?.configured || !effective.voice
-              ? translate('settings.notificationSettings.previewRequirements')
-              : (previewState ?? translate('settings.notificationSettings.previewHint'))
-          }
-          error={previewJob?.error?.message}
-        >
-          <SettingsActions {...settingAnchor('notifications', 'speech.preview')}>
-            <button
-              className="primary"
-              disabled={
-                busy || pending || previewActive || !auxiliary?.configured || !effective.voice
-              }
-              onClick={() => void run('notificationPreview', [crypto.randomUUID()])}
-            >
-              {translate('settings.notificationSettings.previewAction')}
-            </button>
-            <button
-              disabled={pending || !previewActive}
-              onClick={() => void run('notificationPreviewStop')}
-            >
-              {translate('settings.notificationSettings.stopPreview')}
-            </button>
-          </SettingsActions>
-        </SettingsField>
-      </SettingsSection>
-      <SettingsSection
-        title={translate('settings.notificationSettings.delivery')}
-        data-testid="notification-delivery"
-        hint={translate('settings.notificationSettings.deliveryHint')}
-        collapsible
-      >
-        <SettingsField
-          title={translate('settings.notificationSettings.center')}
-          description={translate('settings.notificationSettings.centerHint')}
-        />
-        <SettingsField
-          title={translate('settings.notificationSettings.banner')}
-          description={translate('settings.notificationSettings.bannerHint')}
-        />
-        <SettingsField
-          title={translate('settings.notificationSettings.desktop')}
-          description={translate('settings.notificationSettings.desktopHint')}
-        />
-        <SettingsField
-          title={translate('settings.notificationSettings.windows')}
-          description={translate('settings.notificationSettings.windowsDurationHint')}
-        />
-        <SettingsField
-          title={translate('settings.notificationSettings.speech')}
-          description={translate('settings.notificationSettings.speechRequirements')}
-        />
-        <SettingsField
-          title={translate('settings.notificationSettings.mcpSettings')}
-          description={translate('settings.notificationSettings.mcpHint')}
-        >
-          <SettingsActions>
-            <button onClick={() => select('codex')}>
-              {translate('settings.notificationSettings.openSettings')}
-            </button>
-          </SettingsActions>
-        </SettingsField>
-        <SettingsField
-          title={translate('settings.notificationSettings.changes')}
-          description={translate('settings.notificationSettings.changesHint')}
-        />
-      </SettingsSection>
     </div>
   );
 }

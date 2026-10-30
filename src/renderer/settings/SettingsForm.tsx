@@ -45,6 +45,7 @@ export function SettingsForm({
   editor,
   select,
   invoke,
+  onOpenNotificationCenter,
   triggerTab,
   gestureView,
   onTriggerTab,
@@ -54,6 +55,7 @@ export function SettingsForm({
   editor: FormEditor;
   select(id: string): void;
   invoke(name: string, args?: unknown[]): Promise<any>;
+  onOpenNotificationCenter(): Promise<unknown>;
   triggerTab: TriggerTab;
   gestureView: 'form' | 'triggers';
   onTriggerTab(tab: TriggerTab): void;
@@ -173,6 +175,7 @@ export function SettingsForm({
         invoke={invoke}
         busy={busy}
         select={select}
+        onOpenCenter={onOpenNotificationCenter}
       />
     );
   if (category === 'codex')

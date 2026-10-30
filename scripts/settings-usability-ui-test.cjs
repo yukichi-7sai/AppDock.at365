@@ -210,11 +210,8 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     assert.deepEqual((await row()).targets, []);
     assert.equal((await row()).speak, false);
     checks.push('speech is a destination; center-only clears visual and speech targets atomically');
-    await page
-      .locator('.settings-section')
-      .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
-      .locator(':scope > summary')
-      .click();
+    await page.getByTestId('notification-delivery').locator(':scope > summary').click();
+    await page.getByTestId('notification-speech').locator(':scope > summary').click();
     await page.getByLabel('通知の速度に共通設定を使う').uncheck();
     await settleSettings(page);
     await page.getByLabel('通知用の読み上げ速度').fill('1.2');
@@ -240,8 +237,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       'selecting the current voice candidate replaces unfinished text without saving it on blur',
     );
     await page
-      .locator('.settings-section')
-      .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
+      .getByTestId('notification-speech')
       .getByRole('button', { name: '設定を開く', exact: true })
       .click();
     await page.getByRole('heading', { name: 'TTS', exact: true, level: 1 }).waitFor();
@@ -250,7 +246,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       .locator('.settings-section')
       .filter({ has: page.getByRole('heading', { name: '通知の受け取り方', exact: true }) });
     await events.locator(':scope > summary').click();
-    await events.getByRole('button', { name: '設定を開く', exact: true }).click();
+    await events
+      .getByRole('group', { name: 'MCP連携設定', exact: true })
+      .getByRole('button', { name: '設定を開く', exact: true })
+      .click();
     await page.getByRole('heading', { name: 'MCPサーバー', exact: true, level: 1 }).waitFor();
     assert.equal(
       await page

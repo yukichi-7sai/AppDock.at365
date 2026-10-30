@@ -487,6 +487,10 @@ export function SettingsPage({
               editor={editor}
               select={(pageId) => act({ kind: 'select', pageId })}
               invoke={c.invoke}
+              onOpenNotificationCenter={async () => {
+                await c.preparePageChange();
+                await window.dock.executeCommand('appdock.notifications.open');
+              }}
             />
           </CommandSettingsNavigation.Provider>
         )}

@@ -171,26 +171,23 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await execute('appdock.settings.open');
     let page = await settingsPage(host);
     await page.getByRole('button', { name: '通知', exact: true }).click();
-    const noticeCard = page
-      .locator('.notification-setting-card')
-      .filter({ hasText: 'Speech notice' });
-    await noticeCard.locator(':scope > summary').click();
-    await page.getByLabel('Speech noticeを読み上げる').waitFor();
+    const noticeRow = page
+      .getByRole('row')
+      .filter({ has: page.getByText('Speech notice', { exact: true }) });
+    await noticeRow.waitFor();
     await execute(id + '.publish');
     await new Promise((r) => setTimeout(r, 400));
     assert.equal(requests.length, 0);
     checks.push('default OFF');
-    await page
-      .locator('.settings-section')
-      .filter({ has: page.getByRole('heading', { name: '読み上げ', exact: true, level: 2 }) })
-      .locator(':scope > summary')
-      .click();
+    await page.getByTestId('notification-delivery').locator(':scope > summary').click();
+    await page.getByTestId('notification-speech').locator(':scope > summary').click();
     await page.getByLabel('通知の声に共通設定を使う').uncheck();
     await settleSettings(page);
     const voice = page.getByRole('combobox', { name: '通知用のボイスID', exact: true });
     const toggle = page.getByRole('button', { name: '通知用のボイスIDの候補を表示', exact: true });
     assert.equal(await toggle.isDisabled(), true);
     await voice.fill('custom-voice');
+    await voice.press('Enter');
     await settleSettings(page);
     assert.equal(
       JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
@@ -278,13 +275,25 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByLabel('通知の速度に共通設定を使う').uncheck();
     await settleSettings(page);
     await page.getByLabel('通知用の読み上げ速度').fill('1.6');
+    await page.getByLabel('通知用の読み上げ速度').press('Enter');
     await settleSettings(page);
-    await page.getByLabel('Speech noticeを読み上げる').check();
+    const beforeNotificationEdit = (await snapshot()).settings.value.notificationPreferences;
+    await noticeRow.getByRole('button', { name: /Speech noticeを編集$/ }).click();
+    const notificationDialog = page.getByRole('dialog');
+    await notificationDialog.getByLabel('Speech noticeを読み上げる').check();
+    assert.deepEqual(
+      (await snapshot()).settings.value.notificationPreferences,
+      beforeNotificationEdit,
+    );
+    await notificationDialog.getByTestId('settings-dialog-confirm').click();
+    await notificationDialog.waitFor({ state: 'hidden' });
     await settleSettings(page);
     const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
     assert.deepEqual(saved.notificationPreferences.speech, { voice: 'notice', speed: 1.6 });
     assert.equal(saved.notificationPreferences.overrides.find((r) => r.ownerId === id).speak, true);
-    checks.push('immediate settings preserve whole-notification overrides');
+    checks.push(
+      'voice/speed save immediately; notification speech saves only after dialog confirmation',
+    );
     await execute(id + '.update');
     await new Promise((r) => setTimeout(r, 350));
     assert.equal(requests.length, 0);
@@ -308,7 +317,11 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await page.getByRole('button', { name: '通知の読み上げを試聴', exact: true }).click();
     await until(() => requests.length === 2, 'preview request');
     await until(async () => {
-      const m = await page.evaluate(() => window.dock.settingsPage.get(document.querySelector('.settings-surface').dataset.settingsConnection));
+      const m = await page.evaluate(() =>
+        window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        ),
+      );
       return m.content.auxiliary.notificationSpeech.jobs.at(-1)?.state === 'completed';
     }, 'preview ended');
     checks.push('notification preview completed');
