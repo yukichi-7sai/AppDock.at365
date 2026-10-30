@@ -153,7 +153,11 @@ test('saving Japanese remains PC-local and preserves user commands, groups and s
   assert.equal(store.value.ribbon.groups[0].title, value.ribbon.groups[0].title);
   assert.equal(store.value.customCommands.items[0].title, value.customCommands.items[0].title);
   assert.equal(fs.readFileSync(file, 'utf8'), before);
-  assert.equal(JSON.parse(fs.readFileSync(store.device.file, 'utf8')).host?.language, undefined);
+  assert.equal(
+    JSON.parse(fs.readFileSync(store.device.file, 'utf8')).hostPages.appearance.configuration.host
+      ?.language,
+    undefined,
+  );
 });
 
 test('localized settings views and owned diagnostic modules do not reintroduce inline Japanese', () => {

@@ -328,10 +328,10 @@ test('reading old full files does not rewrite them, and resetting defaults never
   next = structuredClone(store.value);
   next.host.theme = 'light';
   store.save(next, store.revision);
-  assert.equal(disk(store.device.file).host.theme, undefined);
+  assert.equal(disk(store.device.file).hostPages.appearance.configuration.host?.theme, undefined);
   store.reload();
   assert.equal(store.value.host.theme, 'light');
-  assert.equal(disk(store.device.file).host.theme, undefined);
+  assert.equal(disk(store.device.file).hostPages.appearance.configuration.host?.theme, undefined);
   const oldDevice = initialDeviceSettings('PC-RESET');
   assert.deepEqual(
     parseDeviceSettings({ schemaVersion: 1, machineName: 'PC-RESET' }, 'PC-RESET'),

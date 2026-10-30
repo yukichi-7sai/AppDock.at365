@@ -221,6 +221,22 @@ test('notification and update service settings read, write and reset the selecte
   assert.equal(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
 });
 
+test('Shell selection and reset use the appearance page mode without changing the other file', (t) => {
+  const f = fixture(t, { device: true, updateApplets: [shellApplet('shell.a')] });
+  const id = 'service.shell';
+  for (const local of [true, false]) {
+    f.store.setHostPageLocalSettings('appearance', local, f.store.revision);
+    const otherFile = local ? f.store.shared.file : f.store.device.file;
+    const before = fs.readFileSync(otherFile, 'utf8');
+    f.call('apply', f.request(id, [{ kind: 'set', changes: { ribbon: 'shell.a' } }]));
+    assert.equal(f.values(id).ribbon, 'shell.a');
+    assert.equal(f.read(id, ['ribbon']).fields[0].inherited, false);
+    f.call('apply', f.request(id, [{ kind: 'reset', keys: ['ribbon'] }]));
+    assert.equal(f.read(id, ['ribbon']).fields[0].inherited, true);
+    assert.equal(fs.readFileSync(otherFile, 'utf8'), before);
+  }
+});
+
 test('shared browser discovery uses declared defaults, a bounded array and existing six settings operations', (t) => {
   const f = fixture(t),
     id = 'service.command-triggers';
@@ -2019,9 +2035,13 @@ test('integrated ribbon groups are not separate Shell settings and dormant assig
   );
   f.call('apply', f.request(shellId, [{ kind: 'reset', keys: ['titlebar'] }]));
   assert.deepEqual(f.store.value.host.shellProviders, { [retired]: provider.id });
-  assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)).host.shellProviders, {
-    [retired]: provider.id,
-  });
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(f.store.device.file)).hostPages.appearance.configuration.host
+      .shellProviders,
+    {
+      [retired]: provider.id,
+    },
+  );
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
 });
 
@@ -2091,7 +2111,8 @@ test('Shell selection dryRun, replay, default omission and dotted IDs preserve u
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
   const deviceBefore = JSON.parse(device),
     deviceAfter = JSON.parse(fs.readFileSync(f.store.device.file));
-  deviceBefore.host.shellProviders = deviceAfter.host.shellProviders;
+  deviceBefore.hostPages.appearance.configuration.host.shellProviders =
+    deviceAfter.hostPages.appearance.configuration.host.shellProviders;
   assert.deepEqual(deviceAfter, deviceBefore);
   assert(f.read(shellId, Object.keys(changes)).fields.every((field) => !field.inherited));
   f.call('apply', f.request(shellId, [{ kind: 'reset', keys: Object.keys(changes) }]));
@@ -2103,11 +2124,15 @@ test('Shell selection dryRun, replay, default omission and dotted IDs preserve u
   });
   assert.equal(f.read(shellId, ['ribbon']).fields[0].inherited, true);
   assert.deepEqual(fs.readFileSync(f.store.shared.file), before);
-  assert.deepEqual(JSON.parse(fs.readFileSync(f.store.device.file)).host.shellProviders, {
-    'page.settings': 'old.shell',
-    'overlay.command-palette': 'retired.palette',
-    'future.saved': 'future.shell',
-  });
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(f.store.device.file)).hostPages.appearance.configuration.host
+      .shellProviders,
+    {
+      'page.settings': 'old.shell',
+      'overlay.command-palette': 'retired.palette',
+      'future.saved': 'future.shell',
+    },
+  );
   const noOpWrites = f.writes();
   selectShell(f, { ribbon: defaultShellId });
   assert.equal(f.writes(), noOpWrites);

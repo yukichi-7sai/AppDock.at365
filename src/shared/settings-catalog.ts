@@ -3,6 +3,7 @@ import { commandTextPlain, type CommandReference } from './command-text';
 import { hostSettingDefinitions } from './host-settings';
 import {
   hostPageSettingsPaths,
+  deviceOnlyHostKeys,
   isHostPageSettingsId,
   updateSettingKeys,
 } from './host-page-settings';
@@ -451,11 +452,6 @@ export const appletCommonDescriptions = {
   display: hostText('settings.settings-catalog.appletDisplay'),
   startupDelaySeconds: hostText('settings.settings-catalog.appletDelay'),
 };
-const generalKeys = () => [
-  ...hostSettingDefinitions.filter((field) => field.pageId === 'general').map((field) => field.key),
-  'startAtLogon',
-  'runAsAdministrator',
-];
 const updateKeys = updateSettingKeys;
 
 const item = (
@@ -650,25 +646,20 @@ export function settingsPaths(
       ]),
     ];
   }
-  if (isHostPageSettingsId(page.id)) return hostPageSettingsPaths(page.id);
+  if (isHostPageSettingsId(page.id))
+    return [
+      ...hostPageSettingsPaths(page.id),
+      ...(page.id === 'general' ? deviceOnlyHostKeys.map((key) => ['host', key]) : []),
+    ];
   switch (page.id) {
     case 'mcp-client':
       return [['mcpServers']];
     case 'custom-commands':
       return [['customCommands']];
-    case 'appearance':
-      return [
-        ...hostSettingDefinitions
-          .filter((field) => field.pageId === 'appearance')
-          .map((field) => field.key),
-        'shellProviders',
-      ].map((key) => ['host', key]);
     case 'tts':
       return [['tts']];
     case 'ai':
       return [['ai']];
-    case 'general':
-      return generalKeys().map((k) => ['host', k]);
     case 'shortcuts':
       return [
         ['keybindings'],

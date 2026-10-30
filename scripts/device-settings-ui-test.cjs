@@ -131,23 +131,29 @@ const checks = [];
       page = state.page;
     const toggle = () => page.getByTestId('settings-storage-local');
     assert.equal(await toggle().isChecked(), true);
-    assert.equal(await toggle().isDisabled(), true);
+    assert.equal(await toggle().isDisabled(), false);
     await page.getByLabel('テーマ', { exact: true }).selectOption('dark');
     await settleSettings(state.host);
-    await until(() => disk(deviceFile).host.theme === 'dark', 'local theme');
+    await until(
+      () => disk(deviceFile).hostPages.appearance.configuration.host?.theme === 'dark',
+      'local theme',
+    );
     assert.equal(
       require('../out/main/shared/settings-schema').parseSettings(disk(sharedFile)).host.theme,
       'light',
     );
-    checks.push('appearance checked disabled; theme local');
+    checks.push('appearance defaults local and is switchable; theme local');
     const reset = () => page.getByRole('button', { name: 'このページを既定値に戻す', exact: true });
     const dialog = () => page.getByRole('dialog');
     await reset().click();
     await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
-    assert.equal(disk(deviceFile).host.theme, 'dark');
+    assert.equal(disk(deviceFile).hostPages.appearance.configuration.host?.theme, 'dark');
     await reset().click();
     await dialog().getByRole('button', { name: '既定値に戻す', exact: true }).click();
-    await until(() => disk(deviceFile).host.theme === undefined, 'default theme omitted');
+    await until(
+      () => disk(deviceFile).hostPages.appearance.configuration.host?.theme === undefined,
+      'default theme omitted',
+    );
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
     assert.deepEqual(
       JSON.parse(await page.getByRole('textbox', { name: '設定JSON' }).inputValue()),
@@ -169,18 +175,21 @@ const checks = [];
     });
     await dialog().getByRole('button', { name: '既定値に戻す', exact: true }).click();
     await dialog().getByRole('alert').waitFor();
-    assert.equal(disk(deviceFile).host.theme, 'system');
+    assert.equal(disk(deviceFile).hostPages.appearance.configuration.host?.theme, 'system');
     await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
     await reset().click();
     await dialog().getByRole('button', { name: '既定値に戻す', exact: true }).click();
-    await until(() => disk(deviceFile).host.theme === undefined, 'JSON reset');
+    await until(
+      () => disk(deviceFile).hostPages.appearance.configuration.host?.theme === undefined,
+      'JSON reset',
+    );
     checks.push(
       'JSON reset rejects changes after confirmation and succeeds after fresh confirmation',
     );
     await page.getByRole('button', { name: '一般', exact: true }).click();
     await page.getByRole('heading', { name: '一般', exact: true }).waitFor();
     assert.equal(await toggle().isChecked(), true);
-    assert.equal(await toggle().isDisabled(), true);
+    assert.equal(await toggle().isDisabled(), false);
     const general = await page.evaluate(() =>
       window.dock.settingsPage.get(
         document.querySelector('.settings-surface').dataset.settingsConnection,
@@ -190,8 +199,10 @@ const checks = [];
       general.content.auxiliary.storage.files.map((file) => file.scope),
       ['device'],
     );
-    checks.push('general checked disabled; JSON and file target device');
+    checks.push('general defaults local and is switchable; JSON and file target device');
     const hostPages = [
+      ['appearance', '表示', { host: { theme: 'dark', showHints: false } }],
+      ['general', '一般', { host: { soundEnabled: false, closeToTray: false } }],
       [
         'notifications',
         '通知',
@@ -225,7 +236,10 @@ const checks = [];
       await page.getByRole('button', { name: title, exact: true }).click();
       await page.getByTestId(`settings-page:${pageId}`).waitFor();
       assert.equal(await toggle().isDisabled(), false);
-      assert.equal(await toggle().isChecked(), ['notifications', 'statusbar'].includes(pageId));
+      assert.equal(
+        await toggle().isChecked(),
+        ['appearance', 'general', 'notifications', 'statusbar'].includes(pageId),
+      );
       if (!(await toggle().isChecked())) await toggle().check();
       await until(
         () => disk(deviceFile).hostPages[pageId].useLocalSettings,
@@ -258,7 +272,7 @@ const checks = [];
       assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
       assert.deepEqual(
         (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
-        ['shared'],
+        pageId === 'general' ? ['shared', 'device'] : ['shared'],
       );
       await toggle().check();
       await until(
@@ -286,6 +300,43 @@ const checks = [];
     assert.equal(await toggle().isVisible(), true);
     await page.screenshot({ path: path.join(output, 'host-about-shared-narrow.png') });
     await page.setViewportSize({ width: 1280, height: 842 });
+    await page.getByTestId('settings-nav:general').click();
+    const startup = () => page.getByTestId('general-startup-settings');
+    await startup().waitFor();
+    assert.equal(await startup().getByRole('switch').count(), 3);
+    assert.equal(await startup().getByText('このPC専用', { exact: true }).isVisible(), true);
+    const gpu = () => startup().getByRole('switch', { name: /ハードウェアアクセラレーション/ });
+    await gpu().click();
+    await until(
+      () => disk(deviceFile).host.hardwareAcceleration === true,
+      'hardware remains local in shared general',
+    );
+    assert.equal(
+      require('../out/main/shared/settings-schema').parseSettings(disk(sharedFile)).host
+        .hardwareAcceleration,
+      false,
+    );
+    await toggle().check();
+    await until(
+      () => disk(deviceFile).hostPages.general.useLocalSettings,
+      'general local with fixed hardware',
+    );
+    assert.equal(
+      disk(deviceFile).hostPages.general.configuration.host?.hardwareAcceleration,
+      undefined,
+    );
+    await toggle().click();
+    await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
+    await until(
+      () => !disk(deviceFile).hostPages.general.useLocalSettings,
+      'general shared with fixed hardware',
+    );
+    assert.equal(disk(deviceFile).host.hardwareAcceleration, true);
+    await startup().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(output, 'general-shared-startup-device.png') });
+    checks.push(
+      'general shared mode keeps all three startup settings local; hardware is grouped under startup and survives mode switches',
+    );
     await stop();
     state = await start();
     page = state.page;
@@ -295,12 +346,28 @@ const checks = [];
       assert.equal(await toggle().isChecked(), false);
       assert.deepEqual(
         (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
-        ['shared'],
+        pageId === 'general' ? ['shared', 'device'] : ['shared'],
       );
     }
     checks.push(
-      'all five host page modes and file targets survive a real app restart; narrow toolbar remains accessible',
+      'all seven host page modes and file targets survive a real app restart; narrow toolbar remains accessible',
     );
+    assert.equal(
+      (await state.host.evaluate(() => window.dock.snapshot())).settings.value.host
+        .hardwareAcceleration,
+      true,
+    );
+    await page.getByTestId('settings-nav:general').click();
+    await gpu().click();
+    await until(
+      () => disk(deviceFile).host.hardwareAcceleration === undefined,
+      'hardware default omitted locally',
+    );
+    for (const key of ['startAtLogon', 'runAsAdministrator'])
+      assert.equal(
+        (await state.host.evaluate(() => window.dock.snapshot())).settings.value.host[key],
+        false,
+      );
     await page.getByRole('button', { name: 'Device settings fixture', exact: true }).click();
     await page.getByRole('heading', { name: 'Device settings fixture', exact: true }).waitFor();
     assert.equal(await toggle().isChecked(), false);

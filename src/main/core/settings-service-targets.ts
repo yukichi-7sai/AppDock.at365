@@ -200,7 +200,7 @@ export class SettingsServiceTargets {
       category: 'shell',
       fields,
       stored: () => this.options.settings.storedSettingOverrides('appdock'),
-      rewriteScope: 'device',
+      rewriteScope: () => this.options.settings.settingScope(['host', 'shellProviders']),
       context: fields.map(({ key, options }) => ({ key, options })),
       applies: () => 'shellProvidersChanged',
       values: (settings) =>

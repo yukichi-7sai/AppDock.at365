@@ -206,7 +206,10 @@ export function SettingsPageLayout({
                       {t('settings.local.label')}
                       <SettingsHintIcon
                         title={t('settings.local.label')}
-                        hint={storage.local ? t('settings.local.hint') : t('settings.shared.hint')}
+                        hint={[
+                          storage.local ? t('settings.local.hint') : t('settings.shared.hint'),
+                          ...(page.id === 'general' ? [t('settings.general.storageHint')] : []),
+                        ].join(' ')}
                       />
                     </label>
                   ) : null}

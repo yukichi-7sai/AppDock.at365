@@ -37,7 +37,17 @@ function fixture(t, legacy) {
 }
 function change(value, pageId, alternate = false) {
   const next = structuredClone(value);
-  if (pageId === 'notifications') {
+  if (pageId === 'appearance') {
+    next.host.theme = alternate ? 'system' : 'dark';
+    next.host.zoomFactor = alternate ? 1.1 : 1.25;
+    next.host.overlayShadow = alternate;
+    next.host.shellProviders = alternate ? {} : { ribbon: 'example.shell' };
+  } else if (pageId === 'general') {
+    next.host.soundEnabled = alternate;
+    next.host.closeToTray = alternate;
+    next.host.startMinimized = !alternate;
+    next.host.startPage = alternate ? 'about' : 'page:example.missing:main';
+  } else if (pageId === 'notifications') {
     next.host.notificationBannerPosition = alternate ? 'bottom-left' : 'bottom-right';
     next.host.notificationBannerShadow = alternate;
     next.host.notificationDesktopShadow = alternate;
@@ -74,7 +84,7 @@ test('legacy mixed notification values and status visibility migrate once withou
   for (const pageId of hostPageSettingsIds)
     assert.equal(
       store.hostPageLocalSettings(pageId),
-      ['notifications', 'statusbar'].includes(pageId),
+      ['appearance', 'general', 'notifications', 'statusbar'].includes(pageId),
     );
   assert.equal(store.value.host.notificationBannerPosition, 'bottom-right');
   assert.equal(store.value.host.showStatusBar, false);
@@ -133,7 +143,7 @@ for (const pageId of hostPageSettingsIds) {
       hostPageConfiguration(parseSettings(disk(file)), pageId),
       hostPageConfiguration(final, pageId),
     );
-    assert.equal(store.value.host.theme, createDefaultSettings().host.theme);
+    assert.equal(store.value.host.runAsAdministrator, false);
     assert.equal(store.device.value.hostPages[pageId].useLocalSettings, false);
   });
 
@@ -166,7 +176,12 @@ test('host page configuration rejects foreign pages, invalid values and escaping
   delete device.hostPages;
   assert.deepEqual(parseDeviceSettings(device, 'PC-A').hostPages, {});
   for (const hostPages of [
-    { appearance: { useLocalSettings: true, configuration: {} } },
+    { appearance: { useLocalSettings: true, configuration: { host: { soundEnabled: false } } } },
+    { general: { useLocalSettings: true, configuration: { host: { startAtLogon: true } } } },
+    { general: { useLocalSettings: true, configuration: { host: { runAsAdministrator: true } } } },
+    {
+      general: { useLocalSettings: true, configuration: { host: { hardwareAcceleration: true } } },
+    },
     { statusbar: { useLocalSettings: true } },
     { notifications: { useLocalSettings: true, configuration: { host: { theme: 'dark' } } } },
     { statusbar: { useLocalSettings: true, configuration: { host: { showStatusBar: 'false' } } } },
@@ -189,7 +204,7 @@ test('selected persisted overrides and stale revisions follow the host page mode
     SettingsConflictError,
   );
   const before = fs.readFileSync(store.device.file, 'utf8');
-  assert.throws(() => store.setHostPageLocalSettings('appearance', true, store.revision));
+  assert.throws(() => store.setHostPageLocalSettings('tts', true, store.revision));
   assert.equal(fs.readFileSync(store.device.file, 'utf8'), before);
 });
 
@@ -230,4 +245,65 @@ test('switching a legacy tray command list to local retains its resolved menu an
   assert.equal(fs.readFileSync(file, 'utf8'), before);
   store.reload();
   assert.deepEqual(store.value.trayMenu, expected);
+});
+
+test('appearance/general adopt existing PC values while preserving all earlier page modes', (t) => {
+  const { store, file, shared } = fixture(t, (device) => {
+    device.host.theme = 'dark';
+    device.host.zoomFactor = 1.25;
+    device.host.soundEnabled = false;
+    device.host.hardwareAcceleration = true;
+    device.host.startAtLogon = true;
+    device.hostPages = {
+      notifications: { useLocalSettings: false },
+      statusbar: { useLocalSettings: false },
+      ribbon: {
+        useLocalSettings: true,
+        configuration: { ribbon: { rightClickCommand: 'appdock.open' } },
+      },
+      tray: { useLocalSettings: false },
+      about: { useLocalSettings: false },
+    };
+  });
+  assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(shared));
+  const device = disk(store.device.file);
+  assert.equal(device.hostPages.appearance.configuration.host.theme, 'dark');
+  assert.equal(device.hostPages.appearance.configuration.host.zoomFactor, 1.25);
+  assert.equal(device.hostPages.general.configuration.host.soundEnabled, false);
+  assert.equal(device.hostPages.general.configuration.host.hardwareAcceleration, undefined);
+  assert.equal(device.hostPages.notifications.useLocalSettings, false);
+  assert.equal(device.hostPages.ribbon.useLocalSettings, true);
+  assert.equal(store.value.ribbon.rightClickCommand, 'appdock.open');
+  assert.equal(device.host.hardwareAcceleration, true);
+  assert.equal(device.host.startAtLogon, true);
+  assert.equal(device.host.theme, undefined);
+});
+
+test('general shared/local modes and sharing never transfer launch or hardware flags to another PC', (t) => {
+  const { store, file, base } = fixture(t);
+  const fixed = ['startAtLogon', 'runAsAdministrator', 'hardwareAcceleration'];
+  const next = change(store.value, 'general');
+  for (const key of fixed) next.host[key] = true;
+  store.save(next, store.revision);
+  store.setHostPageLocalSettings('general', false, store.revision, undefined, 'share');
+  for (const key of fixed) {
+    assert.equal(store.value.host[key], true);
+    assert.equal(store.settingScope(['host', key]), 'device');
+    assert.equal(parseSettings(disk(file)).host[key], false);
+  }
+  const b = new DeviceSettingsStore(file, path.join(base, 'local-b'), 'PC-B');
+  t.after(() => b.close());
+  b.load();
+  b.setHostPageLocalSettings('general', false, b.revision);
+  for (const key of fixed) assert.equal(b.value.host[key], false);
+  for (const enabled of [true, false, true]) {
+    store.setHostPageLocalSettings('general', enabled, store.revision);
+    store.reload();
+    for (const key of fixed) assert.equal(store.value.host[key], true);
+  }
+  const paths = require('../out/main/shared/settings-catalog').settingsPaths(
+    { id: 'general', kind: 'host', json: true },
+    [],
+  );
+  for (const key of fixed) assert(paths.some((path) => path.join('.') === 'host.' + key));
 });

@@ -80,7 +80,11 @@ test('hint visibility accepts old device files and remains independent per PC wi
   assert.equal(a.value.host.showHints, false);
   assert.equal(b.value.host.showHints, true);
   assert.equal(fs.readFileSync(file, 'utf8'), sharedBefore);
-  assert.equal(disk(path.join(path.dirname(file), 'settings-PC-A.json')).host.showHints, false);
+  assert.equal(
+    disk(path.join(path.dirname(file), 'settings-PC-A.json')).hostPages.appearance.configuration
+      .host.showHints,
+    false,
+  );
   a.reload();
   assert.equal(a.value.host.showHints, false);
 });
@@ -105,13 +109,22 @@ test('accent colors remain independent per PC, persist across reload, and omit t
   assert.equal(fs.readFileSync(file, 'utf8'), before);
   next.host.accentColor = 'mint';
   a.save(next, a.revision);
-  assert.equal(disk(a.device.file).host?.accentColor, undefined);
-  assert.equal(disk(a.device.file).host.customAccentDark, '#123456');
+  assert.equal(disk(a.device.file).hostPages.appearance.configuration.host?.accentColor, undefined);
+  assert.equal(
+    disk(a.device.file).hostPages.appearance.configuration.host.customAccentDark,
+    '#123456',
+  );
   next.host.customAccentDark = createDefaultSettings().host.customAccentDark;
   next.host.customAccentLight = createDefaultSettings().host.customAccentLight;
   a.save(next, a.revision);
-  assert.equal(disk(a.device.file).host?.customAccentDark, undefined);
-  assert.equal(disk(a.device.file).host?.customAccentLight, undefined);
+  assert.equal(
+    disk(a.device.file).hostPages.appearance.configuration.host?.customAccentDark,
+    undefined,
+  );
+  assert.equal(
+    disk(a.device.file).hostPages.appearance.configuration.host?.customAccentLight,
+    undefined,
+  );
 });
 
 test('migration preserves shared bytes and initializes local flags once', (t) => {
@@ -150,7 +163,7 @@ test('all display/general settings remain local while other settings synchronize
     require('../out/main/shared/settings-schema').parseSettings(shared).host.soundEnabled,
     true,
   );
-  assert.equal(device.host.soundEnabled, false);
+  assert.equal(device.hostPages.general.configuration.host.soundEnabled, false);
   assert.equal(device.host.runAsAdministrator, true);
   shared.host ??= {};
   shared.host.theme = 'system';
@@ -300,7 +313,7 @@ test('missing local state is recovered independently and never reimported from s
   assert.equal(plan.scope, 'device');
   reopened.restoreRecovery(plan);
   assert.equal(disk(file).host.theme, 'light');
-  assert.equal(disk(reopened.device.file).host.theme, 'dark');
+  assert.equal(disk(reopened.device.file).hostPages.appearance.configuration.host.theme, 'dark');
 });
 test('invalid local file, foreign PC and malicious identities cannot change storage boundaries', (t) => {
   const { store } = fixture(t);

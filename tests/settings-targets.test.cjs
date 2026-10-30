@@ -123,9 +123,15 @@ function fixture(t, { device = false, definitions } = {}) {
             undefined,
             reset
               ? [
-                  reset.ownerId === 'appdock' || store.localSettings(reset.ownerId)
-                    ? 'device'
-                    : 'shared',
+                  ...new Set(
+                    reset.keys.map((key) =>
+                      reset.ownerId === 'appdock'
+                        ? store.settingScope(['host', key])
+                        : store.localSettings(reset.ownerId)
+                          ? 'device'
+                          : 'shared',
+                    ),
+                  ),
                 ]
               : [],
           )
@@ -554,7 +560,10 @@ test('device-backed resets preserve per-PC ownership and shared bytes', (t) => {
   assert.equal(f.store.value.host.soundEnabled, true);
   assert.equal(fs.readFileSync(f.store.shared.file, 'utf8'), sharedBefore);
   assert.equal(
-    Object.hasOwn(JSON.parse(fs.readFileSync(f.store.device.file)).host ?? {}, 'soundEnabled'),
+    Object.hasOwn(
+      JSON.parse(fs.readFileSync(f.store.device.file)).hostPages.general.configuration.host ?? {},
+      'soundEnabled',
+    ),
     false,
   );
 });
@@ -569,8 +578,8 @@ test('reset clears an explicit override equal to its default and detects represe
     const file = device ? f.store.device.file : f.store.file;
     const sharedBefore = device ? fs.readFileSync(f.store.shared.file, 'utf8') : null;
     const raw = JSON.parse(fs.readFileSync(file));
-    raw.host ??= {};
-    raw.host.soundEnabled = true;
+    const rawHost = device ? (raw.hostPages.general.configuration.host ??= {}) : (raw.host ??= {});
+    rawHost.soundEnabled = true;
     fs.writeFileSync(file, JSON.stringify(raw));
     assert.equal(f.read(targetId, ['soundEnabled']).fields[0].inherited, false);
     assert.throws(() => f.call('apply', stale), { code: 'REVISION_CONFLICT' });
@@ -580,8 +589,12 @@ test('reset clears an explicit override equal to its default and detects represe
     );
     assert.equal(result.changed, true);
     assert.equal(result.changes[0].inherited, true);
+    const saved = JSON.parse(fs.readFileSync(file));
     assert.equal(
-      Object.hasOwn(JSON.parse(fs.readFileSync(file)).host ?? {}, 'soundEnabled'),
+      Object.hasOwn(
+        device ? (saved.hostPages.general.configuration.host ?? {}) : (saved.host ?? {}),
+        'soundEnabled',
+      ),
       false,
     );
     assert.equal(f.read(targetId, ['soundEnabled']).fields[0].inherited, true);

@@ -198,6 +198,7 @@
   "settings.local.label": "このPCで設定を保持する",
   "settings.local.hint": "このPC専用の設定を使います。OFFにするときに、共有への反映・このPCの設定の削除・保持を選べます。",
   "settings.shared.hint": "共有設定を使います。初めてONにすると現在の設定をコピーし、保存済みの端末設定があれば再開します。",
+  "settings.general.storageHint": "「AppDockの起動」の3項目は、保存先にかかわらずこのPC専用です。",
   "settings.storage.json": "設定JSON:",
   "settings.storage.both": "共有＋このPC",
   "settings.storage.deviceOnly": "このPC専用",

@@ -516,7 +516,7 @@ export function SettingsForm({
                   ))}
                 </select>
               </SettingRow>
-              {(['closeToTray', 'startMinimized', 'hardwareAcceleration'] as const).map((key) => (
+              {(['closeToTray', 'startMinimized'] as const).map((key) => (
                 <SettingRow key={key} pageId={category} itemKey={key}>
                   <Toggle
                     label={hostSettingItem(category, key, language).title}
@@ -526,7 +526,12 @@ export function SettingsForm({
                 </SettingRow>
               ))}
             </SettingsSection>
-            <SettingsSection title={t('general.startup.section')} hint={t('general.startup.hint')}>
+            <SettingsSection
+              title={t('general.startup.section')}
+              data-testid="general-startup-settings"
+              description={t('settings.storage.deviceOnly')}
+              hint={t('general.startup.hint')}
+            >
               <SettingRow pageId={category} itemKey="startAtLogon">
                 <Toggle
                   label={t('general.startAtLogon.label')}
@@ -544,6 +549,15 @@ export function SettingsForm({
                   disabled={!launch.supported}
                   onChange={(v) =>
                     edit({ ...settings, host: { ...settings.host, runAsAdministrator: v } })
+                  }
+                />
+              </SettingRow>
+              <SettingRow pageId={category} itemKey="hardwareAcceleration">
+                <Toggle
+                  label={hostSettingItem(category, 'hardwareAcceleration', language).title}
+                  checked={settings.host.hardwareAcceleration}
+                  onChange={(hardwareAcceleration) =>
+                    edit({ ...settings, host: { ...settings.host, hardwareAcceleration } })
                   }
                 />
               </SettingRow>
