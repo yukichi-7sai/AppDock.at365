@@ -101,15 +101,18 @@ async function close() {
     const initial = await snapshot();
     assert.equal(initial.launch.supported, true);
     assert.equal(initial.launch.registered, false);
-    assert.equal(await toggle('スタートアップに登録').getAttribute('aria-checked'), 'false');
+    assert.equal(
+      await toggle('ログイン時に自動的に起動する').getAttribute('aria-checked'),
+      'false',
+    );
     assert.equal(await toggle('常に管理者として起動').getAttribute('aria-checked'), 'false');
-    await toggle('スタートアップに登録').click();
+    await toggle('ログイン時に自動的に起動する').click();
     await save();
     assert.equal((await service.read()).registered, true);
     await toggle('閉じるとトレイに収納').click();
     await category('リボン').click();
     await category('一般').click();
-    assert.equal(await toggle('スタートアップに登録').getAttribute('aria-checked'), 'true');
+    assert.equal(await toggle('ログイン時に自動的に起動する').getAttribute('aria-checked'), 'true');
     await save();
     const registered = await service.read();
     assert.equal(await button('管理者として再起動').isDisabled(), registered.elevated);
@@ -187,7 +190,7 @@ async function close() {
         await page.setViewportSize({ width, height: 900 });
         await page.screenshot({ path: path.join(profile, `${theme}-${width}.png`) });
         for (const name of [
-          'スタートアップに登録',
+          'ログイン時に自動的に起動する',
           '常に管理者として起動',
           '状態を確認',
           '管理者として再起動',
@@ -213,12 +216,12 @@ async function close() {
     await close();
     await launch();
     assert.equal((await snapshot()).launch.registered, true);
-    assert.equal(await toggle('スタートアップに登録').getAttribute('aria-checked'), 'true');
-    await toggle('スタートアップに登録').click();
+    assert.equal(await toggle('ログイン時に自動的に起動する').getAttribute('aria-checked'), 'true');
+    await toggle('ログイン時に自動的に起動する').click();
     await save();
     assert.equal((await service.read()).registered, false);
     await button('状態を確認').click();
-    await page.getByText(/スタートアップ: 未登録/).waitFor();
+    await page.getByText(/ログイン時の自動起動: 未登録/).waitFor();
     checks.push(
       'restart preserves settings and detects Windows registration; disabling and saving removes only isolated task',
     );
