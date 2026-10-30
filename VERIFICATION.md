@@ -1,5 +1,21 @@
 # 検証記録
 
+## 2026-10-30: 設定操作ボタン0.105.8のコミット・プッシュ照合
+
+- 利用者による発行版の確認後、本体とWatchのmainをコミット・GitHubへプッシュする範囲で確認した。origin取得後、本体には既存commit `fc9840a`の未送信1件、Watchには分岐なし。今回の製品差分は受入済み16ファイルで、実装時の871入力・ネイティブ29入力・発行payload/ZIP・固定GUIコピーのSHA256が一致した。
+- 型検査/build、関連50件、共通ボタンの開発/固定GUI各7群、Watch固定GUI14群とMCP、ネイティブ21件の成功を再利用。標準152試験ファイルのうち16件を入力・依存と成功ログへ照合して再利用し、不足136ファイルを追加実行した。並列135ファイル1,260件と単独更新2件はfail/skip 0。再利用分と合わせて必要回帰の成功が揃った。
+- 再レビューの指摘なし、製品の追加修正なし。確認済み0.105.8を維持し、再発行は行わない。今回新たなGUIコピーは生成しておらず、再利用証跡を保持する。GitHub Release・実利用先deployは対象外。
+- 証跡は`.artifacts/commit-validation-action-presentation-20261030/`のreuse.json、inputs.json、standard-plan.json、concurrent/serial-result.jsonと完全ログ、validation.json。対象stageと作業ファイル、stage/commit tree、GitHub origin/mainの照合は同じ場所のstage.json・commits.json・push.jsonへ記録する。
+
+## 2026-10-30: 設定操作ボタンの配置・見た目・アイコン（0.105.8）
+
+- main `fc9840a`から、任意の`placement: inline/below`、`appearance: standard/filled`、組み込み`icon`、`iconOnly`を追加。省略時の横並び・標準表示、設定/操作の個別検索ID、入力確定とコマンド実行経路を維持した。Fieldの共通スロットが配置を所有し、アイコンのみでも必須titleを読み上げ名とtooltipに使う。保存設定・ファイル・MCPの公開キー/スキーマ/権限は追加しないためパッチ更新。新指定にはminimumHostVersion 0.105.8を要求する。
+- 発行前レビューで、文字だけの既存ボタンに新しいラベル配置を広げないことと、下の操作列の余白の二重化を修正。修正後typecheck/buildと開発GUI7群成功。宣言の拒否、最低ホスト版、セクション、入力編集、MCP公開、翻訳、coreの関連50件はfail/skip 0。後続修正はrendererの配置だけで、この50件の入力に影響しない。
+- 本体0.105.8・Watch0.5.4のpublish成功。固定本体EXEの隔離GUI7群で、標準/塗りつぶし、文字+アイコン/アイコンのみ、キーボード実行、保存先行、二重実行防止、失敗時の値保持、検索、停止時無効化、1200/760幅、明暗テーマを確認。画面画像も目視し、共通の灰色/暗色面と文字の可読性を確認した。Watchの固定EXE試験14群では実フォント選択の確定/取消とMCP15項目も成功。
+- Watch試験の初回は、通知画面の閉じた内部「読み上げ」を表示待機して停止した。現行の「通知の受け取り方」を準備条件に修正し、同じ発行版で14群成功。製品修正・再発行なし。初回失敗の記録を保持する。GUI起動は直列・隔離設定で行い、Pause/F13〜F24は登録/送信しない。
+- 証跡は`.artifacts/action-presentation-20261030/`のreview.json、inputs.json/inputs-final.json、各build/test/publishログ、packages.json、validation.json。固定GUIは`.artifacts/setting-actions-ui-1793337465319/`、Watchは`../Applet.Watch.at365/.artifacts/independent-display-ui-1793337532502/`。配布ZIPの本体693ファイル・Watch2ファイルは発行payloadと全件SHA256/サイズ一致、feedと版も一致。全体回帰は今回実行せず、変更に必要な範囲を実行した。
+- 整理は終了・成功・プロセス不在・再解析ポイント不在を照合した旧固定コピー4件の管理対象2,768ファイルのみ。結果・画像・設定・manifestなど408ファイルをハッシュ照合して保持し、最新成功コピーを保持した。論理サイズ2,523,713,122 bytes、A:空き容量の実測差は-32,849,920 bytesで、空き容量増加とは扱わない。旧結果は再利用証跡として全フォルダーを保持。詳細はcleanup.json。実利用先deploy、commit、push、Releaseは行っていない。
+
 ## 2026-10-30: 通知設定・移動時のちらつき修正 0.105.7 のコミット照合
 
 - 利用者が確認した通知設定の並べ替え・重複説明の除去・読み上げの現在値・通知センター/Windows設定へのボタン・入れ子Fieldのインデントと、通知センター移動/MCP読み込みのちらつき対策を19ファイルでレビューした。main `e120441`上の対象差分を保持し、無関係な変更は追加しない。設定ページの接続検査・入力確定・保存・取消を維持し、製品の追加修正は不要と判断した。

@@ -2380,6 +2380,7 @@
   "services.extensions.gestureOwnership": "既定ジェスチャーには自身の宣言コマンドだけを指定してください。",
   "services.extensions.settingsSectionVersion": "設定セクションにはminimumHostVersion:0.36.8以上が必要です。",
   "services.extensions.settingActionFieldVersion": "設定項目内の操作ボタンにはminimumHostVersion:0.105.2以上が必要です。",
+  "services.extensions.settingActionPresentationVersion": "設定操作ボタンの配置・見た目・アイコンの指定にはminimumHostVersion:0.105.8以上が必要です。",
   "services.extensions.duplicateApplet": "同じIDのAppletが存在します。",
   "services.extensions.customTypeLimit": "カスタムコマンドの種類IDが重複しています。",
   "services.extensions.duplicateExtension": "同じIDの拡張が重複しています。外部の重複した拡張は起動しません。",

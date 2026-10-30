@@ -149,6 +149,12 @@ export interface SettingAction {
   command: string;
   /** Place this action inside an existing top-level setting field. Presentation only. */
   settingKey?: string;
+  /** Attached actions default to inline; below starts a separate action row. */
+  placement?: 'inline' | 'below';
+  appearance?: 'standard' | 'filled';
+  icon?: import('./ribbon').RibbonBuiltinIcon;
+  /** The required title remains the accessible name and tooltip. */
+  iconOnly?: boolean;
   description?: string;
   successMessage?: string;
 }

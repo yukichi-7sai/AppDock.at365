@@ -2,6 +2,7 @@ import { useHostTranslation } from '../HostTranslation';
 import { CommandText } from './CommandText';
 import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { defaultAppletEnabled } from '../../shared/applet-state';
+import { Icon } from '../../shared/ui-icons';
 import { appletCommonDefinitions } from '../../shared/applet-common-settings';
 import { Toggle } from './Toggle';
 import type {
@@ -18,12 +19,7 @@ import {
 import { resolveSettingSections } from '../../shared/setting-sections';
 import { settingAnchor } from './setting-anchor';
 import { SettingsInput, SettingsUrlInput, SettingsTextarea, numberInput } from './SettingsInput';
-import {
-  SettingsSection,
-  SettingsField,
-  SettingsActions,
-  SettingsInputActions,
-} from './SettingsSections';
+import { SettingsSection, SettingsField, SettingsActions } from './SettingsSections';
 import { SettingsMcpLock } from './SettingsMcpAccess';
 import { SettingsButton } from './SettingsButton';
 import { useSettingsFeedback } from './SettingsStatus';
@@ -119,13 +115,27 @@ export function AppletSettingsForm({
     <SettingsButton
       type="button"
       className="secondary"
+      appearance={item.appearance}
+      icon={item.iconOnly}
+      aria-label={item.iconOnly ? item.title : undefined}
+      title={item.iconOnly ? item.title : undefined}
       aria-describedby={`setting-action-help-${item.command}`}
       disabled={!actionAvailable(item) || runningAction !== null}
       pending={runningAction === item.command}
       onClick={() => void executeAction(item)}
     >
-      {item.title}
+      {item.icon && <Icon name={item.icon} />}
+      {!item.iconOnly && item.title}
     </SettingsButton>
+  );
+  const attachedAction = (item: SettingAction) => (
+    <SettingsActions key={item.command} {...settingAnchor(pageId, `action:${item.command}`)}>
+      {actionButton(item)}
+      <SettingsMcpLock
+        title={item.title}
+        itemId={settingsItemId(pageId, `action:${item.command}`)}
+      />
+    </SettingsActions>
   );
   const action = (item: SettingAction) => {
     return (
@@ -152,6 +162,8 @@ export function AppletSettingsForm({
     const attached = (applet.settingActions ?? []).filter(
       (action) => action.settingKey === item.key,
     );
+    const inline = attached.filter((action) => action.placement !== 'below');
+    const below = attached.filter((action) => action.placement === 'below');
     const control =
       item.type === 'object-list' && item.list && onListCommit ? (
         <ObjectListDialogSetting
@@ -283,27 +295,11 @@ export function AppletSettingsForm({
             : undefined
         }
         className={wide ? 'settings-field-wide' : ''}
+        actions={inline.length > 0 ? inline.map(attachedAction) : undefined}
+        belowActions={below.length > 0 ? below.map(attachedAction) : undefined}
         {...settingAnchor(pageId, `setting:${item.key}`)}
       >
-        {attached.length ? (
-          <SettingsInputActions wrap>
-            <div>{control}</div>
-            {attached.map((action) => (
-              <SettingsActions
-                key={action.command}
-                {...settingAnchor(pageId, `action:${action.command}`)}
-              >
-                {actionButton(action)}
-                <SettingsMcpLock
-                  title={action.title}
-                  itemId={settingsItemId(pageId, `action:${action.command}`)}
-                />
-              </SettingsActions>
-            ))}
-          </SettingsInputActions>
-        ) : (
-          control
-        )}
+        {control}
       </SettingsField>
     );
   };

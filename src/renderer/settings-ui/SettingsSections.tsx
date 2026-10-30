@@ -114,6 +114,8 @@ export function SettingsField({
   hint,
   error,
   children,
+  actions,
+  belowActions,
   settingKey,
   ...props
 }: {
@@ -123,16 +125,21 @@ export function SettingsField({
   hint?: string;
   error?: string;
   children?: ReactNode;
+  actions?: ReactNode;
+  belowActions?: ReactNode;
   settingKey?: string;
 } & Omit<HTMLAttributes<HTMLFieldSetElement>, 'title'>) {
   const errorId = useSettingsFeedback({ error, target: title });
+  const hasControls = [children, actions, belowActions].some(
+    (node) => node != null && node !== false,
+  );
   return (
     <fieldset
       {...props}
       className={`settings-field ${props.className ?? ''}`}
       aria-describedby={error ? errorId : undefined}
       data-invalid={!!error}
-      data-readonly={children == null || children === false}
+      data-readonly={!hasControls}
     >
       <legend className="sr-only">{group ? `${group}：${title}` : title}</legend>
       <div className="settings-field-label">
@@ -148,14 +155,26 @@ export function SettingsField({
         </div>
         {description && <p>{description}</p>}
       </div>
-      {children != null && children !== false && (
+      {hasControls && (
         <SettingsFieldTarget.Provider value={title}>
           <div className="settings-field-control">
             <SettingsMcpScope
               itemId={props['data-setting-item' as keyof typeof props] as string | undefined}
               fieldKey={settingKey}
             >
-              {children}
+              {actions ? (
+                <SettingsInputActions wrap>
+                  <div>{children}</div>
+                  {actions}
+                </SettingsInputActions>
+              ) : (
+                children
+              )}
+              {belowActions && (
+                <SettingsActions className="settings-field-below-actions">
+                  {belowActions}
+                </SettingsActions>
+              )}
             </SettingsMcpScope>
           </div>
         </SettingsFieldTarget.Provider>

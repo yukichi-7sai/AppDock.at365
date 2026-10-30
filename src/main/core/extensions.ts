@@ -295,6 +295,15 @@ function readManifest(
     (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.105.2') < 0)
   )
     throw Error(hostText('services.extensions.settingActionFieldVersion'));
+  if (
+    settingActions?.some((action) =>
+      [action.placement, action.appearance, action.icon, action.iconOnly].some(
+        (value) => value !== undefined,
+      ),
+    ) &&
+    (!m.minimumHostVersion || compareVersions(m.minimumHostVersion, '0.105.8') < 0)
+  )
+    throw Error(hostText('services.extensions.settingActionPresentationVersion'));
   const settingSections = parseSettingSections(
     m.settingSections,
     settingDefinitions ?? [],

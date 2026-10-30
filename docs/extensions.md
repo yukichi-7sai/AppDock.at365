@@ -82,7 +82,7 @@ MCPは宣言から[共通設定APIの一覧対象](settings-api.md#ショート�
 
 ### 設定ページの操作ボタン
 
-`settingActions` は最大16件の `{ title, command, settingKey?, description?, successMessage? }` を宣言します。
+`settingActions` は最大16件の `{ title, command, settingKey?, placement?, appearance?, icon?, iconOnly?, description?, successMessage? }` を宣言します。
 `command` は同じマニフェストの `commands` に宣言した正規IDに限定し、重複・別Applet・ホストのコマンドを拒否します。
 ボタンは既存のコマンド実行経路を使い、実行中は同じ設定パネルの操作ボタンを無効化します。
 成功・失敗をその場へ表示し、設定変更とは独立して実行します。操作内容はsettings.jsonへ保存しません。
@@ -92,6 +92,17 @@ MCPは宣言から[共通設定APIの一覧対象](settings-api.md#ショート�
 AppDock **0.105.2以上**では、任意の`settingKey`に自身のトップレベル設定キーを指定すると、その入力欄と同じField内へボタンを配置します。例えばフォント選択操作に`"settingKey": "fontFamily"`を指定します。入力欄と操作は横並びになり、狭い幅では折り返します。操作の説明・開始待ち・エラーも同じFieldへ関連付けます。
 
 この操作は対象設定のセクションへ追従するため、`settingSections.actions`には重ねて指定しません。存在しないキーや重複配置は拒否します。省略した操作は従来どおり独立したFieldです。設定値・既定値・JSON保存・MCPの公開キー/スキーマ/読み書き/実行許可は変更しません。検索アンカーとMCP対応表示も、設定と操作それぞれの識別子を維持します。
+
+配置・見た目・アイコンを指定する場合は`minimumHostVersion: "0.105.8"`以上が必要です。
+
+| 属性         | 指定と既定動作                                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `placement`  | `settingKey`がある操作で`inline`（省略時：入力と横並び・折り返し）または`below`（入力の下の行）。各行内は宣言順で並び、狭い場合は折り返す。 |
+| `appearance` | `standard`（省略時：従来の標準ボタン）または`filled`（共通の塗りつぶし面。ライトでは灰色、ダークでは暗い面）。                              |
+| `icon`       | リボンと共通の組み込みアイコン名（例：`folder`、`refresh`）。任意のSVGや画像は受け付けない。省略時は文字のみ。                              |
+| `iconOnly`   | 既定false。trueには`icon`が必要で、文字を省略してアイコンだけを表示する。必須の`title`を読み上げ名とツールチップに使う。                    |
+
+例えば`{ "title": "フォントを選ぶ", "command": "at365.my-tool.choose-font", "settingKey": "fontFamily", "placement": "below", "appearance": "filled" }`で、同じField内の入力欄の下へ塗りつぶしボタンを置けます。これらも表示用の宣言で、設定やコマンドの権限は変更しません。
 
 ```json
 {

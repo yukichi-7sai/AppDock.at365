@@ -22,10 +22,16 @@
   border-radius: 50%;
   visibility: hidden;
 }
-.settings-action-button[data-icon='true'] .settings-action-label {
+.settings-action-button[data-icon='true'] .settings-action-label,
+.settings-action-button .settings-action-label:has(> svg) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 7px;
+}
+.settings-action-button[data-appearance='filled'] {
+  background: var(--raised);
+  color: var(--text);
 }
 /* Balance the reserved spinner so the label stays centered in both states. */
 .settings-action-button[data-icon='false']::after {

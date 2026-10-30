@@ -7,9 +7,14 @@ export function SettingsButton({
   disabled,
   children,
   icon = false,
+  appearance,
   className = '',
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { pending?: boolean; icon?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  pending?: boolean;
+  icon?: boolean;
+  appearance?: 'standard' | 'filled';
+}) {
   return (
     <button
       {...props}
@@ -18,6 +23,7 @@ export function SettingsButton({
       disabled={disabled || pending}
       aria-busy={pending || undefined}
       data-icon={icon}
+      data-appearance={appearance}
     >
       <span className="settings-action-spinner" aria-hidden="true" data-pending={!!pending} />
       <span className="settings-action-label">{children}</span>

@@ -13,6 +13,41 @@ function temporary(t) {
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
 }
+test('action presentation requires a host that understands it while old declarations remain valid', (t) => {
+  const dir = temporary(t);
+  fs.writeFileSync(path.join(dir, 'worker.cjs'), 'exports.activate=async()=>{}');
+  const action = { title: 'Choose', command: 'fixture.actions.choose', settingKey: 'font' };
+  const manifest = {
+    apiVersion: 1,
+    id: 'fixture.actions',
+    name: 'Actions',
+    version: '1.0.0',
+    runtime: 'node',
+    entry: 'worker.cjs',
+    capabilities: ['settings', 'commands'],
+    minimumHostVersion: '0.105.2',
+    commands: [{ id: action.command, title: action.title }],
+    settings: [{ key: 'font', title: 'Font', type: 'string', default: '' }],
+    settingActions: [action],
+  };
+  const read = () => {
+    fs.writeFileSync(path.join(dir, 'extension.json'), JSON.stringify(manifest));
+    return readManifest(dir);
+  };
+  assert.equal(read().settingActions[0].placement, undefined);
+  for (const presentation of [
+    { placement: 'below' },
+    { appearance: 'filled' },
+    { icon: 'clock' },
+    { iconOnly: false },
+  ]) {
+    manifest.settingActions = [{ ...action, ...presentation }];
+    manifest.minimumHostVersion = '0.105.7';
+    assert.throws(read, /0\.105\.8/);
+    manifest.minimumHostVersion = '0.105.8';
+    assert.deepEqual(read().settingActions, manifest.settingActions);
+  }
+});
 test('Shell manifest uses trusted discovery origin, requires capability and confines its entry', (t) => {
   const dir = temporary(t);
   fs.writeFileSync(path.join(dir, 'worker.cjs'), 'exports.activate=async()=>{}');

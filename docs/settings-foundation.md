@@ -12,6 +12,8 @@
 
 本体・Applet設定と設定ダイアログは`SettingsSection`/`SettingsField`の`description`と`hint`を共用する。`description`は現在の値・継続的な状態・重要な説明を常時表示し、`hint`は任意の補足だけを表示する。入力欄を個別のラベルとCSSで配置せず、`SettingsField`へタイトル・説明・入力を渡す。共通の選択候補・キー記録・一覧等のウィジェットは、その内部の操作契約を保つ。
 
+`SettingsField`の`actions`は入力と横並び（狭い幅では折り返し）、`belowActions`は入力の下の共通ボタン列へ配置する。入力は従来どおりchildrenへ渡す。操作の配置もFieldが所有し、各画面でレイアウトを複製しない。`SettingsButton`の`appearance="filled"`は共通の塗りつぶし面を使い、省略・`standard`は既存表示を保つ。アイコンのみの操作は`icon`に加えて読み上げ名とツールチップを必ず指定する。
+
 ページと[SettingsModal/SettingsDialog](../src/renderer/settings-ui/SettingsModal.tsx)は、共通の[SettingsStatusArea](../src/renderer/settings-ui/SettingsStatus.tsx)と[SettingsError](../src/renderer/settings-ui/SettingsError.tsx)を持つ。ページはエラーがあるときだけ40pxの要約行と上下の余白を表示し、ツールバーと一緒に縦stickyにする。「詳細」から全文を確認できる。ダイアログ内は従来の固定高を保つ。進行・正常結果のスクリーンリーダー通知は、エラー欄がないときも維持する。個別配置の`SettingsHint`・`SettingsFeedback`と`errorLayout`は使用しない。
 
 ## 保存と入力
@@ -272,15 +274,15 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 
 本体preloadのDockApiへ`settingsPage`を追加する。以下は本体の内部APIで、Applet/MCPには公開しない。
 
-| 操作                           | 役割                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------------------ |
-| `open(request)`                | fullまたはappletの表示を登録し、接続IDと初回モデルを返す                             |
-| `get(connectionId)`            | 現在の接続に対する最新SettingsPageModelを取得                                        |
-| `act(connectionId, action)`    | 既存SettingsPageActionを検証し、モデルと結果を返す                                   |
-| `input(connectionId, request)` | 現ページの発行済み入力制御IDを検査し、一時停止・再開だけを実行する。モデルは返さない |
-| `palette(connectionId, request)` | 現ページの発行済み操作IDを検査し、選択パレットの開始・取消と結果だけを受け渡す |
-| `close(connectionId)`          | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放                               |
-| `onChanged(callback)`          | 接続ID付きでモデルの更新を受け取る                                                   |
+| 操作                             | 役割                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| `open(request)`                  | fullまたはappletの表示を登録し、接続IDと初回モデルを返す                             |
+| `get(connectionId)`              | 現在の接続に対する最新SettingsPageModelを取得                                        |
+| `act(connectionId, action)`      | 既存SettingsPageActionを検証し、モデルと結果を返す                                   |
+| `input(connectionId, request)`   | 現ページの発行済み入力制御IDを検査し、一時停止・再開だけを実行する。モデルは返さない |
+| `palette(connectionId, request)` | 現ページの発行済み操作IDを検査し、選択パレットの開始・取消と結果だけを受け渡す       |
+| `close(connectionId)`            | 対象接続を閉じ、記録中入力等の表示に付随する処理を解放                               |
+| `onChanged(callback)`            | 接続ID付きでモデルの更新を受け取る                                                   |
 
 接続IDはmainが発行し、開き直した画面へ使い回さない。これはShellの接続ID・提供元IDとは独立する。mainは1つのアクティブな設定ページを管理し、全体設定とApplet詳細を同時にmountしない。新しいopenは既存の入力受付を待った後に古い接続を失効させる。SettingsPageSessionは既存の`settingsNavigation`、`settingsEditing`、補助情報生成と操作関数を再利用する。rendererは購読を登録してからopenし、接続IDとrevisionで初回snapshotと更新通知の順序を判定する。
 

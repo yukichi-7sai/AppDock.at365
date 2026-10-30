@@ -315,6 +315,11 @@
   align-items: center;
   padding: 12px 0;
 }
+/* The field control grid already supplies spacing above its lower action row. */
+.settings-field-below-actions,
+.settings-field-below-actions > .settings-actions {
+  padding: 0;
+}
 .settings-content {
   min-width: 0;
 }

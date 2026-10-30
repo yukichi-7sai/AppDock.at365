@@ -1,4 +1,5 @@
 import { hostText } from './i18n';
+import { ribbonGroupIcons } from './ribbon';
 import type { DeclaredCommand, SettingAction, SettingDefinition } from './contracts';
 
 /** Actions invoke declared commands; they never create persisted settings. */
@@ -25,6 +26,12 @@ export function parseSettingActions(
       (action.settingKey !== undefined &&
         (typeof action.settingKey !== 'string' ||
           !settings.some((setting) => setting.key === action.settingKey))) ||
+      (action.placement !== undefined &&
+        (action.settingKey === undefined || !['inline', 'below'].includes(action.placement))) ||
+      (action.appearance !== undefined && !['standard', 'filled'].includes(action.appearance)) ||
+      (action.icon !== undefined && !ribbonGroupIcons.includes(action.icon)) ||
+      (action.iconOnly !== undefined &&
+        (typeof action.iconOnly !== 'boolean' || (action.iconOnly && action.icon === undefined))) ||
       (action.description !== undefined &&
         (typeof action.description !== 'string' || action.description.length > 1000)) ||
       (action.successMessage !== undefined &&
@@ -38,6 +45,10 @@ export function parseSettingActions(
       title: action.title,
       command: action.command,
       ...(action.settingKey !== undefined ? { settingKey: action.settingKey } : {}),
+      ...(action.placement !== undefined ? { placement: action.placement } : {}),
+      ...(action.appearance !== undefined ? { appearance: action.appearance } : {}),
+      ...(action.icon !== undefined ? { icon: action.icon } : {}),
+      ...(action.iconOnly !== undefined ? { iconOnly: action.iconOnly } : {}),
       ...(action.description !== undefined ? { description: action.description } : {}),
       ...(action.successMessage !== undefined ? { successMessage: action.successMessage } : {}),
     };

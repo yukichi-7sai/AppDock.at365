@@ -35,3 +35,28 @@ test('attached actions only reference a top-level setting without changing its s
     assert.throws(() => parseSettingActions([{ ...action, settingKey }], commands, settings));
   assert.throws(() => parseSettingActions([attached], commands));
 });
+test('action presentation is optional and validates placement, appearance and accessible icons', () => {
+  const settings = [{ key: 'font', title: 'Font', type: 'string', default: '' }];
+  for (const presentation of [
+    { settingKey: 'font', placement: 'below', appearance: 'filled' },
+    { settingKey: 'font', placement: 'inline', appearance: 'standard', icon: 'folder' },
+    { icon: 'refresh', iconOnly: true },
+    { iconOnly: false },
+  ]) {
+    const declared = { ...action, ...presentation };
+    assert.deepEqual(parseSettingActions([declared], commands, settings), [declared]);
+  }
+  for (const presentation of [
+    { placement: 'below' },
+    { settingKey: 'font', placement: 'above' },
+    { settingKey: 'font', placement: null },
+    { appearance: 'gray' },
+    { appearance: null },
+    { icon: 'unknown' },
+    { icon: '<svg />' },
+    { icon: null },
+    { iconOnly: true },
+    { icon: 'refresh', iconOnly: 'true' },
+  ])
+    assert.throws(() => parseSettingActions([{ ...action, ...presentation }], commands, settings));
+});
