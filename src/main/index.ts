@@ -101,7 +101,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { SettingsConflictError } from './core/settings';
 import { DeviceSettingsStore } from './core/device-settings-store';
-import { deviceHostKeys, readDeviceCollections, readDeviceManifests } from './core/device-settings';
+import { readDeviceCollections, readDeviceManifests } from './core/device-settings';
+import { isHostPageSettingsId } from '../shared/host-page-settings';
 import { restoreSettingsCollections } from '../shared/settings-storage';
 import { settingsResetPaths, appletSettingsPageId } from '../shared/settings-catalog';
 import { recoverSettingsAtStartup, type SettingsRecoveryUi } from './core/settings-recovery';
@@ -572,8 +573,10 @@ const settingsCommands = new SettingsCommands({
     const rewrite = new Set<'shared' | 'device'>();
     if (reset) {
       const owner = reset.collection?.owner ?? reset.ownerId;
-      if (!reset.collection || reset.keys.some((key) => key !== 'enabled'))
-        rewrite.add(owner === 'appdock' || settings.localSettings(owner) ? 'device' : 'shared');
+      if (owner === 'appdock')
+        for (const key of reset.keys) rewrite.add(settings.settingScope(['host', key]));
+      else if (!reset.collection || reset.keys.some((key) => key !== 'enabled'))
+        rewrite.add(settings.localSettings(owner) ? 'device' : 'shared');
       if (reset.collection && reset.keys.includes('enabled')) rewrite.add('device');
     }
     return commitSettings(prepareSettings(value), revision, undefined, [...rewrite]);
@@ -2161,18 +2164,18 @@ function settingsPageStorage(
   const local =
     page.kind === 'applet'
       ? settings.localSettings(owner!)
-      : ['appearance', 'general'].includes(page.id);
+      : isHostPageSettingsId(page.id)
+        ? settings.hostPageLocalSettings(page.id)
+        : ['appearance', 'general'].includes(page.id);
   const scopes = new Set<'shared' | 'device'>();
   if (page.id === 'touchpad-gestures' && resetScope !== 'triggers') scopes.add('device');
   for (const p of settingsResetPaths(page, allApplets(), resetScope)) {
     scopes.add(
-      p[0] === 'host' && (deviceHostKeys as readonly string[]).includes(p[1])
-        ? 'device'
-        : p[0] === 'extensions' && p[2] !== 'updateSource'
-          ? settings.localSettings(p[1])
-            ? 'device'
-            : 'shared'
-          : 'shared',
+      p[0] === 'extensions' && p[2] !== 'updateSource'
+        ? settings.localSettings(p[1])
+          ? 'device'
+          : 'shared'
+        : settings.settingScope(p),
     );
   }
   if (
@@ -2186,7 +2189,7 @@ function settingsPageStorage(
   )
     scopes.add('device');
   return {
-    canSwitch: page.kind === 'applet' && !page.collection,
+    canSwitch: (page.kind === 'applet' && !page.collection) || isHostPageSettingsId(page.id),
     local,
     signature: `${page.id}:${local ? 'device' : 'shared'}${
       page.id === 'custom-commands'
@@ -2679,7 +2682,7 @@ function settingsPageActions(
       assertSettingsWritable();
       return customCommands.update(args);
     };
-  if (page.kind === 'applet' && !page.collection)
+  if ((page.kind === 'applet' && !page.collection) || isHostPageSettingsId(page.id))
     actions['set-local-settings'] = async ([
       enabled,
       revision,
@@ -2695,16 +2698,32 @@ function settingsPageActions(
         throw Error(hostText('settings.index.invalidSettingsAction'));
       if (expectedScope !== undefined && expectedScope !== settingsPageStorage(page).signature)
         throw Error(hostText('settings.index.storageChanged'));
-      settings.setLocalSettings(
-        page.owner!,
-        enabled,
-        revision,
-        (value) => {
-          pageCollections.validate(value, settings.value);
-          validateAppletSettings(value, manager.snapshot());
-        },
-        disposition as 'keep' | 'share' | 'clear',
-      );
+      const validate = (value: Settings) => {
+        validateNotificationPreferenceChanges(
+          value,
+          settings.value,
+          notificationCatalog(allApplets()),
+        );
+        pageCollections.validate(value, settings.value);
+        validateAppletSettings(value, manager.snapshot());
+      };
+      if (isHostPageSettingsId(page.id))
+        settings.setHostPageLocalSettings(
+          page.id,
+          enabled,
+          revision,
+          validate,
+          disposition as 'keep' | 'share' | 'clear',
+          allApplets(),
+        );
+      else
+        settings.setLocalSettings(
+          page.owner!,
+          enabled,
+          revision,
+          validate,
+          disposition as 'keep' | 'share' | 'clear',
+        );
       return { storage: enabled ? 'device' : 'shared', revision: settings.revision };
     };
   if (page.id === 'ribbon')

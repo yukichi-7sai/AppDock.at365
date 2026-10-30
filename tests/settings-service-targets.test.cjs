@@ -178,6 +178,49 @@ function fixture(t, { device = false, updateApplets = [] } = {}) {
   };
 }
 
+test('notification and update service settings read, write and reset the selected host page file', (t) => {
+  const f = fixture(t, { device: true });
+  for (const { pageId, targetId, key, value } of [
+    {
+      pageId: 'notifications',
+      targetId: 'service.notifications.speech',
+      key: 'voice',
+      value: 'local-voice',
+    },
+    { pageId: 'about', targetId: 'service.updates', key: 'startupDelaySeconds', value: 42 },
+  ]) {
+    f.store.setHostPageLocalSettings(pageId, true, f.store.revision);
+    const sharedBefore = fs.readFileSync(f.store.file, 'utf8');
+    f.call('apply', f.request(targetId, [{ kind: 'set', changes: { [key]: value } }]));
+    assert.equal(f.values(targetId)[key], value);
+    assert.equal(f.read(targetId).fields.find((field) => field.key === key).inherited, false);
+    assert.equal(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
+    f.call('apply', f.request(targetId, [{ kind: 'reset', keys: [key] }]));
+    assert.equal(f.read(targetId).fields.find((field) => field.key === key).inherited, true);
+    assert.equal(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
+    f.store.setHostPageLocalSettings(pageId, false, f.store.revision);
+    f.call('apply', f.request(targetId, [{ kind: 'set', changes: { [key]: value } }]));
+    assert.equal(f.values(targetId)[key], value);
+    assert.notEqual(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
+  }
+  f.store.setHostPageLocalSettings('about', true, f.store.revision);
+  const device = JSON.parse(fs.readFileSync(f.store.device.file, 'utf8'));
+  device.hostPages.about.configuration.updates = { startupDelaySeconds: 10 };
+  fs.writeFileSync(f.store.device.file, JSON.stringify(device));
+  f.store.reload();
+  const sharedBefore = fs.readFileSync(f.store.file, 'utf8');
+  assert.equal(
+    f.read('service.updates').fields.find((field) => field.key === 'startupDelaySeconds').inherited,
+    false,
+  );
+  f.call('apply', f.request('service.updates', [{ kind: 'reset', keys: ['startupDelaySeconds'] }]));
+  assert.equal(
+    f.read('service.updates').fields.find((field) => field.key === 'startupDelaySeconds').inherited,
+    true,
+  );
+  assert.equal(fs.readFileSync(f.store.file, 'utf8'), sharedBefore);
+});
+
 test('shared browser discovery uses declared defaults, a bounded array and existing six settings operations', (t) => {
   const f = fixture(t),
     id = 'service.command-triggers';

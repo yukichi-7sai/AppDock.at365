@@ -48,7 +48,7 @@ AI接続は所有サービスが必須値を具体的に保存するため、inh
 
 通知の必須通知先・許可された通知先・表示時間の型/範囲・固定寿命を既存の通知編集と同じ検証へ渡す。表示時間は整数またはnull（手動で閉じるまで）で、固定寿命の種類は変更できず、古い上書きのresetだけを受け付ける。指定した上書きだけを解除し、何も残らなければその種類の上書き行を除去する。停止中の提供元も通知設定の保存で起動しない。通知規則や音声継承元の変更はschemaRevisionへ反映する。
 
-本体の通常設定は[src/shared/host-settings.ts](../src/shared/host-settings.ts)へ登録し、HostSettingsの型と画面の操作を追加する。既定値・通常の型検証・設定カタログ・JSON投影・PC専用保存・MCP公開は同じ登録を使う。Appletは既存のmanifest設定定義を使い、MCP専用の登録を増やさない。特殊な適用手順を持つ起動登録・管理者実行・Shell・トレイ割当は、通常設定の登録へ混ぜない。
+本体の通常設定は[src/shared/host-settings.ts](../src/shared/host-settings.ts)へ登録し、HostSettingsの型と画面の操作を追加する。既定値・通常の型検証・設定カタログ・JSON投影・MCP公開は同じ登録を使い、保存先は[設定同期](settings-sync.md#本体5ページの保存先選択)のページ別選択に従う。Appletは既存のmanifest設定定義を使い、MCP専用の登録を増やさない。特殊な適用手順を持つ起動登録・管理者実行・Shell・トレイ割当は、通常設定の登録へ混ぜない。
 
 Appletのホスト管理共通項目は[src/shared/applet-common-settings.ts](../src/shared/applet-common-settings.ts)のappletCommonSettingDeclarationsへ定義する。boolean/number/string/selectは、この1か所から型、共通設定画面、既定値、入力検証、検索カタログ、部分JSON、共有/PC専用の保存とMCP投影を生成する。通常項目を追加するときにMCP用のフィールド表や外側のツールSchemaを変更する必要はない。公開判定は同じautomation/secret/localOnlyを使用する。fromManifestを指定した項目はApplet側の同名プロパティを既定値に使い、その検証も同じ定義へ接続する。専用の寿命処理・OS操作・認証編集や複雑な入力は、その所有サービスとの接続を実装する。
 

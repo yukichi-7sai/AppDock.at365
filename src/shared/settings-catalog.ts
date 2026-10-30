@@ -1,6 +1,11 @@
 import { hostText } from './i18n';
 import { commandTextPlain, type CommandReference } from './command-text';
 import { hostSettingDefinitions } from './host-settings';
+import {
+  hostPageSettingsPaths,
+  isHostPageSettingsId,
+  updateSettingKeys,
+} from './host-page-settings';
 import { appletCommonDefinitions, appletCommonKeys } from './applet-common-settings';
 import { commandTriggerSettingDefinitions } from './command-trigger-options';
 import { getHostTranslator } from './i18n';
@@ -451,15 +456,7 @@ const generalKeys = () => [
   'startAtLogon',
   'runAsAdministrator',
 ];
-const updateKeys = [
-  'hostSource',
-  'checkHostOnAboutOpen',
-  'checkHostOnStartup',
-  'checkAppletsOnStartup',
-  'startupDelaySeconds',
-  'notifyOnStartup',
-  'allowSameVersion',
-];
+const updateKeys = updateSettingKeys;
 
 const item = (
   pageId: string,
@@ -653,6 +650,7 @@ export function settingsPaths(
       ]),
     ];
   }
+  if (isHostPageSettingsId(page.id)) return hostPageSettingsPaths(page.id);
   switch (page.id) {
     case 'mcp-client':
       return [['mcpServers']];
@@ -669,21 +667,8 @@ export function settingsPaths(
       return [['tts']];
     case 'ai':
       return [['ai']];
-    case 'notifications':
-      return [
-        ['notificationPreferences'],
-        ...hostSettingDefinitions
-          .filter((field) => field.pageId === 'notifications')
-          .map((field) => ['host', field.key]),
-      ];
     case 'general':
       return generalKeys().map((k) => ['host', k]);
-    case 'statusbar':
-      return hostSettingDefinitions
-        .filter((field) => field.pageId === page.id)
-        .map((field) => ['host', field.key]);
-    case 'tray':
-      return [['trayMenu'], ['host', 'trayClickCommand'], ['host', 'trayDoubleClickCommand']];
     case 'shortcuts':
       return [
         ['keybindings'],
@@ -730,20 +715,6 @@ export function settingsPaths(
         ].map((key) => ['gestures', key]),
         ['commandTriggerOptions'],
       ];
-    case 'ribbon':
-      return [
-        'order',
-        'hidden',
-        'bottom',
-        'separators',
-        'groups',
-        'itemOverrides',
-        'separatorTitles',
-        'buttons',
-        'rightClickCommand',
-      ].map((k) => ['ribbon', k]);
-    case 'about':
-      return [...updateKeys.map((k) => ['updates', k])];
     default:
       return [];
   }

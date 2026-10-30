@@ -112,6 +112,8 @@ async function start() {
     'visible settings viewport',
   );
   running.page.setDefaultTimeout(15000);
+  await running.page.getByRole('button', { name: '表示', exact: true }).click();
+  await running.page.getByTestId('settings-page:appearance').waitFor();
   return running;
 }
 async function stop() {
@@ -127,8 +129,7 @@ const checks = [];
   try {
     let state = await start(),
       page = state.page;
-    const toggle = () =>
-      page.getByRole('checkbox', { name: 'このPCで設定を保持する', exact: true });
+    const toggle = () => page.getByTestId('settings-storage-local');
     assert.equal(await toggle().isChecked(), true);
     assert.equal(await toggle().isDisabled(), true);
     await page.getByLabel('テーマ', { exact: true }).selectOption('dark');
@@ -190,6 +191,116 @@ const checks = [];
       ['device'],
     );
     checks.push('general checked disabled; JSON and file target device');
+    const hostPages = [
+      [
+        'notifications',
+        '通知',
+        {
+          host: { notificationBannerPosition: 'bottom-right', notificationBannerShadow: false },
+          notificationPreferences: { overrides: [], speech: { voice: 'local-voice' } },
+        },
+      ],
+      ['ribbon', 'リボン', { ribbon: { rightClickCommand: 'appdock.open' } }],
+      ['statusbar', 'ステータスバー', { host: { showStatusBar: false } }],
+      [
+        'tray',
+        'タスクトレイ',
+        {
+          trayMenu: [],
+          host: {
+            trayClickCommand: 'appdock.settings.open',
+            trayDoubleClickCommand: 'appdock.open',
+          },
+        },
+      ],
+      ['about', 'AppDockについて', { updates: { startupDelaySeconds: 31 } }],
+    ];
+    const hostPageModel = () =>
+      page.evaluate(() =>
+        window.dock.settingsPage.get(
+          document.querySelector('.settings-surface').dataset.settingsConnection,
+        ),
+      );
+    for (const [pageId, title, configuration] of hostPages) {
+      await page.getByRole('button', { name: title, exact: true }).click();
+      await page.getByTestId(`settings-page:${pageId}`).waitFor();
+      assert.equal(await toggle().isDisabled(), false);
+      assert.equal(await toggle().isChecked(), ['notifications', 'statusbar'].includes(pageId));
+      if (!(await toggle().isChecked())) await toggle().check();
+      await until(
+        () => disk(deviceFile).hostPages[pageId].useLocalSettings,
+        pageId + ' local mode',
+      );
+      if (pageId === 'notifications')
+        await page.screenshot({ path: path.join(output, 'host-notifications-local.png') });
+      await page.getByRole('button', { name: 'JSON', exact: true }).click();
+      const sharedBefore = fs.readFileSync(sharedFile, 'utf8');
+      const input = page.getByRole('textbox', { name: '設定JSON', exact: true });
+      await input.fill(JSON.stringify(configuration, null, 2));
+      await input.press('Enter');
+      await settleSettings(state.host);
+      const local = JSON.parse(await input.inputValue());
+      assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
+      assert.deepEqual(
+        (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
+        ['device'],
+      );
+      assert(!/hostPages|machineName|useLocalSettings/.test(await input.inputValue()));
+      await toggle().click();
+      await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
+      assert.equal(await toggle().isChecked(), true);
+      await toggle().click();
+      await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
+      await until(
+        () => !disk(deviceFile).hostPages[pageId].useLocalSettings,
+        pageId + ' shared keep',
+      );
+      assert.equal(fs.readFileSync(sharedFile, 'utf8'), sharedBefore);
+      assert.deepEqual(
+        (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
+        ['shared'],
+      );
+      await toggle().check();
+      await until(
+        async () => JSON.stringify(JSON.parse(await input.inputValue())) === JSON.stringify(local),
+        pageId + ' local resume',
+      );
+      await toggle().click();
+      await dialog()
+        .getByRole('radio', { name: 'このPCの設定を共有設定に反映する', exact: true })
+        .check();
+      await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
+      await until(
+        () => !disk(deviceFile).hostPages[pageId].useLocalSettings,
+        pageId + ' shared copy',
+      );
+      assert.equal(disk(deviceFile).hostPages[pageId].configuration, undefined);
+      assert.deepEqual(JSON.parse(await input.inputValue()), local);
+      checks.push(
+        pageId +
+          ': local/shared toggle, isolated JSON save, cancel, keep/resume, share and file target',
+      );
+      await page.getByRole('button', { name: 'フォーム', exact: true }).click();
+    }
+    await page.setViewportSize({ width: 720, height: 820 });
+    assert.equal(await toggle().isVisible(), true);
+    await page.screenshot({ path: path.join(output, 'host-about-shared-narrow.png') });
+    await page.setViewportSize({ width: 1280, height: 842 });
+    await stop();
+    state = await start();
+    page = state.page;
+    for (const [pageId, title] of hostPages) {
+      await page.getByRole('button', { name: title, exact: true }).click();
+      await page.getByTestId(`settings-page:${pageId}`).waitFor();
+      assert.equal(await toggle().isChecked(), false);
+      assert.deepEqual(
+        (await hostPageModel()).content.auxiliary.storage.files.map((file) => file.scope),
+        ['shared'],
+      );
+    }
+    checks.push(
+      'all five host page modes and file targets survive a real app restart; narrow toolbar remains accessible',
+    );
     await page.getByRole('button', { name: 'Device settings fixture', exact: true }).click();
     await page.getByRole('heading', { name: 'Device settings fixture', exact: true }).waitFor();
     assert.equal(await toggle().isChecked(), false);
@@ -245,7 +356,7 @@ const checks = [];
     );
     assert.deepEqual(
       model.content.auxiliary.storage.files.map((file) => file.scope),
-      ['device'],
+      ['device', 'shared'],
     );
     await toggle().click();
     await dialog().getByRole('button', { name: '切り替える', exact: true }).click();
@@ -349,7 +460,8 @@ const checks = [];
     await page.getByRole('alert').first().waitFor();
     await toggle().click();
     await until(
-      async () => (await page.locator('.settings-page-error').innerText()).includes('入力'),
+      async () =>
+        (await page.getByRole('alert').allTextContents()).some((text) => text.includes('入力')),
       'invalid input guard',
     );
     assert.equal(disk(deviceFile).extensions['example.device-settings'].useLocalSettings, true);
@@ -407,24 +519,22 @@ const checks = [];
     assert.equal(disk(sharedFile).extensions['example.device-settings'].settings.interval, 150);
     await state.host.evaluate(() => window.dock.toggleExtension('example.device-settings', false));
     checks.push('real Node Applet self-setting writes selected device configuration');
-    await state.host.evaluate(() => window.dock.navigate('extensions'));
-    await state.host
-      .getByRole('complementary', { name: 'Applet一覧' })
-      .getByRole('button', { name: /Device settings fixture/ })
+    await page.getByTestId('settings-nav:applets').click();
+    await page
+      .getByTestId('settings-page:applets')
+      .getByRole('button', { name: 'Device settings fixture', exact: true })
       .click();
-    await state.host.getByRole('tab', { name: '設定', exact: true }).click();
     page = await settingsPage(state.host);
     await until(
       () => page.evaluate(() => innerWidth > 300 && innerHeight > 200),
-      'detail settings viewport',
+      'Applet settings viewport',
     );
-    assert.equal(
-      await page.getByRole('checkbox', { name: 'このPCで設定を保持する', exact: true }).isChecked(),
-      true,
-    );
+    assert.equal(await page.getByTestId('settings-storage-local').isChecked(), true);
     assert.equal(await page.getByLabel('間隔（秒）', { exact: true }).inputValue(), '180');
     await page.screenshot({ path: path.join(output, 'detail-settings.png') });
-    checks.push('Applet detail and full settings share the same selected storage and values');
+    checks.push(
+      'Applet management opens the same selected storage and values as the settings index',
+    );
     await stop();
     const result = {
       passed: true,

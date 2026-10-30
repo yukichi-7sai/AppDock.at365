@@ -10,10 +10,20 @@ import {
   type SettingsRecoveryPlan,
   storedSettingRecord,
 } from './settings';
-import type { Settings, ExtensionManifest } from '../../shared/contracts';
+import type { Settings, ExtensionManifest, ExtensionSnapshot } from '../../shared/contracts';
+import { getTrayMenu } from '../../shared/tray-menu';
 import type { CollectionBinding } from '../../shared/page-collections';
 import { parseSettings } from '../../shared/settings-schema';
 import { appletCommonKeys } from '../../shared/applet-common-settings';
+import {
+  applyHostPageConfiguration,
+  defaultHostPageLocal,
+  hostPageConfiguration,
+  hostPageForPath,
+  hostPageSettingsIds,
+  isHostPageSettingsId,
+  type HostPageSettingsId,
+} from '../../shared/host-page-settings';
 import {
   settingsStorageValue,
   restoreSettingsCollections,
@@ -24,6 +34,7 @@ import {
   configuration,
   deviceName,
   initialDeviceSettings,
+  initializeHostPageSettings,
   parseDeviceSettings,
   splitSettings,
   deviceSettingsStorageValue,
@@ -53,6 +64,34 @@ export class DeviceSettingsStore extends SettingsStore {
   private mutating = false;
   private loaded = false;
   private healthKeys = new Set<string>();
+  hostPageLocalSettings(pageId: HostPageSettingsId) {
+    return this.device.value.hostPages[pageId]?.useLocalSettings ?? defaultHostPageLocal(pageId);
+  }
+  override settingScope(path: readonly string[]): Scope {
+    const pageId = hostPageForPath(path);
+    if (pageId) return this.hostPageLocalSettings(pageId) ? 'device' : 'shared';
+    return path[0] === 'host' && (deviceHostKeys as readonly string[]).includes(path[1])
+      ? 'device'
+      : 'shared';
+  }
+  override storedValue(): Record<string, any> {
+    const shared = this.shared.storedValue(),
+      device = this.device.storedValue();
+    const result = structuredClone(shared);
+    result.host ??= {};
+    for (const key of deviceHostKeys) {
+      const pageId = hostPageForPath(['host', key]);
+      if (pageId && device.hostPages?.[pageId]) continue;
+      delete result.host[key];
+      if (device.host && Object.hasOwn(device.host, key)) result.host[key] = device.host[key];
+    }
+    for (const pageId of hostPageSettingsIds) {
+      const entry = device.hostPages?.[pageId];
+      if (entry?.useLocalSettings)
+        applyHostPageConfiguration(result, entry.configuration ?? {}, pageId);
+    }
+    return result;
+  }
   override appletConfigurationScope(owner: string): 'shared' | 'device' {
     return this.localSettings(owner) ? 'device' : 'shared';
   }
@@ -64,16 +103,9 @@ export class DeviceSettingsStore extends SettingsStore {
     return entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {};
   }
   override storedSettingOverrides(owner: string, collection?: CollectionBinding) {
+    if (owner === 'appdock') return storedSettingRecord(this.storedValue(), owner);
     const shared = this.shared.storedValue(),
       device = this.device.storedValue();
-    if (owner === 'appdock') {
-      const record = { ...storedSettingRecord(shared, owner) };
-      for (const key of deviceHostKeys) {
-        delete record[key];
-        if (device.host && Object.hasOwn(device.host, key)) record[key] = device.host[key];
-      }
-      return record;
-    }
     const actualOwner = collection?.owner ?? owner;
     const local = device.extensions?.[actualOwner];
     const raw = local?.useLocalSettings
@@ -164,8 +196,18 @@ export class DeviceSettingsStore extends SettingsStore {
     this.recovered = this.shared.recovered || this.device.recovered;
   }
   private refreshCombined(notify: boolean) {
+    const initialized = initializeHostPageSettings(this.shared.value, this.device.value);
+    if (initialized !== this.device.value && !this.shared.recovered && !this.device.recovered) {
+      const mutating = this.mutating;
+      this.mutating = true;
+      try {
+        this.device.save(initialized, this.device.revision);
+      } finally {
+        this.mutating = mutating;
+      }
+    }
     const value = hostStartupTiming.measure('settingsCombine', () =>
-      combineSettings(this.shared.value, this.device.value, this.collections()),
+      combineSettings(this.shared.value, initialized, this.collections()),
     );
     this.value = value;
     this.syncHealth();
@@ -413,6 +455,43 @@ export class DeviceSettingsStore extends SettingsStore {
   }
   localSettings(owner: string) {
     return this.device.value.extensions[owner]?.useLocalSettings ?? false;
+  }
+  setHostPageLocalSettings(
+    pageId: HostPageSettingsId,
+    enabled: boolean,
+    revision: number,
+    validate?: (value: Settings) => void,
+    disposition: 'keep' | 'share' | 'clear' = 'keep',
+    applets: ExtensionSnapshot[] = [],
+  ) {
+    this.assertRevision(revision);
+    if (
+      !isHostPageSettingsId(pageId) ||
+      typeof enabled !== 'boolean' ||
+      !['keep', 'share', 'clear'].includes(disposition) ||
+      (enabled && disposition !== 'keep')
+    )
+      throw Error(hostText('services.deviceSettingsStore.invalidScope'));
+    const shared = structuredClone(this.shared.value);
+    const next = structuredClone(initializeHostPageSettings(shared, this.device.value));
+    const entry = next.hostPages[pageId]!;
+    if (entry.useLocalSettings === enabled) return this.snapshot();
+    if (enabled && !entry.configuration) {
+      if (this.shared.recovered)
+        throw Error(hostText('services.deviceSettingsStore.sharedRecoveryBeforeCopy'));
+      entry.configuration = hostPageConfiguration(this.value, pageId);
+      if (pageId === 'tray' && this.value.trayMenu === undefined)
+        entry.configuration.trayMenu = getTrayMenu(this.value, applets);
+    }
+    if (!enabled && this.shared.recovered)
+      throw Error(hostText('services.deviceSettingsStore.sharedRecoveryBeforeSwitch'));
+    if (!enabled && disposition === 'share')
+      applyHostPageConfiguration(shared, hostPageConfiguration(this.value, pageId), pageId);
+    if (!enabled && disposition !== 'keep') delete entry.configuration;
+    entry.useLocalSettings = enabled;
+    const parsed = parseDeviceSettings(next, this.machineName);
+    validate?.(combineSettings(shared, parsed, this.collections()));
+    return this.commitPair(parseSettings(shared), parsed, revision);
   }
   targetFile(scope: Scope) {
     return this.fileFor(scope);

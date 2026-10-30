@@ -2362,6 +2362,7 @@
   "services.deviceSettings.invalidKey": "設定キーが不正です。",
   "services.deviceSettings.invalidJson": "このPCの設定JSONの形式を確認してください。",
   "services.deviceSettings.invalidHost": "このPCの表示・一般設定を確認してください。",
+  "services.deviceSettings.invalidHostPage": "このPCの設定ページの保存範囲と設定値を確認してください。",
   "services.deviceSettings.invalidApplet": "Appletの端末設定を確認してください。",
   "services.deviceSettings.invalidScope": "Applet設定の保存範囲が不正です。",
   "services.deviceSettings.invalidPages": "ページの端末設定が不正です。",

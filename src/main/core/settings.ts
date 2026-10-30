@@ -141,6 +141,9 @@ class SettingsStore<T = Settings> extends EventEmitter {
   appletConfigurationScope(_owner: string): 'shared' | 'device' {
     return 'shared';
   }
+  settingScope(_path: readonly string[]): 'shared' | 'device' {
+    return 'shared';
+  }
   storedAppletConfiguration(owner: string): Record<string, unknown> {
     const entry = this.storedValue().extensions?.[owner];
     return isObject(entry) ? entry : {};

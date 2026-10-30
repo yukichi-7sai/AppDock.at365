@@ -11,7 +11,20 @@ import type { ExtensionManifest, ExtensionSettings, Settings } from '../../share
 import { createDefaultSettings, parseSettings } from '../../shared/settings-schema';
 import { defaultAppletEnabled } from '../../shared/applet-state';
 import { fillSettingDefaults, omitSettingDefaults } from '../../shared/settings-defaults';
-import { compactAppletConfiguration } from '../../shared/settings-storage';
+import { compactAppletConfiguration, settingsStorageDefaults } from '../../shared/settings-storage';
+import {
+  applyHostPageConfiguration,
+  defaultHostPageLocal,
+  hostPageConfiguration,
+  hostPageForPath,
+  hostPageSettingsIds,
+  hostPageSettingsPaths,
+  isHostPageSettingsId,
+  readHostPagePath,
+  writeHostPagePath,
+  type HostPageConfiguration,
+  type HostPageSettingsId,
+} from '../../shared/host-page-settings';
 import { parseSettingDefinitions } from '../../shared/setting-definitions';
 import { parseAppletPages } from '../../shared/applet-pages';
 import {
@@ -27,10 +40,15 @@ export const deviceHostKeys = [
   'runAsAdministrator',
 ] as const;
 export type DeviceConfiguration = Pick<ExtensionSettings, 'settings' | AppletCommonKey | 'pages'>;
+export interface DeviceHostPage {
+  useLocalSettings: boolean;
+  configuration?: HostPageConfiguration;
+}
 export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
+  hostPages: Partial<Record<HostPageSettingsId, DeviceHostPage>>;
   extensions: Record<
     string,
     { enabled: boolean; useLocalSettings: boolean; configuration?: DeviceConfiguration }
@@ -90,6 +108,7 @@ export function initialDeviceSettings(
     host: Object.fromEntries(
       deviceHostKeys.map((key) => [key, structuredClone(shared.host[key] ?? {})]),
     ) as DeviceSettings['host'],
+    hostPages: {},
     extensions: {},
     touchpadGestures: { enabled: false },
     collectionEnabled: {},
@@ -120,6 +139,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
     typeof raw.machineName !== 'string' ||
     raw.machineName.toLowerCase() !== deviceName(name).toLowerCase() ||
     !object(raw.host) ||
+    !object(raw.hostPages) ||
     !object(raw.extensions) ||
     !object(raw.collectionEnabled) ||
     !object(raw.touchpadGestures) ||
@@ -131,6 +151,7 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'schemaVersion',
           'machineName',
           'host',
+          'hostPages',
           'extensions',
           'collectionEnabled',
           'touchpadGestures',
@@ -170,6 +191,26 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
     }
   }
   const parsedHost = parseSettings(probe).host;
+  const hostPages: DeviceSettings['hostPages'] = {};
+  for (const [pageId, entry] of Object.entries(raw.hostPages)) {
+    if (
+      !isHostPageSettingsId(pageId) ||
+      !object(entry) ||
+      typeof entry.useLocalSettings !== 'boolean' ||
+      Object.keys(entry).some((key) => !['useLocalSettings', 'configuration'].includes(key)) ||
+      (entry.useLocalSettings && !object(entry.configuration))
+    )
+      throw Error(hostText('services.deviceSettings.invalidHostPage'));
+    const page: DeviceHostPage = { useLocalSettings: entry.useLocalSettings };
+    if (entry.configuration !== undefined) {
+      assertHostPageConfiguration(entry.configuration, hostPageSettingsPaths(pageId));
+      const candidate = createDefaultSettings();
+      applyHostPageConfiguration(candidate, entry.configuration, pageId);
+      if (pageId === 'tray') delete (candidate as Partial<Settings>).trayCommands;
+      page.configuration = hostPageConfiguration(parseSettings(candidate), pageId);
+    }
+    hostPages[pageId] = page;
+  }
   for (const [owner, groups] of Object.entries(raw.collectionEnabled)) {
     if (!id(owner) || !object(groups))
       throw Error(hostText('services.deviceSettings.invalidPages'));
@@ -183,8 +224,21 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
   }
   return {
     ...structuredClone(raw),
+    hostPages,
     host: Object.fromEntries(deviceHostKeys.map((key) => [key, parsedHost[key]])),
   } as DeviceSettings;
+}
+function assertHostPageConfiguration(value: unknown, paths: string[][]) {
+  if (!object(value)) throw Error(hostText('services.deviceSettings.invalidHostPage'));
+  for (const [key, child] of Object.entries(value)) {
+    const matching = paths.filter((path) => path[0] === key);
+    if (!matching.length) throw Error(hostText('services.deviceSettings.invalidHostPage'));
+    if (!matching.some((path) => path.length === 1))
+      assertHostPageConfiguration(
+        child,
+        matching.map((path) => path.slice(1)),
+      );
+  }
 }
 export function deviceSettingsStorageValue(
   value: DeviceSettings,
@@ -193,6 +247,18 @@ export function deviceSettingsStorageValue(
   const result = structuredClone(value);
   result.host =
     omitSettingDefaults(value.host, initialDeviceSettings(value.machineName).host) ?? {};
+  for (const pageId of hostPageSettingsIds) {
+    const entry = result.hostPages[pageId];
+    if (!entry) continue;
+    for (const path of hostPageSettingsPaths(pageId))
+      if (path[0] === 'host') delete (result.host as Record<string, unknown>)[path[1]];
+    if (entry.configuration)
+      entry.configuration =
+        omitSettingDefaults(
+          entry.configuration,
+          hostPageConfiguration(settingsStorageDefaults(), pageId),
+        ) ?? {};
+  }
   for (const [owner, entry] of Object.entries(result.extensions))
     if (entry.configuration)
       entry.configuration = compactAppletConfiguration(
@@ -236,6 +302,15 @@ export function combineSettings(
 ): Settings {
   const result = structuredClone(shared);
   Object.assign(result.host, structuredClone(device.host));
+  for (const pageId of hostPageSettingsIds) {
+    const entry = device.hostPages?.[pageId];
+    if (!entry) continue;
+    applyHostPageConfiguration(result, hostPageConfiguration(shared, pageId), pageId);
+    if (entry.useLocalSettings) {
+      applyHostPageConfiguration(result, entry.configuration ?? {}, pageId);
+      if (pageId === 'tray') delete (result as Partial<Settings>).trayCommands;
+    }
+  }
   result.touchpadGestures = {
     ...parseSettings(shared).touchpadGestures!,
     enabled: device.touchpadGestures?.enabled ?? false,
@@ -265,6 +340,25 @@ export function combineSettings(
   }
   return parseSettings(result);
 }
+/** Preserve the effective legacy values once before making each host page independent. */
+export function initializeHostPageSettings(
+  shared: Settings,
+  device: DeviceSettings,
+): DeviceSettings {
+  if (hostPageSettingsIds.every((pageId) => device.hostPages?.[pageId])) return device;
+  const current = combineSettings(shared, device, []);
+  const result = structuredClone(device);
+  result.hostPages ??= {};
+  for (const pageId of hostPageSettingsIds)
+    if (!result.hostPages[pageId]) {
+      const local = defaultHostPageLocal(pageId);
+      result.hostPages[pageId] = {
+        useLocalSettings: local,
+        ...(local ? { configuration: hostPageConfiguration(current, pageId) } : {}),
+      };
+    }
+  return result;
+}
 /** Route only edited fields, retaining the original shared values hidden by local overrides. */
 export function splitSettings(
   next: Settings,
@@ -274,7 +368,7 @@ export function splitSettings(
   collections: DeviceCollection[],
 ) {
   const shared = structuredClone(originalShared),
-    device = structuredClone(originalDevice);
+    device = structuredClone(initializeHostPageSettings(originalShared, originalDevice));
   const copyChanges = (
     target: Record<string, any>,
     previous: Record<string, any>,
@@ -287,7 +381,15 @@ export function splitSettings(
         else target[key] = structuredClone(after[key]);
       }
   };
-  copyChanges(shared, before, next, ['host', 'extensions', 'touchpadGestures']);
+  copyChanges(shared, before, next, [
+    'host',
+    'extensions',
+    'touchpadGestures',
+    ...(device.hostPages.tray?.useLocalSettings ? ['trayCommands'] : []),
+    ...new Set(
+      hostPageSettingsIds.flatMap((pageId) => hostPageSettingsPaths(pageId).map((path) => path[0])),
+    ),
+  ]);
   if (!equal(before.touchpadGestures, next.touchpadGestures)) {
     const previous = { ...before.touchpadGestures, enabled: false };
     const updated = { ...next.touchpadGestures, enabled: false };
@@ -295,10 +397,25 @@ export function splitSettings(
       shared.touchpadGestures = structuredClone(updated) as Settings['touchpadGestures'];
     device.touchpadGestures = { enabled: next.touchpadGestures?.enabled ?? false };
   }
-  copyChanges(shared.host, before.host, next.host, [...deviceHostKeys]);
+  copyChanges(shared.host, before.host, next.host, [
+    ...deviceHostKeys,
+    ...hostPageSettingsIds.flatMap((pageId) =>
+      hostPageSettingsPaths(pageId)
+        .filter((path) => path[0] === 'host')
+        .map((path) => path[1]),
+    ),
+  ]);
   for (const key of deviceHostKeys)
-    if (!equal(before.host[key], next.host[key]))
+    if (!hostPageForPath(['host', key]) && !equal(before.host[key], next.host[key]))
       (device.host as any)[key] = structuredClone(next.host[key]);
+  for (const pageId of hostPageSettingsIds) {
+    const entry = device.hostPages[pageId]!;
+    const target = entry.useLocalSettings ? entry.configuration! : shared;
+    for (const path of hostPageSettingsPaths(pageId)) {
+      const after = readHostPagePath(next, path);
+      if (!equal(readHostPagePath(before, path), after)) writeHostPagePath(target, path, after);
+    }
+  }
   for (const owner of new Set([
     ...Object.keys(before.extensions),
     ...Object.keys(next.extensions),

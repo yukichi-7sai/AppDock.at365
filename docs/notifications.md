@@ -40,7 +40,7 @@ targetsはbanner/desktop/windowsの複数指定、または空配列。必須先
 
 notificationCatalogは本体定義とmanifest.notificationTypesを集約する。Appletはnotifications capabilityとminimumHostVersion:0.30.0以上が必要。notifications capabilityを持ち、notificationTypesが未宣言または空のAppletに限り、予約ID appdock.legacyの「旧方式の通知」を本体が生成する。GmailなどnotificationTypesを宣言したAppletはpublish/endを使い、宣言済み種類だけを設定に表示する。Applet自身による同IDの宣言を拒否し、本文から種類を分類しない。既定Windows/manual、表示先・時間指定が可能。
 
-「設定 → 通知」は本体の共通設定画面を使い、読み上げ共通値は確定後すぐ保存し、通知種類の設定は編集ダイアログのOKでまとめて保存する。通知そのもののOFFは設けず、種類ごとの通知先・表示時間・読み上げを共有settings.jsonのnotificationPreferences.overridesに保存する。targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。通知種類は一つのテーブルで、通知名（提供元マークと説明ヒント）・通知先・表示時間・読み上げ・MCP Events・鉛筆の編集操作を表示する。必須の通知先、固定の表示時間、停止中のAppletや前提不足などの状態も一覧に残す。編集は共通ダイアログ内の一時入力とし、取消では保存しない。OKでは元の上書き値と通知仕様を照合し、その通知だけを最新の設定へ合成する。競合・保存失敗では入力と原因をダイアログに残す。未変更の既定値は明示値として固定しない。
+「設定 → 通知」は本体の共通設定画面を使い、読み上げ共通値は確定後すぐ保存し、通知種類の設定は編集ダイアログのOKでまとめて保存する。通知そのもののOFFは設けず、種類ごとの通知先・表示時間・読み上げを通知ページで選んだ保存先のnotificationPreferences.overridesに保存する。targets/durationSecondsの省略は既定継承、durationSeconds:nullはmanual。時間は1〜86,400整数秒、userDurationだけ編集できる。conditionは利用者の設定で時限化できない。通知種類は一つのテーブルで、通知名（提供元マークと説明ヒント）・通知先・表示時間・読み上げ・MCP Events・鉛筆の編集操作を表示する。必須の通知先、固定の表示時間、停止中のAppletや前提不足などの状態も一覧に残す。編集は共通ダイアログ内の一時入力とし、取消では保存しない。OKでは元の上書き値と通知仕様を照合し、その通知だけを最新の設定へ合成する。競合・保存失敗では入力と原因をダイアログに残す。未変更の既定値は明示値として固定しない。
 
 表示先変更は同じIDと期限を保ち、表示時間変更は新しいepisodeまたは明示restartTimerから適用する。停止/世代変更は旧世代をwithdrawnにする。共有設定が未導入の種類や未対応先を含んでも保持し、配送できない場合は理由付きsuppressedとなる。画面の通知先はbanner/desktop/windowsと読み上げを選択できる。視覚的な表示先は従来のtargets、読み上げはspeakに保存する。「通知センターのみ」はtargets:[]かつspeak:falseで、選択時に両方を一度に反映する。targets:[]かつspeak:trueは読み上げとセンターの履歴だけを利用する。
 
@@ -106,7 +106,7 @@ minimumHostVersion:0.29.0以上のShell Appletは、shell.viewsで次を宣言�
 
 「設定 → 通知 → 通知の受け取り方 → バナー」の折りたたみ行に「バナーの表示位置」「バナーの影」を置く。表示位置は中央上・中央下・右上・右下・左上・左下から選び、`host.notificationBannerPosition`に`top-center`（既定）・`bottom-center`・`top-right`・`bottom-right`・`top-left`・`bottom-left`を保存して即時反映する。「デスクトップ通知」も折りたたみ行とし、その下に「デスクトップ通知の影」を置く。
 
-影は`host.notificationBannerShadow`と`host.notificationDesktopShadow`の独立した真偽値で、どちらも既定は`true`。Default Shellの各通知カードへ即時反映し、通知のID・期限・操作・表示位置は維持する。共通appearance通知で各表示先へ値を渡し、追加Shellも同じsnapshotから設定を参照できる。Windows通知はOSの表示に従う。これらの表示位置/影はPC専用保存と公開設定APIへ接続し、通知ページのJSON編集・検索・既定へのリセットに含める。既定値は保存から省略する。ダイアログ/パレットの影は表示ページの別設定とする。
+影は`host.notificationBannerShadow`と`host.notificationDesktopShadow`の独立した真偽値で、どちらも既定は`true`。Default Shellの各通知カードへ即時反映し、通知のID・期限・操作・表示位置は維持する。共通appearance通知で各表示先へ値を渡し、追加Shellも同じsnapshotから設定を参照できる。Windows通知はOSの表示に従う。これらの表示位置/影も通知ページの共有／端末専用の選択に従い、公開設定APIへ接続し、通知ページのJSON編集・検索・既定へのリセットに含める。既定値は保存から省略する。ダイアログ/パレットの影は表示ページの別設定とする。
 
 上側はWindow上端、下側は下端から48 CSS px、左右配置は対応する端から16 CSS pxへ、幅最大680 CSS pxの小さなWebContentsViewを重ねる。中央配置は水平中央にそろえる。下側は描画された高さに合わせて上方向へ伸び、通知の発行順は維持する。幅・高さとzoomをDIPへ変換し、ウィンドウを縮めても範囲内へ収める。本文レイアウト、Web/AppletのView、入力、sessionを維持する。ページより上、モーダルパレットより下へ置き、ページの追加とバナー更新の後もモーダルを最後に配置する。独立デスクトップ通知とWindows通知の位置はこの設定に含めない。
 

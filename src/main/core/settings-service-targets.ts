@@ -73,7 +73,7 @@ interface Target {
   values(settings: Settings): RecordValue;
   overrides(raw: RecordValue): RecordValue;
   stored?(): RecordValue;
-  rewriteScope?: 'shared' | 'device';
+  rewriteScope?: 'shared' | 'device' | (() => 'shared' | 'device');
   replace(settings: Settings, changes: RecordValue, reset: string[]): Settings;
   guard?(next: Settings): void;
   normalize?(changes: RecordValue): RecordValue;
@@ -320,7 +320,11 @@ export class SettingsServiceTargets {
               next,
               store.revision,
               [...resets].some((key) => original !== undefined && Object.hasOwn(original, key))
-                ? [spec.rewriteScope ?? 'shared']
+                ? [
+                    typeof spec.rewriteScope === 'function'
+                      ? spec.rewriteScope()
+                      : (spec.rewriteScope ?? 'shared'),
+                  ]
                 : [],
             );
           } catch (error) {
@@ -359,6 +363,7 @@ export class SettingsServiceTargets {
       }));
     return {
       id: 'service.updates',
+      rewriteScope: () => this.options.settings.settingScope(['updates', 'hostSource']),
       ui: settingsUiFields('about'),
       title: hostSettingItem('about', 'updates').title,
       category: 'updates',
@@ -1113,6 +1118,7 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.notifications.speech',
+      rewriteScope: () => this.options.settings.settingScope(['notificationPreferences']),
       ui: settingsUiFields('notifications', (field) => 'speech.' + field.key),
       title: hostText('settings.notificationSettings.speechSettings'),
       category: 'notifications',
@@ -1172,6 +1178,7 @@ export class SettingsServiceTargets {
     ];
     return {
       id: 'service.notification.' + Buffer.from(key).toString('base64url'),
+      rewriteScope: () => this.options.settings.settingScope(['notificationPreferences']),
       ui: settingsUiGroup('notifications', notificationSettingKey(type)),
       ownerId: type.ownerKind === 'host' ? 'appdock' : type.ownerId,
       title: type.ownerTitle + ' / ' + type.title,

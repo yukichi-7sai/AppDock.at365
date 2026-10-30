@@ -6,6 +6,8 @@
 
 ## 保存
 
+メニューと単/ダブルクリックの割り当ては、「タスクトレイ」の「このPCで設定を保持する」で選んだ共有／端末専用の保存先へ一式で保存します。フォーム・部分JSON・公開コマンドは同じ選択に従います。[保存先の切り替え](settings-sync.md#本体5ページの保存先選択)を参照してください。
+
 `Settings.trayMenu`が正本です。トップレベルにcommand / separator / group、group.childrenにはcommand / separatorを保存します。項目は独立したidを持ち、同じコマンドを複数位置へ置けます。
 
 ```json

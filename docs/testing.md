@@ -38,6 +38,8 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## 設定・トリガーの主な担当
 
+`tests/host-page-settings.test.cjs`は、本体5ページの共有／端末専用の保存・既定値省略・既存値の引き継ぎ・2端末の独立・共有への反映と取消後の再開・保存失敗時の原子的復旧を確認する。通知・更新の公開設定APIは`tests/settings-service-targets.test.cjs`、画面からの切り替え・JSON・取消・再起動後の保持・共通ツールバーは`scripts/device-settings-ui-test.cjs [固定EXE]`を使う。同スクリプトは表示・一般の常時端末専用と、Appletの既存切り替え・停止中の編集・自己設定も確認する。
+
 `tests/start-page.test.cjs`はページ候補の実効表示先・安定ID・JSON/リセット・待機と戻り先・明示移動の優先を担当する。`scripts/start-page-ui-test.cjs [固定EXE]`は隔離した固定/動的/設定由来のlocal/remoteページで、設定の保存・通常起動・再起動の復元・利用不可時の選択保持・起動待ち/読み込み中の移動取消・非表示/最小化/トレイ起動・広幅/狭幅の操作を確認する。実アカウントや認証情報は使用しない。
 
 `scripts/overlay-shadows-ui-test.cjs [固定EXE]`は、ダイアログ/パレット・バナー・デスクトップ通知の影を個別に切り替え、表示中の反映、通知ID/期限/sessionの保持、折りたたみのキーボード操作と検索による展開、再起動後の設定保持を確認する。設定の配置と明暗・狭幅は代表画像で確認する。`tests/appearance.test.cjs`は既定値・保存・ページ別リセットと共通appearance配信を担当する。
