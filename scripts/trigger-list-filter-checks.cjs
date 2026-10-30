@@ -4,6 +4,64 @@ const path = require('node:path');
 module.exports = async ({ host, open, save, saved, checks, profile }) => {
   const countText = (scope) => scope.locator('.command-list-summary-count').innerText();
   const baseline = await saved();
+  await open();
+  const commandList = host.getByTestId('command-triggers-list');
+  const status = commandList.getByRole('combobox', { name: 'トリガーの絞り込み', exact: true });
+  const command = (id) => host.locator(`[data-shortcut-command="fixture.triggers.${id}"]`);
+  const chip = host.getByTestId('command-provider-filter');
+  const clear = commandList.getByRole('button', { name: '絞り込みを解除', exact: true });
+  await status.selectOption('assigned');
+  await host.getByTestId('command-provider:fixture.triggers.one').click();
+  assert.equal(await status.inputValue(), 'assigned');
+  assert.equal(await command('one').count(), 1);
+  assert.equal(await command('two').count(), 1);
+  assert.equal(await command('new').count(), 0);
+  await chip.getByRole('button').click();
+  assert.equal(await status.inputValue(), 'assigned');
+  checks.push('Applet target selection and its clear action retain the assignment filter');
+
+  const input = command('one').locator('.binding-input-filter').first();
+  await input.focus();
+  await input.press('Enter');
+  assert.equal(await status.inputValue(), 'assigned');
+  assert.equal(await command('one').count(), 1);
+  assert.equal(await command('two').count(), 0);
+  await status.selectOption('unassigned');
+  assert.equal(await commandList.locator('[data-shortcut-command]').count(), 0);
+  await chip.getByRole('button').click();
+  assert.equal(await status.inputValue(), 'unassigned');
+  assert.equal(await command('new').count(), 1);
+  assert(
+    await commandList
+      .getByRole('searchbox')
+      .evaluate((element) => element === document.activeElement),
+  );
+  checks.push(
+    'trigger targets combine with the selected status, retain empty results and clear back to search',
+  );
+
+  await status.selectOption('assigned');
+  await host.getByTestId('command-provider:fixture.triggers.one').click();
+  await host.getByTestId('command-trigger-filter:gestures').click();
+  await clear.click();
+  assert.equal(await status.inputValue(), 'all');
+  assert.equal(await chip.count(), 0);
+  assert.equal(await command('new').count(), 1);
+  assert.equal(
+    await host.getByTestId('command-trigger-filter:gestures').getAttribute('aria-pressed'),
+    'true',
+  );
+  await host.getByTestId('command-provider:fixture.triggers.one').click();
+  await clear.click();
+  assert.equal(
+    await chip.count(),
+    0,
+    'clear all is available when only an Applet target is active',
+  );
+  assert.deepEqual(await saved(), baseline);
+  checks.push(
+    'clear all resets status, trigger kinds and temporary targets without saving settings',
+  );
   for (const context of ['command-triggers', 'feature']) {
     for (const [kind, input] of [
       ['shortcuts', 'Ctrl+F9'],

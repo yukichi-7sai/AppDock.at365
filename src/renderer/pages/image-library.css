@@ -379,7 +379,7 @@
     min-width: 0;
     flex: 1;
   }
-  .library-page .library-mobile-groups select {
+  :where(.library-page .library-mobile-groups) select {
     min-width: 0;
     max-width: 100%;
     width: 100%;

@@ -115,12 +115,12 @@ module.exports = async ({ host, command, row, checks }) => {
   const search = host.getByRole('searchbox', { name: 'トリガーのコマンドを検索', exact: true });
   await search.fill('no-command-matches-this-filter');
   assert.equal(await host.locator('[data-shortcut-command]').count(), 0);
-  assert.equal(await bar.isVisible(), false);
+  await bar.waitFor({ state: 'hidden' });
   await search.fill('');
   await bar.waitFor({ state: 'visible' });
   await host.getByRole('button', { name: 'JSON', exact: true }).click();
   await host.locator('.settings-panel-json textarea').waitFor();
-  assert.equal(await bar.isVisible(), false);
+  await bar.waitFor({ state: 'hidden' });
   await host.getByTestId('command-trigger-tab:commands').click();
   await host.getByTestId('command-triggers-list').waitFor();
   await host.setViewportSize({ width: 1280, height: 840 });

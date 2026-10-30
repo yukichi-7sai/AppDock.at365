@@ -8,6 +8,7 @@ import type {
   NotificationCenterFilters,
 } from '../../shared/notification-center';
 import './notification-center.css';
+import { FilterSelect } from '../settings-ui/FilterSelect';
 const api = window.dock.pages;
 const states = {
   active: hostText('notifications.active'),
@@ -118,7 +119,7 @@ export function NotificationCenterPage({
           maxLength={1000}
           onChange={(e) => change({ ...filters, text: e.target.value })}
         />
-        <select
+        <FilterSelect
           aria-label={hostText('notifications.level')}
           value={filters.level}
           onChange={(e) => change({ ...filters, level: e.target.value as any })}
@@ -129,8 +130,9 @@ export function NotificationCenterPage({
               {title}
             </option>
           ))}
-        </select>
-        <select
+        </FilterSelect>
+        <FilterSelect
+          allValue=""
           aria-label={hostText('notifications.source')}
           value={filters.source}
           onChange={(e) => change({ ...filters, source: e.target.value })}
@@ -141,9 +143,9 @@ export function NotificationCenterPage({
               {s.title}
             </option>
           ))}
-        </select>
+        </FilterSelect>
         {history && (
-          <select
+          <FilterSelect
             aria-label={hostText('notifications.state')}
             value={filters.status}
             onChange={(e) => change({ ...filters, status: e.target.value as any })}
@@ -156,7 +158,7 @@ export function NotificationCenterPage({
                   {title}
                 </option>
               ))}
-          </select>
+          </FilterSelect>
         )}
       </div>
       {error && (

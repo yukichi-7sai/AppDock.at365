@@ -291,8 +291,14 @@ export function CommandTriggersEditor({
           }
         }
         clearInputFilter={filters.clearInput}
-        hasAdditionalFilters={kinds.length !== commandTriggerKinds.length}
-        clearAdditionalFilters={() => setKinds(commandTriggerKinds)}
+        hasAdditionalFilters={
+          kinds.length !== commandTriggerKinds.length || !!filters.provider || !!filters.target
+        }
+        clearAdditionalFilters={() => {
+          setKinds(commandTriggerKinds);
+          filters.clearProvider();
+          filters.clearTarget?.();
+        }}
         filters={
           <div
             className="binding-kind-filters"

@@ -90,7 +90,7 @@ module.exports = async ({ host, select, snapshot, until, profile, checks }) => {
       'exact input across providers',
     );
     assert.equal(await search.inputValue(), '');
-    assert.equal(await status.inputValue(), 'all');
+    assert.equal(await status.inputValue(), 'assigned');
     assert((await chip.textContent()).includes(label));
     assert.equal(await chip.count(), 1);
     assert(

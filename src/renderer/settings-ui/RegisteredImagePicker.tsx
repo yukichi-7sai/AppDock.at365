@@ -15,6 +15,7 @@ import { SettingsDialog, SettingsModal } from './SettingsModal';
 import { ImageGallery, GallerySizeControl, ImageGalleryPreview } from './ImageGallery';
 import { gallerySize } from '../../shared/image-gallery';
 import { SettingsInput } from './SettingsInput';
+import { FilterSelect } from './FilterSelect';
 import { Icon } from '../Icon';
 import './registered-images.css';
 
@@ -199,7 +200,7 @@ export function ImageLibraryBrowser({
     <>
       <div className="image-library-toolbar">
         <SettingsField title={translate('settings.registeredImagePicker.group')}>
-          <select
+          <FilterSelect
             data-testid="image-picker-group"
             aria-label={translate('settings.registeredImagePicker.groupLabel')}
             value={group}
@@ -212,7 +213,7 @@ export function ImageLibraryBrowser({
                 {g.name}
               </option>
             ))}
-          </select>
+          </FilterSelect>
         </SettingsField>
         <SettingsField title={translate('settings.registeredImagePicker.search')}>
           <SettingsInput

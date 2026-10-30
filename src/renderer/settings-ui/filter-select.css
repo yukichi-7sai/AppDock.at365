@@ -1,0 +1,10 @@
+select.filter-select[data-filter-active='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+select.filter-select option {
+  color: var(--text);
+  background: var(--panel);
+}

@@ -6,6 +6,7 @@ import type {
   LogPageModel,
 } from '../../shared/host-pages';
 import { Icon } from '../../shared/ui-icons';
+import { FilterSelect } from '../settings-ui/FilterSelect';
 import './logs.css';
 const api = window.dock.pages;
 export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
@@ -84,7 +85,8 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
         />
         {content.scope.type === 'all' && (
           <div className="log-source-filter">
-            <select
+            <FilterSelect
+              allValue=""
               aria-label="ログのApplet"
               value={filters.source}
               onChange={(e) => change({ ...filters, source: e.target.value })}
@@ -95,7 +97,7 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
                   {s.title}
                 </option>
               ))}
-            </select>
+            </FilterSelect>
             {filters.source && (
               <button
                 type="button"
@@ -109,7 +111,7 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
             )}
           </div>
         )}
-        <select
+        <FilterSelect
           aria-label="ログレベル"
           value={filters.level}
           onChange={(e) => change({ ...filters, level: e.target.value as LogFilters['level'] })}
@@ -118,7 +120,7 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
           <option value="info">Info</option>
           <option value="warn">Warning</option>
           <option value="error">Error</option>
-        </select>
+        </FilterSelect>
         <span>{content.entries.length} 件</span>
       </div>
       {error && <p role="alert">{error}</p>}

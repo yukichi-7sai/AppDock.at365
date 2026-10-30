@@ -21,7 +21,6 @@ export function useBindingCommandFilter(
   } | null>(null);
   useEffect(() => {
     setFilter('');
-    setStatusFilter('all');
     if (provider?.request !== undefined) {
       setInputFilter(null);
       setLocalProvider(null);
@@ -29,7 +28,6 @@ export function useBindingCommandFilter(
   }, [provider?.request]);
   useEffect(() => {
     setFilter('');
-    setStatusFilter('all');
     if (target?.request !== undefined) {
       setInputFilter(null);
       setLocalProvider(null);
@@ -44,7 +42,6 @@ export function useBindingCommandFilter(
           ?.querySelector<HTMLInputElement>('input[type="search"]') ?? null,
     };
     setFilter('');
-    setStatusFilter('all');
     setInputFilter(input);
     setLocalProvider(null);
     if (target) navigation?.clear();
@@ -68,7 +65,6 @@ export function useBindingCommandFilter(
           ?.querySelector<HTMLInputElement>('input[type="search"]') ?? null,
     };
     setFilter('');
-    setStatusFilter('all');
     setInputFilter(null);
     setLocalProvider(next);
     if (target) navigation?.clear();
@@ -87,6 +83,7 @@ export function useBindingCommandFilter(
     provider: localProvider ?? provider,
     selectProvider,
     clearProvider,
+    clearTarget: navigation?.clear,
     target,
     filter,
     setFilter,

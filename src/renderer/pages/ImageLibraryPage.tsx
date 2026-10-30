@@ -7,6 +7,7 @@ import type {
 import { mountImageGallery, mountGallerySizeControl } from '../../../ui/image-gallery';
 import { Icon } from '../../shared/ui-icons';
 import { settingsPopoverScroll } from '../settings-ui/settings-popover-scroll';
+import { FilterSelect } from '../settings-ui/FilterSelect';
 import { useImageLibraryDialogFocus } from '../ImageLibraryDialogHost';
 import '../../../ui/image-gallery/gallery.css';
 import './image-library.css';
@@ -399,7 +400,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
               <div className="library-mobile-groups">
                 <label>
                   グループ
-                  <select
+                  <FilterSelect
                     aria-label="グループ"
                     value={c.group}
                     onChange={(e) => run({ command: 'group', groupId: e.target.value })}
@@ -409,7 +410,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
                         {g.title} ({g.count})
                       </option>
                     ))}
-                  </select>
+                  </FilterSelect>
                 </label>
                 <details>
                   <summary>グループの管理</summary>

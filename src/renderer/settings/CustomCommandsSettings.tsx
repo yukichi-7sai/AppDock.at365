@@ -22,6 +22,7 @@ import {
 } from '../../shared/custom-commands';
 import { SettingsListTable } from '../settings-ui/SettingsListTable';
 import { SettingsListFilters } from '../settings-ui/SettingsListFilters';
+import { FilterSelect } from '../settings-ui/FilterSelect';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsOrderDialog } from '../settings-ui/SettingsOrderDialog';
 import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
@@ -188,7 +189,8 @@ export function CustomCommandsSettings({
               searchLabel={translate('settings.customCommandsSettings.search')}
               searchPlaceholder={translate('settings.customCommandsSettings.searchPlaceholder')}
             >
-              <select
+              <FilterSelect
+                allValue=""
                 aria-label={translate('settings.customCommandsSettings.typeFilter')}
                 value={typeFilter}
                 onChange={(event) => setTypeFilter(event.target.value)}
@@ -199,8 +201,8 @@ export function CustomCommandsSettings({
                     {title}
                   </option>
                 ))}
-              </select>
-              <select
+              </FilterSelect>
+              <FilterSelect
                 aria-label={translate('settings.customCommandsSettings.stateFilter')}
                 value={stateFilter}
                 onChange={(event) => setStateFilter(event.target.value)}
@@ -217,8 +219,8 @@ export function CustomCommandsSettings({
                 <option value="unavailable">
                   {translate('settings.customCommandsSettings.unavailableFilter')}
                 </option>
-              </select>
-              <select
+              </FilterSelect>
+              <FilterSelect
                 aria-label={translate('settings.customCommandsSettings.publicationFilter')}
                 value={publicationFilter}
                 onChange={(event) => setPublicationFilter(event.target.value)}
@@ -232,7 +234,7 @@ export function CustomCommandsSettings({
                 <option value="private">
                   {translate('settings.customCommandsSettings.privateFilter')}
                 </option>
-              </select>
+              </FilterSelect>
             </SettingsListFilters>
           }
           toolbarActions={

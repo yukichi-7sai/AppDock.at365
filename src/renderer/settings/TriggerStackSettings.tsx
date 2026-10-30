@@ -18,6 +18,7 @@ import { SettingsDialog } from '../settings-ui/SettingsModal';
 import { SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsListTable } from '../settings-ui/SettingsListTable';
 import { SettingsListFilters } from '../settings-ui/SettingsListFilters';
+import { FilterSelect } from '../settings-ui/FilterSelect';
 import { CommandListSection } from '../settings-ui/CommandListScroll';
 import { ShortcutCaptureField } from '../settings-ui/ShortcutCaptureField';
 import { GestureInputPicker } from '../settings-ui/GestureInputPicker';
@@ -330,7 +331,8 @@ export function TriggerStackSettings({
             searchLabel={t('settings.commandStacks.search')}
             searchPlaceholder={t('settings.commandStacks.searchPlaceholder')}
           >
-            <select
+            <FilterSelect
+              allValue=""
               aria-label={t('settings.commandStacks.modeFilter')}
               value={modeFilter}
               onChange={(event) => setModeFilter(event.target.value)}
@@ -340,7 +342,7 @@ export function TriggerStackSettings({
               <option value="first">{t('settings.commandExecutionModeField.first')}</option>
               <option value="count">{t('settings.commandExecutionModeField.count')}</option>
               <option value="all">{t('settings.commandExecutionModeField.all')}</option>
-            </select>
+            </FilterSelect>
           </SettingsListFilters>
         }
         toolbarActions={

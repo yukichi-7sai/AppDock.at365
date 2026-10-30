@@ -627,8 +627,7 @@ const recordSuccess = () => {
     assert.equal(await host.locator('.command-triggers-editor [data-shortcut-command]').count(), 0);
     await host.getByRole('button', { name: '絞り込みを解除', exact: true }).click();
     assert.equal(await kindButton('gestures').getAttribute('aria-pressed'), 'true');
-    // Clear the independent provider target before continuing with the full catalog.
-    await host.locator('.command-provider-filter button').click();
+    assert.equal(await host.getByTestId('command-provider-filter').count(), 0);
     await command('fixture.triggers.new').locator('.command-title').hover();
     await host.getByTestId('binding-add:fixture.triggers.new:touchpad-gestures').click();
     await dialog().getByRole('button', { name: 'キャンセル', exact: true }).click();
@@ -663,7 +662,7 @@ const recordSuccess = () => {
     checks.push(
       'one-click typed addition for all three trigger types / no kind-selection step / cancel restores the same add button',
     );
-    assert.equal(await host.locator('.binding-disabled-badge').count(), 0);
+    assert.equal(await host.locator('.binding-condition-cell .binding-disabled-badge').count(), 0);
     for (const kind of ['shortcuts', 'gestures', 'touchpad-gestures']) {
       await row(kind, 'same-id').locator('.binding-condition-cell').hover();
       await row(kind, 'same-id').locator('.binding-condition-edit').click();

@@ -6,6 +6,7 @@ import type { BindingInputFilter } from './useBindingCommandFilter';
 import { CommandListSummary, CommandListToolbar } from './CommandListScroll';
 import { Icon } from '../../shared/ui-icons';
 import { SettingsListCount } from './SettingsListCount';
+import { FilterSelect } from './FilterSelect';
 export function CommandBindingToolbar({
   inputName,
   inputKind,
@@ -59,7 +60,7 @@ export function CommandBindingToolbar({
             onChange={(event) => setFilter(event.target.value)}
           />
         </div>
-        <select
+        <FilterSelect
           className="shortcut-status-filter"
           aria-label={translate('settings.commandBindingToolbar.filter', { inputName: inputName })}
           value={statusFilter}
@@ -75,7 +76,7 @@ export function CommandBindingToolbar({
               {translate('settings.commandBindingToolbar.applyError')}
             </option>
           )}
-        </select>
+        </FilterSelect>
       </div>
       <CommandListSummary
         className="command-shortcut-summary"
