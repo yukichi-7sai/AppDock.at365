@@ -3,7 +3,7 @@ import { hostText } from '../shared/i18n';
 import { RegisteredImagesProvider, ImagePickerHost } from './settings-ui/RegisteredImagePicker';
 import { flushSettingsPageInputs } from './settings-input-flush';
 import { HostPageSlot } from './pages/HostPageSlot';
-import { ImageLibraryDialogHost } from './ImageLibraryDialogHost';
+import { ImageLibraryDialogProvider } from './ImageLibraryDialogHost';
 import { ShellBarSlot } from './ShellBarSlot';
 import { SettingsPage } from './settings/SettingsPage';
 import type { SettingsIndexModel } from '../shared/settings-page';
@@ -551,9 +551,10 @@ function App() {
 createRoot(document.getElementById('root')!).render(
   <SettingsControlsProvider api={window.dock}>
     <RegisteredImagesProvider api={window.dock.imageLibrary}>
-      <App />
-      <ImagePickerHost />
-      <ImageLibraryDialogHost />
+      <ImageLibraryDialogProvider>
+        <App />
+        <ImagePickerHost />
+      </ImageLibraryDialogProvider>
     </RegisteredImagesProvider>
   </SettingsControlsProvider>,
 );

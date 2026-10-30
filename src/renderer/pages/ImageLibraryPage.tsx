@@ -7,6 +7,7 @@ import type {
 import { mountImageGallery, mountGallerySizeControl } from '../../../ui/image-gallery';
 import { Icon } from '../../shared/ui-icons';
 import { settingsPopoverScroll } from '../settings-ui/settings-popover-scroll';
+import { useImageLibraryDialogFocus } from '../ImageLibraryDialogHost';
 import '../../../ui/image-gallery/gallery.css';
 import './image-library.css';
 const api = window.dock.pages;
@@ -16,6 +17,7 @@ type Action = ImageLibraryPageAction extends infer T
     : never
   : never;
 export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryPageModel }) {
+  const captureDialogFocus = useImageLibraryDialogFocus();
   const [model, setModel] = useState<ImageLibraryPageModel>(initialModel);
   const latest = useRef<ImageLibraryPageModel | undefined>(initialModel);
   const [error, setError] = useState('');
@@ -49,10 +51,11 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
       right: rect.left + scroll.current!.clientWidth,
     };
   };
-  const act = async (action: Action) => {
+  const act = async (action: Action, opener?: HTMLElement) => {
     if (!latest.current) return;
     if (openingDialog.current && action.command !== 'anchor') return;
     const opensDialog = action.command === 'dialog';
+    const releaseFocus = opensDialog ? captureDialogFocus(opener) : undefined;
     if (opensDialog) {
       openingDialog.current = true;
       setDialogPending(true);
@@ -65,13 +68,14 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
       throw e;
     } finally {
       if (opensDialog) {
+        releaseFocus?.();
         openingDialog.current = false;
         setDialogPending(false);
       }
     }
   };
-  const run = (action: Action) => {
-    void act(action).catch(() => {});
+  const run = (action: Action, opener?: HTMLElement) => {
+    void act(action, opener).catch(() => {});
   };
   const saveSize = (value: number) => {
     requestedSize.current = value;
@@ -255,8 +259,9 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     kind: 'add' | 'rename' | 'delete' | 'order' | 'order-images',
     groupId?: string,
   ) => {
+    const opener = menu ? (menuButton.current ?? undefined) : undefined;
     setMenu('');
-    run({ command: 'dialog', kind, groupId });
+    run({ command: 'dialog', kind, groupId }, opener);
   };
   return (
     <section className="library-page" inert={dialogPending}>

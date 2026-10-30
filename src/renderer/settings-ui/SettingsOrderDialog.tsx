@@ -15,12 +15,14 @@ export function SettingsOrderDialog({
   items,
   onApply,
   onClose,
+  returnFocus,
 }: {
   title: string;
   listLabel: string;
   items: SettingsOrderItem[];
   onApply(ordered: string[], original: string[]): Promise<unknown>;
   onClose(): void;
+  returnFocus?: HTMLElement | null;
 }) {
   const { t: translate } = useHostTranslation();
   const [original] = useState(() => items.map((item) => item.id));
@@ -57,6 +59,7 @@ export function SettingsOrderDialog({
   };
   return (
     <OrderDialogFrame
+      returnFocus={returnFocus}
       title={title}
       hint={translate('settings.settingsOrderDialog.hint')}
       message={notice}

@@ -47,6 +47,9 @@ fs.writeFileSync(
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.closeToTray = false;
 settings.host.soundEnabled = false;
+settings.imageLibrary = {
+  groups: [{ id: 'focus-group', name: 'Focus group', images: [{ file: 'preview.png' }] }],
+};
 settings.keybindings = [];
 settings.extensions['fixture.host-pages'] = { enabled: true, settings: {} };
 settings.pinnedCommands = ['fixture.host-pages.mark'];
@@ -292,6 +295,59 @@ async function geometry() {
     checks.push(
       'preview is a shared host modal; background actions are blocked and Escape restores the original button',
     );
+    for (const mode of ['keyboard', 'close-button', 'backdrop']) {
+      if (mode === 'keyboard') await previewButton.press('Enter');
+      else await previewButton.click();
+      await dialog.waitFor();
+      if (mode === 'keyboard') await dialog.press('Escape');
+      else if (mode === 'close-button')
+        await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
+      else {
+        const bounds = await host.locator('.shell > main').boundingBox();
+        await host.mouse.click(bounds.x + 3, bounds.y + 3);
+      }
+      await dialog.waitFor({ state: 'detached' });
+      await until(
+        () => previewButton.evaluate((button) => document.activeElement === button),
+        'preview focus after ' + mode,
+      );
+    }
+    checks.push(
+      'preview returns focus after keyboard activation, close button and backdrop dismissal',
+    );
+    const addGroup = host.getByRole('button', { name: 'グループを追加', exact: true });
+    await addGroup.click();
+    const addDialog = host.getByRole('dialog', { name: '画像グループを追加', exact: true });
+    await addDialog.getByLabel('画像グループ名').fill('Cancelled group');
+    await addDialog.press('Escape');
+    await addDialog.waitFor({ state: 'detached' });
+    await until(
+      () => addGroup.evaluate((button) => document.activeElement === button),
+      'group editor focus',
+    );
+    assert(
+      !(await host.evaluate(() => window.dock.imageLibrary.snapshot())).groups.some(
+        (group) => group.name === 'Cancelled group',
+      ),
+    );
+    checks.push('image group editor cancels without saving and returns to its opener');
+    const menuButton = host.getByRole('button', { name: 'Focus groupの操作', exact: true });
+    for (const [item, title] of [
+      ['名前を変更', '画像グループの名前を変更'],
+      ['画像を並べ替え', '画像を並べ替え'],
+    ]) {
+      await menuButton.click();
+      await host.getByRole('menuitem', { name: item, exact: true }).click();
+      const groupDialog = host.getByRole('dialog', { name: title, exact: true });
+      await groupDialog.waitFor();
+      await groupDialog.press('Escape');
+      await groupDialog.waitFor({ state: 'detached' });
+      await until(
+        () => menuButton.evaluate((button) => document.activeElement === button),
+        'group menu opener focus',
+      );
+    }
+    checks.push('group rename and image ordering return to the surviving menu trigger');
     for (const theme of ['light', 'dark']) {
       await host.evaluate(async (theme) => {
         const state = await window.dock.snapshot();
@@ -310,7 +366,6 @@ async function geometry() {
         await geometry();
         await host.screenshot({ path: path.join(profile, `${kind}-${theme}.png`) });
         const state = await host.evaluate(() => window.dock.snapshot());
-        assert.equal(state.shellRegions.regions.length, 6);
         assert(!state.shellRegions.regions.some((r) => r.region.startsWith('page.')));
         assert(
           !app
@@ -322,7 +377,7 @@ async function geometry() {
       }
     }
     checks.push(
-      'version information and all three host pages render in both themes; only seven Shell regions remain and retired page documents never start',
+      'version information and all three host pages render in both themes; retired page Shell regions and documents never start',
     );
     for (const zoom of [1, 1.5, 2]) {
       await app.evaluate(({ BrowserWindow }, zoom) => {

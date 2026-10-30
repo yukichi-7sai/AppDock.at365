@@ -26,6 +26,7 @@ export function SettingsModal({
   closeDisabled = false,
   closeOnBackdrop = false,
   initialFocus = '[data-initial-focus], .shortcut-capture',
+  returnFocus: requestedReturnFocus,
 }: {
   children: ReactNode;
   header?: ReactNode;
@@ -44,6 +45,8 @@ export function SettingsModal({
   closeDisabled?: boolean;
   closeOnBackdrop?: boolean;
   initialFocus?: string;
+  /** An opener captured before asynchronous preparation makes its page inert. */
+  returnFocus?: HTMLElement | null;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const backdropPressed = useRef(false);
@@ -65,7 +68,11 @@ export function SettingsModal({
   const callbacks = useRef({ onReady, onError, onClose });
   callbacks.current = { onReady, onError, onClose };
   const [returnFocus] = useState(() =>
-    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+    requestedReturnFocus !== undefined
+      ? requestedReturnFocus
+      : document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null,
   );
   useLayoutEffect(() => {
     const element = dialog.current!;
@@ -178,6 +185,7 @@ export function SettingsDialog({
   closeAfterApply = true,
   resetAction,
   secondaryAction,
+  returnFocus,
 }: {
   title: string;
   description?: ReactNode;
@@ -201,6 +209,7 @@ export function SettingsDialog({
   cancelWhilePending?: boolean;
   closeAfterApply?: boolean;
   resetAction?: { label: string; onClick(): void };
+  returnFocus?: HTMLElement | null;
   secondaryAction?: {
     label: string;
     onClick(): void;
@@ -232,6 +241,7 @@ export function SettingsDialog({
   };
   return (
     <SettingsModal
+      returnFocus={returnFocus}
       className={`settings-group-dialog ${className}`}
       labelledBy={id}
       onClose={onClose}

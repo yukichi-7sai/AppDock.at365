@@ -24,6 +24,7 @@ export function OrderDialogFrame({
   onError,
   onApply,
   onClose,
+  returnFocus,
 }: {
   title: string;
   eyebrow?: string;
@@ -42,11 +43,13 @@ export function OrderDialogFrame({
   onError(error: string): void;
   onApply(): void;
   onClose(): void;
+  returnFocus?: HTMLElement | null;
 }) {
   const { t: translate } = useHostTranslation();
   const id = useId();
   return (
     <SettingsModal
+      returnFocus={returnFocus}
       className={`order-dialog-frame ${className}`}
       labelledBy={id}
       onClose={onClose}

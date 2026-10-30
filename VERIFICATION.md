@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-30: 画像ダイアログのフォーカス復帰修正 0.107.1
+
+- `b0ee675`上の画像フォーカス調査記録だけが未コミットの状態から開始し、その記録を保持した。画像ライブラリーが非同期要求前に元のフォーカス要素を保存し、同一document内のContextからダイアログへ渡すようにした。共通SettingsModal/SettingsDialog/SettingsOrderDialog/OrderDialogFrameに任意のreturnFocusを追加し、省略時の既存の取得方法、閉鎖時の接続確認とfallbackを保持した。メニューから開く編集・並べ替えは、消えるメニュー項目ではなく生存する起点ボタンへ戻す。参照は要求の終了時に回収し、IPC/設定/保存ファイルへ渡さない。背景のinert、二重要求抑止、保存・取消の処理は維持した。
+- 元の`preview focus restored`を維持し、クリック/Enter、Escape/閉じるボタン/背景クリック、グループ追加の取消・非保存、メニューからの名前変更/画像並べ替えの復帰を同じ本体ページGUIへ追加した。検査の続きで現仕様と異なる「Shell領域6個」の固定比較が失敗したため、その個数比較と古い件数の報告文言だけ除去した。ページのShell領域/旧documentを起動しない境界検査と、独立したShell境界単体試験は保持した。失敗したフォーカス検査を削除・緩和して成功させたものではない。
+- 発行前レビューでは早期の取得順、要求ごとの参照寿命、同じdocument内での保持、メニュー起点、既存の省略時動作、接続済み要素の復帰、背景操作抑止を確認し、未解決指摘なし。設定・保存仕様の変更はなく、通常修正として0.107.0→0.107.1へパッチ更新した。型検査/build/書式確認、関連8ファイル61件がfail/skip 0。前コミットの153ファイル1360件から、変更のないmain/shared/.NET/依存・ツールと単体試験の入力を照合し、残り145ファイル1299件を再利用した。標準153ファイル1360件の必要範囲が揃った。
+- 開発GUI18項目、発行済み固定EXEの本体ページGUI18項目、通常/入れ子の画像選択・フォーカス・親子取消・保存/再起動を含むリボン画像GUI10項目、標準smoke（ok:true）が成功。旧失敗と同じクリック→Escapeで元の画像ボタンへの復帰を確認した。明暗テーマ、狭幅と100/150/200%のCSS zoom、原画像保持、ページ・設定カテゴリ・Appletの復元も確認済み。物理入力、混在DPI、実サービスと実利用先deployは今回未実施。
+- `publish.bat`終了0。`A:\40.ARTIFACT\AppDock.at365\win-unpacked`、feed/配布manifest/ZIP内manifestは0.107.1。ZIPは270,743,482バイト、SHA256 `b18c542755a41f5e56e322f64ece1b55823717bfe4afd94c5e00b4089b903893`がfeedと一致。EXE SHA256 `aef700cf622c9edc621d02aee10a4c90edd9dd4b187da628bc484c418a6eaac5`、asar SHA256 `8e87619f7bbfc0974d012bafbb391e7233dd0204bce3ce1b1d8feae5f57c8569`はZIP内と一致し、両固定GUIのコピーも同じEXE。ZIP693項目に利用者のsettings/data/extensionsは含まれない。
+- 証跡は`.artifacts/image-preview-focus-20261030/`の873入力SHA一覧、完全ログ、review.json・reuse.json・input-comparison.json・publication.json・cleanup.json・validation.json。開発GUIは`.artifacts/host-pages-ui-1793357994331`、固定GUIは`.artifacts/host-pages-ui-1793358246096`と`.artifacts/ribbon-customization-ui-1793358282918`、smokeは`.artifacts/smoke-1793358301357`。発行後も入力一致。終了・成功・実パス・プロセス不在・再解析ポイント不在を確認した旧成功コピー3件から所有EXE/ランタイムのみ整理し、357ファイルの記録・画像・設定・manifestのSHA一致を確認した。最新コピーと過去の失敗・調査記録を保持する。利用者の指示で検証完了後にコミットし、stage treeとcommit treeを照合する。push・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-30: 画像プレビューのフォーカス検査の調査
+
+- スタートページ0.107.0を`b0ee675b0674548a7925aca7ef8313b7aaff5e20`へコミットし、stage treeとcommit treeの一致・clean状態を確認した後に調査した。pushは行っていない。調査開始前の`pull --ff-only`はAlready up to date。
+- `host-pages-ui-test.cjs`の`preview focus restored`は不要な寸法/DOM構造検査ではなく、プレビューを閉じた後に開いた画像ボタンへ戻る操作契約を確認している。本体ページ仕様もフォーカス復帰を明記している。専用のimage-gallery/image-library-session試験には表示・背景操作の拒否・内側/背景クリック・ドラッグ・遅延時の二重起動抑制はあるが、この画像ボタンへの復帰の照合はない。共通Modalの一般的な復帰検査とは異なり、画像ライブラリー固有の準備中inertを含む経路なので、削除・期待値緩和は行わない。
+- 発行済み0.107.0と保存済み0.106.2を、隔離した画像1枚のprofileで実行した。マウスで画像を開いてEscapeで閉じる4操作はすべて元のボタンではなくBODYへ戻り、続くTabはタイトルバー入口へ移った。元のボタンはすべてisConnected:true、親WindowもisFocused:true。0.107.0/0.106.2それぞれで本体WebContents自体もfocused:trueの失敗を確認した。Enterで開いてEscapeまたは「閉じる」で閉じる6操作は画像ボタンへ戻った。操作順を入れ替えてもマウス経路で再現し、初回表示だけの問題ではない。
+- イベント記録と実装を照合すると、`ImageLibraryPage.act`が非同期のページ要求前に`setDialogPending(true)`を行い、sectionをinertにする。その後に表示される`SettingsModal`が`document.activeElement`を保存するため、マウス経路では既にBODYが復帰先になっていた。終了時のfocus呼出し先もBODYと記録された。元の画像ボタンの消滅や、テストの古いセレクター/別Windowへのフォーカス移動が原因ではない。
+- 修正する場合は、背景をinertにする前に開いたボタンを保存し、共通Modalへ明示的な復帰先として渡す方向が妥当。背景操作の抑止・二重起動防止・破棄済み要素への復帰回避は維持する。今回は依頼どおり調査までで、製品・検査の変更、版更新・再発行・追加コミットは行っていない。
+- 証跡は`.artifacts/focus-investigation-20261030/`のprobe.cjs・current.log・reversed.log・baseline.log・investigation.jsonと3実行のresult.json/イベント列/画像。診断コードはfocusへの呼出しとDOMイベントを記録するだけで、復帰先の差し替えや製品へのパッチは行っていない。実行用EXEは既存の固定検証コピーを借用し、新しいruntimeコピーは作成していない。全プローブは終了済み。
+
 ## 2026-10-30: スタートページ0.107.0の受入・コミット前照合
 
 - 利用者の受入後、スタートページの実装・設定・専用試験と関連文書をレビューした。実装時の867入力、完全ログ、発行EXE/asar/ZIP、固定GUI25項目とsmokeの成功記録をSHA256照合した。製品入力と発行物は同一で、型検査/build/書式確認、関連17ファイル160件と発行物のGUI/smokeを再利用した。

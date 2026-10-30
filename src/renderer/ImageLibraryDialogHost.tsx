@@ -1,5 +1,5 @@
 import { SettingsField } from './settings-ui/SettingsSections';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   ImageLibraryDialogRequest,
   ImageLibraryDialogOperation,
@@ -10,7 +10,33 @@ import { SettingsInput } from './settings-ui/SettingsInput';
 import { SettingsOrderDialog } from './settings-ui/SettingsOrderDialog';
 import { RegisteredGalleryPreview } from './settings-ui/RegisteredImagePicker';
 
+const DialogFocus = createContext<{ current: { target: HTMLElement | null } | null } | null>(null);
+
+export function ImageLibraryDialogProvider({ children }: { children: ReactNode }) {
+  const opening = useRef<{ target: HTMLElement | null } | null>(null);
+  return (
+    <DialogFocus.Provider value={opening}>
+      {children}
+      <ImageLibraryDialogHost />
+    </DialogFocus.Provider>
+  );
+}
+
+/** Capture before the page becomes inert; the target never crosses the host IPC boundary. */
+export function useImageLibraryDialogFocus() {
+  const opening = useContext(DialogFocus);
+  if (!opening) throw Error('Image library dialogs are not connected');
+  return (target = document.activeElement) => {
+    const request = { target: target instanceof HTMLElement ? target : null };
+    opening.current = request;
+    return () => {
+      if (opening.current === request) opening.current = null;
+    };
+  };
+}
+
 export function ImageLibraryDialogHost() {
+  const opening = useContext(DialogFocus);
   const [request, setRequest] = useState<ImageLibraryDialogRequest | null>(null);
   useEffect(
     () =>
@@ -19,9 +45,17 @@ export function ImageLibraryDialogHost() {
       ),
     [],
   );
-  return request ? <Editor key={request.id} request={request} /> : null;
+  return request ? (
+    <Editor key={request.id} request={request} returnFocus={opening?.current?.target ?? null} />
+  ) : null;
 }
-function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
+function Editor({
+  request: r,
+  returnFocus,
+}: {
+  request: ImageLibraryDialogRequest;
+  returnFocus: HTMLElement | null;
+}) {
   const current = r.groups.find((g) => g.id === r.groupId);
   const before = (image: { file: string }) =>
     r.groups.filter((g) => g.images.some((i) => imageKey(i) === imageKey(image))).map((g) => g.id);
@@ -37,6 +71,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   if (r.kind === 'order-images')
     return (
       <SettingsOrderDialog
+        returnFocus={returnFocus}
         title="画像を並べ替え"
         listLabel={`${current?.name ?? ''}の画像の表示順`}
         items={(current?.images ?? []).map((image) => ({ id: imageKey(image), title: image.file }))}
@@ -55,6 +90,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   if (r.kind === 'order')
     return (
       <SettingsOrderDialog
+        returnFocus={returnFocus}
         title="画像グループを並べ替え"
         listLabel="画像グループの表示順"
         items={r.groups.map((g) => ({ id: g.id, title: g.name }))}
@@ -65,6 +101,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   if (r.kind === 'delete-image')
     return (
       <SettingsDialog
+        returnFocus={returnFocus}
         title="画像を削除"
         onClose={close}
         onApply={() => save({ kind: 'delete-image' })}
@@ -84,6 +121,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   if (r.kind === 'preview')
     return (
       <SettingsModal
+        returnFocus={returnFocus}
         labelledBy="image-library-preview-title"
         className="image-library-preview-modal"
         closeOnBackdrop
@@ -128,6 +166,7 @@ function Editor({ request: r }: { request: ImageLibraryDialogRequest }) {
   };
   return (
     <SettingsDialog
+      returnFocus={returnFocus}
       title={titles[r.kind]}
       error={error}
       onClose={close}
