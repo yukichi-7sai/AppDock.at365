@@ -1,5 +1,6 @@
 .command-palette {
-  width: min(560px, 90vw);
+  container-type: inline-size;
+  width: min(720px, 90vw);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -103,17 +104,49 @@
   font-size: 12px;
   gap: 12px;
 }
-.palette-execute > svg {
-  color: var(--accent);
-}
 .palette-execute > div {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.palette-execute > kbd {
+.palette-triggers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 0 1 44%;
+  min-width: 0;
   margin-left: auto;
-  font-size: 9px;
-  flex-shrink: 0;
+}
+.palette-triggers .binding-trigger-mark {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.palette-command-text {
+  flex: 1;
+}
+.palette-trigger-settings {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  color: var(--faint);
+  border-radius: 4px;
+}
+.palette-trigger-settings:hover {
+  background: var(--panel);
+}
+@container (max-width: 440px) {
+  .palette-execute {
+    flex-wrap: wrap;
+  }
+  .palette-triggers {
+    flex: 1 0 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+.palette-pin-controls {
+  flex: none;
 }
 .pin-badge {
   color: var(--accent);
@@ -127,7 +160,8 @@
   padding-right: 8px;
   gap: 1px;
 }
-.palette-pin-controls > button {
+.palette-pin-controls > button,
+.palette-pin-order > button {
   height: 27px;
   width: 24px;
   font-size: 13px;
@@ -135,8 +169,17 @@
   padding: 0;
   border-radius: 4px;
 }
-.palette-pin-controls > button:hover {
+.palette-pin-controls > button:hover,
+.palette-pin-order > button:hover {
   background: var(--panel);
+}
+.palette-pin-order {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+.palette-pin-order > button {
+  height: 24px;
 }
 .palette-pin-controls > .pin-toggle {
   font-size: 18px;

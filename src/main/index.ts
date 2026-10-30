@@ -155,7 +155,7 @@ import { initializeGestureDefaults } from '../shared/gestures';
 import { getCommandTriggerOptions } from '../shared/command-trigger-options';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, hostCommandsForApplets, shortcutFromEvent } from '../shared/commands';
-import { commandTriggerEnablement } from '../shared/command-triggers';
+import { activeCommandTriggers, commandTriggerEnablement } from '../shared/command-triggers';
 import { settingsPageCommands } from '../shared/settings-navigation';
 import { updateCommands } from '../shared/update-commands';
 import { AppletManagement } from './core/applet-management';
@@ -1686,6 +1686,38 @@ function openCommandPalette(
     commands: uiCommands,
     pins: () => settings.value.pinnedCommands,
     shortcuts: () => settings.value.shortcuts,
+    triggers: () => activeCommandTriggers(settings.value),
+    openTriggerSettings: async (command) => {
+      await showWindow();
+      await flushSettingsInputs();
+      if (!uiCommands().some((c) => c.id === command.id && !c.hidden))
+        throw Error(hostText('commands.link.missing'));
+      let state = settingsEditing.snapshot();
+      await settingsEditing.act({
+        sessionId: state.sessionId,
+        editRevision: state.editRevision,
+        operationId: randomUUID(),
+        action: { type: 'select-page', pageId: 'command-triggers' },
+      });
+      state = settingsEditing.snapshot();
+      if (state.mode !== 'form')
+        await settingsEditing.act({
+          sessionId: state.sessionId,
+          editRevision: state.editRevision,
+          operationId: randomUUID(),
+          action: { type: 'mode', value: 'form' },
+        });
+      releaseSettingsView();
+      settingsNavigation.provider = undefined;
+      settingsNavigation.move = undefined;
+      settingsNavigation.commandTarget = {
+        id: command.id,
+        title: command.title,
+        request: Date.now(),
+      };
+      await navigation.navigate('settings');
+      changed();
+    },
     dark: () => nativeTheme.shouldUseDarkColors,
     language: () => settings.value.host.language,
     savePins: (ids) => {
@@ -1723,6 +1755,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
     });
     releaseSettingsView();
     settingsNavigation.provider = undefined;
+    settingsNavigation.commandTarget = undefined;
     settingsNavigation.move = undefined;
     await navigation.navigate('settings');
     return { accepted: true };
@@ -2372,6 +2405,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
                 settingsNavigation.provider.id,
             }
           : undefined,
+      commandTarget: id === 'command-triggers' ? settingsNavigation.commandTarget : undefined,
       applets: applets.map(summary),
       commands: settingsUiCommands(),
       statuses: id === 'command-triggers' ? (hotKeys?.statuses ?? []) : undefined,
@@ -2550,6 +2584,7 @@ function settingsPageActions(
           destination === 'settings'
             ? undefined
             : { id: a.id, page: 'command-triggers', request: Date.now() };
+        settingsNavigation.commandTarget = undefined;
         changed();
       }
     };
@@ -2578,11 +2613,16 @@ function settingsPageActions(
       }
     };
   }
-  if (page.id === 'command-triggers')
+  if (page.id === 'command-triggers') {
     actions.clearProvider = async () => {
       settingsNavigation.provider = undefined;
       changed();
     };
+    actions.clearCommandTarget = async () => {
+      settingsNavigation.commandTarget = undefined;
+      changed();
+    };
+  }
   if (page.id === 'mcp-client' || page.id === 'custom-commands') {
     actions.mcpServers = async () => mcpClient.servers(mcpHostActor, { limit: 50 });
     actions.mcpTools = async ([serverId, cursor]) =>

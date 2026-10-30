@@ -27,6 +27,8 @@ export class CommandPaletteSession implements OverlayController {
       commands(): UiCommand[];
       pins(): string[];
       shortcuts(): Record<string, string[]>;
+      triggers?(): Record<string, import('../../shared/command-triggers').CommandTriggerMark[]>;
+      openTriggerSettings?(command: UiCommand): Promise<void>;
       dark(): boolean;
       language?(): import('../../shared/host-language').HostLanguage;
       savePins(ids: string[]): void;
@@ -115,6 +117,7 @@ export class CommandPaletteSession implements OverlayController {
           this.request.mode === 'select'
             ? (this.request.shortcuts ?? this.options.shortcuts())
             : this.options.shortcuts(),
+        triggers: this.options.triggers?.(),
         busy: this.busy,
         error: this.error,
       },
@@ -154,11 +157,27 @@ export class CommandPaletteSession implements OverlayController {
       return;
     }
     if (this.busy) throw Error('Overlay operation in progress');
-    if (!['choose', 'togglePin', 'movePin'].includes(action.type))
+    if (!['choose', 'togglePin', 'movePin', 'openTriggerSettings'].includes(action.type))
       throw Error('Unknown overlay action');
     const command = this.commands().find((c) => c.id === action.commandId);
     if (!command) throw Error('Command is no longer in this palette');
     this.error = '';
+    if (action.type === 'openTriggerSettings') {
+      if (this.request.mode !== 'execute' || !this.options.openTriggerSettings)
+        throw Error('Trigger settings are unavailable in this palette');
+      this.busy = true;
+      this.options.changed();
+      try {
+        await this.options.openTriggerSettings(command);
+        this.cancel('trigger-settings');
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : String(error);
+      } finally {
+        this.busy = false;
+        this.options.changed();
+      }
+      return;
+    }
     if (action.type !== 'choose') {
       if (this.request.mode !== 'execute') throw Error('Selection cannot change saved pins');
       const pins = this.options.pins();

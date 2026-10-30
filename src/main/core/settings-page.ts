@@ -273,6 +273,7 @@ export class SettingsPageSession {
           action: { type: 'select-page', pageId: item.pageId },
         });
         this.navigation.provider = undefined;
+        this.navigation.commandTarget = undefined;
         const selected = this.options.editor.metadata();
         if (selected.mode !== 'form')
           await this.options.editor.act({
@@ -316,6 +317,7 @@ export class SettingsPageSession {
           action: { type: 'select-page', pageId: op.pageId },
         });
         this.navigation.provider = undefined;
+        this.navigation.commandTarget = undefined;
         if (op.pageId !== state.pageId) this.options.release?.();
         this.navigation.move = undefined;
       } else if (op.kind === 'edit') {

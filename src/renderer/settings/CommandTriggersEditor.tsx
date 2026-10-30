@@ -7,14 +7,15 @@ import {
   commandTriggerBinding,
   commandTriggerBindings,
   commandTriggerInput,
+  commandTriggerText,
   commandTriggerKinds,
   deleteCommandTrigger,
   type CommandTriggerBinding,
   type CommandTriggerKind,
 } from '../../shared/command-triggers';
 import { externalShortcutScope, keybindingConditionLabel } from '../../shared/keybindings';
-import { gestureConditionLabel, gestureTitle } from '../../shared/gestures';
-import { touchpadTitle } from '../../shared/touchpad-gestures';
+import { gestureConditionLabel } from '../../shared/gestures';
+import { CommandTriggerMark } from '../settings-ui/CommandTriggerMark';
 import { shortcutPageChoices } from '../../shared/shortcut-pages';
 import { Icon } from '../../shared/ui-icons';
 import { CommandBindingList, type BindingEdit } from '../settings-ui/CommandBindingList';
@@ -179,12 +180,7 @@ export function CommandTriggersEditor({
   const catalog = [...known.values()].filter(
     (command) => !command.hidden || allRows.some((row) => row.command === command.id),
   );
-  const inputText = (row: CommandTriggerBinding) =>
-    row.kind === 'shortcuts'
-      ? row.binding.key
-      : row.kind === 'gestures'
-        ? gestureTitle(row.binding.gesture)
-        : touchpadTitle(row.binding.gesture);
+  const inputText = commandTriggerText;
   const inputLabel = (row: CommandTriggerBinding) =>
     t('settings.commandTriggers.input', {
       kind: t(kindKeys[row.kind]),
@@ -207,12 +203,7 @@ export function CommandTriggersEditor({
             OFF
           </span>
         )}
-        <kbd className="binding-trigger-mark" data-trigger-kind={row.kind}>
-          <span className="binding-trigger-icon" title={t(kindKeys[row.kind])} aria-hidden="true">
-            <Icon name={kindIcons[row.kind]} />
-          </span>
-          <span>{inputText(row)}</span>
-        </kbd>
+        <CommandTriggerMark kind={row.kind} input={inputText(row)} />
       </span>
     );
   };

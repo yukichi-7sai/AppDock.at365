@@ -53,6 +53,7 @@ export interface SettingsPageAuxiliary {
   touchpad?: import('./touchpad-gestures').TouchpadSnapshot;
   touchpadShortcuts?: import('./keybindings').Keybinding[];
   provider?: { id: string; title: string; request: number };
+  commandTarget?: { id: string; title: string; request: number };
   appletManagement?: {
     assignments: { shortcuts: string[]; gestures: string[] };
     packagesAvailable: boolean;
@@ -145,6 +146,7 @@ export type SettingsPageOperation =
 export interface SettingsNavigationState {
   query: string;
   provider?: { id: string; page: 'command-triggers'; request: number };
+  commandTarget?: { id: string; title: string; request: number };
   move?: SettingsPageModel['content']['move'];
 }
 export interface SettingsPageAction {

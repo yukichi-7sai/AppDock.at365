@@ -2,13 +2,15 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { CommandPaletteSession } = require('../out/main/main/core/command-palette');
 const { shellView } = require('../out/main/shared/shell');
-function fixture(request = {}, execute) {
+function fixture(request = {}, execute, openTriggerSettings) {
   const state = {
     commands: ['a', 'b', 'c'].map((id) => ({ id, title: id, extension: 'test', available: true })),
     pins: ['a', 'missing', 'b'],
     executed: [],
     changes: 0,
     closed: 0,
+    settingsOpened: [],
+    triggers: {},
   };
   const session = new CommandPaletteSession(
     { requestId: 'test', mode: 'execute', ...request },
@@ -16,6 +18,12 @@ function fixture(request = {}, execute) {
       commands: () => state.commands,
       pins: () => state.pins,
       shortcuts: () => ({}),
+      triggers: () => state.triggers,
+      openTriggerSettings:
+        openTriggerSettings ??
+        (async (command) => {
+          state.settingsOpened.push(command.id);
+        }),
       dark: () => false,
       savePins: (ids) => {
         state.pins = ids;
@@ -31,6 +39,48 @@ function fixture(request = {}, execute) {
   session.onClosed(() => state.closed++);
   return { state, session, act: (action) => session.act({ id: session.id, ...action }) };
 }
+
+test('trigger settings opens for unavailable commands without execution, and rejects stale or selection actions', async () => {
+  const f = fixture();
+  f.state.commands[1].available = false;
+  await f.act({ type: 'openTriggerSettings', commandId: 'b' });
+  assert.deepEqual(f.state.settingsOpened, ['b']);
+  assert.deepEqual(f.state.executed, []);
+  assert.deepEqual(await f.session.result, { status: 'cancelled', reason: 'trigger-settings' });
+  await assert.rejects(f.act({ type: 'openTriggerSettings', commandId: 'b' }), /Stale/);
+  const selection = fixture({ mode: 'select' });
+  await assert.rejects(
+    selection.act({ type: 'openTriggerSettings', commandId: 'a' }),
+    /unavailable/,
+  );
+  assert.deepEqual(selection.state.settingsOpened, []);
+  const removed = fixture();
+  removed.state.commands = [];
+  await assert.rejects(removed.act({ type: 'openTriggerSettings', commandId: 'a' }), /no longer/);
+});
+
+test('trigger navigation failure stays open and duplicate actions are blocked while navigation is pending', async () => {
+  let reject;
+  const f = fixture(
+    {},
+    undefined,
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      }),
+  );
+  const pending = f.act({ type: 'openTriggerSettings', commandId: 'a' });
+  await assert.rejects(f.act({ type: 'choose', commandId: 'a' }), /in progress/);
+  reject(Error('settings input failed'));
+  await pending;
+  assert.equal(f.session.snapshot().content.error, 'settings input failed');
+  assert.equal(f.state.closed, 0);
+  assert.equal(f.session.snapshot().content.busy, false);
+  const revision = f.session.snapshot().revision;
+  f.state.triggers = { a: [{ id: 'key-a', kind: 'shortcuts', input: 'Ctrl+F8' }] };
+  assert(f.session.snapshot().revision > revision);
+  assert.deepEqual(f.session.snapshot().content.triggers, f.state.triggers);
+});
 test('selection restricts catalog, retains missing choices and never executes or saves pins', async () => {
   const f = fixture({ mode: 'select', commandIds: ['b', 'missing'], pins: ['b'] });
   f.state.commands[1].available = false;

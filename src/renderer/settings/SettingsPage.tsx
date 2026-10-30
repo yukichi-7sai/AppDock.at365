@@ -68,6 +68,14 @@ export function SettingsPage({
       delete triggerScrollPositions.current[tab];
   }, [model?.content.page.id]);
   const commandNavigationRequest = useRef(0);
+  useEffect(() => {
+    const target = model?.content.auxiliary.commandTarget;
+    if (!target || model.content.page.id !== 'command-triggers') return;
+    commandNavigationRequest.current++;
+    setCommandTarget(undefined);
+    setTriggerTab('commands');
+    delete triggerScrollPositions.current.commands;
+  }, [model?.content.auxiliary.commandTarget?.request]);
   const [movement, setMovement] = useState({ id: '', text: '' });
   const [confirmation, setConfirmation] = useState<{
     kind: 'reset' | 'storage';
@@ -456,8 +464,17 @@ export function SettingsPage({
                       ),
                       gestures: new Set(model.content.auxiliary.commandAssignments?.gestures ?? []),
                     },
-                    target: commandTarget?.page === page.id ? commandTarget : undefined,
-                    clear: () => setCommandTarget(undefined),
+                    target:
+                      page.id === 'command-triggers' && model.content.auxiliary.commandTarget
+                        ? { ...model.content.auxiliary.commandTarget, page: 'command-triggers' }
+                        : commandTarget?.page === page.id
+                          ? commandTarget
+                          : undefined,
+                    clear: () => {
+                      setCommandTarget(undefined);
+                      if (model.content.auxiliary.commandTarget)
+                        void c.invoke('clearCommandTarget').catch(() => {});
+                    },
                     open: (pageId, command) => {
                       const request = ++commandNavigationRequest.current;
                       void c

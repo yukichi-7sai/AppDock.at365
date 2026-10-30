@@ -2886,19 +2886,10 @@ summary {
   align-items: flex-start;
   gap: 6px;
 }
-.binding-trigger-display,
-.binding-trigger-mark {
+.binding-trigger-display {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-.binding-trigger-icon {
-  display: inline-flex;
-  flex: none;
-}
-.binding-trigger-icon svg {
-  width: max(1cap, 16px);
-  height: max(1cap, 16px);
 }
 .command-triggers-editor .command-provider-filter .binding-trigger-mark {
   padding: 0;

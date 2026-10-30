@@ -38,6 +38,7 @@ export interface CommandPaletteModel {
     commands: UiCommand[];
     pins: string[];
     shortcuts: Record<string, string[]>;
+    triggers?: Record<string, import('./command-triggers').CommandTriggerMark[]>;
     busy: boolean;
     error: string;
     initialCommandId?: string;
@@ -67,6 +68,7 @@ export type OverlayAction =
   | { id: string; type: 'ribbonChoose'; actionId: string; requestId: string }
   | { id: string; type: 'dismiss' }
   | { id: string; type: 'choose'; commandId: string }
+  | { id: string; type: 'openTriggerSettings'; commandId: string }
   | { id: string; type: 'togglePin'; commandId: string }
   | { id: string; type: 'movePin'; commandId: string; direction: -1 | 1; visibleIds: string[] };
 export interface ShellOverlayApi extends ShellAppletApi {

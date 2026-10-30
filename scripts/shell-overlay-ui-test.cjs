@@ -290,6 +290,7 @@ async function dismiss(p) {
     });
     p = await palette();
     await p.getByRole('combobox').fill('fixture.shell.probe');
+    await p.screenshot({ path: path.join(profile, 'palette-selection.png') });
     await closingAction(p.locator('.palette-execute').click());
     await dock.waitForFunction(() => window.selection?.status === 'selected');
     assert.equal(fs.existsSync(path.join(external, 'probe.json')), false);

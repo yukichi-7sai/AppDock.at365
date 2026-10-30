@@ -13,9 +13,10 @@ import {
   applyGestureBinding,
   defaultGestures,
   groupGestureBindings,
+  gestureTitle,
   type GestureBinding,
 } from './gestures';
-import { defaultTouchpadGestures, touchpadGestureTypes } from './touchpad-gestures';
+import { defaultTouchpadGestures, touchpadGestureTypes, touchpadTitle } from './touchpad-gestures';
 
 export const commandTriggerKinds = ['shortcuts', 'gestures', 'touchpad-gestures'] as const;
 export type CommandTriggerKind = (typeof commandTriggerKinds)[number];
@@ -76,6 +77,31 @@ export function commandTriggerBindings(settings: Settings): CommandTriggerBindin
       .flatMap(([gesture]) => touchpad.bindings.filter((row) => row.gesture === gesture))
       .map((row) => commandTriggerBinding('touchpad-gestures', row)),
   ];
+}
+
+export function commandTriggerText(row: CommandTriggerBinding): string {
+  return row.kind === 'shortcuts'
+    ? row.binding.key
+    : row.kind === 'gestures'
+      ? gestureTitle(row.binding.gesture)
+      : touchpadTitle(row.binding.gesture);
+}
+
+export type CommandTriggerMark = { id: string; kind: CommandTriggerKind; input: string };
+
+/** The palette uses the command list's order, independently of current execution conditions. */
+export function activeCommandTriggers(settings: Settings): Record<string, CommandTriggerMark[]> {
+  const enabled = commandTriggerEnablement(settings);
+  const result: Record<string, CommandTriggerMark[]> = Object.create(null);
+  for (const row of commandTriggerBindings(settings)) {
+    if (!row.enabled || !enabled[row.kind]) continue;
+    (result[row.command] ??= []).push({
+      id: row.id,
+      kind: row.kind,
+      input: commandTriggerText(row),
+    });
+  }
+  return result;
 }
 
 function assertCurrent(settings: Settings, original: CommandTriggerBinding) {

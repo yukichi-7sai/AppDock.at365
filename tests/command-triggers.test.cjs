@@ -10,11 +10,62 @@ const {
 const {
   commandTriggerBindings,
   commandTriggerEnablement,
+  activeCommandTriggers,
   commandTriggerBinding,
   commandTriggerInput,
   applyCommandTrigger,
   deleteCommandTrigger,
 } = require('../out/main/shared/command-triggers');
+
+test('palette shows all enabled trigger kinds in command-list order and preserves conditions and settings', () => {
+  const value = createDefaultSettings();
+  const row = {
+    command: 'fixture.command',
+    enabled: true,
+    when: { scope: 'exe', processes: ['other.exe'], appletIds: [] },
+  };
+  value.keybindings = [
+    { ...row, id: 'key-a', key: 'Ctrl+F8' },
+    { ...row, id: 'key-b', key: 'Ctrl+F9' },
+    { ...row, id: 'key-off', key: 'Ctrl+F10', enabled: false },
+  ];
+  value.gestures.enabled = true;
+  value.gestures.bindings = [
+    { ...row, id: 'mouse-down', gesture: 'move-down' },
+    { ...row, id: 'mouse-up', gesture: 'move-up' },
+    { ...row, id: 'mouse-off', gesture: 'move-left', enabled: false },
+  ];
+  value.touchpadGestures.enabled = true;
+  value.touchpadGestures.bindings = [
+    { ...row, id: 'touch-four', gesture: 'four.right' },
+    { ...row, id: 'touch-three', gesture: 'three.tap' },
+    { ...row, id: 'touch-off', gesture: 'four.tap', enabled: false },
+  ];
+  const before = structuredClone(value);
+  const marks = activeCommandTriggers(value)['fixture.command'];
+  assert.deepEqual(
+    marks.map((mark) => JSON.parse(mark.id)[1]),
+    ['key-a', 'key-b', 'mouse-up', 'mouse-down', 'touch-three', 'touch-four'],
+  );
+  assert.deepEqual(
+    marks.map((mark) => mark.kind),
+    ['shortcuts', 'shortcuts', 'gestures', 'gestures', 'touchpad-gestures', 'touchpad-gestures'],
+  );
+  assert(marks.every((mark) => mark.input.length));
+  assert.deepEqual(value, before);
+  for (const [setting, kind] of [
+    ['keybindingOptions', 'shortcuts'],
+    ['gestures', 'gestures'],
+    ['touchpadGestures', 'touchpad-gestures'],
+  ]) {
+    const disabled = structuredClone(value);
+    disabled[setting].enabled = false;
+    assert.deepEqual(
+      activeCommandTriggers(disabled)['fixture.command'],
+      marks.filter((mark) => mark.kind !== kind),
+    );
+  }
+});
 
 test('whole-method display states stay independent and never change saved binding flags', () => {
   const value = createDefaultSettings();

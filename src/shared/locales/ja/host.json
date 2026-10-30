@@ -3273,5 +3273,5 @@
   "commands.palette.empty": "該当するコマンドはありません。",
   "commands.palette.selectHint": "↑↓キーで選択・Enterで選択（実行しません）・Escで閉じる。",
   "commands.palette.executeHint": "↑↓キーで選択・Enterで実行・Escで閉じる。",
-  "commands.palette.pinHint": "☆でピン留め、矢印ボタンで並べ替え。"
+  "commands.palette.pinHint": "☆でピン留め、上下ボタンで並べ替え。"
 }

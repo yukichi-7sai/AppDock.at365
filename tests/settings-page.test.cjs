@@ -327,7 +327,11 @@ test('search is metadata-only and persistent; explicit movement switches page an
   assert.equal(results[0].definition, undefined);
   assert.deepEqual(f.editor.snapshot(), before);
   assert.equal(f.replacement().snapshot().content.query, 'ＦＩＸＴＵＲＥ number');
+  f.navigation.commandTarget = { id: 'fixture.command', title: 'Command', request: 1 };
+  await assert.rejects(f.act({ kind: 'select', pageId: 'missing-page' }));
+  assert.equal(f.navigation.commandTarget.id, 'fixture.command');
   await f.act({ kind: 'move', itemId: results[0].id });
+  assert.equal(f.navigation.commandTarget, undefined);
   const move = f.page.snapshot().content.move;
   assert.equal(f.editor.snapshot().pageId, 'applet:fixture.a.b');
   assert.equal('dirty' in f.editor.snapshot(), false);
@@ -340,6 +344,9 @@ test('search is metadata-only and persistent; explicit movement switches page an
   assert.equal(f.page.snapshot().content.results.length, 0);
   assert.equal(f.editor.snapshot().pageId, latest.pageId);
   await assert.rejects(f.act({ kind: 'search', text: 'x'.repeat(513) }), /512/);
+  f.navigation.commandTarget = { id: 'fixture.command', title: 'Command', request: 2 };
+  await f.act({ kind: 'select', pageId: 'command-triggers' });
+  assert.equal(f.navigation.commandTarget, undefined);
 });
 test('removed setting targets remain unavailable and cannot be selected', async () => {
   const f = fixture();

@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { rankCommands, type UiCommand } from '../../shared/commands';
 import { Icon } from '../../shared/ui-icons';
 import { useHostTranslation } from '../HostTranslation';
+import { CommandTriggerMark } from '../settings-ui/CommandTriggerMark';
+import type { CommandTriggerMark as TriggerMark } from '../../shared/command-triggers';
 
 /** Execution and selection share navigation and favorites; only the caller decides the action. */
 export function CommandPalette({
@@ -10,6 +12,8 @@ export function CommandPalette({
   pins = [],
   onPinAction,
   shortcuts = {},
+  triggers,
+  onOpenTriggerSettings,
   busy = false,
   mode = 'execute',
   onChoose,
@@ -26,6 +30,8 @@ export function CommandPalette({
     visibleIds?: string[],
   ): void;
   shortcuts?: Record<string, string[]>;
+  triggers?: Record<string, TriggerMark[]>;
+  onOpenTriggerSettings?(command: UiCommand): void;
   busy?: boolean;
   mode?: 'execute' | 'select';
   onChoose(command: UiCommand): void;
@@ -168,6 +174,15 @@ export function CommandPalette({
           {filtered.map((c, i) => {
             const pinned = pins.includes(c.id),
               pinIndex = visiblePins.indexOf(c.id);
+            const marks =
+              triggers?.[c.id] ??
+              (triggers
+                ? []
+                : (shortcuts[c.id] ?? []).map((input, index) => ({
+                    id: String(index),
+                    kind: 'shortcuts' as const,
+                    input,
+                  })));
             return (
               <div
                 className={`palette-command ${pinned ? 'pinned' : ''} ${i === selected ? 'highlighted' : ''}`}
@@ -182,8 +197,7 @@ export function CommandPalette({
                   disabled={!canChoose(c)}
                   onClick={() => onChoose(c)}
                 >
-                  <Icon name={mode === 'select' ? 'check' : 'play'} size={16} />
-                  <div>
+                  <div className="palette-command-text">
                     {c.title}
                     {c.description && <small>{c.description}</small>}
                     <small title={c.extension}>
@@ -194,28 +208,30 @@ export function CommandPalette({
                       {pinned && <span className="pin-badge">{t('commands.palette.pinned')}</span>}
                     </small>
                   </div>
-                  {shortcuts[c.id]?.[0] && <kbd>{shortcuts[c.id][0]}</kbd>}
+                  {!!marks.length && (
+                    <span className="palette-triggers">
+                      {marks.map((mark) => (
+                        <CommandTriggerMark key={mark.id} kind={mark.kind} input={mark.input} />
+                      ))}
+                    </span>
+                  )}
                 </button>
+                {onOpenTriggerSettings && (
+                  <button
+                    className="palette-trigger-settings"
+                    disabled={busy}
+                    title={t('settings.commandTriggers.title')}
+                    aria-label={t('settings.commandSettingsNavigation.open', {
+                      title: c.title,
+                      title2: t('settings.commandTriggers.title'),
+                    })}
+                    onClick={() => onOpenTriggerSettings(c)}
+                  >
+                    <Icon name="bolt" size={16} />
+                  </button>
+                )}
                 {onPinAction && (
                   <div className="palette-pin-controls">
-                    {pinned && (
-                      <>
-                        <button
-                          aria-label={t('commands.palette.moveUp', { title: c.title })}
-                          disabled={busy || pinIndex <= 0}
-                          onClick={() => onPinAction('movePin', c.id, -1, visiblePins)}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          aria-label={t('commands.palette.moveDown', { title: c.title })}
-                          disabled={busy || pinIndex === visiblePins.length - 1}
-                          onClick={() => onPinAction('movePin', c.id, 1, visiblePins)}
-                        >
-                          ↓
-                        </button>
-                      </>
-                    )}
                     <button
                       className="pin-toggle"
                       aria-label={t(pinned ? 'commands.palette.unpin' : 'commands.palette.pin', {
@@ -227,6 +243,26 @@ export function CommandPalette({
                     >
                       {pinned ? '★' : '☆'}
                     </button>
+                    {pinned && (
+                      <div className="palette-pin-order">
+                        <button
+                          aria-label={t('commands.palette.moveUp', { title: c.title })}
+                          title={t('commands.palette.moveUp', { title: c.title })}
+                          disabled={busy || pinIndex <= 0}
+                          onClick={() => onPinAction('movePin', c.id, -1, visiblePins)}
+                        >
+                          △
+                        </button>
+                        <button
+                          aria-label={t('commands.palette.moveDown', { title: c.title })}
+                          title={t('commands.palette.moveDown', { title: c.title })}
+                          disabled={busy || pinIndex === visiblePins.length - 1}
+                          onClick={() => onPinAction('movePin', c.id, 1, visiblePins)}
+                        >
+                          ▽
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -235,9 +271,12 @@ export function CommandPalette({
           {!filtered.length && <p className="empty">{t('commands.palette.empty')}</p>}
         </div>
         {error && <p role="alert">{error}</p>}
-        {!error && initialCommandId === selectedId && selected < 0 && (
-          <p role="alert">{t('commands.link.missing')}</p>
-        )}
+        {!error &&
+          initialCommandId &&
+          initialCommandId === selectedId &&
+          !commands.some((c) => !c.hidden && c.id === initialCommandId) && (
+            <p role="alert">{t('commands.link.missing')}</p>
+          )}
         <div className="palette-footer">
           {t(mode === 'select' ? 'commands.palette.selectHint' : 'commands.palette.executeHint')}
           {onPinAction && t('commands.palette.pinHint')}
