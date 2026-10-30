@@ -1,5 +1,27 @@
 # 検証記録
 
+## 2026-10-31: AppDock 0.109.1と指定6Appletの正式リリース
+
+- プッシュ済みmainと公開状況をGitHubで照合し、全7件の現行版が未公開であることを確認。指定6件だけをスターターへ収録し、全7件をDraft → 添付照合 → 公開 → 公開後検証まで完了した。公開対象とcommitは次のとおり。
+
+| リポジトリ | 公開版 | Release commit |
+| --- | --- | --- |
+| [AppDock.at365](https://github.com/yukichi-7sai/AppDock.at365/releases/tag/v0.109.1) | 0.109.1 | `00a105c` |
+| [Applet.WebApplet.at365](https://github.com/yukichi-7sai/Applet.WebApplet.at365/releases/tag/v0.4.2) | 0.4.2 | `b7950e8` |
+| [Applet.WebBrowserTools.at365](https://github.com/yukichi-7sai/Applet.WebBrowserTools.at365/releases/tag/v0.3.6) | 0.3.6 | `2f32270` |
+| [Applet.WindowsTools.at365](https://github.com/yukichi-7sai/Applet.WindowsTools.at365/releases/tag/v0.2.10) | 0.2.10 | `5d9db7d` |
+| [Applet.Watch.at365](https://github.com/yukichi-7sai/Applet.Watch.at365/releases/tag/v0.5.4) | 0.5.4 | `1fb1392` |
+| [Applet.WallpaperSlideshow.at365](https://github.com/yukichi-7sai/Applet.WallpaperSlideshow.at365/releases/tag/v0.7.6) | 0.7.6 | `2b7785d` |
+| [Applet.Profile.at365](https://github.com/yukichi-7sai/Applet.Profile.at365/releases/tag/v0.1.1) | 0.1.1 | `e99fa5a` |
+
+- 本体3アセット（update.zip/update.json/スターターZIP）、各Applet2アセットの全15件をサイズ・SHA256・GitHub digestで照合。公開後は全件を認証なしでダウンロードし、同じハッシュを確認した。各repoのlatest・タグ・対象commit・ノート・assetを確認し、実PortableUpdates.check()で本体と6Appletの新版available/installable、各Applet個別と全7件一括の結果を確認した。実インストール・実利用deployは行っていない。
+- 初回Prepareで型検査と標準1389/1389（fail/skip 0）、発行・更新・復旧・スターター起動が成功。WallpaperSlideshowの発行処理が共通ギャラリーmanifestの生成元版だけを0.101.6→0.109.1へ更新し、最後のclean検査で公開前に停止した。JS/CSSのSHA256と他の製品入力の不変を照合し、関連metadataと検証記録を2b7785dへcommit/pushした。Applet版0.7.6は維持した。
+- 新しいfinal planでは同じ本体commit/tree・985入力と完全ログSHA256を照合して型検査/標準回帰だけを再利用。本体・6Appletを再発行し、更新/進行表示/復旧/スターターの各試験を再実行して成功した。スターター714ファイルのhash/size、個別Applet ZIP内21ファイルとの一致、6件の初期有効・running・エラーなし、Default Shell、本体EXEとの一致と終了を確認。予約キーの登録は隔離設定で抑止した。更新進行表示は標準手順のソース実行、portable-updatesとスターターは発行EXEで検証した。Applet既存入力/ログ146件の照合と新しい発行物の検証を区別して記録した。
+- 本体Draft作成直後の一覧反映遅延は、実在する下書きIDを読み取って不足assetの添付から再開した。公開済みassetの上書き・同じReleaseの再作成・タグ移動は行っていない。
+- 今回だけ最新1件にする依頼に従い、公開後検証に成功した7repoの旧Release計6件を削除。削除直前に対象ID・アセット・latestを再照合し、削除後は各repoのReleaseが1件だけであることと旧Gitタグの保持を確認した。保持3件の通常手順は変更せず、今回用の保持1件スクリプトと承認範囲を記録した。未公開draftは開始時・終了時とも0件。
+- 成功済み初回portable-updates/スターターの古い本体コピー2件・計1384ファイル（論理1262622484 bytes）を整理。結果・ログ・画像・設定・data・extensions・manifestはhash不変、最新成功コピーを保持した。update-progressはソース実行で本体コピーがなく整理対象外。実空き容量の増加は測定していない。
+- 正本の証跡は`.artifacts/release-0.109.1-20261031-final/`のplan.json・applet-plans.json・bundle-ui.json・applet-file-checks.json・source-evidence.json・reuse.json・applet-public-downloads.json・applet-update-checks.json・cleanup-plan.json・cleanup-results.json・test-copy-cleanup.json・release-result.jsonと完全ログ。初回停止記録は`.artifacts/release-0.109.1-20261031/`へ保持。リリースノートは[0.109.1](docs/releases/v0.109.1.md)。実サービスログイン、実壁紙/OSロック、物理複数画面・混在DPIの網羅検証は含まない。
+
 ## 2026-10-31: スターター対応と共通手順のコミット照合
 
 - スターター対応と共通手順のコミット依頼を受け、AppDock main `dcd088b`の26パス（旧名の削除5件を含む）と、30.PROJECTのAGENTS.mdだけをレビューした。実装後の製品修正はなく、0.109.1と発行物を維持する。指定6件の一覧、対象外の非同梱・非発行、不足/ID不一致の拒否、実行時Applet検出からの独立、Releaseの添付/seal/旧ZIP整理、文書の参照、予約キーを登録しないGUI試験を再確認し、未解決指摘なし。
