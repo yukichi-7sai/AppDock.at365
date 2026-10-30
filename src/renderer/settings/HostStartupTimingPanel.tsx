@@ -14,7 +14,7 @@ export function HostStartupTimingPanel({ timing }: { timing?: HostStartupTiming 
   return (
     <SettingsSection
       title={t('settings.startup.title')}
-      description={t('settings.startup.description')}
+      hint={t('settings.startup.description')}
       data-testid="host-startup-timing"
       collapsible
     >

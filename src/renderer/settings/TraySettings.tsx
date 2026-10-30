@@ -22,6 +22,7 @@ import {
   type ResolvedTrayItem,
 } from '../../shared/tray-menu';
 import { CommandPicker } from '../settings-ui/CommandPicker';
+import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
 import { ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 
@@ -276,17 +277,15 @@ export function TraySettings({
             {...settingAnchor('tray', key)}
           >
             <div className="tray-click-controls">
-              <button
-                className="secondary"
+              <CommandSelectButton
                 aria-label={
                   key === 'trayClickCommand'
                     ? translate('settings.traySettings.chooseClick')
                     : translate('settings.traySettings.chooseDoubleClick')
                 }
                 onClick={() => setPicker(key)}
-              >
-                {commandTitle(settings.host[key])}
-              </button>
+                commandTitle={settings.host[key] ? commandTitle(settings.host[key]) : undefined}
+              />
               {settings.host[key] &&
                 commands.find((c) => c.id === settings.host[key])?.available === false && (
                   <small className="muted">{translate('settings.traySettings.unavailable')}</small>
@@ -314,9 +313,7 @@ export function TraySettings({
         {...settingAnchor('tray', 'trayMenu')}
       >
         <SettingsActions className="tray-toolbar">
-          <button className="secondary accent-action" onClick={() => setPicker('add')}>
-            {translate('settings.traySettings.addCommand')}
-          </button>
+          <CommandSelectButton add onClick={() => setPicker('add')} />
           <button className="secondary accent-action" onClick={() => add('group')}>
             {translate('settings.traySettings.addGroup')}
           </button>

@@ -186,7 +186,7 @@ async function until(fn, name) {
   const renderer = (expression) =>
     inspect(
       inspectPort,
-      `${electronExpression}.BrowserWindow.getAllWindows()[0].webContents.executeJavaScript(${JSON.stringify(expression)})`,
+      `${electronExpression}.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/')).webContents.executeJavaScript(${JSON.stringify(expression)})`,
     );
   const server = http.createServer((req, res) => {
     const name = path.basename(new URL(req.url, 'http://localhost').pathname);
@@ -241,7 +241,7 @@ async function until(fn, name) {
   };
   const ids = () =>
     page.locator('[data-applet-id]').evaluateAll((rows) => rows.map((r) => r.dataset.appletId));
-  const restartApply = async (click) => {
+  const restartApply = async (click, requireManagement = true) => {
     const previousPid = await inspect(inspectPort, 'process.pid');
     // Release renderer CDP before shutdown; use the existing main-inspector bridge across restarts.
     if (browser) {
@@ -255,6 +255,7 @@ async function until(fn, name) {
       if ((await inspect(inspectPort, 'process.pid')) === previousPid) return false;
       const snapshot = await renderer('window.dock.snapshot()');
       if (!snapshot.startupReady) return false;
+      if (!requireManagement) return snapshot;
       const restored = await renderer(
         "document.querySelector('.settings-page-heading h1')?.textContent === 'Applet管理'",
       );
@@ -355,7 +356,7 @@ async function until(fn, name) {
     assert(presentation.checkInVersionHeader && presentation.timeBelowVersion);
     assert.deepEqual(
       presentation.links.map((button) => button.title),
-      ['設定', 'ショートカット', 'マウスジェスチャー', 'ログ'],
+      ['設定', 'ログ', 'コマンドトリガー'],
     );
     assert(
       presentation.oneLine && presentation.links.every((button) => button.icon && !button.text),
@@ -389,7 +390,7 @@ async function until(fn, name) {
         !!(await window.dock.snapshot()).updates.results.find((result) => result.id === 'test.a')
           ?.checkedAt,
     );
-    assert(await row('test.a').locator('time').getAttribute('datetime'));
+    await row('test.a').locator('time[datetime]').waitFor();
     assert.equal(await page.locator('.applet-management tbody .applet-update-check').count(), 0);
     checks.push('global-update-check-header-and-last-check-time');
     const previewFailure = await page.evaluate(async () => {
@@ -419,11 +420,9 @@ async function until(fn, name) {
       'Web site fixture exists outside package rows',
     );
     checks.push('provider-included-sites-excluded-and-old-details-removed');
-    await move('test.b', 'ショートカット');
+    await move('test.b', 'コマンドトリガー');
     await page.locator('.command-provider-filter').waitFor();
-    await page
-      .getByRole('searchbox', { name: 'ショートカットキーのコマンドを検索', exact: true })
-      .focus();
+    await page.getByRole('searchbox', { name: 'トリガーのコマンドを検索', exact: true }).focus();
     assert.deepEqual(
       await page.locator('.command-shortcut-search').evaluate((element) => {
         const s = getComputedStyle(element);
@@ -458,7 +457,7 @@ async function until(fn, name) {
         'running',
     );
     checks.push('enable-and-inline-restart');
-    for (const name of ['ショートカット', 'マウスジェスチャー']) {
+    for (const name of ['コマンドトリガー']) {
       await move('test.a', name);
       await page.locator('.command-provider-filter').waitFor();
       assert.match(await page.locator('.command-provider-filter').innerText(), /test.a/);
@@ -479,7 +478,7 @@ async function until(fn, name) {
       );
       await open();
     }
-    checks.push('shortcuts-and-gestures-include-unassigned-and-clear');
+    checks.push('command-triggers-include-unassigned-and-clear');
     await move('test.a', '設定');
     await page.getByLabel('保持する入力', { exact: true }).waitFor();
     assert.equal(await page.getByLabel('保持する入力', { exact: true }).inputValue(), 'preserved');
@@ -693,9 +692,22 @@ async function until(fn, name) {
           'retained after reinstall',
         );
         checks.push(`${kind}-one-click-install-real-helper-restart-and-preserved-OFF`);
-        await renderer(
-          'document.querySelector(\'[data-applet-id="fixture.install"] button[aria-label="導入テストをアンインストール"]\').click()',
-        );
+        if (kind === 'unpacked-folder') {
+          await renderer(
+            'document.querySelector(\'[data-testid="settings-nav:applet:fixture.install"]\').click()',
+          );
+          await until(
+            () => renderer('!!document.querySelector(\'[data-testid="applet-information"]\')'),
+            'installed Applet information',
+          );
+          await renderer(
+            'document.querySelector(\'[data-testid="applet-information"] .applet-information-uninstall\').click()',
+          );
+        } else {
+          await renderer(
+            'document.querySelector(\'[data-applet-id="fixture.install"] button[aria-label="導入テストをアンインストール"]\').click()',
+          );
+        }
         await until(
           () => renderer("!!document.querySelector('dialog[open]')"),
           'uninstall confirmation',
@@ -704,10 +716,12 @@ async function until(fn, name) {
           () => renderer("!!document.querySelector('dialog[open] button.primary:not([disabled])')"),
           'ready to uninstall',
         );
-        const afterUninstall = await restartApply(() =>
-          renderer(
-            "[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim()==='アンインストールして再起動').click()",
-          ),
+        const afterUninstall = await restartApply(
+          () =>
+            renderer(
+              "[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent.trim()==='アンインストールして再起動').click()",
+            ),
+          kind !== 'unpacked-folder',
         );
         assert(!fs.existsSync(path.join(profile, 'extensions/fixture.install')));
         assert(!afterUninstall.extensions.some((a) => a.id === 'fixture.install'));
@@ -716,7 +730,9 @@ async function until(fn, name) {
           'retained after reinstall',
         );
         assert.equal(fs.readFileSync(path.join(profile, 'data/keep.txt'), 'utf8'), 'retained');
-        checks.push(`${kind}-uninstall-real-helper-restart-and-data-retention`);
+        checks.push(
+          `${kind}-${kind === 'unpacked-folder' ? 'information-panel' : 'management-list'}-uninstall-real-helper-restart-and-data-retention`,
+        );
       }
     }
     assert.deepEqual(errors, []);

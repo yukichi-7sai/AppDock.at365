@@ -23,7 +23,7 @@ export function AppletStartupTimingPanel({ applet }: { applet: ExtensionSnapshot
   return (
     <SettingsSection
       title={t('settings.appletStartup.title')}
-      description={t('settings.appletManagementSettings.startupTimeHint')}
+      hint={t('settings.appletManagementSettings.startupTimeHint')}
       data-testid="applet-startup-timing"
       {...settingAnchor(appletSettingsPageId(applet.id), 'startupTiming')}
       collapsible

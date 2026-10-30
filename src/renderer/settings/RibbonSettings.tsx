@@ -33,6 +33,7 @@ import { Toggle } from '../settings-ui/Toggle';
 import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
 import { imageReference, type RegisteredImageRef } from '../../shared/registered-images';
 import { CommandPicker } from '../settings-ui/CommandPicker';
+import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
 
 export function RibbonSettings({
   settings,
@@ -475,15 +476,12 @@ export function RibbonSettings({
           hint={translate('settings.ribbonSettings.rightClickHint')}
           {...settingAnchor('ribbon', 'rightClickCommand')}
         >
-          <button
-            type="button"
-            className="secondary"
+          <CommandSelectButton
             disabled={pending}
             onClick={() => setPicker('rightClick')}
             aria-label={translate('settings.ribbonSettings.chooseRightClick')}
-          >
-            {commandTitle(rightClickCommand)}
-          </button>
+            commandTitle={rightClickCommand ? commandTitle(rightClickCommand) : undefined}
+          />
           {!commands.some((c) => c.id === rightClickCommand && c.available) && (
             <small>{translate('settings.ribbonSettings.commandUnavailable')}</small>
           )}
@@ -934,16 +932,15 @@ export function RibbonSettings({
                   : undefined
               }
             >
-              <button
-                type="button"
-                className="secondary"
+              <CommandSelectButton
                 aria-label={translate('settings.ribbonSettings.chooseCommand')}
                 onClick={() => setPicker('button')}
-              >
-                {buttonDialog.button.commandId
-                  ? commandTitle(buttonDialog.button.commandId)
-                  : translate('settings.ribbonSettings.selectCommand')}
-              </button>
+                commandTitle={
+                  buttonDialog.button.commandId
+                    ? commandTitle(buttonDialog.button.commandId)
+                    : undefined
+                }
+              />
             </SettingsField>
             <SettingsField
               settingKey="title"

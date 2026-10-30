@@ -763,10 +763,11 @@ export class PortableUpdates {
   cancelPackagePreview() {
     return this.packagePreview ? this.cancel() : false;
   }
-  async discardPackagePlan(id: unknown) {
+  async discardPackagePlan(id: unknown, appletId?: string) {
     if (typeof id !== 'string') return;
     const plan = this.packagePlans.get(id);
     if (!plan) return;
+    this.assertUninstallScope(plan.preview, appletId);
     this.packagePlans.delete(id);
     await fs.rm(plan.temporary, { recursive: true, force: true });
   }
@@ -937,10 +938,15 @@ export class PortableUpdates {
       this.finishPreview();
     }
   }
-  async applyAppletPackage(id: unknown) {
+  private assertUninstallScope(plan: AppletPackagePlan, appletId?: string) {
+    if (appletId !== undefined && (plan.id !== appletId || plan.operation !== 'uninstall'))
+      throw Error(hostText('services.portableUpdates.uninstallForbidden'));
+  }
+  async applyAppletPackage(id: unknown, appletId?: string) {
     if (typeof id !== 'string') throw Error(hostText('services.portableUpdates.invalidPlan'));
     const plan = this.packagePlans.get(id);
     if (!plan) throw Error(hostText('services.portableUpdates.stalePlan'));
+    this.assertUninstallScope(plan.preview, appletId);
     if (this.state.busy) throw Error(hostText('services.portableUpdates.packageBusy'));
     this.packagePlans.delete(id);
     this.begin(hostText('services.portableUpdates.preparingRestart'));

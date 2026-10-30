@@ -19,9 +19,71 @@
 .applet-information-state {
   font-size: 12px;
 }
-.applet-information > .settings-section-row {
-  margin-top: 8px;
+.applet-information-details {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
 }
-.applet-information .settings-field p {
+.applet-information-metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+.applet-information-metadata dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+.applet-information-metadata dd {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
   overflow-wrap: anywhere;
+}
+.applet-information-repository {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3em;
+  max-width: 100%;
+  color: var(--accent);
+  text-decoration: none;
+}
+.applet-information-repository > span {
+  min-width: 0;
+}
+.applet-information-repository > svg {
+  flex: none;
+  align-self: center;
+}
+.applet-information-repository:hover > span {
+  text-decoration: underline;
+}
+.applet-information-repository:focus-visible {
+  outline: 2px solid var(--accent-focus);
+  outline-offset: 2px;
+}
+.applet-information > .applet-information-actions {
+  margin-top: 22px;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--border);
+}
+.applet-information-actions .settings-action-button {
+  min-height: 44px;
+  border-radius: 10px;
+}
+.applet-information-actions .applet-information-uninstall {
+  margin-left: auto;
+  color: var(--destructive);
+  border-color: var(--destructive);
+  background: transparent;
+}
+@container settings-page (max-width: 660px) {
+  .applet-information-metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 620px) {
+  .applet-information-actions .applet-information-uninstall {
+    margin-left: 0;
+  }
 }

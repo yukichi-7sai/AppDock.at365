@@ -22,7 +22,12 @@ import { UpdateCheckTime, VersionDisplay } from '../settings-ui/VersionCheck';
 import { settingAnchor } from '../settings-ui/setting-anchor';
 import { CommandListSummary } from '../settings-ui/CommandListScroll';
 import { SettingsTableEmptyRow } from '../settings-ui/SettingsTable';
-import { SettingsHintIcon } from '../settings-ui/SettingsHintIcon';
+import { SettingsHintIcon, SettingsDescriptionIcon } from '../settings-ui/SettingsHintIcon';
+import {
+  AppletUninstallDialog,
+  applyAppletPackage as applyPackage,
+  type AppletActionInvoker as Invoke,
+} from '../settings-ui/AppletPackageDialogs';
 import { SettingsListCount } from '../settings-ui/SettingsListCount';
 
 const states = {
@@ -59,20 +64,6 @@ function startupTooltip(applet: ExtensionSnapshot, t: HostTranslator) {
     ...(timing.outcome === 'error' ? [t('settings.appletManagementSettings.startupPartial')] : []),
   ].join('\n');
 }
-type Invoke = (name: string, args?: unknown[]) => Promise<any>;
-async function applyPackage(invoke: Invoke, id: string) {
-  try {
-    const result = await invoke('applyAppletPackage', [id]);
-    if (result?.error) throw Error(result.error);
-    return result;
-  } catch (error) {
-    const status = await invoke('appletPackageStatus', [id]).catch(() => undefined);
-    if (status?.status === 'handed-off' || (status?.status === 'completed' && status.result?.ok))
-      return status;
-    throw error;
-  }
-}
-
 function InstallDialog({ invoke, close }: { invoke: Invoke; close(): void }) {
   const { t: translate } = useHostTranslation();
   const errorId = useId();
@@ -361,12 +352,15 @@ export function AppletManagementSettings({
             return (
               <tr key={a.id} data-applet-id={a.id}>
                 <td>
-                  <button
-                    className="text-button applet-management-name"
-                    onClick={() => void move(a.id, 'settings')}
-                  >
-                    <strong>{a.displayName}</strong>
-                  </button>
+                  <span className="settings-title-with-hint">
+                    <button
+                      className="text-button applet-management-name"
+                      onClick={() => void move(a.id, 'settings')}
+                    >
+                      <strong>{a.displayName}</strong>
+                    </button>
+                    <SettingsDescriptionIcon title={a.displayName} description={a.description} />
+                  </span>
                   <small>{a.id}</small>
                 </td>
                 <td>
@@ -565,31 +559,11 @@ export function AppletManagementSettings({
         />
       )}
       {removal && (
-        <SettingsDialog
-          title={translate('settings.appletManagementSettings.uninstallTitle')}
-          applyLabel={translate('settings.appletManagementSettings.uninstallRestart')}
-          onClose={() => {
-            void invoke('discardAppletPackage', [removal.planId]).catch(() => {});
-            setRemoval(undefined);
-          }}
-          onApply={() => applyPackage(invoke, removal.planId)}
-        >
-          <p>
-            {translate('settings.appletManagementSettings.uninstallConfirm', {
-              name: removal.name,
-              version: removal.version,
-            })}
-          </p>
-          <p>{translate('settings.appletManagementSettings.uninstallHint')}</p>
-          {!!removal.siteCount && (
-            <p>
-              {translate('settings.appletManagementSettings.sitesHint', {
-                count: removal.siteCount,
-              })}
-            </p>
-          )}
-          {removal.shell && <p>{translate('settings.appletManagementSettings.shellFallback')}</p>}
-        </SettingsDialog>
+        <AppletUninstallDialog
+          plan={removal}
+          invoke={invoke}
+          onClose={() => setRemoval(undefined)}
+        />
       )}
     </section>
   );

@@ -7,6 +7,7 @@ import { SettingsActions, SettingsChoice, SettingsField } from '../settings-ui/S
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import type { CommandExecutionMode } from '../../shared/command-execution-mode';
 import { CommandPicker } from '../settings-ui/CommandPicker';
+import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
 import { CommandConditionEditor } from '../settings-ui/CommandConditionEditor';
 import { conditionExclusions, useConditionProcesses } from '../settings-ui/CommandConditionDetails';
 import { Icon } from '../../shared/ui-icons';
@@ -192,14 +193,12 @@ export function CommandStackEditor({
       <div className="stack-list-panel">
         <div className="stack-list-heading">
           <strong>{t('settings.commandStacks.entries')}</strong>
-          <button
-            type="button"
+          <CommandSelectButton
+            add
             data-testid="stack-add-command"
             disabled={maxEntries !== undefined && entries.length >= maxEntries}
             onClick={() => setPicking(true)}
-          >
-            ＋ {t('settings.commandStacks.add')}
-          </button>
+          />
         </div>
         <ol
           ref={list}

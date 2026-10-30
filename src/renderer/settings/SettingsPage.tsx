@@ -350,7 +350,10 @@ export function SettingsPage({
             />
           ) : headingApplet ? (
             <AppletInformationPanel
+              key={headingApplet.id}
               applet={headingApplet}
+              management={model.content.auxiliary.appletManagement}
+              invoke={c.invoke}
               updateSource={editor.value.extensions[headingApplet.id]?.updateSource}
               busy={editing.pending}
               headingLevel={1}

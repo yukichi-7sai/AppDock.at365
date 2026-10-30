@@ -14,6 +14,7 @@
   --faint: #62697e;
   --blue: #a4b9fc;
   --purple: #beaff4;
+  --destructive: #ff939b;
   --shadow: 0 20px 70px #0005;
   --hero: #171e28;
   background: var(--bg);
@@ -32,6 +33,7 @@
   --faint: #8c96a9;
   --blue: #566bb5;
   --purple: #7d61b8;
+  --destructive: #a92d38;
   --hero: #edf3f7;
   --shadow: 0 20px 70px #34445f22;
 }

@@ -4,6 +4,7 @@ import { SettingsReadScope } from './core/settings-read-scope';
 import { SettingsServiceTargets } from './core/settings-service-targets';
 import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
+import { validRepository } from '../shared/versions';
 import { isDialogNavigationShortcut } from '../shared/commands';
 import { webAccountSettingsTargets } from './core/settings-web-account-target';
 import { startupShellIds, StartupUiBarrier } from './core/startup';
@@ -2268,6 +2269,15 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
   if (page.kind === 'applet') {
     const a = applets.find((a) => a.id === page.owner)!;
     return {
+      appletManagement: !page.collection
+        ? {
+            assignments: { shortcuts: [], gestures: [] },
+            packagesAvailable: updater.packagesAvailable,
+            busy: updater.state.busy,
+            discoveryIssueCount: 0,
+            mutableIds: updater.canManageApplet(a.id) ? [a.id] : [],
+          }
+        : undefined,
       updates: !page.collection
         ? { ...updater.state, results: updater.state.results.filter((row) => row.id === a.id) }
         : undefined,
@@ -2453,6 +2463,45 @@ function settingsPageActions(
   page: SettingsPageDefinition,
 ): Record<string, (args: unknown[]) => Promise<unknown>> {
   const actions: Record<string, (args: unknown[]) => Promise<unknown>> = {};
+  const appletPage = page.kind === 'applet' && !page.collection;
+  if (page.id === 'applets' || appletPage) {
+    const owner = appletPage ? page.owner : undefined;
+    const target = (id: unknown) => {
+      const found = managedApplets(allApplets()).find((a) => a.id === id);
+      if (!found || (appletPage && id !== owner))
+        throw Error(hostText('settings.index.missingApplet'));
+      return found;
+    };
+    actions.manageApplet = async ([id, operation]) => {
+      target(id);
+      assertSettingsWritable();
+      if (updater.state.busy) throw Error(hostText('settings.index.packageBusy'));
+      if (
+        !(appletPage ? ['restart'] : ['enable', 'disable', 'restart']).includes(operation as string)
+      )
+        throw Error(hostText('settings.index.invalidAction'));
+      return appletManagement.run(id as string, operation as 'enable' | 'disable' | 'restart');
+    };
+    actions.prepareAppletUninstall = async ([id]) => {
+      const a = target(id);
+      const plan = await updater.prepareAppletUninstall(a.id);
+      return {
+        ...plan,
+        siteCount: allApplets().filter((p) => p.collection?.owner === a.id).length,
+        shell: shellRegions.some(({ id }) => settings.value.host.shellProviders?.[id] === a.id),
+      };
+    };
+    actions.discardAppletPackage = async ([id]) => updater.discardPackagePlan(id, owner);
+    actions.applyAppletPackage = async ([id]) => {
+      try {
+        await flushSettingsInputs();
+        return await updater.applyAppletPackage(id, owner);
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : String(error) };
+      }
+    };
+    actions.appletPackageStatus = async ([id]) => updater.packageStatus(id);
+  }
   if (page.id === 'applets') {
     actions.openAppletDiscoveryLogs = async () => {
       await flushSettingsInputs();
@@ -2462,14 +2511,6 @@ function settingsPageActions(
       const found = managedApplets(allApplets()).find((a) => a.id === value);
       if (!found) throw Error(hostText('settings.index.missingApplet'));
       return found;
-    };
-    actions.manageApplet = async ([id, operation]) => {
-      target(id);
-      assertSettingsWritable();
-      if (updater.state.busy) throw Error(hostText('settings.index.packageBusy'));
-      if (!['enable', 'disable', 'restart'].includes(operation as string))
-        throw Error(hostText('settings.index.invalidAction'));
-      return appletManagement.run(id as string, operation as 'enable' | 'disable' | 'restart');
     };
     actions.startAppletNow = async ([id]) => {
       if (target(id).state !== 'waiting' || updater.state.busy)
@@ -2525,7 +2566,6 @@ function settingsPageActions(
       }
     };
     actions.cancelAppletPackagePreview = async () => updater.cancelPackagePreview();
-    actions.discardAppletPackage = async ([id]) => updater.discardPackagePlan(id);
     actions.chooseAppletInstallDirectory = async () => {
       try {
         const result = await dialog.showOpenDialog(window!, {
@@ -2537,24 +2577,6 @@ function settingsPageActions(
         return { error: error instanceof Error ? error.message : String(error) };
       }
     };
-    actions.prepareAppletUninstall = async ([id]) => {
-      const a = target(id);
-      const plan = await updater.prepareAppletUninstall(a.id);
-      return {
-        ...plan,
-        siteCount: allApplets().filter((p) => p.collection?.owner === a.id).length,
-        shell: shellRegions.some(({ id }) => settings.value.host.shellProviders?.[id] === a.id),
-      };
-    };
-    actions.applyAppletPackage = async ([id]) => {
-      try {
-        await flushSettingsInputs();
-        return await updater.applyAppletPackage(id);
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : String(error) };
-      }
-    };
-    actions.appletPackageStatus = async ([id]) => updater.packageStatus(id);
   }
   if (page.id === 'command-triggers')
     actions.clearProvider = async () => {
@@ -2969,6 +2991,14 @@ function settingsPageActions(
         throw Error(hostText('settings.index.invalidUpdateSource'));
       await shell.openExternal(url);
     };
+    if (page.kind === 'applet')
+      actions.openAppletRepository = async ([id]) => {
+        const selected = target(id);
+        const repository = allApplets().find((applet) => applet.id === selected)?.updateRepository;
+        if (!validRepository(repository))
+          throw Error(hostText('settings.index.invalidUpdateSource'));
+        await shell.openExternal(`https://github.com/${repository}`);
+      };
   }
   if (page.id === 'web-accounts') {
     actions.createWebAccount = async ([name]) => pageCollections.addAccount(name);

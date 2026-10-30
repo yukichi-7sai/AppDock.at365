@@ -77,6 +77,7 @@ export function VersionCheck({
   compact = false,
   embedded = false,
   standalone = false,
+  inline = false,
   disabledReason,
 }: {
   id?: string;
@@ -85,6 +86,7 @@ export function VersionCheck({
   compact?: boolean;
   embedded?: boolean;
   standalone?: boolean;
+  inline?: boolean;
   disabledReason?: string;
 }) {
   const { t: translate } = useHostTranslation();
@@ -154,7 +156,9 @@ export function VersionCheck({
       )}
     </>
   );
-  return embedded ? (
+  return inline ? (
+    content
+  ) : embedded ? (
     <div className="about-update-group">{content}</div>
   ) : standalone ? (
     <SettingsActions>{content}</SettingsActions>

@@ -37,6 +37,7 @@ export type IconName =
   | 'heart'
   | 'file'
   | 'link'
+  | 'external-link'
   | 'download'
   | 'upload'
   | 'music'
@@ -69,6 +70,7 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="m10 13 4-4m-5 7-2 2a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 0 2-2a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" />
     </>
   ),
+  'external-link': <path d="M14 3h7v7m0-7L10 14M10 3H3v18h18v-7" />,
   download: <path d="M12 3v12m-5-5 5 5 5-5M4 15v6h16v-6" />,
   upload: <path d="M12 15V3m-5 5 5-5 5 5M4 15v6h16v-6" />,
   music: (

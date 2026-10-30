@@ -108,7 +108,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       updateRepository: 'fixture/info',
     });
     fixture(initial, 'fixture.empty', {}, false);
-    fixture(initial, 'fixture.failed', {}, true, true);
+    fixture(initial, 'fixture.failed', { updateRepository: 'fixture/failed' }, true, true);
     fixture(initial, 'fixture.delayed', { startupDelaySeconds: 600 });
     initial.extensions['fixture.info'].updateSource =
       `http://127.0.0.1:${server.address().port}/info.json`;
@@ -168,6 +168,14 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     }, 'host ready');
     page.setDefaultTimeout(15000);
     page.on('pageerror', (error) => errors.push(error.message));
+    await app.evaluate(({ shell }) => {
+      globalThis.__repositoryLinks = [];
+      globalThis.__repositoryOpenFailure = false;
+      shell.openExternal = async (url) => {
+        if (globalThis.__repositoryOpenFailure) throw Error('fixture browser unavailable');
+        globalThis.__repositoryLinks.push(url);
+      };
+    });
     const snapshot = () => page.evaluate(() => window.dock.snapshot());
     const bindings = require('../out/main/shared/keybindings').getKeybindings(
       (await snapshot()).settings.value,
@@ -223,13 +231,62 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       'startup timing follows Applet settings, display settings and common settings',
     );
     const details = info.getByTestId('applet-information-details');
-    await details.locator(':scope > summary').focus();
-    await page.keyboard.press('Enter');
+    assert(await details.getByText('fixture.info', { exact: true }).isVisible());
+    assert(await details.getByText('0.36.8', { exact: true }).isVisible());
+    assert(await details.getByText('配布元', { exact: true }).isVisible());
     assert(await details.getByText('fixture/info', { exact: true }).isVisible());
+    const repositoryLink = details.getByRole('link', { name: 'fixture/info', exact: true });
+    assert.equal(await repositoryLink.getAttribute('href'), 'https://github.com/fixture/info');
+    const settingsBeforeLink = (await snapshot()).settings.value;
+    const hostUrl = page.url();
+    await repositoryLink.click();
+    await until(
+      async () => (await app.evaluate(() => globalThis.__repositoryLinks.length)) === 1,
+      'repository pointer click',
+    );
+    await repositoryLink.focus();
+    await page.keyboard.press('Enter');
+    await until(
+      async () => (await app.evaluate(() => globalThis.__repositoryLinks.length)) === 2,
+      'repository keyboard activation',
+    );
+    await repositoryLink.click({ button: 'middle' });
+    await until(
+      async () => (await app.evaluate(() => globalThis.__repositoryLinks.length)) === 3,
+      'repository middle click',
+    );
+    await app.evaluate(() => {
+      globalThis.__repositoryOpenFailure = true;
+    });
+    await repositoryLink.click();
+    await page.getByRole('alert').filter({ hasText: '配布元をブラウザーで開く' }).waitFor();
+    await app.evaluate(() => {
+      globalThis.__repositoryOpenFailure = false;
+    });
+    await repositoryLink.click();
+    await until(
+      async () => (await app.evaluate(() => globalThis.__repositoryLinks.length)) === 4,
+      'repository retry',
+    );
+    assert.deepEqual(
+      await app.evaluate(() => globalThis.__repositoryLinks),
+      Array(4).fill('https://github.com/fixture/info'),
+    );
+    assert.equal(page.url(), hostUrl);
+    assert.deepEqual((await snapshot()).settings.value, settingsBeforeLink);
+    assert.deepEqual(requests, []);
+    checks.push(
+      'manifest repository link opens through the external browser with pointer, Enter and middle click before update checks; overrides, settings and host navigation unchanged; launch failure can retry',
+    );
     const denied = await page.evaluate(async () => {
       const connection = document.querySelector('.settings-surface').dataset.settingsConnection;
       const results = [];
-      for (const name of ['checkUpdates', 'installUpdates', 'openReleases']) {
+      for (const name of [
+        'checkUpdates',
+        'installUpdates',
+        'openReleases',
+        'openAppletRepository',
+      ]) {
         for (const id of ['fixture.empty', 'host', 'all', undefined]) {
           const model = await window.dock.settingsPage.get(connection);
           if (model.content.actions.checkAllUpdates || model.content.actions.cancelUpdates)
@@ -252,8 +309,40 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       }
       return results;
     });
-    assert.equal(denied.length, 12);
+    assert.equal(denied.length, 16);
     assert(denied.every(Boolean));
+    const managementDenied = await page.evaluate(async () => {
+      const connection = document.querySelector('.settings-surface').dataset.settingsConnection;
+      const results = [];
+      for (const [name, args] of [
+        ['manageApplet', ['fixture.empty', 'restart']],
+        ['manageApplet', ['fixture.info', 'enable']],
+        ['manageApplet', ['fixture.info', 'disable']],
+        ['prepareAppletUninstall', ['fixture.empty']],
+      ]) {
+        const model = await window.dock.settingsPage.get(connection);
+        if (model.content.actions.prepareAppletInstall || model.content.actions.reorderApplets)
+          throw Error('Applet information exposes global management');
+        {
+          if (!model.content.actions[name]) throw Error(`Missing management action: ${name}`);
+          try {
+            await window.dock.settingsPage.act(connection, {
+              id: model.id,
+              type: 'settings',
+              sessionId: model.content.editing.sessionId,
+              editRevision: model.content.editing.editRevision,
+              operationId: crypto.randomUUID(),
+              operation: { kind: 'invoke', actionId: model.content.actions[name], args },
+            });
+            results.push(false);
+          } catch {
+            results.push(true);
+          }
+        }
+      }
+      return results;
+    });
+    assert(managementDenied.every(Boolean));
     assert.deepEqual(requests, []);
     await page.getByRole('button', { name: 'このAppletの更新を確認', exact: true }).click();
     await until(
@@ -267,6 +356,22 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     assert.deepEqual(requests, ['/info.json']);
     assert(await info.getByRole('button', { name: 'このAppletを更新', exact: true }).isVisible());
     if (source) {
+      const settingsBeforeRemoval = (await snapshot()).settings.value;
+      const uninstall = info.getByRole('button', { name: 'アンインストール', exact: true });
+      await uninstall.click();
+      const dialog = page.getByRole('dialog', { name: 'Appletをアンインストール' });
+      await dialog.waitFor();
+      assert((await dialog.innerText()).includes('設定と保存データは残ります'));
+      await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click();
+      await until(
+        () => uninstall.evaluate((el) => document.activeElement === el),
+        'uninstall cancel focus',
+      );
+      assert(fs.existsSync(path.join(runningFolder, 'extension.json')));
+      assert.deepEqual((await snapshot()).settings.value, settingsBeforeRemoval);
+      checks.push(
+        'information uninstall confirmation cancels without deleting files or settings and returns focus',
+      );
       await app.evaluate(({ dialog }) => {
         globalThis.__appletUpdateConfirmations = [];
         globalThis.__appletUpdateOriginalDialog = dialog.showMessageBox;
@@ -294,7 +399,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       );
     }
     checks.push(
-      'plain-text overview stays visible without hints; keyboard details; scoped update actions reject other owners and groups; metadata only without payload download',
+      'plain-text overview and metadata stay visible without hints or expansion; scoped update actions reject other owners and groups; metadata only without payload download',
     );
     await timing.locator(':scope > summary').focus();
     await page.keyboard.press('Space');
@@ -313,11 +418,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     ])
       assert(await timing.getByRole('cell', { name: label, exact: true }).isVisible());
     fs.writeFileSync(path.join(runningFolder, 'gate'), '');
-    await page.evaluate(() => {
-      void window.dock.restartExtension('fixture.info').catch((e) => {
-        window.__fixtureRestartError = String(e);
-      });
-    });
+    await info.getByRole('button', { name: '再起動', exact: true }).click();
     await until(
       async () =>
         (await snapshot()).extensions.find((a) => a.id === 'fixture.info').state === 'starting',
@@ -365,6 +466,8 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       'information replaces the form heading above the toolbar; JSON edits save and survive returning to the form',
     );
     await select('fixture.empty');
+    assert.equal(await info.getByRole('link').count(), 0);
+    assert(await info.getByRole('button', { name: '再起動', exact: true }).isDisabled());
     assert.equal(await info.getByTestId('app-identity-tagline').count(), 0);
     assert.equal(
       await info.getByTestId('applet-identity-icon').getAttribute('data-icon'),
@@ -389,6 +492,17 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       .getByText('今回のAppDock起動中には、まだこのAppletを起動していません。', { exact: true })
       .waitFor();
     await select('fixture.failed');
+    await info.getByRole('link', { name: 'fixture/failed', exact: true }).click();
+    await until(
+      async () =>
+        (await app.evaluate(() => globalThis.__repositoryLinks.at(-1))) ===
+        'https://github.com/fixture/failed',
+      'failed Applet repository opens without starting it',
+    );
+    assert.equal(
+      (await snapshot()).extensions.find((a) => a.id === 'fixture.failed').state,
+      'error',
+    );
     await timing.locator(':scope > summary').click();
     await timing.getByText('失敗した区間までを計測しています。', { exact: true }).waitFor();
     assert(!(await timing.getByRole('cell', { name: '登録内容の確認', exact: true }).count()));
@@ -400,6 +514,15 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
     await settleSettings(page);
     await page.locator('[data-applet-id="fixture.info"]').waitFor();
     assert.equal(await page.locator('[data-applet-id]').count(), 1);
+    const overviewIcon = page
+      .locator('[data-applet-id="fixture.info"]')
+      .getByRole('button', { name: 'fixture.infoの説明' });
+    await overviewIcon.focus();
+    const overviewTooltip = page.getByRole('tooltip');
+    await overviewTooltip.waitFor();
+    assert.equal(await overviewTooltip.innerText(), description);
+    await page.keyboard.press('Escape');
+    assert(await overviewTooltip.isHidden());
     await page.getByLabel('設定を検索', { exact: true }).fill('毎日の時刻');
     await page.getByRole('option').filter({ hasText: 'Appletについて' }).click();
     await info.getByTestId('applet-description').waitFor();

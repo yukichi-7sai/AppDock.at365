@@ -314,6 +314,9 @@ test('URL preparation validates package without activation; cancellation and cha
   assert.equal(plan.operation, 'install');
   assert(!('folder' in plan));
   assert(!fs.existsSync(path.join(base, 'extensions/fixture.package')));
+  await assert.rejects(updater.applyAppletPackage(plan.planId, plan.id), /アンインストール/);
+  await assert.rejects(updater.discardPackagePlan(plan.planId, plan.id), /アンインストール/);
+  assert.equal(updater.packageStatus(plan.planId).status, 'prepared');
   await assert.rejects(updater.check(), /パッケージ操作/);
   await updater.discardPackagePlan(plan.planId);
   await assert.rejects(updater.applyAppletPackage(plan.planId), /古く/);
@@ -329,8 +332,17 @@ test('URL preparation validates package without activation; cancellation and cha
   });
   await assert.rejects(updater.prepareAppletInstall('https://fixture.invalid/feed/'), /同じID/);
   const removal = await updater.prepareAppletUninstall(plan.id);
+  await assert.rejects(
+    updater.applyAppletPackage(removal.planId, 'other.applet'),
+    /アンインストール/,
+  );
+  await assert.rejects(
+    updater.discardPackagePlan(removal.planId, 'other.applet'),
+    /アンインストール/,
+  );
+  assert.equal(updater.packageStatus(removal.planId).status, 'prepared');
   fs.appendFileSync(path.join(destination, 'index.js'), '// external modification');
-  await assert.rejects(updater.applyAppletPackage(removal.planId), /変更/);
+  await assert.rejects(updater.applyAppletPackage(removal.planId, plan.id), /変更/);
   assert(fs.existsSync(destination));
   assert.equal(fs.readFileSync(path.join(base, 'data/keep.txt'), 'utf8'), 'retained data');
   await updater.discardPackagePlans();
