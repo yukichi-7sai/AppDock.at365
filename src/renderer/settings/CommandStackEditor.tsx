@@ -10,6 +10,7 @@ import { CommandPicker } from '../settings-ui/CommandPicker';
 import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
 import { CommandConditionEditor } from '../settings-ui/CommandConditionEditor';
 import { conditionExclusions, useConditionProcesses } from '../settings-ui/CommandConditionDetails';
+import { SettingsMcpScope } from '../settings-ui/SettingsMcpAccess';
 import { Icon } from '../../shared/ui-icons';
 import './command-stacks.css';
 
@@ -126,14 +127,21 @@ function EntryConditions({
         draft={draft}
         ownerTitle={command?.extensionId ? command.extension : undefined}
         applets={applets}
+        afterScope={
+          keyboard ? (
+            <SettingsMcpScope fieldKey="blockOriginalInput">
+              <SettingsChoice
+                label={t('settings.appletShortcutDialog.blockOriginal')}
+                checked={
+                  !externalShortcutScope(entry.when.scope) || entry.blockOriginalInput !== false
+                }
+                disabled={!externalShortcutScope(entry.when.scope)}
+                onChange={(blockOriginalInput) => onChange({ ...entry, blockOriginalInput })}
+              />
+            </SettingsMcpScope>
+          ) : undefined
+        }
       />
-      {keyboard && externalShortcutScope(entry.when.scope) && (
-        <SettingsChoice
-          label={t('settings.appletShortcutDialog.blockOriginal')}
-          checked={entry.blockOriginalInput !== false}
-          onChange={(blockOriginalInput) => onChange({ ...entry, blockOriginalInput })}
-        />
-      )}
     </>
   );
 }

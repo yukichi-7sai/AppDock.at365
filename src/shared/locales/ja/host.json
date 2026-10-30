@@ -773,7 +773,6 @@
   "settings.gestureBindingDialog.key": "ジェスチャーのキー",
   "settings.gestureBindingDialog.scopeLabel": "割り当てのいつ・どこで",
   "settings.gestureBindingDialog.scope": "いつ・どこで",
-  "settings.gestureBindingDialog.browserHint": "「ジェスチャー共通の設定」で指定したブラウザに適用します。",
   "settings.gestureBindingDialog.enabled": "この割り当てを有効にする",
   "settings.gestureOptions.enabledHint": "右ボタンを押しながら、移動・クリック・ホイール・キーで操作。一時停止はトレイから切り替えられます。",
   "settings.gestureOptions.activateHint": "右ボタンを押した場所をアクティブにして、その対象でジェスチャーを開始します。",

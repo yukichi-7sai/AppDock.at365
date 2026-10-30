@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import {
   externalShortcutScope,
@@ -17,12 +18,14 @@ export function CommandConditionEditor({
   ownerTitle,
   applets,
   draft,
+  afterScope,
 }: {
   when: Keybinding['when'];
   onChange(when: Keybinding['when']): void;
   ownerTitle?: string;
   applets: { id: string; title: string }[];
   draft: ReturnType<typeof useConditionProcesses>;
+  afterScope?: ReactNode;
 }) {
   const { t } = useHostTranslation();
   const selectScope = (scope: Keybinding['when']['scope'], appletIds: string[] = []) =>
@@ -40,12 +43,10 @@ export function CommandConditionEditor({
         <SettingsField
           className="binding-condition-scope"
           title={t('settings.gestureBindingDialog.scopeLabel')}
-          description={
-            when.scope === 'browser' ? t('settings.gestureBindingDialog.browserHint') : undefined
-          }
         >
           <ShortcutConditionField
             presentation="buttons"
+            afterScope={afterScope}
             value={{
               scope: externalShortcutScope(when.scope) ? 'global' : when.scope,
               appletIds: when.appletIds,

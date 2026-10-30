@@ -2,7 +2,7 @@ import { useHostTranslation } from '../HostTranslation';
 import { useSettingsFeedback } from './SettingsStatus';
 import { SettingsInput } from './SettingsInput';
 import { useSettingsControls } from './api';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { shortcutFromEvent } from '../../shared/commands';
 import { shortcutScopes, type Keybinding, type ShortcutScope } from '../../shared/keybindings';
 import { shortcutTargetTitle } from '../../shared/shortcut-pages';
@@ -85,6 +85,7 @@ export function ShortcutConditionField({
   extraScopes = [],
   selectedScope,
   presentation = 'select',
+  afterScope,
   onExtraScope,
   onChange,
 }: {
@@ -96,6 +97,7 @@ export function ShortcutConditionField({
   extraScopes?: { id: string; title: string; after?: ShortcutScope }[];
   selectedScope?: string;
   presentation?: 'select' | 'buttons';
+  afterScope?: ReactNode;
   onExtraScope?(scope: string): void;
   onChange(value: ShortcutCondition): void;
 }) {
@@ -172,6 +174,7 @@ export function ShortcutConditionField({
           ))}
         </select>
       )}
+      {afterScope}
       {value.scope === 'applets' && (
         <>
           {presentation === 'select' && (
