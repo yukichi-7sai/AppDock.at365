@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-10-30: pnpmストアをプロジェクト内へ移動
+
+- main `5bfa4e3`のcleanと追跡先を確認し、`pull --ff-only`成功後に着手。`A:\30.PROJECT\.pnpm_store`を`A:\30.PROJECT\AppDock.at365\.pnpm_store`へ同一ドライブ内で移動した。移動直後に19,407ファイル・364,214,580バイトの全SHA256と12個のjunctionの参照先が移動前と一致し、旧フォルダーの不在を確認した。junctionの先へ進まず、既存の登録先を保持した。
+- `pnpm-workspace.yaml`を`storeDir: .pnpm_store`へ変更し、Git除外と開発手順を更新。固定ドライブ文字に依存しないプロジェクト相対の保存先とした。pnpmの実際の保存先と`node_modules/.modules.yaml`が新しい`.pnpm_store/v11`を指すこと、Git除外を確認した。別PCで依存の参照先が一致しない場合の再接続手順はDEVELOPMENTを参照する。
+- 通常Windowsユーザー環境の固定Node 26.13.0・pnpm 12.15.0で`dev.bat install --frozen-lockfile --force`が成功。363パッケージを再利用し、追加ダウンロードは0件。続けて`install --offline --frozen-lockfile`、`run typecheck`、`run build`が成功した。lockfileと既存の公開後待機・供給網検査を維持した。
+- コミット前の関連回帰として`dev.bat exec node --test tests/dev-launcher.test.cjs tests/release-age.test.cjs`の5件が成功。`dev.bat run smoke`でも隔離プロファイルで起動・設定保存・画像保存・Default Shell稼働・トレイ操作の結果が成功した。全体回帰と全GUIの再実行、別PCの実機確認は行っていない。
+- 差分と影響先をレビューし、未解決の指摘なし。製品コード、package.json、lockfile、toolchain、dev.batは不変で、保存先以外の依存方針を維持。検証開始時の960入力のSHA256が型検査・build後にも一致した。開発環境の保存先整理なので製品の版更新・publishは行わない。
+- 証跡は`.artifacts/pnpm-store-relocation-20261030/`の`baseline.json`・`relocation.json`・`validation-inputs.json`・`input-verification.json`と各コマンドのJSON/ログ。移動直後の内容照合と、依存再接続後の検証を区別して記録した。コミットのtree照合とGitHubへの送信結果も同ディレクトリへ記録する。
+
 ## 2026-10-30: テスト実行用コピーの容量整理
 
 - 各repoの`.artifacts`を再解析ポイントへ進まず計測し、合計370.153GiB、本体344.458GiBを確認した。表示上のファイル容量であり、ディスクの実使用量とは区別する。通常の整理手順で、成功・終了と参照なしを確認した古い5フォルダー354,231,691バイトを削除し、保持する1,046フォルダーの存在とHEAD・作業ツリーの不変を確認した。

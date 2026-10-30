@@ -54,7 +54,7 @@ Windowsが判定する3本指・4本指の10種類を専用キーで接続する
 
 Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。
 
-pnpmのパッケージストアは、`pnpm-workspace.yaml`の`storeDir`で`A:/30.PROJECT/.pnpm_store`に固定しています。ワークスペースを同じ`A:\`へ同期する別PCでも、このプロジェクト内では同じ保存先を使います。PCごとの環境変数やユーザー共通pnpm設定の変更は不要です。依存の参照先が一致しないPCでは、`.\dev.bat install --frozen-lockfile --force`で再接続してください。ストアが空の場合は通常のインストールで必要なパッケージを取得します。
+pnpmのパッケージストアは、`pnpm-workspace.yaml`の`storeDir: .pnpm_store`で、プロジェクト直下の`.pnpm_store`へ保存します。プロジェクトからの相対パスなので、PCごとの環境変数やユーザー共通pnpm設定の変更は不要です。依存の参照先が一致しないPCでは、`.\dev.bat install --frozen-lockfile --force`で再接続してください。ストアが空の場合は通常のインストールで必要なパッケージを取得します。
 
 初回は次の手順で準備します。公式Node.js ZIPのSHA256を照合し、npmでpnpmをプロジェクト内にインストールします。
 
@@ -126,7 +126,7 @@ pnpm本体はnpmで導入するため、workspace設定だけでは保護され�
 
 待機は不正コードの検出を保証する機能ではありません。lockfile固定、導入前の告知・差分確認、導入後の必要な回帰確認も継続します。仕組みの回帰は`dev.bat exec node --test tests/release-age.test.cjs`で、公開時刻の境界、恒久免除と版限定例外、最新安定版/LTSの選択と取得失敗、pnpm実体のElectron即時更新・ほかの直接/間接依存・日時欠落・lockfile復元時の拒否を隔離レジストリで確認します。
 
-`.tools` のツール本体とnpmキャッシュはGit管理・EXEへの同梱対象外です。pnpmの依存パッケージストアはpnpmの通常のユーザーキャッシュを使います。
+`.tools`のツール本体・npmキャッシュと、`.pnpm_store`の依存パッケージストアはGit管理・EXEへの同梱対象外です。
 
 `pnpm run dist` は.NETホストのframework-dependent発行（`win-x64`、`--self-contained false`）、TypeScriptのコンパイル、React/Viteのビルド、Windows x64 フォルダー型本体作成を行います。`publish.bat` からも発行できます。`build:dotnet` は発行前に `.artifacts/dotnet-host` を削除して再生成し、以前のself-contained発行で残ったランタイムファイルの混入を防ぎます。このフォルダには手作業のファイルを置かないでください。`AppDock.at365.slnx` はSDK・Runtime・.NETホスト用です。Electron部分はプロジェクトルートのpackage.jsonを使います。
 

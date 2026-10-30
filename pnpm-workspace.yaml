@@ -1,6 +1,6 @@
 packages:
   - '.'
-storeDir: A:/30.PROJECT/.pnpm_store
+storeDir: .pnpm_store
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
