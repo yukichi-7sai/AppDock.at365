@@ -6,9 +6,8 @@ import { SettingsInputMode } from './SettingsInput';
 import { SettingsHintIcon } from './SettingsHintIcon';
 import { SettingsStatusProvider, SettingsStatusArea } from './SettingsStatus';
 import { SettingsButton } from './SettingsButton';
-let activeSettingsModals = 0;
 
-/** Shared settings modal: focus containment/return, IME-safe dismissal and input suspension. */
+/** Shared settings modal: focus containment/return and IME-safe dismissal. */
 export function SettingsModal({
   children,
   header,
@@ -46,10 +45,8 @@ export function SettingsModal({
   closeOnBackdrop?: boolean;
   initialFocus?: string;
 }) {
-  const settingsControls = useSettingsControls();
   const dialog = useRef<HTMLDialogElement>(null);
   const backdropPressed = useRef(false);
-  const [preparationError, setPreparationError] = useState('');
   const isBackdrop = (event: {
     target: EventTarget;
     currentTarget: HTMLDialogElement;
@@ -96,31 +93,9 @@ export function SettingsModal({
     };
   }, []);
   useEffect(() => {
-    activeSettingsModals++;
-    let active = true;
-    const suspend = () => {
-      setPreparationError('');
-      callbacks.current.onReady?.(false);
-      void settingsControls
-        .setShortcutRecording(true)
-        .then(() => {
-          if (active) callbacks.current.onReady?.(true);
-        })
-        .catch((e) => {
-          if (active) {
-            setPreparationError(String(e));
-            callbacks.current.onError?.(String(e));
-          }
-        });
-    };
-    suspend();
-    window.addEventListener('focus', suspend);
+    callbacks.current.onReady?.(true);
     return () => {
-      active = false;
-      window.removeEventListener('focus', suspend);
-      activeSettingsModals = Math.max(0, activeSettingsModals - 1);
-      if (activeSettingsModals === 0)
-        void settingsControls.setShortcutRecording(false).catch(() => {});
+      callbacks.current.onReady?.(false);
       queueMicrotask(() => {
         if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
         else
@@ -131,19 +106,13 @@ export function SettingsModal({
     };
   }, []);
   return createPortal(
-    <SettingsStatusProvider
-      error={error || preparationError}
-      target={errorTarget}
-      busy={busy}
-      message={message}
-    >
+    <SettingsStatusProvider error={error} target={errorTarget} busy={busy} message={message}>
       <SettingsInputMode.Provider value="input">
         <dialog
           data-testid="settings-dialog"
           ref={dialog}
           className={`applet-shortcut-dialog settings-modal ${className}`}
           aria-labelledby={labelledBy}
-          data-shortcut-recorder="true"
           onPointerDown={(event) => {
             backdropPressed.current =
               closeOnBackdrop &&

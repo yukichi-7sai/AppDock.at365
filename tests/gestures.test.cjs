@@ -158,7 +158,7 @@ test('activation can keep local hooks available without authorizing inactive ass
   );
 });
 
-test('activation preparation synchronizes the new focus and refuses recording or pause', async () => {
+test('activation preparation synchronizes focus and keeps mouse gestures during key recording', async () => {
   const state = { context: { appFocused: false, window: '' }, recording: false };
   const manager = new InputCaptureManager(
     'unused',
@@ -183,8 +183,8 @@ test('activation preparation synchronizes the new focus and refuses recording or
   assert.equal(await manager.event('gestures.prepare', { window: '123', hostWindow: true }), false);
   manager.paused = false;
   state.recording = true;
-  assert.equal(await manager.event('gestures.prepare', { window: '123', hostWindow: true }), false);
-  assert.equal(synced, 1);
+  assert.equal(await manager.event('gestures.prepare', { window: '123', hostWindow: true }), true);
+  assert.equal(synced, 2);
 });
 
 test('gesture foreground transfer prepares before showing and only activates a live invocation', async () => {
@@ -323,6 +323,96 @@ test('activation synchronization uses a bounded key unchanged by focus but chang
   state.settings.gestures.distance++;
   await manager.sync();
   assert.notEqual(payloads[2].gestures.settingsKey, payloads[0].gestures.settingsKey);
+});
+
+test('dialog navigation and key recording do not pause or cancel mouse and touchpad input', async () => {
+  const state = {
+    settings: createDefaultSettings(),
+    context: { appFocused: true, window: '123' },
+    commands: [{ id: 'test.run', title: 'Run' }],
+    recording: false,
+    dialogWindow: '',
+  };
+  state.settings.gestures.bindings = [row('mouse')];
+  const payloads = [],
+    presses = [];
+  const manager = new InputCaptureManager(
+    'unused',
+    () => state,
+    {},
+    async () => {},
+    () => {},
+    assert.fail,
+    { ownership: async () => {}, applied() {}, pressed: (press) => presses.push(press) },
+  );
+  manager.peer = {
+    closed: false,
+    request: async (method, payload) => {
+      payloads.push(payload);
+      return payload.shortcuts.map(({ shortcut }) => ({
+        shortcut,
+        registered: true,
+        inputKeys: [shortcut],
+      }));
+    },
+  };
+  manager.inputs = ['Enter', 'Ctrl+Enter', 'F8'].map((shortcut) => ({
+    shortcut,
+    blockOriginalInput: true,
+  }));
+  manager.touchpadInputs = [
+    { shortcut: 'Ctrl+Shift+F9', owner: 'touchpad:three-tap', blockOriginalInput: true },
+  ];
+  await manager.sync();
+  const revision = manager.revision,
+    active = new AbortController();
+  manager.active.set('ongoing', active);
+  state.dialogWindow = '123';
+  await manager.sync();
+  assert.equal(active.signal.aborted, false);
+  assert.equal(manager.revision, revision);
+  assert.equal(payloads.at(-1).gestures.enabled, true);
+  assert.deepEqual(payloads.at(-1).dialogShortcuts, [
+    'Tab',
+    'Escape',
+    'Enter',
+    'Up',
+    'Down',
+    'Left',
+    'Right',
+  ]);
+  const press = (key, window = '123') =>
+    manager.event('shortcuts.pressed', {
+      shortcuts: [key],
+      window,
+      context: '{}',
+      revision: manager.shortcutRevision,
+      target: { window, processName: 'fixture' },
+    });
+  await press('Enter');
+  await press('Ctrl+Enter');
+  await press('Enter', '456');
+  assert.deepEqual(
+    presses.map((p) => p.shortcuts),
+    [['Ctrl+Enter'], ['Enter']],
+  );
+  state.recording = true;
+  await manager.sync();
+  assert.equal(active.signal.aborted, false);
+  assert.equal(manager.revision, revision);
+  assert.equal(payloads.at(-1).gestures.enabled, true);
+  assert.deepEqual(
+    payloads.at(-1).shortcuts.map((s) => s.shortcut),
+    ['Ctrl+Shift+F9'],
+  );
+  await press('F8');
+  await press('Ctrl+Shift+F9');
+  assert.deepEqual(presses.at(-1).shortcuts, ['Ctrl+Shift+F9']);
+  state.recording = false;
+  state.dialogWindow = '';
+  await manager.sync();
+  await press('Enter');
+  assert.deepEqual(presses.at(-1).shortcuts, ['Enter']);
 });
 
 test('indicator payload keeps design and localized captions without tracking the renderer palette', async (t) => {

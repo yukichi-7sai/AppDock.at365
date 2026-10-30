@@ -4,6 +4,7 @@ import { SettingsReadScope } from './core/settings-read-scope';
 import { SettingsServiceTargets } from './core/settings-service-targets';
 import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
+import { isDialogNavigationShortcut } from '../shared/commands';
 import { webAccountSettingsTargets } from './core/settings-web-account-target';
 import { startupShellIds, StartupUiBarrier } from './core/startup';
 import { physicalFs } from './core/physical-fs';
@@ -615,12 +616,59 @@ async function setShortcutCapture(request: { token: string; active: boolean; all
     typeof request.allowWin !== 'boolean'
   )
     throw Error(hostText('services.index.invalidRecording'));
-  if (request.active && (!shortcutRecording || !window?.isFocused()))
+  if (request.active && !window?.isFocused())
     throw Error(hostText('services.index.foregroundRecording'));
   await gestures?.record(
     request,
     window?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
   );
+  await syncHotKeys();
+}
+function keyboardRecording() {
+  return shortcutRecording || !!gestures?.recordingActive;
+}
+function dialogInputWindow() {
+  return window && !window.isDestroyed() && (hostModalLayer?.isActive || overlayHost?.active)
+    ? window.getNativeWindowHandle().readBigUInt64LE().toString()
+    : '';
+}
+function dialogOwnsShortcut(key: string, sourceWindow?: string) {
+  const target = dialogInputWindow();
+  return (
+    !!target &&
+    isDialogNavigationShortcut(key) &&
+    (sourceWindow ? sourceWindow === target : !!window?.isFocused())
+  );
+}
+function dispatchDialogShortcut(input: Electron.Input) {
+  if (
+    input.type !== 'keyDown' ||
+    input.isAutoRepeat ||
+    input.isComposing ||
+    quitting ||
+    keyboardRecording() ||
+    !window?.isFocused()
+  )
+    return false;
+  const key = shortcutFromEvent({
+    key: input.key,
+    code: input.code,
+    ctrlKey: input.control,
+    altKey: input.alt,
+    shiftKey: input.shift,
+    metaKey: input.meta,
+  });
+  if (
+    !key ||
+    dialogOwnsShortcut(key) ||
+    globalShortcutOwnership.has(key) ||
+    reservedTouchpadKeys(settings.value).has(key)
+  )
+    return false;
+  const plan = prepareShortcut(key);
+  if (!plan.commands.length) return false;
+  void dispatchShortcutPlan(key, plan);
+  return true;
 }
 let windowState: WindowStateStore | undefined;
 let restoreMaximized = false;
@@ -1723,7 +1771,7 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
 const commandDispatcher = new CommandDispatcher(
   executeCommand,
   (message) => log.write('error', 'shortcuts', message),
-  () => quitting || shortcutRecording || !!overlayHost?.active,
+  () => quitting,
   (id) => customCommands.isAvailable(id),
 );
 async function captureCommandContext(): Promise<
@@ -1803,19 +1851,21 @@ function prepareShortcut(
   );
 }
 function dispatchShortcutPlan(key: string, plan: CommandBatchPlan, press?: ShortcutPress) {
+  if (quitting || keyboardRecording() || dialogOwnsShortcut(key, press?.window))
+    return Promise.resolve();
   const input = 'keyboard:' + [...new Set(press?.shortcuts ?? [key])].sort().join('|');
   const run = () =>
     commandDispatcher.dispatch(input, plan, {
-      valid: async () => getKeybindingOptions(settings.value).enabled,
+      valid: async () => getKeybindingOptions(settings.value).enabled && !keyboardRecording(),
       execute: executeCommand,
     });
   return press ? shortcutInvocation.run(press, run) : run();
 }
 function dispatchShortcut(key: string, globalEvent = false, press?: ShortcutPress) {
   if (
-    shortcutRecording ||
+    keyboardRecording() ||
     quitting ||
-    overlayHost?.active ||
+    dialogOwnsShortcut(key, press?.window) ||
     reservedTouchpadKeys(settings.value).has(key)
   )
     return Promise.resolve();
@@ -1899,7 +1949,7 @@ function syncHotKeys(retry = false) {
   const available = catalog.map((command) => command.id);
   const revision = settings.revision;
   const generation = ++hotKeyApplyGeneration;
-  const suspended = shortcutRecording || !!overlayHost?.active;
+  const suspended = keyboardRecording();
   return hotKeys
     .sync(settings.value, available, suspended, retry, catalog)
     .then(() => {
@@ -2810,8 +2860,10 @@ function settingsPageActions(
       await syncHotKeys();
       await gestures?.refresh();
     };
-    actions.setShortcutCapture = async ([value]) =>
-      setShortcutCapture(value as Parameters<typeof setShortcutCapture>[0]);
+    actions.setShortcutCapture = async ([value]) => {
+      settingsRecording = true;
+      return setShortcutCapture(value as Parameters<typeof setShortcutCapture>[0]);
+    };
     if (['shortcuts', 'gestures', 'touchpad-gestures', 'command-triggers'].includes(page.id))
       actions.retryGlobalHotKeys = async () => syncHotKeys(true);
   }
@@ -3730,7 +3782,9 @@ async function initialize() {
           window: focused?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
         },
         commands: availableShortcutCommands(),
-        recording: shortcutRecording || quitting || !!overlayHost?.active,
+        recording: keyboardRecording(),
+        quitting,
+        dialogWindow: dialogInputWindow(),
       };
     },
     commandDispatcher,
@@ -3757,10 +3811,13 @@ async function initialize() {
       },
       ownership: setShortcutOwnership,
       recorded: (event) => {
-        if (!shortcutRecording || !window?.isFocused()) return;
+        if (!keyboardRecording() || !window?.isFocused()) return;
         shortcutCaptured = event;
         window.webContents.send('dock:shortcutCaptured', event);
         changed();
+      },
+      recordingEnded: () => {
+        void syncHotKeys();
       },
     },
   );
@@ -3774,7 +3831,7 @@ async function initialize() {
     input: gestures,
     changed,
     warnings,
-    suspended: () => shortcutRecording || !!overlayHost?.active,
+    suspended: () => quitting,
     open: async (gesture) => {
       await executeCommand('appdock.settings.touchpad-gestures.open');
       settingsNavigation.move = {
@@ -3975,7 +4032,13 @@ async function initialize() {
       relaunchDisplayName: 'AppDock.at365',
     });
   }
-  hostModalLayer = new HostModalLayer(window, () => shellRegistry?.touch());
+  hostModalLayer = new HostModalLayer(window, () => {
+    shellRegistry?.touch();
+    void gestures?.refresh();
+  });
+  window.webContents.on('before-input-event', (event, input) => {
+    if (hostModalLayer?.isActive && dispatchDialogShortcut(input)) event.preventDefault();
+  });
   windowState.track(window);
   notificationService = new NotificationService();
   let notificationCount = 0;
@@ -4154,7 +4217,7 @@ async function initialize() {
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     execute: executeShellCommand,
     shortcut: async (key) => {
-      if (!window?.isFocused() || shortcutRecording) return;
+      if (!window?.isFocused() || keyboardRecording()) return;
       const normalized = normalizeShortcut(key);
       if (!globalShortcutOwnership.has(normalized)) return dispatchShortcut(normalized);
     },
@@ -4252,8 +4315,7 @@ async function initialize() {
         input.type !== 'keyDown' ||
         input.isAutoRepeat ||
         input.isComposing ||
-        shortcutRecording ||
-        overlayHost?.active
+        keyboardRecording()
       )
         return false;
       const key = shortcutFromEvent({
@@ -4285,6 +4347,7 @@ async function initialize() {
     registry: shellRegistry!,
     route: () => navigation.state.route,
     execute: executeShellCommand,
+    shortcut: dispatchDialogShortcut,
     settings: (id) => settings.value.extensions[id]?.settings ?? {},
     changed: () => {
       if (window && !window.isDestroyed())
@@ -4296,6 +4359,7 @@ async function initialize() {
         overlayHost?.kind === 'command-palette' && settings.value.host.overlayBackground === 'blur',
       );
       void syncHotKeys();
+      void gestures?.refresh();
       changed();
     },
     failed: (message) => {
@@ -4467,8 +4531,7 @@ async function initialize() {
         input.type !== 'keyDown' ||
         input.isAutoRepeat ||
         input.isComposing ||
-        shortcutRecording ||
-        overlayHost?.active ||
+        keyboardRecording() ||
         quitting
       )
         return false;
@@ -4507,7 +4570,7 @@ async function initialize() {
   );
   const resumeHotKeys = () => {
     shortcutRecording = false;
-    void syncHotKeys();
+    void gestures?.endRecording().then(() => syncHotKeys());
   };
   window.on('blur', resumeHotKeys);
   window.on('show', changed);

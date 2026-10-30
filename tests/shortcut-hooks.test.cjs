@@ -1,6 +1,30 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeShortcut, shortcutFromEvent } = require('../out/main/shared/commands');
+const {
+  normalizeShortcut,
+  shortcutFromEvent,
+  isDialogNavigationShortcut,
+} = require('../out/main/shared/commands');
+
+test('dialogs own only unmodified navigation keys and leave every modified binding active', () => {
+  for (const key of ['Tab', 'Escape', 'Enter', 'Up', 'Down', 'Left', 'Right']) {
+    assert.equal(isDialogNavigationShortcut(normalizeShortcut(key)), true);
+    for (const modifiers of ['Ctrl+', 'Alt+', 'Shift+', 'Win+', 'Ctrl+Shift+'])
+      assert.equal(isDialogNavigationShortcut(normalizeShortcut(modifiers + key)), false);
+  }
+  for (const key of [
+    'Space',
+    'Delete',
+    'Backspace',
+    'Home',
+    'End',
+    'PageUp',
+    'PageDown',
+    'A',
+    'F8',
+  ])
+    assert.equal(isDialogNavigationShortcut(key), false);
+});
 const {
   parseKeybindings,
   parseKeybindingDefaults,

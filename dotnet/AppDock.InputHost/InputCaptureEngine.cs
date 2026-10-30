@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Threading;
 
 namespace AppDock.InputHost;
@@ -7,7 +8,7 @@ namespace AppDock.InputHost;
 internal sealed record RecordingInput(string Token, string Window, bool AllowWin = true);
 internal sealed record CaptureConfiguration(Configuration Gestures, ShortcutInput[] Shortcuts,
     int ShortcutRevision, uint HostProcessId, string Context, RecordingInput? Recording = null,
-    bool ShortcutsActive = true);
+    bool ShortcutsActive = true, string? DialogWindow = null, string[]? DialogShortcuts = null);
 internal sealed record ShortcutPressNotice(int Revision, long PressId, string[] Shortcuts,
     bool Blocked, string Window, string Context,
     [property: System.Text.Json.Serialization.JsonIgnore] uint HostProcessId, CommandTargetContext? Target = null)
@@ -26,12 +27,14 @@ internal sealed class InputCaptureEngine : IDisposable
     private readonly Dictionary<uint, bool> owned = [];
     private readonly Queue<ShortcutPressNotice> pendingPresses = [];
     private readonly Dictionary<ShortcutChord, List<ShortcutInput>> chords = [];
+    private HashSet<ShortcutChord> dialogChords = [];
     private ShortcutInput[] inputs = [];
     private CaptureConfiguration? configuration;
     private Dictionary<string, HashSet<string>> processPool = new(StringComparer.Ordinal);
     private RecordingInput? recording;
     private nint keyboardHook, mouseHook, layout, preparedLayout;
     private bool disposed, accepting;
+    private int? gestureRevision;
     private long pressId;
     private nint? foregroundWindow;
     internal GestureEngine Gestures { get; }
@@ -63,7 +66,10 @@ internal sealed class InputCaptureEngine : IDisposable
                 CommandConditions.Prepare(condition.StackConditions, processPool);
             }
         }
-        Gestures.Configure(next.Gestures, processPool);
+        if (gestureRevision != next.Gestures.Revision) {
+            Gestures.Configure(next.Gestures, processPool);
+            gestureRevision = next.Gestures.Revision;
+        }
         var statuses = Compile();
         if (!next.ShortcutsActive) preparedLayout = layout;
         try {
@@ -75,6 +81,7 @@ internal sealed class InputCaptureEngine : IDisposable
         } catch (Exception error) {
             inputs = []; chords.Clear(); pendingPresses.Clear(); recording = null;
             Gestures.Configure(next.Gestures with { Enabled = false });
+            gestureRevision = null;
             statuses = next.Shortcuts.Select(row => new ShortcutStatus(row.Shortcut, false, [],
                 EffectiveBlockOriginalInput: row.BlockOriginalInput,
                 Error: "入力フックを適用できません。権限とほかの入力ソフトを確認してください。")).ToArray();
@@ -90,6 +97,7 @@ internal sealed class InputCaptureEngine : IDisposable
     private ShortcutStatus[] Compile()
     {
         layout = ForegroundLayout();
+        dialogChords = (configuration?.DialogShortcuts ?? []).Select(key => ShortcutCodec.Parse(key, layout)).ToHashSet();
         chords.Clear();
         var statuses = inputs.Select(row => {
             try {
@@ -133,6 +141,7 @@ internal sealed class InputCaptureEngine : IDisposable
             accepting = false; inputs = []; chords.Clear(); pendingPresses.Clear(); EndRecording();
             if (configuration != null) {
                 Gestures.Configure(configuration.Gestures with { Enabled = false });
+                gestureRevision = null;
                 var statuses = configuration.Shortcuts.Select(row => new ShortcutStatus(row.Shortcut, false, [],
                     EffectiveBlockOriginalInput: row.BlockOriginalInput, Error: "入力フックを適用できません。設定を保存するか再試行してください。")).ToArray();
                 notify("shortcuts.applied", new { revision = configuration.ShortcutRevision, statuses });
@@ -186,7 +195,8 @@ internal sealed class InputCaptureEngine : IDisposable
             }
             var modifiers = Modifiers(data.Key, up);
             var chord = new ShortcutChord(data.Key, modifiers);
-            if (recording != null) {
+            var touchpad = chords.TryGetValue(chord, out var connected) && connected.Any(ActiveTouchpad);
+            if (recording != null && !touchpad) {
                 if (GetForegroundWindow().ToInt64().ToString() != recording.Window) EndRecording();
                 else if (data.Key == 27 || (data.Key == 9 && (modifiers & ~4) == 0)) EndRecording();
                 else if (!up && !repeat && !ShortcutCodec.Protected(chord) && (recording.AllowWin || (modifiers & 8) == 0)) {
@@ -199,6 +209,8 @@ internal sealed class InputCaptureEngine : IDisposable
                 }
                 return CallNextHookEx(keyboardHook, code, message, pointer);
             }
+            if (DialogOwns(chord, GetForegroundWindow()))
+                return CallNextHookEx(keyboardHook, code, message, pointer);
             if (Gestures.Keyboard(code, message, pointer) != 0) return 1;
             if (up || repeat || configuration == null ||
                 !chords.TryGetValue(chord, out var rows))
@@ -240,7 +252,9 @@ internal sealed class InputCaptureEngine : IDisposable
     private void FlushPendingPresses()
     {
         while (accepting && pendingPresses.TryPeek(out var press)) {
-            if (configuration == null || recording != null || press.Revision != configuration.ShortcutRevision) {
+            if (configuration == null ||
+                (recording != null && !inputs.Any(input => press.Shortcuts.Contains(input.Shortcut) && ActiveTouchpad(input))) ||
+                press.Revision != configuration.ShortcutRevision) {
                 pendingPresses.Dequeue(); continue;
             }
             try {
@@ -251,6 +265,17 @@ internal sealed class InputCaptureEngine : IDisposable
             }
             pendingPresses.Dequeue();
         }
+    }
+    private static bool ActiveTouchpad(ShortcutInput input) =>
+        input.Owner?.StartsWith("touchpad:", StringComparison.Ordinal) == true && TouchpadInputLease.Accepts(input.TouchpadGeneration);
+    private bool DialogOwns(ShortcutChord chord, nint window)
+    {
+        if (!dialogChords.Contains(chord) || configuration == null) return false;
+        if (configuration.DialogWindow == window.ToInt64().ToString()) return true;
+        GetWindowThreadProcessId(window, out var owner);
+        if (owner != configuration.HostProcessId) return false;
+        var name = new StringBuilder(64);
+        return GetClassName(window, name, name.Capacity) > 0 && name.ToString() == "#32770";
     }
     private nint Mouse(int code, uint message, nint pointer)
     {
@@ -298,6 +323,7 @@ internal sealed class InputCaptureEngine : IDisposable
     [DllImport("user32.dll")] private static extern nint CallNextHookEx(nint hook, int code, uint message, nint data);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern nint GetModuleHandle(string? name);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(nint window, StringBuilder name, int capacity);
     [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out uint process);
     [DllImport("user32.dll")] private static extern nint GetKeyboardLayout(uint thread);

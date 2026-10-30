@@ -131,6 +131,10 @@ export function normalizeShortcut(value: unknown): string {
   else throw new Error(`ショートカット ${value} のキーを確認してください。`);
   return [...['Ctrl', 'Alt', 'Shift', 'Win'].filter((m) => modifiers.has(m)), key].join('+');
 }
+/** Unmodified keys owned by the focused dialog or palette. */
+export const dialogNavigationShortcuts = ['Tab', 'Escape', 'Enter', 'Up', 'Down', 'Left', 'Right'];
+export const isDialogNavigationShortcut = (key: string) => dialogNavigationShortcuts.includes(key);
+
 export interface KeyStroke {
   key: string;
   code: string;

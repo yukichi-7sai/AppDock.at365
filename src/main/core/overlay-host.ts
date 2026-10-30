@@ -54,6 +54,7 @@ export class OverlayHost {
       settings(provider: string): Record<string, unknown>;
       changed(): void;
       failed(message: string): void;
+      shortcut?(input: Electron.Input): boolean;
       asset?(id: unknown): { dataUrl: string } | Promise<{ dataUrl: string }>;
     },
   ) {
@@ -270,6 +271,10 @@ export class OverlayHost {
       this.options.window.contentView.addChildView(s.view);
       s.view.webContents.on('render-process-gone', () => this.fail(s, 'renderer exited'));
       s.view.webContents.on('unresponsive', () => this.fail(s, 'renderer unresponsive'));
+      s.view.webContents.on('before-input-event', (event, input) => {
+        if (this.surface === s && this.current && s.ready && this.options.shortcut?.(input))
+          event.preventDefault();
+      });
       void s.view.webContents.loadURL(s.url).catch(() => this.fail(s, 'load failed'));
     } catch {
       this.fail(this.surface, 'load failed');

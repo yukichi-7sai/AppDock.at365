@@ -344,6 +344,11 @@ async function closePalette(p, background = false) {
     let p = await palette();
     const reusedPalette = p;
     const initialSession = await p.evaluate(() => window.appdockPalette.connect());
+    await until(
+      async () =>
+        (await host.locator('main').evaluate((el) => getComputedStyle(el).filter)) === 'blur(2px)',
+      'host palette blur applied',
+    );
     assert.equal(
       await host.locator('main').evaluate((el) => getComputedStyle(el).filter),
       'blur(2px)',

@@ -21,6 +21,7 @@ import type { GlobalHotKeyStatus, Settings } from '../../shared/contracts';
 import type { CommandDispatcher } from './command-dispatcher';
 import { defaultTouchpadGestures, nativeTouchpadConditions } from '../../shared/touchpad-gestures';
 import { getCommandTriggerOptions } from '../../shared/command-trigger-options';
+import { dialogNavigationShortcuts, isDialogNavigationShortcut } from '../../shared/commands';
 import type { StackCatalogEntry } from '../../shared/command-stacks';
 
 const configurationKey = (settings: Settings['gestures'], commands: unknown) =>
@@ -65,6 +66,7 @@ export class InputCaptureManager {
   private peer?: JsonLinePeer;
   private child?: ChildProcessWithoutNullStreams;
   private fingerprint = '';
+  private gestureFingerprint = '';
   private queue: Promise<unknown> = Promise.resolve();
   private stopped = false;
   private revision = 0;
@@ -91,6 +93,8 @@ export class InputCaptureManager {
       context: GestureContext;
       commands: (StackCatalogEntry & { title: string })[];
       recording: boolean;
+      quitting?: boolean;
+      dialogWindow?: string;
     },
     private dispatcher: CommandDispatcher,
     private execute: (id: string, invocation: GestureInvocation) => Promise<unknown>,
@@ -102,10 +106,14 @@ export class InputCaptureManager {
       failed(error: Error): void;
       ownership(keys: string[]): Promise<void>;
       recorded(event: { token: string; key: string; sequence: number }): void;
+      recordingEnded?(): void;
     },
   ) {}
   private state() {
     return this.readState(this.foregroundWindow);
+  }
+  get recordingActive() {
+    return !!this.recording;
   }
   async captureTarget() {
     if (this.stopped) return undefined;
@@ -215,7 +223,7 @@ export class InputCaptureManager {
     if (method === 'gestures.indicator') {
       const notice = readGestureIndicatorNotice(p);
       if (!notice || notice.revision !== this.revision || this.stopped) return;
-      if (!notice.visible || this.paused || this.state().recording) {
+      if (!notice.visible || this.paused) {
         this.indicator?.hide();
         return;
       }
@@ -240,11 +248,11 @@ export class InputCaptureManager {
       // Wait only for the focus event caused by this press, then synchronize its actual conditions.
       const deadline = Date.now() + 500;
       do {
-        if (this.stopped || this.paused || this.state().recording) return false;
+        if (this.stopped || this.paused) return false;
         const context = this.state().context;
         if (p.hostWindow ? context.window === p.window : !context.window) {
           await this.refresh();
-          return !this.stopped && !this.paused && !this.state().recording;
+          return !this.stopped && !this.paused;
         }
         await new Promise((resolve) => setTimeout(resolve, 10));
       } while (Date.now() < deadline);
@@ -253,7 +261,6 @@ export class InputCaptureManager {
     if (method === 'shortcuts.pressed') {
       if (
         this.stopped ||
-        this.state().recording ||
         p.revision !== this.shortcutRevision ||
         !Array.isArray(p.shortcuts) ||
         !p.shortcuts.length ||
@@ -262,8 +269,12 @@ export class InputCaptureManager {
         typeof p.context !== 'string'
       )
         return;
-      const keys = p.shortcuts.filter((key: string) =>
-        this.statuses.some((s) => s.registered && s.shortcut === key),
+      const state = this.state();
+      const keys = p.shortcuts.filter(
+        (key: string) =>
+          this.statuses.some((s) => s.registered && s.shortcut === key) &&
+          (!state.recording || this.touchpadInputs.some((input) => input.shortcut === key)) &&
+          !(state.dialogWindow === p.window && isDialogNavigationShortcut(key)),
       );
       const conditional = [...this.inputs, ...this.touchpadInputs].some(
         (input) => keys.includes(input.shortcut) && (input.owner || input.conditions?.length),
@@ -294,7 +305,10 @@ export class InputCaptureManager {
       return;
     }
     if (method === 'shortcuts.recordEnded') {
-      if (this.recording?.token === p.token) this.recording = undefined;
+      if (this.recording?.token === p.token) {
+        this.recording = undefined;
+        this.shortcuts.recordingEnded?.();
+      }
       return;
     }
     if (method === 'input.error') {
@@ -313,7 +327,6 @@ export class InputCaptureManager {
     const current = this.state();
     const gestureSettings = getGestureSettings(current.settings);
     if (
-      current.recording ||
       !gestureSettings.enabled ||
       p.settingsKey !== configurationKey(gestureSettings, current.commands) ||
       JSON.stringify(current.context) !== p.context ||
@@ -352,7 +365,6 @@ export class InputCaptureManager {
             !controller.signal.aborted &&
             !this.stopped &&
             !this.paused &&
-            !latest.recording &&
             p.revision === this.revision &&
             configurationKey(getGestureSettings(latest.settings), latest.commands) ===
               p.settingsKey &&
@@ -401,6 +413,10 @@ export class InputCaptureManager {
         this.cancelCommand(session);
       }
       if (this.peer !== peer || this.stopped) return;
+      if (this.recording) {
+        this.recording = undefined;
+        this.shortcuts.recordingEnded?.();
+      }
       this.faultSettings = JSON.stringify(this.state().settings);
       this.statuses = this.statuses.map((s) => ({
         ...s,
@@ -429,7 +445,7 @@ export class InputCaptureManager {
       context,
       settingsKey: configurationKey(settings, state.commands),
       hostProcessId: process.pid,
-      enabled: settings.enabled && !this.paused && !state.recording,
+      enabled: settings.enabled && !this.paused && !state.quitting,
     };
     const touchpad = state.settings.touchpadGestures ?? defaultTouchpadGestures();
     const projectedTouchpadInputs = this.touchpadInputs.map((input) => ({
@@ -445,12 +461,13 @@ export class InputCaptureManager {
       this.touchpadProjection = touchpadProjection;
       this.shortcutRevision++;
     }
-    const inputs = state.recording
-      ? []
-      : [
-          ...this.inputs.filter((input) => !this.touchpadReserved.includes(input.shortcut)),
-          ...projectedTouchpadInputs,
-        ];
+    const inputs = [
+      ...this.inputs.filter(
+        (input) =>
+          !state.quitting && !state.recording && !this.touchpadReserved.includes(input.shortcut),
+      ),
+      ...(state.quitting ? [] : projectedTouchpadInputs),
+    ];
     const config = {
       gestures: gesture,
       shortcuts: inputs,
@@ -458,6 +475,8 @@ export class InputCaptureManager {
       hostProcessId: process.pid,
       context,
       recording: this.recording ?? null,
+      dialogWindow: state.dialogWindow ?? '',
+      dialogShortcuts: dialogNavigationShortcuts,
     };
     const fingerprint = JSON.stringify(config);
     if (!force && fingerprint === this.fingerprint && !this.faultSettings) return this.statuses;
@@ -476,7 +495,9 @@ export class InputCaptureManager {
       }
       const peer = this.peer!;
       this.faultSettings = undefined;
-      if (this.fingerprint !== fingerprint) {
+      const gestureFingerprint = JSON.stringify(gesture);
+      if (this.gestureFingerprint !== gestureFingerprint) {
+        this.gestureFingerprint = gestureFingerprint;
         this.indicator?.hide();
         this.revision++;
         for (const [session, controller] of this.active) {

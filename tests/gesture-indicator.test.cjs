@@ -55,7 +55,7 @@ test('indicator notices accept bounded presentation data and reject malformed in
       JSON.stringify(changes),
     );
 });
-test('web indicator ignores stale revisions and hides when paused or recording', async () => {
+test('web indicator ignores stale revisions, respects pause and remains visible during key recording', async () => {
   const state = { recording: false, settings: createDefaultSettings() },
     shown = [],
     hidden = [];
@@ -86,18 +86,19 @@ test('web indicator ignores stale revisions and hides when paused or recording',
   manager.paused = false;
   state.recording = true;
   await manager.event('gestures.indicator', notice());
-  assert.equal(hidden.length, 2);
+  assert.equal(hidden.length, 1);
+  assert.equal(shown.length, 2);
   state.recording = false;
   await manager.event('gestures.indicator', { visible: false, revision: 7 });
-  assert.equal(hidden.length, 3);
+  assert.equal(hidden.length, 2);
   manager.stopped = true;
   await manager.event('gestures.indicator', notice());
-  assert.equal(shown.length, 1);
+  assert.equal(shown.length, 2);
   manager.stopped = false;
   state.settings.gestures.indicatorPosition = 'cursor-follow';
   await manager.event('gestures.indicator', notice());
-  assert.equal(shown[1].followCursor, true);
-  assert.deepEqual(shown[1].model, readGestureIndicatorNotice(notice()));
+  assert.equal(shown[2].followCursor, true);
+  assert.deepEqual(shown[2].model, readGestureIndicatorNotice(notice()));
 });
 test('display lifetime does not reconfigure or cancel input capture', async () => {
   const settings = createDefaultSettings();

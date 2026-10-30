@@ -38,6 +38,8 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## 設定・トリガーの主な担当
 
+`scripts/modal-trigger-input-ui-test.cjs [固定EXE]`は共通ダイアログ・パレットの単独Tab/Escape/Enter/上下左右の操作、修飾キー付きとその他のキー・マウスの継続、別アプリでの7キーの実行、Windows標準ダイアログ、実キー記録中の抑止と復帰、保存済み割り当ての保持を確認する。タッチパッドのキー記録中の継続は`tests/gestures.test.cjs`、全修飾キーと押下・解放の判定は`InputTests --input-blocking`のOS入力を送らないfixtureで補完する。
+
 `scripts/command-links-ui-test.cjs [固定EXE]`はタグ・未知参照・エスケープ、初期対象の可視性、明示実行、フォーカス、設定入力・エラー値の保持と一覧ダイアログ、WindowsToolsの停止中リンクを確認する。`scripts/shell-overlay-ui-test.cjs [固定EXE]`は本体パレットのIME・Tab・ピン・選択モード、下のAppletの入力とフォーカス、Shellからの独立、1回のクラッシュ復旧と再失敗の打切りを担当する。
 
 | 試験                                                                                                                         | 主な契約                                                                                                                                 |

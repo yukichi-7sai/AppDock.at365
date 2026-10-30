@@ -1,5 +1,27 @@
 # 検証記録
 
+## 2026-10-30: トリガー継続のmain統合・コミット前検証 0.105.3
+
+- main `ba8dd02`のclean/追跡先を確認し、pull --ff-only成功後にworktreeの実装を取り込んだ。既存の設定項目内操作を保持し、競合なし。mainで0.105.2が別件として発行済みのため、統合した本体は0.105.3へパッチ更新し、標準`A:\40.ARTIFACT\AppDock.at365`へ発行した。worktreeの0.105.2は別の確認用成果物として保持する。
+- 実装時958入力のSHA256一致と成功ログを照合。mainとworktreeの改行差を内容変更と区別し、既存の日本語文言が不変で追加だけであること、契約型の任意metadataが実行コードへ影響しないことも確認した。依存関係ごとの照合で、実装時173件のうち8ファイル分を再利用。共通カタログが変わった残り4ファイルと、Shell・設定ページ・トリガー・設定操作などの追加対象を合わせ、20ファイル183件をmainで実行して全件成功、fail/skip 0。選定と改行差の一覧は`reuse-plan.json`、実行結果は`regression.log`120件と`integration-regression.log`63件。
+- 追加検証で既存のgesture-indicator試験がキー記録中の全停止を期待していたため、新仕様の「キー記録中もマウスと待機表示を継続」へ期待値を合わせた。pause・非表示通知・古いrevision・停止中の通知拒否の検査は維持し、再実行成功。初回の失敗ログも保持した。製品コードは実装時の内容から追加変更していない。
+- 差分と統合影響をレビューし、設定操作と入力受付、保存/取消/フォーカス、キー単独/修飾付きと前面Window、記録解除、nativeとmainの所有権を確認。新しい設定・保存ファイル・依存・公開APIの追加/削除なし。固定lockfileのinstall、型検査、build、既定publish.bat終了コード0。
+- mainの最終native DLLで`--input-blocking`273件・`--lock-keys`255件成功。固定0.105.3で入力7群、設定項目内操作5群、host-modal9群、shell-overlay7群、IME関連のネイティブ記録42ケースとsmokeが成功。新機能だけでなく既存の設定操作、保存値保持、40回の編集取消、本文とAppletの入力、明暗/狭幅、クラッシュ復旧も確認した。Pause/F13〜F24のOS入力・登録は行わず、物理タッチパッドは引き続き未確認。
+- 959入力の検証前後SHA256が一致。EXE SHA256 `097d37a96f9e5163ca430eb44403472d2b88624328ed71d65d7580faacb1bb5c`、ZIP SHA256 `716f6fa4a187cf63384ce82ab1f9b7220dd1daacbdfa9e65a68104a177ec72b6`。feedの版/サイズ/hash、試験コピーのEXE、発行物のInputHostとビルドDLLの一致を確認。正本は`.artifacts/commit-validation-modal-trigger-input-20261030/`の`integration.json`・`reuse-plan.json`・`inputs-before/after.json`・`artifacts.json`・`validation.json`と各成功log。実装時証跡はmainの`.artifacts/modal-trigger-input-20261030/`にも保全した。
+- 対象19ファイルだけをステージし、stage tree/commit tree・作業ファイルとmainの状態を照合する。結果は同証跡の`stage.json`・`commits.json`。今回の各GUI方式の成功は1回ずつで、既存の再利用証跡と失敗ログを保持し、整理による削除なし。確認用worktreeも保持する。push・GitHub Release・実利用先deployは対象外。
+
+## 2026-10-30: ダイアログ・パレットの操作キーとトリガー継続 0.105.2
+
+- `7f2eaa4`から作成した`codex/modal-trigger-input`、worktree `A:\30.PROJECT\AppDock.at365-modal-trigger-input`で実装。共通ダイアログ・パレット・一時リボングループの表示による一括停止を廃止し、前面の対象UIでは単独Tab/Escape/Enter/上下左右のトリガーだけを抑えて元入力を画面へ渡す。修飾キー付き、その他のキー、マウス、タッチパッドは保存済み条件で継続する。別アプリが前面なら7キーの割り当ても継続する。本体PIDのWindows標準ダイアログも同じ7キーを保護する。
+- 共通計画とDispatcherを維持し、nativeの入力所有権判定とmainの受付で同じキー集合を使う。通常のダイアログをキー記録と同一扱いにせず、実記録欄のフォーカス・準備完了・token・実Windowに応じてキートリガーだけを止める。離脱・前面移動・接続断で記録を解除する。マウスのrevisionはジェスチャー側の構成が変わるときだけ進め、キーボードやmodal状態の同期で生存sessionを取り消さない。
+- 発行前の差分・影響先レビューを1回実施。入力の通過/抑止、単独と修飾付き、記録中のキーとタッチパッドの所有権、マウスsession、ローカル/外部の二重配送、共有ダイアログの保存・取消・フォーカスを確認した。レビューで、記録準備完了前の受付、前面復帰時の記録再開、記録開始後のキーバッチの停止、nativeの無関係な同期によるgesture取消、接続断時の記録解除を整え、関連回帰を最終EXEで再確認した。設定項目・保存ファイル・依存・公開APIの追加/削除はなく、通常修正として0.105.1→0.105.2。
+- 固定lockfileのinstall、整形、型検査、build、既定`publish.bat`に成功。関連Node回帰12ファイル173/173、nativeのOS入力を送らない`--input-blocking`273件・`--lock-keys`255件が成功。Pause/F13〜F24の実送信・OS登録は行っていない。
+- 発行済み固定EXEで`modal-trigger-input-ui-test`7群、`host-modal-ui-test`9群、`shell-overlay-ui-test`7群、`shortcut-native-capture-ui-test`42ケース、smoke成功。7キーのUI操作、修飾付き・その他のローカル/グローバルキーとマウスの継続、別アプリでの7キーの実行、標準フォルダーダイアログ、実記録と離脱後の再開、保存済み割り当て保持、40回の編集取消、明暗/狭幅、下のApplet入力とShell独立、IME関連キーの再クリック記録を確認した。タッチパッドはNode/native投影の模擬確認で、物理タッチパッドは未確認。全標準回帰・実利用先deploy・Releaseは今回の範囲外。
+- 既存の表示GUIは独立パレットの可視化直後、本体本文のblur反映前に判定して1回失敗した。`dialog-blur-ui-test.cjs`で実際の反映完了を待つ条件を追加し、同じ固定EXEで9群成功。製品変更ではないため再発行・追加版更新なし。初期の専用fixtureの最低ホスト版・表示名・一覧のhover待機不足も試験側で修正し、失敗profile/logを保持した。後から変えた入力は当該表示試験の待機だけで、その他の成功対象コードは不変。
+- 発行先は`A:\40.ARTIFACT\AppDock.at365-modal-trigger-input`。EXE SHA256 `46ae1a582d6b317a74e02051d29eb28ff65e5dba64822335f1c0e6978830dcf0`、update.zip SHA256 `53a702ac48583a02571db058aeb5b2c7c6ff33f2934be19d37e20fbd517bce8f`。feedの版・サイズ・hash、同梱InputHostとビルドDLLの一致、試験コピーと発行EXEの一致を確認。証跡は`.artifacts/modal-trigger-input-20261030/`の各log、`artifacts.json`、`validation.json`、`inputs-original/before/after.json`。958入力をhash照合し、表示試験の待機変更以外は不変、再確認前後も不変。
+- 今回の試験プロセス残存0。テスト生成物は成功分が方式ごと3回以下で、失敗・証跡・固定ビルド出力を保持し、削除対象なし。worktreeは引き続き確認用として保持。コミット・mainへの統合・pushは行っていない。元のmainで進行中の別変更へ触れていない。
+
+
 ## 2026-10-30: 設定項目内操作0.105.2のコミット前照合
 
 - 利用者の動作確認後、mainの対象差分をレビュー。実装時の本体845入力とWatch22入力、完全ログ8件、両発行物695ファイル/ZIPのSHA256一致を確認し、型検査/build・関連35件・本体の固定GUI5群・Watchの固定GUI14群とMCP検証を再利用した。WatchのC#/SDK依存29入力も不変で、標準回帰21件を再利用する。

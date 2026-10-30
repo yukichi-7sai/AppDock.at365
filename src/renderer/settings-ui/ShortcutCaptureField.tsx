@@ -35,6 +35,7 @@ export function ShortcutCaptureField({
   const id = useId();
   const recorder = useRef<HTMLButtonElement>(null);
   const [focused, setFocused] = useState(false);
+  const [windowFocused, setWindowFocused] = useState(() => document.hasFocus());
   const [captureReady, setCaptureReady] = useState(false);
   const [captureRequest, setCaptureRequest] = useState(0);
   const callbacks = useRef({ onChange, setError });
@@ -61,12 +62,38 @@ export function ShortcutCaptureField({
     recorder.current?.focus({ preventScroll: true });
   }, []);
   useEffect(() => {
-    if (mode !== 'shortcut' || !focused || !recordingReady) {
+    const focus = () => setWindowFocused(true);
+    const blur = () => setWindowFocused(false);
+    window.addEventListener('focus', focus);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('focus', focus);
+      window.removeEventListener('blur', blur);
+    };
+  }, []);
+  useEffect(() => {
+    if (!focused || !windowFocused || !recordingReady) {
       setCaptureReady(false);
       return;
     }
-    const token = crypto.randomUUID();
     let active = true;
+    setCaptureReady(false);
+    if (mode === 'send') {
+      void controls
+        .setShortcutRecording(true)
+        .then(() => {
+          if (active) setCaptureReady(true);
+        })
+        .catch((error) => {
+          if (active) callbacks.current.setError(String(error));
+        });
+      return () => {
+        active = false;
+        setCaptureReady(false);
+        void controls.setShortcutRecording(false).catch(() => {});
+      };
+    }
+    const token = crypto.randomUUID();
     const unsubscribe = controls.onShortcutCaptured((event) => {
       if (!active || event.token !== token || document.activeElement !== recorder.current) return;
       try {
@@ -93,7 +120,7 @@ export function ShortcutCaptureField({
       setCaptureReady(false);
       void controls.setShortcutCapture({ token, active: false, allowWin }).catch(() => {});
     };
-  }, [focused, recordingReady, mode, allowWin, captureRequest]);
+  }, [focused, windowFocused, recordingReady, mode, allowWin, captureRequest]);
   const choose = (key: string) => {
     onChange(key);
     setModifiers(key.split('+').slice(0, -1));
@@ -110,7 +137,7 @@ export function ShortcutCaptureField({
             ? translate('settings.shortcutCaptureField.preparing')
             : !focused
               ? translate('settings.shortcutCaptureField.click')
-              : mode === 'send' || captureReady
+              : captureReady
                 ? translate('settings.shortcutCaptureField.press')
                 : translate('settings.shortcutCaptureField.preparing')
       }
@@ -136,6 +163,7 @@ export function ShortcutCaptureField({
           event.stopPropagation();
           if (
             !recordingReady ||
+            !captureReady ||
             event.repeat ||
             event.nativeEvent.isComposing ||
             event.nativeEvent.keyCode === 229 ||

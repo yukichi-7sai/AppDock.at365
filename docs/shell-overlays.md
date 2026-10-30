@@ -44,7 +44,7 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 | Default Shell / Shell Applet | リボンと一時グループの公開snapshotを描画する |
 | 本体`CommandPicker` / `CommandLink` | 選択結果を設定へ反映する、または対象コマンドを初期選択して開く |
 
-下のApplet WebContentsや入力・sessionを再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループはクライアント領域を使う。背景は[表示設定](appearance.md#ダイアログパレットの背景)に従う。リボン・タイトルバー・ステータスバーは操作でき、本文の背景クリック・route変更で閉じる。共通コマンドのグローバルキー・ジェスチャー割り当てはモーダル中停止する。
+下のApplet WebContentsや入力・sessionを再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループはクライアント領域を使う。背景は[表示設定](appearance.md#ダイアログパレットの背景)に従う。リボン・タイトルバー・ステータスバーは操作でき、本文の背景クリック・route変更で閉じる。表示中もキー・マウス・タッチパッドのトリガーを継続し、フォーカスのあるダイアログ・パレットでは単独のTab・Escape・Enter・上下左右だけを画面操作へ渡す。修飾キー付きの割り当てと、別アプリでの割り当ては通常どおり評価する。キー記録中の保護は[キー入力の仕様](keybindings.md#ダイアログとパレットの入力)に従う。
 
 所有Windowの非表示・最小化・再読込・終了、本文のroute変更、新要求への置換で取消する。元routeとWindowのフォーカスが保たれている場合だけ元のWebContentsへ戻す。開始済みコマンドの副作用は取消で巻き戻さない。要求ごとの`requestId`照合により、旧呼出側の取消が後から開いた要求を閉じない。
 

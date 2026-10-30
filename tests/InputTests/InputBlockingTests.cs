@@ -59,10 +59,10 @@ internal static partial class Program
                 type.GetField("pendingPresses", members)!.GetValue(engine)!.GetType().GetMethod("Clear")!.Invoke(type.GetField("pendingPresses", members)!.GetValue(engine), null);
                 Config(7); Inputs(Row(block)); Set("accepting", active); delivery = notify;
             }
-            nint Feed(bool up = false) {
+            nint Feed(bool up = false, uint key = 0x91) {
                 var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<GestureTestKeyData>());
                 try {
-                    Marshal.StructureToPtr(new GestureTestKeyData { Key = 0x91, Scan = 0x46, Flags = up ? 0x80u : 0u }, pointer, false);
+                    Marshal.StructureToPtr(new GestureTestKeyData { Key = key, Scan = 0x46, Flags = up ? 0x80u : 0u }, pointer, false);
                     return (nint)keyboard.Invoke(engine, [0, up ? 0x101u : 0x100u, pointer])!;
                 } finally { Marshal.FreeHGlobal(pointer); }
             }
@@ -125,6 +125,32 @@ internal static partial class Program
                 var when=Decode("Condition",new { scope, appletIds=Array.Empty<string>(),processes=scope=="exe"?new[]{"fixture"}:Array.Empty<string>(),excludeDesktop,excludedProcesses=excluded?new[]{"fixture"}:Array.Empty<string>() });
                 Check((bool)conditions.GetMethod("Matches",members)!.Invoke(null,[when,context,null,null])! == expected,
                     $"unknown foreground preserves condition policy: {scope}/{excludeDesktop}/{excluded}");
+            }
+            var navigation = new[] { (9u, "Tab"), (27u, "Escape"), (13u, "Enter"),
+                (38u, "Up"), (40u, "Down"), (37u, "Left"), (39u, "Right") };
+            var codec=assembly.GetType("AppDock.InputHost.ShortcutCodec",true)!;
+            var parse=codec.GetMethod("Parse",members)!;
+            var dialogOwns=type.GetMethod("DialogOwns",members)!;
+            foreach (var (key,name) in navigation) {
+                Reset();
+                var foreground=GetForegroundWindow();
+                Set("configuration", Decode("CaptureConfiguration", new {
+                    gestures=new {}, shortcuts=Array.Empty<object>(), shortcutRevision=7,
+                    hostProcessId=uint.MaxValue, context="{}", dialogWindow=foreground.ToString(),
+                    dialogShortcuts=navigation.Select(n=>n.Item2).ToArray(),
+                }));
+                Inputs(new { shortcut=name, blockOriginalInput=true });
+                Check(Feed(key:key)==0 && Feed(key:key)==0 && Feed(true,key)==0 && notices.Count==0,
+                    name+" passes down, hold and up to the dialog without trigger execution");
+                for(var mask=0;mask<16;mask++) {
+                    var modified=((mask&1)!=0?"Ctrl+":"")+((mask&2)!=0?"Alt+":"")+
+                        ((mask&4)!=0?"Shift+":"")+((mask&8)!=0?"Win+":"")+name;
+                    var chord=parse.Invoke(null,[modified,nint.Zero])!;
+                    Check((bool)dialogOwns.Invoke(engine,[chord,foreground])! == (mask==0), modified+" dialog ownership");
+                    Check(!(bool)dialogOwns.Invoke(engine,[chord,new nint(-1)])!, modified+" remains active in another foreground window");
+                }
+                Config(7); Inputs(new { shortcut=name, blockOriginalInput=true });
+                Check(Feed(key:key)==1 && Feed(true,key)==1 && notices.Count==1, name+" trigger resumes after closing the dialog");
             }
             Check((nint)type.GetField("keyboardHook",members)!.GetValue(engine)! == 0 && (nint)type.GetField("mouseHook",members)!.GetValue(engine)! == 0,"handler fixture installed no hooks");
             var threadType=assembly.GetType("AppDock.InputHost.InputCaptureThread",true)!;
