@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '..');
 const helper = path.join(root, '.artifacts/updater/AppDock.Updater.exe');
 
 test(
-  'all-in-one uses fresh packages and preserves the last archive on invalid inputs',
+  'starter selects its declared Applets and preserves the last archive on invalid inputs',
   { skip: process.platform !== 'win32', timeout: 120000 },
   (t) => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'AppDock-bundle-test-'));
@@ -51,10 +51,23 @@ test(
     fs.mkdirSync(path.join(host, '.artifacts/updater'), { recursive: true });
     fs.copyFileSync(helper, path.join(host, '.artifacts/updater/AppDock.Updater.exe'));
     fs.copyFileSync(
-      path.join(root, 'scripts/build-all-in-one.ps1'),
-      path.join(host, 'scripts/build-all-in-one.ps1'),
+      path.join(root, 'scripts/build-starter.ps1'),
+      path.join(host, 'scripts/build-starter.ps1'),
     );
-    fs.copyFileSync(path.join(root, 'scripts/publish-paths.ps1'), path.join(host, 'scripts/publish-paths.ps1'));
+    fs.copyFileSync(
+      path.join(root, 'scripts/publish-paths.ps1'),
+      path.join(host, 'scripts/publish-paths.ps1'),
+    );
+    for (const file of ['verify-starter.ps1', 'starter-applets.ps1']) {
+      fs.copyFileSync(path.join(root, 'scripts', file), path.join(host, 'scripts', file));
+    }
+    const definition = [{ repository: 'Applet.Fixture', id: 'fixture.applet' }];
+    const writeDefinition = (applets) =>
+      fs.writeFileSync(
+        path.join(host, 'scripts/starter-applets.json'),
+        JSON.stringify({ schemaVersion: 1, applets }),
+      );
+    writeDefinition(definition);
     fs.writeFileSync(path.join(host, 'package.json'), JSON.stringify({ version: '1.0.0' }));
     const hostFolder = path.join(getPublishDirectory(host), 'win-unpacked');
     fs.mkdirSync(path.join(hostFolder, 'resources'), { recursive: true });
@@ -62,7 +75,8 @@ test(
     const exe = path.join(hostFolder, 'AppDock.at365.exe');
     fs.writeFileSync(exe, 'MZ-host-fixture');
     assert.equal(
-      run(helper, ['--pack', 'host', hostFolder, '1.0.0', path.join(getPublishDirectory(host))]).status,
+      run(helper, ['--pack', 'host', hostFolder, '1.0.0', path.join(getPublishDirectory(host))])
+        .status,
       0,
     );
     const manifest = {
@@ -87,13 +101,13 @@ test(
         '-ExecutionPolicy',
         'Bypass',
         '-File',
-        path.join(host, 'scripts/build-all-in-one.ps1'),
+        path.join(host, 'scripts/build-starter.ps1'),
         '-AppletRoot',
         applets,
       ]);
     let result = build();
     assert.equal(result.status, 0, result.stdout + result.stderr);
-    const zip = path.join(getPublishDirectory(host), 'AppDock.at365-all-in-one-1.0.0.zip');
+    const zip = path.join(getPublishDirectory(host), 'AppDock.at365-starter-1.0.0.zip');
     const hash = () => createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
     fs.writeFileSync(
       path.join(applet, 'payload/index.js'),
@@ -103,7 +117,7 @@ test(
     result = build();
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.notEqual(hash(), first, 'republish must replace the previous complete archive');
-    // A newly added sibling repository must be included without changing host scripts.
+    // A newly added sibling must stay outside the starter until explicitly selected.
     const added = path.join(applets, 'Applet.AddedLater');
     init(added);
     fs.mkdirSync(path.join(added, 'payload'));
@@ -112,7 +126,7 @@ test(
       fs.writeFileSync(path.join(added, name), JSON.stringify(addedManifest));
     }
     fs.writeFileSync(path.join(added, 'payload/index.js'), 'exports.activate = () => {};');
-    fs.writeFileSync(path.join(added, 'publish.bat'), publisher, 'ascii');
+    fs.writeFileSync(path.join(added, 'publish.bat'), '@echo off\r\nexit /b 19\r\n', 'ascii');
     result = build();
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const extracted = path.join(directory, 'verified-bundle');
@@ -121,7 +135,7 @@ test(
       '-ExecutionPolicy',
       'Bypass',
       '-File',
-      path.join(root, 'scripts/verify-all-in-one.ps1'),
+      path.join(host, 'scripts/verify-starter.ps1'),
       '-Archive',
       zip,
       '-Destination',
@@ -129,15 +143,12 @@ test(
     ]);
     assert.equal(inspection.status, 0, inspection.stdout + inspection.stderr);
     const bundle = JSON.parse(fs.readFileSync(path.join(extracted, 'bundle.json')));
-    assert.deepEqual(bundle.applets.map((item) => item.id).sort(), [
-      'fixture.added-later',
-      'fixture.applet',
-    ]);
+    assert.deepEqual(bundle.applets.map((item) => item.id).sort(), ['fixture.applet']);
+    assert.equal(fs.existsSync(path.join(extracted, 'extensions/Applet.AddedLater')), false);
     assert.equal(
-      JSON.parse(
-        fs.readFileSync(path.join(extracted, 'extensions/Applet.AddedLater/extension.json')),
-      ).id,
-      'fixture.added-later',
+      fs.existsSync(getPublishDirectory(added)),
+      false,
+      'unlisted Applets must not be published',
     );
     const complete = hash();
     function fails(pattern) {
@@ -147,6 +158,9 @@ test(
       assert.equal(hash(), complete, 'failed builds must not replace the last successful package');
     }
     fs.writeFileSync(path.join(applet, 'publish.bat'), '@echo off\r\nexit /b 19\r\n', 'ascii');
+    writeDefinition([...definition, { repository: 'Applet.Missing', id: 'fixture.missing' }]);
+    fails(/Missing starter repository/);
+    writeDefinition(definition);
     fails(/Applet publish failed/);
     fs.writeFileSync(path.join(applet, 'publish.bat'), '@echo off\r\nexit /b 0\r\n', 'ascii');
     fs.appendFileSync(path.join(getPublishDirectory(applet), 'update.zip'), 'tampered');
@@ -155,10 +169,56 @@ test(
     writeManifest({ ...manifest, minimumHostVersion: '2.0.0' });
     fails(/Applet requires a newer host/);
     writeManifest(manifest);
+    writeManifest({ ...manifest, id: 'wrong.id' });
+    fails(/Starter Applet ID mismatch/);
+    writeManifest(manifest);
     const duplicate = path.join(applets, 'Applet.Duplicate');
     init(duplicate);
     fs.copyFileSync(path.join(applet, 'extension.json'), path.join(duplicate, 'extension.json'));
     fs.copyFileSync(path.join(applet, 'publish.bat'), path.join(duplicate, 'publish.bat'));
+    writeDefinition([...definition, { repository: 'Applet.Duplicate', id: manifest.id }]);
     fails(/Duplicate Applet ID/);
+    writeDefinition([...definition, definition[0]]);
+    fails(/Duplicate starter repository/);
+    writeDefinition([{ repository: '../outside', id: 'outside' }]);
+    fails(/Invalid starter repository/);
+    writeDefinition([]);
+    fails(/Invalid or empty starter definition/);
+    writeDefinition([...definition, { repository: 'Applet.AddedLater', id: addedManifest.id }]);
+    const rejected = run('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(host, 'scripts/verify-starter.ps1'),
+      '-Archive',
+      zip,
+      '-Destination',
+      path.join(directory, 'wrong-roster'),
+    ]);
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stdout + rejected.stderr, /Starter roster differs/);
+    fs.writeFileSync(path.join(added, 'publish.bat'), publisher, 'ascii');
+    result = build();
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const selected = path.join(directory, 'selected-bundle');
+    result = run('powershell.exe', [
+      '-NoProfile',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(host, 'scripts/verify-starter.ps1'),
+      '-Archive',
+      zip,
+      '-Destination',
+      selected,
+    ]);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(path.join(selected, 'bundle.json')))
+        .applets.map((item) => item.id)
+        .sort(),
+      ['fixture.added-later', 'fixture.applet'],
+    );
   },
 );

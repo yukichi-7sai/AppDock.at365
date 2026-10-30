@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "applets": [
+    { "repository": "Applet.WebApplet.at365", "id": "at365.web-applet" },
+    { "repository": "Applet.WebBrowserTools.at365", "id": "at365.web-browser-tools" },
+    { "repository": "Applet.WindowsTools.at365", "id": "at365.windows-tools" },
+    { "repository": "Applet.Watch.at365", "id": "at365.watch" },
+    { "repository": "Applet.WallpaperSlideshow.at365", "id": "at365.wallpaper-slideshow" },
+    { "repository": "Applet.Profile.at365", "id": "at365.profile" }
+  ]
+}

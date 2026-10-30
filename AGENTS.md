@@ -16,7 +16,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 - [実装・コミット・リリースの共通手順](docs/development-workflow.md)に従う。実装時は変更に必要な検証・発行前のレビュー1回と必要な修正・再検証・対象モジュールの版更新・各40.ARTIFACT配下への発行まで。破壊的変更、設定項目の追加・削除、保存ファイルの追加・削除はマイナーを1つ増やしてパッチを0にする。通常の実装・修正は発行のたびにパッチを1つ増やし、同じ機能の未コミット・未公開変更への追加修正にも適用する。判定と新たな実装・修正を伴わない再発行の扱いは共通手順に従う。文書のみの変更は製品の版更新・発行を行わない。
 - コミット依頼時は実装時の成功結果を試験ごとに照合して原則再利用する。未実行・失敗・後続変更の影響がある試験、記録不足の試験だけを実行し、必要回帰の成功が揃ってからコミットする。製品修正時はpublishも更新する。push・公開・実利用先deployは各依頼の範囲に従う。
 - 通常publishは本体の実行用フォルダーとupdate.zip/update.json、変更Appletは自身のupdate.zip/update.jsonを生成する。ビルダーは.artifactsの作業先だけを使い、発行先の利用者データを削除しない。未変更Appletの再発行・全体ZIP作成・旧ZIP整理を通常publishへ含めない。終了コード、版、成果物、固定EXEの隔離起動を確認する。
-- Release依頼では[リリース手順](docs/RELEASING.md)を読み、本体と同梱Appletの未公開版を確認する。公開済み同版は上書き・再作成しない。公開後検証に成功した対象repoごとに最新3件の公開Releaseを保持し、draft・Gitタグ・履歴・無関係repoを保持する。全体ZIPの準備と整理は[オールインワン](docs/all-in-one.md)に従う。
+- Release依頼では[リリース手順](docs/RELEASING.md)を読み、本体と同梱Appletの未公開版を確認する。公開済み同版は上書き・再作成しない。公開後検証に成功した対象repoごとに最新3件の公開Releaseを保持し、draft・Gitタグ・履歴・無関係repoを保持する。全体ZIPの準備と整理は[スターター](docs/starter.md)に従う。
 - deploy先への旧EXEの別フォルダー退避は追加しない。配置hashと利用者データ保持は確認する。この扱いを自己更新helperの復旧用backupへ流用しない。
 - 開発生成物はrepo直下の.artifacts。完了時の整理は[テストフォルダー整理](DEVELOPMENT.md#作業完了時のテストフォルダー整理)に従う。通常の試験フォルダーは終了・成功を確認した種類・実行方式ごとの直近3回を残す。固定配布物の実行用コピーは同じ区分の直近1回だけ残し、古い成功分は結果JSON・ログ・画像・設定・manifestを保持して実行ファイルと同梱ランタイムだけを整理する。実行中・状態不明・失敗未解決・固定ビルド出力・再利用する検証記録は削除しない。同期・バックアップ・スナップショットの設定は利用者が管理する。
 
@@ -87,4 +87,4 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 - 表示先切替でWebContents/session/入力を再生成しない。非選択/非表示でも背景描画を維持する。rAF・visibilityState・observer.readyやPlaywrightのfocus emulationだけで実受信成功と扱わず、通常起動の描画/取得を確認する。
 - keepActiveの遷移/破棄時解除、native focusの優先、Debugger接続の冪等回収を維持する。WebContentsViewを含む画面は親WindowのcapturePageだけで表示確認を完了扱いにしない。
 - 無効Appletは実リボンから除外し、設定カタログと保存配置は保持する。再開時の元の配置と、有効Appletの開始待ち/エラー/再試行を維持する。
-- 新規Appletは30.PROJECT直下の独立repoにextension.jsonとpublish.batを置き、一意IDを使う。共通API・保存・配布は[Appletガイド](docs/applet-development.md)に従い、本体へ固定のApplet一覧を追加しない。共通pack-applet-update.ps1で個別更新物を作る。
+- 新規Appletは30.PROJECT直下の独立repoにextension.jsonとpublish.batを置き、一意IDを使う。共通API・保存・配布は[Appletガイド](docs/applet-development.md)に従い、本体の実行時検出へ固定のApplet一覧を追加しない。配布用スターターの同梱対象はscripts/starter-applets.jsonだけで管理する。共通pack-applet-update.ps1で個別更新物を作る。

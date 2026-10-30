@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-31: スターター対応と共通手順のコミット照合
+
+- スターター対応と共通手順のコミット依頼を受け、AppDock main `dcd088b`の26パス（旧名の削除5件を含む）と、30.PROJECTのAGENTS.mdだけをレビューした。実装後の製品修正はなく、0.109.1と発行物を維持する。指定6件の一覧、対象外の非同梱・非発行、不足/ID不一致の拒否、実行時Applet検出からの独立、Releaseの添付/seal/旧ZIP整理、文書の参照、予約キーを登録しないGUI試験を再確認し、未解決指摘なし。
+- 実装時の985入力と共通手順のSHA256、今回と直前の標準回帰を含む完全ログ81件、発行EXE/asar/ZIP/feed、固定smoke・6Applet GUIの本体コピー、同梱714ファイル、元の各Applet ZIP/feedを照合した。型検査/build/書式・関連19件・固定smoke・全6Applet起動成功を再利用し、新しい試験実行・再発行は行っていない。
+- 標準155ファイルについて、変更したRelease試験とall-in-one→starter改名、および同時に実行したRelease整理試験以外の152ファイルは前回の成功入力と一致した。本体実装・native・API・依存・ビルド実処理は不変で、配布処理とその検証・文書・パッチ版/packコマンドだけの変更である。前回1387件のうち今回範囲の17件を現在の19件へ置き換え、19件＋影響のない既存1370件で標準1389件の必要範囲が揃った。新しい配布物の試験を古い成果物の成功で代替せず、0.109.1の実装時固定コピーを照合した。
+- 証跡は`.artifacts/commit-validation-starter-20261031/`のaudit.cjs・audit.log・reuse.json・scope.json・stage.json・commit.json。今回の記録追記だけを文書差分として記録し、stageと作業ファイル、commit treeの一致を確認する。実行用コピーを追加せず、実装時の整理結果と最新固定コピーを保持した。正式なスターターの作成/Release Prepare・公開後検証・実サービス/物理入力は実装時の未実施範囲を維持する。push・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-31: 指定6Appletのスターター配布へ切り替え 0.109.1
+
+- AppDockと共通手順repoのmain・cleanを確認し、通常Windows環境の`pull --ff-only`は両方Already up to date。本体の開始commitは`dcd088b2e157a408652338cbdf28619c14dfaa70`。スターターの同梱対象を`scripts/starter-applets.json`のWebApplet・WebBrowserTools・WindowsTools・Watch・WallpaperSlideshow・Profileに限定した。作成・Release事前検査・ZIP検証が同じrepository/id定義を参照する。対象外repoは読み取り・再発行・同梱せず、指定repo不足・ID不一致・重複は失敗させる。本体の実行時検出は変更していない。
+- 配布名を`AppDock.at365-starter-<version>.zip`、入口を`pack:starter`へ変更し、作成・検証・GUIスクリプトと手順書を改名した。Releaseの3アセット・検証ログ名・sealを接続し、新版の検証成功後だけ古い正式版のスターターZIPと旧オールインワンZIPを整理する。同版・新版・別名・リンク・ディレクトリ・失敗時の旧ZIPを保持する。README、利用案内、開発・Release手順、本体/30.PROJECTのAGENTSを整合させた。過去のReleaseノートと検証履歴は保持。
+- 発行前レビューで、同梱GUI試験の初期無効・旧設定ナビゲーション・既定値が必ずJSONへ保存されるという古い前提を修正した。新規Appletの初期有効とrunning、現在の設定ナビゲーション、既定値省略を確認する。隔離profileのみで更新自動確認と予約キーを含むmanifest既定ショートカットの登録を抑止し、配布manifestを保持する。追加の起動試験でWatchのPauseが登録されないことを確認。未解決の指摘なし。
+- 配布処理の変更で、製品の設定・保存形式・公開APIは変更しないため0.109.0→0.109.1のパッチ更新。固定lockfile install、型検査、書式・JS/PowerShell構文、PS1のUTF-8 BOM/CRLF、差分・関連参照確認が成功。`tests/starter.test.cjs`・`tests/release.test.cjs`・`tests/release-retention.test.cjs`の19件はfail/cancel/skip 0。新規兄弟repoの非同梱・非発行、指定追加後の収録、不足/ID不一致/重複/不正パス/空一覧、一覧とZIPの不一致、改変payload、最低本体版、失敗時の既存ZIP保持、公開前ガードと旧ZIP整理を隔離fixtureで確認した。標準全体回帰は未実行。
+- `publish.bat`終了0、本体buildと通常発行が成功。`A:\40.ARTIFACT\AppDock.at365\win-unpacked`とupdate.json/ZIPは0.109.1。ZIP270,820,196バイト、SHA256 `51a51ef11d8c29f7cf93e205da702670d5a64fdc7ec446601183a484e3b38e91`はfeedと一致。EXE `b0d8e6e086997f47495e9641517bdc946c2332ff772bd39b803c9b0d9cdeca2a`、asar `b14f24988997cb128170df3b1361c2550d2fe0dbb2e38a41717955a8ea2a0b80`。固定配布物のsmokeはok:true、保存・画像・トレイ・終了を確認。
+- 実発行済みの本体と6Applet（WebApplet0.4.2、WebBrowserTools0.3.6、WindowsTools0.2.10、Watch0.5.4、WallpaperSlideshow0.7.6、Profile0.1.1）のZIP/feedをハッシュ一致の隔離fixtureへコピーし、本番のbuild-starterで検証用ZIPを作成した。fixture publisherは固定コピーを使うため、各Appletの実再発行を代替した検証であり、正式なRelease Prepareではない。714ファイルのhash/size・本体EXE一致・6件だけの収録・全6件の初期有効/running/エラーなし・設定保存・終了がstarter-ui-testで成功。Aboutの「Applet 6／稼働中6」と0.109.1を画像でも確認した。検証用ZIP SHA256は`e39329295bd01eba2804b1dc3512698cda4bf84e23f5f4a0660baa6509828319`。正式発行先へのスターターZIP作成、実Applet再発行、seal・公開後検証、実サービス/物理入力/実利用受入は今回行っていない。
+- 証跡は`.artifacts/starter-20261031/`の入力一覧・完全ログ・review.json・publication.json・real-fixture-inputs.json・bundle-ui.json・validation.json・cleanup.json。固定コピーは`.artifacts/smoke-1793380895994/`と`.artifacts/bundle-verify-186e785e-adb8-4d71-a232-4f865e13c7cb/`。成功・終了・絶対パス・再解析ポイント不在を確認し、今回の一時梱包fixtureと前回成功smokeの本体管理18項目だけを整理、設定/ログ等86ファイルのSHA保持と最新コピー保持を確認した。失敗・診断・状態不明の既存試験は保持。両repoの未コミット変更として残し、commit・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-31: 表示・一般の保存先選択0.109.0の受入・コミット照合
 
 - 表示・一般の共有／端末専用切り替えの実利用確認後、コミット依頼を受けた。main `2ca429a9e3d8d6b713de6d8bdd45c0bd3644d94e`上の今回の22ファイルをレビューし、未解決の製品指摘なし。受入後は利用案内の倍率の保存先を選択に従う説明へ揃えただけで、製品・試験・依存・発行物は変更せず0.109.0を維持する。

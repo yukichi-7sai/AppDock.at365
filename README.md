@@ -4,7 +4,7 @@
 
 [Releases](https://github.com/yukichi-7sai/AppDock.at365/releases/latest)から本体の `update.zip` をダウンロードし、書き込み可能なフォルダーへ全体を展開して、中の `AppDock.at365.exe` を起動します。インストーラーは不要です。
 
-拡張機能（Applet）を同梱した `AppDock.at365-all-in-one-<バージョン>.zip` も利用できます。ZIP全体を展開し、中の `AppDock.at365.exe` を起動してください。
+6つの拡張機能（Applet）を同梱したスターター `AppDock.at365-starter-<バージョン>.zip` も利用できます。ZIP全体を展開し、中の `AppDock.at365.exe` を起動してください。
 
 ## ビルド方法
 

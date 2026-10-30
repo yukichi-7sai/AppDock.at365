@@ -1,5 +1,7 @@
 ﻿param([Parameter(Mandatory = $true)][string]$Archive, [Parameter(Mandatory = $true)][string]$Destination)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'starter-applets.ps1')
+$taskDefinition = @(Read-StarterDefinition)
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $Destination = [IO.Path]::GetFullPath($Destination)
 if (Test-Path -LiteralPath $Destination) { throw 'Verification destination must be new.' }
@@ -22,6 +24,21 @@ try {
     $taskReader = [IO.StreamReader]::new($taskEntries['bundle.json'].Open())
     try { $taskBundle = $taskReader.ReadToEnd() | ConvertFrom-Json } finally { $taskReader.Dispose() }
     if ($taskBundle.schemaVersion -ne 1 -or @($taskBundle.applets).Count -eq 0) { throw 'Invalid bundle manifest' }
+    if (@($taskBundle.applets).Count -ne $taskDefinition.Count) { throw 'Starter roster differs from definition' }
+    $taskAppletDirectories = @{}
+    foreach ($taskExpected in $taskDefinition) {
+        $taskMatches = @($taskBundle.applets | Where-Object { $_.repository -ceq $taskExpected.repository -and $_.id -ceq $taskExpected.id })
+        if ($taskMatches.Count -ne 1) { throw "Starter roster differs from definition: $($taskExpected.repository)" }
+        $taskAppletDirectories[$taskExpected.repository] = $true
+        $taskManifestName = "extensions/$($taskExpected.repository)/extension.json"
+        if (-not $taskEntries.ContainsKey($taskManifestName)) { throw "Missing bundled Applet manifest: $taskManifestName" }
+        $taskReader = [IO.StreamReader]::new($taskEntries[$taskManifestName].Open())
+        try { $taskManifest = $taskReader.ReadToEnd() | ConvertFrom-Json } finally { $taskReader.Dispose() }
+        if ($taskManifest.id -cne $taskExpected.id -or $taskManifest.version -cne $taskMatches[0].version) { throw "Bundled Applet manifest differs: $taskManifestName" }
+    }
+    foreach ($taskName in $taskEntries.Keys) {
+        if ($taskName -imatch '^extensions/([^/]+)(/|$)' -and -not $taskAppletDirectories.ContainsKey($Matches[1])) { throw "Unlisted starter Applet: $taskName" }
+    }
     $taskInventory = @{}
     foreach ($taskFile in $taskBundle.files) {
         if ($taskInventory.ContainsKey($taskFile.path) -or -not $taskEntries.ContainsKey($taskFile.path)) { throw "Invalid inventory: $($taskFile.path)" }

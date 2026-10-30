@@ -6,15 +6,16 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const assert = require('node:assert/strict');
 const { pruneReleases } = require('./release-retention.cjs');
+const { starterSources } = require('./starter-applets.cjs');
 const CHECKS = [
   'typecheck',
   'regression',
   'publish',
-  'pack-all-in-one',
+  'pack-starter',
   'portable-updates',
   'update-progress',
   'update-recovery',
-  'all-in-one',
+  'starter',
 ];
 const REPOSITORY = 'yukichi-7sai/AppDock.at365';
 const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
@@ -57,19 +58,8 @@ function createRelease(
   };
   const sources = () => {
     const host = snapshot(root);
-    const applets = fs
-      .readdirSync(path.dirname(root), { withFileTypes: true })
-      .filter(
-        (entry) =>
-          entry.isDirectory() &&
-          fs.existsSync(path.join(path.dirname(root), entry.name, '.git')) &&
-          fs.existsSync(path.join(path.dirname(root), entry.name, 'extension.json')),
-      )
-      .map((entry) => {
-        const repo = path.join(path.dirname(root), entry.name);
-        const manifest = read(path.join(repo, 'extension.json'));
-        return { ...snapshot(repo), id: manifest.id, version: manifest.version };
-      })
+    const applets = starterSources(root)
+      .map(({ directory, id, version }) => ({ ...snapshot(directory), id, version }))
       .sort((a, b) => a.repository.localeCompare(b.repository));
     assert.ok(applets.length, 'No local Applet repositories');
     assert.equal(
@@ -115,7 +105,7 @@ function createRelease(
         assert.deepEqual(asset(expected.path), expected, `Prepared file changed: ${expected.name}`);
       assert.deepEqual(
         plan.assets.map((a) => a.name),
-        ['update.zip', 'update.json', `AppDock.at365-all-in-one-${version()}.zip`],
+        ['update.zip', 'update.json', `AppDock.at365-starter-${version()}.zip`],
       );
     }
   }
@@ -142,15 +132,18 @@ function createRelease(
     for (const item of bundle.applets) {
       assert.equal(item.dirty, false, `Uncommitted Applet: ${item.repository}`);
       assert.equal(
-        hash(path.join(getPublishDirectory(path.join(path.dirname(root), item.repository)), 'update.zip')),
+        hash(
+          path.join(
+            getPublishDirectory(path.join(path.dirname(root), item.repository)),
+            'update.zip',
+          ),
+        ),
         item.updateZipSha256,
       );
     }
-    plan.assets = [
-      'update.zip',
-      'update.json',
-      `AppDock.at365-all-in-one-${version()}.zip`,
-    ].map((name) => asset(path.join(getPublishDirectory(root), name)));
+    plan.assets = ['update.zip', 'update.json', `AppDock.at365-starter-${version()}.zip`].map(
+      (name) => asset(path.join(getPublishDirectory(root), name)),
+    );
     assert.equal(report.archiveSha256, plan.assets[2].sha256, 'Bundle changed after UI check');
     const hostFile = bundle.files.find((file) => file.path === 'AppDock.at365.exe');
     assert.ok(hostFile, 'Bundle must contain the host executable');
@@ -182,7 +175,7 @@ function createRelease(
     for (const entry of fs.readdirSync(publish, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
       const match =
-        /^AppDock\.at365-all-in-one-((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))\.zip$/.exec(
+        /^AppDock\.at365-(?:starter|all-in-one)-((?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))\.zip$/.exec(
           entry.name,
         );
       if (!match) continue;

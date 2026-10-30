@@ -302,7 +302,7 @@ Coordinatorは共有を含む操作を1つのトランザクションとして�
 
 共有Settingsのschemaと既存の保存値は変更しない。参照先が未指定の既存配置は、そのまま従来のsettings.jsonを使用する。過去の端末JSON、共有設定、data/、正常世代を自動変更しない。
 
-publish・deploy・自己更新・オールインワンの処理対象は従来のEXE配置先を維持する。NAS上のsettings.json・data/・排他用ファイルと、EXE隣の端末JSON・旧data/を配布生成物に含めたり、EXEと一緒に上書き・削除したりしない。参照先変更だけで、配置ID、通知の起動先、Windows起動タスク、更新先を作り直さない。
+publish・deploy・自己更新・スターターの処理対象は従来のEXE配置先を維持する。NAS上のsettings.json・data/・排他用ファイルと、EXE隣の端末JSON・旧data/を配布生成物に含めたり、EXEと一緒に上書き・削除したりしない。参照先変更だけで、配置ID、通知の起動先、Windows起動タスク、更新先を作り直さない。
 
 ## 実装の影響先と順序
 

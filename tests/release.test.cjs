@@ -11,8 +11,16 @@ function fixture(t) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const root = path.join(directory, '30.PROJECT/AppDock.at365');
   const applet = path.join(directory, '30.PROJECT/Applet.Fixture');
-  for (const repo of [root, applet]) { fs.mkdirSync(repo, { recursive: true }); fs.mkdirSync(getPublishDirectory(repo), { recursive: true }); }
+  for (const repo of [root, applet]) {
+    fs.mkdirSync(repo, { recursive: true });
+    fs.mkdirSync(getPublishDirectory(repo), { recursive: true });
+  }
   fs.mkdirSync(path.join(applet, '.git'));
+  save(path.join(root, 'scripts/starter-applets.json'), {
+    schemaVersion: 1,
+    applets: [{ repository: 'Applet.Fixture', id: 'fixture' }],
+  });
+  fs.writeFileSync(path.join(applet, 'publish.bat'), '@echo off\r\n');
   save(path.join(root, 'package.json'), { version: '1.2.3' });
   save(path.join(applet, 'extension.json'), { id: 'fixture', version: '1.0.0' });
   fs.writeFileSync(path.join(getPublishDirectory(applet), 'update.zip'), 'applet fixture');
@@ -93,7 +101,7 @@ function fixture(t) {
   const release = createRelease(root, run);
   release.preflight(planPath, notes);
   const exe = path.join(getPublishDirectory(root), 'update.zip');
-  const archive = path.join(getPublishDirectory(root), 'AppDock.at365-all-in-one-1.2.3.zip');
+  const archive = path.join(getPublishDirectory(root), 'AppDock.at365-starter-1.2.3.zip');
   fs.writeFileSync(exe, 'host fixture');
   fs.writeFileSync(archive, 'archive fixture');
   const host = asset(exe);
@@ -132,6 +140,45 @@ function fixture(t) {
 }
 const mutations = (state) =>
   state.calls.filter((call) => call[0] === 'gh' && call[1] === 'release');
+
+test('starter distribution selects the requested six repositories', () => {
+  const { readStarterDefinition } = require('../scripts/starter-applets.cjs');
+  assert.deepEqual(
+    readStarterDefinition(path.resolve(__dirname, '..')).map((item) => item.repository),
+    [
+      'Applet.WebApplet.at365',
+      'Applet.WebBrowserTools.at365',
+      'Applet.WindowsTools.at365',
+      'Applet.Watch.at365',
+      'Applet.WallpaperSlideshow.at365',
+      'Applet.Profile.at365',
+    ],
+  );
+});
+
+test('release ignores unlisted siblings and refuses missing or substituted starter inputs', (t) => {
+  const { root, release, state, planPath } = fixture(t);
+  const extra = path.join(path.dirname(root), 'Applet.Unlisted');
+  fs.mkdirSync(path.join(extra, '.git'), { recursive: true });
+  fs.writeFileSync(path.join(extra, 'extension.json'), 'invalid JSON');
+  assert.deepEqual(release.sources(), read(planPath).source);
+  assert.equal(
+    state.calls.some((call) => call.includes(extra)),
+    false,
+  );
+  const definitionFile = path.join(root, 'scripts/starter-applets.json');
+  const definition = read(definitionFile);
+  save(definitionFile, {
+    schemaVersion: 1,
+    applets: [...definition.applets, { repository: 'Applet.Missing', id: 'missing' }],
+  });
+  assert.throws(() => release.sources(), /Missing starter repository/);
+  save(definitionFile, definition);
+  const manifest = path.join(path.dirname(root), 'Applet.Fixture/extension.json');
+  save(manifest, { id: 'substituted', version: '1.0.0' });
+  assert.throws(() => release.sources(), /Starter Applet ID mismatch/);
+  assert.equal(mutations(state).length, 0);
+});
 
 test('release stages every verified asset before the single publication operation', async (t) => {
   const { state, release, planPath } = fixture(t);
@@ -215,21 +262,27 @@ test('version update increases stable version and leaves other package data unch
 test('successful release preparation removes only older stable bundles in publish', (t) => {
   const { root, release, planPath, archive } = fixture(t);
   const publish = path.join(getPublishDirectory(root));
-  const old = ['AppDock.at365-all-in-one-0.26.2.zip', 'AppDock.at365-all-in-one-1.2.2.zip'];
+  const old = [
+    'AppDock.at365-starter-0.26.2.zip',
+    'AppDock.at365-starter-1.2.2.zip',
+    'AppDock.at365-all-in-one-1.2.2.zip',
+  ];
   const keep = [
-    'AppDock.at365-all-in-one-1.10.0.zip',
+    'AppDock.at365-all-in-one-1.2.3.zip',
     'AppDock.at365-all-in-one-2.0.0.zip',
-    'AppDock.at365-all-in-one-1.0.0-beta.1.zip',
-    'AppDock.at365-all-in-one-01.0.0.zip',
+    'AppDock.at365-starter-1.10.0.zip',
+    'AppDock.at365-starter-2.0.0.zip',
+    'AppDock.at365-starter-1.0.0-beta.1.zip',
+    'AppDock.at365-starter-01.0.0.zip',
     'other-1.0.0.zip',
   ];
   for (const name of [...old, ...keep]) fs.writeFileSync(path.join(publish, name), name);
-  const nested = path.join(publish, 'nested/AppDock.at365-all-in-one-1.0.0.zip');
+  const nested = path.join(publish, 'nested/AppDock.at365-starter-1.0.0.zip');
   fs.mkdirSync(path.dirname(nested));
   fs.writeFileSync(nested, 'nested');
-  const directory = path.join(publish, 'AppDock.at365-all-in-one-0.0.1.zip');
+  const directory = path.join(publish, 'AppDock.at365-starter-0.0.1.zip');
   fs.mkdirSync(directory);
-  const backup = path.join(root, '.artifacts/previous-all-in-one.zip');
+  const backup = path.join(root, '.artifacts/previous-starter.zip');
   fs.writeFileSync(backup, 'backup');
   const current = asset(archive);
   const hostPackage = asset(path.join(publish, 'update.zip'));
@@ -246,12 +299,12 @@ test('successful release preparation removes only older stable bundles in publis
 
 test('failed preparation or changed bundle preserves older packages', (t) => {
   const { root, release, planPath, archive } = fixture(t);
-  const old = path.join(getPublishDirectory(root), 'AppDock.at365-all-in-one-1.2.2.zip');
+  const old = path.join(getPublishDirectory(root), 'AppDock.at365-starter-1.2.2.zip');
   fs.writeFileSync(old, 'last complete package');
   const checks = path.join(root, '.artifacts/checks.json');
   save(
     checks,
-    CHECKS.filter((name) => name !== 'pack-all-in-one'),
+    CHECKS.filter((name) => name !== 'pack-starter'),
   );
   assert.throws(() => release.seal(planPath), /All checks/);
   assert.equal(fs.readFileSync(old, 'utf8'), 'last complete package');
@@ -266,7 +319,7 @@ test('release cleanup refuses a redirected publish directory', (t) => {
   const { root, release, planPath } = fixture(t);
   const publish = path.join(getPublishDirectory(root));
   const redirected = path.join(root, 'redirected');
-  const oldName = 'AppDock.at365-all-in-one-1.2.2.zip';
+  const oldName = 'AppDock.at365-starter-1.2.2.zip';
   fs.writeFileSync(path.join(publish, oldName), 'keep');
   fs.renameSync(publish, redirected);
   fs.symlinkSync(redirected, publish, process.platform === 'win32' ? 'junction' : 'dir');

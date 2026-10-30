@@ -30,11 +30,11 @@ if ($Mode -eq 'Prepare') {
         @{ name = 'typecheck'; file = (Join-Path $taskRoot 'dev.bat'); arguments = @('run', 'typecheck') },
         @{ name = 'regression'; file = (Join-Path $taskRoot 'dev.bat'); arguments = @('test') },
         @{ name = 'publish'; file = (Join-Path $taskRoot 'publish.bat'); arguments = @() },
-        @{ name = 'pack-all-in-one'; file = (Join-Path $taskRoot 'dev.bat'); arguments = @('run', 'pack:all-in-one') },
+        @{ name = 'pack-starter'; file = (Join-Path $taskRoot 'dev.bat'); arguments = @('run', 'pack:starter') },
         @{ name = 'portable-updates'; file = $taskNode; arguments = @('scripts/portable-updates-ui-test.cjs') },
         @{ name = 'update-progress'; file = $taskNode; arguments = @('scripts/update-progress-ui-test.cjs') },
         @{ name = 'update-recovery'; file = $taskNode; arguments = @('scripts/update-recovery-test.cjs') },
-        @{ name = 'all-in-one'; file = $taskNode; arguments = @('scripts/all-in-one-ui-test.cjs', (Join-Path $taskLogRoot 'bundle-ui.json')) }
+        @{ name = 'starter'; file = $taskNode; arguments = @('scripts/starter-ui-test.cjs', (Join-Path $taskLogRoot 'bundle-ui.json')) }
     )
     $taskPassed = @()
     Push-Location $taskRoot

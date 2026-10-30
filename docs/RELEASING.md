@@ -1,6 +1,6 @@
 # AppDockのGitHub Release手順
 
-この文書をリリースの正本とします。ユーザーからAppDockのリリースを依頼されたら、本体とフルパッケージに同梱したAppletを下記の範囲でまとめて扱い、各repoの公開後検証と整理まで実施します（2026-10-10ユーザー指定）。単なるビルドや手順整備では公開しません。実測結果は[VERIFICATION.md](../VERIFICATION.md)へ記録します。
+この文書をリリースの正本とします。ユーザーからAppDockのリリースを依頼されたら、本体とスターターに同梱したAppletを下記の範囲でまとめて扱い、各repoの公開後検証と整理まで実施します（2026-10-10ユーザー指定）。単なるビルドや手順整備では公開しません。実測結果は[VERIFICATION.md](../VERIFICATION.md)へ記録します。
 
 実装中のテスト選択、発行前のレビュー・修正と版更新、コミット前の必要回帰、コミット漏れの解消と検証証跡の再利用は[共通手順](development-workflow.md)に従います。リリース時に同じソース回帰を重複実行する必要はありません。ただし、以下の新しい配布物と公開後の確認は省略しません。
 
@@ -14,8 +14,8 @@
 | 全体ZIPの各Applet | 同梱した版が自身のrepoで未公開なら、その同梱版を個別公開・検証。公開済み同版はskip | update.zip、update.json |
 | 本機能公開した全repo | 各repoの公開後検証が成功してから、公開日時順で最新3件を保持して古いRelease/assetを削除 | draft・Gitタグ/履歴は保持 |
 
-1. 本体版とGitHubの公開Release/タグを確認します。本体版が未公開なら下記の本体Prepareを実行し、固定した全体ZIPと`bundle.json`のApplet一覧（repository/id/version/commit/updateZipSha256）を公開対象の正本にします。Applet数や名前を固定リストにしません。
-2. 本体版がすでに公開済みの場合は、その公開ZIPと検証済みbundle/planを使います。公開EXE/feed/ZIPのhashと検証済み資料の一致を確認し、未公開Appletのために同版の本体を再ビルド・再公開しません。資料がなければ公開ZIPを隔離して取得・照合し、同梱版を確認します。最新checkoutが同梱版と異なる場合は混ぜず、新しい本体版のフルパッケージを準備するか、差を報告して止めます。
+1. 本体版とGitHubの公開Release/タグを確認します。本体版が未公開なら下記の本体Prepareを実行し、固定した全体ZIPと`bundle.json`のApplet一覧（repository/id/version/commit/updateZipSha256）を公開対象の正本にします。準備対象は`starter-applets.json`で指定し、公開する版とcommitは検証済みbundleで確定します。対象外のAppletは本体リリースに含めません。
+2. 本体版がすでに公開済みの場合は、その公開ZIPと検証済みbundle/planを使います。公開EXE/feed/ZIPのhashと検証済み資料の一致を確認し、未公開Appletのために同版の本体を再ビルド・再公開しません。資料がなければ公開ZIPを隔離して取得・照合し、同梱版を確認します。最新checkoutが同梱版と異なる場合は混ぜず、新しい本体版のスターターを準備するか、差を報告して止めます。
 3. 全同梱Appletのorigin・GitHub main・既存タグ・公開Releaseを読み取ります。同梱manifestの版が公開済みなら、当該タグの公開配布物のID/版を確認してskipと記録します。無関係なrepoやWebAppletのサイト項目は公開対象にしません。
 4. 未公開の各Appletについて、そのrepoの指示・既存検証を確認し、cleanな対象commit/main、ノート、manifest/feedのID/版/最低ホスト版、ZIP全収録ファイルのsize/hashを検証します。同梱の`updateZipSha256`と元update.zip、bundle中の各ファイルとの一致を必須とし、同梱版をそのまま使います。再発行でhashや内容が変われば本体Prepareへ戻します。同梱だけでApplet版を増やしません。
 5. 未公開本体と未公開Appletの下書き/全asset照合を完了してから順番に公開します。各Appletは下記の個別Release手順を使い、既存の一致するdraftは不足assetだけを追加して再利用します。既存の公開済みassetには`--clobber`を使わず、タグを移動しません。
@@ -30,7 +30,7 @@
 | --- | --- |
 | `update.zip` | フォルダー型本体・本体自己更新 |
 | `update.json` | 通常EXEの版・サイズ・SHA256を示す更新情報 |
-| `AppDock.at365-all-in-one-<version>.zip` | 同じEXE + 全ローカルAppletを`extensions`へ配置 + `bundle.json` |
+| `AppDock.at365-starter-<version>.zip` | 同じ本体一式 + 指定の6Appletを`extensions`へ配置 + `bundle.json` |
 
 全体ZIPをupdate.jsonのpayloadに指定しません。Appletの個別更新は各repoのupdate.json/update.zipを継続します。
 
@@ -82,11 +82,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
 1. `dev.bat run typecheck`
 2. `dev.bat test`（helper・本体・fixtureビルドと回帰テスト）
 3. `publish.bat`（本体/.NET/helper/portable/feedのみ）
-4. `dev.bat run pack:all-in-one`（全ローカルApplet再発行 → 全体ZIP。同梱だけの未変更Appletの版は上げない）
+4. `dev.bat run pack:starter`（指定の6Applet再発行 → 全体ZIP。同梱だけの未変更Appletの版は上げない）
 5. ローカルNodeで`scripts/portable-updates-ui-test.cjs`
 6. 同`scripts/update-progress-ui-test.cjs`
 7. 同`scripts/update-recovery-test.cjs`
-8. 同`scripts/all-in-one-ui-test.cjs`（ZIP全収録ファイルのhash/size、通常EXEとの一致、隔離展開起動、全Appletの版/初期無効/エラーなし、終了）
+8. 同`scripts/starter-ui-test.cjs`（ZIP全収録ファイルのhash/size、通常EXEとの一致、隔離展開起動、指定Appletの収録一致/版/初期有効/起動/エラーなし、終了）
 
 1件でも失敗するとそこで停止し、GitHubへ接続/公開しません。各ステップのログ、`checks.json`、`bundle-ui.json`をplan隣へ保存します。最後にsealでhost/Appletのcommitとclean状態、同梱一覧、元Applet ZIPハッシュ、3アセット、ノート、検証ログのハッシュを照合します。通常publishではこの整理を行いません。
 
@@ -109,11 +109,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 `
    ```
 
 3. `typecheck`/`regression`それぞれについて、再利用できる場合は完全な元ログをplan隣の`typecheck.log`/`regression.log`へコピーします。各コピーの末尾へ「実行ではなく再利用」である旨と、元記録/ログの絶対パス・元SHA256・実行日時・コマンド・終了コード・検証時tree/対応commit・tree/commit・依存/環境照合結果を追記します。この末尾を含めてsealの証跡ハッシュに入ります。元ログ/元記録は変更しません。再利用できない項目は上記1/2のコマンドを実行して同名ログへ出力し、終了0を確認します。
-4. 上記3〜8の配布物生成・検証を同じ順序/引数で実行します。実行場所は`$taskRepo`、ローカルNodeは`$taskNode`です。ログ名は順に`publish.log`、`pack-all-in-one.log`、`portable-updates.log`、`update-progress.log`、`update-recovery.log`、`all-in-one.log`。最後の試験へ渡す出力先は`Join-Path $taskLogRoot 'bundle-ui.json'`です。各終了コードを確認し、非0/実行不能ならそこで停止します。PowerShellのnative stderr処理は`release.ps1`の実装と同じく終了コードで判定します。
+4. 上記3〜8の配布物生成・検証を同じ順序/引数で実行します。実行場所は`$taskRepo`、ローカルNodeは`$taskNode`です。ログ名は順に`publish.log`、`pack-starter.log`、`portable-updates.log`、`update-progress.log`、`update-recovery.log`、`starter.log`。最後の試験へ渡す出力先は`Join-Path $taskLogRoot 'bundle-ui.json'`です。各終了コードを確認し、非0/実行不能ならそこで停止します。PowerShellのnative stderr処理は`release.ps1`の実装と同じく終了コードで判定します。
 5. 全8項目が実行成功または上記条件で再利用成功となった場合だけ、以下の内容をUTF-8の`checks.json`へ保存します。各項目の実態とログを確認してから記入し、未確認項目を追加してsealを通す行為は禁止します。
 
    ```json
-   ["typecheck", "regression", "publish", "pack-all-in-one", "portable-updates", "update-progress", "update-recovery", "all-in-one"]
+   ["typecheck", "regression", "publish", "pack-starter", "portable-updates", "update-progress", "update-recovery", "starter"]
    ```
 
 成功後は下記Draft/Publish/Verifyへ進みます。seal後にログやノートを追記しません。
@@ -179,11 +179,11 @@ planの`retentionReport`が指すJSONに、削除前一覧・保持対象・削�
 
 ## Appletを追加したとき
 
-[オールインワン発行](all-in-one.md)の自動探索が正本です。AppDockの親フォルダー直下に独立repoを置き、`.git`、`extension.json`、失敗時非0終了の`publish.bat`を用意します。共通`pack-applet-update.ps1`で`A:/40.ARTIFACT/AppDock.at365/update.json`と`update.zip`を作ります。IDを重複させず、version/runtime/apiVersion/minimumHostVersion/entryを正しく記載します。
+[スターター作成](starter.md)と[`scripts/starter-applets.json`](../scripts/starter-applets.json)の同梱定義が正本です。新規AppletはAppDockの親フォルダー直下に独立repoを置き、`.git`、`extension.json`、失敗時非0終了の`publish.bat`を用意します。共通`pack-applet-update.ps1`で各repoの40.ARTIFACT配下に`update.json`と`update.zip`を作ります。IDを重複させず、version/runtime/apiVersion/minimumHostVersion/entryを正しく記載します。
 
-Release Prepareの`pack:all-in-one`が毎回全対象を列挙するため、6件などの固定リストを更新する必要はありません。追加したAppletは自身のpublishで確認し、AppDockリリース時に全体ZIPの起動検証で収録を確認します。ローカル最新版とはその時点のcheckoutです。リリース準備は全repoのcleanを要求します。
+新規Appletは自動ではスターターへ追加しません。同梱対象を変える依頼があった場合だけ、同梱定義のrepository/idと説明・検証を更新します。作成とRelease事前検査は同じ一覧だけを対象とし、ZIP検証でも不足・余分・ID不一致を拒否します。ローカル最新版とはその時点のcheckoutです。リリース準備は本体と指定された同梱repoのcleanを要求します。公開する同梱版は作成後の検証済み`bundle.json`で確定します。
 
-開発用`build-all-in-one.ps1 -AppletRoot`は別探索先も許可しますが、Releaseスクリプトは標準の兄弟配置を使用します。別配置を正式運用する場合は、発行とreleaseの探索を同時に変更/試験してください。新規repo自動追加の回帰は`tests/all-in-one.test.cjs`で検証します。
+開発用`build-starter.ps1 -AppletRoot`は指定repoの別配置も許可しますが、Releaseスクリプトは標準の兄弟配置を使用します。別配置を正式運用する場合は、発行とReleaseの参照先を同時に変更/試験してください。対象外repoの非同梱・非発行、対象不足やID不一致の拒否は`tests/starter.test.cjs`と`tests/release.test.cjs`で検証します。
 
 ## Applet個別Release
 

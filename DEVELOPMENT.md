@@ -16,7 +16,7 @@
 | --- | --- |
 | 設定一覧の件数と索引 | [設定一覧の容量と検索](docs/settings-capacity.md) |
 | 操作・設定と動作環境 | [機能・操作・設定](docs/usage.md) |
-| 開発・コミット・配布 | [共通手順](docs/development-workflow.md)、[ローカル発行](docs/publishing.md)、[GitHub Release](docs/RELEASING.md)、[全体ZIP](docs/all-in-one.md) |
+| 開発・コミット・配布 | [共通手順](docs/development-workflow.md)、[ローカル発行](docs/publishing.md)、[GitHub Release](docs/RELEASING.md)、[全体ZIP](docs/starter.md) |
 | テストの作成・整理 | [検査の価値、層の選択、共通化と削除の判断](docs/testing.md) |
 | Appletの開発とAPI | [実装ガイド](docs/applet-development.md)、[Applet API](docs/extensions.md)、[ホスト拡張](docs/host-development.md)、[ページ](docs/applet-pages.md) |
 | 設定・入力・保存 | [共通レイアウト指針](docs/settings-ui-guidelines.md)、[設定UIと既定値・リセット](docs/settings-foundation.md)、[一覧とダイアログ](docs/settings-list-editing.md)、[端末別保存・同期・復旧](docs/settings-sync.md) |
@@ -64,7 +64,7 @@ pnpmのパッケージストアは、`pnpm-workspace.yaml`の`storeDir: .pnpm_st
 .\publish.bat
 ```
 
-次回からの発行は `.\publish.bat` です。本体EXEと更新JSONを本体のpublishへ生成します。変更したAppletは、それぞれのrepoでpublish.batを実行します。実装・修正の完成時は、[共通手順](docs/development-workflow.md#実装)に従って発行前のレビュー1回と必要な修正・再検証を終え、[版更新の判断](docs/development-workflow.md#版更新の判断)に従って対象モジュールの版を上げて発行します。同じ機能の追加修正も、完成して発行するたびにパッチ版を進めます。マイナー更新の条件と、新たな実装・修正を伴わない再発行・リリースの扱いは共通手順に従います。通常publishからは呼び出しません。対象リポジトリ・出力・検証方法は[オールインワン作成](docs/all-in-one.md)を参照してください。`dev.bat` はローカルのNode.jsとpnpmを、そのコマンドの実行中だけPATHへ追加します。開発コマンドもこの入口から実行できます。
+次回からの発行は `.\publish.bat` です。本体一式と更新ZIP/JSONを本体の発行先へ生成します。変更したAppletは、それぞれのrepoでpublish.batを実行します。実装・修正の完成時は、[共通手順](docs/development-workflow.md#実装)に従って発行前のレビュー1回と必要な修正・再検証を終え、[版更新の判断](docs/development-workflow.md#版更新の判断)に従って対象モジュールの版を上げて発行します。同じ機能の追加修正も、完成して発行するたびにパッチ版を進めます。マイナー更新の条件と、新たな実装・修正を伴わない再発行・リリースの扱いは共通手順に従います。スターターの作成はリリース準備で行い、通常publishからは呼び出しません。対象リポジトリ・出力・検証方法は[スターター作成](docs/starter.md)を参照してください。`dev.bat` はローカルのNode.jsとpnpmを、そのコマンドの実行中だけPATHへ追加します。開発コマンドもこの入口から実行できます。
 
 開発ドライブのフォルダマウントにドライブ文字を割り当てたり解除したりすると、Nodeが解決する実体パスとpnpmのworkspace記録が変わることがあります。`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`が出たら現在の作業パスと`.pnpm-workspace-state-v1.json`を照合し、対象repoで`dev.bat install --frozen-lockfile`により依存状態を再構築します。lockfileと検査方針は維持します。実行中にパスが変わって発行が失敗した場合は、変更後の環境でビルドから発行し直して確認します。
 
@@ -171,7 +171,7 @@ scripts/                   ビルドと実機UI/portable検証
 5. 削除直前に絶対パスと対象を再確認します。対象は当該repoの`.artifacts`直下にある通常のテスト専用ディレクトリに限定します。対象と配下にjunction・シンボリックリンク等の再解析ポイントがある場合は除外し、repo外へたどりません。PowerShellの`Remove-Item -LiteralPath`など同じシェル内で処理し、使用中や削除失敗時は強制終了・制限迂回をせず残します。
 6. 残す直近分と保護対象が保持され、削除対象がなくなったことを確認します。削除名・件数、保持したものの理由、未実施や失敗を`VERIFICATION.md`の当該作業記録へ簡潔に残します。
 
-`dotnet-host`、`updater`、`test-extensions`、`node-extensions`などの固定ビルド出力、`release-*`、`all-in-one-*`、単独の調査ファイルは、この手順の削除対象に含めません。`.artifacts`全体への再帰削除や、更新日時だけを使った一括削除は行いません。
+`dotnet-host`、`updater`、`test-extensions`、`node-extensions`などの固定ビルド出力、`release-*`、`starter-*`、旧`all-in-one-*`、単独の調査ファイルは、この手順の削除対象に含めません。`.artifacts`全体への再帰削除や、更新日時だけを使った一括削除は行いません。
 
 #### 固定配布物の実行用コピー
 

@@ -4,6 +4,7 @@ $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (-not $AppletRoot) { $AppletRoot = Split-Path $taskRoot -Parent }
 $AppletRoot = [IO.Path]::GetFullPath($AppletRoot)
 . (Join-Path $PSScriptRoot 'publish-paths.ps1')
+. (Join-Path $PSScriptRoot 'starter-applets.ps1')
 $taskPublish = Get-PublishDirectory $taskRoot
 $taskVersion = (Get-Content -LiteralPath (Join-Path $taskRoot 'package.json') -Raw | ConvertFrom-Json).version
 $taskHelper = Join-Path $taskRoot '.artifacts\updater\AppDock.Updater.exe'
@@ -35,18 +36,23 @@ function Assert-Payload($Feed, [string]$Directory, [string]$Kind, [string]$Id, [
     return $taskPayload
 }
 
-# Preflight every immediate sibling repository before starting a build. Test fixtures
-# nested inside repositories and the user's installed extensions are never scanned.
+# Only the distribution roster selects repositories. Unlisted siblings are not read
+# or published, and every listed repository must pass preflight before any build.
+$taskDefinition = @(Read-StarterDefinition)
 $taskHostVersion = Stable-Version $taskVersion
 $taskHostFeed = Read-Json (Join-Path $taskPublish 'update.json')
 $taskHostArchive = Assert-Payload $taskHostFeed $taskPublish 'host' 'host' $taskVersion
 $taskIds = @{}
-$taskApplets = @(foreach ($taskDirectory in (Get-ChildItem -LiteralPath $AppletRoot -Directory | Sort-Object Name)) {
+$taskApplets = @(foreach ($taskExpected in $taskDefinition) {
+    $taskRepository = Join-Path $AppletRoot $taskExpected.repository
+    if (-not (Test-Path -LiteralPath $taskRepository -PathType Container)) { throw "Missing starter repository: $($taskExpected.repository)" }
+    $taskDirectory = Get-Item -LiteralPath $taskRepository
     $taskManifestPath = Join-Path $taskDirectory.FullName 'extension.json'
-    if (-not (Test-Path -LiteralPath $taskManifestPath -PathType Leaf)) { continue }
+    if (-not (Test-Path -LiteralPath $taskManifestPath -PathType Leaf)) { throw "Missing extension.json: $taskDirectory" }
     if ($taskDirectory.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Applet repository cannot be a link: $taskDirectory" }
-    if (-not (Test-Path -LiteralPath (Join-Path $taskDirectory.FullName '.git'))) { continue }
+    if (-not (Test-Path -LiteralPath (Join-Path $taskDirectory.FullName '.git'))) { throw "Missing Applet Git repository: $taskDirectory" }
     $taskManifest = Read-Json $taskManifestPath
+    if ($taskManifest.id -cne $taskExpected.id) { throw "Starter Applet ID mismatch: $taskDirectory" }
     if ($taskDirectory.Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$' -or $taskManifest.apiVersion -ne 1 -or
         -not $taskManifest.id -or $taskManifest.runtime -notin @('node', 'dotnet', 'native')) { throw "Invalid Applet manifest: $taskManifestPath" }
     if ($taskIds.ContainsKey($taskManifest.id)) { throw "Duplicate Applet ID: $($taskManifest.id)" }
@@ -61,7 +67,7 @@ $taskApplets = @(foreach ($taskDirectory in (Get-ChildItem -LiteralPath $AppletR
 })
 if ($taskApplets.Count -eq 0) { throw "No Applet repositories found in $AppletRoot" }
 
-$taskStage = Join-Path $taskRoot ('.artifacts\all-in-one-' + [guid]::NewGuid().ToString('N'))
+$taskStage = Join-Path $taskRoot ('.artifacts\starter-' + [guid]::NewGuid().ToString('N'))
 $taskPackage = Join-Path $taskStage 'package'
 & $taskHelper --extract-host $taskHostArchive $taskPackage
 if ($LASTEXITCODE -ne 0) { throw 'Host folder extraction failed.' }
@@ -112,13 +118,13 @@ $taskBundle = [ordered]@{
 # Only the fresh package directory is archived. No settings, browser profiles, logs,
 # repository sources, or update ZIPs are copied from the host's publish directory.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$taskTemporaryZip = Join-Path $taskStage 'all-in-one.zip'
+$taskTemporaryZip = Join-Path $taskStage 'starter.zip'
 [IO.Compression.ZipFile]::CreateFromDirectory($taskPackage, $taskTemporaryZip, [IO.Compression.CompressionLevel]::Optimal, $false)
-$taskZip = Join-Path $taskPublish "AppDock.at365-all-in-one-$taskVersion.zip"
+$taskZip = Join-Path $taskPublish "AppDock.at365-starter-$taskVersion.zip"
 # Keep the last complete archive if any build/validation fails before this point.
 # Retain the previous ZIP in the stage; a null backup can fail on existing files.
-if (Test-Path -LiteralPath $taskZip) { [IO.File]::Replace($taskTemporaryZip, $taskZip, (Join-Path $taskStage 'previous-all-in-one.zip')) }
+if (Test-Path -LiteralPath $taskZip) { [IO.File]::Replace($taskTemporaryZip, $taskZip, (Join-Path $taskStage 'previous-starter.zip')) }
 else { [IO.File]::Move($taskTemporaryZip, $taskZip) }
-Write-Output "All-in-one package: $taskZip"
+Write-Output "Starter package: $taskZip"
 Write-Output "Bundled Applets: $($taskApplets.Count)"
 Write-Output "Package manifest: $(Join-Path $taskPackage 'bundle.json')"
