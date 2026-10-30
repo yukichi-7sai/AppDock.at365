@@ -17,6 +17,7 @@ const {
   settingsCatalog,
   settingsProjection,
   applySettingsJson,
+  resetSettingsPage,
 } = require('../out/main/shared/settings-catalog');
 const { deviceHostKeys } = require('../out/main/main/core/device-settings');
 const luminance = (hex) => {
@@ -52,6 +53,40 @@ test('overlay background defaults to transparent, preserves explicit blur and re
   );
   settings.host.overlayBackground = 'gray';
   assert.throws(() => parseSettings(settings));
+});
+
+test('shadow preferences default on, persist independently and reset only with their own settings page', () => {
+  const keys = ['overlayShadow', 'notificationBannerShadow', 'notificationDesktopShadow'];
+  const initial = parseSettings({ schemaVersion: 1 });
+  const { hostSettingDefinitions } = require('../out/main/shared/host-settings');
+  for (const key of keys) {
+    assert.equal(initial.host[key], true);
+    assert.equal(settingsStorageValue(initial).host?.[key], undefined);
+    assert(deviceHostKeys.includes(key));
+    assert.equal(hostSettingDefinitions.find((field) => field.key === key).automation, true);
+    const pageId = key === 'overlayShadow' ? 'appearance' : 'notifications';
+    const page = settingsCatalog([], initial).find((p) => p.id === pageId);
+    assert(page.items.some((item) => item.key === key));
+    const next = applySettingsJson(initial, page, [], JSON.stringify({ host: { [key]: false } }));
+    const restored = parseSettings(settingsStorageValue(next));
+    assert.equal(restored.host[key], false);
+    for (const other of keys.filter((other) => other !== key))
+      assert.equal(restored.host[other], true);
+    assert.equal(restored.host.overlayBackground, initial.host.overlayBackground);
+    for (const value of [null, 0, 'false'])
+      assert.throws(() => parseSettings({ ...initial, host: { ...initial.host, [key]: value } }));
+  }
+  const off = parseSettings({
+    ...initial,
+    host: { ...initial.host, ...Object.fromEntries(keys.map((k) => [k, false])) },
+  });
+  for (const pageId of ['appearance', 'notifications']) {
+    const page = settingsCatalog([], off).find((p) => p.id === pageId);
+    const reset = resetSettingsPage(off, page, []);
+    assert.equal(reset.host.overlayShadow, pageId === 'appearance');
+    assert.equal(reset.host.notificationBannerShadow, pageId === 'notifications');
+    assert.equal(reset.host.notificationDesktopShadow, pageId === 'notifications');
+  }
 });
 test('all palettes provide readable accent text, soft selections and filled/hovered controls in both themes', () => {
   assert.deepEqual(
@@ -174,7 +209,12 @@ test('appearance delivery authorizes registered main frames, updates once per ch
   let palette = 'mint',
     dark = false,
     handler;
-  host.configureAppearance(() => resolveAppearance(palette, dark), {
+  const shadows = {
+    overlayShadow: true,
+    notificationBannerShadow: true,
+    notificationDesktopShadow: true,
+  };
+  host.configureAppearance(() => ({ ...resolveAppearance(palette, dark), ...shadows }), {
     handle: (_name, fn) => (handler = fn),
   });
   const contents = new EventEmitter();
@@ -207,6 +247,15 @@ test('appearance delivery authorizes registered main frames, updates once per ch
   assert.equal(styles.length, 1);
   const { scrollbarCss, placeholderCss } = require('../out/main/shared/appearance');
   assert.equal(styles[0], `${scrollbarCss}\n${placeholderCss}`);
+  for (const key of Object.keys(shadows)) {
+    const before = sent.length;
+    shadows[key] = false;
+    host.refreshAppearance();
+    assert.equal(sent.length, before + 1);
+    assert.equal(sent.at(-1).value[key], false);
+    host.refreshAppearance();
+    assert.equal(sent.length, before + 1);
+  }
   contents.mainFrame.url = 'file:///other.html';
   assert.throws(() => handler(event));
   const before = sent.length;
@@ -251,6 +300,9 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
   assert.equal(root['--appdock-overlay-filter'], 'none');
   assert.equal(body['--appdock-overlay-filter'], 'none');
   assert.equal(body['--accent'], '#245f9e');
+  assert.equal(root.dataset.overlayShadow, 'on');
+  assert.equal(root.dataset.notificationBannerShadow, 'on');
+  assert.equal(root.dataset.notificationDesktopShadow, 'on');
   await api.snapshot();
   assert.equal(root.dataset.accent, 'alice-blue');
   let calls = 0;
@@ -264,10 +316,19 @@ test('sandboxed preload applies initial colors before updates and ignores stale 
   ipc.emit(
     'appearance:changed',
     {},
-    { ...resolveAppearance('mint', false, 4), overlayBackground: 'blur' },
+    {
+      ...resolveAppearance('mint', false, 4),
+      overlayBackground: 'blur',
+      overlayShadow: false,
+      notificationBannerShadow: false,
+      notificationDesktopShadow: true,
+    },
   );
   assert.equal(root['--appdock-overlay-filter'], 'blur(2px)');
   assert.equal(body['--appdock-overlay-filter'], 'blur(2px)');
+  assert.equal(root.dataset.overlayShadow, 'off');
+  assert.equal(root.dataset.notificationBannerShadow, 'off');
+  assert.equal(root.dataset.notificationDesktopShadow, 'on');
   assert.equal(calls, 1);
   for (const name of [
     'preload',

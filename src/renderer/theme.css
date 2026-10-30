@@ -37,3 +37,6 @@
   --hero: #edf3f7;
   --shadow: 0 20px 70px #34445f22;
 }
+:root[data-overlay-shadow='off'] {
+  --appdock-overlay-shadow: none;
+}

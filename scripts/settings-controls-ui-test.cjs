@@ -112,6 +112,9 @@ let app,
         const delivery = host.getByTestId('notification-delivery');
         if (!(await delivery.evaluate((element) => element.open)))
           await delivery.locator(':scope > summary').click();
+        const banner = host.getByTestId('notification-banner');
+        if (!(await banner.evaluate((element) => element.open)))
+          await banner.locator(':scope > summary').click();
       }
     };
     const section = (title) =>

@@ -366,6 +366,7 @@ const localizedHostFields = {
       'appearance.overlayBackground.label',
       'appearance.overlayBackground.description',
     ],
+    ['overlayShadow', 'appearance.overlayShadow.label', 'appearance.overlayShadow.description'],
   ],
   general: [
     ['soundEnabled', 'general.sound.label', 'general.sound.description'],
@@ -668,7 +669,12 @@ export function settingsPaths(
     case 'ai':
       return [['ai']];
     case 'notifications':
-      return [['notificationPreferences'], ['host', 'notificationBannerPosition']];
+      return [
+        ['notificationPreferences'],
+        ...hostSettingDefinitions
+          .filter((field) => field.pageId === 'notifications')
+          .map((field) => ['host', field.key]),
+      ];
     case 'general':
       return generalKeys().map((k) => ['host', k]);
     case 'statusbar':

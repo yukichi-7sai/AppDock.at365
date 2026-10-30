@@ -14,7 +14,15 @@ let signature = '';
 const surfaces = new Map<WebContents, string>();
 export function appearanceSnapshot(): AppearanceSnapshot {
   const next = read();
-  const key = JSON.stringify([next.palette, next.dark, next.colors, next.overlayBackground]);
+  const key = JSON.stringify([
+    next.palette,
+    next.dark,
+    next.colors,
+    next.overlayBackground,
+    next.overlayShadow,
+    next.notificationBannerShadow,
+    next.notificationDesktopShadow,
+  ]);
   if (key !== signature) {
     signature = key;
     current = { ...next, revision: current.revision + 1 };

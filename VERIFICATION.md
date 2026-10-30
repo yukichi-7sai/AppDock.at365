@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-30: 影の個別設定0.106.0の受入・コミット照合
+
+- 利用者が実利用で意図どおり設定できることを確認し、コミットを依頼。main `97c3d8d`上の影3設定・通知設定の折りたたみ・関連試験/文書の23ファイルをレビューし、未解決指摘なし。追加の製品修正はなく、受入済み0.106.0を維持する。
+- 実装時の966入力、型検査/build/関連試験の完全ログ、発行EXE/asar/ZIPをSHA256照合した。固定EXEの影GUI4群・設定GUI11群とsmokeは最終入力に一致し、その成功結果を再利用した。再発行とGUIの再実行は行わない。
+- 標準152試験ファイルについて、今回の関連8ファイル83件と、対象/依存/実行条件が一致する既存17ファイルの成功を再利用した。変更された共有設定/翻訳/配色に依存する試験および依存記録が不足する126ファイル1,185件を追加実行。独立したTypeScript出力を動的に読み込むsettings-view-clientも追加20件を実行した。追加計127ファイル1,205件はfail/cancel/skip 0で、必要な標準回帰の成功が揃った。
+- 証跡は`.artifacts/commit-validation-overlay-shadows-20261030/`のinputs.json・standard-plan.json・実行結果/完全ログ・validation.json。stageと作業ファイル、commit treeを照合して記録する。新しいGUIコピーは作成せず、実装時の整理状態と再利用記録を保持。push・GitHub Release・実利用先deployは行わない。
+
+## 2026-10-30: ダイアログ・パレット・通知の影を個別設定 0.106.0
+
+- main `97c3d8d`のclean状態から`pull --ff-only`でAlready up to dateを確認。本体へ`host.overlayShadow`・`host.notificationBannerShadow`・`host.notificationDesktopShadow`を追加し、すべて既定ONとした。既存のhost設定登録を通じて既定値補完・型検証・端末保存・既定値の保存省略・検索・JSON・リセット・公開設定APIとON/OFF/切替コマンドへ接続した。保存設定を3項目追加するため0.105.14→0.106.0へマイナー更新。
+- 表示ページの「ダイアログ・パレットの背景」の直下に影のFieldを追加。通知の受け取り方には共通の折りたたみ行「バナー」（表示位置/影）と「デスクトップ通知」（影）を置き、初期は閉じる。既存の説明、通知センター/Windows通知/読み上げと通知先の設定を維持した。
+- 共通appearance snapshot/preloadで3つの値を即時配信し、パレット/共通ダイアログとDefault Shellの各通知カードへ個別適用する。全体の`--shadow`は置換せず、メニュー/画像カード/選択行の目印を維持。通知のID・期限・sessionを変えず、再発行やWindow再生成なしで反映する。差分・設定保存範囲・初期値/既存値・既存操作/検索・明暗/狭幅を発行前レビューし、未解決指摘なし。
+- 型検査/build、関連8ファイル83件はfail/skip 0。既定ON、明示OFFの保存/復元、不正値拒否、独立した切替、ページ別リセット、PC専用キー、MCP公開、各変更の配信と旧snapshot抑止を確認。開発GUI4群も成功。全標準回帰は今回未実施。
+- 発行済み固定EXEで専用GUI4群と既存settings-controls GUI11群、smoke（ok:true）が成功。表示中のパレット/ダイアログ/バナー/デスクトップ通知への反映、通知の同一性、キーボードでの折りたたみとスイッチ操作、検索での展開、再起動後の保持を確認。既存6位置の移動/下端保持、通知設定の確定/取消、通知センター移動、AI入力などの既存操作も成功した。明暗・広幅/狭幅の代表画像を目視確認。物理入力・複数DPI・第三者Shellでの表示対応・実利用受入は未確認。
+- publish終了0、標準発行先`A:\40.ARTIFACT\AppDock.at365\win-unpacked`とfeed/ZIP内manifestは0.106.0。ZIP270,741,037バイト、SHA256 `6af1e11f012704278a5f5367cb63e92f7da06ba5e8b70addd627dec8a1080297`がfeedに一致。EXE SHA256 `6d13de854f61dcaf8b24497e7e6a9a3f1e772a5660065d2cf6566764a776142f`は固定コピーと一致。ZIP693項目にEXE/asarを含み、settings.json/data/extensionsは含まない。
+- 証跡は`.artifacts/overlay-shadows-20261030/`の966入力SHA一覧、完全ログ、review.json・publication.json・validation.json。最終入力は発行/検証後も一致。固定GUIは`overlay-shadows-ui-1793348590547`、`settings-controls-ui-1793348601681`、smokeは`smoke-1793348617623`。終了/成功/実パス/プロセス不在/再解析ポイント不在を確認した旧成功2コピーの本体管理ファイルのみ整理し、記録・画像・設定等191件の前後SHA一致と最新コピー保持を確認した。詳細はcleanup-plan.json・cleanup-result.json。commit・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-30: コマンドパレット改善0.105.14のコミット照合
 
 - 利用者の実利用確認後、トリガー表示・稲妻での設定移動・検索0件・装飾整理・広幅化・右端△▽の変更24ファイルをレビューした。対象はmain `574262b`上の本体変更のみ。未解決指摘なし、製品の追加修正なし。受入済み0.105.14を維持し、再発行は行わない。

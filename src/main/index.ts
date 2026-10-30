@@ -346,6 +346,9 @@ configureAppearance(
       light: settings.value.host.customAccentLight,
     }),
     overlayBackground: settings.value.host.overlayBackground,
+    overlayShadow: settings.value.host.overlayShadow,
+    notificationBannerShadow: settings.value.host.notificationBannerShadow,
+    notificationDesktopShadow: settings.value.host.notificationDesktopShadow,
   }),
   ipcMain,
 );

@@ -376,6 +376,15 @@ export function SettingsForm({
                   <option value="blur">{t('appearance.overlayBackground.blur')}</option>
                 </select>
               </SettingRow>
+              <SettingRow pageId={category} itemKey="overlayShadow">
+                <Toggle
+                  label={t('appearance.overlayShadow.label')}
+                  checked={settings.host.overlayShadow}
+                  onChange={(overlayShadow) =>
+                    edit({ ...settings, host: { ...settings.host, overlayShadow } })
+                  }
+                />
+              </SettingRow>
             </SettingsSection>
             <SettingsSection title={t('appearance.shell.section')}>
               {shellRegions.map(({ id }) => {

@@ -38,6 +38,8 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## 設定・トリガーの主な担当
 
+`scripts/overlay-shadows-ui-test.cjs [固定EXE]`は、ダイアログ/パレット・バナー・デスクトップ通知の影を個別に切り替え、表示中の反映、通知ID/期限/sessionの保持、折りたたみのキーボード操作と検索による展開、再起動後の設定保持を確認する。設定の配置と明暗・狭幅は代表画像で確認する。`tests/appearance.test.cjs`は既定値・保存・ページ別リセットと共通appearance配信を担当する。
+
 `scripts/command-palette-ui-test.cjs [固定EXE]`は、検索0件、3方式の有効割り当てと全体OFFの即時反映、稲妻からの対象ID指定・解除・再移動、停止中・未割り当ての非実行、明暗・広幅/狭幅を確認する。寸法と折り返し位置は測定値・代表画像を記録して変更時に確認する。タッチパッドのnative呼出し境界は隔離プロセス内でstub化し、F13〜F24の登録・送信やWindowsのタッチパッド設定変更を行わない。条件・表示順・保存値の不変とナビゲーション拒否は`command-triggers.test.cjs`・`command-palette.test.cjs`が担当する。
 
 `scripts/modal-trigger-input-ui-test.cjs [固定EXE]`は共通ダイアログ・パレットの単独Tab/Escape/Enter/上下左右の操作、修飾キー付きとその他のキー・マウスの継続、別アプリでの7キーの実行、Windows標準ダイアログ、実キー記録中の抑止と復帰、保存済み割り当ての保持を確認する。タッチパッドのキー記録中の継続は`tests/gestures.test.cjs`、全修飾キーと押下・解放の判定は`InputTests --input-blocking`のOS入力を送らないfixtureで補完する。

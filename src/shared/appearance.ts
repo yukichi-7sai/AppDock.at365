@@ -94,6 +94,9 @@ export function isAccentColor(value: unknown): value is AccentColor {
 }
 export interface AppearanceSnapshot {
   overlayBackground?: 'blur' | 'transparent';
+  overlayShadow?: boolean;
+  notificationBannerShadow?: boolean;
+  notificationDesktopShadow?: boolean;
   revision: number;
   palette: AccentColor;
   dark: boolean;

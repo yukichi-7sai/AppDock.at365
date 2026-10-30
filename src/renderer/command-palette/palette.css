@@ -4,7 +4,7 @@
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--appdock-overlay-shadow, var(--shadow));
   overflow: hidden;
   max-height: 70vh;
   display: flex;

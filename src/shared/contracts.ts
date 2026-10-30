@@ -11,8 +11,11 @@ export interface HostSettings {
   showHints: boolean;
   showStatusBar: boolean;
   overlayBackground: 'blur' | 'transparent';
+  overlayShadow: boolean;
   soundEnabled: boolean;
   notificationBannerPosition: import('./notifications').NotificationBannerPosition;
+  notificationBannerShadow: boolean;
+  notificationDesktopShadow: boolean;
   closeToTray: boolean;
   startMinimized: boolean;
   startAtLogon: boolean;

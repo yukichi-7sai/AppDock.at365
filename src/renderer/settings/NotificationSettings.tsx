@@ -143,37 +143,76 @@ export function NotificationSettings({
             </button>
           </SettingsActions>
         </SettingsField>
-        <SettingsField
-          title={bannerPositionSetting.title}
-          description={bannerPositionSetting.description}
-          {...settingAnchor('notifications', 'notificationBannerPosition')}
+        <SettingsSection
+          title={translate('settings.notificationSettings.banner')}
+          data-testid="notification-banner"
+          variant="row"
+          collapsible
         >
-          <select
-            aria-label={bannerPositionSetting.title}
-            data-testid="notification-banner-position"
-            disabled={busy}
-            value={settings.host.notificationBannerPosition}
-            onChange={(event) =>
-              editor.edit({
-                ...settings,
-                host: {
-                  ...settings.host,
-                  notificationBannerPosition: event.target.value as NotificationBannerPosition,
-                },
-              })
-            }
+          <SettingsField
+            title={bannerPositionSetting.title}
+            description={bannerPositionSetting.description}
+            {...settingAnchor('notifications', 'notificationBannerPosition')}
           >
-            {bannerPositionSetting.options?.map((option) => (
-              <option key={String(option.value)} value={String(option.value)}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </SettingsField>
-        <SettingsField
+            <select
+              aria-label={bannerPositionSetting.title}
+              data-testid="notification-banner-position"
+              disabled={busy}
+              value={settings.host.notificationBannerPosition}
+              onChange={(event) =>
+                editor.edit({
+                  ...settings,
+                  host: {
+                    ...settings.host,
+                    notificationBannerPosition: event.target.value as NotificationBannerPosition,
+                  },
+                })
+              }
+            >
+              {bannerPositionSetting.options?.map((option) => (
+                <option key={String(option.value)} value={String(option.value)}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+          <SettingsField
+            title={translate('settings.notificationSettings.bannerShadow')}
+            description={translate('settings.notificationSettings.bannerShadowHint')}
+            {...settingAnchor('notifications', 'notificationBannerShadow')}
+          >
+            <Toggle
+              label={translate('settings.notificationSettings.bannerShadow')}
+              checked={settings.host.notificationBannerShadow}
+              disabled={busy}
+              onChange={(notificationBannerShadow) =>
+                editor.edit({ ...settings, host: { ...settings.host, notificationBannerShadow } })
+              }
+            />
+          </SettingsField>
+        </SettingsSection>
+        <SettingsSection
           title={translate('settings.notificationSettings.desktop')}
           description={translate('settings.notificationSettings.desktopHint')}
-        />
+          data-testid="notification-desktop"
+          variant="row"
+          collapsible
+        >
+          <SettingsField
+            title={translate('settings.notificationSettings.desktopShadow')}
+            description={translate('settings.notificationSettings.desktopShadowHint')}
+            {...settingAnchor('notifications', 'notificationDesktopShadow')}
+          >
+            <Toggle
+              label={translate('settings.notificationSettings.desktopShadow')}
+              checked={settings.host.notificationDesktopShadow}
+              disabled={busy}
+              onChange={(notificationDesktopShadow) =>
+                editor.edit({ ...settings, host: { ...settings.host, notificationDesktopShadow } })
+              }
+            />
+          </SettingsField>
+        </SettingsSection>
         <SettingsField
           title={translate('settings.notificationSettings.windows')}
           description={translate('settings.notificationSettings.windowsDurationHint')}

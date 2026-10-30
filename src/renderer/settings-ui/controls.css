@@ -3159,7 +3159,7 @@ summary {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--appdock-overlay-shadow, var(--shadow));
   overflow: auto;
   overscroll-behavior: contain;
 }

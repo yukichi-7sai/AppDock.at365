@@ -53,6 +53,12 @@ body {
 .notification-card.dismissible {
   padding-right: 52px;
 }
+:root[data-notification-banner-shadow='off']
+  .notification-lane:not(.desktop-lane)
+  .notification-card,
+:root[data-notification-desktop-shadow='off'] .desktop-lane .notification-card {
+  box-shadow: none;
+}
 .notification-card > .notification-dismiss {
   position: absolute;
   top: 8px;

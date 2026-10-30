@@ -10,6 +10,10 @@ function paint() {
   const root = document.documentElement;
   root.dataset.theme = current.dark ? 'dark' : 'light';
   root.dataset.accent = current.palette;
+  root.dataset.overlayShadow = current.overlayShadow === false ? 'off' : 'on';
+  root.dataset.notificationBannerShadow = current.notificationBannerShadow === false ? 'off' : 'on';
+  root.dataset.notificationDesktopShadow =
+    current.notificationDesktopShadow === false ? 'off' : 'on';
   const { accent, soft, text, hover } = current.colors;
   for (const [name, value] of Object.entries({
     '--accent': accent,
