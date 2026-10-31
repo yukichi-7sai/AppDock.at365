@@ -14,6 +14,7 @@ const {
   changeRegistration,
   registrationBlock,
   registrationStatus,
+  previewRegistrationChange,
 } = require('../out/main/main/core/codex-registration');
 const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
 const {
@@ -217,6 +218,201 @@ test('registration preserves exact unrelated TOML, detects ownership collisions 
   fs.writeFileSync(file, original + `[mcp_servers.${id}]\nurl="http://other.test"\n`);
   assert.throws(() => changeRegistration(file, id, a));
 });
+test('formatting changes allow repair/removal without confirmation and retain unrelated bytes', (t) => {
+  const f = fixture(t),
+    file = path.join(f.base, 'config.toml'),
+    id = 'appdock_0123456789abcdef';
+  const original =
+    '# keep\r\nmodel = "example"\r\n[mcp_servers.other]\r\nurl="http://other/mcp"\r\n';
+  const block = registrationBlock(id, 'http://127.0.0.1:34567/mcp', 'a'.repeat(64));
+  fs.writeFileSync(file, original);
+  const owned = changeRegistration(file, id, block);
+  const formatted = block
+    .replace('enabled = true\nrequired = false', 'required=false\nenabled=true')
+    .replaceAll('\n', '\r\n');
+  for (const remove of [false, true]) {
+    fs.writeFileSync(file, original + formatted);
+    assert.equal(registrationStatus(file, id, block, owned).registration, 'registered');
+    assert.equal(
+      previewRegistrationChange(file, id, block, owned, remove).requiresConfirmation,
+      false,
+    );
+    changeRegistration(file, id, block, owned, remove);
+    assert.equal(fs.readFileSync(file, 'utf8'), remove ? original : original + block);
+  }
+});
+
+test('changed owned registration can be confirmed, preserves extra policies/headers and rejects stale confirmation', (t) => {
+  const f = fixture(t),
+    file = path.join(f.base, 'config.toml'),
+    id = 'appdock_0123456789abcdef';
+  const original = '# keep\nmodel="example"\n[mcp_servers.other]\nurl="http://other/mcp"\n';
+  const block = registrationBlock(id, 'http://127.0.0.1:34567/mcp', 'a'.repeat(64));
+  fs.writeFileSync(file, original);
+  const owned = changeRegistration(file, id, block);
+  const changed =
+    original +
+    block.replace('enabled = true', 'enabled = false') +
+    'disabled_tools = ["dangerous"]\ntool_timeout_sec = 45\n' +
+    '[mcp_servers.AppDock.http_headers]\n' +
+    'X-Test = "keep"\n[mcp_servers.AppDock.tools.safe]\napproval_mode="approve"\n';
+  const tail = '# next server comment\n[mcp_servers.after]\nurl="http://after/mcp"\n';
+  // Use a separate headers table, as written by Codex, outside the original marker.
+  const external = (changed + tail)
+    .replace(/http_headers = .*\n/, '')
+    .replace(
+      'required = false',
+      'required = true\ncommand="old-transport"\nbearer_token_env_var="OLD_CREDENTIAL"',
+    );
+  fs.writeFileSync(file, external);
+  const preview = previewRegistrationChange(file, id, block, owned);
+  assert.equal(preview.requiresConfirmation, true);
+  assert.equal(fs.readFileSync(file, 'utf8'), external);
+  assert.throws(() => changeRegistration(file, id, block, owned));
+  assert.throws(() => previewRegistrationChange(file, id, block, undefined));
+  fs.writeFileSync(file, external + '# concurrently edited\n');
+  assert.throws(
+    () => changeRegistration(file, id, block, owned, false, preview.revision),
+    /変更されました/,
+  );
+  assert.equal(fs.readFileSync(file, 'utf8'), external + '# concurrently edited\n');
+  fs.writeFileSync(file, external);
+  const repairedHash = changeRegistration(file, id, block, owned, false, preview.revision);
+  const repaired = fs.readFileSync(file, 'utf8'),
+    server = require('smol-toml').parse(repaired).mcp_servers.AppDock;
+  assert.equal(fs.readFileSync(file + '.appdock-backup', 'utf8'), external);
+  assert.ok(repaired.startsWith(original));
+  assert.equal(server.enabled, true);
+  assert.equal(server.required, false);
+  assert.equal(server.command, undefined);
+  assert.equal(server.bearer_token_env_var, undefined);
+  assert.equal(server.http_headers.Authorization, 'Bearer ' + 'a'.repeat(64));
+  assert.equal(server.http_headers['X-Test'], 'keep');
+  assert.deepEqual(server.disabled_tools, ['dangerous']);
+  assert.equal(server.tool_timeout_sec, 45);
+  assert.equal(server.tools.safe.approval_mode, 'approve');
+  assert.equal(registrationStatus(file, id, block, repairedHash).registration, 'registered');
+  const modified = repaired.replace('required = false', 'required = true');
+  fs.writeFileSync(file, modified);
+  const removal = previewRegistrationChange(file, id, block, repairedHash, true);
+  assert.equal(removal.requiresConfirmation, true);
+  changeRegistration(file, id, block, repairedHash, true, removal.revision);
+  assert.equal(fs.readFileSync(file, 'utf8'), original + tail);
+  assert.equal(fs.readFileSync(file + '.appdock-backup', 'utf8'), modified);
+  fs.writeFileSync(file, block.replace('mcp_servers.AppDock', 'mcp_servers.Renamed'));
+  assert.equal(previewRegistrationChange(file, id, block, owned, true).requiresConfirmation, true);
+  assert.throws(() => previewRegistrationChange(file, id, block, owned), /一度登録を解除/);
+});
+
+test('recovery never removes another registration or unrelated string/table inside owned markers', (t) => {
+  const f = fixture(t),
+    file = path.join(f.base, 'config.toml'),
+    id = 'appdock_0123456789abcdef';
+  const block = registrationBlock(id, 'http://127.0.0.1:34567/mcp', 'a'.repeat(64));
+  fs.writeFileSync(file, '');
+  const owned = changeRegistration(file, id, block);
+  for (const extra of [
+    '[mcp_servers.other]\nurl="http://other"\n',
+    '# BEGIN AppDock MCP appdock_fedcba9876543210\n',
+    '[unrelated]\nvalue="keep"\n',
+  ]) {
+    const external = block.replace('# END', extra + '# END');
+    fs.writeFileSync(file, external);
+    for (const remove of [false, true]) {
+      assert.throws(() => previewRegistrationChange(file, id, block, owned, remove));
+      assert.equal(fs.readFileSync(file, 'utf8'), external);
+    }
+  }
+  const external = 'description = """\n' + block + '"""\n';
+  fs.writeFileSync(file, external);
+  assert.throws(() => previewRegistrationChange(file, id, block, owned));
+  assert.equal(fs.readFileSync(file, 'utf8'), external);
+  const unowned = '[mcp_servers.AppDock]\nurl="http://other/mcp"\n';
+  fs.writeFileSync(file, unowned);
+  assert.throws(() => previewRegistrationChange(file, id, block, owned, true), /同じ登録名/);
+  assert.equal(fs.readFileSync(file, 'utf8'), unowned);
+});
+
+test('registration recovery confirmation is private, single use and bound to action/file/connection', async (t) => {
+  const f = fixture(t),
+    file = path.join(f.base, 'config.toml'),
+    messages = [];
+  const options = {
+    localDirectory: path.join(f.base, 'local'),
+    baseDirectory: f.base,
+    version: 'test',
+    encrypt: (s) => Buffer.from(s).toString('base64'),
+    decrypt: (s) => Buffer.from(s, 'base64').toString(),
+    changed: () => {},
+    informed: (message) => messages.push(message),
+    createApi: () => f.api,
+  };
+  const service = new AutomationService(options);
+  t.after(() => service.close());
+  await service.action({ kind: 'selectConfig', file });
+  await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await service.action({ kind: 'register' });
+  const registered = fs.readFileSync(file, 'utf8'),
+    saved = fs.readFileSync(path.join(options.localDirectory, 'automation.json'), 'utf8');
+  const external = registered.replace('enabled = true', 'enabled = false');
+  fs.writeFileSync(file, external);
+  messages.length = 0;
+  const preview = await service.action({ kind: 'register' });
+  assert.equal(preview.registrationConfirmation.name, 'AppDock');
+  assert.equal(JSON.stringify(preview).includes('Bearer '), false);
+  assert.equal(fs.readFileSync(file, 'utf8'), external);
+  assert.equal(
+    fs.readFileSync(path.join(options.localDirectory, 'automation.json'), 'utf8'),
+    saved,
+  );
+  assert.deepEqual(messages, []);
+  const confirmationId = preview.registrationConfirmation.id;
+  await assert.rejects(service.action({ kind: 'unregister', confirmationId }), /変更されました/);
+  assert.equal(fs.readFileSync(file, 'utf8'), external);
+  let confirmation = (await service.action({ kind: 'register' })).registrationConfirmation;
+  const otherFile = path.join(f.base, 'other', 'config.toml');
+  await service.action({ kind: 'selectConfig', file: otherFile });
+  await assert.rejects(
+    service.action({ kind: 'register', confirmationId: confirmation.id }),
+    /変更されました/,
+  );
+  assert.equal(fs.existsSync(otherFile), false);
+  assert.equal(fs.readFileSync(file, 'utf8'), external);
+  await service.action({ kind: 'selectConfig', file });
+  confirmation = (await service.action({ kind: 'register' })).registrationConfirmation;
+  fs.appendFileSync(file, '# concurrent\n');
+  await assert.rejects(
+    service.action({ kind: 'register', confirmationId: confirmation.id }),
+    /変更されました/,
+  );
+  assert.equal(fs.readFileSync(file, 'utf8'), external + '# concurrent\n');
+  fs.writeFileSync(file, external);
+  confirmation = (await service.action({ kind: 'register' })).registrationConfirmation;
+  await service.action({ kind: 'rotateToken' });
+  await assert.rejects(
+    service.action({ kind: 'register', confirmationId: confirmation.id }),
+    /変更されました/,
+  );
+  confirmation = (await service.action({ kind: 'register' })).registrationConfirmation;
+  await service.action({ kind: 'register', confirmationId: confirmation.id });
+  assert.equal(service.state().registration, 'registered');
+  const reloaded = new AutomationService(options);
+  assert.equal(reloaded.state().registration, 'registered');
+  assert.equal(reloaded.state().error, undefined);
+  await reloaded.close();
+  await assert.rejects(
+    service.action({ kind: 'register', confirmationId: confirmation.id }),
+    /変更されました/,
+  );
+  fs.writeFileSync(
+    file,
+    fs.readFileSync(file, 'utf8').replace('enabled = true', 'enabled = false'),
+  );
+  confirmation = (await service.action({ kind: 'unregister' })).registrationConfirmation;
+  await service.action({ kind: 'unregister', confirmationId: confirmation.id });
+  assert.equal(service.state().registration, 'absent');
+});
+
 test('external uninstall leaves one delimiter; owned comment alone can be repaired or removed', (t) => {
   const f = fixture(t),
     file = path.join(f.base, 'config.toml'),

@@ -4,7 +4,13 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 // smol-toml exports a CJS build, but shares its ESM declaration file.
-const { parse }: { parse(text: string): Record<string, unknown> } = require('smol-toml');
+const {
+  parse,
+  stringify,
+}: {
+  parse(text: string): Record<string, unknown>;
+  stringify(value: Record<string, unknown>): string;
+} = require('smol-toml');
 import { atomicWrite } from './settings';
 
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -96,6 +102,144 @@ export function registrationBlock(id: string, endpoint: string, token: string, n
     throw Error(hostText('services.codexRegistration.invalidRegistration'));
   return `# BEGIN AppDock MCP ${id}\n[mcp_servers.${name}]\nurl = "${endpoint}"\nenabled = true\nrequired = false\nhttp_headers = { Authorization = "Bearer ${token}" }\n# END AppDock MCP ${id}\n`;
 }
+
+// Only reserialize the owned server. Preserve tool policies, timeouts and custom headers,
+// but remove alternate transports/credentials that would override the repaired connection.
+function repairedServer(current: any, expected: any) {
+  const record = (value: any) =>
+    value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  current = record(current);
+  const next = Object.assign(Object.create(null), current, expected);
+  for (const key of [
+    'command',
+    'args',
+    'env',
+    'env_vars',
+    'cwd',
+    'experimental_environment',
+    'bearer_token_env_var',
+    'auth',
+    'oauth',
+  ])
+    delete next[key];
+  const headers = { ...record(current.http_headers) };
+  for (const key of Object.keys(headers))
+    if (key.toLowerCase() === 'authorization') delete headers[key];
+  next.http_headers = Object.assign(Object.create(null), headers, expected.http_headers);
+  if (current.env_http_headers) {
+    next.env_http_headers = Object.assign(Object.create(null), record(current.env_http_headers));
+    for (const key of Object.keys(next.env_http_headers))
+      if (key.toLowerCase() === 'authorization') delete next.env_http_headers[key];
+    if (!Object.keys(next.env_http_headers).length) delete next.env_http_headers;
+  }
+  return next;
+}
+
+// Codex can move http_headers and tool policies into separate TOML tables. Candidate
+// sections are accepted only when deleting them changes exactly this server's value.
+function serverSections(text: string, name: string) {
+  const headers: { at: number; keys: string[] }[] = [];
+  for (const match of text.matchAll(/^[\t ]*\[.*$/gm)) {
+    const keys: string[] = [];
+    try {
+      let value: any = parse(match[0]);
+      while (value && typeof value === 'object' && !Array.isArray(value)) {
+        const names = Object.keys(value);
+        if (names.length !== 1) break;
+        keys.push(names[0]);
+        value = value[names[0]];
+      }
+    } catch {
+      /* A header-like line in a multiline string is still a boundary. */
+    }
+    headers.push({ at: match.index!, keys });
+  }
+  return headers.flatMap((header, index) => {
+    if (header.keys[0] !== 'mcp_servers' || header.keys[1] !== name) return [];
+    let end = headers[index + 1]?.at ?? text.length;
+    // Trailing comments/blank lines may belong to the following registration.
+    const lines = text.slice(header.at, end).match(/[^\n]*\n|[^\n]+$/g) ?? [];
+    while (lines.length && (!lines.at(-1)!.trim() || lines.at(-1)!.trimStart().startsWith('#')))
+      end -= lines.pop()!.length;
+    return [{ a: header.at, b: end }];
+  });
+}
+
+function registrationPlan(
+  file: string,
+  id: string,
+  block: string,
+  ownedHash: string | undefined,
+  remove: boolean,
+) {
+  const before = read(codexConfigPath(file)),
+    name = blockName(block),
+    cleaned = removedRegistration(before, id, name, ownedHash),
+    config = parsed(cleaned),
+    r = range(cleaned, id),
+    previousName = r ? blockName(r.block) : undefined;
+  if (remove && !r && config.mcp_servers?.[name])
+    throw Error(hostText('services.codexRegistration.nameConflict'));
+  if (!remove && previousName && previousName !== name)
+    throw Error(hostText('services.codexRegistration.renameRequiresRemoval'));
+  const spans = r ? [{ a: r.a, b: r.b }, ...serverSections(cleaned, previousName!)] : [];
+  spans.sort((a, b) => a.a - b.a);
+  const merged: { a: number; b: number }[] = [];
+  for (const span of spans) {
+    const last = merged.at(-1);
+    if (last && span.a <= last.b) last.b = Math.max(last.b, span.b);
+    else merged.push({ ...span });
+  }
+  let without = cleaned;
+  for (const span of merged.slice().reverse()) {
+    const removed = cleaned.slice(span.a, span.b);
+    for (const marker of removed.matchAll(/^[\t ]*# (?:BEGIN|END) AppDock MCP (\S+)/gm))
+      if (marker[1] !== id) throw Error(hostText('services.codexRegistration.otherSettings'));
+    without = without.slice(0, span.a) + without.slice(span.b);
+  }
+  const stripped = parsed(without),
+    expected = parsed(before);
+  if (expected.mcp_servers) {
+    if (previousName) delete expected.mcp_servers[previousName];
+    if (!Object.keys(expected.mcp_servers).length) delete expected.mcp_servers;
+  }
+  if (stripped.mcp_servers && !Object.keys(stripped.mcp_servers).length)
+    delete stripped.mcp_servers;
+  if (!isDeepStrictEqual(expected, stripped))
+    throw Error(hostText('services.codexRegistration.otherSettings'));
+  if (!remove && stripped.mcp_servers?.[name])
+    throw Error(hostText('services.codexRegistration.nameConflict'));
+  const current = previousName ? config.mcp_servers[previousName] : undefined,
+    desired = parsed(block).mcp_servers[name],
+    complete = r && isDeepStrictEqual(parsed(r.block).mcp_servers[previousName!], current),
+    changed =
+      !!r &&
+      !(complete && (r.block === block || hash(r.block) === ownedHash)) &&
+      (previousName !== name || !isDeepStrictEqual(current, desired));
+  if (changed && !ownedHash) throw Error(hostText('services.codexRegistration.externallyChanged'));
+  const repaired = current ? repairedServer(current, desired) : desired,
+    nextBlock = isDeepStrictEqual(repaired, desired)
+      ? block
+      : `# BEGIN AppDock MCP ${id}\n${stringify({ mcp_servers: { [name]: repaired } })}# END AppDock MCP ${id}\n`,
+    next = remove
+      ? without
+      : without + (without.endsWith('\n') || !without ? '' : '\n') + nextBlock;
+  const nextConfig = parsed(next);
+  if (!remove && !isDeepStrictEqual(nextConfig.mcp_servers?.[name], repaired))
+    throw Error(hostText('services.codexRegistration.registrationFailed'));
+  return { before, next, nextBlock, changed, name: previousName ?? name, revision: hash(before) };
+}
+
+export function previewRegistrationChange(
+  file: string,
+  id: string,
+  block: string,
+  ownedHash: string | undefined,
+  remove = false,
+) {
+  const plan = registrationPlan(file, id, block, ownedHash, remove);
+  return { requiresConfirmation: plan.changed, name: plan.name, revision: plan.revision };
+}
 export function registrationStatus(
   file: string,
   id: string,
@@ -110,8 +254,11 @@ export function registrationStatus(
     if (!r && !config.mcp_servers?.[name]) return { registration: 'absent' as const };
     if (
       r &&
-      r.block === expectedBlock &&
-      isDeepStrictEqual(config.mcp_servers?.[name], parsed(expectedBlock).mcp_servers[name])
+      blockName(r.block) === name &&
+      isDeepStrictEqual(
+        config.mcp_servers?.[name],
+        repairedServer(config.mcp_servers?.[name], parsed(expectedBlock).mcp_servers[name]),
+      )
     )
       return { registration: 'registered' as const };
     return {
@@ -135,45 +282,19 @@ export function changeRegistration(
   block: string,
   ownedHash: string | undefined,
   remove = false,
+  confirmedRevision?: string,
 ) {
   file = codexConfigPath(file);
-  const before = read(file),
-    name = blockName(block),
-    cleaned = removedRegistration(before, id, name, ownedHash),
-    config = parsed(cleaned),
-    r = range(cleaned, id);
-  if (r && r.block !== block && hash(r.block) !== ownedHash)
+  const plan = registrationPlan(file, id, block, ownedHash, remove);
+  if (confirmedRevision !== undefined && confirmedRevision !== plan.revision)
+    throw Error(hostText('services.codexRegistration.settingsChanged'));
+  if (plan.changed && confirmedRevision === undefined)
     throw Error(hostText('services.codexRegistration.externallyChanged'));
-  if (remove && !r && cleaned === before) return undefined;
-  const previousName = r ? blockName(r.block) : undefined;
-  if (!remove && previousName && previousName !== name)
-    throw Error(hostText('services.codexRegistration.renameRequiresRemoval'));
-  const without = r ? cleaned.slice(0, r.a) + cleaned.slice(r.b) : cleaned;
-  // A marker inside a TOML string, or keys appended into our table, must not erase unrelated data.
-  const stripped = parsed(without),
-    expected = parsed(before);
-  if (expected.mcp_servers) {
-    if (previousName) delete expected.mcp_servers[previousName];
-    if (!Object.keys(expected.mcp_servers).length) delete expected.mcp_servers;
-  }
-  if (stripped.mcp_servers && !Object.keys(stripped.mcp_servers).length)
-    delete stripped.mcp_servers;
-  if (!isDeepStrictEqual(expected, stripped))
-    throw Error(hostText('services.codexRegistration.otherSettings'));
-  if (!remove && stripped.mcp_servers?.[name])
-    throw Error(hostText('services.codexRegistration.nameConflict'));
-  const next = remove
-    ? without
-    : without + (without.endsWith('\n') || !without ? '' : '\n') + block;
-  const nextConfig = parsed(next);
-  if (
-    !remove &&
-    !isDeepStrictEqual(nextConfig.mcp_servers?.[name], parsed(block).mcp_servers[name])
-  )
-    throw Error(hostText('services.codexRegistration.registrationFailed'));
-  if (read(file) !== before) throw Error(hostText('services.codexRegistration.settingsChanged'));
+  if (remove && plan.next === plan.before) return undefined;
+  if (read(file) !== plan.before)
+    throw Error(hostText('services.codexRegistration.settingsChanged'));
   // Preserve an exact recovery copy, never restore the entire file on unregister.
-  if (before) atomicWrite(file + '.appdock-backup', before);
-  atomicWrite(file, next);
-  return remove ? undefined : hash(block);
+  if (plan.before) atomicWrite(file + '.appdock-backup', plan.before);
+  atomicWrite(file, plan.next);
+  return remove ? undefined : hash(plan.nextBlock);
 }

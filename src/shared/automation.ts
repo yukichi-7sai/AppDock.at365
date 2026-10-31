@@ -63,7 +63,8 @@ export type AutomationAction =
   | { kind: 'copyEndpoint'; endpoint: string }
   | { kind: 'status' }
   | { kind: 'configure'; enabled: boolean; allowWrite: boolean; port: number }
-  | { kind: 'register' | 'unregister' | 'test' | 'rotateToken' }
+  | { kind: 'register' | 'unregister'; confirmationId?: string }
+  | { kind: 'test' | 'rotateToken' }
   | { kind: 'selectConfig'; file: string }
   | { kind: 'selectName'; name: string }
   | { kind: 'setTts'; allowed: boolean }
@@ -85,4 +86,10 @@ export type AutomationAction =
 export interface AutomationReply {
   state: AutomationState;
   message?: string;
+  registrationConfirmation?: {
+    id: string;
+    kind: 'register' | 'unregister';
+    name: string;
+    configFile: string;
+  };
 }

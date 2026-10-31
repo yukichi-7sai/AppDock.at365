@@ -4,9 +4,10 @@ import { SettingsInput, SettingsTextarea } from '../settings-ui/SettingsInput';
 import { useSettingsControls } from '../settings-ui/api';
 import { useEffect, useRef, useState } from 'react';
 import { Toggle } from '../settings-ui/Toggle';
-import type { AutomationAction, AutomationState } from '../../shared/automation';
+import type { AutomationAction, AutomationState, AutomationReply } from '../../shared/automation';
 import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/SettingsSections';
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
+import { SettingsDialog } from '../settings-ui/SettingsModal';
 
 export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void }) {
   const { t: translate } = useHostTranslation();
@@ -20,6 +21,8 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   const [name, setName] = useState('AppDock');
   const [hostnames, setHostnames] = useState('');
   const operation = useRef(false);
+  const [confirmation, setConfirmation] = useState<AutomationReply['registrationConfirmation']>();
+  const returnFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
     setShowReload(false);
     if (state) return;
@@ -68,12 +71,16 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   }
   async function run(action: AutomationAction) {
     if (operation.current) return;
+    if (action.kind === 'register' || action.kind === 'unregister')
+      returnFocus.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
     operation.current = true;
     setBusy(true);
     setError('');
     try {
       const r = await settingsControls.automation(action);
       setState(r.state);
+      setConfirmation(r.registrationConfirmation);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -226,7 +233,7 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
               disabled={busy || !state.running || file !== state.configFile}
               onClick={() => void run({ kind: 'register' })}
             >
-              {state.registration === 'registered'
+              {state.registration !== 'absent'
                 ? translate('settings.codexSettings.repair')
                 : translate('settings.codexSettings.register')}
             </button>
@@ -435,6 +442,43 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           />
         </SettingsSection>
       </SettingsSection>
+      {confirmation && (
+        <SettingsDialog
+          title={translate(
+            confirmation.kind === 'register'
+              ? 'settings.codexSettings.confirmRepairTitle'
+              : 'settings.codexSettings.confirmRemovalTitle',
+          )}
+          description={translate(
+            confirmation.kind === 'register'
+              ? 'settings.codexSettings.confirmRepairDescription'
+              : 'settings.codexSettings.confirmRemovalDescription',
+          )}
+          applyLabel={translate(
+            confirmation.kind === 'register'
+              ? 'settings.codexSettings.repair'
+              : 'settings.codexSettings.unregister',
+          )}
+          returnFocus={returnFocus.current}
+          onClose={() => setConfirmation(undefined)}
+          onApply={async () => {
+            const reply = await settingsControls.automation({
+              kind: confirmation.kind,
+              confirmationId: confirmation.id,
+            });
+            setState(reply.state);
+          }}
+        >
+          <SettingsField
+            title={translate('settings.codexSettings.registrationName')}
+            description={confirmation.name}
+          />
+          <SettingsField
+            title={translate('settings.codexSettings.configFile')}
+            description={confirmation.configFile}
+          />
+        </SettingsDialog>
+      )}
     </section>
   );
 }

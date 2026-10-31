@@ -278,11 +278,15 @@ MCPは接続経路の表示であり、接続元をCodex固有の本人確認と
 
 登録名の既定値はAppDockで、mcp_servers.AppDockのurl/enabled/required/http_headersだけを追加します。「Codex連携」で登録名を変更できます（英字で始まる64文字以内の英数字・ハイフン・アンダースコア）。複数配置にはAppDock_Testなど別の名前を指定します。同名の他登録は上書きしません。serverIdはCodexへの登録名、APIのinstanceIdと管理コメントは配置IDです。
 
-旧登録や名前変更前の登録は「登録を解除」してから登録し直します。解除は保存済みの所有hashを照合して旧名の管理範囲だけを削除します。ローカルserverNameが未保存の場合はAppDockを既定値にします。
+旧登録や名前変更前の登録は「登録を解除」してから登録し直します。解除は配置の管理コメント・所有情報と対象範囲を照合し、旧名の登録だけを削除します。ローカルserverNameが未保存の場合はAppDockを既定値にします。
 
 required=falseなのでAppDock停止をCodex全体の必須起動失敗にしません。Bearer tokenはCodexのローカルconfig.tomlにも平文で保存されます。画面・IPC状態・ログには出しません。
 
-管理用コメントと範囲hashを使い、全TOMLの構文と範囲外の意味を検査します。現在の正確な登録内容または保存済みhashと一致するときだけ修復/解除します。複数行文字列内の偽コメント・外部編集・同名衝突・不正TOMLを上書きしません。直前bytesを照合しatomic置換します。既存内容があれば同じ場所のconfig.toml.appdock-backupへ復旧用コピーを保存します（既存認証値が含まれ得ます）。解除は管理範囲だけを除き、過去の全ファイルを復元しません。
+管理用コメントと範囲hashを使い、全TOMLの構文と範囲外の意味を検査します。現在の登録内容または保存済みhashと一致する場合と、期待する設定値が同じで改行・空白・項目順だけが違う場合は、そのまま修復/解除できます。外部で値が変わった登録も、この配置の管理コメントが一意で保存済み所有情報があり、対象サーバーだけを切り離せる場合は、共通ダイアログで登録名・ファイル・処理内容を確認して修復/解除できます。認証値や生のTOMLは画面・IPCへ渡しません。
+
+修復はurl/enabled/requiredとAuthorizationを現在の接続へ合わせ、同じ登録のツール許可・タイムアウト・他のヘッダーなどを保持します。競合するstdio起動設定・別の認証方式やAuthorizationの環境変数指定は除きます。Codexがhttp_headersなどを別テーブルへ展開し管理コメントの外へ置いた場合も、対象サーバーのテーブルだけを抽出し、他の設定値と管理コメントを保持できることを検査します。全ファイルを再シリアライズしません。解除は追加のツール設定なども含む対象登録だけを除き、過去の全ファイルを復元しません。
+
+確認は1回限りで、修復/解除の種類・選択ファイル・接続情報・所有情報・ファイル全体のbytesに結び付けます。確認中の変更や別操作で無効になった確認は再利用できず、ダイアログ内にエラーを表示します。取消は保存せず操作元へフォーカスを戻します。複数行文字列内の偽コメント・曖昧な管理範囲・同名の他登録・不正TOMLは変更しません。保存直前のbytes照合とatomic置換を維持し、既存内容があればconfig.toml.appdock-backupへ正確な復旧用コピーを保存します（既存認証値が含まれ得ます）。
 
 外部アプリで登録を削除した結果、開始または終了コメントが1行だけ残った場合は、保存済み所有情報があり、同名のMCP登録が存在せず、そのコメントだけを除いてもTOMLの意味が変わらないときに限り再登録・解除できます。状態確認はファイルを書き換えません。コメントの重複・文字列内のコメント・登録本体が残る場合は従来どおり確認を求めます。
 
@@ -293,6 +297,7 @@ required=falseなのでAppDock停止をCodex全体の必須起動失敗にしま
 - `dev.bat run typecheck` / `dev.bat run build`
 - `dev.bat exec node --test tests/automation.test.cjs tests/settings-commands.test.cjs tests/settings-sync.test.cjs`
 - `dev.bat exec node scripts/automation-ui-test.cjs [A:/40.ARTIFACT/AppDock.at365/AppDock.at365.exe]`
+- `dev.bat exec node scripts/codex-registration-ui-test.cjs [A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe]`: 隔離した設定の外部変更・修復/解除・取消/フォーカス・確認中の競合を実画面で検査します。
 - APPDOCK_TEST_CODEX_EXEへインストール済みCodexの絶対パスを指定すると、GUI生成の隔離configを実Codexで読み込み、7ツールの発見と取得/変更/再取得/復元・公開コマンド実行を確認します。検証にだけapp-serverのMCP呼出しを使い、モデル推論や実利用の認証値は使いません。GUIのコマンド試験は製品にないIDの専用Appletを使い、実デスクトップ壁紙は変更しません。
 
 証跡は.artifacts/automation-source-* / automation-portable-*とVERIFICATIONに記録します。ビルドをGUI検証と同時実行しません。
@@ -485,7 +490,7 @@ networkHostnamesの変更は保存後に検査規則を差し替える。bind変
 | 認証情報の再発行 | 既存どおりCodex登録を修復し、外部クライアントも新tokenへ更新。旧tokenは全接続で無効 |
 | 連携無効・起動失敗 | Codexから利用不可。登録の`required=false`を保持 |
 
-`registrationBlock()`のループバックURL限定検証と、管理コメント・所有hash・TOML検証・直前bytes照合・backup・原子的置換を変更しない。外部削除後の孤立コメント修復条件も保持する。他PCのCodexやAIアプリの設定ファイルをこの画面から編集しない。
+`registrationBlock()`のループバックURL限定検証、管理コメント・所有情報による範囲の限定、TOML検証・直前bytes照合・backup・原子的置換を維持する。外部変更時の確認付き復旧と、外部削除後の孤立コメント修復条件は本書の登録仕様に従う。他PCのCodexやAIアプリの設定ファイルをこの画面から編集しない。
 
 現在の「クライアント接続」日時はCodex専用ではない。ネットワーク接続が増えてもCodexの接続成功と誤認しないよう、「このPCからの最終接続」「ネットワークからの最終接続」に分ける。分類はsocket.remoteAddressのIPv4 loopback判定で行う。このPC側でもクライアント名の自己申告をCodex認証に使わない。実際のCodexからツールが呼べたことは別途確認する。
 

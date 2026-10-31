@@ -23,6 +23,7 @@ import {
   codexServerName,
   registrationBlock,
   registrationStatus,
+  previewRegistrationChange,
 } from './codex-registration';
 
 interface LocalConfig {
@@ -73,6 +74,14 @@ export class AutomationService {
   private lastNetworkClientAt?: string;
   readonly id: string;
   private file: string;
+  private registrationConfirmation?: {
+    id: string;
+    kind: 'register' | 'unregister';
+    file: string;
+    block: string;
+    ownedHash: string | undefined;
+    revision: string;
+  };
   constructor(
     private options: {
       localDirectory: string;
@@ -387,6 +396,8 @@ export class AutomationService {
       throw Error(hostText('services.automation.retiredPermission'));
     if (this.busy || this.closed) throw Error(hostText('services.automation.busy'));
     if (this.loadError) throw Error(this.loadError);
+    if (action.kind !== 'register' && action.kind !== 'unregister')
+      this.registrationConfirmation = undefined;
     this.busy = true;
     const previous = structuredClone(this.config);
     try {
@@ -526,29 +537,68 @@ export class AutomationService {
           message = hostText('services.automation.commandPermissionSaved');
           break;
         case 'register':
-          if (!this.server) throw Error(hostText('services.automation.startFirst'));
-          this.config.owned[this.config.configFile] = changeRegistration(
-            this.config.configFile,
-            this.id,
-            this.block(),
-            this.config.owned[this.config.configFile],
-          )!;
-          this.save();
-          message = hostText('services.automation.registered');
-          break;
-        case 'unregister':
+        case 'unregister': {
+          const remove = action.kind === 'unregister';
+          if (!remove && !this.server) throw Error(hostText('services.automation.startFirst'));
           if (!this.token) throw Error(hostText('services.automation.registrationMissing'));
-          changeRegistration(
-            this.config.configFile,
+          const file = this.config.configFile,
+            block = this.block(),
+            ownedHash = this.config.owned[file];
+          let revision: string;
+          if (action.confirmationId !== undefined) {
+            const pending = this.registrationConfirmation;
+            this.registrationConfirmation = undefined;
+            if (
+              !pending ||
+              pending.id !== action.confirmationId ||
+              pending.kind !== action.kind ||
+              pending.file !== file ||
+              pending.block !== block ||
+              pending.ownedHash !== ownedHash
+            )
+              throw Error(hostText('services.codexRegistration.settingsChanged'));
+            revision = pending.revision;
+          } else {
+            this.registrationConfirmation = undefined;
+            const preview = previewRegistrationChange(file, this.id, block, ownedHash, remove);
+            if (preview.requiresConfirmation) {
+              const id = randomBytes(32).toString('hex');
+              this.registrationConfirmation = {
+                id,
+                kind: action.kind,
+                file,
+                block,
+                ownedHash,
+                revision: preview.revision,
+              };
+              return {
+                state: this.state(),
+                registrationConfirmation: {
+                  id,
+                  kind: action.kind,
+                  name: preview.name,
+                  configFile: file,
+                },
+              };
+            }
+            revision = preview.revision;
+          }
+          const registeredHash = changeRegistration(
+            file,
             this.id,
-            this.block(),
-            this.config.owned[this.config.configFile],
-            true,
+            block,
+            ownedHash,
+            remove,
+            revision,
           );
-          delete this.config.owned[this.config.configFile];
+          if (remove) delete this.config.owned[file];
+          else this.config.owned[file] = registeredHash!;
           this.save();
-          message = hostText('services.automation.unregistered');
+          message = hostText(
+            remove ? 'services.automation.unregistered' : 'services.automation.registered',
+          );
           break;
+        }
         case 'rotateToken':
           if (!this.token) throw Error(hostText('services.automation.enableFirst'));
           this.token = randomBytes(32).toString('hex');
