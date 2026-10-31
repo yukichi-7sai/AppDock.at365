@@ -228,6 +228,7 @@ export class AutomationService {
   private async stop() {
     const server = this.server;
     this.server = undefined;
+    this.events.pause();
     this.clearConnections();
     await server?.close();
   }

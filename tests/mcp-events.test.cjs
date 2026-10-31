@@ -646,6 +646,136 @@ test('OFF aborts in-flight delivery without resurrecting its queue on resume', a
   await f.events.flush();
   assert.deepEqual(delivered, [publication.notificationId, 'after-abort']);
 });
+const settleEvents = async (events) => {
+  await events.work;
+  await Promise.resolve();
+};
+test('idle Events has no recurring work and expires a subscription only at its deadline', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: publication.createdAt });
+  const f = fixture(t, { now: () => Date.now() });
+  const flush = t.mock.method(f.events, 'flush');
+  f.events.start();
+  t.mock.timers.tick(86400000);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 0);
+  await f.events.subscribe(params({ ttlMs: 60000 }));
+  t.mock.timers.tick(59999);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 0);
+  t.mock.timers.tick(1);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 1);
+  const saved = JSON.parse(fs.readFileSync(path.join(f.directory, 'automation-events.json')));
+  const state = JSON.parse(f.options.decrypt(saved.sealed));
+  assert.deepEqual(state.subscriptions, []);
+  t.mock.timers.tick(86400000);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 1);
+  assert.equal(f.calls.length, 1);
+});
+
+test('new notifications preempt a later retry and retries wake only at their own deadline', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: publication.createdAt });
+  const f = fixture(t, { now: () => Date.now() });
+  const flush = t.mock.method(f.events, 'flush');
+  await f.events.subscribe(params());
+  f.setStatus(503);
+  f.events.publish(publication);
+  await settleEvents(f.events);
+  t.mock.timers.tick(0);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 1);
+  const first = f.calls.at(-1).value;
+  t.mock.timers.tick(1000);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 1);
+
+  f.setStatus(200);
+  f.events.publish({ ...publication, notificationId: 'newer' });
+  await settleEvents(f.events);
+  t.mock.timers.tick(0);
+  await settleEvents(f.events);
+  assert.equal(f.calls.at(-1).value.data.notificationId, 'newer');
+  t.mock.timers.tick(999);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 2);
+  t.mock.timers.tick(1);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 3);
+  assert.equal(f.calls.at(-1).value.eventId, first.eventId);
+  t.mock.timers.tick(10000);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 3);
+});
+
+test('renewal replaces the expiration reservation and unsubscribe removes the last scheduled work', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: publication.createdAt });
+  const f = fixture(t, { now: () => Date.now() });
+  const flush = t.mock.method(f.events, 'flush');
+  await f.events.subscribe(params({ ttlMs: 60000 }));
+  t.mock.timers.tick(30000);
+  await f.events.subscribe(params({ ttlMs: 120000 }));
+  t.mock.timers.tick(30000);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 0);
+  await f.events.unsubscribe(params({ delivery: { mode: 'webhook', url: params().delivery.url } }));
+  t.mock.timers.tick(7 * 86400000);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 0);
+});
+
+test('persisted retry reservations resume after restart and MCP pause leaves no periodic wakeup', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: publication.createdAt });
+  const f = fixture(t, { now: () => Date.now() });
+  await f.events.subscribe(params());
+  f.setStatus(503);
+  f.events.publish(publication);
+  await f.events.flush();
+  await f.events.close();
+  const restarted = new McpEvents(f.options);
+  t.after(() => restarted.close());
+  const flush = t.mock.method(restarted, 'flush');
+  restarted.start();
+  t.mock.timers.tick(1999);
+  await settleEvents(restarted);
+  assert.equal(flush.mock.callCount(), 0);
+  f.setStatus(200);
+  t.mock.timers.tick(1);
+  await settleEvents(restarted);
+  assert.equal(flush.mock.callCount(), 1);
+  restarted.pause();
+  f.enable(false);
+  t.mock.timers.tick(2 * 86400000);
+  await settleEvents(restarted);
+  assert.equal(flush.mock.callCount(), 1);
+  f.enable(true);
+  restarted.start();
+  t.mock.timers.tick(0);
+  await settleEvents(restarted);
+  assert.equal(flush.mock.callCount(), 2);
+  t.mock.timers.tick(86400000);
+  await settleEvents(restarted);
+  assert.equal(flush.mock.callCount(), 2);
+});
+
+test('resume reconciliation rechecks deadlines after a wall-clock advance without periodic polling', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(t);
+  const flush = t.mock.method(f.events, 'flush');
+  await f.events.subscribe(params({ ttlMs: 60000 }));
+  f.events.publish(publication);
+  await settleEvents(f.events);
+  f.advance(120000);
+  f.events.reconcile();
+  t.mock.timers.tick(0);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 1);
+  assert.equal(f.calls.length, 1);
+  t.mock.timers.tick(3600000);
+  await settleEvents(f.events);
+  assert.equal(flush.mock.callCount(), 1);
+});
+
 const meta = () => ({
   'io.modelcontextprotocol/protocolVersion': version,
   'io.modelcontextprotocol/clientCapabilities': {},

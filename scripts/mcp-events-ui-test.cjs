@@ -20,7 +20,10 @@ settings.host.closeToTray = false;
 settings.globalShortcutCommands = [];
 settings.keybindings = [];
 settings.gestures.enabled = false;
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const type = require('../out/main/shared/notification-types')
   .notificationCatalog([])
   .find((t) => !t.requiredTargets.length);
@@ -50,7 +53,7 @@ async function start() {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const port = server.address().port;
   await new Promise((r) => server.close(r));
-  const env = { ...process.env };
+  const env = { ...process.env, CODEX_HOME: path.dirname(config) };
   delete env.ELECTRON_RUN_AS_NODE;
   child = spawn(
     exe,
@@ -93,11 +96,21 @@ async function page() {
   await host.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
   const p = await require('./settings-host-helper.cjs').settingsPage(host);
   await p.getByRole('button', { name: '通知', exact: true }).click();
-  const card = p
-    .locator('.notification-setting-card')
-    .filter({ has: p.getByRole('heading', { name: type.title, exact: true }) });
-  if (!(await card.evaluate((e) => e.open))) await card.locator(':scope > summary').click();
+  await p.getByRole('heading', { name: '通知', level: 1, exact: true }).waitFor();
   return p;
+}
+async function edit(p) {
+  await p
+    .getByRole('button', { name: type.ownerTitle + 'の' + type.title + 'を編集', exact: true })
+    .click();
+  const dialog = p.getByRole('dialog', { name: type.title, exact: true });
+  await dialog.waitFor();
+  return dialog;
+}
+async function apply(p, dialog) {
+  await dialog.getByTestId('settings-dialog-confirm').click();
+  await dialog.waitFor({ state: 'hidden' });
+  await settleSettings(p);
 }
 async function rpc(method, args = {}) {
   const state = (await action({ kind: 'status' })).state;
@@ -132,32 +145,43 @@ async function rpc(method, args = {}) {
   try {
     await start();
     let p = await page();
+    let dialog = await edit(p);
     const label = type.title + 'をMCP Eventsで送信';
-    assert.equal(await p.getByLabel(label, { exact: true }).isChecked(), false);
-    await p
-      .locator('.notification-setting-card')
-      .filter({ has: p.getByRole('heading', { name: type.title, exact: true }) })
+    assert.equal(await dialog.getByLabel(label, { exact: true }).isChecked(), false);
+    await dialog
       .getByText('購読中のdot等へタイトルと本文を送信。OFF中は送信を止め、購読は有効期限まで保持', {
         exact: true,
       })
       .waitFor();
+    await dialog.getByTestId('settings-dialog-cancel').click();
+    await dialog.waitFor({ state: 'hidden' });
     await action({ kind: 'selectConfig', file: config });
     await action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
     await action({ kind: 'register' });
     assert.deepEqual((await rpc('events/list')).result.events, []);
     checks.push('fresh profile defaults OFF and exposes no notification events');
-    await p.getByLabel(type.title + 'の通知センターのみ', { exact: true }).check();
-    await settleSettings(p);
-    await p.getByLabel(label, { exact: true }).check();
-    await settleSettings(p);
-    await p.getByText(/^MCP Eventsのみ ／/).waitFor();
+    dialog = await edit(p);
+    await dialog.getByLabel(type.title + 'の通知センターのみ', { exact: true }).check();
+    await dialog.getByLabel(label, { exact: true }).check();
     assert.equal(
-      await p.getByLabel(type.title + 'の通知センターのみ', { exact: true }).isChecked(),
+      await dialog.getByLabel(type.title + 'の通知センターのみ', { exact: true }).isChecked(),
       false,
     );
+    await apply(p, dialog);
+    const table = p
+      .getByRole('table')
+      .filter({ has: p.getByRole('columnheader', { name: 'MCP Events', exact: true }) });
+    const columns = await table.getByRole('columnheader').allTextContents();
+    const row = table.getByRole('row').filter({
+      has: p.getByRole('button', {
+        name: type.ownerTitle + 'の' + type.title + 'を編集',
+        exact: true,
+      }),
+    });
+    assert.equal(await row.getByRole('cell').nth(columns.indexOf('MCP Events')).innerText(), 'ON');
     assert.equal(
-      JSON.parse(
-        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+      (
+        await host.evaluate(async () => (await window.dock.snapshot()).settings.value)
       ).notificationPreferences.overrides.find(
         (r) => r.ownerId === type.ownerId && r.typeId === type.typeId,
       ).mcpEvents,
@@ -178,28 +202,30 @@ async function rpc(method, args = {}) {
     });
     assert.equal(rejected.error.code, -32602);
     checks.push(
-      'immediate selection save, accurate MCP-only summary, authenticated MCP 2 discovery, selected catalog and private callback rejection',
+      'committed selection, accurate MCP column, authenticated MCP 2 discovery, selected catalog and private callback rejection',
     );
-    await p.getByLabel(label, { exact: true }).scrollIntoViewIfNeeded();
+    await row.scrollIntoViewIfNeeded();
     await p.screenshot({ path: path.join(profile, 'settings.png') });
     await stop();
     await start();
     p = await page();
-    assert.equal(await p.getByLabel(label, { exact: true }).isChecked(), true);
+    dialog = await edit(p);
+    assert.equal(await dialog.getByLabel(label, { exact: true }).isChecked(), true);
     assert.equal((await rpc('events/list')).result.events.length, 1);
     checks.push('choice and MCP connection survive full application restart');
-    await p.getByLabel(type.title + 'の通知センターのみ', { exact: true }).check();
-    await settleSettings(p);
-    assert.equal(await p.getByLabel(label, { exact: true }).isChecked(), false);
+    await dialog.getByLabel(type.title + 'の通知センターのみ', { exact: true }).check();
+    assert.equal(await dialog.getByLabel(label, { exact: true }).isChecked(), false);
+    await apply(p, dialog);
     assert.deepEqual((await rpc('events/list')).result.events, []);
     checks.push('center-only clears event sending and removes event catalog');
     await stop();
     await start();
     p = await page();
-    assert.equal(await p.getByLabel(label, { exact: true }).isChecked(), false);
+    dialog = await edit(p);
+    assert.equal(await dialog.getByLabel(label, { exact: true }).isChecked(), false);
     assert.deepEqual((await rpc('events/list')).result.events, []);
-    await p.getByLabel(label, { exact: true }).check();
-    await settleSettings(p);
+    await dialog.getByLabel(label, { exact: true }).check();
+    await apply(p, dialog);
     assert.equal((await rpc('events/list')).result.events.length, 1);
     checks.push('OFF survives restart and ON resumes selected event discovery');
     await action({ kind: 'unregister' });

@@ -1448,6 +1448,7 @@ const operationApi = new AppDockApi({
   ready: () => startupReady && !quitting,
 });
 const changed = () => {
+  gestures?.requestRefresh();
   refreshAppearance();
   setAppletPageBlur(
     overlayHost?.kind === 'command-palette' && settings.value.host.overlayBackground === 'blur',
@@ -1501,6 +1502,10 @@ const changed = () => {
     notifyUpdatedWindowShown();
   }, 60);
 };
+function refreshAfterResume() {
+  gestures?.requestRefresh();
+  automation?.reconcileEvents();
+}
 const shortcutInvocation = new AsyncLocalStorage<ShortcutPress>();
 async function showWindow(invocation?: InputInvocation) {
   if (window) {
@@ -4668,6 +4673,7 @@ async function initialize() {
   window.webContents.on('did-start-loading', () => hostPages?.close());
   window.webContents.on('render-process-gone', () => hostPages?.close());
   configurePageHost({
+    inputContextChanged: () => gestures?.requestRefresh(),
     overlay: () => {
       notificationBanner?.layout();
       overlayHost?.layout();
@@ -4811,6 +4817,7 @@ async function initialize() {
   gestures.indicator = gestureIndicatorHost;
   await hostStartupTiming.phaseAsync('indicator', () => gestureIndicatorHost!.initialize());
   await hostStartupTiming.phaseAsync('gestures', () => gestures!.start());
+  powerMonitor.on('resume', refreshAfterResume);
   await hostStartupTiming.phaseAsync('touchpad', () => touchpad!.start());
   if (quitting) return;
   uiReady = true;
@@ -5161,8 +5168,10 @@ app.on('second-instance', (_event, argv) => {
   if (!activateNotification(argv, openNotificationCenter)) showWindow();
 });
 app.on('before-quit', (event) => {
+  powerMonitor.off('resume', refreshAfterResume);
   clearTimeout(startupUpdateTimer);
   quitting = true;
+  gestures?.requestRefresh();
   fileWatchAssistance.dispose();
   startupUi.cancel();
   completeStartup!();

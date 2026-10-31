@@ -16,12 +16,25 @@ interface PageHost {
   shortcut(input: Input, appletId?: string): boolean;
   failed(message: string): void;
   overlay?(): void;
+  inputContextChanged?(): void;
 }
 let host: PageHost | undefined;
 let selected: string | null = null;
 let bounds: Rectangle | null = null;
 const surfaces = new Map<string, AppletSurface>();
 const allSurfaces = new Set<AppletSurface>();
+function inputContextChanged() {
+  host?.inputContextChanged?.();
+}
+function observeInputWindow(window: BrowserWindow) {
+  window.on('focus', inputContextChanged);
+  window.on('blur', inputContextChanged);
+  window.on('show', inputContextChanged);
+  window.on('hide', inputContextChanged);
+  window.on('minimize', inputContextChanged);
+  window.on('restore', inputContextChanged);
+  window.on('closed', inputContextChanged);
+}
 let paletteBlur = false;
 export function setAppletPageBlur(active: boolean) {
   if (active === paletteBlur) return;
@@ -120,6 +133,7 @@ export function configurePageHost(value: PageHost) {
   window?.on('hide', layout);
   window?.on('minimize', layout);
   window?.on('restore', layout);
+  if (window) observeInputWindow(window);
 }
 export function pageHostShortcut(input: Input, appletId?: string) {
   return host?.shortcut(input, appletId) ?? false;
@@ -141,9 +155,11 @@ export function updatePageViewport(key: string | null, area: Rectangle | null) {
       }))
   )
     throw Error(hostText('services.appletPages.invalidArea'));
+  const contextChanged = selected !== key || (bounds !== null) !== (area !== null);
   selected = key;
   bounds = area;
   for (const surface of surfaces.values()) surface.layout();
+  if (contextChanged) inputContextChanged();
 }
 export function refreshPageDisplays() {
   for (const surface of surfaces.values()) surface.refreshDisplay();
@@ -408,6 +424,7 @@ export class AppletSurface {
       this.standalone = undefined;
       this.options.onLayout();
     });
+    observeInputWindow(window);
     if (saved) restoreWindowBounds(window, saved.bounds);
     if (saved?.maximized) window.maximize();
     return window;
@@ -438,6 +455,7 @@ export class AppletSurface {
       window.focus();
     }
     this.layout();
+    inputContextChanged();
   }
   refreshDisplay() {
     if (this.closed) return;
@@ -465,6 +483,7 @@ export class AppletSurface {
       this.moving = false;
     }
     this.layout();
+    inputContextChanged();
   }
   hide() {
     if (this.closed) return;
@@ -476,6 +495,7 @@ export class AppletSurface {
       host?.selected(null);
     }
     this.layout();
+    inputContextChanged();
   }
   layout() {
     if (this.closed) return;
@@ -536,6 +556,7 @@ export class AppletSurface {
     if (!this.ui.webContents.isDestroyed()) this.ui.webContents.close();
     this.standalone?.destroy();
     this.standalone = undefined;
+    inputContextChanged();
   }
   private reportVisibility() {
     if (this.moving) return;

@@ -79,12 +79,13 @@ export class InputCaptureManager {
   private statuses: NativeShortcutStatus[] = [];
   private recording?: { token: string; window: string; allowWin: boolean };
   private faultSettings?: string;
-  private timer?: ReturnType<typeof setInterval>;
+  private started = false;
+  private refreshScheduled = false;
+  private refreshRequested = false;
   private active = new Map<string, AbortController>();
   private recordSequence = 0;
   private endedRecordings = new Set<string>();
   paused = false;
-  private refreshing = false;
   private foregroundWindow?: string;
   constructor(
     private executable: string,
@@ -125,16 +126,23 @@ export class InputCaptureManager {
     }
   }
   async start() {
+    this.started = true;
     await this.refresh();
-    this.timer = setInterval(() => {
-      if (this.refreshing) return;
-      this.refreshing = true;
+  }
+  requestRefresh() {
+    if (!this.started || this.stopped) return;
+    this.refreshRequested = true;
+    if (this.refreshScheduled) return;
+    this.refreshScheduled = true;
+    queueMicrotask(() => {
+      this.refreshRequested = false;
       void this.refresh()
         .catch(() => {})
         .finally(() => {
-          this.refreshing = false;
+          this.refreshScheduled = false;
+          if (this.refreshRequested) this.requestRefresh();
         });
-    }, 40);
+    });
   }
   togglePause() {
     this.paused = !this.paused;
@@ -307,6 +315,7 @@ export class InputCaptureManager {
     if (method === 'shortcuts.recordEnded') {
       if (this.recording?.token === p.token) {
         this.recording = undefined;
+        this.requestRefresh();
         this.shortcuts.recordingEnded?.();
       }
       return;
@@ -537,7 +546,6 @@ export class InputCaptureManager {
   async close() {
     this.indicator?.hide();
     this.stopped = true;
-    clearInterval(this.timer);
     for (const [session, controller] of this.active) {
       controller.abort();
       this.cancelCommand(session);

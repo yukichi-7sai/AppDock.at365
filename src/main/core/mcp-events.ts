@@ -69,7 +69,9 @@ export class McpEvents {
   private state: State = { version: 1, subscriptions: [], pending: [] };
   private failedLoad = false;
   private stopped = false;
+  private started = false;
   private timer?: ReturnType<typeof setTimeout>;
+  private flushing = 0;
   private work: Promise<unknown> = Promise.resolve();
   private queued = 0;
   private controller = new AbortController();
@@ -206,9 +208,11 @@ export class McpEvents {
       this.state = next;
     } catch {
       this.failedLoad = true;
+      this.clearTimer();
       this.audit('EVENT_STORAGE_FAILED');
       throw new McpEventError(-32603, 'Event storage could not be saved');
     }
+    this.schedule();
   }
   list(params: unknown) {
     if (
@@ -463,16 +467,41 @@ export class McpEvents {
     );
   }
   start() {
-    if (this.timer || this.stopped || this.failedLoad) return;
-    this.timer = setTimeout(() => {
-      this.timer = undefined;
-      void this.flush()
-        .catch(() => this.audit('EVENT_DELIVERY_FAILED'))
-        .finally(() => this.start());
-    }, 1000);
+    this.started = true;
+    this.schedule();
+  }
+  pause() {
+    this.started = false;
+    this.clearTimer();
+  }
+  private clearTimer() {
+    clearTimeout(this.timer);
+    this.timer = undefined;
+  }
+  private schedule() {
+    this.clearTimer();
+    if (!this.started || this.flushing || !this.available()) return;
+    const now = this.now();
+    const subscriptions = new Map(this.state.subscriptions.map((sub) => [sub.id, sub]));
+    let due = Infinity;
+    for (const sub of subscriptions.values())
+      due = Math.min(due, this.valid(sub) ? sub.expires : now);
+    for (const pending of this.state.pending) {
+      const sub = subscriptions.get(pending.subscriptionId);
+      due = Math.min(due, sub && this.valid(sub) && this.allowed(sub.filter) ? pending.due : now);
+    }
+    if (!Number.isFinite(due)) return;
+    this.timer = setTimeout(
+      () => {
+        this.timer = undefined;
+        void this.flush().catch(() => this.audit('EVENT_DELIVERY_FAILED'));
+      },
+      Math.max(0, Math.min(2_147_483_647, due - now)),
+    );
     this.timer.unref();
   }
   reconcile(revoke = false) {
+    this.schedule();
     const selectedKeys = this.options.types().map(notificationTypeKey).sort();
     const selection = JSON.stringify(selectedKeys);
     if (!revoke && selection === this.selection) return;
@@ -494,7 +523,9 @@ export class McpEvents {
     }).catch(() => this.audit('EVENT_REVOKE_FAILED'));
   }
   flush() {
-    return this.serial(async () => {
+    this.flushing++;
+    this.clearTimer();
+    const work = this.serial(async () => {
       if (!this.available()) return;
       const epoch = this.epoch;
       const next = structuredClone(this.state);
@@ -530,10 +561,14 @@ export class McpEvents {
       }
       if (JSON.stringify(next) !== JSON.stringify(this.state)) this.commit(next);
     });
+    return work.finally(() => {
+      this.flushing--;
+      this.schedule();
+    });
   }
   async close() {
     this.stopped = true;
-    clearTimeout(this.timer);
+    this.pause();
     this.controller.abort();
     await this.work;
   }

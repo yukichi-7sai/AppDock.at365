@@ -94,7 +94,10 @@ settings.gestures = {
     when: { ...row.when, processes: [] },
   })),
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const portable = !!process.argv[2];
 const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -115,7 +118,16 @@ async function until(fn, message) {
 const calls = () => {
   try {
     return JSON.parse(
-      fs.readFileSync(path.join(profile, 'data/storage/test.input-pages/calls.json'), 'utf8'),
+      fs.readFileSync(
+        require('../out/main/main/core/applet-storage').appletStorageFile(
+          path.join(profile, 'data'),
+          'test.input-pages',
+          'calls',
+          undefined,
+          require('node:os').hostname(),
+        ),
+        'utf8',
+      ),
     );
   } catch {
     return [];
@@ -123,8 +135,9 @@ const calls = () => {
 };
 let app, host, target, peer;
 const checks = [];
+const measurements = [];
 async function launch() {
-  const env = { ...process.env };
+  const env = { ...process.env, CODEX_HOME: path.join(profile, 'codex') };
   delete env.ELECTRON_RUN_AS_NODE;
   app = await launchTestHost({
     executablePath,
@@ -148,6 +161,18 @@ async function launch() {
       )?.state === 'running',
     'fixture running',
   );
+  await app.evaluate(({ app }) => {
+    const path = process.mainModule.require('node:path');
+    const { InputCaptureManager } = process.mainModule.require(
+      path.join(app.getAppPath(), 'out/main/main/core/gestures.js'),
+    );
+    const original = InputCaptureManager.prototype.sync;
+    globalThis.inputSyncProbe = { calls: 0 };
+    InputCaptureManager.prototype.sync = function (...args) {
+      globalThis.inputSyncProbe.calls++;
+      return original.apply(this, args);
+    };
+  });
 }
 async function focusTarget(suffix) {
   const handle = await until(
@@ -251,25 +276,44 @@ async function expectCalls(suffix, expected) {
     });
     await expectCalls('/test.input-pages/history.html', ['all', 'picked']);
     checks.push('standalone Applet window retains page identity');
+    const idle = await app.evaluate(async () => {
+      const before = globalThis.inputSyncProbe.calls;
+      const started = performance.now();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return {
+        durationMs: performance.now() - started,
+        synchronizations: globalThis.inputSyncProbe.calls - before,
+      };
+    });
+    measurements.push(idle);
+    assert.equal(
+      idle.synchronizations,
+      0,
+      'stable input state must not trigger periodic synchronization',
+    );
+    checks.push('stable input state has no periodic native configuration projection');
     await host.evaluate(() => window.dock.navigate('settings'));
     await focusTarget('appdock://host/index.html');
     const page = require('./settings-aware-page.cjs').settingsAwarePage(host);
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.command-triggers.open'));
+    await page.getByTestId('settings-page:command-triggers').waitFor();
     let candidates;
-    for (const [category, rowId, panelClass] of [
-      ['ショートカットキー', 'picked', '.applet-shortcut-dialog'],
-      ['マウスジェスチャー', 'gesture.picked', '.gesture-binding-dialog'],
+    for (const [kind, rowId] of [
+      ['shortcuts', 'picked'],
+      ['gestures', 'gesture.picked'],
     ]) {
-      await page.getByRole('button', { name: category, exact: true }).click();
-      await page.locator(`[data-binding-id="${rowId}"] .applet-shortcut-edit`).click();
-      const panel = page.locator(panelClass);
-      const condition = panel.getByLabel('割り当てのいつ・どこで');
+      const row = page.locator(
+        `[data-binding-id=${JSON.stringify(JSON.stringify([kind, rowId]))}]`,
+      );
+      await row.locator('.binding-condition-edit').click();
+      const panel = page.getByTestId('settings-dialog');
+      const condition = panel.getByRole('group', { name: '割り当てのいつ・どこで', exact: true });
       assert(
-        (await condition.locator('option').allTextContents()).includes('AppDockのすべてのページ'),
+        (await condition.getByRole('button').allTextContents()).includes('AppDockのすべてのページ'),
       );
       assert(
-        (await condition.locator('option').allTextContents()).includes('AppDockの指定したページ'),
+        (await condition.getByRole('button').allTextContents()).includes('AppDockの指定したページ'),
       );
-      await panel.locator('.keybinding-targets').click();
       const labels = await panel.locator('.keybinding-picker label').allTextContents();
       assert.deepEqual(labels, [
         '画像ライブラリー',
@@ -285,9 +329,9 @@ async function expectCalls(suffix, expected) {
       assert.equal(await panel.locator('.keybinding-picker label').count(), 1);
       await panel.getByLabel('対象ページを検索').fill('');
       await panel.getByRole('checkbox', { name: '別ページ', exact: true }).check();
-      assert.equal(await panel.locator('.settings-error[data-error="true"]').count(), 0);
+      assert.equal(await panel.getByRole('alert').count(), 0);
       await host.screenshot({ path: path.join(profile, rowId + '-picker.png') });
-      await panel.getByRole('button', { name: '適用', exact: true }).click();
+      await panel.getByTestId('settings-dialog-confirm').click();
       await require('./settings-immediate-helper.cjs').settleSettings(page);
     }
     checks.push(
@@ -304,6 +348,7 @@ async function expectCalls(suffix, expected) {
     const result = {
       ok: true,
       checks,
+      measurements,
       portable,
       ...(portable ? { sha256: hash(executablePath) } : {}),
     };
