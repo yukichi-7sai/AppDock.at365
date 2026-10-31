@@ -97,7 +97,7 @@ require('./settings-web-fixture.cjs').installWebSettings(
   initial.webApplets.accounts,
 );
 delete initial.webApplets;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const checks = [],
   errors = [];
 let child,
@@ -310,7 +310,7 @@ async function until(fn, label) {
     checks.push(
       'five available Applets plus a remote collection fixture fit light/dark at wide and narrow sizes; native Applets stay stopped',
     );
-    const disk = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const disk = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     assert.equal(disk.extensions['fixture.sections'].settings.text, 'saved in detail');
     success = true;
   } catch (error) {

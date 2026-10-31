@@ -23,7 +23,7 @@ assert.equal(hash(source), hash(executable));
 const settings = createDefaultSettings();
 settings.host.notifications = false;
 settings.host.hardwareAcceleration = false;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const service = new WindowsLaunch(executable, profile, [`--test-profile=${profile}`]);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -240,9 +240,9 @@ async function close() {
     }
     if (!registered.administratorAccount && !registered.elevated) {
       await close();
-      const stored = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+      const stored = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
       stored.host.runAsAdministrator = true;
-      fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(stored));
+      fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(stored));
       await launch();
       const fallback = await snapshot();
       assert.equal(fallback.launch.elevated, false);

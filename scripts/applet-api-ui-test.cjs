@@ -96,7 +96,7 @@ if (legacyDll) {
   require('./copy-host.cjs').copyHost(legacyDll, path.join(dir, 'AppDock.Extensions.Demo.dll'));
   settings.extensions['appdock.dotnet-demo'] = { enabled: true, settings: {} };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
   assert.equal(hash(path.join(profile, 'AppDock.at365.exe')), hash(portable));

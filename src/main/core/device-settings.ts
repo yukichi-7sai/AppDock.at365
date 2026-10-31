@@ -1,4 +1,5 @@
 import { hostText } from '../../shared/i18n';
+import { parseDeviceUiState, type DeviceUiState } from './device-ui-state';
 import { hostSettingDefinitions } from '../../shared/host-settings';
 import {
   appletCommonKeys,
@@ -47,6 +48,7 @@ export interface DeviceHostPage {
 export interface DeviceSettings {
   schemaVersion: 1;
   machineName: string;
+  uiState?: DeviceUiState;
   host: Pick<Settings['host'], (typeof deviceHostKeys)[number]>;
   hostPages: Partial<Record<HostPageSettingsId, DeviceHostPage>>;
   extensions: Record<
@@ -155,11 +157,13 @@ export function parseDeviceSettings(raw: unknown, name: string): DeviceSettings 
           'extensions',
           'collectionEnabled',
           'touchpadGestures',
+          'uiState',
         ].includes(key),
     )
   )
     throw Error(hostText('services.deviceSettings.invalidJson'));
   safeJson(raw);
+  if (raw.uiState !== undefined) parseDeviceUiState(raw.uiState);
   if (Object.keys(raw.host).some((key) => !(deviceHostKeys as readonly string[]).includes(key)))
     throw Error(hostText('services.deviceSettings.invalidHost'));
   const probe = createDefaultSettings();

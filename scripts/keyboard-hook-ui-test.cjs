@@ -78,7 +78,7 @@ settings.keybindings = [
   binding('missing', 'test.missing.run', 'Ctrl+Shift+F16', true),
   binding('process', 'appdock.custom.' + processId, 'Shift+Win+F19'),
 ];
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portableSource = process.argv[2] && path.resolve(process.argv[2]);
 const terminalExe = process.env.APPDOCK_TEST_TERMINAL;

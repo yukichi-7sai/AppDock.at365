@@ -301,7 +301,7 @@ const deviceManifestRoots = () => [
 ];
 const deviceCollections = () => readDeviceCollections(deviceManifestRoots());
 const settings = new DeviceSettingsStore(
-  path.join(baseDirectory, 'settings.json'),
+  path.join(sharedDirectory, 'settings.json'),
   dataDirectory,
   os.hostname(),
   deviceCollections,
@@ -3627,7 +3627,7 @@ async function initialize() {
   const logPaths = logDirectories(sharedDirectory, dataDirectory, os.hostname());
   log = new HostLog(logPaths.shared, changed, logPaths.fallback);
   ribbonState = new RibbonState(
-    path.join(dataDirectory, 'ribbon-state.json'),
+    settings.uiStateStorage('ribbon'),
     changed,
     () => {
       errors.report({
@@ -3855,6 +3855,7 @@ async function initialize() {
     parents: parentApplets,
     localRoot: dataDirectory,
     sharedRoot: sharedDirectory,
+    windowState: (id) => settings.uiStateStorage('windows', `collection:${id}`),
     changed: () => {
       ribbonCatalog.invalidate();
       changed();
@@ -3871,14 +3872,7 @@ async function initialize() {
           title: page.item.name,
           url: pathToFileURL(contained(parent.manifest.folder, page.definition.ui!)).href,
           preload: path.join(__dirname, 'applet-page-preload.js'),
-          stateFile: path.join(
-            dataDirectory,
-            'pages',
-            page.binding.owner,
-            page.binding.key,
-            page.item.id,
-            'window-state.json',
-          ),
+          stateFile: settings.uiStateStorage('windows', `collection:${page.id}`),
           defaultDisplay: page.item.display,
           partition: 'applet-page-' + page.id,
           onLayout: () => {},
@@ -4129,7 +4123,7 @@ async function initialize() {
   session.defaultSession.setPermissionRequestHandler((_, __, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   Menu.setApplicationMenu(null);
-  windowState = new WindowStateStore(path.join(dataDirectory, 'window-state.json'), (error) =>
+  windowState = new WindowStateStore(settings.uiStateStorage('windows', 'host'), (error) =>
     log.write(
       'error',
       'window',
@@ -4579,9 +4573,7 @@ async function initialize() {
   window.webContents.on('did-start-loading', releaseRendererImages);
   window.webContents.on('render-process-gone', releaseRendererImages);
   window.webContents.on('destroyed', releaseRendererImages);
-  galleryViewState = new GalleryViewStateStore(
-    path.join(dataDirectory, 'image-gallery-state.json'),
-  );
+  galleryViewState = new GalleryViewStateStore(settings.uiStateStorage('gallery'));
   const galleryState = new ImageLibraryPageState(galleryViewState);
   galleryImages = new GalleryImages(registeredImages);
   const galleryFailed = (message: string) =>

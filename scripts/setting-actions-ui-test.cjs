@@ -81,7 +81,7 @@ config.globalShortcutCommands = [];
 config.gestures.enabled = false;
 config.touchpadGestures.enabled = false;
 config.extensions[id] = { enabled: true, settings: { privateValue: 'keep' } };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(config));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(config));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 let executable = require('electron');
 const portable = !!process.argv[2];
@@ -275,7 +275,7 @@ const calls = () =>
     );
     await app.close();
     app = undefined;
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     assert.equal(saved.extensions[id].settings.text, 'fail');
     assert.equal(saved.extensions[id].settings.privateValue, 'keep');
     assert(!JSON.stringify(saved).includes('settingKey'));

@@ -119,8 +119,8 @@ export interface NodeExtensionContext {
   };
   scheduler: { every(milliseconds: number, callback: Handler): () => void };
   storage: {
-    get(key: string): Promise<unknown>;
-    set(key: string, value: unknown): Promise<unknown>;
+    get(key: string, scope?: 'device' | 'shared'): Promise<unknown>;
+    set(key: string, value: unknown, scope?: 'device' | 'shared'): Promise<unknown>;
   };
   secrets: {
     get(key: string): Promise<string | null>;
@@ -319,8 +319,8 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           error: (message) => peer.request('host.log', { level: 'error', message }),
         },
         storage: {
-          get: (key) => peer.request('host.storage.get', { key }),
-          set: (key, value) => peer.request('host.storage.set', { key, value }),
+          get: (key, scope) => peer.request('host.storage.get', { key, scope }),
+          set: (key, value, scope) => peer.request('host.storage.set', { key, value, scope }),
         },
         secrets: {
           get: (key) => peer.request('host.secrets.get', { key }),

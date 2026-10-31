@@ -72,7 +72,7 @@ settings.imageLibrary = {
     { id: 'missing', name: '読取待ち', images: [{ file: 'missing.png' }] },
   ],
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);

@@ -91,7 +91,7 @@ settings.gestures.bindings = [
 ];
 settings.gestures.indicatorPosition = 'none';
 settings.touchpadGestures.enabled = false;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const events = () =>
   fs.existsSync(path.join(fixture, 'events.txt'))
     ? fs.readFileSync(path.join(fixture, 'events.txt'), 'utf8').trim().split('\n').filter(Boolean)

@@ -20,7 +20,7 @@ fs.mkdirSync(profile, { recursive: true });
 require('./copy-host.cjs').copyHost(originalExe, executable);
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 let socket, child, evaluate, fixtureIcon;
 const children = new Set();
 const checkpoints = [];

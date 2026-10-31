@@ -7,8 +7,8 @@ const active = 'fixture.common-active',
   waiting = 'fixture.common-waiting';
 module.exports = async ({ page, client, profile, local, checks, tool, value, until }) => {
   const tools = JSON.stringify((await client.listTools()).tools),
-    sharedFile = path.join(profile, 'settings.json'),
-    deviceFile = path.join(profile, `settings-${require('node:os').hostname()}.json`),
+    sharedFile = require('./test-settings.cjs').file(profile, 'settings.json'),
+    deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
     marker = (id) => path.join(profile, 'extensions', id, 'activations.json'),
     target = async (id) =>
       (await value('appdock_settings_list_targets', { ownerId: id })).items.find(
@@ -198,7 +198,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   await page.getByTestId('settings-nav:mcp-client').waitFor();
 };
 module.exports.install = (profile) => {
-  const file = path.join(profile, 'settings.json'),
+  const file = require('./test-settings.cjs').file(profile, 'settings.json'),
     settings = JSON.parse(fs.readFileSync(file));
   for (const id of [active, disabled, waiting]) {
     const folder = path.join(profile, 'extensions', id);

@@ -27,6 +27,7 @@ export class RemotePageService {
     private changed: () => void,
     sharedFile: string,
     failed: (error: Error) => void = () => {},
+    private windowState?: (id: string) => import('./state-storage').StateStorage,
   ) {
     this.profiles = new WebProfileStore(sharedFile, localDirectory);
     this.profiles.loadStandalone(() => this.items().length > 0);
@@ -172,7 +173,7 @@ export class RemotePageService {
         partition: `web-applet-${a.accountId}`,
         session: this.account(a.accountId),
         remote: true,
-        stateFile: path.join(this.localDirectory, 'windows', `${id}.json`),
+        stateFile: this.windowState?.(id),
         defaultDisplay: a.display,
         onLayout: () => {},
         onCreated: (contents) => {

@@ -1,6 +1,5 @@
 import { hostText } from '../../shared/i18n';
-import fs from 'node:fs';
-import { atomicWrite } from './settings';
+import { stateStorage, type StateStorage } from './state-storage';
 import { validGroupId } from '../../shared/applet-pages';
 import type { RibbonDisplayMode } from '../../shared/ribbon';
 
@@ -8,14 +7,17 @@ import type { RibbonDisplayMode } from '../../shared/ribbon';
 export class RibbonState {
   private expanded: Record<string, boolean> = {};
   private mode: RibbonDisplayMode = 'compact';
+  private storage: StateStorage;
   constructor(
-    private file: string,
+    storage: StateStorage | string,
     private changed: () => void,
     private failed: (error: unknown) => void,
     private groupIds?: () => string[],
   ) {
+    this.storage = stateStorage(storage);
     try {
-      const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const value: any = this.storage.read();
+      if (value === undefined) return;
       if (
         !value ||
         value.schemaVersion !== 1 ||
@@ -70,10 +72,7 @@ export class RibbonState {
   }
   private write(expanded: Record<string, boolean>, displayMode: RibbonDisplayMode) {
     try {
-      atomicWrite(
-        this.file,
-        JSON.stringify({ schemaVersion: 1, expanded, displayMode }, null, 2) + '\n',
-      );
+      this.storage.write({ schemaVersion: 1, expanded, displayMode });
     } catch (error) {
       this.failed(error);
       throw Error(hostText('services.ribbonState.saveFailed'));

@@ -31,7 +31,7 @@ const settings = require('../out/main/shared/keybindings.js').initializeExtensio
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: true } };
 settings.host.notifications = false;
 require('../tests/fixtures/install.cjs')(profile, settings);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const checks = [];
 let application, target, targetPeer;
 async function send(key) {

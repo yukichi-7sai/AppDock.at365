@@ -30,7 +30,7 @@ async function until(fn, label) {
 }
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
 const saved = async () => (await snapshot()).settings.value;
-const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
 (async () => {
   try {
     const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
@@ -78,7 +78,7 @@ const disk = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'
       enabled: false,
       settings: { text: 'Original text', amount: 1, url: 'https://example.invalid/old' },
     };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     let exe = require('electron');
     if (process.argv[2]) {
       exe = path.join(profile, 'AppDock.at365.exe');

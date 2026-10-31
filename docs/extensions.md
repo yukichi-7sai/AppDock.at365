@@ -12,7 +12,7 @@ Shell Appletは、通常のコマンド・設定・ページとShell描画を同
 
 Nodeのcontext.appdockと.NETのcontext.AppDockで、MCPと同じ公開操作APIを利用できます。宣言・PC専用許可・再入制約・既存自己設定APIの互換性は[AppDock共通操作API](appdock-api.md)を参照してください。
 
-認証・Storage・Secrets・生成キャッシュはPC専用のLOCALAPPDATA、登録素材と共有枠はEXE隣に分離します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+Settings・Storage・登録素材と共有枠はEXE隣のdata、認証・Secrets・生成キャッシュはPC専用のLOCALAPPDATAへ分離します。Storageは既定で端末別です。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
 起動時の設定・settingsChanged・自己設定の読書きは、このPCで選択している共有／端末専用の同じ設定へ接続します。既存のNode/.NET APIの形式は維持します。保存モードの切り替えは本体のローカル設定UIだけで行い、Appletからの切り替えAPIは追加しません。
 
@@ -222,6 +222,28 @@ Webサービスのアカウント別ページには[WebアカウントAPI](web-a
 | Scheduler     | 定期実行、停止時のタイマー解除                      | 拡張ランナー内        |
 | Storage       | 拡張ID・キー別のJSON永続データ（1件1MBまで）        | `storage`             |
 | Secrets       | 拡張ID・キー別の暗号化文字列                        | `secrets`             |
+
+### Storageの保存範囲
+
+本体0.111.0、SDK/Runtime 0.27.2以降はStorageのscopeを指定できます。新しいscope指定を使うAppletはminimumHostVersionを0.111.0以上にします。省略時は従来の呼出しと同じ端末別です。保存先は`data/storage/<Applet ID>/devices/<端末名>/<key>.json`、共有指定は`data/storage/<Applet ID>/shared/<key>.json`です。旧LocalAppDataのStorageは読み込みません。
+
+```ts
+await context.storage.set('progress', { page: 1 }); // この端末だけで使用
+await context.storage.set('notes', { text: 'example' }, 'shared');
+const notes = await context.storage.get('notes', 'shared');
+```
+
+```csharp
+await context.Storage.SetAsync("progress", 1, cancellationToken);
+await context.Storage.SetAsync("notes", "example", StorageScope.Shared, cancellationToken);
+var notes = await context.Storage.GetAsync<string>("notes", StorageScope.Shared, cancellationToken);
+```
+
+Nodeは`'device' | 'shared'`、.NETは`StorageScope.Device | StorageScope.Shared`です。新しい.NET overloadではCancellationTokenを明示します（取消不要なら`default`）。既存の省略・CancellationToken指定のシグネチャは保持します。RPCの`host.storage.get/set`は任意の`scope`文字列を受け取り、省略は`device`、未知の値は拒否します。`storage` capability、Applet IDによる隔離、既存の1件1MiB制限を維持します。
+
+StorageはJSONを永続化する共通APIで、設定フォームの項目はSettings、認証情報はSecretsを使います。共有scopeの同じキーを複数PCから変更した場合の自動マージや変更通知は提供しません。取得時はファイルの現在値を読みます。
+
+### ログと設定の受信
 
 ログは.NETの`context.Log.DebugAsync/InfoAsync/ErrorAsync`、Nodeの`context.log.debug/info/error`を使い、独自ファイルへの出力を避けてください。debugは本体0.109.2以降とSDK/Runtime 0.27.1以降に対応し、利用するAppletはminimumHostVersionを揃えます。ホストがApplet IDと通常の種類を付けて全体ログ・Applet詳細ログとホストログファイルへ記録します。レベル・監査の分類と画面は[ログ仕様](logging.md)を参照してください。deactivate中の`host.log`も受け付け、クリーンアップのエラーを元のレベルで保存します。停止完了/異常終了後の呼び出しと、停止中のログ以外のAPIは拒否します。終了前に必要なログをawaitし、同期のバックグラウンド処理から接続する場合は上限付きの待ち行列と短い排出待ちを使ってください。
 

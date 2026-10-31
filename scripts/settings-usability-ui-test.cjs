@@ -69,7 +69,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       model: '',
       defaultVoice: '',
     };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     const config = path.join(profile, 'codex', 'config.toml');
     fs.mkdirSync(path.dirname(config));
     fs.writeFileSync(config, '# fixture\n');

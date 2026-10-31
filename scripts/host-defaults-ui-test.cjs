@@ -17,7 +17,7 @@ const exe = path.join(profile, 'AppDock.at365.exe');
 require('./copy-host.cjs').copyHost(source, exe);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 assert.equal(hash(exe), hash(source));
-assert(!fs.existsSync(path.join(profile, 'settings.json')));
+assert(!fs.existsSync(require('./test-settings.cjs').file(profile, 'settings.json')));
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(read, label) {
   const end = Date.now() + 60000;

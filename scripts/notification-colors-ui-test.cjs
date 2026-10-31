@@ -82,7 +82,7 @@ settings.notificationPreferences = {
     { ownerKind: 'host', ownerId: 'information', typeId: 'operation-completed', enabled: false },
   ],
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
@@ -276,7 +276,7 @@ async function main() {
   await until(
     () =>
       JSON.parse(
-        fs.readFileSync(path.join(profile, 'settings.json')),
+        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
       ).notificationPreferences.overrides.some(
         (r) => r.ownerId === 'information' && r.durationSeconds === 8,
       ),

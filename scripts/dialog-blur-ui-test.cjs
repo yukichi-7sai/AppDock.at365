@@ -68,7 +68,7 @@ initial.customCommands = {
     },
   ],
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const result = { success: false, profile, checks: [], timings: [] };
 let app, host, context, browser, child, mainPort;
 const until = async (fn, label) => {

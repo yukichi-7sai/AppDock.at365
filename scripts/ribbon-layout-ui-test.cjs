@@ -10,7 +10,7 @@ settings.host.hardwareAcceleration = false;
 settings.globalShortcutCommands = [];
 settings.extensions['at365.gmail'] = { enabled: false, settings: { notifications: false } };
 fs.mkdirSync(profile, { recursive: true });
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 fs.cpSync(
   path.resolve(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gmail.at365'),
   path.join(profile, 'extensions', 'Applet.Gmail.at365'),
@@ -227,9 +227,9 @@ async function launch() {
 
     await app.close();
     app = null;
-    const restartSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const restartSettings = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     restartSettings.extensions['at365.gmail'].enabled = false;
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(restartSettings));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(restartSettings));
     await launch();
     assert.equal(await rail.locator('[data-ribbon-id="page:at365.gmail:gmail"]').count(), 0);
     await dock.evaluate(() => window.dock.toggleExtension('at365.gmail', true));

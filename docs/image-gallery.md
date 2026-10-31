@@ -47,7 +47,7 @@ WallpaperSlideshowはビルド時に`sync-gallery.ps1`で本体の専用ビル�
 
 管理ページのカード操作は「グループ」「削除」、画像クリックはプレビュー。削除は本体の確認要求に結び付け、使用中の参照を保護する。[削除の保存境界](registered-images.md)を参照する。管理・選択画面のプレビューは`closeOnBackdrop`を有効にし、背景を押して背景で離したクリックで閉じる。画像内のクリックや内側からのドラッグでは閉じず、所属編集・グループ追加などは背景クリックで取り消さない。
 
-表示サイズの`image-gallery-state.json`はPC専用。`schemaVersion: 1`、`library.cardWidth`と`picker.cardWidth`を独立して保存する。選択・検索・スクロールはWindow内だけに保持する。ファイルは変更時にだけ作り、破損・未知版を上書きせず、保存前の外部変更も検出する。修復後は再起動して読み直す。
+表示サイズは`data/settings-<端末名>.json`の`uiState.gallery`へ保存する。`schemaVersion: 1`、`library.cardWidth`と`picker.cardWidth`を独立して保持し、旧`image-gallery-state.json`は読み込まない。選択・検索・スクロールはWindow内だけに保持する。状態は変更時にだけ追加し、破損・未知版を上書きせず、保存前の同じ状態への外部変更も検出する。修復後は再起動して読み直す。UI状態の保存で設定再適用やバックアップ世代を増やさない。
 
 ダイアログを要求した時点から終了応答まで、Shellの本文を`inert`にし、連続クリックやグループ切り替えによる重複要求を防ぐ。背景のcapture/decodeが失敗してもHostModalLayerは本文Viewを隠し、ダイアログを手前で操作できるようにする。成功時も本体documentの描画フレームを待たず、decodeとDOM配置後に本文Viewを隠す。覆われた本体の描画待ちで透明なダイアログを残さない。接続拒否には原因を識別する理由コードを付けるが、操作の許可条件は変えない。
 

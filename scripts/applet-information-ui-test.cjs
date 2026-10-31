@@ -137,7 +137,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
         });
       }
     }
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (source) {
       require('./copy-host.cjs').copyHost(source, exe);

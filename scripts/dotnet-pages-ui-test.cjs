@@ -39,7 +39,7 @@ for (const [tag,id,pageId] of collisionPages) {
 exports.onPageAction=async()=>{const fs=require('node:fs'),path=require('node:path');const file=path.join(await c.ui.getImageDirectory(),'pixel.png');fs.writeFileSync(file,Buffer.from('${pixel}','base64'));return c.pages.registerImages('${pageId}',[{key:'pixel',file}]);};`);
   settings.extensions[id]={enabled:true,settings:{}};
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const checks = [];
 let instance;
 (async () => {
@@ -72,7 +72,7 @@ let instance;
       await instance.main.evaluate(id => window.dock.executeCommand(id + '.open'), id);
       assert.equal(await ui.getByRole('textbox', { name: '保持する入力' }).inputValue(), 'preserved-' + mode);
       await instance.main.evaluate(id => window.dock.executeCommand(id + '.details'), id);
-      await until(() => instance.main.getByRole('tab', { name: '説明', exact: true }).getAttribute('aria-selected').then(v => v === 'true'), 'own details');
+      await until(() => instance.main.evaluate(async id => (await window.dock.settingsEditing()).pageId === 'applets' && (await window.dock.snapshot()).navigation.appletId === id, id), 'own Applet in management');
       await instance.main.evaluate(id => window.dock.toggleExtension(id, false), id);
       await until(() => ui.isClosed(), mode + ' View closed on stop'); assert.equal(await fetchStatus(second.url), 404);
       checks.push(mode + ': real local page / JSON-null / PNG and change event / private URLs / release / dynamic context and disposal / retained input / own details / stop');

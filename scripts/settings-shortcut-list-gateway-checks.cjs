@@ -86,7 +86,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
     ],
   );
   assert.doesNotMatch(JSON.stringify([definition, await read()]), /PRIVATE_SHORTCUT|retained/);
-  const settingsFile = path.join(profile, 'settings.json'),
+  const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json'),
     before = fs.readFileSync(settingsFile);
   const original = (await read()).items;
   const draft = await request(

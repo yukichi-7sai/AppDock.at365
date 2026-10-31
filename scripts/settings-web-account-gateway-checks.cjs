@@ -14,7 +14,7 @@ const groupFile = (profile) =>
   path.join(profile, 'data', 'web-account-groups', groupId, 'accounts.json');
 const stateFile = (local) => path.join(local, 'web-account-groups', groupId, 'state.json');
 exports.install = (profile, local) => {
-  const settingsFile = path.join(profile, 'settings.json'),
+  const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json'),
     settings = JSON.parse(fs.readFileSync(settingsFile));
   for (const owner of [privateOwner, groupOwner, peerOwner]) {
     const directory = path.join(profile, 'extensions', owner);
@@ -86,7 +86,7 @@ exports.install = (profile, local) => {
 };
 exports.check = async ({ profile, local, page, client, checks, tool, value, until }) => {
   const toolsBefore = JSON.stringify((await client.listTools()).tools);
-  const settingsFile = path.join(profile, 'settings.json'),
+  const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json'),
     settingsBefore = hash(settingsFile);
   const revision = (await value('appdock_get_settings')).revision;
   const localBefore = hash(stateFile(local));

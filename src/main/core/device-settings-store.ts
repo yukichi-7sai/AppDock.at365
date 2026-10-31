@@ -3,6 +3,8 @@ import { hostStartupTiming } from './host-startup-timing';
 import fs from 'node:fs';
 import { appletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
+import type { StateStorage } from './state-storage';
+import { parseDeviceUiState } from './device-ui-state';
 import {
   SettingsStore,
   SettingsConflictError,
@@ -64,6 +66,46 @@ export class DeviceSettingsStore extends SettingsStore {
   private mutating = false;
   private loaded = false;
   private healthKeys = new Set<string>();
+  private deviceConfiguration = '';
+  private configurationSignature(value: DeviceSettings) {
+    const { uiState: _uiState, ...configuration } = value;
+    return JSON.stringify(configuration);
+  }
+  override uiStateStorage(section: 'ribbon' | 'gallery' | 'windows', key?: string): StateStorage {
+    if (
+      (section === 'windows') !== (typeof key === 'string' && !!key) ||
+      (key && ['__proto__', 'constructor', 'prototype'].includes(key))
+    )
+      throw Error('Invalid UI state target');
+    const current = () =>
+      section === 'windows'
+        ? this.device.value.uiState?.windows?.[key!]
+        : this.device.value.uiState?.[section];
+    let previous: unknown;
+    let read = false;
+    return {
+      read: () => {
+        read = true;
+        previous = structuredClone(current());
+        return structuredClone(previous);
+      },
+      write: (value) => {
+        if (!read) throw Error('Read UI state before saving');
+        if (this.writesBlocked || this.mutating || fs.existsSync(this.journal))
+          throw Error(hostText('services.deviceSettingsStore.busy'));
+        this.device.reload();
+        if (this.device.recovered || !same(previous, current()))
+          throw new SettingsConflictError(hostText('services.settings.changedBeforeSave'));
+        const next = structuredClone(this.device.value);
+        const ui = (next.uiState ??= {});
+        if (section === 'windows') (ui.windows ??= {})[key!] = value as any;
+        else ui[section] = value as any;
+        next.uiState = parseDeviceUiState(ui);
+        this.device.save(next, this.device.revision);
+        previous = structuredClone(current());
+      },
+    };
+  }
   hostPageLocalSettings(pageId: HostPageSettingsId) {
     return this.device.value.hostPages[pageId]?.useLocalSettings ?? defaultHostPageLocal(pageId);
   }
@@ -155,10 +197,17 @@ export class DeviceSettingsStore extends SettingsStore {
           return value;
         },
         serialize: (value) => deviceSettingsStorageValue(value, this.applets()),
+        transientChange: (before, after) =>
+          this.configurationSignature(before) === this.configurationSignature(after),
       },
     );
     for (const store of [this.shared, this.device]) {
       store.on('changed', () => {
+        if (
+          store === this.device &&
+          this.deviceConfiguration === this.configurationSignature(this.device.value)
+        )
+          return;
         if (this.loaded && !this.mutating) this.refreshCombined(true);
       });
       store.on('statusChanged', () => {
@@ -210,6 +259,7 @@ export class DeviceSettingsStore extends SettingsStore {
       combineSettings(this.shared.value, initialized, this.collections()),
     );
     this.value = value;
+    this.deviceConfiguration = this.configurationSignature(this.device.value);
     this.syncHealth();
     this.revision++;
     if (notify) this.emit('changed', this.snapshot());

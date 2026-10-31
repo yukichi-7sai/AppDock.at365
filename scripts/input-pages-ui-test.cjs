@@ -94,7 +94,7 @@ settings.gestures = {
     when: { ...row.when, processes: [] },
   })),
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const portable = !!process.argv[2];
 const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');

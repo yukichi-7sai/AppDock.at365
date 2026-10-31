@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-31: data内設定・Storage 0.111.0のコミット前照合
+
+- 今回の実装・試験・文書と関連2リポジトリの差分をレビューし、未解決の阻害指摘なし。実装時の本体995入力と共通ルール/Watch試験/検証記録の3入力、完全ログ43件のSHA256が現在と一致した。ZIP、発行先と固定コピー8箇所の全693ファイル、既存の配置用/利用者ファイル9件も照合した。製品・依存・試験入力の追加変更はなく、検証記録だけを追記する。0.111.0を維持し、再発行は不要。
+- 前回の標準回帰コマンド全体は終了失敗だったため、その部分成功を全体成功として再利用せず、`dev.bat exec node --test --test-concurrency=1 tests/*.test.cjs`を再実行した。現行1398件すべて成功、失敗/skip 0、終了コード0。型検査/build、開発/固定の保存設定3群・本体Window5・端末設定21・リボン7・画像ギャラリー12・各ランタイムのページ/Session隔離4群、固定smoke、Watch GUI15項目は入力・完全ログ・配布物の一致を根拠に再利用した。
+- 旧`image-library-ui-test`の失敗は成功へ数えず、今回の対象契約は現行ギャラリーとUI状態試験で確認済み。実2端末同期/NAS、実Windowsログオン/ARSO、複数画面/DPIの未確認範囲は維持する。新しいGUI実行用コピーは作成せず、実装時の整理結果と再利用証跡を保持した。
+- 証跡は`.artifacts/commit-validation-data-settings-20261031/`のinput-audit・log-mismatches・payload-audit・regression・reuse・stage・commit。今回の範囲だけをstageし、作業内容とstage、stage treeとcommit treeを照合する。本体・Watch試験・共通ルールを別々にcommitし、push・Release・実利用先deployは行わない。
+
+## 2026-10-31: 設定・UI状態・Applet Storageをdataへ集約（0.111.0）
+
+- 利用者指定により共有設定を`data/settings.json`、端末別設定を`data/settings-<端末名>.json`へ変更した。旧配置の設定・UI状態・Storageの読込、コピー、移行、削除は追加していない。リボン開閉/表示モード、画像ライブラリー/選択カード幅、本体とホスト管理Applet Windowの位置/サイズ/最大化は端末JSONの`uiState`へ保存する。通知履歴はメモリーのまま、Secrets/認証/session/キャッシュ/backup/復旧記録はLocalAppDataのまま。
+- Storageは`data/storage/<Applet ID>/devices/<端末名>/<key>.json`を既定とし、明示した`shared`だけ`shared/<key>.json`へ保存する。Nodeと.NETへscopeを追加し、既存のcapability/所有者隔離/サイズ検証を維持した。SDK/Runtimeは0.27.2、AssemblyVersionは0.10.0.0を維持。新しい.NET overloadのCancellationTokenを必須とし、既存の`GetAsync(key, default)`等を曖昧にしない。新scope利用時の最低本体版は0.111.0。保存配置と項目の変更のため本体はマイナー更新。
+- 発行前に保存先配線・schema・通常設定との競合・失敗時保持・API互換性・関連文書/試験をレビューした。UI保存は同じ状態への外部変更を拒否し、他の設定と別Windowの値を保持する。UIだけの変更では設定適用revision/全Applet再適用/バックアップ世代を増やさない。レビューで`.NET default token`のソース互換性と、現行`data/storage`を旧データとして警告する問題を修正・再検証した。未解決の発行阻害指摘なし。
+- `install --frozen-lockfile`、型検査、build、.NETホスト/SDK/Runtime/native fixtureのRelease buildに成功。標準156ファイル1397件は1396成功、更新mount試験1件がディレクトリーのアクセス拒否で失敗したが、製品変更をせず単独再実行で成功した。後から追加したUI保存失敗試験1件と最終のdata/device/legacy計25件も成功し、現行1398件相当の必要範囲を確認した。共有JSON不変、2端末の分離、40回のUI保存でrevision/バックアップ不増、再起動、設定保存/ページreset保持、同じUI状態の競合、破損/保存失敗時保持、Storageの共有/端末別/他Applet隔離と不正scope/権限拒否を含む。
+- 開発版と発行固定EXEで、保存配置/Node・.NET Storage/Secrets/独立Applet Window再起動3群、本体Window5項目、端末設定GUI21項目、リボン7項目、現行画像ギャラリー12項目、dotnet/native/nodeページとSession隔離4群が成功。固定smokeと既存Watch 0.5.6のGUI15項目も成功し、時計・日付の表示/停止/設定/フォント/再起動保持、Debug診断を確認した。テストのsettings参照は共通helperへ変更し、212スクリプトの構文を確認した。Watchはfixtureの設定パスだけを変更し、本体の再発行はしていない。
+- 試験補正: 新fixtureのopenCommand宣言、WindowのURLによる選択/Windows起動表示、現在のhostPages形式、旧説明タブからApplet管理への遷移、バッジ描画待ちを現行契約へ合わせた。一時flyoutのShell状態変更によるcatalog更新は設定変更と区別し、持続型開閉のcatalog更新0を維持した。古いWebApplet素材を含む`image-library-ui-test`はhost待機に失敗し未修復・成功扱いしない。今回の画像サイズ/保持/操作は現行`image-gallery-ui-test`とUI状態の単体試験で検証した。失敗ログも保存した。
+- `publish.bat`成功。feed/manifest/本体は0.111.0、ZIP693ファイルすべてを発行先とSHA256照合し、利用者データを含まないことを確認。既存の配置スクリプト等9ファイルはhash不変。EXE SHA256 `e8b88cc9571bbd6c5563cce1d0a1bf4b28feb361902b89bddcda732250a46de3`、ZIP SHA256 `43b47c7c6febd69cd553b1dd161e1026fb2ef56dcadfa3ad13e92670ec4c797f`。成功した8箇所の固定コピーも全693ファイルを照合した。commit/push/Release/実利用deployは行っていない。
+- 証跡は`.artifacts/data-settings-20261031/`の完全ログ、review、入力hash、package、fixed-copies、validation。成功/終了/プロセス参照/再解析ポイント/manifest所有範囲を照合し、旧成功実行コピー19箇所の論理6,909,445,702 bytesを整理した。最新コピーと失敗・未確認分、再利用に必要な結果/画像/設定/ログ/manifestは保持しhash不変。空き容量の前後値はcleanup/cleanup-smokeへ記録し、論理削除量を物理回収量とみなさない。実2端末の同期サービス動作、NAS、Windowsログオン/ARSOの再現、複数画面/DPIは未確認。
+
 ## 2026-10-31: 共有ログ0.110.0のコミット前照合
 
 - 今回の18ファイルをレビューし、未解決の阻害指摘なし。実装時の987入力、完全ログ31件、配布payload693項目とZIP、固定試験7箇所の全本体ファイル、Watchの発行EXE/ZIP、配置用3ファイルをSHA256で照合した。実装後の製品・試験変更はなく、本検証記録のみ追記する。0.110.0を維持し、再発行は不要。

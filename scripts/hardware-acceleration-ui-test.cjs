@@ -9,7 +9,7 @@ fs.mkdirSync(profile, { recursive: true });
 const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
 const settings = createDefaultSettings();
 delete settings.host.hardwareAcceleration;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 let application;
@@ -43,7 +43,7 @@ async function save(page, value) {
     value,
   );
   assert.equal(
-    JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.hardwareAcceleration,
+    JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).host.hardwareAcceleration,
     value,
   );
 }

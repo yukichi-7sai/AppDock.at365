@@ -142,7 +142,7 @@ async function phase(mode) {
     settings.extensions[selectedId] = { enabled: true, startupDelaySeconds: 5, settings: {} };
   settings.updates.checkHostOnAboutOpen = mode === 'normal';
   settings.updates.hostSource = `http://127.0.0.1:${server.address().port}/${mode}/update.json`;
-  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
   const inspector = await freePort(),
     port = await freePort();
   const env = { ...process.env };

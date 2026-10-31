@@ -190,7 +190,7 @@ async function main() {
     version: 1,
     items: Object.entries(ids).map(([key, id]) => ({ id, name: key, description: '' })),
   };
-  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
   const broken = {
       connection: { enabled: false, url: 'invalid' },
       secret: 'preserve-broken-value',
@@ -220,7 +220,7 @@ async function main() {
   checks.push(
     'shared-only and OFF damaged entries produce no startup notice; unconfigured switches disabled',
   );
-  const sharedFile = path.join(profile, 'settings.json');
+  const sharedFile = require('./test-settings.cjs').file(profile, 'settings.json');
   const beforeAdd = [fs.readFileSync(sharedFile, 'utf8'), fs.readFileSync(localFile, 'utf8')];
   await host.getByRole('button', { name: '接続先を追加', exact: true }).click();
   await host
@@ -389,7 +389,7 @@ async function main() {
   checks.push('explicit repair restores the affected row without replacing another credential');
   await host.screenshot({ path: path.join(profile, 'settings-light.png') });
   await noInlineError();
-  const shared = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+  const shared = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
   assert.deepEqual(
     shared.mcpServers.items.map((i) => i.id),
     [...Object.values(ids), addedId],

@@ -20,7 +20,7 @@ settings.host.closeToTray = false;
 settings.globalShortcutCommands = [];
 settings.keybindings = [];
 settings.gestures.enabled = false;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const type = require('../out/main/shared/notification-types')
   .notificationCatalog([])
   .find((t) => !t.requiredTargets.length);
@@ -157,7 +157,7 @@ async function rpc(method, args = {}) {
     );
     assert.equal(
       JSON.parse(
-        fs.readFileSync(path.join(profile, 'settings.json')),
+        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
       ).notificationPreferences.overrides.find(
         (r) => r.ownerId === type.ownerId && r.typeId === type.typeId,
       ).mcpEvents,

@@ -105,7 +105,7 @@ if (process.argv.includes('--count-only')) {
       entries: entries.map((entry) => ({ ...entry, id: kind + '-' + entry.id })),
     });
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 let browser,
   host,
   child,
@@ -625,7 +625,7 @@ async function close() {
       .getByRole('button', { name: 'このコマンドを削除', exact: true })
       .click();
     await save();
-    const raw = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+    const raw = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
     assert.equal(raw.triggerStacks.items.length, 3);
     assert.equal(raw.keybindings, undefined);
     assert.equal(raw.gestures?.bindings, undefined);

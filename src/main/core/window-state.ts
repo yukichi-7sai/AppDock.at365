@@ -1,7 +1,6 @@
 import { hostText } from '../../shared/i18n';
-import fs from 'node:fs';
 import type { BrowserWindow, Rectangle } from 'electron';
-import { atomicWrite } from './settings';
+import { stateStorage, type StateStorage } from './state-storage';
 
 export interface WindowState {
   bounds: Rectangle;
@@ -76,20 +75,20 @@ export class WindowStateStore {
   state?: WindowState;
   private timer?: ReturnType<typeof setTimeout>;
   private saved = '';
+  private storage: StateStorage;
 
   constructor(
-    private file: string,
+    storage: StateStorage | string | undefined,
     private onError: (error: unknown) => void,
-  ) {}
+  ) {
+    this.storage = stateStorage(storage);
+  }
 
   load(workAreas: Rectangle[], minimum = windowMinimum) {
     try {
-      if (fs.existsSync(this.file)) {
-        this.state = fitWindowState(
-          parseWindowState(JSON.parse(fs.readFileSync(this.file, 'utf8').replace(/^\uFEFF/, ''))),
-          workAreas,
-          minimum,
-        );
+      const value = this.storage.read();
+      if (value !== undefined) {
+        this.state = fitWindowState(parseWindowState(value), workAreas, minimum);
       }
     } catch (error) {
       this.onError(error);
@@ -134,7 +133,7 @@ export class WindowStateStore {
     try {
       const text = JSON.stringify(parseWindowState(this.state), null, 2) + '\n';
       if (text === this.saved) return;
-      atomicWrite(this.file, text);
+      this.storage.write(parseWindowState(this.state));
       this.saved = text;
     } catch (error) {
       this.onError(error);

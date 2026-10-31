@@ -39,7 +39,7 @@ function metrics(pid) {
     settings.host.hardwareAcceleration = false;
     settings.host.closeToTray = false;
     settings.globalShortcutCommands = [];
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
     const server = net.createServer();
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const port = server.address().port;

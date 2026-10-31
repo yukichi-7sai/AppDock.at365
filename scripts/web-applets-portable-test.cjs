@@ -124,7 +124,7 @@ async function stop() {
     settings.gestures.enabled = false;
     const owner = 'at365.web-applet';
     settings.extensions[owner] = { enabled: true, settings: {} };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
     await start();
     assert.equal((await snapshot()).version, require('../package.json').version);
     assert.deepEqual(

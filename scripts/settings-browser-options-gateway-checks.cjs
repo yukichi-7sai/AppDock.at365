@@ -9,8 +9,8 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     ).items.find((item) => item.category === 'command-triggers'),
     targetId = target.targetId,
     read = () => value('appdock_settings_get_values', { targetId }),
-    sharedFile = path.join(profile, 'settings.json'),
-    deviceFile = path.join(profile, `settings-${require('node:os').hostname()}.json`),
+    sharedFile = require('./test-settings.cjs').file(profile, 'settings.json'),
+    deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
     field = (state, key) => state.fields.find((item) => item.key === key);
   const request = async (operations, dryRun = false) => {
     const state = await read();

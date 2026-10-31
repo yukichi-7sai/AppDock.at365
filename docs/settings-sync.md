@@ -6,23 +6,29 @@
 
 ## 保存先
 
-リボンのグループ定義・所属・表示名・アイコンのみ表示は、リボンページで選んだ共有`settings.json`または自端末の`settings-<端末名>.json`へ保存する。持続型の開閉はPC専用rootの`ribbon-state.json`へ分離し、一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-customization-design.md#pc専用の開閉状態)を参照する。
+共有設定はEXE隣の`data/settings.json`、端末別設定は同じ`data/`直下の`settings-<端末名>.json`を使う。旧配置の設定・画面状態・Storageは読込・コピー・移行しない。通常の新規起動は新しい保存先から開始する。
 
-画像ライブラリーと画像選択のカードサイズはPC専用rootの`image-gallery-state.json`へ独立して保存する。グループ定義・所属は引き続き共有`settings.json`、原画像は共有assets。検索・選択・閲覧位置はWindow内だけに保持する。破損・未知版・外部変更を上書きせず、設定カテゴリのリセットで原画像やカードサイズを削除しない。[共通ギャラリー](image-gallery.md)を参照する。
+リボンのグループ定義・所属・表示名・アイコンのみ表示は、リボンページで選んだ共有`settings.json`または自端末の`settings-<端末名>.json`へ保存する。持続型の開閉・表示モードは端末別設定の`uiState.ribbon`へ分離し、一時パネルとバッジは保存しない。形式・失敗時の扱いは[グループとバッジ](ribbon-customization-design.md#pc専用の開閉状態)を参照する。
+
+画像ライブラリーと画像選択のカードサイズは端末別設定の`uiState.gallery`へ独立して保存する。グループ定義・所属は引き続き共有`settings.json`、原画像は共有assets。検索・選択・閲覧位置はWindow内だけに保持する。破損・未知版・外部変更を上書きせず、設定カテゴリのリセットで原画像やカードサイズを削除しない。[共通ギャラリー](image-gallery.md)を参照する。
+
+本体とホストが管理するApplet Windowの通常位置・サイズ・最大化は`uiState.windows`へ保存する。本体は`host`、Appletページは`page:<Applet ID>:<page ID>`、Webアカウントは`web-accounts:<Applet ID>`、collectionは`collection:<page ID>`で分離する。Applet自身が独立して所有するネイティブWindowの保存処理は変更しない。
+
+`uiState`だけの変更では設定適用用revisionを進めず、全Appletへの設定再適用やバックアップ世代の追加を行わない。Windowの保存は既存の300ms debounceを使う。直前に端末JSONを再検証し、他の設定・別Windowの最新値を保持して原子的に置換する。同じUI状態の外部変更、破損、復旧中は保存を拒否する。通常の設定保存・ページリセットは`uiState`を保持する。
 
 MCP Eventsの購読・署名鍵・callback・送信待ちはPC専用rootの`automation-events.json`へsafeStorageで暗号化して保存する。種類別の送信選択は通知ページで選んだ保存先の通知設定に含める。[購読と再送の仕様](mcp-events-design.md)を参照。
 
 共有フォルダー名は小文字の`data`。
 
-今後追加するAppletにもこの保存境界を適用する。同期する設定はホストSettings、登録原素材はEXE隣のApplet別assetsを使う。端末固有のStorage/Secrets/認証/生成キャッシュはホストのPC専用root内でApplet IDごとに分離する。
+今後追加するAppletにもこの保存境界を適用する。設定はホストSettings、登録原素材は`data/assets`、JSONの永続データはホストStorageを使う。Storageは`data/storage/<Applet ID>/devices/<端末名>/<key>.json`を既定とし、明示した共有scopeだけ`data/storage/<Applet ID>/shared/<key>.json`へ保存する。端末別も同期対象にできるが他PCでは適用しない。Secrets・認証・生成キャッシュはホストのPC専用root内でApplet IDごとに分離する。Storageは暗号化せず、共有scopeへの同時保存を自動マージしない。APIは[Applet API](extensions.md#storageの保存範囲)を参照する。
 
 PC専用データはドメイン名のat365配下に保存する。`data-paths.ts`はEXE配置先の絶対パスを小文字化してSHA256を計算し、`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`をPC専用rootにする。配置が同じなら更新・再起動で同じrootを使う。配置先を変えると新しいrootになり、ログインをやり直す。IDとパスの対応表や追加のprofile manifestは持たない。
 
-EXE隣の`settings.json`と`data/`の共有アカウント名簿・登録素材・端末別ログは同期対象。Webプロフィール名簿は`data/web-profiles/<Applet ID>/accounts.json`の`schemaVersion/accounts`だけを共有する。ログは`data/logs/<端末名>/host.log`へ新規記録し、書けない場合だけPC専用rootの`logs/host.log`へ退避する。旧ログ/退避済みログの移行・再送は行わない。詳細は[ログ仕様](logging.md#保存先と端末間の同期)を参照。CookieとsessionはPC専用領域へ保存し、PC間では共有しない。グループ未宣言Appletの`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、storage、ページ/Window状態、更新journal/result、設定backupはPC専用rootに保存する。通知履歴は起動中のメモリーだけに保持し、保存・同期しない。
+`data/`の共有・端末別設定、Storage、共有アカウント名簿・登録素材・端末別ログは同期対象。Webプロフィール名簿は`data/web-profiles/<Applet ID>/accounts.json`の`schemaVersion/accounts`だけを共有する。ログは`data/logs/<端末名>/host.log`へ新規記録し、書けない場合だけPC専用rootの`logs/host.log`へ退避する。旧ログ/退避済みログの移行・再送は行わない。詳細は[ログ仕様](logging.md#保存先と端末間の同期)を参照。CookieとsessionはPC専用領域へ保存し、PC間では共有しない。グループ未宣言Appletの`web-accounts/<Applet ID>/accounts.json`、全session、Chromium、secrets、更新journal/result、設定backupはPC専用rootに保存する。通知履歴は起動中のメモリーだけに保持し、保存・同期しない。
 
 Gmail 0.12.0以降の共通グループ名簿は`data/web-account-groups/at365.google/accounts.json`。同じPCの同じグループではsessionを共用する。全体設定とキーは従来のsettings.json。詳しくは[グループ設計](web-accounts.md)を参照。
 
-旧chromium/web-accounts/storage/secrets/web-applets/sessionsが残る場合は警告する。既存settings.jsonの読み取り互換性と、従来からある名簿の旧フィールド読み取りとは区別する。
+旧chromium/web-accounts/secrets/web-applets/sessions、および旧`.appdock/storage`が残る場合は警告する。現行の`data/storage`は整理対象に含めない。設定・Storageの旧配置への互換読込は追加しない。
 
 通知の「詳細を見る」は本体ログを開く。対象フルパスはログの「整理対象」の行へwarningレベルで記録し、一般設定には専用欄を置かない。空のフォルダーも検出し、検査不能は解消と扱わない。閉じる・期限切れ後も同じ状態は再通知せず、本体ログは更新する。自動削除や通知からの削除は行わない。詳細は[設計](warning-notifications-design.md)を参照する。
 
@@ -83,7 +89,7 @@ notificationPreferences.overridesはsettings.jsonの任意フィールドです�
 
 省略した項目は種類の既定値を継承し、durationSeconds:nullは明示manualです。構造不正、重複、未知フィールド/表示先、範囲外秒数は既存の設定受信検証で拒否し、直近正常値を維持します。正常保存/受信した方針だけを通知へ適用します。設定の即時保存や外部revisionの競合保護を共用し、通知設定も共通の即時保存経路を使います。詳細は[通知契約](notifications.md)を参照してください。
 
-通知センターの既読/履歴削除とnotifications/update-receipt.jsonの受付済み記録はPC専用です。通知種類の設定上書きだけを共有します。targets:[]は通知センターのみの指定であり、既知の未対応先だけを選んだ状態と区別します。
+通知センターの既読・履歴削除は起動中のメモリーだけへ反映します。notifications/update-receipt.jsonの受付済み記録はPC専用rootへ保存します。通知種類の設定上書きだけを共有します。targets:[]は通知センターのみの指定であり、既知の未対応先だけを選んだ状態と区別します。
 
 TTSの通常設定は共有settings.jsonのtts、APIキーはPC専用rootのtts-key.json（safeStorage暗号化・接続先ハッシュに紐付け）へ保存します。生成音声とジョブはメモリ上だけで保持し、共有data/と登録素材へ追加しません。詳細は[TTS連携](tts-design.md#設定と保存)を参照してください。
 
@@ -93,24 +99,27 @@ AIの接続設定と共通プロンプトは共有settings.jsonのai、APIキー
 
 ```text
 AppDock.at365.exe
-settings.json                 共有設定
-settings-PC-A.json            PC-A用の設定
-settings-PC-B.json            PC-B用の設定
-data/                         既存の共有名簿・登録素材
+data/
+  settings.json              共有設定
+  settings-PC-A.json         PC-A用の設定・uiState
+  settings-PC-B.json         PC-B用の設定・uiState
+  storage/<Applet ID>/
+    shared/<key>.json        明示的に共有したStorage
+    devices/PC-A/<key>.json   PC-A用のStorage
+  ...                        共有名簿・登録素材・端末別ログ
 
 %LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/
   settings-backups/            従来の共有設定の正常世代
     device/<端末キー>/         この端末のJSONの正常世代とinitialized.json
   settings-transactions/      保存途中の回復用。同期しない
-  window-state.json           従来どおり
   ...                         認証・許可等の既存データ
 ```
 
-`settings-<端末名>.json`もEXEの隣へ置く。ファイル自体はフォルダー同期・バックアップの対象にできるが、AppDockは起動中の端末に対応する1ファイルだけを適用する。「端末専用」は適用先の区分であり、ファイルを他PCへ転送しないという意味にはしない。
+`settings-<端末名>.json`も`data/`直下へ置く。ファイル自体はフォルダー同期・バックアップの対象にできるが、AppDockは起動中の端末に対応する1ファイルだけを適用する。「端末専用」は適用先の区分であり、ファイルを他PCへ転送しないという意味にはしない。
 
 - 端末名はOSから`os.hostname()`で取得し、起動中は固定する。環境変数や任意のAPI引数から対象端末を指定しない。
 - ファイル名は取得した端末名を用いる。Windowsの大文字・小文字を区別しない同一名を同じ端末キーとして扱う。JSON内のmachineNameもその規則で照合する。
-- 空文字、区切り文字、制御文字、Windows禁止文字、末尾の空白・点など、不正なファイル名になる端末名は拒否する。別の文字へ置換して異なる端末を同じ名前へ丸めない。解決後の親ディレクトリーがEXEの配置先であることも検査する。
+- 空文字、区切り文字、制御文字、Windows禁止文字、末尾の空白・点など、不正なファイル名になる端末名は拒否する。別の文字へ置換して異なる端末を同じ名前へ丸めない。端末ファイルは共有設定と同じ`data/`直下へ解決する。
 - 他の端末用JSONを列挙して選んだり、更新日時が新しいファイルを代用したりしない。参照・監視・保存・復旧は自端末用だけを対象とする。
 - 同じ同期先を使うPCは端末名を一意にする。同じ名前のPC同士は同じ設定ファイルを参照するため、独立運用には別名が必要となる。追加のハードウェアIDや端末名簿は導入しない。
 - 端末名を変更した場合は新しい端末として扱い、旧名ファイルを自動削除・上書きしない。引き継ぐ場合はAppDockを終了し、旧名の内容を新名ファイルへコピーしてmachineNameも変更する。旧端末用ファイルの自動整理機能は追加しない。

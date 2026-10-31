@@ -107,7 +107,7 @@ for (const [id, views] of [
   fs.writeFileSync(path.join(folder, 'stalled.html'), '<!doctype html><body>Not ready</body>');
   settings.extensions[id] = { enabled: true, settings: { fixture: id } };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const result = { profile, notificationsOnly, visibilityOnly, success: false, checks: [] };

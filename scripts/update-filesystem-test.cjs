@@ -173,7 +173,7 @@ async function until(fn, message) {
       settings.keybindings = [];
       settings.globalShortcutCommands = [];
       settings.updates.checkHostOnAboutOpen = false;
-      fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+      fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
       inspector = await freePort();
       child = spawn(
         executable,

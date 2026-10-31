@@ -86,7 +86,7 @@ fs.writeFileSync(
   JSON.stringify({ schemaVersion: 1, accounts: [{ id: account, name: '移行アカウント' }] }),
 );
 settings.extensions['test.dynamic'] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 let app, dock;
 const checks = [];
 const until = async (fn, label) => {

@@ -58,7 +58,7 @@ fs.writeFileSync(
   path.join(fixture, 'index.cjs'),
   `exports.activate=async()=>require('node:fs').writeFileSync(${JSON.stringify(path.join(profile, 'host-pid'))},String(process.ppid));`,
 );
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {

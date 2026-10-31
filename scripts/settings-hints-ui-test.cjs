@@ -666,7 +666,7 @@ async function checkSectionTitles() {
     if (webAccountListOnly)
       require('./settings-web-fixture.cjs').installWebSettings(profile, initial);
     require('../out/main/shared/settings-schema').parseSettings(initial);
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     if (source) {
       require('./copy-host.cjs').copyHost(source, path.join(profile, 'AppDock.at365.exe'));
       assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
@@ -1364,12 +1364,12 @@ async function checkSectionTitles() {
     await stop();
     assert.equal(
       JSON.parse(
-        fs.readFileSync(path.join(profile, `settings-${require('node:os').hostname()}.json`)),
+        fs.readFileSync(require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`)),
       ).host.showHints,
       false,
     );
     assert.notEqual(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.showHints,
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).host.showHints,
       false,
     );
     await launch();

@@ -110,7 +110,7 @@ async function phase(kib) {
   settings.extensions['test.padding'].settings.padding = 'x'.repeat(
     kib * 1024 - Buffer.byteLength(JSON.stringify(settings)),
   );
-  const file = path.join(profile, 'settings.json');
+  const file = require('./test-settings.cjs').file(profile, 'settings.json');
   fs.writeFileSync(file, JSON.stringify(settings));
   require('../out/main/shared/settings-schema').parseSettings(settings);
   assert.equal(fs.statSync(file).size, kib * 1024);

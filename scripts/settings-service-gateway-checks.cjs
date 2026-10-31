@@ -53,7 +53,7 @@ module.exports = async ({ page, client, local, checks, tool, value, until }) => 
     );
   const tts = 'service.tts',
     before = await read(tts),
-    sharedFile = path.join(path.dirname(local), 'settings.json'),
+    sharedFile = require('./test-settings.cjs').file(path.dirname(local), 'settings.json'),
     sharedBefore = fs.readFileSync(sharedFile, 'utf8');
   const preview = await value(
     'appdock_settings_apply',

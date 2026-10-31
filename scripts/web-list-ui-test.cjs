@@ -35,7 +35,7 @@ const site = {
   imported: { name: 'Keep' },
 };
 settings.extensions[owner] = { enabled: true, settings: { items: [site] } };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 fs.mkdirSync(path.join(profile, 'data/web-profiles', owner), { recursive: true });
 fs.writeFileSync(
   path.join(profile, 'data/web-profiles', owner, 'accounts.json'),

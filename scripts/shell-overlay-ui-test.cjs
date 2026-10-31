@@ -75,7 +75,7 @@ fs.writeFileSync(
   '<!doctype html><html><body>Not ready</body></html>',
 );
 settings.extensions['fixture.stalled'] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const checks = [];
@@ -192,7 +192,7 @@ settings.extensions[ribbonManifest.id] = { enabled: true, settings: {} };
 const stalledManifest = JSON.parse(fs.readFileSync(path.join(stalled, 'extension.json')));
 stalledManifest.shell = { apiVersion: 1, views: { 'overlay.command-palette': 'index.html' } };
 fs.writeFileSync(path.join(stalled, 'extension.json'), JSON.stringify(stalledManifest));
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const palette = () => require('./shell-overlay-helper.cjs').overlayPage(dock);
 const { closingAction } = require('./shell-overlay-helper.cjs');
 async function open() {

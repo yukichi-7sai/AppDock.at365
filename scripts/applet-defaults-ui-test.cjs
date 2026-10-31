@@ -78,7 +78,7 @@ fs.writeFileSync(
 const originalHash = hash(originalAccounts);
 assert.equal(settings.migrations, undefined);
 assert.equal(settings.extensions['at365.profile'], undefined);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
@@ -163,7 +163,7 @@ async function launch() {
   await until(async () => (await snapshot()).startupReady, 'startup');
 }
 function assertReferences() {
-  const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+  const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
   assert.equal(JSON.stringify(saved.extensions['at365.web-applet']), referenceBefore);
   assert.equal(saved.migrations, undefined);
   assert.equal(hash(originalAccounts), originalHash);

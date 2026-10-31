@@ -64,7 +64,7 @@ settings.touchpadGestures.bindings = [
   { ...row, id: 'touch-off', gesture: 'four.tap', enabled: false },
 ];
 require('../out/main/shared/settings-schema').parseSettings(settings);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');

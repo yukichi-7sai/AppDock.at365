@@ -54,7 +54,7 @@ for (const name of ['WebBrowserTools']) {
     settings: {},
   };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 let application, target, targetPeer, client, page, sender, packagedChild, browser, resourcesPath;
 let processOutput = '';
 const checks = [],

@@ -68,7 +68,7 @@ settings.notificationPreferences = {
     { ownerKind: 'host', ownerId: 'errors', typeId: 'operation-failed', targets: ['banner'] },
   ],
 };
-const settingsFile = path.join(profile, 'settings.json');
+const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
 fs.mkdirSync(settings.updates.hostSource);
 const feed = {

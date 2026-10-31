@@ -98,7 +98,7 @@ for (const [id, enabled] of [
   fs.writeFileSync(path.join(installed, 'obsolete.dll'), 'old');
   settings.extensions[id] = { enabled, settings: { preserved: 'user-data' }, updateSource: source };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings, null, 2));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings, null, 2));
 fs.mkdirSync(path.join(profile, 'data/web-accounts'), { recursive: true });
 fs.writeFileSync(path.join(profile, 'data/web-accounts/preserved.txt'), 'login-fixture');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

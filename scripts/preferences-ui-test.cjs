@@ -14,7 +14,7 @@ delete legacy.pinnedCommands;
 legacy.host.notifications = false;
 require('./profile-settings-fixture.cjs').installProfileSettings(profile, legacy);
 require('../tests/fixtures/install.cjs')(profile, legacy);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(legacy, null, 2));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(legacy, null, 2));
 let application;
 async function launch() {
   application = await electron.launch({

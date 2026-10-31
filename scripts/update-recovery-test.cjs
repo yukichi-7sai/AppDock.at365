@@ -84,7 +84,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const applet = path.join(base, 'extensions/fixture');
     fs.mkdirSync(applet, { recursive: true });
     fs.mkdirSync(path.join(base, 'data/web-accounts'), { recursive: true });
-    fs.writeFileSync(path.join(base, 'settings.json'), 'preserved settings');
+    fs.writeFileSync(require('./test-settings.cjs').file(base, 'settings.json'), 'preserved settings');
     fs.writeFileSync(path.join(base, 'data/web-accounts/cookie'), 'preserved fixture');
     const executable = path.join(base, 'AppDock.at365.exe');
     fs.writeFileSync(executable, 'old exe fixture');
@@ -203,7 +203,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
         fs.readFileSync(path.join(applet, 'payload.dll'), 'utf8'),
         committed ? '2.0.0' : '1.0.0',
       );
-      assert.equal(fs.readFileSync(path.join(base, 'settings.json'), 'utf8'), 'preserved settings');
+      assert.equal(fs.readFileSync(require('./test-settings.cjs').file(base, 'settings.json'), 'utf8'), 'preserved settings');
       assert.equal(
         fs.readFileSync(path.join(base, 'data/web-accounts/cookie'), 'utf8'),
         'preserved fixture',

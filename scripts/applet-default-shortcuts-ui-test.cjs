@@ -31,7 +31,7 @@ fs.writeFileSync(
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.notifications = false;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 
 (async () => {
   const env = { ...process.env };

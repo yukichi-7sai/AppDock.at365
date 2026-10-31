@@ -21,7 +21,7 @@ settings.extensions['fixture.settings'] = { enabled: false, settings: {} };
 settings.appletOrder = ['fixture.settings', 'fixture.stalled-settings'];
 for (const id of ['fixture.settings-shell', 'fixture.stalled-settings'])
   settings.extensions[id] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const fixture = path.join(profile, 'extensions', 'fixture.settings');
 fs.mkdirSync(fixture, { recursive: true });
 fs.writeFileSync(

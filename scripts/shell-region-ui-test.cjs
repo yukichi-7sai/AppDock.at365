@@ -105,7 +105,7 @@ initial.host.shellProviders = {
   titlebar: ids.b,
   'future.panel': 'missing.future',
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const checks = [],
   env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;

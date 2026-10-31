@@ -149,7 +149,7 @@ function profile(name, overrides = {}) {
     },
     ...(overrides.window ? { pages: { main: { display: 'window' } } } : {}),
   };
-  fs.writeFileSync(path.join(folder, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(require('./test-settings.cjs').file(folder, 'settings.json'), JSON.stringify(settings));
   return folder;
 }
 const snap = () => host.evaluate(() => window.dock.snapshot());

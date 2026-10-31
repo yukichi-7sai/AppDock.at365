@@ -15,7 +15,7 @@ module.exports = async function ({
   checks,
 }) {
   assert.equal((await snapshot()).version, require('../package.json').version);
-  const sharedFile = path.join(profile, 'settings.json');
+  const sharedFile = require('./test-settings.cjs').file(profile, 'settings.json');
   const sharedBefore = fs.readFileSync(sharedFile, 'utf8');
   await select('表示');
   const language = host.getByTestId('host-language');

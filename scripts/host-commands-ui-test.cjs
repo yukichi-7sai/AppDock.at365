@@ -44,7 +44,7 @@ settings.extensions[fixtureId] = { enabled: true, settings: {} };
 settings.shortcuts['appdock.quit'] = ['Ctrl+Alt+Q'];
 settings.trayCommands = ['appdock.restart', 'appdock.quit'];
 settings.host.trayDoubleClickCommand = 'appdock.restart';
-const settingsFile = path.join(profile, 'settings.json');
+const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
 const portable = !!process.argv[2];
 const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');

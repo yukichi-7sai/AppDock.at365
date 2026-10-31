@@ -26,13 +26,14 @@ test('only fixed legacy paths are listed, including empty folders, without readi
     local = path.join(base, 'local');
   const targets = [
     'data/chromium',
-    'data/storage',
+    '.appdock/storage',
     '.appdock/secrets',
     '.appdock/web-accounts',
     '.appdock/web-applets/sessions',
   ].map((p) => path.resolve(base, p));
   for (const p of [
     ...targets,
+    path.join(shared, 'storage'),
     path.join(shared, 'assets/profile'),
     path.join(shared, 'web-applets'),
     path.join(local, 'chromium'),

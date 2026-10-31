@@ -96,7 +96,7 @@ initial.notificationPreferences = {
     },
   ],
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
 if (portable) {
@@ -183,7 +183,7 @@ const storage = (id, key) => {
   const f = path.join(profile, 'data/storage', id, key + '.json');
   return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null;
 };
-const saved = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+const saved = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
 async function settingsPage() {
   await host.evaluate(() => window.dock.navigate('settings'));
   const p = await require('./settings-host-helper.cjs').settingsPage(host);

@@ -15,7 +15,7 @@ const root = path.resolve(__dirname, '..');
 const portable = process.argv[2] && path.resolve(process.argv[2]);
 const profile = path.join(root, '.artifacts', `settings-recovery-ui-${Date.now()}`),
   local = path.join(profile, 'local-state');
-const file = path.join(profile, 'settings.json'),
+const file = require('./test-settings.cjs').file(profile, 'settings.json'),
   checks = [];
 fs.mkdirSync(profile, { recursive: true });
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');

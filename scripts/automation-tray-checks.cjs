@@ -37,7 +37,7 @@ module.exports = async function ({
   );
   await grant();
   await until(async () => (await read()).trayEditingAllowed, 'tray grant');
-  const file = path.join(profile, 'settings.json'),
+  const file = require('./test-settings.cjs').file(profile, 'settings.json'),
     bytes = fs.readFileSync(file, 'utf8');
   const calls = path.join(fixtureRoot, 'calls.json'),
     beforeCalls = fs.readFileSync(calls, 'utf8');

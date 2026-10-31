@@ -113,7 +113,7 @@ async function fixture(name) {
 const snapshot = () => host.evaluate(() => window.dock.snapshot());
 const definitions = async () => (await snapshot()).settings.value.customCommands.items;
 const diskDefinitions = () =>
-  JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).customCommands.items;
+  JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')).customCommands.items;
 (async () => {
   let release;
   try {
@@ -132,7 +132,7 @@ const diskDefinitions = () =>
       items: fixtures.map(({ id, name }) => ({ id, name, description: '' })),
     };
     settings.customCommands = { version: 2, items: [] };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
     const defaultConnection = require('../out/main/shared/mcp-client').defaultMcpConnection;
     fs.writeFileSync(
       path.join(local, 'mcp-client.json'),

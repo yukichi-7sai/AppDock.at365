@@ -100,7 +100,7 @@ exports.activate=async(context)=>{
 `,
 );
 settings.extensions[fixtureId] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const local = path.join(profile, 'local'),
   configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
@@ -433,16 +433,16 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     assert.equal((await call(client, 'appdock_get_info')).writable, false);
     const activationFile = path.join(fixtureRoot, 'activations.txt');
     const beforeRestart = fs.readFileSync(activationFile, 'utf8');
-    const settingsBeforeRestart = fs.readFileSync(path.join(profile, 'settings.json'), 'utf8');
+    const settingsBeforeRestart = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
     assert.equal((await manage(fixtureId, 'restart')).completion, 'lifecycleApplied');
     assert.notEqual(fs.readFileSync(activationFile, 'utf8'), beforeRestart);
     assert.equal(
-      fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'),
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
       settingsBeforeRestart,
     );
     await manage(fixtureId, 'disable');
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[fixtureId]
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions[fixtureId]
         .enabled,
       false,
     );
@@ -502,7 +502,7 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
     );
     await manage(webId, 'disable');
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).webApplets.items.find(
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).webApplets.items.find(
         (a) => a.id === webId,
       ).enabled,
       false,
@@ -661,9 +661,9 @@ const webId = 'web.11111111-2222-3333-4444-555555555555';
       async () => (await readShortcuts()).shortcutEditingAllowed,
       'shortcut editing grant',
     );
-    const settingsBytes = fs.readFileSync(path.join(profile, 'settings.json'), 'utf8');
+    const settingsBytes = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
     assert.equal((await editShortcuts(additions, { dryRun: true })).completion, 'validated');
-    assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), settingsBytes);
+    assert.equal(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'), settingsBytes);
     await editShortcuts(additions);
     await page.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
     const shortcutSearch = page.getByRole('searchbox', {

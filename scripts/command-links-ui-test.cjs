@@ -100,7 +100,7 @@ const winFolder = path.join(profile, 'extensions', 'WindowsTools');
 fs.cpSync(winSource, winFolder, { recursive: true });
 const winManifest = JSON.parse(fs.readFileSync(path.join(winFolder, 'extension.json')));
 settings.extensions[winManifest.id] = { enabled: false, settings: { autoLockEnabled: false } };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -375,7 +375,7 @@ async function selectApplet(id) {
     checks.push('light/dark fixed palette at native 900x640; no horizontal overflow');
     await app.close();
     app = undefined;
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     assert.equal(saved.extensions[manifest.id].settings.privateValue, 'keep');
     assert.equal(saved.extensions[manifest.id].settings.text, 'saved before palette');
     fs.writeFileSync(

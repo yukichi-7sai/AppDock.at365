@@ -7,7 +7,7 @@ fs.mkdirSync(profile, { recursive: true });
 const initial = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 initial.updates.checkHostOnAboutOpen = false;
 fs.writeFileSync(
-  path.join(profile, 'settings.json'),
+  require('./test-settings.cjs').file(profile, 'settings.json'),
   JSON.stringify(initial),
 );
 const portable = !!process.argv[2];
@@ -53,10 +53,10 @@ child.on('exit', (code) => {
   if (
     result.ok &&
     path.resolve(result.settingsPath).toLowerCase() !==
-      path.join(profile, 'settings.json').toLowerCase()
+      require('./test-settings.cjs').file(profile, 'settings.json').toLowerCase()
   ) {
     result.ok = false;
-    result.error = 'Settings were not saved beside the original executable.';
+    result.error = 'Settings were not saved inside data beside the original executable.';
   }
   if (
     result.ok &&

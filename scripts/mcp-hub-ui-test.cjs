@@ -118,7 +118,7 @@ delete watchManifest.defaultKeybindings;
 delete watchManifest.defaultGestures;
 fs.writeFileSync(path.join(watchFolder, 'extension.json'), JSON.stringify(watchManifest));
 settings.extensions['at365.watch'] = { enabled: true, settings: { visible: false } };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const configFile = path.join(profile, 'codex', 'config.toml');
 fs.mkdirSync(path.dirname(configFile), { recursive: true });
 fs.writeFileSync(configFile, '# isolated test\n');
@@ -360,7 +360,7 @@ async function assertMcpWriteDenied() {
       false,
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).customCommands
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')).customCommands
         .version,
       1,
     );
@@ -372,7 +372,7 @@ async function assertMcpWriteDenied() {
     await resetJson.press('Tab');
     await until(() => {
       const saved = JSON.parse(
-        fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'),
+        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
       ).customCommands;
       return saved === undefined || (saved.version === 2 && saved.items.length === 0);
     }, 'explicit v2 JSON replacement');
@@ -397,7 +397,7 @@ async function assertMcpWriteDenied() {
       .fill(JSON.stringify([path.join(root, 'tests/fixtures/mcp-server.cjs')]));
     await connectionDialog.getByRole('button', { name: 'OK', exact: true }).click();
     await connectionDialog.waitFor({ state: 'hidden' });
-    const mcpServerId = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'))
+    const mcpServerId = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'))
       .mcpServers.items[0].id;
     await page.getByLabel('確認するMCP接続先').selectOption(mcpServerId);
     await until(
@@ -471,7 +471,7 @@ async function assertMcpWriteDenied() {
       connection: managedConnection,
     };
     const beforePreview = [
-      hash(path.join(profile, 'settings.json')),
+      hash(require('./test-settings.cjs').file(profile, 'settings.json')),
       hash(path.join(local, 'mcp-client.json')),
     ];
     const secretWrite = await client.callTool({
@@ -485,7 +485,7 @@ async function assertMcpWriteDenied() {
     assert.equal(secretWrite.structuredContent.code, 'INVALID_ARGUMENT');
     assert.equal((await managedUpdate({ ...request, dryRun: true })).saved, false);
     assert.deepEqual(
-      [hash(path.join(profile, 'settings.json')), hash(path.join(local, 'mcp-client.json'))],
+      [hash(require('./test-settings.cjs').file(profile, 'settings.json')), hash(path.join(local, 'mcp-client.json'))],
       beforePreview,
     );
     await managedUpdate(request);
@@ -1046,7 +1046,7 @@ async function assertMcpWriteDenied() {
       'native Watch display/save',
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).extensions[
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')).extensions[
         'at365.watch'
       ].settings.showSeconds,
       false,
@@ -1154,7 +1154,7 @@ async function assertMcpWriteDenied() {
     const mcpDefinition = (await call('appdock_get_custom_command', { id: savedMcp.id })).item;
     const apiItem = { ...mcpDefinition, id: randomUUID(), title: 'API MCP' };
     delete apiItem.owner;
-    const beforeDryRun = fs.readFileSync(path.join(profile, 'settings.json'), 'utf8');
+    const beforeDryRun = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
     await call('appdock_mcp_get_tool', { serverId: mcpServerId, name: 'schedule_off' });
     await call('appdock_execute_command', {
       id: 'appdock.customCommands.update',
@@ -1164,7 +1164,7 @@ async function assertMcpWriteDenied() {
         operations: [{ op: 'add', item: apiItem, expectedTypeRevision: mcpType.typeRevision }],
       },
     });
-    assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), beforeDryRun);
+    assert.equal(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'), beforeDryRun);
     await update([{ op: 'add', item: apiItem, expectedTypeRevision: mcpType.typeRevision }]);
     await update([{ op: 'remove', id: apiItem.id }]);
     const shortcuts = await call('appdock_get_shortcuts');

@@ -28,7 +28,7 @@ settings.keybindings = [
     blockOriginalInput: true,
   },
 ];
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(fn, message, timeout = 60000) {
   const deadline = Date.now() + timeout;
@@ -144,12 +144,12 @@ async function input(blocked) {
     await peer.request('focus');
     await until(async () => (await peer.request('snapshot')).focused, 'target focused');
     const before = await snapshot();
-    const saved = fs.readFileSync(path.join(profile, 'settings.json'), 'utf8');
+    const saved = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8');
     await host.evaluate(() => window.dock.executeCommand('appdock.noop'));
     const after = await snapshot();
     assert.equal((await peer.request('snapshot')).focused, true);
     assert.equal(after.settings.revision, before.settings.revision);
-    assert.equal(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'), saved);
+    assert.equal(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'), saved);
     checks.push('direct no-op keeps native foreground and settings unchanged');
     await input(true);
     checks.push('global no-op blocks F10 including repeated keydowns');

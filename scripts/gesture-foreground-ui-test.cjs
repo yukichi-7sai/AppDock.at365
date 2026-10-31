@@ -57,7 +57,7 @@ settings.gestures.bindings = [
     when: { scope: 'global', appletIds: [], processes: [] },
   },
 ];
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
   const end = Date.now() + 15000;

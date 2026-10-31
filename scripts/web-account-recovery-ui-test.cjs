@@ -21,7 +21,7 @@ const local = portable
       createHash('sha256').update(base.toLowerCase()).digest('hex'),
     )
   : path.join(output, 'local-state');
-const settingsFile = path.join(base, 'settings.json');
+const settingsFile = require('./test-settings.cjs').file(base, 'settings.json');
 const rosterFile = path.join(base, 'data/web-applets/accounts.json');
 const oldId = `account.${randomUUID()}`,
   itemId = `web.${randomUUID()}`;

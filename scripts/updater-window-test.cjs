@@ -73,7 +73,7 @@ async function scenario(schema, mode = 'host') {
     fs.writeFileSync(path.join(folder, 'payload.txt'), version);
   }
   fs.mkdirSync(path.join(base, 'data'));
-  fs.writeFileSync(path.join(base, 'settings.json'), 'preserved');
+  fs.writeFileSync(require('./test-settings.cjs').file(base, 'settings.json'), 'preserved');
   const old = spawn(executable, ['hold', base], { windowsHide: true, stdio: 'ignore' });
   const job = path.join(stage, 'job.json');
   fs.writeFileSync(
@@ -177,7 +177,7 @@ async function scenario(schema, mode = 'host') {
     }
     assert.equal(await exited, 0, diagnostics);
     assert.equal(JSON.parse(fs.readFileSync(path.join(base, 'data/update-result.json'))).ok, true);
-    assert.equal(fs.readFileSync(path.join(base, 'settings.json'), 'utf8'), 'preserved');
+    assert.equal(fs.readFileSync(require('./test-settings.cjs').file(base, 'settings.json'), 'utf8'), 'preserved');
     checks.push(
       `schema ${schema}: ${mode === 'host' ? 'waits for old process, rejects spoof, applies, waits for launched process acknowledgment and exits' : 'startup exit leaves an honest dismissible message without reverting committed files'}`,
     );

@@ -18,6 +18,8 @@ export function inspectLegacyLocalData(
   if (path.resolve(shared).toLowerCase() === path.resolve(local).toLowerCase()) return state;
   for (const root of [shared, path.join(base, '.appdock')]) {
     for (const name of legacyNames) {
+      // Shared data/storage is the current Applet Storage root.
+      if (root === shared && name === 'storage') continue;
       const target = path.resolve(root, name);
       try {
         fs.lstatSync(target);

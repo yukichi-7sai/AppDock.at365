@@ -55,7 +55,7 @@ Object.assign(settings.tts, {
   manualVoices: [{ id: 'fixture-voice', name: 'Fixture voice' }],
 });
 require('./settings-stack-mcp-lock-checks.cjs').install(settings);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({
@@ -428,7 +428,7 @@ async function main() {
   await dialog.getByLabel('Bearer token', { exact: true }).fill('PRIVATE_CREDENTIAL_FIXTURE');
   await dialog.getByRole('button', { name: 'OK', exact: true }).click();
   await until(async () => (await page.getByRole('dialog').count()) === 0, 'local credential saved');
-  const secretId = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).mcpServers
+  const secretId = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).mcpServers
     .items[0].id;
   const detail = await value('appdock_mcp_get_server_settings', { serverId: secretId });
   for (const hidden of ['PRIVATE_CREDENTIAL_FIXTURE', 'tokenConfigured', 'environmentNames'])

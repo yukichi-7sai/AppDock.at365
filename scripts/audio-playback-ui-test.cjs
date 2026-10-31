@@ -13,7 +13,7 @@ settings.host.hardwareAcceleration = false;
 settings.host.soundEnabled = false;
 settings.keybindings = [];
 settings.gestures.enabled = false;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const wave = Buffer.alloc(44 + 8000);
 wave.write('RIFF');
 wave.writeUInt32LE(wave.length - 8, 4);
@@ -243,7 +243,7 @@ let child,
     assert.equal(muted.peak, 1);
     assert.deepEqual(muted.errors, []);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.soundEnabled,
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).host.soundEnabled,
       true,
     );
     checks.push(

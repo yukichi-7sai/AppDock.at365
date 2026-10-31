@@ -159,7 +159,7 @@ const checks = [];
         },
       ],
     };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
     const sound = path.join(profile, 'notice.wav');
     fs.writeFileSync(sound, wave());
     fs.writeFileSync(

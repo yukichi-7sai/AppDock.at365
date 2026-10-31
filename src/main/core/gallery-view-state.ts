@@ -1,17 +1,17 @@
 import { hostText } from '../../shared/i18n';
-import fs from 'node:fs';
-import { atomicWrite } from './settings';
+import { stateStorage, type StateStorage } from './state-storage';
 import { gallerySize, validGalleryWidth } from '../../shared/image-gallery';
 type State = { schemaVersion: 1; library?: { cardWidth: number }; picker?: { cardWidth: number } };
 export class GalleryViewStateStore {
   private state: State = { schemaVersion: 1 };
   private blocked = false;
-  private previous?: Buffer;
+  private storage: StateStorage;
   error = '';
-  constructor(private file: string) {
+  constructor(storage: StateStorage | string) {
+    this.storage = stateStorage(storage);
     try {
-      this.previous = fs.readFileSync(file);
-      const value = JSON.parse(this.previous.toString('utf8').replace(/^\uFEFF/, ''));
+      const value: any = this.storage.read();
+      if (value === undefined) return;
       if (
         !value ||
         value.schemaVersion !== 1 ||
@@ -41,13 +41,11 @@ export class GalleryViewStateStore {
       throw Error(hostText('services.galleryViewState.invalidSize'));
     if (this.blocked) throw Error(this.error);
     const next: State = { ...this.state, [surface]: { cardWidth } };
-    const bytes = Buffer.from(JSON.stringify(next, null, 2));
     try {
-      atomicWrite(this.file, bytes, { previous: this.previous });
+      this.storage.write(next);
     } catch {
       throw Error(hostText('services.galleryViewState.saveFailed'));
     }
     this.state = next;
-    this.previous = bytes;
   }
 }

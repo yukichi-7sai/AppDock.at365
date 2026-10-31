@@ -87,7 +87,7 @@ async function until(fn, label) {
         updateSource: base + '/' + id + '.json',
       };
     }
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     const portable = !!process.argv[2],
       executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (portable) {

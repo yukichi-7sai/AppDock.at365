@@ -21,7 +21,7 @@ settings.updates.allowSameVersion = true;
 settings.notificationPreferences = {
   overrides: [{ ownerKind: 'host', ownerId: 'updates', typeId: 'applied', durationSeconds: null }],
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function connect(port) {
   let last;

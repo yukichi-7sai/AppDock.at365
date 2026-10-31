@@ -48,7 +48,7 @@ module.exports = async ({ page, host, profile, checks }) => {
   await save();
   assert.equal((await snapshot()).settings.value.gestures.indicatorPosition, 'cursor-follow');
   assert.equal(
-    JSON.parse(require('node:fs').readFileSync(path.join(profile, 'settings.json'), 'utf8'))
+    JSON.parse(require('node:fs').readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'))
       .gestures.indicatorPosition,
     'cursor-follow',
   );

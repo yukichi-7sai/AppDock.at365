@@ -1,4 +1,6 @@
 import { hostText } from '../../shared/i18n';
+import os from 'node:os';
+import { appletStorageFile } from './applet-storage';
 import type { TypedNotifications } from './typed-notifications';
 import { SettingsCommands } from './settings-commands';
 import fs from 'node:fs';
@@ -49,6 +51,7 @@ export function createHostApi(
   customCommands?: import('./custom-commands').CustomCommandService,
   pageUi?: { openDetails(id: string): Promise<unknown>; failed?(id: string): void },
   imageLibrary?: import('./image-library-host').ImageLibraryHost,
+  storageMachine = os.hostname(),
 ) {
   const api = async (
     e: ExtensionInstance,
@@ -337,7 +340,7 @@ export function createHostApi(
             title: page.title,
             url: pathToFileURL(contained(e.manifest.folder, page.ui!)).href,
             preload: path.resolve(__dirname, '../applet-page-preload.js'),
-            stateFile: path.join(dataRoot, 'pages', id, page.id, 'window-state.json'),
+            stateFile: settings.uiStateStorage('windows', pageKey(id, page.id)),
             defaultDisplay: page.defaultDisplay,
             partition: `applet-page:${pageKey(id, page.id)}`,
             ...(e.manifest.capabilities?.includes('local-images')
@@ -483,6 +486,7 @@ export function createHostApi(
           e.manifest.webAccounts,
           {
             sharedRoot: sharedDataRoot,
+            windowState: settings.uiStateStorage('windows', `web-accounts:${id}`),
             capabilities: e.manifest.capabilities ?? [],
             soundsDirectory: path.join(assetRoot, id, 'sounds'),
             page: e.manifest.pages?.find((page) => page.source === 'web-accounts'),
@@ -874,7 +878,9 @@ export function createHostApi(
       case 'host.storage.set': {
         requireCapability('storage');
         const k = key();
-        const file = path.join(dataRoot, 'storage', id, k + '.json');
+        if (Object.keys(p).some((key) => !['key', 'value', 'scope'].includes(key)))
+          throw Error('Invalid Storage arguments');
+        const file = appletStorageFile(sharedDataRoot, id, k, p.scope, storageMachine);
         if (method.endsWith('.get'))
           return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
         const text = JSON.stringify(p.value ?? null);

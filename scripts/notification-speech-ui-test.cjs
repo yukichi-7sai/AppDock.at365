@@ -127,7 +127,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         ");});c.commands.register('fixture.speech.real','Real',async()=>{id=(await c.notifications.publish({typeId:'message',title:'通知読み上げの動作確認です。',body:'',dedupeKey:'real'})).notificationId;});};",
     );
     initial.extensions[id] = { enabled: true, settings: {} };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     const exe = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (process.argv[2]) {
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);
@@ -190,7 +190,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await voice.press('Enter');
     await settleSettings(page);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).notificationPreferences
         .speech.voice,
       'custom-voice',
     );
@@ -203,7 +203,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await settleSettings(page);
     assert.equal(await voice.inputValue(), 'second');
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).notificationPreferences
         .speech.voice,
       'second',
     );
@@ -288,7 +288,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await notificationDialog.getByTestId('settings-dialog-confirm').click();
     await notificationDialog.waitFor({ state: 'hidden' });
     await settleSettings(page);
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     assert.deepEqual(saved.notificationPreferences.speech, { voice: 'notice', speed: 1.6 });
     assert.equal(saved.notificationPreferences.overrides.find((r) => r.ownerId === id).speak, true);
     checks.push(

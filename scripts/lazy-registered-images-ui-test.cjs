@@ -101,7 +101,7 @@ settings.ribbon.groups = [
     children: ['button:deferred'],
   },
 ];
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (source) copyHost(source, exe);
 const until = async (fn, label) => {

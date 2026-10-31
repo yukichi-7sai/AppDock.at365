@@ -88,7 +88,7 @@ settings.imageLibrary = {
     images: i < 8 ? refs : [],
   })),
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const originals = Object.fromEntries(
   refs.map((ref) => [ref.file, hash(path.join(images, ref.file))]),
 );
@@ -222,7 +222,7 @@ async function theme(value) {
     await launch();
     await open();
     await until(async () => (await model()).content.total === 512, '512 images indexed');
-    const sharedHash = hash(path.join(profile, 'settings.json'));
+    const sharedHash = hash(require('./test-settings.cjs').file(profile, 'settings.json'));
     let current = (await model()).content;
     assert.equal(current.groups.length, 66);
     assert.equal(current.items.length, 64);
@@ -302,7 +302,7 @@ async function theme(value) {
     await search.fill('');
     await search.press('Enter');
     await until(async () => (await model()).content.total === 512, 'clear search');
-    assert.equal(hash(path.join(profile, 'settings.json')), sharedHash);
+    assert.equal(hash(require('./test-settings.cjs').file(profile, 'settings.json')), sharedHash);
     for (const mode of ['light', 'dark']) {
       await theme(mode);
       await page.screenshot({ path: path.join(profile, `${mode}.png`) });

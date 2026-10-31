@@ -34,7 +34,7 @@ module.exports = async function ({
   assert.equal((await denied([{ kind: 'reset' }])).code, 'RIBBON_EDITING_DISABLED');
   await grant();
   await until(async () => (await read()).ribbonEditingAllowed, 'ribbon grant');
-  const file = path.join(profile, 'settings.json'),
+  const file = require('./test-settings.cjs').file(profile, 'settings.json'),
     bytes = fs.readFileSync(file, 'utf8');
   const ops = [
     { kind: 'addSeparator', id: 'separator:mcp-test', placement: 'bottom' },

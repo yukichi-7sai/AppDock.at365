@@ -212,7 +212,7 @@ const expectCalls = async (before, expected) => {
       path.join(profile, 'extensions', webOwner, 'index.cjs'),
       'exports.activate=async()=>{};',
     );
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
     const portable = !!process.argv[2];
     const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (portable)
@@ -485,7 +485,7 @@ const expectCalls = async (before, expected) => {
         ).enabled,
       'Disabled state saved',
     );
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
     assert.equal(saved.keybindings.find((r) => r.id === 'selected').enabled, false);
     assert.equal(saved.keybindings.find((r) => r.id === 'selected').key, 'Ctrl+Shift+F11');
     assert.equal(saved.keybindings.find((r) => r.id === 'selected').when.scope, 'applets');
@@ -513,7 +513,7 @@ const expectCalls = async (before, expected) => {
         ).when.scope === 'owner',
       'Owner scope saved',
     );
-    const ownerSaved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+    const ownerSaved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
     assert.deepEqual(ownerSaved.keybindings.find((r) => r.id === 'selected').when, {
       scope: 'owner',
       appletIds: [],

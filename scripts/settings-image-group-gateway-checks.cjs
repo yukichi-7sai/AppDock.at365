@@ -5,7 +5,7 @@ const { randomUUID, createHash } = require('node:crypto');
 const files = ['mcp-picture-a.png', 'mcp-picture-b.png'];
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 exports.install = (profile) => {
-  const file = path.join(profile, 'settings.json');
+  const file = require('./test-settings.cjs').file(profile, 'settings.json');
   const settings = JSON.parse(fs.readFileSync(file));
   settings.imageLibrary = {
     groups: [
@@ -46,7 +46,7 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
     ...extra,
   });
   const groupRow = async (id) => (await read(groups)).items.find((row) => row.values.id === id);
-  const settingsFile = path.join(profile, 'settings.json'),
+  const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json'),
     before = fs.readFileSync(settingsFile);
   const usage = JSON.stringify(JSON.parse(before).extensions['test.settings-images']);
   const draft = await request(

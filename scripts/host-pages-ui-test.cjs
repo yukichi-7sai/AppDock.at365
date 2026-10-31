@@ -109,7 +109,7 @@ settings.host.shellProviders = Object.fromEntries(
     'missing.retired-shell',
   ]),
 );
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const images = path.join(profile, 'data/assets/images');
 fs.mkdirSync(images, { recursive: true });
 const original = path.join(images, 'preview.png');

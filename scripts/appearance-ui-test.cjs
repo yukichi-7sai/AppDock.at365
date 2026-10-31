@@ -232,7 +232,7 @@ async function assertRibbonReadability(rail, id, dark) {
     initial.keybindings = [];
     initial.globalShortcutCommands = [];
     initial.extensions['fixture.accent'] = { enabled: true, settings: {} };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     await start();
     assert.equal(
       (await host.evaluate(() => window.dock.snapshot())).version,
@@ -601,7 +601,7 @@ async function assertRibbonReadability(rail, id, dark) {
     checks.push('custom editors fit narrow window');
     const json = JSON.parse(
       fs.readFileSync(
-        path.join(profile, 'settings-' + require('node:os').hostname() + '.json'),
+        require('./test-settings.cjs').file(profile, 'settings-' + require('node:os').hostname() + '.json'),
         'utf8',
       ),
     );

@@ -51,7 +51,7 @@ async function run(name, padding, theme) {
       settings: { padding: 'STARTUP_PADDING_'.repeat(padding) },
     };
   const bytes = JSON.stringify(settings);
-  fs.writeFileSync(path.join(folder, 'settings.json'), bytes);
+  fs.writeFileSync(require('./test-settings.cjs').file(folder, 'settings.json'), bytes);
   const port = await freePort(),
     env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;

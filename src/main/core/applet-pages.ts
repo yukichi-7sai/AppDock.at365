@@ -164,7 +164,7 @@ export interface SurfaceOptions {
   preload?: string;
   remote?: boolean;
   session?: Electron.Session;
-  stateFile: string;
+  stateFile?: string | import('./state-storage').StateStorage;
   defaultDisplay?: PageDisplay;
   partition: string;
   onLayout(): void;

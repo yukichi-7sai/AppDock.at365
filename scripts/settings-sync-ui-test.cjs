@@ -58,7 +58,7 @@ function profile(name) {
     enabled: false,
     settings: { monitoring: false, notifications: false },
   };
-  fs.writeFileSync(path.join(base, 'settings.json'), JSON.stringify(value));
+  fs.writeFileSync(require('./test-settings.cjs').file(base, 'settings.json'), JSON.stringify(value));
   const gmail = path.join(base, 'extensions', 'Applet.Gmail.at365');
   fs.cpSync(path.join(root, '../../40.ARTIFACT/Applet.Gmail.at365/Applet.Gmail.at365'), gmail, {
     recursive: true,
@@ -136,7 +136,7 @@ function deliverFile(from, to) {
   fs.renameSync(to + '.incoming', to);
 }
 function deliverShared(a, b) {
-  deliverFile(path.join(a.base, 'settings.json'), path.join(b.base, 'settings.json'));
+  deliverFile(require('./test-settings.cjs').file(a.base, 'settings.json'), require('./test-settings.cjs').file(b.base, 'settings.json'));
   const shared = path.join(a.base, 'data');
   function walk(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -217,7 +217,7 @@ async function gmail(s) {
     'immediate local setting persists and received external setting replaces the canonical value',
   );
   const broken = '{broken';
-  fs.writeFileSync(path.join(pb.base, 'settings.json'), broken);
+  fs.writeFileSync(require('./test-settings.cjs').file(pb.base, 'settings.json'), broken);
   await until(async () => (await b.snapshot()).settings.recovered, 'invalid receipt');
   assert.equal(
     (await b.snapshot()).settings.value.extensions['fixture.profile'].settings.name,
@@ -226,7 +226,7 @@ async function gmail(s) {
   await stop(b);
   b = await start(pb);
   assert.equal((await b.snapshot()).settings.recovered, true);
-  assert.equal(fs.readFileSync(path.join(pb.base, 'settings.json'), 'utf8'), broken);
+  assert.equal(fs.readFileSync(require('./test-settings.cjs').file(pb.base, 'settings.json'), 'utf8'), broken);
   checks.push('restart uses local backup without rewriting corrupted shared file');
   deliverShared(a, b);
   await until(async () => !(await b.snapshot()).settings.recovered, 'healthy receipt');

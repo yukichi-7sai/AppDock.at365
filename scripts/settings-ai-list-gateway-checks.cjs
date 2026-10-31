@@ -25,7 +25,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   };
   const apply = async (operations, dryRun = false) =>
     value('appdock_settings_apply', await request(operations, dryRun));
-  const shared = path.join(profile, 'settings.json'),
+  const shared = require('./test-settings.cjs').file(profile, 'settings.json'),
     keyFile = path.join(local, 'ai-keys.json'),
     cipher = fs.readFileSync(keyFile),
     before = fs.readFileSync(shared);

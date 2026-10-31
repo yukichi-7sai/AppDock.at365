@@ -173,7 +173,10 @@ for (const [name, id, values] of nativeApplets) {
   fs.writeFileSync(path.join(directory, 'extension.json'), JSON.stringify(manifest));
   settings.extensions[id] = { enabled: true, startupDelaySeconds: 0, settings: values };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
@@ -353,8 +356,9 @@ async function chooseInPicker(file) {
         },
         { id, changes },
       );
-      const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[id]
-        .settings;
+      const saved = JSON.parse(
+        fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+      ).extensions[id].settings;
       for (const [key, value] of Object.entries(changes)) assert.deepEqual(saved[key], value);
       await host.evaluate((id) => window.dock.toggleExtension(id, false), id);
       await until(
@@ -475,7 +479,7 @@ async function chooseInPicker(file) {
     let picker = host.getByRole('dialog', { name: '画像を選択', exact: true });
     await card(picker, 'sample.png').locator('.ad-gallery-image').waitFor();
     assert(await picker.getByRole('button', { name: '画像を使う', exact: true }).isDisabled());
-    const settingsBeforeSize = hash(path.join(profile, 'settings.json'));
+    const settingsBeforeSize = hash(require('./test-settings.cjs').file(profile, 'settings.json'));
     const originalBeforeSize = hash(sample);
     await card(picker, 'sample.png').locator('.ad-gallery-image').click();
     await card(picker, 'sample.png').evaluate((node) => {
@@ -494,11 +498,20 @@ async function chooseInPicker(file) {
       await card(picker, 'sample.png').locator('.ad-gallery-image').getAttribute('aria-pressed'),
       'true',
     );
-    assert.equal(hash(path.join(profile, 'settings.json')), settingsBeforeSize);
+    assert.equal(
+      hash(require('./test-settings.cjs').file(profile, 'settings.json')),
+      settingsBeforeSize,
+    );
     assert.equal(hash(sample), originalBeforeSize);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'data/image-gallery-state.json'))).library
-        ?.cardWidth ?? 260,
+      JSON.parse(
+        fs.readFileSync(
+          require('./test-settings.cjs').file(
+            profile,
+            `settings-${require('node:os').hostname()}.json`,
+          ),
+        ),
+      ).uiState?.gallery?.library?.cardWidth ?? 260,
       260,
       'library size stays independent',
     );
@@ -697,7 +710,9 @@ async function chooseInPicker(file) {
         .setSize(820, 760),
     );
     await libraryPage.screenshot({ path: path.join(profile, 'narrow-library.png') });
-    const before = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const before = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+    );
     await app.close();
     app = null;
     await launch();

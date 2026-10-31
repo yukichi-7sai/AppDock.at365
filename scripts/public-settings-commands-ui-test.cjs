@@ -79,7 +79,7 @@ settings.notificationPreferences.overrides.push({
   typeId: 'available',
   targets: ['banner'],
 });
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const checks = [],
   failures = [];
 let host,

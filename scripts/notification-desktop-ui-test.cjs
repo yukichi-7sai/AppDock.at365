@@ -86,7 +86,7 @@ if (!process.argv[2]) {
   initial.host.shellProviders = { 'notification.desktop': customId };
   initial.extensions[customId] = { enabled: true, settings: {} };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const executable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
 if (executable) {

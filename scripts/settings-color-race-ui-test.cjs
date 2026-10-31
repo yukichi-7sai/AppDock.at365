@@ -29,7 +29,7 @@ initial.globalShortcutCommands = [];
 initial.gestures.enabled = false;
 initial.touchpadGestures.enabled = false;
 initial.updates.checkHostOnAboutOpen = false;
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const checks = [];
 let child,
   browser,
@@ -139,7 +139,7 @@ async function stop() {
     assert.equal(state.settings.value.host.accentColor, last);
     assert.equal(state.settings.syncError, undefined);
     const saved = JSON.parse(
-      fs.readFileSync(path.join(profile, `settings-${require('node:os').hostname()}.json`), 'utf8'),
+      fs.readFileSync(require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`), 'utf8'),
     );
     assert.equal(saved.hostPages.appearance.useLocalSettings, true);
     assert.equal(saved.hostPages.appearance.configuration.host.accentColor, last);

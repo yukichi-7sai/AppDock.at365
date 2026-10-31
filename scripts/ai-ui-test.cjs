@@ -177,7 +177,7 @@ async function errorNoticeFor(caller) {
           `exports.activate=async c=>c.commands.register('${id}.generate','AI probe',async()=>{let r;try{await c.appdock.call('ai.models.list',{connectionId:'sdk'});const j=await c.appdock.call('ai.text.generate',{connectionId:'sdk',model:'node-model',additionalPrompt:'用途の架空指示',input:'架空の入力',requestId:require('node:crypto').randomUUID()});let v;do{await new Promise(r=>setTimeout(r,50));v=await c.appdock.call('ai.jobs.get',{jobId:j.jobId});}while(['queued','running'].includes(v.state));r={ok:v.state==='completed',jobId:j.jobId};}catch(e){r={code:e.code};}await c.log.info('ai-probe:'+JSON.stringify(r));});`,
         );
     }
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
     const probe = net.createServer();
     await new Promise((r) => probe.listen(0, '127.0.0.1', r));
     const port = probe.address().port;
@@ -246,7 +246,7 @@ async function errorNoticeFor(caller) {
     assert.equal(await centerOnly.isChecked(), false);
     assert.equal(await centerOnly.isDisabled(), true);
     assert.deepEqual(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).notificationPreferences
         .overrides[0].targets,
       [],
     );
@@ -286,7 +286,7 @@ async function errorNoticeFor(caller) {
       '共通の架空指示',
     );
 
-    const settingsFile = path.join(profile, 'settings.json');
+    const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
     const before = fs.readFileSync(settingsFile, 'utf8');
     assert.equal(await page.getByLabel('このPCでAI接続を使用', { exact: true }).count(), 0);
     await page.getByRole('button', { name: 'AIサーバーを追加', exact: true }).click();

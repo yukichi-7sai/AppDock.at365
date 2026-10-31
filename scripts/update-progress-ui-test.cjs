@@ -122,7 +122,7 @@ const main = (fn) =>
   });
   fs.writeFileSync(path.join(barFolder, 'extension.json'), JSON.stringify(barManifest));
   settings.extensions[barManifest.id] = { enabled: true, settings: {} };
-  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   try {
@@ -314,7 +314,7 @@ const main = (fn) =>
       );
       await titlebar.screenshot({ path: path.join(profile, `titlebar-${theme}.png`) });
       await page.screenshot({ path: path.join(profile, `progress-${theme}.png`) });
-      await settingsPage.screenshot({ path: path.join(profile, `settings-${theme}.png`) });
+      await settingsPage.screenshot({ path: require('./test-settings.cjs').file(profile, `settings-${theme}.png`) });
       await titlebar.getByRole('button', { name: 'キャンセル', exact: true }).click();
       await page.waitForFunction(() => window.dock.snapshot().then((s) => !s.updates.busy));
       await until(

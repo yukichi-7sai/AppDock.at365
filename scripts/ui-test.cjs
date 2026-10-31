@@ -9,7 +9,7 @@ const profile = path.join(root, '.artifacts', `ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema.js').createDefaultSettings();
 require('../tests/fixtures/install.cjs')(profile, settings);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 (async () => {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -62,7 +62,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await settleSettings(page);
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.theme,
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).host.theme,
       'light',
     );
     await page.getByRole('button', { name: 'JSON', exact: true }).click();
@@ -71,7 +71,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await settleSettings(page);
     await page.getByRole('alert').filter({ hasText: 'JSONの内容' }).waitFor();
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).host.theme,
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).host.theme,
       'light',
     );
     await settleSettings(page);
@@ -90,7 +90,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     await page.getByLabel('更新間隔（秒）').fill('10');
     await settleSettings(page);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions[
         'appdock.dotnet-demo'
       ].settings.intervalSeconds,
       10,
@@ -105,7 +105,7 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
     );
     await page.getByRole('status').filter({ hasText: 'コマンドを実行' }).waitFor();
     // Manual edits are watched and reflected in the UI without restarting.
-    const settingsFile = path.join(profile, 'settings.json');
+    const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
     const config = JSON.parse(fs.readFileSync(settingsFile));
     config.host.theme = 'dark';
     fs.writeFileSync(settingsFile, JSON.stringify(config, null, 2));

@@ -48,7 +48,7 @@ for (const owner of ['a', 'b']) {
   );
   settings.extensions[owner] = { enabled: true, settings: {} };
 }
-const settingsFile = path.join(profile, 'settings.json');
+const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;

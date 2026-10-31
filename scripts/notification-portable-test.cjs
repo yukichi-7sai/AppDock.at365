@@ -81,7 +81,7 @@ const copies = ['installed', 'test'].map((name) => {
     path.join(folder, 'data/update-result.json'),
     JSON.stringify({ ok: true, message: 'Synthetic update completion' }),
   );
-  fs.writeFileSync(path.join(folder, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(require('./test-settings.cjs').file(folder, 'settings.json'), JSON.stringify(settings));
   fs.writeFileSync(
     path.join(folder, 'extensions/notification/extension.json'),
     JSON.stringify({

@@ -89,7 +89,7 @@ module.exports = async function shortcutOptionsChecks(context) {
       (await snapshot()).settings.value.gestures.executionMode,
       original.gestures.executionMode,
     );
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
     assert.equal(saved.keybindingOptions?.executionMode ?? 'all', value);
     await nativeFocus('appdock://host/index.html');
     let before = calls().length;
@@ -139,9 +139,9 @@ module.exports = async function shortcutOptionsChecks(context) {
   await dock.getByRole('button', { name: 'フォーム', exact: true }).click();
   await expand();
   assert.equal(await field().inputValue(), 'first');
-  const external = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8'));
+  const external = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
   external.keybindingOptions = { executionMode: 'all' };
-  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(external));
+  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(external));
   await until(
     async () => (await snapshot()).settings.value.keybindingOptions.executionMode === 'all',
     'external mode reload',

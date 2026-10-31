@@ -110,10 +110,28 @@ class SettingsStore<T = Settings> extends EventEmitter {
   }
   recovered = false;
   writesBlocked = false;
+  /** Shared-only stores have session state; the host overrides this per device. */
+  uiStateStorage(
+    _section: 'ribbon' | 'gallery' | 'windows',
+    _key?: string,
+  ): import('./state-storage').StateStorage {
+    let value: unknown;
+    return {
+      read: () => structuredClone(value),
+      write: (next) => {
+        value = structuredClone(next);
+      },
+    };
+  }
   constructor(
     file: string,
     private backupDirectory?: string,
-    private codec?: { defaults(): T; parse(value: unknown): T; serialize?(value: T): unknown },
+    private codec?: {
+      defaults(): T;
+      parse(value: unknown): T;
+      serialize?(value: T): unknown;
+      transientChange?(before: T, after: T): boolean;
+    },
   ) {
     super();
     this.file = file;
@@ -304,7 +322,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
     const unhealthy = this.syncError || this.recovered;
     this.recovered = false;
     this.health.clear('read');
-    this.tryBackup(next);
+    if (!this.codec?.transientChange?.(this.value, next)) this.tryBackup(next);
     if (changed) {
       this.value = next;
       this.revision++;
@@ -332,7 +350,8 @@ class SettingsStore<T = Settings> extends EventEmitter {
     const parsed = this.codec ? this.codec.parse(value) : (validate(value) as T);
     const serialized = this.serialize(parsed);
     const next = this.parse(serialized);
-    this.tryBackup(this.value);
+    const transient = this.codec?.transientChange?.(this.value, next) === true;
+    if (!transient) this.tryBackup(this.value);
     const previous = this.readBytes(this.file);
     if (JSON.stringify(this.parse(previous)) !== JSON.stringify(this.value)) {
       this.accept(this.parse(previous));
@@ -356,7 +375,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
     this.observer?.resetError();
     this.health.clear('save');
     this.health.clear('read');
-    this.tryBackup(next);
+    if (!transient) this.tryBackup(next);
     this.recovered = false;
     this.revision++;
     this.emit('changed', this.snapshot());

@@ -147,7 +147,7 @@ if (!appearanceOnly && !iconsOnly && !labelsOnly) {
     ],
   };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 let exe = require('electron');
 if (portable) {
   exe = path.join(profile, 'AppDock.at365.exe');

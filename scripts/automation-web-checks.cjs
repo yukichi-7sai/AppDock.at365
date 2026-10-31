@@ -63,7 +63,7 @@ module.exports = async function ({
     'remote page has no host API',
   );
   await page.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
-  const file = path.join(profile, 'settings.json'),
+  const file = require('./test-settings.cjs').file(profile, 'settings.json'),
     bytes = fs.readFileSync(file, 'utf8');
   const update = async (changes, extra = {}) =>
     call(client, 'appdock_execute_command', {

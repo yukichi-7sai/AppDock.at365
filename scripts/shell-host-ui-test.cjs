@@ -76,7 +76,7 @@ fs.writeFileSync(
   '<!doctype html><html><body>Not ready</body></html>',
 );
 settings.extensions['fixture.stalled'] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const checks = [];

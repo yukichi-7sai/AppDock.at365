@@ -42,7 +42,7 @@ module.exports = async function ({
   assert.equal((await denied(additions)).code, 'GESTURE_EDITING_DISABLED');
   await grant();
   await until(async () => (await read()).gestureEditingAllowed, 'gesture grant');
-  const file = path.join(profile, 'settings.json'),
+  const file = require('./test-settings.cjs').file(profile, 'settings.json'),
     bytes = fs.readFileSync(file, 'utf8');
   assert.equal((await edit(additions, { dryRun: true })).completion, 'validated');
   assert.equal(fs.readFileSync(file, 'utf8'), bytes);

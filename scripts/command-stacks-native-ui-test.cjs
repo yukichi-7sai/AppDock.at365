@@ -90,7 +90,7 @@ settings.gestures.bindings = [
 ];
 settings.gestures.inputExecutionModes = { 'move-left': { mode: 'count', count: 2 } };
 require('../out/main/shared/settings-schema').parseSettings(settings);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const executable = path.join(profile, 'AppDock.at365.exe');
 require('./copy-host.cjs').copyHost(source, executable);

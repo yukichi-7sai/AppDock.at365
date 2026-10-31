@@ -77,7 +77,7 @@ settings.gestures.bindings = [
   row('app', 'b', 'app'),
   row('duplicate', 'a', 'app'),
 ];
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const calls = () => {
   const dir = path.join(profile, 'data/storage/test.gestures');
   try {
@@ -130,7 +130,7 @@ const uiOnly = process.env.APPDOCK_GESTURE_UI_ONLY === '1' || indicatorOnly;
       accounts: [{ id: accountId, name: 'Test' }],
     }),
   );
-  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+  fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   let portableChild, portableBrowser, portableHash;

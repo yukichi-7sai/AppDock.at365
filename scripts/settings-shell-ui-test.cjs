@@ -18,7 +18,7 @@ settings.host.closeToTray = false;
 require('./profile-settings-fixture.cjs').installProfileSettings(profile, settings);
 for (const id of ['fixture.settings-shell', 'fixture.stalled-settings', 'fixture.old-settings'])
   settings.extensions[id] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const fixture = path.join(profile, 'extensions', 'fixture.settings');
 fs.mkdirSync(fixture, { recursive: true });
 fs.writeFileSync(
@@ -216,7 +216,7 @@ async function until(fn, label) {
     await shell.getByLabel('ユーザー名', { exact: true }).press('Enter');
     await settleSettings(shell);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['fixture.profile']
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions['fixture.profile']
         .settings.name,
       'Immediate profile',
     );
@@ -500,7 +500,7 @@ async function until(fn, label) {
     shell = await providerPage('appdock.default-shell');
     assert.equal((await modelOf(shell)).content.context, 'full');
     assert.equal(await host.getByText(/設定を読み込んでいます…Error:/).count(), 0);
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     assert.equal(saved.extensions['fixture.settings'].settings.amount, 12);
     assert.equal(
       saved.extensions['fixture.profile'].settings.name,
@@ -531,7 +531,7 @@ async function until(fn, label) {
     await shell.getByLabel('Fixture text', { exact: true }).press('Enter');
     await settleSettings(shell);
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions[
         'fixture.settings'
       ].settings['text.value'],
       'Restored detail',

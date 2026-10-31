@@ -130,7 +130,7 @@ settings.extensions['fixture.install'] = {
   enabled: false,
   settings: { text: 'retained after reinstall' },
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 fs.mkdirSync(path.join(profile, 'data'));
 fs.writeFileSync(path.join(profile, 'data/keep.txt'), 'retained');
 const packageFolder = path.join(output, 'package');

@@ -76,7 +76,7 @@ settings.imageLibrary = {
     { id: 'missing', name: '読取待ち', images: [{ file: 'missing.png' }] },
   ],
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
@@ -271,7 +271,7 @@ async function selectedBorder(label) {
     assert.equal(await page.locator('.library-sidebar').isVisible(), true);
     checks.push('ribbon and command entry, left groups, lazy decoded images and 64-item page');
     const originalHash = hash(path.join(images, 'image-000.png'));
-    const settingsHash = hash(path.join(profile, 'settings.json'));
+    const settingsHash = hash(require('./test-settings.cjs').file(profile, 'settings.json'));
     await card('image-000.png').getByRole('checkbox').check();
     await page.evaluate(() => {
       window.__firstCard = document.querySelector('.ad-gallery-card');
@@ -288,7 +288,7 @@ async function selectedBorder(label) {
     assert.equal(await slider.evaluate((e) => document.activeElement === e), true);
     await slider.press('Home');
     await until(async () => (await model()).content.cardWidth === 120, 'min saved');
-    assert.equal(hash(path.join(profile, 'settings.json')), settingsHash);
+    assert.equal(hash(require('./test-settings.cjs').file(profile, 'settings.json')), settingsHash);
     assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
     await page.getByRole('button', { name: /すべて選択/ }).click();
     await until(async () => (await model()).content.selected === 77, 'all including unloaded');

@@ -123,7 +123,7 @@ module.exports = async ({ host, open, saved, save, checks, profile, row, until }
   await until(localPrevented, 'restored local input handler');
   assert.deepEqual((await saved()).keybindings, baseline.keybindings);
   assert.equal(
-    JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).keybindingOptions
+    JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8')).keybindingOptions
       ?.enabled,
     undefined,
   );

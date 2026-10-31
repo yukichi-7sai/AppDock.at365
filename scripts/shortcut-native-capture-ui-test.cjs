@@ -22,7 +22,7 @@ settings.gestures.bindings = [];
 settings.touchpadGestures.enabled = false;
 settings.touchpadGestures.bindings = [];
 settings.extensions['fixture.capture'] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 fs.writeFileSync(
   path.join(fixture, 'extension.json'),
   JSON.stringify({

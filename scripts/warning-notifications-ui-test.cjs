@@ -41,9 +41,9 @@ settings.notificationPreferences = {
     },
   ],
 };
-const settingsFile = path.join(profile, 'settings.json');
+const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
-const targets = ['data/storage', '.appdock/secrets', 'data/chromium'].map((p) =>
+const targets = ['.appdock/storage', '.appdock/secrets', 'data/chromium'].map((p) =>
   path.join(profile, p),
 );
 for (const target of targets) fs.mkdirSync(target, { recursive: true });

@@ -56,7 +56,7 @@ initial.keybindingDefaultsInitialized = bundle.applets
     );
   })
   .map((applet) => applet.id);
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 assert.equal(
   createHash('sha256')
     .update(fs.readFileSync(path.join(profile, 'AppDock.at365.exe')))
@@ -158,7 +158,7 @@ async function about(page) {
     }
     await about(page);
     await page.screenshot({ path: path.join(profile, 'starter-applets.png') });
-    const saved = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     const defaults = require('../out/main/shared/settings-schema.js').createDefaultSettings();
     assert.equal(
       saved.updates?.hostSource ?? defaults.updates.hostSource,

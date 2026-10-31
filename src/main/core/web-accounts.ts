@@ -53,6 +53,7 @@ type Saved = {
 // A persisted default also used to recognize older unnamed accounts; not display copy.
 const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
+  windowState?: import('./state-storage').StateStorage;
   sharedRoot?: string;
   soundsDirectory?: string;
   capabilities: string[];
@@ -1022,7 +1023,7 @@ export class WebAccountController {
       title: page?.title ?? this.name,
       url: this.uiURL,
       preload: path.resolve(__dirname, '../web-account-preload.js'),
-      stateFile: path.join(this.root, 'window-state.json'),
+      stateFile: this.services.windowState,
       defaultDisplay: page?.defaultDisplay,
       partition: 'web-account-ui-' + this.id,
       onLayout: () => this.layout(),

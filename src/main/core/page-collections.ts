@@ -21,6 +21,7 @@ export class PageCollectionManager {
       parents(): ExtensionSnapshot[];
       localRoot: string;
       sharedRoot: string;
+      windowState?(id: string): import('./state-storage').StateStorage;
       changed(): void;
       failed(error: Error): void;
       openLocal(
@@ -173,6 +174,7 @@ export class PageCollectionManager {
         this.options.changed,
         locations.file,
         this.options.failed,
+        this.options.windowState,
       );
       this.services.set(owner, service);
     }

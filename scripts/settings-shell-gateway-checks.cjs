@@ -13,7 +13,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   assert(target);
   const targetId = target.targetId,
     read = () => value('appdock_settings_get_values', { targetId }),
-    deviceFile = path.join(profile, `settings-${require('node:os').hostname()}.json`),
+    deviceFile = require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`),
     saved = () => JSON.parse(fs.readFileSync(deviceFile));
   const request = async (operations, dryRun = false) => {
     const state = await read();
@@ -42,12 +42,12 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   }
   const aiBytes = fs.readFileSync(path.join(local, 'ai-keys.json')),
     ttsBytes = fs.readFileSync(path.join(local, 'tts-key.json')),
-    before = fs.readFileSync(path.join(profile, 'settings.json')),
+    before = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
     changes = Object.fromEntries(shellRegions.map(({ id }) => [id, active]));
   const preview = await apply([{ kind: 'set', changes }], true);
   assert.equal(preview.completion, 'validated');
   assert.equal(preview.effectVerified, false);
-  assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), before);
+  assert.deepEqual(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')), before);
   const snapshot = () => page.evaluate(() => window.dock.snapshot());
   assert(
     (await snapshot()).shellRegions.regions.every(
@@ -68,7 +68,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
     );
   }, 'MCP Shell save reaches existing hosts');
   assert.deepEqual(saved().host.shellProviders, changes);
-  assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), before);
+  assert.deepEqual(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')), before);
   checks.push(
     'Shell MCP derives all regions and per-region choices from shared declarations; dryRun is inert, save/replay switches existing bars and ribbon, and dotted region IDs persist intact',
   );
@@ -122,7 +122,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   );
   assert((await read()).fields.every((field) => field.inherited && field.value === defaultShellId));
   assert.equal(saved().host?.shellProviders, undefined);
-  assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), before);
+  assert.deepEqual(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')), before);
   assert.deepEqual(fs.readFileSync(path.join(local, 'ai-keys.json')), aiBytes);
   assert.deepEqual(fs.readFileSync(path.join(local, 'tts-key.json')), ttsBytes);
   assert.equal(JSON.stringify((await client.listTools()).tools), tools);
@@ -132,7 +132,7 @@ module.exports = async ({ page, client, profile, local, checks, tool, value, unt
   );
 };
 module.exports.install = (root, profile) => {
-  const file = path.join(profile, 'settings.json'),
+  const file = require('./test-settings.cjs').file(profile, 'settings.json'),
     settings = JSON.parse(fs.readFileSync(file));
   for (const id of [active, disabled]) {
     const folder = path.join(profile, 'extensions', id);

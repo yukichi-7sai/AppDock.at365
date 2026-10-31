@@ -86,7 +86,7 @@ for (let i = 0; i < 24; i++) {
   );
   if (i === 1) settings.extensions[id] = { enabled: true, settings: {} };
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const checks = [];
 (async () => {
   const env = { ...process.env };
@@ -289,7 +289,7 @@ const checks = [];
       '詳細からの編集',
     );
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions['test.applet-1']
         .settings.value0,
       '詳細からの編集',
     );
@@ -354,7 +354,7 @@ const checks = [];
     await chooseApplet('検証Applet 01');
     assert.equal(await body.getByLabel('検証項目 0', { exact: true }).inputValue(), '編集した値');
     await save();
-    const stored = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const stored = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     assert.equal(stored.extensions['test.applet-1'].settings.value23, '末尾の値');
     assert.equal(stored.extensions['test.applet-2'].settings.value0, '別Appletの値');
     checks.push('search / immediate writes across applets / return link');
@@ -368,13 +368,13 @@ const checks = [];
     await settleSettings(page);
     await body.getByRole('alert').filter({ hasText: '検証数値' }).waitFor();
     assert.equal(
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions['test.applet-1']
         .settings.flag,
       false,
     );
     await body.getByLabel('検証数値', { exact: true }).fill('5');
     await save();
-    const typed = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions[
+    const typed = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions[
       'test.applet-1'
     ].settings;
     assert.equal(typed.flag, false);
@@ -517,9 +517,9 @@ const checks = [];
     await body.getByLabel('検証項目 0', { exact: true }).fill('競合しても残す');
     await button('Appletに戻る').click();
     await detailTab('設定').click();
-    const external = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
+    const external = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
     external.profile.name = '外部変更';
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(external));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(external));
     await page.waitForFunction(
       async () => (await window.dock.snapshot()).settings.value.profile.name === '外部変更',
     );
@@ -754,7 +754,7 @@ const checks = [];
         `${theme}: stable description/settings/shortcuts/log tabs at 1280, 900 and 700px; single-line labels`,
       );
       assert.equal(
-        JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).extensions['test.applet-1']
+        JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).extensions['test.applet-1']
           .settings.value0,
         `詳細で保存 ${theme}`,
       );

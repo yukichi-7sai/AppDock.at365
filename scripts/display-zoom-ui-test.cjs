@@ -183,7 +183,7 @@ async function settings() {
     initial.keybindings = [];
     initial.globalShortcutCommands = [];
     initial.extensions['fixture.zoom'] = { enabled: true, settings: {} };
-    fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     await start();
     await settings();
     assert.equal(await host.getByLabel('表示倍率', { exact: true }).inputValue(), '1.25');
@@ -339,7 +339,7 @@ async function settings() {
     await selectZoom(1);
     const saved = JSON.parse(
       fs.readFileSync(
-        path.join(profile, 'settings-' + require('node:os').hostname() + '.json'),
+        require('./test-settings.cjs').file(profile, 'settings-' + require('node:os').hostname() + '.json'),
         'utf8',
       ),
     );

@@ -175,7 +175,7 @@ if (filterConsistencyOnly) {
   initial.touchpadGestures.inputExecutionModes = { 'four.right': 'first' };
   require('../out/main/shared/settings-schema').parseSettings(initial);
 }
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = source ? path.join(profile, 'AppDock.at365.exe') : null;
 if (portable) {

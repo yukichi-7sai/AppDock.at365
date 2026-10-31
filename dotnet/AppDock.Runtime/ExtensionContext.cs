@@ -208,6 +208,18 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
         return result.ValueKind == JsonValueKind.Null ? default : result.Deserialize<T>(JsonRpcConnection.Json);
     }
     Task IStorageService.SetAsync<T>(string key, T value, CancellationToken cancellationToken) => CallAsync("host.storage.set", new { key, value }, cancellationToken);
+    private static string StorageScopeName(StorageScope scope) => scope switch
+    {
+        StorageScope.Device => "device",
+        StorageScope.Shared => "shared",
+        _ => throw new ArgumentOutOfRangeException(nameof(scope))
+    };
+    public async Task<T?> GetAsync<T>(string key, StorageScope scope, CancellationToken cancellationToken)
+    {
+        var result = await connection.RequestAsync("host.storage.get", new { key, scope = StorageScopeName(scope) }, cancellationToken);
+        return result.ValueKind == JsonValueKind.Null ? default : result.Deserialize<T>(JsonRpcConnection.Json);
+    }
+    Task IStorageService.SetAsync<T>(string key, T value, StorageScope scope, CancellationToken cancellationToken) => CallAsync("host.storage.set", new { key, value, scope = StorageScopeName(scope) }, cancellationToken);
     async Task<string?> ISecretService.GetAsync(string key, CancellationToken cancellationToken)
     {
         var result = await connection.RequestAsync("host.secrets.get", new { key }, cancellationToken);

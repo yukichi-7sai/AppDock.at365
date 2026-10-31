@@ -137,14 +137,14 @@ exports.check = async ({ page, profile, local, client, checks, tool, value, unti
     JSON.stringify([definition, await options(), await read(fields)]),
     /PRIVATE_IMAGE|privatePicture|thumbnail|data:image/,
   );
-  const before = fs.readFileSync(path.join(profile, 'settings.json'));
+  const before = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'));
   const draft = await request(
     fields,
     [{ kind: 'set', changes: { picture: { file: filenames[1] } } }],
     { dryRun: true },
   );
   assert.equal((await value('appdock_settings_apply', draft)).completion, 'validated');
-  assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), before);
+  assert.deepEqual(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')), before);
   const save = { ...draft, requestId: randomUUID(), dryRun: false };
   const result = await value('appdock_settings_apply', save);
   assert.equal(result.completion, 'settingsSaved');

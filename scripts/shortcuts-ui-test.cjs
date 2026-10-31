@@ -70,7 +70,7 @@ settings.gestures.bindings = [
     when: { scope: 'app', appletIds: [], processes: [] },
   },
 ];
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : null;
 if (portable) {
@@ -289,7 +289,7 @@ const checks = [];
         when: { scope: 'global', appletIds: [] },
       },
     ];
-    fs.writeFileSync(path.join(conflictProfile, 'settings.json'), JSON.stringify(conflictSettings));
+    fs.writeFileSync(require('./test-settings.cjs').file(conflictProfile, 'settings.json'), JSON.stringify(conflictSettings));
     const conflictApp = await launch(conflictProfile);
     try {
       const cp = require('./settings-aware-page.cjs').settingsAwarePage(

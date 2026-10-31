@@ -48,8 +48,8 @@ module.exports = async ({
     };
     const apply = async (id, operations, dryRun = false) =>
       value('appdock_settings_apply', await request(id, operations, dryRun));
-    const saved = () => JSON.parse(fs.readFileSync(path.join(profile, 'settings.json')));
-    const sharedBefore = fs.readFileSync(path.join(profile, 'settings.json')),
+    const saved = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
+    const sharedBefore = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
       aiBytes = fs.readFileSync(path.join(local, 'ai-keys.json')),
       ttsBytes = fs.readFileSync(path.join(local, 'tts-key.json'));
     const changes = {
@@ -64,7 +64,7 @@ module.exports = async ({
     const preview = await apply(targetId, [{ kind: 'set', changes }], true);
     assert.equal(preview.completion, 'validated');
     assert.equal(preview.applies.startupDelaySeconds, 'nextStart');
-    assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), sharedBefore);
+    assert.deepEqual(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')), sharedBefore);
     await apply(targetId, [{ kind: 'set', changes }]);
     await page.evaluate(() => window.dock.navigate('settings'));
     await page.getByTestId('settings-nav:about').click();
@@ -142,7 +142,7 @@ module.exports = async ({
       },
     ]);
     assert.equal((await read()).fields.find((field) => field.key === 'hostSource').inherited, true);
-    const beforeBad = fs.readFileSync(path.join(profile, 'settings.json'));
+    const beforeBad = fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'));
     assert.equal(
       (
         await tool(
@@ -154,7 +154,7 @@ module.exports = async ({
       ).structuredContent.code,
       'INVALID_ARGUMENT',
     );
-    assert.deepEqual(fs.readFileSync(path.join(profile, 'settings.json')), beforeBad);
+    assert.deepEqual(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')), beforeBad);
     assert.deepEqual(requests, ['/host.json']);
     checks.push(
       'About auto-check runs only on the next page entry; later source edits/reset do not fetch or install, and malformed sources are rejected before save',

@@ -140,7 +140,10 @@ settings.ribbon = {
     'page:missing:child': { lastKnownTitle: 'Missing child' },
   },
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
@@ -173,19 +176,41 @@ async function resetCacheProbe() {
         return get.apply(this, args);
       };
       const inputs = RibbonCatalogCache.prototype.get;
+      const invalidate = RibbonCatalogCache.prototype.invalidate;
+      RibbonCatalogCache.prototype.invalidate = function (...args) {
+        globalThis.ribbonCacheProbeTraces.push(new Error('catalog invalidated').stack);
+        return invalidate.apply(this, args);
+      };
       RibbonCatalogCache.prototype.get = function (...args) {
         const before = this.cached;
         const value = inputs.apply(this, args);
-        if (this.cached !== before) globalThis.ribbonCacheProbe.catalogBuilds++;
+        if (this.cached !== before) {
+          globalThis.ribbonCacheProbe.catalogBuilds++;
+          if (before)
+            globalThis.ribbonCacheProbeTraces.push({
+              settingsChanged: before.settings !== args[0],
+              changedKeys: Object.keys(args[0]).filter(
+                (key) => JSON.stringify(before.settings[key]) !== JSON.stringify(args[0][key]),
+              ),
+              shellChanged: before.shell !== args[1],
+            });
+        }
         return value;
       };
     }
     globalThis.ribbonCacheProbe = { projections: 0, catalogBuilds: 0 };
+    globalThis.ribbonCacheProbeTraces = [];
   });
 }
-async function checkCacheProbe(operation) {
+async function checkCacheProbe(operation, catalogBuilds = 0) {
   const counts = await app.evaluate(() => globalThis.ribbonCacheProbe);
-  assert.deepEqual(counts, { projections: 1, catalogBuilds: 0 }, operation);
+  assert.deepEqual(counts, { projections: 1, catalogBuilds }, operation);
+  if (catalogBuilds)
+    assert.deepEqual(
+      await app.evaluate(() => globalThis.ribbonCacheProbeTraces),
+      [{ settingsChanged: false, changedKeys: [], shellChanged: true }],
+      'flyout visibility changes the Shell requirement key without changing settings',
+    );
   cacheChecks.push({ operation, ...counts });
 }
 const until = async (fn, label) => {
@@ -315,7 +340,13 @@ async function launch() {
   host.setDefaultTimeout(15000);
   app.context().on('page', (p) => p.on('pageerror', (e) => errors.push(String(e))));
   rail = await ribbonPage(host);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(760, 820));
+  await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().startsWith('appdock://host/index.html'),
+    );
+    window.setSize(760, 820);
+    window.show();
+  });
   await until(
     async () =>
       (await snapshot()).extensions?.find((e) => e.id === 'fixture.ribbon')?.state === 'running',
@@ -334,7 +365,7 @@ async function launch() {
     );
     assert.equal(await button('group:persistent').getAttribute('aria-expanded'), 'false');
     assert.equal(await button('page:fixture.ribbon:main').count(), 0);
-    assert.equal(await button('group:persistent').locator('.ribbon-badge.dot').count(), 1);
+    await button('group:persistent').locator('.ribbon-badge.dot').waitFor({ state: 'visible' });
     await resetCacheProbe();
     await button('group:persistent').click();
     await button('page:fixture.ribbon:main').waitFor();
@@ -350,9 +381,19 @@ async function launch() {
       '99+',
     );
     assert.match(await button('page:fixture.ribbon:main').getAttribute('aria-label'), /123/);
-    const stateFile = path.join(profile, 'data', 'ribbon-state.json');
-    await until(() => fs.existsSync(stateFile), 'local expansion file');
-    const beforeSettings = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).ribbon;
+    const stateFile = require('./test-settings.cjs').file(
+      profile,
+      `settings-${require('node:os').hostname()}.json`,
+    );
+    await until(
+      () =>
+        JSON.parse(fs.readFileSync(stateFile)).uiState?.ribbon?.expanded['group:persistent'] ===
+        true,
+      'device expansion state',
+    );
+    const beforeSettings = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')),
+    ).ribbon;
     assert(!JSON.stringify(beforeSettings).includes('expanded'));
     await rail.screenshot({ path: path.join(profile, 'persistent.png') });
     await checkScrollbars(rail, '.ribbon-buttons', false);
@@ -371,7 +412,7 @@ async function launch() {
     const closedPositions = await positions();
     await resetCacheProbe();
     let flyout = await openTemporary();
-    await checkCacheProbe('temporary expand');
+    await checkCacheProbe('temporary expand', 1);
     await flyout.locator('.ribbon-flyout-list button').first().waitFor();
     await until(
       async () => (await button('group:temporary').getAttribute('aria-expanded')) === 'true',

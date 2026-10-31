@@ -61,7 +61,7 @@ fs.writeFileSync(
 };`,
 );
 initial.extensions[fixtureId] = { enabled: true, settings: {} };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 
 const source = process.argv[2] && path.resolve(process.argv[2]);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -233,7 +233,7 @@ let app,
     await host.screenshot({ path: path.join(profile, 'banner-bottom-left.png') });
     await host.evaluate(() => window.dock.executeCommand('fixture.banner-position.end'));
     const raw = JSON.parse(
-      fs.readFileSync(path.join(profile, `settings-${require('node:os').hostname()}.json`)),
+      fs.readFileSync(require('./test-settings.cjs').file(profile, `settings-${require('node:os').hostname()}.json`)),
     );
     assert.equal(raw.host.notificationBannerPosition, 'bottom-left');
     await host.reload();
@@ -571,7 +571,7 @@ let app,
     );
     assert.deepEqual(
       (await saved()).notificationPreferences.overrides,
-      JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'))).notificationPreferences
+      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).notificationPreferences
         .overrides,
     );
     assert(

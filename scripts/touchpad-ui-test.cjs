@@ -39,7 +39,7 @@ settings.notificationPreferences = {
     },
   ],
 };
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const portable = !!process.argv[2],
   executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron'),
   hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');

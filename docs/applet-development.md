@@ -6,7 +6,7 @@
 
 AppDock本体の公開機能をAppletから操作する場合は[AppDock共通操作API](appdock-api.md)を使用します。minimumHostVersion 0.26.36、appdock-api capability、PC専用の利用許可が必要です。
 
-新しいAppletにも、同期するデータはAppDock.at365.exeの配置フォルダー、認証・Storage・Secrets・生成キャッシュは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。設定APIは共有／端末専用の選択に対応し、有効状態は常に端末別です。Appletが直接JSONを読み分けず、既存のSettings APIを使ってください。登録原素材と共有枠はEXE隣です。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
+新しいAppletにも、設定・Storage・登録原素材と共有枠はAppDock.at365.exe隣のdata、認証・Secrets・生成キャッシュは`%LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/`という保存境界を適用します。設定APIは共有／端末専用の選択に対応し、有効状態は常に端末別です。Appletが直接JSONを読み分けず、既存のSettings APIを使ってください。Storageは端末別を既定とし、共有は明示的なscopeで指定します。保存領域と設定受信の正本は[設定同期](settings-sync.md)です。
 
 現在のAppDock / API v1を対象とする実装手順です。まずこのガイドで構成を決め、個々のAPIは[Applet API](extensions.md)、ホストへの機能追加は[AppDockの実装ガイド](host-development.md)を参照してください。
 
@@ -117,12 +117,12 @@ AppDockを起動し直し、「Applet」でSampleを有効にします。「設�
 - `id`は小文字英数字・`.`・`-`による安定した識別子です。コマンドIDは必ず `<id>.` で始め、機能名や表示名を変えても既存IDを維持します。ショートカットとピンはIDで保存されます。
 - 新しく導入したAppletのショートカット初期値は、`extension.json`の`commands`と`defaultKeybindings`で宣言します。例: `"defaultKeybindings": [{"command":"at365.sample.refresh","key":"Ctrl+R","enabled":true,"when":{"scope":"owner","appletIds":[]}}]`。コマンドは同じmanifestの`commands`内に必須です。初回導入時だけ保存設定へコピーし、あとからユーザーが変更・解除した内容を更新で上書きしません。実行時にも同じコマンドIDを登録します。
 - コマンドはActivate時に登録します。有効なAppletが登録したコマンドは、パレットとショートカット設定に自動表示されます。通常のショートカットはAppDockの画面操作中に有効です。ユーザーが「グローバル」を有効にするとWindowsのホットキーとして登録します。登録・解除はホストが担当し、Appletの停止時に解除します。`at365.watch.toggle` は既定でグローバルPauseです。
-- 設定値は `context.Settings` 経由で扱います。保存先はAppDockの `settings.json` の `extensions.<id>.settings` です。Appletから設定ファイル全体を直接書き換えません。
+- 設定値は `context.Settings` 経由で扱います。共有時はAppDockの `data/settings.json` の `extensions.<id>.settings`、端末別を選んだ場合は `data/settings-<端末名>.json` の該当設定へ保存します。Appletから設定ファイル全体を直接書き換えません。
 - manifestの既定値はフォーム表示用です。SDKの読み取りにも同じfallbackを指定します。空の設定で起動できるようにしてください。manifestの既定値が自動的に全項目保存されるわけではありません。
 - boolean / number / string / selectを宣言し、説明・数値の上下限・刻み幅を付けます。フォームとHost API保存時は検証されますが、手動JSON編集の値をApplet側でも検証・補正します。
 - 設定変更は `Settings.OnChanged` / `settings.onChanged` で購読し、タイマー間隔や表示へ反映します。`SetAsync`は保存成功後に自分のキャッシュも更新しますが、自分の購読処理が必ず呼ばれることには依存せず、操作後に必要な表示更新を明示的に行います。
 - モニター等の動的なselectは、manifestに `dynamic: true` と初期optionsを宣言し、Activate時と構成変更時に `SetOptionsAsync` / `setOptions` を呼びます。選択肢は保存値を上書きしません。未接続時の代替先はApplet側で決めます。
-- 同期する設定はSettingsへ保存し、端末固有の処理状態はStorage、認証トークンはSecretsへ分けます。Storage/SecretsはホストがPC専用root内でApplet IDごとに保存します。登録原素材はEXE隣の`data/assets/applets/<Applet ID>/`に置き、生成キャッシュと分けます。追加の共有ファイル保存が必要ならホストの専用領域/契約を整備します。ログへ秘密情報を出さず、必要なcapabilitiesだけを宣言します。
+- 設定はSettings、JSONの永続データはStorage、認証トークンはSecretsへ分けます。Storageはホストが`data/storage/<Applet ID>/`内で端末別と共有を分離します。APIのscopeと対応版は[Storage](extensions.md#storageの保存範囲)を参照してください。SecretsはPC専用rootのままです。登録原素材はEXE隣の`data/assets/applets/<Applet ID>/`に置き、生成キャッシュと分けます。ログへ秘密情報を出さず、必要なcapabilitiesだけを宣言します。
 - トレイ操作が不要なら `Tray.Add` を呼びません。時計Appletは3コマンドを登録し、トレイ項目は0件です。
 
 ## 4. native / WPF Appletを作る場合

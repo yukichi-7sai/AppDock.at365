@@ -86,10 +86,15 @@ public interface ILogService
     Task InfoAsync(string message, CancellationToken cancellationToken = default);
     Task ErrorAsync(string message, CancellationToken cancellationToken = default);
 }
+public enum StorageScope { Device, Shared }
 public interface IStorageService
 {
     Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);
     Task SetAsync<T>(string key, T value, CancellationToken cancellationToken = default);
+    Task<T?> GetAsync<T>(string key, StorageScope scope, CancellationToken cancellationToken)
+        => scope == StorageScope.Device ? GetAsync<T>(key, cancellationToken) : throw new NotSupportedException("Shared Storage is not supported.");
+    Task SetAsync<T>(string key, T value, StorageScope scope, CancellationToken cancellationToken)
+        => scope == StorageScope.Device ? SetAsync(key, value, cancellationToken) : throw new NotSupportedException("Shared Storage is not supported.");
 }
 public interface ISecretService
 {
