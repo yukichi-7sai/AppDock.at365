@@ -20,6 +20,7 @@
 | テストの作成・整理 | [検査の価値、層の選択、共通化と削除の判断](docs/testing.md) |
 | Appletの開発とAPI | [実装ガイド](docs/applet-development.md)、[Applet API](docs/extensions.md)、[ホスト拡張](docs/host-development.md)、[ページ](docs/applet-pages.md) |
 | 設定・入力・保存 | [共通レイアウト指針](docs/settings-ui-guidelines.md)、[設定UIと既定値・リセット](docs/settings-foundation.md)、[一覧とダイアログ](docs/settings-list-editing.md)、[端末別保存・同期・復旧](docs/settings-sync.md) |
+| ファイル監視の補助確認（基盤単体実装済み・未組み込み） | [共通基盤の設計](docs/file-watch-assistance-design.md)、[既存監視への組み込み計画](docs/file-watch-assistance-integration-plan.md) |
 | 表示言語・翻訳 | [本体の翻訳基盤・文言変更・段階移行](docs/localization.md) |
 | 表示倍率 | [Electron画面の共通倍率・対象・画面追加規則](docs/display-zoom.md) |
 | Appletの導入と管理 | [管理一覧・導入・更新・削除](docs/applet-management-settings-design.md) |
