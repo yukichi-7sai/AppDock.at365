@@ -1,5 +1,30 @@
 # 検証記録
 
+## 2026-11-01: native入力監視のレビュー・main統合 0.112.10
+
+- cleanなmain `4448298`でpull --ff-onlyして最新を確認。worktreeの実装と成功ログ・入力・配布物を照合し、レビュー後の16ファイルをmainへ取り込んだ。Windows通知中心の監視と必要時のみの1秒補助確認、押下時の条件、保存順／first/all、元入力のブロックと解放、記録・モーダルの保護を維持する。
+- レビューで3点を修正した。①押下時に配列変更を検出したあと、次の更新までに元の配列へ戻ると受付停止だけが残るため、未反映の変更を保持して所有情報の同期を完了する。②デスクトップ切替で元のWindowへ戻ると記録終了が抜けるため、切替自体を記録のフォーカス喪失として保持する。双方とも修正前の失敗を模擬イベントで再現し、修正後30項目に成功した。OSへのキー送信やキーボード／マウスフックの登録を行わない試験で、WinEventの登録・終了も確認している。
+- ③前回未解決だった初回ジェスチャーを、未変更main 0.112.7の隔離コピーで診断した。通常Appletの登録後、起動準備完了から入力フックの適用までに隙間があり、最初の押下が元Windowへ届き、登録後の解放だけをInputHostが受けていた。通常Applet起動後のキー／ジェスチャー設定の適用完了を待ってから`startupReady`にする形へ修正した。診断用コードは`.artifacts`内の複製だけに加え、製品へ含めていない。修正後はソース・最終固定EXEとも、トレイ起動とrestore-view起動の最初の外部ジェスチャーが手動の本体前面化なしで成功した。
+- 起動待ちの追加が入力ヘルパーのエラーで本体全体を止めないことも検証。専用コピーのInputHost EXEだけを無効化し、既存エラーログ、起動準備完了、通常の明示コマンド成功を確認した。実入力は送信していない。正常な配布物の確認とは区別して記録している。
+- 標準回帰は**164ファイル1,472件、失敗・skip 0**。直前mainのcommit/tree、941入力、成功ログを含む67記録のhash、全標準試験の本文を照合し、161ファイル1,457件を再利用。今回の入口変更を走査するローカライズと、起動計測・入力同期の3ファイル15件だけを新たに実行して成功した。生成モジュール255件のうち変更は`main/index.js`だけで、残る254件はbyte一致。型検査、frozen install、ビルド、書式確認も成功。SDK/Runtime・公開API・設定・保存ファイルの契約は変更しない。
+- 最終配布物のnative DLLで環境／配列／記録30、ブロック273、特殊キー255、ジェスチャーキー58、ポップアップ30、入力キュー4、表示通知13の**7モード663項目が成功**。Pause/F13〜F24の確認はメモリー上だけで、OSへ送信・登録していない。固定EXEはキー入力7・ページ条件9・モーダル／記録7・初回起動2・前面化13の**38グループとsmokeが成功**。これに入力ヘルパー利用不可の1グループを追加して成功した。キーGUIは`--input-only`の範囲で、旧設定編集UI全体の成功には読み替えない。
+- 発行済み0.112.9への修正を含むため**0.112.10**へパッチ更新し、`publish.bat`でmainの`A:\40.ARTIFACT\AppDock.at365`へ発行、終了0。ステージ／発行先／更新ZIPの全693ファイル、ASAR内の288資産、現在のnative／Updaterビルド、package/feed/manifestの版を照合した。EXE SHA256 `fc19cece98c8757a422e201a30929229b66910a2a0ba39f6db8cda3db268a84f`。更新ZIPは270,840,599 bytes / SHA256 `2f39b1b7384a8241a7bf56676f9f8e4f583fcfcf8262076229ff33b0be767b94`。正常GUIコピー6件と意図的なヘルパー無効化コピー1件も配布物の全ファイルへ照合した。
+- 終了・成功と対象パス、プロセス参照なし、再解析ポイントなし、最新コピーの保持を確認し、古いページ条件／モーダルのコピー2件から本体・同梱ランタイムの36項目だけを整理した。結果・ログ・画像・設定・manifest等はhashを照合して保持。失敗・状態不明のフォルダー、作業worktreeとbranch、固定ビルド出力は保持している。
+- 正本の証跡は`.artifacts/commit-native-input-events-20261101/`。`review.json`に指摘と修正、`test-plan.json`に再利用判定、`*-inputs.json`／`*-runs.json`に実行条件と完全ログのhash、`payload-audit.json`／`zip-audit.json`／`fixed-copies-audit.json`に配布物の照合、`cleanup-result.json`に整理結果、`stage.json`／`commit.json`に最終treeとコミットを記録する。初期worktreeと今回の修正前後のログは`source-evidence/`へ複写した。実物のIME／複数配列切替、ロック／UAC／スリープ復帰、OSによる黙示的フック解除、全体CPU／I/O削減率は未測定。push・GitHub公開・実利用先deployは行わない。
+
+## 2026-11-01: native入力監視の通知化 0.112.9（worktree）
+
+- cleanなmain `4448298`でpull --ff-onlyして最新との一致を確認し、`codex/native-input-events` / `A:\30.PROJECT\AppDock.at365-native-input-events`で実装。本体の常時40msの環境確認を廃止した。初期確認は1回、前面WindowとデスクトップはWinEvent通知、フックの要否は設定適用・記録終了・捕捉キー解放・ジェスチャーの状態変化で更新する。記号のキー割り当てがある間と、WinEvent登録失敗中に入力機能が必要な間だけ1秒の補助確認を使う。ジェスチャー操作中の10ms認識は維持した。
+- 配列切替直後は押下時のHKLで記号を照合する。読み込み済み配列の対応を準備し、初めての配列も異なる記号の対応だけを解決する。低レベルフックで全設定・全条件を再構築せず、同じ物理キーの行順、押下時の条件、ブロックON/OFF、押下と解放の対、所有権の受付確認とFIFO通知を維持する。停止済み入力から古い配列表を復活させない。記録前の遅延通知を無視し、記録開始後の短いフォーカス喪失は通知をまとめた場合も検出する。
+- 発行前レビュー1回と修正差分の再確認を実施。古い記録への通知、HKL一覧が空／途中で増減する場合、未割り当てキーの早期通過、停止後の古い配列表を指摘・修正し、関連回帰に成功した。内部変更で公開API・SDK/Runtime・設定・保存ファイルの契約は変更しない。0.112.8のローカル発行後に停止時の保護を追加したため、最終版を**0.112.9**に進めた。SDK/Runtimeは0.27.3を維持。レビューと旧版の証跡は`.artifacts/native-input-events-20261101/review.json`と`v01128/`。
+- 関連Nodeは11ファイル**131件**、型検査・ビルドに成功。source段階からの差はnativeエンジンの停止時ガードと検証用スクリプト・文書・版情報で、Node試験が読む製品TSと条件／実行計画は変更していない。成功結果を再利用し、全標準回帰は一律実行していない。固定配布物のnative DLLでは、環境・配列・記録26、ブロック273、特殊キー255、ジェスチャーキー58、ポップアップ30、入力キュー4、表示通知13の**7モード659項目が成功**。Pause/F13〜F24はメモリー上の模擬イベントだけで検証し、OSへ送信・登録していない。
+- 固定EXEの隔離GUIでは、キー入力経路7、ページ条件9、モーダル／記録7、ジェスチャー前面化13の**36グループとsmokeに成功**。実キー・埋め込み・別Window・非表示・オフラインGmail・保存順の繰り返し実行、元入力のブロック、ナビゲーション保護、記録の開始／終了、マウス・キー・ホイールからの前面化を確認した。キーGUIは`--input-only`の結果で、全設定編集UIの成功には読み替えない。
+- 検証コードの旧Storage参照先を現行の端末別保存先に合わせ、古い重複除去の期待値を現行の各行保存順へ更新した。前面化GUIの実F16はCtrl+Alt+F11へ置き換え、物理修飾キーの解放待ちとfinallyでの試験キー解放を追加した。ポップアップの初回失敗は別のWindows画面が試験メニューを覆っていたためで、未変更mainでも再現。利用者によるファイアウォール確認画面の終了後、元の試験位置で全30項目に成功した。失敗ログ・比較ログは保持した。
+- **未解決の比較結果**: `gesture-startup-ui-test.cjs --portable`は最初の外部ジェスチャーによるStorage更新を確認できなかった。未変更mainの0.112.7を`--executable=...`で指定した比較でも同じ失敗となった。前面とポインター先が実際の試験Windowであること、設定がenabled/global/activateOnStartであること、コマンドがrunning/availableであることを確認したが、原因は未特定。成功扱いにせず、最初のケースで止まったrestore-viewのケースも未確認として残す。現行版の成功した前面化13グループとは分けて扱う。旧キーGUIの設定画面セレクターにも不一致があり、今回対象の入力経路までに試験範囲を限定している。比較の完全ログ・起動直後snapshotは証跡内に保存した。
+- `publish.bat`で**0.112.9**を`A:\40.ARTIFACT\AppDock.at365-native-input-events`へ発行し終了0。ステージ／発行先／更新ZIPの全**693ファイル**、ASAR内の**288資産**、ネイティブホスト／Updaterの現在のビルド、package/feed/manifestの版を照合した。EXE SHA256は`193835738d7c171ab359c85ff403ca56ef610243894b5f3d6148d414e97af646`。更新ZIPは270,840,991 bytes / SHA256 `3ab49ec23c8d4f12f2f1a358ec065e065fe386df58dd86142f62dcd72c80c0d5`。
+- 入力・実行コマンド・環境・完全ログとhashは`.artifacts/native-input-events-20261101/`の`*-inputs.json`、`*-runs.json`、`payload-audit.json`、`zip-audit.json`、`validation.json`を正本とする。Node 26.13.0/pnpm 12.15.0/.NET SDK 10.0.403、lockfile／供給網検査を維持したfrozen installを使用。コミット・main統合・push・GitHub公開・実利用先deployは未実施。
+- Windows APIの前提は[SetWinEventHook](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwineventhook)、[WinEventProc](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nc-winuser-wineventproc)、[WM_INPUTLANGCHANGE](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-inputlangchange)、[LowLevelKeyboardProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelkeyboardproc)で確認。実物のIME／複数配列を切り替える操作、ロック／UAC／スリープ復帰、フックのOS側による黙示解除、全体CPU／I/Oの削減率は今回測定していない。
+
 ## 2026-11-01: MCP結果整理・通知音改善のmain統合とコミット検証 0.112.7
 
 - cleanなmain `80dfb72`でpull --ff-onlyし、最新との一致を確認。worktreeの0.112.6について941入力、完全ログ26件、発行済み全693ファイルのSHA256を照合してから、今回の14ファイルをmainへ取り込んだ。公開API/SDK・設定・保存形式、既存のMCP権限/結果保持/取消と音声FIFO/ロック保留/OFF-ON/世代取消を維持する。

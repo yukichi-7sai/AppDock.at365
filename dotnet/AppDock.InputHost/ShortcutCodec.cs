@@ -10,6 +10,7 @@ internal sealed record ShortcutInput(string Shortcut, bool BlockOriginalInput = 
 internal sealed record ShortcutStatus(string Shortcut, bool Registered, string[] InputKeys,
     string Backend = "hook", bool EffectiveBlockOriginalInput = true, string? Error = null);
 internal readonly record struct ShortcutChord(uint Key, int Modifiers);
+internal readonly record struct ShortcutPattern(uint Key, int Modifiers, char Character = '\0');
 internal static class ShortcutCodec
 {
     // Japanese IME mode keys may arrive without a matching key-up, like Pause.
@@ -30,7 +31,8 @@ internal static class ShortcutCodec
     internal static bool Protected(ShortcutChord chord) =>
         ((chord.Modifiers & 8) != 0 && chord.Key == 0x4C) ||
         ((chord.Modifiers & 3) == 3 && chord.Key == 0x2E);
-    internal static ShortcutChord Parse(string shortcut, nint layout)
+    internal static ShortcutChord Parse(string shortcut, nint layout) => Resolve(Pattern(shortcut), layout);
+    internal static ShortcutPattern Pattern(string shortcut)
     {
         var parts = shortcut.Split('+');
         var modifiers = 0;
@@ -51,9 +53,20 @@ internal static class ShortcutCodec
         if (key == 0 && name.StartsWith('F') && int.TryParse(name.AsSpan(1), out var function) && function is >= 1 and <= 24)
             key = (uint)(0x70 + function - 1);
         if (key == 0 && name.Length == 1 && char.IsAsciiLetterOrDigit(name[0])) key = char.ToUpperInvariant(name[0]);
+        var character = key == 0 ? name == "Plus" ? '+' : name.Length == 1 ? name[0] : '\0' : '\0';
+        if (key == 0 && character == '\0') throw new ArgumentException("このキーボード配列ではキーを検出できません。");
+        return new ShortcutPattern(key, modifiers, character);
+    }
+    internal static ShortcutChord Resolve(ShortcutPattern pattern, nint layout, Dictionary<char, short>? symbols = null)
+    {
+        var key = pattern.Key;
+        var modifiers = pattern.Modifiers;
         if (key == 0) {
-            var character = name == "Plus" ? '+' : name.Length == 1 ? name[0] : '\0';
-            var code = character == '\0' ? -1 : VkKeyScanEx(character, layout);
+            short code;
+            if (symbols == null || !symbols.TryGetValue(pattern.Character, out code)) {
+                code = VkKeyScanEx(pattern.Character, layout);
+                symbols?.Add(pattern.Character, code);
+            }
             if (code == -1) throw new ArgumentException("このキーボード配列ではキーを検出できません。");
             key = (uint)(code & 255);
             var shift = (code >> 8) & 7;

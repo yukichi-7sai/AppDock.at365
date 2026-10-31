@@ -35,7 +35,7 @@ settings.keybindings = [
   {
     id: 'foreground.shortcut',
     command: 'appdock.open',
-    key: 'F16',
+    key: 'Ctrl+Alt+F11',
     enabled: true,
     blockOriginalInput: true,
     when: { scope: 'global', appletIds: [] },
@@ -57,7 +57,10 @@ settings.gestures.bindings = [
     when: { scope: 'global', appletIds: [], processes: [] },
   },
 ];
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
   const end = Date.now() + 15000;
@@ -77,7 +80,7 @@ const foreground = () => {
 const calls = () => {
   try {
     return fs
-      .readdirSync(path.join(profile, 'data/storage/test.foreground'))
+      .readdirSync(require('./test-storage.cjs').directory(profile, 'test.foreground'))
       .filter((n) => /^call\d+\.json$/.test(n)).length;
   } catch {
     return 0;
@@ -155,7 +158,7 @@ const checks = [];
     ['appdock.open', 'hidden', 'key:A'],
     ['test.foreground.record', 'visible', 'move-left'],
     ['test.foreground.record', 'hidden', 'move-right-up'],
-    ['appdock.open', 'hidden', 'shortcut:F16'],
+    ['appdock.open', 'hidden', 'shortcut:Ctrl+Alt+F11'],
     ['appdock.open', 'same-window', 'move-left'],
   ]) {
     await dock.evaluate(

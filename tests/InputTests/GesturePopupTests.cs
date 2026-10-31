@@ -105,6 +105,12 @@ internal static partial class Program
             Marshal.StructureToPtr(new PopupMouseData { X = point.X, Y = point.Y }, pointer, false);
             var down = (nint)mouse.Invoke(engine, [0, 0x204u, pointer])!;
             var ready = (bool)type.GetField("ready", members)!.GetValue(engine)!;
+            if (pass ? down != 0 || ready : down != 1 || !ready) {
+                var target = GestureTarget.At(new(point.X, point.Y));
+                var className = new System.Text.StringBuilder(256);
+                PopupClassName(target, className, className.Capacity);
+                Console.Error.WriteLine($"Popup preflight: point={point}, target={target}, foreground={GetForegroundWindow()}, class={className}, style={PopupWindowStyle(target, -16):X}, exStyle={PopupWindowStyle(target, -20):X}, owner={PopupWindowOwner(target, 4)}, down={down}, ready={ready}");
+            }
             PopupCheck(pass ? down == 0 && !ready : down == 1 && ready, label);
             if (pass) PopupCheck((nint)mouse.Invoke(engine, [0, 0x205u, pointer])! == 0, label + " releases without capture");
         } finally { Marshal.FreeHGlobal(pointer); }
@@ -143,6 +149,9 @@ internal static partial class Program
         if (!success) throw new Exception(label);
         Console.WriteLine("PASS " + label);
     }
+    [DllImport("user32.dll", EntryPoint = "GetClassNameW", CharSet = CharSet.Unicode)] private static extern int PopupClassName(nint window, System.Text.StringBuilder text, int count);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern nint PopupWindowStyle(nint window, int index);
+    [DllImport("user32.dll", EntryPoint = "GetWindow")] private static extern nint PopupWindowOwner(nint window, uint command);
     private sealed class PopupFixture : Form
     {
         internal bool NonActivating = true;

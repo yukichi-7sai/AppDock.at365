@@ -4833,6 +4833,12 @@ async function initialize() {
   startupAppletsReleased = true;
   await hostStartupTiming.phaseAsync('applets', () => manager.reconcile());
   if (quitting) return;
+  // Ordinary Applets can register inputs after the early input initialization.
+  // Finish their projection before reporting readiness, without focusing the window.
+  await syncHotKeys();
+  // Input failures already update the existing error/status callbacks; keep startup usable.
+  await gestures!.refresh().catch(() => {});
+  if (quitting) return;
   startupReady = true;
   fileWatchAssistance.start();
   hostStartupTiming.mark('ready');

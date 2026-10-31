@@ -77,7 +77,7 @@ settings.keybindings = [
 ];
 const server = http.createServer((_, res) => res.end('<h1>Remote fixture</h1><input id="text">'));
 const calls = () => {
-  const d = path.join(profile, 'data/storage/test.keys');
+  const d = require('./test-storage.cjs').directory(profile, 'test.keys');
   try {
     return fs
       .readdirSync(d)
@@ -212,7 +212,10 @@ const expectCalls = async (before, expected) => {
       path.join(profile, 'extensions', webOwner, 'index.cjs'),
       'exports.activate=async()=>{};',
     );
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(settings),
+    );
     const portable = !!process.argv[2];
     const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (portable)
@@ -220,6 +223,13 @@ const expectCalls = async (before, expected) => {
     const portableHash = portable
       ? createHash('sha256').update(fs.readFileSync(executablePath)).digest('hex')
       : undefined;
+    const complete = (scope) => {
+      fs.writeFileSync(
+        path.join(profile, 'result.json'),
+        JSON.stringify({ scope, checks, sha256: portableHash }, null, 2),
+      );
+      console.log(JSON.stringify({ scope, profile, checks }, null, 2));
+    };
     if (portable)
       assert.equal(
         portableHash,
@@ -296,7 +306,7 @@ const expectCalls = async (before, expected) => {
     checks.push('real Windows global key: local overlap once, hidden global only');
     let before = calls().length;
     await send('appdock://host/index.html');
-    await expectCalls(before, ['a', 'b']);
+    await expectCalls(before, ['a', 'b', 'a']);
     checks.push('all pages includes the host settings page');
     await dock.evaluate(() => window.dock.executeCommand('test.keys.open'));
     await until(
@@ -310,17 +320,19 @@ const expectCalls = async (before, expected) => {
     await new Promise((r) => setTimeout(r, 500));
     before = calls().length;
     await send('/test.keys/index.html');
-    await expectCalls(before, ['a', 'b', 'c']);
-    checks.push('local page: ordered all-match and dedup');
+    await expectCalls(before, ['a', 'b', 'c', 'a']);
+    checks.push(
+      'local page: all matching rows execute in saved order, including repeated commands',
+    );
     await save([...settings.keybindings, make('owner', 'test.keys.d', 'owner')]);
     before = calls().length;
     await send('/test.keys/index.html');
-    await expectCalls(before, ['a', 'b', 'c', 'd']);
+    await expectCalls(before, ['a', 'b', 'c', 'a', 'd']);
     // First action opens a different page: later commands still use captured matching rules.
     await save([make('switch', `${webId}.open`, 'pages'), ...settings.keybindings]);
     before = calls().length;
     await send('/test.keys/index.html');
-    await expectCalls(before, ['a', 'b', 'c']);
+    await expectCalls(before, ['a', 'b', 'c', 'a']);
     const remote = await until(
       () =>
         app
@@ -333,7 +345,7 @@ const expectCalls = async (before, expected) => {
     await save([...settings.keybindings, make('owner', 'test.keys.d', 'owner')]);
     before = calls().length;
     await send(webItem.url);
-    await expectCalls(before, ['a', 'b', 'c']);
+    await expectCalls(before, ['a', 'b', 'c', 'a']);
     await save(settings.keybindings);
     checks.push('owner scope runs only on the command provider page, not another Applet');
     checks.push(
@@ -354,7 +366,7 @@ const expectCalls = async (before, expected) => {
     }, webId);
     before = calls().length;
     await send(webItem.url);
-    await expectCalls(before, ['a', 'b', 'c']);
+    await expectCalls(before, ['a', 'b', 'c', 'a']);
     checks.push('standalone page retains context and input');
     await app.evaluate(({ app }) =>
       app.on('session-created', (ses) => {
@@ -393,7 +405,7 @@ const expectCalls = async (before, expected) => {
     await new Promise((r) => setTimeout(r, 600));
     before = calls().length;
     await send(gmailUi.url());
-    await expectCalls(before, ['a', 'b']);
+    await expectCalls(before, ['a', 'b', 'a']);
     const gmailRows = settings.keybindings.map((r) =>
       r.id === 'selected'
         ? { ...r, when: { ...r.when, appletIds: [...r.when.appletIds, 'at365.gmail'] } }
@@ -402,10 +414,14 @@ const expectCalls = async (before, expected) => {
     await save(gmailRows);
     before = calls().length;
     await send(gmail.url());
-    await expectCalls(before, ['a', 'b', 'c']);
+    await expectCalls(before, ['a', 'b', 'c', 'a']);
     await save(settings.keybindings);
     await dock.evaluate((id) => window.dock.executeCommand(id + '.open'), webId);
     checks.push('Gmail local UI and offline remote body use shared scope resolver');
+    if (process.argv.includes('--input-only')) {
+      complete('input');
+      return;
+    }
     await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await dock.getByRole('button', { name: 'ショートカットキー', exact: true }).click();
     await dock.getByLabel('ショートカットキーのコマンドを検索').fill('test.keys.c');
@@ -485,7 +501,9 @@ const expectCalls = async (before, expected) => {
         ).enabled,
       'Disabled state saved',
     );
-    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
+    const saved = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+    );
     assert.equal(saved.keybindings.find((r) => r.id === 'selected').enabled, false);
     assert.equal(saved.keybindings.find((r) => r.id === 'selected').key, 'Ctrl+Shift+F11');
     assert.equal(saved.keybindings.find((r) => r.id === 'selected').when.scope, 'applets');
@@ -513,7 +531,9 @@ const expectCalls = async (before, expected) => {
         ).when.scope === 'owner',
       'Owner scope saved',
     );
-    const ownerSaved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
+    const ownerSaved = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+    );
     assert.deepEqual(ownerSaved.keybindings.find((r) => r.id === 'selected').when, {
       scope: 'owner',
       appletIds: [],
@@ -616,11 +636,7 @@ const expectCalls = async (before, expected) => {
         return { app, dock };
       },
     });
-    fs.writeFileSync(
-      path.join(profile, 'result.json'),
-      JSON.stringify({ checks, sha256: portableHash }, null, 2),
-    );
-    console.log(JSON.stringify({ profile, checks }, null, 2));
+    complete('full');
   } finally {
     targetPeer?.close();
     target?.stdin.end();

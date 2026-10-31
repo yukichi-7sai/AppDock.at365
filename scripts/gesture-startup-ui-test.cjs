@@ -42,10 +42,13 @@ settings.gestures.bindings = [
     when: { scope: 'global', appletIds: [], processes: [] },
   },
 ];
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-async function until(fn, label) {
-  const deadline = Date.now() + 60000;
+async function until(fn, label, timeout = 60000) {
+  const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (await fn()) return;
     await wait(100);
@@ -63,7 +66,9 @@ async function launch(restore) {
   const args = [`--test-profile=${profile}`, ...(restore ? ['--restore-view'] : [])];
   if (!portable)
     return electron.launch({ executablePath: require('electron'), args: [root, ...args], env });
-  const source = path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe');
+  const source =
+    process.argv.find((arg) => arg.startsWith('--executable='))?.slice('--executable='.length) ??
+    path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe');
   const executable = path.join(profile, 'AppDock.at365.exe');
   require('./copy-host.cjs').copyHost(source, executable);
   portableHash = hash(source);
@@ -126,10 +131,14 @@ async function launch(restore) {
       'host ready',
     );
     const n = checks.length;
+    fs.writeFileSync(
+      path.join(profile, 'initial-snapshot-' + n + '.json'),
+      JSON.stringify(await dock.evaluate(() => window.dock.snapshot()), null, 2),
+    );
     const calls = () => {
       try {
         return fs
-          .readdirSync(path.join(profile, 'data/storage/test.startup'))
+          .readdirSync(require('./test-storage.cjs').directory(profile, 'test.startup'))
           .filter((n) => /^call\d+\.json$/.test(n)).length;
       } catch {
         return 0;
@@ -138,7 +147,7 @@ async function launch(restore) {
     const before = calls();
     fs.writeFileSync(path.join(exchange, 'send-' + n), '');
     await until(() => fs.existsSync(path.join(exchange, 'done-' + n)), 'stroke done');
-    await until(() => calls() > before, 'background startup gesture executed');
+    await until(() => calls() > before, 'background startup gesture executed', 15000);
     assert.equal(calls(), before + 1);
     checks.push(
       restore

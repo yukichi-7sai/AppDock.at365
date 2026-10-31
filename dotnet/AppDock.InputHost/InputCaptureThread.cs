@@ -23,6 +23,7 @@ internal sealed class InputCaptureThread : IDisposable
             var dispatcher = Dispatcher.CurrentDispatcher;
             using var engine = new InputCaptureEngine(dispatcher, display,
                 (method, payload) => !disposed && notices.Writer.TryWrite((method, payload)));
+            engine.StartMonitoring();
             ready.SetResult((dispatcher, engine));
             Dispatcher.Run();
         }) { IsBackground = true, Name = "AppDock input capture" };

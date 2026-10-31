@@ -22,6 +22,7 @@ internal sealed class InputCaptureEngine : IDisposable
     private readonly Dispatcher dispatcher;
     private readonly Func<string, object, bool> notify;
     private readonly HookCallback keyboardCallback, mouseCallback;
+    private readonly WinEventCallback environmentCallback;
     private readonly DispatcherTimer timer;
     private readonly HashSet<uint> pressed = [];
     private readonly Dictionary<uint, bool> owned = [];
@@ -29,11 +30,15 @@ internal sealed class InputCaptureEngine : IDisposable
     private readonly Dictionary<ShortcutChord, List<ShortcutInput>> chords = [];
     private HashSet<ShortcutChord> dialogChords = [];
     private ShortcutInput[] inputs = [];
+    private ShortcutInput[]? lookupInputs;
+    private ShortcutLookup lookup = new([]);
     private CaptureConfiguration? configuration;
     private Dictionary<string, HashSet<string>> processPool = new(StringComparer.Ordinal);
     private RecordingInput? recording;
-    private nint keyboardHook, mouseHook, layout, preparedLayout;
-    private bool disposed, accepting;
+    private nint keyboardHook, mouseHook, layout, preparedLayout, foregroundHook, desktopHook;
+    private bool disposed, accepting, monitoring, refreshQueued, layoutRefreshPending;
+    private string? lostRecording;
+    private uint recordingSince;
     private int? gestureRevision;
     private long pressId;
     private nint? foregroundWindow;
@@ -42,11 +47,47 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         this.dispatcher = dispatcher; this.notify = notify;
         keyboardCallback = Keyboard; mouseCallback = Mouse;
+        environmentCallback = EnvironmentChanged;
         Gestures = new GestureEngine(dispatcher, display);
-        Gestures.HooksChanged = () => dispatcher.BeginInvoke(new Action(Poll));
-        timer = new DispatcherTimer(TimeSpan.FromMilliseconds(40), DispatcherPriority.Background,
-            (_, _) => Poll(), dispatcher);
-        timer.Start();
+        Gestures.HooksChanged = QueueRefresh;
+        timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher) { Interval = TimeSpan.FromSeconds(1) };
+        timer.Tick += (_, _) => Refresh();
+    }
+    internal void StartMonitoring()
+    {
+        if (disposed || monitoring) return;
+        monitoring = true;
+        // Out-of-context callbacks run on this dispatcher's message loop; keep the delegate alive.
+        foregroundHook = SetWinEventHook(3, 3, 0, environmentCallback, 0, 0, 0);
+        desktopHook = SetWinEventHook(0x20, 0x20, 0, environmentCallback, 0, 0, 0);
+        if (foregroundHook == 0 || desktopHook == 0)
+            notify("input.error", new { message = "入力対象の変更通知を登録できません。1秒間隔の補助確認を使用します。" });
+        Refresh();
+    }
+    private void EnvironmentChanged(nint hook, uint kind, nint window, int objectId, int child, uint thread, uint time)
+    {
+        if (disposed) return;
+        // Preserve a brief focus loss even when several events coalesce before the next refresh.
+        if (recording != null && unchecked((int)(time - recordingSince)) >= 0 &&
+            (kind == 0x20 || kind == 3 && recording.Window != window.ToInt64().ToString()))
+            lostRecording = recording.Token;
+        QueueRefresh();
+    }
+    private void QueueRefresh()
+    {
+        if (disposed || refreshQueued || dispatcher.HasShutdownStarted) return;
+        refreshQueued = true;
+        dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => {
+            refreshQueued = false;
+            Refresh();
+        }));
+    }
+    private void UpdateTimer()
+    {
+        var active = inputs.Length > 0 || recording != null || Gestures.NeedsKeyboard || Gestures.NeedsMouse;
+        // Other processes do not send WM_INPUTLANGCHANGE to us. Only symbol bindings need this fallback.
+        timer.IsEnabled = !disposed && monitoring && ((inputs.Length > 0 && lookup.HasSymbols) ||
+            (active && (foregroundHook == 0 || desktopHook == 0)));
     }
     internal ShortcutStatus[] Configure(CaptureConfiguration next)
     {
@@ -58,6 +99,7 @@ internal sealed class InputCaptureEngine : IDisposable
             pendingPresses.Clear();
         configuration = next;
         inputs = next.Shortcuts;
+        if (recording?.Token != next.Recording?.Token) recordingSince = unchecked((uint)Environment.TickCount64);
         recording = next.Recording;
         foreach (var input in inputs) {
             CommandConditions.Prepare(input.Environment, processPool);
@@ -87,6 +129,7 @@ internal sealed class InputCaptureEngine : IDisposable
                 Error: "入力フックを適用できません。権限とほかの入力ソフトを確認してください。")).ToArray();
             notify("input.error", new { message = "入力フックを適用できません。", code = error is Win32Exception win ? win.NativeErrorCode : 0 });
         }
+        UpdateTimer();
         return statuses;
     }
     private nint ForegroundLayout()
@@ -97,6 +140,12 @@ internal sealed class InputCaptureEngine : IDisposable
     private ShortcutStatus[] Compile()
     {
         layout = ForegroundLayout();
+        layoutRefreshPending = false;
+        if (!ReferenceEquals(lookupInputs, inputs)) {
+            lookup = new ShortcutLookup(inputs);
+            lookupInputs = inputs;
+        }
+        lookup.Prepare(layout);
         dialogChords = (configuration?.DialogShortcuts ?? []).Select(key => ShortcutCodec.Parse(key, layout)).ToHashSet();
         chords.Clear();
         var statuses = inputs.Select(row => {
@@ -120,7 +169,7 @@ internal sealed class InputCaptureEngine : IDisposable
         return statuses.Select(status => blockers.TryGetValue(status.Shortcut, out var block)
             ? status with { EffectiveBlockOriginalInput = block } : status).ToArray();
     }
-    private void Poll()
+    private void Refresh()
     {
         if (disposed) return;
         try {
@@ -129,8 +178,9 @@ internal sealed class InputCaptureEngine : IDisposable
                 if (notify("capture.foreground", new { window = foreground.ToInt64().ToString() }))
                     foregroundWindow = foreground;
             }
-            if (recording != null && GetForegroundWindow().ToInt64().ToString() != recording.Window) EndRecording();
-            if (inputs.Length > 0 && layout != ForegroundLayout()) {
+            if (recording != null && (lostRecording == recording.Token || foreground.ToInt64().ToString() != recording.Window)) EndRecording();
+            lostRecording = null;
+            if (inputs.Length > 0 && lookup.HasSymbols && (layoutRefreshPending || layout != ForegroundLayout())) {
                 accepting = false;
                 var statuses = Compile();
                 notify("shortcuts.applied", new { revision = configuration?.ShortcutRevision, statuses });
@@ -148,11 +198,12 @@ internal sealed class InputCaptureEngine : IDisposable
             }
             notify("input.error", new { message = "入力フックを適用できません。設定を保存するか再試行してください。" });
         }
+        UpdateTimer();
     }
     private void Reconcile()
     {
         if (disposed) return;
-        var needKeyboard = chords.Count > 0 || recording != null || owned.Count > 0 || Gestures.NeedsKeyboard;
+        var needKeyboard = chords.Count > 0 || (inputs.Length > 0 && lookup.HasSymbols) || recording != null || owned.Count > 0 || Gestures.NeedsKeyboard;
         var needMouse = recording != null || Gestures.NeedsMouse;
         if (needKeyboard && keyboardHook == 0) {
             pressed.Clear();
@@ -190,12 +241,22 @@ internal sealed class InputCaptureEngine : IDisposable
         bool? blockDecision = null;
         try {
             if (owned.TryGetValue(data.Key, out var blocked)) {
-                if (up) owned.Remove(data.Key);
+                if (up) { owned.Remove(data.Key); if (owned.Count == 0) QueueRefresh(); }
                 return blocked ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
             }
             var modifiers = Modifiers(data.Key, up);
             var chord = new ShortcutChord(data.Key, modifiers);
-            var touchpad = chords.TryGetValue(chord, out var connected) && connected.Any(ActiveTouchpad);
+            IEnumerable<ShortcutInput> connected = chords.GetValueOrDefault(chord) ?? [];
+            if (!up && !repeat && inputs.Length > 0 && lookup.HasSymbols) {
+                var currentLayout = ForegroundLayout();
+                if (layout != currentLayout) {
+                    accepting = false;
+                    layoutRefreshPending = true;
+                    connected = lookup.Match(chord, currentLayout);
+                    QueueRefresh();
+                }
+            }
+            var touchpad = connected.Any(ActiveTouchpad);
             if (recording != null && !touchpad) {
                 if (GetForegroundWindow().ToInt64().ToString() != recording.Window) EndRecording();
                 else if (data.Key == 27 || (data.Key == 9 && (modifiers & ~4) == 0)) EndRecording();
@@ -212,11 +273,10 @@ internal sealed class InputCaptureEngine : IDisposable
             if (DialogOwns(chord, GetForegroundWindow()))
                 return CallNextHookEx(keyboardHook, code, message, pointer);
             if (Gestures.Keyboard(code, message, pointer) != 0) return 1;
-            if (up || repeat || configuration == null ||
-                !chords.TryGetValue(chord, out var rows))
+            if (up || repeat || configuration == null || !connected.Any())
                 return CallNextHookEx(keyboardHook, code, message, pointer);
             var capturedWindow = GetForegroundWindow();
-            rows = rows.Where(row => row.Owner == null || (row.Owner.StartsWith("touchpad:", StringComparison.Ordinal) && TouchpadInputLease.Accepts(row.TouchpadGeneration))).ToList();
+            var rows = connected.Where(row => row.Owner == null || (row.Owner.StartsWith("touchpad:", StringComparison.Ordinal) && TouchpadInputLease.Accepts(row.TouchpadGeneration))).ToList();
             if (rows.Count == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
             var target = rows.Any(row => row.Owner != null || row.Conditions is {Length:>0}) ? CommandTargetCapture.Capture(capturedWindow) : null;
             // A local binding sharing this key still dispatches through the native owner, without blocking ordinary input.
@@ -289,7 +349,10 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         var previous = recording;
         recording = null;
-        if (previous != null) notify("shortcuts.recordEnded", new { token = previous.Token });
+        if (previous != null) {
+            QueueRefresh();
+            notify("shortcuts.recordEnded", new { token = previous.Token });
+        }
     }
     private static bool MaskModifier(int modifiers)
     {
@@ -306,12 +369,18 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         if (disposed) return;
         disposed = true; accepting = false; timer.Stop(); recording = null;
+        if (foregroundHook != 0) UnhookWinEvent(foregroundHook);
+        if (desktopHook != 0) UnhookWinEvent(desktopHook);
+        foregroundHook = desktopHook = 0;
         if (keyboardHook != 0) UnhookWindowsHookEx(keyboardHook);
         if (mouseHook != 0) UnhookWindowsHookEx(mouseHook);
         keyboardHook = mouseHook = 0; owned.Clear(); pressed.Clear(); pendingPresses.Clear();
         Gestures.Dispose();
     }
     private delegate nint HookCallback(int code, uint message, nint data);
+    private delegate void WinEventCallback(nint hook, uint kind, nint window, int objectId, int child, uint thread, uint time);
+    [DllImport("user32.dll")] private static extern nint SetWinEventHook(uint first, uint last, nint module, WinEventCallback callback, uint process, uint thread, uint flags);
+    [DllImport("user32.dll")] private static extern bool UnhookWinEvent(nint hook);
     [StructLayout(LayoutKind.Sequential)] private struct KeyData { public uint Key, Scan, Flags, Time; public nuint Extra; }
     [StructLayout(LayoutKind.Sequential)] private struct MouseData { public GesturePoint Point; public uint Data, Flags, Time; public nuint Extra; }
     [StructLayout(LayoutKind.Sequential)] private struct Input { public uint Type; public InputUnion Data; }
