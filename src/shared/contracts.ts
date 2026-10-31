@@ -253,9 +253,11 @@ export interface ExtensionSnapshot extends ExtensionManifest {
   panel: Panel | null;
   settingOptions: Record<string, SettingOption[]>;
 }
+export type LogCategory = 'normal' | 'audit';
 export interface LogEntry {
   time: string;
   level: string;
+  category?: LogCategory;
   source: string;
   message: string;
 }

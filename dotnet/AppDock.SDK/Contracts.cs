@@ -81,6 +81,8 @@ public interface IUiService {
 public interface IBrowserService { Task OpenAsync(string url, CancellationToken cancellationToken = default); }
 public interface ILogService
 {
+    Task DebugAsync(string message, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Debug logging requires AppDock 0.109.2 or later.");
     Task InfoAsync(string message, CancellationToken cancellationToken = default);
     Task ErrorAsync(string message, CancellationToken cancellationToken = default);
 }

@@ -112,7 +112,11 @@ export interface NodeExtensionContext {
     pickFile(kind: 'json' | 'wav'): Promise<string | null>;
   };
   browser: { open(url: string): Promise<unknown> };
-  log: { info(message: string): Promise<unknown>; error(message: string): Promise<unknown> };
+  log: {
+    debug(message: string): Promise<unknown>;
+    info(message: string): Promise<unknown>;
+    error(message: string): Promise<unknown>;
+  };
   scheduler: { every(milliseconds: number, callback: Handler): () => void };
   storage: {
     get(key: string): Promise<unknown>;
@@ -310,6 +314,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
         },
         browser: { open: (url) => peer.request('host.browser.open', { url }) },
         log: {
+          debug: (message) => peer.request('host.log', { level: 'debug', message }),
           info: (message) => peer.request('host.log', { level: 'info', message }),
           error: (message) => peer.request('host.log', { level: 'error', message }),
         },

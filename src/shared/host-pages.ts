@@ -3,7 +3,8 @@ import type { LogEntry } from './contracts';
 export type LogScope = { type: 'all' } | { type: 'applet'; id: string } | { type: 'web' };
 export interface LogFilters {
   source: string;
-  level: 'all' | 'info' | 'warn' | 'error';
+  level: 'all' | 'standard' | 'debug' | 'info' | 'warn' | 'error';
+  category: 'all' | 'normal' | 'audit';
   text: string;
 }
 /** Requests belong to a mounted host slot, not to the presentation provider. */

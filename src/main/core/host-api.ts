@@ -601,7 +601,7 @@ export function createHostApi(
       }
       case 'host.log':
         log(
-          ['info', 'warn', 'error'].includes(p.level) ? p.level : 'info',
+          ['debug', 'info', 'warn', 'error'].includes(p.level) ? p.level : 'info',
           id,
           String(p.message ?? ''),
         );

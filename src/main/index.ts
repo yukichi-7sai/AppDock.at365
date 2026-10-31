@@ -779,7 +779,7 @@ const tts = new TtsService({
   fetcher: (url, init) => net.fetch(url instanceof URL ? url.href : url, init),
   changed: () => changed(),
   audit: (owner, id, state, code) =>
-    log.write(
+    log.audit(
       'info',
       owner.startsWith('applet:')
         ? owner.split(':')[1]
@@ -868,7 +868,7 @@ const ai = new AiService({
   changed: () => changed(),
   audit: (owner, id, state, code) => {
     if (state !== 'failed')
-      log.write(
+      log.audit(
         'info',
         owner.startsWith('applet:') ? owner.split(':')[1] : 'host',
         '[AI] jobId=' + id + ' state=' + state + (code ? ' code=' + code : ''),
@@ -997,7 +997,7 @@ const mcpClient = new McpClientService({
       ...error,
     }),
   audit: (job) =>
-    log.write(
+    log.audit(
       'info',
       'mcp-client',
       'jobId=' +
@@ -3385,7 +3385,7 @@ function registerIpc() {
     ai.reconcile();
     tts.reconcile();
     for (const id of manager.items.keys()) nativeInput?.cancelApplet(id);
-    log.write('info', 'host', '[Applet API] shared permissions updated');
+    log.audit('info', 'host', '[Applet API] shared permissions updated');
     changed();
   });
   handle('dock:automation', async (action: AutomationAction) => {
@@ -3690,7 +3690,7 @@ async function initialize() {
       executeCommand,
       path.join(paths.assets, 'applets'),
       (e, request) =>
-        callAppletApi(operationApi, e, request, log.write, (id) =>
+        callAppletApi(operationApi, e, request, log.audit, (id) =>
           manager.executions.get(e.manifest.id, id),
         ),
       settingsCommands,
@@ -4907,7 +4907,7 @@ async function initialize() {
       mcpClient.reconcile();
       ai.forgetOwner(owner);
     },
-    audit: (level, message) => log.write(level, 'automation', message),
+    audit: (level, message) => log.audit(level, 'automation', message),
     writeClipboard: (value) => clipboard.writeText(value),
     informed: (message) =>
       information.report('automation', hostText('services.index.codexIntegration'), message),

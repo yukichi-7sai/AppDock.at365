@@ -32,6 +32,7 @@
 | カスタムコマンド | [保存・種類・キー送信・プロセス起動・MCP実行](docs/custom-commands-design.md) |
 | AIと音声 | [AI文章生成](docs/ai.md)、[TTS](docs/tts-design.md)、[共通音声再生](docs/audio-playback.md) |
 | 通知とエラー | [通知基盤](docs/notifications.md)、[通知読み上げ](docs/notification-speech-design.md)、[共通エラー](docs/error-reporting.md)、[共通警告](docs/warning-notifications-design.md) |
+| ログ | [レベル・種類・保存と画面の絞り込み](docs/logging.md) |
 | キー・マウス・タッチパッド・トレイ | [ショートカットと入力フック](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[タッチパッド](docs/touchpad-gestures-design.md)、[トレイ](docs/tray-menu.md) |
 | Shellとリボン | [領域と割り当て](docs/shell-foundation.md)、[リボンの配置とバッジ](docs/ribbon-customization-design.md)、[Shell API](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本体のページ](docs/host-pages.md)、[バー](docs/shell-bars.md) |
 | 画像と配色 | [登録画像](docs/registered-images.md)、[共通ギャラリー](docs/image-gallery.md)、[共通配色](docs/appearance.md) |

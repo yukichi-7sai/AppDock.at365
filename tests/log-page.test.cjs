@@ -42,7 +42,7 @@ function fixture(scope = { type: 'all' }) {
     session.act({
       id: 'session',
       type: 'filters',
-      filters: { source: '', level: 'all', text: '', ...filters },
+      filters: { source: '', level: 'all', category: 'all', text: '', ...filters },
     });
   return { state, session, filter };
 }

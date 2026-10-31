@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { LogEntry } from '../../shared/contracts';
+import type { LogCategory, LogEntry } from '../../shared/contracts';
 export class HostLog {
   entries: LogEntry[] = [];
   constructor(
@@ -9,10 +9,13 @@ export class HostLog {
   ) {
     fs.mkdirSync(directory, { recursive: true });
   }
-  write = (level: string, source: string, message: string) => {
+  audit = (level: string, source: string, message: string) =>
+    this.write(level, source, message, 'audit');
+  write = (level: string, source: string, message: string, category: LogCategory = 'normal') => {
     const entry = {
       time: new Date().toISOString(),
       level,
+      category,
       source,
       message: String(message).slice(0, 4000),
     };

@@ -6,8 +6,14 @@ const { spawn } = require('node:child_process');
 const { _electron: electron, chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
 const root = path.resolve(__dirname, '..');
-const portable = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const profile = path.join(root, '.artifacts', `host-pages-ui-${Date.now()}`);
+const logsOnly = process.argv.includes('--logs-only');
+const executable = process.argv.slice(2).find((arg) => arg !== '--logs-only');
+const portable = executable ? path.resolve(executable) : null;
+const profile = path.join(
+  root,
+  '.artifacts',
+  `${logsOnly ? 'log-page' : 'host-pages'}-ui-${Date.now()}`,
+);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 fs.mkdirSync(path.join(profile, 'extensions/fixture.host-pages'), { recursive: true });
 const fixture = path.join(profile, 'extensions/fixture.host-pages');
@@ -20,7 +26,7 @@ fs.writeFileSync(
     version: '1.0.0',
     runtime: 'node',
     entry: 'worker.cjs',
-    capabilities: ['pages'],
+    capabilities: ['pages', ...(logsOnly ? ['appdock-api'] : [])],
     pages: [
       {
         id: 'main',
@@ -38,7 +44,15 @@ fs.writeFileSync(
 );
 fs.writeFileSync(
   path.join(fixture, 'worker.cjs'),
-  "exports.activate=async c=>{c.commands.register('fixture.host-pages.mark','Record host page mark',()=>c.log.info('host-page-mark'));c.commands.register('fixture.host-pages.open','Open recovery fixture',()=>c.pages.open('main'));};",
+  logsOnly
+    ? `exports.activate=async c=>{c.commands.register('fixture.host-pages.mark','Record host page mark',async()=>{
+      await c.log.debug('log-fixture-debug: startup stage');
+      await c.log.info('log-fixture-info: ready');
+      await c.appdock.call('system.getInfo');
+      try { await c.appdock.call('fixture.invalid', { privateValue: 'must-not-appear-in-audit' }); }
+      catch(e) { if(e.code!=='INVALID_ARGUMENT') throw e; }
+    });};`
+    : "exports.activate=async c=>{c.commands.register('fixture.host-pages.mark','Record host page mark',()=>c.log.info('host-page-mark'));c.commands.register('fixture.host-pages.open','Open recovery fixture',()=>c.pages.open('main'));};",
 );
 fs.writeFileSync(
   path.join(fixture, 'page.html'),
@@ -237,6 +251,21 @@ async function geometry() {
   let success = false;
   try {
     await launch();
+    if (logsOnly) {
+      await require('./log-page-ui-check.cjs')({
+        app,
+        host,
+        profile,
+        model,
+        open,
+        until,
+        geometry,
+        checks,
+      });
+      assert.deepEqual(errors, []);
+      success = true;
+      return;
+    }
     await defaultPage();
     const ribbon = await require('./shell-overlay-helper.cjs').ribbonPage(host);
     assert.equal(await ribbon.locator('[data-ribbon-id="home"]').count(), 0);

@@ -56,7 +56,8 @@ export class LogPageSession implements HostPageController {
           : request.scope.type === 'all'
             ? request.source
             : '',
-      level: 'all',
+      level: 'standard',
+      category: 'normal',
       text: '',
     };
   }
@@ -83,7 +84,14 @@ export class LogPageSession implements HostPageController {
           (scope.type === 'web'
             ? e.source.startsWith('web.') || e.source === 'web-applets'
             : !this.filters.source || e.source === this.filters.source) &&
-          (this.filters.level === 'all' || this.filters.level === e.level) &&
+          (this.filters.level === 'all' ||
+            (this.filters.level === 'standard'
+              ? e.level !== 'debug'
+              : this.filters.level === e.level)) &&
+          (this.filters.category === 'all' ||
+            (this.filters.category === 'audit'
+              ? e.category === 'audit'
+              : e.category !== 'audit' || e.level === 'warn' || e.level === 'error')) &&
           `${e.source} ${e.message}`.toLowerCase().includes(this.filters.text.toLowerCase()),
       ),
       limit: 500,
@@ -115,13 +123,14 @@ export class LogPageSession implements HostPageController {
       f.source.length > 200 ||
       typeof f.text !== 'string' ||
       f.text.length > 4000 ||
-      !['all', 'info', 'warn', 'error'].includes(f.level)
+      !['all', 'standard', 'debug', 'info', 'warn', 'error'].includes(f.level) ||
+      !['all', 'normal', 'audit'].includes(f.category)
     )
       throw Error('Invalid log filters');
     if (this.request.scope.type !== 'all' && f.source !== this.filters.source)
       throw Error('Log scope is fixed');
     const previous = this.filters.source;
-    this.filters = { source: f.source, level: f.level, text: f.text };
+    this.filters = { source: f.source, level: f.level, category: f.category, text: f.text };
     if (this.request.scope.type === 'all' && previous !== f.source)
       this.options.sourceChanged(f.source);
     this.options.changed();

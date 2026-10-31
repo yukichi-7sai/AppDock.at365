@@ -47,7 +47,7 @@ tools.listは概要、tools.getは1ツールのSchemaとtoolRevisionを返しま
 | processes.start | read + execute + runProcesses（Applet専用） |
 | 保存したキー送信／プロセス起動コマンド | read + execute + sendInput／runProcessesと、定義の外部公開 |
 
-許可を変更できるのはホストの設定画面だけです。MCPやAppletから自分の許可を追加できません。呼び出し元のApplet IDはホストが接続から決定し、リクエストから受け取りません。監査ログは呼び出し元Appletのログへ`[Applet API]`として操作名・リクエストID・成否を記録し、引数や秘密値を含めません。
+許可を変更できるのはホストの設定画面だけです。MCPやAppletから自分の許可を追加できません。呼び出し元のApplet IDはホストが接続から決定し、リクエストから受け取りません。監査ログは呼び出し元Appletのログへ`[Applet API]`として操作名・リクエストID・成否を記録し、引数や秘密値を含めません。種類は`audit`で、重要度とは独立します。記録と画面の扱いは[ログ仕様](logging.md)を参照してください。
 
 CodexとAppletの許可設定は独立しています。MCPから明示公開されたAppletコマンドを実行し、そのハンドラーが共通APIを呼ぶ場合、ホストが発行する元callerを維持し、必要な共通許可はAppletとMCPの両方を満たす必要があります。キー送信にもMCP列のsendInput許可を使い、元MCPのコマンド実行許可だけでは実行しません。プロセス起動も両方のrunProcessesを必要とします。どちらもMCPの生の引数指定APIとして直接公開しません。信頼できるローカルAppletを前提とし、Appletプロセス自体をOSサンドボックスにする機能ではありません。
 

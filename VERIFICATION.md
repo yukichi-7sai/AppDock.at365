@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-10-31: ログ0.109.2・Watch 0.5.6のコミット前照合
+
+- 受入済みのログ分類/画面とWatch診断を対象に確認。両repoの1020入力、成功ログ、発行済みZIP/payload/feedのhashが実装時と一致した。今回の追加は既存`log-page.test.cjs`のfixtureへ`category: all`を補う1行と検証記録だけ。製品/依存/配布内容は不変のため版更新・再発行は不要。
+- 本体の標準回帰155ファイル1391件を確認。実装時の9ファイル134件を再利用し、未確認分はfixture更新後に145ファイル1255件、既存mounted-update試験1ファイル2件を分離実行して成功した。初回146ファイルの失敗ログも保持する：旧fixtureの種類未指定3件は修正、mounted-updateの一時パスAccess denied1件は同じ製品・判定の単独実行で成功し、発生原因の解消は主張しない。失敗した一括コマンドの一部成功は再利用していない。
+- 型検査/build、開発/固定ログGUI各6項目、固定smoke、Watch build/24回帰/開発・発行起動各6条件/固定GUI15項目は入力・成功ログ・発行物の一致により再利用。共通SDKを参照する本体のテストfixtureは今回再ビルド成功。未実行の必要回帰なし。証跡は`.artifacts/commit-validation-log-categories-20261031/`のreuse-check/reuse、各実行ログ、stage/commit。検証記録の追記を除き最終入力を照合し、stage treeとcommit treeを一致確認する。push/Release/実利用deployは今回の範囲外。
+
+## 2026-10-31: Debug・監査分類とログ画面（0.109.2）
+
+- mainと追跡先のclean状態を確認し、`pull --ff-only`成功後に実装。重要度にdebugを追加し、独立した`category=normal/audit`をHostLogへ追加。既存のApplet API/MCP/MCP Events/MCPクライアント/AI/TTS/許可変更の監査経路を分類し、メッセージの内容・重要度・保存回数を維持した。Applet提供元と種類はホストが付与し、引数や秘密値は追加しない。ErrorReporterへ集約済みの最終失敗は通常errorを維持し、重複記録しない。
+- ログ画面は種類・レベル・提供元・検索を組み合わせ、初期表示は通常/Info以上（監査warn/errorも表示）。一括解除、提供元だけの解除、0件表示、件数、ミリ秒付き時刻と日付tooltip、レベル/種類の併記、狭幅での折り返しを追加。画面のフィルターでdebug/監査のファイル記録を止めない。設定/保存ファイル追加なし、既存記録のcategory省略は通常。保持数/ローテーションは不変。
+- 発行前に共通ログ境界、各監査callback、privateページ契約、絞り込み/対象固定、UI、WatchとのSDK接続をレビューし、発行を妨げる指摘なし。通常の機能追加として本体0.109.2、SDK/Runtime 0.27.1、Watch 0.5.6へパッチ更新。SDKのDebugAsyncは既存ILogService実装への既定メソッドを持ち、AssemblyVersion 0.10.0.0を維持。Watch最低本体版は0.109.2。
+- 型検査・build成功。ログ/本体ページ/Applet API/Automation/lifecycleの39件、TTS/AI/MCPクライアント/MCP Eventsの95件、計134件成功。Nodeのdebug到達・Applet API実呼出しによる監査成功/拒否・秘密値非記録、初期フィルター、組合せ検索、0件からEnterで解除、明暗/狭幅の操作、フィルター後も一度だけファイル保存を、開発/固定EXEのログGUIでそれぞれ6項目成功。1280×900 darkと540×640 lightの代表画像を確認し、横はみ出し/操作不能/rendererエラーなし。
+- `publish.bat`成功。固定配布物0.109.2でログGUIとsmoke成功。共通.NET経路は兄弟WatchのRelease build・24回帰、開発/発行EXEそれぞれ起動6条件、固定本体とのGUI15項目で確認。Watchの最初/完了段階がsource=at365.watch、level=debug、category=normalとして共通ログへ到達した。設定・フォント選択/取消・停止・再起動保持も成功。全本体回帰/無関係Appletの再発行は実施していない。
+- feed/manifest/EXE版、ZIP全693ファイルのサイズ/SHA256と発行フォルダーの一致、同梱SDKの0.27.1を確認。EXE SHA256 `538f2d810ca98d43ca98577e51c6430c6fd9f6e183f63bb134d77f0528603e07`、ZIP SHA256 `a226910cab1df831e38387bd36266f37a999a28c17c51afcdd243583145cce94`。両repoの既存配置スクリプト/ローカル配置先計6ファイルはhash不変。buildの既存chunkサイズ警告あり。
+- 証跡は`.artifacts/log-categories-20261031/`のreview/inputs/packages/validation/cleanupと各成功ログ。関連両repoの1020入力ファイルをhash保存し、最後に一致確認（VERIFICATION追記を除外）。開発GUIは`log-page-ui-1793426205982`、固定GUIは`log-page-ui-1793426453398`、固定smokeは`smoke-1793426481550`。旧成功smoke `1793380895994`とWatch固定GUI `1793424893426`の実行用コピーだけ整理し、各86/110件の記録hashを保持。最新成功・失敗・参照中記録は保持した。
+- 正本は[ログ仕様](docs/logging.md)。実Windowsサインイン/ARSO/ロック中のWatch timeout再現と原因特定、複数画面/混在DPIは未確認。実利用先deploy、commit、push、GitHub Releaseは今回行っていない。
+
 ## 2026-10-31: AppDock 0.109.1と指定6Appletの正式リリース
 
 - プッシュ済みmainと公開状況をGitHubで照合し、全7件の現行版が未公開であることを確認。指定6件だけをスターターへ収録し、全7件をDraft → 添付照合 → 公開 → 公開後検証まで完了した。公開対象とcommitは次のとおり。

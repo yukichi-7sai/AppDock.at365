@@ -122,12 +122,13 @@ test('updating the log source preserves search and level filters', async () => {
   await page.act({
     id: request.id,
     type: 'filters',
-    filters: { source: 'one', level: 'warn', text: 'needle' },
+    filters: { source: 'one', level: 'warn', category: 'audit', text: 'needle' },
   });
   page.update({ ...request, source: 'two' });
   assert.deepEqual(page.snapshot().content.filters, {
     source: 'two',
     level: 'warn',
+    category: 'audit',
     text: 'needle',
   });
   assert.throws(() => page.update({ ...request, id: 'old' }), /Stale/);
