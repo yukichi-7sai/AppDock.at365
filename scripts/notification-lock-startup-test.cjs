@@ -137,6 +137,8 @@ const checks = [];
     settings.keybindings = [];
     settings.gestures.enabled = false;
     settings.host.hardwareAcceleration = false;
+    settings.host.fileWatchAssistanceEnabled = true;
+    settings.host.fileWatchAssistanceIntervalSeconds = 2;
     settings.tts = {
       ...settings.tts,
       baseUrl: 'http://127.0.0.1:' + server.address().port + '/v1',
@@ -159,7 +161,10 @@ const checks = [];
         },
       ],
     };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(settings),
+    );
     const sound = path.join(profile, 'notice.wav');
     fs.writeFileSync(sound, wave());
     fs.writeFileSync(
@@ -218,7 +223,24 @@ const checks = [];
       port,
       `(()=>{
       const e=${electronExpression},req=process.getBuiltinModule('module').createRequire(${portable ? "process.resourcesPath+'/app.asar/package.json'" : JSON.stringify(path.join(root, 'package.json'))});
-      e.powerMonitor.getSystemIdleState=()=> 'locked';
+      // The main-entry debugger must not pause the file reader's own worker startup.
+      const threads=req('node:worker_threads'), Worker=threads.Worker;
+      threads.Worker=class extends Worker{constructor(file,options){super(file,{...options,execArgv:[]});}};
+      globalThis.fixtureIdle='locked';
+      e.powerMonitor.getSystemIdleState=()=>fixtureIdle;
+      globalThis.lockFileChecks=0;globalThis.lockQueries=0;
+      const files=req('./out/main/main/core/file-watch-assistance').FileWatchAssistance.prototype, pauseFiles=files.setPaused, registerFile=files.register;
+      files.register=function(id,check){return registerFile.call(this,id,async context=>{globalThis.lockActiveFile=id;try{return await check(context);}finally{globalThis.lockActiveFile=null;}});};
+      files.setPaused=function(p){
+        if(!globalThis.lockFiles){this.register('fixture:session',async()=>{globalThis.lockFileChecks++;});}
+        globalThis.lockFiles=this;return pauseFiles.call(this,p);
+      };
+      const inputs=req('./out/main/main/core/gestures').InputCaptureManager.prototype, pauseInputs=inputs.setSessionPaused;
+      inputs.setSessionPaused=function(p){globalThis.lockInputs=this;return pauseInputs.call(this,p);};
+      const availability=req('./out/main/main/core/notification-availability').NotificationAvailability.prototype, pauseQueries=availability.setPaused;
+      availability.setPaused=function(p){globalThis.lockAvailability=this;return pauseQueries.call(this,p);};
+      // Keep this integration fixture independent of the workstation's actual notification mode.
+      req('./out/main/main/core/native-notification-state').NativeNotificationState.prototype.accepts=async()=>{globalThis.lockQueries++;return true;};
       const prototype=req('./out/main/main/core/notification-service').NotificationService.prototype, setPaused=prototype.setPaused;
       prototype.setPaused=function(p){globalThis.lockService=this;return setPaused.call(this,p);};
       globalThis.lockAudio=0;globalThis.lockWindows=0;
@@ -233,10 +255,14 @@ const checks = [];
         inspect(port, `globalThis.lockService?.list().some(i=>i.title==='Locked startup fixture')`),
       'startup notification',
     );
-    await delay(1500);
+    await until(
+      () => inspect(port, 'lockFiles?.started && lockInputs?.started'),
+      'common monitoring startup',
+    );
+    await delay(2200);
     const held = await inspect(
       port,
-      `({paused:lockService.isPaused(),notice:lockService.list().find(i=>i.title==='Locked startup fixture'),targets:['banner','desktop','windows'].map(t=>lockService.targetItems(t).length),audio:lockAudio,windows:lockWindows})`,
+      `({paused:lockService.isPaused(),notice:lockService.list().find(i=>i.title==='Locked startup fixture'),targets:['banner','desktop','windows'].map(t=>lockService.targetItems(t).length),audio:lockAudio,windows:lockWindows,files:lockFileChecks,queries:lockQueries,fileOptions:lockFiles.options,inputPaused:JSON.parse(lockInputs.fingerprint).assistancePaused,queryPaused:lockAvailability.paused})`,
     );
     assert.equal(held.paused, true);
     assert.equal(held.notice.status, 'active');
@@ -245,15 +271,34 @@ const checks = [];
     assert.equal(held.audio, 0);
     assert.equal(held.windows, 0);
     assert.equal(requests, 0);
+    assert.equal(held.files, 0);
+    assert.equal(held.queries, 0);
+    assert.deepEqual(held.fileOptions, { enabled: true, intervalSeconds: 2 });
+    assert.equal(held.inputPaused, true);
+    assert.equal(held.queryPaused, true);
     checks.push(
       'locked initial snapshot holds all visual targets, sound and speech beyond display lifetime',
     );
-    await inspect(port, `${electronExpression}.powerMonitor.emit('unlock-screen')`);
+    checks.push(
+      'shared locked startup stops file assistance, input fallback and OS eligibility queries',
+    );
+    await inspect(
+      port,
+      `fixtureIdle='active';${electronExpression}.powerMonitor.emit('unlock-screen')`,
+    );
     await until(
       () => inspect(port, 'lockAudio===2 && lockWindows===1'),
       'deferred sound, speech and Windows projection',
     );
     assert.equal(requests, 1);
+    await until(
+      () =>
+        inspect(
+          port,
+          'lockFileChecks>=1 && JSON.parse(lockInputs.fingerprint).assistancePaused===false',
+        ),
+      'shared resume catch-up',
+    );
     await until(
       () =>
         inspect(
@@ -273,8 +318,51 @@ const checks = [];
     assert.equal(await inspect(port, 'lockAudio'), 2);
     assert.equal(requests, 1);
     checks.push('subsequent lock cycle does not replay an ended episode');
+    await inspect(port, `${electronExpression}.powerMonitor.emit('suspend')`);
+    await until(
+      () => inspect(port, 'JSON.parse(lockInputs.fingerprint).assistancePaused===true'),
+      'input pause on suspend',
+    );
+    const suspended = await inspect(port, '({files:lockFileChecks,queries:lockQueries})');
+    await delay(2200);
+    assert.deepEqual(
+      await inspect(port, '({files:lockFileChecks,queries:lockQueries})'),
+      suspended,
+    );
+    await inspect(port, `fixtureIdle='locked';${electronExpression}.powerMonitor.emit('resume')`);
+    assert.equal(
+      await inspect(
+        port,
+        'lockFiles.paused && lockAvailability.paused && lockInputs.sessionPaused',
+      ),
+      true,
+    );
+    await inspect(
+      port,
+      `fixtureIdle='active';${electronExpression}.powerMonitor.emit('unlock-screen')`,
+    );
+    await until(
+      () =>
+        inspect(
+          port,
+          `lockFileChecks>${suspended.files} && !lockInputs.sessionPaused && !lockAvailability.paused`,
+        ),
+      'shared unlock after resume',
+    );
+    checks.push(
+      'suspend stops all three helpers; locked resume stays paused and final unlock catches up',
+    );
     success = true;
   } catch (error) {
+    if (child?.exitCode === null) {
+      try {
+        const state = await inspect(
+          port,
+          `({files:lockFileChecks,queries:lockQueries,filePaused:lockFiles.paused,fileRound:lockFiles.round,fileActive:globalThis.lockActiveFile,fileRegistrations:[...lockFiles.registrations.keys()],inputPaused:lockInputs.sessionPaused,inputFingerprint:lockInputs.fingerprint,inputFault:lockInputs.faultSettings,inputStopped:lockInputs.stopped,queryPaused:lockAvailability.paused})`,
+        );
+        fs.writeFileSync(path.join(profile, 'failure-state.json'), JSON.stringify(state, null, 2));
+      } catch {}
+    }
     fs.writeFileSync(path.join(profile, 'error.txt'), error.stack || String(error));
     console.error(error);
     process.exitCode = 1;

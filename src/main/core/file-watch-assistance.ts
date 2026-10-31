@@ -38,6 +38,8 @@ export class FileWatchAssistance {
   private registrations = new Map<string, Registration>();
   private started = false;
   private disposed = false;
+  private paused = false;
+  private resumeRequested = false;
   private round?: { cancelled: boolean };
   private wait?: Wait;
   private readonly clock: AssistanceClock;
@@ -66,6 +68,7 @@ export class FileWatchAssistance {
     const intervalChanged = options.intervalSeconds !== this.options.intervalSeconds;
     this.options = { enabled: options.enabled, intervalSeconds: options.intervalSeconds };
     if (!options.enabled) {
+      this.resumeRequested = false;
       this.cancelWait();
       if (this.round) this.round.cancelled = true;
       return;
@@ -77,6 +80,19 @@ export class FileWatchAssistance {
     if (this.disposed || this.started) return;
     this.started = true;
     this.ensureWait();
+  }
+  setPaused(paused: boolean) {
+    if (this.disposed || paused === this.paused) return;
+    this.paused = paused;
+    this.resumeRequested = false;
+    if (paused) {
+      this.cancelWait();
+      if (this.round) this.round.cancelled = true;
+    } else if (this.eligible()) {
+      // Finish an in-flight check before the single catch-up round after unlock.
+      if (this.round) this.resumeRequested = true;
+      else void this.run();
+    }
   }
   register(id: string, check: AssistanceCheck): () => void {
     if (this.disposed) throw new Error('File watch assistance is disposed.');
@@ -91,6 +107,7 @@ export class FileWatchAssistance {
       if (this.registrations.get(id) !== registration) return;
       this.registrations.delete(id);
       if (!this.registrations.size) {
+        this.resumeRequested = false;
         this.cancelWait();
         if (this.round) this.round.cancelled = true;
       }
@@ -100,6 +117,7 @@ export class FileWatchAssistance {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.resumeRequested = false;
     this.cancelWait();
     if (this.round) this.round.cancelled = true;
     const registrations = [...this.registrations.values()];
@@ -107,7 +125,13 @@ export class FileWatchAssistance {
     for (const registration of registrations) registration.controller.abort();
   }
   private eligible() {
-    return this.started && !this.disposed && this.options.enabled && this.registrations.size > 0;
+    return (
+      this.started &&
+      !this.disposed &&
+      !this.paused &&
+      this.options.enabled &&
+      this.registrations.size > 0
+    );
   }
   private cancelWait() {
     const wait = this.wait;
@@ -166,7 +190,10 @@ export class FileWatchAssistance {
       }
     } finally {
       this.round = undefined;
-      this.ensureWait();
+      if (this.resumeRequested && this.eligible()) {
+        this.resumeRequested = false;
+        void this.run();
+      } else this.ensureWait();
     }
   }
 }

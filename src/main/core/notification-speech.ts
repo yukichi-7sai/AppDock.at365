@@ -112,6 +112,7 @@ export class NotificationSpeechService {
     };
     r.timer = setTimeout(() => this.cancel(r), Math.max(0, this.deadline(r) - Date.now()));
     this.updateUse();
+    this.options.availability.prepareDelivery();
     this.reconcile();
   }
   private deadline(r: Record) {
@@ -159,7 +160,12 @@ export class NotificationSpeechService {
       try {
         const job = this.options.tts.speak('notification:' + r.notificationId, r.input, {
           startBefore: this.deadline(r),
-          canStart: () => this.valid(r) && this.options.availability.status() === 'allowed',
+          canStart: () => {
+            // Only previously authorized jobs reach this guard. Another notice's
+            // fresh query must not revoke them before suppression is confirmed.
+            const current = this.options.availability.status();
+            return this.valid(r) && (current === 'allowed' || current === 'unknown');
+          },
         });
         r.jobId = job.jobId as string;
         r.input = undefined;

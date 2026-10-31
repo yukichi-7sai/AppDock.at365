@@ -1,5 +1,5 @@
-/** Snapshot before Applet startup, then follow session events (including ARSO startup). */
-export class NotificationSession {
+/** Shared lock/suspend state, snapshotted before input and Applet startup. */
+export class HostSession {
   private locked = true;
   private suspended = false;
   private retry?: ReturnType<typeof setTimeout>;

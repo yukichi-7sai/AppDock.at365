@@ -15,6 +15,7 @@ export class NotificationDesktopHost {
   private stop: () => void;
   private disposed = false;
   private queued = false;
+  private deliveryIds = new Set<string>();
   private refreshDisplay = () => this.refresh();
   constructor(
     private options: {
@@ -68,7 +69,9 @@ export class NotificationDesktopHost {
   }
   refresh() {
     if (this.disposed) return;
-    if (!this.options.ready() || !this.options.service.targetItems('desktop').length) {
+    const items = this.options.ready() ? this.options.service.targetItems('desktop') : [];
+    if (!items.length) {
+      this.deliveryIds.clear();
       this.options.availability.use('desktop', false);
       this.host?.dispose();
       this.host = undefined;
@@ -76,7 +79,10 @@ export class NotificationDesktopHost {
       this.window = undefined;
       return;
     }
+    const newDelivery = items.some((item) => !this.deliveryIds.has(item.id));
+    this.deliveryIds = new Set(items.map((item) => item.id));
     this.options.availability.use('desktop', true);
+    if (newDelivery) this.options.availability.prepareDelivery();
     if (!this.window) {
       const window = new BrowserWindow({
         title: hostText('services.notificationDesktopHost.title'),

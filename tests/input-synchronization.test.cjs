@@ -133,3 +133,28 @@ test('native recording completion updates capture state and shutdown ignores que
   await settle();
   assert.equal(f.reads(), reads);
 });
+
+test('session pause reaches native assistance without changing input rules or manual gesture pause', async (t) => {
+  const f = fixture(t);
+  await f.manager.syncShortcuts([{ shortcut: 'Ctrl+;', blockOriginalInput: true }]);
+  await f.manager.start();
+  const before = f.applied.at(-1);
+  f.manager.setSessionPaused(true);
+  await settle();
+  const paused = f.applied.at(-1);
+  assert.equal(paused.assistancePaused, true);
+  assert.deepEqual(paused.shortcuts, before.shortcuts);
+  assert.deepEqual(paused.gestures, before.gestures);
+  assert.equal(paused.shortcutRevision, before.shortcutRevision);
+  const count = f.applied.length;
+  f.manager.setSessionPaused(true);
+  await settle();
+  assert.equal(f.applied.length, count);
+  f.manager.togglePause();
+  await settle();
+  f.manager.setSessionPaused(false);
+  await settle();
+  assert.equal(f.applied.at(-1).assistancePaused, false);
+  assert.equal(f.applied.at(-1).gestures.enabled, false);
+  assert.equal(f.manager.paused, true);
+});

@@ -8,7 +8,8 @@ namespace AppDock.InputHost;
 internal sealed record RecordingInput(string Token, string Window, bool AllowWin = true);
 internal sealed record CaptureConfiguration(Configuration Gestures, ShortcutInput[] Shortcuts,
     int ShortcutRevision, uint HostProcessId, string Context, RecordingInput? Recording = null,
-    bool ShortcutsActive = true, string? DialogWindow = null, string[]? DialogShortcuts = null);
+    bool ShortcutsActive = true, string? DialogWindow = null, string[]? DialogShortcuts = null,
+    bool AssistancePaused = false);
 internal sealed record ShortcutPressNotice(int Revision, long PressId, string[] Shortcuts,
     bool Blocked, string Window, string Context,
     [property: System.Text.Json.Serialization.JsonIgnore] uint HostProcessId, CommandTargetContext? Target = null)
@@ -86,11 +87,12 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         var active = inputs.Length > 0 || recording != null || Gestures.NeedsKeyboard || Gestures.NeedsMouse;
         // Other processes do not send WM_INPUTLANGCHANGE to us. Only symbol bindings need this fallback.
-        timer.IsEnabled = !disposed && monitoring && ((inputs.Length > 0 && lookup.HasSymbols) ||
+        timer.IsEnabled = !disposed && monitoring && configuration?.AssistancePaused != true && ((inputs.Length > 0 && lookup.HasSymbols) ||
             (active && (foregroundHook == 0 || desktopHook == 0)));
     }
     internal ShortcutStatus[] Configure(CaptureConfiguration next)
     {
+        var resumed = configuration?.AssistancePaused == true && !next.AssistancePaused;
         accepting = false;
         if (configuration?.ShortcutRevision != next.ShortcutRevision ||
             configuration?.Gestures.SettingsKey != next.Gestures.SettingsKey)
@@ -129,7 +131,8 @@ internal sealed class InputCaptureEngine : IDisposable
                 Error: "入力フックを適用できません。権限とほかの入力ソフトを確認してください。")).ToArray();
             notify("input.error", new { message = "入力フックを適用できません。", code = error is Win32Exception win ? win.NativeErrorCode : 0 });
         }
-        UpdateTimer();
+        if (resumed) Refresh();
+        else UpdateTimer();
         return statuses;
     }
     private nint ForegroundLayout()

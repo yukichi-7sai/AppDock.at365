@@ -84,6 +84,10 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## ファイル監視の補助確認
 
+`tests/notification-availability.test.cjs`は、OS可否確認の60秒予約、応答待ちの非重複、新規提示前の再確認、既知の抑制中の前倒し防止、ロック中の停止・古い応答拒否、失敗後の明示再試行を模擬時刻で確認する。`tests/notification-session.test.cjs`は本体共通のHostSessionの初期状態・ロックとサスペンドの重なり・resume時の状態再取得と既存の音声保留を担当する。`scripts/notification-lock-startup-test.cjs [固定EXE]`は、隔離した実ElectronでセッションイベントとOS可否応答を模擬し、3つの補助停止・解除後の巡回・入力補助の再開・通知の期限と音声の既存動作を確認する。実際のWindowsロックやスリープ、応答不可モードの変更は行わない。ファイル読取workerにはfixtureの起動停止用デバッガ引数を渡さない。
+
+`tests/file-watch-assistance.test.cjs`は保留中の無巡回・解除後の1巡・I/O途中の保留と短い解除でも直列性が保たれることも確認する。`tests/input-synchronization.test.cjs`はセッション保留のnative設定への伝達と入力規則・手動ジェスチャー停止の独立性、`InputTests --input-environment`はnative補助タイマーの停止と解除後の状態更新を検査する。
+
 現行soundsの一覧監視は`tests/file-watch-sounds.test.cjs`で初期照合・OFF時の無走査・通知欠落と完了待ち・走査中の通知・watch失敗・停止後の結果拒否・開始の重複を確認する。`tests/registered-sounds.test.cjs`と`tests/sound-assets.test.cjs`は既存のWAV検証・同名登録・保存先を担当する。`scripts/file-watch-sounds-ui-test.cjs [固定EXE]`は隔離した実Electronで通常watch、補助OFF/ON、抑止した通知の回復、選択値と素材の保持、停止/再開時の登録寿命を確認する。外部サービスと実スピーカー再生は使わない。
 
 `tests/file-watch-assistance.test.cjs`は共通ループ、`tests/file-observer.test.cjs`と`tests/settings-observer-race.test.cjs`は安定確認・通知欠落・保存競合、`tests/file-watch-images.test.cjs`は画像の祖先watch・差分確認・走査中イベント、`tests/file-watch-rosters.test.cjs`は名簿の登録寿命と通知欠落時の受信、`tests/file-watch-settings.test.cjs`は設定の既定/検証/保存を担当する。`scripts/file-watch-assistance-ui-test.cjs [固定EXE]`は設定のON/OFF・数値確定/取消/失敗・通常watch継続・広狭幅・旧残存チェックの非実行とデータ保持を確認する。旧残存チェック専用の単体/GUI試験は機構とともに削除し、共通の警告episodeは`tests/warning-reporter.test.cjs`へ残す。

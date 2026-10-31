@@ -85,6 +85,7 @@ export class InputCaptureManager {
   private active = new Map<string, AbortController>();
   private recordSequence = 0;
   private endedRecordings = new Set<string>();
+  private sessionPaused = false;
   paused = false;
   private foregroundWindow?: string;
   constructor(
@@ -147,6 +148,11 @@ export class InputCaptureManager {
   togglePause() {
     this.paused = !this.paused;
     void this.refresh().catch(() => {});
+  }
+  setSessionPaused(paused: boolean) {
+    if (this.stopped || paused === this.sessionPaused) return;
+    this.sessionPaused = paused;
+    this.requestRefresh();
   }
   refresh(force = false): Promise<NativeShortcutStatus[]> {
     const work = this.queue.then(() => this.sync(force));
@@ -486,6 +492,7 @@ export class InputCaptureManager {
       recording: this.recording ?? null,
       dialogWindow: state.dialogWindow ?? '',
       dialogShortcuts: dialogNavigationShortcuts,
+      assistancePaused: this.sessionPaused,
     };
     const fingerprint = JSON.stringify(config);
     if (!force && fingerprint === this.fingerprint && !this.faultSettings) return this.statuses;

@@ -380,3 +380,44 @@ test('starting playback before freshness deadline permits long playback past tha
   assert(f.speech.allows('notification:' + a.notificationId));
   release();
 });
+
+test('a new eligibility check retains authorized speech while new speech waits for permission', async (t) => {
+  let generationReady, finishQuery;
+  const f = setup(t, {
+    tts: {
+      fetcher: (url, options) =>
+        new Promise((resolve, reject) => {
+          generationReady = () =>
+            resolve(new Response(wave(), { headers: { 'Content-Type': 'audio/wav' } }));
+          options.signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Canceled', 'AbortError')),
+            { once: true },
+          );
+        }),
+    },
+  });
+  const first = f.publish('first');
+  await wait(() => generationReady);
+  const owner = 'notification:' + first.notificationId;
+  const jobId = f.speech.records.get(first.notificationId).jobId;
+  f.availability.options.query = () =>
+    new Promise((resolve) => {
+      finishQuery = resolve;
+    });
+  let second;
+  try {
+    second = f.publish('second');
+    assert.equal(f.availability.status(), 'unknown');
+    assert.equal(f.speech.records.get(second.notificationId).jobId, undefined);
+    generationReady();
+    await wait(() => ['completed', 'canceled', 'failed'].includes(f.tts.get(owner, jobId).state));
+    assert.equal(f.tts.get(owner, jobId).state, 'completed');
+    assert.equal(f.played.length, 1);
+  } finally {
+    finishQuery?.(false);
+    await new Promise(setImmediate);
+  }
+  assert.equal(f.speech.allows('notification:' + second.notificationId), false);
+  assert.equal(f.played.length, 1, 'new speech never starts using the older permission');
+});

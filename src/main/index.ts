@@ -228,7 +228,7 @@ import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
 import { audioPlayback } from './core/audio-service';
 import { notificationSounds } from './core/sounds';
-import { NotificationSession } from './core/notification-session';
+import { HostSession } from './core/host-session';
 import { NotificationAvailability } from './core/notification-availability';
 import { NativeNotificationState } from './core/native-notification-state';
 import { NotificationSpeechService } from './core/notification-speech';
@@ -391,7 +391,7 @@ let settingsRecoveryBusy = false;
 const settingsOperationBusy = () => settingsRecoveryBusy || launch.isBusy;
 let notificationSpeech: NotificationSpeechService | undefined;
 let notificationAvailability: NotificationAvailability | undefined;
-let notificationSession: NotificationSession | undefined;
+let hostSession: HostSession | undefined;
 const settingsInputFlushes = new Map<string, () => void>();
 async function flushSettingsInputs() {
   if (!window || window.isDestroyed() || window.webContents.isLoading())
@@ -4235,7 +4235,7 @@ async function initialize() {
         hostText('services.index.notificationAvailabilityFailed'),
       ),
   });
-  notificationSession = new NotificationSession({
+  hostSession = new HostSession({
     state: () => powerMonitor.getSystemIdleState(1),
     on: (event, callback) => {
       const monitor: NodeJS.EventEmitter = powerMonitor;
@@ -4245,7 +4245,9 @@ async function initialize() {
       };
     },
     changed: (paused) => {
-      notificationAvailability?.setBlocked('lock', paused);
+      fileWatchAssistance.setPaused(paused);
+      gestures?.setSessionPaused(paused);
+      notificationAvailability?.setPaused(paused);
       notificationSounds.setPaused(paused);
       notificationService?.setPaused(paused);
     },
@@ -5195,7 +5197,7 @@ app.on('before-quit', (event) => {
   notificationWindows?.dispose();
   notificationSpeech?.dispose();
   notificationAvailability?.dispose();
-  notificationSession?.dispose();
+  hostSession?.dispose();
   notificationSounds.dispose();
   typedNotifications?.dispose();
   notificationService?.dispose();

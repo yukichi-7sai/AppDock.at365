@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { NotificationSession } = require('../out/main/main/core/notification-session');
+const { HostSession } = require('../out/main/main/core/host-session');
 const { NotificationSounds } = require('../out/main/main/core/notification-sounds');
 const turn = () => new Promise((r) => setImmediate(r));
 test('sound OFF discards lock-held and newly submitted sounds before reading files', async () => {
@@ -66,7 +66,7 @@ test('ARSO startup snapshot pauses before first notification; unlock, lock and r
   const events = new Map(),
     states = [];
   let state = 'locked';
-  const session = new NotificationSession({
+  const session = new HostSession({
     state: () => state,
     on: (event, callback) => {
       events.set(event, callback);
@@ -93,7 +93,7 @@ test('unknown or failed initial snapshot fails closed', () => {
     },
   ]) {
     const states = [];
-    const session = new NotificationSession({
+    const session = new HostSession({
       state,
       on: () => () => {},
       changed: (p) => states.push(p),
@@ -101,6 +101,34 @@ test('unknown or failed initial snapshot fails closed', () => {
     assert.deepEqual(states, [true]);
     session.dispose();
   }
+});
+
+test('shared session stays paused across overlapping lock and suspend; resume rechecks the actual session', () => {
+  const events = new Map(),
+    states = [];
+  let state = 'active';
+  const session = new HostSession({
+    state: () => state,
+    on: (event, callback) => {
+      events.set(event, callback);
+      return () => events.delete(event);
+    },
+    changed: (paused) => states.push(paused),
+  });
+  events.get('suspend')();
+  events.get('lock-screen')();
+  events.get('unlock-screen')();
+  assert.equal(states.at(-1), true, 'unlock does not clear a suspended session');
+  state = 'locked';
+  events.get('resume')();
+  assert.equal(states.at(-1), true, 'resume does not clear the actual lock');
+  events.get('unlock-screen')();
+  assert.equal(states.at(-1), false);
+  state = 'idle';
+  events.get('resume')();
+  assert.equal(states.at(-1), false, 'idle alone does not stop monitoring');
+  session.dispose();
+  assert.equal(events.size, 0);
 });
 
 test('notification sounds wait without reading files; unlock plays in order and drops stopped owners', async () => {

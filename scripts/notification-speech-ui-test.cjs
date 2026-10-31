@@ -19,6 +19,15 @@ let child,
   server,
   success = false;
 const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+const savedNotifications = () => {
+  const file = require('./test-settings.cjs').file(
+    profile,
+    `settings-${require('node:os').hostname()}.json`,
+  );
+  const device = JSON.parse(fs.readFileSync(file));
+  assert.equal(device.hostPages.notifications.useLocalSettings, true);
+  return device.hostPages.notifications.configuration.notificationPreferences;
+};
 const until = async (fn, label) => {
   const end = Date.now() + 30000;
   while (Date.now() < end) {
@@ -127,7 +136,10 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
         ");});c.commands.register('fixture.speech.real','Real',async()=>{id=(await c.notifications.publish({typeId:'message',title:'通知読み上げの動作確認です。',body:'',dedupeKey:'real'})).notificationId;});};",
     );
     initial.extensions[id] = { enabled: true, settings: {} };
-    fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+    fs.writeFileSync(
+      require('./test-settings.cjs').file(profile, 'settings.json'),
+      JSON.stringify(initial),
+    );
     const exe = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (process.argv[2]) {
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);
@@ -189,11 +201,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await voice.fill('custom-voice');
     await voice.press('Enter');
     await settleSettings(page);
-    assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).notificationPreferences
-        .speech.voice,
-      'custom-voice',
-    );
+    assert.equal(savedNotifications().speech.voice, 'custom-voice');
     await page.getByRole('button', { name: 'ボイス一覧を更新', exact: true }).click();
     await until(async () => !(await toggle.isDisabled()), 'voice catalog');
     await toggle.click();
@@ -202,11 +210,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await list.getByRole('option', { name: 'second Second voice', exact: true }).click();
     await settleSettings(page);
     assert.equal(await voice.inputValue(), 'second');
-    assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).notificationPreferences
-        .speech.voice,
-      'second',
-    );
+    assert.equal(savedNotifications().speech.voice, 'second');
     await voice.fill('not');
     await voice.press('ArrowDown');
     await voice.press('Enter');
@@ -288,9 +292,9 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
     await notificationDialog.getByTestId('settings-dialog-confirm').click();
     await notificationDialog.waitFor({ state: 'hidden' });
     await settleSettings(page);
-    const saved = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json')));
-    assert.deepEqual(saved.notificationPreferences.speech, { voice: 'notice', speed: 1.6 });
-    assert.equal(saved.notificationPreferences.overrides.find((r) => r.ownerId === id).speak, true);
+    const saved = savedNotifications();
+    assert.deepEqual(saved.speech, { voice: 'notice', speed: 1.6 });
+    assert.equal(saved.overrides.find((r) => r.ownerId === id).speak, true);
     checks.push(
       'voice/speed save immediately; notification speech saves only after dialog confirmation',
     );

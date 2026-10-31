@@ -61,6 +61,31 @@ internal static partial class Program
             Set("foregroundHook", foregroundHook); Invoke("UpdateTimer");
             Inputs(new { shortcut = ";" }); Invoke("UpdateTimer");
             Check(timer.IsEnabled && timer.Interval == TimeSpan.FromSeconds(1), "symbol shortcuts use the slow layout fallback");
+            object SessionConfiguration(bool paused, bool active) => Decode("CaptureConfiguration", new {
+                gestures = new { enabled = false, browsers = Array.Empty<string>(), excludedProcesses = Array.Empty<string>(),
+                    rows = Array.Empty<object>(), context = "session", revision = 0 },
+                shortcuts = new[] { new { shortcut = ";", blockOriginalInput = true } },
+                shortcutRevision = 1, context = "session", assistancePaused = paused, shortcutsActive = active,
+            });
+            object? ConfigureWithoutInputHooks(bool paused, bool active = false) {
+                Set("keyboardHook", new nint(-1)); Set("mouseHook", new nint(-1));
+                try { return Invoke("Configure", SessionConfiguration(paused, active)); }
+                finally { Set("keyboardHook", nint.Zero); Set("mouseHook", nint.Zero); }
+            }
+            var pausedStatuses = (Array)ConfigureWithoutInputHooks(true)!;
+            ConfigureWithoutInputHooks(true, true);
+            Check(!timer.IsEnabled && pausedStatuses.Length == 1,
+                "shared session pause stops the fallback while retaining configured shortcut status");
+            Invoke("UpdateTimer");
+            Check(!timer.IsEnabled, "reconciliation cannot restart input assistance while locked or suspended");
+            Set("foregroundWindow", null);
+            var beforeResume = notices.Count(n => n.Method == "capture.foreground");
+            ConfigureWithoutInputHooks(false);
+            ConfigureWithoutInputHooks(false, true);
+            Check(timer.IsEnabled && notices.Count(n => n.Method == "capture.foreground") == beforeResume + 1,
+                "resume snapshots current foreground and restarts only the needed fallback");
+            Check((bool)Get("accepting") && ((Array)Get("inputs")).Length == 1,
+                "session assistance pause preserves input acceptance and saved input rules after resume");
             Inputs(); Invoke("UpdateTimer");
             Check(!timer.IsEnabled, "removing the last input stops the fallback");
             Check((nint)Get("keyboardHook") == 0 && (nint)Get("mouseHook") == 0, "monitoring and compilation have installed no keyboard or mouse hooks");

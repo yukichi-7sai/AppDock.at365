@@ -555,3 +555,52 @@ test('native assistance timers do not prevent an otherwise idle process from exi
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim(), 'ready');
 });
+
+test('lock cancels the wait and unlock catches up once without changing enabled or interval', async (t) => {
+  const f = fixture(t);
+  let calls = 0;
+  f.service.register('one', async () => calls++);
+  f.enable(5);
+  await f.clock.tick(4000);
+  f.service.setPaused(true);
+  await f.clock.tick(600000);
+  assert.equal(calls, 0);
+  assert.equal(f.clock.pending.size, 0);
+  f.service.setPaused(false);
+  await flush();
+  assert.equal(calls, 1);
+  f.service.setPaused(false);
+  await f.clock.tick(4999);
+  assert.equal(calls, 1);
+  await f.clock.tick(1);
+  assert.equal(calls, 2);
+  f.service.setPaused(true);
+  f.service.configure({ enabled: false, intervalSeconds: 5 });
+  f.service.setPaused(false);
+  await f.clock.tick(600000);
+  assert.equal(calls, 2, 'unlock does not enable disabled assistance');
+});
+
+test('lock during a scan skips later checks and quick unlock never overlaps the catch-up round', async (t) => {
+  const f = fixture(t),
+    gate = deferred();
+  const calls = [];
+  f.service.register('first', async () => {
+    calls.push('first');
+    if (calls.length === 1) await gate.promise;
+  });
+  f.service.register('second', async () => calls.push('second'));
+  f.enable();
+  await f.clock.tick(2000);
+  f.service.setPaused(true);
+  f.service.setPaused(false);
+  await f.clock.tick(10000);
+  assert.deepEqual(calls, ['first']);
+  gate.resolve();
+  await flush();
+  assert.deepEqual(calls, ['first', 'first', 'second']);
+  await f.clock.tick(1999);
+  assert.equal(calls.length, 3);
+  await f.clock.tick(1);
+  assert.deepEqual(calls, ['first', 'first', 'second', 'first', 'second']);
+});

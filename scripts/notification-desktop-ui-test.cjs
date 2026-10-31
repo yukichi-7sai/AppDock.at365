@@ -86,7 +86,10 @@ if (!process.argv[2]) {
   initial.host.shellProviders = { 'notification.desktop': customId };
   initial.extensions[customId] = { enabled: true, settings: {} };
 }
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 const executable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
 if (executable) {
@@ -140,7 +143,7 @@ async function surface(kind, provider) {
 }
 const command = (id) => host.evaluate((id) => window.dock.executeCommand(id), id);
 const storage = (id, key) => {
-  const file = path.join(profile, 'data/storage', id, key + '.json');
+  const file = require('./test-storage.cjs').file(profile, id, key);
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file)) : null;
 };
 (async () => {
@@ -237,6 +240,33 @@ const storage = (id, key) => {
     assert.equal(await main('electron.BrowserWindow.getFocusedWindow()?.id'), hiddenFocus);
     checks.push(
       'tray work-area bounds, stacked/scrollable cards and independent delivery while the main Window is hidden',
+    );
+    await main(`(()=>{
+      const req=process.getBuiltinModule('module').createRequire(${executable ? "process.resourcesPath+'/app.asar/package.json'" : JSON.stringify(path.join(root, 'package.json'))});
+      globalThis.fixtureOSAllowed=false;globalThis.fixtureOSQueries=0;
+      req('./out/main/main/core/native-notification-state').NativeNotificationState.prototype.accepts=async()=>{globalThis.fixtureOSQueries++;return globalThis.fixtureOSAllowed;};
+      const prototype=req('./out/main/main/core/notification-availability').NotificationAvailability.prototype, prepare=prototype.prepareDelivery;
+      prototype.prepareDelivery=function(){globalThis.fixtureAvailability=this;return prepare.call(this);};
+      return true;
+    })()`);
+    await command(ids.node + '.publish');
+    await until(
+      () => main('fixtureOSQueries===1 && fixtureAvailability.status()==="blocked"'),
+      'fresh eligibility before a new desktop notice',
+    );
+    await until(
+      async () => !(await main(desktopWindow + '.isVisible()')),
+      'new notice suppressed instead of using cached permission',
+    );
+    await main('(fixtureOSAllowed=true)');
+    await command(ids.node + '.publish');
+    assert.equal(await main('fixtureOSQueries'), 1);
+    assert.equal(await main(desktopWindow + '.isVisible()'), false);
+    await main('(fixtureAvailability.retry(),true)');
+    await until(() => main(desktopWindow + '.isVisible()'), 'explicit eligibility retry');
+    assert.equal(await main('fixtureOSQueries'), 2);
+    checks.push(
+      'new desktop notices recheck cached permission; known suppression is not advanced by another notice and explicit retry restores delivery',
     );
     await main('electron.powerMonitor.emit("lock-screen")');
     await until(

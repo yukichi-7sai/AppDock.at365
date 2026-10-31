@@ -12,7 +12,7 @@ NotificationServiceはinfo/warning/error、timed/manual/condition、操作、所
 
 ### ロック中の保留
 
-`NotificationSession`はApplet開始前にElectron `powerMonitor.getSystemIdleState(1)`で現在のロック状態を確認し、以後のlock/unlock・suspend/resumeを監視する。Windowsの自動サインイン後にロックされたまま起動する場合も対象にする。初回状態が不明・照会失敗なら保留して1秒後に再確認する。idleはロックとして扱わない。
+本体共通の`HostSession`は入力・Applet開始前にElectron `powerMonitor.getSystemIdleState(1)`で現在のロック状態を確認し、以後のlock/unlock・suspend/resumeを監視する。同じ保留状態を通知、ファイル変更監視補助、InputHostの補助確認へ伝える。Windowsの自動サインイン後にロックされたまま起動する場合も対象にする。初回状態が不明・照会失敗なら保留して1秒後に再確認する。idleはロックとして扱わない。resumeでは現在の状態を取得し直し、ロック中なら保留を維持する。解除後の追加の60秒待機は設けない。
 
 保留中はbanner/desktop/windowsへの投影を空にし、新規通知の読み上げ受付を解除後へ遅らせる。通知のID、状態、最新本文、安全な履歴は受付時点から通常どおり管理し、更新は同じIDへ集約する。解消・撤回・発行元停止・世代変更で無効になった通知は解除後に再提示しない。すでに表示済みだったWindows通知を戻す際は、本文が同じならOSの通知音を再度鳴らさない。実行中の自動読み上げは既存の取消方針に従い、再読しない。
 
@@ -124,7 +124,7 @@ NotificationDesktopHostは通知がある間だけ独立Windowと表示可否que
 
 トレイ座標の画面、取得できなければ本体の画面のworkAreaへ配置する。座標はDIP、幅最大440/高さ最大600または作業領域60%、余白12。トレイがある側の隅を選び、負の画面座標や狭い画面も範囲内へ収める。画面追加/削除/作業領域・scale変更で再計算する。
 
-[SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shqueryusernotificationstate)のACCEPTS_NOTIFICATIONSだけを表示可能とし、desktop対象がある間に1秒ごと問い合わせる。ロック/サスペンドのイベントと本体の全画面化も抑制する。非表示はdelivery:hiddenで、通知自体はactiveを保ち、期限は進む。問い合わせ失敗はログへ記録し、センターの閲覧を継続する。自動worker再起動を繰り返さず「Shellを再試行」で再問い合わせできる。
+[SHQueryUserNotificationState](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shqueryusernotificationstate)のACCEPTS_NOTIFICATIONSだけを表示可能とする。desktop表示・読み上げで問い合わせを共用し、最初の対象の発生時と、新しい通知の提示前に確認する。通知可能だったキャッシュだけで新規提示を許可しない。通知不可と分かった後は新しい通知が増えても確認を前倒しせず、表示・待機対象がある間、前回の問い合わせ完了から60秒後に1回だけ次を予約する。通知可能な間も同じ間隔で状態変化を確認する。対象がなくなった場合、本体共通のロック/サスペンド保留中、本体の全画面化による抑制中は予約と問い合わせworkerを停止し、遅れた応答を反映しない。解除後は必要な対象があれば確認を再開する。非表示はdelivery:hiddenで、通知自体はactiveを保ち、通常の通知不可では期限は進む。ロック/サスペンド時の期限保留は前述の規則に従う。問い合わせ失敗はログへ記録し、センターの閲覧を継続する。自動worker再起動を繰り返さず「Shellを再試行」で再問い合わせできる。
 
 Shell未提供/故障は同じ共通HostでDefault Shellへ戻る。Default Shellも利用不能なdesktopはdelivery:failedとログを使い、勝手にバナーへ配送しない。バナーのDefault Shell全故障時に使うネイティブdialogをdesktopへ複製しない。
 
