@@ -253,7 +253,8 @@ export class WebAccountController {
   private soundFailures = new Map<string, string>();
   private sounds: RegisteredSounds;
   private registeredSounds: string[] = [];
-  private soundPoll?: ReturnType<typeof setInterval>;
+  private soundWatch?: ReturnType<RegisteredSounds['watch']>;
+  private soundsInitialized?: Promise<void>;
   private avatars = new Map<
     string,
     { url: string; image: string; retryAt: number; abort?: AbortController }
@@ -572,13 +573,16 @@ export class WebAccountController {
       ),
     });
   }
-  private async refreshSounds() {
-    const files = await this.sounds.list();
+  private receiveSounds(files: string[]) {
     if (this.disposed) return;
     if (JSON.stringify(files) !== JSON.stringify(this.registeredSounds)) {
       this.registeredSounds = files;
       this.changed();
     }
+  }
+  private async refreshSounds() {
+    if (this.soundWatch) await this.soundWatch.check(true);
+    else this.receiveSounds(await this.sounds.list());
   }
   async cycle(direction: unknown) {
     if (this.disposed) throw Error('Web accounts are closed');
@@ -887,11 +891,16 @@ export class WebAccountController {
       })();
     await this.initializing;
     if (this.disposed) return;
-    await this.refreshSounds();
-    if (!this.soundPoll)
-      this.soundPoll = setInterval(() => {
-        void this.refreshSounds().catch(() => {});
-      }, 2000);
+    this.soundWatch ??= this.sounds.watch(
+      (files) => this.receiveSounds(files),
+      () => this.services.failed(hostText('services.webAccounts.soundListFailed')),
+      this.services.assistance,
+    );
+    await (this.soundsInitialized ??= this.soundWatch.check().catch((error) => {
+      this.soundsInitialized = undefined;
+      throw error;
+    }));
+    if (this.disposed) return;
     for (const a of this.state.accounts) if (!this.deleting.has(a.id)) this.view(a.id);
   }
   private async returnHiddenViewToStart(view: WebContentsView) {
@@ -1379,7 +1388,7 @@ export class WebAccountController {
   async close() {
     if (this.disposed) return;
     this.disposed = true;
-    clearInterval(this.soundPoll);
+    this.soundWatch?.close();
     this.unsubscribeGroup?.();
     this.unsubscribeSettings?.();
     nativeTheme.removeListener('updated', this.themeChanged);

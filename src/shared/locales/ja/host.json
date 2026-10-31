@@ -1,7 +1,8 @@
 {
   "general.fileWatch.section": "ファイル監視",
   "general.fileWatch.enabled": "ファイル監視の補助確認",
-  "general.fileWatch.description": "設定・アカウント名簿・登録画像を定期的に再確認します。OFFでも通常のファイル監視と起動時の確認は続きます。",
+  "general.fileWatch.description": "設定・アカウント名簿・登録画像・通知音を定期的に再確認します。OFFでも通常のファイル監視と起動時の確認は続きます。",
+  "services.webAccounts.soundListFailed": "登録済みの通知音一覧を確認できませんでした。保存先の状態を確認してください。",
   "general.fileWatch.interval": "補助確認の待機時間（秒）",
   "general.fileWatch.intervalDescription": "すべての確認が終わってから次の確認まで待つ時間です。2秒以上で指定してください。短いほどファイルへのアクセスが増えます。",
   "services.fileWatch.failed": "ファイル監視の補助確認に失敗しました。保存先の状態を確認してください。",

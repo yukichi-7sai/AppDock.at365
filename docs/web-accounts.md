@@ -89,6 +89,8 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 
 選択したWAVはRIFF/WAVE・16MB以下を検証し、EXE隣の`data/assets/applets/<Applet ID>/sounds`へ元のファイル名で登録します。同名・同一内容は再利用し、同名で内容が異なる場合は拒否します。元ファイルを変更せず、登録素材を停止時の未参照キャッシュとして削除しません。再選択で復旧できます。詳細は[登録素材](settings-sync.md#ファイル名を使う登録素材)を参照してください。
 
+通知音の一覧は、開始時に1回取得し、通常のファイル監視と[共通補助確認](file-watch-assistance-design.md)で更新します。補助確認は一般設定のON/OFF・待機時間に従い、独立した2秒タイマーは持ちません。繰り返しのWorker readで初期走査を再実行せず、登録・選択時は明示的に再確認します。一覧はファイル名だけを読み、WAV内容の検証・再生は従来の操作時に行います。停止は監視登録だけを解放し、登録済みファイルと選択値は保持します。
+
 snapshot/readには`dark:boolean`も含まれます。AppDockのテーマを反映したnativeTheme.shouldUseDarkColorsで、テーマ変更時にローカルUIへonChangedを通知します。サービス自身のWebページのCSSは変更しません。
 
 操作UIと各WebContentsのbefore-input-eventは本体の共通ショートカット処理へ渡します。条件と同一キーの実行順は[条件付きショートカット](keybindings.md)に従い、グローバル登録と重複実行しません。長押し・IME入力を区別し、Appletの初期キーはmanifestのdefaultKeybindingsから初回だけ反映します。
