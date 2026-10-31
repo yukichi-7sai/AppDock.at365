@@ -1,18 +1,16 @@
-export interface AssistanceOptions {
-  enabled: boolean;
-  intervalSeconds: number;
-}
+import {
+  defaultFileWatchAssistanceOptions,
+  minimumFileWatchAssistanceIntervalSeconds,
+  type AssistanceOptions,
+} from '../../shared/file-watch-assistance';
+export { defaultFileWatchAssistanceOptions, minimumFileWatchAssistanceIntervalSeconds };
+export type { AssistanceOptions };
 export type AssistanceCheck = (context: { signal: AbortSignal }) => Promise<void>;
 export interface AssistanceClock {
   /** Monotonic nanoseconds, independent of wall-clock adjustments. */
   now(): bigint;
   schedule(callback: () => void, delayMilliseconds: number): { cancel(): void };
 }
-export const defaultFileWatchAssistanceOptions: Readonly<AssistanceOptions> = Object.freeze({
-  enabled: false,
-  intervalSeconds: 300,
-});
-export const minimumFileWatchAssistanceIntervalSeconds = 2;
 const nanosecondsPerSecond = 1_000_000_000n;
 const nanosecondsPerMillisecond = 1_000_000n;
 const maximumTimerDelayMilliseconds = 2_147_483_647n;

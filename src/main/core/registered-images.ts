@@ -50,7 +50,13 @@ export class RegisteredImages {
   private reads: Promise<unknown> = Promise.resolve();
   private stopped = false;
   private refreshing?: Promise<void>;
-  private timer?: ReturnType<typeof setInterval>;
+  private watching = false;
+  private unregister?: () => void;
+  private watchedDirectory?: string;
+  private connectionGeneration = 0;
+  private watchError?: string;
+  private pendingFull = false;
+  private pendingFiles = new Set<string>();
   private watcher?: FSWatcher;
   private listeners = new Set<() => void>();
   error?: string;
@@ -58,6 +64,7 @@ export class RegisteredImages {
     readonly directory: string,
     private decode: ImageDecoder,
     private changed: () => void = () => {},
+    private assistance?: import('./file-watch-assistance').FileWatchAssistance,
   ) {}
   onChanged(callback: () => void) {
     this.listeners.add(callback);
@@ -474,12 +481,77 @@ export class RegisteredImages {
       for (const record of this.entries.values())
         if (record.entry.state === 'error') record.signature = '';
     if (this.refreshing) return this.refreshing;
-    this.refreshing = this.scan().finally(() => {
+    return this.beginRefresh();
+  }
+  private requestRefresh(files?: string[]) {
+    if (this.stopped) return;
+    if (this.refreshing) {
+      if (!files) this.pendingFull = true;
+      else for (const file of files) this.pendingFiles.add(file);
+    } else void this.beginRefresh(files);
+  }
+  private beginRefresh(files?: string[]): Promise<void> {
+    this.refreshing = this.scan(files).finally(() => {
       this.refreshing = undefined;
+      const full = this.pendingFull,
+        pending = [...this.pendingFiles];
+      this.pendingFull = false;
+      this.pendingFiles.clear();
+      if (!this.stopped && (full || pending.length))
+        void this.beginRefresh(full ? undefined : pending);
     });
     return this.refreshing;
   }
-  private async scan() {
+  private async connectWatch(directory = this.directory, recover = true): Promise<void> {
+    const connectionGeneration = ++this.connectionGeneration;
+    while (this.watching && !this.stopped) {
+      if (this.watcher && this.watchedDirectory === directory) return;
+      try {
+        if (
+          (await fs.realpath(directory)).toLowerCase() !== path.resolve(directory).toLowerCase() ||
+          (await fs.lstat(directory)).isSymbolicLink()
+        )
+          throw Error('Redirected image watch directory');
+        if (!this.watching || this.stopped || connectionGeneration !== this.connectionGeneration)
+          return;
+        const next = watch(directory, (_, filename) => {
+          if (this.watcher !== next || this.stopped) return;
+          const name = filename?.toString();
+          if (directory !== this.directory) {
+            const expected = path.relative(directory, this.directory).split(path.sep)[0];
+            if (!name || name.toLowerCase() === expected.toLowerCase()) this.requestRefresh();
+          } else if (!name) this.requestRefresh();
+          else if (imageFilename(name)) this.requestRefresh([name]);
+        });
+        this.watcher?.close();
+        this.watcher = next;
+        this.watchedDirectory = directory;
+        this.watchError = undefined;
+        next.on('error', () => {
+          if (this.watcher !== next || this.stopped) return;
+          next.close();
+          this.watcher = undefined;
+          this.watchedDirectory = undefined;
+          this.error = this.watchError = hostText('services.registeredImages.readFailed');
+          this.notify();
+          const parent = path.dirname(directory);
+          if (recover && parent !== directory) void this.connectWatch(parent, false);
+        });
+        return;
+      } catch (error) {
+        if (!this.watching || this.stopped || connectionGeneration !== this.connectionGeneration)
+          return;
+        const parent = path.dirname(directory);
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT' && parent !== directory) {
+          directory = parent;
+          continue;
+        }
+        this.watchError = hostText('services.registeredImages.readFailed');
+        return;
+      }
+    }
+  }
+  private async scan(files?: string[]) {
     const signature = () =>
       JSON.stringify([
         this.list(),
@@ -489,26 +561,36 @@ export class RegisteredImages {
     const previous = signature();
     try {
       await this.root();
-      const names = (await fs.readdir(this.directory, { withFileTypes: true }))
-        .filter((f) => f.isFile() && imageFilename(f.name))
-        .slice(0, 512);
+      if (this.stopped) return;
+      if (this.watching) await this.connectWatch();
+      const names = files
+        ? files.map((name) => ({ name }))
+        : (await fs.readdir(this.directory, { withFileTypes: true }))
+            .filter((f) => f.isFile() && imageFilename(f.name))
+            .slice(0, 512);
+      if (this.stopped) return;
       const seen = new Set<string>();
       for (const f of names) {
         const key = f.name.toLowerCase();
         seen.add(key);
         try {
           const { signature, bytes } = await this.fileSignature(f.name);
+          if (this.stopped) return;
           const old = this.entries.get(key);
           if (old?.signature === signature && (old.entry.available || old.entry.state === 'error'))
             continue;
           this.replace(f.name, signature, bytes, old);
-        } catch {
+        } catch (error) {
+          if (this.stopped) return;
           const old = this.entries.get(key);
+          const missing = ['ENOENT', 'ENOTDIR'].includes(
+            (error as NodeJS.ErrnoException).code ?? '',
+          );
           if (old) {
             old.signature = '';
             old.entry.available = false;
-            old.entry.state = 'error';
-          } else
+            old.entry.state = missing ? 'missing' : 'error';
+          } else if (!missing)
             this.entries.set(key, {
               signature: '',
               hash: '',
@@ -526,24 +608,17 @@ export class RegisteredImages {
             });
         }
       }
-      for (const [key, value] of this.entries)
-        if (!seen.has(key)) {
-          value.entry.available = false;
-          value.entry.state = 'missing';
-        }
-      this.error = undefined;
-      if (this.timer && !this.watcher) {
-        try {
-          this.watcher = watch(this.directory, () => void this.refresh());
-          this.watcher.on('error', () => {
-            this.watcher?.close();
-            this.watcher = undefined;
-          });
-        } catch {
-          /* Polling remains the recovery path when watch is unavailable. */
-        }
-      }
+      if (!files)
+        for (const [key, value] of this.entries)
+          if (!seen.has(key)) {
+            value.entry.available = false;
+            value.entry.state = 'missing';
+          }
+      this.error = this.watchError;
     } catch (error) {
+      if (this.stopped) return;
+      if (this.watching) await this.connectWatch();
+      if (this.stopped) return;
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         this.error = hostText('services.registeredImages.readFailed');
       for (const value of this.entries.values()) {
@@ -556,13 +631,22 @@ export class RegisteredImages {
     if (previous !== signature()) this.notify();
   }
   watch() {
-    this.timer ??= setInterval(() => void this.refresh(), 2000);
-    this.timer.unref();
+    if (!this.watching && !this.stopped) {
+      this.watching = true;
+      this.unregister = this.assistance?.register(
+        'registered-images:' + path.resolve(this.directory).toLowerCase(),
+        () => this.refresh(),
+      );
+    }
+    return this.refresh();
   }
   stop() {
     this.stopped = true;
-    clearInterval(this.timer);
-    this.timer = undefined;
+    this.watching = false;
+    this.unregister?.();
+    this.unregister = undefined;
+    this.pendingFull = false;
+    this.pendingFiles.clear();
     this.watcher?.close();
     this.watcher = undefined;
   }

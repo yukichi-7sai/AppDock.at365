@@ -392,6 +392,12 @@ const localizedHostFields = {
     ],
     ['startMinimized', 'general.startMinimized.label', 'general.startMinimized.description'],
     ['settingsFile', 'general.files.title', 'general.files.keywords'],
+    ['fileWatchAssistanceEnabled', 'general.fileWatch.enabled', 'general.fileWatch.description'],
+    [
+      'fileWatchAssistanceIntervalSeconds',
+      'general.fileWatch.interval',
+      'general.fileWatch.intervalDescription',
+    ],
   ],
 } as const;
 function hostRows(

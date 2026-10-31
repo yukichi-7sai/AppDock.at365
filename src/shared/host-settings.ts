@@ -4,6 +4,10 @@ import { notificationBannerPositions } from './notifications';
 import { defaultHostLanguage, hostLanguages } from './host-language';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
 import {
+  defaultFileWatchAssistanceOptions,
+  minimumFileWatchAssistanceIntervalSeconds,
+} from './file-watch-assistance';
+import {
   accentChoices,
   legacyAccentPalette,
   defaultAccentColor,
@@ -206,6 +210,24 @@ const definitions = {
     type: 'boolean',
     default: false,
     applies: 'nextStart',
+  },
+  fileWatchAssistanceEnabled: {
+    pageId: 'general',
+    title: hostText('general.fileWatch.enabled'),
+    description: hostText('general.fileWatch.description'),
+    type: 'boolean',
+    default: defaultFileWatchAssistanceOptions.enabled,
+    automation: true,
+    generateCommands: [...switches],
+  },
+  fileWatchAssistanceIntervalSeconds: {
+    pageId: 'general',
+    title: hostText('general.fileWatch.interval'),
+    description: hostText('general.fileWatch.intervalDescription'),
+    type: 'number',
+    default: defaultFileWatchAssistanceOptions.intervalSeconds,
+    minimum: minimumFileWatchAssistanceIntervalSeconds,
+    automation: true,
   },
 } satisfies Record<OrdinaryHostKey, HostField>;
 

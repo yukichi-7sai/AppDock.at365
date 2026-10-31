@@ -60,15 +60,15 @@ GPU描画の変更は完全終了して起動し直すと反映する。一般�
 
 Appletの「開始までの秒数」は0～86400秒。0は即時。待機中の変更では待ち直し、稼働中の変更は次回に適用する。無効化・終了で待機を取り消し、「今すぐ開始」も利用できる。
 
-| Applet | 機能と操作 |
-| --- | --- |
-| [Gmail](../../Applet.Gmail.at365/docs/usage.md) | Gmail画面、アカウント、新着監視・通知 |
-| [Profile](../../Applet.Profile.at365/docs/usage.md) | プロフィールと共通画像のアバター |
-| [WallpaperSlideshow](../../Applet.WallpaperSlideshow.at365/docs/usage.md) | デスクトップ画像と履歴 |
-| [Watch](../../Applet.Watch.at365/docs/usage.md) | デスクトップ時計 |
-| [WebApplet](../../Applet.WebApplet.at365/docs/usage.md) | WebサイトとWebアカウントの管理 |
-| [WebBrowserTools](../../Applet.WebBrowserTools.at365/docs/usage.md) | ブラウザー操作コマンド |
-| [WindowsTools](../../Applet.WindowsTools.at365/docs/usage.md) | ウィンドウ操作、標準キー、消灯・ロック |
+| Applet                                                                    | 機能と操作                             |
+| ------------------------------------------------------------------------- | -------------------------------------- |
+| [Gmail](../../Applet.Gmail.at365/docs/usage.md)                           | Gmail画面、アカウント、新着監視・通知  |
+| [Profile](../../Applet.Profile.at365/docs/usage.md)                       | プロフィールと共通画像のアバター       |
+| [WallpaperSlideshow](../../Applet.WallpaperSlideshow.at365/docs/usage.md) | デスクトップ画像と履歴                 |
+| [Watch](../../Applet.Watch.at365/docs/usage.md)                           | デスクトップ時計                       |
+| [WebApplet](../../Applet.WebApplet.at365/docs/usage.md)                   | WebサイトとWebアカウントの管理         |
+| [WebBrowserTools](../../Applet.WebBrowserTools.at365/docs/usage.md)       | ブラウザー操作コマンド                 |
+| [WindowsTools](../../Applet.WindowsTools.at365/docs/usage.md)             | ウィンドウ操作、標準キー、消灯・ロック |
 
 ## ショートカット・マウスジェスチャー・トレイ
 
@@ -114,12 +114,12 @@ Profile Appletの「プロフィール」から名前とアバターを設定す
 
 ## 設定とデータの保存先
 
-| 保存先 | 内容 |
-| --- | --- |
-| EXE隣のdata/settings.json | 共有を選んだ設定、入力割り当て、登録画像のグループ等 |
-| EXE隣のdata/settings-<端末名>.json | このPCの有効状態・端末専用を選んだ設定・リボン開閉・カードサイズ・Window位置 |
-| EXE隣のdata/ | 共通原画像、通知音、共有アカウント名簿、端末別ログ、共有/端末別Storage |
-| %LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/ | 認証、session、秘密情報、キャッシュ、復旧用記録、書込失敗時の退避ログ |
+| 保存先                                          | 内容                                                                         |
+| ----------------------------------------------- | ---------------------------------------------------------------------------- |
+| EXE隣のdata/settings.json                       | 共有を選んだ設定、入力割り当て、登録画像のグループ等                         |
+| EXE隣のdata/settings-<端末名>.json              | このPCの有効状態・端末専用を選んだ設定・リボン開閉・カードサイズ・Window位置 |
+| EXE隣のdata/                                    | 共通原画像、通知音、共有アカウント名簿、端末別ログ、共有/端末別Storage       |
+| %LOCALAPPDATA%/at365/AppDock/profiles/<配置ID>/ | 認証、session、秘密情報、キャッシュ、復旧用記録、書込失敗時の退避ログ        |
 
 通知履歴は起動中のメモリーだけに保持する。旧配置の設定・UI状態・Storageの移行や互換読込は行わない。
 
@@ -148,3 +148,7 @@ AppDock.at365-starter-<バージョン>.zipには本体とWebApplet・WebBrowser
 条件に一致したコマンドを登録順に選び、最初の1つ／すべてで実行します。条件不一致でも接続キーはブロックします。Windows側で変更されたジェスチャーだけを停止し、通知と設定画面に警告します。再設定・そのまま停止・そのジェスチャーの全割り当て解除を選べます。OFF・削除・終了ではWindowsを元に戻しません。
 
 詳細は[タッチパッドとWindowsの接続仕様](touchpad-gestures-design.md)を参照してください。
+
+## ファイル監視の補助確認
+
+一般の「ファイル監視」で、設定・アカウント名簿・登録画像の定期的な再確認をON/OFFできる。既定はOFF、待機時間は300秒、最小2秒で小数も指定できる。時間は全件の確認が終わってから次の巡回までの待機を表し、短いほどファイルアクセスが増える。OFFでも通常のファイル監視と初期確認は続くが、通知を取り逃した変更の反映は明示的な再確認や次回起動まで遅れる場合がある。通知音の2秒確認は将来のサウンドライブラリーで対応する。旧配置の残存チェックは行わず、既存ファイルも自動削除しない。詳細は[補助基盤](file-watch-assistance-design.md)を参照。

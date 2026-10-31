@@ -17,6 +17,8 @@ export interface HostSettings {
   notificationBannerShadow: boolean;
   notificationDesktopShadow: boolean;
   closeToTray: boolean;
+  fileWatchAssistanceEnabled: boolean;
+  fileWatchAssistanceIntervalSeconds: number;
   startMinimized: boolean;
   startPage: import('./start-page').StartPage;
   startAtLogon: boolean;
@@ -285,7 +287,6 @@ export interface HostSnapshot {
   version: string;
   dataDirectory: string;
   sharedDirectory: string;
-  legacyLocalData: boolean;
   runtime: { electron: string; chrome: string; node: string; platform: string; arch: string };
   dark: boolean;
 }

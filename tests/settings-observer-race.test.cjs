@@ -71,6 +71,20 @@ function fixture(t, device = false) {
   const observe = fileObserver.observeFile;
   t.mock.method(fileObserver, 'observeFile', (...args) => {
     observer = observe(...args);
+    const check = observer.check;
+    observer.beginCheck = check;
+    observer.check = async (...input) => {
+      let settled = false;
+      const pending = check(...input).finally(() => {
+        settled = true;
+      });
+      for (let turn = 0; !settled; turn++) {
+        assert(turn < 10000, 'observer must finish its reconciliation attempt');
+        t.mock.timers.tick(180);
+        await new Promise(setImmediate);
+      }
+      return pending;
+    };
     return observer;
   });
   t.mock.method(fs, 'watch', (_directory, callback) => {
@@ -179,13 +193,14 @@ test(
     f.setBrowser();
     const current = fs.readFileSync(f.file);
     fs.writeFileSync(f.file, original);
-    await f.observer.check();
+    const pending = f.observer.beginCheck();
     let revision;
     await f.interleave(() => {
       fs.writeFileSync(f.file, current);
       revision = f.store.revision;
       f.store.assertRevision(revision);
     });
+    await pending;
     f.agrees();
     assert.equal(f.store.revision, revision);
   },

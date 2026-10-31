@@ -202,7 +202,18 @@ const checks = [];
     checks.push('general defaults local and is switchable; JSON and file target device');
     const hostPages = [
       ['appearance', '表示', { host: { theme: 'dark', showHints: false } }],
-      ['general', '一般', { host: { soundEnabled: false, closeToTray: false } }],
+      [
+        'general',
+        '一般',
+        {
+          host: {
+            soundEnabled: false,
+            closeToTray: false,
+            fileWatchAssistanceEnabled: true,
+            fileWatchAssistanceIntervalSeconds: 61.5,
+          },
+        },
+      ],
       [
         'notifications',
         '通知',

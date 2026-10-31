@@ -53,6 +53,7 @@ type Saved = {
 // A persisted default also used to recognize older unnamed accounts; not display copy.
 const temporaryAccountName = '新しいアカウント';
 interface WebAccountServices {
+  assistance?: import('./file-watch-assistance').FileWatchAssistance;
   windowState?: import('./state-storage').StateStorage;
   sharedRoot?: string;
   soundsDirectory?: string;
@@ -295,6 +296,7 @@ export class WebAccountController {
         services.sharedRoot,
         path.resolve(root, '../..'),
         parseWebAccountSound,
+        services.assistance,
       );
     } else if (fs.existsSync(path.join(root, 'group-binding.json')))
       throw Error(hostText('services.webAccounts.migrated'));

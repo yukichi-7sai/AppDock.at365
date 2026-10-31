@@ -174,7 +174,6 @@ test('localized settings views and owned diagnostic modules do not reintroduce i
       'binding-order',
       'dynamic-pages',
       'extension-commands',
-      'legacy-local-data',
       'object-list',
       'page-collections',
       'registered-images',

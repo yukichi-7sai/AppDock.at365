@@ -21,6 +21,7 @@ export class PageCollectionManager {
       parents(): ExtensionSnapshot[];
       localRoot: string;
       sharedRoot: string;
+      assistance?: import('./file-watch-assistance').FileWatchAssistance;
       windowState?(id: string): import('./state-storage').StateStorage;
       changed(): void;
       failed(error: Error): void;
@@ -175,6 +176,7 @@ export class PageCollectionManager {
         locations.file,
         this.options.failed,
         this.options.windowState,
+        this.options.assistance,
       );
       this.services.set(owner, service);
     }

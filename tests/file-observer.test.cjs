@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const { EventEmitter } = require('node:events');
 const { observeFile } = require('../out/main/main/core/file-observer');
 const fileReader = require('../out/main/main/core/file-reader');
+const { FileWatchAssistance } = require('../out/main/main/core/file-watch-assistance');
 
 function fixture(t, { watchUnavailable = false } = {}) {
   t.mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: 1000000 });
@@ -13,13 +14,29 @@ function fixture(t, { watchUnavailable = false } = {}) {
     stat: { dev: 1n, ino: 2n, mode: 3n, size: 11n, mtimeNs: 4n, ctimeNs: 5n, birthtimeNs: 6n },
     reads: 0,
     stats: 0,
+    watchAttempts: 0,
     active: 0,
     maximumActive: 0,
     accepted: [],
     errors: [],
     watcher: Object.assign(new EventEmitter(), { close() {} }),
   };
+  f.assistance = new FileWatchAssistance({
+    failed: (error) => f.errors.push(error.message),
+    clock: {
+      now: () => BigInt(Date.now()) * 1_000_000n,
+      schedule(callback, delay) {
+        const timer = setTimeout(callback, delay);
+        return { cancel: () => clearTimeout(timer) };
+      },
+    },
+  });
+  f.enable = () => {
+    f.assistance.configure({ enabled: true, intervalSeconds: 2 });
+    f.assistance.start();
+  };
   t.mock.method(fs, 'watch', (_folder, listener) => {
+    f.watchAttempts++;
     if (watchUnavailable) throw Error('watch unavailable');
     f.event = listener;
     return f.watcher;
@@ -53,6 +70,7 @@ function fixture(t, { watchUnavailable = false } = {}) {
       f.onAccept?.(text);
     },
     (error) => f.errors.push(error.message),
+    f.assistance,
   );
   f.tick = async (ms) => {
     t.mock.timers.tick(ms);
@@ -62,25 +80,28 @@ function fixture(t, { watchUnavailable = false } = {}) {
     await f.tick(100);
     await f.tick(180);
   };
-  t.after(() => f.observer.close());
+  f.check = async () => {
+    const pending = f.observer.check();
+    await f.tick(0);
+    await f.tick(180);
+    await pending;
+  };
+  t.after(() => {
+    f.observer.close();
+    f.assistance.dispose();
+  });
   return f;
 }
 
-test('idle polling is once per minute and skips unchanged bytes, with a slower full check', async (t) => {
+test('disabled assistance performs no periodic metadata or content reads after initial reception', async (t) => {
   const f = fixture(t);
   await f.start();
   assert.deepEqual(f.accepted, [f.text]);
   assert.equal(f.reads, 2);
   const stats = f.stats;
-  await f.tick(59000);
+  await f.tick(600000);
   assert.equal(f.stats, stats);
-  await f.tick(1000);
-  assert.equal(f.stats, stats + 1);
   assert.equal(f.reads, 2);
-  for (let i = 0; i < 3; i++) await f.tick(60000);
-  assert.equal(f.reads, 2);
-  await f.tick(60000);
-  assert.equal(f.reads, 3);
   assert.equal(f.accepted.length, 1);
 });
 
@@ -97,7 +118,7 @@ test('watch events read same-size same-metadata edits and wait for stable bytes'
   assert.deepEqual(f.accepted, ['{"value":1}', f.text]);
 });
 
-test('an unavailable watch API still accepts stable data and polls without a retry loop', async (t) => {
+test('unavailable native watching never automatically enables assistance or a retry loop', async (t) => {
   const f = fixture(t, { watchUnavailable: true });
   await f.start();
   assert.deepEqual(f.accepted, [f.text]);
@@ -105,35 +126,73 @@ test('an unavailable watch API still accepts stable data and polls without a ret
   f.text = '{"value":2}';
   f.stat.ctimeNs++;
   await f.tick(60000);
+  assert.equal(f.accepted.length, 1);
+  assert.equal(f.reads, 2);
+  f.enable();
+  await f.tick(2000);
   await f.tick(180);
   assert.equal(f.accepted.at(-1), f.text);
   const reads = f.reads;
-  await f.tick(60000);
-  assert.equal(f.reads, reads);
+  await f.tick(2000);
+  assert.equal(f.reads, reads + 1);
   assert.deepEqual(f.errors, ['watch unavailable']);
 });
 
-test('missed events are recovered using change time and replacement identity', async (t) => {
+test('a runtime watcher error waits for explicit reconciliation instead of a short retry loop', async (t) => {
   const f = fixture(t);
   await f.start();
+  f.watcher.emit('error', Error('watch interrupted'));
+  assert.deepEqual(f.errors, ['watch interrupted']);
+  const attempts = f.watchAttempts;
+  const reads = f.reads;
+  await f.tick(600000);
+  assert.equal(f.watchAttempts, attempts);
+  assert.equal(f.reads, reads);
+  f.text = '{"value":2}';
+  f.enable();
+  await f.tick(2000);
+  await f.tick(180);
+  assert.equal(f.watchAttempts, attempts + 1);
+  assert.equal(f.accepted.at(-1), f.text);
+});
+
+test('enabled shared assistance recovers missed events and replacement identity', async (t) => {
+  const f = fixture(t);
+  await f.start();
+  f.enable();
   for (const key of ['ctimeNs', 'ino']) {
     f.text = key === 'ctimeNs' ? '{"value":2}' : '{"value":3}';
     f.stat[key]++;
-    await f.tick(60000);
+    await f.tick(2000);
     await f.tick(180);
     assert.equal(f.accepted.at(-1), f.text);
   }
 });
 
-test('the slower full check recovers missed edits even when all metadata is preserved', async (t) => {
+test('each enabled shared check reads content even when all metadata is preserved', async (t) => {
   const f = fixture(t);
   await f.start();
+  f.enable();
   f.text = '{"value":2}';
-  for (let i = 0; i < 4; i++) await f.tick(60000);
+  await f.tick(2000);
   assert.equal(f.accepted.length, 1);
-  await f.tick(60000);
   await f.tick(180);
   assert.equal(f.accepted.at(-1), f.text);
+});
+
+test('shared reconciliation waits for stable acceptance before another registered check starts', async (t) => {
+  const f = fixture(t);
+  await f.start();
+  const later = [];
+  f.assistance.register('later', async () => later.push(f.accepted.at(-1)));
+  f.text = '{"value":2}';
+  f.enable();
+  await f.tick(2000);
+  assert.deepEqual(later, []);
+  await f.tick(179);
+  assert.deepEqual(later, []);
+  await f.tick(1);
+  assert.deepEqual(later, [f.text]);
 });
 
 test('overlapping events serialize reads and discard an older in-flight result', async (t) => {
@@ -163,17 +222,17 @@ test('missing and invalid files keep the previous value and can recover identica
   await f.start();
   const original = f.text;
   f.error = Error('temporarily missing');
-  await f.observer.check();
-  await f.observer.check();
+  await f.check();
+  await f.check();
   assert.deepEqual(f.errors, ['temporarily missing']);
   assert.equal(f.accepted.length, 1);
   f.error = undefined;
   f.text = '{invalid';
-  await f.observer.check();
+  await f.check();
   await f.tick(180);
   assert.equal(f.accepted.length, 1);
   f.text = original;
-  await f.observer.check();
+  await f.check();
   await f.tick(180);
   assert.equal(f.accepted.length, 2);
   assert.equal(f.accepted.at(-1), original);
@@ -183,7 +242,7 @@ test('close ignores outstanding reads and oversize files are rejected', async (t
   const f = fixture(t);
   await f.start();
   f.stat.size = BigInt(4 * 1024 * 1024 + 1);
-  await f.observer.check();
+  await f.check();
   assert.equal(f.errors.length, 1);
   assert.equal(f.reads, 2);
   f.stat.size = 11n;

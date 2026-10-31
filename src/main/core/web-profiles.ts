@@ -75,7 +75,11 @@ export class WebProfileStore {
       this.pending = saved.pendingDeletion;
     }
   }
-  watch(changed: () => void, failed: (error: Error) => void) {
+  watch(
+    changed: () => void,
+    failed: (error: Error) => void,
+    assistance?: import('./file-watch-assistance').FileWatchAssistance,
+  ) {
     this.observer = observeFile(
       this.file,
       (text) => {
@@ -88,6 +92,7 @@ export class WebProfileStore {
       (error) => {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || this.value.length) failed(error);
       },
+      assistance,
     );
   }
   close() {

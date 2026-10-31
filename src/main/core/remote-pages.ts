@@ -28,6 +28,7 @@ export class RemotePageService {
     sharedFile: string,
     failed: (error: Error) => void = () => {},
     private windowState?: (id: string) => import('./state-storage').StateStorage,
+    assistance?: import('./file-watch-assistance').FileWatchAssistance,
   ) {
     this.profiles = new WebProfileStore(sharedFile, localDirectory);
     this.profiles.loadStandalone(() => this.items().length > 0);
@@ -36,10 +37,14 @@ export class RemotePageService {
     } catch {
       queueMicrotask(() => failed(Error(hostText('services.remotePages.cleanupDeferred'))));
     }
-    this.profiles.watch(() => {
-      this.reconcile();
-      this.changed();
-    }, failed);
+    this.profiles.watch(
+      () => {
+        this.reconcile();
+        this.changed();
+      },
+      failed,
+      assistance,
+    );
   }
   accounts() {
     return this.profiles.snapshot();

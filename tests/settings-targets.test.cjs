@@ -187,6 +187,54 @@ const values = (result) =>
     result.fields.filter((field) => field.hasValue).map((field) => [field.key, field.value]),
   );
 
+test('assistance settings support public dry-run, fractional apply, minimum validation and scoped reset', (t) => {
+  const f = fixture(t, { device: true });
+  const targetId = 'host.general';
+  const schema = f.call('schema.get', { targetId });
+  assert.equal(
+    schema.items.find((field) => field.key === 'fileWatchAssistanceIntervalSeconds').inputSchema
+      .minimum,
+    2,
+  );
+  const operations = [
+    {
+      kind: 'set',
+      changes: { fileWatchAssistanceEnabled: true, fileWatchAssistanceIntervalSeconds: 2.5 },
+    },
+  ];
+  f.call('apply', f.request(operations, { targetId, dryRun: true }));
+  assert.equal(f.store.value.host.fileWatchAssistanceEnabled, false);
+  f.call('apply', f.request(operations, { targetId }));
+  assert.equal(f.store.value.host.fileWatchAssistanceEnabled, true);
+  assert.equal(f.store.value.host.fileWatchAssistanceIntervalSeconds, 2.5);
+  const writes = f.writes();
+  assert.throws(
+    () =>
+      f.call(
+        'apply',
+        f.request([{ kind: 'set', changes: { fileWatchAssistanceIntervalSeconds: 1 } }], {
+          targetId,
+        }),
+      ),
+    { code: 'INVALID_ARGUMENT' },
+  );
+  assert.equal(f.writes(), writes);
+  f.call(
+    'apply',
+    f.request(
+      [
+        {
+          kind: 'reset',
+          keys: ['fileWatchAssistanceEnabled', 'fileWatchAssistanceIntervalSeconds'],
+        },
+      ],
+      { targetId },
+    ),
+  );
+  assert.equal(f.store.value.host.fileWatchAssistanceEnabled, false);
+  assert.equal(f.store.value.host.fileWatchAssistanceIntervalSeconds, 300);
+});
+
 test('start page publication uses live page candidates, next-start application and atomic validation', (t) => {
   const f = fixture(t);
   f.owner.pages = [

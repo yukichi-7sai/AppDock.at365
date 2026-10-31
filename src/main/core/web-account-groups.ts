@@ -112,6 +112,7 @@ export class WebAccountGroup {
     sharedRoot: string,
     readonly localRoot: string,
     private validateSound: (sound: unknown) => WebAccountSound,
+    private assistance?: import('./file-watch-assistance').FileWatchAssistance,
   ) {
     if (!groupId(id)) throw Error(hostText('services.webAccountGroups.invalidGroup'));
     this.file = path.join(sharedRoot, 'web-account-groups', id, 'accounts.json');
@@ -379,6 +380,7 @@ export class WebAccountGroup {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || this.text !== null)
             for (const l of this.listeners) l.failed();
         },
+        this.assistance,
       );
     }
     return () => {
@@ -404,11 +406,12 @@ export function getWebAccountGroup(
   sharedRoot: string,
   localRoot: string,
   validateSound: (sound: unknown) => WebAccountSound,
+  assistance?: import('./file-watch-assistance').FileWatchAssistance,
 ) {
   const key = JSON.stringify([path.resolve(sharedRoot), path.resolve(localRoot), id]);
   let group = groups.get(key);
   if (!group?.active) {
-    group = new WebAccountGroup(id, sharedRoot, localRoot, validateSound);
+    group = new WebAccountGroup(id, sharedRoot, localRoot, validateSound, assistance);
     groups.set(key, group);
   }
   return group;

@@ -11,6 +11,7 @@ import type { SettingsPageModel } from '../../shared/settings-page';
 import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import { useSettingsControls } from '../settings-ui/api';
 import { Toggle } from '../settings-ui/Toggle';
+import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import { AboutSettings } from './AboutSettings';
 import { AppletManagementSettings } from './AppletManagementSettings';
 import { AppletUpdateSource } from './UpdateSettings';
@@ -594,6 +595,42 @@ export function SettingsForm({
                     {t('general.launch.restartElevated')}
                   </button>
                 </SettingsActions>
+              </SettingRow>
+            </SettingsSection>
+            <SettingsSection
+              title={t('general.fileWatch.section')}
+              data-testid="file-watch-settings"
+            >
+              <SettingRow pageId={category} itemKey="fileWatchAssistanceEnabled">
+                <Toggle
+                  label={t('general.fileWatch.enabled')}
+                  checked={settings.host.fileWatchAssistanceEnabled}
+                  onChange={(checked) =>
+                    edit({
+                      ...settings,
+                      host: { ...settings.host, fileWatchAssistanceEnabled: checked },
+                    })
+                  }
+                />
+              </SettingRow>
+              <SettingRow pageId={category} itemKey="fileWatchAssistanceIntervalSeconds">
+                <SettingsInput
+                  aria-label={t('general.fileWatch.interval')}
+                  type="number"
+                  min={2}
+                  step="any"
+                  disabled={busy || !settings.host.fileWatchAssistanceEnabled}
+                  value={settings.host.fileWatchAssistanceIntervalSeconds}
+                  onChange={(event) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        fileWatchAssistanceIntervalSeconds: numberInput(event.target.value),
+                      },
+                    })
+                  }
+                />
               </SettingRow>
             </SettingsSection>
             <SettingsSection

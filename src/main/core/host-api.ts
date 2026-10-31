@@ -52,6 +52,7 @@ export function createHostApi(
   pageUi?: { openDetails(id: string): Promise<unknown>; failed?(id: string): void },
   imageLibrary?: import('./image-library-host').ImageLibraryHost,
   storageMachine = os.hostname(),
+  assistance?: import('./file-watch-assistance').FileWatchAssistance,
 ) {
   const api = async (
     e: ExtensionInstance,
@@ -486,6 +487,7 @@ export function createHostApi(
           e.manifest.webAccounts,
           {
             sharedRoot: sharedDataRoot,
+            assistance,
             windowState: settings.uiStateStorage('windows', `web-accounts:${id}`),
             capabilities: e.manifest.capabilities ?? [],
             soundsDirectory: path.join(assetRoot, id, 'sounds'),

@@ -88,7 +88,6 @@ export interface SettingsPageAuxiliary {
     errors: string[];
     canRestore: boolean;
   }[];
-  legacyLocalData?: import('./legacy-local-data').LegacyLocalDataState;
   settingsHealth?: {
     restartRequired: boolean;
     reasons: string[];

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { randomUUID, createHash } from 'node:crypto';
 import { observeFile } from './file-observer';
+import type { FileWatchAssistance } from './file-watch-assistance';
 import { SettingsHealth, settingsIssueMessages } from './settings-health';
 import type { Settings, SettingsSnapshot, ExtensionSettings } from '../../shared/contracts';
 import { settingsStorageValue } from '../../shared/settings-storage';
@@ -387,7 +388,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
     v.extensions[id] = { ...current, ...patch };
     return this.save(v, this.revision);
   }
-  watch(onError: (error: Error) => void) {
+  watch(onError: (error: Error) => void, assistance?: FileWatchAssistance) {
     this.observer?.close();
     this.observer = observeFile(
       this.file,
@@ -396,6 +397,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
         this.readFailure(error, false);
         onError(error);
       },
+      assistance,
     );
   }
   restoreBackup(revision: number) {

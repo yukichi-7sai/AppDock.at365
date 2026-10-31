@@ -222,7 +222,7 @@ import { AiSecrets } from './core/ai-secrets';
 import { AiSettingsController } from './core/ai-settings';
 import { ErrorReporter } from './core/error-reporter';
 import { WarningReporter } from './core/warning-reporter';
-import { LegacyLocalDataMonitor, inspectLegacyLocalData } from './core/legacy-local-data';
+import { FileWatchAssistance } from './core/file-watch-assistance';
 import { defaultAiSettings } from '../shared/ai';
 import { TtsSecrets } from './core/tts-secrets';
 import { playTtsWave } from './core/tts-player';
@@ -695,6 +695,22 @@ let quitting = false;
 let shutdownFinished = false;
 let shutdownStarted = false;
 let notifyTimer: ReturnType<typeof setTimeout> | undefined;
+const fileWatchAssistance = new FileWatchAssistance({
+  failed: () =>
+    errors.report({
+      eventId: randomUUID(),
+      source: 'storage',
+      code: 'FILE_WATCH_ASSISTANCE_FAILED',
+      title: hostText('general.fileWatch.section'),
+      message: hostText('services.fileWatch.failed'),
+    }),
+});
+function applyFileWatchAssistanceSettings() {
+  fileWatchAssistance.configure({
+    enabled: settings.value.host.fileWatchAssistanceEnabled,
+    intervalSeconds: settings.value.host.fileWatchAssistanceIntervalSeconds,
+  });
+}
 const registeredImages = new RegisteredImages(
   path.join(paths.assets, 'images'),
   decodeRegisteredImage,
@@ -702,6 +718,7 @@ const registeredImages = new RegisteredImages(
     ribbonImageRevision++;
     changed();
   },
+  fileWatchAssistance,
 );
 const imageLibraryHost = new ImageLibraryHost(registeredImages, {
   settings,
@@ -834,7 +851,6 @@ const information = new InformationReporter({
   notifications: () => (quitting ? undefined : typedNotifications),
   log: (source, message) => log.write('info', source, message),
 });
-let legacyLocalData: LegacyLocalDataMonitor | undefined;
 const ai = new AiService({
   settings: () => settings.value.ai ?? defaultAiSettings(),
   key: (c) => aiSecrets.key(c),
@@ -1972,7 +1988,6 @@ function snapshotCore(): HostSnapshot {
     },
     dataDirectory,
     sharedDirectory,
-    legacyLocalData: !!legacyLocalData?.snapshot().targets.length,
     dark: nativeTheme.shouldUseDarkColors,
   };
 }
@@ -2361,7 +2376,6 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
     return {
       startPages: startPageOptions(settings.value, applets),
       launch: launch.state,
-      legacyLocalData: legacyLocalData?.snapshot(),
       settingsHealth: {
         restartRequired: settingsRestartRequired(),
         reasons: settingsRestartRequired() ? [settingsRestartReason] : [],
@@ -2911,7 +2925,6 @@ function settingsPageActions(
       return null;
     };
     actions.openSettingsDirectory = settingsRecoveryUi.openDirectory;
-    actions.refreshLegacyLocalData = async () => legacyLocalData?.refresh();
     actions.refreshLaunchState = async () => {
       const result = await launch.refresh();
       if (
@@ -3717,6 +3730,8 @@ async function initialize() {
           }),
       },
       imageLibraryHost,
+      os.hostname(),
+      fileWatchAssistance,
     ),
     log: log.write,
   });
@@ -3855,6 +3870,7 @@ async function initialize() {
     parents: parentApplets,
     localRoot: dataDirectory,
     sharedRoot: sharedDirectory,
+    assistance: fileWatchAssistance,
     windowState: (id) => settings.uiStateStorage('windows', `collection:${id}`),
     changed: () => {
       ribbonCatalog.invalidate();
@@ -4051,6 +4067,7 @@ async function initialize() {
   settings.on('changed', () => {
     touchpad?.settingsChanged();
     try {
+      applyFileWatchAssistanceSettings();
       customCommands.reconcile();
       mcpClient.reconcile();
       applyAudioPlaybackSettings();
@@ -4075,12 +4092,12 @@ async function initialize() {
   });
   settings.watch(() => {
     /* The health source reports stable failures through ErrorReporter. */
-  });
+  }, fileWatchAssistance);
   endServices();
   hostStartupTiming.phase('apply', () => applySettings());
-  await hostStartupTiming.phaseAsync('images', () => registeredImages.refresh());
+  applyFileWatchAssistanceSettings();
+  await hostStartupTiming.phaseAsync('images', () => registeredImages.watch());
   hostStartupTiming.count('imageCount', registeredImages.list().length);
-  registeredImages.watch();
   nativeTheme.on('updated', () => {
     refreshWindowTheme();
     changed();
@@ -4806,6 +4823,7 @@ async function initialize() {
   await hostStartupTiming.phaseAsync('applets', () => manager.reconcile());
   if (quitting) return;
   startupReady = true;
+  fileWatchAssistance.start();
   hostStartupTiming.mark('ready');
   const endIntegration = hostStartupTiming.begin('integration');
   completeStartup!();
@@ -4849,23 +4867,6 @@ async function initialize() {
     ],
   });
   settingsHealthNotifications.refresh();
-  legacyLocalData = new LegacyLocalDataMonitor({
-    inspect: () => inspectLegacyLocalData(baseDirectory, sharedDirectory, dataDirectory),
-    warnings,
-    changed,
-    actions: [
-      {
-        key: 'details',
-        label: hostText('services.index.viewDetails'),
-        primary: true,
-        run: async () => {
-          showWindow();
-          await navigation.navigate('logs');
-        },
-      },
-    ],
-  });
-  legacyLocalData.start();
   notificationSpeech?.reconcile();
   automation = new AutomationService({
     localDirectory: dataDirectory,
@@ -5159,6 +5160,7 @@ app.on('second-instance', (_event, argv) => {
 app.on('before-quit', (event) => {
   clearTimeout(startupUpdateTimer);
   quitting = true;
+  fileWatchAssistance.dispose();
   startupUi.cancel();
   completeStartup!();
   trayClicks?.close();
@@ -5169,7 +5171,6 @@ app.on('before-quit', (event) => {
   shutdownStarted = true;
   customCommands.cancelAll();
   settingsHealthNotifications?.dispose();
-  legacyLocalData?.dispose();
   notificationBanner?.dispose();
   notificationDesktop?.dispose();
   notificationWindows?.dispose();

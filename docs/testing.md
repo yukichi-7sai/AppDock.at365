@@ -50,14 +50,14 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 `scripts/command-links-ui-test.cjs [固定EXE]`はタグ・未知参照・エスケープ、初期対象の可視性、明示実行、フォーカス、設定入力・エラー値の保持と一覧ダイアログ、WindowsToolsの停止中リンクを確認する。`scripts/shell-overlay-ui-test.cjs [固定EXE]`は本体パレットのIME・Tab・ピン・選択モード、下のAppletの入力とフォーカス、Shellからの独立、1回のクラッシュ復旧と再失敗の打切りを担当する。
 
-| 試験                                                                                                                         | 主な契約                                                                                                                                 |
-| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 試験                                                                                                                         | 主な契約                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `scripts/settings-controls-ui-test.cjs [固定EXE]`                                                                            | 即時保存と操作コマンドの反映、代表的な明暗・狭幅でのキーボード開閉とフォーカス、通知バナー6位置と下側の伸長・再表示、通知先の選択・保存・取消、検索による移動、AIダイアログの保存・取消 |
-| `scripts/settings-usability-ui-test.cjs <固定EXE>`                                                                           | 模擬APIのモデル・ボイス取得、直接入力、通知の宛先と継承、隔離したCodex設定の登録・解除                                                   |
-| `scripts/command-triggers-ui-test.cjs [固定EXE]`                                                                             | 4タブ、検索・種類・提供元・入力の絞り込み、3方式の追加・編集・削除・並べ替え、スクロールとフォーカスの復帰、再起動後の保存               |
-| `scripts/settings-input-ui-test.cjs [固定EXE]`、`scripts/settings-hints-ui-test.cjs [固定EXE]`                               | 共通入力・確定・取消、ヒント・エラーの操作と表示設定                                                                                     |
-| `tests/appearance.test.cjs`、`scripts/appearance-ui-test.cjs [固定EXE]`、`scripts/notification-colors-ui-test.cjs [固定EXE]` | 共通パレット、実画面の配色と読みやすさ                                                                                                   |
-| `tests/settings-editing.test.cjs`、`tests/command-triggers.test.cjs`、`tests/command-stacks.test.cjs`                        | 保存範囲、競合、安定ID、条件と実行順を保つデータ操作                                                                                     |
+| `scripts/settings-usability-ui-test.cjs <固定EXE>`                                                                           | 模擬APIのモデル・ボイス取得、直接入力、通知の宛先と継承、隔離したCodex設定の登録・解除                                                                                                  |
+| `scripts/command-triggers-ui-test.cjs [固定EXE]`                                                                             | 4タブ、検索・種類・提供元・入力の絞り込み、3方式の追加・編集・削除・並べ替え、スクロールとフォーカスの復帰、再起動後の保存                                                              |
+| `scripts/settings-input-ui-test.cjs [固定EXE]`、`scripts/settings-hints-ui-test.cjs [固定EXE]`                               | 共通入力・確定・取消、ヒント・エラーの操作と表示設定                                                                                                                                    |
+| `tests/appearance.test.cjs`、`scripts/appearance-ui-test.cjs [固定EXE]`、`scripts/notification-colors-ui-test.cjs [固定EXE]` | 共通パレット、実画面の配色と読みやすさ                                                                                                                                                  |
+| `tests/settings-editing.test.cjs`、`tests/command-triggers.test.cjs`、`tests/command-stacks.test.cjs`                        | 保存範囲、競合、安定ID、条件と実行順を保つデータ操作                                                                                                                                    |
 
 各スクリプトの引数・前提は現物と機能別文書で確認します。標準の`.\dev.bat test`はビルドと`tests/*.test.cjs`を実行し、上記の専用GUIスクリプトを一律には実行しません。
 
@@ -75,3 +75,7 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 ```
 
 製品コード・設定・依存・ビルド/配布内容を変えないテストと開発文書だけの整備では、製品の版更新・publishは行いません。製品側の不具合を修正する場合は、[開発手順](development-workflow.md)に戻って影響先の検証と発行を行います。
+
+## ファイル監視の補助確認
+
+`tests/file-watch-assistance.test.cjs`は共通ループ、`tests/file-observer.test.cjs`と`tests/settings-observer-race.test.cjs`は安定確認・通知欠落・保存競合、`tests/file-watch-images.test.cjs`は画像の祖先watch・差分確認・走査中イベント、`tests/file-watch-rosters.test.cjs`は名簿の登録寿命と通知欠落時の受信、`tests/file-watch-settings.test.cjs`は設定の既定/検証/保存を担当する。`scripts/file-watch-assistance-ui-test.cjs [固定EXE]`は設定のON/OFF・数値確定/取消/失敗・通常watch継続・広狭幅・旧残存チェックの非実行とデータ保持を確認する。旧残存チェック専用の単体/GUI試験は機構とともに削除し、共通の警告episodeは`tests/warning-reporter.test.cjs`へ残す。

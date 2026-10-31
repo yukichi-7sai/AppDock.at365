@@ -2,6 +2,8 @@
 
 設定対象や項目名をMCPツールの引数Schemaに埋め込まず、実行時のデータとして取得する。固定入口の初回導入時はクライアント側のツール更新が必要になる場合がある。その後、本体・Appletの通常設定や固定選択候補の追加ではtools/listを変更しない。
 
+`host.general`には`fileWatchAssistanceEnabled`と`fileWatchAssistanceIntervalSeconds`も通常項目として公開する。既存の取得・dry-run・apply・reset、revision検査と一般ページの共有/PC専用保存を使い、待機時間は2以上の有限数を受け付ける。既定値と実行の意味は[ファイル監視補助](file-watch-assistance-design.md)を参照する。
+
 ## 対象と公開判定
 
 ### 設定画面の南京錠

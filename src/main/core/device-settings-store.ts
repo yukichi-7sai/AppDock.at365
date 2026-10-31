@@ -558,9 +558,12 @@ export class DeviceSettingsStore extends SettingsStore {
       };
     });
   }
-  override watch(onError: (error: Error) => void) {
-    this.shared.watch(onError);
-    this.device.watch(onError);
+  override watch(
+    onError: (error: Error) => void,
+    assistance?: import('./file-watch-assistance').FileWatchAssistance,
+  ) {
+    this.shared.watch(onError, assistance);
+    this.device.watch(onError, assistance);
   }
   override reload() {
     this.recoverTransaction();

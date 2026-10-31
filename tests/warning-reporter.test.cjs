@@ -16,7 +16,7 @@ const warning = {
   eventId: 'condition-1',
   source: 'storage',
   title: '確認が必要です',
-  code: 'LEGACY_LOCAL_DATA',
+  code: 'TEST_WARNING',
   message: '詳細を確認してください。',
   logDetails: ['整理対象: C:\\fixture\\data\\storage'],
 };

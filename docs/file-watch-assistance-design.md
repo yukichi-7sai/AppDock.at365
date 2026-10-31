@@ -1,6 +1,6 @@
 # ファイル監視補助基盤の設計
 
-状態: 基盤単体を実装済み。設定画面・本体起動処理・既存監視への組み込みは未実装で、現在の監視動作は変わらない。通常のファイル監視を残し、定期的な補助確認だけを共通化する。工程の区切り・接続箇所・検証は[組み込み計画](file-watch-assistance-integration-plan.md)にまとめる。現行の保存・受信契約は[設定同期](settings-sync.md)、原画像は[登録画像](registered-images.md)を正本とする。
+状態: 基盤と設定画面・本体起動処理・設定/名簿/画像への組み込みを実装済み。通常のファイル監視を残し、定期的な補助確認だけを共通化する。工程の区切り・接続箇所・検証は[組み込み計画](file-watch-assistance-integration-plan.md)にまとめる。現行の保存・受信契約は[設定同期](settings-sync.md)、原画像は[登録画像](registered-images.md)を正本とする。
 
 ## 目的と適用範囲
 
@@ -8,7 +8,7 @@
 
 この変更は不要な定期アクセスの削減を目的とする。Explorerの遅延と現在の監視処理との因果関係は未測定であり、改善を保証しない。ログ追記、同期ソフト、通常のファイル利用によるI/Oとは分けて測定する。
 
-| 対象                                                      | 後続の組み込みでの扱い                                              |
+| 対象                                                      | 本体での扱い                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------- |
 | 共有data/settings.json・自端末data/settings-<端末名>.json | `observeFile`を通して補助確認を登録。親フォルダーの`fs.watch`は継続 |
 | Webプロフィール名簿                                       | 稼働する`WebProfileStore`の監視を登録                               |
@@ -22,7 +22,7 @@
 
 ## 設定
 
-後続の組み込みで、本体の「一般」に「ファイル監視」のセクションを設ける。基盤単体の段階では、保存設定・画面・MCP項目を追加しない。通常のファイル監視が動くことと、補助確認の対象・待機時間だけを説明し、監視処理の内部情報を設定フォームへ追加しない。
+本体の「一般」に「ファイル監視」のセクションを設ける。保存設定・画面・MCPは通常設定の共通定義を使う。通常のファイル監視が動くことと、補助確認の対象・待機時間だけを説明し、監視処理の内部情報を設定フォームへ追加しない。
 
 | キー                                      | 表示                   | 値・既定値                                         |
 | ----------------------------------------- | ---------------------- | -------------------------------------------------- |
@@ -39,7 +39,7 @@
 
 ## 所有と登録API
 
-[file-watch-assistance.ts](../src/main/core/file-watch-assistance.ts)の`FileWatchAssistance`を単体実装済み。本体の起動処理からはまだ生成しない。組み込み時には`index.ts`が1インスタンスだけ生成し、監視の所有者へ明示的に注入する。テストは同じクラスへ時計・タイマーを注入し、グローバルな定期実行の副作用を持たせない。
+[file-watch-assistance.ts](../src/main/core/file-watch-assistance.ts)の`FileWatchAssistance`を単体実装済み。`index.ts`が1インスタンスだけ生成し、監視の所有者へ明示的に注入する。テストは同じクラスへ時計・タイマーを注入し、グローバルな定期実行の副作用を持たせない。
 
 内部インターフェースの要点は次のとおり。以下の寿命・完了契約を、後続の接続でも維持する。
 
@@ -55,7 +55,7 @@ interface FileWatchAssistance {
 }
 ```
 
-- コンストラクターには必須の`failed(error)`と任意の`clock`を渡す。`failed`は同期/非同期どちらも受け付け、その失敗で他の登録を止めない。組み込み時は通知・ログへ生の例外を出さないアダプターで共通の障害報告へ接続する。
+- コンストラクターには必須の`failed(error)`と任意の`clock`を渡す。`failed`は同期/非同期どちらも受け付け、その失敗で他の登録を止めない。通知・ログへ生の例外を出さないアダプターで共通の障害報告へ接続する。
 - `AssistanceClock.now()`は単調なナノ秒のbigint、`schedule(callback, delayMilliseconds)`は取消関数を持つ予約を返す。通常はNodeの単調時計とunref済みタイマーを使う。インポートや生成だけではタイマーを作らない。
 - `defaultFileWatchAssistanceOptions`と`minimumFileWatchAssistanceIntervalSeconds`を公開し、後続の保存設定定義でも既定値と最小値を共用する。
 - `configure`は確定した実効値だけを受ける。同じ2値を再度渡しても、待機の期限や実行状態を変更しない。
@@ -167,6 +167,6 @@ Node.jsは`fs.watch`のプラットフォーム差・ネットワーク上での
 
 - [設定基盤と入力契約](settings-foundation.md)、[設定API](settings-api.md)、[共通レイアウト](settings-ui-guidelines.md)
 - [設定同期と保存領域](settings-sync.md)、[登録画像](registered-images.md)、[Webアカウント](web-accounts.md)
-- [共通エラー](error-reporting.md)、[旧データの警告](warning-notifications-design.md)
+- [共通エラー](error-reporting.md)、[共通警告](warning-notifications-design.md)
 - [未実装の共有保存先設計](shared-settings-location-design.md)。NAS対応・保存先切替は今回の対象に含めない
 - [組み込み計画と受入条件](file-watch-assistance-integration-plan.md)
