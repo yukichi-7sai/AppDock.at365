@@ -141,8 +141,12 @@ async function stop() {
     const saved = JSON.parse(
       fs.readFileSync(path.join(profile, `settings-${require('node:os').hostname()}.json`), 'utf8'),
     );
-    assert.equal(saved.host.accentColor, last);
-    const log = fs.readFileSync(path.join(profile, 'local', 'logs', 'host.log'), 'utf8');
+    assert.equal(saved.hostPages.appearance.useLocalSettings, true);
+    assert.equal(saved.hostPages.appearance.configuration.host.accentColor, last);
+    const log = fs.readFileSync(
+      path.join(profile, 'data', 'logs', require('node:os').hostname(), 'host.log'),
+      'utf8',
+    );
     assert(!/dock:settingsPage:act:|save-failed/.test(log), 'No setting action error was logged');
     await host.screenshot({ path: path.join(profile, 'colors.png') });
     checks.push(

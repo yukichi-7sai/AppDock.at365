@@ -6,15 +6,41 @@ const { spawn } = require('node:child_process');
 const { _electron: electron, chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
 const root = path.resolve(__dirname, '..');
-const logsOnly = process.argv.includes('--logs-only');
-const executable = process.argv.slice(2).find((arg) => arg !== '--logs-only');
+const logsFallback = process.argv.includes('--logs-fallback');
+const logsOnly = process.argv.includes('--logs-only') || logsFallback;
+const executable = process.argv
+  .slice(2)
+  .find((arg) => !['--logs-only', '--logs-fallback'].includes(arg));
 const portable = executable ? path.resolve(executable) : null;
 const profile = path.join(
   root,
   '.artifacts',
-  `${logsOnly ? 'log-page' : 'host-pages'}-ui-${Date.now()}`,
+  `${logsFallback ? 'log-page-fallback' : logsOnly ? 'log-page' : 'host-pages'}-ui-${Date.now()}`,
 );
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const logStorage = logsOnly
+  ? {
+      shared: path.join(profile, 'data/logs', require('node:os').hostname()),
+      fallback: path.join(profile, 'local/logs'),
+      other: path.join(profile, 'data/logs', require('node:os').hostname() + '-OTHER'),
+      fallbackMode: logsFallback,
+    }
+  : undefined;
+if (logStorage) {
+  const old =
+    JSON.stringify({
+      time: '2026-01-01T00:00:00Z',
+      level: 'info',
+      source: 'old.fixture',
+      message: 'existing-log-retained',
+    }) + '\n';
+  for (const directory of [logStorage.fallback, logStorage.other]) {
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'host.log'), old);
+  }
+  logStorage.old = old;
+  if (logsFallback) fs.mkdirSync(path.join(logStorage.shared, 'host.log'), { recursive: true });
+}
 fs.mkdirSync(path.join(profile, 'extensions/fixture.host-pages'), { recursive: true });
 const fixture = path.join(profile, 'extensions/fixture.host-pages');
 fs.writeFileSync(
@@ -140,7 +166,12 @@ async function launch(restore = false) {
   if (!portable)
     app = await electron.launch({
       executablePath: require('electron'),
-      args: [root, `--test-profile=${profile}`, ...(restore ? ['--restore-view'] : [])],
+      args: [
+        root,
+        `--test-profile=${profile}`,
+        ...(logsOnly ? [`--test-local-state=${path.join(profile, 'local')}`] : []),
+        ...(restore ? ['--restore-view'] : []),
+      ],
       env,
     });
   else {
@@ -153,6 +184,7 @@ async function launch(restore = false) {
       exe,
       [
         `--test-profile=${profile}`,
+        ...(logsOnly ? [`--test-local-state=${path.join(profile, 'local')}`] : []),
         `--remote-debugging-port=${debug}`,
         `--inspect=127.0.0.1:${inspector}`,
         ...(restore ? ['--restore-view'] : []),
@@ -261,6 +293,7 @@ async function geometry() {
         until,
         geometry,
         checks,
+        logStorage,
       });
       assert.deepEqual(errors, []);
       success = true;

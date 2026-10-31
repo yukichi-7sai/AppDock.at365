@@ -122,7 +122,7 @@ import { planCommandBatch } from '../shared/command-execution';
 import { commandCondition } from '../shared/command-conditions';
 import { projectSettingsIndex, SettingsPageSession } from './core/settings-page';
 import { SettingsPageHost } from './core/settings-page-host';
-import { dataPaths } from './core/data-paths';
+import { dataPaths, logDirectories } from './core/data-paths';
 import { RegisteredImages } from './core/registered-images';
 import { ImageLibraryHost, decodeRegisteredImage, ownsImage } from './core/image-library-host';
 import { stopRegisteredImageDecoder } from './core/registered-image-decoder';
@@ -3624,7 +3624,8 @@ async function initialize() {
     return;
   }
   const endServices = hostStartupTiming.begin('services');
-  log = new HostLog(path.join(dataDirectory, 'logs'), changed);
+  const logPaths = logDirectories(sharedDirectory, dataDirectory, os.hostname());
+  log = new HostLog(logPaths.shared, changed, logPaths.fallback);
   ribbonState = new RibbonState(
     path.join(dataDirectory, 'ribbon-state.json'),
     changed,
@@ -4641,6 +4642,7 @@ async function initialize() {
             })
           : new LogPageSession(request, {
               entries: () => log.entries,
+              storage: () => log.storage(),
               sources: () => allApplets().map((e) => ({ id: e.id, title: e.displayName })),
               dark: () => nativeTheme.shouldUseDarkColors,
               openDirectory: async () => {

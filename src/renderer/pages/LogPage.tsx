@@ -161,6 +161,18 @@ export function LogPage({ initialModel }: { initialModel: LogPageModel }) {
         {filters.category === 'normal' && <span>監査の警告・エラーも表示します</span>}
       </div>
       {error && <p role="alert">{error}</p>}
+      {content.storage && (
+        <div className="log-storage" role="status" data-mode={content.storage.mode}>
+          <span>
+            {content.storage.mode === 'memory'
+              ? 'ファイルへ保存できません。画面内のログだけ保持しています。'
+              : content.storage.mode === 'local'
+                ? 'このPCに退避中（同期されません）'
+                : '端末別の共有ログ'}
+          </span>
+          {content.storage.mode !== 'memory' && <span>{content.storage.directory}</span>}
+        </div>
+      )}
       <div className="log-table" role="table" aria-label="ログ一覧">
         <div className="log-head" role="row">
           <span role="columnheader">時刻</span>

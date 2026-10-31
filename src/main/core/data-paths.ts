@@ -1,6 +1,14 @@
 import { hostText } from '../../shared/i18n';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { deviceName } from './device-settings';
+
+export function logDirectories(shared: string, local: string, machineName: string) {
+  return {
+    shared: path.join(shared, 'logs', deviceName(machineName)),
+    fallback: path.join(local, 'logs'),
+  };
+}
 
 /** No roster or asset-ID database: local state is isolated by the EXE placement. */
 export function dataPaths(base: string, localAppData: string, isolatedLocal?: string) {

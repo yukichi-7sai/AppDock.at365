@@ -164,6 +164,18 @@
   font-size: 12px;
   margin-bottom: 8px;
 }
+.logs-page .log-storage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.logs-page .log-storage[data-mode='memory'] {
+  color: var(--text);
+}
 .logs-page .log-head,
 .logs-page .log-row {
   grid-template-columns: 105px 85px minmax(0, 1fr);

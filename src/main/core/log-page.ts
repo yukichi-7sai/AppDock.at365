@@ -5,6 +5,7 @@ import type {
   HostPageAction,
   LogPageModel,
   LogPageRequest,
+  LogStorageState,
 } from '../../shared/host-pages';
 import type { HostPageController } from './host-page-controller';
 
@@ -39,6 +40,7 @@ export class LogPageSession implements HostPageController {
     private request: LogPageRequest,
     private options: {
       entries(): LogEntry[];
+      storage?(): LogStorageState;
       sources(): { id: string; title: string }[];
       dark(): boolean;
       openDirectory(): Promise<void>;
@@ -95,6 +97,7 @@ export class LogPageSession implements HostPageController {
           `${e.source} ${e.message}`.toLowerCase().includes(this.filters.text.toLowerCase()),
       ),
       limit: 500,
+      storage: this.options.storage?.(),
     };
     const dark = this.options.dark();
     const signature = JSON.stringify([dark, content]);

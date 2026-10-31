@@ -233,7 +233,10 @@ async function phase(name) {
           return window.__saveStressErrors;
         });
         assert.deepEqual(failures, []);
-        const saveLog = fs.readFileSync(path.join(profile, 'local', 'logs', 'host.log'), 'utf8');
+        const saveLog = fs.readFileSync(
+          path.join(profile, 'data', 'logs', require('node:os').hostname(), 'host.log'),
+          'utf8',
+        );
         assert(!/save-failed|EPERM[^\n]*rename/.test(saveLog));
         measurements.saveStress = { toggles: 60, failures };
         checks.push('rapid-applet-toggles-persist-without-transient-save-errors');

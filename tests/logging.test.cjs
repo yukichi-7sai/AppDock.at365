@@ -7,6 +7,85 @@ const path = require('node:path');
 const { HostLog } = require('../out/main/main/core/log');
 const { LogPageSession } = require('../out/main/main/core/log-page');
 const { callAppletApi } = require('../out/main/main/core/applet-api-access');
+const { logDirectories } = require('../out/main/main/core/data-paths');
+
+function storageFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-log-storage-'));
+  t.after(() => {
+    assert.equal(path.dirname(root), os.tmpdir());
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const paths = logDirectories(path.join(root, 'data'), path.join(root, 'local'), 'PC-A');
+  let changes = 0;
+  const log = new HostLog(paths.shared, () => changes++, paths.fallback);
+  const read = (directory) =>
+    fs.readFileSync(path.join(directory, 'host.log'), 'utf8').trim().split('\n').map(JSON.parse);
+  return { root, paths, log, read, changes: () => changes };
+}
+
+test('new logs are separated by computer under shared data; existing local logs are neither read nor moved', (t) => {
+  const { root, paths, log, read } = storageFixture(t);
+  fs.mkdirSync(paths.fallback, { recursive: true });
+  const previous = path.join(paths.fallback, 'host.log');
+  fs.writeFileSync(previous, 'existing-local-log\n');
+  const otherPaths = logDirectories(path.join(root, 'data'), path.join(root, 'local-b'), 'PC-B');
+  const other = new HostLog(otherPaths.shared, () => {}, otherPaths.fallback);
+  log.write('debug', 'one', 'new A');
+  other.audit('info', 'two', 'new B');
+  assert.equal(paths.shared, path.join(root, 'data/logs/PC-A'));
+  assert.equal(read(paths.shared)[0].message, 'new A');
+  assert.equal(read(otherPaths.shared)[0].message, 'new B');
+  assert.equal(fs.readFileSync(previous, 'utf8'), 'existing-local-log\n');
+  assert(!fs.existsSync(otherPaths.fallback));
+  assert.deepEqual(log.storage(), { mode: 'shared', directory: paths.shared });
+  for (const name of ['../escape', '..', 'bad\\name', 'bad/name', ''])
+    assert.throws(() => logDirectories(path.join(root, 'data'), path.join(root, 'local'), name));
+});
+
+test('unavailable shared directory falls back without failing startup; recovery writes only new entries to shared data', (t) => {
+  const { paths, log, read, changes } = storageFixture(t);
+  fs.mkdirSync(path.dirname(paths.shared), { recursive: true });
+  fs.writeFileSync(paths.shared, 'blocked directory');
+  assert.doesNotThrow(() => log.write('warn', 'one', 'fallback entry'));
+  assert.deepEqual(log.storage(), { mode: 'local', directory: paths.fallback });
+  assert.deepEqual(read(paths.fallback), log.entries);
+  const fallbackBefore = fs.readFileSync(path.join(paths.fallback, 'host.log'));
+  fs.unlinkSync(paths.shared);
+  log.write('info', 'one', 'recovered entry');
+  assert.deepEqual(log.storage(), { mode: 'shared', directory: paths.shared });
+  assert.equal(read(paths.shared).length, 1);
+  assert.equal(read(paths.shared)[0].message, 'recovered entry');
+  assert.deepEqual(fs.readFileSync(path.join(paths.fallback, 'host.log')), fallbackBefore);
+  assert.equal(changes(), 2);
+});
+
+test('append and rotation failures fall back; both destinations failing keeps the live log without recursive error records', (t) => {
+  const { paths, log, read, changes } = storageFixture(t);
+  fs.mkdirSync(path.join(paths.shared, 'host.log'), { recursive: true });
+  log.audit('warn', 'one', 'append failed');
+  assert.equal(read(paths.fallback)[0].category, 'audit');
+  fs.mkdirSync(path.join(paths.fallback, 'host.log.1'));
+  fs.writeFileSync(path.join(paths.fallback, 'host.log'), 'x'.repeat(1024 * 1024 + 1));
+  assert.doesNotThrow(() => log.write('error', 'one', 'both failed'));
+  assert.equal(log.storage().mode, 'memory');
+  assert.equal(log.entries.length, 2);
+  assert.equal(changes(), 2);
+  fs.rmdirSync(path.join(paths.shared, 'host.log'));
+  fs.writeFileSync(path.join(paths.shared, 'host.log'), 'old rotation bytes'.repeat(70000));
+  fs.mkdirSync(path.join(paths.shared, 'host.log.1'));
+  fs.rmdirSync(path.join(paths.fallback, 'host.log.1'));
+  log.write('info', 'one', 'shared rotation failed');
+  assert.equal(log.storage().mode, 'local');
+  assert.equal(read(paths.fallback).length, 1);
+  assert.equal(read(paths.fallback)[0].message, 'shared rotation failed');
+  fs.rmdirSync(path.join(paths.shared, 'host.log.1'));
+  const oldShared = fs.readFileSync(path.join(paths.shared, 'host.log'));
+  log.write('info', 'one', 'rotation recovered');
+  assert.equal(log.storage().mode, 'shared');
+  assert.deepEqual(fs.readFileSync(path.join(paths.shared, 'host.log.1')), oldShared);
+  assert.equal(read(paths.shared).length, 1);
+  assert.equal(read(paths.shared)[0].message, 'rotation recovered');
+});
 
 test('debug and audited API outcomes persist once with independent categories; Applets cannot spoof audits', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'appdock-log-categories-'));

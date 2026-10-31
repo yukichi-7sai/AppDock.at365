@@ -1,6 +1,10 @@
 import type { LogEntry } from './contracts';
 
 export type LogScope = { type: 'all' } | { type: 'applet'; id: string } | { type: 'web' };
+export interface LogStorageState {
+  mode: 'shared' | 'local' | 'memory';
+  directory: string;
+}
 export interface LogFilters {
   source: string;
   level: 'all' | 'standard' | 'debug' | 'info' | 'warn' | 'error';
@@ -32,6 +36,7 @@ export interface LogPageModel {
     sources: { id: string; title: string }[];
     entries: LogEntry[];
     limit: number;
+    storage?: LogStorageState;
   };
 }
 export type HostPageModel =
