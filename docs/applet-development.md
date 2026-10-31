@@ -10,6 +10,8 @@ AppDock本体の公開機能をAppletから操作する場合は[AppDock共通�
 
 現在のAppDock / API v1を対象とする実装手順です。まずこのガイドで構成を決め、個々のAPIは[Applet API](extensions.md)、ホストへの機能追加は[AppDockの実装ガイド](host-development.md)を参照してください。
 
+Appletの版は[共通の版更新ルール](development-workflow.md#版更新の判断)で判定します。新しい連携APIを使うために`minimumHostVersion`を引き上げる場合も、Appletをマイナー更新します。
+
 新しいAppletにも[ドキュメント方針](documentation.md)を適用します。`README.md`はインストール方法とビルド方法だけを簡潔に記載してください。機能・最低ホスト版・動作環境・操作・設定・既定値・制約は`docs/usage.md`へ集約し、`DEVELOPMENT.md`を開発文書全体の入口にします。テスト・発行・内部構造はDEVELOPMENTまたは機能別文書、実測結果はVERIFICATIONへ記載してください。
 
 ## 1. 機能と実行方式を決める
