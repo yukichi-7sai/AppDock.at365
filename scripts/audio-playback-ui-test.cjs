@@ -13,7 +13,11 @@ settings.host.hardwareAcceleration = false;
 settings.host.soundEnabled = false;
 settings.keybindings = [];
 settings.gestures.enabled = false;
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+settings.extensions['test.sound-lifetime'] = { enabled: true, settings: {} };
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const wave = Buffer.alloc(44 + 8000);
 wave.write('RIFF');
 wave.writeUInt32LE(wave.length - 8, 4);
@@ -29,6 +33,32 @@ wave.write('data', 36);
 wave.writeUInt32LE(8000, 40);
 const wav = path.join(profile, 'fixture.wav');
 fs.writeFileSync(wav, wave);
+const fixture = path.join(profile, 'extensions/test.sound-lifetime');
+fs.mkdirSync(fixture, { recursive: true });
+fs.writeFileSync(path.join(fixture, 'fixture.wav'), wave);
+fs.writeFileSync(
+  path.join(fixture, 'extension.json'),
+  JSON.stringify({
+    apiVersion: 1,
+    id: 'test.sound-lifetime',
+    name: 'Sound lifetime fixture',
+    version: '1.0.0',
+    runtime: 'node',
+    entry: 'index.cjs',
+    capabilities: ['audio'],
+    commands: [
+      { id: 'test.sound-lifetime.play', title: 'Play sound' },
+      { id: 'test.sound-lifetime.crash', title: 'Crash fixture' },
+    ],
+  }),
+);
+fs.writeFileSync(
+  path.join(fixture, 'index.cjs'),
+  `exports.activate=async c=>{
+    c.commands.register('test.sound-lifetime.play','Play sound',()=>c.audio.play(require('node:path').join(__dirname,'fixture.wav')));
+    c.commands.register('test.sound-lifetime.crash','Crash fixture',()=>{setImmediate(()=>process.exit(1));});
+  };`,
+);
 const until = async (fn, label) => {
   const end = Date.now() + 30000;
   while (Date.now() < end) {
@@ -48,7 +78,7 @@ let child,
 (async () => {
   try {
     port = await freePort();
-    const env = { ...process.env };
+    const env = { ...process.env, CODEX_HOME: path.join(profile, 'codex') };
     delete env.ELECTRON_RUN_AS_NODE;
     const exe = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : require('electron');
     if (process.argv[2]) {
@@ -242,12 +272,97 @@ let child,
     assert.equal(muted.events.length, 12);
     assert.equal(muted.peak, 1);
     assert.deepEqual(muted.errors, []);
-    assert.equal(
-      JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'))).host.soundEnabled,
-      true,
-    );
+    const persisted =
+      new (require('../out/main/main/core/device-settings-store').DeviceSettingsStore)(
+        require('./test-settings.cjs').file(profile),
+        path.join(profile, 'local'),
+        require('node:os').hostname(),
+      );
+    persisted.load();
+    assert.equal(persisted.value.host.soundEnabled, true);
     checks.push(
       'generated OFF stops active, clears waiting/locked/new sounds; toggle ON plays fresh audio only',
+    );
+    await until(
+      () =>
+        inspect(
+          port,
+          `!audioFixture.req('./out/main/main/core/audio-service').audioPlayback.active`,
+        ),
+      'previous audio completed',
+    );
+    await inspect(
+      port,
+      `(()=>{
+      const f=audioFixture, q=f.req('./out/main/main/core/audio-service').audioPlayback;
+      f.lifetimeStarts=0; f.lifetimeStops=0; f.originalPlayer=q.player;
+      q.player=async r=>{
+        r.beforePlay?.();
+        if(r.signal.aborted)return;
+        f.lifetimeStarts++;
+        await new Promise(resolve=>r.signal.addEventListener('abort',()=>{f.lifetimeStops++;resolve();},{once:true}));
+      };
+      return true;
+    })()`,
+    );
+    const execute = (id) =>
+      inspect(
+        port,
+        `(async()=>{
+      const e=${electronExpression};
+      const w=e.webContents.getAllWebContents().find(w=>w.getURL().startsWith('appdock://host/'));
+      await w.executeJavaScript(${JSON.stringify(`window.dock.executeCommand(${JSON.stringify(id)})`)});
+      return true;
+    })()`,
+      );
+    await execute('test.sound-lifetime.play');
+    await until(() => inspect(port, 'audioFixture.lifetimeStarts===1'), 'owner playback started');
+    await execute('test.sound-lifetime.play');
+    assert.equal(
+      await inspect(
+        port,
+        `audioFixture.req('./out/main/main/core/sounds').notificationSounds.pending.length`,
+      ),
+      1,
+    );
+    await execute('appdock.applets.test.sound-lifetime.restart');
+    await until(
+      () =>
+        inspect(
+          port,
+          `audioFixture.lifetimeStops===1 && !audioFixture.req('./out/main/main/core/sounds').notificationSounds.active`,
+        ),
+      'restart cancels active owner sound',
+    );
+    assert.equal(
+      await inspect(
+        port,
+        `audioFixture.req('./out/main/main/core/sounds').notificationSounds.pending.length`,
+      ),
+      0,
+    );
+    await execute('test.sound-lifetime.play');
+    await until(
+      () => inspect(port, 'audioFixture.lifetimeStarts===2'),
+      'replacement owner can play',
+    );
+    await execute('test.sound-lifetime.crash');
+    await until(
+      () =>
+        inspect(
+          port,
+          `audioFixture.lifetimeStops===2 && !audioFixture.req('./out/main/main/core/sounds').notificationSounds.active`,
+        ),
+      'crash cancels active owner sound',
+    );
+    assert.equal(await inspect(port, 'audioFixture.lifetimeStarts'), 2);
+    assert.deepEqual(await inspect(port, 'audioFixture.errors'), []);
+    await inspect(
+      port,
+      `(()=>{audioFixture.req('./out/main/main/core/audio-service').audioPlayback.player=audioFixture.originalPlayer;return true;})()`,
+    );
+    checks.push(
+      'real Applet restart and crash cancel active/queued sounds; the replacement generation plays fresh audio',
     );
     success = true;
   } catch (error) {

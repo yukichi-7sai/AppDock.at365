@@ -334,6 +334,7 @@ type LoadedManifest = ExtensionManifest & {
   sourceKind: 'builtin' | 'external';
 };
 export interface ExtensionInstance {
+  soundLifetime?: AbortController;
   memoryStorage?: import('./memory-storage').MemoryStorage;
   dynamicPages?: import('../../shared/dynamic-pages').DynamicPageDefinition[];
   pageRevision?: number;
@@ -699,6 +700,8 @@ class ExtensionManager extends EventEmitter {
   }
   async start(e: ExtensionInstance) {
     if (this.shuttingDown || !this.startAllowed(e.manifest.id)) return;
+    e.soundLifetime?.abort();
+    e.soundLifetime = new AbortController();
     e.startupTiming = undefined;
     const startedAt = performance.now();
     e.startupMeasurement = { startedAt, phaseStartedAt: startedAt, phase: 'prepare', phases: [] };
@@ -848,6 +851,7 @@ class ExtensionManager extends EventEmitter {
   crashed(e: ExtensionInstance, message: string) {
     this.executions.stop(e.manifest.id);
     if (e.state === 'stopping') return;
+    e.soundLifetime?.abort();
     this.finishStartup(e, 'error');
     void closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
@@ -868,6 +872,7 @@ class ExtensionManager extends EventEmitter {
     this.cancelStart(e);
     e.startupMeasurement = undefined;
     e.state = 'stopping';
+    e.soundLifetime?.abort();
     await closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
     e.memoryStorage?.clear();

@@ -655,6 +655,7 @@ export function createHostApi(
             : p.file,
           () => e.child === child && ['starting', 'running'].includes(e.state),
           () => log('error', id, hostText('services.hostApi.soundPlaybackFailed')),
+          e.soundLifetime?.signal,
         );
         return null;
       }

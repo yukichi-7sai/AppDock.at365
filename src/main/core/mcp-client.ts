@@ -138,7 +138,9 @@ export class McpClientService {
   private connectionChecks = new Set<string>();
   private jobs = new Map<string, JobRecord>();
   private starts = new Map<string, { signature: string; promise: Promise<McpJob> }>();
-  private reaper: ReturnType<typeof setInterval>;
+  private expiryTimer?: ReturnType<typeof setTimeout>;
+  private expiryAt?: number;
+  private closed = false;
   constructor(
     private options: {
       settings: McpClientSettings;
@@ -149,10 +151,7 @@ export class McpClientService {
       fetcher?: typeof fetch;
       ttlMs?: number;
     },
-  ) {
-    this.reaper = setInterval(() => this.expire(), Math.min(options.ttlMs ?? 600000, 30000));
-    this.reaper.unref();
-  }
+  ) {}
   private allow(actor: McpActor, execute = false) {
     if (!this.options.authorized(actor, execute || actor.management === true))
       fail('API_DISABLED', hostText('services.mcpClient.permission'));
@@ -812,6 +811,12 @@ export class McpClientService {
     clearTimeout(record.timer);
     record.dispose();
     record.controller.abort();
+    this.scheduleExpiry(
+      Math.min(
+        this.expiryAt ?? Infinity,
+        record.job.finishedAt + (this.options.ttlMs ?? 600000) + 1,
+      ),
+    );
     this.options.audit?.(record.job);
     this.options.changed?.();
     if (error && state !== 'cancelled') this.options.failed?.(record.job.jobId, error);
@@ -848,9 +853,31 @@ export class McpClientService {
   }
   private expire() {
     const now = Date.now();
-    for (const [id, r] of this.jobs)
-      if (r.job.finishedAt && now - r.job.finishedAt > (this.options.ttlMs ?? 600000))
-        this.jobs.delete(id);
+    let next = Infinity;
+    for (const [id, r] of this.jobs) {
+      if (r.job.finishedAt === undefined) continue;
+      const due = r.job.finishedAt + (this.options.ttlMs ?? 600000) + 1;
+      if (due <= now) this.jobs.delete(id);
+      else next = Math.min(next, due);
+    }
+    this.scheduleExpiry(next);
+  }
+  private scheduleExpiry(due: number) {
+    if (this.expiryTimer && this.expiryAt === due) return;
+    clearTimeout(this.expiryTimer);
+    this.expiryTimer = undefined;
+    this.expiryAt = undefined;
+    if (this.closed || !Number.isFinite(due)) return;
+    this.expiryAt = due;
+    this.expiryTimer = setTimeout(
+      () => {
+        this.expiryTimer = undefined;
+        this.expiryAt = undefined;
+        this.expire();
+      },
+      Math.max(0, Math.min(2_147_483_647, due - Date.now())),
+    );
+    this.expiryTimer.unref();
   }
   reconcile() {
     for (const record of this.sessions.values()) {
@@ -883,7 +910,10 @@ export class McpClientService {
     }
   }
   async shutdown() {
-    clearInterval(this.reaper);
+    this.closed = true;
+    clearTimeout(this.expiryTimer);
+    this.expiryTimer = undefined;
+    this.expiryAt = undefined;
     for (const r of this.jobs.values())
       this.finish(r, 'cancelled', {
         code: 'SHUTDOWN',

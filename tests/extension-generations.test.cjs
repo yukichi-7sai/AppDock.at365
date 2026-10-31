@@ -75,11 +75,16 @@ test('late events from a process that exceeded the stop timeout do not affect it
   await manager.reconcile();
   const item = manager.items.get('test.generation');
   const oldChild = item.child;
+  const oldSoundLifetime = item.soundLifetime;
+  assert.equal(oldSoundLifetime.signal.aborted, false);
   await manager.restart(item.manifest.id, true);
   const newChild = item.child;
   const newPeer = item.peer;
   const generation = item.runtimeSession;
   assert.notEqual(newChild, oldChild);
+  assert.equal(oldSoundLifetime.signal.aborted, true);
+  assert.notEqual(item.soundLifetime, oldSoundLifetime);
+  assert.equal(item.soundLifetime.signal.aborted, false);
   assert.equal(item.state, 'running');
   const logCount = logs.length;
   oldChild.emit('error', new Error('late process error'));
@@ -96,4 +101,5 @@ test('late events from a process that exceeded the stop timeout do not affect it
   newChild.emit('error', new Error('current process error'));
   assert.equal(item.state, 'error');
   assert.equal(item.error, 'current process error');
+  assert.equal(item.soundLifetime.signal.aborted, true);
 });

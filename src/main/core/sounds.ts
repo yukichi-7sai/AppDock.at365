@@ -25,9 +25,14 @@ export async function readWave(file: string): Promise<Buffer> {
   return bytes;
 }
 /** Short notifications only. Empty selection is silent; no system beep fallback. */
-export function queueSound(file: string, alive: () => boolean, failed: () => void): void {
+export function queueSound(
+  file: string,
+  alive: () => boolean,
+  failed: () => void,
+  signal?: AbortSignal,
+): void {
   if (!file) return;
   if (!path.isAbsolute(file) || path.extname(file).toLowerCase() !== '.wav')
     throw new Error(hostText('services.sounds.absoluteWavPath'));
-  notificationSounds.enqueue(file, alive, failed);
+  notificationSounds.enqueue(file, alive, failed, signal);
 }
