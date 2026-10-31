@@ -1,5 +1,23 @@
 # 検証記録
 
+## 2026-10-31: メモリStorageと壁紙履歴のコミット前照合
+
+- 本体0.112.2・WallpaperSlideshow 0.8.0の1,084入力、実装時の完全ログと発行済み全703ファイル・ZIP/feedをSHA256で照合し、一致を確認した。関連71件（本体標準9ファイル67件と壁紙JS4件）、型検査・ビルド、native回帰/RPC/長パス1,000件、ソースと固定EXEの履歴GUI各11群・固定smoke・発行native起動の成功を再利用する。
+- 更新SDK/Runtimeを使う全テストfixtureをRelease buildして成功。未実施だった本体標準152ファイル1,381件だけを追加実行し、失敗・skip 0。本体標準161ファイル1,448件が再利用と追加実行で揃った。必要な共通SDKのDLL/native接続、表示・保存・停止と壁紙の描画回帰も成功済み。既存の操作・保存契約と削除した検査の担当を再確認し、阻害指摘なし。
+- 製品・試験・依存/ビルド/発行入力は実装時から不変。検証記録の追記だけを例外として最終入力を照合し、今回の26ファイルをstageする。版更新・再発行は行わず、stage/作業内容とcommit treeの一致、コミット直後のcleanを確認する。push・Release・実利用先deployは行わない。
+- 証跡は`.artifacts/commit-validation-memory-history-20261031/`の入力/ログ/発行物の照合、追加回帰の完全ログ・結果、再利用判断、review/stage/commit記録。前工程の`.artifacts/wallpaper-memory-history-20261031/`と使用したGUI記録は保護する。新しいGUI実行用コピーは作成しておらず、追加の整理対象は0件。実壁紙/Explorer・実ロック/RDP・実ごみ箱/関連付けアプリの未検証範囲は前工程と同じ。
+
+## 2026-10-31: メモリStorageとWallpaperSlideshow履歴 0.112.2
+
+- main/431baf3のclean状態からpull --ff-onlyで更新なしを確認して着手。既存Storageへ`memory` scopeを追加し、Applet実行世代ごとに値を保持する。既存のdevice/shared・キー/権限・JSON制約は維持し、停止・異常終了・再起動でメモリ値を解放する。SDK/Runtimeは0.27.3、本体は保存ファイル・設定項目の増減がない追加APIと修正として0.112.2へ更新した。共通仕様は`docs/memory-storage.md`。
+- `source-images`は実行処理が公開した自身のメモリ値だけを画像パスの根拠にし、local View専用Sessionで元ファイルを配信する。画像の生成と保持はJSへ移した。非表示・破棄で読取と参照を失効し、共通ギャラリーもerror/missing時に以前の画像を除去する。任意のfile-removed通知は既存Appletへ必須にせず、画像削除後の通知失敗を削除の再試行へ結び付けない。
+- 発行前レビューで、読込失敗後の旧画像残留、一覧更新中の操作対象変更、解放とOS操作の競合、不確かな索引保存後の区間回収、同じ画像の重複カード情報を修正・再検証した。ごみ箱へ渡すパスは最終変更で絶対化し、発行後の関連71件も再実行して成功。阻害指摘は残っていない。`review.json`を参照。
+- frozen-lockfileの依存照合、型検査、本体ビルド、SDK/Runtime・native fixtureのRelease buildが成功。Storage/表示寿命/既存ページ・.NET接続/共通画像・ギャラリー/WallpaperのJS契約の関連**71/71、失敗・skip 0**。Wallpaperのnative回帰、RPCの拒否・受付不明な索引保存と後続回収、400文字超のパス1,000件の分割公開も成功。1,084入力を照合し、最終のhost-api.ts変更以外は先行試験時と一致した。
+- ソースと発行済み固定EXEの履歴GUIがそれぞれ**11群**成功。元画像不在時の旧画像除去、閉じる/再表示でのBlob URL解放と再取得、カード幅の保存/復元、モニター/ページ位置、開く/削除確認、明暗/狭幅、ページ/Windowの往復、設定8項目と停止時回収を確認した。最終固定EXEのsmokeと、発行native EXEの不正設定拒否・自身のHWNDへのquery/cancel/end・正常終了も成功。画像の表示はスクリーンショットで目視確認した。
+- 標準publish.batは本体・Wallpaperとも終了0。`A:\40.ARTIFACT\AppDock.at365`へ0.112.2を発行し、update.zip **270830679 bytes / SHA256 `50ad42e2deb17f2856af9fdbe3d77d51f4b2483da790fffbcb18d7fc2b4ecbd8`**とfeed、ZIP全693ファイルと発行先を照合した。Wallpaper 0.8.0のZIP全10ファイルと元Web資産8件、最低本体版0.112.2、同梱SDK/Runtime版も一致。未変更Applet・スターターは再発行していない。
+- 証跡は`.artifacts/wallpaper-memory-history-20261031/`の完全ログ、入力一覧、`review.json`、`payload-validation.json`、`validation.json`。固定GUIは兄弟repoの`.artifacts/history-page-ui-long-cache-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-1793454048931/`、smokeは`.artifacts/smoke-1793454058647/`。実壁紙/Explorer再起動・実ロック/RDP・実際のごみ箱/関連付けアプリは未実施で、GUIの外部操作は隔離fixtureを使用した。参照解放とOSの即時メモリ減少は区別する。
+- 整理では終了・成功・参照プロセスなしと通常パスを確認し、古い成功GUIのEXE5個と旧smokeの管理対象18項目だけを除去した。論理サイズは計1,476,378,441 bytes、保持631ファイルと最新コピーのSHA256は前後一致、削除失敗0。失敗/方式不明・固定出力・歴代の再利用記録は保護し、フォルダー全体の削除は0件。計画・結果は`cleanup-plan.json`と`cleanup.json`。コミット・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-10-31: 現行sounds接続のコミット検証
 
 - 前工程の0.112.1について、933入力と発行先693ファイルが保存済みSHA256に一致することを確認した。型検査・書式・関連92件・固定EXEのsounds確認/隔離smokeを再利用し、未実行だった標準149ファイル1,350件だけを追加実行してすべて成功。標準160ファイル1,442件が再利用と追加実行で揃い、失敗/skipは0。

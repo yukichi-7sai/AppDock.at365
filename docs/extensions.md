@@ -220,7 +220,7 @@ Webサービスのアカウント別ページには[WebアカウントAPI](web-a
 | Browser       | 資格情報を含まないHTTPS URLを既定ブラウザで開く     | `browser`             |
 | Logging       | 拡張ID付きホストログ                                | 常時                  |
 | Scheduler     | 定期実行、停止時のタイマー解除                      | 拡張ランナー内        |
-| Storage       | 拡張ID・キー別のJSON永続データ（1件1MBまで）        | `storage`             |
+| Storage       | 拡張ID・キー別のJSON一時／永続データ（1件1MiBまで） | `storage`             |
 | Secrets       | 拡張ID・キー別の暗号化文字列                        | `secrets`             |
 
 ### Storageの保存範囲
@@ -239,9 +239,11 @@ await context.Storage.SetAsync("notes", "example", StorageScope.Shared, cancella
 var notes = await context.Storage.GetAsync<string>("notes", StorageScope.Shared, cancellationToken);
 ```
 
-Nodeは`'device' | 'shared'`、.NETは`StorageScope.Device | StorageScope.Shared`です。新しい.NET overloadではCancellationTokenを明示します（取消不要なら`default`）。既存の省略・CancellationToken指定のシグネチャは保持します。RPCの`host.storage.get/set`は任意の`scope`文字列を受け取り、省略は`device`、未知の値は拒否します。`storage` capability、Applet IDによる隔離、既存の1件1MiB制限を維持します。
+Nodeは`'device' | 'shared' | 'memory'`、.NETは`StorageScope.Device | StorageScope.Shared | StorageScope.Memory`です。`memory`は本体0.112.2・SDK/Runtime 0.27.3以降で使えます。ファイルを作らず、同じAppletのlocalページと実行処理でJSON値を受け渡せます。停止・異常終了・再起動で解放し、`null`の保存でそのキーを除去します。詳細は[メモリStorageと元画像表示](memory-storage.md)を参照してください。
 
-StorageはJSONを永続化する共通APIで、設定フォームの項目はSettings、認証情報はSecretsを使います。共有scopeの同じキーを複数PCから変更した場合の自動マージや変更通知は提供しません。取得時はファイルの現在値を読みます。
+新しい.NET overloadではCancellationTokenを明示します（取消不要なら`default`）。既存の省略・CancellationToken指定のシグネチャは保持します。RPCの`host.storage.get/set`は任意の`scope`文字列を受け取り、省略は`device`、未知の値は拒否します。`storage` capability、Applet IDによる隔離、既存の1件1MiB制限を維持します。
+
+StorageはJSON値を扱う共通APIで、設定フォームの項目はSettings、認証情報はSecretsを使います。共有scopeの同じキーを複数PCから変更した場合の自動マージや変更通知は提供しません。ファイルscopeの取得時はファイルの現在値を読みます。
 
 ### ログと設定の受信
 

@@ -125,6 +125,8 @@ data/
 
 ## 端末別JSONの形式
 
+Storageの`memory` scopeは保存・同期対象ではなく、現在のApplet実行中だけホストのメモリに保持する。ファイルscopeの保存分類は変えない。詳細は[メモリStorage](memory-storage.md)を参照する。
+
 共有settings.jsonのschemaVersionは当初1を維持し、端末別JSONには独立したschemaVersion:1を設ける。以下は端末用ファイルの例である。
 
 ```json

@@ -9,10 +9,17 @@
 ```json
 {
   "commands": [{ "id": "example.applet.open", "title": "画面を開く", "activateOnExecute": true }],
-  "pages": [{
-    "id": "main", "title": "画面", "icon": "folder", "source": "local",
-    "ui": "web/index.html", "openCommand": "example.applet.open", "defaultDisplay": "page"
-  }]
+  "pages": [
+    {
+      "id": "main",
+      "title": "画面",
+      "icon": "folder",
+      "source": "local",
+      "ui": "web/index.html",
+      "openCommand": "example.applet.open",
+      "defaultDisplay": "page"
+    }
+  ]
 }
 ```
 
@@ -91,17 +98,17 @@ manifest.pageCollectionsは自身のobject-list設定からlocal/remoteページ
 
 既存の`IExtensionContext.Pages`と`IPageService.OpenAsync`を保ち、次を追加する。追加メンバーは既定実装で`NotSupportedException`を返し、既存のSDK利用者・テスト用実装を壊さない。`ExtensionContext`が実装する際は既存のホスト検証を通す。
 
-| .NET API | RPC / 意味 |
-| --- | --- |
-| `ListAsync(token)` | `host.pages.list`。固定＋実行中ページと登録revisionを返す |
-| `ReplaceAsync(pages, expectedRevision, token)` | `host.pages.replace`。動的定義だけを全置換し、新revisionを返す |
-| `OpenAsync(id, token)` | 既存の`host.pages.open`。自身のlocalページを開く |
-| `HideAsync(id, token)` | `host.pages.hide`。Viewと入力を保持して隠す |
-| `DisposeAsync(id, token)` | `host.pages.dispose`。登録を残してViewを破棄する |
-| `OpenItemAsync(id, token)` | `host.pages.openItem`。自身の設定由来ページを開く |
-| `NotifyChangedAsync(id, token)` | 新設`host.pages.changed`。対象ページへ既存の変更イベントを送る |
-| `RegisterImagesAsync(id, files, token)` | 新設`host.pages.images.register`。画像ファイルを登録して参照を返す |
-| `ReleaseImagesAsync(id, imageIds, token)` | 新設`host.pages.images.release`。画像参照を失効させる |
+| .NET API                                       | RPC / 意味                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| `ListAsync(token)`                             | `host.pages.list`。固定＋実行中ページと登録revisionを返す          |
+| `ReplaceAsync(pages, expectedRevision, token)` | `host.pages.replace`。動的定義だけを全置換し、新revisionを返す     |
+| `OpenAsync(id, token)`                         | 既存の`host.pages.open`。自身のlocalページを開く                   |
+| `HideAsync(id, token)`                         | `host.pages.hide`。Viewと入力を保持して隠す                        |
+| `DisposeAsync(id, token)`                      | `host.pages.dispose`。登録を残してViewを破棄する                   |
+| `OpenItemAsync(id, token)`                     | `host.pages.openItem`。自身の設定由来ページを開く                  |
+| `NotifyChangedAsync(id, token)`                | 新設`host.pages.changed`。対象ページへ既存の変更イベントを送る     |
+| `RegisterImagesAsync(id, files, token)`        | 新設`host.pages.images.register`。画像ファイルを登録して参照を返す |
+| `ReleaseImagesAsync(id, imageIds, token)`      | 新設`host.pages.images.release`。画像参照を失効させる              |
 
 一覧結果は`PageListResult { revision, pages }`、置換結果は`{ revision }`とする。動的定義は既存の`id/title/source/ui/icon/defaultDisplay/context`だけを持つ専用DTOにし、一覧にある`openCommand`を置換要求へ送り返さない。省略可能な値はJSONから省略し、`source`は`local`。登録revisionは設定revisionと別で、ホストで安全な整数として検証する。
 
@@ -128,28 +135,31 @@ public interface IPageActionHandler
 
 `AppletSession`の`page.action`がこれを呼び、返されたJSON値をRPC結果として返す。nativeの`AppletSession.RunAsync`とDLL用ExtensionHostは同じ実装を使う。入力の`JsonElement`は非同期処理中も有効な複製を渡す。未実装のAppletには「ページ操作は提供されていません」を返す。
 
-| 境界 | 契約 |
-| --- | --- |
-| 呼出元 | 既存の`localPageSource`でWebContents・main frame・正確なlocal URLを照合 |
-| 入力 | 宣言済みidとstring/number/booleanだけ。未宣言キー・型違い・64K文字超過を既存どおり拒否 |
-| 実行 | 起動完了後だけ受付。停止開始・接続終了で取消。別Appletや任意RPCへ転送しない |
-| 結果 | JSON値またはnull。.NETは最終のRPCシリアライズ形式で結果部分512KiB以内を検査し、超過はエラーにする。既存の1MiB制限を緩めない |
-| 世代 | 応答時にも既存のruntimeSession照合を行い、再起動前の結果をUIへ戻さない |
+| 境界   | 契約                                                                                                                        |
+| ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| 呼出元 | 既存の`localPageSource`でWebContents・main frame・正確なlocal URLを照合                                                     |
+| 入力   | 宣言済みidとstring/number/booleanだけ。未宣言キー・型違い・64K文字超過を既存どおり拒否                                      |
+| 実行   | 起動完了後だけ受付。停止開始・接続終了で取消。別Appletや任意RPCへ転送しない                                                 |
+| 結果   | JSON値またはnull。.NETは最終のRPCシリアライズ形式で結果部分512KiB以内を検査し、超過はエラーにする。既存の1MiB制限を緩めない |
+| 世代   | 応答時にも既存のruntimeSession照合を行い、再起動前の結果をUIへ戻さない                                                      |
 
 UIは既存の呼出方法を使う。以下は最小の利用例。実行可能なDLL/native/Nodeのfixtureは`tests/fixtures/dotnet/AppDock.PageProbe`と`scripts/dotnet-pages-ui-test.cjs`にある。
 
 ```json
 {
-  "pageActions": [{
-    "id": "items.read",
-    "parameters": { "offset": "number", "limit": "number" }
-  }]
+  "pageActions": [
+    {
+      "id": "items.read",
+      "parameters": { "offset": "number", "limit": "number" }
+    }
+  ]
 }
 ```
 
 ```javascript
 const result = await window.appletPage.call('actions.invoke', {
-  id: 'items.read', input: { offset: 0, limit: 32 }
+  id: 'items.read',
+  input: { offset: 0, limit: 32 },
 });
 ```
 
@@ -165,14 +175,14 @@ Runtimeは既存のコマンド・設定の直列化を保つ。ページ操作�
 
 `RegisterImagesAsync`の要求は`{id,files:[{key,file}]}`、結果は`{images:[{key,id,url}]}`。`key`はApplet内の対応付け用、`id`はホストが発行する不透明な参照、`url`は`appdock://page-images/<不透明な参照>`。画像の再圧縮や縮小は行わず、元の生成サムネイルを配信する。
 
-| 項目 | 上限・検査 |
-| --- | --- |
-| capability | `pages`と`local-images`。自身の固定／動的localページだけ |
-| 1要求 | 最大64ファイル、最終RPC形式で256KiB以内。必要なら呼出側で小分けにする |
-| 有効な参照 | 1ページ2,000件、1Applet8,000件。上限超過時は要求全体を拒否し、既存参照を保持 |
-| ファイル | PNG/JPEG/WebP、1ファイル32MiB以下、各辺2,048px以下。拡張子・実形式・実ファイルを検査 |
-| 所在 | 専用キャッシュ内の絶対パス。登録時と配信時に実パスを検査し、リンクによる領域外参照を拒否 |
-| 所有 | Applet ID、runtimeSession、localページIDに結び付ける。クライアントにディスクパスを選ばせない |
+| 項目       | 上限・検査                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| capability | `pages`と`local-images`。自身の固定／動的localページだけ                                     |
+| 1要求      | 最大64ファイル、最終RPC形式で256KiB以内。必要なら呼出側で小分けにする                        |
+| 有効な参照 | 1ページ2,000件、1Applet8,000件。上限超過時は要求全体を拒否し、既存参照を保持                 |
+| ファイル   | PNG/JPEG/WebP、1ファイル32MiB以下、各辺2,048px以下。拡張子・実形式・実ファイルを検査         |
+| 所在       | 専用キャッシュ内の絶対パス。登録時と配信時に実パスを検査し、リンクによる領域外参照を拒否     |
+| 所有       | Applet ID、runtimeSession、localページIDに結び付ける。クライアントにディスクパスを選ばせない |
 
 画像登録は対象のlocal Viewが生成された後に行う。検証中にViewが破棄されたら登録を拒否し、次のViewへ遅延結果を引き継がない。画像の形式・寸法はヘッダー等を使って逐次検査し、登録バッチ全体の画像を一度にメモリへ読み込まない。
 
@@ -200,14 +210,14 @@ Runtimeは既存のコマンド・設定の直列化を保つ。ページ操作�
 
 `pages`と`dynamic-pages` capability、minimumHostVersion 0.44.0が必要。Nodeラッパーと`host.pages.*`は同じ処理を使う。
 
-| Node | 引数と結果 |
-| --- | --- |
-| pages.list() | 自身の固定＋実行中ページ定義、登録revision |
-| pages.replace(pages, expectedRevision) | 実行中の定義だけを全置換。新revisionを返す |
-| pages.open(id) | 自身の固定/実行中localページを開く |
-| pages.hide(id) | 非表示にし、入力とViewを保持する |
-| pages.dispose(id) | Viewを破棄する。登録は残り、次のopenで再生成 |
-| pages.openItem(id) | 自身の設定由来の管理項目を開く |
+| Node                                   | 引数と結果                                   |
+| -------------------------------------- | -------------------------------------------- |
+| pages.list()                           | 自身の固定＋実行中ページ定義、登録revision   |
+| pages.replace(pages, expectedRevision) | 実行中の定義だけを全置換。新revisionを返す   |
+| pages.open(id)                         | 自身の固定/実行中localページを開く           |
+| pages.hide(id)                         | 非表示にし、入力とViewを保持する             |
+| pages.dispose(id)                      | Viewを破棄する。登録は残り、次のopenで再生成 |
+| pages.openItem(id)                     | 自身の設定由来の管理項目を開く               |
 
 実行中の定義は`{id,title,source:'local',ui,icon?,defaultDisplay?,context?}`。uiはAppletフォルダー内の実HTMLを指定し、フォルダー外参照や転送された資産を包含検査で拒否する。contextは16KB以下のJSONオブジェクト。固定IDとの衝突、動的ID重複、上限超過、古いrevision、コマンド衝突を全体として拒否する。
 
@@ -215,12 +225,26 @@ Runtimeは既存のコマンド・設定の直列化を保つ。ページ操作�
 
 ```ts
 const current = await context.pages.list();
-await context.pages.replace([
-  { id: 'document.1', title: '文書1', source: 'local', ui: 'web/document.html',
-    context: { documentId: '1' } },
-  { id: 'document.2', title: '文書2', source: 'local', ui: 'web/document.html',
-    defaultDisplay: 'window', context: { documentId: '2' } },
-], current.revision);
+await context.pages.replace(
+  [
+    {
+      id: 'document.1',
+      title: '文書1',
+      source: 'local',
+      ui: 'web/document.html',
+      context: { documentId: '1' },
+    },
+    {
+      id: 'document.2',
+      title: '文書2',
+      source: 'local',
+      ui: 'web/document.html',
+      defaultDisplay: 'window',
+      context: { documentId: '2' },
+    },
+  ],
+  current.revision,
+);
 await context.pages.open('document.1');
 ```
 
@@ -238,19 +262,23 @@ pageCollectionsの各宣言は`key/source/fields`を持つ。keyは自身のobje
 
 固定/実行中のlocalページは既存snapshot/executeCommand/onChangedに加え、`window.appletPage.call(operation,input)`を使う。IPCは送信元WebContents、main frame、ローカルURLを照合する。
 
-| 操作 | 境界 |
-| --- | --- |
-| settings.update | key/value/expectedRevision。自身の設定のみ、settings capability |
-| webProfiles.list/add/rename/clear/delete | 自身の名前空間のみ、web-profiles capability |
-| images.normalize | PNG/JPEG/WebPの検証と32px PNG化、images capability |
-| pages.openItem | 自身の設定由来項目のみ |
-| actions.invoke | manifest.pageActionsのidと宣言されたstring/number/boolean引数だけ。NodeのonPageActionへ渡す |
+| 操作                                     | 境界                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| settings.update                          | key/value/expectedRevision。自身の設定のみ、settings capability                             |
+| webProfiles.list/add/rename/clear/delete | 自身の名前空間のみ、web-profiles capability                                                 |
+| images.normalize                         | PNG/JPEG/WebPの検証と32px PNG化、images capability                                          |
+| pages.openItem                           | 自身の設定由来項目のみ                                                                      |
+| actions.invoke                           | manifest.pageActionsのidと宣言されたstring/number/boolean引数だけ。NodeのonPageActionへ渡す |
+| storage.get/set                          | 自身のStorageだけ。`storage` capabilityと共通のscope・キー検証                              |
+| sourceImages.register/open/trash/release | `source-images` capability。実行処理がメモリStorageへ公開した元画像だけ                     |
 
 ローカルsnapshotにはテーマ、宣言設定値、設定revision、page.id/context、自身のcollectionPages識別子を含む。設定由来local画面はpage.id/contextとテーマ、親の登録コマンド実行を提供する。remoteにはpreload/Node/ホストIPCを渡さない。
 
 pageActionsの入力はJSON文字列表現で64K文字以下。Node処理の応答は提供元の実行世代が変わっていれば破棄する。任意RPC転送、任意JS評価、Cookie取得APIは設けない。自己リソース操作と、MCP/他Applet向けAppDockApiの権限は分離する。
 
 ## 表示寿命
+
+メモリStorage、元画像の一時参照、`snapshot.visible`と`onVisibilityChanged`は[メモリStorageと元画像表示](memory-storage.md)を参照する。既存のキャッシュファイル型ページ画像は引き続き利用できる。
 
 1ページにつき1つのSurfaceを持つ。同じViewを本体ページと別Windowで移動し、入力・履歴を維持する。本体本文の選択は1ページ、異なるページの独立Windowは同時に保持できる。同じページの複製Windowや分割表示は対象外。
 

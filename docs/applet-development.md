@@ -14,15 +14,17 @@ AppDock本体の公開機能をAppletから操作する場合は[AppDock共通�
 
 ## 1. 機能と実行方式を決める
 
+ファイルへ残さない状態をページと共有する場合は、既存Storageの`memory` scopeを使えます。元画像の表示と合わせた権限・寿命は[メモリStorage](memory-storage.md)を参照してください。
+
 Webアカウントの独自ローカルUIに自身のboolean/静的select設定を置く場合は、snapshot.settings/setSettingを使えます。manifestへ設定とsettings capabilityを宣言し、[WebアカウントAPI](web-accounts.md)の保存・同期契約に従ってください。
 
 Appletは1つの道具として有効化・停止・再起動できる単位です。時計やWindows操作など、独立して切り替えたい機能は別Appletにします。マウスジェスチャーの入力基盤は本体が担当するため、Appletへ入力フックを重複実装しません。次の機能のために、Applet内へ汎用的な拡張機構を先に作る必要はありません。
 
-| runtime | 選ぶ場面 | 実装と参照例 |
-| --- | --- | --- |
-| `dotnet` | C#の処理、監視、Windows API。独自のWPF/WinForms画面が不要 | net10.0 DLL。`AppDock.SDK`を参照。[C#検証用拡張](../tests/fixtures/dotnet/AppDock.Extensions.Demo/DemoExtension.cs) |
-| `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要 | 自身のランタイムを持つEXE。[Watch](../../Applet.Watch.at365/DEVELOPMENT.md) |
-| `node` | TypeScriptで実装する処理。Electron同梱Nodeを利用 | コンパイル済みCommonJS。[Node検証用拡張](../tests/fixtures/extensions/welcome/index.ts)、[WebBrowserTools](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md) |
+| runtime  | 選ぶ場面                                                  | 実装と参照例                                                                                                                                                  |
+| -------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dotnet` | C#の処理、監視、Windows API。独自のWPF/WinForms画面が不要 | net10.0 DLL。`AppDock.SDK`を参照。[C#検証用拡張](../tests/fixtures/dotnet/AppDock.Extensions.Demo/DemoExtension.cs)                                           |
+| `native` | WPF/WinFormsの画面、STAや専用メッセージループが必要       | 自身のランタイムを持つEXE。[Watch](../../Applet.Watch.at365/DEVELOPMENT.md)                                                                                   |
+| `node`   | TypeScriptで実装する処理。Electron同梱Nodeを利用          | コンパイル済みCommonJS。[Node検証用拡張](../tests/fixtures/extensions/welcome/index.ts)、[WebBrowserTools](../../Applet.WebBrowserTools.at365/DEVELOPMENT.md) |
 
 独自画面が不要なら、設定フォーム、コマンド、状態パネルをSDKでホストへ提供できます。API v1のパネルはタイトル・説明・事実一覧・コマンドボタンです。AppletからReactコンポーネントやHTMLを注入するAPIはありません。専用画面は[Appletページ](applet-pages.md)を使い、Webアカウントが必要な場合は[WebアカウントAPI](web-accounts.md)を使います。
 
@@ -142,18 +144,18 @@ AppDockはdeactivateを最大2秒待ってからプロセスを停止します�
 
 Watchは独自のWPFウィンドウで時計を描画し、配置とフォントをApplet側で管理します。現行の実装方法は[Watchの開発ガイド](../../Applet.Watch.at365/DEVELOPMENT.md)を参照してください。
 
-| 項目 | 実装時の扱いと参照先 |
-| --- | --- |
-| 表示状態 | 設定UIと表示／非表示コマンドが同じ `visible` を保存する。再起動後も状態を維持する |
-| モニター | 配列番号ではなくDeviceNameを保存。切断時はメインへ退避し、元の保存値を保持する |
-| 座標・DPI | 物理ピクセルとDIPを分け、負のモニター座標も扱う。対象モニターへ移動後にウィンドウのDPIを読み、幅と上下位置を決める |
-| Windowsイベント | DPI／表示構成変更で再配置し、SystemEventsの購読を解除する。Dispatcherへ送った遅延処理にもclosed確認と例外処理を置く |
-| オーバーレイ | 時計ではクリック透過・非アクティブ化・タスクバー非表示・topmostを設定。入力を必要とするAppletへそのまま適用しない |
-| フォント | WPF Resourceとして明示的に埋め込み、AssemblyNameを含むpack URIで参照。ビルド成功だけで判断せず、実際の描画も確認する |
-| 型と画面 | internalなWPFクラスにはXAMLの `x:ClassModifier="internal"` も揃える。WinForms Screenだけの利用で出るDPI警告は、WPFのmanifestによる設定を確認して理由付きで対象警告だけ扱う |
-| 同時処理 | .NETのコマンドと設定変更はRuntimeが直列化する。タイマー・OSイベントは別なので、画面はDispatcher、処理データは必要な排他で守る。Nodeのコマンド／通知は自動直列化されない |
-| テストの待機 | main側のrunningだけではReactへ登録コマンドが届いた保証にならない。ショートカット検証前はパレットの行が現れるまで待つ |
-| 描画テスト | 一時的なPNG書き込みロックは待機して読み取る。必要なら描画出力を原子的に置換する。大量の描画記録はテスト時だけ有効にする |
+| 項目            | 実装時の扱いと参照先                                                                                                                                                       |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 表示状態        | 設定UIと表示／非表示コマンドが同じ `visible` を保存する。再起動後も状態を維持する                                                                                          |
+| モニター        | 配列番号ではなくDeviceNameを保存。切断時はメインへ退避し、元の保存値を保持する                                                                                             |
+| 座標・DPI       | 物理ピクセルとDIPを分け、負のモニター座標も扱う。対象モニターへ移動後にウィンドウのDPIを読み、幅と上下位置を決める                                                         |
+| Windowsイベント | DPI／表示構成変更で再配置し、SystemEventsの購読を解除する。Dispatcherへ送った遅延処理にもclosed確認と例外処理を置く                                                        |
+| オーバーレイ    | 時計ではクリック透過・非アクティブ化・タスクバー非表示・topmostを設定。入力を必要とするAppletへそのまま適用しない                                                          |
+| フォント        | WPF Resourceとして明示的に埋め込み、AssemblyNameを含むpack URIで参照。ビルド成功だけで判断せず、実際の描画も確認する                                                       |
+| 型と画面        | internalなWPFクラスにはXAMLの `x:ClassModifier="internal"` も揃える。WinForms Screenだけの利用で出るDPI警告は、WPFのmanifestによる設定を確認して理由付きで対象警告だけ扱う |
+| 同時処理        | .NETのコマンドと設定変更はRuntimeが直列化する。タイマー・OSイベントは別なので、画面はDispatcher、処理データは必要な排他で守る。Nodeのコマンド／通知は自動直列化されない    |
+| テストの待機    | main側のrunningだけではReactへ登録コマンドが届いた保証にならない。ショートカット検証前はパレットの行が現れるまで待つ                                                       |
+| 描画テスト      | 一時的なPNG書き込みロックは待機して読み取る。必要なら描画出力を原子的に置換する。大量の描画記録はテスト時だけ有効にする                                                    |
 
 動的select・設定検証・native接続の変更先は[ホスト実装ガイド](host-development.md#まず変更範囲を決める)を参照してください。
 
@@ -190,6 +192,7 @@ UIテストは一意の `.artifacts` フォルダーを作り、ホストへ `--
 シングルクリックとダブルクリックを別々の一般コマンドへ割り当てられます。ダブルは既定未設定。割り当てた場合はホストが単クリックを判定時間だけ待機し、ダブル時に単クリックを取り消します。Applet側の実装・API変更は不要です。
 
 表示名はmanifestの任意の`displayName`で指定します（1～100文字、空白のみは不可）。一覧・設定・コマンド候補・トレイ等でこの名前を使います。省略時は`name`の先頭の`Applet.`を除去します。元の名前・ID・実行ファイル名は維持し、manifest更新後はホストを再起動します。詳細は[Applet API](extensions.md)を参照してください。
+
 ## Node Appletのファイル選択・通知音
 
 TypeScript/Nodeの現行実利用例は[Gmail](../../Applet.Gmail.at365/DEVELOPMENT.md)です。ローカルReact UIとWebアカウントのDOM観測を分け、ログイン領域はホストへ任せます。別途APIクライアントを実装する場合は、一般設定をホストフォーム、秘密をSecrets、履歴をStorageへ分けます。認証やポーリングはコマンド受付から切り離し、停止時にAbortControllerで中止してください。
@@ -211,6 +214,7 @@ Webサービスの対話ログインとアカウント別ページが必要なNo
 webAccounts.cycleはウィンドウを開かず、既存の表示/最小化/非表示とフォーカスを維持します。表示が必要な明示操作だけでopenを呼んでください。アバターは当該アカウントのログイン済みsessionから取得します。
 
 操作中のWebContentsでcycleを繰り返すときだけ入力を切替先へ引き継ぎます。ログイン後の自動命名にはobserverのaccountName（1〜60文字・制御文字なし）を返し、最低ホスト版を0.16.3にしてください。新規名は「新しいアカウント」で、明示rename後や一度取得した名前は自動変更しません。Gmailの日本語/英語ヘッダー抽出と連続キー入力の実装例は[Gmail開発ガイド](../../Applet.Gmail.at365/DEVELOPMENT.md)を参照します。
+
 ## Appletページの追加
 
 HTML/Reactで独自画面を作り、リボンから本体ページまたは独立Windowとして開く場合は[Appletページとリボン](applet-pages.md)を参照してください。manifestのpages、安定したページIDとopenCommand、pages capabilityを宣言します。Nodeはcontext.pages.open、.NET/nativeはcontext.Pages.OpenAsyncを利用します。WebアカウントUIはsource:web-accountsと既存openを再利用します。

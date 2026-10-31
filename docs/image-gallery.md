@@ -72,7 +72,7 @@ WallpaperSlideshowはビルド時に`sync-gallery.ps1`で本体の専用ビル�
 - 新しい画像をdecodeできるまで現在の正常画像を残す。読み込みでカード高さ、スクロール位置、操作列を変えない。
 - 更新・削除検知で内容世代を変え、古い取得結果で新しい画像を上書きしない。復旧時は元の安定キーで置換する。
 - Shellへ配信するURL／不透明IDは許可された生存Viewへ限定する。本体の既存asset配信の送信元検査を再利用または拡張し、リモートWebへ公開しない。
-- WallpaperSlideshowは既存のページ画像登録と解放をそのままアダプターへ接続する。共通部品の都合で1MiBのRPC上限を緩めたり、画像bytesをpageActions結果へ埋めたりしない。
+- WallpaperSlideshowはメモリStorageの履歴パスと元画像の一時参照を使い、表示中だけ生成するBlob URLをアダプターへ渡す。共通部品の都合で1MiBのRPC上限を緩めたり、画像bytesをpageActions結果へ埋めたりしない。寿命と権限は[メモリStorage](memory-storage.md)を参照する。
 
 ## 空状態・失敗・アクセシビリティ
 

@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import os from 'node:os';
 import { appletStorageFile } from './applet-storage';
+import { MemoryStorage } from './memory-storage';
 import type { TypedNotifications } from './typed-notifications';
 import { SettingsCommands } from './settings-commands';
 import fs from 'node:fs';
@@ -27,7 +28,13 @@ import { contained } from './extensions';
 import { pageKey } from '../../shared/applet-pages';
 import { openLocalPage, pageHostShortcut } from './applet-pages';
 import { disposeAppletPage, hideAppletPage, updateAppletPage } from './applet-pages';
-import { localPageImages, notifyAppletPage } from './applet-pages';
+import {
+  localPageImages,
+  localPageSources,
+  localPageVisible,
+  notifyAppletPage,
+  notifyAppletPages,
+} from './applet-pages';
 import { parseDynamicPages } from '../../shared/dynamic-pages';
 export function createHostApi(
   settings: SettingsStore,
@@ -334,6 +341,7 @@ export function createHostApi(
         if (!page || page.source !== 'local')
           throw Error(hostText('services.hostApi.localPageMissing'));
         const pageGeneration = e.runtimeSession;
+        const memory = (e.memoryStorage ??= new MemoryStorage());
         return openLocalPage(
           {
             appletId: id,
@@ -344,6 +352,33 @@ export function createHostApi(
             stateFile: settings.uiStateStorage('windows', pageKey(id, page.id)),
             defaultDisplay: page.defaultDisplay,
             partition: `applet-page:${pageKey(id, page.id)}`,
+            ...(e.manifest.capabilities?.includes('source-images')
+              ? {
+                  sourceImages: {
+                    storage: memory,
+                    active: () => e.state === 'running' && e.runtimeSession === pageGeneration,
+                    open: async (file: string) => {
+                      const error = await shell.openPath(file);
+                      if (error) throw Error(hostText('services.pageSources.openFailed'));
+                    },
+                    trash: (file: string) => shell.trashItem(path.resolve(file)),
+                    removed: async (file: string) => {
+                      try {
+                        if (
+                          e.state === 'running' &&
+                          e.runtimeSession === pageGeneration &&
+                          e.peer &&
+                          !e.peer.closed
+                        )
+                          await e.peer.request('page.fileRemoved', { pageId: page.id, file });
+                      } catch {
+                        log('warn', id, hostText('services.pageSources.updateFailed'));
+                      }
+                      notifyAppletPage(pageKey(id, page.id));
+                    },
+                  },
+                }
+              : {}),
             ...(e.manifest.capabilities?.includes('local-images')
               ? {
                   pageImages: {
@@ -360,6 +395,7 @@ export function createHostApi(
           },
           {
             snapshot: () => ({
+              visible: localPageVisible(pageKey(id, page.id)),
               revision: settings.revision,
               collectionPages:
                 collectionHost?.()
@@ -396,6 +432,43 @@ export function createHostApi(
               return executeCommand(command);
             },
             call: async (operation, input) => {
+              if (
+                [
+                  'sourceImages.register',
+                  'sourceImages.open',
+                  'sourceImages.trash',
+                  'sourceImages.release',
+                ].includes(String(operation))
+              ) {
+                requireCapability('source-images');
+                if (
+                  e.state !== 'running' ||
+                  e.runtimeSession !== pageGeneration ||
+                  !isObject(input)
+                )
+                  throw Error(hostText('services.pageSources.unavailable'));
+                const sources = localPageSources(pageKey(id, page.id));
+                if (!sources) throw Error(hostText('services.pageSources.unavailable'));
+                if (operation === 'sourceImages.register') return sources.register(input);
+                if (operation === 'sourceImages.release') {
+                  if (Object.keys(input).some((key) => key !== 'ids'))
+                    throw Error(hostText('services.pageSources.unavailable'));
+                  sources.release(input.ids);
+                  return null;
+                }
+                if (Object.keys(input).some((key) => key !== 'id'))
+                  throw Error(hostText('services.pageSources.unavailable'));
+                try {
+                  return await sources.operate(
+                    input.id,
+                    operation === 'sourceImages.open' ? 'open' : 'trash',
+                  );
+                } catch (error) {
+                  log('error', id, error instanceof Error ? error.message : String(error));
+                  pageUi?.failed?.(id);
+                  throw error;
+                }
+              }
               if (operation === 'actions.invoke') {
                 if (
                   e.state !== 'running' ||
@@ -437,6 +510,8 @@ export function createHostApi(
                 return result;
               }
               const allowed = [
+                'storage.get',
+                'storage.set',
                 'settings.update',
                 'webProfiles.list',
                 'webProfiles.add',
@@ -882,6 +957,16 @@ export function createHostApi(
         const k = key();
         if (Object.keys(p).some((key) => !['key', 'value', 'scope'].includes(key)))
           throw Error('Invalid Storage arguments');
+        if (p.scope === 'memory') {
+          const memory = (e.memoryStorage ??= new MemoryStorage());
+          if (method.endsWith('.get')) return memory.get(k);
+          const text = JSON.stringify(p.value ?? null);
+          if (Buffer.byteLength(text) > 1024 * 1024)
+            throw new Error(hostText('services.hostApi.dataSizeLimit'));
+          memory.set(k, JSON.parse(text), !localPage);
+          notifyAppletPages(id);
+          return null;
+        }
         const file = appletStorageFile(sharedDataRoot, id, k, p.scope, storageMachine);
         if (method.endsWith('.get'))
           return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;

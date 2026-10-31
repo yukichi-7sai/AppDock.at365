@@ -9,4 +9,9 @@ contextBridge.exposeInMainWorld('appletPage', {
     ipcRenderer.on('applet-page:changed', handler);
     return () => ipcRenderer.removeListener('applet-page:changed', handler);
   },
+  onVisibilityChanged: (callback: (visible: boolean) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, visible: boolean) => callback(visible);
+    ipcRenderer.on('applet-page:visibility', handler);
+    return () => ipcRenderer.removeListener('applet-page:visibility', handler);
+  },
 });

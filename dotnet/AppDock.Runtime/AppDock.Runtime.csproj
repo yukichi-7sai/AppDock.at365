@@ -4,7 +4,7 @@
   <ItemGroup><InternalsVisibleTo Include="AppDock.InputTests" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="AppDock.TouchpadTests" /></ItemGroup>
   <PropertyGroup>
-    <Version>0.27.2</Version>
+    <Version>0.27.3</Version>
     <AssemblyVersion>0.10.0.0</AssemblyVersion>
   </PropertyGroup>
 </Project>

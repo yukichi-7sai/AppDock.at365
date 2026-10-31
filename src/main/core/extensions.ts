@@ -334,6 +334,7 @@ type LoadedManifest = ExtensionManifest & {
   sourceKind: 'builtin' | 'external';
 };
 export interface ExtensionInstance {
+  memoryStorage?: import('./memory-storage').MemoryStorage;
   dynamicPages?: import('../../shared/dynamic-pages').DynamicPageDefinition[];
   pageRevision?: number;
   runtimeSession?: string;
@@ -702,6 +703,7 @@ class ExtensionManager extends EventEmitter {
     const startedAt = performance.now();
     e.startupMeasurement = { startedAt, phaseStartedAt: startedAt, phase: 'prepare', phases: [] };
     e.runtimeSession = randomUUID();
+    e.memoryStorage?.clear();
     e.dynamicPages = [];
     e.pageRevision = (e.pageRevision ?? 0) + 1;
     e.shellStateRequested = false;
@@ -849,6 +851,7 @@ class ExtensionManager extends EventEmitter {
     this.finishStartup(e, 'error');
     void closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
+    e.memoryStorage?.clear();
     e.dynamicPages = [];
     e.pageRevision = (e.pageRevision ?? 0) + 1;
     e.state = 'error';
@@ -867,6 +870,7 @@ class ExtensionManager extends EventEmitter {
     e.state = 'stopping';
     await closeWebAccounts(e.manifest.id);
     closeAppletPages(e.manifest.id);
+    e.memoryStorage?.clear();
     e.dynamicPages = [];
     e.pageRevision = (e.pageRevision ?? 0) + 1;
     e.attention = false;

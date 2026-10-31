@@ -241,7 +241,10 @@ import type { AutomationAction } from '../shared/automation';
 configureWindowRendering(app);
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'appdock', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+  {
+    scheme: 'appdock',
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
 ]);
 const restoreView = process.argv.includes('--restore-view');
 const hostDocumentUrl = `appdock://host/index.html${restoreView ? '?restoreView=1' : ''}`;

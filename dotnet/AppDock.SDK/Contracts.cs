@@ -86,7 +86,7 @@ public interface ILogService
     Task InfoAsync(string message, CancellationToken cancellationToken = default);
     Task ErrorAsync(string message, CancellationToken cancellationToken = default);
 }
-public enum StorageScope { Device, Shared }
+public enum StorageScope { Device, Shared, Memory }
 public interface IStorageService
 {
     Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);

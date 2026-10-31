@@ -4,6 +4,7 @@ import path from 'node:path';
 import { WindowStateStore, restoreWindowBounds } from './window-state';
 import type { PageDisplay } from '../../shared/applet-pages';
 import { PageImageRegistry } from './page-images';
+import { PageSourceImages } from './page-source-images';
 import { appearanceArguments, registerAppearance } from './appearance-host';
 import { registerDisplayZoom } from './display-zoom-host';
 import { SurfaceBlur } from './surface-blur';
@@ -80,6 +81,16 @@ const imageSurfaces = new Map<string, AppletSurface>();
 const imageSessions = new WeakSet<Electron.Session>();
 export function localPageImages(key: string) {
   return imageSurfaces.get(key)?.images;
+}
+export function localPageSources(key: string) {
+  return surfaces.get(key)?.sources;
+}
+export function localPageVisible(key: string) {
+  return surfaces.get(key)?.visible ?? false;
+}
+export function notifyAppletPages(owner: string) {
+  for (const surface of surfaces.values())
+    if (surface.options.appletId === owner) surface.notifyChanged();
 }
 export function notifyAppletPage(key: string) {
   const surface = surfaces.get(key);
@@ -170,6 +181,13 @@ export interface SurfaceOptions {
   onLayout(): void;
   onCreated?(contents: Electron.WebContents): void;
   pageImages?: { dataRoot: string; active(): boolean };
+  sourceImages?: {
+    storage: import('./memory-storage').MemoryStorage;
+    active(): boolean;
+    open(file: string): Promise<void>;
+    trash(file: string): Promise<void>;
+    removed(file: string): Promise<void>;
+  };
 }
 /** Trusted startup/restoration requests may attach a page without revealing its host window. */
 export interface PageOpenOptions {
@@ -180,6 +198,9 @@ export interface PageOpenOptions {
 export class AppletSurface {
   covered = false;
   readonly images?: PageImageRegistry;
+  readonly sources?: PageSourceImages;
+  private reportedVisible = false;
+  private moving = false;
   private changePending = false;
   readonly ui: WebContentsView;
   private blurs = new Map<Electron.WebContents, SurfaceBlur>();
@@ -215,25 +236,39 @@ export class AppletSurface {
     this.contentView.addChildView(this.ui);
     registerDisplayZoom(this.ui.webContents);
     if (!options.remote && options.preload) registerAppearance(this.ui.webContents, options.url);
-    if (options.pageImages && options.key && options.appletId) {
-      this.images = new PageImageRegistry(
-        options.pageImages.dataRoot,
-        options.appletId,
-        () =>
-          !this.closed && imageSurfaces.get(options.key!) === this && options.pageImages!.active(),
-        () =>
-          [...imageSurfaces.values()]
-            .filter((surface) => surface.options.appletId === options.appletId)
-            .reduce((sum, surface) => sum + (surface.images?.size ?? 0), 0),
-      );
+    if ((options.pageImages || options.sourceImages) && options.key && options.appletId) {
+      if (options.pageImages)
+        this.images = new PageImageRegistry(
+          options.pageImages.dataRoot,
+          options.appletId,
+          () =>
+            !this.closed &&
+            imageSurfaces.get(options.key!) === this &&
+            options.pageImages!.active(),
+          () =>
+            [...imageSurfaces.values()]
+              .filter((surface) => surface.options.appletId === options.appletId)
+              .reduce((sum, surface) => sum + (surface.images?.size ?? 0), 0),
+        );
+      if (options.sourceImages)
+        this.sources = new PageSourceImages(
+          options.sourceImages.storage,
+          () =>
+            this.visible &&
+            imageSurfaces.get(options.key!) === this &&
+            options.sourceImages!.active(),
+          options.sourceImages,
+        );
       imageSurfaces.set(options.key, this);
       const session = this.ui.webContents.session;
       if (!imageSessions.has(session)) {
         session.protocol.handle('appdock', (request) => {
           const surface = imageSurfaces.get(options.key!);
-          return surface?.ui.webContents.session === session && surface.images
-            ? surface.images.response(request.url)
-            : new Response(null, { status: 404 });
+          if (surface?.ui.webContents.session !== session)
+            return new Response(null, { status: 404 });
+          return new URL(request.url).host === 'source-images'
+            ? (surface.sources?.response(request.url) ?? new Response(null, { status: 404 }))
+            : (surface.images?.response(request.url) ?? new Response(null, { status: 404 }));
         });
         imageSessions.add(session);
       }
@@ -242,7 +277,7 @@ export class AppletSurface {
     if (!options.remote) this.ui.webContents.on('will-navigate', (event) => event.preventDefault());
     this.ui.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     this.ui.webContents.on('render-process-gone', (_, details) => {
-      if (this.images) this.close();
+      if (this.images || this.sources) this.close();
       host?.failed(
         hostText('services.appletPages.rendererExited', { reason: String(details.reason) }),
       );
@@ -270,6 +305,7 @@ export class AppletSurface {
   }
   private releaseImages() {
     this.images?.clear();
+    this.sources?.clear();
     if (this.options.key && imageSurfaces.get(this.options.key) === this)
       imageSurfaces.delete(this.options.key);
   }
@@ -409,19 +445,24 @@ export class AppletSurface {
     if (next === this.mode) return;
     const wasVisible = this.visible;
     const wasSelected = selected === this.options.key;
-    this.detach();
-    this.standalone?.hide();
-    this.mode = next;
-    if (wasSelected) {
-      selected = null;
-      bounds = null;
-      host?.selected(null);
-    }
-    if (this.opened && (wasVisible || wasSelected)) {
-      if (next === 'page') {
-        selected = this.options.key!;
-        host?.selected(selected);
-      } else this.createWindow().show();
+    this.moving = true;
+    try {
+      this.detach();
+      this.standalone?.hide();
+      this.mode = next;
+      if (wasSelected) {
+        selected = null;
+        bounds = null;
+        host?.selected(null);
+      }
+      if (this.opened && (wasVisible || wasSelected)) {
+        if (next === 'page') {
+          selected = this.options.key!;
+          host?.selected(selected);
+        } else this.createWindow().show();
+      }
+    } finally {
+      this.moving = false;
     }
     this.layout();
   }
@@ -438,6 +479,7 @@ export class AppletSurface {
   }
   layout() {
     if (this.closed) return;
+    this.reportVisibility();
     this.updatePaletteBlur();
     const window = this.window;
     if (!window || !this.opened || (!this.visible && this.mode === 'page')) {
@@ -476,6 +518,7 @@ export class AppletSurface {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.reportVisibility();
     for (const blur of this.blurs.values()) blur.setActive(false);
     this.blurs.clear();
     this.releaseImages();
@@ -493,6 +536,15 @@ export class AppletSurface {
     if (!this.ui.webContents.isDestroyed()) this.ui.webContents.close();
     this.standalone?.destroy();
     this.standalone = undefined;
+  }
+  private reportVisibility() {
+    if (this.moving) return;
+    const visible = this.visible;
+    if (visible === this.reportedVisible) return;
+    this.reportedVisible = visible;
+    if (!visible) this.sources?.clear();
+    if (!this.ui.webContents.isDestroyed())
+      this.ui.webContents.send('applet-page:visibility', visible);
   }
 }
 

@@ -212,6 +212,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     {
         StorageScope.Device => "device",
         StorageScope.Shared => "shared",
+        StorageScope.Memory => "memory",
         _ => throw new ArgumentOutOfRangeException(nameof(scope))
     };
     public async Task<T?> GetAsync<T>(string key, StorageScope scope, CancellationToken cancellationToken)
@@ -250,6 +251,12 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
                 throw new InvalidDataException("ページの応答が大きすぎます。データを分割してください。");
             return result;
         }
+        finally { commandLock.Release(); }
+    }
+    internal async Task ExecutePageFileRemovedAsync(IPageFileHandler handler, string pageId, string file, CancellationToken token)
+    {
+        await commandLock.WaitAsync(token);
+        try { token.ThrowIfCancellationRequested(); await handler.HandlePageFileRemovedAsync(pageId, file, token); }
         finally { commandLock.Release(); }
     }
     public IDisposable Every(TimeSpan interval, Func<CancellationToken, Task> callback)

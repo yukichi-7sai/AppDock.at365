@@ -119,8 +119,8 @@ export interface NodeExtensionContext {
   };
   scheduler: { every(milliseconds: number, callback: Handler): () => void };
   storage: {
-    get(key: string, scope?: 'device' | 'shared'): Promise<unknown>;
-    set(key: string, value: unknown, scope?: 'device' | 'shared'): Promise<unknown>;
+    get(key: string, scope?: 'device' | 'shared' | 'memory'): Promise<unknown>;
+    set(key: string, value: unknown, scope?: 'device' | 'shared' | 'memory'): Promise<unknown>;
   };
   secrets: {
     get(key: string): Promise<string | null>;
@@ -133,6 +133,7 @@ export interface NodeExtension {
   deactivate?(): Promise<void>;
   onPanelAction?(actionId: string): Promise<void>;
   onPageAction?(actionId: string, input: Record<string, unknown>, pageId: string): Promise<unknown>;
+  onPageFileRemoved?(pageId: string, file: string): Promise<void>;
 }
 const commands: (Command & { handler: Handler })[] = [];
 const customHandlers = new Map<
@@ -387,6 +388,9 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
       if (!extension?.onPageAction)
         throw Error(hostText('services.nodeWorker.pageActionUnsupported'));
       return extension.onPageAction(p.id, p.input, p.pageId);
+    case 'page.fileRemoved':
+      await extension?.onPageFileRemoved?.(p.pageId, p.file);
+      return null;
     case 'panel.action':
       if (!extension?.onPanelAction) throw new Error('Panel actions are not supported.');
       await extension.onPanelAction(p.id);

@@ -28,6 +28,10 @@ public interface IPageActionHandler
 {
     Task<JsonElement?> HandlePageActionAsync(string actionId, JsonElement input, string pageId, CancellationToken cancellationToken);
 }
+public interface IPageFileHandler
+{
+    Task HandlePageFileRemovedAsync(string pageId, string file, CancellationToken cancellationToken);
+}
 
 public sealed record RuntimePageDefinition(string Id, string Title, string Ui)
 {

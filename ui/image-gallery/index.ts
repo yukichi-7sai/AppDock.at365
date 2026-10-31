@@ -261,6 +261,12 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
           card.labels.replaceChildren(...tags.map((v) => element('span', 'ad-gallery-tag', v)));
           card.labels.dataset.signature = JSON.stringify(tags);
         }
+        if (item.state === 'error' || item.state === 'missing') {
+          card.generation++;
+          card.image.removeAttribute('src');
+          card.edge = 0;
+          card.requested = 0;
+        }
         if (item.state !== 'ready')
           card.status.textContent = {
             missing: '未到着・読取待ち',

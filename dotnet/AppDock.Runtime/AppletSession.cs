@@ -83,6 +83,10 @@ public static class AppletSession
                         return await context.ExecutePageActionAsync(pageActions,
                             parameters.GetProperty("id").GetString()!, parameters.GetProperty("input"),
                             parameters.GetProperty("pageId").GetString()!, active.Token);
+                    case "page.fileRemoved":
+                        if (context is not null && Volatile.Read(ref activated) && applet is IPageFileHandler files)
+                            await context.ExecutePageFileRemovedAsync(files, parameters.GetProperty("pageId").GetString()!, parameters.GetProperty("file").GetString()!, active.Token);
+                        return null;
                     case "deactivate":
                         Volatile.Write(ref activated, false);
                         await active.CancelAsync();
