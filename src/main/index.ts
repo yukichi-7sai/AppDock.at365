@@ -2253,6 +2253,7 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
 }
 function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPageAuxiliary {
   const id = page.id;
+  if (id === 'codex') return { automation: automation?.state() };
   if (id === 'mcp-client')
     return {
       mcpClient: {

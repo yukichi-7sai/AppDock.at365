@@ -45,6 +45,7 @@ export interface SettingsPageModel {
   };
 }
 export interface SettingsPageAuxiliary {
+  automation?: import('./automation').AutomationState;
   startPages?: import('./contracts').SettingOption[];
   commandReferences?: import('./command-text').CommandReference[];
   mcpAccess?: import('./settings-mcp-access').SettingsMcpAccess;

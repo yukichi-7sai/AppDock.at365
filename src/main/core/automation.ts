@@ -64,6 +64,8 @@ export class AutomationService {
   private api?: AutomationApi;
   private token = '';
   private server?: AutomationMcp;
+  private initialized = false;
+  private starting = false;
   private events: McpEvents;
   private busy = false;
   private closed = false;
@@ -305,6 +307,12 @@ export class AutomationService {
       allowEditTray: this.config.allowWrite,
       allowManageCustomCommands: this.config.allowWrite,
       port: this.config.port,
+      starting:
+        this.config.enabled &&
+        !this.server &&
+        !this.closed &&
+        !this.loadError &&
+        (!this.initialized || this.starting),
       running: !!this.server,
       endpoint: this.config.port ? `http://127.0.0.1:${this.config.port}/mcp` : '',
       serverId: this.config.serverName,
@@ -325,31 +333,37 @@ export class AutomationService {
     return createHash('sha256').update(this.token).digest('hex');
   }
   private async start() {
-    if (!this.config.enabled || this.server || this.loadError || this.closed) return;
-    const server = new AutomationMcp(
-      (this.api ??= this.options.createApi(
-        () => this.config.enabled && this.config.allowWrite && !this.closed,
-        this.id,
-        () => this.config.enabled && this.config.allowExecute && !this.closed,
-        () => this.allowed('allowWrite'),
-        () => this.allowed('allowWrite'),
-        () => this.allowed('allowWrite'),
-        () => this.allowed('allowWrite'),
-        () => this.allowed('allowWrite'),
-      )),
-      () => this.token,
-      (local) => {
-        if (this.server !== server || this.closed) return;
-        this.lastClientAt = new Date().toISOString();
-        if (local) this.lastLocalClientAt = this.lastClientAt;
-        else this.lastNetworkClientAt = this.lastClientAt;
-        this.options.changed();
-      },
-      this.options.version,
-      this.options.audit,
-      this.events,
-    );
+    this.initialized = true;
+    if (!this.config.enabled || this.server || this.loadError || this.closed || this.starting)
+      return;
+    this.starting = true;
+    this.error = undefined;
+    this.options.changed();
+    let server: AutomationMcp | undefined;
     try {
+      server = new AutomationMcp(
+        (this.api ??= this.options.createApi(
+          () => this.config.enabled && this.config.allowWrite && !this.closed,
+          this.id,
+          () => this.config.enabled && this.config.allowExecute && !this.closed,
+          () => this.allowed('allowWrite'),
+          () => this.allowed('allowWrite'),
+          () => this.allowed('allowWrite'),
+          () => this.allowed('allowWrite'),
+          () => this.allowed('allowWrite'),
+        )),
+        () => this.token,
+        (local) => {
+          if (this.server !== server || this.closed) return;
+          this.lastClientAt = new Date().toISOString();
+          if (local) this.lastLocalClientAt = this.lastClientAt;
+          else this.lastNetworkClientAt = this.lastClientAt;
+          this.options.changed();
+        },
+        this.options.version,
+        this.options.audit,
+        this.events,
+      );
       await server.start(
         this.config.port,
         this.config.connectionScope,
@@ -368,7 +382,7 @@ export class AutomationService {
       this.events.start();
       this.error = undefined;
     } catch (error) {
-      await server.close();
+      await server?.close();
       this.error =
         error instanceof AutomationStorageError
           ? error.message
@@ -377,6 +391,9 @@ export class AutomationService {
         error instanceof AutomationStorageError ? 'MCP_SAVE_FAILED' : 'MCP_START_FAILED',
         this.error,
       );
+    } finally {
+      this.starting = false;
+      this.options.changed();
     }
   }
   async initialize() {
@@ -394,7 +411,8 @@ export class AutomationService {
     if (action.kind === 'status') return { state: this.state() };
     if ((retiredPermissionActions as readonly string[]).includes(action.kind))
       throw Error(hostText('services.automation.retiredPermission'));
-    if (this.busy || this.closed) throw Error(hostText('services.automation.busy'));
+    if (this.busy || this.starting || this.closed)
+      throw Error(hostText('services.automation.busy'));
     if (this.loadError) throw Error(this.loadError);
     if (action.kind !== 'register' && action.kind !== 'unregister')
       this.registrationConfirmation = undefined;

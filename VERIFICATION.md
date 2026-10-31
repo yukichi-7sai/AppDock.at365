@@ -1,5 +1,24 @@
 # 検証記録
 
+## 2026-11-01: MCPサーバー起動表示 0.112.5のコミット前検証
+
+- 不要な再試行ボタンが消えたことを利用者が確認し、0.112.5を受入。対象は状態投影/起動状態/再試行Field、専用GUIと回帰、仕様/検証記録/版の12ファイル。実装時から製品・試験入力856件、完全ログ、発行EXE/ASAR/ZIP/feed/manifestのSHA256が一致し、out全288資産も発行ASARと一致した。追加の製品修正・版更新・再発行なし。
+- 標準回帰は**162ファイル1,462件、失敗・skip 0**。前回の標準回帰から無影響の153ファイル1,348件と実装時の5ファイル61件を再利用した。AutomationServiceを参照するAI/共通API/入力コマンドと、変更された日本語資源/ソースを検査するlocalizationの不足4ファイル53件を追加実行し成功。内部型のみの追加、Codexページだけの補助投影、MCP用の文言3件、版だけの変更も分類し、各試験の参照範囲と照合した。
+- 型検査・ビルド・書式、固定EXEの起動GUI6群/登録GUI7群・smokeは実装時の成功を再利用した。レビューで保存/認証・起動失敗からの回復・登録確認・画面移動なしの更新とコミット範囲を確認し、未解決指摘なし。
+- 再利用一覧、前後の入力/発行物照合、追加53件の完全ログ、stage treeとコミット後の照合は`.artifacts/commit-validation-mcp-server-startup-20261101/`。実装時の証跡は`.artifacts/mcp-server-startup-20261101/`を保持する。push・Release・実利用先deployは対象外。
+
+## 2026-11-01: MCPサーバー設定の起動状態更新と再試行Field（0.112.5）
+
+- 設定を開いたまま再起動したときに起動前の状態が残る問題を修正。MCPの状態を選択ページの補助情報へ含め、本文は投影を直接表示する。起動待ち・起動中と起動失敗を区別し、起動完了の通知でページrevisionを更新する。周期的な取得は追加していない。
+- 起動失敗時の「接続を再試行」を「MCPサーバーの起動」SettingsFieldへ移し、保存済みの接続設定で起動を再試行する説明を常時表示する。起動中は再試行を表示せず、競合する操作を抑止する。既存の登録・修復・解除の確認、入力確定・保存と接続設定は維持した。
+- 発行前レビューで状態投影、起動準備/失敗/完了、登録確認の応答、秘密値と設定保存、必要回帰を確認。起動準備自体が失敗しても進行中状態を解除し回復できることを回帰へ追加し成功。初回GUIは試験用の競合ソケットの回収待ちで未完了となり、fixtureが受信ソケットを閉じるよう修正した。後続のソース/固定EXE試験は成功し、発行に支障のある未解決指摘なし。
+- 採番は0.112.4→0.112.5のパッチ。mainFrame専用の内部状態・投影と既存動作の修復であり、Applet向け/外部MCPの公開連携API、設定項目、保存ファイル、最低ホスト版の変更はない。
+- 固定Node 26.13.0/pnpm 12.15.0、frozen lockfile・供給網検査を維持。整形、型検査、本体ビルド成功。`automation`/`automation-network`/`settings-page`/`settings-page-host`/`settings-view-client`の関連61件が成功。試験前後と発行後の入力SHA256は一致した。
+- ソースGUI6群、発行固定EXEのMCP起動GUI6群とCodex登録GUI7群が成功。起動中は進行表示・操作無効、完了時はページ移動なしで稼働中へ更新、同じprofileの再起動でMCP設定を復元、network待受の実ポート競合からキーボード再試行で復旧、保存値保持を確認。登録の修復/解除、取消・フォーカス・競合拒否・実SDK認証も成功。広幅/暗色と狭幅/明色の再試行Field画像を目視確認した。
+- `publish.bat`終了0、`A:\40.ARTIFACT\AppDock.at365`へ0.112.5を発行。feedの版・ZIPのsize/SHA256一致、固定EXEのsmoke成功、GUI2種/smokeに使ったコピーのapp.asarが発行物と一致した。旧Codex登録試験と旧smokeの実行用コピー各1件の本体管理対象だけを整理し、結果・画像・設定・manifest等85/86ファイルのSHA256を保持確認。初回未完了試験と以前からの状態不明/失敗コピーは保全した。
+- 証跡: `.artifacts/mcp-server-startup-20261101/`の`validation.json`、入力manifest、`unit.log`、`typecheck.log`、`build.log`、`publish.log`、GUI/smokeログ、`published-artifacts.json`、`fixed-bundles.json`、`review.json`、`cleanup.json`。GUIの結果/画像は`mcp-server-startup-source-1793464902344`、`mcp-server-startup-portable-1793465022119`、`codex-registration-portable-1793465033146`、smokeは`smoke-1793465039177`。
+- 無関係な全回帰は未実行。実利用データでの操作、他端末からのLAN/tailnet到達は未確認。コミット・push・GitHub Release・実利用先deployは行っていない。
+
 ## 2026-11-01: AppDockとAppletの連携APIに関する採番ルール
 
 - 共通手順のマイナー更新条件に、公開連携APIの追加・削除・仕様変更とAppletの最低ホスト版の引き上げを追加した。任意項目を含む互換API追加、Node/.NET・RPC・イベント・capability・manifestの契約を対象とし、本体・SDK/Runtime・Appletごとに判定する。公開仕様を維持する通常修正はパッチ更新、未変更モジュール・発行済み版・`apiVersion`は今回のルール変更に連動させない。

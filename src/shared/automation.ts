@@ -46,6 +46,7 @@ export interface AutomationState {
   allowEditTray: boolean;
   allowManageCustomCommands: boolean;
   port: number;
+  starting: boolean;
   running: boolean;
   endpoint: string;
   serverId: string;

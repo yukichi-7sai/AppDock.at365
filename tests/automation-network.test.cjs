@@ -314,6 +314,31 @@ test('scope switching preserves credentials, permission state and exact Codex re
   assert(!JSON.stringify([...f.audit, ...f.failures, service.state()]).includes(token));
 });
 
+test('restored enabled server reports startup progress and publishes readiness without settings edits', async (t) => {
+  const f = fixture(t);
+  assert.equal(f.service.state().starting, false);
+  await f.service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await f.service.close();
+  const changes = [];
+  const restarted = new AutomationService({
+    ...f.options,
+    changed: () => changes.push(restarted.state()),
+  });
+  t.after(() => restarted.close());
+  assert.equal(restarted.state().starting, true);
+  assert.equal(restarted.state().running, false);
+  const ready = restarted.initialize();
+  assert.equal((await restarted.action({ kind: 'status' })).state.starting, true);
+  await assert.rejects(restarted.action({ kind: 'retryStart' }), /処理中/);
+  await ready;
+  assert.equal(restarted.state().starting, false);
+  assert.equal(restarted.state().running, true);
+  assert(changes.some((state) => state.starting && !state.running));
+  assert(changes.some((state) => !state.starting && state.running));
+  assert.equal(f.read().enabled, true);
+  assert.equal(f.read().allowWrite, false);
+});
+
 test('legacy migration and invalid scope/hostnames fail closed without rewriting files', async (t) => {
   const f = fixture(t);
   await f.service.action({ kind: 'setConnectionScope', scope: 'network' });
@@ -339,11 +364,40 @@ test('legacy migration and invalid scope/hostnames fail closed without rewriting
     await bad.initialize();
     assert(bad.state().error);
     assert.equal(bad.state().running, false);
+    assert.equal(bad.state().starting, false);
     assert.equal(bad.state().canCopyToken, false);
     await assert.rejects(bad.action({ kind: 'retryStart' }));
     assert.deepEqual(fs.readFileSync(f.file), before);
     await bad.close();
   }
+});
+
+test('startup preparation failure clears progress and permits recovery without leaking its cause', async (t) => {
+  const f = fixture(t);
+  await f.service.action({ kind: 'configure', enabled: true, allowWrite: false, port: 0 });
+  await f.service.close();
+  let fail = true;
+  const restarted = new AutomationService({
+    ...f.options,
+    createApi: (...args) => {
+      if (fail) throw Error('PRIVATE_STARTUP_CAUSE');
+      return f.options.createApi(...args);
+    },
+  });
+  t.after(() => restarted.close());
+  await restarted.initialize();
+  assert.equal(restarted.state().starting, false);
+  assert.equal(restarted.state().running, false);
+  assert(restarted.state().error);
+  assert.equal(
+    JSON.stringify([restarted.state(), f.failures]).includes('PRIVATE_STARTUP_CAUSE'),
+    false,
+  );
+  fail = false;
+  await restarted.action({ kind: 'retryStart' });
+  assert.equal(restarted.state().starting, false);
+  assert.equal(restarted.state().running, true);
+  assert.equal(restarted.state().error, undefined);
 });
 
 test('save failure retains existing network listener; bind failure persists scope and permits retry', async (t) => {
@@ -371,12 +425,18 @@ test('save failure retains existing network listener; bind failure persists scop
   await service.action({ kind: 'setConnectionScope', scope: 'local' });
   await service.action({ kind: 'configure', enabled: true, allowWrite: false, port: saved.port });
   assert.equal(service.state().running, false);
+  assert.equal(service.state().starting, false);
+  assert(service.state().error);
   assert.equal(service.state().activeConnectionScope, null);
   assert.equal(f.read().connectionScope, 'local');
   assert.equal(f.read().enabled, true);
   assert.equal(f.read().port, saved.port);
   await new Promise((resolve) => blocker.close(resolve));
-  await service.action({ kind: 'retryStart' });
+  const retry = service.action({ kind: 'retryStart' });
+  assert.equal(service.state().starting, true);
+  assert.equal(service.state().error, undefined);
+  await retry;
+  assert.equal(service.state().starting, false);
   assert.equal(service.state().running, true);
   assert.equal((await request(endpoint, auth)).status, 200);
   assert.equal(f.failures.length, 2);

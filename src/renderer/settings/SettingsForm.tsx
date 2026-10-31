@@ -180,7 +180,7 @@ export function SettingsForm({
       />
     );
   if (category === 'codex')
-    return <CodexSettings onOpenPermissions={() => select('permissions')} />;
+    return <CodexSettings state={aux.automation} onOpenPermissions={() => select('permissions')} />;
   if (category === 'permissions')
     return (
       <ApiPermissionsSettings

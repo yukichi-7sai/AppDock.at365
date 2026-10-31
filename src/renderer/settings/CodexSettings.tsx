@@ -9,12 +9,18 @@ import { SettingsSection, SettingsField, SettingsActions } from '../settings-ui/
 import { useSettingsFeedback } from '../settings-ui/SettingsStatus';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
 
-export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void }) {
+export function CodexSettings({
+  state,
+  onOpenPermissions,
+}: {
+  state?: AutomationState;
+  onOpenPermissions(): void;
+}) {
   const { t: translate } = useHostTranslation();
   const settingsControls = useSettingsControls();
-  const [state, setState] = useState<AutomationState>();
   const [showReload, setShowReload] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [operating, setBusy] = useState(false);
+  const busy = operating || state?.starting === true;
   const [error, setError] = useState('');
   const [file, setFile] = useState('');
   const [port, setPort] = useState('0');
@@ -29,25 +35,6 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
     const timer = window.setTimeout(() => setShowReload(true), 1000);
     return () => window.clearTimeout(timer);
   }, [state]);
-  useEffect(() => {
-    let active = true;
-    const refresh = () =>
-      void settingsControls
-        .automation({ kind: 'status' })
-        .then((r) => {
-          if (!active) return;
-          setState(r.state);
-        })
-        .catch((e) => {
-          if (active) setError(String(e));
-        });
-    refresh();
-    const unsubscribe = settingsControls.onChanged(refresh);
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, []);
   useEffect(() => {
     if (state) setFile(state.configFile);
   }, [state?.configFile]);
@@ -79,7 +66,6 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
     setError('');
     try {
       const r = await settingsControls.automation(action);
-      setState(r.state);
       setConfirmation(r.registrationConfirmation);
     } catch (e) {
       setError(String(e));
@@ -116,11 +102,13 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
   const networkStatus =
     state.connectionScope !== 'network'
       ? translate('settings.codexSettings.networkDisabled')
-      : !state.running
-        ? translate('settings.codexSettings.serverStopped')
-        : state.networkEndpoints.length === 0
-          ? translate('settings.codexSettings.noEndpoints')
-          : undefined;
+      : state.starting
+        ? translate('settings.codexSettings.starting')
+        : !state.running
+          ? translate('settings.codexSettings.serverStopped')
+          : state.networkEndpoints.length === 0
+            ? translate('settings.codexSettings.noEndpoints')
+            : undefined;
   return (
     <section
       className="settings-sections codex-settings"
@@ -155,9 +143,11 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           description={translate('settings.codexSettings.serverState', {
             value: state.running
               ? translate('settings.codexSettings.running')
-              : state.enabled
-                ? translate('settings.codexSettings.startFailed')
-                : translate('settings.codexSettings.stopped'),
+              : state.starting
+                ? translate('settings.codexSettings.starting')
+                : state.enabled
+                  ? translate('settings.codexSettings.startFailed')
+                  : translate('settings.codexSettings.stopped'),
           })}
           hint={translate('settings.codexSettings.runningHint')}
           {...settingAnchor('codex', 'automation')}
@@ -191,12 +181,17 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
             <option value="network">{translate('settings.codexSettings.network')}</option>
           </select>
         </SettingsField>
-        {state.enabled && !state.running && (
-          <SettingsActions>
-            <button disabled={busy} onClick={() => void run({ kind: 'retryStart' })}>
-              {translate('settings.codexSettings.retry')}
-            </button>
-          </SettingsActions>
+        {state.enabled && !state.running && !state.starting && (
+          <SettingsField
+            title={translate('settings.codexSettings.retryTitle')}
+            description={translate('settings.codexSettings.retryDescription')}
+          >
+            <SettingsActions>
+              <button disabled={busy} onClick={() => void run({ kind: 'retryStart' })}>
+                {translate('settings.codexSettings.retry')}
+              </button>
+            </SettingsActions>
+          </SettingsField>
         )}
         <SettingsField
           title={translate('settings.codexSettings.permissions')}
@@ -462,11 +457,10 @@ export function CodexSettings({ onOpenPermissions }: { onOpenPermissions(): void
           returnFocus={returnFocus.current}
           onClose={() => setConfirmation(undefined)}
           onApply={async () => {
-            const reply = await settingsControls.automation({
+            await settingsControls.automation({
               kind: confirmation.kind,
               confirmationId: confirmation.id,
             });
-            setState(reply.state);
           }}
         >
           <SettingsField
