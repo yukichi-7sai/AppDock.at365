@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type {
   ImageLibraryDialogRequest,
   ImageLibraryDialogOperation,
+  IconImportProgress,
 } from '../../shared/image-library-page';
 /** Main owns the request lifetime; the trusted host renderer owns native dialogs. */
 export class ImageLibraryDialogs {
@@ -10,6 +11,7 @@ export class ImageLibraryDialogs {
     request: ImageLibraryDialogRequest;
     resolve(operation?: ImageLibraryDialogOperation): void;
     busy?: boolean;
+    abort?: () => void;
   };
   constructor(
     private options: {
@@ -31,10 +33,40 @@ export class ImageLibraryDialogs {
       this.options.send(this.pending.request);
     });
   }
+  openProgress(abort: () => void) {
+    if (this.pending) throw Error(hostText('services.imageLibraryDialogs.editing'));
+    const id = randomUUID();
+    this.pending = {
+      request: { id, kind: 'import-progress', groups: [], images: [] },
+      resolve: () => {},
+      abort,
+    };
+    this.options.send(this.pending.request);
+    return id;
+  }
+  progress(id: string, importing: IconImportProgress) {
+    if (this.pending?.request.id !== id) return;
+    this.pending.request = { ...this.pending.request, importing: { ...importing } };
+    this.options.send(this.pending.request);
+  }
+  closeProgress(id: string) {
+    if (this.pending?.request.id !== id) return;
+    this.pending = undefined;
+    this.options.send(null);
+  }
   async complete(id: string, operation?: ImageLibraryDialogOperation) {
     const pending = this.pending;
     if (!pending || pending.request.id !== id)
       throw Error(hostText('services.imageLibraryDialogs.busyEnded'));
+    if (pending.request.kind === 'import-progress') {
+      if (operation) throw Error(hostText('services.imageLibraryDialogs.invalidOperation'));
+      if (!pending.request.cancelling) {
+        pending.request = { ...pending.request, cancelling: true };
+        pending.abort?.();
+        this.options.send(pending.request);
+      }
+      return;
+    }
     if (pending.busy) throw Error(hostText('services.imageLibraryDialogs.pending'));
     if (operation) {
       if ((operation.kind === 'delete-image') !== (pending.request.kind === 'delete-image'))
@@ -62,6 +94,7 @@ export class ImageLibraryDialogs {
     const pending = this.pending;
     this.pending = undefined;
     if (pending) {
+      pending.abort?.();
       this.options.send(null);
       pending.resolve();
     }

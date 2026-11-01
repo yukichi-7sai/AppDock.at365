@@ -1,5 +1,15 @@
 # 検証記録
 
+## 2026-11-01: Lucideカテゴリ自動分類・取り込み進捗 0.115.1
+
+- 同じ専用worktree `AppDock.at365-image-library` / `codex/image-library-svg`のcleanな`1726e22`から追加実装。追跡先なしのためpullは行わず、mainは変更していない。既存の設定/保存形式とApplet公開APIを維持した内部改善のため0.115.0→0.115.1のパッチ更新。依存・SDK/Runtimeの変更なし。
+- npmで確定した版と同じ公式GitHubタグからカテゴリ/アイコンJSONを取得する。カテゴリの継承と別名を解決し、`Lucide: Time & calendar`等の英語グループへ成功画像を複数所属させる。再取り込みは重複を加えず、既存名・順序・手動所属を保持する。ボタンを画像追加の隣へ移し、共通モーダルに段階・完了件数・取消を表示。取消後は完成分の画像と分類を保存して閉じる。
+- 発行前レビューは`.artifacts/lucide-groups-20261101/review.md`。固定版取得、JSON/循環/別名検証、配置前失敗、原本/手動分類保持、最新revision、保存失敗の再試行、モーダルの要求ID/背景禁止/重複取消/Window終了を確認し、阻害指摘なし。新たな設定項目・永続ファイルは追加していない。
+- frozen install、型検査、ビルド、関連4ファイル45件が成功。標準169ファイル1,515件は初回1,514件成功・1件失敗。非RIDのExtensionHost試験用DLLが未生成だったためRelease buildし、失敗を含むdotnet-pagesの2件が成功した。製品コードを変更せず標準全件の成功がそろった。初回失敗ログも保持。Node 26.13.0 / pnpm 12.15.0 / Electron 45.1.0 / Windows x64。959入力の発行前後SHA256一致を記録した。
+- ソースGUI9群と固定EXE GUI9群が成功。実配布元のLucide 1.66.0を途中取消後に再取り込みし、2,292 SVG/43カテゴリ、失敗0件。取消を含む取り込み区間はソース37,641ms・固定37,136ms（所要時間の保証ではない）。進捗の更新と取消操作、完成分分類、重複なし、別名/継承、元グループ保持、カテゴリ絞り込み、隣接ボタン、SVG配色、親取消、再起動保存を確認。固定共通ギャラリー12群も成功し、既存編集・削除・フォーカス・背景禁止・150/200%拡大・狭幅を保持。進捗とカテゴリ画像を目視確認した。
+- 固定GUI証跡は`.artifacts/image-folders-svg-ui-1793516777272/`と`image-gallery-ui-1793516827864/`。発行/入力/ログhash、全21群の結果は`.artifacts/lucide-groups-20261101/publication.json`。通常publishは終了0、発行693製品ファイルはstagingと一致。EXE SHA256=`0b05bc596ebaad9a64ba5380f64999ee261151e3005464ab8767038d7e853d5a`。ZIPは270,862,920bytes / SHA256=`6854e6b321793435ae3e3b645c80ef859297541c489d3f5243e978ab3217a835`、feed/manifestは0.115.1。
+- 成功/終了/プロセス/通常パスを確認した古い固定コピー2件の管理対象36項目だけを整理し、結果・画像・設定と最新コピー計6,541ファイルのhashを保持。調査用アーカイブ2件もhashを記録して除去した。失敗0、フォルダー全体の削除なし。詳細は同証跡の`cleanup.json`。本変更を1コミットにまとめ、stage/commit照合を`commit.json`に記録する。main統合・push・Release・実利用deployは行っていない。
+
 ## 2026-11-01: 画像フォルダー・SVG・設定用コピー・Lucide取り込み 0.115.0
 
 - `main 60e0a0a`をfast-forward確認後、専用worktree `AppDock.at365-image-library` / `codex/image-library-svg`で設計・実装。元checkoutは変更していない。設計と現行契約は`docs/image-library-folders-svg-design.md`、`docs/registered-images.md`、`docs/settings-sync.md`、`docs/shell-api.md`。新しい保存領域・参照とShell応答項目により本体を0.114.2→0.115.0へマイナー更新。SDK/Runtimeは型・実装・通信形状を変えておらず0.28.0を維持した。

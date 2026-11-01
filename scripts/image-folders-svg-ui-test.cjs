@@ -268,6 +268,17 @@ async function choose(cancel) {
     );
     checks.push('SVG mask follows light/dark and group state using the ribbon foreground color');
     await resize(820, 760);
+    const headerActions = host.locator('.library-header-actions');
+    assert.equal(
+      await headerActions.getByRole('button', { name: '画像を追加', exact: true }).count(),
+      1,
+    );
+    assert.equal(
+      await headerActions
+        .getByRole('button', { name: 'アイコンセットを取り込む', exact: true })
+        .count(),
+      1,
+    );
     await host.screenshot({ path: path.join(profile, 'narrow-library.png') });
     assert(
       await host.getByRole('button', { name: 'アイコンセットを取り込む', exact: true }).isVisible(),
@@ -277,6 +288,31 @@ async function choose(cancel) {
     assert.equal(await d.getByLabel('アイコンセット', { exact: true }).inputValue(), 'lucide');
     const started = Date.now();
     await d.getByRole('button', { name: '取り込む', exact: true }).click();
+    await d.getByRole('progressbar').waitFor();
+    await until(
+      async () => Number(await d.getByRole('progressbar').getAttribute('value')) >= 120,
+      'live progress before cancellation',
+      120000,
+    );
+    await host.screenshot({ path: path.join(profile, 'lucide-progress.png') });
+    assert(await d.getByRole('button', { name: '取り込みを取消', exact: true }).isEnabled());
+    await d.getByRole('button', { name: '取り込みを取消', exact: true }).click();
+    await d.waitFor({ state: 'hidden' });
+    await until(
+      async () => (await model()).content.message.includes('取り消しました'),
+      'cancel result',
+    );
+    const partial = await library();
+    const partialGroups = partial.groups.filter((g) => g.id.startsWith('icon-set-lucide-'));
+    assert(partialGroups.length > 0);
+    for (const group of partialGroups)
+      for (const image of group.images) assert(fs.existsSync(path.join(directory, image.file)));
+    checks.push(
+      'modal shows live progress; cancellation stays responsive and retains completed images and classifications',
+    );
+    await host.getByRole('button', { name: 'アイコンセットを取り込む', exact: true }).click();
+    await d.getByRole('button', { name: '取り込む', exact: true }).click();
+    await d.getByRole('progressbar').waitFor();
     await until(
       async () => {
         const m = await model();
@@ -288,10 +324,55 @@ async function choose(cancel) {
     const imported = (await library()).images.filter((e) => e.ref.file.startsWith('Lucide Icon/'));
     assert(imported.length > 512);
     assert((await model()).content.message.includes('失敗 0件'));
+    await d.waitFor({ state: 'hidden' });
+    const grouped = (await library()).groups;
+    const time = grouped.find((g) => g.name === 'Lucide: Time & calendar');
+    assert(time);
+    for (const name of ['alarm-clock', 'alarm-clock-check', 'alarm-check'])
+      assert(
+        time.images.some((image) => image.file === `Lucide Icon/${name}.svg`),
+        name,
+      );
+    for (const group of grouped)
+      assert.equal(
+        new Set(group.images.map((image) => image.file.toLowerCase())).size,
+        group.images.length,
+      );
+    assert(grouped.some((g) => g.id === 'icons' && g.name === 'アイコン'));
+    assert(
+      imported.every((image) =>
+        grouped.some((group) => group.images.some((ref) => ref.file === image.ref.file)),
+      ),
+    );
+    checks.push(
+      `official categories, inherited categories and aliases: ${grouped.length - 1} groups; reimport preserves existing group and deduplicates memberships`,
+    );
     checks.push(
       `official Lucide GUI import: ${imported.length} SVGs, ${Date.now() - started} ms, no failures`,
     );
     await host.screenshot({ path: path.join(profile, 'lucide-imported.png') });
+    await resize(1250, 900);
+    const timeButton = host
+      .locator('[data-gallery-group]')
+      .filter({ hasText: 'Lucide: Time & calendar' });
+    await timeButton.click();
+    await until(
+      async () => (await model()).content.total === time.images.length,
+      'category filter',
+    );
+    await until(
+      async () =>
+        card(host, 'Lucide Icon/alarm-check.svg')
+          .locator('img')
+          .evaluateAll((images) =>
+            images.some((image) => image.complete && image.naturalWidth > 0),
+          ),
+      'category thumbnail',
+    );
+    await host.screenshot({ path: path.join(profile, 'lucide-category.png') });
+    checks.push(
+      'import button is beside image-add; automatic category filters work at wide and narrow widths',
+    );
     await app.close();
     app = null;
     await launch();
@@ -299,6 +380,7 @@ async function choose(cancel) {
     rail = await ribbonPage(host);
     await rail.locator('[data-ribbon-id="group:icons"] .ribbon-svg-icon').waitFor();
     assert.deepEqual(fs.readFileSync(stored), original);
+    assert.deepEqual((await library()).groups, grouped);
     checks.push('isolated restart restores assigned SVG independently of original files');
     assert.deepEqual(errors, []);
     fs.writeFileSync(

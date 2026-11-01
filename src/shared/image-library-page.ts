@@ -5,6 +5,14 @@ import type {
   RegisteredImageEntry,
   RegisteredImageRef,
 } from './registered-images';
+export interface IconImportProgress {
+  phase: 'download' | 'metadata' | 'validate' | 'import' | 'groups';
+  completed: number;
+  total: number;
+  added: number;
+  reused: number;
+  failed: number;
+}
 export interface ImageLibraryPageRequest {
   id: string;
   kind: 'image-library';
@@ -25,6 +33,7 @@ export type ImageLibraryDialogKind =
   | 'folder-delete'
   | 'folder-move'
   | 'import-set'
+  | 'import-progress'
   | 'delete-image';
 export type ImageLibraryDialogOperation =
   | ImageLibraryEdit
@@ -42,6 +51,8 @@ export interface ImageLibraryDialogRequest {
   folder?: string;
   folders?: string[];
   iconSets?: { id: string; name: string }[];
+  importing?: IconImportProgress;
+  cancelling?: boolean;
 }
 export interface ImageLibraryDialogApi {
   onRequest(callback: (request: ImageLibraryDialogRequest | null) => void): () => void;
@@ -56,7 +67,7 @@ export interface ImageLibraryPageModel {
   dark: boolean;
   content: {
     iconSets: { id: string; name: string }[];
-    importing?: { phase: 'download' | 'import'; completed: number; total: number };
+    importing?: IconImportProgress;
     folders: string[];
     folder: string;
     groups: { id: string; title: string; count: number }[];

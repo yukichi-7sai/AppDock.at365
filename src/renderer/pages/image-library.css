@@ -59,6 +59,16 @@
   margin: 0 0 4px;
   line-height: 1.35;
 }
+.library-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.image-library-import-progress progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
 .library-page .library-header p {
   margin: 0;
   font-size: 13px;

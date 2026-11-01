@@ -329,6 +329,7 @@ export class ImageLibraryPageSession implements HostPageController {
       s.error = '';
       s.message = '';
       s.importAbort = new AbortController();
+      const progressId = this.options.dialogs.openProgress(() => s.importAbort?.abort());
       this.options.changed();
       try {
         const result = await importIconSet({
@@ -336,9 +337,10 @@ export class ImageLibraryPageSession implements HostPageController {
           images: this.options.host.images,
           signal: s.importAbort.signal,
           writable: () => this.options.host.assertWritable(),
+          groups: (groups) => this.options.host.configuration.addImportedGroups(groups),
           progress: (value) => {
             s.importing = value;
-            this.options.changed();
+            this.options.dialogs.progress(progressId, value);
           },
         });
         s.folder = result.folder;
@@ -353,7 +355,8 @@ export class ImageLibraryPageSession implements HostPageController {
         });
         s.error = result.failures.join(', ');
       } catch (error) {
-        if (s.importAbort.signal.aborted) s.message = hostText('images.importCancelled');
+        if (s.importAbort.signal.aborted && error instanceof Error && error.name === 'AbortError')
+          s.message = hostText('images.importCancelled');
         else {
           s.error = error instanceof Error ? error.message : hostText('images.downloadFailed');
           this.options.failed(s.error);
@@ -362,6 +365,7 @@ export class ImageLibraryPageSession implements HostPageController {
         s.busy = false;
         s.importing = undefined;
         s.importAbort = undefined;
+        this.options.dialogs.closeProgress(progressId);
         this.options.changed();
       }
     } else if (action.command === 'folder') {

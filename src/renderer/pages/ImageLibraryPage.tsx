@@ -278,33 +278,20 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
           <h1>画像ライブラリー</h1>
           <p>AppDockで使う画像を、ひとつの場所に。</p>
         </div>
-        <button
-          className="library-primary"
-          disabled={c.busy}
-          onClick={() => run({ command: 'add' })}
-        >
-          <span aria-hidden="true">＋</span>画像を追加
-        </button>
+        <div className="library-header-actions">
+          <button
+            className="library-primary"
+            disabled={c.busy}
+            onClick={() => run({ command: 'add' })}
+          >
+            <span aria-hidden="true">＋</span>画像を追加
+          </button>
+          <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
+            {t('images.importSet')}
+          </SettingsButton>
+        </div>
       </header>
       <div className="library-folder-toolbar">
-        <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
-          {t('images.importSet')}
-        </SettingsButton>
-        {c.importing && (
-          <>
-            <SettingsButton pending>
-              {c.importing.phase === 'download'
-                ? t('images.downloading')
-                : t('images.importProgress', {
-                    completed: c.importing.completed,
-                    total: c.importing.total,
-                  })}
-            </SettingsButton>
-            <SettingsButton onClick={() => run({ command: 'cancel-import' })}>
-              {t('images.importCancel')}
-            </SettingsButton>
-          </>
-        )}
         <label>
           {t('images.folder')}{' '}
           <FilterSelect

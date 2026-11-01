@@ -42,7 +42,9 @@ export function ImageLibraryDialogHost() {
   useEffect(
     () =>
       window.dock.imageLibraryDialog.onRequest((next) =>
-        setRequest((old) => (old?.id === next?.id ? old : next)),
+        setRequest((old) =>
+          old?.id === next?.id && next?.kind !== 'import-progress' ? old : next,
+        ),
       ),
     [],
   );
@@ -74,6 +76,60 @@ function Editor({
   };
   const save = (operation: ImageLibraryDialogOperation) =>
     window.dock.imageLibraryDialog.complete(r.id, operation);
+  if (r.kind === 'import-progress') {
+    const p = r.importing;
+    const phase = p?.phase ?? 'download';
+    const labels = {
+      download: 'images.downloading',
+      metadata: 'images.metadataDownloading',
+      validate: 'images.validating',
+      import: 'images.importProgress',
+      groups: 'images.assigningGroups',
+    } as const;
+    const label = r.cancelling
+      ? t('images.cancelling')
+      : t(labels[phase], { completed: p?.completed ?? 0, total: p?.total ?? 0 });
+    return (
+      <SettingsModal
+        labelledBy={`image-import-${r.id}`}
+        returnFocus={returnFocus}
+        onClose={close}
+        closeDisabled={r.cancelling}
+        error={error}
+        header={
+          <header>
+            <h2 id={`image-import-${r.id}`}>{t('images.importSet')}</h2>
+          </header>
+        }
+        footer={
+          <footer>
+            <button type="button" data-initial-focus disabled={r.cancelling} onClick={close}>
+              {t('images.importCancel')}
+            </button>
+          </footer>
+        }
+      >
+        <div className="image-library-import-progress">
+          <p role="status">{label}</p>
+          <progress
+            aria-label={label}
+            max={p?.total || 1}
+            value={phase === 'import' ? p?.completed : undefined}
+          />
+          {p && p.completed > 0 && (
+            <p>
+              {t('images.importDone', {
+                added: p.added,
+                reused: p.reused,
+                failed: p.failed,
+              })}
+            </p>
+          )}
+          <p>{t('images.importCancelHint')}</p>
+        </div>
+      </SettingsModal>
+    );
+  }
   if (r.kind === 'import-set')
     return (
       <SettingsDialog

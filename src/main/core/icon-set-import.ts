@@ -6,7 +6,9 @@ import { createReadStream, createWriteStream } from 'node:fs';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip } from 'node:zlib';
-import { imageFilename } from '../../shared/registered-images';
+import { imageFilename, type ImageGroup } from '../../shared/registered-images';
+import type { IconImportProgress } from '../../shared/image-library-page';
+export type { IconImportProgress } from '../../shared/image-library-page';
 import { validateSvg } from '../../shared/svg-image';
 import { hostText } from '../../shared/i18n';
 import { safeDirectory } from './image-files';
@@ -15,18 +17,13 @@ import type { RegisteredImages } from './registered-images';
 export const iconSets = [
   { id: 'lucide', name: 'Lucide', folder: 'Lucide Icon', package: 'lucide-static' },
 ] as const;
-export interface IconImportProgress {
-  phase: 'download' | 'import';
-  completed: number;
-  total: number;
-  added: number;
-  reused: number;
-  failed: number;
-}
 const licenseEntry = (name: string) => /^package\/LICENSE(?:\.txt|\.md)?$/i.test(name);
 
 /** Reads regular files only, never materializes archive paths or executes package code. */
-export async function* tarEntries(file: string): AsyncGenerator<{ name: string; bytes: Buffer }> {
+export async function* tarEntries(
+  file: string,
+  selected = (name: string) => /^package\/icons\/[^/]+\.svg$/.test(name) || licenseEntry(name),
+): AsyncGenerator<{ name: string; bytes: Buffer }> {
   const input = await fs.open(file, 'r');
   let offset = 0;
   try {
@@ -58,10 +55,7 @@ export async function* tarEntries(file: string): AsyncGenerator<{ name: string; 
         base = field(0, 100);
       const name = prefix ? prefix + '/' + base : base;
       if (['1', '2'].includes(field(156, 1))) throw Error(hostText('images.archiveInvalid'));
-      if (
-        ['', '0'].includes(field(156, 1)) &&
-        (/^package\/icons\/[^/]+\.svg$/.test(name) || licenseEntry(name))
-      ) {
+      if (['', '0'].includes(field(156, 1)) && selected(name)) {
         // Registered-image validation defines the supported single-image byte size.
         if (size > 5 * 1024 * 1024) throw Error(hostText('images.archiveInvalid'));
         const bytes = Buffer.alloc(size);
@@ -82,6 +76,7 @@ export async function importIconSet(options: {
   signal: AbortSignal;
   writable(): void;
   progress(value: IconImportProgress): void;
+  groups(value: ImageGroup[]): void;
   fetch?: typeof fetch;
 }) {
   const set = iconSets.find((set) => set.id === options.id);
@@ -146,6 +141,25 @@ export async function importIconSet(options: {
       createWriteStream(unpacked, { flags: 'wx' }),
       { signal },
     );
+    progress.phase = 'metadata';
+    options.progress({ ...progress });
+    const metadataArchive = path.join(temporary, 'metadata.tar');
+    // The release tag matches the verified npm version; no mutable main-branch metadata is used.
+    const metadataResponse = await request(
+      `https://codeload.github.com/lucide-icons/lucide/tar.gz/refs/tags/${meta.version}`,
+      { signal, redirect: 'error' },
+    );
+    if (!metadataResponse.ok || !metadataResponse.body)
+      throw Error(hostText('images.metadataFailed'));
+    await pipeline(
+      Readable.fromWeb(metadataResponse.body as any),
+      createGunzip(),
+      createWriteStream(metadataArchive, { flags: 'wx' }),
+      { signal },
+    );
+    const categories = await readLucideCategories(metadataArchive, meta.version, check);
+    progress.phase = 'validate';
+    options.progress({ ...progress });
     let license: Buffer | undefined;
     const names = new Set<string>();
     // Validate the complete selected set before publishing any image.
@@ -159,6 +173,7 @@ export async function importIconSet(options: {
       if (!imageFilename(name) || names.has(name.toLowerCase()))
         throw Error(hostText('images.archiveInvalid'));
       validateSvg(entry.bytes.toString('utf8'));
+      if (!categories.has(name.slice(0, -4))) throw Error(hostText('images.metadataFailed'));
       names.add(name.toLowerCase());
     }
     if (!license?.length || !names.size) throw Error(hostText('images.archiveInvalid'));
@@ -181,24 +196,45 @@ export async function importIconSet(options: {
     progress.total = names.size;
     options.progress({ ...progress });
     const failures: string[] = [];
-    await options.images.batch(async () => {
-      for await (const entry of tarEntries(unpacked)) {
-        check();
-        if (licenseEntry(entry.name)) continue;
-        const name = entry.name.slice('package/icons/'.length);
-        try {
-          const result = await options.images.addWithResult(entry.bytes, `${set.folder}/${name}`);
-          if (result.reused) progress.reused++;
-          else progress.added++;
-        } catch {
-          progress.failed++;
-          failures.push(name);
+    const groups = new Map<string, ImageGroup>();
+    try {
+      await options.images.batch(async () => {
+        for await (const entry of tarEntries(unpacked)) {
+          check();
+          if (licenseEntry(entry.name)) continue;
+          const name = entry.name.slice('package/icons/'.length);
+          try {
+            const result = await options.images.addWithResult(entry.bytes, `${set.folder}/${name}`);
+            if (result.reused) progress.reused++;
+            else progress.added++;
+            for (const category of categories.get(name.slice(0, -4))!) {
+              const id = `icon-set-${set.id}-${category.id}`;
+              const group = groups.get(id) ?? {
+                id,
+                name: `${set.name}: ${category.title}`,
+                images: [],
+              };
+              group.images.push(result.ref);
+              groups.set(id, group);
+            }
+          } catch {
+            progress.failed++;
+            failures.push(name);
+          }
+          progress.completed++;
+          if (progress.completed % 20 === 0 || progress.completed === progress.total)
+            options.progress({ ...progress });
         }
-        progress.completed++;
-        if (progress.completed % 20 === 0 || progress.completed === progress.total)
-          options.progress({ ...progress });
+      });
+    } finally {
+      // Cancellation retains classifications for successfully added/reused originals only.
+      if (groups.size) {
+        progress.phase = 'groups';
+        options.progress({ ...progress });
+        options.writable();
+        options.groups([...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'en')));
       }
-    });
+    }
     await options.images.refresh();
     return { ...progress, folder: set.folder, version: meta.version, failures };
   } finally {
@@ -210,4 +246,91 @@ export async function importIconSet(options: {
       throw Error('Unexpected temporary directory');
     await fs.rm(real, { recursive: true, force: true });
   }
+}
+
+async function readLucideCategories(file: string, version: string, check: () => void) {
+  const prefix = `lucide-${version}/`;
+  const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const icons = new Map<string, { categories: string[]; aliases: string[] }>();
+  const titles = new Map<string, string>();
+  const invalid = () => Error(hostText('images.metadataFailed'));
+  for await (const entry of tarEntries(
+    file,
+    (name) =>
+      name.startsWith(prefix) &&
+      /^(icons|categories)\/[^/]+\.json$/.test(name.slice(prefix.length)),
+  )) {
+    check();
+    const relative = entry.name.slice(prefix.length);
+    const id = path.posix.basename(relative, '.json');
+    if (!slug.test(id)) throw invalid();
+    let data;
+    try {
+      data = JSON.parse(entry.bytes.toString('utf8'));
+    } catch {
+      throw invalid();
+    }
+    if (!data || typeof data !== 'object') throw invalid();
+    if (relative.startsWith('categories/')) {
+      if (
+        titles.has(id) ||
+        typeof data.title !== 'string' ||
+        !data.title.trim() ||
+        data.title.length > 70 ||
+        /[\x00-\x1f\x7f]/.test(data.title) ||
+        id.length > 64
+      )
+        throw invalid();
+      titles.set(id, data.title.trim());
+    } else {
+      if (
+        icons.has(id) ||
+        !Array.isArray(data.categories) ||
+        !data.categories.every(
+          (v: unknown) =>
+            typeof v === 'string' && slug.test(v.startsWith('$extends:') ? v.slice(9) : v),
+        ) ||
+        (data.aliases !== undefined && !Array.isArray(data.aliases))
+      )
+        throw invalid();
+      const aliases = (data.aliases ?? []).map((v: unknown) =>
+        typeof v === 'string' ? v : (v as { name?: unknown } | null)?.name,
+      );
+      if (!aliases.every((v: unknown) => typeof v === 'string' && slug.test(v))) throw invalid();
+      icons.set(id, { categories: data.categories, aliases });
+    }
+  }
+  type Category = { id: string; title: string };
+  const result = new Map<string, Category[]>(),
+    resolving = new Set<string>();
+  const resolve = (name: string): Category[] => {
+    const done = result.get(name);
+    if (done) return done;
+    const icon = icons.get(name);
+    if (!icon || resolving.has(name)) throw invalid();
+    resolving.add(name);
+    const categories = new Map<string, Category>();
+    for (const value of icon.categories) {
+      if (value.startsWith('$extends:')) {
+        for (const category of resolve(value.slice(9))) categories.set(category.id, category);
+      } else {
+        const title = titles.get(value);
+        if (!title) throw invalid();
+        categories.set(value, { id: value, title });
+      }
+    }
+    resolving.delete(name);
+    result.set(name, [...categories.values()]);
+    return result.get(name)!;
+  };
+  for (const name of icons.keys()) resolve(name);
+  for (const [name, icon] of icons)
+    for (const alias of icon.aliases) {
+      if (icons.has(alias)) continue;
+      const previous = result.get(alias),
+        categories = result.get(name)!;
+      if (previous && JSON.stringify(previous) !== JSON.stringify(categories)) throw invalid();
+      result.set(alias, categories);
+    }
+  return result;
 }
