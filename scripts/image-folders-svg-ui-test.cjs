@@ -132,11 +132,19 @@ const resize = (width, height) =>
   );
 const open = async () => {
   await host.evaluate(() => window.dock.executeCommand('appdock.image-library.open'));
-  await host.getByTestId('library-folder').waitFor();
+  await host.locator('.library-page').waitFor();
 };
 const card = (scope, name) => scope.locator('.ad-gallery-card').filter({ hasText: name });
 async function folderDialog(button, input) {
-  await host.getByRole('button', { name: button, exact: true }).click();
+  if (['フォルダー名・場所を変更', '空のフォルダーを削除'].includes(button)) {
+    await host
+      .getByRole('button', { name: (await model()).content.folder + 'の操作', exact: true })
+      .click();
+    await host.getByRole('menuitem', { name: button, exact: true }).click();
+  } else
+    await host
+      .getByRole('button', { name: button === '選択画像を移動' ? '移動' : button, exact: true })
+      .click();
   const dialog = host.getByRole('dialog', { name: button, exact: true });
   if (input !== undefined) await dialog.getByLabel('フォルダーのパス').fill(input);
   return dialog;
@@ -181,7 +189,7 @@ async function choose(cancel) {
     let d = await folderDialog('フォルダーを作成', '移動先');
     await d.getByRole('button', { name: '適用', exact: true }).click();
     await d.waitFor({ state: 'hidden' });
-    await host.getByTestId('library-folder').selectOption('*');
+    await host.getByRole('button', { name: 'すべてのフォルダー', exact: true }).click();
     await card(host, 'heart.svg').getByRole('checkbox').check();
     d = await folderDialog('選択画像を移動');
     await d.getByLabel('保存先').selectOption('移動先');
@@ -197,7 +205,7 @@ async function choose(cancel) {
       async () => (await library()).groups[0].images[0].file === 'エクスプローラー/heart.svg',
       'external folder move',
     );
-    await host.getByTestId('library-folder').selectOption('素材/空');
+    await host.locator('.library-folder-name').filter({ hasText: /^空$/ }).click();
     d = await folderDialog('フォルダー名・場所を変更', '素材/空の変更');
     await d.getByRole('button', { name: '適用', exact: true }).click();
     await d.waitFor({ state: 'hidden' });
@@ -429,9 +437,7 @@ async function choose(cancel) {
     );
     await host.screenshot({ path: path.join(profile, 'lucide-imported.png') });
     await resize(1250, 900);
-    const timeButton = host
-      .locator('[data-gallery-group]')
-      .filter({ hasText: 'Lucide: Time & calendar' });
+    const timeButton = host.locator('[data-gallery-group]').filter({ hasText: 'Time & calendar' });
     await timeButton.click();
     await until(
       async () => (await model()).content.total === time.images.length,

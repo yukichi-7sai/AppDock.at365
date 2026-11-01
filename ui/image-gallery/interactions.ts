@@ -194,7 +194,7 @@ export function mountGalleryInteractions(
     if (!target || !options.root.contains(target)) return;
     if (
       target.closest(
-        'input, label, select, textarea, a, summary, [contenteditable], [role="menu"], button:not(.ad-gallery-image)',
+        'input, label, select, textarea, a, summary, [contenteditable], [role="menu"], [role="separator"], button:not(.ad-gallery-image)',
       )
     )
       return;

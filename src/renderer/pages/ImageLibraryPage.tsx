@@ -1,58 +1,84 @@
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsButton } from '../settings-ui/SettingsButton';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { HostPageModel } from '../../shared/host-pages';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import type {
   ImageLibraryPageAction,
   ImageLibraryPageModel,
   ImageLibraryDialogKind,
+  ImageLibraryLayout,
+  ImageLibraryFileAction,
 } from '../../shared/image-library-page';
-import { mountImageGallery, mountGallerySizeControl } from '../../../ui/image-gallery';
+import {
+  libraryGallerySize,
+  mountImageGallery,
+  mountGallerySizeControl,
+} from '../../../ui/image-gallery';
 import { Icon } from '../../shared/ui-icons';
-import { settingsPopoverScroll } from '../settings-ui/settings-popover-scroll';
-import { FilterSelect } from '../settings-ui/FilterSelect';
 import { useImageLibraryDialogFocus } from '../ImageLibraryDialogHost';
+import { ImageLibraryMenu, type LibraryMenuItem } from './ImageLibraryMenu';
 import '../../../ui/image-gallery/gallery.css';
 import './image-library.css';
+
 const api = window.dock.pages;
 type Action = ImageLibraryPageAction extends infer T
   ? T extends ImageLibraryPageAction
     ? Omit<T, 'id' | 'type'>
     : never
   : never;
+type Menu = {
+  kind: 'images' | 'group' | 'folder';
+  target?: string;
+  opener: HTMLElement;
+  count?: number;
+  point?: { x: number; y: number };
+};
 export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryPageModel }) {
   const { t } = useHostTranslation();
-  const folderLabels = {
-    create: 'images.createFolder',
-    rename: 'images.renameFolder',
-    delete: 'images.deleteFolder',
-    'move-images': 'images.moveImages',
-  } as const;
   const captureDialogFocus = useImageLibraryDialogFocus();
-  const [model, setModel] = useState<ImageLibraryPageModel>(initialModel);
-  const latest = useRef<ImageLibraryPageModel | undefined>(initialModel);
-  const [error, setError] = useState('');
-  const [query, setQuery] = useState('');
-  const [width, setWidth] = useState(260);
-  const [menu, setMenu] = useState('');
-  const menuPopup = useRef<HTMLDivElement>(null);
-  const menuButton = useRef<HTMLButtonElement | null>(null);
-  const [dialogPending, setDialogPending] = useState(false);
-  const openingDialog = useRef(false);
+  const [model, setModel] = useState(initialModel),
+    latest = useRef(initialModel);
+  const [error, setError] = useState(''),
+    [query, setQuery] = useState(initialModel.content.query);
+  const [width, setWidth] = useState(initialModel.content.cardWidth);
+  const [layout, setLayout] = useState(initialModel.content.layout),
+    layoutRef = useRef(layout);
+  const [menu, setMenu] = useState<Menu | null>(null);
+  const [focusedFile, setFocusedFile] = useState('');
+  const [narrow, setNarrow] = useState(false),
+    [drawer, setDrawer] = useState(false);
+  const [dialogPending, setDialogPending] = useState(false),
+    openingDialog = useRef(false);
+  const root = useRef<HTMLElement>(null),
+    sidebar = useRef<HTMLElement>(null);
+  const navigationButton = useRef<HTMLButtonElement>(null);
+  const interactionRoot = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null),
     scroll = useRef<HTMLDivElement>(null),
     size = useRef<HTMLDivElement>(null);
+  const filters = useRef<HTMLDivElement>(null),
+    sentinel = useRef<HTMLDivElement>(null);
   const gallery = useRef<ReturnType<typeof mountImageGallery> | undefined>(undefined);
   const sizeControl = useRef<ReturnType<typeof mountGallerySizeControl> | undefined>(undefined);
-  const viewRevision = useRef(-1);
-  const pendingSize = useRef<number | undefined>(undefined);
-  const savingSize = useRef(false);
-  const sizeDirty = useRef(false);
+  const viewRevision = useRef(-1),
+    anchorSelection = useRef<string | undefined>(undefined);
+  const pendingSize = useRef<number | undefined>(undefined),
+    savingSize = useRef(false),
+    sizeDirty = useRef(false);
   const requestedSize = useRef<number | undefined>(undefined);
-  const loadingMore = useRef(false);
-  const sidebar = useRef<HTMLElement>(null);
-  const interactionRoot = useRef<HTMLDivElement>(null);
-  const filters = useRef<HTMLDivElement>(null);
+  const requestedLayout = useRef<ImageLibraryLayout | undefined>(undefined);
+  const loadingMore = useRef(false),
+    moreRequest = useRef(''),
+    moreErrorRef = useRef(false);
+  const [moreError, setMoreError] = useState(false),
+    [morePending, setMorePending] = useState(false);
+  const draggingSidebar = useRef(false);
   const viewport = () => {
     const rect = scroll.current!.getBoundingClientRect();
     return {
@@ -63,19 +89,28 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     };
   };
   const act = async (action: Action, opener?: HTMLElement) => {
-    if (!latest.current) return;
     if (openingDialog.current && action.command !== 'anchor') return;
     const opensDialog = action.command === 'dialog' || action.command === 'retry-import';
-    const releaseFocus = opensDialog ? captureDialogFocus(opener) : undefined;
+    const focusTarget =
+      opener ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : undefined);
+    const releaseFocus = opensDialog
+      ? captureDialogFocus(
+          narrow && focusTarget && sidebar.current?.contains(focusTarget)
+            ? (navigationButton.current ?? undefined)
+            : focusTarget,
+        )
+      : undefined;
     if (opensDialog) {
       openingDialog.current = true;
       setDialogPending(true);
+      setDrawer(false);
     }
     try {
-      setError('');
+      if (action.command !== 'anchor' && action.command !== 'more') setError('');
       return await api.act({ ...action, id: latest.current.id, type: 'gallery' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (action.command !== 'anchor') setError(e instanceof Error ? e.message : String(e));
       throw e;
     } finally {
       if (opensDialog) {
@@ -105,36 +140,156 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
       }
     })().catch(() => {});
   };
-  useEffect(() => {
-    const live = true;
-    const accept = (next: HostPageModel) => {
-      if (
-        !live ||
-        next.kind !== 'image-library' ||
-        (latest.current?.id === next.id && latest.current.revision > next.revision)
-      )
+  const saveLayout = (value: ImageLibraryLayout) => {
+    requestedLayout.current = value;
+    layoutRef.current = value;
+    setLayout(value);
+    run({ command: 'layout', value });
+  };
+  const toggle = (kind: 'collapsedFolders' | 'collapsedGroups', key: string) => {
+    const current = layoutRef.current;
+    saveLayout({
+      ...current,
+      [kind]: current[kind].includes(key)
+        ? current[kind].filter((v) => v !== key)
+        : [...current[kind], key],
+    });
+  };
+  const more = (retry = false) => {
+    const c = latest.current.content,
+      key = c.viewRevision + ':' + c.items.length;
+    if (
+      loadingMore.current ||
+      !c.remaining ||
+      c.busy ||
+      openingDialog.current ||
+      (moreErrorRef.current && !retry) ||
+      (!retry && moreRequest.current === key)
+    )
+      return;
+    moreRequest.current = key;
+    loadingMore.current = true;
+    moreErrorRef.current = false;
+    setMoreError(false);
+    setMorePending(true);
+    void act({ command: 'more' })
+      .catch(() => {
+        moreErrorRef.current = true;
+        setMoreError(true);
+      })
+      .finally(() => {
+        loadingMore.current = false;
+        setMorePending(false);
+      });
+  };
+  const maybeMore = () => {
+    if (
+      scroll.current &&
+      sentinel.current &&
+      sentinel.current.getBoundingClientRect().top <
+        scroll.current.getBoundingClientRect().bottom + 300
+    )
+      more();
+  };
+  const imageMenu = (
+    imageId: string | undefined,
+    opener: HTMLElement,
+    event?: MouseEvent | KeyboardEvent,
+  ) => {
+    if (latest.current.content.busy || openingDialog.current) return;
+    const c = latest.current.content,
+      item = c.items.find((i) => i.id === imageId);
+    const count = item && !item.selected ? 1 : c.selected;
+    const point =
+      event instanceof MouseEvent && (event.clientX || event.clientY)
+        ? { x: event.clientX, y: event.clientY }
+        : undefined;
+    const show = () => setMenu({ kind: 'images', target: imageId, opener, point, count });
+    if (imageId)
+      void act({ command: 'select-target', imageId })
+        .then(show)
+        .catch(() => {});
+    else show();
+  };
+  const select = (id: string, event: MouseEvent) => {
+    const items = latest.current.content.items,
+      item = items.find((i) => i.id === id);
+    if (!item || openingDialog.current || latest.current.content.busy) return;
+    if (event.shiftKey && anchorSelection.current) {
+      const start = items.findIndex((i) => i.id === anchorSelection.current),
+        end = items.findIndex((i) => i.id === id);
+      if (start >= 0) {
+        run({
+          command: 'select-range',
+          imageIds: items.slice(Math.min(start, end), Math.max(start, end) + 1).map((i) => i.id),
+          additive: event.ctrlKey || event.metaKey,
+        });
         return;
-      latest.current = next;
-      setModel(next);
-      setQuery(next.content.query);
-      if (requestedSize.current === next.content.cardWidth) {
-        requestedSize.current = undefined;
-        sizeDirty.current = false;
       }
-      if (!savingSize.current && !sizeDirty.current) setWidth(next.content.cardWidth);
-    };
-    accept(initialModel);
+    }
+    anchorSelection.current = id;
+    if (event.ctrlKey || event.metaKey)
+      run({ command: 'select', imageId: id, selected: !item.selected });
+    else if (!item.selected) run({ command: 'select-range', imageIds: [id], additive: false });
+  };
+  useEffect(() => {
+    if (latest.current.id === initialModel.id && latest.current.revision > initialModel.revision)
+      return;
+    latest.current = initialModel;
+    setModel(initialModel);
+    setQuery(initialModel.content.query);
+    if (requestedSize.current === initialModel.content.cardWidth) {
+      requestedSize.current = undefined;
+      sizeDirty.current = false;
+    }
+    if (!savingSize.current && !sizeDirty.current) setWidth(initialModel.content.cardWidth);
+    if (
+      requestedLayout.current &&
+      JSON.stringify(requestedLayout.current) === JSON.stringify(initialModel.content.layout)
+    )
+      requestedLayout.current = undefined;
+    if (!draggingSidebar.current && !requestedLayout.current) {
+      layoutRef.current = initialModel.content.layout;
+      setLayout(initialModel.content.layout);
+    }
   }, [initialModel]);
-  const ready = !!model;
   useLayoutEffect(() => {
-    if (!ready) return;
+    const observer = new ResizeObserver(() => {
+      setNarrow(root.current!.clientWidth < 680);
+      maybeMore();
+    });
+    observer.observe(root.current!);
+    return () => observer.disconnect();
+  }, []);
+  useLayoutEffect(() => {
+    const pane = sidebar.current!;
+    if (narrow && drawer) {
+      pane.showPopover();
+      const bounds = root.current!.getBoundingClientRect();
+      pane.style.left = bounds.left + 'px';
+      pane.style.top = bounds.top + 'px';
+      pane.style.height = bounds.height + 'px';
+      pane.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+    } else {
+      if (pane.matches(':popover-open')) pane.hidePopover();
+      if (!narrow) {
+        pane.style.left = '';
+        pane.style.top = '';
+        pane.style.height = '';
+      }
+    }
+  }, [narrow, drawer]);
+  useLayoutEffect(() => {
     const instance = mountImageGallery(grid.current!, {
+      size: libraryGallerySize,
       scrollElement: scroll.current!,
+      clickSelect: select,
+      context: (id, event, opener) => imageMenu(id, opener, event),
       interactions: {
         root: interactionRoot.current!,
         viewport,
-        enabled: () => !openingDialog.current && !latest.current?.content.busy,
-        canReorder: () => !['all', 'unfiled'].includes(latest.current!.content.group),
+        enabled: () => !openingDialog.current && !latest.current.content.busy,
+        canReorder: () => !['all', 'unfiled'].includes(latest.current.content.group),
         beginDrag: async (imageId) =>
           (await act({ command: 'drag-start', imageId })) as { token: string; count: number },
         drop: (token, groupId) => run({ command: 'drop', token, groupId }),
@@ -145,361 +300,620 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
           [...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-group]') ?? [])].map(
             (element) => ({ element, id: element.dataset.galleryGroup! }),
           ),
-        scrollTargets: () => [scroll.current!, ...(sidebar.current ? [sidebar.current] : [])],
-        more: () => {
-          if (loadingMore.current || !latest.current?.content.remaining) return;
-          loadingMore.current = true;
-          void act({ command: 'more' })
-            .catch(() => {})
-            .finally(() => {
-              loadingMore.current = false;
-            });
-        },
+        scrollTargets: () => [scroll.current!, sidebar.current!],
+        more,
       },
       image: async (assetId, edge) =>
         (await api.act({
-          id: latest.current!.id,
+          id: latest.current.id,
           type: 'gallery',
           command: 'image',
           assetId,
           edge,
         })) as string,
-      select: (imageId, selected) => run({ command: 'select', imageId, selected }),
+      select: (imageId, selected) => {
+        anchorSelection.current = imageId;
+        run({ command: 'select', imageId, selected });
+      },
       activate: (imageId) => run({ command: 'dialog', kind: 'preview', imageId }),
-      action: (imageId, actionId) =>
-        run({
-          command: 'dialog',
-          kind: actionId === 'delete-image' ? 'delete-image' : 'membership',
-          imageId,
-        }),
+      action: (imageId, actionId) => {
+        if (actionId === 'menu') imageMenu(imageId, document.activeElement as HTMLElement);
+        else
+          run({
+            command: 'dialog',
+            kind: actionId === 'delete-image' ? 'delete-image' : 'membership',
+            imageId,
+          });
+      },
     });
     gallery.current = instance;
     sizeControl.current = mountGallerySizeControl(size.current!, {
-      value: latest.current!.content.cardWidth,
+      range: libraryGallerySize,
+      value: latest.current.content.cardWidth,
       change: (value) => {
-        sizeDirty.current = value !== latest.current?.content.cardWidth;
+        sizeDirty.current = value !== latest.current.content.cardWidth;
         setWidth(value);
       },
-      commit: (value) => saveSize(value),
+      commit: saveSize,
     });
     let frame = 0;
-    const saveAnchor = () => {
+    const scroller = scroll.current!;
+    const onScroll = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         run({ command: 'anchor', anchor: instance.anchor() });
+        maybeMore();
       });
     };
-    scroll.current!.addEventListener('scroll', saveAnchor, { passive: true });
-    const scroller = scroll.current!;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) more();
+      },
+      { root: scroller, rootMargin: '300px' },
+    );
+    observer.observe(sentinel.current!);
+    scroller.addEventListener('scroll', onScroll, { passive: true });
     return () => {
+      observer.disconnect();
       cancelAnimationFrame(frame);
-      scroller.removeEventListener('scroll', saveAnchor);
+      scroller.removeEventListener('scroll', onScroll);
       instance.dispose();
       sizeControl.current?.dispose();
       gallery.current = undefined;
     };
-  }, [ready]);
+  }, []);
   useLayoutEffect(() => {
-    if (!model || !gallery.current) return;
     const c = model.content;
-    gallery.current.setModel({
+    gallery.current?.setModel({
       items: c.items,
       cardWidth: width,
       fit: 'contain',
       selection: 'multiple',
-      empty: c.query
-        ? '該当する画像はありません'
-        : c.group === 'all'
-          ? '画像がありません'
-          : 'このグループには画像がありません',
+      empty: c.query ? t('images.noMatches') : t('images.empty'),
     });
     sizeControl.current?.setValue(width);
     if (viewRevision.current !== c.viewRevision) {
-      gallery.current.cancelInteraction();
+      gallery.current?.cancelInteraction();
       viewRevision.current = c.viewRevision;
-      if (c.anchor) gallery.current.restore(c.anchor);
+      anchorSelection.current = undefined;
+      moreErrorRef.current = false;
+      setMoreError(false);
+      moreRequest.current = '';
+      if (c.anchor) gallery.current?.restore(c.anchor);
       else scroll.current!.scrollTop = 0;
     }
-  }, [model, width]);
-  useLayoutEffect(() => {
-    const popup = menuPopup.current,
-      button = menuButton.current;
-    if (!menu || !popup || !button) return;
-    popup.style.maxHeight = 'calc(100dvh - 16px)';
-    popup.showPopover();
-    const rect = button.getBoundingClientRect();
-    const below = window.innerHeight - rect.bottom - 12;
-    const above = rect.top - 12;
-    const upward = below < popup.getBoundingClientRect().height && above > below;
-    popup.style.maxHeight = `${Math.max(0, upward ? above : below)}px`;
-    const size = popup.getBoundingClientRect();
-    popup.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - size.width - 8))}px`;
-    popup.style.top = `${Math.max(8, upward ? rect.top - size.height - 4 : rect.bottom + 4)}px`;
-    popup.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
-    const dismiss = () => setMenu('');
-    const outside = (e: PointerEvent) => {
-      if (!popup.contains(e.target as Node) && !button.contains(e.target as Node)) dismiss();
-    };
-    const close = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) {
-        dismiss();
-        button.focus({ preventScroll: true });
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    const onScroll = settingsPopoverScroll(button, popup, dismiss);
-    document.addEventListener('pointerdown', outside);
-    document.addEventListener('keydown', close, true);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', dismiss);
-    return () => {
-      if (popup.isConnected && popup.matches(':popover-open')) popup.hidePopover();
-      document.removeEventListener('pointerdown', outside);
-      document.removeEventListener('keydown', close, true);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', dismiss);
-    };
-  }, [menu]);
-  useEffect(() => setMenu(''), [model.content.group]);
-  if (!model) return error ? <p role="alert">{error}</p> : null;
-  const c = model.content,
-    current = c.groups.find((g) => g.id === c.group);
-  const normalGroup = !['all', 'unfiled'].includes(c.group);
-  const dialog = (kind: ImageLibraryDialogKind, groupId?: string) => {
-    const opener = menu ? (menuButton.current ?? undefined) : undefined;
-    setMenu('');
-    run({ command: 'dialog', kind, groupId }, opener);
+    const frame = requestAnimationFrame(maybeMore);
+    return () => cancelAnimationFrame(frame);
+  }, [model, width, layout.sidebarWidth, dialogPending, morePending]);
+  useEffect(
+    () => setMenu(null),
+    [model.content.group, model.content.folder, model.content.query, model.id],
+  );
+  const c = model.content;
+  const dialog = (
+    kind: ImageLibraryDialogKind,
+    groupId?: string,
+    folder?: string,
+    imageId?: string,
+    opener?: HTMLElement,
+  ) => {
+    setMenu(null);
+    run({ command: 'dialog', kind, groupId, folder, imageId }, opener);
   };
-  return (
-    <section className="library-page" inert={dialogPending}>
-      <header className="library-header">
-        <div>
-          <h1>画像ライブラリー</h1>
-          <p>AppDockで使う画像を、ひとつの場所に。</p>
-        </div>
-        <div className="library-header-actions">
+  const navigate = (action: Action) => {
+    setDrawer(false);
+    if (narrow) navigationButton.current?.focus({ preventScroll: true });
+    run(action);
+  };
+  const currentGroup = c.groups.find((g) => g.id === c.group),
+    normalGroup = !['all', 'unfiled'].includes(c.group);
+  const groupRow = (g: (typeof c.groups)[number], label = g.title) => (
+    <div className="library-nav-row" key={g.id}>
+      <button
+        type="button"
+        data-gallery-group={['all', 'unfiled'].includes(g.id) ? undefined : g.id}
+        data-testid="library-group-target"
+        disabled={c.busy}
+        aria-current={g.id === c.group ? 'page' : undefined}
+        title={g.title}
+        onClick={() => navigate({ command: 'group', groupId: g.id })}
+      >
+        <span>{label}</span>
+        <small>{g.count}</small>
+      </button>
+      {!['all', 'unfiled'].includes(g.id) && (
+        <button
+          type="button"
+          className="library-icon-button"
+          aria-label={t('images.itemActions', { name: g.title })}
+          aria-haspopup="menu"
+          aria-expanded={menu?.kind === 'group' && menu.target === g.id}
+          disabled={c.busy}
+          onClick={(e) => setMenu({ kind: 'group', target: g.id, opener: e.currentTarget })}
+        >
+          …
+        </button>
+      )}
+    </div>
+  );
+  const buckets: { prefix: string; groups: typeof c.groups }[] = [],
+    byPrefix = new Map<string, (typeof buckets)[number]>();
+  for (const g of c.groups.slice(2)) {
+    const colon = g.title.indexOf(':'),
+      prefix = colon > 0 ? g.title.slice(0, colon).trim() : '';
+    if (!prefix) buckets.push({ prefix: '', groups: [g] });
+    else {
+      let bucket = byPrefix.get(prefix);
+      if (!bucket) {
+        bucket = { prefix, groups: [] };
+        byPrefix.set(prefix, bucket);
+        buckets.push(bucket);
+      }
+      bucket.groups.push(g);
+    }
+  }
+  const folderChildren = new Map<string, string[]>();
+  for (const f of c.folders) {
+    if (!f) continue;
+    const parent = f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '';
+    const children = folderChildren.get(parent) ?? [];
+    children.push(f);
+    folderChildren.set(parent, children);
+  }
+  const folderRow = (folder: string, level = 0): ReactNode => {
+    const children = folderChildren.get(folder) ?? [],
+      closed = layout.collapsedFolders.includes(folder);
+    return (
+      <div key={folder}>
+        <div className="library-nav-row" style={{ '--folder-depth': level } as CSSProperties}>
+          {children.length > 0 ? (
+            <button
+              type="button"
+              className="library-folder-toggle library-icon-button"
+              aria-label={t(closed ? 'images.expandItem' : 'images.collapseItem', {
+                name: folder || t('images.rootFolder'),
+              })}
+              aria-expanded={!closed}
+              onClick={() => toggle('collapsedFolders', folder)}
+            >
+              <Icon name="chevron" size={12} />
+            </button>
+          ) : (
+            <span className="library-folder-spacer" />
+          )}
           <button
-            className="library-primary"
+            type="button"
+            className="library-folder-name"
+            aria-current={c.folder === folder ? 'page' : undefined}
             disabled={c.busy}
+            title={folder || t('images.rootFolder')}
+            onClick={() => navigate({ command: 'folder', folder })}
+          >
+            <Icon name="folder" size={15} />
+            <span>{folder ? folder.split('/').at(-1) : t('images.rootFolder')}</span>
+          </button>
+          <button
+            type="button"
+            className="library-icon-button"
+            disabled={c.busy}
+            aria-label={t('images.itemActions', { name: folder || t('images.rootFolder') })}
+            aria-haspopup="menu"
+            onClick={(e) => setMenu({ kind: 'folder', target: folder, opener: e.currentTarget })}
+          >
+            …
+          </button>
+        </div>
+        {!closed && children.map((child) => folderRow(child, level + 1))}
+      </div>
+    );
+  };
+  let menuItems: LibraryMenuItem[] = [],
+    menuTitle = '';
+  if (menu?.kind === 'images') {
+    const count = menu.count ?? c.selected;
+    const chosen =
+      menu.target && !c.items.find((i) => i.id === menu.target)?.selected
+        ? c.items.filter((i) => i.id === menu.target)
+        : c.items.filter((i) => i.selected);
+    const unreadable = chosen.some((i) => i.state !== 'ready');
+    const file = (operation: ImageLibraryFileAction) =>
+      run({ command: 'file-action', operation, imageId: menu.target }, menu.opener);
+    const edit = (kind: ImageLibraryDialogKind) =>
+      dialog(kind, undefined, undefined, menu.target, menu.opener);
+    menuTitle = t('images.selectedCount', { count });
+    menuItems = [
+      { label: t('images.preview'), disabled: !count, run: () => edit('preview') },
+      {
+        label: t('images.renameImages'),
+        disabled: !count || unreadable,
+        run: () => edit('rename-images'),
+      },
+      {
+        label: t('images.copyFiles'),
+        separator: true,
+        disabled: !count || unreadable,
+        run: () => file('copy-files'),
+      },
+      { label: t('images.copyPaths'), disabled: !count, run: () => file('copy-paths') },
+      {
+        label: t('images.copyImage'),
+        disabled: count !== 1 || unreadable,
+        run: () => file('copy-image'),
+      },
+      { label: t('images.reveal'), disabled: !count || unreadable, run: () => file('reveal') },
+      {
+        label: t('images.addToGroup'),
+        separator: true,
+        disabled: !count || !c.groups.slice(2).length,
+        run: () => edit('batch-add'),
+      },
+      {
+        label: t('images.removeFromGroup'),
+        disabled: !count || !c.groups.slice(2).length,
+        run: () => edit('batch-remove'),
+      },
+      {
+        label: t('images.moveImages'),
+        disabled: !count || unreadable,
+        run: () => edit('folder-move'),
+      },
+      {
+        label: t('images.deleteImages'),
+        separator: true,
+        danger: true,
+        disabled: !count || unreadable,
+        run: () => edit('delete-image'),
+      },
+    ];
+  } else if (menu?.kind === 'group') {
+    menuTitle = t('images.itemActions', {
+      name: c.groups.find((g) => g.id === menu.target)?.title ?? '',
+    });
+    menuItems = [
+      {
+        label: t('images.orderImages'),
+        run: () => dialog('order-images', menu.target, undefined, undefined, menu.opener),
+      },
+      {
+        label: t('images.renameGroup'),
+        run: () => dialog('rename', menu.target, undefined, undefined, menu.opener),
+      },
+      {
+        label: t('images.deleteGroup'),
+        danger: true,
+        run: () => dialog('delete', menu.target, undefined, undefined, menu.opener),
+      },
+    ];
+  } else if (menu) {
+    menuTitle = menu.target || t('images.rootFolder');
+    menuItems = [
+      {
+        label: t('images.openFolder'),
+        run: () => run({ command: 'open-folder', folder: menu.target }),
+      },
+      {
+        label: t('images.createFolder'),
+        run: () => dialog('folder-create', undefined, menu.target, undefined, menu.opener),
+      },
+      {
+        label: t('images.renameFolder'),
+        disabled: !menu.target,
+        run: () => dialog('folder-rename', undefined, menu.target, undefined, menu.opener),
+      },
+      {
+        label: t('images.deleteFolder'),
+        disabled: !menu.target,
+        danger: true,
+        run: () => dialog('folder-delete', undefined, menu.target, undefined, menu.opener),
+      },
+    ];
+  }
+  return (
+    <section
+      ref={root}
+      className="library-page"
+      data-narrow={narrow}
+      inert={dialogPending}
+      style={{ '--library-sidebar-width': layout.sidebarWidth + 'px' } as CSSProperties}
+      onKeyDown={(e) => {
+        if (
+          e.nativeEvent.isComposing ||
+          e.keyCode === 229 ||
+          c.busy ||
+          menu ||
+          e.altKey ||
+          (e.target as Element).closest('input,select,textarea,[role="menu"],[role="separator"]')
+        )
+          return;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          run({ command: 'select-all' });
+        } else if (c.selected && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+          e.preventDefault();
+          run({ command: 'file-action', operation: e.shiftKey ? 'copy-paths' : 'copy-files' });
+        } else if (
+          c.selected &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          !e.shiftKey &&
+          ['F2', 'Delete'].includes(e.key)
+        ) {
+          e.preventDefault();
+          dialog(e.key === 'F2' ? 'rename-images' : 'delete-image');
+        } else if (e.key === 'Enter' && (e.target as Element).matches('.ad-gallery-image')) {
+          e.preventDefault();
+          const imageId = (e.target as Element).closest<HTMLElement>('[data-image-id]')?.dataset
+            .imageId;
+          if (imageId) dialog('preview', undefined, undefined, imageId);
+        }
+      }}
+    >
+      <header className="library-header">
+        <h1>
+          <Icon name="image" size={19} />
+          {t('images.title')}
+        </h1>
+        <div className="library-header-actions">
+          <SettingsButton
+            disabled={c.busy}
+            appearance="filled"
             onClick={() => run({ command: 'add' })}
           >
-            <span aria-hidden="true">＋</span>画像を追加
-          </button>
+            <Icon name="upload" size={15} />
+            {t('images.addImages')}
+          </SettingsButton>
           <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
+            <Icon name="download" size={15} />
             {t('images.importSet')}
           </SettingsButton>
         </div>
       </header>
-      <div className="library-folder-toolbar">
-        <label>
-          {t('images.folder')}{' '}
-          <FilterSelect
-            data-testid="library-folder"
-            value={c.folder}
-            allValue="*"
-            onChange={(e) => run({ command: 'folder', folder: e.target.value })}
-            disabled={c.busy}
-          >
-            <option value="*">{t('images.allFolders')}</option>
-            {c.folders.map((folder) => (
-              <option key={folder} value={folder}>
-                {folder || t('images.rootFolder')}
-              </option>
-            ))}
-          </FilterSelect>
-        </label>
-        {(['create', 'rename', 'delete', 'move-images'] as const).map((operation) => (
-          <button
-            key={operation}
-            disabled={
-              c.busy ||
-              (['rename', 'delete'].includes(operation) && (!c.folder || c.folder === '*')) ||
-              (operation === 'move-images' && !c.selected)
-            }
-            onClick={() =>
-              dialog(
-                operation === 'move-images'
-                  ? 'folder-move'
-                  : (('folder-' + operation) as
-                      'folder-create' | 'folder-rename' | 'folder-delete'),
-              )
-            }
-          >
-            {t(folderLabels[operation])}
-          </button>
-        ))}
-      </div>
       <div className="library-layout" ref={interactionRoot}>
-        <aside className="library-sidebar" aria-label="画像グループ" ref={sidebar}>
-          <nav>
-            {c.groups.slice(0, 2).map((g) => (
-              <button
-                key={g.id}
-                aria-current={g.id === c.group ? 'page' : undefined}
-                onClick={() => run({ command: 'group', groupId: g.id })}
-              >
-                <span>{g.title}</span>
-                <small>{g.count}</small>
-              </button>
-            ))}
-          </nav>
-          <div className="library-group-heading">
-            <strong>グループ</strong>
+        <aside
+          className="library-sidebar"
+          ref={sidebar}
+          popover={narrow ? 'auto' : undefined}
+          aria-label={t('images.navigation')}
+          onKeyDown={(e) => {
+            if (narrow && e.key === 'Escape' && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              e.stopPropagation();
+              setDrawer(false);
+              navigationButton.current?.focus({ preventScroll: true });
+            }
+          }}
+          onToggle={(e) => {
+            if (e.newState === 'closed') setDrawer(false);
+          }}
+        >
+          <div className="library-section-heading">
+            <strong>{t('images.folder')}</strong>
             <button
-              aria-label="グループを並べ替え"
-              disabled={!c.canOrder || c.busy}
-              onClick={() => dialog('order')}
+              type="button"
+              className="library-icon-button"
+              title={t('images.createFolder')}
+              aria-label={t('images.createFolder')}
+              disabled={c.busy}
+              onClick={() => dialog('folder-create')}
             >
-              並べ替え
+              ＋
             </button>
           </div>
-          <nav>
-            {c.groups.slice(2).map((g) => (
-              <div className="library-group-row" key={g.id}>
-                <button
-                  data-gallery-group={g.id}
-                  data-testid="library-group-target"
-                  disabled={c.busy}
-                  aria-current={g.id === c.group ? 'page' : undefined}
-                  onClick={() => run({ command: 'group', groupId: g.id })}
-                >
-                  <span>{g.title}</span>
-                  <small>{g.count}</small>
-                </button>
-                <button
-                  id={`library-group-menu-trigger-${g.id}`}
-                  aria-label={`${g.title}の操作`}
-                  aria-haspopup="menu"
-                  aria-expanded={menu === g.id}
-                  disabled={c.busy}
-                  onClick={(e) => {
-                    menuButton.current = e.currentTarget;
-                    setMenu(menu === g.id ? '' : g.id);
-                  }}
-                >
-                  …
-                </button>
-                {menu === g.id && (
-                  <div
-                    className="library-group-menu"
-                    ref={menuPopup}
-                    popover="manual"
-                    role="menu"
-                    aria-labelledby={`library-group-menu-trigger-${g.id}`}
-                    onBlur={(e) => {
-                      if (
-                        !e.currentTarget.contains(e.relatedTarget as Node) &&
-                        e.relatedTarget !== menuButton.current
-                      )
-                        setMenu('');
-                    }}
-                    onKeyDown={(e) => {
-                      if (
-                        e.nativeEvent.isComposing ||
-                        e.altKey ||
-                        e.ctrlKey ||
-                        e.metaKey ||
-                        e.shiftKey
-                      )
-                        return;
-                      const buttons = [
-                        ...e.currentTarget.querySelectorAll<HTMLButtonElement>('button'),
-                      ];
-                      const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
-                      const index =
-                        e.key === 'Home'
-                          ? 0
-                          : e.key === 'End'
-                            ? buttons.length - 1
-                            : e.key === 'ArrowDown'
-                              ? (current + 1) % buttons.length
-                              : e.key === 'ArrowUp'
-                                ? (current + buttons.length - 1) % buttons.length
-                                : -1;
-                      if (index >= 0) {
-                        e.preventDefault();
-                        buttons[index].focus();
-                      }
-                    }}
-                  >
-                    <button role="menuitem" onClick={() => dialog('order-images', g.id)}>
-                      画像を並べ替え
-                    </button>
-                    <button role="menuitem" onClick={() => dialog('rename', g.id)}>
-                      名前を変更
-                    </button>
-                    <button role="menuitem" onClick={() => dialog('delete', g.id)}>
-                      グループを削除
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+          <nav aria-label={t('images.folder')}>
+            <div className="library-nav-row">
+              <button
+                type="button"
+                disabled={c.busy}
+                aria-current={c.folder === '*' ? 'page' : undefined}
+                onClick={() => navigate({ command: 'folder', folder: '*' })}
+              >
+                <Icon name="folder" size={15} />
+                <span>{t('images.allFolders')}</span>
+              </button>
+            </div>
+            {folderRow('')}
           </nav>
-          <button
+          <div className="library-section-heading">
+            <strong>{t('images.groups')}</strong>
+            <button type="button" disabled={!c.canOrder || c.busy} onClick={() => dialog('order')}>
+              {t('images.order')}
+            </button>
+          </div>
+          <nav aria-label={t('images.groups')}>
+            {c.groups.slice(0, 2).map((g) => groupRow(g))}
+            {buckets.map((bucket) =>
+              bucket.prefix ? (
+                <div className="library-prefix" key={bucket.prefix}>
+                  <button
+                    type="button"
+                    className="library-prefix-toggle"
+                    aria-expanded={!layout.collapsedGroups.includes(bucket.prefix)}
+                    onClick={() => toggle('collapsedGroups', bucket.prefix)}
+                  >
+                    <Icon name="chevron" size={12} />
+                    <span>{bucket.prefix}</span>
+                    <small>{bucket.groups.length}</small>
+                  </button>
+                  {!layout.collapsedGroups.includes(bucket.prefix) && (
+                    <div className="library-prefix-children">
+                      {bucket.groups.map((g) =>
+                        groupRow(g, g.title.slice(g.title.indexOf(':') + 1).trim()),
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                groupRow(bucket.groups[0])
+              ),
+            )}
+          </nav>
+          <SettingsButton
             className="library-add-group"
+            aria-label={t('images.addGroup')}
             disabled={!c.canAddGroup || c.busy}
             onClick={() => dialog('add')}
           >
-            <span aria-hidden="true">＋</span>グループを追加
-          </button>
+            ＋ {t('images.addGroup')}
+          </SettingsButton>
         </aside>
-        <section className="library-content" aria-label="登録画像">
+        <div
+          className="library-splitter"
+          role="separator"
+          tabIndex={narrow ? -1 : 0}
+          aria-orientation="vertical"
+          aria-label={t('images.sidebarWidth')}
+          aria-valuemin={160}
+          aria-valuemax={480}
+          aria-valuenow={layout.sidebarWidth}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.currentTarget.focus();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            draggingSidebar.current = true;
+            e.currentTarget.dataset.original = String(layoutRef.current.sidebarWidth);
+          }}
+          onPointerMove={(e) => {
+            if (!draggingSidebar.current || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
+            const next = {
+              ...layoutRef.current,
+              sidebarWidth: Math.max(
+                160,
+                Math.min(
+                  480,
+                  Math.round(e.clientX - sidebar.current!.getBoundingClientRect().left),
+                ),
+              ),
+            };
+            layoutRef.current = next;
+            setLayout(next);
+          }}
+          onPointerUp={(e) => {
+            if (!draggingSidebar.current) return;
+            draggingSidebar.current = false;
+            e.currentTarget.releasePointerCapture(e.pointerId);
+            saveLayout(layoutRef.current);
+          }}
+          onPointerCancel={(e) => {
+            draggingSidebar.current = false;
+            const next = {
+              ...layoutRef.current,
+              sidebarWidth: Number(e.currentTarget.dataset.original) || 220,
+            };
+            layoutRef.current = next;
+            setLayout(next);
+          }}
+          onLostPointerCapture={(e) => {
+            if (!draggingSidebar.current) return;
+            draggingSidebar.current = false;
+            const next = {
+              ...layoutRef.current,
+              sidebarWidth: Number(e.currentTarget.dataset.original) || 220,
+            };
+            layoutRef.current = next;
+            setLayout(next);
+          }}
+          onKeyDown={(e) => {
+            const values: Record<string, number> = {
+              ArrowLeft: layoutRef.current.sidebarWidth - 8,
+              ArrowRight: layoutRef.current.sidebarWidth + 8,
+              Home: 160,
+              End: 480,
+            };
+            if (values[e.key] !== undefined) {
+              e.preventDefault();
+              saveLayout({
+                ...layoutRef.current,
+                sidebarWidth: Math.max(160, Math.min(480, values[e.key])),
+              });
+            }
+          }}
+        />
+        <section
+          className="library-content"
+          aria-label={t('images.registeredImages')}
+          onPointerOver={(e) => {
+            const card = (e.target as Element).closest<HTMLElement>('[data-image-id]');
+            if (card) setFocusedFile(card.title);
+          }}
+          onPointerLeave={() => {
+            const card = document.activeElement?.closest<HTMLElement>('[data-image-id]');
+            setFocusedFile(card?.title ?? '');
+          }}
+          onFocus={(e) => {
+            const card = (e.target as Element).closest<HTMLElement>('[data-image-id]');
+            setFocusedFile(card?.title ?? '');
+          }}
+        >
           <div className="library-scroll" ref={scroll}>
             <div className="library-filter-panel" ref={filters}>
-              <div className="library-mobile-groups">
-                <label>
-                  グループ
-                  <FilterSelect
-                    aria-label="グループ"
-                    value={c.group}
-                    onChange={(e) => run({ command: 'group', groupId: e.target.value })}
-                  >
-                    {c.groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.title} ({g.count})
-                      </option>
-                    ))}
-                  </FilterSelect>
-                </label>
-                <details>
-                  <summary>グループの管理</summary>
-                  <button disabled={!c.canAddGroup || c.busy} onClick={() => dialog('add')}>
-                    追加
-                  </button>
+              <div className="library-location">
+                {narrow && (
                   <button
-                    disabled={!normalGroup || c.busy}
-                    onClick={() => dialog('rename', c.group)}
+                    type="button"
+                    className="library-navigation-button"
+                    ref={navigationButton}
+                    aria-expanded={drawer}
+                    aria-haspopup="true"
+                    onClick={() => setDrawer(!drawer)}
                   >
-                    名前を変更
+                    {t('images.navigation')}
                   </button>
+                )}
+                <nav className="library-breadcrumb" aria-label={t('images.location')}>
                   <button
-                    disabled={!normalGroup || c.busy}
-                    onClick={() => dialog('delete', c.group)}
+                    type="button"
+                    onClick={() => run({ command: 'folder', folder: c.folder === '*' ? '*' : '' })}
                   >
-                    削除
+                    {t(c.folder === '*' ? 'images.allFolders' : 'images.rootFolder')}
                   </button>
-                  <button disabled={!c.canOrder || c.busy} onClick={() => dialog('order')}>
-                    並べ替え
-                  </button>
-                  <button
-                    disabled={!normalGroup || c.busy}
-                    onClick={() => dialog('order-images', c.group)}
-                  >
-                    画像を並べ替え
-                  </button>
-                </details>
+                  {c.folder !== '*' &&
+                    c.folder
+                      .split('/')
+                      .filter(Boolean)
+                      .map((part, i, parts) => (
+                        <span key={i}>
+                          <Icon name="chevron" size={12} />
+                          <button
+                            type="button"
+                            title={parts.slice(0, i + 1).join('/')}
+                            onClick={() =>
+                              run({ command: 'folder', folder: parts.slice(0, i + 1).join('/') })
+                            }
+                          >
+                            {part}
+                          </button>
+                        </span>
+                      ))}
+                </nav>
+                <SettingsButton
+                  icon
+                  disabled={c.busy}
+                  title={t('images.openFolder')}
+                  aria-label={t('images.openFolder')}
+                  onClick={() => run({ command: 'open-folder' })}
+                >
+                  <Icon name="external-link" size={16} />
+                </SettingsButton>
+                <SettingsButton
+                  icon
+                  disabled={c.busy}
+                  title={t('images.reload')}
+                  aria-label={t('images.reload')}
+                  onClick={() => run({ command: 'reload' })}
+                >
+                  <Icon name="refresh" size={16} />
+                </SettingsButton>
               </div>
               <div className="library-toolbar">
                 <label className="library-search">
                   <Icon name="search" size={16} />
                   <input
                     type="search"
-                    aria-label="ファイル名で検索"
-                    placeholder="ファイル名で検索"
+                    aria-label={t('images.search')}
+                    placeholder={t('images.search')}
                     value={query}
-                    maxLength={260}
+                    disabled={c.busy}
                     onChange={(e) => {
                       setQuery(e.target.value);
                       if (!(e.nativeEvent as InputEvent).isComposing)
@@ -521,97 +935,144 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
               </div>
               <div className="library-summary">
                 <div>
-                  <strong>{current?.title}</strong>
-                  <span>{c.total}枚</span>
+                  <strong>{t('images.imageCount', { count: c.total })}</strong>
+                  {c.group !== 'all' && (
+                    <button
+                      className="library-filter-chip"
+                      title={t('images.clearGroup')}
+                      onClick={() => run({ command: 'group', groupId: 'all' })}
+                    >
+                      {currentGroup?.title}
+                      <Icon name="close" size={12} />
+                    </button>
+                  )}
                 </div>
                 <button
+                  type="button"
                   disabled={!c.total || c.busy}
                   onClick={() => run({ command: 'select-all' })}
                 >
-                  {c.query ? '検索結果を' : ''}すべて選択（{c.total}枚）
+                  {t('images.selectAll', { count: c.total })}
                 </button>
               </div>
-              <div className="library-selection" aria-live="polite">
+              <div className="library-selection">
+                <span aria-live="polite">{t('images.selectedCount', { count: c.selected })}</span>
+                <SettingsButton
+                  disabled={!c.selected || c.busy}
+                  onClick={() => dialog('batch-add')}
+                >
+                  {t('images.addToGroup')}
+                </SettingsButton>
+                <SettingsButton
+                  disabled={!c.selected || c.busy}
+                  onClick={() => dialog('batch-remove', normalGroup ? c.group : undefined)}
+                >
+                  {t('images.removeFromGroup')}
+                </SettingsButton>
+                <SettingsButton
+                  disabled={!c.selected || c.busy}
+                  onClick={() => dialog('folder-move')}
+                >
+                  {t('images.moveShort')}
+                </SettingsButton>
+                <SettingsButton
+                  disabled={!c.selected || c.busy}
+                  aria-haspopup="menu"
+                  onClick={(e) => imageMenu(undefined, e.currentTarget)}
+                >
+                  {t('images.actions')} ▾
+                </SettingsButton>
                 {c.selected > 0 && (
-                  <>
-                    <span>{c.selected}枚を選択</span>
-                    <button
-                      disabled={c.busy}
-                      onClick={() => run({ command: 'dialog', kind: 'batch-add' })}
-                    >
-                      グループに追加
-                    </button>
-                    {normalGroup && (
-                      <button
-                        disabled={c.busy}
-                        onClick={() =>
-                          run({ command: 'dialog', kind: 'batch-remove', groupId: c.group })
-                        }
-                      >
-                        このグループから外す
-                      </button>
-                    )}
-                    <button disabled={c.busy} onClick={() => run({ command: 'clear' })}>
-                      選択を解除
-                    </button>
-                  </>
-                )}
-              </div>
-              <div className="library-status" role="status">
-                {c.busy ? '画像を追加しています…' : c.message}
-                {c.sizeError && (
-                  <div role="alert">
-                    {c.sizeError}
-                    <button onClick={() => saveSize(width)}>保存を再試行</button>
-                  </div>
-                )}
-                {(error || c.error) && (
-                  <div role="alert">
-                    {error || c.error}
-                    <button
-                      disabled={c.busy}
-                      onClick={() =>
-                        run({
-                          command: !error && c.canRetryIconImport ? 'retry-import' : 'reload',
-                        })
-                      }
-                    >
-                      {!error && c.canRetryIconImport ? t('images.importRetry') : '再取得'}
-                    </button>
-                    {c.canRetryMembership && (
-                      <button onClick={() => run({ command: 'retry-membership' })}>
-                        グループへの追加を再試行
-                      </button>
-                    )}
-                  </div>
+                  <button type="button" disabled={c.busy} onClick={() => run({ command: 'clear' })}>
+                    {t('images.clearSelection')}
+                  </button>
                 )}
               </div>
             </div>
-            <div ref={grid} />
+            <div
+              className="library-status"
+              role="status"
+              hidden={!c.busy && !c.message && !c.sizeError && !c.error && !error}
+            >
+              {c.busy ? t('images.working') : c.message}
+              {c.sizeError && (
+                <div role="alert">
+                  {c.sizeError}
+                  <button
+                    onClick={() => {
+                      saveSize(width);
+                      saveLayout(layoutRef.current);
+                    }}
+                  >
+                    {t('images.retrySave')}
+                  </button>
+                </div>
+              )}
+              {(error || c.error) && (
+                <div role="alert">
+                  {error || c.error}
+                  <button
+                    disabled={c.busy}
+                    onClick={() =>
+                      run({ command: !error && c.canRetryIconImport ? 'retry-import' : 'reload' })
+                    }
+                  >
+                    {t(!error && c.canRetryIconImport ? 'images.importRetry' : 'images.reload')}
+                  </button>
+                  {c.canRetryMembership && (
+                    <button onClick={() => run({ command: 'retry-membership' })}>
+                      {t('images.retryMembership')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="library-grid-pad">
+              <div ref={grid} />
+            </div>
             {!c.total && (
               <div className="library-empty-actions">
                 {c.query ? (
-                  <button onClick={() => run({ command: 'query', value: '' })}>検索を解除</button>
+                  <button onClick={() => run({ command: 'query', value: '' })}>
+                    {t('images.clearSearch')}
+                  </button>
                 ) : (
-                  <>
-                    <button disabled={c.busy} onClick={() => run({ command: 'add' })}>
-                      画像を追加
-                    </button>
-                    {normalGroup && (
-                      <p>登録済みの画像は「すべて」から選び、グループに追加できます。</p>
-                    )}
-                  </>
+                  <button disabled={c.busy} onClick={() => run({ command: 'add' })}>
+                    {t('images.addImages')}
+                  </button>
                 )}
               </div>
             )}
-            {!!c.remaining && (
-              <button className="library-more" onClick={() => run({ command: 'more' })}>
-                さらに表示（残り{c.remaining}枚）
-              </button>
-            )}
+            <div ref={sentinel} className="library-load-more" aria-live="polite">
+              {moreError ? (
+                <button onClick={() => more(true)}>{t('images.retryMore')}</button>
+              ) : c.remaining > 0 ? (
+                <button disabled={morePending || c.busy} onClick={() => more(true)}>
+                  {t(morePending ? 'images.loadingMore' : 'images.more', { count: c.remaining })}
+                </button>
+              ) : c.total > 0 ? (
+                t('images.loadedAll', { count: c.total })
+              ) : (
+                ''
+              )}
+            </div>
           </div>
+          {width < 120 && (
+            <div className="library-file-info" title={focusedFile}>
+              {focusedFile || t('images.imageCount', { count: c.total })}
+            </div>
+          )}
         </section>
       </div>
+      {menu && (
+        <ImageLibraryMenu
+          title={menuTitle}
+          opener={menu.opener}
+          point={menu.point}
+          items={menuItems}
+          close={() => setMenu(null)}
+        />
+      )}
     </section>
   );
 }

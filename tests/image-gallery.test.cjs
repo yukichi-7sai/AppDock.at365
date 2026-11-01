@@ -10,6 +10,42 @@ const {
 const { ImageLibraryDialogs } = require('../out/main/main/core/image-library-dialogs');
 const { editImageLibrary } = require('../out/main/shared/registered-images');
 const root = path.join(__dirname, '../.artifacts/gallery-unit-' + Date.now());
+
+test('library compact size and navigation layout persist independently from picker size', () => {
+  const file = path.join(root, 'layout.json');
+  const store = new GalleryViewStateStore(file);
+  store.save('picker', 200);
+  store.save('library', 40);
+  const layout = { sidebarWidth: 328, collapsedGroups: ['Lucide'], collapsedFolders: ['icons'] };
+  store.saveLayout(layout);
+  const reopened = new GalleryViewStateStore(file);
+  assert.equal(reopened.get('library'), 40);
+  assert.equal(reopened.get('picker'), 200);
+  assert.deepEqual(reopened.layout(), layout);
+  assert.throws(() => reopened.save('picker', 40));
+  assert.throws(() => reopened.saveLayout({ ...layout, sidebarWidth: 0 }));
+  assert.deepEqual(new GalleryViewStateStore(file).layout(), layout);
+});
+
+test('card/dialog targets include unrendered selection and right-clicking an unselected card replaces it', async () => {
+  const f = fixture(),
+    items = f.session.snapshot().content.items;
+  await f.act('select-all');
+  const pending = f.act('dialog', { kind: 'rename-images', imageId: items[0].id });
+  assert.equal(f.dialog.images.length, 130);
+  assert.equal(f.dialog.entries.length, 130);
+  await f.dialogs.complete(f.dialog.id);
+  await pending;
+  await f.act('clear');
+  await f.act('select', { imageId: items[0].id, selected: true });
+  await f.act('select-target', { imageId: items[1].id });
+  const model = f.session.snapshot().content;
+  assert.equal(model.selected, 1);
+  assert.equal(model.items[1].selected, true);
+  assert.equal(model.items[0].selected, false);
+  await assert.rejects(f.act('select-target', { imageId: 'stale' }));
+  f.session.dispose();
+});
 test('import progress updates one modal, rejects edits, cancels once and closes only after completion', async () => {
   const requests = [];
   let aborted = 0;

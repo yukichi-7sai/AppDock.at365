@@ -1,5 +1,5 @@
 import { hostText } from '../../shared/i18n';
-import { dialog, shell, type BrowserWindow } from 'electron';
+import { clipboard, ClipboardItem, dialog, shell, type BrowserWindow } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { AssignedImages } from './assigned-images';
@@ -21,7 +21,11 @@ import { objectFieldValue } from '../../shared/object-list';
 import { imageDirectory } from './panel-images';
 import { ImageLibrarySettings } from './image-library-settings';
 
-import { decodeRegisteredImage } from './registered-image-decoder';
+import { decodeRegisteredImage, registeredImageClipboardPng } from './registered-image-decoder';
+import { copyImageFiles } from './image-file-clipboard';
+import { renameImageFiles } from './image-file-rename';
+import type { ImageLibraryFileAction } from '../../shared/image-library-page';
+import type { RegisteredImageEntry } from '../../shared/registered-images';
 export { decodeRegisteredImage } from './registered-image-decoder';
 
 export function ownsImage(
@@ -47,6 +51,7 @@ export function ownsImage(
 export class ImageLibraryHost {
   readonly configuration: ImageLibrarySettings;
   private picking = false;
+  private filesBusy = false;
   private generated = new Map<string, Set<string>>();
   private pickerAlive?: () => boolean;
   private pending?: {
@@ -84,7 +89,7 @@ export class ImageLibraryHost {
     return result;
   }
   reconcileGroups() {
-    if (this.images.error) return;
+    if (this.images.error || this.filesBusy) return;
     try {
       this.options.writable();
     } catch {
@@ -117,6 +122,7 @@ export class ImageLibraryHost {
     folder: string,
     destination?: string,
     images: RegisteredImageRef[] = [],
+    entries?: RegisteredImageEntry[],
   ) {
     this.options.writable();
     if (!imageFolder(folder) || (destination !== undefined && !imageFolder(destination)))
@@ -155,26 +161,19 @@ export class ImageLibraryHost {
         if (!folder) throw Error(hostText('images.folderInvalid'));
         await fs.rmdir(safeDirectory(root, folder));
       } else if (operation === 'move-images') {
-        const targetRoot = safeDirectory(root, folder);
-        for (const ref of images) {
-          if (!imageReference(ref) || assignedImage(ref.file))
-            throw Error(hostText('images.folderInvalid'));
-          const saved = await this.images.read(ref);
-          this.options.writable();
-          const source = imageFile(root, ref.file),
-            target = path.join(targetRoot, imageBasename(ref.file));
-          if (source.toLowerCase() === target.toLowerCase()) continue;
-          safeDirectory(root, imageParent(ref.file));
-          await fs.link(source, target);
-          try {
-            if (!(await fs.readFile(source)).equals(saved.bytes))
-              throw Error(hostText('images.changed'));
-            await fs.unlink(source);
-          } catch (error) {
-            await fs.unlink(target);
-            throw error;
-          }
-        }
+        safeDirectory(root, folder);
+        const confirmed =
+          entries ??
+          images.map((ref) => {
+            const entry = this.images.entry(ref);
+            if (!entry) throw Error(hostText('images.changed'));
+            return entry;
+          });
+        await this.rename(
+          confirmed,
+          confirmed.map((entry) => imageBasename(entry.ref.file)),
+          folder,
+        );
       } else throw Error(hostText('images.folderInvalid'));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOTEMPTY')
@@ -267,6 +266,98 @@ export class ImageLibraryHost {
         };
       },
     });
+  }
+  async removeMany(entries: RegisteredImageEntry[]) {
+    if (!entries.length) throw Error(hostText('images.selectImages'));
+    // Preflight the whole confirmation before moving the first file to the recycle bin.
+    for (const entry of entries) {
+      if (this.inUse(entry.ref)) throw Error(hostText('services.imageLibraryHost.inUse'));
+      await this.images.read(entry.ref, entry.generation ?? '');
+    }
+    let removed = 0;
+    try {
+      for (const entry of entries) {
+        await this.remove(entry);
+        removed++;
+      }
+    } catch (e) {
+      if (removed)
+        throw Error(
+          hostText('images.deletePartial', { count: removed, error: (e as Error).message }),
+        );
+      throw e;
+    }
+  }
+  async rename(entries: RegisteredImageEntry[], names: string[], destinationFolder?: string) {
+    if (this.filesBusy) throw Error(hostText('services.imageLibraryPage.busy'));
+    this.filesBusy = true;
+    try {
+      return await renameImageFiles(
+        this.images,
+        entries,
+        names,
+        (mapping) => {
+          this.options.writable();
+          const check = () => {
+            if (entries.some((entry) => this.inUse(entry.ref)))
+              throw Error(hostText('services.imageLibraryHost.inUse'));
+          };
+          check();
+          const next = this.configuration.snapshot();
+          for (const group of next.groups)
+            group.images = group.images.map((ref) => mapping.get(imageKey(ref)) ?? ref);
+          const plan = this.configuration.plan(next, this.configuration.revision);
+          return () => plan.commit(check);
+        },
+        destinationFolder,
+      );
+    } finally {
+      this.filesBusy = false;
+    }
+  }
+  async openFolder(folder: string) {
+    let directory: string;
+    try {
+      directory = safeDirectory(this.images.directory, folder);
+    } catch (e) {
+      if (folder || (e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+      this.options.writable();
+      directory = safeDirectory(this.images.directory, '', true);
+    }
+    const error = await shell.openPath(directory);
+    if (error) throw Error(hostText('images.openFolderFailed'));
+  }
+  async fileAction(operation: ImageLibraryFileAction, entries: RegisteredImageEntry[]) {
+    if (!entries.length) throw Error(hostText('images.selectImages'));
+    if (!['copy-files', 'copy-paths', 'copy-image', 'reveal'].includes(operation))
+      throw Error('Invalid image operation');
+    if (operation === 'copy-image' && entries.length !== 1)
+      throw Error(hostText('images.copyImageSingle'));
+    const files: string[] = [];
+    for (const entry of entries) {
+      if (operation !== 'copy-paths') await this.images.read(entry.ref, entry.generation ?? '');
+      files.push(imageFile(this.images.directory, entry.ref.file));
+    }
+    if (operation === 'copy-paths') await clipboard.writeText(files.join('\r\n'));
+    else if (operation === 'copy-files') await copyImageFiles(files);
+    else if (operation === 'reveal') {
+      // One Explorer window for each containing folder, even for large selections.
+      const folders = new Set<string>();
+      for (const file of files) {
+        const folder = path.dirname(file).toLowerCase();
+        if (!folders.has(folder)) {
+          folders.add(folder);
+          shell.showItemInFolder(file);
+        }
+      }
+    } else {
+      const saved = await this.images.read(entries[0].ref, entries[0].generation ?? '');
+      const png = await registeredImageClipboardPng(saved.bytes);
+      await this.images.read(entries[0].ref, entries[0].generation ?? '');
+      await clipboard.write([
+        new ClipboardItem({ 'image/png': new Blob([new Uint8Array(png)], { type: 'image/png' }) }),
+      ]);
+    }
   }
   async registerMany(folder = '') {
     if (!imageFolder(folder)) throw Error(hostText('images.folderInvalid'));

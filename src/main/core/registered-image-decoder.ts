@@ -30,7 +30,7 @@ const browserDecode = `(async ({source,edge,svg}) => {
   if (!width || !height || width > 8192 || height > 8192 || width * height > 16777216)
     throw new Error('Invalid dimensions');
   const preview = document.createElement('canvas');
-  const scale = edge === 64 ? 64 / Math.max(width, height) : (svg ? edge / Math.max(width, height) : Math.min(1, edge / Math.max(width, height)));
+  const scale = edge === 0 ? 1 : edge === 64 ? 64 / Math.max(width, height) : (svg ? edge / Math.max(width, height) : Math.min(1, edge / Math.max(width, height)));
   preview.width = Math.max(1, Math.round(width * scale));
   preview.height = Math.max(1, Math.round(height * scale));
   preview.getContext('2d').drawImage(image, 0, 0, preview.width, preview.height);
@@ -98,6 +98,20 @@ function decodeWebP(bytes: Buffer, edge = 64, svg = false): Promise<DecodedImage
   return task;
 }
 
+export async function registeredImageClipboardPng(bytes: Buffer): Promise<Buffer> {
+  const svg = svgSource(bytes.toString('utf8'));
+  if (svg) validateSvg(bytes.toString('utf8'));
+  if (
+    svg ||
+    (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP')
+  ) {
+    const decoded = await decodeWebP(bytes, 0, svg);
+    return Buffer.from(decoded.thumbnail.slice(decoded.thumbnail.indexOf(',') + 1), 'base64');
+  }
+  // Validate with the same decoder, then retain the original raster dimensions.
+  await decodeRegisteredImage(bytes);
+  return nativeImage.createFromBuffer(bytes).toPNG();
+}
 export async function decodeRegisteredImage(bytes: Buffer, edge = 64): Promise<DecodedImage> {
   if (![64, 512, 1024, 2048].includes(edge))
     throw Error(hostText('services.registeredImageDecoder.invalidSize'));

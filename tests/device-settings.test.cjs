@@ -37,6 +37,29 @@ function fixture(t, name = 'PC-A', collections = []) {
 }
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
+test('gallery compact size and navigation layout use the device store and survive restart without shared writes', (t) => {
+  const { store, base, file } = fixture(t);
+  const { GalleryViewStateStore } = require('../out/main/main/core/gallery-view-state');
+  const before = fs.readFileSync(file);
+  const gallery = new GalleryViewStateStore(store.uiStateStorage('gallery'));
+  gallery.save('library', 40);
+  gallery.saveLayout({
+    sidebarWidth: 320,
+    collapsedGroups: ['Lucide'],
+    collapsedFolders: ['icons'],
+  });
+  gallery.save('picker', 200);
+  const reopened = new DeviceSettingsStore(file, path.join(base, 'reopened'), 'PC-A');
+  t.after(() => reopened.close());
+  reopened.load();
+  const saved = new GalleryViewStateStore(reopened.uiStateStorage('gallery'));
+  assert.equal(saved.get('library'), 40);
+  assert.equal(saved.get('picker'), 200);
+  assert.equal(saved.layout().sidebarWidth, 320);
+  assert.deepEqual(saved.layout().collapsedGroups, ['Lucide']);
+  assert.deepEqual(fs.readFileSync(file), before);
+});
+
 test('saving a new ribbon image keeps an immutable copy across source deletion and settings restart', (t) => {
   const { store, base, file } = fixture(t);
   const images = path.join(base, 'assets/images');

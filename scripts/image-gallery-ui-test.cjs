@@ -76,7 +76,10 @@ settings.imageLibrary = {
     { id: 'missing', name: '読取待ち', images: [{ file: 'missing.png' }] },
   ],
 };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
@@ -287,12 +290,14 @@ async function selectedBorder(label) {
     assert.equal((await model()).content.selected, 1);
     assert.equal(await slider.evaluate((e) => document.activeElement === e), true);
     await slider.press('Home');
-    await until(async () => (await model()).content.cardWidth === 120, 'min saved');
+    await until(async () => (await model()).content.cardWidth === 40, 'min saved');
     assert.equal(hash(require('./test-settings.cjs').file(profile, 'settings.json')), settingsHash);
     assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
     await page.getByRole('button', { name: /すべて選択/ }).click();
     await until(async () => (await model()).content.selected === 77, 'all including unloaded');
-    await page.getByRole('button', { name: /さらに表示/ }).click();
+    await until(async () => (await model()).content.items.length === 77, 'automatic pagination');
+    for (let i = 0; i < 20; i++) await slider.press('ArrowRight');
+    await until(async () => (await model()).content.cardWidth === 120, 'cards restored');
     assert.equal((await model()).content.items.length, 77);
     await page.locator('.library-scroll').evaluate((e) => {
       e.scrollTop = 1300;
@@ -314,7 +319,7 @@ async function selectedBorder(label) {
     const anchor = (await model()).content.anchor;
     await slider.focus();
     await slider.press('ArrowRight');
-    await until(async () => (await model()).content.cardWidth === 140, 'resize');
+    await until(async () => (await model()).content.cardWidth === 124, 'resize');
     const anchorOffset = await page
       .locator(`[data-image-id="${anchor.id}"]`)
       .evaluate(
@@ -374,8 +379,8 @@ async function selectedBorder(label) {
       'membership',
     );
     await card('image-000.png')
-      .getByRole('button', { name: 'image-000.pngを拡大', exact: true })
-      .click();
+      .getByRole('button', { name: 'image-000.pngを選択', exact: true })
+      .dblclick();
     d = host.getByRole('dialog', { name: 'image-000.png', exact: true });
     await d.locator('img').waitFor();
     await until(() => d.evaluate((el) => getComputedStyle(el).opacity === '1'), 'preview prepared');
@@ -428,11 +433,11 @@ async function selectedBorder(label) {
     const photoGroup = (await model()).content.groups.find((g) => g.title === '写真');
     await action('group', { groupId: photoGroup.id });
     await page.getByRole('button', { name: /すべて選択/ }).click();
-    await page.getByRole('button', { name: 'このグループから外す' }).click();
+    await page.getByRole('button', { name: 'グループから外す', exact: true }).click();
     d = host.getByRole('dialog', { name: 'グループから外す', exact: true });
     await d.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.equal((await imageSnapshot()).groups.find((g) => g.id === 'photos').images.length, 3);
-    await page.getByRole('button', { name: 'このグループから外す' }).click();
+    await page.getByRole('button', { name: 'グループから外す', exact: true }).click();
     d = host.getByRole('dialog', { name: 'グループから外す', exact: true });
     await d.getByRole('button', { name: '外す', exact: true }).click();
     await until(
@@ -448,7 +453,7 @@ async function selectedBorder(label) {
     await card('image-000.png').waitFor();
     assert.deepEqual(
       await card('image-000.png').locator('.ad-gallery-actions button').allTextContents(),
-      ['グループ', '削除'],
+      ['グループ', '削除', 'その他の操作'],
     );
     await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像を削除', exact: true });
@@ -571,7 +576,7 @@ async function selectedBorder(label) {
       async () => !(await page.locator('.library-sidebar').isVisible()),
       'responsive groups',
     );
-    assert(await page.locator('.library-mobile-groups').isVisible());
+    assert(await page.locator('.library-navigation-button').isVisible());
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: path.join(profile, 'narrow.png') });
     checks.push('light/dark and narrow responsive layout, 16:10 images and aligned card footers');
@@ -652,7 +657,7 @@ async function selectedBorder(label) {
       (await model()).content.items.map((i) => i.title),
       orderedGroups
         .find((g) => g.name === 'ドラッグ検証')
-        .images.slice(0, 64)
+        .images.slice(0, (await model()).content.items.length)
         .map((i) => i.file),
     );
     checks.push('saved group image order survives process restart and renders in that order');

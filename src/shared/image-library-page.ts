@@ -1,4 +1,5 @@
 import type { GalleryAnchor, GalleryItem } from './image-gallery';
+import { gallerySize, libraryGallerySize, validGalleryWidth } from './image-gallery';
 import type {
   ImageGroup,
   ImageLibraryEdit,
@@ -28,6 +29,7 @@ export type ImageLibraryDialogKind =
   | 'batch-add'
   | 'batch-remove'
   | 'preview'
+  | 'rename-images'
   | 'folder-create'
   | 'folder-rename'
   | 'folder-delete'
@@ -38,6 +40,7 @@ export type ImageLibraryDialogKind =
 export type ImageLibraryDialogOperation =
   | ImageLibraryEdit
   | { kind: 'delete-image' }
+  | { kind: 'rename-images'; names: string[] }
   | { kind: 'folder'; destination: string }
   | { kind: 'import-set'; setId: string };
 export interface ImageLibraryDialogRequest {
@@ -47,12 +50,72 @@ export interface ImageLibraryDialogRequest {
   images: RegisteredImageRef[];
   groupId?: string;
   entry?: RegisteredImageEntry;
+  entries?: RegisteredImageEntry[];
   deleteBlocked?: boolean;
   folder?: string;
   folders?: string[];
   iconSets?: { id: string; name: string }[];
   importing?: IconImportProgress;
   cancelling?: boolean;
+}
+export interface ImageLibraryLayout {
+  sidebarWidth: number;
+  collapsedGroups: string[];
+  collapsedFolders: string[];
+}
+export const defaultImageLibraryLayout: ImageLibraryLayout = {
+  sidebarWidth: 220,
+  collapsedGroups: [],
+  collapsedFolders: [],
+};
+export function validImageLibraryLayout(value: unknown): value is ImageLibraryLayout {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as ImageLibraryLayout;
+  return (
+    Object.keys(v).every((k) =>
+      ['sidebarWidth', 'collapsedGroups', 'collapsedFolders'].includes(k),
+    ) &&
+    Number.isInteger(v.sidebarWidth) &&
+    v.sidebarWidth >= 160 &&
+    v.sidebarWidth <= 480 &&
+    [v.collapsedGroups, v.collapsedFolders].every(
+      (a) =>
+        Array.isArray(a) && a.every((s) => typeof s === 'string') && new Set(a).size === a.length,
+    )
+  );
+}
+export type ImageLibraryFileAction = 'copy-files' | 'copy-paths' | 'copy-image' | 'reveal';
+export interface ImageGalleryViewState {
+  schemaVersion: 1;
+  library?: { cardWidth: number; layout?: ImageLibraryLayout };
+  picker?: { cardWidth: number };
+}
+export function validImageGalleryViewState(value: unknown): value is ImageGalleryViewState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as ImageGalleryViewState;
+  return (
+    v.schemaVersion === 1 &&
+    Object.keys(v).every((key) => ['schemaVersion', 'library', 'picker'].includes(key)) &&
+    (['library', 'picker'] as const).every((surface) => {
+      const item = v[surface];
+      return (
+        item === undefined ||
+        (!!item &&
+          typeof item === 'object' &&
+          !Array.isArray(item) &&
+          Object.keys(item).every(
+            (key) => key === 'cardWidth' || (surface === 'library' && key === 'layout'),
+          ) &&
+          validGalleryWidth(
+            item.cardWidth,
+            surface === 'library' ? libraryGallerySize : gallerySize,
+          ) &&
+          (surface !== 'library' ||
+            v.library?.layout === undefined ||
+            validImageLibraryLayout(v.library.layout)))
+      );
+    })
+  );
 }
 export interface ImageLibraryDialogApi {
   onRequest(callback: (request: ImageLibraryDialogRequest | null) => void): () => void;
@@ -77,6 +140,7 @@ export interface ImageLibraryPageModel {
     total: number;
     selected: number;
     cardWidth: number;
+    layout: ImageLibraryLayout;
     sizeError: string;
     error: string;
     message: string;
@@ -107,6 +171,10 @@ export type ImageLibraryPageAction = {
     }
   | { command: 'group'; groupId: string }
   | { command: 'select'; imageId: string; selected: boolean }
+  | { command: 'select-target'; imageId: string }
+  | { command: 'file-action'; operation: ImageLibraryFileAction; imageId?: string }
+  | { command: 'open-folder'; folder?: string }
+  | { command: 'layout'; value: ImageLibraryLayout }
   | { command: 'select-range'; imageIds: string[]; additive: boolean }
   | { command: 'drag-start'; imageId: string }
   | { command: 'drop'; token: string; groupId: string }
@@ -114,6 +182,12 @@ export type ImageLibraryPageAction = {
   | { command: 'select-all' | 'clear' | 'more' | 'reload' | 'add' | 'retry-membership' }
   | { command: 'width'; value: number; commit: boolean }
   | { command: 'anchor'; anchor?: GalleryAnchor }
-  | { command: 'dialog'; kind: ImageLibraryDialogKind; imageId?: string; groupId?: string }
+  | {
+      command: 'dialog';
+      kind: ImageLibraryDialogKind;
+      imageId?: string;
+      groupId?: string;
+      folder?: string;
+    }
   | { command: 'image'; assetId: string; edge: number }
 );

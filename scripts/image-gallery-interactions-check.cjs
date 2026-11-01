@@ -75,7 +75,8 @@ exports.checkGalleryInteractions = async ({
   for (const region of ['.library-sidebar', '.library-selection', '.library-layout']) {
     const r = await page.locator(region).boundingBox();
     const side = await page.locator('.library-sidebar').boundingBox();
-    const x = region === '.library-layout' ? side.x + side.width + 8 : r.x + r.width - 4;
+    const usableWidth = await page.locator(region).evaluate((el) => el.clientWidth);
+    const x = region === '.library-layout' ? side.x + side.width + 8 : r.x + usableWidth - 4;
     await page.mouse.click(x, r.y + r.height - 6);
     await until(async () => (await count()) === 0, `${region} background clears selection`);
     await range(0, 1);
@@ -91,13 +92,15 @@ exports.checkGalleryInteractions = async ({
   assert.equal(focus.outer, 'solid');
   assert(parseFloat(focus.inset) < 0);
   assert.equal(focus.input, 'none');
-  for (const region of ['.library-sidebar', '.library-status']) {
+  for (const region of ['.library-sidebar', '.library-filter-panel']) {
     await action('clear');
     const start = await page.locator(region).boundingBox();
     const end = await box(1);
     const first = await box(0);
     await page.mouse.move(
-      region === '.library-sidebar' ? start.x + start.width - 4 : first.x - 2,
+      region === '.library-sidebar'
+        ? start.x + (await page.locator(region).evaluate((el) => el.clientWidth)) - 4
+        : first.x - 2,
       region === '.library-sidebar' ? first.y + 3 : start.y + start.height - 2,
     );
     await page.mouse.down();
@@ -234,7 +237,7 @@ exports.checkGalleryInteractions = async ({
   assert.equal((await model()).content.message, '', 'group changes dismiss success feedback');
   await action('select-all');
   const beforeCancel = await count();
-  const sidebar = page.getByRole('complementary', { name: '画像グループ' });
+  const sidebar = page.getByRole('complementary', { name: 'フォルダーとグループ' });
   await sidebar.evaluate((el) => {
     el.style.maxHeight = '170px';
   });
@@ -264,7 +267,7 @@ exports.checkGalleryInteractions = async ({
 
   const slider = page.getByRole('slider', { name: '画像サイズ' });
   for (const [edge, expected] of [
-    ['left', 120],
+    ['left', 40],
     ['right', 360],
   ]) {
     const r = await slider.boundingBox();
@@ -281,6 +284,10 @@ exports.checkGalleryInteractions = async ({
   }
   await action('width', { value: 120, commit: true });
   await action('clear');
+  await until(async () => (await slider.inputValue()) === '120', 'range size rendered');
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   const scroll = page.locator('.library-scroll');
   await scroll.evaluate((e) => {
     e.scrollTop = 0;
@@ -288,17 +295,32 @@ exports.checkGalleryInteractions = async ({
   a = await box(0);
   const viewport = await scroll.boundingBox();
   const rangeSidebar = await sidebar.boundingBox();
-  await page.mouse.move(rangeSidebar.x + rangeSidebar.width - 4, a.y + 3);
+  await page.mouse.move(
+    rangeSidebar.x + (await sidebar.evaluate((el) => el.clientWidth)) - 4,
+    a.y + 3,
+  );
   await page.mouse.down();
   await page.mouse.move(viewport.x + viewport.width - 24, viewport.y + viewport.height - 4, {
     steps: 8,
   });
   await until(async () => await scroll.evaluate((e) => e.scrollTop > 200), 'range autoscroll');
   await until(async () => (await model()).content.remaining === 0, 'range loads the next page');
-  await until(
-    async () => scroll.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight < 2),
-    'range reaches end',
-  );
+  try {
+    await until(
+      async () => scroll.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight < 2),
+      'range reaches end',
+    );
+  } catch (error) {
+    const state = await scroll.evaluate((e) => ({
+      top: e.scrollTop,
+      height: e.scrollHeight,
+      viewport: e.clientHeight,
+      focused: document.hasFocus(),
+      gesture: !!document.querySelector('.ad-gallery-gesturing'),
+      rectangle: !!document.querySelector('.ad-gallery-marquee'),
+    }));
+    throw Error(String(error) + ': ' + JSON.stringify(state));
+  }
   await page.mouse.up();
   await until(
     async () => (await count()) === total,

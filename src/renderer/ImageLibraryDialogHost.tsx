@@ -6,6 +6,8 @@ import type {
   ImageLibraryDialogOperation,
 } from '../shared/image-library-page';
 import { imageKey } from '../shared/registered-images';
+import { imageBasename, imageParent, imagePath } from '../shared/image-paths';
+import { SettingsButton } from './settings-ui/SettingsButton';
 import { SettingsDialog, SettingsModal } from './settings-ui/SettingsModal';
 import { SettingsInput } from './settings-ui/SettingsInput';
 import { SettingsOrderDialog } from './settings-ui/SettingsOrderDialog';
@@ -65,17 +67,32 @@ function Editor({
     r.groups.filter((g) => g.images.some((i) => imageKey(i) === imageKey(image))).map((g) => g.id);
   const [name, setName] = useState(current?.name ?? '');
   const [ids, setIds] = useState(r.images[0] ? before(r.images[0]) : []);
-  const [target, setTarget] = useState(r.groups[0]?.id ?? '');
+  const [target, setTarget] = useState(current?.id ?? r.groups[0]?.id ?? '');
+  const entries = r.entries ?? (r.entry ? [r.entry] : []);
+  const [previewIndex, setPreviewIndex] = useState(
+    Math.max(
+      0,
+      entries.findIndex((entry) => entry.ref.file === r.entry?.ref.file),
+    ),
+  );
+  const extensions = r.images.map((image) => image.file.slice(image.file.lastIndexOf('.')));
+  const [names, setNames] = useState(
+    r.images.map((image, i) => imageBasename(image.file).slice(0, -extensions[i].length)),
+  );
   const [error, setError] = useState('');
   const [folderPath, setFolderPath] = useState(
     r.kind === 'folder-create' && r.folder ? r.folder + '/' : (r.folder ?? ''),
   );
   const [setId, setSetId] = useState(r.iconSets?.[0]?.id ?? '');
+  const completed = useRef(false);
   const close = () => {
+    if (completed.current) return;
     void window.dock.imageLibraryDialog.complete(r.id).catch((e) => setError(String(e)));
   };
-  const save = (operation: ImageLibraryDialogOperation) =>
-    window.dock.imageLibraryDialog.complete(r.id, operation);
+  const save = async (operation: ImageLibraryDialogOperation) => {
+    await window.dock.imageLibraryDialog.complete(r.id, operation);
+    completed.current = true;
+  };
   if (r.kind === 'import-progress') {
     const p = r.importing;
     const phase = p?.phase ?? 'download';
@@ -237,16 +254,58 @@ function Editor({
         onApply={(ids) => save({ kind: 'order', ids, before: r.groups.map((g) => g.id) })}
       />
     );
+  if (r.kind === 'rename-images') {
+    const filenames = names.map((name, i) => name + extensions[i]);
+    const destinations = filenames.map((name, i) =>
+      (imageParent(r.images[i].file) + '/' + name).toLowerCase(),
+    );
+    const valid =
+      !r.deleteBlocked &&
+      filenames.every((name) => name === imageBasename(name) && imagePath(name)) &&
+      new Set(destinations).size === destinations.length;
+    return (
+      <SettingsDialog
+        returnFocus={returnFocus}
+        title={t('images.renameImages')}
+        onClose={close}
+        onApply={() => save({ kind: 'rename-images', names: filenames })}
+        applyLabel={t('images.apply')}
+        valid={valid}
+        description={t('images.renameDescription', { count: r.images.length })}
+        error={r.deleteBlocked ? t('images.inUseRename') : error}
+      >
+        <div className="library-rename-list">
+          {r.images.map((image, i) => (
+            <div className="library-rename-row" key={image.file}>
+              <span>{image.file}</span>
+              <span aria-hidden="true">→</span>
+              <label>
+                <SettingsInput
+                  data-initial-focus={i === 0 || undefined}
+                  aria-label={t('images.newName', { name: image.file })}
+                  value={names[i]}
+                  onChange={(e) =>
+                    setNames((old) => old.map((name, n) => (n === i ? e.target.value : name)))
+                  }
+                />
+                <small>{extensions[i]}</small>
+              </label>
+            </div>
+          ))}
+        </div>
+      </SettingsDialog>
+    );
+  }
   if (r.kind === 'delete-image')
     return (
       <SettingsDialog
         returnFocus={returnFocus}
-        title="画像を削除"
+        title={t('images.deleteImages')}
         onClose={close}
         onApply={() => save({ kind: 'delete-image' })}
         applyLabel="削除"
         valid={!r.deleteBlocked}
-        description={`「${r.images[0]?.file ?? ''}」をごみ箱へ移します。すべてのグループからも外れます。`}
+        description={t('images.deleteDescription', { count: r.images.length })}
         error={
           r.deleteBlocked
             ? 'この画像は使用中です。リボンやAppletの画像設定を外してから削除してください。'
@@ -254,7 +313,11 @@ function Editor({
         }
         errorTarget={r.images[0]?.file}
       >
-        {null}
+        <ul className="library-confirm-files">
+          {r.images.map((image) => (
+            <li key={image.file}>{image.file}</li>
+          ))}
+        </ul>
       </SettingsDialog>
     );
   if (r.kind === 'preview')
@@ -268,14 +331,39 @@ function Editor({
         error={error}
         header={
           <header className="image-library-preview-heading">
-            <h2 id="image-library-preview-title">{r.images[0]?.file}</h2>
+            <h2 id="image-library-preview-title">{entries[previewIndex]?.ref.file}</h2>
             <button type="button" data-initial-focus onClick={close}>
               閉じる
             </button>
           </header>
         }
       >
-        {r.entry && <RegisteredGalleryPreview entry={r.entry} groups={r.groups} />}
+        {entries.length > 1 && (
+          <div className="library-preview-navigation">
+            <SettingsButton
+              disabled={previewIndex === 0}
+              onClick={() => setPreviewIndex((i) => i - 1)}
+            >
+              {t('images.previous')}
+            </SettingsButton>
+            <span aria-live="polite">
+              {previewIndex + 1} / {entries.length}
+            </span>
+            <SettingsButton
+              disabled={previewIndex === entries.length - 1}
+              onClick={() => setPreviewIndex((i) => i + 1)}
+            >
+              {t('images.next')}
+            </SettingsButton>
+          </div>
+        )}
+        {entries[previewIndex] && (
+          <RegisteredGalleryPreview
+            key={entries[previewIndex].ref.file}
+            entry={entries[previewIndex]}
+            groups={r.groups}
+          />
+        )}
       </SettingsModal>
     );
   const titles = {
@@ -299,7 +387,7 @@ function Editor({
       await save({
         kind: 'membership-batch',
         mode: r.kind === 'batch-add' ? 'add' : 'remove',
-        groupId: r.kind === 'batch-add' ? target : r.groupId!,
+        groupId: target,
         images: r.images.map((image) => ({ image, before: before(image) })),
       });
   };
@@ -322,7 +410,7 @@ function Editor({
       valid={
         ['add', 'rename'].includes(r.kind)
           ? !!name.trim() && name.trim().length <= 80
-          : r.kind === 'batch-add'
+          : r.kind === 'batch-add' || r.kind === 'batch-remove'
             ? !!target
             : true
       }
@@ -382,9 +470,22 @@ function Editor({
         </>
       )}
       {r.kind === 'batch-remove' && (
-        <p>
-          「{current?.name}」から{r.images.length}枚を外します。画像とほかの所属は残ります。
-        </p>
+        <>
+          <p>{t('images.removeDescription', { count: r.images.length })}</p>
+          <SettingsField title={t('images.removeGroupTarget')}>
+            <select
+              aria-label={t('images.removeGroupTarget')}
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+            >
+              {r.groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+        </>
       )}
     </SettingsDialog>
   );

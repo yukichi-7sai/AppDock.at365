@@ -14,6 +14,7 @@ import type {
   ImageLibraryPageModel,
   ImageLibraryPageRequest,
 } from '../../shared/image-library-page';
+import { validImageLibraryLayout, type ImageLibraryLayout } from '../../shared/image-library-page';
 import {
   imageKey,
   type ImageLibraryEdit,
@@ -21,7 +22,7 @@ import {
   type RegisteredImageEntry,
   type RegisteredImageRef,
 } from '../../shared/registered-images';
-import { validGalleryWidth } from '../../shared/image-gallery';
+import { libraryGallerySize, validGalleryWidth } from '../../shared/image-gallery';
 import type { ImageLibraryHost } from './image-library-host';
 import type { GalleryImages } from './gallery-images';
 import type { GalleryViewStateStore } from './gallery-view-state';
@@ -39,6 +40,7 @@ export class ImageLibraryPageState {
   anchor?: { key: string; offset: number };
   viewRevision = 0;
   width: number;
+  layout: ImageLibraryLayout;
   sizeError: string;
   private errorValue = '';
   retryIconSet?: string;
@@ -58,6 +60,7 @@ export class ImageLibraryPageState {
   closed = false;
   constructor(readonly store: GalleryViewStateStore) {
     this.width = store.get('library');
+    this.layout = store.layout();
     this.sizeError = store.error;
   }
   resetView() {
@@ -246,12 +249,14 @@ export class ImageLibraryPageSession implements HostPageController {
             title: hostText('services.imageLibraryPage.delete'),
             disabled: !e.available || s.busy,
           },
+          { id: 'menu', title: hostText('images.moreActions'), disabled: s.busy },
         ],
       })),
       total: matched.length,
       remaining: Math.max(0, matched.length - s.count),
       selected: s.selected.size,
       cardWidth: s.width,
+      layout: s.layout,
       sizeError: s.sizeError,
       error: s.error || this.options.host.images.error || '',
       message: s.message,
@@ -303,6 +308,17 @@ export class ImageLibraryPageSession implements HostPageController {
       if (!group) throw Error(hostText('services.imageLibraryPage.groupChanged'));
       return group;
     };
+    const targets = (imageId?: string) => {
+      if (imageId) {
+        const [key] = resolveImage(imageId);
+        if (!this.filtered().some(([id]) => id === key))
+          throw Error(hostText('services.imageLibraryPage.imageChanged'));
+        if (!s.selected.has(key)) s.selected = new Set([key]);
+      }
+      return this.filtered()
+        .filter(([key]) => s.selected.has(key))
+        .map(([, value]) => value.entry);
+    };
     if (action.command === 'image') {
       const value = [...this.items.values()].find((v) => v.assetId === action.assetId);
       if (!value?.entry.available || !value.entry.generation)
@@ -326,7 +342,10 @@ export class ImageLibraryPageSession implements HostPageController {
       return;
     }
     if (action.command === 'width') {
-      if (!validGalleryWidth(action.value) || typeof action.commit !== 'boolean')
+      if (
+        !validGalleryWidth(action.value, libraryGallerySize) ||
+        typeof action.commit !== 'boolean'
+      )
         throw Error('Invalid gallery size');
       s.width = action.value;
       if (action.commit) {
@@ -337,6 +356,41 @@ export class ImageLibraryPageSession implements HostPageController {
           s.sizeError = (e as Error).message;
           this.options.failed(hostText('services.imageLibraryPage.sizeSaveFailed'));
         }
+      }
+    } else if (action.command === 'layout') {
+      if (!validImageLibraryLayout(action.value)) throw Error('Invalid gallery layout');
+      s.layout = structuredClone(action.value);
+      try {
+        s.store.saveLayout(s.layout);
+        s.sizeError = '';
+      } catch (e) {
+        s.sizeError = (e as Error).message;
+        this.options.failed(hostText('services.imageLibraryPage.sizeSaveFailed'));
+      }
+    } else if (action.command === 'select-target') {
+      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      targets(action.imageId);
+    } else if (action.command === 'file-action' || action.command === 'open-folder') {
+      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      const entries = action.command === 'file-action' ? targets(action.imageId) : [];
+      s.busy = true;
+      s.error = '';
+      this.options.changed();
+      try {
+        if (action.command === 'open-folder')
+          await this.options.host.openFolder(action.folder ?? (s.folder === '*' ? '' : s.folder));
+        else {
+          await this.options.host.fileAction(action.operation, entries);
+          s.message = hostText(
+            action.operation === 'reveal' ? 'images.revealed' : 'images.copied',
+            { count: entries.length },
+          );
+        }
+      } catch (e) {
+        s.error = (e as Error).message;
+        this.options.failed(s.error);
+      } finally {
+        s.busy = false;
       }
     } else if (action.command === 'cancel-import') {
       s.importAbort?.abort();
@@ -591,6 +645,7 @@ export class ImageLibraryPageSession implements HostPageController {
             'batch-add',
             'batch-remove',
             'preview',
+            'rename-images',
             'delete-image',
             'folder-create',
             'folder-rename',
@@ -602,36 +657,58 @@ export class ImageLibraryPageSession implements HostPageController {
           throw Error('Unknown gallery dialog');
         const groupId = action.groupId ? resolveGroup(action.groupId) : undefined;
         const item = action.imageId ? resolveImage(action.imageId)[1] : undefined;
-        if (['rename', 'delete', 'batch-remove', 'order-images'].includes(action.kind) && !groupId)
+        if (['rename', 'delete', 'order-images'].includes(action.kind) && !groupId)
           throw Error(hostText('services.imageLibraryPage.selectGroup'));
-        if (['membership', 'preview', 'delete-image'].includes(action.kind) && !item)
+        const entries = targets(action.imageId);
+        const images = entries.map((entry) => entry.ref);
+        if (
+          [
+            'membership',
+            'preview',
+            'delete-image',
+            'rename-images',
+            'batch-add',
+            'batch-remove',
+          ].includes(action.kind) &&
+          !images.length
+        )
           throw Error(hostText('services.imageLibraryPage.selectImage'));
-        if (['preview', 'delete-image'].includes(action.kind) && !item?.entry.available)
+        if (
+          ['delete-image', 'rename-images'].includes(action.kind) &&
+          entries.some((entry) => !entry.available)
+        )
           throw Error(hostText('services.imageLibraryPage.unreadable'));
-        if (action.kind === 'batch-remove' && s.group !== `group:${groupId}`)
-          throw Error(hostText('services.imageLibraryPage.currentGroup'));
-        const images = item
-          ? [item.entry.ref]
-          : [...s.selected].map((k) => this.items.get(k)!.entry.ref);
-        if (action.kind.startsWith('batch') && !images.length)
-          throw Error(hostText('services.imageLibraryPage.selectImage'));
         if (action.kind === 'folder-move' && !images.length)
           throw Error(hostText('services.imageLibraryPage.selectImage'));
-        const folder = s.folder === '*' ? '' : s.folder;
+        const folder = action.folder ?? (s.folder === '*' ? '' : s.folder);
+        if (!imageFolder(folder) || !(this.options.host.images.folders ?? ['']).includes(folder))
+          throw Error(hostText('images.folderInvalid'));
         if (['folder-rename', 'folder-delete'].includes(action.kind) && !folder)
           throw Error(hostText('images.folderInvalid'));
         const operation = await this.options.dialogs.open({
-          kind: action.kind,
+          kind: action.kind === 'membership' && images.length > 1 ? 'batch-add' : action.kind,
           groups: this.options.groups(),
           images,
           folder,
           folders: this.options.host.images.folders,
           iconSets: iconSets.map(({ id, name }) => ({ id, name })),
-          groupId,
-          entry: item?.entry,
+          groupId:
+            groupId ??
+            (action.kind === 'batch-remove' && s.group.startsWith('group:')
+              ? s.group.slice(6)
+              : undefined),
+          entry: item?.entry ?? entries[0],
+          entries,
           deleteBlocked:
-            action.kind === 'delete-image' && !!item && this.options.host.inUse(item.entry.ref),
+            ['delete-image', 'rename-images'].includes(action.kind) &&
+            entries.some((entry) => this.options.host.inUse(entry.ref)),
         });
+        if (operation?.kind === 'rename-images') {
+          const renamed = images.map((ref, i) => ({
+            file: ref.file.slice(0, ref.file.lastIndexOf('/') + 1) + operation.names[i],
+          }));
+          s.selected = new Set(renamed.map(imageKey));
+        }
         if (operation?.kind === 'add') {
           s.group = `group:${operation.group.id}`;
           s.selected.clear();

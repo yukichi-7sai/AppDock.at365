@@ -1,12 +1,17 @@
 /** Public, framework-neutral gallery presentation. No file-system or host operations. */
 export const gallerySize = { min: 120, max: 360, step: 20, initial: 260 } as const;
-export function validGalleryWidth(value: unknown): value is number {
+export const libraryGallerySize = { min: 40, max: 360, step: 4, initial: 260 } as const;
+export type GallerySize = { min: number; max: number; step: number; initial: number };
+export function validGalleryWidth(
+  value: unknown,
+  range: GallerySize = gallerySize,
+): value is number {
   return (
     typeof value === 'number' &&
     Number.isInteger(value) &&
-    value >= gallerySize.min &&
-    value <= gallerySize.max &&
-    (value - gallerySize.min) % gallerySize.step === 0
+    value >= range.min &&
+    value <= range.max &&
+    (value - range.min) % range.step === 0
   );
 }
 export type GalleryImageState = 'ready' | 'loading' | 'missing' | 'error';

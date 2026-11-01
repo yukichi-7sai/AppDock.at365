@@ -1,5 +1,8 @@
 import { validGroupId } from '../../shared/applet-pages';
-import { validGalleryWidth } from '../../shared/image-gallery';
+import {
+  validImageGalleryViewState,
+  type ImageGalleryViewState,
+} from '../../shared/image-library-page';
 import { parseWindowState, type WindowState } from './window-state';
 
 export interface DeviceUiState {
@@ -8,7 +11,7 @@ export interface DeviceUiState {
     expanded: Record<string, boolean>;
     displayMode?: 'compact' | 'expanded';
   };
-  gallery?: { schemaVersion: 1; library?: { cardWidth: number }; picker?: { cardWidth: number } };
+  gallery?: ImageGalleryViewState;
   windows?: Record<string, WindowState>;
 }
 const object = (value: any): value is Record<string, any> =>
@@ -34,20 +37,7 @@ export function parseDeviceUiState(value: unknown): DeviceUiState {
       throw Error('Invalid ribbon UI state');
   }
   if (value.gallery !== undefined) {
-    const g = value.gallery;
-    if (
-      !object(g) ||
-      g.schemaVersion !== 1 ||
-      Object.keys(g).some((key) => !['schemaVersion', 'library', 'picker'].includes(key)) ||
-      ['library', 'picker'].some(
-        (key) =>
-          g[key] !== undefined &&
-          (!object(g[key]) ||
-            Object.keys(g[key]).some((k) => k !== 'cardWidth') ||
-            !validGalleryWidth(g[key].cardWidth)),
-      )
-    )
-      throw Error('Invalid gallery UI state');
+    if (!validImageGalleryViewState(value.gallery)) throw Error('Invalid gallery UI state');
   }
   if (value.windows !== undefined) {
     if (!object(value.windows)) throw Error('Invalid window UI state');

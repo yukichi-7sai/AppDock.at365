@@ -88,6 +88,8 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## ファイル監視の補助確認
 
+画像ライブラリーのメニュー・一括ファイル操作・フォルダーツリー・表示状態・自動追加の担当試験は[画像ギャラリーの検証](image-gallery.md#検証)にまとめる。単体試験で保存競合と復旧、GUIで選択対象・確定/取消・キーボード・再起動を確認する。実クリップボード試験は明示オプション時だけ実行する。
+
 `tests/notification-availability.test.cjs`は、OS可否確認の60秒予約、応答待ちの非重複、新規提示前の再確認、既知の抑制中の前倒し防止、ロック中の停止・古い応答拒否、失敗後の明示再試行を模擬時刻で確認する。`tests/notification-session.test.cjs`は本体共通のHostSessionの初期状態・ロックとサスペンドの重なり・resume時の状態再取得と既存の音声保留を担当する。`scripts/notification-lock-startup-test.cjs [固定EXE]`は、隔離した実ElectronでセッションイベントとOS可否応答を模擬し、3つの補助停止・解除後の巡回・入力補助の再開・通知の期限と音声の既存動作を確認する。実際のWindowsロックやスリープ、応答不可モードの変更は行わない。ファイル読取workerにはfixtureの起動停止用デバッガ引数を渡さない。
 
 `tests/file-watch-assistance.test.cjs`は保留中の無巡回・解除後の1巡・I/O途中の保留と短い解除でも直列性が保たれることも確認する。`tests/input-synchronization.test.cjs`はセッション保留のnative設定への伝達と入力規則・手動ジェスチャー停止の独立性、`InputTests --input-environment`はnative補助タイマーの停止と解除後の状態更新を検査する。

@@ -167,10 +167,11 @@ const nativeApplets = [
   ['WallpaperSlideshow', 'at365.wallpaper-slideshow', { paused: true, monitors: [] }],
 ];
 for (const [name, id, values] of nativeApplets) {
-  const directory = install(id, path.join(fixtureRoot, `native-${name}`));
-  const manifest = JSON.parse(
-    fs.readFileSync(path.join(root, `../Applet.${name}.at365/extension.json`)),
+  const directory = install(
+    id,
+    path.resolve(root, `../../40.ARTIFACT/Applet.${name}.at365/Applet.${name}.at365`),
   );
+  const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'extension.json')));
   delete manifest.defaultKeybindings;
   manifest.startupDelaySeconds = 0;
   fs.writeFileSync(path.join(directory, 'extension.json'), JSON.stringify(manifest));
@@ -437,9 +438,8 @@ async function chooseInPicker(file) {
     await addGroup('アイコン');
     await addGroup('背景');
     await libraryPage
-      .locator('.library-sidebar nav')
-      .first()
-      .getByRole('button', { name: /すべて/ })
+      .getByTestId('library-group-target')
+      .filter({ hasText: /^すべて/ })
       .click();
     await libraryCard('sample.png').getByRole('button', { name: 'グループ', exact: true }).click();
     let d = host.getByRole('dialog', { name: '所属グループを編集', exact: true });
@@ -453,7 +453,7 @@ async function chooseInPicker(file) {
     );
     let groups = (await imageSnapshot()).groups;
     await libraryPage.getByRole('button', { name: `${groups[0].name}の操作`, exact: true }).click();
-    await libraryPage.getByRole('menuitem', { name: '名前を変更', exact: true }).click();
+    await libraryPage.getByRole('menuitem', { name: 'グループ名を変更', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像グループの名前を変更', exact: true });
     await d.getByLabel('画像グループ名').fill('ボタン');
     await d.getByLabel('画像グループ名').press('Tab');

@@ -112,7 +112,7 @@ export class GalleryImages {
       }
   }
   private getOwned(owner: Owner, ref: RegisteredImageRef, generation: string, edge: number) {
-    if (![512, 1024, 2048].includes(edge))
+    if (![64, 512, 1024, 2048].includes(edge))
       return Promise.reject(Error(hostText('services.galleryImages.invalidSize')));
     const key = `${imageKey(ref)}:${generation}:${edge}`;
     const hash = this.images.contentHash(ref, generation);
@@ -159,7 +159,10 @@ export class GalleryImages {
         const current = this.images.entry(ref);
         if (!current?.available || current.generation !== generation)
           throw Error(hostText('services.galleryImages.changed'));
-        const scale = Math.min(1, edge / Math.max(image.width, image.height));
+        const scale =
+          edge === 64 || /\.svg$/i.test(ref.file)
+            ? edge / Math.max(image.width, image.height)
+            : Math.min(1, edge / Math.max(image.width, image.height));
         const cost =
           image.thumbnail.length * 2 +
           Math.ceil(image.width * scale) * Math.ceil(image.height * scale) * 4;

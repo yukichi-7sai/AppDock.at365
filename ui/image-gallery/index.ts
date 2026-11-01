@@ -4,11 +4,16 @@ import {
   type GalleryAnchor,
   type GalleryItem,
   type GalleryModel,
+  type GallerySize,
 } from '../../src/shared/image-gallery';
 export * from '../../src/shared/image-gallery';
 import { mountGalleryInteractions, type GalleryInteractions } from './interactions';
 
 export interface GalleryOptions {
+  size?: GallerySize;
+  /** Library selection and context menus are opt-in; picker activation stays unchanged. */
+  clickSelect?(id: string, event: MouseEvent): void;
+  context?(id: string, event: MouseEvent | KeyboardEvent, opener: HTMLElement): void;
   interactions?: GalleryInteractions;
   scrollElement: HTMLElement;
   image(assetId: string, edge: number): Promise<string>;
@@ -62,7 +67,9 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
   const empty = element('p', 'ad-gallery-empty');
   const wantedEdge = (card: Card) => {
     const width = card.button.getBoundingClientRect().width || model.cardWidth;
-    return [512, 1024, 2048].find((v) => v >= width * window.devicePixelRatio) ?? 2048;
+    const edges =
+      options.size && options.size.min < 120 ? [64, 512, 1024, 2048] : [512, 1024, 2048];
+    return edges.find((v) => v >= width * window.devicePixelRatio) ?? 2048;
   };
   const pump = () => {
     if (disposed) return;
@@ -84,6 +91,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       card.requested = edge;
       active++;
       card.status.textContent = card.image.hasAttribute('src') ? '' : '読み込み中';
+      card.status.dataset.state = 'loading';
       void options
         .image(assetId, edge)
         .then(async (source) => {
@@ -99,8 +107,10 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
           card.status.textContent = '';
         })
         .catch(() => {
-          if (!disposed && generation === card.generation)
+          if (!disposed && generation === card.generation) {
             card.status.textContent = '画像を読み込めません';
+            card.status.dataset.state = 'error';
+          }
         })
         .finally(() => {
           active--;
@@ -194,10 +204,25 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       generation: 0,
       loading: false,
     };
-    button.onclick = () =>
-      model.selection === 'single'
-        ? options.select(card.item.id, true)
-        : options.activate(card.item.id);
+    button.onclick = (event) =>
+      options.clickSelect
+        ? options.clickSelect(card.item.id, event)
+        : model.selection === 'single'
+          ? options.select(card.item.id, true)
+          : options.activate(card.item.id);
+    if (options.clickSelect) button.ondblclick = () => options.activate(card.item.id);
+    if (options.context) {
+      node.oncontextmenu = (event) => {
+        event.preventDefault();
+        options.context!(card.item.id, event, button);
+      };
+      node.onkeydown = (event) => {
+        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+          event.preventDefault();
+          options.context!(card.item.id, event, document.activeElement as HTMLElement);
+        }
+      };
+    }
     check.onchange = () => options.select(card.item.id, check.checked);
     observer.observe(node);
     return card;
@@ -215,10 +240,11 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       model = next;
       container.style.setProperty(
         '--ad-gallery-width',
-        `${validGalleryWidth(next.cardWidth) ? next.cardWidth : gallerySize.initial}px`,
+        `${validGalleryWidth(next.cardWidth, options.size) ? next.cardWidth : gallerySize.initial}px`,
       );
       container.dataset.fit = next.fit;
       container.dataset.compact = String(next.cardWidth < 180);
+      container.dataset.icons = String(!!options.clickSelect && next.cardWidth < 120);
       const ids = new Set(next.items.map((i) => i.id));
       for (const [id, card] of cards)
         if (!ids.has(id)) {
@@ -236,6 +262,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
           card.requested = 0;
         }
         card.item = item;
+        if (item.state !== 'ready') card.status.dataset.state = item.state;
         card.node.classList.toggle('ad-gallery-selected', !!item.selected);
         card.check.hidden = next.selection !== 'multiple';
         card.checkArea.hidden = next.selection !== 'multiple';
@@ -244,13 +271,14 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         card.check.setAttribute('aria-label', `${item.title}を選択`);
         card.button.setAttribute(
           'aria-label',
-          `${item.title}${next.selection === 'single' ? 'を選択' : 'を拡大'}`,
+          `${item.title}${next.selection === 'single' || options.clickSelect ? 'を選択' : 'を拡大'}`,
         );
-        if (next.selection === 'single')
+        if (next.selection === 'single' || options.clickSelect)
           card.button.setAttribute('aria-pressed', String(!!item.selected));
         else card.button.removeAttribute('aria-pressed');
         card.button.disabled =
-          item.selectable === false || (next.selection !== 'single' && item.state !== 'ready');
+          item.selectable === false ||
+          (!options.clickSelect && next.selection !== 'single' && item.state !== 'ready');
         card.node.title = item.description ?? item.title;
         card.title.textContent = item.title;
         card.title.title = item.title;
@@ -288,6 +316,8 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
             card.actions.append(control);
           }
           control.textContent = action.title;
+          control.setAttribute('aria-label', action.title);
+          control.title = action.title;
           control.disabled = !!action.disabled;
         });
         // Avoid moving already ordered DOM nodes (moving the focused node loses focus).
@@ -327,6 +357,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
 export function mountGallerySizeControl(
   container: HTMLElement,
   options: {
+    range?: GallerySize;
     value: number;
     change(value: number): void;
     commit(value: number): void;
@@ -337,9 +368,10 @@ export function mountGallerySizeControl(
     large = element('span', '', '大');
   const input = element('input', '');
   input.type = 'range';
-  input.min = String(gallerySize.min);
-  input.max = String(gallerySize.max);
-  input.step = String(gallerySize.step);
+  const range = options.range ?? gallerySize;
+  input.min = String(range.min);
+  input.max = String(range.max);
+  input.step = String(range.step);
   input.setAttribute('aria-label', '画像サイズ');
   let committed = options.value;
   const setValue = (value: number) => {

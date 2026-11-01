@@ -4657,6 +4657,7 @@ async function initialize() {
           kind === 'move' ? operation.destination : (request.folder ?? ''),
           operation.destination,
           request.images,
+          request.entries,
         );
       }
       if (operation.kind === 'import-set') {
@@ -4667,7 +4668,12 @@ async function initialize() {
       if (operation.kind === 'delete-image') {
         if (!request.entry || request.deleteBlocked)
           throw Error(hostText('services.index.invalidDeletion'));
-        return imageLibraryHost.remove(request.entry);
+        return imageLibraryHost.removeMany(request.entries ?? [request.entry]);
+      }
+      if (operation.kind === 'rename-images') {
+        if (!request.entries || request.deleteBlocked)
+          throw Error(hostText('services.index.invalidDeletion'));
+        return imageLibraryHost.rename(request.entries, operation.names).then(() => {});
       }
       return imageLibraryHost.edit(operation);
     },
