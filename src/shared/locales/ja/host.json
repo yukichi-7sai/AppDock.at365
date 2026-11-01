@@ -3346,6 +3346,7 @@
   "images.importSet": "アイコンセットを取り込む",
   "images.set": "アイコンセット",
   "images.importStart": "取り込む",
+  "images.importRetry": "取り込みを再試行",
   "images.importCancel": "取り込みを取消",
   "images.downloading": "ダウンロード中…",
   "images.metadataDownloading": "カテゴリ情報をダウンロード中…",

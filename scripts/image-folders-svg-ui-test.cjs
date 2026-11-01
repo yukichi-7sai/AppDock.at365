@@ -310,6 +310,23 @@ async function choose(cancel) {
     checks.push(
       'modal shows live progress; cancellation stays responsive and retains completed images and classifications',
     );
+    await app.evaluate(({ app }) => {
+      const require = process
+        .getBuiltinModule('module')
+        .createRequire(app.getAppPath() + '/package.json');
+      const { RegisteredImages } = require(
+        app.getAppPath() + '/out/main/main/core/registered-images.js',
+      );
+      const add = RegisteredImages.prototype.addWithResult;
+      RegisteredImages.prototype.addWithResult = async function (bytes, name) {
+        const result = await add.call(this, bytes, name);
+        if (name === 'Lucide Icon/zap.svg') {
+          RegisteredImages.prototype.addWithResult = add;
+          throw Error('fixture: failure after original write');
+        }
+        return result;
+      };
+    });
     await host.getByRole('button', { name: 'アイコンセットを取り込む', exact: true }).click();
     await d.getByRole('button', { name: '取り込む', exact: true }).click();
     await d.getByRole('progressbar').waitFor();
@@ -323,8 +340,68 @@ async function choose(cancel) {
     );
     const imported = (await library()).images.filter((e) => e.ref.file.startsWith('Lucide Icon/'));
     assert(imported.length > 512);
-    assert((await model()).content.message.includes('失敗 0件'));
     await d.waitFor({ state: 'hidden' });
+    assert((await model()).content.message.includes('失敗 1件'));
+    assert(fs.existsSync(path.join(directory, 'Lucide Icon/zap.svg')));
+    assert(
+      !(await library()).groups.some((group) =>
+        group.images.some((image) => image.file === 'Lucide Icon/zap.svg'),
+      ),
+    );
+    const retry = host.getByRole('button', { name: '取り込みを再試行', exact: true });
+    await retry.waitFor();
+    await host.screenshot({ path: path.join(profile, 'lucide-failed-retry.png') });
+    await app.evaluate(({ app }) => {
+      const require = process
+        .getBuiltinModule('module')
+        .createRequire(app.getAppPath() + '/package.json');
+      const { RegisteredImages } = require(
+        app.getAppPath() + '/out/main/main/core/registered-images.js',
+      );
+      const add = RegisteredImages.prototype.addWithResult;
+      globalThis.__retryFiles = [];
+      RegisteredImages.prototype.addWithResult = async function (bytes, name) {
+        globalThis.__retryFiles.push(name);
+        return add.call(this, bytes, name);
+      };
+      const fetch = globalThis.fetch;
+      globalThis.__retryDownloads = 0;
+      globalThis.fetch = (...args) => {
+        if (
+          String(args[0]).includes('registry.npmjs.org/lucide-static') ||
+          String(args[0]).includes('codeload.github.com/lucide-icons/')
+        )
+          globalThis.__retryDownloads++;
+        return fetch(...args);
+      };
+    });
+    await retry.click();
+    await until(
+      async () => {
+        const c = (await model()).content;
+        return !c.busy && c.message.includes('失敗 0件');
+      },
+      'retry completion',
+      120000,
+    );
+    await d.waitFor({ state: 'hidden' });
+    const retryWork = await app.evaluate(() => ({
+      files: globalThis.__retryFiles,
+      downloads: globalThis.__retryDownloads,
+    }));
+    assert.deepEqual(retryWork.files, ['Lucide Icon/zap.svg']);
+    assert.equal(retryWork.downloads, 0);
+    assert((await model()).content.message.includes('登録済み 1件'));
+    assert((await model()).content.message.includes('失敗 0件'));
+    assert.equal(await retry.count(), 0);
+    assert(
+      (await library()).groups.some((group) =>
+        group.images.some((image) => image.file === 'Lucide Icon/zap.svg'),
+      ),
+    );
+    checks.push(
+      'post-write import failure retries only the failed original offline and applies categories without processing successful images',
+    );
     const grouped = (await library()).groups;
     const time = grouped.find((g) => g.name === 'Lucide: Time & calendar');
     assert(time);

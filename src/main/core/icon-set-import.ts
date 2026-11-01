@@ -19,6 +19,30 @@ export const iconSets = [
 ] as const;
 const licenseEntry = (name: string) => /^package\/LICENSE(?:\.txt|\.md)?$/i.test(name);
 
+interface IconImportCandidate {
+  name: string;
+  bytes: Buffer;
+  categories: { id: string; title: string }[];
+}
+/** Verified failed originals and unsaved memberships, owned by the current Window only. */
+export interface IconImportRetry {
+  id: string;
+  version: string;
+  folder: string;
+  images: IconImportCandidate[];
+  groups: ImageGroup[];
+}
+interface IconImportOptions {
+  id: string;
+  images: RegisteredImages;
+  signal: AbortSignal;
+  writable(): void;
+  progress(value: IconImportProgress): void;
+  groups(value: ImageGroup[]): void;
+  retry?(value: IconImportRetry | undefined): void;
+  fetch?: typeof fetch;
+}
+
 /** Reads regular files only, never materializes archive paths or executes package code. */
 export async function* tarEntries(
   file: string,
@@ -70,15 +94,7 @@ export async function* tarEntries(
   }
 }
 
-export async function importIconSet(options: {
-  id: string;
-  images: RegisteredImages;
-  signal: AbortSignal;
-  writable(): void;
-  progress(value: IconImportProgress): void;
-  groups(value: ImageGroup[]): void;
-  fetch?: typeof fetch;
-}) {
+export async function importIconSet(options: IconImportOptions) {
   const set = iconSets.find((set) => set.id === options.id);
   if (!set) throw Error(hostText('images.setUnknown'));
   const request = options.fetch ?? fetch;
@@ -192,51 +208,14 @@ export async function importIconSet(options: {
       )
         throw error;
     }
-    progress.phase = 'import';
-    progress.total = names.size;
-    options.progress({ ...progress });
-    const failures: string[] = [];
-    const groups = new Map<string, ImageGroup>();
-    try {
-      await options.images.batch(async () => {
-        for await (const entry of tarEntries(unpacked)) {
-          check();
-          if (licenseEntry(entry.name)) continue;
-          const name = entry.name.slice('package/icons/'.length);
-          try {
-            const result = await options.images.addWithResult(entry.bytes, `${set.folder}/${name}`);
-            if (result.reused) progress.reused++;
-            else progress.added++;
-            for (const category of categories.get(name.slice(0, -4))!) {
-              const id = `icon-set-${set.id}-${category.id}`;
-              const group = groups.get(id) ?? {
-                id,
-                name: `${set.name}: ${category.title}`,
-                images: [],
-              };
-              group.images.push(result.ref);
-              groups.set(id, group);
-            }
-          } catch {
-            progress.failed++;
-            failures.push(name);
-          }
-          progress.completed++;
-          if (progress.completed % 20 === 0 || progress.completed === progress.total)
-            options.progress({ ...progress });
-        }
-      });
-    } finally {
-      // Cancellation retains classifications for successfully added/reused originals only.
-      if (groups.size) {
-        progress.phase = 'groups';
-        options.progress({ ...progress });
-        options.writable();
-        options.groups([...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'en')));
+    async function* candidates() {
+      for await (const entry of tarEntries(unpacked)) {
+        if (licenseEntry(entry.name)) continue;
+        const name = entry.name.slice('package/icons/'.length);
+        yield { name, bytes: entry.bytes, categories: categories.get(name.slice(0, -4))! };
       }
     }
-    await options.images.refresh();
-    return { ...progress, folder: set.folder, version: meta.version, failures };
+    return await applyIconImport(options, meta.version, candidates(), names.size);
   } finally {
     const real = await fs.realpath(temporary);
     if (
@@ -246,6 +225,101 @@ export async function importIconSet(options: {
       throw Error('Unexpected temporary directory');
     await fs.rm(real, { recursive: true, force: true });
   }
+}
+
+/** Retries only verified failed originals or unsaved groups, without fetching the package again. */
+export async function retryIconImport(options: IconImportOptions, retry: IconImportRetry) {
+  const set = iconSets.find((set) => set.id === options.id);
+  if (
+    !set ||
+    retry.id !== set.id ||
+    retry.folder !== set.folder ||
+    (!retry.images.length && !retry.groups.length)
+  )
+    throw Error(hostText('images.setUnknown'));
+  async function* candidates() {
+    yield* retry.images;
+  }
+  return applyIconImport(options, retry.version, candidates(), retry.images.length, retry.groups);
+}
+
+async function applyIconImport(
+  options: IconImportOptions,
+  version: string,
+  candidates: AsyncIterable<IconImportCandidate>,
+  total: number,
+  pendingGroups: ImageGroup[] = [],
+) {
+  const set = iconSets.find((set) => set.id === options.id)!;
+  const check = () => {
+    options.signal.throwIfAborted();
+    options.writable();
+  };
+  const progress: IconImportProgress = {
+    phase: total ? 'import' : 'groups',
+    completed: 0,
+    total,
+    added: 0,
+    reused: 0,
+    failed: 0,
+  };
+  check();
+  options.progress({ ...progress });
+  const failed: IconImportCandidate[] = [];
+  const groups = new Map(pendingGroups.map((group) => [group.id, structuredClone(group)]));
+  let complete = false;
+  try {
+    await options.images.batch(async () => {
+      for await (const candidate of candidates) {
+        check();
+        try {
+          const result = await options.images.addWithResult(
+            candidate.bytes,
+            `${set.folder}/${candidate.name}`,
+          );
+          if (result.reused) progress.reused++;
+          else progress.added++;
+          for (const category of candidate.categories) {
+            const id = `icon-set-${set.id}-${category.id}`;
+            const group = groups.get(id) ?? {
+              id,
+              name: `${set.name}: ${category.title}`,
+              images: [],
+            };
+            group.images.push(result.ref);
+            groups.set(id, group);
+          }
+        } catch {
+          progress.failed++;
+          failed.push(candidate);
+        }
+        progress.completed++;
+        if (progress.completed % 20 === 0 || progress.completed === total)
+          options.progress({ ...progress });
+      }
+    });
+    complete = true;
+  } finally {
+    const memberships = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'en'));
+    const retry = (unsaved: ImageGroup[]) => {
+      options.retry?.(
+        complete && (failed.length || unsaved.length)
+          ? { id: set.id, version, folder: set.folder, images: failed, groups: unsaved }
+          : undefined,
+      );
+    };
+    // Save the retry scope before attempting the settings write, which can itself fail.
+    retry(memberships);
+    if (memberships.length) {
+      progress.phase = 'groups';
+      options.progress({ ...progress });
+      options.writable();
+      options.groups(memberships);
+    }
+    retry([]);
+  }
+  await options.images.refresh();
+  return { ...progress, folder: set.folder, version, failures: failed.map((image) => image.name) };
 }
 
 async function readLucideCategories(file: string, version: string, check: () => void) {

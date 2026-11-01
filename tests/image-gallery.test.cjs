@@ -158,6 +158,98 @@ test('view state creates no file until a valid edit; surfaces remain independent
   assert.throws(() => external.save('library', 280));
   assert.equal(fs.readFileSync(file, 'utf8'), '{"schemaVersion":99}');
 });
+
+test('icon import retry survives navigation, reruns classification and rejects duplicates or stale retries', async (t) => {
+  const f = fixture(),
+    applied = [],
+    calls = [];
+  f.host.images.folders = ['', 'Lucide Icon'];
+  f.host.assertWritable = () => {};
+  f.host.configuration = { addImportedGroups: (groups) => applied.push(groups) };
+  let release;
+  t.mock.method(
+    require('../out/main/main/core/icon-set-import'),
+    'importIconSet',
+    async (options) => {
+      calls.push(options.id);
+      options.progress({ phase: 'import', completed: 1, total: 1, added: 0, reused: 1, failed: 0 });
+      options.retry({
+        id: 'lucide',
+        version: '1.2.3',
+        folder: 'Lucide Icon',
+        images: [{ name: 'zap.svg' }],
+        groups: [],
+      });
+      assert.equal(calls.length, 1, 'retry must not restart whole-set import');
+      return { folder: 'Lucide Icon', added: 0, reused: 0, failed: 1, failures: ['zap.svg'] };
+    },
+  );
+  t.mock.method(
+    require('../out/main/main/core/icon-set-import'),
+    'retryIconImport',
+    async (options, retry) => {
+      calls.push(retry.id);
+      assert.deepEqual(
+        retry.images.map((image) => image.name),
+        ['zap.svg'],
+      );
+      await new Promise((resolve) => {
+        release = resolve;
+      });
+      options.groups([
+        {
+          id: 'icon-set-lucide-weather',
+          name: 'Lucide: Weather',
+          images: [{ file: 'Lucide Icon/zap.svg' }],
+        },
+      ]);
+      options.retry(undefined);
+      return { folder: 'Lucide Icon', added: 0, reused: 1, failed: 0, failures: [] };
+    },
+  );
+  await f.act('import-set', { setId: 'lucide' });
+  assert(f.session.snapshot().content.canRetryIconImport);
+  f.reopen();
+  assert(f.session.snapshot().content.canRetryIconImport);
+  const pending = f.act('retry-import');
+  await assert.rejects(f.act('retry-import'), /完了|待|追加/);
+  release();
+  await pending;
+  assert.deepEqual(calls, ['lucide', 'lucide']);
+  assert.equal(applied[0][0].images[0].file, 'Lucide Icon/zap.svg');
+  assert.equal(f.session.snapshot().content.canRetryIconImport, false);
+  assert.equal(f.state.error, '');
+  assert.equal(f.dialog, null);
+  await assert.rejects(f.act('retry-import'));
+});
+
+test('download/group-save failures are retryable; an unrelated error or ordinary reload does not retry imports', async (t) => {
+  const f = fixture();
+  let calls = 0,
+    scans = 0;
+  f.host.images.folders = ['', 'Lucide Icon'];
+  f.host.assertWritable = () => {};
+  t.mock.method(require('../out/main/main/core/icon-set-import'), 'importIconSet', async () => {
+    calls++;
+    throw Error('save failed');
+  });
+  f.host.images.refresh = async () => {
+    scans++;
+  };
+  await f.act('import-set', { setId: 'lucide' });
+  assert(f.session.snapshot().content.canRetryIconImport);
+  await f.act('retry-import');
+  assert.equal(calls, 2);
+  assert(f.session.snapshot().content.canRetryIconImport);
+  f.state.error = 'unrelated file error';
+  assert.equal(f.session.snapshot().content.canRetryIconImport, false);
+  await assert.rejects(f.act('retry-import'));
+  await f.act('reload');
+  assert.equal(calls, 2);
+  assert(scans > 0);
+  await assert.rejects(f.act('import-set', { setId: 'unknown' }));
+  assert.equal(calls, 2);
+});
 test('range selection replaces or adds displayed images atomically and rejects stale IDs', async () => {
   const f = fixture(),
     items = f.session.snapshot().content.items;
@@ -392,6 +484,7 @@ test('modal bookkeeping accepts validated anchors while edits remain active oper
     'dialog',
     'add',
     'retry-membership',
+    'retry-import',
   ])
     assert.equal(f.session.passive(request(command)), false, command);
   assert.equal(f.session.passive({ type: 'invoke', command: 'anchor' }), false);

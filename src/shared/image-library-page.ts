@@ -87,6 +87,7 @@ export interface ImageLibraryPageModel {
     canAddGroup: boolean;
     canOrder: boolean;
     canRetryMembership: boolean;
+    canRetryIconImport: boolean;
   };
 }
 export type ImageLibraryPageAction = {
@@ -97,6 +98,7 @@ export type ImageLibraryPageAction = {
   | { command: 'folder'; folder: string }
   | { command: 'import-set'; setId: string }
   | { command: 'cancel-import' }
+  | { command: 'retry-import' }
   | {
       command: 'folder-action';
       operation: 'create' | 'rename' | 'delete' | 'move-images';

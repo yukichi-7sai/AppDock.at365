@@ -1,5 +1,11 @@
 import { hostText } from '../../shared/i18n';
-import { iconSets, importIconSet, type IconImportProgress } from './icon-set-import';
+import {
+  iconSets,
+  importIconSet,
+  retryIconImport,
+  type IconImportProgress,
+  type IconImportRetry,
+} from './icon-set-import';
 import { imageFolder } from '../../shared/image-paths';
 import { randomUUID } from 'node:crypto';
 import type { HostPageController } from './host-page-controller';
@@ -34,7 +40,17 @@ export class ImageLibraryPageState {
   viewRevision = 0;
   width: number;
   sizeError: string;
-  error = '';
+  private errorValue = '';
+  retryIconSet?: string;
+  retryIcons?: IconImportRetry;
+  get error() {
+    return this.errorValue;
+  }
+  set error(value: string) {
+    this.errorValue = value;
+    this.retryIconSet = undefined;
+    this.retryIcons = undefined;
+  }
   message = '';
   feedbackRevision = 0;
   busy = false;
@@ -248,6 +264,7 @@ export class ImageLibraryPageSession implements HostPageController {
       canAddGroup: true,
       canOrder: groups.length > 1,
       canRetryMembership: !!s.retry,
+      canRetryIconImport: !!s.retryIconSet,
     };
     const dark = this.options.dark(),
       signature = JSON.stringify([dark, content]);
@@ -323,26 +340,36 @@ export class ImageLibraryPageSession implements HostPageController {
       }
     } else if (action.command === 'cancel-import') {
       s.importAbort?.abort();
-    } else if (action.command === 'import-set') {
+    } else if (action.command === 'retry-import' || action.command === 'import-set') {
       if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      const setId = action.command === 'import-set' ? action.setId : s.retryIconSet;
+      const retry = action.command === 'retry-import' ? s.retryIcons : undefined;
+      if (!setId) throw Error(hostText('services.imageLibraryPage.noRetry'));
+      if (!iconSets.some((set) => set.id === setId)) throw Error(hostText('images.setUnknown'));
       s.busy = true;
       s.error = '';
       s.message = '';
       s.importAbort = new AbortController();
       const progressId = this.options.dialogs.openProgress(() => s.importAbort?.abort());
       this.options.changed();
+      let retryIcons = retry;
       try {
-        const result = await importIconSet({
-          id: action.setId,
+        const options = {
+          id: setId,
           images: this.options.host.images,
           signal: s.importAbort.signal,
           writable: () => this.options.host.assertWritable(),
-          groups: (groups) => this.options.host.configuration.addImportedGroups(groups),
-          progress: (value) => {
+          groups: (groups: ImageGroup[]) =>
+            this.options.host.configuration.addImportedGroups(groups),
+          retry: (value: IconImportRetry | undefined) => {
+            retryIcons = value;
+          },
+          progress: (value: IconImportProgress) => {
             s.importing = value;
             this.options.dialogs.progress(progressId, value);
           },
-        });
+        };
+        const result = retry ? await retryIconImport(options, retry) : await importIconSet(options);
         s.folder = result.folder;
         s.group = 'all';
         s.query = '';
@@ -354,11 +381,17 @@ export class ImageLibraryPageSession implements HostPageController {
           failed: String(result.failed),
         });
         s.error = result.failures.join(', ');
+        if (result.failed) {
+          s.retryIconSet = setId;
+          s.retryIcons = retryIcons;
+        }
       } catch (error) {
         if (s.importAbort.signal.aborted && error instanceof Error && error.name === 'AbortError')
           s.message = hostText('images.importCancelled');
         else {
           s.error = error instanceof Error ? error.message : hostText('images.downloadFailed');
+          s.retryIconSet = setId;
+          s.retryIcons = retryIcons;
           this.options.failed(s.error);
         }
       } finally {

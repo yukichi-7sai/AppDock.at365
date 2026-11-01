@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { gzipSync } = require('node:zlib');
 const { createHash } = require('node:crypto');
-const { importIconSet } = require('../out/main/main/core/icon-set-import');
+const { importIconSet, retryIconImport } = require('../out/main/main/core/icon-set-import');
 const { RegisteredImages } = require('../out/main/main/core/registered-images');
 const { ImageLibrarySettings } = require('../out/main/main/core/image-library-settings');
 const root = path.resolve('.artifacts/icon-set-import-' + Date.now());
@@ -83,6 +83,7 @@ async function setup(
     },
   };
   const configuration = new ImageLibrarySettings(store, () => {});
+  let retry;
   const options = {
     id: 'lucide',
     images,
@@ -90,6 +91,9 @@ async function setup(
     writable() {},
     groups(value) {
       configuration.addImportedGroups(value);
+    },
+    retry(value) {
+      retry = value;
     },
     progress(value) {
       progress.push(value);
@@ -108,7 +112,19 @@ async function setup(
       );
     },
   };
-  return { directory, images, controller, progress, requests, metadata, options, store };
+  return {
+    directory,
+    images,
+    controller,
+    progress,
+    requests,
+    metadata,
+    options,
+    store,
+    get retry() {
+      return retry;
+    },
+  };
 }
 test('verified explicit import keeps original SVG and license, reuses identical files and preserves edited files', async (t) => {
   const f = await setup(t);
@@ -271,5 +287,76 @@ test('failed image conflicts are not classified, and a group-save failure remain
   assert.deepEqual(await fs.readFile(path.join(f.directory, 'Lucide Icon/heart.svg')), svg);
   f.options.groups = save;
   assert.equal((await importIconSet(f.options)).reused, 1);
+  assert.equal(f.store.value.imageLibrary.groups[0].images.length, 1);
+});
+
+test('only failed originals are retried from verified bytes offline; successful originals are not processed again', async (t) => {
+  const f = await setup(t, [
+    ['package/LICENSE', 'ISC'],
+    ...['heart', 'moon', 'star'].map((name) => ['package/icons/' + name + '.svg', svg]),
+  ]);
+  let round = 0;
+  const calls = [],
+    add = f.images.addWithResult.bind(f.images);
+  f.images.addWithResult = async (bytes, name) => {
+    calls.push(name);
+    const result = await add(bytes, name);
+    if ((name.endsWith('/heart.svg') && round === 0) || (name.endsWith('/moon.svg') && round < 2))
+      throw Error('transient failure after original write');
+    return result;
+  };
+  const first = await importIconSet(f.options);
+  assert.equal(first.failed, 2);
+  assert.deepEqual(
+    f.retry.images.map((image) => image.name),
+    ['heart.svg', 'moon.svg'],
+  );
+  assert.equal(f.retry.version, '1.2.3');
+  f.options.fetch = () => {
+    throw Error('retry must not fetch');
+  };
+  round = 1;
+  f.progress.length = 0;
+  const second = await retryIconImport(f.options, f.retry);
+  assert.equal(second.failed, 1);
+  assert.equal(second.total, 2);
+  assert(f.progress.every((p) => p.total === 2));
+  assert.deepEqual(
+    f.retry.images.map((image) => image.name),
+    ['moon.svg'],
+  );
+  round = 2;
+  const third = await retryIconImport(f.options, f.retry);
+  assert.equal(third.total, 1);
+  assert.equal(third.reused, 1);
+  assert.equal(f.retry, undefined);
+  assert.equal(calls.filter((name) => name.endsWith('/star.svg')).length, 1);
+  assert.equal(calls.filter((name) => name.endsWith('/heart.svg')).length, 2);
+  assert.equal(calls.filter((name) => name.endsWith('/moon.svg')).length, 3);
+  assert.equal(f.requests.length, 3);
+  assert.equal(f.store.value.imageLibrary.groups[0].images.length, 3);
+});
+
+test('failed group saves retry only memberships without downloads or image registration', async (t) => {
+  const f = await setup(t),
+    save = f.options.groups;
+  f.options.groups = () => {
+    throw Error('settings save failed');
+  };
+  await assert.rejects(importIconSet(f.options), /settings save failed/);
+  assert.equal(f.retry.images.length, 0);
+  assert.equal(f.retry.groups.length, 1);
+  f.options.fetch = () => {
+    throw Error('no fetching');
+  };
+  f.images.addWithResult = () => {
+    throw Error('no image registration');
+  };
+  await assert.rejects(retryIconImport(f.options, f.retry), /settings save failed/);
+  assert.equal(f.retry.groups.length, 1);
+  f.options.groups = save;
+  const result = await retryIconImport(f.options, f.retry);
+  assert.equal(result.total, 0);
+  assert.equal(f.retry, undefined);
   assert.equal(f.store.value.imageLibrary.groups[0].images.length, 1);
 });

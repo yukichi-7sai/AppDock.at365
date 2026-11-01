@@ -65,7 +65,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
   const act = async (action: Action, opener?: HTMLElement) => {
     if (!latest.current) return;
     if (openingDialog.current && action.command !== 'anchor') return;
-    const opensDialog = action.command === 'dialog';
+    const opensDialog = action.command === 'dialog' || action.command === 'retry-import';
     const releaseFocus = opensDialog ? captureDialogFocus(opener) : undefined;
     if (opensDialog) {
       openingDialog.current = true;
@@ -568,7 +568,16 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
                 {(error || c.error) && (
                   <div role="alert">
                     {error || c.error}
-                    <button onClick={() => run({ command: 'reload' })}>再取得</button>
+                    <button
+                      disabled={c.busy}
+                      onClick={() =>
+                        run({
+                          command: !error && c.canRetryIconImport ? 'retry-import' : 'reload',
+                        })
+                      }
+                    >
+                      {!error && c.canRetryIconImport ? t('images.importRetry') : '再取得'}
+                    </button>
                     {c.canRetryMembership && (
                       <button onClick={() => run({ command: 'retry-membership' })}>
                         グループへの追加を再試行
