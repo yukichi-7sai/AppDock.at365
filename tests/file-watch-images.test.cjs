@@ -33,14 +33,17 @@ async function fixture(t, { missing = false, assistance } = {}) {
 function fakeWatch(t) {
   const callbacks = new Map();
   const watchers = new Map();
-  t.mock.method(nativeFs, 'watch', (directory, callback) => {
+  t.mock.method(nativeFs, 'watch', (directory, options, callback) => {
+    callback ??= options;
     callbacks.set(directory, callback);
     const watcher = Object.assign(new EventEmitter(), { close() {} });
     watchers.set(directory, watcher);
     return watcher;
   });
-  const event = (directory, name) => callbacks.get(directory)('rename', name);
-  event.fail = (directory) => watchers.get(directory).emit('error', Error('watch interrupted'));
+  const event = (directory, name) =>
+    callbacks.get(path.dirname(directory))('rename', path.basename(directory) + '/' + name);
+  event.fail = (directory) =>
+    watchers.get(path.dirname(directory)).emit('error', Error('watch interrupted'));
   return event;
 }
 
@@ -56,7 +59,7 @@ test('a late ancestor recovery cannot replace a newer connection to the image ro
   });
   const realpath = fs.realpath;
   t.mock.method(fs, 'realpath', async (directory, ...args) => {
-    if (directory === path.dirname(f.directory)) {
+    if (directory === path.dirname(path.dirname(f.directory))) {
       blocked = true;
       await gate;
       throw Object.assign(Error('Obsolete watch failure'), { code: 'EACCES' });

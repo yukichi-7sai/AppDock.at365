@@ -2,6 +2,9 @@ import { hostText } from '../../shared/i18n';
 import { dialog, shell, type BrowserWindow } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { AssignedImages } from './assigned-images';
+import { assignedImage, imageBasename, imageFolder, imageParent } from '../../shared/image-paths';
+import { imageFile, safeDirectory } from './image-files';
 import { createHash, randomUUID } from 'node:crypto';
 import { RegisteredImages } from './registered-images';
 import type { SettingsStore } from './settings';
@@ -65,10 +68,131 @@ export class ImageLibraryHost {
   ) {
     this.configuration = new ImageLibrarySettings(options.settings, options.writable);
   }
+  assertWritable() {
+    this.options.writable();
+  }
+  async import(input: { filename?: string; base64: string }) {
+    this.options.writable();
+    return this.retain(await this.images.import(input));
+  }
+  async retain(ref: RegisteredImageRef) {
+    this.options.writable();
+    const saved = await this.images.read(ref);
+    this.options.writable();
+    const result = new AssignedImages(this.images.directory).retain(ref, saved.bytes);
+    await this.images.refresh(false, [result.file]);
+    return result;
+  }
+  reconcileGroups() {
+    if (this.images.error) return;
+    try {
+      this.options.writable();
+    } catch {
+      return;
+    }
+    const candidates = new Map<string, RegisteredImageRef[]>();
+    for (const ref of this.images.availableReferences()) {
+      const name = imageBasename(ref.file).toLowerCase();
+      candidates.set(name, [...(candidates.get(name) ?? []), ref]);
+    }
+    const current = this.configuration.snapshot();
+    const next = structuredClone(current);
+    for (const group of next.groups) {
+      group.images = group.images
+        .map((ref) => {
+          const entry = this.images.entry(ref);
+          if (entry && entry.state !== 'missing') return ref;
+          const matches = candidates.get(imageBasename(ref.file).toLowerCase());
+          return matches?.length === 1 ? matches[0] : ref;
+        })
+        .filter(
+          (ref, index, values) => values.findIndex((r) => imageKey(r) === imageKey(ref)) === index,
+        );
+    }
+    if (JSON.stringify(current) !== JSON.stringify(next))
+      this.configuration.plan(next, this.configuration.revision).commit();
+  }
+  async folderOperation(
+    operation: string,
+    folder: string,
+    destination?: string,
+    images: RegisteredImageRef[] = [],
+  ) {
+    this.options.writable();
+    if (!imageFolder(folder) || (destination !== undefined && !imageFolder(destination)))
+      throw Error(hostText('images.folderInvalid'));
+    const root = this.images.directory;
+    safeDirectory(root, '', true);
+    try {
+      if (operation === 'create') {
+        if (!destination) throw Error(hostText('images.folderInvalid'));
+        safeDirectory(root, imageParent(destination));
+        await fs.mkdir(path.join(root, ...destination.split('/')));
+      } else if (operation === 'rename') {
+        if (
+          !folder ||
+          !destination ||
+          destination.toLowerCase().startsWith(folder.toLowerCase() + '/')
+        )
+          throw Error(hostText('images.folderInvalid'));
+        const source = safeDirectory(root, folder);
+        const target = path.join(
+          safeDirectory(root, imageParent(destination)),
+          imageBasename(destination),
+        );
+        if (
+          await fs.lstat(target).then(
+            () => true,
+            (e) => {
+              if (e.code === 'ENOENT') return false;
+              throw e;
+            },
+          )
+        )
+          throw Error(hostText('images.destinationExists'));
+        await fs.rename(source, target);
+      } else if (operation === 'delete') {
+        if (!folder) throw Error(hostText('images.folderInvalid'));
+        await fs.rmdir(safeDirectory(root, folder));
+      } else if (operation === 'move-images') {
+        const targetRoot = safeDirectory(root, folder);
+        for (const ref of images) {
+          if (!imageReference(ref) || assignedImage(ref.file))
+            throw Error(hostText('images.folderInvalid'));
+          const saved = await this.images.read(ref);
+          this.options.writable();
+          const source = imageFile(root, ref.file),
+            target = path.join(targetRoot, imageBasename(ref.file));
+          if (source.toLowerCase() === target.toLowerCase()) continue;
+          safeDirectory(root, imageParent(ref.file));
+          await fs.link(source, target);
+          try {
+            if (!(await fs.readFile(source)).equals(saved.bytes))
+              throw Error(hostText('images.changed'));
+            await fs.unlink(source);
+          } catch (error) {
+            await fs.unlink(target);
+            throw error;
+          }
+        }
+      } else throw Error(hostText('images.folderInvalid'));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOTEMPTY')
+        throw Error(hostText('images.folderNotEmpty'));
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST')
+        throw Error(hostText('images.destinationExists'));
+      throw error;
+    } finally {
+      await this.images.refresh(true);
+      this.reconcileGroups();
+    }
+  }
   async snapshot(): Promise<ImageLibrarySnapshot> {
     await this.images.refresh();
+    this.reconcileGroups();
     return {
       images: this.images.list(),
+      folders: this.images.folders,
       groups: this.options.settings.value.imageLibrary?.groups ?? [],
       revision: this.options.settings.revision,
       error: this.images.error,
@@ -85,7 +209,7 @@ export class ImageLibraryHost {
       filters: [
         {
           name: hostText('services.imageLibraryHost.imageFilter'),
-          extensions: ['png', 'jpg', 'jpeg', 'webp'],
+          extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg'],
         },
       ],
     });
@@ -144,7 +268,8 @@ export class ImageLibraryHost {
       },
     });
   }
-  async registerMany() {
+  async registerMany(folder = '') {
+    if (!imageFolder(folder)) throw Error(hostText('images.folderInvalid'));
     this.options.writable();
     const parent = this.options.window();
     if (!parent || parent.isDestroyed())
@@ -155,7 +280,7 @@ export class ImageLibraryHost {
       filters: [
         {
           name: hostText('services.imageLibraryHost.imageFilter'),
-          extensions: ['png', 'jpg', 'jpeg', 'webp'],
+          extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg'],
         },
       ],
     });
@@ -175,7 +300,7 @@ export class ImageLibraryHost {
           throw Error(hostText('services.imageLibraryHost.sizeLimit'));
         const { ref: image, reused } = await this.images.addWithResult(
           await fs.readFile(source),
-          name,
+          folder ? `${folder}/${name}` : name,
         );
         results.push({ name, image, reused });
       } catch (e) {

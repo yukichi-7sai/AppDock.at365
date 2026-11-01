@@ -131,7 +131,7 @@ test('image references reject paths, URLs, reserved names and extra fields', () 
     { file: 'C:\\a.png' },
     { file: 'CON.png' },
     { file: 'https://a/x.png' },
-    { file: 'a.svg' },
+    { file: 'a.exe' },
     { file: 'a.png', group: 'x' },
     'a.png',
     null,
@@ -251,7 +251,12 @@ test('missing or incomplete images preserve references and recover without setti
   await images.preview(ref);
   await fs.unlink(path.join(images.directory, ref.file));
   await images.refresh();
-  assert.equal(images.list()[0].available, false);
+  assert.equal(images.entry(ref).available, false);
+  assert.equal(
+    images.list().length,
+    0,
+    'missing files leave the physical catalogue while references remain readable',
+  );
   assert.equal(images.icon(ref), decoded().thumbnail);
   await fs.writeFile(path.join(images.directory, ref.file), Buffer.from('partial'));
   await images.refresh();

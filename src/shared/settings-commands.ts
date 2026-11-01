@@ -44,7 +44,7 @@ export function settingInputSchema(field: SettingDefinition): Record<string, unk
         { type: 'null' },
         {
           type: 'object',
-          properties: { file: { type: 'string', minLength: 1, maxLength: 180 } },
+          properties: { file: { type: 'string', minLength: 1 } },
           required: ['file'],
           additionalProperties: false,
         },

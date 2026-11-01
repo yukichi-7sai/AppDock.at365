@@ -37,6 +37,44 @@ function fixture(t, name = 'PC-A', collections = []) {
 }
 const disk = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
+test('saving a new ribbon image keeps an immutable copy across source deletion and settings restart', (t) => {
+  const { store, base, file } = fixture(t);
+  const images = path.join(base, 'assets/images');
+  fs.mkdirSync(images, { recursive: true });
+  const source = Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M1 1h20v20Z"/></svg>',
+  );
+  fs.writeFileSync(path.join(images, 'heart.svg'), source);
+  const next = structuredClone(store.value);
+  next.ribbon.groups = [
+    {
+      id: 'group:copy',
+      title: 'Copy',
+      icon: 'folder',
+      expansion: 'persistent',
+      children: [],
+      image: { file: 'heart.svg' },
+    },
+  ];
+  next.ribbon.order = ['group:copy'];
+  store.save(next, store.revision);
+  const selected = store.value.ribbon.groups[0].image;
+  assert.match(selected.file, /^@assigned\/[a-f0-9]{64}\.svg$/);
+  fs.unlinkSync(path.join(images, 'heart.svg'));
+  store.close();
+  const restarted = new DeviceSettingsStore(file, path.join(base, 'local'), 'PC-A');
+  t.after(() => restarted.close());
+  restarted.load();
+  assert.deepEqual(restarted.value.ribbon.groups[0].image, selected);
+  assert.deepEqual(
+    fs.readFileSync(path.join(base, 'assets/assigned-images', selected.file.split('/')[1])),
+    source,
+  );
+  const unrelated = structuredClone(restarted.value);
+  unrelated.host.soundEnabled = !unrelated.host.soundEnabled;
+  restarted.save(unrelated, restarted.revision);
+});
+
 test('rapid Applet toggles preserve PC settings while both settings observers are reading', async (t) => {
   const { store, file, base } = fixture(t);
   const readErrors = [];

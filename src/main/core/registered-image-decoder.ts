@@ -1,3 +1,4 @@
+import { svgSource, validateSvg } from '../../shared/svg-image';
 import { hostText } from '../../shared/i18n';
 import { BrowserWindow, nativeImage } from 'electron';
 import type { DecodedImage } from './registered-images';
@@ -23,13 +24,13 @@ export function disposeRegisteredImageDecoder() {
 
 // NativeImage on Windows decodes PNG/JPEG. Chromium also decodes static WebP.
 // The private, sandboxed renderer receives bytes only and returns small derivatives.
-const browserDecode = `(async ({source,edge}) => {
+const browserDecode = `(async ({source,edge,svg}) => {
   const image = new Image(); image.src = source; await image.decode();
   const width = image.naturalWidth, height = image.naturalHeight;
   if (!width || !height || width > 8192 || height > 8192 || width * height > 16777216)
     throw new Error('Invalid dimensions');
   const preview = document.createElement('canvas');
-  const scale = edge === 64 ? 64 / Math.max(width, height) : Math.min(1, edge / Math.max(width, height));
+  const scale = edge === 64 ? 64 / Math.max(width, height) : (svg ? edge / Math.max(width, height) : Math.min(1, edge / Math.max(width, height)));
   preview.width = Math.max(1, Math.round(width * scale));
   preview.height = Math.max(1, Math.round(height * scale));
   preview.getContext('2d').drawImage(image, 0, 0, preview.width, preview.height);
@@ -40,7 +41,7 @@ const browserDecode = `(async ({source,edge}) => {
   return {width,height,thumbnail:preview.toDataURL('image/png'),circle:circle.toDataURL('image/png')};
 })`;
 
-function decodeWebP(bytes: Buffer, edge = 64): Promise<DecodedImage> {
+function decodeWebP(bytes: Buffer, edge = 64, svg = false): Promise<DecodedImage> {
   const task = queue.then(async () => {
     if (stopped) throw Error(hostText('services.registeredImageDecoder.closed'));
     clearTimeout(idle);
@@ -72,7 +73,7 @@ function decodeWebP(bytes: Buffer, edge = 64): Promise<DecodedImage> {
         (async () => {
           await ready;
           return worker!.webContents.executeJavaScript(
-            `${browserDecode}(${JSON.stringify({ source: 'data:image/webp;base64,' + bytes.toString('base64'), edge })})`,
+            `${browserDecode}(${JSON.stringify({ source: 'data:image/' + (svg ? 'svg+xml' : 'webp') + ';base64,' + bytes.toString('base64'), edge, svg })})`,
           );
         })(),
         new Promise<never>((_, reject) => {
@@ -100,6 +101,10 @@ function decodeWebP(bytes: Buffer, edge = 64): Promise<DecodedImage> {
 export async function decodeRegisteredImage(bytes: Buffer, edge = 64): Promise<DecodedImage> {
   if (![64, 512, 1024, 2048].includes(edge))
     throw Error(hostText('services.registeredImageDecoder.invalidSize'));
+  if (svgSource(bytes.toString('utf8'))) {
+    validateSvg(bytes.toString('utf8'));
+    return decodeWebP(bytes, edge, true);
+  }
   if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP')
     return decodeWebP(bytes, edge);
   const source = nativeImage.createFromBuffer(bytes),

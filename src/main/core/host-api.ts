@@ -201,7 +201,7 @@ export function createHostApi(
         if (method === 'host.registeredImages.import') {
           if (settings.writesBlocked)
             throw Error(hostText('services.hostApi.settingsRecoveryRequired'));
-          return imageLibrary.images.import(p as { base64: string; filename?: string });
+          return imageLibrary.import(p as { base64: string; filename?: string });
         }
         const generation = e.runtimeSession;
         const file = await imageLibrary.copyToCache(

@@ -1,7 +1,10 @@
 import { hostText } from '../../shared/i18n';
+import { svgSource, validateSvg } from '../../shared/svg-image';
 import fs from 'node:fs/promises';
 import { watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
+import { assignedImage, imageParent } from '../../shared/image-paths';
+import { imageFile, safeDirectory, scanImageTree } from './image-files';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   imageFilename,
@@ -42,10 +45,16 @@ export function imageFormat(bytes: Buffer) {
   if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'jpeg';
   if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP')
     return 'webp';
+  const text = bytes.toString('utf8');
+  if (svgSource(text)) {
+    validateSvg(text);
+    return 'svg';
+  }
   throw Error(hostText('services.registeredImages.selectFormat'));
 }
 export class RegisteredImages {
   private entries = new Map<string, ImageRecord>();
+  folders: string[] = [''];
   private queue: Promise<unknown> = Promise.resolve();
   private reads: Promise<unknown> = Promise.resolve();
   private stopped = false;
@@ -59,6 +68,8 @@ export class RegisteredImages {
   private pendingFiles = new Set<string>();
   private watcher?: FSWatcher;
   private listeners = new Set<() => void>();
+  private deferredChanges = 0;
+  private changedWhileDeferred = false;
   error?: string;
   constructor(
     readonly directory: string,
@@ -70,8 +81,20 @@ export class RegisteredImages {
     this.listeners.add(callback);
     return () => this.listeners.delete(callback);
   }
+  async batch<T>(action: () => Promise<T>): Promise<T> {
+    this.deferredChanges++;
+    try {
+      return await action();
+    } finally {
+      this.deferredChanges--;
+      if (!this.deferredChanges && this.changedWhileDeferred) {
+        this.changedWhileDeferred = false;
+        this.notify();
+      }
+    }
+  }
   private async root(create = false) {
-    if (create) await fs.mkdir(this.directory, { recursive: true });
+    if (create) safeDirectory(this.directory, '', true);
     const real = await fs.realpath(this.directory);
     if (
       real.toLowerCase() !== path.resolve(this.directory).toLowerCase() ||
@@ -116,6 +139,10 @@ export class RegisteredImages {
   }
   private notify() {
     if (this.stopped) return;
+    if (this.deferredChanges) {
+      this.changedWhileDeferred = true;
+      return;
+    }
     this.changed();
     for (const callback of this.listeners) callback();
   }
@@ -148,8 +175,12 @@ export class RegisteredImages {
     if (changed) this.notify();
   }
   private async fileSignature(name: string) {
-    const file = path.join(this.directory, name),
-      stat = await fs.lstat(file);
+    const file = imageFile(this.directory, name);
+    safeDirectory(
+      assignedImage(name) ? path.dirname(file) : this.directory,
+      assignedImage(name) ? '' : imageParent(name),
+    );
+    const stat = await fs.lstat(file);
     if (
       stat.isSymbolicLink() ||
       !stat.isFile() ||
@@ -174,7 +205,7 @@ export class RegisteredImages {
       if (!interest.active()) throw Error(hostText('services.registeredImages.changed'));
     };
     checkInterest();
-    await this.refresh();
+    await this.refresh(false, [ref.file]);
     checkInterest();
     const record = this.entries.get(imageKey(ref));
     if (!record || !this.current(record))
@@ -203,7 +234,7 @@ export class RegisteredImages {
       check();
       let decoding = false;
       try {
-        await this.root();
+        if (!assignedImage(ref.file)) await this.root();
         if ((await this.fileSignature(record.entry.ref.file)).signature !== record.signature) {
           await this.refresh();
           throw Error(hostText('services.registeredImages.changed'));
@@ -271,7 +302,7 @@ export class RegisteredImages {
   }
   private async fileBytes(name: string) {
     if (!imageFilename(name)) throw Error(hostText('services.registeredImages.invalidFilename'));
-    const file = path.join(this.directory, name);
+    const file = imageFile(this.directory, name);
     const stat = await fs.lstat(file);
     if (
       stat.isSymbolicLink() ||
@@ -300,7 +331,7 @@ export class RegisteredImages {
       if (!generation || (expectedHash && expectedHash !== original.hash))
         throw Error(hostText('services.registeredImages.changed'));
       const commit = options.prepare();
-      const file = path.join(this.directory, original.ref.file);
+      const file = imageFile(this.directory, original.ref.file);
       let recycled = false;
       try {
         await options.trash(file);
@@ -340,17 +371,31 @@ export class RegisteredImages {
     filename: string,
   ): Promise<{ ref: RegisteredImageRef; reused: boolean }> {
     const run = async () => {
+      if (assignedImage(filename))
+        throw Error(hostText('services.registeredImages.invalidFilename'));
       const decoded = await this.validate(bytes, filename);
       await this.root(true);
-      const files = (await fs.readdir(this.directory)).filter(imageFilename);
+      const parent = imageParent(filename);
+      safeDirectory(this.directory, parent, true);
+      const files = (await fs.readdir(path.dirname(imageFile(this.directory, filename))))
+        .map((name) => (parent ? parent + '/' + name : name))
+        .filter(imageFilename);
       const existing = files.find((n) => n.toLowerCase() === filename.toLowerCase());
       const name = existing ?? filename,
         ref = { file: name };
       const duplicate = async () => {
-        const saved = await this.read(ref);
-        if (!saved.bytes.equals(bytes))
+        const before = await this.fileSignature(name);
+        if (!(await this.fileBytes(name)).equals(bytes))
           throw Error(hostText('services.registeredImages.duplicateName', { name: String(name) }));
-        return { ref: saved.ref, reused: true };
+        if ((await this.fileSignature(name)).signature !== before.signature)
+          throw Error(hostText('services.registeredImages.changed'));
+        const old = this.entries.get(imageKey(ref));
+        const record =
+          old?.signature === before.signature
+            ? old
+            : this.replace(name, before.signature, before.bytes, old);
+        this.publish(record, decoded, createHash('sha256').update(bytes).digest('hex'), false);
+        return { ref, reused: true };
       };
       if (existing) return duplicate();
       const temp = path.join(this.directory, `.${randomUUID()}.tmp`);
@@ -360,7 +405,7 @@ export class RegisteredImages {
         await handle.sync();
         await handle.close();
         try {
-          await fs.link(temp, path.join(this.directory, name));
+          await fs.link(temp, imageFile(this.directory, name));
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'EEXIST') return await duplicate();
           throw error;
@@ -371,8 +416,8 @@ export class RegisteredImages {
       }
       // A scan already in progress may have enumerated the directory before this addition.
       if (this.refreshing) await this.refreshing;
-      await this.refresh();
-      const record = this.entries.get(imageKey(ref));
+      const stat = await this.fileSignature(name);
+      const record = this.replace(name, stat.signature, stat.bytes);
       if (
         !record ||
         !(await this.fileBytes(name)).equals(bytes) ||
@@ -406,6 +451,7 @@ export class RegisteredImages {
   }
   list() {
     return [...this.entries.values()]
+      .filter((v) => !assignedImage(v.entry.ref.file) && v.entry.state !== 'missing')
       .map((v) => structuredClone(v.entry))
       .sort((a, b) => a.ref.file.localeCompare(b.ref.file, 'ja'));
   }
@@ -413,7 +459,7 @@ export class RegisteredImages {
   availableReferences(): RegisteredImageRef[] {
     if (this.error) return [];
     return [...this.entries.values()]
-      .filter(({ entry }) => entry.available)
+      .filter(({ entry }) => entry.available && !assignedImage(entry.ref.file))
       .map(({ entry }) => ({ file: entry.ref.file }))
       .sort((a, b) => a.file.localeCompare(b.file, 'ja'));
   }
@@ -435,6 +481,7 @@ export class RegisteredImages {
     if (!record.entry.available) return this.icon(ref, shape) || undefined;
     return {
       key: `${imageKey(record.entry.ref)}:${record.entry.generation}:${shape}`,
+      monochrome: /\.svg$/i.test(record.entry.ref.file),
       load: async () => {
         if (!this.current(record)) throw Error(hostText('services.registeredImages.changed'));
         if (!record.decoded) await this.read(record.entry.ref, record.entry.generation);
@@ -444,7 +491,8 @@ export class RegisteredImages {
     };
   }
   async preview(ref: unknown) {
-    await this.refresh();
+    if (!imageReference(ref)) return undefined;
+    await this.refresh(false, [ref.file]);
     const asset = this.asset(ref);
     return typeof asset === 'string' ? asset : asset ? asset.load() : undefined;
   }
@@ -474,14 +522,15 @@ export class RegisteredImages {
     this.entries.set(name.toLowerCase(), record);
     return record;
   }
-  refresh(retry = false): Promise<void> {
+  refresh(retry = false, files?: string[]): Promise<void> {
     if (this.stopped) return Promise.resolve();
     if (retry && this.refreshing) return this.refreshing.then(() => this.refresh(true));
     if (retry)
       for (const record of this.entries.values())
         if (record.entry.state === 'error') record.signature = '';
-    if (this.refreshing) return this.refreshing;
-    return this.beginRefresh();
+    if (this.refreshing)
+      return files ? this.refreshing.then(() => this.refresh(false, files)) : this.refreshing;
+    return this.beginRefresh(files);
   }
   private requestRefresh(files?: string[]) {
     if (this.stopped) return;
@@ -502,7 +551,10 @@ export class RegisteredImages {
     });
     return this.refreshing;
   }
-  private async connectWatch(directory = this.directory, recover = true): Promise<void> {
+  private async connectWatch(
+    directory = path.dirname(this.directory),
+    recover = true,
+  ): Promise<void> {
     const connectionGeneration = ++this.connectionGeneration;
     while (this.watching && !this.stopped) {
       if (this.watcher && this.watchedDirectory === directory) return;
@@ -514,15 +566,57 @@ export class RegisteredImages {
           throw Error('Redirected image watch directory');
         if (!this.watching || this.stopped || connectionGeneration !== this.connectionGeneration)
           return;
-        const next = watch(directory, (_, filename) => {
-          if (this.watcher !== next || this.stopped) return;
-          const name = filename?.toString();
-          if (directory !== this.directory) {
-            const expected = path.relative(directory, this.directory).split(path.sep)[0];
-            if (!name || name.toLowerCase() === expected.toLowerCase()) this.requestRefresh();
-          } else if (!name) this.requestRefresh();
-          else if (imageFilename(name)) this.requestRefresh([name]);
-        });
+        const next = watch(
+          directory,
+          { recursive: directory === this.directory || directory === path.dirname(this.directory) },
+          (event, filename) => {
+            if (this.watcher !== next || this.stopped) return;
+            const name = filename?.toString().replace(/\\/g, '/');
+            // Atomic publication generates temporary-file events beside the library.
+            // They cannot add a folder or a supported image; scanning the whole tree
+            // for each event would make a bulk import quadratic.
+            if (name && /(?:^|\/)\.[a-f0-9-]{36}\.tmp$/i.test(name)) return;
+            if (directory === path.dirname(this.directory)) {
+              const prefix = path.basename(this.directory) + '/';
+              const relative = name?.startsWith(prefix)
+                ? name.slice(prefix.length)
+                : name?.startsWith('assigned-images/')
+                  ? '@assigned/' + name.slice('assigned-images/'.length)
+                  : undefined;
+              // Windows emits directory mtime changes alongside each recursive file event.
+              // Directory creation/removal/renaming arrives as "rename" separately.
+              if (
+                event === 'change' &&
+                (name === path.basename(this.directory) || name === 'assigned-images')
+              )
+                return;
+              if (relative && imageFilename(relative)) {
+                if (this.folders.includes(relative)) {
+                  if (event === 'rename') this.requestRefresh();
+                } else
+                  void fs.lstat(imageFile(this.directory, relative)).then(
+                    (stat) => {
+                      if (!stat.isDirectory()) this.requestRefresh([relative]);
+                      else if (event === 'rename') this.requestRefresh();
+                    },
+                    () => this.requestRefresh([relative]),
+                  );
+              } else if (
+                !name ||
+                (event === 'rename' &&
+                  (name === path.basename(this.directory) ||
+                    name.startsWith(prefix) ||
+                    name === 'assigned-images'))
+              )
+                this.requestRefresh();
+            } else if (directory !== this.directory) {
+              const expected = path.relative(directory, this.directory).split(path.sep)[0];
+              if (!name || name.toLowerCase() === expected.toLowerCase()) this.requestRefresh();
+            } else if (!name) this.requestRefresh();
+            else if (imageFilename(name)) this.requestRefresh([name]);
+            else this.requestRefresh();
+          },
+        );
         this.watcher?.close();
         this.watcher = next;
         this.watchedDirectory = directory;
@@ -554,20 +648,48 @@ export class RegisteredImages {
   private async scan(files?: string[]) {
     const signature = () =>
       JSON.stringify([
-        this.list(),
-        [...this.entries.values()].map((value) => value.hash),
+        this.folders,
+        [...this.entries.values()].map(({ entry, hash, decoded }) => [
+          entry.ref.file,
+          entry.generation,
+          entry.available,
+          entry.state,
+          hash,
+          decoded,
+        ]),
         this.error,
       ]);
     const previous = signature();
     try {
-      await this.root();
+      try {
+        await this.root();
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
       if (this.stopped) return;
       if (this.watching) await this.connectWatch();
-      const names = files
-        ? files.map((name) => ({ name }))
-        : (await fs.readdir(this.directory, { withFileTypes: true }))
-            .filter((f) => f.isFile() && imageFilename(f.name))
-            .slice(0, 512);
+      let names: { name: string }[];
+      if (files) names = files.map((name) => ({ name }));
+      else {
+        const tree = await scanImageTree(this.directory).catch((error) => {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          return { folders: [''], files: [] as string[] };
+        });
+        this.folders = tree.folders;
+        names = tree.files.map((name) => ({ name }));
+        const assignedRoot = path.join(path.dirname(this.directory), 'assigned-images');
+        try {
+          safeDirectory(assignedRoot, '');
+          names.push(
+            ...(await fs.readdir(assignedRoot))
+              .map((n) => '@assigned/' + n)
+              .filter(imageFilename)
+              .map((name) => ({ name })),
+          );
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+      }
       if (this.stopped) return;
       const seen = new Set<string>();
       for (const f of names) {
@@ -577,7 +699,11 @@ export class RegisteredImages {
           const { signature, bytes } = await this.fileSignature(f.name);
           if (this.stopped) return;
           const old = this.entries.get(key);
-          if (old?.signature === signature && (old.entry.available || old.entry.state === 'error'))
+          if (
+            old?.signature === signature &&
+            old.entry.ref.file === f.name &&
+            (old.entry.available || old.entry.state === 'error')
+          )
             continue;
           this.replace(f.name, signature, bytes, old);
         } catch (error) {

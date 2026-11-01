@@ -142,7 +142,7 @@ export function imageLibrarySettingsTargets(options: {
         applies: () => 'imageLibraryChanged',
         schemaContext: () => candidateRevision,
         options: () => candidates,
-        inputSchema: () => ({ type: 'string', minLength: 1, maxLength: 180 }),
+        inputSchema: () => ({ type: 'string', minLength: 1 }),
         createRow: () => ({}),
         validateField: (_field: SettingDefinition, value: unknown) => {
           if (
