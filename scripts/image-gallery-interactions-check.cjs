@@ -108,11 +108,22 @@ exports.checkGalleryInteractions = async ({
     await page.mouse.up();
     await until(async () => (await count()) === 2, `${region} starts rectangle selection`);
   }
-  let a = await box(0);
-  await page.mouse.click(a.x + 4, a.y + 4);
+  const clickCheckMargin = async () => {
+    const area = await cards.first().locator('.ad-gallery-check-area').boundingBox();
+    await page.mouse.click(area.x + 4, area.y + area.height / 2);
+  };
+  await until(
+    () => cards.first().locator('.ad-gallery-check').isChecked(),
+    'selected checkbox rendered before toggling',
+  );
+  await clickCheckMargin();
   await until(async () => (await count()) === 1, 'checkbox surrounding hit area toggles selection');
   assert.equal(await page.getByRole('dialog').count(), 0);
-  await page.mouse.click(a.x + 4, a.y + 4);
+  await until(
+    async () => !(await cards.first().locator('.ad-gallery-check').isChecked()),
+    'cleared checkbox rendered before reselecting',
+  );
+  await clickCheckMargin();
   await until(async () => (await count()) === 2, 'surrounding hit area can reselect');
   const drag = async (index, expectedCount) => {
     const source = await cards.nth(index).locator('.ad-gallery-image').boundingBox();
@@ -126,7 +137,8 @@ exports.checkGalleryInteractions = async ({
     );
     await until(
       async () =>
-        (await page.getByTestId('gallery-drag-count').textContent()) === `${expectedCount}枚`,
+        (await page.getByTestId('gallery-drag-count').textContent()) ===
+        `${expectedCount}枚を「ドラッグ検証」に追加`,
       'drag count',
     );
     assert.equal(await target.getAttribute('data-gallery-drop'), 'true');
@@ -257,7 +269,7 @@ exports.checkGalleryInteractions = async ({
     el.scrollTop = 0;
   });
   assert.equal((await members()).length, total, 'cancelled drag keeps group membership');
-  a = await box(0);
+  let a = await box(0);
   await page.mouse.move(a.x - 2, a.y + 3);
   await page.mouse.down();
   await page.mouse.move(a.x + 50, a.y + 70, { steps: 5 });

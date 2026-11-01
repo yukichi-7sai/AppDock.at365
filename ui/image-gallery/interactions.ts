@@ -1,5 +1,12 @@
 import type { GalleryModel } from '../../src/shared/image-gallery';
 
+export interface GalleryDropTarget {
+  element: HTMLElement;
+  id: string;
+  description?(count: number): string;
+  hover?(): void;
+  canDrop?: boolean;
+}
 export interface GalleryInteractions {
   root: HTMLElement;
   viewport(): { top: number; bottom: number; left: number; right: number };
@@ -10,7 +17,7 @@ export interface GalleryInteractions {
   reorder(token: string, imageId: string, after: boolean): void;
   clear(): void;
   selectRange(imageIds: string[], additive: boolean): void;
-  targets(): { element: HTMLElement; id: string }[];
+  targets(): GalleryDropTarget[];
   scrollTargets(): HTMLElement[];
   more(): void;
 }
@@ -35,7 +42,9 @@ export function mountGalleryInteractions(
     active: boolean;
     selection: string[];
     transfer?: Promise<{ token: string; count: number }>;
-    target?: { element: HTMLElement; id: string };
+    target?: GalleryDropTarget;
+    count?: number;
+    hoverAt?: number;
     insertion?: { imageId: string; after: boolean };
   };
   let gesture: Gesture | undefined;
@@ -94,7 +103,14 @@ export function mountGalleryInteractions(
         g.target?.element.removeAttribute('data-gallery-drop');
         target?.element.setAttribute('data-gallery-drop', 'true');
         g.target = target;
+        g.hoverAt = target?.hover ? performance.now() + 600 : undefined;
       }
+      if (g.hoverAt !== undefined && performance.now() >= g.hoverAt) {
+        g.hoverAt = undefined;
+        g.target?.hover?.();
+      }
+      if (g.count !== undefined)
+        count.textContent = target?.description?.(g.count) ?? `${g.count}枚`;
       g.insertion = undefined;
       insertion.remove();
       const card = hit?.closest<HTMLElement>('[data-image-id]');
@@ -122,7 +138,7 @@ export function mountGalleryInteractions(
         });
         document.body.append(insertion);
       }
-      badge.dataset.valid = String(!!target || !!g.insertion);
+      badge.dataset.valid = String((!!target && target.canDrop !== false) || !!g.insertion);
       return;
     }
     const viewport = options.root.getBoundingClientRect();
@@ -255,8 +271,9 @@ export function mountGalleryInteractions(
         void g.transfer
           .then((result) => {
             if (gesture === g) {
-              count.textContent = `${result.count}枚`;
+              g.count = result.count;
               badge.dataset.multiple = String(result.count > 1);
+              draw();
             }
           })
           .catch(() => {
@@ -284,7 +301,7 @@ export function mountGalleryInteractions(
       return;
     }
     e.preventDefault();
-    if (g.transfer && target)
+    if (g.transfer && target && target.canDrop !== false)
       void g.transfer
         .then(({ token }) => {
           if (options.enabled()) options.drop(token, target.id);

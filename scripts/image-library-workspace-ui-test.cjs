@@ -11,6 +11,7 @@ const root = path.resolve(__dirname, '..'),
 const profile = path.join(root, '.artifacts', 'image-library-workspace-ui-' + Date.now());
 const directory = path.join(profile, 'data/assets/images');
 fs.mkdirSync(path.join(directory, '素材/空'), { recursive: true });
+fs.mkdirSync(path.join(directory, '移動先/子'), { recursive: true });
 const original = Buffer.from(
   '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12 12 3 21 12 12 21Z"/></svg>',
 );
@@ -165,7 +166,7 @@ const resize = (width, height) =>
       .locator('.ad-gallery-image')
       .click({ modifiers: ['Shift'] });
     await until(async () => (await model()).content.selected === 3, 'shift range');
-    await first.locator('[data-action="membership"]').click();
+    await page.getByRole('button', { name: 'グループに追加', exact: true }).click();
     const add = host.getByRole('dialog', { name: 'グループに追加', exact: true });
     await add.waitFor();
     assert((await add.innerText()).includes('3枚'));
@@ -187,7 +188,7 @@ const resize = (width, height) =>
       'context focus',
     );
     checks.push(
-      'click/Shift selection; card action and right-click include all 201 selected images',
+      'click/Shift selection; toolbar action and right-click include all 201 selected images',
     );
     await page.getByRole('button', { name: '選択を解除', exact: true }).click();
     await first.click({ button: 'right' });
@@ -448,14 +449,14 @@ const resize = (width, height) =>
     await folderDialog.waitFor({ state: 'hidden' });
     await until(async () => (await page.getAttribute('inert')) === null, 'folder rename released');
     await page.getByRole('button', { name: 'すべて選択（2枚）', exact: true }).click();
-    await first.locator('[data-action="delete-image"]').click();
+    await page.getByRole('button', { name: '削除', exact: true }).click();
     const deletion = host.getByRole('dialog', { name: '画像を削除', exact: true });
     await deletion.waitFor();
     assert.equal(await deletion.getByRole('listitem').count(), 2);
     await deletion.getByRole('button', { name: 'キャンセル', exact: true }).click();
     await until(async () => (await page.getAttribute('inert')) === null, 'delete cancel released');
     assert.equal(fs.readdirSync(path.join(directory, '変更テスト')).length, 2);
-    await first.locator('[data-action="delete-image"]').click();
+    await page.getByRole('button', { name: '削除', exact: true }).click();
     await deletion.getByRole('button', { name: '削除', exact: true }).click();
     await deletion.waitFor({ state: 'hidden' });
     await until(async () => (await page.getAttribute('inert')) === null, 'bulk delete released');
@@ -468,11 +469,37 @@ const resize = (width, height) =>
     checks.push(
       'keyboard menu and multiple preview; bulk rename/move/delete cancel/save; folder rename and Explorer path (isolated shell adapter)',
     );
+    checks.push(
+      await require('./image-library-folder-drop-check.cjs')({
+        host,
+        app,
+        page,
+        directory,
+        profile,
+        model,
+        library,
+        until,
+        resize,
+        original,
+      }),
+    );
     const scroller = page.locator('.library-scroll');
-    await scroller.evaluate((el) => {
-      el.scrollTop = el.scrollHeight;
-    });
-    await until(async () => (await model()).content.items.length > 64, 'scroll loads next batch');
+    await until(
+      async () =>
+        (await page.locator('.ad-gallery-card').count()) >= 64 &&
+        (await page.getByRole('slider', { name: '画像サイズ' }).inputValue()) === '260',
+      'wide catalogue and size rendered after drag checks',
+    );
+    await host.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    const beforeScroll = (await model()).content.items.length;
+    await scroller.hover();
+    await host.mouse.wheel(0, await scroller.evaluate((el) => el.scrollHeight));
+    await until(
+      async () => (await model()).content.items.length > beforeScroll,
+      'scroll loads next batch',
+    );
     await page.getByRole('slider', { name: '画像サイズ' }).press('Home');
     await until(async () => (await model()).content.cardWidth === 40, 'smallest size saved');
     await until(async () => (await model()).content.remaining === 0, 'auto fill viewport');
@@ -526,6 +553,33 @@ const resize = (width, height) =>
     );
     console.log(JSON.stringify({ profile, checks }, null, 2));
   } catch (error) {
+    if (host)
+      await host
+        .evaluate(async () => {
+          const scroller = document.querySelector('.library-scroll');
+          const sentinel = document.querySelector('.library-load-more');
+          const model = await window.dock.pages.get();
+          return {
+            content: model?.content,
+            scroll: scroller && {
+              top: scroller.scrollTop,
+              height: scroller.scrollHeight,
+              clientHeight: scroller.clientHeight,
+              bottom: scroller.getBoundingClientRect().bottom,
+            },
+            sentinel: sentinel && {
+              top: sentinel.getBoundingClientRect().top,
+              text: sentinel.textContent,
+            },
+          };
+        })
+        .then((value) =>
+          fs.writeFileSync(
+            path.join(profile, 'failure-state.json'),
+            JSON.stringify(value, null, 2),
+          ),
+        )
+        .catch(() => {});
     if (host) await host.screenshot({ path: path.join(profile, 'failure.png') }).catch(() => {});
     fs.writeFileSync(
       path.join(profile, 'result.json'),

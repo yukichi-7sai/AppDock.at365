@@ -164,6 +164,67 @@ function fixture() {
     },
   };
 }
+test('folder drops include unrendered selections, survive navigation expansion and keep the current view', async () => {
+  const f = fixture();
+  f.host.images.folders = ['', 'target'];
+  f.state.query = 'image';
+  await f.act('select-all');
+  const before = f.entries;
+  f.host.rename = async (entries, names, folder) => {
+    assert.equal(entries.length, 130);
+    assert.deepEqual(entries, before);
+    const refs = names.map((name) => ({ file: folder + '/' + name }));
+    f.setEntries(entries.map((entry, i) => ({ ...entry, ref: refs[i] })));
+    for (const group of f.value.groups)
+      group.images = group.images.map(
+        (ref) => refs[before.findIndex((entry) => entry.ref.file === ref.file)],
+      );
+    return refs;
+  };
+  const first = f.session.snapshot().content.items[0];
+  const drag = await f.act('drag-start', { imageId: first.id });
+  await f.act('layout', {
+    value: { sidebarWidth: 220, collapsedFolders: [], collapsedGroups: [] },
+  });
+  await f.act('drop-folder', { token: drag.token, folder: 'target' });
+  const content = f.session.snapshot().content;
+  assert.equal(content.selected, 130);
+  assert.equal(content.items.length, 64);
+  assert.equal(content.folder, '*');
+  assert.equal(content.query, 'image');
+  assert.equal(content.group, 'all');
+  assert.match(content.message, /130.*target/);
+  assert(
+    f.value.groups.every((group) => group.images.every((ref) => ref.file.startsWith('target/'))),
+  );
+  await assert.rejects(f.act('drop-folder', { token: drag.token, folder: '' }), /Stale/);
+});
+
+test('folder drop uses the drag-time generation and rejects changed views and invalid destinations', async () => {
+  const f = fixture();
+  f.host.images.folders = ['', 'target'];
+  const first = f.session.snapshot().content.items[0];
+  let drag = await f.act('drag-start', { imageId: first.id });
+  await f.act('query', { value: 'image' });
+  await assert.rejects(f.act('drop-folder', { token: drag.token, folder: 'target' }), /Stale/);
+  drag = await f.act('drag-start', { imageId: first.id });
+  await assert.rejects(f.act('drop-folder', { token: drag.token, folder: '../outside' }));
+  drag = await f.act('drag-start', { imageId: first.id });
+  f.setEntries(f.entries.map((entry, i) => (i ? entry : { ...entry, generation: 'replacement' })));
+  let calls = 0;
+  f.host.rename = async (entries) => {
+    calls++;
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].generation, 'hash0');
+    throw Error('confirmed image changed');
+  };
+  await assert.rejects(f.act('drop-folder', { token: drag.token, folder: 'target' }), /changed/);
+  assert.equal(calls, 1);
+  assert.equal(f.state.busy, false);
+  assert.equal(f.state.folder, '*');
+  assert.equal(f.entries[0].ref.file, 'image-000.png');
+});
+
 test('view state creates no file until a valid edit; surfaces remain independent and corrupt files survive', () => {
   const file = path.join(root, 'state.json'),
     store = new GalleryViewStateStore(file);

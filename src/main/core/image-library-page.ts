@@ -6,7 +6,7 @@ import {
   type IconImportProgress,
   type IconImportRetry,
 } from './icon-set-import';
-import { imageFolder } from '../../shared/image-paths';
+import { imageBasename, imageFolder } from '../../shared/image-paths';
 import { randomUUID } from 'node:crypto';
 import type { HostPageController } from './host-page-controller';
 import type { HostPageAction } from '../../shared/host-pages';
@@ -53,7 +53,15 @@ export class ImageLibraryPageState {
     this.retryIconSet = undefined;
     this.retryIcons = undefined;
   }
-  message = '';
+  private messageValue = '';
+  messageRevision = 0;
+  get message() {
+    return this.messageValue;
+  }
+  set message(value: string) {
+    this.messageValue = value;
+    this.messageRevision++;
+  }
   feedbackRevision = 0;
   busy = false;
   retry?: ImageLibraryEdit;
@@ -89,6 +97,7 @@ export class ImageLibraryPageSession implements HostPageController {
   private groups = new Map<string, string>();
   private drag?: {
     token: string;
+    entries: RegisteredImageEntry[];
     images: { image: RegisteredImageRef; before: string[] }[];
     group?: ImageGroup;
   };
@@ -238,19 +247,7 @@ export class ImageLibraryPageSession implements HostPageController {
         state: e.available ? 'ready' : (e.state ?? 'missing'),
         selected: s.selected.has(key),
         selectable: !s.busy,
-        actions: [
-          {
-            id: 'membership',
-            title: hostText('services.imageLibraryPage.group'),
-            disabled: s.busy,
-          },
-          {
-            id: 'delete-image',
-            title: hostText('services.imageLibraryPage.delete'),
-            disabled: !e.available || s.busy,
-          },
-          { id: 'menu', title: hostText('images.moreActions'), disabled: s.busy },
-        ],
+        actions: [],
       })),
       total: matched.length,
       remaining: Math.max(0, matched.length - s.count),
@@ -260,6 +257,7 @@ export class ImageLibraryPageSession implements HostPageController {
       sizeError: s.sizeError,
       error: s.error || this.options.host.images.error || '',
       message: s.message,
+      messageRevision: s.messageRevision,
       busy: s.busy,
       anchor:
         s.anchor && this.items.has(s.anchor.key)
@@ -293,9 +291,17 @@ export class ImageLibraryPageSession implements HostPageController {
     const s = this.options.state;
     this.catalogue();
     if (
-      !['image', 'anchor', 'width', 'more', 'drag-start', 'drop', 'reorder'].includes(
-        action.command,
-      )
+      ![
+        'image',
+        'anchor',
+        'width',
+        'layout',
+        'more',
+        'drag-start',
+        'drop',
+        'drop-folder',
+        'reorder',
+      ].includes(action.command)
     )
       this.drag = undefined;
     const resolveImage = (id: string) => {
@@ -551,6 +557,7 @@ export class ImageLibraryPageSession implements HostPageController {
           }
         this.drag = {
           token: randomUUID(),
+          entries: keys.map((k) => structuredClone(this.items.get(k)!.entry)),
           group: structuredClone(this.options.groups().find((g) => s.group === `group:${g.id}`)),
           images: keys.map((k) => ({
             image: this.items.get(k)!.entry.ref,
@@ -558,6 +565,46 @@ export class ImageLibraryPageSession implements HostPageController {
           })),
         };
         return { token: this.drag.token, count: this.drag.images.length };
+      } else if (action.command === 'drop-folder') {
+        const drag = this.drag;
+        this.drag = undefined;
+        if (!drag || drag.token !== action.token) throw Error('Stale gallery drag');
+        if (
+          !imageFolder(action.folder) ||
+          !this.options.host.images.folders.includes(action.folder)
+        )
+          throw Error(hostText('images.folderInvalid'));
+        const selected = [...s.selected];
+        const view = s.viewRevision;
+        s.busy = true;
+        s.error = '';
+        s.message = '';
+        this.options.changed();
+        try {
+          const moved = await this.options.host.rename(
+            drag.entries,
+            drag.entries.map((entry) => imageBasename(entry.ref.file)),
+            action.folder,
+          );
+          if (!this.closed && s.viewRevision === view) {
+            const mapping = new Map(
+              drag.entries.map((entry, i) => [imageKey(entry.ref), imageKey(moved[i])]),
+            );
+            s.selected = new Set(selected.map((key) => mapping.get(key) ?? key));
+            this.catalogue();
+            s.message = hostText('images.movedToFolder', {
+              count: moved.length,
+              folder: action.folder || hostText('images.rootFolder'),
+            });
+          }
+        } catch (e) {
+          s.error = (e as Error).message;
+          this.options.failed(s.error);
+          throw e;
+        } finally {
+          s.busy = false;
+          this.options.changed();
+        }
       } else if (action.command === 'drop') {
         const feedbackRevision = s.feedbackRevision;
         const drag = this.drag;

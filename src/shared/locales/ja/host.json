@@ -3425,5 +3425,11 @@
   "images.setUnknown": "このアイコンセットには対応していません。",
   "images.downloadFailed": "アイコンセットをダウンロードできませんでした。接続を確認して再実行してください。",
   "images.integrityFailed": "ダウンロードしたアイコンセットの整合性を確認できませんでした。",
-  "images.svgUnsupported": "このSVGは対応していない記述を含みます。外部参照やスクリプトを含まない静的なSVGを選んでください。"
+  "images.svgUnsupported": "このSVGは対応していない記述を含みます。外部参照やスクリプトを含まない静的なSVGを選んでください。",
+  "images.dragMoveToFolder": "{{count}}枚を「{{folder}}」へ移動",
+  "images.movedToFolder": "{{count}}枚を「{{folder}}」へ移動しました",
+  "images.dragAddToGroup": "{{count}}枚を「{{group}}」に追加",
+  "images.dragChooseFolder": "{{count}}枚の移動先を選択",
+  "images.delete": "削除",
+  "images.editMembership": "所属グループを編集"
 }

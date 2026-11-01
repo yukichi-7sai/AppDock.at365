@@ -305,6 +305,7 @@
 }
 .ad-gallery-drag-badge span {
   display: block;
+  overflow-wrap: anywhere;
   text-align: center;
   font-weight: 600;
 }

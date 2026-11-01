@@ -144,6 +144,7 @@ export interface ImageLibraryPageModel {
     sizeError: string;
     error: string;
     message: string;
+    messageRevision: number;
     busy: boolean;
     remaining: number;
     anchor?: GalleryAnchor;
@@ -178,6 +179,7 @@ export type ImageLibraryPageAction = {
   | { command: 'select-range'; imageIds: string[]; additive: boolean }
   | { command: 'drag-start'; imageId: string }
   | { command: 'drop'; token: string; groupId: string }
+  | { command: 'drop-folder'; token: string; folder: string }
   | { command: 'reorder'; token: string; imageId: string; after: boolean }
   | { command: 'select-all' | 'clear' | 'more' | 'reload' | 'add' | 'retry-membership' }
   | { command: 'width'; value: number; commit: boolean }

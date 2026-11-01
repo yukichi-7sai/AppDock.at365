@@ -10,6 +10,8 @@ export * from '../../src/shared/image-gallery';
 import { mountGalleryInteractions, type GalleryInteractions } from './interactions';
 
 export interface GalleryOptions {
+  /** Show the complete group list; the owning surface provides wrapping/scrolling. */
+  expandLabels?: boolean;
   size?: GallerySize;
   /** Library selection and context menus are opt-in; picker activation stays unchanged. */
   clickSelect?(id: string, event: MouseEvent): void;
@@ -283,10 +285,17 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         card.title.textContent = item.title;
         card.title.title = item.title;
         card.detail.textContent = item.detail;
-        const tags = item.labels.slice(0, 2);
-        if (item.labels.length > 2) tags.push(`ほか${item.labels.length - 2}件`);
+        const tags = options.expandLabels ? item.labels : item.labels.slice(0, 2);
+        if (!options.expandLabels && item.labels.length > 2)
+          tags.push(`ほか${item.labels.length - 2}件`);
         if (card.labels.dataset.signature !== JSON.stringify(tags)) {
-          card.labels.replaceChildren(...tags.map((v) => element('span', 'ad-gallery-tag', v)));
+          card.labels.replaceChildren(
+            ...tags.map((v) => {
+              const label = element('span', 'ad-gallery-tag', v);
+              label.title = v;
+              return label;
+            }),
+          );
           card.labels.dataset.signature = JSON.stringify(tags);
         }
         if (item.state === 'error' || item.state === 'missing') {

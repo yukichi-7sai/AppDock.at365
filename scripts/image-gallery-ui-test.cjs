@@ -369,7 +369,9 @@ async function selectedBorder(label) {
       'gallery restored',
     );
     await action('group', { groupId: 'all' });
-    await card('image-000.png').getByRole('button', { name: 'グループ', exact: true }).click();
+    await action('clear');
+    await card('image-000.png').click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '所属グループを編集', exact: true }).click();
     d = host.getByRole('dialog', { name: '所属グループを編集', exact: true });
     await d.getByLabel('新しいグループ', { exact: true }).check();
     await d.getByRole('button', { name: '適用', exact: true }).click();
@@ -451,11 +453,10 @@ async function selectedBorder(label) {
     await action('group', { groupId: 'all' });
     await action('reload');
     await card('image-000.png').waitFor();
-    assert.deepEqual(
-      await card('image-000.png').locator('.ad-gallery-actions button').allTextContents(),
-      ['グループ', '削除', 'その他の操作'],
-    );
-    await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
+    assert.equal(await card('image-000.png').locator('.ad-gallery-actions button').count(), 0);
+    await action('clear');
+    await card('image-000.png').locator('.ad-gallery-image').click();
+    await page.getByRole('button', { name: '削除', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像を削除', exact: true });
     await d.getByRole('button', { name: 'キャンセル', exact: true }).click();
     assert.equal(hash(path.join(images, 'image-000.png')), originalHash);
@@ -467,7 +468,7 @@ async function selectedBorder(label) {
       };
       await window.dock.saveSettings(s.settings.value, s.settings.revision);
     });
-    await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
+    await page.getByRole('button', { name: '削除', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像を削除', exact: true });
     assert(await d.getByRole('button', { name: '削除', exact: true }).isDisabled());
     assert.match(await d.innerText(), /使用中/);
@@ -483,7 +484,7 @@ async function selectedBorder(label) {
         throw Error('recycle fixture failure');
       };
     });
-    await card('image-000.png').getByRole('button', { name: '削除', exact: true }).click();
+    await page.getByRole('button', { name: '削除', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像を削除', exact: true });
     await d.getByRole('button', { name: '削除', exact: true }).click();
     await d
@@ -519,7 +520,7 @@ async function selectedBorder(label) {
       delete global.__galleryTrash;
     });
     checks.push(
-      'image deletion: footer order, cancel, in-use guard, recycle failure/retry, memberships and catalogue removal (isolated recycle adapter)',
+      'image deletion: toolbar action, cancel, in-use guard, recycle failure/retry, memberships and catalogue removal (isolated recycle adapter)',
     );
     await action('select', { imageId: (await model()).content.items[0].id, selected: true });
     const beforeRoute = (await model()).content;
@@ -554,7 +555,7 @@ async function selectedBorder(label) {
       const geometry = await page.locator('.ad-gallery-card').evaluateAll((cards) =>
         cards.slice(0, 6).map((c) => ({
           top: c.getBoundingClientRect().top,
-          bottom: c.querySelector('.ad-gallery-actions').getBoundingClientRect().bottom,
+          bottom: c.getBoundingClientRect().bottom,
           width: c.querySelector('.ad-gallery-image').getBoundingClientRect().width,
           height: c.querySelector('.ad-gallery-image').getBoundingClientRect().height,
         })),

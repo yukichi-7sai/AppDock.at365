@@ -51,6 +51,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     layoutRef = useRef(layout);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [focusedFile, setFocusedFile] = useState('');
+  const [toast, setToast] = useState('');
   const [narrow, setNarrow] = useState(false),
     [drawer, setDrawer] = useState(false);
   const [dialogPending, setDialogPending] = useState(false),
@@ -233,6 +234,12 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     else if (!item.selected) run({ command: 'select-range', imageIds: [id], additive: false });
   };
   useEffect(() => {
+    setToast(model.content.busy ? '' : model.content.message);
+    if (model.content.busy || !model.content.message) return;
+    const timer = window.setTimeout(() => setToast(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [model.id, model.content.message, model.content.messageRevision, model.content.busy]);
+  useEffect(() => {
     if (latest.current.id === initialModel.id && latest.current.revision > initialModel.revision)
       return;
     latest.current = initialModel;
@@ -281,6 +288,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
   }, [narrow, drawer]);
   useLayoutEffect(() => {
     const instance = mountImageGallery(grid.current!, {
+      expandLabels: true,
       size: libraryGallerySize,
       scrollElement: scroll.current!,
       clickSelect: select,
@@ -292,14 +300,56 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
         canReorder: () => !['all', 'unfiled'].includes(latest.current.content.group),
         beginDrag: async (imageId) =>
           (await act({ command: 'drag-start', imageId })) as { token: string; count: number },
-        drop: (token, groupId) => run({ command: 'drop', token, groupId }),
+        drop: (token, target) =>
+          target.startsWith('folder:')
+            ? run({ command: 'drop-folder', token, folder: target.slice(7) })
+            : run({ command: 'drop', token, groupId: target }),
         reorder: (token, imageId, after) => run({ command: 'reorder', token, imageId, after }),
         clear: () => run({ command: 'clear' }),
         selectRange: (imageIds, additive) => run({ command: 'select-range', imageIds, additive }),
-        targets: () =>
-          [...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-group]') ?? [])].map(
-            (element) => ({ element, id: element.dataset.galleryGroup! }),
-          ),
+        targets: () => [
+          ...[
+            ...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-group]') ?? []),
+          ].map((element) => ({
+            element,
+            id: element.dataset.galleryGroup!,
+            description: (count: number) =>
+              t('images.dragAddToGroup', { count, group: element.title }),
+          })),
+          ...[
+            ...(sidebar.current?.querySelectorAll<HTMLElement>('[data-gallery-folder]') ?? []),
+          ].map((element) => {
+            const folder = element.dataset.galleryFolder!;
+            return {
+              element,
+              id: 'folder:' + folder,
+              description: (count: number) =>
+                t('images.dragMoveToFolder', {
+                  count,
+                  folder: folder || t('images.rootFolder'),
+                }),
+              hover: () => {
+                const current = layoutRef.current;
+                if (current.collapsedFolders.includes(folder))
+                  saveLayout({
+                    ...current,
+                    collapsedFolders: current.collapsedFolders.filter((f) => f !== folder),
+                  });
+              },
+            };
+          }),
+          ...(navigationButton.current && !sidebar.current?.matches(':popover-open')
+            ? [
+                {
+                  element: navigationButton.current,
+                  id: 'navigation',
+                  canDrop: false,
+                  description: (count: number) => t('images.dragChooseFolder', { count }),
+                  hover: () => setDrawer(true),
+                },
+              ]
+            : []),
+        ],
         scrollTargets: () => [scroll.current!, sidebar.current!],
         more,
       },
@@ -461,7 +511,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     folderChildren.set(parent, children);
   }
   const folderRow = (folder: string, level = 0): ReactNode => {
-    const children = folderChildren.get(folder) ?? [],
+    const children = folder ? (folderChildren.get(folder) ?? []) : [],
       closed = layout.collapsedFolders.includes(folder);
     return (
       <div key={folder}>
@@ -484,6 +534,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
           <button
             type="button"
             className="library-folder-name"
+            data-gallery-folder={folder}
             aria-current={c.folder === folder ? 'page' : undefined}
             disabled={c.busy}
             title={folder || t('images.rootFolder')}
@@ -547,6 +598,14 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
         disabled: !count || !c.groups.slice(2).length,
         run: () => edit('batch-add'),
       },
+      ...(count === 1
+        ? [
+            {
+              label: t('images.editMembership'),
+              run: () => edit('membership'),
+            },
+          ]
+        : []),
       {
         label: t('images.removeFromGroup'),
         disabled: !count || !c.groups.slice(2).length,
@@ -712,6 +771,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
               </button>
             </div>
             {folderRow('')}
+            {(folderChildren.get('') ?? []).map((folder) => folderRow(folder))}
           </nav>
           <div className="library-section-heading">
             <strong>{t('images.groups')}</strong>
@@ -977,6 +1037,13 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
                 </SettingsButton>
                 <SettingsButton
                   disabled={!c.selected || c.busy}
+                  onClick={() => dialog('delete-image')}
+                >
+                  <Icon name="trash" size={14} />
+                  {t('images.delete')}
+                </SettingsButton>
+                <SettingsButton
+                  disabled={!c.selected || c.busy}
                   aria-haspopup="menu"
                   onClick={(e) => imageMenu(undefined, e.currentTarget)}
                 >
@@ -988,44 +1055,6 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
                   </button>
                 )}
               </div>
-            </div>
-            <div
-              className="library-status"
-              role="status"
-              hidden={!c.busy && !c.message && !c.sizeError && !c.error && !error}
-            >
-              {c.busy ? t('images.working') : c.message}
-              {c.sizeError && (
-                <div role="alert">
-                  {c.sizeError}
-                  <button
-                    onClick={() => {
-                      saveSize(width);
-                      saveLayout(layoutRef.current);
-                    }}
-                  >
-                    {t('images.retrySave')}
-                  </button>
-                </div>
-              )}
-              {(error || c.error) && (
-                <div role="alert">
-                  {error || c.error}
-                  <button
-                    disabled={c.busy}
-                    onClick={() =>
-                      run({ command: !error && c.canRetryIconImport ? 'retry-import' : 'reload' })
-                    }
-                  >
-                    {t(!error && c.canRetryIconImport ? 'images.importRetry' : 'images.reload')}
-                  </button>
-                  {c.canRetryMembership && (
-                    <button onClick={() => run({ command: 'retry-membership' })}>
-                      {t('images.retryMembership')}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
             <div className="library-grid-pad">
               <div ref={grid} />
@@ -1056,6 +1085,44 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
                 ''
               )}
             </div>
+          </div>
+          <div
+            className="library-status"
+            role="status"
+            hidden={!c.busy && !toast && !c.sizeError && !c.error && !error}
+          >
+            {c.busy ? t('images.working') : toast}
+            {c.sizeError && (
+              <div role="alert">
+                {c.sizeError}
+                <button
+                  onClick={() => {
+                    saveSize(width);
+                    saveLayout(layoutRef.current);
+                  }}
+                >
+                  {t('images.retrySave')}
+                </button>
+              </div>
+            )}
+            {(error || c.error) && (
+              <div role="alert">
+                {error || c.error}
+                <button
+                  disabled={c.busy}
+                  onClick={() =>
+                    run({ command: !error && c.canRetryIconImport ? 'retry-import' : 'reload' })
+                  }
+                >
+                  {t(!error && c.canRetryIconImport ? 'images.importRetry' : 'images.reload')}
+                </button>
+                {c.canRetryMembership && (
+                  <button onClick={() => run({ command: 'retry-membership' })}>
+                    {t('images.retryMembership')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {width < 120 && (
             <div className="library-file-info" title={focusedFile}>
