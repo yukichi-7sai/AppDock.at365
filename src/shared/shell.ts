@@ -184,7 +184,7 @@ export interface ShellApi extends ShellAppletApi {
   ready(sessionId: string): Promise<void>;
   dispose(sessionId: string): Promise<void>;
   get(): Promise<RibbonView>;
-  asset(id: string): Promise<{ dataUrl: string }>;
+  asset(id: string): Promise<{ dataUrl: string; monochrome?: boolean }>;
   invoke(request: UiActionRequest): Promise<unknown>;
   invalidateAnchor(): Promise<void>;
   onChanged(callback: (snapshot: RibbonView) => void): () => void;

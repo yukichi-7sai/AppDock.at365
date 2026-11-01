@@ -71,6 +71,24 @@ test('deferred ribbon assets start loading only when their opaque asset is reque
   assert.equal(loads, 1);
 });
 
+test('SVG presentation returns a monochrome hint with PNG data while retaining opaque asset IDs', async () => {
+  const f = fixture({
+    image: () => ({
+      key: 'private-svg-reference',
+      monochrome: true,
+      load: async () => 'data:image/png;base64,AA==',
+    }),
+  });
+  const view = f.ui.get(),
+    id = view.items.find((item) => item.icon.assetId)?.icon.assetId;
+  assert(id);
+  assert(!JSON.stringify(view).includes('private-svg-reference'));
+  assert.deepEqual(await f.ui.getAsset(id), {
+    dataUrl: 'data:image/png;base64,AA==',
+    monochrome: true,
+  });
+});
+
 function cachedFixture(expansion = 'persistent') {
   let settings = createDefaultSettings(),
     shell = '',

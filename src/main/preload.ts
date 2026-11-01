@@ -60,6 +60,7 @@ const api: DockApi = {
   imageLibrary: {
     snapshot: () => ipcRenderer.invoke('dock:imageLibrary:snapshot'),
     register: () => ipcRenderer.invoke('dock:imageLibrary:register'),
+    retain: (image) => ipcRenderer.invoke('dock:imageLibrary:retain', image),
     edit: (operation) => ipcRenderer.invoke('dock:imageLibrary:edit', operation),
     createImageSession: () => ipcRenderer.invoke('dock:imageLibrary:createImageSession'),
     releaseImageSession: (session) =>

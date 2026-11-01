@@ -39,6 +39,11 @@ export class ImageLibraryDialogs {
     if (operation) {
       if ((operation.kind === 'delete-image') !== (pending.request.kind === 'delete-image'))
         throw Error(hostText('services.imageLibraryDialogs.invalidOperation'));
+      if (
+        (operation.kind === 'folder') !== pending.request.kind.startsWith('folder-') ||
+        (operation.kind === 'import-set') !== (pending.request.kind === 'import-set')
+      )
+        throw Error(hostText('services.imageLibraryDialogs.invalidOperation'));
       pending.busy = true;
       try {
         await this.options.edit(operation, pending.request);

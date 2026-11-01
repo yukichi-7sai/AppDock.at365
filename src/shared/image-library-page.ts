@@ -20,8 +20,17 @@ export type ImageLibraryDialogKind =
   | 'batch-add'
   | 'batch-remove'
   | 'preview'
+  | 'folder-create'
+  | 'folder-rename'
+  | 'folder-delete'
+  | 'folder-move'
+  | 'import-set'
   | 'delete-image';
-export type ImageLibraryDialogOperation = ImageLibraryEdit | { kind: 'delete-image' };
+export type ImageLibraryDialogOperation =
+  | ImageLibraryEdit
+  | { kind: 'delete-image' }
+  | { kind: 'folder'; destination: string }
+  | { kind: 'import-set'; setId: string };
 export interface ImageLibraryDialogRequest {
   id: string;
   kind: ImageLibraryDialogKind;
@@ -30,6 +39,9 @@ export interface ImageLibraryDialogRequest {
   groupId?: string;
   entry?: RegisteredImageEntry;
   deleteBlocked?: boolean;
+  folder?: string;
+  folders?: string[];
+  iconSets?: { id: string; name: string }[];
 }
 export interface ImageLibraryDialogApi {
   onRequest(callback: (request: ImageLibraryDialogRequest | null) => void): () => void;
@@ -43,6 +55,10 @@ export interface ImageLibraryPageModel {
   revision: number;
   dark: boolean;
   content: {
+    iconSets: { id: string; name: string }[];
+    importing?: { phase: 'download' | 'import'; completed: number; total: number };
+    folders: string[];
+    folder: string;
     groups: { id: string; title: string; count: number }[];
     group: string;
     query: string;
@@ -67,6 +83,15 @@ export type ImageLibraryPageAction = {
   type: 'gallery';
 } & (
   | { command: 'query'; value: string }
+  | { command: 'folder'; folder: string }
+  | { command: 'import-set'; setId: string }
+  | { command: 'cancel-import' }
+  | {
+      command: 'folder-action';
+      operation: 'create' | 'rename' | 'delete' | 'move-images';
+      folder: string;
+      destination?: string;
+    }
   | { command: 'group'; groupId: string }
   | { command: 'select'; imageId: string; selected: boolean }
   | { command: 'select-range'; imageIds: string[]; additive: boolean }

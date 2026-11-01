@@ -32,7 +32,7 @@ Gmail 0.12.0以降の共通グループ名簿は`data/web-account-groups/at365.g
 
 ## ファイル名を使う登録素材
 
-- 共通原画像: `data/assets/images/<元ファイル名>`。PNG/JPEG/WebP、5MiB以下。参照は`{file}`、画像の分類は共有`imageLibrary.groups`へ保存し、名前変更や所属変更で原画像を動かさない。詳しくは[共通画像](registered-images.md)。
+- 共通原画像: `data/assets/images/<相対パス>`。PNG/JPEG/WebP/SVG、5MiB以下。実フォルダーを同期し、分類は共有`imageLibrary.groups`へ独立して保存する。設定用コピーは`data/assets/assigned-images/`、参照は`{file}`の予約名前空間`@assigned/`。両方とも共有dataに含める。詳しくは[共通画像](registered-images.md)。
 - Appletの通知音: `data/assets/applets/<Applet ID>/sounds/<元ファイル名>`。Gmailは`at365.gmail`。既存の16MB以下WAV検証を使い、512件まで登録する。ローカル枠の`{enabled,file}`のfileはファイル名だけ。保存された絶対パスをそのまま共有しない。
 - 同一フォルダー内の大文字小文字を無視した同名照合を行う。同名同内容は既存素材を再利用、同名別内容は登録拒否。上書き・連番生成をしない。新規ファイルはexclusive create。登録元・用途の別フォルダーでは同名を使用できる。
 - ファイル名はWindowsの禁止文字/予約名/末尾の空白・点/パス区切りを拒否し、登録rootから外れる参照や転送root/ファイルを受け入れない。任意パスをローカルUIの一覧選択から渡さない。

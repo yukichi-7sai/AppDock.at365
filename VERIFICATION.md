@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-11-01: 画像フォルダー・SVG・設定用コピー・Lucide取り込み 0.115.0
+
+- `main 60e0a0a`をfast-forward確認後、専用worktree `AppDock.at365-image-library` / `codex/image-library-svg`で設計・実装。元checkoutは変更していない。設計と現行契約は`docs/image-library-folders-svg-design.md`、`docs/registered-images.md`、`docs/settings-sync.md`、`docs/shell-api.md`。新しい保存領域・参照とShell応答項目により本体を0.114.2→0.115.0へマイナー更新。SDK/Runtimeは型・実装・通信形状を変えておらず0.28.0を維持した。
+- 実階層の追加・改名・移動・内容変更、空フォルダー、グループとの独立、一意の同名候補だけの追従、620件の遅延列挙、設定用原本コピー、元imagesフォルダー削除後の読取、ネストした画像設定、旧欠落参照保持を確認。保存先のリンク/上位参照、予約された保管領域への通常import、SVGの動的/外部参照を拒否。静的SVGは原bytesを保持して隔離描画し、リボンは現在の文字色を使用する。
+- 発行前レビューは`.artifacts/commit-validation-images/review.md`。Windowsのディレクトリーmtime通知と一時ファイルによる全走査の連鎖を修正し、60件の登録で全走査が増え続けない回帰を追加。ダイアログ確定は既存の要求ID経路へ接続し、背景操作禁止・再試行・親取消を保持。旧単一ファイル名用のAPI総長制限を除き、各要素とroot境界の検証を継続。発行阻害指摘なし。
+- `dev.bat run typecheck`、対象13ファイル145件のNodeテスト、`publish.bat`は終了0、fail/skip 0。対象は保存/監視/SVG/取り込み/画像削除/分類/設定公開API/リボン投影/本体ページ。全機能の標準回帰を今回実行したとの主張はしない。Node 26.13.0 / pnpm 12.15.0 / Electron 45.1.0 / Windows x64。発行前後959ソース・試験・依存定義入力のSHA256一致を`inputs.before.json`と`inputs.after.json`へ保存した。
+- 固定EXEの新機能GUIは6群成功。実フォルダー作成・移動・改名・空削除、Explorer操作と所属追従、親取消、設定確定後の元画像変更/改名/削除、SVGの明暗/グループ状態、実再起動を確認。公式`lucide-static 1.66.0`の全2,292 SVGとLICENSEを取得し、失敗0件。ソース実行33,998ms、発行EXE35,729ms。通信・機器依存の実測であり所要時間の保証ではない。取消・オフライン・整合性不一致・不正SVG・リンク・同名差分は専用テストで確認。性能診断中のGUI取消では追加済み素材の保持も確認した。
+- 既存画像GUI9群と共通ギャラリーGUI12群も固定EXEで成功。Profile/WebApplet、Node/.NET importと自己設定画像のcopyToCache、3ネイティブAppletのRelease build/接続/表示/保存/停止、PNG/JPEG/WebP原本、グループ編集、選択/プレビュー取消とフォーカス、カード寸法/検索/並べ替え、150/200% CSS拡大、狭幅、再起動を確認。ごみ箱障害/復旧は隔離adapter。旧スクリプトのrole・本体本文のbackdrop座標・非同期完了待機を現行UIへ合わせ、検査項目は保持した。
+- 固定EXE証跡: `.artifacts/image-folders-svg-ui-1793512069048/`、`image-library-ui-1793512116609/`、`image-gallery-ui-1793512133551/`。結果・スクリーンショット・実行コピーを保存。新SVGの明暗とLucide一覧画像も目視確認した。入力/ログ/成果物のhashと27群の結果は`.artifacts/commit-validation-images/publication.json`。発行693製品ファイルはstagingと一致し、3試験のコピーEXEも同一hash。
+- 発行先は`A:\40.ARTIFACT\AppDock.at365-image-library`。EXE SHA256=`a8e273554b519b447b45f5c12f81f8baa7e47ff30bc34c11dd4dea9599126ab2`、ZIP SHA256=`a3d905a16fa567e41dc8904bae433d17382cc35c724e5f443cfbf8b647ecefa7`、270,860,228bytes。feed/host manifestは0.115.0。利用者データは管理対象外。mainへの統合・push・Release・実利用deployは実行していない。
+- 制約: 静的SVGの対応要素/属性に限定する。NASでの分散書込み、物理IME、Lucide以外のセットは未検証/未実装。旧設定の一括移行と保管コピーの自動GCは行わない。コミット境界と最終tree照合は同ディレクトリーの`commits.json`に記録する。
+
 ## 2026-11-01: 共通コマンド選択のサイズ調整・可変幅とコミット 0.114.2
 
 - 利用者の最終指定により、本体dialogは基本920×900px（画面内上限を維持）、提供元一覧は従来の170pxを初期値として可変にした。ドラッグ・左右キー・Home/End・ダブルクリックで調整/初期化し、コマンド一覧に240pxを残す。幅はdialog内の一時状態で、設定や保存ファイルを追加していない。狭幅では従来のFilterSelectへ切り替わる。説明欄80pxと内部スクロールを維持。内部UI改善として0.114.1→0.114.2へパッチ更新。

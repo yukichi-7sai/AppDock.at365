@@ -1,4 +1,5 @@
 import { SettingsField } from './settings-ui/SettingsSections';
+import { useHostTranslation } from './HostTranslation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   ImageLibraryDialogRequest,
@@ -56,6 +57,7 @@ function Editor({
   request: ImageLibraryDialogRequest;
   returnFocus: HTMLElement | null;
 }) {
+  const { t } = useHostTranslation();
   const current = r.groups.find((g) => g.id === r.groupId);
   const before = (image: { file: string }) =>
     r.groups.filter((g) => g.images.some((i) => imageKey(i) === imageKey(image))).map((g) => g.id);
@@ -63,11 +65,92 @@ function Editor({
   const [ids, setIds] = useState(r.images[0] ? before(r.images[0]) : []);
   const [target, setTarget] = useState(r.groups[0]?.id ?? '');
   const [error, setError] = useState('');
+  const [folderPath, setFolderPath] = useState(
+    r.kind === 'folder-create' && r.folder ? r.folder + '/' : (r.folder ?? ''),
+  );
+  const [setId, setSetId] = useState(r.iconSets?.[0]?.id ?? '');
   const close = () => {
     void window.dock.imageLibraryDialog.complete(r.id).catch((e) => setError(String(e)));
   };
   const save = (operation: ImageLibraryDialogOperation) =>
     window.dock.imageLibraryDialog.complete(r.id, operation);
+  if (r.kind === 'import-set')
+    return (
+      <SettingsDialog
+        title={t('images.importSet')}
+        applyLabel={t('images.importStart')}
+        returnFocus={returnFocus}
+        closeAfterApply={false}
+        error={error}
+        onClose={close}
+        onApply={() => save({ kind: 'import-set', setId })}
+      >
+        <SettingsField title={t('images.set')}>
+          <select
+            aria-label={t('images.set')}
+            value={setId}
+            onChange={(e) => setSetId(e.target.value)}
+          >
+            {r.iconSets?.map((set) => (
+              <option key={set.id} value={set.id}>
+                {set.name}
+              </option>
+            ))}
+          </select>
+        </SettingsField>
+      </SettingsDialog>
+    );
+  if (
+    r.kind === 'folder-create' ||
+    r.kind === 'folder-rename' ||
+    r.kind === 'folder-delete' ||
+    r.kind === 'folder-move'
+  ) {
+    const titles = {
+      'folder-create': 'images.createFolder',
+      'folder-rename': 'images.renameFolder',
+      'folder-delete': 'images.deleteFolder',
+      'folder-move': 'images.moveImages',
+    } as const;
+    return (
+      <SettingsDialog
+        title={t(titles[r.kind as keyof typeof titles])}
+        returnFocus={returnFocus}
+        closeAfterApply={false}
+        error={error}
+        applyLabel={t('images.apply')}
+        onClose={close}
+        onApply={() => save({ kind: 'folder', destination: folderPath })}
+      >
+        {r.kind === 'folder-delete' ? (
+          <p>{t('images.folderDeleteConfirm')}</p>
+        ) : r.kind === 'folder-move' ? (
+          <SettingsField title={t('images.destination')}>
+            <select
+              aria-label={t('images.destination')}
+              value={folderPath}
+              onChange={(e) => setFolderPath(e.target.value)}
+            >
+              {r.folders?.map((folder) => (
+                <option key={folder} value={folder}>
+                  {folder || t('images.rootFolder')}
+                </option>
+              ))}
+            </select>
+          </SettingsField>
+        ) : (
+          <SettingsField title={t('images.folderPath')}>
+            <SettingsInput
+              data-initial-focus
+              aria-label={t('images.folderPath')}
+              value={folderPath}
+              onChange={(e) => setFolderPath(e.target.value)}
+            />
+          </SettingsField>
+        )}
+      </SettingsDialog>
+    );
+  }
   if (r.kind === 'order-images')
     return (
       <SettingsOrderDialog

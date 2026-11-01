@@ -410,3 +410,14 @@
     max-height: 90px;
   }
 }
+
+.library-folder-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px 12px;
+}
+.library-folder-toolbar select {
+  max-width: min(45vw, 480px);
+}

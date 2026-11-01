@@ -106,3 +106,13 @@
   background: var(--border);
   flex-shrink: 0;
 }
+
+.ribbon-svg-icon {
+  display: block;
+  width: 21px;
+  height: 21px;
+  background-color: currentColor;
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+}

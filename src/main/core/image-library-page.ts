@@ -1,4 +1,6 @@
 import { hostText } from '../../shared/i18n';
+import { iconSets, importIconSet, type IconImportProgress } from './icon-set-import';
+import { imageFolder } from '../../shared/image-paths';
 import { randomUUID } from 'node:crypto';
 import type { HostPageController } from './host-page-controller';
 import type { HostPageAction } from '../../shared/host-pages';
@@ -21,6 +23,9 @@ import type { ImageLibraryDialogs } from './image-library-dialogs';
 
 /** Window-owned state survives navigation and provider recovery. Import jobs also live here. */
 export class ImageLibraryPageState {
+  folder = '*';
+  importing?: IconImportProgress;
+  importAbort?: AbortController;
   group = 'all';
   query = '';
   selected = new Set<string>();
@@ -132,6 +137,10 @@ export class ImageLibraryPageSession implements HostPageController {
     for (const group of groups)
       if (!this.groups.has(group.id)) this.groups.set(group.id, randomUUID());
     const state = this.options.state;
+    if (state.folder !== '*' && !this.options.host.images.folders.includes(state.folder)) {
+      state.folder = '*';
+      state.resetView();
+    }
     if (!['all', 'unfiled'].includes(state.group) && !keys.has(state.group.slice(6))) {
       state.group = 'all';
       state.resetView();
@@ -153,6 +162,10 @@ export class ImageLibraryPageSession implements HostPageController {
       : [...this.items];
     return ordered.filter(
       ([key, value]) =>
+        (s.folder === '*' ||
+          (s.folder === ''
+            ? !value.entry.ref.file.includes('/')
+            : value.entry.ref.file.startsWith(s.folder + '/'))) &&
         (s.group !== 'unfiled' || !members.has(key)) &&
         value.entry.ref.file.toLocaleLowerCase().includes(s.query.toLocaleLowerCase()),
     );
@@ -176,6 +189,10 @@ export class ImageLibraryPageSession implements HostPageController {
         membership.set(key, [...(membership.get(key) ?? []), g.name]);
       }
     const content: ImageLibraryPageModel['content'] = {
+      iconSets: iconSets.map(({ id, name }) => ({ id, name })),
+      importing: s.importing,
+      folders: this.options.host.images.folders,
+      folder: s.folder,
       groups: [
         { id: 'all', title: hostText('services.imageLibraryPage.all'), count: this.items.size },
         {
@@ -303,6 +320,83 @@ export class ImageLibraryPageSession implements HostPageController {
           s.sizeError = (e as Error).message;
           this.options.failed(hostText('services.imageLibraryPage.sizeSaveFailed'));
         }
+      }
+    } else if (action.command === 'cancel-import') {
+      s.importAbort?.abort();
+    } else if (action.command === 'import-set') {
+      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      s.busy = true;
+      s.error = '';
+      s.message = '';
+      s.importAbort = new AbortController();
+      this.options.changed();
+      try {
+        const result = await importIconSet({
+          id: action.setId,
+          images: this.options.host.images,
+          signal: s.importAbort.signal,
+          writable: () => this.options.host.assertWritable(),
+          progress: (value) => {
+            s.importing = value;
+            this.options.changed();
+          },
+        });
+        s.folder = result.folder;
+        s.group = 'all';
+        s.query = '';
+        s.selected.clear();
+        s.resetView();
+        s.message = hostText('images.importDone', {
+          added: String(result.added),
+          reused: String(result.reused),
+          failed: String(result.failed),
+        });
+        s.error = result.failures.join(', ');
+      } catch (error) {
+        if (s.importAbort.signal.aborted) s.message = hostText('images.importCancelled');
+        else {
+          s.error = error instanceof Error ? error.message : hostText('images.downloadFailed');
+          this.options.failed(s.error);
+        }
+      } finally {
+        s.busy = false;
+        s.importing = undefined;
+        s.importAbort = undefined;
+        this.options.changed();
+      }
+    } else if (action.command === 'folder') {
+      if (
+        action.folder !== '*' &&
+        (!imageFolder(action.folder) || !this.options.host.images.folders.includes(action.folder))
+      )
+        throw Error(hostText('images.folderInvalid'));
+      s.folder = action.folder;
+      s.selected.clear();
+      s.resetView();
+    } else if (action.command === 'folder-action') {
+      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      const images = [...s.selected].map((key) => this.items.get(key)!.entry.ref);
+      s.busy = true;
+      s.error = '';
+      this.options.changed();
+      try {
+        await this.options.host.folderOperation(
+          action.operation,
+          action.folder,
+          action.destination,
+          images,
+        );
+        s.folder =
+          action.operation === 'delete'
+            ? '*'
+            : action.operation === 'move-images'
+              ? action.folder
+              : action.destination!;
+        s.selected.clear();
+        s.resetView();
+      } finally {
+        s.busy = false;
+        this.options.changed();
       }
     } else if (action.command === 'query') {
       if (typeof action.value !== 'string' || action.value.length > 260)
@@ -461,6 +555,11 @@ export class ImageLibraryPageSession implements HostPageController {
             'batch-remove',
             'preview',
             'delete-image',
+            'folder-create',
+            'folder-rename',
+            'folder-delete',
+            'folder-move',
+            'import-set',
           ].includes(action.kind)
         )
           throw Error('Unknown gallery dialog');
@@ -479,10 +578,18 @@ export class ImageLibraryPageSession implements HostPageController {
           : [...s.selected].map((k) => this.items.get(k)!.entry.ref);
         if (action.kind.startsWith('batch') && !images.length)
           throw Error(hostText('services.imageLibraryPage.selectImage'));
+        if (action.kind === 'folder-move' && !images.length)
+          throw Error(hostText('services.imageLibraryPage.selectImage'));
+        const folder = s.folder === '*' ? '' : s.folder;
+        if (['folder-rename', 'folder-delete'].includes(action.kind) && !folder)
+          throw Error(hostText('images.folderInvalid'));
         const operation = await this.options.dialogs.open({
           kind: action.kind,
           groups: this.options.groups(),
           images,
+          folder,
+          folders: this.options.host.images.folders,
+          iconSets: iconSets.map(({ id, name }) => ({ id, name })),
           groupId,
           entry: item?.entry,
           deleteBlocked:
@@ -493,6 +600,18 @@ export class ImageLibraryPageSession implements HostPageController {
           s.selected.clear();
           s.resetView();
         }
+        if (operation?.kind === 'folder') {
+          s.folder = action.kind === 'folder-delete' ? '*' : operation.destination;
+          s.selected.clear();
+          s.resetView();
+        }
+        if (operation?.kind === 'import-set')
+          await this.act({
+            id: this.id,
+            type: 'gallery',
+            command: 'import-set',
+            setId: operation.setId,
+          });
       } else throw Error('Unknown gallery action');
     }
     if (['select', 'select-range', 'select-all', 'clear'].includes(action.command))
@@ -509,7 +628,7 @@ export class ImageLibraryPageSession implements HostPageController {
     s.retry = undefined;
     this.options.changed();
     try {
-      const results = await this.options.host.registerMany();
+      const results = await this.options.host.registerMany(s.folder === '*' ? '' : s.folder);
       const successes = results.flatMap((r) => (r.image ? [r.image] : []));
       if (!results.length || s.closed) return;
       s.message = hostText('services.imageLibraryPage.importSummary', {

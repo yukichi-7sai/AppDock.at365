@@ -84,7 +84,8 @@ type Action = {
   displayMode?: true;
 };
 const allowAll = () => true;
-type PresentationImage = string | { key: string; load(): Promise<string | undefined> };
+type PresentationImage =
+  string | { key: string; monochrome?: boolean; load(): Promise<string | undefined> };
 export class UiPresentation {
   readonly epoch = randomUUID();
   private revision = 0;
@@ -449,7 +450,7 @@ export class UiPresentation {
         !/^data:image\/(png|webp);base64,[A-Za-z0-9+/=]+$/.test(dataUrl)
       )
         throw Error('Unknown presentation asset');
-      return { dataUrl };
+      return { dataUrl, ...(source.monochrome ? { monochrome: true } : {}) };
     });
   }
   invoke(
