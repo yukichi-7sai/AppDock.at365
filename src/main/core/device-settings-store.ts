@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import { hostStartupTiming } from './host-startup-timing';
 import fs from 'node:fs';
+import { AssignedImages } from './assigned-images';
 import { appletEnabled } from '../../shared/applet-state';
 import path from 'node:path';
 import type { StateStorage } from './state-storage';
@@ -441,6 +442,11 @@ export class DeviceSettingsStore extends SettingsStore {
   ) {
     this.assertRevision(revision);
     const next = restoreSettingsCollections(parseSettings(value), this.applets());
+    new AssignedImages(path.join(path.dirname(this.file), 'assets', 'images')).prepare(
+      next,
+      this.value,
+      this.applets(),
+    );
     const split = splitSettings(
       next,
       this.value,

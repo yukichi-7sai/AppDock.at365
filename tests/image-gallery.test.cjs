@@ -10,6 +10,35 @@ const {
 const { ImageLibraryDialogs } = require('../out/main/main/core/image-library-dialogs');
 const { editImageLibrary } = require('../out/main/shared/registered-images');
 const root = path.join(__dirname, '../.artifacts/gallery-unit-' + Date.now());
+test('import progress updates one modal, rejects edits, cancels once and closes only after completion', async () => {
+  const requests = [];
+  let aborted = 0;
+  const dialogs = new ImageLibraryDialogs({
+    send: (r) => requests.push(r),
+    edit: async () => {
+      throw Error('unexpected edit');
+    },
+    failed() {},
+  });
+  const id = dialogs.openProgress(() => aborted++);
+  const progress = { phase: 'import', completed: 20, total: 100, added: 20, reused: 0, failed: 0 };
+  dialogs.progress(id, progress);
+  assert.equal(dialogs.current().importing.completed, 20);
+  await assert.rejects(dialogs.complete(id, { kind: 'import-set', setId: 'lucide' }));
+  await dialogs.complete(id);
+  await dialogs.complete(id);
+  assert.equal(aborted, 1);
+  assert(dialogs.current().cancelling);
+  dialogs.progress(id, { ...progress, phase: 'groups' });
+  assert(dialogs.current().cancelling);
+  dialogs.closeProgress('stale');
+  assert(dialogs.current());
+  dialogs.closeProgress(id);
+  assert.equal(requests.at(-1), null);
+  dialogs.openProgress(() => aborted++);
+  dialogs.cancel();
+  assert.equal(aborted, 2);
+});
 fs.mkdirSync(root, { recursive: true });
 let serial = 0;
 function fixture() {

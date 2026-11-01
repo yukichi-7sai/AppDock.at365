@@ -1,5 +1,14 @@
 # 検証記録
 
+## 2026-11-01: 画像ライブラリー拡張をmainへ統合 0.116.0
+
+- 利用者による0.115.1の受入後、mainのcleanな`23b60d3`をpull --ff-onlyで最新確認（更新なし）し、`codex/image-library-svg`の`cd036cc`を通常mergeで統合。競合は版番号と検証履歴だけで、履歴は両側を保持した。条件付き一覧設定の9ファイルと画像側42ファイルのGit blobがそれぞれの親commitと一致することを照合し、両機能を保持。保存領域/参照契約の追加をmainへ反映するため0.115.0→0.116.0。SDK/Runtime・兄弟Applet・依存の変更なし。
+- 発行前レビューは`.artifacts/image-library-main-integration-20261101/review.md`。型検査、標準169ファイル1,516件はfail/skip/cancel 0。main側の条件付き設定と画像保存/分類/APIの関連回帰を含む。959入力の試験/発行前後SHA256が一致し、競合解決で製品コードは追加変更していない。
+- 通常publishは終了0、`A:\40.ARTIFACT\AppDock.at365`へ0.116.0を発行。固定EXEで画像GUI9群、共通ギャラリー12群、smokeが成功。SVG配色・設定用原本保管・実フォルダー・グループ・Lucide 2,292 SVG/43分類・進捗/取消・再起動保存、既存の編集/フォーカス/狭幅を確認。未変更の条件付き設定GUI等はmainの実装時記録と入力一致を確認して再利用した。
+- 発行693製品ファイルとstaging、コピーEXE、ZIP/feed/manifestを照合。EXE SHA256=`a9c7240a5f64931830b6b14f31c7a23a3513d7bd766ccf7edf092b141c75e385`、ZIPは270,863,268bytes / SHA256=`1115db98ef35b83188217dfa4301518f2581d8fa3f9bf68d03dab5151bf07149`。詳細は同証跡の`publication.json`と完全ログ、GUIは`.artifacts/image-folders-svg-ui-1793519184562/`・`image-gallery-ui-1793519236405/`。
+- 元worktreeの検証資料33,520通常ファイル/3,925,649,744bytesを`.artifacts/image-library-worktree-archive-20261101/artifacts/`へ移動し、全件の前後hashを照合。追跡ソース1,031件のhashと元commitも保管した。テスト用junction20件は接続情報を記録し、リンク自身のみ除去して実データを保管。過去ログの絶対パスは当時の値として保持し、旧`.artifacts/`に対応する資料はこの保管先を参照する。
+- 統合commitとstage/commit treeの一致を同証跡の`commit.json`へ記録する。元worktreeとブランチはmain祖先・clean・使用中processなし・再解析ポイント・main依存を確認して削除し、実施結果を`cleanup.json`へ残す。main以外の実利用先deploy、push、Releaseは行わない。
+
 ## 2026-11-01: 壁紙設定・条件付き一覧入力のコミット前照合
 
 - 今回のmain差分11ファイルをレビューし、設定宣言の条件/型検証、共通一覧とダイアログ、非活性表示、保存/取消/競合/フォーカス、公開APIと版を照合した。製品の追加修正は不要。説明文に残っていた壁紙側の旧停止表記だけを訂正し、JSON例や検証対象コードは不変。版更新・再発行は行わない。
@@ -16,6 +25,27 @@
 - 発行先`A:\40.ARTIFACT\AppDock.at365`、版0.115.0。ZIP 270845238bytes / SHA256 `c963be31ff762cd9257ff1bcabf52aa4f285889a3f60513b535ed233835b699a`、配布693ファイルをZIPと照合。EXE `1b59aba015be5995dd0cba53c2c035217ebfa841707b113aeac7c29e066493e6`。既存deployスクリプト・利用者データ保持、全体ZIP再作成なし。
 - 証跡`.artifacts/wallpaper-settings-20261101/{validation,review,inputs-before-publish,inputs-final,published-updates,payload-files,cleanup}.json`と各完全ログ。試験後の製品入力は発行前と一致し、差は壁紙側テスト手順/文書のみ。古い成功2件と今回解消した失敗5件の実行コピーだけ整理し、結果/設定/画像/manifest・最新成功を保持。過去の再利用記録は保護。
 - 本体全回帰・実壁紙/Explorer再起動・物理ロック/RDP・実NAS/関連付けアプリ/ごみ箱は未実施。commit/push/Release/実利用deployなし。
+## 2026-11-01: Lucideカテゴリ自動分類・取り込み進捗 0.115.1
+
+- 同じ専用worktree `AppDock.at365-image-library` / `codex/image-library-svg`のcleanな`1726e22`から追加実装。追跡先なしのためpullは行わず、mainは変更していない。既存の設定/保存形式とApplet公開APIを維持した内部改善のため0.115.0→0.115.1のパッチ更新。依存・SDK/Runtimeの変更なし。
+- npmで確定した版と同じ公式GitHubタグからカテゴリ/アイコンJSONを取得する。カテゴリの継承と別名を解決し、`Lucide: Time & calendar`等の英語グループへ成功画像を複数所属させる。再取り込みは重複を加えず、既存名・順序・手動所属を保持する。ボタンを画像追加の隣へ移し、共通モーダルに段階・完了件数・取消を表示。取消後は完成分の画像と分類を保存して閉じる。
+- 発行前レビューは`.artifacts/lucide-groups-20261101/review.md`。固定版取得、JSON/循環/別名検証、配置前失敗、原本/手動分類保持、最新revision、保存失敗の再試行、モーダルの要求ID/背景禁止/重複取消/Window終了を確認し、阻害指摘なし。新たな設定項目・永続ファイルは追加していない。
+- frozen install、型検査、ビルド、関連4ファイル45件が成功。標準169ファイル1,515件は初回1,514件成功・1件失敗。非RIDのExtensionHost試験用DLLが未生成だったためRelease buildし、失敗を含むdotnet-pagesの2件が成功した。製品コードを変更せず標準全件の成功がそろった。初回失敗ログも保持。Node 26.13.0 / pnpm 12.15.0 / Electron 45.1.0 / Windows x64。959入力の発行前後SHA256一致を記録した。
+- ソースGUI9群と固定EXE GUI9群が成功。実配布元のLucide 1.66.0を途中取消後に再取り込みし、2,292 SVG/43カテゴリ、失敗0件。取消を含む取り込み区間はソース37,641ms・固定37,136ms（所要時間の保証ではない）。進捗の更新と取消操作、完成分分類、重複なし、別名/継承、元グループ保持、カテゴリ絞り込み、隣接ボタン、SVG配色、親取消、再起動保存を確認。固定共通ギャラリー12群も成功し、既存編集・削除・フォーカス・背景禁止・150/200%拡大・狭幅を保持。進捗とカテゴリ画像を目視確認した。
+- 固定GUI証跡は`.artifacts/image-folders-svg-ui-1793516777272/`と`image-gallery-ui-1793516827864/`。発行/入力/ログhash、全21群の結果は`.artifacts/lucide-groups-20261101/publication.json`。通常publishは終了0、発行693製品ファイルはstagingと一致。EXE SHA256=`0b05bc596ebaad9a64ba5380f64999ee261151e3005464ab8767038d7e853d5a`。ZIPは270,862,920bytes / SHA256=`6854e6b321793435ae3e3b645c80ef859297541c489d3f5243e978ab3217a835`、feed/manifestは0.115.1。
+- 成功/終了/プロセス/通常パスを確認した古い固定コピー2件の管理対象36項目だけを整理し、結果・画像・設定と最新コピー計6,541ファイルのhashを保持。調査用アーカイブ2件もhashを記録して除去した。失敗0、フォルダー全体の削除なし。詳細は同証跡の`cleanup.json`。本変更を1コミットにまとめ、stage/commit照合を`commit.json`に記録する。main統合・push・Release・実利用deployは行っていない。
+
+## 2026-11-01: 画像フォルダー・SVG・設定用コピー・Lucide取り込み 0.115.0
+
+- `main 60e0a0a`をfast-forward確認後、専用worktree `AppDock.at365-image-library` / `codex/image-library-svg`で設計・実装。元checkoutは変更していない。設計と現行契約は`docs/image-library-folders-svg-design.md`、`docs/registered-images.md`、`docs/settings-sync.md`、`docs/shell-api.md`。新しい保存領域・参照とShell応答項目により本体を0.114.2→0.115.0へマイナー更新。SDK/Runtimeは型・実装・通信形状を変えておらず0.28.0を維持した。
+- 実階層の追加・改名・移動・内容変更、空フォルダー、グループとの独立、一意の同名候補だけの追従、620件の遅延列挙、設定用原本コピー、元imagesフォルダー削除後の読取、ネストした画像設定、旧欠落参照保持を確認。保存先のリンク/上位参照、予約された保管領域への通常import、SVGの動的/外部参照を拒否。静的SVGは原bytesを保持して隔離描画し、リボンは現在の文字色を使用する。
+- 発行前レビューは`.artifacts/commit-validation-images/review.md`。Windowsのディレクトリーmtime通知と一時ファイルによる全走査の連鎖を修正し、60件の登録で全走査が増え続けない回帰を追加。ダイアログ確定は既存の要求ID経路へ接続し、背景操作禁止・再試行・親取消を保持。旧単一ファイル名用のAPI総長制限を除き、各要素とroot境界の検証を継続。発行阻害指摘なし。
+- `dev.bat run typecheck`、対象13ファイル145件のNodeテスト、`publish.bat`は終了0、fail/skip 0。対象は保存/監視/SVG/取り込み/画像削除/分類/設定公開API/リボン投影/本体ページ。全機能の標準回帰を今回実行したとの主張はしない。Node 26.13.0 / pnpm 12.15.0 / Electron 45.1.0 / Windows x64。発行前後959ソース・試験・依存定義入力のSHA256一致を`inputs.before.json`と`inputs.after.json`へ保存した。
+- 固定EXEの新機能GUIは6群成功。実フォルダー作成・移動・改名・空削除、Explorer操作と所属追従、親取消、設定確定後の元画像変更/改名/削除、SVGの明暗/グループ状態、実再起動を確認。公式`lucide-static 1.66.0`の全2,292 SVGとLICENSEを取得し、失敗0件。ソース実行33,998ms、発行EXE35,729ms。通信・機器依存の実測であり所要時間の保証ではない。取消・オフライン・整合性不一致・不正SVG・リンク・同名差分は専用テストで確認。性能診断中のGUI取消では追加済み素材の保持も確認した。
+- 既存画像GUI9群と共通ギャラリーGUI12群も固定EXEで成功。Profile/WebApplet、Node/.NET importと自己設定画像のcopyToCache、3ネイティブAppletのRelease build/接続/表示/保存/停止、PNG/JPEG/WebP原本、グループ編集、選択/プレビュー取消とフォーカス、カード寸法/検索/並べ替え、150/200% CSS拡大、狭幅、再起動を確認。ごみ箱障害/復旧は隔離adapter。旧スクリプトのrole・本体本文のbackdrop座標・非同期完了待機を現行UIへ合わせ、検査項目は保持した。
+- 固定EXE証跡: `.artifacts/image-folders-svg-ui-1793512069048/`、`image-library-ui-1793512116609/`、`image-gallery-ui-1793512133551/`。結果・スクリーンショット・実行コピーを保存。新SVGの明暗とLucide一覧画像も目視確認した。入力/ログ/成果物のhashと27群の結果は`.artifacts/commit-validation-images/publication.json`。発行693製品ファイルはstagingと一致し、3試験のコピーEXEも同一hash。
+- 発行先は`A:\40.ARTIFACT\AppDock.at365-image-library`。EXE SHA256=`a8e273554b519b447b45f5c12f81f8baa7e47ff30bc34c11dd4dea9599126ab2`、ZIP SHA256=`a3d905a16fa567e41dc8904bae433d17382cc35c724e5f443cfbf8b647ecefa7`、270,860,228bytes。feed/host manifestは0.115.0。利用者データは管理対象外。mainへの統合・push・Release・実利用deployは実行していない。
+- 制約: 静的SVGの対応要素/属性に限定する。NASでの分散書込み、物理IME、Lucide以外のセットは未検証/未実装。旧設定の一括移行と保管コピーの自動GCは行わない。コミット境界と最終tree照合は同ディレクトリーの`commits.json`に記録する。
 
 ## 2026-11-01: 共通コマンド選択のサイズ調整・可変幅とコミット 0.114.2
 

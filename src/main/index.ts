@@ -720,6 +720,13 @@ const registeredImages = new RegisteredImages(
   () => {
     ribbonImageRevision++;
     changed();
+    queueMicrotask(() => {
+      try {
+        imageLibraryHost.reconcileGroups();
+      } catch {
+        /* Keep memberships until a writable, current snapshot. */
+      }
+    });
   },
   fileWatchAssistance,
 );
@@ -2801,7 +2808,7 @@ function settingsPageActions(
     actions.appletListDraftAction = async ([key, request]) => {
       const owner = manager.items.get(page.owner!);
       if (!owner) throw Error(hostText('settings.index.noApplet'));
-      return settingListDraftAction(owner, key, request, (input) => registeredImages.import(input));
+      return settingListDraftAction(owner, key, request, (input) => imageLibraryHost.import(input));
     };
   const string = (v: unknown) => {
     if (typeof v !== 'string') throw Error(hostText('settings.index.invalidInput'));
@@ -3308,6 +3315,7 @@ function registerIpc() {
     imageLibraryDialogs?.complete(id, operation),
   );
   handle('dock:imageLibrary:register', () => imageLibraryHost.register());
+  handle('dock:imageLibrary:retain', (ref) => imageLibraryHost.retain(ref));
   handle('dock:imageLibrary:edit', (operation) => imageLibraryHost.edit(operation));
   handle('dock:imageLibrary:galleryView', () => ({
     cardWidth: galleryViewState.get('picker'),
@@ -3360,6 +3368,8 @@ function registerIpc() {
     if (sessionId !== undefined) return imageSession(sessionId).preview(ref, original === true);
     if (original === true) {
       const saved = await registeredImages.read(ref);
+      if (/\.svg$/i.test(saved.ref.file))
+        return (await decodeRegisteredImage(saved.bytes, 2048)).thumbnail;
       const extension = path.extname(saved.ref.file).slice(1).toLowerCase();
       return `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${saved.bytes.toString('base64')}`;
     }
@@ -4640,6 +4650,20 @@ async function initialize() {
         window.webContents.send('dock:imageLibraryDialog', request);
     },
     edit: (operation, request) => {
+      if (operation.kind === 'folder') {
+        const kind = request.kind.slice('folder-'.length);
+        return imageLibraryHost.folderOperation(
+          kind === 'move' ? 'move-images' : kind,
+          kind === 'move' ? operation.destination : (request.folder ?? ''),
+          operation.destination,
+          request.images,
+        );
+      }
+      if (operation.kind === 'import-set') {
+        if (!request.iconSets?.some((set) => set.id === operation.setId))
+          throw Error(hostText('images.setUnknown'));
+        return Promise.resolve();
+      }
       if (operation.kind === 'delete-image') {
         if (!request.entry || request.deleteBlocked)
           throw Error(hostText('services.index.invalidDeletion'));
@@ -4654,6 +4678,7 @@ async function initialize() {
   window.webContents.on('render-process-gone', () => galleryDialogs.cancel());
   window.once('closed', () => {
     galleryState.closed = true;
+    galleryState.importAbort?.abort();
     galleryDialogs.cancel();
   });
   hostPages = new HostPages({

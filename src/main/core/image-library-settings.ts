@@ -4,6 +4,8 @@ import {
   parseImageLibrary,
   type ImageLibrary,
   type ImageLibraryEdit,
+  type ImageGroup,
+  imageKey,
 } from '../../shared/registered-images';
 import type { SettingsStore } from './settings';
 
@@ -54,5 +56,29 @@ export class ImageLibrarySettings {
       editImageLibrary(this.settings.value.imageLibrary, operation),
       this.revision,
     ).commit();
+  }
+  /** Add downloaded classifications in one revision, retaining manual names, order and memberships. */
+  addImportedGroups(imported: ImageGroup[]) {
+    const next = this.snapshot();
+    const byId = new Map(next.groups.map((group) => [group.id, group]));
+    const byName = new Map(next.groups.map((group) => [group.name.toLowerCase(), group]));
+    for (const incoming of imported) {
+      if (!incoming.images.length) continue;
+      let group = byId.get(incoming.id) ?? byName.get(incoming.name.toLowerCase());
+      if (!group) {
+        group = { ...incoming, images: [] };
+        next.groups.push(group);
+        byId.set(group.id, group);
+        byName.set(group.name.toLowerCase(), group);
+      }
+      const members = new Set(group.images.map(imageKey));
+      for (const image of incoming.images) {
+        if (!members.has(imageKey(image))) {
+          group.images.push(image);
+          members.add(imageKey(image));
+        }
+      }
+    }
+    this.plan(next, this.revision).commit();
   }
 }

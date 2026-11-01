@@ -59,11 +59,14 @@ const sample = path.join(profile, 'sample.png'),
   second = path.join(profile, 'second.png');
 fs.writeFileSync(sample, png(160, 90));
 fs.writeFileSync(second, png(64, 128, 2));
+const sampleRef = { file: `@assigned/${hash(sample)}.png` },
+  secondRef = { file: `@assigned/${hash(second)}.png` };
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.hardwareAcceleration = false;
 settings.host.closeToTray = false;
 settings.globalShortcutCommands = [];
 settings.ribbon.order = ['group:photos', 'button:logs', 'settings'];
+settings.ribbon.bottom = ['theme', 'notifications'];
 settings.ribbon.groups = [
   {
     id: 'group:photos',
@@ -308,6 +311,7 @@ async function chooseInPicker(file) {
   const d = host.getByRole('dialog', { name: '画像を選択', exact: true });
   await card(d, file).locator('.ad-gallery-image').click();
   await d.getByRole('button', { name: '画像を使う', exact: true }).click();
+  await d.waitFor({ state: 'hidden' });
 }
 (async () => {
   try {
@@ -367,7 +371,7 @@ async function chooseInPicker(file) {
       );
     }
     checks.push(
-      'three existing .NET/native Applets connect, display panels, save settings and stop with the new SDK/Runtime',
+      'three existing .NET/native Applets connect, display panels, save settings and stop with the current SDK/Runtime',
     );
     await until(
       () => fs.existsSync(node.marker) && fs.existsSync(dotnet.marker),
@@ -449,14 +453,14 @@ async function chooseInPicker(file) {
     );
     let groups = (await imageSnapshot()).groups;
     await libraryPage.getByRole('button', { name: `${groups[0].name}の操作`, exact: true }).click();
-    await libraryPage.getByRole('button', { name: '名前を変更', exact: true }).click();
+    await libraryPage.getByRole('menuitem', { name: '名前を変更', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像グループの名前を変更', exact: true });
     await d.getByLabel('画像グループ名').fill('ボタン');
     await d.getByLabel('画像グループ名').press('Tab');
     await d.getByRole('button', { name: '適用', exact: true }).click();
     await until(async () => (await imageSnapshot()).groups[0].name === 'ボタン', 'rename');
     await libraryPage.getByRole('button', { name: 'ボタンの操作', exact: true }).click();
-    await libraryPage.getByRole('button', { name: 'グループを削除', exact: true }).click();
+    await libraryPage.getByRole('menuitem', { name: 'グループを削除', exact: true }).click();
     d = host.getByRole('dialog', { name: '画像グループを削除', exact: true });
     await d.getByRole('button', { name: '削除', exact: true }).click();
     await until(async () => (await imageSnapshot()).groups.length === 1, 'delete group');
@@ -523,7 +527,8 @@ async function chooseInPicker(file) {
     );
     await preview.locator('.ad-gallery-preview-stage').click();
     assert(await preview.isVisible(), 'preview content does not dismiss it');
-    await host.mouse.click(4, 4);
+    const previewBackdrop = await host.locator('.shell > main').boundingBox();
+    await host.mouse.click(previewBackdrop.x + 4, previewBackdrop.y + 4);
     await until(() => preview.count().then((count) => count === 0), 'backdrop closes only preview');
     assert(await picker.isVisible());
     assert.equal(
@@ -612,7 +617,7 @@ async function chooseInPicker(file) {
     await until(
       async () =>
         (await snapshot()).settings.value.extensions['at365.profile'].settings.avatar?.file ===
-        'sample.png',
+        sampleRef.file,
       'profile avatar',
     );
     const pbutton = rail.locator('[data-ribbon-id="applet:at365.profile:main"]');
@@ -626,9 +631,7 @@ async function chooseInPicker(file) {
       delayed = original + '.partial';
     fs.renameSync(original, delayed);
     await until(
-      async () =>
-        (await imageSnapshot()).images.find((i) => i.ref.file === 'sample.png')?.available ===
-        false,
+      async () => !(await imageSnapshot()).images.some((i) => i.ref.file === 'sample.png'),
       'missing original',
     );
     assert.equal(await pbutton.locator('img').count(), 1);
@@ -659,12 +662,8 @@ async function chooseInPicker(file) {
       await d.getByRole('button', { name: '適用', exact: true }).click();
       await d.waitFor({ state: 'hidden' });
     }
-    assert.deepEqual((await snapshot()).settings.value.ribbon.groups[0].image, {
-      file: 'sample.png',
-    });
-    assert.deepEqual((await snapshot()).settings.value.ribbon.buttons[0].image, {
-      file: 'second.png',
-    });
+    assert.deepEqual((await snapshot()).settings.value.ribbon.groups[0].image, sampleRef);
+    assert.deepEqual((await snapshot()).settings.value.ribbon.buttons[0].image, secondRef);
     await rail.locator('[data-ribbon-id="group:photos"] img').waitFor();
     await rail.locator('[data-ribbon-id="button:logs"] img').waitFor();
     checks.push('group and command buttons share library image rendering');
@@ -683,7 +682,7 @@ async function chooseInPicker(file) {
     await until(
       async () =>
         (await snapshot()).settings.value.extensions['at365.web-applet'].settings.items[0].image
-          ?.file === 'sample.png',
+          ?.file === sampleRef.file,
       'Web image saved',
     );
     const row = (await snapshot()).settings.value.extensions['at365.web-applet'].settings.items[0];

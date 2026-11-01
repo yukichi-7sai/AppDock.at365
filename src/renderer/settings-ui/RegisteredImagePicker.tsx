@@ -1,3 +1,4 @@
+import { imageParent, assignedImage } from '../../shared/image-paths';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsField } from './SettingsSections';
@@ -163,7 +164,8 @@ export function ImageLibraryBrowser({
   const api = useRegisteredImages();
   const imageSession = useImageSession(api);
   const [limit, setLimit] = useState(64);
-  useEffect(() => setLimit(64), [group, query]);
+  const [folder, setFolder] = useState('*');
+  useEffect(() => setLimit(64), [group, query, folder]);
   const images = new Map(snapshot.images.map((image) => [imageKey(image.ref), image]));
   for (const g of snapshot.groups)
     for (const ref of g.images)
@@ -176,7 +178,7 @@ export function ImageLibraryBrowser({
           thumbnail: '',
           available: false,
         });
-  if (selected && !images.has(imageKey(selected)))
+  if (selected && !assignedImage(selected.file) && !images.has(imageKey(selected)))
     images.set(imageKey(selected), {
       ref: selected,
       width: 0,
@@ -188,6 +190,9 @@ export function ImageLibraryBrowser({
   const memberships = new Set(snapshot.groups.flatMap((g) => g.images.map(imageKey)));
   const filtered = [...images.values()].filter(
     (image) =>
+      (folder === '*' ||
+        imageParent(image.ref.file) === folder ||
+        (folder !== '' && image.ref.file.startsWith(folder + '/'))) &&
       image.ref.file.toLowerCase().includes(query.toLowerCase()) &&
       (group === 'all' ||
         (group === 'unfiled'
@@ -199,6 +204,21 @@ export function ImageLibraryBrowser({
   return (
     <>
       <div className="image-library-toolbar">
+        <SettingsField title={translate('images.folder')}>
+          <FilterSelect
+            aria-label={translate('images.folder')}
+            value={folder}
+            allValue="*"
+            onChange={(e) => setFolder(e.target.value)}
+          >
+            <option value="*">{translate('images.allFolders')}</option>
+            {(snapshot.folders ?? ['']).map((value) => (
+              <option value={value} key={value}>
+                {value || translate('images.rootFolder')}
+              </option>
+            ))}
+          </FilterSelect>
+        </SettingsField>
         <SettingsField title={translate('settings.registeredImagePicker.group')}>
           <FilterSelect
             data-testid="image-picker-group"
@@ -376,17 +396,24 @@ export function RegisteredImagePicker({
         }}
         onApply={async () => {
           if (!selected) return;
-          await onSelect(selected);
+          await onSelect(library.api?.retain ? await library.api.retain(selected) : selected);
           applied.current = true;
         }}
       >
         <div className="image-picker-summary">
+          {selected && assignedImage(selected.file) && (
+            <RegisteredImagePreview value={selected} label={translate('images.assigned')} />
+          )}
           <span
             className="image-picker-filename"
             data-testid="image-picker-filename"
             title={selected?.file}
           >
-            {selected?.file ?? translate('settings.registeredImagePicker.none')}
+            {selected
+              ? assignedImage(selected.file)
+                ? translate('images.assigned')
+                : selected.file
+              : translate('settings.registeredImagePicker.none')}
           </span>
           <GallerySizeControl
             value={cardWidth}

@@ -1,5 +1,5 @@
 import { hostText } from './i18n';
-import { assetFilename } from './asset-names';
+import { imagePath } from './image-paths';
 
 export interface RegisteredImageRef {
   file: string;
@@ -26,6 +26,7 @@ export interface RegisteredImageEntry {
   generation?: string;
 }
 export interface ImageLibrarySnapshot {
+  folders?: string[];
   images: RegisteredImageEntry[];
   groups: ImageGroup[];
   revision: number;
@@ -46,6 +47,7 @@ export type ImageLibraryEdit =
     }
   | { kind: 'membership'; image: RegisteredImageRef; ids: string[]; before: string[] };
 export interface ImageLibraryApi {
+  retain?(image: RegisteredImageRef): Promise<RegisteredImageRef>;
   snapshot(): Promise<ImageLibrarySnapshot>;
   register(): Promise<RegisteredImageRef | null>;
   edit(operation: ImageLibraryEdit): Promise<void>;
@@ -77,8 +79,7 @@ export interface ImageLibraryApi {
 }
 const object = (v: unknown): v is Record<string, any> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
-export const imageFilename = (v: unknown): v is string =>
-  assetFilename(v) && /\.(png|jpe?g|webp)$/i.test(v);
+export const imageFilename = (v: unknown): v is string => imagePath(v);
 export function imageReference(v: unknown): v is RegisteredImageRef {
   return object(v) && Object.keys(v).length === 1 && imageFilename(v.file);
 }

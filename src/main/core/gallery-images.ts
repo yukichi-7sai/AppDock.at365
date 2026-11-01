@@ -40,7 +40,7 @@ export class GalleryImages {
       },
       preview: async (ref, original = false) => {
         check();
-        await this.images.refresh();
+        await this.images.refresh(false, [ref.file]);
         check();
         const entry = this.images.entry(ref);
         if (!entry?.available || !entry.generation)
@@ -56,6 +56,12 @@ export class GalleryImages {
           });
           check();
           if (!original) return saved.thumbnail;
+          if (/\.svg$/i.test(saved.ref.file)) {
+            const source = (await this.decode(saved.bytes, 2048)).thumbnail;
+            check();
+            if (owner.preview !== request) throw Error(hostText('services.galleryImages.changed'));
+            return source;
+          }
           const extension = saved.ref.file.split('.').at(-1)!.toLowerCase();
           return `data:image/${extension === 'jpg' ? 'jpeg' : extension};base64,${saved.bytes.toString('base64')}`;
         })().catch((error) => {

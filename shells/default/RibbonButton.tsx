@@ -7,16 +7,20 @@ export function RibbonIcon({
   asset,
 }: {
   item: RibbonView['items'][number];
-  asset(id: string): Promise<{ dataUrl: string }>;
+  asset(id: string): Promise<{ dataUrl: string; monochrome?: boolean }>;
 }) {
   const [url, setUrl] = useState('');
+  const [monochrome, setMonochrome] = useState(false);
   useEffect(() => {
     let live = true;
     setUrl('');
     if (item.icon.assetId)
       void asset(item.icon.assetId)
         .then((value) => {
-          if (live) setUrl(value.dataUrl);
+          if (live) {
+            setUrl(value.dataUrl);
+            setMonochrome(value.monochrome === true);
+          }
         })
         .catch(() => {});
     return () => {
@@ -27,7 +31,15 @@ export function RibbonIcon({
     <>
       <span className={`ribbon-icon${item.icon.text ? ' avatar' : ''}`}>
         {url ? (
-          <img src={url} alt="" />
+          monochrome ? (
+            <span
+              className="ribbon-svg-icon"
+              aria-hidden="true"
+              style={{ maskImage: 'url("' + url + '")' }}
+            />
+          ) : (
+            <img src={url} alt="" />
+          )
         ) : (
           item.icon.text || <Icon name={item.icon.name as IconName} size={21} />
         )}

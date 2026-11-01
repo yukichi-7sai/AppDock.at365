@@ -1,8 +1,11 @@
+import { useHostTranslation } from '../HostTranslation';
+import { SettingsButton } from '../settings-ui/SettingsButton';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { HostPageModel } from '../../shared/host-pages';
 import type {
   ImageLibraryPageAction,
   ImageLibraryPageModel,
+  ImageLibraryDialogKind,
 } from '../../shared/image-library-page';
 import { mountImageGallery, mountGallerySizeControl } from '../../../ui/image-gallery';
 import { Icon } from '../../shared/ui-icons';
@@ -18,6 +21,13 @@ type Action = ImageLibraryPageAction extends infer T
     : never
   : never;
 export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryPageModel }) {
+  const { t } = useHostTranslation();
+  const folderLabels = {
+    create: 'images.createFolder',
+    rename: 'images.renameFolder',
+    delete: 'images.deleteFolder',
+    'move-images': 'images.moveImages',
+  } as const;
   const captureDialogFocus = useImageLibraryDialogFocus();
   const [model, setModel] = useState<ImageLibraryPageModel>(initialModel);
   const latest = useRef<ImageLibraryPageModel | undefined>(initialModel);
@@ -256,10 +266,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
   const c = model.content,
     current = c.groups.find((g) => g.id === c.group);
   const normalGroup = !['all', 'unfiled'].includes(c.group);
-  const dialog = (
-    kind: 'add' | 'rename' | 'delete' | 'order' | 'order-images',
-    groupId?: string,
-  ) => {
+  const dialog = (kind: ImageLibraryDialogKind, groupId?: string) => {
     const opener = menu ? (menuButton.current ?? undefined) : undefined;
     setMenu('');
     run({ command: 'dialog', kind, groupId }, opener);
@@ -271,14 +278,58 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
           <h1>画像ライブラリー</h1>
           <p>AppDockで使う画像を、ひとつの場所に。</p>
         </div>
-        <button
-          className="library-primary"
-          disabled={c.busy}
-          onClick={() => run({ command: 'add' })}
-        >
-          <span aria-hidden="true">＋</span>画像を追加
-        </button>
+        <div className="library-header-actions">
+          <button
+            className="library-primary"
+            disabled={c.busy}
+            onClick={() => run({ command: 'add' })}
+          >
+            <span aria-hidden="true">＋</span>画像を追加
+          </button>
+          <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
+            {t('images.importSet')}
+          </SettingsButton>
+        </div>
       </header>
+      <div className="library-folder-toolbar">
+        <label>
+          {t('images.folder')}{' '}
+          <FilterSelect
+            data-testid="library-folder"
+            value={c.folder}
+            allValue="*"
+            onChange={(e) => run({ command: 'folder', folder: e.target.value })}
+            disabled={c.busy}
+          >
+            <option value="*">{t('images.allFolders')}</option>
+            {c.folders.map((folder) => (
+              <option key={folder} value={folder}>
+                {folder || t('images.rootFolder')}
+              </option>
+            ))}
+          </FilterSelect>
+        </label>
+        {(['create', 'rename', 'delete', 'move-images'] as const).map((operation) => (
+          <button
+            key={operation}
+            disabled={
+              c.busy ||
+              (['rename', 'delete'].includes(operation) && (!c.folder || c.folder === '*')) ||
+              (operation === 'move-images' && !c.selected)
+            }
+            onClick={() =>
+              dialog(
+                operation === 'move-images'
+                  ? 'folder-move'
+                  : (('folder-' + operation) as
+                      'folder-create' | 'folder-rename' | 'folder-delete'),
+              )
+            }
+          >
+            {t(folderLabels[operation])}
+          </button>
+        ))}
+      </div>
       <div className="library-layout" ref={interactionRoot}>
         <aside className="library-sidebar" aria-label="画像グループ" ref={sidebar}>
           <nav>
