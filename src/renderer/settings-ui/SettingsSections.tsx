@@ -128,6 +128,7 @@ export function SettingsField({
   actions?: ReactNode;
   belowActions?: ReactNode;
   settingKey?: string;
+  disabled?: boolean;
 } & Omit<HTMLAttributes<HTMLFieldSetElement>, 'title'>) {
   const errorId = useSettingsFeedback({ error, target: title });
   const hasControls = [children, actions, belowActions].some(

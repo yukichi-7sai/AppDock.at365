@@ -136,6 +136,16 @@ export function parseSettingDefinitions(
     )
       throw new Error(hostText('settings.setting-definitions.definition'));
     keys.add(s.key);
+    if (
+      s.enabledWhen !== undefined &&
+      (depth !== 1 ||
+        !['boolean', 'number', 'string', 'select'].includes(s.type) ||
+        !object(s.enabledWhen) ||
+        typeof s.enabledWhen.key !== 'string' ||
+        !['string', 'number', 'boolean'].includes(typeof s.enabledWhen.equals) ||
+        (typeof s.enabledWhen.equals === 'number' && !Number.isFinite(s.enabledWhen.equals)))
+    )
+      throw Error(hostText('settings.setting-definitions.objectFields'));
     for (const key of ['minLength', 'maxLength'])
       if (
         s[key] !== undefined &&
@@ -205,6 +215,19 @@ export function parseSettingDefinitions(
       ...(s.type === 'select' ? { options: parseSettingOptions(s.options) } : {}),
       ...(s.type === 'object-list' ? { fields: parseSettingDefinitions(s.fields, depth + 1) } : {}),
     } as SettingDefinition;
+    for (const field of definition.fields ?? []) {
+      if (!field.enabledWhen) continue;
+      const source = definition.fields!.find(
+        (candidate) => candidate.key === field.enabledWhen!.key,
+      );
+      if (
+        !source ||
+        source.key === field.key ||
+        !['boolean', 'number', 'string', 'select'].includes(source.type)
+      )
+        throw Error(hostText('settings.setting-definitions.objectFields'));
+      validateSettingValue(source, field.enabledWhen.equals);
+    }
     const safeKey = (key: unknown) =>
       typeof key === 'string' &&
       /^[a-zA-Z0-9_-]{1,100}$/.test(key) &&

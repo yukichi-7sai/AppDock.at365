@@ -1,5 +1,22 @@
 # 検証記録
 
+## 2026-11-01: 壁紙設定・条件付き一覧入力のコミット前照合
+
+- 今回のmain差分11ファイルをレビューし、設定宣言の条件/型検証、共通一覧とダイアログ、非活性表示、保存/取消/競合/フォーカス、公開APIと版を照合した。製品の追加修正は不要。説明文に残っていた壁紙側の旧停止表記だけを訂正し、JSON例や検証対象コードは不変。版更新・再発行は行わない。
+- 実装時の全入力SHA256・成功ログ・発行EXE/ZIP・GUI結果を照合し、型検査/build/publish、関連5ファイル38件、固定設定GUI9群・履歴/MCP GUI13群・smoke、壁紙native回帰8群・RPC6群を再利用。実装後の差は検証記録と説明文のみ。
+- 共通設定パーサー/object-listへの実行時依存と関連ソース検査を持つ未確認123ファイル1,261件を追加実行し、fail/skip/cancel 0。標準全167ファイル1,496件は追加1,261件＋実装38件＋直前mainの不変39ファイル197件の再利用で成功が揃った。比較元は`.artifacts/commit-validation-command-selection-20261101/`の951入力・25ファイル267件のログと、参照先の標準成功ログ。追加試験前後の追跡ファイルは全一致。
+- 証跡は`.artifacts/commit-validation-wallpaper-settings-20261101/`のtest-plan/reuse/standard-summary・additional.log、inputs-before-additional、history-modules-reuse、stage/commit照合記録。壁紙の不変JS契約11件も以前の入力・成功ログを照合して再利用。新しいGUI/固定EXEコピーは作成せず、実装時の整理記録を保持。
+- 対象11ファイルだけをstageしmainへコミットする。壁紙側も自身の20ファイルを別コミットにする。製品/配布物は不変、push/Release/実利用deployなし。コミットSHA・treeとstage一致は同証跡のcommit.jsonを正本とする。
+
+## 2026-11-01: 一覧フィールドの編集条件と壁紙設定 0.115.0
+
+- mainで実装。本体はクリーンな追跡先からpull --ff-onlyで最新を確認。`SettingDefinition.enabledWhen`で同じ登録の別のスカラー値との一致を宣言し、一覧内フォームと共通ダイアログの入力可否を切り替える。既定値と数値selectを解決し、不正参照・型・非有限値を拒否する。値の保持・保存時検証・公開範囲・権限は維持。manifest公開契約の追加により0.114.2→0.115.0、SDK/Runtimeの版は不変。
+- 発行前レビューは設定宣言/両UI経路、保存・取消・競合、公開設定/コマンド、描画/停止条件と版・配布を対象とし、製品の阻害指摘なし。古いGUI手順の保存先・固定配布物コピー・画面遷移・並べ替えキー・既定値省略の前提を現状へ更新し、最終GUI成功。
+- 型検査・build・関連5ファイル38件（fail/skip 0）・publish.batが終了0。固定本体EXEで壁紙設定GUI9群、履歴/MCP GUI13群、smoke成功。明暗/1280・700幅、Tile以外のグレー表示、条件復帰、値/フォーカス保持、登録単位の保存/取消、競合拒否を確認。生成コマンドの名称とON/OFF/toggle保存も確認。壁紙側のnative回帰8群・RPC6群/発行native起動も成功。
+- 発行先`A:\40.ARTIFACT\AppDock.at365`、版0.115.0。ZIP 270845238bytes / SHA256 `c963be31ff762cd9257ff1bcabf52aa4f285889a3f60513b535ed233835b699a`、配布693ファイルをZIPと照合。EXE `1b59aba015be5995dd0cba53c2c035217ebfa841707b113aeac7c29e066493e6`。既存deployスクリプト・利用者データ保持、全体ZIP再作成なし。
+- 証跡`.artifacts/wallpaper-settings-20261101/{validation,review,inputs-before-publish,inputs-final,published-updates,payload-files,cleanup}.json`と各完全ログ。試験後の製品入力は発行前と一致し、差は壁紙側テスト手順/文書のみ。古い成功2件と今回解消した失敗5件の実行コピーだけ整理し、結果/設定/画像/manifest・最新成功を保持。過去の再利用記録は保護。
+- 本体全回帰・実壁紙/Explorer再起動・物理ロック/RDP・実NAS/関連付けアプリ/ごみ箱は未実施。commit/push/Release/実利用deployなし。
+
 ## 2026-11-01: 共通コマンド選択のサイズ調整・可変幅とコミット 0.114.2
 
 - 利用者の最終指定により、本体dialogは基本920×900px（画面内上限を維持）、提供元一覧は従来の170pxを初期値として可変にした。ドラッグ・左右キー・Home/End・ダブルクリックで調整/初期化し、コマンド一覧に240pxを残す。幅はdialog内の一時状態で、設定や保存ファイルを追加していない。狭幅では従来のFilterSelectへ切り替わる。説明欄80pxと内部スクロールを維持。内部UI改善として0.114.1→0.114.2へパッチ更新。

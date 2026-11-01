@@ -5,7 +5,12 @@ import { useSettingsControls } from './api';
 import { useState } from 'react';
 import { SettingsField } from './SettingsSections';
 import type { SettingDefinition } from '../../shared/contracts';
-import { readObjectList, objectFieldValue, normalizeObject } from '../../shared/object-list';
+import {
+  readObjectList,
+  objectFieldValue,
+  normalizeObject,
+  isObjectFieldEnabled,
+} from '../../shared/object-list';
 import { RegisteredImageInput } from './RegisteredImagePicker';
 import { useSettingsFeedback } from './SettingsStatus';
 
@@ -105,6 +110,7 @@ export function ObjectListSetting({
                 description={field.description && <CommandText text={field.description} />}
                 key={field.key}
                 settingKey={field.key}
+                disabled={!isObjectFieldEnabled(entry, field, fields)}
               >
                 {field.type === 'registered-image' ? (
                   <RegisteredImageInput

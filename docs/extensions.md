@@ -80,6 +80,12 @@ MCPは宣言から[共通設定APIの一覧対象](settings-api.md#ショート�
 
 この宣言は表示用メタデータです。設定キー・既定値・型・保存領域を変更せず、設定JSONへセクション情報を書き込みません。動的な選択肢・旧値の表示・即時保存・外部変更の競合処理も共通経路を使います。`object-list`と`shortcut-list`は横幅を使ったフォームになります。
 
+### 一覧フィールドの編集条件
+
+AppDock **0.115.0以上**では、`object-list`のboolean・number・string・selectフィールドへ`enabledWhen: { "key": "Mode", "equals": "Tile" }`を宣言できます。`key`は同じ登録内の別のboolean・number・string・selectフィールドです。参照先の型と値を検証し、文字列・有限数値・booleanの完全一致で判定します。既定値・数値形式のselectも共通の値解決を使用します。
+
+一覧内フォームと追加／編集ダイアログの入力可否だけを切り替え、非表示にはしません。条件が外れても保存値・ダイアログ内の値を保持し、条件を戻すと再編集できます。保存時の値検証・公開範囲・権限は変更しません。条件は式やコードとして実行しません。
+
 ### 設定ページの操作ボタン
 
 `settingActions` は最大16件の `{ title, command, settingKey?, placement?, appearance?, icon?, iconOnly?, description?, successMessage? }` を宣言します。

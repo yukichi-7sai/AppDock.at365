@@ -5,6 +5,7 @@ import type { SettingDefinition, SettingOption } from '../../shared/contracts';
 import {
   normalizeObject,
   objectFieldValue,
+  isObjectFieldEnabled,
   readObjectList,
   setObjectField,
 } from '../../shared/object-list';
@@ -135,7 +136,8 @@ export function ObjectListDialogSetting({
   };
   const update = (field: SettingDefinition, next: unknown) => {
     const current = dialogRef.current;
-    if (!current || current.kind !== 'edit') return;
+    if (!current || current.kind !== 'edit' || !isObjectFieldEnabled(current.draft, field, fields))
+      return;
     changed(field.key);
     const draft = structuredClone(current.draft);
     setObjectField(draft, field, next);
@@ -319,6 +321,7 @@ export function ObjectListDialogSetting({
                   <SettingsField
                     key={field.key}
                     settingKey={field.key}
+                    disabled={!isObjectFieldEnabled(dialog.draft, field, fields)}
                     title={field.title}
                     description={field.description && <CommandText text={field.description} />}
                     onInputCapture={

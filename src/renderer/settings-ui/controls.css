@@ -4042,3 +4042,7 @@ button:is(.accent-action, .update-primary, .applet-shortcut-add):hover:enabled {
 .toggle[aria-checked='true'] span {
   background: var(--accent-text);
 }
+
+.settings-field:disabled .settings-field-control {
+  opacity: 0.5;
+}

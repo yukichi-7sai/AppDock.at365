@@ -7,7 +7,74 @@ const {
   validateAppletSettings,
 } = require('../out/main/shared/setting-definitions.js');
 const { createDefaultSettings } = require('../out/main/shared/settings-schema.js');
-const { normalizeObject, readObjectList } = require('../out/main/shared/object-list.js');
+const {
+  normalizeObject,
+  readObjectList,
+  isObjectFieldEnabled,
+} = require('../out/main/shared/object-list.js');
+
+test('conditional list inputs resolve defaults and numeric selections without changing saved values', () => {
+  const raw = {
+    key: 'monitors',
+    title: 'Monitors',
+    type: 'object-list',
+    default: [],
+    fields: [
+      {
+        key: 'Mode',
+        title: 'Mode',
+        type: 'select',
+        default: 'Fit',
+        numericOptions: true,
+        options: [
+          { label: 'Fit', value: 'Fit' },
+          { label: 'Tile', value: 'Tile' },
+        ],
+      },
+      {
+        key: 'Gap',
+        title: 'Gap',
+        type: 'number',
+        default: 10,
+        minimum: 0,
+        maximum: 4096,
+        enabledWhen: { key: 'Mode', equals: 'Tile' },
+      },
+    ],
+  };
+  const [definition] = parseSettingDefinitions([raw]);
+  const [mode, gap] = definition.fields;
+  assert.equal(isObjectFieldEnabled({}, gap, definition.fields), false);
+  assert.equal(isObjectFieldEnabled({ Mode: 1 }, gap, definition.fields), true);
+  const stored = { Mode: 'Tile', Gap: 24, private: 'keep' };
+  const draft = normalizeObject(stored, definition.fields);
+  draft.Mode = 'Fit';
+  assert.equal(isObjectFieldEnabled(draft, gap, definition.fields), false);
+  assert.equal(draft.Gap, 24);
+  validateSettingValue(definition, [draft]);
+  draft.Mode = 'Tile';
+  assert.equal(isObjectFieldEnabled(draft, gap, definition.fields), true);
+  assert.equal(isObjectFieldEnabled(draft, mode, definition.fields), true);
+  assert.deepEqual(draft, stored);
+  assert.throws(() => validateSettingValue(definition, [{ Mode: 'Fit', Gap: -1 }]));
+  for (const enabledWhen of [
+    null,
+    {},
+    { key: 'missing', equals: 'Tile' },
+    { key: 'Gap', equals: 10 },
+    { key: 'Mode', equals: 'missing' },
+    { key: 'Mode', equals: true },
+    { key: 'Mode', equals: NaN },
+    { key: 'Mode', equals: {} },
+  ]) {
+    assert.throws(() =>
+      parseSettingDefinitions([
+        { ...raw, fields: [raw.fields[0], { ...raw.fields[1], enabledWhen }] },
+      ]),
+    );
+  }
+  assert.throws(() => parseSettingDefinitions([{ ...raw.fields[1] }]));
+});
 
 test('monitor forms accept legacy JSON and preserve folders, enum values, padding and unknown data', () => {
   const [definition] = parseSettingDefinitions([

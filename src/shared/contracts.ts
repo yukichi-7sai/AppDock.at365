@@ -122,6 +122,8 @@ export interface SettingDefinition {
   aliases?: string[];
   format?: 'directory' | 'url';
   numericOptions?: boolean;
+  /** Edit a scalar list field only when a sibling has this value. Storage is unchanged. */
+  enabledWhen?: { key: string; equals: string | number | boolean };
   /** Opt-in read-only summary table with grouped editing. */
   list?: {
     columns: string[];

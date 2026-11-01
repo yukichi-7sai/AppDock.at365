@@ -58,6 +58,15 @@ export function normalizeObject(
   }
   return result;
 }
+export function isObjectFieldEnabled(
+  item: Record<string, unknown>,
+  field: SettingDefinition,
+  fields: SettingDefinition[],
+): boolean {
+  if (!field.enabledWhen) return true;
+  const source = fields.find((candidate) => candidate.key === field.enabledWhen!.key);
+  return !!source && objectFieldValue(item, source) === field.enabledWhen.equals;
+}
 export function setObjectField(
   item: Record<string, unknown>,
   field: SettingDefinition,
