@@ -38,31 +38,14 @@ export class CommandPaletteSession implements OverlayController {
   ) {
     if (
       !request ||
-      !['execute', 'select'].includes(request.mode) ||
+      request.mode !== 'execute' ||
+      Object.keys(request).some(
+        (key) => !['requestId', 'mode', 'initialCommandId'].includes(key),
+      ) ||
       typeof request.requestId !== 'string' ||
       !/^[a-zA-Z0-9-]{1,100}$/.test(request.requestId)
     )
       throw Error('Invalid palette request');
-    for (const ids of [request.commandIds, request.pins])
-      if (
-        ids !== undefined &&
-        (!Array.isArray(ids) || ids.length > 10000 || !ids.every(validCommandId))
-      )
-        throw Error('Invalid palette commands');
-    if (
-      request.shortcuts !== undefined &&
-      (!request.shortcuts ||
-        typeof request.shortcuts !== 'object' ||
-        Array.isArray(request.shortcuts) ||
-        Object.entries(request.shortcuts).some(
-          ([id, keys]) =>
-            !validCommandId(id) ||
-            !Array.isArray(keys) ||
-            keys.length > 100 ||
-            keys.some((key) => typeof key !== 'string' || key.length > 80),
-        ))
-    )
-      throw Error('Invalid palette shortcuts');
     this.result = new Promise((resolve) => {
       this.resolve = resolve;
     });
@@ -74,26 +57,7 @@ export class CommandPaletteSession implements OverlayController {
       throw Error(hostText('commands.link.missing'));
   }
   private commands(): UiCommand[] {
-    const catalog = this.options.commands();
-    const allowed =
-      this.request.mode === 'select' && this.request.commandIds
-        ? new Set(this.request.commandIds)
-        : undefined;
-    const known = allowed ? new Set(catalog.map((command) => command.id)) : undefined;
-    const missing =
-      this.request.mode === 'select'
-        ? (this.request.commandIds ?? [])
-            .filter((id) => !known?.has(id))
-            .map((id) => ({
-              id,
-              title: id,
-              extension: hostText('services.commandPalette.unverifiedCommand'),
-              available: false,
-            }))
-        : [];
-    return [...catalog, ...missing].filter(
-      (c) => !('hidden' in c && c.hidden) && (!allowed || allowed.has(c.id)),
-    );
+    return this.options.commands().filter((command) => !command.hidden);
   }
   snapshot(): import('../../shared/overlays').CommandPaletteModel {
     const commands = this.commands();
@@ -102,21 +66,14 @@ export class CommandPaletteSession implements OverlayController {
       dark: this.options.dark(),
       language: this.options.language?.(),
       content: {
-        mode: this.request.mode,
         commands: commands.map((c) =>
           c.description?.includes('[command:')
             ? { ...c, description: commandTextPlain(c.description, references) }
             : c,
         ),
         initialCommandId: this.request.initialCommandId,
-        pins:
-          this.request.mode === 'select'
-            ? (this.request.pins ?? this.options.pins())
-            : this.options.pins(),
-        shortcuts:
-          this.request.mode === 'select'
-            ? (this.request.shortcuts ?? this.options.shortcuts())
-            : this.options.shortcuts(),
+        pins: this.options.pins(),
+        shortcuts: this.options.shortcuts(),
         triggers: this.options.triggers?.(),
         busy: this.busy,
         error: this.error,
@@ -163,7 +120,7 @@ export class CommandPaletteSession implements OverlayController {
     if (!command) throw Error('Command is no longer in this palette');
     this.error = '';
     if (action.type === 'openTriggerSettings') {
-      if (this.request.mode !== 'execute' || !this.options.openTriggerSettings)
+      if (!this.options.openTriggerSettings)
         throw Error('Trigger settings are unavailable in this palette');
       this.busy = true;
       this.options.changed();
@@ -179,7 +136,6 @@ export class CommandPaletteSession implements OverlayController {
       return;
     }
     if (action.type !== 'choose') {
-      if (this.request.mode !== 'execute') throw Error('Selection cannot change saved pins');
       const pins = this.options.pins();
       if (
         action.type === 'movePin' &&
@@ -196,10 +152,6 @@ export class CommandPaletteSession implements OverlayController {
           : movePinnedCommand(pins, command.id, action.direction, action.visibleIds);
       this.options.savePins(next);
       this.options.changed();
-      return;
-    }
-    if (this.request.mode === 'select') {
-      this.finish({ status: 'selected', commandId: command.id });
       return;
     }
     if (!command.available) throw Error('Command is unavailable');

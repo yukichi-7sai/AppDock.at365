@@ -21,7 +21,7 @@ import {
   type TrayMenuLeaf,
   type ResolvedTrayItem,
 } from '../../shared/tray-menu';
-import { CommandPicker } from '../settings-ui/CommandPicker';
+import { CommandSelectionDialog } from '../settings-ui/CommandSelectionDialog';
 import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
 import { ListIcon } from '../settings-ui/SettingsListTable';
 import { SettingsDialog } from '../settings-ui/SettingsModal';
@@ -390,12 +390,11 @@ export function TraySettings({
         </SettingsContent>
       </SettingsSection>
       {picker && (
-        <CommandPicker
+        <CommandSelectionDialog
           commands={commands.filter(
             (c) => !c.hidden && (picker !== 'add' || !fixedTrayCommands.includes(c.id)),
           )}
-          pins={settings.pinnedCommands}
-          shortcuts={settings.shortcuts}
+          initialCommandId={picker === 'add' ? undefined : (settings.host[picker] ?? undefined)}
           onChoose={(command) => {
             if (picker === 'add') add('command', command.id);
             else onChange({ ...settings, host: { ...settings.host, [picker]: command.id } });

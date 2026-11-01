@@ -40,7 +40,7 @@ function fixture(request = {}, execute, openTriggerSettings) {
   return { state, session, act: (action) => session.act({ id: session.id, ...action }) };
 }
 
-test('trigger settings opens for unavailable commands without execution, and rejects stale or selection actions', async () => {
+test('trigger settings opens for unavailable commands without execution, and rejects stale actions', async () => {
   const f = fixture();
   f.state.commands[1].available = false;
   await f.act({ type: 'openTriggerSettings', commandId: 'b' });
@@ -48,12 +48,6 @@ test('trigger settings opens for unavailable commands without execution, and rej
   assert.deepEqual(f.state.executed, []);
   assert.deepEqual(await f.session.result, { status: 'cancelled', reason: 'trigger-settings' });
   await assert.rejects(f.act({ type: 'openTriggerSettings', commandId: 'b' }), /Stale/);
-  const selection = fixture({ mode: 'select' });
-  await assert.rejects(
-    selection.act({ type: 'openTriggerSettings', commandId: 'a' }),
-    /unavailable/,
-  );
-  assert.deepEqual(selection.state.settingsOpened, []);
   const removed = fixture();
   removed.state.commands = [];
   await assert.rejects(removed.act({ type: 'openTriggerSettings', commandId: 'a' }), /no longer/);
@@ -81,19 +75,14 @@ test('trigger navigation failure stays open and duplicate actions are blocked wh
   assert(f.session.snapshot().revision > revision);
   assert.deepEqual(f.session.snapshot().content.triggers, f.state.triggers);
 });
-test('selection restricts catalog, retains missing choices and never executes or saves pins', async () => {
-  const f = fixture({ mode: 'select', commandIds: ['b', 'missing'], pins: ['b'] });
-  f.state.commands[1].available = false;
-  assert.deepEqual(
-    f.session.snapshot().content.commands.map((c) => c.id),
-    ['b', 'missing'],
-  );
-  await assert.rejects(f.act({ type: 'choose', commandId: 'a' }), /no longer/);
-  await assert.rejects(f.act({ type: 'togglePin', commandId: 'b' }), /Selection/);
-  await f.act({ type: 'choose', commandId: 'b' });
-  assert.deepEqual(await f.session.result, { status: 'selected', commandId: 'b' });
-  assert.deepEqual(f.state.executed, []);
-  assert.deepEqual(f.state.pins, ['a', 'missing', 'b']);
+test('execution palette rejects removed selection requests and caller-supplied catalogs', () => {
+  for (const request of [
+    { mode: 'select' },
+    { commandIds: ['b'] },
+    { pins: ['b'] },
+    { shortcuts: {} },
+  ])
+    assert.throws(() => fixture(request), /Invalid palette request/);
 });
 test('execution rechecks availability and rejects stale or duplicate in-flight actions', async () => {
   let release,

@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes } from 'react';
 import { useHostTranslation } from '../HostTranslation';
 import './command-select-button.css';
 
-/** A shared entrance to the command palette's selection mode. */
+/** A shared entrance to the command selection dialog. */
 export function CommandSelectButton({
   commandTitle,
   add = false,

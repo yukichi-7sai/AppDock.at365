@@ -292,7 +292,7 @@ ui-icons等、他Shellも利用する素材はsharedに残す。settings-uiと�
 
 `input`は設定ダイアログの入力保護専用で、`sessionId/pageId/actionId/recording:boolean`を送る。最新のページの利用可否と発行済みの`setShortcutRecording`だけを検査し、設定値の変更・任意アクション・モデル全体の取得は行わない。入力確定キューと停止・復帰の既存サービスを使う。詳細は[ダイアログの入力準備](settings-list-editing.md)を参照する。
 
-`palette`も同じ一時操作の照合を共用する。`sessionId/pageId/actionId`と、`kind: open`の選択要求または`kind: cancel`のrequestIdを送る。選択用だけを許可し、要求のサイズ・現在ページの利用可否・発行済み操作IDを検査する。開始前のモデル再取得、操作時のモデル再構築、結果返却時のモデル同梱は行わない。結果は選択IDまたは取消で、設定の保存を兼ねない。入力確定キューは待つが選択待ちの間は占有せず、取消を受け付ける。接続終了後の応答を拒否し、未対応transportは従来のアクション経路へ戻る。
+`palette`も同じ一時操作の照合を共用する。`sessionId/pageId/actionId`と、`kind: open`の対象ID付き実行パレット要求または`kind: cancel`のrequestIdを送る。`mode:execute`と有効な`initialCommandId`だけを許可し、要求のサイズ・現在ページの利用可否・発行済み操作IDを検査する。開始前のモデル再取得、操作時のモデル再構築、結果返却時のモデル同梱は行わない。結果は実行IDまたは取消で、設定の保存を兼ねない。入力確定キューは待つがパレット待ちの間は占有せず、取消を受け付ける。接続終了後の応答を拒否し、未対応transportは従来のアクション経路へ戻る。
 
 - 送信元は既存の`dock:*`ハンドラーと同じ本体webContents・mainFrame・hostDocumentUrl検査で限定する。
 - open時に本体の現在routeと表示対象を検査する。Applet詳細は選択中のAppletとpageIdの所有者を照合し、full用の検索・ページ選択を許可しない。

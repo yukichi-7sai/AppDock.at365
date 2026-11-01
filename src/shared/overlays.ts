@@ -5,25 +5,19 @@ import { validCommandId } from './command-id';
 /** Host-owned content; presentation providers may implement each kind independently. */
 export interface CommandPaletteRequest {
   requestId: string;
-  mode: 'execute' | 'select';
-  commandIds?: string[];
-  pins?: string[];
-  shortcuts?: Record<string, string[]>;
+  mode: 'execute';
   initialCommandId?: string;
 }
 export function validSettingsPaletteRequest(request: CommandPaletteRequest): boolean {
   return (
     !!request &&
-    (request.mode === 'select' ||
-      (request.mode === 'execute' &&
-        validCommandId(request.initialCommandId) &&
-        Object.keys(request).every((key) =>
-          ['requestId', 'mode', 'initialCommandId'].includes(key),
-        )))
+    request.mode === 'execute' &&
+    validCommandId(request.initialCommandId) &&
+    Object.keys(request).every((key) => ['requestId', 'mode', 'initialCommandId'].includes(key))
   );
 }
 export type CommandPaletteResult =
-  { status: 'selected' | 'executed'; commandId: string } | { status: 'cancelled'; reason: string };
+  { status: 'executed'; commandId: string } | { status: 'cancelled'; reason: string };
 export interface CommandPaletteModel {
   schemaVersion: 1;
   id: string;
@@ -34,7 +28,6 @@ export interface CommandPaletteModel {
   language?: import('./host-language').HostLanguage;
   modal: true;
   content: {
-    mode: 'execute' | 'select';
     commands: UiCommand[];
     pins: string[];
     shortcuts: Record<string, string[]>;

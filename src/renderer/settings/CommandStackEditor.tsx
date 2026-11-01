@@ -6,7 +6,7 @@ import { useHostTranslation } from '../HostTranslation';
 import { SettingsActions, SettingsChoice, SettingsField } from '../settings-ui/SettingsSections';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import type { CommandExecutionMode } from '../../shared/command-execution-mode';
-import { CommandPicker } from '../settings-ui/CommandPicker';
+import { CommandSelectionDialog } from '../settings-ui/CommandSelectionDialog';
 import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
 import { CommandConditionEditor } from '../settings-ui/CommandConditionEditor';
 import { conditionExclusions, useConditionProcesses } from '../settings-ui/CommandConditionDetails';
@@ -326,10 +326,8 @@ export function CommandStackEditor({
         ))}
       </div>
       {picking && (
-        <CommandPicker
+        <CommandSelectionDialog
           commands={commands.filter((command) => !command.hidden && command.id !== excludeId)}
-          pins={[]}
-          shortcuts={{}}
           onClose={() => setPicking(false)}
           onChoose={(command) => {
             const id = crypto.randomUUID();

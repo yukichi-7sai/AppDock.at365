@@ -62,6 +62,8 @@ export interface UiCommand extends Command {
   available: boolean;
   disabledReason?: string;
   hidden?: boolean;
+  /** Settings-only history for displaying existing references; not a new selection candidate. */
+  missing?: boolean;
 }
 export const defaultShortcuts: Record<string, string[]> = {
   'appdock.commands.search': ['Ctrl+P'],

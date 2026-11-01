@@ -75,7 +75,10 @@ fs.writeFileSync(
   '<!doctype html><html><body>Not ready</body></html>',
 );
 settings.extensions['fixture.stalled'] = { enabled: true, settings: {} };
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 const checks = [];
@@ -133,6 +136,10 @@ async function launch(extra = []) {
     'host page',
   );
   dock.setDefaultTimeout(10000);
+  await until(
+    async () => (await dock.evaluate(() => window.dock.snapshot())).startupReady,
+    'host startup ready',
+  );
   await until(
     async () =>
       (await dock.evaluate(() => window.dock.snapshot())).shell.active === 'appdock.default-shell',
@@ -192,7 +199,10 @@ settings.extensions[ribbonManifest.id] = { enabled: true, settings: {} };
 const stalledManifest = JSON.parse(fs.readFileSync(path.join(stalled, 'extension.json')));
 stalledManifest.shell = { apiVersion: 1, views: { 'overlay.command-palette': 'index.html' } };
 fs.writeFileSync(path.join(stalled, 'extension.json'), JSON.stringify(stalledManifest));
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 const palette = () => require('./shell-overlay-helper.cjs').overlayPage(dock);
 const { closingAction } = require('./shell-overlay-helper.cjs');
 async function open() {
@@ -278,23 +288,17 @@ async function dismiss(p) {
       () => document.activeElement?.getAttribute('aria-label') === 'Retained input',
     );
     checks.push('pin persists; overlay layers above Applet view; page input and focus retained');
-    await dock.evaluate(() => {
-      window.selection = undefined;
-      void window.dock
-        .openCommandPalette({
-          requestId: 'choose-test',
-          mode: 'select',
-          commandIds: ['fixture.shell.probe'],
-        })
-        .then((r) => (window.selection = r));
+    const removedSelectionRejected = await dock.evaluate(async () => {
+      try {
+        await window.dock.openCommandPalette({ requestId: 'choose-test', mode: 'select' });
+        return false;
+      } catch {
+        return true;
+      }
     });
-    p = await palette();
-    await p.getByRole('combobox').fill('fixture.shell.probe');
-    await p.screenshot({ path: path.join(profile, 'palette-selection.png') });
-    await closingAction(p.locator('.palette-execute').click());
-    await dock.waitForFunction(() => window.selection?.status === 'selected');
+    assert(removedSelectionRejected);
     assert.equal(fs.existsSync(path.join(external, 'probe.json')), false);
-    checks.push('selection returns ID without executing the command');
+    checks.push('removed selection palette requests are rejected without executing');
     await dock.evaluate(() => window.dock.navigate(null));
     await until(
       async () =>

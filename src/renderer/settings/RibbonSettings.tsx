@@ -32,7 +32,7 @@ import { SettingsSection, SettingsField } from '../settings-ui/SettingsSections'
 import { Toggle } from '../settings-ui/Toggle';
 import { RibbonIconPicker } from '../settings-ui/RibbonIconPicker';
 import { imageReference, type RegisteredImageRef } from '../../shared/registered-images';
-import { CommandPicker } from '../settings-ui/CommandPicker';
+import { CommandSelectionDialog } from '../settings-ui/CommandSelectionDialog';
 import { CommandSelectButton } from '../settings-ui/CommandSelectButton';
 
 export function RibbonSettings({
@@ -880,7 +880,7 @@ export function RibbonSettings({
           </SettingsField>
         </SettingsDialog>
       )}
-      {buttonDialog && !picker && (
+      {buttonDialog && (
         <SettingsDialog
           resetAction={{
             label: translate('settings.ribbonSettings.resetIcon'),
@@ -994,10 +994,11 @@ export function RibbonSettings({
         </SettingsDialog>
       )}
       {picker && (
-        <CommandPicker
+        <CommandSelectionDialog
           commands={commands.filter((c) => !c.hidden)}
-          pins={settings.pinnedCommands}
-          shortcuts={settings.shortcuts}
+          initialCommandId={
+            picker === 'rightClick' ? rightClickCommand : buttonDialog?.button.commandId
+          }
           onClose={() => setPicker(undefined)}
           onChoose={(command) => {
             if (picker === 'rightClick')

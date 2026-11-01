@@ -1679,7 +1679,7 @@ function settingsUiCommands() {
     ...commands,
     ...[...knownSettingsCommands.values()]
       .filter((c) => !ids.has(c.id))
-      .map((c) => ({ ...c, available: false, customDefinitionId: undefined })),
+      .map((c) => ({ ...c, available: false, missing: true, customDefinitionId: undefined })),
   ].map((command) => ({ ...command, automation: published.has(command.id) }));
 }
 function settingsCommandAssignments() {
@@ -2228,6 +2228,22 @@ function settingsPageStorage(
 }
 function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxiliary {
   const auxiliary = settingsPageAuxiliaryContent(page);
+  if (
+    [
+      'ribbon',
+      'tray',
+      'custom-commands',
+      'command-triggers',
+      'shortcuts',
+      'gestures',
+      'touchpad-gestures',
+    ].includes(page.id)
+  ) {
+    const candidates = new Set(
+      auxiliary.commands?.filter((command) => !command.hidden).map((command) => command.id),
+    );
+    auxiliary.commandPins = settings.value.pinnedCommands.filter((id) => candidates.has(id));
+  }
   const texts = page.items.flatMap((item) => [
     item.description,
     ...(item.keywords ?? []),
@@ -3008,7 +3024,8 @@ function settingsPageActions(
   ) {
     actions.openCommandPalette = async ([request]) => {
       const value = request as CommandPaletteRequest;
-      if (!validSettingsPaletteRequest(value)) throw Error(hostText('settings.index.selectOnly'));
+      if (!validSettingsPaletteRequest(value))
+        throw Error(hostText('settings.index.commandLinkOnly'));
       settingsPalette = value.requestId;
       return openCommandPalette(value);
     };

@@ -140,7 +140,7 @@ function fixture(t) {
   host.viewport({ x: 0, y: 40, width: 1000, height: 720 });
   const session = () =>
     new CommandPaletteSession(
-      { requestId: 'request-' + ++requestId, mode: 'select' },
+      { requestId: 'request-' + ++requestId, mode: 'execute' },
       {
         commands: () => [],
         pins: () => [],

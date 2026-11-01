@@ -173,11 +173,7 @@ const checks = [];
     };
     const choose = async (trigger, id) => {
       await button(trigger).click();
-      const palette = await require('./shell-overlay-helper.cjs').overlayPage(page);
-      await palette.getByRole('combobox').fill(id);
-      await require('./shell-overlay-helper.cjs').closingAction(
-        palette.locator(`[data-command-id="${id}"] .palette-execute`).click(),
-      );
+      await require('./command-selection-helper.cjs').chooseCommand(page, id);
     };
     const select = async (id) => page.locator(`[data-tray-item="${id}"] .tray-select`).click();
     const ids = () =>
@@ -208,7 +204,7 @@ const checks = [];
     await button('＋ グループ').click();
     await page.getByLabel('グループ名', { exact: true }).fill('日常 & 操作');
     const groupId = await page.locator('.tray-editor-row.selected').getAttribute('data-tray-item');
-    await choose('＋ コマンド', 'appdock.open');
+    await choose('コマンドを追加…', 'appdock.open');
     const openId = await page.locator('.tray-editor-row.selected').getAttribute('data-tray-item');
     assert.equal(await page.getByLabel('メニュー項目の配置先').inputValue(), groupId);
     await commandRow('a.run').locator('.tray-select').click();
@@ -263,11 +259,12 @@ const checks = [];
     await page.getByRole('alert').first().waitFor();
     await page.getByLabel('グループ名', { exact: true }).fill('日常 & 操作');
     await save();
-    await button('＋ コマンド').click();
-    const addPalette = await require('./shell-overlay-helper.cjs').overlayPage(page);
+    await button('コマンドを追加…').click();
+    const addPalette = require('./command-selection-helper.cjs').selectionDialog(page);
     await addPalette.getByRole('combobox').fill('appdock.quit');
     assert.equal(await addPalette.locator('[data-command-id="appdock.quit"]').count(), 0);
-    await require('./shell-overlay-helper.cjs').closingAction(addPalette.keyboard.press('Escape'));
+    await addPalette.getByRole('combobox', { name: 'コマンドを検索' }).press('Escape');
+    await addPalette.waitFor({ state: 'hidden' });
     await choose('トレイクリックのコマンドを選択', 'a.run');
     await choose('トレイダブルクリックのコマンドを選択', 'b.run');
     assert.equal(await page.locator('.tray-click-controls .command-id').count(), 0);

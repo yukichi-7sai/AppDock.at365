@@ -48,6 +48,7 @@ export interface SettingsPageAuxiliary {
   automation?: import('./automation').AutomationState;
   startPages?: import('./contracts').SettingOption[];
   commandReferences?: import('./command-text').CommandReference[];
+  commandPins?: string[];
   mcpAccess?: import('./settings-mcp-access').SettingsMcpAccess;
   commandAssignments?: { shortcuts: string[]; gestures: string[]; 'touchpad-gestures': string[] };
   triggerExecutionModes?: Record<import('./trigger-stacks').TriggerStackKind, 'first' | 'all'>;

@@ -61,7 +61,7 @@ test('settings palette accepts targeted opening without widening direct executio
   assert(
     validSettingsPaletteRequest({ requestId: 'test', mode: 'execute', initialCommandId: 'a' }),
   );
-  assert(validSettingsPaletteRequest({ requestId: 'test', mode: 'select', commandIds: ['a'] }));
+  assert(!validSettingsPaletteRequest({ requestId: 'test', mode: 'select', commandIds: ['a'] }));
   for (const extra of [
     { commandIds: ['a'] },
     { pins: [] },

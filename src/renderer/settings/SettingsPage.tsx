@@ -9,6 +9,7 @@ import type {
 } from '../../shared/settings-page';
 import { SettingsControlsProvider } from '../settings-ui/api';
 import { CommandReferencesProvider } from '../settings-ui/CommandLink';
+import { CommandSelectionPins } from '../settings-ui/CommandSelectionDialog';
 import { SettingsHintsContext } from '../settings-ui/SettingsHints';
 import { SettingsViewClient } from './runtime';
 import type { SettingsResetScope } from '../../shared/settings-catalog';
@@ -285,31 +286,33 @@ export function SettingsPage({
   const frame = (body: ReactNode) => (
     <HostTranslationProvider language={model?.content.language ?? index?.language}>
       <SettingsControlsProvider api={controls ?? window.dock}>
-        <CommandReferencesProvider references={model?.content.auxiliary.commandReferences}>
-          <SettingsMcpAccessProvider
-            value={loaded ? model?.content.auxiliary.mcpAccess : undefined}
-          >
-            <SettingsHintsContext.Provider value={model?.content.showHints ?? true}>
-              <SettingsPageFrame
-                surface={surface}
-                context={context}
-                connectionId={loaded ? model?.id : undefined}
-                index={
-                  indexContent && pendingPage
-                    ? { ...indexContent, page: { id: pendingPage } }
-                    : indexContent
-                }
-                sidebarWidth={loaded ? model!.content.sidebarWidth : sidebarWidth}
-                hostWidth={loaded ? model!.content.hostWidth : window.innerWidth}
-                pending={!loaded}
-                act={act}
-                resize={resize}
-              >
-                {body}
-              </SettingsPageFrame>
-            </SettingsHintsContext.Provider>
-          </SettingsMcpAccessProvider>
-        </CommandReferencesProvider>
+        <CommandSelectionPins.Provider value={model?.content.auxiliary.commandPins}>
+          <CommandReferencesProvider references={model?.content.auxiliary.commandReferences}>
+            <SettingsMcpAccessProvider
+              value={loaded ? model?.content.auxiliary.mcpAccess : undefined}
+            >
+              <SettingsHintsContext.Provider value={model?.content.showHints ?? true}>
+                <SettingsPageFrame
+                  surface={surface}
+                  context={context}
+                  connectionId={loaded ? model?.id : undefined}
+                  index={
+                    indexContent && pendingPage
+                      ? { ...indexContent, page: { id: pendingPage } }
+                      : indexContent
+                  }
+                  sidebarWidth={loaded ? model!.content.sidebarWidth : sidebarWidth}
+                  hostWidth={loaded ? model!.content.hostWidth : window.innerWidth}
+                  pending={!loaded}
+                  act={act}
+                  resize={resize}
+                >
+                  {body}
+                </SettingsPageFrame>
+              </SettingsHintsContext.Provider>
+            </SettingsMcpAccessProvider>
+          </CommandReferencesProvider>
+        </CommandSelectionPins.Provider>
       </SettingsControlsProvider>
     </HostTranslationProvider>
   );

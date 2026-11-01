@@ -92,32 +92,26 @@ function PaletteApp() {
         pins={content.pins}
         shortcuts={content.shortcuts}
         triggers={content.triggers}
-        mode={content.mode}
         initialCommandId={content.initialCommandId}
         busy={content.busy}
         error={error || content.error}
         onChoose={(command) => act({ id: model.id, type: 'choose', commandId: command.id })}
         onClose={() => act({ id: model.id, type: 'dismiss' })}
-        onOpenTriggerSettings={
-          content.mode === 'execute'
-            ? (command) => act({ id: model.id, type: 'openTriggerSettings', commandId: command.id })
-            : undefined
+        onOpenTriggerSettings={(command) =>
+          act({ id: model.id, type: 'openTriggerSettings', commandId: command.id })
         }
-        onPinAction={
-          content.mode === 'execute'
-            ? (type, commandId, direction, visibleIds) =>
-                act(
-                  type === 'togglePin'
-                    ? { id: model.id, type, commandId }
-                    : {
-                        id: model.id,
-                        type,
-                        commandId,
-                        direction: direction!,
-                        visibleIds: visibleIds!,
-                      },
-                )
-            : undefined
+        onPinAction={(type, commandId, direction, visibleIds) =>
+          act(
+            type === 'togglePin'
+              ? { id: model.id, type, commandId }
+              : {
+                  id: model.id,
+                  type,
+                  commandId,
+                  direction: direction!,
+                  visibleIds: visibleIds!,
+                },
+          )
         }
       />
     </HostTranslationProvider>

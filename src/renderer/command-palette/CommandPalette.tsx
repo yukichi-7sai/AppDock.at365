@@ -6,7 +6,7 @@ import { useHostTranslation } from '../HostTranslation';
 import { CommandTriggerMark } from '../settings-ui/CommandTriggerMark';
 import type { CommandTriggerMark as TriggerMark } from '../../shared/command-triggers';
 
-/** Execution and selection share navigation and favorites; only the caller decides the action. */
+/** Host-owned command execution palette. Settings use CommandSelectionDialog. */
 export function CommandPalette({
   commands,
   pins = [],
@@ -15,7 +15,6 @@ export function CommandPalette({
   triggers,
   onOpenTriggerSettings,
   busy = false,
-  mode = 'execute',
   onChoose,
   onClose,
   error = '',
@@ -33,7 +32,6 @@ export function CommandPalette({
   triggers?: Record<string, TriggerMark[]>;
   onOpenTriggerSettings?(command: UiCommand): void;
   busy?: boolean;
-  mode?: 'execute' | 'select';
   onChoose(command: UiCommand): void;
   onClose(): void;
   error?: string;
@@ -68,12 +66,12 @@ export function CommandPalette({
         : -1
       : filtered.findIndex((c) => c.id === selectedId);
   const visiblePins = filtered.filter((c) => pins.includes(c.id)).map((c) => c.id);
-  const canChoose = (c: UiCommand) => !busy && (mode === 'select' || c.available);
+  const canChoose = (c: UiCommand) => !busy && c.available;
   useLayoutEffect(() => {
     const input = ref.current?.querySelector('input');
     input?.focus();
     if (initialCommandId) input?.select();
-  }, [mode, initialCommandId]);
+  }, [initialCommandId]);
   useLayoutEffect(() => {
     const reveal = () =>
       ref.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
@@ -90,7 +88,7 @@ export function CommandPalette({
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-label={t(mode === 'select' ? 'commands.palette.select' : 'commands.palette.title')}
+        aria-label={t('commands.palette.title')}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           e.stopPropagation();
@@ -124,11 +122,7 @@ export function CommandPalette({
             aria-autocomplete="list"
             aria-controls={`${prefix}-results`}
             aria-activedescendant={filtered[selected] ? `${prefix}-option-${selected}` : undefined}
-            placeholder={t(
-              mode === 'select'
-                ? 'commands.palette.selectPlaceholder'
-                : 'commands.palette.executePlaceholder',
-            )}
+            placeholder={t('commands.palette.executePlaceholder')}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -162,9 +156,7 @@ export function CommandPalette({
             <kbd>Esc</kbd>
           </button>
         </div>
-        <div className="palette-label">
-          {t(mode === 'select' ? 'commands.palette.select' : 'commands.palette.label')}
-        </div>
+        <div className="palette-label">{t('commands.palette.label')}</div>
         <div
           id={`${prefix}-results`}
           className="palette-results"
@@ -278,7 +270,7 @@ export function CommandPalette({
             <p role="alert">{t('commands.link.missing')}</p>
           )}
         <div className="palette-footer">
-          {t(mode === 'select' ? 'commands.palette.selectHint' : 'commands.palette.executeHint')}
+          {t('commands.palette.executeHint')}
           {onPinAction && t('commands.palette.pinHint')}
         </div>
       </div>

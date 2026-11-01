@@ -39,10 +39,12 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 | --- | --- |
 | `OverlayHost` | primaryのモーダル枠1件、遅延生成、表示順序、寸法・zoom、IPC送信元、ready、復旧、フォーカス、破棄 |
 | `OverlayController` | 内容別のモデル・操作・完了・取消。表示先を所有しない |
-| `CommandPaletteSession` | 最新コマンド列挙・利用可否、ピン保存、選択だけの結果、共通実行、実行中の重複防止 |
+| `CommandPaletteSession` | 最新コマンド列挙・利用可否、ピン保存、共通実行、実行中の重複防止 |
 | 本体`command-palette` renderer | パレットの検索・選択位置・キーボード移動・描画 |
 | Default Shell / Shell Applet | リボンと一時グループの公開snapshotを描画する |
-| 本体`CommandPicker` / `CommandLink` | 選択結果を設定へ反映する、または対象コマンドを初期選択して開く |
+| 本体`CommandLink` | 対象コマンドを初期選択して実行パレットを開く |
+
+設定の候補選択は[共通コマンド選択ダイアログ](command-selection.md)を使い、パレットのOverlay経路を使用しない。
 
 下のApplet WebContentsや入力・sessionを再生成しない。パレットは本体rendererが報告する本文矩形内の独立WebContentsView。一時リボングループはクライアント領域を使う。背景は[表示設定](appearance.md#ダイアログパレットの背景)に従う。リボン・タイトルバー・ステータスバーは操作でき、本文の背景クリック・route変更で閉じる。表示中もキー・マウス・タッチパッドのトリガーを継続し、フォーカスのあるダイアログ・パレットでは単独のTab・Escape・Enter・上下左右だけを画面操作へ渡す。修飾キー付きの割り当てと、別アプリでの割り当ては通常どおり評価する。キー記録中の保護は[キー入力の仕様](keybindings.md#ダイアログとパレットの入力)に従う。
 
@@ -63,7 +65,7 @@ workerでは通常の`context.commands.register`で宣言コマンドを実装�
 
 本体の`command-palette/index.html`と専用preloadを使う。`window.appdockPalette`の`connect/ready/act/onChanged/onSuspended`だけを公開し、Node、`window.dock`、Shell bridge、設定取得、任意コマンド実行を公開しない。WebContents・main frame・登録URL・route・現session・ready・モデルIDを検査する。
 
-モデルは`schemaVersion:1/id/contextId:primary/kind:command-palette/revision/dark/language/modal:true/content`。contentは`mode/commands/pins/shortcuts/busy/error/initialCommandId`。操作は`dismiss/choose/togglePin/movePin`で、実行直前にも最新の権限・可否を照合する。busy中の重複選択を拒否し、エラー時はパレットを残す。
+モデルは`schemaVersion:1/id/contextId:primary/kind:command-palette/revision/dark/language/modal:true/content`。contentは`commands/pins/shortcuts/triggers/busy/error/initialCommandId`。操作は`dismiss/choose/togglePin/movePin/openTriggerSettings`で、実行直前にも最新の権限・可否を照合する。busy中の重複操作を拒否し、エラー時はパレットを残す。要求は`mode:execute`だけを受け付ける。
 
 - `mode:execute`は共通実行経路を使う。ピン操作は最新の本体設定から対象だけ更新し、検索外のピン・他設定を保つ。
 - `initialCommandId`は対象を初期選択・可視位置へ移動し、フィルターへIDを入力して文字列を全選択する。入力の置換・クリア後は通常検索へ戻り、snapshot更新で入力を初期化しない。通常起動は空検索とする。開くだけでは実行せず、対象消失時に別コマンドを代わりに実行しない。

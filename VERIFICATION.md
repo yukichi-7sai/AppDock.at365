@@ -1,5 +1,40 @@
 # 検証記録
 
+## 2026-11-01: 共通コマンド選択のサイズ調整・可変幅とコミット 0.114.2
+
+- 利用者の最終指定により、本体dialogは基本920×900px（画面内上限を維持）、提供元一覧は従来の170pxを初期値として可変にした。ドラッグ・左右キー・Home/End・ダブルクリックで調整/初期化し、コマンド一覧に240pxを残す。幅はdialog内の一時状態で、設定や保存ファイルを追加していない。狭幅では従来のFilterSelectへ切り替わる。説明欄80pxと内部スクロールを維持。内部UI改善として0.114.1→0.114.2へパッチ更新。
+- コミット前レビューで、旧選択パレット削除からmainへの統合、最新Applet設定APIの保持、公開API/保存形式不変を確認。ResizeObserverの破棄、pointer captureの終了、画面縮小時の幅制限、キーボードの範囲制御を確認し、発行阻害指摘なし。型検査・ビルド・通常publishは終了0。
+- 標準167ファイル1,495件は、今回25ファイル267件を実行してfail/skip 0、残る142ファイル1,228件をmain `186a78d`の成功から再利用。前回の標準ログSHA256と再利用試験本文、製品・依存・native・ビルド入力を照合。runtimeのpalette/overlays参照先とrenderer/mainのソース走査を含む影響先を実行し、commands/settings-pageの差は型メタデータ、他機能の翻訳値と実行ロジックは不変と確認した。詳細は`.artifacts/commit-validation-command-selection-20261101/{test-plan,standard-summary,standard-input-differences}.json`、再利用元は`commit-validation-wallpaper-history-ui-20261101/`。
+- 共通選択GUIはソース/固定EXE各6群成功。初期170px、左右キー、100pxの実ドラッグ、Home/End、縮小時の一覧/操作維持、ダブルクリック初期化、再表示時の初期幅、狭幅切替と説明ホイールを確認。固定EXEのsmokeも成功。1250×1100でdialog920×900、一覧高531px、680×760で592×657、900×640で812×537となり横はみ出しなし。単一クリック/確定/取消、親入力/フォーカス、外部削除、停止中非実行、再起動保存も確認。物理IMEは未確認。
+- 証跡は`.artifacts/commit-validation-command-selection-20261101/`。`unit.log`、`gui-source.log`、`fixed-selection.log`、`fixed-smoke.log`、`publish.log`と入力/成果物manifest、stage/commit照合記録を保存。発行前後951入力は一致。発行693製品ファイルはstagingとSHA256一致、利用者設定は管理対象外として保持。0.114.2 EXE=`e8fdbdbd6c22fdff69e87aa35db10d366cada4b1951e481486d5b034895729c5`、ZIP=`cbdde17978cc97fee546f6b344ec755369197a44e1643080c9f65142e4db4964`、270846531bytes。
+- コミット後のworktree整理は`.artifacts/command-selection-worktree-archive-20261101/cleanup.json`を正本とする。元worktreeの950入力を照合し、作業差分patch・新規7ファイル・artifact9,855件のSHA256を保全準備した。mainとの差は改行正規化後に8ファイルで、版・mainの既存API・承認されたUI/試験/検証文書の更新だけ。共有tool/storeへ向くjunctionはリンク自身だけを外し、祖先関係・使用中process・main依存の参照を確認してから対象worktreeとfeatureブランチを削除する。push/Release/実利用deployは行わない。
+
+## 2026-11-01: mainへのコマンド選択UI統合と一覧拡大 0.114.1
+
+- 利用者がworktree版0.113.1の使い勝手を確認し、main反映と高さ/説明欄の調整を依頼。mainはクリーンな`186a78dd9916cf2b7674ea7edb3ad13fc9b9aeae`から`pull --ff-only`済み。worktreeの検証済み950入力をSHA256照合して一致を確認し、未コミット差分と新規7ファイルをmainの作業ツリーへ適用した。main側のApplet設定遷移/API/SDK変更を維持。元worktree・ブランチ・証跡を保持し、commit/push/Release/deployは行っていない。
+- ダイアログの基本高さ660→760px、詳細118→80px（画面高520px以下は64px）。共通の画面内上限を保ち、一覧へ残りの高さを割り当てる。長い詳細は内部スクロール。主画面の共通エラー領域や操作・保存契約は変更していない。設定/保存ファイル/公開APIの追加変更なしのため、mainの0.114.0からパッチ更新。
+- 発行前レビュー: 共有変更の適用に競合なし。mainの`openSettings`と翻訳キーを保持し、旧選択専用コードの削除・保存責務・親dialog保持を再確認。発行阻害指摘なし。型検査・ビルド・command-selection/command-palette/command-text/overlay-host/settings-page/settings-page-host/tray-menu/ribbon-customization/command-stacks/localization/applet-settings-navigationの関連11ファイル **74/74成功**。
+- 選択GUIはソースと固定EXEで各6群成功。検索/お気に入り・停止中非実行・トレイ保存・リボン/スタック親入力と取消・外部削除・再起動を再確認。長い説明fixtureをホイールでスクロールして、広幅/狭幅/低い画面で一覧と確定操作が見えることを確認。固定EXEでのCSS座標実測は、1250×900でdialog760/list391/detail79px、680×760で657/244/79px、900×640で537/168/79px。説明scrollHeight343pxに対しscrollTop264pxへ到達し、横はみ出しなし。細かな寸法は固定assertにせず結果JSONへ記録した。
+- 固定EXEの実行パレット5群・説明リンク4群・smokeも終了0。既存mainの同梱SDK/Runtimeを含む通常publish成功、Default Shell/保存先/登録画像/トレイを確認。前回のトレイ・リボン・全スタック・Shell復旧GUI全体は再実行せず、旧worktree成功を背景証跡とし、変更経路は今回の共通選択GUIと関連単体で確認。物理IME・利用者設定での新版受入は未確認。
+- 証跡: `.artifacts/command-selection-main-20261101/`の`validation.json`、`typecheck.log`/`build.log`/`unit.log`/`publish.log`/`gui-source.log`/`fixed-*.log`。`inputs-before-publish.json`の951入力は発行・検証後も全件一致（`input-check.json`）。Node26.13.0/pnpm12.15.0/Electron45.1.0、Windows10.0.26300/x64。版変更後の依存照合は正規offline frozen installで更新し、検査を緩めていない。
+- 発行先`A:\40.ARTIFACT\AppDock.at365`。発行先には既存利用者設定もあるため、全ファイル照合からmanifest管理対象だけの照合へ訂正し、693製品ファイルがstagingと一致。利用者設定は照合/削除対象に含めていない。feed/manifestは0.114.1、ZIP270846084bytes。EXE SHA256=`3d2aad95e2fa1839b9632816f304c3e30bbb8e9b056125d20fc03d031a6516f8`、ZIP=`d829299aaaac91df133e622fe8537dfbb8b885f852da49fcfa2ee6a36befeca2`。詳細は`published.json`/`published-files.json`。
+- 固定代表画像は`.artifacts/command-selection-ui-1793506335558/{dark-wide,light-narrow,light-compact}.png`。試験プロセス終了確認済み。古い成功smoke-1793499017227の管理対象18エントリーだけを整理し、設定/画像/ログ/manifestと最新smoke-1793506358744を保持。他の新規固定成功コピーは各種類1件、元worktreeと既存の保全証跡は保持した（`cleanup.json`）。
+
+## 2026-11-01: worktreeの共通コマンド選択ダイアログ 0.113.1
+
+この節の`.artifacts`参照は元の実行元`A:\30.PROJECT\AppDock.at365-command-selection`を基準とする。worktree整理後の保存先はmainの`.artifacts/command-selection-worktree-archive-20261101/artifacts/`。保存済みJSON/ログの旧絶対パスは実行時の履歴値として保持する。
+
+- `A:\30.PROJECT\AppDock.at365-command-selection` / `feature/command-selection-dialog`、基点`079d0201875d9fe35c359b2e56299aec96c167f4`。元checkoutの別作業を保持し、fetch後にmainとorigin/mainの差分0/0を確認して分離した。未コミット・未push・未統合。ローカル発行先は`A:\40.ARTIFACT\AppDock.at365-command-selection`。実利用先へのdeploy/GitHub Releaseは行っていない。
+- 検索・提供元・お気に入り・詳細・現在値を持つ`CommandSelectionDialog`を、リボン/トレイ/共通スタックへ組み込んだ。旧`CommandPicker`とパレットのselectモード/上書き候補/selected結果を削除し、実行パレットとCommandLinkは維持。保存設定・保存ファイル・公開Applet API/SDKは変更していないためパッチ更新とした。仕様は[共通コマンド選択](docs/command-selection.md)。
+- 発行前レビューで、ページ投影に含まれないお気に入りを表示用`commandPins`へ投影、子選択中のリボン親dialogのマウントを保持、既存参照用の削除済みカタログを`missing`で選択対象から除外した。外部削除時は別候補を自動確定せず選択解除する。停止中候補は選べるが起動/実行しない。呼出し元の非表示・自己参照・トレイ固定項目除外と保存契約を維持し、未解決の発行阻害指摘なし。
+- Node26.13.0/pnpm12.15.0、Electron45.1.0、Windows10.0.26300/x64。独立node_modulesを正規`dev.bat install --offline --frozen-lockfile`で構成。版更新後の`ERR_PNPM_VERIFY_DEPS_BEFORE_RUN`も同インストールで解決し、依存検証は緩めていない。`typecheck`・`build`・`build:dotnet`・`publish.bat`は終了0。通常publishは2026-11-01 12:53–12:54 JSTに完了。
+- `dev.bat exec node --test`でcommand-selection/command-palette/command-text/overlay-host/settings-page/settings-page-host/tray-menu/ribbon-customization/command-stacks/localizationの10ファイル、**73/73成功**。新選択GUIはソースと固定EXEの双方で6群成功。0件/固定高、初期値/取消/復帰、提供元と検索/お気に入り、IME合成イベント/Tab、狭幅/明暗、親の一時入力と保存、外部削除、再起動を確認した。1万50件は純粋カタログ回帰で保持を確認したもので、大量描画の性能測定ではない。
+- 固定EXEの既存GUIはcommand-palette 5群、command-links 4群、tray-menu 4群、ribbon-customization 6群、command-stacks 15群、shell-overlay 7群成功。実行/ピン/CommandLink、3種の専用スタックとnativeキー起動、親入力/フォーカス、Shell非依存とパレットの障害復旧を確認。`dev.bat run smoke <固定EXE>`も成功し、Default Shell・保存先・登録画像・トレイを確認。禁止されたPause/F13–F24のOS送信/登録は行っていない。実IME機器操作・利用者設定での受入は未確認。
+- 試験側の修正: 旧トレイ追加ラベルを現行ラベルへ更新、Shell回帰は`startupReady`待機を追加、スタックセットアップは画面の特殊キーピッカーへ変更してキー記録開始前の合成keydownを撤去した。対応する固定EXE回帰を再実行して成功。失敗時のprofileは証跡として保持した。選択GUI初回のactive=false/最小Window幅/編集dialog名/管理コマンド件数の誤前提も訂正し、最終成功へ置き換えた。
+- 証跡は`.artifacts/command-selection-20261101/`。`typecheck.log`、`build.log`、`unit.log`、`publish.log`、`gui-dev.log`、`fixed-*.log`と`validation.json`を参照。製品/試験/依存/ビルド定義の950入力を`inputs-before-publish.json`と`inputs-final.json`へSHA256で記録。発行後の差分は上記3試験スクリプトのみで、製品入力は一致。WindowsToolsの読取fixtureも`external-fixture.json`へ記録した。
+- 発行693ファイルとstagingを全件SHA256で照合し一致。version/feed/manifest/ZIPのsizeとhashが整合し、固定EXEの各試験コピーも照合した。EXE=`7778181c64206b65acfa7d29b851ca1f15d25ad3494b41b0025d82db49818689`、ZIP=`6d48e2dcc70176eca70d4071ec66d575a7de6235bb921fbc462a319a208c8af1`、ZIP270845743bytes。詳細は`published.json`/`published-files.json`。
+- 代表画像: `.artifacts/command-selection-ui-1793505279981/dark-wide.png`と`light-narrow.png`。固定成功コピーは種類ごと1回、ソース成功は3回以内のため整理対象なし。失敗profile・固定ビルド・再利用証跡を保持。元checkoutの未コミット変更へ編集・stash・resetを行っていない。
+
 ## 2026-11-01: 壁紙履歴の表示調整・自己設定UI APIのコミット前照合
 
 - 利用者から表示調整の受入を確認された。実装時の1,095入力・40ログ・104 fixture入力、発行全704ファイルとZIP/feed、GUI結果をSHA256で照合し一致。本体の関連14ファイル86件、壁紙JS11件、native回帰/RPC、ソース/固定EXEのNode/DLL/native 4群・履歴/設定13群・NASを模した削除13群・固定自動更新6群を再利用した。

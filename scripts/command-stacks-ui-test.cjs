@@ -6,7 +6,7 @@ const { randomUUID, createHash } = require('node:crypto');
 const { chromium } = require('playwright');
 const { freePort, inspect } = require('./electron-main-helper.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
-const { overlayPage, closingAction } = require('./shell-overlay-helper.cjs');
+const { selectionDialog, chooseCommand } = require('./command-selection-helper.cjs');
 const { JsonLinePeer } = require('../out/main/main/core/rpc');
 const root = path.resolve(__dirname, '..'),
   portable = process.argv[2] && path.resolve(process.argv[2]);
@@ -105,7 +105,10 @@ if (process.argv.includes('--count-only')) {
       entries: entries.map((entry) => ({ ...entry, id: kind + '-' + entry.id })),
     });
 }
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(initial),
+);
 let browser,
   host,
   child,
@@ -248,14 +251,7 @@ async function close() {
     };
     const choose = async (id) => {
       await dialog.getByTestId('stack-add-command').click();
-      const palette = await overlayPage(host);
-      await palette.getByRole('combobox').fill(id);
-      await until(async () => !!(await palette.locator('[role=option]').count()), 'command result');
-      await closingAction(palette.getByRole('combobox').press('Enter'));
-      await until(
-        () => require('./shell-overlay-helper.cjs').overlayClosed(palette),
-        'picker closed',
-      );
+      await chooseCommand(host, id);
       await dialog.getByTestId('command-stack-editor').waitFor();
     };
     const next = async () => {
@@ -265,6 +261,15 @@ async function close() {
       await action.click();
       await dialog.getByTestId('stack-command-step').waitFor();
       assert(await dialog.getByTestId('stack-trigger-selection').isHidden());
+    };
+    const selectShortcut = async (key) => {
+      // Stack setup uses the picker; native shortcut capture has its own regression.
+      await dialog.locator('.shortcut-special-trigger').click();
+      const picker = dialog.locator('.shortcut-special-picker');
+      for (const modifier of ['Ctrl', 'Shift'])
+        await picker.getByRole('button', { name: modifier, exact: true }).click();
+      if (/^[A-Z0-9]$/.test(key)) await picker.getByRole('combobox').selectOption(key);
+      else await picker.getByRole('button', { name: key, exact: true }).click();
     };
     if (process.argv.includes('--count-only')) {
       await require('./command-count-checks.cjs').check({
@@ -393,17 +398,12 @@ async function close() {
     await dialog.getByTestId('custom-command-kind').selectOption('appdock.commands.stack');
     await dialog.getByLabel('名前', { exact: true }).fill('Ordered stack');
     await dialog.getByTestId('stack-add-command').click();
-    const cancelledPicker = await overlayPage(host);
-    await closingAction(cancelledPicker.mouse.click(5, 5));
-    await until(
-      () => require('./shell-overlay-helper.cjs').overlayClosed(cancelledPicker),
-      'background closes only the command picker',
-    );
+    const cancelledPicker = selectionDialog(host);
+    await cancelledPicker.getByRole('button', { name: 'キャンセル', exact: true }).click();
+    await cancelledPicker.waitFor({ state: 'hidden' });
     assert(await dialog.isVisible(), 'parent editor survives command picker cancellation');
     assert.equal(await dialog.getByLabel('名前', { exact: true }).inputValue(), 'Ordered stack');
-    checks.push(
-      'command picker background cancellation preserves the parent dialog and unsaved input',
-    );
+    checks.push('command selection cancellation preserves the parent dialog and unsaved input');
     await choose('fixture.stacks.a');
     await choose('fixture.stacks.b');
     await dialog.getByTestId('stack-entry').nth(1).locator('.stack-drag').focus();
@@ -447,18 +447,7 @@ async function close() {
       await page.getByTestId('command-trigger-tab:' + kind).click();
       await page.getByTestId('trigger-stack-table').getByRole('button', { name: /追加/ }).click();
       if (kind === 'shortcuts') {
-        const capture = dialog.locator('.shortcut-capture');
-        await until(
-          async () =>
-            !(await capture.locator('.shortcut-capture-status').innerText()).includes('準備'),
-          'shortcut recording session ready',
-        );
-        await capture.dispatchEvent('keydown', {
-          key: '9',
-          code: 'Digit9',
-          ctrlKey: true,
-          shiftKey: true,
-        });
+        await selectShortcut('9');
         await page.setViewportSize({ width: 900, height: 640 });
         await dialog.locator('.shortcut-special-trigger').click();
         await dialog
@@ -625,7 +614,9 @@ async function close() {
       .getByRole('button', { name: 'このコマンドを削除', exact: true })
       .click();
     await save();
-    const raw = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'));
+    const raw = JSON.parse(
+      fs.readFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), 'utf8'),
+    );
     assert.equal(raw.triggerStacks.items.length, 3);
     assert.equal(raw.keybindings, undefined);
     assert.equal(raw.gestures?.bindings, undefined);
@@ -666,14 +657,7 @@ async function close() {
         await table.getByRole('button', { name: /追加/ }).click();
         if (kind === 'shortcuts') {
           const key = input.split('+').at(-1);
-          await until(
-            async () =>
-              !(await dialog.locator('.shortcut-capture-status').innerText()).includes('準備'),
-            'shortcut recording session ready',
-          );
-          await dialog
-            .locator('.shortcut-capture')
-            .dispatchEvent('keydown', { key, code: key, ctrlKey: true, shiftKey: true });
+          await selectShortcut(key);
           titles.set(input, input);
         } else {
           if (kind === 'touchpad-gestures')

@@ -6,7 +6,7 @@ const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
 const { inspect, electronExpression } = require('./electron-main-helper.cjs');
-const { ribbonPage, overlayPage, closingAction } = require('./shell-overlay-helper.cjs');
+const { ribbonPage, closingAction } = require('./shell-overlay-helper.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `ribbon-customization-ui-${Date.now()}`);
@@ -147,7 +147,10 @@ if (!appearanceOnly && !iconsOnly && !labelsOnly) {
     ],
   };
 }
-fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
+fs.writeFileSync(
+  require('./test-settings.cjs').file(profile, 'settings.json'),
+  JSON.stringify(settings),
+);
 let exe = require('electron');
 if (portable) {
   exe = path.join(profile, 'AppDock.at365.exe');
@@ -679,9 +682,7 @@ async function commandChecks() {
   const executions = () =>
     fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8').split('run').length - 1 : 0;
   const choose = async (id) => {
-    const palette = await overlayPage(host);
-    await palette.getByRole('combobox', { name: 'コマンドを検索' }).fill(id);
-    await palette.locator(`[data-command-id="${id}"] .palette-execute`).click();
+    await require('./command-selection-helper.cjs').chooseCommand(host, id);
   };
   await until(
     async () =>
