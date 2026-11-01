@@ -1,5 +1,5 @@
 import type { GalleryAnchor, GalleryItem } from './image-gallery';
-import { gallerySize, libraryGallerySize, validGalleryWidth } from './image-gallery';
+import { libraryGallerySize, validGalleryWidth } from './image-gallery';
 import type {
   ImageGroup,
   ImageLibraryEdit,
@@ -88,7 +88,7 @@ export type ImageLibraryFileAction = 'copy-files' | 'copy-paths' | 'copy-image' 
 export interface ImageGalleryViewState {
   schemaVersion: 1;
   library?: { cardWidth: number; layout?: ImageLibraryLayout };
-  picker?: { cardWidth: number };
+  picker?: { cardWidth: number; layout?: ImageLibraryLayout };
 }
 export function validImageGalleryViewState(value: unknown): value is ImageGalleryViewState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -103,16 +103,9 @@ export function validImageGalleryViewState(value: unknown): value is ImageGaller
         (!!item &&
           typeof item === 'object' &&
           !Array.isArray(item) &&
-          Object.keys(item).every(
-            (key) => key === 'cardWidth' || (surface === 'library' && key === 'layout'),
-          ) &&
-          validGalleryWidth(
-            item.cardWidth,
-            surface === 'library' ? libraryGallerySize : gallerySize,
-          ) &&
-          (surface !== 'library' ||
-            v.library?.layout === undefined ||
-            validImageLibraryLayout(v.library.layout)))
+          Object.keys(item).every((key) => key === 'cardWidth' || key === 'layout') &&
+          validGalleryWidth(item.cardWidth, libraryGallerySize) &&
+          (item.layout === undefined || validImageLibraryLayout(item.layout)))
       );
     })
   );

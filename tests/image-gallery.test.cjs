@@ -11,7 +11,7 @@ const { ImageLibraryDialogs } = require('../out/main/main/core/image-library-dia
 const { editImageLibrary } = require('../out/main/shared/registered-images');
 const root = path.join(__dirname, '../.artifacts/gallery-unit-' + Date.now());
 
-test('library compact size and navigation layout persist independently from picker size', () => {
+test('library and picker compact sizes and navigation layouts persist independently', () => {
   const file = path.join(root, 'layout.json');
   const store = new GalleryViewStateStore(file);
   store.save('picker', 200);
@@ -22,9 +22,41 @@ test('library compact size and navigation layout persist independently from pick
   assert.equal(reopened.get('library'), 40);
   assert.equal(reopened.get('picker'), 200);
   assert.deepEqual(reopened.layout(), layout);
-  assert.throws(() => reopened.save('picker', 40));
+  const pickerLayout = { sidebarWidth: 184, collapsedGroups: [], collapsedFolders: ['photos'] };
+  reopened.save('picker', 40);
+  reopened.saveLayout(pickerLayout, 'picker');
+  assert.equal(new GalleryViewStateStore(file).get('picker'), 40);
+  assert.deepEqual(new GalleryViewStateStore(file).layout('picker'), pickerLayout);
   assert.throws(() => reopened.saveLayout({ ...layout, sidebarWidth: 0 }));
+  assert.throws(() =>
+    reopened.saveLayout({ ...pickerLayout, collapsedGroups: ['a', 'a'] }, 'picker'),
+  );
+  assert.throws(() => reopened.save('picker', 41));
   assert.deepEqual(new GalleryViewStateStore(file).layout(), layout);
+});
+
+test('shared browser intersects folder/group/search, preserves saved order and canonical file names', () => {
+  const { filterImageBrowser } = require('../out/main/shared/image-browser');
+  const images = ['root.svg', 'icons/First.svg', 'icons/nested/second.svg', 'photos/last.png'].map(
+    (file) => ({ file }),
+  );
+  const groups = [
+    {
+      id: 'icons',
+      name: 'Lucide: Icons',
+      images: [images[2], { file: 'ICONS/FIRST.SVG' }, images[0]],
+    },
+  ];
+  const filter = (folder, group, query = '') =>
+    filterImageBrowser(images, groups, { folder, group, query }).map((ref) => ref.file);
+  assert.deepEqual(filter('icons', 'group:icons', '.SVG'), [
+    'icons/nested/second.svg',
+    'icons/First.svg',
+  ]);
+  assert.deepEqual(filter('', 'all'), ['root.svg']);
+  assert.deepEqual(filter('*', 'unfiled'), ['photos/last.png']);
+  assert.deepEqual(filter('photos', 'group:icons'), []);
+  assert.deepEqual(filter('icons/nested', 'all'), ['icons/nested/second.svg']);
 });
 
 test('card/dialog targets include unrendered selection and right-clicking an unselected card replaces it', async () => {

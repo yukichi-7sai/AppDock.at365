@@ -1,3 +1,4 @@
+import { filterImageBrowser } from '../../shared/image-browser';
 import { hostText } from '../../shared/i18n';
 import {
   iconSets,
@@ -181,22 +182,11 @@ export class ImageLibraryPageSession implements HostPageController {
     return matches;
   }
   private filtered() {
-    const s = this.options.state,
-      groups = this.options.groups();
-    const group = groups.find((g) => `group:${g.id}` === s.group);
-    const members = new Set(groups.flatMap((g) => g.images.map(imageKey)));
-    const ordered = group
-      ? group.images.map((image) => [imageKey(image), this.items.get(imageKey(image))!] as const)
-      : [...this.items];
-    return ordered.filter(
-      ([key, value]) =>
-        (s.folder === '*' ||
-          (s.folder === ''
-            ? !value.entry.ref.file.includes('/')
-            : value.entry.ref.file.startsWith(s.folder + '/'))) &&
-        (s.group !== 'unfiled' || !members.has(key)) &&
-        value.entry.ref.file.toLocaleLowerCase().includes(s.query.toLocaleLowerCase()),
-    );
+    return filterImageBrowser(
+      [...this.items.values()].map((item) => item.entry.ref),
+      this.options.groups(),
+      this.options.state,
+    ).map((ref) => [imageKey(ref), this.items.get(imageKey(ref))!] as const);
   }
   passive(action: HostPageAction) {
     // Scrolling can report its last frame after a host dialog has blocked page input.

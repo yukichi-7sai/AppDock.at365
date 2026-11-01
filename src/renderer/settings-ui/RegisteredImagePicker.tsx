@@ -1,7 +1,6 @@
-import { imageParent, assignedImage } from '../../shared/image-paths';
+import { assignedImage } from '../../shared/image-paths';
 import { hostText } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
-import { SettingsField } from './SettingsSections';
 import { SettingsMcpAccessProvider } from './SettingsMcpAccess';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -13,10 +12,13 @@ import {
   type RegisteredImageEntry,
 } from '../../shared/registered-images';
 import { SettingsDialog, SettingsModal } from './SettingsModal';
-import { ImageGallery, GallerySizeControl, ImageGalleryPreview } from './ImageGallery';
-import { gallerySize } from '../../shared/image-gallery';
-import { SettingsInput } from './SettingsInput';
-import { FilterSelect } from './FilterSelect';
+import { ImageGalleryPreview } from './ImageGallery';
+import { libraryGallerySize } from '../../shared/image-gallery';
+import {
+  defaultImageLibraryLayout,
+  type ImageLibraryLayout,
+} from '../../shared/image-library-page';
+import { ImagePickerBrowser } from '../image-browser/ImagePickerBrowser';
 import { Icon } from '../Icon';
 import './registered-images.css';
 
@@ -137,170 +139,6 @@ export function RegisteredImagePreview({
     </span>
   ) : null;
 }
-export function ImageLibraryBrowser({
-  snapshot,
-  selected,
-  onSelect,
-  group,
-  onGroup,
-  query,
-  onQuery,
-  cardWidth,
-  disabled = false,
-  onPreview,
-}: {
-  snapshot: ImageLibrarySnapshot;
-  selected: RegisteredImageRef | null;
-  onSelect(image: RegisteredImageRef): void;
-  group: string;
-  onGroup(value: string): void;
-  query: string;
-  onQuery(value: string): void;
-  cardWidth: number;
-  disabled?: boolean;
-  onPreview(entry: RegisteredImageEntry): void;
-}) {
-  const { t: translate } = useHostTranslation();
-  const api = useRegisteredImages();
-  const imageSession = useImageSession(api);
-  const [limit, setLimit] = useState(64);
-  const [folder, setFolder] = useState('*');
-  useEffect(() => setLimit(64), [group, query, folder]);
-  const images = new Map(snapshot.images.map((image) => [imageKey(image.ref), image]));
-  for (const g of snapshot.groups)
-    for (const ref of g.images)
-      if (!images.has(imageKey(ref)))
-        images.set(imageKey(ref), {
-          ref,
-          width: 0,
-          height: 0,
-          bytes: 0,
-          thumbnail: '',
-          available: false,
-        });
-  if (selected && !assignedImage(selected.file) && !images.has(imageKey(selected)))
-    images.set(imageKey(selected), {
-      ref: selected,
-      width: 0,
-      height: 0,
-      bytes: 0,
-      thumbnail: '',
-      available: false,
-    });
-  const memberships = new Set(snapshot.groups.flatMap((g) => g.images.map(imageKey)));
-  const filtered = [...images.values()].filter(
-    (image) =>
-      (folder === '*' ||
-        imageParent(image.ref.file) === folder ||
-        (folder !== '' && image.ref.file.startsWith(folder + '/'))) &&
-      image.ref.file.toLowerCase().includes(query.toLowerCase()) &&
-      (group === 'all' ||
-        (group === 'unfiled'
-          ? !memberships.has(imageKey(image.ref))
-          : snapshot.groups
-              .find((g) => `group:${g.id}` === group)
-              ?.images.some((ref) => imageKey(ref) === imageKey(image.ref)))),
-  );
-  return (
-    <>
-      <div className="image-library-toolbar">
-        <SettingsField title={translate('images.folder')}>
-          <FilterSelect
-            aria-label={translate('images.folder')}
-            value={folder}
-            allValue="*"
-            onChange={(e) => setFolder(e.target.value)}
-          >
-            <option value="*">{translate('images.allFolders')}</option>
-            {(snapshot.folders ?? ['']).map((value) => (
-              <option value={value} key={value}>
-                {value || translate('images.rootFolder')}
-              </option>
-            ))}
-          </FilterSelect>
-        </SettingsField>
-        <SettingsField title={translate('settings.registeredImagePicker.group')}>
-          <FilterSelect
-            data-testid="image-picker-group"
-            aria-label={translate('settings.registeredImagePicker.groupLabel')}
-            value={group}
-            onChange={(e) => onGroup(e.target.value)}
-          >
-            <option value="all">{translate('settings.registeredImagePicker.all')}</option>
-            <option value="unfiled">{translate('settings.registeredImagePicker.ungrouped')}</option>
-            {snapshot.groups.map((g) => (
-              <option key={g.id} value={`group:${g.id}`}>
-                {g.name}
-              </option>
-            ))}
-          </FilterSelect>
-        </SettingsField>
-        <SettingsField title={translate('settings.registeredImagePicker.search')}>
-          <SettingsInput
-            data-testid="image-picker-search"
-            type="search"
-            aria-label={translate('settings.registeredImagePicker.searchPlaceholder')}
-            value={query}
-            onChange={(e) => onQuery(e.target.value)}
-          />
-        </SettingsField>
-      </div>
-      <ImageGallery
-        resetKey={`${group}:${query}`}
-        model={{
-          cardWidth,
-          fit: 'contain',
-          selection: 'single',
-          empty: translate('settings.registeredImagePicker.noMatches'),
-          items: filtered.slice(0, limit).map((image) => ({
-            id: imageKey(image.ref),
-            assetId: `${imageKey(image.ref)}:${image.generation ?? ''}`,
-            title: image.ref.file,
-            detail:
-              image.width > 0
-                ? `${image.width} × ${image.height}`
-                : translate('services.imageLibraryPage.dimensionsUnavailable'),
-            labels: snapshot.groups
-              .filter((g) => g.images.some((ref) => imageKey(ref) === imageKey(image.ref)))
-              .map((g) => g.name),
-            state: image.available ? 'ready' : (image.state ?? 'missing'),
-            selected: !!selected && imageKey(selected) === imageKey(image.ref),
-            selectable: !disabled,
-            actions: [
-              {
-                id: 'preview',
-                title: translate('settings.registeredImagePicker.enlarge'),
-                disabled: disabled || !image.available,
-              },
-            ],
-          })),
-        }}
-        options={{
-          image: async (assetId, edge) => {
-            const item = [...images.values()].find(
-              (image) => `${imageKey(image.ref)}:${image.generation ?? ''}` === assetId,
-            );
-            if (!item || !api) throw Error(translate('settings.registeredImagePicker.updated'));
-            return imageSession.image(item.ref, item.generation ?? '', edge);
-          },
-          select: (id) => {
-            if (!disabled && images.has(id)) onSelect(images.get(id)!.ref);
-          },
-          activate: () => {},
-          action: (id) => {
-            if (!disabled && images.has(id)) onPreview(images.get(id)!);
-          },
-        }}
-      >
-        {filtered.length > limit && (
-          <button type="button" className="secondary" onClick={() => setLimit(limit + 64)}>
-            {translate('settings.registeredImagePicker.more', { count: filtered.length - limit })}
-          </button>
-        )}
-      </ImageGallery>
-    </>
-  );
-}
 export function RegisteredImagePicker({
   current,
   onSelect,
@@ -313,43 +151,62 @@ export function RegisteredImagePicker({
   const { t: translate } = useHostTranslation();
   const library = useImageLibrary();
   const [selected, setSelected] = useState(current),
+    [folder, setFolder] = useState('*'),
     [group, setGroup] = useState('all'),
     [query, setQuery] = useState(''),
     [registering, setRegistering] = useState(false);
   const applied = useRef(false);
-  const [cardWidth, setCardWidth] = useState<number>(gallerySize.initial);
-  const [sizeError, setSizeError] = useState('');
+  const [reveal, setReveal] = useState<RegisteredImageRef | null>(null);
+  const imageSession = useImageSession(library.api);
+  const [cardWidth, setCardWidth] = useState<number>(libraryGallerySize.initial);
+  const [layout, setLayout] = useState<ImageLibraryLayout>(defaultImageLibraryLayout);
+  const [viewErrors, setViewErrors] = useState({ load: '', width: '', layout: '' });
+  const viewError = [...new Set(Object.values(viewErrors).filter(Boolean))].join('\n');
   const [preview, setPreview] = useState<RegisteredImageEntry | null>(null);
-  const sizeTouched = useRef(false);
-  const widthSave = useRef<Promise<unknown>>(Promise.resolve());
+  const touched = useRef({ width: false, layout: false });
+  const saves = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
     let live = true;
     void library.api
       ?.galleryView()
       .then((view) => {
         if (!live) return;
-        if (!sizeTouched.current) setCardWidth(view.cardWidth);
-        setSizeError(view.error);
+        if (!touched.current.width) setCardWidth(view.cardWidth);
+        if (!touched.current.layout) setLayout(view.layout);
+        setViewErrors((errors) => ({ ...errors, load: view.error }));
       })
       .catch(() => {
-        if (live) setSizeError(translate('settings.registeredImagePicker.sizeUnreadable'));
+        if (live)
+          setViewErrors((errors) => ({
+            ...errors,
+            load: translate('settings.registeredImagePicker.viewUnreadable'),
+          }));
       });
     return () => {
       live = false;
     };
   }, [library.api]);
-  const saveWidth = (value: number) => {
-    sizeTouched.current = true;
-    widthSave.current = widthSave.current
+  const saveView = (kind: 'width' | 'layout', save: () => Promise<void> | undefined) => {
+    touched.current[kind] = true;
+    saves.current = saves.current
       .catch(() => {})
       .then(async () => {
         try {
-          await library.api?.saveGalleryWidth(value);
-          setSizeError('');
+          await save();
+          setViewErrors((errors) => ({ ...errors, load: '', [kind]: '' }));
         } catch (error) {
-          setSizeError(error instanceof Error ? error.message : String(error));
+          setViewErrors((errors) => ({
+            ...errors,
+            [kind]: error instanceof Error ? error.message : String(error),
+          }));
         }
       });
+  };
+  const saveWidth = (value: number) =>
+    saveView('width', () => library.api?.saveGalleryWidth(value));
+  const saveLayout = (value: ImageLibraryLayout) => {
+    setLayout(value);
+    saveView('layout', () => library.api?.saveGalleryLayout(value));
   };
   const register = async () => {
     setRegistering(true);
@@ -359,8 +216,10 @@ export function RegisteredImagePicker({
       if (ref) {
         setSelected(ref);
         setGroup('all');
+        setFolder('*');
         setQuery('');
         await library.reload();
+        setReveal({ ...ref });
       }
     } catch (e) {
       library.setError(String(e instanceof Error ? e.message : e));
@@ -373,22 +232,53 @@ export function RegisteredImagePicker({
       <SettingsDialog
         title={translate('settings.registeredImagePicker.select')}
         description={translate('settings.registeredImagePicker.keepOriginal')}
-        error={[library.error, sizeError].filter(Boolean).join('\n')}
+        error={[library.error, viewError].filter(Boolean).join('\n')}
         errorTarget={translate('settings.registeredImagePicker.selection')}
         errorAction={
-          sizeError ? (
-            <button type="button" onClick={() => saveWidth(cardWidth)}>
+          viewError ? (
+            <button
+              type="button"
+              onClick={() => {
+                saveWidth(cardWidth);
+                saveLayout(layout);
+              }}
+            >
               {translate('settings.registeredImagePicker.retry')}
             </button>
           ) : undefined
         }
-        className="image-library-dialog"
+        className="image-library-dialog image-picker-dialog"
+        collapseStatusWhenEmpty
         secondaryAction={{
           label: translate('settings.registeredImagePicker.register'),
           disabled: !library.api,
           pending: registering,
           onClick: () => void register(),
         }}
+        footerContent={
+          <div className="image-picker-summary">
+            <div
+              className="image-picker-selected-preview"
+              data-svg={!!selected && /\.svg$/i.test(selected.file)}
+            >
+              <RegisteredImagePreview
+                value={selected}
+                label={translate('settings.registeredImagePicker.selection')}
+              />
+            </div>
+            <span
+              className="image-picker-filename"
+              data-testid="image-picker-filename"
+              title={selected && !assignedImage(selected.file) ? selected.file : undefined}
+            >
+              {selected
+                ? assignedImage(selected.file)
+                  ? translate('images.assigned')
+                  : selected.file
+                : translate('settings.registeredImagePicker.none')}
+            </span>
+          </div>
+        }
         applyLabel={translate('settings.registeredImagePicker.use')}
         valid={!!library.api && !!selected && !registering}
         onClose={() => {
@@ -400,41 +290,33 @@ export function RegisteredImagePicker({
           applied.current = true;
         }}
       >
-        <div className="image-picker-summary">
-          {selected && assignedImage(selected.file) && (
-            <RegisteredImagePreview value={selected} label={translate('images.assigned')} />
-          )}
-          <span
-            className="image-picker-filename"
-            data-testid="image-picker-filename"
-            title={selected?.file}
-          >
-            {selected
-              ? assignedImage(selected.file)
-                ? translate('images.assigned')
-                : selected.file
-              : translate('settings.registeredImagePicker.none')}
-          </span>
-          <GallerySizeControl
-            value={cardWidth}
-            onChange={(value) => {
-              sizeTouched.current = true;
-              setCardWidth(value);
-            }}
-            onCommit={saveWidth}
-          />
-        </div>
-        <ImageLibraryBrowser
+        <ImagePickerBrowser
           snapshot={library.snapshot}
           selected={selected}
+          reveal={reveal}
           onSelect={setSelected}
+          folder={folder}
+          onFolder={setFolder}
           group={group}
           onGroup={setGroup}
           query={query}
           onQuery={setQuery}
           cardWidth={cardWidth}
+          onWidth={(value) => {
+            touched.current.width = true;
+            setCardWidth(value);
+          }}
+          onSaveWidth={saveWidth}
+          layout={layout}
+          onLayout={(value) => {
+            touched.current.layout = true;
+            setLayout(value);
+          }}
+          onSaveLayout={saveLayout}
           disabled={registering}
           onPreview={setPreview}
+          image={imageSession.image}
+          onReload={() => void library.reload()}
         />
         {preview && (
           <SettingsModal

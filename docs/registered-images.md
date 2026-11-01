@@ -113,10 +113,13 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 
 共通`RegisteredImagePicker`は画像の登録・検索・選択・確定を担当する。「画像を外す」は入力欄に集約し、選択ダイアログには置かない。未選択の「画像を使う」は無効。取消では呼出元の値を変えず、選択開始ボタンへフォーカスを戻す。一覧のファイル名・検索・寸法は画像の識別用に保持する。公開APIのnullableな戻り値型は互換性のため保持する。
 
-選択中のファイル名と画像サイズのスライダーは上部の同じ行に置く。長いファイル名は省略表示し、ツールチップで全文を確認できる。グループと検索はラベルのすぐ隣に入力欄を置き、狭幅では項目ごとに縦へ並べる。検索エリアの下は全幅の罫線で区切り、サムネイル周囲はダイアログと同じ背景色にする。「ライブラリーに登録」はフッター左側、取消と確定は右側に置き、一覧をスクロールしても操作できる。登録中は共通ボタンの処理中表示を使い、重複実行を防ぐ。
+管理ページと同じ左インデックスでフォルダー・グループを選び、右上のパンくず・検索・サイズスライダーで探す。直下は子フォルダーと同列に置く。グループは`Lucide:`などのプリフィックスで折りたため、左右の境界はドラッグとキーボードで幅を変更できる。狭幅では「フォルダーとグループ」から分類popoverを開く。検索・グループ・フォルダーを組み合わせ、グループ内は保存した順序で表示する。
 
-画像一覧は「すべて」で多数の画像を表示するときと同じ高さを常に確保する。グループや検索で絞り込んだ結果が少数・0件でもダイアログのサイズとフッター位置を変えない。高さは画面の46%と520 CSS pxの小さい方を基準とし、画面の高さが変わったときは追従する。「さらに表示」も一覧のスクロール領域内に置き、ボタンの有無で外枠を伸縮させない。
+画像は1クリックで選択、ダブルクリックまたは画像にフォーカスしたEnterで拡大する。選択画像を絞り込みで隠しても選択を保ち、フッターにプレビューとファイル名、登録・取消・確定を常に表示する。下部のSVGサムネイルは一覧と同じ白い背景で表示する。長いファイル名は省略してツールチップを付ける。検索欄のEscapeは検索を解除し、分類popoverのEscapeは分類だけを閉じる。登録中は共通ボタンの処理中表示を使い、重複実行を防ぐ。登録後はフィルターを解除して登録画像を選択する。
 
+ダイアログは画面高さの80%と800 CSS pxの小さい方を基準とし、共通モーダルの画面内上限へ収める。少数・0件に絞ってもダイアログの高さとフッター位置は変えない。エラーのない状態では空の通知行を省き、一覧へ高さを割り当てる。左右を個別にスクロールし、右のフィルターは上端へ固定、一覧の余白と追加表示は右スクロール内へ置く。64件ずつ末尾付近で自動追加し、小型表示で画面を満たしていなければ続けて追加する。
+
+表示サイズは40〜360px・4px刻み、最小時の画像は約24px。サイズ・分類エリア幅・折りたたみを管理ページとは独立したPC専用の`uiState.gallery.picker`へ保存し、選択の取消でも表示設定は保つ。移動・削除などの管理操作は画像ライブラリーで行う。
 リボングループとコマンドボタンは`RibbonIconPicker`で「画像」「既定のアイコン」をこの順に切り替える。画像モードだけが共通画像入力を表示し、既定モードだけが固定アイコンの一覧を表示する。選択中の既定アイコンは枠とチェックで示す。新規追加は画像モード、既存編集は画像参照の有無から開始モードを決める。編集中の切り替えでは両側の選択を保持し、親ダイアログの適用で確定する。既定モードの適用は`image: null`、画像モードは選択した参照を保存する。画像未選択・解除後の適用は従来どおり固定アイコンへ戻る。親編集の取消は設定を変更しない。モードや非選択側の画像を保存する追加設定は作らない。
 
 新しい画像選択欄でもこの共通入力・選択画面を利用する。既定アイコンの切り替えはリボンの責務とし、一般の画像フィールドにリボン固有の選択肢を持ち込まない。
@@ -125,16 +128,16 @@ Appletは`type: "registered-image"`の設定を宣言する。通常フィール
 
 基本APIは`minimumHostVersion: "0.69.0"`と`registered-images` capabilityを宣言する。SVG・相対フォルダー・保管コピーの動作を前提にするAppletは`minimumHostVersion: "0.115.0"`とする。参照の`file`は不透明な識別値としてそのまま保存・受け渡し、ファイル名やパスを組み立てない。Node/.NETの型・メソッド形状は従来と同じ。原画像の列挙と選択は信頼されたローカルUIだけが利用でき、リモートサイトへbridgeを渡さない。
 
-| 呼出元   | 操作                                                                  | 契約                                                                                      |
-| -------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 呼出元   | 操作                                                                  | 契約                                                                                          |
+| -------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Node     | `context.registeredImages.import({ filename?, base64 })`              | 元bytesを素材一覧へ登録し、設定用の保管コピーの参照を返す。512KiB以下。名前省略時は内容hash名 |
-| Node     | `context.registeredImages.copyToCache(image, variant?)`               | `original`（既定）または`thumbnail`を自己のPC専用imageDirectoryへコピーし、絶対パスを返す |
-| .NET     | `context.RegisteredImages.ImportAsync(bytes, filename?, token)`       | Nodeと同じ。SDK 0.27.0                                                                    |
-| .NET     | `context.RegisteredImages.CopyToCacheAsync(image, thumbnail?, token)` | `RegisteredImageRef`を使い、既定は原画像                                                  |
-| local UI | `appletPage.call('registeredImages.snapshot')`                        | メタデータ・参照・グループ。サムネイル本体は別取得                                        |
-| local UI | `appletPage.call('registeredImages.preview', { image })`              | 縮小プレビューを返す                                                                      |
-| local UI | `appletPage.call('registeredImages.pick', { current })`               | `{cancelled:true}`または`{cancelled:false,image:ref                                       | null}`。現在の選択UIは参照を返し、nullable型は互換用に保持。解除は呼出元の画像入力で行う |
-| local UI | `appletPage.call('registeredImages.import', { filename?, base64 })`   | プログラム登録と同じ上限                                                                  |
+| Node     | `context.registeredImages.copyToCache(image, variant?)`               | `original`（既定）または`thumbnail`を自己のPC専用imageDirectoryへコピーし、絶対パスを返す     |
+| .NET     | `context.RegisteredImages.ImportAsync(bytes, filename?, token)`       | Nodeと同じ。SDK 0.27.0                                                                        |
+| .NET     | `context.RegisteredImages.CopyToCacheAsync(image, thumbnail?, token)` | `RegisteredImageRef`を使い、既定は原画像                                                      |
+| local UI | `appletPage.call('registeredImages.snapshot')`                        | メタデータ・参照・グループ。サムネイル本体は別取得                                            |
+| local UI | `appletPage.call('registeredImages.preview', { image })`              | 縮小プレビューを返す                                                                          |
+| local UI | `appletPage.call('registeredImages.pick', { current })`               | `{cancelled:true}`または`{cancelled:false,image:ref                                           | null}`。現在の選択UIは参照を返し、nullable型は互換用に保持。解除は呼出元の画像入力で行う |
+| local UI | `appletPage.call('registeredImages.import', { filename?, base64 })`   | プログラム登録と同じ上限                                                                      |
 
 `copyToCache`は自己manifestのregistered-image設定、またはobject-list内の同型フィールドが現在参照している画像だけを受け付ける。登録しただけでは読取対象にならず、まず自己設定へ保存する。生成コピーはruntime世代別とし、停止・異常終了・世代変更で回収する。共有原画像は回収しない。古い処理の完了で新世代のコピーを消さない。ページで表示するときは既存の`pages.registerImages`へコピーを渡し、その画像IDの寿命も守る。
 

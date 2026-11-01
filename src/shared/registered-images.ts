@@ -60,8 +60,13 @@ export interface ImageLibraryApi {
     edge: number,
     session?: string,
   ): Promise<string>;
-  galleryView(): Promise<{ cardWidth: number; error: string }>;
+  galleryView(): Promise<{
+    cardWidth: number;
+    layout: import('./image-library-page').ImageLibraryLayout;
+    error: string;
+  }>;
   saveGalleryWidth(value: number): Promise<void>;
+  saveGalleryLayout(value: import('./image-library-page').ImageLibraryLayout): Promise<void>;
   pick(current?: RegisteredImageRef | null): Promise<ImagePickResult>;
   onChanged(callback: () => void): () => void;
   onPickRequest?(

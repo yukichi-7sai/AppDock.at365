@@ -48,13 +48,22 @@ test('gallery compact size and navigation layout use the device store and surviv
     collapsedGroups: ['Lucide'],
     collapsedFolders: ['icons'],
   });
-  gallery.save('picker', 200);
+  gallery.save('picker', 40);
+  gallery.saveLayout(
+    { sidebarWidth: 184, collapsedGroups: ['Other'], collapsedFolders: [] },
+    'picker',
+  );
   const reopened = new DeviceSettingsStore(file, path.join(base, 'reopened'), 'PC-A');
   t.after(() => reopened.close());
   reopened.load();
   const saved = new GalleryViewStateStore(reopened.uiStateStorage('gallery'));
   assert.equal(saved.get('library'), 40);
-  assert.equal(saved.get('picker'), 200);
+  assert.equal(saved.get('picker'), 40);
+  assert.deepEqual(saved.layout('picker'), {
+    sidebarWidth: 184,
+    collapsedGroups: ['Other'],
+    collapsedFolders: [],
+  });
   assert.equal(saved.layout().sidebarWidth, 320);
   assert.deepEqual(saved.layout().collapsedGroups, ['Lucide']);
   assert.deepEqual(fs.readFileSync(file), before);

@@ -27,6 +27,7 @@ export function SettingsModal({
   closeOnBackdrop = false,
   initialFocus = '[data-initial-focus], .shortcut-capture',
   returnFocus: requestedReturnFocus,
+  collapseStatusWhenEmpty = false,
 }: {
   children: ReactNode;
   header?: ReactNode;
@@ -47,6 +48,7 @@ export function SettingsModal({
   initialFocus?: string;
   /** An opener captured before asynchronous preparation makes its page inert. */
   returnFocus?: HTMLElement | null;
+  collapseStatusWhenEmpty?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const backdropPressed = useRef(false);
@@ -157,7 +159,7 @@ export function SettingsModal({
           <div className={bodyClassName} inert={busy || undefined} aria-busy={busy || undefined}>
             {children}
           </div>
-          <SettingsStatusArea action={errorAction} />
+          <SettingsStatusArea action={errorAction} collapseWhenEmpty={collapseStatusWhenEmpty} />
           {footer}
         </dialog>
       </SettingsInputMode.Provider>
@@ -185,6 +187,8 @@ export function SettingsDialog({
   closeAfterApply = true,
   resetAction,
   secondaryAction,
+  footerContent,
+  collapseStatusWhenEmpty,
   returnFocus,
 }: {
   title: string;
@@ -216,6 +220,8 @@ export function SettingsDialog({
     disabled?: boolean;
     pending?: boolean;
   };
+  footerContent?: ReactNode;
+  collapseStatusWhenEmpty?: boolean;
 }) {
   const { t } = useHostTranslation();
   const settingsControls = useSettingsControls();
@@ -242,6 +248,7 @@ export function SettingsDialog({
   return (
     <SettingsModal
       returnFocus={returnFocus}
+      collapseStatusWhenEmpty={collapseStatusWhenEmpty}
       className={`settings-group-dialog ${className}`}
       labelledBy={id}
       onClose={onClose}
@@ -274,6 +281,7 @@ export function SettingsDialog({
       }
       footer={
         <footer>
+          {footerContent}
           {secondaryAction && (
             <SettingsButton
               data-testid="settings-dialog-secondary"

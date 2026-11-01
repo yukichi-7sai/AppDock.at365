@@ -3319,6 +3319,7 @@ function registerIpc() {
   handle('dock:imageLibrary:edit', (operation) => imageLibraryHost.edit(operation));
   handle('dock:imageLibrary:galleryView', () => ({
     cardWidth: galleryViewState.get('picker'),
+    layout: galleryViewState.layout('picker'),
     error: galleryViewState.error,
   }));
   handle('dock:imageLibrary:saveGalleryWidth', (value) => {
@@ -3331,6 +3332,20 @@ function registerIpc() {
         title: hostText('services.index.imageSizeTitle'),
         code: 'IMAGE_LIBRARY_SAVE',
         message: hostText('services.index.imageSizeBody'),
+      });
+      throw error;
+    }
+  });
+  handle('dock:imageLibrary:saveGalleryLayout', (value) => {
+    try {
+      galleryViewState.saveLayout(value, 'picker');
+    } catch (error) {
+      errors.report({
+        eventId: randomUUID(),
+        source: 'image-library',
+        title: hostText('services.index.imageViewTitle'),
+        code: 'IMAGE_LIBRARY_SAVE',
+        message: hostText('services.index.imageViewBody'),
       });
       throw error;
     }

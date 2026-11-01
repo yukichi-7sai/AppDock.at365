@@ -1,13 +1,6 @@
 import { useHostTranslation } from '../HostTranslation';
 import { SettingsButton } from '../settings-ui/SettingsButton';
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type {
   ImageLibraryPageAction,
   ImageLibraryPageModel,
@@ -25,6 +18,12 @@ import { useImageLibraryDialogFocus } from '../ImageLibraryDialogHost';
 import { ImageLibraryMenu, type LibraryMenuItem } from './ImageLibraryMenu';
 import '../../../ui/image-gallery/gallery.css';
 import './image-library.css';
+import { ImageBrowserNavigation } from '../image-browser/ImageBrowserNavigation';
+import {
+  ImageBrowserFilters,
+  ImageBrowserSplitter,
+  useImageBrowserNavigation,
+} from '../image-browser/ImageBrowserControls';
 
 const api = window.dock.pages;
 type Action = ImageLibraryPageAction extends infer T
@@ -52,8 +51,6 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
   const [menu, setMenu] = useState<Menu | null>(null);
   const [focusedFile, setFocusedFile] = useState('');
   const [toast, setToast] = useState('');
-  const [narrow, setNarrow] = useState(false),
-    [drawer, setDrawer] = useState(false);
   const [dialogPending, setDialogPending] = useState(false),
     openingDialog = useRef(false);
   const root = useRef<HTMLElement>(null),
@@ -147,15 +144,6 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     setLayout(value);
     run({ command: 'layout', value });
   };
-  const toggle = (kind: 'collapsedFolders' | 'collapsedGroups', key: string) => {
-    const current = layoutRef.current;
-    saveLayout({
-      ...current,
-      [kind]: current[kind].includes(key)
-        ? current[kind].filter((v) => v !== key)
-        : [...current[kind], key],
-    });
-  };
   const more = (retry = false) => {
     const c = latest.current.content,
       key = c.viewRevision + ':' + c.items.length;
@@ -192,6 +180,8 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     )
       more();
   };
+  const navigation = useImageBrowserNavigation(root, sidebar, navigationButton, maybeMore);
+  const { narrow, setDrawer } = navigation;
   const imageMenu = (
     imageId: string | undefined,
     opener: HTMLElement,
@@ -260,32 +250,6 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
       setLayout(initialModel.content.layout);
     }
   }, [initialModel]);
-  useLayoutEffect(() => {
-    const observer = new ResizeObserver(() => {
-      setNarrow(root.current!.clientWidth < 680);
-      maybeMore();
-    });
-    observer.observe(root.current!);
-    return () => observer.disconnect();
-  }, []);
-  useLayoutEffect(() => {
-    const pane = sidebar.current!;
-    if (narrow && drawer) {
-      pane.showPopover();
-      const bounds = root.current!.getBoundingClientRect();
-      pane.style.left = bounds.left + 'px';
-      pane.style.top = bounds.top + 'px';
-      pane.style.height = bounds.height + 'px';
-      pane.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
-    } else {
-      if (pane.matches(':popover-open')) pane.hidePopover();
-      if (!narrow) {
-        pane.style.left = '';
-        pane.style.top = '';
-        pane.style.height = '';
-      }
-    }
-  }, [narrow, drawer]);
   useLayoutEffect(() => {
     const instance = mountImageGallery(grid.current!, {
       expandLabels: true,
@@ -457,107 +421,6 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
   };
   const currentGroup = c.groups.find((g) => g.id === c.group),
     normalGroup = !['all', 'unfiled'].includes(c.group);
-  const groupRow = (g: (typeof c.groups)[number], label = g.title) => (
-    <div className="library-nav-row" key={g.id}>
-      <button
-        type="button"
-        data-gallery-group={['all', 'unfiled'].includes(g.id) ? undefined : g.id}
-        data-testid="library-group-target"
-        disabled={c.busy}
-        aria-current={g.id === c.group ? 'page' : undefined}
-        title={g.title}
-        onClick={() => navigate({ command: 'group', groupId: g.id })}
-      >
-        <span>{label}</span>
-        <small>{g.count}</small>
-      </button>
-      {!['all', 'unfiled'].includes(g.id) && (
-        <button
-          type="button"
-          className="library-icon-button"
-          aria-label={t('images.itemActions', { name: g.title })}
-          aria-haspopup="menu"
-          aria-expanded={menu?.kind === 'group' && menu.target === g.id}
-          disabled={c.busy}
-          onClick={(e) => setMenu({ kind: 'group', target: g.id, opener: e.currentTarget })}
-        >
-          …
-        </button>
-      )}
-    </div>
-  );
-  const buckets: { prefix: string; groups: typeof c.groups }[] = [],
-    byPrefix = new Map<string, (typeof buckets)[number]>();
-  for (const g of c.groups.slice(2)) {
-    const colon = g.title.indexOf(':'),
-      prefix = colon > 0 ? g.title.slice(0, colon).trim() : '';
-    if (!prefix) buckets.push({ prefix: '', groups: [g] });
-    else {
-      let bucket = byPrefix.get(prefix);
-      if (!bucket) {
-        bucket = { prefix, groups: [] };
-        byPrefix.set(prefix, bucket);
-        buckets.push(bucket);
-      }
-      bucket.groups.push(g);
-    }
-  }
-  const folderChildren = new Map<string, string[]>();
-  for (const f of c.folders) {
-    if (!f) continue;
-    const parent = f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : '';
-    const children = folderChildren.get(parent) ?? [];
-    children.push(f);
-    folderChildren.set(parent, children);
-  }
-  const folderRow = (folder: string, level = 0): ReactNode => {
-    const children = folder ? (folderChildren.get(folder) ?? []) : [],
-      closed = layout.collapsedFolders.includes(folder);
-    return (
-      <div key={folder}>
-        <div className="library-nav-row" style={{ '--folder-depth': level } as CSSProperties}>
-          {children.length > 0 ? (
-            <button
-              type="button"
-              className="library-folder-toggle library-icon-button"
-              aria-label={t(closed ? 'images.expandItem' : 'images.collapseItem', {
-                name: folder || t('images.rootFolder'),
-              })}
-              aria-expanded={!closed}
-              onClick={() => toggle('collapsedFolders', folder)}
-            >
-              <Icon name="chevron" size={12} />
-            </button>
-          ) : (
-            <span className="library-folder-spacer" />
-          )}
-          <button
-            type="button"
-            className="library-folder-name"
-            data-gallery-folder={folder}
-            aria-current={c.folder === folder ? 'page' : undefined}
-            disabled={c.busy}
-            title={folder || t('images.rootFolder')}
-            onClick={() => navigate({ command: 'folder', folder })}
-          >
-            <Icon name="folder" size={15} />
-            <span>{folder ? folder.split('/').at(-1) : t('images.rootFolder')}</span>
-          </button>
-          <button
-            type="button"
-            className="library-icon-button"
-            disabled={c.busy}
-            aria-label={t('images.itemActions', { name: folder || t('images.rootFolder') })}
-            aria-haspopup="menu"
-            onClick={(e) => setMenu({ kind: 'folder', target: folder, opener: e.currentTarget })}
-          >
-            …
-          </button>
-        </div>
-        {!closed && children.map((child) => folderRow(child, level + 1))}
-      </div>
-    );
-  };
   let menuItems: LibraryMenuItem[] = [],
     menuTitle = '';
   if (menu?.kind === 'images') {
@@ -670,7 +533,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
   return (
     <section
       ref={root}
-      className="library-page"
+      className="library-page image-browser"
       data-narrow={narrow}
       inert={dialogPending}
       style={{ '--library-sidebar-width': layout.sidebarWidth + 'px' } as CSSProperties}
@@ -731,163 +594,89 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
         <aside
           className="library-sidebar"
           ref={sidebar}
-          popover={narrow ? 'auto' : undefined}
+          {...navigation.sidebarProps}
           aria-label={t('images.navigation')}
-          onKeyDown={(e) => {
-            if (narrow && e.key === 'Escape' && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              e.stopPropagation();
-              setDrawer(false);
-              navigationButton.current?.focus({ preventScroll: true });
-            }
-          }}
-          onToggle={(e) => {
-            if (e.newState === 'closed') setDrawer(false);
-          }}
         >
-          <div className="library-section-heading">
-            <strong>{t('images.folder')}</strong>
-            <button
-              type="button"
-              className="library-icon-button"
-              title={t('images.createFolder')}
-              aria-label={t('images.createFolder')}
-              disabled={c.busy}
-              onClick={() => dialog('folder-create')}
-            >
-              ＋
-            </button>
-          </div>
-          <nav aria-label={t('images.folder')}>
-            <div className="library-nav-row">
+          <ImageBrowserNavigation
+            folders={c.folders}
+            folder={c.folder}
+            groups={c.groups}
+            group={c.group}
+            layout={layout}
+            disabled={c.busy}
+            onLayout={saveLayout}
+            onFolder={(folder) => navigate({ command: 'folder', folder })}
+            onGroup={(groupId) => navigate({ command: 'group', groupId })}
+            folderHeading={
               <button
                 type="button"
+                className="library-icon-button"
+                title={t('images.createFolder')}
+                aria-label={t('images.createFolder')}
                 disabled={c.busy}
-                aria-current={c.folder === '*' ? 'page' : undefined}
-                onClick={() => navigate({ command: 'folder', folder: '*' })}
+                onClick={() => dialog('folder-create')}
               >
-                <Icon name="folder" size={15} />
-                <span>{t('images.allFolders')}</span>
+                ＋
               </button>
-            </div>
-            {folderRow('')}
-            {(folderChildren.get('') ?? []).map((folder) => folderRow(folder))}
-          </nav>
-          <div className="library-section-heading">
-            <strong>{t('images.groups')}</strong>
-            <button type="button" disabled={!c.canOrder || c.busy} onClick={() => dialog('order')}>
-              {t('images.order')}
-            </button>
-          </div>
-          <nav aria-label={t('images.groups')}>
-            {c.groups.slice(0, 2).map((g) => groupRow(g))}
-            {buckets.map((bucket) =>
-              bucket.prefix ? (
-                <div className="library-prefix" key={bucket.prefix}>
-                  <button
-                    type="button"
-                    className="library-prefix-toggle"
-                    aria-expanded={!layout.collapsedGroups.includes(bucket.prefix)}
-                    onClick={() => toggle('collapsedGroups', bucket.prefix)}
-                  >
-                    <Icon name="chevron" size={12} />
-                    <span>{bucket.prefix}</span>
-                    <small>{bucket.groups.length}</small>
-                  </button>
-                  {!layout.collapsedGroups.includes(bucket.prefix) && (
-                    <div className="library-prefix-children">
-                      {bucket.groups.map((g) =>
-                        groupRow(g, g.title.slice(g.title.indexOf(':') + 1).trim()),
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                groupRow(bucket.groups[0])
-              ),
-            )}
-          </nav>
-          <SettingsButton
-            className="library-add-group"
-            aria-label={t('images.addGroup')}
-            disabled={!c.canAddGroup || c.busy}
-            onClick={() => dialog('add')}
-          >
-            ＋ {t('images.addGroup')}
-          </SettingsButton>
-        </aside>
-        <div
-          className="library-splitter"
-          role="separator"
-          tabIndex={narrow ? -1 : 0}
-          aria-orientation="vertical"
-          aria-label={t('images.sidebarWidth')}
-          aria-valuemin={160}
-          aria-valuemax={480}
-          aria-valuenow={layout.sidebarWidth}
-          onPointerDown={(e) => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-            e.currentTarget.focus();
-            e.currentTarget.setPointerCapture(e.pointerId);
-            draggingSidebar.current = true;
-            e.currentTarget.dataset.original = String(layoutRef.current.sidebarWidth);
-          }}
-          onPointerMove={(e) => {
-            if (!draggingSidebar.current || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
-            const next = {
-              ...layoutRef.current,
-              sidebarWidth: Math.max(
-                160,
-                Math.min(
-                  480,
-                  Math.round(e.clientX - sidebar.current!.getBoundingClientRect().left),
-                ),
-              ),
-            };
-            layoutRef.current = next;
-            setLayout(next);
-          }}
-          onPointerUp={(e) => {
-            if (!draggingSidebar.current) return;
-            draggingSidebar.current = false;
-            e.currentTarget.releasePointerCapture(e.pointerId);
-            saveLayout(layoutRef.current);
-          }}
-          onPointerCancel={(e) => {
-            draggingSidebar.current = false;
-            const next = {
-              ...layoutRef.current,
-              sidebarWidth: Number(e.currentTarget.dataset.original) || 220,
-            };
-            layoutRef.current = next;
-            setLayout(next);
-          }}
-          onLostPointerCapture={(e) => {
-            if (!draggingSidebar.current) return;
-            draggingSidebar.current = false;
-            const next = {
-              ...layoutRef.current,
-              sidebarWidth: Number(e.currentTarget.dataset.original) || 220,
-            };
-            layoutRef.current = next;
-            setLayout(next);
-          }}
-          onKeyDown={(e) => {
-            const values: Record<string, number> = {
-              ArrowLeft: layoutRef.current.sidebarWidth - 8,
-              ArrowRight: layoutRef.current.sidebarWidth + 8,
-              Home: 160,
-              End: 480,
-            };
-            if (values[e.key] !== undefined) {
-              e.preventDefault();
-              saveLayout({
-                ...layoutRef.current,
-                sidebarWidth: Math.max(160, Math.min(480, values[e.key])),
-              });
             }
+            groupHeading={
+              <button
+                type="button"
+                disabled={!c.canOrder || c.busy}
+                onClick={() => dialog('order')}
+              >
+                {t('images.order')}
+              </button>
+            }
+            groupFooter={
+              <SettingsButton
+                className="library-add-group"
+                aria-label={t('images.addGroup')}
+                disabled={!c.canAddGroup || c.busy}
+                onClick={() => dialog('add')}
+              >
+                ＋ {t('images.addGroup')}
+              </SettingsButton>
+            }
+            folderAction={(folder) => (
+              <button
+                type="button"
+                className="library-icon-button"
+                disabled={c.busy}
+                aria-label={t('images.itemActions', { name: folder || t('images.rootFolder') })}
+                aria-haspopup="menu"
+                onClick={(e) =>
+                  setMenu({ kind: 'folder', target: folder, opener: e.currentTarget })
+                }
+              >
+                …
+              </button>
+            )}
+            groupAction={(g) => (
+              <button
+                type="button"
+                className="library-icon-button"
+                disabled={c.busy}
+                aria-label={t('images.itemActions', { name: g.title })}
+                aria-haspopup="menu"
+                aria-expanded={menu?.kind === 'group' && menu.target === g.id}
+                onClick={(e) => setMenu({ kind: 'group', target: g.id, opener: e.currentTarget })}
+              >
+                …
+              </button>
+            )}
+          />
+        </aside>
+        <ImageBrowserSplitter
+          layout={layoutRef}
+          sidebar={sidebar}
+          narrow={narrow}
+          dragging={draggingSidebar}
+          onChange={(value) => {
+            layoutRef.current = value;
+            setLayout(value);
           }}
+          onCommit={saveLayout}
         />
         <section
           className="library-content"
@@ -907,154 +696,108 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
         >
           <div className="library-scroll" ref={scroll}>
             <div className="library-filter-panel" ref={filters}>
-              <div className="library-location">
-                {narrow && (
-                  <button
-                    type="button"
-                    className="library-navigation-button"
-                    ref={navigationButton}
-                    aria-expanded={drawer}
-                    aria-haspopup="true"
-                    onClick={() => setDrawer(!drawer)}
-                  >
-                    {t('images.navigation')}
-                  </button>
-                )}
-                <nav className="library-breadcrumb" aria-label={t('images.location')}>
-                  <button
-                    type="button"
-                    onClick={() => run({ command: 'folder', folder: c.folder === '*' ? '*' : '' })}
-                  >
-                    {t(c.folder === '*' ? 'images.allFolders' : 'images.rootFolder')}
-                  </button>
-                  {c.folder !== '*' &&
-                    c.folder
-                      .split('/')
-                      .filter(Boolean)
-                      .map((part, i, parts) => (
-                        <span key={i}>
-                          <Icon name="chevron" size={12} />
-                          <button
-                            type="button"
-                            title={parts.slice(0, i + 1).join('/')}
-                            onClick={() =>
-                              run({ command: 'folder', folder: parts.slice(0, i + 1).join('/') })
-                            }
-                          >
-                            {part}
-                          </button>
-                        </span>
-                      ))}
-                </nav>
-                <SettingsButton
-                  icon
-                  disabled={c.busy}
-                  title={t('images.openFolder')}
-                  aria-label={t('images.openFolder')}
-                  onClick={() => run({ command: 'open-folder' })}
-                >
-                  <Icon name="external-link" size={16} />
-                </SettingsButton>
-                <SettingsButton
-                  icon
-                  disabled={c.busy}
-                  title={t('images.reload')}
-                  aria-label={t('images.reload')}
-                  onClick={() => run({ command: 'reload' })}
-                >
-                  <Icon name="refresh" size={16} />
-                </SettingsButton>
-              </div>
-              <div className="library-toolbar">
-                <label className="library-search">
-                  <Icon name="search" size={16} />
-                  <input
-                    type="search"
-                    aria-label={t('images.search')}
-                    placeholder={t('images.search')}
-                    value={query}
-                    disabled={c.busy}
-                    onChange={(e) => {
-                      setQuery(e.target.value);
-                      if (!(e.nativeEvent as InputEvent).isComposing)
-                        run({ command: 'query', value: e.target.value });
-                    }}
-                    onCompositionEnd={(e) =>
-                      run({ command: 'query', value: e.currentTarget.value })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape' && !e.nativeEvent.isComposing) {
-                        setQuery('');
-                        run({ command: 'query', value: '' });
-                        e.stopPropagation();
+              <ImageBrowserFilters
+                folder={c.folder}
+                onFolder={(folder) => navigate({ command: 'folder', folder })}
+                query={query}
+                onQuery={setQuery}
+                onSearch={(value) => run({ command: 'query', value })}
+                disabled={c.busy}
+                navigation={navigation}
+                navigationButton={navigationButton}
+                size={<div ref={size} />}
+                locationActions={
+                  <>
+                    <SettingsButton
+                      icon
+                      disabled={c.busy}
+                      title={t('images.openFolder')}
+                      aria-label={t('images.openFolder')}
+                      onClick={() =>
+                        run({ command: 'open-folder', folder: c.folder === '*' ? '' : c.folder })
                       }
-                    }}
-                  />
-                </label>
-                <div ref={size} />
-              </div>
-              <div className="library-summary">
-                <div>
-                  <strong>{t('images.imageCount', { count: c.total })}</strong>
-                  {c.group !== 'all' && (
-                    <button
-                      className="library-filter-chip"
-                      title={t('images.clearGroup')}
-                      onClick={() => run({ command: 'group', groupId: 'all' })}
                     >
-                      {currentGroup?.title}
-                      <Icon name="close" size={12} />
+                      <Icon name="external-link" size={16} />
+                    </SettingsButton>
+                    <SettingsButton
+                      icon
+                      disabled={c.busy}
+                      title={t('images.reload')}
+                      aria-label={t('images.reload')}
+                      onClick={() => run({ command: 'reload' })}
+                    >
+                      <Icon name="refresh" size={16} />
+                    </SettingsButton>
+                  </>
+                }
+              >
+                <div className="library-summary">
+                  <div>
+                    <strong>{t('images.imageCount', { count: c.total })}</strong>
+                    {c.group !== 'all' && (
+                      <button
+                        className="library-filter-chip"
+                        title={t('images.clearGroup')}
+                        onClick={() => run({ command: 'group', groupId: 'all' })}
+                      >
+                        {currentGroup?.title}
+                        <Icon name="close" size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!c.total || c.busy}
+                    onClick={() => run({ command: 'select-all' })}
+                  >
+                    {t('images.selectAll', { count: c.total })}
+                  </button>
+                </div>
+                <div className="library-selection">
+                  <span aria-live="polite">{t('images.selectedCount', { count: c.selected })}</span>
+                  <SettingsButton
+                    disabled={!c.selected || c.busy}
+                    onClick={() => dialog('batch-add')}
+                  >
+                    {t('images.addToGroup')}
+                  </SettingsButton>
+                  <SettingsButton
+                    disabled={!c.selected || c.busy}
+                    onClick={() => dialog('batch-remove', normalGroup ? c.group : undefined)}
+                  >
+                    {t('images.removeFromGroup')}
+                  </SettingsButton>
+                  <SettingsButton
+                    disabled={!c.selected || c.busy}
+                    onClick={() => dialog('folder-move')}
+                  >
+                    {t('images.moveShort')}
+                  </SettingsButton>
+                  <SettingsButton
+                    disabled={!c.selected || c.busy}
+                    onClick={() => dialog('delete-image')}
+                  >
+                    <Icon name="trash" size={14} />
+                    {t('images.delete')}
+                  </SettingsButton>
+                  <SettingsButton
+                    disabled={!c.selected || c.busy}
+                    aria-haspopup="menu"
+                    onClick={(e) => imageMenu(undefined, e.currentTarget)}
+                  >
+                    {t('images.actions')} ▾
+                  </SettingsButton>
+                  {c.selected > 0 && (
+                    <button
+                      type="button"
+                      disabled={c.busy}
+                      onClick={() => run({ command: 'clear' })}
+                    >
+                      {t('images.clearSelection')}
                     </button>
                   )}
                 </div>
-                <button
-                  type="button"
-                  disabled={!c.total || c.busy}
-                  onClick={() => run({ command: 'select-all' })}
-                >
-                  {t('images.selectAll', { count: c.total })}
-                </button>
-              </div>
-              <div className="library-selection">
-                <span aria-live="polite">{t('images.selectedCount', { count: c.selected })}</span>
-                <SettingsButton
-                  disabled={!c.selected || c.busy}
-                  onClick={() => dialog('batch-add')}
-                >
-                  {t('images.addToGroup')}
-                </SettingsButton>
-                <SettingsButton
-                  disabled={!c.selected || c.busy}
-                  onClick={() => dialog('batch-remove', normalGroup ? c.group : undefined)}
-                >
-                  {t('images.removeFromGroup')}
-                </SettingsButton>
-                <SettingsButton
-                  disabled={!c.selected || c.busy}
-                  onClick={() => dialog('folder-move')}
-                >
-                  {t('images.moveShort')}
-                </SettingsButton>
-                <SettingsButton
-                  disabled={!c.selected || c.busy}
-                  onClick={() => dialog('delete-image')}
-                >
-                  <Icon name="trash" size={14} />
-                  {t('images.delete')}
-                </SettingsButton>
-                <SettingsButton
-                  disabled={!c.selected || c.busy}
-                  aria-haspopup="menu"
-                  onClick={(e) => imageMenu(undefined, e.currentTarget)}
-                >
-                  {t('images.actions')} ▾
-                </SettingsButton>
-                {c.selected > 0 && (
-                  <button type="button" disabled={c.busy} onClick={() => run({ command: 'clear' })}>
-                    {t('images.clearSelection')}
-                  </button>
-                )}
-              </div>
+              </ImageBrowserFilters>
             </div>
             <div className="library-grid-pad">
               <div ref={grid} />

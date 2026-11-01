@@ -71,6 +71,7 @@ const api: DockApi = {
       ipcRenderer.invoke('dock:imageLibrary:galleryImage', image, generation, edge, session),
     galleryView: () => ipcRenderer.invoke('dock:imageLibrary:galleryView'),
     saveGalleryWidth: (value) => ipcRenderer.invoke('dock:imageLibrary:saveGalleryWidth', value),
+    saveGalleryLayout: (value) => ipcRenderer.invoke('dock:imageLibrary:saveGalleryLayout', value),
     pick: (current) => ipcRenderer.invoke('dock:imageLibrary:pick', current),
     onChanged: (callback) => {
       const listener = () => callback();

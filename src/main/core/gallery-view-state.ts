@@ -34,23 +34,23 @@ export class GalleryViewStateStore {
   save(surface: 'library' | 'picker', cardWidth: number) {
     if (
       !['library', 'picker'].includes(surface) ||
-      !validGalleryWidth(cardWidth, surface === 'library' ? libraryGallerySize : gallerySize)
+      !validGalleryWidth(cardWidth, libraryGallerySize)
     )
       throw Error(hostText('services.galleryViewState.invalidSize'));
     if (this.blocked) throw Error(this.error);
     const next: State = { ...this.state, [surface]: { ...this.state[surface], cardWidth } };
     this.write(next);
   }
-  layout() {
-    return structuredClone(this.state.library?.layout ?? defaultImageLibraryLayout);
+  layout(surface: 'library' | 'picker' = 'library') {
+    return structuredClone(this.state[surface]?.layout ?? defaultImageLibraryLayout);
   }
-  saveLayout(layout: ImageLibraryLayout) {
-    if (!validImageLibraryLayout(layout))
+  saveLayout(layout: ImageLibraryLayout, surface: 'library' | 'picker' = 'library') {
+    if (!['library', 'picker'].includes(surface) || !validImageLibraryLayout(layout))
       throw Error(hostText('services.galleryViewState.invalidSize'));
     if (this.blocked) throw Error(this.error);
     this.write({
       ...this.state,
-      library: { cardWidth: this.get('library'), layout: structuredClone(layout) },
+      [surface]: { cardWidth: this.get(surface), layout: structuredClone(layout) },
     });
   }
   private write(next: State) {
