@@ -34,7 +34,7 @@ for (const mode of ['native', 'dotnet']) test(`.NET pages ${mode}: JSON, typed s
   });
   t.after(() => peer.close());
   const activated = await peer.request('activate', { id: 'test.pages', settings: {} });
-  assert.equal(activated.commands.length, 2);
+  assert.equal(activated.commands.length, 3);
   const action = (id, input = {}) => peer.request('page.action', { id, input, pageId: 'main' });
   assert.deepEqual(await action('echo', { value: '画像', enabled: true, number: 12 }), { value: '画像', enabled: true, number: 12 });
   assert.equal(await action('null'), null);
@@ -43,6 +43,8 @@ for (const mode of ['native', 'dotnet']) test(`.NET pages ${mode}: JSON, typed s
   assert.match((await action('images')).images[0].url, /^appdock:/);
   await peer.request('command.execute', { id: 'test.pages.details' });
   assert.ok(calls.some((call) => call.method === 'host.ui.openDetails'));
+  await peer.request('command.execute', { id: 'test.pages.settings' });
+  assert.deepEqual(calls.find((call) => call.method === 'host.ui.openSettings').input, {});
   await peer.request('command.execute', { id: 'test.pages.open' });
   assert.deepEqual(await openedEcho, { opened: true });
   await assert.rejects(action('large'), /大きすぎ/);

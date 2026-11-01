@@ -193,6 +193,7 @@ internal sealed class ExtensionContext(string id, JsonElement settings, JsonRpcC
     public Task ReleaseImagesAsync(string id, IReadOnlyList<string> imageIds, CancellationToken cancellationToken = default)
         => CallAsync("host.pages.images.release", new { id, imageIds }, cancellationToken);
     public Task OpenDetailsAsync(CancellationToken cancellationToken = default) => CallAsync("host.ui.openDetails", new { }, cancellationToken);
+    public Task OpenSettingsAsync(CancellationToken cancellationToken = default) => CallAsync("host.ui.openSettings", new { }, cancellationToken);
     private async Task<T> RequestAsync<T>(string method, object parameters, CancellationToken token)
         => (await connection.RequestAsync(method, parameters, token)).Deserialize<T>(JsonRpcConnection.Json)!;
     public Task ShowPanelAsync(Panel panel, CancellationToken cancellationToken = default) => CallAsync("host.ui.panel", panel, cancellationToken);

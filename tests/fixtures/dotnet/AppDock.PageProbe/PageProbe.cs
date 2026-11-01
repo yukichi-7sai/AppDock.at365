@@ -9,6 +9,7 @@ public sealed class PageProbe : IAppDockExtension, IPageActionHandler
         context = services;
         services.Commands.Register(services.ExtensionId + ".open", "ページ検証を開く", ct => services.Pages.OpenAsync("main", ct));
         services.Commands.Register(services.ExtensionId + ".details", "説明へ戻る", ct => services.Ui.OpenDetailsAsync(ct));
+        services.Commands.Register(services.ExtensionId + ".settings", "設定を開く", ct => services.Ui.OpenSettingsAsync(ct));
         return Task.CompletedTask;
     }
     public async Task<JsonElement?> HandlePageActionAsync(string actionId, JsonElement input, string pageId, CancellationToken token)

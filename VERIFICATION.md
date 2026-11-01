@@ -1,5 +1,21 @@
 # 検証記録
 
+## 2026-11-01: 壁紙履歴の表示調整・自己設定UI APIのコミット前照合
+
+- 利用者から表示調整の受入を確認された。実装時の1,095入力・40ログ・104 fixture入力、発行全704ファイルとZIP/feed、GUI結果をSHA256で照合し一致。本体の関連14ファイル86件、壁紙JS11件、native回帰/RPC、ソース/固定EXEのNode/DLL/native 4群・履歴/設定13群・NASを模した削除13群・固定自動更新6群を再利用した。
+- 未実行だった本体標準152ファイル1,406件だけを追加実行し、計166ファイル1,492件がfail/skip 0。製品・設定・依存・発行内容は変更せず、追加の版更新・再発行はない。本体17ファイルと壁紙13ファイルを別々にstageし、作業内容・stage/commit treeを照合する。正本は`.artifacts/commit-validation-wallpaper-history-ui-20261101/`。push・Release・実利用deployは行わない。
+
+## 2026-11-01: Applet自身の設定を開くUI連携と壁紙履歴の表示調整 0.114.0
+
+- WallpaperSlideshowの自動更新ON/OFFを先に`41d4b1c`へコミットし、両repoのcleanとpull --ff-onlyの更新なしを確認して着手。`host.ui.openSettings`、Nodeの`context.ui.openSettings()`、.NETの`Ui.OpenSettingsAsync`を追加した。入力は空オブジェクト、自身の`ui` capabilityと実行状態を確認し、他AppletのID・ページ・URL指定を拒否する。既存の設定コマンドと入力確定経路を使い、自身の設定本文を開く。`openDetails`は従来どおりApplet管理を開く。
+- 公開連携API追加のため、本体0.113.0→0.114.0、SDK/Runtime 0.27.3→0.28.0へマイナー更新。利用側のWallpaperSlideshowは最低本体版を0.114.0へ上げ、0.11.0とした。設定キー・保存ファイル・操作許可・MCP公開項目は追加していない。
+- 発行前レビューでは、履歴View破棄時の既定ページへの移動が設定選択を上書きする競合を修正し、呼出元を明示した設定遷移で実際の本文と編集状態を一致させた。プレビュー中の設定変更を閉じた後に反映するときのフォーカス消失も壁紙側で修正し、他の操作へ移ったフォーカスと非表示状態を保護した。阻害指摘なし。
+- 型検査・本体ビルド・.NETビルドが終了0。関連本体84件と.NET/native契約2件・壁紙JS11件の計97件がfail/skip 0、壁紙native回帰/RPCも成功。ソースと発行済み固定本体でNode/DLL/nativeページの4群、履歴/設定GUI13群、NASを模した削除GUI13群が成功。固定本体で自動更新6群と発行native EXEの起動拒否/自身のHWND/正常終了も成功した。標準全回帰と無関係Appletの再試験は実施せず、変更した連携・設定・表示・履歴の範囲を確認した。
+- 初回の依存照合は版更新後の再installが必要となり、frozen-lockfileで照合した。非RIDの古いExtensionHost/古い画面出力は再ビルドし、native solutionのDebug参照メタデータ不正は直列Rebuildで解消した。初回の失敗・調査ログを保持し、製品の検査・権限・依存を緩めていない。使用ツールはNode 26.13.0、pnpm 12.15.0、.NET SDK 10.0.403、Windows x64/CP65001。
+- publish.batは本体・壁紙とも終了0。本体ZIP **270840932 bytes / SHA256 `f773774f0bfed4dc0ffbb717b8bd0323f8f3b3f6b91f9cc3098d5939d61e5aa6`**、壁紙ZIP **46341094 bytes / SHA256 `979db548495db0845c81dd09bff11dec68d68b0d42b0cc59bca67d74dd1c03a6`**。本体693/壁紙11ファイルをZIPと配置で全件照合し、壁紙の元Web資産9件、manifest/feed/EXEの版・最低本体版、同梱SDK/Runtime 0.28.0が一致した。通常publishのみで、スターター・未変更Appletの再発行はない。
+- 証跡は`.artifacts/wallpaper-history-ui-20261101/`の入力・完全ログ・`environment.json`・`review.json`・`payload-validation.json`・`validation.json`。固定連携GUIは`.artifacts/dotnet-pages-ui-1793504338995/`、固定壁紙の3方式は兄弟repoの同日の検証記録に実パスを記載した。一時画像とnative fixtureを使い、実NAS・実壁紙・Explorer再起動・実ロック/RDP・関連付けアプリ/実ごみ箱・Windows背景設定の起動は操作していない。
+- 成功済み旧固定コピー4件の管理項目72件（論理2,525,540,900 bytes）だけを整理し、保護473ファイルと最新4コピーの結果/EXE/manifestのhashが前後一致した。フォルダー全体の削除と失敗は0。画像・設定・data・extensions・manifest・失敗/調査/再利用記録を保持した。今回の表示調整は未コミットで、push・Release・実利用deployは行っていない。
+
 ## 2026-11-01: NAS画像削除のコミット前照合
 
 - 本体0.113.0・WallpaperSlideshow 0.9.0の1,093入力、実装時の完全ログと全703発行ファイル・ZIP/feedをSHA256で照合し、一致を確認。関連94件（本体90件・壁紙JS4件）、native回帰/RPC、ソース/固定EXEの通常/NAS履歴GUI各11群・smokeを再利用した。利用者から実NAS画像の削除成功も確認された。

@@ -56,7 +56,11 @@ export function createHostApi(
   ribbonBadges?: import('./ribbon-badges').RibbonBadges,
   sharedDataRoot = path.join(dataRoot, 'shared'),
   customCommands?: import('./custom-commands').CustomCommandService,
-  pageUi?: { openDetails(id: string): Promise<unknown>; failed?(id: string): void },
+  pageUi?: {
+    openDetails(id: string): Promise<unknown>;
+    openSettings?(id: string): Promise<unknown>;
+    failed?(id: string): void;
+  },
   imageLibrary?: import('./image-library-host').ImageLibraryHost,
   storageMachine = os.hostname(),
   assistance?: import('./file-watch-assistance').FileWatchAssistance,
@@ -903,6 +907,11 @@ export function createHostApi(
         if (Object.keys(p).length || !pageUi)
           throw Error(hostText('services.hostApi.ownAppletDetails'));
         return pageUi.openDetails(id);
+      case 'host.ui.openSettings':
+        requireCapability('ui');
+        if (Object.keys(p).length || !pageUi?.openSettings)
+          throw Error(hostText('services.hostApi.ownAppletSettings'));
+        return pageUi.openSettings(id);
       case 'host.ui.panel': {
         requireCapability('ui');
         if (

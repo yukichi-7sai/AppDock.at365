@@ -18,6 +18,8 @@
 
 共通preloadが`--appdock-overlay-filter`を配布する。別WebContentsのApplet本文のパレット用CSSも同じ設定に従い、不要なときは除去する。既存設定で項目を省略した場合も透明を使い、明示的な`blur`は保持する。保存・ページリセット・部分JSON・外部設定APIは既存の設定基盤へ接続する。
 
+ローカルAppletのHTML `dialog`も、`::backdrop`を透明にして`backdrop-filter: var(--appdock-overlay-filter, none)`を参照します。影は共通preloadが更新する`:root[data-overlay-shadow='off']`で無効にします。これにより表示中にも設定へ追従し、Appletから全設定を取得する必要はありません。
+
 ### カスタムの2色
 
 `host.accentColor: "custom"`を選んだときだけ「濃い色」「淡い色」の編集欄を開く。既存の`SettingsColorPicker`を使い、色見本・ネイティブカラーピッカー・HEX入力に対応する。HEXはblur/Enterで確定、Escapeで未確定入力を取消。不正値は入力欄だけに保持する。追加の保存ボタンは置かない。

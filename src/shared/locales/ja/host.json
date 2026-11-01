@@ -2518,6 +2518,7 @@
   "services.hostApi.notificationChanged": "通知の発行元または操作が変わりました。",
   "services.hostApi.browserUrl": "ブラウザでは資格情報を含まないHTTPS URLを指定してください。",
   "services.hostApi.ownAppletDetails": "自身のApplet詳細だけを開けます。",
+  "services.hostApi.ownAppletSettings": "自身のApplet設定だけを開けます。",
   "services.hostApi.panelImageLimit": "パネルの画像は1000件以内のサムネイルを指定してください。",
   "services.hostApi.panelFormat": "パネルの形式が正しくありません。",
   "services.hostApi.dataSizeLimit": "保存データは1MB以下です。",

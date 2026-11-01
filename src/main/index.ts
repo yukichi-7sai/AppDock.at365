@@ -3729,6 +3729,11 @@ async function initialize() {
           await navigation.navigate('extensions', undefined, id, 'description');
           return { accepted: true };
         },
+        openSettings: async (id) => {
+          await executeCommand(`appdock.settings.applet.${id}.open`);
+          await navigation.navigate('settings', undefined, id, 'settings');
+          return { accepted: true };
+        },
         failed: (id) =>
           errors.report({
             eventId: randomUUID(),

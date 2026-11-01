@@ -77,6 +77,8 @@ public interface IUiService {
     Task<string> GetImageDirectoryAsync(CancellationToken cancellationToken = default);
     Task OpenDetailsAsync(CancellationToken cancellationToken = default)
         => throw new NotSupportedException("Opening Applet details requires AppDock 0.66.1 or later.");
+    Task OpenSettingsAsync(CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Opening Applet settings requires AppDock 0.114.0 or later.");
 }
 public interface IBrowserService { Task OpenAsync(string url, CancellationToken cancellationToken = default); }
 public interface ILogService

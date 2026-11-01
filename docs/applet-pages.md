@@ -44,6 +44,8 @@ WebアカウントUIでは`source:"web-accounts"`を使い、uiを重複指定�
 
 `IPageService`は固定ページのopenに加え、list/replace/hide/dispose/openItem、変更通知、ページ別画像の登録と解放を提供します。Nodeも同じホストAPIを使用します。動的登録には`dynamic-pages`、画像には`local-images`を併せて宣言します。自身の説明へ戻る場合は`Ui.OpenDetailsAsync` / `context.ui.openDetails()`を使います。
 
+自身の設定本文へ直接移る場合は、本体0.114.0・SDK/Runtime 0.28.0以降の`Ui.OpenSettingsAsync(token)` / `context.ui.openSettings()`を使います。`host.ui.openSettings`の入力は空オブジェクトで、`ui` capabilityを持つ実行中の呼出元だけを対象にします。対象ID・ページ・URLの指定は受け付けません。本体ウィンドウの設定ページ`applet:<呼出元ID>`を開き、設定の書き込み・有効化・再起動は行いません。`openDetails`のApplet管理を開く動作は維持します。
+
 画像は`Ui.GetImageDirectoryAsync`内のPNG/JPEG/WebPを`Pages.RegisterImagesAsync`へ登録します。返されたURLは所属する生存中のlocal Viewだけで読み込めます。画像バイトをJSONへ埋め込んだり、説明パネルを通信経路にしたりする必要はありません。View破棄・停止で参照は失効し、Appletが生成ファイルを削除します。API、各種上限、実装例は[.NETページ連携の契約](applet-pages.md)を参照してください。
 
 ## 表示先

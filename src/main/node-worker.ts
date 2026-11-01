@@ -107,6 +107,7 @@ export interface NodeExtensionContext {
   };
   ui: {
     openDetails(): Promise<unknown>;
+    openSettings(): Promise<unknown>;
     showPanel(panel: Panel): Promise<unknown>;
     getImageDirectory(): Promise<string>;
     pickFile(kind: 'json' | 'wav'): Promise<string | null>;
@@ -293,6 +294,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
         },
         ui: {
           openDetails: () => peer.request('host.ui.openDetails', {}),
+          openSettings: () => peer.request('host.ui.openSettings', {}),
           pickFile: (kind) => peer.request('host.ui.pickFile', { kind }, 300000),
           showPanel: (panel) => peer.request('host.ui.panel', panel),
           getImageDirectory: () => peer.request('host.ui.imageDirectory', {}) as Promise<string>,

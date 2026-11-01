@@ -13,17 +13,17 @@ for (const mode of ['dotnet','native','node']) {
   const folder = path.join(profile, 'extensions/pages-' + mode), id = 'test.pages.' + mode;
   fs.mkdirSync(folder, { recursive: true });
   if (mode !== 'node') fs.cpSync(path.join(root, `tests/fixtures/dotnet/AppDock.PageProbe${mode === 'native' ? '.Native' : ''}/bin/Release/net10.0`), folder, { recursive: true });
-  const manifest = { apiVersion: 1, id, name: 'Page fixture ' + mode, version: '1.0.0', minimumHostVersion: '0.66.1', startupDelaySeconds: 0,
+  const manifest = { apiVersion: 1, id, name: 'Page fixture ' + mode, version: '1.0.0', minimumHostVersion: '0.114.0', startupDelaySeconds: 0,
     runtime: mode, entry: mode === 'node' ? 'worker.cjs' : mode === 'native' ? 'AppDock.PageProbe.Native.exe' : 'AppDock.PageProbe.dll',
     ...(mode === 'dotnet' ? { type: 'AppDock.Tests.PageProbe' } : {}), capabilities: ['ui','pages','dynamic-pages','local-images'],
-    commands: [{ id: id + '.open', title: 'Open ' + mode, activateOnExecute: true }, { id: id + '.details', title: 'Details ' + mode }],
+    commands: [{ id: id + '.open', title: 'Open ' + mode, activateOnExecute: true }, { id: id + '.details', title: 'Details ' + mode }, { id: id + '.settings', title: 'Settings ' + mode }],
     pages: [{ id: 'main', title: 'Pages ' + mode, source: 'local', ui: 'index.html', openCommand: id + '.open' }],
     pageActions: [{ id: 'echo', parameters: { value: 'string' } }, { id: 'null' }, { id: 'images' }, { id: 'pages' }, { id: 'release', parameters: { imageId: 'string' } }],
   };
   fs.writeFileSync(path.join(folder, 'extension.json'), JSON.stringify(manifest));
   fs.writeFileSync(path.join(folder, 'index.html'), `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';script-src 'self';img-src appdock:"><script src="ui.js" defer></script></head><body><h1>Pages ${mode}</h1><input aria-label="保持する入力"><img id="image" alt="Fixture"><output id="changes">0</output></body></html>`);
   fs.writeFileSync(path.join(folder, 'ui.js'), `let changes=0; window.appletPage.onChanged(()=>document.getElementById('changes').textContent=String(++changes));`);
-  if (mode === 'node') fs.writeFileSync(path.join(folder, 'worker.cjs'), `let context; exports.activate=async c=>{context=c;c.commands.register('${id}.open','Open node',()=>c.pages.open('main'));c.commands.register('${id}.details','Details node',()=>c.ui.openDetails());};
+  if (mode === 'node') fs.writeFileSync(path.join(folder, 'worker.cjs'), `let context; exports.activate=async c=>{context=c;c.commands.register('${id}.open','Open node',()=>c.pages.open('main'));c.commands.register('${id}.details','Details node',()=>c.ui.openDetails());c.commands.register('${id}.settings','Settings node',()=>c.ui.openSettings());};
 exports.onPageAction=async(id,input,pageId)=>{if(pageId!=='main')throw Error('Unknown page');if(id==='echo')return input;if(id==='null')return null;if(id==='pages'){const before=await context.pages.list();const result=await context.pages.replace([{id:'dynamic',title:'Dynamic',source:'local',ui:'index.html',context:{document:'one'}}],before.revision);await context.pages.hide('dynamic');await context.pages.dispose('dynamic');return result;}if(id==='images'){const fs=require('node:fs'),path=require('node:path');const file=path.join(await context.ui.getImageDirectory(),'probe.png');fs.writeFileSync(file,Buffer.from('${pixel}','base64'));const result=await context.pages.registerImages('main',[{key:'probe',file}]);await context.pages.notifyChanged('main');return result;}if(id==='release')return context.pages.releaseImages('main',[input.imageId]);throw Error('Unknown action');};`);
   settings.extensions[id] = { enabled: true, settings: {} };
 }
@@ -73,9 +73,13 @@ let instance;
       assert.equal(await ui.getByRole('textbox', { name: '保持する入力' }).inputValue(), 'preserved-' + mode);
       await instance.main.evaluate(id => window.dock.executeCommand(id + '.details'), id);
       await until(() => instance.main.evaluate(async id => (await window.dock.settingsEditing()).pageId === 'applets' && (await window.dock.snapshot()).navigation.appletId === id, id), 'own Applet in management');
+      await instance.main.evaluate(id => window.dock.executeCommand(id + '.settings'), id);
+      await until(() => instance.main.evaluate(async id => (await window.dock.settingsEditing()).pageId === 'applet:' + id, id), 'own Applet settings');
+      await instance.main.getByText(id, { exact: true }).waitFor();
+      assert.equal((await instance.main.evaluate(() => window.dock.settingsEditing())).pageId, 'applet:' + id);
       await instance.main.evaluate(id => window.dock.toggleExtension(id, false), id);
       await until(() => ui.isClosed(), mode + ' View closed on stop'); assert.equal(await fetchStatus(second.url), 404);
-      checks.push(mode + ': real local page / JSON-null / PNG and change event / private URLs / release / dynamic context and disposal / retained input / own details / stop');
+      checks.push(mode + ': real local page / JSON-null / PNG and change event / private URLs / release / dynamic context and disposal / retained input / own details and settings / stop');
     }
     const references = [];
     for (const [tag,id] of collisionPages) {
