@@ -59,7 +59,7 @@ test('memory Storage uses the existing API, isolates owners and releases values 
   assert.deepEqual(fs.readdirSync(root), [], 'memory never creates a data/cache/Storage directory');
 });
 
-function sources(t) {
+function sources(t, options = {}) {
   const base = path.resolve(__dirname, '../.artifacts');
   fs.mkdirSync(base, { recursive: true });
   const root = fs.mkdtempSync(path.join(base, 'source-images-'));
@@ -69,18 +69,34 @@ function sources(t) {
   });
   const file = path.join(root, 'original.png');
   fs.writeFileSync(file, pixel);
+  if (options.actual) {
+    const realpath = fs.promises.realpath.bind(fs.promises);
+    const open = fs.promises.open.bind(fs.promises);
+    t.mock.method(fs.promises, 'realpath', async (target, ...args) =>
+      target === file ? options.actual : realpath(target, ...args),
+    );
+    t.mock.method(fs.promises, 'open', (target, ...args) =>
+      open(target === options.actual ? file : target, ...args),
+    );
+  }
   const storage = new MemoryStorage();
   storage.set('paths', [file]);
   const operations = [];
   let active = true;
-  const registry = new PageSourceImages(storage, () => active, {
+  const effects = {
     open: async (file) => operations.push(['open', file]),
     trash: async (file) => {
       operations.push(['trash', file]);
       fs.unlinkSync(file);
     },
+    delete: async (file) => {
+      operations.push(['delete', file]);
+      if (options.failDelete) throw Object.assign(Error('access denied'), { code: 'EACCES' });
+      await fs.promises.unlink(file);
+    },
     removed: async (file) => operations.push(['removed', file]),
-  });
+  };
+  const registry = new PageSourceImages(storage, () => active, effects);
   t.after(() => registry.clear());
   const request = { key: 'paths', pointer: '/0', file };
   return {
@@ -89,6 +105,7 @@ function sources(t) {
     file,
     storage,
     operations,
+    effects,
     hide: () => {
       active = false;
       registry.clear();
@@ -124,6 +141,78 @@ test('source images accept only publisher-owned image paths and stream current o
     'removed originals never fall back to old pixels',
   );
   await assert.rejects(a.registry.operate(image.id, 'open'));
+});
+
+test('local images never allow permanent deletion, including namespaced local paths', async (t) => {
+  for (const actual of [undefined, '\\\\?\\C:\\images\\original.png']) {
+    await t.test(String(actual ?? 'ordinary local file'), async (t) => {
+      const a = sources(t, { actual });
+      const source = await a.registry.register(a.request);
+      assert.equal(source.deletion, 'trash');
+      await assert.rejects(a.registry.operate(source.id, 'delete'));
+      assert.deepEqual(a.operations, []);
+      assert(fs.existsSync(a.file));
+    });
+  }
+});
+
+test('network and mapped-drive targets require explicit deletion and notify exactly once', async (t) => {
+  for (const actual of ['\\\\nas\\images\\original.png', '\\\\?\\UNC\\nas\\images\\original.png']) {
+    await t.test(actual, async (t) => {
+      const a = sources(t, { actual });
+      const source = await a.registry.register(a.request);
+      assert.equal(source.deletion, 'permanent');
+      assert(fs.existsSync(a.file), 'registering and displaying a warning does not delete');
+      a.storage.set('paths', [a.file + '.replacement']);
+      const pending = a.registry.operate(source.id, 'delete');
+      await assert.rejects(a.registry.operate(source.id, 'delete'));
+      await pending;
+      assert.deepEqual(a.operations, [
+        ['delete', a.file],
+        ['removed', a.file],
+      ]);
+      assert(!fs.existsSync(a.file));
+      assert.equal(a.registry.size, 0);
+      await assert.rejects(a.registry.operate(source.id, 'delete'));
+    });
+  }
+});
+
+test('network recycle failure never falls back; a failed explicit deletion preserves the file and can be retried', async (t) => {
+  const options = { actual: '\\\\nas\\images\\original.png', failDelete: true };
+  const a = sources(t, options);
+  a.effects.trash = async () => {
+    throw Error('Failed to perform delete operation');
+  };
+  const source = await a.registry.register(a.request);
+  await assert.rejects(a.registry.operate(source.id, 'trash'), /Failed to perform/);
+  assert.deepEqual(a.operations, []);
+  assert(fs.existsSync(a.file));
+  await assert.rejects(a.registry.operate(source.id, 'delete'), /access denied/);
+  assert.deepEqual(a.operations, [['delete', a.file]]);
+  assert(fs.existsSync(a.file));
+  options.failDelete = false;
+  await a.registry.operate(source.id, 'delete');
+  assert.deepEqual(a.operations, [
+    ['delete', a.file],
+    ['delete', a.file],
+    ['removed', a.file],
+  ]);
+});
+
+test('closing or releasing a network image during validation prevents permanent deletion', async (t) => {
+  for (const close of [false, true]) {
+    await t.test(String(close), async (t) => {
+      const a = sources(t, { actual: '\\\\nas\\images\\original.png' });
+      const source = await a.registry.register(a.request);
+      const pending = a.registry.operate(source.id, 'delete');
+      if (close) a.hide();
+      else a.registry.release([source.id]);
+      await assert.rejects(pending);
+      assert.deepEqual(a.operations, []);
+      assert(fs.existsSync(a.file));
+    });
+  }
 });
 test('source image close cancels readers and late registration; a deleted reference cannot run twice', async (t) => {
   const a = sources(t);

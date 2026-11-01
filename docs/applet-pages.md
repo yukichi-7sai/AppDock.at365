@@ -270,7 +270,7 @@ pageCollectionsの各宣言は`key/source/fields`を持つ。keyは自身のobje
 | pages.openItem                           | 自身の設定由来項目のみ                                                                      |
 | actions.invoke                           | manifest.pageActionsのidと宣言されたstring/number/boolean引数だけ。NodeのonPageActionへ渡す |
 | storage.get/set                          | 自身のStorageだけ。`storage` capabilityと共通のscope・キー検証                              |
-| sourceImages.register/open/trash/release | `source-images` capability。実行処理がメモリStorageへ公開した元画像だけ                     |
+| sourceImages.register/open/trash/delete/release | `source-images` capability。実行処理がメモリStorageへ公開した元画像だけ。`delete`は本体0.113.0以降の確認済みネットワーク画像 |
 
 ローカルsnapshotにはテーマ、宣言設定値、設定revision、page.id/context、自身のcollectionPages識別子を含む。設定由来local画面はpage.id/contextとテーマ、親の登録コマンド実行を提供する。remoteにはpreload/Node/ホストIPCを渡さない。
 

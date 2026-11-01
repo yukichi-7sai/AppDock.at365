@@ -1,6 +1,6 @@
 # メモリStorageと元画像表示
 
-Storageの共通契約は[Applet API](extensions.md#storageの保存範囲)、localページの境界は[Appletページ](applet-pages.md)を参照する。本体0.112.2、SDK/Runtime 0.27.3以降を対象とする。
+Storageの共通契約は[Applet API](extensions.md#storageの保存範囲)、localページの境界は[Appletページ](applet-pages.md)を参照する。メモリStorageは本体0.112.2、SDK/Runtime 0.27.3以降、ネットワーク元画像の削除は本体0.113.0以降を対象とする。
 
 ## Storageの保存先
 
@@ -43,11 +43,15 @@ const bitmap = await createImageBitmap(await response.blob());
 
 `pointer`はJSON Pointerで、`file`は取得済みパスとの一致確認用。生成開始時のメモリ値から対象を固定し、生成の前後で同じ実行世代・生存中の表示Viewを検査する。途中で一覧が変わっても別の対象へ読み替えない。ページ側の`storage.set`で書いた値は画像パス公開の権限には使わない。PNG/JPEG/BMP/WebPの拡張子と実ヘッダー、実ファイルを検査し、元画像のサイズをサムネイルの上限で制限しない。
 
-結果は`{id,url,size}`。URLは不透明なIDを使う`appdock://source-images/<id>`で、ディスクパスを含めない。ページ専用Sessionのprotocol handlerが毎回元ファイルを開いて配信する。`Cache-Control:no-store`と`nosniff`を指定し、対応するlocal View以外のSessionへ公開しない。CORSはこのSessionの画像応答だけ許可し、CSPの`connect-src appdock:`と組み合わせる。サムネイルの生成・Blob URLの保持はページのJSが担当する。
+結果は`{id,url,size,deletion}`。`deletion`は通常の画像では`trash`、UNC・名前空間付きUNCまたは実体がUNCへ解決されるネットワークドライブの画像では`permanent`となる。名前空間付きローカルドライブをUNCと誤認しない。URLは不透明なIDを使う`appdock://source-images/<id>`で、ディスクパスを含めない。ページ専用Sessionのprotocol handlerが毎回元ファイルを開いて配信する。`Cache-Control:no-store`と`nosniff`を指定し、対応するlocal View以外のSessionへ公開しない。CORSはこのSessionの画像応答だけ許可し、CSPの`connect-src appdock:`と組み合わせる。サムネイルの生成・Blob URLの保持はページのJSが担当する。
 
 元画像が移動・削除・読取不能なら画像を返さず、以前の画像へ代替しない。既に発行した参照は一覧の更新後も元の対象へ固定し、次の値の同じ位置へ読み替えない。`sourceImages.release {ids}`で参照を解放でき、非表示・View破棄・停止でも参照と読取ストリームを回収する。取得中に閉じたViewへ遅延登録を戻さない。
 
-`sourceImages.open {id}`はOSの関連付け、`sourceImages.trash {id}`はごみ箱へ移す処理を行う。ページは削除対象を示して確認し、送信前に確認状態を消費する。二重送信・結果不明時の自動再送はしない。成功後、ホストは任意の`.NET IPageFileHandler.HandlePageFileRemovedAsync`またはNodeの`onPageFileRemoved`へ対象を通知する。通知失敗は警告ログとし、成功済みの削除を失敗として再実行させない。
+`sourceImages.open {id}`はOSの関連付け、`sourceImages.trash {id}`はごみ箱へ移す処理を行う。`trash`失敗から直接削除へ自動で切り替えない。
+
+`sourceImages.delete {id}`は`deletion: permanent`として登録したネットワーク画像1ファイルだけを直接削除する。実行直前にも画像の実体・表示寿命・ネットワーク判定を確認し、ローカル画像やディレクトリーをこのAPIで削除しない。ページはWindowsのごみ箱に入らず復元できない可能性があることと対象パスを確認画面に表示し、明示的な確認後にだけ呼ぶ。NAS側に復元機能があるかどうかは保証しない。
+
+ページは送信前に確認状態を消費し、二重送信・結果不明時の自動再送はしない。成功後、ホストは任意の`.NET IPageFileHandler.HandlePageFileRemovedAsync`またはNodeの`onPageFileRemoved`へ対象を通知する。通知失敗は警告ログとし、成功済みの削除を失敗として再実行させない。
 
 ## 表示中だけの画像
 

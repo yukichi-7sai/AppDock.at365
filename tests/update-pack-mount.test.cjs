@@ -4,12 +4,17 @@ const { test } = require('node:test'),
   path = require('node:path');
 const { spawnSync } = require('node:child_process'),
   { createHash } = require('node:crypto');
+const { isUtf8 } = require('node:buffer');
 const root = path.resolve(__dirname, '..'),
   base = path.join(root, '.artifacts');
 const helper = path.join(base, 'updater/AppDock.Updater.exe');
+const decode = (result) => ({
+  ...result,
+  stderr: new TextDecoder(isUtf8(result.stderr) ? 'utf-8' : 'shift_jis').decode(result.stderr),
+});
 const run = (...args) => {
   const result = spawnSync(helper, ['--pack', ...args], { windowsHide: true });
-  return { ...result, stderr: new TextDecoder('shift_jis').decode(result.stderr) };
+  return decode(result);
 };
 test(
   'pack works below the existing mounted development root; linked payloads and ordinary junction ancestors remain rejected',
@@ -69,7 +74,6 @@ test(
       assert.equal(path.dirname(directory), base);
       fs.rmSync(directory, { recursive: true, force: true });
     });
-    const decode = (r) => ({ ...r, stderr: new TextDecoder('shift_jis').decode(r.stderr) });
     const invoke = (...args) => decode(spawnSync(helper, args, { windowsHide: true }));
     const installed = path.join(directory, 'installed');
     fs.mkdirSync(installed);

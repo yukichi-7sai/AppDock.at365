@@ -2657,6 +2657,7 @@
   "services.pageImages.absoluteCachePath": "ページ画像は専用キャッシュ内の絶対パスを指定してください。",
   "services.pageSources.unavailable": "元画像を読み込めません。履歴を更新してください。",
   "services.pageSources.openFailed": "画像を開けませんでした。関連付けを確認してください。",
+  "services.pageSources.deleteFailed": "画像を削除できませんでした。保存先への接続とアクセス権を確認して、履歴を更新してください。",
   "services.pageSources.updateFailed": "画像の削除後にAppletの履歴を更新できませんでした。",
   "services.pageImages.imageFormat": "ページ画像は専用キャッシュ内のPNG・JPEG・WebPを指定してください。",
   "services.pageImages.fileSize": "ページ画像のファイルサイズを確認してください。",

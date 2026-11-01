@@ -362,6 +362,7 @@ export function createHostApi(
                       if (error) throw Error(hostText('services.pageSources.openFailed'));
                     },
                     trash: (file: string) => shell.trashItem(path.resolve(file)),
+                    delete: (file: string) => fs.promises.unlink(file),
                     removed: async (file: string) => {
                       try {
                         if (
@@ -437,6 +438,7 @@ export function createHostApi(
                   'sourceImages.register',
                   'sourceImages.open',
                   'sourceImages.trash',
+                  'sourceImages.delete',
                   'sourceImages.release',
                 ].includes(String(operation))
               ) {
@@ -461,11 +463,17 @@ export function createHostApi(
                 try {
                   return await sources.operate(
                     input.id,
-                    operation === 'sourceImages.open' ? 'open' : 'trash',
+                    operation === 'sourceImages.open'
+                      ? 'open'
+                      : operation === 'sourceImages.delete'
+                        ? 'delete'
+                        : 'trash',
                   );
                 } catch (error) {
                   log('error', id, error instanceof Error ? error.message : String(error));
                   pageUi?.failed?.(id);
+                  if (operation === 'sourceImages.delete')
+                    throw Error(hostText('services.pageSources.deleteFailed'), { cause: error });
                   throw error;
                 }
               }

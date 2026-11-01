@@ -10,6 +10,13 @@ interface Source {
   pointer: string;
   version: number;
   file: string;
+  deletion: 'trash' | 'permanent';
+}
+function networkPath(file: string) {
+  const normalized = path.win32.normalize(file);
+  if (/^\\\\\?\\UNC\\/i.test(normalized)) return true;
+  if (/^\\\\[?.]\\/.test(normalized)) return false;
+  return /^\\\\[^\\]+\\[^\\]+\\/.test(normalized);
 }
 /** A local View may read only image paths published by its own Applet to memory Storage. */
 export class PageSourceImages {
@@ -24,6 +31,7 @@ export class PageSourceImages {
     private effects: {
       open(file: string): Promise<void>;
       trash(file: string): Promise<void>;
+      delete?(file: string): Promise<void>;
       removed(file: string): Promise<void>;
     },
   ) {}
@@ -62,7 +70,7 @@ export class PageSourceImages {
                 ? 'image/webp'
                 : undefined;
       if (!stat.isFile() || !mime || !this.valid()) this.unavailable();
-      return { handle, size: stat.size, mime };
+      return { handle, size: stat.size, mime, actual };
     } catch (error) {
       await handle.close();
       throw error;
@@ -81,18 +89,29 @@ export class PageSourceImages {
       this.unavailable();
     const reference = this.storage.reference(value.key, value.pointer, value.file);
     if (!reference) this.unavailable();
-    const source = { key: value.key, pointer: value.pointer, ...reference };
+    const source: Source = {
+      key: value.key,
+      pointer: value.pointer,
+      ...reference,
+      deletion: 'trash',
+    };
     const epoch = this.epoch;
     const opened = await this.openFile(source);
     await opened.handle.close();
     if (epoch !== this.epoch || !this.valid()) this.unavailable();
+    if (networkPath(source.file) || networkPath(opened.actual)) source.deletion = 'permanent';
     const identity = `${source.key}:${source.version}:${source.pointer}`;
     const id = this.identities.get(identity) ?? randomBytes(24).toString('base64url');
     this.identities.set(identity, id);
     this.references.set(id, source);
-    return { id, url: `appdock://source-images/${id}`, size: opened.size };
+    return {
+      id,
+      url: `appdock://source-images/${id}`,
+      size: opened.size,
+      deletion: source.deletion,
+    };
   }
-  async operate(id: unknown, operation: 'open' | 'trash') {
+  async operate(id: unknown, operation: 'open' | 'trash' | 'delete') {
     if (typeof id !== 'string' || this.busy.has(id)) this.unavailable();
     const source = this.references.get(id);
     if (!source) this.unavailable();
@@ -103,8 +122,16 @@ export class PageSourceImages {
       await opened.handle.close();
       if (epoch !== this.epoch || this.references.get(id) !== source || !this.valid())
         this.unavailable();
-      await this.effects[operation](source.file);
-      if (operation === 'trash') {
+      if (
+        operation === 'delete' &&
+        (source.deletion !== 'permanent' ||
+          !(networkPath(source.file) || networkPath(opened.actual)))
+      )
+        this.unavailable();
+      const effect = this.effects[operation];
+      if (!effect) this.unavailable();
+      await effect(source.file);
+      if (operation !== 'open') {
         for (const [reference, other] of this.references)
           if (other.file.toLowerCase() === source.file.toLowerCase()) this.release([reference]);
         // Deletion has completed. A failed publisher update must never invite retrying it.

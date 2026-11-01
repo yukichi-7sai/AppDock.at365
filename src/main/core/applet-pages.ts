@@ -202,6 +202,7 @@ export interface SurfaceOptions {
     active(): boolean;
     open(file: string): Promise<void>;
     trash(file: string): Promise<void>;
+    delete?(file: string): Promise<void>;
     removed(file: string): Promise<void>;
   };
 }
