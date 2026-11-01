@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { ImageLibraryLayout } from '../../shared/image-library-page';
 import { Icon } from '../../shared/ui-icons';
-import { useHostTranslation } from '../HostTranslation';
+import { useLibraryTranslation } from './LibraryMedia';
 
 export interface ImageBrowserGroup {
   id: string;
@@ -40,7 +40,7 @@ export function ImageBrowserNavigation({
   folderAction?(folder: string): ReactNode;
   groupAction?(group: ImageBrowserGroup): ReactNode;
 }) {
-  const { t } = useHostTranslation();
+  const { t } = useLibraryTranslation();
   const toggle = (kind: 'collapsedFolders' | 'collapsedGroups', key: string) =>
     onLayout({
       ...layout,

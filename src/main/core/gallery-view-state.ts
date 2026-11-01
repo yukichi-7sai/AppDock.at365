@@ -1,4 +1,5 @@
-import { hostText } from '../../shared/i18n';
+import { libraryText } from '../../shared/library-text';
+import type { LibraryMedia } from '../../shared/library-assets';
 import { stateStorage, type StateStorage } from './state-storage';
 import { gallerySize, libraryGallerySize, validGalleryWidth } from '../../shared/image-gallery';
 import {
@@ -14,7 +15,11 @@ export class GalleryViewStateStore {
   private blocked = false;
   private storage: StateStorage;
   error = '';
-  constructor(storage: StateStorage | string) {
+  private text = (key: string) => libraryText(this.media, key);
+  constructor(
+    storage: StateStorage | string,
+    private media: LibraryMedia = 'image',
+  ) {
     this.storage = stateStorage(storage);
     try {
       const value: any = this.storage.read();
@@ -24,19 +29,19 @@ export class GalleryViewStateStore {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
         this.blocked = true;
-        this.error = hostText('services.galleryViewState.readFailed');
+        this.error = this.text('services.galleryViewState.readFailed');
       }
     }
   }
   get(surface: 'library' | 'picker') {
-    return this.state[surface]?.cardWidth ?? gallerySize.initial;
+    return this.state[surface]?.cardWidth ?? (this.media === 'sound' ? 160 : gallerySize.initial);
   }
   save(surface: 'library' | 'picker', cardWidth: number) {
     if (
       !['library', 'picker'].includes(surface) ||
       !validGalleryWidth(cardWidth, libraryGallerySize)
     )
-      throw Error(hostText('services.galleryViewState.invalidSize'));
+      throw Error(this.text('services.galleryViewState.invalidSize'));
     if (this.blocked) throw Error(this.error);
     const next: State = { ...this.state, [surface]: { ...this.state[surface], cardWidth } };
     this.write(next);
@@ -46,7 +51,7 @@ export class GalleryViewStateStore {
   }
   saveLayout(layout: ImageLibraryLayout, surface: 'library' | 'picker' = 'library') {
     if (!['library', 'picker'].includes(surface) || !validImageLibraryLayout(layout))
-      throw Error(hostText('services.galleryViewState.invalidSize'));
+      throw Error(this.text('services.galleryViewState.invalidSize'));
     if (this.blocked) throw Error(this.error);
     this.write({
       ...this.state,
@@ -57,7 +62,7 @@ export class GalleryViewStateStore {
     try {
       this.storage.write(next);
     } catch {
-      throw Error(hostText('services.galleryViewState.saveFailed'));
+      throw Error(this.text('services.galleryViewState.saveFailed'));
     }
     this.state = next;
   }

@@ -1,3 +1,5 @@
+import { libraryText } from '../../shared/library-text';
+import type { LibrarySoundPreview } from './library-sound-preview';
 import { filterImageBrowser } from '../../shared/image-browser';
 import { hostText } from '../../shared/i18n';
 import {
@@ -84,8 +86,14 @@ export class ImageLibraryPageState {
   }
 }
 export class ImageLibraryPageSession implements HostPageController {
-  readonly kind = 'image-library';
-  readonly route = 'image-library';
+  get kind(): 'image-library' | 'sound-library' {
+    return this.options.host.media === 'sound' ? 'sound-library' : 'image-library';
+  }
+  get route() {
+    return this.kind;
+  }
+  private text = (key: string, values?: Record<string, string | number>) =>
+    libraryText(this.options.host.media, key, values);
   readonly id: string;
   private closed = false;
   private imageSession: ReturnType<GalleryImages['session']>;
@@ -106,7 +114,8 @@ export class ImageLibraryPageSession implements HostPageController {
     request: ImageLibraryPageRequest,
     private options: {
       host: ImageLibraryHost;
-      images: GalleryImages;
+      images: Pick<GalleryImages, 'session'>;
+      preview?: LibrarySoundPreview;
       state: ImageLibraryPageState;
       groups(): import('../../shared/registered-images').ImageGroup[];
       dialogs: ImageLibraryDialogs;
@@ -207,15 +216,17 @@ export class ImageLibraryPageSession implements HostPageController {
         membership.set(key, [...(membership.get(key) ?? []), g.name]);
       }
     const content: ImageLibraryPageModel['content'] = {
-      iconSets: iconSets.map(({ id, name }) => ({ id, name })),
+      playback: this.options.preview?.snapshot(),
+      iconSets:
+        this.options.host.media === 'image' ? iconSets.map(({ id, name }) => ({ id, name })) : [],
       importing: s.importing,
       folders: this.options.host.images.folders,
       folder: s.folder,
       groups: [
-        { id: 'all', title: hostText('services.imageLibraryPage.all'), count: this.items.size },
+        { id: 'all', title: this.text('services.imageLibraryPage.all'), count: this.items.size },
         {
           id: 'unfiled',
-          title: hostText('services.imageLibraryPage.ungrouped'),
+          title: this.text('services.imageLibraryPage.ungrouped'),
           count: [...this.items.keys()].filter((k) => !membership.has(k)).length,
         },
         ...groups.map((g) => ({
@@ -230,9 +241,14 @@ export class ImageLibraryPageSession implements HostPageController {
         id,
         assetId,
         title: e.ref.file,
-        detail: e.width
-          ? `${e.width} × ${e.height} · ${e.ref.file.split('.').at(-1)!.toUpperCase()}`
-          : hostText('services.imageLibraryPage.dimensionsUnavailable'),
+        detail:
+          this.options.host.media === 'sound'
+            ? e.durationMs === undefined
+              ? 'WAV'
+              : `${Math.floor(Math.round(e.durationMs / 1000) / 60)}:${String(Math.round(e.durationMs / 1000) % 60).padStart(2, '0')} · WAV`
+            : e.width
+              ? `${e.width} × ${e.height} · ${e.ref.file.split('.').at(-1)!.toUpperCase()}`
+              : this.text('services.imageLibraryPage.dimensionsUnavailable'),
         labels: membership.get(key) ?? [],
         state: e.available ? 'ready' : (e.state ?? 'missing'),
         selected: s.selected.has(key),
@@ -245,7 +261,7 @@ export class ImageLibraryPageSession implements HostPageController {
       cardWidth: s.width,
       layout: s.layout,
       sizeError: s.sizeError,
-      error: s.error || this.options.host.images.error || '',
+      error: s.error || this.options.preview?.error || this.options.host.images.error || '',
       message: s.message,
       messageRevision: s.messageRevision,
       busy: s.busy,
@@ -279,6 +295,15 @@ export class ImageLibraryPageSession implements HostPageController {
     if (this.closed || !action || action.id !== this.id || action.type !== 'gallery')
       throw Error('Stale gallery action');
     const s = this.options.state;
+    if (action.command === 'stop-playback') {
+      this.options.preview?.stop(this.id);
+      return;
+    }
+    if (
+      this.options.host.media === 'sound' &&
+      ['import-set', 'retry-import', 'cancel-import'].includes(action.command)
+    )
+      throw Error('Unsupported library action');
     this.catalogue();
     if (
       ![
@@ -296,19 +321,19 @@ export class ImageLibraryPageSession implements HostPageController {
       this.drag = undefined;
     const resolveImage = (id: string) => {
       const result = [...this.items].find(([, value]) => value.id === id);
-      if (!result) throw Error(hostText('services.imageLibraryPage.imageChanged'));
+      if (!result) throw Error(this.text('services.imageLibraryPage.imageChanged'));
       return result;
     };
     const resolveGroup = (id: string) => {
       const group = [...this.groups].find(([, token]) => token === id)?.[0];
-      if (!group) throw Error(hostText('services.imageLibraryPage.groupChanged'));
+      if (!group) throw Error(this.text('services.imageLibraryPage.groupChanged'));
       return group;
     };
     const targets = (imageId?: string) => {
       if (imageId) {
         const [key] = resolveImage(imageId);
         if (!this.filtered().some(([id]) => id === key))
-          throw Error(hostText('services.imageLibraryPage.imageChanged'));
+          throw Error(this.text('services.imageLibraryPage.imageChanged'));
         if (!s.selected.has(key)) s.selected = new Set([key]);
       }
       return this.filtered()
@@ -318,7 +343,7 @@ export class ImageLibraryPageSession implements HostPageController {
     if (action.command === 'image') {
       const value = [...this.items.values()].find((v) => v.assetId === action.assetId);
       if (!value?.entry.available || !value.entry.generation)
-        throw Error(hostText('services.imageLibraryPage.missing'));
+        throw Error(this.text('services.imageLibraryPage.missing'));
       const result = await this.imageSession.get(
         value.entry.ref,
         value.entry.generation,
@@ -350,7 +375,7 @@ export class ImageLibraryPageSession implements HostPageController {
           s.sizeError = '';
         } catch (e) {
           s.sizeError = (e as Error).message;
-          this.options.failed(hostText('services.imageLibraryPage.sizeSaveFailed'));
+          this.options.failed(this.text('services.imageLibraryPage.sizeSaveFailed'));
         }
       }
     } else if (action.command === 'layout') {
@@ -361,13 +386,13 @@ export class ImageLibraryPageSession implements HostPageController {
         s.sizeError = '';
       } catch (e) {
         s.sizeError = (e as Error).message;
-        this.options.failed(hostText('services.imageLibraryPage.sizeSaveFailed'));
+        this.options.failed(this.text('services.imageLibraryPage.sizeSaveFailed'));
       }
     } else if (action.command === 'select-target') {
-      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      if (s.busy) throw Error(this.text('services.imageLibraryPage.busy'));
       targets(action.imageId);
     } else if (action.command === 'file-action' || action.command === 'open-folder') {
-      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      if (s.busy) throw Error(this.text('services.imageLibraryPage.busy'));
       const entries = action.command === 'file-action' ? targets(action.imageId) : [];
       s.busy = true;
       s.error = '';
@@ -377,7 +402,7 @@ export class ImageLibraryPageSession implements HostPageController {
           await this.options.host.openFolder(action.folder ?? (s.folder === '*' ? '' : s.folder));
         else {
           await this.options.host.fileAction(action.operation, entries);
-          s.message = hostText(
+          s.message = this.text(
             action.operation === 'reveal' ? 'images.revealed' : 'images.copied',
             { count: entries.length },
           );
@@ -391,11 +416,11 @@ export class ImageLibraryPageSession implements HostPageController {
     } else if (action.command === 'cancel-import') {
       s.importAbort?.abort();
     } else if (action.command === 'retry-import' || action.command === 'import-set') {
-      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      if (s.busy) throw Error(this.text('services.imageLibraryPage.busy'));
       const setId = action.command === 'import-set' ? action.setId : s.retryIconSet;
       const retry = action.command === 'retry-import' ? s.retryIcons : undefined;
-      if (!setId) throw Error(hostText('services.imageLibraryPage.noRetry'));
-      if (!iconSets.some((set) => set.id === setId)) throw Error(hostText('images.setUnknown'));
+      if (!setId) throw Error(this.text('services.imageLibraryPage.noRetry'));
+      if (!iconSets.some((set) => set.id === setId)) throw Error(this.text('images.setUnknown'));
       s.busy = true;
       s.error = '';
       s.message = '';
@@ -425,7 +450,7 @@ export class ImageLibraryPageSession implements HostPageController {
         s.query = '';
         s.selected.clear();
         s.resetView();
-        s.message = hostText('images.importDone', {
+        s.message = this.text('images.importDone', {
           added: String(result.added),
           reused: String(result.reused),
           failed: String(result.failed),
@@ -437,9 +462,9 @@ export class ImageLibraryPageSession implements HostPageController {
         }
       } catch (error) {
         if (s.importAbort.signal.aborted && error instanceof Error && error.name === 'AbortError')
-          s.message = hostText('images.importCancelled');
+          s.message = this.text('images.importCancelled');
         else {
-          s.error = error instanceof Error ? error.message : hostText('images.downloadFailed');
+          s.error = error instanceof Error ? error.message : this.text('images.downloadFailed');
           s.retryIconSet = setId;
           s.retryIcons = retryIcons;
           this.options.failed(s.error);
@@ -456,12 +481,12 @@ export class ImageLibraryPageSession implements HostPageController {
         action.folder !== '*' &&
         (!imageFolder(action.folder) || !this.options.host.images.folders.includes(action.folder))
       )
-        throw Error(hostText('images.folderInvalid'));
+        throw Error(this.text('images.folderInvalid'));
       s.folder = action.folder;
       s.selected.clear();
       s.resetView();
     } else if (action.command === 'folder-action') {
-      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      if (s.busy) throw Error(this.text('services.imageLibraryPage.busy'));
       const images = [...s.selected].map((key) => this.items.get(key)!.entry.ref);
       s.busy = true;
       s.error = '';
@@ -487,7 +512,7 @@ export class ImageLibraryPageSession implements HostPageController {
       }
     } else if (action.command === 'query') {
       if (typeof action.value !== 'string' || action.value.length > 260)
-        throw Error(hostText('services.imageLibraryPage.searchLimit'));
+        throw Error(this.text('services.imageLibraryPage.searchLimit'));
       s.query = action.value;
       s.selected.clear();
       s.resetView();
@@ -503,12 +528,12 @@ export class ImageLibraryPageSession implements HostPageController {
       s.error = '';
       for (const item of this.items.values()) item.assetId = randomUUID();
     } else {
-      if (s.busy) throw Error(hostText('services.imageLibraryPage.busy'));
+      if (s.busy) throw Error(this.text('services.imageLibraryPage.busy'));
       if (action.command === 'select') {
         if (typeof action.selected !== 'boolean') throw Error('Invalid selection');
         const [key] = resolveImage(action.imageId);
         if (!this.filtered().some(([k]) => k === key))
-          throw Error(hostText('services.imageLibraryPage.notDisplayed'));
+          throw Error(this.text('services.imageLibraryPage.notDisplayed'));
         if (action.selected) s.selected.add(key);
         else s.selected.delete(key);
       } else if (action.command === 'select-range') {
@@ -521,7 +546,7 @@ export class ImageLibraryPageSession implements HostPageController {
         );
         const keys = action.imageIds.map((id) => {
           const key = displayed.get(id);
-          if (!key) throw Error(hostText('services.imageLibraryPage.notDisplayed'));
+          if (!key) throw Error(this.text('services.imageLibraryPage.notDisplayed'));
           return key;
         });
         s.selected = new Set([...(action.additive ? s.selected : []), ...keys]);
@@ -533,7 +558,7 @@ export class ImageLibraryPageSession implements HostPageController {
             .slice(0, s.count)
             .some(([k]) => k === key)
         )
-          throw Error(hostText('services.imageLibraryPage.notDisplayed'));
+          throw Error(this.text('services.imageLibraryPage.notDisplayed'));
         const keys = s.selected.has(key)
           ? this.filtered()
               .filter(([k]) => s.selected.has(k))
@@ -563,7 +588,7 @@ export class ImageLibraryPageSession implements HostPageController {
           !imageFolder(action.folder) ||
           !this.options.host.images.folders.includes(action.folder)
         )
-          throw Error(hostText('images.folderInvalid'));
+          throw Error(this.text('images.folderInvalid'));
         const selected = [...s.selected];
         const view = s.viewRevision;
         s.busy = true;
@@ -582,9 +607,9 @@ export class ImageLibraryPageSession implements HostPageController {
             );
             s.selected = new Set(selected.map((key) => mapping.get(key) ?? key));
             this.catalogue();
-            s.message = hostText('images.movedToFolder', {
+            s.message = this.text('images.movedToFolder', {
               count: moved.length,
-              folder: action.folder || hostText('images.rootFolder'),
+              folder: action.folder || this.text('images.rootFolder'),
             });
           }
         } catch (e) {
@@ -602,7 +627,7 @@ export class ImageLibraryPageSession implements HostPageController {
         if (!drag || drag.token !== action.token) throw Error('Stale gallery drag');
         const groupId = resolveGroup(action.groupId);
         if (drag.images.some(({ image }) => !this.items.has(imageKey(image))))
-          throw Error(hostText('services.imageLibraryPage.imageChanged'));
+          throw Error(this.text('services.imageLibraryPage.imageChanged'));
         const added = drag.images.filter((image) => !image.before.includes(groupId)).length;
         try {
           await this.options.host.edit({
@@ -613,11 +638,13 @@ export class ImageLibraryPageSession implements HostPageController {
           });
           s.error = '';
           if (s.feedbackRevision === feedbackRevision)
-            s.message = hostText('services.imageLibraryPage.dropSummary', { added: String(added) });
+            s.message = this.text('services.imageLibraryPage.dropSummary', {
+              added: String(added),
+            });
         } catch (e) {
           s.error =
-            e instanceof Error ? e.message : hostText('services.imageLibraryPage.groupSaveFailed');
-          this.options.failed(hostText('services.imageLibraryPage.groupSaveFailed'));
+            e instanceof Error ? e.message : this.text('services.imageLibraryPage.groupSaveFailed');
+          this.options.failed(this.text('services.imageLibraryPage.groupSaveFailed'));
           this.options.changed();
           throw e;
         }
@@ -628,20 +655,20 @@ export class ImageLibraryPageSession implements HostPageController {
         if (!drag || drag.token !== action.token) throw Error('Stale gallery drag');
         const before = drag.group;
         if (!before || s.group !== `group:${before.id}` || typeof action.after !== 'boolean')
-          throw Error(hostText('services.imageLibraryPage.selectGroup'));
+          throw Error(this.text('services.imageLibraryPage.selectGroup'));
         const [target] = resolveImage(action.imageId);
         if (
           !this.filtered()
             .slice(0, s.count)
             .some(([key]) => key === target)
         )
-          throw Error(hostText('services.imageLibraryPage.notDisplayed'));
+          throw Error(this.text('services.imageLibraryPage.notDisplayed'));
         const moved = new Set(drag.images.map(({ image }) => imageKey(image)));
         if (moved.has(target)) return;
         const remaining = before.images.filter((image) => !moved.has(imageKey(image)));
         const index = remaining.findIndex((image) => imageKey(image) === target);
         if (index < 0 || drag.images.some(({ image }) => !this.items.has(imageKey(image))))
-          throw Error(hostText('services.imageLibraryPage.imageChanged'));
+          throw Error(this.text('services.imageLibraryPage.imageChanged'));
         const insertion = index + Number(action.after);
         const images = [
           ...remaining.slice(0, insertion),
@@ -655,20 +682,20 @@ export class ImageLibraryPageSession implements HostPageController {
         });
         s.error = '';
         if (s.feedbackRevision === feedbackRevision)
-          s.message = hostText('services.imageLibraryPage.orderSaved');
+          s.message = this.text('services.imageLibraryPage.orderSaved');
       } else if (action.command === 'select-all')
         s.selected = new Set(this.filtered().map(([key]) => key));
       else if (action.command === 'clear') s.selected.clear();
       else if (action.command === 'add') await this.import();
       else if (action.command === 'retry-membership') {
-        if (!s.retry) throw Error(hostText('services.imageLibraryPage.noRetry'));
+        if (!s.retry) throw Error(this.text('services.imageLibraryPage.noRetry'));
         try {
           await this.options.host.edit(s.retry);
           s.retry = undefined;
           s.error = '';
         } catch (e) {
           s.error = (e as Error).message;
-          this.options.failed(hostText('services.imageLibraryPage.groupSaveFailed'));
+          this.options.failed(this.text('services.imageLibraryPage.groupSaveFailed'));
         }
       } else if (action.command === 'dialog') {
         if (
@@ -695,7 +722,7 @@ export class ImageLibraryPageSession implements HostPageController {
         const groupId = action.groupId ? resolveGroup(action.groupId) : undefined;
         const item = action.imageId ? resolveImage(action.imageId)[1] : undefined;
         if (['rename', 'delete', 'order-images'].includes(action.kind) && !groupId)
-          throw Error(hostText('services.imageLibraryPage.selectGroup'));
+          throw Error(this.text('services.imageLibraryPage.selectGroup'));
         const entries = targets(action.imageId);
         const images = entries.map((entry) => entry.ref);
         if (
@@ -709,26 +736,38 @@ export class ImageLibraryPageSession implements HostPageController {
           ].includes(action.kind) &&
           !images.length
         )
-          throw Error(hostText('services.imageLibraryPage.selectImage'));
+          throw Error(this.text('services.imageLibraryPage.selectImage'));
         if (
           ['delete-image', 'rename-images'].includes(action.kind) &&
           entries.some((entry) => !entry.available)
         )
-          throw Error(hostText('services.imageLibraryPage.unreadable'));
+          throw Error(this.text('services.imageLibraryPage.unreadable'));
         if (action.kind === 'folder-move' && !images.length)
-          throw Error(hostText('services.imageLibraryPage.selectImage'));
+          throw Error(this.text('services.imageLibraryPage.selectImage'));
         const folder = action.folder ?? (s.folder === '*' ? '' : s.folder);
         if (!imageFolder(folder) || !(this.options.host.images.folders ?? ['']).includes(folder))
-          throw Error(hostText('images.folderInvalid'));
+          throw Error(this.text('images.folderInvalid'));
         if (['folder-rename', 'folder-delete'].includes(action.kind) && !folder)
-          throw Error(hostText('images.folderInvalid'));
+          throw Error(this.text('images.folderInvalid'));
+        if (this.options.preview && action.kind === 'preview') {
+          const target = item?.entry ?? (entries.length === 1 ? entries[0] : undefined);
+          if (!target) throw Error(this.text('sounds.selectOne'));
+          await this.options.preview.play(target.ref, this.id);
+          return;
+        }
+        if (this.options.host.media === 'sound' && action.kind === 'import-set')
+          throw Error('Unsupported library action');
         const operation = await this.options.dialogs.open({
+          media: this.options.host.media,
           kind: action.kind === 'membership' && images.length > 1 ? 'batch-add' : action.kind,
           groups: this.options.groups(),
           images,
           folder,
           folders: this.options.host.images.folders,
-          iconSets: iconSets.map(({ id, name }) => ({ id, name })),
+          iconSets:
+            this.options.host.media === 'image'
+              ? iconSets.map(({ id, name }) => ({ id, name }))
+              : [],
           groupId:
             groupId ??
             (action.kind === 'batch-remove' && s.group.startsWith('group:')
@@ -782,7 +821,7 @@ export class ImageLibraryPageSession implements HostPageController {
       const results = await this.options.host.registerMany(s.folder === '*' ? '' : s.folder);
       const successes = results.flatMap((r) => (r.image ? [r.image] : []));
       if (!results.length || s.closed) return;
-      s.message = hostText('services.imageLibraryPage.importSummary', {
+      s.message = this.text('services.imageLibraryPage.importSummary', {
         added: String(results.filter((r) => r.image && !r.reused).length),
         reused: String(results.filter((r) => r.image && r.reused).length),
         failed: String(results.filter((r) => r.error).length),
@@ -810,8 +849,8 @@ export class ImageLibraryPageSession implements HostPageController {
           await this.options.host.edit(operation);
         } catch {
           s.retry = operation;
-          s.error = hostText('services.imageLibraryPage.groupAddError', { error: s.error });
-          this.options.failed(hostText('services.imageLibraryPage.groupAddFailure'));
+          s.error = this.text('services.imageLibraryPage.groupAddError', { error: s.error });
+          this.options.failed(this.text('services.imageLibraryPage.groupAddFailure'));
         }
       }
       if (successes.length) {
@@ -829,8 +868,8 @@ export class ImageLibraryPageSession implements HostPageController {
         s.viewRevision++;
       }
     } catch (e) {
-      s.error = e instanceof Error ? e.message : hostText('services.imageLibraryPage.addFailed');
-      this.options.failed(hostText('services.imageLibraryPage.addFailedHint'));
+      s.error = e instanceof Error ? e.message : this.text('services.imageLibraryPage.addFailed');
+      this.options.failed(this.text('services.imageLibraryPage.addFailedHint'));
     } finally {
       s.busy = false;
       this.options.changed();
@@ -840,6 +879,7 @@ export class ImageLibraryPageSession implements HostPageController {
     this.closed = true;
     this.drag = undefined;
     this.imageSession.dispose();
+    this.options.preview?.stop(this.id);
     this.items.clear();
     this.options.dialogs.cancel();
   }

@@ -1,6 +1,6 @@
 # 本体のページ表示
 
-画像ライブラリー・通知センター・ログはAppDock本体rendererで描画する。ページのShell提供・割り当て・別WebContentsView・ready待ち・故障時の差し替えは設けない。設定は[設定基盤](settings-foundation.md)、通常Appletのページは[Appletページ](applet-pages.md)を参照する。
+画像/音ライブラリー・通知センター・ログはAppDock本体rendererで描画する。ページのShell提供・割り当て・別WebContentsView・ready待ち・故障時の差し替えは設けない。設定は[設定基盤](settings-foundation.md)、通常Appletのページは[Appletページ](applet-pages.md)を参照する。
 
 ## 起動と戻り先
 
@@ -26,13 +26,13 @@ Appletページの復元中は本体を先に表示し、待機表示を出す�
 
 本体の起動区間・処理回数・データ量は「AppDockについて」で確認できる。起点・表示イベント・初期化完了・比較時の範囲は[本体の起動計測](host-startup-timing.md)を参照する。
 
-| 部分 | 責務 |
-| --- | --- |
-| HostPages | 本体ページの現在の接続・route・要求ID・操作受付・破棄 |
-| HostPageSlot | 本体document内のページ描画、初回モデルと変更購読、古いrevisionの破棄 |
-| LogPageSession / HostLog | 対象・検索・レベル・表示モデル、ログの記録と保存 |
-| ImageLibraryPageSession / ImageLibraryPageState | 検索・グループ・選択・閲覧位置・登録ジョブと操作の検証 |
-| NotificationCenterController / NotificationService | アクティブ通知と安全な履歴、検索・ページング・実行の検証 |
+| 部分                                               | 責務                                                                 |
+| -------------------------------------------------- | -------------------------------------------------------------------- |
+| HostPages                                          | 本体ページの現在の接続・route・要求ID・操作受付・破棄                |
+| HostPageSlot                                       | 本体document内のページ描画、初回モデルと変更購読、古いrevisionの破棄 |
+| LogPageSession / HostLog                           | 対象・検索・レベル・表示モデル、ログの記録と保存                     |
+| ImageLibraryPageSession / ImageLibraryPageState    | 検索・グループ・選択・閲覧位置・登録ジョブと操作の検証               |
+| NotificationCenterController / NotificationService | アクティブ通知と安全な履歴、検索・ページング・実行の検証             |
 
 描画はsrc/renderer/pagesのLogPage、ImageLibraryPage、NotificationCenterPageに置く。カード・画像ギャラリー・入力・ダイアログは共通部品を利用し、部品の再利用だけを理由にShell領域を作らない。配色は共通preload、キーボードとTab順は本体documentの経路を使う。
 
@@ -48,6 +48,7 @@ src/shared/host-pages.tsが本体専用の要求・モデル・操作型を定�
 
 - ログは起動後の直近500件、source・種類・レベル・文字検索、保存先を開く操作を持つ。初期表示・debugと監査の分類・記録と表示の関係は[ログ仕様](logging.md)を正本とする。Applet管理からは全体ログへsourceを指定して移動し、解除して全体へ戻れる。source更新時も他の検索条件を保つ。
 - 画像ライブラリーは[共通ギャラリー](image-gallery.md)を使い、検索・選択・カード幅・閲覧位置を保つ。原画像・グループ・利用先参照の保存契約は[登録画像](registered-images.md)を参照する。
+- 音ライブラリーは画像と共通の管理UIを使い、WAVの試聴と通知音選択へ接続する。分類・保管コピー・画面別表示状態は[素材ライブラリー](asset-libraries.md)を参照する。
 - 通知センターは[通知基盤](notifications.md)のアクティブ表示・起動中だけの安全な履歴・検索・操作を使う。通知バナーとデスクトップ通知のShellは独立して継続する。
 
 ページの外側はスクロールせず、ログは表、画像はギャラリー、通知は一覧をスクロールさせる。狭幅や低い高さでも操作へ到達できるようにする。見出し・検索・カード等のスタイルは各ページ内へ限定し、設定や他ページのCSSを上書きしない。

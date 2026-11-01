@@ -38,7 +38,15 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
   const settings = createDefaultSettings();
   delete settings.ribbon;
   assert.deepEqual(parseSettings(settings).ribbon, {
-    order: ['ribbon-display-mode', 'settings', 'image-library', 'notifications', 'logs', 'theme'],
+    order: [
+      'ribbon-display-mode',
+      'settings',
+      'image-library',
+      'sound-library',
+      'notifications',
+      'logs',
+      'theme',
+    ],
     hidden: [],
     bottom: ['theme', 'logs', 'notifications'],
     separators: [],

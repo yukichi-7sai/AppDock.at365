@@ -26,6 +26,7 @@ import {
 } from './command-trigger-options';
 import type { Settings } from './contracts';
 import { parseImageLibrary } from './registered-images';
+import { parseSoundLibrary } from './sound-library';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
 import { fillSettingDefaults } from './settings-defaults';
@@ -100,6 +101,7 @@ export function parseSettings(value: unknown): Settings {
         : { notificationPreferences: { overrides: [] } }),
       ...(raw.mcpServers === undefined ? {} : { mcpServers: { version: 1, items: [] } }),
       ...(raw.imageLibrary === undefined ? {} : { imageLibrary: { groups: [] } }),
+      ...(raw.soundLibrary === undefined ? {} : { soundLibrary: { groups: [] } }),
     });
   }
   if (
@@ -306,6 +308,9 @@ export function parseSettings(value: unknown): Settings {
     ...(Object.hasOwn(value, 'profile') ? { profile: structuredClone(value.profile) } : {}),
     ...(value.imageLibrary !== undefined
       ? { imageLibrary: parseImageLibrary(value.imageLibrary) }
+      : {}),
+    ...(value.soundLibrary !== undefined
+      ? { soundLibrary: parseSoundLibrary(value.soundLibrary) }
       : {}),
   };
   const parsed = structuredClone(next) as unknown as Settings;

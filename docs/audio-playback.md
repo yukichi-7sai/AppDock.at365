@@ -20,7 +20,8 @@ OFFでは再生中を中断してプレイヤーを回収し、共通キュー�
 - 入力は検証済みWAVの`bytes`、任意の`signal`、`speed`、開始直前の`beforePlay`、必須の`playbackTimeoutMs`。秘密・接続先・本文を渡さない。呼出元はファイルの権限・サイズ・形式と所有者寿命を検証する。
 - `AudioPlaybackQueue`は順番、待機の取消、容量、待ち時間、終了を管理する。`audio-player.ts`だけがsandbox/contextIsolation付きの一時プレイヤーを作る。前のプレイヤーの回収が終わるまで次を開始しない。
 - Applet通知音は`NotificationSounds`でロック・サスペンド中の受付を最大32件保留し、解除後に共通音声キューへ渡す。ファイル読取・再生開始前の再ロックも保留し、開始済みの通知音は停止して再生し直さない。発行元が停止した待機音は捨てる。詳細は[ロック中の保留](notifications.md#ロック中の保留)を参照する。
-- Node Appletは既存の`context.audio.play(file)`を入口とする。自身の登録素材ファイル名、または既存契約のローカルWAV絶対パスを受け付け、受付後すぐ戻る。音声バイトをApplet RPCへ返さない。`audio` capabilityを維持する。
+- Node Appletは既存の`context.audio.play(file)`を入口とする。自身の登録素材ファイル名、Webアカウントの`@library/@assigned/<SHA256>.wav`、または既存契約のローカルWAV絶対パスを受け付け、受付後すぐ戻る。音声バイトをApplet RPCへ返さない。`audio` capabilityを維持する。
+- [音ライブラリー](asset-libraries.md)の試聴も同じキューを使う。手動試聴は一つだけで、次の試聴・停止・表示元の終了で自分の要求を取り消す。通知音/TTSは取り消さない。WAVの長さに合わせた終了待ちを設け、OFFは再生開始扱いにしない。
 - TTSは既存の`tts.speak/jobs.get/stop`と`useTts`許可を維持し、内部再生だけを共通化する。汎用音声のためにTTS接続や権限を要求しない。MCPへの任意ファイル再生の公開は範囲外。
 
 ## 制限と取消

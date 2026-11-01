@@ -63,6 +63,7 @@ export interface Settings {
   /** Opaque legacy data retained on save; never used for host presentation. */
   profile?: unknown;
   imageLibrary?: import('./registered-images').ImageLibrary;
+  soundLibrary?: import('./sound-library').SoundLibrary;
 }
 export interface SettingsSnapshot<T = Settings> {
   value: T;
@@ -304,6 +305,7 @@ export interface GlobalHotKeyStatus {
 export interface DockApi {
   onOverlayState(callback: (state: HostSnapshot['overlay']) => void): () => void;
   imageLibrary: import('./registered-images').ImageLibraryApi;
+  soundLibrary: import('./registered-images').ImageLibraryApi;
   imageLibraryDialog: import('./image-library-page').ImageLibraryDialogApi;
   settingsPage: import('./settings-page').SettingsPageApi;
   settingsEditing(): Promise<import('./settings-editing').SettingsInputState>;

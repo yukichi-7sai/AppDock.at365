@@ -1,3 +1,4 @@
+import { soundLibraryReference } from '../../shared/library-assets';
 import { hostText } from '../../shared/i18n';
 import os from 'node:os';
 import { appletStorageFile } from './applet-storage';
@@ -64,6 +65,7 @@ export function createHostApi(
   imageLibrary?: import('./image-library-host').ImageLibraryHost,
   storageMachine = os.hostname(),
   assistance?: import('./file-watch-assistance').FileWatchAssistance,
+  soundLibrary?: import('./sound-library-service').SoundLibraryAccess,
 ) {
   const api = async (
     e: ExtensionInstance,
@@ -578,6 +580,7 @@ export function createHostApi(
             windowState: settings.uiStateStorage('windows', `web-accounts:${id}`),
             capabilities: e.manifest.capabilities ?? [],
             soundsDirectory: path.join(assetRoot, id, 'sounds'),
+            soundLibrary,
             page: e.manifest.pages?.find((page) => page.source === 'web-accounts'),
             settings: () =>
               Object.fromEntries(
@@ -647,6 +650,16 @@ export function createHostApi(
         requireCapability('file-dialog');
         if (p.kind !== 'json' && p.kind !== 'wav')
           throw new Error(hostText('services.hostApi.fileType'));
+        if (p.kind === 'wav' && soundLibrary) {
+          const child = e.child,
+            session = e.runtimeSession;
+          return soundLibrary.pickFile(
+            () =>
+              e.child === child &&
+              e.runtimeSession === session &&
+              ['starting', 'running'].includes(e.state),
+          );
+        }
         const result = await dialog.showOpenDialog({
           title:
             p.kind === 'json'
@@ -662,9 +675,11 @@ export function createHostApi(
         if (typeof p.file !== 'string') throw new Error(hostText('services.hostApi.audioFile'));
         const child = e.child;
         queueSound(
-          p.file && !path.isAbsolute(p.file)
-            ? await new RegisteredSounds(path.join(assetRoot, id, 'sounds')).resolve(p.file)
-            : p.file,
+          soundLibraryReference(p.file) && soundLibrary
+            ? await soundLibrary.resolve(p.file)
+            : p.file && !path.isAbsolute(p.file)
+              ? await new RegisteredSounds(path.join(assetRoot, id, 'sounds')).resolve(p.file)
+              : p.file,
           () => e.child === child && ['starting', 'running'].includes(e.state),
           () => log('error', id, hostText('services.hostApi.soundPlaybackFailed')),
           e.soundLifetime?.signal,

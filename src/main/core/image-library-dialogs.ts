@@ -20,7 +20,7 @@ export class ImageLibraryDialogs {
         operation: ImageLibraryDialogOperation,
         request: ImageLibraryDialogRequest,
       ): Promise<void>;
-      failed(): void;
+      failed(request: ImageLibraryDialogRequest): void;
     },
   ) {}
   current() {
@@ -83,7 +83,7 @@ export class ImageLibraryDialogs {
         await this.options.edit(operation, pending.request);
       } catch (e) {
         pending.busy = false;
-        this.options.failed();
+        this.options.failed(pending.request);
         throw e;
       }
     }

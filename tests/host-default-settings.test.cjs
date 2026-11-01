@@ -31,6 +31,7 @@ test('fresh host defaults match the supplied behavior without installation histo
     'ribbon-display-mode',
     'settings',
     'image-library',
+    'sound-library',
     'notifications',
     'logs',
     'theme',

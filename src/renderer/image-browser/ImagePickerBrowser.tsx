@@ -1,3 +1,4 @@
+import { useLibraryMedia, soundDuration } from './LibraryMedia';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { assignedImage } from '../../shared/image-paths';
 import {
@@ -14,7 +15,7 @@ import {
   mountGallerySizeControl,
   type GalleryModel,
 } from '../../../ui/image-gallery';
-import { useHostTranslation } from '../HostTranslation';
+import { useLibraryTranslation } from './LibraryMedia';
 import { Icon } from '../../shared/ui-icons';
 import { ImageBrowserNavigation } from './ImageBrowserNavigation';
 import {
@@ -68,7 +69,8 @@ export function ImagePickerBrowser({
   image(ref: RegisteredImageRef, generation: string, edge: number): Promise<string>;
   onReload(): void;
 }) {
-  const { t } = useHostTranslation();
+  const { t } = useLibraryTranslation();
+  const media = useLibraryMedia();
   const root = useRef<HTMLDivElement>(null),
     sidebar = useRef<HTMLElement>(null),
     navigationButton = useRef<HTMLButtonElement>(null);
@@ -140,9 +142,11 @@ export function ImagePickerBrowser({
         assetId: `${imageKey(ref)}:${entry.generation ?? ''}`,
         title: ref.file,
         detail:
-          entry.width > 0
-            ? `${entry.width} × ${entry.height}`
-            : t('services.imageLibraryPage.dimensionsUnavailable'),
+          media === 'sound'
+            ? soundDuration(entry.durationMs)
+            : entry.width > 0
+              ? `${entry.width} × ${entry.height}`
+              : t('services.imageLibraryPage.dimensionsUnavailable'),
         labels: memberships.get(imageKey(ref)) ?? [],
         state: entry.available ? 'ready' : (entry.state ?? 'missing'),
         selected: !!selected && imageKey(selected) === imageKey(ref),
@@ -200,6 +204,7 @@ export function ImagePickerBrowser({
   const sizeControl = useRef<ReturnType<typeof mountGallerySizeControl>>(null);
   useLayoutEffect(() => {
     const view = mountImageGallery(grid.current!, {
+      errorText: media === 'sound' ? t('sounds.readFailed') : undefined,
       scrollElement: scroll.current!,
       size: libraryGallerySize,
       expandLabels: true,
@@ -216,6 +221,7 @@ export function ImagePickerBrowser({
     });
     gallery.current = view;
     const control = mountGallerySizeControl(size.current!, {
+      label: media === 'sound' ? t('sounds.cardSize') : undefined,
       range: libraryGallerySize,
       value: cardWidth,
       change: (value) => latest.current.onWidth(value),

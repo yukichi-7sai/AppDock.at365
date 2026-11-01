@@ -378,8 +378,8 @@ function App() {
     ) ?? []),
   ];
   async function execute(id: string) {
-    if (id === 'appdock.image-library.open') {
-      setPage('image-library');
+    if (id === 'appdock.image-library.open' || id === 'appdock.sound-library.open') {
+      setPage(id === 'appdock.sound-library.open' ? 'sound-library' : 'image-library');
       return;
     }
     if (id === 'appdock.notifications.open') {
@@ -435,7 +435,8 @@ function App() {
           page === 'settings' ||
           page === 'logs' ||
           page === 'notifications' ||
-          page === 'image-library'
+          page === 'image-library' ||
+          page === 'sound-library'
             ? 'host-page-main'
             : page.startsWith('page:')
               ? 'applet-page-main'
@@ -525,10 +526,10 @@ function App() {
                 onReady={hostUiRendered}
               />
             )}
-            {page === 'image-library' && (
+            {(page === 'image-library' || page === 'sound-library') && (
               <HostPageSlot
-                key="image-library"
-                kind="image-library"
+                key={page}
+                kind={page}
                 navigationRequest={snapshot.navigation.request}
                 onReady={hostUiRendered}
               />
@@ -554,6 +555,9 @@ createRoot(document.getElementById('root')!).render(
       <ImageLibraryDialogProvider>
         <App />
         <ImagePickerHost />
+        <RegisteredImagesProvider api={window.dock.soundLibrary}>
+          <ImagePickerHost />
+        </RegisteredImagesProvider>
       </ImageLibraryDialogProvider>
     </RegisteredImagesProvider>
   </SettingsControlsProvider>,

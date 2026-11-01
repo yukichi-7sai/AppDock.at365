@@ -10,6 +10,7 @@ export * from '../../src/shared/image-gallery';
 import { mountGalleryInteractions, type GalleryInteractions } from './interactions';
 
 export interface GalleryOptions {
+  errorText?: string;
   /** Show the complete group list; the owning surface provides wrapping/scrolling. */
   expandLabels?: boolean;
   size?: GallerySize;
@@ -99,7 +100,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         .then(async (source) => {
           if (disposed || generation !== card.generation || !card.visible) return;
           // Only image URLs supplied by the adapter; never interpret markup.
-          if (!safeImage(source)) throw Error('画像を読み込めません');
+          if (!safeImage(source)) throw Error(options.errorText ?? '画像を読み込めません');
           const decoded = new Image();
           decoded.src = source;
           await decoded.decode();
@@ -110,7 +111,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         })
         .catch(() => {
           if (!disposed && generation === card.generation) {
-            card.status.textContent = '画像を読み込めません';
+            card.status.textContent = options.errorText ?? '画像を読み込めません';
             card.status.dataset.state = 'error';
           }
         })
@@ -307,7 +308,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
         if (item.state !== 'ready')
           card.status.textContent = {
             missing: '未到着・読取待ち',
-            error: '画像を読み込めません',
+            error: options.errorText ?? '画像を読み込めません',
             loading: '読み込み中',
           }[item.state];
         else if (card.edge) card.status.textContent = '';
@@ -366,13 +367,14 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
 export function mountGallerySizeControl(
   container: HTMLElement,
   options: {
+    label?: string;
     range?: GallerySize;
     value: number;
     change(value: number): void;
     commit(value: number): void;
   },
 ) {
-  const label = element('label', 'ad-gallery-size', '画像サイズ');
+  const label = element('label', 'ad-gallery-size', options.label ?? '画像サイズ');
   const small = element('span', '', '小'),
     large = element('span', '', '大');
   const input = element('input', '');
@@ -381,7 +383,7 @@ export function mountGallerySizeControl(
   input.min = String(range.min);
   input.max = String(range.max);
   input.step = String(range.step);
-  input.setAttribute('aria-label', '画像サイズ');
+  input.setAttribute('aria-label', options.label ?? '画像サイズ');
   let committed = options.value;
   const setValue = (value: number) => {
     input.value = String(value);

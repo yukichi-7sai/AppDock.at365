@@ -12,6 +12,7 @@ export interface DeviceUiState {
     displayMode?: 'compact' | 'expanded';
   };
   gallery?: ImageGalleryViewState;
+  soundGallery?: ImageGalleryViewState;
   windows?: Record<string, WindowState>;
 }
 const object = (value: any): value is Record<string, any> =>
@@ -19,7 +20,9 @@ const object = (value: any): value is Record<string, any> =>
 export function parseDeviceUiState(value: unknown): DeviceUiState {
   if (
     !object(value) ||
-    Object.keys(value).some((key) => !['ribbon', 'gallery', 'windows'].includes(key))
+    Object.keys(value).some(
+      (key) => !['ribbon', 'gallery', 'soundGallery', 'windows'].includes(key),
+    )
   )
     throw Error('Invalid device UI state');
   if (value.ribbon !== undefined) {
@@ -39,6 +42,8 @@ export function parseDeviceUiState(value: unknown): DeviceUiState {
   if (value.gallery !== undefined) {
     if (!validImageGalleryViewState(value.gallery)) throw Error('Invalid gallery UI state');
   }
+  if (value.soundGallery !== undefined && !validImageGalleryViewState(value.soundGallery))
+    throw Error('Invalid sound gallery UI state');
   if (value.windows !== undefined) {
     if (!object(value.windows)) throw Error('Invalid window UI state');
     for (const [key, state] of Object.entries(value.windows)) {

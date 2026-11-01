@@ -20,6 +20,12 @@ export const hostCommands = [
     extension: 'AppDock',
     available: true,
   },
+  {
+    id: 'appdock.sound-library.open',
+    title: hostText('sounds.open'),
+    extension: 'AppDock',
+    available: true,
+  },
   { id: 'appdock.applets.open', title: 'Applet一覧を開く', extension: 'AppDock', available: true },
   {
     id: 'appdock.notifications.open',

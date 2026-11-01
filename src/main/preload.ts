@@ -102,6 +102,46 @@ const api: DockApi = {
       return () => ipcRenderer.removeListener('dock:imagePickerBackdrop', listener);
     },
   },
+  soundLibrary: {
+    media: 'sound',
+    play: (ref) => ipcRenderer.invoke('dock:soundLibrary:play', ref),
+    stop: () => ipcRenderer.invoke('dock:soundLibrary:stop'),
+    snapshot: () => ipcRenderer.invoke('dock:soundLibrary:snapshot'),
+    register: () => ipcRenderer.invoke('dock:soundLibrary:register'),
+    retain: (image) => ipcRenderer.invoke('dock:soundLibrary:retain', image),
+    edit: (operation) => ipcRenderer.invoke('dock:soundLibrary:edit', operation),
+    createImageSession: () => ipcRenderer.invoke('dock:soundLibrary:createImageSession'),
+    releaseImageSession: (session) =>
+      ipcRenderer.invoke('dock:soundLibrary:releaseImageSession', session),
+    preview: (image, original, session) =>
+      ipcRenderer.invoke('dock:soundLibrary:preview', image, original, session),
+    galleryImage: (image, generation, edge, session) =>
+      ipcRenderer.invoke('dock:soundLibrary:galleryImage', image, generation, edge, session),
+    galleryView: () => ipcRenderer.invoke('dock:soundLibrary:galleryView'),
+    saveGalleryWidth: (value) => ipcRenderer.invoke('dock:soundLibrary:saveGalleryWidth', value),
+    saveGalleryLayout: (value) => ipcRenderer.invoke('dock:soundLibrary:saveGalleryLayout', value),
+    pick: (current) => ipcRenderer.invoke('dock:soundLibrary:pick', current),
+    onChanged: (callback) => {
+      const listener = () => callback();
+      ipcRenderer.on('dock:changed', listener);
+      return () => ipcRenderer.removeListener('dock:changed', listener);
+    },
+    onPickRequest: (callback) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        request: {
+          id: string;
+          current: import('../shared/registered-images').RegisteredImageRef | null;
+        } | null,
+      ) => callback(request);
+      ipcRenderer.on('dock:soundPick', listener);
+      void ipcRenderer.invoke('dock:soundPick:pending').then((request) => {
+        if (request) callback(request);
+      });
+      return () => ipcRenderer.removeListener('dock:soundPick', listener);
+    },
+    completePick: (id, result) => ipcRenderer.invoke('dock:soundPick:complete', id, result),
+  },
   settingsPage: {
     index: () => ipcRenderer.invoke('dock:settingsPage:index'),
     open: (request) => ipcRenderer.invoke('dock:settingsPage:open', request),

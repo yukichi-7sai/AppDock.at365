@@ -40,11 +40,11 @@ AppletのStorage保存先`memory`と、ファイルを書き出さずにlocalペ
 | ログ                                 | [レベル・種類・保存と画面の絞り込み](docs/logging.md)                                                                                                                                                                                               |
 | キー・マウス・タッチパッド・トレイ   | [ショートカットと入力フック](docs/keybindings.md)、[ジェスチャー](docs/gestures.md)、[タッチパッド](docs/touchpad-gestures-design.md)、[トレイ](docs/tray-menu.md)                                                                                  |
 | Shellとリボン                        | [領域と割り当て](docs/shell-foundation.md)、[リボンの配置とバッジ](docs/ribbon-customization-design.md)、[Shell API](docs/shell-api.md)、[共通オーバーレイ](docs/shell-overlays.md)、[本体のページ](docs/host-pages.md)、[バー](docs/shell-bars.md) |
-| 画像と配色                           | [登録画像](docs/registered-images.md)、[共通ギャラリー](docs/image-gallery.md)、[共通配色](docs/appearance.md)                                                                                                                                      |
+| 画像と配色                           | [素材ライブラリー](docs/asset-libraries.md)、[登録画像](docs/registered-images.md)、[共通ギャラリー](docs/image-gallery.md)、[共通配色](docs/appearance.md)                                                                                         |
 | 起動と更新                           | [Windows起動設定](docs/launch-settings.md)、[更新](docs/updates.md)、[配布先の検証](docs/update-checklist.md)                                                                                                                                       |
 | 文書と実測                           | [文書方針](docs/documentation.md)、[検証記録](VERIFICATION.md)                                                                                                                                                                                      |
 
-本体はTypeScript/Reactで構成し、Nodeと.NET Appletは別プロセスで動作する。画像ライブラリー・通知センター・ログ・設定の描画は本体rendererと共通UI部品、Shell領域の描画は選択したShell、native画面は対象Appletが所有する。起動・復元・戻り先は[本体ページ](docs/host-pages.md#起動と戻り先)を参照する。
+本体はTypeScript/Reactで構成し、Nodeと.NET Appletは別プロセスで動作する。画像/音ライブラリー・通知センター・ログ・設定の描画は本体rendererと共通UI部品、Shell領域の描画は選択したShell、native画面は対象Appletが所有する。起動・復元・戻り先は[本体ページ](docs/host-pages.md#起動と戻り先)を参照する。
 
 共有設定・dataの参照先変更は[未実装の設計](docs/shared-settings-location-design.md)として分離する。現在の保存仕様は設定同期の文書を正本とする。
 

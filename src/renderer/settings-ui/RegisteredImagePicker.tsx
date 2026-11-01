@@ -1,6 +1,11 @@
 import { assignedImage } from '../../shared/image-paths';
 import { hostText } from '../../shared/i18n';
-import { useHostTranslation } from '../HostTranslation';
+import {
+  LibraryMediaProvider,
+  useLibraryMedia,
+  useLibraryTranslation,
+} from '../image-browser/LibraryMedia';
+import { libraryReference } from '../../shared/library-assets';
 import { SettingsMcpAccessProvider } from './SettingsMcpAccess';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -30,7 +35,11 @@ export function RegisteredImagesProvider({
   api: ImageLibraryApi;
   children: ReactNode;
 }) {
-  return <ImagesContext.Provider value={api}>{children}</ImagesContext.Provider>;
+  return (
+    <ImagesContext.Provider value={api}>
+      <LibraryMediaProvider media={api.media ?? 'image'}>{children}</LibraryMediaProvider>
+    </ImagesContext.Provider>
+  );
 }
 export const useRegisteredImages = () => useContext(ImagesContext);
 /** Each mounted image surface releases only its own host cache ownership. */
@@ -104,11 +113,11 @@ export function RegisteredImagePreview({
   label?: string;
   fallback?: string;
 }) {
-  const { t: translate } = useHostTranslation();
+  const { t: translate } = useLibraryTranslation();
   const api = useRegisteredImages();
   const images = useImageSession(api);
   const [url, setUrl] = useState<string | null>(null);
-  const file = imageReference(value) ? value.file : '';
+  const file = libraryReference(value, api?.media ?? 'image') ? value.file : '';
   useEffect(() => {
     let live = true,
       generation = 0;
@@ -145,11 +154,18 @@ export function RegisteredImagePicker({
   onClose,
 }: {
   current: RegisteredImageRef | null;
-  onSelect(image: RegisteredImageRef | null): Promise<unknown> | void;
+  onSelect(image: RegisteredImageRef | null, sourceName?: string): Promise<unknown> | void;
   onClose(): void;
 }) {
-  const { t: translate } = useHostTranslation();
+  const { t: translate } = useLibraryTranslation();
   const library = useImageLibrary();
+  const media = useLibraryMedia();
+  useEffect(
+    () => () => {
+      void library.api?.stop?.().catch(() => {});
+    },
+    [library.api],
+  );
   const [selected, setSelected] = useState(current),
     [folder, setFolder] = useState('*'),
     [group, setGroup] = useState('all'),
@@ -257,6 +273,14 @@ export function RegisteredImagePicker({
         }}
         footerContent={
           <div className="image-picker-summary">
+            {media === 'sound' && (
+              <SoundPickerControls
+                api={library.api}
+                selected={selected}
+                snapshot={library.snapshot}
+                onError={library.setError}
+              />
+            )}
             <div
               className="image-picker-selected-preview"
               data-svg={!!selected && /\.svg$/i.test(selected.file)}
@@ -286,7 +310,10 @@ export function RegisteredImagePicker({
         }}
         onApply={async () => {
           if (!selected) return;
-          await onSelect(library.api?.retain ? await library.api.retain(selected) : selected);
+          await onSelect(
+            library.api?.retain ? await library.api.retain(selected) : selected,
+            selected.file.split('/').at(-1),
+          );
           applied.current = true;
         }}
       >
@@ -314,7 +341,15 @@ export function RegisteredImagePicker({
           }}
           onSaveLayout={saveLayout}
           disabled={registering}
-          onPreview={setPreview}
+          onPreview={(entry) => {
+            if (media === 'sound')
+              void library.api
+                ?.play?.(entry.ref)
+                .catch((error) =>
+                  library.setError(String(error instanceof Error ? error.message : error)),
+                );
+            else setPreview(entry);
+          }}
           image={imageSession.image}
           onReload={() => void library.reload()}
         />
@@ -347,7 +382,7 @@ export function RegisteredGalleryPreview({
   entry: RegisteredImageEntry;
   groups: ImageLibrarySnapshot['groups'];
 }) {
-  const { t: translate } = useHostTranslation();
+  const { t: translate } = useLibraryTranslation();
   const library = useImageLibrary();
   const api = library.api;
   const imageSession = useImageSession(api);
@@ -392,7 +427,7 @@ export function RegisteredImageInput({
   label?: string;
   disabled?: boolean;
 }) {
-  const { t: translate } = useHostTranslation();
+  const { t: translate } = useLibraryTranslation();
   const [open, setOpen] = useState(false);
   const ref = imageReference(value) ? value : null;
   const api = useRegisteredImages();
@@ -503,12 +538,65 @@ export function ImagePickerHost() {
             void api?.completePick?.(request.id, { cancelled: true }).catch(() => {});
             setRequest(null);
           }}
-          onSelect={async (image) => {
-            await api?.completePick?.(request.id, { cancelled: false, image });
+          onSelect={async (image, name) => {
+            await api?.completePick?.(request.id, {
+              cancelled: false,
+              image,
+              ...(api?.media === 'sound' ? { name } : {}),
+            });
             setRequest(null);
           }}
         />
       )}
     </>
+  );
+}
+
+function SoundPickerControls({
+  api,
+  selected,
+  snapshot,
+  onError,
+}: {
+  api: ImageLibraryApi | undefined;
+  selected: RegisteredImageRef | null;
+  snapshot: ImageLibrarySnapshot;
+  onError(value: string): void;
+}) {
+  const { t } = useLibraryTranslation();
+  const playback = snapshot.playback;
+  return (
+    <div className="sound-picker-controls">
+      <button
+        type="button"
+        disabled={!selected || !api}
+        onClick={() => {
+          if (selected)
+            void api
+              ?.play?.(selected)
+              .catch((e) => onError(String(e instanceof Error ? e.message : e)));
+        }}
+      >
+        {t('sounds.play')}
+      </button>
+      <button
+        type="button"
+        disabled={!playback}
+        onClick={() => void api?.stop?.().catch((e) => onError(String(e)))}
+      >
+        {t('sounds.stop')}
+      </button>
+      <span role="status">
+        {playback
+          ? t(
+              playback.state === 'playing'
+                ? 'sounds.playing'
+                : playback.state === 'waiting'
+                  ? 'sounds.waiting'
+                  : 'sounds.loading',
+            )
+          : ''}
+      </span>
+    </div>
   );
 }

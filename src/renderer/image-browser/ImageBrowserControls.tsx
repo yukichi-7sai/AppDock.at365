@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { ImageLibraryLayout } from '../../shared/image-library-page';
 import { Icon } from '../../shared/ui-icons';
-import { useHostTranslation } from '../HostTranslation';
+import { useLibraryTranslation } from './LibraryMedia';
 
 export function useImageBrowserNavigation(
   root: RefObject<HTMLElement | null>,
@@ -92,7 +92,7 @@ export function ImageBrowserSplitter({
   onChange(value: ImageLibraryLayout): void;
   onCommit(value: ImageLibraryLayout): void;
 }) {
-  const { t } = useHostTranslation();
+  const { t } = useLibraryTranslation();
   const cancel = (element: HTMLElement) => {
     dragging.current = false;
     onChange({ ...layout.current, sidebarWidth: Number(element.dataset.original) || 220 });
@@ -187,7 +187,7 @@ export function ImageBrowserFilters({
   locationActions?: ReactNode;
   children?: ReactNode;
 }) {
-  const { t } = useHostTranslation();
+  const { t } = useLibraryTranslation();
   return (
     <>
       <div className="library-location">

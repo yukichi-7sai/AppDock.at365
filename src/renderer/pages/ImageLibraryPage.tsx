@@ -1,4 +1,8 @@
-import { useHostTranslation } from '../HostTranslation';
+import {
+  LibraryMediaProvider,
+  useLibraryMedia,
+  useLibraryTranslation,
+} from '../image-browser/LibraryMedia';
 import { SettingsButton } from '../settings-ui/SettingsButton';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type {
@@ -38,8 +42,16 @@ type Menu = {
   count?: number;
   point?: { x: number; y: number };
 };
-export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryPageModel }) {
-  const { t } = useHostTranslation();
+export function ImageLibraryPage(props: { initialModel: ImageLibraryPageModel }) {
+  return (
+    <LibraryMediaProvider media={props.initialModel.kind === 'sound-library' ? 'sound' : 'image'}>
+      <LibraryPageBody {...props} />
+    </LibraryMediaProvider>
+  );
+}
+function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel }) {
+  const { t } = useLibraryTranslation();
+  const media = useLibraryMedia();
   const captureDialogFocus = useImageLibraryDialogFocus();
   const [model, setModel] = useState(initialModel),
     latest = useRef(initialModel);
@@ -252,6 +264,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
   }, [initialModel]);
   useLayoutEffect(() => {
     const instance = mountImageGallery(grid.current!, {
+      errorText: media === 'sound' ? t('sounds.readFailed') : undefined,
       expandLabels: true,
       size: libraryGallerySize,
       scrollElement: scroll.current!,
@@ -342,6 +355,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     });
     gallery.current = instance;
     sizeControl.current = mountGallerySizeControl(size.current!, {
+      label: media === 'sound' ? t('sounds.cardSize') : undefined,
       range: libraryGallerySize,
       value: latest.current.content.cardWidth,
       change: (value) => {
@@ -436,7 +450,11 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
       dialog(kind, undefined, undefined, menu.target, menu.opener);
     menuTitle = t('images.selectedCount', { count });
     menuItems = [
-      { label: t('images.preview'), disabled: !count, run: () => edit('preview') },
+      {
+        label: t('images.preview'),
+        disabled: media === 'sound' ? count !== 1 : !count,
+        run: () => edit('preview'),
+      },
       {
         label: t('images.renameImages'),
         disabled: !count || unreadable,
@@ -449,11 +467,15 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
         run: () => file('copy-files'),
       },
       { label: t('images.copyPaths'), disabled: !count, run: () => file('copy-paths') },
-      {
-        label: t('images.copyImage'),
-        disabled: count !== 1 || unreadable,
-        run: () => file('copy-image'),
-      },
+      ...(media === 'image'
+        ? [
+            {
+              label: t('images.copyImage'),
+              disabled: count !== 1 || unreadable,
+              run: () => file('copy-image'),
+            },
+          ]
+        : []),
       { label: t('images.reveal'), disabled: !count || unreadable, run: () => file('reveal') },
       {
         label: t('images.addToGroup'),
@@ -534,6 +556,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     <section
       ref={root}
       className="library-page image-browser"
+      data-media={media}
       data-narrow={narrow}
       inert={dialogPending}
       style={{ '--library-sidebar-width': layout.sidebarWidth + 'px' } as CSSProperties}
@@ -572,7 +595,7 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
     >
       <header className="library-header">
         <h1>
-          <Icon name="image" size={19} />
+          <Icon name={media === 'sound' ? 'music' : 'image'} size={19} />
           {t('images.title')}
         </h1>
         <div className="library-header-actions">
@@ -584,10 +607,12 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
             <Icon name="upload" size={15} />
             {t('images.addImages')}
           </SettingsButton>
-          <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
-            <Icon name="download" size={15} />
-            {t('images.importSet')}
-          </SettingsButton>
+          {media === 'image' && (
+            <SettingsButton disabled={c.busy} onClick={() => dialog('import-set')}>
+              <Icon name="download" size={15} />
+              {t('images.importSet')}
+            </SettingsButton>
+          )}
         </div>
       </header>
       <div className="library-layout" ref={interactionRoot}>
@@ -754,6 +779,33 @@ export function ImageLibraryPage({ initialModel }: { initialModel: ImageLibraryP
                   </button>
                 </div>
                 <div className="library-selection">
+                  {media === 'sound' && (
+                    <>
+                      <SettingsButton
+                        disabled={c.selected !== 1 || c.busy}
+                        onClick={() => dialog('preview')}
+                      >
+                        {t('sounds.play')}
+                      </SettingsButton>
+                      <SettingsButton
+                        disabled={!c.playback}
+                        onClick={() => run({ command: 'stop-playback' })}
+                      >
+                        {t('sounds.stop')}
+                      </SettingsButton>
+                      {c.playback && (
+                        <span role="status">
+                          {t(
+                            c.playback.state === 'playing'
+                              ? 'sounds.playing'
+                              : c.playback.state === 'waiting'
+                                ? 'sounds.waiting'
+                                : 'sounds.loading',
+                          )}
+                        </span>
+                      )}
+                    </>
+                  )}
                   <span aria-live="polite">{t('images.selectedCount', { count: c.selected })}</span>
                   <SettingsButton
                     disabled={!c.selected || c.busy}

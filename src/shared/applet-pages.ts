@@ -40,6 +40,7 @@ export interface RibbonItem {
 }
 export const builtinRibbon: RibbonItem[] = [
   { id: 'image-library', title: hostText('settings.applet-pages.images'), icon: 'image' },
+  { id: 'sound-library', title: hostText('sounds.title'), icon: 'music' },
   { id: 'settings', title: hostText('settings.applet-pages.settings'), icon: 'settings' },
   { id: 'logs', title: hostText('settings.applet-pages.logs'), icon: 'logs' },
   { id: 'notifications', title: hostText('settings.applet-pages.notifications'), icon: 'bell' },
@@ -77,6 +78,7 @@ export const defaultRibbon = () => ({
     'ribbon-display-mode',
     'settings',
     'image-library',
+    'sound-library',
     'notifications',
     'logs',
     'theme',

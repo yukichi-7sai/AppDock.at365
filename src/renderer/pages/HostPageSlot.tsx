@@ -29,8 +29,10 @@ export function HostPageSlot({
     kind === 'logs'
       ? { id: id.current, kind, route: scope.type === 'all' ? 'logs' : 'extensions', scope, source }
       : kind === 'image-library'
-        ? { id: id.current, kind, route: 'image-library' }
-        : { id: id.current, kind, route: 'notifications' };
+        ? { id: id.current, kind, route: kind }
+        : kind === 'sound-library'
+          ? { id: id.current, kind, route: kind }
+          : { id: id.current, kind, route: 'notifications' };
   const signature = JSON.stringify(request);
   const accept = (next: HostPageModel | null) => {
     if (!next || next.id !== id.current) return;
@@ -66,7 +68,9 @@ export function HostPageSlot({
     <div className="host-page-slot" data-page={kind}>
       {error && <p role="alert">{error}</p>}
       {model?.kind === 'logs' && <LogPage initialModel={model} />}
-      {model?.kind === 'image-library' && <ImageLibraryPage initialModel={model} />}
+      {(model?.kind === 'image-library' || model?.kind === 'sound-library') && (
+        <ImageLibraryPage initialModel={model} />
+      )}
       {model?.kind === 'notifications' && <NotificationCenterPage initialModel={model} />}
     </div>
   );

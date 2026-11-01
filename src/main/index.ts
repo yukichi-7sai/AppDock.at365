@@ -1,3 +1,5 @@
+import { SoundLibraryService } from './core/sound-library-service';
+import type { SoundGallery } from './core/library-sound-preview';
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
 import { hostStartupTiming } from './core/host-startup-timing';
 import { SettingsReadScope } from './core/settings-read-scope';
@@ -417,11 +419,17 @@ let hostModalLayer: HostModalLayer | undefined;
 let hostPages: HostPages | undefined;
 let imageLibraryDialogs: ImageLibraryDialogs | undefined;
 let galleryViewState: GalleryViewStateStore;
+let soundGalleryViewState: GalleryViewStateStore;
+const rendererSoundSessions = new Map<string, ReturnType<SoundGallery['session']>>();
 let galleryImages: GalleryImages;
 const rendererImageSessions = new Map<string, ReturnType<GalleryImages['session']>>();
 const releaseRendererImages = () => {
   for (const session of rendererImageSessions.values()) session.dispose();
   rendererImageSessions.clear();
+  for (const session of rendererSoundSessions.values()) session.dispose();
+  rendererSoundSessions.clear();
+  soundLibrary.preview.stop('picker');
+  soundLibrary.host.cancel();
 };
 let settingsPageHost: SettingsPageHost | undefined;
 let paletteSession: CommandPaletteSession | undefined;
@@ -741,6 +749,27 @@ const imageLibraryHost = new ImageLibraryHost(registeredImages, {
       ownsImage(item.manifest, settings.value.extensions[item.manifest.id]?.settings ?? {}, ref),
     ),
 });
+const soundLibraryFailed = () =>
+  errors.report({
+    eventId: randomUUID(),
+    source: 'sound-library',
+    title: hostText('sounds.title'),
+    code: 'SOUND_LIBRARY',
+    message: hostText('sounds.operationFailed'),
+  });
+const soundLibrary = new SoundLibraryService(
+  path.join(paths.assets, 'sounds'),
+  {
+    settings,
+    window: () => window,
+    writable: assertSettingsWritable,
+    show: showWindow,
+    cover: coverAppletPagesForImagePicker,
+  },
+  () => changed(),
+  soundLibraryFailed,
+  fileWatchAssistance,
+);
 let updater: PortableUpdates;
 let gestureIndicatorHost: GestureIndicatorHost | undefined;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
@@ -3393,6 +3422,57 @@ function registerIpc() {
   handle('dock:imageLibrary:pick', (current) => imageLibraryHost.pick(current));
   handle('dock:imagePick:pending', () => imageLibraryHost.pendingRequest());
   handle('dock:imagePick:complete', (id, result) => imageLibraryHost.complete(id, result));
+  handle('dock:soundLibrary:snapshot', () => soundLibrary.snapshot());
+  handle('dock:soundLibrary:register', () => soundLibrary.host.register());
+  handle('dock:soundLibrary:retain', (ref) => soundLibrary.host.retain(ref));
+  handle('dock:soundLibrary:edit', (op) => soundLibrary.host.edit(op));
+  handle('dock:soundLibrary:galleryView', () => ({
+    cardWidth: soundGalleryViewState.get('picker'),
+    layout: soundGalleryViewState.layout('picker'),
+    error: soundGalleryViewState.error,
+  }));
+  handle('dock:soundLibrary:saveGalleryWidth', (value) => {
+    try {
+      soundGalleryViewState.save('picker', value);
+    } catch (e) {
+      soundLibraryFailed();
+      throw e;
+    }
+  });
+  handle('dock:soundLibrary:saveGalleryLayout', (value) => {
+    try {
+      soundGalleryViewState.saveLayout(value, 'picker');
+    } catch (e) {
+      soundLibraryFailed();
+      throw e;
+    }
+  });
+  handle('dock:soundLibrary:createImageSession', () => {
+    const id = randomUUID();
+    rendererSoundSessions.set(id, soundLibrary.gallery.session());
+    return id;
+  });
+  handle('dock:soundLibrary:releaseImageSession', (id) => {
+    rendererSoundSessions.get(id)?.dispose();
+    rendererSoundSessions.delete(id);
+  });
+  const soundSession = (id: unknown) => {
+    const session = typeof id === 'string' ? rendererSoundSessions.get(id) : undefined;
+    if (!session) throw Error(hostText('sounds.operationFailed'));
+    return session;
+  };
+  handle('dock:soundLibrary:galleryImage', (ref, generation, _edge, id) =>
+    soundSession(id).get(ref, generation),
+  );
+  handle('dock:soundLibrary:preview', (ref, _original, id) => soundSession(id).preview(ref));
+  handle('dock:soundLibrary:play', (ref) => soundLibrary.preview.play(ref, 'picker'));
+  handle('dock:soundLibrary:stop', () => soundLibrary.preview.stop('picker'));
+  handle('dock:soundLibrary:pick', (current) => soundLibrary.host.pick(current));
+  handle('dock:soundPick:pending', () => soundLibrary.host.pendingRequest());
+  handle('dock:soundPick:complete', (id, result) => {
+    soundLibrary.host.complete(id, result);
+    soundLibrary.preview.stop('picker');
+  });
   handle('dock:settingsEditing', () => settingsEditing.snapshot());
   handle('dock:flushSettings', () => flushSettingsInputs());
   handle('dock:editSettings', async (request) => {
@@ -3788,6 +3868,7 @@ async function initialize() {
       imageLibraryHost,
       os.hostname(),
       fileWatchAssistance,
+      soundLibrary,
     ),
     log: log.write,
   });
@@ -4098,6 +4179,7 @@ async function initialize() {
   });
   manager.on('changed', () => {
     ribbonCatalog.invalidate();
+    soundLibrary.host.reconcile(new Set());
     imageLibraryHost.reconcile(
       new Set(
         [...manager.items.values()]
@@ -4153,6 +4235,7 @@ async function initialize() {
   hostStartupTiming.phase('apply', () => applySettings());
   applyFileWatchAssistanceSettings();
   await hostStartupTiming.phaseAsync('images', () => registeredImages.watch());
+  await soundLibrary.files.watch();
   hostStartupTiming.count('imageCount', registeredImages.list().length);
   nativeTheme.on('updated', () => {
     refreshWindowTheme();
@@ -4650,6 +4733,11 @@ async function initialize() {
   window.webContents.on('destroyed', releaseRendererImages);
   galleryViewState = new GalleryViewStateStore(settings.uiStateStorage('gallery'));
   const galleryState = new ImageLibraryPageState(galleryViewState);
+  soundGalleryViewState = new GalleryViewStateStore(
+    settings.uiStateStorage('soundGallery'),
+    'sound',
+  );
+  const soundState = new ImageLibraryPageState(soundGalleryViewState);
   galleryImages = new GalleryImages(registeredImages);
   const galleryFailed = (message: string) =>
     errors.report({
@@ -4665,9 +4753,10 @@ async function initialize() {
         window.webContents.send('dock:imageLibraryDialog', request);
     },
     edit: (operation, request) => {
+      const library = request.media === 'sound' ? soundLibrary.host : imageLibraryHost;
       if (operation.kind === 'folder') {
         const kind = request.kind.slice('folder-'.length);
-        return imageLibraryHost.folderOperation(
+        return library.folderOperation(
           kind === 'move' ? 'move-images' : kind,
           kind === 'move' ? operation.destination : (request.folder ?? ''),
           operation.destination,
@@ -4683,22 +4772,28 @@ async function initialize() {
       if (operation.kind === 'delete-image') {
         if (!request.entry || request.deleteBlocked)
           throw Error(hostText('services.index.invalidDeletion'));
-        return imageLibraryHost.removeMany(request.entries ?? [request.entry]);
+        return library.removeMany(request.entries ?? [request.entry]);
       }
       if (operation.kind === 'rename-images') {
         if (!request.entries || request.deleteBlocked)
           throw Error(hostText('services.index.invalidDeletion'));
-        return imageLibraryHost.rename(request.entries, operation.names).then(() => {});
+        return library.rename(request.entries, operation.names).then(() => {});
       }
-      return imageLibraryHost.edit(operation);
+      return library.edit(operation);
     },
-    failed: () => galleryFailed(hostText('services.index.imageOperationBody')),
+    failed: (request) =>
+      request.media === 'sound'
+        ? soundLibraryFailed()
+        : galleryFailed(hostText('services.index.imageOperationBody')),
   });
   imageLibraryDialogs = galleryDialogs;
   window.webContents.on('did-start-loading', () => galleryDialogs.cancel());
   window.webContents.on('render-process-gone', () => galleryDialogs.cancel());
   window.once('closed', () => {
     galleryState.closed = true;
+    soundState.closed = true;
+    soundLibrary.preview.stop();
+    soundLibrary.host.cancel();
     galleryState.importAbort?.abort();
     galleryDialogs.cancel();
   });
@@ -4710,16 +4805,20 @@ async function initialize() {
     },
     ready: () => uiReady && !quitting,
     create: (request) =>
-      request.kind === 'image-library'
+      request.kind === 'image-library' || request.kind === 'sound-library'
         ? new ImageLibraryPageSession(request, {
-            host: imageLibraryHost,
-            images: galleryImages,
-            state: galleryState,
-            groups: () => settings.value.imageLibrary?.groups ?? [],
+            host: request.kind === 'sound-library' ? soundLibrary.host : imageLibraryHost,
+            images: request.kind === 'sound-library' ? soundLibrary.gallery : galleryImages,
+            preview: request.kind === 'sound-library' ? soundLibrary.preview : undefined,
+            state: request.kind === 'sound-library' ? soundState : galleryState,
+            groups: () =>
+              request.kind === 'sound-library'
+                ? soundLibrary.host.configuration.snapshot().groups
+                : (settings.value.imageLibrary?.groups ?? []),
             dialogs: galleryDialogs,
             dark: () => nativeTheme.shouldUseDarkColors,
             changed,
-            failed: galleryFailed,
+            failed: request.kind === 'sound-library' ? soundLibraryFailed : galleryFailed,
           })
         : request.kind === 'notifications'
           ? new NotificationCenterController(request, {
@@ -5300,6 +5399,7 @@ app.on('before-quit', (event) => {
   })().finally(() => {
     settings.close();
     registeredImages.stop();
+    soundLibrary.close();
     stopRegisteredImageDecoder();
     imageLibraryHost.cancel();
     tray?.destroy();

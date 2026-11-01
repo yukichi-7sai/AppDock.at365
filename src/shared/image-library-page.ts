@@ -14,11 +14,10 @@ export interface IconImportProgress {
   reused: number;
   failed: number;
 }
-export interface ImageLibraryPageRequest {
-  id: string;
-  kind: 'image-library';
-  route: 'image-library';
-}
+export type ImageLibraryPageRequest = { id: string } & (
+  | { kind: 'image-library'; route: 'image-library' }
+  | { kind: 'sound-library'; route: 'sound-library' }
+);
 export type ImageLibraryDialogKind =
   | 'add'
   | 'rename'
@@ -44,6 +43,7 @@ export type ImageLibraryDialogOperation =
   | { kind: 'folder'; destination: string }
   | { kind: 'import-set'; setId: string };
 export interface ImageLibraryDialogRequest {
+  media?: import('./library-assets').LibraryMedia;
   id: string;
   kind: ImageLibraryDialogKind;
   groups: ImageGroup[];
@@ -117,11 +117,12 @@ export interface ImageLibraryDialogApi {
 export interface ImageLibraryPageModel {
   schemaVersion: 1;
   id: string;
-  kind: 'image-library';
+  kind: 'image-library' | 'sound-library';
   contextId: 'primary';
   revision: number;
   dark: boolean;
   content: {
+    playback?: import('./registered-images').LibraryPlayback;
     iconSets: { id: string; name: string }[];
     importing?: IconImportProgress;
     folders: string[];
@@ -185,4 +186,5 @@ export type ImageLibraryPageAction = {
       folder?: string;
     }
   | { command: 'image'; assetId: string; edge: number }
+  | { command: 'stop-playback' }
 );

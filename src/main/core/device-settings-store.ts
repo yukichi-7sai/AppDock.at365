@@ -72,7 +72,10 @@ export class DeviceSettingsStore extends SettingsStore {
     const { uiState: _uiState, ...configuration } = value;
     return JSON.stringify(configuration);
   }
-  override uiStateStorage(section: 'ribbon' | 'gallery' | 'windows', key?: string): StateStorage {
+  override uiStateStorage(
+    section: 'ribbon' | 'gallery' | 'soundGallery' | 'windows',
+    key?: string,
+  ): StateStorage {
     if (
       (section === 'windows') !== (typeof key === 'string' && !!key) ||
       (key && ['__proto__', 'constructor', 'prototype'].includes(key))

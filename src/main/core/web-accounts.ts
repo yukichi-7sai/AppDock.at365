@@ -1,3 +1,4 @@
+import { soundLibraryReference } from '../../shared/library-assets';
 import { hostText } from '../../shared/i18n';
 import { safePageShortcut } from '../../shared/keybindings';
 import {
@@ -57,6 +58,7 @@ interface WebAccountServices {
   windowState?: import('./state-storage').StateStorage;
   sharedRoot?: string;
   soundsDirectory?: string;
+  soundLibrary?: import('./sound-library-service').SoundLibraryAccess;
   capabilities: string[];
   page?: AppletPageDefinition;
   settings?(): Record<string, boolean | string>;
@@ -105,6 +107,7 @@ export function parseWebAccountSound(raw: unknown): WebAccountSound {
         /[\u0000-\u001f\u007f]/.test(sound.name))) ||
     (sound.file &&
       !soundFilename(sound.file) &&
+      !soundLibraryReference(sound.file) &&
       (!path.isAbsolute(sound.file) || path.extname(sound.file).toLowerCase() !== '.wav'))
   )
     throw Error(hostText('services.webAccounts.soundPath'));
@@ -553,17 +556,20 @@ export class WebAccountController {
         hostText('services.webAccounts.capabilityRequired', { capability: String(capability) }),
       );
   }
-  private async sound(id: unknown, sound: unknown) {
+  private async sound(id: unknown, sound: unknown, alive = () => true) {
     this.requireCapability('audio');
     const a = this.account(id);
     const parsed = parseWebAccountSound(sound);
     if (parsed.file) {
-      if (path.isAbsolute(parsed.file)) parsed.file = await this.sounds.add(parsed.file);
+      if (soundLibraryReference(parsed.file)) {
+        if (!this.services.soundLibrary) throw Error(hostText('services.webAccounts.soundPath'));
+        await this.services.soundLibrary.resolve(parsed.file);
+      } else if (path.isAbsolute(parsed.file)) parsed.file = await this.sounds.add(parsed.file);
       else parsed.file = path.basename(await this.sounds.resolve(parsed.file));
     }
-    delete parsed.name;
+    if (!soundLibraryReference(parsed.file)) delete parsed.name;
     await this.refreshSounds();
-    if (this.disposed) return;
+    if (this.disposed || !alive()) return;
     this.account(a.id);
     this.soundFailures.delete(a.id);
     this.save({
@@ -1150,6 +1156,23 @@ export class WebAccountController {
         this.requireCapability('file-dialog');
         this.requireCapability('audio');
         const a = this.account(args[0]);
+        if (this.services.soundLibrary) {
+          const before = JSON.stringify(a.sound);
+          const live = () =>
+            !this.disposed &&
+            !this.deleting.has(a.id) &&
+            this.state.accounts.some(
+              (item) => item.id === a.id && JSON.stringify(item.sound) === before,
+            );
+          const result = await this.services.soundLibrary.pick(a.sound?.file, live);
+          if (result && live())
+            await this.sound(
+              a.id,
+              { enabled: this.account(a.id).sound?.enabled ?? false, ...result },
+              live,
+            );
+          return;
+        }
         const result = await dialog.showOpenDialog(this.window!, {
           title: hostText('services.webAccounts.soundTitle'),
           properties: ['openFile'],
@@ -1167,7 +1190,11 @@ export class WebAccountController {
         this.requireCapability('audio');
         const a = this.account(args[0]);
         queueSound(
-          a.sound?.file ? await this.sounds.resolve(a.sound.file) : '',
+          a.sound?.file
+            ? soundLibraryReference(a.sound.file) && this.services.soundLibrary
+              ? await this.services.soundLibrary.resolve(a.sound.file)
+              : await this.sounds.resolve(a.sound.file)
+            : '',
           () =>
             !this.disposed &&
             this.state.accounts.some((item) => item.id === a.id) &&

@@ -53,6 +53,7 @@ function fixture(
     throw Error('Image I/O forbidden');
   };
   const images = {
+    policy: { media: 'image' },
     availableReferences: () => {
       state.reads++;
       return state.candidates.map((file) => ({ file }));

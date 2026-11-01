@@ -1,12 +1,13 @@
 import { SettingsField } from './settings-ui/SettingsSections';
-import { useHostTranslation } from './HostTranslation';
+import { LibraryMediaProvider, useLibraryTranslation } from './image-browser/LibraryMedia';
+import { libraryPath } from '../shared/library-assets';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   ImageLibraryDialogRequest,
   ImageLibraryDialogOperation,
 } from '../shared/image-library-page';
 import { imageKey } from '../shared/registered-images';
-import { imageBasename, imageParent, imagePath } from '../shared/image-paths';
+import { imageBasename, imageParent } from '../shared/image-paths';
 import { SettingsButton } from './settings-ui/SettingsButton';
 import { SettingsDialog, SettingsModal } from './settings-ui/SettingsModal';
 import { SettingsInput } from './settings-ui/SettingsInput';
@@ -51,7 +52,9 @@ export function ImageLibraryDialogHost() {
     [],
   );
   return request ? (
-    <Editor key={request.id} request={request} returnFocus={opening?.current?.target ?? null} />
+    <LibraryMediaProvider media={request.media ?? 'image'}>
+      <Editor key={request.id} request={request} returnFocus={opening?.current?.target ?? null} />
+    </LibraryMediaProvider>
   ) : null;
 }
 function Editor({
@@ -61,7 +64,7 @@ function Editor({
   request: ImageLibraryDialogRequest;
   returnFocus: HTMLElement | null;
 }) {
-  const { t } = useHostTranslation();
+  const { t } = useLibraryTranslation();
   const current = r.groups.find((g) => g.id === r.groupId);
   const before = (image: { file: string }) =>
     r.groups.filter((g) => g.images.some((i) => imageKey(i) === imageKey(image))).map((g) => g.id);
@@ -261,7 +264,11 @@ function Editor({
     );
     const valid =
       !r.deleteBlocked &&
-      filenames.every((name) => name === imageBasename(name) && imagePath(name)) &&
+      filenames.every(
+        (name) =>
+          name === imageBasename(name) &&
+          ((value: unknown) => libraryPath(value, r.media ?? 'image'))(name),
+      ) &&
       new Set(destinations).size === destinations.length;
     return (
       <SettingsDialog
