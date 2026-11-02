@@ -29,6 +29,9 @@ internal sealed class InputCaptureEngine : IDisposable
     // Left/right Alt downs can precede Windows' Alt context. Use that evidence for the
     // first chord only: a release missed by this hook must not modify later plain keys.
     private int pendingAltSides;
+    // The next hook can withhold a modifier until it sees the first companion key.
+    private readonly HashSet<uint> withheldModifiers = [];
+    private readonly HashSet<uint> blockedKeysSharedWithNextHook = [];
     private readonly Dictionary<uint, bool> owned = [];
     private readonly Queue<ShortcutPressNotice> pendingPresses = [];
     private readonly Dictionary<ShortcutChord, List<ShortcutInput>> chords = [];
@@ -134,7 +137,10 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         if (disposed) return;
         // A release on another input desktop may never have reached this hook.
-        if (kind == 0x20) { pendingAltSides = 0; pressed.Remove(0xA4); pressed.Remove(0xA5); }
+        if (kind == 0x20) {
+            pendingAltSides = 0; withheldModifiers.Clear();
+            pressed.Remove(0xA4); pressed.Remove(0xA5); pressed.Remove(0x5B); pressed.Remove(0x5C);
+        }
         if (palette != null && unchecked((int)(time - palette.Since)) >= 0 &&
             (kind == 0x20 || kind == 3 && !palette.MatchesWindow(window))) DropPalette();
         if (confirmedPastes.Count != 0) {
@@ -290,7 +296,7 @@ internal sealed class InputCaptureEngine : IDisposable
         var needMouse = recording != null || Gestures.NeedsMouse || palette != null || confirmedPastes.Count != 0;
         if (needKeyboard && keyboardHook == 0) {
             pressed.Clear();
-            pendingAltSides = 0;
+            pendingAltSides = 0; withheldModifiers.Clear();
             for (uint key = 1; key < 256; key++)
                 if (!ShortcutCodec.IsPulse(key) && (GetAsyncKeyState((int)key) & 0x8000) != 0) pressed.Add(key);
             keyboardHook = SetWindowsHookEx(13, keyboardCallback, GetModuleHandle(null), 0);
@@ -300,13 +306,15 @@ internal sealed class InputCaptureEngine : IDisposable
             mouseHook = SetWindowsHookEx(14, mouseCallback, GetModuleHandle(null), 0);
             if (mouseHook == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
         }
-        if (!needKeyboard && keyboardHook != 0) { UnhookWindowsHookEx(keyboardHook); keyboardHook = 0; pressed.Clear(); }
+        if (!needKeyboard && keyboardHook != 0) {
+            UnhookWindowsHookEx(keyboardHook); keyboardHook = 0; pressed.Clear(); withheldModifiers.Clear();
+        }
         if (!needMouse && mouseHook != 0) { UnhookWindowsHookEx(mouseHook); mouseHook = 0; }
     }
     private int Modifiers(uint current, bool up, uint flags, bool observedAlt)
     {
         // This callback precedes the OS asynchronous state update for the current key.
-        bool Held(uint key) => key == current ? !up : (GetAsyncKeyState((int)key) & 0x8000) != 0;
+        bool Held(uint key) => key == current ? !up : withheldModifiers.Contains(key) || (GetAsyncKeyState((int)key) & 0x8000) != 0;
         bool HeldAlt(uint key) => Held(key) || (recording != null && owned.ContainsKey(key) && pressed.Contains(key));
         return (Held(0xA2) || Held(0xA3) || Held(0x11) ? 1 : 0) |
             ((flags & 0x20) != 0 || observedAlt || HeldAlt(0xA4) || HeldAlt(0xA5) || Held(0x12) ? 2 : 0) |
@@ -325,23 +333,50 @@ internal sealed class InputCaptureEngine : IDisposable
         var repeat = !up && !pulse && !pressed.Add(data.Key);
         if (up || pulse) pressed.Remove(data.Key);
         int altSide = data.Key switch { 0xA4 => 1, 0xA5 => 2, _ => 0 };
+        bool canBeWithheld = altSide != 0 || data.Key is 0x5B or 0x5C;
+        if (up && canBeWithheld) withheldModifiers.Remove(data.Key);
         if (up) pendingAltSides &= ~altSide;
         else if (!repeat) pendingAltSides |= altSide;
         bool auxiliary = ShortcutCodec.IsModifier(data.Key) ||
             ((data.Flags & 0x10) != 0 && data.Key is 0xE8 or 0xFF); // injected menu masks
         bool observedAlt = pendingAltSides != 0;
         if (!up && !auxiliary) pendingAltSides = 0;
+        nint Forward()
+        {
+            if (!up && !auxiliary) withheldModifiers.Clear();
+            var result = CallNextHookEx(keyboardHook, code, message, pointer);
+            if (canBeWithheld && !up) {
+                if (result == 0) withheldModifiers.Remove(data.Key);
+                else if (!repeat) withheldModifiers.Add(data.Key);
+            }
+            return result;
+        }
+        void BlockChord(int modifiers)
+        {
+            if (withheldModifiers.Count != 0) {
+                // A grab/drag hook needs the companion to finish its deferred modifier.
+                // Let it observe the press before the menu mask, then veto delivery to Windows.
+                if (!pulse) blockedKeysSharedWithNextHook.Add(data.Key);
+                Forward();
+            }
+            MaskBlockedModifier(modifiers);
+        }
         bool? blockDecision = null;
         try {
             if (owned.TryGetValue(data.Key, out var blocked)) {
+                blockDecision = blocked;
                 if (up) { owned.Remove(data.Key); if (owned.Count == 0) QueueRefresh(); }
-                return blocked ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
+                if (!blocked) return Forward();
+                bool shared = up ? blockedKeysSharedWithNextHook.Remove(data.Key) : blockedKeysSharedWithNextHook.Contains(data.Key);
+                if (shared) Forward();
+                return 1;
             }
             // LLKHF_ALTDOWN describes this event, including when the asynchronous Alt state is not visible.
             var modifiers = Modifiers(data.Key, up, data.Flags, observedAlt);
-            if (!up && !auxiliary && (modifiers & 2) == 0) {
-                // The hook can also have missed the up used for repeat detection.
-                pressed.Remove(0xA4); pressed.Remove(0xA5);
+            if (!up && !auxiliary) {
+                // Drop stale repeat state once a plain key confirms that modifier is up.
+                if ((modifiers & 2) == 0) { pressed.Remove(0xA4); pressed.Remove(0xA5); }
+                if ((modifiers & 8) == 0) { pressed.Remove(0x5B); pressed.Remove(0x5C); }
             }
             if (palette != null && !up && !repeat && !auxiliary) {
                 var key = data.Key switch { 38 => "up", 40 => "down", 13 => "choose", 27 => "cancel", _ => null };
@@ -384,27 +419,27 @@ internal sealed class InputCaptureEngine : IDisposable
                     if (key != null && notify("shortcuts.recorded", new { token = recording.Token, key })) {
                         if (!pulse) owned[data.Key] = true;
                         blockDecision = true;
-                        MaskBlockedModifier(modifiers);
+                        BlockChord(modifiers);
                         return 1;
                     }
                 }
-                return CallNextHookEx(keyboardHook, code, message, pointer);
+                return Forward();
             }
             if (DialogOwns(chord, capturedWindow))
-                return CallNextHookEx(keyboardHook, code, message, pointer);
+                return Forward();
             if (Gestures.Keyboard(code, message, pointer) != 0) {
                 // A right-button gesture owns its captured modifier until release.
                 if (altSide != 0) { pendingAltSides &= ~altSide; pressed.Remove(data.Key); }
                 return 1;
             }
             if (up || repeat || configuration == null || !connected.Any())
-                return CallNextHookEx(keyboardHook, code, message, pointer);
+                return Forward();
             // A click can immediately re-arm the same field. Until the host acknowledges the end,
             // leave that window's input alone, but handle the first key in another app right here.
             if (!touchpad && configuration.Recording is { } recorder && recorder.Window == capturedWindow.ToInt64().ToString())
-                return CallNextHookEx(keyboardHook, code, message, pointer);
+                return Forward();
             var rows = connected.Where(row => row.Owner == null || (row.Owner.StartsWith("touchpad:", StringComparison.Ordinal) && TouchpadInputLease.Accepts(row.TouchpadGeneration))).ToList();
-            if (rows.Count == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
+            if (rows.Count == 0) return Forward();
             var target = rows.Any(row => row.Owner != null || row.Conditions is {Length:>0}) ? CommandTargetCapture.Capture(capturedWindow) : null;
             // A local binding sharing this key still dispatches through the native owner, without blocking ordinary input.
             GetWindowThreadProcessId(capturedWindow, out var foregroundProcess);
@@ -414,12 +449,12 @@ internal sealed class InputCaptureEngine : IDisposable
                 Row = row,
                 Conditions = row.Conditions?.Where(c => CommandConditions.Matches(c.When, context, environment: row.Environment) && CommandConditions.MatchesStack(c.StackConditions, context, row.Environment)).ToArray()
             }).Where(item => item.Conditions == null || item.Conditions.Length > 0 || local).ToArray();
-            if (matched.Length == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
+            if (matched.Length == 0) return Forward();
             var block = matched.Any(item => item.Conditions == null ? item.Row.BlockOriginalInput : item.Conditions.Any(c => c.BlockOriginalInput));
             blockDecision = block;
             // Own both halves before notification or synchronization can fail.
             if (!pulse) owned[data.Key] = block;
-            if (block) MaskBlockedModifier(modifiers);
+            if (block) BlockChord(modifiers);
             var window = capturedWindow.ToInt64().ToString();
             var press = new ShortcutPressNotice(configuration.ShortcutRevision, ++pressId,
                 matched.Select(item => item.Row.Shortcut).Distinct().ToArray(), block, window, configuration.Context,
@@ -428,10 +463,10 @@ internal sealed class InputCaptureEngine : IDisposable
             // A blocked key cannot reach it, so retain that press until synchronization completes.
             if (accepting || block) pendingPresses.Enqueue(press);
             FlushPendingPresses();
-            return block ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
+            return block ? 1 : Forward();
         } catch {
             try { notify("input.error", new { message = "入力の通知に失敗しました。確定済みの元入力ブロックは維持します。" }); } catch { }
-            return blockDecision == true ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
+            return blockDecision == true ? 1 : Forward();
         }
     }
     private void FlushPendingPresses()
@@ -475,7 +510,7 @@ internal sealed class InputCaptureEngine : IDisposable
         }
         if (data.Extra == GestureEngine.InputMarker) return CallNextHookEx(mouseHook, code, message, pointer);
         if (recording != null && message is 0x201 or 0x204 or 0x207 or 0x20B) EndRecording();
-        return Gestures.Mouse(code, message, pointer) != 0 ? 1 : CallNextHookEx(mouseHook, code, message, pointer);
+        return Gestures.Mouse(code, message, pointer, withheldModifiers.Count != 0) != 0 ? 1 : CallNextHookEx(mouseHook, code, message, pointer);
     }
     private void EndRecording()
     {
@@ -512,6 +547,7 @@ internal sealed class InputCaptureEngine : IDisposable
         if (keyboardHook != 0) UnhookWindowsHookEx(keyboardHook);
         if (mouseHook != 0) UnhookWindowsHookEx(mouseHook);
         keyboardHook = mouseHook = 0; owned.Clear(); pressed.Clear(); pendingPresses.Clear();
+        withheldModifiers.Clear(); blockedKeysSharedWithNextHook.Clear();
         Gestures.Dispose();
     }
     private delegate nint HookCallback(int code, uint message, nint data);

@@ -76,6 +76,7 @@ internal static partial class Program
                 FocusTarget(owner);
                 await Task.Delay(80);
                 await CheckNativePopup(owner, assembly);
+                CheckPress(owner.PointToScreen(new(260, 180)), true, "a modifier withheld by a drag hook leaves the right button to that hook", assembly, modifierWithheld: true);
                 CheckPress(owner.PointToScreen(new(260, 180)), false, "gesture starts again after menu closes", assembly);
             } catch (Exception e) { Console.Error.WriteLine(e); failed = true; }
             finally { owner.Close(); }
@@ -83,7 +84,7 @@ internal static partial class Program
         Application.Run(owner);
         return failed ? 1 : 0;
     }
-    private static void CheckPress(Point point, bool pass, string label, Assembly assembly, bool activate = true)
+    private static void CheckPress(Point point, bool pass, string label, Assembly assembly, bool activate = true, bool modifierWithheld = false)
     {
         const BindingFlags members = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
         var noticeType = assembly.GetType("AppDock.InputHost.GestureIndicatorNotifications", true)!;
@@ -103,7 +104,7 @@ internal static partial class Program
         var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<PopupMouseData>());
         try {
             Marshal.StructureToPtr(new PopupMouseData { X = point.X, Y = point.Y }, pointer, false);
-            var down = (nint)mouse.Invoke(engine, [0, 0x204u, pointer])!;
+            var down = (nint)mouse.Invoke(engine, [0, 0x204u, pointer, modifierWithheld])!;
             var ready = (bool)type.GetField("ready", members)!.GetValue(engine)!;
             if (pass ? down != 0 || ready : down != 1 || !ready) {
                 var target = GestureTarget.At(new(point.X, point.Y));
@@ -112,7 +113,7 @@ internal static partial class Program
                 Console.Error.WriteLine($"Popup preflight: point={point}, target={target}, foreground={GetForegroundWindow()}, class={className}, style={PopupWindowStyle(target, -16):X}, exStyle={PopupWindowStyle(target, -20):X}, owner={PopupWindowOwner(target, 4)}, down={down}, ready={ready}");
             }
             PopupCheck(pass ? down == 0 && !ready : down == 1 && ready, label);
-            if (pass) PopupCheck((nint)mouse.Invoke(engine, [0, 0x205u, pointer])! == 0, label + " releases without capture");
+            if (pass) PopupCheck((nint)mouse.Invoke(engine, [0, 0x205u, pointer, modifierWithheld])! == 0, label + " releases without capture");
         } finally { Marshal.FreeHGlobal(pointer); }
     }
     private static async Task CheckNativePopup(Form owner, Assembly assembly)

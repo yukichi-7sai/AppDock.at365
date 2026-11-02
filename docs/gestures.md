@@ -56,7 +56,7 @@ InputHostは開始対象のHWND・プロセス・Window class・デスクトッ�
 
 Windowsのアクティブ化中は`GetForegroundWindow()`が一時的にNULLになる場合がある。開始準備中だけこの遷移を許容し、workerで対象のアクティブ化を最大500msまで確認する。他のWindowへ切り替わった場合は中止し、NULLのまま実行へ進まない。準備全体も1000msを上限とし、成功後は通常の対象変更取消へ戻す。参照: [GetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getforegroundwindow)、[SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)。
 
-右ボタン押下時にCtrl/Alt/Shift/Win（左右両方）、左/中/X1/X2ボタンが既に押されている場合は待機を開始せず、右ボタンの押下・解放と通常入力を通す。途中のキー/ボタン解放では開始しない。開始判定はGetAsyncKeyStateの上位ビットを使い、左右ボタンの入れ替えではSM_SWAPBUTTONで論理左ボタンに対応する物理ボタンを選ぶ。前のジェスチャーで捕捉し、まだ解放されていない修飾キー・左/中ボタンも開始を見送る。待機開始後の修飾キー・クリックの捕捉は維持する。通常キーの押下状態は開始判定に含めない。
+右ボタン押下時にCtrl/Alt/Shift/Win（左右両方）、左/中/X1/X2ボタンが既に押されている場合は待機を開始せず、右ボタンの押下・解放と通常入力を通す。途中のキー/ボタン解放では開始しない。開始判定はGetAsyncKeyStateの上位ビットを使い、左右ボタンの入れ替えではSM_SWAPBUTTONで論理左ボタンに対応する物理ボタンを選ぶ。後続のキーボードフックがAlt／Winの押下を保留している間も、修飾キー＋右ドラッグをそのアプリへ通す。前のジェスチャーで捕捉し、まだ解放されていない修飾キー・左/中ボタンも開始を見送る。待機開始後の修飾キー・クリックの捕捉は維持する。通常キーの押下状態は開始判定に含めない。
 
 右ボタン解放で、認識した1段階または2段階の移動と完全一致する操作を実行する。距離は5〜500pxで、各方向の検出に同じ設定値を使う。何も認識せずに解放した場合だけ通常右クリックを再送し、取消・未割当ストロークでは再送しない。右ドラッグを使うアプリは除外または一時停止する。
 

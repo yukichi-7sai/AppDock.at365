@@ -94,6 +94,14 @@ internal static partial class Program
                 Check(notices.Last().GetProperty("Shortcuts")[0].GetString()=="Alt+V",
                     "after a plain key the next fresh Alt down still identifies its first chord without OS context");
             }
+            foreach (var win in new[] { 0x5Bu, 0x5Cu }) {
+                Reset(); Inputs(new { shortcut = "Win+C", blockOriginalInput = false },
+                    new { shortcut = "C", blockOriginalInput = false });
+                Feed(key:win); // no downstream hold and no OS state; the release goes unobserved.
+                Feed(key:0x43); Feed(true,0x43);
+                Check(notices.Single().GetProperty("Shortcuts")[0].GetString() == "C" && !pressed.Contains(win),
+                    $"plain C clears a missed Win release ({win:X2}) so the next press can be recognized");
+            }
             Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false });
             var gestures = type.GetProperty("Gestures", members)!.GetValue(engine)!;
             var gestureKeys = (HashSet<uint>)gestures.GetType().GetField("keys", members)!.GetValue(gestures)!;

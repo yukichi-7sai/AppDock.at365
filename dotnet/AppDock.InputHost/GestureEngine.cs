@@ -216,14 +216,18 @@ internal sealed class GestureEngine : IDisposable
         if (!ready && !busy) timer.Stop();
         ReleaseHooksIfIdle();
     }
-    internal nint Mouse(int code, uint message, nint data)
+    internal nint Mouse(int code, uint message, nint data, bool modifierWithheld)
     {
         if (code < 0 || disposed) return 0;
         var input = Marshal.PtrToStructure<MouseData>(data);
         if (input.Extra == InputMarker) return 0;
         try {
             if ((message is 0x202 or 0x208) && clicks.Remove(message)) { ReleaseHooksIfIdle(); return 1; }
-            if (message == 0x204 && !ready) { if (starting != null) StopStart(true); Begin(input.Point); if (ready) return 1; }
+            if (message == 0x204 && !ready) {
+                if (starting != null) StopStart(true);
+                if (!modifierWithheld) Begin(input.Point);
+                if (ready) return 1;
+            }
             else if (ready || starting != null) {
                 if (starting is { } pending ? !StartCurrent(pending) : !Current && !IntentionalForeground) { cancelled=true; StopStart(false); CancelPending(); }
                 if (!otherMode && message is 0x200 or 0x205) Move(input.Point);
