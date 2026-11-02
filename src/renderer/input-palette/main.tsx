@@ -1,6 +1,10 @@
 import { createRoot } from 'react-dom/client';
 import { useEffect, useRef, useState } from 'react';
-import type { InputPaletteApi, InputPaletteModel } from '../../shared/input-palette';
+import {
+  inputPaletteRowHeight as rowHeight,
+  type InputPaletteApi,
+  type InputPaletteModel,
+} from '../../shared/input-palette';
 import '../theme.css';
 import './window.css';
 declare global {
@@ -9,7 +13,6 @@ declare global {
   }
 }
 
-const rowHeight = 50;
 function Palette() {
   const [model, setModel] = useState<InputPaletteModel | null>(null);
   const current = useRef('');
@@ -46,7 +49,6 @@ function Palette() {
     <>
       <header data-palette-session={model.session}>
         <strong>{model.title}</strong>
-        <span>{model.mode}</span>
       </header>
       <div className="choices" ref={list} onScroll={(e) => scroll(e.currentTarget.scrollTop)}>
         {model.rows.length === 0 ? (

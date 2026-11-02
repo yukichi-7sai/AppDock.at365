@@ -382,6 +382,12 @@ internal sealed class InputCaptureEngine : IDisposable
         try {
             if (owned.TryGetValue(data.Key, out var blocked)) {
                 blockDecision = blocked;
+                if (palette != null && palette.HeldArrows.TryGetValue(data.Key, out var arrow)) {
+                    if (up) palette.HeldArrows.Remove(data.Key);
+                    else if (!palette.IsCurrent()) DropPalette();
+                    else if (Modifiers(data.Key, up, eventAlt) == 0)
+                        notify("palette.key", new { session = palette.Session, key = arrow });
+                }
                 if (up) { owned.Remove(data.Key); if (owned.Count == 0) QueueRefresh(); }
                 if (!blocked) return Forward();
                 bool shared = up ? blockedKeysSharedWithNextHook.Remove(data.Key) : blockedKeysSharedWithNextHook.Contains(data.Key);
@@ -403,6 +409,7 @@ internal sealed class InputCaptureEngine : IDisposable
                     else {
                         var session = palette.Session;
                         if (key == "choose") ConfirmPalette();
+                        else palette.HeldArrows.Add(data.Key, key);
                         notify("palette.key", new { session, key });
                     }
                     return 1;

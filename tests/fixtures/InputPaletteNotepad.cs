@@ -144,6 +144,12 @@ public static class PaletteNotepadFixture {
         if(action=="open"){Chord(0x11,0x12,0x10,0x39);return "ok";}
         if(action=="alt-c"){Chord(0x12,0x43);return "ok";}
         if(AltTestKey(action))return "ok";
+        if(action=="repeat-up" || action=="repeat-down" || action=="repeat-enter"){
+            byte key=action=="repeat-up" ? (byte)38 : action=="repeat-down" ? (byte)40 : (byte)13;
+            for(int i=0;i<4;i++)Key(key,false);
+            Key(key,true);
+            return "ok";
+        }
         if(action=="up"){Chord(38);return "ok";}
         if(action=="down"){Chord(40);return "ok";}
         if(action=="enter"){Chord(13);return "ok";}

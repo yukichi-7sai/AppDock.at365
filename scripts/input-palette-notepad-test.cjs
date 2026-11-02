@@ -25,6 +25,12 @@ const values = ['こんにちは', 'ありがとう🌸', '1行目\r\n2行目�
 fs.writeFileSync(path.join(textDir, '03.txt'), values[2]);
 for (const flag of ['off', 'on'])
   fs.writeFileSync(path.join(textDir, flag + '.txt'), token + '-' + flag);
+const snippetFiles = ['01.txt', '02.txt', '03.txt', 'off.txt', 'on.txt'];
+for (let i = 6; i <= 10; i++) {
+  const name = i + '.txt';
+  fs.writeFileSync(path.join(textDir, name), '候補' + i);
+  snippetFiles.push(name);
+}
 settings.updates.checkHostOnStartup = false;
 settings.updates.checkAppletsOnStartup = false;
 settings.host.closeToTray = false;
@@ -33,7 +39,7 @@ settings.textLibrary = {
     {
       id: require('../out/main/shared/text-library').snippetGroupId,
       name: '定型文',
-      files: ['01.txt', '02.txt', '03.txt', 'off.txt', 'on.txt'].map((file) => ({ file })),
+      files: snippetFiles.map((file) => ({ file })),
     },
   ],
 };
@@ -292,6 +298,27 @@ const open = async () => {
   return visible();
 };
 const closed = () => wait(async () => !(await paletteVisible()), 'palette closes');
+async function checkPaletteLabels(panel, title) {
+  assert.equal(await panel.locator('header').innerText(), title);
+  assert.equal(await panel.locator('footer').textContent(), '↑↓ 選択　Enter 確定　Esc 閉じる');
+}
+async function checkSnippetNavigation(panel) {
+  await checkPaletteLabels(panel, '定型文パレット');
+  for (const [action, expected] of [
+    ['repeat-down', 4], ['repeat-down', 8], ['repeat-down', 9], ['repeat-down', 9],
+    ['repeat-up', 5], ['repeat-up', 1], ['repeat-up', 0], ['repeat-up', 0],
+  ]) {
+    await act(action);
+    const row = panel.locator('[aria-current=true][data-index="' + expected + '"]');
+    await wait(async () => row.evaluate((el) => {
+      const list = el.closest('.choices').getBoundingClientRect();
+      const bounds = el.getBoundingClientRect();
+      return bounds.top >= list.top - 1 && bounds.bottom <= list.bottom + 1;
+    }, undefined, { timeout: 1000 }), 'entire selected row visible at index ' + expected);
+  }
+  await panel.screenshot({ path: path.join(profile, 'snippets.png') });
+  checks.push('Held arrows move once per keydown, scroll each selection into view and stop at both ends');
+}
 async function openEdgeField() {
   edge = await chromium.launch({ channel: 'msedge', headless: false, args: ['--no-first-run'] });
   const web = await edge.newPage();
@@ -418,6 +445,8 @@ async function checkTapPalette(target, field) {
         await act(
           i < 4 ? 'release-test-alt' : i < 8 ? 'release-unobserved-alt' : 'release-masked-alt',
         );
+        if (i === 0) await checkSnippetNavigation(panel);
+        if (i === 1) await checkPaletteLabels(panel, 'クリップボード履歴パレット');
         await act('down');
         if ((await panel.locator('[data-index="1"]').count()) > 0)
           await panel.locator('[data-index="1"][aria-current=true]').waitFor({ timeout: 1500 });
@@ -500,6 +529,7 @@ async function checkTapPalette(target, field) {
     await state('あい');
     await act('caret');
     let panel = await open();
+    await checkSnippetNavigation(panel);
     await act('down');
     await panel.locator('[data-index="1"][aria-current=true]').waitFor();
     await state('あい');
@@ -510,10 +540,10 @@ async function checkTapPalette(target, field) {
     panel = await open();
     await act('down');
     await panel.locator('[data-index="1"][aria-current=true]').waitFor();
-    await act('enter');
+    await act('repeat-enter');
     await closed();
     await state('あありがとう🌸い');
-    checks.push('arrows and Enter insert second row at original caret, including surrogate pair');
+    checks.push('Held Enter inserts the second row exactly once at the original caret, including surrogate pair');
     panel = await open();
     const bounds = await panel.locator('[data-index="0"]').boundingBox();
     const hit = await mainEval(({ BrowserWindow, screen }, point) => {
@@ -675,6 +705,13 @@ async function checkTapPalette(target, field) {
       return visible(true);
     };
     const history = await openHistory();
+    await checkPaletteLabels(history, 'クリップボード履歴パレット');
+    const afterRepeat = Math.min(4, (await history.locator('[data-index]').count()) - 1);
+    assert(afterRepeat >= 1, 'both seeded history items are available');
+    await act('repeat-down');
+    await history.locator('[data-index="' + afterRepeat + '"][aria-current=true]').waitFor();
+    await act('repeat-up');
+    await history.locator('[data-index="0"][aria-current=true]').waitFor();
     const textRow = history.getByRole('button', { name: token + '🌸', exact: true });
     await textRow.waitFor();
     await act('guard');

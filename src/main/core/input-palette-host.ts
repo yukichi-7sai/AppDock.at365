@@ -4,7 +4,7 @@ import { appearanceArguments, registerAppearance } from './appearance-host';
 import type { InputCaptureManager } from './gestures';
 import type { TextLibraryService } from './text-library-service';
 import type { LibraryEntry } from '../../shared/library-assets';
-import type { InputPaletteModel } from '../../shared/input-palette';
+import { inputPaletteBounds, type InputPaletteModel } from '../../shared/input-palette';
 import { hostText } from '../../shared/i18n';
 
 interface Session {
@@ -49,7 +49,6 @@ export class InputPaletteHost {
       selected: s.selected,
       rows: s.entries.map(({ name, preview, thumbnail }) => ({ name, preview, thumbnail })),
       title: hostText(s.kind === 'history' ? 'inputPalette.historyTitle' : 'inputPalette.title'),
-      mode: hostText('inputPalette.mode'),
       keys: hostText('inputPalette.keys'),
       empty: s.empty,
     });
@@ -204,15 +203,8 @@ export class InputPaletteHost {
       }
       const point = screen.screenToDipPoint(anchor),
         area = screen.getDisplayNearestPoint(point).workArea;
-      const width = Math.min(370, area.width),
-        height = Math.min(area.height, 78 + 50 * Math.max(1, Math.min(5, s.entries.length)));
-      const x = Math.max(area.x, Math.min(point.x, area.x + area.width - width));
-      const y = Math.max(
-        area.y,
-        point.y + height + 4 <= area.y + area.height ? point.y + 4 : point.y - height - 16,
-      );
       const win = this.surface();
-      win.setBounds({ x, y, width, height });
+      win.setBounds(inputPaletteBounds(point, area, s.entries.length));
       let timeout: ReturnType<typeof setTimeout> | undefined;
       const rendered = new Promise<void>((resolve, reject) => {
         s.ready = resolve;
@@ -264,7 +256,9 @@ export class InputPaletteHost {
       return;
     }
     if (key !== 'up' && key !== 'down') return;
-    s.selected = Math.max(0, Math.min(s.entries.length - 1, s.selected + (key === 'up' ? -1 : 1)));
+    const next = Math.max(0, Math.min(s.entries.length - 1, s.selected + (key === 'up' ? -1 : 1)));
+    if (next === s.selected) return;
+    s.selected = next;
     if (this.connected) this.window?.webContents.send('input-palette:selected', s.id, s.selected);
   }
   private choose(s: Session, index: number) {
