@@ -6,7 +6,9 @@
 - 本文・画像管理・設定の画像選択のプレビューが同じ幅とヘッダーを使う。右上の×に「閉じる」の読み上げ名を付け、背景クリック、Escape、内容操作中の維持、呼出元フォーカスへの復帰を共通化。本文の高さは内容に合わせる。テキストの作成/編集/複製のみ、EnterとShift+Enterで改行し適用時に保存する。通常設定のEnter確定、IMEとEscapeの契約を維持する。
 - 型検査・ビルド・専用発行成功。ソースと固定EXEでテキスト8群、プレビュー実幅はウィンドウ1360pxで画像/本文960px、600pxで512px。固定EXEで設定の画像選択と既存Applet連携10群、共通入力9群、隔離smokeが成功。共通入力試験はPC別の通知ボイス設定を共有ファイルで照合していたため、実際のPC別保存ファイルに対して入力途中と確定後を検証するよう修正した。IMEは模擬入力で確認。
 - 標準173ファイル1,567件のうち、128ファイル1,203件を今回実行した（直列13件＋1,190件、fail/skip/cancel 0）。残る45ファイル364件は0.121.0実装時と基点の成功結果・関係する入力を照合して再利用。ページ候補への新ライブラリー追加、非RIDの.NET試験用ホスト出力、設定監視試験の実行条件も確認。0.121.1のstage/専用発行先/更新ZIPの管理693ファイルが一致した。
-- コミット前の証跡は専用worktree `A:\30.PROJECT\AppDock.at365-text-library\.artifacts\commit-validation-text-library-20261102` の`test-plan.json`、`validation.json`、`feature-fixed.json`、`feature-publication.json`、`stage.json`。mainは検証したtreeへfast-forwardし、通常発行先と最終EXEの照合をmain側の`.artifacts/commit-validation-text-library-20261102/`に記録する。文字入力パレットは別作業。
+- コミット前の証跡は専用worktree `A:\30.PROJECT\AppDock.at365-text-library\.artifacts\commit-validation-text-library-20261102` の`test-plan.json`、`validation.json`、`feature-fixed.json`、`feature-publication.json`、`stage.json`。mainを実装コミット`2b01d7b6f0e9dc4e04188bd35fa4ed2052980384`へfast-forwardし、stageとcommitのtree `bd8ca900a573d95500b728a2b55d2ff000361709`の一致を確認した。
+- mainから通常発行先`A:\40.ARTIFACT\AppDock.at365\win-unpacked`へ0.121.1を発行。最終EXE SHA256 `a9859fa2a9577319ea07c9c2c4670df14bbace61fcc889bdb69f60b9c64df345`、ZIP 270,913,205 bytes / SHA256 `6db5e8e42abf6e7ff44b8b1204f782af4f6f9656795ece02913e9e93c73f7dc1`。stage・発行先・ZIPの693ファイル、feedの版・サイズ・hashが一致した。このEXEの隔離コピーでテキスト8群（広幅/狭幅のプレビュー実幅も再照合）、画像選択/連携10群、設定入力9群、smokeがすべて成功。`main-publication.json`・`main-completed.json`・各ログをmain側の`.artifacts/commit-validation-text-library-20261102/`に記録した。
+- 両作業ツリーで使用中プロセス・実パス・再解析ポイント・manifestを確認し、古い成功済み固定コピー6か所のランタイム108項目だけを整理。最新コピー・結果・画像・設定など7,924ファイルのhashを保持確認、失敗/スキップ0。各`cleanup-summary.json`に対象と実測を記録。文字入力パレットは別作業。
 
 ## 2026-11-02: テキストライブラリー 0.121.0
 
