@@ -4,6 +4,7 @@ export const defaultNavigation = { route: 'settings', section: 'about' } as cons
 export type PageRoute =
   | 'image-library'
   | 'sound-library'
+  | 'text-library'
   | 'extensions'
   | 'settings'
   | 'logs'
@@ -13,9 +14,15 @@ export type PageRoute =
 export function isPageRoute(value: unknown): value is PageRoute {
   return (
     typeof value === 'string' &&
-    (['image-library', 'sound-library', 'extensions', 'settings', 'logs', 'notifications'].includes(
-      value,
-    ) ||
+    ([
+      'image-library',
+      'sound-library',
+      'text-library',
+      'extensions',
+      'settings',
+      'logs',
+      'notifications',
+    ].includes(value) ||
       /^page:[a-z0-9.-]+:[a-z0-9.-]+$/.test(value))
   );
 }

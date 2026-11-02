@@ -32,6 +32,7 @@ test('fresh host defaults match the supplied behavior without installation histo
     'settings',
     'image-library',
     'sound-library',
+    'text-library',
     'notifications',
     'logs',
     'theme',

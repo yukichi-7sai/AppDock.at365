@@ -73,7 +73,7 @@ export class DeviceSettingsStore extends SettingsStore {
     return JSON.stringify(configuration);
   }
   override uiStateStorage(
-    section: 'ribbon' | 'gallery' | 'soundGallery' | 'windows',
+    section: 'ribbon' | 'gallery' | 'soundGallery' | 'textGallery' | 'windows',
     key?: string,
   ): StateStorage {
     if (

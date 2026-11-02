@@ -378,8 +378,18 @@ function App() {
     ) ?? []),
   ];
   async function execute(id: string) {
-    if (id === 'appdock.image-library.open' || id === 'appdock.sound-library.open') {
-      setPage(id === 'appdock.sound-library.open' ? 'sound-library' : 'image-library');
+    if (
+      id === 'appdock.image-library.open' ||
+      id === 'appdock.sound-library.open' ||
+      id === 'appdock.text-library.open'
+    ) {
+      setPage(
+        id === 'appdock.text-library.open'
+          ? 'text-library'
+          : id === 'appdock.sound-library.open'
+            ? 'sound-library'
+            : 'image-library',
+      );
       return;
     }
     if (id === 'appdock.notifications.open') {
@@ -436,7 +446,8 @@ function App() {
           page === 'logs' ||
           page === 'notifications' ||
           page === 'image-library' ||
-          page === 'sound-library'
+          page === 'sound-library' ||
+          page === 'text-library'
             ? 'host-page-main'
             : page.startsWith('page:')
               ? 'applet-page-main'
@@ -526,7 +537,7 @@ function App() {
                 onReady={hostUiRendered}
               />
             )}
-            {(page === 'image-library' || page === 'sound-library') && (
+            {(page === 'image-library' || page === 'sound-library' || page === 'text-library') && (
               <HostPageSlot
                 key={page}
                 kind={page}

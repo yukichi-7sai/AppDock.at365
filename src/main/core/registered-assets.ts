@@ -14,10 +14,12 @@ import {
 } from '../../shared/library-assets';
 import { assetFile, safeDirectory, scanAssetTree } from './library-files';
 import { libraryText } from '../../shared/library-text';
+import { atomicWrite, SettingsConflictError } from './settings';
 export interface AssetPolicy {
   media: LibraryMedia;
   assignedDirectory: string;
   maxBytes: number;
+  allowEmpty?: boolean;
   format(bytes: Buffer): string;
   validate(bytes: Buffer, name: string): Promise<DecodedAsset>;
 }
@@ -27,6 +29,9 @@ export interface DecodedAsset {
   thumbnail: string;
   circle: string;
   durationMs?: number;
+  textPreview?: string;
+  characters?: number;
+  lines?: number;
 }
 export type AssetDecoder = (bytes: Buffer) => DecodedAsset | Promise<DecodedAsset>;
 interface AssetRecord {
@@ -141,6 +146,9 @@ export class RegisteredAssets {
       width: image.width,
       height: image.height,
       ...(image.durationMs === undefined ? {} : { durationMs: image.durationMs }),
+      ...(image.textPreview === undefined
+        ? {}
+        : { textPreview: image.textPreview, characters: image.characters, lines: image.lines }),
       available: true,
       state: 'ready',
     });
@@ -156,7 +164,7 @@ export class RegisteredAssets {
     if (
       stat.isSymbolicLink() ||
       !stat.isFile() ||
-      !stat.size ||
+      (!stat.size && !this.policy.allowEmpty) ||
       stat.size > this.policy.maxBytes ||
       (await fs.realpath(file)).toLowerCase() !== file.toLowerCase()
     )
@@ -229,6 +237,9 @@ export class RegisteredAssets {
             thumbnail: record.entry.thumbnail,
             circle: record.circle,
             durationMs: record.entry.durationMs,
+            textPreview: record.entry.textPreview,
+            characters: record.entry.characters,
+            lines: record.entry.lines,
           };
         else {
           decoding = true;
@@ -291,6 +302,34 @@ export class RegisteredAssets {
   }
   async add(bytes: Buffer, filename: string): Promise<RegisteredImageRef> {
     return (await this.addWithResult(bytes, filename)).ref;
+  }
+  /** Replace the confirmed generation only; external edits are rechecked at atomic commit. */
+  updateContent(ref: RegisteredImageRef, generation: string, bytes: Buffer, writable: () => void) {
+    const run = async () => {
+      if (this.policy.media !== 'text' || !this.reference(ref) || !generation)
+        throw Error(this.text('services.registeredImages.invalidReference'));
+      writable();
+      await this.validate(bytes, ref.file);
+      const original = await this.read(ref, generation);
+      writable();
+      safeDirectory(this.directory, imageParent(ref.file));
+      await this.fileSignature(ref.file);
+      writable();
+      if (original.bytes.equals(bytes)) return;
+      try {
+        atomicWrite(this.file(ref.file), bytes, { previous: original.bytes });
+      } catch (error) {
+        if (error instanceof SettingsConflictError)
+          throw Error(this.text('services.registeredImages.changed'));
+        throw error;
+      }
+      await this.refresh(false, [ref.file]);
+      // Revalidate the actual file: an external writer can replace it after our save.
+      await this.read(ref);
+    };
+    const task = this.queue.then(run, run);
+    this.queue = task.catch(() => {});
+    return task;
   }
   /** Only the confirmed, unchanged original may be recycled; failed settings saves restore it. */
   remove(
@@ -735,7 +774,9 @@ export class RegisteredAssets {
     if (!this.watching && !this.stopped) {
       this.watching = true;
       this.unregister = this.assistance?.register(
-        (this.policy.media === 'image' ? 'registered-images:' : 'registered-sound-library:') +
+        (this.policy.media === 'image'
+          ? 'registered-images:'
+          : `registered-${this.policy.media}-library:`) +
           path.resolve(this.directory).toLowerCase(),
         () => this.refresh(),
       );

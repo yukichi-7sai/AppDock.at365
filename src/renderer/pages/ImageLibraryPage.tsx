@@ -44,7 +44,15 @@ type Menu = {
 };
 export function ImageLibraryPage(props: { initialModel: ImageLibraryPageModel }) {
   return (
-    <LibraryMediaProvider media={props.initialModel.kind === 'sound-library' ? 'sound' : 'image'}>
+    <LibraryMediaProvider
+      media={
+        props.initialModel.kind === 'text-library'
+          ? 'text'
+          : props.initialModel.kind === 'sound-library'
+            ? 'sound'
+            : 'image'
+      }
+    >
       <LibraryPageBody {...props} />
     </LibraryMediaProvider>
   );
@@ -264,7 +272,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
   }, [initialModel]);
   useLayoutEffect(() => {
     const instance = mountImageGallery(grid.current!, {
-      errorText: media === 'sound' ? t('sounds.readFailed') : undefined,
+      errorText:
+        media === 'text'
+          ? t('texts.invalidEncoding')
+          : media === 'sound'
+            ? t('sounds.readFailed')
+            : undefined,
       expandLabels: true,
       size: libraryGallerySize,
       scrollElement: scroll.current!,
@@ -355,7 +368,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     });
     gallery.current = instance;
     sizeControl.current = mountGallerySizeControl(size.current!, {
-      label: media === 'sound' ? t('sounds.cardSize') : undefined,
+      label: media !== 'image' ? t('sounds.cardSize') : undefined,
       range: libraryGallerySize,
       value: latest.current.content.cardWidth,
       change: (value) => {
@@ -452,9 +465,28 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     menuItems = [
       {
         label: t('images.preview'),
-        disabled: media === 'sound' ? count !== 1 : !count,
+        disabled: media !== 'image' ? count !== 1 : !count,
         run: () => edit('preview'),
       },
+      ...(media === 'text'
+        ? [
+            {
+              label: t('texts.edit'),
+              disabled: count !== 1 || unreadable,
+              run: () => edit('text-edit'),
+            },
+            {
+              label: t('texts.duplicate'),
+              disabled: count !== 1 || unreadable,
+              run: () => edit('text-duplicate'),
+            },
+            {
+              label: t('texts.copy'),
+              disabled: !count || unreadable,
+              run: () => file('copy-text'),
+            },
+          ]
+        : []),
       {
         label: t('images.renameImages'),
         disabled: !count || unreadable,
@@ -575,7 +607,10 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
           run({ command: 'select-all' });
         } else if (c.selected && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
           e.preventDefault();
-          run({ command: 'file-action', operation: e.shiftKey ? 'copy-paths' : 'copy-files' });
+          run({
+            command: 'file-action',
+            operation: e.shiftKey ? 'copy-paths' : media === 'text' ? 'copy-text' : 'copy-files',
+          });
         } else if (
           c.selected &&
           !e.ctrlKey &&
@@ -595,13 +630,26 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
     >
       <header className="library-header">
         <h1>
-          <Icon name={media === 'sound' ? 'music' : 'image'} size={19} />
+          <Icon
+            name={media === 'text' ? 'file' : media === 'sound' ? 'music' : 'image'}
+            size={19}
+          />
           {t('images.title')}
         </h1>
         <div className="library-header-actions">
+          {media === 'text' && (
+            <SettingsButton
+              disabled={c.busy}
+              appearance="filled"
+              onClick={() => dialog('text-create')}
+            >
+              <Icon name="edit" size={15} />
+              {t('texts.create')}
+            </SettingsButton>
+          )}
           <SettingsButton
             disabled={c.busy}
-            appearance="filled"
+            appearance={media === 'text' ? undefined : 'filled'}
             onClick={() => run({ command: 'add' })}
           >
             <Icon name="upload" size={15} />
@@ -759,6 +807,7 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                 <div className="library-summary">
                   <div>
                     <strong>{t('images.imageCount', { count: c.total })}</strong>
+                    {c.indexing && <span role="status">{t('texts.indexing')}</span>}
                     {c.group !== 'all' && (
                       <button
                         className="library-filter-chip"
@@ -779,6 +828,28 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
                   </button>
                 </div>
                 <div className="library-selection">
+                  {media === 'text' && (
+                    <>
+                      <SettingsButton
+                        disabled={c.selected !== 1 || c.busy}
+                        onClick={() => dialog('preview')}
+                      >
+                        {t('texts.preview')}
+                      </SettingsButton>
+                      <SettingsButton
+                        disabled={c.selected !== 1 || c.busy}
+                        onClick={() => dialog('text-edit')}
+                      >
+                        {t('texts.edit')}
+                      </SettingsButton>
+                      <SettingsButton
+                        disabled={!c.selected || c.busy}
+                        onClick={() => run({ command: 'file-action', operation: 'copy-text' })}
+                      >
+                        {t('texts.copy')}
+                      </SettingsButton>
+                    </>
+                  )}
                   {media === 'sound' && (
                     <>
                       <SettingsButton

@@ -43,6 +43,7 @@ test('Legacy preferences gain ribbon defaults and retain explicit presentation a
       'settings',
       'image-library',
       'sound-library',
+      'text-library',
       'notifications',
       'logs',
       'theme',

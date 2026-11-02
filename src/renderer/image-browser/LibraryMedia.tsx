@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { LibraryMedia } from '../../shared/library-assets';
-import { soundLibraryKeys } from '../../shared/library-text';
-import type { HostTextKey, HostTranslator } from '../../shared/i18n';
+import { libraryTextKey } from '../../shared/library-text';
+import type { HostTranslator } from '../../shared/i18n';
 import { useHostTranslation } from '../HostTranslation';
 const Media = createContext<LibraryMedia>('image');
 export function LibraryMediaProvider({
@@ -17,11 +17,7 @@ export const useLibraryMedia = () => useContext(Media);
 export function useLibraryTranslation() {
   const media = useLibraryMedia(),
     translation = useHostTranslation();
-  const t: HostTranslator = (key, values) =>
-    translation.t(
-      (media === 'sound' && soundLibraryKeys.has(key) ? 'soundLibrary.' + key : key) as HostTextKey,
-      values,
-    );
+  const t: HostTranslator = (key, values) => translation.t(libraryTextKey(media, key), values);
   return { ...translation, t };
 }
 export function soundDuration(value?: number) {

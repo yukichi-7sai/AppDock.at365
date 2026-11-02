@@ -69,6 +69,12 @@ export class ImageLibraryDialogs {
     }
     if (pending.busy) throw Error(hostText('services.imageLibraryDialogs.pending'));
     if (operation) {
+      if (
+        (operation.kind === 'text-save') !==
+          ['text-create', 'text-edit'].includes(pending.request.kind) ||
+        pending.request.kind === 'text-preview'
+      )
+        throw Error(hostText('services.imageLibraryDialogs.invalidOperation'));
       if ((operation.kind === 'delete-image') !== (pending.request.kind === 'delete-image'))
         throw Error(hostText('services.imageLibraryDialogs.invalidOperation'));
       if ((operation.kind === 'rename-images') !== (pending.request.kind === 'rename-images'))

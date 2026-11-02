@@ -7,12 +7,26 @@ export function libraryText(
   key: string,
   values?: Record<string, string | number>,
 ) {
-  return hostText(
-    (media === 'sound' && soundLibraryKeys.has(key) ? 'soundLibrary.' + key : key) as HostTextKey,
-    values,
-  );
+  return hostText(libraryTextKey(media, key), values);
+}
+export function libraryTextKey(media: LibraryMedia, key: string): HostTextKey {
+  return (
+    media !== 'image' &&
+    (soundLibraryKeys.has(key) || (media === 'text' && key === 'images.search'))
+      ? `${media}Library.${key}`
+      : key
+  ) as HostTextKey;
 }
 export const soundLibraryKeys = new Set<string>([
+  'images.groupItemsOrder',
+  'images.groupOrderTitle',
+  'images.groupOrderLabel',
+  'images.groupAddTitle',
+  'images.groupRenameTitle',
+  'images.groupDeleteTitle',
+  'images.groupName',
+  'images.groupDeleteDescription',
+  'images.groupAddDescription',
   'images.addImages',
   'images.assigned',
   'images.changed',

@@ -17,8 +17,13 @@ export interface IconImportProgress {
 export type ImageLibraryPageRequest = { id: string } & (
   | { kind: 'image-library'; route: 'image-library' }
   | { kind: 'sound-library'; route: 'sound-library' }
+  | { kind: 'text-library'; route: 'text-library' }
 );
 export type ImageLibraryDialogKind =
+  | 'text-create'
+  | 'text-duplicate'
+  | 'text-edit'
+  | 'text-preview'
   | 'add'
   | 'rename'
   | 'delete'
@@ -37,6 +42,7 @@ export type ImageLibraryDialogKind =
   | 'import-progress'
   | 'delete-image';
 export type ImageLibraryDialogOperation =
+  | { kind: 'text-save'; name: string; body: string }
   | ImageLibraryEdit
   | { kind: 'delete-image' }
   | { kind: 'rename-images'; names: string[] }
@@ -45,7 +51,7 @@ export type ImageLibraryDialogOperation =
 export interface ImageLibraryDialogRequest {
   media?: import('./library-assets').LibraryMedia;
   id: string;
-  kind: ImageLibraryDialogKind;
+  kind: Exclude<ImageLibraryDialogKind, 'text-duplicate'>;
   groups: ImageGroup[];
   images: RegisteredImageRef[];
   groupId?: string;
@@ -57,6 +63,7 @@ export interface ImageLibraryDialogRequest {
   iconSets?: { id: string; name: string }[];
   importing?: IconImportProgress;
   cancelling?: boolean;
+  document?: import('./text-library').LibraryTextDocument;
 }
 export interface ImageLibraryLayout {
   sidebarWidth: number;
@@ -84,7 +91,8 @@ export function validImageLibraryLayout(value: unknown): value is ImageLibraryLa
     )
   );
 }
-export type ImageLibraryFileAction = 'copy-files' | 'copy-paths' | 'copy-image' | 'reveal';
+export type ImageLibraryFileAction =
+  'copy-files' | 'copy-paths' | 'copy-image' | 'copy-text' | 'reveal';
 export interface ImageGalleryViewState {
   schemaVersion: 1;
   library?: { cardWidth: number; layout?: ImageLibraryLayout };
@@ -117,12 +125,13 @@ export interface ImageLibraryDialogApi {
 export interface ImageLibraryPageModel {
   schemaVersion: 1;
   id: string;
-  kind: 'image-library' | 'sound-library';
+  kind: 'image-library' | 'sound-library' | 'text-library';
   contextId: 'primary';
   revision: number;
   dark: boolean;
   content: {
     playback?: import('./registered-images').LibraryPlayback;
+    indexing?: boolean;
     iconSets: { id: string; name: string }[];
     importing?: IconImportProgress;
     folders: string[];

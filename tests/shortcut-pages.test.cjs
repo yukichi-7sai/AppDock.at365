@@ -38,11 +38,11 @@ const row = (id, scope, appletIds = []) => ({
   when: { scope, appletIds },
 });
 
-test('candidates include five host pages and each declared page, excluding background Applets', () => {
+test('candidates include the library and settings pages and each declared Applet page', () => {
   const pages = shortcutPageChoices(applets);
   assert.deepEqual(
     pages.filter((p) => p.id.startsWith('host:')).map((p) => p.title),
-    ['画像ライブラリー', '音ライブラリー', '設定', 'ログ', '通知センター'],
+    ['画像ライブラリー', '音ライブラリー', 'テキストライブラリー', '設定', 'ログ', '通知センター'],
   );
   assert.equal(pages.find((p) => p.id === 'page:test.wallpaper:history').title, '壁紙履歴');
   assert.equal(
@@ -50,7 +50,7 @@ test('candidates include five host pages and each declared page, excluding backg
     'プレビュー（Wallpaper）',
   );
   assert.equal(pages.find((p) => p.id === 'page:test.other:preview').title, 'プレビュー（Other）');
-  assert.equal(pages.length, 8);
+  assert.equal(pages.length, 9);
   assert.equal(
     pages.some((p) => p.id.includes('background')),
     false,

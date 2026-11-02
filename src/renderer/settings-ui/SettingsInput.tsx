@@ -18,7 +18,7 @@ export const SettingsInputMode = createContext<CommitOn>('blur-or-enter');
 type TextElement = HTMLInputElement | HTMLTextAreaElement;
 function useConfirmedText<T extends TextElement>(
   props: (InputHTMLAttributes<T> | TextareaHTMLAttributes<T>) & Confirmation,
-  multiline = false,
+  enterAction: 'confirm' | 'confirm-unless-shift' | 'newline' = 'confirm',
 ) {
   const mode = useContext(SettingsInputMode);
   const input = props as InputHTMLAttributes<T>;
@@ -113,7 +113,9 @@ function useConfirmedText<T extends TextElement>(
       }
       props.onKeyDown?.(event);
       if (ime || props.readOnly || event.defaultPrevented) return;
-      if (event.key === 'Enter' && (!multiline || !event.shiftKey) && !search) {
+      const confirmEnter =
+        enterAction === 'confirm' || (enterAction === 'confirm-unless-shift' && !event.shiftKey);
+      if (event.key === 'Enter' && confirmEnter && !search) {
         event.preventDefault();
         commit(event);
       } else if (numeric && ['ArrowUp', 'ArrowDown'].includes(event.key)) {
@@ -165,10 +167,13 @@ export const SettingsInput = forwardRef<
 
 export const SettingsTextarea = forwardRef<
   HTMLTextAreaElement,
-  TextareaHTMLAttributes<HTMLTextAreaElement> & Confirmation
+  TextareaHTMLAttributes<HTMLTextAreaElement> & Confirmation & { newlineOnEnter?: boolean }
 >(function SettingsTextarea(props, ref) {
-  const { commitOn, confirmation, ...textareaProps } = props;
-  const text = useConfirmedText<HTMLTextAreaElement>(props, true);
+  const { commitOn, confirmation, newlineOnEnter, ...textareaProps } = props;
+  const text = useConfirmedText<HTMLTextAreaElement>(
+    props,
+    newlineOnEnter ? 'newline' : 'confirm-unless-shift',
+  );
   return <textarea {...textareaProps} {...text} ref={ref} />;
 });
 /** URL normalization waits for confirmation even inside a grouped dialog. */

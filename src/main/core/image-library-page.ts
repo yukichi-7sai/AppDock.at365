@@ -1,5 +1,7 @@
+import type { LibraryEntry } from '../../shared/library-assets';
 import { libraryText } from '../../shared/library-text';
 import type { LibrarySoundPreview } from './library-sound-preview';
+import type { TextLibraryService } from './text-library-service';
 import { filterImageBrowser } from '../../shared/image-browser';
 import { hostText } from '../../shared/i18n';
 import {
@@ -22,7 +24,6 @@ import {
   imageKey,
   type ImageLibraryEdit,
   type ImageGroup,
-  type RegisteredImageEntry,
   type RegisteredImageRef,
 } from '../../shared/registered-images';
 import { libraryGallerySize, validGalleryWidth } from '../../shared/image-gallery';
@@ -86,8 +87,8 @@ export class ImageLibraryPageState {
   }
 }
 export class ImageLibraryPageSession implements HostPageController {
-  get kind(): 'image-library' | 'sound-library' {
-    return this.options.host.media === 'sound' ? 'sound-library' : 'image-library';
+  get kind(): 'image-library' | 'sound-library' | 'text-library' {
+    return `${this.options.host.media}-library`;
   }
   get route() {
     return this.kind;
@@ -96,17 +97,17 @@ export class ImageLibraryPageSession implements HostPageController {
     libraryText(this.options.host.media, key, values);
   readonly id: string;
   private closed = false;
-  private imageSession: ReturnType<GalleryImages['session']>;
+  private imageSession?: ReturnType<GalleryImages['session']>;
   private revision = 0;
   private signature = '';
   private items = new Map<
     string,
-    { id: string; assetId: string; generation: string; entry: RegisteredImageEntry }
+    { id: string; assetId: string; generation: string; entry: LibraryEntry }
   >();
   private groups = new Map<string, string>();
   private drag?: {
     token: string;
-    entries: RegisteredImageEntry[];
+    entries: LibraryEntry[];
     images: { image: RegisteredImageRef; before: string[] }[];
     group?: ImageGroup;
   };
@@ -114,7 +115,8 @@ export class ImageLibraryPageSession implements HostPageController {
     request: ImageLibraryPageRequest,
     private options: {
       host: ImageLibraryHost;
-      images: Pick<GalleryImages, 'session'>;
+      images?: Pick<GalleryImages, 'session'>;
+      texts?: TextLibraryService;
       preview?: LibrarySoundPreview;
       state: ImageLibraryPageState;
       groups(): import('../../shared/registered-images').ImageGroup[];
@@ -134,7 +136,7 @@ export class ImageLibraryPageSession implements HostPageController {
     )
       throw Error('Invalid image library page request');
     this.id = request.id;
-    this.imageSession = options.images.session();
+    this.imageSession = options.images?.session();
     void options.host.images.refresh().catch(() => {});
   }
   private catalogue() {
@@ -195,6 +197,7 @@ export class ImageLibraryPageSession implements HostPageController {
       [...this.items.values()].map((item) => item.entry.ref),
       this.options.groups(),
       this.options.state,
+      this.options.texts ? (ref, query) => this.options.texts!.matches(ref, query) : undefined,
     ).map((ref) => [imageKey(ref), this.items.get(imageKey(ref))!] as const);
   }
   passive(action: HostPageAction) {
@@ -217,6 +220,7 @@ export class ImageLibraryPageSession implements HostPageController {
       }
     const content: ImageLibraryPageModel['content'] = {
       playback: this.options.preview?.snapshot(),
+      indexing: this.options.texts?.indexing,
       iconSets:
         this.options.host.media === 'image' ? iconSets.map(({ id, name }) => ({ id, name })) : [],
       importing: s.importing,
@@ -239,10 +243,14 @@ export class ImageLibraryPageSession implements HostPageController {
       query: s.query,
       items: matched.slice(0, s.count).map(([key, { id, assetId, entry: e }]) => ({
         id,
-        assetId,
+        assetId: this.options.texts ? '' : assetId,
+        textPreview: this.options.texts ? e.textPreview || hostText('texts.emptyBody') : undefined,
         title: e.ref.file,
-        detail:
-          this.options.host.media === 'sound'
+        detail: this.options.texts
+          ? e.characters === undefined
+            ? 'TXT'
+            : hostText('texts.details', { characters: e.characters, lines: e.lines ?? 1 })
+          : this.options.host.media === 'sound'
             ? e.durationMs === undefined
               ? 'WAV'
               : `${Math.floor(Math.round(e.durationMs / 1000) / 60)}:${String(Math.round(e.durationMs / 1000) % 60).padStart(2, '0')} · WAV`
@@ -250,7 +258,11 @@ export class ImageLibraryPageSession implements HostPageController {
               ? `${e.width} × ${e.height} · ${e.ref.file.split('.').at(-1)!.toUpperCase()}`
               : this.text('services.imageLibraryPage.dimensionsUnavailable'),
         labels: membership.get(key) ?? [],
-        state: e.available ? 'ready' : (e.state ?? 'missing'),
+        state: e.available
+          ? this.options.texts && e.textPreview === undefined
+            ? 'loading'
+            : 'ready'
+          : (e.state ?? 'missing'),
         selected: s.selected.has(key),
         selectable: !s.busy,
         actions: [],
@@ -300,7 +312,7 @@ export class ImageLibraryPageSession implements HostPageController {
       return;
     }
     if (
-      this.options.host.media === 'sound' &&
+      this.options.host.media !== 'image' &&
       ['import-set', 'retry-import', 'cancel-import'].includes(action.command)
     )
       throw Error('Unsupported library action');
@@ -341,6 +353,7 @@ export class ImageLibraryPageSession implements HostPageController {
         .map(([, value]) => value.entry);
     };
     if (action.command === 'image') {
+      if (!this.imageSession) throw Error('Unsupported library action');
       const value = [...this.items.values()].find((v) => v.assetId === action.assetId);
       if (!value?.entry.available || !value.entry.generation)
         throw Error(this.text('services.imageLibraryPage.missing'));
@@ -716,6 +729,10 @@ export class ImageLibraryPageSession implements HostPageController {
             'folder-delete',
             'folder-move',
             'import-set',
+            'text-create',
+            'text-duplicate',
+            'text-edit',
+            'text-preview',
           ].includes(action.kind)
         )
           throw Error('Unknown gallery dialog');
@@ -755,11 +772,28 @@ export class ImageLibraryPageSession implements HostPageController {
           await this.options.preview.play(target.ref, this.id);
           return;
         }
-        if (this.options.host.media === 'sound' && action.kind === 'import-set')
+        if (this.options.host.media !== 'image' && action.kind === 'import-set')
           throw Error('Unsupported library action');
+        if (action.kind.startsWith('text-') && !this.options.texts)
+          throw Error('Unsupported library action');
+        const kind =
+          action.kind === 'text-duplicate'
+            ? 'text-create'
+            : this.options.texts && action.kind === 'preview'
+              ? 'text-preview'
+              : action.kind;
+        const needsDocument =
+          ['text-edit', 'text-preview'].includes(kind) || action.kind === 'text-duplicate';
+        if (needsDocument && entries.length !== 1) throw Error(hostText('texts.selectOne'));
+        const document =
+          this.options.texts && needsDocument
+            ? await this.options.texts.document(entries[0].ref, entries[0].generation)
+            : undefined;
+        if (this.closed || s.closed) return;
         const operation = await this.options.dialogs.open({
           media: this.options.host.media,
-          kind: action.kind === 'membership' && images.length > 1 ? 'batch-add' : action.kind,
+          kind: kind === 'membership' && images.length > 1 ? 'batch-add' : kind,
+          document,
           groups: this.options.groups(),
           images,
           folder,
@@ -779,6 +813,32 @@ export class ImageLibraryPageSession implements HostPageController {
             ['delete-image', 'rename-images'].includes(action.kind) &&
             entries.some((entry) => this.options.host.inUse(entry.ref)),
         });
+        if (operation?.kind === 'text-save' && kind === 'text-create') {
+          const ref = { file: folder ? `${folder}/${operation.name}` : operation.name };
+          if (s.group.startsWith('group:')) {
+            const edit: ImageLibraryEdit = {
+              kind: 'membership-batch',
+              mode: 'add',
+              groupId: s.group.slice(6),
+              images: [{ image: ref, before: [] }],
+            };
+            try {
+              await this.options.host.edit(edit);
+            } catch {
+              s.retry = edit;
+              s.error = this.text('services.imageLibraryPage.groupAddFailure');
+              s.group = 'all';
+              this.options.failed(s.error);
+            }
+          } else if (s.group === 'unfiled') s.group = 'all';
+          s.query = '';
+          this.catalogue();
+          s.selected = new Set([imageKey(ref)]);
+          const first = this.filtered().findIndex(([key]) => key === imageKey(ref));
+          s.count = Math.max(64, (Math.floor(first / 64) + 1) * 64);
+          s.anchor = { key: imageKey(ref), offset: 0 };
+          s.viewRevision++;
+        }
         if (operation?.kind === 'rename-images') {
           const renamed = images.map((ref, i) => ({
             file: ref.file.slice(0, ref.file.lastIndexOf('/') + 1) + operation.names[i],
@@ -878,7 +938,7 @@ export class ImageLibraryPageSession implements HostPageController {
   dispose() {
     this.closed = true;
     this.drag = undefined;
-    this.imageSession.dispose();
+    this.imageSession?.dispose();
     this.options.preview?.stop(this.id);
     this.items.clear();
     this.options.dialogs.cancel();

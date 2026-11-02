@@ -27,6 +27,7 @@ import {
 import type { Settings } from './contracts';
 import { parseImageLibrary } from './registered-images';
 import { parseSoundLibrary } from './sound-library';
+import { parseTextLibrary } from './text-library';
 import { validateUpdateSource } from './update-sources';
 import { validPageId, parseRibbon, defaultRibbon } from './applet-pages';
 import { fillSettingDefaults } from './settings-defaults';
@@ -102,6 +103,7 @@ export function parseSettings(value: unknown): Settings {
       ...(raw.mcpServers === undefined ? {} : { mcpServers: { version: 1, items: [] } }),
       ...(raw.imageLibrary === undefined ? {} : { imageLibrary: { groups: [] } }),
       ...(raw.soundLibrary === undefined ? {} : { soundLibrary: { groups: [] } }),
+      ...(raw.textLibrary === undefined ? {} : { textLibrary: { groups: [] } }),
     });
   }
   if (
@@ -311,6 +313,9 @@ export function parseSettings(value: unknown): Settings {
       : {}),
     ...(value.soundLibrary !== undefined
       ? { soundLibrary: parseSoundLibrary(value.soundLibrary) }
+      : {}),
+    ...(value.textLibrary !== undefined
+      ? { textLibrary: parseTextLibrary(value.textLibrary) }
       : {}),
   };
   const parsed = structuredClone(next) as unknown as Settings;

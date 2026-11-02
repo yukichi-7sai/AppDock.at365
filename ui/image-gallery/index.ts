@@ -34,6 +34,7 @@ type Card = {
   node: HTMLElement;
   button: HTMLButtonElement;
   image: HTMLImageElement;
+  text: HTMLElement;
   check: HTMLInputElement;
   checkArea: HTMLLabelElement;
   title: HTMLElement;
@@ -177,7 +178,9 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
     image.alt = '';
     image.decoding = 'async';
     const status = element('span', 'ad-gallery-status');
-    button.append(image, status);
+    const text = element('span', 'ad-gallery-text');
+    text.hidden = true;
+    button.append(image, text, status);
     const check = element('input', 'ad-gallery-check');
     check.type = 'checkbox';
     const checkArea = element('label', 'ad-gallery-check-area');
@@ -193,6 +196,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
       node,
       button,
       image,
+      text,
       status,
       check,
       checkArea,
@@ -265,6 +269,11 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
           card.requested = 0;
         }
         card.item = item;
+        const isText = item.textPreview !== undefined;
+        card.image.hidden = isText;
+        card.text.hidden = !isText || item.state !== 'ready';
+        card.text.textContent = item.textPreview ?? '';
+        card.node.dataset.text = String(isText);
         if (item.state !== 'ready') card.status.dataset.state = item.state;
         card.node.classList.toggle('ad-gallery-selected', !!item.selected);
         card.check.hidden = next.selection !== 'multiple';
@@ -311,7 +320,7 @@ export function mountImageGallery(container: HTMLElement, options: GalleryOption
             error: options.errorText ?? '画像を読み込めません',
             loading: '読み込み中',
           }[item.state];
-        else if (card.edge) card.status.textContent = '';
+        else if (card.edge || isText) card.status.textContent = '';
         for (const old of [...card.actions.children])
           if (!item.actions.some((a) => a.id === (old as HTMLElement).dataset.action)) old.remove();
         item.actions.forEach((action) => {

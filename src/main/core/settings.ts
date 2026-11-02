@@ -113,7 +113,7 @@ class SettingsStore<T = Settings> extends EventEmitter {
   writesBlocked = false;
   /** Shared-only stores have session state; the host overrides this per device. */
   uiStateStorage(
-    _section: 'ribbon' | 'gallery' | 'soundGallery' | 'windows',
+    _section: 'ribbon' | 'gallery' | 'soundGallery' | 'textGallery' | 'windows',
     _key?: string,
   ): import('./state-storage').StateStorage {
     let value: unknown;

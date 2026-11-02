@@ -9,8 +9,10 @@ import type {
 import { imageKey } from '../shared/registered-images';
 import { imageBasename, imageParent } from '../shared/image-paths';
 import { SettingsButton } from './settings-ui/SettingsButton';
+import { LibraryPreviewDialog } from './settings-ui/LibraryPreviewDialog';
 import { SettingsDialog, SettingsModal } from './settings-ui/SettingsModal';
 import { SettingsInput } from './settings-ui/SettingsInput';
+import { TextLibraryEditor } from './TextLibraryEditor';
 import { SettingsOrderDialog } from './settings-ui/SettingsOrderDialog';
 import { RegisteredGalleryPreview } from './settings-ui/RegisteredImagePicker';
 
@@ -96,6 +98,16 @@ function Editor({
     await window.dock.imageLibraryDialog.complete(r.id, operation);
     completed.current = true;
   };
+  if (r.kind === 'text-create' || r.kind === 'text-edit' || r.kind === 'text-preview')
+    return (
+      <TextLibraryEditor
+        request={r}
+        returnFocus={returnFocus}
+        onClose={close}
+        onSave={save}
+        error={error}
+      />
+    );
   if (r.kind === 'import-progress') {
     const p = r.importing;
     const phase = p?.phase ?? 'download';
@@ -231,8 +243,8 @@ function Editor({
     return (
       <SettingsOrderDialog
         returnFocus={returnFocus}
-        title="画像を並べ替え"
-        listLabel={`${current?.name ?? ''}の画像の表示順`}
+        title={t('images.orderImages')}
+        listLabel={t('images.groupItemsOrder', { name: current?.name ?? '' })}
         items={(current?.images ?? []).map((image) => ({ id: imageKey(image), title: image.file }))}
         onClose={close}
         onApply={(ids) => {
@@ -250,8 +262,8 @@ function Editor({
     return (
       <SettingsOrderDialog
         returnFocus={returnFocus}
-        title="画像グループを並べ替え"
-        listLabel="画像グループの表示順"
+        title={t('images.groupOrderTitle')}
+        listLabel={t('images.groupOrderLabel')}
         items={r.groups.map((g) => ({ id: g.id, title: g.name }))}
         onClose={close}
         onApply={(ids) => save({ kind: 'order', ids, before: r.groups.map((g) => g.id) })}
@@ -313,11 +325,7 @@ function Editor({
         applyLabel="削除"
         valid={!r.deleteBlocked}
         description={t('images.deleteDescription', { count: r.images.length })}
-        error={
-          r.deleteBlocked
-            ? 'この画像は使用中です。リボンやAppletの画像設定を外してから削除してください。'
-            : error
-        }
+        error={r.deleteBlocked ? t('services.imageLibraryHost.inUse') : error}
         errorTarget={r.images[0]?.file}
       >
         <ul className="library-confirm-files">
@@ -329,21 +337,12 @@ function Editor({
     );
   if (r.kind === 'preview')
     return (
-      <SettingsModal
+      <LibraryPreviewDialog
         returnFocus={returnFocus}
-        labelledBy="image-library-preview-title"
+        title={entries[previewIndex]?.ref.file ?? ''}
         className="image-library-preview-modal"
-        closeOnBackdrop
         onClose={close}
         error={error}
-        header={
-          <header className="image-library-preview-heading">
-            <h2 id="image-library-preview-title">{entries[previewIndex]?.ref.file}</h2>
-            <button type="button" data-initial-focus onClick={close}>
-              閉じる
-            </button>
-          </header>
-        }
       >
         {entries.length > 1 && (
           <div className="library-preview-navigation">
@@ -371,12 +370,12 @@ function Editor({
             groups={r.groups}
           />
         )}
-      </SettingsModal>
+      </LibraryPreviewDialog>
     );
   const titles = {
-    add: '画像グループを追加',
-    rename: '画像グループの名前を変更',
-    delete: '画像グループを削除',
+    add: t('images.groupAddTitle'),
+    rename: t('images.groupRenameTitle'),
+    delete: t('images.groupDeleteTitle'),
     membership: '所属グループを編集',
     'batch-add': 'グループに追加',
     'batch-remove': 'グループから外す',
@@ -426,14 +425,16 @@ function Editor({
         <SettingsField title="グループ名">
           <SettingsInput
             data-initial-focus
-            aria-label="画像グループ名"
+            aria-label={t('images.groupName')}
             maxLength={80}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </SettingsField>
       )}
-      {r.kind === 'delete' && <p>「{current?.name}」を削除します。画像と使用先は残ります。</p>}
+      {r.kind === 'delete' && (
+        <p>{t('images.groupDeleteDescription', { name: current?.name ?? '' })}</p>
+      )}
       {r.kind === 'membership' && (
         <SettingsField
           title="所属グループ"
@@ -459,7 +460,7 @@ function Editor({
       )}
       {r.kind === 'batch-add' && (
         <>
-          <p>{r.images.length}枚の画像を追加します。ほかのグループへの所属は残ります。</p>
+          <p>{t('images.groupAddDescription', { count: r.images.length })}</p>
           <SettingsField title="追加先">
             <select
               aria-label="追加先グループ"

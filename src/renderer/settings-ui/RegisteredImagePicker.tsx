@@ -16,7 +16,8 @@ import {
   type RegisteredImageRef,
   type RegisteredImageEntry,
 } from '../../shared/registered-images';
-import { SettingsDialog, SettingsModal } from './SettingsModal';
+import { SettingsDialog } from './SettingsModal';
+import { LibraryPreviewDialog } from './LibraryPreviewDialog';
 import { ImageGalleryPreview } from './ImageGallery';
 import { libraryGallerySize } from '../../shared/image-gallery';
 import {
@@ -354,22 +355,13 @@ export function RegisteredImagePicker({
           onReload={() => void library.reload()}
         />
         {preview && (
-          <SettingsModal
-            labelledBy="picker-preview-title"
+          <LibraryPreviewDialog
+            title={preview.ref.file}
             className="image-library-preview-modal"
-            closeOnBackdrop
             onClose={() => setPreview(null)}
-            header={
-              <header className="image-library-preview-heading">
-                <h2 id="picker-preview-title">{preview.ref.file}</h2>
-                <button type="button" data-initial-focus onClick={() => setPreview(null)}>
-                  {translate('settings.registeredImagePicker.close')}
-                </button>
-              </header>
-            }
           >
             <RegisteredGalleryPreview entry={preview} groups={library.snapshot.groups} />
-          </SettingsModal>
+          </LibraryPreviewDialog>
         )}
       </SettingsDialog>
     </SettingsMcpAccessProvider>

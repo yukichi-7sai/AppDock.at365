@@ -28,6 +28,12 @@ export const hostCommands = [
   },
   { id: 'appdock.applets.open', title: 'Applet一覧を開く', extension: 'AppDock', available: true },
   {
+    id: 'appdock.text-library.open',
+    title: hostText('texts.open'),
+    extension: 'AppDock',
+    available: true,
+  },
+  {
     id: 'appdock.notifications.open',
     title: '通知センターを開く',
     extension: 'AppDock',

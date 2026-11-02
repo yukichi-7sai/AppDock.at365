@@ -1,1 +1,18 @@
 @import '../image-browser/image-browser.css';
+.text-library-dialog {
+  width: min(860px, 100%);
+}
+.text-library-input {
+  width: 100%;
+  min-height: 200px;
+  resize: vertical;
+  font-family: monospace;
+}
+.text-library-preview {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+  font: inherit;
+  line-height: 1.7;
+}

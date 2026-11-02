@@ -130,6 +130,7 @@ function fixture() {
     ],
   };
   const host = {
+    media: 'image',
     inUse: () => false,
     images: { list: () => structuredClone(entries), refresh: async () => {} },
     edit: async (operation) => {

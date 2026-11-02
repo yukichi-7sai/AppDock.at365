@@ -64,6 +64,7 @@ export interface Settings {
   profile?: unknown;
   imageLibrary?: import('./registered-images').ImageLibrary;
   soundLibrary?: import('./sound-library').SoundLibrary;
+  textLibrary?: import('./text-library').TextLibrary;
 }
 export interface SettingsSnapshot<T = Settings> {
   value: T;

@@ -1,4 +1,5 @@
 import { SoundLibraryService } from './core/sound-library-service';
+import { TextLibraryService } from './core/text-library-service';
 import type { SoundGallery } from './core/library-sound-preview';
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
 import { hostStartupTiming } from './core/host-startup-timing';
@@ -768,6 +769,26 @@ const soundLibrary = new SoundLibraryService(
   },
   () => changed(),
   soundLibraryFailed,
+  fileWatchAssistance,
+);
+const textLibraryFailed = () =>
+  errors.report({
+    eventId: randomUUID(),
+    source: 'text-library',
+    title: hostText('texts.title'),
+    code: 'TEXT_LIBRARY',
+    message: hostText('texts.operationFailed'),
+  });
+const textLibrary = new TextLibraryService(
+  path.join(paths.assets, 'texts'),
+  {
+    settings,
+    window: () => window,
+    writable: assertSettingsWritable,
+    show: showWindow,
+    cover: coverAppletPagesForImagePicker,
+  },
+  () => changed(),
   fileWatchAssistance,
 );
 let updater: PortableUpdates;
@@ -4236,6 +4257,7 @@ async function initialize() {
   applyFileWatchAssistanceSettings();
   await hostStartupTiming.phaseAsync('images', () => registeredImages.watch());
   await soundLibrary.files.watch();
+  await textLibrary.files.watch();
   hostStartupTiming.count('imageCount', registeredImages.list().length);
   nativeTheme.on('updated', () => {
     refreshWindowTheme();
@@ -4738,6 +4760,9 @@ async function initialize() {
     'sound',
   );
   const soundState = new ImageLibraryPageState(soundGalleryViewState);
+  const textState = new ImageLibraryPageState(
+    new GalleryViewStateStore(settings.uiStateStorage('textGallery'), 'text'),
+  );
   galleryImages = new GalleryImages(registeredImages);
   const galleryFailed = (message: string) =>
     errors.report({
@@ -4753,7 +4778,27 @@ async function initialize() {
         window.webContents.send('dock:imageLibraryDialog', request);
     },
     edit: (operation, request) => {
-      const library = request.media === 'sound' ? soundLibrary.host : imageLibraryHost;
+      const library =
+        request.media === 'text'
+          ? textLibrary.host
+          : request.media === 'sound'
+            ? soundLibrary.host
+            : imageLibraryHost;
+      if (operation.kind === 'text-save') {
+        if (
+          request.media !== 'text' ||
+          typeof operation.name !== 'string' ||
+          typeof operation.body !== 'string'
+        )
+          throw Error(hostText('texts.invalidBody'));
+        if (request.kind === 'text-create')
+          return textLibrary
+            .create(request.folder ?? '', operation.name, operation.body)
+            .then(() => {});
+        if (request.kind !== 'text-edit' || !request.entry || !request.document)
+          throw Error(hostText('texts.selectOne'));
+        return textLibrary.save(request.entry.ref, request.document.generation, operation.body);
+      }
       if (operation.kind === 'folder') {
         const kind = request.kind.slice('folder-'.length);
         return library.folderOperation(
@@ -4782,9 +4827,11 @@ async function initialize() {
       return library.edit(operation);
     },
     failed: (request) =>
-      request.media === 'sound'
-        ? soundLibraryFailed()
-        : galleryFailed(hostText('services.index.imageOperationBody')),
+      request.media === 'text'
+        ? textLibraryFailed()
+        : request.media === 'sound'
+          ? soundLibraryFailed()
+          : galleryFailed(hostText('services.index.imageOperationBody')),
   });
   imageLibraryDialogs = galleryDialogs;
   window.webContents.on('did-start-loading', () => galleryDialogs.cancel());
@@ -4792,6 +4839,7 @@ async function initialize() {
   window.once('closed', () => {
     galleryState.closed = true;
     soundState.closed = true;
+    textState.closed = true;
     soundLibrary.preview.stop();
     soundLibrary.host.cancel();
     galleryState.importAbort?.abort();
@@ -4805,20 +4853,45 @@ async function initialize() {
     },
     ready: () => uiReady && !quitting,
     create: (request) =>
-      request.kind === 'image-library' || request.kind === 'sound-library'
+      request.kind === 'image-library' ||
+      request.kind === 'sound-library' ||
+      request.kind === 'text-library'
         ? new ImageLibraryPageSession(request, {
-            host: request.kind === 'sound-library' ? soundLibrary.host : imageLibraryHost,
-            images: request.kind === 'sound-library' ? soundLibrary.gallery : galleryImages,
+            host:
+              request.kind === 'text-library'
+                ? textLibrary.host
+                : request.kind === 'sound-library'
+                  ? soundLibrary.host
+                  : imageLibraryHost,
+            images:
+              request.kind === 'text-library'
+                ? undefined
+                : request.kind === 'sound-library'
+                  ? soundLibrary.gallery
+                  : galleryImages,
+            texts: request.kind === 'text-library' ? textLibrary : undefined,
             preview: request.kind === 'sound-library' ? soundLibrary.preview : undefined,
-            state: request.kind === 'sound-library' ? soundState : galleryState,
+            state:
+              request.kind === 'text-library'
+                ? textState
+                : request.kind === 'sound-library'
+                  ? soundState
+                  : galleryState,
             groups: () =>
-              request.kind === 'sound-library'
-                ? soundLibrary.host.configuration.snapshot().groups
-                : (settings.value.imageLibrary?.groups ?? []),
+              request.kind === 'text-library'
+                ? textLibrary.host.configuration.snapshot().groups
+                : request.kind === 'sound-library'
+                  ? soundLibrary.host.configuration.snapshot().groups
+                  : (settings.value.imageLibrary?.groups ?? []),
             dialogs: galleryDialogs,
             dark: () => nativeTheme.shouldUseDarkColors,
             changed,
-            failed: request.kind === 'sound-library' ? soundLibraryFailed : galleryFailed,
+            failed:
+              request.kind === 'text-library'
+                ? textLibraryFailed
+                : request.kind === 'sound-library'
+                  ? soundLibraryFailed
+                  : galleryFailed,
           })
         : request.kind === 'notifications'
           ? new NotificationCenterController(request, {
@@ -5400,6 +5473,7 @@ app.on('before-quit', (event) => {
     settings.close();
     registeredImages.stop();
     soundLibrary.close();
+    textLibrary.close();
     stopRegisteredImageDecoder();
     imageLibraryHost.cancel();
     tray?.destroy();

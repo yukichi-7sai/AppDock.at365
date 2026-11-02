@@ -20,6 +20,8 @@ export interface GalleryItem {
   assetId: string;
   title: string;
   description?: string;
+  /** Optional plain text preview; never interpreted as HTML or an image URL. */
+  textPreview?: string;
   detail: string;
   labels: string[];
   state: GalleryImageState;

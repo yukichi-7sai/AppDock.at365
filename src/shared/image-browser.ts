@@ -5,6 +5,7 @@ export function filterImageBrowser(
   images: RegisteredImageRef[],
   groups: ImageGroup[],
   filter: { folder: string; group: string; query: string },
+  matchesBody?: (ref: RegisteredImageRef, query: string) => boolean,
 ): RegisteredImageRef[] {
   const available = new Map(images.map((ref) => [imageKey(ref), ref]));
   const group = groups.find((g) => `group:${g.id}` === filter.group);
@@ -22,6 +23,6 @@ export function filterImageBrowser(
           ? !ref.file.includes('/')
           : ref.file.startsWith(filter.folder + '/'))) &&
       (filter.group !== 'unfiled' || !members.has(imageKey(ref))) &&
-      ref.file.toLocaleLowerCase().includes(query),
+      (ref.file.toLocaleLowerCase().includes(query) || !!matchesBody?.(ref, query)),
   );
 }

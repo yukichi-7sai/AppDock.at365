@@ -1,4 +1,4 @@
-import { soundGroupsForBrowser, soundLibraryFromBrowser } from '../../shared/sound-library';
+import { fileGroupsForBrowser, fileLibraryFromBrowser } from '../../shared/file-library';
 import type { LibraryMedia } from '../../shared/library-assets';
 import { libraryText } from '../../shared/library-text';
 import {
@@ -28,7 +28,12 @@ export class LibraryClassificationStore {
   private get value() {
     return this.media === 'image'
       ? this.settings.value.imageLibrary
-      : soundGroupsForBrowser(this.settings.value.soundLibrary);
+      : fileGroupsForBrowser(
+          this.media === 'text'
+            ? this.settings.value.textLibrary
+            : this.settings.value.soundLibrary,
+          this.media,
+        );
   }
   get revision() {
     return this.settings.revision;
@@ -56,7 +61,9 @@ export class LibraryClassificationStore {
               ...this.settings.value,
               ...(this.media === 'image'
                 ? { imageLibrary: next }
-                : { soundLibrary: soundLibraryFromBrowser(next) }),
+                : this.media === 'text'
+                  ? { textLibrary: fileLibraryFromBrowser(next, 'text') }
+                  : { soundLibrary: fileLibraryFromBrowser(next) }),
             },
             expectedRevision,
           );

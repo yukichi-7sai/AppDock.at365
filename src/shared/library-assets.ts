@@ -1,6 +1,6 @@
 import { assetFilename } from './asset-names';
 
-export type LibraryMedia = 'image' | 'sound';
+export type LibraryMedia = 'image' | 'sound' | 'text';
 export interface LibraryRef {
   file: string;
 }
@@ -15,6 +15,9 @@ export interface LibraryEntry {
   height: number;
   thumbnail: string;
   durationMs?: number;
+  textPreview?: string;
+  characters?: number;
+  lines?: number;
 }
 export const libraryKey = (ref: LibraryRef) => ref.file.toLowerCase();
 export const libraryBasename = (file: string) => file.split('/').at(-1)!;
@@ -30,7 +33,8 @@ export function libraryFolder(value: unknown): value is string {
 }
 export function libraryPath(value: unknown, media: LibraryMedia): value is string {
   if (typeof value !== 'string') return false;
-  const extensions = media === 'image' ? '(png|jpe?g|webp|svg)' : 'wav';
+  const extensions = media === 'image' ? '(png|jpe?g|webp|svg)' : media === 'sound' ? 'wav' : 'txt';
+  if (media === 'text' && assignedAsset(value)) return false;
   return assignedAsset(value)
     ? new RegExp('^@assigned/[a-f0-9]{64}\\.' + extensions + '$').test(value)
     : value !== '' && libraryFolder(value) && new RegExp('\\.' + extensions + '$', 'i').test(value);

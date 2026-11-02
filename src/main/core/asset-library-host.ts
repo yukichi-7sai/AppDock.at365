@@ -66,6 +66,7 @@ export class AssetLibraryHost {
     return this.retain(await this.images.import(input));
   }
   async retain(ref: RegisteredImageRef) {
+    if (this.media === 'text') throw Error('Text settings copies are not supported');
     this.options.writable();
     const saved = await this.images.read(ref);
     this.options.writable();
@@ -215,8 +216,7 @@ export class AssetLibraryHost {
     };
     return (
       Object.entries(this.options.settings.value).some(
-        ([key, value]) =>
-          key !== (this.media === 'image' ? 'imageLibrary' : 'soundLibrary') && contains(value),
+        ([key, value]) => key !== `${this.media}Library` && contains(value),
       ) || !!this.options.referenced?.(ref)
     );
   }
@@ -302,8 +302,19 @@ export class AssetLibraryHost {
   }
   async fileAction(operation: ImageLibraryFileAction, entries: RegisteredImageEntry[]) {
     if (!entries.length) throw Error(this.text('images.selectImages'));
-    if (!['copy-files', 'copy-paths', 'copy-image', 'reveal'].includes(operation))
+    if (!['copy-files', 'copy-paths', 'copy-image', 'copy-text', 'reveal'].includes(operation))
       throw Error('Invalid image operation');
+    if (operation === 'copy-text') {
+      if (this.media !== 'text') throw Error('Unsupported library action');
+      const bodies: string[] = [];
+      for (const entry of entries) {
+        const read = await this.images.read(entry.ref, entry.generation ?? '');
+        bodies.push(new TextDecoder('utf-8', { fatal: true }).decode(read.bytes));
+      }
+      for (const entry of entries) await this.images.read(entry.ref, entry.generation ?? '');
+      await clipboard.writeText(bodies.join('\r\n'));
+      return;
+    }
     if (operation === 'copy-image' && (this.media !== 'image' || entries.length !== 1))
       throw Error(this.text('images.copyImageSingle'));
     const files: string[] = [];
@@ -344,7 +355,12 @@ export class AssetLibraryHost {
       filters: [
         {
           name: this.text('services.imageLibraryHost.imageFilter'),
-          extensions: this.media === 'image' ? ['png', 'jpg', 'jpeg', 'webp', 'svg'] : ['wav'],
+          extensions:
+            this.media === 'image'
+              ? ['png', 'jpg', 'jpeg', 'webp', 'svg']
+              : this.media === 'sound'
+                ? ['wav']
+                : ['txt'],
         },
       ],
     });
