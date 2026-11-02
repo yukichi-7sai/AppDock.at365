@@ -26,6 +26,9 @@ internal sealed class InputCaptureEngine : IDisposable
     private readonly WinEventCallback environmentCallback;
     private readonly DispatcherTimer timer;
     private readonly HashSet<uint> pressed = [];
+    // Left/right Alt downs can precede Windows' Alt context. Use that evidence for the
+    // first chord only: a release missed by this hook must not modify later plain keys.
+    private int pendingAltSides;
     private readonly Dictionary<uint, bool> owned = [];
     private readonly Queue<ShortcutPressNotice> pendingPresses = [];
     private readonly Dictionary<ShortcutChord, List<ShortcutInput>> chords = [];
@@ -43,6 +46,68 @@ internal sealed class InputCaptureEngine : IDisposable
     private int? gestureRevision;
     private long pressId;
     private nint? foregroundWindow;
+    private InputPaletteTarget? palette;
+    // Committing a row releases the picker, not its original focus/foreground guard.
+    private readonly Dictionary<string, InputPaletteTarget> confirmedPastes = new();
+    internal InputPaletteTarget? ConfirmedTarget(string id) => confirmedPastes.GetValueOrDefault(id);
+    internal InputPaletteTarget? OpenTarget(string id) => palette?.Session == id ? palette : null;
+    private void ForgetSelection(InputPaletteTarget target, bool notifyHost = true)
+    {
+        target.Cancel();
+        confirmedPastes.Remove(target.Session);
+        if (notifyHost) notify("palette.key", new { session = target.Session, key = "cancel" });
+    }
+    private void ConfirmPalette()
+    {
+        var selection = palette!;
+        confirmedPastes.Add(selection.Session, selection);
+        palette = null;
+        QueueRefresh();
+    }
+    internal object? PaletteRequest(string method, System.Text.Json.JsonElement p)
+    {
+        var id = p.GetProperty("session").GetString()!;
+        if (method == "palette.capture") {
+            DropPalette();
+            palette = InputPaletteTarget.Capture(id, p.GetProperty("window").GetString()!);
+            if (palette != null) {
+                try { Reconcile(); UpdateTimer(); } catch { DropPalette(); throw; }
+            }
+            return palette == null ? null : new { x = palette.Anchor.X, y = palette.Anchor.Y, window = palette.WindowId };
+        }
+        if (confirmedPastes.TryGetValue(id, out var selection)) {
+            if (method == "palette.close" || !selection.IsCurrent()) {
+                ForgetSelection(selection, method != "palette.close");
+                QueueRefresh();
+                return false;
+            }
+            if (method == "palette.confirm") return true;
+            if (method == "palette.append") { selection.Body.Append(p.GetProperty("text").GetString()); return true; }
+            return false;
+        }
+        if (palette == null || palette.Session != id) return false;
+        if (method == "palette.close") { DropPalette(); return true; }
+        if (!palette.IsCurrent()) { DropPalette(); return false; }
+        switch (method) {
+            case "palette.show":
+                palette.Popup = new nint(long.Parse(p.GetProperty("popup").GetString()!));
+                try { Reconcile(); UpdateTimer(); } catch { DropPalette(); throw; }
+                return true;
+            case "palette.confirm":
+                if (palette.Popup == 0) return false;
+                ConfirmPalette();
+                return true;
+            default: throw new ArgumentException("Unknown palette operation.");
+        }
+    }
+    private void DropPalette()
+    {
+        if (palette == null) return;
+        var session = palette.Session;
+        palette = null;
+        notify("palette.key", new { session, key = "cancel" });
+        QueueRefresh();
+    }
     internal GestureEngine Gestures { get; }
     internal InputCaptureEngine(Dispatcher dispatcher, GestureIndicatorNotifications display, Func<string, object, bool> notify)
     {
@@ -69,7 +134,14 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         if (disposed) return;
         // A release on another input desktop may never have reached this hook.
-        if (kind == 0x20) { pressed.Remove(0xA4); pressed.Remove(0xA5); }
+        if (kind == 0x20) { pendingAltSides = 0; pressed.Remove(0xA4); pressed.Remove(0xA5); }
+        if (palette != null && unchecked((int)(time - palette.Since)) >= 0 &&
+            (kind == 0x20 || kind == 3 && !palette.MatchesWindow(window))) DropPalette();
+        if (confirmedPastes.Count != 0) {
+            foreach (var pending in confirmedPastes.Values.Where(p => unchecked((int)(time - p.Since)) >= 0 &&
+                         (kind == 0x20 || kind == 3 && !p.MatchesWindow(window))).ToArray())
+                ForgetSelection(pending);
+        }
         // Preserve a brief focus loss even when several events coalesce before the next refresh.
         if (recording != null && unchecked((int)(time - recordingSince)) >= 0 &&
             (kind == 0x20 || kind == 3 && recording.Window != window.ToInt64().ToString()))
@@ -87,7 +159,7 @@ internal sealed class InputCaptureEngine : IDisposable
     }
     private void UpdateTimer()
     {
-        var active = inputs.Length > 0 || recording != null || Gestures.NeedsKeyboard || Gestures.NeedsMouse;
+        var active = inputs.Length > 0 || recording != null || palette != null || confirmedPastes.Count != 0 || Gestures.NeedsKeyboard || Gestures.NeedsMouse;
         // Other processes do not send WM_INPUTLANGCHANGE to us. Only symbol bindings need this fallback.
         timer.IsEnabled = !disposed && monitoring && configuration?.AssistancePaused != true && ((inputs.Length > 0 && lookup.HasSymbols) ||
             (active && (foregroundHook == 0 || desktopHook == 0)));
@@ -180,6 +252,10 @@ internal sealed class InputCaptureEngine : IDisposable
         if (disposed) return;
         try {
             var foreground = GetForegroundWindow();
+            if (palette != null && !palette.IsCurrent()) DropPalette();
+            if (confirmedPastes.Count != 0)
+                foreach (var pending in confirmedPastes.Values.Where(p => !p.IsCurrent()).ToArray())
+                    ForgetSelection(pending);
             if (foregroundWindow != foreground) {
                 if (notify("capture.foreground", new { window = foreground.ToInt64().ToString() }))
                     foregroundWindow = foreground;
@@ -210,9 +286,11 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         if (disposed) return;
         var needKeyboard = chords.Count > 0 || (inputs.Length > 0 && lookup.HasSymbols) || recording != null || owned.Count > 0 || Gestures.NeedsKeyboard;
-        var needMouse = recording != null || Gestures.NeedsMouse;
+        needKeyboard |= palette != null || confirmedPastes.Count != 0;
+        var needMouse = recording != null || Gestures.NeedsMouse || palette != null || confirmedPastes.Count != 0;
         if (needKeyboard && keyboardHook == 0) {
             pressed.Clear();
+            pendingAltSides = 0;
             for (uint key = 1; key < 256; key++)
                 if (!ShortcutCodec.IsPulse(key) && (GetAsyncKeyState((int)key) & 0x8000) != 0) pressed.Add(key);
             keyboardHook = SetWindowsHookEx(13, keyboardCallback, GetModuleHandle(null), 0);
@@ -225,13 +303,13 @@ internal sealed class InputCaptureEngine : IDisposable
         if (!needKeyboard && keyboardHook != 0) { UnhookWindowsHookEx(keyboardHook); keyboardHook = 0; pressed.Clear(); }
         if (!needMouse && mouseHook != 0) { UnhookWindowsHookEx(mouseHook); mouseHook = 0; }
     }
-    private int Modifiers(uint current, bool up, uint flags)
+    private int Modifiers(uint current, bool up, uint flags, bool observedAlt)
     {
         // This callback precedes the OS asynchronous state update for the current key.
         bool Held(uint key) => key == current ? !up : (GetAsyncKeyState((int)key) & 0x8000) != 0;
+        bool HeldAlt(uint key) => Held(key) || (recording != null && owned.ContainsKey(key) && pressed.Contains(key));
         return (Held(0xA2) || Held(0xA3) || Held(0x11) ? 1 : 0) |
-            ((flags & 0x20) != 0 || pressed.Contains(0xA4) || pressed.Contains(0xA5) ||
-                Held(0xA4) || Held(0xA5) || Held(0x12) ? 2 : 0) |
+            ((flags & 0x20) != 0 || observedAlt || HeldAlt(0xA4) || HeldAlt(0xA5) || Held(0x12) ? 2 : 0) |
             (Held(0xA0) || Held(0xA1) || Held(0x10) ? 4 : 0) |
             (Held(0x5B) || Held(0x5C) ? 8 : 0);
     }
@@ -246,6 +324,13 @@ internal sealed class InputCaptureEngine : IDisposable
         var pulse = ShortcutCodec.IsPulse(data.Key);
         var repeat = !up && !pulse && !pressed.Add(data.Key);
         if (up || pulse) pressed.Remove(data.Key);
+        int altSide = data.Key switch { 0xA4 => 1, 0xA5 => 2, _ => 0 };
+        if (up) pendingAltSides &= ~altSide;
+        else if (!repeat) pendingAltSides |= altSide;
+        bool auxiliary = ShortcutCodec.IsModifier(data.Key) ||
+            ((data.Flags & 0x10) != 0 && data.Key is 0xE8 or 0xFF); // injected menu masks
+        bool observedAlt = pendingAltSides != 0;
+        if (!up && !auxiliary) pendingAltSides = 0;
         bool? blockDecision = null;
         try {
             if (owned.TryGetValue(data.Key, out var blocked)) {
@@ -253,7 +338,25 @@ internal sealed class InputCaptureEngine : IDisposable
                 return blocked ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
             }
             // LLKHF_ALTDOWN describes this event, including when the asynchronous Alt state is not visible.
-            var modifiers = Modifiers(data.Key, up, data.Flags);
+            var modifiers = Modifiers(data.Key, up, data.Flags, observedAlt);
+            if (!up && !auxiliary && (modifiers & 2) == 0) {
+                // The hook can also have missed the up used for repeat detection.
+                pressed.Remove(0xA4); pressed.Remove(0xA5);
+            }
+            if (palette != null && !up && !repeat && !auxiliary) {
+                var key = data.Key switch { 38 => "up", 40 => "down", 13 => "choose", 27 => "cancel", _ => null };
+                if (key != null && modifiers == 0 && palette.IsCurrent()) {
+                    owned[data.Key] = true;
+                    if (key == "cancel") DropPalette();
+                    else {
+                        var session = palette.Session;
+                        if (key == "choose") ConfirmPalette();
+                        notify("palette.key", new { session, key });
+                    }
+                    return 1;
+                }
+                DropPalette();
+            }
             var chord = new ShortcutChord(data.Key, modifiers);
             IEnumerable<ShortcutInput> connected = chords.GetValueOrDefault(chord) ?? [];
             if (!up && !repeat && inputs.Length > 0 && lookup.HasSymbols) {
@@ -291,7 +394,7 @@ internal sealed class InputCaptureEngine : IDisposable
                 return CallNextHookEx(keyboardHook, code, message, pointer);
             if (Gestures.Keyboard(code, message, pointer) != 0) {
                 // A right-button gesture owns its captured modifier until release.
-                if (data.Key is 0xA4 or 0xA5) pressed.Remove(data.Key);
+                if (altSide != 0) { pendingAltSides &= ~altSide; pressed.Remove(data.Key); }
                 return 1;
             }
             if (up || repeat || configuration == null || !connected.Any())
@@ -363,6 +466,13 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         if (code < 0 || disposed) return CallNextHookEx(mouseHook, code, message, pointer);
         var data = Marshal.PtrToStructure<MouseData>(pointer);
+        if (message is (0x201 or 0x204 or 0x207 or 0x20B) && palette?.PointerInside(data.Point) != true) {
+            if (confirmedPastes.Count != 0 && !confirmedPastes.Values.Any(p => p.PointerInside(data.Point))) {
+                foreach (var item in confirmedPastes.Values.ToArray()) ForgetSelection(item);
+                QueueRefresh();
+            }
+            if (palette != null) DropPalette();
+        }
         if (data.Extra == GestureEngine.InputMarker) return CallNextHookEx(mouseHook, code, message, pointer);
         if (recording != null && message is 0x201 or 0x204 or 0x207 or 0x20B) EndRecording();
         return Gestures.Mouse(code, message, pointer) != 0 ? 1 : CallNextHookEx(mouseHook, code, message, pointer);
@@ -394,6 +504,8 @@ internal sealed class InputCaptureEngine : IDisposable
     {
         if (disposed) return;
         disposed = true; accepting = false; timer.Stop(); recording = null;
+        foreach (var item in confirmedPastes.Values) item.Cancel();
+        confirmedPastes.Clear();
         if (foregroundHook != 0) UnhookWinEvent(foregroundHook);
         if (desktopHook != 0) UnhookWinEvent(desktopHook);
         foregroundHook = desktopHook = 0;

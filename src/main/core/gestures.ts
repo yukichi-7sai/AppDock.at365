@@ -62,6 +62,23 @@ export interface ShortcutPress {
   target?: CommandTarget;
 }
 export class InputCaptureManager {
+  inputPalette?: { key(session: string, key: string): void; disconnected(): void };
+  private paletteControls: Promise<void> = Promise.resolve();
+  paletteRequest<T>(method: string, params: unknown): Promise<T> {
+    if (method === 'capture' && !this.stopped && (!this.peer || this.peer.closed)) this.connect();
+    const peer = this.peer;
+    if (!peer || peer.closed || this.stopped)
+      return Promise.reject(Error(hostText('services.gestures.disconnected')));
+    const request = () => peer.request('palette.' + method, params) as Promise<T>;
+    if (method === 'paste' || method === 'history') return request();
+    // Native RPC handlers run concurrently. A click must claim its selection before the next capture.
+    const result = this.paletteControls.then(request);
+    this.paletteControls = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
+  }
   indicator?: { show(model: GestureIndicatorModel, followCursor?: boolean): void; hide(): void };
   private peer?: JsonLinePeer;
   private child?: ChildProcessWithoutNullStreams;
@@ -234,6 +251,11 @@ export class InputCaptureManager {
     return !!prepared && !!(await peer.request('gestures.activate', request));
   }
   private async event(method: string, p: any) {
+    if (method === 'palette.key') {
+      if (typeof p.session === 'string' && typeof p.key === 'string')
+        this.inputPalette?.key(p.session, p.key);
+      return;
+    }
     if (method === 'gestures.indicator') {
       const notice = readGestureIndicatorNotice(p);
       if (!notice || notice.revision !== this.revision || this.stopped) return;
@@ -422,6 +444,7 @@ export class InputCaptureManager {
     });
     child.on('exit', () => peer.close());
     peer.on('closed', () => {
+      if (this.peer === peer) this.inputPalette?.disconnected();
       this.indicator?.hide();
       child.kill();
       for (const [session, controller] of this.active) {

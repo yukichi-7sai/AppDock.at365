@@ -35,6 +35,49 @@ const { parseDeviceUiState } = require('../out/main/main/core/device-ui-state');
 const { libraryPath } = require('../out/main/shared/library-assets');
 const { filterImageBrowser } = require('../out/main/shared/image-browser');
 const root = path.resolve('.artifacts/text-library-unit-' + Date.now());
+test('snippet group keeps its identity and order without adopting or deleting user texts', async (t) => {
+  const { snippetGroupId } = require('../out/main/shared/text-library');
+  const f = await fixture(t);
+  const user = { id: 'appdock-snippets', name: '定型文', files: [f.a] };
+  f.settings.value.textLibrary = { groups: [user] };
+  const store = f.host.configuration;
+  const [fixed, existing] = store.snapshot().groups;
+  assert.equal(fixed.id, snippetGroupId);
+  assert.notEqual(fixed.name, user.name);
+  assert.deepEqual(fixed.images, []);
+  assert.deepEqual(existing.images, [f.a]);
+  store.edit({
+    kind: 'membership-batch',
+    mode: 'add',
+    groupId: fixed.id,
+    images: [
+      { image: f.b, before: [] },
+      { image: f.a, before: [user.id] },
+    ],
+  });
+  const selected = store.snapshot().groups[0];
+  assert.deepEqual(selected.images, [f.b, f.a]);
+  assert.deepEqual(
+    f.service.snippetEntries().map((entry) => entry.ref),
+    [f.b, f.a],
+  );
+  assert.throws(() =>
+    store.edit({ kind: 'update', before: selected, group: { ...selected, name: 'changed' } }),
+  );
+  assert.throws(() => store.edit({ kind: 'delete', id: fixed.id, before: selected }));
+  assert.throws(() =>
+    store.edit({ kind: 'order', before: [fixed.id, user.id], ids: [user.id, fixed.id] }),
+  );
+  store.edit({
+    kind: 'membership-batch',
+    mode: 'remove',
+    groupId: fixed.id,
+    images: [{ image: f.a, before: [fixed.id, user.id] }],
+  });
+  assert.deepEqual(store.snapshot().groups[0].images, [f.b]);
+  assert.deepEqual(store.snapshot().groups[1].images, [f.a]);
+  assert(f.files.entry(f.a).available);
+});
 let serial = 0;
 async function fixture(t) {
   const directory = path.join(root, String(++serial), 'texts');
@@ -91,8 +134,14 @@ test('batch import rechecks large sources on their turn and continues in selecti
     return add(bytes, name);
   });
   const results = await f.host.registerMany();
-  assert.deepEqual(results.map((item) => item.name), names);
-  assert.deepEqual(results.map((item) => !!item.image), [true, false, true, true]);
+  assert.deepEqual(
+    results.map((item) => item.name),
+    names,
+  );
+  assert.deepEqual(
+    results.map((item) => !!item.image),
+    [true, false, true, true],
+  );
   assert.ok(results[1].error);
   assert.equal((await f.service.document(results[2].image)).body.length, size);
 });

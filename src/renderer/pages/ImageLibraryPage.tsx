@@ -552,10 +552,12 @@ function LibraryPageBody({ initialModel }: { initialModel: ImageLibraryPageModel
       },
       {
         label: t('images.renameGroup'),
+        disabled: c.groups.find((g) => g.id === menu.target)?.fixed,
         run: () => dialog('rename', menu.target, undefined, undefined, menu.opener),
       },
       {
         label: t('images.deleteGroup'),
+        disabled: c.groups.find((g) => g.id === menu.target)?.fixed,
         danger: true,
         run: () => dialog('delete', menu.target, undefined, undefined, menu.opener),
       },

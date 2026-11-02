@@ -11,6 +11,7 @@ import type { SettingsPageModel } from '../../shared/settings-page';
 import { defaultShellId, shellRegions, shellProviderCandidates } from '../../shared/shell';
 import { useSettingsControls } from '../settings-ui/api';
 import { Toggle } from '../settings-ui/Toggle';
+import { CommandLink } from '../settings-ui/CommandLink';
 import { SettingsInput, numberInput } from '../settings-ui/SettingsInput';
 import { AboutSettings } from './AboutSettings';
 import { AppletManagementSettings } from './AppletManagementSettings';
@@ -468,6 +469,35 @@ export function SettingsForm({
           </>
         )}
 
+        {category === 'text-palette' && (
+          <>
+            <SettingsSection title={t('inputPalette.snippets')}>
+              <CommandLink commandId="appdock.text-palette.open" />
+              <SettingRow pageId={category} itemKey="textPaletteHistory">
+                <Toggle
+                  label={t('inputPalette.history')}
+                  checked={settings.host.textPaletteHistory}
+                  onChange={(v) =>
+                    edit({ ...settings, host: { ...settings.host, textPaletteHistory: v } })
+                  }
+                />
+              </SettingRow>
+              <SettingsActions>
+                <button onClick={() => void run(() => invoke('manageSnippets'))}>
+                  {t('inputPalette.manage')}
+                </button>
+              </SettingsActions>
+            </SettingsSection>
+            <SettingsSection title={t('inputPalette.historySection')}>
+              <CommandLink commandId="appdock.clipboard-history.open" />
+              <SettingsActions>
+                <button onClick={() => void run(() => invoke('openClipboardSettings'))}>
+                  {t('inputPalette.windowsSettings')}
+                </button>
+              </SettingsActions>
+            </SettingsSection>
+          </>
+        )}
         {category === 'general' && (
           <>
             <SettingsSection>

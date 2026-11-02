@@ -13,6 +13,7 @@ export interface HostSettings {
   overlayBackground: 'blur' | 'transparent';
   overlayShadow: boolean;
   soundEnabled: boolean;
+  textPaletteHistory: boolean;
   notificationBannerPosition: import('./notifications').NotificationBannerPosition;
   notificationBannerShadow: boolean;
   notificationDesktopShadow: boolean;

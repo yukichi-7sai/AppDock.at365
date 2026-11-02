@@ -84,6 +84,18 @@ internal sealed class InputSender : IDisposable
     }
     private static void CheckTarget(nint target) { if (GetForegroundWindow() != target || !IsWindowVisible(target)) throw new InvalidOperationException("操作先が変わりました。"); }
     private static bool Pressed(int key) => (GetAsyncKeyState(key) & 0x8000) != 0;
+    internal static bool PasteKeysHeld() => HeldModifiers.Any(Pressed) || Pressed(0x56);
+    internal static void SubmitPasteShortcut()
+    {
+        var events = new[] { KeyEvent(0x11, false, false), KeyEvent(0x56, false, false), KeyEvent(0x56, true, false), KeyEvent(0x11, true, false) };
+        var sent = SendInput(4, events, Marshal.SizeOf<Input>());
+        if (sent == 4) return;
+        if (sent > 0) {
+            var releases = sent == 2 ? events[2..] : events[3..];
+            SendInput((uint)releases.Length, releases, Marshal.SizeOf<Input>());
+        }
+        throw new InvalidOperationException("貼り付けキーを送信できませんでした。");
+    }
     public void Dispose() { lock (sync) { disposed = true; foreach (var cts in pending.Values) cts.Cancel(); } }
     private static Input KeyEvent(ushort key, bool up, bool extended) => new() {
         Type = 1, Data = new InputUnion { Keyboard = new KeyboardInput { Key = key, Flags = (up ? 2u : 0) | (extended ? 1u : 0), Extra = GestureEngine.InputMarker } }

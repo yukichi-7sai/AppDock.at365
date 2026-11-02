@@ -1,6 +1,6 @@
 import { libraryText } from './library-text';
 import { imagePath } from './image-paths';
-import { libraryReference, type LibraryMedia } from './library-assets';
+import { libraryReference, snippetGroupId, type LibraryMedia } from './library-assets';
 
 export interface RegisteredImageRef {
   file: string;
@@ -116,7 +116,7 @@ export function parseImageLibrary(value: unknown, media: LibraryMedia = 'image')
       !object(g) ||
       Object.keys(g).some((k) => !['id', 'name', 'images'].includes(k)) ||
       typeof g.id !== 'string' ||
-      !/^[a-z0-9][a-z0-9-]{0,79}$/.test(g.id) ||
+      (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(g.id) && !(media === 'text' && g.id === snippetGroupId)) ||
       ids.has(g.id) ||
       typeof g.name !== 'string' ||
       !g.name.trim() ||

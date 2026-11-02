@@ -57,7 +57,7 @@ internal static partial class Program
                 type.GetMethod("Compile", members)!.Invoke(engine, null);
             }
             void Reset(bool block = true, bool active = true, int notify = 1) {
-                owned.Clear(); pressed.Clear(); notices.Clear();
+                owned.Clear(); pressed.Clear(); Set("pendingAltSides", 0); notices.Clear();
                 type.GetField("pendingPresses", members)!.GetValue(engine)!.GetType().GetMethod("Clear")!.Invoke(type.GetField("pendingPresses", members)!.GetValue(engine), null);
                 Config(7); Inputs(Row(block)); Set("accepting", active); delivery = notify;
             }
@@ -81,6 +81,19 @@ internal static partial class Program
                 Check(Feed(true, alt, flags) == 0 && Feed(key:0x43) == 0 && Feed(true, 0x43) == 0 &&
                     notices.Count == 1, "releasing either Alt leaves the next plain C alone");
             }
+            foreach (var (alt,altFlags) in new[] { (0xA4u,0x20u), (0xA5u,0u) }) {
+                Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false },
+                    new { shortcut = "Alt+V", blockOriginalInput = false }, new { shortcut = "F8", blockOriginalInput = false });
+                Feed(key:alt); Feed(key:0x43,flags:altFlags); Feed(true,0x43);
+                Feed(key:alt); // A repeat while Alt is held must not re-arm the fallback.
+                // Windows now reports Alt up, but the capture hook did not receive the release.
+                Feed(key:0x43); Feed(true,0x43); Feed(key:0x56); Feed(true,0x56); Feed(key:0x77); Feed(true,0x77);
+                Check(notices.Select(n=>n.GetProperty("Shortcuts")[0].GetString()).SequenceEqual(["Alt+C","F8"]),
+                    "a lost Alt release does not trigger either palette from plain C/V or suppress plain F8");
+                Feed(key:alt); Feed(key:0x56); Feed(true,0x56); Feed(true,alt);
+                Check(notices.Last().GetProperty("Shortcuts")[0].GetString()=="Alt+V",
+                    "after a plain key the next fresh Alt down still identifies its first chord without OS context");
+            }
             Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false });
             var gestures = type.GetProperty("Gestures", members)!.GetValue(engine)!;
             var gestureKeys = (HashSet<uint>)gestures.GetType().GetField("keys", members)!.GetValue(gestures)!;
@@ -98,6 +111,8 @@ internal static partial class Program
             Set("recording", Decode("RecordingInput", new { token = "capture-left-alt", window = recorderWindow }));
             Check(Feed(key:0xA4) == 1 && Feed(key:0x43) == 1 && Feed(true, 0x43) == 1 &&
                 recorded.SequenceEqual(["Alt+C"]) && notices.Count == 0, "recorder owns left Alt and captures its chord once without a menu mask");
+            Check(Feed(key:0x56)==1 && Feed(true,0x56)==1 && recorded.Last()=="Alt+V",
+                "recorder-owned Alt stays held for a second key even without Windows Alt context");
             type.GetMethod("EndRecording", members)!.Invoke(engine, null);
             Check(Feed(true, 0xA4) == 1 && Feed(key:0xA4) == 0 && Feed(true, 0xA4) == 0,
                 "release after leaving the recorder is paired and the next standalone Alt passes");

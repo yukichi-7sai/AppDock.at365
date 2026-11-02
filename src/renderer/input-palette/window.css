@@ -1,0 +1,94 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+#root {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+header,
+footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+}
+header {
+  height: 39px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+header span,
+footer,
+button span {
+  color: var(--muted);
+  font-size: 12px;
+}
+footer {
+  height: 29px;
+  border-top: 1px solid var(--border);
+}
+.choices {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 4px;
+}
+.choices p {
+  color: var(--muted);
+  margin: 8px;
+}
+button {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 10px;
+  border: 0;
+  border-inline-start: 3px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button:hover {
+  background: var(--raised);
+}
+button img {
+  position: absolute;
+  left: 8px;
+  width: 72px;
+  height: 44px;
+  object-fit: contain;
+}
+button:has(img) {
+  padding-left: 88px;
+}
+button[aria-current='true'] {
+  background: var(--accent-soft);
+  border-inline-start-color: var(--accent);
+}
+button span,
+button strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

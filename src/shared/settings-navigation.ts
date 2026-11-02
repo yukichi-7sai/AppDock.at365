@@ -5,6 +5,7 @@ import type { ExtensionSnapshot } from './contracts';
 export const hostSettingsPages = [
   ['appearance', hostText('pages.appearance.title')],
   ['general', hostText('pages.general.title')],
+  ['text-palette', hostText('inputPalette.settings')],
   ['notifications', hostText('settings.settings-navigation.notifications')],
   ['ribbon', hostText('settings.settings-navigation.ribbon')],
   ['statusbar', hostText('settings.settings-navigation.statusbar')],

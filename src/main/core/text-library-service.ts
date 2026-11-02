@@ -8,6 +8,7 @@ import {
 } from '../../shared/library-assets';
 import { hostText } from '../../shared/i18n';
 import type { LibraryTextDocument } from '../../shared/text-library';
+import { snippetGroupId } from '../../shared/library-assets';
 import { RegisteredAssets } from './registered-assets';
 import { AssetLibraryHost } from './asset-library-host';
 import type { FileWatchAssistance } from './file-watch-assistance';
@@ -80,6 +81,15 @@ export class TextLibraryService {
   }
   get indexing() {
     return !!this.pendingIndex;
+  }
+  snippetEntries() {
+    const files =
+      this.options.settings.value.textLibrary?.groups.find((g) => g.id === snippetGroupId)?.files ??
+      [];
+    return files.flatMap((ref) => {
+      const entry = this.files.entry(ref);
+      return entry?.available && entry.generation ? [entry] : [];
+    });
   }
   /** Incremental body index: unchanged generations are never reread during search. */
   index(): Promise<void> {

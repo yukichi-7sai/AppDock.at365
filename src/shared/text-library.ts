@@ -2,6 +2,7 @@ import { fileGroupsForBrowser, fileLibraryFromBrowser, type FileLibrary } from '
 
 /** Text originals remain ordinary UTF-8 files; settings contain classification only. */
 export type TextLibrary = FileLibrary;
+export { snippetGroupId } from './library-assets';
 export const parseTextLibrary = (value: unknown): TextLibrary =>
   fileLibraryFromBrowser(fileGroupsForBrowser(value, 'text'), 'text');
 export interface LibraryTextDocument {

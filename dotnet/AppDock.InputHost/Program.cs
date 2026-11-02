@@ -27,6 +27,7 @@ internal static class Program
         var output = Console.Out; Console.SetOut(Console.Error);
         if (args.SequenceEqual(new[] { "--notification-state" })) return NotificationState(output).GetAwaiter().GetResult();
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        using var palettePaste = new PalettePaste(app.Dispatcher);
         using var capture = new InputCaptureThread();
         _ = Task.Run(async () => {
             await using var peer = new JsonRpcConnection(Console.In, output);
@@ -39,6 +40,7 @@ internal static class Program
             try {
                 await peer.ReadAsync(async (method, p) => {
                     if (method == "capture.target") return CommandTargetCapture.Capture(GetForegroundWindow());
+                    if (method.StartsWith("palette.", StringComparison.Ordinal)) return await capture.PaletteAsync(method, p, palettePaste, peer.Lifetime);
                     if (method.StartsWith("touchpad.", StringComparison.Ordinal))
                         return await app.Dispatcher.InvokeAsync(() => touchpad.Handle(method, p));
                     if (method == "capture.validTarget") return long.TryParse(p.GetProperty("window").GetString(), out var target) && target != 0 && GetForegroundWindow().ToInt64() == target;

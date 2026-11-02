@@ -1,5 +1,6 @@
 import { SoundLibraryService } from './core/sound-library-service';
 import { TextLibraryService } from './core/text-library-service';
+import { snippetGroupId } from '../shared/text-library';
 import type { SoundGallery } from './core/library-sound-preview';
 import { replaceNotificationPreference } from '../shared/notification-preference-edit';
 import { hostStartupTiming } from './core/host-startup-timing';
@@ -161,6 +162,7 @@ import { initializeGestureDefaults } from '../shared/gestures';
 import { getCommandTriggerOptions } from '../shared/command-trigger-options';
 import { normalizeShortcut } from '../shared/commands';
 import { hostCommands, hostCommandsForApplets, shortcutFromEvent } from '../shared/commands';
+import { InputPaletteHost } from './core/input-palette-host';
 import { activeCommandTriggers, commandTriggerEnablement } from '../shared/command-triggers';
 import { settingsPageCommands } from '../shared/settings-navigation';
 import { updateCommands } from '../shared/update-commands';
@@ -796,6 +798,8 @@ const textLibrary = new TextLibraryService(
 );
 let updater: PortableUpdates;
 let gestureIndicatorHost: GestureIndicatorHost | undefined;
+let inputPalette: InputPaletteHost | undefined;
+let textLibraryPageState: ImageLibraryPageState | undefined;
 let startupUpdateTimer: ReturnType<typeof setTimeout> | undefined;
 let automation: AutomationService | undefined;
 const appletApiAccess = new AppletApiAccess(path.join(dataDirectory, 'applet-api.json'));
@@ -1846,6 +1850,16 @@ function openCommandPalette(
 async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
   if (id === 'appdock.noop') return { accepted: true };
+  if (id === 'appdock.text-palette.open' || id === 'appdock.clipboard-history.open') {
+    if (!inputPalette) throw Error(hostText('services.index.notReady'));
+    return inputPalette.open(
+      invocation?.window ??
+        shortcutInvocation.getStore()?.window ??
+        invocation?.triggerContext?.target?.window ??
+        '0',
+      id === 'appdock.clipboard-history.open' ? 'history' : 'snippets',
+    );
+  }
   const settingsPage = settingsPageCommands(allApplets()).find((command) => command.id === id);
   if (settingsPage) {
     await showWindow(invocation);
@@ -2318,6 +2332,10 @@ function settingsPageAuxiliary(page: SettingsPageDefinition): SettingsPageAuxili
       ...(applet.settingSections ?? []).map((section) => section.description ?? ''),
     );
   const ids = commandTextIds(texts);
+  if (page.id === 'text-palette') {
+    ids.add('appdock.text-palette.open');
+    ids.add('appdock.clipboard-history.open');
+  }
   if (ids.size) auxiliary.commandReferences = commandReferences(ids, uiCommands());
   if (page.id === 'applets' && auxiliary.commandReferences) {
     const references = new Map(auxiliary.commandReferences.map((command) => [command.id, command]));
@@ -2991,6 +3009,19 @@ function settingsPageActions(
       }
     };
   }
+  if (page.id === 'text-palette') {
+    actions.openClipboardSettings = () => shell.openExternal('ms-settings:clipboard');
+    actions.manageSnippets = async () => {
+      const state = textLibraryPageState;
+      if (!state || state.closed) return;
+      state.group = 'group:' + snippetGroupId;
+      state.query = '';
+      state.folder = '*';
+      state.selected.clear();
+      state.resetView();
+      await navigation.navigate('text-library');
+    };
+  }
   if (page.id === 'general') {
     actions.restoreScopedSettings = async ([scope]) => {
       if (scope !== 'shared' && scope !== 'device')
@@ -3076,6 +3107,7 @@ function settingsPageActions(
       'command-triggers',
       'custom-commands',
     ].includes(page.id) ||
+    page.id === 'text-palette' ||
     page.kind === 'applet' ||
     page.items.some(
       (item) =>
@@ -4769,6 +4801,7 @@ async function initialize() {
   const textState = new ImageLibraryPageState(
     new GalleryViewStateStore(settings.uiStateStorage('textGallery'), 'text'),
   );
+  textLibraryPageState = textState;
   galleryImages = new GalleryImages(registeredImages);
   const galleryFailed = (message: string) =>
     errors.report({
@@ -5064,6 +5097,22 @@ async function initialize() {
       }),
   });
   gestures.indicator = gestureIndicatorHost;
+  inputPalette = new InputPaletteHost(
+    pathToFileURL(path.join(app.getAppPath(), 'out/renderer/input-palette.html')).href,
+    path.join(__dirname, 'input-palette-preload.js'),
+    gestures,
+    textLibrary,
+    () => settings.value.host.textPaletteHistory,
+    (stage, session) =>
+      errors.report({
+        eventId: 'input-palette-' + session.id,
+        source: session.kind === 'history' ? 'clipboard-history' : 'text-palette',
+        title: hostText(session.kind === 'history' ? 'inputPalette.historyTitle' : 'inputPalette.title'),
+        code: (session.kind === 'history' ? 'CLIPBOARD_HISTORY_' : 'TEXT_PALETTE_') + stage.toUpperCase(),
+        message: hostText(`inputPalette.error.${stage}`),
+      }),
+  );
+  gestures.inputPalette = inputPalette;
   await hostStartupTiming.phaseAsync('indicator', () => gestureIndicatorHost!.initialize());
   await hostStartupTiming.phaseAsync('gestures', () => gestures!.start());
   powerMonitor.on('resume', refreshAfterResume);
@@ -5463,6 +5512,7 @@ app.on('before-quit', (event) => {
       () => touchpad?.close(),
       () => gestures?.close(),
       () => gestureIndicatorHost?.dispose(),
+      () => inputPalette?.dispose(),
       () => nativeInput?.close(),
       () => processLauncher.close(),
       () => hotKeys?.close(),

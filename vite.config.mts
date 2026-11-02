@@ -12,6 +12,7 @@ export default defineConfig({
         main: 'src/renderer/index.html',
         commandPalette: 'src/renderer/command-palette/index.html',
         gestureIndicator: 'src/renderer/gesture-indicator.html',
+        inputPalette: 'src/renderer/input-palette.html',
       },
     },
   },

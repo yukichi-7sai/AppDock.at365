@@ -28,7 +28,7 @@ type OrdinaryHostKey = Exclude<
 >;
 export type HostSettingDefinition = SettingDefinition & {
   key: OrdinaryHostKey;
-  pageId: 'appearance' | 'general' | 'statusbar' | 'notifications';
+  pageId: 'appearance' | 'general' | 'statusbar' | 'notifications' | 'text-palette';
   catalogKey?: string;
   applies?: string;
 };
@@ -132,6 +132,14 @@ const definitions = {
     default: true,
     automation: true,
     generateCommands: [...switches],
+  },
+  textPaletteHistory: {
+    pageId: 'text-palette',
+    title: hostText('inputPalette.history'),
+    description: hostText('inputPalette.historyHint'),
+    type: 'boolean',
+    default: true,
+    automation: false,
   },
   notificationBannerPosition: {
     pageId: 'notifications',

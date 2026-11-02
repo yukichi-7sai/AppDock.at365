@@ -1,6 +1,8 @@
 import { assetFilename } from './asset-names';
 
 export type LibraryMedia = 'image' | 'sound' | 'text';
+// The colon keeps this identity outside the namespace of user-created group IDs.
+export const snippetGroupId = 'builtin:snippets';
 export interface LibraryRef {
   file: string;
 }

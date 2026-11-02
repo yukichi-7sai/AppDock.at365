@@ -47,6 +47,8 @@ function change(value, pageId, alternate = false) {
     next.host.closeToTray = alternate;
     next.host.startMinimized = !alternate;
     next.host.startPage = alternate ? 'about' : 'page:example.missing:main';
+  } else if (pageId === 'text-palette') {
+    next.host.textPaletteHistory = alternate;
   } else if (pageId === 'notifications') {
     next.host.notificationBannerPosition = alternate ? 'bottom-left' : 'bottom-right';
     next.host.notificationBannerShadow = alternate;
@@ -84,7 +86,7 @@ test('legacy mixed notification values and status visibility migrate once withou
   for (const pageId of hostPageSettingsIds)
     assert.equal(
       store.hostPageLocalSettings(pageId),
-      ['appearance', 'general', 'notifications', 'statusbar'].includes(pageId),
+      ['appearance', 'general', 'notifications', 'statusbar', 'text-palette'].includes(pageId),
     );
   assert.equal(store.value.host.notificationBannerPosition, 'bottom-right');
   assert.equal(store.value.host.showStatusBar, false);

@@ -136,7 +136,7 @@ export interface ImageLibraryPageModel {
     importing?: IconImportProgress;
     folders: string[];
     folder: string;
-    groups: { id: string; title: string; count: number }[];
+    groups: { id: string; title: string; count: number; fixed?: boolean }[];
     group: string;
     query: string;
     items: GalleryItem[];

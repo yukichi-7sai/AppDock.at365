@@ -13,7 +13,19 @@ export const hostCommands = [
   },
   { id: 'appdock.open', title: 'AppDockを開く', extension: 'AppDock', available: true },
   { id: 'appdock.commands.search', title: 'コマンドを検索', extension: 'AppDock', available: true },
+  {
+    id: 'appdock.text-palette.open',
+    title: hostText('inputPalette.open'),
+    extension: 'AppDock',
+    available: true,
+  },
   { id: 'appdock.settings.open', title: '設定を開く', extension: 'AppDock', available: true },
+  {
+    id: 'appdock.clipboard-history.open',
+    title: hostText('inputPalette.historyOpen'),
+    extension: 'AppDock',
+    available: true,
+  },
   {
     id: 'appdock.image-library.open',
     title: '画像ライブラリーを開く',

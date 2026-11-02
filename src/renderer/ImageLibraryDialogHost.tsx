@@ -1,6 +1,7 @@
 import { SettingsField } from './settings-ui/SettingsSections';
 import { LibraryMediaProvider, useLibraryTranslation } from './image-browser/LibraryMedia';
 import { libraryPath } from '../shared/library-assets';
+import { snippetGroupId } from '../shared/text-library';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type {
   ImageLibraryDialogRequest,
@@ -264,9 +265,17 @@ function Editor({
         returnFocus={returnFocus}
         title={t('images.groupOrderTitle')}
         listLabel={t('images.groupOrderLabel')}
-        items={r.groups.map((g) => ({ id: g.id, title: g.name }))}
+        items={r.groups
+          .filter((g) => r.media !== 'text' || g.id !== snippetGroupId)
+          .map((g) => ({ id: g.id, title: g.name }))}
         onClose={close}
-        onApply={(ids) => save({ kind: 'order', ids, before: r.groups.map((g) => g.id) })}
+        onApply={(ids) =>
+          save({
+            kind: 'order',
+            ids: r.media === 'text' ? [snippetGroupId, ...ids] : ids,
+            before: r.groups.map((g) => g.id),
+          })
+        }
       />
     );
   if (r.kind === 'rename-images') {

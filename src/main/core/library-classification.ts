@@ -1,4 +1,6 @@
 import { fileGroupsForBrowser, fileLibraryFromBrowser } from '../../shared/file-library';
+import { snippetGroupId } from '../../shared/text-library';
+import { hostText } from '../../shared/i18n';
 import type { LibraryMedia } from '../../shared/library-assets';
 import { libraryText } from '../../shared/library-text';
 import {
@@ -39,7 +41,15 @@ export class LibraryClassificationStore {
     return this.settings.revision;
   }
   snapshot() {
-    return parseImageLibrary(this.value, this.media);
+    const value = parseImageLibrary(this.value, this.media);
+    if (this.media !== 'text') return value;
+    const fixed = value.groups.find((group) => group.id === snippetGroupId);
+    const others = value.groups.filter((group) => group !== fixed);
+    const names = new Set(others.map((group) => group.name));
+    const title = hostText('inputPalette.snippets');
+    let name = title;
+    for (let n = 1; names.has(name); n++) name = title + ' (' + n + ')';
+    return { groups: [{ id: snippetGroupId, name, images: fixed?.images ?? [] }, ...others] };
   }
   plan(value: ImageLibrary, expectedRevision: number) {
     this.writable();
@@ -47,6 +57,11 @@ export class LibraryClassificationStore {
     const before = JSON.stringify(this.value);
     const current = this.snapshot(),
       next = parseImageLibrary(value, this.media);
+    if (
+      this.media === 'text' &&
+      (next.groups[0]?.id !== snippetGroupId || next.groups[0].name !== current.groups[0].name)
+    )
+      throw new ImageLibrarySettingsError(this.media);
     const changed = JSON.stringify(current) !== JSON.stringify(next);
     return {
       changed,
@@ -62,7 +77,16 @@ export class LibraryClassificationStore {
               ...(this.media === 'image'
                 ? { imageLibrary: next }
                 : this.media === 'text'
-                  ? { textLibrary: fileLibraryFromBrowser(next, 'text') }
+                  ? {
+                      textLibrary: fileLibraryFromBrowser(
+                        {
+                          groups: next.groups.filter(
+                            (g) => g.id !== snippetGroupId || g.images.length,
+                          ),
+                        },
+                        'text',
+                      ),
+                    }
                   : { soundLibrary: fileLibraryFromBrowser(next) }),
             },
             expectedRevision,
@@ -72,7 +96,7 @@ export class LibraryClassificationStore {
   }
   edit(operation: ImageLibraryEdit) {
     this.writable();
-    this.plan(editImageLibrary(this.value, operation, this.media), this.revision).commit();
+    this.plan(editImageLibrary(this.snapshot(), operation, this.media), this.revision).commit();
   }
   /** Add downloaded classifications in one revision, retaining manual names, order and memberships. */
   addImportedGroups(imported: ImageGroup[]) {

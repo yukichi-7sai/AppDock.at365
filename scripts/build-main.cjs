@@ -35,6 +35,7 @@ for (const name of [
   'applet-page-preload',
   'web-account-preload',
   'gesture-indicator-preload',
+  'input-palette-preload',
 ]) {
   fs.appendFileSync(
     path.join(output, 'main', name + '.js'),

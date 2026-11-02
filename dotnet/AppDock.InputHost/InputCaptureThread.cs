@@ -75,6 +75,22 @@ internal sealed class InputCaptureThread : IDisposable
         var state = await ready.Task;
         return await state.Dispatcher.InvokeAsync(() => state.Engine.Configure(configuration));
     }
+    internal async Task<object?> PaletteAsync(string method, System.Text.Json.JsonElement p, PalettePaste paste, CancellationToken lifetime)
+    {
+        var state = await ready.Task;
+        if (method == "palette.history") {
+            var session = p.GetProperty("session").GetString()!;
+            var open = await state.Dispatcher.InvokeAsync(() => state.Engine.OpenTarget(session));
+            return open == null ? null : await PaletteHistory.ReadAsync(open);
+        }
+        if (method != "palette.paste")
+            return await state.Dispatcher.InvokeAsync(() => state.Engine.PaletteRequest(method, p));
+        var id = p.GetProperty("session").GetString()!;
+        var target = await state.Dispatcher.InvokeAsync(() => state.Engine.ConfirmedTarget(id));
+        if (target == null || !target.IsCurrent()) return "cancelled";
+        var item = p.TryGetProperty("item", out var value) ? value.GetString() : null;
+        return await paste.SubmitAsync(target, p.TryGetProperty("history", out var flag) && flag.GetBoolean(), item, lifetime);
+    }
     internal async Task ConfigureGesturesAsync(Configuration configuration)
     {
         var state = await ready.Task;

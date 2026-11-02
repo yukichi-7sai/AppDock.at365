@@ -2,6 +2,7 @@ import type { LibraryEntry } from '../../shared/library-assets';
 import { libraryText } from '../../shared/library-text';
 import type { LibrarySoundPreview } from './library-sound-preview';
 import type { TextLibraryService } from './text-library-service';
+import { snippetGroupId } from '../../shared/text-library';
 import { filterImageBrowser } from '../../shared/image-browser';
 import { hostText } from '../../shared/i18n';
 import {
@@ -235,6 +236,7 @@ export class ImageLibraryPageSession implements HostPageController {
         },
         ...groups.map((g) => ({
           id: this.groups.get(g.id)!,
+          ...(this.options.texts && g.id === snippetGroupId ? { fixed: true } : {}),
           title: g.name,
           count: g.images.length,
         })),
@@ -283,7 +285,7 @@ export class ImageLibraryPageSession implements HostPageController {
           : undefined,
       viewRevision: s.viewRevision,
       canAddGroup: true,
-      canOrder: groups.length > 1,
+      canOrder: groups.length > (this.options.texts ? 2 : 1),
       canRetryMembership: !!s.retry,
       canRetryIconImport: !!s.retryIconSet,
     };
@@ -737,6 +739,12 @@ export class ImageLibraryPageSession implements HostPageController {
         )
           throw Error('Unknown gallery dialog');
         const groupId = action.groupId ? resolveGroup(action.groupId) : undefined;
+        if (
+          this.options.texts &&
+          groupId === snippetGroupId &&
+          ['rename', 'delete'].includes(action.kind)
+        )
+          throw Error(this.text('services.sharedRegisteredImages.invalidOperation'));
         const item = action.imageId ? resolveImage(action.imageId)[1] : undefined;
         if (['rename', 'delete', 'order-images'].includes(action.kind) && !groupId)
           throw Error(this.text('services.imageLibraryPage.selectGroup'));
