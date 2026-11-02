@@ -56,6 +56,8 @@ Windowsが判定する3本指・4本指の10種類を専用キーで接続する
 
 テストを追加・修正するときは[テストの作成と整理](docs/testing.md)を参照してください。必要回帰と結果の再利用は[共通手順](docs/development-workflow.md)に従います。
 
+`.artifacts`へテスト生成物を作るときは[共通テストモジュールの利用手順](docs/test-runtime.md)に従い、固定ランタイムと隔離profileを使います。新規テストの準備例、共通ヘルパーの選択、`.artifacts`の初回・削除後の再作成も同手順を参照してください。
+
 スタートアップ登録・管理者起動の仕様と保存処理は[起動設定](docs/launch-settings.md)を参照してください。実Windowsタスクと発行したフォルダー型本体の専用検証は`dev.bat exec node scripts/launch-settings-ui-test.cjs A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe`です。UAC承認・実サインインの確認範囲は検証記録で区別します。
 
 Windows x64と.NET 10 SDKが必要です。Node.jsとpnpmは **このプロジェクトの `.tools` 内**に配置できます。グローバルインストール、管理者権限、永続的なPATH変更は不要です。[toolchain.json](toolchain.json)でNode.jsとpnpmのバージョンを固定し、依存ライブラリは `pnpm-lock.yaml` で固定しています。

@@ -23,6 +23,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 ## ツールとWindows検証
 
 - テストの追加・修正・整理では[テストの作成と整理](docs/testing.md)を参照する。利用者の操作・保存・拒否・復旧を守り、細かな意匠やCSS/DOMの実装方法だけを固定する検査を増やさない。共通部品は代表例へ集約し、検査削除時は残る契約と担当試験を記録する。
+- `.artifacts`へテスト生成物を作るときは[共通テストモジュールの利用手順](docs/test-runtime.md)を必ず適用する。通常の固定配布物試験は既存の共通ヘルパーと固定ランタイムを使い、独自の本体コピー関数や試験ごとのEXE・ランタイム複製を追加しない。`.artifacts`の初回・削除後も共通ヘルパーから再作成する。継続利用するスクリプトは`scripts/`または`tests/`で管理し、専用コピーが必要な試験は同手順の例外に従う。
 - Node/pnpmはtoolchain.jsonに従うプロジェクト内の.toolsをdev.bat経由で使用する。グローバル導入はしない。パッケージ更新はupdate-packages.batを使い、Electronは最新安定版・Node.jsは最新LTSを毎回選び完全版で固定する。この2つは7日待機の恒久免除、ほかの依存・pnpmは7日待機と版指定例外を維持する。[依存方針](DEVELOPMENT.md#依存とツールの公開後待機)に従い、pnpmのshim生成とElectron取得を含め、更新時は初回setupと再実行も確認する。
 - node_modulesをjunction共有したworktreeで依存をインストールしない。依存更新用checkoutは独立node_modulesを使い、整理前後は元checkoutへの参照と動作を確認する。
 - GUI試験は直列・隔離profileで行う。通常の固定配布物のGUI/MCP試験は`copy-host.cjs`の`testHostPath`または`prepareTestHost`で共通EXEを取得し、`--test-profile`等で保存先を分ける。Applet側の試験は自身の`.artifacts`をprofile保存rootとして明示する。[共通実行場所と配置検証の例外](docs/testing.md#固定配布物の共通実行場所)に従う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。

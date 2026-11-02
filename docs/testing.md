@@ -32,6 +32,8 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 ## 固定配布物の共通実行場所
 
+新規・修正するテストでも、以下の共通ヘルパーと固定ランタイムを必ず使います。具体的な追加手順、準備コード、`.artifacts`の初回・削除後の再作成、専用コピーが必要な場合の記録は[共通テストモジュールの利用手順](test-runtime.md)を参照してください。
+
 通常のGUI/MCPテストは、`scripts/copy-host.cjs`の`testHostPath(profile)`で取得した`.artifacts/test-runtime/host/AppDock.at365.exe`を起動します。`copyHost(source, executable)`は本体manifestに含まれるランタイムを一緒に準備し、配布物全体の内容をSHA256で照合します。同じ内容ならコピーを再利用し、異なる内容や破損したコピーは、実行中プロセスがないことを確認して更新します。EXEだけでなく`resources/app.asar`等の変更も判定対象です。
 
 Applet側のテストも同じAppDockの固定EXEを共用します。`prepareTestHost(source, profile, path.join(appletRoot, '.artifacts'))`へApplet側の保存rootを明示して渡します。`testHostPath`の第2引数、`page-test-host.cjs`の`launch`の第4引数、`data-settings-host.cjs`の`isolatedHost`の第3引数も同じrootを受け取ります。`electron-test-launcher.cjs`では`profileArtifacts`を指定します。外部rootは`.artifacts`に限定し、profileがその内側にあり、共通ランタイムの外側であることと、親に再解析ポイントがないことを確認します。設定fixtureは`test-settings.cjs`の`file(profile)`で`data/settings.json`へ作成します。

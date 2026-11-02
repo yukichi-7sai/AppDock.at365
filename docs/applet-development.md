@@ -175,7 +175,7 @@ Watchは独自のWPFウィンドウで時計を描画し、配置とフォント
 - 他Appletやホストが動作を継続すること。OS全体に作用する機能は、隔離できる範囲と実機で必要な範囲を分ける。
 - publish成果物と完成AppDock EXEの組み合わせ。開発実行だけでは依存DLLやランタイムの欠落を検出できない。
 
-UIテストは一意の `.artifacts` フォルダーを作り、ホストへ `--test-profile=<絶対パス>` を渡します。実利用のsettings.jsonや認証データを変更しません。[時計のUIテスト](../../Applet.Watch.at365/scripts/test-ui.cjs)は隔離profileにnative EXEを配置し、設定・コマンドと独自WPF画面を検証します。[検証結果と限界](../../Applet.Watch.at365/VERIFICATION.md)も参照してください。
+UIテストは本repoの`.artifacts`内に一意のprofileを作り、[共通テストモジュールの利用手順](test-runtime.md)に従ってAppDockの固定ランタイムを使います。共通ヘルパーへApplet側の`.artifacts`を明示し、`--test-profile=<profileの絶対パス>`と必要な`--test-local-state`で設定・data・extensions・PC専用状態を分けます。本体EXEと同梱ランタイムをprofileへ複製する処理は追加しません。`.artifacts`が空でも同じ手順から再作成します。実利用のsettings.jsonや認証データを変更しません。[時計のUIテスト](../../Applet.Watch.at365/scripts/test-ui.cjs)は隔離profileにnative Appletのfixtureを配置し、設定・コマンドと独自WPF画面を検証します。[検証結果と限界](../../Applet.Watch.at365/VERIFICATION.md)も参照してください。
 
 時計のテストはマウスジェスチャー・OSホットキー・AutoLock等を検証しません。モニターの抜き差し、異なるDPIの実機、RDP、スリープ復帰、長期常駐も、次の機能で必要なら別途確認します。
 
