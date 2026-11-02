@@ -1,5 +1,53 @@
 # 検証記録
 
+## 2026-11-02: 設定セクション/通知サマリー 0.121.5のコミット前照合
+
+- 利用者が0.121.5の整列を実利用で確認し、今回の変更のコミットを依頼。右端マーク、非折りたたみの全幅、先頭Fieldの標準余白、通知サマリー/ヒント、MCP試験整理と文書を含む最終12ファイルをレビューし、追加の製品修正は不要と判断した。
+- 標準173ファイルは試験内容が不変。直前の標準1,572件の記録に対して996入力・外部fixture 27件と成功ログ/証跡の参照を照合し、不変の1,526件を再利用。実装時の43件は現行TSX/翻訳・試験入力を照合して再利用し、現在のrendererソース一覧を走査するShell境界3件だけを追加実行した。合計1,572件、fail/skip/cancel 0が揃った。既存翻訳はすべて一致し、追加はrenderer用4キーだけ、packageはversion以外不変。
+- 最終版の型検査/build/publish、固定共通GUI11群・配置/余白5群・smokeの入力と成功ログを照合して再利用。MCP専用7群はbackend/状態投影/試験が不変で、後続CSSが当該フォームにない折りたたみ/row領域を対象とすることを確認して再利用した。現在の693発行ファイル・EXE/ZIP/feedは実装時のhashと一致し、版更新・再発行・GUI再起動は行っていない。
+- 証跡は`.artifacts/commit-validation-settings-section-20261102/`の`test-plan.json`・`commands.json`・`additional.log`・`validation.json`・`review.md`。文書のみの追記後、対象12ファイルを明示stageし、作業ファイル/stage tree/commit treeの一致とcommit SHAを`stage.json`・`commit.json`へ記録する。push/Release/実利用deployなし。
+
+## 2026-11-02: 折りたたみ直下の先頭入力の上余白を修正 0.121.5
+
+- 0.121.4のマーク右端/サマリー表示を利用確認後、バナーの表示位置Selectが見出しへ接する画像の報告に対応。原因は共通CSSでrow Section直下の先頭Fieldだけ`padding-top:0`にしていたこと。例外を削除し、ページでは通常の18px、ダイアログでは既存のField用余白を継承するようにした。項目名と入力行の縦揃え、狭幅の縦並び、左16pxの字下げ、右端マーク・サマリー・開閉・保存/取消を維持した。
+- 既存の未コミット変更を保持して開始し、pull/stash/resetなし。今回の製品入力の変更は`settings-sections.css`と版だけで、TSX・翻訳・試験・保存形式・公開API・SDK/Runtime/各Appletは不変。通常のUI修正として0.121.4→0.121.5へpatch更新した。標準Fieldの上余白と先頭入力行の位置の方針を共通UI指針へ追記した。
+- 発行前に差分・影響先と長文/狭幅、他row Section、Fieldのタイトル位置をレビューし、修正が必要な指摘なし。レビューは`.artifacts/settings-field-top-spacing-20261102/review.md`。固定lockfileの照合、型検査、build、publishが成功した。
+- ソース配置5群、発行済み固定EXEで共通設定通常モード11群・配置5群と隔離smokeが成功。明暗1560pxで見出し下から項目名/Selectまでの上余白は18px、項目名とSelectの中心差は0px。明560pxでは項目名の上余白18pxと従来の縦並び・横はみ出しなしを確認した。配置には右端マーク、非折りたたみの全幅説明、複製DOMを使うcard/group/rowのダイアログfixtureも含む。6位置・影・即時保存、通知先とAIダイアログの確定/取消、キーボード開閉/フォーカス、検索とプロセス再起動も成功した。
+- 各成功工程の入力前後960件のhash一致と、発行前後の入力不変を確認。stage/発行先のmanifest管理693ファイル、ZIP693項目・feedの版/size/hash一致を検証した。ProductVersion=0.121.5.0、EXE SHA256=`c06742254c530c2b5f860f7f15cbe604a43fbe27b95f6ca2e3dbbae0b64bcfbc`、ZIP 270,913,586bytes / SHA256=`f014dd2c88dc73074f2c8e2f6b7b8e83db7ee79d6ddd85ea95160dbb3fba7165`。
+- 証跡は`.artifacts/settings-field-top-spacing-20261102/`の各log・入力manifest・`publication.json`・`payload-files.json`・`completed.json`。固定共通GUIは`.artifacts/settings-controls-ui-1793614518274/`、固定配置は`.artifacts/section-field-spacing-ui-1793614533095/`、smokeは`.artifacts/smoke-1793614540333/`。成功/終了・使用中process・絶対パス/再解析ポイント/追加AGENTSを検査して旧成功3コピーの管理18項目ずつを整理し、証跡・画像・設定・manifest 280ファイルのhash一致と最新コピーの保持を確認した。詳細は`cleanup.json`・`*.retained.json`。
+- CSS修正のため新しい永続寸法試験は追加せず、測定値・代表画像を今回の証跡として保存。標準全回帰・未変更MCP専用試験・物理キー/実TTS/実通知受信・複数DPI移動は今回再実行していない。未コミットで利用確認へ渡し、push/Release/実利用deployなし。
+
+## 2026-11-02: 開閉マークを右端へ戻して通知サマリーを保持 0.121.4
+
+- 0.121.3の未コミット変更と完了済みのMCP試験整理を保持して開始し、pull/stash/resetなし。共通Sectionの見出しを可変の説明領域と右端の開閉マークに変更し、両者の間隔を14pxに揃えた。card/group/row、ダイアログ、狭幅に共用する。折りたたみのない見出し・説明の全幅、native detailsの操作、子Fieldの字下げ、ヒント・ロック、サマリーの更新と保存を維持した。
+- 今回の製品入力の変更は`settings-sections.css`・`controls.css`と版のみ。`SettingsSections.tsx`・`NotificationSettings.tsx`・日本語リソース・共通/MCP専用GUI試験は開始時とhash一致し、バナーの位置/影とデスクトップの影のサマリーを保持した。設定・保存ファイル・公開API・SDK/Runtime/各Appletは不変。発行済みUIへの追加調整としてpatch 0.121.3→0.121.4へ更新した。
+- 発行前に差分と影響先をレビューし、修正が必要な指摘なし。Fieldの列幅は変更せず、全幅の説明や長文の折り返し、マーク用の領域、ダイアログのvariant別余白を確認した。レビューは`.artifacts/settings-section-right-20261102/review.md`。
+- 固定lockfileの依存照合、型検査、build、publishが成功。ソースで配置5群、発行済み固定EXEで共通設定の通常モード11群・配置5群・隔離smokeが成功した。6位置と影の切り替え、折りたたみ中のサマリー、Enter/Spaceとフォーカス、通知先/AIダイアログの保存・取消、検索、プロセス再起動を確認した。以前の単体43件とMCP専用7群は変更していない機能の証跡として保持し、今回0.121.4で新たに実行した結果とは区別する。
+- 配置確認は実通知設定の明暗1560px・明560pxで外側/入れ子のマークを測定し、見出し内側の右端との差は最大0px、横はみ出しなし。非折りたたみのCodex説明は全幅を確認。ダイアログ内card/group/rowの900/480pxは、実共通SectionのDOMを複製した隔離レイアウトfixtureで確認した。
+- 各成功工程の入力前後960件、発行前後の入力hashが一致。stageと発行先のmanifest管理693ファイル、ZIP693項目とfeedの版・size/hash一致を確認。ProductVersionは0.121.4.0、EXE SHA256=`b51f59bb86d310c0d866fe7f7b0979fa5189b7c7811be864bc8d1f45680305b5`、ZIP 270,915,188bytes / SHA256=`d98e254592b586b599453e5b9ad75cc95e94347199acfb87a4a626630fd86920`。
+- 証跡は`.artifacts/settings-section-right-20261102/`の各log・入力manifest・`publication.json`・`payload-files.json`・`completed.json`。固定共通GUIは`.artifacts/settings-controls-ui-1793613402869/`、固定配置は`.artifacts/section-layout-ui-1793613417567/`、smokeは`.artifacts/smoke-1793613424784/`。終了/成功・使用中process・パス/再解析ポイント/追加AGENTSを確認して旧成功3コピーの管理18項目ずつを整理し、結果・画像・設定・manifest 280ファイルのhash保持と最新3コピーの保持を確認した。詳細は`cleanup.json`・`*.retained.json`。
+- 全標準回帰・物理キー・実通知受信/実TTS・複数DPI移動は未実施。未コミットで実利用確認へ渡し、push/Release/実利用deployなし。
+
+## 2026-11-02: MCP待機試験の整理と発行済み0.121.3の設定画面確認
+
+- mainには直前の0.121.3の未コミット変更があるため保持して開始し、pull/stash/resetなし。今回開始時の958入力を`.artifacts/mcp-wait-test-cleanup-20261102/baseline-inputs.json`へ記録した。今回の変更は試験2ファイルと開発/検証文書のみで、製品ソース・設定・版・依存・発行物は不変。共通手順のテスト整備に該当し、版更新・build/publishは行っていない。
+- `settings-controls-ui-test.cjs`から旧`AutomationService.action(status)`の応答保留/失敗fixtureを削除。現行の補助状態投影を使うMCP起動の確認は`mcp-server-startup-ui-test.cjs`へ集約し、起動中に通知設定へ移動して戻っても進行状態・操作抑止が維持される検査を追加した。起動完了・失敗・再試行・設定保持・再起動の既存検査は維持し、担当範囲を`docs/testing.md`へ明記した。
+- 追加した画面移動は編集revisionを進めるため、初回の専用試験は移動前との比較で失敗した。起動完了の比較基準を画面復帰直後へ修正し、起動完了時のページrevision更新と編集revision保持を再検証した。製品の修正は不要。レビューは`.artifacts/mcp-wait-test-cleanup-20261102/review.md`。
+- プロジェクト固定Node/pnpmを通常Windows環境で使用し、書式と両試験の構文検査が成功。発行済み`A:/40.ARTIFACT/AppDock.at365/win-unpacked/AppDock.at365.exe`を隔離コピーしてGUIを直列実行し、共通設定の通常モード11群とMCP起動専用7群がすべて成功した。通知サマリー・6位置・影ON/OFF・即時保存・センター移動、明暗/狭幅での開閉とフォーカス、通知先の確定/取消と保存、検索、AIダイアログの確定/取消、プロセス再起動を確認した。専用試験は実ポート競合とキーボード再試行による復旧まで確認した。
+- 通常モード全体は`.artifacts/settings-controls-ui-1793611513774/result.json`、専用試験は`.artifacts/mcp-server-startup-portable-1793611572458/result.json`。各成功工程の入力前後959件のhash一致を確認し、共通試験後の変更が独立した専用試験だけであることを照合した。発行物の693ファイル、EXE/ZIP/feedのhashが直前の発行記録と一致し、EXE SHA256は`ca20d9a657921b01ed04eafc7c94b6cfc354e3a8ca96d86577ea02b75a0cf5c1`のまま。証跡は`.artifacts/mcp-wait-test-cleanup-20261102/`の各log・入力manifest・`review.md`・`completed.json`。
+- 終了・成功と使用中プロセス、絶対パス/再解析ポイント/追加AGENTSを確認し、旧成功3コピーの本体管理18項目ずつを整理。結果・設定・画像・manifest計287ファイルをhashで保持確認し、最新の共通/専用コピーと今回の失敗診断は保持した。詳細は同フォルダーの`cleanup.json`と`*.retained.json`。標準全回帰・他の機能専用GUI・実利用MCP設定の変更・物理キー/実TTSは対象外。commit/push/Release/deployなし。
+
+## 2026-11-02: 設定の開閉マークの列揃えと通知サマリー 0.121.3
+
+- cleanなmain `4d0f174`から開始し、`pull --ff-only`で更新なしを確認。共通Sectionの折りたためる見出しだけをFieldと同じ列幅・間隔で配置し、開閉マークを同じ階層の入力列の左端へ揃えた。非折りたたみの見出し・説明は全幅を保つ。狭幅ではマークを見出しの右側へ置き、行全体のクリック、Enter/Space、フォーカス、ヒント・MCPロック、子Fieldの字下げを維持した。
+- バナーのdescriptionは表示位置と影の有無、デスクトップ通知は影の有無を現在の実効設定から表示する。デスクトップの表示場所の補足はhintへ移した。設定項目・保存形式・保存ファイル・公開API・SDK/Runtime/各Appletの変更はなく、通常のUI変更として0.121.2→0.121.3へpatch更新した。
+- 発行前に差分と影響先をレビュー。ダイアログ共通paddingがgroup見出しだけをずらす問題を表示fixtureで検出し、paddingの適用をcardへ限定して修正した。card/group/rowの広幅・狭幅を再確認し、発行を妨げる指摘なし。レビュー正本は`.artifacts/settings-section-layout-20261102/review.md`。
+- 固定lockfileの依存照合・型検査・build・publish成功。関連5ファイル43件（appearance/setting-sections/notification-preference-edit/ui-presentation/localization）が成功し、fail/skip/cancel 0。最後の製品修正はCSSの適用先限定だけで、これらの単体試験が使うmain/shared、翻訳とTSXは不変のため43件を再利用した。ソースと固定EXEの通知専用GUIは各4群、配置確認は各5群、固定EXEの隔離smokeも成功した。
+- 通知専用GUIは6通りの位置、バナー/デスクトップそれぞれの影ON/OFF、折りたたみ中のサマリー、Enter/Space、端末専用保存とページ再読み込み、センター移動を確認。配置確認は実通知設定の明暗1560px・明560px、外側と入れ子のマークの列揃え、非折りたたみのCodex説明の全幅を確認した。ダイアログ内card/group/rowは、実共通SectionのDOMを複製した隔離fixtureで900/480pxを測定したもので、既存の製品ダイアログの操作試験とは区別する。
+- controls試験の旧保存先前提2箇所を現行`hostPages.notifications.configuration`へ更新。広域モードでは、今回と無関係な旧`AutomationService.action(status)`保留fixtureが現行のページモデルによる状態供給を止められず、MCP再読み込み待機でtimeoutした。結果とprofileを保全し、明示的な`--notification-summaries-only`で今回の必要範囲を検証した。広域モードのMCP/AI部分や標準全回帰を成功扱いしていない。
+- 発行前後960入力のSHA256一致、各成功工程の入力前後一致、stageと発行先のmanifest管理693ファイル一致、ZIP693項目とfeedの版・size/hashを確認。EXE SHA256=`ca20d9a657921b01ed04eafc7c94b6cfc354e3a8ca96d86577ea02b75a0cf5c1`、ZIP 270,915,223bytes / SHA256=`19fd7218a01d2584360ddc56ac73ad60388497867c6cb715c7768ba40a685e84`。ProductVersionは0.121.3.0。Node 26.13.0 / pnpm 12.15.0 / Electron 45.1.0 / Windows x64。
+- 証跡は`.artifacts/settings-section-layout-20261102/`の各log・入力manifest・`publication.json`・`payload-files.json`・`completed.json`。固定GUIは`.artifacts/settings-controls-ui-1793610583319/`、固定配置は`.artifacts/section-layout-ui-1793610591401/`、smokeは`.artifacts/smoke-1793610598624/`。今回生成した成功分は種類・方式ごとに1回だけで、古い成功コピーの整理対象はなし。失敗した診断profileと記録は保全した。実通知受信・実TTS・物理キー・複数DPI移動は未実施。未コミットで利用確認へ渡し、push/Release/実利用deployなし。
+
 ## 2026-11-02: ウィンドウ位置の保存競合からの復帰 0.121.2
 
 - cleanなmain `d49e972`から開始し、通常ユーザー環境の`pull --ff-only`で更新なしを確認。制限環境のDNS失敗と通常環境の取得成功を区別した。

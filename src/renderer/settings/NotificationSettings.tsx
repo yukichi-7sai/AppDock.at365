@@ -145,6 +145,16 @@ export function NotificationSettings({
         </SettingsField>
         <SettingsSection
           title={translate('settings.notificationSettings.banner')}
+          description={translate('settings.notificationSettings.bannerSummary', {
+            position: translate(
+              `settings.notificationSettings.position.${settings.host.notificationBannerPosition}`,
+            ),
+            shadow: translate(
+              settings.host.notificationBannerShadow
+                ? 'settings.notificationSettings.shadowEnabled'
+                : 'settings.notificationSettings.shadowDisabled',
+            ),
+          })}
           data-testid="notification-banner"
           variant="row"
           collapsible
@@ -193,7 +203,14 @@ export function NotificationSettings({
         </SettingsSection>
         <SettingsSection
           title={translate('settings.notificationSettings.desktop')}
-          description={translate('settings.notificationSettings.desktopHint')}
+          description={translate('settings.notificationSettings.desktopSummary', {
+            shadow: translate(
+              settings.host.notificationDesktopShadow
+                ? 'settings.notificationSettings.shadowEnabled'
+                : 'settings.notificationSettings.shadowDisabled',
+            ),
+          })}
+          hint={translate('settings.notificationSettings.desktopHint')}
           data-testid="notification-desktop"
           variant="row"
           collapsible

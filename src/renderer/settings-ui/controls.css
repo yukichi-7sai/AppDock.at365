@@ -3946,6 +3946,8 @@ summary {
   line-height: 1.7;
 }
 .settings-dialog-body {
+  --settings-field-columns: minmax(100px, 0.55fr) minmax(0, 1.45fr);
+  --settings-field-gap: 20px;
   min-width: 0;
   min-height: 0;
   padding: 6px;
@@ -3964,8 +3966,7 @@ summary {
   margin-top: 18px;
 }
 .settings-dialog-body .settings-field {
-  grid-template-columns: minmax(100px, 0.55fr) minmax(0, 1.45fr);
-  gap: 20px;
+  gap: var(--settings-field-gap);
   padding: 14px 0;
 }
 .settings-dialog-body .settings-field:is(.settings-field-wide, [data-readonly='true']) {
@@ -3992,11 +3993,8 @@ summary {
 .settings-dialog-body .settings-section {
   margin-top: 20px;
 }
-.settings-dialog-body .settings-section > summary {
-  padding: 14px 58px 14px 16px;
-}
-.settings-dialog-body .settings-section > summary > .settings-section-toggle {
-  right: 16px;
+.settings-dialog-body .settings-section-card > summary {
+  padding: 14px 16px;
 }
 .settings-dialog-body .settings-section h2 {
   font-size: 13px;

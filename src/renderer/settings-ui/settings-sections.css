@@ -25,12 +25,6 @@
   padding: 0 0 14px;
   border-bottom: 0;
 }
-.settings-section.settings-section-group > summary {
-  padding-right: 42px;
-}
-.settings-section-group > summary > .settings-section-toggle {
-  right: 0;
-}
 .settings-section.settings-section-group > .settings-section-content {
   display: grid;
   gap: 16px;
@@ -45,11 +39,16 @@
   border-bottom: 1px solid var(--border);
 }
 .settings-section > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 14px;
+  align-items: center;
   cursor: pointer;
   list-style: none;
-  position: relative;
-  padding-right: 64px;
   border-radius: 14px;
+}
+.settings-section-heading {
+  min-width: 0;
 }
 .settings-section > summary::-webkit-details-marker {
   display: none;
@@ -57,7 +56,7 @@
 .settings-section > summary:is(:hover, :focus-visible) {
   background: var(--accent-soft);
 }
-.settings-section > summary:is(:hover, :focus-visible) > p {
+.settings-section > summary:is(:hover, :focus-visible) > .settings-section-heading > p {
   color: var(--accent);
 }
 .settings-section > summary:focus-visible {
@@ -68,10 +67,7 @@
   border-radius: 14px 14px 0 0;
 }
 .settings-section-toggle {
-  position: absolute;
-  right: 22px;
-  top: 50%;
-  transform: translateY(-50%);
+  justify-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -123,26 +119,20 @@
   border-bottom: 0;
 }
 .settings-section.settings-section-row > :is(header, summary) {
-  padding: 18px 42px 18px 0;
+  padding: 18px 0;
   border-bottom: 0;
   border-radius: 6px;
 }
 .settings-section.settings-section-row > summary {
   margin-inline: calc(-1 * var(--settings-row-inset));
-  padding-inline: var(--settings-row-inset) calc(42px + var(--settings-row-inset));
+  padding-inline: var(--settings-row-inset);
 }
 .settings-section-row > :is(header, summary) h2 {
   font-size: 13px;
   font-weight: 500;
 }
-.settings-section.settings-section-row > summary > .settings-section-toggle {
-  right: var(--settings-row-inset);
-}
 .settings-section.settings-section-row > .settings-section-content {
   padding: 0 0 18px;
-}
-.settings-section-row > .settings-section-content > .settings-field:first-child {
-  padding-top: 0;
 }
 .settings-section-content > .settings-section-row > .settings-section-content > .settings-field {
   margin-inline-start: 16px;
@@ -152,8 +142,8 @@
   margin: 0;
   border: 0;
   display: grid;
-  grid-template-columns: minmax(160px, 0.8fr) minmax(0, 1.2fr);
-  gap: 24px;
+  grid-template-columns: var(--settings-field-columns, minmax(160px, 0.8fr) minmax(0, 1.2fr));
+  gap: var(--settings-field-gap, 24px);
   align-items: start;
   padding: 18px 0;
   border-bottom: 1px solid var(--border);
@@ -464,12 +454,6 @@
   .settings-section > header,
   .settings-section > summary {
     padding: 16px;
-  }
-  .settings-section > summary {
-    padding-right: 58px;
-  }
-  .settings-section > summary > .settings-section-toggle {
-    right: 16px;
   }
   .settings-section.settings-section-row {
     --settings-row-inset: 8px;

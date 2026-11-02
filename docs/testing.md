@@ -46,6 +46,10 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 `scripts/overlay-shadows-ui-test.cjs [固定EXE]`は、ダイアログ/パレット・バナー・デスクトップ通知の影を個別に切り替え、表示中の反映、通知ID/期限/sessionの保持、折りたたみのキーボード操作と検索による展開、再起動後の設定保持を確認する。設定の配置と明暗・狭幅は代表画像で確認する。`tests/appearance.test.cjs`は既定値・保存・ページ別リセットと共通appearance配信を担当する。
 
+通知見出しのサマリーは`scripts/settings-controls-ui-test.cjs [固定EXE] --notification-summaries-only`で確認する。6通りの表示位置、バナーとデスクトップ通知それぞれの影の切り替え、折りたたみ中の表示、端末専用設定の保存とページ再読み込みを対象とし、MCP読み込みやAIダイアログの試験はこのモードに含めない。
+
+MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定EXE]`へ集約する。設定ページへ投影される無効・起動中・稼働中・失敗の状態と、起動中の操作抑止、別設定への移動と復帰、起動完了の自動反映、プロセス再起動、ポート競合後のキーボード再試行と設定保持を確認する。旧status要求の応答を保留して読み込み画面を作るfixtureは使用しない。共通設定画面の通知・明暗/狭幅・保存/取消・検索・再起動は`settings-controls-ui-test.cjs`の通常モードで確認する。
+
 `scripts/command-palette-ui-test.cjs [固定EXE]`は、検索0件、3方式の有効割り当てと全体OFFの即時反映、稲妻からの対象ID指定・解除・再移動、停止中・未割り当ての非実行、明暗・広幅/狭幅を確認する。寸法と折り返し位置は測定値・代表画像を記録して変更時に確認する。タッチパッドのnative呼出し境界は隔離プロセス内でstub化し、F13〜F24の登録・送信やWindowsのタッチパッド設定変更を行わない。条件・表示順・保存値の不変とナビゲーション拒否は`command-triggers.test.cjs`・`command-palette.test.cjs`が担当する。
 
 設定の選択は`scripts/command-selection-ui-test.cjs [固定EXE]`へ集約し、トレイ・リボン・スタックの確定/取消、親の入力とフォーカス、候補除外、お気に入り、停止中の非実行、IME、狭幅/明暗、外部削除と再起動を確認する。検索・所有元・非表示/削除済みの除外・1万件超の候補は`tests/command-selection.test.cjs`が担当する。旧選択パレットの成功検査は廃止し、不正要求の拒否はパレット単体回帰と`shell-overlay-ui-test.cjs`へ残す。

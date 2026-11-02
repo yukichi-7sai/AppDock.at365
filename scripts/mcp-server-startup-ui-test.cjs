@@ -26,11 +26,18 @@ let child,
   output = '';
 fs.mkdirSync(profile, { recursive: true });
 const initial = require('../out/main/shared/settings-schema').createDefaultSettings();
-Object.assign(initial.host, { theme: 'dark', hardwareAcceleration: false, closeToTray: false });
+Object.assign(initial.host, {
+  theme: 'dark',
+  hardwareAcceleration: false,
+  closeToTray: false,
+  soundEnabled: false,
+});
 initial.keybindings = [];
-initial.globalShortcutCommands = [];
+initial.keybindingOptions.enabled = false;
 initial.gestures.enabled = false;
-initial.updates.checkHostOnAboutOpen = false;
+initial.touchpadGestures.enabled = false;
+initial.updates.checkHostOnStartup = false;
+initial.updates.checkAppletsOnStartup = false;
 fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(initial));
 const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
 if (portable) {
@@ -151,7 +158,7 @@ async function waitRunning() {
       () => inspect(mainPort, "typeof globalThis.__mcpStartupUiRelease === 'function'"),
       'startup gate',
     );
-    const starting = await until(async () => {
+    await until(async () => {
       const value = await model();
       return value?.content.auxiliary.automation?.starting && value;
     }, 'starting projection');
@@ -168,6 +175,27 @@ async function waitRunning() {
       true,
     );
     checks.push('in-flight startup shows progress, disables changes and offers no retry');
+    const pendingState = await state();
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.notifications.open'));
+    await settingsPage(host);
+    await host.getByTestId('settings-page:notifications').waitFor();
+    assert.equal((await model()).content.page.id, 'notifications');
+    await host.evaluate(() => window.dock.executeCommand('appdock.settings.codex.open'));
+    await settingsPage(host);
+    await until(async () => {
+      const value = await model();
+      return value?.content.page.id === 'codex' && value.content.auxiliary.automation?.starting;
+    }, 'startup projection after navigation');
+    assert.equal(await retryField().count(), 0);
+    assert.equal(
+      await host.getByRole('switch', { name: 'Codex連携を有効にする', exact: true }).isDisabled(),
+      true,
+    );
+    assert.equal((await state()).port, pendingState.port);
+    checks.push(
+      'settings navigation remains available during startup and returning keeps the live progress',
+    );
+    const starting = await model();
     await inspect(
       mainPort,
       'globalThis.__mcpStartupUiRelease(); delete globalThis.__mcpStartupUiRelease; true',
