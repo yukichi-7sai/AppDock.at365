@@ -1,10 +1,27 @@
 @import '../image-browser/image-browser.css';
-.text-library-dialog {
-  width: min(860px, 100%);
+.settings-modal.text-library-dialog[open] {
+  width: min(960px, 90vw);
+  height: 512px;
+}
+.text-library-dialog .settings-dialog-body {
+  flex: 1;
+}
+.text-library-dialog .settings-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.text-library-body-field {
+  flex: 1;
+  grid-template-rows: auto;
+  grid-auto-rows: 1fr;
+}
+.text-library-body-field .settings-field-control,
+.text-library-input {
+  align-self: stretch;
 }
 .text-library-input {
   width: 100%;
-  min-height: 200px;
   resize: vertical;
   font-family: monospace;
 }

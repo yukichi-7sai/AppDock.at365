@@ -3700,7 +3700,6 @@
   "texts.emptyBody": "（空のテキスト）",
   "texts.indexing": "本文を検索用に読み込み中…",
   "texts.details": "{{characters}}文字 · {{lines}}行",
-  "texts.editHint": "EnterとShift+Enterで改行できます。",
   "texts.operationFailed": "テキストライブラリーの操作を完了できませんでした。表示された内容を確認して再試行してください。",
   "textLibrary.images.search": "名前・本文で検索",
   "images.groupItemsOrder": "{{name}}の画像の表示順",

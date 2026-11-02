@@ -210,17 +210,20 @@ const choose = (page, file, options) =>
     await dialog.waitFor({ state: 'hidden' });
     await page.getByRole('button', { name: '本文を編集', exact: true }).click();
     dialog = host.getByRole('dialog', { name: '本文を編集', exact: true });
-    await dialog.getByRole('textbox', { name: '本文', exact: true }).fill('unsaved draft');
+    const draft = dialog.getByRole('textbox', { name: '本文', exact: true });
+    const applyEdit = dialog.getByRole('button', { name: '適用', exact: true });
+    await draft.fill('unsaved draft');
+    const draftBeforeError = await draft.boundingBox();
+    const applyBeforeError = await applyEdit.boundingBox();
     fs.writeFileSync(path.join(directory, 'あいさつ.txt'), 'external edit wins');
-    await dialog.getByRole('button', { name: '適用', exact: true }).click();
+    await applyEdit.click();
     await dialog
       .getByRole('alert')
       .filter({ hasText: /テキストが変更されました/ })
       .waitFor();
-    assert.equal(
-      await dialog.getByRole('textbox', { name: '本文', exact: true }).inputValue(),
-      'unsaved draft',
-    );
+    assert((await draft.boundingBox()).height < draftBeforeError.height, 'error takes draft space');
+    assert(Math.abs((await applyEdit.boundingBox()).y - applyBeforeError.y) <= 1, 'stable footer');
+    assert.equal(await draft.inputValue(), 'unsaved draft');
     assert.equal(
       fs.readFileSync(path.join(directory, 'あいさつ.txt'), 'utf8'),
       'external edit wins',

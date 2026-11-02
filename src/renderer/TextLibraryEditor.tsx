@@ -63,6 +63,7 @@ export function TextLibraryEditor({
       valid={!creating || (!!name && !filename.includes('/') && !!libraryPath(filename, 'text'))}
       applyLabel={t('images.apply')}
       error={error}
+      collapseStatusWhenEmpty
     >
       {creating && (
         <SettingsField title={t('texts.filename')}>
@@ -74,18 +75,17 @@ export function TextLibraryEditor({
           />
         </SettingsField>
       )}
-      <SettingsField title={t('texts.body')}>
+      <SettingsField title={t('texts.body')} className="text-library-body-field">
         <SettingsTextarea
           newlineOnEnter
           data-initial-focus={!creating || undefined}
           aria-label={t('texts.body')}
           className="text-library-input"
-          rows={14}
+          rows={4}
           value={body}
           onChange={(e) => setBody(e.target.value)}
         />
       </SettingsField>
-      <p className="hint">{t('texts.editHint')}</p>
     </SettingsDialog>
   );
 }
