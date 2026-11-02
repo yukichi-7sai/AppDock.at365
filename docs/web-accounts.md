@@ -72,12 +72,23 @@ ONでは、実際に表示していたSurfaceが非表示・最小化・本体�
 | `context.webAccounts.open()`                               | `host.webAccounts.open`     | 操作用ウィンドウを表示・復帰                                              |
 | `context.webAccounts.cycle(1                               | -1)`                        | `host.webAccounts.cycle`                                                  | 次/前の枠へ循環して選択。ウィンドウ表示/復元/フォーカス移動なし |
 | `context.webAccounts.navigate(action)`                     | `host.webAccounts.navigate` | back/forward/reload/inboxだけを受け付け、選択中のViewを操作。停止中は拒否 |
-| `context.webAccounts.read()`                               | `host.webAccounts.read`     | 各枠の観測結果とUIからのクリア要求を返す                                  |
+| `context.webAccounts.read()`                               | `host.webAccounts.readPart` | 各枠の観測結果、UIからのクリア要求と監視リセットを返す                      |
 | `context.webAccounts.report(id, status, attention, data?)` | `host.webAccounts.report`   | アカウントの状態表示と一時UIデータを更新                                  |
 
-`read`の戻り値は`{ dark, selected, accounts, acknowledged, monitoringResets }`。アカウントは`id/name/monitoring/avatar/url/loading/error/canGoBack/canGoForward/observation/status/attention/data/sound/soundError`を持ちます。型は[src/shared/web-accounts.ts](../src/shared/web-accounts.ts)、Node contextは[src/main/node-worker.ts](../src/main/node-worker.ts)が正本です。dataはJSON化可能な50KB以下の値で、ローカルUIのsnapshotへ渡します。省略時はnull。ホストはファイルやログに保存せず、Applet停止時に破棄します。Nodeへの`read`ではdataをnull、avatarを空文字にし、最大10枠の観測と履歴の二重送信でJSON-RPCの1MB制限を超えないようにします。
+`read`は現在の名簿順の全枠、選択状態、`acknowledged`（クリア要求）と`monitoringResets`を返します。型は[src/shared/web-accounts.ts](../src/shared/web-accounts.ts)、Node contextは[src/main/node-worker.ts](../src/main/node-worker.ts)を参照してください。ローカルUI用の`data`はJSON化可能な50KB以下で、省略時はnullです。ホストはファイルやログに保存せず、Applet停止時に破棄します。Nodeへの応答ではdataをnull、avatarを空文字にします。
 
-観測JSは式としてJSON化可能な値を返します。ページがobserveOrigin内で読み込み済みの場合だけ、**isolated world 1001**で実行します。1枠の観測結果は60KBまで、待機は800msまで。同じ枠で未完了の観測を並行起動しません。逐次読取で最大10枠を扱い、ナビゲーション世代/URLの変化・停止・削除があれば遅い結果を捨てます。ページの再読込や通信APIポーリングは行いません。ページ遷移/プロセス終了でisolated worldのObserverも破棄されます。
+観測JSは、ページがobserveOrigin内で読み込み済みの場合だけ**isolated world 1001**で実行します。1枠の観測結果は60KBまでです。名簿順に観測し、1回の走査で応答待ちに使う6秒を残りの枠へ配分し、各枠は最大800ms待ちます。応答待ちの枠は`observation: null`で返し、同一ページ世代の未完了の観測は起動し直さず、後から完了した結果を次回取得できます。ページ遷移・停止・削除で古い結果を失効させます。ページの再読込やサービスへの追加通信は行いません。
+
+同梱のNode workerは`context.webAccounts.read()`の内部で`host.webAccounts.readPart`を使います。ホストは長い処理の途中では継続用IDを返し、進行のない読取は期限切れにします。結果は1つのsnapshotから作り、大きい場合だけUTF-8のbytesを分割してworkerで復元します。各フレームは1MiB以内です。workerは完全な結果を取得した後、次の読取で受領したIDを返します。ホストはその結果に含まれた世代のクリア要求・監視リセットだけを消費します。中断時の未受領分は次回に含め、放置された転送は回収します。従来の単一応答RPC `host.webAccounts.read` も1フレームの範囲で使用できます。
+
+独自のworkerから分割RPCを直接使う場合は本体0.122.0以降が必要です。Appletごとに1つの転送を開始し、完了後に次を開始します。
+
+| 要求・応答 | 扱い |
+| --- | --- |
+| 開始要求 `{}` または `{received}` | 前回すべて取得できたときだけ、その応答のIDを `received` に指定する。 |
+| 応答 `{id, waiting: true}` | 同じ `id` と現在の `offset` で続ける。初期位置は0。 |
+| 応答 `{id, value}` | `value` が全件の結果。 |
+| 応答 `{id, bytes, next}` | Base64をデコードしたバイト列を順番に連結する。`next` が数値なら `{id, offset: next}` で続け、nullなら全体をUTF-8のJSONとして復元する。 |
 
 観測の任意の`accountName`（制御文字なしの1〜60文字）を仮名の置換に使います。新規枠は`name:"新しいアカウント"/temporaryName:true`で保存します。取得成功または明示的なrenameで`temporaryName:false`とし、以後は自動変更しません。Gmail固有の名前/メール抽出はAppletのobserverへ置きます。受信トレイのreadyとは独立して処理し、監視OFFでも本人情報を取得できます。
 

@@ -104,11 +104,7 @@ export class TextLibraryService {
               const result = await this.files.read(entry.ref, entry.generation, {
                 active: () => !this.closed,
               });
-              if (!this.closed)
-                this.indexed.set(libraryKey(entry.ref), {
-                  generation: result.generation,
-                  body: decodeLibraryText(result.bytes).toLocaleLowerCase(),
-                });
+              this.indexBody(entry.ref, result.generation, decodeLibraryText(result.bytes));
             } catch {
               /* The common catalogue exposes missing/invalid files; continue indexing others. */
             }
@@ -125,6 +121,11 @@ export class TextLibraryService {
         if (!this.closed) this.changed();
       });
     return this.pendingIndex;
+  }
+  private indexBody(ref: LibraryRef, generation: string, body: string) {
+    const current = this.files.entry(ref);
+    if (!this.closed && current?.available && current.generation === generation)
+      this.indexed.set(libraryKey(ref), { generation, body: body.toLocaleLowerCase() });
   }
   matches(ref: LibraryRef, query: string) {
     const cached = this.indexed.get(libraryKey(ref));
@@ -143,9 +144,11 @@ export class TextLibraryService {
     if (!libraryFolder(folder) || name.includes('/') || !libraryPath(name, 'text'))
       throw Error(hostText('texts.invalidName'));
     const file = folder ? `${folder}/${name}` : name;
-    const result = await this.files.addWithResult(encodeLibraryText(body), file);
+    const bytes = encodeLibraryText(body);
+    const result = await this.files.addVerified(bytes, file);
     if (result.reused) throw Error(hostText('texts.nameExists'));
-    await this.index();
+    this.indexBody(result.ref, result.generation, decodeLibraryText(bytes));
+    this.changed();
     return result.ref;
   }
   async save(ref: LibraryRef, generation: string, body: string) {
@@ -156,14 +159,18 @@ export class TextLibraryService {
     // Textareas normalize line endings. Keep original bytes on an unchanged save,
     // and retain an existing BOM / CRLF convention on actual edits.
     const normalized = body.replace(/\r\n/g, '\n');
-    if (normalized === previous.replace(/\r\n/g, '\n')) return;
+    if (normalized === previous.replace(/\r\n/g, '\n')) {
+      this.indexBody(ref, original.generation, previous);
+      return;
+    }
     const ending = previous.includes('\r\n') && !/(?<!\r)\n/.test(previous) ? '\r\n' : '\n';
     const bytes = encodeLibraryText(normalized.replace(/\n/g, ending));
     const next = original.bytes.subarray(0, 3).equals(Buffer.from([239, 187, 191]))
       ? Buffer.concat([Buffer.from([239, 187, 191]), bytes])
       : bytes;
-    await this.files.updateContent(ref, generation, next, this.options.writable);
-    await this.index();
+    const saved = await this.files.updateContent(ref, generation, next, this.options.writable);
+    this.indexBody(ref, saved.generation, decodeLibraryText(saved.bytes));
+    this.changed();
   }
   close() {
     this.closed = true;

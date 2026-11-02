@@ -804,6 +804,67 @@ test('metadata cancellation does not become an origin error or request a later t
   assert.match(result.phase, /取り消しました/);
 });
 
+test('independent update feeds overlap, preserve result order and drain active reads on cancellation', async (t) => {
+  const f = fixture(t);
+  const targets = Array.from({ length: 8 }, (_, i) => ({
+    ...f.target,
+    id: 'slot' + i,
+    source: 'https://example.test/slot' + i,
+  }));
+  let overlap, release;
+  const started = new Promise((r) => (overlap = r)),
+    gate = new Promise((r) => (release = r));
+  let requests = 0,
+    active = 0,
+    cancel = false;
+  const updater = new PortableUpdates({
+    ...f.updater.options,
+    targets: () => targets,
+    fetcher: async (url, { signal }) => {
+      requests++;
+      active++;
+      try {
+        const id = new URL(url).pathname.slice(1);
+        if (cancel) {
+          if (active === 2) overlap();
+          await new Promise((_, reject) =>
+            signal.addEventListener('abort', () => reject(signal.reason), { once: true }),
+          );
+        }
+        if (id === 'slot0') await gate;
+        if (id === 'slot1') release();
+        return new Response(
+          JSON.stringify({
+            id,
+            kind: 'applet',
+            schemaVersion: 1,
+            version: '2.0.0',
+            payload: { file: 'update.zip', format: 'zip', size: 1, sha256: 'a'.repeat(64) },
+          }),
+        );
+      } finally {
+        active--;
+      }
+    },
+  });
+  const result = await updater.check(undefined, true);
+  assert.deepEqual(
+    result.results.map((r) => [r.id, r.status]),
+    targets.map((t) => [t.id, 'available']),
+  );
+  cancel = true;
+  requests = 0;
+  const checking = updater.check();
+  await started;
+  const alreadyStarted = requests;
+  assert(updater.cancel());
+  const stopped = await checking;
+  assert.equal(active, 0);
+  assert.equal(requests, alreadyStarted);
+  assert(alreadyStarted < targets.length);
+  assert.match(stopped.phase, /取り消しました/);
+});
+
 test('recovery stores journals and results in isolated local state and rejects an unrelated location', (t) => {
   const f = fixture(t),
     base = path.join(f.directory, 'installed'),

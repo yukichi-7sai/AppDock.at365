@@ -360,6 +360,7 @@ export interface ExtensionInstance {
   startTimer?: ReturnType<typeof setTimeout>;
   child?: ChildProcessWithoutNullStreams | null;
   peer?: JsonLinePeer | null;
+  settingsDelivery?: { json?: string };
 }
 interface ManagerOptions {
   startAllowed?(id: string): boolean;
@@ -614,11 +615,15 @@ class ExtensionManager extends EventEmitter {
           if (!enabled && ['running', 'error', 'starting', 'waiting'].includes(e.state))
             await this.stop(e);
           if (enabled && e.state === 'running') {
+            const values = this.settings.value.extensions[e.manifest.id]?.settings ?? {};
+            const json = JSON.stringify(values);
+            const delivery = (e.settingsDelivery ??= {});
+            if (delivery.json === json) continue;
+            // A lost reply may have applied the new settings. Reconfirm even on a revert.
+            delivery.json = undefined;
             try {
-              await e.peer!.request(
-                'settings.changed',
-                this.settings.value.extensions[e.manifest.id]?.settings ?? {},
-              );
+              await e.peer!.request('settings.changed', values);
+              delivery.json = json;
             } catch (err: any) {
               this.log('warn', e.manifest.id, err.message);
             }
@@ -779,9 +784,13 @@ class ExtensionManager extends EventEmitter {
         }
       });
       this.advanceStartup(e, 'activate');
+      const values = this.settings.value.extensions[m.id]?.settings ?? {};
+      const initial = JSON.stringify(values);
+      const delivery: { json?: string } = {};
+      e.settingsDelivery = delivery;
       const result = await peer.request('activate', {
         id: m.id,
-        settings: this.settings.value.extensions[m.id]?.settings ?? {},
+        settings: values,
       });
       if (e.error) throw new Error(e.error);
       this.advanceStartup(e, 'validate');
@@ -811,6 +820,7 @@ class ExtensionManager extends EventEmitter {
           )
         : [];
       this.finishStartup(e, 'success');
+      delivery.json = initial;
       e.state = 'running';
       this.log(
         'info',
@@ -849,6 +859,7 @@ class ExtensionManager extends EventEmitter {
     e.startupMeasurement = undefined;
   }
   crashed(e: ExtensionInstance, message: string) {
+    e.settingsDelivery = undefined;
     this.executions.stop(e.manifest.id);
     if (e.state === 'stopping') return;
     e.soundLifetime?.abort();
@@ -868,6 +879,7 @@ class ExtensionManager extends EventEmitter {
     this.emit('changed');
   }
   async stop(e: ExtensionInstance) {
+    e.settingsDelivery = undefined;
     this.executions.stop(e.manifest.id);
     this.cancelStart(e);
     e.startupMeasurement = undefined;

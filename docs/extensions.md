@@ -148,6 +148,8 @@ AppDock **0.105.2以上**では、任意の`settingKey`に自身のトップレ�
 
 設定変更の通知は `.NET: Settings.OnChanged(async token => ...)` / `Node: settings.onChanged(async () => ...)` で購読します。購読解除のIDisposable／関数を返します。.NETでは同じAppletのコマンドと設定変更処理を直列化します。
 
+ホストはAppletの起動世代ごとにactivateまたは設定通知で渡した実効値を記録し、同値なら追加の通知を省きます。送達失敗やApplet自身による設定書込の後は再照合します。
+
 ## ネイティブ表示を持つApplet
 
 WPF等で独自ウィンドウを表示するAppletは `runtime: "native"`、`entry: "Applet.Watch.at365.exe"` を指定します。AppDockが専用EXEを起動し、DLL拡張と同じ標準入力／出力のJSON-RPCで接続します。`type` は不要です。EXEは実行環境と依存関係を自身で持つ必要があります。

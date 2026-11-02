@@ -101,8 +101,7 @@ export class PageImageRegistry {
   }
   private async openFile(file: string) {
     if (!path.isAbsolute(file)) throw Error(hostText('services.pageImages.absoluteCachePath'));
-    const base = await fs.realpath(this.root),
-      actual = await fs.realpath(file);
+    const [base, actual] = await Promise.all([fs.realpath(this.root), fs.realpath(file)]);
     const relative = path.relative(base, actual);
     if (
       !relative ||

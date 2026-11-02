@@ -5,6 +5,7 @@ const fs = require('node:fs/promises'),
 const Module = require('node:module'),
   original = Module._load;
 let copied;
+const dialog = { showOpenDialog() {} };
 Module._load = function (name, ...args) {
   return name === 'electron'
     ? {
@@ -14,7 +15,7 @@ Module._load = function (name, ...args) {
             copied = text;
           },
         },
-        dialog: {},
+        dialog,
       }
     : original.call(this, name, ...args);
 };
@@ -70,6 +71,31 @@ async function fixture(t) {
   };
   return { directory, settings, options, service, files: service.files, host: service.host, a, b };
 }
+test('batch import rechecks large sources on their turn and continues in selection order', async (t) => {
+  const f = await fixture(t);
+  const source = path.join(path.dirname(f.directory), 'import');
+  await fs.mkdir(source);
+  const names = ['first.txt', 'growing.txt', 'large.txt', 'last.txt'];
+  const paths = names.map((name) => path.join(source, name));
+  const size = 512 * 1024 + 1;
+  f.files.policy = { ...f.files.policy, maxBytes: size };
+  for (const [i, file] of paths.entries())
+    await fs.writeFile(file, i === 1 || i === 2 ? Buffer.alloc(size, 97) : names[i]);
+  t.mock.method(dialog, 'showOpenDialog', async () => ({
+    canceled: false,
+    filePaths: paths,
+  }));
+  const add = f.files.addWithResult.bind(f.files);
+  t.mock.method(f.files, 'addWithResult', async (bytes, name) => {
+    if (name === names[0]) await fs.appendFile(paths[1], 'growing');
+    return add(bytes, name);
+  });
+  const results = await f.host.registerMany();
+  assert.deepEqual(results.map((item) => item.name), names);
+  assert.deepEqual(results.map((item) => !!item.image), [true, false, true, true]);
+  assert.ok(results[1].error);
+  assert.equal((await f.service.document(results[2].image)).body.length, size);
+});
 test('UTF-8 decoder accepts empty, BOM, emoji and line breaks, and rejects corrupt or binary bytes', () => {
   for (const value of ['', 'こんにちは😀\r\n次の行', '<script>alert(1)</script>'])
     assert.equal(decodeLibraryText(Buffer.from(value)), value);
@@ -188,6 +214,45 @@ test('body search intersects folder and group filters, retains group order, and 
   await f.service.index();
   assert.equal(f.service.matches(f.a, 'alpha'), false);
   assert.equal(f.service.matches(f.a, 'replacement'), true);
+});
+test('saving or creating one text makes it searchable during a pending index of another file', async (t) => {
+  const f = await fixture(t);
+  await f.service.index();
+  let enter, release;
+  const started = new Promise((r) => (enter = r));
+  const blocked = new Promise((r) => (release = r));
+  const read = f.files.read.bind(f.files);
+  f.files.read = async (ref, ...args) => {
+    if (ref.file === f.b.file) {
+      enter();
+      await blocked;
+    }
+    return read(ref, ...args);
+  };
+  await fs.writeFile(f.files.file(f.b.file), 'background replacement');
+  await f.files.refresh(true);
+  const index = f.service.index();
+  await started;
+  let timer;
+  try {
+    await Promise.race([
+      (async () => {
+        const doc = await f.service.document(f.a);
+        await f.service.save(f.a, doc.generation, 'updated immediately');
+        assert(f.service.matches(f.a, 'immediately'));
+        const created = await f.service.create('', 'early.txt', 'new searchable body');
+        assert(f.service.matches(created, 'searchable'));
+      })(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(Error('Edit blocked behind background index')), 5000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    release();
+    await index;
+  }
+  assert(f.service.matches(f.b, 'background replacement'));
 });
 test('batch rename, folder moves and recycle preserve memberships and unrelated libraries', async (t) => {
   const f = await fixture(t),

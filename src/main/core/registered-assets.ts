@@ -13,6 +13,7 @@ import {
   type LibraryEntry as RegisteredImageEntry,
 } from '../../shared/library-assets';
 import { assetFile, safeDirectory, scanAssetTree } from './library-files';
+import { orderedReads } from './ordered-io';
 import { libraryText } from '../../shared/library-text';
 import { atomicWrite, SettingsConflictError } from './settings';
 export interface AssetPolicy {
@@ -154,12 +155,16 @@ export class RegisteredAssets {
     });
     if (changed) this.notify();
   }
-  private async fileSignature(name: string) {
+  private async fileSignature(name: string, checkedParents?: Set<string>) {
     const file = this.file(name);
-    safeDirectory(
-      assignedImage(name) ? path.dirname(file) : this.directory,
-      assignedImage(name) ? '' : imageParent(name),
-    );
+    const parent = path.dirname(file);
+    if (!checkedParents?.has(parent)) {
+      safeDirectory(
+        assignedImage(name) ? parent : this.directory,
+        assignedImage(name) ? '' : imageParent(name),
+      );
+      checkedParents?.add(parent);
+    }
     const stat = await fs.lstat(file);
     if (
       stat.isSymbolicLink() ||
@@ -315,7 +320,7 @@ export class RegisteredAssets {
       safeDirectory(this.directory, imageParent(ref.file));
       await this.fileSignature(ref.file);
       writable();
-      if (original.bytes.equals(bytes)) return;
+      if (original.bytes.equals(bytes)) return original;
       try {
         atomicWrite(this.file(ref.file), bytes, { previous: original.bytes });
       } catch (error) {
@@ -323,9 +328,8 @@ export class RegisteredAssets {
           throw Error(this.text('services.registeredImages.changed'));
         throw error;
       }
-      await this.refresh(false, [ref.file]);
-      // Revalidate the actual file: an external writer can replace it after our save.
-      await this.read(ref);
+      // read() refreshes this specific path and verifies the bytes actually present after the save.
+      return this.read(ref);
     };
     const task = this.queue.then(run, run);
     this.queue = task.catch(() => {});
@@ -384,6 +388,13 @@ export class RegisteredAssets {
     bytes: Buffer,
     filename: string,
   ): Promise<{ ref: RegisteredImageRef; reused: boolean }> {
+    const { ref, reused } = await this.addVerified(bytes, filename);
+    return { ref, reused };
+  }
+  async addVerified(
+    bytes: Buffer,
+    filename: string,
+  ): Promise<{ ref: RegisteredImageRef; reused: boolean; generation: string }> {
     const run = async () => {
       if (assignedImage(filename))
         throw Error(this.text('services.registeredImages.invalidFilename'));
@@ -409,7 +420,7 @@ export class RegisteredAssets {
             ? old
             : this.replace(name, before.signature, before.bytes, old);
         this.publish(record, decoded, createHash('sha256').update(bytes).digest('hex'), false);
-        return { ref, reused: true };
+        return { ref, reused: true, generation: record.entry.generation! };
       };
       if (existing) return duplicate();
       const temp = path.join(this.directory, `.${randomUUID()}.tmp`);
@@ -439,7 +450,7 @@ export class RegisteredAssets {
       )
         throw Error(this.text('services.registeredImages.changed'));
       this.publish(record, decoded, createHash('sha256').update(bytes).digest('hex'), false);
-      return { ref, reused: false };
+      return { ref, reused: false, generation: record.entry.generation! };
     };
     const task = this.queue.then(run, run);
     this.queue = task.catch(() => {});
@@ -660,20 +671,8 @@ export class RegisteredAssets {
     }
   }
   private async scan(files?: string[]) {
-    const signature = () =>
-      JSON.stringify([
-        this.folders,
-        [...this.entries.values()].map(({ entry, hash, decoded }) => [
-          entry.ref.file,
-          entry.generation,
-          entry.available,
-          entry.state,
-          hash,
-          decoded,
-        ]),
-        this.error,
-      ]);
-    const previous = signature();
+    const previousError = this.error;
+    let changed = false;
     try {
       try {
         await this.root();
@@ -689,7 +688,13 @@ export class RegisteredAssets {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
           return { folders: [''], files: [] as string[] };
         });
-        this.folders = tree.folders;
+        if (
+          this.folders.length !== tree.folders.length ||
+          this.folders.some((folder, i) => folder !== tree.folders[i])
+        ) {
+          this.folders = tree.folders;
+          changed = true;
+        }
         names = tree.files.map((name) => ({ name }));
         const assignedRoot = path.join(path.dirname(this.directory), this.policy.assignedDirectory);
         try {
@@ -706,12 +711,19 @@ export class RegisteredAssets {
       }
       if (this.stopped) return;
       const seen = new Set<string>();
-      for (const f of names) {
+      const checkedParents = new Set<string>();
+      let index = 0;
+      // Only metadata is prefetched. Every file still has its own lstat and realpath check.
+      for await (const result of orderedReads(names, 8, (f) =>
+        this.fileSignature(f.name, checkedParents),
+      )) {
+        if (this.stopped) return;
+        const f = names[index++];
         const key = f.name.toLowerCase();
         seen.add(key);
         try {
-          const { signature, bytes } = await this.fileSignature(f.name);
-          if (this.stopped) return;
+          if (result.status === 'rejected') throw result.reason;
+          const { signature, bytes } = result.value;
           const old = this.entries.get(key);
           if (
             old?.signature === signature &&
@@ -720,6 +732,7 @@ export class RegisteredAssets {
           )
             continue;
           this.replace(f.name, signature, bytes, old);
+          changed = true;
         } catch (error) {
           if (this.stopped) return;
           const old = this.entries.get(key);
@@ -727,10 +740,13 @@ export class RegisteredAssets {
             (error as NodeJS.ErrnoException).code ?? '',
           );
           if (old) {
+            const state = missing ? 'missing' : 'error';
+            if (old.entry.available || old.entry.state !== state) changed = true;
             old.signature = '';
             old.entry.available = false;
-            old.entry.state = missing ? 'missing' : 'error';
-          } else if (!missing)
+            old.entry.state = state;
+          } else if (!missing) {
+            changed = true;
             this.entries.set(key, {
               signature: '',
               hash: '',
@@ -746,11 +762,13 @@ export class RegisteredAssets {
                 state: 'error',
               },
             });
+          }
         }
       }
       if (!files)
         for (const [key, value] of this.entries)
           if (!seen.has(key)) {
+            if (value.entry.available || value.entry.state !== 'missing') changed = true;
             value.entry.available = false;
             value.entry.state = 'missing';
           }
@@ -762,13 +780,14 @@ export class RegisteredAssets {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
         this.error = this.text('services.registeredImages.readFailed');
       for (const value of this.entries.values()) {
+        const state = (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'error';
+        if (value.entry.available || value.entry.state !== state) changed = true;
         value.signature = '';
         value.entry.available = false;
-        value.entry.state =
-          (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'error';
+        value.entry.state = state;
       }
     }
-    if (previous !== signature()) this.notify();
+    if (changed || this.error !== previousError) this.notify();
   }
   watch() {
     if (!this.watching && !this.stopped) {

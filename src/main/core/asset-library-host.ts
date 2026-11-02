@@ -1,6 +1,7 @@
 import { clipboard, ClipboardItem, dialog, shell, type BrowserWindow } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { orderedReads } from './ordered-io';
 import { AssignedAssets } from './assigned-assets';
 import { imageBasename, imageFolder, imageParent } from '../../shared/image-paths';
 import { safeDirectory } from './library-files';
@@ -343,6 +344,30 @@ export class AssetLibraryHost {
       ]);
     }
   }
+  private readImport(source: string, ahead: true): Promise<Buffer | undefined>;
+  private readImport(source: string): Promise<Buffer>;
+  private async readImport(source: string, ahead = false): Promise<Buffer | undefined> {
+    this.options.writable();
+    const handle = await fs.open(source, 'r');
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > this.images.policy.maxBytes)
+        throw Error(this.text('services.imageLibraryHost.sizeLimit'));
+      // Larger sources are read on their own turn; a growing source cannot inflate read-ahead.
+      if (ahead && stat.size > 512 * 1024) return;
+      const bytes = Buffer.allocUnsafe(stat.size + 1);
+      let length = 0;
+      while (length < bytes.length) {
+        const { bytesRead } = await handle.read(bytes, length, bytes.length - length, length);
+        if (!bytesRead) break;
+        length += bytesRead;
+      }
+      if (length === stat.size) return bytes.subarray(0, length);
+      if (!ahead) throw Error(this.text('services.registeredImages.changed'));
+    } finally {
+      await handle.close();
+    }
+  }
   async registerMany(folder = '') {
     if (!imageFolder(folder)) throw Error(this.text('images.folderInvalid'));
     this.options.writable();
@@ -371,15 +396,17 @@ export class AssetLibraryHost {
       error?: string;
     }[] = [];
     if (selected.canceled) return results;
-    for (const source of selected.filePaths) {
+    let index = 0;
+    for await (const prepared of orderedReads(selected.filePaths, 2, (source) =>
+      this.readImport(source, true),
+    )) {
+      const source = selected.filePaths[index++];
       const name = path.basename(source);
       try {
         this.options.writable();
-        const stat = await fs.stat(source);
-        if (!stat.isFile() || stat.size > this.images.policy.maxBytes)
-          throw Error(this.text('services.imageLibraryHost.sizeLimit'));
+        if (prepared.status === 'rejected') throw prepared.reason;
         const { ref: image, reused } = await this.images.addWithResult(
-          await fs.readFile(source),
+          prepared.value ?? (await this.readImport(source)),
           folder ? `${folder}/${name}` : name,
         );
         results.push({ name, image, reused });

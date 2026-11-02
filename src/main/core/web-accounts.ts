@@ -39,6 +39,14 @@ import {
 } from './web-account-groups';
 import { WebAccountRoster, WebAccountRosterError } from './web-account-roster';
 import { webAccountName } from '../../shared/web-accounts';
+import {
+  pendingRead,
+  waitForRead,
+  WebAccountReadChannel,
+  type AccountDelivery,
+  type WebReadQuery,
+} from './web-account-read';
+import { RpcDelivery, RPC_TIMEOUT_MS } from './rpc';
 
 type Saved = {
   version: 1;
@@ -236,7 +244,11 @@ export class WebAccountController {
   private visibilityCheckPending = false;
   private returnAfterLoad = new WeakSet<WebContentsView>();
   private openingExternal = false;
-  private reads = new Map<string, Promise<unknown>>();
+  private reads = new Map<
+    string,
+    { generation: number | undefined; url: string; task: Promise<unknown>; settled: boolean }
+  >();
+  private readChannel = new WebAccountReadChannel();
   private generation = new Map<string, number>();
   private views = new Map<string, WebContentsView>();
   private activityCleanup = new Map<string, ReturnType<typeof keepWebPageActive>>();
@@ -244,8 +256,9 @@ export class WebAccountController {
     string,
     { error: string; status: string; attention: boolean; observation: unknown; data: string }
   >();
-  private acknowledgements = new Set<string>();
-  private monitoringResets = new Set<string>();
+  private eventVersion = 0;
+  private acknowledgements = new Map<string, number>();
+  private monitoringResets = new Map<string, number>();
   private deleting = new Set<string>();
   private definition: WebAccountDefinition;
   private uiURL: string;
@@ -836,7 +849,11 @@ export class WebAccountController {
       this.changed();
       if (this.returnAfterLoad.delete(view)) void this.returnHiddenViewToStart(view);
     });
-    wc.on('did-navigate', () => this.changed());
+    wc.on('did-navigate', () => {
+      // An observer left in the preceding document cannot serve this document.
+      this.reads.delete(id);
+      this.changed();
+    });
     wc.on('did-navigate-in-page', () => this.changed());
     wc.on('did-fail-load', (_event, code, _description, _url, main) => {
       if (main && code !== -3) {
@@ -1122,7 +1139,7 @@ export class WebAccountController {
         }
         // A worker can miss a rapid OFF/ON between reads. Explicitly reset its
         // baseline on either transition, independently of display clearing.
-        this.monitoringResets.add(a.id);
+        this.monitoringResets.set(a.id, ++this.eventVersion);
         this.changed();
         return;
       }
@@ -1145,7 +1162,7 @@ export class WebAccountController {
         return;
       }
       case 'acknowledge':
-        this.acknowledgements.add(this.account(args[0]).id);
+        this.acknowledgements.set(this.account(args[0]).id, ++this.eventVersion);
         return;
       case 'cycle':
         return this.cycle(args[0]);
@@ -1307,90 +1324,127 @@ export class WebAccountController {
         throw Error('Unknown Web account action');
     }
   }
-  async read() {
-    await this.start();
-    // Sequential reads keep the IPC response bounded and avoid parallel DOM scans.
-    for (const a of this.state.accounts) {
-      if (this.disposed || this.deleting.has(a.id)) continue;
-      const wc = this.views.get(a.id)?.webContents,
-        status = this.statuses.get(a.id);
-      if (!wc || wc.isDestroyed() || !status) continue;
-      if (wc.isLoadingMainFrame() || status.error) {
-        status.observation = null;
-        continue;
-      }
-      let origin = '';
-      try {
-        origin = new URL(wc.getURL()).origin;
-      } catch {}
-      if (origin !== this.definition.observeOrigin) {
-        this.updateAvatar(a.id, null);
-        status.observation = null;
-        status.status = hostText('services.webAccounts.loginRequired');
-        continue;
-      }
-      const generation = this.generation.get(a.id);
-      const url = wc.getURL();
-      try {
-        let read = this.reads.get(a.id);
-        if (!read) {
-          // Applet-owned source runs in an isolated world; remote pages receive no host bridge.
-          read = wc.executeJavaScriptInIsolatedWorld(1001, [{ code: this.source }]);
-          this.reads.set(a.id, read);
-          void read
-            .finally(() => {
-              if (this.reads.get(a.id) === read) this.reads.delete(a.id);
-            })
-            .catch(() => {});
-        }
-        const timedOut = Symbol('timeout');
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        const result = await Promise.race([
-          read,
-          new Promise<symbol>((resolve) => {
-            timer = setTimeout(() => resolve(timedOut), 800);
-          }),
-        ]).finally(() => clearTimeout(timer));
-        if (result === timedOut) {
-          status.observation = null;
-          status.status = hostText('services.webAccounts.waitingResponse');
-          continue;
-        }
-        if (
-          this.disposed ||
-          this.deleting.has(a.id) ||
-          wc.isDestroyed() ||
-          wc.getURL() !== url ||
-          this.generation.get(a.id) !== generation
-        )
-          continue;
-        if (Buffer.byteLength(JSON.stringify(result ?? null)) > 60000)
-          throw Error('Observation too large');
-        status.observation = result;
-        this.updateAccountName(
-          a.id,
-          result && typeof result === 'object' && 'accountName' in result
-            ? result.accountName
-            : null,
-        );
-        this.updateAvatar(
-          a.id,
-          result && typeof result === 'object' && 'avatar' in result ? result.avatar : null,
-        );
-        if (result && typeof result === 'object' && 'ready' in result && result.ready === true)
-          this.activityCleanup.get(a.id)?.ready();
-      } catch {
-        status.observation = null;
-        status.status = hostText('services.webAccounts.waitingAnalysis');
-      }
+  private async observe(id: string, wait: number, live: () => boolean) {
+    if (this.deleting.has(id)) return;
+    const wc = this.views.get(id)?.webContents,
+      status = this.statuses.get(id);
+    if (!wc || wc.isDestroyed() || !status) return;
+    if (wc.isLoadingMainFrame() || status.error) {
+      status.observation = null;
+      return;
     }
-    const acknowledged = [...this.acknowledgements];
-    this.acknowledgements.clear();
-    // Reports belong to the local UI, not the worker that produced them. Avoid
-    // duplicating ten accounts' histories in the bounded 1 MB JSON-RPC response.
-    const monitoringResets = [...this.monitoringResets];
-    this.monitoringResets.clear();
-    return { ...this.snapshot(false), acknowledged, monitoringResets };
+    let origin = '';
+    try {
+      origin = new URL(wc.getURL()).origin;
+    } catch {}
+    if (origin !== this.definition.observeOrigin) {
+      this.updateAvatar(id, null);
+      status.observation = null;
+      status.status = hostText('services.webAccounts.loginRequired');
+      return;
+    }
+    const generation = this.generation.get(id);
+    const url = wc.getURL();
+    let read = this.reads.get(id);
+    const current = () =>
+      live() &&
+      !this.disposed &&
+      !this.deleting.has(id) &&
+      !wc.isDestroyed() &&
+      wc.getURL() === url &&
+      this.generation.get(id) === generation;
+    try {
+      if (read && !read.settled) {
+        // A prior read already waited on this View. Never start a competing observer.
+        status.observation = null;
+        status.status = hostText('services.webAccounts.waitingResponse');
+        return;
+      }
+      if (!read || read.generation !== generation || read.url !== url) {
+        const task = wc
+          .executeJavaScriptInIsolatedWorld(1001, [{ code: this.source }])
+          .then((result) => {
+            if (Buffer.byteLength(JSON.stringify(result ?? null)) > 60000)
+              throw Error('Observation too large');
+            return result;
+          });
+        const started = { generation, url, task, settled: false };
+        void task.then(
+          () => {
+            started.settled = true;
+          },
+          () => {
+            started.settled = true;
+          },
+        );
+        read = started;
+        this.reads.set(id, read);
+      }
+      let result: unknown = pendingRead;
+      if (read.settled) result = await read.task;
+      else if (wait > 0) result = await waitForRead(read.task, wait);
+      if (!current()) return;
+      if (result === pendingRead) {
+        status.observation = null;
+        status.status = hostText('services.webAccounts.waitingResponse');
+        return;
+      }
+      if (this.reads.get(id) === read) this.reads.delete(id);
+      status.observation = result;
+      this.updateAccountName(
+        id,
+        result && typeof result === 'object' && 'accountName' in result ? result.accountName : null,
+      );
+      this.updateAvatar(
+        id,
+        result && typeof result === 'object' && 'avatar' in result ? result.avatar : null,
+      );
+      if (result && typeof result === 'object' && 'ready' in result && result.ready === true)
+        this.activityCleanup.get(id)?.ready();
+    } catch {
+      if (this.reads.get(id) === read) this.reads.delete(id);
+      if (!current()) return;
+      status.observation = null;
+      status.status = hostText('services.webAccounts.waitingAnalysis');
+    }
+  }
+  private async collectRead(live: () => boolean, progress?: () => void): Promise<AccountDelivery> {
+    await this.start();
+    // Keep room in the enclosing activate/command RPC while still visiting every account.
+    const deadline = performance.now() + 6000;
+    const accounts = this.state.accounts;
+    for (const [index, account] of accounts.entries()) {
+      progress?.();
+      if (this.disposed || !live()) throw Error(hostText('services.webAccounts.readExpired'));
+      const share = (deadline - performance.now()) / (accounts.length - index);
+      await this.observe(account.id, Math.min(800, share), live);
+    }
+    if (this.disposed || !live()) throw Error(hostText('services.webAccounts.readExpired'));
+    const acknowledgements = new Map(this.acknowledgements);
+    const resets = new Map(this.monitoringResets);
+    return {
+      value: {
+        ...this.snapshot(false),
+        acknowledged: [...acknowledgements.keys()],
+        monitoringResets: [...resets.keys()],
+      },
+      confirm: () => {
+        for (const [id, version] of acknowledgements)
+          if (this.acknowledgements.get(id) === version) this.acknowledgements.delete(id);
+        for (const [id, version] of resets)
+          if (this.monitoringResets.get(id) === version) this.monitoringResets.delete(id);
+      },
+    };
+  }
+  readPart(query: WebReadQuery) {
+    return this.readChannel.page(query, (live, progress) => this.collectRead(live, progress));
+  }
+  async read() {
+    const deadline = performance.now() + RPC_TIMEOUT_MS;
+    const delivery = await this.collectRead(() => !this.disposed);
+    return new RpcDelivery(delivery.value, () => {
+      if (!this.disposed && performance.now() < deadline) delivery.confirm();
+    });
   }
   report(id: string, status: string, attention: boolean, data?: unknown) {
     if (this.group && (this.deleting.has(id) || !this.state.accounts.some((a) => a.id === id)))
@@ -1415,6 +1469,8 @@ export class WebAccountController {
   async close() {
     if (this.disposed) return;
     this.disposed = true;
+    this.readChannel.close();
+    this.reads.clear();
     this.soundWatch?.close();
     this.unsubscribeGroup?.();
     this.unsubscribeSettings?.();

@@ -566,6 +566,7 @@ export function createHostApi(
       case 'host.webAccounts.cycle':
       case 'host.webAccounts.navigate':
       case 'host.webAccounts.read':
+      case 'host.webAccounts.readPart':
       case 'host.webAccounts.report': {
         requireCapability('web-accounts');
         const web = getWebAccounts(
@@ -644,7 +645,7 @@ export function createHostApi(
           web.report(p.id as string, p.status as string, p.attention as boolean, p.data);
           return null;
         }
-        return web.read();
+        return method.endsWith('.readPart') ? web.readPart(p) : web.read();
       }
       case 'host.ui.pickFile': {
         requireCapability('file-dialog');
@@ -721,6 +722,8 @@ export function createHostApi(
         requireCapability('settings');
         const k = key();
         settingsCommands.setOwnSetting(e.manifest, k, p.value);
+        // The worker updates its local settings after this reply, even during activate.
+        e.settingsDelivery = undefined;
         return null;
       }
       case 'host.settings.options': {

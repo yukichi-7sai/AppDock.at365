@@ -119,8 +119,12 @@ export class ProcessLaunchService {
     check();
     let peer: JsonLinePeer;
     try {
-      peer = await this.worker();
-      const [file, cwd] = await Promise.all([fs.stat(spec.file), fs.stat(spec.cwd)]);
+      const [ready, file, cwd] = await Promise.all([
+        this.worker(),
+        fs.stat(spec.file),
+        fs.stat(spec.cwd),
+      ]);
+      peer = ready;
       if (!file.isFile() || !cwd.isDirectory())
         return fail('INVALID_ARGUMENT', hostText('services.processLaunch.invalidPaths'));
     } catch (error) {

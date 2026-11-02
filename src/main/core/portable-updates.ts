@@ -1,5 +1,6 @@
 import { hostText } from '../../shared/i18n';
 import { physicalFs } from './physical-fs';
+import { orderedReads } from './ordered-io';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
@@ -519,8 +520,32 @@ export class PortableUpdates {
     this.begin(hostText('services.portableUpdates.checking'));
     try {
       const results: UpdateResult[] = [];
-      for (const target of this.options.targets().filter((t) => !ids || ids.includes(t.id))) {
-        const { result } = await this.checkTarget(target);
+      const selected = ids && new Set(ids);
+      const targets = this.options.targets().filter((t) => !selected || selected.has(t.id));
+      const signal = this.controller!.signal;
+      const busySources = new Map<string, Promise<void>>();
+      for await (const checked of orderedReads(targets, 4, (target) => {
+        // Several installed entries may point at the same feed. Don't issue competing reads.
+        const source = target.source.trim();
+        const previous = busySources.get(source);
+        const start = () => {
+          signal.throwIfAborted();
+          return this.checkTarget(target);
+        };
+        const check = previous ? previous.then(start) : start();
+        const done = check.then(
+          () => {},
+          () => {},
+        );
+        busySources.set(source, done);
+        void done.then(() => {
+          if (busySources.get(source) === done) busySources.delete(source);
+        });
+        return check;
+      })) {
+        signal.throwIfAborted();
+        if (checked.status === 'rejected') throw checked.reason;
+        const { result } = checked.value;
         results.push(result);
         this.update(result);
       }

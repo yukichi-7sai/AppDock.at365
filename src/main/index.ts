@@ -4259,9 +4259,11 @@ async function initialize() {
   endServices();
   hostStartupTiming.phase('apply', () => applySettings());
   applyFileWatchAssistanceSettings();
-  await hostStartupTiming.phaseAsync('images', () => registeredImages.watch());
-  await soundLibrary.files.watch();
-  await textLibrary.files.watch();
+  await Promise.all([
+    hostStartupTiming.phaseAsync('images', () => registeredImages.watch()),
+    soundLibrary.files.watch(),
+    textLibrary.files.watch(),
+  ]);
   hostStartupTiming.count('imageCount', registeredImages.list().length);
   nativeTheme.on('updated', () => {
     refreshWindowTheme();

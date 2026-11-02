@@ -3,6 +3,7 @@ import type { OwnShellState } from '../shared/shell';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createAppDockClient, type AppDockClient } from '../shared/appdock-api';
 import { JsonLinePeer } from './core/rpc';
+import { webAccountReader, type AccountRead } from './core/web-account-read';
 import type { Command, TrayItem, Panel, SettingOption } from '../shared/contracts';
 export interface NodeCommandInvocation {
   signal: AbortSignal;
@@ -78,9 +79,7 @@ export interface NodeExtensionContext {
     open(): Promise<unknown>;
     cycle(direction: 1 | -1): Promise<unknown>;
     navigate(action: 'back' | 'forward' | 'reload' | 'inbox'): Promise<unknown>;
-    read(): Promise<
-      import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
-    >;
+    read(): Promise<AccountRead>;
     report(id: string, status: string, attention: boolean, data?: unknown): Promise<unknown>;
   };
   commands: { register(id: string, title: string, handler: Handler): void };
@@ -258,10 +257,7 @@ const peer = new JsonLinePeer(process.stdin, process.stdout, async (method, p) =
           open: () => peer.request('host.webAccounts.open', {}),
           cycle: (direction) => peer.request('host.webAccounts.cycle', { direction }),
           navigate: (action) => peer.request('host.webAccounts.navigate', { action }),
-          read: () =>
-            peer.request('host.webAccounts.read', {}) as Promise<
-              import('../shared/web-accounts').WebAccountSnapshot & { acknowledged: string[] }
-            >,
+          read: webAccountReader((query) => peer.request('host.webAccounts.readPart', query)),
           report: (id, status, attention, data) =>
             peer.request('host.webAccounts.report', { id, status, attention, data }),
         },

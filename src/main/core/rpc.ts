@@ -1,7 +1,15 @@
 import { hostText } from '../../shared/i18n';
 import { EventEmitter } from 'node:events';
 import type { Readable, Writable } from 'node:stream';
-const MAX_LINE = 1024 * 1024;
+export const MAX_RPC_LINE_BYTES = 1024 * 1024;
+export const RPC_TIMEOUT_MS = 15000;
+/** Legacy single-frame results may consume state only after their frame was written. */
+export class RpcDelivery {
+  constructor(
+    readonly value: unknown,
+    readonly written: () => void,
+  ) {}
+}
 interface Pending {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
@@ -20,7 +28,7 @@ class JsonLinePeer extends EventEmitter {
     input: Readable,
     output: Writable,
     handler: (method: string, params: any) => Promise<unknown>,
-    timeout = 15000,
+    timeout = RPC_TIMEOUT_MS,
   ) {
     super();
     this.input = input;
@@ -43,13 +51,13 @@ class JsonLinePeer extends EventEmitter {
     while ((newline = this.buffer.indexOf('\n')) !== -1) {
       const line = this.buffer.slice(0, newline);
       this.buffer = this.buffer.slice(newline + 1);
-      if (Buffer.byteLength(line) > MAX_LINE) {
+      if (Buffer.byteLength(line) > MAX_RPC_LINE_BYTES) {
         this.fail(new Error(hostText('services.rpc.sizeLimit')));
         return;
       }
       if (line.trim()) this.dispatch(line);
     }
-    if (Buffer.byteLength(this.buffer) > MAX_LINE)
+    if (Buffer.byteLength(this.buffer) > MAX_RPC_LINE_BYTES)
       this.fail(new Error(hostText('services.rpc.sizeLimit')));
   }
   async dispatch(line: string) {
@@ -64,8 +72,13 @@ class JsonLinePeer extends EventEmitter {
     if (typeof msg.method === 'string') {
       try {
         const result = await this.handler(msg.method, msg.params ?? {});
-        if (msg.id !== undefined && !this.closed)
-          this.send({ jsonrpc: '2.0', id: msg.id, result: result ?? null });
+        if (msg.id !== undefined && !this.closed) {
+          if (result instanceof RpcDelivery)
+            this.send({ jsonrpc: '2.0', id: msg.id, result: result.value }, () => {
+              if (!this.closed) result.written();
+            });
+          else this.send({ jsonrpc: '2.0', id: msg.id, result: result ?? null });
+        }
       } catch (e) {
         if (msg.id !== undefined && !this.closed) {
           try {
@@ -87,11 +100,16 @@ class JsonLinePeer extends EventEmitter {
       msg.error ? pending.reject(new Error(msg.error.message)) : pending.resolve(msg.result);
     }
   }
-  send(msg: unknown) {
+  send(msg: unknown, written?: () => void) {
     if (this.closed || this.output.destroyed) throw new Error(hostText('services.rpc.closed'));
     const line = JSON.stringify(msg) + '\n';
-    if (Buffer.byteLength(line) > MAX_LINE) throw new Error(hostText('services.rpc.sizeLimit'));
-    this.output.write(line);
+    if (Buffer.byteLength(line) > MAX_RPC_LINE_BYTES)
+      throw new Error(hostText('services.rpc.sizeLimit'));
+    if (written)
+      this.output.write(line, (error) => {
+        if (!error) written();
+      });
+    else this.output.write(line);
   }
   request(method: string, params: unknown = {}, timeout = this.timeout): Promise<any> {
     return new Promise((resolve, reject) => {

@@ -27,8 +27,8 @@ test('Worker read excludes UI reports so multi-account history cannot overflow J
     views: new Map(),
     deleting: new Set(),
     soundFailures: new Map(),
-    acknowledgements: new Set(['0']),
-    monitoringResets: new Set(),
+    acknowledgements: new Map([['0', 1]]),
+    monitoringResets: new Map(),
     statuses: new Map(
       accounts.map((a) => [
         a.id,
@@ -39,10 +39,13 @@ test('Worker read excludes UI reports so multi-account history cannot overflow J
     snapshot: WebAccountController.prototype.snapshot,
   };
   assert.ok(Buffer.byteLength(JSON.stringify(fake.snapshot())) > 1024 * 1024);
-  const read = await WebAccountController.prototype.read.call(fake);
+  Object.setPrototypeOf(fake, WebAccountController.prototype);
+  const delivery = await fake.read();
+  const read = delivery.value;
   assert.ok(Buffer.byteLength(JSON.stringify(read)) < 1024 * 1024);
   assert.ok(read.accounts.every((a) => a.data === null && a.observation.length === 59000));
   assert.deepEqual(read.acknowledged, ['0']);
+  delivery.written();
   assert.equal(fake.acknowledgements.size, 0);
 });
 test('Web account navigation requires exact declared HTTPS origins and excludes credentials', () => {
@@ -136,7 +139,8 @@ test('Account ordering preserves selected IDs, sessions and settings; monitoring
       selected: 'a',
     },
     deleting: new Set(),
-    monitoringResets: new Set(),
+    eventVersion: 0,
+    monitoringResets: new Map(),
     statuses: new Map([['a', { attention: true, data: '{"pending":3}' }]]),
     views: new Map([['a', { session: 'preserved' }]]),
     changed() {},
@@ -390,7 +394,7 @@ test('Web account API is unavailable without capability and when extension is st
     () => {},
   );
   const e = { state: 'running', manifest: { id: 'test.web', capabilities: [] } };
-  for (const method of ['start', 'read', 'open', 'cycle', 'report'])
+  for (const method of ['start', 'read', 'readPart', 'open', 'cycle', 'report'])
     await assert.rejects(api(e, 'host.webAccounts.' + method, {}), /capabilities/);
   e.state = 'stopped';
   e.manifest.capabilities = ['web-accounts'];

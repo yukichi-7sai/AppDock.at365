@@ -3011,6 +3011,7 @@
   "services.webAccounts.keepLastSimple": "最後のアカウントは残してください。",
   "services.webAccounts.loginRequired": "ログインが必要です",
   "services.webAccounts.waitingResponse": "画面の応答を待っています",
+  "services.webAccounts.readExpired": "アカウント情報の読み取りが終了しました。もう一度読み取ってください。",
   "services.webAccounts.waitingAnalysis": "画面の解析を待っています",
   "services.webAccounts.manifestRequired": "manifest.webAccounts が必要です。",
   "services.webProfiles.sizeLimit": "Webアカウントの保存ファイルが大きすぎます。",

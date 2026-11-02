@@ -46,8 +46,12 @@ function fixture(t, delay = 0) {
         return true;
       },
     });
-    child.remote = new JsonLinePeer(child.stdin, child.stdout, (method) =>
-      method === 'activate' ? f.activate(child) : null,
+    child.remote = new JsonLinePeer(child.stdin, child.stdout, (method, params) =>
+      method === 'activate'
+        ? f.activate(child, params)
+        : method === 'settings.changed'
+          ? f.settingsChanged?.(params)
+          : null,
     );
     children.push(child);
     return child;
@@ -92,6 +96,48 @@ function expectedTiming(durationMs, outcome, validated = outcome === 'success') 
     ],
   };
 }
+
+test('settings delivery skips unrelated saves, retries an uncertain revert and uses the new activation snapshot', async (t) => {
+  const f = fixture(t),
+    id = f.item.manifest.id,
+    delivered = [],
+    activated = [];
+  const set = (value) => f.settings.updateExtension(id, { settings: { value } });
+  set('initial');
+  f.activate = async (_child, params) => {
+    activated.push(params.settings.value);
+    return { commands: [] };
+  };
+  let fail = false;
+  f.settingsChanged = (values) => {
+    delivered.push(values.value);
+    if (fail) throw Error('lost response');
+  };
+  await f.manager.reconcile();
+  f.settings.updateExtension('another.applet', { settings: { label: 'unrelated' } });
+  await f.manager.reconcile();
+  assert.deepEqual(delivered, []);
+  set('updated');
+  await f.manager.reconcile();
+  await f.manager.reconcile();
+  fail = true;
+  set('uncertain');
+  await f.manager.reconcile();
+  fail = false;
+  set('updated');
+  await f.manager.reconcile();
+  await f.manager.restart(id, true);
+  await f.manager.reconcile();
+  assert.deepEqual(delivered, ['updated', 'uncertain', 'updated']);
+  assert.deepEqual(activated, ['initial', 'updated']);
+  f.activate = async () => {
+    set('changed during activation');
+    return { commands: [] };
+  };
+  await f.manager.restart(id, true);
+  await f.manager.reconcile();
+  assert.equal(delivered.at(-1), 'changed during activation');
+});
 
 test('manifest descriptions remain optional plain text and reject non-text values', (t) => {
   const f = fixture(t);
