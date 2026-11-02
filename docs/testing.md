@@ -34,6 +34,12 @@ UIの待機には描画・保存・接続の条件を使います。固定時間
 
 通常のGUI/MCPテストは、`scripts/copy-host.cjs`の`testHostPath(profile)`で取得した`.artifacts/test-runtime/host/AppDock.at365.exe`を起動します。`copyHost(source, executable)`は本体manifestに含まれるランタイムを一緒に準備し、配布物全体の内容をSHA256で照合します。同じ内容ならコピーを再利用し、異なる内容や破損したコピーは、実行中プロセスがないことを確認して更新します。EXEだけでなく`resources/app.asar`等の変更も判定対象です。
 
+Applet側のテストも同じAppDockの固定EXEを共用します。`prepareTestHost(source, profile, path.join(appletRoot, '.artifacts'))`へApplet側の保存rootを明示して渡します。`testHostPath`の第2引数、`page-test-host.cjs`の`launch`の第4引数、`data-settings-host.cjs`の`isolatedHost`の第3引数も同じrootを受け取ります。`electron-test-launcher.cjs`では`profileArtifacts`を指定します。外部rootは`.artifacts`に限定し、profileがその内側にあり、共通ランタイムの外側であることと、親に再解析ポイントがないことを確認します。設定fixtureは`test-settings.cjs`の`file(profile)`で`data/settings.json`へ作成します。
+
+起動パラメーターは既存の`--test-profile`と`--test-local-state`を使います。`extensions`は各profile内に置き、試験用に変更するmanifest・スクリプト・DLL/EXEはfixtureとして保持します。`--test-extensions`等の追加パラメーターや、製品の保存先仕様の変更は行いません。
+
+Applet自身を直接起動する試験で、配置やコードの変更を検査しない場合は`prepareTestApplet(sourceExe, profile, appletArtifacts)`を使えます。実行物はApplet側の`.artifacts/test-runtime/<Applet名>/`へ固定し、EXEと同じ入力フォルダーにあるDLL・ランタイム・アセットをまとめて照合します。設定やdataを含む入力フォルダーは拒否します。各profileには`<Applet名>-runtime.json`を残し、通常の結果・画像・状態出力はprofile内へ分離します。既に発行先や固定build出力を直接使う試験には、新しいコピーを追加しません。
+
 起動には従来の`--test-profile=<各試験のroot>`を渡します。共有設定・data・extensionsはそのrootに、PC専用の状態は`--test-local-state=<各試験のlocal>`を指定した場所（省略時はそのrootのdata）に保存します。EXEの共用だけを目的にprofileIdを固定したり、前の試験の設定を再利用したりしません。各試験のrootには結果・ログ・画像・配布manifestと`test-runtime.json`を残し、後者に実行した配布物の全管理ファイルのSHA256と固定EXEの場所を記録します。本体やランタイムは各試験のrootへ複製しません。
 
 GUI試験は直列に実行します。共通実行場所はランナーPIDで排他し、別ランナーが使用中なら起動準備を拒否します。異常終了したランナーの排他は、PIDの終了と残存AppDockプロセスの不在を確認して回収します。起動中の上書き、予期しないdata等の削除、再解析ポイントをたどるコピーや削除は行いません。

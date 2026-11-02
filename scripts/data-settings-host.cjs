@@ -20,13 +20,13 @@ async function until(fn, label) {
   }
   throw Error(label + (last ? ': ' + last : ''));
 }
-function isolatedHost(profile, portable) {
+function isolatedHost(profile, portable, profileArtifacts) {
   const root = path.resolve(__dirname, '..');
   fs.mkdirSync(profile, { recursive: true });
   let exe = require('electron');
   const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   if (portable) {
-    exe = testHostPath(profile);
+    exe = testHostPath(profile, profileArtifacts);
     require('./copy-host.cjs').copyHost(path.resolve(portable), exe);
     assert.equal(hash(exe), hash(portable));
   }

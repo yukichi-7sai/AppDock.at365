@@ -15,7 +15,7 @@ async function until(callback, label, timeout = 30000) {
   }
   throw Error(label + (last ? ': ' + last.message : ''));
 }
-async function launch(profile, portable, extraEnvironment = {}) {
+async function launch(profile, portable, extraEnvironment = {}, profileArtifacts) {
   const env = { ...process.env, LOCALAPPDATA: path.join(profile, 'LocalAppData'), ...extraEnvironment };
   delete env.ELECTRON_RUN_AS_NODE;
   let app, child, browser, main;
@@ -23,7 +23,7 @@ async function launch(profile, portable, extraEnvironment = {}) {
     app = await _electron.launch({ executablePath: require('electron'), args: [root, `--test-profile=${profile}`], env });
     main = await app.firstWindow();
   } else {
-    const exe = testHostPath(profile); require('./copy-host.cjs').copyHost(portable, exe);
+    const exe = testHostPath(profile, profileArtifacts); require('./copy-host.cjs').copyHost(portable, exe);
     if (hash(exe) !== hash(portable)) throw Error('Fixed EXE hash mismatch');
     const debug = await freePort(), inspector = await freePort();
     child = spawn(exe, [`--test-profile=${profile}`, `--remote-debugging-port=${debug}`, `--inspect=127.0.0.1:${inspector}`], { cwd: profile, env, windowsHide: true, stdio: 'ignore' });

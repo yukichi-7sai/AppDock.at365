@@ -25,7 +25,7 @@ A:配下では[A:の共通指示](../AGENTS.md)と[30.PROJECTの共通指示](..
 - テストの追加・修正・整理では[テストの作成と整理](docs/testing.md)を参照する。利用者の操作・保存・拒否・復旧を守り、細かな意匠やCSS/DOMの実装方法だけを固定する検査を増やさない。共通部品は代表例へ集約し、検査削除時は残る契約と担当試験を記録する。
 - Node/pnpmはtoolchain.jsonに従うプロジェクト内の.toolsをdev.bat経由で使用する。グローバル導入はしない。パッケージ更新はupdate-packages.batを使い、Electronは最新安定版・Node.jsは最新LTSを毎回選び完全版で固定する。この2つは7日待機の恒久免除、ほかの依存・pnpmは7日待機と版指定例外を維持する。[依存方針](DEVELOPMENT.md#依存とツールの公開後待機)に従い、pnpmのshim生成とElectron取得を含め、更新時は初回setupと再実行も確認する。
 - node_modulesをjunction共有したworktreeで依存をインストールしない。依存更新用checkoutは独立node_modulesを使い、整理前後は元checkoutへの参照と動作を確認する。
-- GUI試験は直列・隔離profileで行う。通常の固定配布物のGUI/MCP試験は`copy-host.cjs`の`testHostPath(profile)`で共通EXEを取得し、`--test-profile`等で保存先を分ける。[共通実行場所と配置検証の例外](docs/testing.md#固定配布物の共通実行場所)に従う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。
+- GUI試験は直列・隔離profileで行う。通常の固定配布物のGUI/MCP試験は`copy-host.cjs`の`testHostPath`または`prepareTestHost`で共通EXEを取得し、`--test-profile`等で保存先を分ける。Applet側の試験は自身の`.artifacts`をprofile保存rootとして明示する。[共通実行場所と配置検証の例外](docs/testing.md#固定配布物の共通実行場所)に従う。build-main.cjsはout/mainを再生成するため、GUI起動中・再起動中にビルドを重ねない。発行後は固定配布物を使い、コピーと最終EXEのSHA256を照合する。
 - フォルダー型ポータブルの配布・更新・保存先は[配布仕様](docs/portable-distribution.md)に従う。直接起動、再起動、二重起動、異常終了、Tray識別と本体ファイルの保持を確認する。設定・data・認証と本体ファイルの寿命を混ぜない。
 - .NET SDK/Runtime・接続契約を変えたらnative AppletもRelease buildし、接続・停止・表示・保存を確認する。runtimeconfig欠落は発行元・EXE内・展開先を比較する。
 - PowerShell 5.1用PS1はUTF-8 BOM/CRLF、BATはCP932/CRLFを保つ。File.Replaceへnull backupを渡す場合はNullString.Valueを使う。GitHub CLIのPATH・認証・実行権限はその環境で確認する。

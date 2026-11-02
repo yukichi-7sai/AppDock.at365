@@ -2,7 +2,12 @@
 const { spawn } = require('node:child_process');
 const { _electron: electron, chromium } = require('playwright');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
-async function launchTestHost({ executablePath, portable, mainInspector = false, args, env }) {
+async function launchTestHost({ executablePath, portable, mainInspector = false, args, env, profileArtifacts }) {
+  if (portable && profileArtifacts) {
+    const profile = args.find((arg) => arg.startsWith('--test-profile='))?.slice('--test-profile='.length);
+    if (!profile) throw Error('Shared Applet test host requires an explicit test profile');
+    executablePath = require('./copy-host.cjs').prepareTestHost(executablePath, profile, profileArtifacts);
+  }
   if (!portable && !mainInspector) return electron.launch({ executablePath, args, env });
   const port = await freePort(),
     mainPort = await freePort();

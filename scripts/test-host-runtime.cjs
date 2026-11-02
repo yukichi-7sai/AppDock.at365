@@ -20,27 +20,42 @@ function plainTree(directory) {
     for (const entry of fs.readdirSync(directory)) plainTree(path.join(directory, entry));
 }
 
-function managedEntries(directory) {
-  const manifest = path.join(directory, 'appdock-host.json');
-  const entries = fs.existsSync(manifest)
-    ? JSON.parse(fs.readFileSync(manifest, 'utf8')).entries
-    : [executableName];
+function validateEntries(entries, executable = executableName) {
   if (
     !Array.isArray(entries) ||
-    !entries.includes(executableName) ||
+    !entries.includes(executable) ||
     new Set(entries.map((entry) => String(entry).toLowerCase())).size !== entries.length ||
     entries.some(
       (entry) =>
         typeof entry !== 'string' ||
         !entry ||
         path.basename(entry) !== entry ||
-        /[\\/:]/.test(entry) ||
-        /[. ]$/.test(entry) ||
+        /[\\/:]|[. ]$/.test(entry) ||
         ['.', '..', 'settings.json', 'data', 'extensions'].includes(entry.toLowerCase()),
     )
   )
     throw Error('Unsafe host fixture manifest');
   return entries;
+}
+
+function managedEntries(directory) {
+  const manifest = path.join(directory, 'appdock-host.json');
+  const entries = fs.existsSync(manifest)
+    ? JSON.parse(fs.readFileSync(manifest, 'utf8')).entries
+    : [executableName];
+  return validateEntries(entries);
+}
+
+function plainParents(file) {
+  for (let current = path.resolve(file); ; current = path.dirname(current)) {
+    try {
+      if (fs.lstatSync(current).isSymbolicLink())
+        throw Error('Test profile parent is a reparse point');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    if (path.dirname(current) === current) break;
+  }
 }
 
 function snapshot(directory, entries) {
@@ -79,25 +94,45 @@ function activeProcesses(directory) {
 }
 
 class TestHostRuntime {
-  constructor(artifacts, processes = activeProcesses) {
+  constructor(artifacts, processes = activeProcesses, options = {}) {
     this.artifacts = path.resolve(artifacts);
     this.directory = path.join(this.artifacts, 'test-runtime');
-    this.host = path.join(this.directory, 'host');
-    this.path = path.join(this.host, executableName);
-    this.lock = path.join(this.directory, 'host.lock');
+    this.slot = options.slot || 'host';
+    this.executableName = options.executableName || executableName;
+    if (
+      !/^[a-z0-9-]+$/.test(this.slot) ||
+      path.basename(this.executableName) !== this.executableName ||
+      /[\\/:]|[. ]$/.test(this.executableName)
+    )
+      throw Error('Invalid test runtime identity');
+    this.native = options.native === true;
+    this.host = path.join(this.directory, this.slot);
+    this.path = path.join(this.host, this.executableName);
+    this.lock = path.join(this.directory, this.slot + '.lock');
+    this.metadata = this.slot === 'host' ? 'test-runtime.json' : this.slot + '-runtime.json';
     this.processes = processes;
   }
 
-  executable(profile) {
+  validateProfile(profile, artifacts) {
+    artifacts = path.resolve(artifacts);
     profile = path.resolve(profile);
     if (
-      !inside(this.artifacts, profile) ||
+      (!samePath(artifacts, this.artifacts) &&
+        path.basename(artifacts).toLowerCase() !== '.artifacts') ||
+      !inside(artifacts, profile) ||
       samePath(profile, this.directory) ||
       inside(this.directory, profile)
     )
       throw Error('Test profile must be separate from the shared runtime and inside .artifacts');
+    plainParents(profile);
+    return { profile, artifacts };
+  }
+
+  executable(profile, artifacts = this.artifacts) {
+    ({ profile, artifacts } = this.validateProfile(profile, artifacts));
     this.profile = profile;
-    if (this.evidence) this.record(profile);
+    this.profileArtifacts = artifacts;
+    if (this.evidence) this.record(profile, artifacts);
     return this.path;
   }
 
@@ -155,17 +190,25 @@ class TestHostRuntime {
     }
     if (inside(this.directory, source)) throw Error('Test runtime cannot be its own source');
     const sourceDirectory = path.dirname(source);
-    const entries = managedEntries(sourceDirectory);
+    const entries = this.native
+      ? validateEntries(fs.readdirSync(sourceDirectory), this.executableName)
+      : managedEntries(sourceDirectory);
     const input = snapshot(sourceDirectory, entries);
     this.acquire();
-    const stateFile = path.join(this.directory, 'host.json');
+    const stateFile = path.join(this.directory, this.slot + '.json');
     const previous = fs.existsSync(stateFile)
       ? JSON.parse(fs.readFileSync(stateFile, 'utf8'))
       : undefined;
     plainTree(this.host);
-    const oldEntries = fs.existsSync(path.join(this.host, 'appdock-host.json'))
-      ? managedEntries(this.host)
-      : entries;
+    const oldEntries =
+      this.native && previous?.files
+        ? validateEntries(
+            [...new Set(previous.files.map((file) => file.file.split('/')[0]))],
+            this.executableName,
+          )
+        : fs.existsSync(path.join(this.host, 'appdock-host.json'))
+          ? managedEntries(this.host)
+          : entries;
     const allowed = new Set([...oldEntries, ...entries]);
     if (fs.existsSync(this.host))
       for (const entry of fs.readdirSync(this.host))
@@ -190,7 +233,8 @@ class TestHostRuntime {
         }
       }
       fs.mkdirSync(this.host, { recursive: true });
-      copyDistribution(source, this.path);
+      if (this.native) copyDistribution(source, this.path, entries);
+      else copyDistribution(source, this.path);
       current = snapshot(this.host, entries);
       if (current.fingerprint !== input.fingerprint) throw Error('Test runtime copy hash mismatch');
       fs.writeFileSync(stateFile, JSON.stringify(current, null, 2) + '\n');
@@ -199,20 +243,14 @@ class TestHostRuntime {
     this.manifest = fs.existsSync(path.join(sourceDirectory, 'appdock-host.json'))
       ? fs.readFileSync(path.join(sourceDirectory, 'appdock-host.json'))
       : undefined;
-    if (this.profile) this.record(this.profile);
+    if (this.profile) this.record(this.profile, this.profileArtifacts);
   }
 
-  record(profile) {
-    profile = path.resolve(profile);
-    if (
-      samePath(profile, this.directory) ||
-      inside(this.directory, profile) ||
-      !inside(this.artifacts, profile)
-    )
-      throw Error('Test profile must be separate from the shared runtime and inside .artifacts');
+  record(profile, artifacts = this.artifacts) {
+    ({ profile } = this.validateProfile(profile, artifacts));
     fs.mkdirSync(profile, { recursive: true });
     fs.writeFileSync(
-      path.join(profile, 'test-runtime.json'),
+      path.join(profile, this.metadata),
       JSON.stringify(this.evidence, null, 2) + '\n',
     );
     if (this.manifest) fs.writeFileSync(path.join(profile, 'appdock-host.json'), this.manifest);

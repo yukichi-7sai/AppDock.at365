@@ -169,3 +169,109 @@ test('partial copy failures fail verification and the next preparation repairs t
   runtime.copy(exe, copyHost);
   assert.equal(fs.readFileSync(runtime.path, 'utf8'), 'exe-version-1');
 });
+
+test('an explicitly selected Applet artifact root shares the host without sharing profile data', (t) => {
+  const { root, runtime, exe } = fixture(t);
+  const own = path.join(root, 'host-run');
+  const artifacts = path.join(root, 'Applet.Probe', '.artifacts');
+  const applet = path.join(artifacts, 'run');
+  const fixed = runtime.executable(own);
+  runtime.copy(exe, copyHost);
+  const original = fs.readFileSync(path.join(own, 'test-runtime.json'));
+  assert.equal(runtime.executable(applet, artifacts), fixed);
+  runtime.copy(exe, copyHost);
+  assert.equal(
+    JSON.parse(fs.readFileSync(path.join(applet, 'test-runtime.json'))).executable,
+    fixed,
+  );
+  assert.deepEqual(fs.readFileSync(path.join(own, 'test-runtime.json')), original);
+  assert(!fs.existsSync(path.join(applet, 'AppDock.at365.exe')));
+  assert.throws(() => runtime.executable(path.join(root, 'outside'), artifacts), /Test profile/);
+  assert.throws(
+    () => runtime.executable(path.join(root, 'arbitrary/run'), path.join(root, 'arbitrary')),
+    /Test profile/,
+  );
+});
+
+test('external Applet profiles cannot traverse a junction into unrelated files', (t) => {
+  const { root, runtime } = fixture(t);
+  const artifacts = path.join(root, 'Applet.Probe', '.artifacts');
+  const target = path.join(root, 'protected');
+  fs.mkdirSync(artifacts, { recursive: true });
+  fs.mkdirSync(target);
+  fs.writeFileSync(path.join(target, 'keep.txt'), 'keep');
+  fs.symlinkSync(target, path.join(artifacts, 'linked'), 'junction');
+  assert.throws(
+    () => runtime.executable(path.join(artifacts, 'linked/run'), artifacts),
+    /reparse point/,
+  );
+  assert.equal(fs.readFileSync(path.join(target, 'keep.txt'), 'utf8'), 'keep');
+  assert(!fs.existsSync(path.join(target, 'run')));
+});
+
+test('native Applet runtime reuses the whole distribution and removes obsolete owned libraries', (t) => {
+  const { root } = fixture(t);
+  const source = path.join(root, 'native-source');
+  fs.mkdirSync(source);
+  const exe = path.join(source, 'Applet.Probe.exe');
+  fs.writeFileSync(exe, 'native-exe');
+  fs.writeFileSync(path.join(source, 'Probe.dll'), 'library-1');
+  fs.writeFileSync(path.join(source, 'obsolete.dll'), 'old');
+  const native = new TestHostRuntime(root, () => [], {
+    slot: 'applet-probe',
+    executableName: 'Applet.Probe.exe',
+    native: true,
+  });
+  t.after(() => native.close());
+  const profile = path.join(root, 'native-run');
+  const fixed = native.executable(profile);
+  let copies = 0;
+  const copy = (input, output, entries) => {
+    copies++;
+    for (const entry of entries)
+      fs.cpSync(path.join(path.dirname(input), entry), path.join(path.dirname(output), entry), {
+        recursive: true,
+      });
+  };
+  native.copy(exe, copy);
+  native.copy(exe, copy);
+  assert.equal(copies, 1);
+  fs.writeFileSync(path.join(source, 'Probe.dll'), 'library-2');
+  fs.unlinkSync(path.join(source, 'obsolete.dll'));
+  native.copy(exe, copy);
+  assert.equal(copies, 2);
+  assert.equal(fs.readFileSync(path.join(path.dirname(fixed), 'Probe.dll'), 'utf8'), 'library-2');
+  assert(!fs.existsSync(path.join(path.dirname(fixed), 'obsolete.dll')));
+  assert(!fs.existsSync(path.join(profile, 'Applet.Probe.exe')));
+  assert(fs.existsSync(path.join(profile, 'applet-probe-runtime.json')));
+});
+
+test('native Applet preparation never treats data directories as a disposable distribution', (t) => {
+  const { root } = fixture(t);
+  const source = path.join(root, 'native-source');
+  fs.mkdirSync(path.join(source, 'data'), { recursive: true });
+  const exe = path.join(source, 'Applet.Probe.exe');
+  fs.writeFileSync(exe, 'native-exe');
+  fs.writeFileSync(path.join(source, 'data/keep.txt'), 'keep');
+  const native = new TestHostRuntime(root, () => [], {
+    slot: 'applet-probe',
+    executableName: 'Applet.Probe.exe',
+    native: true,
+  });
+  t.after(() => native.close());
+  assert.throws(
+    () => native.copy(exe, () => assert.fail('must not copy')),
+    /Unsafe host fixture manifest/,
+  );
+  assert.equal(fs.readFileSync(path.join(source, 'data/keep.txt'), 'utf8'), 'keep');
+  assert(!fs.existsSync(native.path));
+});
+
+test('legacy single-executable fixtures retain the copy callback contract', (t) => {
+  const { root, source, runtime, exe } = fixture(t);
+  fs.unlinkSync(path.join(source, 'appdock-host.json'));
+  runtime.executable(path.join(root, 'legacy-run'));
+  runtime.copy(exe, copyHost);
+  assert.equal(fs.readFileSync(runtime.path, 'utf8'), 'exe-version-1');
+  assert(!fs.existsSync(path.join(runtime.host, 'resources')));
+});
