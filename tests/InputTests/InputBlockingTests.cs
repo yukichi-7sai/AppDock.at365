@@ -57,7 +57,7 @@ internal static partial class Program
                 type.GetMethod("Compile", members)!.Invoke(engine, null);
             }
             void Reset(bool block = true, bool active = true, int notify = 1) {
-                owned.Clear(); pressed.Clear(); Set("pendingAltSides", 0); notices.Clear();
+                owned.Clear(); pressed.Clear(); Set("pendingAltSides", 0); Set("standaloneAltReleased", false); notices.Clear();
                 type.GetField("pendingPresses", members)!.GetValue(engine)!.GetType().GetMethod("Clear")!.Invoke(type.GetField("pendingPresses", members)!.GetValue(engine), null);
                 Config(7); Inputs(Row(block)); Set("accepting", active); delivery = notify;
             }
@@ -74,6 +74,16 @@ internal static partial class Program
             Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false });
             Check(Feed(key:0x43, flags:0x20) == 0 && Feed(true, 0x43) == 0 && notices.Count == 1,
                 "Alt context on the event recognizes the first Alt+C even without an asynchronous Alt press");
+            Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false }, new { shortcut = "C", blockOriginalInput = false });
+            Feed(key:0xA4); Feed(true,0xA4);
+            Feed(key:0x43,flags:0x20); Feed(true,0x43);
+            Feed(key:0x43,flags:0x20); Feed(true,0x43);
+            Feed(key:0x43); Feed(true,0x43);
+            Feed(key:0x43,flags:0x20); Feed(true,0x43);
+            Check(notices.Select(n => n.GetProperty("Shortcuts")[0].GetString()).SequenceEqual(["C","C","C","Alt+C"]),
+                "a passed Alt tap leaves menu input alone; a clean key restores recognition from Windows Alt context");
+            Feed(key:0xA4); Feed(key:0xA5); Feed(true,0xA4); Feed(key:0x43); Feed(true,0x43); Feed(true,0xA5);
+            Check(notices.Last().GetProperty("Shortcuts")[0].GetString() == "Alt+C", "releasing one Alt preserves the other observed press");
             foreach (var (alt, flags) in new[] { (0xA4u, 0u), (0x12u, 1u) }) {
                 Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false });
                 Check(Feed(key:alt, flags:flags) == 0 && Feed(key:0x43) == 0 && Feed(true, 0x43) == 0 &&

@@ -29,6 +29,7 @@ internal sealed class InputCaptureEngine : IDisposable
     // Left/right Alt downs can precede Windows' Alt context. Use that evidence for the
     // first chord only: a release missed by this hook must not modify later plain keys.
     private int pendingAltSides;
+    private bool standaloneAltReleased;
     // The next hook can withhold a modifier until it sees the first companion key.
     private readonly HashSet<uint> withheldModifiers = [];
     private readonly HashSet<uint> blockedKeysSharedWithNextHook = [];
@@ -138,7 +139,7 @@ internal sealed class InputCaptureEngine : IDisposable
         if (disposed) return;
         // A release on another input desktop may never have reached this hook.
         if (kind == 0x20) {
-            pendingAltSides = 0; withheldModifiers.Clear();
+            pendingAltSides = 0; standaloneAltReleased = false; withheldModifiers.Clear();
             pressed.Remove(0xA4); pressed.Remove(0xA5); pressed.Remove(0x5B); pressed.Remove(0x5C);
         }
         if (palette != null && unchecked((int)(time - palette.Since)) >= 0 &&
@@ -296,7 +297,7 @@ internal sealed class InputCaptureEngine : IDisposable
         var needMouse = recording != null || Gestures.NeedsMouse || palette != null || confirmedPastes.Count != 0;
         if (needKeyboard && keyboardHook == 0) {
             pressed.Clear();
-            pendingAltSides = 0; withheldModifiers.Clear();
+            pendingAltSides = 0; standaloneAltReleased = false; withheldModifiers.Clear();
             for (uint key = 1; key < 256; key++)
                 if (!ShortcutCodec.IsPulse(key) && (GetAsyncKeyState((int)key) & 0x8000) != 0) pressed.Add(key);
             keyboardHook = SetWindowsHookEx(13, keyboardCallback, GetModuleHandle(null), 0);
@@ -311,13 +312,13 @@ internal sealed class InputCaptureEngine : IDisposable
         }
         if (!needMouse && mouseHook != 0) { UnhookWindowsHookEx(mouseHook); mouseHook = 0; }
     }
-    private int Modifiers(uint current, bool up, uint flags, bool observedAlt)
+    private int Modifiers(uint current, bool up, bool eventAlt)
     {
         // This callback precedes the OS asynchronous state update for the current key.
         bool Held(uint key) => key == current ? !up : withheldModifiers.Contains(key) || (GetAsyncKeyState((int)key) & 0x8000) != 0;
         bool HeldAlt(uint key) => Held(key) || (recording != null && owned.ContainsKey(key) && pressed.Contains(key));
         return (Held(0xA2) || Held(0xA3) || Held(0x11) ? 1 : 0) |
-            ((flags & 0x20) != 0 || observedAlt || HeldAlt(0xA4) || HeldAlt(0xA5) || Held(0x12) ? 2 : 0) |
+            (eventAlt || HeldAlt(0xA4) || HeldAlt(0xA5) || Held(0x12) ? 2 : 0) |
             (Held(0xA0) || Held(0xA1) || Held(0x10) ? 4 : 0) |
             (Held(0x5B) || Held(0x5C) ? 8 : 0);
     }
@@ -334,17 +335,33 @@ internal sealed class InputCaptureEngine : IDisposable
         if (up || pulse) pressed.Remove(data.Key);
         int altSide = data.Key switch { 0xA4 => 1, 0xA5 => 2, _ => 0 };
         bool canBeWithheld = altSide != 0 || data.Key is 0x5B or 0x5C;
-        if (up && canBeWithheld) withheldModifiers.Remove(data.Key);
+        bool releasedWithheldModifier = up && canBeWithheld && withheldModifiers.Remove(data.Key);
+        bool releasingAltTap = up && (pendingAltSides & altSide) != 0;
         if (up) pendingAltSides &= ~altSide;
         else if (!repeat) pendingAltSides |= altSide;
         bool auxiliary = ShortcutCodec.IsModifier(data.Key) ||
             ((data.Flags & 0x10) != 0 && data.Key is 0xE8 or 0xFF); // injected menu masks
-        bool observedAlt = pendingAltSides != 0;
+        bool windowsAlt = (data.Flags & 0x20) != 0;
+        if (!up && (altSide != 0 || (!auxiliary && !windowsAlt))) standaloneAltReleased = false;
+        // Windows can keep sending system keys with Alt context after a standalone Alt opened
+        // a menu. An observed new press or the actual held state still identifies a real chord.
+        bool eventAlt = pendingAltSides != 0 || (windowsAlt && !standaloneAltReleased);
         if (!up && !auxiliary) pendingAltSides = 0;
         nint Forward()
         {
             if (!up && !auxiliary) withheldModifiers.Clear();
             var result = CallNextHookEx(keyboardHook, code, message, pointer);
+            if (up && altSide != 0 && result == 0) {
+                if (releasedWithheldModifier) {
+                    // A downstream hook can replay Alt-down inside this Alt-up. The passed outer
+                    // up completes last, so the nested down cannot arm a chord or mark a repeat.
+                    pressed.Remove(data.Key);
+                    withheldModifiers.Remove(data.Key);
+                    pendingAltSides &= ~altSide;
+                }
+                if (releasingAltTap && !pressed.Contains(altSide == 1 ? 0xA5u : 0xA4u))
+                    standaloneAltReleased = true;
+            }
             if (canBeWithheld && !up) {
                 if (result == 0) withheldModifiers.Remove(data.Key);
                 else if (!repeat) withheldModifiers.Add(data.Key);
@@ -372,7 +389,7 @@ internal sealed class InputCaptureEngine : IDisposable
                 return 1;
             }
             // LLKHF_ALTDOWN describes this event, including when the asynchronous Alt state is not visible.
-            var modifiers = Modifiers(data.Key, up, data.Flags, observedAlt);
+            var modifiers = Modifiers(data.Key, up, eventAlt);
             if (!up && !auxiliary) {
                 // Drop stale repeat state once a plain key confirms that modifier is up.
                 if ((modifiers & 2) == 0) { pressed.Remove(0xA4); pressed.Remove(0xA5); }

@@ -34,9 +34,11 @@ public static class PaletteNotepadFixture {
     [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr ctx);
     static IntPtr originalFocus;
     static bool testAltDown;
-    static void Key(byte key,bool up){keybd_event(key,0,up?2u:0u,UIntPtr.Zero);}
+    static readonly UIntPtr fixtureMarker = Environment.GetEnvironmentVariable("PALETTE_TEST_GRAB") == "1" ? new UIntPtr(0x765010u) : UIntPtr.Zero;
+    static void Key(byte key,bool up){keybd_event(key,0,up?2u:0u,fixtureMarker);}
     static void Chord(params byte[] keys){foreach(var key in keys)Key(key,false);for(int i=keys.Length-1;i>=0;i--)Key(keys[i],true);}
     static bool AltTestKey(string action) {
+        if(action=="alt-tap"){Chord(0x12);return true;}
         if(action=="alt-c-hold"){Key(0x12,false);testAltDown=true;Chord(0x43);return true;}
         if(action=="alt-v-hold"){Key(0x12,false);testAltDown=true;Chord(0x56);return true;}
         if(action=="plain-c"){Chord(0x43);return true;}
@@ -52,9 +54,9 @@ public static class PaletteNotepadFixture {
     }
     public static string Run(string token,string action) {
         if(action=="release-test-alt"){if(testAltDown)Key(0x12,true);testAltDown=false;return "ok";}
-        if(action=="prepare" || action=="edge-prepare" || action=="paint-prepare" || action=="host-prepare"){
+        if(action=="prepare" || action=="edge-prepare" || action=="edge-focus-field" || action=="paint-prepare" || action=="host-prepare"){
             SetThreadDpiAwarenessContext(new IntPtr(-4));
-            bool edge = action=="edge-prepare";
+            bool edge = action=="edge-prepare" || action=="edge-focus-field";
             bool paint=action=="paint-prepare";
             bool host=action=="host-prepare";
             var candidates=host ? new[]{Process.GetProcessById(int.Parse(Environment.GetEnvironmentVariable("PALETTE_TEST_MAIN")))}
@@ -69,7 +71,7 @@ public static class PaletteNotepadFixture {
                 var a=fgThread!=0&&fgThread!=current&&AttachThreadInput(current,fgThread,true);
                 var b=target!=current&&target!=fgThread&&AttachThreadInput(current,target,true);
                 try{SetForegroundWindow(h);}finally{if(b)AttachThreadInput(current,target,false);if(a)AttachThreadInput(current,fgThread,false);}
-                if(GetForegroundWindow()!=h){
+                if(GetForegroundWindow()!=h || action=="edge-focus-field"){
                     SetWindowPos(h,IntPtr.Zero,0,0,0,0,0x13);
                     if(host)return "waiting for host focus";
                     if(edge || paint){

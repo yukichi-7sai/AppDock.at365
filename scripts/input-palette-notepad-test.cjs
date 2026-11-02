@@ -8,7 +8,8 @@ const { createInterface } = require('node:readline');
 const { once } = require('node:events');
 const assert = require('node:assert/strict');
 const { freePort, inspect, electronExpression } = require('./electron-main-helper.cjs');
-const altOnly = process.argv.includes('--alt-only');
+const grabAltTap = process.argv.includes('--grab-alt-tap');
+const altOnly = grabAltTap || process.argv.includes('--alt-only');
 const published = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
 const root = path.resolve(__dirname, '..'),
   profile = path.join(root, '.artifacts', 'input-palette-notepad-' + Date.now());
@@ -48,7 +49,9 @@ settings.keybindings = [
     blockOriginalInput: true,
   },
 ];
-if (altOnly) {
+if (grabAltTap) {
+  settings.keybindings[0].when.processes = ['appdock.at365', 'electron', 'msedge'];
+} else if (altOnly) {
   settings.keybindings.push(
     {
       ...settings.keybindings[0],
@@ -77,6 +80,7 @@ if (altOnly) {
 }
 fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(settings));
 let app, browser, child, helper, pending, host, context, mainEval, hash;
+let grabHook, grabExit, grabReplays;
 const checks = [];
 let savedTestText,
   edge,
@@ -96,6 +100,28 @@ const wait = async (fn, name) => {
   throw Error(name + (last ? ' (' + last + ')' : ''));
 };
 async function start() {
+  if (grabAltTap) {
+    const project = path.join(root, 'tests/InputTests');
+    const build = spawnSync(
+      'dotnet',
+      ['build', path.join(project, 'InputTests.csproj'), '-c', 'Release'],
+      { windowsHide: true },
+    );
+    if (build.error || build.status !== 0)
+      throw Error('Grab fixture build failed: ' + (build.error || build.stdout));
+    grabHook = spawn(
+      path.join(project, 'bin/Release/net10.0-windows/AppDock.InputTests.exe'),
+      ['--palette-grab-hook'],
+      { windowsHide: true, stdio: ['pipe', 'pipe', 'inherit'] },
+    );
+    grabExit = once(grabHook, 'close');
+    const lines = createInterface({ input: grabHook.stdout });
+    lines.on('line', (line) => {
+      if (line.startsWith('replays=')) grabReplays = Number(line.slice(8));
+    });
+    const [ready] = await Promise.race([once(lines, 'line'), grabExit]);
+    assert.equal(ready, 'ready', 'grab hook installed before AppDock');
+  }
   const build = spawnSync(
     'dotnet',
     [
@@ -186,6 +212,7 @@ async function start() {
       env: {
         ...env,
         PALETTE_TEST_TAB: token,
+        PALETTE_TEST_GRAB: grabAltTap ? '1' : '0',
         PALETTE_TEST_FIXTURE: path.join(root, 'tests/fixtures/InputPaletteNotepad.cs'),
         PALETTE_TEST_CLIPBOARD: path.join(root, 'tests/fixtures/PaletteTestClipboard.cs'),
         PALETTE_TEST_MAIN: String(await mainEval(() => process.pid, null)),
@@ -240,6 +267,14 @@ const state = async (expected) =>
     'expected test document ' + JSON.stringify(expected),
   );
 const openKey = () => act('alt-c');
+const paletteVisible = () =>
+  mainEval(
+    ({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().some(
+        (w) => w.isVisible() && w.webContents.getURL().endsWith('/input-palette.html'),
+      ),
+    null,
+  );
 const visible = async (history = false) => {
   const p = await wait(
     async () =>
@@ -249,35 +284,14 @@ const visible = async (history = false) => {
   if (history)
     await p.locator('header strong').filter({ hasText: 'クリップボード履歴パレット' }).waitFor();
   else await p.getByRole('button', { name: /01.txt/ }).waitFor();
-  await wait(
-    () =>
-      mainEval(
-        ({ BrowserWindow }) =>
-          BrowserWindow.getAllWindows().some(
-            (w) => w.isVisible() && w.webContents.getURL().endsWith('/input-palette.html'),
-          ),
-        null,
-      ),
-    'visible palette',
-  );
+  await wait(paletteVisible, 'visible palette');
   return p;
 };
 const open = async () => {
   await openKey();
   return visible();
 };
-const closed = () =>
-  wait(
-    () =>
-      mainEval(
-        ({ BrowserWindow }) =>
-          !BrowserWindow.getAllWindows().some(
-            (w) => w.isVisible() && w.webContents.getURL().endsWith('/input-palette.html'),
-          ),
-        null,
-      ),
-    'palette closes',
-  );
+const closed = () => wait(async () => !(await paletteVisible()), 'palette closes');
 async function openEdgeField() {
   edge = await chromium.launch({ channel: 'msedge', headless: false, args: ['--no-first-run'] });
   const web = await edge.newPage();
@@ -326,6 +340,37 @@ async function checkNoopAlt(target, field) {
       ' Alt+C bound only to appdock.noop: plain C/V and unmodified F8 work after all three release paths',
   );
 }
+async function checkTapPalette(target, field) {
+  for (const close of ['command', 'escape']) {
+    await field.fill('');
+    await field.focus();
+    await act(target + '-guard');
+    await act(target + '-alt-tap');
+    // Alt can focus Edge's toolbar while CDP still reports a focused textarea.
+    // Return native focus to the full-page editor without another keystroke.
+    if (target === 'edge') await act('edge-focus-field');
+    await act(target + '-alt-c-hold');
+    await visible();
+    await act('release-test-alt');
+    if (close === 'escape') await act(target + '-esc');
+    else await host.evaluate(() => window.dock.executeCommand('appdock.text-palette.open'));
+    await closed();
+    await act(target + '-plain-c');
+    await wait(
+      async () => (await field.inputValue()) === 'c' || (await paletteVisible()),
+      'plain C handled',
+    );
+    assert.equal(
+      await paletteVisible(),
+      false,
+      target + ': plain C reopened the palette after ' + close,
+    );
+    assert.equal(await field.inputValue(), 'c');
+    checks.push(
+      target + ': standalone Alt, Alt+C, palette closed by ' + close + ', plain C delivered',
+    );
+  }
+}
 (async () => {
   let success = false;
   let historyFixture,
@@ -341,7 +386,18 @@ async function checkNoopAlt(target, field) {
         async () => (await ask('host-prepare')) === 'ok',
         'activate isolated AppDock window',
       );
-      await checkNoopAlt('host', host.getByRole('combobox', { name: '設定を検索', exact: true }));
+      const hostField = host.getByRole('combobox', { name: '設定を検索', exact: true });
+      if (grabAltTap) {
+        await checkTapPalette('host', hostField);
+        await checkTapPalette('edge', await openEdgeField());
+        grabHook.stdin.end();
+        assert.equal((await grabExit)[0], 0);
+        assert.equal(grabReplays, 8, 'the competing hook replayed both Alt presses in every case');
+        success = true;
+        console.log('Passed:', checks, profile);
+        return;
+      }
+      await checkNoopAlt('host', hostField);
       await checkNoopAlt('edge', await openEdgeField());
       await edge.close();
       edge = undefined;
@@ -731,6 +787,10 @@ async function checkNoopAlt(target, field) {
     if (child && child.exitCode === null) child.kill();
     if (helper?.exitCode === null) {
       helper.stdin.end();
+    }
+    if (grabHook?.exitCode === null) {
+      grabHook.stdin.end();
+      await grabExit;
     }
     fs.writeFileSync(
       path.join(profile, 'result.json'),
