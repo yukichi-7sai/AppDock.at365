@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process'),
@@ -89,7 +90,7 @@ async function until(fn, label) {
   let app, context, child, connection, portable;
   async function launch(extra = []) {
     if (process.argv[2]) {
-      portable = path.join(profile, 'AppDock.at365.exe');
+      portable = testHostPath(profile);
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
       assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
       const probe = net.createServer();

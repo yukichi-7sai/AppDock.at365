@@ -30,6 +30,18 @@ AppDock本体とAppletのテストを追加・修正・整理するときの判�
 
 UIの待機には描画・保存・接続の条件を使います。固定時間のsleepを追加して成功させたり、失敗するまで全体を繰り返したりしません。テスト用の設定・profile・模擬サーバーを使い、実利用のデータ、認証、Windows設定を変更しません。PauseとF13～F24の実入力・OS登録の禁止など、[作業規則](../AGENTS.md)も適用します。
 
+## 固定配布物の共通実行場所
+
+通常のGUI/MCPテストは、`scripts/copy-host.cjs`の`testHostPath(profile)`で取得した`.artifacts/test-runtime/host/AppDock.at365.exe`を起動します。`copyHost(source, executable)`は本体manifestに含まれるランタイムを一緒に準備し、配布物全体の内容をSHA256で照合します。同じ内容ならコピーを再利用し、異なる内容や破損したコピーは、実行中プロセスがないことを確認して更新します。EXEだけでなく`resources/app.asar`等の変更も判定対象です。
+
+起動には従来の`--test-profile=<各試験のroot>`を渡します。共有設定・data・extensionsはそのrootに、PC専用の状態は`--test-local-state=<各試験のlocal>`を指定した場所（省略時はそのrootのdata）に保存します。EXEの共用だけを目的にprofileIdを固定したり、前の試験の設定を再利用したりしません。各試験のrootには結果・ログ・画像・配布manifestと`test-runtime.json`を残し、後者に実行した配布物の全管理ファイルのSHA256と固定EXEの場所を記録します。本体やランタイムは各試験のrootへ複製しません。
+
+GUI試験は直列に実行します。共通実行場所はランナーPIDで排他し、別ランナーが使用中なら起動準備を拒否します。異常終了したランナーの排他は、PIDの終了と残存AppDockプロセスの不在を確認して回収します。起動中の上書き、予期しないdata等の削除、再解析ポイントをたどるコピーや削除は行いません。
+
+Windows Firewallの通常のプログラム規則はEXEのフルパスに対応するため、この固定パスを利用するネットワークの範囲で一度許可すれば、テストごとに別パスの許可を増やさずに済みます。テストはFirewallの設定・通知を変更しません。新しい端末、別checkout、初めて使うネットワークプロファイルでは別途許可が必要になる場合があります。
+
+配置場所そのものを試す`smoke.cjs`の配布物モード、`notification-portable-test.cjs`、`tray-identity-portable-test.cjs`、`portable-updates-ui-test.cjs`、`update-result-banner-portable-test.cjs`、`settings-sync-ui-test.cjs`、`launch-settings-ui-test.cjs`、`update-filesystem-test.cjs`、スターターZIPの展開試験は、検査する配布先・移動先・更新対象を専用に複製します。これらのコピーと変更前に作られたコピーは、[既存の整理手順](../DEVELOPMENT.md#固定配布物の実行用コピー)に従い、成功・終了を確認したものだけ整理します。
+
 ## 整理するときの確認
 
 1. assertionごとに、守る要件と検出する不具合を確認する。実装のコピーだけになった条件、役目を終えた画面の期待値、重複を候補にする。

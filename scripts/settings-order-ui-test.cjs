@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -92,7 +93,7 @@ initial.mcpServers = {
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const source = process.argv[2] && path.resolve(process.argv[2]);
-const portable = source && path.join(profile, 'AppDock.at365.exe');
+const portable = source && testHostPath(profile);
 if (portable) {
   require('./copy-host.cjs').copyHost(source, portable);
   assert.equal(hash(portable), hash(source));

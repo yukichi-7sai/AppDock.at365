@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { _electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process');
 const { leftDrag } = require('./windows-mouse-helper.cjs');
@@ -171,9 +172,8 @@ const capture = async (name) => {
 };
 async function launch(extra = []) {
   if (portable) {
-    const executable = path.join(profile, 'AppDock.at365.exe');
-    if (!fs.existsSync(executable))
-      require('./copy-host.cjs').copyHost(path.resolve(portable), executable);
+    const executable = testHostPath(profile);
+    require('./copy-host.cjs').copyHost(path.resolve(portable), executable);
     result.executableSha256 = hash(executable);
     assert.equal(result.executableSha256, hash(path.resolve(portable)));
     const port = await freePort();

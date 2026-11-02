@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { chromium } = require('playwright');
 const { spawn, execFileSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -47,7 +48,7 @@ settings.host.trayDoubleClickCommand = 'appdock.restart';
 const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json');
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
 const portable = !!process.argv[2];
-const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const executable = portable ? testHostPath(profile) : require('electron');
 if (portable) require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;

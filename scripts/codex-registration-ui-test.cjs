@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -51,7 +52,7 @@ const state = () =>
 (async () => {
   try {
     const port = await freePort();
-    const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+    const exe = portable ? testHostPath(profile) : require('electron');
     if (portable) {
       require('./copy-host.cjs').copyHost(portable, exe);
       assert.equal(hash(exe), hash(portable));

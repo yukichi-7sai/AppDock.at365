@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path');
 const assert = require('node:assert/strict');
@@ -60,7 +61,7 @@ initial.updates.checkAppletsOnStartup = false;
 initial.extensions[fixtureId] = { enabled: true, settings: {} };
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const source = process.argv[2] && path.resolve(process.argv[2]);
-const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const exe = source ? testHostPath(profile) : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (source) {
   require('./copy-host.cjs').copyHost(source, exe);

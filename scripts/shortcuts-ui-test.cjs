@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process');
@@ -72,7 +73,7 @@ settings.gestures.bindings = [
 ];
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : null;
+const portable = process.argv[2] ? testHostPath(profile) : null;
 if (portable) {
   require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));

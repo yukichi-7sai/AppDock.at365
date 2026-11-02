@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
@@ -52,7 +53,7 @@ const settingsFile = require('./test-settings.cjs').file(profile, 'settings.json
 fs.writeFileSync(settingsFile, JSON.stringify(settings));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : null;
+const portable = process.argv[2] ? testHostPath(profile) : null;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (portable) {
   require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);

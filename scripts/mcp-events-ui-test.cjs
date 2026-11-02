@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'),
@@ -29,7 +30,7 @@ const type = require('../out/main/shared/notification-types')
   .find((t) => !t.requiredTargets.length);
 const portable = process.argv[2] && path.resolve(process.argv[2]);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const exe = portable ? testHostPath(profile) : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));

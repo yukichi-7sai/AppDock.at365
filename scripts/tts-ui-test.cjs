@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   http = require('node:http'),
@@ -136,7 +137,7 @@ async function configure(patch) {
     let executable = require('electron'),
       args = [root];
     if (process.argv[2]) {
-      executable = path.join(profile, 'AppDock.at365.exe');
+      executable = testHostPath(profile);
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
       assert.equal(
         createHash('sha256').update(fs.readFileSync(executable)).digest('hex'),

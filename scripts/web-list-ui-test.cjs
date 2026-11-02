@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const chooseOption = (control, value) => control.selectOption(value);
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process');
@@ -69,7 +70,7 @@ async function closeDialog(page) {
     delete env.ELECTRON_RUN_AS_NODE;
     if (process.argv[2]) {
       const source = path.resolve(process.argv[2]),
-        executable = path.join(profile, 'AppDock.at365.exe');
+        executable = testHostPath(profile);
       require('./copy-host.cjs').copyHost(source, executable);
       const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
       executableSha256 = hash(source);

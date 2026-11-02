@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 // Visibility integration uses a simulated bridge and accelerated timer, never native key registration.
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,7 +13,7 @@ const source = process.argv[2] && path.resolve(process.argv[2]);
 assert(source, 'Fixed distribution EXE required');
 const profile = path.join(root, '.artifacts', `touchpad-polling-ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
-const exe = path.join(profile, 'AppDock.at365.exe');
+const exe = testHostPath(profile);
 require('./copy-host.cjs').copyHost(source, exe);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 assert.equal(hash(exe), hash(source));

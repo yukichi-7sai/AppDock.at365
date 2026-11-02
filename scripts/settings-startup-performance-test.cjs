@@ -6,7 +6,7 @@ const { spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { chromium } = require('playwright');
 const { freePort, inspect } = require('./electron-main-helper.cjs');
-const { copyHost } = require('./copy-host.cjs');
+const { copyHost, testHostPath } = require('./copy-host.cjs');
 const root = path.resolve(__dirname, '..');
 const source = path.resolve(process.argv[2]);
 const idleMode = process.argv.includes('--idle');
@@ -16,7 +16,7 @@ const output = path.join(
   '.artifacts',
   `${idleMode ? 'settings-idle-update' : 'settings-startup-performance'}-${Date.now()}`,
 );
-const executable = path.join(output, 'host', 'AppDock.at365.exe');
+const executable = testHostPath(output);
 const ids = Array.from({ length: 8 }, (_, i) => `test.startup.${i}`);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

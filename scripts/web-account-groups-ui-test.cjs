@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { launchTestHost } = require('./electron-test-launcher.cjs');
 // Isolated Electron sessions and two independent consumers. No Google traffic or accounts.
 const fs = require('node:fs');
@@ -33,7 +34,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 let executable = require('electron'),
   packedHash;
 if (process.argv[2]) {
-  executable = path.join(profile, 'AppDock.at365.exe');
+  executable = testHostPath(profile);
   require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
   const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
   packedHash = hash(executable);

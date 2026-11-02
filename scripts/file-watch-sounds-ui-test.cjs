@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { launchTestHost } = require('./electron-test-launcher.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,7 +26,7 @@ fs.writeFileSync(
   JSON.stringify(settings),
 );
 const portable = process.argv[2] && path.resolve(process.argv[2]);
-const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const executable = portable ? testHostPath(profile) : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, executable);

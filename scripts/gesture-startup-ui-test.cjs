@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { getPublishDirectory } = require('./publish-paths.cjs');
 const { createHash } = require('node:crypto');
@@ -69,7 +70,7 @@ async function launch(restore) {
   const source =
     process.argv.find((arg) => arg.startsWith('--executable='))?.slice('--executable='.length) ??
     path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe');
-  const executable = path.join(profile, 'AppDock.at365.exe');
+  const executable = testHostPath(profile);
   require('./copy-host.cjs').copyHost(source, executable);
   portableHash = hash(source);
   assert.equal(hash(executable), portableHash);

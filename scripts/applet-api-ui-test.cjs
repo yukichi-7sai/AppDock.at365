@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 // Real Node/.NET Applet processes, shared API, local permission UI and isolated MCP.
 const fs = require('node:fs'),
@@ -98,8 +99,8 @@ if (legacyDll) {
 }
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 if (portable) {
-  require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
-  assert.equal(hash(path.join(profile, 'AppDock.at365.exe')), hash(portable));
+  require('./copy-host.cjs').copyHost(portable, testHostPath(profile));
+  assert.equal(hash(testHostPath(profile)), hash(portable));
 }
 const states = [],
   checks = [];
@@ -127,7 +128,7 @@ async function start() {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(
-    portable ? path.join(profile, 'AppDock.at365.exe') : require('electron'),
+    portable ? testHostPath(profile) : require('electron'),
     [
       ...(portable ? [] : [root]),
       `--test-profile=${profile}`,

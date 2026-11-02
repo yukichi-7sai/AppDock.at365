@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -107,7 +108,7 @@ fs.mkdirSync(path.dirname(configFile), { recursive: true });
 const original = '# Existing configuration must survive\npersonality = "friendly"\n';
 fs.writeFileSync(configFile, original);
 const portableHash = portable ? hash(portable) : undefined;
-if (portable) require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
+if (portable) require('./copy-host.cjs').copyHost(portable, testHostPath(profile));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, label) {
   const start = Date.now();
@@ -132,7 +133,7 @@ async function start() {
     env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(
-    portable ? path.join(profile, 'AppDock.at365.exe') : require('electron'),
+    portable ? testHostPath(profile) : require('electron'),
     [
       ...(portable ? [] : [root]),
       `--test-profile=${profile}`,

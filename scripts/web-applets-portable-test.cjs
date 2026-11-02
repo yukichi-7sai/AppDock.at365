@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { getPublishDirectory } = require('./publish-paths.cjs');
 const { settingsPage } = require('./settings-host-helper.cjs');
 const { freePort } = require('./electron-main-helper.cjs');
@@ -14,7 +15,7 @@ const development = process.argv.includes('--development');
 const source = development
   ? require('electron')
   : path.resolve(process.argv[2] || path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'));
-const executable = development ? source : path.join(profile, 'AppDock.at365.exe');
+const executable = development ? source : testHostPath(profile);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 fs.mkdirSync(profile, { recursive: true });
 if (!development) require('./copy-host.cjs').copyHost(source, executable);

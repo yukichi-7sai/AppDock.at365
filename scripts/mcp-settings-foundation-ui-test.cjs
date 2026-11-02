@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net');
@@ -187,7 +188,7 @@ async function main() {
   await new Promise((resolve) => listener.listen(0, '127.0.0.1', resolve));
   const port = listener.address().port;
   await new Promise((resolve) => listener.close(resolve));
-  const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+  const executable = portable ? testHostPath(profile) : require('electron');
   if (portable) {
     require('./copy-host.cjs').copyHost(portable, executable);
     assert.equal(hash(executable), hash(portable));

@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
@@ -22,7 +23,7 @@ async function launch(profile, portable, extraEnvironment = {}) {
     app = await _electron.launch({ executablePath: require('electron'), args: [root, `--test-profile=${profile}`], env });
     main = await app.firstWindow();
   } else {
-    const exe = path.join(profile, 'AppDock.at365.exe'); require('./copy-host.cjs').copyHost(portable, exe);
+    const exe = testHostPath(profile); require('./copy-host.cjs').copyHost(portable, exe);
     if (hash(exe) !== hash(portable)) throw Error('Fixed EXE hash mismatch');
     const debug = await freePort(), inspector = await freePort();
     child = spawn(exe, [`--test-profile=${profile}`, `--remote-debugging-port=${debug}`, `--inspect=127.0.0.1:${inspector}`], { cwd: profile, env, windowsHide: true, stdio: 'ignore' });

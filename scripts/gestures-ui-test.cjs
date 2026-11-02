@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { getPublishDirectory } = require('./publish-paths.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
@@ -139,7 +140,7 @@ const uiOnly = process.env.APPDOCK_GESTURE_UI_ONLY === '1' || indicatorOnly;
     portable
       ? await (async () => {
           const source = path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe'),
-            executable = path.join(profile, 'AppDock.at365.exe');
+            executable = testHostPath(profile);
           require('./copy-host.cjs').copyHost(source, executable);
           const hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
           portableHash = hash(source);

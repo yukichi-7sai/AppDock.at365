@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -82,7 +83,7 @@ async function phase(name) {
     fixture(profile, settings, 'test.failed', { wait: 25, fail: true });
   }
   fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
-  const executable = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+  const executable = source ? testHostPath(profile) : require('electron');
   if (source) {
     require('./copy-host.cjs').copyHost(source, executable);
     assert.equal(hash(executable), hash(source));

@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict'),
@@ -112,7 +113,7 @@ delete env.ELECTRON_RUN_AS_NODE;
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 let executable, app, browser, host, child;
 if (process.argv[2]) {
-  executable = path.join(profile, 'AppDock.at365.exe');
+  executable = testHostPath(profile);
   require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
   assert.equal(hash(executable), hash(path.resolve(process.argv[2])));
 }

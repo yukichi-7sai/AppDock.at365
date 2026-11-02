@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   http = require('node:http'),
@@ -59,7 +60,7 @@ async function launch() {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
   child = spawn(
-    source ? path.join(profile, 'AppDock.at365.exe') : require('electron'),
+    source ? testHostPath(profile) : require('electron'),
     [
       ...(source ? [] : [root]),
       `--test-profile=${profile}`,
@@ -671,8 +672,8 @@ async function checkSectionTitles() {
       JSON.stringify(initial),
     );
     if (source) {
-      require('./copy-host.cjs').copyHost(source, path.join(profile, 'AppDock.at365.exe'));
-      assert.equal(hash(source), hash(path.join(profile, 'AppDock.at365.exe')));
+      require('./copy-host.cjs').copyHost(source, testHostPath(profile));
+      assert.equal(hash(source), hash(testHostPath(profile)));
     }
     await launch();
     if (webAccountListOnly) {

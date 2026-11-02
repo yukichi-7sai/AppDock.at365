@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
@@ -91,7 +92,7 @@ async function execute(id) {
     if (packaged) {
       const port = await freePort(),
         mainPort = await freePort();
-      const executable = path.join(profile, 'AppDock.at365.exe');
+      const executable = testHostPath(profile);
       require('./copy-host.cjs').copyHost(packaged, executable);
       const env = { ...process.env };
       delete env.ELECTRON_RUN_AS_NODE;

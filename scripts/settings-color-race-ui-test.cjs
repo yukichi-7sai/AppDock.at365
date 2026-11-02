@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -13,7 +14,7 @@ assert(source, 'A fixed distribution EXE is required');
 const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `settings-color-race-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
-const exe = path.join(profile, 'AppDock.at365.exe');
+const exe = testHostPath(profile);
 require('./copy-host.cjs').copyHost(source, exe);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 assert.equal(hash(exe), hash(source));

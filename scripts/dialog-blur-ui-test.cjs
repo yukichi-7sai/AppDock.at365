@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { _electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -133,7 +134,7 @@ async function closePalette(p, background = false) {
     const env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
     if (process.argv[2]) {
-      const executable = path.join(profile, 'AppDock.at365.exe');
+      const executable = testHostPath(profile);
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
       const port = await freePort();
       mainPort = await freePort();

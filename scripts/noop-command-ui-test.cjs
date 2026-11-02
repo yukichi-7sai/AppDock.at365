@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { chromium } = require('playwright');
 const { spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -10,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', `noop-command-ui-${Date.now()}`);
 fs.mkdirSync(profile, { recursive: true });
 const source = process.argv[2] && path.resolve(process.argv[2]);
-const executable = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const executable = source ? testHostPath(profile) : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (source) {
   require('./copy-host.cjs').copyHost(source, executable);

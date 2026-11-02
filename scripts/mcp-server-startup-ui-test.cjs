@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
@@ -39,7 +40,7 @@ initial.touchpadGestures.enabled = false;
 initial.updates.checkHostOnStartup = false;
 initial.updates.checkAppletsOnStartup = false;
 fs.writeFileSync(require('./test-settings.cjs').file(profile), JSON.stringify(initial));
-const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const exe = portable ? testHostPath(profile) : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));

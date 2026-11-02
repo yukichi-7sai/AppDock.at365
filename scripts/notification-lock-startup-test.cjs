@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   http = require('node:http');
@@ -200,7 +201,7 @@ const checks = [];
       `exports.activate=async c=>{await c.notifications.publish({typeId:'message',title:'Locked startup fixture',body:'Body'});await c.audio.play(${JSON.stringify(sound)});};`,
     );
     const portable = process.argv[2],
-      exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+      exe = portable ? testHostPath(profile) : require('electron');
     if (portable) {
       require('./copy-host.cjs').copyHost(path.resolve(portable), exe);
       assert.equal(hash(exe), hash(path.resolve(portable)));

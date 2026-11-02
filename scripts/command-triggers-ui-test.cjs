@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -177,7 +178,7 @@ if (filterConsistencyOnly) {
 }
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const portable = source ? path.join(profile, 'AppDock.at365.exe') : null;
+const portable = source ? testHostPath(profile) : null;
 if (portable) {
   require('./copy-host.cjs').copyHost(path.resolve(source), portable);
   assert.equal(hash(portable), hash(path.resolve(source)));

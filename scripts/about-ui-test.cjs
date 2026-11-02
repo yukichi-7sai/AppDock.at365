@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   http = require('node:http');
@@ -89,7 +90,7 @@ async function until(fn, label) {
     }
     fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     const portable = !!process.argv[2],
-      executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+      executablePath = portable ? testHostPath(profile) : require('electron');
     if (portable) {
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executablePath);
       assert.equal(hash(executablePath), hash(process.argv[2]));

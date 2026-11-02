@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -148,7 +149,7 @@ const diskDefinitions = () =>
     );
     let exe = require('electron');
     if (portable) {
-      exe = path.join(profile, 'AppDock.at365.exe');
+      exe = testHostPath(profile);
       require('./copy-host.cjs').copyHost(portable, exe);
       assert.equal(hash(exe), hash(portable));
     }

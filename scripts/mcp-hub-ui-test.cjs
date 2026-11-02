@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   net = require('node:net'),
@@ -124,7 +125,7 @@ fs.mkdirSync(path.dirname(configFile), { recursive: true });
 fs.writeFileSync(configFile, '# isolated test\n');
 const portableHash = portable ? hash(portable) : undefined;
 if (portable)
-  require('./copy-host.cjs').copyHost(portable, path.join(profile, 'AppDock.at365.exe'));
+  require('./copy-host.cjs').copyHost(portable, testHostPath(profile));
 function fixtureHashes(folder) {
   return Object.fromEntries(
     fs.readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
@@ -194,7 +195,7 @@ async function start() {
   delete env.ELECTRON_RUN_AS_NODE;
   const state = {
     child: spawn(
-      portable ? path.join(profile, 'AppDock.at365.exe') : require('electron'),
+      portable ? testHostPath(profile) : require('electron'),
       [
         ...(portable ? [] : [root]),
         `--test-profile=${profile}`,

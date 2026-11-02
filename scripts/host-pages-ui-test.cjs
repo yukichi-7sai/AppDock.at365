@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
@@ -175,8 +176,8 @@ async function launch(restore = false) {
       env,
     });
   else {
-    const exe = path.join(profile, 'AppDock.at365.exe');
-    if (!fs.existsSync(exe)) require('./copy-host.cjs').copyHost(portable, exe);
+    const exe = testHostPath(profile);
+    require('./copy-host.cjs').copyHost(portable, exe);
     assert.equal(hash(exe), hash(portable));
     const debug = await freePort(),
       inspector = await freePort();

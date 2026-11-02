@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   http = require('node:http'),
@@ -77,7 +78,7 @@ const snapshot = () => host.evaluate(() => window.dock.snapshot());
       mainPort = await freePort(),
       env = { ...process.env };
     delete env.ELECTRON_RUN_AS_NODE;
-    const exe = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+    const exe = process.argv[2] ? testHostPath(profile) : require('electron');
     if (process.argv[2]) {
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);
       assert.equal(hash(exe), hash(path.resolve(process.argv[2])));

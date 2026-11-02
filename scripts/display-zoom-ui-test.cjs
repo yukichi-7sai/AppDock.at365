@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   http = require('node:http');
@@ -13,7 +14,7 @@ fs.mkdirSync(profile, { recursive: true });
 const checks = [],
   errors = [];
 const source = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const exe = source ? testHostPath(profile) : require('electron');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (source) {
   require('./copy-host.cjs').copyHost(source, exe);

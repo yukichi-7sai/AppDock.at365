@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs'),
@@ -79,7 +80,7 @@ const originalHash = hash(originalAccounts);
 assert.equal(settings.migrations, undefined);
 assert.equal(settings.extensions['at365.profile'], undefined);
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
-const exe = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const exe = portable ? testHostPath(profile) : require('electron');
 if (portable) {
   require('./copy-host.cjs').copyHost(portable, exe);
   assert.equal(hash(exe), hash(portable));

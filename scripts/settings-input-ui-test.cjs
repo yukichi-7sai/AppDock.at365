@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
@@ -81,7 +82,7 @@ const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').fil
     fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
     let exe = require('electron');
     if (process.argv[2]) {
-      exe = path.join(profile, 'AppDock.at365.exe');
+      exe = testHostPath(profile);
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), exe);
       assert.equal(hash(exe), hash(process.argv[2]));
     }

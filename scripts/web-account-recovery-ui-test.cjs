@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 // Old settings with a missing/empty roster, using isolated local state and no live accounts.
 const { chromium } = require('playwright');
@@ -52,7 +53,7 @@ settings.webApplets.items = [
 ];
 const originalSettings = JSON.stringify(settings);
 fs.writeFileSync(settingsFile, originalSettings);
-const executable = portable ? path.join(base, 'AppDock.at365.exe') : require('electron');
+const executable = portable ? testHostPath(base) : require('electron');
 if (portable) require('./copy-host.cjs').copyHost(portable, executable);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

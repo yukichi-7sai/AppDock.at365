@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
 const { freePort, inspect } = require('./electron-main-helper.cjs');
 const { waitForHost } = require('./settings-host-helper.cjs');
 const { ribbonPage } = require('./shell-overlay-helper.cjs');
-const { copyHost } = require('./copy-host.cjs');
+const { copyHost, testHostPath } = require('./copy-host.cjs');
 const root = path.resolve(__dirname, '..'),
   source = process.argv[2] && path.resolve(process.argv[2]);
 const profile = path.join(root, '.artifacts', 'lazy-images-ui-' + Date.now());
@@ -102,7 +102,7 @@ settings.ribbon.groups = [
   },
 ];
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
-const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const exe = source ? testHostPath(profile) : require('electron');
 if (source) copyHost(source, exe);
 const until = async (fn, label) => {
   const end = Date.now() + 60000;

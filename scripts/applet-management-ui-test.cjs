@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -159,7 +160,7 @@ const checks = [],
   errors = [];
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
-const executable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
+const executable = process.argv[2] ? testHostPath(profile) : undefined;
 const managementOnly = process.argv.includes('--management-only');
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (executable) {

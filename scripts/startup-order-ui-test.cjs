@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -24,9 +25,8 @@ const selectedId = 'test.selected-shell',
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const mainWindow = `${electronExpression}.BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('appdock://host/'))`;
 fs.mkdirSync(output, { recursive: true });
-const executable = source ? path.join(output, 'runtime/AppDock.at365.exe') : require('electron');
+const executable = source ? testHostPath(output) : require('electron');
 if (source) {
-  fs.mkdirSync(path.dirname(executable));
   require('./copy-host.cjs').copyHost(source, executable);
   assert.equal(hash(executable), hash(source));
 }

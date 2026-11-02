@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { chromium } = require('playwright'),
   { spawn } = require('node:child_process'),
   fs = require('node:fs'),
@@ -41,7 +42,7 @@ settings.notificationPreferences = {
 };
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const portable = !!process.argv[2],
-  executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron'),
+  executable = portable ? testHostPath(profile) : require('electron'),
   hash = (p) => createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 let expectedHash;
 if (portable) {

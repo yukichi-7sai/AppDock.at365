@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -93,7 +94,7 @@ const source = path.join(
   'win-unpacked',
   'AppDock.at365.exe',
 );
-const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const executablePath = portable ? testHostPath(profile) : require('electron');
 let sha256, app, probe;
 const checks = [];
 (async () => {

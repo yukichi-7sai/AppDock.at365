@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -40,7 +41,7 @@ fs.writeFileSync(
   "exports.activate=async c=>c.commands.register('fixture.capture.run','Capture diagnostic command',async()=>{});",
 );
 const source = process.argv[2] ? path.resolve(process.argv[2]) : null;
-const executable = path.join(profile, 'AppDock.at365.exe');
+const executable = testHostPath(profile);
 if (!development) require('./copy-host.cjs').copyHost(source, executable);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 if (!development) assert.equal(hash(source), hash(executable));

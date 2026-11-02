@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -12,7 +13,7 @@ const root = path.resolve(__dirname, '..');
 const profile = path.join(root, '.artifacts', 'public-settings-commands-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const sourceExe = path.resolve(process.argv[2]);
-const executable = path.join(profile, 'AppDock.at365.exe');
+const executable = testHostPath(profile);
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 require('./copy-host.cjs').copyHost(sourceExe, executable);
 assert.equal(hash(executable), hash(sourceExe));

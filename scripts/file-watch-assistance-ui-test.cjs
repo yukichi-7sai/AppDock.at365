@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,7 +26,7 @@ for (const name of markers) {
 }
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const markerHashes = markers.map((name) => hash(path.join(profile, name)));
-const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const executable = portable ? testHostPath(profile) : require('electron');
 if (portable) require('./copy-host.cjs').copyHost(portable, executable);
 const checks = [];
 let app, browser, child, host;

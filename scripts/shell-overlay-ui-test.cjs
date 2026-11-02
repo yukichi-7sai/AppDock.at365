@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -95,7 +96,7 @@ const until = async (fn, label) => {
 };
 let portable;
 if (process.argv[2]) {
-  portable = path.join(profile, 'AppDock.at365.exe');
+  portable = testHostPath(profile);
   require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
 }

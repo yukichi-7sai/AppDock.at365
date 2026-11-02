@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 // Fixed portable builds, isolated profiles, sequential runs. Never touches a real profile.
 const fs = require('node:fs'),
   path = require('node:path'),
@@ -31,7 +32,7 @@ function metrics(pid) {
   for (const [index, input] of process.argv.slice(2).entries()) {
     const profile = path.join(output, String(index));
     fs.mkdirSync(profile, { recursive: true });
-    const exe = path.join(profile, 'AppDock.at365.exe');
+    const exe = testHostPath(profile);
     require('./copy-host.cjs').copyHost(path.resolve(input), exe);
     const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
     settings.profile = { name: 'Legacy fixture', avatar: null };

@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { chromium } = require('playwright');
 const { spawn } = require('node:child_process');
 const { createHash, randomUUID } = require('node:crypto');
@@ -84,7 +85,7 @@ const portableSource = process.argv[2] && path.resolve(process.argv[2]);
 const terminalExe = process.env.APPDOCK_TEST_TERMINAL;
 const terminalTitle = 'AppDock shortcut test ' + randomUUID();
 let terminalWindow, widgetsBaseline;
-const executable = portableSource ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+const executable = portableSource ? testHostPath(profile) : require('electron');
 if (portableSource) {
   require('./copy-host.cjs').copyHost(portableSource, executable);
   assert.equal(hash(executable), hash(portableSource));

@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -138,7 +139,7 @@ function fixture(settings, id, extra, enabled = true, fail = false) {
       }
     }
     fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
-    const exe = source ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+    const exe = source ? testHostPath(profile) : require('electron');
     if (source) {
       require('./copy-host.cjs').copyHost(source, exe);
       assert.equal(hash(exe), hash(source));

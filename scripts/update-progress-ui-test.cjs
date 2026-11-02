@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { getPublishDirectory } = require('./publish-paths.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const assert = require('node:assert/strict');
@@ -127,7 +128,7 @@ const main = (fn) =>
   delete env.ELECTRON_RUN_AS_NODE;
   try {
     if (process.argv[2]) {
-      const executable = path.join(profile, 'AppDock.at365.exe');
+      const executable = testHostPath(profile);
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executable);
       const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
       executableSha256 = hash(executable);

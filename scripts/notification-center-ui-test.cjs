@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
 const assert = require('node:assert/strict'),
@@ -135,7 +136,7 @@ fs.writeFileSync(
 
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(initial));
 const hash = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
-const portable = process.argv[2] ? path.join(profile, 'AppDock.at365.exe') : undefined;
+const portable = process.argv[2] ? testHostPath(profile) : undefined;
 if (portable) {
   require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));

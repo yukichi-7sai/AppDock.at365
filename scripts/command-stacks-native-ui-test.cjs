@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -92,7 +93,7 @@ settings.gestures.inputExecutionModes = { 'move-left': { mode: 'count', count: 2
 require('../out/main/shared/settings-schema').parseSettings(settings);
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const executable = path.join(profile, 'AppDock.at365.exe');
+const executable = testHostPath(profile);
 require('./copy-host.cjs').copyHost(source, executable);
 assert.equal(hash(source), hash(executable));
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

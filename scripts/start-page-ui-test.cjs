@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const fs = require('node:fs'),
   path = require('node:path'),
   assert = require('node:assert/strict');
@@ -11,7 +12,7 @@ const portable = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const output = path.join(root, '.artifacts', 'start-page-ui-' + Date.now());
 fs.mkdirSync(output, { recursive: true });
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-const exe = portable ? path.join(output, 'runtime', 'AppDock.at365.exe') : require('electron');
+const exe = portable ? testHostPath(output) : require('electron');
 if (portable) {
   fs.mkdirSync(path.dirname(exe), { recursive: true });
   require('./copy-host.cjs').copyHost(portable, exe);

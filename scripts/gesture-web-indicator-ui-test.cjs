@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { launchTestHost } = require('./electron-test-launcher.cjs');
 const { getPublishDirectory } = require('./publish-paths.cjs');
 const { createHash } = require('node:crypto');
@@ -75,7 +76,7 @@ const groups = followOnly ? 8 : desktopOnly ? 2 : topmostOnly ? 9 : 19;
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 let artifactHash;
 (async () => {
-  const executable = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+  const executable = portable ? testHostPath(profile) : require('electron');
   if (portable) {
     const source = path.join(getPublishDirectory(root), 'win-unpacked', 'AppDock.at365.exe');
     require('./copy-host.cjs').copyHost(source, executable);

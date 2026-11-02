@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { settingsPage: getSettingsPage, deferred } = require('./settings-host-helper.cjs');
 const { _electron: electron, chromium } = require('playwright');
@@ -93,7 +94,7 @@ const until = async (fn, label) => {
 };
 let portable;
 if (process.argv[2]) {
-  portable = path.join(profile, 'AppDock.at365.exe');
+  portable = testHostPath(profile);
   require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), portable);
   assert.equal(hash(portable), hash(path.resolve(process.argv[2])));
 }

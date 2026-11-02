@@ -1,3 +1,4 @@
+const { testHostPath } = require('./copy-host.cjs');
 const { settleSettings } = require('./settings-immediate-helper.cjs');
 const { launchTestHost } = require('./electron-test-launcher.cjs');
 const fs = require('node:fs'),
@@ -217,7 +218,7 @@ const expectCalls = async (before, expected) => {
       JSON.stringify(settings),
     );
     const portable = !!process.argv[2];
-    const executablePath = portable ? path.join(profile, 'AppDock.at365.exe') : require('electron');
+    const executablePath = portable ? testHostPath(profile) : require('electron');
     if (portable)
       require('./copy-host.cjs').copyHost(path.resolve(process.argv[2]), executablePath);
     const portableHash = portable

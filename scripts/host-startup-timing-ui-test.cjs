@@ -5,7 +5,7 @@ const { spawn } = require('node:child_process');
 const { chromium } = require('playwright');
 const { freePort } = require('./electron-main-helper.cjs');
 const { waitForHost, settingsPage } = require('./settings-host-helper.cjs');
-const { copyHost } = require('./copy-host.cjs');
+const { copyHost, testHostPath } = require('./copy-host.cjs');
 const root = path.resolve(__dirname, '..'),
   source = process.argv[2] ? path.resolve(process.argv[2]) : undefined;
 const profile = path.join(root, '.artifacts', 'host-startup-timing-ui-' + Date.now());
@@ -23,7 +23,7 @@ const until = async (fn, label) => {
 async function run(name, padding, theme) {
   const folder = path.join(profile, name);
   fs.mkdirSync(folder, { recursive: true });
-  const exe = source ? path.join(folder, 'AppDock.at365.exe') : require('electron');
+  const exe = source ? testHostPath(folder) : require('electron');
   if (source) copyHost(source, exe);
   const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
   Object.assign(settings.host, {
