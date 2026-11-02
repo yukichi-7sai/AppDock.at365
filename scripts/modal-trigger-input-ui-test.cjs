@@ -69,7 +69,7 @@ Object.assign(settings.host, {
 settings.extensions['fixture.modal'] = { enabled: true, settings: {} };
 settings.keybindings = [
   ...navigation.map(([, key]) => [key, key.toLowerCase(), 'global']),
-  ['Ctrl+Shift+F8', 'global', 'global'],
+  ['Alt+C', 'global', 'global'],
   ['Ctrl+Shift+F9', 'local', 'app'],
   ['Ctrl+Enter', 'modified', 'global'],
 ].map(([key, id, scope]) => ({
@@ -225,6 +225,37 @@ async function palette() {
     const initialSettings = await dock.evaluate(
       async () => (await window.dock.snapshot()).settings.value,
     );
+    await peer.request('focus');
+    await until(async () => (await peer.request('snapshot')).focused, 'external target foreground');
+    const targetWindow = (await peer.request('menuProbe')).window;
+    await peer.request('clear');
+    await expectCommand('global', 0x43, [0x12]);
+    const beforeBatch = count('global');
+    await peer.request('batchAltC', { window: targetWindow });
+    await until(() => count('global') === beforeBatch + 1, 'fast Alt+C trigger');
+    await key(0x12);
+    await until(
+      async () => (await peer.request('snapshot')).events.includes('menu:0'),
+      'bare Alt activates the native menu',
+    );
+    await key(0x44, [0x12]);
+    await until(
+      async () => (await peer.request('snapshot')).events.includes('key:D, Alt'),
+      'unassigned Alt+D reaches the external window',
+    );
+    const targetEvents = (await peer.request('snapshot')).events;
+    assert.equal(
+      targetEvents.filter((event) => event === 'menu:0').length,
+      1,
+      'only the standalone Alt activates the native menu',
+    );
+    assert(!targetEvents.includes('key:C, Alt'), 'blocked Alt+C does not reach the external window');
+    assert(
+      !targetEvents.includes('menu:99') && !targetEvents.includes('menu:67'),
+      'C mnemonic stays closed',
+    );
+    checks.push('external app receives unassigned Alt+D while Alt+C runs only its assigned command');
+    await focus();
     await dock.evaluate(() => window.dock.executeCommand('appdock.settings.open'));
     await settingsPage(dock);
     await dock.getByTestId('settings-nav:applet:fixture.modal').click();
@@ -242,7 +273,7 @@ async function palette() {
     await input.focus();
     await key(9);
     assert.equal(await input.evaluate((el) => document.activeElement === el), false);
-    await expectCommand('global', 0x77, [0x11, 0x10]);
+    await expectCommand('global', 0x43, [0x12]);
     await expectCommand('local', 0x78, [0x11, 0x10]);
     await expectCommand('modified', 13, [0x11]);
     const beforeMouse = count('mouse');
@@ -285,7 +316,7 @@ async function palette() {
     await key(39);
     await key(9);
     assert.equal(await combo.evaluate((el) => document.activeElement === el), false);
-    await expectCommand('global', 0x77, [0x11, 0x10]);
+    await expectCommand('global', 0x43, [0x12]);
     await expectCommand('local', 0x78, [0x11, 0x10]);
     await expectCommand('modified', 13, [0x11]);
     const paletteMouse = count('mouse');
@@ -333,25 +364,87 @@ async function palette() {
     await focus();
     await waitForHost(dock, async () => (await window.dock.snapshot()).globalHotKeys.length === 0);
     const keyCount = count('global');
-    await key(0x77, [0x11, 0x10]);
-    await until(async () => (await recorder.innerText()).includes('F8'), 'real key recording');
+    await dock.evaluate(() => {
+      window.__recordedAlt = [];
+      window.dock.onShortcutCaptured((event) => window.__recordedAlt.push(event));
+    });
+    const box = await recorder.boundingBox();
+    const clickPoint = await app.evaluate(({ BrowserWindow, screen }, box) => {
+      const w = BrowserWindow.getFocusedWindow();
+      const bounds = w.getContentBounds();
+      return screen.dipToScreenPoint({
+        x: Math.round(bounds.x + box.x + box.width / 2),
+        y: Math.round(bounds.y + box.y + box.height / 2),
+      });
+    }, box);
+    for (const [i, letter] of ['C', 'D', 'C'].entries()) {
+      if (i) await peer.request('click', { ...clickPoint, window: handle });
+      await key(letter.charCodeAt(0), [0x12]);
+      await until(async () => {
+        const events = await dock.evaluate(() => window.__recordedAlt);
+        return (
+          events.length === i + 1 &&
+          events[i].key === 'Alt+' + letter &&
+          (await recorder.locator('kbd').allTextContents()).join('+') === 'Alt+' + letter
+        );
+      }, 'native Alt+' + letter + ' recording after click ' + i);
+    }
+    const recordings = await dock.evaluate(() => window.__recordedAlt);
+    assert.equal(new Set(recordings.map((entry) => entry.token)).size, 3);
     assert.equal(count('global'), keyCount);
+    await peer.request('clear');
+    await peer.request('focusAndAltC', { window: targetWindow });
+    await until(() => count('global') === keyCount + 1, 'first external Alt+C on leaving the recorder');
+    const firstEvents = (await peer.request('snapshot')).events;
+    assert(!firstEvents.some((entry) => entry.startsWith('menu:') || entry === 'key:C, Alt'));
+    checks.push(
+      'repeated recorder clicks capture Alt chords once; switching straight to another app blocks and runs its first Alt+C',
+    );
+    await focus();
+    await recorder.click();
+    await waitForHost(dock, async () => (await window.dock.snapshot()).globalHotKeys.length === 0);
     const recordingMouse = count('mouse');
     mouse();
     await until(() => count('mouse') === recordingMouse + 1, 'mouse during key recording');
     await dialog.getByTestId('binding-cancel').focus();
     await waitForHost(dock, async () => (await window.dock.snapshot()).globalHotKeys.length === 9);
-    await expectCommand('global', 0x77, [0x11, 0x10]);
+    await expectCommand('global', 0x43, [0x12]);
     await key(27);
     await dialog.waitFor({ state: 'hidden' });
     checks.push(
       'only actual key recording suspends keyboard triggers; mouse works and keyboard resumes after leaving the recorder',
     );
     const snapshot = await dock.evaluate(() => window.dock.snapshot());
+    assert.deepEqual(
+      snapshot.logs.filter((entry) => entry.source === 'settings' && entry.message.includes('apply-failed')),
+      [],
+    );
     for (const name of ['keybindings', 'triggerStacks', 'commandStacks'])
       assert.deepEqual(snapshot.settings.value[name], initialSettings[name]);
     assert.deepEqual(snapshot.settings.value.gestures.bindings, initialSettings.gestures.bindings);
     checks.push('opening, dismissing and recording without applying retain saved trigger bindings');
+    await dock.getByRole('searchbox', { name: 'トリガーのコマンドを検索', exact: true }).fill('Palette choice');
+    await dock.locator('[data-shortcut-command="fixture.modal.choice"] .command-title').hover();
+    await dock.getByTestId('binding-add:fixture.modal.choice:shortcuts').click();
+    await dialog.getByText('押して入力', { exact: true }).waitFor();
+    await key(0x43, [0xA4]);
+    await until(async () => (await recorder.locator('kbd').allTextContents()).join('+') === 'Alt+C',
+      'left Alt+C captured for saving');
+    await dialog.getByTestId('binding-scope:global').click();
+    await dialog.getByTestId('binding-apply').click();
+    await dialog.waitFor({ state: 'hidden' });
+    await waitForHost(dock, async () => (await window.dock.snapshot()).globalHotKeys.some((row) =>
+      row.shortcut === 'Alt+C' && row.commandId === 'fixture.modal.choice' && row.registered));
+    const persisted = JSON.parse(fs.readFileSync(require('./test-settings.cjs').file(profile), 'utf8'));
+    assert(persisted.triggerStacks.items.some((stack) => stack.kind === 'shortcuts' &&
+      stack.input === 'Alt+C' && stack.entries.some((row) => row.command === 'fixture.modal.choice' &&
+        row.when.scope === 'global' && row.blockOriginalInput !== false)));
+    await peer.request('focus');
+    await until(async () => (await peer.request('snapshot')).focused, 'external target for saved binding');
+    await peer.request('clear');
+    await expectCommand('choice', 0x43, [0xA4]);
+    assert(!(await peer.request('snapshot')).events.some((entry) => entry.startsWith('menu:') || entry === 'key:C, Alt'));
+    checks.push('saving the recorded left Alt+C with global blocking persists and runs the new command on the first press');
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify({ ok: true, portable, checks, events: events() }, null, 2),

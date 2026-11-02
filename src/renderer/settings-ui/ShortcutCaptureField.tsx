@@ -126,21 +126,18 @@ export function ShortcutCaptureField({
     setModifiers(key.split('+').slice(0, -1));
     setError('');
   };
+  const status = !recordingReady
+    ? 'settings.shortcutCaptureField.preparing'
+    : !focused || !windowFocused
+      ? 'settings.shortcutCaptureField.click'
+      : captureReady
+        ? 'settings.shortcutCaptureField.press'
+        : 'settings.shortcutCaptureField.preparing';
   return (
     <SettingsField
       title={label}
       hint={translate('settings.shortcutCaptureField.keyboardHint')}
-      description={
-        !showDescription
-          ? undefined
-          : !recordingReady
-            ? translate('settings.shortcutCaptureField.preparing')
-            : !focused
-              ? translate('settings.shortcutCaptureField.click')
-              : captureReady
-                ? translate('settings.shortcutCaptureField.press')
-                : translate('settings.shortcutCaptureField.preparing')
-      }
+      description={showDescription ? translate(status) : undefined}
     >
       <button
         ref={recorder}
@@ -178,15 +175,7 @@ export function ShortcutCaptureField({
         }}
       >
         {!showDescription && (
-          <small className="shortcut-capture-status">
-            {translate(
-              !recordingReady
-                ? 'settings.shortcutCaptureField.preparing'
-                : focused
-                  ? 'settings.shortcutCaptureField.press'
-                  : 'settings.shortcutCaptureField.click',
-            )}
-          </small>
+          <small className="shortcut-capture-status">{translate(status)}</small>
         )}
         {value ? (
           value.split('+').map((part, index) => <kbd key={index}>{part}</kbd>)

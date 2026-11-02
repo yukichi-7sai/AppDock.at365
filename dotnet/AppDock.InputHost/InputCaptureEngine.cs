@@ -38,7 +38,7 @@ internal sealed class InputCaptureEngine : IDisposable
     private RecordingInput? recording;
     private nint keyboardHook, mouseHook, layout, preparedLayout, foregroundHook, desktopHook;
     private bool disposed, accepting, monitoring, refreshQueued, layoutRefreshPending;
-    private string? lostRecording;
+    private string? lostRecording, endedRecording;
     private uint recordingSince;
     private int? gestureRevision;
     private long pressId;
@@ -68,6 +68,8 @@ internal sealed class InputCaptureEngine : IDisposable
     private void EnvironmentChanged(nint hook, uint kind, nint window, int objectId, int child, uint thread, uint time)
     {
         if (disposed) return;
+        // A release on another input desktop may never have reached this hook.
+        if (kind == 0x20) { pressed.Remove(0xA4); pressed.Remove(0xA5); }
         // Preserve a brief focus loss even when several events coalesce before the next refresh.
         if (recording != null && unchecked((int)(time - recordingSince)) >= 0 &&
             (kind == 0x20 || kind == 3 && recording.Window != window.ToInt64().ToString()))
@@ -97,12 +99,13 @@ internal sealed class InputCaptureEngine : IDisposable
         if (configuration?.ShortcutRevision != next.ShortcutRevision ||
             configuration?.Gestures.SettingsKey != next.Gestures.SettingsKey)
             processPool = new(StringComparer.Ordinal);
-        if (configuration?.ShortcutRevision != next.ShortcutRevision || next.Recording != null || next.Shortcuts.Length == 0)
+        var nextRecording = next.Recording?.Token == endedRecording ? null : next.Recording;
+        if (configuration?.ShortcutRevision != next.ShortcutRevision || nextRecording != null || next.Shortcuts.Length == 0)
             pendingPresses.Clear();
         configuration = next;
         inputs = next.Shortcuts;
-        if (recording?.Token != next.Recording?.Token) recordingSince = unchecked((uint)Environment.TickCount64);
-        recording = next.Recording;
+        if (recording?.Token != nextRecording?.Token) recordingSince = unchecked((uint)Environment.TickCount64);
+        recording = nextRecording;
         foreach (var input in inputs) {
             CommandConditions.Prepare(input.Environment, processPool);
             foreach (var condition in input.Conditions ?? []) {
@@ -118,8 +121,8 @@ internal sealed class InputCaptureEngine : IDisposable
         if (!next.ShortcutsActive) preparedLayout = layout;
         try {
             Reconcile();
-            accepting = next.ShortcutsActive && preparedLayout == layout;
-            if (next.ShortcutsActive && preparedLayout != layout)
+            accepting = next.ShortcutsActive && (!lookup.HasSymbols || preparedLayout == layout);
+            if (next.ShortcutsActive && !accepting)
                 notify("shortcuts.applied", new { revision = next.ShortcutRevision, statuses });
             FlushPendingPresses();
         } catch (Exception error) {
@@ -222,12 +225,13 @@ internal sealed class InputCaptureEngine : IDisposable
         if (!needKeyboard && keyboardHook != 0) { UnhookWindowsHookEx(keyboardHook); keyboardHook = 0; pressed.Clear(); }
         if (!needMouse && mouseHook != 0) { UnhookWindowsHookEx(mouseHook); mouseHook = 0; }
     }
-    private int Modifiers(uint current, bool up)
+    private int Modifiers(uint current, bool up, uint flags)
     {
         // This callback precedes the OS asynchronous state update for the current key.
         bool Held(uint key) => key == current ? !up : (GetAsyncKeyState((int)key) & 0x8000) != 0;
         return (Held(0xA2) || Held(0xA3) || Held(0x11) ? 1 : 0) |
-            (Held(0xA4) || Held(0xA5) || Held(0x12) ? 2 : 0) |
+            ((flags & 0x20) != 0 || pressed.Contains(0xA4) || pressed.Contains(0xA5) ||
+                Held(0xA4) || Held(0xA5) || Held(0x12) ? 2 : 0) |
             (Held(0xA0) || Held(0xA1) || Held(0x10) ? 4 : 0) |
             (Held(0x5B) || Held(0x5C) ? 8 : 0);
     }
@@ -237,6 +241,7 @@ internal sealed class InputCaptureEngine : IDisposable
         var data = Marshal.PtrToStructure<KeyData>(pointer);
         if (data.Extra == GestureEngine.InputMarker) return CallNextHookEx(keyboardHook, code, message, pointer);
         data.Key = ShortcutCodec.CaptureKey(data.Key, data.Scan, data.Flags);
+        if (data.Key == 0x12) data.Key = (data.Flags & 1) == 0 ? 0xA4u : 0xA5u;
         var up = message is 0x101 or 0x105;
         var pulse = ShortcutCodec.IsPulse(data.Key);
         var repeat = !up && !pulse && !pressed.Add(data.Key);
@@ -247,7 +252,8 @@ internal sealed class InputCaptureEngine : IDisposable
                 if (up) { owned.Remove(data.Key); if (owned.Count == 0) QueueRefresh(); }
                 return blocked ? 1 : CallNextHookEx(keyboardHook, code, message, pointer);
             }
-            var modifiers = Modifiers(data.Key, up);
+            // LLKHF_ALTDOWN describes this event, including when the asynchronous Alt state is not visible.
+            var modifiers = Modifiers(data.Key, up, data.Flags);
             var chord = new ShortcutChord(data.Key, modifiers);
             IEnumerable<ShortcutInput> connected = chords.GetValueOrDefault(chord) ?? [];
             if (!up && !repeat && inputs.Length > 0 && lookup.HasSymbols) {
@@ -260,25 +266,40 @@ internal sealed class InputCaptureEngine : IDisposable
                 }
             }
             var touchpad = connected.Any(ActiveTouchpad);
+            var capturedWindow = GetForegroundWindow();
+            if (recording != null && (lostRecording == recording.Token || capturedWindow.ToInt64().ToString() != recording.Window))
+                EndRecording();
             if (recording != null && !touchpad) {
-                if (GetForegroundWindow().ToInt64().ToString() != recording.Window) EndRecording();
-                else if (data.Key == 27 || (data.Key == 9 && (modifiers & ~4) == 0)) EndRecording();
+                if (data.Key == 27 || (data.Key == 9 && (modifiers & ~4) == 0)) EndRecording();
+                else if (!up && !repeat && data.Key is 0xA4 or 0xA5) {
+                    // Keep the menu from taking focus before the recorder sees the rest of the chord.
+                    owned[data.Key] = true;
+                    return 1;
+                }
                 else if (!up && !repeat && !ShortcutCodec.Protected(chord) && (recording.AllowWin || (modifiers & 8) == 0)) {
                     var key = ShortcutCodec.Format(data.Key, modifiers, ForegroundLayout());
-                    if (key != null && MaskModifier(modifiers) &&
-                        notify("shortcuts.recorded", new { token = recording.Token, key })) {
+                    if (key != null && notify("shortcuts.recorded", new { token = recording.Token, key })) {
                         if (!pulse) owned[data.Key] = true;
+                        blockDecision = true;
+                        MaskBlockedModifier(modifiers);
                         return 1;
                     }
                 }
                 return CallNextHookEx(keyboardHook, code, message, pointer);
             }
-            if (DialogOwns(chord, GetForegroundWindow()))
+            if (DialogOwns(chord, capturedWindow))
                 return CallNextHookEx(keyboardHook, code, message, pointer);
-            if (Gestures.Keyboard(code, message, pointer) != 0) return 1;
+            if (Gestures.Keyboard(code, message, pointer) != 0) {
+                // A right-button gesture owns its captured modifier until release.
+                if (data.Key is 0xA4 or 0xA5) pressed.Remove(data.Key);
+                return 1;
+            }
             if (up || repeat || configuration == null || !connected.Any())
                 return CallNextHookEx(keyboardHook, code, message, pointer);
-            var capturedWindow = GetForegroundWindow();
+            // A click can immediately re-arm the same field. Until the host acknowledges the end,
+            // leave that window's input alone, but handle the first key in another app right here.
+            if (!touchpad && configuration.Recording is { } recorder && recorder.Window == capturedWindow.ToInt64().ToString())
+                return CallNextHookEx(keyboardHook, code, message, pointer);
             var rows = connected.Where(row => row.Owner == null || (row.Owner.StartsWith("touchpad:", StringComparison.Ordinal) && TouchpadInputLease.Accepts(row.TouchpadGeneration))).ToList();
             if (rows.Count == 0) return CallNextHookEx(keyboardHook, code, message, pointer);
             var target = rows.Any(row => row.Owner != null || row.Conditions is {Length:>0}) ? CommandTargetCapture.Capture(capturedWindow) : null;
@@ -295,9 +316,7 @@ internal sealed class InputCaptureEngine : IDisposable
             blockDecision = block;
             // Own both halves before notification or synchronization can fail.
             if (!pulse) owned[data.Key] = block;
-            if (block && !MaskModifier(modifiers)) {
-                notify("input.error", new { message = "修飾キーの単独動作を抑止できませんでした。元キーのブロックは維持します。" });
-            }
+            if (block) MaskBlockedModifier(modifiers);
             var window = capturedWindow.ToInt64().ToString();
             var press = new ShortcutPressNotice(configuration.ShortcutRevision, ++pressId,
                 matched.Select(item => item.Row.Shortcut).Distinct().ToArray(), block, window, configuration.Context,
@@ -353,20 +372,23 @@ internal sealed class InputCaptureEngine : IDisposable
         var previous = recording;
         recording = null;
         if (previous != null) {
+            endedRecording = previous.Token;
             QueueRefresh();
             notify("shortcuts.recordEnded", new { token = previous.Token });
         }
     }
-    private static bool MaskModifier(int modifiers)
+    private bool RecordingOwnsAlt => owned.ContainsKey(0xA4) || owned.ContainsKey(0xA5);
+    private void MaskBlockedModifier(int modifiers)
     {
-        if ((modifiers & (2 | 8)) == 0) return true;
+        if (RecordingOwnsAlt) modifiers &= ~2;
+        if ((modifiers & (2 | 8)) == 0) return;
         var events = new[] {
             new Input { Type = 1, Data = new InputUnion { Keyboard = new KeyInput { Key = 0xFF, Extra = GestureEngine.InputMarker } } },
             new Input { Type = 1, Data = new InputUnion { Keyboard = new KeyInput { Key = 0xFF, Flags = 2, Extra = GestureEngine.InputMarker } } }
         };
         var sent = SendInput(2, events, Marshal.SizeOf<Input>());
         if (sent == 1) SendInput(1, [events[1]], Marshal.SizeOf<Input>());
-        return sent == 2;
+        if (sent != 2) notify("input.error", new { message = "修飾キーの単独動作を抑止できませんでした。元キーのブロックは維持します。" });
     }
     public void Dispose()
     {

@@ -7,10 +7,16 @@ internal sealed class Target : Form
     private readonly nint previous = GetForegroundWindow();
     private readonly System.Drawing.Point previousCursor = Cursor.Position;
     private bool movedCursor;
+    private bool menuProbe;
     private object? focusAttempt;
     public Target() { Text = "AppDock isolated input target"; Width = 480; Height = 180; Controls.Add(new Label { Text = "Input verification window", Dock = DockStyle.Fill }); }
-    protected override bool ProcessCmdKey(ref Message msg, Keys keyData) { events.Add("key:" + keyData); return true; }
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData) { events.Add("key:" + keyData); return !menuProbe || base.ProcessCmdKey(ref msg, keyData); }
     protected override void WndProc(ref Message m) {
+        if (menuProbe && m.Msg == 0x112 && (m.WParam.ToInt64() & 0xfff0) == 0xf100) {
+            events.Add("menu:" + m.LParam.ToInt64());
+            // Observe the real SC_KEYMENU without entering a modal menu loop in the fixture.
+            m.Result = 0; return;
+        }
         if (m.Msg == 0x0319) { events.Add("app:" + (((long)m.LParam >> 16) & 0x7ff)); m.Result = 1; return; }
         base.WndProc(ref m);
     }
@@ -34,6 +40,23 @@ internal sealed class Target : Form
     }
     private static string Title(nint window) { var text = new System.Text.StringBuilder(512); GetWindowText(window, text, text.Capacity); return text.ToString(); }
     private object Call(string method, JsonElement request) {
+        if (method == "menuProbe") {
+            var menu = CreateMenu();
+            if (menu == 0 || !AppendMenu(menu, 0, 100, "&Commands") || !SetMenu(Handle, menu))
+                throw new Exception("Failed to create the diagnostic menu.");
+            menuProbe = true;
+        }
+        if (method == "batchAltC" || method == "focusAndAltC") {
+            var window = new nint(long.Parse(request.GetProperty("params").GetProperty("window").GetString()!));
+            if (method == "focusAndAltC" && window == Handle) Foreground(Handle);
+            if (window == 0 || GetForegroundWindow() != window) throw new Exception("The diagnostic target is not foreground.");
+            Input Stroke(ushort key, bool up) => new() { Type = 1, Data = new InputUnion { Keyboard = new KeyInput { Key = key, Flags = up ? 2u : 0u } } };
+            var inputs = new[] { Stroke(0xA4, false), Stroke(0x43, false), Stroke(0x43, true), Stroke(0xA4, true) };
+            if (SendInput(4, inputs, Marshal.SizeOf<Input>()) != 4) {
+                SendInput(2, [inputs[2], inputs[3]], Marshal.SizeOf<Input>());
+                throw new Exception("Batch Alt+C input failed.");
+            }
+        }
         if (method == "click") {
             var p = request.GetProperty("params");
             var window = new nint(long.Parse(p.GetProperty("window").GetString()!));
@@ -174,6 +197,9 @@ internal sealed class Target : Form
     }
     [STAThread] public static void Main() { Application.SetHighDpiMode(HighDpiMode.PerMonitorV2); Application.Run(new Target()); }
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern nint CreateMenu();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool AppendMenu(nint menu, uint flags, nuint item, string name);
+    [DllImport("user32.dll")] private static extern bool SetMenu(nint window, nint menu);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint window);
     [DllImport("user32.dll")] private static extern nint GetKeyboardLayout(uint thread);
     [DllImport("user32.dll", EntryPoint = "VkKeyScanExW", CharSet = CharSet.Unicode)] private static extern short VkKeyScanEx(char character, nint layout);

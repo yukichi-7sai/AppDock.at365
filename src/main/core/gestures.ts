@@ -287,7 +287,8 @@ export class InputCaptureManager {
       const keys = p.shortcuts.filter(
         (key: string) =>
           this.statuses.some((s) => s.registered && s.shortcut === key) &&
-          (!state.recording || this.touchpadInputs.some((input) => input.shortcut === key)) &&
+          (!(state.recording || this.recording) ||
+            this.touchpadInputs.some((input) => input.shortcut === key)) &&
           !(state.dialogWindow === p.window && isDialogNavigationShortcut(key)),
       );
       const conditional = [...this.inputs, ...this.touchpadInputs].some(

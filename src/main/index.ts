@@ -658,6 +658,9 @@ async function setShortcutCapture(request: { token: string; active: boolean; all
 function keyboardRecording() {
   return shortcutRecording || !!gestures?.recordingActive;
 }
+function visibleHotKeyStatuses() {
+  return keyboardRecording() ? [] : (hotKeys?.statuses ?? []);
+}
 function dialogInputWindow() {
   return window && !window.isDestroyed() && (hostModalLayer?.isActive || overlayHost?.active)
     ? window.getNativeWindowHandle().readBigUInt64LE().toString()
@@ -1489,7 +1492,7 @@ const operationApi = new AppDockApi({
   },
   ribbonApplets: allApplets,
   trayApplets: allApplets,
-  shortcutStatus: () => hotKeys?.statuses ?? [],
+  shortcutStatus: visibleHotKeyStatuses,
   inputPages: () => shortcutPageChoices(allApplets()),
   save: (value, revision) => commitSettings(prepareSettings(value), revision),
   applets: () => automationApplets(allApplets()),
@@ -2037,7 +2040,7 @@ function snapshotCore(): HostSnapshot {
     uiReady,
     windowVisible: !!window && !window.isDestroyed() && window.isVisible() && !window.isMinimized(),
     updates: updater?.state ?? { busy: false, phase: '', results: [] },
-    globalHotKeys: hotKeys?.statuses ?? [],
+    globalHotKeys: visibleHotKeyStatuses(),
     settings: settings.snapshot(),
     extensions: allApplets(),
     webPages: pageCollections.states(),
@@ -2083,24 +2086,25 @@ function syncHotKeys(retry = false) {
   const available = catalog.map((command) => command.id);
   const revision = settings.revision;
   const generation = ++hotKeyApplyGeneration;
-  const suspended = keyboardRecording();
+  // The native recorder owns its window. Keep the bindings ready for the first key in another window.
+  const suspended = shortcutRecording;
+  // A recorder click can start a new session while the previous session's restore is in flight.
+  const current = () =>
+    !quitting &&
+    revision === settings.revision &&
+    generation === hotKeyApplyGeneration &&
+    !suspended &&
+    !keyboardRecording();
   return hotKeys
     .sync(settings.value, available, suspended, retry, catalog)
     .then(() => {
-      if (
-        quitting ||
-        revision !== settings.revision ||
-        suspended ||
-        generation !== hotKeyApplyGeneration
-      )
-        return;
+      if (!current()) return;
       if (hotKeys?.statuses.some((s) => !s.registered))
         settings.health.set('apply-hotkeys', 'apply-failed', generation);
       else settings.health.clear('apply-hotkeys', generation);
     })
     .catch(() => {
-      if (generation === hotKeyApplyGeneration)
-        settings.health.set('apply-hotkeys', 'apply-failed', generation);
+      if (current()) settings.health.set('apply-hotkeys', 'apply-failed', generation);
     });
 }
 async function reconcileSettingsApplets() {
@@ -2525,7 +2529,7 @@ function settingsPageAuxiliaryContent(page: SettingsPageDefinition): SettingsPag
       commandTarget: id === 'command-triggers' ? settingsNavigation.commandTarget : undefined,
       applets: applets.map(summary),
       commands: settingsUiCommands(),
-      statuses: id === 'command-triggers' ? (hotKeys?.statuses ?? []) : undefined,
+      statuses: id === 'command-triggers' ? visibleHotKeyStatuses() : undefined,
     };
   if (id === 'about') {
     const commands = settingsUiCommands();
@@ -4103,7 +4107,7 @@ async function initialize() {
           window: focused?.getNativeWindowHandle().readBigUInt64LE().toString() ?? '',
         },
         commands: availableShortcutCommands(),
-        recording: keyboardRecording(),
+        recording: shortcutRecording,
         quitting,
         dialogWindow: dialogInputWindow(),
       };

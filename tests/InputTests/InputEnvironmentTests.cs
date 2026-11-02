@@ -61,15 +61,15 @@ internal static partial class Program
             Set("foregroundHook", foregroundHook); Invoke("UpdateTimer");
             Inputs(new { shortcut = ";" }); Invoke("UpdateTimer");
             Check(timer.IsEnabled && timer.Interval == TimeSpan.FromSeconds(1), "symbol shortcuts use the slow layout fallback");
-            object SessionConfiguration(bool paused, bool active) => Decode("CaptureConfiguration", new {
+            object SessionConfiguration(bool paused, bool active, string shortcut, object? recording) => Decode("CaptureConfiguration", new {
                 gestures = new { enabled = false, browsers = Array.Empty<string>(), excludedProcesses = Array.Empty<string>(),
                     rows = Array.Empty<object>(), context = "session", revision = 0 },
-                shortcuts = new[] { new { shortcut = ";", blockOriginalInput = true } },
-                shortcutRevision = 1, context = "session", assistancePaused = paused, shortcutsActive = active,
+                shortcuts = new[] { new { shortcut, blockOriginalInput = true } },
+                shortcutRevision = 1, context = "session", assistancePaused = paused, shortcutsActive = active, recording,
             });
-            object? ConfigureWithoutInputHooks(bool paused, bool active = false) {
+            object? ConfigureWithoutInputHooks(bool paused, bool active = false, string shortcut = ";", object? recording = null) {
                 Set("keyboardHook", new nint(-1)); Set("mouseHook", new nint(-1));
-                try { return Invoke("Configure", SessionConfiguration(paused, active)); }
+                try { return Invoke("Configure", SessionConfiguration(paused, active, shortcut, recording)); }
                 finally { Set("keyboardHook", nint.Zero); Set("mouseHook", nint.Zero); }
             }
             var pausedStatuses = (Array)ConfigureWithoutInputHooks(true)!;
@@ -86,6 +86,12 @@ internal static partial class Program
                 "resume snapshots current foreground and restarts only the needed fallback");
             Check((bool)Get("accepting") && ((Array)Get("inputs")).Length == 1,
                 "session assistance pause preserves input acceptance and saved input rules after resume");
+            ConfigureWithoutInputHooks(false, false, "F21");
+            Set("preparedLayout", new nint(-1));
+            var beforeFixed = notices.Count(n => n.Method == "shortcuts.applied");
+            ConfigureWithoutInputHooks(false, true, "F21");
+            Check((bool)Get("accepting") && notices.Count(n => n.Method == "shortcuts.applied") == beforeFixed,
+                "a layout change during acknowledgement does not suspend layout-independent function keys");
             Inputs(); Invoke("UpdateTimer");
             Check(!timer.IsEnabled, "removing the last input stops the fallback");
             Check((nint)Get("keyboardHook") == 0 && (nint)Get("mouseHook") == 0, "monitoring and compilation have installed no keyboard or mouse hooks");
@@ -118,6 +124,8 @@ internal static partial class Program
             Check(type.GetField("recording", members)!.GetValue(engine) == null &&
                 notices.Count(n => n.Method == "shortcuts.recordEnded" && n.Payload.GetProperty("token").GetString() == "desktop-cycle") == 1,
                 "desktop switch ends recording even if the same foreground window returns before refresh");
+            ConfigureWithoutInputHooks(false, true, "F21", new { token = "desktop-cycle", window });
+            Check(Get("recording") == null, "a late configuration cannot restart an ended recorder");
 
             // A layout changed before its WinEvent/fallback update. Exercise its first stroke directly.
             Set("configuration", Decode("CaptureConfiguration", new {

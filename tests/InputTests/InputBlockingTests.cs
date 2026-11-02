@@ -16,9 +16,11 @@ internal static partial class Program
             var assembly = Assembly.LoadFrom(Path.GetFullPath(assemblyPath));
             var type = assembly.GetType("AppDock.InputHost.InputCaptureEngine", true)!;
             var notices = new List<JsonElement>();
+            var recorded = new List<string>();
             var delivery = 1;
             engine = Activator.CreateInstance(type, members, null,
                 [Dispatcher.CurrentDispatcher, null, new Func<string, object, bool>((method, payload) => {
+                    if (method == "shortcuts.recorded") recorded.Add(JsonSerializer.SerializeToElement(payload).GetProperty("key").GetString()!);
                     if (method != "shortcuts.pressed") return true;
                     if (delivery == 0) return false;
                     notices.Add(JsonSerializer.SerializeToElement(payload));
@@ -59,15 +61,46 @@ internal static partial class Program
                 type.GetField("pendingPresses", members)!.GetValue(engine)!.GetType().GetMethod("Clear")!.Invoke(type.GetField("pendingPresses", members)!.GetValue(engine), null);
                 Config(7); Inputs(Row(block)); Set("accepting", active); delivery = notify;
             }
-            nint Feed(bool up = false, uint key = 0x91) {
+            nint Feed(bool up = false, uint key = 0x91, uint flags = 0) {
                 var pointer = Marshal.AllocHGlobal(Marshal.SizeOf<GestureTestKeyData>());
                 try {
-                    Marshal.StructureToPtr(new GestureTestKeyData { Key = key, Scan = 0x46, Flags = up ? 0x80u : 0u }, pointer, false);
-                    return (nint)keyboard.Invoke(engine, [0, up ? 0x101u : 0x100u, pointer])!;
+                    Marshal.StructureToPtr(new GestureTestKeyData { Key = key, Scan = 0x46, Flags = flags | (up ? 0x80u : 0u) }, pointer, false);
+                    var message = (flags & 0x20) != 0 ? 0x104u : 0x100u;
+                    return (nint)keyboard.Invoke(engine, [0, up ? message + 1 : message, pointer])!;
                 } finally { Marshal.FreeHGlobal(pointer); }
             }
             var checks = 0;
             void Check(bool value, string label) { if (!value) throw new Exception(label); checks++; Console.WriteLine("PASS " + label); }
+            Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false });
+            Check(Feed(key:0x43, flags:0x20) == 0 && Feed(true, 0x43) == 0 && notices.Count == 1,
+                "Alt context on the event recognizes the first Alt+C even without an asynchronous Alt press");
+            foreach (var (alt, flags) in new[] { (0xA4u, 0u), (0x12u, 1u) }) {
+                Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false });
+                Check(Feed(key:alt, flags:flags) == 0 && Feed(key:0x43) == 0 && Feed(true, 0x43) == 0 &&
+                    notices.Count == 1, "observed Alt down identifies the chord when the asynchronous state and context flag are absent");
+                Check(Feed(true, alt, flags) == 0 && Feed(key:0x43) == 0 && Feed(true, 0x43) == 0 &&
+                    notices.Count == 1, "releasing either Alt leaves the next plain C alone");
+            }
+            Reset(); Inputs(new { shortcut = "Alt+C", blockOriginalInput = false });
+            var gestures = type.GetProperty("Gestures", members)!.GetValue(engine)!;
+            var gestureKeys = (HashSet<uint>)gestures.GetType().GetField("keys", members)!.GetValue(gestures)!;
+            gestureKeys.Add(0xA4);
+            Check(Feed(key:0xA4) == 1 && Feed(key:0x43) == 0 && Feed(true, 0x43) == 0 &&
+                notices.Count == 0 && Feed(true, 0xA4) == 1, "a mouse gesture's captured Alt does not modify unrelated shortcuts");
+            Reset(); Inputs(new { shortcut = "F21", blockOriginalInput = true });
+            Set("recording", Decode("RecordingInput", new { token = "left-field", window = "-1" }));
+            Check(Feed(key:0x84) == 1 && Feed(key:0x84) == 1 && Feed(true, 0x84) == 1 && notices.Count == 1,
+                "the first F21 in a different foreground window ends recording and triggers once before host resync");
+            Check(Feed(key:0x84) == 1 && Feed(true, 0x84) == 1 && notices.Count == 2,
+                "the next separate F21 also triggers once");
+            Reset();
+            var recorderWindow = GetForegroundWindow().ToInt64().ToString();
+            Set("recording", Decode("RecordingInput", new { token = "capture-left-alt", window = recorderWindow }));
+            Check(Feed(key:0xA4) == 1 && Feed(key:0x43) == 1 && Feed(true, 0x43) == 1 &&
+                recorded.SequenceEqual(["Alt+C"]) && notices.Count == 0, "recorder owns left Alt and captures its chord once without a menu mask");
+            type.GetMethod("EndRecording", members)!.Invoke(engine, null);
+            Check(Feed(true, 0xA4) == 1 && Feed(key:0xA4) == 0 && Feed(true, 0xA4) == 0,
+                "release after leaving the recorder is paired and the next standalone Alt passes");
             Reset();
             for (var i=0; i<200; i++) if (Feed()!=1 || Feed(true)!=1) throw new Exception("Stable tap leaked: " + i);
             Check(notices.Count == 200, "200 independent taps block both halves and each dispatch once");

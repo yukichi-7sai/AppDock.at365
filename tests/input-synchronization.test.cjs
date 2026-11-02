@@ -26,7 +26,7 @@ function fixture(t) {
     'unused',
     () => {
       reads++;
-      return { ...state, recording: state.recording || manager.recordingActive };
+      return state;
     },
     {},
     async () => {},
@@ -118,10 +118,25 @@ test('a change during synchronization is applied afterwards without overlapping 
 
 test('native recording completion updates capture state and shutdown ignores queued changes', async (t) => {
   const f = fixture(t);
+  const pressed = [];
+  f.manager.shortcuts.pressed = (event) => pressed.push(event.shortcuts);
+  const request = f.manager.peer.request;
+  f.manager.peer.request = async (method, config) => {
+    await request(method, config);
+    return config.shortcuts.map(({ shortcut }) => ({ shortcut, registered: true }));
+  };
+  await f.manager.syncShortcuts([{ shortcut: 'F21', blockOriginalInput: true }]);
   await f.manager.start();
+  const revision = f.applied.at(-1).shortcutRevision;
   await f.manager.record({ token: 'recording', active: true, allowWin: false }, '123');
   assert.equal(f.applied.at(-1).recording.token, 'recording');
+  assert.equal(f.applied.at(-1).shortcuts[0].shortcut, 'F21');
+  const press = { shortcuts: ['F21'], window: '456', revision, context: '{}' };
+  await f.manager.event('shortcuts.pressed', press);
+  assert.deepEqual(pressed, []);
   await f.manager.event('shortcuts.recordEnded', { token: 'recording' });
+  await f.manager.event('shortcuts.pressed', press);
+  assert.deepEqual(pressed, [['F21']]);
   await settle();
   assert.equal(f.applied.at(-1).recording, null);
 
