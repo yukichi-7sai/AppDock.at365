@@ -76,7 +76,7 @@ MCPサーバーの状態表示は`scripts/mcp-server-startup-ui-test.cjs [固定
 
 `command-stacks-ui-test.cjs`のキー入力セットアップは画面の特殊キーピッカーを使う。キー記録のnative受付は`shortcut-native-capture-ui-test.cjs`が担当し、スタック回帰では準備状態を表さない表示だけを待って合成keydownを送らない。パレットGUIの起動待ちは`startupReady`を条件とする。
 
-`scripts/modal-trigger-input-ui-test.cjs [固定EXE]`は共通ダイアログ・パレットの単独Tab/Escape/Enter/上下左右の操作、修飾キー付きとその他のキー・マウスの継続、別アプリでの7キーの実行、Windows標準ダイアログ、実キー記録中の抑止と復帰、保存済み割り当ての保持を確認する。タッチパッドのキー記録中の継続は`tests/gestures.test.cjs`、全修飾キーと押下・解放の判定は`InputTests --input-blocking`のOS入力を送らないfixtureで補完する。
+`scripts/modal-trigger-input-ui-test.cjs [固定EXE]`は共通ダイアログ・パレットの単独Tab/Escape/Enter/上下左右の操作、入力欄からのCtrl+Enter確定と同じ割り当ての抑止・復帰、その他のキー・マウスの継続、別アプリとWindows標準ダイアログ、実キー記録中の抑止と復帰、保存済み割り当ての保持を確認する。タッチパッドのキー記録中の継続は`tests/gestures.test.cjs`、全修飾キーと押下・解放の判定は`InputTests --input-blocking`のOS入力を送らないfixtureで補完する。
 
 `tests/input-synchronization.test.cjs`は、待機中の周期的な状態取得がないこと、変更要求の集約と同期中に届いた変更の反映、条件・コマンドの更新、nativeの記録終了と停止後の抑止を確認する。`scripts/input-pages-ui-test.cjs [固定EXE]`は、本体・埋め込みページ・独立Windowのキーとnativeジェスチャー、ページ別条件と保存・再起動に加え、状態が安定した250msの観測区間で本体の入力設定投影が0回であることを検査する。
 

@@ -114,6 +114,7 @@ export class InputCaptureManager {
       recording: boolean;
       quitting?: boolean;
       dialogWindow?: string;
+      dialogHasConfirm?: boolean;
     },
     private dispatcher: CommandDispatcher,
     private execute: (id: string, invocation: GestureInvocation) => Promise<unknown>,
@@ -311,7 +312,7 @@ export class InputCaptureManager {
           this.statuses.some((s) => s.registered && s.shortcut === key) &&
           (!(state.recording || this.recording) ||
             this.touchpadInputs.some((input) => input.shortcut === key)) &&
-          !(state.dialogWindow === p.window && isDialogNavigationShortcut(key)),
+          !(state.dialogWindow === p.window && isDialogNavigationShortcut(key, state.dialogHasConfirm)),
       );
       const conditional = [...this.inputs, ...this.touchpadInputs].some(
         (input) => keys.includes(input.shortcut) && (input.owner || input.conditions?.length),
@@ -515,6 +516,7 @@ export class InputCaptureManager {
       context,
       recording: this.recording ?? null,
       dialogWindow: state.dialogWindow ?? '',
+      dialogHasConfirm: !!state.dialogHasConfirm,
       dialogShortcuts: dialogNavigationShortcuts,
       assistancePaused: this.sessionPaused,
     };

@@ -54,11 +54,15 @@ test('host modal state resets on reload, renderer exit and window close without 
   const window = Object.assign(new EventEmitter(), { webContents: new EventEmitter() });
   const state = new HostModalLayer(window, () => changes++);
   for (const event of ['did-start-loading', 'render-process-gone', 'closed']) {
-    state.setActive(true);
-    state.setActive(true);
+    state.setState('open');
+    assert(!state.hasConfirm);
+    state.setState('confirm');
+    state.setState('confirm');
     assert(state.isActive);
+    assert(state.hasConfirm);
     (event === 'closed' ? window : window.webContents).emit(event);
     assert(!state.isActive);
+    assert(!state.hasConfirm);
   }
-  assert.equal(changes, 6);
+  assert.equal(changes, 9);
 });

@@ -201,6 +201,7 @@ export function CommandSelectionDialog({
             <SettingsButton
               className="primary"
               data-testid="command-selection-confirm"
+              aria-keyshortcuts="Control+Enter"
               disabled={!ready || !selected}
               pending={pending}
               onClick={() => void choose()}

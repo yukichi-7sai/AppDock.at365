@@ -672,9 +672,12 @@ function dialogOwnsShortcut(key: string, sourceWindow?: string) {
   const target = dialogInputWindow();
   return (
     !!target &&
-    isDialogNavigationShortcut(key) &&
+    isDialogNavigationShortcut(key, dialogHasConfirm()) &&
     (sourceWindow ? sourceWindow === target : !!window?.isFocused())
   );
+}
+function dialogHasConfirm() {
+  return !!hostModalLayer?.hasConfirm && !overlayHost?.active;
 }
 function dispatchDialogShortcut(input: Electron.Input) {
   if (
@@ -3726,9 +3729,9 @@ function registerIpc() {
     return dispatchShortcut(normalized);
   });
   handle('dock:retryGlobalHotKeys', () => syncHotKeys(true));
-  handle('dock:hostModal', (active: boolean) => {
-    if (typeof active !== 'boolean') throw Error('Invalid modal state');
-    hostModalLayer?.setActive(active);
+  handle('dock:hostModal', (state: unknown) => {
+    if (state !== 'none' && state !== 'open' && state !== 'confirm') throw Error('Invalid modal state');
+    hostModalLayer?.setState(state);
   });
 
   handle('dock:setShortcutRecording', async (recording: boolean) => {
@@ -4142,6 +4145,7 @@ async function initialize() {
         recording: shortcutRecording,
         quitting,
         dialogWindow: dialogInputWindow(),
+        dialogHasConfirm: dialogHasConfirm(),
       };
     },
     commandDispatcher,

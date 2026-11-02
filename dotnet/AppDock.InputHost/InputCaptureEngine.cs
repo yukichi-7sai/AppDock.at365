@@ -9,7 +9,7 @@ internal sealed record RecordingInput(string Token, string Window, bool AllowWin
 internal sealed record CaptureConfiguration(Configuration Gestures, ShortcutInput[] Shortcuts,
     int ShortcutRevision, uint HostProcessId, string Context, RecordingInput? Recording = null,
     bool ShortcutsActive = true, string? DialogWindow = null, string[]? DialogShortcuts = null,
-    bool AssistancePaused = false);
+    bool AssistancePaused = false, bool DialogHasConfirm = false);
 internal sealed record ShortcutPressNotice(int Revision, long PressId, string[] Shortcuts,
     bool Blocked, string Window, string Context,
     [property: System.Text.Json.Serialization.JsonIgnore] uint HostProcessId, CommandTargetContext? Target = null)
@@ -514,6 +514,8 @@ internal sealed class InputCaptureEngine : IDisposable
         input.Owner?.StartsWith("touchpad:", StringComparison.Ordinal) == true && TouchpadInputLease.Accepts(input.TouchpadGeneration);
     private bool DialogOwns(ShortcutChord chord, nint window)
     {
+        if (chord is { Key: 13, Modifiers: 1 })
+            return configuration?.DialogHasConfirm == true && configuration.DialogWindow == window.ToInt64().ToString();
         if (!dialogChords.Contains(chord) || configuration == null) return false;
         if (configuration.DialogWindow == window.ToInt64().ToString()) return true;
         GetWindowThreadProcessId(window, out var owner);

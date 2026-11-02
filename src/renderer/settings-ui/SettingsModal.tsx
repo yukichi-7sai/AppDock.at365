@@ -1,6 +1,6 @@
 import { useHostTranslation } from '../HostTranslation';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { useSettingsControls } from './api';
 import { SettingsInputMode } from './SettingsInput';
 import { SettingsHintIcon } from './SettingsHintIcon';
@@ -51,6 +51,7 @@ export function SettingsModal({
   collapseStatusWhenEmpty?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const composing = useRef<EventTarget | null>(null);
   const backdropPressed = useRef(false);
   const isBackdrop = (event: {
     target: EventTarget;
@@ -141,6 +142,50 @@ export function SettingsModal({
           onCancel={(event) => {
             event.preventDefault();
             if (!closeDisabled) onClose();
+          }}
+          onCompositionStartCapture={(event) => {
+            composing.current = event.target;
+          }}
+          onCompositionEndCapture={() => {
+            composing.current = null;
+          }}
+          onBlurCapture={(event) => {
+            if (composing.current === event.target) composing.current = null;
+          }}
+          onKeyDownCapture={(event) => {
+            if (
+              event.defaultPrevented || event.key !== 'Enter' || !event.ctrlKey ||
+              event.shiftKey || event.altKey || event.metaKey
+            )
+              return;
+            const target = event.target;
+            const modal = event.currentTarget;
+            if (
+              !(target instanceof HTMLElement) ||
+              target.closest('dialog:modal') !== modal ||
+              target.closest('[data-shortcut-recorder]')
+            )
+              return;
+            const confirm = modal.querySelector<HTMLButtonElement>(
+              'button[aria-keyshortcuts="Control+Enter"]',
+            );
+            if (!confirm) return;
+            event.stopPropagation();
+            if (
+              composing.current === target ||
+              event.nativeEvent.isComposing ||
+              event.nativeEvent.keyCode === 229
+            )
+              return;
+            event.preventDefault();
+            if (event.repeat || busy) return;
+            // A pointer click commits blur-only inputs before the button's click handler runs.
+            if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+              flushSync(() => target.blur());
+              if (target.isConnected && modal.matches(':modal')) target.focus({ preventScroll: true });
+            }
+            if (document.activeElement?.closest('dialog:modal') === modal && !confirm.disabled)
+              confirm.click();
           }}
           onKeyDown={(event) => {
             event.stopPropagation();
@@ -311,6 +356,7 @@ export function SettingsDialog({
             </button>
             <SettingsButton
               data-testid="settings-dialog-confirm"
+              aria-keyshortcuts="Control+Enter"
               className="primary"
               disabled={!ready || !valid}
               pending={pending}

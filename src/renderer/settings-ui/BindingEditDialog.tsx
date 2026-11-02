@@ -77,6 +77,7 @@ export function BindingEditDialog({
               </button>
               <button
                 data-testid="binding-apply"
+                aria-keyshortcuts="Control+Enter"
                 className="primary"
                 disabled={!valid || !recordingReady}
                 onClick={apply}

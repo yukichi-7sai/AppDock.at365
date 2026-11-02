@@ -95,6 +95,7 @@ export function OrderDialogFrame({
             </button>
             <SettingsButton
               data-testid="settings-dialog-confirm"
+              aria-keyshortcuts="Control+Enter"
               type="button"
               className="primary"
               pending={pending}

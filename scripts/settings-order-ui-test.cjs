@@ -253,7 +253,8 @@ async function open(target) {
       await open(target);
       assert.deepEqual(await order(), target.ids);
       await handle(first).press('ArrowDown');
-      await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+      await handle(first).press('Control+Enter');
+      await dialog.waitFor({ state: 'hidden' });
       await settleSettings(host);
       assert.deepEqual(target.values(await saved()), moved);
       await open(target);

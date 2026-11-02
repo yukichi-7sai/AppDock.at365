@@ -396,6 +396,13 @@ test('dialog navigation and key recording do not pause or cancel mouse and touch
     presses.map((p) => p.shortcuts),
     [['Ctrl+Enter'], ['Enter']],
   );
+  state.dialogHasConfirm = true;
+  await manager.sync();
+  assert.equal(payloads.at(-1).dialogHasConfirm, true);
+  await press('Ctrl+Enter');
+  assert.equal(presses.length, 2);
+  await press('Ctrl+Enter', '456');
+  assert.deepEqual(presses.at(-1).shortcuts, ['Ctrl+Enter']);
   state.recording = true;
   await manager.sync();
   assert.equal(active.signal.aborted, false);

@@ -230,6 +230,8 @@ async function inspectLayout(dialog, name) {
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).fill('存在しないコマンド');
     assert.equal(await dialog.getByRole('option').count(), 0);
     assert(await dialog.getByTestId('command-selection-confirm').isDisabled());
+    await dialog.getByRole('combobox', { name: 'コマンドを検索' }).press('Control+Enter');
+    assert(await dialog.isVisible());
     await dialog.getByRole('combobox', { name: 'コマンドを検索' }).press('Enter');
     assert(await dialog.isVisible());
     assert(Math.abs((await dialog.boundingBox()).height - size.height) < 2);
@@ -325,7 +327,12 @@ async function inspectLayout(dialog, name) {
     );
     assert(await opener.evaluate((e) => e === document.activeElement));
     await opener.click();
-    await chooseCommand(host, 'appdock.notifications.open');
+    const child = selectionDialog(host);
+    const search = child.getByRole('combobox', { name: 'コマンドを検索' });
+    await search.fill('appdock.notifications.open');
+    await child.locator('[role="option"][aria-selected="true"][data-command-id="appdock.notifications.open"]').waitFor();
+    await search.press('Control+Enter');
+    await child.waitFor({ state: 'hidden' });
     assert.equal(
       await parent.getByLabel('ボタン名', { exact: true }).inputValue(),
       'Selection ribbon',

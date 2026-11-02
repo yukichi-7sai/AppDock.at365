@@ -2,13 +2,21 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DockApi } from '../shared/contracts';
 // Track host dialogs without capturing or hiding the independent Shell views.
 window.addEventListener('DOMContentLoaded', () => {
-  let active = false;
+  let state = 'none';
   const update = () => {
-    const next = !!document.querySelector('dialog:modal');
-    if (next === active) return;
-    active = next;
-    void ipcRenderer.invoke('dock:hostModal', active).catch(() => {});
+    const focused = document.activeElement?.closest('dialog:modal');
+    // Disabling all controls during submission can move focus to the document body.
+    const modal = focused ?? Array.from(document.querySelectorAll('dialog:modal')).at(-1);
+    const canConfirm =
+      document.hasFocus() && !!modal?.querySelector('button[aria-keyshortcuts="Control+Enter"]');
+    const next = canConfirm ? 'confirm' : modal ? 'open' : 'none';
+    if (next === state) return;
+    state = next;
+    void ipcRenderer.invoke('dock:hostModal', state).catch(() => {});
   };
+  document.addEventListener('focusin', update);
+  window.addEventListener('focus', update);
+  window.addEventListener('blur', update);
   new MutationObserver(update).observe(document.documentElement, {
     childList: true,
     subtree: true,

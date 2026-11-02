@@ -177,11 +177,18 @@ const choose = (page, file, options) =>
     const createdBody = 'こんにちは😀\nx\ny';
     assert.equal(await body.inputValue(), createdBody);
     assert.equal(fs.existsSync(path.join(directory, 'あいさつ.txt')), false);
-    await dialog.getByRole('button', { name: '適用', exact: true }).click();
+    await body.evaluate((el) => {
+      el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+      el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, repeat: true, bubbles: true }));
+    });
+    assert(await body.isVisible());
+    await body.press('Control+Enter');
     await dialog.waitFor({ state: 'hidden' });
     assert.equal(fs.readFileSync(path.join(directory, 'あいさつ.txt'), 'utf8'), createdBody);
     checks.push(
-      'body search, cancelled creation, Japanese text with Enter and Shift+Enter saved only on Apply',
+      'body search, cancellation, Japanese multiline text and Ctrl+Enter confirmation; composition and repeat ignored',
     );
     await page.getByRole('button', { name: '本文を編集', exact: true }).click();
     dialog = host.getByRole('dialog', { name: '本文を編集', exact: true });
@@ -204,6 +211,8 @@ const choose = (page, file, options) =>
     await page.getByRole('button', { name: '本文を表示', exact: true }).click();
     dialog = host.getByRole('dialog');
     assert.equal(await dialog.locator('pre').textContent(), markup);
+    await dialog.locator('pre').press('Control+Enter');
+    assert(await dialog.isVisible());
     await host.screenshot({ path: path.join(profile, 'text-preview.png') });
     assert.equal(await host.evaluate(() => window.untrustedTextRan), undefined);
     await dialog.getByRole('button', { name: '閉じる', exact: true }).click();

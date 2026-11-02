@@ -337,11 +337,13 @@ const disk = () => JSON.parse(fs.readFileSync(require('./test-settings.cjs').fil
     await page.getByLabel('AIの認証方式').selectOption('none');
     const aiUrl = page.getByLabel('AIのAPIのURL', { exact: true });
     await aiUrl.fill('http://127.0.0.1:1/v1');
-    await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+    await aiUrl.press('Control+Enter');
+    await dialog.waitFor({ state: 'hidden' });
     await settleSettings(page);
     assert.equal(disk().ai.connections[0].name, 'Dialog IME confirmed');
+    assert.equal(disk().ai.connections[0].baseUrl, 'http://127.0.0.1:1/v1');
     checks.push(
-      'dialog text/password Escape cancels the field, Enter and IME blur stay local, OK saves the record once',
+      'dialog Enter and IME stay local; Ctrl+Enter saves the record with the latest blur-confirmed URL',
     );
 
     await select('通知');

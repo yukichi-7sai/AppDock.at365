@@ -276,7 +276,6 @@ async function palette() {
     assert.equal(await input.evaluate((el) => document.activeElement === el), false);
     await expectCommand('global', 0x43, [0x12]);
     await expectCommand('local', 0x78, [0x11, 0x10]);
-    await expectCommand('modified', 13, [0x11]);
     const beforeMouse = count('mouse');
     mouse();
     await until(() => count('mouse') === beforeMouse + 1, 'mouse during dialog');
@@ -285,16 +284,26 @@ async function palette() {
       0,
     );
     checks.push(
-      'dialog arrows and Tab reach controls; other global/local/modified keys and mouse gesture continue',
+      'dialog arrows and Tab reach controls; other global/local keys and mouse gesture continue',
     );
     await peer.request('focus');
     await until(async () => (await peer.request('snapshot')).focused, 'external target foreground');
     for (const [code, name] of navigation) await expectCommand(name.toLowerCase(), code, []);
+    await expectCommand('modified', 13, [0x11]);
     assert.equal(await dialog.count(), 1);
     checks.push(
       'all seven navigation triggers run normally in another foreground app while the dialog remains open',
     );
     await focus();
+    await input.fill('Ctrl+Enter row');
+    const beforeConfirm = count('modified');
+    await key(13, [0x11]);
+    await dialog.waitFor({ state: 'hidden' });
+    await dock.getByText('Ctrl+Enter row', { exact: true }).first().waitFor();
+    assert.equal(count('modified'), beforeConfirm);
+    await expectCommand('modified', 13, [0x11]);
+    checks.push('Ctrl+Enter saves from the focused input, suppresses the global command only inside the dialog, and resumes on close');
+    dialog = await openDialog();
     await key(27);
     await dialog.waitFor({ state: 'hidden' });
     dialog = await openDialog();
@@ -345,6 +354,7 @@ async function palette() {
       async () => (await peer.request('snapshot')).foregroundClass === '#32770',
       'native folder dialog foreground',
     );
+    await expectCommand('modified', 13, [0x11]);
     await key(9);
     await key(27);
     await waitForHost(dock, () => window.__nativePickerClosed);
@@ -392,6 +402,9 @@ async function palette() {
     }
     const recordings = await dock.evaluate(() => window.__recordedAlt);
     assert.equal(new Set(recordings.map((entry) => entry.token)).size, 3);
+    await key(13, [0x11]);
+    await until(async () => (await recorder.locator('kbd').allTextContents()).join('+') === 'Ctrl+Enter',
+      'Ctrl+Enter belongs to the active recorder');
     assert.equal(count('global'), keyCount);
     await peer.request('clear');
     await peer.request('focusAndAltC', { window: targetWindow });
@@ -432,7 +445,7 @@ async function palette() {
     await until(async () => (await recorder.locator('kbd').allTextContents()).join('+') === 'Alt+C',
       'left Alt+C captured for saving');
     await dialog.getByTestId('binding-scope:global').click();
-    await dialog.getByTestId('binding-apply').click();
+    await key(13, [0x11]);
     await dialog.waitFor({ state: 'hidden' });
     await waitForHost(dock, async () => (await window.dock.snapshot()).globalHotKeys.some((row) =>
       row.shortcut === 'Alt+C' && row.commandId === 'fixture.modal.choice' && row.registered));

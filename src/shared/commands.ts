@@ -159,7 +159,8 @@ export function normalizeShortcut(value: unknown): string {
 }
 /** Unmodified keys owned by the focused dialog or palette. */
 export const dialogNavigationShortcuts = ['Tab', 'Escape', 'Enter', 'Up', 'Down', 'Left', 'Right'];
-export const isDialogNavigationShortcut = (key: string) => dialogNavigationShortcuts.includes(key);
+export const isDialogNavigationShortcut = (key: string, hasConfirm = false) =>
+  dialogNavigationShortcuts.includes(key) || (hasConfirm && key === 'Ctrl+Enter');
 
 export interface KeyStroke {
   key: string;

@@ -141,6 +141,7 @@ export function ShortcutCaptureField({
     >
       <button
         ref={recorder}
+        data-shortcut-recorder="true"
         className="shortcut-capture"
         aria-label={translate('settings.shortcutCaptureField.enter', { label: label })}
         onFocus={() => setFocused(true)}

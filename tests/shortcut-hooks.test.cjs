@@ -6,11 +6,14 @@ const {
   isDialogNavigationShortcut,
 } = require('../out/main/shared/commands');
 
-test('dialogs own only unmodified navigation keys and leave every modified binding active', () => {
+test('only a dialog with a confirm action additionally owns Ctrl+Enter', () => {
   for (const key of ['Tab', 'Escape', 'Enter', 'Up', 'Down', 'Left', 'Right']) {
     assert.equal(isDialogNavigationShortcut(normalizeShortcut(key)), true);
-    for (const modifiers of ['Ctrl+', 'Alt+', 'Shift+', 'Win+', 'Ctrl+Shift+'])
-      assert.equal(isDialogNavigationShortcut(normalizeShortcut(modifiers + key)), false);
+    for (const modifiers of ['Ctrl+', 'Alt+', 'Shift+', 'Win+', 'Ctrl+Shift+']) {
+      const chord = normalizeShortcut(modifiers + key);
+      assert.equal(isDialogNavigationShortcut(chord), false);
+      assert.equal(isDialogNavigationShortcut(chord, true), chord === 'Ctrl+Enter');
+    }
   }
   for (const key of [
     'Space',

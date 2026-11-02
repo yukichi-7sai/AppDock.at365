@@ -218,6 +218,16 @@ internal static partial class Program
                 Config(7); Inputs(new { shortcut=name, blockOriginalInput=true });
                 Check(Feed(key:key)==1 && Feed(true,key)==1 && notices.Count==1, name+" trigger resumes after closing the dialog");
             }
+            Reset();
+            var confirmWindow=GetForegroundWindow();
+            Set("configuration", Decode("CaptureConfiguration", new {
+                gestures=new {}, shortcuts=Array.Empty<object>(), shortcutRevision=7,
+                hostProcessId=uint.MaxValue, context="{}", dialogWindow=confirmWindow.ToString(), dialogHasConfirm=true
+            }));
+            Inputs(new { shortcut="Ctrl+Enter", blockOriginalInput=true });
+            var confirmChord=parse.Invoke(null,["Ctrl+Enter",nint.Zero])!;
+            Check((bool)dialogOwns.Invoke(engine,[confirmChord,confirmWindow])!, "confirm dialog owns Ctrl+Enter");
+            Check(!(bool)dialogOwns.Invoke(engine,[confirmChord,new nint(-1)])!, "another window retains Ctrl+Enter");
             Check((nint)type.GetField("keyboardHook",members)!.GetValue(engine)! == 0 && (nint)type.GetField("mouseHook",members)!.GetValue(engine)! == 0,"handler fixture installed no hooks");
             var threadType=assembly.GetType("AppDock.InputHost.InputCaptureThread",true)!;
             using(var thread=(IDisposable)Activator.CreateInstance(threadType,members,null,[],null)!) {
