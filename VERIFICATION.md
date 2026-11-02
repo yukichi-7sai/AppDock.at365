@@ -1,5 +1,16 @@
 # 検証記録
 
+## 2026-11-02: ウィンドウ位置の保存競合からの復帰 0.121.2
+
+- cleanなmain `d49e972`から開始し、通常ユーザー環境の`pull --ff-only`で更新なしを確認。制限環境のDNS失敗と通常環境の取得成功を区別した。
+- 外部から同じWindowの位置が変わると、`uiStateStorage`の比較基準が古いまま残り、以後の移動も同じ競合で拒否されることを再現した。提示ログの最初の外部変更を発生させた処理は未特定。`WindowStateStore`で競合したcaptureを破棄し、保存済み状態を読み直して次のWindowイベントから保存を再開する。表示中Windowは移動させず、拒否した保存の自動再送も行わない。読み直しの失敗は報告し、正常値を取得するまで上書きしない。
+- 設定項目・保存ファイル・公開APIの変更はなく、通常の不具合修正として0.121.1→0.121.2へpatch更新。SDK/Runtime/各Appletの版更新は不要。変更範囲・競合/破損の保護・他設定と他Windowの保持・revisionとバックアップへの影響を発行前にレビューし、発行を妨げる指摘なし。仕様は[設定同期](docs/settings-sync.md)、レビューは`.artifacts/window-state-conflict-20261102/review.md`。
+- 修正前の回帰試験は16件中4件失敗して問題を再現。修正後は関連5ファイル53件成功（fail/skip/cancel 0）。外部変更と削除、壊れたJSONと不正な寸法、修復後の保存再開、他設定・別Window・共有ファイル・設定revision・バックアップの保持を確認。型検査・通常build・固定lockfileの依存照合・publishが成功した。標準全回帰は一律再実行せず、共通WindowStateStoreを使うAppletページ/Webアカウントと端末設定の関連回帰を選んだ。
+- ソースと固定EXEで6群（競合後の保存再開、再起動後の位置/サイズ、最大化/解除、最小化、トレイ格納、非表示起動）が成功し、専用host.logに対象エラーがないことを確認。固定EXEは実行中の版0.121.2も照合。初回のソースGUI2回は試験中のネイティブ位置/サイズ設定に伴うDIP丸めで古い幅を期待して失敗したため、実際に返るnormal boundsで保存と復元を検証するよう修正。既定値省略の影響を避けるため並行設定は非既定のdarkを使用した。製品のサイズ補正処理は変更していない。
+- 発行先`A:\40.ARTIFACT\AppDock.at365\win-unpacked`、EXE SHA256 `4dedcbe0e065d7aef3cf23ed9c88f5d2e1da2eb7139484646d5f90d953611c66`。stage・発行先・更新ZIPの管理693ファイルが一致。ZIP 270,913,340 bytes / SHA256 `4de74721518ec7712487e6361a40864bd087ba26dbe36faad583c5b49881e8b3`、feedの版・サイズ・hash一致。固定コピーの専用GUIと隔離smokeも成功。証跡は同フォルダーの`publication.json`、非文書996入力の`inputs.json`、各実行ログ、`.artifacts/window-state-1793605969756/result.json`、`.artifacts/window-state-1793606125475/result.json`、`.artifacts/smoke-1793606197808/smoke-result.json`。
+- 整理では、実パス・再解析ポイント・使用中プロセス・成功結果・manifestを照合し、古い成功済み固定コピー2か所のランタイム36項目/1,384ファイルだけを削除。設定・ログ・画像・結果・manifestなど174ファイルのhashを保持確認。最新の専用GUI/smokeコピー各1件と、失敗/状態不明の試験は保持した。`cleanup.json`に記録。実装完了時点では実利用先への配置・commit・push・GitHub Releaseは行っていない。実同期サービスが最初の競合を発生させた経路は未確認。
+- コミット確認では非文書996入力が実装時と一致。標準173ファイル1,572件について、影響する53ファイル572件を追加実行、実装時の5ファイル53件と0.121.1の影響しない115ファイル947件をログ・入力・外部fixture27件のhash照合で再利用し、fail/skip/cancel 0を確認。別checkoutとの446入力のCRLF/LF差分は内容一致を照合した。発行物693ファイル・更新ZIP・固定EXE GUI/smokeも一致し、製品変更や再発行は不要。証跡は`.artifacts/commit-validation-window-state-20261102/`の`test-plan.json`、`commands.json`、`validation.json`、`stage.json`、`commit.json`。今回の7ファイルだけをコミット対象とし、push・Release・実利用先への配置は行わない。
+
 ## 2026-11-02: テキストライブラリーのプレビュー・本文改行とmain統合 0.121.1
 
 - 0.121.0の非文書995入力と実装を照合したうえで、テキスト管理を含む変更を`daf2c95`からの専用worktreeで仕上げた。追加修正はプレビューと入力操作のためパッチ版を更新。仕様は[素材ライブラリー](docs/asset-libraries.md)と[設定基盤](docs/settings-foundation.md)に反映した。

@@ -126,6 +126,43 @@ test('failed UI saves and invalid external device state preserve settings and th
   assert.equal(fs.readFileSync(a.device.file, 'utf8'), bytes);
   assert.equal(gallery.get('library'), 180);
 });
+
+test('window saving recovers from an incoming device position while preserving settings and other windows', (t) => {
+  const { a, file, root } = fixture(t);
+  const errors = [];
+  const store = new WindowStateStore(a.uiStateStorage('windows', 'host'), (e) => errors.push(e));
+  store.load([{ x: 0, y: 0, width: 1920, height: 1080 }]);
+  const state = { bounds: { x: 20, y: 30, width: 1000, height: 700 }, maximized: false };
+  store.state = state;
+  store.flush();
+  const sharedBefore = fs.readFileSync(file);
+  const incoming = disk(a.device.file);
+  incoming.host.startAtLogon = true;
+  incoming.uiState.windows.host.bounds.x = 80;
+  incoming.uiState.windows['page:other'] = { ...state, maximized: true };
+  fs.writeFileSync(a.device.file, JSON.stringify(incoming));
+  store.state = { ...state, bounds: { ...state.bounds, x: 100 } };
+  store.flush();
+  store.flush();
+  assert.deepEqual(disk(a.device.file), incoming, 'the conflicting save is discarded');
+  assert.deepEqual(errors, []);
+  const revision = a.revision;
+  const backupFolder = path.join(root, 'local-a/settings-backups/device/pc-a');
+  const backups = fs.readdirSync(backupFolder).sort();
+  store.state = { ...state, bounds: { ...state.bounds, x: 120 } };
+  store.flush();
+  assert.deepEqual(disk(a.device.file).uiState.windows.host, store.state);
+  assert.deepEqual(
+    disk(a.device.file).uiState.windows['page:other'],
+    incoming.uiState.windows['page:other'],
+  );
+  assert.equal(a.value.host.startAtLogon, true);
+  assert.equal(disk(a.device.file).host.startAtLogon, true);
+  assert.deepEqual(fs.readFileSync(file), sharedBefore);
+  assert.equal(a.revision, revision);
+  assert.deepEqual(fs.readdirSync(backupFolder).sort(), backups);
+  assert.deepEqual(errors, []);
+});
 test('Storage API separates computers and owners, shares only explicit scope and never imports old local values', async (t) => {
   const { root, a } = fixture(t);
   const shared = path.join(root, 'data');

@@ -14,7 +14,7 @@
 
 本体とホストが管理するApplet Windowの通常位置・サイズ・最大化は`uiState.windows`へ保存する。本体は`host`、Appletページは`page:<Applet ID>:<page ID>`、Webアカウントは`web-accounts:<Applet ID>`、collectionは`collection:<page ID>`で分離する。Applet自身が独立して所有するネイティブWindowの保存処理は変更しない。
 
-`uiState`だけの変更では設定適用用revisionを進めず、全Appletへの設定再適用やバックアップ世代の追加を行わない。Windowの保存は既存の300ms debounceを使う。直前に端末JSONを再検証し、他の設定・別Windowの最新値を保持して原子的に置換する。同じUI状態の外部変更、破損、復旧中は保存を拒否する。通常の設定保存・ページリセットは`uiState`を保持する。
+`uiState`だけの変更では設定適用用revisionを進めず、全Appletへの設定再適用やバックアップ世代の追加を行わない。Windowの保存は既存の300ms debounceを使う。直前に端末JSONを再検証し、他の設定・別Windowの最新値を保持して原子的に置換する。同じUI状態の外部変更、破損、復旧中は保存を拒否する。Window状態の競合では、その時点の保存を破棄して最新の位置情報を読み直し、次のWindowイベントから保存を再開する。受信値による表示中Windowの移動や、拒否した保存の自動再送は行わない。読み直しに失敗した場合はエラーを報告し、正常な状態を取得するまで上書きしない。通常の設定保存・ページリセットは`uiState`を保持する。
 
 MCP Eventsの購読・署名鍵・callback・送信待ちはPC専用rootの`automation-events.json`へsafeStorageで暗号化して保存する。種類別の送信選択は通知ページで選んだ保存先の通知設定に含める。[購読と再送の仕様](mcp-events-design.md)を参照。
 

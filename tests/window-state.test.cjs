@@ -115,6 +115,70 @@ test('write failures are reported without throwing from a window event', (t) => 
   assert.equal(errors.length, 1);
 });
 
+for (const deleted of [false, true])
+  test(`a window move resumes after an external position ${deleted ? 'deletion' : 'change'} without retrying the rejected save`, (t) => {
+    const { store, file, window, errors } = fixture(t);
+    store.load([area]);
+    store.track(window);
+    window.emit('move');
+    store.flush();
+    const incoming = { ...state, bounds: { ...state.bounds, x: 500 } };
+    if (deleted) fs.unlinkSync(file);
+    else fs.writeFileSync(file, JSON.stringify(incoming));
+    window.bounds.x = 200;
+    window.emit('move');
+    store.flush();
+    store.flush();
+    if (deleted) assert.equal(fs.existsSync(file), false);
+    else assert.deepEqual(JSON.parse(fs.readFileSync(file)), incoming);
+    assert.deepEqual(errors, [], 'a recovered conflict is not a final save failure');
+    window.bounds.x = 300;
+    window.emit('move');
+    store.flush();
+    assert.deepEqual(JSON.parse(fs.readFileSync(file)), {
+      bounds: window.bounds,
+      maximized: false,
+    });
+    assert.deepEqual(errors, []);
+  });
+
+for (const invalid of [
+  '{broken',
+  JSON.stringify({ ...state, bounds: { ...state.bounds, width: -1 } }),
+])
+  test('a failed conflict reload protects invalid window state until repaired', (t) => {
+    const { store, file, window, errors } = fixture(t);
+    store.load([area]);
+    store.track(window);
+    window.emit('move');
+    store.flush();
+    fs.writeFileSync(file, invalid);
+    window.bounds.x = 200;
+    window.emit('move');
+    store.flush();
+    assert.equal(errors.length, 1);
+    assert(
+      !(errors[0] instanceof require('../out/main/main/core/settings').SettingsConflictError),
+      'report the reload failure',
+    );
+    window.bounds.x = 300;
+    window.emit('move');
+    store.flush();
+    assert.equal(errors.length, 2);
+    assert.equal(fs.readFileSync(file, 'utf8'), invalid);
+    fs.writeFileSync(file, JSON.stringify(state));
+    store.flush();
+    assert.deepEqual(JSON.parse(fs.readFileSync(file)), state);
+    window.bounds.x = 400;
+    window.emit('move');
+    store.flush();
+    assert.deepEqual(JSON.parse(fs.readFileSync(file)), {
+      bounds: window.bounds,
+      maximized: false,
+    });
+    assert.equal(errors.length, 2);
+  });
+
 test('fractional DPI rounding does not grow bounds on each restart', () => {
   let actual;
   const window = {

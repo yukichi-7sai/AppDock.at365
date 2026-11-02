@@ -12,6 +12,10 @@ async function launch(show = true) {
   await application.start();
   const page = await application.firstWindow();
   await page.waitForFunction(async () => (await window.dock.snapshot()).startupReady);
+  assert.equal(
+    await page.evaluate(async () => (await window.dock.snapshot()).version),
+    require('../package.json').version,
+  );
   if (show) await page.evaluate(() => window.dock.executeCommand('appdock.open'));
   if (
     await application.evaluate(({ BrowserWindow }) =>
@@ -46,7 +50,7 @@ const saved = () =>
   try {
     await launch();
     await waitFor(async () => (await current()).visible);
-    const expected = await application.evaluate(({ BrowserWindow, screen }) => {
+    let expected = await application.evaluate(({ BrowserWindow, screen }) => {
       const area = screen.getPrimaryDisplay().workArea;
       const bounds = { x: area.x + 40, y: area.y + 40, width: 1000, height: 680 };
       BrowserWindow.getAllWindows()
@@ -57,6 +61,52 @@ const saved = () =>
         .getNormalBounds();
     });
     await waitFor(() => JSON.stringify(saved()?.bounds) === JSON.stringify(expected));
+    await application.evaluate(() => {
+      const modules = process
+        .getBuiltinModule('module')
+        .createRequire(process.resourcesPath + '/app.asar/package.json').cache;
+      const { WindowStateStore } = Object.values(modules).find(
+        (module) => module.exports?.WindowStateStore,
+      ).exports;
+      const flush = WindowStateStore.prototype.flush;
+      globalThis.windowStateFlushCount = 0;
+      WindowStateStore.prototype.flush = function () {
+        try {
+          return flush.call(this);
+        } finally {
+          globalThis.windowStateFlushCount++;
+        }
+      };
+    });
+    const incoming = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const externalPosition = { ...expected, x: expected.x + 20 };
+    incoming.uiState.windows.host.bounds = externalPosition;
+    const otherWindow = { bounds: expected, maximized: true };
+    incoming.uiState.windows['test:other'] = otherWindow;
+    incoming.hostPages.appearance.configuration.host ??= {};
+    incoming.hostPages.appearance.configuration.host.theme = 'dark';
+    fs.writeFileSync(file, JSON.stringify(incoming));
+    await application.evaluate(
+      ({ BrowserWindow }, bounds) => {
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().startsWith('appdock://host/index.html'))
+          .setPosition(bounds.x, bounds.y);
+      },
+      { ...expected, x: expected.x + 40 },
+    );
+    await waitFor(() => application.evaluate(() => globalThis.windowStateFlushCount > 0));
+    assert.deepEqual(saved().bounds, externalPosition, 'the conflicting capture is discarded');
+    expected = await application.evaluate(({ BrowserWindow }, bounds) => {
+      const window = BrowserWindow.getAllWindows().find((w) =>
+        w.webContents.getURL().startsWith('appdock://host/index.html'),
+      );
+      window.setPosition(bounds.x, bounds.y);
+      return window.getNormalBounds();
+    }, expected);
+    await waitFor(() => JSON.stringify(saved()?.bounds) === JSON.stringify(expected));
+    const recovered = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(recovered.uiState.windows['test:other'], otherWindow);
+    assert.equal(recovered.hostPages.appearance.configuration.host.theme, 'dark');
     await application.close();
     await launch();
     await waitFor(async () => (await current()).visible);
@@ -103,6 +153,8 @@ const saved = () =>
     assert.equal((await current()).visible, false);
     await application.close();
     assert.deepEqual(saved(), { bounds: expected, maximized: true });
+    const log = path.join(profile, 'data/logs', require('node:os').hostname(), 'host.log');
+    assert.doesNotMatch(fs.readFileSync(log, 'utf8'), /ウィンドウ状態の読み込み・保存に失敗/);
     fs.writeFileSync(
       path.join(profile, 'result.json'),
       JSON.stringify(
@@ -116,6 +168,7 @@ const saved = () =>
             'minimize',
             'tray close',
             'hidden startup',
+            'incoming position conflict recovery preserves settings and other windows',
           ],
           file,
         },
@@ -123,7 +176,9 @@ const saved = () =>
         2,
       ),
     );
-    console.log('PASS: restart bounds, maximize/unmaximize, minimize, tray close, hidden startup');
+    console.log(
+      'PASS: restart bounds, maximize/unmaximize, minimize, tray close, hidden startup, incoming position conflict recovery',
+    );
   } finally {
     await application?.close();
   }

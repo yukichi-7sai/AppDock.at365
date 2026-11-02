@@ -1,6 +1,7 @@
 import { hostText } from '../../shared/i18n';
 import type { BrowserWindow, Rectangle } from 'electron';
 import { stateStorage, type StateStorage } from './state-storage';
+import { SettingsConflictError } from './settings';
 
 export interface WindowState {
   bounds: Rectangle;
@@ -75,6 +76,7 @@ export class WindowStateStore {
   state?: WindowState;
   private timer?: ReturnType<typeof setTimeout>;
   private saved = '';
+  private reloadRequired = false;
   private storage: StateStorage;
 
   constructor(
@@ -129,14 +131,37 @@ export class WindowStateStore {
   flush() {
     clearTimeout(this.timer);
     this.timer = undefined;
-    if (!this.state) return;
     try {
+      if (this.reloadRequired) {
+        this.reloadAfterConflict();
+        return;
+      }
+      if (!this.state) return;
       const text = JSON.stringify(parseWindowState(this.state), null, 2) + '\n';
       if (text === this.saved) return;
       this.storage.write(parseWindowState(this.state));
       this.saved = text;
     } catch (error) {
-      this.onError(error);
+      if (!(error instanceof SettingsConflictError)) {
+        this.onError(error);
+        return;
+      }
+      this.reloadRequired = true;
+      try {
+        this.reloadAfterConflict();
+      } catch (readError) {
+        this.onError(readError);
+      }
     }
+  }
+
+  private reloadAfterConflict() {
+    // Discard this capture rather than overwrite an incoming position.
+    // The next window event captures fresh bounds against the new baseline.
+    const value = this.storage.read();
+    const state = value === undefined ? undefined : parseWindowState(value);
+    this.state = state;
+    this.saved = state ? JSON.stringify(state, null, 2) + '\n' : '';
+    this.reloadRequired = false;
   }
 }
