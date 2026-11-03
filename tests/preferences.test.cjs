@@ -28,6 +28,8 @@ test('legacy settings gain Ctrl+P and pins without creating a host profile', () 
     overlayShadow: true,
     soundEnabled: true,
     textPaletteHistory: true,
+    textPaletteRows: 8,
+    clipboardPaletteRows: 8,
     notificationBannerPosition: 'top-center',
     notificationBannerShadow: true,
     notificationDesktopShadow: true,

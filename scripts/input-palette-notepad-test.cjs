@@ -289,7 +289,7 @@ const visible = async (history = false) => {
   );
   if (history)
     await p.locator('header strong').filter({ hasText: 'クリップボード履歴パレット' }).waitFor();
-  else await p.getByRole('button', { name: /01.txt/ }).waitFor();
+  else await p.locator('[data-index="0"] strong').filter({ hasText: /^01$/ }).waitFor();
   await wait(paletteVisible, 'visible palette');
   return p;
 };
@@ -300,24 +300,43 @@ const open = async () => {
 const closed = () => wait(async () => !(await paletteVisible()), 'palette closes');
 async function checkPaletteLabels(panel, title) {
   assert.equal(await panel.locator('header').innerText(), title);
-  assert.equal(await panel.locator('footer').textContent(), '↑↓ 選択　Enter 確定　Esc 閉じる');
+  assert.equal(
+    await panel.locator('footer span').first().textContent(),
+    '↑↓ 選択　1–0 入力　←→ 切替　Enter 確定　Esc 閉じる',
+  );
 }
 async function checkSnippetNavigation(panel) {
   await checkPaletteLabels(panel, '定型文パレット');
   for (const [action, expected] of [
-    ['repeat-down', 4], ['repeat-down', 8], ['repeat-down', 9], ['repeat-down', 9],
-    ['repeat-up', 5], ['repeat-up', 1], ['repeat-up', 0], ['repeat-up', 0],
+    ['repeat-down', 4],
+    ['repeat-down', 8],
+    ['repeat-down', 9],
+    ['repeat-down', 9],
+    ['repeat-up', 5],
+    ['repeat-up', 1],
+    ['repeat-up', 0],
+    ['repeat-up', 0],
   ]) {
     await act(action);
     const row = panel.locator('[aria-current=true][data-index="' + expected + '"]');
-    await wait(async () => row.evaluate((el) => {
-      const list = el.closest('.choices').getBoundingClientRect();
-      const bounds = el.getBoundingClientRect();
-      return bounds.top >= list.top - 1 && bounds.bottom <= list.bottom + 1;
-    }, undefined, { timeout: 1000 }), 'entire selected row visible at index ' + expected);
+    await wait(
+      async () =>
+        row.evaluate(
+          (el) => {
+            const list = el.closest('.choices').getBoundingClientRect();
+            const bounds = el.getBoundingClientRect();
+            return bounds.top >= list.top - 1 && bounds.bottom <= list.bottom + 1;
+          },
+          undefined,
+          { timeout: 1000 },
+        ),
+      'entire selected row visible at index ' + expected,
+    );
   }
   await panel.screenshot({ path: path.join(profile, 'snippets.png') });
-  checks.push('Held arrows move once per keydown, scroll each selection into view and stop at both ends');
+  checks.push(
+    'Held arrows move once per keydown, scroll each selection into view and stop at both ends',
+  );
 }
 async function openEdgeField() {
   edge = await chromium.launch({ channel: 'msedge', headless: false, args: ['--no-first-run'] });
@@ -543,7 +562,9 @@ async function checkTapPalette(target, field) {
     await act('repeat-enter');
     await closed();
     await state('あありがとう🌸い');
-    checks.push('Held Enter inserts the second row exactly once at the original caret, including surrogate pair');
+    checks.push(
+      'Held Enter inserts the second row exactly once at the original caret, including surrogate pair',
+    );
     panel = await open();
     const bounds = await panel.locator('[data-index="0"]').boundingBox();
     const hit = await mainEval(({ BrowserWindow, screen }, point) => {

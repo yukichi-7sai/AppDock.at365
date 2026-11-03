@@ -1,20 +1,34 @@
 import { BrowserWindow, ipcMain, screen, type IpcMainEvent } from 'electron';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { appearanceArguments, registerAppearance } from './appearance-host';
 import type { InputCaptureManager } from './gestures';
 import type { TextLibraryService } from './text-library-service';
 import type { LibraryEntry } from '../../shared/library-assets';
-import { inputPaletteBounds, type InputPaletteModel } from '../../shared/input-palette';
+import {
+  inputPaletteBounds,
+  inputPaletteSelection,
+  type InputPaletteKind,
+  type InputPaletteModel,
+} from '../../shared/input-palette';
 import { hostText } from '../../shared/i18n';
 
-interface Session {
-  id: string;
-  pasteEpoch: number;
-  kind: 'snippets' | 'history';
-  expected: string;
+interface PaletteList {
   entries: (InputPaletteModel['rows'][number] & ({ document: LibraryEntry } | { item: string }))[];
   empty: string;
   selected: number;
+  scrollTop: number;
+}
+interface Session extends PaletteList {
+  id: string;
+  view: number;
+  pasteEpoch: number;
+  kind: InputPaletteKind;
+  expected: string;
+  anchor?: { x: number; y: number };
+  lists: Partial<Record<InputPaletteKind, PaletteList>>;
+  switching: boolean;
+  captureView?: (top: number) => void;
   ready?: () => void;
 }
 export type PaletteFailure = 'open' | 'read' | 'send' | 'modifiers' | 'unconfirmed' | 'denied';
@@ -32,11 +46,16 @@ export class InputPaletteHost {
     private input: InputCaptureManager,
     private texts: TextLibraryService,
     private includeHistory: () => boolean,
+    private displayRows: (kind: InputPaletteKind) => number,
+    private manageSnippets: () => Promise<void>,
     private report: (stage: PaletteFailure, session: Pick<Session, 'id' | 'kind'>) => void,
   ) {
     ipcMain.on('input-palette:connect', this.connect);
     ipcMain.on('input-palette:choose', this.click);
     ipcMain.on('input-palette:ready', this.ready);
+    ipcMain.on('input-palette:manage', this.manage);
+    ipcMain.on('input-palette:scroll', this.scroll);
+    ipcMain.on('input-palette:view-state', this.viewState);
   }
   private connect = (e: IpcMainEvent) => {
     if (!this.trusted(e)) return;
@@ -46,17 +65,27 @@ export class InputPaletteHost {
   private publish(s: Session) {
     this.window?.webContents.send('input-palette:model', {
       session: s.id,
+      view: s.view,
+      kind: s.kind,
       selected: s.selected,
-      rows: s.entries.map(({ name, preview, thumbnail }) => ({ name, preview, thumbnail })),
+      scrollTop: s.scrollTop,
+      restoreScroll: s.lists[s.kind] !== undefined,
+      rows: s.entries.map(({ name, preview, thumbnail, title }) => ({
+        name,
+        preview,
+        thumbnail,
+        title,
+      })),
       title: hostText(s.kind === 'history' ? 'inputPalette.historyTitle' : 'inputPalette.title'),
       keys: hostText('inputPalette.keys'),
+      keyHelp: hostText('inputPalette.keyHelp'),
+      manage: hostText('inputPalette.manage'),
       empty: s.empty,
     });
   }
-  private ready = (e: IpcMainEvent, session: string) => {
+  private ready = (e: IpcMainEvent, session: string, view: number) => {
     const s = this.active;
-    if (s && s.id === session && this.trusted(e)) {
-      e.sender.send('input-palette:selected', s.id, s.selected);
+    if (s && s.id === session && s.view === view && this.trusted(e)) {
       s.ready?.();
     }
   };
@@ -67,11 +96,74 @@ export class InputPaletteHost {
       e.senderFrame?.url === this.url
     );
   }
-  private click = (e: IpcMainEvent, session: string, index: number) => {
+  private click = (e: IpcMainEvent, session: string, view: number, index: number) => {
     const s = this.active;
-    if (s && s.id === session && this.trusted(e) && Number.isInteger(index) && s.entries[index])
+    if (
+      s &&
+      s.id === session &&
+      s.view === view &&
+      !s.switching &&
+      this.trusted(e) &&
+      Number.isInteger(index) &&
+      s.entries[index]
+    )
       void this.choose(s, index);
   };
+  private scroll = (e: IpcMainEvent, session: string, view: number, top: number) => {
+    const s = this.active;
+    if (
+      s &&
+      s.id === session &&
+      s.view === view &&
+      this.trusted(e) &&
+      Number.isFinite(top) &&
+      top >= 0
+    )
+      s.scrollTop = top;
+  };
+  private manage = (e: IpcMainEvent, session: string, view: number) => {
+    const s = this.active;
+    if (
+      !s ||
+      s.id !== session ||
+      s.view !== view ||
+      s.kind !== 'snippets' ||
+      s.switching ||
+      !this.trusted(e)
+    )
+      return;
+    this.end(s);
+    void this.manageSnippets().catch(() => this.report('open', s));
+  };
+  private viewState = (e: IpcMainEvent, session: string, view: number, top: number) => {
+    const s = this.active;
+    if (
+      s &&
+      s.id === session &&
+      s.view === view &&
+      this.trusted(e) &&
+      Number.isFinite(top) &&
+      top >= 0
+    )
+      s.captureView?.(top);
+  };
+  private async captureView(s: Session) {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const captured = new Promise<void>((resolve, reject) => {
+      s.captureView = (top) => {
+        s.scrollTop = top;
+        resolve();
+      };
+      timeout = setTimeout(() => reject(Error('Palette view state timeout')), 10000);
+    });
+    try {
+      this.window?.webContents.send('input-palette:capture-view', s.id, s.view);
+      await captured;
+    } finally {
+      clearTimeout(timeout);
+      s.captureView = undefined;
+    }
+  }
   private surface() {
     if (this.window && !this.window.isDestroyed()) return this.window;
     const win = new BrowserWindow({
@@ -137,24 +229,22 @@ export class InputPaletteHost {
     if (this.presented) this.hide();
     const s: Session = {
       id: randomUUID(),
+      view: 0,
       kind,
       expected,
       empty: hostText('inputPalette.empty'),
       entries: [],
       selected: 0,
+      scrollTop: 0,
+      lists: {},
+      switching: false,
       pasteEpoch: this.pasteEpoch,
     };
     this.active = s;
     try {
       // Keyboard selection is valid once native captures the target, including during first paint.
       if (kind === 'snippets') {
-        s.entries = this.texts
-          .snippetEntries()
-          .map((document) => ({
-            document,
-            name: document.ref.file,
-            preview: document.textPreview ?? '',
-          }));
+        s.entries = this.snippets();
       }
       const anchor = await this.input.paletteRequest<{
         x: number;
@@ -169,73 +259,139 @@ export class InputPaletteHost {
         return;
       }
       s.expected = anchor.window;
+      s.anchor = screen.screenToDipPoint(anchor);
       if (kind === 'history') {
-        const list = await this.input.paletteRequest<{
-          status: 'ok' | 'disabled' | 'denied';
-          rows: { id: string; kind: 'image' | 'text'; preview: string; thumbnail?: string }[];
-        } | null>('history', { session: s.id });
+        const list = await this.history(s);
         if (!list || this.active !== s) {
           this.end(s);
           return;
         }
-        s.empty = hostText(
-          list.status === 'disabled'
-            ? 'inputPalette.disabled'
-            : list.status === 'denied'
-              ? 'inputPalette.error.denied'
-              : 'inputPalette.historyEmpty',
-        );
-        s.entries = list.rows.map((row) => ({
-          item: row.id,
-          name:
-            row.kind === 'image'
-              ? hostText('inputPalette.image')
-              : row.preview.split(/\r\n|\r|\n/, 1)[0] || hostText('inputPalette.text'),
-          preview:
-            row.kind === 'image'
-              ? ''
-              : row.preview
-                  .split(/\r\n|\r|\n/)
-                  .slice(1)
-                  .join(' '),
-          thumbnail: row.thumbnail,
-        }));
+        Object.assign(s, list);
       }
-      const point = screen.screenToDipPoint(anchor),
-        area = screen.getDisplayNearestPoint(point).workArea;
-      const win = this.surface();
-      win.setBounds(inputPaletteBounds(point, area, s.entries.length));
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      const rendered = new Promise<void>((resolve, reject) => {
-        s.ready = resolve;
-        timeout = setTimeout(() => reject(Error('Palette readiness timeout')), 10000);
-      });
-      try {
-        if (this.connected) this.publish(s);
-        await rendered;
-      } finally {
-        clearTimeout(timeout);
-        s.ready = undefined;
-      }
-      if (this.active !== s) return;
-      const ok = await this.input.paletteRequest('show', {
-        session: s.id,
-        popup: win.getNativeWindowHandle().readBigUInt64LE().toString(),
-      });
-      if (!ok || this.active !== s) {
-        this.end(s);
-        return;
-      }
-      this.presented = s.id;
-      win.showInactive();
-      // Reopening a hidden toolbar can leave it under the foreground editor on Windows.
-      win.setAlwaysOnTop(true, 'pop-up-menu');
+      await this.present(s);
     } catch {
       if (this.active === s) {
         this.end(s);
         this.report('open', s);
       }
     }
+  }
+  private snippets(): PaletteList['entries'] {
+    return this.texts.snippetEntries().map((document) => ({
+      document,
+      name: path.parse(document.ref.file).name,
+      title: document.ref.file,
+      preview: document.textPreview ?? '',
+    }));
+  }
+  private async history(s: Session): Promise<PaletteList | null> {
+    const list = await this.input.paletteRequest<{
+      status: 'ok' | 'disabled' | 'denied';
+      rows: { id: string; kind: 'image' | 'text'; preview: string; thumbnail?: string }[];
+    } | null>('history', { session: s.id });
+    if (!list) return null;
+    return {
+      empty: hostText(
+        list.status === 'disabled'
+          ? 'inputPalette.disabled'
+          : list.status === 'denied'
+            ? 'inputPalette.error.denied'
+            : 'inputPalette.historyEmpty',
+      ),
+      selected: 0,
+      scrollTop: 0,
+      entries: list.rows.map((row) => ({
+        item: row.id,
+        name:
+          row.kind === 'image'
+            ? hostText('inputPalette.image')
+            : row.preview.split(/\r\n|\r|\n/, 1)[0] || hostText('inputPalette.text'),
+        preview:
+          row.kind === 'image'
+            ? ''
+            : row.preview
+                .split(/\r\n|\r|\n/)
+                .slice(1)
+                .join(' '),
+        thumbnail: row.thumbnail,
+      })),
+    };
+  }
+  private async switchPalette(s: Session) {
+    if (s.switching) return;
+    s.switching = true;
+    const kind = s.kind === 'snippets' ? 'history' : 'snippets';
+    try {
+      // Scroll events can arrive after a native key notice. Capture the rendered view before switching.
+      await this.captureView(s);
+      if (this.active !== s) return;
+      s.lists[s.kind] = {
+        entries: s.entries,
+        empty: s.empty,
+        selected: s.selected,
+        scrollTop: s.scrollTop,
+      };
+      // Invalidate clicks/scrolls queued by the previous view, while retaining the captured editor.
+      s.view++;
+      const list =
+        s.lists[kind] ??
+        (kind === 'history'
+          ? await this.history(s)
+          : {
+              entries: this.snippets(),
+              empty: hostText('inputPalette.empty'),
+              selected: 0,
+              scrollTop: 0,
+            });
+      if (this.active !== s) return;
+      if (!list) {
+        this.end(s);
+        return;
+      }
+      s.kind = kind;
+      Object.assign(s, list);
+      await this.present(s);
+    } catch {
+      if (this.active === s) {
+        this.end(s);
+        this.report('open', s);
+      }
+    } finally {
+      s.switching = false;
+    }
+  }
+  private async present(s: Session) {
+    const point = s.anchor!,
+      area = screen.getDisplayNearestPoint(point).workArea;
+    const win = this.surface();
+    win.setBounds(inputPaletteBounds(point, area, s.entries.length, this.displayRows(s.kind)));
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const rendered = new Promise<void>((resolve, reject) => {
+      s.ready = resolve;
+      timeout = setTimeout(() => reject(Error('Palette readiness timeout')), 10000);
+    });
+    try {
+      if (this.connected) this.publish(s);
+      await rendered;
+    } finally {
+      clearTimeout(timeout);
+      s.ready = undefined;
+    }
+    if (this.active !== s) return;
+    s.switching = false;
+    const ok = await this.input.paletteRequest('show', {
+      session: s.id,
+      count: s.entries.length,
+      popup: win.getNativeWindowHandle().readBigUInt64LE().toString(),
+    });
+    if (!ok || this.active !== s) {
+      this.end(s);
+      return;
+    }
+    this.presented = s.id;
+    win.showInactive();
+    // Reopening a hidden toolbar can leave it under the foreground editor on Windows.
+    win.setAlwaysOnTop(true, 'pop-up-menu');
   }
   key(id: string, key: string) {
     const pending = this.confirmations.get(id);
@@ -250,16 +406,25 @@ export class InputPaletteHost {
       this.end(s, false);
       return;
     }
+    if (key === 'switch') {
+      void this.switchPalette(s);
+      return;
+    }
+    if (s.switching) return;
+    if (/^choose:[0-9]$/.test(key)) {
+      const index = Number(key.slice(7));
+      if (s.entries[index]) void this.choose(s, index);
+      return;
+    }
     if (key === 'choose') {
       if (s.entries.length) void this.choose(s, s.selected);
       else this.end(s);
       return;
     }
-    if (key !== 'up' && key !== 'down') return;
-    const next = Math.max(0, Math.min(s.entries.length - 1, s.selected + (key === 'up' ? -1 : 1)));
-    if (next === s.selected) return;
-    s.selected = next;
-    if (this.connected) this.window?.webContents.send('input-palette:selected', s.id, s.selected);
+    if (!['up', 'down', 'page-up', 'page-down', 'home', 'end'].includes(key)) return;
+    s.selected = inputPaletteSelection(key, s.selected, s.entries.length, this.displayRows(s.kind));
+    if (this.connected)
+      this.window?.webContents.send('input-palette:selected', s.id, s.view, s.selected);
   }
   private choose(s: Session, index: number) {
     if (this.active !== s) return;
@@ -338,6 +503,7 @@ export class InputPaletteHost {
     if (this.active !== s) return;
     this.active = undefined;
     s.ready?.();
+    s.captureView?.(s.scrollTop);
     if (notify) void this.input.paletteRequest('close', { session: s.id }).catch(() => {});
     this.hide();
   }
@@ -354,5 +520,8 @@ export class InputPaletteHost {
     ipcMain.removeListener('input-palette:connect', this.connect);
     ipcMain.removeListener('input-palette:choose', this.click);
     ipcMain.removeListener('input-palette:ready', this.ready);
+    ipcMain.removeListener('input-palette:manage', this.manage);
+    ipcMain.removeListener('input-palette:scroll', this.scroll);
+    ipcMain.removeListener('input-palette:view-state', this.viewState);
   }
 }

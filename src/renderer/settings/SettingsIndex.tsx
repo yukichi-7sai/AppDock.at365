@@ -9,6 +9,7 @@ import { appletSettingsPageId } from '../../shared/settings-catalog';
 const indexIcons: Partial<Record<string, IconName>> = {
   applets: 'extensions',
   notifications: 'bell',
+  'text-palette': 'palette',
   'command-triggers': 'bolt',
   shortcuts: 'keyboard',
   gestures: 'mouse',

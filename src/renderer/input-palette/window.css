@@ -28,15 +28,45 @@ footer {
 header {
   height: 39px;
   border-bottom: 1px solid var(--border);
+  justify-content: space-between;
+  gap: 8px;
 }
 footer,
-button span {
+.choices button span {
   color: var(--muted);
   font-size: 12px;
 }
 footer {
-  height: 29px;
+  height: 47px;
   border-top: 1px solid var(--border);
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+}
+footer span,
+header > strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.manage {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+}
+.manage svg {
+  width: 20px;
+  height: 20px;
 }
 .choices {
   min-height: 0;
@@ -48,7 +78,7 @@ footer {
   color: var(--muted);
   margin: 8px;
 }
-button {
+.choices button {
   position: absolute;
   left: 0;
   width: 100%;
@@ -57,7 +87,7 @@ button {
   justify-content: center;
   align-items: stretch;
   gap: 2px;
-  padding: 4px 10px;
+  padding: 4px 42px 4px 10px;
   border: 0;
   border-inline-start: 3px solid transparent;
   border-radius: 5px;
@@ -70,23 +100,38 @@ button {
 button:hover {
   background: var(--raised);
 }
-button img {
+.choices button img {
   position: absolute;
   left: 8px;
   width: 72px;
   height: 44px;
   object-fit: contain;
 }
-button:has(img) {
+.choices button:has(img) {
   padding-left: 88px;
 }
-button[aria-current='true'] {
+.choices button[aria-current='true'] {
   background: var(--accent-soft);
   border-inline-start-color: var(--accent);
 }
-button span,
-button strong {
+.choices button span,
+.choices button strong {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.choices kbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 22px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: center;
 }

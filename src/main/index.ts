@@ -1705,6 +1705,17 @@ function refreshAfterResume() {
   automation?.reconcileEvents();
 }
 const shortcutInvocation = new AsyncLocalStorage<ShortcutPress>();
+async function manageSnippets() {
+  const state = textLibraryPageState;
+  if (!state || state.closed) return;
+  state.group = 'group:' + snippetGroupId;
+  state.query = '';
+  state.folder = '*';
+  state.selected.clear();
+  state.resetView();
+  await showWindow();
+  await navigation.navigate('text-library');
+}
 async function showWindow(invocation?: InputInvocation) {
   if (window) {
     if (invocation?.source === 'gesture' && invocation.session && invocation.window && gestures) {
@@ -3200,16 +3211,7 @@ function settingsPageActions(
   }
   if (page.id === 'text-palette') {
     actions.openClipboardSettings = () => shell.openExternal('ms-settings:clipboard');
-    actions.manageSnippets = async () => {
-      const state = textLibraryPageState;
-      if (!state || state.closed) return;
-      state.group = 'group:' + snippetGroupId;
-      state.query = '';
-      state.folder = '*';
-      state.selected.clear();
-      state.resetView();
-      await navigation.navigate('text-library');
-    };
+    actions.manageSnippets = manageSnippets;
   }
   if (page.id === 'general') {
     actions.restoreScopedSettings = async ([scope]) => {
@@ -5322,6 +5324,11 @@ async function initialize() {
     gestures,
     textLibrary,
     () => settings.value.host.textPaletteHistory,
+    (kind) =>
+      kind === 'snippets'
+        ? settings.value.host.textPaletteRows
+        : settings.value.host.clipboardPaletteRows,
+    manageSnippets,
     (stage, session) =>
       errors.report({
         eventId: 'input-palette-' + session.id,

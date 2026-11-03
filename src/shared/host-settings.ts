@@ -1,6 +1,7 @@
 import { localizedMetadata } from './translation-metadata';
 import type { HostSettings, SettingDefinition } from './contracts';
 import { hostText } from './i18n';
+import { defaultInputPaletteRows } from './input-palette';
 import { notificationBannerPositions } from './notifications';
 import { defaultHostLanguage, hostLanguages, hostLanguageName } from './host-language';
 import { defaultZoomFactor, minimumZoomFactor, maximumZoomFactor } from './display-zoom';
@@ -148,6 +149,26 @@ const definitions = localizedMetadata(() => ({
     description: hostText('inputPalette.historyHint'),
     type: 'boolean',
     default: true,
+    automation: false,
+  },
+  textPaletteRows: {
+    pageId: 'text-palette',
+    title: hostText('inputPalette.displayRows'),
+    description: hostText('inputPalette.displayRowsHint'),
+    type: 'number',
+    default: defaultInputPaletteRows,
+    minimum: 1,
+    step: 1,
+    automation: false,
+  },
+  clipboardPaletteRows: {
+    pageId: 'text-palette',
+    title: hostText('inputPalette.displayRows'),
+    description: hostText('inputPalette.displayRowsHint'),
+    type: 'number',
+    default: defaultInputPaletteRows,
+    minimum: 1,
+    step: 1,
     automation: false,
   },
   notificationBannerPosition: {

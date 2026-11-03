@@ -498,6 +498,26 @@ export function SettingsForm({
                   }
                 />
               </SettingRow>
+              <SettingRow pageId={category} itemKey="textPaletteRows">
+                <SettingsInput
+                  aria-label={t('inputPalette.displayRows')}
+                  data-testid="text-palette-rows"
+                  type="number"
+                  min={1}
+                  step={1}
+                  disabled={busy}
+                  value={settings.host.textPaletteRows}
+                  onChange={(event) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        textPaletteRows: numberInput(event.target.value),
+                      },
+                    })
+                  }
+                />
+              </SettingRow>
             </SettingsSection>
             <SettingsSection
               title={t('inputPalette.historyTitle')}
@@ -510,6 +530,26 @@ export function SettingsForm({
                   </button>
                 </SettingsActions>
               </SettingsField>
+              <SettingRow pageId={category} itemKey="clipboardPaletteRows">
+                <SettingsInput
+                  aria-label={t('inputPalette.displayRows')}
+                  data-testid="clipboard-palette-rows"
+                  type="number"
+                  min={1}
+                  step={1}
+                  disabled={busy}
+                  value={settings.host.clipboardPaletteRows}
+                  onChange={(event) =>
+                    edit({
+                      ...settings,
+                      host: {
+                        ...settings.host,
+                        clipboardPaletteRows: numberInput(event.target.value),
+                      },
+                    })
+                  }
+                />
+              </SettingRow>
             </SettingsSection>
           </>
         )}

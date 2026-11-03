@@ -50,6 +50,8 @@ function change(value, pageId, alternate = false) {
     next.host.startPage = alternate ? 'about' : 'page:example.missing:main';
   } else if (pageId === 'text-palette') {
     next.host.textPaletteHistory = alternate;
+    next.host.textPaletteRows = alternate ? 11 : 4;
+    next.host.clipboardPaletteRows = alternate ? 3 : 12;
   } else if (pageId === 'notifications') {
     next.host.notificationBannerPosition = alternate ? 'bottom-left' : 'bottom-right';
     next.host.notificationBannerShadow = alternate;

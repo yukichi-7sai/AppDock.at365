@@ -95,6 +95,8 @@ internal sealed class InputCaptureEngine : IDisposable
         switch (method) {
             case "palette.show":
                 palette.Popup = new nint(long.Parse(p.GetProperty("popup").GetString()!));
+                palette.Count = p.GetProperty("count").GetInt32();
+                palette.Switching = false;
                 try { Reconcile(); UpdateTimer(); } catch { DropPalette(); throw; }
                 return true;
             case "palette.confirm":
@@ -385,7 +387,7 @@ internal sealed class InputCaptureEngine : IDisposable
                 if (palette != null && palette.HeldArrows.TryGetValue(data.Key, out var arrow)) {
                     if (up) palette.HeldArrows.Remove(data.Key);
                     else if (!palette.IsCurrent()) DropPalette();
-                    else if (Modifiers(data.Key, up, eventAlt) == 0)
+                    else if (!palette.Switching && Modifiers(data.Key, up, eventAlt) == 0)
                         notify("palette.key", new { session = palette.Session, key = arrow });
                 }
                 if (up) { owned.Remove(data.Key); if (owned.Count == 0) QueueRefresh(); }
@@ -402,14 +404,19 @@ internal sealed class InputCaptureEngine : IDisposable
                 if ((modifiers & 8) == 0) { pressed.Remove(0x5B); pressed.Remove(0x5C); }
             }
             if (palette != null && !up && !repeat && !auxiliary) {
-                var key = data.Key switch { 38 => "up", 40 => "down", 13 => "choose", 27 => "cancel", _ => null };
+                var key = InputPaletteKeys.Action(data.Key);
                 if (key != null && modifiers == 0 && palette.IsCurrent()) {
                     owned[data.Key] = true;
                     if (key == "cancel") DropPalette();
-                    else {
+                    else if (!palette.Switching) {
+                        // Unknown numbers are consumed without confirming or dismissing the list.
+                        var index = InputPaletteKeys.Index(data.Key);
+                        if (index >= palette.Count) return 1;
+                        if (key == "switch" && palette.Popup == 0) return 1;
                         var session = palette.Session;
-                        if (key == "choose") ConfirmPalette();
-                        else palette.HeldArrows.Add(data.Key, key);
+                        if (key == "choose" || index >= 0) ConfirmPalette();
+                        else if (key == "switch") palette.Switching = true;
+                        else if (InputPaletteKeys.Repeats(key)) palette.HeldArrows.Add(data.Key, key);
                         notify("palette.key", new { session, key });
                     }
                     return 1;

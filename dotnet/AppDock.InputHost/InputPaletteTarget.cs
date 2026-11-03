@@ -10,6 +10,8 @@ internal sealed class InputPaletteTarget
     internal readonly uint Since = unchecked((uint)Environment.TickCount);
     internal readonly GesturePoint Anchor;
     internal readonly Dictionary<uint, string> HeldArrows = [];
+    internal bool Switching;
+    internal int Count;
     internal nint Popup;
     internal nint Editor => focus;
     internal string WindowId => window.ToInt64().ToString();

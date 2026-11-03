@@ -17,6 +17,7 @@ internal static partial class Program
         if(args is ["--lock-keys",var lockKeyAssembly]) return RunLockKeyTests(lockKeyAssembly);
         if(args is ["--input-queue",var inputQueueAssembly]) return RunInputQueueTests(inputQueueAssembly);
         if(args is ["--input-blocking",var inputBlockingAssembly]) return RunInputBlockingTests(inputBlockingAssembly);
+        if(args is ["--input-palette",var paletteAssembly]) return RunInputPaletteTests(paletteAssembly);
         if(args is ["--modifier-hook-chain", var inputAssembly, "capture-first" or "grab-first", "Alt" or "Win"])
             return RunModifierHookChainTests(inputAssembly, args[2] == "grab-first", args[3] == "Win");
         if(args is ["--palette-grab-hook"]) return RunPaletteGrabHook();

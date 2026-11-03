@@ -35,6 +35,7 @@ export type IconName =
   | 'star'
   | 'heart'
   | 'file'
+  | 'palette'
   | 'link'
   | 'external-link'
   | 'download'
@@ -48,6 +49,15 @@ export type IconName =
   | 'help';
 const playIcon = <path d="m7 4 13 8-13 8Z" />;
 const paths: Record<IconName, React.ReactNode> = {
+  palette: (
+    <>
+      <path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.4-3.4 1.5 1.5 0 0 1 1.1-2.6H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z" />
+      <circle cx="7.5" cy="10" r=".8" />
+      <circle cx="10.5" cy="6.5" r=".8" />
+      <circle cx="15" cy="7.5" r=".8" />
+      <circle cx="17.5" cy="11" r=".8" />
+    </>
+  ),
   calendar: (
     <>
       <rect x="3" y="5" width="18" height="16" rx="2" />
