@@ -26,10 +26,11 @@ export class NotificationSounds {
   ) {}
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
-    if (!enabled) {
-      for (const job of [...this.pending]) this.discard(job);
-      if (this.active) this.discard(this.active.job);
-    }
+    if (!enabled) this.stopAll();
+  }
+  stopAll() {
+    for (const job of [...this.pending]) this.discard(job);
+    if (this.active) this.discard(this.active.job);
   }
   setPaused(paused: boolean) {
     this.paused = paused;

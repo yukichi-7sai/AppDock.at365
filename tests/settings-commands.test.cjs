@@ -303,6 +303,39 @@ for (const field of ['soundEnabled', 'showHints'])
     assert.equal(f.settings.value.host[field], false);
   });
 
+test('new host switches keep descriptions, application timing and private publication while saving through the shared path', (t) => {
+  const f = fixture(t);
+  const fields = [
+    'ribbonExpandOnHover',
+    'hardwareAcceleration',
+    'paletteShowGuide',
+    'textPaletteHistory',
+  ];
+  for (const field of fields) {
+    const localOnly = ['paletteShowGuide', 'textPaletteHistory'].includes(field);
+    for (const action of ['on', 'off', 'toggle']) {
+      const id = `appdock.settings.${field}.${action}`;
+      const command = f.commands.commands().find((c) => c.id === id);
+      assert.equal(!!command, !localOnly);
+      if (command) assert(command.description.includes('保存'));
+      if (localOnly)
+        assert.throws(
+          () => f.commands.execute(id),
+          (e) => e.code === 'NOT_FOUND',
+        );
+      const before = f.settings.value.host[field];
+      const result = f.commands.execute(id, {}, false);
+      assert.equal(f.settings.value.host[field], action === 'toggle' ? !before : action === 'on');
+      if (result.changed.includes(field))
+        assert.equal(
+          result.applies[field],
+          field === 'hardwareAcceleration' ? 'nextStart' : 'immediate',
+        );
+      assert.equal(f.settings.value.host.showHints, true);
+    }
+  }
+});
+
 test('manifest accepts generated shortcut references and reserves host namespace', (t) => {
   const f = fixture(t),
     dir = path.dirname(f.settings.file);

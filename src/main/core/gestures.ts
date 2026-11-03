@@ -104,6 +104,8 @@ export class InputCaptureManager {
   private endedRecordings = new Set<string>();
   private sessionPaused = false;
   paused = false;
+  private keyboardPaused = false;
+  private touchpadPaused = false;
   private foregroundWindow?: string;
   constructor(
     private executable: string,
@@ -166,6 +168,20 @@ export class InputCaptureManager {
   togglePause() {
     this.paused = !this.paused;
     void this.refresh().catch(() => {});
+  }
+  async setInputPaused(mouse: boolean, keyboard: boolean, touchpad: boolean) {
+    if (
+      this.paused === mouse &&
+      this.keyboardPaused === keyboard &&
+      this.touchpadPaused === touchpad
+    )
+      return;
+    if (this.keyboardPaused !== keyboard || this.touchpadPaused !== touchpad)
+      this.shortcutRevision++;
+    this.paused = mouse;
+    this.keyboardPaused = keyboard;
+    this.touchpadPaused = touchpad;
+    await this.refresh(true);
   }
   setSessionPaused(paused: boolean) {
     if (this.stopped || paused === this.sessionPaused) return;
@@ -309,10 +325,14 @@ export class InputCaptureManager {
       const state = this.state();
       const keys = p.shortcuts.filter(
         (key: string) =>
+          !(this.touchpadReserved.includes(key) ? this.touchpadPaused : this.keyboardPaused) &&
           this.statuses.some((s) => s.registered && s.shortcut === key) &&
           (!(state.recording || this.recording) ||
             this.touchpadInputs.some((input) => input.shortcut === key)) &&
-          !(state.dialogWindow === p.window && isDialogNavigationShortcut(key, state.dialogHasConfirm)),
+          !(
+            state.dialogWindow === p.window &&
+            isDialogNavigationShortcut(key, state.dialogHasConfirm)
+          ),
       );
       const conditional = [...this.inputs, ...this.touchpadInputs].some(
         (input) => keys.includes(input.shortcut) && (input.owner || input.conditions?.length),
@@ -504,9 +524,12 @@ export class InputCaptureManager {
     const inputs = [
       ...this.inputs.filter(
         (input) =>
-          !state.quitting && !state.recording && !this.touchpadReserved.includes(input.shortcut),
+          !state.quitting &&
+          !state.recording &&
+          !this.keyboardPaused &&
+          !this.touchpadReserved.includes(input.shortcut),
       ),
-      ...(state.quitting ? [] : projectedTouchpadInputs),
+      ...(state.quitting || this.touchpadPaused ? [] : projectedTouchpadInputs),
     ];
     const config = {
       gestures: gesture,

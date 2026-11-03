@@ -44,6 +44,7 @@ export function appletManagementCommands(applets: ExtensionSnapshot[]) {
       .map((operation) => ({
         id: appletManagementId(a.id, operation),
         title: hostText(`services.sharedAppletManagement.${operation}`, { name: a.displayName }),
+        description: hostText(`commands.applet.${operation}Description`, { name: a.displayName }),
         extension: 'AppDock',
         extensionId: null,
         appletId: a.id,

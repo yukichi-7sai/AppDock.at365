@@ -113,6 +113,21 @@ function wave() {
   b.writeUInt32LE(160, 40);
   return b;
 }
+test('stop all cancels playing and waiting audio without muting future requests', async () => {
+  const f = controlled();
+  const first = f.queue.play(request('active'));
+  const waiting = f.queue.play(request('waiting'));
+  await turn();
+  await f.queue.stopAll();
+  await Promise.all([first, waiting]);
+  assert.deepEqual(f.events, ['start:active', 'end:active']);
+  const fresh = f.queue.play(request('fresh'));
+  await turn();
+  assert.equal(f.events.at(-1), 'start:fresh');
+  f.releases.pop()();
+  await fresh;
+  await f.queue.close();
+});
 test('OFF stops active audio, drops waiting and new audio, and ON only plays fresh audio', async () => {
   const f = controlled();
   const first = f.queue.play(request('active'));

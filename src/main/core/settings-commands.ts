@@ -395,6 +395,7 @@ export class SettingsCommands {
           ...base,
           id: c.id,
           title: c.title,
+          description: c.description,
           inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         })),
       ];

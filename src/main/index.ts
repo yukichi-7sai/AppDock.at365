@@ -8,6 +8,16 @@ import { SettingsReadScope } from './core/settings-read-scope';
 import { SettingsServiceTargets } from './core/settings-service-targets';
 import { imageLibrarySettingsTargets } from './core/settings-image-library-targets';
 import { hostText } from '../shared/i18n';
+import {
+  hostActionCommands,
+  inputPauseCommand,
+  inputPauseKinds,
+  inputPausePrefixes,
+} from '../shared/host-action-commands';
+import { hostToggleCommand } from '../shared/host-toggle-settings';
+import { applyHostToggle } from '../shared/host-toggle-apply';
+import { displayZoomChoices } from '../shared/display-zoom';
+import { HostCommandSession } from './core/host-command-session';
 import { validRepository } from '../shared/versions';
 import { isDialogNavigationShortcut } from '../shared/commands';
 import { webAccountSettingsTargets } from './core/settings-web-account-target';
@@ -184,7 +194,6 @@ import {
   getTrayMenu,
   resolveTrayMenu,
   trayCommandCatalog,
-  gesturePauseCommand,
   type ResolvedTrayItem,
 } from '../shared/tray-menu';
 import {
@@ -422,6 +431,27 @@ const settingsOperationBusy = () => settingsRecoveryBusy || launch.isBusy;
 let notificationSpeech: NotificationSpeechService | undefined;
 let notificationAvailability: NotificationAvailability | undefined;
 let hostSession: HostSession | undefined;
+let sessionLocked = false;
+const commandSession = new HostCommandSession(() => {
+  syncNotificationPause();
+  trayMenu();
+  changed();
+});
+function syncNotificationPause() {
+  const paused = sessionLocked || commandSession.notificationsPaused;
+  notificationAvailability?.setPaused(paused);
+  notificationSounds.setPaused(paused);
+  notificationService?.setPaused(paused);
+}
+async function syncInputPause() {
+  await gestures?.setInputPaused(
+    commandSession.inputPaused('mouse'),
+    commandSession.inputPaused('keyboard'),
+    commandSession.inputPaused('touchpad'),
+  );
+  await syncHotKeys();
+  await touchpad?.reconcile();
+}
 const settingsInputFlushes = new Map<string, () => void>();
 async function flushSettingsInputs() {
   if (!window || window.isDestroyed() || window.webContents.isLoading())
@@ -591,25 +621,25 @@ const presentation = new UiPresentation({
   displayMode: ribbonDisplayMode,
   toggleDisplayMode: safeShell
     ? undefined
-    : () => {
-        if (!ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
-        const mode = ribbonDisplayMode() === 'compact' ? 'expanded' : 'compact';
-        if (settings.value.host.ribbonExpandOnHover) {
-          const value = prepareSettings({
-            ...settings.value,
-            host: { ...settings.value.host, ribbonExpandOnHover: false },
-          });
-          ribbonState.setDisplayMode(mode, () =>
-            commitSettings(value, settings.revision, undefined, [], 'page', mode),
-          );
-        } else ribbonState.setDisplayMode(mode);
-      },
+    : () => setRibbonDisplayMode(ribbonDisplayMode() === 'compact' ? 'expanded' : 'compact'),
   badge: (id) => {
     if (id !== 'notifications') return ribbonBadges.get(id);
     const count = notificationService?.activeCount ?? 0;
     return count ? { kind: 'count', count, label: hostText('notifications.activeBadge') } : null;
   },
 });
+function setRibbonDisplayMode(mode: import('../shared/ribbon').RibbonDisplayMode) {
+  if (safeShell || !ribbonState) throw Error(hostText('services.index.ribbonNotReady'));
+  if (settings.value.host.ribbonExpandOnHover) {
+    const value = prepareSettings({
+      ...settings.value,
+      host: { ...settings.value.host, ribbonExpandOnHover: false },
+    });
+    ribbonState.setDisplayMode(mode, () =>
+      commitSettings(value, settings.revision, undefined, [], 'page', mode),
+    );
+  } else ribbonState.setDisplayMode(mode);
+}
 async function toggleTheme() {
   commitSettings(
     prepareSettings({
@@ -1786,14 +1816,20 @@ function trayMenu() {
                 item.title! + (item.disabledReason ? '（' + item.disabledReason + '）' : '')
               ).replace(/&/g, '&&'),
               enabled: item.enabled,
-              ...(item.command === gesturePauseCommand
-                ? { type: 'checkbox' as const, checked: gestures?.paused ?? false }
-                : {}),
+              ...(item.command && inputPauseCommand(item.command)?.action === 'toggle'
+                ? {
+                    type: 'checkbox' as const,
+                    checked: commandSession.inputSelected(inputPauseCommand(item.command)!.kind),
+                  }
+                : item.command === 'appdock.notifications.togglePause'
+                  ? { type: 'checkbox' as const, checked: commandSession.notificationsPaused }
+                  : {}),
               click: () => runTrayCommand(item.command!),
             },
     );
   const menu = Menu.buildFromTemplate([
     ...template(entries),
+    ...temporaryResumeMenu(),
     ...(entries.length ? [{ type: 'separator' as const }] : []),
     {
       label: hostText('services.index.traySettings'),
@@ -1803,6 +1839,23 @@ function trayMenu() {
   ]);
   menu.on('menu-will-show', () => trayClicks?.cancel());
   tray.setContextMenu(menu);
+}
+function temporaryResumeMenu(): Electron.MenuItemConstructorOptions[] {
+  const submenu: Electron.MenuItemConstructorOptions[] = inputPauseKinds
+    .filter((kind) => commandSession.inputSelected(kind))
+    .map((kind) => {
+      const id = `${inputPausePrefixes[kind]}.resume`;
+      return {
+        label: hostActionCommands.find((command) => command.id === id)!.title,
+        click: () => runTrayCommand(id),
+      };
+    });
+  if (commandSession.notificationsPaused)
+    submenu.push({
+      label: hostText('commands.actions.notificationsResume.title'),
+      click: () => runTrayCommand('appdock.notifications.resume'),
+    });
+  return submenu.length ? [{ label: hostText('commands.session.resumeMenu'), submenu }] : [];
 }
 function quitHost(restart = false) {
   if (quitting) return;
@@ -2000,6 +2053,30 @@ function openCommandPalette(
 async function executeCommand(id: string, invocation?: InputInvocation) {
   if (quitting) return;
   if (id === 'appdock.noop') return { accepted: true };
+  const pause = inputPauseCommand(id);
+  if (pause) {
+    commandSession.setInput(pause.kind, pause.action);
+    await syncInputPause();
+    return { accepted: true, paused: commandSession.inputPaused(pause.kind) };
+  }
+  const toggle = hostToggleCommand(id);
+  if (toggle) {
+    assertSettingsWritable();
+    const revision = settings.revision;
+    settings.assertRevision(revision);
+    const before = settings.value;
+    const next = prepareSettings(applyHostToggle(before, toggle.field, toggle.action));
+    await launch.save(
+      next.host,
+      before.host,
+      () => settings.assertRevision(revision),
+      () => commitSettings(next, revision),
+    );
+    if (toggle.field.section === 'touchpadGestures') await touchpad?.afterLocalEdit(before);
+    return { accepted: true, settingsSaved: true };
+  }
+  if (hostActionCommands.some((command) => command.id === id))
+    return executeHostAction(id, invocation);
   if (id === navigationCommands.back || id === navigationCommands.forward) {
     const direction = id === navigationCommands.back ? 'back' : 'forward';
     navigation.history.prune(validHistoryPlace);
@@ -2039,12 +2116,6 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
   }
   if (appletManagement.has(id)) return appletManagement.execute(id);
   if (settingsCommands.hasGenerated(id)) return settingsCommands.execute(id, {}, false);
-  if (id === gesturePauseCommand) {
-    gestures?.togglePause();
-    trayMenu();
-    changed();
-    return;
-  }
   if (id === 'appdock.restart' || id === 'appdock.quit') {
     quitHost(id === 'appdock.restart');
     return;
@@ -2065,6 +2136,86 @@ async function executeCommand(id: string, invocation?: InputInvocation) {
       ? pageCollections.open(web)
       : pageCollections.navigate(web, id.slice(split + 1));
   return manager.execute(id, invocation);
+}
+async function executeHostAction(id: string, invocation?: InputInvocation) {
+  if (id.startsWith('appdock.ribbon.')) {
+    setRibbonDisplayMode(
+      id === 'appdock.ribbon.expand'
+        ? 'expanded'
+        : id === 'appdock.ribbon.collapse'
+          ? 'compact'
+          : ribbonDisplayMode() === 'compact'
+            ? 'expanded'
+            : 'compact',
+    );
+  } else if (id.startsWith('appdock.theme.')) {
+    const theme =
+      id === 'appdock.theme.light'
+        ? 'light'
+        : id === 'appdock.theme.dark'
+          ? 'dark'
+          : id === 'appdock.theme.system'
+            ? 'system'
+            : nativeTheme.shouldUseDarkColors
+              ? 'light'
+              : 'dark';
+    commitSettings(
+      prepareSettings({ ...settings.value, host: { ...settings.value.host, theme } }),
+      settings.revision,
+    );
+  } else if (id.startsWith('appdock.zoom.')) {
+    const current = settings.value.host.zoomFactor;
+    const zoomFactor =
+      id === 'appdock.zoom.reset'
+        ? 1
+        : id === 'appdock.zoom.in'
+          ? (displayZoomChoices.find((value) => value > current + 0.000001) ??
+            displayZoomChoices.at(-1)!)
+          : ([...displayZoomChoices].reverse().find((value) => value < current - 0.000001) ??
+            displayZoomChoices[0]);
+    commitSettings(
+      prepareSettings({ ...settings.value, host: { ...settings.value.host, zoomFactor } }),
+      settings.revision,
+    );
+  } else if (id.startsWith('appdock.window.')) {
+    if (!window || window.isDestroyed()) throw Error(hostText('services.index.notReady'));
+    if (
+      id === 'appdock.window.hide' ||
+      (id === 'appdock.window.toggle' && window.isVisible() && !window.isMinimized())
+    )
+      window.hide();
+    else if (id === 'appdock.window.minimize') window.minimize();
+    else {
+      const maximized = window.isMaximized();
+      await showWindow(invocation);
+      if (
+        id === 'appdock.window.maximize' ||
+        (id === 'appdock.window.toggleMaximize' && !maximized)
+      )
+        window.maximize();
+      else if (id === 'appdock.window.restore' || id === 'appdock.window.toggleMaximize')
+        window.unmaximize();
+    }
+  } else if (id === 'appdock.audio.stopAll') {
+    soundLibrary.preview.stop();
+    notificationSpeech?.stopAll();
+    notificationSounds.stopAll();
+    await Promise.all([tts.stopAll(), audioPlayback.stopAll()]);
+  } else {
+    commandSession.setNotifications(
+      id === 'appdock.notifications.pause30Minutes'
+        ? 'on'
+        : id === 'appdock.notifications.resume'
+          ? 'off'
+          : 'toggle',
+    );
+    return {
+      accepted: true,
+      paused: commandSession.notificationsPaused,
+      until: commandSession.notificationsUntil,
+    };
+  }
+  return { accepted: true };
 }
 const commandDispatcher = new CommandDispatcher(
   executeCommand,
@@ -2130,7 +2281,7 @@ function prepareShortcut(
       press.context !== JSON.stringify({ ...currentContext, window: press.window }))
       ? { appFocused: false }
       : currentContext;
-  const rows = getKeybindings(settings.value);
+  const rows = commandSession.inputPaused('keyboard') ? [] : getKeybindings(settings.value);
   const keys = press?.shortcuts ?? [key];
   return planKeybindings(
     rows,
@@ -2156,7 +2307,10 @@ function dispatchShortcutPlan(key: string, plan: CommandBatchPlan, press?: Short
   const input = 'keyboard:' + [...new Set(press?.shortcuts ?? [key])].sort().join('|');
   const run = () =>
     commandDispatcher.dispatch(input, plan, {
-      valid: async () => getKeybindingOptions(settings.value).enabled && !keyboardRecording(),
+      valid: async () =>
+        getKeybindingOptions(settings.value).enabled &&
+        !commandSession.inputPaused('keyboard') &&
+        !keyboardRecording(),
       execute: executeCommand,
     });
   return press ? shortcutInvocation.run(press, run) : run();
@@ -2250,7 +2404,7 @@ function syncHotKeys(retry = false) {
   const revision = settings.revision;
   const generation = ++hotKeyApplyGeneration;
   // The native recorder owns its window. Keep the bindings ready for the first key in another window.
-  const suspended = shortcutRecording;
+  const suspended = shortcutRecording || commandSession.inputPaused('keyboard');
   // A recorder click can start a new session while the previous session's restore is in flight.
   const current = () =>
     !quitting &&
@@ -4374,7 +4528,7 @@ async function initialize() {
     input: gestures,
     changed,
     warnings,
-    suspended: () => quitting,
+    suspended: () => quitting || commandSession.inputPaused('touchpad'),
     open: async (gesture) => {
       await showWindow();
       await navigation.selectSettings(
@@ -4392,6 +4546,7 @@ async function initialize() {
       });
     },
     dispatch: async (gesture, press, valid) => {
+      if (commandSession.inputPaused('touchpad')) return;
       const current = shortcutContext();
       const context =
         press.window ===
@@ -4414,7 +4569,10 @@ async function initialize() {
         getCommandTriggerOptions(settings.value),
       );
       return shortcutInvocation.run(press, () =>
-        commandDispatcher.dispatch('touchpad:' + gesture, plan, { valid, execute: executeCommand }),
+        commandDispatcher.dispatch('touchpad:' + gesture, plan, {
+          valid: async () => !commandSession.inputPaused('touchpad') && (await valid()),
+          execute: executeCommand,
+        }),
       );
     },
   });
@@ -4622,9 +4780,8 @@ async function initialize() {
     changed: (paused) => {
       fileWatchAssistance.setPaused(paused);
       gestures?.setSessionPaused(paused);
-      notificationAvailability?.setPaused(paused);
-      notificationSounds.setPaused(paused);
-      notificationService?.setPaused(paused);
+      sessionLocked = paused;
+      syncNotificationPause();
     },
   });
   window.on('enter-full-screen', () => notificationAvailability?.setBlocked('fullscreen', true));
@@ -5728,6 +5885,7 @@ app.on('before-quit', (event) => {
   notificationSpeech?.dispose();
   notificationAvailability?.dispose();
   hostSession?.dispose();
+  commandSession.dispose();
   notificationSounds.dispose();
   typedNotifications?.dispose();
   notificationService?.dispose();

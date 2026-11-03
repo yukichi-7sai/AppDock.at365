@@ -79,9 +79,18 @@ test('internal publication IDs share the external catalog without granting execu
     },
   ];
   const published = f.api.publishedCommandIds();
+  const mcpListed = await f.api.call('commands.list');
+  assert.deepEqual([...published].sort(), mcpListed.commands.map((c) => c.id).sort());
   const listed = await f.call('commands.list');
   assert.equal(listed.ok, true);
-  assert.deepEqual([...published].sort(), listed.value.commands.map((c) => c.id).sort());
+  const appletIds = new Set(listed.value.commands.map((c) => c.id));
+  assert([...appletIds].every((id) => published.has(id)));
+  // Hardware acceleration keeps its MCP-only setting scope when commands are generated.
+  for (const action of ['on', 'off', 'toggle']) {
+    const id = `appdock.settings.hardwareAcceleration.${action}`;
+    assert(published.has(id));
+    assert(!appletIds.has(id));
+  }
   assert(published.has('test.public'));
   f.grant({});
   assert(f.api.publishedCommandIds().has('test.public'));

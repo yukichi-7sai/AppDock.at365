@@ -12,7 +12,11 @@ export function generatedSettingCommands(
   return definitions.flatMap((field) =>
     (field.generateCommands ?? []).map((action) => ({
       id: `${owner}.settings.${field.key}.${action}`,
-      title: `${field.title}を${{ on: 'ONにする', off: 'OFFにする', toggle: '切り替える' }[action]}`,
+      title: hostText(`commands.setting.${action}Title`, { title: field.title }),
+      description: hostText(`commands.setting.${action}Description`, {
+        title: field.title,
+        detail: field.description ?? '',
+      }).trim(),
       category: hostText('commands.category.settings'),
       available,
       automation: isSettingAccessible(field, 'mcp'),

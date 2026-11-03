@@ -91,6 +91,10 @@ export class AudioPlaybackQueue {
     }
     this.active?.controller.abort();
   }
+  async stopAll() {
+    this.discard();
+    await this.running;
+  }
   async close() {
     this.closed = true;
     this.discard();

@@ -48,6 +48,7 @@ const definitions = localizedMetadata(() => ({
     type: 'boolean',
     default: false,
     automation: true,
+    generateCommands: [...switches],
   },
   language: {
     pageId: 'appearance',
@@ -154,6 +155,7 @@ const definitions = localizedMetadata(() => ({
     type: 'boolean',
     default: true,
     automation: false,
+    generateCommands: [...switches],
   },
   textPaletteHistory: {
     pageId: 'text-palette',
@@ -162,6 +164,7 @@ const definitions = localizedMetadata(() => ({
     type: 'boolean',
     default: true,
     automation: false,
+    generateCommands: [...switches],
   },
   textPaletteRows: {
     pageId: 'text-palette',
@@ -280,6 +283,7 @@ const definitions = localizedMetadata(() => ({
     type: 'boolean',
     default: false,
     applies: 'nextStart',
+    generateCommands: [...switches],
   },
   fileWatchAssistanceEnabled: {
     pageId: 'general',

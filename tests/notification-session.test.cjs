@@ -3,6 +3,23 @@ const assert = require('node:assert/strict');
 const { HostSession } = require('../out/main/main/core/host-session');
 const { NotificationSounds } = require('../out/main/main/core/notification-sounds');
 const turn = () => new Promise((r) => setImmediate(r));
+test('stop all discards notification sounds held by pause and permits new sounds after resume', async () => {
+  const played = [];
+  const sounds = new NotificationSounds({
+    read: async (file) => Buffer.from(file),
+    play: async (bytes) => played.push(bytes.toString()),
+  });
+  sounds.setPaused(true);
+  sounds.enqueue('old', () => true, assert.fail);
+  sounds.stopAll();
+  sounds.setPaused(false);
+  await turn();
+  assert.deepEqual(played, []);
+  sounds.enqueue('new', () => true, assert.fail);
+  await turn();
+  assert.deepEqual(played, ['new']);
+  sounds.dispose();
+});
 test('sound OFF discards lock-held and newly submitted sounds before reading files', async () => {
   const events = [];
   const sounds = new NotificationSounds({
