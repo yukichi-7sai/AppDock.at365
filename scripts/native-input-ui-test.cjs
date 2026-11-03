@@ -19,6 +19,8 @@ const profile = path.join(root, '.artifacts', 'native-input-ui-' + Date.now());
 fs.mkdirSync(profile, { recursive: true });
 const settings = require('../out/main/shared/settings-schema').createDefaultSettings();
 settings.host.notifications = false;
+settings.host.checkUpdatesOnStartup = false;
+settings.updates.checkHostOnAboutOpen = false;
 const ids = ['at365.web-browser-tools'];
 settings.gestures.bindings = [
   {
@@ -61,7 +63,8 @@ for (const name of ['WebBrowserTools']) {
   fs.writeFileSync(file, JSON.stringify(m));
   settings.extensions[m.id] = {
     enabled: true,
-    settings: {},
+    // Keep this host API fixture independent of the Applet's evolving defaults.
+    settings: { 'keys.super-reload': 'Ctrl+F5' },
   };
 }
 fs.writeFileSync(require('./test-settings.cjs').file(profile, 'settings.json'), JSON.stringify(settings));
@@ -237,7 +240,10 @@ async function execute(id) {
       'next-tab': 'key:Tab, Control',
       'restore-tab': 'key:T, Shift, Control',
     };
-    for (const command of snapshot.extensions.find((e) => e.id === ids[0]).commands) {
+    // The Applet suite covers its full catalog; this host suite keeps its representative cases.
+    for (const suffix of Object.keys(expected)) {
+      const command = snapshot.extensions.find((e) => e.id === ids[0]).commands.find((c) => c.id === ids[0] + '.' + suffix);
+      assert.ok(command, 'Required input fixture command: ' + suffix);
       // Ordinary commands deliberately retain the native 150 ms re-entry guard.
       await sleep(170);
       await focus();

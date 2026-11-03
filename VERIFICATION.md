@@ -1,5 +1,17 @@
 # 検証記録
 
+## 2026-11-03 WebBrowserTools関連入力試験のコミット前照合
+
+- WebBrowserTools 0.4.0のコミット依頼に伴い、本体は `scripts/native-input-ui-test.cjs` とこの検証記録の2ファイルだけを対象とした。本体製品コード・設定仕様・依存・版・配布物の変更なしを再確認した。
+- 試験入力・完全ログ・固定配布物115ファイルのSHA256一致を確認し、実装時の本体入力回帰8群の成功を再利用。Applet側の最終発行版GUI5群/全46件実受信も成功している。本体標準全回帰・版更新・再発行は対象外。照合とstage/commitの記録は `../Applet.WebBrowserTools.at365/.artifacts/commit-validation-browser-tools-040-20261103/`。ローカルコミットのみ行い、push・Release・実利用先配置は行わない。
+
+## 2026-11-03 WebBrowserTools拡張に伴う入力回帰fixtureの調整
+
+- WebBrowserTools 0.4.0の46コマンド化に対応し、`scripts/native-input-ui-test.cjs` の本体共通入力検査を代表11コマンドへ限定した。必要な各IDの存在を検査し、強制再読み込みの送信キーはfixture内でCtrl+F5を明示する。全46コマンドの既定キー・説明・設定画面・再起動はApplet側の試験が担当する。
+- fixtureの起動時/更新画面の自動更新確認を無効化し、匿名GitHub APIへの間接通信を避けた。本体製品ソース、依存、設定仕様、製品版0.132.4と発行物は不変。cleanなmainをpull --ff-onlyで照合してから、試験とこの記録のみ変更した。
+- 発行済み0.132.4の共用固定EXEとWebBrowserTools 0.4.0で入力回帰8群が成功。右+A、対象変更、許可独立性/取消、メディア7キー、記号の配列解決、連続ジェスチャーを確認した。結果は `.artifacts/native-input-ui-1793699925831/result.json`。完全ログ・入力hash・配布照合は `../Applet.WebBrowserTools.at365/.artifacts/commands-settings-20261103/`、Applet全体の実測は同repoのVERIFICATION.mdを参照する。
+- 本体の版更新・再発行・標準全回帰は行わない。commit・push・Release・実利用先配置も行っていない。
+
 ## 2026-11-03 トリガー選び直しの実利用確認とコミット
 
 - 利用者が0.132.4のトリガー編集からの選び直しを実利用で確認。実装時の入力1,000ファイルと成功ログ12件を照合し、型検査・ビルド・関連49件、ソース/固定EXE各9群の成功を再利用した。ビルド元・発行先・共用ランタイムの管理115ファイル、更新ZIPのSHA256、feedの版/サイズも一致し、版更新・再発行は行っていない。
