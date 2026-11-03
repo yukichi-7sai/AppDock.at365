@@ -168,7 +168,7 @@ import { activeCommandTriggers, commandTriggerEnablement } from '../shared/comma
 import { settingsPageCommands } from '../shared/settings-navigation';
 import { updateCommands } from '../shared/update-commands';
 import { AppletManagement } from './core/applet-management';
-import { AppletCatalog } from './core/applet-catalog';
+import { AppletCatalog, readAppletRoster } from './core/applet-catalog';
 import {
   appletManagementCommands,
   managedApplets,
@@ -640,10 +640,12 @@ const parentApplets = () => settingsReads.once('parents', () => manager.snapshot
 const allApplets = () =>
   settingsReads.once('applets', () => [...parentApplets(), ...(pageCollections?.snapshot() ?? [])]);
 // Opening settings in an isolated GUI test must never consume the user's GitHub quota.
-const appletCatalog = new AppletCatalog(
-  app.getVersion(),
-  testDirectory || smoke ? async () => Response.error() : undefined,
-);
+const appletCatalog = new AppletCatalog(app.getVersion(), {
+  repositories: () => readAppletRoster(path.join(baseDirectory,'applets.json'), path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(),'applets.json')),
+  file: path.join(dataDirectory, 'applet-catalog-cache.json'),
+  fetcher: testDirectory || smoke ? async () => Response.error() : undefined,
+  warn: () => log.write('warn', 'applets', hostText('settings.appletCatalog.cacheError')),
+});
 const appletManagement = new AppletManagement({
   settings,
   applets: allApplets,
@@ -2769,7 +2771,8 @@ function settingsPageActions(
     actions.appletPackageStatus = async ([id]) => updater.packageStatus(id);
   }
   if (page.id === 'applets') {
-    actions.listAppletCatalog = () => appletCatalog.list();
+    actions.readAppletCatalog = async () => appletCatalog.snapshot(managedApplets(allApplets()));
+    actions.listAppletCatalog = () => appletCatalog.list(managedApplets(allApplets()));
     actions.openAppletDiscoveryLogs = async () => {
       await flushSettingsInputs();
       await navigation.navigate('logs', undefined, '');

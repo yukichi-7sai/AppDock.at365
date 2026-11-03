@@ -14,6 +14,8 @@
 
 ## 配布物と所有範囲
 
+Appletカタログの編集用ファイルはEXEの隣の `applets.json`。通常発行と手動deployでは未配置の場合だけ作成し、スターターにも同梱する。更新ZIPには外部ファイル `resources/applets.json` として初期値を収録する。ZIPの新規展開や旧版からの更新では、管理ページを初めて開いたときにEXEの隣へ初期値を複製する。配置先が読み取り専用なら初期値を参照する。編集用ファイルは本体交換の対象外で、再発行・更新・再配置後も編集を保持する。
+
 `appdock-host.json`はビルド時に作成する本体ファイル一覧で、schemaVersion、version、entriesを持つ。entriesは本体が所有するルート直下の名前だけを列挙する。EXE・Electronの固定ファイル、`resources`、`locales`、この一覧自身に限定し、Updaterの許可一覧でも検証する。設定・data・extensionsなどは受け付けない。配布フォルダーに一覧外のファイルやリンクがあれば発行・更新準備を拒否する。
 
 `update.zip`は本体フォルダーの内容だけを格納する。feedはschemaVersion=1、kind=host、id=host、payload.format=zip。SHA256と配布サイズを従来どおり照合する。圧縮ファイルは512MiB、展開済み本体は1GiB、ファイル数は10,000件を上限とする。Appletの既存512MiB上限は変えない。

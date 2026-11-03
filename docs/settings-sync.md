@@ -1,5 +1,7 @@
 # 設定同期と保存領域
 
+未導入Appletのカタログ結果は配置別のPC専用rootに `applet-catalog-cache.json` として保存する。公開版・開発版の取得時刻、表示用情報とAPI再開時刻を保持する。削除後は未導入分だけを再取得する。[カタログの表示と更新](applet-management-settings-design.md#未インストールのapplet)を参照。
+
 新規Appletと宣言型の子ページは、このPCで有効状態が未保存なら有効とし、保存済みのOFFを保持する。Appletの再起動では有効状態を変更しない。
 
 共有設定、端末別設定、素材と認証の保存場所、外部更新と復旧を扱う。入力確定とページリセットは[設定UI](settings-foundation.md)、各機能の設定項目は[操作案内](usage.md)を参照する。

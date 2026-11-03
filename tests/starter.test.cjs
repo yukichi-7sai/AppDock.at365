@@ -72,6 +72,10 @@ test(
     const hostFolder = path.join(getPublishDirectory(host), 'win-unpacked');
     fs.mkdirSync(path.join(hostFolder, 'resources'), { recursive: true });
     fs.writeFileSync(path.join(hostFolder, 'resources/app.asar'), 'fixture');
+    fs.writeFileSync(
+      path.join(hostFolder, 'resources/applets.json'),
+      '{"applets":["owner/External"]}',
+    );
     const exe = path.join(hostFolder, 'AppDock.at365.exe');
     fs.writeFileSync(exe, 'MZ-host-fixture');
     assert.equal(
@@ -143,6 +147,9 @@ test(
     ]);
     assert.equal(inspection.status, 0, inspection.stdout + inspection.stderr);
     const bundle = JSON.parse(fs.readFileSync(path.join(extracted, 'bundle.json')));
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(extracted, 'applets.json'))), {
+      applets: ['owner/External'],
+    });
     assert.deepEqual(bundle.applets.map((item) => item.id).sort(), ['fixture.applet']);
     assert.equal(fs.existsSync(path.join(extracted, 'extensions/Applet.AddedLater')), false);
     assert.equal(

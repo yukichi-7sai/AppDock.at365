@@ -572,6 +572,7 @@
   "settings.apiPermissionsSettings.api": "APIの公開",
   "settings.apiPermissionsSettings.title": "操作の許可",
   "settings.appletCatalog.title": "未インストールのApplet",
+  "settings.appletCatalog.cacheError": "未インストールApplet一覧のキャッシュファイルを読み書きできませんでした。",
   "settings.appletCatalog.release": "公開版・公開日",
   "settings.appletCatalog.development": "開発版・更新日",
   "settings.appletCatalog.developmentHint": "既定ブランチの最新コミット時点のバージョンと更新日",

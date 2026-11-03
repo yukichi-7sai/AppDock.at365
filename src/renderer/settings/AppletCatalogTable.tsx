@@ -54,13 +54,19 @@ export function AppletCatalogTable({
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const installedIds = JSON.stringify(applets.map((applet) => applet.id).sort());
   useEffect(() => {
     let active = true;
     setLoading(true);
     setFailed(false);
-    void invoke('listAppletCatalog')
-      .then((result) => {
-        if (active) setEntries(result);
+    void invoke('readAppletCatalog')
+      .then(async (cached) => {
+        if (!active) return;
+        setEntries(cached.entries);
+        if (cached.needsRefresh) {
+          const result = await invoke('listAppletCatalog');
+          if (active) setEntries(result);
+        }
       })
       .catch(() => {
         if (active) setFailed(true);
@@ -71,7 +77,7 @@ export function AppletCatalogTable({
     return () => {
       active = false;
     };
-  }, [attempt, invoke]);
+  }, [attempt, invoke, installedIds]);
   const installed = new Set(applets.map((applet) => applet.id));
   const hasUnresolved = entries.some(
     ({ release, development }) => typeof release !== 'object' && typeof development !== 'object',
@@ -86,7 +92,8 @@ export function AppletCatalogTable({
     failed ||
     hasUnresolved ||
     candidates.some(
-      ({ release, development }) =>
+      ({ release, development, refreshFailed }) =>
+        refreshFailed ||
         release === 'error' ||
         development === 'error' ||
         (typeof release === 'object' && release.unavailable === 'package'),

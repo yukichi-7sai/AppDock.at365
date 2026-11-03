@@ -68,6 +68,22 @@ test('folder host packs ZIP and deploys program files while preserving user data
   assert(!fs.existsSync(path.join(f.base, 'resources/obsolete.dll')));
   f.preserved();
 });
+test('folder deployment seeds a new editable Applet roster and preserves edits on redeploy and self-update', (t) => {
+  const f = fixture(t);
+  const seed = path.join(f.source, 'resources', 'applets.json');
+  const sidecar = path.join(f.base, 'applets.json');
+  fs.writeFileSync(seed, '{"applets":["owner/One"]}');
+  ok(['--deploy-host', f.source, f.base]);
+  assert.equal(fs.readFileSync(sidecar, 'utf8'), fs.readFileSync(seed, 'utf8'));
+  fs.writeFileSync(sidecar, '{"applets":[]}');
+  fs.writeFileSync(path.join(f.source, 'applets.json'), '{"applets":["owner/Two"]}');
+  ok(['--deploy-host', f.source, f.base]);
+  assert.equal(fs.readFileSync(sidecar, 'utf8'), '{"applets":[]}');
+  fs.unlinkSync(path.join(f.source, 'applets.json'));
+  assert(!f.plan().some((item) => item.destination === sidecar));
+  fs.writeFileSync(path.join(f.source, 'unrelated.json'), '{}');
+  assert.notEqual(run(['--deploy-host', f.source, f.base]).status, 0);
+});
 test('folder host update adds/removes managed assets in the existing transaction', (t) => {
   const f = fixture(t);
   fs.writeFileSync(path.join(f.base, 'dxil.dll'), 'old DLL');

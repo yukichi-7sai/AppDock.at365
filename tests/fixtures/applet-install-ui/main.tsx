@@ -13,7 +13,28 @@ fixture.applyFailure = '';
 let catalogReads = 0;
 const invoke = async (name: string, args: unknown[] = []) => {
   fixture.installCalls.push({ name, args });
+  if (name === 'readAppletCatalog')
+    return {
+      entries: [
+        {
+          repository: 'owner/Fixture',
+          development: 'error',
+          release: {
+            id: 'fixture.install',
+            displayName: 'Fixture',
+            version: '0.9.0',
+            date: '2025-01-01T00:00:00Z',
+            source: 'https://github.com/owner/Fixture/releases/tag/v0.9.0',
+          },
+        },
+      ],
+      needsRefresh: true,
+    };
   if (name === 'listAppletCatalog') {
+    if (!catalogReads)
+      await new Promise<void>((resolve) => {
+        fixture.finishCatalogRefresh = resolve;
+      });
     const release = {
       id: 'fixture.install',
       displayName: 'Fixture',

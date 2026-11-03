@@ -48,6 +48,13 @@ const same = (a, b) => {
     page = await app.firstWindow();
     page.setDefaultTimeout(15000);
     page.on('pageerror', (e) => errors.push(e.message));
+    const cachedVersion = page.locator(
+      '[data-catalog-repository="owner/Fixture"] td:nth-child(2) .version-current',
+    );
+    await cachedVersion.filter({ hasText: '0.9.0' }).waitFor();
+    await page.evaluate(() => window.finishCatalogRefresh());
+    await cachedVersion.filter({ hasText: '1.0.0' }).waitFor();
+    checks.push('stale-catalog-visible-while-background-refresh-is-pending');
     const open = () =>
       page.getByRole('button', { name: 'Appletをインストール', exact: true }).click();
     const dialog = page.getByRole('dialog');

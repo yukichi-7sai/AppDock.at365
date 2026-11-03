@@ -71,6 +71,7 @@ $taskStage = Join-Path $taskRoot ('.artifacts\starter-' + [guid]::NewGuid().ToSt
 $taskPackage = Join-Path $taskStage 'package'
 & $taskHelper --extract-host $taskHostArchive $taskPackage
 if ($LASTEXITCODE -ne 0) { throw 'Host folder extraction failed.' }
+Copy-Item -LiteralPath (Join-Path $taskPackage 'resources\applets.json') -Destination (Join-Path $taskPackage 'applets.json')
 New-Item -ItemType Directory -Path (Join-Path $taskPackage 'extensions') -Force | Out-Null
 $taskInventory = @()
 foreach ($taskApplet in $taskApplets) {
